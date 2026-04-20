@@ -73,10 +73,11 @@ class MemoryFileRegistry {
 	 *                                        A capability string (e.g. 'manage_options') = editable only
 	 *                                        by users with that WordPress capability. Default true.
 	 *                                        Forced to false when composable is true.
-	 *     @type string[]    $contexts        Execution contexts where this file should be injected.
-	 *                                        Array of context slugs (e.g. 'chat', 'editor', 'pipeline',
+	 *     @type string[]    $modes           Execution modes where this file should be injected.
+	 *                                        Array of mode slugs (e.g. 'chat', 'editor', 'pipeline',
 	 *                                        'system') or array( 'all' ) to inject everywhere.
 	 *                                        Default array( 'all' ).
+	 *     @type string[]    $contexts        Deprecated. Alias for $modes — use $modes instead.
 	 *     @type bool        $composable      Whether this file is auto-generated from registered sections
 	 *                                        via SectionRegistry. Composable files are regenerated on
 	 *                                        demand and are not hand-editable. Default false.
@@ -107,12 +108,13 @@ class MemoryFileRegistry {
 			$editable = true;
 		}
 
-		// Normalize contexts: array of slugs, or ['all'] (default).
-		$contexts = $args['contexts'] ?? array( self::CONTEXT_ALL );
-		if ( ! is_array( $contexts ) || empty( $contexts ) ) {
-			$contexts = array( self::CONTEXT_ALL );
+		// Normalize modes: array of slugs, or ['all'] (default).
+		// Back-compat: accept 'contexts' key as alias for 'modes'.
+		$modes = $args['modes'] ?? $args['contexts'] ?? array( self::CONTEXT_ALL );
+		if ( ! is_array( $modes ) || empty( $modes ) ) {
+			$modes = array( self::CONTEXT_ALL );
 		}
-		$contexts = array_values( array_unique( array_map( 'sanitize_key', $contexts ) ) );
+		$modes = array_values( array_unique( array_map( 'sanitize_key', $modes ) ) );
 
 		// Convention path: relative path from ABSPATH for an additional copy.
 		$convention_path = isset( $args['convention_path'] ) ? ltrim( $args['convention_path'], '/' ) : '';
@@ -125,7 +127,7 @@ class MemoryFileRegistry {
 			'editable'        => $editable,
 			'composable'      => $composable,
 			'convention_path' => $convention_path,
-			'contexts'        => $contexts,
+			'modes'           => $modes,
 			'label'           => $args['label'] ?? self::filename_to_label( $filename ),
 			'description'     => $args['description'] ?? '',
 		);
@@ -352,14 +354,15 @@ class MemoryFileRegistry {
 	}
 
 	/**
-	 * Get all files applicable to a specific execution context.
+	 * Get all files applicable to a specific execution mode.
 	 *
-	 * Returns files that either list the context in their `contexts` array
+	 * Returns files that either list the mode in their `modes` array
 	 * or are registered with `['all']` (the default).
 	 *
 	 * @since 0.60.0
+	 * @since 0.68.0 Internal key renamed from contexts to modes.
 	 *
-	 * @param string $context Execution context slug (e.g. 'chat', 'pipeline', 'system', 'editor').
+	 * @param string $context Execution mode slug (e.g. 'chat', 'pipeline', 'system', 'editor').
 	 * @return array<string, array> Filtered and sorted file metadata.
 	 */
 	public static function get_for_context( string $context ): array {
@@ -372,21 +375,22 @@ class MemoryFileRegistry {
 		return array_filter(
 			self::get_resolved(),
 			function ( $meta ) use ( $context ) {
-				$contexts = $meta['contexts'] ?? array( self::CONTEXT_ALL );
-				return in_array( self::CONTEXT_ALL, $contexts, true )
-					|| in_array( $context, $contexts, true );
+				$modes = $meta['modes'] ?? array( self::CONTEXT_ALL );
+				return in_array( self::CONTEXT_ALL, $modes, true )
+					|| in_array( $context, $modes, true );
 			}
 		);
 	}
 
 	/**
-	 * Check if a file applies to a specific execution context.
+	 * Check if a file applies to a specific execution mode.
 	 *
 	 * @since 0.60.0
+	 * @since 0.68.0 Internal key renamed from contexts to modes.
 	 *
 	 * @param string $filename Filename to check.
-	 * @param string $context  Execution context slug.
-	 * @return bool True if the file should be injected in this context.
+	 * @param string $context  Execution mode slug.
+	 * @return bool True if the file should be injected in this mode.
 	 */
 	public static function applies_to_context( string $filename, string $context ): bool {
 		$resolved = self::get_resolved();
@@ -397,23 +401,37 @@ class MemoryFileRegistry {
 			return true; // Unregistered files are included everywhere.
 		}
 
-		$contexts = $resolved[ $filename ]['contexts'] ?? array( self::CONTEXT_ALL );
-		return in_array( self::CONTEXT_ALL, $contexts, true )
-			|| in_array( $context, $contexts, true );
+		$modes = $resolved[ $filename ]['modes'] ?? array( self::CONTEXT_ALL );
+		return in_array( self::CONTEXT_ALL, $modes, true )
+			|| in_array( $context, $modes, true );
+	}
+
+	/**
+	 * Get the modes array for a registered file.
+	 *
+	 * @since 0.60.0
+	 * @since 0.68.0 Renamed from get_contexts() — old name still works via this method.
+	 *
+	 * @param string $filename Filename to look up.
+	 * @return string[]|null Modes array, or null if not registered.
+	 */
+	public static function get_modes( string $filename ): ?array {
+		$resolved = self::get_resolved();
+		$filename = sanitize_file_name( $filename );
+		return isset( $resolved[ $filename ] ) ? ( $resolved[ $filename ]['modes'] ?? array( self::CONTEXT_ALL ) ) : null;
 	}
 
 	/**
 	 * Get the contexts array for a registered file.
 	 *
 	 * @since 0.60.0
+	 * @deprecated 0.68.0 Use get_modes() instead.
 	 *
 	 * @param string $filename Filename to look up.
-	 * @return string[]|null Contexts array, or null if not registered.
+	 * @return string[]|null Modes array, or null if not registered.
 	 */
 	public static function get_contexts( string $filename ): ?array {
-		$resolved = self::get_resolved();
-		$filename = sanitize_file_name( $filename );
-		return isset( $resolved[ $filename ] ) ? ( $resolved[ $filename ]['contexts'] ?? array( self::CONTEXT_ALL ) ) : null;
+		return self::get_modes( $filename );
 	}
 
 	/**

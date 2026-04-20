@@ -341,18 +341,7 @@ class AgentBundler {
 			}
 		}
 
-		// Also collect any custom .md files in the agent directory (contexts, etc.).
-		$context_dir = $agent_dir . '/contexts';
-		if ( is_dir( $context_dir ) ) {
-			$iterator = new \DirectoryIterator( $context_dir );
-			foreach ( $iterator as $file ) {
-				if ( $file->isDot() || ! $file->isFile() ) {
-					continue;
-				}
-				$relative_path           = 'contexts/' . $file->getFilename();
-				$files[ $relative_path ] = file_get_contents( $file->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-			}
-		}
+
 
 		return $files;
 	}

@@ -62,9 +62,9 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 
 		$outputs = array();
 
-		// Load registered files applicable to the current execution context,
+		// Load registered files applicable to the current execution mode,
 		// filtered through the per-agent MemoryPolicy.
-		$context       = $payload['context'] ?? '';
+		$context       = $payload['agent_mode'] ?? $payload['context'] ?? '';
 		$resolver      = new MemoryPolicyResolver();
 		$context_files = $resolver->resolveRegistered( array(
 			'context'  => $context,
@@ -89,28 +89,6 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 				'type'    => 'system_text',
 				'content' => $content,
 			);
-		}
-
-		// Load context-specific memory file (contexts/{context}.md). The
-		// context slug comes from the payload, which the PromptBuilder
-		// passes through from the execution context ('chat', 'pipeline',
-		// 'system', etc.). Filename is a relative path inside the agent
-		// layer so the AgentMemory facade handles it like any other
-		// agent-scoped file.
-		if ( ! empty( $context ) ) {
-			$context_filename = 'contexts/' . sanitize_file_name( $context ) . '.md';
-			$context_memory   = new AgentMemory( $user_id, $agent_id, $context_filename, MemoryFileRegistry::LAYER_AGENT );
-			$context_read     = $context_memory->read();
-
-			if ( $context_read->exists ) {
-				$content = self::normalize_for_injection( $context_read->content, $context_read->bytes, $context_filename );
-				if ( null !== $content ) {
-					$outputs[] = array(
-						'type'    => 'system_text',
-						'content' => $content,
-					);
-				}
-			}
 		}
 
 		return $outputs;

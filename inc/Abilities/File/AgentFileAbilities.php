@@ -315,7 +315,7 @@ class AgentFileAbilities {
 				'layer'       => $layer,
 				'protected'   => MemoryFileRegistry::is_protected( $filename ),
 				'editable'    => MemoryFileRegistry::is_editable( $filename ),
-				'contexts'    => $registry_meta['contexts'] ?? array( MemoryFileRegistry::CONTEXT_ALL ),
+				'modes'       => $registry_meta['modes'] ?? array( MemoryFileRegistry::CONTEXT_ALL ),
 				'registered'  => true,
 				'label'       => $registry_meta['label'] ?? self::filename_to_label( $filename ),
 				'description' => $registry_meta['description'] ?? '',
@@ -347,7 +347,7 @@ class AgentFileAbilities {
 					'layer'       => $registry_meta ? $registry_meta['layer'] : $layer,
 					'protected'   => MemoryFileRegistry::is_protected( $entry->filename ),
 					'editable'    => MemoryFileRegistry::is_editable( $entry->filename ),
-					'contexts'    => $registry_meta['contexts'] ?? array( MemoryFileRegistry::CONTEXT_ALL ),
+					'modes'       => $registry_meta['modes'] ?? array( MemoryFileRegistry::CONTEXT_ALL ),
 					'registered'  => null !== $registry_meta,
 					'label'       => $registry_meta['label'] ?? self::filename_to_label( $entry->filename ),
 					'description' => $registry_meta['description'] ?? '',
@@ -356,35 +356,7 @@ class AgentFileAbilities {
 			}
 		}
 
-		// Include context memory files (contexts/*.md inside the agent layer).
-		// Goes through the store seam so this works on any backend.
-		$context_entries = AgentMemory::list_subtree(
-			MemoryFileRegistry::LAYER_AGENT,
-			$user_id,
-			(int) ( $input['agent_id'] ?? 0 ),
-			'contexts'
-		);
 
-		foreach ( $context_entries as $entry ) {
-			$basename = basename( $entry->filename );
-			if ( '.md' !== substr( $basename, -3 ) ) {
-				continue;
-			}
-			$slug    = substr( $basename, 0, -3 );
-			$files[] = array(
-				'filename'     => $basename,
-				'size'         => $entry->bytes,
-				'modified'     => null !== $entry->updated_at ? gmdate( 'c', $entry->updated_at ) : '',
-				'type'         => 'context',
-				'layer'        => 'context',
-				'protected'    => false,
-				'editable'     => true,
-				'registered'   => false,
-				'label'        => ucfirst( $slug ) . ' Context',
-				'description'  => "Context-scoped instructions loaded when execution context is '{$slug}'.",
-				'context_slug' => $slug,
-			);
-		}
 
 		// Include daily memory summary.
 		$daily        = new DailyMemory( $user_id, (int) ( $input['agent_id'] ?? 0 ) );

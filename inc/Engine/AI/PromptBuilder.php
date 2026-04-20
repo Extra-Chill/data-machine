@@ -101,8 +101,11 @@ class PromptBuilder {
 			}
 		);
 
-		// Ensure directives can access the current execution context
-		// for context-scoped memory file loading (contexts/{context}.md).
+		// Ensure directives can access the current execution mode.
+		// Back-compat: set both 'agent_mode' (canonical) and 'context' (deprecated).
+		if ( ! isset( $payload['agent_mode'] ) ) {
+			$payload['agent_mode'] = $context;
+		}
 		if ( ! isset( $payload['context'] ) ) {
 			$payload['context'] = $context;
 		}

@@ -394,20 +394,7 @@ class DirectoryManager {
 		return $default_id;
 	}
 
-	/**
-	 * Get contexts directory path for an agent.
-	 *
-	 * Returns the contexts/ subdirectory inside the agent's identity directory.
-	 * Each file in this directory is named after a context (e.g. chat.md,
-	 * pipeline.md, editor.md) and is injected only when that context is active.
-	 *
-	 * @since 0.58.0
-	 * @param array $context See resolve_agent_slug() for keys.
-	 * @return string Full path to agent contexts directory.
-	 */
-	public function get_contexts_directory( array $context ): string {
-		return $this->resolve_agent_directory( $context ) . '/contexts';
-	}
+
 
 	/**
 	 * Ensure directory exists

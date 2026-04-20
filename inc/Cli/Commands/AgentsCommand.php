@@ -1202,6 +1202,90 @@ class AgentsCommand extends BaseCommand {
 	}
 
 	/**
+	 * Remove legacy contexts/ directories from agent memory.
+	 *
+	 * Scans all agent directories and deletes contexts/ subdirectories
+	 * and their contents. These files are superseded by the runtime
+	 * AgentModeDirective which provides mode guidance without per-agent
+	 * disk files.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--dry-run]
+	 * : Show what would be deleted without actually deleting.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Preview what would be cleaned up
+	 *     wp datamachine agents cleanup-legacy-context-files --dry-run
+	 *
+	 *     # Actually remove legacy context files
+	 *     wp datamachine agents cleanup-legacy-context-files
+	 *
+	 * @subcommand cleanup-legacy-context-files
+	 */
+	public function cleanup_legacy_context_files( array $args, array $assoc_args ): void {
+		$dry_run = isset( $assoc_args['dry-run'] );
+		$dm      = new DirectoryManager();
+		$base    = $dm->get_base_directory();
+
+		$agents_dir = $base . '/agents';
+		if ( ! is_dir( $agents_dir ) ) {
+			WP_CLI::success( 'No agents directory found — nothing to clean.' );
+			return;
+		}
+
+		$deleted_files = 0;
+		$deleted_dirs  = 0;
+		$iterator      = new \DirectoryIterator( $agents_dir );
+
+		foreach ( $iterator as $agent_entry ) {
+			if ( $agent_entry->isDot() || ! $agent_entry->isDir() ) {
+				continue;
+			}
+
+			$contexts_dir = $agent_entry->getPathname() . '/contexts';
+			if ( ! is_dir( $contexts_dir ) ) {
+				continue;
+			}
+
+			// Delete all files in contexts/.
+			$files = new \DirectoryIterator( $contexts_dir );
+			foreach ( $files as $file ) {
+				if ( $file->isDot() || ! $file->isFile() ) {
+					continue;
+				}
+
+				$path = $file->getPathname();
+				if ( $dry_run ) {
+					WP_CLI::log( sprintf( '[dry-run] Would delete: %s', $path ) );
+				} else {
+					unlink( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+					WP_CLI::log( sprintf( 'Deleted: %s', $path ) );
+				}
+				++$deleted_files;
+			}
+
+			// Remove the empty contexts/ directory.
+			if ( $dry_run ) {
+				WP_CLI::log( sprintf( '[dry-run] Would remove directory: %s', $contexts_dir ) );
+			} else {
+				rmdir( $contexts_dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+				WP_CLI::log( sprintf( 'Removed directory: %s', $contexts_dir ) );
+			}
+			++$deleted_dirs;
+		}
+
+		if ( 0 === $deleted_files && 0 === $deleted_dirs ) {
+			WP_CLI::success( 'No legacy context files found — already clean.' );
+			return;
+		}
+
+		$prefix = $dry_run ? '[dry-run] Would delete' : 'Cleaned up';
+		WP_CLI::success( sprintf( '%s %d file(s) and %d directory(ies).', $prefix, $deleted_files, $deleted_dirs ) );
+	}
+
+	/**
 	 * Resolve a user identifier to a WordPress user ID.
 	 *
 	 * @param string|int $value User ID, login, or email.
