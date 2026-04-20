@@ -160,6 +160,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Analytics/GoogleSearchConsoleAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Analytics/PageSpeedAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentPingAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/AgentRemoteCallAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/TaxonomyAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentMemoryAbilities.php';
@@ -228,6 +229,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Analytics\GoogleSearchConsoleAbilities();
 	new \DataMachine\Abilities\Analytics\PageSpeedAbilities();
 	new \DataMachine\Abilities\AgentPingAbilities();
+	new \DataMachine\Abilities\AgentRemoteCallAbilities();
 	new \DataMachine\Abilities\TaxonomyAbilities();
 	new \DataMachine\Abilities\AgentAbilities();
 	new \DataMachine\Abilities\AgentTokenAbilities();
