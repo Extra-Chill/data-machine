@@ -29,6 +29,9 @@
 
 namespace DataMachine\Core\Auth;
 
+use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Database\Agents\Agents;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -130,11 +133,28 @@ class RemoteAgentClient {
 			'Accept'        => 'application/json',
 		);
 
+		// Attach A2A caller identity + chain correlation headers so the
+		// receiving site can tell this is an agent call, know which agent
+		// on which site is calling, enforce its own chain_depth budget,
+		// and correlate logs across sites via chain_id. Propagates the
+		// incoming chain if we're extending one, or starts a fresh chain
+		// if we're top-of-chain.
+		$caller_ctx = self::build_outbound_caller_context();
+		$headers    = array_merge( $headers, $caller_ctx->toOutboundHeaders() );
+
 		if ( ! empty( $args['headers'] ) && is_array( $args['headers'] ) ) {
-			// Caller-provided headers win except for Authorization, which
-			// we always control to guarantee the stored token is used.
+			// Caller-provided headers win except for Authorization and
+			// our A2A headers, which we always control so downstream
+			// code can trust chain_depth + chain_id semantics.
 			$caller_headers = $args['headers'];
-			unset( $caller_headers['Authorization'], $caller_headers['authorization'] );
+			unset(
+				$caller_headers['Authorization'],
+				$caller_headers['authorization'],
+				$caller_headers[ CallerContext::HEADER_CALLER_SITE ],
+				$caller_headers[ CallerContext::HEADER_CALLER_AGENT ],
+				$caller_headers[ CallerContext::HEADER_CHAIN_ID ],
+				$caller_headers[ CallerContext::HEADER_CHAIN_DEPTH ]
+			);
 			$headers = array_merge( $headers, $caller_headers );
 		}
 
@@ -356,5 +376,41 @@ class RemoteAgentClient {
 			'url'         => $url,
 			'error'       => $error,
 		);
+	}
+
+	/**
+	 * Build the {@see CallerContext} to emit on this outbound call.
+	 *
+	 * Resolves the calling site's host and the acting agent's slug
+	 * (from PermissionHelper if we're running in an agent context),
+	 * then propagates the incoming chain context if one exists on
+	 * PermissionHelper — otherwise starts a fresh chain.
+	 *
+	 * @return CallerContext
+	 */
+	private static function build_outbound_caller_context(): CallerContext {
+		$site = '';
+		if ( function_exists( 'network_home_url' ) ) {
+			$host = wp_parse_url( network_home_url(), PHP_URL_HOST );
+			$site = is_string( $host ) ? (string) $host : '';
+		}
+
+		$agent_slug = '';
+		if ( class_exists( PermissionHelper::class ) ) {
+			$agent_id = PermissionHelper::get_acting_agent_id();
+			if ( null !== $agent_id && class_exists( Agents::class ) ) {
+				$repo  = new Agents();
+				$agent = $repo->get_agent( (int) $agent_id );
+				if ( $agent && isset( $agent['agent_slug'] ) ) {
+					$agent_slug = (string) $agent['agent_slug'];
+				}
+			}
+		}
+
+		$inbound = class_exists( PermissionHelper::class )
+			? PermissionHelper::get_caller_context()
+			: null;
+
+		return CallerContext::forOutbound( $site, $agent_slug, $inbound );
 	}
 }

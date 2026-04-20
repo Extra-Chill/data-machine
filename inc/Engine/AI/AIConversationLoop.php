@@ -457,8 +457,9 @@ class AIConversationLoop {
 				array_merge(
 					$base_log_context,
 					array(
-						'max_turns'            => $max_turns,
-						'final_turn_count'     => $turn_count,
+						'budget'               => $turn_budget->name(),
+						'ceiling'              => $turn_budget->ceiling(),
+						'current'              => $turn_budget->current(),
 						'still_had_tool_calls' => ! empty( $last_tool_calls ),
 					)
 				)

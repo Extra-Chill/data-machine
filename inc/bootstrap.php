@@ -85,6 +85,18 @@ IterationBudgetRegistry::register( 'conversation_turns', array(
 	'setting' => 'max_turns',
 ) );
 
+// A2A chain depth — bounds how many cross-site agent hops a single
+// chain can contain before being refused. Prevents runaway recursion
+// when agents on different sites can call each other's /chat endpoints.
+// Default 3 is deliberately low; raise via the `max_chain_depth` site
+// setting if a real chain genuinely needs more hops.
+IterationBudgetRegistry::register( 'chain_depth', array(
+	'default' => 3,
+	'min'     => 1,
+	'max'     => 10,
+	'setting' => 'max_chain_depth',
+) );
+
 /*
 |--------------------------------------------------------------------------
 | Execution mode registrations
