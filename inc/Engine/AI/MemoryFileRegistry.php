@@ -82,10 +82,6 @@ class MemoryFileRegistry {
 	 *                                        demand and are not hand-editable. Default false.
 	 *     @type string      $convention_path Relative path from ABSPATH where a convention copy of this
 	 *                                        file should also be written (e.g. 'AGENTS.md'). Optional.
-	 *     @type string      $header          Optional header content prepended to composable output
-	 *                                        during regeneration (e.g. a top-level title). Only used
-	 *                                        when `composable` is true. The registrar owns this
-	 *                                        string — core does not inject editorial content.
 	 * }
 	 * @return void
 	 */
@@ -121,9 +117,6 @@ class MemoryFileRegistry {
 		// Convention path: relative path from ABSPATH for an additional copy.
 		$convention_path = isset( $args['convention_path'] ) ? ltrim( $args['convention_path'], '/' ) : '';
 
-		// Optional composable header (owned by the registrar, not core).
-		$header = isset( $args['header'] ) && is_string( $args['header'] ) ? $args['header'] : '';
-
 		self::$files[ $filename ] = array(
 			'filename'        => $filename,
 			'priority'        => $priority,
@@ -135,7 +128,6 @@ class MemoryFileRegistry {
 			'contexts'        => $contexts,
 			'label'           => $args['label'] ?? self::filename_to_label( $filename ),
 			'description'     => $args['description'] ?? '',
-			'header'          => $header,
 		);
 	}
 
