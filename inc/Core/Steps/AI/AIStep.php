@@ -247,11 +247,6 @@ class AIStep extends Step {
 			$handler_slugs     = $adj_step_config['handler_slugs'] ?? array();
 			$all_handler_slugs = array_merge( $all_handler_slugs, $handler_slugs );
 		}
-		if ( ! empty( $all_handler_slugs ) ) {
-			$payload['flow_step_config'] = array(
-				'handler_slugs' => array_unique( $all_handler_slugs ),
-			);
-		}
 
 		$engine_data = $this->engine->all();
 
@@ -272,6 +267,26 @@ class AIStep extends Step {
 			'engine_data'          => $engine_data,
 			'categories'           => $tool_categories,
 		) );
+
+		// Filter handler slugs to only those that are actual AI tools.
+		// Previous-step handler slugs (e.g. 'universal_web_scraper') are
+		// pipeline-level fetch handlers, not AI-callable tools. Including
+		// them in configured_handlers causes the conversation loop to wait
+		// forever for a handler that can never fire, resulting in the AI
+		// calling the same handler tool on every turn until max_turns.
+		// See: https://github.com/Extra-Chill/data-machine/issues/1108
+		if ( ! empty( $all_handler_slugs ) ) {
+			$ai_tool_handler_slugs = array_values( array_intersect(
+				array_unique( $all_handler_slugs ),
+				array_keys( $available_tools )
+			) );
+
+			if ( ! empty( $ai_tool_handler_slugs ) ) {
+				$payload['flow_step_config'] = array(
+					'handler_slugs' => $ai_tool_handler_slugs,
+				);
+			}
+		}
 
 		// Model/provider resolved exclusively via context system — pipeline config is ignored.
 		$context_model = PluginSettings::resolveModelForAgentContext( $agent_id, 'pipeline' );
