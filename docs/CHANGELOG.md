@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.70.2] - 2026-04-20
+
+### Changed
+- remove dead legacy fan-out skip path from UpsertStep
+- replace DailyMemorySelectorDirective with opt-in AgentDailyMemoryDirective (closes #1103)
+
+### Fixed
+- Fix AI conversation never completing due to non-AI handler slugs in completion gate
+
 ## [0.70.1] - 2026-04-19
 
 ### Changed
