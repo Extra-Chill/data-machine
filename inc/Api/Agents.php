@@ -385,17 +385,27 @@ class Agents {
 	 */
 	public static function handle_list( WP_REST_Request $request ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
 		$agents_repo  = new AgentsRepository();
+		$access_repo  = new AgentAccess();
 		$user_id      = get_current_user_id();
 		$current_site = get_current_blog_id();
+		$is_admin     = PermissionHelper::can( 'manage_agents' );
 
-		if ( PermissionHelper::can( 'manage_agents' ) ) {
+		if ( $is_admin ) {
 			// Admins see agents scoped to the current site + network-wide agents.
 			$all_agents = $agents_repo->get_all( array( 'site_id' => $current_site ) );
 		} else {
-			$access_repo    = new AgentAccess();
-			$accessible_ids = $access_repo->get_agent_ids_for_user( $user_id );
+			// Non-admin: union of OWNED agents and ACCESS-GRANTED agents.
+			//
+			// The owner relationship lives on `datamachine_agents.owner_id` —
+			// not in `agent_access` — so a missing access grant (race, migration
+			// gap, manual DB edit) used to cause owners to vanish from their own
+			// list. Merging here is the source-of-truth fix for that bug.
+			$owned_agents   = $agents_repo->get_all_by_owner_id( $user_id );
+			$owned_ids      = array_map( static fn( $a ) => (int) $a['agent_id'], $owned_agents );
+			$accessible_ids = array_map( 'intval', $access_repo->get_agent_ids_for_user( $user_id ) );
+			$all_ids        = array_values( array_unique( array_merge( $owned_ids, $accessible_ids ) ) );
 
-			if ( empty( $accessible_ids ) ) {
+			if ( empty( $all_ids ) ) {
 				return rest_ensure_response(
 					array(
 						'success' => true,
@@ -404,14 +414,12 @@ class Agents {
 				);
 			}
 
-			// Filter accessible agents by site scope (current site + network-wide).
-			$all_agents = array();
-			foreach ( $accessible_ids as $agent_id ) {
-				$agent = $agents_repo->get_agent( $agent_id );
-				if ( ! $agent ) {
-					continue;
-				}
+			// Single batched query replaces the previous N+1 get_agent() loop.
+			$candidate_agents = $agents_repo->get_agents_by_ids( $all_ids );
 
+			// Apply site scoping (current site + network-wide).
+			$all_agents = array();
+			foreach ( $candidate_agents as $agent ) {
 				$scope = $agent['site_scope'] ?? null;
 				if ( null === $scope || (int) $scope === $current_site ) {
 					$all_agents[] = $agent;
@@ -421,7 +429,24 @@ class Agents {
 
 		$data = array();
 		foreach ( $all_agents as $agent ) {
-			$data[] = self::shape_list_item( $agent );
+			// Resolve the requesting user's role on this agent so the frontend
+			// can make UI decisions (show edit button, hide config tab, etc.).
+			// Owners are normalized to 'admin' even when no explicit access row
+			// exists, so the frontend has a single role enum to switch on.
+			$user_role = null;
+
+			if ( $is_admin ) {
+				$user_role = 'admin';
+			} elseif ( (int) $agent['owner_id'] === $user_id ) {
+				$user_role = 'admin';
+			} else {
+				$grant = $access_repo->get_access( (int) $agent['agent_id'], $user_id );
+				if ( $grant && isset( $grant['role'] ) ) {
+					$user_role = (string) $grant['role'];
+				}
+			}
+
+			$data[] = self::shape_list_item( $agent, $user_role );
 		}
 
 		return rest_ensure_response(
@@ -803,12 +828,17 @@ class Agents {
 	 *
 	 * @since 0.41.0
 	 * @since 0.57.0 Added site_scope to output.
+	 * @since 0.69.2 Added user_role for frontend role-based UI decisions.
 	 *
-	 * @param array $agent Agent database row.
+	 * @param array       $agent     Agent database row.
+	 * @param string|null $user_role The requesting user's role on this agent
+	 *                               (admin/operator/viewer). Owners and admin
+	 *                               capability holders are normalized to 'admin'.
+	 *                               Null when not resolved.
 	 * @return array Shaped output.
 	 */
-	private static function shape_list_item( array $agent ): array {
-		return array(
+	private static function shape_list_item( array $agent, ?string $user_role = null ): array {
+		$item = array(
 			'agent_id'   => (int) $agent['agent_id'],
 			'agent_slug' => (string) $agent['agent_slug'],
 			'agent_name' => (string) $agent['agent_name'],
@@ -818,6 +848,12 @@ class Agents {
 			'created_at' => $agent['created_at'] ?? '',
 			'updated_at' => $agent['updated_at'] ?? '',
 		);
+
+		if ( null !== $user_role ) {
+			$item['user_role'] = $user_role;
+		}
+
+		return $item;
 	}
 
 	/**
