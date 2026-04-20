@@ -134,12 +134,21 @@ SystemTask::setPromptOverride('daily_memory_generation', 'memory_cleanup', 'Your
 
 ### Scheduling
 
-The `SystemAgentServiceProvider` manages the recurring Action Scheduler action:
+Scheduling is registered separately from the task handler via the
+`datamachine_recurring_schedules` filter in `SystemAgentServiceProvider`.
+All AS plumbing runs through the shared `RecurringScheduler` primitive
+(see [recurring-scheduler.md](recurring-scheduler.md)).
 
-- **Hook:** `datamachine_system_agent_daily_memory`
-- **Schedule:** Daily at midnight UTC (via `as_schedule_recurring_action`)
-- **Setting:** `daily_memory_enabled` (default: false) — when disabled, the schedule is unregistered
-- **Manual run:** Supported (`supports_run: true` in task meta) — can be triggered via CLI
+- **Hook:** `datamachine_recurring_daily_memory_generation`
+- **Schedule:** Daily; first run at tomorrow midnight UTC
+- **Setting:** `daily_memory_enabled` (default: false) — when disabled, the
+  schedule is unregistered during reconciliation on `action_scheduler_init`
+- **Manual run:** Supported (`supports_run: true` in task meta) — can be
+  triggered via CLI / REST / UI
+
+The legacy hook `datamachine_system_agent_daily_memory` is still wired for
+one release so in-flight AS actions enqueued before the refactor continue
+to dispatch correctly.
 
 ### Task Metadata
 
@@ -149,10 +158,27 @@ The `SystemAgentServiceProvider` manages the recurring Action Scheduler action:
     'description'     => 'AI-generated daily summary of activity and automatic MEMORY.md cleanup',
     'setting_key'     => 'daily_memory_enabled',
     'default_enabled' => false,
-    'trigger'         => 'Daily at midnight UTC',
-    'trigger_type'    => 'cron',
     'supports_run'    => true,
+    // trigger / trigger_type are resolved by TaskRegistry from the matching
+    // schedule in RecurringScheduleRegistry — the task is a pure handler.
 ]
+```
+
+### Schedule Registration
+
+```php
+add_filter( 'datamachine_recurring_schedules', function ( $schedules ) {
+    $schedules['daily_memory_generation'] = [
+        'task_type'          => 'daily_memory_generation',
+        'interval'           => 'daily',
+        'enabled_setting'    => 'daily_memory_enabled',
+        'default_enabled'    => false,
+        'label'              => 'Daily at midnight UTC',
+        'first_run_callback' => 'strtotime',
+        'first_run_arg'      => 'tomorrow midnight',
+    ];
+    return $schedules;
+} );
 ```
 
 ## DailyMemoryAbilities
