@@ -519,6 +519,24 @@ class Chat extends BaseRepository {
 			return array();
 		}
 
+		// Batch-load the agents referenced by these sessions so each row can
+		// expose agent_name/agent_slug without an N+1 query inside the loop.
+		$agent_ids_in_sessions = array();
+		foreach ( $sessions as $session ) {
+			$session_agent_id = isset( $session['agent_id'] ) ? (int) $session['agent_id'] : 0;
+			if ( $session_agent_id > 0 ) {
+				$agent_ids_in_sessions[] = $session_agent_id;
+			}
+		}
+
+		$agents_by_id = array();
+		if ( ! empty( $agent_ids_in_sessions ) ) {
+			$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+			foreach ( $agents_repo->get_agents_by_ids( $agent_ids_in_sessions ) as $agent_row ) {
+				$agents_by_id[ (int) $agent_row['agent_id'] ] = $agent_row;
+			}
+		}
+
 		$result = array();
 		foreach ( $sessions as $session ) {
 			$messages      = json_decode( $session['messages'] ?? '[]', true ) ?? array();
@@ -530,7 +548,9 @@ class Chat extends BaseRepository {
 				}
 			}
 
-			$last_read_at = $session['last_read_at'] ?? null;
+			$last_read_at     = $session['last_read_at'] ?? null;
+			$session_agent_id = isset( $session['agent_id'] ) ? (int) $session['agent_id'] : 0;
+			$agent_row        = $session_agent_id > 0 ? ( $agents_by_id[ $session_agent_id ] ?? null ) : null;
 
 			$result[] = array(
 				'session_id'    => $session['session_id'],
@@ -539,6 +559,9 @@ class Chat extends BaseRepository {
 				'first_message' => mb_substr( $first_message, 0, 100 ),
 				'message_count' => count( $messages ),
 				'unread_count'  => $this->count_unread( $messages, $last_read_at ),
+				'agent_id'      => $session_agent_id > 0 ? $session_agent_id : null,
+				'agent_slug'    => $agent_row ? (string) $agent_row['agent_slug'] : null,
+				'agent_name'    => $agent_row ? (string) $agent_row['agent_name'] : null,
 				'created_at'    => DateFormatter::format_for_api( $session['created_at'] ?? null ),
 				'updated_at'    => DateFormatter::format_for_api( $session['updated_at'] ?? $session['created_at'] ?? null ),
 			);

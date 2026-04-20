@@ -118,6 +118,9 @@ class Agents extends BaseRepository {
 	/**
 	 * Get agent by owner ID.
 	 *
+	 * Returns the first agent owned by the user (oldest by agent_id). For
+	 * multi-agent contexts, prefer {@see self::get_all_by_owner_id()}.
+	 *
 	 * @param int $owner_id Owner user ID.
 	 * @return array|null
 	 */
@@ -142,6 +145,101 @@ class Agents extends BaseRepository {
 		}
 
 		return $row;
+	}
+
+	/**
+	 * Get all agents owned by a user.
+	 *
+	 * Replaces the legacy `get_all() + array_filter()` pattern. Issues a single
+	 * indexed query against the `owner_id` key instead of fetching the whole
+	 * table and filtering in PHP.
+	 *
+	 * @since 0.69.2
+	 *
+	 * @param int $owner_id Owner user ID.
+	 * @return array List of agent rows owned by the user (may be empty).
+	 */
+	public function get_all_by_owner_id( int $owner_id ): array {
+		if ( $owner_id <= 0 ) {
+			return array();
+		}
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				'SELECT * FROM %i WHERE owner_id = %d ORDER BY agent_id ASC',
+				$this->table_name,
+				$owner_id
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( ! $rows ) {
+			return array();
+		}
+
+		foreach ( $rows as &$row ) {
+			if ( ! empty( $row['agent_config'] ) ) {
+				$decoded             = json_decode( $row['agent_config'], true );
+				$row['agent_config'] = is_array( $decoded ) ? $decoded : array();
+			}
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * Batch fetch agents by ID.
+	 *
+	 * Replaces the N+1 pattern of looping `get_agent()` calls. Returns rows in
+	 * the same order they were requested when present; missing IDs are silently
+	 * dropped.
+	 *
+	 * @since 0.69.2
+	 *
+	 * @param int[] $agent_ids Agent IDs to fetch.
+	 * @return array List of agent rows (may be empty if no IDs match).
+	 */
+	public function get_agents_by_ids( array $agent_ids ): array {
+		// Sanitize: dedupe, cast to int, drop non-positive values.
+		$agent_ids = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'intval', $agent_ids ),
+					static fn( $id ) => $id > 0
+				)
+			)
+		);
+
+		if ( empty( $agent_ids ) ) {
+			return array();
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $agent_ids ), '%d' ) );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT * FROM %i WHERE agent_id IN ({$placeholders}) ORDER BY agent_id ASC",
+				array_merge( array( $this->table_name ), $agent_ids )
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		if ( ! $rows ) {
+			return array();
+		}
+
+		foreach ( $rows as &$row ) {
+			if ( ! empty( $row['agent_config'] ) ) {
+				$decoded             = json_decode( $row['agent_config'], true );
+				$row['agent_config'] = is_array( $decoded ) ? $decoded : array();
+			}
+		}
+
+		return $rows;
 	}
 
 	/**
@@ -255,28 +353,44 @@ class Agents extends BaseRepository {
 	 * @param array $args {
 	 *     Optional. Query arguments.
 	 *
-	 *     @type int|null $site_id Blog ID to filter by. Agents with this site_scope
-	 *                             OR site_scope IS NULL (network-wide) are returned.
-	 *                             Default null (no filtering — all agents).
+	 *     @type int|null $site_id  Blog ID to filter by. Agents with this site_scope
+	 *                              OR site_scope IS NULL (network-wide) are returned.
+	 *                              Default null (no filtering — all agents).
+	 *     @type int|null $owner_id User ID to filter by. Returns only agents owned by
+	 *                              this user. Combines with site_id when both present.
+	 *                              Default null (no owner filtering).
 	 * }
 	 * @return array List of agent rows.
 	 */
 	public function get_all( array $args = array() ): array {
-		$site_id = $args['site_id'] ?? null;
+		$site_id  = $args['site_id'] ?? null;
+		$owner_id = $args['owner_id'] ?? null;
+
+		$where        = array();
+		$where_values = array();
 
 		if ( null !== $site_id ) {
-			$site_id = (int) $site_id;
+			$where[]        = '(site_scope = %d OR site_scope IS NULL)';
+			$where_values[] = (int) $site_id;
+		}
 
-			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		if ( null !== $owner_id ) {
+			$where[]        = 'owner_id = %d';
+			$where_values[] = (int) $owner_id;
+		}
+
+		if ( ! empty( $where ) ) {
+			$sql = 'SELECT * FROM %i WHERE ' . implode( ' AND ', $where ) . ' ORDER BY agent_id ASC';
+
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$rows = $this->wpdb->get_results(
 				$this->wpdb->prepare(
-					'SELECT * FROM %i WHERE site_scope = %d OR site_scope IS NULL ORDER BY agent_id ASC',
-					$this->table_name,
-					$site_id
+					$sql,
+					array_merge( array( $this->table_name ), $where_values )
 				),
 				ARRAY_A
 			);
-			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		} else {
 			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 			$rows = $this->wpdb->get_results(

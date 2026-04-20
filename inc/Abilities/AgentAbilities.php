@@ -500,8 +500,7 @@ class AgentAbilities {
 
 			// For limits > 1, count all agents owned by this user.
 			if ( $max_agents > 1 ) {
-				$all_agents = $agents_repo->get_all();
-				$owned      = array_filter( $all_agents, fn( $a ) => (int) $a['owner_id'] === $owner_id );
+				$owned = $agents_repo->get_all_by_owner_id( $owner_id );
 
 				if ( count( $owned ) >= $max_agents ) {
 					return array(

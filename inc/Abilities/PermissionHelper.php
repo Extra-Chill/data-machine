@@ -454,6 +454,43 @@ class PermissionHelper {
 	}
 
 	/**
+	 * Resolve all agent IDs the acting user can access.
+	 *
+	 * Multi-agent companion to {@see self::resolve_scoped_agent_id()}. Returns
+	 * the union of agents the user OWNS plus agents granted to them via the
+	 * access table. Admins (callers with the given $action capability) get an
+	 * empty array, which by convention means "no scoping — see everything."
+	 *
+	 * @since 0.69.2
+	 *
+	 * @param string $action Action key for admin check (default: 'manage_flows').
+	 * @return int[] Agent IDs the user can access. Empty array for admins
+	 *               (no scoping) OR for unauthenticated callers (no access).
+	 *               Use {@see self::can()} to disambiguate if needed.
+	 */
+	public static function resolve_all_accessible_agent_ids( string $action = 'manage_flows' ): array {
+		// Admins get no scoping — empty array signals "see everything."
+		if ( self::can( $action ) ) {
+			return array();
+		}
+
+		$user_id = self::acting_user_id();
+
+		if ( $user_id <= 0 ) {
+			return array();
+		}
+
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		$owned       = $agents_repo->get_all_by_owner_id( $user_id );
+		$owned_ids   = array_map( static fn( $a ) => (int) $a['agent_id'], $owned );
+
+		$access_repo    = new \DataMachine\Core\Database\Agents\AgentAccess();
+		$accessible_ids = $access_repo->get_agent_ids_for_user( $user_id );
+
+		return array_values( array_unique( array_merge( $owned_ids, array_map( 'intval', $accessible_ids ) ) ) );
+	}
+
+	/**
 	 * Check if the acting user can access an agent.
 	 *
 	 * Returns true if:
