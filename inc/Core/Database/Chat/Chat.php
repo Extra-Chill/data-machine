@@ -20,8 +20,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Chat Database Manager
+ *
+ * Implements {@see ConversationStoreInterface} so the conversation
+ * storage backend can be swapped via the `datamachine_conversation_store`
+ * filter. Resolve via {@see ConversationStoreFactory::get()} rather than
+ * instantiating this class directly.
  */
-class Chat extends BaseRepository {
+class Chat extends BaseRepository implements ConversationStoreInterface {
 
 	/**
 	 * Table name (without prefix)
@@ -918,11 +923,15 @@ class Chat extends BaseRepository {
 add_action(
 	'datamachine_cleanup_chat_sessions',
 	function () {
-		if ( ! Chat::table_exists() ) {
+		// Route through the factory so a swapped store (e.g. an AI Framework
+		// shim) gets its own cleanup semantics. The default MySQL store gates
+		// on table existence internally.
+		$chat_db = ConversationStoreFactory::get();
+
+		if ( $chat_db instanceof Chat && ! Chat::table_exists() ) {
 			return;
 		}
 
-		$chat_db        = new Chat();
 		$retention_days = \DataMachine\Core\PluginSettings::get( 'chat_retention_days', 90 );
 
 		$deleted_count = $chat_db->cleanup_old_sessions( $retention_days );
