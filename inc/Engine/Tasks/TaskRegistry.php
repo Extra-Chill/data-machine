@@ -18,6 +18,7 @@ namespace DataMachine\Engine\Tasks;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\Tasks\RecurringScheduleRegistry;
 
 class TaskRegistry {
 
@@ -93,13 +94,26 @@ class TaskRegistry {
 	 * Get the full task registry with metadata for admin UI and REST API.
 	 *
 	 * Iterates registered handlers, reads static getTaskMeta() from each,
-	 * and merges with current enabled state from PluginSettings.
+	 * resolves enabled state from PluginSettings, and — for any task that
+	 * has a matching entry in RecurringScheduleRegistry — fills in the
+	 * `trigger` / `trigger_type` UI fields from the schedule definition.
+	 *
+	 * Tasks are pure handlers; their invocation pattern is described by
+	 * their schedule(s), not by metadata on the task itself.
 	 *
 	 * @return array<string, array> Task type => metadata array.
 	 */
 	public static function getRegistry(): array {
 		self::load();
 		$registry = array();
+
+		// Resolve schedules once so each task can look up its own binding.
+		$schedules_by_task = array();
+		if ( class_exists( RecurringScheduleRegistry::class ) ) {
+			foreach ( RecurringScheduleRegistry::all() as $schedule ) {
+				$schedules_by_task[ $schedule['task_type'] ][] = $schedule;
+			}
+		}
 
 		foreach ( self::$handlers as $task_type => $handler_class ) {
 			$meta = array(
@@ -114,6 +128,25 @@ class TaskRegistry {
 
 			if ( method_exists( $handler_class, 'getTaskMeta' ) ) {
 				$meta = array_merge( $meta, $handler_class::getTaskMeta() );
+			}
+
+			// If a schedule is bound to this task, it describes the trigger.
+			// Multiple schedules → summarize count; single → use its label.
+			$bound = $schedules_by_task[ $task_type ] ?? array();
+			if ( ! empty( $bound ) ) {
+				$meta['trigger_type'] = 'scheduled';
+				if ( 1 === count( $bound ) ) {
+					$meta['trigger'] = $bound[0]['label'] ?: ucfirst( str_replace( '_', ' ', $bound[0]['interval'] ) );
+				} else {
+					$meta['trigger'] = sprintf( '%d schedules', count( $bound ) );
+				}
+				// Inherit setting_key from the schedule when the task itself
+				// doesn't declare one — keeps the UI toggle pointing at the
+				// right setting even for pure-handler tasks.
+				if ( empty( $meta['setting_key'] ) && ! empty( $bound[0]['enabled_setting'] ) ) {
+					$meta['setting_key']     = $bound[0]['enabled_setting'];
+					$meta['default_enabled'] = (bool) $bound[0]['default_enabled'];
+				}
 			}
 
 			// Resolve current enabled state from settings.

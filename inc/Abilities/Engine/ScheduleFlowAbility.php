@@ -112,7 +112,7 @@ class ScheduleFlowAbility {
 
 		// Detect cron expressions and route to cron scheduling.
 		if ( is_string( $interval_or_timestamp )
-			&& \DataMachine\Api\Flows\FlowScheduling::looks_like_cron_expression( $interval_or_timestamp )
+			&& \DataMachine\Engine\Tasks\RecurringScheduler::looksLikeCronExpression( $interval_or_timestamp )
 		) {
 			return $this->scheduleCron( $flow_id, $interval_or_timestamp );
 		}

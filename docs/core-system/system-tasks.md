@@ -202,14 +202,23 @@ Hooks the `datamachine_tasks` filter to register the seven built-in task types:
 | `datamachine_task_handle` | `handleScheduledTask` | Dispatches a scheduled task job |
 | `datamachine_task_process_batch` | `handleBatchChunk` | Processes a batch chunk |
 | `datamachine_system_agent_set_featured_image` | `handleDeferredFeaturedImage` | Retries featured image assignment (up to 12 × 15s = 3 minutes) |
-| `datamachine_system_agent_daily_memory` | `handleDailyMemoryGeneration` | Triggers daily memory task |
+| `datamachine_recurring_<task_type>` | closure → `TaskScheduler::schedule()` | One hook per registered recurring schedule. Fires on the cadence defined by the schedule and enqueues an ephemeral DM job for the bound task. |
 
-### Daily Memory Schedule Management
+### Recurring Task Schedule Management
 
-On every page load (fast check via `as_next_scheduled_action`):
+Schedules are registered separately from task handlers via the
+`datamachine_recurring_schedules` filter (see
+[recurring-scheduler.md](recurring-scheduler.md)). On `action_scheduler_init`
+the service provider reconciles every registered schedule with Action
+Scheduler:
 
-- If `daily_memory_enabled` is true and no schedule exists → create recurring schedule at midnight UTC
-- If `daily_memory_enabled` is false and a schedule exists → unschedule all actions
+- If the schedule's `enabled_setting` resolves to true and no AS action is
+  pending → schedule via `RecurringScheduler::ensureSchedule()`.
+- If the setting resolves to false → unschedule.
+
+On upgrade, any pending AS action queued under the pre-refactor hook
+`datamachine_system_agent_daily_memory` is unscheduled during the first
+reconciliation so no zombie recurring action remains in the queue.
 
 ## SystemTaskStep
 

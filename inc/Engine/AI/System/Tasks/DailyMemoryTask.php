@@ -309,9 +309,10 @@ class DailyMemoryTask extends SystemTask {
 			'description'     => 'Automated MEMORY.md maintenance -- archives session-specific content to daily files, compresses and cleans persistent knowledge.',
 			'setting_key'     => 'daily_memory_enabled',
 			'default_enabled' => false,
-			'trigger'         => 'Daily at midnight UTC',
-			'trigger_type'    => 'cron',
 			'supports_run'    => true,
+			// trigger / trigger_type are resolved by TaskRegistry from the
+			// matching schedule in RecurringScheduleRegistry. The task is a
+			// handler; it does not describe its own invocation pattern.
 		);
 	}
 

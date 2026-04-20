@@ -2,8 +2,14 @@
 /**
  * System Agent Service Provider.
  *
- * Registers task infrastructure: built-in task handlers, Action Scheduler
- * hooks, and scheduled task management.
+ * Registers task infrastructure: built-in task handlers, built-in recurring
+ * schedules, Action Scheduler hooks, and the generic recurring-schedule
+ * runtime that dispatches scheduled ticks into ephemeral DM jobs.
+ *
+ * Scheduling plumbing lives on RecurringScheduler (shared with FlowScheduling).
+ * Schedule definitions live in the datamachine_recurring_schedules filter.
+ * This provider only wires everything up — it no longer hardcodes per-task
+ * scheduling logic.
  *
  * @package DataMachine\Engine\AI\System
  * @since 0.22.4
@@ -16,42 +22,54 @@ defined( 'ABSPATH' ) || exit;
 use DataMachine\Engine\AI\System\Tasks\AgentPingTask;
 use DataMachine\Engine\AI\System\Tasks\AltTextTask;
 use DataMachine\Engine\AI\System\Tasks\DailyMemoryTask;
-// GitHubIssueTask moved to data-machine-code extension.
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
 use DataMachine\Engine\AI\System\Tasks\ImageOptimizationTask;
 use DataMachine\Engine\AI\System\Tasks\InternalLinkingTask;
 use DataMachine\Engine\AI\System\Tasks\MetaDescriptionTask;
+use DataMachine\Engine\Tasks\RecurringScheduleRegistry;
+use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\Tasks\TaskScheduler;
-use DataMachine\Core\PluginSettings;
 
 class SystemAgentServiceProvider {
 
 	/**
-	 * Action Scheduler hook name for daily memory generation.
+	 * Legacy Action Scheduler hook for daily memory generation.
+	 *
+	 * Used solely to unschedule stale AS actions queued under the old name
+	 * on sites upgrading from before the recurring-scheduler refactor. New
+	 * scheduling runs under `datamachine_recurring_daily_memory_generation`.
 	 */
-	const DAILY_MEMORY_HOOK = 'datamachine_system_agent_daily_memory';
+	private const LEGACY_DAILY_MEMORY_HOOK = 'datamachine_system_agent_daily_memory';
 
 	/**
 	 * Constructor - registers all task infrastructure.
 	 */
 	public function __construct() {
 		$this->registerTaskHandlers();
+		$this->registerBuiltInSchedules();
 		$this->initializeRegistry();
 		$this->registerActionSchedulerHooks();
-		add_action( 'action_scheduler_init', array( $this, 'manageDailyMemorySchedule' ) );
+		add_action( 'action_scheduler_init', array( $this, 'manageRecurringTaskSchedules' ) );
 	}
 
 	/**
-	 * Register built-in task handlers on the new filter.
-	 *
-	 * Hooks the datamachine_tasks filter to register the core task types.
+	 * Register built-in task handlers on the datamachine_tasks filter.
 	 */
 	private function registerTaskHandlers(): void {
-		add_filter(
-			'datamachine_tasks',
-			array( $this, 'getBuiltInTasks' )
-		);
+		add_filter( 'datamachine_tasks', array( $this, 'getBuiltInTasks' ) );
+	}
+
+	/**
+	 * Register built-in recurring schedules.
+	 *
+	 * Schedules are registered separately from task handlers so a task
+	 * class stays a pure handler with no knowledge of how or how often
+	 * it runs. The same task handler can be referenced by zero or many
+	 * schedules (or none — it can be invoked on demand only).
+	 */
+	private function registerBuiltInSchedules(): void {
+		add_filter( 'datamachine_recurring_schedules', array( $this, 'getBuiltInSchedules' ) );
 	}
 
 	/**
@@ -61,16 +79,38 @@ class SystemAgentServiceProvider {
 	 * @return array Task handlers including built-in ones.
 	 */
 	public function getBuiltInTasks( array $tasks ): array {
-		$tasks['agent_ping']          = AgentPingTask::class;
-		$tasks['image_generation']    = ImageGenerationTask::class;
-		$tasks['image_optimization']  = ImageOptimizationTask::class;
-		$tasks['alt_text_generation'] = AltTextTask::class;
-		// github_create_issue moved to data-machine-code extension.
+		$tasks['agent_ping']                  = AgentPingTask::class;
+		$tasks['image_generation']            = ImageGenerationTask::class;
+		$tasks['image_optimization']          = ImageOptimizationTask::class;
+		$tasks['alt_text_generation']         = AltTextTask::class;
 		$tasks['internal_linking']            = InternalLinkingTask::class;
 		$tasks['daily_memory_generation']     = DailyMemoryTask::class;
 		$tasks['meta_description_generation'] = MetaDescriptionTask::class;
 
 		return $tasks;
+	}
+
+	/**
+	 * Get built-in recurring schedules.
+	 *
+	 * @param array $schedules Existing schedule definitions.
+	 * @return array Schedules including built-in ones.
+	 */
+	public function getBuiltInSchedules( array $schedules ): array {
+		$schedules['daily_memory_generation'] = array(
+			'task_type'          => 'daily_memory_generation',
+			'interval'           => 'daily',
+			'enabled_setting'    => 'daily_memory_enabled',
+			'default_enabled'    => false,
+			'label'              => 'Daily at midnight UTC',
+			'first_run_callback' => 'strtotime',
+			'first_run_arg'      => 'tomorrow midnight',
+			'task_params_callback' => static function () {
+				return array( 'date' => gmdate( 'Y-m-d' ) );
+			},
+		);
+
+		return $schedules;
 	}
 
 	/**
@@ -87,18 +127,16 @@ class SystemAgentServiceProvider {
 
 	/**
 	 * Register Action Scheduler hooks.
+	 *
+	 * Wires three classes of AS callback:
+	 *   - datamachine_task_handle         → run ephemeral jobs
+	 *   - datamachine_task_process_batch  → process batch chunks
+	 *   - datamachine_recurring_<task>    → one hook per registered schedule,
+	 *     turns each AS tick into an ephemeral job via TaskScheduler.
 	 */
 	private function registerActionSchedulerHooks(): void {
-		add_action(
-			'datamachine_task_handle',
-			array( $this, 'handleScheduledTask' )
-		);
-
-		add_action(
-			'datamachine_task_process_batch',
-			array( $this, 'handleBatchChunk' )
-		);
-
+		add_action( 'datamachine_task_handle', array( $this, 'handleScheduledTask' ) );
+		add_action( 'datamachine_task_process_batch', array( $this, 'handleBatchChunk' ) );
 		add_action(
 			'datamachine_system_agent_set_featured_image',
 			array( $this, 'handleDeferredFeaturedImage' ),
@@ -106,49 +144,93 @@ class SystemAgentServiceProvider {
 			3
 		);
 
-		add_action(
-			self::DAILY_MEMORY_HOOK,
-			array( $this, 'handleDailyMemoryGeneration' )
-		);
-	}
+		// Generic per-schedule handler: one action hook per registered
+		// recurring schedule. Action Scheduler fires the hook; the closure
+		// enqueues an ephemeral DM job with the task's params.
+		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
+			$hook        = RecurringScheduleRegistry::hookFor( $schedule );
+			$task_type   = $schedule['task_type'];
+			$schedule_id = $schedule['schedule_id'];
 
-	/**
-	 * Manage the daily memory recurring schedule.
-	 *
-	 * Ensures the recurring Action Scheduler action exists when enabled
-	 * and is removed when disabled. Deferred to action_scheduler_init
-	 * to avoid calling AS functions before the data store is initialized.
-	 *
-	 * @since 0.32.0
-	 */
-	public function manageDailyMemorySchedule(): void {
-		$enabled        = (bool) PluginSettings::get( 'daily_memory_enabled', false );
-		$next_scheduled = as_next_scheduled_action( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
+			add_action(
+				$hook,
+				static function () use ( $schedule_id, $task_type ): void {
+					$def = RecurringScheduleRegistry::get( $schedule_id );
+					if ( null === $def ) {
+						return;
+					}
 
-		if ( $enabled && ! $next_scheduled ) {
-			// Schedule daily at midnight UTC.
-			$midnight = strtotime( 'tomorrow midnight' );
-			as_schedule_recurring_action(
-				$midnight,
-				DAY_IN_SECONDS,
-				self::DAILY_MEMORY_HOOK,
-				array(),
-				'data-machine'
+					$params = $def['task_params'] ?? array();
+					if ( ! empty( $def['task_params_callback'] ) && is_callable( $def['task_params_callback'] ) ) {
+						$params = (array) call_user_func( $def['task_params_callback'] );
+					}
+
+					TaskScheduler::schedule( $task_type, $params );
+				}
 			);
-		} elseif ( ! $enabled && $next_scheduled ) {
-			as_unschedule_all_actions( self::DAILY_MEMORY_HOOK, array(), 'data-machine' );
 		}
 	}
 
 	/**
-	 * Handle the daily memory generation Action Scheduler callback.
+	 * Reconcile all registered recurring schedules with Action Scheduler.
 	 *
-	 * @since 0.32.0
+	 * For every registered schedule:
+	 *   - If enabled → ensure the matching AS action exists via
+	 *     RecurringScheduler::ensureSchedule().
+	 *   - If disabled → unschedule.
+	 *
+	 * Also unschedules any stale AS action still queued under the
+	 * pre-refactor daily-memory hook so upgrading sites don't carry a
+	 * zombie recurring action that fires forever with no handler.
+	 *
+	 * Deferred to action_scheduler_init to avoid calling AS functions
+	 * before the data store is initialized.
+	 *
+	 * @since 0.71.0
 	 */
-	public function handleDailyMemoryGeneration(): void {
-		TaskScheduler::schedule( 'daily_memory_generation', array(
-			'date' => gmdate( 'Y-m-d' ),
-		) );
+	public function manageRecurringTaskSchedules(): void {
+		// Upgrade cleanup: strip any pending AS action queued under the
+		// legacy daily-memory hook before this refactor. One-shot migration;
+		// no-op on fresh installs.
+		RecurringScheduler::unschedule( self::LEGACY_DAILY_MEMORY_HOOK, array() );
+
+		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
+			$hook    = RecurringScheduleRegistry::hookFor( $schedule );
+			$enabled = RecurringScheduleRegistry::isEnabled( $schedule );
+
+			$options = array();
+			if ( ! empty( $schedule['cron_expression'] ) ) {
+				$options['cron_expression'] = $schedule['cron_expression'];
+			}
+			if ( ! empty( $schedule['first_run_callback'] ) && is_callable( $schedule['first_run_callback'] ) ) {
+				$first_run = call_user_func( $schedule['first_run_callback'], $schedule['first_run_arg'] ?? null );
+				if ( is_int( $first_run ) && $first_run > 0 ) {
+					$options['first_run_timestamp'] = $first_run;
+				}
+			}
+
+			$result = RecurringScheduler::ensureSchedule(
+				$hook,
+				array(),
+				$schedule['interval'],
+				$options,
+				$enabled
+			);
+
+			if ( is_wp_error( $result ) ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Recurring schedule reconciliation failed: ' . $result->get_error_message(),
+					array(
+						'schedule_id' => $schedule['schedule_id'],
+						'task_type'   => $schedule['task_type'],
+						'hook'        => $hook,
+						'interval'    => $schedule['interval'],
+					)
+				);
+			}
+		}
 	}
 
 	/**
