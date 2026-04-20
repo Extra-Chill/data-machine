@@ -383,70 +383,77 @@ class Agents {
 	 * @param WP_REST_Request $request REST request.
 	 * @return \WP_REST_Response|WP_Error
 	 */
-	public static function handle_list( WP_REST_Request $request ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
-		$agents_repo  = new AgentsRepository();
-		$access_repo  = new AgentAccess();
-		$user_id      = get_current_user_id();
-		$current_site = get_current_blog_id();
-		$is_admin     = PermissionHelper::can( 'manage_agents' );
+	public static function handle_list( WP_REST_Request $request ) {
+		// Delegate to the scope-aware listAgents ability. The ability is the
+		// single source of truth for permission escalation, owned+granted
+		// resolution, and role enrichment — the REST controller just passes
+		// query params through and shapes the response envelope.
+		//
+		// Supported query params:
+		//   scope=mine|all      (default 'mine'; 'all' requires admin)
+		//   user_id=<int>       (admin-only; defaults to caller)
+		//   status=<string>     (default 'active'; 'any' to skip)
+		//   include_role=1      (optional; on for list UI by default below)
 
-		if ( $is_admin ) {
-			// Admins see agents scoped to the current site + network-wide agents.
-			$all_agents = $agents_repo->get_all( array( 'site_id' => $current_site ) );
-		} else {
-			// Non-admin: union of OWNED agents and ACCESS-GRANTED agents.
-			//
-			// The owner relationship lives on `datamachine_agents.owner_id` —
-			// not in `agent_access` — so a missing access grant (race, migration
-			// gap, manual DB edit) used to cause owners to vanish from their own
-			// list. Merging here is the source-of-truth fix for that bug.
-			$owned_agents   = $agents_repo->get_all_by_owner_id( $user_id );
-			$owned_ids      = array_map( static fn( $a ) => (int) $a['agent_id'], $owned_agents );
-			$accessible_ids = array_map( 'intval', $access_repo->get_agent_ids_for_user( $user_id ) );
-			$all_ids        = array_values( array_unique( array_merge( $owned_ids, $accessible_ids ) ) );
+		$input = array(
+			'include_role' => true, // Admin UIs depend on this — enable by default.
+		);
 
-			if ( empty( $all_ids ) ) {
-				return rest_ensure_response(
-					array(
-						'success' => true,
-						'data'    => array(),
-					)
-				);
-			}
-
-			// Single batched query replaces the previous N+1 get_agent() loop.
-			$candidate_agents = $agents_repo->get_agents_by_ids( $all_ids );
-
-			// Apply site scoping (current site + network-wide).
-			$all_agents = array();
-			foreach ( $candidate_agents as $agent ) {
-				$scope = $agent['site_scope'] ?? null;
-				if ( null === $scope || (int) $scope === $current_site ) {
-					$all_agents[] = $agent;
-				}
-			}
+		$scope_param = $request->get_param( 'scope' );
+		if ( null !== $scope_param && '' !== $scope_param ) {
+			$input['scope'] = sanitize_key( $scope_param );
 		}
 
-		$data = array();
-		foreach ( $all_agents as $agent ) {
-			// Resolve the requesting user's role on this agent so the frontend
-			// can make UI decisions (show edit button, hide config tab, etc.).
-			// Owners are normalized to 'admin' even when no explicit access row
-			// exists, so the frontend has a single role enum to switch on.
-			$user_role = null;
+		$user_id_param = $request->get_param( 'user_id' );
+		if ( null !== $user_id_param && '' !== $user_id_param ) {
+			$input['user_id'] = (int) $user_id_param;
+		}
 
-			if ( $is_admin ) {
-				$user_role = 'admin';
-			} elseif ( (int) $agent['owner_id'] === $user_id ) {
-				$user_role = 'admin';
-			} else {
-				$grant = $access_repo->get_access( (int) $agent['agent_id'], $user_id );
-				if ( $grant && isset( $grant['role'] ) ) {
-					$user_role = (string) $grant['role'];
-				}
+		$status_param = $request->get_param( 'status' );
+		if ( null !== $status_param && '' !== $status_param ) {
+			$input['status'] = sanitize_key( $status_param );
+		}
+
+		$include_role = $request->get_param( 'include_role' );
+		if ( null !== $include_role ) {
+			$input['include_role'] = rest_sanitize_boolean( $include_role );
+		}
+
+		$result = AgentAbilities::listAgents( $input );
+
+		if ( empty( $result['success'] ) ) {
+			return new WP_Error(
+				'list_agents_failed',
+				$result['error'] ?? __( 'Failed to list agents.', 'data-machine' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		// Shape the ability output for REST consumers. The ability already
+		// returns the canonical per-agent fields; we just attach timestamps
+		// (which REST historically exposes) and drop `description`/`is_owner`
+		// only when they're empty/default to keep the payload lean.
+		$data = array();
+		foreach ( $result['agents'] as $agent ) {
+			$item = array(
+				'agent_id'   => (int) $agent['agent_id'],
+				'agent_slug' => (string) $agent['agent_slug'],
+				'agent_name' => (string) $agent['agent_name'],
+				'owner_id'   => (int) $agent['owner_id'],
+				'site_scope' => $agent['site_scope'] ?? null,
+				'status'     => (string) ( $agent['status'] ?? '' ),
+				'is_owner'   => (bool) ( $agent['is_owner'] ?? false ),
+			);
+
+			if ( ! empty( $agent['description'] ) ) {
+				$item['description'] = (string) $agent['description'];
 			}
 
-			$data[] = self::shape_list_item( $agent, $user_role );
+			if ( array_key_exists( 'user_role', $agent ) && null !== $agent['user_role'] ) {
+				$item['user_role'] = (string) $agent['user_role'];
+			}
+
+			$data[] = $item;
 		}
 
 		return rest_ensure_response(
@@ -822,39 +829,6 @@ class Agents {
 	// ---------------------------------------------------------------
 	// Helpers
 	// ---------------------------------------------------------------
-
-	/**
-	 * Shape an agent row for list output (excludes config which may contain secrets).
-	 *
-	 * @since 0.41.0
-	 * @since 0.57.0 Added site_scope to output.
-	 * @since 0.69.2 Added user_role for frontend role-based UI decisions.
-	 *
-	 * @param array       $agent     Agent database row.
-	 * @param string|null $user_role The requesting user's role on this agent
-	 *                               (admin/operator/viewer). Owners and admin
-	 *                               capability holders are normalized to 'admin'.
-	 *                               Null when not resolved.
-	 * @return array Shaped output.
-	 */
-	private static function shape_list_item( array $agent, ?string $user_role = null ): array {
-		$item = array(
-			'agent_id'   => (int) $agent['agent_id'],
-			'agent_slug' => (string) $agent['agent_slug'],
-			'agent_name' => (string) $agent['agent_name'],
-			'owner_id'   => (int) $agent['owner_id'],
-			'site_scope' => isset( $agent['site_scope'] ) ? (int) $agent['site_scope'] : null,
-			'status'     => (string) $agent['status'],
-			'created_at' => $agent['created_at'] ?? '',
-			'updated_at' => $agent['updated_at'] ?? '',
-		);
-
-		if ( null !== $user_role ) {
-			$item['user_role'] = $user_role;
-		}
-
-		return $item;
-	}
 
 	/**
 	 * Permission callback — any logged-in user can list their agents.

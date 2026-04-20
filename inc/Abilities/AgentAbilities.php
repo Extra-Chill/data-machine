@@ -13,6 +13,7 @@ namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Agents\Agents;
+use DataMachine\Core\Database\Agents\AgentAccess;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 
 defined( 'ABSPATH' ) || exit;
@@ -77,11 +78,33 @@ class AgentAbilities {
 				'datamachine/list-agents',
 				array(
 					'label'               => 'List Agents',
-					'description'         => 'List all registered agent identities',
+					'description'         => 'List agents accessible to the caller. Defaults to the caller\'s own accessible agents; admins can escalate to all agents or query other users.',
 					'category'            => 'datamachine-agent',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'properties' => new \stdClass(),
+						'properties' => array(
+							'scope'        => array(
+								'type'        => 'string',
+								'enum'        => array( 'mine', 'all' ),
+								'description' => '"mine" (default) returns agents the caller can access (owned + granted). "all" returns every agent on the site (admin-only).',
+							),
+							'user_id'      => array(
+								'type'        => 'integer',
+								'description' => 'Resolve accessible agents for this user instead of the caller. Non-admins are forced to themselves. Ignored when scope=all.',
+							),
+							'site_id'      => array(
+								'type'        => 'integer',
+								'description' => 'Filter by site_scope. Matches the exact site OR network-wide (NULL) agents. Defaults to current blog.',
+							),
+							'status'       => array(
+								'type'        => 'string',
+								'description' => 'Filter by agent status. Defaults to "active". Pass "any" to skip status filtering.',
+							),
+							'include_role' => array(
+								'type'        => 'boolean',
+								'description' => 'When true, enriches each row with the resolved user\'s role on that agent.',
+							),
+						),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -92,18 +115,22 @@ class AgentAbilities {
 								'items' => array(
 									'type'       => 'object',
 									'properties' => array(
-										'agent_id'   => array( 'type' => 'integer' ),
-										'agent_slug' => array( 'type' => 'string' ),
-										'agent_name' => array( 'type' => 'string' ),
-										'owner_id'   => array( 'type' => 'integer' ),
-										'status'     => array( 'type' => 'string' ),
+										'agent_id'    => array( 'type' => 'integer' ),
+										'agent_slug'  => array( 'type' => 'string' ),
+										'agent_name'  => array( 'type' => 'string' ),
+										'owner_id'    => array( 'type' => 'integer' ),
+										'site_scope'  => array( 'type' => array( 'integer', 'null' ) ),
+										'status'      => array( 'type' => 'string' ),
+										'description' => array( 'type' => 'string' ),
+										'is_owner'    => array( 'type' => 'boolean' ),
+										'user_role'   => array( 'type' => array( 'string', 'null' ) ),
 									),
 								),
 							),
 						),
 					),
 					'execute_callback'    => array( self::class, 'listAgents' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'chat' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -413,21 +440,143 @@ class AgentAbilities {
 	 * @param array $input Input parameters (unused).
 	 * @return array Result.
 	 */
-	public static function listAgents( array $input ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Required by WP_Ability interface.
-		$agents_repo = new Agents();
-		$rows        = $agents_repo->get_all( array( 'site_id' => get_current_blog_id() ) );
+	public static function listAgents( array $input ): array {
+		// ---- Parameter resolution ----------------------------------------
+		$scope        = isset( $input['scope'] ) ? (string) $input['scope'] : 'mine';
+		$requested_user_id = isset( $input['user_id'] ) ? (int) $input['user_id'] : 0;
+		$site_id      = isset( $input['site_id'] ) ? (int) $input['site_id'] : get_current_blog_id();
+		$status       = isset( $input['status'] ) ? (string) $input['status'] : 'active';
+		$include_role = ! empty( $input['include_role'] );
 
+		if ( ! in_array( $scope, array( 'mine', 'all' ), true ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Invalid scope. Allowed values: "mine", "all".',
+			);
+		}
+
+		$is_admin  = PermissionHelper::can_manage();
+		$caller_id = PermissionHelper::acting_user_id();
+
+		// ---- Escalation checks -------------------------------------------
+		if ( 'all' === $scope && ! $is_admin ) {
+			return array(
+				'success' => false,
+				'error'   => 'scope=all requires admin privileges.',
+			);
+		}
+
+		// Non-admins are always forced to self. Admin omitting user_id also
+		// defaults to self (the intuitive "show me MY accessible agents").
+		if ( $requested_user_id > 0 && $requested_user_id !== $caller_id && ! $is_admin ) {
+			return array(
+				'success' => false,
+				'error'   => 'Querying another user\'s agents requires admin privileges.',
+			);
+		}
+
+		$target_user_id = $requested_user_id > 0 ? $requested_user_id : $caller_id;
+
+		$agents_repo = new Agents();
+		$access_repo = new AgentAccess();
+
+		// ---- Resolve candidate rows --------------------------------------
+		if ( 'all' === $scope ) {
+			// Admin firehose: all agents on the requested site.
+			$candidates = $agents_repo->get_all( array( 'site_id' => $site_id ) );
+		} else {
+			if ( $target_user_id <= 0 ) {
+				return array(
+					'success' => true,
+					'agents'  => array(),
+				);
+			}
+
+			// Union of agents the target user OWNS plus agents they have
+			// ACCESS GRANTS to. The owner relationship lives on
+			// datamachine_agents.owner_id, not on agent_access, so merging
+			// both sides is the only way to get the complete picture.
+			$owned        = $agents_repo->get_all_by_owner_id( $target_user_id );
+			$owned_ids    = array_map( static fn( $a ) => (int) $a['agent_id'], $owned );
+			$granted_ids  = array_map( 'intval', $access_repo->get_agent_ids_for_user( $target_user_id ) );
+			$extra_ids    = array_values( array_diff( $granted_ids, $owned_ids ) );
+			$granted_rows = ! empty( $extra_ids ) ? $agents_repo->get_agents_by_ids( $extra_ids ) : array();
+
+			$candidates = array_merge( $owned, $granted_rows );
+
+			// Site scoping: match the requested site OR network-wide (NULL).
+			$candidates = array_values(
+				array_filter(
+					$candidates,
+					static function ( $row ) use ( $site_id ) {
+						$scope_value = $row['site_scope'] ?? null;
+						return null === $scope_value || (int) $scope_value === $site_id;
+					}
+				)
+			);
+		}
+
+		// ---- Status filter -----------------------------------------------
+		if ( 'any' !== $status ) {
+			$candidates = array_values(
+				array_filter(
+					$candidates,
+					static fn( $row ) => ( $row['status'] ?? '' ) === $status
+				)
+			);
+		}
+
+		// ---- Final access gate (mine only) -------------------------------
+		//
+		// When listing the caller's OWN agents, defence-in-depth: run each
+		// row through can_access_agent() so the filter `datamachine_can_access_agent`
+		// still has the final say. When the admin queries another user via
+		// `user_id`, this gate is skipped — the admin permission check above
+		// is authoritative and we must not accidentally filter out agents
+		// the target user can actually access.
+		if ( 'mine' === $scope && $target_user_id === $caller_id ) {
+			$candidates = array_values(
+				array_filter(
+					$candidates,
+					static fn( $row ) => PermissionHelper::can_access_agent( (int) $row['agent_id'] )
+				)
+			);
+		}
+
+		// ---- Role enrichment (optional) ----------------------------------
+		// Computed against $target_user_id so `include_role=true` reflects
+		// the resolved user's role even when an admin queries on their behalf.
 		$agents = array();
 
-		foreach ( $rows as $row ) {
-			$agents[] = array(
-				'agent_id'   => (int) $row['agent_id'],
-				'agent_slug' => (string) $row['agent_slug'],
-				'agent_name' => (string) $row['agent_name'],
-				'owner_id'   => (int) $row['owner_id'],
-				'site_scope' => isset( $row['site_scope'] ) ? (int) $row['site_scope'] : null,
-				'status'     => (string) $row['status'],
+		foreach ( $candidates as $row ) {
+			$agent_id   = (int) $row['agent_id'];
+			$owner_id   = (int) $row['owner_id'];
+			$config     = is_array( $row['agent_config'] ?? null ) ? $row['agent_config'] : array();
+			$description = isset( $config['description'] ) ? (string) $config['description'] : '';
+
+			$item = array(
+				'agent_id'    => $agent_id,
+				'agent_slug'  => (string) $row['agent_slug'],
+				'agent_name'  => (string) $row['agent_name'],
+				'owner_id'    => $owner_id,
+				'site_scope'  => isset( $row['site_scope'] ) ? (int) $row['site_scope'] : null,
+				'status'      => (string) ( $row['status'] ?? '' ),
+				'description' => $description,
+				'is_owner'    => $target_user_id > 0 && $owner_id === $target_user_id,
 			);
+
+			if ( $include_role ) {
+				if ( $target_user_id > 0 && $owner_id === $target_user_id ) {
+					$item['user_role'] = 'admin';
+				} elseif ( $target_user_id > 0 ) {
+					$grant             = $access_repo->get_access( $agent_id, $target_user_id );
+					$item['user_role'] = $grant && isset( $grant['role'] ) ? (string) $grant['role'] : null;
+				} else {
+					$item['user_role'] = null;
+				}
+			}
+
+			$agents[] = $item;
 		}
 
 		return array(

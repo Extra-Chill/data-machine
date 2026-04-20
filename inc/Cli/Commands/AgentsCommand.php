@@ -30,6 +30,27 @@ class AgentsCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--scope=<scope>]
+	 * : Which agents to list.
+	 * ---
+	 * default: all
+	 * options:
+	 *   - mine
+	 *   - all
+	 * ---
+	 *
+	 * [--user_id=<id>]
+	 * : List accessible agents for a specific user (implies scope=mine).
+	 *
+	 * [--status=<status>]
+	 * : Filter by agent status. Use "any" to skip status filtering.
+	 * ---
+	 * default: any
+	 * ---
+	 *
+	 * [--include_role]
+	 * : Include the resolved user's role per agent in the output.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -43,21 +64,52 @@ class AgentsCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
+	 *     # All agents on the current site (admin default)
 	 *     wp datamachine agents list
+	 *
+	 *     # Agents accessible to a specific user
+	 *     wp datamachine agents list --user_id=5
+	 *
+	 *     # My own accessible agents with role info
+	 *     wp datamachine agents list --scope=mine --include_role
+	 *
 	 *     wp datamachine agents list --format=json
 	 *
 	 * @subcommand list
 	 */
 	public function list_agents( array $args, array $assoc_args ): void {
-		$result = AgentAbilities::listAgents( array() );
+		$input = array(
+			'status' => (string) \WP_CLI\Utils\get_flag_value( $assoc_args, 'status', 'any' ),
+		);
+
+		$user_id_flag = \WP_CLI\Utils\get_flag_value( $assoc_args, 'user_id', null );
+		if ( null !== $user_id_flag ) {
+			$input['user_id'] = (int) $user_id_flag;
+			// Passing --user_id implies scope=mine for that user.
+			$input['scope'] = (string) \WP_CLI\Utils\get_flag_value( $assoc_args, 'scope', 'mine' );
+		} else {
+			$input['scope'] = (string) \WP_CLI\Utils\get_flag_value( $assoc_args, 'scope', 'all' );
+		}
+
+		if ( \WP_CLI\Utils\get_flag_value( $assoc_args, 'include_role', false ) ) {
+			$input['include_role'] = true;
+		}
+
+		$result = AgentAbilities::listAgents( $input );
+
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to list agents.' );
+			return;
+		}
 
 		if ( empty( $result['agents'] ) ) {
-			WP_CLI::warning( 'No agents registered.' );
+			WP_CLI::warning( 'No agents found for the given scope.' );
 			return;
 		}
 
 		$directory_manager = new DirectoryManager();
 		$items             = array();
+		$include_role      = ! empty( $input['include_role'] );
 
 		foreach ( $result['agents'] as $agent ) {
 			$owner_id = (int) $agent['owner_id'];
@@ -65,18 +117,29 @@ class AgentsCommand extends BaseCommand {
 			$slug     = (string) $agent['agent_slug'];
 
 			$agent_dir = $directory_manager->get_agent_identity_directory( $slug );
-			$items[]   = array(
+			$row       = array(
 				'agent_id'    => (int) $agent['agent_id'],
 				'agent_slug'  => $slug,
 				'agent_name'  => (string) $agent['agent_name'],
 				'owner_id'    => $owner_id,
 				'owner_login' => $user ? $user->user_login : '(deleted)',
 				'has_files'   => is_dir( $agent_dir ) ? 'Yes' : 'No',
-				'status'      => (string) $agent['status'],
+				'status'      => (string) ( $agent['status'] ?? '' ),
 			);
+
+			if ( $include_role ) {
+				$role             = $agent['user_role'] ?? null;
+				$row['user_role'] = ( null === $role || '' === $role ) ? '-' : (string) $role;
+			}
+
+			$items[] = $row;
 		}
 
 		$fields = array( 'agent_id', 'agent_slug', 'agent_name', 'owner_id', 'owner_login', 'has_files', 'status' );
+		if ( $include_role ) {
+			$fields[] = 'user_role';
+		}
+
 		$this->format_items( $items, $fields, $assoc_args, 'agent_id' );
 
 		WP_CLI::log( sprintf( 'Total: %d agent(s).', count( $items ) ) );
