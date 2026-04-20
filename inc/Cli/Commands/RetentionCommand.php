@@ -14,6 +14,7 @@ namespace DataMachine\Cli\Commands;
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -277,7 +278,6 @@ class RetentionCommand extends BaseCommand {
 			'Processed items' => $wpdb->prefix . 'datamachine_processed_items',
 			'AS actions'      => $wpdb->prefix . 'actionscheduler_actions',
 			'Stale claims'    => $wpdb->prefix . 'actionscheduler_claims',
-			'Chat sessions'   => $wpdb->prefix . 'datamachine_chat_sessions',
 		);
 
 		// Deduplicate tables for the query (jobs appears twice).
@@ -328,6 +328,14 @@ class RetentionCommand extends BaseCommand {
 				'rows'    => 0,
 				'size_mb' => '0.0',
 			);
+		}
+
+		// Chat sessions routes through the conversation store so swapped
+		// backends (e.g. AI Framework adapters) can opt into the metrics
+		// table or bow out by returning null.
+		$chat_metrics = ConversationStoreFactory::get()->get_storage_metrics();
+		if ( null !== $chat_metrics ) {
+			$sizes['Chat sessions'] = $chat_metrics;
 		}
 
 		return $sizes;

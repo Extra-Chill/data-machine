@@ -915,6 +915,112 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 
 		return (int) $deleted;
 	}
+
+	/**
+	 * List lightweight session summaries for a single calendar day.
+	 *
+	 * Used by the Daily Memory Task so it can summarize "today's chats"
+	 * without loading the full messages blob for every row.
+	 *
+	 * @param string $date Date string in `Y-m-d` format.
+	 * @return array<int, array{session_id: string, title: string|null, context: string, created_at: string}>
+	 */
+	public function list_sessions_for_day( string $date ): array {
+		global $wpdb;
+
+		if ( ! self::table_exists() ) {
+			return array();
+		}
+
+		$table_name = self::get_prefixed_table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT session_id, title, context, created_at
+				 FROM %i
+				 WHERE DATE(created_at) = %s
+				 ORDER BY created_at ASC',
+				$table_name,
+				$date
+			),
+			ARRAY_A
+		);
+
+		if ( ! $rows ) {
+			return array();
+		}
+
+		$result = array();
+		foreach ( $rows as $row ) {
+			$result[] = array(
+				'session_id' => (string) $row['session_id'],
+				'title'      => isset( $row['title'] ) ? (string) $row['title'] : null,
+				'context'    => isset( $row['context'] ) ? (string) $row['context'] : 'chat',
+				'created_at' => (string) $row['created_at'],
+			);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Storage metrics for the retention CLI.
+	 *
+	 * Returns the row count and on-disk size for the MySQL-backed chat
+	 * sessions table. SQLite installs report rows but cannot compute
+	 * table size, so `size_mb` is `'0.0'` there.
+	 *
+	 * @return array{rows: int, size_mb: string}|null
+	 */
+	public function get_storage_metrics(): ?array {
+		global $wpdb;
+
+		if ( ! self::table_exists() ) {
+			return array(
+				'rows'    => 0,
+				'size_mb' => '0.0',
+			);
+		}
+
+		$table_name = self::get_prefixed_table_name();
+
+		if ( self::is_sqlite() ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$count = (int) $wpdb->get_var(
+				$wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table_name )
+			);
+			return array(
+				'rows'    => $count,
+				'size_mb' => '0.0',
+			);
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT table_rows,
+					ROUND((data_length + index_length) / 1024 / 1024, 1) AS size_mb
+				FROM information_schema.tables
+				WHERE table_schema = DATABASE()
+				AND table_name = %s',
+				$table_name
+			),
+			ARRAY_A
+		);
+
+		if ( ! $row ) {
+			return array(
+				'rows'    => 0,
+				'size_mb' => '0.0',
+			);
+		}
+
+		return array(
+			'rows'    => (int) $row['table_rows'],
+			'size_mb' => (string) $row['size_mb'],
+		);
+	}
 }
 
 /**

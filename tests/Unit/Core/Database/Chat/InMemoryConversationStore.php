@@ -239,4 +239,32 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		}
 		return $deleted;
 	}
+
+	public function list_sessions_for_day( string $date ): array {
+		$result = array();
+
+		foreach ( $this->sessions as $session ) {
+			if ( substr( (string) $session['created_at'], 0, 10 ) !== $date ) {
+				continue;
+			}
+			$result[] = array(
+				'session_id' => (string) $session['session_id'],
+				'title'      => $session['title'],
+				'context'    => (string) $session['context'],
+				'created_at' => (string) $session['created_at'],
+			);
+		}
+
+		usort( $result, static fn( $a, $b ) => strcmp( $a['created_at'], $b['created_at'] ) );
+
+		return $result;
+	}
+
+	public function get_storage_metrics(): ?array {
+		// In-memory fixture reports row count only; on-disk size is meaningless.
+		return array(
+			'rows'    => count( $this->sessions ),
+			'size_mb' => '0.0',
+		);
+	}
 }
