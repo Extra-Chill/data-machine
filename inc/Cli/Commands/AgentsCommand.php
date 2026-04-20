@@ -1225,11 +1225,9 @@ class AgentsCommand extends BaseCommand {
 	 * @subcommand cleanup-legacy-context-files
 	 */
 	public function cleanup_legacy_context_files( array $args, array $assoc_args ): void {
-		$dry_run = isset( $assoc_args['dry-run'] );
-		$dm      = new DirectoryManager();
-		$base    = $dm->get_base_directory();
-
-		$agents_dir = $base . '/agents';
+		$dry_run    = isset( $assoc_args['dry-run'] );
+		$upload_dir = wp_upload_dir();
+		$agents_dir = trailingslashit( $upload_dir['basedir'] ) . 'datamachine-files/agents';
 		if ( ! is_dir( $agents_dir ) ) {
 			WP_CLI::success( 'No agents directory found — nothing to clean.' );
 			return;
