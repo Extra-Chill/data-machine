@@ -86,26 +86,6 @@ class UpsertStep extends Step {
 			return $this->create_update_entry_from_tool_result( $tool_result_entry, $this->dataPackets, $primary_handler_slug, $this->flow_step_id );
 		}
 
-		// Legacy fan-out skip: kept as a narrow safety net for the pre-batch
-		// fan-out model where multiple packets landed in the same job and only
-		// one sibling carried the handler result. Batch children created by
-		// PipelineBatchScheduler each carry their own ai_handler_complete
-		// packet — if a batch child reaches this branch with missing handler
-		// data, that's a real failure (upstream filtering regression or handler
-		// tool not called) and should be logged as such, not silenced.
-		if ( $this->isLegacyFanOutChild() ) {
-			$this->log(
-				'debug',
-				'Legacy fan-out child missing handler result (sibling handled it)',
-				array(
-					'required_handler_slugs'    => $required_handler_slugs,
-					'missing_required_handlers' => $missing_required_handlers,
-				)
-			);
-
-			return $this->buildFanOutSkipPacket( $configured_handler_slugs, $required_handler_slugs, $missing_required_handlers );
-		}
-
 		$this->log(
 			'warning',
 			'Upsert step required handler tool was not executed by AI',
@@ -220,85 +200,6 @@ class UpsertStep extends Step {
 		);
 
 		return $packet->addTo( $dataPackets );
-	}
-
-	/**
-	 * Check if this job is a LEGACY fan-out child that should silently skip.
-	 *
-	 * Two scenarios produce a job with parent_job_id:
-	 *
-	 * 1. Legacy fan-out: multiple packets landed in the same job and only
-	 *    one sibling carried the handler result. Missing handler data is
-	 *    expected for the other siblings — skip silently.
-	 *
-	 * 2. PipelineBatchScheduler child: each child job gets its OWN packet
-	 *    with its own ai_handler_complete metadata. If such a child reaches
-	 *    this branch with missing handler data, that's a real failure
-	 *    (upstream filtering regression or AI didn't call the handler tool)
-	 *    and must NOT be silenced — the item should be retried, not
-	 *    marked completed_no_items.
-	 *
-	 * Batch children are identifiable because their parent's engine_data
-	 * carries the 'batch' flag set by PipelineBatchScheduler::fanOut().
-	 * Presence of that flag means we're the non-legacy case and should
-	 * fall through to the normal failure path.
-	 *
-	 * @return bool True only for legacy fan-out children that should skip silently.
-	 */
-	private function isLegacyFanOutChild(): bool {
-		$engine_data = $this->engine_data ?? array();
-		$job_context = $engine_data['job'] ?? array();
-		$parent_id   = $job_context['parent_job_id'] ?? null;
-
-		if ( empty( $parent_id ) ) {
-			return false;
-		}
-
-		// If the parent is a batch parent (PipelineBatchScheduler), this child
-		// owns its own packet and a missing handler result is a real failure.
-		$parent_engine = datamachine_get_engine_data( (int) $parent_id );
-		if ( ! empty( $parent_engine['batch'] ) ) {
-			return false;
-		}
-
-		return true;
-	}
-
-	/**
-	 * Build a skip packet for fan-out children that don't have the handler result.
-	 *
-	 * Uses status_override = 'completed_no_items' so the routing layer
-	 * completes the job silently instead of logging a noisy failure.
-	 *
-	 * @param array $configured_handler_slugs Configured handler slugs.
-	 * @param array $required_handler_slugs   Required handler slugs.
-	 * @param array $missing_required_handlers Missing required handlers.
-	 * @return array
-	 */
-	private function buildFanOutSkipPacket( array $configured_handler_slugs, array $required_handler_slugs, array $missing_required_handlers ): array {
-		// Set job_status override in engine_data so the routing layer
-		// completes with 'completed_no_items' instead of a generic 'completed'.
-		datamachine_merge_engine_data( $this->job_id, array(
-			'job_status' => 'completed_no_items',
-		) );
-
-		$packet = new DataPacket(
-			array(
-				'update_result' => array(),
-				'updated_at'    => current_time( 'mysql', true ),
-			),
-			array(
-				'step_type'                 => 'upsert',
-				'handler'                   => $required_handler_slugs[0] ?? ( $configured_handler_slugs[0] ?? '' ),
-				'flow_step_id'              => $this->flow_step_id,
-				'success'                   => true,
-				'fanout_sibling_handled'    => true,
-				'missing_required_handlers' => $missing_required_handlers,
-			),
-			'upsert'
-		);
-
-		return $packet->addTo( $this->dataPackets );
 	}
 
 	/**
