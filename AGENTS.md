@@ -66,7 +66,7 @@ Core architecture
 - WordPressSettingsResolver provides centralized settings resolution with system defaults override.
 - Handler and Step registration use standardized traits (`HandlerRegistrationTrait`, `StepTypeRegistrationTrait`) to auto-register services via WordPress filters. Tools extend `BaseTool` for unified registration.
 - Cache Management: Each ability class provides its own `clearCache()` method for domain-specific invalidation. `SiteContext` handles site metadata caching. Admin UI uses TanStack Query for client-side state.
-- Prompt and directive management is centralized via a PromptBuilder with ordered directives (site, pipeline, flow, context).
+- Prompt and directive management is centralized via a PromptBuilder with ordered directives (site, pipeline, flow, agent mode).
 - Providers are pluggable and configured by site administrators (OpenAI, Anthropic, Google, Grok, OpenRouter).
 - Universal Engine architecture supports both Pipeline and Chat agents with shared AI infrastructure.
 - **System Agent Architecture**: Hook-based system agent handles infrastructure operations like session title generation (@since v0.13.7). Uses `datamachine_ai_response_received` hook to trigger system abilities immediately after AI responses, with graceful fallback to truncated titles when AI generation fails.
