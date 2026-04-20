@@ -177,4 +177,70 @@ class EventUpsertTest extends WP_UnitTestCase {
 
 		$this->assertSame( 'date_only', $result );
 	}
+
+	/**
+	 * Verify that recurring series events with the same title but different
+	 * dates are treated as distinct events, not duplicates.
+	 *
+	 * The legacy findExistingEvent() method correctly uses venue + date +
+	 * fuzzy title matching. This test verifies that the method returns null
+	 * for a different date at the same venue with the same title.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine/issues/1108
+	 */
+	public function test_find_existing_event_distinguishes_recurring_series_by_date(): void {
+		$method = new \ReflectionMethod( $this->handler, 'findExistingEvent' );
+		$method->setAccessible( true );
+
+		$venue_name = 'Recurring Venue ' . uniqid();
+
+		// Create venue term.
+		$venue_term = wp_insert_term( $venue_name, 'venue' );
+		$this->assertNotWPError( $venue_term );
+
+		// Create existing event: "Barn Jam" on April 22.
+		$existing_post_id = wp_insert_post(
+			array(
+				'post_title'   => 'Barn Jam',
+				'post_type'    => 'data_machine_events',
+				'post_status'  => 'publish',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"startDate":"2026-04-22","venue":"' . $venue_name . '"} --><div class="wp-block-data-machine-events-event-details"></div><!-- /wp:data-machine-events/event-details -->',
+			)
+		);
+		$this->assertGreaterThan( 0, $existing_post_id );
+		wp_set_object_terms( $existing_post_id, array( $venue_term['term_id'] ), 'venue' );
+
+		// Search for "Barn Jam" at same venue but DIFFERENT date — should NOT match.
+		$result = $method->invoke(
+			$this->handler,
+			'Barn Jam',
+			$venue_name,
+			'2026-05-06',
+			''
+		);
+
+		$this->assertNull(
+			$result,
+			'findExistingEvent should NOT match same-title event on a different date (recurring series)'
+		);
+
+		// Search for "Barn Jam" at same venue and SAME date — should match.
+		$result_same_date = $method->invoke(
+			$this->handler,
+			'Barn Jam',
+			$venue_name,
+			'2026-04-22',
+			''
+		);
+
+		$this->assertSame(
+			$existing_post_id,
+			$result_same_date,
+			'findExistingEvent should match same-title event on the same date'
+		);
+
+		// Cleanup.
+		wp_delete_post( $existing_post_id, true );
+		wp_delete_term( $venue_term['term_id'], 'venue' );
+	}
 }

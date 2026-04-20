@@ -279,6 +279,37 @@ class EventUpsert extends UpsertHandler {
 		if ( is_array( $result ) && 'duplicate' === ( $result['verdict'] ?? '' ) ) {
 			$post_id = (int) ( $result['match']['post_id'] ?? 0 );
 			if ( $post_id > 0 ) {
+				// Verify the matched post has the same startDate. The core
+				// duplicate check matches on title similarity alone and does
+				// not consider event dates. Recurring series events (e.g.
+				// weekly "Barn Jam" at Awendaw Green) share the same title
+				// and venue but have different dates — these are distinct
+				// events, not duplicates.
+				// See: https://github.com/Extra-Chill/data-machine/issues/1108
+				if ( ! empty( $startDate ) ) {
+					$existing_data      = $this->extractEventData( $post_id );
+					$existing_startDate = $existing_data['startDate'] ?? '';
+
+					if ( ! empty( $existing_startDate ) && $existing_startDate !== $startDate ) {
+						do_action(
+							'datamachine_log',
+							'info',
+							'Event Upsert: Ability matched title but startDate differs — treating as new event (recurring series)',
+							array(
+								'title'              => $title,
+								'venue'              => $venue,
+								'incoming_startDate' => $startDate,
+								'existing_startDate' => $existing_startDate,
+								'existing_post_id'   => $post_id,
+							)
+						);
+
+						// Fall through to legacy date-aware lookup which
+						// searches by venue + date + fuzzy title.
+						return $this->findExistingEvent( $title, $venue, $startDate, $ticketUrl );
+					}
+				}
+
 				return $post_id;
 			}
 		}
