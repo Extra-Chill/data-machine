@@ -50,6 +50,7 @@ require_once __DIR__ . '/Api/Handlers.php';
 require_once __DIR__ . '/Api/Tools.php';
 require_once __DIR__ . '/Api/Chat/ChatFilters.php';
 require_once __DIR__ . '/Engine/AI/Directives/CoreMemoryFilesDirective.php';
+require_once __DIR__ . '/Engine/AI/Directives/AgentModeDirective.php';
 
 /*
 |--------------------------------------------------------------------------
@@ -60,28 +61,28 @@ require_once __DIR__ . '/Engine/AI/Directives/CoreMemoryFilesDirective.php';
 */
 
 use DataMachine\Engine\AI\MemoryFileRegistry;
-use DataMachine\Engine\AI\ContextRegistry;
+use DataMachine\Engine\AI\AgentModeRegistry;
 
 /*
 |--------------------------------------------------------------------------
-| Execution context registrations
+| Execution mode registrations
 |--------------------------------------------------------------------------
-| Core contexts register through the same API any extension would use.
+| Core modes register through the same API any extension would use.
 | Each specifies a priority for sort order, a label, and a description.
 */
 
 add_action(
 	'init',
 	function () {
-		ContextRegistry::register( 'chat', 10, array(
+		AgentModeRegistry::register( 'chat', 10, array(
 			'label'       => __( 'Chat Agent', 'data-machine' ),
 			'description' => __( 'Interactive chat conversations. Benefits from capable models for complex reasoning.', 'data-machine' ),
 		) );
-		ContextRegistry::register( 'pipeline', 20, array(
+		AgentModeRegistry::register( 'pipeline', 20, array(
 			'label'       => __( 'Pipeline Agent', 'data-machine' ),
 			'description' => __( 'Structured workflow execution. Operates within defined steps — efficient models work well.', 'data-machine' ),
 		) );
-		ContextRegistry::register( 'system', 30, array(
+		AgentModeRegistry::register( 'system', 30, array(
 			'label'       => __( 'System Agent', 'data-machine' ),
 			'description' => __( 'Background tasks like alt text generation and issue creation.', 'data-machine' ),
 		) );
@@ -106,34 +107,34 @@ MemoryFileRegistry::register( 'RULES.md', 15, array(
 ) );
 
 // Agent layer — identity and knowledge, scoped to a single agent.
-// Injected in interactive contexts only (chat, pipeline). Excluded from
-// system contexts so autonomous maintenance tasks (e.g. daily memory
+// Injected in interactive modes only (chat, pipeline). Excluded from
+// system mode so autonomous maintenance tasks (e.g. daily memory
 // compaction) are not primed with the agent's identity while operating
 // on these files.
 MemoryFileRegistry::register( 'SOUL.md', 20, array(
 	'layer'       => MemoryFileRegistry::LAYER_AGENT,
 	'protected'   => true,
-	'contexts'    => array( 'chat', 'pipeline' ),
+	'modes'       => array( 'chat', 'pipeline' ),
 	'label'       => 'Agent Identity',
-	'description' => 'Agent identity, voice, rules. Injected in interactive contexts only.',
+	'description' => 'Agent identity, voice, rules. Injected in interactive modes only.',
 ) );
 MemoryFileRegistry::register( 'MEMORY.md', 30, array(
 	'layer'       => MemoryFileRegistry::LAYER_AGENT,
 	'protected'   => true,
-	'contexts'    => array( 'chat', 'pipeline' ),
+	'modes'       => array( 'chat', 'pipeline' ),
 	'label'       => 'Agent Memory',
-	'description' => 'Accumulated knowledge. Injected in interactive contexts only.',
+	'description' => 'Accumulated knowledge. Injected in interactive modes only.',
 ) );
 
 // User layer — human preferences, network-scoped on multisite.
-// Only injected in interactive contexts where a human is present.
+// Only injected in interactive modes where a human is present.
 // Pipelines can still opt in via pipeline memory file selection.
 MemoryFileRegistry::register( 'USER.md', 25, array(
 	'layer'       => MemoryFileRegistry::LAYER_USER,
 	'protected'   => true,
-	'contexts'    => array( 'chat', 'editor' ),
+	'modes'       => array( 'chat', 'editor' ),
 	'label'       => 'User Profile',
-	'description' => 'Information about the human the agent works with. Injected in chat and editor contexts only.',
+	'description' => 'Information about the human the agent works with. Injected in chat and editor modes only.',
 ) );
 
 // Network layer — multisite topology, only meaningful on multisite installs.

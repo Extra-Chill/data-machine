@@ -216,18 +216,18 @@ class PluginSettings {
 	}
 
 	/**
-	 * Get the list of known execution contexts.
+	 * Get the list of known execution modes.
 	 *
-	 * Delegates to ContextRegistry which provides the canonical list of
-	 * registered contexts. Core contexts register in bootstrap.php;
-	 * extensions register via the `datamachine_contexts` action.
+	 * Delegates to AgentModeRegistry which provides the canonical list of
+	 * registered modes. Core modes register in bootstrap.php;
+	 * extensions register via the `datamachine_agent_modes` action.
 	 *
-	 * @since 0.63.0 Delegates to ContextRegistry.
+	 * @since 0.68.0 Renamed from getContexts(). Delegates to AgentModeRegistry.
 	 *
-	 * @return array Array of context definitions with id, label, and description.
+	 * @return array Array of mode definitions with id, label, and description.
 	 */
-	public static function getContexts(): array {
-		return \DataMachine\Engine\AI\ContextRegistry::get_for_settings();
+	public static function getAgentModes(): array {
+		return \DataMachine\Engine\AI\AgentModeRegistry::get_for_settings();
 	}
 
 	/**

@@ -463,7 +463,7 @@ class SettingsAbilities {
 		}
 
 		if ( is_array( $raw_context_models ) ) {
-			$valid_context_ids = array_column( PluginSettings::getContexts(), 'id' );
+			$valid_context_ids = array_column( PluginSettings::getAgentModes(), 'id' );
 			$context_models    = array();
 			foreach ( $raw_context_models as $context => $config ) {
 				if ( in_array( $context, $valid_context_ids, true ) && is_array( $config ) ) {
@@ -558,7 +558,7 @@ class SettingsAbilities {
 				}
 
 				if ( is_array( $raw_network_context_models ) ) {
-					$valid_context_ids      = array_column( PluginSettings::getContexts(), 'id' );
+					$valid_context_ids      = array_column( PluginSettings::getAgentModes(), 'id' );
 					$network_context_models = array();
 					foreach ( $raw_network_context_models as $context => $config ) {
 						if ( in_array( $context, $valid_context_ids, true ) && is_array( $config ) ) {
