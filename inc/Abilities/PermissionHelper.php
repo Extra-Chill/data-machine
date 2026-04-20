@@ -99,6 +99,20 @@ class PermissionHelper {
 	private static ?array $agent_token_capabilities = null;
 
 	/**
+	 * Cross-site caller context for the current request.
+	 *
+	 * Populated by AgentAuthMiddleware from X-Datamachine-Caller-*
+	 * and X-Datamachine-Chain-* headers after bearer-token resolution.
+	 * Describes who is calling and where this request sits in an
+	 * agent-to-agent chain. Null means no A2A caller context is set —
+	 * typically a top-of-chain request (admin UI, CLI, direct /chat call).
+	 *
+	 * @since 0.71.0
+	 * @var \DataMachine\Core\Auth\CallerContext|null
+	 */
+	private static ?\DataMachine\Core\Auth\CallerContext $caller_context = null;
+
+	/**
 	 * Check if current context has admin-level permissions.
 	 *
 	 * Allows execution in:
@@ -256,6 +270,46 @@ class PermissionHelper {
 		self::$acting_token_id          = null;
 		self::$agent_owner_id           = 0;
 		self::$agent_token_capabilities = null;
+		self::$caller_context           = null;
+	}
+
+	/**
+	 * Set the cross-site caller context for the current request.
+	 *
+	 * Called by {@see \DataMachine\Core\Auth\AgentAuthMiddleware} after
+	 * parsing X-Datamachine-Caller-* and X-Datamachine-Chain-* headers.
+	 *
+	 * @since 0.71.0
+	 *
+	 * @param \DataMachine\Core\Auth\CallerContext $context
+	 */
+	public static function set_caller_context( \DataMachine\Core\Auth\CallerContext $context ): void {
+		self::$caller_context = $context;
+	}
+
+	/**
+	 * Get the cross-site caller context for the current request.
+	 *
+	 * @since 0.71.0
+	 *
+	 * @return \DataMachine\Core\Auth\CallerContext|null
+	 */
+	public static function get_caller_context(): ?\DataMachine\Core\Auth\CallerContext {
+		return self::$caller_context;
+	}
+
+	/**
+	 * Whether the current request originated from another DM site.
+	 *
+	 * Convenience wrapper over {@see CallerContext::isCrossSite()} that
+	 * treats the absence of a caller context as "not cross-site".
+	 *
+	 * @since 0.71.0
+	 *
+	 * @return bool
+	 */
+	public static function in_cross_site_context(): bool {
+		return self::$caller_context !== null && self::$caller_context->isCrossSite();
 	}
 
 	/**

@@ -26,6 +26,7 @@ namespace DataMachine\Core\Auth;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Agents\AgentTokens;
+use DataMachine\Engine\AI\IterationBudgetRegistry;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -124,6 +125,51 @@ class AgentAuthMiddleware {
 		// Track token usage.
 		$tokens_repo->touch_last_used( $token_id );
 
+		// Parse cross-site caller context from A2A headers (no-op for non-A2A requests).
+		$request      = self::current_rest_request();
+		$inbound_ctx  = $request !== null
+			? CallerContext::fromRequest( $request )
+			: new CallerContext();
+
+		// Enforce chain_depth budget on the incoming call. Depth >= ceiling
+		// means this call is the Nth+1 hop in a chain that has already
+		// exhausted its budget — reject before running any work.
+		$depth_budget = IterationBudgetRegistry::create( 'chain_depth', $inbound_ctx->chainDepth() );
+
+		if ( $depth_budget->exceeded() ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Agent auth: chain depth exceeded',
+				array_merge(
+					array(
+						'agent_id'   => $agent_id,
+						'agent_slug' => $agent['agent_slug'],
+						'budget'     => $depth_budget->name(),
+						'ceiling'    => $depth_budget->ceiling(),
+						'current'    => $depth_budget->current(),
+					),
+					$inbound_ctx->toLogContext()
+				)
+			);
+
+			return new \WP_Error(
+				'datamachine_chain_depth_exceeded',
+				sprintf(
+					/* translators: %d: max chain depth */
+					__( 'A2A chain depth (%d) exceeded. Refusing to extend the chain further.', 'data-machine' ),
+					$depth_budget->ceiling()
+				),
+				array(
+					'status'      => 429,
+					'retry_after' => 60,
+					'chain_id'    => $inbound_ctx->chainId(),
+					'chain_depth' => $inbound_ctx->chainDepth(),
+					'ceiling'     => $depth_budget->ceiling(),
+				)
+			);
+		}
+
 		// Set WordPress current user to the owner.
 		// This ensures all WordPress capability checks use the owner's role
 		// (the ceiling — the agent can never exceed the owner's capabilities).
@@ -134,21 +180,58 @@ class AgentAuthMiddleware {
 		$token_capabilities = $token_record['capabilities'] ?? null;
 		PermissionHelper::set_agent_context( $agent_id, $owner_id, $token_capabilities, $token_id );
 
+		// Expose the caller context for downstream code (ChatOrchestrator,
+		// abilities, logging) that wants to know who's calling and where
+		// in the chain this request lives.
+		PermissionHelper::set_caller_context( $inbound_ctx );
+
 		do_action(
 			'datamachine_log',
 			'debug',
 			'Agent auth: token authenticated',
-			array(
-				'agent_id'             => $agent_id,
-				'agent_slug'           => $agent['agent_slug'],
-				'owner_id'             => $owner_id,
-				'token_id'             => $token_id,
-				'token_label'          => $token_record['label'] ?? '',
-				'has_cap_restrictions' => null !== $token_capabilities,
+			array_merge(
+				array(
+					'agent_id'             => $agent_id,
+					'agent_slug'           => $agent['agent_slug'],
+					'owner_id'             => $owner_id,
+					'token_id'             => $token_id,
+					'token_label'          => $token_record['label'] ?? '',
+					'has_cap_restrictions' => null !== $token_capabilities,
+				),
+				$inbound_ctx->toLogContext()
 			)
 		);
 
 		return true;
+	}
+
+	/**
+	 * Best-effort access to the current REST request for header parsing.
+	 *
+	 * The `rest_authentication_errors` filter runs before the dispatcher
+	 * assigns the request to a handler, so WP_REST_Request isn't directly
+	 * available here. Fall back to synthesizing one from $_SERVER so
+	 * CallerContext can resolve headers consistently via the same API
+	 * it uses in tests.
+	 *
+	 * @return \WP_REST_Request|null
+	 */
+	private static function current_rest_request(): ?\WP_REST_Request {
+		if ( ! class_exists( '\\WP_REST_Request' ) ) {
+			return null;
+		}
+
+		$request = new \WP_REST_Request();
+
+		foreach ( $_SERVER as $key => $value ) {
+			if ( ! is_string( $key ) || strpos( $key, 'HTTP_' ) !== 0 ) {
+				continue;
+			}
+			$header_name = strtolower( str_replace( '_', '-', substr( $key, 5 ) ) );
+			$request->set_header( $header_name, (string) $value );
+		}
+
+		return $request;
 	}
 
 	/**

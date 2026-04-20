@@ -12,6 +12,7 @@
 namespace DataMachine\Engine\AI;
 
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\IterationBudgetRegistry;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -145,8 +146,14 @@ class AIConversationLoop {
 		int $max_turns = PluginSettings::DEFAULT_MAX_TURNS,
 		bool $single_turn = false
 	): array {
-		// Ensure max_turns is within reasonable bounds
-		$max_turns              = max( 1, min( 50, $max_turns ) );
+		// Bound the conversation with the shared IterationBudget primitive.
+		// Ceiling resolution + clamp lives in IterationBudgetRegistry; the
+		// caller-supplied $max_turns is an override that still gets clamped
+		// to the registered bounds (currently [1, 50]). $turn_count mirrors
+		// the budget's current value so the rest of this method keeps its
+		// existing local-int semantics for log payloads and message formatting.
+		$turn_budget            = IterationBudgetRegistry::create( 'conversation_turns', 0, $max_turns );
+		$max_turns              = $turn_budget->ceiling();
 		$conversation_complete  = false;
 		$turn_count             = 0;
 		$final_content          = '';
@@ -178,7 +185,8 @@ class AIConversationLoop {
 		);
 
 		do {
-			++$turn_count;
+			$turn_budget->increment();
+			$turn_count = $turn_budget->current();
 
 			// Build AI request using centralized RequestBuilder
 			$ai_response = RequestBuilder::build(
@@ -438,10 +446,10 @@ class AIConversationLoop {
 			if ( $single_turn ) {
 				break;
 			}
-		} while ( ! $conversation_complete && $turn_count < $max_turns );
+		} while ( ! $conversation_complete && ! $turn_budget->exceeded() );
 
 		// Log if max turns reached
-		if ( $turn_count >= $max_turns && ! $conversation_complete ) {
+		if ( $turn_budget->exceeded() && ! $conversation_complete ) {
 			do_action(
 				'datamachine_log',
 				'warning',
@@ -449,8 +457,9 @@ class AIConversationLoop {
 				array_merge(
 					$base_log_context,
 					array(
-						'max_turns'            => $max_turns,
-						'final_turn_count'     => $turn_count,
+						'budget'               => $turn_budget->name(),
+						'ceiling'              => $turn_budget->ceiling(),
+						'current'              => $turn_budget->current(),
 						'still_had_tool_calls' => ! empty( $last_tool_calls ),
 					)
 				)
@@ -473,12 +482,12 @@ class AIConversationLoop {
 			'usage'                  => $total_usage,
 		);
 
-		if ( $turn_count >= $max_turns && ! $conversation_complete ) {
+		if ( $turn_budget->exceeded() && ! $conversation_complete ) {
 			$result['warning'] = 'Maximum conversation turns (' . $max_turns . ') reached. Response may be incomplete.';
 		}
 
 		// Add max_turns_reached flag for single-turn mode
-		if ( $single_turn && $turn_count >= $max_turns ) {
+		if ( $single_turn && $turn_budget->exceeded() ) {
 			$result['max_turns_reached'] = true;
 		}
 

@@ -62,6 +62,40 @@ require_once __DIR__ . '/Engine/AI/Directives/AgentModeDirective.php';
 
 use DataMachine\Engine\AI\MemoryFileRegistry;
 use DataMachine\Engine\AI\AgentModeRegistry;
+use DataMachine\Engine\AI\IterationBudgetRegistry;
+use DataMachine\Core\PluginSettings;
+
+/*
+|--------------------------------------------------------------------------
+| Iteration budget registrations
+|--------------------------------------------------------------------------
+| Named bounded-iteration budgets shared across the engine. Each budget
+| declares its ceiling-resolution rules (default, site-setting key,
+| clamp bounds). Consumers instantiate a fresh IterationBudget per run
+| via IterationBudgetRegistry::create().
+|
+| Registration is side-effect free (static map mutation) and safe to
+| run at file-load time — instance creation reads options lazily.
+*/
+
+IterationBudgetRegistry::register( 'conversation_turns', array(
+	'default' => PluginSettings::DEFAULT_MAX_TURNS,
+	'min'     => 1,
+	'max'     => 50,
+	'setting' => 'max_turns',
+) );
+
+// A2A chain depth — bounds how many cross-site agent hops a single
+// chain can contain before being refused. Prevents runaway recursion
+// when agents on different sites can call each other's /chat endpoints.
+// Default 3 is deliberately low; raise via the `max_chain_depth` site
+// setting if a real chain genuinely needs more hops.
+IterationBudgetRegistry::register( 'chain_depth', array(
+	'default' => 3,
+	'min'     => 1,
+	'max'     => 10,
+	'setting' => 'max_chain_depth',
+) );
 
 /*
 |--------------------------------------------------------------------------
