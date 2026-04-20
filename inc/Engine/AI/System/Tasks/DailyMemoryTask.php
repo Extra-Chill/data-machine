@@ -21,6 +21,7 @@ namespace DataMachine\Engine\AI\System\Tasks;
 
 defined( 'ABSPATH' ) || exit;
 
+use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DailyMemory;
@@ -487,36 +488,15 @@ class DailyMemoryTask extends SystemTask {
 	/**
 	 * Get a summary of today's chat sessions.
 	 *
+	 * Routes through the conversation store so a swapped backend
+	 * (e.g. an AI Framework adapter on WordPress.com) can feed its
+	 * own session list into the daily summary.
+	 *
 	 * @param string $date Date string (Y-m-d).
 	 * @return string
 	 */
 	private function getChatContext( string $date ): string {
-		global $wpdb;
-		$table = $wpdb->prefix . 'datamachine_chat_sessions';
-
-		// Check if the table exists first.
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$table_exists = $wpdb->get_var(
-			$wpdb->prepare( 'SHOW TABLES LIKE %s', $table )
-		);
-
-		if ( ! $table_exists ) {
-			return '';
-		}
-
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-		$sessions = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT session_id, title, context, created_at
-				 FROM {$table}
-				 WHERE DATE(created_at) = %s
-				 ORDER BY created_at ASC",
-				$date
-			),
-			ARRAY_A
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL
+		$sessions = ConversationStoreFactory::get()->list_sessions_for_day( $date );
 
 		if ( empty( $sessions ) ) {
 			return '';
@@ -524,7 +504,7 @@ class DailyMemoryTask extends SystemTask {
 
 		$lines = array();
 		foreach ( $sessions as $session ) {
-			$title   = $session['title'] ? $session['title'] : 'Untitled session';
+			$title   = ! empty( $session['title'] ) ? $session['title'] : 'Untitled session';
 			$context = $session['context'] ?? 'chat';
 			$lines[] = "- [{$context}] {$title}";
 		}

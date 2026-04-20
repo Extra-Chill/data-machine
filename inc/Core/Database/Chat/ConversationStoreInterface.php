@@ -180,4 +180,37 @@ interface ConversationStoreInterface {
 	 * @return int Number of sessions deleted.
 	 */
 	public function cleanup_orphaned_sessions( int $hours = 1 ): int;
+
+	/**
+	 * List lightweight session summaries created on the given date.
+	 *
+	 * Returns rows with `{session_id, title, context, created_at}`.
+	 * Used by the Daily Memory Task to summarize a day's chat activity
+	 * without loading the full messages array.
+	 *
+	 * Implementations determine their own date comparison semantics.
+	 * The default MySQL store uses `DATE(created_at) = $date` on the
+	 * stored timestamp (MySQL-server timezone, which in a WordPress
+	 * install is typically UTC for Data Machine DATETIME columns).
+	 *
+	 * @param string $date Date string in `Y-m-d` format.
+	 * @return array<int, array{session_id: string, title: string|null, context: string, created_at: string}>
+	 */
+	public function list_sessions_for_day( string $date ): array;
+
+	/**
+	 * Report storage metrics for the retention CLI.
+	 *
+	 * Returns `['rows' => int, 'size_mb' => string]` for the default
+	 * MySQL store. Stores that cannot report byte size (e.g. an external
+	 * API-backed store) return `size_mb => '0.0'`. Stores that cannot
+	 * report rows either return `null` to opt out of the metrics table.
+	 *
+	 * The CLI displays the "Chat sessions" row only when this method
+	 * returns a non-null value, so the metrics table stays meaningful
+	 * regardless of backend.
+	 *
+	 * @return array{rows: int, size_mb: string}|null
+	 */
+	public function get_storage_metrics(): ?array;
 }
