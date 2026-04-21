@@ -19,7 +19,7 @@ import { useProviders } from '@shared/queries/providers';
 const EMPTY_FORM = {
 	default_provider: '',
 	default_model: '',
-	context_models: {},
+	mode_models: {},
 	site_context_enabled: false,
 	max_turns: 0,
 };
@@ -88,10 +88,7 @@ const AgentSettings = () => {
 			form.reset( {
 				default_provider: data.settings.default_provider || '',
 				default_model: data.settings.default_model || '',
-				context_models:
-					data.settings.context_models ||
-					data.settings.agent_models ||
-					{},
+				mode_models: data.settings.mode_models || {},
 				site_context_enabled:
 					data.settings.site_context_enabled ?? false,
 				max_turns: data.settings.max_turns ?? maxTurnsDefault,
@@ -153,15 +150,15 @@ const AgentSettings = () => {
 							</div>
 							<p className="description">
 								The default provider and model used for all
-								contexts unless overridden below.
+								modes unless overridden below.
 							</p>
 						</td>
 					</tr>
 
-					{ ( providersData?.contexts || [] ).length > 0 && (
+					{ ( providersData?.modes || [] ).length > 0 && (
 						<tr>
 							<th scope="row">
-								Per-Context Model Overrides
+								Per-Mode Model Overrides
 							</th>
 							<td>
 								<p
@@ -171,20 +168,20 @@ const AgentSettings = () => {
 										marginBottom: '16px',
 									} }
 								>
-									The same agent runs in different contexts
+									The same agent runs in different modes
 									with different toolkits. Override the default
-									model for specific contexts — leave empty to
+									model for specific modes — leave empty to
 									use the default above.
 								</p>
-								{ ( providersData?.contexts || [] ).map(
-									( contextItem ) => {
-										const contextConfig =
-											form.data.context_models?.[
-												contextItem.id
+								{ ( providersData?.modes || [] ).map(
+									( modeItem ) => {
+										const modeConfig =
+											form.data.mode_models?.[
+												modeItem.id
 											] || {};
 										return (
 											<div
-												key={ contextItem.id }
+												key={ modeItem.id }
 												className="datamachine-agent-model-override"
 												style={ {
 													marginBottom: '20px',
@@ -198,7 +195,7 @@ const AgentSettings = () => {
 														margin: '0 0 4px',
 													} }
 												>
-													{ contextItem.label }
+													{ modeItem.label }
 												</h4>
 												<p
 													className="description"
@@ -207,27 +204,27 @@ const AgentSettings = () => {
 														marginBottom: '8px',
 													} }
 												>
-														{ contextItem.description }
+														{ modeItem.description }
 													</p>
 													<ProviderModelSelector
 														provider={
-															contextConfig.provider ||
+															modeConfig.provider ||
 															''
 														}
 														model={
-															contextConfig.model ||
+															modeConfig.model ||
 															''
 														}
 													onProviderChange={ (
 														provider
 													) => {
 															form.updateData( {
-																context_models: {
+																mode_models: {
 																	...form.data
-																		.context_models,
-																	[ contextItem.id ]:
+																		.mode_models,
+																	[ modeItem.id ]:
 																		{
-																			...contextConfig,
+																			...modeConfig,
 																			provider,
 																			model: '',
 																	},
@@ -239,12 +236,12 @@ const AgentSettings = () => {
 														model
 													) => {
 															form.updateData( {
-																context_models: {
+																mode_models: {
 																	...form.data
-																		.context_models,
-																	[ contextItem.id ]:
+																		.mode_models,
+																	[ modeItem.id ]:
 																		{
-																			...contextConfig,
+																			...modeConfig,
 																			model,
 																	},
 															},

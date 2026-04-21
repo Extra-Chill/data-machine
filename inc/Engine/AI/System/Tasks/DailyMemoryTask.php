@@ -506,8 +506,8 @@ class DailyMemoryTask extends SystemTask {
 		$lines = array();
 		foreach ( $sessions as $session ) {
 			$title   = ! empty( $session['title'] ) ? $session['title'] : 'Untitled session';
-			$context = $session['context'] ?? 'chat';
-			$lines[] = "- [{$context}] {$title}";
+			$mode    = $session['mode'] ?? 'chat';
+			$lines[] = "- [{$mode}] {$title}";
 		}
 
 		return implode( "\n", $lines );

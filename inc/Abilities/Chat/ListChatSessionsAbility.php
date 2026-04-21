@@ -2,7 +2,7 @@
 /**
  * List Chat Sessions Ability
  *
-	 * Lists chat sessions for a given user with pagination and context filtering.
+	 * Lists chat sessions for a given user with pagination and mode filtering.
  *
  * @package DataMachine\Abilities\Chat
  * @since 0.31.0
@@ -35,7 +35,7 @@ class ListChatSessionsAbility {
 				'datamachine/list-chat-sessions',
 				array(
 					'label'               => __( 'List Chat Sessions', 'data-machine' ),
-					'description'         => __( 'List chat sessions for a user with pagination and context filtering.', 'data-machine' ),
+					'description'         => __( 'List chat sessions for a user with pagination and mode filtering.', 'data-machine' ),
 					'category'            => 'datamachine-chat',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -58,9 +58,9 @@ class ListChatSessionsAbility {
 								'default'     => 0,
 								'description' => __( 'Pagination offset.', 'data-machine' ),
 							),
-							'context'  => array(
+							'mode'     => array(
 								'type'        => array( 'string', 'null' ),
-								'description' => __( 'Context filter (chat, pipeline, system). Null returns all contexts.', 'data-machine' ),
+								'description' => __( 'Mode filter (chat, pipeline, system). Null returns all modes.', 'data-machine' ),
 							),
 						),
 						'required'   => array( 'user_id' ),
@@ -76,7 +76,7 @@ class ListChatSessionsAbility {
 							'total'    => array( 'type' => 'integer' ),
 							'limit'    => array( 'type' => 'integer' ),
 							'offset'   => array( 'type' => 'integer' ),
-							'context'  => array( 'type' => array( 'string', 'null' ) ),
+							'mode'     => array( 'type' => array( 'string', 'null' ) ),
 							'error'    => array( 'type' => 'string' ),
 						),
 					),
@@ -103,7 +103,8 @@ class ListChatSessionsAbility {
 	/**
 	 * Execute list-chat-sessions ability.
 	 *
-	 * @param array $input Input parameters with user_id, optional limit, offset, context.
+	 * @param array $input Input parameters with user_id, optional limit, offset, mode.
+	 *
 	 * @return array Result with sessions list and total count.
 	 */
 	public function execute( array $input ): array {
@@ -125,11 +126,11 @@ class ListChatSessionsAbility {
 
 		$limit    = min( 100, max( 1, (int) ( $input['limit'] ?? 20 ) ) );
 		$offset   = max( 0, (int) ( $input['offset'] ?? 0 ) );
-		$context  = ! empty( $input['context'] ) ? sanitize_text_field( $input['context'] ) : null;
+		$mode     = ! empty( $input['mode'] ) ? sanitize_text_field( $input['mode'] ) : null;
 		$agent_id = isset( $input['agent_id'] ) && is_numeric( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
 
-		$sessions = $this->chat_db->get_user_sessions( $user_id, $limit, $offset, $context, $agent_id );
-		$total    = $this->chat_db->get_user_session_count( $user_id, $context, $agent_id );
+		$sessions = $this->chat_db->get_user_sessions( $user_id, $limit, $offset, $mode, $agent_id );
+		$total    = $this->chat_db->get_user_session_count( $user_id, $mode, $agent_id );
 
 		return array(
 			'success'  => true,
@@ -137,7 +138,7 @@ class ListChatSessionsAbility {
 			'total'    => $total,
 			'limit'    => $limit,
 			'offset'   => $offset,
-			'context'  => $context,
+			'mode'     => $mode,
 		);
 	}
 }

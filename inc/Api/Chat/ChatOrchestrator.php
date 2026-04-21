@@ -107,7 +107,7 @@ class ChatOrchestrator {
 						'session_id'          => $session_id,
 						'user_id'             => $user_id,
 						'original_created_at' => $pending_session['created_at'],
-						'context'             => 'chat',
+						'mode'                => 'chat',
 					)
 				);
 			} else {
@@ -329,7 +329,7 @@ class ChatOrchestrator {
 		}
 
 		$messages             = $session['messages'] ?? array();
-		$chat_defaults        = PluginSettings::resolveModelForAgentContext( (int) ( $session['agent_id'] ?? 0 ), 'chat' );
+		$chat_defaults        = PluginSettings::resolveModelForAgentMode( (int) ( $session['agent_id'] ?? 0 ), 'chat' );
 		$provider             = $session['provider'] ?? $chat_defaults['provider'];
 		$model                = $session['model'] ?? $chat_defaults['model'];
 		$message_count_before = count( $messages );
@@ -510,7 +510,7 @@ class ChatOrchestrator {
 			array(
 				'session_id' => $session_id,
 				'turns'      => $result['turn_count'],
-				'context'    => 'chat',
+				'mode'       => 'chat',
 			)
 		);
 
@@ -552,7 +552,7 @@ class ChatOrchestrator {
 			$input = array(
 				'user_id'  => $user_id,
 				'agent_id' => $agent_id,
-				'context'  => 'chat',
+				'mode'     => 'chat',
 			);
 
 			if ( $source ) {

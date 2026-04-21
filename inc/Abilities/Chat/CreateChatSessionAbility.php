@@ -49,10 +49,10 @@ class CreateChatSessionAbility {
 								'type'        => 'integer',
 								'description' => __( 'First-class agent ID for this session.', 'data-machine' ),
 							),
-							'context'  => array(
+							'mode'     => array(
 								'type'        => 'string',
 								'default'     => 'chat',
-								'description' => __( 'Execution context (chat, pipeline, system).', 'data-machine' ),
+								'description' => __( 'Execution mode (chat, pipeline, system).', 'data-machine' ),
 							),
 							'source'   => array(
 								'type'        => 'string',
@@ -90,7 +90,7 @@ class CreateChatSessionAbility {
 	/**
 	 * Execute create-chat-session ability.
 	 *
-	 * @param array $input Input parameters with user_id, optional context, source, metadata.
+	 * @param array $input Input parameters with user_id, optional mode, source, metadata.
 	 * @return array Result with session_id on success.
 	 */
 	public function execute( array $input ): array {
@@ -103,7 +103,7 @@ class CreateChatSessionAbility {
 
 		$user_id  = (int) $input['user_id'];
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$context  = ! empty( $input['context'] ) ? sanitize_text_field( $input['context'] ) : 'chat';
+		$mode     = ! empty( $input['mode'] ) ? sanitize_text_field( $input['mode'] ) : 'chat';
 		$source   = ! empty( $input['source'] ) ? sanitize_text_field( $input['source'] ) : null;
 
 		if ( ! $this->can_access_user_sessions( $user_id ) ) {
@@ -127,7 +127,7 @@ class CreateChatSessionAbility {
 			$session_metadata = array_merge( $session_metadata, $input['metadata'] );
 		}
 
-		$session_id = $this->chat_db->create_session( $user_id, $agent_id, $session_metadata, $context );
+		$session_id = $this->chat_db->create_session( $user_id, $agent_id, $session_metadata, $mode );
 
 		if ( empty( $session_id ) ) {
 			return array(

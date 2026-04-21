@@ -91,13 +91,13 @@ class ChatCommand extends BaseCommand {
 			$display_items[] = array(
 				'session_id'    => $session['session_id'],
 				'title'         => $session['title'] ?? '(untitled)',
-				'context'       => $session['context'] ?? 'chat',
+				'mode'          => $session['mode'] ?? 'chat',
 				'message_count' => $metadata['message_count'] ?? 0,
 				'created_at'    => $metadata['started_at'] ?? $session['created_at'] ?? '-',
 			);
 		}
 
-		$fields = array( 'session_id', 'title', 'context', 'message_count', 'created_at' );
+		$fields = array( 'session_id', 'title', 'mode', 'message_count', 'created_at' );
 		$this->format_items( $display_items, $fields, $assoc_args, 'session_id' );
 
 		$format = $assoc_args['format'] ?? 'table';
@@ -171,7 +171,7 @@ class ChatCommand extends BaseCommand {
 		WP_CLI::log( WP_CLI::colorize( '%BSession Metadata:%n' ) );
 		WP_CLI::log( "  Session ID:   {$session['session_id']}" );
 		WP_CLI::log( '  Title:        ' . ( $session['title'] ?? '(untitled)' ) );
-		WP_CLI::log( '  Context:      ' . ( $session['context'] ?? 'chat' ) );
+		WP_CLI::log( '  Mode:         ' . ( $session['mode'] ?? 'chat' ) );
 		WP_CLI::log( "  User ID:      {$session['user_id']}" );
 		WP_CLI::log( '  Started:      ' . ( $metadata['started_at'] ?? '-' ) );
 		WP_CLI::log( '  Messages:     ' . count( $messages ) );

@@ -498,7 +498,7 @@ class SystemAbilities {
 	}
 
 	private static function generateAITitle( string $first_user_message, ?string $first_assistant_response ): ?string {
-		$chat_defaults = PluginSettings::resolveModelForAgentContext( null, 'chat' );
+		$chat_defaults = PluginSettings::resolveModelForAgentMode( null, 'chat' );
 		$provider      = $chat_defaults['provider'];
 		$model         = $chat_defaults['model'];
 

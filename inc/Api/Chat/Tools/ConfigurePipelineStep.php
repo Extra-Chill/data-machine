@@ -33,7 +33,7 @@ class ConfigurePipelineStep extends BaseTool {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handle_tool_call',
-			'description' => 'Configure pipeline-level AI step settings: system prompt and disabled tools. Model/provider are managed via the context_models site setting, not per-pipeline. For flow-level settings (handler, handler_config, user_message), use configure_flow_steps instead.',
+			'description' => 'Configure pipeline-level AI step settings: system prompt and disabled tools. Model/provider are managed via the mode_models site setting, not per-pipeline. For flow-level settings (handler, handler_config, user_message), use configure_flow_steps instead.',
 			'parameters'  => array(
 				'pipeline_step_id' => array(
 					'type'        => 'string',

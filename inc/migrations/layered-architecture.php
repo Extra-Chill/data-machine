@@ -86,7 +86,7 @@ function datamachine_migrate_to_layered_architecture(): void {
 			$user        = get_user_by( 'id', $user_id );
 			$agent_slug  = $user ? sanitize_title( $user->user_login ) : 'user-' . $user_id;
 			$agent_name  = $user ? $user->display_name : 'User ' . $user_id;
-			$agent_model = \DataMachine\Core\PluginSettings::getContextModel( 'chat' );
+			$agent_model = \DataMachine\Core\PluginSettings::getModelForMode( 'chat' );
 
 			$agent_id = $agents_repo->create_if_missing(
 				$agent_slug,
@@ -189,7 +189,7 @@ function datamachine_migrate_to_layered_architecture(): void {
 		$default_user    = get_user_by( 'id', $default_user_id );
 		$default_slug    = $default_user ? sanitize_title( $default_user->user_login ) : 'user-' . $default_user_id;
 		$default_name    = $default_user ? $default_user->display_name : 'User ' . $default_user_id;
-		$default_model   = \DataMachine\Core\PluginSettings::getContextModel( 'chat' );
+		$default_model   = \DataMachine\Core\PluginSettings::getModelForMode( 'chat' );
 
 		$agents_repo->create_if_missing(
 			$default_slug,

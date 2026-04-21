@@ -170,7 +170,7 @@ function datamachine_register_default_admin_agent(): void {
 	$default_config = array();
 	if ( class_exists( '\\DataMachine\\Core\\PluginSettings' ) ) {
 		$default_config['model'] = array(
-			'default' => \DataMachine\Core\PluginSettings::getContextModel( 'chat' ),
+			'default' => \DataMachine\Core\PluginSettings::getModelForMode( 'chat' ),
 		);
 	}
 
