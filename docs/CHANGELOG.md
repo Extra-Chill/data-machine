@@ -2,7 +2,7 @@
 
 All notable changes to Data Machine will be documented in this file.
 
-## [Unreleased]
+## [0.71.0] - 2026-04-21
 
 ### Added
 - **AgentModeDirective** (priority 22) replaces per-agent context files with a runtime directive. `AgentModeRegistry` replaces `ContextRegistry` (kept as `class_alias` shim). `datamachine_contexts` action fires via `do_action_deprecated()` from `datamachine_agent_modes`. Built-in modes: `chat`, `pipeline`, `system`. Extension modes (`editor`, `bridge`) provide content via `datamachine_agent_mode_{slug}` filter. MemoryFileRegistry metadata key renamed `contexts` → `modes` with BC shim. (#1129)
@@ -14,13 +14,28 @@ All notable changes to Data Machine will be documented in this file.
 - **Multi-agent DB primitives** + REST list bugfixes; scope-aware defaults and per-user access resolution in list-agents; locked-in self-service agent creation contract via tests. (#1110, #1112, #1113)
 - New CLI: `wp datamachine agents cleanup-legacy-context-files [--dry-run]` for removing stale on-disk context files after the AgentMode migration.
 - New docs: `docs/core-filters.md` documents AgentMode filter/action/registry.
+- datamachine_register_agents hook + dogfooded default admin agent
+- CallerContextDirective — surface authenticated A2A caller identity to receiving agent
+- consolidate chubes_ai_tools + rename contexts → modes
+- feat(engine/auth): IterationBudget primitive + cross-site A2A chain depth (closes #1122)
+- AgentModeDirective — replace per-agent context files with runtime directive
+- outbound client for cross-site agent calls (closes #1121)
+- route raw-SQL chat leaks through ConversationStoreInterface
+- extract RecurringScheduler primitive + schedule registry (closes #1114)
 
 ### Changed
 - Payload key `context` → `agent_mode` (both set during migration window for BC).
 - `MemoryFileRegistry`: drop unused header arg; move header ownership from core to registrar. (#1126, #1127)
+- drop unused header arg from MemoryFileRegistry
+- lock in self-service agent creation contract
+- refactor(list-agents): scope-aware defaults, per-user access resolution
 
 ### Removed
 - Per-agent `contexts/*.md` infrastructure: scaffolding no longer creates `contexts/` subdirectories; REST API drops `/files/agent/contexts/*` routes; admin file listing no longer surfaces context files; `AgentBundler` no longer exports/imports `contexts/`; `DirectoryManager::get_contexts_directory()` removed. (#1129)
+
+### Fixed
+- fix(import-export): restore flows + handler_configs on pipeline import (#1133)
+- fix(import-export): honor step_config on pipeline import (#1133)
 
 ## [0.70.2] - 2026-04-20
 
