@@ -2,6 +2,26 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **AgentModeDirective** (priority 22) replaces per-agent context files with a runtime directive. `AgentModeRegistry` replaces `ContextRegistry` (kept as `class_alias` shim). `datamachine_contexts` action fires via `do_action_deprecated()` from `datamachine_agent_modes`. Built-in modes: `chat`, `pipeline`, `system`. Extension modes (`editor`, `bridge`) provide content via `datamachine_agent_mode_{slug}` filter. MemoryFileRegistry metadata key renamed `contexts` → `modes` with BC shim. (#1129)
+- **Tool registry consolidation**: `chubes_ai_tools` filter consolidated into `datamachine_tools`; tool metadata `contexts` renamed to `modes`. (#1130)
+- **IterationBudget primitive**: generic bounded-iteration primitive used to enforce run limits. API: `increment()`, `exceeded()`, `remaining()`, `current()`, `ceiling()`, `toResponseFlag()`. Cross-site A2A chain depth exceedance returns 429 with `datamachine_chain_depth_exceeded`. (#1125)
+- **Outbound client for cross-site agent calls** via `CallerContext` headers. (#1123)
+- **`datamachine_conversation_store` filter seam** + `ConversationStoreInterface` route for raw-SQL chat leaks. (#1118, #1120)
+- **RecurringScheduler primitive** + schedule registry — extracted reusable recurring-task infrastructure. (#1117)
+- **Multi-agent DB primitives** + REST list bugfixes; scope-aware defaults and per-user access resolution in list-agents; locked-in self-service agent creation contract via tests. (#1110, #1112, #1113)
+- New CLI: `wp datamachine agents cleanup-legacy-context-files [--dry-run]` for removing stale on-disk context files after the AgentMode migration.
+- New docs: `docs/core-filters.md` documents AgentMode filter/action/registry.
+
+### Changed
+- Payload key `context` → `agent_mode` (both set during migration window for BC).
+- `MemoryFileRegistry`: drop unused header arg; move header ownership from core to registrar. (#1126, #1127)
+
+### Removed
+- Per-agent `contexts/*.md` infrastructure: scaffolding no longer creates `contexts/` subdirectories; REST API drops `/files/agent/contexts/*` routes; admin file listing no longer surfaces context files; `AgentBundler` no longer exports/imports `contexts/`; `DirectoryManager::get_contexts_directory()` removed. (#1129)
+
 ## [0.70.2] - 2026-04-20
 
 ### Changed
