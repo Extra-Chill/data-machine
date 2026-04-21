@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.75.0] - 2026-04-21
+
+### Added
+- route all system tasks through execute-workflow engine
+
 ## [0.74.0] - 2026-04-21
 
 ### Added
