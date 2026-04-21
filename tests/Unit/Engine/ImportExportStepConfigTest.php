@@ -1,10 +1,10 @@
 <?php
 /**
- * ImportExport — step_config round-trip tests.
+ * ImportExport — pipeline round-trip tests.
  *
- * Verifies that `datamachine/import-pipelines` honors the step_config column
- * emitted by `datamachine/export-pipelines` (issue #1133 step 1). Flow and
- * handler_config restoration is explicitly out of scope.
+ * Covers the two lossy-import fixes from issue #1133:
+ *   - Step 1: step_config restoration (system_prompt, provider, model, label, extensions).
+ *   - Step 2: flow + handler_slugs / handler_configs restoration.
  *
  * @package DataMachine\Tests\Unit\Engine
  */
@@ -13,6 +13,7 @@ namespace DataMachine\Tests\Unit\Engine;
 
 use DataMachine\Abilities\PipelineAbilities;
 use DataMachine\Abilities\PipelineStepAbilities;
+use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Engine\Actions\ImportExport;
 use WP_UnitTestCase;
@@ -23,6 +24,7 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 	private PipelineAbilities $pipeline_abilities;
 	private PipelineStepAbilities $step_abilities;
 	private Pipelines $db_pipelines;
+	private Flows $db_flows;
 
 	public function set_up(): void {
 		parent::set_up();
@@ -34,6 +36,7 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 		$this->pipeline_abilities = new PipelineAbilities();
 		$this->step_abilities     = new PipelineStepAbilities();
 		$this->db_pipelines       = new Pipelines();
+		$this->db_flows           = new Flows();
 	}
 
 	public function tear_down(): void {
@@ -111,8 +114,8 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 
 	public function test_import_does_not_duplicate_steps_when_flow_rows_present(): void {
 		// Hand-craft a CSV that mirrors what the exporter emits for a pipeline with one step
-		// and one flow that has a handler configured. Today the flow-row branch of the CSV is
-		// deferred (step 2), but we still must not create duplicate steps from those rows.
+		// and one flow that has a handler configured. Flow rows share step_type/step_config
+		// with their parent pipeline row and must NOT trigger duplicate add-step calls.
 		$step_config_json = wp_json_encode(
 			array(
 				'step_type'        => 'fetch',
@@ -143,6 +146,124 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 		$this->assertTrue( $steps_result['success'] );
 		$this->assertCount( 1, $steps_result['steps'], 'Flow rows must not trigger duplicate add-step calls.' );
 		$this->assertSame( 'Fetch', $steps_result['steps'][0]['label'] );
+	}
+
+	public function test_import_restores_flow_and_handler_config_from_export(): void {
+		// Build a source pipeline with a fetch step and a flow configured with an RSS handler.
+		$created            = $this->pipeline_abilities->executeCreatePipeline(
+			array(
+				'pipeline_name' => 'Flow Round Trip Source',
+				'flow_config'   => array( 'flow_name' => 'Morning Flow' ),
+			)
+		);
+		$source_pipeline_id = $created['pipeline_id'];
+		$source_flow_id     = $created['flow_id'] ?? null;
+		$this->assertNotNull( $source_flow_id );
+
+		$add_result     = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $source_pipeline_id,
+				'step_type'   => 'fetch',
+			)
+		);
+		$source_step_id = $add_result['pipeline_step_id'];
+
+		// Directly seed the flow_config with handler_slugs + handler_configs for this step.
+		$source_flow      = $this->db_flows->get_flow( (int) $source_flow_id );
+		$flow_config      = $source_flow['flow_config'] ?? array();
+		$source_flow_step = apply_filters( 'datamachine_generate_flow_step_id', '', $source_step_id, (int) $source_flow_id );
+		$flow_config[ $source_flow_step ]['handler_slugs']   = array( 'rss' );
+		$flow_config[ $source_flow_step ]['handler_configs'] = array(
+			'rss' => array(
+				'feed_url' => 'https://example.com/feed',
+				'max_items' => 25,
+			),
+		);
+		$flow_config[ $source_flow_step ]['enabled'] = true;
+		$this->db_flows->update_flow( (int) $source_flow_id, array( 'flow_config' => $flow_config ) );
+
+		// Export.
+		$csv = $this->import_export->handle_export( 'pipelines', array( $source_pipeline_id ) );
+		$this->assertIsString( $csv );
+		$this->assertStringContainsString( 'Morning Flow', $csv );
+		$this->assertStringContainsString( 'rss', $csv );
+
+		// Rename to force a distinct target pipeline.
+		$csv_renamed = str_replace( 'Flow Round Trip Source', 'Flow Round Trip Target', $csv );
+
+		$result = $this->import_export->handle_import( 'pipelines', $csv_renamed );
+		$this->assertIsArray( $result );
+		$this->assertCount( 1, $result['imported'] );
+
+		$imported_pipeline_id = (int) $result['imported'][0];
+		$this->assertNotSame( $source_pipeline_id, $imported_pipeline_id );
+
+		// The imported pipeline should have exactly one flow, and it should be named after
+		// the exported flow (not the legacy "Default Flow" fallback).
+		$imported_flows = $this->db_flows->get_flows_for_pipeline( $imported_pipeline_id );
+		$this->assertCount( 1, $imported_flows, 'Import should not leave an orphan Default Flow.' );
+		$imported_flow = $imported_flows[0];
+		$this->assertSame( 'Morning Flow', $imported_flow['flow_name'] );
+
+		// Imported step id.
+		$steps_result     = $this->step_abilities->executeGetPipelineSteps(
+			array( 'pipeline_id' => $imported_pipeline_id )
+		);
+		$imported_step_id = $steps_result['steps'][0]['pipeline_step_id'];
+
+		// Compute the target flow_step_id and verify handler_slugs + handler_configs round-trip.
+		$imported_flow_step_id = apply_filters(
+			'datamachine_generate_flow_step_id',
+			'',
+			$imported_step_id,
+			(int) $imported_flow['flow_id']
+		);
+		$this->assertNotEmpty( $imported_flow_step_id );
+		$this->assertNotSame( $source_flow_step, $imported_flow_step_id );
+
+		$imported_flow_config = $imported_flow['flow_config'] ?? array();
+		$this->assertArrayHasKey( $imported_flow_step_id, $imported_flow_config );
+		$imported_step = $imported_flow_config[ $imported_flow_step_id ];
+
+		$this->assertSame( array( 'rss' ), $imported_step['handler_slugs'] );
+		$this->assertSame(
+			array(
+				'feed_url'  => 'https://example.com/feed',
+				'max_items' => 25,
+			),
+			$imported_step['handler_configs']['rss']
+		);
+		$this->assertTrue( $imported_step['enabled'] );
+	}
+
+	public function test_import_without_flow_rows_creates_default_flow_fallback(): void {
+		// Pipeline with only an AI step and no handler-bearing flow — export emits no flow
+		// rows, so import should still leave the pipeline with at least one flow.
+		$created            = $this->pipeline_abilities->executeCreatePipeline(
+			array( 'pipeline_name' => 'Empty Flow Source' )
+		);
+		$source_pipeline_id = $created['pipeline_id'];
+		$this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $source_pipeline_id,
+				'step_type'   => 'ai',
+			)
+		);
+
+		// Delete any auto-created flows on the source so the export has no flow rows.
+		foreach ( $this->db_flows->get_flows_for_pipeline( $source_pipeline_id ) as $flow ) {
+			$this->db_flows->delete_flow( (int) $flow['flow_id'] );
+		}
+
+		$csv         = $this->import_export->handle_export( 'pipelines', array( $source_pipeline_id ) );
+		$csv_renamed = str_replace( 'Empty Flow Source', 'Empty Flow Target', $csv );
+
+		$result = $this->import_export->handle_import( 'pipelines', $csv_renamed );
+		$this->assertCount( 1, $result['imported'] );
+
+		$imported_flows = $this->db_flows->get_flows_for_pipeline( (int) $result['imported'][0] );
+		$this->assertCount( 1, $imported_flows, 'Exports with no flow rows should still produce one default flow on import.' );
+		$this->assertSame( 'Default Flow', $imported_flows[0]['flow_name'] );
 	}
 
 	/**
