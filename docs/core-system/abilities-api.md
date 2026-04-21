@@ -355,13 +355,16 @@ Internal abilities for the pipeline execution engine.
 | `datamachine/get-step-types` | List available step types, or get single by slug | `StepTypeAbilities.php` |
 | `datamachine/validate-step-type` | Validate step type configuration | `StepTypeAbilities.php` |
 
-### Processed Items (3 abilities)
+### Processed Items (6 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
 | `datamachine/clear-processed-items` | Clear processed items for flow (resets deduplication) | `ProcessedItemsAbilities.php` |
 | `datamachine/check-processed-item` | Check if item was processed | `ProcessedItemsAbilities.php` |
 | `datamachine/has-processed-history` | Check if flow has processed history | `ProcessedItemsAbilities.php` |
+| `datamachine/processed-items-get-processed-at` | Get last-processed Unix timestamp for an item (or null) | `ProcessedItemsAbilities.php` |
+| `datamachine/processed-items-find-stale` | Given candidates, return those older than N days | `ProcessedItemsAbilities.php` |
+| `datamachine/processed-items-find-never-processed` | Given candidates, return those never processed | `ProcessedItemsAbilities.php` |
 
 ### Agent Ping (1 ability)
 

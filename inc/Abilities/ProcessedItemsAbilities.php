@@ -44,6 +44,9 @@ class ProcessedItemsAbilities {
 			$this->registerClearProcessedItems();
 			$this->registerCheckProcessedItem();
 			$this->registerHasProcessedHistory();
+			$this->registerGetProcessedAt();
+			$this->registerFindStale();
+			$this->registerFindNeverProcessed();
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
@@ -166,6 +169,163 @@ class ProcessedItemsAbilities {
 					),
 				),
 				'execute_callback'    => array( $this, 'executeHasProcessedHistory' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Register datamachine/processed-items-get-processed-at ability.
+	 */
+	private function registerGetProcessedAt(): void {
+		wp_register_ability(
+			'datamachine/processed-items-get-processed-at',
+			array(
+				'label'               => __( 'Get Processed-At Timestamp', 'data-machine' ),
+				'description'         => __( 'Get the last-processed Unix timestamp for a specific item, or null if never processed.', 'data-machine' ),
+				'category'            => 'datamachine-agent',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'flow_step_id', 'source_type', 'item_identifier' ),
+					'properties' => array(
+						'flow_step_id'    => array(
+							'type'        => 'string',
+							'description' => __( 'Flow step ID in format "{pipeline_step_id}_{flow_id}"', 'data-machine' ),
+						),
+						'source_type'     => array(
+							'type'        => 'string',
+							'description' => __( 'Source type identifier (e.g., "rss", "wiki_post", "venue")', 'data-machine' ),
+						),
+						'item_identifier' => array(
+							'type'        => 'string',
+							'description' => __( 'Unique identifier for the item', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'      => array( 'type' => 'boolean' ),
+						'processed_at' => array(
+							'type'        => array( 'integer', 'null' ),
+							'description' => __( 'Unix timestamp, or null when never processed', 'data-machine' ),
+						),
+						'error'        => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeGetProcessedAt' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Register datamachine/processed-items-find-stale ability.
+	 */
+	private function registerFindStale(): void {
+		wp_register_ability(
+			'datamachine/processed-items-find-stale',
+			array(
+				'label'               => __( 'Find Stale Processed Items', 'data-machine' ),
+				'description'         => __( 'Given candidate identifiers, return those whose processed_timestamp is older than the given window. Enables maintenance pipelines.', 'data-machine' ),
+				'category'            => 'datamachine-agent',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'flow_step_id', 'source_type', 'candidate_identifiers', 'max_age_days' ),
+					'properties' => array(
+						'flow_step_id'          => array(
+							'type'        => 'string',
+							'description' => __( 'Flow step ID in format "{pipeline_step_id}_{flow_id}"', 'data-machine' ),
+						),
+						'source_type'           => array(
+							'type'        => 'string',
+							'description' => __( 'Source type identifier', 'data-machine' ),
+						),
+						'candidate_identifiers' => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => __( 'Candidate item identifiers to evaluate', 'data-machine' ),
+						),
+						'max_age_days'          => array(
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'description' => __( 'Staleness threshold in days', 'data-machine' ),
+						),
+						'limit'                 => array(
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'description' => __( 'Maximum number of identifiers returned. Default 100.', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'   => array( 'type' => 'boolean' ),
+						'stale_ids' => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'string' ),
+						),
+						'count'     => array( 'type' => 'integer' ),
+						'error'     => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeFindStale' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Register datamachine/processed-items-find-never-processed ability.
+	 */
+	private function registerFindNeverProcessed(): void {
+		wp_register_ability(
+			'datamachine/processed-items-find-never-processed',
+			array(
+				'label'               => __( 'Find Never-Processed Items', 'data-machine' ),
+				'description'         => __( 'Given candidate identifiers, return those that have never been processed for this flow step + source type. Enables backfill on first run.', 'data-machine' ),
+				'category'            => 'datamachine-agent',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'flow_step_id', 'source_type', 'candidate_identifiers' ),
+					'properties' => array(
+						'flow_step_id'          => array(
+							'type'        => 'string',
+							'description' => __( 'Flow step ID in format "{pipeline_step_id}_{flow_id}"', 'data-machine' ),
+						),
+						'source_type'           => array(
+							'type'        => 'string',
+							'description' => __( 'Source type identifier', 'data-machine' ),
+						),
+						'candidate_identifiers' => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'description' => __( 'Candidate item identifiers to evaluate', 'data-machine' ),
+						),
+						'limit'                 => array(
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'description' => __( 'Maximum number of identifiers returned. Default 100.', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'         => array( 'type' => 'boolean' ),
+						'never_processed' => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'string' ),
+						),
+						'count'           => array( 'type' => 'integer' ),
+						'error'           => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeFindNeverProcessed' ),
 				'permission_callback' => array( $this, 'checkPermission' ),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
@@ -319,6 +479,165 @@ class ProcessedItemsAbilities {
 		return array(
 			'success'     => true,
 			'has_history' => $has_history,
+		);
+	}
+
+	/**
+	 * Execute processed-items-get-processed-at ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result with processed_at timestamp (or null).
+	 */
+	public function executeGetProcessedAt( array $input ): array {
+		$flow_step_id    = $input['flow_step_id'] ?? null;
+		$source_type     = $input['source_type'] ?? null;
+		$item_identifier = $input['item_identifier'] ?? null;
+
+		if ( empty( $flow_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_step_id is required',
+			);
+		}
+
+		if ( empty( $source_type ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'source_type is required',
+			);
+		}
+
+		if ( empty( $item_identifier ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'item_identifier is required',
+			);
+		}
+
+		$flow_step_id    = sanitize_text_field( $flow_step_id );
+		$source_type     = sanitize_text_field( $source_type );
+		$item_identifier = sanitize_text_field( $item_identifier );
+
+		$processed_at = $this->db_processed_items->get_processed_at(
+			$flow_step_id,
+			$source_type,
+			$item_identifier
+		);
+
+		return array(
+			'success'      => true,
+			'processed_at' => $processed_at,
+		);
+	}
+
+	/**
+	 * Execute processed-items-find-stale ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result with stale_ids array.
+	 */
+	public function executeFindStale( array $input ): array {
+		$flow_step_id = $input['flow_step_id'] ?? null;
+		$source_type  = $input['source_type'] ?? null;
+		$candidates   = $input['candidate_identifiers'] ?? null;
+		$max_age_days = $input['max_age_days'] ?? null;
+		$limit        = $input['limit'] ?? 100;
+
+		if ( empty( $flow_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_step_id is required',
+			);
+		}
+
+		if ( empty( $source_type ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'source_type is required',
+			);
+		}
+
+		if ( ! is_array( $candidates ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'candidate_identifiers must be an array',
+			);
+		}
+
+		if ( ! is_numeric( $max_age_days ) || (int) $max_age_days < 1 ) {
+			return array(
+				'success' => false,
+				'error'   => 'max_age_days must be an integer >= 1',
+			);
+		}
+
+		$flow_step_id = sanitize_text_field( $flow_step_id );
+		$source_type  = sanitize_text_field( $source_type );
+		$candidates   = array_values( array_map( 'strval', $candidates ) );
+
+		$stale_ids = $this->db_processed_items->find_stale(
+			$flow_step_id,
+			$source_type,
+			$candidates,
+			(int) $max_age_days,
+			max( 1, (int) $limit )
+		);
+
+		return array(
+			'success'   => true,
+			'stale_ids' => $stale_ids,
+			'count'     => count( $stale_ids ),
+		);
+	}
+
+	/**
+	 * Execute processed-items-find-never-processed ability.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result with never_processed array.
+	 */
+	public function executeFindNeverProcessed( array $input ): array {
+		$flow_step_id = $input['flow_step_id'] ?? null;
+		$source_type  = $input['source_type'] ?? null;
+		$candidates   = $input['candidate_identifiers'] ?? null;
+		$limit        = $input['limit'] ?? 100;
+
+		if ( empty( $flow_step_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_step_id is required',
+			);
+		}
+
+		if ( empty( $source_type ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'source_type is required',
+			);
+		}
+
+		if ( ! is_array( $candidates ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'candidate_identifiers must be an array',
+			);
+		}
+
+		$flow_step_id = sanitize_text_field( $flow_step_id );
+		$source_type  = sanitize_text_field( $source_type );
+		$candidates   = array_values( array_map( 'strval', $candidates ) );
+
+		$never = $this->db_processed_items->find_never_processed(
+			$flow_step_id,
+			$source_type,
+			$candidates,
+			max( 1, (int) $limit )
+		);
+
+		return array(
+			'success'         => true,
+			'never_processed' => $never,
+			'count'           => count( $never ),
 		);
 	}
 }

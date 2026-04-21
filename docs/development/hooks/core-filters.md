@@ -743,6 +743,54 @@ $data = apply_filters('datamachine_data_packet', $data, $packet_data, $flow_step
 
 **Return**: Boolean processed status
 
+### `datamachine_should_reprocess_item`
+
+**Since**: v0.71.0
+
+**Purpose**: Opt into time-windowed revisit semantics for fetch-side deduplication without every handler growing its own `--revisit-days` flag.
+
+**Wire point**: `ExecutionContext::isItemProcessed()` — applied after the default seen/not-seen check runs. The filter is **not** invoked in `direct` or `standalone` execution modes, or when `flow_step_id` is empty.
+
+**Parameters**:
+- `$skip` (bool) — Current skip decision. `true` means "skip — already processed"; `false` means "process".
+- `$context` (array):
+  - `flow_step_id` (string)
+  - `source_type` (string)
+  - `item_identifier` (string)
+  - `job_id` (int) — 0 when unavailable.
+
+**Return**: Boolean. `true` to skip (default seen-before behavior). `false` to process anyway (revisit).
+
+**Default behavior (no filter)**: The filter never returns a different value than was passed in; existing deployments behave identically to pre-0.71 installs.
+
+**Example — reprocess stale wiki posts**:
+
+```php
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
+
+add_filter( 'datamachine_should_reprocess_item', function ( $skip, $ctx ) {
+    if ( ! $skip ) {
+        return false;
+    }
+
+    if ( 'wiki_post' !== $ctx['source_type'] ) {
+        return $skip;
+    }
+
+    $fresh = ( new ProcessedItems() )->has_been_processed_within(
+        $ctx['flow_step_id'],
+        $ctx['source_type'],
+        $ctx['item_identifier'],
+        7
+    );
+
+    // skip=false means "process"; return true to keep skipping when still fresh.
+    return $fresh;
+}, 10, 2 );
+```
+
+**See also**: `ProcessedItems::get_processed_at()`, `ProcessedItems::has_been_processed_within()`, `ProcessedItems::find_stale()`, `ProcessedItems::find_never_processed()` — the time-windowed read API introduced in the same release.
+
 
 ## Duplicate Detection Filters
 

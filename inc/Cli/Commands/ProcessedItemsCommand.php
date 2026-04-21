@@ -483,4 +483,269 @@ class ProcessedItemsCommand extends BaseCommand {
 			WP_CLI::log( sprintf( 'Flow step %s has no processing history (first run or cleared).', $flow_step_id ) );
 		}
 	}
+
+	/**
+	 * Get the last-processed timestamp for a specific item.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --flow-step-id=<flow_step_id>
+	 * : Flow step ID in format "{pipeline_step_id}_{flow_id}".
+	 *
+	 * --source-type=<source_type>
+	 * : Source type (e.g., "rss", "wiki_post", "venue").
+	 *
+	 * --item-identifier=<item_identifier>
+	 * : Unique identifier for the item.
+	 *
+	 * [--format=<format>]
+	 * : Output format. Default: table.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine processed-items get-processed-at --flow-step-id=3_12 --source-type=rss --item-identifier=https://example.com/post-1
+	 *     wp datamachine processed-items get-processed-at --flow-step-id=3_12 --source-type=wiki_post --item-identifier=42 --format=json
+	 *
+	 * @subcommand get-processed-at
+	 */
+	public function get_processed_at( array $args, array $assoc_args ): void {
+		$flow_step_id    = $assoc_args['flow-step-id'] ?? '';
+		$source_type     = $assoc_args['source-type'] ?? '';
+		$item_identifier = $assoc_args['item-identifier'] ?? '';
+		$format          = $assoc_args['format'] ?? 'table';
+
+		if ( '' === $flow_step_id || '' === $source_type || '' === $item_identifier ) {
+			WP_CLI::error( '--flow-step-id, --source-type, and --item-identifier are all required.' );
+			return;
+		}
+
+		$ability = new ProcessedItemsAbilities();
+		$result  = $ability->executeGetProcessedAt(
+			array(
+				'flow_step_id'    => $flow_step_id,
+				'source_type'     => $source_type,
+				'item_identifier' => $item_identifier,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to get processed-at timestamp.' );
+			return;
+		}
+
+		$processed_at = $result['processed_at'];
+
+		$rows = array(
+			array(
+				'flow_step_id'      => $flow_step_id,
+				'source_type'       => $source_type,
+				'item_identifier'   => $item_identifier,
+				'processed_at_unix' => null === $processed_at ? '—' : (string) $processed_at,
+				'processed_at_iso'  => null === $processed_at ? '—' : gmdate( 'Y-m-d\\TH:i:s\\Z', (int) $processed_at ),
+			),
+		);
+
+		WP_CLI\Utils\format_items( $format, $rows, array_keys( $rows[0] ) );
+	}
+
+	/**
+	 * Find candidate items that are stale (processed longer ago than the window).
+	 *
+	 * ## OPTIONS
+	 *
+	 * --flow-step-id=<flow_step_id>
+	 * : Flow step ID in format "{pipeline_step_id}_{flow_id}".
+	 *
+	 * --source-type=<source_type>
+	 * : Source type identifier.
+	 *
+	 * --candidate-ids=<csv>
+	 * : Comma-separated list of candidate item identifiers to check.
+	 *
+	 * --max-age-days=<days>
+	 * : Staleness threshold in days (integer >= 1).
+	 *
+	 * [--limit=<limit>]
+	 * : Maximum number of identifiers returned. Default 100.
+	 *
+	 * [--format=<format>]
+	 * : Output format. Default: table.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 *   - csv
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine processed-items find-stale --flow-step-id=3_12 --source-type=wiki_post \
+	 *         --candidate-ids=1,2,3,4 --max-age-days=7
+	 *
+	 * @subcommand find-stale
+	 */
+	public function find_stale( array $args, array $assoc_args ): void {
+		$flow_step_id = $assoc_args['flow-step-id'] ?? '';
+		$source_type  = $assoc_args['source-type'] ?? '';
+		$ids_csv      = $assoc_args['candidate-ids'] ?? '';
+		$max_age_days = $assoc_args['max-age-days'] ?? null;
+		$limit        = (int) ( $assoc_args['limit'] ?? 100 );
+		$format       = $assoc_args['format'] ?? 'table';
+
+		if ( '' === $flow_step_id || '' === $source_type || '' === $ids_csv ) {
+			WP_CLI::error( '--flow-step-id, --source-type, and --candidate-ids are all required.' );
+			return;
+		}
+
+		if ( null === $max_age_days || ! is_numeric( $max_age_days ) || (int) $max_age_days < 1 ) {
+			WP_CLI::error( '--max-age-days is required and must be an integer >= 1.' );
+			return;
+		}
+
+		$candidates = array_values(
+			array_filter(
+				array_map( 'trim', explode( ',', (string) $ids_csv ) ),
+				static function ( $v ) {
+					return '' !== $v;
+				}
+			)
+		);
+
+		if ( empty( $candidates ) ) {
+			WP_CLI::error( '--candidate-ids cannot be empty.' );
+			return;
+		}
+
+		$ability = new ProcessedItemsAbilities();
+		$result  = $ability->executeFindStale(
+			array(
+				'flow_step_id'          => $flow_step_id,
+				'source_type'           => $source_type,
+				'candidate_identifiers' => $candidates,
+				'max_age_days'          => (int) $max_age_days,
+				'limit'                 => $limit,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to find stale items.' );
+			return;
+		}
+
+		$stale = $result['stale_ids'];
+
+		WP_CLI::log( sprintf( 'Stale: %d of %d candidate(s) older than %d day(s).', count( $stale ), count( $candidates ), (int) $max_age_days ) );
+
+		if ( empty( $stale ) ) {
+			return;
+		}
+
+		$rows = array();
+		foreach ( $stale as $id ) {
+			$rows[] = array( 'item_identifier' => $id );
+		}
+
+		WP_CLI\Utils\format_items( $format, $rows, array_keys( $rows[0] ) );
+	}
+
+	/**
+	 * Find candidate items that have never been processed.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --flow-step-id=<flow_step_id>
+	 * : Flow step ID in format "{pipeline_step_id}_{flow_id}".
+	 *
+	 * --source-type=<source_type>
+	 * : Source type identifier.
+	 *
+	 * --candidate-ids=<csv>
+	 * : Comma-separated list of candidate item identifiers to check.
+	 *
+	 * [--limit=<limit>]
+	 * : Maximum number of identifiers returned. Default 100.
+	 *
+	 * [--format=<format>]
+	 * : Output format. Default: table.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 *   - csv
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine processed-items find-never-processed --flow-step-id=3_12 --source-type=wiki_post \
+	 *         --candidate-ids=1,2,3,4
+	 *
+	 * @subcommand find-never-processed
+	 */
+	public function find_never_processed( array $args, array $assoc_args ): void {
+		$flow_step_id = $assoc_args['flow-step-id'] ?? '';
+		$source_type  = $assoc_args['source-type'] ?? '';
+		$ids_csv      = $assoc_args['candidate-ids'] ?? '';
+		$limit        = (int) ( $assoc_args['limit'] ?? 100 );
+		$format       = $assoc_args['format'] ?? 'table';
+
+		if ( '' === $flow_step_id || '' === $source_type || '' === $ids_csv ) {
+			WP_CLI::error( '--flow-step-id, --source-type, and --candidate-ids are all required.' );
+			return;
+		}
+
+		$candidates = array_values(
+			array_filter(
+				array_map( 'trim', explode( ',', (string) $ids_csv ) ),
+				static function ( $v ) {
+					return '' !== $v;
+				}
+			)
+		);
+
+		if ( empty( $candidates ) ) {
+			WP_CLI::error( '--candidate-ids cannot be empty.' );
+			return;
+		}
+
+		$ability = new ProcessedItemsAbilities();
+		$result  = $ability->executeFindNeverProcessed(
+			array(
+				'flow_step_id'          => $flow_step_id,
+				'source_type'           => $source_type,
+				'candidate_identifiers' => $candidates,
+				'limit'                 => $limit,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to find never-processed items.' );
+			return;
+		}
+
+		$never = $result['never_processed'];
+
+		WP_CLI::log( sprintf( 'Never-processed: %d of %d candidate(s).', count( $never ), count( $candidates ) ) );
+
+		if ( empty( $never ) ) {
+			return;
+		}
+
+		$rows = array();
+		foreach ( $never as $id ) {
+			$rows[] = array( 'item_identifier' => $id );
+		}
+
+		WP_CLI\Utils\format_items( $format, $rows, array_keys( $rows[0] ) );
+	}
 }

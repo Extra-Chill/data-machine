@@ -33,7 +33,7 @@ The migration from OOP service managers to WordPress Abilities API is **complete
 - **JobAbilities** - 6 abilities for workflow execution, job management, health monitoring, summary
 - **RecoverStuckJobsAbility** - 1 ability for stuck job recovery
 - **FileAbilities** - 5 abilities for file management and uploads
-- **ProcessedItemsAbilities** - 3 abilities for deduplication tracking
+- **ProcessedItemsAbilities** - 6 abilities for deduplication tracking and time-windowed revisit reads
 - **SettingsAbilities** - 7 abilities for plugin and handler settings
 - **AuthAbilities** - 3 abilities for OAuth authentication management
 - **LogAbilities** - 6 abilities for logging operations

@@ -395,13 +395,22 @@ curl -X DELETE https://example.com/wp-json/datamachine/v1/processed-items/1523 \
 
 ## Abilities API Integration
 
-Three registered abilities provide programmatic access to processed items operations. These are used by REST API endpoints, CLI commands, and Chat tools.
+Six registered abilities provide programmatic access to processed items operations. These are used by REST API endpoints, CLI commands, and Chat tools.
 
 | Ability | Description |
 |---------|-------------|
 | `datamachine/clear-processed-items` | Clear processed items by pipeline or flow scope |
 | `datamachine/check-processed-item` | Check if a specific item has been processed for a flow step |
 | `datamachine/has-processed-history` | Check if a flow step has any processing history |
+| `datamachine/processed-items-get-processed-at` | Get the last-processed Unix timestamp for a specific item (or null) |
+| `datamachine/processed-items-find-stale` | Given candidate identifiers, return those older than N days |
+| `datamachine/processed-items-find-never-processed` | Given candidate identifiers, return those with no row for this flow step + source type |
+
+### Revisit API (since 0.71.0)
+
+The three `processed-items-*` abilities expose the time-windowed read surface on the `processed_timestamp` column that has been populated on every row since the table existed. Together with the `datamachine_should_reprocess_item` filter (see [core-filters.md](../../development/hooks/core-filters.md)), they let consumers build maintenance-style pipelines ("review wiki post X if last reviewed > 7 days ago", "venue refresh on cadence", "rotating SEO audit") as thin wrappers on one DM primitive — no parallel tables, no post_meta, no new registration surface.
+
+See `ProcessedItems::get_processed_at()`, `has_been_processed_within()`, `find_stale()`, and `find_never_processed()` for the underlying methods.
 
 ### has-processed-history
 
@@ -455,7 +464,7 @@ The `SkipItemTool` is a handler tool available during the Fetch step that allows
 - `ExecutionContext::fromConfig($config, $job_id, $handler_type)` — Backward-compatible creation from handler config array
 
 **Key Methods for Processed Items**:
-- `isItemProcessed(string $item_id): bool` — Checks deduplication via `ProcessedItems::has_item_been_processed()`. Returns `false` in direct mode.
+- `isItemProcessed(string $item_id): bool` — Checks deduplication via `ProcessedItems::has_item_been_processed()` and applies the `datamachine_should_reprocess_item` filter so consumers can opt into revisit semantics (since 0.71.0). Returns `false` in direct and standalone modes.
 - `markItemProcessed(string $item_id): void` — Fires `datamachine_mark_item_processed` action. No-op in direct mode.
 - `storeEngineData(array $data): void` — Merges data into engine snapshot for the current job
 - `getEngine(): EngineData` — Lazily loads engine data for the current job
