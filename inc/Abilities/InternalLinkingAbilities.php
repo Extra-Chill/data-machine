@@ -72,6 +72,11 @@ class InternalLinkingAbilities {
 	 * link graph filters so core behavior is a participant, not a hardcoded
 	 * fallback.
 	 *
+	 * Intentionally uses anonymous closures so these registrations cannot
+	 * be removed by consumers via `remove_filter`. The built-in edge type
+	 * is a guarantee of the core primitive, not a default that third-party
+	 * code should be able to silently drop.
+	 *
 	 * @since 0.72.0
 	 */
 	private function registerBuiltInLinkGraphParticipants(): void {
@@ -826,7 +831,10 @@ class InternalLinkingAbilities {
 		$filtered_links = array();
 		foreach ( $all_links as $edge ) {
 			$edge_type = (string) ( $edge['edge_type'] ?? '' );
-			if ( '' === $edge_type || isset( $types_set[ $edge_type ] ) ) {
+			// Drop edges lacking a type when a filter is active — dispatchExtractors
+			// stamps edge_type from the registration key, so missing types only
+			// appear for malformed data and shouldn't leak into scoped results.
+			if ( '' !== $edge_type && isset( $types_set[ $edge_type ] ) ) {
 				$filtered_links[] = $edge;
 			}
 		}
@@ -1843,7 +1851,11 @@ class InternalLinkingAbilities {
 			if ( $source_id <= 0 ) {
 				continue;
 			}
-			if ( null !== $types_set && '' !== $edge_type && ! isset( $types_set[ $edge_type ] ) ) {
+			// Drop edges lacking a type when a filter is active — same rationale
+			// as applyTypesFilterToGraph(): dispatch stamps edge_type from the
+			// registration key, so missing types only appear for malformed data
+			// and shouldn't leak into scoped aggregates.
+			if ( null !== $types_set && ( '' === $edge_type || ! isset( $types_set[ $edge_type ] ) ) ) {
 				continue;
 			}
 			if ( null === $target_id ) {

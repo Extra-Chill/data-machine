@@ -131,8 +131,8 @@ class InternalLinkingAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 3, $result['total_scanned'] );
-		// A→B and B→C = 2 resolved outbound edges in this corpus.
-		$this->assertGreaterThanOrEqual( 2, $result['total_links'] );
+		// A→B and B→C = exactly 2 resolved outbound edges in this corpus.
+		$this->assertSame( 2, $result['total_links'] );
 
 		// Every edge in the graph should be typed as html_anchor.
 		$this->assertArrayHasKey( '_all_links', $result );
@@ -363,9 +363,9 @@ class InternalLinkingAbilitiesTest extends WP_UnitTestCase {
 		add_filter( 'datamachine_link_resolvers', $reg_resolver );
 
 		try {
-			// All-types audit: total_links = html_anchor (2) + test_type (1) = 3.
+			// All-types audit: total_links = html_anchor (2) + test_type (1) = exactly 3.
 			$full = InternalLinkingAbilities::auditInternalLinks( array( 'force' => true ) );
-			$this->assertGreaterThanOrEqual( 3, $full['total_links'] );
+			$this->assertSame( 3, $full['total_links'] );
 
 			// Scoped to test_type only: total_links in the returned view drops to 1.
 			$scoped = InternalLinkingAbilities::auditInternalLinks( array( 'types' => array( 'test_type' ) ) );
