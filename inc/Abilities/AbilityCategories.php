@@ -41,6 +41,7 @@ class AbilityCategories {
 	public const LOGGING    = 'datamachine-logging';
 	public const SYSTEM     = 'datamachine-system';
 	public const CHAT       = 'datamachine-chat';
+	public const ACTIONS    = 'datamachine-actions';
 
 	private static bool $registered = false;
 
@@ -128,6 +129,10 @@ class AbilityCategories {
 			self::CHAT       => array(
 				'label'       => __( 'Chat', 'data-machine' ),
 				'description' => __( 'Chat session management and messaging.', 'data-machine' ),
+			),
+			self::ACTIONS    => array(
+				'label'       => __( 'Actions', 'data-machine' ),
+				'description' => __( 'Pending action staging and resolution (user approval of tool invocations).', 'data-machine' ),
 			),
 		);
 

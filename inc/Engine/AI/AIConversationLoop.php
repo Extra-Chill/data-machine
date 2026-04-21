@@ -323,12 +323,17 @@ class AIConversationLoop {
 					);
 					$messages[]        = $tool_call_message;
 
-					// Execute the tool
+					// Execute the tool. Pass mode + agent_id + client_context
+					// so ActionPolicyResolver can apply per-agent and per-mode
+					// policy (preview/forbidden/direct) before the handler fires.
 					$tool_result = ToolExecutor::executeTool(
 						$tool_name,
 						$tool_parameters,
 						$tools,
-						$payload
+						$payload,
+						$context,
+						(int) ( $payload['agent_id'] ?? 0 ),
+						is_array( $payload['client_context'] ?? null ) ? $payload['client_context'] : array()
 					);
 
 					do_action(
