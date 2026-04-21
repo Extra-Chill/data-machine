@@ -52,6 +52,7 @@ require_once __DIR__ . '/Api/Chat/ChatFilters.php';
 require_once __DIR__ . '/Engine/AI/Directives/CoreMemoryFilesDirective.php';
 require_once __DIR__ . '/Engine/AI/Directives/AgentModeDirective.php';
 require_once __DIR__ . '/Engine/AI/Directives/CallerContextDirective.php';
+require_once __DIR__ . '/Engine/Agents/register-agents.php';
 
 /*
 |--------------------------------------------------------------------------

@@ -12,6 +12,8 @@ The multi-agent system consists of five layers:
 4. **Database scoping** — agent_id on pipelines, flows, jobs, and chat sessions
 5. **Resolution** — CLI and API helpers that resolve the active agent from context
 
+Plugins that ship bundled agent roles (e.g. a wiki-generator, a support-triage bot) declare them via the `datamachine_register_agents` action. See `agent-registration.md` for the declarative registration surface.
+
 ## Agents Table
 
 **Table:** `{prefix}_datamachine_agents`

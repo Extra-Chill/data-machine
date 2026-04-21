@@ -2,6 +2,48 @@
 
 ## Actions
 
+### `datamachine_register_agents`
+
+Fires once per request when the AgentRegistry is first consumed. Plugins declare agent roles inside this callback; DM reconciles declarations against the `datamachine_agents` table on `init` priority 15.
+
+Same API DM itself uses to register the default site administrator agent. Registrations are collected statically; last-wins on slug collision so plugins can override via hook priority.
+
+**Since:** 0.71.0
+
+```php
+add_action( 'datamachine_register_agents', function () {
+    datamachine_register_agent( 'wiki-generator', array(
+        'label'       => 'Wiki Generator',
+        'description' => 'Fetches sources, distills into wiki articles.',
+        'soul_path'   => MY_PLUGIN_DIR . 'agents/wiki-generator/SOUL.md',
+    ) );
+} );
+```
+
+See `docs/core-system/agent-registration.md` for the full registration contract.
+
+---
+
+### `datamachine_registered_agent_reconciled`
+
+Fires for each registered agent that was just materialized into the `datamachine_agents` table by `AgentRegistry::reconcile()`. Does not fire for registrations whose DB row already existed.
+
+**Since:** 0.71.0
+
+```php
+add_action( 'datamachine_registered_agent_reconciled', function ( $agent_id, $slug, $def ) {
+    // One-time provisioning for newly-created agents.
+}, 10, 3 );
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$agent_id` | `int` | Newly created agent row ID. |
+| `$slug` | `string` | Registered slug. |
+| `$def` | `array` | Full registration definition. |
+
+---
+
 ### `datamachine_agent_modes`
 
 Fires once per request when the AgentModeRegistry is first consumed. Extensions register their execution modes inside this callback.
