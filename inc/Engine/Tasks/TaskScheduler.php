@@ -1,13 +1,17 @@
 <?php
 /**
- * Task Scheduler - Async task scheduling and execution.
+ * Task Scheduler - Routes system tasks through the workflow engine.
  *
- * Handles scheduling individual tasks and batches via Action Scheduler,
- * with DM Jobs for tracking. This replaces the scheduling functionality
- * that was previously embedded in the SystemAgent singleton.
+ * All task scheduling now delegates to datamachine/execute-workflow.
+ * The task's getWorkflow() method provides the step list; the engine
+ * handles job creation, Action Scheduler dispatch, and step execution.
+ *
+ * This replaces the previous direct-to-Action-Scheduler path that used
+ * the datamachine_task_handle hook and per-task execute() calls.
  *
  * @package DataMachine\Engine\Tasks
  * @since 0.37.0
+ * @since 0.72.0 Delegates to datamachine/execute-workflow; handleTask() removed.
  */
 
 namespace DataMachine\Engine\Tasks;
@@ -36,13 +40,13 @@ class TaskScheduler {
 	const BATCH_CHUNK_DELAY = 30;
 
 	/**
-	 * Schedule an async task.
+	 * Schedule an async task via the workflow engine.
 	 *
-	 * Creates a DM Job record and schedules an Action Scheduler action for
-	 * task execution. Returns the job ID for tracking purposes.
+	 * Resolves the task handler, calls getWorkflow() to build the step
+	 * list, and delegates to datamachine/execute-workflow for execution.
 	 *
 	 * @param string $taskType    Task type identifier.
-	 * @param array  $params      Task parameters to store in engine_data.
+	 * @param array  $params      Task parameters passed to getWorkflow().
 	 * @param array  $context     Context for routing results back (origin, IDs, etc.).
 	 * @param int    $parentJobId Parent job ID for hierarchy (batch parent, pipeline parent).
 	 * @return int|false Job ID on success, false on failure.
@@ -63,93 +67,98 @@ class TaskScheduler {
 			return false;
 		}
 
-		// Create DM Job.
-		$jobs_db  = new Jobs();
-		$job_data = array(
-			'pipeline_id' => 'direct',
-			'flow_id'     => 'direct',
-			'source'      => 'system',
-			'label'       => ucfirst( str_replace( '_', ' ', $taskType ) ),
-			'user_id'     => (int) ( $context['user_id'] ?? 0 ),
-		);
+		// Resolve the task handler and build the workflow.
+		$handler_class = TaskRegistry::getHandler( $taskType );
 
-		if ( $parentJobId > 0 ) {
-			$job_data['parent_job_id'] = $parentJobId;
-		}
-
-		$job_id = $jobs_db->create_job( $job_data );
-
-		if ( ! $job_id ) {
+		if ( ! $handler_class || ! class_exists( $handler_class ) ) {
 			do_action(
 				'datamachine_log',
 				'error',
-				'TaskScheduler: Failed to create job for task',
+				"TaskScheduler: Handler class not found for '{$taskType}'",
+				array( 'task_type' => $taskType, 'handler_class' => $handler_class )
+			);
+			return false;
+		}
+
+		$handler  = new $handler_class();
+		$workflow = $handler->getWorkflow( $params );
+
+		if ( empty( $workflow['steps'] ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				"TaskScheduler: getWorkflow() returned empty steps for '{$taskType}'",
+				array( 'task_type' => $taskType, 'params' => $params )
+			);
+			return false;
+		}
+
+		// Delegate to the execute-workflow ability.
+		$ability = wp_get_ability( 'datamachine/execute-workflow' );
+
+		if ( ! $ability ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'TaskScheduler: datamachine/execute-workflow ability not available',
+				array( 'task_type' => $taskType )
+			);
+			return false;
+		}
+
+		$result = $ability->execute( array(
+			'workflow'     => $workflow,
+			'timestamp'    => $params['scheduled_at'] ?? null,
+			'initial_data' => array(
+				'task_type'     => $taskType,
+				'task_params'   => $params,
+				'task_context'  => $context,
+				'parent_job_id' => $parentJobId,
+				'user_id'       => (int) ( $context['user_id'] ?? 0 ),
+			),
+		) );
+
+		if ( empty( $result['success'] ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'TaskScheduler: Workflow execution failed for ' . $taskType . ': ' . ( $result['error'] ?? 'Unknown error' ),
 				array(
 					'task_type' => $taskType,
 					'context'   => 'system',
+					'error'     => $result['error'] ?? '',
 				)
 			);
 			return false;
 		}
 
-		// Store task params in engine_data.
-		$jobs_db->store_engine_data( (int) $job_id, array_merge( $params, array(
-			'task_type'    => $taskType,
-			'context'      => $context,
-			'scheduled_at' => current_time( 'mysql' ),
-		) ) );
+		$job_id = $result['job_id'] ?? 0;
 
-		// Job stays 'pending' until Action Scheduler fires handleTask().
-		// The transition to 'processing' happens there, so recover-stuck
-		// only catches jobs that genuinely started but never finished.
+		do_action(
+			'datamachine_log',
+			'info',
+			"Task scheduled via workflow engine: {$taskType} (Job #{$job_id})",
+			array(
+				'job_id'         => $job_id,
+				'task_type'      => $taskType,
+				'execution_type' => $result['execution_type'] ?? 'immediate',
+				'context'        => 'system',
+				'params'         => $params,
+				'route'          => $context,
+			)
+		);
 
-		// Schedule Action Scheduler action.
-		if ( function_exists( 'as_schedule_single_action' ) ) {
-			$args = array(
-				'job_id' => $job_id,
-			);
-
-			$action_id = as_schedule_single_action(
-				time(),
-				'datamachine_task_handle',
-				$args,
-				'data-machine'
-			);
-
-			if ( $action_id ) {
-				do_action(
-					'datamachine_log',
-					'info',
-					"Task scheduled: {$taskType} (Job #{$job_id})",
-					array(
-						'job_id'    => $job_id,
-						'action_id' => $action_id,
-						'task_type' => $taskType,
-						'context'   => 'system',
-						'params'    => $params,
-						'route'     => $context,
-					)
-				);
-
-				return $job_id;
-			} else {
-				// Action Scheduler failed — mark job as failed.
-				$jobs_db->complete_job( $job_id, JobStatus::failed( 'Failed to schedule Action Scheduler action' )->toString() );
-				return false;
-			}
-		} else {
-			// Action Scheduler not available.
-			$jobs_db->complete_job( $job_id, JobStatus::failed( 'Action Scheduler not available' )->toString() );
-			return false;
-		}
+		return $job_id;
 	}
 
 	/**
 	 * Schedule a batch of tasks with chunked execution.
 	 *
-	 * Instead of creating hundreds of AS actions at once, stores all items
+	 * Instead of creating hundreds of workflow jobs at once, stores all items
 	 * in a transient and processes them in chunks. Between chunks, other
 	 * task types can run — preventing queue flooding.
+	 *
+	 * Each item becomes its own standalone workflow job via schedule().
 	 *
 	 * @param string $taskType   Task type identifier (must be registered).
 	 * @param array  $itemParams Array of parameter arrays, one per task.
@@ -436,97 +445,6 @@ class TaskScheduler {
 					'total'        => $total,
 				)
 			);
-		}
-	}
-
-	/**
-	 * Handle a scheduled task (Action Scheduler callback).
-	 *
-	 * Loads the job, determines the task type, and delegates to the
-	 * appropriate handler for execution.
-	 *
-	 * @param int $jobId Job ID from DM Jobs table.
-	 */
-	public static function handleTask( int $jobId ): void {
-		$jobs_db = new Jobs();
-
-		// Transition from 'pending' → 'processing' now that AS is running this.
-		$jobs_db->start_job( $jobId, JobStatus::PROCESSING );
-
-		$job = $jobs_db->get_job( $jobId );
-
-		if ( ! $job ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				"TaskScheduler: Job {$jobId} not found",
-				array(
-					'job_id'  => $jobId,
-					'context' => 'system',
-				)
-			);
-			return;
-		}
-
-		$engine_data = $job['engine_data'] ?? array();
-		$task_type   = $engine_data['task_type'] ?? '';
-
-		if ( empty( $task_type ) ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				"TaskScheduler: No task type found in job {$jobId}",
-				array(
-					'job_id'      => $jobId,
-					'context'     => 'system',
-					'engine_data' => $engine_data,
-				)
-			);
-
-			$jobs_db->complete_job( $jobId, JobStatus::failed( 'No task type found' )->toString() );
-			return;
-		}
-
-		$handler_class = TaskRegistry::getHandler( $task_type );
-
-		if ( ! $handler_class ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				"TaskScheduler: Unknown task type '{$task_type}' for job {$jobId}",
-				array(
-					'job_id'    => $jobId,
-					'task_type' => $task_type,
-					'context'   => 'system',
-				)
-			);
-
-			$jobs_db->complete_job( $jobId, JobStatus::failed( "Unknown task type: {$task_type}" )->toString() );
-			return;
-		}
-
-		// Instantiate and execute the task handler.
-		try {
-			$handler = new $handler_class();
-			$handler->execute( $jobId, $engine_data );
-		} catch ( \Throwable $e ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				"Task execution failed for job {$jobId}: " . $e->getMessage(),
-				array(
-					'job_id'         => $jobId,
-					'task_type'      => $task_type,
-					'context'        => 'system',
-					'handler_class'  => $handler_class,
-					'exception'      => $e->getMessage(),
-					'exception_file' => $e->getFile(),
-					'exception_line' => $e->getLine(),
-				)
-			);
-
-			// Mark job as failed due to exception.
-			$jobs_db->complete_job( $jobId, JobStatus::failed( 'Task execution exception: ' . $e->getMessage() )->toString() );
 		}
 	}
 

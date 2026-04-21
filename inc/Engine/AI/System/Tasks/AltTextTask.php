@@ -2,12 +2,11 @@
 /**
  * Alt Text Generation Task for System Agent.
  *
- * Generates AI-powered alt text for image attachments. Loads the image file,
- * builds a contextual prompt, sends to the configured AI provider, normalizes
- * the response, and saves it as the attachment's alt text meta.
+ * Generates AI-powered alt text for image attachments.
  *
  * @package DataMachine\Engine\AI\System\Tasks
  * @since 0.23.0
+ * @since 0.72.0 Migrated to getWorkflow() + executeTask() contract.
  */
 
 namespace DataMachine\Engine\AI\System\Tasks;
@@ -25,7 +24,7 @@ class AltTextTask extends SystemTask {
 	 * @param int   $jobId  Job ID from DM Jobs table.
 	 * @param array $params Task parameters from engine_data.
 	 */
-	public function execute( int $jobId, array $params ): void {
+	public function executeTask( int $jobId, array $params ): void {
 		$attachment_id = absint( $params['attachment_id'] ?? 0 );
 		$force         = ! empty( $params['force'] );
 
@@ -107,7 +106,6 @@ class AltTextTask extends SystemTask {
 			return;
 		}
 
-		// Save the alt text.
 		$current_alt = get_post_meta( $attachment_id, '_wp_attachment_image_alt', true );
 		$updated     = update_post_meta( $attachment_id, '_wp_attachment_image_alt', $alt_text );
 
@@ -116,7 +114,6 @@ class AltTextTask extends SystemTask {
 			return;
 		}
 
-		// Build standardized effects array for undo.
 		$effects = array(
 			array(
 				'type'           => 'post_meta_set',
@@ -137,8 +134,6 @@ class AltTextTask extends SystemTask {
 	}
 
 	/**
-	 * Get the task type identifier.
-	 *
 	 * @return string
 	 */
 	public function getTaskType(): string {
@@ -161,20 +156,14 @@ class AltTextTask extends SystemTask {
 	}
 
 	/**
-	 * Alt text generation supports undo — restores previous alt text value.
-	 *
 	 * @return bool
-	 * @since 0.33.0
 	 */
 	public function supportsUndo(): bool {
 		return true;
 	}
 
 	/**
-	 * Get editable prompt definitions for this task.
-	 *
-	 * @return array Prompt definitions keyed by prompt key.
-	 * @since 0.41.0
+	 * @return array
 	 */
 	public function getPromptDefinitions(): array {
 		return array(
@@ -199,8 +188,6 @@ class AltTextTask extends SystemTask {
 	}
 
 	/**
-	 * Build the AI prompt with contextual information.
-	 *
 	 * @param int $attachment_id Attachment ID.
 	 * @return string Prompt text.
 	 */
@@ -234,21 +221,16 @@ class AltTextTask extends SystemTask {
 	}
 
 	/**
-	 * Check if attachment alt text is missing.
-	 *
 	 * @param int $attachment_id Attachment ID.
 	 * @return bool
 	 */
 	private function isAltTextMissing( int $attachment_id ): bool {
 		$alt_text = get_post_meta( $attachment_id, '_wp_attachment_image_alt', true );
 		$alt_text = is_string( $alt_text ) ? trim( $alt_text ) : '';
-
 		return '' === $alt_text;
 	}
 
 	/**
-	 * Normalize AI response to a clean alt text string.
-	 *
 	 * @param string $raw Raw AI response.
 	 * @return string Normalized alt text.
 	 */
@@ -261,7 +243,6 @@ class AltTextTask extends SystemTask {
 			return '';
 		}
 
-		// Capitalize first character.
 		$first_char = mb_substr( $alt_text, 0, 1 );
 		$rest       = mb_substr( $alt_text, 1 );
 		if ( preg_match( '/[a-z]/', $first_char ) ) {
@@ -269,7 +250,6 @@ class AltTextTask extends SystemTask {
 		}
 		$alt_text = $first_char . $rest;
 
-		// Ensure trailing period.
 		if ( ! preg_match( '/\.$/', $alt_text ) ) {
 			$alt_text .= '.';
 		}

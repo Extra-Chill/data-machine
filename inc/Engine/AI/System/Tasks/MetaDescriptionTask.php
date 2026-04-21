@@ -6,12 +6,9 @@
  * content, and taxonomy context, sends to the configured AI provider,
  * normalizes the response, and saves to the WordPress post_excerpt field.
  *
- * WordPress post_excerpt is the standard field for meta descriptions.
- * SEO plugins (including extrachill-seo) read from post_excerpt as their
- * primary source for meta description output.
- *
  * @package DataMachine\Engine\AI\System\Tasks
  * @since 0.31.0
+ * @since 0.72.0 Migrated to getWorkflow() + executeTask() contract.
  */
 
 namespace DataMachine\Engine\AI\System\Tasks;
@@ -23,16 +20,7 @@ use DataMachine\Engine\AI\RequestBuilder;
 
 class MetaDescriptionTask extends SystemTask {
 
-	/**
-	 * Maximum character length for meta descriptions.
-	 *
-	 * Google truncates at ~155-160 characters. Targeting 155 to stay safe.
-	 */
-	const MAX_LENGTH = 155;
-
-	/**
-	 * Maximum content characters to include in the prompt.
-	 */
+	const MAX_LENGTH            = 155;
 	const CONTENT_EXCERPT_LENGTH = 1500;
 
 	/**
@@ -41,7 +29,7 @@ class MetaDescriptionTask extends SystemTask {
 	 * @param int   $jobId  Job ID from DM Jobs table.
 	 * @param array $params Task parameters from engine_data.
 	 */
-	public function execute( int $jobId, array $params ): void {
+	public function executeTask( int $jobId, array $params ): void {
 		$post_id = absint( $params['post_id'] ?? 0 );
 		$force   = ! empty( $params['force'] );
 
@@ -112,7 +100,6 @@ class MetaDescriptionTask extends SystemTask {
 			return;
 		}
 
-		// Save to the WordPress post_excerpt field.
 		$result = wp_update_post(
 			array(
 				'ID'           => $post_id,
@@ -126,7 +113,6 @@ class MetaDescriptionTask extends SystemTask {
 			return;
 		}
 
-		// Build standardized effects array for undo.
 		$effects = array(
 			array(
 				'type'           => 'post_field_set',
@@ -148,8 +134,6 @@ class MetaDescriptionTask extends SystemTask {
 	}
 
 	/**
-	 * Get the task type identifier.
-	 *
 	 * @return string
 	 */
 	public function getTaskType(): string {
@@ -172,8 +156,6 @@ class MetaDescriptionTask extends SystemTask {
 	}
 
 	/**
-	 * Meta description generation supports undo — restores previous excerpt.
-	 *
 	 * @return bool
 	 */
 	public function supportsUndo(): bool {
@@ -181,9 +163,7 @@ class MetaDescriptionTask extends SystemTask {
 	}
 
 	/**
-	 * Get editable prompt definitions for this task.
-	 *
-	 * @return array Prompt definitions keyed by prompt key.
+	 * @return array
 	 * @since 0.41.0
 	 */
 	public function getPromptDefinitions(): array {
@@ -212,9 +192,6 @@ class MetaDescriptionTask extends SystemTask {
 	/**
 	 * Build the AI prompt with post context.
 	 *
-	 * Note: The current excerpt is intentionally excluded from prompt context
-	 * since we are generating a replacement for it.
-	 *
 	 * @param \WP_Post $post Post object.
 	 * @return string Prompt text.
 	 */
@@ -226,7 +203,6 @@ class MetaDescriptionTask extends SystemTask {
 			$context_lines[] = 'Title: ' . $title;
 		}
 
-		// Get a clean text snippet of the post content.
 		$content = wp_strip_all_tags( strip_shortcodes( $post->post_content ) );
 		$content = preg_replace( '/\s+/', ' ', trim( $content ) );
 		if ( ! empty( $content ) ) {
@@ -237,7 +213,6 @@ class MetaDescriptionTask extends SystemTask {
 			$context_lines[] = 'Content: ' . $snippet;
 		}
 
-		// Gather taxonomy context.
 		$categories = wp_get_post_categories( $post->ID, array( 'fields' => 'names' ) );
 		if ( ! empty( $categories ) && ! is_wp_error( $categories ) ) {
 			$context_lines[] = 'Categories: ' . implode( ', ', $categories );
@@ -261,28 +236,21 @@ class MetaDescriptionTask extends SystemTask {
 	 */
 	private function normalizeDescription( string $raw ): string {
 		$description = trim( $raw );
-
-		// Strip wrapping quotes (AI sometimes wraps in quotes).
 		$description = trim( $description, " \t\n\r\0\x0B\"'" );
-
-		// Strip any markdown formatting.
 		$description = preg_replace( '/^#+\s*/', '', $description );
 		$description = preg_replace( '/\*\*(.*?)\*\*/', '$1', $description );
-
 		$description = sanitize_text_field( $description );
 
 		if ( '' === $description ) {
 			return '';
 		}
 
-		// Truncate to max length, breaking at word boundary.
 		if ( mb_strlen( $description ) > self::MAX_LENGTH ) {
 			$description = mb_substr( $description, 0, self::MAX_LENGTH );
 			$last_space  = mb_strrpos( $description, ' ' );
 			if ( false !== $last_space && $last_space > self::MAX_LENGTH - 30 ) {
 				$description = mb_substr( $description, 0, $last_space );
 			}
-			// Ensure it ends cleanly.
 			$description = rtrim( $description, ' ,;:-' );
 			if ( ! preg_match( '/[.!?]$/', $description ) ) {
 				$description .= '.';

@@ -8,6 +8,7 @@
  *
  * @package DataMachine\Engine\AI\System\Tasks
  * @since 0.24.0
+ * @since 0.72.0 Migrated to getWorkflow() + executeTask() contract.
  */
 
 namespace DataMachine\Engine\AI\System\Tasks;
@@ -21,13 +22,16 @@ use DataMachine\Engine\AI\RequestBuilder;
 
 class InternalLinkingTask extends SystemTask {
 
+	private const MIN_RELEVANCE_SCORE  = 3;
+	private const TITLE_WORD_MAX_WEIGHT = 5.0;
+
 	/**
 	 * Execute internal linking for a specific post.
 	 *
 	 * @param int   $jobId  Job ID from DM Jobs table.
 	 * @param array $params Task parameters from engine_data.
 	 */
-	public function execute( int $jobId, array $params ): void {
+	public function executeTask( int $jobId, array $params ): void {
 		$post_id        = absint( $params['post_id'] ?? 0 );
 		$links_per_post = absint( $params['links_per_post'] ?? 3 );
 		$force          = ! empty( $params['force'] );
@@ -44,7 +48,6 @@ class InternalLinkingTask extends SystemTask {
 			return;
 		}
 
-		// Check if already processed.
 		if ( ! $force ) {
 			$existing_links = get_post_meta( $post_id, '_datamachine_internal_links', true );
 			if ( ! empty( $existing_links ) ) {
@@ -57,7 +60,6 @@ class InternalLinkingTask extends SystemTask {
 			}
 		}
 
-		// Get post taxonomies.
 		$categories = wp_get_post_categories( $post_id, array( 'fields' => 'ids' ) );
 		$tags       = wp_get_post_tags( $post_id, array( 'fields' => 'ids' ) );
 
@@ -70,7 +72,6 @@ class InternalLinkingTask extends SystemTask {
 			return;
 		}
 
-		// Parse post into paragraph blocks.
 		$blocks_result = GetPostBlocksAbility::execute( array(
 			'post_id'     => $post_id,
 			'block_types' => array( 'core/paragraph' ),
@@ -87,10 +88,8 @@ class InternalLinkingTask extends SystemTask {
 
 		$paragraph_blocks = $blocks_result['blocks'];
 
-		// Find related posts scored by taxonomy overlap + title similarity.
 		$related = $this->findRelatedPosts( $post_id, $post->post_title, $categories, $tags, $links_per_post );
 
-		// Filter out posts already linked in any paragraph block.
 		$all_block_html = implode( "\n", array_column( $paragraph_blocks, 'inner_html' ) );
 		$related        = $this->filterAlreadyLinked( $related, $all_block_html );
 
@@ -103,7 +102,6 @@ class InternalLinkingTask extends SystemTask {
 			return;
 		}
 
-		// Build AI request config.
 		$system_defaults = $this->resolveSystemModel( $params );
 		$provider        = $system_defaults['provider'];
 		$model           = $system_defaults['model'];
@@ -113,7 +111,6 @@ class InternalLinkingTask extends SystemTask {
 			return;
 		}
 
-		// For each related post, find a candidate paragraph and send to AI.
 		$replacements   = array();
 		$inserted_links = array();
 
@@ -149,7 +146,6 @@ class InternalLinkingTask extends SystemTask {
 				continue;
 			}
 
-			// Validate a link was actually inserted.
 			if ( ! $this->detectInsertedLink( $new_html, $related_post['url'] ) ) {
 				continue;
 			}
@@ -165,7 +161,6 @@ class InternalLinkingTask extends SystemTask {
 				'title'   => $related_post['title'],
 			);
 
-			// Update inner_html in our working copy so subsequent candidates see the change.
 			foreach ( $paragraph_blocks as &$block ) {
 				if ( $block['index'] === $candidate['index'] ) {
 					$block['inner_html'] = $new_html;
@@ -184,10 +179,8 @@ class InternalLinkingTask extends SystemTask {
 			return;
 		}
 
-		// Capture pre-modification revision for undo support.
 		$revision_id = wp_save_post_revision( $post_id );
 
-		// Apply all block replacements at once.
 		$replace_result = ReplacePostBlocksAbility::execute( array(
 			'post_id'      => $post_id,
 			'replacements' => $replacements,
@@ -198,7 +191,6 @@ class InternalLinkingTask extends SystemTask {
 			return;
 		}
 
-		// Track which links were added.
 		$existing_meta = get_post_meta( $post_id, '_datamachine_internal_links', true );
 		$link_tracking = array(
 			'processed_at' => current_time( 'mysql' ),
@@ -207,7 +199,6 @@ class InternalLinkingTask extends SystemTask {
 		);
 		update_post_meta( $post_id, '_datamachine_internal_links', $link_tracking );
 
-		// Build standardized effects array for undo.
 		$effects = array();
 
 		if ( ! empty( $revision_id ) && ! is_wp_error( $revision_id ) ) {
@@ -237,8 +228,6 @@ class InternalLinkingTask extends SystemTask {
 	}
 
 	/**
-	 * Get the task type identifier.
-	 *
 	 * @return string
 	 */
 	public function getTaskType(): string {
@@ -246,11 +235,7 @@ class InternalLinkingTask extends SystemTask {
 	}
 
 	/**
-	 * Internal linking supports undo — restores pre-modification revision
-	 * and removes the _datamachine_internal_links tracking meta.
-	 *
 	 * @return bool
-	 * @since 0.33.0
 	 */
 	public function supportsUndo(): bool {
 		return true;
@@ -272,72 +257,7 @@ class InternalLinkingTask extends SystemTask {
 	}
 
 	/**
-	 * Find the best candidate paragraph block for a related post link.
-	 *
-	 * Scores paragraphs by title word matches, tag overlap, and keyword
-	 * relevance. Skips blocks already targeted by a pending replacement.
-	 *
-	 * @param array $blocks       Paragraph blocks from GetPostBlocksAbility.
-	 * @param array $related_post Related post data with id, url, title, tags.
-	 * @param array $replacements Already-queued replacements (to avoid same block).
-	 * @return array|null Best candidate block or null if none found.
-	 */
-	private function findCandidateParagraph( array $blocks, array $related_post, array $replacements ): ?array {
-		$used_indices = array_column( $replacements, 'block_index' );
-
-		// Get title words (3+ chars) for matching.
-		$title_words = array_filter(
-			preg_split( '/\s+/', strtolower( $related_post['title'] ) ),
-			fn( $word ) => strlen( $word ) >= 3
-		);
-
-		// Get related post's tag names for matching.
-		$related_tags = wp_get_post_tags( $related_post['id'], array( 'fields' => 'names' ) );
-		$related_tags = array_map( 'strtolower', $related_tags );
-
-		$best_block = null;
-		$best_score = 0;
-
-		foreach ( $blocks as $block ) {
-			if ( in_array( $block['index'], $used_indices, true ) ) {
-				continue;
-			}
-
-			// Skip blocks that already contain a link to this URL.
-			if ( false !== stripos( $block['inner_html'], $related_post['url'] ) ) {
-				continue;
-			}
-
-			$html_lower = strtolower( $block['inner_html'] );
-			$score      = 0;
-
-			// Score by title word matches.
-			foreach ( $title_words as $word ) {
-				if ( false !== strpos( $html_lower, $word ) ) {
-					$score += 2;
-				}
-			}
-
-			// Score by tag name matches.
-			foreach ( $related_tags as $tag ) {
-				if ( false !== strpos( $html_lower, $tag ) ) {
-					$score += 3;
-				}
-			}
-
-			if ( $score > $best_score ) {
-				$best_score = $score;
-				$best_block = $block;
-			}
-		}
-
-		return $best_block;
-	}
-
-	/**
-	 * Get editable prompt definitions for this task.
-	 *
-	 * @return array Prompt definitions keyed by prompt key.
+	 * @return array
 	 * @since 0.41.0
 	 */
 	public function getPromptDefinitions(): array {
@@ -362,13 +282,55 @@ class InternalLinkingTask extends SystemTask {
 		);
 	}
 
-	/**
-	 * Build AI prompt for a single paragraph + link insertion.
-	 *
-	 * @param string $paragraph_html The paragraph innerHTML.
-	 * @param array  $related_post   Related post data with url and title.
-	 * @return string Prompt text.
-	 */
+	// ─── Private helpers (unchanged from pre-migration) ───────────────
+
+	private function findCandidateParagraph( array $blocks, array $related_post, array $replacements ): ?array {
+		$used_indices = array_column( $replacements, 'block_index' );
+
+		$title_words = array_filter(
+			preg_split( '/\s+/', strtolower( $related_post['title'] ) ),
+			fn( $word ) => strlen( $word ) >= 3
+		);
+
+		$related_tags = wp_get_post_tags( $related_post['id'], array( 'fields' => 'names' ) );
+		$related_tags = array_map( 'strtolower', $related_tags );
+
+		$best_block = null;
+		$best_score = 0;
+
+		foreach ( $blocks as $block ) {
+			if ( in_array( $block['index'], $used_indices, true ) ) {
+				continue;
+			}
+
+			if ( false !== stripos( $block['inner_html'], $related_post['url'] ) ) {
+				continue;
+			}
+
+			$html_lower = strtolower( $block['inner_html'] );
+			$score      = 0;
+
+			foreach ( $title_words as $word ) {
+				if ( false !== strpos( $html_lower, $word ) ) {
+					$score += 2;
+				}
+			}
+
+			foreach ( $related_tags as $tag ) {
+				if ( false !== strpos( $html_lower, $tag ) ) {
+					$score += 3;
+				}
+			}
+
+			if ( $score > $best_score ) {
+				$best_score = $score;
+				$best_block = $block;
+			}
+		}
+
+		return $best_block;
+	}
+
 	private function buildBlockPrompt( string $paragraph_html, array $related_post ): string {
 		return $this->buildPromptFromTemplate(
 			'insert_link',
@@ -380,63 +342,11 @@ class InternalLinkingTask extends SystemTask {
 		);
 	}
 
-	/**
-	 * Check if a specific URL was inserted as an anchor tag in the content.
-	 *
-	 * @param string $html The HTML content to check.
-	 * @param string $url  The URL to look for.
-	 * @return bool True if the URL is found in an anchor href.
-	 */
 	private function detectInsertedLink( string $html, string $url ): bool {
 		$escaped_url = preg_quote( $url, '/' );
 		return (bool) preg_match( '/<a\s[^>]*href=["\']' . $escaped_url . '["\'][^>]*>/', $html );
 	}
 
-	/**
-	 * Minimum relevance score a candidate must reach to be considered.
-	 *
-	 * Prevents linking to posts that only share a broad category with no
-	 * other semantic signal. A single shared tag (3) or a high-IDF title
-	 * word match clears the threshold.
-	 *
-	 * @var int
-	 */
-	private const MIN_RELEVANCE_SCORE = 3;
-
-	/**
-	 * Maximum weight a single title word can contribute.
-	 *
-	 * Applied to words with maximum IDF (appearing in only 1 candidate).
-	 * Template words appearing in most candidates score near zero.
-	 *
-	 * @var float
-	 * @since 0.34.0
-	 */
-	private const TITLE_WORD_MAX_WEIGHT = 5.0;
-
-	/**
-	 * Find related posts scored by taxonomy overlap and IDF-weighted title similarity.
-	 *
-	 * Taxonomy provides the candidate pool. Title word overlap between the
-	 * source and candidate posts is the primary relevance signal — but words
-	 * are weighted by IDF (Inverse Document Frequency) so common template
-	 * words like "spiritual", "meaning", "facts" score near zero while
-	 * differentiating words like "lobsters" score at full weight.
-	 *
-	 * Scoring weights:
-	 * - Shared categories: ×1 (broad, low signal)
-	 * - Shared tags:       ×3 (specific, moderate signal)
-	 * - Title word overlap: ×IDF weight (0 to TITLE_WORD_MAX_WEIGHT per word)
-	 *
-	 * Candidates below MIN_RELEVANCE_SCORE are discarded entirely.
-	 *
-	 * @param int    $post_id      Current post ID to exclude.
-	 * @param string $source_title Source post title for similarity scoring.
-	 * @param array  $categories   Category term IDs.
-	 * @param array  $tags         Tag term IDs.
-	 * @param int    $limit        Maximum related posts to return.
-	 * @return array Array of related post data [{id, url, title, excerpt, score}].
-	 */
 	private function findRelatedPosts( int $post_id, string $source_title, array $categories, array $tags, int $limit ): array {
 		$tax_query = array( 'relation' => 'OR' );
 
@@ -470,19 +380,15 @@ class InternalLinkingTask extends SystemTask {
 			return array();
 		}
 
-		// Extract meaningful words (3+ chars) from source title for matching.
 		$source_words = $this->extractTitleWords( $source_title );
 
-		// Collect all candidate titles for IDF computation.
 		$candidate_titles = array();
 		foreach ( $query->posts as $candidate_id ) {
 			$candidate_titles[ $candidate_id ] = get_the_title( $candidate_id );
 		}
 
-		// Compute IDF weights: rare words score high, common template words score near zero.
 		$idf_weights = $this->computeWordIDF( $candidate_titles );
 
-		// Score each candidate by taxonomy overlap + IDF-weighted title similarity.
 		$scored = array();
 
 		foreach ( $query->posts as $candidate_id ) {
@@ -490,15 +396,12 @@ class InternalLinkingTask extends SystemTask {
 			$candidate_cats = wp_get_post_categories( $candidate_id, array( 'fields' => 'ids' ) );
 			$candidate_tags = wp_get_post_tags( $candidate_id, array( 'fields' => 'ids' ) );
 
-			// Taxonomy overlap.
 			$shared_cats = array_intersect( $categories, $candidate_cats );
 			$shared_tags = array_intersect( $tags, $candidate_tags );
 
 			$score += count( $shared_cats ) * 1;
 			$score += count( $shared_tags ) * 3;
 
-			// IDF-weighted title word overlap — rare shared words score high,
-			// common template words (spiritual, meaning, facts) score near zero.
 			$candidate_words = $this->extractTitleWords( $candidate_titles[ $candidate_id ] );
 			$shared_words    = array_intersect( $source_words, $candidate_words );
 
@@ -507,16 +410,13 @@ class InternalLinkingTask extends SystemTask {
 				$score += $weight;
 			}
 
-			// Enforce minimum relevance threshold.
 			if ( $score >= self::MIN_RELEVANCE_SCORE ) {
 				$scored[ $candidate_id ] = $score;
 			}
 		}
 
-		// Sort by score descending.
 		arsort( $scored );
 
-		// Pick top N.
 		$top_ids = array_slice( array_keys( $scored ), 0, $limit, true );
 		$related = array();
 
@@ -534,27 +434,10 @@ class InternalLinkingTask extends SystemTask {
 		return $related;
 	}
 
-	/**
-	 * Compute IDF (Inverse Document Frequency) weights for title words.
-	 *
-	 * Words appearing in many candidate titles get low scores (template words
-	 * like "spiritual", "meaning", "facts"). Words appearing in few titles
-	 * get high scores (differentiating words like "lobsters", "sandpipers").
-	 *
-	 * Formula: weight = max_weight × log(N / df) / log(N)
-	 * Where N = total candidates, df = number of candidates containing the word.
-	 *
-	 * A word in every candidate scores 0. A word in only 1 candidate scores max_weight.
-	 *
-	 * @param array $candidate_titles Assoc array of candidate_id => title string.
-	 * @return array Assoc array of word => float weight (0 to max_weight).
-	 * @since 0.34.0
-	 */
 	private function computeWordIDF( array $candidate_titles ): array {
 		$total_docs = count( $candidate_titles );
 
 		if ( $total_docs <= 1 ) {
-			// With 0-1 candidates, all words get max weight (no IDF signal).
 			$all_words = array();
 			foreach ( $candidate_titles as $title ) {
 				foreach ( $this->extractTitleWords( $title ) as $word ) {
@@ -564,23 +447,19 @@ class InternalLinkingTask extends SystemTask {
 			return $all_words;
 		}
 
-		// Count how many candidate titles contain each word (document frequency).
 		$doc_frequency = array();
 		foreach ( $candidate_titles as $title ) {
-			// Use array_unique so each word counts once per document.
 			$words = array_unique( $this->extractTitleWords( $title ) );
 			foreach ( $words as $word ) {
 				$doc_frequency[ $word ] = ( $doc_frequency[ $word ] ?? 0 ) + 1;
 			}
 		}
 
-		// Compute IDF weight for each word.
 		$weights = array();
 		$log_n   = log( $total_docs );
 
 		foreach ( $doc_frequency as $word => $df ) {
 			if ( $df >= $total_docs ) {
-				// Word appears in every candidate — zero weight.
 				$weights[ $word ] = 0.0;
 			} else {
 				$weights[ $word ] = round( self::TITLE_WORD_MAX_WEIGHT * log( $total_docs / $df ) / $log_n, 2 );
@@ -590,82 +469,15 @@ class InternalLinkingTask extends SystemTask {
 		return $weights;
 	}
 
-	/**
-	 * Extract meaningful words from a title for similarity matching.
-	 *
-	 * Strips common stop words and short tokens to focus on
-	 * topically significant terms.
-	 *
-	 * @param string $title Post title.
-	 * @return array Lowercase words (3+ chars, no stop words).
-	 */
 	private function extractTitleWords( string $title ): array {
 		$stop_words = array(
-			'the',
-			'and',
-			'for',
-			'are',
-			'but',
-			'not',
-			'you',
-			'all',
-			'can',
-			'had',
-			'her',
-			'was',
-			'one',
-			'our',
-			'out',
-			'has',
-			'his',
-			'how',
-			'its',
-			'may',
-			'new',
-			'now',
-			'old',
-			'see',
-			'way',
-			'who',
-			'did',
-			'get',
-			'let',
-			'say',
-			'she',
-			'too',
-			'use',
-			'what',
-			'when',
-			'where',
-			'which',
-			'why',
-			'will',
-			'with',
-			'this',
-			'that',
-			'from',
-			'they',
-			'been',
-			'have',
-			'many',
-			'some',
-			'them',
-			'than',
-			'each',
-			'make',
-			'like',
-			'into',
-			'over',
-			'such',
-			'your',
-			'about',
-			'their',
-			'would',
-			'could',
-			'other',
-			'these',
-			'there',
-			'after',
+			'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had',
+			'her', 'was', 'one', 'our', 'out', 'has', 'his', 'how', 'its', 'may',
+			'new', 'now', 'old', 'see', 'way', 'who', 'did', 'get', 'let', 'say',
+			'she', 'too', 'use', 'what', 'when', 'where', 'which', 'why', 'will',
+			'with', 'this', 'that', 'from', 'they', 'been', 'have', 'many', 'some',
+			'them', 'than', 'each', 'make', 'like', 'into', 'over', 'such', 'your',
+			'about', 'their', 'would', 'could', 'other', 'these', 'there', 'after',
 			'being',
 		);
 
@@ -676,13 +488,6 @@ class InternalLinkingTask extends SystemTask {
 		return array_values( $words );
 	}
 
-	/**
-	 * Filter out posts that are already linked in the content.
-	 *
-	 * @param array  $related      Related posts array.
-	 * @param string $post_content Content to check for existing links.
-	 * @return array Filtered related posts.
-	 */
 	private function filterAlreadyLinked( array $related, string $post_content ): array {
 		return array_values( array_filter( $related, function ( $item ) use ( $post_content ) {
 			$url = preg_quote( $item['url'], '/' );

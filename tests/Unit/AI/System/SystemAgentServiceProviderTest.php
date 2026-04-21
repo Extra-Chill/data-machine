@@ -3,6 +3,7 @@
  * Tests for the SystemAgentServiceProvider registration.
  *
  * @package DataMachine\Tests\Unit\AI\System
+ * @since 0.72.0 Updated: datamachine_task_handle removed, datamachine_task_retry added.
  */
 
 namespace DataMachine\Tests\Unit\AI\System;
@@ -33,9 +34,15 @@ class SystemAgentServiceProviderTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'image_generation', $tasks );
 	}
 
-	public function test_task_handle_action_is_registered(): void {
-		$this->assertIsInt(
+	public function test_legacy_task_handle_action_is_not_registered(): void {
+		$this->assertFalse(
 			has_action( 'datamachine_task_handle', [ $this->provider, 'handleScheduledTask' ] )
+		);
+	}
+
+	public function test_task_retry_action_is_registered(): void {
+		$this->assertIsInt(
+			has_action( 'datamachine_task_retry', [ $this->provider, 'handleTaskRetry' ] )
 		);
 	}
 

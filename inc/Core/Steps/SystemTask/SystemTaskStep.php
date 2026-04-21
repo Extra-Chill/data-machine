@@ -15,6 +15,7 @@
  *
  * @package DataMachine\Core\Steps\SystemTask
  * @since 0.34.0
+ * @since 0.72.0 Calls executeTask() instead of execute().
  */
 
 namespace DataMachine\Core\Steps\SystemTask;
@@ -87,8 +88,6 @@ class SystemTaskStep extends Step {
 	/**
 	 * Validate System Task step configuration.
 	 *
-	 * Requires a valid task type in handler_config.
-	 *
 	 * @return bool
 	 */
 	protected function validateStepConfiguration(): bool {
@@ -108,7 +107,6 @@ class SystemTaskStep extends Step {
 			return false;
 		}
 
-		// Verify task type is registered.
 		$handlers = TaskRegistry::getHandlers();
 
 		if ( ! isset( $handlers[ $task_type ] ) ) {
@@ -133,8 +131,7 @@ class SystemTaskStep extends Step {
 	 * Execute System Task step logic.
 	 *
 	 * Creates a child DM job for tracking, resolves the task handler,
-	 * and executes it synchronously. The child job captures effects
-	 * and completion status independently from the pipeline job.
+	 * and calls executeTask() synchronously.
 	 *
 	 * @return array Updated data packets.
 	 */
@@ -204,7 +201,6 @@ class SystemTaskStep extends Step {
 			$child_engine_data['job_id']       = $this->job_id;
 			$child_engine_data['pipeline_id']  = $job_context['pipeline_id'] ?? null;
 
-			// Queue context from flow_step_config.
 			$fsc                                = $this->flow_step_config ?? array();
 			$child_engine_data['queue_enabled'] = ! empty( $fsc['queue_enabled'] );
 		}
@@ -221,13 +217,13 @@ class SystemTaskStep extends Step {
 			)
 		);
 
-		// Execute the task synchronously.
+		// Execute the task synchronously via executeTask().
 		$success   = true;
 		$error_msg = '';
 
 		try {
 			$handler = new $handler_class();
-			$handler->execute( (int) $child_job_id, $child_engine_data );
+			$handler->executeTask( (int) $child_job_id, $child_engine_data );
 		} catch ( \Throwable $e ) {
 			$success   = false;
 			$error_msg = $e->getMessage();
@@ -242,7 +238,6 @@ class SystemTaskStep extends Step {
 				)
 			);
 
-			// Mark child job as failed if the task didn't already.
 			$child_job = $jobs_db->get_job( $child_job_id );
 			$status    = $child_job['status'] ?? '';
 			if ( 'PROCESSING' === $status ) {
@@ -255,14 +250,11 @@ class SystemTaskStep extends Step {
 		$child_status = $child_job['status'] ?? '';
 		$child_data   = $child_job['engine_data'] ?? array();
 
-		// Check if the task itself reported failure.
 		if ( $success && str_starts_with( $child_status, 'FAILED' ) ) {
 			$success   = false;
 			$error_msg = $child_data['error'] ?? 'Task reported failure';
 		}
 
-		// Determine if pipeline should continue on task failure.
-		// Skipped tasks (already processed) are not failures.
 		$skipped = ! empty( $child_data['skipped'] );
 		if ( $skipped ) {
 			$success = true;
