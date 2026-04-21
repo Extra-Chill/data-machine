@@ -202,6 +202,96 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		$this->assertEquals( 'upsert', $result['step_type'] );
 	}
 
+	public function test_add_pipeline_step_with_step_config_seeds_fields(): void {
+		$seed_config = array(
+			'system_prompt' => 'You are a careful summarizer.',
+			'label'         => 'Imported AI Step',
+			'provider'      => 'openai',
+			'model'         => 'gpt-5.4',
+			'custom_field'  => 'preserved',
+		);
+
+		$result = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'ai',
+				'step_config' => $seed_config,
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$steps = $this->step_abilities->executeGetPipelineSteps(
+			array( 'pipeline_step_id' => $result['pipeline_step_id'] )
+		);
+
+		$this->assertTrue( $steps['success'] );
+		$this->assertCount( 1, $steps['steps'] );
+		$stored = $steps['steps'][0];
+
+		$this->assertSame( 'You are a careful summarizer.', $stored['system_prompt'] );
+		$this->assertSame( 'Imported AI Step', $stored['label'] );
+		$this->assertSame( 'openai', $stored['provider'] );
+		$this->assertSame( 'gpt-5.4', $stored['model'] );
+		$this->assertSame( 'preserved', $stored['custom_field'] );
+		$this->assertSame( 'ai', $stored['step_type'] );
+		$this->assertSame( $result['pipeline_step_id'], $stored['pipeline_step_id'] );
+		$this->assertEquals( 0, $stored['execution_order'] );
+	}
+
+	public function test_add_pipeline_step_with_step_config_overrides_identity_fields(): void {
+		$seed_config = array(
+			'pipeline_step_id' => 'legacy-id-from-another-install',
+			'execution_order'  => 99,
+			'step_type'        => 'publish',
+			'label'            => 'Kept Label',
+		);
+
+		$result = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'fetch',
+				'step_config' => $seed_config,
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'fetch', $result['step_type'] );
+		$this->assertNotSame( 'legacy-id-from-another-install', $result['pipeline_step_id'] );
+		$this->assertStringStartsWith( $this->test_pipeline_id . '_', $result['pipeline_step_id'] );
+
+		$steps  = $this->step_abilities->executeGetPipelineSteps(
+			array( 'pipeline_step_id' => $result['pipeline_step_id'] )
+		);
+		$stored = $steps['steps'][0];
+
+		$this->assertSame( 'fetch', $stored['step_type'] );
+		$this->assertSame( 'Kept Label', $stored['label'] );
+		$this->assertEquals( 0, $stored['execution_order'] );
+		$this->assertNotSame( 'legacy-id-from-another-install', $stored['pipeline_step_id'] );
+	}
+
+	public function test_add_pipeline_step_ai_type_without_step_config_uses_defaults(): void {
+		$result = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'ai',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$steps  = $this->step_abilities->executeGetPipelineSteps(
+			array( 'pipeline_step_id' => $result['pipeline_step_id'] )
+		);
+		$stored = $steps['steps'][0];
+
+		$this->assertArrayHasKey( 'provider', $stored );
+		$this->assertArrayHasKey( 'model', $stored );
+		$this->assertNotEmpty( $stored['provider'] );
+		$this->assertNotEmpty( $stored['model'] );
+	}
+
 	public function test_add_pipeline_step_invalid_type(): void {
 		$result = $this->step_abilities->executeAddPipelineStep(
 			array(

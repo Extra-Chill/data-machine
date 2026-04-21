@@ -59,6 +59,18 @@ class ImportExport {
 			$step_position = $cols[2];
 			$step_type     = $cols[3];
 			$step_config   = json_decode( $cols[4], true );
+			if ( ! is_array( $step_config ) ) {
+				$step_config = array();
+			}
+			$flow_id_col = $cols[5] ?? '';
+
+			// Flow-specific rows (flow_id present) are emitted per-flow by the exporter and
+			// share the same step_type/step_config as their parent pipeline row. Flow + handler
+			// restoration is deferred to a follow-up (see issue #1133 step 2). Skip here to
+			// avoid adding duplicate steps when a pipeline has handler-bearing flows.
+			if ( '' !== (string) $flow_id_col ) {
+				continue;
+			}
 
 			if ( ! isset( $processed[ $pipeline_name ] ) ) {
 				$existing_id = $this->find_pipeline_by_name( $pipeline_name );
@@ -100,6 +112,7 @@ class ImportExport {
 						array(
 							'pipeline_id' => $processed[ $pipeline_name ],
 							'step_type'   => $step_type,
+							'step_config' => $step_config,
 						)
 					);
 				}
