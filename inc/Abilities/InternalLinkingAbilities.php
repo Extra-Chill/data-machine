@@ -30,13 +30,26 @@ class InternalLinkingAbilities {
 
 	/**
 	 * Transient key for the cached link graph.
+	 *
+	 * Bumped to v2 in 0.72.0 when edge_type was added to graph storage and
+	 * `datamachine_link_extractors` / `datamachine_link_resolvers` filters
+	 * were introduced. Existing installs rebuild the graph on first read.
 	 */
-	const GRAPH_TRANSIENT_KEY = 'datamachine_link_graph';
+	const GRAPH_TRANSIENT_KEY = 'datamachine_link_graph_v2';
 
 	/**
 	 * Cache TTL: 24 hours.
 	 */
 	const GRAPH_CACHE_TTL = DAY_IN_SECONDS;
+
+	/**
+	 * Built-in edge type for HTML anchor links.
+	 *
+	 * Consumers can register additional edge types (e.g. `wikilink`, `hashtag`,
+	 * `mention`) via the `datamachine_link_extractors` and
+	 * `datamachine_link_resolvers` filters.
+	 */
+	const EDGE_TYPE_HTML_ANCHOR = 'html_anchor';
 
 	private static bool $registered = false;
 
@@ -50,7 +63,54 @@ class InternalLinkingAbilities {
 		}
 
 		$this->registerAbilities();
+		$this->registerBuiltInLinkGraphParticipants();
 		self::$registered = true;
+	}
+
+	/**
+	 * Register DM's built-in HTML anchor extractor + resolver against the
+	 * link graph filters so core behavior is a participant, not a hardcoded
+	 * fallback.
+	 *
+	 * Intentionally uses anonymous closures so these registrations cannot
+	 * be removed by consumers via `remove_filter`. The built-in edge type
+	 * is a guarantee of the core primitive, not a default that third-party
+	 * code should be able to silently drop.
+	 *
+	 * @since 0.72.0
+	 */
+	private function registerBuiltInLinkGraphParticipants(): void {
+		add_filter(
+			'datamachine_link_extractors',
+			function ( $extractors ) {
+				if ( ! is_array( $extractors ) ) {
+					$extractors = array();
+				}
+				if ( ! isset( $extractors[ self::EDGE_TYPE_HTML_ANCHOR ] ) ) {
+					$extractors[ self::EDGE_TYPE_HTML_ANCHOR ] = array(
+						'label'       => __( 'HTML anchor', 'data-machine' ),
+						'description' => __( 'Internal links via <a href> pointing to the site host.', 'data-machine' ),
+						'callback'    => array( self::class, 'extractHtmlAnchorEdges' ),
+					);
+				}
+				return $extractors;
+			}
+		);
+
+		add_filter(
+			'datamachine_link_resolvers',
+			function ( $resolvers ) {
+				if ( ! is_array( $resolvers ) ) {
+					$resolvers = array();
+				}
+				if ( ! isset( $resolvers[ self::EDGE_TYPE_HTML_ANCHOR ] ) ) {
+					$resolvers[ self::EDGE_TYPE_HTML_ANCHOR ] = array(
+						'callback' => array( self::class, 'resolveHtmlAnchor' ),
+					);
+				}
+				return $resolvers;
+			}
+		);
 	}
 
 	private function registerAbilities(): void {
@@ -167,6 +227,11 @@ class InternalLinkingAbilities {
 								'description' => 'Force rebuild even if cached graph exists.',
 								'default'     => false,
 							),
+							'types'     => array(
+								'type'        => 'array',
+								'items'       => array( 'type' => 'string' ),
+								'description' => 'Optional edge types to include in aggregates (e.g. ["html_anchor"]). Omit for all types.',
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -214,6 +279,11 @@ class InternalLinkingAbilities {
 								'description' => 'Maximum orphaned posts to return. Default: 50.',
 								'default'     => 50,
 							),
+							'types'     => array(
+								'type'        => 'array',
+								'items'       => array( 'type' => 'string' ),
+								'description' => 'Optional edge types to include (e.g. ["html_anchor"]). Omit for all types.',
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -253,6 +323,11 @@ class InternalLinkingAbilities {
 								'type'        => 'string',
 								'description' => 'Post type scope for the link graph. Default: post.',
 								'default'     => 'post',
+							),
+							'types'     => array(
+								'type'        => 'array',
+								'items'       => array( 'type' => 'string' ),
+								'description' => 'Optional edge types to include (e.g. ["html_anchor"]). Omit for all types.',
 							),
 						),
 					),
@@ -313,6 +388,11 @@ class InternalLinkingAbilities {
 								'description' => 'HTTP timeout per request in seconds. Default: 5.',
 								'default'     => 5,
 							),
+							'types'     => array(
+								'type'        => 'array',
+								'items'       => array( 'type' => 'string' ),
+								'description' => 'Optional edge types to include for internal-link checks (e.g. ["html_anchor"]). Omit for all types.',
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -362,6 +442,11 @@ class InternalLinkingAbilities {
 								'type'        => 'integer',
 								'description' => 'GSC lookback period in days. Default: 28.',
 								'default'     => 28,
+							),
+							'types'      => array(
+								'type'        => 'array',
+								'items'       => array( 'type' => 'string' ),
+								'description' => 'Optional edge types to include in link counts (e.g. ["html_anchor"]). Omit for all types.',
 							),
 						),
 					),
@@ -692,14 +777,16 @@ class InternalLinkingAbilities {
 		$category     = sanitize_text_field( $input['category'] ?? '' );
 		$specific_ids = array_map( 'absint', $input['post_ids'] ?? array() );
 		$force        = ! empty( $input['force'] );
+		$types        = self::normalizeTypesInput( $input['types'] ?? null );
 
 		// Check cache unless forced or scoped to specific posts/category.
 		$is_scoped = ! empty( $specific_ids ) || ! empty( $category );
 		if ( ! $force && ! $is_scoped ) {
 			$cached = get_transient( self::GRAPH_TRANSIENT_KEY );
 			if ( false !== $cached && is_array( $cached ) && ( $cached['post_type'] ?? '' ) === $post_type ) {
-				$cached['cached'] = true;
-				return $cached;
+				$graph            = self::applyTypesFilterToGraph( $cached, $types );
+				$graph['cached']  = true;
+				return $graph;
 			}
 		}
 
@@ -709,12 +796,60 @@ class InternalLinkingAbilities {
 			return $graph;
 		}
 
-		// Cache the full graph if this was an unscoped audit.
+		// Cache the full, unfiltered graph if this was an unscoped audit.
 		if ( ! $is_scoped ) {
 			set_transient( self::GRAPH_TRANSIENT_KEY, $graph, self::GRAPH_CACHE_TTL );
 		}
 
+		$graph           = self::applyTypesFilterToGraph( $graph, $types );
 		$graph['cached'] = false;
+		return $graph;
+	}
+
+	/**
+	 * Apply a `types` filter to a pre-built graph, re-computing aggregates
+	 * (outbound/orphaned/top_linked) from `_all_links` scoped to the given
+	 * edge types.
+	 *
+	 * @since 0.72.0
+	 *
+	 * @param array      $graph Full graph (returned by buildLinkGraph or from cache).
+	 * @param array|null $types Edge types to scope to. null/empty = all types unioned.
+	 * @return array Graph with aggregates recomputed and total_links updated.
+	 */
+	private static function applyTypesFilterToGraph( array $graph, ?array $types ): array {
+		if ( empty( $types ) ) {
+			return $graph;
+		}
+
+		$all_links   = $graph['_all_links'] ?? array();
+		$post_ids    = $graph['_post_ids'] ?? array();
+		$id_to_title = $graph['_id_to_title'] ?? array();
+		$id_to_url   = $graph['_id_to_url'] ?? array();
+
+		$types_set      = array_flip( array_map( 'strval', $types ) );
+		$filtered_links = array();
+		foreach ( $all_links as $edge ) {
+			$edge_type = (string) ( $edge['edge_type'] ?? '' );
+			// Drop edges lacking a type when a filter is active — dispatchExtractors
+			// stamps edge_type from the registration key, so missing types only
+			// appear for malformed data and shouldn't leak into scoped results.
+			if ( '' !== $edge_type && isset( $types_set[ $edge_type ] ) ) {
+				$filtered_links[] = $edge;
+			}
+		}
+
+		$aggregates = self::computeGraphAggregates( $filtered_links, $post_ids, $id_to_title, $id_to_url, $types );
+
+		$graph['orphaned_posts'] = $aggregates['orphaned_posts'];
+		$graph['top_linked']     = $aggregates['top_linked'];
+		$graph['outbound']       = $aggregates['outbound'];
+		$graph['orphaned_count'] = $aggregates['orphaned_count'];
+		$graph['avg_outbound']   = $aggregates['avg_outbound'];
+		$graph['avg_inbound']    = $aggregates['avg_inbound'];
+		$graph['total_links']    = count( $filtered_links );
+		$graph['types']          = array_values( $types );
+
 		return $graph;
 	}
 
@@ -731,6 +866,7 @@ class InternalLinkingAbilities {
 	public static function getOrphanedPosts( array $input = array() ): array {
 		$post_type  = sanitize_text_field( $input['post_type'] ?? 'post' );
 		$limit      = absint( $input['limit'] ?? 50 );
+		$types      = self::normalizeTypesInput( $input['types'] ?? null );
 		$from_cache = true;
 
 		$graph = get_transient( self::GRAPH_TRANSIENT_KEY );
@@ -743,6 +879,8 @@ class InternalLinkingAbilities {
 			set_transient( self::GRAPH_TRANSIENT_KEY, $graph, self::GRAPH_CACHE_TTL );
 			$from_cache = false;
 		}
+
+		$graph = self::applyTypesFilterToGraph( $graph, $types );
 
 		$orphaned = $graph['orphaned_posts'] ?? array();
 		if ( $limit > 0 && count( $orphaned ) > $limit ) {
@@ -773,6 +911,7 @@ class InternalLinkingAbilities {
 	public static function getBacklinks( array $input = array() ): array {
 		$post_id    = absint( $input['post_id'] ?? 0 );
 		$post_type  = sanitize_text_field( $input['post_type'] ?? 'post' );
+		$types      = self::normalizeTypesInput( $input['types'] ?? null );
 		$from_cache = true;
 
 		if ( 0 === $post_id ) {
@@ -795,17 +934,25 @@ class InternalLinkingAbilities {
 
 		$all_links   = $graph['_all_links'] ?? array();
 		$id_to_title = $graph['_id_to_title'] ?? array();
+		$types_set   = null === $types ? null : array_flip( array_map( 'strval', $types ) );
 
 		// Filter links where target_id matches, group by source_id.
 		$sources = array();
 		foreach ( $all_links as $link ) {
-			if ( ( $link['target_id'] ?? null ) === $post_id ) {
-				$source_id = $link['source_id'];
-				if ( ! isset( $sources[ $source_id ] ) ) {
-					$sources[ $source_id ] = 0;
-				}
-				++$sources[ $source_id ];
+			if ( ( $link['target_id'] ?? null ) !== $post_id ) {
+				continue;
 			}
+			if ( null !== $types_set ) {
+				$edge_type = (string) ( $link['edge_type'] ?? '' );
+				if ( '' === $edge_type || ! isset( $types_set[ $edge_type ] ) ) {
+					continue;
+				}
+			}
+			$source_id = $link['source_id'];
+			if ( ! isset( $sources[ $source_id ] ) ) {
+				$sources[ $source_id ] = 0;
+			}
+			++$sources[ $source_id ];
 		}
 
 		// Build the response array with titles and permalinks.
@@ -849,6 +996,7 @@ class InternalLinkingAbilities {
 		$limit      = absint( $input['limit'] ?? 200 );
 		$timeout    = absint( $input['timeout'] ?? 5 );
 		$scope      = sanitize_text_field( $input['scope'] ?? 'internal' );
+		$types      = self::normalizeTypesInput( $input['types'] ?? null );
 		$from_cache = true;
 
 		if ( ! in_array( $scope, array( 'internal', 'external', 'all' ), true ) ) {
@@ -868,6 +1016,7 @@ class InternalLinkingAbilities {
 		// Build URL → source mapping based on scope.
 		$url_sources = array(); // url => array of {source_id, anchor_text}.
 		$id_to_title = $graph['_id_to_title'] ?? array();
+		$types_set   = null === $types ? null : array_flip( array_map( 'strval', $types ) );
 
 		if ( 'internal' === $scope || 'all' === $scope ) {
 			$all_links = $graph['_all_links'] ?? array();
@@ -875,6 +1024,12 @@ class InternalLinkingAbilities {
 				$url = $link['target_url'] ?? '';
 				if ( empty( $url ) ) {
 					continue;
+				}
+				if ( null !== $types_set ) {
+					$edge_type = (string) ( $link['edge_type'] ?? '' );
+					if ( '' === $edge_type || ! isset( $types_set[ $edge_type ] ) ) {
+						continue;
+					}
 				}
 				if ( ! isset( $url_sources[ $url ] ) ) {
 					$url_sources[ $url ] = array();
@@ -1042,6 +1197,7 @@ class InternalLinkingAbilities {
 		$category   = sanitize_text_field( $input['category'] ?? '' );
 		$min_clicks = absint( $input['min_clicks'] ?? 5 );
 		$days       = absint( $input['days'] ?? 28 );
+		$types      = self::normalizeTypesInput( $input['types'] ?? null );
 
 		// 1. Load the link graph from transient (run audit if not cached).
 		$graph = get_transient( self::GRAPH_TRANSIENT_KEY );
@@ -1059,26 +1215,35 @@ class InternalLinkingAbilities {
 		// Build inbound/outbound counts from the link graph's _all_links data.
 		$inbound_counts  = array();
 		$outbound_counts = array();
+		$types_set       = null === $types ? null : array_flip( array_map( 'strval', $types ) );
 
-		// Initialize from orphaned_posts (0 inbound).
-		foreach ( $graph['orphaned_posts'] ?? array() as $orphan ) {
-			$pid = $orphan['post_id'] ?? 0;
-			if ( $pid > 0 ) {
-				$inbound_counts[ $pid ] = 0;
+		// Initialize from orphaned_posts (0 inbound) — only reliable for unfiltered reads.
+		if ( null === $types_set ) {
+			foreach ( $graph['orphaned_posts'] ?? array() as $orphan ) {
+				$pid = $orphan['post_id'] ?? 0;
+				if ( $pid > 0 ) {
+					$inbound_counts[ $pid ] = 0;
+				}
+			}
+
+			foreach ( $graph['top_linked'] ?? array() as $top ) {
+				$pid = $top['post_id'] ?? 0;
+				if ( $pid > 0 ) {
+					$inbound_counts[ $pid ] = (int) ( $top['inbound'] ?? 0 );
+				}
 			}
 		}
 
-		// Initialize from top_linked (has inbound count).
-		foreach ( $graph['top_linked'] ?? array() as $top ) {
-			$pid = $top['post_id'] ?? 0;
-			if ( $pid > 0 ) {
-				$inbound_counts[ $pid ] = (int) ( $top['inbound'] ?? 0 );
-			}
-		}
-
-		// Rebuild full counts from _all_links for accuracy.
+		// Rebuild full counts from _all_links for accuracy / types filtering.
 		$all_links = $graph['_all_links'] ?? array();
 		foreach ( $all_links as $link ) {
+			if ( null !== $types_set ) {
+				$edge_type = (string) ( $link['edge_type'] ?? '' );
+				if ( '' === $edge_type || ! isset( $types_set[ $edge_type ] ) ) {
+					continue;
+				}
+			}
+
 			$source_id = $link['source_id'] ?? 0;
 			$target_id = $link['target_id'] ?? null;
 
@@ -1244,12 +1409,211 @@ class InternalLinkingAbilities {
 	}
 
 	/**
+	 * Get the registered link edge extractors.
+	 *
+	 * Applies the `datamachine_link_extractors` filter. Consumers register
+	 * extractors as a keyed map: `[ edge_type => [ 'label', 'description',
+	 * 'callback' ] ]` where callback receives `(string $content, array
+	 * $context)` and returns an array of edges with `target_hint`,
+	 * `edge_type`, and optional `display` / `location`.
+	 *
+	 * @since 0.72.0
+	 *
+	 * @return array<string, array{label?: string, description?: string, callback: callable}>
+	 */
+	public static function getExtractors(): array {
+		$extractors = apply_filters( 'datamachine_link_extractors', array() );
+		return is_array( $extractors ) ? $extractors : array();
+	}
+
+	/**
+	 * Get the registered link target resolvers, keyed by edge_type.
+	 *
+	 * Applies the `datamachine_link_resolvers` filter. Consumers register
+	 * resolvers as `[ edge_type => [ 'callback' ] ]` where callback
+	 * receives `(string $target_hint, array $context)` and returns an
+	 * `int` post ID or `null`.
+	 *
+	 * @since 0.72.0
+	 *
+	 * @return array<string, array{callback: callable}>
+	 */
+	public static function getResolvers(): array {
+		$resolvers = apply_filters( 'datamachine_link_resolvers', array() );
+		return is_array( $resolvers ) ? $resolvers : array();
+	}
+
+	/**
+	 * Dispatch all registered extractors against a single post's content.
+	 *
+	 * @since 0.72.0
+	 *
+	 * @param string $content Post content.
+	 * @param array  $context Context passed to each extractor (post_id, post_type, home_host, ...).
+	 * @return array List of edges; each edge carries at minimum `target_hint` and `edge_type`.
+	 */
+	public static function dispatchExtractors( string $content, array $context ): array {
+		$edges = array();
+		foreach ( self::getExtractors() as $edge_type => $extractor ) {
+			$callback = $extractor['callback'] ?? null;
+			if ( ! is_callable( $callback ) ) {
+				continue;
+			}
+			$result = call_user_func( $callback, $content, $context );
+			if ( ! is_array( $result ) ) {
+				continue;
+			}
+			foreach ( $result as $edge ) {
+				if ( ! is_array( $edge ) || empty( $edge['target_hint'] ) ) {
+					continue;
+				}
+				// Stamp edge_type from registration key when extractor omits or conflicts.
+				$edge['edge_type'] = isset( $edge['edge_type'] ) && is_string( $edge['edge_type'] ) && '' !== $edge['edge_type']
+					? $edge['edge_type']
+					: (string) $edge_type;
+				$edges[]           = $edge;
+			}
+		}
+		return $edges;
+	}
+
+	/**
+	 * Resolve a single edge's `target_hint` to a post ID using the registered
+	 * resolver for its `edge_type`.
+	 *
+	 * @since 0.72.0
+	 *
+	 * @param string $target_hint Target hint produced by an extractor.
+	 * @param string $edge_type   Edge type (resolver lookup key).
+	 * @param array  $context     Context passed to the resolver.
+	 * @return int|null Post ID or null if unresolvable.
+	 */
+	public static function dispatchResolver( string $target_hint, string $edge_type, array $context ): ?int {
+		$resolvers = self::getResolvers();
+		$entry     = $resolvers[ $edge_type ] ?? null;
+		if ( null === $entry ) {
+			return null;
+		}
+		$callback = $entry['callback'] ?? null;
+		if ( ! is_callable( $callback ) ) {
+			return null;
+		}
+		$result = call_user_func( $callback, $target_hint, $context );
+		if ( is_int( $result ) && $result > 0 ) {
+			return $result;
+		}
+		return null;
+	}
+
+	/**
+	 * Built-in extractor for HTML anchor edges.
+	 *
+	 * Parses `<a href>` tags in post content and emits edges pointing to the
+	 * site's own host. Replaces the legacy `extractInternalLinks()` helper as
+	 * a first-class participant in the extractor filter.
+	 *
+	 * @since 0.72.0
+	 *
+	 * @param string $content Post content.
+	 * @param array  $context Context; reads `home_host` for host comparison.
+	 * @return array List of edges with target_hint = normalized URL.
+	 */
+	public static function extractHtmlAnchorEdges( string $content, array $context ): array {
+		$home_host = $context['home_host'] ?? wp_parse_url( home_url(), PHP_URL_HOST );
+		$edges     = array();
+
+		if ( empty( $content ) || ! is_string( $home_host ) || '' === $home_host ) {
+			return $edges;
+		}
+
+		if ( ! preg_match_all( '/<a\s[^>]*href=["\']([^"\'#]+)["\'][^>]*>/i', $content, $matches ) ) {
+			return $edges;
+		}
+
+		$seen = array();
+
+		foreach ( $matches[1] as $url ) {
+			// Skip non-http URLs.
+			if ( preg_match( '/^(mailto:|tel:|javascript:|data:)/i', $url ) ) {
+				continue;
+			}
+
+			// Handle relative URLs.
+			if ( 0 === strpos( $url, '/' ) && 0 !== strpos( $url, '//' ) ) {
+				$url = home_url( $url );
+			}
+
+			$parsed = wp_parse_url( $url );
+			$host   = $parsed['host'] ?? '';
+
+			if ( empty( $host ) || strcasecmp( $host, $home_host ) !== 0 ) {
+				continue;
+			}
+
+			$clean_url = ( $parsed['scheme'] ?? 'http' ) . '://' . $parsed['host'];
+			if ( ! empty( $parsed['path'] ) ) {
+				$clean_url .= $parsed['path'];
+			}
+
+			if ( isset( $seen[ $clean_url ] ) ) {
+				continue;
+			}
+			$seen[ $clean_url ] = true;
+
+			$edges[] = array(
+				'target_hint' => $clean_url,
+				'edge_type'   => self::EDGE_TYPE_HTML_ANCHOR,
+				'location'    => 'body',
+			);
+		}
+
+		return $edges;
+	}
+
+	/**
+	 * Built-in resolver for `html_anchor` edges.
+	 *
+	 * Resolves a URL `target_hint` to a post ID by consulting a provided
+	 * URL→ID lookup first, then falling back to `url_to_postid()`.
+	 *
+	 * @since 0.72.0
+	 *
+	 * @param string $target_hint URL produced by the html_anchor extractor.
+	 * @param array  $context     Context; reads `url_to_id` lookup map.
+	 * @return int|null Post ID or null.
+	 */
+	public static function resolveHtmlAnchor( string $target_hint, array $context ): ?int {
+		$url       = $target_hint;
+		$url_to_id = $context['url_to_id'] ?? array();
+
+		if ( is_array( $url_to_id ) ) {
+			$normalized = untrailingslashit( $url );
+			if ( isset( $url_to_id[ $normalized ] ) ) {
+				return (int) $url_to_id[ $normalized ];
+			}
+			$trailing = trailingslashit( $url );
+			if ( isset( $url_to_id[ $trailing ] ) ) {
+				return (int) $url_to_id[ $trailing ];
+			}
+		}
+
+		$fallback = url_to_postid( $url );
+		if ( $fallback > 0 ) {
+			return (int) $fallback;
+		}
+		return null;
+	}
+
+	/**
 	 * Build the internal link graph by scanning post content.
 	 *
 	 * Shared logic used by audit, get-orphaned-posts, and check-broken-links.
 	 * Returns the full graph data structure suitable for caching.
 	 *
 	 * @since 0.32.0
+	 * @since 0.72.0 Graph edges carry `edge_type`; extractors and resolvers
+	 *               are pluggable via `datamachine_link_extractors` and
+	 *               `datamachine_link_resolvers` filters.
 	 *
 	 * @param string $post_type    Post type to scan.
 	 * @param string $category     Category slug to filter by.
@@ -1313,17 +1677,21 @@ class InternalLinkingAbilities {
 
 		if ( empty( $posts ) ) {
 			return array(
-				'success'        => true,
-				'post_type'      => $post_type,
-				'total_scanned'  => 0,
-				'total_links'    => 0,
-				'orphaned_count' => 0,
-				'avg_outbound'   => 0,
-				'avg_inbound'    => 0,
-				'orphaned_posts' => array(),
-				'top_linked'     => array(),
-				'_all_links'     => array(),
-				'_id_to_title'   => array(),
+				'success'             => true,
+				'post_type'           => $post_type,
+				'total_scanned'       => 0,
+				'total_links'         => 0,
+				'orphaned_count'      => 0,
+				'avg_outbound'        => 0,
+				'avg_inbound'         => 0,
+				'orphaned_posts'      => array(),
+				'top_linked'          => array(),
+				'outbound'            => array(),
+				'_all_links'          => array(),
+				'_all_external_links' => array(),
+				'_id_to_title'        => array(),
+				'_id_to_url'          => array(),
+				'_post_ids'           => array(),
 			);
 		}
 
@@ -1331,6 +1699,7 @@ class InternalLinkingAbilities {
 		$url_to_id   = array();
 		$id_to_url   = array();
 		$id_to_title = array();
+		$post_ids    = array();
 
 		foreach ( $posts as $post ) {
 			$permalink = get_permalink( $post->ID );
@@ -1340,19 +1709,12 @@ class InternalLinkingAbilities {
 				$id_to_url[ $post->ID ]                       = $permalink;
 			}
 			$id_to_title[ $post->ID ] = $post->post_title;
+			$post_ids[]               = (int) $post->ID;
 		}
 
-		// Scan each post's content for internal links.
-		$outbound    = array(); // post_id => array of target post_ids.
-		$inbound     = array(); // post_id => count of inbound links.
-		$all_links   = array(); // all discovered internal link entries.
+		// Scan each post's content using the registered extractors + resolvers.
+		$all_links   = array(); // all discovered internal edge entries (with edge_type).
 		$total_links = 0;
-
-		// Initialize inbound counts.
-		foreach ( $posts as $post ) {
-			$inbound[ $post->ID ]  = 0;
-			$outbound[ $post->ID ] = array();
-		}
 
 		$all_external_links = array();
 
@@ -1362,45 +1724,54 @@ class InternalLinkingAbilities {
 				continue;
 			}
 
-			// Internal links.
-			$links = self::extractInternalLinks( $content, $home_host );
+			$extract_context = array(
+				'post_id'   => (int) $post->ID,
+				'post_type' => $post_type,
+				'home_host' => $home_host,
+				'home_url'  => $home_url,
+			);
 
-			foreach ( $links as $link_url ) {
-				++$total_links;
-				$normalized = untrailingslashit( $link_url );
+			$edges = self::dispatchExtractors( $content, $extract_context );
 
-				// Resolve to a post ID if possible.
-				$target_id = $url_to_id[ $normalized ] ?? $url_to_id[ trailingslashit( $link_url ) ] ?? null;
-
-				if ( null === $target_id ) {
-					// Try url_to_postid as fallback for non-standard URLs.
-					$target_id = url_to_postid( $link_url );
-					if ( 0 === $target_id ) {
-						$target_id = null;
-					}
+			foreach ( $edges as $edge ) {
+				$target_hint = $edge['target_hint'] ?? '';
+				$edge_type   = $edge['edge_type'] ?? '';
+				if ( '' === $target_hint || '' === $edge_type ) {
+					continue;
 				}
 
-				if ( null !== $target_id && $target_id !== $post->ID ) {
-					$outbound[ $post->ID ][] = $target_id;
+				++$total_links;
 
-					if ( isset( $inbound[ $target_id ] ) ) {
-						++$inbound[ $target_id ];
-					}
+				$resolve_context = $extract_context;
+				if ( self::EDGE_TYPE_HTML_ANCHOR === $edge_type ) {
+					$resolve_context['url_to_id'] = $url_to_id;
+				}
+				$resolve_context['edge']    = $edge;
+				$resolve_context['post_ids'] = $post_ids;
+
+				$target_id = self::dispatchResolver( $target_hint, $edge_type, $resolve_context );
+
+				// Don't self-loop.
+				if ( null !== $target_id && $target_id === (int) $post->ID ) {
+					$target_id = null;
 				}
 
 				$all_links[] = array(
-					'source_id'  => $post->ID,
-					'target_url' => $link_url,
+					'source_id'  => (int) $post->ID,
+					'target_url' => $target_hint,
 					'target_id'  => $target_id,
+					'edge_type'  => $edge_type,
 					'resolved'   => null !== $target_id,
+					'display'    => $edge['display'] ?? '',
+					'location'   => $edge['location'] ?? '',
 				);
 			}
 
-			// External links.
+			// External links — html_anchor-specific auxiliary data for broken-link checks.
 			$external = self::extractExternalLinks( $content, $home_host );
 			foreach ( $external as $ext_link ) {
 				$all_external_links[] = array(
-					'source_id'   => $post->ID,
+					'source_id'   => (int) $post->ID,
 					'target_url'  => $ext_link['url'],
 					'anchor_text' => $ext_link['anchor_text'],
 					'domain'      => $ext_link['domain'],
@@ -1408,107 +1779,200 @@ class InternalLinkingAbilities {
 			}
 		}
 
-		// Identify orphaned posts (zero inbound links from other scanned posts).
-		$orphaned = array();
-		foreach ( $inbound as $post_id => $count ) {
-			if ( 0 === $count ) {
-				$orphaned[] = array(
-					'post_id'   => $post_id,
-					'title'     => $id_to_title[ $post_id ] ?? '',
-					'permalink' => $id_to_url[ $post_id ] ?? '',
-					'outbound'  => count( $outbound[ $post_id ] ?? array() ),
-				);
-			}
-		}
-
-		// Top linked posts (most inbound).
-		arsort( $inbound );
-		$top_linked = array();
-		$top_count  = 0;
-		foreach ( $inbound as $post_id => $count ) {
-			if ( 0 === $count || $top_count >= 20 ) {
-				break;
-			}
-			$top_linked[] = array(
-				'post_id'   => $post_id,
-				'title'     => $id_to_title[ $post_id ] ?? '',
-				'permalink' => $id_to_url[ $post_id ] ?? '',
-				'inbound'   => $count,
-				'outbound'  => count( $outbound[ $post_id ] ?? array() ),
-			);
-			++$top_count;
-		}
-
-		$total_scanned  = count( $posts );
-		$outbound_total = array_sum( array_map( 'count', $outbound ) );
-		$inbound_total  = array_sum( $inbound );
+		// Derive the default all-types-unioned aggregates.
+		$aggregates = self::computeGraphAggregates( $all_links, $post_ids, $id_to_title, $id_to_url, null );
 
 		return array(
 			'success'             => true,
 			'post_type'           => $post_type,
-			'total_scanned'       => $total_scanned,
+			'total_scanned'       => count( $posts ),
 			'total_links'         => $total_links,
-			'orphaned_count'      => count( $orphaned ),
-			'avg_outbound'        => $total_scanned > 0 ? round( $outbound_total / $total_scanned, 2 ) : 0,
-			'avg_inbound'         => $total_scanned > 0 ? round( $inbound_total / $total_scanned, 2 ) : 0,
-			'orphaned_posts'      => $orphaned,
-			'top_linked'          => $top_linked,
-			// Internal data for broken link checker (not exposed in REST).
+			'orphaned_count'      => $aggregates['orphaned_count'],
+			'avg_outbound'        => $aggregates['avg_outbound'],
+			'avg_inbound'         => $aggregates['avg_inbound'],
+			'orphaned_posts'      => $aggregates['orphaned_posts'],
+			'top_linked'          => $aggregates['top_linked'],
+			'outbound'            => $aggregates['outbound'],
+			// Internal data kept for typed queries and broken-link checker (not exposed in REST).
 			'_all_links'          => $all_links,
 			'_all_external_links' => $all_external_links,
 			'_id_to_title'        => $id_to_title,
+			'_id_to_url'          => $id_to_url,
+			'_post_ids'           => $post_ids,
 		);
 	}
 
 	/**
-	 * Extract internal link URLs from HTML content.
+	 * Compute graph aggregates (outbound map, inbound counts, orphans, top-linked)
+	 * from a raw edge list, optionally filtered by edge_type.
 	 *
-	 * Uses regex to find all <a href="..."> tags where the href points to
-	 * the same host as the site. Ignores anchors, mailto, tel, and external links.
+	 * @since 0.72.0
 	 *
-	 * @since 0.32.0
-	 *
-	 * @param string $html      HTML content to parse.
-	 * @param string $home_host Site hostname for comparison.
-	 * @return array Array of internal link URLs.
+	 * @param array      $all_links   Raw `_all_links` entries with `edge_type`.
+	 * @param array      $post_ids    Post IDs included in the scan scope.
+	 * @param array      $id_to_title post_id => title lookup.
+	 * @param array      $id_to_url   post_id => permalink lookup.
+	 * @param array|null $types       Edge types to include. null / empty = all types.
+	 * @return array{
+	 *     outbound: array<int, array<int, array{count: int, types: array<string, int>}>>,
+	 *     orphaned_posts: array<int, array{post_id: int, title: string, permalink: string, outbound: int}>,
+	 *     top_linked: array<int, array{post_id: int, title: string, permalink: string, inbound: int, outbound: int}>,
+	 *     orphaned_count: int,
+	 *     avg_outbound: float,
+	 *     avg_inbound: float
+	 * }
 	 */
-	private static function extractInternalLinks( string $html, string $home_host ): array {
-		$links = array();
-
-		// Match all href attributes in anchor tags.
-		if ( ! preg_match_all( '/<a\s[^>]*href=["\']([^"\'#]+)["\'][^>]*>/i', $html, $matches ) ) {
-			return $links;
+	private static function computeGraphAggregates(
+		array $all_links,
+		array $post_ids,
+		array $id_to_title,
+		array $id_to_url,
+		?array $types
+	): array {
+		$types_set = null;
+		if ( is_array( $types ) && ! empty( $types ) ) {
+			$types_set = array_flip( array_map( 'strval', $types ) );
 		}
 
-		foreach ( $matches[1] as $url ) {
-			// Skip non-http URLs.
-			if ( preg_match( '/^(mailto:|tel:|javascript:|data:)/i', $url ) ) {
+		$outbound        = array();
+		$outbound_counts = array();
+		$inbound         = array();
+
+		foreach ( $post_ids as $pid ) {
+			$pid             = (int) $pid;
+			$inbound[ $pid ] = 0;
+		}
+
+		foreach ( $all_links as $edge ) {
+			$source_id = (int) ( $edge['source_id'] ?? 0 );
+			$target_id = $edge['target_id'] ?? null;
+			$edge_type = (string) ( $edge['edge_type'] ?? '' );
+
+			if ( $source_id <= 0 ) {
+				continue;
+			}
+			// Drop edges lacking a type when a filter is active — same rationale
+			// as applyTypesFilterToGraph(): dispatch stamps edge_type from the
+			// registration key, so missing types only appear for malformed data
+			// and shouldn't leak into scoped aggregates.
+			if ( null !== $types_set && ( '' === $edge_type || ! isset( $types_set[ $edge_type ] ) ) ) {
+				continue;
+			}
+			if ( null === $target_id ) {
+				continue;
+			}
+			$target_id = (int) $target_id;
+			if ( $target_id <= 0 || $target_id === $source_id ) {
 				continue;
 			}
 
-			// Handle relative URLs.
-			if ( 0 === strpos( $url, '/' ) && 0 !== strpos( $url, '//' ) ) {
-				$url = home_url( $url );
+			if ( ! isset( $outbound[ $source_id ] ) ) {
+				$outbound[ $source_id ] = array();
+			}
+			if ( ! isset( $outbound[ $source_id ][ $target_id ] ) ) {
+				$outbound[ $source_id ][ $target_id ] = array(
+					'count' => 0,
+					'types' => array(),
+				);
+			}
+			++$outbound[ $source_id ][ $target_id ]['count'];
+			if ( '' !== $edge_type ) {
+				if ( ! isset( $outbound[ $source_id ][ $target_id ]['types'][ $edge_type ] ) ) {
+					$outbound[ $source_id ][ $target_id ]['types'][ $edge_type ] = 0;
+				}
+				++$outbound[ $source_id ][ $target_id ]['types'][ $edge_type ];
 			}
 
-			// Parse and check host.
-			$parsed = wp_parse_url( $url );
-			$host   = $parsed['host'] ?? '';
-
-			if ( empty( $host ) || strcasecmp( $host, $home_host ) !== 0 ) {
-				continue;
+			if ( ! isset( $outbound_counts[ $source_id ] ) ) {
+				$outbound_counts[ $source_id ] = 0;
 			}
+			++$outbound_counts[ $source_id ];
 
-			// Strip query string and fragment for normalization.
-			$clean_url = $parsed['scheme'] . '://' . $parsed['host'];
-			if ( ! empty( $parsed['path'] ) ) {
-				$clean_url .= $parsed['path'];
+			if ( isset( $inbound[ $target_id ] ) ) {
+				++$inbound[ $target_id ];
 			}
-
-			$links[] = $clean_url;
 		}
 
-		return array_unique( $links );
+		// Orphans: posts in scope with zero inbound links.
+		$orphaned = array();
+		foreach ( $inbound as $post_id => $count ) {
+			if ( 0 === $count ) {
+				$orphaned[] = array(
+					'post_id'   => (int) $post_id,
+					'title'     => $id_to_title[ $post_id ] ?? '',
+					'permalink' => $id_to_url[ $post_id ] ?? '',
+					'outbound'  => $outbound_counts[ $post_id ] ?? 0,
+				);
+			}
+		}
+
+		// Top linked: descending inbound, cap 20.
+		$inbound_sorted = $inbound;
+		arsort( $inbound_sorted );
+		$top_linked = array();
+		$top_count  = 0;
+		foreach ( $inbound_sorted as $post_id => $count ) {
+			if ( 0 === $count || $top_count >= 20 ) {
+				break;
+			}
+			$top_linked[] = array(
+				'post_id'   => (int) $post_id,
+				'title'     => $id_to_title[ $post_id ] ?? '',
+				'permalink' => $id_to_url[ $post_id ] ?? '',
+				'inbound'   => (int) $count,
+				'outbound'  => $outbound_counts[ $post_id ] ?? 0,
+			);
+			++$top_count;
+		}
+
+		$total_scanned  = count( $post_ids );
+		$outbound_total = array_sum( $outbound_counts );
+		$inbound_total  = array_sum( $inbound );
+
+		return array(
+			'outbound'       => $outbound,
+			'orphaned_posts' => $orphaned,
+			'top_linked'     => $top_linked,
+			'orphaned_count' => count( $orphaned ),
+			'avg_outbound'   => $total_scanned > 0 ? round( $outbound_total / $total_scanned, 2 ) : 0,
+			'avg_inbound'    => $total_scanned > 0 ? round( $inbound_total / $total_scanned, 2 ) : 0,
+		);
+	}
+
+	/**
+	 * Sanitize a `types` input parameter into a normalized array of edge_type
+	 * strings. Accepts arrays, comma-separated strings, or empty/null values.
+	 *
+	 * @since 0.72.0
+	 *
+	 * @param mixed $raw Raw input.
+	 * @return array|null Non-empty array of edge types, or null for "all types".
+	 */
+	private static function normalizeTypesInput( $raw ): ?array {
+		if ( empty( $raw ) ) {
+			return null;
+		}
+		if ( is_string( $raw ) ) {
+			$raw = array_map( 'trim', explode( ',', $raw ) );
+		}
+		if ( ! is_array( $raw ) ) {
+			return null;
+		}
+		$normalized = array();
+		foreach ( $raw as $type ) {
+			if ( ! is_scalar( $type ) ) {
+				continue;
+			}
+			$type = sanitize_key( (string) $type );
+			if ( '' === $type ) {
+				continue;
+			}
+			$normalized[ $type ] = true;
+		}
+		if ( empty( $normalized ) ) {
+			return null;
+		}
+		return array_keys( $normalized );
 	}
 
 	/**

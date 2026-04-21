@@ -29,6 +29,29 @@ defined( 'ABSPATH' ) || exit;
 class LinksCommand extends BaseCommand {
 
 	/**
+	 * Parse a `--types=` associative arg into a normalized array.
+	 *
+	 * Accepts comma-separated values (e.g. `--types=html_anchor,wikilink`).
+	 * Returns an empty array when the flag is omitted or empty.
+	 *
+	 * @since 0.72.0
+	 *
+	 * @param array $assoc_args CLI associative args.
+	 * @return array
+	 */
+	private static function parseTypesArg( array $assoc_args ): array {
+		$raw = $assoc_args['types'] ?? '';
+		if ( is_array( $raw ) ) {
+			return array_values( array_filter( array_map( 'strval', $raw ) ) );
+		}
+		$raw = (string) $raw;
+		if ( '' === trim( $raw ) ) {
+			return array();
+		}
+		return array_values( array_filter( array_map( 'trim', explode( ',', $raw ) ) ) );
+	}
+
+	/**
 	 * Queue internal cross-linking for posts.
 	 *
 	 * ## OPTIONS
@@ -272,6 +295,9 @@ class LinksCommand extends BaseCommand {
 	 * [--force]
 	 * : Force rebuild even if cached graph exists.
 	 *
+	 * [--types=<types>]
+	 * : Comma-separated list of edge types to include (e.g. html_anchor,wikilink). Omit for all types.
+	 *
 	 * [--show=<section>]
 	 * : Which section to display: summary, orphans, top, all.
 	 * ---
@@ -327,6 +353,8 @@ class LinksCommand extends BaseCommand {
 			$post_ids = array_map( 'absint', explode( ',', $assoc_args['post_id'] ) );
 		}
 
+		$types = self::parseTypesArg( $assoc_args );
+
 		WP_CLI::log( 'Scanning post content for internal links...' );
 
 		$result = InternalLinkingAbilities::auditInternalLinks(
@@ -335,6 +363,7 @@ class LinksCommand extends BaseCommand {
 				'category'  => $category,
 				'post_ids'  => $post_ids,
 				'force'     => $force,
+				'types'     => $types,
 			)
 		);
 
@@ -460,6 +489,9 @@ class LinksCommand extends BaseCommand {
 	 * default: 50
 	 * ---
 	 *
+	 * [--types=<types>]
+	 * : Comma-separated list of edge types to include (e.g. html_anchor,wikilink). Omit for all types.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -495,6 +527,7 @@ class LinksCommand extends BaseCommand {
 			array(
 				'post_type' => $post_type,
 				'limit'     => $limit,
+				'types'     => self::parseTypesArg( $assoc_args ),
 			)
 		);
 
@@ -549,6 +582,9 @@ class LinksCommand extends BaseCommand {
 	 * default: post
 	 * ---
 	 *
+	 * [--types=<types>]
+	 * : Comma-separated list of edge types to include (e.g. html_anchor,wikilink). Omit for all types.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -589,6 +625,7 @@ class LinksCommand extends BaseCommand {
 			array(
 				'post_id'   => $post_id,
 				'post_type' => $post_type,
+				'types'     => self::parseTypesArg( $assoc_args ),
 			)
 		);
 
@@ -654,6 +691,9 @@ class LinksCommand extends BaseCommand {
 	 * default: 28
 	 * ---
 	 *
+	 * [--types=<types>]
+	 * : Comma-separated list of edge types to include in link counts (e.g. html_anchor,wikilink). Omit for all types.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -698,6 +738,7 @@ class LinksCommand extends BaseCommand {
 				'category'   => $category,
 				'min_clicks' => $min_clicks,
 				'days'       => $days,
+				'types'      => self::parseTypesArg( $assoc_args ),
 			)
 		);
 
@@ -776,6 +817,9 @@ class LinksCommand extends BaseCommand {
 	 * default: 5
 	 * ---
 	 *
+	 * [--types=<types>]
+	 * : Comma-separated list of edge types to include for internal-link checks (e.g. html_anchor,wikilink). Omit for all types.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -828,6 +872,7 @@ class LinksCommand extends BaseCommand {
 				'scope'     => $scope,
 				'limit'     => $limit,
 				'timeout'   => $timeout,
+				'types'     => self::parseTypesArg( $assoc_args ),
 			)
 		);
 
