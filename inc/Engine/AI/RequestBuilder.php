@@ -120,7 +120,7 @@ class RequestBuilder {
 					'AI request dispatched via wp-ai-client',
 					array_filter(
 						array(
-							'context'      => $context,
+							'mode'         => $mode,
 							'job_id'       => $payload['job_id'] ?? null,
 							'flow_step_id' => $payload['flow_step_id'] ?? null,
 							'provider'     => $provider,
