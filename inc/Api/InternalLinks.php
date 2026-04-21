@@ -144,6 +144,19 @@ class InternalLinks {
 			$input = array();
 		}
 
+		// Normalize `types` for GET where arrays arrive as comma-separated strings
+		// (e.g. ?types=html_anchor,wikilink) and keep arrays intact for JSON bodies.
+		if ( array_key_exists( 'types', $input ) ) {
+			$types = $input['types'];
+			if ( is_string( $types ) ) {
+				$types = array_filter( array_map( 'trim', explode( ',', $types ) ) );
+			}
+			if ( ! is_array( $types ) ) {
+				$types = array();
+			}
+			$input['types'] = array_values( $types );
+		}
+
 		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {

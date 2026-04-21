@@ -131,6 +131,12 @@ class InternalLinkAudit extends BaseTool {
 					'required'    => false,
 					'description' => 'Maximum results to return. For orphans: max posts (default 50). For broken: max URLs to check (default 200).',
 				),
+				'types'     => array(
+					'type'        => 'array',
+					'required'    => false,
+					'description' => 'Optional edge types to include (e.g. ["html_anchor"], ["wikilink"]). Omit for all registered types.',
+					'items'       => array( 'type' => 'string' ),
+				),
 			),
 		);
 	}
