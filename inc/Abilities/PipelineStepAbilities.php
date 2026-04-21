@@ -152,7 +152,7 @@ class PipelineStepAbilities {
 			'datamachine/update-pipeline-step',
 			array(
 				'label'               => __( 'Update Pipeline Step', 'data-machine' ),
-				'description'         => __( 'Update pipeline step configuration (system prompt, disabled tools). Model/provider are configured via context_models setting.', 'data-machine' ),
+				'description'         => __( 'Update pipeline step configuration (system prompt, disabled tools). Model/provider are configured via mode_models setting.', 'data-machine' ),
 				'category'            => 'datamachine-pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -416,7 +416,7 @@ class PipelineStepAbilities {
 
 		if ( 'ai' === $step_type ) {
 			if ( empty( $new_step['provider'] ) || empty( $new_step['model'] ) ) {
-				$pipeline_defaults = PluginSettings::getContextModel( 'pipeline' );
+				$pipeline_defaults = PluginSettings::getModelForMode( 'pipeline' );
 				if ( empty( $new_step['provider'] ) ) {
 					$new_step['provider'] = $pipeline_defaults['provider'];
 				}
@@ -527,7 +527,7 @@ class PipelineStepAbilities {
 		$disabled_tools = $input['disabled_tools'] ?? null;
 
 		// provider/model are no longer configurable at the pipeline step level.
-		// Model resolution is handled exclusively by the context system (context_models setting).
+		// Model resolution is handled exclusively by the mode system (mode_models setting).
 
 		if ( null === $system_prompt && null === $disabled_tools ) {
 			return array(

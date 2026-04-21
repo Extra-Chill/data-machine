@@ -86,17 +86,17 @@ class Providers {
 				'model'    => PluginSettings::get( 'default_model', '' ),
 			);
 
-			$contexts       = PluginSettings::getAgentModes();
-			$context_models = PluginSettings::get( 'context_models', PluginSettings::get( 'agent_models', array() ) );
+			$modes       = PluginSettings::getAgentModes();
+			$mode_models = PluginSettings::get( 'mode_models', array() );
 
 			return rest_ensure_response(
 				array(
 					'success' => true,
 					'data'    => array(
-						'providers'      => $providers,
-						'defaults'       => $defaults,
-						'contexts'       => $contexts,
-						'context_models' => $context_models,
+						'providers'   => $providers,
+						'defaults'    => $defaults,
+						'modes'       => $modes,
+						'mode_models' => $mode_models,
 					),
 				)
 			);

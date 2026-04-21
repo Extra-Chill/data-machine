@@ -44,7 +44,7 @@ class AIConversationLoop {
 	 * @param array  $tools         Available tools for AI.
 	 * @param string $provider      AI provider identifier.
 	 * @param string $model         AI model identifier.
-	 * @param string $context       Execution context ('pipeline', 'chat', ...).
+	 * @param string $mode       Execution mode ('pipeline', 'chat', ...).
 	 * @param array  $payload       Step payload / loop context.
 	 * @param int    $max_turns     Maximum conversation turns.
 	 * @param bool   $single_turn   Execute exactly one turn and return.
@@ -55,7 +55,7 @@ class AIConversationLoop {
 		array $tools,
 		string $provider,
 		string $model,
-		string $context,
+		string $mode,
 		array $payload = array(),
 		int $max_turns = PluginSettings::DEFAULT_MAX_TURNS,
 		bool $single_turn = false
@@ -81,7 +81,7 @@ class AIConversationLoop {
 		 * @param array      $tools        Available tools for AI.
 		 * @param string     $provider     AI provider identifier.
 		 * @param string     $model        AI model identifier.
-		 * @param string     $context      Execution context.
+		 * @param string     $mode      Execution mode.
 		 * @param array      $payload      Step payload / loop context.
 		 * @param int        $max_turns    Maximum conversation turns.
 		 * @param bool       $single_turn  Single-turn mode flag.
@@ -93,7 +93,7 @@ class AIConversationLoop {
 			$tools,
 			$provider,
 			$model,
-			$context,
+			$mode,
 			$payload,
 			$max_turns,
 			$single_turn
@@ -109,7 +109,7 @@ class AIConversationLoop {
 			$tools,
 			$provider,
 			$model,
-			$context,
+			$mode,
 			$payload,
 			$max_turns,
 			$single_turn
@@ -123,7 +123,7 @@ class AIConversationLoop {
 	 * @param array  $tools          Available tools for AI
 	 * @param string $provider       AI provider (openai, anthropic, etc.)
 	 * @param string $model          AI model identifier
-	 * @param string $context        Execution context: 'pipeline' or 'chat'
+	 * @param string $mode        Execution mode: 'pipeline' or 'chat'
 	 * @param array  $payload        Step payload (job_id, flow_step_id, data, flow_step_config)
 	 * @param int    $max_turns      Maximum conversation turns (default 25)
 	 * @param bool   $single_turn    Execute exactly one turn and return (default false)
@@ -141,7 +141,7 @@ class AIConversationLoop {
 		array $tools,
 		string $provider,
 		string $model,
-		string $context,
+		string $mode,
 		array $payload = array(),
 		int $max_turns = PluginSettings::DEFAULT_MAX_TURNS,
 		bool $single_turn = false
@@ -174,10 +174,10 @@ class AIConversationLoop {
 		$flow_step_config       = $payload['flow_step_config'] ?? array();
 		$configured_handlers    = $flow_step_config['handler_slugs'] ?? array();
 
-		// Build base log context from payload for consistent logging
+		// Build base log metadata from payload for consistent logging.
 		$base_log_context = array_filter(
 			array(
-				'context'      => $context,
+				'mode'         => $mode,
 				'job_id'       => $payload['job_id'] ?? null,
 				'flow_step_id' => $payload['flow_step_id'] ?? null,
 			),
@@ -194,7 +194,7 @@ class AIConversationLoop {
 				$provider,
 				$model,
 				$tools,
-				$context,
+				$mode,
 				$payload
 			);
 
@@ -247,7 +247,7 @@ class AIConversationLoop {
 				$messages[] = $ai_message;
 
 				// Fire hook for AI response events (used for system operations like title generation)
-				do_action( 'datamachine_ai_response_received', $context, $messages, $payload );
+				do_action( 'datamachine_ai_response_received', $mode, $messages, $payload );
 			}
 
 			// Process tool calls
@@ -356,7 +356,7 @@ class AIConversationLoop {
 
 					// Track handler tool execution in pipeline mode.
 					// Only complete when ALL configured handlers have fired (multi-handler support).
-					if ( 'pipeline' === $context && $is_handler_tool && ( $tool_result['success'] ?? false ) ) {
+					if ( 'pipeline' === $mode && $is_handler_tool && ( $tool_result['success'] ?? false ) ) {
 						$handler_slug = $tool_def['handler'] ?? null;
 						if ( $handler_slug ) {
 							$executed_handler_slugs[] = $handler_slug;

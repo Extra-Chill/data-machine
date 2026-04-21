@@ -397,7 +397,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		$pipeline_step_id = $add_result['pipeline_step_id'];
 
 		// Provider/model are no longer configurable at the pipeline step level.
-		// Model resolution is handled by the context system (context_models setting).
+		// Model resolution is handled by the context system (mode_models setting).
 		$result = $this->step_abilities->executeUpdatePipelineStep(
 			array(
 				'pipeline_step_id' => $pipeline_step_id,

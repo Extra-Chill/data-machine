@@ -55,7 +55,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			metadata LONGTEXT NULL,
 			provider VARCHAR(50) NULL,
 			model VARCHAR(100) NULL,
-			context VARCHAR(20) NOT NULL DEFAULT 'chat',
+			mode VARCHAR(20) NOT NULL DEFAULT 'chat',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			last_read_at DATETIME NULL,
@@ -63,8 +63,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			PRIMARY KEY  (session_id),
 			KEY user_id (user_id),
 			KEY agent_id (agent_id),
-			KEY context (context),
-			KEY user_context (user_id, context),
+			KEY mode (mode),
+			KEY user_mode (user_id, mode),
 			KEY created_at (created_at),
 			KEY updated_at (updated_at),
 			KEY expires_at (expires_at)
@@ -100,47 +100,49 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	}
 
 	/**
-	 * Ensure context column exists and migrate legacy agent_type data.
+	 * Ensure the mode column exists, migrating from legacy `context` (or even
+	 * older `agent_type`) columns if present.
+	 *
+	 * Idempotent. Existing rows keep their values under the new `mode` name.
 	 *
 	 * @return void
 	 */
-	public static function ensure_context_column(): void {
+	public static function ensure_mode_column(): void {
 		global $wpdb;
 
 		$table_name = self::get_prefixed_table_name();
 
-		if ( ! self::column_exists( $table_name, 'context', $wpdb ) ) {
-			$legacy_agent_type = self::column_exists( $table_name, 'agent_type', $wpdb );
-
-			if ( $legacy_agent_type ) {
+		if ( ! self::column_exists( $table_name, 'mode', $wpdb ) ) {
+			if ( self::column_exists( $table_name, 'context', $wpdb ) ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i CHANGE COLUMN agent_type context VARCHAR(20) NOT NULL DEFAULT %s', $table_name, 'chat' ) );
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i CHANGE COLUMN context mode VARCHAR(20) NOT NULL DEFAULT %s', $table_name, 'chat' ) );
+			} elseif ( self::column_exists( $table_name, 'agent_type', $wpdb ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i CHANGE COLUMN agent_type mode VARCHAR(20) NOT NULL DEFAULT %s', $table_name, 'chat' ) );
 			} else {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN context VARCHAR(20) NOT NULL DEFAULT %s AFTER model', $table_name, 'chat' ) );
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN mode VARCHAR(20) NOT NULL DEFAULT %s AFTER model', $table_name, 'chat' ) );
 			}
 		}
 
-		// Idempotent index normalization: drop legacy, add new — only when needed.
+		// Idempotent index normalization: drop legacy indexes, add new — only when needed.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$indexes       = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table_name ) );
 		$existing_keys = array_unique( array_column( $indexes, 'Key_name' ) );
 
-		if ( in_array( 'agent_type', $existing_keys, true ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP KEY agent_type', $table_name ) );
+		foreach ( array( 'agent_type', 'user_agent', 'context', 'user_context' ) as $legacy_key ) {
+			if ( in_array( $legacy_key, $existing_keys, true ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP KEY ' . $legacy_key, $table_name ) );
+			}
 		}
-		if ( in_array( 'user_agent', $existing_keys, true ) ) {
+		if ( ! in_array( 'mode', $existing_keys, true ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP KEY user_agent', $table_name ) );
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY mode (mode)', $table_name ) );
 		}
-		if ( ! in_array( 'context', $existing_keys, true ) ) {
+		if ( ! in_array( 'user_mode', $existing_keys, true ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY context (context)', $table_name ) );
-		}
-		if ( ! in_array( 'user_context', $existing_keys, true ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY user_context (user_id, context)', $table_name ) );
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY user_mode (user_id, mode)', $table_name ) );
 		}
 	}
 
@@ -211,14 +213,14 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 *
 	 * @param int    $user_id  WordPress user ID
 	 * @param array  $metadata Optional session metadata
-	 * @param string $context  Execution context (chat, pipeline, system)
+	 * @param string $mode  Execution mode (chat, pipeline, system)
 	 * @return string Session ID (UUID)
 	 */
 	public function create_session(
 		int $user_id,
 		int $agent_id = 0,
 		array $metadata = array(),
-		string $context = 'chat'
+		string $mode = 'chat'
 	): string {
 		global $wpdb;
 
@@ -236,7 +238,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				'metadata'   => wp_json_encode( $metadata ),
 				'provider'   => null,
 				'model'      => null,
-				'context'    => $context,
+				'mode' => $mode,
 				'expires_at' => null,
 			),
 			array( '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
@@ -250,7 +252,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				array(
 					'user_id' => $user_id,
 					'error'   => $wpdb->last_error,
-					'context' => $context,
+					'mode' => $mode,
 				)
 			);
 			return '';
@@ -264,7 +266,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				'session_id' => $session_id,
 				'user_id'    => $user_id,
 				'agent_id'   => $agent_id,
-				'context'    => $context,
+				'mode' => $mode,
 			)
 		);
 
@@ -357,7 +359,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				array(
 					'session_id' => $session_id,
 					'error'      => $wpdb->last_error,
-					'context'    => 'chat',
+					'mode' => 'chat',
 				)
 			);
 			return false;
@@ -392,7 +394,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				array(
 					'session_id' => $session_id,
 					'error'      => $wpdb->last_error,
-					'context'    => 'chat',
+					'mode' => 'chat',
 				)
 			);
 			return false;
@@ -404,7 +406,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			'Chat session deleted',
 			array(
 				'session_id' => $session_id,
-				'context'    => 'chat',
+				'mode' => 'chat',
 			)
 		);
 
@@ -437,7 +439,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				'Cleaned up expired chat sessions',
 				array(
 					'deleted_count' => $deleted,
-					'context'       => 'chat',
+					'mode' => 'chat',
 				)
 			);
 		}
@@ -451,7 +453,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * @param int         $user_id  WordPress user ID
 	 * @param int         $limit    Maximum sessions to return
 	 * @param int         $offset   Pagination offset
-	 * @param string|null $context  Optional context filter
+	 * @param string|null $mode  Optional mode filter
 	 * @param int|null    $agent_id Optional agent ID filter (null = no filter)
 	 * @return array Array of session data
 	 */
@@ -459,21 +461,21 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		int $user_id,
 		int $limit = 20,
 		int $offset = 0,
-		?string $context = null,
+		?string $mode = null,
 		?int $agent_id = null
 	): array {
 		global $wpdb;
 
 		$table_name = self::get_prefixed_table_name();
 
-		if ( null !== $agent_id && null !== $context && '' !== $context ) {
+		if ( null !== $agent_id && null !== $mode && '' !== $mode ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$sessions = $wpdb->get_results(
 				$wpdb->prepare(
-					'SELECT * FROM %i WHERE user_id = %d AND context = %s AND agent_id = %d ORDER BY updated_at DESC LIMIT %d OFFSET %d',
+					'SELECT * FROM %i WHERE user_id = %d AND mode = %s AND agent_id = %d ORDER BY updated_at DESC LIMIT %d OFFSET %d',
 					$table_name,
 					$user_id,
-					$context,
+					$mode,
 					$agent_id,
 					$limit,
 					$offset
@@ -493,14 +495,14 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				),
 				ARRAY_A
 			);
-		} elseif ( null !== $context && '' !== $context ) {
+		} elseif ( null !== $mode && '' !== $mode ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$sessions = $wpdb->get_results(
 				$wpdb->prepare(
-					'SELECT * FROM %i WHERE user_id = %d AND context = %s ORDER BY updated_at DESC LIMIT %d OFFSET %d',
+					'SELECT * FROM %i WHERE user_id = %d AND mode = %s ORDER BY updated_at DESC LIMIT %d OFFSET %d',
 					$table_name,
 					$user_id,
-					$context,
+					$mode,
 					$limit,
 					$offset
 				),
@@ -560,7 +562,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			$result[] = array(
 				'session_id'    => $session['session_id'],
 				'title'         => $session['title'] ?? null,
-				'context'       => $session['context'] ?? 'chat',
+				'mode' => $session['mode'] ?? 'chat',
 				'first_message' => mb_substr( $first_message, 0, 100 ),
 				'message_count' => count( $messages ),
 				'unread_count'  => $this->count_unread( $messages, $last_read_at ),
@@ -579,27 +581,27 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * Get total session count for a user
 	 *
 	 * @param int         $user_id  WordPress user ID
-	 * @param string|null $context  Optional context filter
+	 * @param string|null $mode  Optional mode filter
 	 * @param int|null    $agent_id Optional agent ID filter (null = no filter)
 	 * @return int Total session count
 	 */
 	public function get_user_session_count(
 		int $user_id,
-		?string $context = null,
+		?string $mode = null,
 		?int $agent_id = null
 	): int {
 		global $wpdb;
 
 		$table_name = self::get_prefixed_table_name();
 
-		if ( null !== $agent_id && null !== $context && '' !== $context ) {
+		if ( null !== $agent_id && null !== $mode && '' !== $mode ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$count = $wpdb->get_var(
 				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i WHERE user_id = %d AND context = %s AND agent_id = %d',
+					'SELECT COUNT(*) FROM %i WHERE user_id = %d AND mode = %s AND agent_id = %d',
 					$table_name,
 					$user_id,
-					$context,
+					$mode,
 					$agent_id
 				)
 			);
@@ -613,14 +615,14 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 					$agent_id
 				)
 			);
-		} elseif ( null !== $context && '' !== $context ) {
+		} elseif ( null !== $mode && '' !== $mode ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$count = $wpdb->get_var(
 				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i WHERE user_id = %d AND context = %s',
+					'SELECT COUNT(*) FROM %i WHERE user_id = %d AND mode = %s',
 					$table_name,
 					$user_id,
-					$context
+					$mode
 				)
 			);
 		} else {
@@ -644,7 +646,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * - Belongs to this user
 	 * - Was created within the threshold (default 10 minutes)
 	 * - Has 0 messages OR is actively processing (user message added but no AI response)
-	 * - Matches the specified agent type
+	 * - Matches the specified mode
 	 *
 	 * This prevents duplicate sessions when requests timeout at Cloudflare
 	 * but PHP continues executing. On retry, we reuse the pending session
@@ -653,14 +655,14 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * @since 0.9.8
 	 * @param int      $user_id WordPress user ID
 	 * @param int      $seconds Lookback window in seconds (default 600 = 10 minutes)
-	 * @param string   $context Context filter
+	 * @param string $mode Mode filter
 	 * @param int|null $token_id Optional token ID for login-scoped deduplication.
 	 * @return array|null Session data or null if none found
 	 */
 	public function get_recent_pending_session(
 		int $user_id,
 		int $seconds = 600,
-		string $context = 'chat',
+		string $mode = 'chat',
 		?int $token_id = null
 	): ?array {
 		global $wpdb;
@@ -670,7 +672,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 
 		$query  = "SELECT * FROM %i
 				WHERE user_id = %d
-				AND context = %s
+				AND mode = %s
 				AND created_at >= %s
 				AND (
 					(messages = '[]' OR messages = '' OR messages IS NULL)
@@ -679,7 +681,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$params = array(
 			$table_name,
 			$user_id,
-			$context,
+			$mode,
 			$cutoff_time,
 			'%"status":"processing"%',
 		);
@@ -736,7 +738,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				array(
 					'session_id' => $session_id,
 					'error'      => $wpdb->last_error,
-					'context'    => 'chat',
+					'mode' => 'chat',
 				)
 			);
 			return false;
@@ -860,7 +862,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 					'deleted_count'  => $deleted,
 					'retention_days' => $retention_days,
 					'cutoff_date'    => $cutoff_date,
-					'context'        => 'chat',
+					'mode' => 'chat',
 				)
 			);
 		}
@@ -908,7 +910,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 					'deleted_count'   => $deleted,
 					'hours_threshold' => $hours,
 					'cutoff_time'     => $cutoff_time,
-					'context'         => 'chat',
+					'mode' => 'chat',
 				)
 			);
 		}
@@ -923,7 +925,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * without loading the full messages blob for every row.
 	 *
 	 * @param string $date Date string in `Y-m-d` format.
-	 * @return array<int, array{session_id: string, title: string|null, context: string, created_at: string}>
+	 * @return array<int, array{session_id: string, title: string|null, mode: string, created_at: string}>
 	 */
 	public function list_sessions_for_day( string $date ): array {
 		global $wpdb;
@@ -937,7 +939,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				'SELECT session_id, title, context, created_at
+				'SELECT session_id, title, mode, created_at
 				 FROM %i
 				 WHERE DATE(created_at) = %s
 				 ORDER BY created_at ASC',
@@ -956,7 +958,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			$result[] = array(
 				'session_id' => (string) $row['session_id'],
 				'title'      => isset( $row['title'] ) ? (string) $row['title'] : null,
-				'context'    => isset( $row['context'] ) ? (string) $row['context'] : 'chat',
+				'mode' => isset($row['mode']) ? (string) $row['mode'] : 'chat',
 				'created_at' => (string) $row['created_at'],
 			);
 		}

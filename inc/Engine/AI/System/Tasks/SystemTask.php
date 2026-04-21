@@ -260,7 +260,7 @@ abstract class SystemTask {
 	 */
 	protected function resolveSystemModel( array $params ): array {
 		$agent_id = (int) ( $params['agent_id'] ?? ( $params['context']['agent_id'] ?? 0 ) );
-		return PluginSettings::resolveModelForAgentContext( $agent_id, 'system' );
+		return PluginSettings::resolveModelForAgentMode( $agent_id, 'system' );
 	}
 
 	/**

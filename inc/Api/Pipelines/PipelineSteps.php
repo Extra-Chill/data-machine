@@ -493,7 +493,7 @@ class PipelineSteps {
 
 		// Build step configuration data for AI steps.
 		// Note: provider/model are NOT configurable at the pipeline step level.
-		// Model resolution is handled by the context system (context_models setting).
+		// Model resolution is handled by the mode system (mode_models setting).
 		$step_config_data = array();
 		$api_key_saved    = false;
 

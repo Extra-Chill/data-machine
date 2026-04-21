@@ -239,10 +239,10 @@ class Chat {
 						'description'       => __( 'Pagination offset', 'data-machine' ),
 						'sanitize_callback' => 'absint',
 					),
-					'context'  => array(
+					'mode'     => array(
 						'type'              => 'string',
 						'required'          => false,
-						'description'       => __( 'Context filter (chat, pipeline, system)', 'data-machine' ),
+						'description'       => __( 'Mode filter (chat, pipeline, system)', 'data-machine' ),
 						'sanitize_callback' => 'sanitize_text_field',
 						'validate_callback' => function ( $param ) {
 							return in_array( $param, array( 'chat', 'pipeline', 'system' ), true );
@@ -318,7 +318,7 @@ class Chat {
 		$prompt  = sanitize_textarea_field( wp_unslash( $request->get_param( 'prompt' ) ?? '' ) );
 		$context = $request->get_param( 'context' ) ?? array();
 
-		$agent_config = PluginSettings::resolveModelForAgentContext( $agent_id, 'chat' );
+		$agent_config = PluginSettings::resolveModelForAgentMode( $agent_id, 'chat' );
 		$provider     = $agent_config['provider'];
 		$model        = $agent_config['model'];
 
@@ -368,7 +368,7 @@ class Chat {
 				'agent_id' => PermissionHelper::resolve_scoped_agent_id( $request ),
 				'limit'    => (int) $request->get_param( 'limit' ),
 				'offset'   => (int) $request->get_param( 'offset' ),
-				'context'  => $request->get_param( 'context' ),
+				'mode'     => $request->get_param( 'mode' ),
 			)
 		);
 	}
