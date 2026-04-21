@@ -189,18 +189,29 @@ class MemoryCommand extends BaseCommand {
 	 * Otherwise the first two arguments are section and content
 	 * targeting MEMORY.md.
 	 *
+	 * Content can also be supplied via --from-file=<path> or via stdin
+	 * by passing `-` as the content positional. These avoid shell-quoting
+	 * issues when content contains backticks, `$`, or multi-line markdown.
+	 *
 	 * ## OPTIONS
 	 *
 	 * <file_or_section>
 	 * : Filename (e.g. SOUL.md) or section name (without ##).
 	 *   Arguments ending in .md are treated as filenames.
 	 *
-	 * <section_or_content>
+	 * [<section_or_content>]
 	 * : Section name when first arg is a filename, or content
-	 *   when first arg is a section name.
+	 *   when first arg is a section name. Use `-` to read content
+	 *   from stdin. Optional when --from-file is used.
 	 *
 	 * [<content>]
-	 * : Content to write when first arg is a filename.
+	 * : Content to write when first arg is a filename. Use `-` to
+	 *   read content from stdin. Optional when --from-file is used.
+	 *
+	 * [--from-file=<path>]
+	 * : Read content from a file on disk. When set, the content positional
+	 *   becomes optional. Cannot be combined with a non-`-` positional content
+	 *   or with stdin (`-`).
 	 *
 	 * [--agent=<slug>]
 	 * : Agent slug or numeric ID.
@@ -231,16 +242,20 @@ class MemoryCommand extends BaseCommand {
 	 *     # Write to a specific agent's file
 	 *     wp datamachine agent write SOUL.md "Voice" "Concise and direct" --agent=studio
 	 *
+	 *     # Load content from a file on disk
+	 *     wp datamachine agent write "Session Notes" --from-file=/tmp/notes.md --mode=append
+	 *
+	 *     # Pipe content via stdin
+	 *     echo "- New lesson" | wp datamachine agent write "Lessons Learned" - --mode=append
+	 *
+	 *     # Heredoc via stdin
+	 *     wp datamachine agent write SOUL.md "Identity" - <<'EOF'
+	 *     Multi-line content with `backticks` and $vars
+	 *     EOF
+	 *
 	 * @subcommand write
 	 */
 	public function write( array $args, array $assoc_args ): void {
-		$parsed = $this->parseFileSectionContent( $args );
-
-		if ( null === $parsed ) {
-			WP_CLI::error( 'Usage: wp datamachine agent write [<file.md>] <section> <content> [--mode=set|append]' );
-			return;
-		}
-
 		$mode = $assoc_args['mode'] ?? 'set';
 
 		if ( ! in_array( $mode, $this->valid_modes, true ) ) {
@@ -248,18 +263,93 @@ class MemoryCommand extends BaseCommand {
 			return;
 		}
 
+		$from_file     = $assoc_args['from-file'] ?? null;
+		$stdin_marker  = ( ! empty( $args ) && '-' === end( $args ) );
+		reset( $args );
+
+		if ( null !== $from_file && $stdin_marker ) {
+			WP_CLI::error( 'Cannot use both --from-file and stdin (`-`). Pick one.' );
+			return;
+		}
+
+		if ( null !== $from_file ) {
+			// --from-file path: content positional must NOT be present.
+			$file_section = $this->parseFileAndSection( $args );
+
+			if ( null === $file_section['section'] ) {
+				WP_CLI::error( 'Usage: wp datamachine agent write [<file.md>] <section> --from-file=<path> [--mode=set|append]' );
+				return;
+			}
+
+			$expected_count = ( null !== $file_section['file'] ) ? 2 : 1;
+			if ( count( $args ) > $expected_count ) {
+				WP_CLI::error( 'Cannot supply both --from-file and positional content. Pick one.' );
+				return;
+			}
+
+			if ( ! file_exists( $from_file ) ) {
+				WP_CLI::error( sprintf( '--from-file path does not exist: %s', $from_file ) );
+				return;
+			}
+
+			if ( ! is_readable( $from_file ) ) {
+				WP_CLI::error( sprintf( '--from-file path is not readable: %s', $from_file ) );
+				return;
+			}
+
+			$content = file_get_contents( $from_file );
+			if ( false === $content ) {
+				WP_CLI::error( sprintf( 'Failed to read --from-file path: %s', $from_file ) );
+				return;
+			}
+
+			$file    = $file_section['file'];
+			$section = $file_section['section'];
+		} elseif ( $stdin_marker ) {
+			// Stdin path: pop the `-` and parse remaining args as [file?] section.
+			array_pop( $args );
+			$file_section = $this->parseFileAndSection( $args );
+
+			if ( null === $file_section['section'] ) {
+				WP_CLI::error( 'Usage: wp datamachine agent write [<file.md>] <section> - [--mode=set|append]' );
+				return;
+			}
+
+			$expected_count = ( null !== $file_section['file'] ) ? 2 : 1;
+			if ( count( $args ) > $expected_count ) {
+				WP_CLI::error( 'Unexpected extra positional arguments before stdin marker.' );
+				return;
+			}
+
+			$content = $this->readStdin();
+			$file    = $file_section['file'];
+			$section = $file_section['section'];
+		} else {
+			// Positional content (existing behavior).
+			$parsed = $this->parseFileSectionContent( $args );
+
+			if ( null === $parsed ) {
+				WP_CLI::error( 'Usage: wp datamachine agent write [<file.md>] <section> <content> [--mode=set|append]' );
+				return;
+			}
+
+			$file    = $parsed['file'];
+			$section = $parsed['section'];
+			$content = $parsed['content'];
+		}
+
 		$scoping = $this->resolveMemoryScoping( $assoc_args );
 		$input   = array_merge(
 			$scoping,
 			array(
-				'section' => $parsed['section'],
-				'content' => $parsed['content'],
+				'section' => $section,
+				'content' => $content,
 				'mode'    => $mode,
 			)
 		);
 
-		if ( null !== $parsed['file'] ) {
-			$input['file'] = $parsed['file'];
+		if ( null !== $file ) {
+			$input['file'] = $file;
 		}
 
 		$result = AgentMemoryAbilities::updateMemory( $input );
@@ -270,6 +360,19 @@ class MemoryCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( $result['message'] );
+	}
+
+	/**
+	 * Read content from stdin (php://stdin) and return as string.
+	 *
+	 * Returns an empty string if stdin yields nothing.
+	 *
+	 * @since 0.71.0
+	 * @return string Content read from stdin.
+	 */
+	private function readStdin(): string {
+		$content = file_get_contents( 'php://stdin' );
+		return ( false === $content ) ? '' : $content;
 	}
 
 	/**
