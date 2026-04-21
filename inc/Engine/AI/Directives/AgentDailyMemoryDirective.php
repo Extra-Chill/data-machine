@@ -179,7 +179,7 @@ add_filter(
 		$directives[] = array(
 			'class'    => AgentDailyMemoryDirective::class,
 			'priority' => 35,
-			'contexts' => array( 'chat', 'pipeline' ),
+			'modes'    => array( 'chat', 'pipeline' ),
 		);
 		return $directives;
 	}

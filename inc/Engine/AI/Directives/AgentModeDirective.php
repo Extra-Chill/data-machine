@@ -202,7 +202,7 @@ add_filter(
 		$directives[] = array(
 			'class'    => AgentModeDirective::class,
 			'priority' => 22,
-			'contexts' => array( 'all' ),
+			'modes'    => array( 'all' ),
 		);
 		return $directives;
 	}

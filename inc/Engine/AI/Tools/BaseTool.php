@@ -26,7 +26,7 @@ abstract class BaseTool {
 	 * Register a tool with the unified tool registry.
 	 *
 	 * All tools register via the single `datamachine_tools` filter. Each tool
-	 * must declare its contexts — the surfaces where it's available (e.g.
+	 * must declare its modes — the agent modes where it's available (e.g.
 	 * 'chat', 'pipeline').
 	 *
 	 * Tools should also declare which ability they wrap via the `ability` key
@@ -34,9 +34,9 @@ abstract class BaseTool {
 	 * check the ability's permission_callback before offering the tool to AI agents.
 	 * Tools without an ability declaration default to admin-only access.
 	 *
-	 * When the definition is a callable (for lazy evaluation), the contexts
+	 * When the definition is a callable (for lazy evaluation), the modes
 	 * are stored alongside so they're available before the callable is resolved.
-	 * The ToolManager merges contexts into the resolved definition.
+	 * The ToolManager merges modes into the resolved definition.
 	 *
 	 * IMPORTANT: Pass a callable (e.g., [$this, 'getToolDefinition']) instead of
 	 * calling the method directly. This enables lazy evaluation after translations
@@ -47,7 +47,7 @@ abstract class BaseTool {
 	 *
 	 * @param string         $toolName       Tool identifier.
 	 * @param array|callable $toolDefinition Tool definition array OR callable that returns it.
-	 * @param array          $contexts       Contexts where this tool is available (e.g. ['chat', 'pipeline']).
+	 * @param array          $modes          Agent modes where this tool is available (e.g. ['chat', 'pipeline']).
 	 * @param array          $meta           Optional metadata for permission resolution. {
 	 *     @type string   $ability      Single ability slug this tool wraps (e.g. 'datamachine/local-search').
 	 *     @type string[] $abilities    Multiple ability slugs for composed tools. ALL must pass permission check.
@@ -55,20 +55,20 @@ abstract class BaseTool {
 	 *                                  One of: 'public', 'authenticated', 'author', 'editor', 'admin'. Default: 'admin'.
 	 * }
 	 */
-	protected function registerTool( string $toolName, array|callable $toolDefinition, array $contexts = array(), array $meta = array() ): void {
+	protected function registerTool( string $toolName, array|callable $toolDefinition, array $modes = array(), array $meta = array() ): void {
 		add_filter(
 			'datamachine_tools',
-			function ( $tools ) use ( $toolName, $toolDefinition, $contexts, $meta ) {
+			function ( $tools ) use ( $toolName, $toolDefinition, $modes, $meta ) {
 				if ( is_callable( $toolDefinition ) ) {
-					// Wrap callable with contexts for pre-resolution filtering.
+					// Wrap callable with modes for pre-resolution filtering.
 					$tools[ $toolName ] = array(
 						'_callable' => $toolDefinition,
-						'contexts'  => $contexts,
+						'modes'     => $modes,
 					);
 				} else {
-					// Array definition — merge contexts directly.
-					$toolDefinition['contexts'] = $contexts;
-					$tools[ $toolName ]         = $toolDefinition;
+					// Array definition — merge modes directly.
+					$toolDefinition['modes'] = $modes;
+					$tools[ $toolName ]      = $toolDefinition;
 				}
 
 				// Merge permission metadata into the tool entry.

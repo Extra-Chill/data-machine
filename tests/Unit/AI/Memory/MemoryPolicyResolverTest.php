@@ -32,22 +32,38 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 		// Seed a small, known set of registered files so assertions are
 		// stable across test runs. The real core registrations happen in
 		// bootstrap code we don't need here.
-		MemoryFileRegistry::register( 'SOUL.md', 10, array(
-			'layer'    => MemoryFileRegistry::LAYER_AGENT,
-			'contexts' => array( 'all' ),
-		) );
-		MemoryFileRegistry::register( 'MEMORY.md', 20, array(
-			'layer'    => MemoryFileRegistry::LAYER_AGENT,
-			'contexts' => array( 'all' ),
-		) );
-		MemoryFileRegistry::register( 'USER.md', 30, array(
-			'layer'    => MemoryFileRegistry::LAYER_USER,
-			'contexts' => array( 'chat', 'pipeline' ),
-		) );
-		MemoryFileRegistry::register( 'CHAT_ONLY.md', 40, array(
-			'layer'    => MemoryFileRegistry::LAYER_AGENT,
-			'contexts' => array( 'chat' ),
-		) );
+		MemoryFileRegistry::register(
+			'SOUL.md',
+			10,
+			array(
+				'layer'    => MemoryFileRegistry::LAYER_AGENT,
+				'contexts' => array( 'all' ),
+			)
+		);
+		MemoryFileRegistry::register(
+			'MEMORY.md',
+			20,
+			array(
+				'layer'    => MemoryFileRegistry::LAYER_AGENT,
+				'contexts' => array( 'all' ),
+			)
+		);
+		MemoryFileRegistry::register(
+			'USER.md',
+			30,
+			array(
+				'layer'    => MemoryFileRegistry::LAYER_USER,
+				'contexts' => array( 'chat', 'pipeline' ),
+			)
+		);
+		MemoryFileRegistry::register(
+			'CHAT_ONLY.md',
+			40,
+			array(
+				'layer'    => MemoryFileRegistry::LAYER_AGENT,
+				'contexts' => array( 'chat' ),
+			)
+		);
 
 		$this->resolver = new MemoryPolicyResolver();
 	}
@@ -64,9 +80,11 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	// ============================================
 
 	public function test_registered_chat_context_includes_all_and_chat_files(): void {
-		$files = $this->resolver->resolveRegistered( array(
-			'context' => MemoryPolicyResolver::CONTEXT_CHAT,
-		) );
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode' => MemoryPolicyResolver::MODE_CHAT,
+			)
+		);
 
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayHasKey( 'MEMORY.md', $files );
@@ -75,9 +93,11 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_registered_pipeline_context_excludes_chat_only(): void {
-		$files = $this->resolver->resolveRegistered( array(
-			'context' => MemoryPolicyResolver::CONTEXT_PIPELINE,
-		) );
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode' => MemoryPolicyResolver::MODE_PIPELINE,
+			)
+		);
 
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayHasKey( 'MEMORY.md', $files );
@@ -86,9 +106,11 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_registered_preserves_metadata(): void {
-		$files = $this->resolver->resolveRegistered( array(
-			'context' => MemoryPolicyResolver::CONTEXT_CHAT,
-		) );
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode' => MemoryPolicyResolver::MODE_CHAT,
+			)
+		);
 
 		$this->assertSame( MemoryFileRegistry::LAYER_AGENT, $files['SOUL.md']['layer'] );
 		$this->assertSame( MemoryFileRegistry::LAYER_USER, $files['USER.md']['layer'] );
@@ -99,20 +121,24 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	// ============================================
 
 	public function test_context_deny_removes_files(): void {
-		$files = $this->resolver->resolveRegistered( array(
-			'context' => MemoryPolicyResolver::CONTEXT_CHAT,
-			'deny'    => array( 'MEMORY.md' ),
-		) );
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode' => MemoryPolicyResolver::MODE_CHAT,
+				'deny' => array( 'MEMORY.md' ),
+			)
+		);
 
 		$this->assertArrayNotHasKey( 'MEMORY.md', $files );
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 	}
 
 	public function test_context_allow_only_narrows_to_subset(): void {
-		$files = $this->resolver->resolveRegistered( array(
-			'context'    => MemoryPolicyResolver::CONTEXT_CHAT,
-			'allow_only' => array( 'SOUL.md' ),
-		) );
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode'       => MemoryPolicyResolver::MODE_CHAT,
+				'allow_only' => array( 'SOUL.md' ),
+			)
+		);
 
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayNotHasKey( 'MEMORY.md', $files );
@@ -124,14 +150,18 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	// ============================================
 
 	public function test_no_agent_id_means_no_agent_filter(): void {
-		$without = $this->resolver->resolveRegistered( array(
-			'context' => MemoryPolicyResolver::CONTEXT_CHAT,
-		) );
+		$without = $this->resolver->resolveRegistered(
+			array(
+				'mode' => MemoryPolicyResolver::MODE_CHAT,
+			)
+		);
 
-		$with_zero = $this->resolver->resolveRegistered( array(
-			'context'  => MemoryPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => 0,
-		) );
+		$with_zero = $this->resolver->resolveRegistered(
+			array(
+				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'agent_id' => 0,
+			)
+		);
 
 		$this->assertSame( $without, $with_zero );
 	}
@@ -139,28 +169,36 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	public function test_agent_default_mode_is_noop(): void {
 		$agent_id = $this->createAgentWithPolicy( array( 'mode' => 'default' ) );
 
-		$without = $this->resolver->resolveRegistered( array(
-			'context' => MemoryPolicyResolver::CONTEXT_CHAT,
-		) );
+		$without = $this->resolver->resolveRegistered(
+			array(
+				'mode' => MemoryPolicyResolver::MODE_CHAT,
+			)
+		);
 
-		$with = $this->resolver->resolveRegistered( array(
-			'context'  => MemoryPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$with = $this->resolver->resolveRegistered(
+			array(
+				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertSame( $without, $with );
 	}
 
 	public function test_agent_deny_mode_removes_listed_files(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode' => 'deny',
-			'deny' => array( 'MEMORY.md', 'USER.md' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode' => 'deny',
+				'deny' => array( 'MEMORY.md', 'USER.md' ),
+			)
+		);
 
-		$files = $this->resolver->resolveRegistered( array(
-			'context'  => MemoryPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayHasKey( 'CHAT_ONLY.md', $files );
@@ -169,15 +207,19 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_agent_allow_only_narrows_to_listed_files(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'       => 'allow_only',
-			'allow_only' => array( 'SOUL.md' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'       => 'allow_only',
+				'allow_only' => array( 'SOUL.md' ),
+			)
+		);
 
-		$files = $this->resolver->resolveRegistered( array(
-			'context'  => MemoryPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayNotHasKey( 'MEMORY.md', $files );
@@ -185,47 +227,61 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_agent_allow_only_empty_returns_nothing(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'       => 'allow_only',
-			'allow_only' => array(),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'       => 'allow_only',
+				'allow_only' => array(),
+			)
+		);
 
-		$files = $this->resolver->resolveRegistered( array(
-			'context'  => MemoryPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertSame( array(), $files );
 	}
 
 	public function test_agent_deny_empty_list_is_noop(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode' => 'deny',
-			'deny' => array(),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode' => 'deny',
+				'deny' => array(),
+			)
+		);
 
-		$without = $this->resolver->resolveRegistered( array(
-			'context' => MemoryPolicyResolver::CONTEXT_CHAT,
-		) );
+		$without = $this->resolver->resolveRegistered(
+			array(
+				'mode' => MemoryPolicyResolver::MODE_CHAT,
+			)
+		);
 
-		$with = $this->resolver->resolveRegistered( array(
-			'context'  => MemoryPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$with = $this->resolver->resolveRegistered(
+			array(
+				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertSame( $without, $with );
 	}
 
 	public function test_agent_allow_only_ignores_unknown_files(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'       => 'allow_only',
-			'allow_only' => array( 'SOUL.md', 'DOES_NOT_EXIST.md' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'       => 'allow_only',
+				'allow_only' => array( 'SOUL.md', 'DOES_NOT_EXIST.md' ),
+			)
+		);
 
-		$files = $this->resolver->resolveRegistered( array(
-			'context'  => MemoryPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayNotHasKey( 'DOES_NOT_EXIST.md', $files );
@@ -237,16 +293,20 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	// ============================================
 
 	public function test_explicit_deny_wins_over_agent_allow_only(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'       => 'allow_only',
-			'allow_only' => array( 'SOUL.md', 'MEMORY.md' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'       => 'allow_only',
+				'allow_only' => array( 'SOUL.md', 'MEMORY.md' ),
+			)
+		);
 
-		$files = $this->resolver->resolveRegistered( array(
-			'context'  => MemoryPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-			'deny'     => array( 'MEMORY.md' ),
-		) );
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+				'deny'     => array( 'MEMORY.md' ),
+			)
+		);
 
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayNotHasKey( 'MEMORY.md', $files );
@@ -256,15 +316,15 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	// datamachine_resolved_memory_files filter
 	// ============================================
 
-	public function test_resolved_filter_fires_with_context_and_files(): void {
+	public function test_resolved_filter_fires_with_mode_and_files(): void {
 		$captured = null;
 		add_filter(
 			'datamachine_resolved_memory_files',
-			function ( $files, $context_type, $context ) use ( &$captured ) {
+			function ( $files, $mode, $args ) use ( &$captured ) {
 				$captured = array(
-					'files'        => $files,
-					'context_type' => $context_type,
-					'context'      => $context,
+					'files' => $files,
+					'mode'  => $mode,
+					'args'  => $args,
 				);
 				return $files;
 			},
@@ -272,13 +332,15 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 			3
 		);
 
-		$this->resolver->resolveRegistered( array(
-			'context'  => MemoryPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => 0,
-		) );
+		$this->resolver->resolveRegistered(
+			array(
+				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'agent_id' => 0,
+			)
+		);
 
 		$this->assertNotNull( $captured );
-		$this->assertSame( MemoryPolicyResolver::CONTEXT_CHAT, $captured['context_type'] );
+		$this->assertSame( MemoryPolicyResolver::MODE_CHAT, $captured['mode'] );
 		$this->assertArrayHasKey( 'SOUL.md', $captured['files'] );
 	}
 
@@ -291,9 +353,11 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 			}
 		);
 
-		$files = $this->resolver->resolveRegistered( array(
-			'context' => MemoryPolicyResolver::CONTEXT_CHAT,
-		) );
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode' => MemoryPolicyResolver::MODE_CHAT,
+			)
+		);
 
 		$this->assertArrayNotHasKey( 'SOUL.md', $files );
 		$this->assertArrayHasKey( 'MEMORY.md', $files );
@@ -317,10 +381,12 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_filter_agent_deny_removes_files(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode' => 'deny',
-			'deny' => array( 'brand-voice.md' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode' => 'deny',
+				'deny' => array( 'brand-voice.md' ),
+			)
+		);
 
 		$out = $this->resolver->filter(
 			array( 'brand-voice.md', 'seo-checklist.md' ),
@@ -331,10 +397,12 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_filter_agent_allow_only_narrows_list(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'       => 'allow_only',
-			'allow_only' => array( 'seo-checklist.md' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'       => 'allow_only',
+				'allow_only' => array( 'seo-checklist.md' ),
+			)
+		);
 
 		$out = $this->resolver->filter(
 			array( 'brand-voice.md', 'seo-checklist.md', 'tone.md' ),
@@ -345,10 +413,12 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_filter_explicit_deny_applies_after_agent_policy(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode' => 'deny',
-			'deny' => array( 'brand-voice.md' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode' => 'deny',
+				'deny' => array( 'brand-voice.md' ),
+			)
+		);
 
 		$out = $this->resolver->filter(
 			array( 'brand-voice.md', 'seo-checklist.md', 'tone.md' ),
@@ -365,10 +435,10 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 		$captured = null;
 		add_filter(
 			'datamachine_resolved_scoped_memory_files',
-			function ( $filenames, $context ) use ( &$captured ) {
+			function ( $filenames, $args ) use ( &$captured ) {
 				$captured = array(
 					'filenames' => $filenames,
-					'context'   => $context,
+					'args'      => $args,
 				);
 				return $filenames;
 			},
@@ -383,7 +453,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 
 		$this->assertNotNull( $captured );
 		$this->assertSame( array( 'a.md' ), $captured['filenames'] );
-		$this->assertSame( 'pipeline', $captured['context']['scope'] );
+		$this->assertSame( 'pipeline', $captured['args']['scope'] );
 	}
 
 	// ============================================
@@ -412,18 +482,22 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_get_policy_returns_null_for_deny_with_empty_list(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode' => 'deny',
-			'deny' => array(),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode' => 'deny',
+				'deny' => array(),
+			)
+		);
 		$this->assertNull( $this->resolver->getAgentMemoryPolicy( $agent_id ) );
 	}
 
 	public function test_get_policy_returns_structure_for_valid_deny(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode' => 'deny',
-			'deny' => array( 'MEMORY.md' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode' => 'deny',
+				'deny' => array( 'MEMORY.md' ),
+			)
+		);
 
 		$policy = $this->resolver->getAgentMemoryPolicy( $agent_id );
 
@@ -434,10 +508,12 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_get_policy_returns_structure_for_valid_allow_only(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'       => 'allow_only',
-			'allow_only' => array( 'SOUL.md' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'       => 'allow_only',
+				'allow_only' => array( 'SOUL.md' ),
+			)
+		);
 
 		$policy = $this->resolver->getAgentMemoryPolicy( $agent_id );
 
@@ -448,15 +524,15 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	// ============================================
-	// getContexts()
+	// getModes()
 	// ============================================
 
-	public function test_get_contexts_returns_all_three_presets(): void {
-		$contexts = MemoryPolicyResolver::getContexts();
+	public function test_get_modes_returns_all_three_presets(): void {
+		$modes = MemoryPolicyResolver::getModes();
 
-		$this->assertArrayHasKey( MemoryPolicyResolver::CONTEXT_PIPELINE, $contexts );
-		$this->assertArrayHasKey( MemoryPolicyResolver::CONTEXT_CHAT, $contexts );
-		$this->assertArrayHasKey( MemoryPolicyResolver::CONTEXT_SYSTEM, $contexts );
+		$this->assertArrayHasKey( MemoryPolicyResolver::MODE_PIPELINE, $modes );
+		$this->assertArrayHasKey( MemoryPolicyResolver::MODE_CHAT, $modes );
+		$this->assertArrayHasKey( MemoryPolicyResolver::MODE_SYSTEM, $modes );
 	}
 
 	// ============================================

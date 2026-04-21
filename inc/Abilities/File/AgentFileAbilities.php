@@ -315,7 +315,7 @@ class AgentFileAbilities {
 				'layer'       => $layer,
 				'protected'   => MemoryFileRegistry::is_protected( $filename ),
 				'editable'    => MemoryFileRegistry::is_editable( $filename ),
-				'modes'       => $registry_meta['modes'] ?? array( MemoryFileRegistry::CONTEXT_ALL ),
+				'modes'       => $registry_meta['modes'] ?? array( MemoryFileRegistry::MODE_ALL ),
 				'registered'  => true,
 				'label'       => $registry_meta['label'] ?? self::filename_to_label( $filename ),
 				'description' => $registry_meta['description'] ?? '',
@@ -338,8 +338,8 @@ class AgentFileAbilities {
 					continue;
 				}
 
-				$registry_meta = MemoryFileRegistry::get( $entry->filename );
-				$files[]       = array(
+				$registry_meta            = MemoryFileRegistry::get( $entry->filename );
+				$files[]                  = array(
 					'filename'    => $entry->filename,
 					'size'        => $entry->bytes,
 					'modified'    => null !== $entry->updated_at ? gmdate( 'c', $entry->updated_at ) : '',
@@ -347,7 +347,7 @@ class AgentFileAbilities {
 					'layer'       => $registry_meta ? $registry_meta['layer'] : $layer,
 					'protected'   => MemoryFileRegistry::is_protected( $entry->filename ),
 					'editable'    => MemoryFileRegistry::is_editable( $entry->filename ),
-					'modes'       => $registry_meta['modes'] ?? array( MemoryFileRegistry::CONTEXT_ALL ),
+					'modes'       => $registry_meta['modes'] ?? array( MemoryFileRegistry::MODE_ALL ),
 					'registered'  => null !== $registry_meta,
 					'label'       => $registry_meta['label'] ?? self::filename_to_label( $entry->filename ),
 					'description' => $registry_meta['description'] ?? '',
@@ -355,8 +355,6 @@ class AgentFileAbilities {
 				$seen[ $entry->filename ] = true;
 			}
 		}
-
-
 
 		// Include daily memory summary.
 		$daily        = new DailyMemory( $user_id, (int) ( $input['agent_id'] ?? 0 ) );
@@ -612,10 +610,12 @@ class AgentFileAbilities {
 		}
 
 		// Return updated file list.
-		return $this->executeListAgentFiles( array(
-			'user_id'  => $user_id,
-			'agent_id' => $agent_id,
-		) );
+		return $this->executeListAgentFiles(
+			array(
+				'user_id'  => $user_id,
+				'agent_id' => $agent_id,
+			)
+		);
 	}
 
 	// =========================================================================

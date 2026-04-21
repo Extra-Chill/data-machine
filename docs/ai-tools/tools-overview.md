@@ -292,7 +292,7 @@ Available only to chat AI agents via `datamachine_chat_tools` filter. These spec
 
 ### Handler-Specific Tools
 
-Available only when next step matches the handler type, registered via `chubes_ai_tools` filter:
+Available only when the adjacent step matches the handler slug or type, registered into the unified `datamachine_tools` registry as `_handler_callable` entries:
 
 **Publishing Tools**:
 - `twitter_publish` - Post to Twitter (280 char limit)
@@ -391,7 +391,7 @@ Chat-specific tools at `/inc/Api/Chat/Tools/`:
 - `SystemHealthCheck.php` - System health diagnostics
 - `UpdateFlow.php` - Flow property updates and scheduling modifications
 
-Handler-specific tools registered via `chubes_ai_tools` filter using HandlerRegistrationTrait in each handler class.
+Handler-specific tools registered into the unified `datamachine_tools` registry using HandlerRegistrationTrait in each handler class. Each entry carries a `_handler_callable` that is resolved at pipeline execution time with the adjacent step's runtime handler config.
 
 ## Tool Management
 
@@ -417,22 +417,30 @@ add_filter('datamachine_chat_tools', function($tools) {
 });
 ```
 
-**Handler-Specific Tools** (available when next step matches handler type):
+**Handler-Specific Tools** (available when adjacent step matches handler slug or type):
 ```php
-// Registered via chubes_ai_tools filter with handler context
-add_filter('chubes_ai_tools', function($tools, $handler_slug = null, $handler_config = []) {
-    if ($handler_slug === 'twitter') {
-        $tools['twitter_publish'] = [
-            'class' => 'Twitter\\Handler',
-            'method' => 'handle_tool_call',
-            'handler' => 'twitter',
-            'description' => 'Post to Twitter',
-            'parameters' => ['content' => ['type' => 'string', 'required' => true]],
-            'handler_config' => $handler_config
-        ];
-    }
+// Registered into the unified datamachine_tools registry as a deferred
+// _handler_callable entry. Preferred path is HandlerRegistrationTrait.
+add_filter('datamachine_tools', function($tools) {
+    $tools['__handler_tools_twitter'] = [
+        '_handler_callable' => function($handler_slug, $handler_config, $engine_data) {
+            return [
+                'twitter_publish' => [
+                    'class'          => 'Twitter\\Handler',
+                    'method'         => 'handle_tool_call',
+                    'handler'        => $handler_slug,
+                    'description'    => 'Post to Twitter',
+                    'parameters'     => ['content' => ['type' => 'string', 'required' => true]],
+                    'handler_config' => $handler_config,
+                ],
+            ];
+        },
+        'handler'      => 'twitter',
+        'modes'        => ['pipeline'],
+        'access_level' => 'admin',
+    ];
     return $tools;
-}, 10, 3);
+});
 ```
 
 ### Discovery Hierarchy
@@ -480,7 +488,7 @@ $available_tools = \DataMachine\Engine\AI\ToolExecutor::getAvailableTools(
 ```
 
 **Discovery Process**:
-1. **Handler Tools**: Retrieved via `chubes_ai_tools` filter for specific handler
+1. **Handler Tools**: Retrieved from the `datamachine_tools` registry — `_handler_callable` entries resolved per adjacent step
 2. **Global Tools**: Retrieved via `datamachine_global_tools` filter
 3. **Chat Tools**: Retrieved via `datamachine_chat_tools` filter (chat agent only)
 4. **Enablement Check**: Each tool filtered through `datamachine_tool_enabled`

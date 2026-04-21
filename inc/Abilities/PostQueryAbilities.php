@@ -217,7 +217,7 @@ class PostQueryAbilities {
 			function ( $tools ) {
 				$tools['query_posts'] = array(
 					'_callable' => array( $this, 'getQueryPostsTool' ),
-					'contexts'  => array( 'chat' ),
+					'modes'     => array( 'chat' ),
 					'ability'   => 'datamachine/query-posts',
 				);
 				return $tools;

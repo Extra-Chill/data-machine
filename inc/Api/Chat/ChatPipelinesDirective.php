@@ -128,7 +128,7 @@ add_filter(
 		$directives[] = array(
 			'class'    => ChatPipelinesDirective::class,
 			'priority' => 45,
-			'contexts' => array( 'chat' ),
+			'modes'    => array( 'chat' ),
 		);
 
 		return $directives;

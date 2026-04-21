@@ -54,24 +54,28 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		// Auto-scaffold missing user-layer files (e.g. USER.md) on first chat.
 		$scaffold_ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
 		if ( $user_id > 0 && $scaffold_ability ) {
-			$scaffold_ability->execute( array(
-				'layer'   => MemoryFileRegistry::LAYER_USER,
-				'user_id' => $user_id,
-			) );
+			$scaffold_ability->execute(
+				array(
+					'layer'   => MemoryFileRegistry::LAYER_USER,
+					'user_id' => $user_id,
+				)
+			);
 		}
 
 		$outputs = array();
 
-		// Load registered files applicable to the current execution mode,
+		// Load registered files applicable to the current agent mode,
 		// filtered through the per-agent MemoryPolicy.
-		$context       = $payload['agent_mode'] ?? '';
-		$resolver      = new MemoryPolicyResolver();
-		$context_files = $resolver->resolveRegistered( array(
-			'context'  => $context,
-			'agent_id' => $agent_id,
-		) );
+		$mode       = $payload['agent_mode'] ?? '';
+		$resolver   = new MemoryPolicyResolver();
+		$mode_files = $resolver->resolveRegistered(
+			array(
+				'mode'     => $mode,
+				'agent_id' => $agent_id,
+			)
+		);
 
-		foreach ( $context_files as $filename => $meta ) {
+		foreach ( $mode_files as $filename => $meta ) {
 			$layer  = $meta['layer'] ?? MemoryFileRegistry::LAYER_AGENT;
 			$memory = new AgentMemory( $user_id, $agent_id, $filename, $layer );
 			$read   = $memory->read();
@@ -169,7 +173,7 @@ add_filter(
 		$directives[] = array(
 			'class'    => CoreMemoryFilesDirective::class,
 			'priority' => 20,
-			'contexts' => array( 'all' ),
+			'modes'    => array( 'all' ),
 		);
 		return $directives;
 	}

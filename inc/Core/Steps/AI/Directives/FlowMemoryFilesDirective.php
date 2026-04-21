@@ -62,10 +62,13 @@ class FlowMemoryFilesDirective implements \DataMachine\Engine\AI\Directives\Dire
 		// deny/allow_only applies to flow memory, not just registered
 		// core files.
 		$resolver     = new MemoryPolicyResolver();
-		$memory_files = $resolver->filter( $memory_files, array(
-			'agent_id' => $agent_id,
-			'scope'    => 'flow',
-		) );
+		$memory_files = $resolver->filter(
+			$memory_files,
+			array(
+				'agent_id' => $agent_id,
+				'scope'    => 'flow',
+			)
+		);
 
 		return MemoryFilesReader::read( $memory_files, 'Flow', $flow_id, $user_id, $agent_id );
 	}
@@ -78,7 +81,7 @@ add_filter(
 		$directives[] = array(
 			'class'    => FlowMemoryFilesDirective::class,
 			'priority' => 45,
-			'contexts' => array( 'pipeline' ),
+			'modes'    => array( 'pipeline' ),
 		);
 		return $directives;
 	}

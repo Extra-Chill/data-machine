@@ -30,7 +30,11 @@ trait HandlerRegistrationTrait {
 	 * @param bool $requiresAuth Whether handler requires authentication
 	 * @param string|null $authClass Authentication class name
 	 * @param string|null $settingsClass Settings class name
-	 * @param callable|null $aiToolCallback AI tool registration callback
+	 * @param callable|null $aiToolCallback AI tool registration callback. Receives
+	 *                                      `(string $handler_slug, array $handler_config, array $engine_data)`
+	 *                                      and returns an `['tool_name' => $tool_definition]` array
+	 *                                      (empty array to opt out). Resolved lazily from the unified
+	 *                                      `datamachine_tools` registry at pipeline execution time.
 	 * @param string|null $authProviderKey Optional custom auth provider key for shared authentication
 	 * @param array $meta Optional arbitrary metadata (e.g. charLimit, maxImages). Passed through to /handlers API.
 	 */
@@ -92,9 +96,28 @@ trait HandlerRegistrationTrait {
 			}, 10, 2);
 		}
 
-		// AI tools registration (4 params: tools, handler_slug, handler_config, engine_data)
+		// AI tools registration — resolved lazily from the unified
+		// datamachine_tools registry at pipeline execution time. The callback
+		// returns [tool_name => definition] shaped by the runtime handler
+		// config and engine data of the adjacent pipeline step.
 		if ( $aiToolCallback ) {
-			add_filter('chubes_ai_tools', $aiToolCallback, 10, 4);
+			add_filter(
+				'datamachine_tools',
+				function ( array $tools ) use ( $slug, $aiToolCallback ): array {
+					// Wrapper entry keyed uniquely per handler slug.
+					// ToolPolicyResolver::gatherPipelineTools detects
+					// `_handler_callable` entries and invokes them with
+					// runtime handler context; this registry entry is
+					// intentionally NOT a directly usable tool definition.
+					$tools[ '__handler_tools_' . $slug ] = array(
+						'_handler_callable' => $aiToolCallback,
+						'handler'           => $slug,
+						'modes'             => array( 'pipeline' ),
+						'access_level'      => 'admin',
+					);
+					return $tools;
+				}
+			);
 		}
 
 		// Fire action for cache invalidation

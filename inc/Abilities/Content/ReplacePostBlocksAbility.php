@@ -102,7 +102,7 @@ class ReplacePostBlocksAbility {
 			function ( $tools ) {
 				$tools['replace_post_blocks'] = array(
 					'_callable' => array( self::class, 'getChatTool' ),
-					'contexts'  => array( 'chat' ),
+					'modes'     => array( 'chat' ),
 					'ability'   => 'datamachine/replace-post-blocks',
 				);
 				return $tools;
@@ -273,30 +273,38 @@ class ReplacePostBlocksAbility {
 				);
 			}
 
-			$diff = CanonicalDiffPreview::build( array(
-				'diff_id'             => $diff_id,
-				'diff_type'           => 'replace',
-				'original_content'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
-				'replacement_content' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
-				'summary'             => 'Preview generated. Accept or reject to apply changes.',
-				'items'               => $diffs,
-			) );
+			$diff = CanonicalDiffPreview::build(
+				array(
+					'diff_id'             => $diff_id,
+					'diff_type'           => 'replace',
+					'original_content'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
+					'replacement_content' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
+					'summary'             => 'Preview generated. Accept or reject to apply changes.',
+					'items'               => $diffs,
+				)
+			);
 
-			CanonicalDiffPreview::store_pending( $diff_id, array(
-				'type'    => 'replace_post_blocks',
-				'post_id' => $post_id,
-				'input'   => array(
-					'post_id'      => $post_id,
-					'replacements' => $replacements,
-				),
-				'diff'    => $diff,
-			) );
+			CanonicalDiffPreview::store_pending(
+				$diff_id,
+				array(
+					'type'    => 'replace_post_blocks',
+					'post_id' => $post_id,
+					'input'   => array(
+						'post_id'      => $post_id,
+						'replacements' => $replacements,
+					),
+					'diff'    => $diff,
+				)
+			);
 
 			// Strip raw HTML from the changes returned to the AI.
-			$clean_changes = array_map( function ( $c ) {
-				unset( $c['originalContent'], $c['replacementContent'] );
-				return $c;
-			}, $changes );
+			$clean_changes = array_map(
+				function ( $c ) {
+					unset( $c['originalContent'], $c['replacementContent'] );
+					return $c;
+				},
+				$changes
+			);
 
 			return CanonicalDiffPreview::response(
 				$post_id,
@@ -337,10 +345,13 @@ class ReplacePostBlocksAbility {
 		);
 
 		// Strip raw HTML from changes in normal mode too (not needed in response).
-		$clean_changes = array_map( function ( $c ) {
-			unset( $c['originalContent'], $c['replacementContent'] );
-			return $c;
-		}, $changes );
+		$clean_changes = array_map(
+			function ( $c ) {
+				unset( $c['originalContent'], $c['replacementContent'] );
+				return $c;
+			},
+			$changes
+		);
 
 		return array(
 			'success'         => true,

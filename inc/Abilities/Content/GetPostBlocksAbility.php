@@ -97,7 +97,7 @@ class GetPostBlocksAbility {
 			function ( $tools ) {
 				$tools['get_post_blocks'] = array(
 					'_callable' => array( self::class, 'getChatTool' ),
-					'contexts'  => array( 'chat' ),
+					'modes'     => array( 'chat' ),
 					'ability'   => 'datamachine/get-post-blocks',
 				);
 				return $tools;

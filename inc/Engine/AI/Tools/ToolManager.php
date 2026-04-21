@@ -90,12 +90,12 @@ class ToolManager {
 	 * and their results cached. Arrays are returned as-is.
 	 *
 	 * Supports the unified registry wrapper format where a callable is stored
-	 * as `['_callable' => callable, 'contexts' => [...]]`. The callable is
-	 * resolved and contexts are merged into the result.
+	 * as `['_callable' => callable, 'modes' => [...]]`. The callable is
+	 * resolved and modes are merged into the result.
 	 *
 	 * Cache keys are scoped: when a $cache_scope is provided, the key
 	 * becomes "$cache_scope|$tool_id" so that the same tool_id can hold
-	 * different definitions for different contexts (e.g. different flows
+	 * different definitions for different modes (e.g. different flows
 	 * configure upsert_event with different taxonomy selections).
 	 *
 	 * @param string $tool_id     Tool identifier.
@@ -125,10 +125,10 @@ class ToolManager {
 			);
 		}
 
-		// Handle unified registry wrapper: ['_callable' becomes callable, 'contexts' becomes [...]]
-		$contexts = array();
+		// Handle unified registry wrapper: ['_callable' becomes callable, 'modes' becomes [...]]
+		$modes = array();
 		if ( is_array( $definition ) && isset( $definition['_callable'] ) ) {
-			$contexts   = $definition['contexts'] ?? array();
+			$modes      = $definition['modes'] ?? array();
 			$definition = $definition['_callable'];
 		}
 
@@ -142,9 +142,9 @@ class ToolManager {
 		// Ensure result is an array
 		$resolved = is_array( $resolved ) ? $resolved : array();
 
-		// Merge contexts into resolved definition (registry contexts take precedence)
-		if ( ! empty( $contexts ) ) {
-			$resolved['contexts'] = $contexts;
+		// Merge modes into resolved definition (registry modes take precedence)
+		if ( ! empty( $modes ) ) {
+			$resolved['modes'] = $modes;
 		}
 
 		// Cache the resolved definition
@@ -190,7 +190,7 @@ class ToolManager {
 	 * Get all registered tools (raw, unresolved).
 	 *
 	 * Returns the raw registry including callables and wrapper arrays.
-	 * Useful when you need to check contexts without resolving all definitions.
+	 * Useful when you need to check modes without resolving all definitions.
 	 *
 	 * @return array Raw tools array.
 	 */
@@ -199,16 +199,162 @@ class ToolManager {
 	}
 
 	/**
-	 * Get contexts for a tool from its raw (unresolved) definition.
+	 * Resolve handler tools for a specific adjacent-step handler.
 	 *
-	 * Extracts contexts without resolving callable definitions.
+	 * Iterates the unified `datamachine_tools` registry and resolves every
+	 * entry whose `_handler_callable` matches the given handler slug. Two
+	 * matching modes are supported:
+	 *
+	 * - **Exact slug**: `['handler' => 'wordpress_publish']` — the entry only
+	 *   applies when the adjacent step's handler_slug equals `'wordpress_publish'`.
+	 * - **Type match**: `['handler_types' => ['fetch', 'event_import']]` — the
+	 *   entry applies to any handler whose registered type is in the list
+	 *   (used by cross-cutting tools like `skip_item`).
+	 *
+	 * Callbacks receive `(handler_slug, handler_config, engine_data)` and
+	 * return an `['tool_name' => $tool_definition]` array (empty to opt out).
+	 * Multiple tools per handler are allowed.
+	 *
+	 * Results are cached per `flow_step_id|handler_slug` scope so repeated
+	 * lookups within the same pipeline execution don't re-invoke callbacks.
+	 *
+	 * @since NEXT
+	 *
+	 * @param string $handler_slug   Adjacent step handler slug.
+	 * @param array  $handler_config Handler configuration from flow step.
+	 * @param array  $engine_data    Engine data snapshot for dynamic generation.
+	 * @param string $cache_scope    Scope key (e.g. flow_step_id + handler_slug).
+	 * @return array Resolved tools keyed by tool name.
+	 */
+	public function resolveHandlerTools(
+		string $handler_slug,
+		array $handler_config,
+		array $engine_data,
+		string $cache_scope = ''
+	): array {
+		$cache_key = $cache_scope . '|handler_tools|' . $handler_slug;
+
+		if ( '' !== $cache_scope && isset( self::$resolved_cache[ $cache_key ] ) ) {
+			return self::$resolved_cache[ $cache_key ];
+		}
+
+		$raw_tools        = $this->get_raw_tools();
+		$resolved         = array();
+		$handlers_by_slug = null; // Lazy-loaded only when handler_types matching is needed.
+
+		foreach ( $raw_tools as $definition ) {
+			if ( ! is_array( $definition ) ) {
+				continue;
+			}
+			if ( ! isset( $definition['_handler_callable'] ) || ! is_callable( $definition['_handler_callable'] ) ) {
+				continue;
+			}
+
+			$matches = false;
+
+			// Exact-slug match.
+			if ( isset( $definition['handler'] ) && $definition['handler'] === $handler_slug ) {
+				$matches = true;
+			}
+
+			// Handler-type match (cross-cutting tools).
+			if ( ! $matches && ! empty( $definition['handler_types'] ) && is_array( $definition['handler_types'] ) ) {
+				if ( null === $handlers_by_slug ) {
+					$handlers_by_slug = apply_filters( 'datamachine_handlers', array() );
+				}
+				$handler_meta = $handlers_by_slug[ $handler_slug ] ?? null;
+				$handler_type = $handler_meta['type'] ?? '';
+				if ( $handler_type && in_array( $handler_type, $definition['handler_types'], true ) ) {
+					$matches = true;
+				}
+			}
+
+			if ( ! $matches ) {
+				continue;
+			}
+
+			$tool_map = call_user_func(
+				$definition['_handler_callable'],
+				$handler_slug,
+				$handler_config,
+				$engine_data
+			);
+
+			if ( ! is_array( $tool_map ) ) {
+				continue;
+			}
+
+			$access_level = $definition['access_level'] ?? 'admin';
+			$ability      = $definition['ability'] ?? null;
+
+			foreach ( $tool_map as $tool_name => $tool_def ) {
+				if ( ! is_string( $tool_name ) || '' === $tool_name || ! is_array( $tool_def ) ) {
+					continue;
+				}
+
+				// Ensure a handler link is set so downstream filters (handler
+				// context, permission resolution) know which handler owns
+				// the tool.
+				if ( ! isset( $tool_def['handler'] ) ) {
+					$tool_def['handler'] = $handler_slug;
+				}
+
+				// Apply registry-level meta unless the resolved tool
+				// explicitly overrides.
+				if ( ! isset( $tool_def['modes'] ) ) {
+					$tool_def['modes'] = array( ToolPolicyResolver::MODE_PIPELINE );
+				}
+				if ( null !== $ability && ! isset( $tool_def['ability'] ) ) {
+					$tool_def['ability'] = $ability;
+				}
+				if ( ! isset( $tool_def['access_level'] ) && ! isset( $tool_def['ability'] ) ) {
+					$tool_def['access_level'] = $access_level;
+				}
+
+				$resolved[ $tool_name ] = $tool_def;
+			}
+		}
+
+		if ( '' !== $cache_scope ) {
+			self::$resolved_cache[ $cache_key ] = $resolved;
+		}
+
+		return $resolved;
+	}
+
+	/**
+	 * Get raw registry entries for handler tools.
+	 *
+	 * Returns unresolved entries from `datamachine_tools` that have a
+	 * `_handler_callable` key. Useful for admin UIs that need to enumerate
+	 * registered handler tools without invoking their callbacks.
+	 *
+	 * @since NEXT
+	 *
+	 * @return array Raw entries keyed by registry key.
+	 */
+	public function get_handler_tool_entries(): array {
+		$raw_tools = $this->get_raw_tools();
+
+		return array_filter(
+			$raw_tools,
+			function ( $definition ) {
+				return is_array( $definition ) && isset( $definition['_handler_callable'] );
+			}
+		);
+	}
+
+	/**
+	 * Get agent modes for a tool from its raw (unresolved) definition.
+	 *
+	 * Extracts modes without resolving callable definitions.
 	 *
 	 * @param mixed $definition Raw tool definition (array, callable, or wrapper).
-	 * @return array Contexts array.
+	 * @return array Modes array.
 	 */
-	public static function get_tool_contexts( mixed $definition ): array {
+	public static function get_tool_modes( mixed $definition ): array {
 		if ( is_array( $definition ) ) {
-			return $definition['contexts'] ?? array();
+			return $definition['modes'] ?? array();
 		}
 		return array();
 	}
@@ -447,15 +593,15 @@ class ToolManager {
 	/**
 	 * Get tools for REST API response.
 	 *
-	 * @param string|null $context Optional context to filter tools ('pipeline', 'chat', 'system').
-	 *                            When null, returns all tools.
+	 * @param string|null $mode Optional agent mode to filter tools ('pipeline', 'chat', 'system').
+	 *                          When null, returns all tools.
 	 * @return array Tools formatted for API
 	 */
-	public function get_tools_for_api( ?string $context = null ): array {
-		// If context specified, use ToolPolicyResolver to filter appropriately
-		if ( null !== $context ) {
+	public function get_tools_for_api( ?string $mode = null ): array {
+		// If mode specified, use ToolPolicyResolver to filter appropriately.
+		if ( null !== $mode ) {
 			$resolver = new ToolPolicyResolver( $this );
-			$tools    = $resolver->resolve( array( 'context' => $context ) );
+			$tools    = $resolver->resolve( array( 'mode' => $mode ) );
 		} else {
 			$tools = $this->get_global_tools();
 		}
@@ -471,7 +617,7 @@ class ToolManager {
 				'requires_config'  => $this->requires_configuration( $tool_id ),
 				'configured'       => $this->is_tool_configured( $tool_id ),
 				'globally_enabled' => $is_globally_enabled,
-				'contexts'         => $tool_config['contexts'] ?? array(),
+				'modes'            => $tool_config['modes'] ?? array(),
 			);
 		}
 
@@ -479,9 +625,9 @@ class ToolManager {
 	}
 
 	/**
-	 * Get all available tools for chat context.
+	 * Get all available tools for chat mode.
 	 *
-	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with CONTEXT_CHAT instead.
+	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with MODE_CHAT instead.
 	 *             Delegates to ToolPolicyResolver internally.
 	 *
 	 * @return array Available tools for chat agents
@@ -489,8 +635,10 @@ class ToolManager {
 	public function getAvailableToolsForChat(): array {
 		$resolver = new ToolPolicyResolver( $this );
 
-		return $resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		return $resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 	}
 }

@@ -30,18 +30,11 @@ defined( 'ABSPATH' ) || exit;
 class ToolPolicyResolver {
 
 	/**
-	 * Context presets define which tool pools are available.
+	 * Agent mode presets define which tool pools are available.
 	 */
-	public const CONTEXT_PIPELINE = 'pipeline';
-	public const CONTEXT_CHAT     = 'chat';
-	public const CONTEXT_SYSTEM   = 'system';
-
-	/**
-	 * @deprecated Use CONTEXT_* constants instead.
-	 */
-	public const SURFACE_PIPELINE = self::CONTEXT_PIPELINE;
-	public const SURFACE_CHAT     = self::CONTEXT_CHAT;
-	public const SURFACE_SYSTEM   = self::CONTEXT_SYSTEM;
+	public const MODE_PIPELINE = 'pipeline';
+	public const MODE_CHAT     = 'chat';
+	public const MODE_SYSTEM   = 'system';
 
 	private ToolManager $tool_manager;
 
@@ -50,15 +43,14 @@ class ToolPolicyResolver {
 	}
 
 	/**
-	 * Resolve available tools for a given execution context.
+	 * Resolve available tools for a given agent mode.
 	 *
 	 * This is the single entry point. All tool assembly should go through here.
 	 *
-	 * @param array $context {
-	 *     Execution context describing the request.
+	 * @param array $args {
+	 *     Resolution arguments describing the request.
 	 *
-	 *     @type string      $context              Required. One of the CONTEXT_* constants.
-	 *     @type string      $surface              Deprecated alias for $context.
+	 *     @type string      $mode                  Required. One of the MODE_* constants (or a custom mode slug).
 	 *     @type int|null    $agent_id              Agent ID for per-agent tool policy filtering.
 	 *     @type array|null  $previous_step_config  Pipeline only: previous step config with handler_slugs.
 	 *     @type array|null  $next_step_config      Pipeline only: next step config with handler_slugs.
@@ -86,11 +78,10 @@ class ToolPolicyResolver {
 		'admin'         => 'datamachine_manage_settings',
 	);
 
-	public function resolve( array $context ): array {
-		// Accept 'context' key, fall back to deprecated 'surface' key.
-		$context_type = $context['context'] ?? $context['surface'] ?? self::CONTEXT_PIPELINE;
-		$deny         = $context['deny'] ?? array();
-		$agent_id     = isset( $context['agent_id'] ) ? (int) $context['agent_id'] : 0;
+	public function resolve( array $args ): array {
+		$mode     = $args['mode'] ?? self::MODE_PIPELINE;
+		$deny     = $args['deny'] ?? array();
+		$agent_id = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
 
 		// 0. Optional legacy baseline gate.
 		//
@@ -106,18 +97,18 @@ class ToolPolicyResolver {
 		//
 		// The legacy behavior is still available behind a filter for installs that
 		// want to preserve the coarse gate during migration.
-		$require_use_tools_for_chat = apply_filters( 'datamachine_require_use_tools_for_chat_tools', false, $context );
+		$require_use_tools_for_chat = apply_filters( 'datamachine_require_use_tools_for_chat_tools', false, $args );
 
-		if ( self::CONTEXT_CHAT === $context_type && $require_use_tools_for_chat && ! PermissionHelper::can( 'use_tools' ) ) {
+		if ( self::MODE_CHAT === $mode && $require_use_tools_for_chat && ! PermissionHelper::can( 'use_tools' ) ) {
 			return array();
 		}
 
-		// 1. Gather tools based on context preset.
-		$tools = $this->gatherByContext( $context_type, $context );
+		// 1. Gather tools based on mode preset.
+		$tools = $this->gatherByMode( $mode, $args );
 
 		// 2. Filter by linked ability permissions (from Abilities API).
-		//    Only applies in chat context — pipeline/system run as admin.
-		if ( self::CONTEXT_CHAT === $context_type ) {
+		// Only applies in chat mode — pipeline/system run as admin.
+		if ( self::MODE_CHAT === $mode ) {
 			$tools = $this->filterByAbilityPermissions( $tools );
 		}
 
@@ -128,14 +119,14 @@ class ToolPolicyResolver {
 		}
 
 		// 4. Filter by ability categories (narrows to tools whose linked ability
-		//    belongs to one of the specified categories).
-		$categories = $context['categories'] ?? array();
+		// belongs to one of the specified categories).
+		$categories = $args['categories'] ?? array();
 		if ( ! empty( $categories ) ) {
 			$tools = $this->filterByAbilityCategories( $tools, $categories );
 		}
 
 		// 5. Apply allowlist if specified (narrows to explicit subset).
-		$allow_only = $context['allow_only'] ?? array();
+		$allow_only = $args['allow_only'] ?? array();
 		if ( ! empty( $allow_only ) ) {
 			$tools = array_intersect_key( $tools, array_flip( $allow_only ) );
 		}
@@ -146,7 +137,7 @@ class ToolPolicyResolver {
 		}
 
 		// 7. Allow external filtering of resolved tools.
-		$tools = apply_filters( 'datamachine_resolved_tools', $tools, $context_type, $context );
+		$tools = apply_filters( 'datamachine_resolved_tools', $tools, $mode, $args );
 
 		return $tools;
 	}
@@ -254,81 +245,92 @@ class ToolPolicyResolver {
 	}
 
 	/**
-	 * Gather tools by context preset.
+	 * Gather tools by mode preset.
 	 *
-	 * @param string $context_type Context preset string.
-	 * @param array  $context      Full execution context.
+	 * @param string $mode Agent mode slug.
+	 * @param array  $args Full resolution arguments.
 	 * @return array Tools array.
 	 */
-	private function gatherByContext( string $context_type, array $context ): array {
+	private function gatherByMode( string $mode, array $args ): array {
 		// Pipeline has special handling for adjacent step handler tools.
-		if ( self::CONTEXT_PIPELINE === $context_type ) {
-			return $this->gatherPipelineTools( $context );
+		if ( self::MODE_PIPELINE === $mode ) {
+			return $this->gatherPipelineTools( $args );
 		}
 
-		// All other contexts (chat, system, and any custom contexts) use
-		// the generic gatherer — filter tools by their declared contexts.
-		return $this->gatherToolsForContext( $context_type );
+		// All other modes (chat, system, and any custom modes) use the
+		// generic gatherer — filter tools by their declared modes.
+		return $this->gatherToolsForMode( $mode );
 	}
 
 	/**
-	 * Filter resolved tools by context.
+	 * Filter resolved tools by agent mode.
 	 *
-	 * @param array  $tools        Resolved tools array.
-	 * @param string $context_type Context string to filter by (e.g. 'chat', 'pipeline').
+	 * @param array  $tools Resolved tools array.
+	 * @param string $mode  Mode slug to filter by (e.g. 'chat', 'pipeline').
 	 * @return array Filtered tools.
 	 */
-	private function filterByContext( array $tools, string $context_type ): array {
+	private function filterByMode( array $tools, string $mode ): array {
 		return array_filter(
 			$tools,
-			function ( $tool ) use ( $context_type ) {
-				$contexts = $tool['contexts'] ?? array();
-				return in_array( $context_type, $contexts, true );
+			function ( $tool ) use ( $mode ) {
+				$modes = $tool['modes'] ?? array();
+				return in_array( $mode, $modes, true );
 			}
 		);
 	}
 
 	/**
-	 * Pipeline context: context-filtered tools + handler tools from adjacent steps.
+	 * Pipeline mode: mode-filtered tools + handler tools from adjacent steps.
+	 *
+	 * Handler tools are resolved from the unified `datamachine_tools` registry
+	 * via {@see ToolManager::resolveHandlerTools()}. Each adjacent step contributes
+	 * the handler tools owned by its handler_slug (exact match) plus any
+	 * cross-cutting tools registered against its handler type (e.g. `skip_item`
+	 * for fetch-type handlers).
 	 */
-	private function gatherPipelineTools( array $context ): array {
+	private function gatherPipelineTools( array $args ): array {
 		$available_tools  = array();
-		$pipeline_step_id = $context['pipeline_step_id'] ?? null;
-		$engine_data      = $context['engine_data'] ?? array();
+		$pipeline_step_id = $args['pipeline_step_id'] ?? null;
+		$engine_data      = $args['engine_data'] ?? array();
 
-		// Handler tools from adjacent steps (dynamic, not part of the static registry).
-		foreach ( array( $context['previous_step_config'] ?? null, $context['next_step_config'] ?? null ) as $step_config ) {
+		// Handler tools from adjacent steps (dynamic, resolved per-execution).
+		foreach ( array( $args['previous_step_config'] ?? null, $args['next_step_config'] ?? null ) as $step_config ) {
 			if ( ! $step_config ) {
 				continue;
 			}
 
 			$handler_slugs       = $step_config['handler_slugs'] ?? array();
 			$handler_configs_map = $step_config['handler_configs'] ?? array();
-			$cache_scope         = $step_config['flow_step_id'] ?? ( $context['cache_scope'] ?? '' );
+			$cache_scope         = $step_config['flow_step_id'] ?? ( $args['cache_scope'] ?? '' );
 
 			foreach ( $handler_slugs as $slug ) {
 				$handler_config = $handler_configs_map[ $slug ] ?? array();
-				$tools          = apply_filters( 'chubes_ai_tools', array(), $slug, $handler_config, $engine_data );
-				$tools          = $this->tool_manager->resolveAllTools( $tools, $cache_scope );
+				$tools          = $this->tool_manager->resolveHandlerTools(
+					$slug,
+					$handler_config,
+					$engine_data,
+					$cache_scope
+				);
 
 				foreach ( $tools as $tool_name => $tool_config ) {
-					if ( ! is_array( $tool_config ) ) {
-						continue;
-					}
-					// Handler tools only included if they match the current handler.
-					if ( isset( $tool_config['handler'] ) && $tool_config['handler'] === $slug ) {
-						$available_tools[ $tool_name ] = $tool_config;
-					}
+					$available_tools[ $tool_name ] = $tool_config;
 				}
 			}
 		}
 
-		// Static registry tools filtered for 'pipeline' context.
+		// Static registry tools filtered for 'pipeline' mode.
 		$all_tools      = $this->tool_manager->get_all_tools();
-		$pipeline_tools = $this->filterByContext( $all_tools, 'pipeline' );
+		$pipeline_tools = $this->filterByMode( $all_tools, self::MODE_PIPELINE );
 
 		foreach ( $pipeline_tools as $tool_name => $tool_config ) {
-			if ( is_array( $tool_config ) && $this->tool_manager->is_tool_available( $tool_name, $pipeline_step_id ) ) {
+			if ( ! is_array( $tool_config ) ) {
+				continue;
+			}
+			// Skip handler tool registry wrappers — those are resolved above.
+			if ( isset( $tool_config['_handler_callable'] ) ) {
+				continue;
+			}
+			if ( $this->tool_manager->is_tool_available( $tool_name, $pipeline_step_id ) ) {
 				$available_tools[ $tool_name ] = $tool_config;
 			}
 		}
@@ -337,23 +339,23 @@ class ToolPolicyResolver {
 	}
 
 	/**
-	 * Gather tools for any context string.
+	 * Gather tools for any mode slug.
 	 *
-	 * Filters the tool registry by declared contexts, then applies availability
-	 * and enablement checks. Works with built-in contexts (chat, system) and
-	 * any custom context — third parties can register tools with custom context
-	 * strings and resolve them through the same path.
+	 * Filters the tool registry by declared modes, then applies availability
+	 * and enablement checks. Works with built-in modes (chat, system) and
+	 * any custom mode — third parties can register tools with custom mode
+	 * slugs and resolve them through the same path.
 	 *
-	 * @param string $context_type Context string to filter by (e.g. 'chat', 'system', 'automation').
-	 * @return array Available tools for this context.
+	 * @param string $mode Mode slug to filter by (e.g. 'chat', 'system', 'automation').
+	 * @return array Available tools for this mode.
 	 */
-	private function gatherToolsForContext( string $context_type ): array {
+	private function gatherToolsForMode( string $mode ): array {
 		$available_tools = array();
 
-		$all_tools     = $this->tool_manager->get_all_tools();
-		$context_tools = $this->filterByContext( $all_tools, $context_type );
+		$all_tools  = $this->tool_manager->get_all_tools();
+		$mode_tools = $this->filterByMode( $all_tools, $mode );
 
-		foreach ( $context_tools as $tool_name => $tool_config ) {
+		foreach ( $mode_tools as $tool_name => $tool_config ) {
 			if ( ! is_array( $tool_config ) || empty( $tool_config ) ) {
 				continue;
 			}
@@ -591,22 +593,15 @@ class ToolPolicyResolver {
 	}
 
 	/**
-	 * Get available context presets.
+	 * Get available agent mode presets.
 	 *
-	 * @return array<string, string> Context name => description.
+	 * @return array<string, string> Mode slug => description.
 	 */
-	public static function getContexts(): array {
+	public static function getModes(): array {
 		return array(
-			self::CONTEXT_PIPELINE => 'Pipeline execution with handler tools from adjacent steps',
-			self::CONTEXT_CHAT     => 'Chat interaction with full management tools',
-			self::CONTEXT_SYSTEM   => 'System task execution with minimal toolset',
+			self::MODE_PIPELINE => 'Pipeline execution with handler tools from adjacent steps',
+			self::MODE_CHAT     => 'Chat interaction with full management tools',
+			self::MODE_SYSTEM   => 'System task execution with minimal toolset',
 		);
-	}
-
-	/**
-	 * @deprecated Use getContexts() instead.
-	 */
-	public static function getSurfaces(): array {
-		return self::getContexts();
 	}
 }

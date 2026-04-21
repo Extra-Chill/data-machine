@@ -36,7 +36,7 @@ class MemoryFileRegistry {
 	/**
 	 * Special context value meaning "inject in all contexts."
 	 */
-	const CONTEXT_ALL = 'all';
+	const MODE_ALL = 'all';
 
 	/**
 	 * Registered memory files.
@@ -59,10 +59,10 @@ class MemoryFileRegistry {
 	 * @since 0.50.0 Added `editable` argument for write-permission gating.
 	 * @since 0.60.0 Added `contexts` argument for context-aware injection.
 	 *
-	 * @param string    $filename Filename (e.g. 'SOUL.md', 'brand-guidelines.md').
-	 * @param int       $priority Sort order. Lower numbers load first.
-	 * @param array     $args     {
-	 *     Optional. Registration arguments.
+	 * @param string $filename Filename (e.g. 'SOUL.md', 'brand-guidelines.md').
+	 * @param int    $priority Sort order. Lower numbers load first.
+	 * @param array  $args     {
+	 *  Optional. Registration arguments.
 	 *
 	 *     @type string      $layer           One of 'shared', 'agent', 'user', 'network'. Default 'agent'.
 	 *     @type bool        $protected       Whether the file is protected from deletion. Default false.
@@ -108,9 +108,9 @@ class MemoryFileRegistry {
 		}
 
 		// Normalize modes: array of slugs, or ['all'] (default).
-		$modes = $args['modes'] ?? array( self::CONTEXT_ALL );
+		$modes = $args['modes'] ?? array( self::MODE_ALL );
 		if ( ! is_array( $modes ) || empty( $modes ) ) {
-			$modes = array( self::CONTEXT_ALL );
+			$modes = array( self::MODE_ALL );
 		}
 		$modes = array_values( array_unique( array_map( 'sanitize_key', $modes ) ) );
 
@@ -352,7 +352,7 @@ class MemoryFileRegistry {
 	}
 
 	/**
-	 * Get all files applicable to a specific execution mode.
+	 * Get all files applicable to a specific agent mode.
 	 *
 	 * Returns files that either list the mode in their `modes` array
 	 * or are registered with `['all']` (the default).
@@ -360,48 +360,48 @@ class MemoryFileRegistry {
 	 * @since 0.60.0
 	 * @since 0.68.0 Internal key renamed from contexts to modes.
 	 *
-	 * @param string $context Execution mode slug (e.g. 'chat', 'pipeline', 'system', 'editor').
+	 * @param string $mode Agent mode slug (e.g. 'chat', 'pipeline', 'system', 'editor').
 	 * @return array<string, array> Filtered and sorted file metadata.
 	 */
-	public static function get_for_context( string $context ): array {
-		$context = sanitize_key( $context );
+	public static function get_for_mode( string $mode ): array {
+		$mode = sanitize_key( $mode );
 
-		if ( empty( $context ) ) {
+		if ( empty( $mode ) ) {
 			return self::get_resolved();
 		}
 
 		return array_filter(
 			self::get_resolved(),
-			function ( $meta ) use ( $context ) {
-				$modes = $meta['modes'] ?? array( self::CONTEXT_ALL );
-				return in_array( self::CONTEXT_ALL, $modes, true )
-					|| in_array( $context, $modes, true );
+			function ( $meta ) use ( $mode ) {
+				$modes = $meta['modes'] ?? array( self::MODE_ALL );
+				return in_array( self::MODE_ALL, $modes, true )
+					|| in_array( $mode, $modes, true );
 			}
 		);
 	}
 
 	/**
-	 * Check if a file applies to a specific execution mode.
+	 * Check if a file applies to a specific agent mode.
 	 *
 	 * @since 0.60.0
 	 * @since 0.68.0 Internal key renamed from contexts to modes.
 	 *
 	 * @param string $filename Filename to check.
-	 * @param string $context  Execution mode slug.
+	 * @param string $mode     Agent mode slug.
 	 * @return bool True if the file should be injected in this mode.
 	 */
-	public static function applies_to_context( string $filename, string $context ): bool {
+	public static function applies_to_mode( string $filename, string $mode ): bool {
 		$resolved = self::get_resolved();
 		$filename = sanitize_file_name( $filename );
-		$context  = sanitize_key( $context );
+		$mode     = sanitize_key( $mode );
 
 		if ( ! isset( $resolved[ $filename ] ) ) {
 			return true; // Unregistered files are included everywhere.
 		}
 
-		$modes = $resolved[ $filename ]['modes'] ?? array( self::CONTEXT_ALL );
-		return in_array( self::CONTEXT_ALL, $modes, true )
-			|| in_array( $context, $modes, true );
+		$modes = $resolved[ $filename ]['modes'] ?? array( self::MODE_ALL );
+		return in_array( self::MODE_ALL, $modes, true )
+			|| in_array( $mode, $modes, true );
 	}
 
 	/**
@@ -416,7 +416,7 @@ class MemoryFileRegistry {
 	public static function get_modes( string $filename ): ?array {
 		$resolved = self::get_resolved();
 		$filename = sanitize_file_name( $filename );
-		return isset( $resolved[ $filename ] ) ? ( $resolved[ $filename ]['modes'] ?? array( self::CONTEXT_ALL ) ) : null;
+		return isset( $resolved[ $filename ] ) ? ( $resolved[ $filename ]['modes'] ?? array( self::MODE_ALL ) ) : null;
 	}
 
 	/**

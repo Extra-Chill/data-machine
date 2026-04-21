@@ -60,10 +60,13 @@ class PipelineMemoryFilesDirective implements \DataMachine\Engine\AI\Directives\
 		// gets the same treatment whether the file is injected by the
 		// registry or by explicit pipeline config.
 		$resolver     = new MemoryPolicyResolver();
-		$memory_files = $resolver->filter( $memory_files, array(
-			'agent_id' => $agent_id,
-			'scope'    => 'pipeline',
-		) );
+		$memory_files = $resolver->filter(
+			$memory_files,
+			array(
+				'agent_id' => $agent_id,
+				'scope'    => 'pipeline',
+			)
+		);
 
 		return MemoryFilesReader::read( $memory_files, 'Pipeline', (int) $pipeline_id, $user_id, $agent_id );
 	}
@@ -76,7 +79,7 @@ add_filter(
 		$directives[] = array(
 			'class'    => PipelineMemoryFilesDirective::class,
 			'priority' => 40,
-			'contexts' => array( 'pipeline' ),
+			'modes'    => array( 'pipeline' ),
 		);
 		return $directives;
 	}

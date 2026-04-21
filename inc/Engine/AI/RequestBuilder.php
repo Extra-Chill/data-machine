@@ -2,7 +2,7 @@
 /**
  * AI Request Builder - Centralized AI request construction for all agents
  *
-	 * Single source of truth for building standardized AI requests across chat and pipeline contexts.
+ * Single source of truth for building standardized AI requests across chat and pipeline contexts.
  * Ensures consistent request structure, tool formatting, and directive application to prevent
  * architectural drift between different AI agent types.
  *
@@ -61,7 +61,7 @@ class RequestBuilder {
 			$promptBuilder->addDirective(
 				$directive['class'],
 				$directive['priority'],
-				$directive['contexts'] ?? array( 'all' )
+				$directive['modes'] ?? array( 'all' )
 			);
 		}
 

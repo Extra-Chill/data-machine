@@ -46,7 +46,7 @@ class PipelineToolsAvailabilityTest extends WP_UnitTestCase {
 		$this->assertTrue( $updated );
 
 		$tools_without_disabled = $this->resolver->resolve( [
-			'context'          => ToolPolicyResolver::CONTEXT_PIPELINE,
+			'mode'              => ToolPolicyResolver::MODE_PIPELINE,
 			'pipeline_step_id' => $pipeline_step_id,
 		] );
 		$this->assertIsArray( $tools_without_disabled );
@@ -59,7 +59,7 @@ class PipelineToolsAvailabilityTest extends WP_UnitTestCase {
 		$this->assertTrue( $updated_again );
 
 		$tools_with_disabled = $this->resolver->resolve( [
-			'context'          => ToolPolicyResolver::CONTEXT_PIPELINE,
+			'mode'              => ToolPolicyResolver::MODE_PIPELINE,
 			'pipeline_step_id' => $pipeline_step_id,
 		] );
 		$this->assertIsArray( $tools_with_disabled );
@@ -90,7 +90,7 @@ class PipelineToolsAvailabilityTest extends WP_UnitTestCase {
 		$this->assertTrue( $updated );
 
 		$tools = $this->resolver->resolve( [
-			'context'          => ToolPolicyResolver::CONTEXT_PIPELINE,
+			'mode'              => ToolPolicyResolver::MODE_PIPELINE,
 			'pipeline_step_id' => $pipeline_step_id,
 		] );
 		$this->assertIsArray( $tools );

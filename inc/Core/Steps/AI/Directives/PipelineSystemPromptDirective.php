@@ -161,7 +161,7 @@ add_filter(
 		$directives[] = array(
 			'class'    => PipelineSystemPromptDirective::class,
 			'priority' => 50,
-			'contexts' => array( 'pipeline' ),
+			'modes'    => array( 'pipeline' ),
 		);
 		return $directives;
 	}

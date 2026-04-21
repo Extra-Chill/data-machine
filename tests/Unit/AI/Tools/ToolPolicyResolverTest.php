@@ -40,27 +40,33 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	// ============================================
 
 	public function test_chat_includes_global_tools(): void {
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
 		$this->assertIsArray( $tools );
 		$this->assertArrayHasKey( 'web_fetch', $tools );
 	}
 
 	public function test_chat_includes_chat_tools(): void {
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
 		$this->assertIsArray( $tools );
 		$this->assertArrayHasKey( 'update_flow', $tools );
 	}
 
- 	public function test_chat_tools_pass_availability_check(): void {
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+	public function test_chat_tools_pass_availability_check(): void {
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
 		foreach ( $tools as $tool_name => $tool_config ) {
 			$this->assertIsArray( $tool_config, "Tool '{$tool_name}' should have array config" );
@@ -76,28 +82,33 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		// filter. Only the use_tools cap is stripped here — chat remains.
 		add_filter( 'user_has_cap', array( $this, 'deny_use_tools_cap' ), 10, 4 );
 
-		add_filter( 'datamachine_tools', function ( $tools ) {
-			$tools['test_authenticated_tool'] = array(
-				'label'        => 'Test Authenticated Tool',
-				'description'  => 'Visible to authenticated users.',
-				'class'        => 'NonExistentClass',
-				'method'       => 'handle_tool_call',
-				'parameters'   => array(),
-				'contexts'     => array( 'chat' ),
-				'access_level' => 'authenticated',
-			);
+		add_filter(
+			'datamachine_tools',
+			function ( $tools ) {
+				$tools['test_authenticated_tool'] = array(
+					'label'        => 'Test Authenticated Tool',
+					'description'  => 'Visible to authenticated users.',
+					'class'        => 'NonExistentClass',
+					'method'       => 'handle_tool_call',
+					'parameters'   => array(),
+					'modes'        => array( 'chat' ),
+					'access_level' => 'authenticated',
+				);
 
-			return $tools;
-		} );
+				return $tools;
+			}
+		);
 
 		ToolManager::clearCache();
 
 		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
 		wp_set_current_user( $user_id );
 
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
 		$this->assertArrayHasKey( 'test_authenticated_tool', $tools );
 
@@ -111,28 +122,33 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		add_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10, 4 );
 		add_filter( 'datamachine_require_use_tools_for_chat_tools', '__return_true' );
 
-		add_filter( 'datamachine_tools', function ( $tools ) {
-			$tools['test_authenticated_tool'] = array(
-				'label'        => 'Test Authenticated Tool',
-				'description'  => 'Visible to authenticated users.',
-				'class'        => 'NonExistentClass',
-				'method'       => 'handle_tool_call',
-				'parameters'   => array(),
-				'contexts'     => array( 'chat' ),
-				'access_level' => 'authenticated',
-			);
+		add_filter(
+			'datamachine_tools',
+			function ( $tools ) {
+				$tools['test_authenticated_tool'] = array(
+					'label'        => 'Test Authenticated Tool',
+					'description'  => 'Visible to authenticated users.',
+					'class'        => 'NonExistentClass',
+					'method'       => 'handle_tool_call',
+					'parameters'   => array(),
+					'modes'        => array( 'chat' ),
+					'access_level' => 'authenticated',
+				);
 
-			return $tools;
-		} );
+				return $tools;
+			}
+		);
 
 		ToolManager::clearCache();
 
 		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
 		wp_set_current_user( $user_id );
 
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
 		$this->assertEmpty( $tools );
 
@@ -146,25 +162,30 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_chat_allows_public_tools_for_anonymous_users(): void {
 		wp_set_current_user( 0 );
 
-		add_filter( 'datamachine_tools', function ( $tools ) {
-			$tools['test_public_tool'] = array(
-				'label'        => 'Test Public Tool',
-				'description'  => 'Visible without login.',
-				'class'        => 'NonExistentClass',
-				'method'       => 'handle_tool_call',
-				'parameters'   => array(),
-				'contexts'     => array( 'chat' ),
-				'access_level' => 'public',
-			);
+		add_filter(
+			'datamachine_tools',
+			function ( $tools ) {
+				$tools['test_public_tool'] = array(
+					'label'        => 'Test Public Tool',
+					'description'  => 'Visible without login.',
+					'class'        => 'NonExistentClass',
+					'method'       => 'handle_tool_call',
+					'parameters'   => array(),
+					'modes'        => array( 'chat' ),
+					'access_level' => 'public',
+				);
 
-			return $tools;
-		} );
+				return $tools;
+			}
+		);
 
 		ToolManager::clearCache();
 
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
 		$this->assertArrayHasKey( 'test_public_tool', $tools );
 
@@ -175,24 +196,29 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_chat_keeps_untagged_tools_admin_only_for_anonymous_users(): void {
 		wp_set_current_user( 0 );
 
-		add_filter( 'datamachine_tools', function ( $tools ) {
-			$tools['test_untagged_tool'] = array(
-				'label'       => 'Test Untagged Tool',
-				'description' => 'No access metadata.',
-				'class'       => 'NonExistentClass',
-				'method'      => 'handle_tool_call',
-				'parameters'  => array(),
-				'contexts'    => array( 'chat' ),
-			);
+		add_filter(
+			'datamachine_tools',
+			function ( $tools ) {
+				$tools['test_untagged_tool'] = array(
+					'label'       => 'Test Untagged Tool',
+					'description' => 'No access metadata.',
+					'class'       => 'NonExistentClass',
+					'method'      => 'handle_tool_call',
+					'parameters'  => array(),
+					'modes'       => array( 'chat' ),
+				);
 
-			return $tools;
-		} );
+				return $tools;
+			}
+		);
 
 		ToolManager::clearCache();
 
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
 		$this->assertArrayNotHasKey( 'test_untagged_tool', $tools );
 
@@ -205,45 +231,56 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	// ============================================
 
 	public function test_pipeline_includes_global_tools(): void {
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_PIPELINE,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
+			)
+		);
 
 		$this->assertIsArray( $tools );
 		$this->assertArrayHasKey( 'web_fetch', $tools );
 	}
 
 	public function test_pipeline_excludes_chat_tools(): void {
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_PIPELINE,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
+			)
+		);
 
 		$this->assertArrayNotHasKey( 'update_flow', $tools );
 	}
 
 	public function test_pipeline_respects_step_disabled_tools(): void {
 		$pipelines   = new Pipelines();
-		$pipeline_id = $pipelines->create_pipeline( array(
-			'pipeline_name'   => 'Resolver Pipeline',
-			'pipeline_config' => array(),
-		) );
+		$pipeline_id = $pipelines->create_pipeline(
+			array(
+				'pipeline_name'   => 'Resolver Pipeline',
+				'pipeline_config' => array(),
+			)
+		);
 
 		$this->assertIsInt( $pipeline_id );
 		$pipeline_step_id = $pipeline_id . '_resolver-test-uuid';
 
-		$pipelines->update_pipeline( $pipeline_id, array(
-			'pipeline_config' => array(
-				$pipeline_step_id => array(
-					'step_type'      => 'fetch',
-					'disabled_tools' => array( 'web_fetch' ),
+		$pipelines->update_pipeline(
+			$pipeline_id,
+			array(
+				'pipeline_config' => array(
+					$pipeline_step_id => array(
+						'step_type'      => 'fetch',
+						'disabled_tools' => array( 'web_fetch' ),
+					),
 				),
-			),
-		) );
+			)
+		);
 
-		$tools = $this->resolver->resolve( array(
-			'context'          => ToolPolicyResolver::CONTEXT_PIPELINE,
-			'pipeline_step_id' => $pipeline_step_id,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode'             => ToolPolicyResolver::MODE_PIPELINE,
+				'pipeline_step_id' => $pipeline_step_id,
+			)
+		);
 
 		$this->assertArrayNotHasKey( 'web_fetch', $tools );
 	}
@@ -253,9 +290,11 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	// ============================================
 
 	public function test_system_returns_only_system_context_tools(): void {
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_SYSTEM,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_SYSTEM,
+			)
+		);
 
 		$this->assertIsArray( $tools );
 		// No tools currently register with 'system' context.
@@ -263,23 +302,28 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_system_includes_system_context_tools(): void {
-		add_filter( 'datamachine_tools', function ( $tools ) {
-			$tools['test_system_tool'] = array(
-				'label'       => 'Test System Tool',
-				'description' => 'Only available to system tasks.',
-				'class'       => 'NonExistentClass',
-				'method'      => 'handle_tool_call',
-				'parameters'  => array(),
-				'contexts'    => array( 'system' ),
-			);
-			return $tools;
-		} );
+		add_filter(
+			'datamachine_tools',
+			function ( $tools ) {
+				$tools['test_system_tool'] = array(
+					'label'       => 'Test System Tool',
+					'description' => 'Only available to system tasks.',
+					'class'       => 'NonExistentClass',
+					'method'      => 'handle_tool_call',
+					'parameters'  => array(),
+					'modes'       => array( 'system' ),
+				);
+				return $tools;
+			}
+		);
 
 		ToolManager::clearCache();
 
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_SYSTEM,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_SYSTEM,
+			)
+		);
 
 		$this->assertArrayHasKey( 'test_system_tool', $tools );
 
@@ -292,20 +336,24 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	// ============================================
 
 	public function test_deny_list_removes_tools(): void {
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-			'deny'    => array( 'web_fetch' ),
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'deny' => array( 'web_fetch' ),
+			)
+		);
 
 		$this->assertArrayNotHasKey( 'web_fetch', $tools );
 	}
 
 	public function test_deny_list_overrides_allowlist(): void {
-		$tools = $this->resolver->resolve( array(
-			'context'    => ToolPolicyResolver::CONTEXT_CHAT,
-			'allow_only' => array( 'web_fetch' ),
-			'deny'       => array( 'web_fetch' ),
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode'       => ToolPolicyResolver::MODE_CHAT,
+				'allow_only' => array( 'web_fetch' ),
+				'deny'       => array( 'web_fetch' ),
+			)
+		);
 
 		$this->assertArrayNotHasKey( 'web_fetch', $tools );
 	}
@@ -315,20 +363,24 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	// ============================================
 
 	public function test_allowlist_narrows_tools(): void {
-		$tools = $this->resolver->resolve( array(
-			'context'    => ToolPolicyResolver::CONTEXT_CHAT,
-			'allow_only' => array( 'web_fetch' ),
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode'       => ToolPolicyResolver::MODE_CHAT,
+				'allow_only' => array( 'web_fetch' ),
+			)
+		);
 
 		$this->assertArrayHasKey( 'web_fetch', $tools );
 		$this->assertCount( 1, $tools );
 	}
 
 	public function test_allowlist_with_nonexistent_tool_returns_empty(): void {
-		$tools = $this->resolver->resolve( array(
-			'context'    => ToolPolicyResolver::CONTEXT_CHAT,
-			'allow_only' => array( 'completely_fake_tool_xyz' ),
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode'       => ToolPolicyResolver::MODE_CHAT,
+				'allow_only' => array( 'completely_fake_tool_xyz' ),
+			)
+		);
 
 		$this->assertEmpty( $tools );
 	}
@@ -338,42 +390,56 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	// ============================================
 
 	public function test_resolved_tools_filter_can_modify_output(): void {
-		add_filter( 'datamachine_resolved_tools', function ( $tools, $context_type, $context ) {
-			$tools['injected_tool'] = array(
-				'label'       => 'Injected Tool',
-				'description' => 'Added via filter.',
-				'class'       => 'NonExistentClass',
-				'method'      => 'handle_tool_call',
-				'parameters'  => array(),
-			);
-			return $tools;
-		}, 10, 3 );
+		add_filter(
+			'datamachine_resolved_tools',
+			function ( $tools, $mode, $args ) {
+				$tools['injected_tool'] = array(
+					'label'       => 'Injected Tool',
+					'description' => 'Added via filter.',
+					'class'       => 'NonExistentClass',
+					'method'      => 'handle_tool_call',
+					'parameters'  => array(),
+				);
+				return $tools;
+			},
+			10,
+			3
+		);
 
-		$tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
 		$this->assertArrayHasKey( 'injected_tool', $tools );
 
 		remove_all_filters( 'datamachine_resolved_tools' );
 	}
 
-	public function test_resolved_tools_filter_receives_context_type(): void {
-		$captured_context_type = null;
-		$captured_context      = null;
+	public function test_resolved_tools_filter_receives_mode(): void {
+		$captured_mode = null;
+		$captured_args = null;
 
-		add_filter( 'datamachine_resolved_tools', function ( $tools, $context_type, $context ) use ( &$captured_context_type, &$captured_context ) {
-			$captured_context_type = $context_type;
-			$captured_context      = $context;
-			return $tools;
-		}, 10, 3 );
+		add_filter(
+			'datamachine_resolved_tools',
+			function ( $tools, $mode, $args ) use ( &$captured_mode, &$captured_args ) {
+				$captured_mode = $mode;
+				$captured_args = $args;
+				return $tools;
+			},
+			10,
+			3
+		);
 
-		$this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
-		$this->assertSame( ToolPolicyResolver::CONTEXT_CHAT, $captured_context_type );
-		$this->assertIsArray( $captured_context );
+		$this->assertSame( ToolPolicyResolver::MODE_CHAT, $captured_mode );
+		$this->assertIsArray( $captured_args );
 
 		remove_all_filters( 'datamachine_resolved_tools' );
 	}
@@ -394,9 +460,11 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		// are registered for this context, so the result is empty.
 		// This is correct: custom contexts only get tools that explicitly
 		// declare them, making the system extensible.
-		$tools = $this->resolver->resolve( array(
-			'context' => 'unknown_context_type',
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => 'unknown_context_type',
+			)
+		);
 
 		$this->assertIsArray( $tools );
 		$this->assertEmpty( $tools );
@@ -405,23 +473,28 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_custom_context_resolves_registered_tools(): void {
 		// Third parties can register tools with custom contexts and
 		// resolve them through the same path as built-in contexts.
-		add_filter( 'datamachine_tools', function ( $tools ) {
-			$tools['custom_automation_tool'] = array(
-				'label'       => 'Custom Automation Tool',
-				'description' => 'Only available in the automation context.',
-				'class'       => 'NonExistentClass',
-				'method'      => 'handle_tool_call',
-				'parameters'  => array(),
-				'contexts'    => array( 'automation' ),
-			);
-			return $tools;
-		} );
+		add_filter(
+			'datamachine_tools',
+			function ( $tools ) {
+				$tools['custom_automation_tool'] = array(
+					'label'       => 'Custom Automation Tool',
+					'description' => 'Only available in the automation context.',
+					'class'       => 'NonExistentClass',
+					'method'      => 'handle_tool_call',
+					'parameters'  => array(),
+					'modes'       => array( 'automation' ),
+				);
+				return $tools;
+			}
+		);
 
 		ToolManager::clearCache();
 
-		$tools = $this->resolver->resolve( array(
-			'context' => 'automation',
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => 'automation',
+			)
+		);
 
 		$this->assertArrayHasKey( 'custom_automation_tool', $tools );
 
@@ -432,38 +505,13 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		ToolManager::clearCache();
 	}
 
-	public function test_getContexts_returns_all_three_presets(): void {
-		$contexts = ToolPolicyResolver::getContexts();
+	public function test_getModes_returns_all_three_presets(): void {
+		$modes = ToolPolicyResolver::getModes();
 
-		$this->assertArrayHasKey( ToolPolicyResolver::CONTEXT_PIPELINE, $contexts );
-		$this->assertArrayHasKey( ToolPolicyResolver::CONTEXT_CHAT, $contexts );
-		$this->assertArrayHasKey( ToolPolicyResolver::CONTEXT_SYSTEM, $contexts );
-		$this->assertCount( 3, $contexts );
-	}
-
-	// ============================================
-	// BACKWARD COMPATIBILITY
-	// ============================================
-
-	public function test_surface_key_still_works(): void {
-		// The deprecated 'surface' key should still resolve correctly.
-		$tools = $this->resolver->resolve( array(
-			'surface' => ToolPolicyResolver::SURFACE_CHAT,
-		) );
-
-		$this->assertIsArray( $tools );
-		$this->assertArrayHasKey( 'web_fetch', $tools );
-		$this->assertArrayHasKey( 'update_flow', $tools );
-	}
-
-	public function test_surface_constants_alias_context_constants(): void {
-		$this->assertSame( ToolPolicyResolver::CONTEXT_PIPELINE, ToolPolicyResolver::SURFACE_PIPELINE );
-		$this->assertSame( ToolPolicyResolver::CONTEXT_CHAT, ToolPolicyResolver::SURFACE_CHAT );
-		$this->assertSame( ToolPolicyResolver::CONTEXT_SYSTEM, ToolPolicyResolver::SURFACE_SYSTEM );
-	}
-
-	public function test_getSurfaces_delegates_to_getContexts(): void {
-		$this->assertSame( ToolPolicyResolver::getSurfaces(), ToolPolicyResolver::getContexts() );
+		$this->assertArrayHasKey( ToolPolicyResolver::MODE_PIPELINE, $modes );
+		$this->assertArrayHasKey( ToolPolicyResolver::MODE_CHAT, $modes );
+		$this->assertArrayHasKey( ToolPolicyResolver::MODE_SYSTEM, $modes );
+		$this->assertCount( 3, $modes );
 	}
 
 	// ============================================
@@ -472,18 +520,22 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 	public function test_deprecated_executor_delegates_to_resolver(): void {
 		$executor_tools = \DataMachine\Engine\AI\Tools\ToolExecutor::getAvailableTools( null, null, null, array() );
-		$resolver_tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_PIPELINE,
-		) );
+		$resolver_tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
+			)
+		);
 
 		$this->assertSame( $executor_tools, $resolver_tools );
 	}
 
 	public function test_deprecated_manager_delegates_to_resolver(): void {
 		$manager_tools  = ( new ToolManager() )->getAvailableToolsForChat();
-		$resolver_tools = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$resolver_tools = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
 		$this->assertSame( $manager_tools, $resolver_tools );
 	}
@@ -538,14 +590,18 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_no_agent_id_means_no_restrictions(): void {
-		$tools_without = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools_without = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
-		$tools_with_zero = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => 0,
-		) );
+		$tools_with_zero = $this->resolver->resolve(
+			array(
+				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'agent_id' => 0,
+			)
+		);
 
 		$this->assertSame( $tools_without, $tools_with_zero );
 	}
@@ -553,28 +609,36 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_agent_without_policy_no_restrictions(): void {
 		$agent_id = $this->createAgentWithPolicy( null );
 
-		$tools_no_agent = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools_no_agent = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
-		$tools_with_agent = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$tools_with_agent = $this->resolver->resolve(
+			array(
+				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertSame( $tools_no_agent, $tools_with_agent );
 	}
 
 	public function test_agent_deny_mode_removes_listed_tools(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'  => 'deny',
-			'tools' => array( 'web_fetch' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'  => 'deny',
+				'tools' => array( 'web_fetch' ),
+			)
+		);
 
-		$tools = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertArrayNotHasKey( 'web_fetch', $tools );
 		// Other tools should still be present.
@@ -582,91 +646,117 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_agent_allow_mode_keeps_only_listed_tools(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'  => 'allow',
-			'tools' => array( 'web_fetch' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'  => 'allow',
+				'tools' => array( 'web_fetch' ),
+			)
+		);
 
-		$tools = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertArrayHasKey( 'web_fetch', $tools );
 		$this->assertCount( 1, $tools );
 	}
 
 	public function test_agent_allow_mode_empty_tools_returns_empty(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'  => 'allow',
-			'tools' => array(),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'  => 'allow',
+				'tools' => array(),
+			)
+		);
 
-		$tools = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertEmpty( $tools );
 	}
 
 	public function test_agent_deny_mode_empty_tools_no_restrictions(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'  => 'deny',
-			'tools' => array(),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'  => 'deny',
+				'tools' => array(),
+			)
+		);
 
-		$tools_no_agent = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools_no_agent = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
-		$tools_with_agent = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$tools_with_agent = $this->resolver->resolve(
+			array(
+				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertSame( $tools_no_agent, $tools_with_agent );
 	}
 
 	public function test_nonexistent_agent_id_no_restrictions(): void {
-		$tools_no_agent = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools_no_agent = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
-		$tools_bad_id = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => 999999,
-		) );
+		$tools_bad_id = $this->resolver->resolve(
+			array(
+				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'agent_id' => 999999,
+			)
+		);
 
 		$this->assertSame( $tools_no_agent, $tools_bad_id );
 	}
 
 	public function test_explicit_deny_overrides_agent_allow_policy(): void {
 		// Agent allows only web_fetch, but explicit deny removes it.
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'  => 'allow',
-			'tools' => array( 'web_fetch' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'  => 'allow',
+				'tools' => array( 'web_fetch' ),
+			)
+		);
 
-		$tools = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-			'deny'     => array( 'web_fetch' ),
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+				'deny'     => array( 'web_fetch' ),
+			)
+		);
 
 		$this->assertEmpty( $tools );
 	}
 
 	public function test_agent_policy_applies_to_chat_context(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'  => 'deny',
-			'tools' => array( 'update_flow' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'  => 'deny',
+				'tools' => array( 'update_flow' ),
+			)
+		);
 
-		$tools = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertArrayNotHasKey( 'update_flow', $tools );
 		// Other chat tools should still be present.
@@ -674,60 +764,78 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_agent_policy_applies_to_pipeline_context(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'  => 'deny',
-			'tools' => array( 'web_fetch' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'  => 'deny',
+				'tools' => array( 'web_fetch' ),
+			)
+		);
 
-		$tools = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_PIPELINE,
-			'agent_id' => $agent_id,
-		) );
+		$tools = $this->resolver->resolve(
+			array(
+				'mode'     => ToolPolicyResolver::MODE_PIPELINE,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertArrayNotHasKey( 'web_fetch', $tools );
 	}
 
 	public function test_agent_invalid_policy_mode_ignored(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'  => 'invalid_mode',
-			'tools' => array( 'web_fetch' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'  => 'invalid_mode',
+				'tools' => array( 'web_fetch' ),
+			)
+		);
 
-		$tools_no_agent = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools_no_agent = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
-		$tools_with_agent = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$tools_with_agent = $this->resolver->resolve(
+			array(
+				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertSame( $tools_no_agent, $tools_with_agent );
 	}
 
 	public function test_agent_malformed_policy_ignored(): void {
 		// Missing 'tools' key.
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode' => 'deny',
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode' => 'deny',
+			)
+		);
 
-		$tools_no_agent = $this->resolver->resolve( array(
-			'context' => ToolPolicyResolver::CONTEXT_CHAT,
-		) );
+		$tools_no_agent = $this->resolver->resolve(
+			array(
+				'mode' => ToolPolicyResolver::MODE_CHAT,
+			)
+		);
 
-		$tools_with_agent = $this->resolver->resolve( array(
-			'context'  => ToolPolicyResolver::CONTEXT_CHAT,
-			'agent_id' => $agent_id,
-		) );
+		$tools_with_agent = $this->resolver->resolve(
+			array(
+				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'agent_id' => $agent_id,
+			)
+		);
 
 		$this->assertSame( $tools_no_agent, $tools_with_agent );
 	}
 
 	public function test_getAgentToolPolicy_returns_valid_policy(): void {
-		$agent_id = $this->createAgentWithPolicy( array(
-			'mode'  => 'deny',
-			'tools' => array( 'web_fetch', 'send_ping' ),
-		) );
+		$agent_id = $this->createAgentWithPolicy(
+			array(
+				'mode'  => 'deny',
+				'tools' => array( 'web_fetch', 'send_ping' ),
+			)
+		);
 
 		$policy = $this->resolver->getAgentToolPolicy( $agent_id );
 
@@ -751,7 +859,10 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_applyAgentPolicy_null_returns_unchanged(): void {
-		$tools = array( 'tool_a' => array(), 'tool_b' => array() );
+		$tools = array(
+			'tool_a' => array(),
+			'tool_b' => array(),
+		);
 
 		$result = $this->resolver->applyAgentPolicy( $tools, null );
 
