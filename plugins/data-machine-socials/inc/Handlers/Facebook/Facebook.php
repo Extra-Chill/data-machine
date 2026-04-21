@@ -44,13 +44,12 @@ class Facebook extends PublishHandler {
 			true,
 			FacebookAuth::class,
 			FacebookSettings::class,
-			function ( $tools, $handler_slug, $handler_config ) {
-				$handler_config;
-				if ( 'facebook_publish' === $handler_slug ) {
-					$tools['facebook_publish'] = array(
+			function ( $handler_slug, $handler_config, $engine_data ) {
+				return array(
+					'facebook_publish' => array(
 						'class'       => self::class,
 						'method'      => 'handle_tool_call',
-						'handler'     => 'facebook_publish',
+						'handler'     => $handler_slug,
 						'description' => 'Post content to a Facebook Page. Supports text and images.',
 						'parameters'  => array(
 							'type'       => 'object',
@@ -62,9 +61,8 @@ class Facebook extends PublishHandler {
 							),
 							'required'   => array( 'content' ),
 						),
-					);
-				}
-				return $tools;
+					),
+				);
 			},
 			'facebook',
 			array(

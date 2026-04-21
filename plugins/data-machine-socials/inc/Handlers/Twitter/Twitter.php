@@ -46,13 +46,12 @@ class Twitter extends PublishHandler {
 			true,
 			TwitterAuth::class,
 			TwitterSettings::class,
-			function ( $tools, $handler_slug, $handler_config ) {
-				$handler_config;
-				if ( 'twitter_publish' === $handler_slug ) {
-					$tools['twitter_publish'] = array(
+			function ( $handler_slug, $handler_config, $engine_data ) {
+				return array(
+					'twitter_publish' => array(
 						'class'       => self::class,
 						'method'      => 'handle_tool_call',
-						'handler'     => 'twitter_publish',
+						'handler'     => $handler_slug,
 						'description' => 'Post content to Twitter. Supports text (280 chars), images, and URL handling.',
 						'parameters'  => array(
 							'type'       => 'object',
@@ -64,9 +63,8 @@ class Twitter extends PublishHandler {
 							),
 							'required'   => array( 'content' ),
 						),
-					);
-				}
-				return $tools;
+					),
+				);
 			},
 			'twitter',
 			array(

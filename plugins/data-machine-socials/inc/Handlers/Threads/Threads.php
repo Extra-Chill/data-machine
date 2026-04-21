@@ -44,13 +44,12 @@ class Threads extends PublishHandler {
 			true,
 			ThreadsAuth::class,
 			ThreadsSettings::class,
-			function ( $tools, $handler_slug, $handler_config ) {
-				$handler_config;
-				if ( 'threads_publish' === $handler_slug ) {
-					$tools['threads_publish'] = array(
+			function ( $handler_slug, $handler_config, $engine_data ) {
+				return array(
+					'threads_publish' => array(
 						'class'       => self::class,
 						'method'      => 'handle_tool_call',
-						'handler'     => 'threads_publish',
+						'handler'     => $handler_slug,
 						'description' => 'Post content to Meta Threads. Supports text and images.',
 						'parameters'  => array(
 							'type'       => 'object',
@@ -62,9 +61,8 @@ class Threads extends PublishHandler {
 							),
 							'required'   => array( 'content' ),
 						),
-					);
-				}
-				return $tools;
+					),
+				);
 			},
 			'threads',
 			array(

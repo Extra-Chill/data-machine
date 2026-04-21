@@ -49,26 +49,26 @@ class Pinterest extends PublishHandler {
 			true,
 			PinterestAuth::class,
 			PinterestSettings::class,
-			function ( $tools, $handler_slug, $handler_config ) {
-				if ( 'pinterest_publish' === $handler_slug ) {
-					$board_id_description = 'Pinterest board ID override (uses default if omitted)';
+			function ( $handler_slug, $handler_config, $engine_data ) {
+				$board_id_description = 'Pinterest board ID override (uses default if omitted)';
 
-					// Inject cached board names when AI decides mode is active.
-					$mode = $handler_config['board_selection_mode'] ?? 'pre_selected';
-					if ( 'ai_decides' === $mode ) {
-						$cached_boards = PinterestBoardsAbility::get_cached_boards();
-						if ( ! empty( $cached_boards ) ) {
-							$board_list           = implode( ', ', array_map( function ( $b ) {
-								return $b['name'] . ' (' . $b['id'] . ')';
-							}, $cached_boards ) );
-							$board_id_description = "Pinterest board ID. Available boards: {$board_list}";
-						}
+				// Inject cached board names when AI decides mode is active.
+				$mode = $handler_config['board_selection_mode'] ?? 'pre_selected';
+				if ( 'ai_decides' === $mode ) {
+					$cached_boards = PinterestBoardsAbility::get_cached_boards();
+					if ( ! empty( $cached_boards ) ) {
+						$board_list           = implode( ', ', array_map( function ( $b ) {
+							return $b['name'] . ' (' . $b['id'] . ')';
+						}, $cached_boards ) );
+						$board_id_description = "Pinterest board ID. Available boards: {$board_list}";
 					}
+				}
 
-					$tools['pinterest_publish'] = array(
+				return array(
+					'pinterest_publish' => array(
 						'class'       => self::class,
 						'method'      => 'handle_tool_call',
-						'handler'     => 'pinterest_publish',
+						'handler'     => $handler_slug,
 						'description' => 'Pin content to Pinterest with image, title, description, and link.',
 						'parameters'  => array(
 							'type'       => 'object',
@@ -88,9 +88,8 @@ class Pinterest extends PublishHandler {
 							),
 							'required'   => array( 'title', 'description' ),
 						),
-					);
-				}
-				return $tools;
+					),
+				);
 			},
 			'pinterest',
 			array(

@@ -47,13 +47,12 @@ class LinkedIn extends PublishHandler {
 			true,
 			LinkedInAuth::class,
 			LinkedInSettings::class,
-			function ( $tools, $handler_slug, $handler_config ) {
-				$handler_config;
-				if ( 'linkedin_publish' === $handler_slug ) {
-					$tools['linkedin_publish'] = array(
+			function ( $handler_slug, $handler_config, $engine_data ) {
+				return array(
+					'linkedin_publish' => array(
 						'class'       => self::class,
 						'method'      => 'handle_tool_call',
-						'handler'     => 'linkedin_publish',
+						'handler'     => $handler_slug,
 						'description' => 'Post content to LinkedIn. Supports text (up to 3000 chars), images, and article sharing.',
 						'parameters'  => array(
 							'type'       => 'object',
@@ -65,9 +64,8 @@ class LinkedIn extends PublishHandler {
 							),
 							'required'   => array( 'content' ),
 						),
-					);
-				}
-				return $tools;
+					),
+				);
 			},
 			'linkedin',
 			array(

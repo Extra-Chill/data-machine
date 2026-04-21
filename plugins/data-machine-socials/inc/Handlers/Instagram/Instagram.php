@@ -46,13 +46,12 @@ class Instagram extends PublishHandler {
 			true,
 			InstagramAuth::class,
 			InstagramSettings::class,
-			function ( $tools, $handler_slug, $handler_config ) {
-				$handler_config;
-				if ( 'instagram_publish' === $handler_slug ) {
-					$tools['instagram_publish'] = array(
+			function ( $handler_slug, $handler_config, $engine_data ) {
+				return array(
+					'instagram_publish' => array(
 						'class'       => self::class,
 						'method'      => 'handle_tool_call',
-						'handler'     => 'instagram_publish',
+						'handler'     => $handler_slug,
 						'description' => 'Post content to Instagram. Supports single images and carousels (up to 10 images). Images are processed async.',
 						'parameters'  => array(
 							'type'       => 'object',
@@ -78,9 +77,8 @@ class Instagram extends PublishHandler {
 							),
 							'required'   => array( 'content' ),
 						),
-					);
-				}
-				return $tools;
+					),
+				);
 			},
 			'instagram',
 			array(

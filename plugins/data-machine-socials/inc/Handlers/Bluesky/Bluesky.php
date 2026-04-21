@@ -35,13 +35,12 @@ class Bluesky extends PublishHandler {
 			true,
 			BlueskyAuth::class,
 			BlueskySettings::class,
-			function ( $tools, $handler_slug, $handler_config ) {
-				$handler_config;
-				if ( 'bluesky_publish' === $handler_slug ) {
-					$tools['bluesky_publish'] = array(
+			function ( $handler_slug, $handler_config, $engine_data ) {
+				return array(
+					'bluesky_publish' => array(
 						'class'       => self::class,
 						'method'      => 'handle_tool_call',
-						'handler'     => 'bluesky_publish',
+						'handler'     => $handler_slug,
 						'description' => 'Post content to Bluesky. Supports text and images.',
 						'parameters'  => array(
 							'type'       => 'object',
@@ -53,9 +52,8 @@ class Bluesky extends PublishHandler {
 							),
 							'required'   => array( 'content' ),
 						),
-					);
-				}
-				return $tools;
+					),
+				);
 			},
 			'bluesky',
 			array(
