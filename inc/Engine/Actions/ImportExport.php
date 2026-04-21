@@ -28,7 +28,18 @@ class ImportExport {
 	}
 
 	/**
-	 * Handle datamachine_import action
+	 * Handle datamachine_import action.
+	 *
+	 * Two-pass CSV import:
+	 *   Pass 1 — pipeline-structure rows (flow_id empty): create pipelines and add steps
+	 *            with their full step_config (#1133 step 1).
+	 *   Pass 2 — flow-step rows (flow_id present): ensure target flows exist, then write
+	 *            handler_slugs + handler_configs into each flow_config entry keyed by the
+	 *            freshly-generated flow_step_id (#1133 step 2).
+	 *
+	 * NOTE on secrets: handler_configs is restored verbatim. Any auth tokens / API keys in
+	 * the exported CSV will land in the imported flow's config. A scrub-or-reference policy
+	 * is orthogonal to the lossiness fix and is tracked separately.
 	 */
 	public function handle_import( $type, $data ) {
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -41,81 +52,95 @@ class ImportExport {
 			return false;
 		}
 
-		$rows               = str_getcsv( $data, "\n" );
+		$parsed_rows = $this->parse_csv_rows( $data );
+
 		$imported_pipelines = array();
-		$processed          = array();
+		// pipeline_name => imported pipeline_id.
+		$pipeline_ids_by_name = array();
+		// [pipeline_name][(int) step_position] => imported pipeline_step_id.
+		$step_id_map = array();
+		// [pipeline_name][source_flow_id] => imported flow_id.
+		$flow_id_map = array();
 
-		foreach ( $rows as $index => $row ) {
-			if ( 0 === $index ) {
+		// Pass 1: pipelines + steps.
+		foreach ( $parsed_rows as $row ) {
+			if ( '' !== $row['flow_id'] ) {
 				continue;
 			}
 
-			$cols = str_getcsv( $row );
-			if ( count( $cols ) < 5 ) {
+			$pipeline_name = $row['pipeline_name'];
+
+			if ( ! isset( $pipeline_ids_by_name[ $pipeline_name ] ) ) {
+				$pipeline_id = $this->ensure_pipeline( $pipeline_name );
+				if ( ! $pipeline_id ) {
+					continue;
+				}
+				$pipeline_ids_by_name[ $pipeline_name ] = $pipeline_id;
+				$imported_pipelines[]                   = $pipeline_id;
+			}
+
+			if ( ! $row['step_type'] ) {
 				continue;
 			}
 
-			$pipeline_name = $cols[1];
-			$step_position = $cols[2];
-			$step_type     = $cols[3];
-			$step_config   = json_decode( $cols[4], true );
-			if ( ! is_array( $step_config ) ) {
-				$step_config = array();
+			$pipeline_step_id = $this->add_step_to_pipeline(
+				$pipeline_ids_by_name[ $pipeline_name ],
+				$row['step_type'],
+				$row['step_config']
+			);
+			if ( $pipeline_step_id ) {
+				$step_id_map[ $pipeline_name ][ $row['step_position'] ] = $pipeline_step_id;
 			}
-			$flow_id_col = $cols[5] ?? '';
+		}
 
-			// Flow-specific rows (flow_id present) are emitted per-flow by the exporter and
-			// share the same step_type/step_config as their parent pipeline row. Flow + handler
-			// restoration is deferred to a follow-up (see issue #1133 step 2). Skip here to
-			// avoid adding duplicate steps when a pipeline has handler-bearing flows.
-			if ( '' !== (string) $flow_id_col ) {
+		// Pass 2: flows + handler configs.
+		foreach ( $parsed_rows as $row ) {
+			if ( '' === $row['flow_id'] ) {
 				continue;
 			}
 
-			if ( ! isset( $processed[ $pipeline_name ] ) ) {
-				$existing_id = $this->find_pipeline_by_name( $pipeline_name );
-
-				if ( ! $existing_id ) {
-					$ability = wp_get_ability( 'datamachine/create-pipeline' );
-
-					if ( ! $ability ) {
-						do_action( 'datamachine_log', 'error', 'Import: create-pipeline ability not available' );
-						continue;
-					}
-
-					$result = $ability->execute(
-						array(
-							'pipeline_name' => $pipeline_name,
-							'flow_config'   => array( 'flow_name' => 'Default Flow' ),
-						)
-					);
-
-					if ( is_wp_error( $result ) ) {
-						do_action( 'datamachine_log', 'error', 'Import: create-pipeline failed: ' . $result->get_error_message() );
-						continue;
-					}
-
-					$existing_id = $result['success'] ? ( $result['pipeline_id'] ?? false ) : false;
-				}
-
-				if ( $existing_id ) {
-					$processed[ $pipeline_name ] = $existing_id;
-					$imported_pipelines[]        = $existing_id;
-				}
+			$pipeline_name = $row['pipeline_name'];
+			if ( ! isset( $pipeline_ids_by_name[ $pipeline_name ] ) ) {
+				continue;
 			}
 
-			if ( isset( $processed[ $pipeline_name ] ) && $step_type ) {
-				$add_step_ability = wp_get_ability( 'datamachine/add-pipeline-step' );
+			$imported_pipeline_id = $pipeline_ids_by_name[ $pipeline_name ];
+			$source_flow_id       = $row['flow_id'];
+			$flow_name            = '' !== $row['flow_name'] ? $row['flow_name'] : 'Flow';
 
-				if ( $add_step_ability ) {
-					$add_step_ability->execute(
-						array(
-							'pipeline_id' => $processed[ $pipeline_name ],
-							'step_type'   => $step_type,
-							'step_config' => $step_config,
-						)
-					);
+			if ( ! isset( $flow_id_map[ $pipeline_name ][ $source_flow_id ] ) ) {
+				$new_flow_id = $this->ensure_flow( $imported_pipeline_id, $flow_name );
+				if ( ! $new_flow_id ) {
+					continue;
 				}
+				$flow_id_map[ $pipeline_name ][ $source_flow_id ] = $new_flow_id;
+			}
+
+			$imported_flow_id = $flow_id_map[ $pipeline_name ][ $source_flow_id ];
+			$pipeline_step_id = $step_id_map[ $pipeline_name ][ $row['step_position'] ] ?? null;
+			if ( ! $pipeline_step_id ) {
+				continue;
+			}
+
+			$handler_slugs   = $row['settings']['handler_slugs'] ?? array();
+			$handler_configs = $row['settings']['handler_configs'] ?? array();
+			if ( empty( $handler_slugs ) && '' !== $row['handler'] ) {
+				$handler_slugs = array( $row['handler'] );
+			}
+
+			$this->restore_flow_step_handlers(
+				$imported_flow_id,
+				$pipeline_step_id,
+				$handler_slugs,
+				$handler_configs
+			);
+		}
+
+		// Ensure every imported pipeline has at least one flow (fallback for exports with
+		// no flow rows — e.g. a pipeline containing only AI steps with no handlers).
+		foreach ( $pipeline_ids_by_name as $pipeline_name => $imported_pipeline_id ) {
+			if ( ! isset( $flow_id_map[ $pipeline_name ] ) ) {
+				$this->ensure_flow( $imported_pipeline_id, 'Default Flow' );
 			}
 		}
 
@@ -129,6 +154,218 @@ class ImportExport {
 
 		do_action( 'datamachine_log', 'debug', 'Pipeline import completed', array( 'count' => count( $result['imported'] ) ) );
 		return $result;
+	}
+
+	/**
+	 * Parse the import CSV into a normalized row list.
+	 *
+	 * @param string $data Raw CSV content.
+	 * @return array<int, array{
+	 *     pipeline_name:string, step_position:int, step_type:string, step_config:array,
+	 *     flow_id:string, flow_name:string, handler:string, settings:array
+	 * }>
+	 */
+	private function parse_csv_rows( string $data ): array {
+		$rows   = str_getcsv( $data, "\n" );
+		$parsed = array();
+
+		foreach ( $rows as $index => $row ) {
+			if ( 0 === $index ) {
+				continue;
+			}
+
+			$cols = str_getcsv( $row );
+			if ( count( $cols ) < 5 ) {
+				continue;
+			}
+
+			$step_config = json_decode( $cols[4], true );
+			if ( ! is_array( $step_config ) ) {
+				$step_config = array();
+			}
+
+			$settings_raw = $cols[8] ?? '';
+			$settings     = json_decode( $settings_raw, true );
+			if ( ! is_array( $settings ) ) {
+				$settings = array();
+			}
+
+			$parsed[] = array(
+				'pipeline_name' => (string) $cols[1],
+				'step_position' => (int) $cols[2],
+				'step_type'     => (string) $cols[3],
+				'step_config'   => $step_config,
+				'flow_id'       => (string) ( $cols[5] ?? '' ),
+				'flow_name'     => (string) ( $cols[6] ?? '' ),
+				'handler'       => (string) ( $cols[7] ?? '' ),
+				'settings'      => $settings,
+			);
+		}
+
+		return $parsed;
+	}
+
+	/**
+	 * Ensure a pipeline with the given name exists; return its id.
+	 *
+	 * Reuses any existing pipeline with a matching name. When a new pipeline is created we
+	 * deliberately skip auto-flow-creation (no flow_config) — flows are created in pass 2
+	 * from the CSV, with a final "Default Flow" fallback for exports that carry no flow rows.
+	 */
+	private function ensure_pipeline( string $pipeline_name ): ?int {
+		$existing_id = $this->find_pipeline_by_name( $pipeline_name );
+		if ( $existing_id ) {
+			return (int) $existing_id;
+		}
+
+		$ability = wp_get_ability( 'datamachine/create-pipeline' );
+		if ( ! $ability ) {
+			do_action( 'datamachine_log', 'error', 'Import: create-pipeline ability not available' );
+			return null;
+		}
+
+		$result = $ability->execute(
+			array(
+				'pipeline_name' => $pipeline_name,
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			do_action( 'datamachine_log', 'error', 'Import: create-pipeline failed: ' . $result->get_error_message() );
+			return null;
+		}
+
+		if ( empty( $result['success'] ) || empty( $result['pipeline_id'] ) ) {
+			return null;
+		}
+
+		return (int) $result['pipeline_id'];
+	}
+
+	/**
+	 * Add a step to a pipeline with its full step_config; return the new pipeline_step_id.
+	 */
+	private function add_step_to_pipeline( int $pipeline_id, string $step_type, array $step_config ): ?string {
+		$ability = wp_get_ability( 'datamachine/add-pipeline-step' );
+		if ( ! $ability ) {
+			return null;
+		}
+
+		$result = $ability->execute(
+			array(
+				'pipeline_id' => $pipeline_id,
+				'step_type'   => $step_type,
+				'step_config' => $step_config,
+			)
+		);
+
+		if ( is_wp_error( $result ) || empty( $result['success'] ) || empty( $result['pipeline_step_id'] ) ) {
+			return null;
+		}
+
+		return (string) $result['pipeline_step_id'];
+	}
+
+	/**
+	 * Ensure a flow matching the given name exists on the pipeline; return its id.
+	 *
+	 * Reuses an existing flow by exact name match (case-sensitive) so repeated imports of
+	 * the same export don't spawn duplicate flows. Otherwise creates a new flow.
+	 */
+	private function ensure_flow( int $pipeline_id, string $flow_name ): ?int {
+		$db_flows = new \DataMachine\Core\Database\Flows\Flows();
+
+		$existing = $db_flows->get_flows_for_pipeline( $pipeline_id );
+		foreach ( $existing as $flow ) {
+			if ( isset( $flow['flow_name'] ) && $flow['flow_name'] === $flow_name ) {
+				return (int) $flow['flow_id'];
+			}
+		}
+
+		$create_flow = wp_get_ability( 'datamachine/create-flow' );
+		if ( ! $create_flow ) {
+			do_action( 'datamachine_log', 'error', 'Import: create-flow ability not available' );
+			return null;
+		}
+
+		$result = $create_flow->execute(
+			array(
+				'pipeline_id' => $pipeline_id,
+				'flow_name'   => $flow_name,
+			)
+		);
+
+		if ( is_wp_error( $result ) || empty( $result['success'] ) || empty( $result['flow_id'] ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Import: failed to create flow',
+				array(
+					'pipeline_id' => $pipeline_id,
+					'flow_name'   => $flow_name,
+				)
+			);
+			return null;
+		}
+
+		return (int) $result['flow_id'];
+	}
+
+	/**
+	 * Write handler_slugs and handler_configs into the flow_config entry for this step.
+	 *
+	 * `create-flow` (and the step-sync pipeline) already populate the flow_config entry
+	 * keyed by flow_step_id with structural fields (step_type, pipeline_step_id, etc.).
+	 * This overlays the handler fields verbatim — no handler validation, no auth rewiring,
+	 * no secret scrubbing. Secret policy is a separate concern (see #1133).
+	 */
+	private function restore_flow_step_handlers(
+		int $flow_id,
+		string $pipeline_step_id,
+		array $handler_slugs,
+		array $handler_configs
+	): bool {
+		if ( empty( $handler_slugs ) && empty( $handler_configs ) ) {
+			return false;
+		}
+
+		$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $pipeline_step_id, $flow_id );
+		if ( empty( $flow_step_id ) ) {
+			return false;
+		}
+
+		$db_flows = new \DataMachine\Core\Database\Flows\Flows();
+		$flow     = $db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return false;
+		}
+
+		$flow_config = $flow['flow_config'] ?? array();
+		if ( ! isset( $flow_config[ $flow_step_id ] ) ) {
+			// Defensive seed — should have been created by create-flow's step sync, but
+			// fall back to a minimal entry so the handler restore still lands.
+			$flow_config[ $flow_step_id ] = array(
+				'flow_step_id'     => $flow_step_id,
+				'pipeline_step_id' => $pipeline_step_id,
+				'flow_id'          => $flow_id,
+			);
+		}
+
+		if ( ! empty( $handler_slugs ) ) {
+			$flow_config[ $flow_step_id ]['handler_slugs'] = array_values( $handler_slugs );
+			$flow_config[ $flow_step_id ]['handler']       = $handler_slugs[0] ?? null;
+		}
+
+		if ( ! empty( $handler_configs ) ) {
+			$flow_config[ $flow_step_id ]['handler_configs'] = $handler_configs;
+		}
+
+		$flow_config[ $flow_step_id ]['enabled'] = true;
+
+		return (bool) $db_flows->update_flow(
+			$flow_id,
+			array( 'flow_config' => $flow_config )
+		);
 	}
 
 	/**
