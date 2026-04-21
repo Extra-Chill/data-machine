@@ -24,7 +24,7 @@ class SocialCrossPostTask extends SystemTask {
 	 * @param int   $jobId  Job ID from DM Jobs table.
 	 * @param array $params Task parameters from engine_data.
 	 */
-	public function execute( int $jobId, array $params ): void {
+	public function executeTask( int $jobId, array $params ): void {
 		$post_id   = absint( $params['post_id'] ?? 0 );
 		$platforms = $params['platforms'] ?? array();
 		$caption   = $params['caption'] ?? '';
