@@ -4,15 +4,6 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
-
-### Changed
-- Broaden social ability permissions from `can_manage` to `use_tools` so non-admin team members with tool access can drive social handlers (refs #110)
-- Migrate `aiToolCallback` handler registrations to the new `datamachine_tools` signature — `(handler_slug, handler_config, engine_data)` returning `[tool_name => def]` — coordinating with `data-machine#1130`'s tool consolidation. Covers Twitter, Bluesky, Facebook, Instagram, LinkedIn, Pinterest, Threads (Reddit is fetch-only, no callback).
-
-### CI
-- Restrict homeboy CI to audit-only (no refactor/autofix) after reverting bulk auto-refactor merge
-
 ## [0.9.1] - 2026-04-03
 
 ### Added
