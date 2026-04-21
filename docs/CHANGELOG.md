@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.74.0] - 2026-04-21
+
+### Added
+- feat(processed-items): time-windowed revisit API + filter wire point
+- bridge RequestBuilder to wp-ai-client when available
+
+### Fixed
+- use $mode after contexts -> modes rename in wp-ai-client dispatch log
+
 ## [0.73.0] - 2026-04-21
 
 ### Added
