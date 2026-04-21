@@ -64,10 +64,15 @@ class AgentRegistry {
 	 *
 	 *     @type string   $label          Display name. Defaults to the slug.
 	 *     @type string   $description    Short description for admin UI / CLI listings.
-	 *     @type string   $soul_path      Absolute path to a bundled SOUL.md file.
-	 *                                    When the scaffold ability runs for this agent,
-	 *                                    its contents are used as the SOUL.md content
-	 *                                    instead of the generic site-context default.
+	 *     @type array    $memory_seeds   Map of filename → absolute path to a bundled
+	 *                                    memory-file template. When the scaffold ability
+	 *                                    runs for a registered filename AND the target
+	 *                                    file does not yet exist on disk, the bundled
+	 *                                    content is used as the scaffold seed. Works
+	 *                                    for any filename registered via
+	 *                                    `MemoryFileRegistry::register()` — SOUL.md and
+	 *                                    MEMORY.md are the common cases, but plugins can
+	 *                                    seed custom agent-layer files the same way.
 	 *                                    Optional.
 	 *     @type callable $owner_resolver Callable returning int user_id. Called once
 	 *                                    on row creation to determine the owner.
@@ -88,11 +93,22 @@ class AgentRegistry {
 			$label = $slug;
 		}
 
+		$memory_seeds = array();
+		if ( isset( $args['memory_seeds'] ) && is_array( $args['memory_seeds'] ) ) {
+			foreach ( $args['memory_seeds'] as $filename => $path ) {
+				$filename = sanitize_file_name( (string) $filename );
+				$path     = (string) $path;
+				if ( '' !== $filename && '' !== $path ) {
+					$memory_seeds[ $filename ] = $path;
+				}
+			}
+		}
+
 		self::$agents[ $slug ] = array(
 			'slug'           => $slug,
 			'label'          => $label,
 			'description'    => isset( $args['description'] ) ? (string) $args['description'] : '',
-			'soul_path'      => isset( $args['soul_path'] ) ? (string) $args['soul_path'] : '',
+			'memory_seeds'   => $memory_seeds,
 			'owner_resolver' => isset( $args['owner_resolver'] ) && is_callable( $args['owner_resolver'] ) ? $args['owner_resolver'] : null,
 			'default_config' => isset( $args['default_config'] ) && is_array( $args['default_config'] ) ? $args['default_config'] : array(),
 		);
@@ -199,9 +215,10 @@ class AgentRegistry {
 				$dir_mgr->ensure_directory_exists( $agent_dir );
 			}
 
-			// Scaffold agent-layer memory files (SOUL.md, MEMORY.md).
-			// The SOUL.md scaffold generator consults AgentRegistry for a
-			// `soul_path` and substitutes bundled content when present.
+			// Scaffold agent-layer memory files (SOUL.md, MEMORY.md, etc.).
+			// The scaffold filter consults AgentRegistry for a matching
+			// `memory_seeds` entry per filename and substitutes bundled
+			// content when present.
 			$scaffold = ScaffoldAbilities::get_ability();
 			if ( $scaffold ) {
 				$scaffold->execute(

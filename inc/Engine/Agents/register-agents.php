@@ -5,8 +5,10 @@
  * Defines the top-level `datamachine_register_agent()` function that
  * plugins call from inside a `datamachine_register_agents` action
  * callback to declare agents. Wires reconciliation on `init` and a
- * SOUL.md scaffold generator that surfaces each registered agent's
- * bundled `soul_path` as the SOUL content at creation time.
+ * scaffold generator that surfaces each registered agent's bundled
+ * `memory_seeds` entries as scaffold content for their respective
+ * agent-layer memory files (SOUL.md, MEMORY.md, or any custom file
+ * registered via `MemoryFileRegistry::register()`).
  *
  * Also dogfoods the API: DM itself registers the site's default
  * administrator agent through the same hook plugins use. On existing
@@ -59,13 +61,18 @@ add_action(
 );
 
 /**
- * SOUL.md scaffold generator — surface registered `soul_path` as content.
+ * Memory-seed scaffold generator — surface registered `memory_seeds` as content.
  *
- * Priority 5 runs before DM's default site-context SOUL generator
+ * Priority 5 runs before DM's default site-context scaffold generators
  * (priority 10 in inc/migrations/scaffolding.php). When a registered
- * agent provides a `soul_path`, its bundled content becomes the SOUL.md
- * scaffold. Agents without a `soul_path` fall through untouched and the
- * default generator produces the generic site-context SOUL.
+ * agent declares a `memory_seeds` entry for the current filename, the
+ * bundled file's contents become the scaffold content. Filenames without
+ * a seed entry fall through untouched; the default generator produces
+ * the generic site-context default.
+ *
+ * Symmetric across any registered agent-layer memory file — SOUL.md,
+ * MEMORY.md, or any custom filename a plugin registers via
+ * `MemoryFileRegistry::register()` and seeds through `memory_seeds`.
  *
  * @since 0.71.0
  *
@@ -77,7 +84,7 @@ add_action(
 add_filter(
 	'datamachine_scaffold_content',
 	static function ( string $content, string $filename, array $context ): string {
-		if ( 'SOUL.md' !== $filename || '' !== $content ) {
+		if ( '' !== $content ) {
 			return $content;
 		}
 
@@ -87,12 +94,18 @@ add_filter(
 		}
 
 		$def = AgentRegistry::get( $agent_slug );
-		if ( ! $def || empty( $def['soul_path'] ) ) {
+		if ( ! $def || empty( $def['memory_seeds'] ) ) {
 			return $content;
 		}
 
-		$path = (string) $def['soul_path'];
-		if ( ! is_readable( $path ) ) {
+		$filename_key = sanitize_file_name( $filename );
+		$seeds        = $def['memory_seeds'];
+		if ( ! isset( $seeds[ $filename_key ] ) ) {
+			return $content;
+		}
+
+		$path = (string) $seeds[ $filename_key ];
+		if ( '' === $path || ! is_readable( $path ) ) {
 			return $content;
 		}
 

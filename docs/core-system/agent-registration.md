@@ -18,9 +18,12 @@ Inside your plugin:
 ```php
 add_action( 'datamachine_register_agents', function () {
     datamachine_register_agent( 'wiki-generator', array(
-        'label'       => __( 'Wiki Generator', 'my-plugin' ),
-        'description' => __( 'Fetches sources, distills into wiki articles, cross-links.', 'my-plugin' ),
-        'soul_path'   => MY_PLUGIN_DIR . 'agents/wiki-generator/SOUL.md',
+        'label'        => __( 'Wiki Generator', 'my-plugin' ),
+        'description'  => __( 'Fetches sources, distills into wiki articles, cross-links.', 'my-plugin' ),
+        'memory_seeds' => array(
+            'SOUL.md'   => MY_PLUGIN_DIR . 'agents/wiki-generator/SOUL.md',
+            'MEMORY.md' => MY_PLUGIN_DIR . 'agents/wiki-generator/MEMORY.md',
+        ),
     ) );
 } );
 ```
@@ -28,8 +31,8 @@ add_action( 'datamachine_register_agents', function () {
 That's it. On the next request where `init` fires, DM reconciles the registration:
 
 - If a row with `agent_slug = 'wiki-generator'` already exists in `datamachine_agents`, nothing happens. Mutable state is DB-owned; the registration never overwrites it.
-- If the row is missing, DM creates it (owner resolved via `owner_resolver` or falls back to the default admin user), bootstraps owner access, ensures the agent directory exists, and runs the scaffold ability for SOUL.md / MEMORY.md.
-- If a `soul_path` was registered, its file contents become the initial SOUL.md instead of DM's generic site-context SOUL.
+- If the row is missing, DM creates it (owner resolved via `owner_resolver` or falls back to the default admin user), bootstraps owner access, ensures the agent directory exists, and runs the scaffold ability for every registered agent-layer memory file.
+- For each `memory_seeds` entry whose target file does not yet exist on disk, the bundled file's contents become the initial scaffold. Generic site-context defaults apply to any filename without a seed entry.
 
 ## Registration arguments
 
@@ -39,7 +42,7 @@ That's it. On the next request where `init` fires, DM reconciles the registratio
 |---|---|---|
 | `label` | string | Display name. Defaults to the slug when omitted. |
 | `description` | string | Short description for admin UI / CLI listings. |
-| `soul_path` | string | Absolute path to a bundled `SOUL.md`. Its contents are surfaced through the scaffold ability as the SOUL content for this agent. See [SOUL resolution](#soul-resolution). |
+| `memory_seeds` | array<string,string> | Map of `filename => absolute path`. Each entry surfaces the bundled file as scaffold content for that filename when the target file does not yet exist on disk. Works for any filename registered via `MemoryFileRegistry::register()` — `SOUL.md` and `MEMORY.md` are common, but plugins can seed custom agent-layer files through the same primitive. See [Memory seed resolution](#memory-seed-resolution). |
 | `owner_resolver` | callable | Returns `int user_id`. Called once at row-creation time. Defaults to `DirectoryManager::get_default_agent_user_id()`. |
 | `default_config` | array | Initial `agent_config` persisted on creation. Subsequent config changes go through the DB — the registration never overrides user-edited config. |
 
@@ -57,16 +60,18 @@ Reconciliation runs on `init` at priority 15:
 
 The `datamachine_register_agents` action is also fired lazily by `AgentRegistry::get_all()` / `get()` / `reconcile()` — so any caller can query the registry regardless of hook ordering.
 
-## SOUL resolution
+## Memory seed resolution
 
-Registered `soul_path` contents flow into SOUL.md via the existing `datamachine_scaffold_content` filter chain:
+Registered `memory_seeds` entries flow into scaffold content via the existing `datamachine_scaffold_content` filter chain:
 
-1. **Priority 5** — registry's generator. Checks `AgentRegistry::get($agent_slug)` for a `soul_path`. If present and readable, returns the file contents as the SOUL.md scaffold content.
-2. **Priority 10** — DM's default `datamachine_scaffold_soul_content` generator. Produces the generic site-context SOUL using agent display name + site metadata.
+1. **Priority 5** — registry's generator. For any filename being scaffolded, checks `AgentRegistry::get($agent_slug)['memory_seeds'][$filename]`. If a readable bundle path is registered, its contents become the scaffold content.
+2. **Priority 10** — DM's default generators (`datamachine_scaffold_soul_content`, `datamachine_scaffold_memory_content`, etc.). Produce generic site-context content using agent display name + site metadata.
 
-Registered agents with a `soul_path` win at priority 5. Registered agents without a `soul_path` fall through to priority 10. Agents created imperatively via `AgentAbilities::createAgent()` (with no registry entry) likewise fall through.
+Registered agents with a `memory_seeds` entry for a filename win at priority 5. Filenames without a seed entry fall through to priority 10. Agents created imperatively via `AgentAbilities::createAgent()` (with no registry entry) likewise fall through for every filename.
 
-The scaffold ability never overwrites existing files. Once SOUL.md exists on disk, its content is user-editable and plugin updates don't rewrite it. To reseed a SOUL.md from an updated bundled version, delete the file and run the scaffold ability again.
+The scaffold ability never overwrites existing files. Once a seeded file exists on disk, its content is user-editable and plugin updates don't rewrite it. To reseed from an updated bundled version, delete the file and run the scaffold ability again.
+
+Seeds apply to any filename registered via `MemoryFileRegistry::register()`. `SOUL.md` and `MEMORY.md` ship registered by default, so they work out of the box. Custom agent-layer files need a one-line `MemoryFileRegistry::register()` call somewhere in the plugin's bootstrap before a `memory_seeds` entry can be surfaced for them.
 
 ## Reconciliation outcomes
 
@@ -129,8 +134,10 @@ Hook at a higher priority and re-register with the same slug:
 ```php
 add_action( 'datamachine_register_agents', function () {
     datamachine_register_agent( 'wiki-generator', array(
-        'label'     => __( 'Custom Wiki Generator', 'my-override' ),
-        'soul_path' => __DIR__ . '/custom-wiki-soul.md',
+        'label'        => __( 'Custom Wiki Generator', 'my-override' ),
+        'memory_seeds' => array(
+            'SOUL.md' => __DIR__ . '/custom-wiki-soul.md',
+        ),
     ) );
 }, 20 ); // Higher than the original plugin's priority 10.
 ```
@@ -139,9 +146,9 @@ Last registration wins at the registry level. Because reconciliation is create-i
 
 | State | Override applies? |
 |---|---|
-| Agent row doesn't exist yet | ✅ Yes — your registration creates the row with your label + scaffolds SOUL.md from your `soul_path` |
-| Agent row exists but SOUL.md doesn't | ✅ Partially — `label`/`description` are ignored (DB-owned), but the next scaffold cycle picks up your `soul_path` |
-| Agent row exists and SOUL.md exists | ❌ No — registration changes don't propagate to existing DB rows, and scaffold never overwrites existing files |
+| Agent row doesn't exist yet | ✅ Yes — your registration creates the row with your label + scaffolds from your `memory_seeds` |
+| Agent row exists, seeded file doesn't | ✅ Partially — `label`/`description` are ignored (DB-owned), but the next scaffold cycle picks up your `memory_seeds` for any still-missing files |
+| Agent row exists and seeded files exist | ❌ No — registration changes don't propagate to existing DB rows, and scaffold never overwrites existing files |
 
 To reseed SOUL.md on an existing install, delete the file and let the scaffold ability regenerate it. To change `agent_name` or `agent_config`, go through the DB (`wp datamachine pipeline update`, admin UI, or direct `Agents::update_agent()` call) — those are DB-owned, user-editable fields.
 
@@ -174,5 +181,5 @@ Registry-level overrides are the right tool for declaring defaults; content-leve
 
 - `docs/core-system/multi-agent-architecture.md` — agents table schema, access control, filesystem layout
 - `docs/core-filters.md` — the `datamachine_register_agents` action, `datamachine_registered_agent_reconciled` action, `datamachine_scaffold_content` filter
-- `inc/Abilities/File/ScaffoldAbilities.php` — scaffold ability that honors registered `soul_path` content
+- `inc/Abilities/File/ScaffoldAbilities.php` — scaffold ability that honors registered `memory_seeds` content
 - `inc/migrations/scaffolding.php` — default `datamachine_scaffold_content` generators

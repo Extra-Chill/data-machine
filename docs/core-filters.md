@@ -13,9 +13,12 @@ Same API DM itself uses to register the default site administrator agent. Regist
 ```php
 add_action( 'datamachine_register_agents', function () {
     datamachine_register_agent( 'wiki-generator', array(
-        'label'       => 'Wiki Generator',
-        'description' => 'Fetches sources, distills into wiki articles.',
-        'soul_path'   => MY_PLUGIN_DIR . 'agents/wiki-generator/SOUL.md',
+        'label'        => 'Wiki Generator',
+        'description'  => 'Fetches sources, distills into wiki articles.',
+        'memory_seeds' => array(
+            'SOUL.md'   => MY_PLUGIN_DIR . 'agents/wiki-generator/SOUL.md',
+            'MEMORY.md' => MY_PLUGIN_DIR . 'agents/wiki-generator/MEMORY.md',
+        ),
     ) );
 } );
 ```
