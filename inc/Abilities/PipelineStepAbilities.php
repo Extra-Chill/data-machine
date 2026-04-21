@@ -416,7 +416,7 @@ class PipelineStepAbilities {
 
 		if ( 'ai' === $step_type ) {
 			if ( empty( $new_step['provider'] ) || empty( $new_step['model'] ) ) {
-				$pipeline_defaults = PluginSettings::getContextModel( 'pipeline' );
+				$pipeline_defaults = PluginSettings::getModelForMode( 'pipeline' );
 				if ( empty( $new_step['provider'] ) ) {
 					$new_step['provider'] = $pipeline_defaults['provider'];
 				}

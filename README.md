@@ -222,7 +222,7 @@ Data Machine ships its own multi-turn conversation loop and uses it by default. 
 ```php
 add_filter(
     'datamachine_conversation_runner',
-    function ( $result, $messages, $tools, $provider, $model, $context, $payload, $max_turns, $single_turn ) {
+    function ( $result, $messages, $tools, $provider, $model, $mode, $payload, $max_turns, $single_turn ) {
         // Return an array matching AIConversationLoop::execute()'s shape to
         // replace the built-in loop, or null to let Data Machine run it.
         return my_runtime_run( ... );

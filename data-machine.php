@@ -653,7 +653,7 @@ function datamachine_resolve_or_create_agent_id( int $user_id ): int {
 
 	$agent_slug  = sanitize_title( (string) $user->user_login );
 	$agent_name  = (string) $user->display_name;
-	$agent_model = \DataMachine\Core\PluginSettings::getContextModel( 'chat' );
+	$agent_model = \DataMachine\Core\PluginSettings::getModelForMode( 'chat' );
 
 	return $agents_repo->create_if_missing(
 		$agent_slug,

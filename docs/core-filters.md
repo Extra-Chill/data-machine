@@ -94,8 +94,6 @@ Central registry for execution modes. Extensions register modes; the settings UI
 | `get_for_settings(): array` | Get modes formatted for the admin UI. |
 | `reset(): void` | Clear all registrations (testing only). |
 
-**Deprecated:** `ContextRegistry` is a class alias for `AgentModeRegistry`.
-
 ---
 
 ### `AgentModeDirective`

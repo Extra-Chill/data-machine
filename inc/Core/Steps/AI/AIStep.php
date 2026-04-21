@@ -75,10 +75,10 @@ class AIStep extends Step {
 		$job_snapshot         = $this->engine->get( 'job' );
 		$agent_id             = (int) ( $job_snapshot['agent_id'] ?? 0 );
 
-		// Model/provider resolved exclusively via context system (agent → site → network).
+		// Model/provider resolved exclusively via mode system (agent → site → network).
 		// Pipeline-level model/provider fields are ignored — context_models is the authority.
-		$context_model = PluginSettings::resolveModelForAgentContext( $agent_id, 'pipeline' );
-		$provider_name = $context_model['provider'];
+		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
+		$provider_name = $mode_model['provider'];
 		if ( empty( $provider_name ) ) {
 			do_action(
 				'datamachine_fail_job',
@@ -88,7 +88,7 @@ class AIStep extends Step {
 					'flow_step_id'     => $this->flow_step_id,
 					'pipeline_step_id' => $pipeline_step_id,
 					'error_message'    => 'AI step requires provider configuration. Set a default provider in Data Machine settings or configure context_models.',
-					'solution'         => 'Set default_provider in Data Machine settings or configure context_models for the pipeline context',
+					'solution'         => 'Set default_provider in Data Machine settings or configure context_models for the pipeline mode',
 				)
 			);
 			return false;
@@ -292,10 +292,10 @@ class AIStep extends Step {
 			}
 		}
 
-		// Model/provider resolved exclusively via context system — pipeline config is ignored.
-		$context_model = PluginSettings::resolveModelForAgentContext( $agent_id, 'pipeline' );
-		$provider_name = $context_model['provider'];
-		$model_name    = $context_model['model'];
+		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
+		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
+		$provider_name = $mode_model['provider'];
+		$model_name    = $mode_model['model'];
 
 		// Establish agent execution context before firing the conversation loop.
 		//

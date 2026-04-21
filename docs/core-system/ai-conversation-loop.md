@@ -122,7 +122,7 @@ $result = AIConversationLoop::run(
     $tools,           // Available tools for AI
     $provider,        // AI provider (openai, anthropic, etc.)
     $model,           // AI model identifier
-    $context,         // 'pipeline' or 'chat'
+    $mode,            // Execution mode: 'pipeline' or 'chat'
     $payload,         // Agent-specific payload data
     $max_turns,       // Maximum conversation turns (default: 25)
     $single_turn      // Execute exactly one turn (default: false)
@@ -200,12 +200,17 @@ apply_filters(
     $tools,
     $provider,
     $model,
-    $context,
+    $mode,
     $payload,
     $max_turns,
     $single_turn
 );
 ```
+
+> The 5th positional argument was previously documented as `$context`; it was renamed to
+> `$mode` in v0.68.0 for vocabulary alignment with the AgentMode concept (see
+> [#1138](https://github.com/Extra-Chill/data-machine/issues/1138)). The filter is positional,
+> so existing adapters continue to receive the same value by position without any changes.
 
 Return an array matching `AIConversationLoop::execute()`'s documented return
 shape to replace the built-in loop. Return `null` (the default) to let Data
@@ -232,9 +237,9 @@ honored.
 ```php
 add_filter(
     'datamachine_conversation_runner',
-    function ( $result, $messages, $tools, $provider, $model, $context, $payload, $max_turns, $single_turn ) {
-        // Only take over for a specific context.
-        if ( 'chat' !== $context ) {
+    function ( $result, $messages, $tools, $provider, $model, $mode, $payload, $max_turns, $single_turn ) {
+        // Only take over for a specific execution mode.
+        if ( 'chat' !== $mode ) {
             return $result;
         }
 

@@ -111,36 +111,41 @@ class PluginSettings {
 	}
 
 	/**
-	 * Get provider and model for a specific execution context.
+	 * Get provider and model for a specific execution mode.
 	 *
 	 * Resolution order:
-	 * 1. Per-site context-specific override from context_models setting (or legacy agent_models)
-	 * 2. Network context-specific override from network context_models (or legacy agent_models)
+	 * 1. Per-site mode-specific override from context_models setting (or legacy agent_models)
+	 * 2. Network mode-specific override from network context_models (or legacy agent_models)
 	 * 3. Per-site global default_provider / default_model
 	 * 4. Network global default_provider / default_model
 	 * 5. Empty strings
 	 *
-	 * @param string $context Execution context: 'chat', 'pipeline', 'system'.
+	 * Note: the underlying setting key is still `context_models` — that rename is
+	 * scheduled for Phase 2 of #1138 (needs migration + React admin coordination).
+	 *
+	 * @since 0.68.0 Renamed from getContextModel().
+	 *
+	 * @param string $mode Execution mode: 'chat', 'pipeline', 'system'.
 	 * @return array{ provider: string, model: string }
 	 */
-	public static function getContextModel( string $context ): array {
-		// Step 1: Check per-site context-specific override.
-		$site_context_models = self::get( 'context_models', self::get( 'agent_models', array() ) );
-		$site_context_config = $site_context_models[ $context ] ?? array();
+	public static function getModelForMode( string $mode ): array {
+		// Step 1: Check per-site mode-specific override.
+		$site_mode_models = self::get( 'context_models', self::get( 'agent_models', array() ) );
+		$site_mode_config = $site_mode_models[ $mode ] ?? array();
 
-		$provider = ! empty( $site_context_config['provider'] ) ? $site_context_config['provider'] : '';
-		$model    = ! empty( $site_context_config['model'] ) ? $site_context_config['model'] : '';
+		$provider = ! empty( $site_mode_config['provider'] ) ? $site_mode_config['provider'] : '';
+		$model    = ! empty( $site_mode_config['model'] ) ? $site_mode_config['model'] : '';
 
-		// Step 2: Fall back to network context-specific override.
+		// Step 2: Fall back to network mode-specific override.
 		if ( empty( $provider ) || empty( $model ) ) {
-			$network_context_models = NetworkSettings::get( 'context_models', NetworkSettings::get( 'agent_models', array() ) );
-			$network_context_config = $network_context_models[ $context ] ?? array();
+			$network_mode_models = NetworkSettings::get( 'context_models', NetworkSettings::get( 'agent_models', array() ) );
+			$network_mode_config = $network_mode_models[ $mode ] ?? array();
 
-			if ( empty( $provider ) && ! empty( $network_context_config['provider'] ) ) {
-				$provider = $network_context_config['provider'];
+			if ( empty( $provider ) && ! empty( $network_mode_config['provider'] ) ) {
+				$provider = $network_mode_config['provider'];
 			}
-			if ( empty( $model ) && ! empty( $network_context_config['model'] ) ) {
-				$model = $network_context_config['model'];
+			if ( empty( $model ) && ! empty( $network_mode_config['model'] ) ) {
+				$model = $network_mode_config['model'];
 			}
 		}
 
@@ -159,21 +164,26 @@ class PluginSettings {
 	}
 
 	/**
-	 * Resolve provider/model for an agent within an execution context.
+	 * Resolve provider/model for an agent within an execution mode.
 	 *
 	 * Resolution order:
-	 * 1. agent_config.context_models[context]
+	 * 1. agent_config.context_models[mode]
 	 * 2. agent_config.default_provider/default_model
-	 * 3. site/network context-specific overrides
+	 * 3. site/network mode-specific overrides
 	 * 4. site/network global defaults
 	 *
+	 * Note: the underlying agent_config key is still `context_models` — that rename
+	 * is scheduled for Phase 2 of #1138 (needs migration + React admin coordination).
+	 *
+	 * @since 0.68.0 Renamed from resolveModelForAgentContext().
+	 *
 	 * @param int|null $agent_id Agent ID or null/0 for no agent-specific override.
-	 * @param string   $context  Execution context.
+	 * @param string   $mode     Execution mode.
 	 * @return array{ provider: string, model: string }
 	 */
-	public static function resolveModelForAgentContext( ?int $agent_id, string $context ): array {
+	public static function resolveModelForAgentMode( ?int $agent_id, string $mode ): array {
 		$agent_id  = (int) $agent_id;
-		$cache_key = $agent_id . ':' . $context;
+		$cache_key = $agent_id . ':' . $mode;
 
 		if ( isset( self::$agent_model_cache[ $cache_key ] ) ) {
 			return self::$agent_model_cache[ $cache_key ];
@@ -184,13 +194,13 @@ class PluginSettings {
 			$agent       = $agents_repo->get_agent( $agent_id );
 			$config      = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
 
-			$context_models = is_array( $config['context_models'] ?? null )
+			$mode_models = is_array( $config['context_models'] ?? null )
 				? $config['context_models']
 				: ( is_array( $config['agent_models'] ?? null ) ? $config['agent_models'] : array() );
-			$context_model  = is_array( $context_models[ $context ] ?? null ) ? $context_models[ $context ] : array();
+			$mode_model  = is_array( $mode_models[ $mode ] ?? null ) ? $mode_models[ $mode ] : array();
 
-			$provider = sanitize_text_field( $context_model['provider'] ?? '' );
-			$model    = sanitize_text_field( $context_model['model'] ?? '' );
+			$provider = sanitize_text_field( $mode_model['provider'] ?? '' );
+			$model    = sanitize_text_field( $mode_model['model'] ?? '' );
 
 			if ( empty( $provider ) ) {
 				$provider = sanitize_text_field( $config['default_provider'] ?? '' );
@@ -210,7 +220,7 @@ class PluginSettings {
 			}
 		}
 
-		self::$agent_model_cache[ $cache_key ] = self::getContextModel( $context );
+		self::$agent_model_cache[ $cache_key ] = self::getModelForMode( $mode );
 
 		return self::$agent_model_cache[ $cache_key ];
 	}

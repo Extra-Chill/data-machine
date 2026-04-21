@@ -329,7 +329,7 @@ class ChatOrchestrator {
 		}
 
 		$messages             = $session['messages'] ?? array();
-		$chat_defaults        = PluginSettings::resolveModelForAgentContext( (int) ( $session['agent_id'] ?? 0 ), 'chat' );
+		$chat_defaults        = PluginSettings::resolveModelForAgentMode( (int) ( $session['agent_id'] ?? 0 ), 'chat' );
 		$provider             = $session['provider'] ?? $chat_defaults['provider'];
 		$model                = $session['model'] ?? $chat_defaults['model'];
 		$message_count_before = count( $messages );

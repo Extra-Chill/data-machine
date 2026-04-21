@@ -318,7 +318,7 @@ class Chat {
 		$prompt  = sanitize_textarea_field( wp_unslash( $request->get_param( 'prompt' ) ?? '' ) );
 		$context = $request->get_param( 'context' ) ?? array();
 
-		$agent_config = PluginSettings::resolveModelForAgentContext( $agent_id, 'chat' );
+		$agent_config = PluginSettings::resolveModelForAgentMode( $agent_id, 'chat' );
 		$provider     = $agent_config['provider'];
 		$model        = $agent_config['model'];
 

@@ -1117,7 +1117,7 @@ $final_response = \DataMachine\Engine\AI\AIConversationLoop::run(
     array $tools,
     string $provider,
     string $model,
-    string $context,         // 'pipeline', 'chat', etc.
+    string $mode,            // Execution mode: 'pipeline', 'chat', 'system', etc.
     array $payload = [],
     int $max_turns = 25,
     bool $single_turn = false
@@ -1135,9 +1135,14 @@ apply_filters(
     'datamachine_conversation_runner',
     null,           // Return non-null array to short-circuit
     $messages, $tools, $provider, $model,
-    $context, $payload, $max_turns, $single_turn
+    $mode, $payload, $max_turns, $single_turn
 );
 ```
+
+> The 5th positional argument was previously documented as `$context`; it was renamed
+> to `$mode` in v0.68.0 for vocabulary alignment with the AgentMode concept (see
+> [#1138](https://github.com/Extra-Chill/data-machine/issues/1138)). The filter signature
+> is positional, so existing adapters are unaffected.
 
 Return an array matching `execute()`'s documented return shape to replace the
 built-in loop. Return `null` (the default) to let Data Machine run the

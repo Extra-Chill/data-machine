@@ -2,7 +2,7 @@
 /**
  * AI Request Builder - Centralized AI request construction for all agents
  *
- * Single source of truth for building standardized AI requests across chat and pipeline contexts.
+ * Single source of truth for building standardized AI requests across chat and pipeline modes.
  * Ensures consistent request structure, tool formatting, and directive application to prevent
  * architectural drift between different AI agent types.
  *
@@ -17,18 +17,22 @@ defined( 'ABSPATH' ) || exit;
 class RequestBuilder {
 
 	/**
-	 * Build standardized AI request for any context.
+	 * Build standardized AI request for any execution mode.
 	 *
 	 * Centralizes request construction logic to ensure chat and pipeline flows
 	 * build identical request structures. Handles tool restructuring, directive
 	 * application via PromptBuilder, and consistent chubes_ai_request filter invocation.
 	 *
-	 * @param array  $messages    Initial messages array with role/content
-	 * @param string $provider    AI provider name (openai, anthropic, google, grok, openrouter)
-	 * @param string $model       Model identifier
-	 * @param array  $tools       Raw tools array from filters
-	 * @param string $context     Execution context: 'chat' or 'pipeline'
-	 * @param array  $payload     Step payload (session_id, job_id, flow_step_id, data, etc)
+	 * @since 0.68.0 Renamed `$context` parameter to `$mode`. The external
+	 *               `chubes_ai_request` filter still receives a `context` key
+	 *               in its 6th argument (Phase 2 rename).
+	 *
+	 * @param array  $messages Initial messages array with role/content
+	 * @param string $provider AI provider name (openai, anthropic, google, grok, openrouter)
+	 * @param string $model    Model identifier
+	 * @param array  $tools    Raw tools array from filters
+	 * @param string $mode     Execution mode: 'chat' or 'pipeline'
+	 * @param array  $payload  Step payload (session_id, job_id, flow_step_id, data, etc)
 	 * @return array AI response from provider
 	 */
 	public static function build(
@@ -36,7 +40,7 @@ class RequestBuilder {
 		string $provider,
 		string $model,
 		array $tools,
-		string $context,
+		string $mode,
 		array $payload = array()
 	): array {
 
@@ -66,7 +70,7 @@ class RequestBuilder {
 		}
 
 		// Build the request with directives applied
-		$request            = $promptBuilder->build( $context, $provider, $payload );
+		$request            = $promptBuilder->build( $mode, $provider, $payload );
 		$applied_directives = $request['applied_directives'] ?? array();
 		unset( $request['applied_directives'] );
 		$request['model'] = $model;
@@ -77,7 +81,7 @@ class RequestBuilder {
 			'AI request built',
 			array_filter(
 				array(
-					'context'       => $context,
+					'mode'          => $mode,
 					'job_id'        => $payload['job_id'] ?? null,
 					'flow_step_id'  => $payload['flow_step_id'] ?? null,
 					'provider'      => $provider,
@@ -90,7 +94,9 @@ class RequestBuilder {
 			)
 		);
 
-		// 4. Send to ai-http-client via chubes_ai_request filter
+		// 4. Send to ai-http-client via chubes_ai_request filter.
+		//    The `context` key here is the external filter contract and is
+		//    scheduled for Phase 2 of #1138 (coordinated ai-http-client rename).
 		return apply_filters(
 			'chubes_ai_request',
 			$request,
@@ -99,7 +105,7 @@ class RequestBuilder {
 			$structured_tools,
 			$payload['step_id'] ?? $payload['session_id'] ?? null,
 			array(
-				'context' => $context,
+				'context' => $mode,
 				'payload' => $payload,
 			)
 		);

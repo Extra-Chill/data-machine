@@ -161,7 +161,7 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 		$this->assertSame( 12, PluginSettings::resolve( 'max_turns', 12 ) );
 	}
 
-	// --- getContextModel() cascade ---
+	// --- getModelForMode() cascade ---
 
 	public function test_get_agent_model_site_override_wins(): void {
 		update_option( 'datamachine_settings', array(
@@ -177,7 +177,7 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 			),
 		) );
 
-		$result = PluginSettings::getContextModel( 'chat' );
+		$result = PluginSettings::getModelForMode( 'chat' );
 
 		$this->assertSame( 'openai', $result['provider'] );
 		$this->assertSame( 'gpt-4o', $result['model'] );
@@ -193,7 +193,7 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 			),
 		) );
 
-		$result = PluginSettings::getContextModel( 'pipeline' );
+		$result = PluginSettings::getModelForMode( 'pipeline' );
 
 		$this->assertSame( 'openai', $result['provider'] );
 		$this->assertSame( 'gpt-4o-mini', $result['model'] );
@@ -208,7 +208,7 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 			'default_model'    => 'claude-sonnet-4-20250514',
 		) );
 
-		$result = PluginSettings::getContextModel( 'system' );
+		$result = PluginSettings::getModelForMode( 'system' );
 
 		$this->assertSame( 'anthropic', $result['provider'] );
 		$this->assertSame( 'claude-sonnet-4-20250514', $result['model'] );
@@ -218,7 +218,7 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 		update_option( 'datamachine_settings', array() );
 		PluginSettings::clearCache();
 
-		$result = PluginSettings::getContextModel( 'chat' );
+		$result = PluginSettings::getModelForMode( 'chat' );
 
 		$this->assertSame( '', $result['provider'] );
 		$this->assertSame( '', $result['model'] );
@@ -240,7 +240,7 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 			),
 		) );
 
-		$result = PluginSettings::getContextModel( 'chat' );
+		$result = PluginSettings::getModelForMode( 'chat' );
 
 		// Provider from site, model from network.
 		$this->assertSame( 'openai', $result['provider'] );

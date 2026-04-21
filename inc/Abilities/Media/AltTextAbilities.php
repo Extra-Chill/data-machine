@@ -146,7 +146,7 @@ class AltTextAbilities {
 
 		$user_id         = get_current_user_id();
 		$agent_id        = function_exists( 'datamachine_resolve_or_create_agent_id' ) && $user_id > 0 ? datamachine_resolve_or_create_agent_id( $user_id ) : 0;
-		$system_defaults = PluginSettings::resolveModelForAgentContext( $agent_id, 'system' );
+		$system_defaults = PluginSettings::resolveModelForAgentMode( $agent_id, 'system' );
 		$provider        = $system_defaults['provider'];
 		$model           = $system_defaults['model'];
 
@@ -362,7 +362,7 @@ class AltTextAbilities {
 
 		$user_id         = get_current_user_id();
 		$agent_id        = function_exists( 'datamachine_resolve_or_create_agent_id' ) && $user_id > 0 ? datamachine_resolve_or_create_agent_id( $user_id ) : 0;
-		$system_defaults = PluginSettings::resolveModelForAgentContext( $agent_id, 'system' );
+		$system_defaults = PluginSettings::resolveModelForAgentMode( $agent_id, 'system' );
 		$provider        = $system_defaults['provider'];
 		$model           = $system_defaults['model'];
 
