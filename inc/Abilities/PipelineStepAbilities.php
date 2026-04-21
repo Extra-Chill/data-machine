@@ -121,6 +121,10 @@ class PipelineStepAbilities {
 								$types_list
 							),
 						),
+						'step_config' => array(
+							'type'        => 'object',
+							'description' => __( 'Optional step configuration to seed the new step (e.g. system_prompt, provider, model, label). Fresh pipeline_step_id, execution_order, and step_type are always generated/validated and will override values in step_config.', 'data-machine' ),
+						),
 					),
 				),
 				'output_schema'       => array(
@@ -389,17 +393,37 @@ class PipelineStepAbilities {
 		$current_steps        = $this->db_pipelines->get_pipeline_config( $pipeline_id );
 		$next_execution_order = count( $current_steps );
 
-		$new_step = array(
-			'step_type'        => $step_type,
-			'execution_order'  => $next_execution_order,
-			'pipeline_step_id' => $pipeline_id . '_' . wp_generate_uuid4(),
-			'label'            => $step_type_config['label'] ?? ucfirst( str_replace( '_', ' ', $step_type ) ),
+		// Seed from optional step_config (used by import to restore system_prompt, provider,
+		// model, label, etc.). Fresh pipeline_step_id / execution_order / step_type always
+		// override — the incoming pipeline_step_id is scoped to the exporting install and
+		// would collide here.
+		$seed_config = ( isset( $input['step_config'] ) && is_array( $input['step_config'] ) )
+			? $input['step_config']
+			: array();
+
+		$new_step = array_merge(
+			$seed_config,
+			array(
+				'step_type'        => $step_type,
+				'execution_order'  => $next_execution_order,
+				'pipeline_step_id' => $pipeline_id . '_' . wp_generate_uuid4(),
+			)
 		);
 
+		if ( ! isset( $new_step['label'] ) || '' === $new_step['label'] ) {
+			$new_step['label'] = $step_type_config['label'] ?? ucfirst( str_replace( '_', ' ', $step_type ) );
+		}
+
 		if ( 'ai' === $step_type ) {
-			$pipeline_defaults    = PluginSettings::getContextModel( 'pipeline' );
-			$new_step['provider'] = $pipeline_defaults['provider'];
-			$new_step['model']    = $pipeline_defaults['model'];
+			if ( empty( $new_step['provider'] ) || empty( $new_step['model'] ) ) {
+				$pipeline_defaults = PluginSettings::getContextModel( 'pipeline' );
+				if ( empty( $new_step['provider'] ) ) {
+					$new_step['provider'] = $pipeline_defaults['provider'];
+				}
+				if ( empty( $new_step['model'] ) ) {
+					$new_step['model'] = $pipeline_defaults['model'];
+				}
+			}
 		}
 
 		$pipeline_config = array();
