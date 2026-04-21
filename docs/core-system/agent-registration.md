@@ -120,6 +120,10 @@ Registered agents and imperatively-created agents coexist cleanly — they're al
 
 ## Overriding a registered agent
 
+Two override paths. Pick based on what you're trying to change.
+
+### 1. Override registration intent (fresh installs only)
+
 Hook at a higher priority and re-register with the same slug:
 
 ```php
@@ -131,7 +135,40 @@ add_action( 'datamachine_register_agents', function () {
 }, 20 ); // Higher than the original plugin's priority 10.
 ```
 
-Last registration wins. Because reconciliation never overwrites existing DB rows, an override only affects **fresh creation** — already-materialized rows retain their historical data. To reseed SOUL.md on an existing install, delete the file and let the scaffold ability regenerate it.
+Last registration wins at the registry level. Because reconciliation is create-if-missing and the scaffold ability never overwrites existing files, an override only affects **fresh creation**:
+
+| State | Override applies? |
+|---|---|
+| Agent row doesn't exist yet | ✅ Yes — your registration creates the row with your label + scaffolds SOUL.md from your `soul_path` |
+| Agent row exists but SOUL.md doesn't | ✅ Partially — `label`/`description` are ignored (DB-owned), but the next scaffold cycle picks up your `soul_path` |
+| Agent row exists and SOUL.md exists | ❌ No — registration changes don't propagate to existing DB rows, and scaffold never overwrites existing files |
+
+To reseed SOUL.md on an existing install, delete the file and let the scaffold ability regenerate it. To change `agent_name` or `agent_config`, go through the DB (`wp datamachine pipeline update`, admin UI, or direct `Agents::update_agent()` call) — those are DB-owned, user-editable fields.
+
+### 2. Suppress a default registration entirely
+
+Every DM core registration is a **named function** — callers can remove it cleanly:
+
+```php
+remove_action(
+    'datamachine_register_agents',
+    'datamachine_register_default_admin_agent',
+    10
+);
+```
+
+This prevents the registration from contributing to the registry at all. Useful for deployments that want full control over which agents exist on their site.
+
+Plugins that bundle their own default registrations should follow the same convention — use a named function, document the handle in their README so site operators can suppress them.
+
+### 3. Change SOUL.md content on an existing agent
+
+Neither path 1 nor path 2 touches SOUL.md content once it exists on disk. To replace content for an already-materialized agent, the clean options are:
+
+- **Delete and reseed** — remove the existing `SOUL.md` file, let the scaffold ability regenerate on the next read path (scaffold is idempotent + never overwrites extant files, so deletion is the trigger).
+- **Hook `datamachine_scaffold_content` directly** — for conditional overrides based on agent context (e.g. Intelligence's `intelligence_kit` agent_config flag already does this at priority 20).
+
+Registry-level overrides are the right tool for declaring defaults; content-level overrides are the right tool for active SOUL.md substitution.
 
 ## Related
 

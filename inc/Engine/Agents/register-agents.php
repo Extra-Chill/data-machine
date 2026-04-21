@@ -116,50 +116,59 @@ add_filter(
  * on a user's first chat turn — so this registration is a no-op on
  * existing installs where that agent already exists.
  *
- * Plugins that want to replace or reshape the default admin agent
- * registration can hook at a higher priority and re-register with the
- * same slug.
+ * Named function (not a closure) so plugins that want to suppress the
+ * default admin-agent registration can `remove_action()` it cleanly:
+ *
+ *     remove_action(
+ *         'datamachine_register_agents',
+ *         'datamachine_register_default_admin_agent',
+ *         10
+ *     );
+ *
+ * Plugins that want to *replace* (rather than suppress) the default
+ * admin agent can hook at a higher priority and re-register with the
+ * same slug — standard WordPress last-wins semantics apply at the
+ * registry level. Note: reconciliation is create-if-missing, so
+ * re-registration only affects fresh installs where the DB row has
+ * not yet been materialized.
  *
  * @since 0.71.0
  */
-add_action(
-	'datamachine_register_agents',
-	static function (): void {
-		if ( ! class_exists( DirectoryManager::class ) ) {
-			return;
-		}
+function datamachine_register_default_admin_agent(): void {
+	if ( ! class_exists( DirectoryManager::class ) ) {
+		return;
+	}
 
-		$default_user_id = (int) DirectoryManager::get_default_agent_user_id();
-		if ( $default_user_id <= 0 ) {
-			return;
-		}
+	$default_user_id = (int) DirectoryManager::get_default_agent_user_id();
+	if ( $default_user_id <= 0 ) {
+		return;
+	}
 
-		$user = get_user_by( 'id', $default_user_id );
-		if ( ! $user ) {
-			return;
-		}
+	$user = get_user_by( 'id', $default_user_id );
+	if ( ! $user ) {
+		return;
+	}
 
-		$slug = sanitize_title( (string) $user->user_login );
-		if ( '' === $slug ) {
-			return;
-		}
+	$slug = sanitize_title( (string) $user->user_login );
+	if ( '' === $slug ) {
+		return;
+	}
 
-		$default_config = array();
-		if ( class_exists( '\\DataMachine\\Core\\PluginSettings' ) ) {
-			$default_config['model'] = array(
-				'default' => \DataMachine\Core\PluginSettings::getContextModel( 'chat' ),
-			);
-		}
-
-		datamachine_register_agent(
-			$slug,
-			array(
-				'label'          => (string) $user->display_name,
-				'description'    => __( 'Default site administrator agent.', 'data-machine' ),
-				'owner_resolver' => static fn() => $default_user_id,
-				'default_config' => $default_config,
-			)
+	$default_config = array();
+	if ( class_exists( '\\DataMachine\\Core\\PluginSettings' ) ) {
+		$default_config['model'] = array(
+			'default' => \DataMachine\Core\PluginSettings::getContextModel( 'chat' ),
 		);
-	},
-	10
-);
+	}
+
+	datamachine_register_agent(
+		$slug,
+		array(
+			'label'          => (string) $user->display_name,
+			'description'    => __( 'Default site administrator agent.', 'data-machine' ),
+			'owner_resolver' => static fn() => $default_user_id,
+			'default_config' => $default_config,
+		)
+	);
+}
+add_action( 'datamachine_register_agents', 'datamachine_register_default_admin_agent', 10 );
