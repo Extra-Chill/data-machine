@@ -271,4 +271,146 @@ class ProcessedItemsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] );
 		$this->assertArrayHasKey( 'is_processed', $result );
 	}
+
+	// -----------------------------------------------------------------
+	// processed-items-get-processed-at
+	// -----------------------------------------------------------------
+
+	public function test_get_processed_at_ability_registered(): void {
+		$ability = wp_get_ability( 'datamachine/processed-items-get-processed-at' );
+
+		$this->assertNotNull( $ability );
+		$this->assertSame( 'datamachine/processed-items-get-processed-at', $ability->get_name() );
+	}
+
+	public function test_get_processed_at_returns_null_for_unknown_item(): void {
+		$result = $this->abilities->executeGetProcessedAt(
+			array(
+				'flow_step_id'    => $this->test_flow_step_id,
+				'source_type'     => 'rss',
+				'item_identifier' => 'never-touched-guid',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertArrayHasKey( 'processed_at', $result );
+		$this->assertNull( $result['processed_at'] );
+	}
+
+	public function test_get_processed_at_returns_timestamp_for_known_item(): void {
+		$this->db_processed_items->add_processed_item( $this->test_flow_step_id, 'rss', 'known-guid', 1 );
+
+		$result = $this->abilities->executeGetProcessedAt(
+			array(
+				'flow_step_id'    => $this->test_flow_step_id,
+				'source_type'     => 'rss',
+				'item_identifier' => 'known-guid',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertIsInt( $result['processed_at'] );
+	}
+
+	public function test_get_processed_at_requires_fields(): void {
+		$result = $this->abilities->executeGetProcessedAt( array() );
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'flow_step_id', $result['error'] );
+	}
+
+	// -----------------------------------------------------------------
+	// processed-items-find-stale
+	// -----------------------------------------------------------------
+
+	public function test_find_stale_ability_registered(): void {
+		$ability = wp_get_ability( 'datamachine/processed-items-find-stale' );
+
+		$this->assertNotNull( $ability );
+		$this->assertSame( 'datamachine/processed-items-find-stale', $ability->get_name() );
+	}
+
+	public function test_find_stale_requires_candidate_array(): void {
+		$result = $this->abilities->executeFindStale(
+			array(
+				'flow_step_id'          => $this->test_flow_step_id,
+				'source_type'           => 'rss',
+				'candidate_identifiers' => 'not-an-array',
+				'max_age_days'          => 7,
+			)
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'candidate_identifiers', $result['error'] );
+	}
+
+	public function test_find_stale_requires_valid_max_age_days(): void {
+		$result = $this->abilities->executeFindStale(
+			array(
+				'flow_step_id'          => $this->test_flow_step_id,
+				'source_type'           => 'rss',
+				'candidate_identifiers' => array( 'a' ),
+				'max_age_days'          => 0,
+			)
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'max_age_days', $result['error'] );
+	}
+
+	public function test_find_stale_returns_empty_for_fresh_candidates(): void {
+		$this->db_processed_items->add_processed_item( $this->test_flow_step_id, 'rss', 'fresh-a', 1 );
+
+		$result = $this->abilities->executeFindStale(
+			array(
+				'flow_step_id'          => $this->test_flow_step_id,
+				'source_type'           => 'rss',
+				'candidate_identifiers' => array( 'fresh-a' ),
+				'max_age_days'          => 7,
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( array(), $result['stale_ids'] );
+		$this->assertSame( 0, $result['count'] );
+	}
+
+	// -----------------------------------------------------------------
+	// processed-items-find-never-processed
+	// -----------------------------------------------------------------
+
+	public function test_find_never_processed_ability_registered(): void {
+		$ability = wp_get_ability( 'datamachine/processed-items-find-never-processed' );
+
+		$this->assertNotNull( $ability );
+		$this->assertSame( 'datamachine/processed-items-find-never-processed', $ability->get_name() );
+	}
+
+	public function test_find_never_processed_requires_candidate_array(): void {
+		$result = $this->abilities->executeFindNeverProcessed(
+			array(
+				'flow_step_id'          => $this->test_flow_step_id,
+				'source_type'           => 'rss',
+				'candidate_identifiers' => 'not-an-array',
+			)
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'candidate_identifiers', $result['error'] );
+	}
+
+	public function test_find_never_processed_returns_unseen_subset(): void {
+		$this->db_processed_items->add_processed_item( $this->test_flow_step_id, 'rss', 'already-seen', 1 );
+
+		$result = $this->abilities->executeFindNeverProcessed(
+			array(
+				'flow_step_id'          => $this->test_flow_step_id,
+				'source_type'           => 'rss',
+				'candidate_identifiers' => array( 'already-seen', 'brand-new' ),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( array( 'brand-new' ), $result['never_processed'] );
+		$this->assertSame( 1, $result['count'] );
+	}
 }

@@ -219,15 +219,59 @@ class ExecutionContext {
 	 *
 	 * In direct mode, always returns false (no deduplication).
 	 *
+	 * Applies the `datamachine_should_reprocess_item` filter so consumers
+	 * can opt into time-windowed revisit semantics without every handler
+	 * growing its own `--revisit-days` flag. The filter receives the
+	 * default boolean skip decision and a context array, and returns a
+	 * boolean: true to skip (default seen/not-seen behavior), false to
+	 * process again despite the item being present in the table.
+	 *
 	 * @param string $item_identifier Item identifier
-	 * @return bool True if already processed
+	 * @return bool True if already processed (and should be skipped).
 	 */
 	public function isItemProcessed( string $item_identifier ): bool {
 		if ( $this->isDirect() || $this->isStandalone() || ! $this->flow_step_id ) {
 			return false;
 		}
 		$db_processed_items = new ProcessedItems();
-		return $db_processed_items->has_item_been_processed( $this->flow_step_id, $this->handler_type, $item_identifier );
+		$skip               = $db_processed_items->has_item_been_processed(
+			$this->flow_step_id,
+			$this->handler_type,
+			$item_identifier
+		);
+
+		/**
+		 * Filters whether an item should be reprocessed despite existing in processed_items.
+		 *
+		 * Default behavior (no filter): honor the boolean seen/not-seen check.
+		 * Consumers can subscribe to reprocess stale items by returning false
+		 * when `$skip` is true and the stored `processed_timestamp` is older
+		 * than their revisit window.
+		 *
+		 * @since 0.71.0
+		 *
+		 * @param bool  $skip    Whether current logic says to skip (true = skip, false = process).
+		 * @param array $context {
+		 *     Context for the decision.
+		 *
+		 *     @type string $flow_step_id    Flow step ID.
+		 *     @type string $source_type     Handler source type.
+		 *     @type string $item_identifier Item identifier being checked.
+		 *     @type int    $job_id          Current job ID (0 if unavailable).
+		 * }
+		 */
+		$skip = (bool) apply_filters(
+			'datamachine_should_reprocess_item',
+			$skip,
+			array(
+				'flow_step_id'    => $this->flow_step_id,
+				'source_type'     => $this->handler_type,
+				'item_identifier' => $item_identifier,
+				'job_id'          => (int) $this->job_id,
+			)
+		);
+
+		return $skip;
 	}
 
 	/**

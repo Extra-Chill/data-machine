@@ -55,6 +55,178 @@ class ProcessedItems extends BaseRepository {
 	}
 
 	/**
+	 * Get the last-processed timestamp for an item.
+	 *
+	 * Exposes the `processed_timestamp` column populated on every insert,
+	 * enabling time-windowed revisit semantics for consumers that want
+	 * "have I touched this recently?" instead of "have I ever seen it?".
+	 *
+	 * @since 0.71.0
+	 *
+	 * @param string $flow_step_id    Flow step ID (composite: pipeline_step_id_flow_id).
+	 * @param string $source_type     Source type (e.g. 'rss', 'wiki_post', 'venue').
+	 * @param string $item_identifier Unique identifier for the item.
+	 * @return int|null Unix timestamp, or null when the item has never been processed.
+	 */
+	public function get_processed_at( string $flow_step_id, string $source_type, string $item_identifier ): ?int {
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$value = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT UNIX_TIMESTAMP(processed_timestamp) FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s',
+				$this->table_name,
+				$flow_step_id,
+				$source_type,
+				$item_identifier
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		if ( null === $value || '' === $value ) {
+			return null;
+		}
+
+		return (int) $value;
+	}
+
+	/**
+	 * Check whether an item has been processed within a given time window.
+	 *
+	 * Returns true only when the item exists in the table AND its
+	 * `processed_timestamp` is newer than (now - $max_age_days).
+	 *
+	 * @since 0.71.0
+	 *
+	 * @param string $flow_step_id    Flow step ID.
+	 * @param string $source_type     Source type.
+	 * @param string $item_identifier Unique identifier for the item.
+	 * @param int    $max_age_days    Window in days; must be >= 1.
+	 * @return bool True when item is present and fresh. False otherwise.
+	 */
+	public function has_been_processed_within( string $flow_step_id, string $source_type, string $item_identifier, int $max_age_days ): bool {
+		if ( $max_age_days < 1 ) {
+			return false;
+		}
+
+		$processed_at = $this->get_processed_at( $flow_step_id, $source_type, $item_identifier );
+
+		if ( null === $processed_at ) {
+			return false;
+		}
+
+		return $processed_at >= ( time() - ( $max_age_days * DAY_IN_SECONDS ) );
+	}
+
+	/**
+	 * Find candidate identifiers that exist in the table but are stale.
+	 *
+	 * Given a candidate list, returns the subset that:
+	 *   (a) has a row for (flow_step_id, source_type), AND
+	 *   (b) whose `processed_timestamp` is older than (now - $max_age_days).
+	 *
+	 * Enables maintenance pipelines: "which of these posts haven't I
+	 * reviewed in the last N days?"
+	 *
+	 * @since 0.71.0
+	 *
+	 * @param string   $flow_step_id          Flow step ID.
+	 * @param string   $source_type           Source type.
+	 * @param string[] $candidate_identifiers Candidate item identifiers to check.
+	 * @param int      $max_age_days          Staleness threshold in days; must be >= 1.
+	 * @param int      $limit                 Maximum number of identifiers returned. Default 100.
+	 * @return string[] Subset of $candidate_identifiers that are stale. Empty array on bad input.
+	 */
+	public function find_stale( string $flow_step_id, string $source_type, array $candidate_identifiers, int $max_age_days, int $limit = 100 ): array {
+		if ( empty( $candidate_identifiers ) || $max_age_days < 1 || $limit < 1 ) {
+			return array();
+		}
+
+		// Normalize to unique strings to keep the IN() list bounded.
+		$candidates = array_values( array_unique( array_map( 'strval', $candidate_identifiers ) ) );
+
+		$cutoff_datetime = gmdate( 'Y-m-d H:i:s', time() - ( $max_age_days * DAY_IN_SECONDS ) );
+
+		$placeholders = implode( ',', array_fill( 0, count( $candidates ), '%s' ) );
+
+		$sql = sprintf(
+			'SELECT item_identifier FROM %%i WHERE flow_step_id = %%s AND source_type = %%s AND processed_timestamp < %%s AND item_identifier IN (%s) ORDER BY processed_timestamp ASC LIMIT %%d',
+			$placeholders
+		);
+
+		$prepare_args = array_merge(
+			array( $this->table_name, $flow_step_id, $source_type, $cutoff_datetime ),
+			$candidates,
+			array( $limit )
+		);
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $this->wpdb->get_col( $this->wpdb->prepare( $sql, ...$prepare_args ) );
+
+		return array_map( 'strval', (array) $rows );
+	}
+
+	/**
+	 * Find candidate identifiers that have never been processed.
+	 *
+	 * Given a candidate list, returns the subset with no row in the table
+	 * for (flow_step_id, source_type). Enables backfill on the first run
+	 * of a maintenance pipeline over an existing corpus.
+	 *
+	 * @since 0.71.0
+	 *
+	 * @param string   $flow_step_id          Flow step ID.
+	 * @param string   $source_type           Source type.
+	 * @param string[] $candidate_identifiers Candidate item identifiers to check.
+	 * @param int      $limit                 Maximum number of identifiers returned. Default 100.
+	 * @return string[] Subset of $candidate_identifiers with no processed row. Empty array on bad input.
+	 */
+	public function find_never_processed( string $flow_step_id, string $source_type, array $candidate_identifiers, int $limit = 100 ): array {
+		if ( empty( $candidate_identifiers ) || $limit < 1 ) {
+			return array();
+		}
+
+		// Preserve input order while deduping.
+		$seen       = array();
+		$candidates = array();
+		foreach ( $candidate_identifiers as $candidate ) {
+			$candidate = (string) $candidate;
+			if ( isset( $seen[ $candidate ] ) ) {
+				continue;
+			}
+			$seen[ $candidate ] = true;
+			$candidates[]       = $candidate;
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $candidates ), '%s' ) );
+
+		$sql = sprintf(
+			'SELECT item_identifier FROM %%i WHERE flow_step_id = %%s AND source_type = %%s AND item_identifier IN (%s)',
+			$placeholders
+		);
+
+		$prepare_args = array_merge(
+			array( $this->table_name, $flow_step_id, $source_type ),
+			$candidates
+		);
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$existing = $this->wpdb->get_col( $this->wpdb->prepare( $sql, ...$prepare_args ) );
+		$existing = array_flip( array_map( 'strval', (array) $existing ) );
+
+		$result = array();
+		foreach ( $candidates as $candidate ) {
+			if ( isset( $existing[ $candidate ] ) ) {
+				continue;
+			}
+			$result[] = $candidate;
+			if ( count( $result ) >= $limit ) {
+				break;
+			}
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Adds a record indicating an item has been processed.
 	 *
 	 * @param string $flow_step_id   The ID of the flow step (composite: pipeline_step_id_flow_id).
@@ -321,7 +493,8 @@ class ProcessedItems extends BaseRepository {
             UNIQUE KEY `flow_source_item` (flow_step_id, source_type, item_identifier(191)),
             KEY `flow_step_id` (flow_step_id),
             KEY `source_type` (source_type),
-            KEY `job_id` (job_id)
+            KEY `job_id` (job_id),
+            KEY `flow_source_ts` (flow_step_id, source_type, processed_timestamp)
         ) $charset_collate;";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -329,6 +502,9 @@ class ProcessedItems extends BaseRepository {
 
 		// dbDelta may not add UNIQUE indexes to existing tables — ensure it exists.
 		self::ensure_unique_index( $this->table_name );
+
+		// dbDelta is also unreliable at adding regular indexes to existing tables.
+		self::ensure_flow_source_ts_index( $this->table_name );
 
 		// Log table creation
 		do_action(
@@ -401,6 +577,44 @@ class ProcessedItems extends BaseRepository {
 			'datamachine_log',
 			'info',
 			'Added UNIQUE index flow_source_item to processed_items table',
+			array( 'table_name' => $table_name )
+		);
+	}
+
+	/**
+	 * Ensure the composite (flow_step_id, source_type, processed_timestamp) index exists.
+	 *
+	 * Supports the time-windowed query methods added in 0.71.0 (`find_stale`,
+	 * `has_been_processed_within`). Range scans on `processed_timestamp`
+	 * scoped by flow_step_id + source_type benefit from a covering composite
+	 * index; the existing UNIQUE key on `item_identifier` does not help.
+	 *
+	 * @since 0.71.0
+	 *
+	 * @param string $table_name Full table name.
+	 */
+	private static function ensure_flow_source_ts_index( string $table_name ): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$index = $wpdb->get_row( "SHOW INDEX FROM {$table_name} WHERE Key_name = 'flow_source_ts'" );
+
+		if ( $index ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		$wpdb->query(
+			"ALTER TABLE {$table_name}
+			 ADD KEY `flow_source_ts` (flow_step_id, source_type, processed_timestamp)"
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Added composite index flow_source_ts to processed_items table',
 			array( 'table_name' => $table_name )
 		);
 	}

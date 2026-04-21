@@ -516,6 +516,21 @@ wp datamachine processed-items check --flow-step=fetch_1_10 --source=rss --item=
 
 # Check if a flow step has processing history
 wp datamachine processed-items history --flow-step=fetch_1_10
+
+# Revisit semantics (since 0.71.0) — time-windowed reads on processed_timestamp
+# When was this item last processed?
+wp datamachine processed-items get-processed-at \
+  --flow-step-id=fetch_1_10 --source-type=wiki_post --item-identifier=42
+
+# Of these candidates, which are stale (older than N days)?
+wp datamachine processed-items find-stale \
+  --flow-step-id=fetch_1_10 --source-type=wiki_post \
+  --candidate-ids=1,2,3,4 --max-age-days=7
+
+# Of these candidates, which have never been processed?
+wp datamachine processed-items find-never-processed \
+  --flow-step-id=fetch_1_10 --source-type=wiki_post \
+  --candidate-ids=1,2,3,4
 ```
 
 ### datamachine links
