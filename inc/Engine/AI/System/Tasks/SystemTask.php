@@ -2,22 +2,40 @@
 /**
  * Abstract base class for all System Agent tasks.
  *
- * Provides standardized task execution interface with shared helpers for
- * job completion, failure handling, rescheduling, and undo. All async
- * system tasks must extend this class.
+ * Tasks declare their execution shape via getWorkflow() — returning a
+ * step-list JSON that the engine executes through datamachine/execute-workflow.
+ * This is the same engine contract used by persistent flows, chat-built
+ * workflows, and system tasks. The only difference between them is where
+ * the JSON lives: database row, chat context, or hardcoded PHP.
+ *
+ * ## Dual Contract
+ *
+ * - getWorkflow(array $params): array — public scheduling contract.
+ *   Returns { steps: [...] } for datamachine/execute-workflow.
+ *   TaskScheduler::schedule() calls this.
+ *
+ * - executeTask(int $jobId, array $params): void — imperative execution.
+ *   Called by SystemTaskStep when running inline in a pipeline, or by
+ *   the engine when processing a system_task step in a workflow.
+ *   Contains the actual business logic (API calls, file ops, AI requests).
+ *
+ * Most tasks return a single system_task step from getWorkflow() that
+ * points to their own task type. The engine routes this through
+ * SystemTaskStep which calls executeTask(). Over time, tasks can be
+ * decomposed into richer multi-step workflows.
  *
  * ## Undo System
  *
  * Tasks that modify WordPress content can opt into undo support by:
- * 1. Recording effects during execution via the standardized effects array
- * 2. Returning `true` from `supportsUndo()`
+ * 1. Returning true from supportsUndo()
+ * 2. Recording effects in engine_data during executeTask()
  *
- * The base class provides generic undo handlers for common effect types
- * (post_content_modified, post_meta_set, attachment_created, featured_image_set).
- * Tasks only override `undo()` if they need custom reversal logic.
+ * The undo() method reads effects from child step jobs via
+ * Jobs::get_children($parentJobId) and reverses them.
  *
  * @package DataMachine\Engine\AI\System\Tasks
  * @since 0.22.4
+ * @since 0.72.0 Replaced execute() with getWorkflow() + executeTask() contract.
  */
 
 namespace DataMachine\Engine\AI\System\Tasks;
@@ -25,18 +43,54 @@ namespace DataMachine\Engine\AI\System\Tasks;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\Database\Jobs\Jobs;
-use DataMachine\Core\JobStatus;
 use DataMachine\Core\PluginSettings;
 
 abstract class SystemTask {
 
 	/**
-	 * Execute the task for a specific job.
+	 * Declare the task as a workflow step list.
 	 *
-	 * @param int   $jobId  The job ID from DM Jobs table.
-	 * @param array $params Task parameters from the job's engine_data.
+	 * Returns an array with a "steps" key, where each step is an object
+	 * matching the datamachine/execute-workflow JSON schema.
+	 *
+	 * Default implementation returns a single system_task step that
+	 * references this task's own type — the engine routes through
+	 * SystemTaskStep which calls executeTask(). Override to return
+	 * richer multi-step workflows.
+	 *
+	 * @param array $params Task parameters from the scheduler.
+	 * @return array Workflow definition with "steps" key.
+	 * @since 0.72.0
 	 */
-	abstract public function execute( int $jobId, array $params ): void;
+	public function getWorkflow( array $params ): array {
+		return array(
+			'steps' => array(
+				array(
+					'type'           => 'system_task',
+					'handler_config' => array(
+						'task'   => $this->getTaskType(),
+						'params' => $params,
+					),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Execute the task's imperative business logic.
+	 *
+	 * Called by SystemTaskStep when running as a pipeline/workflow step.
+	 * Contains the actual work: API calls, file operations, AI requests,
+	 * database writes, etc.
+	 *
+	 * Tasks MUST call completeJob() or failJob() before returning to
+	 * signal the outcome to the engine.
+	 *
+	 * @param int   $jobId  Job ID from DM Jobs table.
+	 * @param array $params Task parameters from engine_data.
+	 * @since 0.72.0 Renamed from execute().
+	 */
+	abstract public function executeTask( int $jobId, array $params ): void;
 
 	/**
 	 * Get the task type identifier.
@@ -63,10 +117,85 @@ abstract class SystemTask {
 		);
 	}
 
+	// ─── Job lifecycle helpers ────────────────────────────────────────
+	// Used by executeTask() implementations to signal completion/failure.
+
+	/**
+	 * Mark a job as completed with result data.
+	 *
+	 * @param int   $jobId Job ID.
+	 * @param array $data  Result data to store in engine_data.
+	 */
+	protected function completeJob( int $jobId, array $data ): void {
+		$jobs_db     = new Jobs();
+		$engine_data = $jobs_db->retrieve_engine_data( $jobId );
+		$engine_data = array_merge( $engine_data, $data );
+		$jobs_db->store_engine_data( $jobId, $engine_data );
+		$jobs_db->complete_job( $jobId, 'completed' );
+	}
+
+	/**
+	 * Mark a job as failed with an error message.
+	 *
+	 * @param int    $jobId   Job ID.
+	 * @param string $message Error message.
+	 */
+	protected function failJob( int $jobId, string $message ): void {
+		$jobs_db     = new Jobs();
+		$engine_data = $jobs_db->retrieve_engine_data( $jobId );
+		$engine_data['error'] = $message;
+		$jobs_db->store_engine_data( $jobId, $engine_data );
+		$jobs_db->complete_job( $jobId, 'failed: ' . $message );
+
+		do_action(
+			'datamachine_log',
+			'error',
+			"Task failed (job #{$jobId}): {$message}",
+			array(
+				'job_id'    => $jobId,
+				'task_type' => $this->getTaskType(),
+				'error'     => $message,
+				'context'   => 'system',
+			)
+		);
+	}
+
+	/**
+	 * Reschedule a job for later retry via Action Scheduler.
+	 *
+	 * Used by tasks with polling patterns (e.g. ImageGenerationTask).
+	 *
+	 * @param int $jobId        Job ID.
+	 * @param int $delaySeconds Delay in seconds before next attempt.
+	 */
+	protected function reschedule( int $jobId, int $delaySeconds ): void {
+		$jobs_db     = new Jobs();
+		$engine_data = $jobs_db->retrieve_engine_data( $jobId );
+		$attempts    = ( $engine_data['attempts'] ?? 0 ) + 1;
+		$max         = $engine_data['max_attempts'] ?? 24;
+
+		if ( $attempts >= $max ) {
+			$this->failJob( $jobId, "Max attempts ({$max}) reached" );
+			return;
+		}
+
+		$engine_data['attempts'] = $attempts;
+		$jobs_db->store_engine_data( $jobId, $engine_data );
+
+		if ( function_exists( 'as_schedule_single_action' ) ) {
+			as_schedule_single_action(
+				time() + $delaySeconds,
+				'datamachine_task_retry',
+				array( $jobId ),
+				'data-machine'
+			);
+		}
+	}
+
+	// ─── Prompt system ────────────────────────────────────────────────
+
 	/**
 	 * Option key for storing system task prompt overrides.
-	 *
-	 * Stored as: datamachine_task_prompts[task_type][prompt_key] = string
 	 *
 	 * @since 0.41.0
 	 */
@@ -82,10 +211,6 @@ abstract class SystemTask {
 
 	/**
 	 * Get prompt definitions for this task.
-	 *
-	 * Tasks with AI prompts override this to declare their editable prompts.
-	 * Each prompt has a key, label, description, default template, and available
-	 * context variables (for interpolation).
 	 *
 	 * @return array<string, array{label: string, description: string, default: string, variables: array<string, string>}>
 	 * @since 0.41.0
@@ -121,9 +246,6 @@ abstract class SystemTask {
 	/**
 	 * Interpolate context variables into a prompt template.
 	 *
-	 * Replaces {{variable_name}} placeholders with provided values.
-	 * Undefined variables are left as-is (not replaced).
-	 *
 	 * @param string $template  Prompt template with {{variable}} placeholders.
 	 * @param array  $variables Key-value pairs of variable_name => value.
 	 * @return string Interpolated prompt text.
@@ -140,21 +262,6 @@ abstract class SystemTask {
 	/**
 	 * Resolve and interpolate a prompt in one call.
 	 *
-	 * Convenience method combining resolvePrompt() + interpolatePrompt().
-	 * After gathering the task's own variables, applies the
-	 * `datamachine_task_prompt_variables` filter so site code can inject
-	 * additional variables (or override existing ones) without modifying
-	 * the task class.
-	 *
-	 * Example usage in a theme or plugin:
-	 *
-	 *     add_filter( 'datamachine_task_prompt_variables', function( $vars, $task_type, $prompt_key ) {
-	 *         if ( 'daily_memory_generation' === $task_type ) {
-	 *             $vars['git_commits'] = my_get_todays_commits();
-	 *         }
-	 *         return $vars;
-	 *     }, 10, 3 );
-	 *
 	 * @param string $prompt_key The prompt key.
 	 * @param array  $variables  Context variables for interpolation.
 	 * @return string The final prompt text.
@@ -167,13 +274,9 @@ abstract class SystemTask {
 		/**
 		 * Filter prompt template variables before interpolation.
 		 *
-		 * Allows site code to inject additional variables or override
-		 * existing ones for any system task prompt. The prompt template
-		 * can reference these via {{variable_name}} placeholders.
-		 *
 		 * @since 0.44.0
 		 * @param array  $variables  Key-value pairs of variable_name => value.
-		 * @param string $task_type  The system task type (e.g. 'daily_memory_generation').
+		 * @param string $task_type  The system task type.
 		 * @param string $prompt_key The prompt key within the task.
 		 */
 		$variables = apply_filters( 'datamachine_task_prompt_variables', $variables, $task_type, $prompt_key );
@@ -184,7 +287,7 @@ abstract class SystemTask {
 	/**
 	 * Get all prompt overrides from the database.
 	 *
-	 * @return array Overrides keyed by task_type then prompt_key.
+	 * @return array
 	 * @since 0.41.0
 	 */
 	public static function getAllPromptOverrides(): array {
@@ -196,11 +299,11 @@ abstract class SystemTask {
 	}
 
 	/**
-	 * Set a prompt override for a specific task and prompt key.
+	 * Set a prompt override.
 	 *
 	 * @param string $task_type  Task type identifier.
 	 * @param string $prompt_key Prompt key within the task.
-	 * @param string $prompt     The override prompt text. Empty string removes the override.
+	 * @param string $prompt     The override prompt text. Empty string removes.
 	 * @return bool True on success.
 	 * @since 0.41.0
 	 */
@@ -208,10 +311,7 @@ abstract class SystemTask {
 		$overrides = self::getAllPromptOverrides();
 
 		if ( '' === $prompt ) {
-			// Remove the override — fall back to default.
 			unset( $overrides[ $task_type ][ $prompt_key ] );
-
-			// Clean up empty task-level arrays.
 			if ( isset( $overrides[ $task_type ] ) && empty( $overrides[ $task_type ] ) ) {
 				unset( $overrides[ $task_type ] );
 			}
@@ -227,7 +327,7 @@ abstract class SystemTask {
 	}
 
 	/**
-	 * Reset all prompt overrides for a task (revert to defaults).
+	 * Reset all prompt overrides for a task.
 	 *
 	 * @param string $task_type Task type identifier.
 	 * @return bool True on success.
@@ -250,10 +350,7 @@ abstract class SystemTask {
 	}
 
 	/**
-	 * Resolve the effective system-context model for this job.
-	 *
-	 * Prefers the explicit agent_id stored in task params or nested context.
-	 * Falls back to global system context defaults when no agent is available.
+	 * Resolve the effective system-context model for this task.
 	 *
 	 * @param array $params Task params / engine_data.
 	 * @return array{ provider: string, model: string }
@@ -263,11 +360,10 @@ abstract class SystemTask {
 		return PluginSettings::resolveModelForAgentMode( $agent_id, 'system' );
 	}
 
+	// ─── Undo system ──────────────────────────────────────────────────
+
 	/**
 	 * Whether this task type supports undo.
-	 *
-	 * Tasks opt in by overriding this to return true and recording
-	 * effects in their engine_data during execution.
 	 *
 	 * @return bool
 	 * @since 0.33.0
@@ -279,16 +375,31 @@ abstract class SystemTask {
 	/**
 	 * Undo the effects of a completed job.
 	 *
-	 * Reads the standardized effects array from engine_data and reverses
-	 * each effect in reverse order. Tasks may override for custom logic.
+	 * Reads the standardized effects array from child step jobs via
+	 * Jobs::get_children() and reverses each effect in reverse order.
 	 *
-	 * @param int   $jobId      The job ID to undo.
+	 * @param int   $jobId      The parent job ID to undo.
 	 * @param array $engineData The job's full engine_data.
 	 * @return array{success: bool, reverted: array, skipped: array, failed: array}
 	 * @since 0.33.0
+	 * @since 0.72.0 Reads effects from child step jobs instead of self.
 	 */
 	public function undo( int $jobId, array $engineData ): array {
+		// First try effects from the job itself (backward compat for
+		// jobs that completed before the migration).
 		$effects = $engineData['effects'] ?? array();
+
+		// If no self-effects, gather from child step jobs.
+		if ( empty( $effects ) ) {
+			$jobs_db  = new Jobs();
+			$children = $jobs_db->get_children( $jobId );
+
+			foreach ( $children as $child ) {
+				$child_data    = $child['engine_data'] ?? array();
+				$child_effects = $child_data['effects'] ?? array();
+				$effects       = array_merge( $effects, $child_effects );
+			}
+		}
 
 		if ( empty( $effects ) ) {
 			return array(
@@ -306,15 +417,6 @@ abstract class SystemTask {
 	/**
 	 * Generic undo handler — reverses standard effect types in reverse order.
 	 *
-	 * Supported effect types:
-	 * - post_content_modified: restores from WP revision
-	 * - post_meta_set: restores previous value or deletes meta
-	 * - attachment_created: deletes the attachment
-	 * - featured_image_set: removes or restores previous thumbnail
-	 *
-	 * Unknown effect types are skipped (not failed) so tasks with mixed
-	 * reversible/irreversible effects degrade gracefully.
-	 *
 	 * @param int   $jobId   Job ID (for logging).
 	 * @param array $effects Effects array from engine_data.
 	 * @return array{success: bool, reverted: array, skipped: array, failed: array}
@@ -325,9 +427,7 @@ abstract class SystemTask {
 		$skipped  = array();
 		$failed   = array();
 
-		// Reverse order: undo last effect first.
 		foreach ( array_reverse( $effects ) as $effect ) {
-			$type   = $effect['type'] ?? '';
 			$result = $this->undoEffect( $effect );
 
 			switch ( $result['status'] ) {
@@ -372,7 +472,7 @@ abstract class SystemTask {
 	/**
 	 * Undo a single effect by dispatching to the appropriate handler.
 	 *
-	 * @param array $effect Single effect entry from the effects array.
+	 * @param array $effect Single effect entry.
 	 * @return array{status: string, type: string, reason?: string}
 	 * @since 0.33.0
 	 */
@@ -382,16 +482,14 @@ abstract class SystemTask {
 		switch ( $type ) {
 			case 'post_content_modified':
 				return $this->undoContentModification( $effect );
-
 			case 'post_meta_set':
 				return $this->undoMetaSet( $effect );
-
+			case 'post_field_set':
+				return $this->undoPostFieldSet( $effect );
 			case 'attachment_created':
 				return $this->undoAttachmentCreated( $effect );
-
 			case 'featured_image_set':
 				return $this->undoFeaturedImageSet( $effect );
-
 			default:
 				return array(
 					'status' => 'skipped',
@@ -404,77 +502,45 @@ abstract class SystemTask {
 	/**
 	 * Undo a post content modification by restoring a WP revision.
 	 *
-	 * @param array $effect Effect with revision_id and target.post_id.
+	 * @param array $effect Effect data.
 	 * @return array
-	 * @since 0.33.0
 	 */
 	protected function undoContentModification( array $effect ): array {
 		$post_id     = $effect['target']['post_id'] ?? 0;
 		$revision_id = $effect['revision_id'] ?? 0;
 
 		if ( $post_id <= 0 ) {
-			return array(
-				'status' => 'failed',
-				'type'   => 'post_content_modified',
-				'reason' => 'Missing post_id in effect target',
-			);
+			return array( 'status' => 'failed', 'type' => 'post_content_modified', 'reason' => 'Missing post_id' );
 		}
-
 		if ( $revision_id <= 0 ) {
-			return array(
-				'status' => 'failed',
-				'type'   => 'post_content_modified',
-				'reason' => "No revision_id recorded for post #{$post_id}",
-			);
+			return array( 'status' => 'failed', 'type' => 'post_content_modified', 'reason' => 'No revision_id' );
 		}
 
 		$revision = get_post( $revision_id );
-
 		if ( ! $revision || 'revision' !== $revision->post_type ) {
-			return array(
-				'status' => 'failed',
-				'type'   => 'post_content_modified',
-				'reason' => "Revision #{$revision_id} not found or not a revision",
-			);
+			return array( 'status' => 'failed', 'type' => 'post_content_modified', 'reason' => "Revision #{$revision_id} not found" );
 		}
 
 		$restored = wp_restore_post_revision( $revision_id );
-
 		if ( ! $restored ) {
-			return array(
-				'status' => 'failed',
-				'type'   => 'post_content_modified',
-				'reason' => "Failed to restore revision #{$revision_id} for post #{$post_id}",
-			);
+			return array( 'status' => 'failed', 'type' => 'post_content_modified', 'reason' => "Failed to restore revision #{$revision_id}" );
 		}
 
-		return array(
-			'status'      => 'reverted',
-			'type'        => 'post_content_modified',
-			'post_id'     => $post_id,
-			'revision_id' => $revision_id,
-		);
+		return array( 'status' => 'reverted', 'type' => 'post_content_modified', 'post_id' => $post_id, 'revision_id' => $revision_id );
 	}
 
 	/**
 	 * Undo a post meta set operation.
 	 *
-	 * Restores the previous value if one was recorded, otherwise deletes the meta key.
-	 *
-	 * @param array $effect Effect with target.post_id, target.meta_key, and optional previous_value.
+	 * @param array $effect Effect data.
 	 * @return array
-	 * @since 0.33.0
 	 */
 	protected function undoMetaSet( array $effect ): array {
 		$post_id  = $effect['target']['post_id'] ?? 0;
 		$meta_key = $effect['target']['meta_key'] ?? '';
 
 		if ( $post_id <= 0 || empty( $meta_key ) ) {
-			return array(
-				'status' => 'failed',
-				'type'   => 'post_meta_set',
-				'reason' => 'Missing post_id or meta_key in effect target',
-			);
+			return array( 'status' => 'failed', 'type' => 'post_meta_set', 'reason' => 'Missing post_id or meta_key' );
 		}
 
 		if ( array_key_exists( 'previous_value', $effect ) && null !== $effect['previous_value'] ) {
@@ -483,215 +549,80 @@ abstract class SystemTask {
 			delete_post_meta( $post_id, $meta_key );
 		}
 
-		return array(
-			'status'   => 'reverted',
-			'type'     => 'post_meta_set',
-			'post_id'  => $post_id,
-			'meta_key' => $meta_key,
-		);
+		return array( 'status' => 'reverted', 'type' => 'post_meta_set', 'post_id' => $post_id, 'meta_key' => $meta_key );
+	}
+
+	/**
+	 * Undo a post field set operation (e.g. post_excerpt).
+	 *
+	 * @param array $effect Effect data.
+	 * @return array
+	 */
+	protected function undoPostFieldSet( array $effect ): array {
+		$post_id = $effect['target']['post_id'] ?? 0;
+		$field   = $effect['target']['field'] ?? '';
+
+		if ( $post_id <= 0 || empty( $field ) ) {
+			return array( 'status' => 'failed', 'type' => 'post_field_set', 'reason' => 'Missing post_id or field' );
+		}
+
+		$update = array( 'ID' => $post_id );
+
+		if ( array_key_exists( 'previous_value', $effect ) && null !== $effect['previous_value'] ) {
+			$update[ $field ] = $effect['previous_value'];
+		} else {
+			$update[ $field ] = '';
+		}
+
+		$result = wp_update_post( $update, true );
+		if ( is_wp_error( $result ) ) {
+			return array( 'status' => 'failed', 'type' => 'post_field_set', 'reason' => $result->get_error_message() );
+		}
+
+		return array( 'status' => 'reverted', 'type' => 'post_field_set', 'post_id' => $post_id, 'field' => $field );
 	}
 
 	/**
 	 * Undo an attachment creation by deleting the attachment.
 	 *
-	 * @param array $effect Effect with target.attachment_id.
+	 * @param array $effect Effect data.
 	 * @return array
-	 * @since 0.33.0
 	 */
 	protected function undoAttachmentCreated( array $effect ): array {
 		$attachment_id = $effect['target']['attachment_id'] ?? 0;
 
 		if ( $attachment_id <= 0 ) {
-			return array(
-				'status' => 'failed',
-				'type'   => 'attachment_created',
-				'reason' => 'Missing attachment_id in effect target',
-			);
+			return array( 'status' => 'failed', 'type' => 'attachment_created', 'reason' => 'Missing attachment_id' );
 		}
 
 		$deleted = wp_delete_attachment( $attachment_id, true );
-
 		if ( ! $deleted ) {
-			return array(
-				'status' => 'failed',
-				'type'   => 'attachment_created',
-				'reason' => "Failed to delete attachment #{$attachment_id}",
-			);
+			return array( 'status' => 'failed', 'type' => 'attachment_created', 'reason' => "Failed to delete attachment #{$attachment_id}" );
 		}
 
-		return array(
-			'status'        => 'reverted',
-			'type'          => 'attachment_created',
-			'attachment_id' => $attachment_id,
-		);
+		return array( 'status' => 'reverted', 'type' => 'attachment_created', 'attachment_id' => $attachment_id );
 	}
 
 	/**
 	 * Undo a featured image set operation.
 	 *
-	 * Restores the previous thumbnail if one was recorded, otherwise removes it.
-	 *
-	 * @param array $effect Effect with target.post_id and optional previous_value.
+	 * @param array $effect Effect data.
 	 * @return array
-	 * @since 0.33.0
 	 */
 	protected function undoFeaturedImageSet( array $effect ): array {
 		$post_id = $effect['target']['post_id'] ?? 0;
 
 		if ( $post_id <= 0 ) {
-			return array(
-				'status' => 'failed',
-				'type'   => 'featured_image_set',
-				'reason' => 'Missing post_id in effect target',
-			);
+			return array( 'status' => 'failed', 'type' => 'featured_image_set', 'reason' => 'Missing post_id' );
 		}
 
 		$previous = $effect['previous_value'] ?? 0;
-
 		if ( $previous > 0 ) {
 			set_post_thumbnail( $post_id, $previous );
 		} else {
 			delete_post_thumbnail( $post_id );
 		}
 
-		return array(
-			'status'  => 'reverted',
-			'type'    => 'featured_image_set',
-			'post_id' => $post_id,
-		);
-	}
-
-	/**
-	 * Complete a job with successful results.
-	 *
-	 * Merges the result into existing engine_data (preserving scheduler
-	 * metadata like task_type and context) and marks the job as completed.
-	 *
-	 * @param int   $jobId Job ID.
-	 * @param array $result Result data to merge into engine_data.
-	 */
-	protected function completeJob( int $jobId, array $result ): void {
-		$jobs_db = new Jobs();
-
-		// Merge result into existing engine_data to preserve scheduler metadata (task_type, context, etc.).
-		$existing = $jobs_db->retrieve_engine_data( $jobId );
-		$jobs_db->store_engine_data( $jobId, array_merge( $existing, $result ) );
-
-		// Mark job as completed
-		$jobs_db->complete_job( $jobId, JobStatus::COMPLETED );
-
-		do_action(
-			'datamachine_log',
-			'info',
-			"System Agent task completed successfully for job {$jobId}",
-			array(
-				'job_id'    => $jobId,
-				'task_type' => $this->getTaskType(),
-				'context'   => 'system',
-				'result'    => $result,
-			)
-		);
-	}
-
-	/**
-	 * Fail a job with error reason.
-	 *
-	 * Merges error details into existing engine_data (preserving scheduler
-	 * metadata like task_type and context) and marks the job as failed.
-	 *
-	 * @param int    $jobId  Job ID.
-	 * @param string $reason Failure reason.
-	 */
-	protected function failJob( int $jobId, string $reason ): void {
-		$jobs_db = new Jobs();
-
-		// Merge error into existing engine_data to preserve scheduler metadata.
-		$existing   = $jobs_db->retrieve_engine_data( $jobId );
-		$error_data = array_merge( $existing, array(
-			'error'     => $reason,
-			'failed_at' => current_time( 'mysql' ),
-			'task_type' => $this->getTaskType(),
-		) );
-		$jobs_db->store_engine_data( $jobId, $error_data );
-
-		// Mark job as failed
-		$jobs_db->complete_job( $jobId, JobStatus::failed( $reason )->toString() );
-
-		do_action(
-			'datamachine_log',
-			'error',
-			"System Agent task failed for job {$jobId}: {$reason}",
-			array(
-				'job_id'    => $jobId,
-				'task_type' => $this->getTaskType(),
-				'context'   => 'system',
-				'error'     => $reason,
-			)
-		);
-	}
-
-	/**
-	 * Reschedule a job for later execution.
-	 *
-	 * Useful for polling scenarios where the task needs to check status again.
-	 * Includes attempt tracking to prevent infinite rescheduling.
-	 *
-	 * @param int $jobId        Job ID.
-	 * @param int $delaySeconds Delay in seconds before next execution.
-	 */
-	protected function reschedule( int $jobId, int $delaySeconds = 10 ): void {
-		$jobs_db = new Jobs();
-
-		// Get current engine_data to track attempts
-		$job = $jobs_db->get_job( $jobId );
-		if ( ! $job ) {
-			$this->failJob( $jobId, 'Job not found for rescheduling' );
-			return;
-		}
-
-		$engine_data  = $job['engine_data'] ?? array();
-		$attempts     = ( $engine_data['attempts'] ?? 0 ) + 1;
-		$max_attempts = $engine_data['max_attempts'] ?? 24; // Default 24 attempts
-
-		// Check if we've exceeded max attempts
-		if ( $attempts > $max_attempts ) {
-			$this->failJob( $jobId, "Task exceeded maximum attempts ({$max_attempts})" );
-			return;
-		}
-
-		// Update attempt count
-		$engine_data['attempts']     = $attempts;
-		$engine_data['last_attempt'] = current_time( 'mysql' );
-		$jobs_db->store_engine_data( $jobId, $engine_data );
-
-		// Schedule next execution
-		if ( function_exists( 'as_schedule_single_action' ) ) {
-			$args = array(
-				'job_id' => $jobId,
-			);
-
-			as_schedule_single_action(
-				time() + $delaySeconds,
-				'datamachine_system_agent_handle_task',
-				$args,
-				'data-machine'
-			);
-
-			do_action(
-				'datamachine_log',
-				'debug',
-				"System Agent task rescheduled for job {$jobId} (attempt {$attempts}/{$max_attempts})",
-				array(
-					'job_id'        => $jobId,
-					'task_type'     => $this->getTaskType(),
-					'context'       => 'system',
-					'attempts'      => $attempts,
-					'max_attempts'  => $max_attempts,
-					'delay_seconds' => $delaySeconds,
-				)
-			);
-		} else {
-			$this->failJob( $jobId, 'Action Scheduler not available for rescheduling' );
-		}
+		return array( 'status' => 'reverted', 'type' => 'featured_image_set', 'post_id' => $post_id );
 	}
 }

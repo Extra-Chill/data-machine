@@ -6,13 +6,9 @@
  * schedules, Action Scheduler hooks, and the generic recurring-schedule
  * runtime that dispatches scheduled ticks into ephemeral DM jobs.
  *
- * Scheduling plumbing lives on RecurringScheduler (shared with FlowScheduling).
- * Schedule definitions live in the datamachine_recurring_schedules filter.
- * This provider only wires everything up — it no longer hardcodes per-task
- * scheduling logic.
- *
  * @package DataMachine\Engine\AI\System
  * @since 0.22.4
+ * @since 0.72.0 Removed datamachine_task_handle; all scheduling routes through execute-workflow.
  */
 
 namespace DataMachine\Engine\AI\System;
@@ -36,11 +32,16 @@ class SystemAgentServiceProvider {
 	/**
 	 * Legacy Action Scheduler hook for daily memory generation.
 	 *
-	 * Used solely to unschedule stale AS actions queued under the old name
-	 * on sites upgrading from before the recurring-scheduler refactor. New
-	 * scheduling runs under `datamachine_recurring_daily_memory_generation`.
+	 * Used solely to unschedule stale AS actions queued under the old name.
 	 */
 	private const LEGACY_DAILY_MEMORY_HOOK = 'datamachine_system_agent_daily_memory';
+
+	/**
+	 * Legacy task handle hook — unschedule on upgrade.
+	 *
+	 * @since 0.72.0
+	 */
+	private const LEGACY_TASK_HANDLE_HOOK = 'datamachine_task_handle';
 
 	/**
 	 * Constructor - registers all task infrastructure.
@@ -62,11 +63,6 @@ class SystemAgentServiceProvider {
 
 	/**
 	 * Register built-in recurring schedules.
-	 *
-	 * Schedules are registered separately from task handlers so a task
-	 * class stays a pure handler with no knowledge of how or how often
-	 * it runs. The same task handler can be referenced by zero or many
-	 * schedules (or none — it can be invoked on demand only).
 	 */
 	private function registerBuiltInSchedules(): void {
 		add_filter( 'datamachine_recurring_schedules', array( $this, 'getBuiltInSchedules' ) );
@@ -116,9 +112,6 @@ class SystemAgentServiceProvider {
 	/**
 	 * Initialize the TaskRegistry.
 	 *
-	 * Ensures the registry is loaded early in the WordPress lifecycle
-	 * so task handlers are available for scheduling.
-	 *
 	 * @since 0.37.0
 	 */
 	private function initializeRegistry(): void {
@@ -128,15 +121,20 @@ class SystemAgentServiceProvider {
 	/**
 	 * Register Action Scheduler hooks.
 	 *
-	 * Wires three classes of AS callback:
-	 *   - datamachine_task_handle         → run ephemeral jobs
+	 * Post-migration hooks:
 	 *   - datamachine_task_process_batch  → process batch chunks
-	 *   - datamachine_recurring_<task>    → one hook per registered schedule,
-	 *     turns each AS tick into an ephemeral job via TaskScheduler.
+	 *   - datamachine_task_retry          → retry polling tasks (e.g. image generation)
+	 *   - datamachine_system_agent_set_featured_image → deferred featured image
+	 *   - datamachine_recurring_<task>    → per-schedule ticks via TaskScheduler
+	 *
+	 * The legacy datamachine_task_handle hook is no longer registered.
+	 * All task scheduling routes through datamachine/execute-workflow.
+	 *
+	 * @since 0.72.0 Removed datamachine_task_handle; added datamachine_task_retry.
 	 */
 	private function registerActionSchedulerHooks(): void {
-		add_action( 'datamachine_task_handle', array( $this, 'handleScheduledTask' ) );
 		add_action( 'datamachine_task_process_batch', array( $this, 'handleBatchChunk' ) );
+		add_action( 'datamachine_task_retry', array( $this, 'handleTaskRetry' ) );
 		add_action(
 			'datamachine_system_agent_set_featured_image',
 			array( $this, 'handleDeferredFeaturedImage' ),
@@ -146,7 +144,7 @@ class SystemAgentServiceProvider {
 
 		// Generic per-schedule handler: one action hook per registered
 		// recurring schedule. Action Scheduler fires the hook; the closure
-		// enqueues an ephemeral DM job with the task's params.
+		// enqueues an ephemeral DM job with the task's params via TaskScheduler.
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
 			$hook        = RecurringScheduleRegistry::hookFor( $schedule );
 			$task_type   = $schedule['task_type'];
@@ -174,25 +172,19 @@ class SystemAgentServiceProvider {
 	/**
 	 * Reconcile all registered recurring schedules with Action Scheduler.
 	 *
-	 * For every registered schedule:
-	 *   - If enabled → ensure the matching AS action exists via
-	 *     RecurringScheduler::ensureSchedule().
-	 *   - If disabled → unschedule.
-	 *
-	 * Also unschedules any stale AS action still queued under the
-	 * pre-refactor daily-memory hook so upgrading sites don't carry a
-	 * zombie recurring action that fires forever with no handler.
-	 *
-	 * Deferred to action_scheduler_init to avoid calling AS functions
-	 * before the data store is initialized.
+	 * Also cleans up legacy hooks from pre-migration versions.
 	 *
 	 * @since 0.71.0
+	 * @since 0.72.0 Also unschedules legacy datamachine_task_handle.
 	 */
 	public function manageRecurringTaskSchedules(): void {
-		// Upgrade cleanup: strip any pending AS action queued under the
-		// legacy daily-memory hook before this refactor. One-shot migration;
-		// no-op on fresh installs.
+		// Upgrade cleanup: strip legacy hooks.
 		RecurringScheduler::unschedule( self::LEGACY_DAILY_MEMORY_HOOK, array() );
+
+		// Unschedule any orphaned datamachine_task_handle actions from pre-0.72.0.
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( self::LEGACY_TASK_HANDLE_HOOK );
+		}
 
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
 			$hook    = RecurringScheduleRegistry::hookFor( $schedule );
@@ -234,15 +226,6 @@ class SystemAgentServiceProvider {
 	}
 
 	/**
-	 * Handle Action Scheduler task callback.
-	 *
-	 * @param int $jobId Job ID from DM Jobs table.
-	 */
-	public function handleScheduledTask( int $jobId ): void {
-		TaskScheduler::handleTask( $jobId );
-	}
-
-	/**
 	 * Handle a batch chunk (Action Scheduler callback).
 	 *
 	 * @since 0.32.0
@@ -254,18 +237,82 @@ class SystemAgentServiceProvider {
 	}
 
 	/**
-	 * Handle deferred featured image assignment.
+	 * Handle task retry (Action Scheduler callback for polling tasks).
 	 *
-	 * Called when the System Agent finished image generation before the
-	 * pipeline published the post. Retries up to 12 times (3 minutes total
-	 * at 15-second intervals).
+	 * Used by tasks with polling patterns (e.g. ImageGenerationTask) that
+	 * call reschedule() to retry after a delay. Resolves the task type
+	 * from the job's engine_data and calls executeTask() directly.
+	 *
+	 * @since 0.72.0
+	 *
+	 * @param int $jobId Job ID from DM Jobs table.
+	 */
+	public function handleTaskRetry( int $jobId ): void {
+		$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+		$job     = $jobs_db->get_job( $jobId );
+
+		if ( ! $job ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				"Task retry: Job #{$jobId} not found",
+				array( 'job_id' => $jobId, 'context' => 'system' )
+			);
+			return;
+		}
+
+		$engine_data = $job['engine_data'] ?? array();
+		$task_type   = $engine_data['task_type'] ?? '';
+
+		if ( empty( $task_type ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				"Task retry: No task_type in engine_data for job #{$jobId}",
+				array( 'job_id' => $jobId, 'context' => 'system' )
+			);
+			return;
+		}
+
+		$handler_class = TaskRegistry::getHandler( $task_type );
+
+		if ( ! $handler_class || ! class_exists( $handler_class ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				"Task retry: Handler not found for '{$task_type}' (job #{$jobId})",
+				array( 'job_id' => $jobId, 'task_type' => $task_type, 'context' => 'system' )
+			);
+			return;
+		}
+
+		try {
+			$handler = new $handler_class();
+			$handler->executeTask( $jobId, $engine_data );
+		} catch ( \Throwable $e ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				"Task retry: Exception in '{$task_type}' (job #{$jobId}): " . $e->getMessage(),
+				array(
+					'job_id'    => $jobId,
+					'task_type' => $task_type,
+					'context'   => 'system',
+					'exception' => $e->getMessage(),
+				)
+			);
+		}
+	}
+
+	/**
+	 * Handle deferred featured image assignment.
 	 *
 	 * @param int $attachmentId   WordPress attachment ID.
 	 * @param int $pipelineJobId  Pipeline job ID to check for post_id.
 	 * @param int $attempt        Current attempt number.
 	 */
 	public function handleDeferredFeaturedImage( int $attachmentId, int $pipelineJobId, int $attempt = 1 ): void {
-		$max_attempts = 12; // 12 × 15s = 3 minutes
+		$max_attempts = 12;
 
 		$pipeline_engine_data = datamachine_get_engine_data( $pipelineJobId );
 		$post_id              = $pipeline_engine_data['post_id'] ?? 0;
@@ -285,7 +332,6 @@ class SystemAgentServiceProvider {
 				return;
 			}
 
-			// Reschedule.
 			if ( function_exists( 'as_schedule_single_action' ) ) {
 				as_schedule_single_action(
 					time() + 15,
@@ -301,7 +347,6 @@ class SystemAgentServiceProvider {
 			return;
 		}
 
-		// Don't overwrite existing featured image.
 		if ( has_post_thumbnail( $post_id ) ) {
 			return;
 		}

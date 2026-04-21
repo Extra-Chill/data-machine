@@ -5,11 +5,9 @@
  * Compresses oversized images and generates WebP variants using WordPress's
  * native image editor (Imagick or GD). No external API dependencies.
  *
- * Follows the diagnose → fix pattern: ImageOptimizationAbilities::diagnoseImages()
- * identifies issues, this task fixes individual images scheduled via batch.
- *
  * @package DataMachine\Engine\AI\System\Tasks
  * @since 0.42.0
+ * @since 0.72.0 Migrated to getWorkflow() + executeTask() contract.
  */
 
 namespace DataMachine\Engine\AI\System\Tasks;
@@ -19,8 +17,6 @@ defined( 'ABSPATH' ) || exit;
 class ImageOptimizationTask extends SystemTask {
 
 	/**
-	 * Get the task type identifier.
-	 *
 	 * @return string
 	 */
 	public function getTaskType(): string {
@@ -28,8 +24,6 @@ class ImageOptimizationTask extends SystemTask {
 	}
 
 	/**
-	 * Get task metadata for admin UI and TaskRegistry.
-	 *
 	 * @return array
 	 */
 	public static function getTaskMeta(): array {
@@ -45,8 +39,6 @@ class ImageOptimizationTask extends SystemTask {
 	}
 
 	/**
-	 * Whether this task supports undo.
-	 *
 	 * @return bool
 	 */
 	public function supportsUndo(): bool {
@@ -59,7 +51,7 @@ class ImageOptimizationTask extends SystemTask {
 	 * @param int   $jobId  DM Job ID.
 	 * @param array $params Engine data with attachment_id, quality, webp.
 	 */
-	public function execute( int $jobId, array $params ): void {
+	public function executeTask( int $jobId, array $params ): void {
 		$attachment_id = absint( $params['attachment_id'] ?? 0 );
 		$quality       = absint( $params['quality'] ?? 82 );
 		$webp          = $params['webp'] ?? true;
@@ -85,7 +77,6 @@ class ImageOptimizationTask extends SystemTask {
 			'webp_created'  => false,
 		);
 
-		// ── Compress the original file ────────────────────────────────
 		if ( in_array( $mime_type, array( 'image/jpeg', 'image/png', 'image/webp' ), true ) ) {
 			$compress_result = $this->compressImage( $file_path, $mime_type, $quality, $attachment_id );
 
@@ -105,7 +96,6 @@ class ImageOptimizationTask extends SystemTask {
 					'new_size'      => $compress_result['new_size'],
 				);
 
-				// Update attachment metadata with new file size.
 				$metadata = wp_get_attachment_metadata( $attachment_id );
 				if ( is_array( $metadata ) ) {
 					$metadata['filesize'] = $compress_result['new_size'];
@@ -114,7 +104,6 @@ class ImageOptimizationTask extends SystemTask {
 			}
 		}
 
-		// ── Generate WebP variant ─────────────────────────────────────
 		if ( $webp && in_array( $mime_type, array( 'image/jpeg', 'image/png' ), true ) ) {
 			$webp_result = $this->generateWebP( $file_path, $quality, $attachment_id );
 
@@ -139,89 +128,55 @@ class ImageOptimizationTask extends SystemTask {
 	}
 
 	/**
-	 * Compress an image file in place using WordPress image editor.
-	 *
-	 * @param string $file_path     Absolute path to image.
-	 * @param string $mime_type     MIME type of the image.
-	 * @param int    $quality       Compression quality (1-100).
-	 * @param int    $attachment_id Attachment ID for logging.
+	 * @param string $file_path     Absolute path.
+	 * @param string $mime_type     MIME type.
+	 * @param int    $quality       Compression quality.
+	 * @param int    $attachment_id Attachment ID.
 	 * @return array{success: bool, new_size: int, error: string}
 	 */
 	private function compressImage( string $file_path, string $mime_type, int $quality, int $attachment_id ): array {
 		$editor = wp_get_image_editor( $file_path );
 
 		if ( is_wp_error( $editor ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Image editor not available: ' . $editor->get_error_message(),
-			);
+			return array( 'success' => false, 'error' => 'Image editor not available: ' . $editor->get_error_message() );
 		}
 
 		$editor->set_quality( $quality );
-
-		// Save back to same path and format.
 		$saved = $editor->save( $file_path, $mime_type );
 
 		if ( is_wp_error( $saved ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Compression failed: ' . $saved->get_error_message(),
-			);
+			return array( 'success' => false, 'error' => 'Compression failed: ' . $saved->get_error_message() );
 		}
 
 		clearstatcache( true, $file_path );
-		$new_size = filesize( $file_path );
-
-		return array(
-			'success'  => true,
-			'new_size' => $new_size,
-		);
+		return array( 'success' => true, 'new_size' => filesize( $file_path ) );
 	}
 
 	/**
-	 * Generate a WebP variant of an image.
-	 *
-	 * @param string $file_path     Source image path.
-	 * @param int    $quality       WebP compression quality.
-	 * @param int    $attachment_id Attachment ID for logging.
+	 * @param string $file_path     Source image.
+	 * @param int    $quality       WebP quality.
+	 * @param int    $attachment_id Attachment ID.
 	 * @return array{success: bool, webp_path: string, webp_size: int, error: string}
 	 */
 	private function generateWebP( string $file_path, int $quality, int $attachment_id ): array {
 		$webp_path = preg_replace( '/\.(jpe?g|png)$/i', '.webp', $file_path );
 
-		// Skip if WebP already exists.
 		if ( file_exists( $webp_path ) ) {
-			return array(
-				'success'   => true,
-				'webp_path' => $webp_path,
-				'webp_size' => filesize( $webp_path ),
-			);
+			return array( 'success' => true, 'webp_path' => $webp_path, 'webp_size' => filesize( $webp_path ) );
 		}
 
 		$editor = wp_get_image_editor( $file_path );
-
 		if ( is_wp_error( $editor ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Image editor not available: ' . $editor->get_error_message(),
-			);
+			return array( 'success' => false, 'error' => 'Image editor not available: ' . $editor->get_error_message() );
 		}
 
 		$editor->set_quality( $quality );
-
 		$saved = $editor->save( $webp_path, 'image/webp' );
 
 		if ( is_wp_error( $saved ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'WebP generation failed: ' . $saved->get_error_message(),
-			);
+			return array( 'success' => false, 'error' => 'WebP generation failed: ' . $saved->get_error_message() );
 		}
 
-		return array(
-			'success'   => true,
-			'webp_path' => $saved['path'],
-			'webp_size' => filesize( $saved['path'] ),
-		);
+		return array( 'success' => true, 'webp_path' => $saved['path'], 'webp_size' => filesize( $saved['path'] ) );
 	}
 }

@@ -3,6 +3,7 @@
  * Tests for the ImageGenerationTask system task.
  *
  * @package DataMachine\Tests\Unit\AI\System\Tasks
+ * @since 0.72.0 Updated to use executeTask() instead of execute().
  */
 
 namespace DataMachine\Tests\Unit\AI\System\Tasks;
@@ -52,7 +53,15 @@ class ImageGenerationTaskTest extends WP_UnitTestCase {
 		$this->assertSame( 'image_generation', $this->task->getTaskType() );
 	}
 
-	public function test_execute_fails_when_prediction_id_missing(): void {
+	public function test_get_workflow_returns_system_task_step(): void {
+		$workflow = $this->task->getWorkflow( [ 'prediction_id' => 'test' ] );
+		$this->assertArrayHasKey( 'steps', $workflow );
+		$this->assertCount( 1, $workflow['steps'] );
+		$this->assertSame( 'system_task', $workflow['steps'][0]['type'] );
+		$this->assertSame( 'image_generation', $workflow['steps'][0]['handler_config']['task'] );
+	}
+
+	public function test_execute_task_fails_when_prediction_id_missing(): void {
 		$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
 		$job_id = $jobs_db->create_job( [
 			'pipeline_id' => 'direct',
@@ -65,13 +74,13 @@ class ImageGenerationTaskTest extends WP_UnitTestCase {
 			$this->markTestSkipped( 'Could not create test job.' );
 		}
 
-		$this->task->execute( (int) $job_id, [] );
+		$this->task->executeTask( (int) $job_id, [] );
 
 		$job = $jobs_db->get_job( (int) $job_id );
 		$this->assertStringContainsString( 'failed', strtolower( $job['status'] ?? '' ) );
 	}
 
-	public function test_execute_fails_when_api_key_not_configured(): void {
+	public function test_execute_task_fails_when_api_key_not_configured(): void {
 		delete_site_option( 'datamachine_image_generation_config' );
 
 		$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
@@ -86,7 +95,7 @@ class ImageGenerationTaskTest extends WP_UnitTestCase {
 			$this->markTestSkipped( 'Could not create test job.' );
 		}
 
-		$this->task->execute( (int) $job_id, [ 'prediction_id' => 'test-pred-123' ] );
+		$this->task->executeTask( (int) $job_id, [ 'prediction_id' => 'test-pred-123' ] );
 
 		$job = $jobs_db->get_job( (int) $job_id );
 		$this->assertStringContainsString( 'failed', strtolower( $job['status'] ?? '' ) );

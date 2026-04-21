@@ -3,6 +3,7 @@
  * Tests for the TaskScheduler.
  *
  * @package DataMachine\Tests\Unit\Engine
+ * @since 0.72.0 Updated: handleTask() removed, schedule() delegates to execute-workflow.
  */
 
 namespace DataMachine\Tests\Unit\Engine;
@@ -27,34 +28,6 @@ class TaskSchedulerTest extends WP_UnitTestCase {
 	public function test_schedule_returns_false_for_unknown_task(): void {
 		$result = TaskScheduler::schedule( 'nonexistent_task_type', array() );
 		$this->assertFalse( $result );
-	}
-
-	public function test_handle_task_handles_missing_job_gracefully(): void {
-		// Job ID 999999 should not exist — should not throw.
-		TaskScheduler::handleTask( 999999 );
-		$this->assertTrue( true );
-	}
-
-	public function test_handle_task_fails_job_with_missing_task_type(): void {
-		$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
-		$job_id  = $jobs_db->create_job( array(
-			'pipeline_id' => 'direct',
-			'flow_id'     => 'direct',
-			'source'      => 'system',
-			'label'       => 'Test Job',
-		) );
-
-		if ( ! $job_id ) {
-			$this->markTestSkipped( 'Could not create test job.' );
-		}
-
-		// Store engine_data without task_type.
-		$jobs_db->store_engine_data( (int) $job_id, array( 'foo' => 'bar' ) );
-
-		TaskScheduler::handleTask( (int) $job_id );
-
-		$job = $jobs_db->get_job( (int) $job_id );
-		$this->assertStringContainsString( 'failed', strtolower( $job['status'] ?? '' ) );
 	}
 
 	public function test_schedule_batch_returns_false_for_unknown_task(): void {

@@ -8,6 +8,7 @@
  *
  * @package DataMachine\Engine\AI\System\Tasks
  * @since 0.60.0
+ * @since 0.72.0 Migrated to getWorkflow() + executeTask() contract.
  */
 
 namespace DataMachine\Engine\AI\System\Tasks;
@@ -47,13 +48,10 @@ class AgentPingTask extends SystemTask {
 	/**
 	 * Execute agent ping task.
 	 *
-	 * Reads webhook config from params, resolves prompt (from queue or config),
-	 * and delegates to SendPingAbility for HTTP delivery.
-	 *
 	 * @param int   $jobId  DM Job ID.
 	 * @param array $params Engine data with webhook_url, prompt, auth settings, etc.
 	 */
-	public function execute( int $jobId, array $params ): void {
+	public function executeTask( int $jobId, array $params ): void {
 		$webhook_url = $params['webhook_url'] ?? '';
 		$prompt      = $params['prompt'] ?? '';
 
@@ -86,7 +84,6 @@ class AgentPingTask extends SystemTask {
 					)
 				);
 			} elseif ( empty( $prompt ) ) {
-				// Queue enabled but empty and no configured prompt — skip cleanly.
 				do_action(
 					'datamachine_log',
 					'info',

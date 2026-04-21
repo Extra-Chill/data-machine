@@ -14,6 +14,7 @@
  *
  * @package DataMachine\Engine\AI\System\Tasks
  * @since 0.32.0
+ * @since 0.72.0 Migrated to getWorkflow() + executeTask() contract.
  * @see https://github.com/Extra-Chill/data-machine/issues/357
  */
 
@@ -32,13 +33,10 @@ class DailyMemoryTask extends SystemTask {
 	/**
 	 * Execute daily memory maintenance.
 	 *
-	 * Single-phase operation: read MEMORY.md, gather activity context,
-	 * send one AI call to clean/compress/archive, write results.
-	 *
 	 * @param int   $jobId  Job ID from DM Jobs table.
 	 * @param array $params Task parameters from engine_data.
 	 */
-	public function execute( int $jobId, array $params ): void {
+	public function executeTask( int $jobId, array $params ): void {
 		if ( ! PluginSettings::get( 'daily_memory_enabled', false ) ) {
 			$this->completeJob(
 				$jobId,
@@ -172,10 +170,8 @@ class DailyMemoryTask extends SystemTask {
 		$oversize_factor = $original_size / max( $target_size, 1 );
 
 		if ( $oversize_factor > 2 ) {
-			// File is more than 2x over budget -- allow reduction down to half the target.
 			$min_size = intval( $target_size * 0.5 );
 		} else {
-			// File is near budget -- don't allow reduction below 10% of original.
 			$min_size = intval( $original_size * 0.10 );
 		}
 
@@ -199,8 +195,6 @@ class DailyMemoryTask extends SystemTask {
 			return;
 		}
 
-		// Write cleaned MEMORY.md through the configured store so this
-		// path stays backend-agnostic (works on disk and on swap-in stores).
 		$write_result = $memory->replace_all( $new_content );
 		if ( empty( $write_result['success'] ) ) {
 			$this->failJob( $jobId, $write_result['message'] ?? 'Failed to persist cleaned memory.' );
@@ -222,33 +216,7 @@ class DailyMemoryTask extends SystemTask {
 				'job_id'        => $jobId,
 			);
 
-			/**
-			 * Filters whether the default daily file archive write should be skipped.
-			 *
-			 * Developers can return `true` to handle archived content storage
-			 * themselves (e.g., creating a WordPress post or page, sending to
-			 * an external service, etc.). When `true` is returned, the flat-file
-			 * write to `daily/YYYY/MM/DD.md` is skipped entirely.
-			 *
-			 * For a complete storage backend override (read, list, search, delete),
-			 * see the `datamachine_daily_memory_storage` filter in DailyMemoryAbilities.
-			 *
-			 * @since 0.46.0
-			 *
-			 * @param bool   $handled Whether a handler has already stored the content.
-			 *                        Default false (flat-file write proceeds).
-			 * @param string $content The archived content extracted from MEMORY.md.
-			 * @param string $date    The archive date (YYYY-MM-DD).
-			 * @param array  $context {
-			 *     Additional context about the daily memory operation.
-			 *
-			 *     @type string $persistent    The persistent content remaining in MEMORY.md.
-			 *     @type int    $original_size Original MEMORY.md size in bytes.
-			 *     @type int    $new_size      New MEMORY.md size in bytes after cleanup.
-			 *     @type int    $archived_size Archived content size in bytes.
-			 *     @type int    $job_id        The job ID for this task execution.
-			 * }
-			 */
+			/** This filter is documented in DailyMemoryTask.php */
 			$handled = apply_filters(
 				'datamachine_daily_memory_pre_archive',
 				false,
@@ -311,20 +279,11 @@ class DailyMemoryTask extends SystemTask {
 			'setting_key'     => 'daily_memory_enabled',
 			'default_enabled' => false,
 			'supports_run'    => true,
-			// trigger / trigger_type are resolved by TaskRegistry from the
-			// matching schedule in RecurringScheduleRegistry. The task is a
-			// handler; it does not describe its own invocation pattern.
 		);
 	}
 
 	/**
-	 * Get the single editable prompt definition for this task.
-	 *
-	 * One prompt handles the full memory maintenance cycle: read MEMORY.md,
-	 * incorporate activity context, clean/compress, split into persistent
-	 * and archived sections.
-	 *
-	 * @return array Prompt definitions keyed by prompt key.
+	 * @return array
 	 * @since 0.41.0
 	 */
 	public function getPromptDefinitions(): array {
@@ -378,13 +337,6 @@ class DailyMemoryTask extends SystemTask {
 	}
 
 	/**
-	 * Parse the AI response into persistent and archived sections.
-	 *
-	 * Expects the AI output to contain two clearly delimited sections:
-	 * - `===PERSISTENT===` followed by the cleaned MEMORY.md content
-	 * - `===ARCHIVED===` followed by the session-specific content to archive
-	 *
-	 * @since 0.38.0
 	 * @param string $ai_output Raw AI response text.
 	 * @return array{persistent: string|null, archived: string|null}
 	 */
@@ -392,26 +344,21 @@ class DailyMemoryTask extends SystemTask {
 		$persistent = null;
 		$archived   = null;
 
-		// Find the delimiters.
 		$persistent_pos = strpos( $ai_output, '===PERSISTENT===' );
 		$archived_pos   = strpos( $ai_output, '===ARCHIVED===' );
 
 		if ( false !== $persistent_pos && false !== $archived_pos ) {
-			// Both sections present -- extract content between delimiters.
 			$persistent_start = $persistent_pos + strlen( '===PERSISTENT===' );
 
 			if ( $archived_pos > $persistent_pos ) {
-				// Normal order: PERSISTENT then ARCHIVED.
 				$persistent = trim( substr( $ai_output, $persistent_start, $archived_pos - $persistent_start ) );
 				$archived   = trim( substr( $ai_output, $archived_pos + strlen( '===ARCHIVED===' ) ) );
 			} else {
-				// Reversed order: ARCHIVED then PERSISTENT.
 				$archived_start = $archived_pos + strlen( '===ARCHIVED===' );
 				$archived       = trim( substr( $ai_output, $archived_start, $persistent_pos - $archived_start ) );
 				$persistent     = trim( substr( $ai_output, $persistent_start ) );
 			}
 		} elseif ( false !== $persistent_pos ) {
-			// Only PERSISTENT section -- no content to archive.
 			$persistent = trim( substr( $ai_output, $persistent_pos + strlen( '===PERSISTENT===' ) ) );
 		}
 
@@ -422,22 +369,18 @@ class DailyMemoryTask extends SystemTask {
 	}
 
 	/**
-	 * Gather today's activity context from jobs and chat sessions.
-	 *
-	 * @param array $params Task params (may contain target date override).
-	 * @return string Combined context text, empty if nothing happened.
+	 * @param array $params Task params.
+	 * @return string Combined context text.
 	 */
 	private function gatherContext( array $params ): string {
 		$date  = $params['date'] ?? gmdate( 'Y-m-d' );
 		$parts = array();
 
-		// Gather pipeline and system jobs from today.
 		$jobs_context = $this->getJobsContext( $date );
 		if ( ! empty( $jobs_context ) ) {
 			$parts[] = "## Jobs completed on {$date}\n\n{$jobs_context}";
 		}
 
-		// Gather chat sessions from today.
 		$chat_context = $this->getChatContext( $date );
 		if ( ! empty( $chat_context ) ) {
 			$parts[] = "## Chat sessions on {$date}\n\n{$chat_context}";
@@ -447,8 +390,6 @@ class DailyMemoryTask extends SystemTask {
 	}
 
 	/**
-	 * Get a summary of today's jobs.
-	 *
 	 * @param string $date Date string (Y-m-d).
 	 * @return string
 	 */
@@ -456,7 +397,6 @@ class DailyMemoryTask extends SystemTask {
 		global $wpdb;
 		$table = $wpdb->prefix . 'datamachine_jobs';
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$jobs = $wpdb->get_results(
 			$wpdb->prepare(
@@ -487,12 +427,6 @@ class DailyMemoryTask extends SystemTask {
 	}
 
 	/**
-	 * Get a summary of today's chat sessions.
-	 *
-	 * Routes through the conversation store so a swapped backend
-	 * (e.g. an AI Framework adapter on WordPress.com) can feed its
-	 * own session list into the daily summary.
-	 *
 	 * @param string $date Date string (Y-m-d).
 	 * @return string
 	 */
