@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.73.0] - 2026-04-21
+
+### Added
+- agent write --from-file + stdin support (#1149)
+
 ## [0.72.0] - 2026-04-21
 
 ### Added
