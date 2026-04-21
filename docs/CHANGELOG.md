@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **ActionPolicyResolver** (`inc/Engine/AI/Actions/ActionPolicyResolver.php`) — third sibling to `ToolPolicyResolver` and `MemoryPolicyResolver`. Decides whether a tool invocation executes directly, is staged for user approval (`preview`), or is refused (`forbidden`). Reads `agent_config.action_policy`. Resolution precedence: context-deny → per-agent tool → per-agent category → tool-declared default → mode preset → global default → `datamachine_tool_action_policy` filter.
+- **PendingActionStore** (generic successor to `PendingDiffStore`): kind-agnostic transient storage for tool invocations awaiting user resolution.
+- **PendingActionHelper** — convenience `stage()` method for tool handlers that need to produce a preview envelope. Fires `datamachine_pending_action_staged` action.
+- **ResolvePendingActionAbility** (`datamachine/resolve-pending-action`): generic resolver that dispatches by `kind` via the `datamachine_pending_action_handlers` filter. REST: `POST /datamachine/v1/actions/resolve`.
+- **`resolve_pending_action` chat tool** — thin BaseTool wrapper so the AI can close the loop on staged actions.
+- `datamachine-actions` ability category.
+
+### Changed
+- `ToolExecutor::executeTool()` now consults `ActionPolicyResolver` before invoking a tool handler. Forbidden invocations return an error; preview invocations stage via `PendingActionHelper` and return the standardized envelope instead of firing the handler. Tools without `action_policy` metadata resolve to `direct` — behavior is unchanged for all existing tools.
+- `ToolExecutor::executeTool()` accepts optional `$mode`, `$agent_id`, and `$client_context` parameters so the resolver has enough context. Old 4-arg callers continue to work (defaults: `mode=chat`, `agent_id=0`, `client_context=[]`).
+- `AIConversationLoop::execute()` forwards `$context`, `$payload['agent_id']`, and `$payload['client_context']` into `ToolExecutor::executeTool()`.
+
 ## [0.71.0] - 2026-04-21
 
 ### Added

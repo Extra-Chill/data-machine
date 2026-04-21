@@ -242,6 +242,11 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
 	new \DataMachine\Abilities\Content\InsertContentAbility();
 	new \DataMachine\Abilities\Content\ResolveDiffAbility();
+
+	// ActionPolicy + pending-action resolver (generic successor to ResolveDiffAbility).
+	new \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility();
+	new \DataMachine\Engine\AI\Actions\ResolvePendingAction();
+
 	// GitHubAbilities moved to data-machine-code extension.
 	new \DataMachine\Abilities\Fetch\FetchFilesAbility();
 	new \DataMachine\Abilities\Email\EmailAbilities();
