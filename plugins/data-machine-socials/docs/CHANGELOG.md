@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.10.0] - 2026-04-21
+
+### Added
+- broaden social ability permissions from can_manage to use_tools (refs #110)
+
+### Changed
+- Revert "docs(changelog): add Unreleased section for 0.9.1 → next release"
+- migrate aiToolCallback to new datamachine_tools signature
+- restrict homeboy to audit-only (no refactor/autofix)
+- Revert "Merge pull request #108 from Extra-Chill/ci/autofix/data-machine-socials/main"
+
 ## [0.9.1] - 2026-04-03
 
 ### Added
