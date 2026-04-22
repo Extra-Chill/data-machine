@@ -273,12 +273,30 @@ class ToolManager {
 				continue;
 			}
 
-			$tool_map = call_user_func(
-				$definition['_handler_callable'],
-				$handler_slug,
-				$handler_config,
-				$engine_data
-			);
+			// Handler callables follow two conventions:
+			// 1. Filter-style: ($tools, $handler_slug, $handler_config, $engine_data) — 4 params
+			// 2. Direct-style: ($handler_slug, $handler_config, $engine_data) — 3 params
+			// Detect by parameter count so both work correctly.
+			$callable         = $definition['_handler_callable'];
+			$callable_params  = $this->get_callable_param_count( $callable );
+			$uses_filter_convention = ( $callable_params >= 4 );
+
+			if ( $uses_filter_convention ) {
+				$tool_map = call_user_func(
+					$callable,
+					array(),           // $tools — filter callbacks expect this as first arg.
+					$handler_slug,
+					$handler_config,
+					$engine_data
+				);
+			} else {
+				$tool_map = call_user_func(
+					$callable,
+					$handler_slug,
+					$handler_config,
+					$engine_data
+				);
+			}
 
 			if ( ! is_array( $tool_map ) ) {
 				continue;
@@ -640,5 +658,26 @@ class ToolManager {
 				'mode' => ToolPolicyResolver::MODE_CHAT,
 			)
 		);
+	}
+
+	/**
+	 * Get the number of parameters a callable accepts.
+	 *
+	 * @param callable $callable Callable to inspect.
+	 * @return int Number of required+optional parameters, or 0 if unresolvable.
+	 */
+	private function get_callable_param_count( $callable ): int {
+		try {
+			if ( is_array( $callable ) ) {
+				$ref = new \ReflectionMethod( $callable[0], $callable[1] );
+			} elseif ( $callable instanceof \Closure || is_string( $callable ) ) {
+				$ref = new \ReflectionFunction( $callable );
+			} else {
+				return 0;
+			}
+			return $ref->getNumberOfParameters();
+		} catch ( \ReflectionException $e ) {
+			return 0;
+		}
 	}
 }

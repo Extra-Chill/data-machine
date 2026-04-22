@@ -331,7 +331,7 @@ class AIConversationLoop {
 						$tool_parameters,
 						$tools,
 						$payload,
-						$context,
+						$mode,
 						(int) ( $payload['agent_id'] ?? 0 ),
 						is_array( $payload['client_context'] ?? null ) ? $payload['client_context'] : array()
 					);
