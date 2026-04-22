@@ -44,7 +44,7 @@ class VoteRedditAbility {
 				array(
 					'label'               => __( 'Vote on Reddit Post or Comment', 'data-machine-socials' ),
 					'description'         => __( 'Upvote, downvote, or unvote a Reddit post or comment', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'thing_id', 'direction', 'access_token' ),

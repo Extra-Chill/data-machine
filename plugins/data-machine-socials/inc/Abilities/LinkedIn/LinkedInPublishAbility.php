@@ -55,7 +55,7 @@ class LinkedInPublishAbility {
 				array(
 					'label'               => __( 'Publish to LinkedIn', 'data-machine-socials' ),
 					'description'         => __( 'Post content to LinkedIn with optional media and article sharing', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'content' ),
@@ -110,7 +110,7 @@ class LinkedInPublishAbility {
 				array(
 					'label'               => __( 'LinkedIn Account Info', 'data-machine-socials' ),
 					'description'         => __( 'Get authenticated LinkedIn account details', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),

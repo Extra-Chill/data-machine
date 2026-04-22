@@ -43,7 +43,7 @@ class FacebookUpdateAbility {
 				array(
 					'label'               => __( 'Update Facebook Page Posts', 'data-machine-socials' ),
 					'description'         => __( 'Edit post message, hide/unhide posts, or delete posts from a Facebook Page', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

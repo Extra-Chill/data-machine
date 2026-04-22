@@ -43,7 +43,7 @@ class PinterestUpdateAbility {
 				array(
 					'label'               => __( 'Update Pinterest Pins', 'data-machine-socials' ),
 					'description'         => __( 'Delete pins from Pinterest boards', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

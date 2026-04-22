@@ -70,7 +70,7 @@ class PinterestBoardsAbility {
 				array(
 					'label'               => __( 'Sync Pinterest Boards', 'data-machine-socials' ),
 					'description'         => __( 'Sync Pinterest boards from API and cache locally', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),
@@ -96,7 +96,7 @@ class PinterestBoardsAbility {
 				array(
 					'label'               => __( 'List Pinterest Boards', 'data-machine-socials' ),
 					'description'         => __( 'Get cached Pinterest boards', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),
@@ -120,7 +120,7 @@ class PinterestBoardsAbility {
 				array(
 					'label'               => __( 'Pinterest Status', 'data-machine-socials' ),
 					'description'         => __( 'Get Pinterest integration status', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),

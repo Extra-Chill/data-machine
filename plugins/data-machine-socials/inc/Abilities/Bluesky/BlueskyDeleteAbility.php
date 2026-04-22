@@ -40,7 +40,7 @@ class BlueskyDeleteAbility {
 				array(
 					'label'               => __( 'Delete Bluesky Posts', 'data-machine-socials' ),
 					'description'         => __( 'Delete your Bluesky posts', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

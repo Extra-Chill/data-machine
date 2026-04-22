@@ -42,7 +42,7 @@ class LinkedInDeleteAbility {
 				array(
 					'label'               => __( 'Delete LinkedIn Post', 'data-machine-socials' ),
 					'description'         => __( 'Delete a post from LinkedIn', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'post_id' ),

@@ -41,7 +41,7 @@ class TwitterUpdateAbility {
 				array(
 					'label'               => __( 'Update Twitter', 'data-machine-socials' ),
 					'description'         => __( 'Delete tweets, retweet, unretweet, like, or unlike tweets', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

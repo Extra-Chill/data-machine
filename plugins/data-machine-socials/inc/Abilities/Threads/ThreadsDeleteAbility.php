@@ -42,7 +42,7 @@ class ThreadsDeleteAbility {
 				array(
 					'label'               => __( 'Delete Threads Posts', 'data-machine-socials' ),
 					'description'         => __( 'Delete your Threads posts', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

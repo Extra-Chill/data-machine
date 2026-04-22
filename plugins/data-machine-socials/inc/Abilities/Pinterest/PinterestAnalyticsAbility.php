@@ -65,7 +65,7 @@ class PinterestAnalyticsAbility {
 				array(
 					'label'               => __( 'Pinterest Analytics', 'data-machine-socials' ),
 					'description'         => __( 'Get analytics metrics for user account, pins, or boards. Includes impressions, saves, clicks, and engagement data.', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

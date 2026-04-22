@@ -42,7 +42,7 @@ class LinkedInReadAbility {
 				array(
 					'label'               => __( 'Read LinkedIn Posts', 'data-machine-socials' ),
 					'description'         => __( 'List recent posts or get a specific post from LinkedIn', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

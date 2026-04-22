@@ -55,7 +55,7 @@ class SubmitRedditAbility {
 				array(
 					'label'               => __( 'Submit Reddit Post', 'data-machine-socials' ),
 					'description'         => __( 'Submit a new text or link post to a Reddit subreddit', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'subreddit', 'title', 'access_token' ),

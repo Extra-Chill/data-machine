@@ -52,7 +52,7 @@ class PinterestPublishAbility {
 				array(
 					'label'               => __( 'Publish to Pinterest', 'data-machine-socials' ),
 					'description'         => __( 'Create a pin on Pinterest with image, title, description, and link', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'title', 'description', 'image_url' ),

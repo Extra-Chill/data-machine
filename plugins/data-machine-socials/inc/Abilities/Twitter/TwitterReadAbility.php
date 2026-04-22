@@ -45,7 +45,7 @@ class TwitterReadAbility {
 				array(
 					'label'               => __( 'Read Tweets', 'data-machine-socials' ),
 					'description'         => __( 'List recent tweets, get a specific tweet, or get mentions', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

@@ -42,7 +42,7 @@ class BlueskyReadAbility {
 				array(
 					'label'               => __( 'Read Bluesky Posts', 'data-machine-socials' ),
 					'description'         => __( 'List recent Bluesky posts, get a post thread, or view profile', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

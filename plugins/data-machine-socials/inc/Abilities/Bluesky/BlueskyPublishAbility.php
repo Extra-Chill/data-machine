@@ -51,7 +51,7 @@ class BlueskyPublishAbility {
 				array(
 					'label'               => __( 'Publish to Bluesky', 'data-machine-socials' ),
 					'description'         => __( 'Post content to Bluesky with optional media', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'content' ),
@@ -100,7 +100,7 @@ class BlueskyPublishAbility {
 				array(
 					'label'               => __( 'Bluesky Account Info', 'data-machine-socials' ),
 					'description'         => __( 'Get authenticated Bluesky account details', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),

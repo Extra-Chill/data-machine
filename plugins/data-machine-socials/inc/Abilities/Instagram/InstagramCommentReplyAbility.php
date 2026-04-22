@@ -44,7 +44,7 @@ class InstagramCommentReplyAbility {
 				array(
 					'label'               => __( 'Reply to Instagram Comment', 'data-machine-socials' ),
 					'description'         => __( 'Reply to a specific Instagram comment', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

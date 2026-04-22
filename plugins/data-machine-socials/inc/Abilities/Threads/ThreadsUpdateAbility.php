@@ -43,7 +43,7 @@ class ThreadsUpdateAbility {
 				array(
 					'label'               => __( 'Update Threads Posts', 'data-machine-socials' ),
 					'description'         => __( 'Delete Threads posts', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

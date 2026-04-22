@@ -48,7 +48,7 @@ class InstagramUpdateAbility {
 				array(
 					'label'               => __( 'Update Instagram Media', 'data-machine-socials' ),
 					'description'         => __( 'Edit caption, delete, or archive Instagram posts', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

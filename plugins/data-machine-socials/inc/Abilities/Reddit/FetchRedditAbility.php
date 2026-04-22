@@ -42,7 +42,7 @@ class FetchRedditAbility {
 				array(
 					'label'               => __( 'Fetch Reddit Posts', 'data-machine-socials' ),
 					'description'         => __( 'Fetch posts from Reddit subreddits with filtering and pagination', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'access_token' ),

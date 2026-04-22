@@ -42,7 +42,7 @@ class PinterestDeleteAbility {
 				array(
 					'label'               => __( 'Delete Pinterest Pins', 'data-machine-socials' ),
 					'description'         => __( 'Delete pins from your Pinterest boards', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

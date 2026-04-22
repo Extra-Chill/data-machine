@@ -51,7 +51,7 @@ class ThreadsPublishAbility {
 				array(
 					'label'               => __( 'Publish to Threads', 'data-machine-socials' ),
 					'description'         => __( 'Post content to Meta Threads with optional media', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'content' ),
@@ -97,7 +97,7 @@ class ThreadsPublishAbility {
 				array(
 					'label'               => __( 'Threads Account Info', 'data-machine-socials' ),
 					'description'         => __( 'Get authenticated Threads account details', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),

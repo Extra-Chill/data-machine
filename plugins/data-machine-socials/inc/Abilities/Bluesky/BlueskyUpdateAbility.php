@@ -41,7 +41,7 @@ class BlueskyUpdateAbility {
 				array(
 					'label'               => __( 'Update Bluesky Posts', 'data-machine-socials' ),
 					'description'         => __( 'Delete posts or like/unlike posts on Bluesky', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

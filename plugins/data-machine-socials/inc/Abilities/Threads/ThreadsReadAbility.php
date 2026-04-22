@@ -48,7 +48,7 @@ class ThreadsReadAbility {
 				array(
 					'label'               => __( 'Read Threads Posts', 'data-machine-socials' ),
 					'description'         => __( 'List recent Threads posts or get details for a specific thread', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

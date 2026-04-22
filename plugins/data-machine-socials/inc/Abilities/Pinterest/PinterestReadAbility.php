@@ -44,7 +44,7 @@ class PinterestReadAbility {
 				array(
 					'label'               => __( 'Read Pinterest Pins', 'data-machine-socials' ),
 					'description'         => __( 'List pins, get pin details, list boards, or list board pins', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

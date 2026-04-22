@@ -50,7 +50,7 @@ class ReplyRedditAbility {
 				array(
 					'label'               => __( 'Reply to Reddit Post or Comment', 'data-machine-socials' ),
 					'description'         => __( 'Post a reply to a Reddit post or comment', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'thing_id', 'text', 'access_token' ),

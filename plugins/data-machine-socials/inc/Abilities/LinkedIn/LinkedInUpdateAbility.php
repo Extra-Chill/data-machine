@@ -42,7 +42,7 @@ class LinkedInUpdateAbility {
 				array(
 					'label'               => __( 'Update LinkedIn Post', 'data-machine-socials' ),
 					'description'         => __( 'Update the commentary of an existing LinkedIn post', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'post_id', 'commentary' ),

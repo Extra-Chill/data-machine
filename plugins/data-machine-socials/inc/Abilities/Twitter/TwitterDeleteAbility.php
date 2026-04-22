@@ -40,7 +40,7 @@ class TwitterDeleteAbility {
 				array(
 					'label'               => __( 'Delete Tweets', 'data-machine-socials' ),
 					'description'         => __( 'Delete tweets from your account', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

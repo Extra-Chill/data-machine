@@ -83,7 +83,7 @@ class InstagramPublishAbility {
 				array(
 					'label'               => __( 'Publish to Instagram', 'data-machine-socials' ),
 				'description'         => __( 'Post content to Instagram — supports single image, carousel (up to 10 images), Reel (video), and Story (image or video)', 'data-machine-socials' ),
-				'category'            => 'datamachine',
+				'category'            => 'datamachine-socials',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'content' ),
@@ -166,7 +166,7 @@ class InstagramPublishAbility {
 				array(
 					'label'               => __( 'Instagram Account Info', 'data-machine-socials' ),
 					'description'         => __( 'Get authenticated Instagram account details', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),

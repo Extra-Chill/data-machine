@@ -26,6 +26,23 @@ define( 'DATAMACHINE_SOCIALS_URL', plugin_dir_url( __FILE__ ) );
 require_once __DIR__ . '/vendor/autoload.php';
 
 /**
+ * Register the Data Machine Socials ability category.
+ *
+ * Hooked on wp_abilities_api_categories_init so the category is
+ * available before any social abilities are registered.
+ */
+function datamachine_socials_register_ability_category() {
+	wp_register_ability_category(
+		'datamachine-socials',
+		array(
+			'label'       => __( 'Socials', 'data-machine-socials' ),
+			'description' => __( 'Social media publishing, reading, and engagement across all supported platforms.', 'data-machine-socials' ),
+		)
+	);
+}
+add_action( 'wp_abilities_api_categories_init', 'datamachine_socials_register_ability_category' );
+
+/**
  * Bootstrap the plugin after all plugins are loaded.
  *
  * Data Machine core must be active — check at plugins_loaded time

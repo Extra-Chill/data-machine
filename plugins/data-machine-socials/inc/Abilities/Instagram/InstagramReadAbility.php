@@ -60,7 +60,7 @@ class InstagramReadAbility {
 				array(
 					'label'               => __( 'Read Instagram Media', 'data-machine-socials' ),
 					'description'         => __( 'List recent Instagram posts or get details for a specific post', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

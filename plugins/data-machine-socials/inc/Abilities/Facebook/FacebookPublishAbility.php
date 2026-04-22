@@ -51,7 +51,7 @@ class FacebookPublishAbility {
 				array(
 					'label'               => __( 'Publish to Facebook', 'data-machine-socials' ),
 					'description'         => __( 'Post content to Facebook Pages with optional media', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'content' ),
@@ -111,7 +111,7 @@ class FacebookPublishAbility {
 				array(
 					'label'               => __( 'Facebook Pages', 'data-machine-socials' ),
 					'description'         => __( 'Get connected Facebook pages', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),

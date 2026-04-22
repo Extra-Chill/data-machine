@@ -42,7 +42,7 @@ class FacebookDeleteAbility {
 				array(
 					'label'               => __( 'Delete Facebook Posts', 'data-machine-socials' ),
 					'description'         => __( 'Delete posts from your Facebook Page', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

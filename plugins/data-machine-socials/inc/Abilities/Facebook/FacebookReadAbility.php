@@ -46,7 +46,7 @@ class FacebookReadAbility {
 				array(
 					'label'               => __( 'Read Facebook Page Posts', 'data-machine-socials' ),
 					'description'         => __( 'List recent Facebook Page posts or get details for a specific post', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

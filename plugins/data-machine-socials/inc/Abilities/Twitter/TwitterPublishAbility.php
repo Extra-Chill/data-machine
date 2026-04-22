@@ -54,7 +54,7 @@ class TwitterPublishAbility {
 				array(
 					'label'               => __( 'Publish to Twitter', 'data-machine-socials' ),
 					'description'         => __( 'Post content to Twitter/X with optional media', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'content' ),
@@ -110,7 +110,7 @@ class TwitterPublishAbility {
 				array(
 					'label'               => __( 'Twitter Account Info', 'data-machine-socials' ),
 					'description'         => __( 'Get authenticated Twitter account details', 'data-machine-socials' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(),
