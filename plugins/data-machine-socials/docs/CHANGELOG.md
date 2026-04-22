@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.11.1] - 2026-04-22
+
+### Fixed
+- register datamachine-socials ability category and update all abilities
+
 ## [0.11.0] - 2026-04-21
 
 ### Added
