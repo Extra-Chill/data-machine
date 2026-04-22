@@ -144,6 +144,58 @@ class PostTracking {
 	}
 
 	/**
+	 * Resolve the agent ID for a DM-produced post.
+	 *
+	 * Reads _datamachine_post_flow_id from post meta and resolves the
+	 * agent ID via the flows table. datamachine_flows.agent_id is set at
+	 * flow creation (see Flows::create_flow) and is not mutated by
+	 * update_flow, so the resolution is stable.
+	 *
+	 * @param int $post_id WordPress post ID.
+	 * @return int Agent ID, or 0 if the post was not produced by DM,
+	 *             the flow row has since been deleted, or the flow has
+	 *             no agent_id set.
+	 */
+	public static function getAgentIdForPost( int $post_id ): int {
+		if ( $post_id <= 0 ) {
+			return 0;
+		}
+
+		$flow_id = (int) get_post_meta( $post_id, self::FLOW_ID_META_KEY, true );
+		if ( $flow_id <= 0 ) {
+			return 0;
+		}
+
+		$flow = ( new Flows() )->get_flow( $flow_id );
+		if ( ! $flow || empty( $flow['agent_id'] ) ) {
+			return 0;
+		}
+
+		return (int) $flow['agent_id'];
+	}
+
+	/**
+	 * Collect the flow IDs that belong to a given agent.
+	 *
+	 * Used to translate "posts produced by agent N" queries into
+	 * meta_query clauses on _datamachine_post_flow_id, since agent_id
+	 * is not stored on posts. datamachine_flows.agent_id is set at flow
+	 * creation and is not mutated by update_flow.
+	 *
+	 * @param int $agent_id Agent ID.
+	 * @return int[] Flow IDs belonging to the agent. Empty array if none.
+	 */
+	public static function getFlowIdsForAgent( int $agent_id ): array {
+		if ( $agent_id <= 0 ) {
+			return array();
+		}
+
+		$flows = ( new Flows() )->get_all_flows( null, $agent_id );
+
+		return array_map( static fn ( array $flow ): int => (int) $flow['flow_id'], $flows );
+	}
+
+	/**
 	 * Extract post_id from a handler result array.
 	 *
 	 * Checks both top-level and nested data.post_id locations,
