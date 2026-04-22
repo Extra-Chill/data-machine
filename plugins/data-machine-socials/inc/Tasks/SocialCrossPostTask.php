@@ -3,18 +3,20 @@
  * Social Cross-Post Task for Data Machine Task System.
  *
  * Async cross-posting of published content to social platforms.
- * Fires via Action Scheduler after a post transitions to 'publish'.
+ * Fires via the workflow engine (datamachine/execute-workflow).
  * Each platform is posted sequentially within a single job.
  *
  * @package DataMachineSocials\Tasks
- * @since 0.9.0
+ * @since   0.9.0
+ * @since   0.12.0 Removed rest_do_request(); calls Publisher directly.
  */
 
 namespace DataMachineSocials\Tasks;
 
-defined( 'ABSPATH' ) || exit;
-
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
+use DataMachineSocials\Publisher;
+
+defined( 'ABSPATH' ) || exit;
 
 class SocialCrossPostTask extends SystemTask {
 
@@ -25,19 +27,14 @@ class SocialCrossPostTask extends SystemTask {
 	 * @param array $params Task parameters from engine_data.
 	 */
 	public function executeTask( int $jobId, array $params ): void {
-		$post_id   = absint( $params['post_id'] ?? 0 );
-		$platforms = $params['platforms'] ?? array();
-		$caption   = $params['caption'] ?? '';
-		$images    = $params['images'] ?? array();
+		$post_id      = absint( $params['post_id'] ?? 0 );
+		$platforms    = $params['platforms'] ?? array();
+		$caption      = $params['caption'] ?? '';
+		$images       = $params['images'] ?? array();
 		$media_kind   = $params['media_kind'] ?? 'image';
 		$aspect_ratio = $params['aspect_ratio'] ?? '4:5';
 		$video_url    = $params['video_url'] ?? '';
 		$cover_url    = $params['cover_url'] ?? '';
-
-		if ( $post_id <= 0 ) {
-			$this->failJob( $jobId, 'Missing or invalid post_id' );
-			return;
-		}
 
 		if ( empty( $platforms ) || ! is_array( $platforms ) ) {
 			$this->failJob( $jobId, 'No platforms specified' );
@@ -49,76 +46,55 @@ class SocialCrossPostTask extends SystemTask {
 			return;
 		}
 
-		// Call the cross-post REST endpoint internally.
-		$request = new \WP_REST_Request( 'POST', '/datamachine/v1/socials/post' );
-		$request->set_header( 'Content-Type', 'application/json' );
-		$request->set_body( wp_json_encode( array(
-			'platforms'     => $platforms,
-			'caption'       => $caption,
-			'images'        => $images,
-			'aspect_ratio'  => $aspect_ratio,
-			'media_kind'    => $media_kind,
-			'video_url'     => $video_url,
-			'cover_url'     => $cover_url,
-			'post_id'       => $post_id,
-			'share_to_feed' => true,
-		) ) );
+		// Publish directly via Publisher utility (no REST round-trip).
+		$publish_result = Publisher::cross_post( $params );
 
-		$response = rest_do_request( $request );
-		$data     = $response->get_data();
-
-		// Build per-platform result log.
-		$log      = array();
-		$failures = array();
-
-		if ( isset( $data['results'] ) && is_array( $data['results'] ) ) {
-			foreach ( $data['results'] as $result ) {
-				$entry = array(
-					'platform'  => $result['platform'] ?? 'unknown',
-					'success'   => $result['success'] ?? false,
-					'post_id'   => $result['platform_post_id'] ?? '',
-					'url'       => $result['platform_url'] ?? '',
-					'error'     => $result['error'] ?? '',
-					'timestamp' => gmdate( 'c' ),
-				);
-				$log[] = $entry;
-
-				if ( empty( $result['success'] ) ) {
-					$failures[] = ( $result['platform'] ?? 'unknown' ) . ': ' . ( $result['error'] ?? 'Unknown error' );
-				}
-			}
-		} else {
-			$log[] = array(
-				'platform'  => 'system',
-				'success'   => false,
-				'error'     => $data['error'] ?? 'Cross-post API returned unexpected response.',
-				'timestamp' => gmdate( 'c' ),
-			);
-			$failures[] = $data['error'] ?? 'Unexpected response';
-		}
-
-		// Store results in post meta.
-		$existing_log = get_post_meta( $post_id, '_studio_social_publish_log', true ) ?: array();
-		$merged_log   = array_merge( $existing_log, $log );
-		update_post_meta( $post_id, '_studio_social_publish_log', $merged_log );
-
-		// Complete or fail the job.
-		$successes = array_filter( $log, function ( $entry ) {
-			return ! empty( $entry['success'] );
-		} );
-
-		if ( empty( $successes ) ) {
-			$this->failJob( $jobId, 'All platforms failed: ' . implode( '; ', $failures ) );
+		if ( ! empty( $publish_result['error'] ) && empty( $publish_result['results'] ) ) {
+			// Validation-level failure (e.g. missing video_url for reel).
+			$this->failJob( $jobId, $publish_result['error'] );
 			return;
 		}
 
-		$this->completeJob( $jobId, array(
-			'post_id'       => $post_id,
+		$results  = $publish_result['results'] ?? array();
+		$errors   = $publish_result['errors'] ?? array();
+		$successes = array_filter( $results, fn( $r ) => ! empty( $r['success'] ) );
+
+		// Build normalized log entries.
+		$log = array();
+		foreach ( $results as $result ) {
+			$log[] = array(
+				'platform'  => $result['platform'] ?? 'unknown',
+				'success'   => $result['success'] ?? false,
+				'post_id'   => $result['platform_post_id'] ?? '',
+				'url'       => $result['platform_url'] ?? '',
+				'error'     => $result['error'] ?? '',
+				'timestamp' => gmdate( 'c' ),
+			);
+		}
+
+		// Store results in post meta when post_id is available.
+		if ( $post_id ) {
+			$existing_log = get_post_meta( $post_id, '_studio_social_publish_log', true ) ?: array();
+			$merged_log   = array_merge( $existing_log, $log );
+			update_post_meta( $post_id, '_studio_social_publish_log', $merged_log );
+		}
+
+		// Write full results to job engine_data.
+		$completion_data = array(
+			'post_id'       => $post_id ?: null,
 			'platforms'     => $platforms,
-			'results'       => $log,
+			'results'       => $results,
+			'log'           => $log,
 			'success_count' => count( $successes ),
-			'failure_count' => count( $failures ),
-		) );
+			'failure_count' => count( $errors ),
+		);
+
+		if ( empty( $successes ) ) {
+			$this->failJob( $jobId, 'All platforms failed: ' . implode( '; ', $errors ) );
+			return;
+		}
+
+		$this->completeJob( $jobId, $completion_data );
 	}
 
 	/**

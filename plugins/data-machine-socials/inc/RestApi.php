@@ -9,6 +9,7 @@
 namespace DataMachineSocials;
 
 use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Engine\Tasks\TaskScheduler;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -114,6 +115,17 @@ class RestApi {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( __CLASS__, 'get_post_status' ),
+				'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
+			)
+		);
+
+		// Get job status by job ID
+		register_rest_route(
+			self::NAMESPACE,
+			'/socials/jobs/(?P<job_id>\d+)',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( __CLASS__, 'get_job_status' ),
 				'permission_callback' => array( __CLASS__, 'check_edit_permission' ),
 			)
 		);
@@ -1001,10 +1013,18 @@ class RestApi {
 	}
 
 	/**
-	 * Cross-platform post
+	 * Cross-platform post (always async)
+	 *
+	 * Validates input and schedules a DM job via TaskScheduler.
+	 * The job executes via the workflow engine (datamachine/execute-workflow)
+	 * which routes to SocialCrossPostTask::executeTask().
+	 *
+	 * @param \WP_REST_Request $request Request object.
+	 * @return \WP_REST_Response
 	 */
 	public static function cross_post( \WP_REST_Request $request ) {
-		$params        = $request->get_json_params();
+		$params = $request->get_json_params();
+
 		$platforms     = $params['platforms'] ?? array();
 		$images        = $params['images'] ?? array();
 		$caption       = sanitize_textarea_field( $params['caption'] ?? '' );
@@ -1056,126 +1076,86 @@ class RestApi {
 			);
 		}
 
-		$results = array();
-		$errors  = array();
-
-		// Get source URL.
-		$source_url = $post_id ? get_permalink( $post_id ) : '';
-
-		// Build extra params for reel publishing.
-		$extra = array(
+		$task_params = array(
+			'post_id'       => $post_id,
+			'platforms'     => $platforms,
+			'caption'       => $caption,
+			'images'        => $images,
+			'aspect_ratio'  => $aspect_ratio,
 			'media_kind'    => $media_kind,
 			'video_url'     => $video_url,
 			'cover_url'     => $cover_url,
 			'share_to_feed' => $share_to_feed,
 		);
 
-		// Post to each platform.
-		foreach ( $platforms as $platform ) {
-			$result    = self::post_to_platform( $platform, $images, $caption, $source_url, $extra );
-			$results[] = $result;
+		$context = array(
+			'user_id' => get_current_user_id(),
+			'origin'  => 'rest_api',
+		);
 
-			if ( ! $result['success'] ) {
-				$errors[] = $platform . ': ' . $result['error'];
-			}
+		$job_id = TaskScheduler::schedule( 'social_cross_post', $task_params, $context );
 
-			// Track successful shares via SocialShareTracker.
-			if ( $post_id && ! empty( $result['success'] ) ) {
-				\DataMachineSocials\Tracking\SocialShareTracker::record_from_result(
-					$post_id,
-					$platform,
-					$result,
-					array( 'media_kind' => $media_kind )
-				);
-			}
+		if ( ! $job_id ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'error'   => 'Failed to schedule cross-post job',
+				),
+				500
+			);
+		}
+
+		// Store job reference on post when available.
+		if ( $post_id ) {
+			update_post_meta( $post_id, '_studio_social_job_id', $job_id );
 		}
 
 		return new \WP_REST_Response(
 			array(
-				'success' => empty( $errors ),
-				'results' => $results,
-				'errors'  => $errors ? $errors : null,
+				'success' => true,
+				'job_id'  => $job_id,
+				'status'  => 'pending',
 			)
 		);
 	}
 
 	/**
-	 * Post to individual platform.
+	 * Get job status by job ID.
 	 *
-	 * @param string $platform   Platform slug.
-	 * @param array  $images     Array of image objects with 'url' key.
-	 * @param string $caption    Post caption.
-	 * @param string $source_url Source URL to attribute.
-	 * @param array  $extra      Extra params (media_kind, video_url, cover_url, share_to_feed).
-	 * @return array Result.
+	 * Returns the DM job record including engine_data (per-platform results).
+	 * Thin wrapper around datamachine/jobs-get ability.
+	 *
+	 * @param \WP_REST_Request $request Request object.
+	 * @return \WP_REST_Response
 	 */
-	private static function post_to_platform( string $platform, array $images, string $caption, string $source_url, array $extra = array() ): array {
-		$ability_slug = "datamachine/{$platform}-publish";
+	public static function get_job_status( \WP_REST_Request $request ) {
+		$job_id = intval( $request->get_param( 'job_id' ) );
 
-		$ability = wp_get_ability( $ability_slug );
+		$ability = wp_get_ability( 'datamachine/jobs-get' );
 
 		if ( ! $ability ) {
-			return array(
-				'platform' => $platform,
-				'success'  => false,
-				'error'    => "Ability {$ability_slug} not registered",
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'error'   => 'Job lookup ability not available',
+				),
+				500
 			);
 		}
 
-		$image_urls = array_map(
-			function ( $img ) {
-				return $img['url'] ?? '';
-			},
-			$images
-		);
+		$result = $ability->execute( array( 'job_id' => $job_id ) );
 
-		$input = array(
-			'content'    => $caption,
-			'image_urls' => $image_urls,
-			'source_url' => $source_url,
-		);
-
-		// Pass through media-kind-specific params when applicable.
-		$media_kind = $extra['media_kind'] ?? 'image';
-		if ( 'reel' === $media_kind ) {
-			$input['media_kind']    = 'reel';
-			$input['video_url']     = $extra['video_url'] ?? '';
-			$input['cover_url']     = $extra['cover_url'] ?? '';
-			$input['share_to_feed'] = $extra['share_to_feed'] ?? true;
-		} elseif ( 'story' === $media_kind ) {
-			$input['media_kind'] = 'story';
-			$input['video_url']  = $extra['video_url'] ?? '';
-			// For stories, image comes from story_image_url or first image_url.
-			if ( ! empty( $image_urls[0] ) && empty( $extra['video_url'] ) ) {
-				$input['story_image_url'] = $image_urls[0];
-			}
-		}
-
-		$result = $ability->execute( $input );
-
-		if ( is_wp_error( $result ) ) {
-			return array(
-				'platform' => $platform,
-				'success'  => false,
-				'error'    => $result->get_error_message(),
+		if ( is_wp_error( $result ) || empty( $result['success'] ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'error'   => $result['error'] ?? 'Job not found',
+				),
+				404
 			);
 		}
 
-		if ( ! empty( $result['success'] ) ) {
-			return array(
-				'platform'         => $platform,
-				'success'          => true,
-				'platform_post_id' => \DataMachineSocials\Tracking\SocialShareTracker::extract_platform_post_id( $platform, $result ),
-				'platform_url'     => \DataMachineSocials\Tracking\SocialShareTracker::extract_platform_url( $platform, $result ),
-				'media_kind'       => $result['media_kind'] ?? null,
-			);
-		}
-
-		return array(
-			'platform' => $platform,
-			'success'  => false,
-			'error'    => $result['error'] ?? 'Unknown error',
-		);
+		return new \WP_REST_Response( $result );
 	}
 
 	/**
