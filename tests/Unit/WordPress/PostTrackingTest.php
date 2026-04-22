@@ -108,17 +108,86 @@ class PostTrackingTest extends WP_UnitTestCase {
 		$this->assertSame( 0, PostTracking::extractPostId( array( 'data' => array( 'post_id' => 0 ) ) ) );
 	}
 
-	private function create_flow( int $pipeline_id, string $flow_name = 'Test Flow' ): int {
-		$flows_db = new Flows();
-		$flow_id  = $flows_db->create_flow(
-			array(
-				'pipeline_id'       => $pipeline_id,
-				'user_id'           => get_current_user_id(),
-				'flow_name'         => $flow_name,
-				'flow_config'       => array(),
-				'scheduling_config' => array(),
-			)
+	public function test_get_agent_id_for_post_resolves_via_flow_row(): void {
+		$pipeline_id = 444;
+		$agent_id    = 42;
+		$flow_id     = $this->create_flow( $pipeline_id, 'Agent Flow', $agent_id );
+
+		$post_id = self::factory()->post->create();
+		update_post_meta( $post_id, PostTracking::FLOW_ID_META_KEY, $flow_id );
+
+		$this->assertSame( $agent_id, PostTracking::getAgentIdForPost( $post_id ) );
+	}
+
+	public function test_get_agent_id_for_post_returns_zero_when_flow_row_missing(): void {
+		$post_id = self::factory()->post->create();
+		update_post_meta( $post_id, PostTracking::FLOW_ID_META_KEY, 987654321 );
+
+		$this->assertSame( 0, PostTracking::getAgentIdForPost( $post_id ) );
+	}
+
+	public function test_get_agent_id_for_post_returns_zero_when_flow_has_no_agent(): void {
+		$pipeline_id = 555;
+		$flow_id     = $this->create_flow( $pipeline_id );
+
+		$post_id = self::factory()->post->create();
+		update_post_meta( $post_id, PostTracking::FLOW_ID_META_KEY, $flow_id );
+
+		$this->assertSame( 0, PostTracking::getAgentIdForPost( $post_id ) );
+	}
+
+	public function test_get_agent_id_for_post_returns_zero_for_untracked_post(): void {
+		$post_id = self::factory()->post->create();
+		$this->assertSame( 0, PostTracking::getAgentIdForPost( $post_id ) );
+	}
+
+	public function test_get_agent_id_for_post_returns_zero_for_invalid_post_id(): void {
+		$this->assertSame( 0, PostTracking::getAgentIdForPost( 0 ) );
+		$this->assertSame( 0, PostTracking::getAgentIdForPost( -5 ) );
+	}
+
+	public function test_get_flow_ids_for_agent_returns_flow_ids(): void {
+		$a = $this->create_flow( 100, 'Agent 7 Flow A', 7 );
+		$b = $this->create_flow( 200, 'Agent 7 Flow B', 7 );
+		// Flows belonging to a different agent, or no agent, must not appear.
+		$this->create_flow( 100, 'Agent 8 Flow', 8 );
+		$this->create_flow( 100, 'Unassigned Flow' );
+
+		$result = PostTracking::getFlowIdsForAgent( 7 );
+
+		$this->assertContains( $a, $result );
+		$this->assertContains( $b, $result );
+		$this->assertCount( 2, $result );
+	}
+
+	public function test_get_flow_ids_for_agent_empty_when_no_flows(): void {
+		$this->assertSame( array(), PostTracking::getFlowIdsForAgent( 999999 ) );
+	}
+
+	public function test_get_flow_ids_for_agent_empty_for_invalid_agent_id(): void {
+		// Create a flow with no agent_id to confirm the guard short-circuits
+		// rather than matching NULL/0 rows.
+		$this->create_flow( 100, 'Unassigned Flow' );
+
+		$this->assertSame( array(), PostTracking::getFlowIdsForAgent( 0 ) );
+		$this->assertSame( array(), PostTracking::getFlowIdsForAgent( -1 ) );
+	}
+
+	private function create_flow( int $pipeline_id, string $flow_name = 'Test Flow', ?int $agent_id = null ): int {
+		$flow_data = array(
+			'pipeline_id'       => $pipeline_id,
+			'user_id'           => get_current_user_id(),
+			'flow_name'         => $flow_name,
+			'flow_config'       => array(),
+			'scheduling_config' => array(),
 		);
+
+		if ( null !== $agent_id ) {
+			$flow_data['agent_id'] = $agent_id;
+		}
+
+		$flows_db = new Flows();
+		$flow_id  = $flows_db->create_flow( $flow_data );
 		$this->assertIsInt( $flow_id );
 		$this->assertGreaterThan( 0, $flow_id );
 		return (int) $flow_id;
