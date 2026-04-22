@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.76.0] - 2026-04-22
+
+### Added
+- add agent-direction resolution helpers
+
+### Fixed
+- detect filter vs direct callable convention in resolveHandlerTools
+
 ## [0.75.0] - 2026-04-21
 
 ### Added
