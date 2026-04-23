@@ -64,22 +64,22 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Read full MEMORY.md (default)
-	 *     wp datamachine agent read
+	 *     wp datamachine memory read
 	 *
 	 *     # Read a specific section from MEMORY.md
-	 *     wp datamachine agent read "Fleet"
+	 *     wp datamachine memory read "Fleet"
 	 *
 	 *     # Read full SOUL.md
-	 *     wp datamachine agent read SOUL.md
+	 *     wp datamachine memory read SOUL.md
 	 *
 	 *     # Read a section from SOUL.md
-	 *     wp datamachine agent read SOUL.md "Identity"
+	 *     wp datamachine memory read SOUL.md "Identity"
 	 *
 	 *     # Read USER.md for a specific agent
-	 *     wp datamachine agent read USER.md --agent=studio
+	 *     wp datamachine memory read USER.md --agent=studio
 	 *
 	 *     # Read for a specific user
-	 *     wp datamachine agent read --user=2
+	 *     wp datamachine memory read --user=2
 	 *
 	 * @subcommand read
 	 */
@@ -134,16 +134,16 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # List MEMORY.md sections (default)
-	 *     wp datamachine agent sections
+	 *     wp datamachine memory sections
 	 *
 	 *     # List SOUL.md sections
-	 *     wp datamachine agent sections --file=SOUL.md
+	 *     wp datamachine memory sections --file=SOUL.md
 	 *
 	 *     # List USER.md sections as JSON
-	 *     wp datamachine agent sections --file=USER.md --format=json
+	 *     wp datamachine memory sections --file=USER.md --format=json
 	 *
 	 *     # List sections for a specific agent
-	 *     wp datamachine agent sections --agent=studio
+	 *     wp datamachine memory sections --agent=studio
 	 *
 	 * @subcommand sections
 	 */
@@ -228,28 +228,28 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Replace a section in MEMORY.md (default)
-	 *     wp datamachine agent write "State" "- Data Machine v0.30.0 installed"
+	 *     wp datamachine memory write "State" "- Data Machine v0.30.0 installed"
 	 *
 	 *     # Append to a section in MEMORY.md
-	 *     wp datamachine agent write "Lessons Learned" "- Always check file permissions" --mode=append
+	 *     wp datamachine memory write "Lessons Learned" "- Always check file permissions" --mode=append
 	 *
 	 *     # Write to a section in SOUL.md
-	 *     wp datamachine agent write SOUL.md "Identity" "I am chubes-bot"
+	 *     wp datamachine memory write SOUL.md "Identity" "I am chubes-bot"
 	 *
 	 *     # Append to a section in USER.md
-	 *     wp datamachine agent write USER.md "Goals" "- Ship the feature" --mode=append
+	 *     wp datamachine memory write USER.md "Goals" "- Ship the feature" --mode=append
 	 *
 	 *     # Write to a specific agent's file
-	 *     wp datamachine agent write SOUL.md "Voice" "Concise and direct" --agent=studio
+	 *     wp datamachine memory write SOUL.md "Voice" "Concise and direct" --agent=studio
 	 *
 	 *     # Load content from a file on disk
-	 *     wp datamachine agent write "Session Notes" --from-file=/tmp/notes.md --mode=append
+	 *     wp datamachine memory write "Session Notes" --from-file=/tmp/notes.md --mode=append
 	 *
 	 *     # Pipe content via stdin
-	 *     echo "- New lesson" | wp datamachine agent write "Lessons Learned" - --mode=append
+	 *     echo "- New lesson" | wp datamachine memory write "Lessons Learned" - --mode=append
 	 *
 	 *     # Heredoc via stdin
-	 *     wp datamachine agent write SOUL.md "Identity" - <<'EOF'
+	 *     wp datamachine memory write SOUL.md "Identity" - <<'EOF'
 	 *     Multi-line content with `backticks` and $vars
 	 *     EOF
 	 *
@@ -277,7 +277,7 @@ class MemoryCommand extends BaseCommand {
 			$file_section = $this->parseFileAndSection( $args );
 
 			if ( null === $file_section['section'] ) {
-				WP_CLI::error( 'Usage: wp datamachine agent write [<file.md>] <section> --from-file=<path> [--mode=set|append]' );
+				WP_CLI::error( 'Usage: wp datamachine memory write [<file.md>] <section> --from-file=<path> [--mode=set|append]' );
 				return;
 			}
 
@@ -311,7 +311,7 @@ class MemoryCommand extends BaseCommand {
 			$file_section = $this->parseFileAndSection( $args );
 
 			if ( null === $file_section['section'] ) {
-				WP_CLI::error( 'Usage: wp datamachine agent write [<file.md>] <section> - [--mode=set|append]' );
+				WP_CLI::error( 'Usage: wp datamachine memory write [<file.md>] <section> - [--mode=set|append]' );
 				return;
 			}
 
@@ -329,7 +329,7 @@ class MemoryCommand extends BaseCommand {
 			$parsed = $this->parseFileSectionContent( $args );
 
 			if ( null === $parsed ) {
-				WP_CLI::error( 'Usage: wp datamachine agent write [<file.md>] <section> <content> [--mode=set|append]' );
+				WP_CLI::error( 'Usage: wp datamachine memory write [<file.md>] <section> <content> [--mode=set|append]' );
 				return;
 			}
 
@@ -395,16 +395,16 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Search MEMORY.md (default)
-	 *     wp datamachine agent search "homeboy"
+	 *     wp datamachine memory search "homeboy"
 	 *
 	 *     # Search SOUL.md
-	 *     wp datamachine agent search "identity" --file=SOUL.md
+	 *     wp datamachine memory search "identity" --file=SOUL.md
 	 *
 	 *     # Search within a section
-	 *     wp datamachine agent search "docker" --section="Lessons Learned"
+	 *     wp datamachine memory search "docker" --section="Lessons Learned"
 	 *
 	 *     # Search a specific agent's file
-	 *     wp datamachine agent search "socials" --file=USER.md --agent=studio
+	 *     wp datamachine memory search "socials" --file=USER.md --agent=studio
 	 *
 	 * @subcommand search
 	 */
@@ -474,34 +474,34 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # List all daily memory files
-	 *     wp datamachine agent daily list
+	 *     wp datamachine memory daily list
 	 *
 	 *     # Read today's daily memory
-	 *     wp datamachine agent daily read
+	 *     wp datamachine memory daily read
 	 *
 	 *     # Read a specific date
-	 *     wp datamachine agent daily read 2026-02-24
+	 *     wp datamachine memory daily read 2026-02-24
 	 *
 	 *     # Write to today's daily memory (replaces content)
-	 *     wp datamachine agent daily write "## Session notes"
+	 *     wp datamachine memory daily write "## Session notes"
 	 *
 	 *     # Append to a specific date
-	 *     wp datamachine agent daily append 2026-02-24 "- Additional discovery"
+	 *     wp datamachine memory daily append 2026-02-24 "- Additional discovery"
 	 *
 	 *     # Delete a daily file
-	 *     wp datamachine agent daily delete 2026-02-24
+	 *     wp datamachine memory daily delete 2026-02-24
 	 *
 	 *     # Search daily memory
-	 *     wp datamachine agent daily search "homeboy"
+	 *     wp datamachine memory daily search "homeboy"
 	 *
 	 *     # Search with date range
-	 *     wp datamachine agent daily search "deploy" --from=2026-02-01 --to=2026-02-28
+	 *     wp datamachine memory daily search "deploy" --from=2026-02-01 --to=2026-02-28
 	 *
 	 * @subcommand daily
 	 */
 	public function daily( array $args, array $assoc_args ): void {
 		if ( empty( $args ) ) {
-			WP_CLI::error( 'Usage: wp datamachine agent daily <list|read|write|append|delete> [date] [content]' );
+			WP_CLI::error( 'Usage: wp datamachine memory daily <list|read|write|append|delete> [date] [content]' );
 			return;
 		}
 
@@ -527,7 +527,7 @@ class MemoryCommand extends BaseCommand {
 			case 'delete':
 				$date = $args[1] ?? null;
 				if ( ! $date ) {
-					WP_CLI::error( 'Date is required for delete. Usage: wp datamachine agent daily delete 2026-02-24' );
+					WP_CLI::error( 'Date is required for delete. Usage: wp datamachine memory daily delete 2026-02-24' );
 					return;
 				}
 				$this->daily_delete( $daily, $date );
@@ -535,7 +535,7 @@ class MemoryCommand extends BaseCommand {
 			case 'search':
 				$search_query = $args[1] ?? null;
 				if ( ! $search_query ) {
-					WP_CLI::error( 'Search query is required. Usage: wp datamachine agent daily search "query" [--from=...] [--to=...]' );
+					WP_CLI::error( 'Search query is required. Usage: wp datamachine memory daily search "query" [--from=...] [--to=...]' );
 					return;
 				}
 				$this->daily_search( $daily, $search_query, $assoc_args );
@@ -606,7 +606,7 @@ class MemoryCommand extends BaseCommand {
 	private function daily_write( DailyMemory $daily, array $args ): void {
 		// write [date] <content> — date defaults to today.
 		if ( count( $args ) < 2 ) {
-			WP_CLI::error( 'Content is required. Usage: wp datamachine agent daily write [date] <content>' );
+			WP_CLI::error( 'Content is required. Usage: wp datamachine memory daily write [date] <content>' );
 			return;
 		}
 
@@ -641,7 +641,7 @@ class MemoryCommand extends BaseCommand {
 	private function daily_append( DailyMemory $daily, array $args ): void {
 		// append [date] <content> — date defaults to today.
 		if ( count( $args ) < 2 ) {
-			WP_CLI::error( 'Content is required. Usage: wp datamachine agent daily append [date] <content>' );
+			WP_CLI::error( 'Content is required. Usage: wp datamachine memory daily append [date] <content>' );
 			return;
 		}
 
@@ -753,25 +753,25 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # List all agent files with timestamps and sizes
-	 *     wp datamachine agent files list
+	 *     wp datamachine memory files list
 	 *
 	 *     # List files for a specific agent
-	 *     wp datamachine agent files list --agent=studio
+	 *     wp datamachine memory files list --agent=studio
 	 *
 	 *     # Check for stale files (not updated in 7 days)
-	 *     wp datamachine agent files check
+	 *     wp datamachine memory files check
 	 *
 	 *     # Check with custom threshold
-	 *     wp datamachine agent files check --days=14
+	 *     wp datamachine memory files check --days=14
 	 *
 	 *     # Check a specific agent's files
-	 *     wp datamachine agent files check --agent=studio
+	 *     wp datamachine memory files check --agent=studio
 	 *
 	 * @subcommand files
 	 */
 	public function files( array $args, array $assoc_args ): void {
 		if ( empty( $args ) ) {
-			WP_CLI::error( 'Usage: wp datamachine agent files <list|check>' );
+			WP_CLI::error( 'Usage: wp datamachine memory files <list|check>' );
 			return;
 		}
 
@@ -1045,16 +1045,16 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Regenerate all composable files
-	 *     wp datamachine agent compose
+	 *     wp datamachine memory compose
 	 *
 	 *     # Regenerate a specific file
-	 *     wp datamachine agent compose AGENTS.md
+	 *     wp datamachine memory compose AGENTS.md
 	 *
 	 *     # List registered sections for a file
-	 *     wp datamachine agent compose --list AGENTS.md
+	 *     wp datamachine memory compose --list AGENTS.md
 	 *
 	 *     # List all sections across all composable files
-	 *     wp datamachine agent compose --list
+	 *     wp datamachine memory compose --list
 	 *
 	 * @subcommand compose
 	 */
@@ -1217,16 +1217,16 @@ class MemoryCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     # Get all resolved paths as JSON (for setup scripts)
-	 *     wp datamachine agent paths --format=json
+	 *     wp datamachine memory paths --format=json
 	 *
 	 *     # Get paths for a specific agent (multi-agent)
-	 *     wp datamachine agent paths --agent=chubes-bot
+	 *     wp datamachine memory paths --agent=chubes-bot
 	 *
 	 *     # Get relative paths for config file injection
-	 *     wp datamachine agent paths --relative
+	 *     wp datamachine memory paths --relative
 	 *
 	 *     # Table view for debugging
-	 *     wp datamachine agent paths --format=table
+	 *     wp datamachine memory paths --format=table
 	 *
 	 * @subcommand paths
 	 */

@@ -330,22 +330,22 @@ All endpoints require `manage_options` capability. The `PUT` endpoint accepts co
 
 ```bash
 # List all daily memory files
-wp datamachine agent daily list [--agent=<slug>] [--user=<id>] [--format=table|json]
+wp datamachine memory daily list [--agent=<slug>] [--user=<id>] [--format=table|json]
 
 # Read a daily file (defaults to today)
-wp datamachine agent daily read [YYYY-MM-DD] [--agent=<slug>]
+wp datamachine memory daily read [YYYY-MM-DD] [--agent=<slug>]
 
 # Write (replace) a daily file
-wp datamachine agent daily write [YYYY-MM-DD] <content> [--agent=<slug>]
+wp datamachine memory daily write [YYYY-MM-DD] <content> [--agent=<slug>]
 
 # Append to a daily file
-wp datamachine agent daily append [YYYY-MM-DD] <content> [--agent=<slug>]
+wp datamachine memory daily append [YYYY-MM-DD] <content> [--agent=<slug>]
 
 # Delete a daily file
-wp datamachine agent daily delete <YYYY-MM-DD> [--agent=<slug>]
+wp datamachine memory daily delete <YYYY-MM-DD> [--agent=<slug>]
 
 # Search across daily files
-wp datamachine agent daily search <query> [--from=YYYY-MM-DD] [--to=YYYY-MM-DD] [--agent=<slug>]
+wp datamachine memory daily search <query> [--from=YYYY-MM-DD] [--to=YYYY-MM-DD] [--agent=<slug>]
 ```
 
 All commands resolve agent scoping via `AgentResolver` (from `--agent` flag) with fallback to `--user`.

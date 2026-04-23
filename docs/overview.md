@@ -79,7 +79,7 @@ Pipelines can selectively inject daily memory via the **DailyMemorySelectorDirec
 ### Memory Path Discovery
 
 ```bash
-wp datamachine agent paths --allow-root
+wp datamachine memory paths --allow-root
 ```
 
 This canonical CLI command returns the full directory structure and file locations for any agent — the recommended way for external consumers to discover memory file paths.

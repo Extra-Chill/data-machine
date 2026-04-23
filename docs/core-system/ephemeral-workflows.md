@@ -18,7 +18,7 @@ When a direct execution workflow is triggered via the `/execute` REST endpoint, 
 - **AI Chatbot Execution**: When the Data Machine chat agent suggests a sequence of actions, it can trigger them immediately as a direct execution workflow.
 - **External Triggers**: Programmatically trigger a specific sequence of steps from an external script without cluttering the WordPress database with temporary pipelines.
 - **Testing**: Quickly test a new combination of handlers and prompts without going through the Pipeline Builder UI.
-- **CLI Tools**: Use the `wp datamachine agent` WP-CLI command to run the chat agent directly for debugging and validation.
+- **CLI Tools**: Use the `wp datamachine chat` WP-CLI command to run the chat agent directly for debugging and validation.
 
 ## Limitations
 

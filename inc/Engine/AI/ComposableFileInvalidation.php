@@ -8,7 +8,7 @@
  * removes SectionRegistry entries. Plugins whose sections read live state
  * register their own state-change hooks via the
  * `datamachine_composable_invalidation_hooks` filter so files stay in sync
- * without manual `wp datamachine agent compose` runs.
+ * without manual `wp datamachine memory compose` runs.
  *
  * Regeneration is debounced to one run per 60 seconds so frequent-fire hooks
  * (e.g. save_post) are safe to register.

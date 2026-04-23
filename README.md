@@ -53,7 +53,7 @@ users/{id}/
   USER.md                  — Information about the human
 ```
 
-Discovery: `wp datamachine agent paths --allow-root`
+Discovery: `wp datamachine memory paths --allow-root`
 
 ### Abilities API
 
