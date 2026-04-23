@@ -56,10 +56,6 @@ class ImageGenerationAbilities {
 	private static bool $registered = false;
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
 		if ( self::$registered ) {
 			return;
 		}

@@ -21,10 +21,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class ResolveTermAbility {
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
 		$this->registerAbility();
 	}
 

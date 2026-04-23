@@ -19,10 +19,6 @@ class ListChatSessionsAbility {
 	public function __construct() {
 		$this->initDatabase();
 
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
 		$this->registerAbility();
 	}
 

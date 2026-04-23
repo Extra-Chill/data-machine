@@ -27,10 +27,6 @@ class ProcessedItemsAbilities {
 	public function __construct() {
 		$this->db_processed_items = new ProcessedItems();
 
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
 		if ( self::$registered ) {
 			return;
 		}

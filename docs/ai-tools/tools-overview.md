@@ -475,16 +475,18 @@ See Tool Manager for complete documentation.
 
 ### ToolExecutor Pattern
 
-All tools integrate via the universal `ToolExecutor` class (`/inc/Engine/AI/Tools/ToolExecutor.php`):
+All tools integrate via the universal `ToolExecutor` class
+(`/inc/Engine/AI/Tools/ToolExecutor.php`) for execution, and the
+`ToolPolicyResolver` for discovery:
 
 ```php
 // Tool discovery
-$available_tools = \DataMachine\Engine\AI\ToolExecutor::getAvailableTools(
-    $agent_type,  // 'pipeline' or 'chat'
-    $handler_slug,
-    $handler_config,
-    $flow_step_id
-);
+$resolver        = new \DataMachine\Engine\AI\Tools\ToolPolicyResolver();
+$available_tools = $resolver->resolve( array(
+    'mode'             => \DataMachine\Engine\AI\Tools\ToolPolicyResolver::MODE_PIPELINE,
+    'pipeline_step_id' => $flow_step_id,
+    'engine_data'      => $engine_data,
+) );
 ```
 
 **Discovery Process**:

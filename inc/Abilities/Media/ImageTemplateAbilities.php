@@ -20,11 +20,7 @@ class ImageTemplateAbilities {
 
 	private static bool $registered = false;
 
-	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-		if ( self::$registered ) {
+	public function __construct() {		if ( self::$registered ) {
 			return;
 		}
 		$this->registerAbilities();

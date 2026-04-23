@@ -24,6 +24,45 @@
     }
   },
   "id": "data-machine",
+  "transforms": {
+    "drop_wp_ability_dead_guards": {
+      "description": "Drop dead class_exists('WP_Ability') and class_exists('WP_Abilities_Registry') guards. Plugin header requires WP 6.9 where both classes ship in core, so every guard on these symbols is unreachable. Ref: https://github.com/Extra-Chill/data-machine/issues/XXXX",
+      "rules": [
+        {
+          "id": "simple_guard",
+          "description": "Remove standalone if ( ! class_exists( 'WP_Ability' ) ) { return; } blocks.",
+          "find": "(?s)\n\t\tif \\( ! class_exists\\( ?'WP_Ability' ?\\) \\) \\{\n\t\t\treturn;\n\t\t\\}\n",
+          "replace": "",
+          "files": "inc/Abilities/**/*.php",
+          "context": "file"
+        },
+        {
+          "id": "combined_guard_registered",
+          "description": "Drop the WP_Ability half of 'if ( ! class_exists( WP_Ability ) || self::$registered ) { return; }' guards.",
+          "find": "(?s)if \\( ! class_exists\\( 'WP_Ability' \\) \\|\\| self::\\$registered \\) \\{\n\t+return;\n\t+\\}",
+          "replace": "if ( self::$$registered ) {\n\t\t\treturn;\n\t\t}",
+          "files": "inc/Abilities/**/*.php",
+          "context": "file"
+        },
+        {
+          "id": "ternary_registry_guard",
+          "description": "Replace '(class_exists(WP_Abilities_Registry) ? WP_Abilities_Registry::get_instance() : null)' with a direct call — the ternary is unreachable.",
+          "find": "class_exists\\( 'WP_Abilities_Registry' \\) \\? \\\\WP_Abilities_Registry::get_instance\\(\\) : null",
+          "replace": "\\\\WP_Abilities_Registry::get_instance()",
+          "files": "inc/**/*.php",
+          "context": "line"
+        },
+        {
+          "id": "combined_guard_registered_engine",
+          "description": "Same as combined_guard_registered but catches the one hit in inc/Engine/ (ResolvePendingActionAbility).",
+          "find": "(?s)if \\( ! class_exists\\( 'WP_Ability' \\) \\|\\| self::\\$registered \\) \\{\n\t+return;\n\t+\\}",
+          "replace": "if ( self::$$registered ) {\n\t\t\treturn;\n\t\t}",
+          "files": "inc/Engine/**/*.php",
+          "context": "file"
+        }
+      ]
+    }
+  },
   "version_targets": [
     {
       "file": "data-machine.php",

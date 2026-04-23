@@ -12,7 +12,7 @@ use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 use DataMachine\Core\Selection\SelectionMode;
-use DataMachine\Core\WordPress\DuplicateDetection;
+
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
 use DataMachine\Core\WordPress\WordPressPublishHelper;
@@ -122,7 +122,7 @@ class WordPress extends PublishHandler {
 			$post_type = $handler_config['post_type'] ?? '';
 
 			if ( ! empty( $title ) && ! empty( $post_type ) ) {
-				$lookback_days   = (int) ( $handler_config['dedup_lookback_days'] ?? DuplicateDetection::DEFAULT_LOOKBACK_DAYS );
+				$lookback_days   = (int) ( $handler_config['dedup_lookback_days'] ?? 14 );
 				$duplicate_check = wp_get_ability( 'datamachine/check-duplicate' );
 				$source_url      = $engine->getSourceUrl();
 				$existing_id     = null;
@@ -146,10 +146,6 @@ class WordPress extends PublishHandler {
 					if ( is_array( $duplicate_result ) && 'duplicate' === ( $duplicate_result['verdict'] ?? '' ) ) {
 						$existing_id = (int) ( $duplicate_result['match']['post_id'] ?? 0 );
 					}
-				}
-
-				if ( ! $existing_id ) {
-					$existing_id = DuplicateDetection::findExistingPostByTitle( $title, $post_type, $lookback_days );
 				}
 
 				if ( $existing_id ) {

@@ -643,24 +643,6 @@ class ToolManager {
 	}
 
 	/**
-	 * Get all available tools for chat mode.
-	 *
-	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with MODE_CHAT instead.
-	 *             Delegates to ToolPolicyResolver internally.
-	 *
-	 * @return array Available tools for chat agents
-	 */
-	public function getAvailableToolsForChat(): array {
-		$resolver = new ToolPolicyResolver( $this );
-
-		return $resolver->resolve(
-			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
-			)
-		);
-	}
-
-	/**
 	 * Get the number of parameters a callable accepts.
 	 *
 	 * @param callable $callable Callable to inspect.

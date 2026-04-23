@@ -31,7 +31,7 @@ class AuthAbilities {
 	public function __construct() {
 		$this->handler_abilities = new HandlerAbilities();
 
-		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
+		if ( self::$registered ) {
 			return;
 		}
 

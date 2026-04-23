@@ -25,28 +25,32 @@ Handles tool discovery via filters, enablement validation, and execution with co
 
 ### Tool Discovery
 
-Tools are discovered through three filter-based registration patterns:
+Tools are discovered through three filter-based registration patterns, and
+resolved via `ToolPolicyResolver::resolve()` — the single entry point for
+both chat and pipeline modes:
 
 ```php
-public static function getAvailableTools(
-    ?array $previous_step_config = null,
-    ?array $next_step_config = null,
-    ?string $current_pipeline_step_id = null
-): array
+use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
+
+$resolver = new ToolPolicyResolver();
 ```
 
 **Pipeline Agent Usage** (with step context):
 ```php
-$tools = ToolExecutor::getAvailableTools(
-    $previous_step_config,    // Previous step configuration
-    $next_step_config,        // Next step configuration
-    $current_pipeline_step_id // Current pipeline step ID
-);
+$tools = $resolver->resolve( array(
+    'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
+    'previous_step_config' => $previous_step_config,
+    'next_step_config'     => $next_step_config,
+    'pipeline_step_id'     => $current_pipeline_step_id,
+    'engine_data'          => $engine_data,
+) );
 ```
 
 **Chat Agent Usage** (global tools only):
 ```php
-$tools = ToolExecutor::getAvailableTools(null, null, null);
+$tools = $resolver->resolve( array(
+    'mode' => ToolPolicyResolver::MODE_CHAT,
+) );
 ```
 
 ### Tool Registration Patterns

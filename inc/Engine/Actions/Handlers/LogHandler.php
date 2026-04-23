@@ -29,21 +29,18 @@ class LogHandler {
 		$valid_levels = datamachine_get_valid_log_levels();
 
 		if ( ! in_array( $level, $valid_levels, true ) ) {
-			if ( class_exists( 'WP_Ability' ) ) {
-				$ability = wp_get_ability( 'datamachine/write-to-log' );
-				if ( ! $ability ) {
-					return false;
-				}
-				$result = $ability->execute(
-					array(
-						'level'   => $level,
-						'message' => $message,
-						'context' => $context,
-					)
-				);
-				return ! is_wp_error( $result );
+			$ability = wp_get_ability( 'datamachine/write-to-log' );
+			if ( ! $ability ) {
+				return false;
 			}
-			return false;
+			$result = $ability->execute(
+				array(
+					'level'   => $level,
+					'message' => $message,
+					'context' => $context,
+				)
+			);
+			return ! is_wp_error( $result );
 		}
 
 		$function_name = 'datamachine_log_' . $level;

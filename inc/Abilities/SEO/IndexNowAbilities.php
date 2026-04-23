@@ -55,9 +55,7 @@ class IndexNowAbilities {
 	 * Constructor.
 	 */
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
-			$this->register_hooks();
-			self::$registered = true;
+		if ( self::$registered ) {
 			return;
 		}
 

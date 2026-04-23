@@ -30,7 +30,7 @@ class FlowStepAbilities {
 	private ValidateFlowStepsConfigAbility $validate_flow_steps_config;
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
+		if ( self::$registered ) {
 			return;
 		}
 

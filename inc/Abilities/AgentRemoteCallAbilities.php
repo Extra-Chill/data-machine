@@ -21,7 +21,7 @@ class AgentRemoteCallAbilities {
 	private AgentRemoteCallAbility $remote_call;
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
+		if ( self::$registered ) {
 			return;
 		}
 

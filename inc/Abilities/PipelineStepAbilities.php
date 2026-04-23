@@ -32,7 +32,7 @@ class PipelineStepAbilities {
 		$this->db_flows           = new Flows();
 		$this->db_processed_items = new ProcessedItems();
 
-		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
+		if ( self::$registered ) {
 			return;
 		}
 

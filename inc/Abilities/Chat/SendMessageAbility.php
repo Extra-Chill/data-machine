@@ -25,10 +25,6 @@ defined( 'ABSPATH' ) || exit;
 class SendMessageAbility {
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
 		$this->registerAbility();
 	}
 

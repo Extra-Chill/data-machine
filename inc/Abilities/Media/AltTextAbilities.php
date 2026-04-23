@@ -25,10 +25,6 @@ class AltTextAbilities {
 	public function __construct() {
 		$this->registerHooks();
 
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
 		if ( self::$registered ) {
 			return;
 		}
