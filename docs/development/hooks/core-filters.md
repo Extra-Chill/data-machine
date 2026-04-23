@@ -441,6 +441,66 @@ add_filter('datamachine_session_title_prompt', function($prompt, $context) {
 - Create privacy-safe titles that don't expose chat content
 - Customize title style per site or plugin
 
+## Preview & Approval Filters
+
+Data Machine ships **one** preview/approve primitive: `PendingActionStore`
+plus `ResolvePendingActionAbility`. Any tool that wants the user to see a
+change before it takes effect stages its invocation via
+`PendingActionHelper::stage()` and registers an apply callback on
+`datamachine_pending_action_handlers`. The core content abilities
+(`edit_post_blocks`, `replace_post_blocks`, `insert_content`), the socials
+publishers, and anything else opting into `action_policy=preview` all route
+through the same lane.
+
+> **Which preview primitive should I use?** There is only one. Call
+> `PendingActionHelper::stage()` to stage a pending invocation and register
+> your apply callback on `datamachine_pending_action_handlers`. The
+> `ResolvePendingActionAbility` (ability slug
+> `datamachine/resolve-pending-action`, REST route
+> `POST /datamachine/v1/actions/resolve`, chat tool
+> `resolve_pending_action`) finalizes every kind.
+
+### `datamachine_pending_action_handlers`
+
+**Purpose**: Register the apply + permission callbacks for a pending-action
+kind.
+
+```php
+add_filter( 'datamachine_pending_action_handlers', function ( $handlers ) {
+    $handlers['my_kind'] = array(
+        'apply'       => array( MyAbility::class, 'execute' ),
+        'can_resolve' => function ( array $payload, string $decision, int $user_id ) {
+            // Return true, false, or a WP_Error. Optional — defaults to
+            // "any user who can call resolve_pending_action".
+            return current_user_can( 'edit_posts' );
+        },
+    );
+    return $handlers;
+} );
+```
+
+`apply` receives the stored `apply_input` array and must return either a
+value (which is wrapped into the resolver response) or a `WP_Error` to
+surface failure.
+
+### `datamachine_pending_action_staged`
+
+**Purpose**: Fires when a tool invocation has been staged and is awaiting
+user resolution. Use this to notify users, log audit trails, or mirror the
+payload into a visible queue.
+
+### `datamachine_pending_action_resolved`
+
+**Purpose**: Fires after a staged action is accepted or rejected. Receives
+`$decision, $action_id, $kind, $payload, $result`.
+
+### `datamachine_tool_action_policy`
+
+**Purpose**: Last-layer override of the resolved action policy
+(`direct | preview | forbidden`) for a single tool invocation. Runs after
+`ActionPolicyResolver` has consulted deny lists, per-agent overrides, tool
+declarations, and mode presets.
+
 ## Pipeline Operations Filters
 
 ### `datamachine_create_pipeline`
