@@ -13,6 +13,8 @@
 namespace DataMachine\Abilities\Content;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Engine\AI\Actions\PendingActionHelper;
+use DataMachine\Engine\AI\Actions\PendingActionStore;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -275,9 +277,9 @@ class EditPostBlocksAbility {
 
 		$new_content = BlockSanitizer::sanitizeAndSerialize( $blocks );
 
-		// --- Preview mode: store pending edit, return diff data ---
+		// --- Preview mode: stage pending action, return preview envelope ---
 		if ( $preview ) {
-			$diff_id = PendingDiffStore::generate_id();
+			$action_id = PendingActionStore::generate_id();
 
 			// Build per-edit diff data for the frontend.
 			$diffs = array();
@@ -294,7 +296,7 @@ class EditPostBlocksAbility {
 
 			$diff = CanonicalDiffPreview::build(
 				array(
-					'diff_id'             => $diff_id,
+					'action_id'           => $action_id,
 					'diff_type'           => 'edit',
 					'original_content'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
 					'replacement_content' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
@@ -303,24 +305,34 @@ class EditPostBlocksAbility {
 				)
 			);
 
-			CanonicalDiffPreview::store_pending(
-				$diff_id,
+			$envelope = PendingActionHelper::stage(
 				array(
-					'type'    => 'edit_post_blocks',
-					'post_id' => $post_id,
-					'input'   => array(
+					'action_id'    => $action_id,
+					'kind'         => 'edit_post_blocks',
+					'summary'      => sprintf( 'Preview edits to post #%d.', $post_id ),
+					'apply_input'  => array(
 						'post_id' => $post_id,
 						'edits'   => $edits,
 					),
-					'diff'    => $diff,
+					'preview_data' => $diff,
+					'context'      => array( 'post_id' => $post_id ),
 				)
 			);
 
-			return CanonicalDiffPreview::response(
-				$post_id,
-				'Preview generated. Accept or reject to apply changes.',
-				$diff,
+			if ( empty( $envelope['staged'] ) ) {
+				return array(
+					'success' => false,
+					'post_id' => $post_id,
+					'error'   => $envelope['error'] ?? 'Failed to stage preview.',
+				);
+			}
+
+			return array_merge(
+				$envelope,
 				array(
+					'success'         => true,
+					'is_preview'      => true,
+					'post_id'         => $post_id,
 					'changes_applied' => $changes,
 				)
 			);

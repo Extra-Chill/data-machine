@@ -14,6 +14,8 @@
 namespace DataMachine\Abilities\Content;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Engine\AI\Actions\PendingActionHelper;
+use DataMachine\Engine\AI\Actions\PendingActionStore;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -68,9 +70,9 @@ class InsertContentAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'diff_id' => array( 'type' => 'string' ),
-							'diff'    => array( 'type' => 'object' ),
+							'success'   => array( 'type' => 'boolean' ),
+							'action_id' => array( 'type' => 'string' ),
+							'preview'   => array( 'type' => 'object' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute' ),
@@ -255,11 +257,11 @@ class InsertContentAbility {
 			);
 		}
 
-		$diff_id = PendingDiffStore::generate_id();
+		$action_id = PendingActionStore::generate_id();
 
 		$diff = CanonicalDiffPreview::build(
 			array(
-				'diff_id'             => $diff_id,
+				'action_id'           => $action_id,
 				'diff_type'           => 'insert',
 				'original_content'    => '',
 				'replacement_content' => $content,
@@ -286,26 +288,36 @@ class InsertContentAbility {
 			)
 		);
 
-		CanonicalDiffPreview::store_pending(
-			$diff_id,
+		$envelope = PendingActionHelper::stage(
 			array(
-				'type'    => 'insert_content',
-				'post_id' => $post_id,
-				'input'   => array(
+				'action_id'    => $action_id,
+				'kind'         => 'insert_content',
+				'summary'      => sprintf( 'Preview content insertion %s on post #%d.', $insertion_point, $post_id ),
+				'apply_input'  => array(
 					'post_id'               => $post_id,
 					'content'               => $content,
 					'position'              => $position,
 					'target_paragraph_text' => $target_paragraph_text,
 				),
-				'diff'    => $diff,
+				'preview_data' => $diff,
+				'context'      => array( 'post_id' => $post_id ),
 			)
 		);
 
-		return CanonicalDiffPreview::response(
-			$post_id,
-			sprintf( 'Prepared content insertion %s. Accept or reject to apply changes.', $insertion_point ),
-			$diff,
+		if ( empty( $envelope['staged'] ) ) {
+			return array(
+				'success' => false,
+				'post_id' => $post_id,
+				'error'   => $envelope['error'] ?? 'Failed to stage preview.',
+			);
+		}
+
+		return array_merge(
+			$envelope,
 			array(
+				'success'         => true,
+				'is_preview'      => true,
+				'post_id'         => $post_id,
 				'position'        => $position,
 				'insertion_point' => $insertion_point,
 				'new_content'     => $new_content,

@@ -12,6 +12,8 @@
 namespace DataMachine\Abilities\Content;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Engine\AI\Actions\PendingActionHelper;
+use DataMachine\Engine\AI\Actions\PendingActionStore;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -259,9 +261,9 @@ class ReplacePostBlocksAbility {
 
 		$new_content = BlockSanitizer::sanitizeAndSerialize( $blocks );
 
-		// --- Preview mode: store pending edit, return diff data ---
+		// --- Preview mode: stage pending action, return preview envelope ---
 		if ( $preview ) {
-			$diff_id = PendingDiffStore::generate_id();
+			$action_id = PendingActionStore::generate_id();
 
 			// Build per-block diff data for the frontend.
 			$diffs = array();
@@ -275,7 +277,7 @@ class ReplacePostBlocksAbility {
 
 			$diff = CanonicalDiffPreview::build(
 				array(
-					'diff_id'             => $diff_id,
+					'action_id'           => $action_id,
 					'diff_type'           => 'replace',
 					'original_content'    => implode( "\n", array_column( $diffs, 'originalContent' ) ),
 					'replacement_content' => implode( "\n", array_column( $diffs, 'replacementContent' ) ),
@@ -284,18 +286,27 @@ class ReplacePostBlocksAbility {
 				)
 			);
 
-			CanonicalDiffPreview::store_pending(
-				$diff_id,
+			$envelope = PendingActionHelper::stage(
 				array(
-					'type'    => 'replace_post_blocks',
-					'post_id' => $post_id,
-					'input'   => array(
+					'action_id'    => $action_id,
+					'kind'         => 'replace_post_blocks',
+					'summary'      => sprintf( 'Preview block replacements on post #%d.', $post_id ),
+					'apply_input'  => array(
 						'post_id'      => $post_id,
 						'replacements' => $replacements,
 					),
-					'diff'    => $diff,
+					'preview_data' => $diff,
+					'context'      => array( 'post_id' => $post_id ),
 				)
 			);
+
+			if ( empty( $envelope['staged'] ) ) {
+				return array(
+					'success' => false,
+					'post_id' => $post_id,
+					'error'   => $envelope['error'] ?? 'Failed to stage preview.',
+				);
+			}
 
 			// Strip raw HTML from the changes returned to the AI.
 			$clean_changes = array_map(
@@ -306,11 +317,12 @@ class ReplacePostBlocksAbility {
 				$changes
 			);
 
-			return CanonicalDiffPreview::response(
-				$post_id,
-				'Preview generated. Accept or reject to apply changes.',
-				$diff,
+			return array_merge(
+				$envelope,
 				array(
+					'success'         => true,
+					'is_preview'      => true,
+					'post_id'         => $post_id,
 					'blocks_replaced' => $clean_changes,
 				)
 			);
