@@ -112,6 +112,10 @@ class UpsertPostAbility {
 								'type'        => 'string',
 								'description' => 'Post status for create path. Defaults to publish.',
 							),
+							'post_author'    => array(
+								'type'        => 'integer',
+								'description' => 'Post author user ID. Only applied on create; ignored on update.',
+							),
 							'post_excerpt'   => array(
 								'type'        => 'string',
 								'description' => 'Post excerpt.',
@@ -215,6 +219,10 @@ class UpsertPostAbility {
 					'type'        => 'string',
 					'description' => 'Slash-delimited parent path (e.g. "artist/link-pages").',
 				),
+				'post_author'  => array(
+					'type'        => 'integer',
+					'description' => 'Post author user ID (create only).',
+				),
 				'content_hash' => array(
 					'type'        => 'string',
 					'description' => 'Hash for idempotency check.',
@@ -254,6 +262,7 @@ class UpsertPostAbility {
 		$content_hash = $input['content_hash'] ?? '';
 		$raw_source   = $input['raw_source'] ?? '';
 		$post_status  = sanitize_key( $input['post_status'] ?? 'publish' );
+		$post_author  = absint( $input['post_author'] ?? 0 );
 		$post_excerpt = $input['post_excerpt'] ?? '';
 		$taxonomies   = $input['taxonomies'] ?? array();
 		$meta_input   = $input['meta_input'] ?? array();
@@ -345,6 +354,9 @@ class UpsertPostAbility {
 			$action          = 'updated';
 		} else {
 			$action = 'created';
+			if ( $post_author > 0 ) {
+				$post_data['post_author'] = $post_author;
+			}
 		}
 
 		// Merge caller-supplied meta_input.
