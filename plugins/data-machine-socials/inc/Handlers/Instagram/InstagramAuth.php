@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 	const AUTH_URL      = 'https://www.facebook.com/v18.0/dialog/oauth';
-	const TOKEN_URL     = 'https://graph.instagram.com/oauth/access_token';
+	const TOKEN_URL     = 'https://graph.facebook.com/v18.0/oauth/access_token';
 	const GRAPH_API_URL = 'https://graph.instagram.com';
 	const SCOPES        = 'instagram_basic,instagram_content_publish,instagram_manage_messages,instagram_manage_comments,pages_read_engagement';
 
