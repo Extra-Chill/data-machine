@@ -200,8 +200,9 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			},
 			null, // No token transform needed after exchange
 			function ( $account_data ) {
-				$this->save_account( $account_data );
+				$saved = $this->save_account( $account_data );
 				$this->schedule_proactive_refresh();
+				return $saved;
 			}
 		);
 	}
