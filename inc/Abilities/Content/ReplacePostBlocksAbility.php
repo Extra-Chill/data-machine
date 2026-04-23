@@ -22,7 +22,7 @@ class ReplacePostBlocksAbility {
 	private static bool $registered = false;
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
+		if ( self::$registered ) {
 			return;
 		}
 

@@ -23,10 +23,6 @@ defined( 'ABSPATH' ) || exit;
 class AgentRemoteCallAbility {
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
 		$this->registerAbility();
 	}
 

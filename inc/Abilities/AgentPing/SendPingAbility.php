@@ -18,10 +18,6 @@ defined( 'ABSPATH' ) || exit;
 class SendPingAbility {
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
 		$this->registerAbility();
 	}
 

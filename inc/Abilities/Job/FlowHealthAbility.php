@@ -19,10 +19,6 @@ class FlowHealthAbility {
 	public function __construct() {
 		$this->initDatabases();
 
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
 		$this->registerAbility();
 	}
 

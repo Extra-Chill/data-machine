@@ -159,9 +159,7 @@ class ToolPolicyResolver {
 	 * @return array Filtered tools.
 	 */
 	private function filterByAbilityPermissions( array $tools ): array {
-		$registry = function_exists( 'WP_Abilities_Registry' )
-			? null
-			: ( class_exists( 'WP_Abilities_Registry' ) ? \WP_Abilities_Registry::get_instance() : null );
+		$registry = \WP_Abilities_Registry::get_instance();
 
 		$filtered = array();
 
@@ -401,7 +399,7 @@ class ToolPolicyResolver {
 			return $tools;
 		}
 
-		$registry        = class_exists( 'WP_Abilities_Registry' ) ? \WP_Abilities_Registry::get_instance() : null;
+		$registry        = \WP_Abilities_Registry::get_instance();
 		$categories_flip = array_flip( $categories );
 		$filtered        = array();
 
@@ -552,7 +550,7 @@ class ToolPolicyResolver {
 		}
 
 		// Category-aware filtering: check both tool names and categories.
-		$registry        = class_exists( 'WP_Abilities_Registry' ) ? \WP_Abilities_Registry::get_instance() : null;
+		$registry        = \WP_Abilities_Registry::get_instance();
 		$tool_names_flip = ! empty( $tool_names ) ? array_flip( $tool_names ) : array();
 		$categories_flip = array_flip( $policy_categories );
 		$filtered        = array();

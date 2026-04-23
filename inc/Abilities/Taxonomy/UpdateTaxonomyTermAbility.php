@@ -19,10 +19,6 @@ defined( 'ABSPATH' ) || exit;
 class UpdateTaxonomyTermAbility {
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
 		$this->registerAbility();
 	}
 

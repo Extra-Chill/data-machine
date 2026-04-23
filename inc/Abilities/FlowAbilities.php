@@ -40,7 +40,7 @@ class FlowAbilities {
 	private WebhookTriggerAbility $webhook_trigger;
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
+		if ( self::$registered ) {
 			return;
 		}
 

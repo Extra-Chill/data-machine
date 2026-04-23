@@ -40,7 +40,7 @@ class JobAbilities {
 	private RetryJobAbility $retry_job;
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) || self::$registered ) {
+		if ( self::$registered ) {
 			return;
 		}
 

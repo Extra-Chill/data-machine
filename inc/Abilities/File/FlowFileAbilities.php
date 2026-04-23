@@ -31,10 +31,6 @@ class FlowFileAbilities {
 		$this->file_cleanup = new FileCleanup();
 		$this->db_flows     = new Flows();
 
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
 		if ( self::$registered ) {
 			return;
 		}

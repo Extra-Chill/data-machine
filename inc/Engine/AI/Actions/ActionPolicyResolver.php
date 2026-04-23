@@ -207,7 +207,7 @@ class ActionPolicyResolver {
 			return null;
 		}
 
-		$registry = class_exists( 'WP_Abilities_Registry' ) ? \WP_Abilities_Registry::get_instance() : null;
+		$registry = \WP_Abilities_Registry::get_instance();
 		if ( ! $registry ) {
 			return null;
 		}
