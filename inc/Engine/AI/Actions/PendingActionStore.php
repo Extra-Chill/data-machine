@@ -7,11 +7,11 @@
  * datamachine/resolve-pending-action ability later retrieves the stored
  * payload and either replays it (`accepted`) or discards it (`rejected`).
  *
- * This is the generic successor to PendingDiffStore. PendingDiffStore was
- * scoped to post-content diffs (`edit_post_blocks`, `replace_post_blocks`,
- * `insert_content`); PendingActionStore is kind-agnostic and supports any
- * tool that opts into the preview/approve workflow (socials publishes,
- * destructive ops, account mutations, etc.).
+ * The store is kind-agnostic: any tool that opts into the preview/approve
+ * workflow can stage here — content edits (`edit_post_blocks`,
+ * `replace_post_blocks`, `insert_content`), socials publishes, destructive
+ * ops, account mutations, etc. Each kind is dispatched via the
+ * `datamachine_pending_action_handlers` filter at resolution time.
  *
  * Payload shape:
  *

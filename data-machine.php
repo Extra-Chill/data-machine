@@ -168,13 +168,12 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/ChatAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/InternalLinkingAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Content/BlockSanitizer.php';
-	require_once __DIR__ . '/inc/Abilities/Content/PendingDiffStore.php';
 	require_once __DIR__ . '/inc/Abilities/Content/CanonicalDiffPreview.php';
 	require_once __DIR__ . '/inc/Abilities/Content/GetPostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Content/EditPostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Content/ReplacePostBlocksAbility.php';
-	require_once __DIR__ . '/inc/Abilities/Content/ResolveDiffAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Content/UpsertPostAbility.php';
+	require_once __DIR__ . '/inc/Abilities/Content/ContentActionHandlers.php';
 	// GitHubAbilities moved to data-machine-code extension.
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchFilesAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Email/EmailAbilities.php';
@@ -243,9 +242,10 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
 	new \DataMachine\Abilities\Content\InsertContentAbility();
 	new \DataMachine\Abilities\Content\UpsertPostAbility();
-	new \DataMachine\Abilities\Content\ResolveDiffAbility();
 
-	// ActionPolicy + pending-action resolver (generic successor to ResolveDiffAbility).
+	// ActionPolicy + unified pending-action resolver. Content abilities register
+	// themselves on `datamachine_pending_action_handlers` via
+	// inc/Abilities/Content/ContentActionHandlers.php (required above).
 	new \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility();
 	new \DataMachine\Engine\AI\Actions\ResolvePendingAction();
 
