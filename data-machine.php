@@ -174,6 +174,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Content/EditPostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Content/ReplacePostBlocksAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Content/ResolveDiffAbility.php';
+	require_once __DIR__ . '/inc/Abilities/Content/UpsertPostAbility.php';
 	// GitHubAbilities moved to data-machine-code extension.
 	require_once __DIR__ . '/inc/Abilities/Fetch/FetchFilesAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Email/EmailAbilities.php';
@@ -241,6 +242,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Content\EditPostBlocksAbility();
 	new \DataMachine\Abilities\Content\ReplacePostBlocksAbility();
 	new \DataMachine\Abilities\Content\InsertContentAbility();
+	new \DataMachine\Abilities\Content\UpsertPostAbility();
 	new \DataMachine\Abilities\Content\ResolveDiffAbility();
 
 	// ActionPolicy + pending-action resolver (generic successor to ResolveDiffAbility).
