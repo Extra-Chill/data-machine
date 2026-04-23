@@ -48,6 +48,10 @@ class PendingActionHelper {
 	 *                                  and re-executed as if the tool were called fresh.
 	 *     @type array    $preview_data Optional. Renderable preview payload (copy, images, counts, etc.).
 	 *                                  Surfaced in the envelope so the AI can summarize to the user.
+	 *     @type string   $action_id    Optional. Pre-generated action identifier. Useful when the caller
+	 *                                  has to embed the id in the preview payload (e.g. Gutenberg diff
+	 *                                  block attributes) before staging. Must be produced by
+	 *                                  PendingActionStore::generate_id(); anything else is replaced.
 	 *     @type int|null $agent_id     Optional. Acting agent ID (recorded for audit + can_resolve checks).
 	 *     @type int|null $user_id      Optional. Acting user ID (defaults to current user).
 	 *     @type array    $context      Optional. Free-form context (session_id, bridge_app, etc.).
@@ -62,6 +66,7 @@ class PendingActionHelper {
 		$agent_id     = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
 		$user_id      = isset( $args['user_id'] ) ? (int) $args['user_id'] : get_current_user_id();
 		$context      = isset( $args['context'] ) && is_array( $args['context'] ) ? $args['context'] : array();
+		$action_id    = isset( $args['action_id'] ) ? (string) $args['action_id'] : '';
 
 		if ( '' === $kind ) {
 			return array(
@@ -79,7 +84,11 @@ class PendingActionHelper {
 			);
 		}
 
-		$action_id = PendingActionStore::generate_id();
+		// Accept a caller-supplied action_id only if it matches the generated
+		// shape; otherwise produce a fresh one.
+		if ( '' === $action_id || ! preg_match( '/^act_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $action_id ) ) {
+			$action_id = PendingActionStore::generate_id();
+		}
 
 		$payload = array(
 			'kind'         => $kind,
