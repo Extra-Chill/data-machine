@@ -609,6 +609,9 @@ function datamachine_activate_for_site() {
 	// Migrate agent_ping step types to flow configs (idempotent).
 	datamachine_migrate_agent_ping_to_system_task();
 
+	// Migrate agent_ping step types to pipeline configs (idempotent).
+	datamachine_migrate_agent_ping_pipeline_to_system_task();
+
 	// Migrate `update` step type to `upsert` in pipeline/flow configs (idempotent).
 	datamachine_migrate_update_to_upsert_step_type();
 

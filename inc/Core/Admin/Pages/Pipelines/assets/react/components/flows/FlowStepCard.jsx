@@ -68,7 +68,8 @@ export default function FlowStepCard( {
 		const handlerSlugs = flowStepConfig?.handler_slugs || [];
 		const primarySlug = handlerSlugs[0];
 		const primaryConfig = primarySlug && flowStepConfig?.handler_configs?.[primarySlug];
-		return primaryConfig?.prompt || '';
+		// Support both top-level prompt (legacy) and nested params.prompt (system_task).
+		return primaryConfig?.prompt || primaryConfig?.params?.prompt || '';
 	}, [ isAiStep, flowStepConfig.user_message, flowStepConfig?.handler_slugs, flowStepConfig?.handler_configs ] );
 
 	// Determine if this step type shows a prompt field.
@@ -77,7 +78,10 @@ export default function FlowStepCard( {
 	const handlerSlugs = flowStepConfig?.handler_slugs || [];
 	const primarySlug = handlerSlugs[0];
 	const primaryConfig = primarySlug && flowStepConfig?.handler_configs?.[primarySlug];
-	const hasPromptConfig = primaryConfig && primaryConfig.prompt !== undefined;
+	const hasPromptConfig = primaryConfig && (
+		primaryConfig.prompt !== undefined ||
+		primaryConfig.params?.prompt !== undefined
+	);
 	const showPromptField = isAiStep || shouldShowQueue || hasPromptConfig;
 
 	// Fields to exclude from inline config (handled by QueueablePromptField).
@@ -92,14 +96,28 @@ export default function FlowStepCard( {
 	const handlePromptSave = useCallback(
 		async ( value ) => {
 			try {
-				const config = isAiStep
-					? { user_message: value }
-					: {
+				let config;
+				if ( isAiStep ) {
+					config = { user_message: value };
+				} else if ( primaryConfig?.params?.prompt !== undefined ) {
+					// system_task with nested params (e.g. agent_ping).
+					config = {
 						handler_config: {
 							...( primaryConfig || {} ),
-							prompt: value
-						}
+							params: {
+								...( primaryConfig.params || {} ),
+								prompt: value,
+							},
+						},
 					};
+				} else {
+					config = {
+						handler_config: {
+							...( primaryConfig || {} ),
+							prompt: value,
+						},
+					};
+				}
 
 				const response = await updateFlowStepConfig( flowStepId, config );
 				if ( ! response?.success ) {
