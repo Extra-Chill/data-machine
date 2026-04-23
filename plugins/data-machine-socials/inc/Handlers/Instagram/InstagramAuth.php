@@ -23,6 +23,7 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	const AUTH_URL      = 'https://www.facebook.com/v18.0/dialog/oauth';
 	const TOKEN_URL     = 'https://graph.facebook.com/v18.0/oauth/access_token';
 	const GRAPH_API_URL = 'https://graph.instagram.com';
+	const FB_API_URL    = 'https://graph.facebook.com/v18.0';
 	const SCOPES        = 'instagram_basic,instagram_content_publish,instagram_manage_messages,instagram_manage_comments,pages_read_engagement';
 
 	public function __construct() {
@@ -160,12 +161,42 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 				'code'          => $code,
 			),
 			function ( $short_lived_token_data ) use ( $config ) {
-				// Instagram: Exchange short-lived for long-lived token
-				return $this->exchange_for_long_lived_token(
-					$short_lived_token_data['access_token'],
-					$short_lived_token_data['user_id'],
-					$config
-				);
+				$access_token = $short_lived_token_data['access_token'];
+
+				// Facebook Login doesn't return user_id in token response.
+				// Fetch Instagram Business Account ID from Facebook Graph API.
+				$user_id = $short_lived_token_data['user_id'] ?? null;
+				if ( empty( $user_id ) ) {
+					$user_id = $this->get_instagram_user_id_from_facebook_token( $access_token );
+				}
+
+				if ( empty( $user_id ) || is_wp_error( $user_id ) ) {
+					$error_msg = is_wp_error( $user_id ) ? $user_id->get_error_message() : 'Could not determine Instagram user ID.';
+					return new \WP_Error( 'instagram_missing_user_id', $error_msg );
+				}
+
+				// Try Facebook token extension (fb_exchange_token) for Facebook Login tokens.
+				// Falls back to Instagram ig_exchange_token for backward compatibility.
+				$long_lived = $this->exchange_for_long_lived_token_fb( $access_token, $config );
+				if ( is_wp_error( $long_lived ) ) {
+					// Fallback: try Instagram endpoint (legacy Basic Display tokens).
+					$long_lived = $this->exchange_for_long_lived_token( $access_token, $user_id, $config );
+				}
+
+				if ( is_wp_error( $long_lived ) ) {
+					return $long_lived;
+				}
+
+				$long_lived['user_id'] = $user_id;
+
+				// Fetch username.
+				$username = $this->get_username_from_token( $long_lived['access_token'], $user_id );
+				if ( is_wp_error( $username ) ) {
+					$username = '';
+				}
+				$long_lived['username'] = $username;
+
+				return $long_lived;
 			},
 			null, // No token transform needed after exchange
 			function ( $account_data ) {
@@ -176,12 +207,98 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	}
 
 	/**
-	 * Exchange short-lived token for long-lived token (Instagram-specific)
+	 * Get Instagram Business Account ID from a Facebook User Access Token.
 	 *
-	 * @param string $short_lived_token Short-lived access token
-	 * @param string $user_id Instagram user ID
-	 * @param array $config OAuth configuration
-	 * @return array|\WP_Error Token data ['access_token' => ..., 'user_id' => ..., 'expires_at' => ..., 'username' => ...] or error
+	 * Queries the user's Facebook Pages and extracts the connected
+	 * Instagram Business Account.
+	 *
+	 * @param string $access_token Facebook User Access Token.
+	 * @return string|\WP_Error Instagram user ID or error.
+	 */
+	private function get_instagram_user_id_from_facebook_token( string $access_token ): string|\WP_Error {
+		$url = self::FB_API_URL . '/me/accounts?fields=instagram_business_account{id,username}&access_token=' . $access_token;
+
+		$result = HttpClient::get( $url, array( 'context' => 'Instagram OAuth - Resolve IG Account' ) );
+
+		if ( ! $result['success'] ) {
+			return new \WP_Error( 'instagram_fb_resolve_failed', 'Failed to resolve Instagram account from Facebook token: ' . $result['error'] );
+		}
+
+		$body      = $result['data'];
+		$data      = json_decode( $body, true );
+		$http_code = $result['status_code'];
+
+		if ( 200 !== $http_code || isset( $data['error'] ) ) {
+			$error_message = $data['error']['message'] ?? 'Failed to resolve Instagram account.';
+			return new \WP_Error( 'instagram_fb_resolve_error', $error_message, $data );
+		}
+
+		if ( empty( $data['data'] ) || ! is_array( $data['data'] ) ) {
+			return new \WP_Error( 'instagram_no_pages', 'No Facebook Pages found. Link your Instagram Business account to a Facebook Page.' );
+		}
+
+		foreach ( $data['data'] as $page ) {
+			if ( ! empty( $page['instagram_business_account']['id'] ) ) {
+				return $page['instagram_business_account']['id'];
+			}
+		}
+
+		return new \WP_Error( 'instagram_no_linked_account', 'No Instagram Business Account linked to any Facebook Page.' );
+	}
+
+	/**
+	 * Exchange short-lived Facebook token for long-lived token.
+	 *
+	 * Uses Facebook's fb_exchange_token grant for tokens obtained via Facebook Login.
+	 *
+	 * @param string $short_lived_token Short-lived Facebook access token.
+	 * @param array  $config OAuth configuration.
+	 * @return array|\WP_Error Token data or error.
+	 */
+	private function exchange_for_long_lived_token_fb( string $short_lived_token, array $config ): array|\WP_Error {
+		do_action( 'datamachine_log', 'debug', 'Instagram OAuth: Exchanging short-lived Facebook token for long-lived token' );
+
+		$params = array(
+			'grant_type'    => 'fb_exchange_token',
+			'client_id'     => $config['app_id'] ?? '',
+			'client_secret' => $config['app_secret'] ?? '',
+			'fb_exchange_token' => $short_lived_token,
+		);
+		$url = self::FB_API_URL . '/oauth/access_token?' . http_build_query( $params );
+
+		$result = HttpClient::get( $url, array( 'context' => 'Instagram OAuth' ) );
+
+		if ( ! $result['success'] ) {
+			return new \WP_Error( 'instagram_fb_exchange_request_failed', $result['error'] );
+		}
+
+		$body      = $result['data'];
+		$data      = json_decode( $body, true );
+		$http_code = $result['status_code'];
+
+		if ( 200 !== $http_code || empty( $data['access_token'] ) ) {
+			$error_message = $data['error']['message'] ?? $data['error_description'] ?? 'Failed to exchange Facebook token.';
+			return new \WP_Error( 'instagram_fb_exchange_failed', $error_message, $data );
+		}
+
+		$expires_in = $data['expires_in'] ?? 3600 * 24 * 60;
+		$expires_at = time() + intval( $expires_in );
+
+		return array(
+			'access_token'     => $data['access_token'],
+			'token_expires_at' => $expires_at,
+		);
+	}
+
+	/**
+	 * Exchange short-lived token for long-lived token (Instagram-specific, legacy).
+	 *
+	 * Uses Instagram's ig_exchange_token grant for Basic Display tokens.
+	 *
+	 * @param string $short_lived_token Short-lived access token.
+	 * @param string $user_id Instagram user ID.
+	 * @param array  $config OAuth configuration.
+	 * @return array|\WP_Error Token data or error.
 	 */
 	private function exchange_for_long_lived_token( string $short_lived_token, string $user_id, array $config ): array|\WP_Error {
 		do_action( 'datamachine_log', 'debug', 'Instagram OAuth: Exchanging short-lived token for long-lived token' );
@@ -191,13 +308,12 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			'client_secret' => $config['app_secret'] ?? '',
 			'access_token'  => $short_lived_token,
 		);
-		$url    = self::GRAPH_API_URL . '/access_token?' . http_build_query( $params );
+		$url = self::GRAPH_API_URL . '/access_token?' . http_build_query( $params );
 
 		$result = HttpClient::get( $url, array( 'context' => 'Instagram OAuth' ) );
 
 		if ( ! $result['success'] ) {
-			do_action( 'datamachine_log', 'error', 'Instagram OAuth Error: Long-lived token exchange request failed', array( 'error' => $result['error'] ) );
-			return new \WP_Error( 'instagram_oauth_exchange_request_failed', __( 'HTTP error during long-lived token exchange with Instagram.', 'data-machine-socials' ), $result['error'] );
+			return new \WP_Error( 'instagram_oauth_exchange_request_failed', $result['error'] );
 		}
 
 		$body      = $result['data'];
@@ -206,15 +322,6 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 		if ( 200 !== $http_code || empty( $data['access_token'] ) ) {
 			$error_message = $data['error']['message'] ?? $data['error_description'] ?? 'Failed to retrieve long-lived access token from Instagram.';
-			do_action(
-				'datamachine_log',
-				'error',
-				'Instagram OAuth Error: Long-lived token exchange failed',
-				array(
-					'http_code' => $http_code,
-					'response'  => $body,
-				)
-			);
 			return new \WP_Error( 'instagram_oauth_exchange_failed', $error_message, $data );
 		}
 
@@ -222,18 +329,9 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		$expires_in       = $data['expires_in'] ?? 3600 * 24 * 60;
 		$expires_at       = time() + intval( $expires_in );
 
-		// Fetch username
-		$username = $this->get_username_from_token( $long_lived_token, $user_id );
-		if ( is_wp_error( $username ) ) {
-			$username = '';
-		}
-
-		do_action( 'datamachine_log', 'debug', 'Instagram OAuth: Successfully exchanged for long-lived token', array( 'user_id' => $user_id ) );
-
 		return array(
 			'access_token'     => $long_lived_token,
 			'user_id'          => $user_id,
-			'username'         => $username,
 			'token_expires_at' => $expires_at,
 		);
 	}
@@ -256,7 +354,6 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		);
 
 		if ( ! $result['success'] ) {
-			do_action( 'datamachine_log', 'error', 'Instagram OAuth Error: Username fetch request failed', array( 'error' => $result['error'] ) );
 			return new \WP_Error( 'instagram_username_fetch_failed', $result['error'] );
 		}
 
@@ -266,15 +363,6 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 		if ( 200 !== $http_code || isset( $data['error'] ) ) {
 			$error_message = $data['error']['message'] ?? 'Failed to fetch Instagram username.';
-			do_action(
-				'datamachine_log',
-				'error',
-				'Instagram OAuth Error: Username fetch failed',
-				array(
-					'http_code' => $http_code,
-					'response'  => $body,
-				)
-			);
 			return new \WP_Error( 'instagram_username_fetch_failed', $error_message, $data );
 		}
 
