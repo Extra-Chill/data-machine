@@ -21,32 +21,6 @@ class ToolExecutor {
 
 
 	/**
-	 * Get available tools for AI agent execution.
-	 *
-	 * @deprecated 0.39.0 Use ToolPolicyResolver::resolve() with MODE_PIPELINE instead.
-	 *             Delegates to ToolPolicyResolver internally.
-	 *
-	 * @param  array|null  $previous_step_config     Previous step configuration (pipeline only)
-	 * @param  array|null  $next_step_config         Next step configuration (pipeline only)
-	 * @param  string|null $current_pipeline_step_id Current pipeline step ID (pipeline only)
-	 * @param  array       $engine_data              Engine data snapshot for dynamic tool generation
-	 * @return array Available tools array
-	 */
-	public static function getAvailableTools( ?array $previous_step_config = null, ?array $next_step_config = null, ?string $current_pipeline_step_id = null, array $engine_data = array() ): array {
-		$resolver = new ToolPolicyResolver();
-
-		return $resolver->resolve(
-			array(
-				'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
-				'previous_step_config' => $previous_step_config,
-				'next_step_config'     => $next_step_config,
-				'pipeline_step_id'     => $current_pipeline_step_id,
-				'engine_data'          => $engine_data,
-			)
-		);
-	}
-
-	/**
 	 * Execute tool with parameter merging and comprehensive error handling.
 	 * Builds complete parameters by combining AI parameters with step payload.
 	 *

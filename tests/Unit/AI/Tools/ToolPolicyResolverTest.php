@@ -515,32 +515,6 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	// ============================================
-	// DEPRECATED METHOD DELEGATION
-	// ============================================
-
-	public function test_deprecated_executor_delegates_to_resolver(): void {
-		$executor_tools = \DataMachine\Engine\AI\Tools\ToolExecutor::getAvailableTools( null, null, null, array() );
-		$resolver_tools = $this->resolver->resolve(
-			array(
-				'mode' => ToolPolicyResolver::MODE_PIPELINE,
-			)
-		);
-
-		$this->assertSame( $executor_tools, $resolver_tools );
-	}
-
-	public function test_deprecated_manager_delegates_to_resolver(): void {
-		$manager_tools  = ( new ToolManager() )->getAvailableToolsForChat();
-		$resolver_tools = $this->resolver->resolve(
-			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
-			)
-		);
-
-		$this->assertSame( $manager_tools, $resolver_tools );
-	}
-
-	// ============================================
 	// AGENT TOOL POLICY
 	// ============================================
 

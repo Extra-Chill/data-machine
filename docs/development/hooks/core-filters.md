@@ -1197,14 +1197,22 @@ Builds parameters for handler-specific tools with engine data merging (source_ur
 
 **Core Method**:
 
-#### `getAvailableTools()`
+#### `ToolPolicyResolver::resolve()`
+
+Tool discovery moved from `ToolExecutor::getAvailableTools()` (removed in 0.79)
+to `ToolPolicyResolver::resolve()`. Single entry point for chat and pipeline
+modes.
+
 ```php
-\DataMachine\Engine\AI\ToolExecutor::getAvailableTools(
-    string $agent_type,      // 'pipeline' or 'chat'
-    ?string $handler_slug,   // Handler identifier
-    array $handler_config,   // Handler configuration
-    ?string $flow_step_id    // Flow step identifier
-): array
+$resolver = new \DataMachine\Engine\AI\Tools\ToolPolicyResolver();
+
+$tools = $resolver->resolve( array(
+    'mode'                 => ToolPolicyResolver::MODE_PIPELINE, // or MODE_CHAT, MODE_SYSTEM
+    'previous_step_config' => $previous_step_config,
+    'next_step_config'     => $next_step_config,
+    'pipeline_step_id'     => $flow_step_id,
+    'engine_data'          => $engine_data,
+) );
 ```
 
 **Discovery Process**:
