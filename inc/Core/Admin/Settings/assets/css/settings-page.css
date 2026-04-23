@@ -512,6 +512,7 @@
     border-radius: 4px;
     padding: 16px;
     background: #fff;
+    min-width: 0;
 }
 
 .datamachine-auth-card--connected {
@@ -573,6 +574,9 @@
     font-size: 13px;
     color: #50575e;
     margin-bottom: 8px;
+    word-break: break-all;
+    overflow-wrap: break-word;
+    max-width: 100%;
 }
 
 /* Card notice */
