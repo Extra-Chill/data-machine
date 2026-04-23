@@ -56,7 +56,7 @@ The **CoreMemoryFilesDirective** loads all files from the **MemoryFileRegistry**
 - Editable through the WordPress admin Agent page
 - No serialization — plain markdown, human-readable, git-friendly
 - Core files created on activation with starter templates
-- Discover paths via `wp datamachine agent paths --allow-root`
+- Discover paths via `wp datamachine memory paths --allow-root`
 
 ### 2. Daily Memory — Temporal Knowledge
 
@@ -142,7 +142,7 @@ wp datamachine agents create --slug=my-agent --name="My Agent" --allow-root
 wp datamachine agents rename old-slug new-slug --allow-root
 
 # Discover file paths for an agent
-wp datamachine agent paths --agent=my-agent --allow-root
+wp datamachine memory paths --agent=my-agent --allow-root
 ```
 
 ## Core Memory Files
@@ -398,13 +398,13 @@ The canonical way to find agent memory file paths is via WP-CLI:
 
 ```bash
 # Discover all paths for the current agent
-wp datamachine agent paths --allow-root
+wp datamachine memory paths --allow-root
 
 # For a specific agent
-wp datamachine agent paths --agent=my-agent --allow-root
+wp datamachine memory paths --agent=my-agent --allow-root
 
 # Table format for readability
-wp datamachine agent paths --format=table --allow-root
+wp datamachine memory paths --format=table --allow-root
 ```
 
 Output structure:
@@ -456,24 +456,24 @@ This makes WordPress the single source of truth for agent memory, regardless of 
 
 ### Reading Memory via WP-CLI
 
-Agents with shell access can use the `agent` command for structured access:
+Agents with shell access can use the `memory` command for structured access:
 
 ```bash
 # Discover file paths (canonical command for external consumers)
-wp datamachine agent paths --allow-root
+wp datamachine memory paths --allow-root
 
 # Read memory file
-wp datamachine agent files read SOUL.md --allow-root
-wp datamachine agent files read MEMORY.md --allow-root
+wp datamachine memory files read SOUL.md --allow-root
+wp datamachine memory files read MEMORY.md --allow-root
 
 # List agent directory contents
-wp datamachine agent files list --allow-root
+wp datamachine memory files list --allow-root
 
 # Read daily memory
-wp datamachine agent daily read 2026-03-15 --allow-root
+wp datamachine memory daily read 2026-03-15 --allow-root
 
 # Search daily memory
-wp datamachine agent daily search "deployment" --allow-root
+wp datamachine memory daily search "deployment" --allow-root
 ```
 
 ### The Key Principle
@@ -634,16 +634,16 @@ All daily memory abilities accept `user_id` and `agent_id` for multi-agent scopi
 
 ```bash
 # Canonical discovery command — returns all layer paths and file locations
-wp datamachine agent paths --allow-root
+wp datamachine memory paths --allow-root
 
 # Resolve for a specific agent
-wp datamachine agent paths --agent=my-agent --allow-root
+wp datamachine memory paths --agent=my-agent --allow-root
 
 # Table format
-wp datamachine agent paths --format=table --allow-root
+wp datamachine memory paths --format=table --allow-root
 
 # Relative paths (useful for AGENTS.md generators)
-wp datamachine agent paths --relative --allow-root
+wp datamachine memory paths --relative --allow-root
 ```
 
 ### Agent Management
@@ -657,11 +657,11 @@ wp datamachine agents rename old-slug new-slug --allow-root
 ### Agent File Commands
 
 ```bash
-wp datamachine agent paths --allow-root
-wp datamachine agent files list --allow-root
-wp datamachine agent files read <file> --allow-root
-wp datamachine agent files write <file> --content="..." --allow-root
-wp datamachine agent files edit <file> --old="..." --new="..." --allow-root
+wp datamachine memory paths --allow-root
+wp datamachine memory files list --allow-root
+wp datamachine memory files read <file> --allow-root
+wp datamachine memory files write <file> --content="..." --allow-root
+wp datamachine memory files edit <file> --old="..." --new="..." --allow-root
 ```
 
 > **Note:** For workspace/git operations, install the `data-machine-code` extension and use `wp datamachine-code workspace`.

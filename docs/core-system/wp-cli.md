@@ -187,11 +187,12 @@ wp datamachine jobs undo 42 --task-type=alt_text --force
 
 ### datamachine agents
 
-Manage agent identities. **Since**: 0.37.0
+Manage agent identities. **Aliases**: `agent`. **Since**: 0.37.0
 
 ```bash
 # List all agents
 wp datamachine agents list
+wp datamachine agent list  # alias
 
 # Show agent details (config, access grants, directory info)
 wp datamachine agents show my-agent
@@ -211,44 +212,44 @@ wp datamachine agents access revoke my-agent 2
 wp datamachine agents access list my-agent
 ```
 
-### datamachine agent
+### datamachine memory
 
-Agent memory operations. **Alias**: `memory`. **Since**: 0.30.0
+Agent memory-file operations. **Since**: 0.30.0
 
 ```bash
 # Read full memory
-wp datamachine agent read
+wp datamachine memory read
 
 # Read a specific section
-wp datamachine agent read "## State"
+wp datamachine memory read "## State"
 
 # List sections
-wp datamachine agent sections
+wp datamachine memory sections
 
 # Write to a section
-wp datamachine agent write "## State" "Active and running"
-wp datamachine agent write "## State" "New note" --mode=append
+wp datamachine memory write "## State" "Active and running"
+wp datamachine memory write "## State" "New note" --mode=append
 
 # Search memory
-wp datamachine agent search "deployment" --section="## State"
+wp datamachine memory search "deployment" --section="## State"
 
 # Daily memory operations
-wp datamachine agent daily list
-wp datamachine agent daily read 2026-03-15
-wp datamachine agent daily write 2026-03-15 "Session notes"
-wp datamachine agent daily append 2026-03-15 "More notes"
-wp datamachine agent daily delete 2026-03-15
-wp datamachine agent daily search "keyword" --from=2026-03-01 --to=2026-03-15
+wp datamachine memory daily list
+wp datamachine memory daily read 2026-03-15
+wp datamachine memory daily write 2026-03-15 "Session notes"
+wp datamachine memory daily append 2026-03-15 "More notes"
+wp datamachine memory daily delete 2026-03-15
+wp datamachine memory daily search "keyword" --from=2026-03-01 --to=2026-03-15
 
 # Agent file management
-wp datamachine agent files list
-wp datamachine agent files read SOUL.md
-echo "content" | wp datamachine agent files write CUSTOM.md
-wp datamachine agent files check --days=7
+wp datamachine memory files list
+wp datamachine memory files read SOUL.md
+echo "content" | wp datamachine memory files write CUSTOM.md
+wp datamachine memory files check --days=7
 
 # Show resolved file paths for all memory layers
-wp datamachine agent paths
-wp datamachine agent paths --agent=my-agent --format=json
+wp datamachine memory paths
+wp datamachine memory paths --agent=my-agent --format=json
 ```
 
 
@@ -650,7 +651,8 @@ Most commands have singular and plural forms:
 - `wp datamachine step-type` / `wp datamachine step-types`
 - `wp datamachine processed-item` / `wp datamachine processed-items`
 - `wp datamachine setting` / `wp datamachine settings`
-- `wp datamachine agent` / `wp datamachine memory` (backwards-compatible alias)
+- `wp datamachine agent` / `wp datamachine agents` (agent management)
+- `wp datamachine memory` (agent memory-file operations)
 
 ## Examples
 
@@ -687,6 +689,6 @@ fi
 
 ```bash
 # Read current memory, update a section, verify
-wp datamachine agent read
-wp datamachine agent write "## Status" "All systems operational"
-wp datamachine agent search "operational"
+wp datamachine memory read
+wp datamachine memory write "## Status" "All systems operational"
+wp datamachine memory search "operational"
