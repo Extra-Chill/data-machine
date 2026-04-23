@@ -20,10 +20,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
-	const AUTH_URL      = 'https://www.instagram.com/oauth/authorize';
-	const TOKEN_URL     = 'https://api.instagram.com/oauth/access_token';
+	const AUTH_URL      = 'https://www.facebook.com/v18.0/dialog/oauth';
+	const TOKEN_URL     = 'https://graph.instagram.com/oauth/access_token';
 	const GRAPH_API_URL = 'https://graph.instagram.com';
-	const SCOPES        = 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages,instagram_business_manage_comments';
+	const SCOPES        = 'instagram_basic,instagram_content_publish,instagram_manage_messages,instagram_manage_comments,pages_read_engagement';
 
 	public function __construct() {
 		parent::__construct( 'instagram' );
@@ -134,7 +134,6 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 			'scope'                => self::SCOPES,
 			'response_type'        => 'code',
 			'state'                => $state,
-			'enable_fb_login'      => '0',
 			'force_authentication' => '1',
 		);
 
