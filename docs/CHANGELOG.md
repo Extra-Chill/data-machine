@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.77.0] - 2026-04-23
+
+### Added
+- generic idempotent upsert primitive + ResolvePostByPath helper
+- feat(composable-files): invalidation class + plugin state-change filter
+
+### Changed
+- disable homeboy autofix
+
 ## [0.76.0] - 2026-04-22
 
 ### Added
