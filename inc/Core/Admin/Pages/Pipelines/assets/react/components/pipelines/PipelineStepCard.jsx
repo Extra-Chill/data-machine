@@ -37,8 +37,18 @@ export default function PipelineStepCard( {
 	// Use TanStack Query for data
 	const { data: stepTypes = {} } = useStepTypes();
 	const isAiStep = step.step_type === 'ai';
+	const isSystemTask = step.step_type === 'system_task';
 
 	const stepConfig = pipelineConfig[ step.pipeline_step_id ] || null;
+
+	// Resolve display label: step type registry, then legacy fallback for agent_ping.
+	const displayLabel = stepTypes[ step.step_type ]?.label
+		|| ( step.step_type === 'agent_ping' ? __( 'Agent Ping', 'data-machine' ) : step.step_type );
+
+	// For system_task steps, show the task name badge (e.g. "Agent Ping").
+	const systemTaskName = isSystemTask
+		? ( stepConfig?.handler_configs?.system_task?.task || step.handler_configs?.system_task?.task || '' )
+		: '';
 
 	/**
 	 * Save system prompt to API (AI steps)
@@ -106,8 +116,13 @@ export default function PipelineStepCard( {
 			<CardBody>
 				<div className="datamachine-step-card-header">
 					<strong>
-						{ stepTypes[ step.step_type ]?.label || step.step_type }
+						{ displayLabel }
 					</strong>
+					{ systemTaskName && (
+						<span className="datamachine-step-card-task-badge">
+							{ systemTaskName }
+						</span>
+					) }
 				</div>
 
 				{ /* AI Step: inline system prompt editor */ }
