@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.78.0] - 2026-04-23
+
+### Added
+- feat(upsert-post): add post_author parameter for create path
+
 ## [0.77.0] - 2026-04-23
 
 ### Added
