@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.29.3] - 2026-04-23
+
+### Changed
+- delegate create/update/no_change to DM core upsert-post ability
+- disable homeboy autofix
+
 ## [0.29.2] - 2026-04-20
 
 ### Fixed
