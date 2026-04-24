@@ -3,6 +3,7 @@
 namespace DataMachine\Core\Steps\Fetch;
 
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Abilities\HandlerAbilities;
@@ -19,11 +20,25 @@ if ( ! defined( 'ABSPATH' ) ) {
  * PipelineBatchScheduler is active, multiple packets trigger fan-out
  * into child jobs.
  *
+ * Supports queue-driven dynamic params via QueueableTrait. When
+ * `queue_enabled` is true on the flow step config, the step pops one
+ * queued JSON-encoded patch per invocation and deep-merges it into the
+ * handler's static config before invoking the handler. This is how
+ * windowed retroactive backfills (a flow that processes a different
+ * date range each tick) and rotating-source forward-ingestion are
+ * expressed without an external orchestrator.
+ *
+ * Empty queue with queue_enabled=true is treated as a no-op tick: the
+ * job completes with COMPLETED_NO_ITEMS and no fetch is attempted. This
+ * matches the AI step's queue-empty behaviour and keeps recurring flows
+ * idempotent once their backfill queue drains.
+ *
  * @package DataMachine
  */
 class FetchStep extends Step {
 
 	use StepTypeRegistrationTrait;
+	use QueueableTrait;
 
 	/**
 	 * Initialize fetch step.
@@ -62,6 +77,45 @@ class FetchStep extends Step {
 		if ( ! isset( $this->flow_step_config['flow_id'] ) || empty( $this->flow_step_config['flow_id'] ) ) {
 			$this->log( 'error', 'Fetch Step: Missing flow_id in step config' );
 			return $this->dataPackets;
+		}
+
+		// Queue-driven params: when enabled, pop one queued patch and
+		// merge it into the static handler config. This is how a flow
+		// expresses "every tick, process the next windowed slice" with
+		// no external orchestrator.
+		$queue_enabled = (bool) ( $this->flow_step_config['queue_enabled'] ?? false );
+
+		if ( $queue_enabled ) {
+			$queue_result = $this->popQueuedConfigPatch( true );
+
+			if ( ! $queue_result['from_queue'] ) {
+				// Queue enabled but empty — clean no-op tick. Mark the
+				// job as completed-no-items so the engine treats this
+				// as success rather than a fetch failure.
+				$this->log(
+					'info',
+					'Fetch step skipped — queue enabled but empty',
+					array(
+						'flow_step_id' => $this->flow_step_id,
+					)
+				);
+
+				$this->engine->set( 'job_status', \DataMachine\Core\JobStatus::COMPLETED_NO_ITEMS );
+
+				return $this->dataPackets;
+			}
+
+			$handler_settings = $this->mergeQueuedConfigPatch( $handler_settings, $queue_result['patch'] );
+
+			$this->log(
+				'info',
+				'Fetch step merged queued config patch',
+				array(
+					'flow_step_id'  => $this->flow_step_id,
+					'patch_keys'    => array_keys( $queue_result['patch'] ),
+					'queued_at'     => $queue_result['added_at'],
+				)
+			);
 		}
 
 		$handler_settings['flow_step_id'] = $this->flow_step_config['flow_step_id'];
