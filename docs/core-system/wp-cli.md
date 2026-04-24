@@ -107,27 +107,49 @@ wp datamachine flows queue validate 10 "AI agents" --post_type=post --threshold=
 
 ### datamachine flows webhook
 
-Manage webhook triggers. **Since**: 0.31.0
+Manage webhook triggers. Supports two auth modes: Bearer (default) and HMAC-SHA256. **Since**: 0.31.0 (Bearer), 0.79.0 (HMAC).
 
 ```bash
-# Enable webhook trigger (generates token and shows curl example)
+# Enable webhook trigger with default Bearer auth
 wp datamachine flows webhook enable 10
 
-# Check webhook status
+# Enable with HMAC-SHA256 auth (GitHub-style) and a generated secret
+wp datamachine flows webhook enable 10 --auth-mode=hmac_sha256 --generate-secret
+
+# Enable with HMAC for a non-GitHub provider (Shopify example)
+wp datamachine flows webhook enable 10 \
+  --auth-mode=hmac_sha256 \
+  --signature-header=X-Shopify-Hmac-Sha256 \
+  --signature-format=base64 \
+  --secret=<shopify_secret>
+
+# Set or rotate the HMAC secret (prints the new secret once)
+wp datamachine flows webhook set-secret 10 --generate
+wp datamachine flows webhook set-secret 10 --secret=<value>
+
+# Check webhook status (shows auth mode; never shows secret/token)
 wp datamachine flows webhook status 10
 
 # List all webhook-enabled flows
 wp datamachine flows webhook list
 
-# Regenerate token
+# Regenerate Bearer token (bearer mode only)
 wp datamachine flows webhook regenerate 10
 
 # Configure rate limiting
 wp datamachine flows webhook rate-limit 10 --max=10 --window=60
 
-# Disable webhook
+# Disable webhook (clears all auth material, both modes)
 wp datamachine flows webhook disable 10
 ```
+
+**Signature formats for HMAC mode** (`--signature-format`):
+- `sha256=hex` (default) — GitHub-style `sha256=<hex>` header values.
+- `hex` — raw hex digest (e.g. Linear).
+- `base64` — base64-encoded raw digest (e.g. Shopify).
+
+See [Webhook Triggers](../api/endpoints/webhook-triggers.md) for the full
+GitHub walkthrough and security notes.
 
 ### datamachine flows bulk-config
 

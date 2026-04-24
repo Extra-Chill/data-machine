@@ -66,13 +66,27 @@ class WebhookTrigger {
 	}
 
 	/**
+	 * Default maximum raw body size (1 MB).
+	 *
+	 * @var int
+	 */
+	const DEFAULT_MAX_BODY_BYTES = 1048576;
+
+	/**
 	 * Handle inbound webhook trigger.
 	 *
-	 * Authentication flow:
+	 * Authentication flow (Bearer, default):
 	 * 1. Extract Bearer token from Authorization header
 	 * 2. Load flow by ID
 	 * 3. Verify webhook_enabled in scheduling_config
 	 * 4. Constant-time token comparison via hash_equals()
+	 * 5. Delegate to execute-workflow ability
+	 *
+	 * Authentication flow (HMAC-SHA256, opt-in via `webhook_auth_mode`):
+	 * 1. Load flow by ID
+	 * 2. Verify webhook_enabled and a non-empty secret in scheduling_config
+	 * 3. Enforce optional max body size (413 on overflow)
+	 * 4. Verify signature header via WebhookSignatureVerifier::verify_hmac_sha256()
 	 * 5. Delegate to execute-workflow ability
 	 *
 	 * Returns generic 401 for all auth failures to prevent information leakage.
@@ -83,48 +97,7 @@ class WebhookTrigger {
 	public static function handle_trigger( \WP_REST_Request $request ) {
 		$flow_id = (int) $request->get_param( 'flow_id' );
 
-		// Extract Bearer token from Authorization header.
-		$auth_header = $request->get_header( 'authorization' );
-		$token       = self::extract_bearer_token( $auth_header );
-
-		if ( ! $token ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'Webhook trigger: Missing or malformed Authorization header',
-				array(
-					'flow_id'   => $flow_id,
-					'remote_ip' => self::get_remote_ip( $request ),
-				)
-			);
-
-			return new \WP_Error(
-				'unauthorized',
-				'Invalid or missing authorization.',
-				array( 'status' => 401 )
-			);
-		}
-
-		// Validate token format before database lookup.
-		if ( ! preg_match( '/^[a-f0-9]{64}$/', $token ) ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'Webhook trigger: Invalid token format',
-				array(
-					'flow_id'   => $flow_id,
-					'remote_ip' => self::get_remote_ip( $request ),
-				)
-			);
-
-			return new \WP_Error(
-				'unauthorized',
-				'Invalid or missing authorization.',
-				array( 'status' => 401 )
-			);
-		}
-
-		// Load flow and validate webhook configuration.
+		// Load flow first so auth-mode branching can read scheduling_config.
 		$db_flows = new Flows();
 		$flow     = $db_flows->get_flow( $flow_id );
 
@@ -149,9 +122,8 @@ class WebhookTrigger {
 
 		$scheduling_config = $flow['scheduling_config'] ?? array();
 		$webhook_enabled   = ! empty( $scheduling_config['webhook_enabled'] );
-		$stored_token      = $scheduling_config['webhook_token'] ?? '';
 
-		if ( ! $webhook_enabled || empty( $stored_token ) ) {
+		if ( ! $webhook_enabled ) {
 			do_action(
 				'datamachine_log',
 				'warning',
@@ -169,23 +141,16 @@ class WebhookTrigger {
 			);
 		}
 
-		// Constant-time token comparison to prevent timing attacks.
-		if ( ! hash_equals( $stored_token, $token ) ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'Webhook trigger: Token mismatch',
-				array(
-					'flow_id'   => $flow_id,
-					'remote_ip' => self::get_remote_ip( $request ),
-				)
-			);
+		$auth_mode = self::resolve_auth_mode( $scheduling_config );
 
-			return new \WP_Error(
-				'unauthorized',
-				'Invalid or missing authorization.',
-				array( 'status' => 401 )
-			);
+		if ( 'hmac_sha256' === $auth_mode ) {
+			$auth_error = self::authenticate_hmac( $flow_id, $scheduling_config, $request );
+		} else {
+			$auth_error = self::authenticate_bearer( $flow_id, $scheduling_config, $request );
+		}
+
+		if ( $auth_error instanceof \WP_Error ) {
+			return $auth_error;
 		}
 
 		// Check rate limit before executing.
@@ -221,6 +186,17 @@ class WebhookTrigger {
 			$webhook_body = $request->get_body_params();
 		}
 		if ( empty( $webhook_body ) ) {
+			// Fall back to decoding the raw body — HMAC flows often arrive with
+			// non-standard content types that skip WP's automatic parsing.
+			$raw = $request->get_body();
+			if ( ! empty( $raw ) ) {
+				$decoded = json_decode( $raw, true );
+				if ( is_array( $decoded ) ) {
+					$webhook_body = $decoded;
+				}
+			}
+		}
+		if ( empty( $webhook_body ) ) {
 			$webhook_body = array();
 		}
 
@@ -233,6 +209,7 @@ class WebhookTrigger {
 					'received_at' => gmdate( 'Y-m-d\TH:i:s\Z' ),
 					'remote_ip'   => self::get_remote_ip( $request ),
 					'headers'     => self::get_safe_headers( $request ),
+					'auth_mode'   => $auth_mode,
 				),
 			),
 		);
@@ -319,6 +296,224 @@ class WebhookTrigger {
 	 * @var int
 	 */
 	const DEFAULT_RATE_LIMIT_WINDOW = 60;
+
+	/**
+	 * Resolve the effective webhook auth mode for a flow.
+	 *
+	 * Missing / unrecognized values default to `bearer` so existing flows
+	 * behave identically to before HMAC support was added.
+	 *
+	 * @param array $scheduling_config Flow scheduling config.
+	 * @return string Either 'bearer' or 'hmac_sha256'.
+	 */
+	private static function resolve_auth_mode( array $scheduling_config ): string {
+		$mode = $scheduling_config['webhook_auth_mode'] ?? 'bearer';
+		if ( 'hmac_sha256' === $mode ) {
+			return 'hmac_sha256';
+		}
+		return 'bearer';
+	}
+
+	/**
+	 * Authenticate a webhook request using a per-flow Bearer token.
+	 *
+	 * @param int              $flow_id          Flow ID.
+	 * @param array            $scheduling_config Flow scheduling config.
+	 * @param \WP_REST_Request $request          REST request object.
+	 * @return \WP_Error|null WP_Error on failure, null on success.
+	 */
+	private static function authenticate_bearer( int $flow_id, array $scheduling_config, \WP_REST_Request $request ): ?\WP_Error {
+		$auth_header = $request->get_header( 'authorization' );
+		$token       = self::extract_bearer_token( $auth_header );
+
+		if ( ! $token ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Webhook trigger: Missing or malformed Authorization header',
+				array(
+					'flow_id'   => $flow_id,
+					'remote_ip' => self::get_remote_ip( $request ),
+				)
+			);
+
+			return new \WP_Error(
+				'unauthorized',
+				'Invalid or missing authorization.',
+				array( 'status' => 401 )
+			);
+		}
+
+		// Validate token format before database lookup.
+		if ( ! preg_match( '/^[a-f0-9]{64}$/', $token ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Webhook trigger: Invalid token format',
+				array(
+					'flow_id'   => $flow_id,
+					'remote_ip' => self::get_remote_ip( $request ),
+				)
+			);
+
+			return new \WP_Error(
+				'unauthorized',
+				'Invalid or missing authorization.',
+				array( 'status' => 401 )
+			);
+		}
+
+		$stored_token = $scheduling_config['webhook_token'] ?? '';
+
+		if ( empty( $stored_token ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Webhook trigger: Bearer token not configured for flow',
+				array(
+					'flow_id'   => $flow_id,
+					'remote_ip' => self::get_remote_ip( $request ),
+				)
+			);
+
+			return new \WP_Error(
+				'unauthorized',
+				'Invalid or missing authorization.',
+				array( 'status' => 401 )
+			);
+		}
+
+		// Constant-time token comparison to prevent timing attacks.
+		if ( ! hash_equals( $stored_token, $token ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Webhook trigger: Token mismatch',
+				array(
+					'flow_id'   => $flow_id,
+					'remote_ip' => self::get_remote_ip( $request ),
+				)
+			);
+
+			return new \WP_Error(
+				'unauthorized',
+				'Invalid or missing authorization.',
+				array( 'status' => 401 )
+			);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Authenticate a webhook request using HMAC-SHA256 signatures.
+	 *
+	 * Verifies the raw request body (`$request->get_body()`) against a
+	 * provider-specified signature header, using the shared secret stored
+	 * in `scheduling_config.webhook_secret`.
+	 *
+	 * @param int              $flow_id          Flow ID.
+	 * @param array            $scheduling_config Flow scheduling config.
+	 * @param \WP_REST_Request $request          REST request object.
+	 * @return \WP_Error|null WP_Error on failure, null on success.
+	 */
+	private static function authenticate_hmac( int $flow_id, array $scheduling_config, \WP_REST_Request $request ): ?\WP_Error {
+		$secret = $scheduling_config['webhook_secret'] ?? '';
+		if ( empty( $secret ) || ! is_string( $secret ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Webhook trigger: HMAC secret not configured for flow',
+				array(
+					'flow_id'   => $flow_id,
+					'remote_ip' => self::get_remote_ip( $request ),
+				)
+			);
+
+			return new \WP_Error(
+				'unauthorized',
+				'Invalid or missing authorization.',
+				array( 'status' => 401 )
+			);
+		}
+
+		$signature_header = $scheduling_config['webhook_signature_header'] ?? 'X-Hub-Signature-256';
+		$signature_format = $scheduling_config['webhook_signature_format'] ?? WebhookSignatureVerifier::FORMAT_PREFIXED_HEX;
+
+		$provided = $request->get_header( $signature_header );
+		if ( empty( $provided ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Webhook trigger: Missing HMAC signature header',
+				array(
+					'flow_id'          => $flow_id,
+					'remote_ip'        => self::get_remote_ip( $request ),
+					'signature_header' => $signature_header,
+				)
+			);
+
+			return new \WP_Error(
+				'unauthorized',
+				'Invalid or missing authorization.',
+				array( 'status' => 401 )
+			);
+		}
+
+		$raw_body = $request->get_body();
+
+		// Enforce an optional max body size before running HMAC — unauthenticated
+		// clients can otherwise force the server to hash arbitrarily large payloads.
+		$max_body_bytes = (int) ( $scheduling_config['webhook_max_body_bytes'] ?? self::DEFAULT_MAX_BODY_BYTES );
+		if ( $max_body_bytes > 0 && strlen( $raw_body ) > $max_body_bytes ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Webhook trigger: Payload exceeds max_body_bytes',
+				array(
+					'flow_id'   => $flow_id,
+					'remote_ip' => self::get_remote_ip( $request ),
+					'size'      => strlen( $raw_body ),
+					'limit'     => $max_body_bytes,
+				)
+			);
+
+			return new \WP_Error(
+				'payload_too_large',
+				'Payload too large.',
+				array( 'status' => 413 )
+			);
+		}
+
+		$valid = WebhookSignatureVerifier::verify_hmac_sha256(
+			$raw_body,
+			$provided,
+			$secret,
+			$signature_format
+		);
+
+		if ( ! $valid ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Webhook trigger: HMAC signature mismatch',
+				array(
+					'flow_id'          => $flow_id,
+					'remote_ip'        => self::get_remote_ip( $request ),
+					'signature_header' => $signature_header,
+					'signature_format' => $signature_format,
+				)
+			);
+
+			return new \WP_Error(
+				'unauthorized',
+				'Invalid or missing authorization.',
+				array( 'status' => 401 )
+			);
+		}
+
+		return null;
+	}
 
 	/**
 	 * Check rate limit for a webhook trigger request.
@@ -445,6 +640,12 @@ class WebhookTrigger {
 			'x-hub-signature-256',
 			'x-webhook-id',
 			'x-request-id',
+			'x-shopify-topic',
+			'x-shopify-hmac-sha256',
+			'stripe-signature',
+			'linear-signature',
+			'x-slack-signature',
+			'x-slack-request-timestamp',
 		);
 
 		$headers = array();
