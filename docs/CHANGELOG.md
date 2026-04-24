@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.80.0] - 2026-04-24
+
+### Added
+- queueable fetch step — drive handler params from prompt queue (#1196)
+
+### Changed
+- Dead code sweep in React admin
+
 ## [0.79.1] - 2026-04-24
 
 ### Changed
