@@ -42,30 +42,97 @@ class WebhookTriggerAbility {
 				'datamachine/webhook-trigger-enable',
 				array(
 					'label'               => __( 'Enable Webhook Trigger', 'data-machine' ),
-					'description'         => __( 'Enable webhook trigger for a flow and generate a Bearer token. External services can POST to the trigger URL to start flow executions.', 'data-machine' ),
+					'description'         => __( 'Enable webhook trigger for a flow. Supports Bearer token (default) or HMAC-SHA256 authentication. External services can POST to the trigger URL to start flow executions.', 'data-machine' ),
 					'category'            => 'datamachine-flow',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'flow_id' ),
 						'properties' => array(
-							'flow_id' => array(
+							'flow_id'          => array(
 								'type'        => 'integer',
 								'description' => __( 'Flow ID to enable webhook trigger for', 'data-machine' ),
+							),
+							'auth_mode'        => array(
+								'type'        => 'string',
+								'enum'        => array( 'bearer', 'hmac_sha256' ),
+								'description' => __( 'Authentication mode. Defaults to bearer for backward compatibility.', 'data-machine' ),
+							),
+							'signature_header' => array(
+								'type'        => 'string',
+								'description' => __( 'HMAC signature header name (e.g. X-Hub-Signature-256). Only used when auth_mode is hmac_sha256.', 'data-machine' ),
+							),
+							'signature_format' => array(
+								'type'        => 'string',
+								'enum'        => array( 'sha256=hex', 'hex', 'base64' ),
+								'description' => __( 'HMAC signature encoding. Only used when auth_mode is hmac_sha256.', 'data-machine' ),
+							),
+							'generate_secret'  => array(
+								'type'        => 'boolean',
+								'description' => __( 'When auth_mode is hmac_sha256, auto-generate a random 32-byte hex secret.', 'data-machine' ),
+							),
+							'secret'           => array(
+								'type'        => 'string',
+								'description' => __( 'When auth_mode is hmac_sha256, use this secret value (takes precedence over generate_secret).', 'data-machine' ),
 							),
 						),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'     => array( 'type' => 'boolean' ),
-							'flow_id'     => array( 'type' => 'integer' ),
-							'webhook_url' => array( 'type' => 'string' ),
-							'token'       => array( 'type' => 'string' ),
-							'message'     => array( 'type' => 'string' ),
-							'error'       => array( 'type' => 'string' ),
+							'success'          => array( 'type' => 'boolean' ),
+							'flow_id'          => array( 'type' => 'integer' ),
+							'webhook_url'      => array( 'type' => 'string' ),
+							'auth_mode'        => array( 'type' => 'string' ),
+							'token'            => array( 'type' => 'string' ),
+							'secret'           => array( 'type' => 'string' ),
+							'signature_header' => array( 'type' => 'string' ),
+							'signature_format' => array( 'type' => 'string' ),
+							'message'          => array( 'type' => 'string' ),
+							'error'            => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'executeEnable' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/webhook-trigger-set-secret',
+				array(
+					'label'               => __( 'Set Webhook HMAC Secret', 'data-machine' ),
+					'description'         => __( 'Set or rotate the HMAC shared secret for a flow webhook. The secret is returned once and never retrievable via status.', 'data-machine' ),
+					'category'            => 'datamachine-flow',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'flow_id' ),
+						'properties' => array(
+							'flow_id'  => array(
+								'type'        => 'integer',
+								'description' => __( 'Flow ID to set the HMAC secret for', 'data-machine' ),
+							),
+							'secret'   => array(
+								'type'        => 'string',
+								'description' => __( 'Secret value provided by the upstream service (e.g. GitHub webhook secret).', 'data-machine' ),
+							),
+							'generate' => array(
+								'type'        => 'boolean',
+								'description' => __( 'Generate a random 32-byte hex secret and display it once.', 'data-machine' ),
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'   => array( 'type' => 'boolean' ),
+							'flow_id'   => array( 'type' => 'integer' ),
+							'secret'    => array( 'type' => 'string' ),
+							'auth_mode' => array( 'type' => 'string' ),
+							'message'   => array( 'type' => 'string' ),
+							'error'     => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeSetSecret' ),
 					'permission_callback' => array( $this, 'checkPermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
@@ -200,13 +267,17 @@ class WebhookTriggerAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'         => array( 'type' => 'boolean' ),
-							'flow_id'         => array( 'type' => 'integer' ),
-							'flow_name'       => array( 'type' => 'string' ),
-							'webhook_enabled' => array( 'type' => 'boolean' ),
-							'webhook_url'     => array( 'type' => 'string' ),
-							'created_at'      => array( 'type' => 'string' ),
-							'error'           => array( 'type' => 'string' ),
+							'success'          => array( 'type' => 'boolean' ),
+							'flow_id'          => array( 'type' => 'integer' ),
+							'flow_name'        => array( 'type' => 'string' ),
+							'webhook_enabled'  => array( 'type' => 'boolean' ),
+							'webhook_url'      => array( 'type' => 'string' ),
+							'created_at'       => array( 'type' => 'string' ),
+							'auth_mode'        => array( 'type' => 'string' ),
+							'signature_header' => array( 'type' => 'string' ),
+							'signature_format' => array( 'type' => 'string' ),
+							'max_body_bytes'   => array( 'type' => 'integer' ),
+							'error'            => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'executeStatus' ),
@@ -226,11 +297,15 @@ class WebhookTriggerAbility {
 	/**
 	 * Enable webhook trigger for a flow.
 	 *
-	 * Generates a new token and stores it in scheduling_config.
-	 * If already enabled, returns the existing token and URL.
+	 * Supports two auth modes:
+	 * - `bearer` (default): generates a 32-byte hex token.
+	 * - `hmac_sha256`:       stores a shared secret plus signature header/format.
 	 *
-	 * @param array $input Input with flow_id.
-	 * @return array Result with token and webhook URL.
+	 * If already enabled in the same mode, returns the existing config.
+	 * Switching modes requires disabling and re-enabling.
+	 *
+	 * @param array $input Input with flow_id and optional auth_mode / header / format / secret.
+	 * @return array Result with token or secret and webhook URL.
 	 */
 	public function executeEnable( array $input ): array {
 		$flow_id = (int) ( $input['flow_id'] ?? 0 );
@@ -252,23 +327,113 @@ class WebhookTriggerAbility {
 
 		$scheduling_config = $flow['scheduling_config'] ?? array();
 
-		// If already enabled with a valid token, return existing.
-		if ( ! empty( $scheduling_config['webhook_enabled'] ) && ! empty( $scheduling_config['webhook_token'] ) ) {
+		$requested_mode = isset( $input['auth_mode'] ) ? (string) $input['auth_mode'] : '';
+		if ( '' === $requested_mode ) {
+			$requested_mode = $scheduling_config['webhook_auth_mode'] ?? 'bearer';
+		}
+		if ( ! in_array( $requested_mode, array( 'bearer', 'hmac_sha256' ), true ) ) {
 			return array(
-				'success'     => true,
-				'flow_id'     => $flow_id,
-				'webhook_url' => self::get_webhook_url( $flow_id ),
-				'token'       => $scheduling_config['webhook_token'],
-				'message'     => 'Webhook trigger already enabled.',
+				'success' => false,
+				'error'   => sprintf( 'Unknown auth_mode "%s". Expected bearer or hmac_sha256.', $requested_mode ),
 			);
 		}
 
-		// Generate new token.
-		$token = self::generate_token();
+		// If already enabled in the same mode with valid auth material, return existing config.
+		$existing_mode = $scheduling_config['webhook_auth_mode'] ?? 'bearer';
+		if ( ! empty( $scheduling_config['webhook_enabled'] ) && $existing_mode === $requested_mode ) {
+			if ( 'bearer' === $requested_mode && ! empty( $scheduling_config['webhook_token'] ) ) {
+				return array(
+					'success'     => true,
+					'flow_id'     => $flow_id,
+					'webhook_url' => self::get_webhook_url( $flow_id ),
+					'auth_mode'   => 'bearer',
+					'token'       => $scheduling_config['webhook_token'],
+					'message'     => 'Webhook trigger already enabled.',
+				);
+			}
+			if ( 'hmac_sha256' === $requested_mode && ! empty( $scheduling_config['webhook_secret'] ) ) {
+				return array(
+					'success'          => true,
+					'flow_id'          => $flow_id,
+					'webhook_url'      => self::get_webhook_url( $flow_id ),
+					'auth_mode'        => 'hmac_sha256',
+					'signature_header' => $scheduling_config['webhook_signature_header'] ?? 'X-Hub-Signature-256',
+					'signature_format' => $scheduling_config['webhook_signature_format'] ?? 'sha256=hex',
+					'message'          => 'Webhook trigger already enabled.',
+				);
+			}
+		}
 
 		$scheduling_config['webhook_enabled']    = true;
-		$scheduling_config['webhook_token']      = $token;
-		$scheduling_config['webhook_created_at'] = gmdate( 'Y-m-d\TH:i:s\Z' );
+		$scheduling_config['webhook_auth_mode']  = $requested_mode;
+		$scheduling_config['webhook_created_at'] = $scheduling_config['webhook_created_at'] ?? gmdate( 'Y-m-d\TH:i:s\Z' );
+
+		$response = array(
+			'success'     => true,
+			'flow_id'     => $flow_id,
+			'webhook_url' => self::get_webhook_url( $flow_id ),
+			'auth_mode'   => $requested_mode,
+		);
+
+		if ( 'bearer' === $requested_mode ) {
+			if ( empty( $scheduling_config['webhook_token'] ) ) {
+				$scheduling_config['webhook_token'] = self::generate_token();
+			}
+			// Clear HMAC-specific fields when switching to bearer.
+			unset( $scheduling_config['webhook_secret'] );
+			unset( $scheduling_config['webhook_signature_header'] );
+			unset( $scheduling_config['webhook_signature_format'] );
+
+			$response['token']   = $scheduling_config['webhook_token'];
+			$response['message'] = sprintf( 'Webhook trigger enabled for flow %d (bearer).', $flow_id );
+		} else {
+			// HMAC mode — resolve secret from input (explicit > generate > existing).
+			$explicit_secret = isset( $input['secret'] ) ? (string) $input['secret'] : '';
+			$generate        = ! empty( $input['generate_secret'] );
+
+			if ( '' !== $explicit_secret ) {
+				$scheduling_config['webhook_secret'] = $explicit_secret;
+				$response['secret']                  = $explicit_secret;
+			} elseif ( $generate || empty( $scheduling_config['webhook_secret'] ) ) {
+				$new_secret                          = self::generate_secret();
+				$scheduling_config['webhook_secret'] = $new_secret;
+				$response['secret']                  = $new_secret;
+			}
+
+			if ( empty( $scheduling_config['webhook_secret'] ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'HMAC auth_mode requires a secret. Pass --generate-secret or --secret=<value>.',
+				);
+			}
+
+			$header = isset( $input['signature_header'] ) ? trim( (string) $input['signature_header'] ) : '';
+			if ( '' !== $header ) {
+				$scheduling_config['webhook_signature_header'] = $header;
+			} elseif ( empty( $scheduling_config['webhook_signature_header'] ) ) {
+				$scheduling_config['webhook_signature_header'] = 'X-Hub-Signature-256';
+			}
+
+			$format = isset( $input['signature_format'] ) ? (string) $input['signature_format'] : '';
+			if ( '' !== $format ) {
+				if ( ! in_array( $format, \DataMachine\Api\WebhookSignatureVerifier::supported_formats(), true ) ) {
+					return array(
+						'success' => false,
+						'error'   => sprintf( 'Unsupported signature_format "%s".', $format ),
+					);
+				}
+				$scheduling_config['webhook_signature_format'] = $format;
+			} elseif ( empty( $scheduling_config['webhook_signature_format'] ) ) {
+				$scheduling_config['webhook_signature_format'] = 'sha256=hex';
+			}
+
+			// Clear Bearer-specific field when switching to HMAC.
+			unset( $scheduling_config['webhook_token'] );
+
+			$response['signature_header'] = $scheduling_config['webhook_signature_header'];
+			$response['signature_format'] = $scheduling_config['webhook_signature_format'];
+			$response['message']          = sprintf( 'Webhook trigger enabled for flow %d (hmac_sha256).', $flow_id );
+		}
 
 		$updated = $this->db_flows->update_flow( $flow_id, array( 'scheduling_config' => $scheduling_config ) );
 
@@ -283,15 +448,96 @@ class WebhookTriggerAbility {
 			'datamachine_log',
 			'info',
 			'Webhook trigger enabled for flow',
+			array(
+				'flow_id'   => $flow_id,
+				'auth_mode' => $requested_mode,
+			)
+		);
+
+		return $response;
+	}
+
+	/**
+	 * Set or rotate the HMAC shared secret for a flow.
+	 *
+	 * Accepts either an explicit `secret` value or `generate=true` to produce
+	 * a random 32-byte hex secret. The secret is returned once in the result
+	 * and never exposed via `executeStatus`.
+	 *
+	 * Also flips `webhook_auth_mode` to `hmac_sha256` if not already set, so
+	 * this command can be used as a one-liner for new HMAC flows.
+	 *
+	 * @param array $input Input with flow_id and either secret or generate=true.
+	 * @return array Result with the new secret on success.
+	 */
+	public function executeSetSecret( array $input ): array {
+		$flow_id = (int) ( $input['flow_id'] ?? 0 );
+
+		if ( $flow_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_id must be a positive integer',
+			);
+		}
+
+		$explicit_secret = isset( $input['secret'] ) ? (string) $input['secret'] : '';
+		$generate        = ! empty( $input['generate'] );
+
+		if ( '' === $explicit_secret && ! $generate ) {
+			return array(
+				'success' => false,
+				'error'   => 'Provide either secret=<value> or generate=true.',
+			);
+		}
+
+		$flow = $this->db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Flow %d not found', $flow_id ),
+			);
+		}
+
+		$scheduling_config = $flow['scheduling_config'] ?? array();
+
+		$secret = '' !== $explicit_secret ? $explicit_secret : self::generate_secret();
+
+		$scheduling_config['webhook_secret']     = $secret;
+		$scheduling_config['webhook_auth_mode']  = 'hmac_sha256';
+		$scheduling_config['webhook_enabled']    = true;
+		$scheduling_config['webhook_created_at'] = $scheduling_config['webhook_created_at'] ?? gmdate( 'Y-m-d\TH:i:s\Z' );
+
+		if ( empty( $scheduling_config['webhook_signature_header'] ) ) {
+			$scheduling_config['webhook_signature_header'] = 'X-Hub-Signature-256';
+		}
+		if ( empty( $scheduling_config['webhook_signature_format'] ) ) {
+			$scheduling_config['webhook_signature_format'] = 'sha256=hex';
+		}
+		// Clear Bearer-specific field when switching into HMAC mode.
+		unset( $scheduling_config['webhook_token'] );
+
+		$updated = $this->db_flows->update_flow( $flow_id, array( 'scheduling_config' => $scheduling_config ) );
+
+		if ( ! $updated ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to update flow scheduling config',
+			);
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Webhook HMAC secret updated for flow',
 			array( 'flow_id' => $flow_id )
 		);
 
 		return array(
-			'success'     => true,
-			'flow_id'     => $flow_id,
-			'webhook_url' => self::get_webhook_url( $flow_id ),
-			'token'       => $token,
-			'message'     => sprintf( 'Webhook trigger enabled for flow %d.', $flow_id ),
+			'success'   => true,
+			'flow_id'   => $flow_id,
+			'secret'    => $secret,
+			'auth_mode' => 'hmac_sha256',
+			'message'   => sprintf( 'HMAC secret updated for flow %d. Old secret is invalidated.', $flow_id ),
 		);
 	}
 
@@ -326,6 +572,11 @@ class WebhookTriggerAbility {
 		unset( $scheduling_config['webhook_enabled'] );
 		unset( $scheduling_config['webhook_token'] );
 		unset( $scheduling_config['webhook_created_at'] );
+		unset( $scheduling_config['webhook_auth_mode'] );
+		unset( $scheduling_config['webhook_secret'] );
+		unset( $scheduling_config['webhook_signature_header'] );
+		unset( $scheduling_config['webhook_signature_format'] );
+		unset( $scheduling_config['webhook_max_body_bytes'] );
 
 		$updated = $this->db_flows->update_flow( $flow_id, array( 'scheduling_config' => $scheduling_config ) );
 
@@ -382,6 +633,14 @@ class WebhookTriggerAbility {
 			return array(
 				'success' => false,
 				'error'   => sprintf( 'Webhook trigger is not enabled for flow %d. Enable it first.', $flow_id ),
+			);
+		}
+
+		$auth_mode = $scheduling_config['webhook_auth_mode'] ?? 'bearer';
+		if ( 'bearer' !== $auth_mode ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'regenerate only applies to bearer auth_mode (flow %d is %s). Use set-secret for HMAC flows.', $flow_id, $auth_mode ),
 			);
 		}
 
@@ -553,8 +812,18 @@ class WebhookTriggerAbility {
 		);
 
 		if ( $enabled ) {
+			$auth_mode             = $scheduling_config['webhook_auth_mode'] ?? 'bearer';
 			$result['webhook_url'] = self::get_webhook_url( $flow_id );
 			$result['created_at']  = $scheduling_config['webhook_created_at'] ?? '';
+			$result['auth_mode']   = $auth_mode;
+
+			if ( 'hmac_sha256' === $auth_mode ) {
+				$result['signature_header'] = $scheduling_config['webhook_signature_header'] ?? 'X-Hub-Signature-256';
+				$result['signature_format'] = $scheduling_config['webhook_signature_format'] ?? 'sha256=hex';
+				$result['max_body_bytes']   = (int) ( $scheduling_config['webhook_max_body_bytes']
+					?? \DataMachine\Api\WebhookTrigger::DEFAULT_MAX_BODY_BYTES );
+				// NEVER include the secret.
+			}
 
 			$rate_config          = $scheduling_config['webhook_rate_limit'] ?? array();
 			$result['rate_limit'] = array(
@@ -572,6 +841,18 @@ class WebhookTriggerAbility {
 	 * @return string 64-character hex token.
 	 */
 	public static function generate_token(): string {
+		return bin2hex( random_bytes( 32 ) );
+	}
+
+	/**
+	 * Generate a cryptographically secure HMAC shared secret.
+	 *
+	 * Returned as a 64-character hex string so it can be safely pasted into
+	 * provider webhook configuration UIs (GitHub, Shopify, etc.).
+	 *
+	 * @return string 64-character hex secret.
+	 */
+	public static function generate_secret(): string {
 		return bin2hex( random_bytes( 32 ) );
 	}
 
