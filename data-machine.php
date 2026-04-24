@@ -615,6 +615,9 @@ function datamachine_activate_for_site() {
 	// Migrate `update` step type to `upsert` in pipeline/flow configs (idempotent).
 	datamachine_migrate_update_to_upsert_step_type();
 
+	// Strip dead `provider`/`model` keys from pipeline_config rows (data-machine#1180, idempotent).
+	datamachine_strip_pipeline_step_provider_model();
+
 	// Drop redundant _datamachine_post_pipeline_id rows (#1091). Idempotent.
 	datamachine_drop_redundant_post_pipeline_meta();
 
