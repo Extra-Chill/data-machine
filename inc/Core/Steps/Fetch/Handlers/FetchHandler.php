@@ -480,7 +480,7 @@ abstract class FetchHandler {
 			'parameters'     => array(
 				'reason' => array(
 					'type'        => 'string',
-					'description' => 'Concise skip reason, 2-5 words max. Examples: "not a music event", "comedy show", "wrong location", "duplicate event", "past event". Do NOT write sentences — just the category.',
+					'description' => 'Concise 2-5 word categorical skip reason, following the vocabulary defined in the pipeline system prompt or RULES.md. Do NOT write sentences — just the category.',
 					'required'    => true,
 				),
 			),
