@@ -271,14 +271,31 @@ class PipelineBatchScheduler {
 		$pipeline_id = ( empty( $pipeline_id ) && ! is_string( $pipeline_id ) ) ? null : $pipeline_id;
 		$flow_id     = ( empty( $flow_id ) && ! is_string( $flow_id ) ) ? null : $flow_id;
 
+		// Carry the parent's agent_id + user_id onto the child so it
+		// runs under the same identity. Without this, child jobs lose
+		// their agent binding and downstream consumers fall back to
+		// the default-agent lookup (wrong agent's memory files, wrong
+		// model resolution, wrong permission context).
+		$parent_agent_id = (int) ( $engine_snapshot['job']['agent_id'] ?? 0 );
+		$parent_user_id  = (int) ( $engine_snapshot['job']['user_id'] ?? 0 );
+
 		// Create child job linked to parent.
-		$child_job_id = $this->db_jobs->create_job( array(
+		$child_job_args = array(
 			'pipeline_id'   => $pipeline_id,
 			'flow_id'       => $flow_id,
 			'source'        => $pipeline_id ? 'pipeline' : 'direct',
 			'label'         => $item_title,
 			'parent_job_id' => $parent_job_id,
-		) );
+		);
+
+		if ( $parent_agent_id > 0 ) {
+			$child_job_args['agent_id'] = $parent_agent_id;
+		}
+		if ( $parent_user_id > 0 ) {
+			$child_job_args['user_id'] = $parent_user_id;
+		}
+
+		$child_job_id = $this->db_jobs->create_job( $child_job_args );
 
 		if ( ! $child_job_id ) {
 			do_action(
@@ -293,12 +310,18 @@ class PipelineBatchScheduler {
 			return false;
 		}
 
-		// Clone engine_data to child, updating the job context.
+		// Clone engine_data to child, updating the job context. Preserves
+		// agent_id and user_id (resolved above) so downstream consumers
+		// like CoreMemoryFilesDirective resolve the correct agent's
+		// MEMORY.md / SOUL.md instead of falling back to the user_id
+		// default-agent lookup.
 		$child_engine        = $engine_snapshot;
 		$child_engine['job'] = array(
 			'job_id'        => $child_job_id,
 			'flow_id'       => $flow_id,
 			'pipeline_id'   => $pipeline_id,
+			'agent_id'      => $parent_agent_id > 0 ? $parent_agent_id : null,
+			'user_id'       => $parent_user_id > 0 ? $parent_user_id : null,
 			'created_at'    => current_time( 'mysql', true ),
 			'parent_job_id' => $parent_job_id,
 		);
