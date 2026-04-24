@@ -28,10 +28,6 @@ export const resolveFieldValue = (
 	);
 };
 
-export const getFieldHelpText = ( fieldConfig = {} ) => {
-	return fieldConfig.description || '';
-};
-
 /**
  * Sanitize handler settings payload with proper type coercion.
  *
@@ -42,4 +38,4 @@ export const getFieldHelpText = ( fieldConfig = {} ) => {
  * @param {Object} settingsFields Field schema definitions
  * @return {Object} Sanitized settings with proper types
  */
-export default { resolveFieldValue, getFieldHelpText };
+export default { resolveFieldValue };

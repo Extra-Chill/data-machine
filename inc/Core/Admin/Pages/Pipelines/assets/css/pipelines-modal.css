@@ -43,10 +43,6 @@
 }
 
 /* Modal body - main content area */
-.datamachine-modal-body {
-    /* Main content area with consistent spacing */
-}
-
 /* Modal error display */
 .datamachine-modal-error {
     margin-bottom: 16px;
@@ -58,14 +54,6 @@
     margin-bottom: 16px;
     padding-bottom: 16px;
     border-bottom: 1px solid var(--datamachine-border-1);
-}
-
-.datamachine-modal-section--spaced {
-    margin-bottom: 24px;
-}
-
-.datamachine-modal-section--no-border {
-    border-bottom: none;
 }
 
 /* ===== MODAL UTILITIES ===== */
@@ -84,12 +72,6 @@
 }
 
 /* Modal descriptions */
-.datamachine-modal-description {
-    margin-bottom: 16px;
-    color: #757575;
-    font-size: 14px;
-}
-
 /* Modal info boxes */
 .datamachine-modal-info-box {
     margin-top: 16px;
@@ -207,11 +189,6 @@
     font-weight: 500;
 }
 
-.datamachine-modal-badge--info {
-    background: #0073aa;
-    color: #fff;
-}
-
 /* Handler display in modal sections */
 .datamachine-modal-handler-display {
     margin-top: 12px;
@@ -248,26 +225,10 @@
 }
 
 /* Modal text variants */
-.datamachine-modal-text--note {
-    margin: 0;
-    font-size: 12px;
-    color: #757575;
-}
-
 .datamachine-modal-text--info {
     margin: 0;
     font-size: 12px;
     color: #757575;
-}
-
-.datamachine-modal-text--highlight {
-    margin: 0;
-    font-size: 12px;
-    color: #0073aa;
-}
-
-.datamachine-modal-text--strong {
-    font-weight: 600;
 }
 
 /* Modal loading/empty states */
@@ -306,10 +267,6 @@
     gap: 12px;
 }
 
-.datamachine-warning-icon-container {
-    flex-shrink: 0;
-}
-
 .datamachine-warning-content {
     flex: 1;
 }
@@ -336,12 +293,6 @@
 }
 
 /* Tool selector layouts */
-.datamachine-tools-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-}
-
 .datamachine-tool-checkbox-simple {
     padding: 12px;
     border: 1px solid var(--datamachine-border-1);
@@ -379,21 +330,9 @@
 }
 
 /* Form field wrapper for modal components */
-.datamachine-form-field-wrapper {
-    position: relative;
-    z-index: 1;
-}
-
 /* Tool spacing */
 .datamachine-tools-spacing--mt-16 {
     margin-top: 16px;
-}
-
-.datamachine-tools-header {
-    margin-bottom: 12px;
-    padding: 10px;
-    background: #f9f9f9;
-    border-radius: var(--datamachine-border-radius);
 }
 
 /* ============================================================================
@@ -645,10 +584,6 @@
 }
 
 /* Step Cards */
-.datamachine-step-card-section {
-    margin-bottom: 12px;
-}
-
 .datamachine-step-card-header {
     display: flex;
     align-items: center;
@@ -663,16 +598,6 @@
 }
 
 /* AI Config Display */
-.datamachine-ai-config-section {
-    margin-top: 12px;
-}
-
-.datamachine-ai-config-meta {
-    font-size: 12px;
-    color: #757575;
-    margin-bottom: 8px;
-}
-
 /* Empty Cards - moved to pipelines-page.css for proper architectural separation */
 
 /* Flow Handler Components */
@@ -686,12 +611,6 @@
     border: 1px solid #ffc107;
     border-radius: var(--datamachine-border-radius);
     margin-top: 12px;
-}
-
-.datamachine-handler-empty-text {
-    margin: 0 0 8px 0;
-    font-size: 12px;
-    color: #856404;
 }
 
 .datamachine-handler-tag {
@@ -723,58 +642,13 @@
     margin-bottom: 16px;
 }
 
-.datamachine-section-title {
-    margin: 0 0 8px 0;
-    font-size: 16px;
-    font-weight: 600;
-}
-
-.datamachine-section-description {
-    margin: 0;
-    color: #757575;
-    font-size: 12px;
-}
-
-.datamachine-section-content {
-    margin-bottom: 24px;
-}
-
-.datamachine-section-loading {
-    text-align: center;
-    padding: 20px;
-    color: #757575;
-}
-
 /* Pipeline Steps Layout */
-.datamachine-pipeline-steps-wrapper {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 20px;
-    padding: 20px 0;
-}
-
 .datamachine-pipeline-steps-empty {
     padding: 20px;
     text-align: center;
 }
 
-.datamachine-pipeline-steps-empty-text {
-    color: #757575;
-    margin-bottom: 16px;
-}
-
-.datamachine-step-item {
-    flex: 0 0 auto;
-    min-width: 300px;
-    max-width: 300px;
-}
-
 /* Modal Empty States */
-.datamachine-modal-empty-state-text {
-    margin: 0;
-}
-
 /* Responsive adjustments for modal utilities */
 @media (max-width: 768px) {
     .datamachine-modal-grid-2col {
@@ -793,21 +667,7 @@
 
 /* ===== FILES HANDLER MODAL STYLES ===== */
 
-
 /* File status section */
-.datamachine-uploaded-files-section {
-    margin-top: 20px;
-    border-top: 1px solid var(--datamachine-border-2);
-    padding-top: 20px;
-}
-
-.datamachine-files-section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
 .datamachine-files-section-header h5 {
     margin: 0;
     color: #1d2327;
@@ -820,12 +680,6 @@
 }
 
 /* File states */
-.datamachine-files-state {
-    padding: 20px;
-    text-align: center;
-    color: #646970;
-}
-
 .datamachine-loading-files .dashicons {
     animation: spin 1s linear infinite;
 }
@@ -835,58 +689,10 @@
     100% { transform: rotate(360deg); }
 }
 
-.datamachine-empty-files {
-    background: #f9f9f9;
-    border-radius: var(--datamachine-border-radius);
-}
-
-.datamachine-empty-icon {
-    font-size: 48px;
-    color: #c3c4c7;
-    margin-bottom: 10px;
-}
-
-.datamachine-empty-message {
-    margin: 0 0 8px 0;
-    color: #50575e;
-    font-weight: 500;
-}
-
-.datamachine-empty-hint {
-    margin: 0;
-    font-size: 12px;
-    color: #8c8f94;
-}
-
-
-.datamachine-file-row.datamachine-file-status-processed {
-    background: #f8fff8;
-}
-
-.datamachine-file-row.datamachine-file-status-pending {
-    background: #fffef7;
-}
-
-.datamachine-file-name {
-    font-weight: 500;
-}
-
-.datamachine-file-actions-col {
-    width: 60px;
-    text-align: center;
-}
-
-.datamachine-delete-file {
-    padding: 4px 6px;
-    min-height: unset;
-    line-height: 1;
-}
-
-.datamachine-delete-file .dashicons {
+.datamachine-file-row.datamachine-file-row.datamachine-delete-file .dashicons {
     font-size: 14px;
     line-height: 1;
 }
-
 
 /* Tab content (used by ImportExportModal) */
 .datamachine-tab-content {
@@ -898,12 +704,6 @@
 }
 
 /* Form field styling (used by Jobs modals) */
-.datamachine-form-field {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
 .datamachine-form-field label {
     font-weight: 600;
     color: #333;
