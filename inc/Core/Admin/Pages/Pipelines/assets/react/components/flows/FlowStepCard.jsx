@@ -30,7 +30,8 @@ import { useStepTypes } from '../../queries/config';
  * @param {string}   props.flowStepId     - Flow step ID.
  * @param {Object}   props.flowStepConfig - Flow step configuration.
  * @param {Object}   props.pipelineStep   - Pipeline step data.
- * @param {Object}   props.pipelineConfig - Pipeline AI configuration.
+ * @param {Object}   props.pipelineConfig - Pipeline AI configuration (currently unused; retained
+ *                                          for API stability while callers still pass it).
  * @param {Function} props.onConfigure    - Configure handler callback.
  * @param {Function} props.onQueueClick   - Queue button click handler (opens modal).
  * @return {JSX.Element} Flow step card.
@@ -49,9 +50,6 @@ export default function FlowStepCard( {
 	const stepTypeInfo = stepTypes[ pipelineStep.step_type ] || {};
 
 	const isAiStep = pipelineStep.step_type === 'ai';
-	const aiConfig = isAiStep
-		? pipelineConfig[ pipelineStep.pipeline_step_id ]
-		: null;
 
 	const promptQueue = flowStepConfig.prompt_queue || [];
 	const queueEnabled = !! flowStepConfig.queue_enabled;
@@ -161,22 +159,10 @@ export default function FlowStepCard( {
 						</strong>
 					</div>
 
-					{ /* AI Provider/Model Display */ }
-					{ isAiStep && aiConfig && (
-						<div className="datamachine-ai-config-display">
-							<div className="datamachine-ai-provider-info">
-								<strong>
-									{ __( 'AI Provider:', 'data-machine' ) }
-								</strong>{ ' ' }
-								{ aiConfig.provider || 'Not configured' }
-								{ ' | ' }
-								<strong>
-									{ __( 'Model:', 'data-machine' ) }
-								</strong>{ ' ' }
-								{ aiConfig.model || 'Not configured' }
-							</div>
-						</div>
-					) }
+					{ /* AI provider/model are not shown on the step card:
+					   they are resolved server-side via the mode system
+					   (PluginSettings::resolveModelForAgentMode), not from
+					   per-step config. See data-machine#1180. */ }
 
 					{ /* Inline Config Fields — flow step settings for non-handler step types only.
 					   Handler-based steps show their settings in the configuration modal,

@@ -177,18 +177,11 @@ class PipelineSteps {
 				'sanitize_callback' => 'absint',
 				'description'       => __( 'Pipeline ID for context', 'data-machine' ),
 			),
-			'provider'         => array(
-				'required'          => false,
-				'type'              => 'string',
-				'sanitize_callback' => 'sanitize_text_field',
-				'description'       => __( 'AI provider slug', 'data-machine' ),
-			),
-			'model'            => array(
-				'required'          => false,
-				'type'              => 'string',
-				'sanitize_callback' => 'sanitize_text_field',
-				'description'       => __( 'AI model identifier', 'data-machine' ),
-			),
+			// Note: `provider` and `model` were previously accepted here but have
+			// never influenced execution — AIStep resolves model/provider exclusively
+			// from the mode system (PluginSettings::resolveModelForAgentMode()).
+			// They were removed to stop the REST schema from advertising dead fields.
+			// See: inc/Core/Steps/AI/AIStep.php
 			'ai_api_key'       => array(
 				'required'          => false,
 				'type'              => 'string',
@@ -492,8 +485,8 @@ class PipelineSteps {
 		$existing_config = $pipeline_config[ $pipeline_step_id ] ?? array();
 
 		// Build step configuration data for AI steps.
-		// Note: provider/model are NOT configurable at the pipeline step level.
-		// Model resolution is handled by the mode system (mode_models setting).
+		// Model/provider are resolved exclusively via the mode system
+		// (PluginSettings::resolveModelForAgentMode). They are not accepted here.
 		$step_config_data = array();
 		$api_key_saved    = false;
 
@@ -538,7 +531,7 @@ class PipelineSteps {
 			}
 		}
 
-		// Preserve provider-specific models by merging with existing config
+		// Preserve provider-specific models by merging with existing config.
 		if ( ! empty( $existing_config ) ) {
 			if ( isset( $existing_config['providers'] ) && isset( $step_config_data['providers'] ) ) {
 				$step_config_data['providers'] = array_merge(
@@ -548,6 +541,11 @@ class PipelineSteps {
 			} elseif ( isset( $existing_config['providers'] ) && ! isset( $step_config_data['providers'] ) ) {
 				$step_config_data['providers'] = $existing_config['providers'];
 			}
+
+			// Strip dead `provider` and `model` keys from any existing row on write.
+			// These were never read by AIStep (mode system is the authority) but older
+			// UI + REST versions persisted them. Remove so inspection matches execution.
+			unset( $existing_config['provider'], $existing_config['model'] );
 
 			$pipeline_config[ $pipeline_step_id ] = array_merge( $existing_config, $step_config_data );
 		} else {
@@ -570,8 +568,6 @@ class PipelineSteps {
 			);
 		}
 
-		$provider_for_log = $step_config_data['provider'] ?? ( $existing_config['provider'] ?? null );
-
 		return rest_ensure_response(
 			array(
 				'success' => true,
@@ -580,7 +576,6 @@ class PipelineSteps {
 					'debug_info'       => array(
 						'api_key_saved'     => $api_key_saved,
 						'step_config_saved' => true,
-						'provider'          => $provider_for_log,
 					),
 				),
 				'message' => __( 'AI step configuration saved successfully', 'data-machine' ),

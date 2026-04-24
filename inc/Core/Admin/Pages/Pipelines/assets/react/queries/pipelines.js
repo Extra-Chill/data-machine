@@ -230,14 +230,11 @@ export const useAddPipelineStep = () => {
 						if ( ! isSameId( pipeline.pipeline_id, pipelineId ) ) {
 							return pipeline;
 						}
-						// Build config entry for AI steps
+						// Build config entry for AI steps.
+						// Note: provider/model are resolved via the mode system
+						// (PluginSettings::resolveModelForAgentMode on the server).
+						// They are not carried on the pipeline step config.
 						const configEntry = {};
-						if ( stepData.provider ) {
-							configEntry.provider = stepData.provider;
-						}
-						if ( stepData.model ) {
-							configEntry.model = stepData.model;
-						}
 						if ( stepData.disabled_tools ) {
 							configEntry.disabled_tools =
 								stepData.disabled_tools;
