@@ -332,69 +332,6 @@ export const useUpdateFlowHandler = () => {
 	} );
 };
 
-export const useUpdateUserMessage = () => {
-	const queryClient = useQueryClient();
-	return useMutation( {
-		mutationFn: ( { flowStepId, message } ) =>
-			updateUserMessage( flowStepId, message ),
-		onMutate: async ( { pipelineId, flowId, flowStepId, message } ) => {
-			const patches = {
-				pipelineId,
-				flowId,
-				flowStepId,
-				patchStep: ( step ) => ( {
-					...step,
-					user_message: message,
-				} ),
-			};
-
-			const cachedFlowId = normalizeId( flowId );
-			const cachedPipelineId = normalizeId( pipelineId );
-
-			const previousSingle = cachedFlowId
-				? queryClient.getQueryData( [
-						'flows',
-						'single',
-						cachedFlowId,
-				  ] )
-				: undefined;
-
-			const previousPaginatedQueries = cachedPipelineId
-				? queryClient.getQueriesData( {
-						queryKey: [ 'flows', cachedPipelineId ],
-						exact: false,
-				  } )
-				: [];
-
-			patchFlowStepInCache( queryClient, patches );
-
-			return { previousSingle, previousPaginatedQueries };
-		},
-		onError: ( _, { pipelineId, flowId }, context ) => {
-			const cachedFlowId = normalizeId( flowId );
-			const cachedPipelineId = normalizeId( pipelineId );
-
-			if ( cachedFlowId && context?.previousSingle ) {
-				queryClient.setQueryData(
-					[ 'flows', 'single', cachedFlowId ],
-					context.previousSingle
-				);
-			}
-
-			if (
-				cachedPipelineId &&
-				context?.previousPaginatedQueries?.length
-			) {
-				context.previousPaginatedQueries.forEach(
-					( [ queryKey, data ] ) => {
-						queryClient.setQueryData( queryKey, data );
-					}
-				);
-			}
-		},
-	} );
-};
-
 export const useAddFlowHandler = () => {
 	const queryClient = useQueryClient();
 	return useMutation( {

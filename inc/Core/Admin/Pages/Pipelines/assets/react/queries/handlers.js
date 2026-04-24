@@ -23,12 +23,6 @@ export const useHandlers = () =>
 		staleTime: 30 * 60 * 1000, // 30 minutes - handlers don't change often
 	} );
 
-export const useHandlerModels = () => {
-	// Deprecated: Return mapping slug -> model via HandlerFactory
-	const { data: handlers = {} } = useHandlers();
-	return handlers;
-};
-
 export const useHandlerDetails = ( handlerSlug ) =>
 	useQuery( {
 		queryKey: [ 'handlers', handlerSlug ],

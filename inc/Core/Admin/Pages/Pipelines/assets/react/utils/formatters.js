@@ -10,19 +10,6 @@
 import { __ } from '@wordpress/i18n';
 
 /**
- * Format timestamp for display
- *
- * Backend handles ALL date formatting via DateFormatter class.
- * This function simply passes through the pre-formatted display value.
- *
- * @param {string|null} displayValue - Pre-formatted display string from backend
- * @return {string} Display string or "Never"
- */
-export const formatDateTime = ( displayValue ) => {
-	return displayValue || __( 'Never', 'data-machine' );
-};
-
-/**
  * Parse a datetime string as UTC.
  *
  * Handles both ISO 8601 format (2025-01-28T14:30:00Z) and MySQL format (2025-01-28 14:30:00).
@@ -31,7 +18,7 @@ export const formatDateTime = ( displayValue ) => {
  * @param {string|null} dateString - Datetime string from API
  * @return {Date|null} Date object or null if invalid
  */
-export const parseUtcDateTime = ( dateString ) => {
+const parseUtcDateTime = ( dateString ) => {
 	if ( ! dateString ) {
 		return null;
 	}

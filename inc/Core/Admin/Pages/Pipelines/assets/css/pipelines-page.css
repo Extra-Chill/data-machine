@@ -38,28 +38,9 @@
 }
 
 /* Spacing utilities */
-.datamachine-spacing--margin-bottom-16 {
-    margin-bottom: 16px;
-}
 
 .datamachine-spacing--margin-bottom-20 {
     margin-bottom: 20px;
-}
-
-.datamachine-spacing--margin-bottom-24 {
-    margin-bottom: 24px;
-}
-
-.datamachine-spacing--margin-top-12 {
-    margin-top: 12px;
-}
-
-.datamachine-spacing--margin-top-16 {
-    margin-top: 16px;
-}
-
-.datamachine-spacing--margin-top-24 {
-    margin-top: 24px;
 }
 
 /* Color utilities */
@@ -67,43 +48,7 @@
     color: #757575;
 }
 
-.datamachine-color--text-secondary {
-    color: #646970;
-}
-
-.datamachine-color--text-error {
-    color: #dc3232;
-}
-
 /* Typography utilities */
-.datamachine-text--h4 {
-    margin: 0 0 8px 0;
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.datamachine-text--description {
-    margin: 0 0 12px 0;
-    font-size: 12px;
-    color: #757575;
-}
-
-.datamachine-text--note {
-    margin: 0;
-    font-size: 12px;
-    color: #0073aa;
-}
-
-/* Layout utilities */
-.datamachine-layout--flex-center {
-    display: flex;
-    align-items: center;
-}
-
-.datamachine-layout--flex-column {
-    display: flex;
-    flex-direction: column;
-}
 
 /* Empty state styling */
 .datamachine-empty-state {
@@ -122,17 +67,6 @@
 }
 
 /* Table styling */
-.datamachine-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.datamachine-table--bordered {
-    border: 1px solid var(--datamachine-border-1);
-    border-radius: var(--datamachine-border-radius);
-    max-height: 300px;
-    overflow-y: auto;
-}
 
 /* Status badges - base moved to root.css */
 
@@ -144,7 +78,6 @@
     margin-bottom: 16px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-
 
 /* ===== COMPONENT: PIPELINE HEADER ===== */
 
@@ -176,12 +109,7 @@
 	outline: none;
 }
 
-
 /* Pipeline sections */
-.datamachine-pipeline-steps-section,
-.datamachine-pipeline-flows {
-    padding: 20px;
-}
 
 /* Pipeline steps - horizontal scrolling flex layout */
 .datamachine-pipeline-steps {
@@ -214,7 +142,6 @@
 	margin-bottom: 16px;
 	box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
-
 
 /* ===== COMPONENT: FLOW HEADER ===== */
 
@@ -428,21 +355,6 @@
 }
 
 /* Status badge variants - base moved to root.css */
-.datamachine-status-badge--processed {
-	background: rgba(70, 180, 80, 0.13);
-	color: #46b450;
-}
-
-.datamachine-status-badge--pending {
-	background: rgba(240, 184, 73, 0.13);
-	color: #f0b849;
-}
-
-.datamachine-flow-steps__list {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-}
 
 /* Individual step containers within flow steps */
 .datamachine-flow-step-container {
@@ -494,12 +406,8 @@
     word-break: break-all;
     max-width: 100%;
     box-sizing: border-box;
-}
-
-.datamachine-handler-settings-display div {
     background: #f0f0f0;
 }
-
 
 /* Responsive design */
 @media (max-width: 768px) {
@@ -566,56 +474,6 @@
 }
 
 /* Empty step content styling - uses same card structure as populated steps */
-.datamachine-step-empty-content {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-}
-
-/* Delete button styling - WordPress standard */
-.button-link-delete {
-    color: #d63638;
-    border: none;
-    background: transparent;
-    box-shadow: none;
-    text-decoration: none;
-}
-
-.button-link-delete:hover {
-    color: #d63638;
-    background: transparent;
-    text-decoration: underline;
-}
-
-/* Red delete button styling - secondary style with red border and text */
-.button-delete {
-    background: #fff;
-    border-color: #d63638;
-    color: #d63638;
-}
-
-.button-delete:hover,
-.button-delete:focus {
-    background: #f8f9fa;
-    border-color: #b32d2e;
-    color: #b32d2e;
-}
-
-/* Configure button styling - WordPress admin blue */
-.button-link-configure {
-    color: #0073aa;
-    border: none;
-    background: transparent;
-    box-shadow: none;
-    text-decoration: none;
-}
-
-.button-link-configure:hover {
-    color: #0073aa;
-    background: transparent;
-    text-decoration: underline;
-}
 
 /* Universal data flow arrows - inline flex items */
 .datamachine-data-flow-arrow {
@@ -668,43 +526,6 @@
 
 /* Hidden element utility now in root.css */
 
-/* Admin notice dismissible features - extends root.css base */
-.datamachine-admin-notice--dismissible {
-    padding-right: 38px;
-    position: relative;
-}
-
-.datamachine-admin-notice .notice-dismiss {
-    background: none;
-    border: none;
-    border-radius: 0;
-    color: #787c82;
-    cursor: pointer;
-    float: right;
-    font-size: 12px;
-    height: 38px;
-    margin: 0;
-    overflow: hidden;
-    padding: 9px;
-    position: absolute;
-    right: 1px;
-    text-align: center;
-    text-decoration: none;
-    top: 0;
-    width: 38px;
-    z-index: 1;
-}
-
-.datamachine-admin-notice .notice-dismiss:hover,
-.datamachine-admin-notice .notice-dismiss:active {
-    color: #d63638;
-}
-
-.datamachine-admin-notice .notice-dismiss:focus {
-    box-shadow: 0 0 0 1px #72aee6, 0 0 2px 1px rgba(54, 144, 192, 0.8);
-    outline: 2px solid transparent;
-}
-
 /* ===== PIPELINE STEP CARD ===== */
 /**
  * WordPress Components Overrides
@@ -722,13 +543,6 @@
 
 .datamachine-step-card-ai-config {
     margin-top: 12px;
-}
-
-.datamachine-step-card-ai-label,
-.datamachine-step-card-tools-label {
-    font-size: 12px;
-    color: #757575;
-    margin-bottom: 8px;
 }
 
 .datamachine-step-card-actions {

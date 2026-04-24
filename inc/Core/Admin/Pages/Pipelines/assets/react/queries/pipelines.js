@@ -201,17 +201,6 @@ export const useCreatePipeline = ( options = {} ) => {
 	} );
 };
 
-export const useUpdatePipelineTitle = () => {
-	const queryClient = useQueryClient();
-	return useMutation( {
-		mutationFn: ( { pipelineId, name } ) =>
-			updatePipelineTitle( pipelineId, name ),
-		onSuccess: () => {
-			queryClient.invalidateQueries( { queryKey: [ 'pipelines' ] } );
-		},
-	} );
-};
-
 export const useDeletePipeline = () => {
 	const queryClient = useQueryClient();
 	return useMutation( {
@@ -296,33 +285,7 @@ export const useDeletePipelineStep = () => {
 	} );
 };
 
-export const useReorderPipelineSteps = () => {
-	const queryClient = useQueryClient();
-	return useMutation( {
-		mutationFn: ( { pipelineId, steps } ) =>
-			reorderPipelineSteps( pipelineId, steps ),
-		onSuccess: ( _, { pipelineId } ) => {
-			queryClient.invalidateQueries( { queryKey: [ 'pipelines' ] } );
-			queryClient.invalidateQueries( {
-				queryKey: [ 'flows', pipelineId ],
-			} );
-		},
-	} );
-};
 
-export const useUpdateSystemPrompt = () => {
-	const queryClient = useQueryClient();
-	return useMutation( {
-		mutationFn: ( { stepId, prompt, stepType, pipelineId } ) =>
-			updateSystemPrompt( stepId, prompt, stepType, pipelineId ),
-		onSuccess: ( _, { pipelineId } ) => {
-			queryClient.invalidateQueries( { queryKey: [ 'pipelines' ] } );
-			queryClient.invalidateQueries( {
-				queryKey: [ 'flows', pipelineId ],
-			} );
-		},
-	} );
-};
 
 export const useUploadContextFile = () => {
 	const queryClient = useQueryClient();
