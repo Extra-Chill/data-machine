@@ -43,27 +43,12 @@
     margin-bottom: 20px;
 }
 
-.datamachine-spacing--margin-top-16 {
-    margin-top: 16px;
-}
-
 /* Color utilities */
 .datamachine-color--text-muted {
     color: #757575;
 }
 
 /* Typography utilities */
-
-/* Layout utilities */
-.datamachine-layout--flex-center {
-    display: flex;
-    align-items: center;
-}
-
-.datamachine-layout--flex-column {
-    display: flex;
-    flex-direction: column;
-}
 
 /* Empty state styling */
 .datamachine-empty-state {
@@ -490,50 +475,6 @@
 
 /* Empty step content styling - uses same card structure as populated steps */
 
-/* Delete button styling - WordPress standard */
-.button-link-delete {
-    color: #d63638;
-    border: none;
-    background: transparent;
-    box-shadow: none;
-    text-decoration: none;
-}
-
-.button-link-delete:hover {
-    color: #d63638;
-    background: transparent;
-    text-decoration: underline;
-}
-
-/* Red delete button styling - secondary style with red border and text */
-.button-delete {
-    background: #fff;
-    border-color: #d63638;
-    color: #d63638;
-}
-
-.button-delete:hover,
-.button-delete:focus {
-    background: #f8f9fa;
-    border-color: #b32d2e;
-    color: #b32d2e;
-}
-
-/* Configure button styling - WordPress admin blue */
-.button-link-configure {
-    color: #0073aa;
-    border: none;
-    background: transparent;
-    box-shadow: none;
-    text-decoration: none;
-}
-
-.button-link-configure:hover {
-    color: #0073aa;
-    background: transparent;
-    text-decoration: underline;
-}
-
 /* Universal data flow arrows - inline flex items */
 .datamachine-data-flow-arrow {
     color: #666;
@@ -584,43 +525,6 @@
 /* ===== UTILITY CLASSES ===== */
 
 /* Hidden element utility now in root.css */
-
-/* Admin notice dismissible features - extends root.css base */
-.datamachine-admin-notice--dismissible {
-    padding-right: 38px;
-    position: relative;
-}
-
-.datamachine-admin-notice .notice-dismiss {
-    background: none;
-    border: none;
-    border-radius: 0;
-    color: #787c82;
-    cursor: pointer;
-    float: right;
-    font-size: 12px;
-    height: 38px;
-    margin: 0;
-    overflow: hidden;
-    padding: 9px;
-    position: absolute;
-    right: 1px;
-    text-align: center;
-    text-decoration: none;
-    top: 0;
-    width: 38px;
-    z-index: 1;
-}
-
-.datamachine-admin-notice .notice-dismiss:hover,
-.datamachine-admin-notice .notice-dismiss:active {
-    color: #d63638;
-}
-
-.datamachine-admin-notice .notice-dismiss:focus {
-    box-shadow: 0 0 0 1px #72aee6, 0 0 2px 1px rgba(54, 144, 192, 0.8);
-    outline: 2px solid transparent;
-}
 
 /* ===== PIPELINE STEP CARD ===== */
 /**

@@ -358,19 +358,6 @@ export const removeFlowHandler = async ( flowStepId, handlerSlug ) => {
 };
 
 /**
- * Update user message for AI step in flow
- *
- * @param {string} flowStepId - Flow step ID
- * @param {string} message    - User message content
- * @return {Promise<Object>} Updated flow step data
- */
-export const updateUserMessage = async ( flowStepId, message ) => {
-	return await client.patch( `/flows/steps/${ flowStepId }/user-message`, {
-		user_message: message,
-	} );
-};
-
-/**
  * Get available scheduling intervals
  *
  * @return {Promise<Object>} Array of scheduling intervals
@@ -535,15 +522,6 @@ export const fetchHandlerDetails = async ( handlerSlug ) => {
  */
 export const getStepTypes = async () => {
 	return await client.get( '/step-types' );
-};
-
-/**
- * Get available providers
- *
- * @return {Promise<Object>} Providers configuration
- */
-export const getProviders = async () => {
-	return await client.get( '/providers' );
 };
 
 /**
