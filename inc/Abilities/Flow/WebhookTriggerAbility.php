@@ -57,6 +57,10 @@ class WebhookTriggerAbility {
 								'enum'        => array( 'bearer', 'hmac_sha256' ),
 								'description' => __( 'Authentication mode. Defaults to bearer for backward compatibility.', 'data-machine' ),
 							),
+							'preset'           => array(
+								'type'        => 'string',
+								'description' => __( 'Name of a preset registered via the datamachine_webhook_auth_presets filter (e.g. stripe, slack). Resolves to a full v2 template config; implies HMAC mode.', 'data-machine' ),
+							),
 							'signature_header' => array(
 								'type'        => 'string',
 								'description' => __( 'HMAC signature header name (e.g. X-Hub-Signature-256). Only used when auth_mode is hmac_sha256.', 'data-machine' ),
@@ -68,11 +72,15 @@ class WebhookTriggerAbility {
 							),
 							'generate_secret'  => array(
 								'type'        => 'boolean',
-								'description' => __( 'When auth_mode is hmac_sha256, auto-generate a random 32-byte hex secret.', 'data-machine' ),
+								'description' => __( 'When HMAC mode is active, auto-generate a random 32-byte hex secret.', 'data-machine' ),
 							),
 							'secret'           => array(
 								'type'        => 'string',
-								'description' => __( 'When auth_mode is hmac_sha256, use this secret value (takes precedence over generate_secret).', 'data-machine' ),
+								'description' => __( 'When HMAC mode is active, use this secret value (takes precedence over generate_secret).', 'data-machine' ),
+							),
+							'secret_id'        => array(
+								'type'        => 'string',
+								'description' => __( 'Optional secret id for multi-secret rotation (default: current).', 'data-machine' ),
 							),
 						),
 					),
@@ -285,6 +293,123 @@ class WebhookTriggerAbility {
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
+
+			wp_register_ability(
+				'datamachine/webhook-trigger-rotate-secret',
+				array(
+					'label'               => __( 'Rotate Webhook HMAC Secret', 'data-machine' ),
+					'description'         => __( 'Zero-downtime rotation: promote the current secret to `previous` (with an expiry), install a new current secret. Both verify signatures until the previous secret expires.', 'data-machine' ),
+					'category'            => 'datamachine-flow',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'flow_id' ),
+						'properties' => array(
+							'flow_id'              => array( 'type' => 'integer' ),
+							'secret'               => array(
+								'type'        => 'string',
+								'description' => __( 'Explicit new secret (takes precedence over generate).', 'data-machine' ),
+							),
+							'generate'             => array(
+								'type'        => 'boolean',
+								'description' => __( 'Generate a new random 32-byte hex secret.', 'data-machine' ),
+							),
+							'previous_ttl_seconds' => array(
+								'type'        => 'integer',
+								'description' => __( 'How long the previous secret keeps verifying (default: 604800 = 7 days).', 'data-machine' ),
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'             => array( 'type' => 'boolean' ),
+							'flow_id'             => array( 'type' => 'integer' ),
+							'new_secret'          => array( 'type' => 'string' ),
+							'previous_expires_at' => array( 'type' => 'string' ),
+							'secret_ids'          => array( 'type' => 'array' ),
+							'message'             => array( 'type' => 'string' ),
+							'error'               => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeRotateSecret' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/webhook-trigger-forget-secret',
+				array(
+					'label'               => __( 'Forget Webhook HMAC Secret', 'data-machine' ),
+					'description'         => __( 'Immediately remove a specific secret by id from the rotation list.', 'data-machine' ),
+					'category'            => 'datamachine-flow',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'flow_id', 'secret_id' ),
+						'properties' => array(
+							'flow_id'   => array( 'type' => 'integer' ),
+							'secret_id' => array( 'type' => 'string' ),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'    => array( 'type' => 'boolean' ),
+							'flow_id'    => array( 'type' => 'integer' ),
+							'secret_ids' => array( 'type' => 'array' ),
+							'message'    => array( 'type' => 'string' ),
+							'error'      => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeForgetSecret' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/webhook-trigger-test',
+				array(
+					'label'               => __( 'Test Webhook Verification', 'data-machine' ),
+					'description'         => __( 'Run the verifier offline against a captured payload + headers without spawning a flow job. Useful for debugging upstream signature configuration.', 'data-machine' ),
+					'category'            => 'datamachine-flow',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'flow_id', 'body', 'headers' ),
+						'properties' => array(
+							'flow_id' => array( 'type' => 'integer' ),
+							'body'    => array(
+								'type'        => 'string',
+								'description' => __( 'Raw request body as bytes.', 'data-machine' ),
+							),
+							'headers' => array(
+								'type'        => 'object',
+								'description' => __( 'Request headers as an object keyed by header name.', 'data-machine' ),
+							),
+							'now'     => array(
+								'type'        => 'integer',
+								'description' => __( 'Override "now" (unix seconds) for deterministic replay-window checks.', 'data-machine' ),
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'      => array( 'type' => 'boolean' ),
+							'ok'           => array( 'type' => 'boolean' ),
+							'reason'       => array( 'type' => 'string' ),
+							'secret_id'    => array( 'type' => 'string' ),
+							'timestamp'    => array( 'type' => 'integer' ),
+							'skew_seconds' => array( 'type' => 'integer' ),
+							'detail'       => array( 'type' => 'string' ),
+							'error'        => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeTest' ),
+					'permission_callback' => array( $this, 'checkPermission' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
@@ -328,6 +453,25 @@ class WebhookTriggerAbility {
 		$scheduling_config = $flow['scheduling_config'] ?? array();
 
 		$requested_mode = isset( $input['auth_mode'] ) ? (string) $input['auth_mode'] : '';
+		$preset_name    = isset( $input['preset'] ) ? trim( (string) $input['preset'] ) : '';
+
+		// A preset implies HMAC mode.
+		if ( '' !== $preset_name ) {
+			$presets = \DataMachine\Api\WebhookAuthResolver::get_presets();
+			if ( ! isset( $presets[ $preset_name ] ) ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf(
+						'Unknown preset "%s". Register presets via the datamachine_webhook_auth_presets filter.',
+						$preset_name
+					),
+				);
+			}
+			if ( '' === $requested_mode ) {
+				$requested_mode = 'hmac_sha256';
+			}
+		}
+
 		if ( '' === $requested_mode ) {
 			$requested_mode = $scheduling_config['webhook_auth_mode'] ?? 'bearer';
 		}
@@ -339,8 +483,16 @@ class WebhookTriggerAbility {
 		}
 
 		// If already enabled in the same mode with valid auth material, return existing config.
-		$existing_mode = $scheduling_config['webhook_auth_mode'] ?? 'bearer';
-		if ( ! empty( $scheduling_config['webhook_enabled'] ) && $existing_mode === $requested_mode ) {
+		// A new secret or preset request always falls through so the caller's intent wins.
+		$has_new_secret    = ! empty( $input['secret'] ) || ! empty( $input['generate_secret'] );
+		$has_preset_change = ( '' !== $preset_name ) && ( ( $scheduling_config['webhook_auth_preset'] ?? '' ) !== $preset_name );
+		$existing_mode     = $scheduling_config['webhook_auth_mode'] ?? 'bearer';
+
+		if ( ! empty( $scheduling_config['webhook_enabled'] )
+			&& $existing_mode === $requested_mode
+			&& ! $has_new_secret
+			&& ! $has_preset_change
+		) {
 			if ( 'bearer' === $requested_mode && ! empty( $scheduling_config['webhook_token'] ) ) {
 				return array(
 					'success'     => true,
@@ -352,15 +504,21 @@ class WebhookTriggerAbility {
 				);
 			}
 			if ( 'hmac_sha256' === $requested_mode && ! empty( $scheduling_config['webhook_secret'] ) ) {
-				return array(
-					'success'          => true,
-					'flow_id'          => $flow_id,
-					'webhook_url'      => self::get_webhook_url( $flow_id ),
-					'auth_mode'        => 'hmac_sha256',
-					'signature_header' => $scheduling_config['webhook_signature_header'] ?? 'X-Hub-Signature-256',
-					'signature_format' => $scheduling_config['webhook_signature_format'] ?? 'sha256=hex',
-					'message'          => 'Webhook trigger already enabled.',
+				$existing_preset = $scheduling_config['webhook_auth_preset'] ?? null;
+				$result          = array(
+					'success'     => true,
+					'flow_id'     => $flow_id,
+					'webhook_url' => self::get_webhook_url( $flow_id ),
+					'auth_mode'   => 'hmac_sha256',
+					'message'     => 'Webhook trigger already enabled.',
 				);
+				if ( $existing_preset ) {
+					$result['preset'] = $existing_preset;
+				} else {
+					$result['signature_header'] = $scheduling_config['webhook_signature_header'] ?? 'X-Hub-Signature-256';
+					$result['signature_format'] = $scheduling_config['webhook_signature_format'] ?? 'sha256=hex';
+				}
+				return $result;
 			}
 		}
 
@@ -390,49 +548,78 @@ class WebhookTriggerAbility {
 			// HMAC mode — resolve secret from input (explicit > generate > existing).
 			$explicit_secret = isset( $input['secret'] ) ? (string) $input['secret'] : '';
 			$generate        = ! empty( $input['generate_secret'] );
+			$secret_id       = isset( $input['secret_id'] ) ? (string) $input['secret_id'] : 'current';
+			if ( '' === $secret_id ) {
+				$secret_id = 'current';
+			}
+
+			$new_secret_value = null;
 
 			if ( '' !== $explicit_secret ) {
-				$scheduling_config['webhook_secret'] = $explicit_secret;
-				$response['secret']                  = $explicit_secret;
+				$new_secret_value = $explicit_secret;
 			} elseif ( $generate || empty( $scheduling_config['webhook_secret'] ) ) {
-				$new_secret                          = self::generate_secret();
-				$scheduling_config['webhook_secret'] = $new_secret;
-				$response['secret']                  = $new_secret;
+				$new_secret_value = self::generate_secret();
+			}
+
+			if ( null !== $new_secret_value ) {
+				// Legacy single-value field (v1 compat).
+				$scheduling_config['webhook_secret'] = $new_secret_value;
+
+				// v2 multi-secret list.
+				$secrets                              = self::upsert_secret(
+					$scheduling_config['webhook_secrets'] ?? array(),
+					$secret_id,
+					$new_secret_value
+				);
+				$scheduling_config['webhook_secrets'] = $secrets;
+				$response['secret']                   = $new_secret_value;
 			}
 
 			if ( empty( $scheduling_config['webhook_secret'] ) ) {
 				return array(
 					'success' => false,
-					'error'   => 'HMAC auth_mode requires a secret. Pass --generate-secret or --secret=<value>.',
+					'error'   => 'HMAC mode requires a secret. Pass --generate-secret or --secret=<value>.',
 				);
 			}
 
-			$header = isset( $input['signature_header'] ) ? trim( (string) $input['signature_header'] ) : '';
-			if ( '' !== $header ) {
-				$scheduling_config['webhook_signature_header'] = $header;
-			} elseif ( empty( $scheduling_config['webhook_signature_header'] ) ) {
-				$scheduling_config['webhook_signature_header'] = 'X-Hub-Signature-256';
-			}
+			if ( '' !== $preset_name ) {
+				$scheduling_config['webhook_auth_preset'] = $preset_name;
+				// Drop v1 header/format fields — the preset defines them.
+				unset( $scheduling_config['webhook_signature_header'] );
+				unset( $scheduling_config['webhook_signature_format'] );
+				$response['preset']  = $preset_name;
+				$response['message'] = sprintf( 'Webhook trigger enabled for flow %d (hmac preset=%s).', $flow_id, $preset_name );
+			} else {
+				// Clear any stale preset when switching back to explicit config.
+				unset( $scheduling_config['webhook_auth_preset'] );
 
-			$format = isset( $input['signature_format'] ) ? (string) $input['signature_format'] : '';
-			if ( '' !== $format ) {
-				if ( ! in_array( $format, \DataMachine\Api\WebhookSignatureVerifier::supported_formats(), true ) ) {
-					return array(
-						'success' => false,
-						'error'   => sprintf( 'Unsupported signature_format "%s".', $format ),
-					);
+				$header = isset( $input['signature_header'] ) ? trim( (string) $input['signature_header'] ) : '';
+				if ( '' !== $header ) {
+					$scheduling_config['webhook_signature_header'] = $header;
+				} elseif ( empty( $scheduling_config['webhook_signature_header'] ) ) {
+					$scheduling_config['webhook_signature_header'] = 'X-Hub-Signature-256';
 				}
-				$scheduling_config['webhook_signature_format'] = $format;
-			} elseif ( empty( $scheduling_config['webhook_signature_format'] ) ) {
-				$scheduling_config['webhook_signature_format'] = 'sha256=hex';
+
+				$format = isset( $input['signature_format'] ) ? (string) $input['signature_format'] : '';
+				if ( '' !== $format ) {
+					if ( ! in_array( $format, \DataMachine\Api\WebhookSignatureVerifier::supported_formats(), true ) ) {
+						return array(
+							'success' => false,
+							'error'   => sprintf( 'Unsupported signature_format "%s".', $format ),
+						);
+					}
+					$scheduling_config['webhook_signature_format'] = $format;
+				} elseif ( empty( $scheduling_config['webhook_signature_format'] ) ) {
+					$scheduling_config['webhook_signature_format'] = 'sha256=hex';
+				}
+
+				$response['signature_header'] = $scheduling_config['webhook_signature_header'];
+				$response['signature_format'] = $scheduling_config['webhook_signature_format'];
+				$response['message']          = sprintf( 'Webhook trigger enabled for flow %d (hmac_sha256).', $flow_id );
 			}
 
 			// Clear Bearer-specific field when switching to HMAC.
 			unset( $scheduling_config['webhook_token'] );
-
-			$response['signature_header'] = $scheduling_config['webhook_signature_header'];
-			$response['signature_format'] = $scheduling_config['webhook_signature_format'];
-			$response['message']          = sprintf( 'Webhook trigger enabled for flow %d (hmac_sha256).', $flow_id );
 		}
 
 		$updated = $this->db_flows->update_flow( $flow_id, array( 'scheduling_config' => $scheduling_config ) );
@@ -500,18 +687,30 @@ class WebhookTriggerAbility {
 
 		$scheduling_config = $flow['scheduling_config'] ?? array();
 
-		$secret = '' !== $explicit_secret ? $explicit_secret : self::generate_secret();
+		$secret    = '' !== $explicit_secret ? $explicit_secret : self::generate_secret();
+		$secret_id = isset( $input['secret_id'] ) ? (string) $input['secret_id'] : 'current';
+		if ( '' === $secret_id ) {
+			$secret_id = 'current';
+		}
 
 		$scheduling_config['webhook_secret']     = $secret;
+		$scheduling_config['webhook_secrets']    = self::upsert_secret(
+			$scheduling_config['webhook_secrets'] ?? array(),
+			$secret_id,
+			$secret
+		);
 		$scheduling_config['webhook_auth_mode']  = 'hmac_sha256';
 		$scheduling_config['webhook_enabled']    = true;
 		$scheduling_config['webhook_created_at'] = $scheduling_config['webhook_created_at'] ?? gmdate( 'Y-m-d\TH:i:s\Z' );
 
-		if ( empty( $scheduling_config['webhook_signature_header'] ) ) {
-			$scheduling_config['webhook_signature_header'] = 'X-Hub-Signature-256';
-		}
-		if ( empty( $scheduling_config['webhook_signature_format'] ) ) {
-			$scheduling_config['webhook_signature_format'] = 'sha256=hex';
+		// Only populate legacy v1 header/format defaults when no preset / v2 auth is driving the flow.
+		if ( empty( $scheduling_config['webhook_auth_preset'] ) && empty( $scheduling_config['webhook_auth'] ) ) {
+			if ( empty( $scheduling_config['webhook_signature_header'] ) ) {
+				$scheduling_config['webhook_signature_header'] = 'X-Hub-Signature-256';
+			}
+			if ( empty( $scheduling_config['webhook_signature_format'] ) ) {
+				$scheduling_config['webhook_signature_format'] = 'sha256=hex';
+			}
 		}
 		// Clear Bearer-specific field when switching into HMAC mode.
 		unset( $scheduling_config['webhook_token'] );
@@ -574,9 +773,13 @@ class WebhookTriggerAbility {
 		unset( $scheduling_config['webhook_created_at'] );
 		unset( $scheduling_config['webhook_auth_mode'] );
 		unset( $scheduling_config['webhook_secret'] );
+		unset( $scheduling_config['webhook_secrets'] );
 		unset( $scheduling_config['webhook_signature_header'] );
 		unset( $scheduling_config['webhook_signature_format'] );
 		unset( $scheduling_config['webhook_max_body_bytes'] );
+		unset( $scheduling_config['webhook_auth'] );
+		unset( $scheduling_config['webhook_auth_preset'] );
+		unset( $scheduling_config['webhook_auth_overrides'] );
 
 		$updated = $this->db_flows->update_flow( $flow_id, array( 'scheduling_config' => $scheduling_config ) );
 
@@ -818,11 +1021,21 @@ class WebhookTriggerAbility {
 			$result['auth_mode']   = $auth_mode;
 
 			if ( 'hmac_sha256' === $auth_mode ) {
-				$result['signature_header'] = $scheduling_config['webhook_signature_header'] ?? 'X-Hub-Signature-256';
-				$result['signature_format'] = $scheduling_config['webhook_signature_format'] ?? 'sha256=hex';
-				$result['max_body_bytes']   = (int) ( $scheduling_config['webhook_max_body_bytes']
+				$preset = $scheduling_config['webhook_auth_preset'] ?? null;
+				if ( $preset ) {
+					$result['preset'] = $preset;
+				} else {
+					$result['signature_header'] = $scheduling_config['webhook_signature_header'] ?? 'X-Hub-Signature-256';
+					$result['signature_format'] = $scheduling_config['webhook_signature_format'] ?? 'sha256=hex';
+				}
+				$result['max_body_bytes'] = (int) ( $scheduling_config['webhook_max_body_bytes']
 					?? \DataMachine\Api\WebhookTrigger::DEFAULT_MAX_BODY_BYTES );
-				// NEVER include the secret.
+
+				// v2 multi-secret roster — ids only, never values.
+				$result['secret_ids'] = self::summarize_secrets(
+					$scheduling_config['webhook_secrets'] ?? array(),
+					$scheduling_config['webhook_secret'] ?? ''
+				);
 			}
 
 			$rate_config          = $scheduling_config['webhook_rate_limit'] ?? array();
@@ -864,5 +1077,357 @@ class WebhookTriggerAbility {
 	 */
 	public static function get_webhook_url( int $flow_id ): string {
 		return rest_url( "datamachine/v1/trigger/{$flow_id}" );
+	}
+
+	/**
+	 * Zero-downtime secret rotation.
+	 *
+	 * Demotes `current` → `previous` with a TTL, installs a fresh `current`.
+	 * Both continue to verify inbound signatures until `previous` expires —
+	 * so upstream providers have a grace window to swap in the new secret.
+	 *
+	 * @param array $input flow_id, optional secret / generate / previous_ttl_seconds.
+	 * @return array
+	 */
+	public function executeRotateSecret( array $input ): array {
+		$flow_id = (int) ( $input['flow_id'] ?? 0 );
+		if ( $flow_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_id must be a positive integer',
+			);
+		}
+
+		$flow = $this->db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Flow %d not found', $flow_id ),
+			);
+		}
+
+		$scheduling_config = $flow['scheduling_config'] ?? array();
+		$explicit          = isset( $input['secret'] ) ? (string) $input['secret'] : '';
+		$generate          = ! empty( $input['generate'] );
+
+		if ( '' === $explicit && ! $generate ) {
+			return array(
+				'success' => false,
+				'error'   => 'Provide either secret=<value> or generate=true.',
+			);
+		}
+
+		$ttl = isset( $input['previous_ttl_seconds'] ) ? (int) $input['previous_ttl_seconds'] : WEEK_IN_SECONDS;
+		if ( $ttl < 0 ) {
+			$ttl = 0;
+		}
+		$now        = time();
+		$expires_at = gmdate( 'Y-m-d\TH:i:s\Z', $now + $ttl );
+
+		$new_secret = '' !== $explicit ? $explicit : self::generate_secret();
+
+		// Find current secret; demote it to previous.
+		$secrets = $scheduling_config['webhook_secrets'] ?? array();
+		if ( ! is_array( $secrets ) || empty( $secrets ) ) {
+			$legacy = (string) ( $scheduling_config['webhook_secret'] ?? '' );
+			if ( '' !== $legacy ) {
+				$secrets = array(
+					array(
+						'id'    => 'current',
+						'value' => $legacy,
+					),
+				);
+			}
+		}
+
+		$demoted = array();
+		foreach ( $secrets as $entry ) {
+			if ( ! is_array( $entry ) ) {
+				continue;
+			}
+			if ( ( $entry['id'] ?? '' ) === 'current' ) {
+				$entry['id']         = 'previous';
+				$entry['expires_at'] = $expires_at;
+			}
+			if ( ( $entry['id'] ?? '' ) === 'previous' && empty( $entry['expires_at'] ) ) {
+				// Legacy `previous` without a TTL — give it the same window.
+				$entry['expires_at'] = $expires_at;
+			}
+			$demoted[] = $entry;
+		}
+		$demoted[] = array(
+			'id'    => 'current',
+			'value' => $new_secret,
+		);
+
+		$scheduling_config['webhook_secrets']    = $demoted;
+		$scheduling_config['webhook_secret']     = $new_secret;
+		$scheduling_config['webhook_auth_mode']  = $scheduling_config['webhook_auth_mode'] ?? 'hmac_sha256';
+		$scheduling_config['webhook_enabled']    = true;
+		$scheduling_config['webhook_created_at'] = $scheduling_config['webhook_created_at'] ?? gmdate( 'Y-m-d\TH:i:s\Z' );
+		unset( $scheduling_config['webhook_token'] );
+
+		$updated = $this->db_flows->update_flow( $flow_id, array( 'scheduling_config' => $scheduling_config ) );
+		if ( ! $updated ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to update flow scheduling config',
+			);
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Webhook HMAC secret rotated',
+			array(
+				'flow_id'    => $flow_id,
+				'expires_at' => $expires_at,
+			)
+		);
+
+		return array(
+			'success'             => true,
+			'flow_id'             => $flow_id,
+			'new_secret'          => $new_secret,
+			'previous_expires_at' => $expires_at,
+			'secret_ids'          => self::summarize_secrets( $demoted, $new_secret ),
+			'message'             => sprintf(
+				'HMAC secret rotated for flow %d. Previous secret valid until %s.',
+				$flow_id,
+				$expires_at
+			),
+		);
+	}
+
+	/**
+	 * Immediately forget a secret by id (no grace period).
+	 *
+	 * @param array $input flow_id, secret_id.
+	 * @return array
+	 */
+	public function executeForgetSecret( array $input ): array {
+		$flow_id   = (int) ( $input['flow_id'] ?? 0 );
+		$secret_id = isset( $input['secret_id'] ) ? (string) $input['secret_id'] : '';
+
+		if ( $flow_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_id must be a positive integer',
+			);
+		}
+		if ( '' === $secret_id ) {
+			return array(
+				'success' => false,
+				'error'   => 'secret_id is required',
+			);
+		}
+
+		$flow = $this->db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Flow %d not found', $flow_id ),
+			);
+		}
+
+		$scheduling_config = $flow['scheduling_config'] ?? array();
+		$secrets           = $scheduling_config['webhook_secrets'] ?? array();
+		if ( ! is_array( $secrets ) ) {
+			$secrets = array();
+		}
+
+		$filtered = array();
+		$found    = false;
+		foreach ( $secrets as $entry ) {
+			if ( is_array( $entry ) && ( $entry['id'] ?? '' ) === $secret_id ) {
+				$found = true;
+				continue;
+			}
+			$filtered[] = $entry;
+		}
+
+		if ( ! $found ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'No secret with id "%s" on flow %d.', $secret_id, $flow_id ),
+			);
+		}
+
+		$scheduling_config['webhook_secrets'] = $filtered;
+
+		// If we dropped the secret that mirrored the legacy field, resync.
+		if ( 'current' === $secret_id ) {
+			$next_current = '';
+			foreach ( $filtered as $entry ) {
+				if ( is_array( $entry ) && ( $entry['id'] ?? '' ) === 'current' ) {
+					$next_current = (string) ( $entry['value'] ?? '' );
+					break;
+				}
+			}
+			if ( '' === $next_current ) {
+				unset( $scheduling_config['webhook_secret'] );
+			} else {
+				$scheduling_config['webhook_secret'] = $next_current;
+			}
+		}
+
+		$updated = $this->db_flows->update_flow( $flow_id, array( 'scheduling_config' => $scheduling_config ) );
+		if ( ! $updated ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to update flow scheduling config',
+			);
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Webhook HMAC secret forgotten',
+			array(
+				'flow_id'   => $flow_id,
+				'secret_id' => $secret_id,
+			)
+		);
+
+		return array(
+			'success'    => true,
+			'flow_id'    => $flow_id,
+			'secret_ids' => self::summarize_secrets( $filtered, $scheduling_config['webhook_secret'] ?? '' ),
+			'message'    => sprintf( 'Secret "%s" removed from flow %d.', $secret_id, $flow_id ),
+		);
+	}
+
+	/**
+	 * Run the verifier offline against a supplied payload + headers.
+	 *
+	 * Never spawns a job. Never touches the rate limiter. Useful for debugging
+	 * upstream signature configuration or replaying captured deliveries.
+	 *
+	 * @param array $input flow_id, body (string), headers (assoc), optional now.
+	 * @return array
+	 */
+	public function executeTest( array $input ): array {
+		$flow_id = (int) ( $input['flow_id'] ?? 0 );
+		if ( $flow_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'flow_id must be a positive integer',
+			);
+		}
+
+		$flow = $this->db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Flow %d not found', $flow_id ),
+			);
+		}
+
+		$body    = isset( $input['body'] ) ? (string) $input['body'] : '';
+		$headers = isset( $input['headers'] ) && is_array( $input['headers'] ) ? $input['headers'] : array();
+		$now     = isset( $input['now'] ) ? (int) $input['now'] : null;
+
+		$scheduling_config = $flow['scheduling_config'] ?? array();
+		$resolved          = \DataMachine\Api\WebhookAuthResolver::resolve( $scheduling_config );
+
+		if ( 'bearer' === $resolved['mode'] ) {
+			return array(
+				'success' => false,
+				'error'   => 'test only applies to HMAC / verifier-based auth modes.',
+			);
+		}
+		if ( empty( $resolved['verifier'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Flow has no verifier config resolved.',
+			);
+		}
+
+		// Lower-case header keys for the verifier.
+		$normalised = array();
+		foreach ( $headers as $k => $v ) {
+			$normalised[ strtolower( (string) $k ) ] = is_array( $v ) ? implode( ',', array_map( 'strval', $v ) ) : (string) $v;
+		}
+
+		$result = \DataMachine\Api\WebhookVerifier::verify(
+			$body,
+			$normalised,
+			array(),
+			array(),
+			self::get_webhook_url( $flow_id ),
+			$resolved['verifier'],
+			$now
+		);
+
+		return array(
+			'success'      => true,
+			'ok'           => $result->ok,
+			'reason'       => $result->reason,
+			'secret_id'    => $result->secret_id,
+			'timestamp'    => $result->timestamp,
+			'skew_seconds' => $result->skew_seconds,
+			'detail'       => $result->detail,
+		);
+	}
+
+	/**
+	 * Add or replace a secret entry in the v2 multi-secret list.
+	 *
+	 * @param array  $existing
+	 * @param string $id
+	 * @param string $value
+	 * @return array
+	 */
+	public static function upsert_secret( array $existing, string $id, string $value ): array {
+		$replaced = false;
+		$out      = array();
+		foreach ( $existing as $entry ) {
+			if ( is_array( $entry ) && ( $entry['id'] ?? '' ) === $id ) {
+				$out[]    = array(
+					'id'    => $id,
+					'value' => $value,
+				);
+				$replaced = true;
+				continue;
+			}
+			$out[] = $entry;
+		}
+		if ( ! $replaced ) {
+			$out[] = array(
+				'id'    => $id,
+				'value' => $value,
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Summarise a secrets list into a safe-for-response shape (ids + expiry only).
+	 *
+	 * Accepts both the v2 array-of-arrays and a legacy single-value fallback.
+	 *
+	 * @param mixed  $secrets
+	 * @param string $legacy_value Fallback value when no v2 list is present.
+	 * @return array<int,array{id:string,expires_at:?string}>
+	 */
+	public static function summarize_secrets( $secrets, string $legacy_value = '' ): array {
+		$out = array();
+		if ( is_array( $secrets ) ) {
+			foreach ( $secrets as $entry ) {
+				if ( is_array( $entry ) && ! empty( $entry['value'] ) ) {
+					$out[] = array(
+						'id'         => (string) ( $entry['id'] ?? '' ),
+						'expires_at' => isset( $entry['expires_at'] ) ? (string) $entry['expires_at'] : null,
+					);
+				}
+			}
+		}
+		if ( empty( $out ) && '' !== $legacy_value ) {
+			$out[] = array(
+				'id'         => 'current',
+				'expires_at' => null,
+			);
+		}
+		return $out;
 	}
 }

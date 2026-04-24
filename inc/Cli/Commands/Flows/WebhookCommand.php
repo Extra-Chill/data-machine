@@ -29,7 +29,7 @@ class WebhookCommand extends BaseCommand {
 	 */
 	public function dispatch( array $args, array $assoc_args ): void {
 		if ( empty( $args ) ) {
-			WP_CLI::error( 'Usage: wp datamachine flows webhook <enable|disable|regenerate|set-secret|status|list|rate-limit> [flow_id]' );
+			WP_CLI::error( 'Usage: wp datamachine flows webhook <enable|disable|regenerate|set-secret|rotate|forget|test|presets|status|list|rate-limit> [flow_id]' );
 			return;
 		}
 
@@ -50,6 +50,18 @@ class WebhookCommand extends BaseCommand {
 			case 'set_secret':
 				$this->set_secret( $remaining, $assoc_args );
 				break;
+			case 'rotate':
+				$this->rotate( $remaining, $assoc_args );
+				break;
+			case 'forget':
+				$this->forget( $remaining, $assoc_args );
+				break;
+			case 'test':
+				$this->test( $remaining, $assoc_args );
+				break;
+			case 'presets':
+				$this->presets( $remaining, $assoc_args );
+				break;
 			case 'status':
 				$this->status( $remaining, $assoc_args );
 				break;
@@ -60,7 +72,7 @@ class WebhookCommand extends BaseCommand {
 				$this->rate_limit( $remaining, $assoc_args );
 				break;
 			default:
-				WP_CLI::error( "Unknown webhook action: {$action}. Use: enable, disable, regenerate, set-secret, status, list, rate-limit" );
+				WP_CLI::error( "Unknown webhook action: {$action}. Use: enable, disable, regenerate, set-secret, rotate, forget, test, presets, status, list, rate-limit" );
 		}
 	}
 
@@ -104,6 +116,14 @@ class WebhookCommand extends BaseCommand {
 	 * [--secret=<value>]
 	 * : Use this explicit HMAC secret (e.g. the value you configured on the upstream service).
 	 *
+	 * [--secret-id=<id>]
+	 * : Optional secret id for multi-secret rotation (default: `current`).
+	 *
+	 * [--preset=<name>]
+	 * : Name of a preset registered via the `datamachine_webhook_auth_presets` filter.
+	 * Implies HMAC mode and resolves the full signing template server-side. Run
+	 * `wp datamachine flows webhook presets` to list available presets.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Enable with default Bearer auth
@@ -121,6 +141,9 @@ class WebhookCommand extends BaseCommand {
 	 *       --signature-header=X-Shopify-Hmac-Sha256 \
 	 *       --signature-format=base64 \
 	 *       --secret=<shopify_secret>
+	 *
+	 *     # Enable via a registered preset (Stripe, Slack, ...)
+	 *     wp datamachine flows webhook enable 42 --preset=stripe --secret=whsec_...
 	 *
 	 * @subcommand enable
 	 */
@@ -153,6 +176,12 @@ class WebhookCommand extends BaseCommand {
 		if ( isset( $assoc_args['secret'] ) ) {
 			$input['secret'] = (string) $assoc_args['secret'];
 		}
+		if ( isset( $assoc_args['secret-id'] ) ) {
+			$input['secret_id'] = (string) $assoc_args['secret-id'];
+		}
+		if ( isset( $assoc_args['preset'] ) ) {
+			$input['preset'] = (string) $assoc_args['preset'];
+		}
 
 		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
 		$result  = $ability->executeEnable( $input );
@@ -169,8 +198,12 @@ class WebhookCommand extends BaseCommand {
 		WP_CLI::log( sprintf( 'Auth mode: %s', $auth_mode ) );
 
 		if ( 'hmac_sha256' === $auth_mode ) {
-			WP_CLI::log( sprintf( 'Header:    %s', $result['signature_header'] ?? 'X-Hub-Signature-256' ) );
-			WP_CLI::log( sprintf( 'Format:    %s', $result['signature_format'] ?? 'sha256=hex' ) );
+			if ( ! empty( $result['preset'] ) ) {
+				WP_CLI::log( sprintf( 'Preset:    %s', $result['preset'] ) );
+			} else {
+				WP_CLI::log( sprintf( 'Header:    %s', $result['signature_header'] ?? 'X-Hub-Signature-256' ) );
+				WP_CLI::log( sprintf( 'Format:    %s', $result['signature_format'] ?? 'sha256=hex' ) );
+			}
 
 			if ( isset( $result['secret'] ) ) {
 				WP_CLI::log( sprintf( 'Secret:    %s', $result['secret'] ) );
@@ -178,7 +211,7 @@ class WebhookCommand extends BaseCommand {
 				WP_CLI::log( '' );
 				WP_CLI::log( 'Paste this secret into your webhook provider (e.g. GitHub → Settings → Webhooks → Secret).' );
 			} else {
-				WP_CLI::log( 'Secret:    (unchanged — use `set-secret` to rotate)' );
+				WP_CLI::log( 'Secret:    (unchanged — use `set-secret` or `rotate` to change)' );
 			}
 		} else {
 			WP_CLI::log( sprintf( 'Token:     %s', $result['token'] ) );
@@ -411,10 +444,24 @@ class WebhookCommand extends BaseCommand {
 			WP_CLI::log( sprintf( 'Created:   %s', $result['created_at'] ?? 'unknown' ) );
 
 			if ( 'hmac_sha256' === ( $result['auth_mode'] ?? 'bearer' ) ) {
-				WP_CLI::log( sprintf( 'Header:    %s', $result['signature_header'] ?? 'X-Hub-Signature-256' ) );
-				WP_CLI::log( sprintf( 'Format:    %s', $result['signature_format'] ?? 'sha256=hex' ) );
+				if ( ! empty( $result['preset'] ) ) {
+					WP_CLI::log( sprintf( 'Preset:    %s', $result['preset'] ) );
+				} else {
+					WP_CLI::log( sprintf( 'Header:    %s', $result['signature_header'] ?? 'X-Hub-Signature-256' ) );
+					WP_CLI::log( sprintf( 'Format:    %s', $result['signature_format'] ?? 'sha256=hex' ) );
+				}
 				if ( isset( $result['max_body_bytes'] ) ) {
 					WP_CLI::log( sprintf( 'Max body:  %d bytes', (int) $result['max_body_bytes'] ) );
+				}
+				if ( ! empty( $result['secret_ids'] ) ) {
+					WP_CLI::log( 'Secrets:' );
+					foreach ( $result['secret_ids'] as $entry ) {
+						$line = '  - ' . ( $entry['id'] ?? '' );
+						if ( ! empty( $entry['expires_at'] ) ) {
+							$line .= ' (expires ' . $entry['expires_at'] . ')';
+						}
+						WP_CLI::log( $line );
+					}
 				}
 			}
 		}
@@ -563,5 +610,313 @@ class WebhookCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( $result['message'] );
+	}
+
+	/**
+	 * Rotate the HMAC shared secret with a grace period.
+	 *
+	 * Demotes `current` → `previous` (keeps verifying for --previous-ttl-seconds),
+	 * installs a fresh `current`. Use this when you want to swap secrets without
+	 * a downtime window: rotate here, update the provider, then forget `previous`.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <flow_id>
+	 * : The flow ID to rotate the secret for.
+	 *
+	 * [--secret=<value>]
+	 * : Explicit new secret value (takes precedence over --generate).
+	 *
+	 * [--generate]
+	 * : Generate a random 32-byte hex secret.
+	 *
+	 * [--previous-ttl-seconds=<seconds>]
+	 * : How long the old secret keeps verifying (default: 604800 = 7 days).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine flows webhook rotate 42 --generate
+	 *     wp datamachine flows webhook rotate 42 --secret=whsec_new... --previous-ttl-seconds=86400
+	 *
+	 * @subcommand rotate
+	 */
+	public function rotate( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine flows webhook rotate <flow_id> (--generate | --secret=<value>) [--previous-ttl-seconds=<n>]' );
+			return;
+		}
+		$flow_id = (int) $args[0];
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		$has_secret   = isset( $assoc_args['secret'] );
+		$has_generate = ! empty( $assoc_args['generate'] );
+		if ( ! $has_secret && ! $has_generate ) {
+			WP_CLI::error( 'Provide exactly one of --secret=<value> or --generate.' );
+			return;
+		}
+		if ( $has_secret && $has_generate ) {
+			WP_CLI::error( 'Pass either --secret=<value> or --generate, not both.' );
+			return;
+		}
+
+		$input = array( 'flow_id' => $flow_id );
+		if ( $has_secret ) {
+			$input['secret'] = (string) $assoc_args['secret'];
+		} else {
+			$input['generate'] = true;
+		}
+		if ( isset( $assoc_args['previous-ttl-seconds'] ) ) {
+			$input['previous_ttl_seconds'] = (int) $assoc_args['previous-ttl-seconds'];
+		}
+
+		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
+		$result  = $ability->executeRotateSecret( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to rotate secret' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+		WP_CLI::log( sprintf( 'New secret:           %s', $result['new_secret'] ) );
+		WP_CLI::log( sprintf( 'Previous expires at:  %s', $result['previous_expires_at'] ) );
+		WP_CLI::warning( 'Save this secret now — it will not be shown again.' );
+
+		if ( ! empty( $result['secret_ids'] ) ) {
+			WP_CLI::log( '' );
+			WP_CLI::log( 'Active secret ids:' );
+			foreach ( $result['secret_ids'] as $entry ) {
+				$line = '  - ' . ( $entry['id'] ?? '' );
+				if ( ! empty( $entry['expires_at'] ) ) {
+					$line .= ' (expires ' . $entry['expires_at'] . ')';
+				}
+				WP_CLI::log( $line );
+			}
+		}
+	}
+
+	/**
+	 * Forget a specific secret by id.
+	 *
+	 * Removes the secret from the rotation list immediately — no grace window.
+	 * Typical use: `forget previous` after you've updated the provider side.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <flow_id>
+	 * : The flow ID.
+	 *
+	 * <secret_id>
+	 * : The secret id to forget (e.g. `previous`).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine flows webhook forget 42 previous
+	 *
+	 * @subcommand forget
+	 */
+	public function forget( array $args, array $assoc_args ): void {
+		if ( count( $args ) < 2 ) {
+			WP_CLI::error( 'Usage: wp datamachine flows webhook forget <flow_id> <secret_id>' );
+			return;
+		}
+		$flow_id   = (int) $args[0];
+		$secret_id = (string) $args[1];
+
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
+		$result  = $ability->executeForgetSecret(
+			array(
+				'flow_id'   => $flow_id,
+				'secret_id' => $secret_id,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to forget secret' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+	}
+
+	/**
+	 * Run offline signature verification against a captured payload.
+	 *
+	 * Invokes the verifier without spawning a job or hitting rate limits.
+	 * Useful for debugging upstream signature configuration or replaying
+	 * captured deliveries. Prints the full verification result including
+	 * which secret matched (if any) and the extracted timestamp skew.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <flow_id>
+	 * : The flow ID (its auth config is used for verification).
+	 *
+	 * [--body=<value>]
+	 * : Raw request body. Use @/path/to/file.json to read from disk.
+	 *
+	 * [--header=<header>]
+	 * : Request header in "Name: value" form. Repeatable.
+	 *
+	 * [--now=<unix_seconds>]
+	 * : Override "now" for deterministic replay-window checks.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Verify a captured GitHub ping payload
+	 *     wp datamachine flows webhook test 42 \\
+	 *       --body=@fixtures/github-ping.json \\
+	 *       --header="X-Hub-Signature-256: sha256=abc123..." \\
+	 *       --header="X-GitHub-Event: ping"
+	 *
+	 * @subcommand test
+	 * @when after_wp_load
+	 */
+	public function test( array $args, array $assoc_args ): void {
+		if ( empty( $args ) ) {
+			WP_CLI::error( 'Usage: wp datamachine flows webhook test <flow_id> [--body=@file.json] [--header="Name: value"]... [--now=<unix>]' );
+			return;
+		}
+		$flow_id = (int) $args[0];
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		// --body may be literal or @path.
+		$body_arg = $assoc_args['body'] ?? '';
+		$body     = '';
+		if ( is_string( $body_arg ) && '' !== $body_arg ) {
+			if ( 0 === strpos( $body_arg, '@' ) ) {
+				$path = substr( $body_arg, 1 );
+				if ( ! is_readable( $path ) ) {
+					WP_CLI::error( sprintf( 'Cannot read body file: %s', $path ) );
+					return;
+				}
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+				$body = (string) file_get_contents( $path );
+			} else {
+				$body = $body_arg;
+			}
+		}
+
+		// --header can be repeated; WP-CLI represents repeated flags as arrays when passed --header=foo --header=bar.
+		$raw_headers = array();
+		if ( isset( $assoc_args['header'] ) ) {
+			$raw_headers = is_array( $assoc_args['header'] ) ? $assoc_args['header'] : array( $assoc_args['header'] );
+		}
+		$headers = array();
+		foreach ( $raw_headers as $header_line ) {
+			$line = (string) $header_line;
+			$pos  = strpos( $line, ':' );
+			if ( false === $pos ) {
+				WP_CLI::warning( sprintf( 'Skipping malformed header (expected "Name: value"): %s', $line ) );
+				continue;
+			}
+			$name  = trim( substr( $line, 0, $pos ) );
+			$value = trim( substr( $line, $pos + 1 ) );
+			if ( '' === $name ) {
+				continue;
+			}
+			$headers[ $name ] = $value;
+		}
+
+		$input = array(
+			'flow_id' => $flow_id,
+			'body'    => $body,
+			'headers' => $headers,
+		);
+		if ( isset( $assoc_args['now'] ) ) {
+			$input['now'] = (int) $assoc_args['now'];
+		}
+
+		$ability = new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
+		$result  = $ability->executeTest( $input );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Test failed' );
+			return;
+		}
+
+		if ( $result['ok'] ) {
+			WP_CLI::success( sprintf( 'Signature verified (secret_id=%s).', $result['secret_id'] ?? 'current' ) );
+		} else {
+			WP_CLI::warning( sprintf( 'Verification failed: %s', $result['reason'] ) );
+		}
+
+		WP_CLI::log( sprintf( 'Reason:        %s', $result['reason'] ) );
+		if ( isset( $result['secret_id'] ) ) {
+			WP_CLI::log( sprintf( 'Secret id:     %s', $result['secret_id'] ) );
+		}
+		if ( isset( $result['timestamp'] ) ) {
+			WP_CLI::log( sprintf( 'Timestamp:     %d', $result['timestamp'] ) );
+		}
+		if ( isset( $result['skew_seconds'] ) ) {
+			WP_CLI::log( sprintf( 'Skew seconds:  %d', $result['skew_seconds'] ) );
+		}
+		if ( ! empty( $result['detail'] ) ) {
+			WP_CLI::log( sprintf( 'Detail:        %s', $result['detail'] ) );
+		}
+	}
+
+	/**
+	 * List webhook auth presets registered via the
+	 * `datamachine_webhook_auth_presets` filter.
+	 *
+	 * Core ships zero presets. Third-party packages (or site-specific
+	 * mu-plugins) register them; this command simply displays what is available
+	 * on the current install.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine flows webhook presets
+	 *
+	 * @subcommand presets
+	 */
+	public function presets( array $args, array $assoc_args ): void {
+		$presets = \DataMachine\Api\WebhookAuthResolver::get_presets();
+
+		if ( empty( $presets ) ) {
+			WP_CLI::log( 'No presets registered. Add one via the datamachine_webhook_auth_presets filter.' );
+			return;
+		}
+
+		$rows = array();
+		foreach ( $presets as $name => $cfg ) {
+			$sig    = $cfg['signature_source'] ?? array();
+			$ts     = $cfg['timestamp_source'] ?? array();
+			$rows[] = array(
+				'name'             => (string) $name,
+				'mode'             => (string) ( $cfg['mode'] ?? 'hmac' ),
+				'algo'             => (string) ( $cfg['algo'] ?? 'sha256' ),
+				'signed_template'  => (string) ( $cfg['signed_template'] ?? '{body}' ),
+				'signature_header' => (string) ( $sig['header'] ?? ( $sig['param'] ?? '' ) ),
+				'encoding'         => (string) ( $sig['encoding'] ?? '' ),
+				'replay_tolerance' => isset( $cfg['tolerance_seconds'] ) ? (string) (int) $cfg['tolerance_seconds'] : '',
+				'has_timestamp'    => $ts ? 'yes' : 'no',
+			);
+		}
+
+		$this->format_items( $rows, array( 'name', 'mode', 'signed_template', 'signature_header', 'encoding', 'has_timestamp', 'replay_tolerance' ), $assoc_args, 'name' );
 	}
 }

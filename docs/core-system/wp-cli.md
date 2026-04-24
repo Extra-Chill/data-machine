@@ -107,13 +107,15 @@ wp datamachine flows queue validate 10 "AI agents" --post_type=post --threshold=
 
 ### datamachine flows webhook
 
-Manage webhook triggers. Supports two auth modes: Bearer (default) and HMAC-SHA256. **Since**: 0.31.0 (Bearer), 0.79.0 (HMAC).
+Manage webhook triggers. Supports Bearer (default), HMAC-SHA256 (v1 shorthand),
+and the v2 provider-agnostic template verifier. **Since**: 0.31.0 (Bearer),
+0.79.0 (HMAC + v2 verifier).
 
 ```bash
 # Enable webhook trigger with default Bearer auth
 wp datamachine flows webhook enable 10
 
-# Enable with HMAC-SHA256 auth (GitHub-style) and a generated secret
+# Enable with HMAC-SHA256 (v1 shorthand — GitHub-style)
 wp datamachine flows webhook enable 10 --auth-mode=hmac_sha256 --generate-secret
 
 # Enable with HMAC for a non-GitHub provider (Shopify example)
@@ -123,11 +125,28 @@ wp datamachine flows webhook enable 10 \
   --signature-format=base64 \
   --secret=<shopify_secret>
 
-# Set or rotate the HMAC secret (prints the new secret once)
+# Enable with a registered preset (v2 — filter-registered, provider-agnostic)
+wp datamachine flows webhook enable 10 --preset=stripe --secret=whsec_...
+wp datamachine flows webhook enable 10 --preset=slack --generate-secret
+
+# List available presets (core ships zero — they come from plugins / mu-plugins)
+wp datamachine flows webhook presets
+
+# Zero-downtime secret rotation (keeps the old secret verifying for 7 days)
+wp datamachine flows webhook rotate 10 --generate
+wp datamachine flows webhook rotate 10 --generate --previous-ttl-seconds=86400
+wp datamachine flows webhook forget 10 previous
+
+# Offline verification — no job spawned, no rate limit hit
+wp datamachine flows webhook test 10 \
+  --body=@fixtures/github-ping.json \
+  --header="X-Hub-Signature-256: sha256=abc123..."
+
+# Set or rotate the HMAC secret (single-secret v1 shorthand)
 wp datamachine flows webhook set-secret 10 --generate
 wp datamachine flows webhook set-secret 10 --secret=<value>
 
-# Check webhook status (shows auth mode; never shows secret/token)
+# Check webhook status (shows auth mode, preset, secret ids — never values)
 wp datamachine flows webhook status 10
 
 # List all webhook-enabled flows
@@ -139,17 +158,20 @@ wp datamachine flows webhook regenerate 10
 # Configure rate limiting
 wp datamachine flows webhook rate-limit 10 --max=10 --window=60
 
-# Disable webhook (clears all auth material, both modes)
+# Disable webhook (clears all auth material)
 wp datamachine flows webhook disable 10
 ```
 
-**Signature formats for HMAC mode** (`--signature-format`):
+**Signature formats for the v1 shorthand** (`--signature-format`):
 - `sha256=hex` (default) — GitHub-style `sha256=<hex>` header values.
 - `hex` — raw hex digest (e.g. Linear).
 - `base64` — base64-encoded raw digest (e.g. Shopify).
 
-See [Webhook Triggers](../api/endpoints/webhook-triggers.md) for the full
-GitHub walkthrough and security notes.
+**v2 template verifier**: the `--preset=<name>` flag expands a filter-registered
+template into the full v2 config — supporting Stripe / Slack / Svix / Mailgun
+timestamp-composite signatures, replay protection, and multi-secret rotation.
+See [Webhook Triggers](../api/endpoints/webhook-triggers.md) for the grammar,
+provider coverage table, and the `datamachine_webhook_auth_presets` filter.
 
 ### datamachine flows bulk-config
 

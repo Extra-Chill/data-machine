@@ -67,16 +67,19 @@ All abilities support `agent_id` and `user_id` parameters for multi-agent scopin
 | `datamachine/queue-move` | Reorder queue item | `Flow/QueueAbility.php` |
 | `datamachine/queue-settings` | Get/set queue settings | `Flow/QueueAbility.php` |
 
-### Webhook Triggers (6 abilities)
+### Webhook Triggers (9 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
-| `datamachine/webhook-trigger-enable` | Enable webhook trigger for a flow. Supports `bearer` (default) or `hmac_sha256` auth modes. | `Flow/WebhookTriggerAbility.php` |
-| `datamachine/webhook-trigger-disable` | Disable webhook trigger, revoke all auth material (token and HMAC secret) | `Flow/WebhookTriggerAbility.php` |
-| `datamachine/webhook-trigger-regenerate` | Regenerate Bearer token (bearer auth mode only; old token immediately invalidated) | `Flow/WebhookTriggerAbility.php` |
-| `datamachine/webhook-trigger-set-secret` | Set or rotate the HMAC shared secret; switches the flow to `hmac_sha256` mode | `Flow/WebhookTriggerAbility.php` |
-| `datamachine/webhook-trigger-rate-limit` | Set rate limiting for flow webhook trigger | `Flow/WebhookTriggerAbility.php` |
-| `datamachine/webhook-trigger-status` | Get webhook trigger status for a flow (auth mode, header, format — never the secret) | `Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-enable` | Enable webhook trigger for a flow. Supports `bearer` (default), `hmac_sha256` (v1 shorthand), or a preset resolved via `datamachine_webhook_auth_presets`. | `Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-disable` | Disable webhook trigger, revoke all auth material (token, HMAC secrets, v2 config, preset). | `Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-regenerate` | Regenerate Bearer token (bearer auth mode only; old token immediately invalidated). | `Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-set-secret` | Set or rotate the HMAC shared secret; switches the flow to `hmac_sha256` mode. | `Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-rotate-secret` | **Zero-downtime rotation** — demote `current` → `previous` with a TTL, install a fresh `current`. | `Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-forget-secret` | Remove a specific secret by id from the rotation list immediately. | `Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-test` | Run the verifier offline against supplied body + headers; no job spawn, no rate limiter touched. | `Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-rate-limit` | Set rate limiting for flow webhook trigger. | `Flow/WebhookTriggerAbility.php` |
+| `datamachine/webhook-trigger-status` | Get webhook trigger status for a flow (auth mode, preset, secret ids — never the secret values). | `Flow/WebhookTriggerAbility.php` |
 
 ### Job Execution (9 abilities)
 

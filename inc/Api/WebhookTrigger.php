@@ -141,12 +141,14 @@ class WebhookTrigger {
 			);
 		}
 
-		$auth_mode = self::resolve_auth_mode( $scheduling_config );
+		$resolved  = WebhookAuthResolver::resolve( $scheduling_config );
+		$auth_mode = $resolved['mode'];
 
-		if ( 'hmac_sha256' === $auth_mode ) {
-			$auth_error = self::authenticate_hmac( $flow_id, $scheduling_config, $request );
-		} else {
+		if ( 'bearer' === $auth_mode ) {
 			$auth_error = self::authenticate_bearer( $flow_id, $scheduling_config, $request );
+		} else {
+			// 'hmac' (core) or any pluggable mode registered via filter — run through the verifier.
+			$auth_error = self::authenticate_via_verifier( $flow_id, $resolved, $request );
 		}
 
 		if ( $auth_error instanceof \WP_Error ) {
@@ -298,23 +300,6 @@ class WebhookTrigger {
 	const DEFAULT_RATE_LIMIT_WINDOW = 60;
 
 	/**
-	 * Resolve the effective webhook auth mode for a flow.
-	 *
-	 * Missing / unrecognized values default to `bearer` so existing flows
-	 * behave identically to before HMAC support was added.
-	 *
-	 * @param array $scheduling_config Flow scheduling config.
-	 * @return string Either 'bearer' or 'hmac_sha256'.
-	 */
-	private static function resolve_auth_mode( array $scheduling_config ): string {
-		$mode = $scheduling_config['webhook_auth_mode'] ?? 'bearer';
-		if ( 'hmac_sha256' === $mode ) {
-			return 'hmac_sha256';
-		}
-		return 'bearer';
-	}
-
-	/**
 	 * Authenticate a webhook request using a per-flow Bearer token.
 	 *
 	 * @param int              $flow_id          Flow ID.
@@ -406,30 +391,34 @@ class WebhookTrigger {
 	}
 
 	/**
-	 * Authenticate a webhook request using HMAC-SHA256 signatures.
+	 * Authenticate a webhook request using the provider-agnostic verifier.
 	 *
-	 * Verifies the raw request body (`$request->get_body()`) against a
-	 * provider-specified signature header, using the shared secret stored
-	 * in `scheduling_config.webhook_secret`.
+	 * Works for any mode other than `bearer`. Core ships `hmac`; additional
+	 * modes (Ed25519, x509, JWT, ...) are pluggable via the
+	 * `datamachine_webhook_verifier_modes` filter.
 	 *
-	 * @param int              $flow_id          Flow ID.
-	 * @param array            $scheduling_config Flow scheduling config.
-	 * @param \WP_REST_Request $request          REST request object.
+	 * On failure returns a generic 401 (or 413 for oversized payloads) to
+	 * prevent information leakage. The real failure reason is logged
+	 * server-side for the flow owner's diagnostics.
+	 *
+	 * @param int              $flow_id   Flow ID.
+	 * @param array            $resolved  Output of WebhookAuthResolver::resolve().
+	 * @param \WP_REST_Request $request   REST request object.
 	 * @return \WP_Error|null WP_Error on failure, null on success.
 	 */
-	private static function authenticate_hmac( int $flow_id, array $scheduling_config, \WP_REST_Request $request ): ?\WP_Error {
-		$secret = $scheduling_config['webhook_secret'] ?? '';
-		if ( empty( $secret ) || ! is_string( $secret ) ) {
+	private static function authenticate_via_verifier( int $flow_id, array $resolved, \WP_REST_Request $request ): ?\WP_Error {
+		$verifier_config = $resolved['verifier'] ?? null;
+		if ( ! is_array( $verifier_config ) ) {
 			do_action(
 				'datamachine_log',
 				'warning',
-				'Webhook trigger: HMAC secret not configured for flow',
+				'Webhook trigger: Missing or malformed verifier config',
 				array(
 					'flow_id'   => $flow_id,
 					'remote_ip' => self::get_remote_ip( $request ),
+					'mode'      => $resolved['mode'] ?? 'unknown',
 				)
 			);
-
 			return new \WP_Error(
 				'unauthorized',
 				'Invalid or missing authorization.',
@@ -437,47 +426,45 @@ class WebhookTrigger {
 			);
 		}
 
-		$signature_header = $scheduling_config['webhook_signature_header'] ?? 'X-Hub-Signature-256';
-		$signature_format = $scheduling_config['webhook_signature_format'] ?? WebhookSignatureVerifier::FORMAT_PREFIXED_HEX;
+		$raw_body     = $request->get_body();
+		$headers      = self::collect_headers( $request );
+		$query_params = (array) $request->get_query_params();
+		$post_params  = (array) $request->get_body_params();
+		$url          = self::build_request_url( $request );
 
-		$provided = $request->get_header( $signature_header );
-		if ( empty( $provided ) ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'Webhook trigger: Missing HMAC signature header',
-				array(
-					'flow_id'          => $flow_id,
-					'remote_ip'        => self::get_remote_ip( $request ),
-					'signature_header' => $signature_header,
-				)
-			);
+		$result = WebhookVerifier::verify(
+			$raw_body,
+			$headers,
+			$query_params,
+			$post_params,
+			$url,
+			$verifier_config
+		);
 
-			return new \WP_Error(
-				'unauthorized',
-				'Invalid or missing authorization.',
-				array( 'status' => 401 )
-			);
+		// Structured log for the flow owner's diagnostics — never contains
+		// secrets, signatures, or payload bodies.
+		do_action(
+			'datamachine_log',
+			$result->ok ? 'info' : 'warning',
+			'Webhook trigger: verification ' . $result->reason,
+			array(
+				'flow_id'      => $flow_id,
+				'remote_ip'    => self::get_remote_ip( $request ),
+				'mode'         => $resolved['mode'] ?? 'hmac',
+				'preset'       => $resolved['preset'] ?? null,
+				'reason'       => $result->reason,
+				'secret_id'    => $result->secret_id,
+				'timestamp'    => $result->timestamp,
+				'skew_seconds' => $result->skew_seconds,
+				'detail'       => $result->detail,
+			)
+		);
+
+		if ( $result->ok ) {
+			return null;
 		}
 
-		$raw_body = $request->get_body();
-
-		// Enforce an optional max body size before running HMAC — unauthenticated
-		// clients can otherwise force the server to hash arbitrarily large payloads.
-		$max_body_bytes = (int) ( $scheduling_config['webhook_max_body_bytes'] ?? self::DEFAULT_MAX_BODY_BYTES );
-		if ( $max_body_bytes > 0 && strlen( $raw_body ) > $max_body_bytes ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'Webhook trigger: Payload exceeds max_body_bytes',
-				array(
-					'flow_id'   => $flow_id,
-					'remote_ip' => self::get_remote_ip( $request ),
-					'size'      => strlen( $raw_body ),
-					'limit'     => $max_body_bytes,
-				)
-			);
-
+		if ( WebhookVerificationResult::PAYLOAD_TOO_LARGE === $result->reason ) {
 			return new \WP_Error(
 				'payload_too_large',
 				'Payload too large.',
@@ -485,34 +472,50 @@ class WebhookTrigger {
 			);
 		}
 
-		$valid = WebhookSignatureVerifier::verify_hmac_sha256(
-			$raw_body,
-			$provided,
-			$secret,
-			$signature_format
+		return new \WP_Error(
+			'unauthorized',
+			'Invalid or missing authorization.',
+			array( 'status' => 401 )
 		);
+	}
 
-		if ( ! $valid ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'Webhook trigger: HMAC signature mismatch',
-				array(
-					'flow_id'          => $flow_id,
-					'remote_ip'        => self::get_remote_ip( $request ),
-					'signature_header' => $signature_header,
-					'signature_format' => $signature_format,
-				)
-			);
-
-			return new \WP_Error(
-				'unauthorized',
-				'Invalid or missing authorization.',
-				array( 'status' => 401 )
-			);
+	/**
+	 * Collect all request headers into a lower-cased assoc array for the verifier.
+	 *
+	 * WP_REST_Request::get_headers() returns keys lower-cased with underscores;
+	 * values are arrays. We flatten to a single string per header.
+	 *
+	 * @param \WP_REST_Request $request
+	 * @return array<string,string>
+	 */
+	private static function collect_headers( \WP_REST_Request $request ): array {
+		$out = array();
+		foreach ( (array) $request->get_headers() as $name => $values ) {
+			if ( is_array( $values ) ) {
+				$value = implode( ',', array_map( 'strval', $values ) );
+			} else {
+				$value = (string) $values;
+			}
+			$normalised         = strtolower( str_replace( '_', '-', $name ) );
+			$out[ $normalised ] = $value;
 		}
+		return $out;
+	}
 
-		return null;
+	/**
+	 * Reconstruct the full request URL (scheme://host/path?query).
+	 *
+	 * @param \WP_REST_Request $request
+	 * @return string
+	 */
+	private static function build_request_url( \WP_REST_Request $request ): string {
+		$route = ltrim( $request->get_route(), '/' );
+		$url   = rest_url( $route );
+		$query = $request->get_query_params();
+		if ( ! empty( $query ) ) {
+			$url = add_query_arg( $query, $url );
+		}
+		return $url;
 	}
 
 	/**
@@ -646,6 +649,17 @@ class WebhookTrigger {
 			'linear-signature',
 			'x-slack-signature',
 			'x-slack-request-timestamp',
+			'webhook-id',
+			'webhook-timestamp',
+			'webhook-signature',
+			'svix-id',
+			'svix-timestamp',
+			'svix-signature',
+			'x-mailgun-signature',
+			'x-mailgun-timestamp',
+			'x-mailgun-token',
+			'paypal-transmission-sig',
+			'paypal-transmission-time',
 		);
 
 		$headers = array();
