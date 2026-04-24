@@ -12,11 +12,6 @@
 import { useCallback } from '@wordpress/element';
 
 /**
- * External dependencies
- */
-import { useQueryClient } from '@tanstack/react-query';
-
-/**
  * Internal dependencies
  */
 import { useUIStore } from '../../stores/uiStore';
