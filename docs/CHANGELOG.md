@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.79.1] - 2026-04-24
+
+### Changed
+- provider-agnostic template verifier (#1179)
+
 ## [0.78.0] - 2026-04-23
 
 ### Added
