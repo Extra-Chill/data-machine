@@ -1,7 +1,7 @@
 /**
  * Configuration Queries
  *
- * TanStack Query hooks for configuration data (step types, global settings, tools).
+ * TanStack Query hooks for configuration data (step types, tools, scheduling intervals).
  * Provider queries have been moved to @shared/queries/providers.
  */
 
@@ -22,15 +22,6 @@ export const useStepTypes = () =>
 			return result.success ? result.data : {};
 		},
 		staleTime: Infinity, // Never refetch - step types don't change
-	} );
-
-export const useGlobalSettings = () =>
-	useQuery( {
-		queryKey: [ 'config', 'global-settings' ],
-		queryFn: async () => {
-			return window.datamachineConfig?.globalSettings || {};
-		},
-		staleTime: 10 * 60 * 1000, // 10 minutes
 	} );
 
 export const useSchedulingIntervals = () =>
