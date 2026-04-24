@@ -1,14 +1,16 @@
 <?php
 /**
- * Webhook Signature Verifier
+ * Webhook Signature Verifier — DEPRECATED.
  *
- * Shared HMAC-SHA256 signature verification helper for inbound webhooks.
- * Kept deliberately small and static so future providers (Slack, Stripe)
- * can plug in additional verification helpers without duplicating HMAC logic.
+ * Kept only as a transitional shim for external callers that imported this
+ * class during the short-lived v1 (single-format HMAC) window. The production
+ * verification path now lives in {@see \DataMachine\Api\WebhookVerifier},
+ * which supports a provider-agnostic template grammar.
  *
  * @package DataMachine\Api
  * @since 0.79.0
- * @see https://github.com/Extra-Chill/data-machine/issues/1177
+ * @deprecated 0.79.0 Use WebhookVerifier instead.
+ * @see https://github.com/Extra-Chill/data-machine/issues/1179
  */
 
 namespace DataMachine\Api;
@@ -18,11 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Static helper for verifying webhook signatures.
- *
- * Single responsibility: verify an HMAC-SHA256 signature against a raw
- * request body using a shared secret. All comparisons are timing-safe
- * via hash_equals().
+ * @deprecated 0.79.0 Use WebhookVerifier instead.
  */
 class WebhookSignatureVerifier {
 
