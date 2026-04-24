@@ -10,7 +10,6 @@
 export const MODAL_TYPES = {
 	STEP_SELECTION: 'step-selection',
 	HANDLER_SELECTION: 'handler-selection',
-	CONFIGURE_STEP: 'configure-step',
 	HANDLER_SETTINGS: 'handler-settings',
 	FLOW_SCHEDULE: 'flow-schedule',
 	FLOW_QUEUE: 'flow-queue',

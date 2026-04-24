@@ -3,18 +3,12 @@
  */
 import React from 'react';
 /**
- * WordPress dependencies
- */
-import { Modal, Button } from '@wordpress/components';
-import { __ } from '@wordpress/i18n';
-/**
  * Internal dependencies
  */
 import { MODAL_TYPES } from '../../utils/constants';
 import {
 	ImportExportModal,
 	StepSelectionModal,
-	ConfigureStepModal,
 	FlowScheduleModal,
 	FlowQueueModal,
 	HandlerSelectionModal,
@@ -36,14 +30,6 @@ export default function ModalSwitch( { activeModal, baseProps } ) {
 
 		case MODAL_TYPES.STEP_SELECTION:
 			return <StepSelectionModal { ...baseProps } />;
-
-		case MODAL_TYPES.CONFIGURE_STEP:
-			return (
-				<ConfigureStepModal
-					key={ baseProps.pipelineStepId }
-					{ ...baseProps }
-				/>
-			);
 
 		case MODAL_TYPES.FLOW_SCHEDULE:
 			return <FlowScheduleModal { ...baseProps } />;

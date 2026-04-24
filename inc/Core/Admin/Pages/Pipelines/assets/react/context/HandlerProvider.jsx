@@ -5,7 +5,7 @@ import React, { createContext, useContext, useMemo } from 'react';
 /**
  * Internal dependencies
  */
-import { useHandlers, useHandlerDetails } from '../queries/handlers';
+import { useHandlers } from '../queries/handlers';
 import createModel, { registerHandlerModel } from '../models/HandlerFactory';
 import FilesHandlerModel from '../models/handlers/FilesHandlerModel';
 

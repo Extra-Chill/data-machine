@@ -21,7 +21,6 @@ import {
 	updateFlowHandler,
 	addFlowHandler,
 	removeFlowHandler,
-	updateUserMessage,
 	updateFlowSchedule,
 	updateFlowStepConfig,
 	fetchFlowMemoryFiles,

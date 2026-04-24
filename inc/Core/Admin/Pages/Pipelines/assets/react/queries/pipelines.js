@@ -14,12 +14,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
 	fetchPipelines,
 	createPipeline,
-	updatePipelineTitle,
 	deletePipeline,
 	addPipelineStep,
 	deletePipelineStep,
-	reorderPipelineSteps,
-	updateSystemPrompt,
 	fetchContextFiles,
 	uploadContextFile,
 	deleteContextFile,

@@ -17,7 +17,7 @@ import { useQueryClient } from '@tanstack/react-query';
 /**
  * Internal dependencies
  */
-import { useAgents, AGENTS_KEY } from '@shared/queries/agents';
+import { useAgents } from '@shared/queries/agents';
 import { useAgentStore } from '@shared/stores/agentStore';
 
 const LOGS_QUERY_KEY = [ 'logs' ];

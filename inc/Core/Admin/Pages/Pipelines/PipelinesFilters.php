@@ -77,8 +77,6 @@ function datamachine_register_pipelines_admin_page_filters() {
 									'maxUploadSize' => wp_max_upload_size(),
 									// stepTypes: Loaded via REST API in PipelineContext
 									// handlers: Loaded via REST API in PipelineContext
-									// aiProviders: Loaded via REST API in ConfigureStepModal
-									// aiTools: Loaded via REST API in AIToolsSelector
 									// handlerSettings: Lazy-loaded via REST API in HandlerSettingsModal
 								),
 							),

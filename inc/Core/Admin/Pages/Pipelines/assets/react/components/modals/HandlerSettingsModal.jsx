@@ -9,7 +9,7 @@
  * WordPress dependencies
  */
 import { useState, useEffect, useRef } from '@wordpress/element';
-import { Modal, Button, Notice, Spinner } from '@wordpress/components';
+import { Modal, Button } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import { applyFilters } from '@wordpress/hooks';
 
@@ -18,7 +18,6 @@ import { applyFilters } from '@wordpress/hooks';
  */
 import { useUpdateFlowHandler } from '../../queries/flows';
 import { useFormState } from '../../hooks/useFormState';
-import FilesHandlerSettings from './handler-settings/files/FilesHandlerSettings';
 import HandlerSettingField from './handler-settings/HandlerSettingField';
 
 import useHandlerModel from '../../hooks/useHandlerModel';
@@ -62,7 +61,6 @@ export default function HandlerSettingsModal( {
 	// Presentational: Receive handler details as props
 	const isLoadingSettings =
 		handlerDetails === undefined || handlerDetails === null;
-	const handlerDetailsError = null;
 	const updateHandlerMutation = useUpdateFlowHandler();
 
 	const [ settingsFields, setSettingsFields ] = useState( {} );
