@@ -182,12 +182,12 @@ class PipelineSteps {
 			// from the mode system (PluginSettings::resolveModelForAgentMode()).
 			// They were removed to stop the REST schema from advertising dead fields.
 			// See: inc/Core/Steps/AI/AIStep.php
-			'ai_api_key'       => array(
-				'required'          => false,
-				'type'              => 'string',
-				'sanitize_callback' => 'sanitize_text_field',
-				'description'       => __( 'AI API key', 'data-machine' ),
-			),
+			//
+			// Note: `ai_api_key` was previously accepted here but the save branch
+			// relied on an undefined `$effective_provider` and silently dropped every
+			// submitted key. API keys are managed exclusively through the canonical
+			// settings path (`SettingsAbilities` → `ai_provider_keys`), which exposes
+			// them via `wp datamachine auth` and the settings admin page.
 			'disabled_tools'   => array(
 				'required'    => false,
 				'type'        => 'array',
@@ -488,11 +488,9 @@ class PipelineSteps {
 		// Model/provider are resolved exclusively via the mode system
 		// (PluginSettings::resolveModelForAgentMode). They are not accepted here.
 		$step_config_data = array();
-		$api_key_saved    = false;
 
 		$has_system_prompt  = $request->has_param( 'system_prompt' );
 		$has_disabled_tools = $request->has_param( 'disabled_tools' );
-		$has_api_key        = $request->has_param( 'ai_api_key' );
 
 		if ( $has_system_prompt ) {
 			$step_config_data['system_prompt'] = sanitize_textarea_field( $request->get_param( 'system_prompt' ) );
@@ -509,26 +507,12 @@ class PipelineSteps {
 			$step_config_data['disabled_tools'] = $tools_manager->save_step_tool_selections( $pipeline_step_id, $sanitized_tool_ids );
 		}
 
-		if ( 'ai' === $step_type && empty( $step_config_data ) && ! $has_api_key ) {
+		if ( 'ai' === $step_type && empty( $step_config_data ) ) {
 			return new \WP_Error(
 				'no_config_values',
 				__( 'No configuration values were provided.', 'data-machine' ),
 				array( 'status' => 400 )
 			);
-		}
-
-		// Store API key if provided
-		if ( $has_api_key && ! empty( $effective_provider ) ) {
-			$ai_api_key = sanitize_text_field( $request->get_param( 'ai_api_key' ) );
-			try {
-				// Use AI HTTP Client library's filters directly to save API key
-				$all_keys                        = apply_filters( 'chubes_ai_provider_api_keys', null );
-				$all_keys[ $effective_provider ] = $ai_api_key;
-				apply_filters( 'chubes_ai_provider_api_keys', $all_keys );
-				$api_key_saved = true;
-			} catch ( \Exception $e ) {
-				unset( $e );
-			}
 		}
 
 		// Preserve provider-specific models by merging with existing config.
@@ -574,7 +558,6 @@ class PipelineSteps {
 				'data'    => array(
 					'pipeline_step_id' => $pipeline_step_id,
 					'debug_info'       => array(
-						'api_key_saved'     => $api_key_saved,
 						'step_config_saved' => true,
 					),
 				),
