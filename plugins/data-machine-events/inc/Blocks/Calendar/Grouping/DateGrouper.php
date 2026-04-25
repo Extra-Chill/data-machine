@@ -89,12 +89,26 @@ class DateGrouper {
 			$occurrence_dates     = $event_data['occurrenceDates'] ?? array();
 			$has_occurrence_dates = ! empty( $occurrence_dates ) && is_array( $occurrence_dates );
 
+			// effective_start_date is what we treat as the event's grouping
+			// "start" — same as $start_date in normal cases, but shifted back
+			// one day for late-night events. Used downstream for the
+			// is_continuation / is_start_day flags so the cutoff doesn't
+			// confuse the calendar's continuation rendering.
+			$effective_start_date = $start_date;
+
 			if ( $has_occurrence_dates ) {
 				$event_dates = $occurrence_dates;
 			} elseif ( $is_multi_day ) {
 				$event_dates = MultiDayResolver::get_date_range( $start_date, $end_date, $event_tz );
 			} else {
-				$event_dates = array( $start_date );
+				// Single-day events get a late-night cutoff shift: a 1am show
+				// belongs to the previous night for human-friendly grouping.
+				// The underlying start_datetime stays untouched.
+				$effective_start_date = LateNightCutoff::display_date_from_strings(
+					$start_date,
+					$event_data['startTime'] ?? ''
+				);
+				$event_dates          = array( $effective_start_date );
 			}
 
 			// Filter out past dates when show_past is false.
@@ -135,12 +149,16 @@ class DateGrouper {
 				}
 
 				// Events with explicit occurrence dates are NOT continuations.
-				$is_continuation = $has_occurrence_dates ? false : ( $date_key !== $start_date );
+				// For non-occurrence events the "start" we compare against is
+				// the effective (cutoff-shifted) start so a 1am show on its
+				// own bucket is still flagged as the start day, not a
+				// continuation of the previous night.
+				$is_continuation = $has_occurrence_dates ? false : ( $date_key !== $effective_start_date );
 
 				$display_item                    = $event_item;
 				$display_item['display_context'] = array(
 					'is_multi_day'        => $has_occurrence_dates ? false : $is_multi_day,
-					'is_start_day'        => $has_occurrence_dates ? true : ( $date_key === $start_date ),
+					'is_start_day'        => $has_occurrence_dates ? true : ( $date_key === $effective_start_date ),
 					'is_end_day'          => $has_occurrence_dates ? true : ( $date_key === $end_date ),
 					'is_continuation'     => $is_continuation,
 					'display_date'        => $date_key,

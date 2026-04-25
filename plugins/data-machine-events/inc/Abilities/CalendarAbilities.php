@@ -14,6 +14,7 @@ use DateTime;
 use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
 use DataMachineEvents\Blocks\Calendar\Data\EventHydrator;
 use DataMachineEvents\Blocks\Calendar\Grouping\DateGrouper;
+use DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff;
 use DataMachineEvents\Blocks\Calendar\Display\EventRenderer;
 use DataMachineEvents\Blocks\Calendar\Pagination;
 use DataMachineEvents\Blocks\Calendar\Pagination\PageBoundary;
@@ -594,6 +595,11 @@ class CalendarAbilities {
 		$has_tax_filter = ( $archive_taxonomy && $archive_term_id )
 			|| self::has_active_tax_filter( $tax_filters );
 
+		// SQL fragment that buckets start_datetime by display date (with
+		// late-night cutoff applied). Identical semantics to
+		// LateNightCutoff::display_date_from_strings() at the PHP layer.
+		$start_bucket_sql = LateNightCutoff::sql_display_date_expression( 'ed.start_datetime' );
+
 		// Fast path: no taxonomy constraint → skip posts/term joins entirely.
 		// event_dates already carries post_status, so we can aggregate against
 		// the single table + its status_start composite index.
@@ -607,10 +613,10 @@ class CalendarAbilities {
 			}
 
 			$where = implode( ' AND ', $where_clauses );
-			$sql   = "SELECT DATE(ed.start_datetime) AS start_date, DATE(ed.end_datetime) AS end_date, COUNT(*) AS bucket_count
+			$sql   = "SELECT {$start_bucket_sql} AS start_date, DATE(ed.end_datetime) AS end_date, COUNT(*) AS bucket_count
 					FROM {$ed_table} ed
 					WHERE {$where}
-					GROUP BY DATE(ed.start_datetime), DATE(ed.end_datetime)
+					GROUP BY {$start_bucket_sql}, DATE(ed.end_datetime)
 					ORDER BY start_date ASC";
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -673,12 +679,12 @@ class CalendarAbilities {
 
 		// DISTINCT p.ID inside COUNT to avoid double-counting when a post
 		// is attached to multiple matching terms in a multi-filter join.
-		$sql = "SELECT DATE(ed.start_datetime) AS start_date, DATE(ed.end_datetime) AS end_date, COUNT(DISTINCT p.ID) AS bucket_count
+		$sql = "SELECT {$start_bucket_sql} AS start_date, DATE(ed.end_datetime) AS end_date, COUNT(DISTINCT p.ID) AS bucket_count
 				FROM {$wpdb->posts} p
 				INNER JOIN {$ed_table} ed ON p.ID = ed.post_id
 				{$joins}
 				WHERE {$where}
-				GROUP BY DATE(ed.start_datetime), DATE(ed.end_datetime)
+				GROUP BY {$start_bucket_sql}, DATE(ed.end_datetime)
 				ORDER BY start_date ASC";
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared

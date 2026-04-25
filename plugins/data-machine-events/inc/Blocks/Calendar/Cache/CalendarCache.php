@@ -59,6 +59,9 @@ class CalendarCache {
 			'tax_filters'  => $params['tax_filters'] ?? array(),
 			'archive_tax'  => $params['archive_taxonomy'] ?? '',
 			'archive_term' => $params['archive_term_id'] ?? 0,
+			// Bucketing depends on the cutoff hour; fold it into the key so
+			// switching the filter at runtime invalidates stale buckets.
+			'cutoff_hour'  => \DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff::cutoff_hour(),
 		);
 
 		return self::PREFIX . $prefix . '_' . md5( wp_json_encode( $key_data ) );
