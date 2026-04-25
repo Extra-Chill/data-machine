@@ -31,12 +31,12 @@ add_action(
 		 *
 		 * @since 0.40.0
 		 *
-		 * @param int $max_age_days Maximum age in days. Default 14.
+		 * @param int $max_age_days Maximum age in days. Default 30.
 		 */
-		$max_age_days = (int) apply_filters( 'datamachine_completed_jobs_max_age_days', 14 );
+		$max_age_days = (int) apply_filters( 'datamachine_completed_jobs_max_age_days', 30 );
 
 		if ( $max_age_days < 1 ) {
-			$max_age_days = 14;
+			$max_age_days = 30;
 		}
 
 		$deleted = $db_jobs->delete_old_jobs( 'completed', $max_age_days );

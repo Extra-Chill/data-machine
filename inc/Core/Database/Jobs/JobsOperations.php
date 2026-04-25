@@ -479,6 +479,7 @@ class JobsOperations extends BaseRepository {
 		'completed' => array(
 			'completed',
 			'completed_no_items',
+			'agent_skipped',
 		),
 		'failed'    => array(
 			'failed',
