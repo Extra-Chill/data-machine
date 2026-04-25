@@ -162,8 +162,10 @@ class DailyMemoryTask extends SystemTask {
 		}
 
 		// Write the cleaned MEMORY.md.
-		$new_content = $parsed['persistent'];
-		$new_size    = strlen( $new_content );
+		$new_content   = $parsed['persistent'];
+		$new_size      = strlen( $new_content );
+		$archived_text = $parsed['archived'] ?? '';
+		$archived_size = strlen( $archived_text );
 
 		// Safety check: don't write if the new content is suspiciously small.
 		$target_size     = AgentMemory::MAX_FILE_SIZE;
@@ -195,19 +197,90 @@ class DailyMemoryTask extends SystemTask {
 			return;
 		}
 
+		// Conservation check: persistent + archived must approximately
+		// account for the original. The prompt explicitly says "NEVER
+		// discard information -- everything goes to either PERSISTENT or
+		// ARCHIVED", but a model that ignores that instruction can emit
+		// a short ARCHIVED section and silently lose content. Without
+		// this gate, the truncated MEMORY.md gets committed and the
+		// missing content is gone (the daily file ends up with the AI's
+		// _description_ of what it archived, not the content itself).
+		//
+		// Threshold defaults to 0.85 (combined size must be at least 85%
+		// of original) and is filterable for consumers that legitimately
+		// expect heavier compression. A value of 0 disables the check
+		// entirely (not recommended).
+		$combined_size = $new_size + $archived_size;
+
+		/**
+		 * Filter the conservation threshold for daily memory compaction.
+		 *
+		 * The persistent section plus the archived section must together
+		 * account for at least this fraction of the original MEMORY.md
+		 * size. Below the threshold the task fails rather than commit a
+		 * lossy split. Set to 0 to disable the check.
+		 *
+		 * @since 0.80.3
+		 *
+		 * @param float $threshold      Default 0.85.
+		 * @param array $context        date, original_size, new_size, archived_size, job_id.
+		 */
+		$conservation_threshold = (float) apply_filters(
+			'datamachine_daily_memory_conservation_threshold',
+			0.85,
+			array(
+				'date'          => $date,
+				'original_size' => $original_size,
+				'new_size'      => $new_size,
+				'archived_size' => $archived_size,
+				'job_id'        => $jobId,
+			)
+		);
+
+		if ( $conservation_threshold > 0 ) {
+			$min_combined = (int) ( $original_size * $conservation_threshold );
+			if ( $combined_size < $min_combined ) {
+				$discarded = $original_size - $combined_size;
+				do_action(
+					'datamachine_log',
+					'warning',
+					sprintf(
+						'Daily memory aborted -- conservation check failed: persistent (%s) + archived (%s) = %s, expected at least %s of %s original (~%s discarded). AI ignored the "NEVER discard information" rule.',
+						size_format( $new_size ),
+						size_format( $archived_size ),
+						size_format( $combined_size ),
+						size_format( $min_combined ),
+						size_format( $original_size ),
+						size_format( $discarded )
+					),
+					array(
+						'date'           => $date,
+						'original_size'  => $original_size,
+						'new_size'       => $new_size,
+						'archived_size'  => $archived_size,
+						'combined_size'  => $combined_size,
+						'min_combined'   => $min_combined,
+						'discarded_size' => $discarded,
+						'threshold'      => $conservation_threshold,
+					)
+				);
+				$this->failJob( $jobId, 'Conservation check failed -- AI emitted a lossy split. MEMORY.md unchanged.' );
+				return;
+			}
+		}
+
 		$write_result = $memory->replace_all( $new_content );
 		if ( empty( $write_result['success'] ) ) {
 			$this->failJob( $jobId, $write_result['message'] ?? 'Failed to persist cleaned memory.' );
 			return;
 		}
 
-		// Archive extracted content to the daily file.
-		$archived_size = 0;
-		$parts         = explode( '-', $date );
+		// Archive extracted content to the daily file. $archived_size
+		// is already computed above (was needed for the conservation
+		// check).
+		$parts = explode( '-', $date );
 
-		if ( ! empty( $parsed['archived'] ) ) {
-			$archived_size = strlen( $parsed['archived'] );
-
+		if ( $archived_size > 0 ) {
 			$archive_context = array(
 				'persistent'    => $parsed['persistent'],
 				'original_size' => $original_size,
@@ -220,16 +293,16 @@ class DailyMemoryTask extends SystemTask {
 			$handled = apply_filters(
 				'datamachine_daily_memory_pre_archive',
 				false,
-				$parsed['archived'],
+				$archived_text,
 				$date,
 				$archive_context
 			);
 
 			if ( ! $handled ) {
 				$archive_header = "\n### Archived from MEMORY.md\n\n";
-				$archive_text   = $archive_header . $parsed['archived'] . "\n";
+				$archive_body   = $archive_header . $archived_text . "\n";
 
-				$daily->append( $parts[0], $parts[1], $parts[2], $archive_text );
+				$daily->append( $parts[0], $parts[1], $parts[2], $archive_body );
 			}
 		}
 
