@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.29.4] - 2026-04-25
+
+### Changed
+- GROUP BY dates + skip posts join in calendar/taxonomy counts
+
 ## [0.29.3] - 2026-04-23
 
 ### Changed
