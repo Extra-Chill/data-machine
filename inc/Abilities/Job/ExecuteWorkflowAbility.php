@@ -313,26 +313,44 @@ class ExecuteWorkflowAbility {
 			// Flow config (instance-specific)
 			$handler_slug   = $step['handler_slug'] ?? '';
 			$handler_config = $step['handler_config'] ?? array();
+			$step_type      = $step['type'];
 
-			// Resolve handler_slugs: explicit handler_slug for non-AI steps,
-			// or enabled_tools for AI steps (tells the AI which tools it must call).
+			// Resolve handler_slugs to mirror the on-disk shape established
+			// by inc/migrations/handler-keys.php (v0.60.0):
+			//
+			//   1. Explicit handler_slug → [handler_slug] (fetch, publish,
+			//      upsert, …).
+			//   2. AI step with enabled_tools → enabled_tools (legacy field
+			//      overload; Phase 2b in #1205 will move this off
+			//      handler_slugs into a dedicated enabled_tools field).
+			//   3. Self-configuring step types (system_task, webhook_gate,
+			//      agent_ping) with a non-empty handler_config → [step_type].
+			//      This is the synthetic-slug shape the migration uses for
+			//      handler-free steps; mirroring it here lets
+			//      FlowStepConfig::getPrimaryHandlerConfig() resolve via
+			//      handler_slugs[0] uniformly with no handler-free fallback
+			//      ladder. Step::getHandlerConfig() collapses to one line as
+			//      a result.
+			//   4. Otherwise → []. AI without enabled_tools, or
+			//      self-configuring step with no config, lands here — same as
+			//      the migration's "no config to key" branch.
 			$handler_slugs = array();
 			if ( ! empty( $handler_slug ) ) {
 				$handler_slugs = array( $handler_slug );
-			} elseif ( ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) ) {
+			} elseif ( 'ai' === $step_type && ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) ) {
 				$handler_slugs = $step['enabled_tools'];
+			} elseif ( 'ai' !== $step_type && ! empty( $handler_config ) ) {
+				$handler_slugs = array( $step_type );
 			}
 
-			// Preserve handler_config for handler-free step types (system_task,
-			// webhook_gate, ai with no handler) by keying it under the step
-			// type slug. Step::getHandlerConfig() falls back to this slot when
-			// no handler_slug is set, so SystemTaskStep can find its
-			// { task, params } config and the data is not silently dropped.
+			// Key handler_configs by the primary slug (handler_slugs[0]) so
+			// FlowStepConfig::getPrimaryHandlerConfig() finds the slot
+			// without branching on step type.
 			$handler_configs = array();
 			if ( ! empty( $handler_slug ) ) {
 				$handler_configs[ $handler_slug ] = $handler_config;
-			} elseif ( ! empty( $handler_config ) ) {
-				$handler_configs[ $step['type'] ] = $handler_config;
+			} elseif ( 'ai' !== $step_type && ! empty( $handler_config ) ) {
+				$handler_configs[ $step_type ] = $handler_config;
 			}
 
 			$flow_config[ $step_id ] = array(

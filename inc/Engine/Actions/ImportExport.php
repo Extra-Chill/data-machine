@@ -434,6 +434,13 @@ class ImportExport {
 					$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $step['pipeline_step_id'], $flow['flow_id'] );
 					$flow_step    = $flow_config[ $flow_step_id ] ?? array();
 
+					// Read the primary slug raw rather than via FlowStepConfig::
+					// getEffectiveSlug() so handler-free steps (system_task,
+					// webhook_gate) don't synthesize a step_type fallback into
+					// the exported handler column when the row genuinely has
+					// no handler. The export emits a row only when the primary
+					// slug is present; FlowStepConfig's step_type fallback
+					// would defeat that gate.
 					$primary_handler = $flow_step['handler_slugs'][0] ?? '';
 
 					if ( ! empty( $primary_handler ) ) {

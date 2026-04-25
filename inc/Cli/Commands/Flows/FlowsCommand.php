@@ -20,6 +20,7 @@ use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\AgentResolver;
 use DataMachine\Cli\UserResolver;
+use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -1064,8 +1065,7 @@ class FlowsCommand extends BaseCommand {
 		$flow_config = $flow['flow_config'] ?? array();
 
 		foreach ( $flow_config as $step_data ) {
-			$primary_slug   = $step_data['handler_slugs'][0] ?? '';
-			$primary_config = ! empty( $primary_slug ) ? ( $step_data['handler_configs'][ $primary_slug ] ?? array() ) : array();
+			$primary_config = FlowStepConfig::getPrimaryHandlerConfig( $step_data );
 			if ( ! empty( $primary_config['prompt'] ) ) {
 				$prompt = $primary_config['prompt'];
 				return mb_strlen( $prompt ) > 50

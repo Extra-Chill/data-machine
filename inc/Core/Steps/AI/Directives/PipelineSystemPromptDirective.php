@@ -98,7 +98,13 @@ class PipelineSystemPromptDirective implements \DataMachine\Engine\AI\Directives
 			return '';
 		}
 
-		// Sort steps by execution_order
+		// Sort steps by execution_order.
+		//
+		// Reads handler_slugs raw (not via FlowStepConfig::getEffectiveSlug)
+		// because the workflow visualization needs to render every handler
+		// in a multi-handler step (e.g. PUBLISH_A+PUBLISH_B → AI → UPSERT),
+		// not just the primary slug. This is one of the legitimate
+		// multi-element callsites alongside ToolPolicyResolver.
 		$sorted_steps = array();
 		foreach ( $flow_config as $flow_step_id => $step_config ) {
 			$execution_order = $step_config['execution_order'] ?? -1;
