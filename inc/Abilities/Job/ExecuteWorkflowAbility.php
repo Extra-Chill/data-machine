@@ -139,6 +139,24 @@ class ExecuteWorkflowAbility {
 			$engine_data = array_merge( $engine_data, $initial_data );
 		}
 
+		// Mirror RunFlowAbility's engine_data['job'] shape so downstream
+		// step types (AIStep, SystemTaskStep) can read job + agent
+		// identity from the engine snapshot the same way they do for
+		// flow jobs. Callers (e.g. TaskScheduler) may provide a partial
+		// 'job' snapshot in initial_data with agent_id/user_id; this
+		// layers our authoritative job_id on top of any caller-provided
+		// snapshot.
+		$caller_snapshot = is_array( $engine_data['job'] ?? null ) ? $engine_data['job'] : array();
+		$job_snapshot    = array_merge(
+			array( 'user_id' => (int) ( $initial_data['user_id'] ?? 0 ) ),
+			$caller_snapshot,
+			array( 'job_id' => $job_id )
+		);
+		if ( ! empty( $initial_data['agent_id'] ) && empty( $job_snapshot['agent_id'] ) ) {
+			$job_snapshot['agent_id'] = (int) $initial_data['agent_id'];
+		}
+		$engine_data['job'] = $job_snapshot;
+
 		// Set dry_run_mode flag for preview execution
 		if ( ! empty( $input['dry_run'] ) ) {
 			$engine_data['dry_run_mode'] = true;
