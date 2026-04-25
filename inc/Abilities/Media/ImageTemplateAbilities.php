@@ -63,17 +63,22 @@ class ImageTemplateAbilities {
 							),
 							'output'      => array(
 								'type'        => 'string',
-								'description' => 'Output destination: "files" returns file paths (default, requires context for repository or returns temp paths), "attachment" creates WordPress attachments and returns IDs/URLs.',
-								'enum'        => array( 'files', 'attachment' ),
+								'description' => 'Output destination: "files" returns file paths (default, requires context for repository or returns temp paths), "cached_file" stores the rendered file under uploads/<bucket>/<key>.<ext> and returns a stable public URL — ideal for OG images and other long-lived public artifacts that should not pollute the media library.',
+								'enum'        => array( 'files', 'cached_file' ),
 								'default'     => 'files',
 							),
-							'attachment'  => array(
+							'cache'       => array(
 								'type'        => 'object',
-								'description' => 'Attachment options when output=attachment. Supports parent_post_id (attach to a post), title, alt_text.',
+								'description' => 'Cache options when output=cached_file. Required when output=cached_file.',
 								'properties'  => array(
-									'parent_post_id' => array( 'type' => 'integer' ),
-									'title'          => array( 'type' => 'string' ),
-									'alt_text'       => array( 'type' => 'string' ),
+									'bucket' => array(
+										'type'        => 'string',
+										'description' => 'Subdirectory under wp-content/uploads/ (slug-style; sanitized).',
+									),
+									'key'    => array(
+										'type'        => 'string',
+										'description' => 'Stable filename stem within the bucket (sanitized). Re-renders overwrite atomically.',
+									),
 								),
 							),
 						),
@@ -81,21 +86,21 @@ class ImageTemplateAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'        => array( 'type' => 'boolean' ),
-							'file_paths'     => array(
+							'success'      => array( 'type' => 'boolean' ),
+							'file_paths'   => array(
 								'type'  => 'array',
 								'items' => array( 'type' => 'string' ),
 							),
-							'attachment_ids' => array(
-								'type'  => 'array',
-								'items' => array( 'type' => 'integer' ),
-							),
-							'attachment_urls' => array(
+							'cached_paths' => array(
 								'type'  => 'array',
 								'items' => array( 'type' => 'string' ),
 							),
-							'template_id'    => array( 'type' => 'string' ),
-							'message'        => array( 'type' => 'string' ),
+							'cached_urls'  => array(
+								'type'  => 'array',
+								'items' => array( 'type' => 'string' ),
+							),
+							'template_id'  => array( 'type' => 'string' ),
+							'message'      => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'renderTemplate' ),
@@ -148,7 +153,7 @@ class ImageTemplateAbilities {
 		$format      = $input['format'] ?? 'png';
 		$context     = $input['context'] ?? array();
 		$output      = $input['output'] ?? 'files';
-		$attachment  = $input['attachment'] ?? array();
+		$cache_opts  = $input['cache'] ?? array();
 
 		if ( empty( $template_id ) ) {
 			return array(
@@ -224,7 +229,7 @@ class ImageTemplateAbilities {
 		}
 
 		// Default output mode — return file paths as-is.
-		if ( 'attachment' !== $output ) {
+		if ( 'cached_file' !== $output ) {
 			return array(
 				'success'     => true,
 				'file_paths'  => $file_paths,
@@ -233,56 +238,78 @@ class ImageTemplateAbilities {
 			);
 		}
 
-		// Attachment output — convert each rendered file into a WP attachment.
-		$attachment_result = self::convertFilesToAttachments( $file_paths, $template_id, $attachment );
+		// Cached file output — copy each rendered file under uploads/<bucket>/<key>.<ext>.
+		$cached_result = self::copyFilesToCachedLocation( $file_paths, $template_id, $cache_opts );
 
 		return array_merge(
 			array(
-				'success'     => ! empty( $attachment_result['attachment_ids'] ),
+				'success'     => ! empty( $cached_result['cached_urls'] ),
 				'template_id' => $template_id,
 			),
-			$attachment_result
+			$cached_result
 		);
 	}
 
 	/**
-	 * Convert rendered template files into WordPress attachments.
+	 * Copy rendered template files to a stable cached location under uploads/.
 	 *
-	 * Each file is sideloaded into the media library via wp_insert_attachment().
-	 * Original temp files are removed after sideload completes.
+	 * Files land at `wp-content/uploads/<bucket>/<key>[-<n>].<ext>`. Existing
+	 * files at the destination are overwritten, so re-rendering the same key
+	 * naturally invalidates and replaces. The bucket is intentionally outside
+	 * the YYYY/MM media library tree so cached artifacts do not pollute the
+	 * media browser, do not get resized, and do not interact with Imagify or
+	 * other media-pipeline plugins.
 	 *
-	 * @param string[] $file_paths       Rendered file paths from the template.
-	 * @param string   $template_id      Template identifier (used in fallback titles).
-	 * @param array    $attachment_opts  Attachment options (parent_post_id, title, alt_text).
+	 * Source temp files are removed after the copy to avoid leaking PHP tmp.
+	 *
+	 * @param string[] $file_paths   Rendered file paths from the template.
+	 * @param string   $template_id  Template identifier (for log/message context).
+	 * @param array    $cache_opts   { bucket, key } — both required.
 	 * @return array {
-	 *     @type string[] $file_paths      Original file paths (for parity with files mode).
-	 *     @type int[]    $attachment_ids  Created attachment post IDs.
-	 *     @type string[] $attachment_urls Public URLs for the created attachments.
-	 *     @type string   $message         Human-readable summary.
+	 *     @type string[] $file_paths   Original file paths (for parity with files mode).
+	 *     @type string[] $cached_paths Absolute filesystem paths of cached copies.
+	 *     @type string[] $cached_urls  Public URLs of cached copies.
+	 *     @type string   $message      Human-readable summary.
 	 * }
 	 */
-	private static function convertFilesToAttachments( array $file_paths, string $template_id, array $attachment_opts ): array {
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		require_once ABSPATH . 'wp-admin/includes/image.php';
-		require_once ABSPATH . 'wp-admin/includes/media.php';
+	private static function copyFilesToCachedLocation( array $file_paths, string $template_id, array $cache_opts ): array {
+		$bucket = isset( $cache_opts['bucket'] ) ? sanitize_file_name( (string) $cache_opts['bucket'] ) : '';
+		$key    = isset( $cache_opts['key'] ) ? sanitize_file_name( (string) $cache_opts['key'] ) : '';
 
-		$parent_post_id = isset( $attachment_opts['parent_post_id'] ) ? (int) $attachment_opts['parent_post_id'] : 0;
-		$title          = isset( $attachment_opts['title'] ) ? (string) $attachment_opts['title'] : '';
-		$alt_text       = isset( $attachment_opts['alt_text'] ) ? (string) $attachment_opts['alt_text'] : '';
+		if ( '' === $bucket || '' === $key ) {
+			return array(
+				'file_paths'   => $file_paths,
+				'cached_paths' => array(),
+				'cached_urls'  => array(),
+				'message'      => 'cached_file output requires cache.bucket and cache.key',
+			);
+		}
 
 		$upload_dir = wp_upload_dir();
 		if ( ! empty( $upload_dir['error'] ) ) {
 			return array(
-				'file_paths'      => $file_paths,
-				'attachment_ids'  => array(),
-				'attachment_urls' => array(),
-				'message'         => sprintf( 'Upload directory error: %s', $upload_dir['error'] ),
+				'file_paths'   => $file_paths,
+				'cached_paths' => array(),
+				'cached_urls'  => array(),
+				'message'      => sprintf( 'Upload directory error: %s', $upload_dir['error'] ),
 			);
 		}
 
-		$attachment_ids  = array();
-		$attachment_urls = array();
-		$failures        = array();
+		$bucket_dir = trailingslashit( $upload_dir['basedir'] ) . $bucket;
+		$bucket_url = trailingslashit( $upload_dir['baseurl'] ) . $bucket;
+
+		if ( ! wp_mkdir_p( $bucket_dir ) ) {
+			return array(
+				'file_paths'   => $file_paths,
+				'cached_paths' => array(),
+				'cached_urls'  => array(),
+				'message'      => sprintf( 'Failed to create cache directory: %s', $bucket_dir ),
+			);
+		}
+
+		$cached_paths = array();
+		$cached_urls  = array();
+		$failures     = array();
 
 		foreach ( $file_paths as $index => $source_path ) {
 			if ( ! file_exists( $source_path ) ) {
@@ -290,55 +317,28 @@ class ImageTemplateAbilities {
 				continue;
 			}
 
-			$basename     = basename( $source_path );
-			$safe_name    = wp_unique_filename( $upload_dir['path'], $basename );
-			$dest_path    = trailingslashit( $upload_dir['path'] ) . $safe_name;
+			$ext       = strtolower( pathinfo( $source_path, PATHINFO_EXTENSION ) ) ?: 'png';
+			$suffix    = count( $file_paths ) > 1 ? '-' . ( $index + 1 ) : '';
+			$filename  = $key . $suffix . '.' . $ext;
+			$dest_path = trailingslashit( $bucket_dir ) . $filename;
+			$dest_url  = trailingslashit( $bucket_url ) . $filename;
 
 			if ( ! @copy( $source_path, $dest_path ) ) {
-				$failures[] = $basename;
+				$failures[] = basename( $source_path );
 				continue;
 			}
 
-			// Best-effort cleanup of the source temp file.
 			wp_delete_file( $source_path );
 
-			$filetype = wp_check_filetype( $dest_path );
-
-			$attachment_title = $title;
-			if ( '' === $attachment_title ) {
-				$attachment_title = sprintf( '%s-%d', $template_id, $index + 1 );
-			}
-
-			$attachment_data = array(
-				'guid'           => trailingslashit( $upload_dir['url'] ) . $safe_name,
-				'post_mime_type' => $filetype['type'] ?: 'image/png',
-				'post_title'     => sanitize_text_field( $attachment_title ),
-				'post_content'   => '',
-				'post_status'    => 'inherit',
-			);
-
-			$attach_id = wp_insert_attachment( $attachment_data, $dest_path, $parent_post_id, true );
-
-			if ( is_wp_error( $attach_id ) || ! $attach_id ) {
-				wp_delete_file( $dest_path );
-				$failures[] = $basename;
-				continue;
-			}
-
-			$metadata = wp_generate_attachment_metadata( $attach_id, $dest_path );
-			wp_update_attachment_metadata( $attach_id, $metadata );
-
-			if ( '' !== $alt_text ) {
-				update_post_meta( $attach_id, '_wp_attachment_image_alt', sanitize_text_field( $alt_text ) );
-			}
-
-			$attachment_ids[]  = (int) $attach_id;
-			$attachment_urls[] = wp_get_attachment_url( (int) $attach_id );
+			$cached_paths[] = $dest_path;
+			$cached_urls[]  = $dest_url;
 		}
 
 		$message = sprintf(
-			'Created %d attachment(s) from template "%s"',
-			count( $attachment_ids ),
+			'Cached %d image(s) under %s/%s for template "%s"',
+			count( $cached_paths ),
+			$bucket,
+			$key,
 			$template_id
 		);
 
@@ -347,10 +347,10 @@ class ImageTemplateAbilities {
 		}
 
 		return array(
-			'file_paths'      => $file_paths,
-			'attachment_ids'  => $attachment_ids,
-			'attachment_urls' => $attachment_urls,
-			'message'         => $message,
+			'file_paths'   => $file_paths,
+			'cached_paths' => $cached_paths,
+			'cached_urls'  => $cached_urls,
+			'message'      => $message,
 		);
 	}
 
