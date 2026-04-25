@@ -30,6 +30,8 @@ const EMPTY_FORM = {
 		concurrent_batches: 0,
 		batch_size: 0,
 		time_limit: 0,
+		chunk_size: 0,
+		chunk_delay: 0,
 	},
 };
 
@@ -49,6 +51,8 @@ const QUEUE_LIMITS = {
 	concurrent_batches: { min: 1, max: 10, default: 3 },
 	batch_size: { min: 10, max: 200, default: 25 },
 	time_limit: { min: 15, max: 300, default: 60 },
+	chunk_size: { min: 1, max: 100, default: 10 },
+	chunk_delay: { min: 0, max: 300, default: 30 },
 };
 
 const GeneralTab = () => {
@@ -58,6 +62,8 @@ const GeneralTab = () => {
 		concurrent_batches: 3,
 		batch_size: 25,
 		time_limit: 60,
+		chunk_size: 10,
+		chunk_delay: 30,
 	};
 
 	const form = useFormState( {
@@ -321,8 +327,11 @@ const GeneralTab = () => {
 
 			<h3>Queue Performance</h3>
 			<p className="description datamachine-section-description">
-				Tune Action Scheduler for faster parallel execution. Higher
-				values = more throughput but higher server load.
+				Tune how Data Machine feeds the queue (chunking) and how
+				Action Scheduler drains it (concurrency). Higher values =
+				more throughput but higher server load. The two layers are
+				complementary — bumping concurrency without bumping chunk
+				size leaves the queue runner idle waiting for work.
 			</p>
 			<table className="form-table">
 				<tbody>
@@ -410,6 +419,68 @@ const GeneralTab = () => {
 									Maximum seconds per batch execution. AI
 									steps with external API calls may need
 									longer limits. (15-300, default: { queueDefaults.time_limit })
+								</p>
+							</fieldset>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row">Chunk size</th>
+						<td>
+							<fieldset>
+								<input
+									type="number"
+									id="chunk_size"
+									value={
+										form.data.queue_tuning?.chunk_size ?? queueDefaults.chunk_size
+									}
+									onChange={ ( e ) =>
+										updateQueueTuning(
+											'chunk_size',
+											e.target.value
+										)
+									}
+									min="1"
+									max="100"
+									className="small-text"
+								/>
+								<p className="description">
+									Number of child jobs Data Machine creates
+									per scheduling cycle when fanning out a
+									batch. Lower = gentler on the queue;
+									higher = faster fan-out. (1-100,
+									default: { queueDefaults.chunk_size })
+								</p>
+							</fieldset>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row">Chunk delay (seconds)</th>
+						<td>
+							<fieldset>
+								<input
+									type="number"
+									id="chunk_delay"
+									value={
+										form.data.queue_tuning?.chunk_delay ?? queueDefaults.chunk_delay
+									}
+									onChange={ ( e ) =>
+										updateQueueTuning(
+											'chunk_delay',
+											e.target.value
+										)
+									}
+									min="0"
+									max="300"
+									className="small-text"
+								/>
+								<p className="description">
+									Seconds to wait between chunks while
+									creating a batch. Higher = more
+									breathing room for other tasks; 0 =
+									schedule chunks back-to-back. (0-300,
+									default: { queueDefaults.chunk_delay })
 								</p>
 							</fieldset>
 						</td>

@@ -128,7 +128,7 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 
 		$this->assertEquals( $parent_id, $result['parent_job_id'] );
 		$this->assertEquals( 3, $result['total'] );
-		$this->assertEquals( PipelineBatchScheduler::CHUNK_SIZE, $result['chunk_size'] );
+		$this->assertEquals( \DataMachine\Core\ActionScheduler\BatchScheduler::DEFAULT_CHUNK_SIZE, $result['chunk_size'] );
 
 		// Check batch metadata was stored on parent.
 		$parent_engine = datamachine_get_engine_data( $parent_id );
@@ -152,11 +152,16 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'batch_state', $parent_engine );
 
 		$batch_state = $parent_engine['batch_state'];
-		$this->assertEquals( 'step_abc_123', $batch_state['next_flow_step_id'] );
 		$this->assertEquals( 1, $batch_state['total'] );
 		$this->assertEquals( 0, $batch_state['offset'] );
-		$this->assertCount( 1, $batch_state['data_packets'] );
-		$this->assertArrayHasKey( 'engine_snapshot', $batch_state );
+		$this->assertCount( 1, $batch_state['items'] );
+		$this->assertArrayHasKey( 'extra', $batch_state );
+		$this->assertEquals( 'step_abc_123', $batch_state['extra']['next_flow_step_id'] );
+		$this->assertArrayHasKey( 'engine_snapshot', $batch_state['extra'] );
+		$this->assertEquals( PipelineBatchScheduler::BATCH_HOOK, $batch_state['hook'] );
+
+		// next_flow_step_id is also surfaced top-level for legacy consumers.
+		$this->assertEquals( 'step_abc_123', $parent_engine['next_flow_step_id'] );
 
 		// No transient should exist.
 		$this->assertFalse( get_transient( 'dm_pipeline_batch_' . $parent_id ) );
@@ -249,15 +254,19 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 			'batch'             => true,
 			'batch_total'       => 0,
 			'batch_scheduled'   => 0,
-			'batch_chunk_size'  => PipelineBatchScheduler::CHUNK_SIZE,
+			'batch_chunk_size'  => \DataMachine\Core\ActionScheduler\BatchScheduler::DEFAULT_CHUNK_SIZE,
+			'batch_context'     => PipelineBatchScheduler::BATCH_CONTEXT,
 			'next_flow_step_id' => 'step_empty',
 			'started_at'        => current_time( 'mysql' ),
 			'batch_state'       => array(
-				'next_flow_step_id' => 'step_empty',
-				'engine_snapshot'   => $engine,
-				'data_packets'      => array(),
-				'total'             => 0,
-				'offset'            => 0,
+				'offset' => 0,
+				'total'  => 0,
+				'items'  => array(),
+				'extra'  => array(
+					'next_flow_step_id' => 'step_empty',
+					'engine_snapshot'   => $engine,
+				),
+				'hook'   => PipelineBatchScheduler::BATCH_HOOK,
 			),
 		) );
 

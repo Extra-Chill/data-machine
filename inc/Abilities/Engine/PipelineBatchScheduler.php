@@ -2,23 +2,30 @@
 /**
  * Pipeline Batch Scheduler
  *
- * Handles fan-out of multiple DataPackets into child jobs. When a pipeline
- * step returns N DataPackets, this scheduler creates N child jobs that each
- * carry one DataPacket through the remaining pipeline steps independently.
+ * Pipeline-specific consumer of {@see \DataMachine\Core\ActionScheduler\BatchScheduler}.
+ * Fans out N DataPackets into N child *pipeline jobs* that each carry one
+ * packet through the remaining pipeline steps independently.
  *
- * The original job becomes the parent and tracks overall progress. Child
- * jobs use the same engine_data (flow_config, pipeline_config) but operate
- * on their own DataPacket.
+ * Owns:
+ *   - createChildJob(): pipeline-specific glue (engine_data cloning,
+ *     per-item engine data seeding from packet metadata, agent_id/user_id
+ *     carry-over, datamachine_schedule_next_step dispatch).
+ *   - onChildComplete(): wired to datamachine_job_complete; aggregates
+ *     child status counts into the parent's final status.
  *
- * This is not a special mode — it's how the engine works. A single DataPacket
- * is simply a batch of one.
+ * Does NOT own:
+ *   - The chunking loop, state storage, cancellation, chunk_size/chunk_delay
+ *     reads, or chunk re-scheduling. Those live in BatchScheduler and apply
+ *     uniformly across pipeline + system-task fan-out.
  *
  * @package DataMachine\Abilities\Engine
  * @since 0.35.0
+ * @since 0.82.0 Chunking loop extracted to BatchScheduler.
  */
 
 namespace DataMachine\Abilities\Engine;
 
+use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\JobStatus;
 
@@ -27,22 +34,16 @@ defined( 'ABSPATH' ) || exit;
 class PipelineBatchScheduler {
 
 	/**
-	 * Number of child jobs to schedule per chunk.
-	 *
-	 * Between chunks, other Action Scheduler actions can run,
-	 * preventing queue flooding.
-	 */
-	const CHUNK_SIZE = 10;
-
-	/**
-	 * Delay in seconds between scheduling chunks.
-	 */
-	const CHUNK_DELAY = 30;
-
-	/**
 	 * Action Scheduler hook for processing batch chunks.
 	 */
 	const BATCH_HOOK = 'datamachine_pipeline_batch_chunk';
+
+	/**
+	 * Consumer context, used by BatchScheduler when reading chunk_size /
+	 * chunk_delay so filter consumers can tell pipeline fan-out apart
+	 * from system-task fan-out.
+	 */
+	const BATCH_CONTEXT = 'pipeline';
 
 	/**
 	 * @var Jobs
@@ -56,9 +57,9 @@ class PipelineBatchScheduler {
 	/**
 	 * Fan out DataPackets into child jobs.
 	 *
-	 * Converts the parent job into a batch parent and creates child jobs
-	 * for each DataPacket. Each child continues through the remaining
-	 * pipeline steps independently.
+	 * Records the engine_snapshot on the parent's batch_state so each
+	 * subsequently-scheduled chunk has the data it needs to spawn a
+	 * pipeline-shaped child without re-reading the parent's full state.
 	 *
 	 * @param int    $parent_job_id     The current job ID (becomes the parent).
 	 * @param string $next_flow_step_id The next step to execute on each child.
@@ -72,29 +73,27 @@ class PipelineBatchScheduler {
 		array $dataPackets,
 		array $engine_snapshot
 	): array {
-		$total       = count( $dataPackets );
-		$pipeline_id = $engine_snapshot['job']['pipeline_id'] ?? 0;
-		$flow_id     = $engine_snapshot['job']['flow_id'] ?? 0;
-		$flow_name   = $engine_snapshot['flow']['name'] ?? '';
+		$total     = count( $dataPackets );
+		$flow_name = $engine_snapshot['flow']['name'] ?? '';
 
-		// Store batch metadata and state on the parent job's engine_data.
-		// This survives deploys, cache flushes, and Redis restarts — unlike
-		// the old transient approach which could be evicted mid-batch.
-		datamachine_merge_engine_data( $parent_job_id, array(
-			'batch'             => true,
-			'batch_total'       => $total,
-			'batch_scheduled'   => 0,
-			'batch_chunk_size'  => self::CHUNK_SIZE,
-			'next_flow_step_id' => $next_flow_step_id,
-			'started_at'        => current_time( 'mysql' ),
-			'batch_state'       => array(
+		$result = BatchScheduler::start(
+			$parent_job_id,
+			self::BATCH_HOOK,
+			$dataPackets,
+			array(
 				'next_flow_step_id' => $next_flow_step_id,
 				'engine_snapshot'   => $engine_snapshot,
-				'data_packets'      => $dataPackets,
-				'total'             => $total,
-				'offset'            => 0,
 			),
-		) );
+			self::BATCH_CONTEXT
+		);
+
+		// Surface next_flow_step_id at the top level for legacy consumers
+		// that read it without descending into batch_state. Parity with
+		// the pre-extraction shape.
+		datamachine_merge_engine_data(
+			$parent_job_id,
+			array( 'next_flow_step_id' => $next_flow_step_id )
+		);
 
 		do_action(
 			'datamachine_log',
@@ -102,43 +101,31 @@ class PipelineBatchScheduler {
 			sprintf( 'Pipeline batch: fanning out %d items for flow "%s"', $total, $flow_name ),
 			array(
 				'parent_job_id'     => $parent_job_id,
-				'pipeline_id'       => $pipeline_id,
-				'flow_id'           => $flow_id,
+				'pipeline_id'       => $engine_snapshot['job']['pipeline_id'] ?? 0,
+				'flow_id'           => $engine_snapshot['job']['flow_id'] ?? 0,
 				'total'             => $total,
 				'next_flow_step_id' => $next_flow_step_id,
 			)
 		);
 
-		// Schedule first chunk immediately.
-		if ( function_exists( 'as_schedule_single_action' ) ) {
-			as_schedule_single_action(
-				time(),
-				self::BATCH_HOOK,
-				array( 'parent_job_id' => $parent_job_id ),
-				'data-machine'
-			);
-		}
-
-		return array(
-			'parent_job_id' => $parent_job_id,
-			'total'         => $total,
-			'chunk_size'    => self::CHUNK_SIZE,
-		);
+		return $result;
 	}
 
 	/**
 	 * Process a chunk of the batch.
 	 *
-	 * Called by Action Scheduler. Creates child jobs for the current chunk,
-	 * then schedules the next chunk with a delay.
+	 * Action Scheduler callback — delegates to BatchScheduler::processChunk
+	 * with a pipeline-specific child-creation callback.
 	 *
 	 * @param int $parent_job_id The parent job ID.
 	 */
 	public function processChunk( int $parent_job_id ): void {
-		$parent_engine = datamachine_get_engine_data( $parent_job_id );
-		$batch_data    = $parent_engine['batch_state'] ?? null;
+		$result = BatchScheduler::processChunk(
+			$parent_job_id,
+			array( $this, 'createChildJobFromBatch' )
+		);
 
-		if ( ! $batch_data ) {
+		if ( $result['missing'] ) {
 			$this->failParentIfStillProcessing( $parent_job_id, 'batch_state_missing' );
 			do_action(
 				'datamachine_log',
@@ -149,71 +136,36 @@ class PipelineBatchScheduler {
 			return;
 		}
 
-		// Check for cancellation.
-		if ( ! empty( $parent_engine['cancelled'] ) ) {
-			unset( $parent_engine['batch_state'] );
-			datamachine_set_engine_data( $parent_job_id, $parent_engine );
-			$this->db_jobs->complete_job( $parent_job_id, JobStatus::failed( 'batch cancelled' )->toString() );
+		if ( $result['cancelled'] ) {
+			$this->db_jobs->complete_job(
+				$parent_job_id,
+				JobStatus::failed( 'batch cancelled' )->toString()
+			);
 			return;
 		}
-
-		$next_flow_step_id = $batch_data['next_flow_step_id'];
-		$engine_snapshot   = $batch_data['engine_snapshot'];
-		$all_packets       = $batch_data['data_packets'];
-		$total             = $batch_data['total'];
-		$offset            = $batch_data['offset'];
-		$chunk             = array_slice( $all_packets, $offset, self::CHUNK_SIZE );
-
-		$scheduled = 0;
-
-		foreach ( $chunk as $single_packet ) {
-			$child_job_id = $this->createChildJob(
-				$parent_job_id,
-				$next_flow_step_id,
-				$single_packet,
-				$engine_snapshot
-			);
-
-			if ( $child_job_id ) {
-				++$scheduled;
-			}
-		}
-
-		$new_offset = $offset + self::CHUNK_SIZE;
-
-		// Update parent progress.
-		$parent_engine                    = datamachine_get_engine_data( $parent_job_id );
-		$parent_engine['batch_scheduled'] = ( $parent_engine['batch_scheduled'] ?? 0 ) + $scheduled;
-		$parent_engine['batch_offset']    = min( $new_offset, $total );
 
 		do_action(
 			'datamachine_log',
 			'debug',
-			sprintf( 'Pipeline batch chunk: scheduled %d/%d (offset %d)', $scheduled, $total, $new_offset ),
+			sprintf(
+				'Pipeline batch chunk: scheduled %d/%d (offset %d)',
+				$result['scheduled'],
+				$result['total'],
+				$result['offset']
+			),
 			array(
 				'parent_job_id' => $parent_job_id,
-				'scheduled'     => $scheduled,
-				'offset'        => $new_offset,
-				'total'         => $total,
+				'scheduled'     => $result['scheduled'],
+				'offset'        => $result['offset'],
+				'total'         => $result['total'],
 			)
 		);
 
-		if ( $new_offset < $total ) {
-			// More items — update offset in batch_state and persist.
-			$parent_engine['batch_state']['offset'] = $new_offset;
-			datamachine_set_engine_data( $parent_job_id, $parent_engine );
-
-			as_schedule_single_action(
-				time() + self::CHUNK_DELAY,
-				self::BATCH_HOOK,
-				array( 'parent_job_id' => $parent_job_id ),
-				'data-machine'
-			);
-		} else {
-			// All items scheduled — remove batch_state to free space.
-			unset( $parent_engine['batch_state'] );
-			datamachine_set_engine_data( $parent_job_id, $parent_engine );
-
+		// Last chunk — verify at least one child was actually created
+		// across the whole batch. Without this, a batch where every
+		// createChildJob() returned false would silently complete with
+		// no children, no error, and no clear failure mode.
+		if ( ! $result['more'] ) {
 			$child_count = $this->countChildren( $parent_job_id );
 			if ( $child_count < 1 ) {
 				$this->db_jobs->complete_job(
@@ -227,7 +179,7 @@ class PipelineBatchScheduler {
 					'Pipeline batch: no child jobs were scheduled; parent marked failed',
 					array(
 						'parent_job_id' => $parent_job_id,
-						'total'         => $total,
+						'total'         => $result['total'],
 					)
 				);
 
@@ -237,10 +189,30 @@ class PipelineBatchScheduler {
 			do_action(
 				'datamachine_log',
 				'info',
-				sprintf( 'Pipeline batch: all %d items scheduled', $total ),
+				sprintf( 'Pipeline batch: all %d items scheduled', $result['total'] ),
 				array( 'parent_job_id' => $parent_job_id )
 			);
 		}
+	}
+
+	/**
+	 * BatchScheduler callback: spawn one child job for one DataPacket.
+	 *
+	 * Signature is (item, extra, parent_job_id) per the BatchScheduler
+	 * contract; we forward to the existing createChildJob().
+	 *
+	 * @param array $single_packet  A single DataPacket array.
+	 * @param array $extra          Per-batch state (engine_snapshot, next_flow_step_id).
+	 * @param int   $parent_job_id  Parent job ID.
+	 * @return int|false Child job ID or false on failure.
+	 */
+	public function createChildJobFromBatch( array $single_packet, array $extra, int $parent_job_id ): int|false {
+		return $this->createChildJob(
+			$parent_job_id,
+			(string) ( $extra['next_flow_step_id'] ?? '' ),
+			$single_packet,
+			is_array( $extra['engine_snapshot'] ?? null ) ? $extra['engine_snapshot'] : array()
+		);
 	}
 
 	/**
@@ -264,7 +236,6 @@ class PipelineBatchScheduler {
 	): int|false {
 		$pipeline_id = $engine_snapshot['job']['pipeline_id'] ?? null;
 		$flow_id     = $engine_snapshot['job']['flow_id'] ?? null;
-		$flow_name   = $engine_snapshot['flow']['name'] ?? '';
 		$item_title  = $single_packet['data']['title'] ?? 'Untitled';
 
 		// Normalize: 0 → null when no pipeline/flow context.
@@ -279,7 +250,6 @@ class PipelineBatchScheduler {
 		$parent_agent_id = (int) ( $engine_snapshot['job']['agent_id'] ?? 0 );
 		$parent_user_id  = (int) ( $engine_snapshot['job']['user_id'] ?? 0 );
 
-		// Create child job linked to parent.
 		$child_job_args = array(
 			'pipeline_id'   => $pipeline_id,
 			'flow_id'       => $flow_id,
@@ -396,6 +366,13 @@ class PipelineBatchScheduler {
 		$parent_engine = datamachine_get_engine_data( (int) $parent_job_id );
 		if ( empty( $parent_engine['batch'] ) ) {
 			return; // Not a pipeline batch parent.
+		}
+
+		// Pipeline-only — system-task batches use the same engine_data
+		// shape but their parent is completed inline by TaskScheduler.
+		$context = $parent_engine['batch_context'] ?? '';
+		if ( '' !== $context && self::BATCH_CONTEXT !== $context ) {
+			return;
 		}
 
 		// Count child statuses.

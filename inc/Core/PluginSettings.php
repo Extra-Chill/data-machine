@@ -28,20 +28,33 @@ class PluginSettings {
 	/**
 	 * Get default queue tuning values.
 	 *
-	 * @return array{concurrent_batches:int,batch_size:int,time_limit:int}
+	 * Five knobs across two layers:
+	 *
+	 *   Producer side (BatchScheduler — how DM creates child jobs):
+	 *     - chunk_size:  child jobs created per scheduling cycle
+	 *     - chunk_delay: seconds between scheduling cycles
+	 *
+	 *   Consumer side (Action Scheduler — how it drains them):
+	 *     - concurrent_batches: parallel AS batches
+	 *     - batch_size:         actions claimed per AS batch
+	 *     - time_limit:         seconds per AS batch
+	 *
+	 * @return array{concurrent_batches:int,batch_size:int,time_limit:int,chunk_size:int,chunk_delay:int}
 	 */
 	public static function getDefaultQueueTuning(): array {
 		return array(
 			'concurrent_batches' => 3,
 			'batch_size'         => 25,
 			'time_limit'         => 60,
+			'chunk_size'         => 10,
+			'chunk_delay'        => 30,
 		);
 	}
 
 	/**
 	 * Get centralized plugin defaults used by backend and admin UI.
 	 *
-	 * @return array{max_turns:int,queue_tuning:array{concurrent_batches:int,batch_size:int,time_limit:int}}
+	 * @return array{max_turns:int,queue_tuning:array{concurrent_batches:int,batch_size:int,time_limit:int,chunk_size:int,chunk_delay:int}}
 	 */
 	public static function getDefaults(): array {
 		return array(

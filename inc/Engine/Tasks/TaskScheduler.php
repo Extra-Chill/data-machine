@@ -1,43 +1,43 @@
 <?php
 /**
- * Task Scheduler - Routes system tasks through the workflow engine.
+ * Task Scheduler — Routes system tasks through the workflow engine.
  *
- * All task scheduling now delegates to datamachine/execute-workflow.
- * The task's getWorkflow() method provides the step list; the engine
- * handles job creation, Action Scheduler dispatch, and step execution.
+ * All task scheduling delegates to datamachine/execute-workflow. The task's
+ * getWorkflow() method provides the step list; the engine handles job
+ * creation, Action Scheduler dispatch, and step execution.
  *
- * This replaces the previous direct-to-Action-Scheduler path that used
- * the datamachine_task_handle hook and per-task execute() calls.
+ * Batch fan-out delegates the chunking loop to BatchScheduler — same
+ * primitive that powers pipeline fan-out. State lives on the parent batch
+ * job's engine_data (Redis-survivable), not transients.
  *
  * @package DataMachine\Engine\Tasks
  * @since 0.37.0
  * @since 0.72.0 Delegates to datamachine/execute-workflow; handleTask() removed.
+ * @since 0.82.0 Chunking loop extracted to BatchScheduler; transient state replaced
+ *               with engine_data-only persistence.
  */
 
 namespace DataMachine\Engine\Tasks;
 
 defined( 'ABSPATH' ) || exit;
 
+use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\JobStatus;
 
 class TaskScheduler {
 
 	/**
-	 * Default chunk size for batch scheduling.
-	 *
-	 * Controls how many individual tasks are created per batch cycle.
-	 * Between cycles, other task types can run in Action Scheduler.
+	 * Action Scheduler hook for processing batch chunks.
 	 */
-	const BATCH_CHUNK_SIZE = 10;
+	public const BATCH_HOOK = 'datamachine_task_process_batch';
 
 	/**
-	 * Delay in seconds between batch chunks.
-	 *
-	 * Gives Action Scheduler time to process other pending actions
-	 * between bulk task chunks.
+	 * Consumer context, passed to BatchScheduler so chunk_size /
+	 * chunk_delay filter consumers can tell system-task fan-out apart
+	 * from pipeline fan-out.
 	 */
-	const BATCH_CHUNK_DELAY = 30;
+	public const BATCH_CONTEXT = 'task';
 
 	/**
 	 * Schedule an async task via the workflow engine.
@@ -154,19 +154,21 @@ class TaskScheduler {
 	/**
 	 * Schedule a batch of tasks with chunked execution.
 	 *
-	 * Instead of creating hundreds of workflow jobs at once, stores all items
-	 * in a transient and processes them in chunks. Between chunks, other
-	 * task types can run — preventing queue flooding.
+	 * Creates a parent batch job, hands the work list to BatchScheduler,
+	 * and returns identifiers callers can use to query / cancel the batch.
+	 * Each item later becomes its own standalone workflow job via schedule().
 	 *
-	 * Each item becomes its own standalone workflow job via schedule().
+	 * Per-call chunk-size override is no longer accepted — chunking is
+	 * controlled by the queue_tuning settings group (settable globally
+	 * via Settings → General → Queue Performance, and overridable per
+	 * context via the datamachine_batch_chunk_size filter).
 	 *
 	 * @param string $taskType   Task type identifier (must be registered).
 	 * @param array  $itemParams Array of parameter arrays, one per task.
 	 * @param array  $context    Shared context for all tasks in the batch.
-	 * @param int    $chunkSize  Items per chunk (default: BATCH_CHUNK_SIZE).
-	 * @return array{batch_id: string, total: int, chunk_size: int}|false Batch info or false on failure.
+	 * @return array{batch_id:string,batch_job_id:int,total:int,scheduled:int,chunk_size:int,job_ids?:array}|false Batch info or false on failure.
 	 */
-	public static function scheduleBatch( string $taskType, array $itemParams, array $context = array(), int $chunkSize = 0 ): array|false {
+	public static function scheduleBatch( string $taskType, array $itemParams, array $context = array() ): array|false {
 		if ( ! TaskRegistry::isRegistered( $taskType ) ) {
 			do_action(
 				'datamachine_log',
@@ -185,12 +187,10 @@ class TaskScheduler {
 			return false;
 		}
 
-		if ( $chunkSize <= 0 ) {
-			$chunkSize = self::BATCH_CHUNK_SIZE;
-		}
+		$chunk_size = BatchScheduler::chunkSize( self::BATCH_CONTEXT );
 
-		// If small enough, just schedule directly — no batch overhead.
-		if ( count( $itemParams ) <= $chunkSize ) {
+		// Small batches: schedule directly, no batch overhead.
+		if ( count( $itemParams ) <= $chunk_size ) {
 			$job_ids = array();
 			foreach ( $itemParams as $params ) {
 				$job_id = self::schedule( $taskType, $params, $context );
@@ -199,20 +199,18 @@ class TaskScheduler {
 				}
 			}
 			return array(
-				'batch_id'   => 'direct',
-				'total'      => count( $itemParams ),
-				'scheduled'  => count( $job_ids ),
-				'chunk_size' => $chunkSize,
-				'job_ids'    => $job_ids,
+				'batch_id'     => 'direct',
+				'batch_job_id' => 0,
+				'total'        => count( $itemParams ),
+				'scheduled'    => count( $job_ids ),
+				'chunk_size'   => $chunk_size,
+				'job_ids'      => $job_ids,
 			);
 		}
 
-		// Generate batch ID and transient key.
-		$batch_id      = 'dm_batch_' . wp_generate_uuid4();
-		$transient_key = 'datamachine_batch_' . md5( $batch_id );
-
 		// Create parent batch job for persistent tracking.
 		$jobs_db      = new Jobs();
+		$batch_id     = 'dm_batch_' . wp_generate_uuid4();
 		$batch_job_id = $jobs_db->create_job( array(
 			'pipeline_id' => 'direct',
 			'flow_id'     => 'direct',
@@ -220,59 +218,43 @@ class TaskScheduler {
 			'label'       => 'Batch: ' . ucfirst( str_replace( '_', ' ', $taskType ) ),
 		) );
 
-		if ( $batch_job_id ) {
-			$jobs_db->start_job( (int) $batch_job_id, JobStatus::PROCESSING );
-			$jobs_db->store_engine_data( (int) $batch_job_id, array(
-				'batch'           => true,
-				'task_type'       => $taskType,
-				'batch_id'        => $batch_id,
-				'transient_key'   => $transient_key,
-				'total'           => count( $itemParams ),
-				'chunk_size'      => $chunkSize,
-				'offset'          => 0,
-				'tasks_scheduled' => 0,
-				'started_at'      => current_time( 'mysql' ),
-			) );
-		}
-
-		$batch_data = array(
-			'batch_id'     => $batch_id,
-			'batch_job_id' => $batch_job_id ? $batch_job_id : 0,
-			'task_type'    => $taskType,
-			'context'      => $context,
-			'items'        => $itemParams,
-			'chunk_size'   => $chunkSize,
-			'offset'       => 0,
-			'total'        => count( $itemParams ),
-			'created_at'   => current_time( 'mysql' ),
-		);
-
-		// Store with 4 hour TTL — enough time for large batches to complete.
-		set_transient( $transient_key, $batch_data, 4 * HOUR_IN_SECONDS );
-
-		// Schedule first chunk.
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			delete_transient( $transient_key );
-			if ( $batch_job_id ) {
-				$jobs_db->complete_job( $batch_job_id, JobStatus::failed( 'Action Scheduler not available' )->toString() );
-			}
+		if ( ! $batch_job_id ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'TaskScheduler: failed to create batch parent job',
+				array( 'task_type' => $taskType, 'total' => count( $itemParams ) )
+			);
 			return false;
 		}
 
-		$action_id = as_schedule_single_action(
-			time(),
-			'datamachine_task_process_batch',
-			array( 'batch_id' => $batch_id ),
-			'data-machine'
+		$jobs_db->start_job( (int) $batch_job_id, JobStatus::PROCESSING );
+
+		// Hand the work list to the shared chunking primitive. State
+		// lives on this parent job's engine_data — no transients, no
+		// eviction risk.
+		$result = BatchScheduler::start(
+			(int) $batch_job_id,
+			self::BATCH_HOOK,
+			$itemParams,
+			array(
+				'task_type' => $taskType,
+				'context'   => $context,
+				'batch_id'  => $batch_id,
+			),
+			self::BATCH_CONTEXT
 		);
 
-		if ( ! $action_id ) {
-			delete_transient( $transient_key );
-			if ( $batch_job_id ) {
-				$jobs_db->complete_job( $batch_job_id, JobStatus::failed( 'Failed to schedule batch action' )->toString() );
-			}
-			return false;
-		}
+		// Surface task-specific identifiers alongside the BatchScheduler
+		// metadata so getBatchStatus() and CLI consumers see the same
+		// fields they read pre-extraction.
+		datamachine_merge_engine_data(
+			(int) $batch_job_id,
+			array(
+				'task_type' => $taskType,
+				'batch_id'  => $batch_id,
+			)
+		);
 
 		do_action(
 			'datamachine_log',
@@ -281,7 +263,7 @@ class TaskScheduler {
 				'Task batch scheduled: %s (%d items in chunks of %d)',
 				$taskType,
 				count( $itemParams ),
-				$chunkSize
+				$chunk_size
 			),
 			array(
 				'batch_id'     => $batch_id,
@@ -289,104 +271,108 @@ class TaskScheduler {
 				'task_type'    => $taskType,
 				'context'      => 'system',
 				'total'        => count( $itemParams ),
-				'chunk_size'   => $chunkSize,
+				'chunk_size'   => $chunk_size,
 			)
 		);
 
 		return array(
 			'batch_id'     => $batch_id,
-			'batch_job_id' => $batch_job_id,
+			'batch_job_id' => (int) $batch_job_id,
 			'total'        => count( $itemParams ),
 			'scheduled'    => 0, // Actual scheduling happens in chunks.
-			'chunk_size'   => $chunkSize,
+			'chunk_size'   => $chunk_size,
 		);
 	}
 
 	/**
 	 * Process a batch chunk (Action Scheduler callback).
 	 *
-	 * Pulls the next chunk of items from the batch transient, schedules
-	 * individual tasks for each, then schedules the next chunk (if any)
-	 * with a delay to allow other task types to execute between chunks.
+	 * Pre-0.82.0 this was called with a string $batchId and looked up
+	 * state in a transient. The new BatchScheduler pipes the parent job
+	 * ID instead — the state lives on its engine_data. The legacy
+	 * string-key path is retained for one cycle so any in-flight
+	 * Action Scheduler entries still resolve.
 	 *
-	 * @param string $batchId Batch identifier.
+	 * @param int|string $parentJobIdOrBatchId Parent job ID (current) or
+	 *                                         legacy batch ID (pre-0.82.0).
 	 */
-	public static function processBatchChunk( string $batchId ): void {
-		$transient_key = 'datamachine_batch_' . md5( $batchId );
-		$batch_data    = get_transient( $transient_key );
+	public static function processBatchChunk( int|string $parentJobIdOrBatchId ): void {
+		$parent_job_id = self::resolveParentJobId( $parentJobIdOrBatchId );
 
-		if ( false === $batch_data || ! is_array( $batch_data ) ) {
+		if ( $parent_job_id <= 0 ) {
 			do_action(
 				'datamachine_log',
 				'warning',
-				"TaskScheduler: Batch {$batchId} not found or expired",
+				'TaskScheduler: Batch parent not resolvable',
+				array( 'arg' => $parentJobIdOrBatchId, 'context' => 'system' )
+			);
+			return;
+		}
+
+		$result = BatchScheduler::processChunk(
+			$parent_job_id,
+			static function ( array $params, array $extra, int $parent_id ): int|false {
+				$task_type = (string) ( $extra['task_type'] ?? '' );
+				$context   = is_array( $extra['context'] ?? null ) ? $extra['context'] : array();
+
+				if ( '' === $task_type ) {
+					return false;
+				}
+
+				return self::schedule( $task_type, $params, $context, $parent_id );
+			}
+		);
+
+		$jobs_db       = new Jobs();
+		$parent_engine = datamachine_get_engine_data( $parent_job_id );
+		$task_type     = (string) ( $parent_engine['task_type'] ?? '' );
+		$batch_id      = (string) ( $parent_engine['batch_id'] ?? '' );
+
+		if ( $result['missing'] ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'TaskScheduler: batch state missing from engine_data',
 				array(
-					'batch_id' => $batchId,
-					'context'  => 'system',
+					'parent_job_id' => $parent_job_id,
+					'context'       => 'system',
+				)
+			);
+			$jobs_db->complete_job(
+				$parent_job_id,
+				JobStatus::failed( 'batch_state_missing' )->toString()
+			);
+			return;
+		}
+
+		if ( $result['cancelled'] ) {
+			$jobs_db->complete_job( $parent_job_id, 'cancelled' );
+
+			do_action(
+				'datamachine_log',
+				'info',
+				sprintf( 'Task batch cancelled: %s (at %d/%d)', $task_type, $result['offset'], $result['total'] ),
+				array(
+					'batch_id'     => $batch_id,
+					'batch_job_id' => $parent_job_id,
+					'task_type'    => $task_type,
+					'context'      => 'system',
+					'offset'       => $result['offset'],
+					'total'        => $result['total'],
 				)
 			);
 			return;
 		}
 
-		$task_type    = $batch_data['task_type'];
-		$context      = $batch_data['context'] ?? array();
-		$items        = $batch_data['items'] ?? array();
-		$chunk_size   = $batch_data['chunk_size'] ?? self::BATCH_CHUNK_SIZE;
-		$offset       = $batch_data['offset'] ?? 0;
-		$total        = $batch_data['total'] ?? count( $items );
-		$batch_job_id = $batch_data['batch_job_id'] ?? 0;
-
-		// Check for cancellation via parent batch job.
-		if ( $batch_job_id > 0 ) {
-			$jobs_db    = new Jobs();
-			$parent_job = $jobs_db->get_job( $batch_job_id );
-
-			if ( $parent_job ) {
-				$parent_data = $parent_job['engine_data'] ?? array();
-
-				if ( ! empty( $parent_data['cancelled'] ) ) {
-					delete_transient( $transient_key );
-					$jobs_db->complete_job( $batch_job_id, 'cancelled' );
-
-					do_action(
-						'datamachine_log',
-						'info',
-						sprintf( 'Task batch cancelled: %s (at %d/%d)', $task_type, $offset, $total ),
-						array(
-							'batch_id'     => $batchId,
-							'batch_job_id' => $batch_job_id,
-							'task_type'    => $task_type,
-							'context'      => 'system',
-							'offset'       => $offset,
-							'total'        => $total,
-						)
-					);
-					return;
-				}
-			}
-		}
-
-		// Get current chunk.
-		$chunk     = array_slice( $items, $offset, $chunk_size );
-		$scheduled = 0;
-
-		foreach ( $chunk as $params ) {
-			$job_id = self::schedule( $task_type, $params, $context, $batch_job_id );
-			if ( $job_id ) {
-				++$scheduled;
-			}
-		}
-
-		$new_offset = $offset + $chunk_size;
-
-		// Update parent batch job progress.
-		if ( $batch_job_id > 0 ) {
-			$progress_db                    = $jobs_db ?? new Jobs();
-			$parent_data                    = $progress_db->retrieve_engine_data( $batch_job_id );
-			$parent_data['offset']          = min( $new_offset, $total );
-			$parent_data['tasks_scheduled'] = ( $parent_data['tasks_scheduled'] ?? 0 ) + $scheduled;
-			$progress_db->store_engine_data( $batch_job_id, $parent_data );
-		}
+		// Surface progress fields on the parent's engine_data using the
+		// keys CLI / status consumers already know about.
+		datamachine_merge_engine_data(
+			$parent_job_id,
+			array(
+				'offset'          => $result['offset'],
+				'tasks_scheduled' => ( $parent_engine['tasks_scheduled'] ?? 0 ) + $result['scheduled'],
+			)
+		);
 
 		do_action(
 			'datamachine_log',
@@ -394,58 +380,85 @@ class TaskScheduler {
 			sprintf(
 				'Task batch chunk processed: %s (%d/%d, scheduled %d)',
 				$task_type,
-				min( $new_offset, $total ),
-				$total,
-				$scheduled
+				$result['offset'],
+				$result['total'],
+				$result['scheduled']
 			),
 			array(
-				'batch_id'     => $batchId,
-				'batch_job_id' => $batch_job_id,
+				'batch_id'     => $batch_id,
+				'batch_job_id' => $parent_job_id,
 				'task_type'    => $task_type,
 				'context'      => 'system',
-				'offset'       => $offset,
-				'chunk_size'   => $chunk_size,
-				'scheduled'    => $scheduled,
-				'remaining'    => max( 0, $total - $new_offset ),
+				'offset'       => $result['offset'],
+				'scheduled'    => $result['scheduled'],
+				'remaining'    => max( 0, $result['total'] - $result['offset'] ),
 			)
 		);
 
-		// Schedule next chunk if items remain.
-		if ( $new_offset < $total ) {
-			$batch_data['offset'] = $new_offset;
-			set_transient( $transient_key, $batch_data, 4 * HOUR_IN_SECONDS );
-
-			as_schedule_single_action(
-				time() + self::BATCH_CHUNK_DELAY,
-				'datamachine_task_process_batch',
-				array( 'batch_id' => $batchId ),
-				'data-machine'
+		if ( ! $result['more'] ) {
+			datamachine_merge_engine_data(
+				$parent_job_id,
+				array( 'completed_at' => current_time( 'mysql' ) )
 			);
-		} else {
-			// Batch complete — clean up transient and mark parent job.
-			delete_transient( $transient_key );
-
-			if ( $batch_job_id > 0 ) {
-				$complete_db                 = $jobs_db ?? new Jobs();
-				$parent_data                 = $complete_db->retrieve_engine_data( $batch_job_id );
-				$parent_data['completed_at'] = current_time( 'mysql' );
-				$complete_db->store_engine_data( $batch_job_id, $parent_data );
-				$complete_db->complete_job( $batch_job_id, JobStatus::COMPLETED );
-			}
+			$jobs_db->complete_job( $parent_job_id, JobStatus::COMPLETED );
 
 			do_action(
 				'datamachine_log',
 				'info',
-				sprintf( 'Task batch complete: %s (%d items)', $task_type, $total ),
+				sprintf( 'Task batch complete: %s (%d items)', $task_type, $result['total'] ),
 				array(
-					'batch_id'     => $batchId,
-					'batch_job_id' => $batch_job_id,
+					'batch_id'     => $batch_id,
+					'batch_job_id' => $parent_job_id,
 					'task_type'    => $task_type,
 					'context'      => 'system',
-					'total'        => $total,
+					'total'        => $result['total'],
 				)
 			);
 		}
+	}
+
+	/**
+	 * Resolve the parent job ID for a chunk callback argument.
+	 *
+	 * BatchScheduler always passes the parent job ID. Legacy in-flight
+	 * Action Scheduler entries (scheduled before 0.82.0) carry the
+	 * string batch ID and are resolved by looking up the parent job
+	 * whose engine_data['batch_id'] matches.
+	 *
+	 * @param int|string $arg Parent job ID or legacy batch ID string.
+	 * @return int Parent job ID, or 0 when unresolvable.
+	 */
+	private static function resolveParentJobId( int|string $arg ): int {
+		if ( is_int( $arg ) ) {
+			return $arg;
+		}
+
+		// Numeric string from Action Scheduler — coerce.
+		if ( ctype_digit( $arg ) ) {
+			return (int) $arg;
+		}
+
+		// Legacy batch_id path. Look the parent up by engine_data field.
+		// Only invoked for in-flight pre-migration jobs; new batches use
+		// the int parent_job_id path.
+		global $wpdb;
+		$table = $wpdb->prefix . 'datamachine_jobs';
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix.
+		$row = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT job_id FROM {$table}
+				WHERE source = 'batch'
+				  AND engine_data LIKE %s
+				ORDER BY job_id DESC
+				LIMIT 1",
+				'%' . $wpdb->esc_like( $arg ) . '%'
+			)
+		);
+		// phpcs:enable
+
+		return $row ? (int) $row : 0;
 	}
 
 	/**
@@ -491,13 +504,17 @@ class TaskScheduler {
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL
 
+		// Pull total from batch_total (BatchScheduler) with fallback to
+		// the legacy `total` key for any pre-migration rows.
+		$total = (int) ( $engine_data['batch_total'] ?? $engine_data['total'] ?? 0 );
+
 		return array(
 			'batch_job_id'    => $batchJobId,
 			'task_type'       => $engine_data['task_type'] ?? '',
-			'total_items'     => $engine_data['total'] ?? 0,
-			'offset'          => $engine_data['offset'] ?? 0,
-			'chunk_size'      => $engine_data['chunk_size'] ?? self::BATCH_CHUNK_SIZE,
-			'tasks_scheduled' => $engine_data['tasks_scheduled'] ?? 0,
+			'total_items'     => $total,
+			'offset'          => $engine_data['offset'] ?? $engine_data['batch_offset'] ?? 0,
+			'chunk_size'      => $engine_data['batch_chunk_size'] ?? BatchScheduler::DEFAULT_CHUNK_SIZE,
+			'tasks_scheduled' => $engine_data['tasks_scheduled'] ?? $engine_data['batch_scheduled'] ?? 0,
 			'status'          => $job['status'] ?? '',
 			'started_at'      => $engine_data['started_at'] ?? '',
 			'completed_at'    => $engine_data['completed_at'] ?? '',
@@ -515,35 +532,20 @@ class TaskScheduler {
 	/**
 	 * Cancel a running batch.
 	 *
-	 * Sets the cancelled flag on the parent batch job. The next
-	 * processBatchChunk() call will see it and stop scheduling.
+	 * Sets the cancelled flag on the parent batch job's engine_data.
+	 * The next chunk callback sees it and stops creating children.
 	 *
 	 * @param int $batchJobId Parent batch job ID.
 	 * @return bool True on success, false if not found or not a batch.
 	 */
 	public static function cancelBatch( int $batchJobId ): bool {
-		$jobs_db = new Jobs();
-		$job     = $jobs_db->get_job( $batchJobId );
+		$cancelled = BatchScheduler::cancel( $batchJobId );
 
-		if ( ! $job ) {
+		if ( ! $cancelled ) {
 			return false;
 		}
 
-		$engine_data = $job['engine_data'] ?? array();
-
-		if ( empty( $engine_data['batch'] ) ) {
-			return false;
-		}
-
-		$engine_data['cancelled']    = true;
-		$engine_data['cancelled_at'] = current_time( 'mysql' );
-		$jobs_db->store_engine_data( $batchJobId, $engine_data );
-
-		// Also delete the transient to prevent further chunk scheduling.
-		$transient_key = $engine_data['transient_key'] ?? '';
-		if ( ! empty( $transient_key ) ) {
-			delete_transient( $transient_key );
-		}
+		$engine_data = datamachine_get_engine_data( $batchJobId );
 
 		do_action(
 			'datamachine_log',

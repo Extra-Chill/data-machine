@@ -55,11 +55,11 @@ class TaskSchedulerTest extends WP_UnitTestCase {
 		$this->assertIsArray( $result );
 	}
 
-	public function test_batch_chunk_size_constant(): void {
-		$this->assertSame( 10, TaskScheduler::BATCH_CHUNK_SIZE );
+	public function test_batch_hook_constant(): void {
+		$this->assertSame( 'datamachine_task_process_batch', TaskScheduler::BATCH_HOOK );
 	}
 
-	public function test_batch_chunk_delay_constant(): void {
-		$this->assertSame( 30, TaskScheduler::BATCH_CHUNK_DELAY );
+	public function test_batch_context_constant(): void {
+		$this->assertSame( 'task', TaskScheduler::BATCH_CONTEXT );
 	}
 }
