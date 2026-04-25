@@ -2,6 +2,20 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.81.0] - 2026-04-25
+
+### Added
+- BrandTokens primitive + cached_file output mode
+
+### Changed
+- refactor(ai-step): split enabled_tools off handler_slugs (Phase 2b)
+- refactor(flow-step-config): collapse callsites onto FlowStepConfig helper
+
+### Fixed
+- fix(daily-memory): conservation guard against lossy compaction
+- preserve handler_config for handler-free step types
+- fix(ai-step): include agent_id in directive payload
+
 ## [0.80.1] - 2026-04-24
 
 ### Fixed
