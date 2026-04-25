@@ -283,14 +283,15 @@ class ExecuteWorkflowAbility {
 					'error' => "Step {$index} has invalid type: {$step['type']}. Valid types: " . implode( ', ', $valid_types ),
 				);
 			}
-
-			if ( 'ai' !== $step['type'] && ! isset( $step['handler_slug'] ) ) {
-				return array(
-					'valid' => false,
-					'error' => "Step {$index} missing handler_slug (required for non-AI steps)",
-				);
-			}
 		}
+
+		// Step types own their config requirements — handler_slug
+		// presence, handler_config shape, and any other per-type
+		// invariants are validated by each step's own executeStep() at
+		// runtime, not here. The workflow validator only enforces
+		// structural invariants (the workflow has steps; each step has
+		// a registered type) and leaves per-type validation to the
+		// step types themselves.
 
 		return array( 'valid' => true );
 	}
