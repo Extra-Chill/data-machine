@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.82.0] - 2026-04-25
+
+### Added
+- add MergeTermMetaAbility as the post-resolution meta-write primitive
+- optional pipeline AI conversation transcript persistence
+- pass through wp_insert_term args from ResolveTermAbility::resolve()
+
+### Fixed
+- align retention windows to prevent orphaned processed_items (#1222)
+
 ## [0.81.0] - 2026-04-25
 
 ### Added
