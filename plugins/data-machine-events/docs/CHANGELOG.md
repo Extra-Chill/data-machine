@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.31.0] - 2026-04-25
+
+### Added
+- late-night cutoff for calendar bucketing
+
 ## [0.30.1] - 2026-04-25
 
 ### Changed
