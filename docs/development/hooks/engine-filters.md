@@ -1,533 +1,206 @@
 # Universal Engine Filters
 
-**Since**: 0.2.0
+Reference for the WordPress filters used by the Universal Engine to register directives, tools, and authentication providers, and to validate tool configuration.
 
-Comprehensive reference for filter hooks used by the Universal Engine to apply directives, register tools, and control tool enablement across Pipeline AI and Chat API agents.
-
-## Overview
-
-The Universal Engine uses WordPress filters for extensible integration, allowing custom directives, tools, and agent behaviors without modifying core code. All filters follow consistent patterns with clear parameter structures.
+> Modes vs contexts: prior to v0.71.0 the directive-targeting field was named `contexts`. It was renamed to `modes` during the AgentMode refactor (#1130). Both `RequestBuilder` and `PromptBuilder` now read `modes`. Old `contexts =>` registrations are silently ignored and treated as `all`.
 
 ## Directive System
 
-Directives inject system messages, tool definitions, and contextual information into AI requests. Since v0.2.5, directives use a unified registration system with priority-based ordering and agent targeting.
+Directives inject system messages and contextual information into AI requests. They self-register via a single unified filter with priority-based ordering and mode targeting.
 
 ### datamachine_directives
 
-Centralized filter for directive registration with priority and agent type targeting.
+Centralized filter for directive registration.
 
-**Hook Usage**:
+**Hook usage**:
+
 ```php
-apply_filters('datamachine_directives', $directives);
+$directives = apply_filters( 'datamachine_directives', array() );
 ```
 
-**Parameters**:
-- `$directives` (array) - Array of directive configurations
+**Return shape**: array of directive configurations.
 
-**Return**: Modified `$directives` array
+**Directive configuration**:
 
-**Directive Configuration**:
 ```php
-$directive_config = [
-    'class' => DirectiveClass::class,        // Directive class name
-    'priority' => 20,                        // Priority (lower = applied first)
-    'agent_types' => ['all']                 // 'all', 'pipeline', 'chat', or array
+$directive = [
+    'class'    => DirectiveClass::class, // implements DirectiveInterface
+    'priority' => 25,                    // lower = applied first
+    'modes'    => ['all'],               // 'all', or array of modes (chat, pipeline, system)
 ];
 ```
 
-**Implementation Example**:
-```php
-add_filter('datamachine_directives', function($directives) {
-    $directives[] = [
-        'class' => MyDirective::class,
-        'priority' => 25,
-        'agent_types' => ['all']
-    ];
+**Implementation example**:
 
+```php
+add_filter( 'datamachine_directives', function ( $directives ) {
     $directives[] = [
-        'class' => PipelineDirective::class,
+        'class'    => MyCustomDirective::class,
         'priority' => 30,
-        'agent_types' => ['pipeline']
-    ];
-
-    return $directives;
-});
-```
-
-**Registered Directives**:
-
-#### GlobalSystemPromptDirective (Priority 20)
-**File**: `/inc/Engine/AI/Directives/GlobalSystemPromptDirective.php`
-**Purpose**: Injects user-defined global system prompt from settings
-**Configuration**: Settings → AI Configuration → Global System Prompt
-**Agent Types**: `['all']`
-
-#### SiteContextDirective (Priority 50)
-**File**: `/inc/Engine/AI/Directives/SiteContextDirective.php`
-**Purpose**: Injects WordPress site context (site name, URL, description, post types, taxonomies)
-**Configuration**: Settings → AI Configuration → Include Site Context in AI Requests (enabled by default)
-**Agent Types**: `['all']`
-
-#### PipelineCoreDirective (Priority 10)
-**File**: `/inc/Core/Steps/AI/Directives/PipelineCoreDirective.php`
-**Purpose**: Foundational pipeline agent identity with tool instructions
-**Agent Types**: `['pipeline']`
-
-#### PipelineSystemPromptDirective (Priority 30)
-**File**: `/inc/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php`
-**Purpose**: User-defined pipeline system prompts
-**Agent Types**: `['pipeline']`
-
-#### ChatAgentDirective (Priority 10)
-**File**: `/inc/Api/Chat/ChatAgentDirective.php`
-**Purpose**: Chat agent identity and capabilities
-**Agent Types**: `['chat']`
-
-**Hook Usage (LEGACY — use datamachine_directives instead)**:
-```php
-// Legacy usage — not used in core since v0.2.5. Use datamachine_directives with agent_types instead.
-apply_filters(
-    'datamachine_agent_directives',
-    $request,
-    $agent_type,
-    $provider,
-    $tools,
-    $context
-);
-```
-
-**Recommended (current)**:
-```php
-add_filter('datamachine_directives', function($directives) {
-    $directives[] = [
-        'class' => MyChatDirective::class,
-        'priority' => 15,
-        'agent_types' => ['chat']
+        'modes'    => ['chat', 'pipeline'],
     ];
     return $directives;
-});
+} );
+```
+
+**Built-in directives** are listed in [AI Directives System](../../core-system/ai-directives.md) with current priority and mode assignments. The earlier `GlobalSystemPromptDirective`, `SiteContextDirective`, `PipelineCoreDirective`, `ChatAgentDirective`, and `SystemAgentDirective` classes were removed during the AgentMode refactor — their guidance now lives inline in `AgentModeDirective` and in agent memory files (SITE.md, SOUL.md, MEMORY.md).
+
+### datamachine_agent_mode_{slug}
+
+Per-mode guidance composition hook fired by `AgentModeDirective` (priority 22).
+
+**Hook usage** (one filter per mode slug):
+
+```php
+$content = apply_filters( "datamachine_agent_mode_{$mode}", $default_content, $payload );
 ```
 
 **Parameters**:
-- `$request` (array) - AI request array (model, messages)
-- `$agent_type` (string) - Agent type ('pipeline' or 'chat')
-- `$provider` (string) - AI provider name
-- `$tools` (array) - Structured tools array
-- `$context` (array) - Agent-specific context (step_id/payload for pipeline, session_id for chat)
 
-**Return**: Modified `$request` array
+- `$default_content` (string) — Built-in guidance for that mode (or empty for unregistered modes).
+- `$payload` (array) — Full request payload (`agent_id`, `user_id`, `agent_mode`, etc.).
 
-**Pipeline Implementation Example**:
+**Return**: Modified guidance text. Returning an empty string suppresses the directive.
+
+**Built-in modes**: `chat`, `pipeline`, `system`. Extensions can register additional modes (e.g. the editor plugin registers `editor` to inject diff-workflow instructions).
+
+**Implementation example**:
+
 ```php
-add_filter('datamachine_agent_directives', function($request, $agent_type, $provider, $tools, $context) {
-    if ($agent_type === 'pipeline') {
-        // Apply pipeline-specific directives
-        $request = PipelineCoreDirective::inject(
-            $request,
-            $provider,
-            $tools,
-            $context['step_id'] ?? null,
-            $context['payload'] ?? []
-        );
+add_filter( 'datamachine_agent_mode_chat', function ( $content, $payload ) {
+    if ( empty( $payload['agent_id'] ) ) {
+        return $content;
     }
-    return $request;
-}, 10, 5);
+    return $content . "\n\n## Site-specific\n\nAlways prefer existing taxonomies before creating new ones.";
+}, 10, 2 );
 ```
 
-**Chat Implementation Example**:
-```php
-add_filter('datamachine_agent_directives', function($request, $agent_type, $provider, $tools, $context) {
-    if ($agent_type === 'chat') {
-        // Apply chat-specific directives
-        $request = ChatAgentDirective::inject($request, $provider, $tools, $context);
-    }
-    return $request;
-}, 10, 5);
-```
+## Tool System
 
-**Registered Directives**:
+Tools are registered via a single unified filter. Per-mode tool partitioning is handled inside `ToolManager`, not by separate registration filters.
 
-#### Pipeline Directives
+### datamachine_tools
 
-**PipelineCoreDirective**
-**File**: `/inc/Core/Steps/AI/Directives/PipelineCoreDirective.php`
-**Purpose**: Foundational pipeline agent identity and operational principles
-**Content**: Agent role, workflow approach, data packet structure
+Single registry for all AI tools. Used by `ToolManager::getRawToolsForMode()` to assemble the available tool set for a given execution mode.
+
+**Hook usage**:
 
 ```php
-add_filter('datamachine_agent_directives', function($request, $agent_type, $provider, $tools, $context) {
-    if ($agent_type === 'pipeline') {
-        $request = PipelineCoreDirective::inject(
-            $request,
-            $provider,
-            $tools,
-            $context['step_id'] ?? null,
-            $context['payload'] ?? []
-        );
-    }
-    return $request;
-}, 10, 5);
+$tools = apply_filters( 'datamachine_tools', array() );
 ```
 
-**PipelineSystemPromptDirective**
-**File**: `/inc/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php`
-**Purpose**: User-defined pipeline-level system prompt from pipeline configuration
-**Configuration**: Pipeline Builder → System Prompt (template level)
+**Return shape**: associative array keyed by tool ID.
 
-```php
-add_filter('datamachine_agent_directives', function($request, $agent_type, $provider, $tools, $context) {
-    if ($agent_type === 'pipeline') {
-        $request = PipelineSystemPromptDirective::inject(
-            $request,
-            $provider,
-            $tools,
-            $context['step_id'] ?? null,
-            $context['payload'] ?? []
-        );
-    }
-    return $request;
-}, 20, 5);
-```
+**Tool definition**:
 
-#### Chat Directives
-
-**ChatAgentDirective**
-**File**: `/inc/Api/Chat/ChatAgentDirective.php`
-**Purpose**: Chat agent identity, capabilities, and available REST API endpoints
-**Content**: Agent role, workflow building capabilities, API documentation
-
-```php
-add_filter('datamachine_agent_directives', function($request, $agent_type, $provider, $tools, $context) {
-    if ($agent_type === 'chat') {
-        $request = ChatAgentDirective::inject($request, $provider, $tools, $context);
-    }
-    return $request;
-}, 10, 5);
-```
-
-
-
-## Tool Filters
-
-Control tool registration, enablement, and configuration validation.
-
-### datamachine_tool_enabled
-
-Universal tool enablement control. Determines which tools are available to AI agents.
-
-**Note**: Direct filter usage for tool availability is replaced by **ToolManager** (@since v0.2.1). The ToolManager provides centralized methods (`is_tool_available()`, `is_tool_configured()`) that internally use these filters but add additional validation layers. Components should use ToolManager methods rather than calling filters directly.
-
-See Tool Manager for the modern tool management approach.
-
-**Hook Usage**:
-```php
-apply_filters(
-    'datamachine_tool_enabled',
-    $enabled,
-    $tool_name,
-    $tool_config,
-    $context_id
-);
-```
-
-**Parameters**:
-- `$enabled` (bool) - Current enablement status
-- `$tool_name` (string) - Tool identifier
-- `$tool_config` (array) - Tool configuration array
-- `$context_id` (string|null) - Pipeline step ID or null for chat
-
-**Return**: (bool) Whether tool is enabled
-
-**Pipeline Implementation** (step-specific enablement):
-```php
-add_filter('datamachine_tool_enabled', function($enabled, $tool_name, $tool_config, $pipeline_step_id) {
-    if ($pipeline_step_id) {
-        // Pipeline agent: check step-specific enablement
-        $step_config = apply_filters('datamachine_get_flow_step_config', [], $pipeline_step_id);
-        $enabled_tools = $step_config['enabled_tools'] ?? [];
-        return in_array($tool_name, $enabled_tools);
-    }
-    return $enabled;
-}, 10, 4);
-```
-
-**Chat Implementation** (global enablement):
-```php
-add_filter('datamachine_tool_enabled', function($enabled, $tool_name, $tool_config, $context_id) {
-    if ($context_id === null) {
-        // Chat agent: use global tool enablement
-        $tool_configured = apply_filters('datamachine_tool_configured', false, $tool_name);
-        $requires_config = !empty($tool_config['requires_config']);
-        return !$requires_config || $tool_configured;
-    }
-    return $enabled;
-}, 5, 4); // Priority 5 so pipeline (priority 10) can override
-```
-
-### datamachine_tool_configured
-
-Validates tool configuration. Used to check if tools requiring external services (API keys, credentials) are properly configured.
-
-**Hook Usage**:
-```php
-apply_filters(
-    'datamachine_tool_configured',
-    $configured,
-    $tool_name
-);
-```
-
-**Parameters**:
-- `$configured` (bool) - Current configuration status
-- `$tool_name` (string) - Tool identifier
-
-**Return**: (bool) Whether tool is configured
-
-**Implementation Example**:
-```php
-add_filter('datamachine_tool_configured', function($configured, $tool_name) {
-    if ($tool_name === 'google_search') {
-        $settings = datamachine_get_data_machine_settings();
-        $api_key = $settings['google_search_api_key'] ?? '';
-        $search_engine_id = $settings['google_search_engine_id'] ?? '';
-        return !empty($api_key) && !empty($search_engine_id);
-    }
-    return $configured;
-}, 10, 2);
-```
-
-**Tools Requiring Configuration**:
-- `google_search` - API key + Custom Search Engine ID
-- OAuth-based handler tools (validated via separate OAuth filters)
-
-### datamachine_global_tools
-
-Registers tools available to all AI agents (pipeline + chat).
-
-**Hook Usage**:
-```php
-apply_filters('datamachine_global_tools', $tools);
-```
-
-**Parameters**:
-- `$tools` (array) - Current global tools array
-
-**Return**: Modified `$tools` array
-
-**Implementation Example**:
-```php
-add_filter('datamachine_global_tools', function($tools) {
-    $tools['google_search'] = [
-        'class' => 'DataMachine\\Engine\\AI\\Tools\\GoogleSearch',
-        'method' => 'handle_tool_call',
-        'description' => 'Search the web using Google Custom Search',
-        'parameters' => [
-            'query' => [
-                'type' => 'string',
-                'required' => true,
-                'description' => 'Search query'
-            ],
-            'num_results' => [
-                'type' => 'integer',
-                'required' => false,
-                'description' => 'Number of results (1-10, default 5)'
-            ]
-        ],
-        'requires_config' => true
-    ];
-    return $tools;
-});
-```
-
-**Registered Global Tools**:
-- `google_search` - Web search via Google Custom Search API
-- `local_search` - WordPress content search
-- `web_fetch` - Retrieve web page content
-- `wordpress_post_reader` - Read specific WordPress post by URL
-
-**Tool Structure**:
 ```php
 [
-    'class' => 'Namespace\\ClassName',     // Tool handler class
-    'method' => 'handle_tool_call',        // Handler method
-    'description' => 'Tool description',   // Visible to AI
-    'parameters' => [                      // Tool parameters
-        'param_name' => [
-            'type' => 'string|integer|boolean|array',
-            'required' => true|false,
-            'description' => 'Parameter description'
-        ]
+    'class'            => 'My\\Plugin\\Tools\\MyTool',
+    'method'           => 'handle_tool_call',
+    'description'      => 'Clear, AI-readable description.',
+    'parameters'       => [
+        'query' => [
+            'type'        => 'string',
+            'required'    => true,
+            'description' => 'Search query',
+        ],
     ],
-    'requires_config' => true|false        // Whether tool needs configuration
+    'modes'            => ['chat', 'pipeline'], // which modes can see this tool
+    'requires_config'  => true,                 // checked via datamachine_tool_configured
+    'category'         => 'search',             // optional grouping
 ]
 ```
 
-### datamachine_chat_tools
+**Implementation example**:
 
-Registers tools available exclusively to chat agents.
-
-**Hook Usage**:
 ```php
-apply_filters('datamachine_chat_tools', $tools);
+add_filter( 'datamachine_tools', function ( $tools ) {
+    $tools['my_search'] = [
+        'class'           => 'My\\Plugin\\Tools\\MySearch',
+        'method'          => 'handle_tool_call',
+        'description'     => 'Search the My Plugin index.',
+        'parameters'      => [
+            'query' => [
+                'type'        => 'string',
+                'required'    => true,
+                'description' => 'Search terms',
+            ],
+        ],
+        'modes'           => ['chat'],
+        'requires_config' => false,
+    ];
+    return $tools;
+} );
+```
+
+> The legacy `datamachine_global_tools` and `datamachine_chat_tools` filters were consolidated into `datamachine_tools` in v0.68.0 (PR #1130). The old per-mode filters no longer exist.
+
+### datamachine_tool_configured
+
+Validates that tools requiring external services (API keys, OAuth credentials) are properly configured.
+
+**Hook usage**:
+
+```php
+$configured = apply_filters( 'datamachine_tool_configured', false, $tool_id );
 ```
 
 **Parameters**:
-- `$tools` (array) - Current chat tools array
 
-**Return**: Modified `$tools` array
+- `$configured` (bool) — Current configuration status.
+- `$tool_id` (string) — Tool identifier.
 
-**Implementation Example**:
+**Return**: bool — Whether the tool is configured.
+
+**Implementation example**:
+
 ```php
-add_filter('datamachine_chat_tools', function($tools) {
-    $tools['create_pipeline'] = [
-        'class' => 'DataMachine\\Api\\Chat\\Tools\\CreatePipeline',
-        'method' => 'handle_tool_call',
-        'description' => 'Create a new pipeline with optional steps',
-        'parameters' => [
-            'name' => [
-                'type' => 'string',
-                'required' => true,
-                'description' => 'Pipeline name'
-            ],
-            'steps' => [
-                'type' => 'array',
-                'required' => false,
-                'description' => 'Optional initial steps'
-            ]
-        ]
-    ];
-    return $tools;
-});
+add_filter( 'datamachine_tool_configured', function ( $configured, $tool_id ) {
+    if ( $tool_id === 'my_search' ) {
+        $settings = get_option( 'my_plugin_settings', array() );
+        return ! empty( $settings['api_key'] ) && strlen( $settings['api_key'] ) >= 20;
+    }
+    return $configured;
+}, 10, 2 );
 ```
 
-**Registered Chat Tools** (@since v0.4.3 specialized tools):
-- `execute_workflow` - Execute complete multi-step workflows
-- `add_pipeline_step` - Add steps to existing pipelines
-- `api_query` - REST API query for discovery
-- `configure_flow_step` - Configure flow step handlers and AI messages
-- `configure_pipeline_step` - Configure pipeline AI settings
-- `create_flow` - Create flow instances from pipelines
-- `create_pipeline` - Create pipelines with optional steps
-- `run_flow` - Execute or schedule flows
-- `update_flow` - Update flow properties
+> Tool *availability* (whether the AI sees the tool in this request) is now resolved by `ToolManager::is_tool_available()`, not by a public filter. The `datamachine_tool_enabled` filter from earlier versions has been removed in favour of `ToolManager`'s direct logic, which combines configuration state, mode membership, and per-step `enabled_tools` settings.
 
-## Directive Application Order
+## Handler Registration
 
-Directives are applied in priority-based order by PromptBuilder (@since v0.2.5):
+Handlers (fetch / publish / upsert) are registered via the `HandlerRegistrationTrait` (`inc/Core/Steps/HandlerRegistrationTrait.php`), which wires multiple filters in one call. The full pattern is documented in [Core Filters](core-filters.md). The trait registers:
 
-```
-Unified Directive System (datamachine_directives filter):
-├── Priority 10-19: Core agent identity
-│   ├── PipelineCoreDirective (Priority 10, pipeline only)
-│   └── ChatAgentDirective (Priority 10, chat only)
-│
-├── Priority 20-29: Global system prompts
-│   ├── GlobalSystemPromptDirective (Priority 20, all agents)
-│   └── GlobalToolsDirective (Priority 25, all agents)
-│
-├── Priority 30-39: Agent-specific prompts
-│   └── PipelineSystemPromptDirective (Priority 30, pipeline only)
-│
-└── Priority 50+: Site context
-    └── SiteContextDirective (Priority 50, all agents)
-```
-
-**Migration Note**: Prior to v0.2.5, directives used separate `datamachine_global_directives` and `datamachine_agent_directives` filters. These are now deprecated in favor of the unified `datamachine_directives` filter with priority-based ordering and agent type targeting.
+| Filter | Purpose |
+|--------|---------|
+| `datamachine_handlers` | Handler metadata lookup keyed by step type |
+| `datamachine_auth_providers` | Auth provider lookup (when `requires_auth=true`) |
+| `datamachine_handler_settings` | Settings class lookup keyed by handler slug |
+| `datamachine_tools` | Handler tool registration via `_handler_callable` deferred entries |
 
 ## Best Practices
 
 ### Directive Registration
 
-**Use Appropriate Filter Priority**:
-```php
-// Earlier priority (10-30) for foundational directives
-add_filter('datamachine_global_directives', function($request, ...) {
-    // Critical system directive
-    return $request;
-}, 15, 5);
+- Use **priority 10–29** for foundational identity / mode guidance.
+- Use **priority 30–49** for contextual information (memory files, inventory).
+- Use **priority 50+** for late-stage configuration (workflow visualization, pipeline goals).
+- Always declare `modes` explicitly. Default to `['all']` only when the directive truly applies everywhere.
 
-// Later priority (40-50) for contextual information
-add_filter('datamachine_global_directives', function($request, ...) {
-    // Site context, tool definitions
-    return $request;
-}, 40, 5);
-```
+### Tool Registration
 
-**Always Return Modified Request**:
-```php
-add_filter('datamachine_global_directives', function($request, $provider, $tools, $step_id, $payload) {
-    $request['messages'][] = [
-        'role' => 'system',
-        'content' => 'Directive content'
-    ];
+- Provide a complete `parameters` schema — the AI relies on it for argument structure.
+- Set `requires_config => true` only when the tool genuinely needs configuration. Tools that always work (e.g. `web_fetch`) should leave it `false` so they don't get filtered out.
+- Declare `modes` so the tool only appears where it's useful (e.g. workflow-management tools should be `chat`-only, not exposed to pipeline AI steps).
 
-    return $request; // Critical: always return
-}, 10, 5);
-```
+### Configuration Validation
 
-**Check Agent Type for Agent Directives**:
-```php
-add_filter('datamachine_agent_directives', function($request, $agent_type, $provider, $tools, $context) {
-    if ($agent_type === 'pipeline') {
-        // Pipeline-specific logic
-    } elseif ($agent_type === 'chat') {
-        // Chat-specific logic
-    }
-    return $request;
-}, 10, 5);
-```
-
-### Tool Filters
-
-**Provide Complete Tool Definitions**:
-```php
-add_filter('datamachine_global_tools', function($tools) {
-    $tools['my_tool'] = [
-        'class' => 'MyNamespace\\MyTool',
-        'method' => 'handle_tool_call',
-        'description' => 'Clear, concise description for AI',
-        'parameters' => [
-            'required_param' => [
-                'type' => 'string',
-                'required' => true,
-                'description' => 'Parameter description'
-            ]
-        ],
-        'requires_config' => false
-    ];
-    return $tools;
-});
-```
-
-**Validate Configuration Properly**:
-```php
-add_filter('datamachine_tool_configured', function($configured, $tool_name) {
-    if ($tool_name === 'my_tool') {
-        $settings = datamachine_get_data_machine_settings();
-        $api_key = $settings['my_tool_api_key'] ?? '';
-        return !empty($api_key) && strlen($api_key) >= 20; // Validate length
-    }
-    return $configured;
-}, 10, 2);
-```
-
-**Respect Context ID in Tool Enablement**:
-```php
-add_filter('datamachine_tool_enabled', function($enabled, $tool_name, $tool_config, $context_id) {
-    // context_id = pipeline_step_id for pipeline, null for chat
-    if ($context_id === null) {
-        // Chat agent logic
-    } else {
-        // Pipeline agent logic
-    }
-    return $enabled;
-}, 10, 4);
-```
+- Validate the actual usability of credentials, not just their presence (e.g. minimum length, expected prefix).
+- Keep validation cheap — `datamachine_tool_configured` is called repeatedly during tool listing.
+- Do not perform live API calls inside the filter; cache results elsewhere if you need to verify connectivity.
 
 ## Related Documentation
 
-- Universal Engine Architecture - Overall engine structure
-- RequestBuilder Pattern - Directive application system
-- Tool Execution Architecture - Tool discovery and execution
-- Tool Manager - Centralized tool management (@since v0.2.1)
-- AI Conversation Loop - Multi-turn conversation execution
+- [AI Directives System](../../core-system/ai-directives.md) — Built-in directive list, priorities, modes
+- [Tool Manager](../../core-system/tool-manager.md) — Tool availability resolution
+- [Tool Execution](../../core-system/tool-execution.md) — Tool dispatch and result handling
+- [Core Filters](core-filters.md) — Handler registration filters and OAuth service discovery

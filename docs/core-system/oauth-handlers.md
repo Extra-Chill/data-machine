@@ -81,7 +81,8 @@ abstract public function handle_oauth_callback();
 ```
 
 **Providers Using BaseOAuth1Provider**:
-- TwitterAuth (OAuth 1.0a for tweet publishing)
+
+Core data-machine does not ship any concrete OAuth1 providers. Extensions register their own — for example, `data-machine-socials` ships `TwitterAuth` for tweet publishing.
 
 **Example Implementation**:
 
@@ -174,10 +175,11 @@ public function refresh_token(): bool; // Token refresh implementation
 ```
 
 **Providers Using BaseOAuth2Provider**:
-- RedditAuth (subreddit fetching)
-- FacebookAuth (Graph API publishing)
-- ThreadsAuth (Meta Threads integration)
-- GoogleSheetsAuth (spreadsheet operations, moved to `/inc/Core/OAuth/Providers/` in v0.2.6)
+
+Core data-machine ships only `EmailAuth` (`inc/Core/Steps/Fetch/Handlers/Email/EmailAuth.php`). Concrete OAuth2 social/event providers live in extension plugins:
+
+- `data-machine-socials` — `RedditAuth`, `FacebookAuth`, `ThreadsAuth`, etc.
+- `data-machine-events` — `DiceFmAuth`, `TicketmasterAuth`, etc.
 
 **Example Implementation**:
 
@@ -262,10 +264,10 @@ class RedditAuth extends BaseOAuth2Provider {
 ### Bluesky Authentication (BaseAuthProvider Direct Extension)
 
 **Provider**: BlueskyAuth
-**Location**: `/inc/Core/Steps/Publish/Handlers/Bluesky/BlueskyAuth.php`
+**Location**: `data-machine-socials/inc/Handlers/Bluesky/BlueskyAuth.php` (extension plugin)
 **Since**: v0.1.0 (updated to extend BaseAuthProvider in v0.2.6)
 
-Bluesky authentication uses app password authentication and extends BaseAuthProvider directly.
+Bluesky authentication uses app password authentication and extends BaseAuthProvider directly. The implementation lives in the `data-machine-socials` extension plugin; the example below shows the pattern any extension can follow.
 
 **Implementation Pattern**:
 
@@ -397,37 +399,30 @@ public function handle_callback(
 - 15-minute expiration for request tokens
 - Automatic cleanup after exchange
 
-## OAuth Providers Directory
+## Provider Registration via Filters
 
-**Location**: `/inc/Core/OAuth/Providers/`
-**Since**: v0.2.5
+Concrete OAuth providers self-register via the `datamachine_auth_providers` filter (typically through `HandlerRegistrationTrait`). Core data-machine does not ship a `inc/Core/OAuth/Providers/` directory — every concrete provider lives next to its handler in either core or an extension plugin.
 
-Centralized directory for shared OAuth provider implementations used by multiple handlers.
+**In core data-machine:**
 
-### GoogleSheetsAuth
+- `EmailAuth` — `inc/Core/Steps/Fetch/Handlers/Email/EmailAuth.php`
 
-**Location**: `/inc/Core/OAuth/Providers/GoogleSheetsAuth.php`
-**Since**: v0.2.0 (moved to Providers/ in v0.2.5, updated to extend BaseOAuth2Provider in v0.2.6)
+**In extension plugins:**
 
-OAuth2 provider for Google Sheets API access shared by both fetch and publish handlers.
+- `data-machine-socials` — Bluesky, Twitter, Reddit, Facebook, Threads, etc.
+- `data-machine-events` — Dice.fm, Ticketmaster, etc.
 
-**Key Features**:
-- OAuth2 authentication with offline access
-- Automatic token refresh 5 minutes before expiry
-- Service access method returning valid access token
-- Spreadsheet-specific scopes
+**Reusable provider pattern**:
 
-**Usage Pattern**:
+When multiple handlers in the same plugin need the same OAuth2 provider (e.g. a fetch and publish handler against the same API), implement the auth provider once and inject it into both handlers. The shared instance lives next to its handlers (e.g. `<plugin>/inc/Handlers/<Service>/<Service>Auth.php`).
 
 ```php
-use DataMachine\Core\OAuth\Providers\GoogleSheetsAuth;
-
-class GoogleSheetsFetch extends FetchHandler {
+class MyServiceFetch extends FetchHandler {
 
     private $auth;
 
     public function __construct() {
-        $this->auth = new GoogleSheetsAuth();
+        $this->auth = new MyServiceAuth();
     }
 
     public function fetch($flow_step_config, $job_id) {
@@ -641,5 +636,5 @@ class RedditAuth extends BaseOAuth2Provider {
 
 ---
 
-**Implementation**: `/inc/Core/OAuth/` directory with BaseAuthProvider, BaseOAuth1Provider, and BaseOAuth2Provider base classes, OAuth1Handler and OAuth2Handler services, and Providers/ directory (GoogleSheetsAuth)
+**Implementation**: `/inc/Core/OAuth/` directory ships `BaseAuthProvider`, `BaseOAuth1Provider`, and `BaseOAuth2Provider` base classes plus the `OAuth1Handler` and `OAuth2Handler` services. Concrete providers ship in core (`EmailAuth`) and in extension plugins (`data-machine-socials`, `data-machine-events`).
 **Architecture**: Inheritance-based provider system with centralized storage and validation

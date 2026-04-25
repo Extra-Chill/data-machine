@@ -1,6 +1,6 @@
 # Files Endpoint
 
-**Implementation**: `inc/Api/Files.php`, `inc/Api/AgentFiles.php`
+**Implementation**: `inc/Api/FlowFiles.php`, `inc/Api/AgentFiles.php`
 
 **Base URL**: `/wp-json/datamachine/v1/files`
 
@@ -8,7 +8,7 @@
 
 The Files endpoint handles two distinct scopes:
 
-1. **Flow files** — File uploads for pipeline processing with flow-isolated storage, security validation, and automatic URL generation (`inc/Api/Files.php`)
+1. **Flow files** — File uploads for pipeline processing with flow-isolated storage, security validation, and automatic URL generation (`inc/Api/FlowFiles.php`)
 2. **Agent files** — Agent memory file management with 3-layer directory resolution for SOUL.md, MEMORY.md, USER.md, and daily memory journals (`inc/Api/AgentFiles.php`)
 
 ## Authentication
@@ -561,5 +561,5 @@ curl -X POST https://example.com/wp-json/datamachine/v1/files \
 ---
 
 **Base URL**: `/wp-json/datamachine/v1/files`
-**Implementation**: `inc/Api/Files.php` (flow files), `inc/Api/AgentFiles.php` (agent files)
+**Implementation**: `inc/Api/FlowFiles.php` (flow files), `inc/Api/AgentFiles.php` (agent files)
 **Max File Size**: WordPress `wp_max_upload_size()` setting

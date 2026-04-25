@@ -1,6 +1,6 @@
 # System Tasks
 
-System tasks are background operations that run outside the normal pipeline execution cycle. They handle AI-powered content operations (alt text, meta descriptions, internal linking), media processing (image generation, optimization), and agent maintenance (daily memory, GitHub issues). All system tasks share a common base class with standardized job management, effect tracking, and undo support.
+System tasks are background operations that run outside the normal pipeline execution cycle. They handle AI-powered content operations (alt text, meta descriptions, internal linking), media processing (image generation, optimization), and agent housekeeping (daily memory synthesis, agent ping). All system tasks share a common base class with standardized job management, effect tracking, and undo support.
 
 ## Overview
 
@@ -12,6 +12,8 @@ The system tasks framework consists of:
 4. **TaskScheduler** — schedules and dispatches tasks via Action Scheduler
 5. **SystemTaskStep** — pipeline step type that bridges system tasks into pipeline workflows
 6. **Seven built-in tasks** — each implementing a specific AI or system operation
+
+> Note: `GitHubIssueTask` was extracted to the `data-machine-code` extension plugin (see PR #926). It is no longer part of core data-machine.
 
 ## SystemTask Base Class
 
@@ -187,10 +189,10 @@ Hooks the `datamachine_tasks` filter to register the seven built-in task types:
 
 | Task Key | Class |
 |----------|-------|
+| `agent_ping` | `AgentPingTask` |
 | `image_generation` | `ImageGenerationTask` |
 | `image_optimization` | `ImageOptimizationTask` |
 | `alt_text_generation` | `AltTextTask` |
-| `github_create_issue` | `GitHubIssueTask` |
 | `internal_linking` | `InternalLinkingTask` |
 | `daily_memory_generation` | `DailyMemoryTask` |
 | `meta_description_generation` | `MetaDescriptionTask` |
@@ -361,20 +363,21 @@ Compresses oversized images and generates WebP variants using WordPress's native
 | Manual run | No |
 | Prompts | None (not an AI task) |
 
-### GitHubIssueTask
+### AgentPingTask
 
-**Type:** `github_create_issue`
-**Source:** `inc/Engine/AI/System/Tasks/GitHubIssueTask.php`
+**Type:** `agent_ping`
+**Source:** `inc/Engine/AI/System/Tasks/AgentPingTask.php`
+**Since:** v0.60.0
 **Undo:** No
 
-The simplest task — creates GitHub issues by delegating entirely to `GitHubAbilities::createIssue()`. Validates the result and completes or fails the job. No prompt building, no normalization.
+Sends pipeline context to external webhook endpoints (Discord, Slack, custom HTTP collectors). Delegates HTTP transport to `SendPingAbility` (`inc/Abilities/AgentPing/SendPingAbility.php`). When dispatched as a pipeline step via `SystemTaskStep`, supports queue popping so a single ping configuration can be reused across queued runs.
 
 | Property | Value |
 |----------|-------|
 | Setting | None (always available) |
-| Trigger | AI tool call |
-| Manual run | No |
-| Prompts | None |
+| Trigger | On-demand via CLI, REST, or pipeline step |
+| Manual run | Yes |
+| Prompts | None (not an AI task) |
 
 ## Task Registration
 
@@ -426,6 +429,6 @@ The class must extend `SystemTask` and implement `execute()` and `getTaskType()`
 | `inc/Engine/AI/System/Tasks/AltTextTask.php` | AI-powered image alt text generation |
 | `inc/Engine/AI/System/Tasks/ImageGenerationTask.php` | Async image generation via Replicate API |
 | `inc/Engine/AI/System/Tasks/ImageOptimizationTask.php` | Image compression and WebP generation |
-| `inc/Engine/AI/System/Tasks/GitHubIssueTask.php` | GitHub issue creation |
+| `inc/Engine/AI/System/Tasks/AgentPingTask.php` | Send pipeline context to external webhook endpoints |
 | `inc/Core/Steps/SystemTask/SystemTaskStep.php` | Pipeline step type bridging system tasks |
 | `inc/Core/Steps/SystemTask/SystemTaskSettings.php` | Admin UI settings for the SystemTask step |
