@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.30.1] - 2026-04-25
+
+### Changed
+- collapse meta-write helpers onto MergeTermMetaAbility
+- collapse find_or_create_promoter onto ResolveTermAbility::resolve()
+
+### Fixed
+- coerce findExistingEventViaAbility null to 0 for buildEventData
+
 ## [0.30.0] - 2026-04-25
 
 ### Added
