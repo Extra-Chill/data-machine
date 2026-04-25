@@ -48,6 +48,28 @@ class ResolveTermAbility {
 								'default'     => false,
 								'description' => __( 'Create term if not found', 'data-machine' ),
 							),
+							'args'       => array(
+								'type'        => 'object',
+								'description' => __( 'Optional arguments forwarded to wp_insert_term() on the create path. Ignored when an existing term is matched.', 'data-machine' ),
+								'properties'  => array(
+									'description' => array(
+										'type'        => 'string',
+										'description' => __( 'Term description.', 'data-machine' ),
+									),
+									'parent'      => array(
+										'type'        => 'integer',
+										'description' => __( 'Parent term ID for hierarchical taxonomies.', 'data-machine' ),
+									),
+									'slug'        => array(
+										'type'        => 'string',
+										'description' => __( 'Explicit term slug. Defaults to a sanitised version of the name.', 'data-machine' ),
+									),
+									'alias_of'    => array(
+										'type'        => 'string',
+										'description' => __( 'Slug of an existing term that the new term should alias.', 'data-machine' ),
+									),
+								),
+							),
 						),
 						'required'   => array( 'identifier', 'taxonomy' ),
 					),
@@ -86,13 +108,14 @@ class ResolveTermAbility {
 	 * 3. Try get_term_by('slug')
 	 * 4. If create=true and not found, create via wp_insert_term()
 	 *
-	 * @param array $input Input with identifier, taxonomy, create flag.
+	 * @param array $input Input with identifier, taxonomy, create flag, optional args.
 	 * @return array Success with term data or error.
 	 */
 	public function execute( array $input ): array {
 		$identifier = trim( (string) ( $input['identifier'] ?? '' ) );
 		$taxonomy   = trim( (string) ( $input['taxonomy'] ?? '' ) );
 		$create     = (bool) ( $input['create'] ?? false );
+		$term_args  = is_array( $input['args'] ?? null ) ? $input['args'] : array();
 
 		// Validate inputs.
 		if ( empty( $identifier ) ) {
@@ -133,7 +156,8 @@ class ResolveTermAbility {
 
 		// 4. Not found - create if requested.
 		if ( $create ) {
-			$result = wp_insert_term( $identifier, $taxonomy );
+			$insert_args = $this->normalize_term_args( $term_args );
+			$result      = wp_insert_term( $identifier, $taxonomy, $insert_args );
 			if ( is_wp_error( $result ) ) {
 				return $this->error_response( $result->get_error_message() );
 			}
@@ -155,6 +179,34 @@ class ResolveTermAbility {
 		}
 
 		return $this->error_response( "Term '{$identifier}' not found in taxonomy '{$taxonomy}'" );
+	}
+
+	/**
+	 * Whitelist and sanitise wp_insert_term() arguments.
+	 *
+	 * Only the four create-time keys (description, parent, slug, alias_of) are forwarded.
+	 * Any other input is silently dropped to keep the surface narrow.
+	 *
+	 * @param array $args Raw args from the caller.
+	 * @return array Sanitised args ready for wp_insert_term().
+	 */
+	private function normalize_term_args( array $args ): array {
+		$clean = array();
+
+		if ( isset( $args['description'] ) ) {
+			$clean['description'] = sanitize_textarea_field( (string) $args['description'] );
+		}
+		if ( isset( $args['parent'] ) ) {
+			$clean['parent'] = absint( $args['parent'] );
+		}
+		if ( isset( $args['slug'] ) ) {
+			$clean['slug'] = sanitize_title( (string) $args['slug'] );
+		}
+		if ( isset( $args['alias_of'] ) ) {
+			$clean['alias_of'] = sanitize_title( (string) $args['alias_of'] );
+		}
+
+		return $clean;
 	}
 
 	/**
@@ -205,15 +257,18 @@ class ResolveTermAbility {
 	 * @param string $identifier Term identifier (ID, name, or slug).
 	 * @param string $taxonomy   Taxonomy name.
 	 * @param bool   $create     Create if not found.
+	 * @param array  $args       Optional wp_insert_term() args, forwarded only on the create path.
+	 *                           Whitelisted keys: description, parent, slug, alias_of.
 	 * @return array Result with success, term data, or error.
 	 */
-	public static function resolve( string $identifier, string $taxonomy, bool $create = false ): array {
+	public static function resolve( string $identifier, string $taxonomy, bool $create = false, array $args = array() ): array {
 		$instance = new self();
 		return $instance->execute(
 			array(
 				'identifier' => $identifier,
 				'taxonomy'   => $taxonomy,
 				'create'     => $create,
+				'args'       => $args,
 			)
 		);
 	}
