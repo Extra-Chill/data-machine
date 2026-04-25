@@ -301,33 +301,29 @@ class Venue_Taxonomy {
 	 * Smartly merge new venue data into existing venue
 	 * Only updates fields that are currently empty in the database
 	 *
+	 * Composes MergeTermMetaAbility (fill_empty strategy) with the
+	 * venue-specific post-write side effects (geocoding, timezone derivation).
+	 *
 	 * @param int $term_id Venue term ID
 	 * @param array $venue_data New venue data
 	 */
 	private static function smart_merge_venue_meta( $term_id, $venue_data ) {
-		$address_fields    = array( 'address', 'city', 'state', 'zip', 'country' );
-		$address_updated   = false;
-		$coordinates_added = false;
+		$result = \DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::merge(
+			(int) $term_id,
+			'venue',
+			$venue_data,
+			self::$meta_fields,
+			\DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::STRATEGY_FILL_EMPTY
+		);
 
-		foreach ( self::$meta_fields as $data_key => $meta_key ) {
-			if ( empty( $venue_data[ $data_key ] ) ) {
-				continue;
-			}
-
-			$existing_value = get_term_meta( $term_id, $meta_key, true );
-
-			if ( empty( $existing_value ) ) {
-				update_term_meta( $term_id, $meta_key, sanitize_text_field( $venue_data[ $data_key ] ) );
-
-				if ( in_array( $data_key, $address_fields, true ) ) {
-					$address_updated = true;
-				}
-
-				if ( 'coordinates' === $data_key ) {
-					$coordinates_added = true;
-				}
-			}
+		if ( empty( $result['success'] ) ) {
+			return;
 		}
+
+		$updated         = $result['updated'] ?? array();
+		$address_fields  = array( 'address', 'city', 'state', 'zip', 'country' );
+		$address_updated = (bool) array_intersect( $updated, $address_fields );
+		$coordinates_added = in_array( 'coordinates', $updated, true );
 
 		if ( $address_updated ) {
 			self::maybe_geocode_venue( $term_id );
@@ -346,6 +342,10 @@ class Venue_Taxonomy {
 	 * This allows updating only changed fields without overwriting unchanged ones.
 	 * Automatically geocodes address to coordinates if address fields are updated.
 	 *
+	 * Composes MergeTermMetaAbility (overwrite strategy) with the venue-specific
+	 * post-write side effects (clear-and-regeocode on address change, derive
+	 * timezone when coordinates land).
+	 *
 	 * @param int $term_id Venue term ID
 	 * @param array $venue_data Venue data array (can contain subset of fields)
 	 * @return bool Success status
@@ -355,33 +355,27 @@ class Venue_Taxonomy {
 			return false;
 		}
 
-		$address_fields    = array( 'address', 'city', 'state', 'zip', 'country' );
-		$address_changed   = false;
-		$coordinates_added = false;
+		$result = \DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::merge(
+			(int) $term_id,
+			'venue',
+			$venue_data,
+			self::$meta_fields,
+			\DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::STRATEGY_OVERWRITE
+		);
 
-		foreach ( self::$meta_fields as $data_key => $meta_key ) {
-			if ( array_key_exists( $data_key, $venue_data ) ) {
-				$new_value = sanitize_text_field( $venue_data[ $data_key ] );
-				$old_value = get_term_meta( $term_id, $meta_key, true );
-
-				if ( in_array( $data_key, $address_fields, true ) ) {
-					if ( $new_value !== $old_value ) {
-						$address_changed = true;
-					}
-				}
-
-				if ( 'coordinates' === $data_key && empty( $old_value ) && ! empty( $new_value ) ) {
-					$coordinates_added = true;
-				}
-
-				update_term_meta( $term_id, $meta_key, $new_value );
-			}
+		if ( empty( $result['success'] ) ) {
+			return false;
 		}
+
+		$updated         = $result['updated'] ?? array();
+		$address_fields  = array( 'address', 'city', 'state', 'zip', 'country' );
+		$address_changed = (bool) array_intersect( $updated, $address_fields );
+		$coordinates_set = in_array( 'coordinates', $updated, true );
 
 		if ( $address_changed ) {
 			delete_term_meta( $term_id, '_venue_coordinates' );
 			self::maybe_geocode_venue( $term_id );
-		} elseif ( $coordinates_added ) {
+		} elseif ( $coordinates_set ) {
 			$coordinates = get_term_meta( $term_id, '_venue_coordinates', true );
 			if ( ! empty( $coordinates ) ) {
 				self::maybe_derive_timezone( $term_id, $coordinates );
