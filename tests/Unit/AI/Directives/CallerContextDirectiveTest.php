@@ -140,6 +140,6 @@ class CallerContextDirectiveTest extends WP_UnitTestCase {
 
 		$this->assertNotNull( $found, 'CallerContextDirective must be registered via datamachine_directives filter.' );
 		$this->assertSame( 25, $found['priority'] );
-		$this->assertSame( array( 'all' ), $found['contexts'] );
+		$this->assertSame( array( 'all' ), $found['modes'] );
 	}
 }
