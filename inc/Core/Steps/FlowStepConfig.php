@@ -59,4 +59,30 @@ class FlowStepConfig {
 		}
 		return array();
 	}
+
+	/**
+	 * Get the AI step's enabled tools.
+	 *
+	 * Reads the dedicated `enabled_tools` field. The pre-Phase 2b shape
+	 * (AI tools stored under `handler_slugs`) is migrated on activation
+	 * by inc/migrations/ai-enabled-tools.php — there is no runtime
+	 * fallback to legacy data.
+	 *
+	 * @since 0.81.0
+	 *
+	 * @param array $step_config Flow step configuration array.
+	 * @return array Tool slugs the AI step has enabled. Empty for non-AI steps.
+	 */
+	public static function getEnabledTools( array $step_config ): array {
+		if ( 'ai' !== ( $step_config['step_type'] ?? '' ) ) {
+			return array();
+		}
+
+		$enabled = $step_config['enabled_tools'] ?? array();
+		if ( ! is_array( $enabled ) ) {
+			return array();
+		}
+
+		return array_values( $enabled );
+	}
 }

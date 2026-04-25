@@ -315,30 +315,21 @@ class ExecuteWorkflowAbility {
 			$handler_config = $step['handler_config'] ?? array();
 			$step_type      = $step['type'];
 
-			// Resolve handler_slugs to mirror the on-disk shape established
-			// by inc/migrations/handler-keys.php (v0.60.0):
+			// Resolve handler_slugs. Single-purpose: it names the step's
+			// handler (always length 0..1). Three shapes match
+			// inc/migrations/handler-keys.php (v0.60.0):
 			//
 			//   1. Explicit handler_slug → [handler_slug] (fetch, publish,
 			//      upsert, …).
-			//   2. AI step with enabled_tools → enabled_tools (legacy field
-			//      overload; Phase 2b in #1205 will move this off
-			//      handler_slugs into a dedicated enabled_tools field).
-			//   3. Self-configuring step types (system_task, webhook_gate,
+			//   2. Self-configuring step types (system_task, webhook_gate,
 			//      agent_ping) with a non-empty handler_config → [step_type].
-			//      This is the synthetic-slug shape the migration uses for
-			//      handler-free steps; mirroring it here lets
-			//      FlowStepConfig::getPrimaryHandlerConfig() resolve via
-			//      handler_slugs[0] uniformly with no handler-free fallback
-			//      ladder. Step::getHandlerConfig() collapses to one line as
-			//      a result.
-			//   4. Otherwise → []. AI without enabled_tools, or
-			//      self-configuring step with no config, lands here — same as
-			//      the migration's "no config to key" branch.
+			//      Synthetic-slug shape lets FlowStepConfig::getPrimary
+			//      HandlerConfig() resolve uniformly via handler_slugs[0].
+			//   3. Otherwise → []. AI steps always land here: their tool
+			//      list lives in `enabled_tools`, not handler_slugs.
 			$handler_slugs = array();
 			if ( ! empty( $handler_slug ) ) {
 				$handler_slugs = array( $handler_slug );
-			} elseif ( 'ai' === $step_type && ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) ) {
-				$handler_slugs = $step['enabled_tools'];
 			} elseif ( 'ai' !== $step_type && ! empty( $handler_config ) ) {
 				$handler_slugs = array( $step_type );
 			}
@@ -353,6 +344,12 @@ class ExecuteWorkflowAbility {
 				$handler_configs[ $step_type ] = $handler_config;
 			}
 
+			// AI's tool list lives in its own field. handler_slugs is for
+			// handlers; enabled_tools is for AI tools. No overload.
+			$enabled_tools = ( 'ai' === $step_type && ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) )
+				? array_values( $step['enabled_tools'] )
+				: array();
+
 			$flow_config[ $step_id ] = array(
 				'flow_step_id'     => $step_id,
 				'pipeline_step_id' => $pipeline_step_id,
@@ -360,6 +357,7 @@ class ExecuteWorkflowAbility {
 				'execution_order'  => $index,
 				'handler_slugs'    => $handler_slugs,
 				'handler_configs'  => $handler_configs,
+				'enabled_tools'    => $enabled_tools,
 				'user_message'     => $step['user_message'] ?? '',
 				'disabled_tools'   => $step['disabled_tools'] ?? array(),
 				'pipeline_id'      => 'direct',
