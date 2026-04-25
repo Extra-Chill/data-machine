@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.30.0] - 2026-04-25
+
+### Added
+- feat(og-card): register event OG card template with Data Machine
+
 ## [0.29.4] - 2026-04-25
 
 ### Changed
