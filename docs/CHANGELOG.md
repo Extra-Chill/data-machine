@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.80.1] - 2026-04-24
+
+### Fixed
+- drop hardcoded handler_slug check; let step types own their config
+- carry agent_id and user_id from parent to child jobs
+
 ## [0.80.0] - 2026-04-24
 
 ### Added
