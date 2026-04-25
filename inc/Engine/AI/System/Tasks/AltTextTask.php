@@ -84,13 +84,21 @@ class AltTextTask extends SystemTask {
 			),
 		);
 
+		$ai_payload = array( 'attachment_id' => $attachment_id );
+		if ( ! empty( $params['agent_id'] ) ) {
+			$ai_payload['agent_id'] = (int) $params['agent_id'];
+		}
+		if ( ! empty( $params['user_id'] ) ) {
+			$ai_payload['user_id'] = (int) $params['user_id'];
+		}
+
 		$response = RequestBuilder::build(
 			$messages,
 			$provider,
 			$model,
 			array(),
 			'system',
-			array( 'attachment_id' => $attachment_id )
+			$ai_payload
 		);
 
 		if ( empty( $response['success'] ) ) {
