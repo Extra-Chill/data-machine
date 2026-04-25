@@ -61,18 +61,46 @@ class ImageTemplateAbilities {
 								'type'        => 'object',
 								'description' => 'Storage context with pipeline_id and flow_id for repository storage',
 							),
+							'output'      => array(
+								'type'        => 'string',
+								'description' => 'Output destination: "files" returns file paths (default, requires context for repository or returns temp paths), "cached_file" stores the rendered file under uploads/<bucket>/<key>.<ext> and returns a stable public URL — ideal for OG images and other long-lived public artifacts that should not pollute the media library.',
+								'enum'        => array( 'files', 'cached_file' ),
+								'default'     => 'files',
+							),
+							'cache'       => array(
+								'type'        => 'object',
+								'description' => 'Cache options when output=cached_file. Required when output=cached_file.',
+								'properties'  => array(
+									'bucket' => array(
+										'type'        => 'string',
+										'description' => 'Subdirectory under wp-content/uploads/ (slug-style; sanitized).',
+									),
+									'key'    => array(
+										'type'        => 'string',
+										'description' => 'Stable filename stem within the bucket (sanitized). Re-renders overwrite atomically.',
+									),
+								),
+							),
 						),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'     => array( 'type' => 'boolean' ),
-							'file_paths'  => array(
+							'success'      => array( 'type' => 'boolean' ),
+							'file_paths'   => array(
 								'type'  => 'array',
 								'items' => array( 'type' => 'string' ),
 							),
-							'template_id' => array( 'type' => 'string' ),
-							'message'     => array( 'type' => 'string' ),
+							'cached_paths' => array(
+								'type'  => 'array',
+								'items' => array( 'type' => 'string' ),
+							),
+							'cached_urls'  => array(
+								'type'  => 'array',
+								'items' => array( 'type' => 'string' ),
+							),
+							'template_id'  => array( 'type' => 'string' ),
+							'message'      => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'renderTemplate' ),
@@ -124,6 +152,8 @@ class ImageTemplateAbilities {
 		$preset      = $input['preset'] ?? '';
 		$format      = $input['format'] ?? 'png';
 		$context     = $input['context'] ?? array();
+		$output      = $input['output'] ?? 'files';
+		$cache_opts  = $input['cache'] ?? array();
 
 		if ( empty( $template_id ) ) {
 			return array(
@@ -198,11 +228,129 @@ class ImageTemplateAbilities {
 			);
 		}
 
+		// Default output mode — return file paths as-is.
+		if ( 'cached_file' !== $output ) {
+			return array(
+				'success'     => true,
+				'file_paths'  => $file_paths,
+				'template_id' => $template_id,
+				'message'     => sprintf( 'Generated %d image(s) using template "%s"', count( $file_paths ), $template_id ),
+			);
+		}
+
+		// Cached file output — copy each rendered file under uploads/<bucket>/<key>.<ext>.
+		$cached_result = self::copyFilesToCachedLocation( $file_paths, $template_id, $cache_opts );
+
+		return array_merge(
+			array(
+				'success'     => ! empty( $cached_result['cached_urls'] ),
+				'template_id' => $template_id,
+			),
+			$cached_result
+		);
+	}
+
+	/**
+	 * Copy rendered template files to a stable cached location under uploads/.
+	 *
+	 * Files land at `wp-content/uploads/<bucket>/<key>[-<n>].<ext>`. Existing
+	 * files at the destination are overwritten, so re-rendering the same key
+	 * naturally invalidates and replaces. The bucket is intentionally outside
+	 * the YYYY/MM media library tree so cached artifacts do not pollute the
+	 * media browser, do not get resized, and do not interact with Imagify or
+	 * other media-pipeline plugins.
+	 *
+	 * Source temp files are removed after the copy to avoid leaking PHP tmp.
+	 *
+	 * @param string[] $file_paths   Rendered file paths from the template.
+	 * @param string   $template_id  Template identifier (for log/message context).
+	 * @param array    $cache_opts   { bucket, key } — both required.
+	 * @return array {
+	 *     @type string[] $file_paths   Original file paths (for parity with files mode).
+	 *     @type string[] $cached_paths Absolute filesystem paths of cached copies.
+	 *     @type string[] $cached_urls  Public URLs of cached copies.
+	 *     @type string   $message      Human-readable summary.
+	 * }
+	 */
+	private static function copyFilesToCachedLocation( array $file_paths, string $template_id, array $cache_opts ): array {
+		$bucket = isset( $cache_opts['bucket'] ) ? sanitize_file_name( (string) $cache_opts['bucket'] ) : '';
+		$key    = isset( $cache_opts['key'] ) ? sanitize_file_name( (string) $cache_opts['key'] ) : '';
+
+		if ( '' === $bucket || '' === $key ) {
+			return array(
+				'file_paths'   => $file_paths,
+				'cached_paths' => array(),
+				'cached_urls'  => array(),
+				'message'      => 'cached_file output requires cache.bucket and cache.key',
+			);
+		}
+
+		$upload_dir = wp_upload_dir();
+		if ( ! empty( $upload_dir['error'] ) ) {
+			return array(
+				'file_paths'   => $file_paths,
+				'cached_paths' => array(),
+				'cached_urls'  => array(),
+				'message'      => sprintf( 'Upload directory error: %s', $upload_dir['error'] ),
+			);
+		}
+
+		$bucket_dir = trailingslashit( $upload_dir['basedir'] ) . $bucket;
+		$bucket_url = trailingslashit( $upload_dir['baseurl'] ) . $bucket;
+
+		if ( ! wp_mkdir_p( $bucket_dir ) ) {
+			return array(
+				'file_paths'   => $file_paths,
+				'cached_paths' => array(),
+				'cached_urls'  => array(),
+				'message'      => sprintf( 'Failed to create cache directory: %s', $bucket_dir ),
+			);
+		}
+
+		$cached_paths = array();
+		$cached_urls  = array();
+		$failures     = array();
+
+		foreach ( $file_paths as $index => $source_path ) {
+			if ( ! file_exists( $source_path ) ) {
+				$failures[] = basename( $source_path );
+				continue;
+			}
+
+			$ext       = strtolower( pathinfo( $source_path, PATHINFO_EXTENSION ) ) ?: 'png';
+			$suffix    = count( $file_paths ) > 1 ? '-' . ( $index + 1 ) : '';
+			$filename  = $key . $suffix . '.' . $ext;
+			$dest_path = trailingslashit( $bucket_dir ) . $filename;
+			$dest_url  = trailingslashit( $bucket_url ) . $filename;
+
+			if ( ! @copy( $source_path, $dest_path ) ) {
+				$failures[] = basename( $source_path );
+				continue;
+			}
+
+			wp_delete_file( $source_path );
+
+			$cached_paths[] = $dest_path;
+			$cached_urls[]  = $dest_url;
+		}
+
+		$message = sprintf(
+			'Cached %d image(s) under %s/%s for template "%s"',
+			count( $cached_paths ),
+			$bucket,
+			$key,
+			$template_id
+		);
+
+		if ( ! empty( $failures ) ) {
+			$message .= sprintf( ' — %d failed (%s)', count( $failures ), implode( ', ', $failures ) );
+		}
+
 		return array(
-			'success'     => true,
-			'file_paths'  => $file_paths,
-			'template_id' => $template_id,
-			'message'     => sprintf( 'Generated %d image(s) using template "%s"', count( $file_paths ), $template_id ),
+			'file_paths'   => $file_paths,
+			'cached_paths' => $cached_paths,
+			'cached_urls'  => $cached_urls,
+			'message'      => $message,
 		);
 	}
 
