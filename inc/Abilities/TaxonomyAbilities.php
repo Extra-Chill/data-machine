@@ -18,6 +18,7 @@ use DataMachine\Abilities\Taxonomy\CreateTaxonomyTermAbility;
 use DataMachine\Abilities\Taxonomy\UpdateTaxonomyTermAbility;
 use DataMachine\Abilities\Taxonomy\DeleteTaxonomyTermAbility;
 use DataMachine\Abilities\Taxonomy\ResolveTermAbility;
+use DataMachine\Abilities\Taxonomy\MergeTermMetaAbility;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -30,6 +31,7 @@ class TaxonomyAbilities {
 	private UpdateTaxonomyTermAbility $update_taxonomy_term;
 	private DeleteTaxonomyTermAbility $delete_taxonomy_term;
 	private ResolveTermAbility $resolve_term;
+	private MergeTermMetaAbility $merge_term_meta;
 
 	public function __construct() {
 		if ( self::$registered ) {
@@ -37,6 +39,7 @@ class TaxonomyAbilities {
 		}
 
 		$this->resolve_term         = new ResolveTermAbility();
+		$this->merge_term_meta      = new MergeTermMetaAbility();
 		$this->get_taxonomy_terms   = new GetTaxonomyTermsAbility();
 		$this->create_taxonomy_term = new CreateTaxonomyTermAbility();
 		$this->update_taxonomy_term = new UpdateTaxonomyTermAbility();
