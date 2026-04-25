@@ -228,6 +228,7 @@ class AIStep extends Step {
 			'data'         => $this->dataPackets,
 			'engine'       => $this->engine,
 			'user_id'      => $user_id,
+			'agent_id'     => $agent_id,
 		);
 
 		$navigator             = new \DataMachine\Engine\StepNavigator();
