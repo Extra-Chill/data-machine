@@ -68,50 +68,44 @@ class Promoter_Taxonomy {
 	/**
 	 * Find or create a promoter with given name and metadata
 	 *
-	 * @param string $promoter_name Promoter name
-	 * @param array $promoter_data Promoter metadata (url, type)
+	 * Composes DM core's ResolveTermAbility (find-or-create the term) with
+	 * MergeTermMetaAbility (write the promoter-specific meta in either
+	 * fill_empty or overwrite mode depending on whether the term existed).
+	 *
+	 * @param string $promoter_name Promoter name (or numeric ID / slug — resolver matches all three)
+	 * @param array  $promoter_data Promoter metadata (url, type, description)
 	 * @return array Array with keys: term_id, was_created
 	 */
 	public static function find_or_create_promoter( $promoter_name, $promoter_data = array() ) {
-		$promoter_name = trim( $promoter_name );
+		$promoter_name = trim( (string) $promoter_name );
 
-		if ( empty( $promoter_name ) ) {
+		if ( '' === $promoter_name ) {
 			return array(
 				'term_id'     => null,
 				'was_created' => false,
 			);
 		}
 
-		$existing = get_term_by( 'name', $promoter_name, 'promoter' );
-
-		if ( $existing ) {
-			$term_id = $existing->term_id;
-
-			if ( ! empty( $promoter_data ) ) {
-				self::smart_merge_promoter_meta( $term_id, $promoter_data );
-			}
-
-			return array(
-				'term_id'     => $term_id,
-				'was_created' => false,
-			);
-		}
-
 		$term_args = array();
 		if ( ! empty( $promoter_data['description'] ) ) {
-			$term_args['description'] = sanitize_textarea_field( $promoter_data['description'] );
+			$term_args['description'] = $promoter_data['description'];
 		}
 
-		$result = wp_insert_term( $promoter_name, 'promoter', $term_args );
+		$resolved = \DataMachine\Abilities\Taxonomy\ResolveTermAbility::resolve(
+			$promoter_name,
+			'promoter',
+			true,
+			$term_args
+		);
 
-		if ( is_wp_error( $result ) ) {
+		if ( empty( $resolved['success'] ) ) {
 			do_action(
 				'datamachine_log',
 				'error',
-				'Failed to create promoter term',
+				'Failed to resolve promoter term',
 				array(
 					'promoter_name' => $promoter_name,
-					'error'         => $result->get_error_message(),
+					'error'         => $resolved['error'] ?? 'unknown',
 				)
 			);
 			return array(
@@ -120,54 +114,45 @@ class Promoter_Taxonomy {
 			);
 		}
 
-		$term_id = $result['term_id'];
+		$term_id     = (int) $resolved['term_id'];
+		$was_created = ! empty( $resolved['created'] );
 
-		self::update_promoter_meta( $term_id, $promoter_data );
+		if ( ! empty( $promoter_data ) ) {
+			$strategy = $was_created
+				? \DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::STRATEGY_OVERWRITE
+				: \DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::STRATEGY_FILL_EMPTY;
+
+			// Description was already applied by ResolveTermAbility on the create
+			// path (via wp_insert_term args). Only the existing-term path needs
+			// the merge to consider description, in fill_empty mode.
+			$merge_description = ( ! $was_created && isset( $promoter_data['description'] ) )
+				? (string) $promoter_data['description']
+				: null;
+
+			\DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::merge(
+				$term_id,
+				'promoter',
+				$promoter_data,
+				self::$meta_fields,
+				$strategy,
+				$merge_description
+			);
+		}
 
 		return array(
 			'term_id'     => $term_id,
-			'was_created' => true,
+			'was_created' => $was_created,
 		);
-	}
-
-	/**
-	 * Smartly merge new promoter data into existing promoter
-	 * Only updates fields that are currently empty in the database
-	 *
-	 * @param int $term_id Promoter term ID
-	 * @param array $promoter_data New promoter data
-	 */
-	private static function smart_merge_promoter_meta( $term_id, $promoter_data ) {
-		foreach ( self::$meta_fields as $data_key => $meta_key ) {
-			if ( empty( $promoter_data[ $data_key ] ) ) {
-				continue;
-			}
-
-			$existing_value = get_term_meta( $term_id, $meta_key, true );
-
-			if ( empty( $existing_value ) ) {
-				update_term_meta( $term_id, $meta_key, sanitize_text_field( $promoter_data[ $data_key ] ) );
-			}
-		}
-
-		if ( ! empty( $promoter_data['description'] ) ) {
-			$term = get_term( $term_id, 'promoter' );
-			if ( $term && empty( $term->description ) ) {
-				wp_update_term(
-					$term_id,
-					'promoter',
-					array(
-						'description' => sanitize_textarea_field( $promoter_data['description'] ),
-					)
-				);
-			}
-		}
 	}
 
 	/**
 	 * Update promoter term meta with promoter data
 	 *
-	 * @param int $term_id Promoter term ID
+	 * Thin wrapper over MergeTermMetaAbility for backwards compatibility with
+	 * any external callers. Uses the overwrite strategy to preserve the
+	 * historical "write every supplied field" semantics.
+	 *
+	 * @param int   $term_id       Promoter term ID
 	 * @param array $promoter_data Promoter data array
 	 * @return bool Success status
 	 */
@@ -176,13 +161,15 @@ class Promoter_Taxonomy {
 			return false;
 		}
 
-		foreach ( self::$meta_fields as $data_key => $meta_key ) {
-			if ( array_key_exists( $data_key, $promoter_data ) ) {
-				update_term_meta( $term_id, $meta_key, sanitize_text_field( $promoter_data[ $data_key ] ) );
-			}
-		}
+		$result = \DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::merge(
+			(int) $term_id,
+			'promoter',
+			$promoter_data,
+			self::$meta_fields,
+			\DataMachine\Abilities\Taxonomy\MergeTermMetaAbility::STRATEGY_OVERWRITE
+		);
 
-		return true;
+		return ! empty( $result['success'] );
 	}
 
 	/**
