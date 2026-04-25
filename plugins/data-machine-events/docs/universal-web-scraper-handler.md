@@ -10,7 +10,7 @@ The Universal Web Scraper handler prioritizes structured data extraction for max
 
 ### Structured Data Extraction (Priority Order)
 
-The handler registers 22 extraction layers (21 specialized extractors + HTML fallback) in `UniversalWebScraper::getExtractors()`.
+The handler registers extraction layers (specialized extractors + HTML fallback) in `UniversalWebScraper::getExtractors()`.
 
 1. **AEG/AXS JSON feed** (`AegAxsExtractor`): Extracts events from AEG/AXS venue JSON feeds
 2. **Red Rocks** (`RedRocksExtractor`): Parses Red Rocks Amphitheatre event pages (@since v0.8.0)
@@ -222,20 +222,42 @@ Websites without structured data (AI fallback):
 ### Extractors (Extractors/ directory)
 
 - **ExtractorInterface.php**: Contract for all extractor implementations
+- **BaseExtractor.php**: Shared extraction utilities (date parsing, address normalization, coordinate extraction)
 - **AegAxsExtractor.php**: Parses AEG/AXS JSON feeds
-- **RedRocksExtractor.php**: Parses Red Rocks Amphitheatre event pages
-- **FreshtixExtractor.php**: Parses Freshtix platform pages
+- **BandzoogleExtractor.php**: Extracts events from Bandzoogle-powered venue calendar pages
+- **CraftpeakExtractor.php**: Parses Craftpeak brewery/venue calendar pages
+- **DoStuffExtractor.php**: Parses DoStuff Media API JSON feeds (replaces legacy DoStuffMediaApi handler)
+- **DuskFmExtractor.php**: Extracts events from Dusk.fm venue pages
+- **ElfsightEventsExtractor.php**: Parses Elfsight Event Calendar widget data
+- **EmbeddedCalendarExtractor.php**: Detects and scrapes embedded Google Calendar, SeeTickets, and Turntable widgets
+- **EventbriteExtractor.php**: Parses Eventbrite organizer/event page JSON-LD (ItemList + single Event)
 - **FirebaseExtractor.php**: Fetches events from Firebase Realtime Database REST API
-- **SquarespaceExtractor.php**: Parses Squarespace context JSON
-- **SpotHopperExtractor.php**: Detects SpotHopper and parses their API
-- **WixEventsExtractor.php**: Parses Wix warmup-data JSON
-- **RhpEventsExtractor.php**: Parses RHP Events plugin HTML
-- **OpenDateExtractor.php**: Handles OpenDate.io listing/detail extraction
+- **FreshtixExtractor.php**: Parses Freshtix platform pages
+- **GenericHtmlEventsExtractor.php**: Generic HTML event list extraction via structured selectors
+- **GigwellExtractor.php**: Detects gigwell-gigstream embeds and extracts from Gigwell API
+- **GoDaddyExtractor.php**: Extracts events from GoDaddy Website Builder calendars with REST API
+- **IcsExtractor.php**: Parses ICS/iCal feeds (replaces legacy IcsCalendar handler)
 - **JsonLdExtractor.php**: Parses Schema.org JSON-LD script tags
 - **MicrodataExtractor.php**: Parses Schema.org microdata attributes
-- **ElfsightEventsExtractor.php**: Parses Elfsight Event Calendar widget data
-- **CraftpeakExtractor.php**: Parses Craftpeak brewery/venue calendar pages
 - **MusicItemExtractor.php**: Extracts Schema.org MusicEvent items
+- **NocodeflowExtractor.php**: Extracts events from Nocodeflow-powered event pages
+- **OpenDateExtractor.php**: Handles OpenDate.io listing/detail extraction
+- **PrekindleExtractor.php**: Auto-detects Prekindle widgets and extracts via mobile API (replaces legacy Prekindle handler)
+- **RedRocksExtractor.php**: Parses Red Rocks Amphitheatre event pages
+- **RhpEventsExtractor.php**: Parses RHP Events plugin HTML
+- **ShowareExtractor.php**: Extracts events from Showare ticketing platform pages
+- **ShowtimeExtractor.php**: Extracts events from Showtime ticketing/venue pages
+- **SofarSoundsExtractor.php**: Extracts events from Sofar Sounds pages
+- **SpotHopperExtractor.php**: Detects SpotHopper and parses their API
+- **SquareOnlineExtractor.php**: Extracts events from Square Online store pages
+- **SquarespaceExtractor.php**: Parses Squarespace context JSON
+- **TimelyExtractor.php**: Specialized extractor for Time.ly All-in-One Event Calendar
+- **VenuePilotExtractor.php**: Extracts events from VenuePilot embeds (including Wix HtmlComponent resolution)
+- **VisionExtractor.php**: AI-powered event extraction from arbitrary page screenshots
+- **WebflowExtractor.php**: Extracts events from Webflow CMS pages
+- **WeeblyExtractor.php**: Extracts events from Weebly event listings (including multi-artist showcase patterns)
+- **WixEventsExtractor.php**: Parses Wix warmup-data JSON
+- **WordPressExtractor.php**: Extracts events from external WordPress sites via REST API or structured HTML
 
 ### DataPacket Format
 
@@ -302,3 +324,21 @@ When using HTML fallback:
 - AEG/AXS venue feeds embedded/linked from venue pages
 - Google Calendar (via EmbeddedCalendarExtractor)
 - External WordPress Events (via WordPressExtractor)
+- Eventbrite organizer and event pages (via EventbriteExtractor)
+- ICS/iCal feeds (via IcsExtractor)
+- DoStuff Media API feeds (via DoStuffExtractor)
+- Dusk.fm venue pages (via DuskFmExtractor)
+- Bandzoogle venue calendars (via BandzoogleExtractor)
+- GoDaddy Website Builder calendars (via GoDaddyExtractor)
+- Gigwell embeds (via GigwellExtractor)
+- Time.ly All-in-One Event Calendar (via TimelyExtractor)
+- Elfsight Event Calendar widgets (via ElfsightEventsExtractor)
+- Craftpeak brewery/venue pages (via CraftpeakExtractor)
+- Nocodeflow pages (via NocodeflowExtractor)
+- Showare ticketing (via ShowareExtractor)
+- Showtime ticketing (via ShowtimeExtractor)
+- Sofar Sounds (via SofarSoundsExtractor)
+- Square Online stores (via SquareOnlineExtractor)
+- VenuePilot embeds (via VenuePilotExtractor)
+- Webflow CMS pages (via WebflowExtractor)
+- Weebly event listings (via WeeblyExtractor)

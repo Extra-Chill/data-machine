@@ -1,162 +1,35 @@
-# ICS Calendar Handler
+# ICS Calendar Handler (Deprecated)
 
-Generic ICS/iCal feed integration for importing events from any calendar feed supporting the ICS format.
+This handler has been consolidated into the Universal Web Scraper as the `IcsExtractor`.
 
-## Overview
+Previously the handler lived at `inc/Steps/EventImport/Handlers/IcsCalendar/IcsCalendar.php` with `IcsCalendarSettings.php`. That standalone handler and its settings were removed; existing flows should migrate to the scraper-based extractor by reconfiguring the fetch step to use the `UniversalWebScraper` handler.
 
-The ICS Calendar handler provides comprehensive support for importing events from any ICS (iCalendar) feed, including popular platforms like Tockify, Outlook, Apple Calendar, and Google Calendar ICS exports. Features automatic protocol conversion, venue override options, and keyword filtering.
+See `docs/universal-web-scraper-handler.md` for extraction behavior and `inc/Steps/EventImport/Handlers/WebScraper/Extractors/IcsExtractor.php` for the implementation.
 
-## Features
+## Migration
 
-### Calendar Feed Support
-- **Universal ICS Support**: Works with any ICS/iCal feed URL
-- **Protocol Conversion**: Automatic `webcal://` to `https://` conversion
-- **Multiple Platforms**: Supports Tockify, Outlook, Apple Calendar, Google Calendar exports, and custom ICS feeds
+The `IcsExtractor` handles ICS/iCal feeds within the Universal Web Scraper:
 
-### Venue Management
-- **Venue Override**: Optional venue name override for consistent venue assignment
-- **Address Override**: Venue address override for accurate location data
-- **Automatic Venue Creation**: Creates venues with complete metadata when overrides are provided
-
-### Event Filtering
-- **Keyword Filtering**: Include/exclude keywords to filter relevant events
-- **Case-Insensitive Matching**: Flexible keyword matching in event titles and descriptions
-- **Multiple Keywords**: Support for comma-separated keyword lists
-
-### Technical Features
-- **Single-Item Processing**: Processes one event per job execution with duplicate prevention
-- **Event Identifier Generation**: Uses EventIdentifierGenerator for consistent event identity
-- **Processed Items Tracking**: Prevents duplicate imports using Data Machine's processed items system
+1. Detects ICS feeds by URL extension (`.ics`) or `webcal://` protocol.
+2. Converts `webcal://` to `https://` automatically.
+3. Parses VEVENT components using the `johngrogg/ics-parser` library.
+4. Applies keyword filtering and venue overrides via standard handler settings.
+5. Supports RRULE recurring events, EXDATE exception dates, and RDATE additional dates.
 
 ## Configuration
 
-### Required Settings
-- **ICS URL**: The URL of the ICS feed to import from
-- **Venue Name Override** (optional): Override venue names for consistent assignment
-- **Venue Address Override** (optional): Override venue addresses for accurate geocoding
+When using the Universal Web Scraper with an ICS feed:
 
-### Optional Settings
-- **Include Keywords**: Comma-separated keywords to include (events must contain at least one)
-- **Exclude Keywords**: Comma-separated keywords to exclude (events containing these are skipped)
+- **`source_url`**: The ICS feed URL (`.ics` or `webcal://` links)
+- **`search` / `exclude_keywords`**: Comma-separated filters applied before normalization
+- **Venue override fields**: Available via `VenueFieldsTrait` in handler settings
 
-## Usage Examples
+## Data Mapping
 
-### Basic ICS Import
-```php
-$config = [
-    'ics_url' => 'https://example.com/calendar.ics',
-    'venue_name_override' => 'Custom Venue Name',
-    'venue_address_override' => '123 Main St, City, State 12345'
-];
-```
-
-### Filtered Import
-```php
-$config = [
-    'ics_url' => 'https://calendar.google.com/calendar/ical/.../basic.ics',
-    'search' => 'concert,music,jazz',
-    'exclude_keywords' => 'cancelled,postponed'
-];
-```
-
-### WebCal Protocol
-```php
-$config = [
-    'ics_url' => 'webcal://example.com/calendar.ics' // Automatically converted to https://
-];
-```
-
-## Event Processing
-
-### Data Mapping
-- **Title**: Event summary from ICS VEVENT
-- **Start/End Dates**: DTSTART/DTEND from ICS event
-- **Description**: Event description from ICS DESCRIPTION
-- **Location**: Venue information from ICS LOCATION (overridden if configured)
-- **Time Zone**: Respects ICS timezone information
-
-### Duplicate Prevention
-```php
-use DataMachineEvents\Utilities\EventIdentifierGenerator;
-
-// Generate consistent identifier
-$event_identifier = EventIdentifierGenerator::generate($title, $startDate, $venue);
-
-// Check if already processed
-if (apply_filters('datamachine_is_item_processed', false, $flow_step_id, 'ics_calendar', $event_identifier)) {
-    continue;
-}
-
-// Mark as processed
-do_action('datamachine_mark_item_processed', $flow_step_id, 'ics_calendar', $event_identifier, $job_id);
-```
-
-## Integration Architecture
-
-### Handler Structure
-- **IcsCalendar.php**: Main import handler with ICS parsing and event processing
-- **IcsCalendarSettings.php**: Admin interface and configuration forms
-- **johngrogg/ics-parser**: PHP library for reliable ICS parsing
-
-### Data Flow
-1. **Feed Retrieval**: Downloads ICS feed from configured URL
-2. **Protocol Conversion**: Converts webcal:// to https:// if needed
-3. **ICS Parsing**: Parses VEVENT components using ics-parser library
-4. **Event Filtering**: Applies include/exclude keyword filtering
-5. **Venue Processing**: Applies venue overrides or extracts from event location
-6. **Event Mapping**: Converts ICS data to Data Machine event structure
-7. **Duplicate Check**: Uses EventIdentifierGenerator for identity verification
-8. **Event Upsert**: Creates/updates events using EventUpsert handler
-
-## Supported ICS Features
-
-### Event Properties
-- **SUMMARY**: Event title
-- **DESCRIPTION**: Event description
-- **DTSTART/DTEND**: Event start and end times
-- **LOCATION**: Venue information
-- **TZID**: Timezone information
-
-### Recurring Events
-- **RRULE**: Recurrence rules (expanded to individual events)
-- **EXDATE**: Exception dates
-- **RDATE**: Additional recurrence dates
-
-## Error Handling
-
-### Feed Errors
-- **Invalid URL**: Clear error messages for malformed URLs
-- **Network Errors**: Timeout and connection error handling
-- **Parse Errors**: Malformed ICS file detection
-
-### Configuration Errors
-- **Missing URL**: Validation for required ICS URL
-- **Invalid Keywords**: Warning for malformed keyword lists
-
-## Performance Considerations
-
-### Feed Size Limits
-- **Memory Usage**: Efficient parsing of large ICS feeds
-- **Processing Limits**: Single-item processing prevents timeouts
-- **Batch Handling**: Handles feeds with hundreds of events
-
-### Optimization Features
-- **Incremental Processing**: Only processes new/changed events
-- **Caching**: Feed content caching for repeated imports
-- **Error Recovery**: Continues processing after individual event errors
-
-## Troubleshooting
-
-### Common Issues
-- **WebCal Links**: Ensure webcal:// URLs are accessible (may need manual conversion)
-- **Timezone Issues**: Verify ICS feed timezone settings
-- **Large Feeds**: Consider date range limiting for very large calendars
-- **Encoding Problems**: Check ICS file encoding (UTF-8 recommended)
-
-### Debug Information
-- **Feed Validation**: Test ICS URL accessibility
-- **Event Parsing**: Review parsed event data structure
-- **Filter Matching**: Verify keyword filtering logic
-- **Venue Assignment**: Check venue override application
-
-The ICS Calendar handler provides flexible, reliable event import from any ICS-compatible calendar feed with comprehensive filtering and venue management capabilities.
+| ICS Property | Event Details Attribute |
+|--------------|------------------------|
+| `SUMMARY` | title |
+| `DESCRIPTION` | description |
+| `DTSTART` / `DTEND` | start/end dates and times |
+| `LOCATION` | venue |
+| `TZID` | timezone |

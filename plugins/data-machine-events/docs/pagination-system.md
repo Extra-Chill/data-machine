@@ -10,7 +10,7 @@ The Pagination system provides day-based pagination for the Calendar block. Inst
 
 ### Day-Based Pagination
 - **Complete Day Groups**: Events are never split across pages - each day appears in full
-- **5 Days Per Page**: Configurable via `DAYS_PER_PAGE` constant in `Calendar_Query.php`
+- **5 Days Per Page**: Configurable via `DAYS_PER_PAGE` constant in `inc/Blocks/Calendar/Pagination/PageBoundary.php`
 - **Dynamic Event Counts**: Pages may contain varying numbers of events (5 events on a slow week, 250 on a busy week)
 - **User-Friendly Browsing**: Users see natural calendar day boundaries
 
@@ -29,12 +29,16 @@ The Pagination system provides day-based pagination for the Calendar block. Inst
 
 ### Core Components
 
-**`Calendar_Query.php`** - Single source of truth for pagination logic:
+**`PageBoundary.php`** (`inc/Blocks/Calendar/Pagination/PageBoundary.php`) - Day boundary calculation:
 - `DAYS_PER_PAGE` constant (default: 5)
-- `get_unique_event_dates()` - Returns ordered array of unique event dates
+- `get_unique_event_dates()` - Returns ordered array of unique event dates. **Deprecated** in favor of `CalendarAbilities::get_unique_event_dates()`.
 - `get_date_boundaries_for_page()` - Calculates start/end dates for a given page
 
-**`Pagination.php`** - Renders pagination controls with extensibility filters
+**`CalendarAbilities.php`** (`inc/Abilities/CalendarAbilities.php`) - Primary date query logic:
+- `compute_unique_event_dates()` - DB-level `GROUP BY DATE` aggregation (the fast path used by the calendar block)
+- `get_unique_event_dates()` - Wrapper that delegates to `compute_unique_event_dates()`
+
+**`Pagination.php`** (`inc/Blocks/Calendar/Pagination.php`) - Renders pagination controls with extensibility filters
 
 ### Algorithm
 
@@ -56,8 +60,8 @@ Given: page=2, DAYS_PER_PAGE=5
 
 ### Calendar Query Integration
 ```php
-use DataMachineEvents\Blocks\Calendar\Calendar_Query;
-use const DataMachineEvents\Blocks\Calendar\DAYS_PER_PAGE;
+use DataMachineEvents\Blocks\Calendar\Pagination\PageBoundary;
+use DataMachineEvents\Abilities\CalendarAbilities;
 
 // Build base query parameters
 $base_params = [
@@ -66,11 +70,11 @@ $base_params = [
     'tax_filters' => [],
 ];
 
-// Get unique event dates
-$unique_dates = Calendar_Query::get_unique_event_dates($base_params);
+// Get unique event dates (primary path via CalendarAbilities)
+$unique_dates = CalendarAbilities::get_unique_event_dates($base_params);
 
 // Get date boundaries for current page
-$date_boundaries = Calendar_Query::get_date_boundaries_for_page($unique_dates, $current_page);
+$date_boundaries = PageBoundary::get_date_boundaries_for_page($unique_dates, $current_page);
 
 // Calculate max pages
 $max_pages = $date_boundaries['max_pages'];
@@ -211,18 +215,21 @@ add_filter('data_machine_events_calendar_query_args', function($args, $params) {
 
 ### Common Issues
 - **Pagination Not Appearing**: Verify more than 5 unique event days exist
-- **Wrong Page Count**: Check `DAYS_PER_PAGE` constant value
-- **Events Missing**: Verify `_datamachine_event_datetime` meta field is populated
+- **Wrong Page Count**: Check `DAYS_PER_PAGE` constant value in `PageBoundary`
+- **Events Missing**: Verify the `c8c_<blog>_datamachine_event_dates` table has `post_status = 'publish'` rows with valid `start_datetime`
 
 ### Debug Information
 ```php
 // Debug pagination data
-$unique_dates = Calendar_Query::get_unique_event_dates($base_params);
+use DataMachineEvents\Abilities\CalendarAbilities;
+use DataMachineEvents\Blocks\Calendar\Pagination\PageBoundary;
+
+$unique_dates = CalendarAbilities::get_unique_event_dates($base_params);
 error_log('Total unique days: ' . count($unique_dates));
 error_log('First date: ' . ($unique_dates[0] ?? 'none'));
 error_log('Last date: ' . ($unique_dates[count($unique_dates)-1] ?? 'none'));
 
-$boundaries = Calendar_Query::get_date_boundaries_for_page($unique_dates, $current_page);
+$boundaries = PageBoundary::get_date_boundaries_for_page($unique_dates, $current_page);
 error_log('Page ' . $current_page . ' boundaries: ' . $boundaries['start_date'] . ' to ' . $boundaries['end_date']);
 error_log('Max pages: ' . $boundaries['max_pages']);
 ```
