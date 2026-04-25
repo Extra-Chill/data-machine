@@ -23,3 +23,4 @@ require_once __DIR__ . '/flows.php';
 require_once __DIR__ . '/post-pipeline-meta.php';
 require_once __DIR__ . '/update-to-upsert.php';
 require_once __DIR__ . '/strip-pipeline-step-provider-model.php';
+require_once __DIR__ . '/ai-enabled-tools.php';

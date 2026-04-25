@@ -618,6 +618,9 @@ function datamachine_activate_for_site() {
 	// Strip dead `provider`/`model` keys from pipeline_config rows (data-machine#1180, idempotent).
 	datamachine_strip_pipeline_step_provider_model();
 
+	// Move AI step tools from handler_slugs to enabled_tools (#1205 Phase 2b, idempotent).
+	datamachine_migrate_ai_enabled_tools();
+
 	// Drop redundant _datamachine_post_pipeline_id rows (#1091). Idempotent.
 	datamachine_drop_redundant_post_pipeline_meta();
 

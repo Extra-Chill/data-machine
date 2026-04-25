@@ -50,8 +50,6 @@ function build_configs_from_workflow_for_test( array $workflow ): array {
 		$handler_slugs = array();
 		if ( ! empty( $handler_slug ) ) {
 			$handler_slugs = array( $handler_slug );
-		} elseif ( 'ai' === $step_type && ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) ) {
-			$handler_slugs = $step['enabled_tools'];
 		} elseif ( 'ai' !== $step_type && ! empty( $handler_config ) ) {
 			$handler_slugs = array( $step_type );
 		}
@@ -63,6 +61,10 @@ function build_configs_from_workflow_for_test( array $workflow ): array {
 			$handler_configs[ $step_type ] = $handler_config;
 		}
 
+		$enabled_tools = ( 'ai' === $step_type && ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) )
+			? array_values( $step['enabled_tools'] )
+			: array();
+
 		$flow_config[ $step_id ] = array(
 			'flow_step_id'     => $step_id,
 			'pipeline_step_id' => $pipeline_step_id,
@@ -70,6 +72,7 @@ function build_configs_from_workflow_for_test( array $workflow ): array {
 			'execution_order'  => $index,
 			'handler_slugs'    => $handler_slugs,
 			'handler_configs'  => $handler_configs,
+			'enabled_tools'    => $enabled_tools,
 			'user_message'     => $step['user_message'] ?? '',
 			'disabled_tools'   => $step['disabled_tools'] ?? array(),
 			'pipeline_id'      => 'direct',
@@ -136,8 +139,8 @@ function assert_equals( $expected, $actual, string $name, array &$failures, int 
 	echo "    actual:   " . var_export( $actual, true ) . "\n";
 }
 
-echo "system-task config passthrough smoke (Phase 2a)\n";
-echo "-----------------------------------------------\n";
+echo "system-task config passthrough smoke (Phase 2a + 2b)\n";
+echo "-----------------------------------------------------\n";
 
 // Test 1: system_task workflow round-trips handler_config under step type slug.
 echo "\n[1] system_task workflow round-trips { task, params }:\n";
@@ -207,10 +210,10 @@ assert_equals( array(), $step0['handler_configs'], 'no config → empty handler_
 assert_equals( array(), get_primary_handler_config_for_test( $step0 ), 'getPrimaryHandlerConfig returns empty', $failures, $passes );
 assert_equals( 'webhook_gate', get_effective_slug_for_test( $step0 ), 'getEffectiveSlug falls back to step_type', $failures, $passes );
 
-// Test 4: ai step with enabled_tools (no handler_slug, no handler_config).
-// Phase 2a preserves the legacy AI shape (enabled_tools as handler_slugs);
-// Phase 2b in #1205 will move enabled_tools to its own field.
-echo "\n[4] ai step with enabled_tools (legacy shape preserved for Phase 2a):\n";
+// Test 4: ai step with enabled_tools.
+// Phase 2b: tools now land in `enabled_tools` and `handler_slugs` stays empty
+// for AI steps. The field overload (enabled_tools as handler_slugs) is gone.
+echo "\n[4] ai step with enabled_tools (Phase 2b shape):\n";
 $workflow = array(
 	'steps' => array(
 		array(
@@ -224,13 +227,12 @@ $workflow = array(
 $built = build_configs_from_workflow_for_test( $workflow );
 $step0 = $built['flow_config']['ephemeral_step_0'];
 
-assert_equals( array( 'intelligence/search', 'intelligence/wiki-upsert' ), $step0['handler_slugs'], 'enabled_tools become handler_slugs', $failures, $passes );
+assert_equals( array( 'intelligence/search', 'intelligence/wiki-upsert' ), $step0['enabled_tools'], 'enabled_tools land in dedicated field', $failures, $passes );
+assert_equals( array(), $step0['handler_slugs'], 'ai handler_slugs stays empty (single-purpose now)', $failures, $passes );
 assert_equals( array(), $step0['handler_configs'], 'ai step without handler_config → empty handler_configs', $failures, $passes );
 assert_equals( 'be helpful', $built['pipeline_config']['ephemeral_pipeline_0']['system_prompt'] ?? null, 'system_prompt lands in pipeline_config', $failures, $passes );
 
-// Test 5: ai step with no enabled_tools, no handler — must NOT synthesize step_type as a slug.
-// AI semantics treat handler_slugs as "enabled tools"; synthesizing 'ai' would pollute the AI
-// tool registry intersection in AIStep::resolve_pipeline_tools() and ToolPolicyResolver.
+// Test 5: ai step with no enabled_tools, no handler — both arrays empty, including the new field.
 echo "\n[5] ai step with no enabled_tools and no handler_config:\n";
 $workflow = array(
 	'steps' => array(
@@ -244,7 +246,8 @@ $workflow = array(
 $built = build_configs_from_workflow_for_test( $workflow );
 $step0 = $built['flow_config']['ephemeral_step_0'];
 
-assert_equals( array(), $step0['handler_slugs'], 'ai with no tools does not synthesize step_type', $failures, $passes );
+assert_equals( array(), $step0['handler_slugs'], 'ai handler_slugs stays empty', $failures, $passes );
+assert_equals( array(), $step0['enabled_tools'], 'ai enabled_tools empty when none provided', $failures, $passes );
 assert_equals( array(), $step0['handler_configs'], 'ai with no config → empty handler_configs', $failures, $passes );
 
 // Test 6: regression — system_task workflow that bypassed validation
@@ -270,7 +273,7 @@ $config = get_primary_handler_config_for_test( $step0 );
 assert_equals( 'agent_ping', $config['task'] ?? null, 'task type reaches step runtime', $failures, $passes );
 assert_equals( array( 'agent_id' => 2 ), $config['params'] ?? null, 'task params reach step runtime', $failures, $passes );
 
-echo "\n-----------------------------------------------\n";
+echo "\n-----------------------------------------------------\n";
 $total = $passes + count( $failures );
 echo "{$passes} / {$total} passed\n";
 
