@@ -15,6 +15,7 @@ namespace DataMachine\Abilities\Handler;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Flows\Flows;
+use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -246,15 +247,13 @@ class TestHandlerAbility {
 				continue;
 			}
 
-			$handler_slugs = $step['handler_slugs'] ?? array();
+			$slug = FlowStepConfig::getEffectiveSlug( $step );
 
-			if ( empty( $handler_slugs ) ) {
+			if ( empty( $slug ) ) {
 				continue;
 			}
 
-			$slug            = $handler_slugs[0];
-			$handler_configs = $step['handler_configs'] ?? array();
-			$handler_config  = $handler_configs[ $slug ] ?? array();
+			$handler_config = FlowStepConfig::getPrimaryHandlerConfig( $step );
 
 			return array(
 				'success'      => true,
