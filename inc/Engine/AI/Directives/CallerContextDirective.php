@@ -114,7 +114,7 @@ add_filter(
 		$directives[] = array(
 			'class'    => CallerContextDirective::class,
 			'priority' => 25,
-			'contexts' => array( 'all' ),
+			'modes'    => array( 'all' ),
 		);
 		return $directives;
 	}
