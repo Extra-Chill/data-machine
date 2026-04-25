@@ -113,11 +113,13 @@ class SettingsAbilities {
 						'ai_provider_keys'               => array( 'type' => 'object' ),
 						'queue_tuning'                   => array(
 							'type'        => 'object',
-							'description' => 'Action Scheduler queue tuning settings',
+							'description' => 'Queue tuning — producer side (chunk_size/chunk_delay control how DM creates child jobs) and consumer side (concurrent_batches/batch_size/time_limit control how Action Scheduler drains them).',
 							'properties'  => array(
 								'concurrent_batches' => array( 'type' => 'integer' ),
 								'batch_size'         => array( 'type' => 'integer' ),
 								'time_limit'         => array( 'type' => 'integer' ),
+								'chunk_size'         => array( 'type' => 'integer' ),
+								'chunk_delay'        => array( 'type' => 'integer' ),
 							),
 						),
 						// GitHub settings moved to data-machine-code extension.
@@ -510,6 +512,16 @@ class SettingsAbilities {
 			if ( isset( $input['queue_tuning']['time_limit'] ) ) {
 				$limit                = absint( $input['queue_tuning']['time_limit'] );
 				$tuning['time_limit'] = max( 15, min( 300, $limit ) ); // 15-300 seconds range
+			}
+
+			if ( isset( $input['queue_tuning']['chunk_size'] ) ) {
+				$chunk                = absint( $input['queue_tuning']['chunk_size'] );
+				$tuning['chunk_size'] = max( 1, min( 100, $chunk ) ); // 1-100 range
+			}
+
+			if ( isset( $input['queue_tuning']['chunk_delay'] ) ) {
+				$delay                 = absint( $input['queue_tuning']['chunk_delay'] );
+				$tuning['chunk_delay'] = max( 0, min( 300, $delay ) ); // 0-300 seconds range
 			}
 
 			$all_settings['queue_tuning'] = $tuning;

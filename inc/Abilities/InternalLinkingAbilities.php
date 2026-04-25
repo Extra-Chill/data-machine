@@ -615,7 +615,7 @@ class InternalLinkingAbilities {
 			'message'      => sprintf(
 				'Internal linking batch scheduled for %d post(s) (chunks of %d).',
 				count( $eligible ),
-				$batch['chunk_size'] ?? TaskScheduler::BATCH_CHUNK_SIZE
+				$batch['chunk_size'] ?? \DataMachine\Core\ActionScheduler\BatchScheduler::DEFAULT_CHUNK_SIZE
 			),
 		);
 	}

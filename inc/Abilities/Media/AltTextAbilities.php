@@ -266,7 +266,7 @@ class AltTextAbilities {
 			'message'        => sprintf(
 				'Alt text generation batch scheduled for %d attachment(s) (chunks of %d).',
 				count( $eligible ),
-				$batch['chunk_size'] ?? TaskScheduler::BATCH_CHUNK_SIZE
+				$batch['chunk_size'] ?? \DataMachine\Core\ActionScheduler\BatchScheduler::DEFAULT_CHUNK_SIZE
 			),
 		);
 	}
