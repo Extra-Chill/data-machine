@@ -1282,10 +1282,20 @@ class MemoryCommand extends BaseCommand {
 			$layer     = $meta['layer'];
 			$directory = $layer_dirs[ $layer ] ?? $agent_dir;
 
+			// Use the registry's canonical resolver so files with `convention_path`
+			// (e.g. AGENTS.md → ABSPATH) report the path that compose actually
+			// writes to, not the layer dir that nothing touches anymore.
+			$abs_path = MemoryFileRegistry::resolve_filepath( $filename, $directory );
+			if ( null === $abs_path ) {
+				$abs_path = trailingslashit( $directory ) . $filename;
+			}
+
 			$core_files[] = array(
-				'file'      => $filename,
-				'layer'     => $layer,
-				'directory' => $directory,
+				'file'            => $filename,
+				'layer'           => $layer,
+				'directory'       => $directory,
+				'path'            => $abs_path,
+				'convention_path' => $meta['convention_path'] ?? '',
 			);
 		}
 
@@ -1303,15 +1313,16 @@ class MemoryCommand extends BaseCommand {
 			$relative_files = array();
 
 			foreach ( $core_files as $entry ) {
-				$abs_path = trailingslashit( $entry['directory'] ) . $entry['file'];
+				$abs_path = $entry['path'];
 				$rel_path = str_replace( $site_root . '/', '', $abs_path );
 				$exists   = file_exists( $abs_path );
 
 				$files[ $entry['file'] ] = array(
-					'layer'    => $entry['layer'],
-					'path'     => $abs_path,
-					'relative' => $rel_path,
-					'exists'   => $exists,
+					'layer'           => $entry['layer'],
+					'path'            => $abs_path,
+					'relative'        => $rel_path,
+					'exists'          => $exists,
+					'convention_path' => $entry['convention_path'],
 				);
 
 				if ( $exists ) {
@@ -1331,7 +1342,7 @@ class MemoryCommand extends BaseCommand {
 		} else {
 			$items = array();
 			foreach ( $core_files as $entry ) {
-				$abs_path = trailingslashit( $entry['directory'] ) . $entry['file'];
+				$abs_path = $entry['path'];
 				$rel_path = str_replace( $site_root . '/', '', $abs_path );
 
 				$items[] = array(
