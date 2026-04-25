@@ -151,7 +151,9 @@ class EventUpsert extends UpsertHandler {
 		EngineData $engine
 	): array {
 		// 1. Find existing event via domain-specific duplicate detection.
-		$existing_post_id = $this->findExistingEventViaAbility( $title, $venue, $startDate, $ticketUrl );
+		// findExistingEventViaAbility() returns ?int — null means no existing post.
+		// Normalize to int (0 = no match) so downstream type contracts hold.
+		$existing_post_id = (int) $this->findExistingEventViaAbility( $title, $venue, $startDate, $ticketUrl );
 
 		// 2. Build event data.
 		$event_data = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
