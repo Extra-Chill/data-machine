@@ -381,6 +381,105 @@ class ProcessedItemsCommand extends BaseCommand {
 	}
 
 	/**
+	 * Remove orphaned processed items whose jobs no longer exist.
+	 *
+	 * When completed-job retention purges old jobs, their processed_items
+	 * records can persist longer (different retention window). These orphans
+	 * block re-ingestion because dedup says "already processed" but the
+	 * evidence (the job) is gone. This command cleans them up.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--flow=<flow_id>]
+	 * : Only clean orphans for this flow ID.
+	 *
+	 * [--dry-run]
+	 * : Show what would be deleted without actually deleting.
+	 *
+	 * [--yes]
+	 * : Skip confirmation prompt.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine processed-items cleanup-orphans --dry-run
+	 *     wp datamachine processed-items cleanup-orphans --yes
+	 *     wp datamachine processed-items cleanup-orphans --flow=9 --yes
+	 *
+	 * @subcommand cleanup-orphans
+	 */
+	public function cleanup_orphans( array $args, array $assoc_args ): void {
+		global $wpdb;
+
+		$flow_id      = $assoc_args['flow'] ?? null;
+		$dry_run      = isset( $assoc_args['dry-run'] );
+		$skip_confirm = isset( $assoc_args['yes'] );
+
+		$db    = new ProcessedItems();
+		$table = $db->get_table_name();
+		$jobs  = $wpdb->prefix . 'datamachine_jobs';
+
+		$where_extra = '';
+		$values      = array( $table, $jobs );
+
+		if ( $flow_id ) {
+			$where_extra = ' AND pi.flow_step_id LIKE %s';
+			$values[]    = '%_' . (int) $flow_id;
+		}
+
+		// Count orphans.
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM %i pi LEFT JOIN %i j ON pi.job_id = j.job_id WHERE j.job_id IS NULL{$where_extra}",
+				...$values
+			)
+		);
+
+		if ( 0 === $count ) {
+			WP_CLI::success( 'No orphaned processed items found.' );
+			return;
+		}
+
+		$scope = $flow_id ? sprintf( 'flow %d', (int) $flow_id ) : 'all flows';
+
+		if ( $dry_run ) {
+			WP_CLI::log( sprintf( 'DRY RUN: Would delete %s orphaned processed items for %s.', number_format( $count ), $scope ) );
+			return;
+		}
+
+		if ( ! $skip_confirm ) {
+			WP_CLI::confirm(
+				sprintf( 'Delete %s orphaned processed items for %s? This unblocks re-ingestion of those items.', number_format( $count ), $scope )
+			);
+		}
+
+		// Delete orphans.
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$deleted = $wpdb->query(
+			$wpdb->prepare(
+				"DELETE pi FROM %i pi LEFT JOIN %i j ON pi.job_id = j.job_id WHERE j.job_id IS NULL{$where_extra}",
+				...$values
+			)
+		);
+
+		if ( false === $deleted ) {
+			WP_CLI::error( 'Database error during deletion: ' . $wpdb->last_error );
+			return;
+		}
+
+		WP_CLI::success( sprintf( 'Deleted %s orphaned processed items for %s.', number_format( $deleted ), $scope ) );
+	}
+
+	/**
 	 * Check if a specific item has been processed.
 	 *
 	 * ## OPTIONS

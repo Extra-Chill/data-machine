@@ -133,7 +133,7 @@ class RetentionCommand extends BaseCommand {
 		$results = array();
 
 		// 1. Completed jobs.
-		$completed_days = (int) apply_filters( 'datamachine_completed_jobs_max_age_days', 14 );
+		$completed_days = (int) apply_filters( 'datamachine_completed_jobs_max_age_days', 30 );
 		$db_jobs        = new \DataMachine\Core\Database\Jobs\Jobs();
 		$count          = $db_jobs->count_old_jobs( 'completed', $completed_days );
 		$results[]      = array(
@@ -228,7 +228,7 @@ class RetentionCommand extends BaseCommand {
 	private function get_retention_policies(): array {
 		return array(
 			'Completed jobs'  => array(
-				'retention' => apply_filters( 'datamachine_completed_jobs_max_age_days', 14 ) . ' days',
+				'retention' => apply_filters( 'datamachine_completed_jobs_max_age_days', 30 ) . ' days',
 				'filter'    => 'datamachine_completed_jobs_max_age_days',
 			),
 			'Failed jobs'     => array(
