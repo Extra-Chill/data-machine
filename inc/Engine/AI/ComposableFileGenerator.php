@@ -23,10 +23,15 @@ class ComposableFileGenerator {
 	/**
 	 * Regenerate a single composable file from its registered sections.
 	 *
-	 * Generates content via SectionRegistry, writes to the layer directory,
-	 * and optionally writes a convention copy at ABSPATH + convention_path.
+	 * Generates content via SectionRegistry. For files with a `convention_path`
+	 * the file is written ONLY at `ABSPATH + convention_path` (since v0.67.0);
+	 * any pre-v0.67.0 copy in the layer directory is removed so consumers don't
+	 * read a frozen snapshot. Files without a `convention_path` write to their
+	 * layer directory as before.
 	 *
 	 * @since 0.66.0
+	 * @since 0.67.0 Convention-path files write only to the convention path.
+	 * @since x.y.z  Removes pre-v0.67.0 layer-dir copies during regenerate.
 	 *
 	 * @param string $filename Composable filename (e.g. 'AGENTS.md').
 	 * @param array  $context  {
@@ -36,7 +41,7 @@ class ComposableFileGenerator {
 	 *     @type string $agent_slug Agent slug.
 	 *     @type int    $agent_id   Agent ID.
 	 * }
-	 * @return array{success: bool, message: string, filepath?: string}
+	 * @return array{success: bool, message: string, filepath?: string, stale_removed?: string}
 	 */
 	public static function regenerate( string $filename, array $context = array() ): array {
 		$meta = MemoryFileRegistry::get( $filename );
@@ -75,9 +80,23 @@ class ComposableFileGenerator {
 		// Resolve write target.
 		// Files with a convention_path write ONLY to that path (e.g. AGENTS.md → site root).
 		// Files without one write to their layer directory as before.
+		$stale_layer_path = '';
 		if ( ! empty( $meta['convention_path'] ) ) {
 			$filepath  = rtrim( ABSPATH, '/' ) . '/' . $meta['convention_path'];
 			$directory = dirname( $filepath );
+
+			// Pre-v0.67.0 versions wrote to the layer dir; the convention_path
+			// flag only controls writes now. If a stale layer-dir copy exists
+			// from before the migration, remove it so consumers reading the
+			// layer dir don't get pointed at a frozen snapshot. Resolving the
+			// directory must not fail the regenerate — cleanup is best-effort.
+			$layer_dir = ScaffoldAbilities::resolve_directory( $meta['layer'], $context );
+			if ( $layer_dir ) {
+				$candidate = trailingslashit( $layer_dir ) . $filename;
+				if ( $candidate !== $filepath && file_exists( $candidate ) ) {
+					$stale_layer_path = $candidate;
+				}
+			}
 		} else {
 			$directory = ScaffoldAbilities::resolve_directory( $meta['layer'], $context );
 
@@ -100,6 +119,17 @@ class ComposableFileGenerator {
 			);
 		}
 
+		// Best-effort cleanup of pre-v0.67.0 layer-dir copy. We only remove the
+		// file when it's at the dead layer-dir path, never the convention_path
+		// itself (those paths are guaranteed different by the check above).
+		$stale_removed = '';
+		if ( '' !== $stale_layer_path ) {
+			$fs = FilesystemHelper::get();
+			if ( $fs && $fs->delete( $stale_layer_path ) ) {
+				$stale_removed = $stale_layer_path;
+			}
+		}
+
 		/**
 		 * Fires after a composable file has been regenerated.
 		 *
@@ -113,11 +143,15 @@ class ComposableFileGenerator {
 		do_action( 'datamachine_composable_regenerated', $filename, $filepath, $context );
 
 		$message = sprintf( 'Regenerated %s at %s (%d sections).', $filename, $filepath, count( SectionRegistry::get_sections( $filename ) ) );
+		if ( '' !== $stale_removed ) {
+			$message .= sprintf( ' Removed stale layer-dir copy at %s.', $stale_removed );
+		}
 
 		return array(
-			'success'  => true,
-			'message'  => $message,
-			'filepath' => $filepath,
+			'success'       => true,
+			'message'       => $message,
+			'filepath'      => $filepath,
+			'stale_removed' => $stale_removed,
 		);
 	}
 
