@@ -292,6 +292,13 @@ class ToolPolicyResolver {
 		$engine_data      = $args['engine_data'] ?? array();
 
 		// Handler tools from adjacent steps (dynamic, resolved per-execution).
+		//
+		// Reads handler_slugs / handler_configs raw (not via FlowStepConfig
+		// helpers) because adjacent steps may declare multiple handler slugs
+		// (e.g. multi-handler publish: wordpress_publish + twitter_publish)
+		// and the AI must see tools for all of them, not just the primary.
+		// This is one of the legitimate multi-element callsites alongside
+		// PipelineSystemPromptDirective; see #1205 for the audit.
 		foreach ( array( $args['previous_step_config'] ?? null, $args['next_step_config'] ?? null ) as $step_config ) {
 			if ( ! $step_config ) {
 				continue;

@@ -212,7 +212,19 @@ abstract class Step {
 
 
 	/**
-	 * Get handler slug from flow step configuration.
+	 * Get the primary handler slug from flow step configuration.
+	 *
+	 * Returns the raw `handler_slugs[0]` value. For self-configuring step
+	 * types (system_task, webhook_gate, agent_ping), the migration in
+	 * inc/migrations/handler-keys.php and ExecuteWorkflowAbility::build
+	 * ConfigsFromWorkflow() store the step_type as the synthetic primary
+	 * slug, so this returns the step_type for those rows. Returns null
+	 * when no slug has been resolved (e.g. fetch step with no handler
+	 * configured) so the default validateStepConfiguration() can reject.
+	 *
+	 * Prefer FlowStepConfig::getEffectiveSlug() at non-Step callsites; it
+	 * is the canonical resolver and falls back to step_type when the
+	 * handler_slugs array is empty.
 	 *
 	 * @return string|null Handler slug or null if not set
 	 */
@@ -221,21 +233,19 @@ abstract class Step {
 	}
 
 	/**
-	 * Get handler configuration from flow step configuration.
+	 * Get the primary handler configuration from flow step configuration.
 	 *
-	 * Handler-bearing steps store config keyed by handler_slug.
-	 * Handler-free step types (system_task, webhook_gate, ai with no handler)
-	 * have their config keyed by step_type slug instead, since there is no
-	 * handler to key under. This accessor handles both shapes.
+	 * Reads handler_configs[handler_slugs[0]]. Handler-bearing steps key
+	 * by handler_slug; handler-free steps (system_task, webhook_gate,
+	 * agent_ping) key by step_type via the synthetic-slug shape applied
+	 * in inc/migrations/handler-keys.php and ExecuteWorkflowAbility::build
+	 * ConfigsFromWorkflow(). FlowStepConfig::getPrimaryHandlerConfig() is
+	 * the single source of truth for the lookup so callsites stay aligned.
 	 *
 	 * @return array Handler configuration array
 	 */
 	protected function getHandlerConfig(): array {
-		$slug = $this->getHandlerSlug();
-		if ( ! empty( $slug ) ) {
-			return $this->flow_step_config['handler_configs'][ $slug ] ?? array();
-		}
-		return $this->flow_step_config['handler_configs'][ $this->step_type ] ?? array();
+		return FlowStepConfig::getPrimaryHandlerConfig( $this->flow_step_config );
 	}
 
 	/**
