@@ -212,7 +212,7 @@ If two resolvers later turn out to share *both* the same return shape *and* the 
 inc/Engine/AI/Tools/ToolPolicyResolver.php
 inc/Engine/AI/Memory/MemoryPolicyResolver.php
 inc/Engine/AI/Actions/ActionPolicyResolver.php
-inc/Engine/AI/Transcripts/PipelineTranscriptPolicy.php
+inc/Engine/AI/PipelineTranscriptPolicy.php
 ```
 
 Each is a single file, single class, single responsibility. Class docblocks carry the precedence ladder. Class methods carry the per-step rationale. There is no shared parent, no shared interface, and no shared trait — only a shared shape that's documented here.

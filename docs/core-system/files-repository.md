@@ -7,8 +7,13 @@ The FilesRepository is a modular component system for file operations in the Dat
 ## Architecture
 
 **Location**: `/inc/Core/FilesRepository/`
-**Components**: 6 specialized classes
 **Since**: 0.2.1
+
+The repository covers two responsibility groups:
+
+- **Flow file primitives** — `DirectoryManager`, `FileStorage`, `FileRetrieval`, `FileCleanup`, `RemoteFileDownloader`, `FilesystemHelper`
+- **Validation primitives** — `ImageValidator`, `MediaValidator`, `VideoValidator`, `VideoMetadata`
+- **Agent memory primitives** — `AgentMemory`, `AgentMemoryStoreInterface`, `AgentMemoryStoreFactory`, `DiskAgentMemoryStore`, `AgentMemoryScope`, `AgentMemoryReadResult`, `AgentMemoryWriteResult`, `AgentMemoryListEntry`, `DailyMemory`, `DailyMemoryStorage`
 
 ## Components
 
@@ -153,7 +158,7 @@ $file_data = $file_retrieval->retrieve_data_by_job_id($job_id, [
 
 Components work together for complete file handling:
 
-> Note: When mapping flow_step_id -> flow_id, the REST API uses `datamachine_get_flow_id_from_step` filter (see datamachine/inc/Api/Files.php:168). Implement this filter when connecting flow-step-aware file operations from extensions.
+> Note: When mapping flow_step_id -> flow_id, the REST API uses `datamachine_get_flow_id_from_step` filter (see datamachine/inc/Api/FlowFiles.php). Implement this filter when connecting flow-step-aware file operations from extensions.
 
 ```php
 use DataMachine\Core\FilesRepository\RemoteFileDownloader;

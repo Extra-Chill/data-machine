@@ -12,6 +12,11 @@ Complete user documentation for Data Machine, the AI-first WordPress plugin that
 - **Database Schema**: Tables that persist pipelines, flows, jobs, and processed items.
 - **Changelog**: Historical summary of notable releases and architectural changes.
 
+### Architecture Deep Dives
+- **Pipeline Execution Axes**: Queue, fan-out, and per-step iteration semantics ([architecture/pipeline-execution-axes.md](architecture/pipeline-execution-axes.md)).
+- **Policy Resolvers**: Why `ToolPolicyResolver`, `MemoryPolicyResolver`, `ActionPolicyResolver`, and `PipelineTranscriptPolicy` stay as four single-purpose classes ([architecture/policy-resolvers.md](architecture/policy-resolvers.md)).
+- **Iteration Budget**: Shared bounded-iteration primitive backing `conversation_turns` and `chain_depth` budgets ([architecture/iteration-budget.md](architecture/iteration-budget.md)).
+
 ### Engine & Services
 - **Universal Engine**: Shared AI infrastructure for pipeline and chat agents.
 - **AI Conversation Loop**: Turn-based conversation execution with directive orchestration.
@@ -57,6 +62,7 @@ Complete user documentation for Data Machine, the AI-first WordPress plugin that
 docs/
 ├── overview.md                        # System overview, data flow, and key concepts
 ├── architecture.md                    # Execution engine, architecture principles, and shared components
+├── architecture/                      # Architecture deep dives (axes, policies, primitives)
 ├── CHANGELOG.md                       # Semantic changelog for releases
 ├── core-system/                       # Engine, services, and core infrastructure pieces
 │   ├── abilities-api.md               # WordPress 6.9 Abilities API for flow queries, logging, and post filtering

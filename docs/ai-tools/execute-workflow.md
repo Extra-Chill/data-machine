@@ -8,18 +8,17 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 
 ## Implementation
 
-**Location**: `/inc/Api/Chat/Tools/ExecuteWorkflowTool.php`
+**Tool wrapper**: `/inc/Api/Chat/Tools/ExecuteWorkflowTool.php` — registers the `execute_workflow` chat tool and binds it to the `datamachine/execute-workflow` ability via `BaseTool::registerTool()`.
 
-**Supporting Utilities**: `/inc/Api/Chat/Tools/HandlerDocumentation.php` - Shared utility for dynamic handler documentation generation from registered handlers
+**Backing ability**: `/inc/Abilities/Job/ExecuteWorkflowAbility.php` — owns the actual execution logic for ephemeral workflows.
 
-**Architecture**: Streamlined single-file implementation that delegates execution to the internal REST API Execute endpoint. Uses shared handler documentation utilities for dynamic description generation.
+**Architecture**: Ability-backed pattern. The chat tool is a thin handler that validates `steps`, looks up the ability via `wp_get_ability( 'datamachine/execute-workflow' )`, and forwards the workflow to it. Step type slugs are resolved at runtime from the `datamachine/get-step-types` ability so the description always reflects registered step types.
 
 **Key Responsibilities**:
 - Tool registration and definition
-- Request handling and parameter validation
-- REST API delegation to `/datamachine/v1/execute` endpoint
+- Parameter validation (`steps` required, `dry_run` optional)
+- Ability delegation via `wp_get_ability()`
 - Error handling and response formatting
-- Dynamic documentation generation from registered handlers
 
 ## Step Configuration
 
@@ -205,17 +204,19 @@ The ExecuteWorkflow tool provides comprehensive error handling:
 }
 ```
 
-## REST API Integration
+## Ability Integration
 
-The tool integrates with the internal Execute REST endpoint:
+The tool delegates to the `datamachine/execute-workflow` ability:
 
 ```php
-$request = new \WP_REST_Request('POST', '/datamachine/v1/execute');
-$request->set_body_params([
-    'steps' => $workflow_steps
-]);
-$response = rest_do_request($request);
+$ability = wp_get_ability( 'datamachine/execute-workflow' );
+$result  = $ability->execute( array(
+    'workflow' => array( 'steps' => $workflow_steps ),
+    'dry_run'  => $dry_run, // optional
+) );
 ```
+
+The same ability backs the `POST /datamachine/v1/execute` REST endpoint, so the tool path and the REST path produce identical results. See [Execute endpoint](../api/endpoints/execute.md) and [Abilities API](../core-system/abilities-api.md).
 
 ## Handler Discovery
 
