@@ -276,6 +276,7 @@ homeboy lint data-machine    # PHPCS with WordPress standards
 ## Documentation
 
 - [docs/](docs/) — User documentation
+- [docs/architecture/pipeline-execution-axes.md](docs/architecture/pipeline-execution-axes.md) — Four orthogonal axes of work expansion in a pipeline
 - [skills/data-machine/SKILL.md](skills/data-machine/SKILL.md) — Agent integration patterns
 - [AGENTS.md](AGENTS.md) — Technical reference for contributors
 - [docs/CHANGELOG.md](docs/CHANGELOG.md) — Version history
