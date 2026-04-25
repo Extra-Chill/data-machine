@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.82.1] - 2026-04-25
+
+### Changed
+- consolidate chunked fan-out into BatchScheduler primitive
+
+### Fixed
+- remove pre-v0.67.0 layer-dir copy when convention_path applies
+- fix(memory paths): report convention_path target, not the dead layer dir
+- CallerContextDirective registers under modes key, not contexts
+
 ## [0.82.0] - 2026-04-25
 
 ### Added
