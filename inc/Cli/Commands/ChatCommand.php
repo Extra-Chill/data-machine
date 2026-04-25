@@ -21,13 +21,22 @@ class ChatCommand extends BaseCommand {
 	/**
 	 * List chat sessions for a user.
 	 *
+	 * Pipeline transcript sessions (mode='pipeline') are hidden from the
+	 * default listing because they're forensic captures of AI conversation
+	 * loops, not human chats. Use --include-transcripts to include them, or
+	 * --context=pipeline to list only pipeline-mode sessions.
+	 *
 	 * ## OPTIONS
 	 *
 	 * [--user=<id>]
 	 * : User ID to list sessions for. Defaults to current user.
 	 *
 	 * [--context=<type>]
-	 * : Filter by execution context (chat, pipeline, system).
+	 * : Filter by execution context (chat, pipeline, system). When set, the
+	 *   --include-transcripts flag is implicitly on for pipeline contexts.
+	 *
+	 * [--include-transcripts]
+	 * : Include pipeline transcript sessions in the default listing.
 	 *
 	 * [--limit=<n>]
 	 * : Maximum number of sessions to return.
@@ -58,11 +67,17 @@ class ChatCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # List sessions for user 1
+	 *     # List human chat sessions for user 1 (transcripts hidden)
 	 *     wp datamachine chat list --user=1
 	 *
-	 *     # List chat-context sessions
+	 *     # List chat-context sessions explicitly
 	 *     wp datamachine chat list --user=1 --context=chat
+	 *
+	 *     # Include pipeline transcripts in the list
+	 *     wp datamachine chat list --user=1 --include-transcripts
+	 *
+	 *     # List only pipeline transcripts
+	 *     wp datamachine chat list --user=1 --context=pipeline
 	 *
 	 *     # Get session IDs only
 	 *     wp datamachine chat list --user=1 --format=ids
@@ -75,9 +90,38 @@ class ChatCommand extends BaseCommand {
 		$offset  = max( 0, (int) ( $assoc_args['offset'] ?? 0 ) );
 		$context = ! empty( $assoc_args['context'] ) ? sanitize_text_field( $assoc_args['context'] ) : null;
 
+		$include_transcripts = isset( $assoc_args['include-transcripts'] );
+
 		$chat_db  = ConversationStoreFactory::get();
 		$sessions = $chat_db->get_user_sessions( $user_id, $limit, $offset, $context );
 		$total    = $chat_db->get_user_session_count( $user_id, $context );
+
+		// Hide pipeline transcripts unless explicitly opted in or filtered to.
+		// When the caller passes an explicit --context, they've already chosen
+		// what they want — don't second-guess them.
+		if ( null === $context && ! $include_transcripts ) {
+			$filtered = array_values(
+				array_filter(
+					$sessions,
+					static function ( $session ) {
+						return ( $session['mode'] ?? 'chat' ) !== 'pipeline';
+					}
+				)
+			);
+
+			if ( count( $filtered ) !== count( $sessions ) ) {
+				$hidden = count( $sessions ) - count( $filtered );
+				WP_CLI::debug(
+					sprintf(
+						'Hid %d pipeline transcript session(s). Use --include-transcripts to show them.',
+						$hidden
+					),
+					'datamachine'
+				);
+			}
+
+			$sessions = $filtered;
+		}
 
 		if ( empty( $sessions ) ) {
 			WP_CLI::log( 'No chat sessions found.' );

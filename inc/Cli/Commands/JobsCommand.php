@@ -16,6 +16,7 @@ use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\AgentResolver;
 use DataMachine\Cli\UserResolver;
 use DataMachine\Abilities\JobAbilities;
+use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Engine\Tasks\TaskRegistry;
 
@@ -386,6 +387,175 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
+	 * Read the persisted AI conversation transcript for a job.
+	 *
+	 * Reads engine_data['transcript_session_id'] from the job and renders
+	 * the persisted $messages array. Errors cleanly when the job has no
+	 * transcript persisted (default behavior — persistence is opt-in).
+	 *
+	 * ## OPTIONS
+	 *
+	 * <job_id>
+	 * : The job ID whose transcript should be read.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: text
+	 * options:
+	 *   - text
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * [--raw]
+	 * : Dump the messages array verbatim (only with --format=json or yaml).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Render the transcript human-readable
+	 *     wp datamachine jobs transcript 844
+	 *
+	 *     # Pipe full messages array as JSON for further processing
+	 *     wp datamachine jobs transcript 844 --format=json --raw
+	 *
+	 * @subcommand transcript
+	 */
+	public function transcript( array $args, array $assoc_args ): void {
+		if ( empty( $args[0] ) || ! is_numeric( $args[0] ) || (int) $args[0] <= 0 ) {
+			WP_CLI::error( 'Job ID is required and must be a positive integer.' );
+			return;
+		}
+
+		$job_id = (int) $args[0];
+		$format = $assoc_args['format'] ?? 'text';
+		$raw    = isset( $assoc_args['raw'] );
+
+		$result = $this->abilities->executeGetJobs( array( 'job_id' => $job_id ) );
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
+			return;
+		}
+
+		$jobs = $result['jobs'] ?? array();
+		if ( empty( $jobs ) ) {
+			WP_CLI::error( sprintf( 'Job %d not found.', $job_id ) );
+			return;
+		}
+
+		$job                   = $jobs[0];
+		$engine_data           = $job['engine_data'] ?? array();
+		$transcript_session_id = $engine_data['transcript_session_id'] ?? '';
+
+		if ( empty( $transcript_session_id ) ) {
+			WP_CLI::error(
+				sprintf(
+					'No transcript persisted for job %d. Enable datamachine_persist_pipeline_transcripts (or set persist_transcripts on the pipeline/flow) and re-run the job.',
+					$job_id
+				)
+			);
+			return;
+		}
+
+		$store   = ConversationStoreFactory::get();
+		$session = $store->get_session( (string) $transcript_session_id );
+
+		if ( ! $session ) {
+			WP_CLI::error(
+				sprintf(
+					'Transcript session %s referenced by job %d is missing. It may have been deleted by retention.',
+					$transcript_session_id,
+					$job_id
+				)
+			);
+			return;
+		}
+
+		$messages = $session['messages'] ?? array();
+		$metadata = $session['metadata'] ?? array();
+
+		if ( 'json' === $format ) {
+			$payload = $raw ? $messages : array(
+				'job_id'         => $job_id,
+				'session_id'     => $transcript_session_id,
+				'metadata'       => $metadata,
+				'provider'       => $session['provider'] ?? null,
+				'model'          => $session['model'] ?? null,
+				'messages'       => $messages,
+			);
+			WP_CLI::log( wp_json_encode( $payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
+			return;
+		}
+
+		if ( 'yaml' === $format ) {
+			$payload = $raw ? $messages : array(
+				'job_id'     => $job_id,
+				'session_id' => $transcript_session_id,
+				'metadata'   => $metadata,
+				'provider'   => $session['provider'] ?? null,
+				'model'      => $session['model'] ?? null,
+				'messages'   => $messages,
+			);
+			WP_CLI::log( \Spyc::YAMLDump( $payload, false, false, true ) );
+			return;
+		}
+
+		$this->renderTranscriptText( $job_id, (string) $transcript_session_id, $session, $messages, $metadata );
+	}
+
+	/**
+	 * Render a transcript as a human-readable turn-by-turn text block.
+	 *
+	 * @param int    $job_id     Owning job ID.
+	 * @param string $session_id Transcript session UUID.
+	 * @param array  $session    Decoded session row.
+	 * @param array  $messages   Decoded messages array.
+	 * @param array  $metadata   Decoded metadata array.
+	 */
+	private function renderTranscriptText( int $job_id, string $session_id, array $session, array $messages, array $metadata ): void {
+		WP_CLI::log( sprintf( 'Transcript for job %d', $job_id ) );
+		WP_CLI::log( sprintf( '  Session: %s', $session_id ) );
+		WP_CLI::log( sprintf( '  Provider: %s', $session['provider'] ?? ( $metadata['provider'] ?? 'unknown' ) ) );
+		WP_CLI::log( sprintf( '  Model: %s', $session['model'] ?? ( $metadata['model'] ?? 'unknown' ) ) );
+		WP_CLI::log( sprintf( '  Turns: %d', $metadata['turn_count'] ?? 0 ) );
+		WP_CLI::log( sprintf( '  Completed: %s', ! empty( $metadata['completed'] ) ? 'true' : 'false' ) );
+		if ( ! empty( $metadata['error'] ) ) {
+			WP_CLI::log( sprintf( '  Error: %s', $metadata['error'] ) );
+		}
+		$usage = $metadata['usage'] ?? array();
+		if ( ! empty( $usage['total_tokens'] ) ) {
+			WP_CLI::log(
+				sprintf(
+					'  Tokens: prompt=%d completion=%d total=%d',
+					$usage['prompt_tokens'] ?? 0,
+					$usage['completion_tokens'] ?? 0,
+					$usage['total_tokens'] ?? 0
+				)
+			);
+		}
+		WP_CLI::log( sprintf( '  Messages: %d', count( $messages ) ) );
+		WP_CLI::log( '' );
+
+		foreach ( $messages as $idx => $message ) {
+			$role     = $message['role'] ?? 'unknown';
+			$type     = $message['metadata']['type'] ?? 'text';
+			$content  = $message['content'] ?? '';
+			$header   = sprintf( '[%d] %s (%s)', $idx, $role, $type );
+
+			WP_CLI::log( $header );
+			WP_CLI::log( str_repeat( '-', min( 80, strlen( $header ) ) ) );
+
+			if ( is_array( $content ) ) {
+				WP_CLI::log( wp_json_encode( $content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
+			} else {
+				WP_CLI::log( (string) $content );
+			}
+			WP_CLI::log( '' );
+		}
+	}
+
+	/**
 	 * Output job details in table format.
 	 *
 	 * @param array $job Job data.
@@ -451,8 +621,30 @@ class JobsCommand extends BaseCommand {
 
 		$engine_data = $job['engine_data'] ?? array();
 
-		// Strip error keys already displayed in the error section above.
-		unset( $engine_data['error_reason'], $engine_data['error_message'], $engine_data['error_step_id'], $engine_data['error_trace'] );
+		// Surface transcript availability on its own line so operators see
+		// the read command they can run. Stripped from engine_data summary
+		// below to avoid double-rendering.
+		$transcript_session_id = $engine_data['transcript_session_id'] ?? '';
+		if ( ! empty( $transcript_session_id ) ) {
+			WP_CLI::log( '' );
+			WP_CLI::log(
+				sprintf(
+					'Transcript: session_id=%s  (wp datamachine jobs transcript %d)',
+					$transcript_session_id,
+					$job['job_id'] ?? 0
+				)
+			);
+		}
+
+		// Strip error keys already displayed in the error section above
+		// and the transcript_session_id surfaced separately.
+		unset(
+			$engine_data['error_reason'],
+			$engine_data['error_message'],
+			$engine_data['error_step_id'],
+			$engine_data['error_trace'],
+			$engine_data['transcript_session_id']
+		);
 
 		if ( ! empty( $engine_data ) ) {
 			WP_CLI::log( '' );
