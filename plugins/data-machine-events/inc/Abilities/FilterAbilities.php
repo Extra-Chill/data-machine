@@ -15,8 +15,8 @@
 namespace DataMachineEvents\Abilities;
 
 use DataMachineEvents\Blocks\Calendar\Geo_Query;
-use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventDatesTable;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -353,8 +353,11 @@ class FilterAbilities {
 	/**
 	 * Get event counts for all terms in a taxonomy with a single query.
 	 *
-	 * Uses UpcomingFilter for date filtering SQL fragments.
-	 * This method does GROUP BY with cross-taxonomy filtering.
+	 * Joins term_relationships → event_dates directly. The posts table is
+	 * NOT joined because event_dates already carries post_status (synced
+	 * on upsert) and only event-typed posts ever get rows in that table.
+	 * Filtering on ed.post_status = 'publish' eliminates stale/trashed
+	 * rows and guarantees the post_type constraint transitively.
 	 *
 	 * @param string     $taxonomy_slug     Taxonomy to count events for.
 	 * @param array      $date_context      Optional date filtering context.
@@ -365,11 +368,13 @@ class FilterAbilities {
 	private function get_batch_term_counts( $taxonomy_slug, $date_context = array(), $active_filters = array(), $tax_query_override = null ) {
 		global $wpdb;
 
-		$post_type = Event_Post_Type::POST_TYPE;
+		$ed_table = EventDatesTable::table_name();
 
-		$joins         = '';
-		$where_clauses = '';
-		$params        = array( $taxonomy_slug, $post_type );
+		// Join event_dates directly onto tr.object_id — no posts table hop.
+		// event_dates.post_status is authoritative and already indexed.
+		$joins         = "INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id";
+		$where_clauses = " AND ed.post_status = 'publish'";
+		$params        = array( $taxonomy_slug );
 
 		if ( ! empty( $date_context ) ) {
 			$date_start       = $date_context['date_start'] ?? '';
@@ -378,21 +383,15 @@ class FilterAbilities {
 			$current_datetime = current_time( 'mysql' );
 
 			if ( ! empty( $date_start ) && ! empty( $date_end ) ) {
-				$filter = UpcomingFilter::date_range_sql( false, 'p.ID' );
-				$joins         .= ' ' . $filter['joins'];
-				$where_clauses .= ' AND ' . $filter['where'];
+				$where_clauses .= ' AND (ed.start_datetime >= %s AND ed.start_datetime <= %s)';
 				$params[]       = $date_start . ' 00:00:00';
 				$params[]       = $date_end . ' 23:59:59';
 			} elseif ( $show_past ) {
-				$filter = UpcomingFilter::past_sql( false, 'p.ID' );
-				$joins         .= ' ' . $filter['joins'];
-				$where_clauses .= ' AND ' . $filter['where'];
+				$where_clauses .= ' AND (ed.start_datetime < %s AND (ed.end_datetime < %s OR ed.end_datetime IS NULL))';
 				$params[]       = $current_datetime;
 				$params[]       = $current_datetime;
 			} else {
-				$filter = UpcomingFilter::upcoming_sql( false, 'p.ID' );
-				$joins         .= ' ' . $filter['joins'];
-				$where_clauses .= ' AND ' . $filter['where'];
+				$where_clauses .= ' AND (ed.start_datetime >= %s OR ed.end_datetime >= %s)';
 				$params[]       = $current_datetime;
 				$params[]       = $current_datetime;
 			}
@@ -412,7 +411,7 @@ class FilterAbilities {
 				$alias_tr     = "base_tr_{$base_join_index}";
 				$alias_tt     = "base_tt_{$base_join_index}";
 
-				$joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON p.ID = {$alias_tr}.object_id";
+				$joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON tr.object_id = {$alias_tr}.object_id";
 				$joins .= " INNER JOIN {$wpdb->term_taxonomy} {$alias_tt} ON {$alias_tr}.term_taxonomy_id = {$alias_tt}.term_taxonomy_id";
 
 				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -438,7 +437,7 @@ class FilterAbilities {
 			$alias_tr = "cross_tr_{$join_index}";
 			$alias_tt = "cross_tt_{$join_index}";
 
-			$joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON p.ID = {$alias_tr}.object_id";
+			$joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON tr.object_id = {$alias_tr}.object_id";
 			$joins .= " INNER JOIN {$wpdb->term_taxonomy} {$alias_tt} ON {$alias_tr}.term_taxonomy_id = {$alias_tt}.term_taxonomy_id";
 
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -453,14 +452,10 @@ class FilterAbilities {
 		$query = $wpdb->prepare(
 			"SELECT tt.term_id, COUNT(DISTINCT tr.object_id) as event_count
             FROM {$wpdb->term_relationships} tr
-            INNER JOIN {$wpdb->term_taxonomy} tt 
+            INNER JOIN {$wpdb->term_taxonomy} tt
                 ON tr.term_taxonomy_id = tt.term_taxonomy_id
-            INNER JOIN {$wpdb->posts} p 
-                ON tr.object_id = p.ID
             {$joins}
             WHERE tt.taxonomy = %s
-            AND p.post_type = %s
-            AND p.post_status = 'publish'
             {$where_clauses}
             GROUP BY tt.term_id",
 			$params

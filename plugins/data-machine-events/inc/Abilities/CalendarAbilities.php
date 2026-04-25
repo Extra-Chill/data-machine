@@ -569,9 +569,13 @@ class CalendarAbilities {
 	/**
 	 * Compute unique event dates (uncached).
 	 *
-	 * Fetches start/end dates (without post IDs) and uses DATE() in SQL
-	 * to minimize data transfer. Multi-day events are properly expanded
-	 * to count on each spanned date.
+	 * Aggregates at the DB layer via GROUP BY DATE() to collapse tens of
+	 * thousands of event rows down to a few hundred unique (start_date,
+	 * end_date) buckets. This eliminates the historical "unbounded query"
+	 * scan where every event row was transferred to PHP just to be bucketed.
+	 *
+	 * Multi-day events are expanded to count on each spanned date in PHP
+	 * using the aggregated count per bucket.
 	 *
 	 * @param array $params Query parameters.
 	 * @return array Event dates data.
@@ -583,7 +587,43 @@ class CalendarAbilities {
 		$current_date    = current_time( 'Y-m-d' );
 		$ed_table        = EventDatesTable::table_name();
 
-		// Build WHERE clauses from params for taxonomy/location filtering.
+		$archive_taxonomy = $params['archive_taxonomy'] ?? '';
+		$archive_term_id  = $params['archive_term_id'] ?? 0;
+		$tax_filters      = $params['tax_filters'] ?? array();
+
+		$has_tax_filter = ( $archive_taxonomy && $archive_term_id )
+			|| self::has_active_tax_filter( $tax_filters );
+
+		// Fast path: no taxonomy constraint → skip posts/term joins entirely.
+		// event_dates already carries post_status, so we can aggregate against
+		// the single table + its status_start composite index.
+		if ( ! $has_tax_filter ) {
+			$where_clauses = array( "ed.post_status = 'publish'" );
+			$query_values  = array();
+
+			if ( ! $show_past_param ) {
+				$where_clauses[] = 'ed.start_datetime >= %s';
+				$query_values[]  = $current_date . ' 00:00:00';
+			}
+
+			$where = implode( ' AND ', $where_clauses );
+			$sql   = "SELECT DATE(ed.start_datetime) AS start_date, DATE(ed.end_datetime) AS end_date, COUNT(*) AS bucket_count
+					FROM {$ed_table} ed
+					WHERE {$where}
+					GROUP BY DATE(ed.start_datetime), DATE(ed.end_datetime)
+					ORDER BY start_date ASC";
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = empty( $query_values )
+				? $wpdb->get_results( $sql )
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				: $wpdb->get_results( $wpdb->prepare( $sql, ...$query_values ) );
+
+			return self::expand_date_buckets( $rows, $show_past_param, $current_date );
+		}
+
+		// Slow path: taxonomy constraints require joining posts + term tables.
+		// Still aggregates via GROUP BY to keep the result set bounded.
 		$where_clauses = array(
 			"p.post_type = 'data_machine_events'",
 			"p.post_status = 'publish'",
@@ -596,10 +636,6 @@ class CalendarAbilities {
 			$query_values[]  = $current_date . ' 00:00:00';
 		}
 
-		// Handle taxonomy archive filter (any taxonomy: artist, venue, location, etc.).
-		$archive_taxonomy = $params['archive_taxonomy'] ?? '';
-		$archive_term_id  = $params['archive_term_id'] ?? 0;
-
 		if ( $archive_taxonomy && $archive_term_id ) {
 			$join_clauses[]  = "INNER JOIN {$wpdb->term_relationships} tr_archive ON p.ID = tr_archive.object_id";
 			$join_clauses[]  = "INNER JOIN {$wpdb->term_taxonomy} tt_archive ON tr_archive.term_taxonomy_id = tt_archive.term_taxonomy_id";
@@ -609,8 +645,6 @@ class CalendarAbilities {
 			$query_values[]  = (int) $archive_term_id;
 		}
 
-		// Handle additional taxonomy filters from the filter bar.
-		$tax_filters  = $params['tax_filters'] ?? array();
 		$filter_index = 0;
 		foreach ( $tax_filters as $taxonomy_slug => $term_ids ) {
 			if ( empty( $term_ids ) || ! is_array( $term_ids ) ) {
@@ -637,34 +671,64 @@ class CalendarAbilities {
 		$joins = implode( ' ', $join_clauses );
 		$where = implode( ' AND ', $where_clauses );
 
-		// Fetch start/end dates without IDs — DATE() in SQL avoids gmdate() in PHP.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$rows = $wpdb->get_results(
-			empty( $query_values )
-				? "SELECT DATE(ed.start_datetime) AS start_date, DATE(ed.end_datetime) AS end_date
-				   FROM {$wpdb->posts} p
-				   INNER JOIN {$ed_table} ed ON p.ID = ed.post_id
-				   {$joins}
-				   WHERE {$where}
-				   ORDER BY ed.start_datetime ASC"
-				: $wpdb->prepare(
-					"SELECT DATE(ed.start_datetime) AS start_date, DATE(ed.end_datetime) AS end_date
-					FROM {$wpdb->posts} p
-					INNER JOIN {$ed_table} ed ON p.ID = ed.post_id
-					{$joins}
-					WHERE {$where}
-					ORDER BY ed.start_datetime ASC",
-					...$query_values
-				)
-		);
+		// DISTINCT p.ID inside COUNT to avoid double-counting when a post
+		// is attached to multiple matching terms in a multi-filter join.
+		$sql = "SELECT DATE(ed.start_datetime) AS start_date, DATE(ed.end_datetime) AS end_date, COUNT(DISTINCT p.ID) AS bucket_count
+				FROM {$wpdb->posts} p
+				INNER JOIN {$ed_table} ed ON p.ID = ed.post_id
+				{$joins}
+				WHERE {$where}
+				GROUP BY DATE(ed.start_datetime), DATE(ed.end_datetime)
+				ORDER BY start_date ASC";
 
-		$total_events    = count( $rows );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$query_values ) );
+
+		return self::expand_date_buckets( $rows, $show_past_param, $current_date );
+	}
+
+	/**
+	 * Determine whether any tax filter entry carries real term constraints.
+	 *
+	 * @param array $tax_filters Taxonomy filter map [slug => term_ids[]].
+	 * @return bool True when at least one filter has terms.
+	 */
+	private static function has_active_tax_filter( array $tax_filters ): bool {
+		foreach ( $tax_filters as $term_ids ) {
+			if ( ! empty( $term_ids ) && is_array( $term_ids ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Expand aggregated date buckets into a per-date event count map.
+	 *
+	 * Each bucket row represents COUNT(*) events sharing the same
+	 * (start_date, end_date) pair. Multi-day events contribute to every
+	 * spanned date after their start.
+	 *
+	 * @param array  $rows            Rows with start_date, end_date, bucket_count.
+	 * @param bool   $show_past_param When true, sort result DESC; also skip the
+	 *                                "drop past dates" filter during expansion.
+	 * @param string $current_date    Today (Y-m-d) for past-date filtering.
+	 * @return array { dates, total_events, events_per_date }
+	 */
+	private static function expand_date_buckets( array $rows, bool $show_past_param, string $current_date ): array {
+		$total_events    = 0;
 		$events_per_date = array();
 
 		foreach ( $rows as $row ) {
-			$events_per_date[ $row->start_date ] = ( $events_per_date[ $row->start_date ] ?? 0 ) + 1;
+			$count = (int) $row->bucket_count;
+			if ( $count <= 0 ) {
+				continue;
+			}
+			$total_events += $count;
 
-			// Multi-day: expand to each spanned date after the start.
+			$events_per_date[ $row->start_date ] = ( $events_per_date[ $row->start_date ] ?? 0 ) + $count;
+
+			// Multi-day: each spanned date after the start also gets +$count.
 			if ( $row->end_date && $row->end_date > $row->start_date ) {
 				$current = new \DateTime( $row->start_date );
 				$current->modify( '+1 day' );
@@ -678,7 +742,7 @@ class CalendarAbilities {
 						continue;
 					}
 
-					$events_per_date[ $date ] = ( $events_per_date[ $date ] ?? 0 ) + 1;
+					$events_per_date[ $date ] = ( $events_per_date[ $date ] ?? 0 ) + $count;
 					$current->modify( '+1 day' );
 				}
 			}

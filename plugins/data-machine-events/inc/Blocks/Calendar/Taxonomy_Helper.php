@@ -8,7 +8,7 @@
 namespace DataMachineEvents\Blocks\Calendar;
 
 use DataMachineEvents\Core\Event_Post_Type;
-use DataMachineEvents\Blocks\Calendar\Query\DateFilter;
+use DataMachineEvents\Core\EventDatesTable;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -137,20 +137,30 @@ class Taxonomy_Helper {
 	}
 
 	/**
-	 * Get event counts for all terms in a taxonomy with a single query
+	 * Get event counts for all terms in a taxonomy with a single query.
 	 *
-	 * @param string $taxonomy_slug Taxonomy to count events for.
-	 * @param array  $date_context  Optional date filtering context.
-	 * @param array  $active_filters Optional active taxonomy filters for cross-filtering.
+	 * Always joins term_relationships → event_dates directly (no posts
+	 * table). event_dates.post_status is authoritative and only event-typed
+	 * posts ever get rows in that table, so filtering on
+	 * ed.post_status = 'publish' is sufficient to guarantee correctness
+	 * while avoiding the expensive posts join.
+	 *
+	 * @param string     $taxonomy_slug     Taxonomy to count events for.
+	 * @param array      $date_context      Optional date filtering context.
+	 * @param array      $active_filters    Optional active taxonomy filters for cross-filtering.
+	 * @param array|null $tax_query_override Optional taxonomy query override.
 	 * @return array Term ID => event count mapping.
 	 */
 	public static function get_batch_term_counts( $taxonomy_slug, $date_context = array(), $active_filters = array(), $tax_query_override = null ) {
 		global $wpdb;
 
-		$joins         = '';
-		$where_clauses = '';
+		$ed_table = EventDatesTable::table_name();
+
+		// Base join: term_relationships → event_dates (no posts hop).
+		// ed.post_status carries authoritative status for the event post type.
+		$joins         = "INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id";
+		$where_clauses = " AND ed.post_status = 'publish'";
 		$params        = array( $taxonomy_slug );
-		$has_date_filter = false;
 
 		if ( ! empty( $date_context ) ) {
 			$date_start       = $date_context['date_start'] ?? '';
@@ -159,26 +169,17 @@ class Taxonomy_Helper {
 			$current_datetime = current_time( 'mysql' );
 
 			if ( ! empty( $date_start ) && ! empty( $date_end ) ) {
-				$filter = DateFilter::date_range_sql( true, 'tr.object_id' );
-				$joins         .= ' ' . $filter['joins'];
-				$where_clauses .= ' AND ' . $filter['where'];
+				$where_clauses .= ' AND (ed.start_datetime >= %s AND ed.start_datetime <= %s)';
 				$params[]       = $date_start . ' 00:00:00';
 				$params[]       = $date_end . ' 23:59:59';
-				$has_date_filter = true;
 			} elseif ( $show_past ) {
-				$filter = DateFilter::past_sql( true, 'tr.object_id' );
-				$joins         .= ' ' . $filter['joins'];
-				$where_clauses .= ' AND ' . $filter['where'];
+				$where_clauses .= ' AND (ed.start_datetime < %s AND (ed.end_datetime < %s OR ed.end_datetime IS NULL))';
 				$params[]       = $current_datetime;
 				$params[]       = $current_datetime;
-				$has_date_filter = true;
 			} else {
-				$filter = DateFilter::upcoming_sql( true, 'tr.object_id' );
-				$joins         .= ' ' . $filter['joins'];
-				$where_clauses .= ' AND ' . $filter['where'];
+				$where_clauses .= ' AND (ed.start_datetime >= %s OR ed.end_datetime >= %s)';
 				$params[]       = $current_datetime;
 				$params[]       = $current_datetime;
-				$has_date_filter = true;
 			}
 		}
 
@@ -199,7 +200,7 @@ class Taxonomy_Helper {
 				$joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON tr.object_id = {$alias_tr}.object_id";
 				$joins .= " INNER JOIN {$wpdb->term_taxonomy} {$alias_tt} ON {$alias_tr}.term_taxonomy_id = {$alias_tt}.term_taxonomy_id";
 
-                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$where_clauses .= " AND {$alias_tt}.taxonomy = %s AND {$alias_tt}.term_id IN ($placeholders)";
 				$params[]       = $base_taxonomy;
 				$params         = array_merge( $params, $base_terms );
@@ -208,7 +209,7 @@ class Taxonomy_Helper {
 			}
 		}
 
-		// Cross-taxonomy filtering (exclude current taxonomy from cross-filter)
+		// Cross-taxonomy filtering (exclude current taxonomy from cross-filter).
 		$cross_filters = array_diff_key( $active_filters, array( $taxonomy_slug => true ) );
 		$join_index    = 0;
 		foreach ( $cross_filters as $filter_taxonomy => $term_ids ) {
@@ -225,7 +226,7 @@ class Taxonomy_Helper {
 			$joins .= " INNER JOIN {$wpdb->term_relationships} {$alias_tr} ON tr.object_id = {$alias_tr}.object_id";
 			$joins .= " INNER JOIN {$wpdb->term_taxonomy} {$alias_tt} ON {$alias_tr}.term_taxonomy_id = {$alias_tt}.term_taxonomy_id";
 
-            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$where_clauses .= " AND {$alias_tt}.taxonomy = %s AND {$alias_tt}.term_id IN ($placeholders)";
 			$params[]       = $filter_taxonomy;
 			$params         = array_merge( $params, $term_ids );
@@ -233,44 +234,20 @@ class Taxonomy_Helper {
 			++$join_index;
 		}
 
-		// When a date filter is active, event_dates provides post_status filtering
-		// so we can skip the expensive posts table JOIN entirely.
-		if ( $has_date_filter ) {
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$query = $wpdb->prepare(
-				"SELECT tt.term_id, COUNT(DISTINCT tr.object_id) as event_count
-				FROM {$wpdb->term_relationships} tr
-				INNER JOIN {$wpdb->term_taxonomy} tt
-					ON tr.term_taxonomy_id = tt.term_taxonomy_id
-				{$joins}
-				WHERE tt.taxonomy = %s
-				{$where_clauses}
-				GROUP BY tt.term_id",
-				$params
-			);
-		} else {
-			// No date filter — fall back to posts JOIN for type/status filtering.
-			$post_type = Event_Post_Type::POST_TYPE;
-			array_splice( $params, 1, 0, array( $post_type ) );
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$query = $wpdb->prepare(
-				"SELECT tt.term_id, COUNT(DISTINCT tr.object_id) as event_count
-				FROM {$wpdb->term_relationships} tr
-				INNER JOIN {$wpdb->term_taxonomy} tt
-					ON tr.term_taxonomy_id = tt.term_taxonomy_id
-				INNER JOIN {$wpdb->posts} p
-					ON tr.object_id = p.ID
-				{$joins}
-				WHERE tt.taxonomy = %s
-				AND p.post_type = %s
-				AND p.post_status = 'publish'
-				{$where_clauses}
-				GROUP BY tt.term_id",
-				$params
-			);
-		}
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$query = $wpdb->prepare(
+			"SELECT tt.term_id, COUNT(DISTINCT tr.object_id) as event_count
+			FROM {$wpdb->term_relationships} tr
+			INNER JOIN {$wpdb->term_taxonomy} tt
+				ON tr.term_taxonomy_id = tt.term_taxonomy_id
+			{$joins}
+			WHERE tt.taxonomy = %s
+			{$where_clauses}
+			GROUP BY tt.term_id",
+			$params
+		);
 
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$results = $wpdb->get_results( $query );
 
 		$counts = array();
