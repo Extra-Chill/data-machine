@@ -223,11 +223,19 @@ abstract class Step {
 	/**
 	 * Get handler configuration from flow step configuration.
 	 *
+	 * Handler-bearing steps store config keyed by handler_slug.
+	 * Handler-free step types (system_task, webhook_gate, ai with no handler)
+	 * have their config keyed by step_type slug instead, since there is no
+	 * handler to key under. This accessor handles both shapes.
+	 *
 	 * @return array Handler configuration array
 	 */
 	protected function getHandlerConfig(): array {
 		$slug = $this->getHandlerSlug();
-		return ! empty( $slug ) ? ( $this->flow_step_config['handler_configs'][ $slug ] ?? array() ) : array();
+		if ( ! empty( $slug ) ) {
+			return $this->flow_step_config['handler_configs'][ $slug ] ?? array();
+		}
+		return $this->flow_step_config['handler_configs'][ $this->step_type ] ?? array();
 	}
 
 	/**

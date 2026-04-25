@@ -323,13 +323,25 @@ class ExecuteWorkflowAbility {
 				$handler_slugs = $step['enabled_tools'];
 			}
 
+			// Preserve handler_config for handler-free step types (system_task,
+			// webhook_gate, ai with no handler) by keying it under the step
+			// type slug. Step::getHandlerConfig() falls back to this slot when
+			// no handler_slug is set, so SystemTaskStep can find its
+			// { task, params } config and the data is not silently dropped.
+			$handler_configs = array();
+			if ( ! empty( $handler_slug ) ) {
+				$handler_configs[ $handler_slug ] = $handler_config;
+			} elseif ( ! empty( $handler_config ) ) {
+				$handler_configs[ $step['type'] ] = $handler_config;
+			}
+
 			$flow_config[ $step_id ] = array(
 				'flow_step_id'     => $step_id,
 				'pipeline_step_id' => $pipeline_step_id,
 				'step_type'        => $step['type'],
 				'execution_order'  => $index,
 				'handler_slugs'    => $handler_slugs,
-				'handler_configs'  => ! empty( $handler_slug ) ? array( $handler_slug => $handler_config ) : array(),
+				'handler_configs'  => $handler_configs,
 				'user_message'     => $step['user_message'] ?? '',
 				'disabled_tools'   => $step['disabled_tools'] ?? array(),
 				'pipeline_id'      => 'direct',
