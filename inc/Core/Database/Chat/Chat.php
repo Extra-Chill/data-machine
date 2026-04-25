@@ -871,6 +871,62 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	}
 
 	/**
+	 * Cleanup pipeline transcript sessions older than the retention window.
+	 *
+	 * Pipeline transcripts are written by AIConversationLoop when persistence
+	 * is enabled. They live in the same chat_sessions table with
+	 * `mode='pipeline'` and `metadata.source='pipeline_transcript'`. This
+	 * cleanup is independent from the human chat retention so transcripts
+	 * can have a tighter TTL (default 30 days) without shortening human
+	 * chat retention (default 90 days).
+	 *
+	 * Idempotent. Safe to call from a recurring action.
+	 *
+	 * @since next
+	 * @param int $retention_days Days to retain pipeline transcripts.
+	 * @return int Number of deleted transcript sessions.
+	 */
+	public function cleanup_pipeline_transcripts( int $retention_days ): int {
+		global $wpdb;
+
+		if ( $retention_days <= 0 ) {
+			return 0;
+		}
+
+		$table_name  = self::get_prefixed_table_name();
+		$cutoff_date = gmdate( 'Y-m-d H:i:s', strtotime( "-{$retention_days} days" ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$deleted = $wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM %i
+				WHERE mode = %s
+				AND metadata LIKE %s
+				AND updated_at < %s",
+				$table_name,
+				'pipeline',
+				'%"source":"pipeline_transcript"%',
+				$cutoff_date
+			)
+		);
+
+		if ( $deleted > 0 ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Cleaned up old pipeline transcript sessions',
+				array(
+					'deleted_count'  => $deleted,
+					'retention_days' => $retention_days,
+					'cutoff_date'    => $cutoff_date,
+				)
+			);
+		}
+
+		return (int) $deleted;
+	}
+
+	/**
 	 * Cleanup orphaned sessions from timeout failures
 	 *
 	 * Deletes sessions that:
@@ -1042,6 +1098,16 @@ add_action(
 
 		$retention_days = \DataMachine\Core\PluginSettings::get( 'chat_retention_days', 90 );
 
+		// Pipeline transcripts get their own (typically tighter) retention.
+		// Run this first so transcripts past the transcript TTL are gone
+		// before the broader sweep runs; anything that slips through still
+		// gets caught by the human-chat retention floor below.
+		$transcript_retention_days = (int) get_option( 'datamachine_pipeline_transcript_retention_days', 30 );
+		$transcripts_deleted       = 0;
+		if ( $transcript_retention_days > 0 && method_exists( $chat_db, 'cleanup_pipeline_transcripts' ) ) {
+			$transcripts_deleted = $chat_db->cleanup_pipeline_transcripts( $transcript_retention_days );
+		}
+
 		$deleted_count = $chat_db->cleanup_old_sessions( $retention_days );
 
 		do_action(
@@ -1049,8 +1115,10 @@ add_action(
 			'debug',
 			'Chat sessions cleanup completed',
 			array(
-				'sessions_deleted' => $deleted_count,
-				'retention_days'   => $retention_days,
+				'sessions_deleted'             => $deleted_count,
+				'retention_days'               => $retention_days,
+				'transcripts_deleted'          => $transcripts_deleted,
+				'transcript_retention_days'    => $transcript_retention_days,
 			)
 		);
 	}

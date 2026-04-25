@@ -11,6 +11,7 @@ use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\ConversationManager;
+use DataMachine\Engine\AI\PipelineTranscriptPolicy;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 
@@ -221,14 +222,23 @@ class AIStep extends Step {
 		$agent_id     = (int) ( $job_snapshot['agent_id'] ?? 0 );
 		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
 
+		// Resolve transcript persistence policy once per AI step invocation.
+		// Resolution order: flow > pipeline > site option (default false).
+		// The boolean is threaded through $payload so the loop doesn't need
+		// to repeat the lookup every turn.
+		$persist_transcript = PipelineTranscriptPolicy::shouldPersist( $this->engine );
+
 		$payload = array(
-			'job_id'       => $this->job_id,
-			'flow_step_id' => $this->flow_step_id,
-			'step_id'      => $pipeline_step_id,
-			'data'         => $this->dataPackets,
-			'engine'       => $this->engine,
-			'user_id'      => $user_id,
-			'agent_id'     => $agent_id,
+			'job_id'             => $this->job_id,
+			'flow_step_id'       => $this->flow_step_id,
+			'step_id'            => $pipeline_step_id,
+			'data'               => $this->dataPackets,
+			'engine'             => $this->engine,
+			'user_id'            => $user_id,
+			'agent_id'           => $agent_id,
+			'pipeline_id'        => $job_snapshot['pipeline_id'] ?? null,
+			'flow_id'            => $job_snapshot['flow_id'] ?? null,
+			'persist_transcript' => $persist_transcript,
 		);
 
 		$navigator             = new \DataMachine\Engine\StepNavigator();
@@ -358,6 +368,18 @@ class AIStep extends Step {
 
 		// Check for errors
 		if ( isset( $loop_result['error'] ) ) {
+			// Record the transcript on the failure path too so operators
+			// can `wp datamachine jobs transcript <id>` and see exactly
+			// what the model received before the AI request died. This
+			// mirrors the same merge pattern used for the success path.
+			$transcript_session_id = $loop_result['transcript_session_id'] ?? '';
+			if ( '' !== $transcript_session_id && $this->job_id > 0 ) {
+				datamachine_merge_engine_data(
+					$this->job_id,
+					array( 'transcript_session_id' => $transcript_session_id )
+				);
+			}
+
 			do_action(
 				'datamachine_fail_job',
 				$this->job_id,
@@ -377,6 +399,17 @@ class AIStep extends Step {
 		$usage = $loop_result['usage'] ?? array();
 		if ( ! empty( $usage ) && $this->job_id > 0 && ( $usage['total_tokens'] ?? 0 ) > 0 ) {
 			datamachine_merge_engine_data( $this->job_id, array( 'token_usage' => $usage ) );
+		}
+
+		// Store the transcript session ID when the AI loop persisted one.
+		// Same merge pattern as token_usage so handler-tool-written keys
+		// (event_id, post_id, etc.) are preserved.
+		$transcript_session_id = $loop_result['transcript_session_id'] ?? '';
+		if ( '' !== $transcript_session_id && $this->job_id > 0 ) {
+			datamachine_merge_engine_data(
+				$this->job_id,
+				array( 'transcript_session_id' => $transcript_session_id )
+			);
 		}
 
 		// Process loop results into data packets

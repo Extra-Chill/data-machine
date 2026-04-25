@@ -11,6 +11,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\IterationBudgetRegistry;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
@@ -214,7 +215,7 @@ class AIConversationLoop {
 					)
 				);
 
-				return array(
+				$failure_result = array(
 					'messages'        => $messages,
 					'final_content'   => '',
 					'turn_count'      => $turn_count,
@@ -223,6 +224,22 @@ class AIConversationLoop {
 					'error'           => $ai_response['error'] ?? 'AI request failed',
 					'usage'           => $total_usage,
 				);
+
+				// Persist transcript on the error path too — this is exactly
+				// the scenario the feature exists for. Failing silently here
+				// would defeat the debugging value.
+				$transcript_session_id = self::maybePersistTranscript(
+					$messages,
+					$provider,
+					$model,
+					$payload,
+					$failure_result
+				);
+				if ( '' !== $transcript_session_id ) {
+					$failure_result['transcript_session_id'] = $transcript_session_id;
+				}
+
+				return $failure_result;
 			}
 
 			$tool_calls = $ai_response['data']['tool_calls'] ?? array();
@@ -496,6 +513,125 @@ class AIConversationLoop {
 			$result['max_turns_reached'] = true;
 		}
 
+		$transcript_session_id = self::maybePersistTranscript(
+			$messages,
+			$provider,
+			$model,
+			$payload,
+			$result
+		);
+		if ( '' !== $transcript_session_id ) {
+			$result['transcript_session_id'] = $transcript_session_id;
+		}
+
 		return $result;
+	}
+
+	/**
+	 * Persist the conversation transcript when the caller has opted in.
+	 *
+	 * Opt-in is signaled by `$payload['persist_transcript']` (resolved in
+	 * AIStep::executeStep() via PipelineTranscriptPolicy). When enabled,
+	 * a chat session is created with `mode='pipeline'` and metadata
+	 * `source='pipeline_transcript'` so it can be filtered out of the
+	 * human chat session list.
+	 *
+	 * Persistence is opportunistic: any failure (store unavailable,
+	 * insert error) is logged at debug level and returns an empty
+	 * string. Transcript persistence MUST NOT break the AI step.
+	 *
+	 * @param array  $messages Final conversation messages.
+	 * @param string $provider Provider identifier.
+	 * @param string $model    Model identifier.
+	 * @param array  $payload  Loop payload (job_id, agent_id, etc.).
+	 * @param array  $result   Loop result so far (used for outcome metadata).
+	 * @return string Session ID on success, empty string when not persisted.
+	 */
+	private static function maybePersistTranscript(
+		array $messages,
+		string $provider,
+		string $model,
+		array $payload,
+		array $result
+	): string {
+		if ( empty( $payload['persist_transcript'] ) ) {
+			return '';
+		}
+
+		// Without messages there's nothing useful to persist. This guards
+		// against the early-failure path where the first AI request errored
+		// before any message was assembled.
+		if ( empty( $messages ) ) {
+			return '';
+		}
+
+		$store = ConversationStoreFactory::get();
+
+		$user_id  = (int) ( $payload['user_id'] ?? 0 );
+		$agent_id = (int) ( $payload['agent_id'] ?? 0 );
+
+		$metadata = array(
+			'source'        => 'pipeline_transcript',
+			'job_id'        => $payload['job_id'] ?? null,
+			'flow_step_id'  => $payload['flow_step_id'] ?? null,
+			'pipeline_id'   => $payload['pipeline_id'] ?? null,
+			'flow_id'       => $payload['flow_id'] ?? null,
+			'agent_id'      => $agent_id ?: null,
+			'owner_id'      => $user_id ?: null,
+			'provider'      => $provider,
+			'model'         => $model,
+			'turn_count'    => $result['turn_count'] ?? 0,
+			'completed'     => (bool) ( $result['completed'] ?? false ),
+			'error'         => $result['error'] ?? null,
+			'usage'         => $result['usage'] ?? array(),
+		);
+
+		$session_id = $store->create_session( $user_id, $agent_id, $metadata, 'pipeline' );
+
+		if ( '' === $session_id ) {
+			do_action(
+				'datamachine_log',
+				'debug',
+				'AIConversationLoop: Failed to create transcript session',
+				array(
+					'job_id'       => $payload['job_id'] ?? null,
+					'flow_step_id' => $payload['flow_step_id'] ?? null,
+				)
+			);
+			return '';
+		}
+
+		$updated = $store->update_session( $session_id, $messages, $metadata, $provider, $model );
+		if ( ! $updated ) {
+			do_action(
+				'datamachine_log',
+				'debug',
+				'AIConversationLoop: Failed to write transcript messages',
+				array(
+					'session_id'   => $session_id,
+					'job_id'       => $payload['job_id'] ?? null,
+					'flow_step_id' => $payload['flow_step_id'] ?? null,
+				)
+			);
+			// Best-effort cleanup so we don't leave an empty pipeline-mode
+			// row behind. Failure to delete is non-fatal — retention will
+			// catch it eventually.
+			$store->delete_session( $session_id );
+			return '';
+		}
+
+		do_action(
+			'datamachine_log',
+			'debug',
+			'AIConversationLoop: Transcript persisted',
+			array(
+				'session_id'   => $session_id,
+				'job_id'       => $payload['job_id'] ?? null,
+				'flow_step_id' => $payload['flow_step_id'] ?? null,
+				'turn_count'   => $result['turn_count'] ?? 0,
+			)
+		);
+
+		return $session_id;
 	}
 }
