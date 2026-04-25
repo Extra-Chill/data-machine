@@ -47,7 +47,7 @@ Mechanics:
 
 - After a step succeeds, the engine counts the DataPackets it returned.
 - ≤ 1 packet: **inline continuation**. The same job continues to the next step. No fan-out.
-- &gt; 1 packets (after `filterPacketsForFanOut`): the current job becomes the **batch parent**. `PipelineBatchScheduler::fanOut()` records batch state on the parent's `engine_data` and schedules child-creation in chunks via Action Scheduler. Each chunk is `CHUNK_SIZE = 10` children, with `CHUNK_DELAY = 30` seconds between chunks so the queue doesn't flood.
+- &gt; 1 packets (after `filterPacketsForFanOut`): the current job becomes the **batch parent**. `PipelineBatchScheduler::fanOut()` hands the packet list to the shared `BatchScheduler` primitive, which records batch state on the parent's `engine_data` and schedules child-creation in chunks via Action Scheduler. Chunk size and chunk delay come from the `queue_tuning` settings group (`chunk_size` defaults to 10, `chunk_delay` defaults to 30 seconds). Both are tunable in **Settings → General → Queue Performance** and overridable per-context via the `datamachine_batch_chunk_size` / `datamachine_batch_chunk_delay` filters.
 - Each child job inherits a clone of the parent's `engine_data` plus per-item engine data from its own packet's `metadata['_engine_data']`, plus dedup context (`item_identifier`, `source_type`). Children carry the parent's `agent_id` and `user_id` so downstream consumers (memory directives, permission resolution, model selection) bind to the right agent.
 - `PipelineBatchScheduler::onChildComplete()` is wired to `datamachine_job_complete` and decides the parent's final status from the child status counts.
 
@@ -77,7 +77,7 @@ Non-handler tool calls (search, fetch, generic abilities) don't move the complet
 |------|----------|---------|----------|-------------|-------|
 | **1. Queueable fetch** | `Core/Steps/Fetch/FetchStep.php` + `Core/Steps/QueueableTrait.php::popQueuedConfigPatch` | `flow_step_config['queue_enabled']` + a non-empty per-flow-step queue | Static handler config; or one queued patch popped per tick | Many ticks, each popping the next patch | Across ticks |
 | **2. `max_items`** | `Core/Steps/Fetch/Handlers/FetchHandler.php::get_fetch_data` | `handler_config['max_items']`, applied after dedup | One DataPacket per fetch call | N DataPackets per fetch call | Inside one fetch call |
-| **3. Batch fan-out** | `Abilities/Engine/PipelineBatchScheduler.php::fanOut` (called from `ExecuteStepAbility`) | Any step returning > 1 DataPacket after filtering | Inline continuation on the same job | N child jobs, scheduled in chunks of 10 every 30s | Across child jobs in one run |
+| **3. Batch fan-out** | `Abilities/Engine/PipelineBatchScheduler.php::fanOut` + `Core/ActionScheduler/BatchScheduler.php` (called from `ExecuteStepAbility`) | Any step returning > 1 DataPacket after filtering | Inline continuation on the same job | N child jobs, scheduled in chunks of `chunk_size` every `chunk_delay` seconds (defaults: 10 / 30) | Across child jobs in one run |
 | **4. Multi-handler completion** | `Engine/AI/AIConversationLoop.php` (~line 359) | `flow_step_config['handler_slugs']` length on a pipeline-mode AI step | Loop completes after first successful handler tool | Loop runs until every configured handler has fired | Across turns of one conversation |
 
 ## Composed example
@@ -133,7 +133,8 @@ A backfill flow with `queue_enabled = true`, a queue seeded with twelve monthly 
 ```
 tick 0   pop {after:"2015-01-01", before:"2015-02-01"}
          fetch returns 47 items → 47 DataPackets
-         engine fans out: 47 children (chunk 1: 10, chunk 2: 10 (+30s),
+         engine fans out: 47 children (default chunk_size=10, chunk_delay=30s:
+                                       chunk 1: 10, chunk 2: 10 (+30s),
                                        chunk 3: 10 (+60s), chunk 4: 10 (+90s),
                                        chunk 5: 7  (+120s))
          each child runs AI step → publishes via configured handlers
@@ -155,19 +156,21 @@ Axis 1 paces *which* slice gets touched. Axis 2 caps the slice. Axis 3 paralleli
 
 ## Two near-misses
 
-### `max_items` (axis 2) vs. `CHUNK_SIZE` (axis 3) — different layers
+### `max_items` (axis 2) vs. `chunk_size` (axis 3) — different layers
 
 Both look like "max N at a time." They aren't the same thing.
 
-| | `max_items` | `CHUNK_SIZE` |
+| | `max_items` | `chunk_size` |
 |---|---|---|
-| Where | Handler config field, enforced in `FetchHandler::get_fetch_data` | Hard-coded constant on `PipelineBatchScheduler` |
-| Cap on | Items returned from the source per fetch call | Child jobs scheduled per Action Scheduler tick |
-| Visible to | Pipeline author / agent (`max_items` is a UI field with default 1) | Engine internals only — not configurable per pipeline |
-| Purpose | Source-side rate / batch shaping | Action Scheduler queue throughput |
+| Where | Handler config field, enforced in `FetchHandler::get_fetch_data` | `queue_tuning` setting, read by `BatchScheduler::chunkSize()` |
+| Cap on | Items returned from the source per fetch call | Child jobs created per scheduling cycle |
+| Visible to | Pipeline author / agent (`max_items` is a UI field with default 1) | Site operator (Settings → General → Queue Performance, default 10) |
+| Purpose | Source-side rate / batch shaping | Producer-side throttle on how fast jobs reach Action Scheduler |
 | Relationship to packets | Decides how many packets are produced | Decides how fast existing packets become child jobs |
 
-A flow with `max_items = 50` and 50 packets produces 50 child jobs. They are *all* scheduled — `CHUNK_SIZE` only controls that 10 are created right now and the next 10 30 seconds later. `CHUNK_SIZE` doesn't drop anything; `max_items` does.
+A flow with `max_items = 50` and 50 packets produces 50 child jobs. They are *all* scheduled — `chunk_size` only controls that 10 are created right now and the next 10 `chunk_delay` seconds later. `chunk_size` doesn't drop anything; `max_items` does.
+
+Note: `chunk_size` is the **producer-side** knob (how DM creates child jobs). The complementary **consumer-side** knobs (`concurrent_batches`, `batch_size`, `time_limit`) live in the same `queue_tuning` settings group and control how Action Scheduler drains the resulting queue. Tune them together — bumping consumer-side concurrency without bumping producer-side chunking leaves the queue runner idle waiting for work.
 
 ### Queueable fetch vs. queueable AI — same primitive, two consumption shapes
 
@@ -186,7 +189,7 @@ The persistence layer (`QueueAbility`), the per-flow-step FIFO ordering, the `qu
 
 - **"I want this flow to drain a multi-window backfill over the next N ticks."** Axis 1 (queueable fetch). Seed N JSON patches into the flow step's queue. Each tick pops one.
 - **"I want each fetch call to return up to N items instead of 1."** Axis 2 (`max_items`). Set the handler's `max_items` field. Default is 1; `0` means unlimited. Items fetched but capped surface on the next call — nothing is dropped.
-- **"My fetch returns N items and I want N parallel runs of the rest of the pipeline."** Axis 3 (batch fan-out). Automatic — no configuration. The engine fans out any time a step emits more than one DataPacket. Tune throughput by adjusting `max_items` upstream, not the (non-configurable) `CHUNK_SIZE`.
+- **"My fetch returns N items and I want N parallel runs of the rest of the pipeline."** Axis 3 (batch fan-out). Automatic — no per-pipeline configuration. The engine fans out any time a step emits more than one DataPacket. Tune **how many** packets get produced via `max_items` (axis 2). Tune **how fast** they become child jobs via `chunk_size` / `chunk_delay` in Settings → General → Queue Performance (or the matching filters).
 - **"My AI step needs to publish to multiple destinations in one conversation."** Axis 4 (multi-handler completion). Set `flow_step_config['handler_slugs']` to the list of handler slugs the loop must satisfy before it can terminate. Empty list falls back to first-handler-wins.
 
 The four axes are independent. A pipeline can use any subset:
