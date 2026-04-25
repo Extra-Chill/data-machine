@@ -15,6 +15,7 @@ namespace DataMachine\Engine\AI\System;
 
 defined( 'ABSPATH' ) || exit;
 
+use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Engine\AI\System\Tasks\AgentPingTask;
 use DataMachine\Engine\AI\System\Tasks\AltTextTask;
 use DataMachine\Engine\AI\System\Tasks\DailyMemoryTask;
@@ -94,13 +95,19 @@ class SystemAgentServiceProvider {
 	 */
 	public function getBuiltInSchedules( array $schedules ): array {
 		$schedules['daily_memory_generation'] = array(
-			'task_type'          => 'daily_memory_generation',
-			'interval'           => 'daily',
-			'enabled_setting'    => 'daily_memory_enabled',
-			'default_enabled'    => false,
-			'label'              => 'Daily at midnight UTC',
-			'first_run_callback' => 'strtotime',
-			'first_run_arg'      => 'tomorrow midnight',
+			'task_type'            => 'daily_memory_generation',
+			'interval'             => 'daily',
+			'enabled_setting'      => 'daily_memory_enabled',
+			'default_enabled'      => false,
+			'label'                => 'Daily at midnight UTC',
+			'first_run_callback'   => 'strtotime',
+			'first_run_arg'        => 'tomorrow midnight',
+			// Each agent owns its own MEMORY.md and daily archive — fan
+			// out so every active agent gets compacted on the daily tick.
+			// Without this, only the install's primary agent (oldest by
+			// agent_id) ever has its memory compacted; agents 2+ grow
+			// forever.
+			'per_agent'            => true,
 			'task_params_callback' => static function () {
 				return array( 'date' => gmdate( 'Y-m-d' ) );
 			},
@@ -145,6 +152,12 @@ class SystemAgentServiceProvider {
 		// Generic per-schedule handler: one action hook per registered
 		// recurring schedule. Action Scheduler fires the hook; the closure
 		// enqueues an ephemeral DM job with the task's params via TaskScheduler.
+		//
+		// When the schedule declares per_agent => true, the closure
+		// iterates every active agent and fires one job per agent with
+		// that agent's identity in $context. Without this, recurring
+		// per-agent tasks (daily memory) only run against the install's
+		// primary agent.
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
 			$hook        = RecurringScheduleRegistry::hookFor( $schedule );
 			$task_type   = $schedule['task_type'];
@@ -161,6 +174,42 @@ class SystemAgentServiceProvider {
 					$params = $def['task_params'] ?? array();
 					if ( ! empty( $def['task_params_callback'] ) && is_callable( $def['task_params_callback'] ) ) {
 						$params = (array) call_user_func( $def['task_params_callback'] );
+					}
+
+					if ( ! empty( $def['per_agent'] ) ) {
+						$agents_repo = new Agents();
+						$agents      = $agents_repo->get_all();
+
+						if ( empty( $agents ) ) {
+							// No agents on this install — fall back to a
+							// single site-scoped run so the task still
+							// fires (mirrors pre-multi-agent behaviour).
+							TaskScheduler::schedule( $task_type, $params );
+							return;
+						}
+
+						foreach ( $agents as $agent ) {
+							$agent_id = (int) ( $agent['agent_id'] ?? 0 );
+							$owner_id = (int) ( $agent['owner_id'] ?? 0 );
+
+							if ( $agent_id <= 0 ) {
+								continue;
+							}
+
+							$agent_params             = $params;
+							$agent_params['agent_id'] = $agent_id;
+							$agent_params['user_id']  = $owner_id;
+
+							TaskScheduler::schedule(
+								$task_type,
+								$agent_params,
+								array(
+									'agent_id' => $agent_id,
+									'user_id'  => $owner_id,
+								)
+							);
+						}
+						return;
 					}
 
 					TaskScheduler::schedule( $task_type, $params );
