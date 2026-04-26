@@ -14,7 +14,7 @@ import {
 	Button,
 	TextareaControl,
 	Spinner,
-	CheckboxControl,
+	SelectControl,
 } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 /**
@@ -25,8 +25,27 @@ import {
 	useAddToQueue,
 	useClearQueue,
 	useRemoveFromQueue,
-	useUpdateQueueSettings,
+	useUpdateQueueMode,
 } from '../../queries/queue';
+
+/**
+ * Queue mode options for the SelectControl. The value strings must match
+ * the server-side enum on /flows/{id}/queue/mode (drain | loop | static).
+ */
+const QUEUE_MODE_OPTIONS = [
+	{
+		value: 'static',
+		label: __( 'Static — peek head every run, do not pop', 'data-machine' ),
+	},
+	{
+		value: 'drain',
+		label: __( 'Drain — pop head per run, discard', 'data-machine' ),
+	},
+	{
+		value: 'loop',
+		label: __( 'Loop — pop head per run, append to tail', 'data-machine' ),
+	},
+];
 
 /**
  * Flow Queue Modal Component
@@ -47,39 +66,39 @@ export default function FlowQueueModal( {
 } ) {
 	const [ newPrompt, setNewPrompt ] = useState( '' );
 	const [ confirmClear, setConfirmClear ] = useState( false );
-	const [ queueEnabled, setQueueEnabled ] = useState( false );
+	const [ queueMode, setQueueMode ] = useState( 'static' );
 
 	// Query hooks
 	const { data, isLoading, error } = useFlowQueue( flowId, flowStepId );
 	const addMutation = useAddToQueue();
 	const clearMutation = useClearQueue();
 	const removeMutation = useRemoveFromQueue();
-	const updateSettingsMutation = useUpdateQueueSettings();
+	const updateModeMutation = useUpdateQueueMode();
 
 	const queue = data?.queue || [];
 	const isOperating =
 		addMutation.isPending ||
 		clearMutation.isPending ||
 		removeMutation.isPending ||
-		updateSettingsMutation.isPending;
+		updateModeMutation.isPending;
 
 	useEffect( () => {
-		if ( typeof data?.queueEnabled === 'boolean' ) {
-			setQueueEnabled( data.queueEnabled );
+		if ( typeof data?.queueMode === 'string' ) {
+			setQueueMode( data.queueMode );
 		}
-	}, [ data?.queueEnabled ] );
+	}, [ data?.queueMode ] );
 
-	const handleQueueEnabledChange = useCallback(
-		( enabled ) => {
-			setQueueEnabled( enabled );
-			updateSettingsMutation.mutate( {
+	const handleQueueModeChange = useCallback(
+		( mode ) => {
+			setQueueMode( mode );
+			updateModeMutation.mutate( {
 				flowId,
 				flowStepId,
 				pipelineId,
-				queueEnabled: enabled,
+				mode,
 			} );
 		},
-		[ flowId, flowStepId, pipelineId, updateSettingsMutation ]
+		[ flowId, flowStepId, pipelineId, updateModeMutation ]
 	);
 
 	/**
@@ -181,13 +200,14 @@ export default function FlowQueueModal( {
 
 				{ flowStepId && (
 					<div className="datamachine-modal-spacing--mb-20">
-						<CheckboxControl
-							label={ __( 'Queue enabled', 'data-machine' ) }
-							checked={ queueEnabled }
-							onChange={ handleQueueEnabledChange }
+						<SelectControl
+							label={ __( 'Queue mode', 'data-machine' ) }
+							value={ queueMode }
+							options={ QUEUE_MODE_OPTIONS }
+							onChange={ handleQueueModeChange }
 							disabled={ isOperating }
 							help={ __(
-								'When enabled, the queue pops the next prompt each run. When disabled, the first queued prompt is reused every run without popping.',
+								'Static reuses the head every run. Drain pops the head and discards it. Loop pops the head and appends it to the tail so the queue rotates indefinitely.',
 								'data-machine'
 							) }
 						/>
@@ -344,7 +364,7 @@ export default function FlowQueueModal( {
 							{ __( 'How it works:', 'data-machine' ) }
 						</strong>{ ' ' }
 						{ __(
-							'Prompts are processed in order (FIFO). When queue is enabled, the first prompt is removed each run. When disabled, the first prompt is reused each run without popping.',
+							'Prompts are processed in order (FIFO). The queue mode decides what happens to the head after each run: static peeks without mutating, drain pops and discards, loop pops and appends to the tail.',
 							'data-machine'
 						) }
 					</p>

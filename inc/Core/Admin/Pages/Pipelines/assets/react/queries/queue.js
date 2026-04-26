@@ -17,9 +17,26 @@ import {
 	clearFlowQueue,
 	removeFromFlowQueue,
 	updateFlowQueueItem,
-	updateFlowQueueSettings,
+	updateFlowQueueMode,
 } from '../utils/api';
 import { normalizeId } from '../utils/ids';
+
+/**
+ * Valid queue access modes (must match the server-side enum on
+ * /flows/{id}/queue/mode and AIStep / FetchStep config).
+ */
+const QUEUE_MODES = [ 'drain', 'loop', 'static' ];
+
+/**
+ * Normalize a queue mode value, falling back to "static" for unknown
+ * or missing values. Mirrors the server-side default in AIStep and
+ * FetchStep when the key is absent on the flow_step_config.
+ *
+ * @param {*} value Raw value from the server or cache.
+ * @return {string} Normalized mode.
+ */
+const normalizeQueueMode = ( value ) =>
+	QUEUE_MODES.includes( value ) ? value : 'static';
 
 /**
  * Invalidate flows cache scoped to a specific pipeline when available.
@@ -62,7 +79,7 @@ export const useFlowQueue = ( flowId, flowStepId ) => {
 			return {
 				queue: response.data?.queue || [],
 				count: response.data?.count || 0,
-				queueEnabled: !! response.data?.queue_enabled,
+				queueMode: normalizeQueueMode( response.data?.queue_mode ),
 			};
 		},
 		enabled: !! cachedFlowId && !! cachedFlowStepId,
@@ -119,7 +136,6 @@ export const useClearQueue = () => {
 				cachedFlowId,
 				cachedFlowStepId,
 			] );
-			const queueEnabled = previousQueue?.queueEnabled;
 
 			// Optimistically clear the cache
 			queryClient.setQueryData(
@@ -127,10 +143,7 @@ export const useClearQueue = () => {
 				{
 					queue: [],
 					count: 0,
-					queueEnabled:
-						typeof queueEnabled === 'boolean'
-							? queueEnabled
-							: false,
+					queueMode: normalizeQueueMode( previousQueue?.queueMode ),
 				}
 			);
 
@@ -175,7 +188,9 @@ export const useRemoveFromQueue = () => {
 							( _, i ) => i !== index
 						),
 						count: Math.max( 0, previousQueue.count - 1 ),
-						queueEnabled: previousQueue.queueEnabled,
+						queueMode: normalizeQueueMode(
+							previousQueue.queueMode
+						),
 					}
 				);
 			}
@@ -256,7 +271,9 @@ export const useUpdateQueueItem = () => {
 					{
 						queue: newQueue,
 						count: newQueue.length,
-						queueEnabled: previousQueue.queueEnabled,
+						queueMode: normalizeQueueMode(
+							previousQueue.queueMode
+						),
 					}
 				);
 			}
@@ -291,17 +308,22 @@ export const useUpdateQueueItem = () => {
 };
 
 /**
- * Update queue settings for a flow step
+ * Update queue mode for a flow step
+ *
+ * Replaces the legacy `useUpdateQueueSettings` boolean toggle. Post-#1291
+ * the queue access pattern is a three-state enum (drain | loop | static)
+ * stored on `flow_step_config.queue_mode` and read by AIStep, FetchStep,
+ * and AgentPingTask via the same path.
  *
  * @return {Object} Mutation result
  */
-export const useUpdateQueueSettings = () => {
+export const useUpdateQueueMode = () => {
 	const queryClient = useQueryClient();
 
 	return useMutation( {
-		mutationFn: ( { flowId, flowStepId, queueEnabled } ) =>
-			updateFlowQueueSettings( flowId, flowStepId, queueEnabled ),
-		onMutate: async ( { flowId, flowStepId, queueEnabled } ) => {
+		mutationFn: ( { flowId, flowStepId, mode } ) =>
+			updateFlowQueueMode( flowId, flowStepId, mode ),
+		onMutate: async ( { flowId, flowStepId, mode } ) => {
 			const cachedFlowId = normalizeId( flowId );
 			const cachedFlowStepId = flowStepId ? String( flowStepId ) : null;
 
@@ -320,7 +342,7 @@ export const useUpdateQueueSettings = () => {
 					[ 'flowQueue', cachedFlowId, cachedFlowStepId ],
 					{
 						...previousQueue,
-						queueEnabled: !! queueEnabled,
+						queueMode: normalizeQueueMode( mode ),
 					}
 				);
 			}

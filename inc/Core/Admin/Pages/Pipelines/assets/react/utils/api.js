@@ -634,20 +634,16 @@ export const updateFlowQueueItem = async (
 };
 
 /**
- * Update queue settings for a flow step
+ * Update queue mode for a flow step
  *
- * @param {number}  flowId       - Flow ID
- * @param {string}  flowStepId   - Flow step ID
- * @param {boolean} queueEnabled - Whether queue pop is enabled
+ * @param {number} flowId     - Flow ID
+ * @param {string} flowStepId - Flow step ID
+ * @param {string} mode       - Queue access mode: "drain" | "loop" | "static"
  * @return {Promise<Object>} Result
  */
-export const updateFlowQueueSettings = async (
-	flowId,
-	flowStepId,
-	queueEnabled
-) => {
-	return await client.put( `/flows/${ flowId }/queue/settings`, {
+export const updateFlowQueueMode = async ( flowId, flowStepId, mode ) => {
+	return await client.put( `/flows/${ flowId }/queue/mode`, {
 		flow_step_id: flowStepId,
-		queue_enabled: queueEnabled,
+		mode,
 	} );
 };

@@ -26,7 +26,7 @@ import { AUTO_SAVE_DELAY } from '../../utils/constants';
  * @param {string}   props.flowStepId     - Flow step ID.
  * @param {string}   props.prompt         - Current prompt value (from handler_config or user_message).
  * @param {Array}    props.promptQueue    - Prompt queue array.
- * @param {boolean}  props.queueEnabled   - Whether queue is enabled.
+ * @param {string}   props.queueMode      - Queue access mode: "drain" | "loop" | "static".
  * @param {string}   props.placeholder    - Placeholder text.
  * @param {string}   props.label          - Field label override.
  * @param {Function} props.onSave         - Save callback for non-queue saves (receives prompt string).
@@ -40,7 +40,7 @@ export default function QueueablePromptField( {
 	pipelineId,
 	prompt = '',
 	promptQueue = [],
-	queueEnabled = false,
+	queueMode = 'static',
 	placeholder,
 	label,
 	onSave,
@@ -50,7 +50,11 @@ export default function QueueablePromptField( {
 	const queueCount = promptQueue.length;
 	const queueHasItems = queueCount > 0;
 	const firstQueuePrompt = queueHasItems ? promptQueue[ 0 ].prompt : '';
-	const shouldUseQueue = queueEnabled || queueHasItems;
+	// Drain/loop are the actively-mutating modes; static peeks without
+	// popping. The field routes saves through the queue whenever the
+	// mode is active OR items already exist (so editing the head of a
+	// dormant static stockpile still updates index 0).
+	const shouldUseQueue = queueMode !== 'static' || queueHasItems;
 
 	const [ localValue, setLocalValue ] = useState(
 		firstQueuePrompt || prompt || ''
@@ -204,12 +208,12 @@ export default function QueueablePromptField( {
 				);
 			}
 			return __(
-				'Queue enabled. Type a prompt to add it to the queue. Use Manage Queue for multiple prompts.',
+				'Queue active. Type a prompt to add it to the queue. Use Manage Queue for multiple prompts or to change mode.',
 				'data-machine'
 			);
 		}
 		return __(
-			'Type a prompt to save it directly. Enable the queue to pop prompts in order.',
+			'Type a prompt to save it directly. Switch the queue to drain or loop mode in Manage Queue to rotate prompts.',
 			'data-machine'
 		);
 	};
