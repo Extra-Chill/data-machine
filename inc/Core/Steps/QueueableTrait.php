@@ -85,11 +85,32 @@ trait QueueableTrait {
 	 * is a structured config dict rather than a scalar prompt. The popped
 	 * prompt string is JSON-decoded and returned as an array.
 	 *
-	 * Typical use: fetch step pops a date-window dict
-	 * (e.g. `{"after":"2015-05-01","before":"2015-06-01"}` or
-	 * `{"params":{"after":"2015-05-01","before":"2015-06-01"}}`) and the
-	 * caller deep-merges it into the existing handler config to drive
-	 * windowed retroactive backfills.
+	 * Typical use: fetch step pops a config patch and the caller
+	 * deep-merges it into the existing handler config to drive windowed
+	 * retroactive backfills, rotating sources, or any other per-tick
+	 * config rotation.
+	 *
+	 * **Patch shape must mirror the handler's static config shape.** The
+	 * merge is opaque (it knows nothing about handler-specific layout),
+	 * so a key in the patch lands at the same nesting depth in the
+	 * handler config. For example, the MCP fetch handler stores its tool
+	 * parameters as a JSON-encoded string under the `params` key, so a
+	 * date-window patch for an MCP flow must nest the date keys inside
+	 * `params`:
+	 *
+	 *   {"params":{"after":"2015-05-01","before":"2015-06-01"}}
+	 *
+	 * For a handler whose params live at the top level (e.g. RSS, which
+	 * reads `$config['feed_url']` directly), a top-level patch shape is
+	 * correct:
+	 *
+	 *   {"feed_url":"https://example.com/feed.xml"}
+	 *
+	 * If the patch is shaped at the wrong nesting level the keys will
+	 * land on top-level config slots the handler never reads, and they
+	 * will be silently ignored downstream. The merge log line includes
+	 * both `patch_keys` and `merged_keys` to make this kind of
+	 * mis-shaping visible at debug time.
 	 *
 	 * Empty queue and disabled queue both return `from_queue: false` with
 	 * an empty patch — callers can branch on that to either skip the tick
