@@ -234,8 +234,11 @@ class SystemTaskStep extends Step {
 			$child_engine_data['job_id']       = $this->job_id;
 			$child_engine_data['pipeline_id']  = $job_context['pipeline_id'] ?? null;
 
-			$fsc                                = $this->flow_step_config ?? array();
-			$child_engine_data['queue_enabled'] = ! empty( $fsc['queue_enabled'] );
+			$fsc                             = $this->flow_step_config ?? array();
+			$queue_mode                      = $fsc['queue_mode'] ?? 'static';
+			$child_engine_data['queue_mode'] = in_array( $queue_mode, array( 'drain', 'loop', 'static' ), true )
+				? $queue_mode
+				: 'static';
 		}
 		$jobs_db->store_engine_data( (int) $child_job_id, $child_engine_data );
 		$jobs_db->start_job( (int) $child_job_id, JobStatus::PROCESSING );

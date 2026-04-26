@@ -100,9 +100,10 @@ class FlowsCommand extends BaseCommand {
 	 * : ISO-8601 datetime for one-time scheduling (e.g. "2026-03-20T15:00:00Z"). Implies --scheduling=one_time.
 	 *
 	 * [--set-user-message=<text>]
-	 * : Update the user_message for an AI step (per-flow task context appended
-	 *   after fetched data packets). For the pipeline-wide system prompt shared
-	 *   across all flows on the pipeline, use `pipeline update --set-system-prompt`.
+	 * : Update the per-flow user message for an AI step. Stored as a 1-entry
+	 *   static prompt_queue (the queue head fires every tick). For the pipeline-
+	 *   wide system prompt shared across all flows, use `pipeline update
+	 *   --set-system-prompt`.
 	 *
 	 * [--handler-config=<json>]
 	 * : JSON object of handler config key-value pairs to update (merged with existing config).
@@ -165,7 +166,7 @@ class FlowsCommand extends BaseCommand {
 	 *     # Update flow name
 	 *     wp datamachine flows update 141 --name="New Name"
 	 *
-	 *     # Update flow user_message (per-flow task context for an AI step)
+	 *     # Update per-flow user message (stored as a 1-entry static prompt_queue)
 	 *     wp datamachine flows update 42 --set-user-message="New user message"
 	 *
 	 *     # Add a handler to a flow step
@@ -412,12 +413,13 @@ class FlowsCommand extends BaseCommand {
 	 * @param string $format Output format (table, json, csv, yaml).
 	 */
 	private function showFlowDetail( array $flow, string $format ): void {
-		// Always surface user_message, prompt_queue, and queue_enabled on
-		// AI steps, even when unset, so every slot AIStep reads at runtime
-		// is discoverable. Otherwise these fields disappear from the JSON
-		// output and the next reader can't tell whether they're empty or
-		// whether they're looking at the wrong key — which is exactly how
-		// the --set-prompt-writes-dead-key bug stayed invisible.
+		// Always surface prompt_queue / config_patch_queue + queue_mode
+		// on queueable steps, even when unset, so every slot AIStep /
+		// FetchStep reads at runtime is discoverable. Otherwise these
+		// fields disappear from JSON output and the next reader can't
+		// tell whether they're empty or looking at the wrong key — which
+		// is exactly how the --set-prompt-writes-dead-key bug stayed
+		// invisible.
 		$flow = self::normalizeAiStepPromptSlots( $flow );
 
 		// JSON/YAML: output the full flow data including flow_config.
@@ -493,23 +495,17 @@ class FlowsCommand extends BaseCommand {
 				}
 
 				if ( 'ai' === $step_type ) {
-					// AI steps have THREE prompt-input slots that AIStep::execute()
-					// chains as a precedence: prompt_queue head → user_message →
-					// (none). Surface every slot that exists and mark which one
-					// AIStep would actually read at runtime, so the active prompt
-					// is never invisible.
-					$user_message = $step_data['user_message'] ?? '';
-					$config_parts[] = 'user_message=' . ( '' === $user_message ? '(unset)' : $this->truncateValue( $user_message, 60 ) );
-
+					// AI steps consume the prompt_queue slot under one of
+					// three modes (drain | loop | static). Surface the
+					// queue depth, mode, and the active prompt label so
+					// the resolved per-flow user message is never invisible.
 					$resolved = self::resolveAiStepActivePrompt( $step_data );
 
-					if ( $resolved['queue_depth'] > 0 || $resolved['queue_enabled'] ) {
-						$config_parts[] = sprintf(
-							'queue=%d item(s), queue_enabled=%s',
-							$resolved['queue_depth'],
-							$resolved['queue_enabled'] ? 'true' : 'false'
-						);
-					}
+					$config_parts[] = sprintf(
+						'queue=%d item(s), queue_mode=%s',
+						$resolved['queue_depth'],
+						$resolved['queue_mode']
+					);
 
 					$config_parts[] = 'active_prompt=' . self::formatActivePromptLabel( $resolved );
 				}
@@ -532,17 +528,17 @@ class FlowsCommand extends BaseCommand {
 					$config_parts[] = $key . '=' . $this->formatConfigValue( $value );
 				}
 
-				// Fetch steps surface config_patch_queue depth + queue_enabled
-				// alongside their static handler config (#1292).
+				// Fetch steps surface config_patch_queue depth + queue_mode
+				// alongside their static handler config (#1291 / #1292).
 				if ( 'fetch' === $step_type ) {
-					$patch_queue   = $step_data['config_patch_queue'] ?? array();
-					$queue_depth   = is_array( $patch_queue ) ? count( $patch_queue ) : 0;
-					$queue_enabled = ! empty( $step_data['queue_enabled'] );
-					if ( $queue_depth > 0 || $queue_enabled ) {
+					$patch_queue = $step_data['config_patch_queue'] ?? array();
+					$queue_depth = is_array( $patch_queue ) ? count( $patch_queue ) : 0;
+					$queue_mode  = $step_data['queue_mode'] ?? 'static';
+					if ( $queue_depth > 0 || 'static' !== $queue_mode ) {
 						$config_parts[] = sprintf(
-							'config_patch_queue=%d item(s), queue_enabled=%s',
+							'config_patch_queue=%d item(s), queue_mode=%s',
 							$queue_depth,
-							$queue_enabled ? 'true' : 'false'
+							$queue_mode
 						);
 					}
 				}
@@ -579,28 +575,17 @@ class FlowsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Ensure every AI step in a flow exposes its prompt-input slots.
+	 * Ensure every queueable step in a flow exposes its queue slots.
 	 *
-	 * AIStep::execute() reads three slots at the flow_step_config root
-	 * (not under handler_configs):
-	 *
-	 *   - user_message: per-flow task framing (the slot --set-user-message
-	 *     writes to).
-	 *   - prompt_queue:  list of queued prompts (managed by `flow queue
-	 *     add/remove/clear` or by webhooks). When non-empty, AIStep
-	 *     reads the head of this queue in preference to user_message.
-	 *   - queue_enabled: when true, the queue head is popped per tick;
-	 *     when false, the head is statically peeked (first entry wins
-	 *     forever). Either way, queue head takes precedence over
-	 *     user_message.
-	 *
-	 * Omitting any of these from `flow get` output hides the precedence
-	 * chain — exactly the same blind-spot pattern as the original
-	 * --set-prompt dead-key bug. Render the slot keys with their
-	 * "unset" defaults so every input AIStep reads is discoverable.
+	 * Post-#1291 collapse: AI and Fetch steps each consume one slot
+	 * (`prompt_queue` for AI, `config_patch_queue` for Fetch) and share
+	 * a single `queue_mode` enum. Default the slots to empty arrays and
+	 * `queue_mode` to "static" so the keys are visible on `flow get`
+	 * output even when never set, preserving the discoverability that
+	 * caught the --set-prompt dead-key bug originally.
 	 *
 	 * @param array $flow Flow data with flow_config.
-	 * @return array Flow data with AI step prompt slots normalized.
+	 * @return array Flow data with queue slots normalized.
 	 */
 	private static function normalizeAiStepPromptSlots( array $flow ): array {
 		if ( empty( $flow['flow_config'] ) || ! is_array( $flow['flow_config'] ) ) {
@@ -613,31 +598,22 @@ class FlowsCommand extends BaseCommand {
 			}
 			$step_type = $step_data['step_type'] ?? '';
 
-			// AI steps consume the prompt_queue slot. Surface
-			// user_message + prompt_queue + queue_enabled so every
-			// input AIStep reads is discoverable.
 			if ( 'ai' === $step_type ) {
-				if ( ! array_key_exists( 'user_message', $step_data ) ) {
-					$flow['flow_config'][ $step_id ]['user_message'] = '';
-				}
 				if ( ! array_key_exists( 'prompt_queue', $step_data ) ) {
 					$flow['flow_config'][ $step_id ]['prompt_queue'] = array();
 				}
-				if ( ! array_key_exists( 'queue_enabled', $step_data ) ) {
-					$flow['flow_config'][ $step_id ]['queue_enabled'] = false;
+				if ( ! array_key_exists( 'queue_mode', $step_data ) ) {
+					$flow['flow_config'][ $step_id ]['queue_mode'] = 'static';
 				}
 				continue;
 			}
 
-			// Fetch steps consume the config_patch_queue slot (#1292).
-			// Surface config_patch_queue + queue_enabled so the queue
-			// shape is discoverable on `flow get`.
 			if ( 'fetch' === $step_type ) {
 				if ( ! array_key_exists( 'config_patch_queue', $step_data ) ) {
 					$flow['flow_config'][ $step_id ]['config_patch_queue'] = array();
 				}
-				if ( ! array_key_exists( 'queue_enabled', $step_data ) ) {
-					$flow['flow_config'][ $step_id ]['queue_enabled'] = false;
+				if ( ! array_key_exists( 'queue_mode', $step_data ) ) {
+					$flow['flow_config'][ $step_id ]['queue_mode'] = 'static';
 				}
 			}
 		}
@@ -646,51 +622,36 @@ class FlowsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Resolve which prompt slot AIStep would actually read at runtime.
+	 * Resolve the active prompt slot for an AI step at runtime.
 	 *
-	 * Mirrors the precedence in inc/Core/Steps/AI/AIStep.php::execute()
-	 * lines 140-173:
-	 *
-	 *   - prompt_queue head wins when present (popped if queue_enabled,
-	 *     statically peeked otherwise).
-	 *   - user_message is the fallback when the queue head is empty.
-	 *   - both empty: AIStep runs with no flow-level user message
-	 *     (the pipeline system_prompt and any data packets still apply).
+	 * Post-#1291 there is one slot — `prompt_queue` — and the access
+	 * mode picks how the head is consumed. Reading the active prompt
+	 * is just "look up queue_mode, peek the head".
 	 *
 	 * @param array $step_data AI step data from flow_config.
-	 * @return array{slot:string, value:string, queue_depth:int, queue_enabled:bool}
-	 *               slot is one of: 'queue_head', 'user_message', 'none'.
+	 * @return array{slot:string, value:string, queue_depth:int, queue_mode:string}
+	 *               slot is one of: 'queue_head', 'none'.
 	 */
 	private static function resolveAiStepActivePrompt( array $step_data ): array {
-		$queue_enabled = (bool) ( $step_data['queue_enabled'] ?? false );
-		$prompt_queue  = $step_data['prompt_queue'] ?? array();
-		$queue_depth   = is_array( $prompt_queue ) ? count( $prompt_queue ) : 0;
-		$queue_head    = is_array( $prompt_queue ) ? trim( (string) ( $prompt_queue[0]['prompt'] ?? '' ) ) : '';
-		$user_message  = trim( (string) ( $step_data['user_message'] ?? '' ) );
+		$queue_mode   = $step_data['queue_mode'] ?? 'static';
+		$prompt_queue = $step_data['prompt_queue'] ?? array();
+		$queue_depth  = is_array( $prompt_queue ) ? count( $prompt_queue ) : 0;
+		$queue_head   = is_array( $prompt_queue ) ? trim( (string) ( $prompt_queue[0]['prompt'] ?? '' ) ) : '';
 
 		if ( '' !== $queue_head ) {
 			return array(
-				'slot'          => 'queue_head',
-				'value'         => $queue_head,
-				'queue_depth'   => $queue_depth,
-				'queue_enabled' => $queue_enabled,
-			);
-		}
-
-		if ( '' !== $user_message ) {
-			return array(
-				'slot'          => 'user_message',
-				'value'         => $user_message,
-				'queue_depth'   => $queue_depth,
-				'queue_enabled' => $queue_enabled,
+				'slot'        => 'queue_head',
+				'value'       => $queue_head,
+				'queue_depth' => $queue_depth,
+				'queue_mode'  => $queue_mode,
 			);
 		}
 
 		return array(
-			'slot'          => 'none',
-			'value'         => '',
-			'queue_depth'   => $queue_depth,
-			'queue_enabled' => $queue_enabled,
+			'slot'        => 'none',
+			'value'       => '',
+			'queue_depth' => $queue_depth,
+			'queue_mode'  => $queue_mode,
 		);
 	}
 
@@ -698,17 +659,12 @@ class FlowsCommand extends BaseCommand {
 	 * Render a short label for the slot AIStep will read at runtime.
 	 *
 	 * Output examples:
-	 *   - "queue_head[1/3] (drains): \"Generate Q3 brief...\""
-	 *   - "queue_head[1/1] (static): \"Single override...\""
-	 *   - "user_message: \"Per-flow framing...\""
+	 *   - "queue_head[1/3] (drain): \"Generate Q3 brief...\""
+	 *   - "queue_head[1/1] (static): \"Single per-flow message...\""
+	 *   - "queue_head[1/5] (loop): \"Cycling source A...\""
 	 *   - "(none)"
 	 *
-	 * The drains/static suffix on queue_head matches AIStep behavior:
-	 * with queue_enabled=true the head pops per tick (drains); with
-	 * queue_enabled=false the head is statically peeked (first entry
-	 * wins forever until the queue is mutated).
-	 *
-	 * @param array{slot:string, value:string, queue_depth:int, queue_enabled:bool} $resolved
+	 * @param array{slot:string, value:string, queue_depth:int, queue_mode:string} $resolved
 	 * @return string Formatted label suitable for table output.
 	 */
 	private static function formatActivePromptLabel( array $resolved ): string {
@@ -717,12 +673,9 @@ class FlowsCommand extends BaseCommand {
 				return sprintf(
 					'queue_head[1/%d] (%s): "%s"',
 					$resolved['queue_depth'],
-					$resolved['queue_enabled'] ? 'drains' : 'static',
+					$resolved['queue_mode'],
 					self::truncateForLabel( $resolved['value'], 50 )
 				);
-
-			case 'user_message':
-				return sprintf( 'user_message: "%s"', self::truncateForLabel( $resolved['value'], 50 ) );
 
 			default:
 				return '(none)';

@@ -60,14 +60,27 @@ class AgentPingTask extends SystemTask {
 			return;
 		}
 
-		// Pop from flow queue when running as a pipeline step.
-		$from_queue    = false;
-		$flow_id       = (int) ( $params['flow_id'] ?? 0 );
-		$flow_step_id  = $params['flow_step_id'] ?? '';
-		$queue_enabled = ! empty( $params['queue_enabled'] );
+		// Consume from flow queue when running as a pipeline step. The
+		// `queue_mode` enum (#1291) decides the access pattern:
+		//   - drain  → pop the head, discard
+		//   - loop   → pop the head, append to tail
+		//   - static → peek the head; do not mutate
+		// Static mode + non-empty `prompt` argument falls through to use
+		// the configured prompt directly. This preserves the pre-#1291
+		// behaviour where running an agent_ping task without a queue
+		// just sent the configured prompt every tick.
+		$from_queue   = false;
+		$flow_id      = (int) ( $params['flow_id'] ?? 0 );
+		$flow_step_id = $params['flow_step_id'] ?? '';
+		$queue_mode   = $params['queue_mode'] ?? 'static';
+		if ( ! in_array( $queue_mode, array( 'drain', 'loop', 'static' ), true ) ) {
+			$queue_mode = 'static';
+		}
 
-		if ( $queue_enabled && $flow_id > 0 && ! empty( $flow_step_id ) ) {
-			$queued_item = QueueAbility::popFromQueue( $flow_id, $flow_step_id );
+		if ( 'static' !== $queue_mode && $flow_id > 0 && ! empty( $flow_step_id ) ) {
+			$queued_item = ( 'loop' === $queue_mode )
+				? QueueAbility::loopFromQueue( $flow_id, $flow_step_id )
+				: QueueAbility::popFromQueue( $flow_id, $flow_step_id );
 
 			if ( $queued_item && ! empty( $queued_item['prompt'] ) ) {
 				$prompt     = $queued_item['prompt'];
@@ -81,19 +94,23 @@ class AgentPingTask extends SystemTask {
 						'job_id'       => $jobId,
 						'flow_id'      => $flow_id,
 						'flow_step_id' => $flow_step_id,
+						'queue_mode'   => $queue_mode,
 					)
 				);
 			} elseif ( empty( $prompt ) ) {
 				do_action(
 					'datamachine_log',
 					'info',
-					'Agent ping task skipped — queue enabled but empty, no configured prompt',
-					array( 'job_id' => $jobId )
+					'Agent ping task skipped — queue mode requires per-tick prompt but queue is empty, no configured fallback',
+					array(
+						'job_id'     => $jobId,
+						'queue_mode' => $queue_mode,
+					)
 				);
 
 				$this->completeJob( $jobId, array(
 					'skipped'      => true,
-					'reason'       => 'Queue enabled but empty, no configured prompt',
+					'reason'       => sprintf( 'Queue mode "%s" but queue empty, no configured prompt', $queue_mode ),
 					'completed_at' => current_time( 'mysql' ),
 				) );
 				return;

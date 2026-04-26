@@ -3,7 +3,7 @@
  * WP-CLI Flows Queue Command
  *
  * Manages per-step queues attached to flow steps. Two queue slots are
- * supported (#1292):
+ * supported (#1292), both gated by a single `queue_mode` enum (#1291):
  *
  *   - prompt_queue       — string prompts, consumed by AI steps
  *   - config_patch_queue — object patches, consumed by fetch steps
@@ -15,9 +15,14 @@
  * fetch step, or `--patch=` against an AI step) errors loudly with a
  * pointer to the right flag.
  *
+ * The `mode` subcommand sets the access pattern (drain | loop | static)
+ * for whichever slot the step consumes — the same enum drives both
+ * AI and Fetch behaviour.
+ *
  * @package DataMachine\Cli\Commands\Flows
  * @since 0.31.0
  * @see https://github.com/Extra-Chill/data-machine/issues/345
+ * @see https://github.com/Extra-Chill/data-machine/issues/1291
  * @see https://github.com/Extra-Chill/data-machine/issues/1292
  */
 
@@ -41,7 +46,7 @@ class QueueCommand extends BaseCommand {
 	 */
 	public function dispatch( array $args, array $assoc_args ): void {
 		if ( empty( $args ) ) {
-			WP_CLI::error( 'Usage: wp datamachine flows queue <add|list|clear|remove|update|move|validate> <flow_id> [args...]' );
+			WP_CLI::error( 'Usage: wp datamachine flows queue <add|list|clear|remove|update|move|mode|validate> <flow_id> [args...]' );
 			return;
 		}
 
@@ -67,11 +72,14 @@ class QueueCommand extends BaseCommand {
 			case 'move':
 				$this->move( $remaining, $assoc_args );
 				break;
+			case 'mode':
+				$this->mode( $remaining, $assoc_args );
+				break;
 			case 'validate':
 				$this->validate( $remaining, $assoc_args );
 				break;
 			default:
-				WP_CLI::error( "Unknown queue action: {$action}. Use: add, list, clear, remove, update, move, validate" );
+				WP_CLI::error( "Unknown queue action: {$action}. Use: add, list, clear, remove, update, move, mode, validate" );
 		}
 	}
 
@@ -283,16 +291,16 @@ class QueueCommand extends BaseCommand {
 			return;
 		}
 
-		$prompt_queue  = $prompt_result['queue'] ?? array();
-		$patch_queue   = $patch_result['queue'] ?? array();
-		$queue_enabled = $prompt_result['queue_enabled'] ?? $patch_result['queue_enabled'] ?? false;
+		$prompt_queue = $prompt_result['queue'] ?? array();
+		$patch_queue  = $patch_result['queue'] ?? array();
+		$queue_mode   = $prompt_result['queue_mode'] ?? $patch_result['queue_mode'] ?? 'static';
 
 		if ( 'json' === $format ) {
 			WP_CLI::line( wp_json_encode(
 				array(
 					'flow_id'            => $flow_id,
 					'flow_step_id'       => $flow_step_id,
-					'queue_enabled'      => $queue_enabled,
+					'queue_mode'         => $queue_mode,
 					'prompt_queue'       => $prompt_queue,
 					'config_patch_queue' => $patch_queue,
 				),
@@ -302,7 +310,7 @@ class QueueCommand extends BaseCommand {
 		}
 
 		if ( empty( $prompt_queue ) && empty( $patch_queue ) ) {
-			WP_CLI::log( sprintf( 'Queue is empty. (queue_enabled: %s)', $queue_enabled ? 'yes' : 'no' ) );
+			WP_CLI::log( sprintf( 'Queue is empty. (queue_mode: %s)', $queue_mode ) );
 			return;
 		}
 
@@ -337,10 +345,10 @@ class QueueCommand extends BaseCommand {
 		}
 
 		WP_CLI::log( sprintf(
-			'Total: %d prompt(s), %d patch(es). (queue_enabled: %s)',
+			'Total: %d prompt(s), %d patch(es). (queue_mode: %s)',
 			count( $prompt_queue ),
 			count( $patch_queue ),
-			$queue_enabled ? 'yes' : 'no'
+			$queue_mode
 		) );
 	}
 
@@ -710,6 +718,89 @@ class QueueCommand extends BaseCommand {
 	}
 
 	/**
+	 * Set the queue access mode for a flow step.
+	 *
+	 * Replaces the pre-#1291 `flow queue settings --queue-enabled=...`
+	 * verb. Mode is one of:
+	 *
+	 *   - drain  — pop the head per tick, discard. Empty queue → skip
+	 *              with COMPLETED_NO_ITEMS.
+	 *   - loop   — pop the head per tick, append to tail. The queue
+	 *              cycles indefinitely.
+	 *   - static — peek the head every tick, do not mutate. Position 0
+	 *              is the active entry; positions 1..N stay staged.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <flow_id>
+	 * : The flow ID.
+	 *
+	 * <mode>
+	 * : One of: drain, loop, static.
+	 *
+	 * [--step=<flow_step_id>]
+	 * : Target a specific flow step. Auto-resolved if the flow has exactly one queueable step.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Make the AI step drain its prompt queue per tick
+	 *     wp datamachine flows queue mode 42 drain
+	 *
+	 *     # Cycle through queued patches forever
+	 *     wp datamachine flows queue mode 42 loop --step=fetch_42_abc
+	 *
+	 *     # Pin position 0 — runs every tick without mutating the queue
+	 *     wp datamachine flows queue mode 42 static
+	 *
+	 * @subcommand mode
+	 */
+	public function mode( array $args, array $assoc_args ): void {
+		if ( count( $args ) < 2 ) {
+			WP_CLI::error( 'Usage: wp datamachine flows queue mode <flow_id> <drain|loop|static>' );
+			return;
+		}
+
+		$flow_id      = (int) $args[0];
+		$mode         = strtolower( (string) $args[1] );
+		$flow_step_id = $assoc_args['step'] ?? null;
+
+		if ( $flow_id <= 0 ) {
+			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		if ( ! in_array( $mode, array( 'drain', 'loop', 'static' ), true ) ) {
+			WP_CLI::error( 'mode must be one of: drain, loop, static' );
+			return;
+		}
+
+		if ( empty( $flow_step_id ) ) {
+			$resolved = $this->resolveQueueableStep( $flow_id );
+			if ( $resolved['error'] ) {
+				WP_CLI::error( $resolved['error'] );
+				return;
+			}
+			$flow_step_id = $resolved['step_id'];
+		}
+
+		$ability = new \DataMachine\Abilities\FlowAbilities();
+		$result  = $ability->executeQueueMode(
+			array(
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+				'mode'         => $mode,
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to set queue mode' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] ?? sprintf( 'Queue mode set to %s.', $mode ) );
+	}
+
+	/**
 	 * Validate a topic against published posts and queue items for duplicates.
 	 *
 	 * ## OPTIONS
@@ -851,9 +942,17 @@ class QueueCommand extends BaseCommand {
 			);
 		}
 
+		// Post-#1291 a step is "queueable" by virtue of its step type
+		// (AI consumes prompt_queue, Fetch consumes config_patch_queue).
+		// Pre-#1291 the queueable signal was the `queue_enabled` flag,
+		// which conflated the access mode with the step's eligibility.
 		$queueable = array();
 		foreach ( $config as $step_id => $step_data ) {
-			if ( ! empty( $step_data['queue_enabled'] ) ) {
+			if ( ! is_array( $step_data ) ) {
+				continue;
+			}
+			$step_type = $step_data['step_type'] ?? '';
+			if ( 'ai' === $step_type || 'fetch' === $step_type ) {
 				$queueable[] = $step_id;
 			}
 		}

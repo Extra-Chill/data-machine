@@ -240,6 +240,23 @@ class FlowAbilities {
 	}
 
 	/**
+	 * Execute queue-mode ability (#1291).
+	 *
+	 * Replaces the pre-#1291 `executeQueueSettings()` (which wrote a
+	 * `queue_enabled` boolean). Sets queue access mode to one of
+	 * drain | loop | static.
+	 *
+	 * @param array $input Input parameters (flow_id, flow_step_id, mode).
+	 * @return array Result with queue_mode set.
+	 */
+	public function executeQueueMode( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
+		return $this->queue->executeQueueMode( $input );
+	}
+
+	/**
 	 * Execute config-patch-add ability (Fetch consumer).
 	 *
 	 * @param array $input Input parameters (flow_id, flow_step_id, patch).

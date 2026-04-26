@@ -20,7 +20,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ManageQueue extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'manage_queue', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'abilities' => array( 'datamachine/queue-add', 'datamachine/queue-list', 'datamachine/queue-clear', 'datamachine/queue-remove', 'datamachine/queue-update', 'datamachine/queue-move', 'datamachine/queue-settings' ) ) );
+		$this->registerTool( 'manage_queue', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'abilities' => array( 'datamachine/queue-add', 'datamachine/queue-list', 'datamachine/queue-clear', 'datamachine/queue-remove', 'datamachine/queue-update', 'datamachine/queue-move', 'datamachine/queue-mode' ) ) );
 	}
 
 	/**
@@ -35,45 +35,46 @@ class ManageQueue extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => $this->buildDescription(),
 			'parameters'  => array(
-				'action'        => array(
+				'action'       => array(
 					'type'        => 'string',
 					'required'    => true,
-					'description' => 'Action to perform: "add", "list", "clear", "remove", "update", "move", or "settings"',
+					'description' => 'Action to perform: "add", "list", "clear", "remove", "update", "move", or "mode"',
 				),
-				'flow_id'       => array(
+				'flow_id'      => array(
 					'type'        => 'integer',
 					'required'    => true,
 					'description' => 'Flow ID',
 				),
-				'flow_step_id'  => array(
+				'flow_step_id' => array(
 					'type'        => 'string',
 					'required'    => true,
 					'description' => 'Flow step ID',
 				),
-				'prompt'        => array(
+				'prompt'       => array(
 					'type'        => 'string',
 					'required'    => false,
 					'description' => 'Prompt text (for add and update actions)',
 				),
-				'index'         => array(
+				'index'        => array(
 					'type'        => 'integer',
 					'required'    => false,
 					'description' => 'Queue index, 0-based (for remove and update actions)',
 				),
-				'from_index'    => array(
+				'from_index'   => array(
 					'type'        => 'integer',
 					'required'    => false,
 					'description' => 'Source index for move action (0-based)',
 				),
-				'to_index'      => array(
+				'to_index'     => array(
 					'type'        => 'integer',
 					'required'    => false,
 					'description' => 'Destination index for move action (0-based)',
 				),
-				'queue_enabled' => array(
-					'type'        => 'boolean',
+				'mode'         => array(
+					'type'        => 'string',
 					'required'    => false,
-					'description' => 'Whether queue pop is enabled (for settings action)',
+					'enum'        => array( 'drain', 'loop', 'static' ),
+					'description' => 'Queue access mode for the "mode" action: drain (pop+discard), loop (pop+append-to-tail), static (peek-only).',
 				),
 			),
 		);
@@ -95,7 +96,7 @@ ACTIONS:
 - remove: Remove a prompt by index (requires index)
 - update: Update a prompt at a specific index (requires index and prompt)
 - move: Move a prompt from one position to another (requires from_index and to_index)
-- settings: Update queue settings (requires queue_enabled)
+- mode: Set the queue access mode (requires mode: drain | loop | static)
 
 All actions require flow_id and flow_step_id.';
 	}
@@ -112,19 +113,19 @@ All actions require flow_id and flow_step_id.';
 		$action = $parameters['action'] ?? '';
 
 		$ability_map = array(
-			'add'      => 'datamachine/queue-add',
-			'list'     => 'datamachine/queue-list',
-			'clear'    => 'datamachine/queue-clear',
-			'remove'   => 'datamachine/queue-remove',
-			'update'   => 'datamachine/queue-update',
-			'move'     => 'datamachine/queue-move',
-			'settings' => 'datamachine/queue-settings',
+			'add'    => 'datamachine/queue-add',
+			'list'   => 'datamachine/queue-list',
+			'clear'  => 'datamachine/queue-clear',
+			'remove' => 'datamachine/queue-remove',
+			'update' => 'datamachine/queue-update',
+			'move'   => 'datamachine/queue-move',
+			'mode'   => 'datamachine/queue-mode',
 		);
 
 		if ( ! isset( $ability_map[ $action ] ) ) {
 			return array(
 				'success'   => false,
-				'error'     => 'Invalid action. Use "add", "list", "clear", "remove", "update", "move", or "settings"',
+				'error'     => 'Invalid action. Use "add", "list", "clear", "remove", "update", "move", or "mode"',
 				'tool_name' => 'manage_queue',
 			);
 		}
@@ -187,8 +188,8 @@ All actions require flow_id and flow_step_id.';
 				$input['to_index']   = $parameters['to_index'] ?? null;
 				break;
 
-			case 'settings':
-				$input['queue_enabled'] = $parameters['queue_enabled'] ?? null;
+			case 'mode':
+				$input['mode'] = $parameters['mode'] ?? null;
 				break;
 		}
 
