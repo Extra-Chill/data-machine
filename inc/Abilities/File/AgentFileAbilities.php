@@ -313,7 +313,7 @@ class AgentFileAbilities {
 				'editable'    => MemoryFileRegistry::is_editable( $filename ),
 				'modes'       => $registry_meta['modes'] ?? array( MemoryFileRegistry::MODE_ALL ),
 				'registered'  => true,
-				'label'       => $registry_meta['label'] ?? self::filename_to_label( $filename ),
+				'label'       => $registry_meta['label'] ?? MemoryFileRegistry::filename_to_label( $filename ),
 				'description' => $registry_meta['description'] ?? '',
 			);
 			$seen[ $filename ] = true;
@@ -345,7 +345,7 @@ class AgentFileAbilities {
 					'editable'    => MemoryFileRegistry::is_editable( $entry->filename ),
 					'modes'       => $registry_meta['modes'] ?? array( MemoryFileRegistry::MODE_ALL ),
 					'registered'  => null !== $registry_meta,
-					'label'       => $registry_meta['label'] ?? self::filename_to_label( $entry->filename ),
+					'label'       => $registry_meta['label'] ?? MemoryFileRegistry::filename_to_label( $entry->filename ),
 					'description' => $registry_meta['description'] ?? '',
 				);
 				$seen[ $entry->filename ] = true;
@@ -686,14 +686,4 @@ class AgentFileAbilities {
 		return $sanitized;
 	}
 
-	/**
-	 * Derive a human-readable label from a filename.
-	 *
-	 * @param string $filename The filename.
-	 * @return string Label.
-	 */
-	private static function filename_to_label( string $filename ): string {
-		$name = pathinfo( $filename, PATHINFO_FILENAME );
-		return ucwords( str_replace( array( '-', '_' ), ' ', $name ) );
-	}
 }

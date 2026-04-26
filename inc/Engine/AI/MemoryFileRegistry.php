@@ -498,7 +498,7 @@ class MemoryFileRegistry {
 	 * @param string $filename The filename.
 	 * @return string Label.
 	 */
-	private static function filename_to_label( string $filename ): string {
+	public static function filename_to_label( string $filename ): string {
 		$name = pathinfo( $filename, PATHINFO_FILENAME );
 		return ucwords( str_replace( array( '-', '_' ), ' ', $name ) );
 	}

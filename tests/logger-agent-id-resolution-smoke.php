@@ -53,7 +53,7 @@ class PermissionHelper {
 	}
 
 	public static function in_agent_context(): bool {
-		return null !== self::$acting_agent_id;
+		return null !== self::get_acting_agent_id();
 	}
 
 	public static function get_acting_agent_id(): ?int {

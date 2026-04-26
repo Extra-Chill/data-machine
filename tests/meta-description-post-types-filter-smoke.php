@@ -21,6 +21,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+require_once __DIR__ . '/smoke-wp-stubs.php';
+
 // Tiny filter registry — enough for getEligiblePostTypes().
 $GLOBALS['_dm_test_filters'] = array();
 
@@ -67,30 +69,6 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 	function sanitize_key( $key ) {
 		$key = strtolower( (string) $key );
 		return preg_replace( '/[^a-z0-9_\-]/', '', $key );
-	}
-}
-
-if ( ! function_exists( 'doing_action' ) ) {
-	function doing_action( $action = '' ) {
-		return false;
-	}
-}
-
-if ( ! function_exists( 'did_action' ) ) {
-	function did_action( $action = '' ) {
-		return 1; // pretend wp_abilities_api_init already fired
-	}
-}
-
-if ( ! function_exists( 'add_action' ) ) {
-	function add_action( ...$args ) {
-		// no-op
-	}
-}
-
-if ( ! function_exists( 'wp_register_ability' ) ) {
-	function wp_register_ability( ...$args ) {
-		// no-op
 	}
 }
 

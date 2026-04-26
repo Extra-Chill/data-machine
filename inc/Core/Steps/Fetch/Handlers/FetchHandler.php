@@ -21,14 +21,16 @@ use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\FilesRepository\FileStorage;
-use DataMachine\Core\HttpClient;
 use DataMachine\Core\Steps\Fetch\Tools\SkipItemTool;
+use DataMachine\Core\Steps\Handlers\HttpRequestHelpers;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 abstract class FetchHandler {
+
+	use HttpRequestHelpers;
 
 	/**
 	 * Handler type identifier (e.g., 'rss', 'reddit', 'files')
@@ -359,59 +361,6 @@ abstract class FetchHandler {
 	protected function getAuthProvider( string $provider_key ): ?object {
 		$auth_abilities = new AuthAbilities();
 		return $auth_abilities->getProvider( $provider_key );
-	}
-
-	/**
-	 * Perform HTTP request with standardized handling
-	 *
-	 * @param string $method  HTTP method (GET, POST, PUT, DELETE, PATCH)
-	 * @param string $url     Request URL
-	 * @param array  $options Request options:
-	 *                        - headers: array - Additional headers to merge
-	 *                        - body: string|array - Request body (for POST/PUT/PATCH)
-	 *                        - timeout: int - Request timeout (default 120)
-	 *                        - browser_mode: bool - Use browser-like headers (default false)
-	 *                        - context: string - Context for logging (defaults to handler_type)
-	 * @return array{success: bool, data?: string, status_code?: int, headers?: array, response?: array, error?: string}
-	 */
-	protected function httpRequest( string $method, string $url, array $options = array() ): array {
-		if ( ! isset( $options['context'] ) ) {
-			$options['context'] = ucfirst( $this->handler_type );
-		}
-		return HttpClient::request( $method, $url, $options );
-	}
-
-	/**
-	 * Perform HTTP GET request
-	 *
-	 * @param string $url     Request URL
-	 * @param array  $options Request options
-	 * @return array Response array
-	 */
-	protected function httpGet( string $url, array $options = array() ): array {
-		return $this->httpRequest( 'GET', $url, $options );
-	}
-
-	/**
-	 * Perform HTTP POST request
-	 *
-	 * @param string $url     Request URL
-	 * @param array  $options Request options
-	 * @return array Response array
-	 */
-	protected function httpPost( string $url, array $options = array() ): array {
-		return $this->httpRequest( 'POST', $url, $options );
-	}
-
-	/**
-	 * Perform HTTP DELETE request
-	 *
-	 * @param string $url     Request URL
-	 * @param array  $options Request options
-	 * @return array Response array
-	 */
-	protected function httpDelete( string $url, array $options = array() ): array {
-		return $this->httpRequest( 'DELETE', $url, $options );
 	}
 
 	/**
