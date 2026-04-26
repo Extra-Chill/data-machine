@@ -12,6 +12,7 @@
 namespace DataMachine\Abilities\Job;
 
 use DataMachine\Abilities\StepTypeAbilities;
+use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -344,35 +345,6 @@ class ExecuteWorkflowAbility {
 			$handler_config = $step['handler_config'] ?? array();
 			$step_type      = $step['type'];
 
-			// Resolve handler_slugs. Single-purpose: it names the step's
-			// handler (always length 0..1). Three shapes match
-			// inc/migrations/handler-keys.php (v0.60.0):
-			//
-			//   1. Explicit handler_slug → [handler_slug] (fetch, publish,
-			//      upsert, …).
-			//   2. Self-configuring step types (system_task, webhook_gate,
-			//      agent_ping) with a non-empty handler_config → [step_type].
-			//      Synthetic-slug shape lets FlowStepConfig::getPrimary
-			//      HandlerConfig() resolve uniformly via handler_slugs[0].
-			//   3. Otherwise → []. AI steps always land here: their tool
-			//      list lives in `enabled_tools`, not handler_slugs.
-			$handler_slugs = array();
-			if ( ! empty( $handler_slug ) ) {
-				$handler_slugs = array( $handler_slug );
-			} elseif ( 'ai' !== $step_type && ! empty( $handler_config ) ) {
-				$handler_slugs = array( $step_type );
-			}
-
-			// Key handler_configs by the primary slug (handler_slugs[0]) so
-			// FlowStepConfig::getPrimaryHandlerConfig() finds the slot
-			// without branching on step type.
-			$handler_configs = array();
-			if ( ! empty( $handler_slug ) ) {
-				$handler_configs[ $handler_slug ] = $handler_config;
-			} elseif ( 'ai' !== $step_type && ! empty( $handler_config ) ) {
-				$handler_configs[ $step_type ] = $handler_config;
-			}
-
 			// AI's tool list lives in its own field. handler_slugs is for
 			// handlers; enabled_tools is for AI tools. No overload.
 			$enabled_tools = ( 'ai' === $step_type && ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) )
@@ -401,13 +373,11 @@ class ExecuteWorkflowAbility {
 				);
 			}
 
-			$flow_config[ $step_id ] = array(
+			$flow_step_config = array(
 				'flow_step_id'     => $step_id,
 				'pipeline_step_id' => $pipeline_step_id,
 				'step_type'        => $step['type'],
 				'execution_order'  => $index,
-				'handler_slugs'    => $handler_slugs,
-				'handler_configs'  => $handler_configs,
 				'enabled_tools'    => $enabled_tools,
 				'prompt_queue'     => $prompt_queue,
 				'queue_mode'       => 'static',
@@ -415,6 +385,20 @@ class ExecuteWorkflowAbility {
 				'pipeline_id'      => 'direct',
 				'flow_id'          => 'direct',
 			);
+
+			if ( ! empty( $handler_slug ) ) {
+				if ( FlowStepConfig::isMultiHandler( $flow_step_config ) ) {
+					$flow_step_config['handler_slugs']   = array( $handler_slug );
+					$flow_step_config['handler_configs'] = array( $handler_slug => $handler_config );
+				} else {
+					$flow_step_config['handler_slug']   = $handler_slug;
+					$flow_step_config['handler_config'] = $handler_config;
+				}
+			} elseif ( ! FlowStepConfig::usesHandler( $flow_step_config ) && ! empty( $handler_config ) ) {
+				$flow_step_config['handler_config'] = $handler_config;
+			}
+
+			$flow_config[ $step_id ] = $flow_step_config;
 
 			// Pipeline config (AI settings only — model/provider resolved via context system, not stored here).
 			if ( 'ai' === $step['type'] ) {

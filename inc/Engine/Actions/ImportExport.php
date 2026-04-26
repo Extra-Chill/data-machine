@@ -11,6 +11,8 @@
 
 namespace DataMachine\Engine\Actions;
 
+use DataMachine\Core\Steps\FlowStepConfig;
+
 // Prevent direct access
 if ( ! defined( 'WPINC' ) ) {
 	die;
@@ -34,8 +36,8 @@ class ImportExport {
 	 *   Pass 1 — pipeline-structure rows (flow_id empty): create pipelines and add steps
 	 *            with their full step_config (#1133 step 1).
 	 *   Pass 2 — flow-step rows (flow_id present): ensure target flows exist, then write
-	 *            handler_slugs + handler_configs into each flow_config entry keyed by the
-	 *            freshly-generated flow_step_id (#1133 step 2).
+	 *            canonical handler fields into each flow_config entry keyed by the
+	 *            freshly-generated flow_step_id (#1133 step 2, #1293 shape cleanup).
 	 *
 	 * NOTE on secrets: handler_configs is restored verbatim. Any auth tokens / API keys in
 	 * the exported CSV will land in the imported flow's config. A scrub-or-reference policy
@@ -122,17 +124,16 @@ class ImportExport {
 				continue;
 			}
 
-			$handler_slugs   = $row['settings']['handler_slugs'] ?? array();
-			$handler_configs = $row['settings']['handler_configs'] ?? array();
-			if ( empty( $handler_slugs ) && '' !== $row['handler'] ) {
-				$handler_slugs = array( $row['handler'] );
+			$settings = $row['settings'];
+			if ( '' !== $row['handler'] && empty( $settings['handler_slug'] ) && empty( $settings['handler_slugs'] ) ) {
+				$settings['handler_slug'] = $row['handler'];
 			}
 
-			$this->restore_flow_step_handlers(
+			$this->restore_flow_step_config(
 				$imported_flow_id,
 				$pipeline_step_id,
-				$handler_slugs,
-				$handler_configs
+				$row['step_type'],
+				$settings
 			);
 		}
 
@@ -312,20 +313,20 @@ class ImportExport {
 	}
 
 	/**
-	 * Write handler_slugs and handler_configs into the flow_config entry for this step.
+	 * Write canonical handler config into the flow_config entry for this step.
 	 *
 	 * `create-flow` (and the step-sync pipeline) already populate the flow_config entry
 	 * keyed by flow_step_id with structural fields (step_type, pipeline_step_id, etc.).
 	 * This overlays the handler fields verbatim — no handler validation, no auth rewiring,
 	 * no secret scrubbing. Secret policy is a separate concern (see #1133).
 	 */
-	private function restore_flow_step_handlers(
+	private function restore_flow_step_config(
 		int $flow_id,
 		string $pipeline_step_id,
-		array $handler_slugs,
-		array $handler_configs
+		string $step_type,
+		array $settings
 	): bool {
-		if ( empty( $handler_slugs ) && empty( $handler_configs ) ) {
+		if ( empty( $settings ) ) {
 			return false;
 		}
 
@@ -348,17 +349,29 @@ class ImportExport {
 				'flow_step_id'     => $flow_step_id,
 				'pipeline_step_id' => $pipeline_step_id,
 				'flow_id'          => $flow_id,
+				'step_type'        => $step_type,
 			);
 		}
-
-		if ( ! empty( $handler_slugs ) ) {
-			$flow_config[ $flow_step_id ]['handler_slugs'] = array_values( $handler_slugs );
-			$flow_config[ $flow_step_id ]['handler']       = $handler_slugs[0] ?? null;
+		if ( empty( $flow_config[ $flow_step_id ]['step_type'] ) ) {
+			$flow_config[ $flow_step_id ]['step_type'] = $step_type;
 		}
 
-		if ( ! empty( $handler_configs ) ) {
-			$flow_config[ $flow_step_id ]['handler_configs'] = $handler_configs;
+
+		$step = FlowStepConfig::normalizeHandlerShape(
+			array_merge(
+				$flow_config[ $flow_step_id ],
+				$settings
+			)
+		);
+
+		$primary_handler = FlowStepConfig::getPrimaryHandlerSlug( $step );
+		if ( null !== $primary_handler ) {
+			$step['handler'] = $primary_handler;
+		} else {
+			unset( $step['handler'] );
 		}
+
+		$flow_config[ $flow_step_id ] = $step;
 
 		$flow_config[ $flow_step_id ]['enabled'] = true;
 
@@ -434,21 +447,26 @@ class ImportExport {
 					$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $step['pipeline_step_id'], $flow['flow_id'] );
 					$flow_step    = $flow_config[ $flow_step_id ] ?? array();
 
-					// Read the primary slug raw rather than via FlowStepConfig::
-					// getEffectiveSlug() so handler-free steps (system_task,
-					// webhook_gate) don't synthesize a step_type fallback into
-					// the exported handler column when the row genuinely has
-					// no handler. The export emits a row only when the primary
-					// slug is present; FlowStepConfig's step_type fallback
-					// would defeat that gate.
-					$primary_handler = $flow_step['handler_slugs'][0] ?? '';
+					$settings        = array();
+					$primary_handler = FlowStepConfig::getPrimaryHandlerSlug( $flow_step ) ?? '';
 
-					if ( ! empty( $primary_handler ) ) {
+					if ( FlowStepConfig::isMultiHandler( $flow_step ) && ! empty( $primary_handler ) ) {
 						$settings = array(
-							'handler_slugs'   => $flow_step['handler_slugs'] ?? array(),
-							'handler_configs' => $flow_step['handler_configs'] ?? array(),
+							'handler_slugs'   => FlowStepConfig::getHandlerSlugs( $flow_step ),
+							'handler_configs' => FlowStepConfig::getHandlerConfigs( $flow_step ),
 						);
+					} elseif ( FlowStepConfig::usesHandler( $flow_step ) && ! empty( $primary_handler ) ) {
+						$settings = array(
+							'handler_slug'   => $primary_handler,
+							'handler_config' => FlowStepConfig::getPrimaryHandlerConfig( $flow_step ),
+						);
+					} elseif ( ! FlowStepConfig::usesHandler( $flow_step ) && ! empty( $flow_step['handler_config'] ) ) {
+						$settings = array(
+							'handler_config' => $flow_step['handler_config'],
+						);
+					}
 
+					if ( ! empty( $settings ) ) {
 						$csv_rows[] = array(
 							$pipeline_id,
 							$pipeline['pipeline_name'],

@@ -43,7 +43,7 @@ HANDLERS are the core intelligence. Fetch handlers extract and structure source 
 
 PIPELINES define workflow structure: step types in sequence (e.g., event_import → ai → upsert). The pipeline system_prompt defines AI behavior shared by all flows.
 
-FLOWS are configured pipeline instances. Each step needs a handler_slug and handler_config. When creating flows, match handler configurations from existing flows on the same pipeline.
+FLOWS are configured pipeline instances. Handler-based single steps use handler_slug + handler_config; multi-handler steps use handler_slugs + handler_configs; handler-free steps only carry handler_config when they have settings. When creating flows, match handler configurations from existing flows on the same pipeline.
 
 AI STEPS process data that handlers cannot automatically handle. The pipeline system_prompt sets the agent's stable identity (shared across every flow). The flow's per-flow user message lives in the prompt_queue head — appended as the final user-role message after fetched data packets — use it for per-flow task framing on top of the pipeline system_prompt. The two are additive, not alternative. Set it via `flow update --set-user-message` (a 1-entry static queue) or `flow queue add` plus `flow queue mode <drain|loop|static>`.
 

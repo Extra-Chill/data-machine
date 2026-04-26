@@ -75,28 +75,10 @@ class SettingsDisplayService {
 			return array();
 		}
 
-		// Data is normalized at the DB layer.
-		$handler_configs = $flow_step_config['handler_configs'] ?? array();
-		$handler_slugs   = $flow_step_config['handler_slugs'] ?? array();
-
-		// Fallback: build from primary handler when configs are empty.
-		if ( empty( $handler_configs ) ) {
-			$handler_slug     = FlowStepConfig::getEffectiveSlug( $flow_step_config );
-			$current_settings = FlowStepConfig::getPrimaryHandlerConfig( $flow_step_config );
-
-			if ( empty( $handler_slug ) ) {
-				return array();
-			}
-
-			$display = $this->getDisplayForHandler( $handler_slug, $current_settings );
-
-			return ! empty( $display ) ? array( $handler_slug => $display ) : array();
-		}
-
-		// Ensure handler_slugs is populated for ordering.
-		if ( empty( $handler_slugs ) ) {
-			$handler_slugs = array_keys( $handler_configs );
-		}
+		$handler_configs = FlowStepConfig::getHandlerConfigs( $flow_step_config );
+		$handler_slugs   = FlowStepConfig::usesHandler( $flow_step_config )
+			? FlowStepConfig::getConfiguredHandlerSlugs( $flow_step_config )
+			: array_keys( $handler_configs );
 
 		$result = array();
 		foreach ( $handler_slugs as $slug ) {

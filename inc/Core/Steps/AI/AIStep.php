@@ -7,6 +7,7 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Steps\Step;
+use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Engine\AI\AIConversationLoop;
@@ -258,7 +259,7 @@ class AIStep extends Step {
 			if ( ! $adj_step_config ) {
 				continue;
 			}
-			$handler_slugs     = $adj_step_config['handler_slugs'] ?? array();
+			$handler_slugs     = FlowStepConfig::getConfiguredHandlerSlugs( $adj_step_config );
 			$all_handler_slugs = array_merge( $all_handler_slugs, $handler_slugs );
 		}
 
@@ -300,9 +301,7 @@ class AIStep extends Step {
 			);
 
 			if ( ! empty( $ai_tool_handler_slugs ) ) {
-				$payload['flow_step_config'] = array(
-					'handler_slugs' => $ai_tool_handler_slugs,
-				);
+				$payload['configured_handler_slugs'] = $ai_tool_handler_slugs;
 			}
 		}
 

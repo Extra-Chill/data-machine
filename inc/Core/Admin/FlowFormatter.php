@@ -66,13 +66,16 @@ class FlowFormatter {
 				$step_type
 			);
 
-			// Apply defaults to the primary handler config.
+			// Apply defaults to the primary config slot.
 			if ( ! empty( $effective_slug ) ) {
-				$primary_config                                  = $step_data['handler_configs'][ $effective_slug ] ?? array();
-				$step_data['handler_configs'][ $effective_slug ] = $handler_abilities->applyDefaults(
-					$effective_slug,
-					$primary_config
-				);
+				$primary_config = FlowStepConfig::getPrimaryHandlerConfig( $step_data );
+				$with_defaults  = $handler_abilities->applyDefaults( $effective_slug, $primary_config );
+
+				if ( FlowStepConfig::isMultiHandler( $step_data ) ) {
+					$step_data['handler_configs'][ $effective_slug ] = $with_defaults;
+				} else {
+					$step_data['handler_config'] = $with_defaults;
+				}
 			}
 
 			if ( ! empty( $step_data['settings_display'] ) && is_array( $step_data['settings_display'] ) ) {

@@ -4,24 +4,11 @@
  *
  * Run with: php tests/tool-policy-resolver-adjacency-smoke.php
  *
- * After Phase 2a (#1205), ExecuteWorkflowAbility::buildConfigsFromWorkflow()
- * writes handler_slugs = [step_type] for handler-free step types
- * (system_task, webhook_gate, agent_ping) with a non-empty handler_config,
- * mirroring inc/migrations/handler-keys.php (v0.60.0).
- *
- * ToolPolicyResolver::gatherPipelineTools() iterates handler_slugs from
- * adjacent steps to surface their handler tools to the AI. The
- * synthetic-slug shape means an adjacent system_task step will have
- * handler_slugs = ['system_task'] — a slug that does NOT correspond to a
- * registered handler tool. The resolver MUST handle that gracefully:
- * when ToolManager::resolveHandlerTools('system_task', …) returns no
- * tools, the resolver moves on without injecting a synthetic 'system_task'
- * pseudo-tool into the AI's tool list.
- *
- * This regression guard verifies the iteration shape stays correct: the
- * resolver visits each slug, asks the tool manager for tools, and only
- * adds tools the manager actually returns. A handler-free synthetic slug
- * yielding an empty result must not pollute the available_tools map.
+ * After #1293, handler-free steps (system_task, webhook_gate) no longer
+ * carry synthetic handler_slugs. ToolPolicyResolver::gatherPipelineTools()
+ * reads adjacent steps through FlowStepConfig::getConfiguredHandlerSlugs(),
+ * so handler-free adjacency should contribute zero handler tools while
+ * single-handler and multi-handler steps still expose their real handlers.
  *
  * @package DataMachine\Tests
  */
@@ -30,12 +17,37 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $hook, $value ) {
+		if ( 'datamachine_step_types' !== $hook ) {
+			return $value;
+		}
+
+		return array(
+			'ai'           => array( 'uses_handler' => false, 'multi_handler' => false ),
+			'system_task'  => array( 'uses_handler' => false, 'multi_handler' => false ),
+			'webhook_gate' => array( 'uses_handler' => false, 'multi_handler' => false ),
+			'fetch'        => array( 'uses_handler' => true, 'multi_handler' => false ),
+			'publish'      => array( 'uses_handler' => true, 'multi_handler' => true ),
+			'upsert'       => array( 'uses_handler' => true, 'multi_handler' => true ),
+		);
+	}
+}
+
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( string $hook, ...$args ): void {
+		$GLOBALS['__tool_policy_resolver_actions'][] = array( $hook, $args );
+	}
+}
+
+require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
+
+use DataMachine\Core\Steps\FlowStepConfig;
+
 /**
  * Stub ToolManager that records the slugs the resolver asked for and
  * returns canned tools per slug. A real handler slug
- * ('wordpress_publish') gets back a real tool; a synthetic slug
- * ('system_task') gets back an empty array, simulating what the unified
- * datamachine_tools registry actually does for unknown handler slugs.
+ * ('wordpress_publish') gets back a real tool.
  */
 class StubToolManager {
 	public array $resolveCalls = array();
@@ -52,17 +64,14 @@ class StubToolManager {
 			);
 		}
 
-		// All other slugs (including handler-free synthetic step_type
-		// slugs like 'system_task' or 'webhook_gate') return no tools.
+		// All other slugs return no tools.
 		return array();
 	}
 }
 
 /**
  * Inline reimplementation of ToolPolicyResolver::gatherPipelineTools()
- * adjacency loop. Mirrors inc/Engine/AI/Tools/ToolPolicyResolver.php
- * post-#1205 (the documentation-only edit there did not change the
- * iteration shape).
+ * adjacency loop. Mirrors inc/Engine/AI/Tools/ToolPolicyResolver.php.
  */
 function gather_pipeline_handler_tools_for_test( array $args, StubToolManager $tool_manager ): array {
 	$available_tools = array();
@@ -72,12 +81,11 @@ function gather_pipeline_handler_tools_for_test( array $args, StubToolManager $t
 			continue;
 		}
 
-		$handler_slugs       = $step_config['handler_slugs'] ?? array();
-		$handler_configs_map = $step_config['handler_configs'] ?? array();
-		$cache_scope         = $step_config['flow_step_id'] ?? ( $args['cache_scope'] ?? '' );
+		$handler_slugs = FlowStepConfig::getConfiguredHandlerSlugs( $step_config );
+		$cache_scope   = $step_config['flow_step_id'] ?? ( $args['cache_scope'] ?? '' );
 
 		foreach ( $handler_slugs as $slug ) {
-			$handler_config = $handler_configs_map[ $slug ] ?? array();
+			$handler_config = FlowStepConfig::getHandlerConfigForSlug( $step_config, $slug );
 			$tools          = $tool_manager->resolveHandlerTools( $slug, $handler_config, array(), $cache_scope );
 
 			foreach ( $tools as $tool_name => $tool_config ) {
@@ -105,7 +113,7 @@ function assert_equals( $expected, $actual, string $name, array &$failures, int 
 	echo "    actual:   " . var_export( $actual, true ) . "\n";
 }
 
-echo "ToolPolicyResolver adjacency smoke (Phase 2a)\n";
+echo "ToolPolicyResolver adjacency smoke (#1293)\n";
 echo "----------------------------------------------\n";
 
 // Test 1: AI step with a publish step (handler-bearing) before it.
@@ -128,28 +136,22 @@ $tools = gather_pipeline_handler_tools_for_test( $args, $tool_manager );
 assert_equals( array( 'wordpress_publish' ), $tool_manager->resolveCalls, 'asked tool manager for wordpress_publish', $failures, $passes );
 assert_equals( true, isset( $tools['wordpress_publish_tool'] ), 'wordpress_publish_tool surfaced', $failures, $passes );
 
-// Test 2: AI step with a synthetic-slug system_task adjacency.
-// After #1205, system_task carries handler_slugs = ['system_task'].
-// Resolver must NOT inject a 'system_task' pseudo-tool — the tool
-// manager returns nothing for that slug, and the resolver respects
-// the empty result.
-echo "\n[2] AI adjacent to handler-free system_task step (synthetic slug):\n";
+// Test 2: AI step with a handler-free system_task adjacency.
+// Resolver should not ask the tool manager for any handler slug.
+echo "\n[2] AI adjacent to handler-free system_task step:\n";
 $tool_manager = new StubToolManager();
 $args         = array(
 	'previous_step_config' => array(
 		'flow_step_id'    => 'flow_sys_1',
 		'step_type'       => 'system_task',
-		'handler_slugs'   => array( 'system_task' ),
-		'handler_configs' => array(
-			'system_task' => array( 'task' => 'daily_memory_generation', 'params' => array() ),
-		),
+		'handler_config'  => array( 'task' => 'daily_memory_generation', 'params' => array() ),
 	),
 	'next_step_config'     => null,
 );
 $tools = gather_pipeline_handler_tools_for_test( $args, $tool_manager );
 
-assert_equals( array( 'system_task' ), $tool_manager->resolveCalls, 'resolver asked for synthetic system_task slug', $failures, $passes );
-assert_equals( array(), $tools, 'no tools surfaced for handler-free synthetic slug', $failures, $passes );
+assert_equals( array(), $tool_manager->resolveCalls, 'resolver ignored handler-free system_task', $failures, $passes );
+assert_equals( array(), $tools, 'no tools surfaced for handler-free step', $failures, $passes );
 
 // Test 3: Mixed adjacency — publish before, system_task after.
 // Only the real handler tool should land in available_tools.
@@ -167,15 +169,12 @@ $args         = array(
 	'next_step_config'     => array(
 		'flow_step_id'    => 'flow_sys_2',
 		'step_type'       => 'system_task',
-		'handler_slugs'   => array( 'system_task' ),
-		'handler_configs' => array(
-			'system_task' => array( 'task' => 'agent_ping', 'params' => array() ),
-		),
+		'handler_config'  => array( 'task' => 'agent_ping', 'params' => array() ),
 	),
 );
 $tools = gather_pipeline_handler_tools_for_test( $args, $tool_manager );
 
-assert_equals( array( 'wordpress_publish', 'system_task' ), $tool_manager->resolveCalls, 'resolver visited both adjacent slugs', $failures, $passes );
+assert_equals( array( 'wordpress_publish' ), $tool_manager->resolveCalls, 'resolver visited only real adjacent handlers', $failures, $passes );
 assert_equals( array( 'wordpress_publish_tool' ), array_keys( $tools ), 'only real handler tool landed in available_tools', $failures, $passes );
 
 // Test 4: Multi-handler publish adjacency — the legitimate multi-element callsite.

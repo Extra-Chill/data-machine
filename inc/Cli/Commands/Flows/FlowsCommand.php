@@ -480,15 +480,18 @@ class FlowsCommand extends BaseCommand {
 
 			$step_type = $step_data['step_type'] ?? '';
 			$order     = $step_data['execution_order'] ?? '';
-			$slugs     = $step_data['handler_slugs'] ?? array();
-			$configs   = $step_data['handler_configs'] ?? array();
+			$slugs     = FlowStepConfig::getConfiguredHandlerSlugs( $step_data );
+			$configs   = FlowStepConfig::getHandlerConfigs( $step_data );
 
 			// Show pipeline-level prompt if set.
 			$pipeline_prompt = $step_data['pipeline_config']['prompt'] ?? '';
 
 			if ( empty( $slugs ) ) {
-				// Step with no handlers (e.g. AI step with only pipeline config).
+				// Step with no handlers (e.g. AI or system_task).
 				$config_parts = array();
+				foreach ( FlowStepConfig::getPrimaryHandlerConfig( $step_data ) as $key => $value ) {
+					$config_parts[] = $key . '=' . $this->formatConfigValue( $value );
+				}
 
 				if ( $pipeline_prompt ) {
 					$config_parts[] = 'system_prompt=' . $this->truncateValue( $pipeline_prompt, 60 );
@@ -1158,8 +1161,7 @@ class FlowsCommand extends BaseCommand {
 		$handlers    = array();
 
 		foreach ( $flow_config as $step_data ) {
-			// Data is normalized at the DB layer — handler_slugs is canonical.
-			$handlers = array_merge( $handlers, $step_data['handler_slugs'] ?? array() );
+			$handlers = array_merge( $handlers, FlowStepConfig::getConfiguredHandlerSlugs( $step_data ) );
 		}
 
 		return implode( ', ', array_unique( $handlers ) );
@@ -1180,7 +1182,7 @@ class FlowsCommand extends BaseCommand {
 		$parts       = array();
 
 		foreach ( $flow_config as $step_data ) {
-			$handler_configs = $step_data['handler_configs'] ?? array();
+			$handler_configs = FlowStepConfig::getHandlerConfigs( $step_data );
 
 			foreach ( $handler_configs as $hconfig ) {
 				if ( ! is_array( $hconfig ) ) {
@@ -1304,7 +1306,7 @@ class FlowsCommand extends BaseCommand {
 				continue;
 			}
 
-			$handler_configs = $step_data['handler_configs'] ?? array();
+			$handler_configs = FlowStepConfig::getHandlerConfigs( $step_data );
 			if ( ! is_array( $handler_configs ) ) {
 				continue;
 			}
@@ -1446,8 +1448,8 @@ class FlowsCommand extends BaseCommand {
 
 			$step_type = $step['step_type'] ?? '';
 
-			$slugs   = $step['handler_slugs'] ?? array();
-			$configs = $step['handler_configs'] ?? array();
+			$slugs   = FlowStepConfig::getConfiguredHandlerSlugs( $step );
+			$configs = FlowStepConfig::getHandlerConfigs( $step );
 
 			if ( empty( $slugs ) && ! $step_id ) {
 				continue; // Skip steps with no handlers unless specifically requested.
@@ -1514,7 +1516,7 @@ class FlowsCommand extends BaseCommand {
 
 		$handler_steps = array();
 		foreach ( $flow_config as $step_id => $step_data ) {
-			if ( ! empty( $step_data['handler_slugs'] ) ) {
+			if ( ! empty( FlowStepConfig::getConfiguredHandlerSlugs( $step_data ) ) ) {
 				$handler_steps[] = $step_id;
 			}
 		}

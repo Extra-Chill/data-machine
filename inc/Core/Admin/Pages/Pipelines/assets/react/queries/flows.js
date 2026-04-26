@@ -337,7 +337,7 @@ export const useAddFlowHandler = () => {
 		mutationFn: ( { flowStepId, handlerSlug, settings = {} } ) =>
 			addFlowHandler( flowStepId, handlerSlug, settings ),
 		onSuccess: ( response, variables ) => {
-			// Invalidate flows to pick up updated handler_slugs / handler_configs.
+			// Invalidate flows to pick up updated handler config shape.
 			if ( variables.pipelineId ) {
 				const cachedPipelineId = normalizeId( variables.pipelineId );
 				queryClient.invalidateQueries( {

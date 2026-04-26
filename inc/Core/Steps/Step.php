@@ -214,33 +214,21 @@ abstract class Step {
 	/**
 	 * Get the primary handler slug from flow step configuration.
 	 *
-	 * Returns the raw `handler_slugs[0]` value. For self-configuring step
-	 * types (system_task, webhook_gate, agent_ping), the migration in
-	 * inc/migrations/handler-keys.php and ExecuteWorkflowAbility::build
-	 * ConfigsFromWorkflow() store the step_type as the synthetic primary
-	 * slug, so this returns the step_type for those rows. Returns null
-	 * when no slug has been resolved (e.g. fetch step with no handler
-	 * configured) so the default validateStepConfiguration() can reject.
-	 *
-	 * Prefer FlowStepConfig::getEffectiveSlug() at non-Step callsites; it
-	 * is the canonical resolver and falls back to step_type when the
-	 * handler_slugs array is empty.
+	 * Reads the canonical scalar `handler_slug` field. Multi-handler steps
+	 * should call getHandlerSlugs(); handler-free steps return null.
 	 *
 	 * @return string|null Handler slug or null if not set
 	 */
 	protected function getHandlerSlug(): ?string {
-		return $this->flow_step_config['handler_slugs'][0] ?? null;
+		return FlowStepConfig::getHandlerSlug( $this->flow_step_config );
 	}
 
 	/**
 	 * Get the primary handler configuration from flow step configuration.
 	 *
-	 * Reads handler_configs[handler_slugs[0]]. Handler-bearing steps key
-	 * by handler_slug; handler-free steps (system_task, webhook_gate,
-	 * agent_ping) key by step_type via the synthetic-slug shape applied
-	 * in inc/migrations/handler-keys.php and ExecuteWorkflowAbility::build
-	 * ConfigsFromWorkflow(). FlowStepConfig::getPrimaryHandlerConfig() is
-	 * the single source of truth for the lookup so callsites stay aligned.
+	 * Reads the canonical config slot: `handler_config` for handler-free and
+	 * single-handler steps, or `handler_configs[primary_slug]` for true
+	 * multi-handler steps.
 	 *
 	 * @return array Handler configuration array
 	 */
@@ -249,12 +237,12 @@ abstract class Step {
 	}
 
 	/**
-	 * Get handler slugs (supports both singular and plural config).
+	 * Get handler slugs for multi-handler steps.
 	 *
 	 * @return array Handler slug array
 	 */
 	protected function getHandlerSlugs(): array {
-		return $this->flow_step_config['handler_slugs'] ?? array();
+		return FlowStepConfig::getHandlerSlugs( $this->flow_step_config );
 	}
 
 	/**
@@ -263,7 +251,7 @@ abstract class Step {
 	 * @return array<string, array> Handler configs keyed by slug
 	 */
 	protected function getHandlerConfigs(): array {
-		return $this->flow_step_config['handler_configs'] ?? array();
+		return FlowStepConfig::getHandlerConfigs( $this->flow_step_config );
 	}
 
 	/**

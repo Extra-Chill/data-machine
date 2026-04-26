@@ -34,6 +34,7 @@ class PublishStep extends Step {
 			class_name: self::class,
 			position: 30,
 			usesHandler: true,
+			multiHandler: true,
 			hasPipelineConfig: false
 		);
 	}

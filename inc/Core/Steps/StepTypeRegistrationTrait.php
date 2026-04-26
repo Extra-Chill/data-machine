@@ -39,6 +39,7 @@ trait StepTypeRegistrationTrait {
 	 * @param string     $class_name Step class name
 	 * @param int        $position Position in step type list (lower = earlier)
 	 * @param bool       $usesHandler Whether step type uses handlers
+	 * @param bool       $multiHandler Whether step type supports multiple handlers
 	 * @param bool       $hasPipelineConfig Whether step has pipeline-level configuration
 	 * @param bool       $consumeAllPackets Whether step consumes all packets at once
 	 * @param array|null $stepSettings Optional UI settings for pipeline step configuration
@@ -50,6 +51,7 @@ trait StepTypeRegistrationTrait {
 		string $class_name,
 		int $position = 50,
 		bool $usesHandler = true,
+		bool $multiHandler = false,
 		bool $hasPipelineConfig = false,
 		bool $consumeAllPackets = false,
 		?array $stepSettings = null,
@@ -67,9 +69,10 @@ trait StepTypeRegistrationTrait {
 				$slug,
 				$label,
 				$description,
-			$class_name,
-			$position,
+				$class_name,
+				$position,
 				$usesHandler,
+				$multiHandler,
 				$hasPipelineConfig,
 				$consumeAllPackets,
 				$showSettingsDisplay
@@ -80,6 +83,7 @@ trait StepTypeRegistrationTrait {
 					'class'                 => $class_name,
 					'position'              => $position,
 					'uses_handler'          => $usesHandler,
+					'multi_handler'         => $multiHandler,
 					'has_pipeline_config'   => $hasPipelineConfig,
 					'consume_all_packets'   => $consumeAllPackets,
 					'show_settings_display' => $showSettingsDisplay,

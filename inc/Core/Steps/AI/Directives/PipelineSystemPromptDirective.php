@@ -20,6 +20,7 @@
 namespace DataMachine\Core\Steps\AI\Directives;
 
 use DataMachine\Abilities\HandlerAbilities;
+use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -100,11 +101,10 @@ class PipelineSystemPromptDirective implements \DataMachine\Engine\AI\Directives
 
 		// Sort steps by execution_order.
 		//
-		// Reads handler_slugs raw (not via FlowStepConfig::getEffectiveSlug)
-		// because the workflow visualization needs to render every handler
-		// in a multi-handler step (e.g. PUBLISH_A+PUBLISH_B → AI → UPSERT),
-		// not just the primary slug. This is one of the legitimate
-		// multi-element callsites alongside ToolPolicyResolver.
+		// Reads every configured handler through FlowStepConfig's cardinality-
+		// agnostic helper because the visualization needs to render every
+		// handler in multi-handler steps, while still supporting scalar
+		// single-handler steps.
 		$sorted_steps = array();
 		foreach ( $flow_config as $flow_step_id => $step_config ) {
 			$execution_order = $step_config['execution_order'] ?? -1;
@@ -116,7 +116,7 @@ class PipelineSystemPromptDirective implements \DataMachine\Engine\AI\Directives
 				$sorted_steps[ $execution_order ] = array(
 					'pipeline_step_id' => $step_pipeline_step_id,
 					'step_type'        => $step_config['step_type'] ?? '',
-					'handler_slugs'    => $step_config['handler_slugs'] ?? array(),
+					'handler_slugs'    => FlowStepConfig::getConfiguredHandlerSlugs( $step_config ),
 				);
 			}
 		}

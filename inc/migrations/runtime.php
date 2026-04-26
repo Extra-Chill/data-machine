@@ -99,6 +99,9 @@ function datamachine_run_schema_migrations(): void {
 	// Move AI step tools from handler_slugs to enabled_tools (#1205 Phase 2b, idempotent).
 	datamachine_migrate_ai_enabled_tools();
 
+	// Collapse handler storage to match step-type cardinality (#1293, idempotent).
+	datamachine_migrate_handler_slug_scalar();
+
 	// Split prompt_queue / config_patch_queue payload polymorphism (#1292, idempotent).
 	datamachine_migrate_split_queue_payload();
 

@@ -172,8 +172,8 @@ class AIConversationLoop {
 		// In pipeline mode, conversation should only complete when ALL configured
 		// handlers have fired, not just the first one.
 		$executed_handler_slugs = array();
-		$flow_step_config       = $payload['flow_step_config'] ?? array();
-		$configured_handlers    = $flow_step_config['handler_slugs'] ?? array();
+		$configured_handlers    = $payload['configured_handler_slugs'] ?? array();
+		$configured_handlers    = is_array( $configured_handlers ) ? array_values( $configured_handlers ) : array();
 
 		// Build base log metadata from payload for consistent logging.
 		$base_log_context = array_filter(
