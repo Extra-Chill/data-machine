@@ -400,6 +400,58 @@ class JobsOperations extends BaseRepository {
 	}
 
 	/**
+	 * Get all child jobs of a parent job, ordered by job_id ascending.
+	 *
+	 * Used by fan-out system tasks (parent schedules N children via
+	 * TaskScheduler::scheduleBatch) to walk their children's effects
+	 * for undo, status aggregation, etc. Children are linked via the
+	 * indexed `parent_job_id` column.
+	 *
+	 * Engine data is decoded from JSON to match get_job()'s shape so
+	 * callers can treat parent and child rows uniformly.
+	 *
+	 * @since 0.83.0
+	 *
+	 * @param int $parent_job_id Parent job ID.
+	 * @return array Array of child job rows with engine_data decoded, or empty array.
+	 */
+	public function get_children( int $parent_job_id ): array {
+		if ( $parent_job_id <= 0 ) {
+			return array();
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				'SELECT * FROM %i WHERE parent_job_id = %d ORDER BY job_id ASC',
+				$this->table_name,
+				$parent_job_id
+			),
+			ARRAY_A
+		);
+
+		if ( empty( $rows ) ) {
+			return array();
+		}
+
+		foreach ( $rows as &$row ) {
+			if ( isset( $row['engine_data'] ) && is_string( $row['engine_data'] ) && '' !== $row['engine_data'] ) {
+				$decoded = json_decode( $row['engine_data'], true );
+				if ( json_last_error() === JSON_ERROR_NONE ) {
+					$row['engine_data'] = $decoded;
+				} else {
+					$row['engine_data'] = array();
+				}
+			} else {
+				$row['engine_data'] = array();
+			}
+		}
+		unset( $row );
+
+		return $rows;
+	}
+
+	/**
 	 * Get the latest job for each flow in a batch.
 	 *
 	 * Uses a subquery to efficiently get the most recent job per flow_id.
