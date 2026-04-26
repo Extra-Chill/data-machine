@@ -43,11 +43,6 @@ class LogAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function testWrite_toLog_withValidData_returnsSuccess(): void {
-		if (!class_exists('WP_Ability')) {
-			$this->markTestSkipped('WP_Ability class not available');
-			return;
-		}
-
 		$ability = wp_get_ability('datamachine/write-to-log');
 		$result = $ability->execute([
 			'level' => 'debug',
@@ -62,11 +57,6 @@ class LogAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function testWrite_toLog_withoutPermissions_returnsPermissionDenied(): void {
-		if (!class_exists('WP_Ability')) {
-			$this->markTestSkipped('WP_Ability class not available');
-			return;
-		}
-
 		wp_set_current_user(0);
 		add_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
 
@@ -81,11 +71,6 @@ class LogAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function testWrite_toLog_withInvalidLevel_returnsError(): void {
-		if (!class_exists('WP_Ability')) {
-			$this->markTestSkipped('WP_Ability class not available');
-			return;
-		}
-
 		$ability = wp_get_ability('datamachine/write-to-log');
 		$result = $ability->execute([
 			'level' => 'invalid_level',
@@ -97,11 +82,6 @@ class LogAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function testWrite_toLog_withContext_storesContext(): void {
-		if (!class_exists('WP_Ability')) {
-			$this->markTestSkipped('WP_Ability class not available');
-			return;
-		}
-
 		$ability = wp_get_ability('datamachine/write-to-log');
 		$result = $ability->execute([
 			'level' => 'info',
@@ -115,11 +95,6 @@ class LogAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function testWrite_toLog_withoutContext_succeeds(): void {
-		if (!class_exists('WP_Ability')) {
-			$this->markTestSkipped('WP_Ability class not available');
-			return;
-		}
-
 		$ability = wp_get_ability('datamachine/write-to-log');
 		$result = $ability->execute([
 			'level' => 'info',
@@ -130,11 +105,6 @@ class LogAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function testClearLogs_withValidAgentType_returnsSuccess(): void {
-		if (!class_exists('WP_Ability')) {
-			$this->markTestSkipped('WP_Ability class not available');
-			return;
-		}
-
 		$ability = wp_get_ability('datamachine/clear-logs');
 		$result = $ability->execute([]);
 
@@ -143,11 +113,6 @@ class LogAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function testClearLogs_withAll_clearsAllAgentTypes(): void {
-		if (!class_exists('WP_Ability')) {
-			$this->markTestSkipped('WP_Ability class not available');
-			return;
-		}
-
 		$ability = wp_get_ability('datamachine/clear-logs');
 		$result = $ability->execute([]);
 
@@ -156,11 +121,6 @@ class LogAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function testClearLogs_withoutPermissions_returnsPermissionDenied(): void {
-		if (!class_exists('WP_Ability')) {
-			$this->markTestSkipped('WP_Ability class not available');
-			return;
-		}
-
 		wp_set_current_user(0);
 		add_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
 
@@ -179,11 +139,6 @@ class LogAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function testReadDebugLog_returnsSuccess(): void {
-		if (!class_exists('WP_Ability')) {
-			$this->markTestSkipped('WP_Ability class not available');
-			return;
-		}
-
 		$ability = wp_get_ability('datamachine/read-debug-log');
 		$result = $ability->execute([]);
 
