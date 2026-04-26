@@ -119,6 +119,10 @@ Pipeline flow:
 - **EngineData** — `getImagePath()` and `getVideoPath()` for pipeline media flow
 - **PublishHandler** — `resolveMediaUrls()`, `validateImage()`, `validateVideo()` on the base class
 
+## Theming
+
+Data Machine exposes two aligned theming surfaces: CSS custom properties for browser-rendered UI and `BrandTokens` for PHP/GD-rendered image templates. See [`docs/theming.md`](docs/theming.md) for the decision matrix and token catalogs.
+
 ## System Tasks
 
 Background AI tasks that run on hooks or schedules:
