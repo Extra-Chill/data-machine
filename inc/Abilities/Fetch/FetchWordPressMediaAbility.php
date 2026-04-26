@@ -53,6 +53,11 @@ class FetchWordPressMediaAbility {
 								'default'     => '',
 								'description' => __( 'Search term to filter media', 'data-machine' ),
 							),
+							'exclude_keywords'       => array(
+								'type'        => 'string',
+								'default'     => '',
+								'description' => __( 'Comma-separated keywords; media whose title, description, or excerpt contains any of these are skipped', 'data-machine' ),
+							),
 							'randomize'              => array(
 								'type'        => 'boolean',
 								'default'     => false,
@@ -115,6 +120,7 @@ class FetchWordPressMediaAbility {
 		$file_types             = $config['file_types'];
 		$timeframe_limit        = $config['timeframe_limit'];
 		$search                 = $config['search'];
+		$exclude_keywords       = $config['exclude_keywords'];
 		$randomize              = $config['randomize'];
 		$include_parent_content = $config['include_parent_content'];
 		$processed_items        = $config['processed_items'];
@@ -195,11 +201,24 @@ class FetchWordPressMediaAbility {
 				continue;
 			}
 
-			if ( $use_client_side_search && ! empty( $search ) ) {
+			// Build search text once for both include and exclude filters.
+			// $search is server-side handled by WP_Query when single-term;
+			// only the comma-separated case falls through to client-side filtering.
+			$search_text       = '';
+			$needs_search_text = ( $use_client_side_search && ! empty( $search ) ) || '' !== trim( $exclude_keywords );
+			if ( $needs_search_text ) {
 				$search_text = $post->post_title . ' ' . wp_strip_all_tags( $post->post_content . ' ' . $post->post_excerpt );
+			}
+
+			if ( $use_client_side_search && ! empty( $search ) ) {
 				if ( ! $this->applyKeywordSearch( $search_text, $search ) ) {
 					continue;
 				}
+			}
+
+			// Always honor exclude_keywords (server-side WP_Query has no inverse).
+			if ( $this->applyKeywordExclusion( $search_text, $exclude_keywords ) ) {
+				continue;
 			}
 
 			$title       = ! empty( $post->post_title ) ? $post->post_title : 'N/A';
@@ -309,6 +328,7 @@ class FetchWordPressMediaAbility {
 			'file_types'             => array( 'image' ),
 			'timeframe_limit'        => 'all_time',
 			'search'                 => '',
+			'exclude_keywords'       => '',
 			'randomize'              => false,
 			'include_parent_content' => false,
 			'processed_items'        => array(),
@@ -369,6 +389,31 @@ class FetchWordPressMediaAbility {
 			if ( empty( $term ) ) {
 				continue;
 			}
+			if ( strpos( $text_lower, strtolower( $term ) ) !== false ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Apply keyword exclusion filter.
+	 *
+	 * Returns true when any of the comma-separated terms in $exclude_keywords
+	 * is present in $text. Inverse of applyKeywordSearch — callers should skip
+	 * items for which this returns true. An empty exclusion list never matches.
+	 */
+	private function applyKeywordExclusion( string $text, string $exclude_keywords ): bool {
+		$exclude_keywords = trim( $exclude_keywords );
+		if ( '' === $exclude_keywords ) {
+			return false;
+		}
+
+		$terms      = array_filter( array_map( 'trim', explode( ',', $exclude_keywords ) ) );
+		$text_lower = strtolower( $text );
+
+		foreach ( $terms as $term ) {
 			if ( strpos( $text_lower, strtolower( $term ) ) !== false ) {
 				return true;
 			}

@@ -49,9 +49,10 @@ class WordPressAPISettings extends FetchHandlerSettings {
 	 */
 	public static function sanitize( array $raw_settings ): array {
 		$sanitized = array(
-			'endpoint_url'    => esc_url_raw( trim( $raw_settings['endpoint_url'] ?? '' ) ),
-			'timeframe_limit' => sanitize_text_field( $raw_settings['timeframe_limit'] ?? 'all_time' ),
-			'search'          => sanitize_text_field( $raw_settings['search'] ?? '' ),
+			'endpoint_url'     => esc_url_raw( trim( $raw_settings['endpoint_url'] ?? '' ) ),
+			'timeframe_limit'  => sanitize_text_field( $raw_settings['timeframe_limit'] ?? 'all_time' ),
+			'search'           => sanitize_text_field( $raw_settings['search'] ?? '' ),
+			'exclude_keywords' => sanitize_text_field( $raw_settings['exclude_keywords'] ?? '' ),
 		);
 
 		// Validate endpoint URL

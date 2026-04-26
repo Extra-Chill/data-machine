@@ -65,19 +65,21 @@ class WordPressAPI extends FetchHandler {
 		}
 
 		// Get filtering settings
-		$timeframe_limit = $config['timeframe_limit'] ?? 'all_time';
-		$search          = trim( $config['search'] ?? '' );
+		$timeframe_limit  = $config['timeframe_limit'] ?? 'all_time';
+		$search           = trim( $config['search'] ?? '' );
+		$exclude_keywords = trim( $config['exclude_keywords'] ?? '' );
 
 		// Get processed items for deduplication
 		$processed_items = $this->getProcessedItems( $context );
 
 		// Prepare input for ability
 		$ability_input = array(
-			'endpoint_url'    => $endpoint_url,
-			'timeframe_limit' => $timeframe_limit,
-			'search'          => $search,
-			'processed_items' => $processed_items,
-			'download_images' => true,
+			'endpoint_url'     => $endpoint_url,
+			'timeframe_limit'  => $timeframe_limit,
+			'search'           => $search,
+			'exclude_keywords' => $exclude_keywords,
+			'processed_items'  => $processed_items,
+			'download_images'  => true,
 		);
 
 		// Execute ability

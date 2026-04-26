@@ -46,11 +46,12 @@ class Rss extends FetchHandler {
 	 */
 	protected function executeFetch( array $config, ExecutionContext $context ): array {
 		$ability_input = array(
-			'feed_url'        => $config['feed_url'] ?? '',
-			'timeframe_limit' => $config['timeframe_limit'] ?? 'all_time',
-			'search'          => $config['search'] ?? '',
-			'processed_items' => array(),
-			'download_images' => true,
+			'feed_url'         => $config['feed_url'] ?? '',
+			'timeframe_limit'  => $config['timeframe_limit'] ?? 'all_time',
+			'search'           => $config['search'] ?? '',
+			'exclude_keywords' => $config['exclude_keywords'] ?? '',
+			'processed_items'  => array(),
+			'download_images'  => true,
 		);
 
 		$ability = new FetchRssAbility();

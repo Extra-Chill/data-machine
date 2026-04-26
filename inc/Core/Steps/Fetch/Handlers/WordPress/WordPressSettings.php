@@ -119,6 +119,7 @@ class WordPressSettings extends FetchHandlerSettings {
 		// Sanitize common fields
 		$sanitized['timeframe_limit']     = sanitize_text_field( $raw_settings['timeframe_limit'] ?? 'all_time' );
 		$sanitized['search']              = sanitize_text_field( $raw_settings['search'] ?? '' );
+		$sanitized['exclude_keywords']    = sanitize_text_field( $raw_settings['exclude_keywords'] ?? '' );
 		$sanitized['randomize_selection'] = ! empty( $raw_settings['randomize_selection'] );
 
 		return $sanitized;

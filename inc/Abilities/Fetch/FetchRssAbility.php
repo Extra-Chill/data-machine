@@ -53,6 +53,11 @@ class FetchRssAbility {
 								'default'     => '',
 								'description' => __( 'Search term to filter items', 'data-machine' ),
 							),
+							'exclude_keywords' => array(
+								'type'        => 'string',
+								'default'     => '',
+								'description' => __( 'Comma-separated keywords; items whose title or description contains any of these are skipped', 'data-machine' ),
+							),
 							'processed_items' => array(
 								'type'        => 'array',
 								'default'     => array(),
@@ -107,11 +112,12 @@ class FetchRssAbility {
 		$logs   = array();
 		$config = $this->normalizeConfig( $input );
 
-		$feed_url        = $config['feed_url'];
-		$timeframe_limit = $config['timeframe_limit'];
-		$search          = $config['search'];
-		$processed_items = $config['processed_items'];
-		$download_images = $config['download_images'];
+		$feed_url         = $config['feed_url'];
+		$timeframe_limit  = $config['timeframe_limit'];
+		$search           = $config['search'];
+		$exclude_keywords = $config['exclude_keywords'];
+		$processed_items  = $config['processed_items'];
+		$download_images  = $config['download_images'];
 
 		$result = $this->httpGet( $feed_url, array( 'context' => 'RSS Feed' ) );
 
@@ -244,6 +250,17 @@ class FetchRssAbility {
 			if ( ! $this->applyKeywordSearch( $search_text, $search ) ) {
 				continue;
 			}
+			if ( $this->applyKeywordExclusion( $search_text, $exclude_keywords ) ) {
+				$logs[] = array(
+					'level'   => 'debug',
+					'message' => 'Rss: Skipping item matching exclude_keywords.',
+					'data'    => array(
+						'guid'  => $guid,
+						'title' => $title,
+					),
+				);
+				continue;
+			}
 
 			$author        = $this->extractItemAuthor( $item );
 			$categories    = $this->extractItemCategories( $item );
@@ -338,11 +355,12 @@ class FetchRssAbility {
 	 */
 	private function normalizeConfig( array $input ): array {
 		$defaults = array(
-			'feed_url'        => '',
-			'timeframe_limit' => 'all_time',
-			'search'          => '',
-			'processed_items' => array(),
-			'download_images' => true,
+			'feed_url'         => '',
+			'timeframe_limit'  => 'all_time',
+			'search'           => '',
+			'exclude_keywords' => '',
+			'processed_items'  => array(),
+			'download_images'  => true,
 		);
 
 		return array_merge( $defaults, $input );
@@ -552,6 +570,31 @@ class FetchRssAbility {
 			if ( empty( $term ) ) {
 				continue;
 			}
+			if ( strpos( $text_lower, strtolower( $term ) ) !== false ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Apply keyword exclusion filter.
+	 *
+	 * Returns true when any of the comma-separated terms in $exclude_keywords
+	 * is present in $text. Inverse of applyKeywordSearch — callers should skip
+	 * items for which this returns true. An empty exclusion list never matches.
+	 */
+	private function applyKeywordExclusion( string $text, string $exclude_keywords ): bool {
+		$exclude_keywords = trim( $exclude_keywords );
+		if ( '' === $exclude_keywords ) {
+			return false;
+		}
+
+		$terms      = array_filter( array_map( 'trim', explode( ',', $exclude_keywords ) ) );
+		$text_lower = strtolower( $text );
+
+		foreach ( $terms as $term ) {
 			if ( strpos( $text_lower, strtolower( $term ) ) !== false ) {
 				return true;
 			}
