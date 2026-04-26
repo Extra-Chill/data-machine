@@ -238,4 +238,67 @@ class FlowAbilities {
 		}
 		return $this->queue->executeQueueMove( $input );
 	}
+
+	/**
+	 * Execute config-patch-add ability (Fetch consumer).
+	 *
+	 * @param array $input Input parameters (flow_id, flow_step_id, patch).
+	 * @return array Result.
+	 */
+	public function executeConfigPatchAdd( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
+		return $this->queue->executeConfigPatchAdd( $input );
+	}
+
+	/**
+	 * Execute config-patch-list ability.
+	 */
+	public function executeConfigPatchList( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
+		return $this->queue->executeConfigPatchList( $input );
+	}
+
+	/**
+	 * Execute config-patch-clear ability.
+	 */
+	public function executeConfigPatchClear( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
+		return $this->queue->executeConfigPatchClear( $input );
+	}
+
+	/**
+	 * Execute config-patch-remove ability.
+	 */
+	public function executeConfigPatchRemove( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
+		return $this->queue->executeConfigPatchRemove( $input );
+	}
+
+	/**
+	 * Execute config-patch-update ability.
+	 */
+	public function executeConfigPatchUpdate( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
+		return $this->queue->executeConfigPatchUpdate( $input );
+	}
+
+	/**
+	 * Execute config-patch-move ability.
+	 */
+	public function executeConfigPatchMove( array $input ): array {
+		if ( ! isset( $this->queue ) ) {
+			$this->queue = new QueueAbility();
+		}
+		return $this->queue->executeConfigPatchMove( $input );
+	}
 }

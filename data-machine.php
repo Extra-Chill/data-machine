@@ -621,6 +621,9 @@ function datamachine_activate_for_site() {
 	// Move AI step tools from handler_slugs to enabled_tools (#1205 Phase 2b, idempotent).
 	datamachine_migrate_ai_enabled_tools();
 
+	// Split prompt_queue / config_patch_queue payload polymorphism (#1292, idempotent).
+	datamachine_migrate_split_queue_payload();
+
 	// Drop redundant _datamachine_post_pipeline_id rows (#1091). Idempotent.
 	datamachine_drop_redundant_post_pipeline_meta();
 
