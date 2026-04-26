@@ -52,9 +52,15 @@ export default function FlowStepCard( {
 	const isAiStep = pipelineStep.step_type === 'ai';
 
 	const promptQueue = flowStepConfig.prompt_queue || [];
-	const queueEnabled = !! flowStepConfig.queue_enabled;
+	const rawQueueMode = flowStepConfig.queue_mode;
+	const queueMode = [ 'drain', 'loop', 'static' ].includes( rawQueueMode )
+		? rawQueueMode
+		: 'static';
 	const queueHasItems = promptQueue.length > 0;
-	const shouldShowQueue = queueEnabled || queueHasItems;
+	// Static is the no-op mode; only drain/loop actively mutate the queue
+	// per tick. Show the queue surface when the mode is active OR when items
+	// are staged (so the user can manage a dormant stockpile).
+	const shouldShowQueue = queueMode !== 'static' || queueHasItems;
 
 	const [ error, setError ] = useState( null );
 
@@ -188,7 +194,7 @@ export default function FlowStepCard( {
 							pipelineId={ pipelineId }
 							prompt={ currentPrompt }
 							promptQueue={ promptQueue }
-							queueEnabled={ queueEnabled }
+							queueMode={ queueMode }
 							placeholder={
 								isAiStep
 									? __( 'Enter user message for AI processing…', 'data-machine' )
