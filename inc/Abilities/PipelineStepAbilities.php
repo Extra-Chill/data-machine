@@ -516,10 +516,10 @@ class PipelineStepAbilities {
 		}
 
 		// Reject handler fields — handlers are flow-scoped, not pipeline-scoped.
-		if ( isset( $input['handler_slugs'] ) || isset( $input['handler_configs'] ) ) {
+		if ( isset( $input['handler_slug'] ) || isset( $input['handler_slugs'] ) || isset( $input['handler_config'] ) || isset( $input['handler_configs'] ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'handler_slugs and handler_configs are flow-scoped. Use datamachine/update-flow-step ability instead.',
+				'error'   => 'handler_slug(s) and handler_config(s) are flow-scoped. Use datamachine/update-flow-step ability instead.',
 			);
 		}
 

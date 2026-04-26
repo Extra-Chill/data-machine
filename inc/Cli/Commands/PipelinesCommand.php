@@ -15,6 +15,7 @@ use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\AgentResolver;
 use DataMachine\Cli\UserResolver;
+use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -394,7 +395,7 @@ class PipelinesCommand extends BaseCommand {
 			}
 
 			foreach ( $config as $step ) {
-				$handler_configs = $step['handler_configs'] ?? array();
+				$handler_configs = is_array( $step ) ? FlowStepConfig::getHandlerConfigs( $step ) : array();
 
 				foreach ( $handler_configs as $hconfig ) {
 					// Coordinates (any handler that has a location field with lat,lon).

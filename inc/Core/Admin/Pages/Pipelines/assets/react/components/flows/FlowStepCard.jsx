@@ -50,6 +50,15 @@ export default function FlowStepCard( {
 	const stepTypeInfo = stepTypes[ pipelineStep.step_type ] || {};
 
 	const isAiStep = pipelineStep.step_type === 'ai';
+	const usesHandler = stepTypeInfo.uses_handler === true;
+	const isMultiHandlerStep = stepTypeInfo.multi_handler === true;
+	const handlerSlugs = isMultiHandlerStep
+		? ( flowStepConfig?.handler_slugs || [] )
+		: ( flowStepConfig?.handler_slug ? [ flowStepConfig.handler_slug ] : [] );
+	const primarySlug = handlerSlugs[0] || '';
+	const primaryConfig = isMultiHandlerStep
+		? ( primarySlug && flowStepConfig?.handler_configs?.[primarySlug] )
+		: ( flowStepConfig?.handler_config || {} );
 
 	const promptQueue = flowStepConfig.prompt_queue || [];
 	const rawQueueMode = flowStepConfig.queue_mode;
@@ -69,19 +78,13 @@ export default function FlowStepCard( {
 		if ( isAiStep ) {
 			return flowStepConfig.user_message || '';
 		}
-		const handlerSlugs = flowStepConfig?.handler_slugs || [];
-		const primarySlug = handlerSlugs[0];
-		const primaryConfig = primarySlug && flowStepConfig?.handler_configs?.[primarySlug];
 		// Support both top-level prompt (legacy) and nested params.prompt (system_task).
 		return primaryConfig?.prompt || primaryConfig?.params?.prompt || '';
-	}, [ isAiStep, flowStepConfig.user_message, flowStepConfig?.handler_slugs, flowStepConfig?.handler_configs ] );
+	}, [ isAiStep, flowStepConfig.user_message, primaryConfig ] );
 
 	// Determine if this step type shows a prompt field.
 	// AI steps always get it. Other steps get it if they have a prompt in handler_config
 	// or if queue is enabled/has items.
-	const handlerSlugs = flowStepConfig?.handler_slugs || [];
-	const primarySlug = handlerSlugs[0];
-	const primaryConfig = primarySlug && flowStepConfig?.handler_configs?.[primarySlug];
 	const hasPromptConfig = primaryConfig && (
 		primaryConfig.prompt !== undefined ||
 		primaryConfig.params?.prompt !== undefined
@@ -136,11 +139,7 @@ export default function FlowStepCard( {
 		[ flowStepId, isAiStep, primaryConfig ]
 	);
 
-	// Resolve handler info for settings display.
-	// Strict positive check — defaults to false while step types are loading
-	// so non-handler step types (AI, Agent Ping, Webhook Gate) never flash handler UI.
-	const usesHandler = stepTypeInfo.uses_handler === true;
-	const effectiveHandlerSlug = usesHandler ? ( flowStepConfig.handler_slugs?.[0] || '' ) : pipelineStep.step_type;
+	const effectiveHandlerSlug = usesHandler ? primarySlug : pipelineStep.step_type;
 
 	return (
 		<Card
@@ -177,7 +176,7 @@ export default function FlowStepCard( {
 					{ ! usesHandler && effectiveHandlerSlug && (
 					<InlineStepConfig
 						flowStepId={ flowStepId }
-						handlerConfig={ flowStepConfig?.handler_configs?.[ effectiveHandlerSlug ] || {} }
+						handlerConfig={ flowStepConfig?.handler_config || {} }
 						handlerSlug={ effectiveHandlerSlug }
 							excludeFields={ excludeFields }
 							onError={ setError }
@@ -210,16 +209,16 @@ export default function FlowStepCard( {
 					{ /* Handler Configuration (handler-based steps only) */ }
 					{ usesHandler && (
 					<FlowStepHandler
-						handlerSlug={ flowStepConfig.handler_slugs?.[0] || null }
-							handlerSlugs={ flowStepConfig.handler_slugs || null }
+						handlerSlug={ primarySlug || null }
+							handlerSlugs={ handlerSlugs.length ? handlerSlugs : null }
 							settingsDisplay={ flowStepConfig.settings_display || [] }
 							handlerSettingsDisplays={ flowStepConfig.handler_settings_displays || null }
 							onConfigure={ ( slug ) =>
 								onConfigure && onConfigure( flowStepId, slug )
 							}
-							onAddHandler={ () =>
+							onAddHandler={ isMultiHandlerStep ? () =>
 								onConfigure && onConfigure( flowStepId, null, true )
-							}
+							: undefined }
 							showConfigureButton
 							showBadge
 						/>

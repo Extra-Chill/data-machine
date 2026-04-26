@@ -83,9 +83,9 @@ function datamachine_migrate_agent_ping_to_system_task(): void {
 			);
 
 			// Convert step type and handler references.
-			$step['step_type']       = 'system_task';
-			$step['handler_slugs']   = array( 'system_task' );
-			$step['handler_configs'] = array( 'system_task' => $new_config );
+			$step['step_type']      = 'system_task';
+			$step['handler_config'] = $new_config;
+			unset( $step['handler_slug'], $step['handler_slugs'], $step['handler_configs'] );
 
 			// queue_enabled and prompt_queue stay at their existing positions
 			// in the step config — no changes needed, they're already there.
@@ -191,9 +191,9 @@ function datamachine_migrate_agent_ping_pipeline_to_system_task(): void {
 			);
 
 			// Convert step type and handler references.
-			$step['step_type']       = 'system_task';
-			$step['handler_slugs']   = array( 'system_task' );
-			$step['handler_configs'] = array( 'system_task' => $new_config );
+			$step['step_type']      = 'system_task';
+			$step['handler_config'] = $new_config;
+			unset( $step['handler_slug'], $step['handler_slugs'], $step['handler_configs'] );
 
 			$changed = true;
 		}

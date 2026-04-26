@@ -24,6 +24,7 @@ namespace DataMachine\Engine\AI\Tools;
 
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -52,8 +53,8 @@ class ToolPolicyResolver {
 	 *
 	 *     @type string      $mode                  Required. One of the MODE_* constants (or a custom mode slug).
 	 *     @type int|null    $agent_id              Agent ID for per-agent tool policy filtering.
-	 *     @type array|null  $previous_step_config  Pipeline only: previous step config with handler_slugs.
-	 *     @type array|null  $next_step_config      Pipeline only: next step config with handler_slugs.
+	 *     @type array|null  $previous_step_config  Pipeline only: previous step config.
+	 *     @type array|null  $next_step_config      Pipeline only: next step config.
 	 *     @type string|null $pipeline_step_id      Pipeline only: current pipeline step ID for per-step filtering.
 	 *     @type array       $engine_data           Engine data snapshot for dynamic tool generation.
 	 *     @type array       $deny                  Tool names to explicitly deny (highest precedence).
@@ -293,23 +294,20 @@ class ToolPolicyResolver {
 
 		// Handler tools from adjacent steps (dynamic, resolved per-execution).
 		//
-		// Reads handler_slugs / handler_configs raw (not via FlowStepConfig
-		// helpers) because adjacent steps may declare multiple handler slugs
-		// (e.g. multi-handler publish: wordpress_publish + twitter_publish)
-		// and the AI must see tools for all of them, not just the primary.
-		// This is one of the legitimate multi-element callsites alongside
-		// PipelineSystemPromptDirective; see #1205 for the audit.
+		// Reads every configured handler through FlowStepConfig's cardinality-
+		// agnostic helper because adjacent steps can be single-handler (fetch)
+		// or true multi-handler (publish/upsert). The AI must see tools for
+		// every adjacent handler, not just the primary.
 		foreach ( array( $args['previous_step_config'] ?? null, $args['next_step_config'] ?? null ) as $step_config ) {
 			if ( ! $step_config ) {
 				continue;
 			}
 
-			$handler_slugs       = $step_config['handler_slugs'] ?? array();
-			$handler_configs_map = $step_config['handler_configs'] ?? array();
+			$handler_slugs       = FlowStepConfig::getConfiguredHandlerSlugs( $step_config );
 			$cache_scope         = $step_config['flow_step_id'] ?? ( $args['cache_scope'] ?? '' );
 
 			foreach ( $handler_slugs as $slug ) {
-				$handler_config = $handler_configs_map[ $slug ] ?? array();
+				$handler_config = FlowStepConfig::getHandlerConfigForSlug( $step_config, $slug );
 				$tools          = $this->tool_manager->resolveHandlerTools(
 					$slug,
 					$handler_config,

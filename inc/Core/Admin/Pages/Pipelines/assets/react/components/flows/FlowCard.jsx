@@ -23,6 +23,7 @@ import {
 	useDuplicateFlow,
 	useRunFlow,
 } from '../../queries/flows';
+import { useStepTypes } from '../../queries/config';
 import { useUIStore } from '../../stores/uiStore';
 import useFlowReconciliation from '../../hooks/useFlowReconciliation';
 
@@ -49,6 +50,7 @@ function FlowCardContent( props ) {
 	const deleteFlowMutation = useDeleteFlow();
 	const duplicateFlowMutation = useDuplicateFlow();
 	const runFlowMutation = useRunFlow();
+	const { data: stepTypes = {} } = useStepTypes();
 	const { openModal } = useUIStore();
 	const { optimisticLastRunDisplay, reconcile } = useFlowReconciliation();
 
@@ -234,7 +236,11 @@ function FlowCardContent( props ) {
 				isSameId( s.pipeline_step_id, pipelineStepId )
 			);
 
-			const handlerSlugs = flowStepConfig.handler_slugs || [];
+			const stepType = pipelineStep?.step_type || flowStepConfig.step_type;
+			const isMultiHandlerStep = stepTypes[ stepType ]?.multi_handler === true;
+			const handlerSlugs = isMultiHandlerStep
+				? ( flowStepConfig.handler_slugs || [] )
+				: ( flowStepConfig.handler_slug ? [ flowStepConfig.handler_slug ] : [] );
 			const primarySlug = handlerSlugs[0] || '';
 
 			// Build data for handler modals
@@ -242,12 +248,12 @@ function FlowCardContent( props ) {
 				flowStepId,
 				handlerSlug: specificHandler || primarySlug,
 				handlerSlugs,
-				stepType: pipelineStep?.step_type || flowStepConfig.step_type,
+				stepType,
 				pipelineId: currentFlowData.pipeline_id,
 				flowId: currentFlowData.flow_id,
 				currentSettings: specificHandler
 					? ( flowStepConfig.handler_configs?.[ specificHandler ] || {} )
-					: ( flowStepConfig.handler_configs?.[ primarySlug ] || {} ),
+					: ( isMultiHandlerStep ? ( flowStepConfig.handler_configs?.[ primarySlug ] || {} ) : ( flowStepConfig.handler_config || {} ) ),
 				addMode,
 			};
 
@@ -262,7 +268,7 @@ function FlowCardContent( props ) {
 				openModal( MODAL_TYPES.HANDLER_SETTINGS, {
 					...data,
 					handlerSlug: specificHandler,
-					currentSettings: flowStepConfig.handler_configs?.[ specificHandler ] || {},
+					currentSettings: isMultiHandlerStep ? ( flowStepConfig.handler_configs?.[ specificHandler ] || {} ) : ( flowStepConfig.handler_config || {} ),
 				} );
 			} else {
 				// Default: open settings for primary handler.
@@ -274,6 +280,7 @@ function FlowCardContent( props ) {
 			currentFlowData.pipeline_id,
 			currentFlowData.flow_id,
 			pipelineConfig,
+			stepTypes,
 			openModal,
 		]
 	);

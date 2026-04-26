@@ -11,6 +11,8 @@
 
 namespace DataMachine\Abilities\FlowStep;
 
+use DataMachine\Core\Steps\FlowStepConfig;
+
 defined( 'ABSPATH' ) || exit;
 
 class ValidateFlowStepsConfigAbility {
@@ -195,15 +197,15 @@ class ValidateFlowStepsConfigAbility {
 				}
 
 				if ( ! empty( $handler_slug ) ) {
-					if ( ! in_array( $handler_slug, $step_config['handler_slugs'] ?? array(), true ) ) {
+					if ( ! in_array( $handler_slug, FlowStepConfig::getConfiguredHandlerSlugs( $step_config ), true ) ) {
 						continue;
 					}
 				}
 
 				++$total_matching_steps;
 
-				$existing_handler_slug  = \DataMachine\Core\Steps\FlowStepConfig::getEffectiveSlug( $step_config );
-				$effective_handler_slug = \DataMachine\Core\Steps\FlowStepConfig::getEffectiveSlug( $step_config, $target_handler_slug ?? '' );
+				$existing_handler_slug  = FlowStepConfig::getEffectiveSlug( $step_config );
+				$effective_handler_slug = FlowStepConfig::getEffectiveSlug( $step_config, $target_handler_slug ?? '' );
 
 				if ( empty( $effective_handler_slug ) ) {
 					$validation_errors[] = array(

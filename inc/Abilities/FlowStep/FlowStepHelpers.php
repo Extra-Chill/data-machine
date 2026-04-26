@@ -305,30 +305,26 @@ trait FlowStepHelpers {
 			);
 		}
 
-		$effective_slug = FlowStepConfig::getEffectiveSlug( $flow_config[ $flow_step_id ], $handler_slug );
+		$step = &$flow_config[ $flow_step_id ];
+
+		$uses_handler     = FlowStepConfig::usesHandler( $step );
+		$is_multi_handler = FlowStepConfig::isMultiHandler( $step );
+		$effective_slug   = $uses_handler
+			? FlowStepConfig::getEffectiveSlug( $step, $handler_slug )
+			: ( $step['step_type'] ?? '' );
 
 		if ( empty( $effective_slug ) ) {
 			do_action( 'datamachine_log', 'error', 'No handler slug or step_type available for flow step update', array( 'flow_step_id' => $flow_step_id ) );
+			unset( $step );
 			return false;
 		}
 
-		// Ensure handler_slugs array contains the effective slug.
-		$current_slugs = $flow_config[ $flow_step_id ]['handler_slugs'] ?? array();
-		if ( ! in_array( $effective_slug, $current_slugs, true ) ) {
-			$current_slugs = array( $effective_slug );
-		} elseif ( $current_slugs[0] !== $effective_slug ) {
-			// Move to first position (primary).
-			$current_slugs = array_diff( $current_slugs, array( $effective_slug ) );
-			array_unshift( $current_slugs, $effective_slug );
-		}
-		$flow_config[ $flow_step_id ]['handler_slugs'] = $current_slugs;
-
-		// Get existing config for this handler.
-		$existing_handler_config = $flow_config[ $flow_step_id ]['handler_configs'][ $effective_slug ] ?? array();
+		// Get existing config for this handler/settings slug.
+		$existing_handler_config = FlowStepConfig::getHandlerConfigForSlug( $step, $effective_slug );
 
 		// If switching handlers, strip legacy config fields that don't belong to the new handler.
-		$current_primary = $flow_config[ $flow_step_id ]['handler_slugs'][0] ?? '';
-		if ( $current_primary !== $effective_slug ) {
+		$current_primary = FlowStepConfig::getPrimaryHandlerSlug( $step ) ?? '';
+		if ( $uses_handler && $current_primary !== $effective_slug ) {
 			$valid_fields = array_keys( $this->handler_abilities->getConfigFields( $effective_slug ) );
 			if ( ! empty( $valid_fields ) ) {
 				$existing_handler_config = array_intersect_key( $existing_handler_config, array_flip( $valid_fields ) );
@@ -340,10 +336,34 @@ trait FlowStepHelpers {
 		// Sanitize incoming values via handler's settings class before merge.
 		$handler_settings = $this->sanitizeHandlerConfig( $effective_slug, $handler_settings );
 
-		// Merge and store in handler_configs.
 		$merged_config = array_merge( $existing_handler_config, $handler_settings );
-		$flow_config[ $flow_step_id ]['handler_configs'][ $effective_slug ] = $this->handler_abilities->applyDefaults( $effective_slug, $merged_config );
-		$flow_config[ $flow_step_id ]['enabled']                            = true;
+		$stored_config = $this->handler_abilities->applyDefaults( $effective_slug, $merged_config );
+
+		if ( ! $uses_handler ) {
+			$step['handler_config'] = $stored_config;
+			unset( $step['handler_slug'], $step['handler_slugs'], $step['handler_configs'] );
+		} elseif ( $is_multi_handler ) {
+			$current_slugs = FlowStepConfig::getHandlerSlugs( $step );
+			if ( ! in_array( $effective_slug, $current_slugs, true ) ) {
+				$current_slugs = array( $effective_slug );
+			} elseif ( $current_slugs[0] !== $effective_slug ) {
+				$current_slugs = array_values( array_diff( $current_slugs, array( $effective_slug ) ) );
+				array_unshift( $current_slugs, $effective_slug );
+			}
+
+			$handler_configs                    = is_array( $step['handler_configs'] ?? null ) ? $step['handler_configs'] : array();
+			$handler_configs[ $effective_slug ] = $stored_config;
+			$step['handler_slugs']              = $current_slugs;
+			$step['handler_configs']            = $handler_configs;
+			unset( $step['handler_slug'], $step['handler_config'] );
+		} else {
+			$step['handler_slug']   = $effective_slug;
+			$step['handler_config'] = $stored_config;
+			unset( $step['handler_slugs'], $step['handler_configs'] );
+		}
+
+		$step['enabled'] = true;
+		unset( $step );
 
 		$success = $this->db_flows->update_flow(
 			$flow_id,
@@ -404,7 +424,16 @@ trait FlowStepHelpers {
 
 		$step = &$flow_config[ $flow_step_id ];
 
-		$existing_slugs = $step['handler_slugs'] ?? array();
+		if ( ! FlowStepConfig::isMultiHandler( $step ) ) {
+			do_action( 'datamachine_log', 'error', 'Cannot add multiple handlers to single-handler step', array(
+				'flow_step_id' => $flow_step_id,
+				'step_type'    => $step['step_type'] ?? '',
+			) );
+			unset( $step );
+			return false;
+		}
+
+		$existing_slugs = FlowStepConfig::getHandlerSlugs( $step );
 
 		// Don't add duplicates.
 		if ( in_array( $handler_slug, $existing_slugs, true ) ) {
@@ -483,8 +512,12 @@ trait FlowStepHelpers {
 		}
 
 		$step = &$flow_config[ $flow_step_id ];
+		if ( ! FlowStepConfig::isMultiHandler( $step ) ) {
+			unset( $step );
+			return false;
+		}
 
-		$existing_slugs = $step['handler_slugs'] ?? array();
+		$existing_slugs = FlowStepConfig::getHandlerSlugs( $step );
 		$existing_slugs = array_values( array_filter( $existing_slugs, fn( $s ) => $s !== $handler_slug ) );
 
 		$step['handler_slugs'] = $existing_slugs;

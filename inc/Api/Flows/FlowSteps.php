@@ -368,13 +368,17 @@ class FlowSteps {
 
 			$step_config = array(
 				'step_type'        => $step_type,
-				'handler_slugs'    => $existing_step['handler_slugs'] ?? array(),
-				'handler_configs'  => $existing_step['handler_configs'] ?? array(),
 				'enabled'          => true,
 				'flow_id'          => $flow_id,
 				'pipeline_step_id' => $pipeline_step_id,
 				'flow_step_id'     => $flow_step_id,
 			);
+
+			foreach ( array( 'handler_slug', 'handler_slugs', 'handler_config', 'handler_configs' ) as $handler_field ) {
+				if ( array_key_exists( $handler_field, $existing_step ) ) {
+					$step_config[ $handler_field ] = $existing_step[ $handler_field ];
+				}
+			}
 
 			if ( isset( $existing_step['execution_order'] ) ) {
 				$step_config['execution_order'] = $existing_step['execution_order'];

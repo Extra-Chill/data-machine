@@ -19,6 +19,7 @@ use DataMachine\Core\Admin\FlowFormatter;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -321,8 +322,7 @@ trait FlowHelpers {
 				$flow_config = $flow['flow_config'] ?? array();
 
 				foreach ( $flow_config as $flow_step_id => $step_data ) {
-					// Data is normalized at the DB layer — handler_slugs is canonical.
-					$handler_slugs = $step_data['handler_slugs'] ?? array();
+					$handler_slugs = FlowStepConfig::getConfiguredHandlerSlugs( $step_data );
 					if ( in_array( $handler_slug, $handler_slugs, true ) ) {
 						return true;
 					}
@@ -439,12 +439,14 @@ trait FlowHelpers {
 			if ( isset( $source_steps_by_order[ $order ] ) ) {
 				$source_step = $source_steps_by_order[ $order ];
 
-				// Data is normalized at the DB layer — copy canonical plural fields.
-				if ( ! empty( $source_step['handler_slugs'] ) ) {
-					$new_step_config['handler_slugs'] = $source_step['handler_slugs'];
-				}
-				if ( ! empty( $source_step['handler_configs'] ) ) {
-					$new_step_config['handler_configs'] = $source_step['handler_configs'];
+				// Copy canonical handler fields verbatim. Single-handler steps use
+				// handler_slug/handler_config; multi-handler steps use
+				// handler_slugs/handler_configs; handler-free steps only carry
+				// handler_config when they have step-level settings.
+				foreach ( array( 'handler_slug', 'handler_slugs', 'handler_config', 'handler_configs' ) as $handler_field ) {
+					if ( array_key_exists( $handler_field, $source_step ) ) {
+						$new_step_config[ $handler_field ] = $source_step[ $handler_field ];
+					}
 				}
 
 				// Queue state copies verbatim (#1291 / #1292): AI steps
@@ -473,13 +475,27 @@ trait FlowHelpers {
 			$override = $this->resolveOverride( $overrides, $step_type, $order );
 			if ( $override ) {
 				if ( ! empty( $override['handler_slug'] ) ) {
-					$new_step_config['handler_slugs']   = array( $override['handler_slug'] );
-					$handler_config                     = $override['handler_config'] ?? array();
-					$new_step_config['handler_configs'] = array( $override['handler_slug'] => $handler_config );
-				} elseif ( ! empty( $override['handler_config'] ) && ! empty( $new_step_config['handler_slugs'] ) ) {
-					$primary_slug                                        = $new_step_config['handler_slugs'][0];
-					$existing_config                                     = $new_step_config['handler_configs'][ $primary_slug ] ?? array();
-					$new_step_config['handler_configs'][ $primary_slug ] = array_merge( $existing_config, $override['handler_config'] );
+					$handler_config = $override['handler_config'] ?? array();
+					if ( FlowStepConfig::isMultiHandler( $new_step_config ) ) {
+						$new_step_config['handler_slugs']   = array( $override['handler_slug'] );
+						$new_step_config['handler_configs'] = array( $override['handler_slug'] => $handler_config );
+						unset( $new_step_config['handler_slug'], $new_step_config['handler_config'] );
+					} else {
+						$new_step_config['handler_slug']   = $override['handler_slug'];
+						$new_step_config['handler_config'] = $handler_config;
+						unset( $new_step_config['handler_slugs'], $new_step_config['handler_configs'] );
+					}
+				} elseif ( ! empty( $override['handler_config'] ) ) {
+					if ( FlowStepConfig::isMultiHandler( $new_step_config ) ) {
+						$primary_slug = FlowStepConfig::getPrimaryHandlerSlug( $new_step_config );
+						if ( null !== $primary_slug ) {
+							$existing_config                                      = $new_step_config['handler_configs'][ $primary_slug ] ?? array();
+							$new_step_config['handler_configs'][ $primary_slug ] = array_merge( $existing_config, $override['handler_config'] );
+						}
+					} else {
+						$existing_config                   = FlowStepConfig::getPrimaryHandlerConfig( $new_step_config );
+						$new_step_config['handler_config'] = array_merge( $existing_config, $override['handler_config'] );
+					}
 				}
 				// Override user_message arrives as a workflow-spec input
 				// (matches the public contract used by `flow copy` and
@@ -560,13 +576,12 @@ trait FlowHelpers {
 				continue;
 			}
 
-			// Normalize plural forms to the singular keys that UpdateFlowStepAbility expects.
-			// CLI and admin UI naturally pass handler_slugs (array) and handler_configs (keyed object),
-			// but the ability expects handler_slug (string) and handler_config (object).
+			// Multi-handler configs use handler_slugs/handler_configs; single-handler
+			// and handler-free configs use handler_slug/handler_config.
 			$handler_slugs   = $config['handler_slugs'] ?? array();
 			$handler_configs = $config['handler_configs'] ?? array();
 
-			// If singular forms are provided, use those directly (backward compat with --handler-config path).
+			// Scalar forms go through UpdateFlowStepAbility.
 			$single_slug   = $config['handler_slug'] ?? '';
 			$single_config = $config['handler_config'] ?? array();
 
@@ -668,7 +683,7 @@ trait FlowHelpers {
 			}
 
 			// Skip if handler already configured.
-			if ( ! empty( $step_data['handler_slugs'] ) ) {
+			if ( ! empty( FlowStepConfig::getConfiguredHandlerSlugs( $step_data ) ) ) {
 				continue;
 			}
 

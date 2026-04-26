@@ -70,13 +70,14 @@ class StepTypesCommand extends BaseCommand {
 		$items = array();
 		foreach ( $result['step_types'] as $slug => $step_type ) {
 			$items[] = array(
-				'slug'         => $slug,
-				'label'        => $step_type['label'] ?? '',
-				'uses_handler' => ! empty( $step_type['uses_handler'] ) ? 'yes' : 'no',
+				'slug'          => $slug,
+				'label'         => $step_type['label'] ?? '',
+				'uses_handler'  => ! empty( $step_type['uses_handler'] ) ? 'yes' : 'no',
+				'multi_handler' => ! empty( $step_type['multi_handler'] ) ? 'yes' : 'no',
 			);
 		}
 
-		$fields = array( 'slug', 'label', 'uses_handler' );
+		$fields = array( 'slug', 'label', 'uses_handler', 'multi_handler' );
 		$this->format_items( $items, $fields, $assoc_args, 'slug' );
 
 		WP_CLI::log( sprintf( 'Total: %d step type(s).', $result['count'] ) );

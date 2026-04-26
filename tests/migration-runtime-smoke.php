@@ -120,6 +120,7 @@ $migration_chain = array(
 	'datamachine_migrate_update_to_upsert_step_type',
 	'datamachine_strip_pipeline_step_provider_model',
 	'datamachine_migrate_ai_enabled_tools',
+	'datamachine_migrate_handler_slug_scalar',
 	'datamachine_migrate_split_queue_payload',
 	'datamachine_migrate_user_message_queue_mode',
 	'datamachine_drop_redundant_post_pipeline_meta',
@@ -199,6 +200,19 @@ assert_runtime(
 	false !== $handler_keys_pos
 		&& false !== $ai_tools_pos
 		&& $handler_keys_pos < $ai_tools_pos
+);
+$handler_scalar_pos = array_search(
+	'datamachine_migrate_handler_slug_scalar',
+	$GLOBALS['__test_migration_calls'],
+	true
+);
+assert_runtime(
+	'handler_slug_scalar runs after ai_enabled_tools and before split_queue_payload (#1293 dependency)',
+	false !== $handler_scalar_pos
+		&& false !== $ai_tools_pos
+		&& false !== $queue_split_pos
+		&& $ai_tools_pos < $handler_scalar_pos
+		&& $handler_scalar_pos < $queue_split_pos
 );
 
 // ---------------------------------------------------------------

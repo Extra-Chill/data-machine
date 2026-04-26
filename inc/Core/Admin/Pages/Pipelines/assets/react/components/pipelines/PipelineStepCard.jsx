@@ -47,7 +47,7 @@ export default function PipelineStepCard( {
 
 	// For system_task steps, show the task name badge (e.g. "Agent Ping").
 	const systemTaskName = isSystemTask
-		? ( stepConfig?.handler_configs?.system_task?.task || step.handler_configs?.system_task?.task || '' )
+		? ( stepConfig?.handler_config?.task || step.handler_config?.task || '' )
 		: '';
 
 	/**

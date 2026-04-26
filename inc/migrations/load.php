@@ -24,6 +24,7 @@ require_once __DIR__ . '/post-pipeline-meta.php';
 require_once __DIR__ . '/update-to-upsert.php';
 require_once __DIR__ . '/strip-pipeline-step-provider-model.php';
 require_once __DIR__ . '/ai-enabled-tools.php';
+require_once __DIR__ . '/handler-slug-scalar.php';
 require_once __DIR__ . '/split-queue-payload.php';
 require_once __DIR__ . '/user-message-queue-mode.php';
 

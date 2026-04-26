@@ -11,6 +11,8 @@
 
 namespace DataMachine\Api\Chat;
 
+use DataMachine\Core\Steps\FlowStepConfig;
+
 defined( 'ABSPATH' ) || exit;
 
 class ChatPipelinesDirective implements \DataMachine\Engine\AI\Directives\DirectiveInterface {
@@ -103,8 +105,7 @@ class ChatPipelinesDirective implements \DataMachine\Engine\AI\Directives\Direct
 			$handlers    = array();
 
 			foreach ( $flow_config as $step_config ) {
-				// Data is normalized at the DB layer — handler_slugs is canonical.
-				foreach ( $step_config['handler_slugs'] ?? array() as $slug ) {
+				foreach ( FlowStepConfig::getConfiguredHandlerSlugs( $step_config ) as $slug ) {
 					if ( ! in_array( $slug, $handlers, true ) ) {
 						$handlers[] = $slug;
 					}

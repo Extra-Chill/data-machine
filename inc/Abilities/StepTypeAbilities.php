@@ -257,6 +257,22 @@ class StepTypeAbilities {
 	}
 
 	/**
+	 * Check if a step type supports multiple handlers.
+	 *
+	 * @param string $slug Step type slug.
+	 * @return bool True if step type supports multiple handlers.
+	 */
+	public function supportsMultipleHandlers( string $slug ): bool {
+		$step_type = $this->getStepType( $slug );
+
+		if ( ! $step_type ) {
+			return false;
+		}
+
+		return $step_type['multi_handler'] ?? false;
+	}
+
+	/**
 	 * Validate a step type slug.
 	 *
 	 * @param string $slug Step type slug to validate.

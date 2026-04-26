@@ -38,6 +38,7 @@ class UpsertStep extends Step {
 			class_name: self::class,
 			position: 40,
 			usesHandler: true,
+			multiHandler: true,
 			hasPipelineConfig: false
 		);
 	}

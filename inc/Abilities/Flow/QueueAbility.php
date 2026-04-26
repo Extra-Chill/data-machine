@@ -34,6 +34,7 @@ namespace DataMachine\Abilities\Flow;
 
 use DataMachine\Core\Database\Flows\Flows as DB_Flows;
 use DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility;
+use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -1725,7 +1726,7 @@ class QueueAbility {
 			if ( ( $step_config['step_type'] ?? '' ) !== 'publish' ) {
 				continue;
 			}
-			$handler_configs = $step_config['handler_configs'] ?? array();
+			$handler_configs = FlowStepConfig::getHandlerConfigs( $step_config );
 			foreach ( $handler_configs as $handler_config ) {
 				if ( ! empty( $handler_config['post_type'] ) ) {
 					return sanitize_text_field( $handler_config['post_type'] );

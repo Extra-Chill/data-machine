@@ -99,7 +99,7 @@ export default function ModalManager() {
 
 				const stepConfig = result?.data?.step_config || {};
 				const handlerConfigs = stepConfig.handler_configs || {};
-				const currentSettings = handlerConfigs[selectedHandlerSlug] || {};
+				const currentSettings = stepConfig.handler_config || handlerConfigs[selectedHandlerSlug] || {};
 
 				openModal( MODAL_TYPES.HANDLER_SETTINGS, {
 					...modalData,
