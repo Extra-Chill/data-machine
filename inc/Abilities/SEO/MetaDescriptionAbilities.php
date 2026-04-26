@@ -50,8 +50,7 @@ class MetaDescriptionAbilities {
 							),
 							'post_type' => array(
 								'type'        => 'string',
-								'description' => 'Post type to batch process (e.g. "post", "page")',
-								'default'     => 'post',
+								'description' => 'Post type to batch process (e.g. "post", "page"). When omitted in batch mode, discovery spans every post type registered via the datamachine_post_types_for_meta_description filter.',
 							),
 							'limit'     => array(
 								'type'        => 'integer',
@@ -134,7 +133,7 @@ class MetaDescriptionAbilities {
 	 */
 	public static function generateMetaDescriptions( array $input ): array {
 		$post_id   = absint( $input['post_id'] ?? 0 );
-		$post_type = sanitize_key( $input['post_type'] ?? 'post' );
+		$post_type = isset( $input['post_type'] ) ? sanitize_key( $input['post_type'] ) : '';
 		$limit     = absint( $input['limit'] ?? 50 );
 		$force     = ! empty( $input['force'] );
 
@@ -177,8 +176,13 @@ class MetaDescriptionAbilities {
 
 			$eligible = array( $post_id );
 		} else {
-			// Batch mode — find posts missing excerpts.
-			$eligible = self::findPostsMissingExcerpt( $post_type, $limit, $force );
+			// Batch mode — find posts missing excerpts. When no explicit
+			// post_type is provided, discover across every eligible post
+			// type registered via datamachine_post_types_for_meta_description.
+			$post_types = '' !== $post_type
+				? array( $post_type )
+				: self::getEligiblePostTypes();
+			$eligible   = self::findPostsMissingExcerpt( $post_types, $limit, $force );
 		}
 
 		if ( empty( $eligible ) ) {
@@ -275,40 +279,74 @@ class MetaDescriptionAbilities {
 	}
 
 	/**
+	 * Get post types eligible for meta description generation.
+	 *
+	 * Plugins register custom post types via the
+	 * 'datamachine_post_types_for_meta_description' filter so they
+	 * appear in batch discovery alongside the defaults.
+	 *
+	 * @return string[] Array of post type slugs.
+	 */
+	public static function getEligiblePostTypes(): array {
+		/**
+		 * Filter the post types eligible for meta description generation.
+		 *
+		 * @param string[] $post_types Default: ['post', 'page'].
+		 */
+		$post_types = apply_filters(
+			'datamachine_post_types_for_meta_description',
+			array( 'post', 'page' )
+		);
+
+		if ( ! is_array( $post_types ) ) {
+			return array( 'post', 'page' );
+		}
+
+		$post_types = array_values( array_unique( array_filter( array_map( 'sanitize_key', $post_types ) ) ) );
+
+		return ! empty( $post_types ) ? $post_types : array( 'post', 'page' );
+	}
+
+	/**
 	 * Find published posts missing a post_excerpt.
 	 *
-	 * @param string $post_type Post type to query.
-	 * @param int    $limit     Maximum results.
-	 * @param bool   $force     If true, return all posts regardless of excerpt.
+	 * Accepts either a single post type slug or an array of slugs so that
+	 * batch discovery can span every post type registered through
+	 * {@see self::getEligiblePostTypes()}.
+	 *
+	 * @param string|string[] $post_types Post type slug(s) to query.
+	 * @param int             $limit      Maximum results.
+	 * @param bool            $force      If true, return all posts regardless of excerpt.
 	 * @return int[] Post IDs.
 	 */
-	private static function findPostsMissingExcerpt( string $post_type, int $limit, bool $force ): array {
+	private static function findPostsMissingExcerpt( $post_types, int $limit, bool $force ): array {
 		global $wpdb;
 
-		if ( $force ) {
-			$results = $wpdb->get_col(
-				$wpdb->prepare(
-					"SELECT ID FROM {$wpdb->posts}
-					 WHERE post_type = %s AND post_status = 'publish'
-					 ORDER BY ID DESC LIMIT %d",
-					$post_type,
-					$limit
-				)
-			);
-		} else {
-			$results = $wpdb->get_col(
-				$wpdb->prepare(
-					"SELECT ID FROM {$wpdb->posts}
-					 WHERE post_type = %s
-					 AND post_status = 'publish'
-					 AND ( post_excerpt IS NULL OR post_excerpt = '' )
-					 ORDER BY ID DESC
-					 LIMIT %d",
-					$post_type,
-					$limit
-				)
-			);
+		$post_types = (array) $post_types;
+		$post_types = array_values( array_unique( array_filter( array_map( 'sanitize_key', $post_types ) ) ) );
+
+		if ( empty( $post_types ) ) {
+			return array();
 		}
+
+		$placeholders = implode( ', ', array_fill( 0, count( $post_types ), '%s' ) );
+
+		if ( $force ) {
+			$sql  = "SELECT ID FROM {$wpdb->posts}
+				 WHERE post_type IN ({$placeholders}) AND post_status = 'publish'
+				 ORDER BY ID DESC LIMIT %d";
+			$args = array_merge( $post_types, array( $limit ) );
+		} else {
+			$sql  = "SELECT ID FROM {$wpdb->posts}
+				 WHERE post_type IN ({$placeholders})
+				 AND post_status = 'publish'
+				 AND ( post_excerpt IS NULL OR post_excerpt = '' )
+				 ORDER BY ID DESC
+				 LIMIT %d";
+			$args = array_merge( $post_types, array( $limit ) );
+		}
+
+		$results = $wpdb->get_col( $wpdb->prepare( $sql, $args ) );
 
 		return array_map( 'absint', $results ? $results : array() );
 	}
