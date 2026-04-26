@@ -127,6 +127,43 @@ function datamachine_migrate_user_message_queue_mode(): void {
 			++$queue_modes_resolved;
 
 			// AI-step-only: collapse user_message into prompt_queue.
+			//
+			// Three cases, distinguished by what was actually running each
+			// tick pre-#1291 (per AIStep::execute() lines 140-173 in the
+			// pre-collapse code):
+			//
+			//   (a) queue empty + user_message="X" (queue_enabled=any)
+			//       → pre: pop/peek returned '', fell through to "X"
+			//         every tick. Migration: seed prompt_queue=[{X}],
+			//         queue_mode=static. (Static peeks "X" forever,
+			//         matching de-facto behaviour: queue_enabled=true
+			//         with an empty queue never gained entries on its
+			//         own, so user_message ran every tick regardless.)
+			//
+			//   (b) non-empty queue + user_message + queue_enabled=true
+			//       → pre: drain the queue, then fall through to
+			//         user_message once the queue empties. Migration:
+			//         keep queue, queue_mode=drain (matching the
+			//         boolean), DROP user_message. The drain-then-
+			//         fallback semantic does not have a clean
+			//         post-#1291 equivalent — drain emptied →
+			//         COMPLETED_NO_ITEMS skip. The dropped user_message
+			//         is logged with `lossy_fallback: true` so operators
+			//         can re-add it via `flow queue add` if they want
+			//         the post-drain fallback behaviour to keep working.
+			//
+			//   (c) non-empty queue + user_message + queue_enabled=false
+			//       → pre: peek the queue head every tick; user_message
+			//         was permanently shadowed. Migration: keep queue,
+			//         queue_mode=static (matching the boolean), drop
+			//         user_message. Behaviour-preserving — the queue
+			//         head was the active prompt and continues to be.
+			//
+			// Critical: `queue_mode` for cases (b) and (c) follows the
+			// original `queue_enabled` boolean. Forcing static when
+			// queue_enabled=true was previously set would silently
+			// convert a draining flow into a static one, which is a
+			// real behaviour change.
 			if ( 'ai' === $step_type && $has_user_message ) {
 				$user_message = is_string( $step['user_message'] ) ? trim( $step['user_message'] ) : '';
 				$queue        = isset( $step['prompt_queue'] ) && is_array( $step['prompt_queue'] )
@@ -135,38 +172,39 @@ function datamachine_migrate_user_message_queue_mode(): void {
 
 				if ( '' !== $user_message ) {
 					if ( empty( $queue ) ) {
-						// Seed 1-entry static queue with the legacy user_message.
+						// Case (a): seed 1-entry static queue with the
+						// legacy user_message. Pre-#1291 ran the
+						// user_message every tick when the queue was
+						// empty regardless of queue_enabled — static
+						// preserves that.
 						$step['prompt_queue'] = array(
 							array(
 								'prompt'   => $user_message,
 								'added_at' => gmdate( 'c' ),
 							),
 						);
-						// Force static so the seeded entry doesn't drain on
-						// the next tick — preserves "runs every tick" semantics.
 						$step['queue_mode'] = 'static';
 						++$user_messages_seeded;
 					} else {
-						// Both populated: queue head was already winning at
-						// runtime (AIStep precedence). Drop user_message and
-						// log it for traceability.
+						// Cases (b) and (c): drop user_message; keep the
+						// queue_mode resolved from the original
+						// queue_enabled boolean. Lossy for case (b) —
+						// log loudly so operators can recover.
 						do_action(
 							'datamachine_log',
 							'info',
 							'user_message → prompt_queue migration: dropped user_message that was already shadowed by non-empty prompt_queue head',
 							array(
-								'flow_id'        => $row['flow_id'],
-								'step_id'        => $step_id,
-								'queue_depth'    => count( $queue ),
-								'dropped_value'  => mb_substr( $user_message, 0, 200 ),
+								'flow_id'             => $row['flow_id'],
+								'step_id'             => $step_id,
+								'queue_depth'         => count( $queue ),
+								'resolved_queue_mode' => $queue_mode,
+								'lossy_fallback'      => 'drain' === $queue_mode,
+								'dropped_value'       => mb_substr( $user_message, 0, 200 ),
 							)
 						);
-						// Force static so the kept queue head doesn't suddenly
-						// start draining if queue_enabled was true previously
-						// — preserves observable behaviour ("first entry wins
-						// every tick" was the de-facto state once user_message
-						// was dropped on the floor).
-						$step['queue_mode'] = 'static';
+						// queue_mode stays at the boolean-resolved value
+						// (drain or static); do NOT force static here.
 						++$user_messages_dropped;
 					}
 				}

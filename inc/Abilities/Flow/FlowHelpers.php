@@ -447,9 +447,24 @@ trait FlowHelpers {
 					$new_step_config['handler_configs'] = $source_step['handler_configs'];
 				}
 
-				if ( ! empty( $source_step['user_message'] ) ) {
-					$new_step_config['user_message'] = $source_step['user_message'];
+				// Queue state copies verbatim (#1291 / #1292): AI steps
+				// own prompt_queue, fetch steps own config_patch_queue,
+				// and queue_mode applies to whichever slot the step
+				// type consumes. Pre-fix this lane copied the legacy
+				// `user_message` field — that slot is gone and the
+				// per-flow user message lives in prompt_queue head.
+				if ( isset( $source_step['prompt_queue'] ) && is_array( $source_step['prompt_queue'] ) ) {
+					$new_step_config['prompt_queue'] = $source_step['prompt_queue'];
 				}
+				if ( isset( $source_step['config_patch_queue'] ) && is_array( $source_step['config_patch_queue'] ) ) {
+					$new_step_config['config_patch_queue'] = $source_step['config_patch_queue'];
+				}
+				if ( isset( $source_step['queue_mode'] )
+					&& in_array( $source_step['queue_mode'], array( 'drain', 'loop', 'static' ), true )
+				) {
+					$new_step_config['queue_mode'] = $source_step['queue_mode'];
+				}
+
 				if ( isset( $source_step['disabled_tools'] ) ) {
 					$new_step_config['disabled_tools'] = $source_step['disabled_tools'];
 				}
@@ -466,8 +481,18 @@ trait FlowHelpers {
 					$existing_config                                     = $new_step_config['handler_configs'][ $primary_slug ] ?? array();
 					$new_step_config['handler_configs'][ $primary_slug ] = array_merge( $existing_config, $override['handler_config'] );
 				}
+				// Override user_message arrives as a workflow-spec input
+				// (matches the public contract used by `flow copy` and
+				// chat tools). Convert it to a 1-entry static
+				// prompt_queue so AIStep sees it post-#1291.
 				if ( ! empty( $override['user_message'] ) ) {
-					$new_step_config['user_message'] = $override['user_message'];
+					$new_step_config['prompt_queue'] = array(
+						array(
+							'prompt'   => $override['user_message'],
+							'added_at' => gmdate( 'c' ),
+						),
+					);
+					$new_step_config['queue_mode']   = 'static';
 				}
 			}
 
