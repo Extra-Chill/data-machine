@@ -224,21 +224,39 @@ class SystemTaskStep extends Step {
 		}
 		$child_engine_data['job'] = $child_job_snapshot;
 
-		// Inject additional pipeline context for tasks that need it (e.g. agent_ping).
-		if ( 'agent_ping' === $task_type ) {
-			$job_context                       = $this->engine->getJobContext();
-			$child_engine_data['flow_id']      = $job_context['flow_id'] ?? null;
+		// Instantiate the task once. Used here to read its declarative
+		// passthrough contract (#1297) and again inside the try/catch
+		// envelope below to call executeTask(). Passthrough methods are
+		// pure declarations with no side effects.
+		$task_for_passthrough = new $handler_class();
+
+		// Inject the standard pipeline-execution context bundle when the
+		// task declares it needs it. Replaces the per-task `if` block
+		// that hardcoded agent_ping-specific knowledge into this step
+		// (#1297). Tasks opt in via SystemTask::needsPipelineContext().
+		if ( $task_for_passthrough->needsPipelineContext() ) {
+			$pipeline_context                  = $this->engine->getJobContext();
+			$child_engine_data['flow_id']      = $pipeline_context['flow_id'] ?? null;
 			$child_engine_data['flow_step_id'] = $this->flow_step_id;
 			$child_engine_data['data_packets'] = $this->dataPackets;
 			$child_engine_data['engine_data']  = $this->engine->all();
 			$child_engine_data['job_id']       = $this->job_id;
-			$child_engine_data['pipeline_id']  = $job_context['pipeline_id'] ?? null;
+			$child_engine_data['pipeline_id']  = $pipeline_context['pipeline_id'] ?? null;
+		}
 
-			$fsc                             = $this->flow_step_config ?? array();
-			$queue_mode                      = $fsc['queue_mode'] ?? 'static';
-			$child_engine_data['queue_mode'] = in_array( $queue_mode, array( 'drain', 'loop', 'static' ), true )
-				? $queue_mode
-				: 'static';
+		// Copy declared flow_step_config keys into engine_data so the
+		// task can read them from $params at execution time. Tasks
+		// opt in by listing key names from
+		// SystemTask::getFlowStepConfigPassthrough().
+		$fsc                  = $this->flow_step_config ?? array();
+		$flow_step_config_keys = $task_for_passthrough->getFlowStepConfigPassthrough();
+		foreach ( $flow_step_config_keys as $key ) {
+			if ( ! is_string( $key ) || '' === $key ) {
+				continue;
+			}
+			if ( array_key_exists( $key, $fsc ) ) {
+				$child_engine_data[ $key ] = $fsc[ $key ];
+			}
 		}
 		$jobs_db->store_engine_data( (int) $child_job_id, $child_engine_data );
 		$jobs_db->start_job( (int) $child_job_id, JobStatus::PROCESSING );
@@ -292,8 +310,8 @@ class SystemTaskStep extends Step {
 				}
 			}
 
-			$handler = new $handler_class();
-			$handler->executeTask( (int) $child_job_id, $child_engine_data );
+			// Reuse the instance built earlier for passthrough resolution.
+			$task_for_passthrough->executeTask( (int) $child_job_id, $child_engine_data );
 		} catch ( \Throwable $e ) {
 			$success   = false;
 			$error_msg = $e->getMessage();
