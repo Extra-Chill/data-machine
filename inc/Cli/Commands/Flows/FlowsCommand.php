@@ -99,8 +99,10 @@ class FlowsCommand extends BaseCommand {
 	 * [--scheduled-at=<datetime>]
 	 * : ISO-8601 datetime for one-time scheduling (e.g. "2026-03-20T15:00:00Z"). Implies --scheduling=one_time.
 	 *
-	 * [--set-prompt=<text>]
-	 * : Update the prompt for a handler step (requires handler step to exist).
+	 * [--set-user-message=<text>]
+	 * : Update the user_message for an AI step (per-flow task context appended
+	 *   after fetched data packets). For the pipeline-wide system prompt shared
+	 *   across all flows on the pipeline, use `pipeline update --set-system-prompt`.
 	 *
 	 * [--handler-config=<json>]
 	 * : JSON object of handler config key-value pairs to update (merged with existing config).
@@ -159,8 +161,8 @@ class FlowsCommand extends BaseCommand {
 	 *     # Update flow name
 	 *     wp datamachine flows update 141 --name="New Name"
 	 *
-	 *     # Update flow prompt
-	 *     wp datamachine flows update 42 --set-prompt="New prompt text"
+	 *     # Update flow user_message (per-flow task context for an AI step)
+	 *     wp datamachine flows update 42 --set-user-message="New user message"
 	 *
 	 *     # Add a handler to a flow step
 	 *     wp datamachine flows add-handler 42 --handler=rss
@@ -261,7 +263,7 @@ class FlowsCommand extends BaseCommand {
 		// Handle 'update' subcommand: `flows update 42 --name="New Name"`.
 		if ( ! empty( $args ) && 'update' === $args[0] ) {
 			if ( ! isset( $args[1] ) ) {
-				WP_CLI::error( 'Usage: wp datamachine flows update <flow_id> [--name=<name>] [--scheduling=<interval>] [--set-prompt=<text>] [--handler-config=<json>] [--step=<flow_step_id>]' );
+				WP_CLI::error( 'Usage: wp datamachine flows update <flow_id> [--name=<name>] [--scheduling=<interval>] [--set-user-message=<text>] [--handler-config=<json>] [--step=<flow_step_id>]' );
 				return;
 			}
 			$this->updateFlow( (int) $args[1], $assoc_args );
@@ -406,6 +408,14 @@ class FlowsCommand extends BaseCommand {
 	 * @param string $format Output format (table, json, csv, yaml).
 	 */
 	private function showFlowDetail( array $flow, string $format ): void {
+		// Always surface user_message on AI steps, even when unset, so the
+		// slot is visible to anyone inspecting the config. Otherwise the
+		// field disappears from the JSON output and the next reader can't
+		// tell whether it's empty or whether they're looking at the wrong
+		// key (which is exactly how the --set-prompt-writes-dead-key bug
+		// stayed invisible).
+		$flow = self::normalizeAiStepUserMessage( $flow );
+
 		// JSON/YAML: output the full flow data including flow_config.
 		if ( 'json' === $format ) {
 			WP_CLI::line( wp_json_encode( $flow, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
@@ -472,10 +482,15 @@ class FlowsCommand extends BaseCommand {
 
 			if ( empty( $slugs ) ) {
 				// Step with no handlers (e.g. AI step with only pipeline config).
-				$config_display = '';
+				$config_parts = array();
 
 				if ( $pipeline_prompt ) {
-					$config_display = 'prompt=' . $this->truncateValue( $pipeline_prompt, 60 );
+					$config_parts[] = 'system_prompt=' . $this->truncateValue( $pipeline_prompt, 60 );
+				}
+
+				if ( 'ai' === $step_type ) {
+					$user_message    = $step_data['user_message'] ?? '';
+					$config_parts[]  = 'user_message=' . ( '' === $user_message ? '(unset)' : $this->truncateValue( $user_message, 60 ) );
 				}
 
 				$rows[] = array(
@@ -483,7 +498,7 @@ class FlowsCommand extends BaseCommand {
 					'order'     => $order,
 					'step_type' => $step_type,
 					'handler'   => '—',
-					'config'    => $config_display ? $config_display : '(default)',
+					'config'    => empty( $config_parts ) ? '(default)' : implode( ', ', $config_parts ),
 				);
 				continue;
 			}
@@ -525,6 +540,38 @@ class FlowsCommand extends BaseCommand {
 			return mb_substr( $value, 0, $max - 3 ) . '...';
 		}
 		return $value;
+	}
+
+	/**
+	 * Ensure every AI step in a flow exposes the `user_message` slot.
+	 *
+	 * AIStep::execute() reads $flow_step_config['user_message'] at the
+	 * flow_step_config root (not under handler_configs). When the slot
+	 * is unset, omitting it from output makes the field invisible to
+	 * agents and humans inspecting flow configuration. Render an empty
+	 * string instead so the slot is always discoverable.
+	 *
+	 * @param array $flow Flow data with flow_config.
+	 * @return array Flow data with user_message normalized on AI steps.
+	 */
+	private static function normalizeAiStepUserMessage( array $flow ): array {
+		if ( empty( $flow['flow_config'] ) || ! is_array( $flow['flow_config'] ) ) {
+			return $flow;
+		}
+
+		foreach ( $flow['flow_config'] as $step_id => $step_data ) {
+			if ( ! is_array( $step_data ) ) {
+				continue;
+			}
+			if ( 'ai' !== ( $step_data['step_type'] ?? '' ) ) {
+				continue;
+			}
+			if ( ! array_key_exists( 'user_message', $step_data ) ) {
+				$flow['flow_config'][ $step_id ]['user_message'] = '';
+			}
+		}
+
+		return $flow;
 	}
 
 	/**
@@ -807,11 +854,20 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
+		// Clean break: the old --set-prompt flag silently wrote to a dead
+		// key (handler_configs.ai.prompt) that AIStep never reads. There is
+		// no working consumer to migrate. Hard-fail with a pointer to the
+		// correct flag rather than alias.
+		if ( isset( $assoc_args['set-prompt'] ) ) {
+			WP_CLI::error( '--set-prompt has been removed. Use --set-user-message=<text> for AI step per-flow context, or `pipeline update --set-system-prompt` for the shared pipeline system prompt.' );
+			return;
+		}
+
 		$name           = $assoc_args['name'] ?? null;
 		$scheduling     = $assoc_args['scheduling'] ?? null;
 		$scheduled_at   = $assoc_args['scheduled-at'] ?? null;
-		$prompt         = isset( $assoc_args['set-prompt'] )
-			? wp_kses_post( wp_unslash( $assoc_args['set-prompt'] ) )
+		$user_message   = isset( $assoc_args['set-user-message'] )
+			? wp_kses_post( wp_unslash( $assoc_args['set-user-message'] ) )
 			: null;
 		$handler_config = isset( $assoc_args['handler-config'] )
 			? json_decode( wp_unslash( $assoc_args['handler-config'] ), true )
@@ -828,13 +884,13 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
-		if ( null === $name && null === $scheduling && null === $prompt && null === $handler_config ) {
-			WP_CLI::error( 'Must provide --name, --scheduling, --set-prompt, --scheduled-at, or --handler-config to update' );
+		if ( null === $name && null === $scheduling && null === $user_message && null === $handler_config ) {
+			WP_CLI::error( 'Must provide --name, --scheduling, --set-user-message, --scheduled-at, or --handler-config to update' );
 			return;
 		}
 
 		// Validate step resolution BEFORE any writes (atomic: fail fast, change nothing).
-		$needs_step = null !== $prompt || null !== $handler_config;
+		$needs_step = null !== $user_message || null !== $handler_config;
 
 		if ( $needs_step && null === $step ) {
 			$resolved = $this->resolveHandlerStep( $flow_id );
@@ -880,13 +936,13 @@ class FlowsCommand extends BaseCommand {
 			}
 		}
 
-		// Phase 2: Step-level updates (prompt, handler config).
-		if ( null !== $prompt ) {
+		// Phase 2: Step-level updates (user_message, handler config).
+		if ( null !== $user_message ) {
 			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
 			$step_result  = $step_ability->execute(
 				array(
-					'flow_step_id'   => $step,
-					'handler_config' => array( 'prompt' => $prompt ),
+					'flow_step_id' => $step,
+					'user_message' => $user_message,
 				)
 			);
 
@@ -895,11 +951,11 @@ class FlowsCommand extends BaseCommand {
 			}
 
 			if ( ! $step_result['success'] ) {
-				WP_CLI::error( $step_result['error'] ?? 'Failed to update prompt' );
+				WP_CLI::error( $step_result['error'] ?? 'Failed to update user_message' );
 				return;
 			}
 
-			WP_CLI::success( 'Prompt updated for step: ' . $step );
+			WP_CLI::success( 'User message updated for step: ' . $step );
 		}
 
 		if ( null !== $handler_config ) {

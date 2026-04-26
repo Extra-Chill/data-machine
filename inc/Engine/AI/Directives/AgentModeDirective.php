@@ -45,7 +45,7 @@ PIPELINES define workflow structure: step types in sequence (e.g., event_import 
 
 FLOWS are configured pipeline instances. Each step needs a handler_slug and handler_config. When creating flows, match handler configurations from existing flows on the same pipeline.
 
-AI STEPS process data that handlers cannot automatically handle. Flow user_message is rarely needed; only for minimal source-specific overrides.
+AI STEPS process data that handlers cannot automatically handle. The pipeline system_prompt sets the agent's stable identity (shared across every flow). The flow user_message is appended as the final user-role message after fetched data packets — use it for per-flow task framing on top of the pipeline system_prompt. The two are additive, not alternative.
 
 ## Discovery
 
