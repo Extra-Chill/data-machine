@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.13.0] - 2026-04-26
+
+### Changed
+- return /platforms as ordered array with slug, filter fetch handlers, sort authenticated-first
+
 ## [0.12.1] - 2026-04-26
 
 ### Changed
