@@ -21,6 +21,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+require_once __DIR__ . '/smoke-wp-stubs.php';
+
 // Stub the WordPress functions FetchRssAbility's class definition references
 // before we autoload it. Only stub if not already provided so tests stay
 // composable with other smoke tests.
@@ -29,27 +31,6 @@ if ( ! function_exists( '__' ) ) {
 		return $text;
 	}
 }
-if ( ! function_exists( 'doing_action' ) ) {
-	function doing_action( $action = '' ) {
-		return false;
-	}
-}
-if ( ! function_exists( 'did_action' ) ) {
-	function did_action( $action = '' ) {
-		return 1; // Pretend wp_abilities_api_init already fired so registration is skipped.
-	}
-}
-if ( ! function_exists( 'add_action' ) ) {
-	function add_action( ...$args ) {
-		// no-op
-	}
-}
-if ( ! function_exists( 'wp_register_ability' ) ) {
-	function wp_register_ability( ...$args ) {
-		// no-op
-	}
-}
-
 require_once __DIR__ . '/../inc/Abilities/PermissionHelper.php';
 require_once __DIR__ . '/../inc/Abilities/Fetch/FetchRssAbility.php';
 

@@ -48,6 +48,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+require_once __DIR__ . '/smoke-wp-stubs.php';
+
 if ( ! function_exists( 'do_action' ) ) {
 	function do_action( ...$args ): void {
 		// no-op for tests.
@@ -61,11 +63,6 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 if ( ! function_exists( 'sanitize_textarea_field' ) ) {
 	function sanitize_textarea_field( $value ) {
 		return trim( (string) $value );
-	}
-}
-if ( ! function_exists( 'wp_unslash' ) ) {
-	function wp_unslash( $value ) {
-		return is_string( $value ) ? stripslashes( $value ) : $value;
 	}
 }
 if ( ! function_exists( 'mb_substr' ) && ! function_exists( 'datamachine_test_mb_polyfill' ) ) {

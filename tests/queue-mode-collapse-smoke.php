@@ -25,6 +25,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+require_once __DIR__ . '/smoke-wp-stubs.php';
+
 if ( ! function_exists( 'gmdate' ) ) {
 	// Defensive — gmdate is a PHP built-in but we need to be sure.
 }
@@ -46,12 +48,6 @@ if ( ! function_exists( 'sanitize_textarea_field' ) ) {
 		return trim( (string) $value );
 	}
 }
-if ( ! function_exists( 'wp_unslash' ) ) {
-	function wp_unslash( $value ) {
-		return is_string( $value ) ? stripslashes( $value ) : $value;
-	}
-}
-
 $failed = 0;
 $total  = 0;
 
