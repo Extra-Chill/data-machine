@@ -44,7 +44,6 @@
 namespace DataMachine\Core\Steps;
 
 use DataMachine\Abilities\Flow\QueueAbility;
-use DataMachine\Core\Database\Flows\Flows as DB_Flows;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -193,7 +192,7 @@ trait QueueableTrait {
 			return null;
 		}
 
-		$entry = self::consumeFromQueueSlot(
+		$entry = QueueAbility::consumeFromQueueSlot(
 			(int) $flow_id,
 			$this->flow_step_id,
 			QueueAbility::SLOT_PROMPT_QUEUE,
@@ -260,7 +259,7 @@ trait QueueableTrait {
 			return null;
 		}
 
-		$entry = self::consumeFromQueueSlot(
+		$entry = QueueAbility::consumeFromQueueSlot(
 			(int) $flow_id,
 			$this->flow_step_id,
 			QueueAbility::SLOT_CONFIG_PATCH_QUEUE,
@@ -309,82 +308,12 @@ trait QueueableTrait {
 		);
 	}
 
-	/**
-	 * Consume one item from a named queue slot per the given mode.
-	 *
-	 * Centralizes the mode-aware read so prompt and config-patch
-	 * consumers share the same mutation/peek/rotate semantics. For
-	 * `drain` and `loop` the slot is rewritten in place; for `static`
-	 * no DB write happens.
-	 *
-	 * @param int      $flow_id      Flow ID.
-	 * @param string   $flow_step_id Flow step ID.
-	 * @param string   $slot         Queue slot name.
-	 * @param string   $queue_mode   "drain" | "loop" | "static".
-	 * @param DB_Flows $db_flows     Optional database instance.
-	 * @return array|null The consumed entry, or null if the queue was empty.
-	 */
-	private static function consumeFromQueueSlot(
-		int $flow_id,
-		string $flow_step_id,
-		string $slot,
-		string $queue_mode,
-		?DB_Flows $db_flows = null
-	): ?array {
-		if ( null === $db_flows ) {
-			$db_flows = new DB_Flows();
-		}
-
-		$flow = $db_flows->get_flow( $flow_id );
-		if ( ! $flow ) {
-			return null;
-		}
-
-		$flow_config = $flow['flow_config'] ?? array();
-		if ( ! isset( $flow_config[ $flow_step_id ] ) ) {
-			return null;
-		}
-
-		$step_config = $flow_config[ $flow_step_id ];
-		$queue       = $step_config[ $slot ] ?? array();
-
-		if ( empty( $queue ) ) {
-			return null;
-		}
-
-		// Static peek: read head, do not mutate storage.
-		if ( 'static' === $queue_mode ) {
-			return $queue[0];
-		}
-
-		// Drain or loop: pop the head, optionally rotate.
-		$entry = array_shift( $queue );
-
-		if ( 'loop' === $queue_mode ) {
-			$queue[] = $entry;
-		}
-
-		$flow_config[ $flow_step_id ][ $slot ] = $queue;
-
-		$db_flows->update_flow(
-			$flow_id,
-			array( 'flow_config' => $flow_config )
-		);
-
-		do_action(
-			'datamachine_log',
-			'info',
-			'Item consumed from queue',
-			array(
-				'flow_id'         => $flow_id,
-				'slot'            => $slot,
-				'queue_mode'      => $queue_mode,
-				'remaining_count' => count( $queue ),
-			)
-		);
-
-		return $entry;
-	}
+	// Note: the consumer-agnostic mode-aware reader lives on
+	// `QueueAbility::consumeFromQueueSlot()` (#1299). The trait
+	// delegates to it from `consumeOnceFromPromptQueue()` /
+	// `consumeOnceFromConfigPatchQueue()` above; AgentPingTask calls
+	// it directly. Single source of truth for drain / loop / static
+	// semantics regardless of which consumer is reading.
 
 	/**
 	 * Deep-merge a config patch into existing handler settings.
