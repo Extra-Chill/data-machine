@@ -408,13 +408,13 @@ class FlowsCommand extends BaseCommand {
 	 * @param string $format Output format (table, json, csv, yaml).
 	 */
 	private function showFlowDetail( array $flow, string $format ): void {
-		// Always surface user_message on AI steps, even when unset, so the
-		// slot is visible to anyone inspecting the config. Otherwise the
-		// field disappears from the JSON output and the next reader can't
-		// tell whether it's empty or whether they're looking at the wrong
-		// key (which is exactly how the --set-prompt-writes-dead-key bug
-		// stayed invisible).
-		$flow = self::normalizeAiStepUserMessage( $flow );
+		// Always surface user_message, prompt_queue, and queue_enabled on
+		// AI steps, even when unset, so every slot AIStep reads at runtime
+		// is discoverable. Otherwise these fields disappear from the JSON
+		// output and the next reader can't tell whether they're empty or
+		// whether they're looking at the wrong key — which is exactly how
+		// the --set-prompt-writes-dead-key bug stayed invisible.
+		$flow = self::normalizeAiStepPromptSlots( $flow );
 
 		// JSON/YAML: output the full flow data including flow_config.
 		if ( 'json' === $format ) {
@@ -489,8 +489,25 @@ class FlowsCommand extends BaseCommand {
 				}
 
 				if ( 'ai' === $step_type ) {
-					$user_message    = $step_data['user_message'] ?? '';
-					$config_parts[]  = 'user_message=' . ( '' === $user_message ? '(unset)' : $this->truncateValue( $user_message, 60 ) );
+					// AI steps have THREE prompt-input slots that AIStep::execute()
+					// chains as a precedence: prompt_queue head → user_message →
+					// (none). Surface every slot that exists and mark which one
+					// AIStep would actually read at runtime, so the active prompt
+					// is never invisible.
+					$user_message = $step_data['user_message'] ?? '';
+					$config_parts[] = 'user_message=' . ( '' === $user_message ? '(unset)' : $this->truncateValue( $user_message, 60 ) );
+
+					$resolved = self::resolveAiStepActivePrompt( $step_data );
+
+					if ( $resolved['queue_depth'] > 0 || $resolved['queue_enabled'] ) {
+						$config_parts[] = sprintf(
+							'queue=%d item(s), queue_enabled=%s',
+							$resolved['queue_depth'],
+							$resolved['queue_enabled'] ? 'true' : 'false'
+						);
+					}
+
+					$config_parts[] = 'active_prompt=' . self::formatActivePromptLabel( $resolved );
 				}
 
 				$rows[] = array(
@@ -543,18 +560,30 @@ class FlowsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Ensure every AI step in a flow exposes the `user_message` slot.
+	 * Ensure every AI step in a flow exposes its prompt-input slots.
 	 *
-	 * AIStep::execute() reads $flow_step_config['user_message'] at the
-	 * flow_step_config root (not under handler_configs). When the slot
-	 * is unset, omitting it from output makes the field invisible to
-	 * agents and humans inspecting flow configuration. Render an empty
-	 * string instead so the slot is always discoverable.
+	 * AIStep::execute() reads three slots at the flow_step_config root
+	 * (not under handler_configs):
+	 *
+	 *   - user_message: per-flow task framing (the slot --set-user-message
+	 *     writes to).
+	 *   - prompt_queue:  list of queued prompts (managed by `flow queue
+	 *     add/remove/clear` or by webhooks). When non-empty, AIStep
+	 *     reads the head of this queue in preference to user_message.
+	 *   - queue_enabled: when true, the queue head is popped per tick;
+	 *     when false, the head is statically peeked (first entry wins
+	 *     forever). Either way, queue head takes precedence over
+	 *     user_message.
+	 *
+	 * Omitting any of these from `flow get` output hides the precedence
+	 * chain — exactly the same blind-spot pattern as the original
+	 * --set-prompt dead-key bug. Render the slot keys with their
+	 * "unset" defaults so every input AIStep reads is discoverable.
 	 *
 	 * @param array $flow Flow data with flow_config.
-	 * @return array Flow data with user_message normalized on AI steps.
+	 * @return array Flow data with AI step prompt slots normalized.
 	 */
-	private static function normalizeAiStepUserMessage( array $flow ): array {
+	private static function normalizeAiStepPromptSlots( array $flow ): array {
 		if ( empty( $flow['flow_config'] ) || ! is_array( $flow['flow_config'] ) ) {
 			return $flow;
 		}
@@ -569,9 +598,118 @@ class FlowsCommand extends BaseCommand {
 			if ( ! array_key_exists( 'user_message', $step_data ) ) {
 				$flow['flow_config'][ $step_id ]['user_message'] = '';
 			}
+			if ( ! array_key_exists( 'prompt_queue', $step_data ) ) {
+				$flow['flow_config'][ $step_id ]['prompt_queue'] = array();
+			}
+			if ( ! array_key_exists( 'queue_enabled', $step_data ) ) {
+				$flow['flow_config'][ $step_id ]['queue_enabled'] = false;
+			}
 		}
 
 		return $flow;
+	}
+
+	/**
+	 * Resolve which prompt slot AIStep would actually read at runtime.
+	 *
+	 * Mirrors the precedence in inc/Core/Steps/AI/AIStep.php::execute()
+	 * lines 140-173:
+	 *
+	 *   - prompt_queue head wins when present (popped if queue_enabled,
+	 *     statically peeked otherwise).
+	 *   - user_message is the fallback when the queue head is empty.
+	 *   - both empty: AIStep runs with no flow-level user message
+	 *     (the pipeline system_prompt and any data packets still apply).
+	 *
+	 * @param array $step_data AI step data from flow_config.
+	 * @return array{slot:string, value:string, queue_depth:int, queue_enabled:bool}
+	 *               slot is one of: 'queue_head', 'user_message', 'none'.
+	 */
+	private static function resolveAiStepActivePrompt( array $step_data ): array {
+		$queue_enabled = (bool) ( $step_data['queue_enabled'] ?? false );
+		$prompt_queue  = $step_data['prompt_queue'] ?? array();
+		$queue_depth   = is_array( $prompt_queue ) ? count( $prompt_queue ) : 0;
+		$queue_head    = is_array( $prompt_queue ) ? trim( (string) ( $prompt_queue[0]['prompt'] ?? '' ) ) : '';
+		$user_message  = trim( (string) ( $step_data['user_message'] ?? '' ) );
+
+		if ( '' !== $queue_head ) {
+			return array(
+				'slot'          => 'queue_head',
+				'value'         => $queue_head,
+				'queue_depth'   => $queue_depth,
+				'queue_enabled' => $queue_enabled,
+			);
+		}
+
+		if ( '' !== $user_message ) {
+			return array(
+				'slot'          => 'user_message',
+				'value'         => $user_message,
+				'queue_depth'   => $queue_depth,
+				'queue_enabled' => $queue_enabled,
+			);
+		}
+
+		return array(
+			'slot'          => 'none',
+			'value'         => '',
+			'queue_depth'   => $queue_depth,
+			'queue_enabled' => $queue_enabled,
+		);
+	}
+
+	/**
+	 * Render a short label for the slot AIStep will read at runtime.
+	 *
+	 * Output examples:
+	 *   - "queue_head[1/3] (drains): \"Generate Q3 brief...\""
+	 *   - "queue_head[1/1] (static): \"Single override...\""
+	 *   - "user_message: \"Per-flow framing...\""
+	 *   - "(none)"
+	 *
+	 * The drains/static suffix on queue_head matches AIStep behavior:
+	 * with queue_enabled=true the head pops per tick (drains); with
+	 * queue_enabled=false the head is statically peeked (first entry
+	 * wins forever until the queue is mutated).
+	 *
+	 * @param array{slot:string, value:string, queue_depth:int, queue_enabled:bool} $resolved
+	 * @return string Formatted label suitable for table output.
+	 */
+	private static function formatActivePromptLabel( array $resolved ): string {
+		switch ( $resolved['slot'] ) {
+			case 'queue_head':
+				return sprintf(
+					'queue_head[1/%d] (%s): "%s"',
+					$resolved['queue_depth'],
+					$resolved['queue_enabled'] ? 'drains' : 'static',
+					self::truncateForLabel( $resolved['value'], 50 )
+				);
+
+			case 'user_message':
+				return sprintf( 'user_message: "%s"', self::truncateForLabel( $resolved['value'], 50 ) );
+
+			default:
+				return '(none)';
+		}
+	}
+
+	/**
+	 * Static helper for truncating values inside formatActivePromptLabel.
+	 *
+	 * Mirrors truncateValue() but is static so resolveAiStepActivePrompt's
+	 * companion formatter can stay static (callable from contexts without
+	 * a FlowsCommand instance, e.g. tests).
+	 *
+	 * @param string $value Value to truncate.
+	 * @param int    $max   Maximum characters.
+	 * @return string Truncated value.
+	 */
+	private static function truncateForLabel( string $value, int $max = 40 ): string {
+		$value = str_replace( array( "\n", "\r" ), ' ', $value );
+		if ( mb_strlen( $value ) > $max ) {
+			return mb_substr( $value, 0, $max - 3 ) . '...';
+		}
+		return $value;
 	}
 
 	/**

@@ -63,12 +63,13 @@ function apply_update_flow_step_for_test( array $flow_step_config, array $input 
 }
 
 /**
- * Inline reimplementation of FlowsCommand::normalizeAiStepUserMessage().
- * AI steps must always expose the `user_message` slot, even when unset.
+ * Inline reimplementation of FlowsCommand::normalizeAiStepPromptSlots().
+ * AI steps must always expose every slot AIStep reads at runtime
+ * (`user_message`, `prompt_queue`, `queue_enabled`), even when unset.
  *
- * Mirrors inc/Cli/Commands/Flows/FlowsCommand.php::normalizeAiStepUserMessage.
+ * Mirrors inc/Cli/Commands/Flows/FlowsCommand.php::normalizeAiStepPromptSlots.
  */
-function normalize_ai_user_message_for_test( array $flow ): array {
+function normalize_ai_prompt_slots_for_test( array $flow ): array {
 	if ( empty( $flow['flow_config'] ) || ! is_array( $flow['flow_config'] ) ) {
 		return $flow;
 	}
@@ -83,9 +84,56 @@ function normalize_ai_user_message_for_test( array $flow ): array {
 		if ( ! array_key_exists( 'user_message', $step_data ) ) {
 			$flow['flow_config'][ $step_id ]['user_message'] = '';
 		}
+		if ( ! array_key_exists( 'prompt_queue', $step_data ) ) {
+			$flow['flow_config'][ $step_id ]['prompt_queue'] = array();
+		}
+		if ( ! array_key_exists( 'queue_enabled', $step_data ) ) {
+			$flow['flow_config'][ $step_id ]['queue_enabled'] = false;
+		}
 	}
 
 	return $flow;
+}
+
+/**
+ * Inline reimplementation of FlowsCommand::resolveAiStepActivePrompt().
+ * Resolves which slot AIStep::execute() reads at runtime.
+ *
+ * Mirrors inc/Core/Steps/AI/AIStep.php::execute() lines 140-173 and
+ * inc/Cli/Commands/Flows/FlowsCommand.php::resolveAiStepActivePrompt.
+ * Diverging here means one of those two files regressed.
+ */
+function resolve_ai_active_prompt_for_test( array $step_data ): array {
+	$queue_enabled = (bool) ( $step_data['queue_enabled'] ?? false );
+	$prompt_queue  = $step_data['prompt_queue'] ?? array();
+	$queue_depth   = is_array( $prompt_queue ) ? count( $prompt_queue ) : 0;
+	$queue_head    = is_array( $prompt_queue ) ? trim( (string) ( $prompt_queue[0]['prompt'] ?? '' ) ) : '';
+	$user_message  = trim( (string) ( $step_data['user_message'] ?? '' ) );
+
+	if ( '' !== $queue_head ) {
+		return array(
+			'slot'          => 'queue_head',
+			'value'         => $queue_head,
+			'queue_depth'   => $queue_depth,
+			'queue_enabled' => $queue_enabled,
+		);
+	}
+
+	if ( '' !== $user_message ) {
+		return array(
+			'slot'          => 'user_message',
+			'value'         => $user_message,
+			'queue_depth'   => $queue_depth,
+			'queue_enabled' => $queue_enabled,
+		);
+	}
+
+	return array(
+		'slot'          => 'none',
+		'value'         => '',
+		'queue_depth'   => $queue_depth,
+		'queue_enabled' => $queue_enabled,
+	);
 }
 
 $tests   = array();
@@ -195,10 +243,10 @@ assert_test(
 	'got: ' . var_export( $fetch_result['user_message'] ?? null, true )
 );
 
-// --- Case 4: normalizeAiStepUserMessage exposes the slot for `flow get`.
-echo "\nCase 4: flow get always renders user_message on AI steps\n";
+// --- Case 4: normalization exposes every prompt-input slot for `flow get`.
+echo "\nCase 4: flow get always renders user_message + prompt_queue + queue_enabled on AI steps\n";
 
-$flow_with_unset_user_message = array(
+$flow_with_unset_slots = array(
 	'flow_id'     => 1,
 	'flow_config' => array(
 		'pstep_ai_uuid_1' => array(
@@ -214,7 +262,7 @@ $flow_with_unset_user_message = array(
 	),
 );
 
-$normalized = normalize_ai_user_message_for_test( $flow_with_unset_user_message );
+$normalized = normalize_ai_prompt_slots_for_test( $flow_with_unset_slots );
 
 assert_test(
 	'AI step gets user_message="" when previously unset',
@@ -224,30 +272,58 @@ assert_test(
 );
 
 assert_test(
-	'non-AI step is NOT decorated with user_message',
-	! array_key_exists( 'user_message', $normalized['flow_config']['pstep_fetch_uuid_1'] ),
+	'AI step gets prompt_queue=[] when previously unset',
+	array_key_exists( 'prompt_queue', $normalized['flow_config']['pstep_ai_uuid_1'] )
+		&& array() === $normalized['flow_config']['pstep_ai_uuid_1']['prompt_queue'],
+	'got: ' . var_export( $normalized['flow_config']['pstep_ai_uuid_1']['prompt_queue'] ?? null, true )
+);
+
+assert_test(
+	'AI step gets queue_enabled=false when previously unset',
+	array_key_exists( 'queue_enabled', $normalized['flow_config']['pstep_ai_uuid_1'] )
+		&& false === $normalized['flow_config']['pstep_ai_uuid_1']['queue_enabled'],
+	'got: ' . var_export( $normalized['flow_config']['pstep_ai_uuid_1']['queue_enabled'] ?? null, true )
+);
+
+assert_test(
+	'non-AI step is NOT decorated with prompt slots',
+	! array_key_exists( 'user_message', $normalized['flow_config']['pstep_fetch_uuid_1'] )
+		&& ! array_key_exists( 'prompt_queue', $normalized['flow_config']['pstep_fetch_uuid_1'] )
+		&& ! array_key_exists( 'queue_enabled', $normalized['flow_config']['pstep_fetch_uuid_1'] ),
 	'got: ' . var_export( $normalized['flow_config']['pstep_fetch_uuid_1'], true )
 );
 
-// --- Case 5: existing user_message values are preserved by normalization.
-echo "\nCase 5: normalization preserves existing user_message values\n";
+// --- Case 5: existing values are preserved by normalization.
+echo "\nCase 5: normalization preserves existing values\n";
 
-$flow_with_set_user_message = array(
+$flow_with_set_values = array(
 	'flow_id'     => 2,
 	'flow_config' => array(
 		'pstep_ai_uuid_1' => array(
-			'step_type'    => 'ai',
-			'user_message' => 'Existing per-flow context.',
+			'step_type'     => 'ai',
+			'user_message'  => 'Existing per-flow context.',
+			'prompt_queue'  => array( array( 'prompt' => 'queued', 'added_at' => '2026-01-01T00:00:00Z' ) ),
+			'queue_enabled' => true,
 		),
 	),
 );
 
-$preserved = normalize_ai_user_message_for_test( $flow_with_set_user_message );
+$preserved = normalize_ai_prompt_slots_for_test( $flow_with_set_values );
 
 assert_test(
-	'existing user_message is preserved verbatim',
-	'Existing per-flow context.' === $preserved['flow_config']['pstep_ai_uuid_1']['user_message'],
-	'got: ' . var_export( $preserved['flow_config']['pstep_ai_uuid_1']['user_message'] ?? null, true )
+	'existing user_message preserved verbatim',
+	'Existing per-flow context.' === $preserved['flow_config']['pstep_ai_uuid_1']['user_message']
+);
+
+assert_test(
+	'existing prompt_queue preserved verbatim',
+	$preserved['flow_config']['pstep_ai_uuid_1']['prompt_queue']
+		=== array( array( 'prompt' => 'queued', 'added_at' => '2026-01-01T00:00:00Z' ) )
+);
+
+assert_test(
+	'existing queue_enabled preserved verbatim',
+	true === $preserved['flow_config']['pstep_ai_uuid_1']['queue_enabled']
 );
 
 // --- Case 6: empty/missing flow_config doesn't blow up normalization.
@@ -255,12 +331,12 @@ echo "\nCase 6: normalization is null-safe\n";
 
 assert_test(
 	'no flow_config returns flow unchanged',
-	normalize_ai_user_message_for_test( array( 'flow_id' => 3 ) ) === array( 'flow_id' => 3 )
+	normalize_ai_prompt_slots_for_test( array( 'flow_id' => 3 ) ) === array( 'flow_id' => 3 )
 );
 
 assert_test(
 	'non-array flow_config returns flow unchanged',
-	normalize_ai_user_message_for_test( array( 'flow_id' => 4, 'flow_config' => 'oops' ) )
+	normalize_ai_prompt_slots_for_test( array( 'flow_id' => 4, 'flow_config' => 'oops' ) )
 		=== array( 'flow_id' => 4, 'flow_config' => 'oops' )
 );
 
@@ -273,10 +349,148 @@ assert_test(
 				'pstep_ai_uuid_1' => array( 'step_type' => 'ai' ),
 			),
 		);
-		$out = normalize_ai_user_message_for_test( $flow );
+		$out = normalize_ai_prompt_slots_for_test( $flow );
 		return $out['flow_config']['memory_files'] === array( 'a.md' )
 			&& '' === $out['flow_config']['pstep_ai_uuid_1']['user_message'];
 	})()
+);
+
+// --- Case 7: resolver picks queue_head when prompt_queue has entries.
+echo "\nCase 7: resolveAiStepActivePrompt — queue head wins over user_message\n";
+
+$step_with_queue_and_message = array(
+	'step_type'     => 'ai',
+	'user_message'  => 'fallback per-flow context',
+	'prompt_queue'  => array(
+		array( 'prompt' => 'first queued', 'added_at' => '2026-01-01T00:00:00Z' ),
+		array( 'prompt' => 'second queued', 'added_at' => '2026-01-02T00:00:00Z' ),
+	),
+	'queue_enabled' => false,
+);
+
+$resolved = resolve_ai_active_prompt_for_test( $step_with_queue_and_message );
+
+assert_test(
+	'queue head takes precedence over user_message',
+	'queue_head' === $resolved['slot'] && 'first queued' === $resolved['value']
+);
+
+assert_test(
+	'queue depth reflects total entries (not just head)',
+	2 === $resolved['queue_depth']
+);
+
+assert_test(
+	'queue_enabled=false surfaced unchanged',
+	false === $resolved['queue_enabled']
+);
+
+// --- Case 8: queue_enabled=true with non-empty queue still picks queue_head.
+echo "\nCase 8: resolveAiStepActivePrompt — queue_enabled=true + non-empty\n";
+
+$step_drains_mode = array(
+	'step_type'     => 'ai',
+	'user_message'  => 'fallback',
+	'prompt_queue'  => array( array( 'prompt' => 'drains tick', 'added_at' => '2026-01-01T00:00:00Z' ) ),
+	'queue_enabled' => true,
+);
+
+$resolved = resolve_ai_active_prompt_for_test( $step_drains_mode );
+
+assert_test(
+	'drains-mode queue head still resolves to queue_head slot',
+	'queue_head' === $resolved['slot'] && 'drains tick' === $resolved['value']
+);
+
+assert_test(
+	'queue_enabled=true surfaced unchanged',
+	true === $resolved['queue_enabled']
+);
+
+// --- Case 9: empty queue falls back to user_message.
+echo "\nCase 9: resolveAiStepActivePrompt — empty queue falls back to user_message\n";
+
+$step_message_only = array(
+	'step_type'     => 'ai',
+	'user_message'  => 'per-flow framing',
+	'prompt_queue'  => array(),
+	'queue_enabled' => false,
+);
+
+$resolved = resolve_ai_active_prompt_for_test( $step_message_only );
+
+assert_test(
+	'empty queue → user_message slot',
+	'user_message' === $resolved['slot'] && 'per-flow framing' === $resolved['value']
+);
+
+assert_test(
+	'queue_depth=0 reported when queue is empty',
+	0 === $resolved['queue_depth']
+);
+
+// --- Case 10: queue head with empty string falls through to user_message.
+//     This matches AIStep::execute() behavior: empty $queued_prompt
+//     triggers the `if ( empty( $user_message ) )` fallback.
+echo "\nCase 10: resolveAiStepActivePrompt — empty-string queue head falls through\n";
+
+$step_empty_head = array(
+	'step_type'     => 'ai',
+	'user_message'  => 'message wins when head is empty string',
+	'prompt_queue'  => array( array( 'prompt' => '', 'added_at' => '2026-01-01T00:00:00Z' ) ),
+	'queue_enabled' => false,
+);
+
+$resolved = resolve_ai_active_prompt_for_test( $step_empty_head );
+
+assert_test(
+	'empty-string queue head falls through to user_message',
+	'user_message' === $resolved['slot']
+		&& 'message wins when head is empty string' === $resolved['value']
+);
+
+// --- Case 11: nothing set anywhere yields slot=none.
+echo "\nCase 11: resolveAiStepActivePrompt — nothing set yields slot=none\n";
+
+$step_empty = array(
+	'step_type'     => 'ai',
+	'user_message'  => '',
+	'prompt_queue'  => array(),
+	'queue_enabled' => false,
+);
+
+$resolved = resolve_ai_active_prompt_for_test( $step_empty );
+
+assert_test(
+	'all slots empty → slot=none',
+	'none' === $resolved['slot'] && '' === $resolved['value']
+);
+
+assert_test(
+	'all slots empty → queue_depth=0',
+	0 === $resolved['queue_depth']
+);
+
+// --- Case 12: malformed prompt_queue (non-array) is null-safe.
+echo "\nCase 12: resolveAiStepActivePrompt — null-safe on malformed data\n";
+
+$step_malformed = array(
+	'step_type'     => 'ai',
+	'user_message'  => 'still works',
+	'prompt_queue'  => 'not an array',
+	'queue_enabled' => false,
+);
+
+$resolved = resolve_ai_active_prompt_for_test( $step_malformed );
+
+assert_test(
+	'malformed prompt_queue → falls back to user_message',
+	'user_message' === $resolved['slot'] && 'still works' === $resolved['value']
+);
+
+assert_test(
+	'malformed prompt_queue → queue_depth=0',
+	0 === $resolved['queue_depth']
 );
 
 echo "\n--- Summary ---\n";
