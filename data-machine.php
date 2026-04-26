@@ -724,7 +724,7 @@ require_once __DIR__ . '/inc/migrations/load.php';
 
 
 function datamachine_check_requirements() {
-	if ( version_compare( PHP_VERSION, '8.0', '<' ) ) {
+	if ( version_compare( PHP_VERSION, '8.2', '<' ) ) {
 		add_action(
 			'admin_notices',
 			function () {
@@ -732,7 +732,7 @@ function datamachine_check_requirements() {
 				printf(
 					esc_html( 'Data Machine requires PHP %2$s or higher. You are running PHP %1$s.' ),
 					esc_html( PHP_VERSION ),
-					'8.0'
+					'8.2'
 				);
 				echo '</p></div>';
 			}
