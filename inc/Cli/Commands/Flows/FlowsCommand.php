@@ -111,6 +111,10 @@ class FlowsCommand extends BaseCommand {
 	 * [--step=<flow_step_id>]
 	 * : Target a specific flow step for prompt update or handler config update (auto-resolved if flow has exactly one handler step).
 	 *
+	 * [--patch=<json>]
+	 * : JSON-encoded config patch object for fetch step queue operations (queue add/update subcommands).
+	 *   The patch is deep-merged into the handler config when the fetch step runs.
+	 *
 	 * [--add=<filename>]
 	 * : Attach a memory file to a flow (memory-files subcommand).
 	 *
@@ -528,6 +532,21 @@ class FlowsCommand extends BaseCommand {
 					$config_parts[] = $key . '=' . $this->formatConfigValue( $value );
 				}
 
+				// Fetch steps surface config_patch_queue depth + queue_enabled
+				// alongside their static handler config (#1292).
+				if ( 'fetch' === $step_type ) {
+					$patch_queue   = $step_data['config_patch_queue'] ?? array();
+					$queue_depth   = is_array( $patch_queue ) ? count( $patch_queue ) : 0;
+					$queue_enabled = ! empty( $step_data['queue_enabled'] );
+					if ( $queue_depth > 0 || $queue_enabled ) {
+						$config_parts[] = sprintf(
+							'config_patch_queue=%d item(s), queue_enabled=%s',
+							$queue_depth,
+							$queue_enabled ? 'true' : 'false'
+						);
+					}
+				}
+
 				$rows[] = array(
 					'step_id'   => $step_id,
 					'order'     => $order,
@@ -592,17 +611,34 @@ class FlowsCommand extends BaseCommand {
 			if ( ! is_array( $step_data ) ) {
 				continue;
 			}
-			if ( 'ai' !== ( $step_data['step_type'] ?? '' ) ) {
+			$step_type = $step_data['step_type'] ?? '';
+
+			// AI steps consume the prompt_queue slot. Surface
+			// user_message + prompt_queue + queue_enabled so every
+			// input AIStep reads is discoverable.
+			if ( 'ai' === $step_type ) {
+				if ( ! array_key_exists( 'user_message', $step_data ) ) {
+					$flow['flow_config'][ $step_id ]['user_message'] = '';
+				}
+				if ( ! array_key_exists( 'prompt_queue', $step_data ) ) {
+					$flow['flow_config'][ $step_id ]['prompt_queue'] = array();
+				}
+				if ( ! array_key_exists( 'queue_enabled', $step_data ) ) {
+					$flow['flow_config'][ $step_id ]['queue_enabled'] = false;
+				}
 				continue;
 			}
-			if ( ! array_key_exists( 'user_message', $step_data ) ) {
-				$flow['flow_config'][ $step_id ]['user_message'] = '';
-			}
-			if ( ! array_key_exists( 'prompt_queue', $step_data ) ) {
-				$flow['flow_config'][ $step_id ]['prompt_queue'] = array();
-			}
-			if ( ! array_key_exists( 'queue_enabled', $step_data ) ) {
-				$flow['flow_config'][ $step_id ]['queue_enabled'] = false;
+
+			// Fetch steps consume the config_patch_queue slot (#1292).
+			// Surface config_patch_queue + queue_enabled so the queue
+			// shape is discoverable on `flow get`.
+			if ( 'fetch' === $step_type ) {
+				if ( ! array_key_exists( 'config_patch_queue', $step_data ) ) {
+					$flow['flow_config'][ $step_id ]['config_patch_queue'] = array();
+				}
+				if ( ! array_key_exists( 'queue_enabled', $step_data ) ) {
+					$flow['flow_config'][ $step_id ]['queue_enabled'] = false;
+				}
 			}
 		}
 

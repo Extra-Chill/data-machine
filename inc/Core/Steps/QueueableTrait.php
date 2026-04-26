@@ -1,22 +1,25 @@
 <?php
 /**
- * Trait for steps that can consume prompts/tasks from the flow queue.
+ * Trait for steps that consume from a per-flow-step queue.
  *
- * Provides shared queue pop functionality that can be used by any step type
- * that needs to pull work items from the prompt queue.
+ * Two consumption modes are exposed, each backed by its own storage
+ * slot on the flow_step_config (see QueueAbility for the storage
+ * contract):
  *
- * Two consumption modes are exposed:
- *
- * - {@see popFromQueueIfEmpty()} — for steps that consume scalar prompts
- *   (AI step's user_message). Returns the popped string verbatim.
+ * - {@see popFromQueueIfEmpty()} — for steps that consume scalar
+ *   prompts (AI step's user_message). Reads from the
+ *   `prompt_queue` slot. Each entry is `{ prompt: string, added_at }`.
  *
  * - {@see popQueuedConfigPatch()} — for steps that consume structured
- *   config patches (Fetch step's handler params). Decodes the popped
- *   prompt as JSON and returns it as an array suitable for deep-merging
- *   into the step's existing handler configuration.
+ *   config patches (Fetch step's handler params). Reads from the
+ *   `config_patch_queue` slot. Each entry is `{ patch: array,
+ *   added_at }` — the patch is a decoded object stored verbatim, so
+ *   no JSON-decode happens at read time.
  *
- * Both share the same persistence (per-flow-step FIFO queue), the same
- * `queue_enabled` toggle, and the same retry-on-failure backup semantics.
+ * Both share the same `queue_enabled` toggle on the step config and
+ * the same retry-on-failure backup semantics. Splitting the storage
+ * slots is #1292; pre-split, both consumers shared `prompt_queue` and
+ * had to do string-vs-JSON detective work at read time.
  *
  * @package DataMachine\Core\Steps
  * @since 0.19.0
@@ -31,7 +34,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Queueable trait for steps that consume from prompt queue.
+ * Queueable trait for steps that consume from a per-step queue.
  *
  * Usage:
  *   class MyStep extends Step {
@@ -46,7 +49,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 trait QueueableTrait {
 
 	/**
-	 * Pop from queue if the provided value is empty and queue is enabled.
+	 * Pop from the prompt queue if the provided value is empty and the
+	 * queue is enabled.
+	 *
+	 * Reads from the `prompt_queue` slot (AI consumer).
 	 *
 	 * @param string $current_value The current value (e.g., user_message or prompt).
 	 * @param bool   $queue_enabled Whether queue pop is enabled for this step.
@@ -61,7 +67,7 @@ trait QueueableTrait {
 			);
 		}
 
-		$queued = $this->popOnceFromFlowQueue();
+		$queued = $this->popOnceFromPromptQueue();
 
 		if ( null === $queued ) {
 			return array(
@@ -79,11 +85,13 @@ trait QueueableTrait {
 	}
 
 	/**
-	 * Pop a structured config patch from the queue.
+	 * Pop a structured config patch from the fetch step queue.
 	 *
-	 * Sibling of {@see popFromQueueIfEmpty()} for steps whose unit of work
-	 * is a structured config dict rather than a scalar prompt. The popped
-	 * prompt string is JSON-decoded and returned as an array.
+	 * Sibling of {@see popFromQueueIfEmpty()} for steps whose unit of
+	 * work is a structured config dict rather than a scalar prompt.
+	 * Reads from the `config_patch_queue` slot (Fetch consumer). The
+	 * `patch` field is stored as a decoded array verbatim, so no
+	 * JSON-decode happens here.
 	 *
 	 * Typical use: fetch step pops a config patch and the caller
 	 * deep-merges it into the existing handler config to drive windowed
@@ -117,7 +125,7 @@ trait QueueableTrait {
 	 * or fall through to the static handler config.
 	 *
 	 * @param bool $queue_enabled Whether queue pop is enabled for this step.
-	 * @return array{patch: array, from_queue: bool, added_at: string|null, raw_prompt: string} Result with the decoded patch and source info.
+	 * @return array{patch: array, from_queue: bool, added_at: string|null} Result with the decoded patch and source info.
 	 */
 	protected function popQueuedConfigPatch( bool $queue_enabled = false ): array {
 		if ( ! $queue_enabled ) {
@@ -125,32 +133,28 @@ trait QueueableTrait {
 				'patch'      => array(),
 				'from_queue' => false,
 				'added_at'   => null,
-				'raw_prompt' => '',
 			);
 		}
 
-		$queued = $this->popOnceFromFlowQueue();
+		$queued = $this->popOnceFromConfigPatchQueue();
 
 		if ( null === $queued ) {
 			return array(
 				'patch'      => array(),
 				'from_queue' => false,
 				'added_at'   => null,
-				'raw_prompt' => '',
 			);
 		}
 
-		$decoded = json_decode( $queued['prompt'], true );
-		$patch   = is_array( $decoded ) ? $decoded : array();
+		$patch = isset( $queued['patch'] ) && is_array( $queued['patch'] ) ? $queued['patch'] : array();
 
-		if ( ! is_array( $decoded ) ) {
+		if ( empty( $patch ) ) {
 			do_action(
 				'datamachine_log',
 				'warning',
-				'Queueable fetch: queued item is not a JSON object — treating as empty patch',
+				'Queueable fetch: queued config patch is empty or malformed — treating as no-op tick',
 				array(
 					'flow_step_id' => $this->flow_step_id,
-					'raw_prompt'   => substr( $queued['prompt'], 0, 200 ),
 				)
 			);
 		}
@@ -159,19 +163,15 @@ trait QueueableTrait {
 			'patch'      => $patch,
 			'from_queue' => true,
 			'added_at'   => $queued['added_at'] ?? null,
-			'raw_prompt' => $queued['prompt'],
 		);
 	}
 
 	/**
-	 * Pop one item from the flow queue and back it up to engine data.
-	 *
-	 * Internal helper shared by both pop variants. Returns null when the
-	 * flow_id is unavailable or the queue is empty.
+	 * Pop one item from the AI prompt queue and back it up to engine data.
 	 *
 	 * @return array{prompt: string, added_at: string|null}|null Popped item, or null if no item.
 	 */
-	private function popOnceFromFlowQueue(): ?array {
+	private function popOnceFromPromptQueue(): ?array {
 		$job_context = $this->engine->getJobContext();
 		$flow_id     = $job_context['flow_id'] ?? null;
 
@@ -197,11 +197,13 @@ trait QueueableTrait {
 		);
 
 		// Store backup of the popped prompt in engine data for retry on failure.
+		// The `slot` field tells the retry path which queue to re-push to.
 		if ( property_exists( $this, 'job_id' ) && ! empty( $this->job_id ) ) {
 			\datamachine_merge_engine_data(
 				$this->job_id,
 				array(
 					'queued_prompt_backup' => array(
+						'slot'         => QueueAbility::SLOT_PROMPT_QUEUE,
 						'prompt'       => $queued_item['prompt'],
 						'flow_id'      => (int) $flow_id,
 						'flow_step_id' => $this->flow_step_id,
@@ -213,6 +215,60 @@ trait QueueableTrait {
 
 		return array(
 			'prompt'   => $queued_item['prompt'],
+			'added_at' => $queued_item['added_at'] ?? null,
+		);
+	}
+
+	/**
+	 * Pop one item from the fetch config-patch queue and back it up to engine data.
+	 *
+	 * @return array{patch: array, added_at: string|null}|null Popped item, or null if no item.
+	 */
+	private function popOnceFromConfigPatchQueue(): ?array {
+		$job_context = $this->engine->getJobContext();
+		$flow_id     = $job_context['flow_id'] ?? null;
+
+		if ( ! $flow_id ) {
+			return null;
+		}
+
+		$queued_item = QueueAbility::popConfigPatchFromQueue( (int) $flow_id, $this->flow_step_id );
+
+		if ( ! $queued_item || ! isset( $queued_item['patch'] ) || ! is_array( $queued_item['patch'] ) ) {
+			return null;
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Using config patch from queue',
+			array(
+				'flow_id'    => $flow_id,
+				'step_type'  => $this->step_type ?? 'unknown',
+				'patch_keys' => array_keys( $queued_item['patch'] ),
+				'added_at'   => $queued_item['added_at'] ?? '',
+			)
+		);
+
+		// Store backup for retry on failure. `slot` distinguishes which
+		// queue the backup belongs to.
+		if ( property_exists( $this, 'job_id' ) && ! empty( $this->job_id ) ) {
+			\datamachine_merge_engine_data(
+				$this->job_id,
+				array(
+					'queued_prompt_backup' => array(
+						'slot'         => QueueAbility::SLOT_CONFIG_PATCH_QUEUE,
+						'patch'        => $queued_item['patch'],
+						'flow_id'      => (int) $flow_id,
+						'flow_step_id' => $this->flow_step_id,
+						'added_at'     => $queued_item['added_at'] ?? null,
+					),
+				)
+			);
+		}
+
+		return array(
+			'patch'    => $queued_item['patch'],
 			'added_at' => $queued_item['added_at'] ?? null,
 		);
 	}

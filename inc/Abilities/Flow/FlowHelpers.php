@@ -71,18 +71,31 @@ trait FlowHelpers {
 
 			$disabled_tools = $pipeline_config[ $pipeline_step_id ]['disabled_tools'] ?? array();
 
-			$flow_config[ $flow_step_id ] = array(
+			$step_type   = $step['step_type'] ?? '';
+			$step_config = array(
 				'flow_step_id'     => $flow_step_id,
-				'step_type'        => $step['step_type'] ?? '',
+				'step_type'        => $step_type,
 				'pipeline_step_id' => $pipeline_step_id,
 				'pipeline_id'      => $pipeline_id,
 				'flow_id'          => $flow_id,
 				'execution_order'  => $step['execution_order'] ?? 0,
 				'disabled_tools'   => $disabled_tools,
 				'handler'          => null,
-				'prompt_queue'     => array(),
 				'queue_enabled'    => false,
 			);
+
+			// Fetch consumes from config_patch_queue (#1292); other
+			// step types that consume the queue use prompt_queue. Steps
+			// that have no queueable consumer don't need either field
+			// initialized — it's lazy-created by QueueAbility on first
+			// write.
+			if ( 'fetch' === $step_type ) {
+				$step_config['config_patch_queue'] = array();
+			} else {
+				$step_config['prompt_queue'] = array();
+			}
+
+			$flow_config[ $flow_step_id ] = $step_config;
 		}
 
 		$success = $this->db_flows->update_flow(

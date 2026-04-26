@@ -239,23 +239,43 @@ class RecoverStuckJobsAbility {
 
 					do_action( 'datamachine_job_complete', $job_id, 'failed' );
 
-					// Check for queued_prompt_backup and requeue if found
-					if ( isset( $engine_data['queued_prompt_backup']['prompt'] ) && isset( $engine_data['queued_prompt_backup']['flow_step_id'] ) ) {
+					// Check for queued_prompt_backup and requeue if found.
+					// Slot-aware: AI backups go back to prompt_queue,
+					// fetch backups go back to config_patch_queue.
+					$backup = $engine_data['queued_prompt_backup'] ?? array();
+					if ( ! empty( $backup ) && isset( $backup['flow_step_id'] ) ) {
+						$slot = $backup['slot'] ?? \DataMachine\Abilities\Flow\QueueAbility::SLOT_PROMPT_QUEUE;
 						$flow = $this->db_flows->get_flow( $job_flow_id );
 						if ( $flow && isset( $flow['flow_config'] ) ) {
 							$flow_config = $flow['flow_config'];
-							$step_id     = $engine_data['queued_prompt_backup']['flow_step_id'];
-							$prompt      = $engine_data['queued_prompt_backup']['prompt'];
+							$step_id     = $backup['flow_step_id'];
 
-							if ( isset( $flow_config[ $step_id ] ) && isset( $flow_config[ $step_id ]['prompt_queue'] ) ) {
-								$flow_config[ $step_id ]['prompt_queue'][] = array(
-									'prompt'   => $prompt,
-									'added_at' => gmdate( 'c' ),
-								);
+							if ( isset( $flow_config[ $step_id ] ) ) {
+								$entry = null;
 
-								$update_result = $this->db_flows->update_flow( $job_flow_id, array( 'flow_config' => $flow_config ) );
-								if ( $update_result ) {
-									++$requeued;
+								if ( \DataMachine\Abilities\Flow\QueueAbility::SLOT_CONFIG_PATCH_QUEUE === $slot && isset( $backup['patch'] ) && is_array( $backup['patch'] ) ) {
+									$entry = array(
+										'patch'    => $backup['patch'],
+										'added_at' => gmdate( 'c' ),
+									);
+								} elseif ( isset( $backup['prompt'] ) ) {
+									$entry = array(
+										'prompt'   => $backup['prompt'],
+										'added_at' => gmdate( 'c' ),
+									);
+									$slot  = \DataMachine\Abilities\Flow\QueueAbility::SLOT_PROMPT_QUEUE;
+								}
+
+								if ( null !== $entry ) {
+									if ( ! isset( $flow_config[ $step_id ][ $slot ] ) || ! is_array( $flow_config[ $step_id ][ $slot ] ) ) {
+										$flow_config[ $step_id ][ $slot ] = array();
+									}
+									$flow_config[ $step_id ][ $slot ][] = $entry;
+
+									$update_result = $this->db_flows->update_flow( $job_flow_id, array( 'flow_config' => $flow_config ) );
+									if ( $update_result ) {
+										++$requeued;
+									}
 								}
 							}
 						}

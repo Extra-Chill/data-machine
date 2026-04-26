@@ -2,18 +2,30 @@
 /**
  * WP-CLI Flows Queue Command
  *
- * Manages the prompt queue for flow steps.
- * Extracted from FlowsCommand to follow the focused command pattern.
+ * Manages per-step queues attached to flow steps. Two queue slots are
+ * supported (#1292):
+ *
+ *   - prompt_queue       — string prompts, consumed by AI steps
+ *   - config_patch_queue — object patches, consumed by fetch steps
+ *
+ * The CLI is consumer-aware: it inspects the target flow step's
+ * `step_type` and routes to the slot that step consumes. Fetch steps
+ * accept patches via `--patch=<json>`; AI steps accept prompts as a
+ * positional argument. Mixing the two (a string prompt against a
+ * fetch step, or `--patch=` against an AI step) errors loudly with a
+ * pointer to the right flag.
  *
  * @package DataMachine\Cli\Commands\Flows
  * @since 0.31.0
  * @see https://github.com/Extra-Chill/data-machine/issues/345
+ * @see https://github.com/Extra-Chill/data-machine/issues/1292
  */
 
 namespace DataMachine\Cli\Commands\Flows;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
+use DataMachine\Abilities\Flow\QueueAbility;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -64,41 +76,60 @@ class QueueCommand extends BaseCommand {
 	}
 
 	/**
-	 * Add a prompt to the flow queue.
+	 * Add a prompt or config patch to a flow step's queue.
+	 *
+	 * Routes by target step type:
+	 *  - AI step    → writes to prompt_queue (string prompt argument)
+	 *  - Fetch step → writes to config_patch_queue (--patch=<json>)
 	 *
 	 * ## OPTIONS
 	 *
 	 * <flow_id>
 	 * : The flow ID.
 	 *
-	 * <prompt>
-	 * : The prompt text to enqueue.
+	 * [<prompt>]
+	 * : Prompt text to enqueue (for AI steps). Conflicts with --patch.
+	 *
+	 * [--patch=<json>]
+	 * : JSON-encoded config patch object to enqueue (for fetch steps).
+	 * : The patch is deep-merged into the handler config when the step runs.
 	 *
 	 * [--step=<flow_step_id>]
 	 * : Target a specific flow step. Auto-resolved if the flow has exactly one queueable step.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Add a prompt to the queue
+	 *     # Add a prompt to an AI step queue
 	 *     wp datamachine flows queue add 42 "Generate a blog post about AI"
 	 *
-	 *     # Add with explicit step
-	 *     wp datamachine flows queue add 42 --step=flow-42-step-abc "Write about cats"
+	 *     # Add a config patch to a fetch step queue
+	 *     wp datamachine flows queue add 42 --patch='{"params":{"after":"2015-05-01"}}'
 	 *
 	 * @subcommand add
 	 */
 	public function add( array $args, array $assoc_args ): void {
-		if ( count( $args ) < 2 ) {
-			WP_CLI::error( 'Usage: wp datamachine flows queue add <flow_id> "prompt text"' );
+		if ( count( $args ) < 1 ) {
+			WP_CLI::error( 'Usage: wp datamachine flows queue add <flow_id> "prompt text"  or  wp datamachine flows queue add <flow_id> --patch=\'{...}\'' );
 			return;
 		}
 
 		$flow_id      = (int) $args[0];
 		$flow_step_id = $assoc_args['step'] ?? null;
-		$prompt       = $args[1];
+		$patch_json   = $assoc_args['patch'] ?? null;
+		$prompt       = $args[1] ?? null;
 
 		if ( $flow_id <= 0 ) {
 			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		if ( null !== $patch_json && null !== $prompt ) {
+			WP_CLI::error( 'Cannot use both a positional prompt and --patch. Pick one based on the target step type.' );
+			return;
+		}
+
+		if ( null === $patch_json && null === $prompt ) {
+			WP_CLI::error( 'Provide either a positional prompt (AI step) or --patch=<json> (fetch step).' );
 			return;
 		}
 
@@ -111,30 +142,72 @@ class QueueCommand extends BaseCommand {
 			$flow_step_id = $resolved['step_id'];
 		}
 
-		if ( empty( trim( $prompt ) ) ) {
-			WP_CLI::error( 'prompt cannot be empty' );
+		$step_type = $this->getStepType( $flow_id, $flow_step_id );
+		if ( null === $step_type ) {
+			WP_CLI::error( sprintf( 'Flow step %s not found in flow %d.', $flow_step_id, $flow_id ) );
 			return;
 		}
 
 		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executeQueueAdd(
-			array(
-				'flow_id'      => $flow_id,
-				'flow_step_id' => $flow_step_id,
-				'prompt'       => $prompt,
-			)
-		);
+
+		if ( null !== $patch_json ) {
+			if ( 'fetch' !== $step_type ) {
+				WP_CLI::error( sprintf(
+					'--patch is only valid for fetch steps; this step is "%s". For AI steps, pass a positional prompt instead.',
+					$step_type
+				) );
+				return;
+			}
+
+			$patch = json_decode( $patch_json, true );
+			if ( ! is_array( $patch ) ) {
+				WP_CLI::error( 'Invalid --patch: not a JSON object.' );
+				return;
+			}
+
+			$result = $ability->executeConfigPatchAdd(
+				array(
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'patch'        => $patch,
+				)
+			);
+		} else {
+			if ( 'fetch' === $step_type ) {
+				WP_CLI::error( 'Fetch steps consume config patches, not string prompts. Use --patch=\'{...}\' instead.' );
+				return;
+			}
+
+			if ( empty( trim( (string) $prompt ) ) ) {
+				WP_CLI::error( 'prompt cannot be empty' );
+				return;
+			}
+
+			$result = $ability->executeQueueAdd(
+				array(
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'prompt'       => $prompt,
+				)
+			);
+		}
 
 		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Failed to add prompt to queue' );
+			WP_CLI::error( $result['error'] ?? 'Failed to add item to queue' );
 			return;
 		}
 
-		WP_CLI::success( $result['message'] ?? 'Prompt added to queue.' );
+		WP_CLI::success( $result['message'] ?? 'Item added to queue.' );
 	}
 
 	/**
-	 * List all prompts in the flow queue.
+	 * List queued items for a flow step.
+	 *
+	 * Renders both prompt_queue (AI) and config_patch_queue (fetch)
+	 * when the step has either populated. Per-step routing decides
+	 * which slot to query, but `flow queue list` is allowed to show
+	 * either — convenient for inspecting flows without remembering the
+	 * step type.
 	 *
 	 * ## OPTIONS
 	 *
@@ -157,10 +230,10 @@ class QueueCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # List queued prompts
+	 *     # List queued items
 	 *     wp datamachine flows queue list 42
 	 *
-	 *     # List queued prompts as JSON
+	 *     # List as JSON
 	 *     wp datamachine flows queue list 42 --format=json
 	 *
 	 * @subcommand list
@@ -190,51 +263,92 @@ class QueueCommand extends BaseCommand {
 		}
 
 		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executeQueueList(
+
+		$prompt_result = $ability->executeQueueList(
 			array(
 				'flow_id'      => $flow_id,
 				'flow_step_id' => $flow_step_id,
 			)
 		);
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Failed to list queue' );
+		$patch_result = $ability->executeConfigPatchList(
+			array(
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+			)
+		);
+
+		if ( ! $prompt_result['success'] && ! $patch_result['success'] ) {
+			WP_CLI::error( $prompt_result['error'] ?? $patch_result['error'] ?? 'Failed to list queue' );
 			return;
 		}
 
-		$queue         = $result['queue'] ?? array();
-		$queue_enabled = $result['queue_enabled'] ?? false;
+		$prompt_queue  = $prompt_result['queue'] ?? array();
+		$patch_queue   = $patch_result['queue'] ?? array();
+		$queue_enabled = $prompt_result['queue_enabled'] ?? $patch_result['queue_enabled'] ?? false;
 
-		if ( empty( $queue ) ) {
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode(
+				array(
+					'flow_id'            => $flow_id,
+					'flow_step_id'       => $flow_step_id,
+					'queue_enabled'      => $queue_enabled,
+					'prompt_queue'       => $prompt_queue,
+					'config_patch_queue' => $patch_queue,
+				),
+				JSON_PRETTY_PRINT
+			) );
+			return;
+		}
+
+		if ( empty( $prompt_queue ) && empty( $patch_queue ) ) {
 			WP_CLI::log( sprintf( 'Queue is empty. (queue_enabled: %s)', $queue_enabled ? 'yes' : 'no' ) );
 			return;
 		}
 
-		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $queue, JSON_PRETTY_PRINT ) );
-			return;
+		if ( ! empty( $prompt_queue ) ) {
+			WP_CLI::log( '== AI prompts (prompt_queue) ==' );
+			$items = array();
+			foreach ( $prompt_queue as $index => $item ) {
+				$prompt_preview = mb_strlen( $item['prompt'] ?? '' ) > 60
+					? mb_substr( $item['prompt'], 0, 57 ) . '...'
+					: ( $item['prompt'] ?? '' );
+
+				$items[] = array(
+					'index'    => $index,
+					'prompt'   => $prompt_preview,
+					'added_at' => $item['added_at'] ?? '',
+				);
+			}
+			$this->format_items( $items, array( 'index', 'prompt', 'added_at' ), $assoc_args, 'index' );
 		}
 
-		// Transform for table display.
-		$items = array();
-		foreach ( $queue as $index => $item ) {
-			$prompt_preview = mb_strlen( $item['prompt'] ) > 60
-				? mb_substr( $item['prompt'], 0, 57 ) . '...'
-				: $item['prompt'];
-
-			$items[] = array(
-				'index'    => $index,
-				'prompt'   => $prompt_preview,
-				'added_at' => $item['added_at'] ?? '',
-			);
+		if ( ! empty( $patch_queue ) ) {
+			WP_CLI::log( '== Config patches (config_patch_queue) ==' );
+			foreach ( $patch_queue as $index => $item ) {
+				$patch     = $item['patch'] ?? array();
+				$added_at  = $item['added_at'] ?? '';
+				$patch_str = is_array( $patch ) ? wp_json_encode( $patch, JSON_PRETTY_PRINT ) : (string) $patch;
+				WP_CLI::log( sprintf( '[%d]  added_at: %s', $index, $added_at ) );
+				foreach ( explode( "\n", $patch_str ) as $line ) {
+					WP_CLI::log( '      ' . $line );
+				}
+			}
 		}
 
-		$this->format_items( $items, array( 'index', 'prompt', 'added_at' ), $assoc_args, 'index' );
-		WP_CLI::log( sprintf( 'Total: %d prompt(s) in queue. (queue_enabled: %s)', count( $queue ), $queue_enabled ? 'yes' : 'no' ) );
+		WP_CLI::log( sprintf(
+			'Total: %d prompt(s), %d patch(es). (queue_enabled: %s)',
+			count( $prompt_queue ),
+			count( $patch_queue ),
+			$queue_enabled ? 'yes' : 'no'
+		) );
 	}
 
 	/**
-	 * Clear all prompts from the flow queue.
+	 * Clear all queued items for a flow step.
+	 *
+	 * Routes by step type. Fetch steps clear `config_patch_queue`;
+	 * other step types clear `prompt_queue`.
 	 *
 	 * ## OPTIONS
 	 *
@@ -246,7 +360,7 @@ class QueueCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Clear all prompts from queue
+	 *     # Clear all queued items
 	 *     wp datamachine flows queue clear 42
 	 *
 	 * @subcommand clear
@@ -274,13 +388,24 @@ class QueueCommand extends BaseCommand {
 			$flow_step_id = $resolved['step_id'];
 		}
 
-		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executeQueueClear(
-			array(
-				'flow_id'      => $flow_id,
-				'flow_step_id' => $flow_step_id,
-			)
-		);
+		$step_type = $this->getStepType( $flow_id, $flow_step_id );
+		$ability   = new \DataMachine\Abilities\FlowAbilities();
+
+		if ( 'fetch' === $step_type ) {
+			$result = $ability->executeConfigPatchClear(
+				array(
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+				)
+			);
+		} else {
+			$result = $ability->executeQueueClear(
+				array(
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+				)
+			);
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to clear queue' );
@@ -291,7 +416,9 @@ class QueueCommand extends BaseCommand {
 	}
 
 	/**
-	 * Remove a specific prompt from the queue by index.
+	 * Remove a queued item by index.
+	 *
+	 * Routes by step type.
 	 *
 	 * ## OPTIONS
 	 *
@@ -299,18 +426,15 @@ class QueueCommand extends BaseCommand {
 	 * : The flow ID.
 	 *
 	 * <index>
-	 * : Zero-based index of the prompt to remove.
+	 * : Zero-based index of the item to remove.
 	 *
 	 * [--step=<flow_step_id>]
 	 * : Target a specific flow step. Auto-resolved if the flow has exactly one queueable step.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Remove the first prompt
+	 *     # Remove the first item
 	 *     wp datamachine flows queue remove 42 0
-	 *
-	 *     # Remove from specific step
-	 *     wp datamachine flows queue remove 42 3 --step=flow-42-step-abc
 	 *
 	 * @subcommand remove
 	 */
@@ -343,31 +467,48 @@ class QueueCommand extends BaseCommand {
 			return;
 		}
 
-		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executeQueueRemove(
-			array(
-				'flow_id'      => $flow_id,
-				'flow_step_id' => $flow_step_id,
-				'index'        => $index,
-			)
-		);
+		$step_type = $this->getStepType( $flow_id, $flow_step_id );
+		$ability   = new \DataMachine\Abilities\FlowAbilities();
+
+		if ( 'fetch' === $step_type ) {
+			$result = $ability->executeConfigPatchRemove(
+				array(
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'index'        => $index,
+				)
+			);
+		} else {
+			$result = $ability->executeQueueRemove(
+				array(
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'index'        => $index,
+				)
+			);
+		}
 
 		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Failed to remove prompt from queue' );
+			WP_CLI::error( $result['error'] ?? 'Failed to remove item from queue' );
 			return;
 		}
 
-		WP_CLI::success( $result['message'] ?? 'Prompt removed from queue.' );
+		WP_CLI::success( $result['message'] ?? 'Item removed from queue.' );
 		if ( ! empty( $result['removed_prompt'] ) ) {
 			$preview = mb_strlen( $result['removed_prompt'] ) > 80
 				? mb_substr( $result['removed_prompt'], 0, 77 ) . '...'
 				: $result['removed_prompt'];
 			WP_CLI::log( sprintf( 'Removed: %s', $preview ) );
+		} elseif ( ! empty( $result['removed_patch'] ) && is_array( $result['removed_patch'] ) ) {
+			WP_CLI::log( 'Removed patch: ' . wp_json_encode( $result['removed_patch'] ) );
 		}
 	}
 
 	/**
-	 * Update a prompt at a specific index in the queue.
+	 * Update a queued item at a specific index.
+	 *
+	 * Routes by step type. AI steps accept a positional prompt; fetch
+	 * steps accept --patch=<json>.
 	 *
 	 * ## OPTIONS
 	 *
@@ -375,34 +516,51 @@ class QueueCommand extends BaseCommand {
 	 * : The flow ID.
 	 *
 	 * <index>
-	 * : Zero-based index of the prompt to update.
+	 * : Zero-based index of the item to update.
 	 *
-	 * <prompt>
-	 * : The replacement prompt text.
+	 * [<prompt>]
+	 * : Replacement prompt text (for AI steps).
+	 *
+	 * [--patch=<json>]
+	 * : JSON-encoded replacement patch (for fetch steps).
 	 *
 	 * [--step=<flow_step_id>]
 	 * : Target a specific flow step. Auto-resolved if the flow has exactly one queueable step.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Update the first prompt
+	 *     # Update an AI prompt at index 0
 	 *     wp datamachine flows queue update 42 0 "Updated prompt text"
+	 *
+	 *     # Update a fetch patch
+	 *     wp datamachine flows queue update 42 0 --patch='{"params":{"after":"2016-01-01"}}'
 	 *
 	 * @subcommand update
 	 */
 	public function update( array $args, array $assoc_args ): void {
-		if ( count( $args ) < 3 ) {
-			WP_CLI::error( 'Usage: wp datamachine flows queue update <flow_id> <index> "new prompt text"' );
+		if ( count( $args ) < 2 ) {
+			WP_CLI::error( 'Usage: wp datamachine flows queue update <flow_id> <index> "new prompt text"  or  --patch=\'{...}\'' );
 			return;
 		}
 
 		$flow_id      = (int) $args[0];
 		$flow_step_id = $assoc_args['step'] ?? null;
 		$index        = (int) $args[1];
-		$prompt       = $args[2];
+		$patch_json   = $assoc_args['patch'] ?? null;
+		$prompt       = $args[2] ?? null;
 
 		if ( $flow_id <= 0 ) {
 			WP_CLI::error( 'flow_id must be a positive integer' );
+			return;
+		}
+
+		if ( null !== $patch_json && null !== $prompt ) {
+			WP_CLI::error( 'Cannot use both a positional prompt and --patch.' );
+			return;
+		}
+
+		if ( null === $patch_json && null === $prompt ) {
+			WP_CLI::error( 'Provide either a positional prompt or --patch=<json>.' );
 			return;
 		}
 
@@ -420,26 +578,54 @@ class QueueCommand extends BaseCommand {
 			return;
 		}
 
-		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executeQueueUpdate(
-			array(
-				'flow_id'      => $flow_id,
-				'flow_step_id' => $flow_step_id,
-				'index'        => $index,
-				'prompt'       => $prompt,
-			)
-		);
+		$step_type = $this->getStepType( $flow_id, $flow_step_id );
+		$ability   = new \DataMachine\Abilities\FlowAbilities();
+
+		if ( null !== $patch_json ) {
+			if ( 'fetch' !== $step_type ) {
+				WP_CLI::error( sprintf( '--patch is only valid for fetch steps; this step is "%s".', $step_type ) );
+				return;
+			}
+			$patch = json_decode( $patch_json, true );
+			if ( ! is_array( $patch ) ) {
+				WP_CLI::error( 'Invalid --patch: not a JSON object.' );
+				return;
+			}
+			$result = $ability->executeConfigPatchUpdate(
+				array(
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'index'        => $index,
+					'patch'        => $patch,
+				)
+			);
+		} else {
+			if ( 'fetch' === $step_type ) {
+				WP_CLI::error( 'Fetch steps consume config patches, not string prompts. Use --patch=\'{...}\' instead.' );
+				return;
+			}
+			$result = $ability->executeQueueUpdate(
+				array(
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'index'        => $index,
+					'prompt'       => $prompt,
+				)
+			);
+		}
 
 		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Failed to update prompt in queue' );
+			WP_CLI::error( $result['error'] ?? 'Failed to update queue item' );
 			return;
 		}
 
-		WP_CLI::success( $result['message'] ?? 'Prompt updated in queue.' );
+		WP_CLI::success( $result['message'] ?? 'Queue item updated.' );
 	}
 
 	/**
-	 * Move a prompt from one position to another in the queue.
+	 * Move an item from one position to another in the queue.
+	 *
+	 * Routes by step type.
 	 *
 	 * ## OPTIONS
 	 *
@@ -447,7 +633,7 @@ class QueueCommand extends BaseCommand {
 	 * : The flow ID.
 	 *
 	 * <from_index>
-	 * : Current zero-based index of the prompt.
+	 * : Current zero-based index of the item.
 	 *
 	 * <to_index>
 	 * : Desired zero-based index.
@@ -457,7 +643,7 @@ class QueueCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Move prompt from position 2 to front of queue
+	 *     # Move item from position 2 to front of queue
 	 *     wp datamachine flows queue move 42 2 0
 	 *
 	 * @subcommand move
@@ -492,15 +678,28 @@ class QueueCommand extends BaseCommand {
 			return;
 		}
 
-		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executeQueueMove(
-			array(
-				'flow_id'      => $flow_id,
-				'flow_step_id' => $flow_step_id,
-				'from_index'   => $from_index,
-				'to_index'     => $to_index,
-			)
-		);
+		$step_type = $this->getStepType( $flow_id, $flow_step_id );
+		$ability   = new \DataMachine\Abilities\FlowAbilities();
+
+		if ( 'fetch' === $step_type ) {
+			$result = $ability->executeConfigPatchMove(
+				array(
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'from_index'   => $from_index,
+					'to_index'     => $to_index,
+				)
+			);
+		} else {
+			$result = $ability->executeQueueMove(
+				array(
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'from_index'   => $from_index,
+					'to_index'     => $to_index,
+				)
+			);
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to move item in queue' );
@@ -677,5 +876,39 @@ class QueueCommand extends BaseCommand {
 			'step_id' => $queueable[0],
 			'error'   => null,
 		);
+	}
+
+	/**
+	 * Look up the step_type of a specific flow step.
+	 *
+	 * Used to route consumer-aware operations (AI vs Fetch) to the
+	 * correct queue slot.
+	 *
+	 * @param int    $flow_id      Flow ID.
+	 * @param string $flow_step_id Flow step ID.
+	 * @return string|null Step type, or null if not found.
+	 */
+	private function getStepType( int $flow_id, string $flow_step_id ): ?string {
+		global $wpdb;
+
+		$flow = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT flow_config FROM {$wpdb->prefix}datamachine_flows WHERE flow_id = %d",
+				$flow_id
+			),
+			ARRAY_A
+		);
+
+		if ( ! $flow ) {
+			return null;
+		}
+
+		$config = json_decode( $flow['flow_config'], true );
+		if ( ! is_array( $config ) || ! isset( $config[ $flow_step_id ] ) ) {
+			return null;
+		}
+
+		$step_type = $config[ $flow_step_id ]['step_type'] ?? '';
+		return is_string( $step_type ) && '' !== $step_type ? $step_type : null;
 	}
 }
