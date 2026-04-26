@@ -116,10 +116,10 @@ class MetaDescriptionCommand extends BaseCommand {
 	 * : Single post ID to generate a description for.
 	 *
 	 * [--post_type=<type>]
-	 * : Post type to batch process (used when --post_id is not set).
-	 * ---
-	 * default: post
-	 * ---
+	 * : Post type to batch process (used when --post_id is not set). When
+	 * omitted, batch discovery spans every post type registered via the
+	 * `datamachine_post_types_for_meta_description` filter (defaults to
+	 * `post` and `page`).
 	 *
 	 * [--limit=<number>]
 	 * : Maximum posts to queue in batch mode.
@@ -161,19 +161,22 @@ class MetaDescriptionCommand extends BaseCommand {
 	 */
 	public function generate( array $args, array $assoc_args ): void {
 		$post_id   = isset( $assoc_args['post_id'] ) ? \absint( $assoc_args['post_id'] ) : 0;
-		$post_type = $assoc_args['post_type'] ?? 'post';
+		$post_type = isset( $assoc_args['post_type'] ) ? (string) $assoc_args['post_type'] : '';
 		$limit     = isset( $assoc_args['limit'] ) ? \absint( $assoc_args['limit'] ) : 50;
 		$force     = isset( $assoc_args['force'] );
 		$format    = $assoc_args['format'] ?? 'table';
 
-		$result = MetaDescriptionAbilities::generateMetaDescriptions(
-			array(
-				'post_id'   => $post_id,
-				'post_type' => $post_type,
-				'limit'     => $limit,
-				'force'     => $force,
-			)
+		$ability_input = array(
+			'post_id' => $post_id,
+			'limit'   => $limit,
+			'force'   => $force,
 		);
+
+		if ( '' !== $post_type ) {
+			$ability_input['post_type'] = $post_type;
+		}
+
+		$result = MetaDescriptionAbilities::generateMetaDescriptions( $ability_input );
 
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to queue meta description generation.' );
