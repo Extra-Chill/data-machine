@@ -24,7 +24,7 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 	 */
 	public function test_all_data_machine_abilities_registered(): void {
 		$expected = array(
-			// FlowAbilities (5)
+			// Flow abilities (5)
 			'datamachine/get-flows',
 			'datamachine/create-flow',
 			'datamachine/delete-flow',

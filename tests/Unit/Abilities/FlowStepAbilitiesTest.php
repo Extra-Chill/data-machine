@@ -9,7 +9,6 @@
 
 namespace DataMachine\Tests\Unit\Abilities;
 
-use DataMachine\Abilities\FlowAbilities;
 use DataMachine\Abilities\FlowStepAbilities;
 use DataMachine\Abilities\PipelineAbilities;
 use DataMachine\Abilities\PipelineStepAbilities;
@@ -18,7 +17,6 @@ use WP_UnitTestCase;
 class FlowStepAbilitiesTest extends WP_UnitTestCase {
 
 	private FlowStepAbilities $flow_step_abilities;
-	private FlowAbilities $flow_abilities;
 	private PipelineAbilities $pipeline_abilities;
 	private PipelineStepAbilities $pipeline_step_abilities;
 	private int $test_pipeline_id;
@@ -34,7 +32,6 @@ class FlowStepAbilitiesTest extends WP_UnitTestCase {
 
 		$this->pipeline_abilities      = new PipelineAbilities();
 		$this->pipeline_step_abilities = new PipelineStepAbilities();
-		$this->flow_abilities          = new FlowAbilities();
 		$this->flow_step_abilities     = new FlowStepAbilities();
 
 		$pipeline_result        = $this->pipeline_abilities->executeCreatePipeline(
@@ -50,7 +47,7 @@ class FlowStepAbilitiesTest extends WP_UnitTestCase {
 		);
 		$this->test_pipeline_step_id = $step_result['pipeline_step_id'];
 
-		$flow_result        = $this->flow_abilities->executeCreateFlow(
+		$flow_result        = wp_get_ability( 'datamachine/create-flow' )->execute(
 			array(
 				'flow_name'   => 'Test Flow for Step Abilities',
 				'pipeline_id' => $this->test_pipeline_id,
@@ -394,7 +391,7 @@ class FlowStepAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_configure_flow_steps_per_flow_configs(): void {
-		$flow2 = $this->flow_abilities->executeCreateFlow(
+		$flow2 = wp_get_ability( 'datamachine/create-flow' )->execute(
 			array(
 				'flow_name'   => 'Second Test Flow',
 				'pipeline_id' => $this->test_pipeline_id,

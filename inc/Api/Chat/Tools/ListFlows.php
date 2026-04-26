@@ -3,7 +3,7 @@
  * List Flows Tool
  *
  * Chat tool for listing flows with optional filtering by pipeline ID or handler slug.
- * Wraps FlowAbilities API primitive.
+ * Wraps the datamachine/get-flows ability.
  *
  * @package DataMachine\Api\Chat\Tools
  */

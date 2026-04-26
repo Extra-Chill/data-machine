@@ -644,8 +644,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		$pipeline_step_id = $add_result['pipeline_step_id'];
 
 		// Create a flow for this pipeline (steps are synced automatically)
-		$flow_abilities = new \DataMachine\Abilities\FlowAbilities();
-		$flow_result    = $flow_abilities->executeCreateFlow([
+		$flow_result = wp_get_ability( 'datamachine/create-flow' )->execute([
 			'pipeline_id' => $this->test_pipeline_id,
 			'flow_name'   => 'Test Flow for Delete Sync',
 		]);

@@ -1,20 +1,21 @@
 <?php
 /**
- * FlowAbilities Tests
+ * Flow ability tests.
  *
- * Tests for flow listing ability.
+ * Integration coverage for the get-flows / create-flow / update-flow /
+ * delete-flow / duplicate-flow abilities. Pre-#1298 these went through
+ * the `FlowAbilities` proxy class; the tests now drive the abilities
+ * directly via `wp_get_ability()`, matching the production CLI surface.
  *
  * @package DataMachine\Tests\Unit\Abilities
  */
 
 namespace DataMachine\Tests\Unit\Abilities;
 
-use DataMachine\Abilities\FlowAbilities;
 use WP_UnitTestCase;
 
 class FlowAbilitiesTest extends WP_UnitTestCase {
 
-	private FlowAbilities $flow_abilities;
 	private int $test_pipeline_id;
 	private int $test_flow_id;
 
@@ -26,8 +27,6 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 
 		$user_id = self::factory()->user->create(['role' => 'administrator']);
 		wp_set_current_user($user_id);
-
-		$this->flow_abilities = new FlowAbilities();
 
 		$pipeline_ability = wp_get_ability( 'datamachine/create-pipeline' );
 		$flow_ability     = wp_get_ability( 'datamachine/create-flow' );
@@ -54,7 +53,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_get_all_flows(): void {
-		$result = $this->flow_abilities->executeAbility([
+		$result = wp_get_ability('datamachine/get-flows')->execute([
 			'pipeline_id' => null,
 			'handler_slug' => null,
 			'per_page' => 20,
@@ -87,7 +86,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_get_flows_by_pipeline_id(): void {
-		$result = $this->flow_abilities->executeAbility([
+		$result = wp_get_ability('datamachine/get-flows')->execute([
 			'pipeline_id' => $this->test_pipeline_id,
 			'per_page' => 20,
 			'offset' => 0
@@ -123,7 +122,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			],
 		] );
 
-		$result = $this->flow_abilities->executeAbility([
+		$result = wp_get_ability('datamachine/get-flows')->execute([
 			'pipeline_id' => $this->test_pipeline_id,
 			'handler_slug' => 'rss',
 			'per_page' => 20,
@@ -182,7 +181,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			],
 		] );
 
-		$result = $this->flow_abilities->executeAbility([
+		$result = wp_get_ability('datamachine/get-flows')->execute([
 			'pipeline_id' => $pipeline['pipeline_id'],
 			'handler_slug' => 'wordpress_publish',
 			'per_page' => 20,
@@ -212,12 +211,12 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'flow_name'   => 'Second Flow for Pagination',
 		] );
 
-		$result1 = $this->flow_abilities->executeAbility([
+		$result1 = wp_get_ability('datamachine/get-flows')->execute([
 			'per_page' => 1,
 			'offset' => 0
 		]);
 
-		$result2 = $this->flow_abilities->executeAbility([
+		$result2 = wp_get_ability('datamachine/get-flows')->execute([
 			'per_page' => 1,
 			'offset' => 1
 		]);
@@ -233,7 +232,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_get_flows_with_both_filters(): void {
-		$result = $this->flow_abilities->executeAbility([
+		$result = wp_get_ability('datamachine/get-flows')->execute([
 			'pipeline_id' => $this->test_pipeline_id,
 			'handler_slug' => null,
 			'per_page' => 20,
@@ -245,7 +244,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_empty_results(): void {
-		$result = $this->flow_abilities->executeAbility([
+		$result = wp_get_ability('datamachine/get-flows')->execute([
 			'pipeline_id' => 999999,
 			'per_page' => 20,
 			'offset' => 0
@@ -258,7 +257,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_output_mode_full(): void {
-		$result = $this->flow_abilities->executeAbility([
+		$result = wp_get_ability('datamachine/get-flows')->execute([
 			'pipeline_id' => $this->test_pipeline_id,
 			'output_mode' => 'full',
 			'per_page' => 20,
@@ -281,7 +280,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_output_mode_summary(): void {
-		$result = $this->flow_abilities->executeAbility([
+		$result = wp_get_ability('datamachine/get-flows')->execute([
 			'pipeline_id' => $this->test_pipeline_id,
 			'output_mode' => 'summary',
 			'per_page' => 20,
@@ -303,7 +302,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_output_mode_ids(): void {
-		$result = $this->flow_abilities->executeAbility([
+		$result = wp_get_ability('datamachine/get-flows')->execute([
 			'pipeline_id' => $this->test_pipeline_id,
 			'output_mode' => 'ids',
 			'per_page' => 20,
@@ -319,7 +318,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_output_mode_default_is_full(): void {
-		$result = $this->flow_abilities->executeAbility([
+		$result = wp_get_ability('datamachine/get-flows')->execute([
 			'pipeline_id' => $this->test_pipeline_id,
 			'per_page' => 20,
 			'offset' => 0
@@ -330,7 +329,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_output_mode_invalid_defaults_to_full(): void {
-		$result = $this->flow_abilities->executeAbility([
+		$result = wp_get_ability('datamachine/get-flows')->execute([
 			'pipeline_id' => $this->test_pipeline_id,
 			'output_mode' => 'invalid_mode',
 			'per_page' => 20,
@@ -342,7 +341,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_single_flow_with_output_modes(): void {
-		$result_full = $this->flow_abilities->executeAbility([
+		$result_full = wp_get_ability('datamachine/get-flows')->execute([
 			'flow_id' => $this->test_flow_id,
 			'output_mode' => 'full'
 		]);
@@ -352,7 +351,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 		$this->assertEquals(1, count($result_full['flows']));
 		$this->assertArrayHasKey('flow_config', $result_full['flows'][0]);
 
-		$result_summary = $this->flow_abilities->executeAbility([
+		$result_summary = wp_get_ability('datamachine/get-flows')->execute([
 			'flow_id' => $this->test_flow_id,
 			'output_mode' => 'summary'
 		]);
@@ -362,7 +361,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 		$this->assertEquals(1, count($result_summary['flows']));
 		$this->assertArrayNotHasKey('flow_config', $result_summary['flows'][0]);
 
-		$result_ids = $this->flow_abilities->executeAbility([
+		$result_ids = wp_get_ability('datamachine/get-flows')->execute([
 			'flow_id' => $this->test_flow_id,
 			'output_mode' => 'ids'
 		]);
@@ -407,7 +406,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_delete_flow_with_valid_id_deletes_flow(): void {
-		$result = $this->flow_abilities->executeDeleteFlow([
+		$result = wp_get_ability('datamachine/delete-flow')->execute([
 			'flow_id' => $this->test_flow_id
 		]);
 
@@ -422,7 +421,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_delete_flow_with_invalid_id_returns_error(): void {
-		$result = $this->flow_abilities->executeDeleteFlow([
+		$result = wp_get_ability('datamachine/delete-flow')->execute([
 			'flow_id' => 999999
 		]);
 
@@ -432,7 +431,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_delete_flow_with_zero_id_returns_error(): void {
-		$result = $this->flow_abilities->executeDeleteFlow([
+		$result = wp_get_ability('datamachine/delete-flow')->execute([
 			'flow_id' => 0
 		]);
 
@@ -449,7 +448,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_create_flow_with_valid_pipeline_creates_flow(): void {
-		$result = $this->flow_abilities->executeCreateFlow([
+		$result = wp_get_ability('datamachine/create-flow')->execute([
 			'pipeline_id' => $this->test_pipeline_id,
 			'flow_name' => 'Test Created Flow'
 		]);
@@ -463,7 +462,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_create_flow_with_invalid_pipeline_returns_error(): void {
-		$result = $this->flow_abilities->executeCreateFlow([
+		$result = wp_get_ability('datamachine/create-flow')->execute([
 			'pipeline_id' => 999999,
 			'flow_name' => 'Should Not Exist'
 		]);
@@ -474,7 +473,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_create_flow_defaults_name_to_flow(): void {
-		$result = $this->flow_abilities->executeCreateFlow([
+		$result = wp_get_ability('datamachine/create-flow')->execute([
 			'pipeline_id' => $this->test_pipeline_id
 		]);
 
@@ -483,7 +482,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_create_flow_with_scheduling_config(): void {
-		$result = $this->flow_abilities->executeCreateFlow([
+		$result = wp_get_ability('datamachine/create-flow')->execute([
 			'pipeline_id' => $this->test_pipeline_id,
 			'flow_name' => 'Scheduled Flow',
 			'scheduling_config' => ['interval' => 'manual']
@@ -502,7 +501,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_update_flow_updates_name(): void {
-		$result = $this->flow_abilities->executeUpdateFlow([
+		$result = wp_get_ability('datamachine/update-flow')->execute([
 			'flow_id' => $this->test_flow_id,
 			'flow_name' => 'Updated Flow Name'
 		]);
@@ -513,7 +512,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_update_flow_requires_at_least_one_field(): void {
-		$result = $this->flow_abilities->executeUpdateFlow([
+		$result = wp_get_ability('datamachine/update-flow')->execute([
 			'flow_id' => $this->test_flow_id
 		]);
 
@@ -523,7 +522,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_update_flow_with_invalid_id_returns_error(): void {
-		$result = $this->flow_abilities->executeUpdateFlow([
+		$result = wp_get_ability('datamachine/update-flow')->execute([
 			'flow_id' => 999999,
 			'flow_name' => 'Should Not Update'
 		]);
@@ -534,7 +533,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_update_flow_with_empty_name_returns_error(): void {
-		$result = $this->flow_abilities->executeUpdateFlow([
+		$result = wp_get_ability('datamachine/update-flow')->execute([
 			'flow_id' => $this->test_flow_id,
 			'flow_name' => ''
 		]);
@@ -552,7 +551,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_duplicate_flow_same_pipeline(): void {
-		$result = $this->flow_abilities->executeDuplicateFlow([
+		$result = wp_get_ability('datamachine/duplicate-flow')->execute([
 			'source_flow_id' => $this->test_flow_id
 		]);
 
@@ -566,7 +565,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_duplicate_flow_with_custom_name(): void {
-		$result = $this->flow_abilities->executeDuplicateFlow([
+		$result = wp_get_ability('datamachine/duplicate-flow')->execute([
 			'source_flow_id' => $this->test_flow_id,
 			'flow_name' => 'My Custom Copy'
 		]);
@@ -576,7 +575,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_duplicate_flow_with_invalid_source_returns_error(): void {
-		$result = $this->flow_abilities->executeDuplicateFlow([
+		$result = wp_get_ability('datamachine/duplicate-flow')->execute([
 			'source_flow_id' => 999999
 		]);
 
@@ -586,7 +585,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_duplicate_flow_with_invalid_target_pipeline_returns_error(): void {
-		$result = $this->flow_abilities->executeDuplicateFlow([
+		$result = wp_get_ability('datamachine/duplicate-flow')->execute([
 			'source_flow_id' => $this->test_flow_id,
 			'target_pipeline_id' => 999999
 		]);
