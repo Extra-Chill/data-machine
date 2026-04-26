@@ -165,14 +165,22 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 				// Facebook Login doesn't return user_id in token response.
 				// Fetch Instagram Business Account ID from Facebook Graph API.
-				$user_id = $short_lived_token_data['user_id'] ?? null;
+				// resolve_instagram_account_from_facebook_token() returns both id and
+				// username in one call, so we capture both up front and avoid a second
+				// round trip below.
+				$resolved_username = '';
+				$user_id           = $short_lived_token_data['user_id'] ?? null;
 				if ( empty( $user_id ) ) {
-					$user_id = $this->get_instagram_user_id_from_facebook_token( $access_token );
+					$resolved = $this->resolve_instagram_account_from_facebook_token( $access_token );
+					if ( is_wp_error( $resolved ) ) {
+						return new \WP_Error( 'instagram_missing_user_id', $resolved->get_error_message() );
+					}
+					$user_id           = $resolved['id'];
+					$resolved_username = $resolved['username'] ?? '';
 				}
 
-				if ( empty( $user_id ) || is_wp_error( $user_id ) ) {
-					$error_msg = is_wp_error( $user_id ) ? $user_id->get_error_message() : 'Could not determine Instagram user ID.';
-					return new \WP_Error( 'instagram_missing_user_id', $error_msg );
+				if ( empty( $user_id ) ) {
+					return new \WP_Error( 'instagram_missing_user_id', 'Could not determine Instagram user ID.' );
 				}
 
 				// Try Facebook token extension (fb_exchange_token) for Facebook Login tokens.
@@ -189,10 +197,23 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 				$long_lived['user_id'] = $user_id;
 
-				// Fetch username.
-				$username = $this->get_username_from_token( $long_lived['access_token'], $user_id );
-				if ( is_wp_error( $username ) ) {
-					$username = '';
+				// Username preference: use the value already resolved from /me/accounts
+				// when present (Facebook Login path). Only hit the username-only endpoint
+				// as a fallback for legacy Instagram Basic Display tokens.
+				$username = $resolved_username;
+				if ( '' === $username ) {
+					$looked_up = $this->get_username_from_token( $long_lived['access_token'], $user_id );
+					if ( is_wp_error( $looked_up ) ) {
+						do_action(
+							'datamachine_log',
+							'warning',
+							'Instagram OAuth: username lookup failed, storing empty value. ' . $looked_up->get_error_message(),
+							array( 'user_id' => $user_id )
+						);
+						$username = '';
+					} else {
+						$username = $looked_up;
+					}
 				}
 				$long_lived['username'] = $username;
 
@@ -208,15 +229,16 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	}
 
 	/**
-	 * Get Instagram Business Account ID from a Facebook User Access Token.
+	 * Resolve the Instagram Business Account from a Facebook User Access Token.
 	 *
-	 * Queries the user's Facebook Pages and extracts the connected
-	 * Instagram Business Account.
+	 * Queries the user's Facebook Pages and extracts the first connected
+	 * Instagram Business Account, returning both id and username so callers
+	 * can avoid a separate username lookup.
 	 *
 	 * @param string $access_token Facebook User Access Token.
-	 * @return string|\WP_Error Instagram user ID or error.
+	 * @return array{id: string, username: string}|\WP_Error Account data or error.
 	 */
-	private function get_instagram_user_id_from_facebook_token( string $access_token ): string|\WP_Error {
+	private function resolve_instagram_account_from_facebook_token( string $access_token ): array|\WP_Error {
 		$url = self::FB_API_URL . '/me/accounts?fields=instagram_business_account{id,username}&access_token=' . $access_token;
 
 		$result = HttpClient::get( $url, array( 'context' => 'Instagram OAuth - Resolve IG Account' ) );
@@ -240,7 +262,10 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
 		foreach ( $data['data'] as $page ) {
 			if ( ! empty( $page['instagram_business_account']['id'] ) ) {
-				return $page['instagram_business_account']['id'];
+				return array(
+					'id'       => (string) $page['instagram_business_account']['id'],
+					'username' => (string) ( $page['instagram_business_account']['username'] ?? '' ),
+				);
 			}
 		}
 
@@ -338,14 +363,21 @@ class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	}
 
 	/**
-	 * Get username from Instagram Graph API
+	 * Get the Instagram username for a given user ID.
 	 *
-	 * @param string $access_token Access token
-	 * @param string $user_id User ID
-	 * @return string|\WP_Error Username or error
+	 * Used as the fallback path when an OAuth flow does not surface the
+	 * username up front (e.g. legacy Instagram Basic Display tokens, or
+	 * out-of-band backfills). Hits the Facebook Graph API because all
+	 * tokens issued by this provider — including IG Basic Display — are
+	 * accepted there, while graph.instagram.com rejects FB-flavored tokens
+	 * with "Cannot parse access token".
+	 *
+	 * @param string $access_token Access token (FB-flavored or IG-flavored).
+	 * @param string $user_id      Instagram Business Account ID.
+	 * @return string|\WP_Error Username or error.
 	 */
 	private function get_username_from_token( string $access_token, string $user_id ): string|\WP_Error {
-		$url = self::GRAPH_API_URL . "/{$user_id}?fields=username&access_token={$access_token}";
+		$url = self::FB_API_URL . "/{$user_id}?fields=username&access_token={$access_token}";
 
 		$result = HttpClient::get(
 			$url,
