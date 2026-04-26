@@ -27,7 +27,17 @@ use DataMachine\Abilities\PermissionHelper;
  *
  * Priority:
  * 1. Explicit agent_id in context
- * 2. PermissionHelper acting user → agent lookup
+ * 2. Active agent context from PermissionHelper (set by AIStep / SystemTaskStep
+ *    / RunFlowAbility / AgentAuthMiddleware before firing tools)
+ * 3. PermissionHelper acting user → first agent owned by that user
+ *
+ * Priority 2 is the authoritative answer for any code path that runs
+ * inside an agent context — pipeline jobs, REST bearer-token requests,
+ * chat-orchestrator turns. Without it, log lines from inside a tool call
+ * fall through to the user→first-agent guess at priority 3, which is
+ * wrong on any site where the owner runs more than one agent (the lookup
+ * picks whichever agent the database returns first, not the one that
+ * actually did the work). See https://github.com/Extra-Chill/data-machine/issues/1268.
  *
  * @param array $context Log context array.
  * @return int|null Resolved agent_id, or null for system/unscoped.
@@ -38,7 +48,31 @@ function datamachine_resolve_agent_id( array $context = array() ): ?int {
 		return (int) $context['agent_id'];
 	}
 
-	// Priority 2: Resolve from PermissionHelper acting user.
+	// Priority 2: Active agent context from PermissionHelper.
+	// AIStep, SystemTaskStep, RunFlowAbility, and AgentAuthMiddleware
+	// all install this via set_agent_context() before invoking tools or
+	// firing logs. When present, it is the authoritative answer — much
+	// sharper than the owner→first-agent fallback at priority 3, which
+	// guesses wrong when an owner has multiple agents.
+	try {
+		if ( class_exists( PermissionHelper::class )
+			&& PermissionHelper::in_agent_context() ) {
+			$acting_agent_id = PermissionHelper::get_acting_agent_id();
+			if ( $acting_agent_id ) {
+				return (int) $acting_agent_id;
+			}
+		}
+	} catch ( \Exception $e ) {
+		// Silently fall through — don't let agent resolution crash logging.
+		unset( $e );
+	}
+
+	// Priority 3: Resolve from PermissionHelper acting user → first
+	// agent owned by that user. Legacy fallback for code paths that
+	// don't install agent context (admin REST calls outside an agent
+	// session, manual CLI invocations, etc.). When the owner has
+	// multiple agents this guesses; priority 2 above is the correct
+	// channel for agent-scoped contexts.
 	try {
 		if ( class_exists( PermissionHelper::class ) ) {
 			$user_id = PermissionHelper::acting_user_id();
