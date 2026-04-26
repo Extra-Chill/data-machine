@@ -207,11 +207,16 @@ class TaskScheduler {
 
 		$chunk_size = BatchScheduler::chunkSize( self::BATCH_CONTEXT );
 
+		// Caller-supplied parent_job_id (e.g. a fan-out system task that
+		// scheduled this batch) — children stamp this so the originating
+		// job can walk them via Jobs::get_children for undo / status.
+		$caller_parent_job_id = isset( $context['parent_job_id'] ) ? (int) $context['parent_job_id'] : 0;
+
 		// Small batches: schedule directly, no batch overhead.
 		if ( count( $itemParams ) <= $chunk_size ) {
 			$job_ids = array();
 			foreach ( $itemParams as $params ) {
-				$job_id = self::schedule( $taskType, $params, $context );
+				$job_id = self::schedule( $taskType, $params, $context, $caller_parent_job_id );
 				if ( $job_id ) {
 					$job_ids[] = $job_id;
 				}
@@ -226,15 +231,22 @@ class TaskScheduler {
 			);
 		}
 
-		// Create parent batch job for persistent tracking.
-		$jobs_db      = new Jobs();
-		$batch_id     = 'dm_batch_' . wp_generate_uuid4();
-		$batch_job_id = $jobs_db->create_job( array(
+		// Create parent batch job for persistent tracking. When the
+		// caller passed a parent_job_id, link this batch parent to it
+		// so the chain caller → batch_parent is preserved even though
+		// per-item children chain off the caller directly (below).
+		$jobs_db          = new Jobs();
+		$batch_id         = 'dm_batch_' . wp_generate_uuid4();
+		$batch_create_args = array(
 			'pipeline_id' => 'direct',
 			'flow_id'     => 'direct',
 			'source'      => 'batch',
 			'label'       => 'Batch: ' . ucfirst( str_replace( '_', ' ', $taskType ) ),
-		) );
+		);
+		if ( $caller_parent_job_id > 0 ) {
+			$batch_create_args['parent_job_id'] = $caller_parent_job_id;
+		}
+		$batch_job_id = $jobs_db->create_job( $batch_create_args );
 
 		if ( ! $batch_job_id ) {
 			do_action(
@@ -250,15 +262,19 @@ class TaskScheduler {
 
 		// Hand the work list to the shared chunking primitive. State
 		// lives on this parent job's engine_data — no transients, no
-		// eviction risk.
+		// eviction risk. The chunk extras include the caller's
+		// parent_job_id (when present) so processBatchChunk can route
+		// it through to per-item children — caller intent wins over
+		// the batch parent for the per-item linkage.
 		$result = BatchScheduler::start(
 			(int) $batch_job_id,
 			self::BATCH_HOOK,
 			$itemParams,
 			array(
-				'task_type' => $taskType,
-				'context'   => $context,
-				'batch_id'  => $batch_id,
+				'task_type'            => $taskType,
+				'context'              => $context,
+				'batch_id'             => $batch_id,
+				'caller_parent_job_id' => $caller_parent_job_id,
 			),
 			self::BATCH_CONTEXT
 		);
@@ -266,13 +282,14 @@ class TaskScheduler {
 		// Surface task-specific identifiers alongside the BatchScheduler
 		// metadata so getBatchStatus() and CLI consumers see the same
 		// fields they read pre-extraction.
-		datamachine_merge_engine_data(
-			(int) $batch_job_id,
-			array(
-				'task_type' => $taskType,
-				'batch_id'  => $batch_id,
-			)
+		$batch_engine_merge = array(
+			'task_type' => $taskType,
+			'batch_id'  => $batch_id,
 		);
+		if ( $caller_parent_job_id > 0 ) {
+			$batch_engine_merge['caller_parent_job_id'] = $caller_parent_job_id;
+		}
+		datamachine_merge_engine_data( (int) $batch_job_id, $batch_engine_merge );
 
 		do_action(
 			'datamachine_log',
@@ -337,7 +354,14 @@ class TaskScheduler {
 					return false;
 				}
 
-				return self::schedule( $task_type, $params, $context, $parent_id );
+				// When the original caller passed parent_job_id in
+				// $context, per-item children chain to it (caller
+				// intent wins). Otherwise they chain to the batch
+				// parent for grouping.
+				$caller_parent_job_id = (int) ( $extra['caller_parent_job_id'] ?? 0 );
+				$child_parent_id      = $caller_parent_job_id > 0 ? $caller_parent_job_id : $parent_id;
+
+				return self::schedule( $task_type, $params, $context, $child_parent_id );
 			}
 		);
 

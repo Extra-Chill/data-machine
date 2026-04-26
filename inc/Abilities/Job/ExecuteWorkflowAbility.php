@@ -112,15 +112,26 @@ class ExecuteWorkflowAbility {
 		// Build configs from workflow
 		$configs = $this->buildConfigsFromWorkflow( $workflow );
 
-		// Create job record for direct execution
-		$job_id = $this->db_jobs->create_job(
-			array(
-				'pipeline_id' => 'direct',
-				'flow_id'     => 'direct',
-				'source'      => 'chat',
-				'label'       => 'Chat Workflow',
-			)
+		// Create job record for direct execution. Honor parent_job_id
+		// from initial_data so callers (e.g. TaskScheduler scheduling
+		// fan-out children, scheduleBatch passing through caller
+		// linkage) can stamp the indexed parent_job_id column — the
+		// path Jobs::get_children walks for status / undo.
+		$create_args = array(
+			'pipeline_id' => 'direct',
+			'flow_id'     => 'direct',
+			'source'      => 'chat',
+			'label'       => 'Chat Workflow',
 		);
+
+		if ( is_array( $initial_data ) ) {
+			$initial_parent_job_id = (int) ( $initial_data['parent_job_id'] ?? 0 );
+			if ( $initial_parent_job_id > 0 ) {
+				$create_args['parent_job_id'] = $initial_parent_job_id;
+			}
+		}
+
+		$job_id = $this->db_jobs->create_job( $create_args );
 
 		if ( ! $job_id ) {
 			return array(

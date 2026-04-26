@@ -62,6 +62,21 @@ class Jobs {
 		return $this->operations->get_jobs_for_flow( $flow_id );
 	}
 
+	/**
+	 * Get all child jobs of a parent job, ordered by job_id ascending.
+	 *
+	 * Used by fan-out system tasks (e.g. SystemTask::undo) to walk
+	 * children's effects when the parent records none of its own.
+	 *
+	 * @since 0.83.0
+	 *
+	 * @param int $parent_job_id Parent job ID.
+	 * @return array Child job rows with engine_data decoded.
+	 */
+	public function get_children( int $parent_job_id ): array {
+		return $this->operations->get_children( $parent_job_id );
+	}
+
 	public function get_latest_jobs_by_flow_ids( array $flow_ids ): array {
 		return $this->operations->get_latest_jobs_by_flow_ids( $flow_ids );
 	}

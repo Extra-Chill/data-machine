@@ -1239,17 +1239,27 @@ class JobsCommand extends BaseCommand {
 				continue;
 			}
 
-			$effects = $engine_data['effects'] ?? array();
-			if ( empty( $effects ) ) {
-				WP_CLI::log( sprintf( '  Job #%d: no effects recorded.', $jid ) );
-				++$total_skipped;
-				continue;
-			}
-
-			// Dry run — just describe what would happen.
+			// Dry run — describe what would happen. For fan-out parents
+			// the parent has no own effects; aggregate from children
+			// via Jobs::get_children so the preview is accurate.
 			if ( $dry_run ) {
-				WP_CLI::log( sprintf( '  Job #%d (%s): would undo %d effect(s):', $jid, $jtype, count( $effects ) ) );
-				foreach ( $effects as $effect ) {
+				$preview_effects = $engine_data['effects'] ?? array();
+				if ( empty( $preview_effects ) ) {
+					foreach ( $jobs_db->get_children( (int) $jid ) as $child ) {
+						$child_data    = is_array( $child['engine_data'] ?? null ) ? $child['engine_data'] : array();
+						$child_effects = $child_data['effects'] ?? array();
+						$preview_effects = array_merge( $preview_effects, $child_effects );
+					}
+				}
+
+				if ( empty( $preview_effects ) ) {
+					WP_CLI::log( sprintf( '  Job #%d (%s): no effects to undo.', $jid, $jtype ) );
+					++$total_skipped;
+					continue;
+				}
+
+				WP_CLI::log( sprintf( '  Job #%d (%s): would undo %d effect(s):', $jid, $jtype, count( $preview_effects ) ) );
+				foreach ( $preview_effects as $effect ) {
 					$type   = $effect['type'] ?? 'unknown';
 					$target = $effect['target'] ?? array();
 					WP_CLI::log( sprintf( '    - %s → %s', $type, wp_json_encode( $target ) ) );
@@ -1257,30 +1267,43 @@ class JobsCommand extends BaseCommand {
 				continue;
 			}
 
-			// Execute undo.
-			WP_CLI::log( sprintf( '  Job #%d (%s): undoing %d effect(s)...', $jid, $jtype, count( $effects ) ) );
+			// Execute undo. SystemTask::undo handles both leaf jobs
+			// (own effects) and fan-out parents (effects from children
+			// via Jobs::get_children). The empty-effects-no-op case is
+			// handled inside the task with a structured envelope.
+			WP_CLI::log( sprintf( '  Job #%d (%s): undoing...', $jid, $jtype ) );
 			$result = $task->undo( $jid, $engine_data );
 
-			foreach ( $result['reverted'] as $r ) {
-				WP_CLI::log( sprintf( '    ✓ %s reverted', $r['type'] ) );
-			}
-			foreach ( $result['skipped'] as $s ) {
-				WP_CLI::log( sprintf( '    - %s skipped: %s', $s['type'], $s['reason'] ?? '' ) );
-			}
-			foreach ( $result['failed'] as $f ) {
-				WP_CLI::warning( sprintf( '    ✗ %s failed: %s', $f['type'], $f['reason'] ?? '' ) );
+			$reverted = is_array( $result['reverted'] ?? null ) ? $result['reverted'] : array();
+			$skipped  = is_array( $result['skipped'] ?? null ) ? $result['skipped'] : array();
+			$failed   = is_array( $result['failed'] ?? null ) ? $result['failed'] : array();
+
+			if ( empty( $reverted ) && empty( $skipped ) && empty( $failed ) ) {
+				WP_CLI::log( sprintf( '  Job #%d (%s): no effects to undo.', $jid, $jtype ) );
+				++$total_skipped;
+				continue;
 			}
 
-			$total_reverted += count( $result['reverted'] );
-			$total_skipped  += count( $result['skipped'] );
-			$total_failed   += count( $result['failed'] );
+			foreach ( $reverted as $r ) {
+				WP_CLI::log( sprintf( '    ✓ %s reverted', $r['type'] ?? 'unknown' ) );
+			}
+			foreach ( $skipped as $s ) {
+				WP_CLI::log( sprintf( '    - %s skipped: %s', $s['type'] ?? 'unknown', $s['reason'] ?? '' ) );
+			}
+			foreach ( $failed as $f ) {
+				WP_CLI::warning( sprintf( '    ✗ %s failed: %s', $f['type'] ?? 'unknown', $f['reason'] ?? '' ) );
+			}
+
+			$total_reverted += count( $reverted );
+			$total_skipped  += count( $skipped );
+			$total_failed   += count( $failed );
 
 			// Record undo metadata in engine_data.
 			$engine_data['undo'] = array(
 				'undone_at'        => current_time( 'mysql' ),
-				'effects_reverted' => count( $result['reverted'] ),
-				'effects_skipped'  => count( $result['skipped'] ),
-				'effects_failed'   => count( $result['failed'] ),
+				'effects_reverted' => count( $reverted ),
+				'effects_skipped'  => count( $skipped ),
+				'effects_failed'   => count( $failed ),
 			);
 			$jobs_db->store_engine_data( $jid, $engine_data );
 		}
