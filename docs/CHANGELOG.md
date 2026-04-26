@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.83.0] - 2026-04-25
+
+### Added
+- feat(system-tasks): make fan-out tasks undoable end-to-end
+- datamachine_post_types_for_meta_description filter for batch discovery (#1246)
+
+### Fixed
+- fix(system-tasks): propagate agent context end-to-end (closes #1208)
+- document queueable patch shape contract + log merged_keys
+- honor exclude_keywords config across fetch handlers
+- processed-items audit honors --pipeline filter and works on SQLite
+
 ## [0.82.1] - 2026-04-25
 
 ### Changed
