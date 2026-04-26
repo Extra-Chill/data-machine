@@ -238,4 +238,43 @@ dm_assert(
 	'empty + empty = empty'
 );
 
+// -----------------------------------------------------------------
+echo "\n[13] flat-shaped patch lands top-level — contract check (issue #1235)\n";
+// When a user incorrectly shapes the patch flat instead of nesting under
+// `params`, the keys land at top level alongside the JSON-encoded
+// `params` field. The handler ignores them because it only reads
+// `$config['params']`. This test locks the documented contract: the
+// merge is opaque, and a misshapen patch produces an observable shape
+// (top-level keys present, JSON params unchanged) rather than silent
+// success or silent failure.
+$static_config = array(
+	'server'   => 'a8c',
+	'provider' => 'mgs',
+	'tool'     => 'search',
+	'params'   => '{"query":"WooCommerce"}',
+);
+$wrong_shape = array(
+	'query'  => 'WooCommerce',
+	'after'  => '2026-04-01',
+	'before' => '2026-04-25',
+);
+$merged = $harness->publicMerge( $static_config, $wrong_shape );
+
+dm_assert(
+	'{"query":"WooCommerce"}' === $merged['params'],
+	'JSON-encoded params untouched when patch keys do not match the params key'
+);
+dm_assert( 'WooCommerce' === $merged['query'], 'flat patch key landed at top level (where handler will not read it)' );
+dm_assert( '2026-04-01' === $merged['after'], 'flat after lands at top level' );
+dm_assert( '2026-04-25' === $merged['before'], 'flat before lands at top level' );
+// merged_keys log: comparing patch_keys ["query","after","before"] to
+// merged_keys ["server","provider","tool","params","query","after","before"]
+// surfaces the mis-shaping — the keys are present but alongside `params`
+// rather than inside it.
+$expected_merged_keys = array( 'server', 'provider', 'tool', 'params', 'query', 'after', 'before' );
+dm_assert(
+	$expected_merged_keys === array_keys( $merged ),
+	'merged_keys log surfaces the mis-shaping: patch keys sit alongside params, not inside it'
+);
+
 echo "\n=== queueable-trait-smoke: ALL PASS ===\n";

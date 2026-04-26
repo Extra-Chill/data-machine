@@ -111,9 +111,10 @@ class FetchStep extends Step {
 				'info',
 				'Fetch step merged queued config patch',
 				array(
-					'flow_step_id'  => $this->flow_step_id,
-					'patch_keys'    => array_keys( $queue_result['patch'] ),
-					'queued_at'     => $queue_result['added_at'],
+					'flow_step_id' => $this->flow_step_id,
+					'patch_keys'   => array_keys( $queue_result['patch'] ),
+					'merged_keys'  => array_keys( $handler_settings ),
+					'queued_at'    => $queue_result['added_at'],
 				)
 			);
 		}
