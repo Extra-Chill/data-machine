@@ -15,6 +15,8 @@ use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Core\Database\BaseRepository;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCleanup;
+use DataMachine\Engine\Tasks\TaskScheduler;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -98,11 +100,11 @@ class RetentionCommand extends BaseCommand {
 	}
 
 	/**
-	 * Execute retention cleanup for all data domains.
+	 * Schedule retention cleanup for all data domains.
 	 *
-	 * Runs all configured cleanup routines immediately, regardless of
-	 * their scheduled timing. Use --dry-run to preview what would be
-	 * deleted without making changes.
+	 * Enqueues cleanup SystemTask jobs for domains with eligible data,
+	 * regardless of their recurring timing. Use --dry-run to preview what
+	 * would be deleted without scheduling cleanup jobs.
 	 *
 	 * [--dry-run]
 	 * : Preview what would be purged without deleting anything.
@@ -132,72 +134,21 @@ class RetentionCommand extends BaseCommand {
 		$dry_run = isset( $assoc_args['dry-run'] );
 		$results = array();
 
-		// 1. Completed jobs.
-		$completed_days = (int) apply_filters( 'datamachine_completed_jobs_max_age_days', 30 );
-		$db_jobs        = new \DataMachine\Core\Database\Jobs\Jobs();
-		$count          = $db_jobs->count_old_jobs( 'completed', $completed_days );
-		$results[]      = array(
-			'domain'    => 'Completed jobs',
-			'threshold' => $completed_days . ' days',
-			'eligible'  => $count,
-			'action'    => $dry_run ? 'would delete' : 'deleted',
-		);
-		if ( ! $dry_run && $count > 0 ) {
-			$db_jobs->delete_old_jobs( 'completed', $completed_days );
-		}
+		foreach ( $this->get_retention_domains() as $domain ) {
+			$count  = (int) call_user_func( $domain['count'] );
+			$action = $dry_run ? 'would delete' : 'skipped';
 
-		// 2. Failed jobs.
-		$failed_days = (int) apply_filters( 'datamachine_failed_jobs_max_age_days', 30 );
-		$count       = $db_jobs->count_old_jobs( 'failed', $failed_days );
-		$results[]   = array(
-			'domain'    => 'Failed jobs',
-			'threshold' => $failed_days . ' days',
-			'eligible'  => $count,
-			'action'    => $dry_run ? 'would delete' : 'deleted',
-		);
-		if ( ! $dry_run && $count > 0 ) {
-			$db_jobs->delete_old_jobs( 'failed', $failed_days );
-		}
+			if ( ! $dry_run && $count > 0 ) {
+				$job_id = TaskScheduler::schedule( $domain['task_type'], array() );
+				$action = $job_id ? 'scheduled job #' . $job_id : 'schedule failed';
+			}
 
-		// 3. Logs.
-		$log_days  = (int) apply_filters( 'datamachine_log_max_age_days', 7 );
-		$count     = $this->count_old_logs( $log_days );
-		$results[] = array(
-			'domain'    => 'Pipeline logs',
-			'threshold' => $log_days . ' days',
-			'eligible'  => $count,
-			'action'    => $dry_run ? 'would delete' : 'deleted',
-		);
-		if ( ! $dry_run && $count > 0 ) {
-			$repo = new \DataMachine\Core\Database\Logs\LogRepository();
-			$repo->prune_before( gmdate( 'Y-m-d H:i:s', time() - ( $log_days * DAY_IN_SECONDS ) ) );
-		}
-
-		// 4. Processed items.
-		$processed_days = (int) apply_filters( 'datamachine_processed_items_max_age_days', 30 );
-		$db_processed   = new \DataMachine\Core\Database\ProcessedItems\ProcessedItems();
-		$count          = $db_processed->count_old_processed_items( $processed_days );
-		$results[]      = array(
-			'domain'    => 'Processed items',
-			'threshold' => $processed_days . ' days',
-			'eligible'  => $count,
-			'action'    => $dry_run ? 'would delete' : 'deleted',
-		);
-		if ( ! $dry_run && $count > 0 ) {
-			$db_processed->delete_old_processed_items( $processed_days );
-		}
-
-		// 5. Action Scheduler actions + logs.
-		$as_days   = (int) apply_filters( 'datamachine_as_actions_max_age_days', 7 );
-		$as_count  = $this->count_old_as_actions( $as_days );
-		$results[] = array(
-			'domain'    => 'AS actions + logs',
-			'threshold' => $as_days . ' days',
-			'eligible'  => $as_count,
-			'action'    => $dry_run ? 'would delete' : 'deleted',
-		);
-		if ( ! $dry_run && $as_count > 0 ) {
-			do_action( 'datamachine_cleanup_as_actions' );
+			$results[] = array(
+				'domain'    => $domain['label'],
+				'threshold' => $domain['threshold'],
+				'eligible'  => $count,
+				'action'    => $action,
+			);
 		}
 
 		if ( $dry_run ) {
@@ -216,8 +167,66 @@ class RetentionCommand extends BaseCommand {
 
 		if ( ! $dry_run ) {
 			$total = array_sum( array_column( $results, 'eligible' ) );
-			WP_CLI::success( sprintf( 'Retention cleanup complete. %d total rows processed.', $total ) );
+			WP_CLI::success( sprintf( 'Retention cleanup scheduled. %d total eligible rows/items found.', $total ) );
 		}
+	}
+
+	/**
+	 * Get retention task domains for CLI dry-run and manual scheduling.
+	 *
+	 * @return array<int, array{label:string, task_type:string, threshold:string, count:callable}>
+	 */
+	private function get_retention_domains(): array {
+		return array(
+			array(
+				'label'     => 'Completed jobs',
+				'task_type' => RetentionCleanup::TASK_COMPLETED_JOBS,
+				'threshold' => RetentionCleanup::completedJobsMaxAgeDays() . ' days',
+				'count'     => array( RetentionCleanup::class, 'countCompletedJobs' ),
+			),
+			array(
+				'label'     => 'Failed jobs',
+				'task_type' => RetentionCleanup::TASK_FAILED_JOBS,
+				'threshold' => RetentionCleanup::failedJobsMaxAgeDays() . ' days',
+				'count'     => array( RetentionCleanup::class, 'countFailedJobs' ),
+			),
+			array(
+				'label'     => 'Pipeline logs',
+				'task_type' => RetentionCleanup::TASK_LOGS,
+				'threshold' => RetentionCleanup::logsMaxAgeDays() . ' days',
+				'count'     => array( RetentionCleanup::class, 'countLogs' ),
+			),
+			array(
+				'label'     => 'Processed items',
+				'task_type' => RetentionCleanup::TASK_PROCESSED_ITEMS,
+				'threshold' => RetentionCleanup::processedItemsMaxAgeDays() . ' days',
+				'count'     => array( RetentionCleanup::class, 'countProcessedItems' ),
+			),
+			array(
+				'label'     => 'AS actions + logs',
+				'task_type' => RetentionCleanup::TASK_AS_ACTIONS,
+				'threshold' => RetentionCleanup::actionSchedulerMaxAgeDays() . ' days',
+				'count'     => array( RetentionCleanup::class, 'countActionSchedulerActions' ),
+			),
+			array(
+				'label'     => 'Stale claims',
+				'task_type' => RetentionCleanup::TASK_STALE_CLAIMS,
+				'threshold' => round( RetentionCleanup::staleClaimMaxAgeSeconds() / HOUR_IN_SECONDS ) . ' hours',
+				'count'     => array( RetentionCleanup::class, 'countStaleClaims' ),
+			),
+			array(
+				'label'     => 'File cleanup',
+				'task_type' => RetentionCleanup::TASK_FILES,
+				'threshold' => RetentionCleanup::fileRetentionDays() . ' days',
+				'count'     => array( RetentionCleanup::class, 'countOldFiles' ),
+			),
+			array(
+				'label'     => 'Chat sessions',
+				'task_type' => RetentionCleanup::TASK_CHAT_SESSIONS,
+				'threshold' => RetentionCleanup::chatRetentionDays() . ' days',
+				'count'     => array( RetentionCleanup::class, 'countChatSessions' ),
+			),
+		);
 	}
 
 	/**
@@ -341,61 +350,4 @@ class RetentionCommand extends BaseCommand {
 		return $sizes;
 	}
 
-	/**
-	 * Count log entries older than a given number of days.
-	 *
-	 * @param int $older_than_days Age threshold.
-	 * @return int Row count.
-	 */
-	private function count_old_logs( int $older_than_days ): int {
-		global $wpdb;
-
-		$cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
-		$table  = $wpdb->prefix . 'datamachine_logs';
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		return (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$table} WHERE created_at < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$cutoff
-			)
-		);
-	}
-
-	/**
-	 * Count completed/failed/canceled AS actions older than a given number of days.
-	 *
-	 * @param int $older_than_days Age threshold.
-	 * @return int Row count (actions + their log entries).
-	 */
-	private function count_old_as_actions( int $older_than_days ): int {
-		global $wpdb;
-
-		$cutoff        = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
-		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
-		$logs_table    = $wpdb->prefix . 'actionscheduler_logs';
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$actions_count = (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$actions_table}
-				WHERE status IN ('complete', 'failed', 'canceled')
-				AND last_attempt_gmt < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$cutoff
-			)
-		);
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$logs_count = (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$logs_table} l
-				INNER JOIN {$actions_table} a ON l.action_id = a.action_id
-				WHERE a.status IN ('complete', 'failed', 'canceled')
-				AND a.last_attempt_gmt < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$cutoff
-			)
-		);
-
-		return $actions_count + $logs_count;
-	}
 }

@@ -11,8 +11,6 @@
 
 namespace DataMachine\Core\FilesRepository;
 
-use DataMachine\Core\PluginSettings;
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -212,48 +210,3 @@ class FileCleanup {
 		return $deleted_count;
 	}
 }
-
-/**
- * Register scheduled cleanup action for old files
- */
-add_action(
-	'datamachine_cleanup_old_files',
-	function () {
-		$file_cleanup   = new FileCleanup();
-		$retention_days = PluginSettings::get( 'file_retention_days', 7 );
-
-		$deleted_count = $file_cleanup->cleanup_old_files( $retention_days );
-
-		do_action(
-			'datamachine_log',
-			'debug',
-			'FilesRepository: Cleanup completed',
-			array(
-				'files_deleted'  => $deleted_count,
-				'retention_days' => $retention_days,
-			)
-		);
-	}
-);
-
-/**
- * Schedule cleanup after Action Scheduler is fully initialized.
- * Only check in admin context to avoid database queries on every frontend request.
- */
-add_action(
-	'action_scheduler_init',
-	function () {
-		if ( ! is_admin() ) {
-			return;
-		}
-		if ( ! as_next_scheduled_action( 'datamachine_cleanup_old_files', array(), 'datamachine-files' ) ) {
-			as_schedule_recurring_action(
-				time() + WEEK_IN_SECONDS,
-				WEEK_IN_SECONDS,
-				'datamachine_cleanup_old_files',
-				array(),
-				'datamachine-files'
-			);
-		}
-	}
-);

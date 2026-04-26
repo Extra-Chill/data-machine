@@ -23,6 +23,15 @@ use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
 use DataMachine\Engine\AI\System\Tasks\ImageOptimizationTask;
 use DataMachine\Engine\AI\System\Tasks\InternalLinkingTask;
 use DataMachine\Engine\AI\System\Tasks\MetaDescriptionTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionActionSchedulerTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionChatSessionsTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCleanup;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCompletedJobsTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionFailedJobsTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionFilesTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionLogsTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionProcessedItemsTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionStaleClaimsTask;
 use DataMachine\Engine\Tasks\RecurringScheduleRegistry;
 use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Tasks\TaskRegistry;
@@ -43,6 +52,22 @@ class SystemAgentServiceProvider {
 	 * @since 0.72.0
 	 */
 	private const LEGACY_TASK_HANDLE_HOOK = 'datamachine_task_handle';
+
+	/**
+	 * Legacy retention hooks replaced by retention SystemTasks.
+	 *
+	 * @var array<int, array{0:string,1:string}>
+	 */
+	private const LEGACY_RETENTION_HOOKS = array(
+		array( 'datamachine_cleanup_stale_claims', 'datamachine-maintenance' ),
+		array( 'datamachine_cleanup_failed_jobs', 'datamachine-maintenance' ),
+		array( 'datamachine_cleanup_completed_jobs', 'datamachine-maintenance' ),
+		array( 'datamachine_cleanup_logs', 'datamachine-maintenance' ),
+		array( 'datamachine_cleanup_processed_items', 'datamachine-maintenance' ),
+		array( 'datamachine_cleanup_as_actions', 'datamachine-maintenance' ),
+		array( 'datamachine_cleanup_old_files', 'datamachine-files' ),
+		array( 'datamachine_cleanup_chat_sessions', 'datamachine-chat' ),
+	);
 
 	/**
 	 * Constructor - registers all task infrastructure.
@@ -83,6 +108,14 @@ class SystemAgentServiceProvider {
 		$tasks['internal_linking']            = InternalLinkingTask::class;
 		$tasks['daily_memory_generation']     = DailyMemoryTask::class;
 		$tasks['meta_description_generation'] = MetaDescriptionTask::class;
+		$tasks[ RetentionCleanup::TASK_COMPLETED_JOBS ]  = RetentionCompletedJobsTask::class;
+		$tasks[ RetentionCleanup::TASK_FAILED_JOBS ]     = RetentionFailedJobsTask::class;
+		$tasks[ RetentionCleanup::TASK_LOGS ]            = RetentionLogsTask::class;
+		$tasks[ RetentionCleanup::TASK_PROCESSED_ITEMS ] = RetentionProcessedItemsTask::class;
+		$tasks[ RetentionCleanup::TASK_AS_ACTIONS ]      = RetentionActionSchedulerTask::class;
+		$tasks[ RetentionCleanup::TASK_STALE_CLAIMS ]    = RetentionStaleClaimsTask::class;
+		$tasks[ RetentionCleanup::TASK_FILES ]           = RetentionFilesTask::class;
+		$tasks[ RetentionCleanup::TASK_CHAT_SESSIONS ]   = RetentionChatSessionsTask::class;
 
 		return $tasks;
 	}
@@ -113,7 +146,100 @@ class SystemAgentServiceProvider {
 			},
 		);
 
+		foreach ( self::getRetentionScheduleDefinitions() as $schedule_id => $schedule ) {
+			$schedules[ $schedule_id ] = $schedule;
+		}
+
 		return $schedules;
+	}
+
+	private static function getRetentionScheduleDefinitions(): array {
+		$daily_first_run = array(
+			'first_run_callback' => 'strtotime',
+			'first_run_arg'      => '+1 day',
+		);
+
+		return array(
+			RetentionCleanup::TASK_COMPLETED_JOBS  => array_merge(
+				$daily_first_run,
+				array(
+					'task_type'       => RetentionCleanup::TASK_COMPLETED_JOBS,
+					'interval'        => 'daily',
+					'enabled_setting' => 'retention_completed_jobs_enabled',
+					'default_enabled' => true,
+					'label'           => 'Daily completed-jobs cleanup',
+				)
+			),
+			RetentionCleanup::TASK_FAILED_JOBS     => array_merge(
+				$daily_first_run,
+				array(
+					'task_type'       => RetentionCleanup::TASK_FAILED_JOBS,
+					'interval'        => 'daily',
+					'enabled_setting' => 'retention_failed_jobs_enabled',
+					'default_enabled' => true,
+					'label'           => 'Daily failed-jobs cleanup',
+				)
+			),
+			RetentionCleanup::TASK_LOGS            => array_merge(
+				$daily_first_run,
+				array(
+					'task_type'       => RetentionCleanup::TASK_LOGS,
+					'interval'        => 'daily',
+					'enabled_setting' => 'retention_logs_enabled',
+					'default_enabled' => true,
+					'label'           => 'Daily log cleanup',
+				)
+			),
+			RetentionCleanup::TASK_PROCESSED_ITEMS => array_merge(
+				$daily_first_run,
+				array(
+					'task_type'       => RetentionCleanup::TASK_PROCESSED_ITEMS,
+					'interval'        => 'daily',
+					'enabled_setting' => 'retention_processed_items_enabled',
+					'default_enabled' => true,
+					'label'           => 'Daily processed-items cleanup',
+				)
+			),
+			RetentionCleanup::TASK_AS_ACTIONS      => array_merge(
+				$daily_first_run,
+				array(
+					'task_type'       => RetentionCleanup::TASK_AS_ACTIONS,
+					'interval'        => 'daily',
+					'enabled_setting' => 'retention_as_actions_enabled',
+					'default_enabled' => true,
+					'label'           => 'Daily Action Scheduler action cleanup',
+				)
+			),
+			RetentionCleanup::TASK_STALE_CLAIMS    => array_merge(
+				$daily_first_run,
+				array(
+					'task_type'       => RetentionCleanup::TASK_STALE_CLAIMS,
+					'interval'        => 'daily',
+					'enabled_setting' => 'retention_stale_claims_enabled',
+					'default_enabled' => true,
+					'label'           => 'Daily stale-claims cleanup',
+				)
+			),
+			RetentionCleanup::TASK_FILES           => array(
+				'task_type'          => RetentionCleanup::TASK_FILES,
+				'interval'           => 'weekly',
+				'enabled_setting'    => 'retention_files_enabled',
+				'default_enabled'    => true,
+				'label'              => 'Weekly repository-file cleanup',
+				'first_run_callback' => 'strtotime',
+				'first_run_arg'      => '+1 week',
+			),
+			RetentionCleanup::TASK_CHAT_SESSIONS   => array_merge(
+				$daily_first_run,
+				array(
+					'task_type'       => RetentionCleanup::TASK_CHAT_SESSIONS,
+					'interval'        => 'daily',
+					'enabled_setting' => 'retention_chat_sessions_enabled',
+					'default_enabled' => true,
+					'label'           => 'Daily chat-session cleanup',
+				)
+			),
+		);
 	}
 
 	/**
@@ -233,6 +359,10 @@ class SystemAgentServiceProvider {
 		// Unschedule any orphaned datamachine_task_handle actions from pre-0.72.0.
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
 			as_unschedule_all_actions( self::LEGACY_TASK_HANDLE_HOOK );
+
+			foreach ( self::LEGACY_RETENTION_HOOKS as $legacy_hook ) {
+				as_unschedule_all_actions( $legacy_hook[0], array(), $legacy_hook[1] );
+			}
 		}
 
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
