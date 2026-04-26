@@ -31,6 +31,9 @@ class HandlersCommand extends BaseCommand {
 	 * [--step-type=<step_type>]
 	 * : Filter by step type (fetch, publish, upsert, etc.).
 	 *
+	 * [--handler=<slug>]
+	 * : Filter to one handler slug and include its settings class.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -46,20 +49,30 @@ class HandlersCommand extends BaseCommand {
 	 *
 	 *     wp datamachine handlers list
 	 *     wp datamachine handlers list --step-type=fetch
+	 *     wp datamachine handlers list --handler=rss
 	 *     wp datamachine handlers list --format=json
 	 *
 	 * @subcommand list
 	 */
 	public function list_handlers( array $args, array $assoc_args ): void {
-		$step_type = $assoc_args['step-type'] ?? null;
-		$format    = $assoc_args['format'] ?? 'table';
+		$step_type    = $assoc_args['step-type'] ?? null;
+		$handler_slug = $assoc_args['handler'] ?? null;
+		$format       = $assoc_args['format'] ?? 'table';
 
 		$ability = new HandlerAbilities();
 		$result  = $ability->executeGetHandlers(
 			array(
-				'step_type' => $step_type,
+				'step_type'    => $step_type,
+				'handler_slug' => $handler_slug,
 			)
 		);
+
+		if ( $handler_slug ) {
+			$settings_class = $ability->getSettingsClass( $handler_slug );
+			if ( isset( $result['handlers'][ $handler_slug ] ) ) {
+				$result['handlers'][ $handler_slug ]['settings_class'] = $settings_class ? get_class( $settings_class ) : '';
+			}
+		}
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to get handlers.' );
@@ -84,11 +97,14 @@ class HandlersCommand extends BaseCommand {
 			$items[] = array(
 				'slug'      => $slug,
 				'label'     => $handler['label'] ?? '',
-				'step_type' => $handler['step_type'] ?? '',
+				'step_type'      => $handler['step_type'] ?? '',
+				'settings_class' => $handler['settings_class'] ?? '',
 			);
 		}
 
-		$fields = array( 'slug', 'label', 'step_type' );
+		$fields = $handler_slug
+			? array( 'slug', 'label', 'step_type', 'settings_class' )
+			: array( 'slug', 'label', 'step_type' );
 		$this->format_items( $items, $fields, $assoc_args, 'slug' );
 
 		WP_CLI::log( sprintf( 'Total: %d handler(s).', $result['count'] ) );

@@ -31,6 +31,7 @@ defined( 'ABSPATH' ) || exit;
  *
  *     # Test a handler with config
  *     wp datamachine test ticketmaster --config='{"lat":32.7,"lng":-79.9,"radius":50}'
+ *     wp datamachine fetch test --handler=ticketmaster --config='{"lat":32.7,"lng":-79.9,"radius":50}'
  *
  *     # Test using an existing flow's config
  *     wp datamachine test --flow=42
@@ -49,6 +50,9 @@ class TestCommand extends BaseCommand {
 	 *
 	 * [<handler>]
 	 * : Handler slug to test.
+	 *
+	 * [--handler=<slug>]
+	 * : Handler slug to test. Useful for the `wp datamachine fetch test` alias.
 	 *
 	 * [--config=<json>]
 	 * : Handler config as JSON string.
@@ -84,6 +88,7 @@ class TestCommand extends BaseCommand {
 	 *     wp datamachine test --list
 	 *     wp datamachine test ticketmaster --describe
 	 *     wp datamachine test ticketmaster --config='{"lat":32.7,"lng":-79.9,"radius":50}'
+	 *     wp datamachine fetch test --handler=ticketmaster --config='{"lat":32.7,"lng":-79.9,"radius":50}'
 	 *     wp datamachine test rss --config='{"feed_url":"https://example.com/feed"}'
 	 *     wp datamachine test --flow=42
 	 *     wp datamachine test ticketmaster --config='...' --limit=3 --format=json
@@ -91,7 +96,7 @@ class TestCommand extends BaseCommand {
 	 * @when after_wp_load
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
-		$handler_slug = $args[0] ?? null;
+		$handler_slug = $assoc_args['handler'] ?? ( $args[0] ?? null );
 		$format       = $assoc_args['format'] ?? 'table';
 
 		// --list: show available handlers.
