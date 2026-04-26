@@ -26,3 +26,10 @@ require_once __DIR__ . '/strip-pipeline-step-provider-model.php';
 require_once __DIR__ . '/ai-enabled-tools.php';
 require_once __DIR__ . '/split-queue-payload.php';
 require_once __DIR__ . '/user-message-queue-mode.php';
+
+// Schema-migration runtime — defines `datamachine_run_schema_migrations()`
+// and `datamachine_maybe_run_deferred_migrations()`. Hooked at
+// plugins_loaded priority 5 so deploys that bump DATAMACHINE_VERSION past
+// the persisted `datamachine_db_version` option auto-migrate without
+// requiring an activation cycle (#1301).
+require_once __DIR__ . '/runtime.php';
