@@ -54,6 +54,7 @@ class WordPressMedia extends FetchHandler {
 			'file_types'             => $config['file_types'] ?? array( 'image' ),
 			'timeframe_limit'        => $config['timeframe_limit'] ?? 'all_time',
 			'search'                 => trim( $config['search'] ?? '' ),
+			'exclude_keywords'       => trim( $config['exclude_keywords'] ?? '' ),
 			'randomize'              => ! empty( $config['randomize_selection'] ),
 			'include_parent_content' => ! empty( $config['include_parent_content'] ),
 			'processed_items'        => $processed_items,

@@ -55,6 +55,7 @@ class WordPressMediaSettings extends FetchHandlerSettings {
 			'include_parent_content' => ! empty( $raw_settings['include_parent_content'] ),
 			'timeframe_limit'        => sanitize_text_field( $raw_settings['timeframe_limit'] ?? 'all_time' ),
 			'search'                 => sanitize_text_field( $raw_settings['search'] ?? '' ),
+			'exclude_keywords'       => sanitize_text_field( $raw_settings['exclude_keywords'] ?? '' ),
 			'randomize_selection'    => ! empty( $raw_settings['randomize_selection'] ),
 		);
 

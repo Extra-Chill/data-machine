@@ -155,6 +155,7 @@ class WordPress extends FetchHandler {
 			'post_status'       => sanitize_text_field( $config['post_status'] ?? 'publish' ),
 			'timeframe_limit'   => $config['timeframe_limit'] ?? 'all_time',
 			'search'            => trim( $config['search'] ?? '' ),
+			'exclude_keywords'  => trim( $config['exclude_keywords'] ?? '' ),
 			'randomize'         => ! empty( $config['randomize_selection'] ),
 			'posts_per_page'    => 10,
 			'tax_query'         => $tax_query,
