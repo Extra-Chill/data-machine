@@ -7,22 +7,24 @@
  *
  *   - `prompt_queue`        — array<{prompt:string, added_at:string}>
  *                             Consumed by AI step (`AIStep::execute()`)
- *                             via {@see QueueableTrait::popFromQueueIfEmpty}.
+ *                             via {@see QueueableTrait::consumeFromPromptQueue}.
  *                             Each entry is a plain user-message string.
  *
  *   - `config_patch_queue`  — array<{patch:array, added_at:string}>
  *                             Consumed by Fetch step
  *                             (`FetchStep::executeStep()`) via
- *                             {@see QueueableTrait::popQueuedConfigPatch}.
+ *                             {@see QueueableTrait::consumeFromConfigPatchQueue}.
  *                             Each entry is a decoded object that gets
  *                             deep-merged into the handler's static
  *                             config before the fetch runs.
  *
- * Splitting these slots is #1292 — pre-split, both consumers shared a
- * single `prompt_queue` and ran string-vs-JSON detective work at read
- * time, with no validation at write time. Now each slot has one
- * payload shape, validated by JSON Schema directly, and writes that
- * target the wrong slot for a step type fail loudly.
+ * Both consumers share a single `queue_mode` enum on the step config
+ * — `drain` | `loop` | `static` — that picks the access pattern. See
+ * {@see QueueAbility::registerQueueMode()} for the contract.
+ *
+ * Splitting the slots was #1292; collapsing the legacy
+ * `user_message` slot into `prompt_queue` and replacing
+ * `queue_enabled` with the mode enum is #1291.
  *
  * @package DataMachine\Abilities\Flow
  * @since 0.16.0
@@ -81,7 +83,9 @@ class QueueAbility {
 			$this->registerQueueRemove();
 			$this->registerQueueUpdate();
 			$this->registerQueueMove();
-			$this->registerQueueSettings();
+
+			// Shared mode toggle for both prompt_queue and config_patch_queue.
+			$this->registerQueueMode();
 
 			// Config patch queue (Fetch consumer).
 			$this->registerConfigPatchAdd();
@@ -184,13 +188,13 @@ class QueueAbility {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'success'       => array( 'type' => 'boolean' ),
-						'flow_id'       => array( 'type' => 'integer' ),
-						'flow_step_id'  => array( 'type' => 'string' ),
-						'queue'         => array( 'type' => 'array' ),
-						'count'         => array( 'type' => 'integer' ),
-						'queue_enabled' => array( 'type' => 'boolean' ),
-						'error'         => array( 'type' => 'string' ),
+						'success'      => array( 'type' => 'boolean' ),
+						'flow_id'      => array( 'type' => 'integer' ),
+						'flow_step_id' => array( 'type' => 'string' ),
+						'queue'        => array( 'type' => 'array' ),
+						'count'        => array( 'type' => 'integer' ),
+						'queue_mode'   => array( 'type' => 'string' ),
+						'error'        => array( 'type' => 'string' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeQueueList' ),
@@ -392,45 +396,61 @@ class QueueAbility {
 	}
 
 	/**
-	 * Register queue settings ability.
+	 * Register queue-mode ability.
+	 *
+	 * Replaces the pre-#1291 `queue-settings` ability (which wrote a
+	 * `queue_enabled` boolean). The new enum names the access pattern
+	 * explicitly:
+	 *
+	 *   - drain  — pop the head per tick, discard. Empty queue → skip
+	 *              with COMPLETED_NO_ITEMS.
+	 *   - loop   — pop the head per tick, append to tail. The queue
+	 *              rotates indefinitely.
+	 *   - static — peek the head every tick without mutating the queue.
+	 *              Position 0 is active; positions 1..N stay staged.
+	 *
+	 * The mode applies to whichever slot the step type consumes (AI
+	 * steps consume `prompt_queue`, fetch steps consume
+	 * `config_patch_queue`) — there is no per-slot mode.
 	 */
-	private function registerQueueSettings(): void {
+	private function registerQueueMode(): void {
 		wp_register_ability(
-			'datamachine/queue-settings',
+			'datamachine/queue-mode',
 			array(
-				'label'               => __( 'Update Queue Settings', 'data-machine' ),
-				'description'         => __( 'Update queue settings for a flow step.', 'data-machine' ),
+				'label'               => __( 'Set Queue Mode', 'data-machine' ),
+				'description'         => __( 'Set the access mode (drain | loop | static) for a flow step\'s queue.', 'data-machine' ),
 				'category'            => 'datamachine-flow',
 				'input_schema'        => array(
 					'type'       => 'object',
-					'required'   => array( 'flow_id', 'flow_step_id', 'queue_enabled' ),
+					'required'   => array( 'flow_id', 'flow_step_id', 'mode' ),
 					'properties' => array(
-						'flow_id'       => array(
+						'flow_id'      => array(
 							'type'        => 'integer',
 							'description' => __( 'Flow ID', 'data-machine' ),
 						),
-						'flow_step_id'  => array(
+						'flow_step_id' => array(
 							'type'        => 'string',
 							'description' => __( 'Flow step ID', 'data-machine' ),
 						),
-						'queue_enabled' => array(
-							'type'        => 'boolean',
-							'description' => __( 'Whether queue pop is enabled for this step', 'data-machine' ),
+						'mode'         => array(
+							'type'        => 'string',
+							'enum'        => array( 'drain', 'loop', 'static' ),
+							'description' => __( 'Queue access mode: drain (pop+discard), loop (pop+append-to-tail), static (peek-only).', 'data-machine' ),
 						),
 					),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'success'       => array( 'type' => 'boolean' ),
-						'flow_id'       => array( 'type' => 'integer' ),
-						'flow_step_id'  => array( 'type' => 'string' ),
-						'queue_enabled' => array( 'type' => 'boolean' ),
-						'message'       => array( 'type' => 'string' ),
-						'error'         => array( 'type' => 'string' ),
+						'success'      => array( 'type' => 'boolean' ),
+						'flow_id'      => array( 'type' => 'integer' ),
+						'flow_step_id' => array( 'type' => 'string' ),
+						'queue_mode'   => array( 'type' => 'string' ),
+						'message'      => array( 'type' => 'string' ),
+						'error'        => array( 'type' => 'string' ),
 					),
 				),
-				'execute_callback'    => array( $this, 'executeQueueSettings' ),
+				'execute_callback'    => array( $this, 'executeQueueMode' ),
 				'permission_callback' => array( $this, 'checkPermission' ),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
@@ -510,13 +530,13 @@ class QueueAbility {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'success'       => array( 'type' => 'boolean' ),
-						'flow_id'       => array( 'type' => 'integer' ),
-						'flow_step_id'  => array( 'type' => 'string' ),
-						'queue'         => array( 'type' => 'array' ),
-						'count'         => array( 'type' => 'integer' ),
-						'queue_enabled' => array( 'type' => 'boolean' ),
-						'error'         => array( 'type' => 'string' ),
+						'success'      => array( 'type' => 'boolean' ),
+						'flow_id'      => array( 'type' => 'integer' ),
+						'flow_step_id' => array( 'type' => 'string' ),
+						'queue'        => array( 'type' => 'array' ),
+						'count'        => array( 'type' => 'integer' ),
+						'queue_mode'   => array( 'type' => 'string' ),
+						'error'        => array( 'type' => 'string' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeConfigPatchList' ),
@@ -1015,32 +1035,37 @@ class QueueAbility {
 	}
 
 	/**
-	 * Update queue settings for a flow step.
+	 * Set the queue access mode for a flow step.
 	 *
-	 * @param array $input Input with flow_id, flow_step_id, and queue_enabled.
+	 * Replaces the pre-#1291 `executeQueueSettings()` (which wrote a
+	 * `queue_enabled` boolean). The mode is a single enum on the step
+	 * config; whichever slot the step consumes (`prompt_queue` or
+	 * `config_patch_queue`) reads it identically.
+	 *
+	 * @param array $input Input with flow_id, flow_step_id, and mode.
 	 * @return array Result.
 	 */
-	public function executeQueueSettings( array $input ): array {
-		$flow_id       = $input['flow_id'] ?? null;
-		$flow_step_id  = $input['flow_step_id'] ?? null;
-		$queue_enabled = $input['queue_enabled'] ?? null;
+	public function executeQueueMode( array $input ): array {
+		$flow_id      = $input['flow_id'] ?? null;
+		$flow_step_id = $input['flow_step_id'] ?? null;
+		$mode         = $input['mode'] ?? null;
 
 		$validation = $this->validateFlowStepIds( $flow_id, $flow_step_id );
 		if ( ! $validation['success'] ) {
 			return $validation;
 		}
 
-		if ( ! is_bool( $queue_enabled ) ) {
+		if ( ! is_string( $mode ) || ! in_array( $mode, array( 'drain', 'loop', 'static' ), true ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'queue_enabled is required and must be a boolean',
+				'error'   => 'mode must be one of: drain, loop, static',
 			);
 		}
 
 		$flow_id      = $validation['flow_id'];
 		$flow_step_id = $validation['flow_step_id'];
 
-		// queue_enabled is a step-level toggle that applies to whichever
+		// queue_mode is a step-level toggle that applies to whichever
 		// queue slot the step type consumes — no slot routing needed
 		// here. Use SLOT_PROMPT_QUEUE for the existence check; the
 		// step_config defaulting just ensures the row exists.
@@ -1049,8 +1074,8 @@ class QueueAbility {
 			return $flow_lookup;
 		}
 
-		$flow_config                                   = $flow_lookup['flow_config'];
-		$flow_config[ $flow_step_id ]['queue_enabled'] = $queue_enabled;
+		$flow_config                                = $flow_lookup['flow_config'];
+		$flow_config[ $flow_step_id ]['queue_mode'] = $mode;
 
 		$success = $this->db_flows->update_flow(
 			$flow_id,
@@ -1060,16 +1085,16 @@ class QueueAbility {
 		if ( ! $success ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to update queue settings',
+				'error'   => 'Failed to update queue mode',
 			);
 		}
 
 		return array(
-			'success'       => true,
-			'flow_id'       => $flow_id,
-			'flow_step_id'  => $flow_step_id,
-			'queue_enabled' => $queue_enabled,
-			'message'       => 'Queue settings updated successfully',
+			'success'      => true,
+			'flow_id'      => $flow_id,
+			'flow_step_id' => $flow_step_id,
+			'queue_mode'   => $mode,
+			'message'      => sprintf( 'Queue mode set to %s.', $mode ),
 		);
 	}
 
@@ -1103,12 +1128,12 @@ class QueueAbility {
 		$queue       = $step_config[ $slot ];
 
 		return array(
-			'success'       => true,
-			'flow_id'       => $flow_id,
-			'flow_step_id'  => $flow_step_id,
-			'queue'         => $queue,
-			'count'         => count( $queue ),
-			'queue_enabled' => $step_config['queue_enabled'],
+			'success'      => true,
+			'flow_id'      => $flow_id,
+			'flow_step_id' => $flow_step_id,
+			'queue'        => $queue,
+			'count'        => count( $queue ),
+			'queue_mode'   => $step_config['queue_mode'],
 		);
 	}
 
@@ -1498,10 +1523,11 @@ class QueueAbility {
 	}
 
 	/**
-	 * Pop the first prompt from the queue (for engine use).
+	 * Pop the first prompt from the queue (drain semantics).
 	 *
-	 * Used by AIStep's queueable trait. For the fetch-step config-patch
-	 * queue, see {@see popConfigPatchFromQueue()}.
+	 * Used by AgentPingTask when its `queue_mode` is `drain`. AIStep's
+	 * mode-aware reader lives in QueueableTrait. For the fetch-step
+	 * config-patch queue, see {@see popConfigPatchFromQueue()}.
 	 *
 	 * @param int      $flow_id      Flow ID.
 	 * @param string   $flow_step_id Flow step ID.
@@ -1510,6 +1536,24 @@ class QueueAbility {
 	 */
 	public static function popFromQueue( int $flow_id, string $flow_step_id, ?DB_Flows $db_flows = null ): ?array {
 		return self::popFromQueueSlot( $flow_id, $flow_step_id, self::SLOT_PROMPT_QUEUE, $db_flows );
+	}
+
+	/**
+	 * Pop the first prompt from the queue and rotate it to the tail
+	 * (loop semantics).
+	 *
+	 * Sibling of {@see popFromQueue()} for the `loop` queue mode. The
+	 * returned entry is the one the caller should consume; the tail of
+	 * the queue gets the same entry appended so it cycles back around
+	 * after the rest of the queue drains.
+	 *
+	 * @param int      $flow_id      Flow ID.
+	 * @param string   $flow_step_id Flow step ID.
+	 * @param DB_Flows $db_flows     Database instance.
+	 * @return array|null The rotated queue item or null if empty.
+	 */
+	public static function loopFromQueue( int $flow_id, string $flow_step_id, ?DB_Flows $db_flows = null ): ?array {
+		return self::popFromQueueSlot( $flow_id, $flow_step_id, self::SLOT_PROMPT_QUEUE, $db_flows, true );
 	}
 
 	/**
@@ -1535,9 +1579,12 @@ class QueueAbility {
 	 * @param string   $flow_step_id Flow step ID.
 	 * @param string   $slot         Slot name.
 	 * @param DB_Flows $db_flows     Database instance.
+	 * @param bool     $loop         When true, append the popped entry to
+	 *                               the tail of the queue (loop semantics).
+	 *                               When false (default), discard (drain).
 	 * @return array|null The popped item or null if empty.
 	 */
-	private static function popFromQueueSlot( int $flow_id, string $flow_step_id, string $slot, ?DB_Flows $db_flows = null ): ?array {
+	private static function popFromQueueSlot( int $flow_id, string $flow_step_id, string $slot, ?DB_Flows $db_flows = null, bool $loop = false ): ?array {
 		if ( null === $db_flows ) {
 			$db_flows = new DB_Flows();
 		}
@@ -1561,6 +1608,10 @@ class QueueAbility {
 
 		$popped_item = array_shift( $queue );
 
+		if ( $loop ) {
+			$queue[] = $popped_item;
+		}
+
 		$flow_config[ $flow_step_id ][ $slot ] = $queue;
 
 		$db_flows->update_flow(
@@ -1571,7 +1622,7 @@ class QueueAbility {
 		do_action(
 			'datamachine_log',
 			'info',
-			'Item popped from queue',
+			$loop ? 'Item rotated in queue (loop)' : 'Item popped from queue (drain)',
 			array(
 				'flow_id'         => $flow_id,
 				'slot'            => $slot,
@@ -1614,10 +1665,11 @@ class QueueAbility {
 	/**
 	 * Load flow + normalize step config for queue operations.
 	 *
-	 * Defaults the named slot to an empty array and `queue_enabled` to
-	 * false when missing — same shape as the pre-split helper, but
-	 * targets a specific queue slot rather than the implicit
-	 * `prompt_queue`.
+	 * Defaults the named slot to an empty array and `queue_mode` to
+	 * "static" when missing — matches the migration's default for
+	 * absent toggles and preserves "first-entry-wins-every-tick"
+	 * behaviour for any pre-existing queue rows that haven't been
+	 * touched since the #1291 collapse.
 	 *
 	 * @param int    $flow_id      Flow ID (already validated).
 	 * @param string $flow_step_id Flow step ID (already validated).
@@ -1659,8 +1711,10 @@ class QueueAbility {
 		if ( ! isset( $step_config[ $slot ] ) || ! is_array( $step_config[ $slot ] ) ) {
 			$step_config[ $slot ] = array();
 		}
-		if ( ! isset( $step_config['queue_enabled'] ) || ! is_bool( $step_config['queue_enabled'] ) ) {
-			$step_config['queue_enabled'] = false;
+		if ( ! isset( $step_config['queue_mode'] )
+			|| ! in_array( $step_config['queue_mode'], array( 'drain', 'loop', 'static' ), true )
+		) {
+			$step_config['queue_mode'] = 'static';
 		}
 		$flow_config[ $flow_step_id ] = $step_config;
 

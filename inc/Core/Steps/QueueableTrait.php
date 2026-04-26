@@ -2,24 +2,40 @@
 /**
  * Trait for steps that consume from a per-flow-step queue.
  *
- * Two consumption modes are exposed, each backed by its own storage
+ * Two consumption surfaces are exposed, each backed by its own storage
  * slot on the flow_step_config (see QueueAbility for the storage
  * contract):
  *
- * - {@see popFromQueueIfEmpty()} — for steps that consume scalar
- *   prompts (AI step's user_message). Reads from the
+ * - {@see consumeFromPromptQueue()} — for steps that consume scalar
+ *   prompts (AI step's per-flow user message). Reads from the
  *   `prompt_queue` slot. Each entry is `{ prompt: string, added_at }`.
  *
- * - {@see popQueuedConfigPatch()} — for steps that consume structured
- *   config patches (Fetch step's handler params). Reads from the
- *   `config_patch_queue` slot. Each entry is `{ patch: array,
- *   added_at }` — the patch is a decoded object stored verbatim, so
- *   no JSON-decode happens at read time.
+ * - {@see consumeFromConfigPatchQueue()} — for steps that consume
+ *   structured config patches (Fetch step's handler params). Reads
+ *   from the `config_patch_queue` slot. Each entry is
+ *   `{ patch: array, added_at }` — the patch is a decoded object
+ *   stored verbatim, so no JSON-decode happens at read time.
  *
- * Both share the same `queue_enabled` toggle on the step config and
- * the same retry-on-failure backup semantics. Splitting the storage
- * slots is #1292; pre-split, both consumers shared `prompt_queue` and
- * had to do string-vs-JSON detective work at read time.
+ * Both share a single `queue_mode` enum on the step config and the
+ * same retry-on-failure backup semantics. The mode is consumer-agnostic
+ * — `drain`, `loop`, and `static` all map to honest use cases on
+ * either consumer (see issue #1291 for the access-pattern table).
+ *
+ *   - drain  → pop the head, discard. Empty queue → null result with
+ *              `mutated: true` so the caller can branch on no-items.
+ *   - loop   → pop the head, append the same entry to the tail. Empty
+ *              queue → null result.
+ *   - static → peek the head, do not mutate. Empty queue → null result
+ *              with `mutated: false` so the caller can fall through to
+ *              its non-queue defaults.
+ *
+ * Pre-#1291 this trait took a `queue_enabled` boolean and exposed
+ * `popFromQueueIfEmpty()` / `popQueuedConfigPatch()`. Storage rewrites
+ * happened via QueueAbility::popFromQueueSlot() which always pop-and-
+ * discarded (no peek path, no rotate path). The boolean shadowed two
+ * unrelated decisions: "should the slot be consumed at all?" and "does
+ * the head get popped or peeked?". The mode enum names the access
+ * pattern explicitly and unblocks rotate-without-discard (loop).
  *
  * @package DataMachine\Core\Steps
  * @since 0.19.0
@@ -28,6 +44,7 @@
 namespace DataMachine\Core\Steps;
 
 use DataMachine\Abilities\Flow\QueueAbility;
+use DataMachine\Core\Database\Flows\Flows as DB_Flows;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -41,39 +58,45 @@ if ( ! defined( 'ABSPATH' ) ) {
  *       use QueueableTrait;
  *
  *       protected function executeStep(): array {
- *           $task = $this->popFromQueueIfEmpty( '', true );
- *           // Use $task...
+ *           $mode   = $this->flow_step_config['queue_mode'] ?? 'static';
+ *           $result = $this->consumeFromPromptQueue( $mode );
+ *           // Use $result['value'] / $result['from_queue'] / $result['mutated']...
  *       }
  *   }
  */
 trait QueueableTrait {
 
 	/**
-	 * Pop from the prompt queue if the provided value is empty and the
-	 * queue is enabled.
+	 * Consume from the prompt queue (AI consumer).
 	 *
-	 * Reads from the `prompt_queue` slot (AI consumer).
+	 * Reads from the `prompt_queue` slot. Mode-driven:
 	 *
-	 * @param string $current_value The current value (e.g., user_message or prompt).
-	 * @param bool   $queue_enabled Whether queue pop is enabled for this step.
-	 * @return array{value: string, from_queue: bool, added_at: string|null} Result with value and source info.
+	 *   - drain  → pop+discard
+	 *   - loop   → pop+append-to-tail
+	 *   - static → peek, no mutation
+	 *
+	 * Empty queue in any mode returns `value: ''`, `from_queue: false`.
+	 * For drain and loop, callers typically interpret an empty result
+	 * as "no work this tick" and short-circuit with COMPLETED_NO_ITEMS.
+	 * For static, callers fall through to whatever non-queue default
+	 * applies (e.g. system prompt + data packets only on AIStep).
+	 *
+	 * @param string $queue_mode One of "drain" | "loop" | "static".
+	 *                           Unknown values are treated as "static"
+	 *                           (peek without mutating) — same fail-safe
+	 *                           default the migration uses for absent
+	 *                           queue_mode keys.
+	 * @return array{value: string, from_queue: bool, added_at: string|null, mutated: bool}
 	 */
-	protected function popFromQueueIfEmpty( string $current_value, bool $queue_enabled = false ): array {
-		if ( ! $queue_enabled ) {
-			return array(
-				'value'      => $current_value,
-				'from_queue' => false,
-				'added_at'   => null,
-			);
-		}
-
-		$queued = $this->popOnceFromPromptQueue();
+	protected function consumeFromPromptQueue( string $queue_mode ): array {
+		$queued = $this->consumeOnceFromPromptQueue( $queue_mode );
 
 		if ( null === $queued ) {
 			return array(
 				'value'      => '',
 				'from_queue' => false,
 				'added_at'   => null,
+				'mutated'    => 'static' !== $queue_mode,
 			);
 		}
 
@@ -81,14 +104,15 @@ trait QueueableTrait {
 			'value'      => $queued['prompt'],
 			'from_queue' => true,
 			'added_at'   => $queued['added_at'] ?? null,
+			'mutated'    => 'static' !== $queue_mode,
 		);
 	}
 
 	/**
-	 * Pop a structured config patch from the fetch step queue.
+	 * Consume a structured config patch from the fetch step queue.
 	 *
-	 * Sibling of {@see popFromQueueIfEmpty()} for steps whose unit of
-	 * work is a structured config dict rather than a scalar prompt.
+	 * Sibling of {@see consumeFromPromptQueue()} for steps whose unit
+	 * of work is a structured config dict rather than a scalar prompt.
 	 * Reads from the `config_patch_queue` slot (Fetch consumer). The
 	 * `patch` field is stored as a decoded array verbatim, so no
 	 * JSON-decode happens here.
@@ -114,35 +138,22 @@ trait QueueableTrait {
 	 *
 	 *   {"feed_url":"https://example.com/feed.xml"}
 	 *
-	 * If the patch is shaped at the wrong nesting level the keys will
-	 * land on top-level config slots the handler never reads, and they
-	 * will be silently ignored downstream. The merge log line includes
-	 * both `patch_keys` and `merged_keys` to make this kind of
-	 * mis-shaping visible at debug time.
+	 * Empty queue in any mode returns `from_queue: false` with an empty
+	 * patch — callers can branch on that to either skip the tick or
+	 * fall through to the static handler config.
 	 *
-	 * Empty queue and disabled queue both return `from_queue: false` with
-	 * an empty patch — callers can branch on that to either skip the tick
-	 * or fall through to the static handler config.
-	 *
-	 * @param bool $queue_enabled Whether queue pop is enabled for this step.
-	 * @return array{patch: array, from_queue: bool, added_at: string|null} Result with the decoded patch and source info.
+	 * @param string $queue_mode One of "drain" | "loop" | "static".
+	 * @return array{patch: array, from_queue: bool, added_at: string|null, mutated: bool}
 	 */
-	protected function popQueuedConfigPatch( bool $queue_enabled = false ): array {
-		if ( ! $queue_enabled ) {
-			return array(
-				'patch'      => array(),
-				'from_queue' => false,
-				'added_at'   => null,
-			);
-		}
-
-		$queued = $this->popOnceFromConfigPatchQueue();
+	protected function consumeFromConfigPatchQueue( string $queue_mode ): array {
+		$queued = $this->consumeOnceFromConfigPatchQueue( $queue_mode );
 
 		if ( null === $queued ) {
 			return array(
 				'patch'      => array(),
 				'from_queue' => false,
 				'added_at'   => null,
+				'mutated'    => 'static' !== $queue_mode,
 			);
 		}
 
@@ -163,15 +174,18 @@ trait QueueableTrait {
 			'patch'      => $patch,
 			'from_queue' => true,
 			'added_at'   => $queued['added_at'] ?? null,
+			'mutated'    => 'static' !== $queue_mode,
 		);
 	}
 
 	/**
-	 * Pop one item from the AI prompt queue and back it up to engine data.
+	 * Consume one item from the AI prompt queue per the given mode and
+	 * back it up to engine data when the consumption mutates storage.
 	 *
-	 * @return array{prompt: string, added_at: string|null}|null Popped item, or null if no item.
+	 * @param string $queue_mode "drain" | "loop" | "static".
+	 * @return array{prompt: string, added_at: string|null}|null
 	 */
-	private function popOnceFromPromptQueue(): ?array {
+	private function consumeOnceFromPromptQueue( string $queue_mode ): ?array {
 		$job_context = $this->engine->getJobContext();
 		$flow_id     = $job_context['flow_id'] ?? null;
 
@@ -179,9 +193,14 @@ trait QueueableTrait {
 			return null;
 		}
 
-		$queued_item = QueueAbility::popFromQueue( (int) $flow_id, $this->flow_step_id );
+		$entry = self::consumeFromQueueSlot(
+			(int) $flow_id,
+			$this->flow_step_id,
+			QueueAbility::SLOT_PROMPT_QUEUE,
+			$queue_mode
+		);
 
-		if ( ! $queued_item || empty( $queued_item['prompt'] ) ) {
+		if ( ! $entry || empty( $entry['prompt'] ) ) {
 			return null;
 		}
 
@@ -190,41 +209,50 @@ trait QueueableTrait {
 			'info',
 			'Using prompt from queue',
 			array(
-				'flow_id'   => $flow_id,
-				'step_type' => $this->step_type ?? 'unknown',
-				'added_at'  => $queued_item['added_at'] ?? '',
+				'flow_id'    => $flow_id,
+				'step_type'  => $this->step_type ?? 'unknown',
+				'queue_mode' => $queue_mode,
+				'added_at'   => $entry['added_at'] ?? '',
 			)
 		);
 
-		// Store backup of the popped prompt in engine data for retry on failure.
-		// The `slot` field tells the retry path which queue to re-push to.
-		if ( property_exists( $this, 'job_id' ) && ! empty( $this->job_id ) ) {
+		// Store backup of the popped prompt in engine data for retry on
+		// failure. Static mode never mutates so no rollback is needed —
+		// re-running the static tick re-peeks the same entry naturally.
+		if ( 'static' !== $queue_mode
+			&& property_exists( $this, 'job_id' )
+			&& ! empty( $this->job_id )
+		) {
 			\datamachine_merge_engine_data(
 				$this->job_id,
 				array(
 					'queued_prompt_backup' => array(
 						'slot'         => QueueAbility::SLOT_PROMPT_QUEUE,
-						'prompt'       => $queued_item['prompt'],
+						'mode'         => $queue_mode,
+						'prompt'       => $entry['prompt'],
 						'flow_id'      => (int) $flow_id,
 						'flow_step_id' => $this->flow_step_id,
-						'added_at'     => $queued_item['added_at'] ?? null,
+						'added_at'     => $entry['added_at'] ?? null,
 					),
 				)
 			);
 		}
 
 		return array(
-			'prompt'   => $queued_item['prompt'],
-			'added_at' => $queued_item['added_at'] ?? null,
+			'prompt'   => $entry['prompt'],
+			'added_at' => $entry['added_at'] ?? null,
 		);
 	}
 
 	/**
-	 * Pop one item from the fetch config-patch queue and back it up to engine data.
+	 * Consume one item from the fetch config-patch queue per the given
+	 * mode and back it up to engine data when the consumption mutates
+	 * storage.
 	 *
-	 * @return array{patch: array, added_at: string|null}|null Popped item, or null if no item.
+	 * @param string $queue_mode "drain" | "loop" | "static".
+	 * @return array{patch: array, added_at: string|null}|null
 	 */
-	private function popOnceFromConfigPatchQueue(): ?array {
+	private function consumeOnceFromConfigPatchQueue( string $queue_mode ): ?array {
 		$job_context = $this->engine->getJobContext();
 		$flow_id     = $job_context['flow_id'] ?? null;
 
@@ -232,9 +260,14 @@ trait QueueableTrait {
 			return null;
 		}
 
-		$queued_item = QueueAbility::popConfigPatchFromQueue( (int) $flow_id, $this->flow_step_id );
+		$entry = self::consumeFromQueueSlot(
+			(int) $flow_id,
+			$this->flow_step_id,
+			QueueAbility::SLOT_CONFIG_PATCH_QUEUE,
+			$queue_mode
+		);
 
-		if ( ! $queued_item || ! isset( $queued_item['patch'] ) || ! is_array( $queued_item['patch'] ) ) {
+		if ( ! $entry || ! isset( $entry['patch'] ) || ! is_array( $entry['patch'] ) ) {
 			return null;
 		}
 
@@ -245,32 +278,112 @@ trait QueueableTrait {
 			array(
 				'flow_id'    => $flow_id,
 				'step_type'  => $this->step_type ?? 'unknown',
-				'patch_keys' => array_keys( $queued_item['patch'] ),
-				'added_at'   => $queued_item['added_at'] ?? '',
+				'queue_mode' => $queue_mode,
+				'patch_keys' => array_keys( $entry['patch'] ),
+				'added_at'   => $entry['added_at'] ?? '',
 			)
 		);
 
-		// Store backup for retry on failure. `slot` distinguishes which
-		// queue the backup belongs to.
-		if ( property_exists( $this, 'job_id' ) && ! empty( $this->job_id ) ) {
+		if ( 'static' !== $queue_mode
+			&& property_exists( $this, 'job_id' )
+			&& ! empty( $this->job_id )
+		) {
 			\datamachine_merge_engine_data(
 				$this->job_id,
 				array(
 					'queued_prompt_backup' => array(
 						'slot'         => QueueAbility::SLOT_CONFIG_PATCH_QUEUE,
-						'patch'        => $queued_item['patch'],
+						'mode'         => $queue_mode,
+						'patch'        => $entry['patch'],
 						'flow_id'      => (int) $flow_id,
 						'flow_step_id' => $this->flow_step_id,
-						'added_at'     => $queued_item['added_at'] ?? null,
+						'added_at'     => $entry['added_at'] ?? null,
 					),
 				)
 			);
 		}
 
 		return array(
-			'patch'    => $queued_item['patch'],
-			'added_at' => $queued_item['added_at'] ?? null,
+			'patch'    => $entry['patch'],
+			'added_at' => $entry['added_at'] ?? null,
 		);
+	}
+
+	/**
+	 * Consume one item from a named queue slot per the given mode.
+	 *
+	 * Centralizes the mode-aware read so prompt and config-patch
+	 * consumers share the same mutation/peek/rotate semantics. For
+	 * `drain` and `loop` the slot is rewritten in place; for `static`
+	 * no DB write happens.
+	 *
+	 * @param int      $flow_id      Flow ID.
+	 * @param string   $flow_step_id Flow step ID.
+	 * @param string   $slot         Queue slot name.
+	 * @param string   $queue_mode   "drain" | "loop" | "static".
+	 * @param DB_Flows $db_flows     Optional database instance.
+	 * @return array|null The consumed entry, or null if the queue was empty.
+	 */
+	private static function consumeFromQueueSlot(
+		int $flow_id,
+		string $flow_step_id,
+		string $slot,
+		string $queue_mode,
+		?DB_Flows $db_flows = null
+	): ?array {
+		if ( null === $db_flows ) {
+			$db_flows = new DB_Flows();
+		}
+
+		$flow = $db_flows->get_flow( $flow_id );
+		if ( ! $flow ) {
+			return null;
+		}
+
+		$flow_config = $flow['flow_config'] ?? array();
+		if ( ! isset( $flow_config[ $flow_step_id ] ) ) {
+			return null;
+		}
+
+		$step_config = $flow_config[ $flow_step_id ];
+		$queue       = $step_config[ $slot ] ?? array();
+
+		if ( empty( $queue ) ) {
+			return null;
+		}
+
+		// Static peek: read head, do not mutate storage.
+		if ( 'static' === $queue_mode ) {
+			return $queue[0];
+		}
+
+		// Drain or loop: pop the head, optionally rotate.
+		$entry = array_shift( $queue );
+
+		if ( 'loop' === $queue_mode ) {
+			$queue[] = $entry;
+		}
+
+		$flow_config[ $flow_step_id ][ $slot ] = $queue;
+
+		$db_flows->update_flow(
+			$flow_id,
+			array( 'flow_config' => $flow_config )
+		);
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Item consumed from queue',
+			array(
+				'flow_id'         => $flow_id,
+				'slot'            => $slot,
+				'queue_mode'      => $queue_mode,
+				'remaining_count' => count( $queue ),
+			)
+		);
+
+		return $entry;
 	}
 
 	/**

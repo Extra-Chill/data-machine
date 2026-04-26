@@ -20,18 +20,25 @@ if ( ! defined( 'ABSPATH' ) ) {
  * PipelineBatchScheduler is active, multiple packets trigger fan-out
  * into child jobs.
  *
- * Supports queue-driven dynamic params via QueueableTrait. When
- * `queue_enabled` is true on the flow step config, the step pops one
- * queued JSON-encoded patch per invocation and deep-merges it into the
- * handler's static config before invoking the handler. This is how
- * windowed retroactive backfills (a flow that processes a different
- * date range each tick) and rotating-source forward-ingestion are
- * expressed without an external orchestrator.
+ * Supports queue-driven dynamic params via QueueableTrait. The
+ * `queue_mode` enum on the flow step config (#1291) picks the access
+ * pattern:
  *
- * Empty queue with queue_enabled=true is treated as a no-op tick: the
- * job completes with COMPLETED_NO_ITEMS and no fetch is attempted. This
- * matches the AI step's queue-empty behaviour and keeps recurring flows
- * idempotent once their backfill queue drains.
+ *   - drain  — pop one queued patch per tick, discard. Empty queue →
+ *              COMPLETED_NO_ITEMS. Drives windowed historical
+ *              backfills.
+ *   - loop   — pop one queued patch per tick, append same patch to
+ *              tail. Drives rotating-source forward-ingestion (e.g.
+ *              cycle through a list of fetch configs).
+ *   - static — peek the head, do not mutate. The position-0 patch
+ *              fires every tick; positions 1..N stay staged for
+ *              iterative flow development. Switch to drain or loop
+ *              once the patch is dialed in.
+ *
+ * Empty queue in drain/loop modes is treated as a no-op tick: the job
+ * completes with COMPLETED_NO_ITEMS and no fetch is attempted. Static
+ * mode falls through to the unmerged static handler config when the
+ * queue is empty (no patch == no overlay).
  *
  * @package DataMachine
  */
@@ -79,24 +86,23 @@ class FetchStep extends Step {
 			return $this->dataPackets;
 		}
 
-		// Queue-driven params: when enabled, pop one queued patch and
-		// merge it into the static handler config. This is how a flow
-		// expresses "every tick, process the next windowed slice" with
-		// no external orchestrator.
-		$queue_enabled = (bool) ( $this->flow_step_config['queue_enabled'] ?? false );
+		// Queue-driven params: read the configured mode and consume from
+		// the config_patch_queue accordingly. Drain pops, loop pops+
+		// appends, static peeks — see QueueableTrait for the contract.
+		$queue_mode   = $this->flow_step_config['queue_mode'] ?? 'static';
+		$queue_result = $this->consumeFromConfigPatchQueue( $queue_mode );
 
-		if ( $queue_enabled ) {
-			$queue_result = $this->popQueuedConfigPatch( true );
-
-			if ( ! $queue_result['from_queue'] ) {
-				// Queue enabled but empty — clean no-op tick. Mark the
-				// job as completed-no-items so the engine treats this
-				// as success rather than a fetch failure.
+		if ( ! $queue_result['from_queue'] ) {
+			// Empty queue in drain or loop modes implies per-tick work
+			// that can't proceed — short-circuit cleanly. Static mode
+			// falls through to the unmerged handler config below.
+			if ( in_array( $queue_mode, array( 'drain', 'loop' ), true ) ) {
 				$this->log(
 					'info',
-					'Fetch step skipped — queue enabled but empty',
+					'Fetch step skipped — queue mode requires per-tick patch but queue is empty',
 					array(
 						'flow_step_id' => $this->flow_step_id,
+						'queue_mode'   => $queue_mode,
 					)
 				);
 
@@ -104,7 +110,7 @@ class FetchStep extends Step {
 
 				return $this->dataPackets;
 			}
-
+		} else {
 			$handler_settings = $this->mergeQueuedConfigPatch( $handler_settings, $queue_result['patch'] );
 
 			$this->log(
@@ -112,6 +118,7 @@ class FetchStep extends Step {
 				'Fetch step merged queued config patch',
 				array(
 					'flow_step_id' => $this->flow_step_id,
+					'queue_mode'   => $queue_mode,
 					'patch_keys'   => array_keys( $queue_result['patch'] ),
 					'merged_keys'  => array_keys( $handler_settings ),
 					'queued_at'    => $queue_result['added_at'],

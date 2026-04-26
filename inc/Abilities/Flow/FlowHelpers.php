@@ -81,7 +81,12 @@ trait FlowHelpers {
 				'execution_order'  => $step['execution_order'] ?? 0,
 				'disabled_tools'   => $disabled_tools,
 				'handler'          => null,
-				'queue_enabled'    => false,
+				// queue_mode is the access pattern enum that drives both
+				// AI (prompt_queue) and Fetch (config_patch_queue)
+				// consumption (#1291). Default "static" preserves
+				// "first-entry-wins-every-tick" semantics for any
+				// freshly-scaffolded step.
+				'queue_mode'       => 'static',
 			);
 
 			// Fetch consumes from config_patch_queue (#1292); other

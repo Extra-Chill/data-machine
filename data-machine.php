@@ -624,6 +624,11 @@ function datamachine_activate_for_site() {
 	// Split prompt_queue / config_patch_queue payload polymorphism (#1292, idempotent).
 	datamachine_migrate_split_queue_payload();
 
+	// Collapse user_message into prompt_queue and replace queue_enabled with
+	// queue_mode enum (drain | loop | static) on every queueable step (#1291,
+	// idempotent).
+	datamachine_migrate_user_message_queue_mode();
+
 	// Drop redundant _datamachine_post_pipeline_id rows (#1091). Idempotent.
 	datamachine_drop_redundant_post_pipeline_meta();
 

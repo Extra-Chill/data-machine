@@ -137,39 +137,42 @@ class AIStep extends Step {
 			return $this->dataPackets;
 		}
 
-		$configured_message = trim( $this->flow_step_config['user_message'] ?? '' );
-		$queue_enabled      = (bool) ( $this->flow_step_config['queue_enabled'] ?? false );
-		$prompt_queue       = $this->flow_step_config['prompt_queue'] ?? array();
-		$queued_prompt      = $prompt_queue[0]['prompt'] ?? '';
+		// AIStep reads a single prompt slot — `prompt_queue` — under one
+		// of three access modes (#1291). Pre-collapse this branched on
+		// `queue_enabled` plus a `user_message` fallback; post-collapse
+		// the mode picks the access pattern and the queue head is the
+		// only source of per-flow user-role content. Migration #1291
+		// rewrites legacy `user_message` into a 1-entry static queue so
+		// no runtime fallback shim is needed here.
+		$queue_mode   = $this->flow_step_config['queue_mode'] ?? 'static';
+		$queue_result = $this->consumeFromPromptQueue( $queue_mode );
+		$user_message = $queue_result['value'];
 
-		if ( $queue_enabled ) {
-			$queue_result = $this->popFromQueueIfEmpty( '', true );
-			$user_message = $queue_result['value'];
-
-			// Queue is enabled but empty — skip cleanly instead of failing.
-			if ( empty( $user_message ) && empty( $configured_message ) ) {
+		if ( '' === $user_message ) {
+			// Empty queue in drain or loop modes implies per-tick work
+			// that can't proceed — short-circuit cleanly so the engine
+			// completes with COMPLETED_NO_ITEMS rather than treating the
+			// missing prompt as a failure.
+			if ( in_array( $queue_mode, array( 'drain', 'loop' ), true ) ) {
 				do_action(
 					'datamachine_log',
 					'info',
-					'AI step skipped — queue enabled but empty, no configured message',
+					'AI step skipped — queue mode requires per-tick prompt but queue is empty',
 					array(
 						'job_id'       => $this->job_id,
 						'flow_step_id' => $this->flow_step_id,
+						'queue_mode'   => $queue_mode,
 					)
 				);
 
-				// Set status override so Engine completes with completed_no_items
-				// instead of treating empty data packets as a failure.
 				$this->engine->set( 'job_status', \DataMachine\Core\JobStatus::COMPLETED_NO_ITEMS );
 
 				return $this->dataPackets;
 			}
-		} else {
-			$user_message = $queued_prompt;
-		}
 
-		if ( empty( $user_message ) ) {
-			$user_message = $configured_message;
+			// Static mode + empty queue: no flow-level user message,
+			// but the pipeline system_prompt and any data packets still
+			// drive the conversation. Fall through with $user_message=''.
 		}
 
 		// Vision image from engine data (single source of truth)

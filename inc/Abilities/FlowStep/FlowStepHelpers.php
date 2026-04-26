@@ -499,7 +499,24 @@ trait FlowStepHelpers {
 	}
 
 	/**
-	 * Update user message for an AI flow step.
+	 * Update the per-flow user message for an AI step.
+	 *
+	 * Post-#1291 the dedicated `user_message` slot is gone. This helper
+	 * is the public-facing shim that lets existing callers (CLI's
+	 * `--set-user-message`, ConfigureFlowSteps, CreateFlow chat tools,
+	 * the React UI's save path) keep their input contract while we
+	 * route the write through the unified `prompt_queue` storage:
+	 *
+	 *   - Replace the entire prompt_queue with a single `{prompt, added_at}`
+	 *     entry containing the new user message.
+	 *   - Set queue_mode to "static" so the entry is peeked (not popped)
+	 *     every tick — this is the direct equivalent of the legacy
+	 *     "single user_message that runs every tick" semantic.
+	 *
+	 * Empty input (`""`) clears the queue entirely. The seeded entry's
+	 * shape mirrors `QueueAbility::executeQueueAdd`'s output so any
+	 * subsequent `flow queue list` rendering looks identical to a
+	 * manually-added prompt.
 	 *
 	 * @param string $flow_step_id Flow step ID (format: pipeline_step_id_flow_id).
 	 * @param string $user_message User message content.
@@ -542,7 +559,21 @@ trait FlowStepHelpers {
 			return false;
 		}
 
-		$flow_config[ $flow_step_id ]['user_message'] = wp_unslash( sanitize_textarea_field( $user_message ) );
+		$sanitized = wp_unslash( sanitize_textarea_field( $user_message ) );
+
+		// Empty input clears the queue entirely (matches the pre-#1291
+		// behaviour of unsetting user_message via empty string).
+		if ( '' === trim( $sanitized ) ) {
+			$flow_config[ $flow_step_id ]['prompt_queue'] = array();
+		} else {
+			$flow_config[ $flow_step_id ]['prompt_queue'] = array(
+				array(
+					'prompt'   => $sanitized,
+					'added_at' => gmdate( 'c' ),
+				),
+			);
+		}
+		$flow_config[ $flow_step_id ]['queue_mode'] = 'static';
 
 		$success = $this->db_flows->update_flow(
 			$flow_id,

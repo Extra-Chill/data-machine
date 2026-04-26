@@ -178,28 +178,29 @@ class FlowQueue {
 
 		register_rest_route(
 			'datamachine/v1',
-			'/flows/(?P<flow_id>\d+)/queue/settings',
+			'/flows/(?P<flow_id>\d+)/queue/mode',
 			array(
 				'methods'             => WP_REST_Server::EDITABLE,
-				'callback'            => array( self::class, 'handle_update_queue_settings' ),
+				'callback'            => array( self::class, 'handle_update_queue_mode' ),
 				'permission_callback' => array( self::class, 'check_permission' ),
 				'args'                => array(
-					'flow_id'       => array(
+					'flow_id'      => array(
 						'required'          => true,
 						'type'              => 'integer',
 						'sanitize_callback' => 'absint',
 						'description'       => __( 'Flow ID', 'data-machine' ),
 					),
-					'flow_step_id'  => array(
+					'flow_step_id' => array(
 						'required'          => true,
 						'type'              => 'string',
 						'sanitize_callback' => 'sanitize_text_field',
 						'description'       => __( 'Flow step ID', 'data-machine' ),
 					),
-					'queue_enabled' => array(
+					'mode'         => array(
 						'required'    => true,
-						'type'        => 'boolean',
-						'description' => __( 'Whether queue pop is enabled for this step', 'data-machine' ),
+						'type'        => 'string',
+						'enum'        => array( 'drain', 'loop', 'static' ),
+						'description' => __( 'Queue access mode: drain | loop | static.', 'data-machine' ),
 					),
 				),
 			)
@@ -267,11 +268,11 @@ class FlowQueue {
 			array(
 				'success' => true,
 				'data'    => array(
-					'flow_id'       => $result['flow_id'],
-					'flow_step_id'  => $result['flow_step_id'],
-					'queue'         => $result['queue'],
-					'count'         => $result['count'],
-					'queue_enabled' => $result['queue_enabled'],
+					'flow_id'      => $result['flow_id'],
+					'flow_step_id' => $result['flow_step_id'],
+					'queue'        => $result['queue'],
+					'count'        => $result['count'],
+					'queue_mode'   => $result['queue_mode'],
 				),
 			)
 		);
@@ -529,24 +530,24 @@ class FlowQueue {
 	}
 
 	/**
-	 * Handle queue settings update.
+	 * Handle queue mode update.
 	 *
-	 * PUT /flows/{id}/queue/settings
+	 * PUT /flows/{id}/queue/mode
 	 *
 	 * @param \WP_REST_Request $request Request object.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public static function handle_update_queue_settings( $request ) {
-		$ability = wp_get_ability( 'datamachine/queue-settings' );
+	public static function handle_update_queue_mode( $request ) {
+		$ability = wp_get_ability( 'datamachine/queue-mode' );
 		if ( ! $ability ) {
 			return new \WP_Error( 'ability_not_found', 'Ability not found', array( 'status' => 500 ) );
 		}
 
 		$result = $ability->execute(
 			array(
-				'flow_id'       => (int) $request->get_param( 'flow_id' ),
-				'flow_step_id'  => sanitize_text_field( $request->get_param( 'flow_step_id' ) ),
-				'queue_enabled' => (bool) $request->get_param( 'queue_enabled' ),
+				'flow_id'      => (int) $request->get_param( 'flow_id' ),
+				'flow_step_id' => sanitize_text_field( $request->get_param( 'flow_step_id' ) ),
+				'mode'         => sanitize_text_field( $request->get_param( 'mode' ) ),
 			)
 		);
 
@@ -561,8 +562,8 @@ class FlowQueue {
 			}
 
 			return new \WP_Error(
-				'queue_settings_failed',
-				$result['error'] ?? __( 'Failed to update queue settings.', 'data-machine' ),
+				'queue_mode_failed',
+				$result['error'] ?? __( 'Failed to update queue mode.', 'data-machine' ),
 				array( 'status' => $status )
 			);
 		}
@@ -571,11 +572,11 @@ class FlowQueue {
 			array(
 				'success' => true,
 				'data'    => array(
-					'flow_id'       => $result['flow_id'],
-					'flow_step_id'  => $result['flow_step_id'],
-					'queue_enabled' => $result['queue_enabled'],
+					'flow_id'      => $result['flow_id'],
+					'flow_step_id' => $result['flow_step_id'],
+					'queue_mode'   => $result['queue_mode'],
 				),
-				'message' => $result['message'] ?? __( 'Queue settings updated.', 'data-machine' ),
+				'message' => $result['message'] ?? __( 'Queue mode updated.', 'data-machine' ),
 			)
 		);
 	}
