@@ -652,14 +652,4 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 		);
 	}
 
-	/**
-	 * Refresh token (Legacy — use get_valid_access_token() instead)
-	 *
-	 * @deprecated 0.31.1 Use get_valid_access_token() for on-demand refresh.
-	 * @return bool True on success
-	 */
-	public function refresh_token(): bool {
-		$token = $this->get_valid_access_token();
-		return null !== $token;
-	}
 }

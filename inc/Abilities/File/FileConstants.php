@@ -94,21 +94,4 @@ class FileConstants {
 		return MemoryFileRegistry::get_edit_capability( $filename );
 	}
 
-	/**
-	 * Legacy constant — kept for backward compatibility.
-	 * Use is_protected() or get_protected_files() instead.
-	 *
-	 * @deprecated 0.42.0 Use FileConstants::is_protected() or MemoryFileRegistry::is_protected().
-	 * @var string[]
-	 */
-	const PROTECTED_FILES = array( 'SOUL.md', 'MEMORY.md', 'SITE.md', 'RULES.md', 'USER.md' );
-
-	/**
-	 * Legacy constant — kept for backward compatibility.
-	 * Use is_user_layer() or get_layer() instead.
-	 *
-	 * @deprecated 0.42.0 Use FileConstants::is_user_layer() or MemoryFileRegistry::get_layer().
-	 * @var string[]
-	 */
-	const USER_LAYER_FILES = array( 'USER.md' );
 }
