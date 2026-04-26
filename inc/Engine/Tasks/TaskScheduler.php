@@ -106,6 +106,22 @@ class TaskScheduler {
 			return false;
 		}
 
+		// Resolve agent identity from the context. Callers without
+		// agent_id/user_id continue to work — the resulting job runs
+		// without an agent (matching pre-multi-agent behaviour).
+		$context_user_id  = (int) ( $context['user_id'] ?? 0 );
+		$context_agent_id = (int) ( $context['agent_id'] ?? 0 );
+
+		// Mirror RunFlowAbility's engine_data['job'] shape so downstream
+		// step types (AIStep, SystemTaskStep) can read agent identity
+		// from the engine snapshot the same way they do for flow jobs.
+		$job_snapshot = array(
+			'user_id' => $context_user_id,
+		);
+		if ( $context_agent_id > 0 ) {
+			$job_snapshot['agent_id'] = $context_agent_id;
+		}
+
 		$result = $ability->execute( array(
 			'workflow'     => $workflow,
 			'timestamp'    => $params['scheduled_at'] ?? null,
@@ -114,7 +130,9 @@ class TaskScheduler {
 				'task_params'   => $params,
 				'task_context'  => $context,
 				'parent_job_id' => $parentJobId,
-				'user_id'       => (int) ( $context['user_id'] ?? 0 ),
+				'user_id'       => $context_user_id,
+				'agent_id'      => $context_agent_id,
+				'job'           => $job_snapshot,
 			),
 		) );
 

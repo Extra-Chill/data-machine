@@ -78,13 +78,21 @@ class MetaDescriptionTask extends SystemTask {
 			),
 		);
 
+		$ai_payload = array( 'post_id' => $post_id );
+		if ( ! empty( $params['agent_id'] ) ) {
+			$ai_payload['agent_id'] = (int) $params['agent_id'];
+		}
+		if ( ! empty( $params['user_id'] ) ) {
+			$ai_payload['user_id'] = (int) $params['user_id'];
+		}
+
 		$response = RequestBuilder::build(
 			$messages,
 			$provider,
 			$model,
 			array(),
 			'system',
-			array( 'post_id' => $post_id )
+			$ai_payload
 		);
 
 		if ( empty( $response['success'] ) ) {

@@ -20,7 +20,9 @@
 
 namespace DataMachine\Core\Steps\SystemTask;
 
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -183,6 +185,16 @@ class SystemTaskStep extends Step {
 			return $result_packet->addTo( $this->dataPackets );
 		}
 
+		// Carry parent's agent identity into the child engine_data so
+		// task bodies (and any AI request they fire) can resolve the
+		// correct agent's MEMORY.md / SOUL.md / per-agent model. This
+		// mirrors the AIStep + PipelineBatchScheduler pattern (see
+		// #1083, #1198, #1207). On agent-less flows the values are 0
+		// and behaviour matches single-agent installs.
+		$parent_job_snapshot = $this->engine->getJobContext();
+		$parent_agent_id     = (int) ( $parent_job_snapshot['agent_id'] ?? 0 );
+		$parent_user_id      = (int) ( $parent_job_snapshot['user_id'] ?? 0 );
+
 		// Store task params in child job engine_data.
 		$child_engine_data = array_merge( $task_params, array(
 			'task_type'        => $task_type,
@@ -190,6 +202,27 @@ class SystemTaskStep extends Step {
 			'pipeline_step_id' => $this->flow_step_id,
 			'scheduled_at'     => current_time( 'mysql' ),
 		) );
+
+		// Propagate agent identity to the child. Both as flat keys (so
+		// task bodies can read $params['agent_id'] / $params['user_id']
+		// without rummaging through nested job snapshots) and under the
+		// 'job' key (so any nested AIStep / engine consumer reads the
+		// canonical engine_data['job'] shape).
+		if ( $parent_agent_id > 0 ) {
+			$child_engine_data['agent_id'] = $parent_agent_id;
+		}
+		if ( $parent_user_id > 0 ) {
+			$child_engine_data['user_id'] = $parent_user_id;
+		}
+		$child_job_snapshot = array(
+			'job_id'        => (int) $child_job_id,
+			'user_id'       => $parent_user_id,
+			'parent_job_id' => $this->job_id,
+		);
+		if ( $parent_agent_id > 0 ) {
+			$child_job_snapshot['agent_id'] = $parent_agent_id;
+		}
+		$child_engine_data['job'] = $child_job_snapshot;
 
 		// Inject additional pipeline context for tasks that need it (e.g. agent_ping).
 		if ( 'agent_ping' === $task_type ) {
@@ -217,11 +250,45 @@ class SystemTaskStep extends Step {
 			)
 		);
 
+		// Establish agent execution context before firing the task body.
+		//
+		// SystemTaskStep runs inside the Action Scheduler queue under
+		// whatever user the parent step set up (typically nothing in
+		// pre-#1083 paths). System tasks frequently call abilities that
+		// mutate WordPress content (wp_update_post, update_post_meta,
+		// wp_save_post_revision) — those need a real user for proper
+		// post_author resolution and capability checks. This mirrors
+		// the AIStep envelope from #1083 so abilities fired inside
+		// executeTask() see the right identity.
+		$owner_id = 0;
+		if ( $parent_agent_id > 0 ) {
+			$agents_repo  = new Agents();
+			$agent_record = $agents_repo->get_agent( $parent_agent_id );
+			if ( $agent_record ) {
+				$owner_id = (int) ( $agent_record['owner_id'] ?? 0 );
+			}
+		}
+		if ( $owner_id <= 0 && $parent_user_id > 0 ) {
+			// Legacy / agent-less flows: fall back to the flow's user_id.
+			$owner_id = $parent_user_id;
+		}
+
+		$previous_user_id = get_current_user_id();
+		$context_set      = false;
+
 		// Execute the task synchronously via executeTask().
 		$success   = true;
 		$error_msg = '';
 
 		try {
+			if ( $owner_id > 0 ) {
+				wp_set_current_user( $owner_id );
+				if ( $parent_agent_id > 0 ) {
+					PermissionHelper::set_agent_context( $parent_agent_id, $owner_id );
+					$context_set = true;
+				}
+			}
+
 			$handler = new $handler_class();
 			$handler->executeTask( (int) $child_job_id, $child_engine_data );
 		} catch ( \Throwable $e ) {
@@ -242,6 +309,13 @@ class SystemTaskStep extends Step {
 			$status    = $child_job['status'] ?? '';
 			if ( 'PROCESSING' === $status ) {
 				$jobs_db->complete_job( $child_job_id, JobStatus::failed( 'Exception: ' . $error_msg )->toString() );
+			}
+		} finally {
+			if ( $context_set ) {
+				PermissionHelper::clear_agent_context();
+			}
+			if ( $owner_id > 0 && $previous_user_id !== $owner_id ) {
+				wp_set_current_user( $previous_user_id );
 			}
 		}
 

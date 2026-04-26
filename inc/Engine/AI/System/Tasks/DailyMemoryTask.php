@@ -57,11 +57,13 @@ class DailyMemoryTask extends SystemTask {
 			return;
 		}
 
-		$date  = $params['date'] ?? gmdate( 'Y-m-d' );
-		$daily = new DailyMemory();
+		$date     = $params['date'] ?? gmdate( 'Y-m-d' );
+		$user_id  = (int) ( $params['user_id'] ?? 0 );
+		$agent_id = (int) ( $params['agent_id'] ?? 0 );
+		$daily    = new DailyMemory( $user_id, $agent_id );
 
 		// Read current MEMORY.md.
-		$memory = new AgentMemory();
+		$memory = new AgentMemory( $user_id, $agent_id );
 		$result = $memory->get_all();
 
 		if ( empty( $result['success'] ) || empty( $result['content'] ) ) {
@@ -116,13 +118,21 @@ class DailyMemoryTask extends SystemTask {
 			),
 		);
 
+		$ai_payload = array();
+		if ( $agent_id > 0 ) {
+			$ai_payload['agent_id'] = $agent_id;
+		}
+		if ( $user_id > 0 ) {
+			$ai_payload['user_id'] = $user_id;
+		}
+
 		$response = RequestBuilder::build(
 			$messages,
 			$provider,
 			$model,
 			array(),
 			'system',
-			array()
+			$ai_payload
 		);
 
 		if ( empty( $response['success'] ) ) {
