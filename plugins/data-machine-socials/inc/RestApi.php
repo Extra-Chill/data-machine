@@ -1029,13 +1029,57 @@ class RestApi {
 			$platforms[] = $entry;
 		}
 
-		// Sort: authenticated first, then alphabetical by label.
+		/**
+		 * Filter the platform display priority list.
+		 *
+		 * Returns an ordered list of platform slugs that should be pinned to
+		 * the top of the response, in declared order. Slugs not in the list
+		 * fall through to the default sort (authenticated first, then
+		 * alphabetical by label).
+		 *
+		 * Pinned slugs bypass the authenticated-first rule. If a caller pins
+		 * an unauthenticated platform it will still appear at the top — the
+		 * filter respects caller intent. Clients that only want to render
+		 * authenticated platforms should filter on `authenticated` themselves.
+		 *
+		 * Example: pin Instagram to the top regardless of auth state.
+		 *
+		 *   add_filter( 'datamachine_socials_platform_priority', function ( $list ) {
+		 *       return array_merge( array( 'instagram' ), $list );
+		 *   } );
+		 *
+		 * @since 0.13.1
+		 * @param array $priority Ordered list of slugs to pin to the top. Default empty.
+		 */
+		$priority = apply_filters( 'datamachine_socials_platform_priority', array() );
+		$priority = is_array( $priority ) ? array_values( array_filter( array_map( 'strval', $priority ) ) ) : array();
+
+		// Sort: pinned (in $priority order) → authenticated → alphabetical by label.
 		usort(
 			$platforms,
-			static function ( array $a, array $b ): int {
+			static function ( array $a, array $b ) use ( $priority ): int {
+				$a_idx = array_search( $a['slug'], $priority, true );
+				$b_idx = array_search( $b['slug'], $priority, true );
+
+				// 1. Pinned beats unpinned.
+				if ( false !== $a_idx && false === $b_idx ) {
+					return -1;
+				}
+				if ( false !== $b_idx && false === $a_idx ) {
+					return 1;
+				}
+
+				// 2. Both pinned: declared priority order.
+				if ( false !== $a_idx && false !== $b_idx ) {
+					return $a_idx - $b_idx;
+				}
+
+				// 3. Both unpinned: authenticated first.
 				if ( $a['authenticated'] !== $b['authenticated'] ) {
 					return $a['authenticated'] ? -1 : 1;
 				}
+
+				// 4. Then alphabetical by label.
 				return strcasecmp( $a['label'], $b['label'] );
 			}
 		);
