@@ -11,7 +11,26 @@ export async function getAuthStatus(): Promise<PlatformAuthStatus[]> {
 	return apiFetch({ path: `${REST_BASE}/auth/status` });
 }
 
-export async function getPlatforms(): Promise<Record<string, unknown>> {
+export interface PlatformCapability {
+	slug: string;
+	label: string;
+}
+
+export interface PlatformConfig {
+	slug: string;
+	label: string;
+	type: string;
+	authenticated: boolean;
+	username: string | null;
+	capabilities: PlatformCapability[];
+	[key: string]: unknown;
+}
+
+export interface PlatformsResponse {
+	platforms: PlatformConfig[];
+}
+
+export async function getPlatforms(): Promise<PlatformsResponse> {
 	return apiFetch({ path: `${REST_BASE}/platforms` });
 }
 

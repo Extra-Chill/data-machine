@@ -947,6 +947,35 @@ class RestApi {
 	 * Assembles from DM core's handler registry — each social handler
 	 * self-declares its constraints via the $meta parameter in registerHandler().
 	 * Auth status is folded in from the auth providers filter.
+	 *
+	 * Response shape (since v0.13.0):
+	 *
+	 *   {
+	 *     "platforms": [
+	 *       {
+	 *         "slug": "instagram",
+	 *         "label": "Instagram",
+	 *         "type": "publish",
+	 *         "authenticated": true,
+	 *         "username": "extrachill",
+	 *         "capabilities": [{ "slug": "publish", "label": "Publish" }, ...],
+	 *         ...meta fields like charLimit, maxImages, supportsCarousel
+	 *       },
+	 *       ...
+	 *     ]
+	 *   }
+	 *
+	 * Server-side rules:
+	 *   - Fetch-only handlers (e.g. Reddit) are filtered out — this endpoint
+	 *     is "where can I publish socially".
+	 *   - `slug` is always included on each entry; clients must not reconstruct
+	 *     it from object keys.
+	 *   - `capabilities` is canonicalised to `[{slug, label}]`. The legacy
+	 *     bare-string form is no longer accepted.
+	 *   - Sort: authenticated first, then alphabetical by label. This is the
+	 *     canonical display order; clients should render in array order.
+	 *   - The `{ platforms: [...] }` envelope leaves room to add metadata
+	 *     (totals, timestamps) without another breaking change.
 	 */
 	public static function get_platforms() {
 		$handler_abilities = new \DataMachine\Abilities\HandlerAbilities();
@@ -973,12 +1002,20 @@ class RestApi {
 				continue;
 			}
 
+			$type = $handler['type'] ?? 'publish';
+
+			// Skip fetch-only handlers (e.g. Reddit). Publish targets only.
+			if ( 'publish' !== $type ) {
+				continue;
+			}
+
 			$meta = $handler['meta'] ?? array();
 
-			$platforms[ $auth_key ] = array_merge(
+			$entry = array_merge(
 				array(
+					'slug'  => $auth_key,
 					'label' => $handler['label'] ?? $auth_key,
-					'type'  => $handler['type'] ?? 'publish',
+					'type'  => $type,
 				),
 				$meta,
 				array(
@@ -986,9 +1023,76 @@ class RestApi {
 					'username'      => $provider->get_username(),
 				)
 			);
+
+			$entry['capabilities'] = self::normalize_capabilities( $entry['capabilities'] ?? null );
+
+			$platforms[] = $entry;
 		}
 
-		return new \WP_REST_Response( $platforms );
+		// Sort: authenticated first, then alphabetical by label.
+		usort(
+			$platforms,
+			static function ( array $a, array $b ): int {
+				if ( $a['authenticated'] !== $b['authenticated'] ) {
+					return $a['authenticated'] ? -1 : 1;
+				}
+				return strcasecmp( $a['label'], $b['label'] );
+			}
+		);
+
+		return new \WP_REST_Response(
+			array(
+				'platforms' => $platforms,
+			)
+		);
+	}
+
+	/**
+	 * Normalise the `capabilities` shape declared by handlers.
+	 *
+	 * Accepts the canonical `[{slug, label}]` form, legacy bare-string lists
+	 * (`['publish', 'comments']`), or `null`/missing. Always returns a list
+	 * with at least one entry — every publish handler implicitly supports
+	 * `{slug:'publish', label:'Publish'}` so client renderers can rely on a
+	 * non-empty array without defaulting.
+	 *
+	 * @param mixed $raw Raw value from the handler's `meta['capabilities']`.
+	 * @return array<int, array{slug: string, label: string}>
+	 */
+	private static function normalize_capabilities( $raw ): array {
+		$default = array(
+			array(
+				'slug'  => 'publish',
+				'label' => 'Publish',
+			),
+		);
+
+		if ( ! is_array( $raw ) || empty( $raw ) ) {
+			return $default;
+		}
+
+		$normalised = array();
+
+		foreach ( $raw as $entry ) {
+			if ( is_string( $entry ) && '' !== $entry ) {
+				$normalised[] = array(
+					'slug'  => $entry,
+					'label' => ucfirst( $entry ),
+				);
+				continue;
+			}
+
+			if ( is_array( $entry ) && ! empty( $entry['slug'] ) ) {
+				$normalised[] = array(
+					'slug'  => (string) $entry['slug'],
+					'label' => isset( $entry['label'] ) && '' !== $entry['label']
+						? (string) $entry['label']
+						: ucfirst( (string) $entry['slug'] ),
+				);
+			}
+		}
+
+		return $normalised ?: $default;
 	}
 
 	/**
