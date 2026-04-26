@@ -17,7 +17,6 @@ namespace DataMachine\Tests\Unit\Abilities;
 use DataMachine\Abilities\AgentMemoryAbilities;
 use DataMachine\Abilities\File\AgentFileAbilities;
 use DataMachine\Abilities\PipelineAbilities;
-use DataMachine\Abilities\FlowAbilities;
 use DataMachine\Abilities\JobAbilities;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\Flows\Flows;

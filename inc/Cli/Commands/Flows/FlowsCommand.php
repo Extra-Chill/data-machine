@@ -3,7 +3,7 @@
  * WP-CLI Flows Command
  *
  * Provides CLI access to flow operations including listing, creation, and execution.
- * Wraps FlowAbilities API primitive.
+ * Wraps the datamachine/get-flows / create-flow / update-flow / delete-flow / pause-flow / resume-flow / duplicate-flow abilities.
  *
  * Queue and webhook subcommands are handled by dedicated command classes:
  * - QueueCommand (flows queue)
@@ -340,13 +340,13 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		$scoping = AgentResolver::buildScopingInput( $assoc_args );
-		$ability = new \DataMachine\Abilities\FlowAbilities();
+		$ability = wp_get_ability( 'datamachine/get-flows' );
 
 		// Use 'list' mode for multi-flow views (skips expensive handler enrichment).
 		// Use 'full' mode for single-flow detail views.
 		$output_mode = $flow_id ? 'full' : 'list';
 
-		$result = $ability->executeAbility(
+		$result = $ability->execute(
 			array_merge(
 				$scoping,
 				array(
@@ -409,7 +409,7 @@ class FlowsCommand extends BaseCommand {
 	 * For JSON format: outputs the full flow data with flow_config intact.
 	 * For table format: outputs key-value pairs followed by a step configs table.
 	 *
-	 * @param array  $flow   Full flow data from FlowAbilities.
+	 * @param array  $flow   Full flow data from the get-flows ability.
 	 * @param string $format Output format (table, json, csv, yaml).
 	 */
 	private function showFlowDetail( array $flow, string $format ): void {
@@ -808,8 +808,8 @@ class FlowsCommand extends BaseCommand {
 			);
 		}
 
-		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executeCreateFlow( $input );
+		$ability = wp_get_ability( 'datamachine/create-flow' );
+		$result  = $ability->execute( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to create flow' );
@@ -954,8 +954,8 @@ class FlowsCommand extends BaseCommand {
 			WP_CLI::confirm( sprintf( 'Are you sure you want to delete flow %d?', $flow_id ) );
 		}
 
-		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executeDeleteFlow( array( 'flow_id' => $flow_id ) );
+		$ability = wp_get_ability( 'datamachine/delete-flow' );
+		$result  = $ability->execute( array( 'flow_id' => $flow_id ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to delete flow' );
@@ -1040,8 +1040,8 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		if ( null !== $name || null !== $scheduling ) {
-			$ability = new \DataMachine\Abilities\FlowAbilities();
-			$result  = $ability->executeUpdateFlow( $input );
+			$ability = wp_get_ability( 'datamachine/update-flow' );
+			$result  = $ability->execute( $input );
 
 			if ( is_wp_error( $result ) ) {
 				WP_CLI::error( $result->get_error_message() );
@@ -1661,8 +1661,8 @@ class FlowsCommand extends BaseCommand {
 			return; // Error already printed.
 		}
 
-		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executePauseFlow( $input );
+		$ability = wp_get_ability( 'datamachine/pause-flow' );
+		$result  = $ability->execute( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to pause flows' );
@@ -1701,8 +1701,8 @@ class FlowsCommand extends BaseCommand {
 			return; // Error already printed.
 		}
 
-		$ability = new \DataMachine\Abilities\FlowAbilities();
-		$result  = $ability->executeResumeFlow( $input );
+		$ability = wp_get_ability( 'datamachine/resume-flow' );
+		$result  = $ability->execute( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to resume flows' );

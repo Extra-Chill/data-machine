@@ -133,7 +133,6 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/File/AgentFileAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/File/FlowFileAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/File/ScaffoldAbilities.php';
-	require_once __DIR__ . '/inc/Abilities/FlowAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/FlowStepAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/JobAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/LogAbilities.php';
@@ -203,7 +202,20 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\File\AgentFileAbilities();
 	new \DataMachine\Abilities\File\FlowFileAbilities();
 	new \DataMachine\Abilities\File\ScaffoldAbilities();
-	new \DataMachine\Abilities\FlowAbilities();
+	// Flow abilities self-register via their constructors. Pre-#1298 a
+	// `FlowAbilities` facade instantiated each of these to centralize
+	// the registration trigger; the facade was a hand-maintained proxy
+	// with no logic, so it got dropped (#1298). Each ability class
+	// stays single-purpose with its own `wp_register_ability()` call.
+	new \DataMachine\Abilities\Flow\GetFlowsAbility();
+	new \DataMachine\Abilities\Flow\CreateFlowAbility();
+	new \DataMachine\Abilities\Flow\UpdateFlowAbility();
+	new \DataMachine\Abilities\Flow\DeleteFlowAbility();
+	new \DataMachine\Abilities\Flow\DuplicateFlowAbility();
+	new \DataMachine\Abilities\Flow\PauseFlowAbility();
+	new \DataMachine\Abilities\Flow\ResumeFlowAbility();
+	new \DataMachine\Abilities\Flow\QueueAbility();
+	new \DataMachine\Abilities\Flow\WebhookTriggerAbility();
 	new \DataMachine\Abilities\FlowStepAbilities();
 	new \DataMachine\Abilities\JobAbilities();
 	new \DataMachine\Abilities\LogAbilities();

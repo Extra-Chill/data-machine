@@ -15,7 +15,6 @@ namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\AgentAbilities;
 use DataMachine\Abilities\PipelineAbilities;
-use DataMachine\Abilities\FlowAbilities;
 use DataMachine\Abilities\AgentMemoryAbilities;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\Flows\Flows;
@@ -27,7 +26,6 @@ use WP_UnitTestCase;
 class AgentContextPropagationTest extends WP_UnitTestCase {
 
 	private PipelineAbilities $pipeline_abilities;
-	private FlowAbilities $flow_abilities;
 	private int $admin_id;
 	private int $agent_id;
 
@@ -41,7 +39,6 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 		wp_set_current_user( $this->admin_id );
 
 		$this->pipeline_abilities = new PipelineAbilities();
-		$this->flow_abilities     = new FlowAbilities();
 
 		// Create a test agent via the abilities layer.
 		$agent_result = AgentAbilities::createAgent(
@@ -152,7 +149,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 		);
 		$pipeline_id     = $pipeline_result['pipeline_id'];
 
-		$result = $this->flow_abilities->executeCreateFlow(
+		$result = wp_get_ability( 'datamachine/create-flow' )->execute(
 			array(
 				'pipeline_id' => $pipeline_id,
 				'flow_name'   => 'Agent-Scoped Flow',
@@ -177,7 +174,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 		);
 		$pipeline_id     = $pipeline_result['pipeline_id'];
 
-		$result = $this->flow_abilities->executeCreateFlow(
+		$result = wp_get_ability( 'datamachine/create-flow' )->execute(
 			array(
 				'pipeline_id' => $pipeline_id,
 				'flow_name'   => 'Unscoped Flow',
