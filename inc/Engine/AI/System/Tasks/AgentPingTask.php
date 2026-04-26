@@ -46,6 +46,33 @@ class AgentPingTask extends SystemTask {
 	}
 
 	/**
+	 * Agent ping forwards pipeline context to the webhook payload, so it
+	 * needs the full engine bundle (flow_id, pipeline_id, flow_step_id,
+	 * data_packets, engine_data, job_id) injected into engine_data by
+	 * SystemTaskStep. Replaces the per-task `if` block in
+	 * SystemTaskStep::execute_pipeline_step() (#1297).
+	 *
+	 * @return bool
+	 * @since 0.84.0
+	 */
+	public function needsPipelineContext(): bool {
+		return true;
+	}
+
+	/**
+	 * Agent ping reads `queue_mode` (post-#1291) to decide whether to pop
+	 * from the prompt queue (drain), rotate it (loop), or peek without
+	 * mutating (static). Declared here so SystemTaskStep doesn't need to
+	 * know that agent_ping cares about queue_mode (#1297).
+	 *
+	 * @return array<int, string>
+	 * @since 0.84.0
+	 */
+	public function getFlowStepConfigPassthrough(): array {
+		return array( 'queue_mode' );
+	}
+
+	/**
 	 * Execute agent ping task.
 	 *
 	 * @param int   $jobId  DM Job ID.

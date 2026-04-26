@@ -117,6 +117,63 @@ abstract class SystemTask {
 		);
 	}
 
+	// ─── SystemTaskStep passthrough contract (#1297) ─────────────────
+	//
+	// SystemTaskStep::execute_pipeline_step() builds the child engine_data
+	// that's passed to executeTask(). The universal merge already includes
+	// task params, agent identity, and post_id. Tasks that need more
+	// context (pipeline-execution snapshot, flow_step_config keys) declare
+	// it here instead of forcing the step to bake task-specific knowledge
+	// into a per-task `if` block.
+	//
+	// Default implementations return "no extra passthrough", so existing
+	// tasks (InternalLinkingTask, AltTextTask, MetaDescriptionTask, etc.)
+	// keep working unchanged. Only AgentPingTask needs the pipeline
+	// context bundle today; future tasks can opt in.
+
+	/**
+	 * Whether this task needs the full pipeline-execution context bundled
+	 * into engine_data when run as a pipeline step.
+	 *
+	 * When true, SystemTaskStep injects:
+	 *   - flow_id            (from job context)
+	 *   - pipeline_id        (from job context)
+	 *   - flow_step_id       (the step that scheduled the task)
+	 *   - data_packets       (the step's incoming packets)
+	 *   - engine_data        (the engine's full key/value snapshot)
+	 *   - job_id             (the parent job)
+	 *
+	 * Used by AgentPingTask to forward the in-flight pipeline state to
+	 * the SendPingAbility so the webhook receives the same shape it
+	 * would see in a non-system-task path.
+	 *
+	 * @return bool
+	 * @since 0.84.0
+	 */
+	public function needsPipelineContext(): bool {
+		return false;
+	}
+
+	/**
+	 * Declare flow_step_config keys that should be copied into the child
+	 * engine_data when this task is run as a pipeline step.
+	 *
+	 * Each key is read from `flow_step_config[$key]` (when present) and
+	 * placed at `engine_data[$key]` so executeTask() can read it from
+	 * `$params[$key]` without rummaging through nested config blobs.
+	 *
+	 * Used by AgentPingTask for `queue_mode` (post-#1291) so the queue
+	 * access pattern is available to the task at execution time without
+	 * SystemTaskStep needing to know which tasks care about which
+	 * flow_step_config fields.
+	 *
+	 * @return array<int, string> Flat list of flow_step_config key names.
+	 * @since 0.84.0
+	 */
+	public function getFlowStepConfigPassthrough(): array {
+		return array();
+	}
+
 	// ─── Job lifecycle helpers ────────────────────────────────────────
 	// Used by executeTask() implementations to signal completion/failure.
 
