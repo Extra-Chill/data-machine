@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.12.1] - 2026-04-26
+
+### Changed
+- disable homeboy autofix
+
+### Fixed
+- resolve Instagram username via Facebook Graph API instead of graph.instagram.com, which rejects FB Login tokens with 'Cannot parse access token' and silently stored empty usernames
+- return save_account result from OAuth storage callback
+- resolve Instagram user ID from Facebook token and support fb_exchange_token
+- use Facebook graph endpoint for token exchange
+- use Facebook Login dialog for Instagram Graph API publishing
+
 ## [0.12.0] - 2026-04-22
 
 ### Added
