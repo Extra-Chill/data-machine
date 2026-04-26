@@ -1523,68 +1523,43 @@ class QueueAbility {
 	}
 
 	/**
-	 * Pop the first prompt from the queue (drain semantics).
+	 * Consume one item from a named queue slot per the given mode.
 	 *
-	 * Used by AgentPingTask when its `queue_mode` is `drain`. AIStep's
-	 * mode-aware reader lives in QueueableTrait. For the fetch-step
-	 * config-patch queue, see {@see popConfigPatchFromQueue()}.
+	 * Single source of truth for the drain / loop / static access
+	 * pattern (#1291) regardless of which consumer is reading. Used by
+	 * `QueueableTrait` (Step-side consumers AIStep + FetchStep) and
+	 * `AgentPingTask` (SystemTask consumer) — both share the same
+	 * mutation, peek, rotation, and logging semantics.
 	 *
-	 * @param int      $flow_id      Flow ID.
-	 * @param string   $flow_step_id Flow step ID.
-	 * @param DB_Flows $db_flows     Database instance (avoids creating new instance each call).
-	 * @return array|null The popped queue item or null if empty.
+	 *   - drain  → pop the head, discard. DB write.
+	 *   - loop   → pop the head, append to the tail. DB write.
+	 *   - static → peek the head, no mutation. No DB write.
+	 *
+	 * Pre-#1299 this lived as `private static` on `QueueableTrait` with
+	 * three sibling helpers on `QueueAbility` (`popFromQueue`,
+	 * `loopFromQueue`, `popConfigPatchFromQueue`) that AgentPingTask
+	 * called instead — those reimplemented the same logic minus the
+	 * static-mode branch. The static helpers are gone; AgentPingTask
+	 * goes through this method now.
+	 *
+	 * @param int           $flow_id      Flow ID.
+	 * @param string        $flow_step_id Flow step ID.
+	 * @param string        $slot         Queue slot name (one of the
+	 *                                    SLOT_* constants on this class).
+	 * @param string        $queue_mode   "drain" | "loop" | "static".
+	 *                                    Unknown values are treated as
+	 *                                    "static" (peek without mutating).
+	 * @param DB_Flows|null $db_flows     Optional database instance.
+	 * @return array|null The consumed entry, or null if the queue was empty.
+	 * @since 0.84.0
 	 */
-	public static function popFromQueue( int $flow_id, string $flow_step_id, ?DB_Flows $db_flows = null ): ?array {
-		return self::popFromQueueSlot( $flow_id, $flow_step_id, self::SLOT_PROMPT_QUEUE, $db_flows );
-	}
-
-	/**
-	 * Pop the first prompt from the queue and rotate it to the tail
-	 * (loop semantics).
-	 *
-	 * Sibling of {@see popFromQueue()} for the `loop` queue mode. The
-	 * returned entry is the one the caller should consume; the tail of
-	 * the queue gets the same entry appended so it cycles back around
-	 * after the rest of the queue drains.
-	 *
-	 * @param int      $flow_id      Flow ID.
-	 * @param string   $flow_step_id Flow step ID.
-	 * @param DB_Flows $db_flows     Database instance.
-	 * @return array|null The rotated queue item or null if empty.
-	 */
-	public static function loopFromQueue( int $flow_id, string $flow_step_id, ?DB_Flows $db_flows = null ): ?array {
-		return self::popFromQueueSlot( $flow_id, $flow_step_id, self::SLOT_PROMPT_QUEUE, $db_flows, true );
-	}
-
-	/**
-	 * Pop the first config patch from the fetch step config-patch queue.
-	 *
-	 * Sibling of {@see popFromQueue()} for FetchStep's QueueableTrait
-	 * consumer. Returns the entry verbatim (no JSON-decode — the patch
-	 * is stored as a decoded array).
-	 *
-	 * @param int      $flow_id      Flow ID.
-	 * @param string   $flow_step_id Flow step ID.
-	 * @param DB_Flows $db_flows     Database instance.
-	 * @return array|null The popped queue item (`{ patch, added_at }`) or null if empty.
-	 */
-	public static function popConfigPatchFromQueue( int $flow_id, string $flow_step_id, ?DB_Flows $db_flows = null ): ?array {
-		return self::popFromQueueSlot( $flow_id, $flow_step_id, self::SLOT_CONFIG_PATCH_QUEUE, $db_flows );
-	}
-
-	/**
-	 * Pop the first item from a named queue slot.
-	 *
-	 * @param int      $flow_id      Flow ID.
-	 * @param string   $flow_step_id Flow step ID.
-	 * @param string   $slot         Slot name.
-	 * @param DB_Flows $db_flows     Database instance.
-	 * @param bool     $loop         When true, append the popped entry to
-	 *                               the tail of the queue (loop semantics).
-	 *                               When false (default), discard (drain).
-	 * @return array|null The popped item or null if empty.
-	 */
-	private static function popFromQueueSlot( int $flow_id, string $flow_step_id, string $slot, ?DB_Flows $db_flows = null, bool $loop = false ): ?array {
+	public static function consumeFromQueueSlot(
+		int $flow_id,
+		string $flow_step_id,
+		string $slot,
+		string $queue_mode,
+		?DB_Flows $db_flows = null
+	): ?array {
 		if ( null === $db_flows ) {
 			$db_flows = new DB_Flows();
 		}
@@ -1606,10 +1581,16 @@ class QueueAbility {
 			return null;
 		}
 
-		$popped_item = array_shift( $queue );
+		// Static peek: read head, do not mutate storage.
+		if ( 'static' === $queue_mode ) {
+			return $queue[0];
+		}
 
-		if ( $loop ) {
-			$queue[] = $popped_item;
+		// Drain or loop: pop the head, optionally rotate.
+		$entry = array_shift( $queue );
+
+		if ( 'loop' === $queue_mode ) {
+			$queue[] = $entry;
 		}
 
 		$flow_config[ $flow_step_id ][ $slot ] = $queue;
@@ -1622,15 +1603,16 @@ class QueueAbility {
 		do_action(
 			'datamachine_log',
 			'info',
-			$loop ? 'Item rotated in queue (loop)' : 'Item popped from queue (drain)',
+			'Item consumed from queue',
 			array(
 				'flow_id'         => $flow_id,
 				'slot'            => $slot,
+				'queue_mode'      => $queue_mode,
 				'remaining_count' => count( $queue ),
 			)
 		);
 
-		return $popped_item;
+		return $entry;
 	}
 
 	/**

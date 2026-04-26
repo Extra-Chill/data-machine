@@ -62,13 +62,17 @@ class AgentPingTask extends SystemTask {
 
 		// Consume from flow queue when running as a pipeline step. The
 		// `queue_mode` enum (#1291) decides the access pattern:
-		//   - drain  → pop the head, discard
-		//   - loop   → pop the head, append to tail
-		//   - static → peek the head; do not mutate
+		//   - drain  → pop the head, discard. DB write.
+		//   - loop   → pop the head, append to tail. DB write.
+		//   - static → peek the head; do not mutate. No DB write.
 		// Static mode + non-empty `prompt` argument falls through to use
 		// the configured prompt directly. This preserves the pre-#1291
 		// behaviour where running an agent_ping task without a queue
 		// just sent the configured prompt every tick.
+		//
+		// #1299: shares `QueueAbility::consumeFromQueueSlot()` with
+		// `QueueableTrait` (AIStep / FetchStep). Single source of truth
+		// for the drain / loop / static semantics.
 		$from_queue   = false;
 		$flow_id      = (int) ( $params['flow_id'] ?? 0 );
 		$flow_step_id = $params['flow_step_id'] ?? '';
@@ -78,14 +82,40 @@ class AgentPingTask extends SystemTask {
 		}
 
 		if ( 'static' !== $queue_mode && $flow_id > 0 && ! empty( $flow_step_id ) ) {
-			$queued_item = ( 'loop' === $queue_mode )
-				? QueueAbility::loopFromQueue( $flow_id, $flow_step_id )
-				: QueueAbility::popFromQueue( $flow_id, $flow_step_id );
+			$queued_item = QueueAbility::consumeFromQueueSlot(
+				$flow_id,
+				$flow_step_id,
+				QueueAbility::SLOT_PROMPT_QUEUE,
+				$queue_mode
+			);
 
 			if ( $queued_item && ! empty( $queued_item['prompt'] ) ) {
 				$prompt     = $queued_item['prompt'];
 				$from_queue = true;
 
+				// Back up the popped prompt to engine_data for retry on
+				// failure. Mirrors `QueueableTrait::consumeOnceFromPromptQueue()`'s
+				// `queued_prompt_backup` write so a SendPingAbility
+				// failure after the pop doesn't lose the prompt. Static
+				// mode never mutates so no rollback is needed.
+				\datamachine_merge_engine_data(
+					$jobId,
+					array(
+						'queued_prompt_backup' => array(
+							'slot'         => QueueAbility::SLOT_PROMPT_QUEUE,
+							'mode'         => $queue_mode,
+							'prompt'       => $queued_item['prompt'],
+							'flow_id'      => $flow_id,
+							'flow_step_id' => $flow_step_id,
+							'added_at'     => $queued_item['added_at'] ?? null,
+						),
+					)
+				);
+
+				// `consumeFromQueueSlot` already logged the slot-level
+				// pop/rotate event with the unified shape. This second
+				// log line is the consumer-side announcement so an
+				// operator searching by "agent_ping" still finds it.
 				do_action(
 					'datamachine_log',
 					'info',
