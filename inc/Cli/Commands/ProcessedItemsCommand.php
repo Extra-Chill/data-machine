@@ -65,7 +65,7 @@ class ProcessedItemsCommand extends BaseCommand {
 		global $wpdb;
 
 		$handler_filter  = $assoc_args['handler'] ?? null;
-		$pipeline_filter = $assoc_args['pipeline'] ?? null;
+		$pipeline_filter = isset( $assoc_args['pipeline'] ) ? (int) $assoc_args['pipeline'] : null;
 		$min_waste       = (int) ( $assoc_args['min-waste'] ?? 10 );
 		$format          = $assoc_args['format'] ?? 'table';
 
@@ -73,12 +73,21 @@ class ProcessedItemsCommand extends BaseCommand {
 		$table = $db->get_table_name();
 
 		// Get processed items grouped by flow_step_id and source_type.
+		// Pipeline + flow IDs are parsed from flow_step_id in PHP (deterministic prefix
+		// {pipeline_id}_{uuid}_{flow_id}); avoiding SQL string functions like
+		// SUBSTRING_INDEX keeps this portable across MySQL and the SQLite drop-in.
 		$where_clauses = array();
 		$prepare_args  = array( $table );
 
 		if ( $handler_filter ) {
 			$where_clauses[] = 'source_type = %s';
 			$prepare_args[]  = $handler_filter;
+		}
+
+		if ( null !== $pipeline_filter ) {
+			// flow_step_id always begins with the pipeline_id followed by an underscore.
+			$where_clauses[] = 'flow_step_id LIKE %s';
+			$prepare_args[]  = $wpdb->esc_like( (string) $pipeline_filter ) . '_%';
 		}
 
 		$where_sql = ! empty( $where_clauses ) ? 'WHERE ' . implode( ' AND ', $where_clauses ) : '';
@@ -91,8 +100,7 @@ class ProcessedItemsCommand extends BaseCommand {
 					source_type,
 					COUNT(*) as processed_count,
 					MIN(processed_timestamp) as first_processed,
-					MAX(processed_timestamp) as last_processed,
-					CAST(SUBSTRING_INDEX(flow_step_id, '_', -1) AS UNSIGNED) as flow_id
+					MAX(processed_timestamp) as last_processed
 				FROM %i
 				{$where_sql}
 				GROUP BY flow_step_id, source_type
@@ -107,19 +115,22 @@ class ProcessedItemsCommand extends BaseCommand {
 			return;
 		}
 
-		// Enrich with flow names and filter by pipeline.
+		// Enrich with flow names; pipeline_id and flow_id come from the flow_step_id prefix.
 		$db_flows = new \DataMachine\Core\Database\Flows\Flows();
 		$rows     = array();
 
 		foreach ( $results as $row ) {
-			$flow_id = (int) $row['flow_id'];
-			$flow    = $db_flows->get_flow( $flow_id );
-
-			if ( ! $flow ) {
+			$ids = $this->parse_flow_step_id( (string) $row['flow_step_id'] );
+			if ( null === $ids ) {
+				// Malformed flow_step_id — skip rather than misattribute.
 				continue;
 			}
 
-			if ( $pipeline_filter && (int) $flow['pipeline_id'] !== (int) $pipeline_filter ) {
+			$pipeline_id = $ids['pipeline_id'];
+			$flow_id     = $ids['flow_id'];
+
+			// Defensive: skip rows that slipped past the LIKE filter (shouldn't happen).
+			if ( null !== $pipeline_filter && $pipeline_id !== $pipeline_filter ) {
 				continue;
 			}
 
@@ -130,10 +141,13 @@ class ProcessedItemsCommand extends BaseCommand {
 				continue;
 			}
 
+			$flow      = $db_flows->get_flow( $flow_id );
+			$flow_name = is_array( $flow ) ? ( $flow['flow_name'] ?? '(deleted)' ) : '(deleted)';
+
 			$rows[] = array(
 				'flow_id'     => $flow_id,
-				'flow_name'   => $flow['flow_name'] ?? '?',
-				'pipeline_id' => $flow['pipeline_id'] ?? '?',
+				'flow_name'   => $flow_name,
+				'pipeline_id' => $pipeline_id,
 				'handler'     => $row['source_type'],
 				'processed'   => $processed,
 				'first_seen'  => $row['first_processed'],
@@ -152,6 +166,40 @@ class ProcessedItemsCommand extends BaseCommand {
 		WP_CLI::log( '' );
 
 		WP_CLI\Utils\format_items( $format, $rows, array_keys( $rows[0] ) );
+	}
+
+	/**
+	 * Parse pipeline_id and flow_id from a flow_step_id.
+	 *
+	 * Format: {pipeline_id}_{uuid}_{flow_id}, where pipeline_id and flow_id are
+	 * positive integers and uuid is a v4 UUID (contains dashes, no underscores).
+	 *
+	 * @param string $flow_step_id Composite flow step ID.
+	 * @return array{pipeline_id:int,flow_id:int}|null Null when the input is malformed.
+	 */
+	private function parse_flow_step_id( string $flow_step_id ): ?array {
+		if ( '' === $flow_step_id ) {
+			return null;
+		}
+
+		$first_underscore = strpos( $flow_step_id, '_' );
+		$last_underscore  = strrpos( $flow_step_id, '_' );
+
+		if ( false === $first_underscore || false === $last_underscore || $first_underscore === $last_underscore ) {
+			return null;
+		}
+
+		$pipeline_part = substr( $flow_step_id, 0, $first_underscore );
+		$flow_part     = substr( $flow_step_id, $last_underscore + 1 );
+
+		if ( ! ctype_digit( $pipeline_part ) || ! ctype_digit( $flow_part ) ) {
+			return null;
+		}
+
+		return array(
+			'pipeline_id' => (int) $pipeline_part,
+			'flow_id'     => (int) $flow_part,
+		);
 	}
 
 	/**
