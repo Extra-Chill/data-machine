@@ -585,54 +585,17 @@ function datamachine_activate_for_site() {
 		set_transient( 'datamachine_needs_scaffold', 1, HOUR_IN_SECONDS );
 	}
 
-	// Run layered architecture migration (idempotent).
-	datamachine_migrate_to_layered_architecture();
-
-	// Migrate flow_config handler keys from singular to plural (idempotent).
-	datamachine_migrate_handler_keys_to_plural();
-
-	// Backfill agent_id on pipelines, flows, and jobs from user_id→owner_id mapping (idempotent).
-	datamachine_backfill_agent_ids();
-
-	// Assign orphaned resources (agent_id IS NULL) to sole agent on single-agent installs (idempotent).
-	datamachine_assign_orphaned_resources_to_sole_agent();
-
-	// Migrate USER.md to network-scoped paths and create NETWORK.md on multisite (idempotent).
-	datamachine_migrate_user_md_to_network_scope();
-
-	// Migrate per-site agents to network-scoped tables (idempotent).
-	datamachine_migrate_agents_to_network_scope();
-
-	// Drop orphaned per-site agent tables left behind by the migration (idempotent).
-	datamachine_drop_orphaned_agent_tables();
-
-	// Migrate agent_ping step types to flow configs (idempotent).
-	datamachine_migrate_agent_ping_to_system_task();
-
-	// Migrate agent_ping step types to pipeline configs (idempotent).
-	datamachine_migrate_agent_ping_pipeline_to_system_task();
-
-	// Migrate `update` step type to `upsert` in pipeline/flow configs (idempotent).
-	datamachine_migrate_update_to_upsert_step_type();
-
-	// Strip dead `provider`/`model` keys from pipeline_config rows (data-machine#1180, idempotent).
-	datamachine_strip_pipeline_step_provider_model();
-
-	// Move AI step tools from handler_slugs to enabled_tools (#1205 Phase 2b, idempotent).
-	datamachine_migrate_ai_enabled_tools();
-
-	// Split prompt_queue / config_patch_queue payload polymorphism (#1292, idempotent).
-	datamachine_migrate_split_queue_payload();
-
-	// Collapse user_message into prompt_queue and replace queue_enabled with
-	// queue_mode enum (drain | loop | static) on every queueable step (#1291,
-	// idempotent).
-	datamachine_migrate_user_message_queue_mode();
-
-	// Drop redundant _datamachine_post_pipeline_id rows (#1091). Idempotent.
-	datamachine_drop_redundant_post_pipeline_meta();
+	// Run the shared migration chain. Each migration is idempotent and
+	// option-gated; this same function fires from
+	// `datamachine_maybe_run_deferred_migrations()` at plugins_loaded:5
+	// when a deploy advances DATAMACHINE_VERSION past the persisted
+	// `datamachine_db_version` option (#1301).
+	datamachine_run_schema_migrations();
 
 	// Regenerate SITE.md with enriched content and clean up legacy SiteContext transient.
+	// Activation-only — SITE.md regeneration is heavy and shouldn't fire on
+	// every deploy (the version-gated runtime path is for schema-shape drift,
+	// not opportunistic content refresh).
 	datamachine_regenerate_site_md();
 	delete_transient( 'datamachine_site_context_data' );
 
