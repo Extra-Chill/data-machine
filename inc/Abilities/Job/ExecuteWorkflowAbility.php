@@ -379,6 +379,28 @@ class ExecuteWorkflowAbility {
 				? array_values( $step['enabled_tools'] )
 				: array();
 
+			// AIStep reads its per-flow user message from the
+			// prompt_queue head (gated by queue_mode), not a dedicated
+			// user_message slot — see #1291. The workflow JSON spec
+			// still accepts `user_message` as an input field for
+			// ergonomics (matches ExecuteWorkflowTool's documented
+			// shape); convert it here into a 1-entry static prompt_queue
+			// so AIStep sees it. Pre-fix this lane wrote the legacy
+			// `user_message` slot directly, which AIStep no longer
+			// reads — the input value was silently dropped at runtime.
+			$workflow_user_message = is_string( $step['user_message'] ?? null )
+				? trim( $step['user_message'] )
+				: '';
+			$prompt_queue          = array();
+			if ( 'ai' === $step_type && '' !== $workflow_user_message ) {
+				$prompt_queue = array(
+					array(
+						'prompt'   => $workflow_user_message,
+						'added_at' => gmdate( 'c' ),
+					),
+				);
+			}
+
 			$flow_config[ $step_id ] = array(
 				'flow_step_id'     => $step_id,
 				'pipeline_step_id' => $pipeline_step_id,
@@ -387,7 +409,8 @@ class ExecuteWorkflowAbility {
 				'handler_slugs'    => $handler_slugs,
 				'handler_configs'  => $handler_configs,
 				'enabled_tools'    => $enabled_tools,
-				'user_message'     => $step['user_message'] ?? '',
+				'prompt_queue'     => $prompt_queue,
+				'queue_mode'       => 'static',
 				'disabled_tools'   => $step['disabled_tools'] ?? array(),
 				'pipeline_id'      => 'direct',
 				'flow_id'          => 'direct',

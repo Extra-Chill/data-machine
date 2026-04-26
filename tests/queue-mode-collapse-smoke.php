@@ -106,6 +106,9 @@ function migrate_collapse_for_test( array $flow_config ): array {
 
 			if ( '' !== $user_message ) {
 				if ( empty( $queue ) ) {
+					// Empty queue + user_message: seed 1-entry static
+					// queue. Pre-#1291 ran user_message every tick when
+					// the queue was empty, regardless of queue_enabled.
 					$step['prompt_queue'] = array(
 						array(
 							'prompt'   => $user_message,
@@ -115,8 +118,11 @@ function migrate_collapse_for_test( array $flow_config ): array {
 					$step['queue_mode'] = 'static';
 					++$seeded;
 				} else {
-					// Both populated: kept queue, dropped user_message.
-					$step['queue_mode'] = 'static';
+					// Non-empty queue + user_message: drop user_message
+					// (queue head was already shadowing it). queue_mode
+					// stays at the boolean-resolved value (drain or
+					// static); do NOT force static — that would silently
+					// stop a draining flow from draining.
 					++$dropped;
 				}
 			}
@@ -282,7 +288,14 @@ assert_collapse(
 	! array_key_exists( 'user_message', $migrated['ai_step_42'] )
 );
 
-echo "\n[migration:4] both prompt_queue and user_message non-empty → keep queue, drop user_message\n";
+echo "\n[migration:4a] queue_enabled=true + non-empty queue + user_message → drain mode preserved\n";
+// Regression test for the original #1291 migration which forced
+// queue_mode=static here. That silently converted a draining flow
+// into a static one — a real behaviour change. Correct behaviour is
+// to keep queue_mode=drain (matching the original boolean) and drop
+// user_message. The drain-then-fallback semantic is lossy in the new
+// model; the migration logs the dropped value so operators can
+// recover it via `flow queue add` if needed.
 $flow_config = array(
 	'ai_step_42' => array(
 		'step_type'     => 'ai',
@@ -300,13 +313,38 @@ assert_collapse(
 		&& 'queued head wins' === $migrated['ai_step_42']['prompt_queue'][0]['prompt']
 );
 assert_collapse(
-	'mode forced to static (preserves observable behaviour)',
-	'static' === $migrated['ai_step_42']['queue_mode']
+	'queue_enabled=true preserved as drain (NOT forced to static)',
+	'drain' === $migrated['ai_step_42']['queue_mode']
 );
 assert_collapse( 'dropped counter incremented', 1 === $dropped );
 assert_collapse( 'seeded counter not touched', 0 === $seeded );
 assert_collapse(
 	'user_message dropped',
+	! array_key_exists( 'user_message', $migrated['ai_step_42'] )
+);
+
+echo "\n[migration:4b] queue_enabled=false + non-empty queue + user_message → static mode preserved\n";
+$flow_config = array(
+	'ai_step_42' => array(
+		'step_type'     => 'ai',
+		'user_message'  => 'shadowed legacy message',
+		'queue_enabled' => false,
+		'prompt_queue'  => array(
+			array( 'prompt' => 'pinned head', 'added_at' => 'x' ),
+		),
+	),
+);
+[ $migrated, $dropped, $seeded ] = migrate_collapse_for_test( $flow_config );
+assert_collapse(
+	'queue preserved as-is (case 4b)',
+	1 === count( $migrated['ai_step_42']['prompt_queue'] )
+);
+assert_collapse(
+	'queue_enabled=false preserved as static (case 4b)',
+	'static' === $migrated['ai_step_42']['queue_mode']
+);
+assert_collapse(
+	'user_message dropped (case 4b)',
 	! array_key_exists( 'user_message', $migrated['ai_step_42'] )
 );
 
