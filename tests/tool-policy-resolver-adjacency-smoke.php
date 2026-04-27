@@ -97,6 +97,32 @@ function gather_pipeline_handler_tools_for_test( array $args, StubToolManager $t
 	return $available_tools;
 }
 
+/**
+ * Inline reimplementation of the static-tool merge portion of
+ * ToolPolicyResolver::gatherPipelineTools(). Handler-scoped tools must win
+ * name collisions because they carry the `handler` metadata downstream steps
+ * use to prove required handler execution.
+ */
+function merge_static_pipeline_tools_for_test( array $available_tools, array $pipeline_tools ): array {
+	foreach ( $pipeline_tools as $tool_name => $tool_config ) {
+		if ( ! is_array( $tool_config ) ) {
+			continue;
+		}
+
+		if ( isset( $tool_config['_handler_callable'] ) ) {
+			continue;
+		}
+
+		if ( isset( $available_tools[ $tool_name ] ) ) {
+			continue;
+		}
+
+		$available_tools[ $tool_name ] = $tool_config;
+	}
+
+	return $available_tools;
+}
+
 $failures = array();
 $passes   = 0;
 
@@ -227,6 +253,37 @@ $tools = gather_pipeline_handler_tools_for_test( $args, $tool_manager );
 
 assert_equals( array(), $tool_manager->resolveCalls, 'resolver did not call tool manager', $failures, $passes );
 assert_equals( array(), $tools, 'no tools surfaced', $failures, $passes );
+
+// Test 6: Handler-scoped tool collides with static pipeline tool of same name.
+// The handler-scoped definition must win so AIConversationLoop records a
+// successful handler completion for downstream UpsertStep/PublishStep.
+echo "\n[6] Handler-scoped tool wins static tool name collision:\n";
+$tools = merge_static_pipeline_tools_for_test(
+	array(
+		'wiki_upsert' => array(
+			'class'       => 'WikiUpsertHandler',
+			'method'      => 'handle_tool_call',
+			'handler'     => 'wiki_upsert',
+			'parameters'  => array( 'handler-scoped' => true ),
+		),
+	),
+	array(
+		'wiki_upsert' => array(
+			'class'      => 'WikiUpsertAbility',
+			'method'     => 'handle_tool_call',
+			'parameters' => array( 'global' => true ),
+		),
+		'wiki_read'   => array(
+			'class'      => 'WikiReadAbility',
+			'method'     => 'handle_tool_call',
+			'parameters' => array(),
+		),
+	)
+);
+
+assert_equals( 'wiki_upsert', $tools['wiki_upsert']['handler'] ?? null, 'handler metadata preserved on colliding tool', $failures, $passes );
+assert_equals( array( 'handler-scoped' => true ), $tools['wiki_upsert']['parameters'], 'handler-scoped definition preserved', $failures, $passes );
+assert_equals( true, isset( $tools['wiki_read'] ), 'non-colliding static pipeline tool still added', $failures, $passes );
 
 echo "\n----------------------------------------------\n";
 $total = $passes + count( $failures );
