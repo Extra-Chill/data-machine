@@ -19,8 +19,12 @@ permissions:
 
 jobs:
   homeboy:
-    name: Homeboy
+    name: Homeboy (${{ matrix.command }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        command: [audit, lint, test]
     services:
       mysql:
         image: mysql:8.0
@@ -48,8 +52,10 @@ jobs:
           app-id: ${{ secrets.HOMEBOY_APP_ID }}
           private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
 
-      - uses: Extra-Chill/homeboy-action@v2
+      - name: Run Homeboy ${{ matrix.command }}
+        uses: Extra-Chill/homeboy-action@v2
         with:
-          commands: audit
+          commands: ${{ matrix.command }}
+          expected-commands: audit,lint,test
           app-token: ${{ steps.app-token.outputs.token || '' }}
           autofix: 'false'
