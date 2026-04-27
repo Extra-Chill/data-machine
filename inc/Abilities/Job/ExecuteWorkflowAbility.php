@@ -99,7 +99,7 @@ class ExecuteWorkflowAbility {
 	public function execute( array $input ): array {
 		$workflow     = $input['workflow'] ?? null;
 		$timestamp    = $input['timestamp'] ?? null;
-		$initial_data = $input['initial_data'] ?? null;
+		$initial_data = is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array();
 
 		// Validate workflow structure
 		$validation = $this->validateWorkflow( $workflow );
@@ -125,11 +125,9 @@ class ExecuteWorkflowAbility {
 			'label'       => 'Chat Workflow',
 		);
 
-		if ( is_array( $initial_data ) ) {
-			$initial_parent_job_id = (int) ( $initial_data['parent_job_id'] ?? 0 );
-			if ( $initial_parent_job_id > 0 ) {
-				$create_args['parent_job_id'] = $initial_parent_job_id;
-			}
+		$initial_parent_job_id = (int) ( $initial_data['parent_job_id'] ?? 0 );
+		if ( $initial_parent_job_id > 0 ) {
+			$create_args['parent_job_id'] = $initial_parent_job_id;
 		}
 
 		$job_id = $this->db_jobs->create_job( $create_args );
@@ -141,15 +139,10 @@ class ExecuteWorkflowAbility {
 			);
 		}
 
-		// Build engine data with configs and optional initial data
-		$engine_data = array(
-			'flow_config'     => $configs['flow_config'],
-			'pipeline_config' => $configs['pipeline_config'],
-		);
-
-		if ( ! empty( $initial_data ) && is_array( $initial_data ) ) {
-			$engine_data = array_merge( $engine_data, $initial_data );
-		}
+		// Build engine data with caller data underneath engine-owned configs.
+		$engine_data                    = $initial_data;
+		$engine_data['flow_config']     = $configs['flow_config'];
+		$engine_data['pipeline_config'] = $configs['pipeline_config'];
 
 		// Mirror RunFlowAbility's engine_data['job'] shape so downstream
 		// step types (AIStep, SystemTaskStep) can read job + agent
