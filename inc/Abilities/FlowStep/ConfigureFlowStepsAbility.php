@@ -12,6 +12,7 @@
 namespace DataMachine\Abilities\FlowStep;
 
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Core\Steps\FlowStepTargetResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -78,11 +79,11 @@ class ConfigureFlowStepsAbility {
 							),
 							'updates'             => array(
 								'type'        => 'array',
-								'description' => __( 'Cross-pipeline mode: configure multiple flows with different settings. Each item: {flow_id, step_configs (keyed by step_type)}', 'data-machine' ),
+								'description' => __( 'Cross-pipeline mode: configure multiple flows with different settings. Each item: {flow_id, step_configs}. Step configs may be keyed by step_type when unique, or include flow_step_id, pipeline_step_id, or execution_order when duplicate step types exist.', 'data-machine' ),
 							),
 							'shared_config'       => array(
 								'type'        => 'object',
-								'description' => __( 'Shared step config for updates mode applied before per-flow overrides (keyed by step_type)', 'data-machine' ),
+								'description' => __( 'Shared step config for updates mode applied before per-flow overrides. Keys may use unique step_type shorthand; duplicate step types require explicit targeting in the config.', 'data-machine' ),
 							),
 							'validate_only'       => array(
 								'type'        => 'boolean',
@@ -517,29 +518,20 @@ class ConfigureFlowStepsAbility {
 			// Merge shared config with per-flow config (per-flow takes precedence)
 			$merged_step_configs = array_merge( $shared_config, $step_configs );
 
-			// Build step_type to flow_step_id mapping
-			$step_type_to_flow_step = array();
-			foreach ( $flow_config as $flow_step_id => $step_data ) {
-				$step_type = $step_data['step_type'] ?? '';
-				if ( ! empty( $step_type ) ) {
-					$step_type_to_flow_step[ $step_type ] = $flow_step_id;
-				}
-			}
-
 			$flow_updated    = false;
 			$flow_step_count = 0;
 
-			foreach ( $merged_step_configs as $step_type => $config ) {
-				$flow_step_id = $step_type_to_flow_step[ $step_type ] ?? null;
+			foreach ( $merged_step_configs as $step_key => $config ) {
+				$config = is_array( $config ) ? $config : array();
 
-				if ( ! $flow_step_id ) {
-					$errors[] = array(
-						'flow_id'   => $flow_id,
-						'step_type' => $step_type,
-						'error'     => "No step of type '{$step_type}' found in flow",
-					);
+				$target = FlowStepTargetResolver::resolve( $flow_config, (string) $step_key, $config );
+				if ( empty( $target['success'] ) ) {
+					$errors[] = array_merge( array( 'flow_id' => $flow_id ), $target['error'] );
 					continue;
 				}
+
+				$flow_step_id = $target['flow_step_id'];
+				$step_type    = $target['step_type'] ?? (string) $step_key;
 
 				$handler_slug   = $config['handler_slug'] ?? null;
 				$handler_config = $config['handler_config'] ?? array();
