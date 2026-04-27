@@ -7,6 +7,8 @@
 
 namespace DataMachine\Core\Steps;
 
+use DataMachine\Abilities\Flow\QueueAbility;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -99,8 +101,8 @@ class FlowStepConfigFactory {
 			'execution_order'    => true,
 			'enabled_tools'      => true,
 			'disabled_tools'     => true,
-			'prompt_queue'       => true,
-			'config_patch_queue' => true,
+			QueueAbility::SLOT_PROMPT_QUEUE       => true,
+			QueueAbility::SLOT_CONFIG_PATCH_QUEUE => true,
 			'queue_mode'         => true,
 			'pipeline_id'        => true,
 			'flow_id'            => true,
@@ -141,9 +143,9 @@ class FlowStepConfigFactory {
 		$defaults = array( 'queue_mode' => 'static' );
 
 		if ( 'fetch' === $step_type ) {
-			$defaults['config_patch_queue'] = array();
+			$defaults[ QueueAbility::SLOT_CONFIG_PATCH_QUEUE ] = array();
 		} else {
-			$defaults['prompt_queue'] = array();
+			$defaults[ QueueAbility::SLOT_PROMPT_QUEUE ] = array();
 		}
 
 		return $defaults;
@@ -161,11 +163,11 @@ class FlowStepConfigFactory {
 			: '';
 
 		if ( 'ai' !== ( $step['type'] ?? '' ) || '' === $workflow_user_message ) {
-			return array( 'prompt_queue' => array() );
+			return array( QueueAbility::SLOT_PROMPT_QUEUE => array() );
 		}
 
 		return array(
-			'prompt_queue' => array(
+			QueueAbility::SLOT_PROMPT_QUEUE => array(
 				array(
 					'prompt'   => $workflow_user_message,
 					'added_at' => gmdate( 'c' ),

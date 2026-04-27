@@ -7,6 +7,17 @@
  * @package DataMachine\Tests
  */
 
+namespace DataMachine\Abilities\Flow {
+	if ( ! class_exists( QueueAbility::class, false ) ) {
+		class QueueAbility {
+			const SLOT_PROMPT_QUEUE       = 'prompt_queue';
+			const SLOT_CONFIG_PATCH_QUEUE = 'config_patch_queue';
+		}
+	}
+}
+
+namespace {
+
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
@@ -247,3 +258,4 @@ if ( ! empty( $failures ) ) {
 }
 
 echo "\nAll assertions passed.\n";
+}
