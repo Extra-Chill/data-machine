@@ -2,10 +2,10 @@
 /**
  * Tests for the TaskRegistry.
  *
- * @package DataMachine\Tests\Unit\Engine
+ * @package DataMachine\Tests\Unit\Engine\Tasks
  */
 
-namespace DataMachine\Tests\Unit\Engine;
+namespace DataMachine\Tests\Unit\Engine\Tasks;
 
 use DataMachine\Engine\Tasks\TaskRegistry;
 use WP_UnitTestCase;

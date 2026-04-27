@@ -2,10 +2,10 @@
 /**
  * Tests for PipelineBatchScheduler.
  *
- * @package DataMachine\Tests\Unit\Engine
+ * @package DataMachine\Tests\Unit\Abilities\Engine
  */
 
-namespace DataMachine\Tests\Unit\Engine;
+namespace DataMachine\Tests\Unit\Abilities\Engine;
 
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 use DataMachine\Core\Database\Jobs\Jobs;

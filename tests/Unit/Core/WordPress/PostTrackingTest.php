@@ -5,10 +5,10 @@
  * Covers the post-tracking write path (PostTracking::store) and the
  * pipeline_id resolver / fallback introduced by #1091.
  *
- * @package DataMachine\Tests\Unit\WordPress
+ * @package DataMachine\Tests\Unit\Core\WordPress
  */
 
-namespace DataMachine\Tests\Unit\WordPress;
+namespace DataMachine\Tests\Unit\Core\WordPress;
 
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;

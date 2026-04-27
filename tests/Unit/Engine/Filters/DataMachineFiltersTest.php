@@ -4,10 +4,10 @@
  *
  * Tests for utility filters in Engine/Filters/DataMachineFilters.php.
  *
- * @package DataMachine\Tests\Unit\Engine
+ * @package DataMachine\Tests\Unit\Engine\Filters
  */
 
-namespace DataMachine\Tests\Unit\Engine;
+namespace DataMachine\Tests\Unit\Engine\Filters;
 
 use WP_UnitTestCase;
 

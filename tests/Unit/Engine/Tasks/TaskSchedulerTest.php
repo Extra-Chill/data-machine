@@ -2,11 +2,11 @@
 /**
  * Tests for the TaskScheduler.
  *
- * @package DataMachine\Tests\Unit\Engine
+ * @package DataMachine\Tests\Unit\Engine\Tasks
  * @since 0.72.0 Updated: handleTask() removed, schedule() delegates to execute-workflow.
  */
 
-namespace DataMachine\Tests\Unit\Engine;
+namespace DataMachine\Tests\Unit\Engine\Tasks;
 
 use DataMachine\Engine\Tasks\TaskScheduler;
 use DataMachine\Engine\Tasks\TaskRegistry;
