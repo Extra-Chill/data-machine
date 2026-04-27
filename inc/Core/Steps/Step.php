@@ -11,6 +11,7 @@
 
 namespace DataMachine\Core\Steps;
 
+use DataMachine\Core\DataPacket;
 use DataMachine\Core\EngineData;
 
 if ( ! defined('ABSPATH') ) {
@@ -255,11 +256,11 @@ abstract class Step {
 	}
 
 	/**
-	 * Handle exceptions with consistent logging and data packet return.
+	 * Handle exceptions with consistent logging and failure packet return.
 	 *
 	 * @param  \Exception $e       Exception instance
 	 * @param  string     $context Context where exception occurred
-	 * @return array Data packet array (unchanged on exception)
+	 * @return array Data packet array with an explicit failure packet
 	 */
 	protected function handleException( \Exception $e, string $context = 'execution' ): array {
 		$this->log(
@@ -271,7 +272,34 @@ abstract class Step {
 			)
 		);
 
-		return $this->dataPackets;
+		return $this->buildExceptionFailurePackets( $e, $context, 'step_exception' );
+	}
+
+	/**
+	 * Build a data packet that makes step exceptions explicit to the engine.
+	 *
+	 * @param \Exception $e Exception instance.
+	 * @param string     $context Exception context.
+	 * @param string     $failure_reason Machine-readable failure reason.
+	 * @return array Data packet array with the failure packet prepended.
+	 */
+	protected function buildExceptionFailurePackets( \Exception $e, string $context, string $failure_reason ): array {
+		$packet = new DataPacket(
+			array(
+				'body'              => $e->getMessage(),
+				'exception_context' => $context,
+				'exception_class'   => get_class( $e ),
+			),
+			array(
+				'step_type'      => $this->step_type,
+				'flow_step_id'   => $this->flow_step_id,
+				'success'        => false,
+				'failure_reason' => $failure_reason,
+			),
+			'step_error'
+		);
+
+		return $packet->addTo( $this->dataPackets );
 	}
 
 	/**
