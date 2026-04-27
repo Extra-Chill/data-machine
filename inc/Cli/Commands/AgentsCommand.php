@@ -42,12 +42,6 @@ class AgentsCommand extends BaseCommand {
 	 * [--user_id=<id>]
 	 * : List accessible agents for a specific user (implies scope=mine).
 	 *
-	 * [--status=<status>]
-	 * : Filter by agent status. Use "any" to skip status filtering.
-	 * ---
-	 * default: any
-	 * ---
-	 *
 	 * [--include_role]
 	 * : Include the resolved user's role per agent in the output.
 	 *
@@ -78,9 +72,7 @@ class AgentsCommand extends BaseCommand {
 	 * @subcommand list
 	 */
 	public function list_agents( array $args, array $assoc_args ): void {
-		$input = array(
-			'status' => (string) \WP_CLI\Utils\get_flag_value( $assoc_args, 'status', 'any' ),
-		);
+		$input = array();
 
 		$user_id_flag = \WP_CLI\Utils\get_flag_value( $assoc_args, 'user_id', null );
 		if ( null !== $user_id_flag ) {
@@ -124,7 +116,6 @@ class AgentsCommand extends BaseCommand {
 				'owner_id'    => $owner_id,
 				'owner_login' => $user ? $user->user_login : '(deleted)',
 				'has_files'   => is_dir( $agent_dir ) ? 'Yes' : 'No',
-				'status'      => (string) ( $agent['status'] ?? '' ),
 			);
 
 			if ( $include_role ) {
@@ -135,7 +126,7 @@ class AgentsCommand extends BaseCommand {
 			$items[] = $row;
 		}
 
-		$fields = array( 'agent_id', 'agent_slug', 'agent_name', 'owner_id', 'owner_login', 'has_files', 'status' );
+		$fields = array( 'agent_id', 'agent_slug', 'agent_name', 'owner_id', 'owner_login', 'has_files' );
 		if ( $include_role ) {
 			$fields[] = 'user_role';
 		}
@@ -340,7 +331,6 @@ class AgentsCommand extends BaseCommand {
 		WP_CLI::log( sprintf( 'Slug:        %s', $agent['agent_slug'] ) );
 		WP_CLI::log( sprintf( 'Name:        %s', $agent['agent_name'] ) );
 		WP_CLI::log( sprintf( 'Owner:       %s (ID: %d)', $owner ? $owner->user_login : '(deleted)', $agent['owner_id'] ) );
-		WP_CLI::log( sprintf( 'Status:      %s', $agent['status'] ) );
 		WP_CLI::log( sprintf( 'Created:     %s', $agent['created_at'] ) );
 		WP_CLI::log( sprintf( 'Updated:     %s', $agent['updated_at'] ) );
 		WP_CLI::log( sprintf( 'Directory:   %s', $agent['agent_dir'] ) );

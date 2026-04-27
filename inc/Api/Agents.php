@@ -392,7 +392,6 @@ class Agents {
 		// Supported query params:
 		//   scope=mine|all      (default 'mine'; 'all' requires admin)
 		//   user_id=<int>       (admin-only; defaults to caller)
-		//   status=<string>     (default 'active'; 'any' to skip)
 		//   include_role=1      (optional; on for list UI by default below)
 
 		$input = array(
@@ -407,11 +406,6 @@ class Agents {
 		$user_id_param = $request->get_param( 'user_id' );
 		if ( null !== $user_id_param && '' !== $user_id_param ) {
 			$input['user_id'] = (int) $user_id_param;
-		}
-
-		$status_param = $request->get_param( 'status' );
-		if ( null !== $status_param && '' !== $status_param ) {
-			$input['status'] = sanitize_key( $status_param );
 		}
 
 		$include_role = $request->get_param( 'include_role' );
@@ -441,7 +435,6 @@ class Agents {
 				'agent_name' => (string) $agent['agent_name'],
 				'owner_id'   => (int) $agent['owner_id'],
 				'site_scope' => $agent['site_scope'] ?? null,
-				'status'     => (string) ( $agent['status'] ?? '' ),
 				'is_owner'   => (bool) ( $agent['is_owner'] ?? false ),
 			);
 

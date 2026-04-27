@@ -33,15 +33,6 @@ import {
 } from '../queries/agents';
 
 /**
- * Status options for the dropdown.
- */
-const STATUS_OPTIONS = [
-	{ label: __( 'Active', 'data-machine' ), value: 'active' },
-	{ label: __( 'Inactive', 'data-machine' ), value: 'inactive' },
-	{ label: __( 'Archived', 'data-machine' ), value: 'archived' },
-];
-
-/**
  * Role options for access grants.
  */
 const ROLE_OPTIONS = [
@@ -245,14 +236,12 @@ const AgentEditView = ( { agentId, onBack } ) => {
 	const updateMutation = useUpdateAgent();
 
 	const [ name, setName ] = useState( '' );
-	const [ status, setStatus ] = useState( 'active' );
 	const [ saveMessage, setSaveMessage ] = useState( null );
 
 	// Sync form state when agent data loads.
 	useEffect( () => {
 		if ( agent ) {
 			setName( agent.agent_name || '' );
-			setStatus( agent.status || 'active' );
 		}
 	}, [ agent ] );
 
@@ -262,7 +251,6 @@ const AgentEditView = ( { agentId, onBack } ) => {
 		const result = await updateMutation.mutateAsync( {
 			agentId,
 			agent_name: name,
-			status,
 		} );
 
 		if ( result.success ) {
@@ -302,9 +290,7 @@ const AgentEditView = ( { agentId, onBack } ) => {
 		);
 	}
 
-	const isDirty =
-		name !== ( agent.agent_name || '' ) ||
-		status !== ( agent.status || 'active' );
+	const isDirty = name !== ( agent.agent_name || '' );
 
 	return (
 		<div className="datamachine-agent-edit-view">
@@ -348,13 +334,6 @@ const AgentEditView = ( { agentId, onBack } ) => {
 						label={ __( 'Display Name', 'data-machine' ) }
 						value={ name }
 						onChange={ setName }
-					/>
-
-					<SelectControl
-						label={ __( 'Status', 'data-machine' ) }
-						value={ status }
-						options={ STATUS_OPTIONS }
-						onChange={ setStatus }
 					/>
 
 					<div className="datamachine-agent-meta">
