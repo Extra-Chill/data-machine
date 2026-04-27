@@ -6,7 +6,7 @@ WordPress 6.9 Abilities API provides standardized capability discovery and execu
 
 The Abilities API in `inc/Abilities/` provides a unified interface for Data Machine operations. Each ability implements `execute_callback` with `permission_callback` for consistent access control across REST API, CLI commands, and Chat tools.
 
-**Total registered abilities**: 167
+**Total registered abilities**: 193
 
 ## Multi-Agent Scoping
 
@@ -23,8 +23,8 @@ All abilities support `agent_id` and `user_id` parameters for multi-agent scopin
 | `datamachine/update-pipeline` | Update pipeline properties | `Pipeline/UpdatePipelineAbility.php` |
 | `datamachine/delete-pipeline` | Delete pipeline and associated flows | `Pipeline/DeletePipelineAbility.php` |
 | `datamachine/duplicate-pipeline` | Duplicate pipeline with flows | `Pipeline/DuplicatePipelineAbility.php` |
-| `datamachine/import-pipelines` | Import pipelines from JSON | `Pipeline/ImportExportAbility.php` |
-| `datamachine/export-pipelines` | Export pipelines to JSON | `Pipeline/ImportExportAbility.php` |
+| `datamachine/import-pipelines` | Import pipelines from CSV | `Pipeline/ImportExportAbility.php` |
+| `datamachine/export-pipelines` | Export pipelines to CSV | `Pipeline/ImportExportAbility.php` |
 
 ### Pipeline Steps (5 abilities)
 
@@ -55,7 +55,7 @@ All abilities support `agent_id` and `user_id` parameters for multi-agent scopin
 | `datamachine/configure-flow-steps` | Bulk configure flow steps | `FlowStep/ConfigureFlowStepsAbility.php` |
 | `datamachine/validate-flow-steps-config` | Validate flow steps configuration | `FlowStep/ValidateFlowStepsConfigAbility.php` |
 
-### Queue Management (7 abilities)
+### Queue Management (13 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
@@ -65,7 +65,13 @@ All abilities support `agent_id` and `user_id` parameters for multi-agent scopin
 | `datamachine/queue-remove` | Remove item from queue | `Flow/QueueAbility.php` |
 | `datamachine/queue-update` | Update queue item | `Flow/QueueAbility.php` |
 | `datamachine/queue-move` | Reorder queue item | `Flow/QueueAbility.php` |
-| `datamachine/queue-settings` | Get/set queue settings | `Flow/QueueAbility.php` |
+| `datamachine/queue-mode` | Set queue access mode (`drain`, `loop`, or `static`) | `Flow/QueueAbility.php` |
+| `datamachine/config-patch-add` | Add a fetch config patch to a flow step queue | `Flow/QueueAbility.php` |
+| `datamachine/config-patch-list` | List fetch config patches | `Flow/QueueAbility.php` |
+| `datamachine/config-patch-clear` | Clear fetch config patches | `Flow/QueueAbility.php` |
+| `datamachine/config-patch-remove` | Remove a fetch config patch by index | `Flow/QueueAbility.php` |
+| `datamachine/config-patch-update` | Update a fetch config patch by index | `Flow/QueueAbility.php` |
+| `datamachine/config-patch-move` | Reorder a fetch config patch | `Flow/QueueAbility.php` |
 
 ### Webhook Triggers (8 abilities)
 
@@ -419,23 +425,21 @@ PermissionHelper::resolve_scoped_user_id($params);
 
 ### Delegation Pattern
 
-REST API endpoints, CLI commands, and Chat tools delegate to abilities for business logic. Abilities are the canonical, public-facing primitive; service classes are considered an internal implementation detail and are being phased out as abilities become fully self-contained.
+REST API endpoints, CLI commands, and Chat tools delegate to abilities for business logic. Abilities are the canonical, public-facing primitive; implementation classes below an ability are internal details.
 
 ```
-REST API Endpoint → Ability → (Service layer used during migration) → Database
-CLI Command → Ability → (Service layer used during migration) → Database
-Chat Tool → Ability → (Service layer used during migration) → Database
+REST API Endpoint → Ability → Database / WordPress API
+CLI Command → Ability → Database / WordPress API
+Chat Tool → Ability → Database / WordPress API
 ```
-
-Note: many ability implementations are already self-contained and do not call service managers. Where services remain, they are transitional and will be migrated into abilities per the migration plan.
 
 ### Facade Pattern
 
-Several top-level ability classes serve as facades that instantiate sub-ability classes from subdirectories:
+Several top-level ability classes serve as facades that instantiate sub-ability classes from subdirectories; other domains are registered directly from their subdirectory classes:
 
 - `ChatAbilities.php` → `Chat/CreateChatSessionAbility.php`, etc.
 - `EngineAbilities.php` → `Engine/RunFlowAbility.php`, etc.
-- `FlowAbilities.php` → `Flow/QueueAbility.php`, `Flow/WebhookTriggerAbility.php`, etc.
+- Flow abilities are registered from `Flow/CreateFlowAbility.php`, `Flow/QueueAbility.php`, `Flow/WebhookTriggerAbility.php`, etc.
 
 ### Ability Registration
 

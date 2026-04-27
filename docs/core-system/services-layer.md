@@ -10,11 +10,11 @@ The migration from OOP service managers to WordPress Abilities API is **complete
 
 | Former Service | Replacement | Location |
 |----------------|-------------|----------|
-| `FlowManager` | `FlowAbilities` | `inc/Abilities/FlowAbilities.php` |
-| `PipelineManager` | `PipelineAbilities` | `inc/Abilities/PipelineAbilities.php` |
+| `FlowManager` | Flow ability classes | `inc/Abilities/Flow/` |
+| `PipelineManager` | Pipeline ability classes | `inc/Abilities/Pipeline/` and `inc/Abilities/PipelineAbilities.php` |
 | `PipelineStepManager` | `PipelineStepAbilities` | `inc/Abilities/PipelineStepAbilities.php` |
-| `FlowStepManager` | `FlowStepAbilities` | `inc/Abilities/FlowStepAbilities.php` |
-| `JobManager` | `JobAbilities` | `inc/Abilities/JobAbilities.php` |
+| `FlowStepManager` | Flow step ability classes | `inc/Abilities/FlowStep/` and `inc/Abilities/FlowStepAbilities.php` |
+| `JobManager` | Job ability classes | `inc/Abilities/Job/` and `inc/Abilities/JobAbilities.php` |
 | `ProcessedItemsManager` | `ProcessedItemsAbilities` | `inc/Abilities/ProcessedItemsAbilities.php` |
 | `HandlerService` | `HandlerAbilities` | `inc/Abilities/HandlerAbilities.php` |
 | `StepTypeService` | `StepTypeAbilities` | `inc/Abilities/StepTypeAbilities.php` |
@@ -24,28 +24,14 @@ The migration from OOP service managers to WordPress Abilities API is **complete
 
 ## Abilities Overview
 
-22 ability classes provide 79 registered abilities covering all Data Machine operations:
+Ability classes under `inc/Abilities/` register the operations Data Machine exposes to REST, WP-CLI, and chat tools. The current registry includes 193 `wp_register_ability()` callsites across domains including:
 
-- **PipelineAbilities** - 7 abilities for pipeline CRUD, import/export
-- **PipelineStepAbilities** - 5 abilities for pipeline step management
-- **FlowAbilities** - 5 abilities for flow CRUD and duplication
-- **FlowStepAbilities** - 4 abilities for flow step configuration and validation
-- **JobAbilities** - 6 abilities for workflow execution, job management, health monitoring, summary
-- **RecoverStuckJobsAbility** - 1 ability for stuck job recovery
-- **FileAbilities** - 5 abilities for file management and uploads
-- **ProcessedItemsAbilities** - 6 abilities for deduplication tracking and time-windowed revisit reads
-- **SettingsAbilities** - 7 abilities for plugin and handler settings
-- **AuthAbilities** - 3 abilities for OAuth authentication management
-- **LogAbilities** - 6 abilities for logging operations
-- **HandlerAbilities** - 5 abilities for handler discovery and configuration
-- **StepTypeAbilities** - 2 abilities for step type discovery and validation
-- **PostQueryAbilities** - 1 ability for querying Data Machine-created posts
-- **LocalSearchAbilities** - 1 ability for WordPress site search
-- **SystemAbilities** - 2 abilities for session titles and health checks
-- **TaxonomyAbilities** - 5 abilities for taxonomy term CRUD and resolution
-- **QueueAbility** - 8 abilities for flow queue management
-- **AltTextAbilities** - 2 abilities for media alt text generation and diagnostics
-- **SendPingAbility** - 1 ability for agent ping notifications
+- Pipeline and pipeline-step CRUD, duplication, import, and export
+- Flow CRUD, scheduling, duplication, pause/resume, webhook triggers, and per-step configuration
+- Prompt queues, fetch config-patch queues, and queue mode management
+- Job execution, retry/fail/delete/recovery, flow health, and summaries
+- Agent identity, access, tokens, remote calls, memory, and ping notifications
+- File, scaffold, chat, email, media, SEO, taxonomy, settings, auth, logs, and analytics operations
 
 ## Architecture Principles
 

@@ -15,19 +15,20 @@ Axes 1–3 expand fetch-side work. Axis 4 governs the AI step's completion bound
 
 ### 1. Queueable fetch — cross-tick scheduling
 
-`inc/Core/Steps/Fetch/FetchStep.php`, gated by the `queue_enabled` flag on `flow_step_config` and consuming via `inc/Core/Steps/QueueableTrait.php::popQueuedConfigPatch()`.
+`inc/Core/Steps/Fetch/FetchStep.php`, gated by the `queue_mode` enum on `flow_step_config` and consuming via `inc/Core/Steps/QueueableTrait.php::consumeFromConfigPatchQueue()`.
 
 Every tick of the flow:
 
-- If `queue_enabled` is false: use the static handler config as written. Standard fetch.
-- If `queue_enabled` is true: pop **one** JSON-encoded patch from the per-flow-step prompt queue. Deep-merge it into the static handler config via `QueueableTrait::mergeQueuedConfigPatch()`. Run the handler with the merged config.
-- If `queue_enabled` is true and the queue is empty: the fetch step is a no-op. The job completes with `JobStatus::COMPLETED_NO_ITEMS`. No fetch is attempted.
+- If `queue_mode` is `static`: peek the first config patch without mutating the queue. If the config-patch queue is empty, use the static handler config as written.
+- If `queue_mode` is `drain`: pop **one** decoded config patch from `config_patch_queue`, deep-merge it into the static handler config, and discard it after the tick.
+- If `queue_mode` is `loop`: pop **one** decoded config patch from `config_patch_queue`, deep-merge it into the static handler config, then append that patch to the tail so the queue rotates indefinitely.
+- If `queue_mode` is `drain` or `loop` and the queue is empty: the fetch step is a no-op. The job completes with `JobStatus::COMPLETED_NO_ITEMS`. No fetch is attempted.
 
 A "1" case is one queued patch consumed per tick. The "many" case is a queue of N patches drained over N ticks. The axis is **time** — different tick, different config.
 
-Typical use: windowed retroactive backfills (each patch is a date window like `{"after": "2015-05-01", "before": "2015-06-01"}`) and rotating-source forward-ingestion. The queue lets a single recurring flow chew through a backfill plan without an external orchestrator and goes idempotent — clean no-op ticks — once the queue drains.
+Typical use: windowed retroactive backfills (each patch is a date window like `{"after": "2015-05-01", "before": "2015-06-01"}`) and rotating-source forward-ingestion. Drain mode lets a single recurring flow chew through a backfill plan without an external orchestrator and goes idempotent — clean no-op ticks — once the queue drains. Loop mode cycles patches forever for rotating-source ingestion.
 
-The popped item is backed up to the parent job's engine data (`queued_prompt_backup`) so a failed tick can be retried without losing the input.
+The consumed item is backed up to the parent job's engine data so a failed tick can be retried without losing the input.
 
 ### 2. `max_items` — per-call source cap
 
@@ -75,7 +76,7 @@ Non-handler tool calls (search, fetch, generic abilities) don't move the complet
 
 | Axis | Lives in | Trigger | "1" case | "many" case | Layer |
 |------|----------|---------|----------|-------------|-------|
-| **1. Queueable fetch** | `Core/Steps/Fetch/FetchStep.php` + `Core/Steps/QueueableTrait.php::popQueuedConfigPatch` | `flow_step_config['queue_enabled']` + a non-empty per-flow-step queue | Static handler config; or one queued patch popped per tick | Many ticks, each popping the next patch | Across ticks |
+| **1. Queueable fetch** | `Core/Steps/Fetch/FetchStep.php` + `Core/Steps/QueueableTrait.php::consumeFromConfigPatchQueue` | `flow_step_config['queue_mode']` + `config_patch_queue` | Static handler config; or one queued patch consumed per tick | Many ticks draining or looping queued patches | Across ticks |
 | **2. `max_items`** | `Core/Steps/Fetch/Handlers/FetchHandler.php::get_fetch_data` | `handler_config['max_items']`, applied after dedup | One DataPacket per fetch call | N DataPackets per fetch call | Inside one fetch call |
 | **3. Batch fan-out** | `Abilities/Engine/PipelineBatchScheduler.php::fanOut` + `Core/ActionScheduler/BatchScheduler.php` (called from `ExecuteStepAbility`) | Any step returning > 1 DataPacket after filtering | Inline continuation on the same job | N child jobs, scheduled in chunks of `chunk_size` every `chunk_delay` seconds (defaults: 10 / 30) | Across child jobs in one run |
 | **4. Multi-handler completion** | `Engine/AI/AIConversationLoop.php` (~line 359) | `flow_step_config['handler_slugs']` length on a pipeline-mode AI step | Loop completes after first successful handler tool | Loop runs until every configured handler has fired | Across turns of one conversation |
@@ -90,9 +91,10 @@ flow ticks (e.g. cron) ──┐
               ┌──────────────────────┐
               │  Fetch step          │
               │                      │
-              │  (1) queue_enabled?  │ ──► no  → use static config
-              │                      │ ──► yes → pop one patch, deep-merge
-              │                      │       (empty queue → COMPLETED_NO_ITEMS)
+              │  (1) queue_mode      │ ──► static → peek patch or use static config
+              │                      │ ──► drain  → pop one patch, deep-merge
+              │                      │ ──► loop   → pop one patch, requeue at tail
+              │                      │       (empty drain/loop → COMPLETED_NO_ITEMS)
               │                      │
               │  Handler runs        │
               │  → returns N raw     │
@@ -128,7 +130,7 @@ flow ticks (e.g. cron) ──┐
 
 ### Many ticks chewing through a queue
 
-A backfill flow with `queue_enabled = true`, a queue seeded with twelve monthly date windows, and a fetch handler configured to return up to `max_items = 50` items per call:
+A backfill flow with `queue_mode = drain`, a `config_patch_queue` seeded with twelve monthly date windows, and a fetch handler configured to return up to `max_items = 50` items per call:
 
 ```
 tick 0   pop {after:"2015-01-01", before:"2015-02-01"}
@@ -174,16 +176,17 @@ Note: `chunk_size` is the **producer-side** knob (how DM creates child jobs). Th
 
 ### Queueable fetch vs. queueable AI — same primitive, two consumption shapes
 
-Both share `QueueableTrait` and the same `popOnceFromFlowQueue()` pop / backup mechanics. They differ only in how the popped string is interpreted.
+Both share `QueueableTrait` and the same queue-mode mechanics. They differ in which storage slot they consume and how that slot's payload is interpreted.
 
-| | Queueable AI (`popFromQueueIfEmpty`) | Queueable fetch (`popQueuedConfigPatch`) |
+| | Queueable AI (`consumeFromPromptQueue`) | Queueable fetch (`consumeFromConfigPatchQueue`) |
 |---|---|---|
-| Used by | AI step's `user_message` | Fetch step's handler config |
-| Popped value treated as | Scalar prompt string, returned verbatim | JSON object, decoded into a config patch |
-| What the consumer does with it | Sets it as the AI step's user message | Deep-merges it into the static handler config (with JSON-encoded sub-fields handled transparently — see `mergeQueuedConfigPatch`) |
-| Empty-queue behaviour | Returns empty value with `from_queue = false` — caller decides | `FetchStep` treats it as a clean no-op tick (`COMPLETED_NO_ITEMS`) |
+| Used by | AI step's per-flow user message | Fetch step's handler config |
+| Storage slot | `prompt_queue` | `config_patch_queue` |
+| Queued value treated as | Scalar prompt string, returned verbatim | Decoded config patch object |
+| What the consumer does with it | Appends it as the AI step's user-role message | Deep-merges it into the static handler config |
+| Empty-queue behaviour | `drain` / `loop` skip with `COMPLETED_NO_ITEMS`; `static` falls back to no per-flow user message | `drain` / `loop` skip with `COMPLETED_NO_ITEMS`; `static` falls back to the static handler config |
 
-The persistence layer (`QueueAbility`), the per-flow-step FIFO ordering, the `queue_enabled` toggle, and the retry-on-failure backup into engine data are identical. The difference is "config dict" vs "scalar string" and what happens when the queue runs dry. This is intentional shared infrastructure, not duplicated machinery.
+The persistence layer (`QueueAbility`), the per-flow-step FIFO ordering, the `queue_mode` enum, and the retry-on-failure backup into engine data are shared. The payload slots stay separate so AI prompts and fetch config patches cannot be mixed accidentally.
 
 ## What to reach for when
 
