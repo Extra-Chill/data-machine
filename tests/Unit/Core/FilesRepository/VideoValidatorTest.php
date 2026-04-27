@@ -2,10 +2,10 @@
 /**
  * Tests for VideoValidator.
  *
- * @package DataMachine\Tests\Unit\FilesRepository
+ * @package DataMachine\Tests\Unit\Core\FilesRepository
  */
 
-namespace DataMachine\Tests\Unit\FilesRepository;
+namespace DataMachine\Tests\Unit\Core\FilesRepository;
 
 use DataMachine\Core\FilesRepository\VideoValidator;
 use WP_UnitTestCase;

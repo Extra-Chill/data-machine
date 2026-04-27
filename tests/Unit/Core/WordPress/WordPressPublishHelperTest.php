@@ -2,10 +2,10 @@
 /**
  * Tests for WordPressPublishHelper source attribution.
  *
- * @package DataMachine\Tests\Unit\WordPress
+ * @package DataMachine\Tests\Unit\Core\WordPress
  */
 
-namespace DataMachine\Tests\Unit\WordPress;
+namespace DataMachine\Tests\Unit\Core\WordPress;
 
 use DataMachine\Core\WordPress\WordPressPublishHelper;
 use WP_UnitTestCase;

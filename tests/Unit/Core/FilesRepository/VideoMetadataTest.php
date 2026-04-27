@@ -2,10 +2,10 @@
 /**
  * Tests for VideoMetadata.
  *
- * @package DataMachine\Tests\Unit\FilesRepository
+ * @package DataMachine\Tests\Unit\Core\FilesRepository
  */
 
-namespace DataMachine\Tests\Unit\FilesRepository;
+namespace DataMachine\Tests\Unit\Core\FilesRepository;
 
 use DataMachine\Core\FilesRepository\VideoMetadata;
 use WP_UnitTestCase;

@@ -5,10 +5,10 @@
  * Verifies the shared validation logic works correctly through both
  * ImageValidator and VideoValidator subclasses.
  *
- * @package DataMachine\Tests\Unit\FilesRepository
+ * @package DataMachine\Tests\Unit\Core\FilesRepository
  */
 
-namespace DataMachine\Tests\Unit\FilesRepository;
+namespace DataMachine\Tests\Unit\Core\FilesRepository;
 
 use DataMachine\Core\FilesRepository\ImageValidator;
 use DataMachine\Core\FilesRepository\MediaValidator;
