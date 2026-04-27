@@ -11,10 +11,10 @@ The migration from OOP service managers to WordPress Abilities API is **complete
 | Former Service | Replacement | Location |
 |----------------|-------------|----------|
 | `FlowManager` | Flow ability classes | `inc/Abilities/Flow/` |
-| `PipelineManager` | Pipeline ability classes | `inc/Abilities/Pipeline/` and `inc/Abilities/PipelineAbilities.php` |
+| `PipelineManager` | Pipeline ability classes | `inc/Abilities/Pipeline/` |
 | `PipelineStepManager` | `PipelineStepAbilities` | `inc/Abilities/PipelineStepAbilities.php` |
-| `FlowStepManager` | Flow step ability classes | `inc/Abilities/FlowStep/` and `inc/Abilities/FlowStepAbilities.php` |
-| `JobManager` | Job ability classes | `inc/Abilities/Job/` and `inc/Abilities/JobAbilities.php` |
+| `FlowStepManager` | Flow step ability classes | `inc/Abilities/FlowStep/` |
+| `JobManager` | Job ability classes | `inc/Abilities/Job/` |
 | `ProcessedItemsManager` | `ProcessedItemsAbilities` | `inc/Abilities/ProcessedItemsAbilities.php` |
 | `HandlerService` | `HandlerAbilities` | `inc/Abilities/HandlerAbilities.php` |
 | `StepTypeService` | `StepTypeAbilities` | `inc/Abilities/StepTypeAbilities.php` |

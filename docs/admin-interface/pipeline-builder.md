@@ -149,8 +149,8 @@ For the authoritative list of endpoints used by the UI, refer to `inc/Core/Admin
 
 Handler-related server state is fetched through TanStack Query hooks under `inc/Core/Admin/Pages/Pipelines/assets/react/queries/` and shared utility helpers under `inc/Core/Admin/Pages/Pipelines/assets/react/utils/`:
 
-- `queries/handlers.js` - handler metadata queries
-- `utils/handlerSettings.js` - field normalization and settings helpers
+- `inc/Core/Admin/Pages/Pipelines/assets/react/queries/handlers.js` - handler metadata queries
+- `inc/Core/Admin/Pages/Pipelines/assets/react/utils/handlerSettings.js` - field normalization and settings helpers
 
 ### Service Layer Architecture
 
