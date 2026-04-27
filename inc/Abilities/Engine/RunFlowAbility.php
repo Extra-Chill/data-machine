@@ -14,6 +14,8 @@
 
 namespace DataMachine\Abilities\Engine;
 
+use DataMachine\Engine\ExecutionPlan;
+
 defined( 'ABSPATH' ) || exit;
 
 class RunFlowAbility {
@@ -222,12 +224,24 @@ class RunFlowAbility {
 
 		datamachine_set_engine_data( $job_id, $engine_snapshot );
 
-		$first_flow_step_id = null;
-		foreach ( $flow_config as $flow_step_id => $config ) {
-			if ( ( $config['execution_order'] ?? -1 ) === 0 ) {
-				$first_flow_step_id = $flow_step_id;
-				break;
-			}
+		try {
+			$first_flow_step_id = ExecutionPlan::from_flow_config( $flow_config )->first_step_id();
+		} catch ( \InvalidArgumentException $e ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Flow execution failed - invalid execution plan',
+				array(
+					'job_id'      => $job_id,
+					'pipeline_id' => $pipeline_id,
+					'flow_id'     => $flow_id,
+					'error'       => $e->getMessage(),
+				)
+			);
+			return array(
+				'success' => false,
+				'error'   => $e->getMessage(),
+			);
 		}
 
 		if ( ! $first_flow_step_id ) {
