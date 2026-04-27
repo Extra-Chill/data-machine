@@ -68,6 +68,23 @@ class ListAgentsAbilityTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['agents'][0]['is_owner'] );
 	}
 
+	/**
+	 * Regression: the agents table has no `status` column (#1080), so a
+	 * stale status='active' filter would silently exclude every row.
+	 * Default-arg listing must return owned rows without any status check.
+	 */
+	public function test_default_scope_returns_rows_without_status_column(): void {
+		$this->repo->create_if_missing( 'one', 'One', $this->owner_user );
+		$this->repo->create_if_missing( 'two', 'Two', $this->owner_user );
+
+		wp_set_current_user( $this->owner_user );
+		$result = AgentAbilities::listAgents( array() );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertCount( 2, $result['agents'] );
+		$this->assertArrayNotHasKey( 'status', $result['agents'][0] );
+	}
+
 	public function test_default_scope_returns_granted_agents_for_non_admin(): void {
 		$agent_id = $this->repo->create_if_missing( 'shared', 'Shared', $this->owner_user );
 		$this->access_repo->grant_access( $agent_id, $this->granted_user, 'operator' );
@@ -106,33 +123,6 @@ class ListAgentsAbilityTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( array(), $result['agents'] );
-	}
-
-	public function test_default_scope_filters_by_status(): void {
-		$active_id = $this->repo->create_if_missing( 'active-agent', 'Active', $this->owner_user );
-		$this->repo->update_agent(
-			$this->repo->create_if_missing( 'inactive-agent', 'Inactive', $this->owner_user ),
-			array( 'status' => 'inactive' )
-		);
-
-		wp_set_current_user( $this->owner_user );
-		$result = AgentAbilities::listAgents( array( 'status' => 'active' ) );
-
-		$this->assertCount( 1, $result['agents'] );
-		$this->assertSame( $active_id, $result['agents'][0]['agent_id'] );
-	}
-
-	public function test_status_any_skips_status_filter(): void {
-		$this->repo->create_if_missing( 'active-agent', 'Active', $this->owner_user );
-		$this->repo->update_agent(
-			$this->repo->create_if_missing( 'inactive-agent', 'Inactive', $this->owner_user ),
-			array( 'status' => 'inactive' )
-		);
-
-		wp_set_current_user( $this->owner_user );
-		$result = AgentAbilities::listAgents( array( 'status' => 'any' ) );
-
-		$this->assertCount( 2, $result['agents'] );
 	}
 
 	// ---------------------------------------------------------------

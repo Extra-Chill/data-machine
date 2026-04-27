@@ -192,13 +192,6 @@ class AgentTokenAbilities {
 			);
 		}
 
-		if ( 'active' !== ( $agent['status'] ?? '' ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'Agent is not active', 'data-machine' ),
-			);
-		}
-
 		// Check access — caller must have admin access to the agent.
 		if ( ! PermissionHelper::can_access_agent( $agent_id, 'admin' ) ) {
 			return array(

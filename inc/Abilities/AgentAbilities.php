@@ -92,10 +92,6 @@ class AgentAbilities {
 								'type'        => 'integer',
 								'description' => 'Filter by site_scope. Matches the exact site OR network-wide (NULL) agents. Defaults to current blog.',
 							),
-							'status'       => array(
-								'type'        => 'string',
-								'description' => 'Filter by agent status. Defaults to "active". Pass "any" to skip status filtering.',
-							),
 							'include_role' => array(
 								'type'        => 'boolean',
 								'description' => 'When true, enriches each row with the resolved user\'s role on that agent.',
@@ -116,7 +112,6 @@ class AgentAbilities {
 										'agent_name'  => array( 'type' => 'string' ),
 										'owner_id'    => array( 'type' => 'integer' ),
 										'site_scope'  => array( 'type' => array( 'integer', 'null' ) ),
-										'status'      => array( 'type' => 'string' ),
 										'description' => array( 'type' => 'string' ),
 										'is_owner'    => array( 'type' => 'boolean' ),
 										'user_role'   => array( 'type' => array( 'string', 'null' ) ),
@@ -221,7 +216,7 @@ class AgentAbilities {
 				'datamachine/update-agent',
 				array(
 					'label'               => 'Update Agent',
-					'description'         => 'Update an agent\'s mutable fields (name, config, status)',
+					'description'         => 'Update an agent\'s mutable fields (name, config)',
 					'category'            => 'datamachine-agent',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -238,10 +233,6 @@ class AgentAbilities {
 							'agent_config' => array(
 								'type'        => 'object',
 								'description' => 'New agent configuration (replaces existing config).',
-							),
-							'status'       => array(
-								'type'        => 'string',
-								'description' => 'New status (active, inactive, archived).',
 							),
 						),
 					),
@@ -441,7 +432,6 @@ class AgentAbilities {
 		$scope        = isset( $input['scope'] ) ? (string) $input['scope'] : 'mine';
 		$requested_user_id = isset( $input['user_id'] ) ? (int) $input['user_id'] : 0;
 		$site_id      = isset( $input['site_id'] ) ? (int) $input['site_id'] : get_current_blog_id();
-		$status       = isset( $input['status'] ) ? (string) $input['status'] : 'active';
 		$include_role = ! empty( $input['include_role'] );
 
 		if ( ! in_array( $scope, array( 'mine', 'all' ), true ) ) {
@@ -512,16 +502,6 @@ class AgentAbilities {
 			);
 		}
 
-		// ---- Status filter -----------------------------------------------
-		if ( 'any' !== $status ) {
-			$candidates = array_values(
-				array_filter(
-					$candidates,
-					static fn( $row ) => ( $row['status'] ?? '' ) === $status
-				)
-			);
-		}
-
 		// ---- Final access gate (mine only) -------------------------------
 		//
 		// When listing the caller's OWN agents, defence-in-depth: run each
@@ -556,7 +536,6 @@ class AgentAbilities {
 				'agent_name'  => (string) $row['agent_name'],
 				'owner_id'    => $owner_id,
 				'site_scope'  => isset( $row['site_scope'] ) ? (int) $row['site_scope'] : null,
-				'status'      => (string) ( $row['status'] ?? '' ),
 				'description' => $description,
 				'is_owner'    => $target_user_id > 0 && $owner_id === $target_user_id,
 			);
@@ -777,7 +756,6 @@ class AgentAbilities {
 				'agent_config' => is_array( $agent['agent_config'] ?? null )
 					? $agent['agent_config']
 					: ( json_decode( $agent['agent_config'] ?? '{}', true ) ? json_decode( $agent['agent_config'] ?? '{}', true ) : array() ),
-				'status'       => (string) $agent['status'],
 				'created_at'   => $agent['created_at'] ?? '',
 				'updated_at'   => $agent['updated_at'] ?? '',
 				'agent_dir'    => $agent_dir,
@@ -790,7 +768,7 @@ class AgentAbilities {
 	/**
 	 * Update an agent's mutable fields.
 	 *
-	 * @param array $input { agent_id, agent_name?, agent_config?, status? }.
+	 * @param array $input { agent_id, agent_name?, agent_config? }.
 	 * @return array Result with updated agent data.
 	 */
 	public static function updateAgent( array $input ): array {
@@ -831,22 +809,10 @@ class AgentAbilities {
 			$update['agent_config'] = is_array( $input['agent_config'] ) ? $input['agent_config'] : array();
 		}
 
-		if ( isset( $input['status'] ) ) {
-			$valid_statuses = array( 'active', 'inactive', 'archived' );
-			$status         = sanitize_text_field( $input['status'] );
-			if ( ! in_array( $status, $valid_statuses, true ) ) {
-				return array(
-					'success' => false,
-					'error'   => sprintf( 'Invalid status "%s". Must be one of: %s', $status, implode( ', ', $valid_statuses ) ),
-				);
-			}
-			$update['status'] = $status;
-		}
-
 		if ( empty( $update ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'No fields to update. Provide agent_name, agent_config, or status.',
+				'error'   => 'No fields to update. Provide agent_name or agent_config.',
 			);
 		}
 

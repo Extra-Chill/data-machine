@@ -232,25 +232,6 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 'New Name', $result['agent']['agent_name'] );
 	}
 
-	public function test_updateAgent_status(): void {
-		$created = AgentAbilities::createAgent(
-			array(
-				'agent_slug' => 'status-bot',
-				'owner_id'   => $this->admin_id,
-			)
-		);
-
-		$result = AgentAbilities::updateAgent(
-			array(
-				'agent_id' => $created['agent_id'],
-				'status'   => 'inactive',
-			)
-		);
-
-		$this->assertTrue( $result['success'] );
-		$this->assertSame( 'inactive', $result['agent']['status'] );
-	}
-
 	public function test_updateAgent_config(): void {
 		$created = AgentAbilities::createAgent(
 			array(
@@ -283,15 +264,15 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 
 		$result = AgentAbilities::updateAgent(
 			array(
-				'agent_id'   => $created['agent_id'],
-				'agent_name' => 'After',
-				'status'     => 'archived',
+				'agent_id'     => $created['agent_id'],
+				'agent_name'   => 'After',
+				'agent_config' => array( 'provider' => 'anthropic' ),
 			)
 		);
 
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'After', $result['agent']['agent_name'] );
-		$this->assertSame( 'archived', $result['agent']['status'] );
+		$this->assertSame( 'anthropic', $result['agent']['agent_config']['provider'] );
 	}
 
 	public function test_updateAgent_requires_agent_id(): void {
@@ -330,25 +311,6 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertFalse( $result['success'] );
 		$this->assertStringContainsString( 'empty', $result['error'] );
-	}
-
-	public function test_updateAgent_rejects_invalid_status(): void {
-		$created = AgentAbilities::createAgent(
-			array(
-				'agent_slug' => 'bad-status-bot',
-				'owner_id'   => $this->admin_id,
-			)
-		);
-
-		$result = AgentAbilities::updateAgent(
-			array(
-				'agent_id' => $created['agent_id'],
-				'status'   => 'deleted',
-			)
-		);
-
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Invalid status', $result['error'] );
 	}
 
 	public function test_updateAgent_rejects_no_fields(): void {
