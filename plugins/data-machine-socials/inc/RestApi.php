@@ -1271,7 +1271,7 @@ class RestApi {
 	 * Get job status by job ID.
 	 *
 	 * Returns the DM job record including engine_data (per-platform results).
-	 * Thin wrapper around datamachine/jobs-get ability.
+	 * Thin wrapper around datamachine/get-jobs ability.
 	 *
 	 * @param \WP_REST_Request $request Request object.
 	 * @return \WP_REST_Response
@@ -1279,7 +1279,7 @@ class RestApi {
 	public static function get_job_status( \WP_REST_Request $request ) {
 		$job_id = intval( $request->get_param( 'job_id' ) );
 
-		$ability = wp_get_ability( 'datamachine/jobs-get' );
+		$ability = wp_get_ability( 'datamachine/get-jobs' );
 
 		if ( ! $ability ) {
 			return new \WP_REST_Response(
