@@ -175,4 +175,125 @@ class FlowStepConfigFactory {
 			),
 		);
 	}
+
+	/**
+	 * Overlay canonical handler fields onto a step config.
+	 *
+	 * @param array $step_config Step configuration array.
+	 * @param array $handler_fields Source fields containing handler shape data.
+	 * @return array Step config with canonical handler shape.
+	 */
+	public static function withHandlerFields( array $step_config, array $handler_fields ): array {
+		$overlay = array();
+		foreach ( array( 'handler_slug', 'handler_slugs', 'handler_config', 'handler_configs' ) as $field ) {
+			if ( array_key_exists( $field, $handler_fields ) ) {
+				$overlay[ $field ] = $handler_fields[ $field ];
+			}
+		}
+
+		if ( empty( $overlay ) ) {
+			return $step_config;
+		}
+
+		return FlowStepConfig::normalizeHandlerShape( array_merge( $step_config, $overlay ) );
+	}
+
+	/**
+	 * Set or merge the primary handler/settings config for a step.
+	 *
+	 * @param array  $step_config Step configuration array.
+	 * @param string $handler_slug Explicit handler slug. Empty preserves the current effective slug.
+	 * @param array  $handler_config Handler/settings config to store.
+	 * @param bool   $merge Whether to merge into the existing primary config.
+	 * @return array Step config with canonical handler shape.
+	 */
+	public static function withHandlerConfig( array $step_config, string $handler_slug = '', array $handler_config = array(), bool $merge = false ): array {
+		$uses_handler   = FlowStepConfig::usesHandler( $step_config );
+		$is_multi       = FlowStepConfig::isMultiHandler( $step_config );
+		$effective_slug = FlowStepConfig::getEffectiveSlug( $step_config, $handler_slug );
+
+		if ( ! $uses_handler ) {
+			$existing_config = $merge ? FlowStepConfig::getPrimaryHandlerConfig( $step_config ) : array();
+			return self::withHandlerFields(
+				$step_config,
+				array( 'handler_config' => array_merge( $existing_config, $handler_config ) )
+			);
+		}
+
+		if ( '' === $effective_slug ) {
+			return $step_config;
+		}
+
+		$existing_config = $merge ? FlowStepConfig::getHandlerConfigForSlug( $step_config, $effective_slug ) : array();
+		$stored_config   = array_merge( $existing_config, $handler_config );
+
+		if ( $is_multi ) {
+			$slugs = '' !== $handler_slug ? array( $effective_slug ) : FlowStepConfig::getHandlerSlugs( $step_config );
+			if ( empty( $slugs ) ) {
+				$slugs = array( $effective_slug );
+			}
+
+			$configs                    = '' !== $handler_slug ? array() : FlowStepConfig::getHandlerConfigs( $step_config );
+			$configs[ $effective_slug ] = $stored_config;
+
+			return self::withHandlerFields(
+				$step_config,
+				array(
+					'handler_slugs'   => $slugs,
+					'handler_configs' => $configs,
+				)
+			);
+		}
+
+		return self::withHandlerFields(
+			$step_config,
+			array(
+				'handler_slug'   => $effective_slug,
+				'handler_config' => $stored_config,
+			)
+		);
+	}
+
+	/**
+	 * Copy queue state fields from a source step config.
+	 *
+	 * @param array $step_config Step configuration array.
+	 * @param array $source_step Source step configuration array.
+	 * @return array Step config with copied queue state.
+	 */
+	public static function withQueueState( array $step_config, array $source_step ): array {
+		if ( isset( $source_step[ QueueAbility::SLOT_PROMPT_QUEUE ] ) && is_array( $source_step[ QueueAbility::SLOT_PROMPT_QUEUE ] ) ) {
+			$step_config[ QueueAbility::SLOT_PROMPT_QUEUE ] = $source_step[ QueueAbility::SLOT_PROMPT_QUEUE ];
+		}
+		if ( isset( $source_step[ QueueAbility::SLOT_CONFIG_PATCH_QUEUE ] ) && is_array( $source_step[ QueueAbility::SLOT_CONFIG_PATCH_QUEUE ] ) ) {
+			$step_config[ QueueAbility::SLOT_CONFIG_PATCH_QUEUE ] = $source_step[ QueueAbility::SLOT_CONFIG_PATCH_QUEUE ];
+		}
+		if ( isset( $source_step['queue_mode'] )
+			&& in_array( $source_step['queue_mode'], array( 'drain', 'loop', 'static' ), true )
+		) {
+			$step_config['queue_mode'] = $source_step['queue_mode'];
+		}
+
+		return $step_config;
+	}
+
+	/**
+	 * Store a public user_message input as a one-entry static prompt queue.
+	 *
+	 * @param array       $step_config Step configuration array.
+	 * @param string      $user_message User message text.
+	 * @param string|null $added_at Optional timestamp for tests/importers.
+	 * @return array Step config with prompt queue state.
+	 */
+	public static function withUserMessage( array $step_config, string $user_message, ?string $added_at = null ): array {
+		$step_config[ QueueAbility::SLOT_PROMPT_QUEUE ] = array(
+			array(
+				'prompt'   => $user_message,
+				'added_at' => $added_at ?? gmdate( 'c' ),
+			),
+		);
+		$step_config['queue_mode']   = 'static';
+
+		return $step_config;
+	}
 }

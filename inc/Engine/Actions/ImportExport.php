@@ -12,6 +12,7 @@
 namespace DataMachine\Engine\Actions;
 
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Core\Steps\FlowStepConfigFactory;
 
 // Prevent direct access
 if ( ! defined( 'WPINC' ) ) {
@@ -345,11 +346,13 @@ class ImportExport {
 		if ( ! isset( $flow_config[ $flow_step_id ] ) ) {
 			// Defensive seed — should have been created by create-flow's step sync, but
 			// fall back to a minimal entry so the handler restore still lands.
-			$flow_config[ $flow_step_id ] = array(
-				'flow_step_id'     => $flow_step_id,
-				'pipeline_step_id' => $pipeline_step_id,
-				'flow_id'          => $flow_id,
-				'step_type'        => $step_type,
+			$flow_config[ $flow_step_id ] = FlowStepConfigFactory::build(
+				array(
+					'flow_step_id'     => $flow_step_id,
+					'pipeline_step_id' => $pipeline_step_id,
+					'flow_id'          => $flow_id,
+					'step_type'        => $step_type,
+				)
 			);
 		}
 		if ( empty( $flow_config[ $flow_step_id ]['step_type'] ) ) {
@@ -357,12 +360,7 @@ class ImportExport {
 		}
 
 
-		$step = FlowStepConfig::normalizeHandlerShape(
-			array_merge(
-				$flow_config[ $flow_step_id ],
-				$settings
-			)
-		);
+		$step = FlowStepConfigFactory::withHandlerFields( $flow_config[ $flow_step_id ], $settings );
 
 		$flow_config[ $flow_step_id ] = $step;
 
