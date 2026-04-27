@@ -129,6 +129,7 @@ function datamachine_run_datamachine_plugin() {
 
 	// Load abilities
 	require_once __DIR__ . '/inc/Abilities/AuthAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/AI/InspectRequestAbility.php';
 	require_once __DIR__ . '/inc/Abilities/File/FileConstants.php';
 	require_once __DIR__ . '/inc/Abilities/File/AgentFileAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/File/FlowFileAbilities.php';
@@ -196,6 +197,7 @@ function datamachine_run_datamachine_plugin() {
 	// via ScaffoldAbilities::get_ability() → WP_Abilities_Registry::get_instance(),
 	// firing wp_abilities_api_init before the hooks were registered.
 	new \DataMachine\Abilities\AuthAbilities();
+	new \DataMachine\Abilities\AI\InspectRequestAbility();
 	new \DataMachine\Abilities\File\AgentFileAbilities();
 	new \DataMachine\Abilities\File\FlowFileAbilities();
 	new \DataMachine\Abilities\File\ScaffoldAbilities();

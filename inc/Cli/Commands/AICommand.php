@@ -8,7 +8,7 @@
 namespace DataMachine\Cli\Commands;
 
 use DataMachine\Cli\BaseCommand;
-use DataMachine\Engine\AI\RequestInspector;
+use DataMachine\Abilities\AI\InspectRequestAbility;
 use WP_CLI;
 
 defined( 'ABSPATH' ) || exit;
@@ -42,7 +42,7 @@ class AICommand extends BaseCommand {
 	 *
 	 * @subcommand inspect-request
 	 */
-	public function inspect_request( array $args, array $assoc_args ): void {
+	public function inspect_request( array $_args, array $assoc_args ): void {
 		$job_id = isset( $assoc_args['job'] ) ? (int) $assoc_args['job'] : 0;
 		if ( $job_id <= 0 ) {
 			WP_CLI::error( 'Missing or invalid --job=<job_id>.' );
@@ -55,9 +55,11 @@ class AICommand extends BaseCommand {
 			return;
 		}
 
-		$result = ( new RequestInspector() )->inspectPipelineJob(
-			$job_id,
-			isset( $assoc_args['step'] ) ? (string) $assoc_args['step'] : null
+		$result = ( new InspectRequestAbility() )->execute(
+			array(
+				'job_id'       => $job_id,
+				'flow_step_id' => isset( $assoc_args['step'] ) ? (string) $assoc_args['step'] : '',
+			)
 		);
 
 		if ( empty( $result['success'] ) ) {

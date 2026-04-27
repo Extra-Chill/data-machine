@@ -15,6 +15,7 @@ use DataMachine\Core\FilesRepository\FileRetrieval;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Steps\AI\AIStep;
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use DataMachine\Engine\StepNavigator;
 
@@ -210,7 +211,7 @@ class RequestInspector {
 	}
 
 	private function peekPromptQueueValue( array $flow_step_config ): string {
-		$queue = $flow_step_config['prompt_queue'] ?? array();
+		$queue = $flow_step_config[ QueueAbility::SLOT_PROMPT_QUEUE ] ?? array();
 		if ( ! is_array( $queue ) || empty( $queue ) ) {
 			return '';
 		}

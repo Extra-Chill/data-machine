@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $test_filters = array();
 
-function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+function add_filter( string $hook, callable $callback, int $priority = 10, int $_accepted_args = 1 ): void {
 	global $test_filters;
 	$test_filters[ $hook ][ $priority ][] = $callback;
 }
@@ -35,7 +35,7 @@ function apply_filters( string $hook, $value, ...$args ) {
 	return $value;
 }
 
-function do_action( string $hook, ...$args ): void {}
+function do_action( string $_hook, ...$args ): void {}
 
 function wp_json_encode( $value, int $flags = 0 ) {
 	return json_encode( $value, $flags );
@@ -48,7 +48,7 @@ require_once __DIR__ . '/../inc/Engine/AI/PromptBuilder.php';
 require_once __DIR__ . '/../inc/Engine/AI/RequestBuilder.php';
 
 class Test_Request_Inspector_Directive implements \DataMachine\Engine\AI\Directives\DirectiveInterface {
-	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
+	public static function get_outputs( string $_provider_name, array $_tools, ?string $_step_id = null, array $payload = array() ): array {
 		return array(
 			array(
 				'type'    => 'system_text',
@@ -155,11 +155,19 @@ $command   = file_get_contents( __DIR__ . '/../inc/Cli/Commands/AICommand.php' )
 
 assert_test( 'datamachine ai namespace registered', false !== strpos( $bootstrap, "datamachine ai" ) );
 assert_test( 'inspect-request subcommand declared', false !== strpos( $command, '@subcommand inspect-request' ) );
+assert_test( 'CLI routes through inspect request ability', false !== strpos( $command, 'InspectRequestAbility' ) );
 assert_test( '--job option documented', false !== strpos( $command, '--job=<job_id>' ) );
 assert_test( '--step option documented', false !== strpos( $command, '--step=<flow_step_id>' ) );
 assert_test( 'json output path exists', false !== strpos( $command, "'json' === \$format" ) );
 assert_test( 'table output includes directive section', false !== strpos( $command, "Directives" ) );
 assert_test( 'table output includes largest tools section', false !== strpos( $command, "Largest tools" ) );
+
+$plugin = file_get_contents( __DIR__ . '/../data-machine.php' );
+$ability = file_get_contents( __DIR__ . '/../inc/Abilities/AI/InspectRequestAbility.php' );
+
+assert_test( 'inspect request ability loaded by plugin bootstrap', false !== strpos( $plugin, 'InspectRequestAbility.php' ) );
+assert_test( 'inspect request ability instantiated by plugin bootstrap', false !== strpos( $plugin, 'new \\DataMachine\\Abilities\\AI\\InspectRequestAbility()' ) );
+assert_test( 'ability registers datamachine/inspect-ai-request', false !== strpos( $ability, 'datamachine/inspect-ai-request' ) );
 
 echo "\n$total assertions, $failed failures\n";
 if ( $failed > 0 ) {
