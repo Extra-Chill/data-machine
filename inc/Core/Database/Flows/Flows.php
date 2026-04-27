@@ -66,9 +66,10 @@ class Flows extends BaseRepository {
 		if ( ! self::column_exists( $this->table_name, 'user_id', $this->wpdb ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
 			$result = $this->wpdb->query(
 				"ALTER TABLE {$this->table_name}
-				 ADD COLUMN user_id bigint(20) unsigned NOT NULL DEFAULT 0 AFTER pipeline_id,
+				 ADD COLUMN user_id bigint(20) unsigned NOT NULL DEFAULT 0,
 				 ADD KEY user_id (user_id)"
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL
@@ -98,9 +99,10 @@ class Flows extends BaseRepository {
 		if ( ! self::column_exists( $this->table_name, 'agent_id', $this->wpdb ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
 			$result = $this->wpdb->query(
 				"ALTER TABLE {$this->table_name}
-				 ADD COLUMN agent_id bigint(20) unsigned DEFAULT NULL AFTER user_id,
+				 ADD COLUMN agent_id bigint(20) unsigned DEFAULT NULL,
 				 ADD KEY agent_id (agent_id)"
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL
@@ -130,9 +132,10 @@ class Flows extends BaseRepository {
 		if ( ! self::column_exists( $this->table_name, 'portable_slug', $this->wpdb ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
 			$result = $this->wpdb->query(
 				"ALTER TABLE {$this->table_name}
-				 ADD COLUMN portable_slug varchar(191) DEFAULT NULL AFTER flow_name,
+				 ADD COLUMN portable_slug varchar(191) DEFAULT NULL,
 				 ADD UNIQUE KEY pipeline_portable_slug (pipeline_id, portable_slug)"
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL

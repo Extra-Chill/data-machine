@@ -93,7 +93,9 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN agent_id BIGINT(20) UNSIGNED NULL AFTER user_id', $table_name ) );
+		// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it. Column position
+		// is cosmetic — both engines accept the bare ADD COLUMN form.
+		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN agent_id BIGINT(20) UNSIGNED NULL', $table_name ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
 		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY agent_id (agent_id)', $table_name ) );
@@ -121,7 +123,9 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i CHANGE COLUMN agent_type mode VARCHAR(20) NOT NULL DEFAULT %s', $table_name, 'chat' ) );
 			} else {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN mode VARCHAR(20) NOT NULL DEFAULT %s AFTER model', $table_name, 'chat' ) );
+				// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it. Column position
+				// is cosmetic — both engines accept the bare ADD COLUMN form.
+				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN mode VARCHAR(20) NOT NULL DEFAULT %s', $table_name, 'chat' ) );
 			}
 		}
 
@@ -165,7 +169,9 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN last_read_at DATETIME NULL AFTER updated_at', $table_name ) );
+		// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it. Column position
+		// is cosmetic — both engines accept the bare ADD COLUMN form.
+		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN last_read_at DATETIME NULL', $table_name ) );
 	}
 
 	/**

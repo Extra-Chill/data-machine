@@ -75,7 +75,9 @@ class Agents extends BaseRepository {
 
 		if ( ! BaseRepository::column_exists( $table_name, 'site_scope', $wpdb ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$wpdb->query( "ALTER TABLE `{$table_name}` ADD COLUMN site_scope BIGINT(20) UNSIGNED NULL DEFAULT NULL AFTER owner_id" );
+			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it. Column position
+			// is cosmetic — both engines accept the bare ADD COLUMN form.
+			$wpdb->query( "ALTER TABLE `{$table_name}` ADD COLUMN site_scope BIGINT(20) UNSIGNED NULL DEFAULT NULL" );
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$wpdb->query( "ALTER TABLE `{$table_name}` ADD KEY site_scope (site_scope)" );
 		}
