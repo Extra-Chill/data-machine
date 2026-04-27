@@ -155,7 +155,7 @@ class UpsertStep extends Step {
 	 *
 	 * @param \Exception $e Exception instance
 	 * @param string     $context Context where exception occurred
-	 * @return array Data packet array (unchanged on exception)
+	 * @return array Data packet array with an explicit failure packet
 	 */
 	protected function handleException( \Exception $e, string $context = 'execution' ): array {
 		do_action(
@@ -169,7 +169,7 @@ class UpsertStep extends Step {
 			)
 		);
 
-		return $this->dataPackets;
+		return $this->buildExceptionFailurePackets( $e, $context, 'upsert_step_exception' );
 	}
 
 	/**
