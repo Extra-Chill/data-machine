@@ -11,6 +11,8 @@ namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\Pipeline\CreatePipelineAbility;
 use DataMachine\Abilities\PipelineStepAbilities;
+use DataMachine\Core\Database\Flows\Flows;
+use DataMachine\Core\Database\Pipelines\Pipelines;
 use WP_UnitTestCase;
 
 class PipelineStepAbilitiesTest extends WP_UnitTestCase {
@@ -536,6 +538,162 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		$this->assertEquals( $this->test_pipeline_id, $result['pipeline_id'] );
 		$this->assertEquals( 2, $result['step_count'] );
 		$this->assertStringContainsString( 'reordered', $result['message'] );
+	}
+
+	public function test_reorder_pipeline_steps_normalizes_gapped_orders_and_syncs_flows(): void {
+		$step1 = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'fetch',
+			)
+		);
+
+		$step2 = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'ai',
+			)
+		);
+
+		$step3 = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'publish',
+			)
+		);
+
+		$flow_result = wp_get_ability( 'datamachine/create-flow' )->execute(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'flow_name'   => 'Flow for gapped reorder sync',
+			)
+		);
+		$this->assertTrue( $flow_result['success'] );
+
+		$result = $this->step_abilities->executeReorderPipelineSteps(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_order'  => array(
+					array(
+						'pipeline_step_id' => $step3['pipeline_step_id'],
+						'execution_order'  => 0,
+					),
+					array(
+						'pipeline_step_id' => $step1['pipeline_step_id'],
+						'execution_order'  => 10,
+					),
+					array(
+						'pipeline_step_id' => $step2['pipeline_step_id'],
+						'execution_order'  => 20,
+					),
+				),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$db_pipelines    = new Pipelines();
+		$pipeline_config = $db_pipelines->get_pipeline_config( $this->test_pipeline_id );
+
+		$this->assertSame( array( $step3['pipeline_step_id'], $step1['pipeline_step_id'], $step2['pipeline_step_id'] ), array_keys( $pipeline_config ) );
+		$this->assertSame( 0, $pipeline_config[ $step3['pipeline_step_id'] ]['execution_order'] );
+		$this->assertSame( 1, $pipeline_config[ $step1['pipeline_step_id'] ]['execution_order'] );
+		$this->assertSame( 2, $pipeline_config[ $step2['pipeline_step_id'] ]['execution_order'] );
+
+		$db_flows    = new Flows();
+		$flow        = $db_flows->get_flow( $flow_result['flow_id'] );
+		$flow_config = $flow['flow_config'];
+
+		$this->assertSame( 0, $flow_config[ $step3['pipeline_step_id'] . '_' . $flow_result['flow_id'] ]['execution_order'] );
+		$this->assertSame( 1, $flow_config[ $step1['pipeline_step_id'] . '_' . $flow_result['flow_id'] ]['execution_order'] );
+		$this->assertSame( 2, $flow_config[ $step2['pipeline_step_id'] . '_' . $flow_result['flow_id'] ]['execution_order'] );
+	}
+
+	public function test_reorder_pipeline_steps_normalizes_duplicate_orders_by_input_order(): void {
+		$step1 = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'fetch',
+			)
+		);
+
+		$step2 = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'ai',
+			)
+		);
+
+		$step3 = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'publish',
+			)
+		);
+
+		$result = $this->step_abilities->executeReorderPipelineSteps(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_order'  => array(
+					array(
+						'pipeline_step_id' => $step2['pipeline_step_id'],
+						'execution_order'  => 0,
+					),
+					array(
+						'pipeline_step_id' => $step3['pipeline_step_id'],
+						'execution_order'  => 0,
+					),
+					array(
+						'pipeline_step_id' => $step1['pipeline_step_id'],
+						'execution_order'  => 1,
+					),
+				),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$db_pipelines    = new Pipelines();
+		$pipeline_config = $db_pipelines->get_pipeline_config( $this->test_pipeline_id );
+
+		$this->assertSame( 0, $pipeline_config[ $step2['pipeline_step_id'] ]['execution_order'] );
+		$this->assertSame( 1, $pipeline_config[ $step3['pipeline_step_id'] ]['execution_order'] );
+		$this->assertSame( 2, $pipeline_config[ $step1['pipeline_step_id'] ]['execution_order'] );
+	}
+
+	public function test_reorder_pipeline_steps_rejects_duplicate_step_ids(): void {
+		$step1 = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'fetch',
+			)
+		);
+
+		$this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'ai',
+			)
+		);
+
+		$result = $this->step_abilities->executeReorderPipelineSteps(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_order'  => array(
+					array(
+						'pipeline_step_id' => $step1['pipeline_step_id'],
+						'execution_order'  => 0,
+					),
+					array(
+						'pipeline_step_id' => $step1['pipeline_step_id'],
+						'execution_order'  => 1,
+					),
+				),
+			)
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'appears more than once', $result['error'] );
 	}
 
 	public function test_reorder_pipeline_steps_invalid_format(): void {
