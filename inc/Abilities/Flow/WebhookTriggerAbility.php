@@ -395,10 +395,7 @@ class WebhookTriggerAbility {
 			);
 		}
 
-		// Run the one-time legacy migration before doing anything else so we
-		// read/write the canonical shape only.
-		$migration         = \DataMachine\Api\WebhookAuthResolver::migrate_legacy( $flow['scheduling_config'] ?? array() );
-		$scheduling_config = $migration['config'];
+		$scheduling_config = $flow['scheduling_config'] ?? array();
 
 		$preset_name = isset( $input['preset'] ) ? trim( (string) $input['preset'] ) : '';
 		$template_in = isset( $input['template'] ) && is_array( $input['template'] ) ? $input['template'] : null;
@@ -606,8 +603,7 @@ class WebhookTriggerAbility {
 			);
 		}
 
-		$migration         = \DataMachine\Api\WebhookAuthResolver::migrate_legacy( $flow['scheduling_config'] ?? array() );
-		$scheduling_config = $migration['config'];
+		$scheduling_config = $flow['scheduling_config'] ?? array();
 
 		if ( empty( $scheduling_config['webhook_auth'] ) ) {
 			return array(
@@ -697,12 +693,7 @@ class WebhookTriggerAbility {
 			$scheduling_config['webhook_created_at'],
 			$scheduling_config['webhook_auth_mode'],
 			$scheduling_config['webhook_auth'],
-			$scheduling_config['webhook_secrets'],
-			// Legacy v1 fields — safe to clear even post-migration.
-			$scheduling_config['webhook_secret'],
-			$scheduling_config['webhook_signature_header'],
-			$scheduling_config['webhook_signature_format'],
-			$scheduling_config['webhook_max_body_bytes']
+			$scheduling_config['webhook_secrets']
 		);
 
 		$updated = $this->db_flows->update_flow( $flow_id, array( 'scheduling_config' => $scheduling_config ) );
@@ -932,12 +923,7 @@ class WebhookTriggerAbility {
 			);
 		}
 
-		// Apply the one-time migration silently so status reports the canonical shape.
-		$migration         = \DataMachine\Api\WebhookAuthResolver::migrate_legacy( $flow['scheduling_config'] ?? array() );
-		$scheduling_config = $migration['config'];
-		if ( $migration['migrated'] ) {
-			$this->db_flows->update_flow( $flow_id, array( 'scheduling_config' => $scheduling_config ) );
-		}
+		$scheduling_config = $flow['scheduling_config'] ?? array();
 
 		$enabled = ! empty( $scheduling_config['webhook_enabled'] );
 		$result  = array(
@@ -1027,8 +1013,7 @@ class WebhookTriggerAbility {
 			);
 		}
 
-		$migration         = \DataMachine\Api\WebhookAuthResolver::migrate_legacy( $flow['scheduling_config'] ?? array() );
-		$scheduling_config = $migration['config'];
+		$scheduling_config = $flow['scheduling_config'] ?? array();
 
 		if ( empty( $scheduling_config['webhook_auth'] ) ) {
 			return array(
@@ -1148,8 +1133,7 @@ class WebhookTriggerAbility {
 			);
 		}
 
-		$migration         = \DataMachine\Api\WebhookAuthResolver::migrate_legacy( $flow['scheduling_config'] ?? array() );
-		$scheduling_config = $migration['config'];
+		$scheduling_config = $flow['scheduling_config'] ?? array();
 
 		$secrets = $scheduling_config['webhook_secrets'] ?? array();
 		if ( ! is_array( $secrets ) ) {

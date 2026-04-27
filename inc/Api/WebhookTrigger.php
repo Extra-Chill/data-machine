@@ -117,14 +117,6 @@ class WebhookTrigger {
 
 		$scheduling_config = $flow['scheduling_config'] ?? array();
 
-		// Silently upgrade legacy v1 HMAC fields into the canonical v2 shape.
-		// This happens once per flow, the first time any v1 flow is hit.
-		$migration = WebhookAuthResolver::migrate_legacy( $scheduling_config );
-		if ( $migration['migrated'] ) {
-			$scheduling_config = $migration['config'];
-			$db_flows->update_flow( $flow_id, array( 'scheduling_config' => $scheduling_config ) );
-		}
-
 		if ( empty( $scheduling_config['webhook_enabled'] ) ) {
 			do_action(
 				'datamachine_log',

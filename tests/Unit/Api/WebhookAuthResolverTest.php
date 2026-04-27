@@ -2,7 +2,7 @@
 /**
  * WebhookAuthResolver tests.
  *
- * Covers the silent legacy-migration path and the preset filter registry.
+ * Covers canonical auth resolution and the preset filter registry.
  * Requires WordPress because `apply_filters` is used for preset discovery.
  *
  * @package DataMachine\Tests\Unit\Api
@@ -65,89 +65,6 @@ class WebhookAuthResolverTest extends WP_UnitTestCase {
 		) );
 		$this->assertSame( 'hmac', $out['mode'] );
 		$this->assertNull( $out['verifier'] );
-	}
-
-	/* -------- migrate_legacy() -------- */
-
-	public function test_migrate_noop_for_bearer_flow(): void {
-		$in  = array(
-			'webhook_enabled'   => true,
-			'webhook_auth_mode' => 'bearer',
-			'webhook_token'     => 'tok',
-		);
-		$out = WebhookAuthResolver::migrate_legacy( $in );
-		$this->assertFalse( $out['migrated'] );
-		$this->assertSame( $in, $out['config'] );
-	}
-
-	public function test_migrate_noop_for_canonical_hmac_flow(): void {
-		$in  = array(
-			'webhook_enabled'   => true,
-			'webhook_auth_mode' => 'hmac',
-			'webhook_auth'      => array( 'mode' => 'hmac' ),
-			'webhook_secrets'   => array(),
-		);
-		$out = WebhookAuthResolver::migrate_legacy( $in );
-		$this->assertFalse( $out['migrated'] );
-	}
-
-	public function test_migrate_v1_hmac_sha256_flow_to_v2(): void {
-		$in  = array(
-			'webhook_enabled'          => true,
-			'webhook_auth_mode'        => 'hmac_sha256',
-			'webhook_signature_header' => 'X-Hub-Signature-256',
-			'webhook_signature_format' => 'sha256=hex',
-			'webhook_secret'           => 'legacy-secret',
-		);
-		$out = WebhookAuthResolver::migrate_legacy( $in );
-
-		$this->assertTrue( $out['migrated'] );
-		$config = $out['config'];
-
-		$this->assertSame( 'hmac', $config['webhook_auth_mode'] );
-		$this->assertArrayNotHasKey( 'webhook_signature_header', $config );
-		$this->assertArrayNotHasKey( 'webhook_signature_format', $config );
-		$this->assertArrayNotHasKey( 'webhook_secret', $config );
-
-		$this->assertArrayHasKey( 'webhook_auth', $config );
-		$this->assertSame( '{body}', $config['webhook_auth']['signed_template'] );
-		$this->assertSame( 'X-Hub-Signature-256', $config['webhook_auth']['signature_source']['header'] );
-		$this->assertSame( 'prefix', $config['webhook_auth']['signature_source']['extract']['kind'] );
-		$this->assertSame( 'sha256=', $config['webhook_auth']['signature_source']['extract']['key'] );
-		$this->assertSame( 'hex', $config['webhook_auth']['signature_source']['encoding'] );
-
-		$this->assertArrayHasKey( 'webhook_secrets', $config );
-		$this->assertSame( 'current', $config['webhook_secrets'][0]['id'] );
-		$this->assertSame( 'legacy-secret', $config['webhook_secrets'][0]['value'] );
-	}
-
-	public function test_migrate_v1_base64_format(): void {
-		$in  = array(
-			'webhook_enabled'          => true,
-			'webhook_auth_mode'        => 'hmac_sha256',
-			'webhook_signature_header' => 'X-Shopify-Hmac-Sha256',
-			'webhook_signature_format' => 'base64',
-			'webhook_secret'           => 'x',
-		);
-		$out = WebhookAuthResolver::migrate_legacy( $in );
-		$this->assertTrue( $out['migrated'] );
-		$this->assertSame( 'base64', $out['config']['webhook_auth']['signature_source']['encoding'] );
-		$this->assertSame( 'raw', $out['config']['webhook_auth']['signature_source']['extract']['kind'] );
-	}
-
-	public function test_migrate_drops_orphan_legacy_fields(): void {
-		// Fields left over from a partial migration but no legacy mode set.
-		$in  = array(
-			'webhook_enabled'          => true,
-			'webhook_auth_mode'        => 'hmac',
-			'webhook_auth'             => array( 'mode' => 'hmac' ),
-			'webhook_signature_header' => 'stale',
-			'webhook_secret'           => 'stale',
-		);
-		$out = WebhookAuthResolver::migrate_legacy( $in );
-		$this->assertTrue( $out['migrated'] );
-		$this->assertArrayNotHasKey( 'webhook_signature_header', $out['config'] );
-		$this->assertArrayNotHasKey( 'webhook_secret', $out['config'] );
 	}
 
 	/* -------- presets -------- */

@@ -110,6 +110,10 @@ function datamachine_run_schema_migrations(): void {
 	// idempotent).
 	datamachine_migrate_user_message_queue_mode();
 
+	// Normalize webhook auth scheduling configs to canonical v2 shape (#1333,
+	// idempotent).
+	datamachine_migrate_webhook_auth_v2();
+
 	// Drop redundant _datamachine_post_pipeline_id rows (#1091). Idempotent.
 	datamachine_drop_redundant_post_pipeline_meta();
 }
