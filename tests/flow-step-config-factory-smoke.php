@@ -62,6 +62,19 @@ function legacy_workflow_step_config_for_test( array $step, int $index ): array 
 	$handler_slug     = $step['handler_slug'] ?? '';
 	$handler_config   = $step['handler_config'] ?? array();
 	$step_type        = $step['type'];
+	$prompt_queue     = array();
+
+	$workflow_user_message = is_string( $step['user_message'] ?? null )
+		? trim( $step['user_message'] )
+		: '';
+	if ( 'ai' === $step_type && '' !== $workflow_user_message ) {
+		$prompt_queue = array(
+			array(
+				'prompt'   => $workflow_user_message,
+				'added_at' => '__dynamic__',
+			),
+		);
+	}
 
 	$flow_step_config = array(
 		'flow_step_id'     => $step_id,
@@ -71,7 +84,7 @@ function legacy_workflow_step_config_for_test( array $step, int $index ): array 
 		'enabled_tools'    => ( 'ai' === $step_type && ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) )
 			? array_values( $step['enabled_tools'] )
 			: array(),
-		'prompt_queue'     => $step['prompt_queue'] ?? array(),
+		'prompt_queue'     => $prompt_queue,
 		'queue_mode'       => 'static',
 		'disabled_tools'   => $step['disabled_tools'] ?? array(),
 		'pipeline_id'      => 'direct',
@@ -94,26 +107,11 @@ function legacy_workflow_step_config_for_test( array $step, int $index ): array 
 }
 
 function factory_workflow_step_config_for_test( array $step, int $index ): array {
-	$step_type = $step['type'];
-
-	return FlowStepConfigFactory::build(
-		array(
-			'flow_step_id'     => "ephemeral_step_{$index}",
-			'pipeline_step_id' => "ephemeral_pipeline_{$index}",
-			'step_type'        => $step_type,
-			'execution_order'  => $index,
-			'enabled_tools'    => ( 'ai' === $step_type && ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) )
-				? array_values( $step['enabled_tools'] )
-				: array(),
-			'prompt_queue'     => $step['prompt_queue'] ?? array(),
-			'queue_mode'       => 'static',
-			'disabled_tools'   => $step['disabled_tools'] ?? array(),
-			'pipeline_id'      => 'direct',
-			'flow_id'          => 'direct',
-			'handler_slug'     => $step['handler_slug'] ?? '',
-			'handler_config'   => $step['handler_config'] ?? array(),
-		)
-	);
+	$config = FlowStepConfigFactory::buildFromWorkflowStep( $step, $index );
+	if ( isset( $config['prompt_queue'][0]['added_at'] ) ) {
+		$config['prompt_queue'][0]['added_at'] = '__dynamic__';
+	}
+	return $config;
 }
 
 function legacy_synced_step_config_for_test( array $step, int $flow_id, int $pipeline_id, array $disabled_tools ): array {
@@ -129,7 +127,6 @@ function legacy_synced_step_config_for_test( array $step, int $flow_id, int $pip
 		'flow_id'          => $flow_id,
 		'execution_order'  => $step['execution_order'] ?? 0,
 		'disabled_tools'   => $disabled_tools,
-		'handler'          => null,
 		'queue_mode'       => 'static',
 	);
 
@@ -143,27 +140,14 @@ function legacy_synced_step_config_for_test( array $step, int $flow_id, int $pip
 }
 
 function factory_synced_step_config_for_test( array $step, int $flow_id, int $pipeline_id, array $disabled_tools ): array {
-	$step_type        = $step['step_type'] ?? '';
 	$pipeline_step_id = $step['pipeline_step_id'];
-	$queue_defaults   = ( 'fetch' === $step_type )
-		? array( 'config_patch_queue' => array() )
-		: array( 'prompt_queue' => array() );
 
-	return FlowStepConfigFactory::build(
-		array_merge(
-			array(
-				'flow_step_id'     => $pipeline_step_id . '_' . $flow_id,
-				'step_type'        => $step_type,
-				'pipeline_step_id' => $pipeline_step_id,
-				'pipeline_id'      => $pipeline_id,
-				'flow_id'          => $flow_id,
-				'execution_order'  => $step['execution_order'] ?? 0,
-				'disabled_tools'   => $disabled_tools,
-				'handler'          => null,
-				'queue_mode'       => 'static',
-			),
-			$queue_defaults
-		)
+	return FlowStepConfigFactory::buildFromPipelineStep(
+		$step,
+		$pipeline_id,
+		$flow_id,
+		$pipeline_step_id . '_' . $flow_id,
+		array( 'disabled_tools' => $disabled_tools )
 	);
 }
 
@@ -186,15 +170,10 @@ $workflow_cases = array(
 		'type'           => 'system_task',
 		'handler_config' => array( 'task' => 'daily_memory_generation' ),
 	),
-	'ai keeps enabled tools and prompt queue' => array(
+	'ai converts user message to prompt queue' => array(
 		'type'          => 'ai',
 		'enabled_tools' => array( 'local_search' ),
-		'prompt_queue'  => array(
-			array(
-				'prompt'   => 'Summarize',
-				'added_at' => '2026-04-27T00:00:00+00:00',
-			),
-		),
+		'user_message'  => ' Summarize ',
 	),
 );
 
@@ -235,6 +214,25 @@ foreach ( $sync_cases as $name => $step ) {
 		$passes
 	);
 }
+
+$execute_workflow_src = file_get_contents( __DIR__ . '/../inc/Abilities/Job/ExecuteWorkflowAbility.php' ) ?: '';
+$flow_helpers_src     = file_get_contents( __DIR__ . '/../inc/Abilities/Flow/FlowHelpers.php' ) ?: '';
+
+assert_factory_equals(
+	true,
+	false !== strpos( $execute_workflow_src, 'FlowStepConfigFactory::buildFromWorkflowStep( $step, $index )' ),
+	'ExecuteWorkflowAbility routes workflow rows through the factory scaffold',
+	$failures,
+	$passes
+);
+
+assert_factory_equals(
+	true,
+	false !== strpos( $flow_helpers_src, 'FlowStepConfigFactory::buildFromPipelineStep(' ),
+	'FlowHelpers routes synced flow rows through the factory scaffold',
+	$failures,
+	$passes
+);
 
 echo "\n-----------------------------------\n";
 $total = $passes + count( $failures );

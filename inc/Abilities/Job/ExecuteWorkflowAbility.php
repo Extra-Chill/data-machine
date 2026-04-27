@@ -333,55 +333,8 @@ class ExecuteWorkflowAbility {
 			$step_id          = "ephemeral_step_{$index}";
 			$pipeline_step_id = "ephemeral_pipeline_{$index}";
 
-			// Flow config (instance-specific)
-			$handler_slug   = $step['handler_slug'] ?? '';
-			$handler_config = $step['handler_config'] ?? array();
-			$step_type      = $step['type'];
-
-			// AI's tool list lives in its own field. handler_slugs is for
-			// handlers; enabled_tools is for AI tools. No overload.
-			$enabled_tools = ( 'ai' === $step_type && ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) )
-				? array_values( $step['enabled_tools'] )
-				: array();
-
-			// AIStep reads its per-flow user message from the
-			// prompt_queue head (gated by queue_mode), not a dedicated
-			// user_message slot — see #1291. The workflow JSON spec
-			// still accepts `user_message` as an input field for
-			// ergonomics (matches ExecuteWorkflowTool's documented
-			// shape); convert it here into a 1-entry static prompt_queue
-			// so AIStep sees it. Pre-fix this lane wrote the legacy
-			// `user_message` slot directly, which AIStep no longer
-			// reads — the input value was silently dropped at runtime.
-			$workflow_user_message = is_string( $step['user_message'] ?? null )
-				? trim( $step['user_message'] )
-				: '';
-			$prompt_queue          = array();
-			if ( 'ai' === $step_type && '' !== $workflow_user_message ) {
-				$prompt_queue = array(
-					array(
-						'prompt'   => $workflow_user_message,
-						'added_at' => gmdate( 'c' ),
-					),
-				);
-			}
-
-			$flow_step_config = FlowStepConfigFactory::build(
-				array(
-					'flow_step_id'     => $step_id,
-					'pipeline_step_id' => $pipeline_step_id,
-					'step_type'        => $step_type,
-					'execution_order'  => $index,
-					'enabled_tools'    => $enabled_tools,
-					'prompt_queue'     => $prompt_queue,
-					'queue_mode'       => 'static',
-					'disabled_tools'   => $step['disabled_tools'] ?? array(),
-					'pipeline_id'      => 'direct',
-					'flow_id'          => 'direct',
-					'handler_slug'     => $handler_slug,
-					'handler_config'   => $handler_config,
-				)
-			);
+			$step_type        = $step['type'];
+			$flow_step_config = FlowStepConfigFactory::buildFromWorkflowStep( $step, $index );
 
 			$flow_config[ $step_id ] = $flow_step_config;
 
