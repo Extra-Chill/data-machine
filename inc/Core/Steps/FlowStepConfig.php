@@ -187,6 +187,39 @@ class FlowStepConfig {
 	}
 
 	/**
+	 * Resolve handler slugs that must execute before an adjacent AI step completes.
+	 *
+	 * Publish requires every configured handler because it processes all matching
+	 * handler results. Upsert may require only a configured subset; when no
+	 * explicit subset is set, it requires the primary handler only.
+	 *
+	 * @param array $step_config Step configuration array.
+	 * @return array<int, string> Required handler slugs for AI completion.
+	 */
+	public static function getRequiredHandlerSlugsForAi( array $step_config ): array {
+		$step_type = $step_config['step_type'] ?? '';
+
+		if ( 'publish' === $step_type ) {
+			return self::getConfiguredHandlerSlugs( $step_config );
+		}
+
+		if ( 'upsert' !== $step_type ) {
+			return array();
+		}
+
+		$required = $step_config['required_handler_slugs'] ?? array();
+		if ( is_array( $required ) ) {
+			$required = self::sanitizeSlugList( $required );
+			if ( ! empty( $required ) ) {
+				return $required;
+			}
+		}
+
+		$primary = self::getPrimaryHandlerSlug( $step_config );
+		return null === $primary ? array() : array( $primary );
+	}
+
+	/**
 	 * Get the primary handler config from a step config.
 	 *
 	 * @param array $step_config Step configuration array.

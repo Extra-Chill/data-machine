@@ -169,8 +169,8 @@ class AIConversationLoop {
 		);
 
 		// Track which handler tools have been executed for multi-handler support.
-		// In pipeline mode, conversation should only complete when ALL configured
-		// handlers have fired, not just the first one.
+		// In pipeline mode, conversation should only complete when all handlers
+		// required by the adjacent step have fired, not just the first one.
 		$executed_handler_slugs = array();
 		$configured_handlers    = $payload['configured_handler_slugs'] ?? array();
 		$configured_handlers    = is_array( $configured_handlers ) ? array_values( $configured_handlers ) : array();
