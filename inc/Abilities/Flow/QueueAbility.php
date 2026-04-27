@@ -1565,55 +1565,87 @@ class QueueAbility {
 			$db_flows = new DB_Flows();
 		}
 
-		$flow = $db_flows->get_flow( $flow_id );
-		if ( ! $flow ) {
-			return null;
+		if ( ! in_array( $queue_mode, array( 'drain', 'loop', 'static' ), true ) ) {
+			$queue_mode = 'static';
 		}
 
-		$flow_config = $flow['flow_config'] ?? array();
-		if ( ! isset( $flow_config[ $flow_step_id ] ) ) {
-			return null;
-		}
-
-		$step_config = $flow_config[ $flow_step_id ];
-		$queue       = $step_config[ $slot ] ?? array();
-
-		if ( empty( $queue ) ) {
-			return null;
-		}
-
-		// Static peek: read head, do not mutate storage.
 		if ( 'static' === $queue_mode ) {
+			$flow = $db_flows->get_flow( $flow_id );
+			if ( ! $flow ) {
+				return null;
+			}
+
+			$flow_config = $flow['flow_config'] ?? array();
+			if ( ! isset( $flow_config[ $flow_step_id ] ) ) {
+				return null;
+			}
+
+			$queue = $flow_config[ $flow_step_id ][ $slot ] ?? array();
+			if ( empty( $queue ) ) {
+				return null;
+			}
+
 			return $queue[0];
 		}
 
-		// Drain or loop: pop the head, optionally rotate.
-		$entry = array_shift( $queue );
+		for ( $attempt = 1; $attempt <= 3; $attempt++ ) {
+			$expected_config_json = $db_flows->get_flow_config_json( $flow_id );
+			if ( null === $expected_config_json ) {
+				return null;
+			}
 
-		if ( 'loop' === $queue_mode ) {
-			$queue[] = $entry;
+			$flow_config = json_decode( $expected_config_json, true );
+			if ( ! is_array( $flow_config ) || ! isset( $flow_config[ $flow_step_id ] ) ) {
+				return null;
+			}
+
+			$queue = $flow_config[ $flow_step_id ][ $slot ] ?? array();
+			if ( empty( $queue ) ) {
+				return null;
+			}
+
+			// Drain or loop: pop the head, optionally rotate.
+			$entry = array_shift( $queue );
+
+			if ( 'loop' === $queue_mode ) {
+				$queue[] = $entry;
+			}
+
+			$flow_config[ $flow_step_id ][ $slot ] = $queue;
+			$flow_config[ $flow_step_id ]['_queue_consume_revision'] =
+				(int) ( $flow_config[ $flow_step_id ]['_queue_consume_revision'] ?? 0 ) + 1;
+
+			if ( ! $db_flows->compare_and_swap_flow_config( $flow_id, $expected_config_json, $flow_config ) ) {
+				continue;
+			}
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'Item consumed from queue',
+				array(
+					'flow_id'         => $flow_id,
+					'slot'            => $slot,
+					'queue_mode'      => $queue_mode,
+					'remaining_count' => count( $queue ),
+				)
+			);
+
+			return $entry;
 		}
-
-		$flow_config[ $flow_step_id ][ $slot ] = $queue;
-
-		$db_flows->update_flow(
-			$flow_id,
-			array( 'flow_config' => $flow_config )
-		);
 
 		do_action(
 			'datamachine_log',
-			'info',
-			'Item consumed from queue',
+			'warning',
+			'Queue consumption compare-and-swap failed after retries',
 			array(
-				'flow_id'         => $flow_id,
-				'slot'            => $slot,
-				'queue_mode'      => $queue_mode,
-				'remaining_count' => count( $queue ),
+				'flow_id'    => $flow_id,
+				'slot'       => $slot,
+				'queue_mode' => $queue_mode,
 			)
 		);
 
-		return $entry;
+		return null;
 	}
 
 	/**

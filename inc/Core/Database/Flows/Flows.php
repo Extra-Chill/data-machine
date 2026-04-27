@@ -267,6 +267,68 @@ class Flows extends BaseRepository {
 		return $flow;
 	}
 
+	/**
+	 * Get the raw flow_config JSON blob for compare-and-swap updates.
+	 *
+	 * @param int $flow_id Flow ID.
+	 * @return string|null Raw JSON string, or null when the flow is missing.
+	 */
+	public function get_flow_config_json( int $flow_id ): ?string {
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$value = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT flow_config FROM %i WHERE flow_id = %d',
+				$this->table_name,
+				$flow_id
+			)
+		);
+
+		return null === $value ? null : (string) $value;
+	}
+
+	/**
+	 * Atomically replace flow_config only if it still matches the expected JSON.
+	 *
+	 * Used by queue consumers to avoid two workers consuming the same head item
+	 * from the longtext-backed flow_config queue slots.
+	 *
+	 * @param int    $flow_id              Flow ID.
+	 * @param string $expected_config_json Raw flow_config JSON read before mutation.
+	 * @param array  $new_flow_config      New decoded flow_config to persist.
+	 * @return bool True when the compare-and-swap updated one row.
+	 */
+	public function compare_and_swap_flow_config( int $flow_id, string $expected_config_json, array $new_flow_config ): bool {
+		$new_config_json = wp_json_encode( $new_flow_config );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$result = $this->wpdb->query(
+			$this->wpdb->prepare(
+				'UPDATE %i SET flow_config = %s WHERE flow_id = %d AND flow_config = %s',
+				$this->table_name,
+				$new_config_json,
+				$flow_id,
+				$expected_config_json
+			)
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		if ( false === $result ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to compare-and-swap flow_config',
+				array(
+					'flow_id'    => $flow_id,
+					'wpdb_error' => $this->wpdb->last_error,
+				)
+			);
+			return false;
+		}
+
+		return 1 === (int) $result;
+	}
+
 	public function get_flows_for_pipeline( int $pipeline_id ): array {
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$flows = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT * FROM %i WHERE pipeline_id = %d ORDER BY flow_id ASC', $this->table_name, $pipeline_id ), ARRAY_A );
