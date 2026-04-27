@@ -13,6 +13,7 @@
 namespace DataMachine\Core\Steps\Upsert;
 
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Engine\AI\Tools\ToolResultFinder;
@@ -50,7 +51,7 @@ class UpsertStep extends Step {
 	 */
 	protected function executeStep(): array {
 		$configured_handler_slugs = $this->getHandlerSlugs();
-		$required_handler_slugs   = $this->getRequiredHandlerSlugs( $configured_handler_slugs );
+		$required_handler_slugs   = $this->getRequiredHandlerSlugs();
 		$tool_results_by_slug     = $this->findSuccessfulHandlerResultsBySlug( $required_handler_slugs );
 
 		$missing_required_handlers = array_values( array_diff( $required_handler_slugs, array_keys( $tool_results_by_slug ) ) );
@@ -237,21 +238,10 @@ class UpsertStep extends Step {
 	/**
 	 * Resolve required handler slugs for this upsert step.
 	 *
-	 * @param array $configured_handler_slugs Configured handler slugs.
 	 * @return array
 	 */
-	private function getRequiredHandlerSlugs( array $configured_handler_slugs ): array {
-		$required = $this->getRawRequiredHandlerSlugs();
-
-		if ( ! empty( $required ) ) {
-			return $required;
-		}
-
-		if ( empty( $configured_handler_slugs ) ) {
-			return array();
-		}
-
-		return array( $configured_handler_slugs[0] );
+	private function getRequiredHandlerSlugs(): array {
+		return FlowStepConfig::getRequiredHandlerSlugsForAi( $this->flow_step_config );
 	}
 
 	/**

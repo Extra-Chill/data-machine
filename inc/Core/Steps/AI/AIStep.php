@@ -253,14 +253,14 @@ class AIStep extends Step {
 		$next_flow_step_id = $navigator->get_next_flow_step_id( $this->flow_step_id, $payload );
 		$next_step_config  = $next_flow_step_id ? $this->engine->getFlowStepConfig( $next_flow_step_id ) : null;
 
-		// Collect handler slugs from adjacent steps for multi-handler tracking.
-		$all_handler_slugs = array();
+		// Collect required handler slugs from adjacent steps for completion tracking.
+		$required_handler_slugs = array();
 		foreach ( array( $previous_step_config, $next_step_config ) as $adj_step_config ) {
 			if ( ! $adj_step_config ) {
 				continue;
 			}
-			$handler_slugs     = FlowStepConfig::getConfiguredHandlerSlugs( $adj_step_config );
-			$all_handler_slugs = array_merge( $all_handler_slugs, $handler_slugs );
+			$handler_slugs          = FlowStepConfig::getRequiredHandlerSlugsForAi( $adj_step_config );
+			$required_handler_slugs = array_merge( $required_handler_slugs, $handler_slugs );
 		}
 
 		$engine_data = $this->engine->all();
@@ -285,17 +285,17 @@ class AIStep extends Step {
 			)
 		);
 
-		// Filter handler slugs to only those that are actual AI tools.
+		// Filter required handler slugs to only those that are actual AI tools.
 		// Previous-step handler slugs (e.g. 'universal_web_scraper') are
 		// pipeline-level fetch handlers, not AI-callable tools. Including
 		// them in configured_handlers causes the conversation loop to wait
 		// forever for a handler that can never fire, resulting in the AI
 		// calling the same handler tool on every turn until max_turns.
 		// See: https://github.com/Extra-Chill/data-machine/issues/1108
-		if ( ! empty( $all_handler_slugs ) ) {
+		if ( ! empty( $required_handler_slugs ) ) {
 			$ai_tool_handler_slugs = array_values(
 				array_intersect(
-					array_unique( $all_handler_slugs ),
+					array_unique( $required_handler_slugs ),
 					array_keys( $available_tools )
 				)
 			);

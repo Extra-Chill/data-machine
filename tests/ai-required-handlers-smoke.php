@@ -1,0 +1,174 @@
+<?php
+/**
+ * Pure-PHP smoke test for AI required handler completion semantics.
+ *
+ * Run with: php tests/ai-required-handlers-smoke.php
+ *
+ * @package DataMachine\Tests
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', __DIR__ . '/' );
+}
+
+function do_action( string $hook, ...$args ): void {
+	$GLOBALS['__ai_required_handlers_actions'][] = array( $hook, $args );
+}
+
+function apply_filters( string $hook, $value ) {
+	if ( 'datamachine_step_types' !== $hook ) {
+		return $value;
+	}
+
+	return array(
+		'ai'           => array( 'uses_handler' => false, 'multi_handler' => false ),
+		'system_task'  => array( 'uses_handler' => false, 'multi_handler' => false ),
+		'webhook_gate' => array( 'uses_handler' => false, 'multi_handler' => false ),
+		'fetch'        => array( 'uses_handler' => true, 'multi_handler' => false ),
+		'publish'      => array( 'uses_handler' => true, 'multi_handler' => true ),
+		'upsert'       => array( 'uses_handler' => true, 'multi_handler' => true ),
+	);
+}
+
+require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
+
+use DataMachine\Core\Steps\FlowStepConfig;
+
+$failures = array();
+$passes   = 0;
+
+function assert_equals( $expected, $actual, string $name, array &$failures, int &$passes ): void {
+	if ( $expected === $actual ) {
+		++$passes;
+		echo "  ✓ {$name}\n";
+		return;
+	}
+
+	$failures[] = $name;
+	echo "  ✗ {$name}\n";
+	echo '    expected: ' . var_export( $expected, true ) . "\n";
+	echo '    actual:   ' . var_export( $actual, true ) . "\n";
+}
+
+function assert_contains( string $needle, string $haystack, string $name, array &$failures, int &$passes ): void {
+	assert_equals( true, str_contains( $haystack, $needle ), $name, $failures, $passes );
+}
+
+function assert_not_contains( string $needle, string $haystack, string $name, array &$failures, int &$passes ): void {
+	assert_equals( false, str_contains( $haystack, $needle ), $name, $failures, $passes );
+}
+
+function resolve_required_ai_handler_tools_for_test( ?array $previous_step_config, ?array $next_step_config, array $available_tools ): array {
+	$required_handler_slugs = array();
+	foreach ( array( $previous_step_config, $next_step_config ) as $adjacent_step_config ) {
+		if ( ! $adjacent_step_config ) {
+			continue;
+		}
+
+		$required_handler_slugs = array_merge(
+			$required_handler_slugs,
+			FlowStepConfig::getRequiredHandlerSlugsForAi( $adjacent_step_config )
+		);
+	}
+
+	return array_values(
+		array_intersect(
+			array_unique( $required_handler_slugs ),
+			array_keys( $available_tools )
+		)
+	);
+}
+
+echo "AI required handlers smoke\n";
+echo "--------------------------\n";
+
+$publish_step = array(
+	'step_type'     => 'publish',
+	'handler_slugs' => array( 'wordpress_publish', 'email_publish' ),
+);
+assert_equals(
+	array( 'wordpress_publish', 'email_publish' ),
+	FlowStepConfig::getRequiredHandlerSlugsForAi( $publish_step ),
+	'publish requires all configured handlers',
+	$failures,
+	$passes
+);
+
+$upsert_step = array(
+	'step_type'              => 'upsert',
+	'handler_slugs'          => array( 'wordpress_update', 'notion_update' ),
+	'required_handler_slugs' => array( 'notion_update' ),
+);
+assert_equals(
+	array( 'notion_update' ),
+	FlowStepConfig::getRequiredHandlerSlugsForAi( $upsert_step ),
+	'upsert explicit required_handler_slugs wins',
+	$failures,
+	$passes
+);
+
+$upsert_step_without_required = array(
+	'step_type'     => 'upsert',
+	'handler_slugs' => array( 'wordpress_update', 'notion_update' ),
+);
+assert_equals(
+	array( 'wordpress_update' ),
+	FlowStepConfig::getRequiredHandlerSlugsForAi( $upsert_step_without_required ),
+	'upsert without required_handler_slugs requires first configured handler',
+	$failures,
+	$passes
+);
+
+$fetch_step = array(
+	'step_type'    => 'fetch',
+	'handler_slug' => 'rss_fetch',
+);
+assert_equals(
+	array(),
+	FlowStepConfig::getRequiredHandlerSlugsForAi( $fetch_step ),
+	'handler-free-for-AI completion step returns empty required list',
+	$failures,
+	$passes
+);
+
+$available_tools = array(
+	'wordpress_update' => array( 'handler' => 'wordpress_update' ),
+	'notion_update'    => array( 'handler' => 'notion_update' ),
+);
+assert_equals(
+	array( 'notion_update' ),
+	resolve_required_ai_handler_tools_for_test( null, $upsert_step, $available_tools ),
+	'AIStep-style payload tracks only required upsert handler tools',
+	$failures,
+	$passes
+);
+
+$ai_step_source = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' );
+assert_contains(
+	'FlowStepConfig::getRequiredHandlerSlugsForAi( $adj_step_config )',
+	$ai_step_source,
+	'AIStep resolves adjacent required handlers through FlowStepConfig',
+	$failures,
+	$passes
+);
+assert_not_contains(
+	'FlowStepConfig::getConfiguredHandlerSlugs( $adj_step_config )',
+	$ai_step_source,
+	'AIStep no longer passes every adjacent configured handler to the AI loop',
+	$failures,
+	$passes
+);
+
+echo "\n--------------------------\n";
+$total = $passes + count( $failures );
+echo "{$passes} / {$total} passed\n";
+
+if ( ! empty( $failures ) ) {
+	echo "\nFailures:\n";
+	foreach ( $failures as $failure ) {
+		echo " - {$failure}\n";
+	}
+	exit( 1 );
+}
+
+echo "\nAll assertions passed.\n";
