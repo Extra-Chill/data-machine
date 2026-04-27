@@ -34,9 +34,16 @@ class InstagramPublishAbility {
 	private static bool $registered = false;
 
 	/**
-	 * Instagram Graph API base URL
+	 * Instagram Graph API base URL.
+	 *
+	 * Uses Facebook Graph API because our OAuth flow issues FB-flavored tokens
+	 * via Facebook Login. graph.instagram.com rejects these with "Cannot parse
+	 * access token" (code 190). graph.facebook.com accepts both FB-flavored and
+	 * legacy IG Basic Display tokens for all Instagram Content Publishing endpoints.
+	 *
+	 * @see InstagramAuth — same reasoning as the v0.12.1 username lookup fix.
 	 */
-	const GRAPH_API_URL = 'https://graph.instagram.com';
+	const GRAPH_API_URL = 'https://graph.facebook.com/v18.0';
 
 	/**
 	 * Maximum images per carousel

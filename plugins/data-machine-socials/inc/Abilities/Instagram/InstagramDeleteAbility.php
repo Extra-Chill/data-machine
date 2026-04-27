@@ -20,7 +20,13 @@ class InstagramDeleteAbility {
 
 	private static bool $registered = false;
 
-	const GRAPH_API_URL = 'https://graph.instagram.com';
+	/**
+	 * Uses Facebook Graph API because our OAuth flow issues FB-flavored tokens.
+	 * graph.instagram.com rejects these with "Cannot parse access token" (code 190).
+	 *
+	 * @see InstagramPublishAbility::GRAPH_API_URL for full rationale.
+	 */
+	const GRAPH_API_URL = 'https://graph.facebook.com/v18.0';
 
 	public function __construct() {
 		if ( ! class_exists( 'WP_Ability' ) ) {
