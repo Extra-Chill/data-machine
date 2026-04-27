@@ -532,13 +532,10 @@ class WebhookCommand extends BaseCommand {
 
 		$webhook_flows = array();
 		foreach ( $flows as $flow ) {
-			$raw_config = $flow['scheduling_config'] ?? array();
-			if ( empty( $raw_config['webhook_enabled'] ) ) {
+			$config = $flow['scheduling_config'] ?? array();
+			if ( empty( $config['webhook_enabled'] ) ) {
 				continue;
 			}
-			// Normalise auth_mode label for list display (v1 → v2 on the fly).
-			$migration       = \DataMachine\Api\WebhookAuthResolver::migrate_legacy( $raw_config );
-			$config          = $migration['config'];
 			$webhook_flows[] = array(
 				'flow_id'     => $flow['flow_id'],
 				'flow_name'   => $flow['flow_name'],

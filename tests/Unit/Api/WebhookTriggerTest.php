@@ -294,43 +294,6 @@ class WebhookTriggerTest extends WP_UnitTestCase {
 	}
 
 	/* =================================================================
-	 * Silent v1 → v2 migration
-	 * =================================================================
-	 */
-
-	public function test_v1_legacy_flow_migrates_silently_and_still_authenticates(): void {
-		// Set a flow to the legacy v1 shape directly in the DB, bypassing the ability.
-		$db     = new Flows();
-		$secret = 'legacy-secret-value';
-		$config = array(
-			'webhook_enabled'          => true,
-			'webhook_auth_mode'        => 'hmac_sha256',
-			'webhook_signature_header' => 'X-Hub-Signature-256',
-			'webhook_signature_format' => 'sha256=hex',
-			'webhook_secret'           => $secret,
-		);
-		$db->update_flow( $this->flow_id, array( 'scheduling_config' => $config ) );
-
-		// First request — should succeed.
-		$body = '{"legacy":true}';
-		$sig  = 'sha256=' . hash_hmac( 'sha256', $body, $secret );
-		$res  = WebhookTrigger::handle_trigger( $this->make_request( $body, array( 'x-hub-signature-256' => $sig ) ) );
-		$this->assert_not_unauthorized( $res );
-
-		// Config must now be in canonical v2 shape — legacy fields gone, v2 fields present.
-		$new = $this->get_scheduling_config();
-		$this->assertSame( 'hmac', $new['webhook_auth_mode'] );
-		$this->assertArrayHasKey( 'webhook_auth', $new );
-		$this->assertArrayNotHasKey( 'webhook_signature_header', $new );
-		$this->assertArrayNotHasKey( 'webhook_signature_format', $new );
-		$this->assertArrayNotHasKey( 'webhook_secret', $new );
-
-		$this->assertArrayHasKey( 'webhook_secrets', $new );
-		$this->assertSame( 'current', $new['webhook_secrets'][0]['id'] );
-		$this->assertSame( $secret, $new['webhook_secrets'][0]['value'] );
-	}
-
-	/* =================================================================
 	 * Safe headers — pattern-based deny-list, no provider names
 	 * =================================================================
 	 */
