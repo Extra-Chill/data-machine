@@ -57,6 +57,11 @@ class Pipelines extends BaseRepository {
 			$format[]         = '%d';
 		}
 
+		if ( isset( $pipeline_data['portable_slug'] ) && '' !== trim( (string) $pipeline_data['portable_slug'] ) ) {
+			$data['portable_slug'] = sanitize_title( (string) $pipeline_data['portable_slug'] );
+			$format[]              = '%s';
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$inserted = $this->wpdb->insert( $this->table_name, $data, $format );
 
@@ -661,6 +666,38 @@ class Pipelines extends BaseRepository {
 				array( 'table_name' => $this->table_name )
 			);
 		}
+
+		// Stable bundle filename/reference for portable agent exports (#1303).
+		if ( ! self::column_exists( $this->table_name, 'portable_slug', $this->wpdb ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			$result = $this->wpdb->query(
+				"ALTER TABLE {$this->table_name}
+				 ADD COLUMN portable_slug varchar(191) DEFAULT NULL AFTER pipeline_name,
+				 ADD UNIQUE KEY agent_portable_slug (agent_id, portable_slug)"
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+
+			if ( false === $result ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Failed to add portable_slug column to pipelines table',
+					array(
+						'table_name' => $this->table_name,
+						'db_error'   => $this->wpdb->last_error,
+					)
+				);
+				return;
+			}
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'Added portable_slug column to pipelines table for agent bundles',
+				array( 'table_name' => $this->table_name )
+			);
+		}
 	}
 
 	public static function create_table() {
@@ -674,13 +711,17 @@ class Pipelines extends BaseRepository {
 		$sql = "CREATE TABLE $table_name (
 			pipeline_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			agent_id bigint(20) unsigned DEFAULT NULL,
 			pipeline_name varchar(255) NOT NULL,
+			portable_slug varchar(191) DEFAULT NULL,
 			pipeline_config longtext NULL,
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY  (pipeline_id),
 			KEY user_id (user_id),
+			KEY agent_id (agent_id),
 			KEY pipeline_name (pipeline_name),
+			UNIQUE KEY agent_portable_slug (agent_id, portable_slug),
 			KEY created_at (created_at),
 			KEY updated_at (updated_at)
 		) $charset_collate;";
