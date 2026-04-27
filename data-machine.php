@@ -381,6 +381,7 @@ function datamachine_load_handlers() {
 	new \DataMachine\Core\Steps\Fetch\Handlers\Rss\Rss();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Email\Email();
 	new \DataMachine\Core\Steps\Fetch\Handlers\Files\Files();
+	new \DataMachine\Core\Steps\Fetch\Handlers\WebhookPayload\WebhookPayload();
 
 	// Upsert Handlers
 	new \DataMachine\Core\Steps\Upsert\Handlers\WordPress\WordPress();
