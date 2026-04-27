@@ -406,27 +406,21 @@ trait FlowHelpers {
 			$step_type               = $target_step['step_type'];
 			$new_flow_step_id        = $target_pipeline_step_id . '_' . $new_flow_id;
 
-			$new_step_config = array(
-				'flow_step_id'     => $new_flow_step_id,
-				'step_type'        => $step_type,
-				'pipeline_step_id' => $target_pipeline_step_id,
-				'pipeline_id'      => $target_pipeline_id,
-				'flow_id'          => $new_flow_id,
-				'execution_order'  => $order,
+			$new_step_config = FlowStepConfigFactory::build(
+				array(
+					'flow_step_id'     => $new_flow_step_id,
+					'step_type'        => $step_type,
+					'pipeline_step_id' => $target_pipeline_step_id,
+					'pipeline_id'      => $target_pipeline_id,
+					'flow_id'          => $new_flow_id,
+					'execution_order'  => $order,
+				)
 			);
 
 			if ( isset( $source_steps_by_order[ $order ] ) ) {
 				$source_step = $source_steps_by_order[ $order ];
 
-				// Copy canonical handler fields verbatim. Single-handler steps use
-				// handler_slug/handler_config; multi-handler steps use
-				// handler_slugs/handler_configs; handler-free steps only carry
-				// handler_config when they have step-level settings.
-				foreach ( array( 'handler_slug', 'handler_slugs', 'handler_config', 'handler_configs' ) as $handler_field ) {
-					if ( array_key_exists( $handler_field, $source_step ) ) {
-						$new_step_config[ $handler_field ] = $source_step[ $handler_field ];
-					}
-				}
+				$new_step_config = FlowStepConfigFactory::withHandlerFields( $new_step_config, $source_step );
 
 				// Queue state copies verbatim (#1291 / #1292): AI steps
 				// own prompt_queue, fetch steps own config_patch_queue,
@@ -434,17 +428,7 @@ trait FlowHelpers {
 				// type consumes. Pre-fix this lane copied the legacy
 				// `user_message` field — that slot is gone and the
 				// per-flow user message lives in prompt_queue head.
-				if ( isset( $source_step['prompt_queue'] ) && is_array( $source_step['prompt_queue'] ) ) {
-					$new_step_config['prompt_queue'] = $source_step['prompt_queue'];
-				}
-				if ( isset( $source_step['config_patch_queue'] ) && is_array( $source_step['config_patch_queue'] ) ) {
-					$new_step_config['config_patch_queue'] = $source_step['config_patch_queue'];
-				}
-				if ( isset( $source_step['queue_mode'] )
-					&& in_array( $source_step['queue_mode'], array( 'drain', 'loop', 'static' ), true )
-				) {
-					$new_step_config['queue_mode'] = $source_step['queue_mode'];
-				}
+				$new_step_config = FlowStepConfigFactory::withQueueState( $new_step_config, $source_step );
 
 				if ( isset( $source_step['disabled_tools'] ) ) {
 					$new_step_config['disabled_tools'] = $source_step['disabled_tools'];
@@ -455,39 +439,16 @@ trait FlowHelpers {
 			if ( $override ) {
 				if ( ! empty( $override['handler_slug'] ) ) {
 					$handler_config = $override['handler_config'] ?? array();
-					if ( FlowStepConfig::isMultiHandler( $new_step_config ) ) {
-						$new_step_config['handler_slugs']   = array( $override['handler_slug'] );
-						$new_step_config['handler_configs'] = array( $override['handler_slug'] => $handler_config );
-						unset( $new_step_config['handler_slug'], $new_step_config['handler_config'] );
-					} else {
-						$new_step_config['handler_slug']   = $override['handler_slug'];
-						$new_step_config['handler_config'] = $handler_config;
-						unset( $new_step_config['handler_slugs'], $new_step_config['handler_configs'] );
-					}
+					$new_step_config = FlowStepConfigFactory::withHandlerConfig( $new_step_config, $override['handler_slug'], $handler_config );
 				} elseif ( ! empty( $override['handler_config'] ) ) {
-					if ( FlowStepConfig::isMultiHandler( $new_step_config ) ) {
-						$primary_slug = FlowStepConfig::getPrimaryHandlerSlug( $new_step_config );
-						if ( null !== $primary_slug ) {
-							$existing_config                                      = $new_step_config['handler_configs'][ $primary_slug ] ?? array();
-							$new_step_config['handler_configs'][ $primary_slug ] = array_merge( $existing_config, $override['handler_config'] );
-						}
-					} else {
-						$existing_config                   = FlowStepConfig::getPrimaryHandlerConfig( $new_step_config );
-						$new_step_config['handler_config'] = array_merge( $existing_config, $override['handler_config'] );
-					}
+					$new_step_config = FlowStepConfigFactory::withHandlerConfig( $new_step_config, '', $override['handler_config'], true );
 				}
 				// Override user_message arrives as a workflow-spec input
 				// (matches the public contract used by `flow copy` and
 				// chat tools). Convert it to a 1-entry static
 				// prompt_queue so AIStep sees it post-#1291.
 				if ( ! empty( $override['user_message'] ) ) {
-					$new_step_config['prompt_queue'] = array(
-						array(
-							'prompt'   => $override['user_message'],
-							'added_at' => gmdate( 'c' ),
-						),
-					);
-					$new_step_config['queue_mode']   = 'static';
+					$new_step_config = FlowStepConfigFactory::withUserMessage( $new_step_config, $override['user_message'] );
 				}
 			}
 
@@ -549,14 +510,15 @@ trait FlowHelpers {
 			$flow_step_id = $target['flow_step_id'];
 			$step_type    = $target['step_type'] ?? (string) $step_key;
 
-			// Multi-handler configs use handler_slugs/handler_configs; single-handler
-			// and handler-free configs use handler_slug/handler_config.
-			$handler_slugs   = $config['handler_slugs'] ?? array();
-			$handler_configs = $config['handler_configs'] ?? array();
+			$normalized_handler_config = FlowStepConfigFactory::withHandlerFields(
+				array( 'step_type' => $step_type ),
+				$config
+			);
 
-			// Scalar forms go through UpdateFlowStepAbility.
-			$single_slug   = $config['handler_slug'] ?? '';
-			$single_config = $config['handler_config'] ?? array();
+			$handler_slugs   = $config['handler_slugs'] ?? array();
+			$handler_configs = FlowStepConfig::getHandlerConfigs( $normalized_handler_config );
+			$single_slug     = $config['handler_slug'] ?? '';
+			$single_config   = $config['handler_config'] ?? array();
 
 			// When handler_slugs is provided, add each handler with its config from handler_configs.
 			if ( ! empty( $handler_slugs ) ) {
