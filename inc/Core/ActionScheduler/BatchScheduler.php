@@ -42,6 +42,16 @@ defined( 'ABSPATH' ) || exit;
 class BatchScheduler {
 
 	/**
+	 * Parent completes after all child jobs complete.
+	 */
+	public const COMPLETION_STRATEGY_CHILDREN_COMPLETE = 'children_complete';
+
+	/**
+	 * Parent completes after all chunks have scheduled their work.
+	 */
+	public const COMPLETION_STRATEGY_CHUNKS_SCHEDULED = 'chunks_scheduled';
+
+	/**
 	 * Default chunk size when settings are unavailable.
 	 *
 	 * Used as a last-resort fallback only. The live value is read from
@@ -118,6 +128,7 @@ class BatchScheduler {
 	 *   batch_scheduled    => 0,
 	 *   batch_chunk_size   => 10,
 	 *   batch_context      => 'pipeline' | 'task' | ...,
+	 *   batch_completion_strategy => 'children_complete' | 'chunks_scheduled' | ...,
 	 *   started_at         => 'YYYY-MM-DD HH:MM:SS',
 	 *   batch_state        => array(
 	 *       offset       => 0,
@@ -131,6 +142,7 @@ class BatchScheduler {
 	 * @param array  $items         Raw work items. Shape is consumer-defined.
 	 * @param array  $extra         Arbitrary per-batch state cloned to chunks (engine_snapshot, task_type, ...).
 	 * @param string $context       Consumer context, used for chunk-size/delay filter dispatch.
+	 * @param string $completion_strategy Declared parent-completion strategy.
 	 * @return array{parent_job_id:int,total:int,chunk_size:int} Batch summary.
 	 */
 	public static function start(
@@ -138,7 +150,8 @@ class BatchScheduler {
 		string $hook,
 		array $items,
 		array $extra = array(),
-		string $context = ''
+		string $context = '',
+		string $completion_strategy = ''
 	): array {
 		$total      = count( $items );
 		$chunk_size = self::chunkSize( $context );
@@ -146,13 +159,14 @@ class BatchScheduler {
 		datamachine_merge_engine_data(
 			$parent_job_id,
 			array(
-				'batch'            => true,
-				'batch_total'      => $total,
-				'batch_scheduled'  => 0,
-				'batch_chunk_size' => $chunk_size,
-				'batch_context'    => $context,
-				'started_at'       => current_time( 'mysql' ),
-				'batch_state'      => array(
+				'batch'                     => true,
+				'batch_total'               => $total,
+				'batch_scheduled'           => 0,
+				'batch_chunk_size'          => $chunk_size,
+				'batch_context'             => $context,
+				'batch_completion_strategy' => $completion_strategy,
+				'started_at'                => current_time( 'mysql' ),
+				'batch_state'               => array(
 					'offset' => 0,
 					'total'  => $total,
 					'items'  => $items,
