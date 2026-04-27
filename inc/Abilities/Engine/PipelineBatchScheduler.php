@@ -84,7 +84,8 @@ class PipelineBatchScheduler {
 				'next_flow_step_id' => $next_flow_step_id,
 				'engine_snapshot'   => $engine_snapshot,
 			),
-			self::BATCH_CONTEXT
+			self::BATCH_CONTEXT,
+			BatchScheduler::COMPLETION_STRATEGY_CHILDREN_COMPLETE
 		);
 
 		// Surface next_flow_step_id at the top level for legacy consumers

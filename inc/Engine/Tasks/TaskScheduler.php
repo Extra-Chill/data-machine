@@ -276,7 +276,8 @@ class TaskScheduler {
 				'batch_id'             => $batch_id,
 				'caller_parent_job_id' => $caller_parent_job_id,
 			),
-			self::BATCH_CONTEXT
+			self::BATCH_CONTEXT,
+			BatchScheduler::COMPLETION_STRATEGY_CHUNKS_SCHEDULED
 		);
 
 		// Surface task-specific identifiers alongside the BatchScheduler
@@ -551,17 +552,18 @@ class TaskScheduler {
 		$total = (int) ( $engine_data['batch_total'] ?? $engine_data['total'] ?? 0 );
 
 		return array(
-			'batch_job_id'    => $batchJobId,
-			'task_type'       => $engine_data['task_type'] ?? '',
-			'total_items'     => $total,
-			'offset'          => $engine_data['offset'] ?? $engine_data['batch_offset'] ?? 0,
-			'chunk_size'      => $engine_data['batch_chunk_size'] ?? BatchScheduler::DEFAULT_CHUNK_SIZE,
-			'tasks_scheduled' => $engine_data['tasks_scheduled'] ?? $engine_data['batch_scheduled'] ?? 0,
-			'status'          => $job['status'] ?? '',
-			'started_at'      => $engine_data['started_at'] ?? '',
-			'completed_at'    => $engine_data['completed_at'] ?? '',
-			'cancelled'       => ! empty( $engine_data['cancelled'] ),
-			'child_jobs'      => array(
+			'batch_job_id'        => $batchJobId,
+			'task_type'           => $engine_data['task_type'] ?? '',
+			'completion_strategy' => $engine_data['batch_completion_strategy'] ?? '',
+			'total_items'         => $total,
+			'offset'              => $engine_data['offset'] ?? $engine_data['batch_offset'] ?? 0,
+			'chunk_size'          => $engine_data['batch_chunk_size'] ?? BatchScheduler::DEFAULT_CHUNK_SIZE,
+			'tasks_scheduled'     => $engine_data['tasks_scheduled'] ?? $engine_data['batch_scheduled'] ?? 0,
+			'status'              => $job['status'] ?? '',
+			'started_at'          => $engine_data['started_at'] ?? '',
+			'completed_at'        => $engine_data['completed_at'] ?? '',
+			'cancelled'           => ! empty( $engine_data['cancelled'] ),
+			'child_jobs'          => array(
 				'total'      => (int) ( $child_stats['total'] ?? 0 ),
 				'completed'  => (int) ( $child_stats['completed'] ?? 0 ),
 				'failed'     => (int) ( $child_stats['failed'] ?? 0 ),
