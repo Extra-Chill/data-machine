@@ -101,11 +101,11 @@ class AIConversationLoop {
 		);
 
 		if ( is_array( $result ) ) {
-			return $result;
+			return self::normalizeResultForRun( $result, $messages );
 		}
 
 		$loop = new self();
-		return $loop->execute(
+		$result = $loop->execute(
 			$messages,
 			$tools,
 			$provider,
@@ -115,6 +115,32 @@ class AIConversationLoop {
 			$max_turns,
 			$single_turn
 		);
+
+		return self::normalizeResultForRun( $result, $messages );
+	}
+
+	/**
+	 * Normalize a loop result, returning a caller-consumable error on contract drift.
+	 *
+	 * @param array $result            Raw loop result.
+	 * @param array $fallback_messages Initial messages for validation failures.
+	 * @return array Normalized result or error result.
+	 */
+	private static function normalizeResultForRun( array $result, array $fallback_messages ): array {
+		try {
+			return AIConversationResult::normalize( $result );
+		} catch ( \InvalidArgumentException $e ) {
+			return array(
+				'messages'               => $fallback_messages,
+				'final_content'          => '',
+				'turn_count'             => 0,
+				'completed'              => false,
+				'last_tool_calls'        => array(),
+				'tool_execution_results' => array(),
+				'usage'                  => array(),
+				'error'                  => $e->getMessage(),
+			);
+		}
 	}
 
 	/**
