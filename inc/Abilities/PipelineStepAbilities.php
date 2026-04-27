@@ -249,7 +249,7 @@ class PipelineStepAbilities {
 						),
 						'step_order'  => array(
 							'type'        => 'array',
-							'description' => __( 'Array of step order objects: [{pipeline_step_id: "...", execution_order: 0}, ...]', 'data-machine' ),
+							'description' => __( 'Array of step order objects. Input array order determines final contiguous execution_order values.', 'data-machine' ),
 						),
 					),
 				),
@@ -687,6 +687,7 @@ class PipelineStepAbilities {
 			$step['execution_order']                    = $index;
 			$updated_steps[ $step['pipeline_step_id'] ] = $step;
 		}
+		$updated_orders = $this->buildExecutionOrderMap( $updated_steps );
 
 		$success = $this->db_pipelines->update_pipeline(
 			$pipeline_id,
@@ -709,6 +710,10 @@ class PipelineStepAbilities {
 			$updated_flow_config = array();
 			foreach ( $flow_config as $flow_step_id => $flow_step ) {
 				if ( isset( $flow_step['pipeline_step_id'] ) && $flow_step['pipeline_step_id'] !== $pipeline_step_id ) {
+					$flow_pipeline_step_id = $flow_step['pipeline_step_id'];
+					if ( isset( $updated_orders[ $flow_pipeline_step_id ] ) ) {
+						$flow_step['execution_order'] = $updated_orders[ $flow_pipeline_step_id ];
+					}
 					$updated_flow_config[ $flow_step_id ] = $flow_step;
 				}
 			}
@@ -803,22 +808,31 @@ class PipelineStepAbilities {
 			);
 		}
 
-		$updated_steps = array();
-		foreach ( $step_order as $item ) {
-			$pipeline_step_id = sanitize_text_field( $item['pipeline_step_id'] );
-			$execution_order  = (int) $item['execution_order'];
-
-			$step_found = false;
-			foreach ( $pipeline_steps as $step ) {
-				if ( $step['pipeline_step_id'] === $pipeline_step_id ) {
-					$step['execution_order'] = $execution_order;
-					$updated_steps[]         = $step;
-					$step_found              = true;
-					break;
-				}
+		$steps_by_id = array();
+		foreach ( $pipeline_steps as $step ) {
+			if ( ! empty( $step['pipeline_step_id'] ) ) {
+				$steps_by_id[ $step['pipeline_step_id'] ] = $step;
 			}
+		}
 
-			if ( ! $step_found ) {
+		$updated_steps = array();
+		$seen_steps    = array();
+		foreach ( $step_order as $index => $item ) {
+			$pipeline_step_id = sanitize_text_field( $item['pipeline_step_id'] );
+
+			if ( isset( $seen_steps[ $pipeline_step_id ] ) ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf(
+						/* translators: %s: pipeline step ID */
+						__( 'Step %s appears more than once in reorder input', 'data-machine' ),
+						$pipeline_step_id
+					),
+				);
+			}
+			$seen_steps[ $pipeline_step_id ] = true;
+
+			if ( ! isset( $steps_by_id[ $pipeline_step_id ] ) ) {
 				return array(
 					'success' => false,
 					'error'   => sprintf(
@@ -828,6 +842,10 @@ class PipelineStepAbilities {
 					),
 				);
 			}
+
+			$step                              = $steps_by_id[ $pipeline_step_id ];
+			$step['execution_order']           = $index;
+			$updated_steps[ $pipeline_step_id ] = $step;
 		}
 
 		if ( count( $updated_steps ) !== count( $pipeline_steps ) ) {
@@ -851,7 +869,8 @@ class PipelineStepAbilities {
 			);
 		}
 
-		$flows = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
+		$updated_orders = $this->buildExecutionOrderMap( $updated_steps );
+		$flows          = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
 		foreach ( $flows as $flow ) {
 			$flow_id     = $flow['flow_id'];
 			$flow_config = $flow['flow_config'] ?? array();
@@ -862,11 +881,8 @@ class PipelineStepAbilities {
 				}
 				$pipeline_step_id = $flow_step['pipeline_step_id'];
 
-				foreach ( $updated_steps as $updated_step ) {
-					if ( $updated_step['pipeline_step_id'] === $pipeline_step_id ) {
-						$flow_step['execution_order'] = $updated_step['execution_order'];
-						break;
-					}
+				if ( isset( $updated_orders[ $pipeline_step_id ] ) ) {
+					$flow_step['execution_order'] = $updated_orders[ $pipeline_step_id ];
 				}
 			}
 			unset( $flow_step );
@@ -895,6 +911,22 @@ class PipelineStepAbilities {
 			'step_count'  => count( $updated_steps ),
 			'message'     => 'Pipeline steps reordered successfully.',
 		);
+	}
+
+	/**
+	 * Build pipeline step ID to execution order map.
+	 *
+	 * @param array $steps Pipeline steps keyed by pipeline_step_id.
+	 * @return array<string,int>
+	 */
+	private function buildExecutionOrderMap( array $steps ): array {
+		$orders = array();
+		foreach ( $steps as $step ) {
+			if ( ! empty( $step['pipeline_step_id'] ) && isset( $step['execution_order'] ) ) {
+				$orders[ $step['pipeline_step_id'] ] = (int) $step['execution_order'];
+			}
+		}
+		return $orders;
 	}
 
 	/**
