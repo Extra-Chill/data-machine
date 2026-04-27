@@ -488,7 +488,13 @@ $agent_access->grant_access($agent_id, $user_id, 'operator');
 ```json
 {
     "step_uuid_1_123": {
-        "user_message": "Custom prompt for this flow instance...",
+        "prompt_queue": [
+            {
+                "prompt": "Custom prompt for this flow instance...",
+                "added_at": "2026-04-26T00:00:00+00:00"
+            }
+        ],
+        "queue_mode": "static",
         "execution_order": 0
     },
     "step_uuid_2_123": {
