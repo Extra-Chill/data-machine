@@ -35,8 +35,10 @@ if ( ! function_exists( 'do_action' ) ) {
 }
 
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
+require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfigFactory.php';
 
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Core\Steps\FlowStepConfigFactory;
 
 /**
  * Inline mirror of ExecuteWorkflowAbility::buildConfigsFromWorkflow().
@@ -52,32 +54,24 @@ function build_configs_from_workflow_for_test( array $workflow ): array {
 		$handler_config   = $step['handler_config'] ?? array();
 		$step_type        = $step['type'];
 
-		$flow_step_config = array(
-			'flow_step_id'     => $step_id,
-			'pipeline_step_id' => $pipeline_step_id,
-			'step_type'        => $step_type,
-			'execution_order'  => $index,
-			'enabled_tools'    => ( 'ai' === $step_type && ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) )
-				? array_values( $step['enabled_tools'] )
-				: array(),
-			'prompt_queue'     => array(),
-			'queue_mode'       => 'static',
-			'disabled_tools'   => $step['disabled_tools'] ?? array(),
-			'pipeline_id'      => 'direct',
-			'flow_id'          => 'direct',
+		$flow_step_config = FlowStepConfigFactory::build(
+			array(
+				'flow_step_id'     => $step_id,
+				'pipeline_step_id' => $pipeline_step_id,
+				'step_type'        => $step_type,
+				'execution_order'  => $index,
+				'enabled_tools'    => ( 'ai' === $step_type && ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) )
+					? array_values( $step['enabled_tools'] )
+					: array(),
+				'prompt_queue'     => array(),
+				'queue_mode'       => 'static',
+				'disabled_tools'   => $step['disabled_tools'] ?? array(),
+				'pipeline_id'      => 'direct',
+				'flow_id'          => 'direct',
+				'handler_slug'     => $handler_slug,
+				'handler_config'   => $handler_config,
+			)
 		);
-
-		if ( ! empty( $handler_slug ) ) {
-			if ( FlowStepConfig::isMultiHandler( $flow_step_config ) ) {
-				$flow_step_config['handler_slugs']   = array( $handler_slug );
-				$flow_step_config['handler_configs'] = array( $handler_slug => $handler_config );
-			} else {
-				$flow_step_config['handler_slug']   = $handler_slug;
-				$flow_step_config['handler_config'] = $handler_config;
-			}
-		} elseif ( ! FlowStepConfig::usesHandler( $flow_step_config ) && ! empty( $handler_config ) ) {
-			$flow_step_config['handler_config'] = $handler_config;
-		}
 
 		$flow_config[ $step_id ] = $flow_step_config;
 
