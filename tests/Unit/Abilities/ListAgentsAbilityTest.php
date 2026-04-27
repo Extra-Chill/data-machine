@@ -108,26 +108,20 @@ class ListAgentsAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( array(), $result['agents'] );
 	}
 
-	public function test_default_scope_filters_by_status(): void {
+	public function test_default_scope_treats_missing_status_as_active(): void {
 		$active_id = $this->repo->create_if_missing( 'active-agent', 'Active', $this->owner_user );
-		$this->repo->update_agent(
-			$this->repo->create_if_missing( 'inactive-agent', 'Inactive', $this->owner_user ),
-			array( 'status' => 'inactive' )
-		);
 
 		wp_set_current_user( $this->owner_user );
 		$result = AgentAbilities::listAgents( array( 'status' => 'active' ) );
 
 		$this->assertCount( 1, $result['agents'] );
 		$this->assertSame( $active_id, $result['agents'][0]['agent_id'] );
+		$this->assertSame( 'active', $result['agents'][0]['status'] );
 	}
 
 	public function test_status_any_skips_status_filter(): void {
 		$this->repo->create_if_missing( 'active-agent', 'Active', $this->owner_user );
-		$this->repo->update_agent(
-			$this->repo->create_if_missing( 'inactive-agent', 'Inactive', $this->owner_user ),
-			array( 'status' => 'inactive' )
-		);
+		$this->repo->create_if_missing( 'another-agent', 'Another', $this->owner_user );
 
 		wp_set_current_user( $this->owner_user );
 		$result = AgentAbilities::listAgents( array( 'status' => 'any' ) );

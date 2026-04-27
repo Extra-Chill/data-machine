@@ -513,11 +513,13 @@ class AgentAbilities {
 		}
 
 		// ---- Status filter -----------------------------------------------
+		$status_for_row = static fn( array $row ): string => (string) ( ( $row['status'] ?? '' ) ?: 'active' );
+
 		if ( 'any' !== $status ) {
 			$candidates = array_values(
 				array_filter(
 					$candidates,
-					static fn( $row ) => ( $row['status'] ?? '' ) === $status
+					static fn( $row ) => $status_for_row( $row ) === $status
 				)
 			);
 		}
@@ -547,8 +549,9 @@ class AgentAbilities {
 		foreach ( $candidates as $row ) {
 			$agent_id   = (int) $row['agent_id'];
 			$owner_id   = (int) $row['owner_id'];
-			$config     = is_array( $row['agent_config'] ?? null ) ? $row['agent_config'] : array();
+			$config      = is_array( $row['agent_config'] ?? null ) ? $row['agent_config'] : array();
 			$description = isset( $config['description'] ) ? (string) $config['description'] : '';
+			$row_status  = $status_for_row( $row );
 
 			$item = array(
 				'agent_id'    => $agent_id,
@@ -556,7 +559,7 @@ class AgentAbilities {
 				'agent_name'  => (string) $row['agent_name'],
 				'owner_id'    => $owner_id,
 				'site_scope'  => isset( $row['site_scope'] ) ? (int) $row['site_scope'] : null,
-				'status'      => (string) ( $row['status'] ?? '' ),
+				'status'      => $row_status,
 				'description' => $description,
 				'is_owner'    => $target_user_id > 0 && $owner_id === $target_user_id,
 			);
