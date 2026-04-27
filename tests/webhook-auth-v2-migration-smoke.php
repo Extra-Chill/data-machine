@@ -55,7 +55,7 @@ class WebhookAuthV2MigrationWpdb {
 		return null;
 	}
 
-	public function get_results( string $query, $output ) {
+	public function get_results( string $query, $_output ) {
 		foreach ( $this->rows as $table => $rows ) {
 			if ( str_contains( $query, $table ) ) {
 				return $rows;

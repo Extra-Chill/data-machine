@@ -103,11 +103,7 @@ function datamachine_normalize_webhook_auth_v2_config( array $scheduling_config 
 	}
 
 	if ( 'hmac_sha256' !== $legacy_mode ) {
-		unset(
-			$scheduling_config['webhook_signature_header'],
-			$scheduling_config['webhook_signature_format'],
-			$scheduling_config['webhook_secret']
-		);
+		$scheduling_config = datamachine_webhook_auth_remove_v1_fields( $scheduling_config );
 
 		return array(
 			'config'  => $scheduling_config,
@@ -133,16 +129,28 @@ function datamachine_normalize_webhook_auth_v2_config( array $scheduling_config 
 		);
 	}
 
+	$scheduling_config = datamachine_webhook_auth_remove_v1_fields( $scheduling_config );
+
+	return array(
+		'config'  => $scheduling_config,
+		'changed' => true,
+	);
+}
+
+/**
+ * Remove legacy v1 webhook auth fields from a scheduling config.
+ *
+ * @param array $scheduling_config Scheduling config.
+ * @return array
+ */
+function datamachine_webhook_auth_remove_v1_fields( array $scheduling_config ): array {
 	unset(
 		$scheduling_config['webhook_signature_header'],
 		$scheduling_config['webhook_signature_format'],
 		$scheduling_config['webhook_secret']
 	);
 
-	return array(
-		'config'  => $scheduling_config,
-		'changed' => true,
-	);
+	return $scheduling_config;
 }
 
 /**
