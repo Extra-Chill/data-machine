@@ -88,9 +88,9 @@ See [WordPress as Agent Memory](core-system/wordpress-as-agent-memory.md) for th
 
 ## Abilities API
 
-The Abilities API classes in the `DataMachine\Abilities` namespace provide direct method calls for core operations via the WordPress 6.9 Abilities API:
+The ability classes under `inc/Abilities/` provide direct method calls for core operations via the WordPress 6.9 Abilities API:
 
-- `FlowAbilities`, `PipelineAbilities`, `FlowStepAbilities`, and `PipelineStepAbilities` handle creation, duplication, synchronization, and ordering.
+- Flow, pipeline, and flow-step operations live in focused classes under `inc/Abilities/Flow/`, `inc/Abilities/Pipeline/`, and `inc/Abilities/FlowStep/`; `PipelineStepAbilities` handles pipeline-step ordering and synchronization.
 - Job abilities monitor execution outcomes, retries, manual failure, recovery, summaries, and deletion.
 - `ProcessedItemsAbilities` deduplicates content across executions by tracking previously processed identifiers.
 - `AgentAbilities` manages agent CRUD, renaming (with filesystem migration), and deletion.

@@ -87,4 +87,4 @@ Store pipeline configurations in external version control systems for change tra
 - **CSV Format**: Standard CSV with proper escaping for complex JSON configurations
 - **Execution Ordering**: Pipeline steps are sorted by `execution_order` during export
 - **Flow Isolation**: Each flow's handler configurations are preserved independently
-- **Database Integration**: Import/export is implemented by `DataMachine\Engine\Actions\ImportExport` and surfaced through `Pipeline/ImportExportAbility.php`; REST, CLI, and ability callers all route through that same action layer.
+- **Database Integration**: Import/export is implemented by `DataMachine\Engine\Actions\ImportExport` and surfaced through `inc/Abilities/Pipeline/ImportExportAbility.php`; REST, CLI, and ability callers all route through that same action layer.

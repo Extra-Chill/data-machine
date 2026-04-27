@@ -2,14 +2,14 @@
 
 Comprehensive reference for all WordPress actions used by Data Machine for pipeline execution, data processing, and system operations.
 
-**Note**: Most core operations use classes in the `DataMachine\Abilities` namespace for direct method calls. These actions remain primarily for extensibility and backward compatibility.
+**Note**: Most core operations use ability classes under `inc/Abilities/` for direct method calls. These actions remain primarily for extensibility and backward compatibility.
 
 ## Abilities API Integration
 
 Direct ability calls are preferred over actions for system operations:
-- `PipelineAbilities` -> `create()`, `delete()`, `duplicate()`
-- `FlowAbilities` -> `create()`, `delete()`, `duplicate()`
-- `JobAbilities` -> `executeFailJob()`, `executeRetryJob()`
+- Pipeline abilities such as `datamachine/create-pipeline`, `datamachine/delete-pipeline`, and `datamachine/duplicate-pipeline`
+- Flow abilities such as `datamachine/create-flow`, `datamachine/delete-flow`, and `datamachine/duplicate-flow`
+- Job abilities such as `datamachine/fail-job` and `datamachine/retry-job`
 - `LogAbilities` -> `write_to_log()`, `read_logs()`, `clear_logs()`
 
 ## Pipeline Execution Actions
