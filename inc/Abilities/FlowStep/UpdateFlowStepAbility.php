@@ -10,6 +10,8 @@
 
 namespace DataMachine\Abilities\FlowStep;
 
+use DataMachine\Core\Steps\FlowStepConfig;
+
 defined( 'ABSPATH' ) || exit;
 
 class UpdateFlowStepAbility {
@@ -128,7 +130,7 @@ class UpdateFlowStepAbility {
 		$updated_fields = array();
 
 		if ( $has_handler_update ) {
-			$effective_slug = \DataMachine\Core\Steps\FlowStepConfig::getEffectiveSlug( $existing_step, $handler_slug ?? '' );
+			$effective_slug = FlowStepConfig::getEffectiveSlug( $existing_step, $handler_slug ?? '' );
 
 			if ( empty( $effective_slug ) ) {
 				return array(
