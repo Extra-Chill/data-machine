@@ -223,12 +223,12 @@ class DirectivePolicyResolver {
 	 * @param string $class Directive class.
 	 * @return string[] FQCN first, short class name second.
 	 */
-	private function getClassIdentifiers( string $class ): array {
-		$class = ltrim( $class, '\\' );
-		$pos   = strrpos( $class, '\\' );
-		$short = false === $pos ? $class : substr( $class, $pos + 1 );
+	private function getClassIdentifiers( string $class_name ): array {
+		$class_name = ltrim( $class_name, '\\' );
+		$pos        = strrpos( $class_name, '\\' );
+		$short      = false === $pos ? $class_name : substr( $class_name, $pos + 1 );
 
-		return array_values( array_unique( array( $class, $short ) ) );
+		return array_values( array_unique( array( $class_name, $short ) ) );
 	}
 
 	/**

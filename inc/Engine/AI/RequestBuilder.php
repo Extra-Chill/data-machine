@@ -68,18 +68,18 @@ class RequestBuilder {
 			'AI request built',
 			array_filter(
 				array(
-					'mode'                => $mode,
-					'job_id'              => $payload['job_id'] ?? null,
-					'flow_step_id'        => $payload['flow_step_id'] ?? null,
-					'provider'            => $provider,
-					'model'               => $model,
-					'message_count'       => count( $request['messages'] ),
-					'tool_count'          => count( $structured_tools ),
-					'directives'          => $applied_directives,
+					'mode'                  => $mode,
+					'job_id'                => $payload['job_id'] ?? null,
+					'flow_step_id'          => $payload['flow_step_id'] ?? null,
+					'provider'              => $provider,
+					'model'                 => $model,
+					'message_count'         => count( $request['messages'] ),
+					'tool_count'            => count( $structured_tools ),
+					'directives'            => $applied_directives,
 					'suppressed_directives' => ! empty( $assembled['suppressed_directives'] ) ? $assembled['suppressed_directives'] : null,
-					'request_json_bytes'  => $request_metadata['request_json_bytes'] ?? null,
-					'messages_json_bytes' => $request_metadata['messages_json_bytes'] ?? null,
-					'tools_json_bytes'    => $request_metadata['tools_json_bytes'] ?? null,
+					'request_json_bytes'    => $request_metadata['request_json_bytes'] ?? null,
+					'messages_json_bytes'   => $request_metadata['messages_json_bytes'] ?? null,
+					'tools_json_bytes'      => $request_metadata['tools_json_bytes'] ?? null,
 				),
 				fn( $v ) => null !== $v
 			)
@@ -179,8 +179,8 @@ class RequestBuilder {
 				'agent_id' => $payload['agent_id'] ?? 0,
 			)
 		);
-		$directives       = $directive_policy['directives'];
-		$suppressed       = $directive_policy['suppressed'] ?? array();
+		$directives        = $directive_policy['directives'];
+		$suppressed        = $directive_policy['suppressed'] ?? array();
 		foreach ( $directives as $directive ) {
 			$promptBuilder->addDirective(
 				$directive['class'],
@@ -201,7 +201,7 @@ class RequestBuilder {
 			'structured_tools'    => $structured_tools,
 			'applied_directives'  => $applied_directives,
 			'directive_metadata'  => $directive_metadata,
-			'directive_breakdown' => $directive_breakdown,
+			'directive_breakdown'   => $directive_breakdown,
 			'suppressed_directives' => $suppressed,
 		);
 	}
