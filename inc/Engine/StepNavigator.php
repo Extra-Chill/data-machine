@@ -30,6 +30,28 @@ class StepNavigator {
 	}
 
 	/**
+	 * Build the execution plan for navigation, logging invalid plans once.
+	 */
+	private function getExecutionPlan( array $flow_config, int $job_id, string $flow_step_id ): ?ExecutionPlan {
+		try {
+			return ExecutionPlan::from_flow_config( $flow_config );
+		} catch ( \InvalidArgumentException $e ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Step navigation failed - invalid execution plan',
+				array(
+					'job_id'       => $job_id,
+					'flow_step_id' => $flow_step_id,
+					'error'        => $e->getMessage(),
+				)
+			);
+		}
+
+		return null;
+	}
+
+	/**
 	 * Get next flow step ID based on execution order
 	 *
 	 * Uses centralized engine data for execution context.
@@ -46,21 +68,12 @@ class StepNavigator {
 
 		$flow_config = $this->getFlowConfig( $job_id );
 
-		$current_step = $flow_config[ $flow_step_id ] ?? null;
-		if ( ! $current_step ) {
+		if ( ! isset( $flow_config[ $flow_step_id ] ) ) {
 			return null;
 		}
 
-		$current_order = $current_step['execution_order'] ?? -1;
-		$next_order    = $current_order + 1;
-
-		foreach ( $flow_config as $step_id => $step ) {
-			if ( ( $step['execution_order'] ?? -1 ) === $next_order ) {
-				return $step_id;
-			}
-		}
-
-		return null;
+		$plan = $this->getExecutionPlan( $flow_config, $job_id, $flow_step_id );
+		return $plan ? $plan->next_step_id( $flow_step_id ) : null;
 	}
 
 	/**
@@ -80,20 +93,11 @@ class StepNavigator {
 
 		$flow_config = $this->getFlowConfig( $job_id );
 
-		$current_step = $flow_config[ $flow_step_id ] ?? null;
-		if ( ! $current_step ) {
+		if ( ! isset( $flow_config[ $flow_step_id ] ) ) {
 			return null;
 		}
 
-		$current_order = $current_step['execution_order'] ?? -1;
-		$prev_order    = $current_order - 1;
-
-		foreach ( $flow_config as $step_id => $step ) {
-			if ( ( $step['execution_order'] ?? -1 ) === $prev_order ) {
-				return $step_id;
-			}
-		}
-
-		return null;
+		$plan = $this->getExecutionPlan( $flow_config, $job_id, $flow_step_id );
+		return $plan ? $plan->previous_step_id( $flow_step_id ) : null;
 	}
 }
