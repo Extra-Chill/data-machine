@@ -333,6 +333,13 @@ class ToolPolicyResolver {
 			if ( isset( $tool_config['_handler_callable'] ) ) {
 				continue;
 			}
+			// Handler-scoped tools carry flow-specific config and completion
+			// metadata. If a global pipeline tool uses the same name, keep the
+			// adjacent handler definition so downstream steps can detect that the
+			// required handler tool actually ran.
+			if ( isset( $available_tools[ $tool_name ] ) ) {
+				continue;
+			}
 			if ( $this->tool_manager->is_tool_available( $tool_name, $pipeline_step_id ) ) {
 				$available_tools[ $tool_name ] = $tool_config;
 			}
