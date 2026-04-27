@@ -130,9 +130,9 @@ Delete a file by filename.
 **Implementation**: `inc/Api/AgentFiles.php` (@since v0.38.0)
 
 Agent files use a 3-layer directory resolution system:
-1. **Shared layer** (`shared/`) — Site-wide files like SITE.md
-2. **Agent layer** (`agents/{slug}/`) — Agent-specific files: SOUL.md, MEMORY.md
-3. **User layer** (`users/{id}/`) — User-specific files: USER.md
+1. **Shared layer** — Site-wide files like SITE.md
+2. **Agent layer** — Agent-specific files: SOUL.md, MEMORY.md
+3. **User layer** — User-specific files: USER.md
 
 The `user_id` parameter controls which user context to resolve. Defaults to the current authenticated user. Users with `manage_agents` capability can access other users' files.
 
@@ -224,7 +224,7 @@ Delete an agent file.
 
 **Implementation**: `inc/Api/AgentFiles.php` (lines 121-195)
 
-Daily memory files store temporal session logs at `daily/YYYY/MM/DD.md`. These endpoints manage the daily memory journal separate from persistent memory files.
+Daily memory files store temporal session logs in the agent daily-memory tree by year, month, and day. These endpoints manage the daily memory journal separate from persistent memory files.
 
 ### GET /files/agent/daily
 

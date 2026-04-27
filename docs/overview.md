@@ -49,7 +49,7 @@ Data Machine supports **multiple agents on a single WordPress installation** (@s
 - **Access Control**: The `datamachine_agent_access` table implements role-based access (viewer, operator, admin) for sharing agents across WordPress users.
 - **Resource Scoping**: All major resources (pipelines, flows, jobs, chat sessions) carry an `agent_id` column. Queries filter by agent context automatically.
 - **Filesystem Isolation**: Each agent gets its own directory under `agents/{slug}/` for identity files (SOUL.md, MEMORY.md) and daily memory.
-- **Three-Layer Directory System**: Memory files are organized into shared (site-wide), agent (identity), and user (personal) layers under `wp-content/uploads/datamachine-files/`.
+- **Three-Layer Directory System**: Memory files are organized into shared (site-wide), agent (identity), and user (personal) layers below Data Machine's files root in WordPress uploads.
 
 See [Multi-Agent Architecture](core-system/wordpress-as-agent-memory.md#multi-agent-architecture) for details.
 
@@ -63,13 +63,13 @@ Markdown files organized in three layers:
 
 | Layer | Directory | Contents |
 |-------|-----------|----------|
-| **Shared** | `shared/` | SITE.md, RULES.md (site-wide context) |
-| **Agent** | `agents/{slug}/` | SOUL.md, MEMORY.md (agent identity and knowledge) |
-| **User** | `users/{id}/` | USER.md, MEMORY.md (human preferences) |
+| **Shared** | shared layer | SITE.md, RULES.md (site-wide context) |
+| **Agent** | agent slug layer | SOUL.md, MEMORY.md (agent identity and knowledge) |
+| **User** | user ID layer | USER.md, MEMORY.md (human preferences) |
 
 ### Daily Memory System
 
-Temporal knowledge preserved in date-organized files (`agents/{slug}/daily/YYYY/MM/DD.md`). The **DailyMemoryTask** system task automatically:
+Temporal knowledge is preserved in date-organized daily memory files. The **DailyMemoryTask** system task automatically:
 
 1. Synthesizes daily activity into summary files
 2. Prunes MEMORY.md when it exceeds 8KB, archiving session-specific content to daily files
@@ -88,7 +88,7 @@ See [WordPress as Agent Memory](core-system/wordpress-as-agent-memory.md) for th
 
 ## Abilities API
 
-The Abilities API (DataMachine\Abilities) provides direct method calls for core operations via the WordPress 6.9 Abilities API:
+The Abilities API classes in the `DataMachine\Abilities` namespace provide direct method calls for core operations via the WordPress 6.9 Abilities API:
 
 - `FlowAbilities`, `PipelineAbilities`, `FlowStepAbilities`, and `PipelineStepAbilities` handle creation, duplication, synchronization, and ordering.
 - Job abilities monitor execution outcomes, retries, manual failure, recovery, summaries, and deletion.

@@ -2,10 +2,10 @@
 /**
  * Tests for BingWebmasterAbilities.
  *
- * @package DataMachine\Tests\Unit\Abilities
+ * @package DataMachine\Tests\Unit\Abilities\Analytics
  */
 
-namespace DataMachine\Tests\Unit\Abilities;
+namespace DataMachine\Tests\Unit\Abilities\Analytics;
 
 use DataMachine\Abilities\Analytics\BingWebmasterAbilities;
 use DataMachine\Core\HttpClient;

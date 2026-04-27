@@ -2,10 +2,10 @@
 /**
  * ToolResultFinder unit tests.
  *
- * @package DataMachine\Tests\Unit\AI\Tools
+ * @package DataMachine\Tests\Unit\Engine\AI\Tools
  */
 
-namespace DataMachine\Tests\Unit\AI\Tools;
+namespace DataMachine\Tests\Unit\Engine\AI\Tools;
 
 use DataMachine\Engine\AI\Tools\ToolResultFinder;
 use PHPUnit\Framework\TestCase;

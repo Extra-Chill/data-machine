@@ -2,7 +2,7 @@
 
 Comprehensive reference for all WordPress actions used by Data Machine for pipeline execution, data processing, and system operations.
 
-**Note**: Most core operations use the Abilities API (`DataMachine\Abilities`) for direct method calls. These actions remain primarily for extensibility and backward compatibility.
+**Note**: Most core operations use classes in the `DataMachine\Abilities` namespace for direct method calls. These actions remain primarily for extensibility and backward compatibility.
 
 ## Abilities API Integration
 

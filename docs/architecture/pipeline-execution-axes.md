@@ -76,10 +76,10 @@ Non-handler tool calls (search, fetch, generic abilities) don't move the complet
 
 | Axis | Lives in | Trigger | "1" case | "many" case | Layer |
 |------|----------|---------|----------|-------------|-------|
-| **1. Queueable fetch** | `Core/Steps/Fetch/FetchStep.php` + `Core/Steps/QueueableTrait.php::consumeFromConfigPatchQueue` | `flow_step_config['queue_mode']` + `config_patch_queue` | Static handler config; or one queued patch consumed per tick | Many ticks draining or looping queued patches | Across ticks |
+| **1. Queueable fetch** | `inc/Core/Steps/Fetch/FetchStep.php` + `inc/Core/Steps/QueueableTrait.php::consumeFromConfigPatchQueue` | `flow_step_config['queue_mode']` + `config_patch_queue` | Static handler config; or one queued patch consumed per tick | Many ticks draining or looping queued patches | Across ticks |
 | **2. `max_items`** | `Core/Steps/Fetch/Handlers/FetchHandler.php::get_fetch_data` | `handler_config['max_items']`, applied after dedup | One DataPacket per fetch call | N DataPackets per fetch call | Inside one fetch call |
-| **3. Batch fan-out** | `Abilities/Engine/PipelineBatchScheduler.php::fanOut` + `Core/ActionScheduler/BatchScheduler.php` (called from `ExecuteStepAbility`) | Any step returning > 1 DataPacket after filtering | Inline continuation on the same job | N child jobs, scheduled in chunks of `chunk_size` every `chunk_delay` seconds (defaults: 10 / 30) | Across child jobs in one run |
-| **4. Multi-handler completion** | `Engine/AI/AIConversationLoop.php` (~line 359) | `flow_step_config['handler_slugs']` length on a pipeline-mode AI step | Loop completes after first successful handler tool | Loop runs until every configured handler has fired | Across turns of one conversation |
+| **3. Batch fan-out** | `inc/Abilities/Engine/PipelineBatchScheduler.php::fanOut` + `inc/Core/ActionScheduler/BatchScheduler.php` (called from `ExecuteStepAbility`) | Any step returning > 1 DataPacket after filtering | Inline continuation on the same job | N child jobs, scheduled in chunks of `chunk_size` every `chunk_delay` seconds (defaults: 10 / 30) | Across child jobs in one run |
+| **4. Multi-handler completion** | `inc/Engine/AI/AIConversationLoop.php` (~line 359) | `flow_step_config['handler_slugs']` length on a pipeline-mode AI step | Loop completes after first successful handler tool | Loop runs until every configured handler has fired | Across turns of one conversation |
 
 ## Composed example
 

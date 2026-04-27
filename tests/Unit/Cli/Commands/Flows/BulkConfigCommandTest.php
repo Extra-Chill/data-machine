@@ -6,10 +6,10 @@
  * using the ConfigureFlowStepsAbility directly. WP-CLI runtime
  * utilities are not available in PHPUnit.
  *
- * @package DataMachine\Tests\Unit\Cli
+ * @package DataMachine\Tests\Unit\Cli\Commands\Flows
  */
 
-namespace DataMachine\Tests\Unit\Cli;
+namespace DataMachine\Tests\Unit\Cli\Commands\Flows;
 
 use DataMachine\Abilities\FlowStep\ConfigureFlowStepsAbility;
 use DataMachine\Core\Database\Flows\Flows;

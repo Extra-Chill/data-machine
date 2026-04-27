@@ -70,7 +70,7 @@ Data Machine supports **multiple agents on a single WordPress installation** (@s
 
 ### Layered Memory Architecture
 
-Agent memory is organized in a **three-layer directory system** under `wp-content/uploads/datamachine-files/`:
+Agent memory is organized in a **three-layer directory system** below Data Machine's files root in WordPress uploads:
 
 ```
 datamachine-files/
@@ -101,9 +101,9 @@ datamachine-files/
 ```
 
 **CoreMemoryFilesDirective** (Priority 20) loads files from layers in order:
-1. `shared/SITE.md` → `shared/RULES.md`
-2. `agents/{slug}/SOUL.md` → `agents/{slug}/MEMORY.md`
-3. `users/{id}/USER.md` → `users/{id}/MEMORY.md`
+1. SITE.md → RULES.md from the shared layer
+2. SOUL.md → MEMORY.md from the agent layer
+3. USER.md → MEMORY.md from the user layer
 4. Custom files from `MemoryFileRegistry` (extensions)
 
 See [WordPress as Agent Memory](core-system/wordpress-as-agent-memory.md) for full memory documentation.

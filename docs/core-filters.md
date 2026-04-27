@@ -145,7 +145,7 @@ Central registry for execution modes. Extensions register modes; the settings UI
 
 ### `AgentModeDirective`
 
-**Namespace:** `DataMachine\Engine\AI\Directives`  
+**Class:** `DataMachine\Engine\AI\Directives\AgentModeDirective`
 **Since:** 0.68.0  
 **Priority:** 22
 

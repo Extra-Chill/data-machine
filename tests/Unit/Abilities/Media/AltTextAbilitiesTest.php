@@ -2,10 +2,10 @@
 /**
  * Tests for AltTextAbilities.
  *
- * @package DataMachine\Tests\Unit\Abilities
+ * @package DataMachine\Tests\Unit\Abilities\Media
  */
 
-namespace DataMachine\Tests\Unit\Abilities;
+namespace DataMachine\Tests\Unit\Abilities\Media;
 
 use DataMachine\Abilities\Media\AltTextAbilities;
 use DataMachine\Core\PluginSettings;
