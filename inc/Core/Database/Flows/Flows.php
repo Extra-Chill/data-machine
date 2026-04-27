@@ -26,12 +26,16 @@ class Flows extends BaseRepository {
             flow_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             pipeline_id bigint(20) unsigned NOT NULL,
             user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+            agent_id bigint(20) unsigned DEFAULT NULL,
             flow_name varchar(255) NOT NULL,
+            portable_slug varchar(191) DEFAULT NULL,
             flow_config longtext NOT NULL,
             scheduling_config longtext NOT NULL,
             PRIMARY KEY (flow_id),
             KEY pipeline_id (pipeline_id),
-            KEY user_id (user_id)
+            KEY user_id (user_id),
+            KEY agent_id (agent_id),
+            UNIQUE KEY pipeline_portable_slug (pipeline_id, portable_slug)
         ) $charset_collate;";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -121,6 +125,38 @@ class Flows extends BaseRepository {
 				array( 'table_name' => $this->table_name )
 			);
 		}
+
+		// Stable bundle filename/reference within a pipeline (#1303).
+		if ( ! self::column_exists( $this->table_name, 'portable_slug', $this->wpdb ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			$result = $this->wpdb->query(
+				"ALTER TABLE {$this->table_name}
+				 ADD COLUMN portable_slug varchar(191) DEFAULT NULL AFTER flow_name,
+				 ADD UNIQUE KEY pipeline_portable_slug (pipeline_id, portable_slug)"
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+
+			if ( false === $result ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Failed to add portable_slug column to flows table',
+					array(
+						'table_name' => $this->table_name,
+						'db_error'   => $this->wpdb->last_error,
+					)
+				);
+				return;
+			}
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'Added portable_slug column to flows table for agent bundles',
+				array( 'table_name' => $this->table_name )
+			);
+		}
 	}
 
 	public function create_flow( array $flow_data ) {
@@ -167,6 +203,11 @@ class Flows extends BaseRepository {
 		if ( null !== $agent_id && $agent_id > 0 ) {
 			$insert_data['agent_id'] = $agent_id;
 			$insert_format[]         = '%d';
+		}
+
+		if ( isset( $flow_data['portable_slug'] ) && '' !== trim( (string) $flow_data['portable_slug'] ) ) {
+			$insert_data['portable_slug'] = sanitize_title( (string) $flow_data['portable_slug'] );
+			$insert_format[]              = '%s';
 		}
 
 		$result = $this->wpdb->insert(
