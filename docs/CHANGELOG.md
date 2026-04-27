@@ -2,6 +2,33 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.85.0] - 2026-04-27
+
+### Added
+- map webhook payloads into data packets
+
+### Changed
+- add fake AI pipeline contract coverage
+- centralize step config scaffolding
+- declare completion strategy
+- split Homeboy action checks
+
+### Fixed
+- make transition fan-out policy explicit
+- mark step exceptions as failures
+- validate conversation loop results
+- protect child engine context from packet metadata
+- require only downstream handler blockers
+- drain due step actions after CLI runs
+- preserve handler tool metadata for upsert handoff
+- drop stale status field references (regression from #1112)
+- drop `AFTER <col>` from retroactive column migrations
+- reject ambiguous step type targets
+- make queue consumption atomic
+- normalize reordered step execution order
+- protect engine configs from initial data
+- handle task status and no-op queue moves
+
 ## [0.84.1] - 2026-04-27
 
 ### Fixed
