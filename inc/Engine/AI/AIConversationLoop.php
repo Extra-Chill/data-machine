@@ -186,6 +186,7 @@ class AIConversationLoop {
 		$final_content          = '';
 		$last_tool_calls        = array();
 		$tool_execution_results = array();
+		$last_request_metadata  = array();
 
 		// Accumulate token usage across all turns.
 		$total_usage = array(
@@ -224,6 +225,7 @@ class AIConversationLoop {
 				$mode,
 				$payload
 			);
+			$last_request_metadata = is_array( $ai_response['request_metadata'] ?? null ) ? $ai_response['request_metadata'] : array();
 
 			// Handle AI request failure
 			if ( ! $ai_response['success'] ) {
@@ -248,7 +250,8 @@ class AIConversationLoop {
 					'completed'       => false,
 					'last_tool_calls' => array(),
 					'error'           => $ai_response['error'] ?? 'AI request failed',
-					'usage'           => $total_usage,
+					'usage'            => $total_usage,
+					'request_metadata' => $last_request_metadata,
 				);
 
 				// Persist transcript on the error path too — this is exactly
@@ -528,6 +531,7 @@ class AIConversationLoop {
 			'tool_execution_results' => $tool_execution_results,
 			'has_pending_tools'      => ! empty( $last_tool_calls ) && ! $conversation_complete,
 			'usage'                  => $total_usage,
+			'request_metadata'       => $last_request_metadata,
 		);
 
 		if ( $turn_budget->exceeded() && ! $conversation_complete ) {
@@ -611,6 +615,10 @@ class AIConversationLoop {
 			'error'         => $result['error'] ?? null,
 			'usage'         => $result['usage'] ?? array(),
 		);
+
+		if ( ! empty( $result['request_metadata'] ) && is_array( $result['request_metadata'] ) ) {
+			$metadata['request_metadata'] = $result['request_metadata'];
+		}
 
 		$session_id = $store->create_session( $user_id, $agent_id, $metadata, 'pipeline' );
 

@@ -107,8 +107,16 @@ class PromptBuilder {
 		}
 
 		$conversation_messages = $this->messages;
-		$directive_outputs     = array();
-		$applied_directives    = array();
+		$directive_outputs      = array();
+		$applied_directives     = array();
+		$directive_metadata     = array();
+		$validation_context     = array_filter(
+			array(
+				'job_id'       => $payload['job_id'] ?? null,
+				'flow_step_id' => $payload['flow_step_id'] ?? null,
+			),
+			fn( $v ) => null !== $v
+		);
 
 		foreach ( $this->directives as $directiveConfig ) {
 			$directive = $directiveConfig['directive'];
@@ -128,6 +136,11 @@ class PromptBuilder {
 					$directive_outputs = array_merge( $directive_outputs, $outputs );
 				}
 				$applied_directives[] = $directive_name;
+				$directive_metadata[] = self::describeDirectiveOutputs(
+					$directive_name,
+					(int) $directiveConfig['priority'],
+					is_array( $outputs ) ? $outputs : array()
+				);
 				continue;
 			}
 
@@ -137,17 +150,15 @@ class PromptBuilder {
 					$directive_outputs = array_merge( $directive_outputs, $outputs );
 				}
 				$applied_directives[] = $directive_name;
+				$directive_metadata[] = self::describeDirectiveOutputs(
+					$directive_name,
+					(int) $directiveConfig['priority'],
+					is_array( $outputs ) ? $outputs : array()
+				);
 				continue;
 			}
 		}
 
-		$validation_context = array_filter(
-			array(
-				'job_id'       => $payload['job_id'] ?? null,
-				'flow_step_id' => $payload['flow_step_id'] ?? null,
-			),
-			fn( $v ) => null !== $v
-		);
 		$validated_outputs  = DirectiveOutputValidator::validateOutputs( $directive_outputs, $validation_context );
 		$directive_messages = DirectiveRenderer::renderMessages( $validated_outputs );
 
@@ -155,6 +166,93 @@ class PromptBuilder {
 			'messages'           => array_merge( $directive_messages, $conversation_messages ),
 			'tools'              => $this->tools,
 			'applied_directives' => $applied_directives,
+			'directive_metadata' => $directive_metadata,
 		);
+	}
+
+	/**
+	 * Describe a directive's output without storing full prompt text.
+	 *
+	 * @param string $name     Directive display name.
+	 * @param int    $priority Directive priority.
+	 * @param array  $outputs  Raw directive outputs.
+	 * @return array<string,mixed>
+	 */
+	private static function describeDirectiveOutputs( string $name, int $priority, array $outputs ): array {
+		$content_bytes = 0;
+		$memory_files  = array();
+
+		foreach ( $outputs as $output ) {
+			$content = '';
+			if ( is_array( $output ) && isset( $output['content'] ) && is_scalar( $output['content'] ) ) {
+				$content = (string) $output['content'];
+			} elseif ( is_array( $output ) && isset( $output['data'] ) ) {
+				$content = (string) wp_json_encode( $output['data'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+			}
+
+			$content_bytes += strlen( $content );
+			$memory_file    = self::extractMemoryFilename( $content );
+			if ( '' !== $memory_file ) {
+				$memory_files[] = array(
+					'filename' => $memory_file,
+					'bytes'    => strlen( $content ),
+					'injected' => true,
+				);
+			}
+		}
+
+		$json = wp_json_encode( $outputs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+
+		return array(
+			'name'          => $name,
+			'priority'      => $priority,
+			'messages'      => self::countRenderableOutputs( $outputs ),
+			'outputs'       => count( $outputs ),
+			'content_bytes' => $content_bytes,
+			'json_bytes'    => strlen( (string) $json ),
+			'memory_files'  => $memory_files,
+		);
+	}
+
+	/**
+	 * Count outputs that can render into request messages without logging validation warnings.
+	 *
+	 * @param array $outputs Raw directive outputs.
+	 * @return int Renderable output count.
+	 */
+	private static function countRenderableOutputs( array $outputs ): int {
+		$count = 0;
+		foreach ( $outputs as $output ) {
+			if ( ! is_array( $output ) ) {
+				continue;
+			}
+
+			$type = $output['type'] ?? '';
+			if ( 'system_text' === $type && isset( $output['content'] ) && is_string( $output['content'] ) && '' !== trim( $output['content'] ) ) {
+				++$count;
+			}
+			if ( 'system_json' === $type && ! empty( $output['label'] ) && is_array( $output['data'] ?? null ) ) {
+				++$count;
+			}
+			if ( 'system_file' === $type && ! empty( $output['file_path'] ) && ! empty( $output['mime_type'] ) ) {
+				++$count;
+			}
+		}
+
+		return $count;
+	}
+
+	/**
+	 * Extract a memory filename from the standard MemoryFilesReader content prefix.
+	 *
+	 * @param string $content Directive content.
+	 * @return string Filename when present, otherwise empty string.
+	 */
+	private static function extractMemoryFilename( string $content ): string {
+		if ( preg_match( '/^## Memory File: ([^\n]+)/', $content, $matches ) ) {
+			return trim( $matches[1] );
+		}
+
+		return '';
 	}
 }

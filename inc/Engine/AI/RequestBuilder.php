@@ -71,10 +71,22 @@ class RequestBuilder {
 		}
 
 		// Build the request with directives applied
-		$request            = $promptBuilder->build( $mode, $provider, $payload );
-		$applied_directives = $request['applied_directives'] ?? array();
+		$request             = $promptBuilder->build( $mode, $provider, $payload );
+		$applied_directives  = $request['applied_directives'] ?? array();
+		$directive_metadata  = $request['directive_metadata'] ?? array();
 		unset( $request['applied_directives'] );
+		unset( $request['directive_metadata'] );
 		$request['model'] = $model;
+
+		$request_metadata = RequestMetadata::build(
+			$request,
+			$structured_tools,
+			$directive_metadata,
+			$provider,
+			$model,
+			$mode
+		);
+		RequestMetadata::warn_if_oversized( $request_metadata, $payload );
 
 		do_action(
 			'datamachine_log',
@@ -82,14 +94,17 @@ class RequestBuilder {
 			'AI request built',
 			array_filter(
 				array(
-					'mode'          => $mode,
-					'job_id'        => $payload['job_id'] ?? null,
-					'flow_step_id'  => $payload['flow_step_id'] ?? null,
-					'provider'      => $provider,
-					'model'         => $model,
-					'message_count' => count( $request['messages'] ),
-					'tool_count'    => count( $structured_tools ),
-					'directives'    => $applied_directives,
+					'mode'                => $mode,
+					'job_id'              => $payload['job_id'] ?? null,
+					'flow_step_id'        => $payload['flow_step_id'] ?? null,
+					'provider'            => $provider,
+					'model'               => $model,
+					'message_count'       => count( $request['messages'] ),
+					'tool_count'          => count( $structured_tools ),
+					'directives'          => $applied_directives,
+					'request_json_bytes'  => $request_metadata['request_json_bytes'] ?? null,
+					'messages_json_bytes' => $request_metadata['messages_json_bytes'] ?? null,
+					'tools_json_bytes'    => $request_metadata['tools_json_bytes'] ?? null,
 				),
 				fn( $v ) => null !== $v
 			)
@@ -131,12 +146,13 @@ class RequestBuilder {
 					)
 				);
 
+				$wp_ai_response['request_metadata'] = $request_metadata;
 				return $wp_ai_response;
 			}
 		}
 
 		// Legacy path: ai-http-client via chubes_ai_request filter.
-		return apply_filters(
+		$response = apply_filters(
 			'chubes_ai_request',
 			$request,
 			$provider,
@@ -148,6 +164,12 @@ class RequestBuilder {
 				'payload' => $payload,
 			)
 		);
+
+		if ( is_array( $response ) ) {
+			$response['request_metadata'] = $request_metadata;
+		}
+
+		return $response;
 	}
 
 	/**

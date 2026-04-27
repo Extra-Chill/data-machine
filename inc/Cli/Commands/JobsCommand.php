@@ -528,6 +528,18 @@ class JobsCommand extends BaseCommand {
 				)
 			);
 		}
+		$request_metadata = $metadata['request_metadata'] ?? array();
+		if ( is_array( $request_metadata ) && ! empty( $request_metadata ) ) {
+			WP_CLI::log(
+				sprintf(
+					'  Request: %s total, %s messages, %s tools, %d tools',
+					size_format( (int) ( $request_metadata['request_json_bytes'] ?? 0 ) ),
+					size_format( (int) ( $request_metadata['messages_json_bytes'] ?? 0 ) ),
+					size_format( (int) ( $request_metadata['tools_json_bytes'] ?? 0 ) ),
+					(int) ( $request_metadata['tools']['count'] ?? 0 )
+				)
+			);
+		}
 		WP_CLI::log( sprintf( '  Messages: %d', count( $messages ) ) );
 		WP_CLI::log( '' );
 
