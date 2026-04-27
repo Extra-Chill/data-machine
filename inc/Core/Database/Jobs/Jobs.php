@@ -278,10 +278,12 @@ class Jobs {
 		if ( ! BaseRepository::column_exists( $table_name, 'source', $wpdb ) ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it. Column position
+			// is cosmetic — both engines accept the bare ADD COLUMN form.
 			$result = $wpdb->query(
 				"ALTER TABLE {$table_name}
-				 ADD COLUMN source varchar(50) NOT NULL DEFAULT 'pipeline' AFTER flow_id,
-				 ADD COLUMN label varchar(255) NULL DEFAULT NULL AFTER source,
+				 ADD COLUMN source varchar(50) NOT NULL DEFAULT 'pipeline',
+				 ADD COLUMN label varchar(255) NULL DEFAULT NULL,
 				 ADD KEY source (source)"
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL
@@ -317,9 +319,10 @@ class Jobs {
 		if ( ! BaseRepository::column_exists( $table_name, 'parent_job_id', $wpdb ) ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
 			$result = $wpdb->query(
 				"ALTER TABLE {$table_name}
-				 ADD COLUMN parent_job_id bigint(20) unsigned NULL DEFAULT NULL AFTER label,
+				 ADD COLUMN parent_job_id bigint(20) unsigned NULL DEFAULT NULL,
 				 ADD KEY parent_job_id (parent_job_id)"
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL
@@ -338,9 +341,10 @@ class Jobs {
 		if ( ! BaseRepository::column_exists( $table_name, 'user_id', $wpdb ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
 			$result = $wpdb->query(
 				"ALTER TABLE {$table_name}
-				 ADD COLUMN user_id bigint(20) unsigned NOT NULL DEFAULT 0 AFTER job_id,
+				 ADD COLUMN user_id bigint(20) unsigned NOT NULL DEFAULT 0,
 				 ADD KEY user_id (user_id)"
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL
@@ -359,9 +363,10 @@ class Jobs {
 		if ( ! BaseRepository::column_exists( $table_name, 'agent_id', $wpdb ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
 			$result = $wpdb->query(
 				"ALTER TABLE {$table_name}
-				 ADD COLUMN agent_id bigint(20) unsigned DEFAULT NULL AFTER user_id,
+				 ADD COLUMN agent_id bigint(20) unsigned DEFAULT NULL,
 				 ADD KEY agent_id (agent_id)"
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL
@@ -398,9 +403,10 @@ class Jobs {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it.
 		$result = $wpdb->query(
 			"ALTER TABLE {$table_name}
-			 ADD COLUMN task_type varchar(100) NULL DEFAULT NULL AFTER agent_id,
+			 ADD COLUMN task_type varchar(100) NULL DEFAULT NULL,
 			 ADD KEY idx_task_type (task_type, source)"
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL
