@@ -290,7 +290,8 @@ $flow_step_config = $payload['flow_step_config'];
 $step_type = $flow_step_config['step_type'];           // From pipeline
 $execution_order = $flow_step_config['execution_order']; // From pipeline
 $system_prompt = $flow_step_config['system_prompt'];   // From pipeline (AI steps)
-$user_message = $flow_step_config['user_message'];     // From flow (AI steps)
+$prompt_queue = $flow_step_config['prompt_queue'];     // From flow (AI steps)
+$queue_mode = $flow_step_config['queue_mode'];         // drain | loop | static
 $handler_config = $flow_step_config['handler_config']; // Handler settings
 ```
 

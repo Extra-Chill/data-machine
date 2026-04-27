@@ -8,6 +8,8 @@ The Abilities API in `inc/Abilities/` provides a unified interface for Data Mach
 
 **Total registered abilities**: 193
 
+The tables below document the core ability groups most commonly used by REST, CLI, and chat integrations. For a generated live inventory, run `wp abilities list --category=datamachine-*` or inspect the current `wp_register_ability()` callsites under `inc/Abilities/`.
+
 ## Multi-Agent Scoping
 
 All abilities support `agent_id` and `user_id` parameters for multi-agent scoping. The `PermissionHelper` class resolves scoped agent and user IDs, enforces ownership checks via `owns_resource()` and `owns_agent_resource()`, and controls access grants via `can_access_agent()`.
@@ -161,27 +163,6 @@ Internal abilities for the pipeline execution engine.
 | `datamachine/upload-flow-file` | Upload a file to a flow step | `File/FlowFileAbilities.php` |
 | `datamachine/cleanup-flow-files` | Cleanup data packets and temporary files for a job or flow | `File/FlowFileAbilities.php` |
 
-### Workspace (16 abilities)
-
-| Ability | Description | Location |
-|---------|-------------|----------|
-| `datamachine/workspace-path` | Get the agent workspace directory path | `WorkspaceAbilities.php` |
-| `datamachine/workspace-list` | List repositories in the agent workspace | `WorkspaceAbilities.php` |
-| `datamachine/workspace-show` | Show detailed repo info (branch, remote, latest commit, dirty status) | `WorkspaceAbilities.php` |
-| `datamachine/workspace-read` | Read a text file from a workspace repository | `WorkspaceAbilities.php` |
-| `datamachine/workspace-ls` | List directory contents within a workspace repository | `WorkspaceAbilities.php` |
-| `datamachine/workspace-clone` | Clone a git repository into the workspace | `WorkspaceAbilities.php` |
-| `datamachine/workspace-remove` | Remove a repository from the workspace | `WorkspaceAbilities.php` |
-| `datamachine/workspace-write` | Create or overwrite a file in a workspace repository | `WorkspaceAbilities.php` |
-| `datamachine/workspace-edit` | Find-and-replace text in a workspace repository file | `WorkspaceAbilities.php` |
-| `datamachine/workspace-git-status` | Get git status for a workspace repository | `WorkspaceAbilities.php` |
-| `datamachine/workspace-git-log` | Read git log entries | `WorkspaceAbilities.php` |
-| `datamachine/workspace-git-diff` | Read git diff output | `WorkspaceAbilities.php` |
-| `datamachine/workspace-git-pull` | Run git pull --ff-only | `WorkspaceAbilities.php` |
-| `datamachine/workspace-git-add` | Stage repository paths with git add | `WorkspaceAbilities.php` |
-| `datamachine/workspace-git-commit` | Commit staged changes | `WorkspaceAbilities.php` |
-| `datamachine/workspace-git-push` | Push commits | `WorkspaceAbilities.php` |
-
 ### Chat Sessions (4 abilities)
 
 | Ability | Description | Location |
@@ -191,18 +172,11 @@ Internal abilities for the pipeline execution engine.
 | `datamachine/get-chat-session` | Retrieve a chat session with conversation and metadata | `Chat/GetChatSessionAbility.php` |
 | `datamachine/delete-chat-session` | Delete a chat session after verifying ownership | `Chat/DeleteChatSessionAbility.php` |
 
-### GitHub (6 abilities)
+### Coding / GitHub Extension Abilities
 
-| Ability | Description | Location |
-|---------|-------------|----------|
-| `datamachine/list-github-issues` | List issues from a GitHub repository with optional filters | `Fetch/GitHubAbilities.php` |
-| `datamachine/get-github-issue` | Get a single GitHub issue with full details | `Fetch/GitHubAbilities.php` |
-| `datamachine/update-github-issue` | Update a GitHub issue (title, body, labels, assignees, state) | `Fetch/GitHubAbilities.php` |
-| `datamachine/comment-github-issue` | Add a comment to a GitHub issue | `Fetch/GitHubAbilities.php` |
-| `datamachine/list-github-pulls` | List pull requests from a GitHub repository | `Fetch/GitHubAbilities.php` |
-| `datamachine/list-github-repos` | List repositories for a user or organization | `Fetch/GitHubAbilities.php` |
+Workspace and GitHub coding abilities live in the `data-machine-code` extension plugin. Data Machine core no longer registers the old workspace, GitHub issue, or GitHub repository ability names.
 
-### Handler Execution (9 abilities)
+### Handler Execution (8 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
@@ -214,7 +188,6 @@ Internal abilities for the pipeline execution engine.
 | `datamachine/query-wordpress-posts` | Query WordPress posts with filters | `Fetch/QueryWordPressPostsAbility.php` |
 | `datamachine/publish-wordpress` | Create WordPress posts | `Publish/PublishWordPressAbility.php` |
 | `datamachine/update-wordpress` | Update existing WordPress posts | `Update/UpdateWordPressAbility.php` |
-| `datamachine/fetch-reddit` | Fetch posts from Reddit API | `Fetch/FetchRedditAbility.php` |
 
 ### Duplicate Check (2 abilities)
 
@@ -265,7 +238,7 @@ Internal abilities for the pipeline execution engine.
 | `datamachine/diagnose-images` | Scan media library for oversized images, missing WebP, missing thumbnails | `Media/ImageOptimizationAbilities.php` |
 | `datamachine/optimize-images` | Compress oversized images and generate WebP variants | `Media/ImageOptimizationAbilities.php` |
 
-### Internal Linking (6 abilities)
+### Internal Linking (7 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
@@ -273,8 +246,9 @@ Internal abilities for the pipeline execution engine.
 | `datamachine/diagnose-internal-links` | Report internal link coverage across published posts | `InternalLinkingAbilities.php` |
 | `datamachine/audit-internal-links` | Scan post content for internal links, build link graph | `InternalLinkingAbilities.php` |
 | `datamachine/get-orphaned-posts` | Return posts with zero inbound internal links | `InternalLinkingAbilities.php` |
+| `datamachine/get-backlinks` | Return posts that link to a given post | `InternalLinkingAbilities.php` |
 | `datamachine/check-broken-links` | HTTP HEAD check links to find broken URLs | `InternalLinkingAbilities.php` |
-| `datamachine/inject-category-links` | Deterministic keyword-matching link injection (no AI) | `InternalLinkingAbilities.php` |
+| `datamachine/link-opportunities` | Rank candidate internal links from search analytics and the cached link graph | `InternalLinkingAbilities.php` |
 
 ### SEO — Meta Descriptions (2 abilities)
 
@@ -381,13 +355,12 @@ Internal abilities for the pipeline execution engine.
 |---------|-------------|----------|
 | `datamachine/send-ping` | Send agent ping notification | `AgentPing/SendPingAbility.php` |
 
-### System Infrastructure (4 abilities)
+### System Infrastructure (3 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
 | `datamachine/generate-session-title` | Generate AI-powered title for chat session | `SystemAbilities.php` |
 | `datamachine/system-health-check` | Unified health diagnostics for Data Machine and extensions | `SystemAbilities.php` |
-| `datamachine/create-github-issue` | Create GitHub issues programmatically | `SystemAbilities.php` |
 | `datamachine/run-task` | Manually trigger a registered system task for immediate execution | `SystemAbilities.php` |
 
 ## Category Registration
