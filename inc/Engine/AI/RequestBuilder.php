@@ -171,7 +171,7 @@ class RequestBuilder {
 		$promptBuilder = new PromptBuilder();
 		$promptBuilder->setMessages( $messages )->setTools( $structured_tools );
 
-		$directives        = apply_filters( 'datamachine_directives', array() );
+		$directives       = apply_filters( 'datamachine_directives', array() );
 		$directive_policy = ( new DirectivePolicyResolver() )->resolve(
 			$directives,
 			array(
@@ -179,8 +179,8 @@ class RequestBuilder {
 				'agent_id' => $payload['agent_id'] ?? 0,
 			)
 		);
-		$directives        = $directive_policy['directives'];
-		$suppressed        = $directive_policy['suppressed'] ?? array();
+		$directives = $directive_policy['directives'];
+		$suppressed = $directive_policy['suppressed'] ?? array();
 		foreach ( $directives as $directive ) {
 			$promptBuilder->addDirective(
 				$directive['class'],
