@@ -973,7 +973,7 @@ This filter, the strategy definition shape, the callback signature, and the retu
 
 **See Also**:
 - Source: `inc/Abilities/DuplicateCheck/DuplicateCheckAbility.php::getStrategies()`
-- Canonical consumer: `data-machine-events/inc/Core/DuplicateDetection/EventDuplicateStrategy.php`
+- Canonical consumer: the event duplicate strategy in the `data-machine-events` extension plugin
 - Ability docs: [datamachine/check-duplicate](../../ai-tools/) in ai-tools reference
 
 ## Files Repository Filters

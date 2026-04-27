@@ -24,13 +24,13 @@ Four layers, each serving a different purpose:
 
 ### 1. Agent Files — Identity and Knowledge
 
-**Location:** Three-layer directory system under `wp-content/uploads/datamachine-files/`:
+**Location:** Three-layer directory system below Data Machine's files root in WordPress uploads:
 
 | Layer | Directory | Contents |
 |-------|-----------|----------|
-| **Shared** (site-wide) | `shared/` | `SITE.md`, `RULES.md` — site-level context shared by all agents |
-| **Agent** (identity + knowledge) | `agents/{agent_slug}/` | `SOUL.md`, `MEMORY.md`, `daily/` — agent-specific identity and knowledge |
-| **User** (personal) | `users/{user_id}/` | `USER.md` — user preferences that follow the human across agents |
+| **Shared** (site-wide) | shared layer | `SITE.md`, `RULES.md` — site-level context shared by all agents |
+| **Agent** (identity + knowledge) | agent slug layer | `SOUL.md`, `MEMORY.md`, daily memory — agent-specific identity and knowledge |
+| **User** (personal) | user ID layer | `USER.md` — user preferences that follow the human across agents |
 
 Markdown files stored on the WordPress filesystem. The agent reads these to know who it is, who it works with, and what it knows.
 
@@ -164,9 +164,9 @@ SITE.md contains information about the WordPress installation that all agents sh
 | **Taxonomies** | `get_taxonomies( ['public' => true] )` | Table with label, slug, term count, type, associated post types |
 | **User Roles** | `wp_roles()` | Only shown when custom roles exist (beyond the 5 defaults) |
 | **Active Plugins** | `get_option('active_plugins')` + network plugins on multisite | Name + truncated description. Data Machine itself is excluded |
-| **Must-Use Plugins** | `get_mu_plugins()` | Plugins in `wp-content/mu-plugins/`. Only shown when present |
+| **Must-Use Plugins** | `get_mu_plugins()` | Must-use plugins. Only shown when present |
 | **Drop-ins** | `get_dropins()` | Recognized drop-ins (`db.php`, `object-cache.php`, `sunrise.php`, etc.) with filename. Only shown when present. Multisite-only drop-ins (`sunrise.php`, `blog-deleted.php`, etc.) only appear on multisite installs |
-| **REST API** | `rest_get_server()->get_namespaces()` | Custom namespaces only (excludes `wp/`, `oembed/`, `wp-site-health/`) |
+| **REST API** | `rest_get_server()->get_namespaces()` | Custom namespaces only (excludes WordPress core namespaces) |
 
 ### RULES.md — Site-Wide Rules (Shared Layer)
 

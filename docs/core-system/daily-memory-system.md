@@ -15,9 +15,9 @@ Daily memory has six components:
 
 ## File Storage
 
-**Location:** `wp-content/uploads/datamachine-files/agents/{agent_slug}/daily/YYYY/MM/DD.md`
+**Location:** the agent's daily-memory directory below Data Machine's files root, grouped by year and month.
 
-Files follow the WordPress Media Library date convention (`YYYY/MM/`). Each day gets one markdown file, named by the two-digit day.
+Files follow the WordPress Media Library date convention: year directory, month directory, then one markdown file per day named by the two-digit day.
 
 ```
 agents/chubes-bot/daily/

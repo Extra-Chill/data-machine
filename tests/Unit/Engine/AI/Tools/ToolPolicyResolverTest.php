@@ -2,10 +2,10 @@
 /**
  * Tests for ToolPolicyResolver — single entry point for tool resolution.
  *
- * @package DataMachine\Tests\Unit\AI\Tools
+ * @package DataMachine\Tests\Unit\Engine\AI\Tools
  */
 
-namespace DataMachine\Tests\Unit\AI\Tools;
+namespace DataMachine\Tests\Unit\Engine\AI\Tools;
 
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Pipelines\Pipelines;

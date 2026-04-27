@@ -5,10 +5,10 @@
  * Tests for the unified similarity engine — title normalization,
  * fuzzy matching, Jaccard similarity, and tokenization.
  *
- * @package DataMachine\Tests\Unit\Core
+ * @package DataMachine\Tests\Unit\Core\Similarity
  */
 
-namespace DataMachine\Tests\Unit\Core;
+namespace DataMachine\Tests\Unit\Core\Similarity;
 
 use DataMachine\Core\Similarity\SimilarityEngine;
 use DataMachine\Core\Similarity\SimilarityResult;

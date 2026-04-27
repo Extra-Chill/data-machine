@@ -95,7 +95,7 @@ The `AgentAccess` repository provides:
 
 **Source:** `inc/Core/FilesRepository/DirectoryManager.php`
 
-Agent files live under `wp-content/uploads/datamachine-files/` in a three-layer directory architecture:
+Agent files live below Data Machine's files root in a three-layer directory architecture:
 
 ```
 wp-content/uploads/datamachine-files/
@@ -128,7 +128,7 @@ When resolving an agent directory:
 
 1. If `agent_id` is provided and non-zero, look up the agent slug from the database and use `agents/{slug}/`
 2. If `user_id` is provided and non-zero, check if the user owns an agent and resolve to `agents/{slug}/`; otherwise fall back to `users/{user_id}/`
-3. If neither is provided, use the legacy shared directory (`agent/`)
+3. If neither is provided, use the legacy shared single-agent directory
 
 This ensures backward compatibility with single-agent installations (`user_id=0`) while supporting full multi-agent scoping.
 

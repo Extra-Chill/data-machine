@@ -264,7 +264,7 @@ class RedditAuth extends BaseOAuth2Provider {
 ### Bluesky Authentication (BaseAuthProvider Direct Extension)
 
 **Provider**: BlueskyAuth
-**Location**: `data-machine-socials/inc/Handlers/Bluesky/BlueskyAuth.php` (extension plugin)
+**Location**: the Bluesky handler in the `data-machine-socials` extension plugin
 **Since**: v0.1.0 (updated to extend BaseAuthProvider in v0.2.6)
 
 Bluesky authentication uses app password authentication and extends BaseAuthProvider directly. The implementation lives in the `data-machine-socials` extension plugin; the example below shows the pattern any extension can follow.

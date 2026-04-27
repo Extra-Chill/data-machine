@@ -2,10 +2,10 @@
 /**
  * Tests for BingWebmaster global tool.
  *
- * @package DataMachine\Tests\Unit\AI\Tools
+ * @package DataMachine\Tests\Unit\Engine\AI\Tools\Global
  */
 
-namespace DataMachine\Tests\Unit\AI\Tools;
+namespace DataMachine\Tests\Unit\Engine\AI\Tools\Global;
 
 use DataMachine\Engine\AI\Tools\Global\BingWebmaster;
 use WP_UnitTestCase;

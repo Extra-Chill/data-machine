@@ -2,10 +2,10 @@
 /**
  * Tests for AltTextTask.
  *
- * @package DataMachine\Tests\Unit\AI\System\Tasks
+ * @package DataMachine\Tests\Unit\Engine\AI\System\Tasks
  */
 
-namespace DataMachine\Tests\Unit\AI\System\Tasks;
+namespace DataMachine\Tests\Unit\Engine\AI\System\Tasks;
 
 use DataMachine\Engine\AI\System\Tasks\AltTextTask;
 use DataMachine\Core\PluginSettings;

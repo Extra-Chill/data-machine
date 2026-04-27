@@ -7,10 +7,10 @@
  * pick_fields) that are not available in the PHPUnit test environment.
  * These tests verify the underlying ability behavior instead.
  *
- * @package DataMachine\Tests\Unit\Cli
+ * @package DataMachine\Tests\Unit\Cli\Commands\Flows
  */
 
-namespace DataMachine\Tests\Unit\Cli;
+namespace DataMachine\Tests\Unit\Cli\Commands\Flows;
 
 use WP_UnitTestCase;
 

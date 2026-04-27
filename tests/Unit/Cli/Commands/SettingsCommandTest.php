@@ -7,10 +7,10 @@
  * invokes exit() — that kills the PHPUnit process in the test environment.
  * These tests verify the underlying ability and type-coercion behavior instead.
  *
- * @package DataMachine\Tests\Unit\Cli
+ * @package DataMachine\Tests\Unit\Cli\Commands
  */
 
-namespace DataMachine\Tests\Unit\Cli;
+namespace DataMachine\Tests\Unit\Cli\Commands;
 
 use WP_UnitTestCase;
 

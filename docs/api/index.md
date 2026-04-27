@@ -10,7 +10,7 @@ Complete REST API reference for Data Machine
 
 **Permissions**: Most endpoints require `manage_options` capability
 
-**Implementation**: All endpoints are implemented in `data-machine/inc/Api/`. The project is migrating business logic to the WordPress 6.9 Abilities API; REST handlers should prefer calling abilities (via `wp_get_ability()` / `wp_ability_execute`) where available. Service managers may still be instantiated as a transitional implementation during migration.
+**Implementation**: All endpoints are implemented in `inc/Api/`. The project is migrating business logic to the WordPress 6.9 Abilities API; REST handlers should prefer calling abilities (via `wp_get_ability()` / `wp_ability_execute`) where available. Service managers may still be instantiated as a transitional implementation during migration.
 
 ## Endpoint Categories
 
@@ -75,7 +75,7 @@ Endpoints returning lists support pagination parameters:
 
 ## Implementation Guide
 
-All endpoints are implemented in `data-machine/inc/Api/` using the services layer architecture for direct method calls, with automatic registration via `rest_api_init`: 
+All endpoints are implemented in `inc/Api/` using the services layer architecture for direct method calls, with automatic registration via `rest_api_init`:
 
 ```php
 // Example endpoint registration using services layer

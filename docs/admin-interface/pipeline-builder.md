@@ -102,7 +102,7 @@ Modal state is also held in the UI store (`activeModal`, `modalData`) but is not
 
 The Pipelines UI calls REST endpoints through `inc/Core/Admin/Pages/Pipelines/assets/react/utils/api.js` (a wrapper around `@wordpress/api-fetch` that reads the nonce/namespace from `window.dataMachineConfig`).
 
-For the authoritative list of endpoints used by the UI, refer to `inc/Core/Admin/Pages/Pipelines/assets/react/utils/api.js` and the PHP REST controllers under `data-machine/inc/Api/`.
+For the authoritative list of endpoints used by the UI, refer to `inc/Core/Admin/Pages/Pipelines/assets/react/utils/api.js` and the PHP REST controllers under `inc/Api/`.
 
 ### Benefits of React Architecture
 
@@ -151,6 +151,14 @@ Handler-related server state is fetched through TanStack Query hooks under `inc/
 
 - `queries/handlers.js` - handler metadata queries
 - `utils/handlerSettings.js` - field normalization and settings helpers
+
+### Service Layer Architecture
+
+**Handler queries** (`inc/Core/Admin/Pages/Pipelines/assets/react/queries/handlers.js`):
+- Query abstraction for handler-related API operations
+- Separates API communication from component logic
+- Provides reusable handler operation methods
+- Centralizes error handling for handler operations
 
 **Benefits**:
 - Clear separation between API calls, query state, and UI components

@@ -2,10 +2,10 @@
 /**
  * Tests for QueueValidator global tool.
  *
- * @package DataMachine\Tests\Unit\AI\Tools
+ * @package DataMachine\Tests\Unit\Engine\AI\Tools\Global
  */
 
-namespace DataMachine\Tests\Unit\AI\Tools;
+namespace DataMachine\Tests\Unit\Engine\AI\Tools\Global;
 
 use DataMachine\Core\Similarity\SimilarityEngine;
 use DataMachine\Engine\AI\Tools\Global\QueueValidator;

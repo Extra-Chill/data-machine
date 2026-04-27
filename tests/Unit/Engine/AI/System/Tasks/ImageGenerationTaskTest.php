@@ -2,11 +2,11 @@
 /**
  * Tests for the ImageGenerationTask system task.
  *
- * @package DataMachine\Tests\Unit\AI\System\Tasks
+ * @package DataMachine\Tests\Unit\Engine\AI\System\Tasks
  * @since 0.72.0 Updated to use executeTask() instead of execute().
  */
 
-namespace DataMachine\Tests\Unit\AI\System\Tasks;
+namespace DataMachine\Tests\Unit\Engine\AI\System\Tasks;
 
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
 use WP_UnitTestCase;
