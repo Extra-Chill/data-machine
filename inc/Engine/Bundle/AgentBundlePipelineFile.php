@@ -13,6 +13,7 @@ defined( 'ABSPATH' ) || exit;
  * Immutable representation of pipelines/<slug>.json schema_version 1.
  */
 final class AgentBundlePipelineFile {
+	use AgentBundleSlugTrait;
 
 	private string $slug;
 	private string $name;
@@ -46,10 +47,6 @@ final class AgentBundlePipelineFile {
 			'name'           => $this->name,
 			'steps'          => $this->steps,
 		);
-	}
-
-	public function slug(): string {
-		return $this->slug;
 	}
 
 	private static function validate_steps( array $steps ): array {
