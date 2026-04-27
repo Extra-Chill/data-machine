@@ -59,7 +59,7 @@ wp datamachine flows run 10 --count=5 --timestamp="2026-01-01 00:00:00"
 # Update flow properties
 wp datamachine flows update 10 --name="New Name"
 wp datamachine flows update 10 --scheduling=daily
-wp datamachine flows update 10 --set-prompt --step=ai_2
+wp datamachine flows update 10 --set-user-message="Summarize this week's source data" --step=ai_2
 wp datamachine flows update 10 --handler-config='{"key":"val"}' --step=fetch_1
 
 # Delete a flow
@@ -84,8 +84,15 @@ Manage flow queues. **Since**: 0.31.0
 # Add a prompt to the queue
 wp datamachine flows queue add 10 "Write about AI agents"
 
+# Add a fetch config patch to the queue
+wp datamachine flows queue add 10 --patch='{"params":{"after":"2026-01-01"}}' --step=fetch_1
+
 # List queue contents
 wp datamachine flows queue list 10
+
+# Set queue access mode: drain, loop, or static
+wp datamachine flows queue mode 10 drain --step=ai_2
+wp datamachine flows queue mode 10 loop --step=fetch_1
 
 # Update a queue item
 wp datamachine flows queue update 10 0 "Updated prompt"

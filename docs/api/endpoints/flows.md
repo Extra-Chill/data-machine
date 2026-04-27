@@ -525,30 +525,26 @@ Remove a specific queue item.
 - `flow_id` (integer, required): Flow ID
 - `index` (integer, required): Queue position
 
-### GET /flows/{flow_id}/queue/settings
+### PUT /flows/{flow_id}/queue/mode
 
-Get queue settings for a flow.
-
-**Permission**: `manage_options` capability required
-
-**Response**:
-```json
-{
-  "success": true,
-  "settings": {
-    "enabled": true,
-    "mode": "sequential"
-  }
-}
-```
-
-### PUT /flows/{flow_id}/queue/settings
-
-Update queue settings for a flow.
+Set the queue access mode for a flow step.
 
 **Permission**: `manage_options` capability required
 
 **Parameters**:
 - `flow_id` (integer, required): Flow ID
-- `enabled` (boolean, optional): Enable/disable queue
-- `mode` (string, optional): "sequential" or "random"
+- `flow_step_id` (string, required): Flow step ID
+- `mode` (string, required): One of `drain`, `loop`, or `static`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "flow_id": 10,
+    "flow_step_id": "ai_2",
+    "queue_mode": "static"
+  },
+  "message": "Queue mode updated."
+}
+```
