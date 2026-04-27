@@ -89,6 +89,56 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'job_id' => 99 ), $resolved['widget_publish']['_observed']['engine'] );
 	}
 
+	public function test_resolves_three_param_filter_style_handler_callable_before_static_tool(): void {
+		add_filter(
+			'datamachine_tools',
+			function ( array $tools ): array {
+				$tools['wiki_upsert'] = array(
+					'description' => 'Global wiki upsert tool',
+					'modes'       => array( 'pipeline' ),
+				);
+
+				$tools['__handler_tools_wiki_upsert'] = array(
+					'_handler_callable' => static function ( $tools, $handler_slug, $handler_config ) {
+						if ( 'wiki_upsert' !== $handler_slug ) {
+							return $tools;
+						}
+
+						$tools['wiki_upsert'] = array(
+							'description' => 'Handler-scoped wiki upsert tool',
+							'parameters'  => array(),
+							'config_seen' => $handler_config,
+						);
+
+						return $tools;
+					},
+					'handler'           => 'wiki_upsert',
+					'modes'             => array( 'pipeline' ),
+					'access_level'      => 'admin',
+				);
+
+				return $tools;
+			}
+		);
+
+		$resolver = new ToolPolicyResolver();
+		$tools    = $resolver->resolve(
+			array(
+				'mode'             => ToolPolicyResolver::MODE_PIPELINE,
+				'next_step_config' => array(
+					'flow_step_id'    => 'fs_wiki_upsert',
+					'handler_slugs'   => array( 'wiki_upsert' ),
+					'handler_configs' => array( 'wiki_upsert' => array( 'fixed_parent_path' => 'woocommerce' ) ),
+				),
+			)
+		);
+
+		$this->assertArrayHasKey( 'wiki_upsert', $tools );
+		$this->assertSame( 'wiki_upsert', $tools['wiki_upsert']['handler'] );
+		$this->assertSame( 'Handler-scoped wiki upsert tool', $tools['wiki_upsert']['description'] );
+		$this->assertSame( array( 'fixed_parent_path' => 'woocommerce' ), $tools['wiki_upsert']['config_seen'] );
+	}
+
 	public function test_skips_handler_tools_with_non_matching_slug(): void {
 		add_filter(
 			'datamachine_tools',

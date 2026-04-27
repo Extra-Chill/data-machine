@@ -274,12 +274,11 @@ class ToolManager {
 			}
 
 			// Handler callables follow two conventions:
-			// 1. Filter-style: ($tools, $handler_slug, $handler_config, $engine_data) — 4 params
-			// 2. Direct-style: ($handler_slug, $handler_config, $engine_data) — 3 params
-			// Detect by parameter count so both work correctly.
-			$callable         = $definition['_handler_callable'];
-			$callable_params  = $this->get_callable_param_count( $callable );
-			$uses_filter_convention = ( $callable_params >= 4 );
+			// 1. Filter-style: ($tools, $handler_slug, $handler_config[, $engine_data])
+			// 2. Direct-style: ($handler_slug, $handler_config, $engine_data)
+			// Detect by shape so 3-param filter callbacks are not mistaken for direct-style.
+			$callable = $definition['_handler_callable'];
+			$uses_filter_convention = $this->uses_filter_convention( $callable );
 
 			if ( $uses_filter_convention ) {
 				$tool_map = call_user_func(
@@ -633,23 +632,50 @@ class ToolManager {
 	}
 
 	/**
-	 * Get the number of parameters a callable accepts.
+	 * Determine whether a handler tool callback uses filter-style arguments.
 	 *
 	 * @param callable $callable Callable to inspect.
-	 * @return int Number of required+optional parameters, or 0 if unresolvable.
+	 * @return bool True for ($tools, $handler_slug, ...) callbacks.
 	 */
-	private function get_callable_param_count( $callable ): int {
+	private function uses_filter_convention( $callable ): bool {
 		try {
-			if ( is_array( $callable ) ) {
-				$ref = new \ReflectionMethod( $callable[0], $callable[1] );
-			} elseif ( $callable instanceof \Closure || is_string( $callable ) ) {
-				$ref = new \ReflectionFunction( $callable );
-			} else {
-				return 0;
+			$ref = $this->reflect_callable( $callable );
+			if ( null === $ref ) {
+				return false;
 			}
-			return $ref->getNumberOfParameters();
+
+			$params = $ref->getParameters();
+			if ( empty( $params ) ) {
+				return false;
+			}
+
+			if ( count( $params ) >= 4 ) {
+				return true;
+			}
+
+			$first_param_name = $params[0]->getName();
+			return in_array( $first_param_name, array( 'tools', 'all_tools' ), true );
 		} catch ( \ReflectionException $e ) {
-			return 0;
+			return false;
 		}
+	}
+
+	/**
+	 * Reflect a callable into a function-like reflection object.
+	 *
+	 * @param callable $callable Callable to inspect.
+	 * @return \ReflectionFunctionAbstract|null Reflection object, or null when unsupported.
+	 * @throws \ReflectionException When reflection fails.
+	 */
+	private function reflect_callable( $callable ): ?\ReflectionFunctionAbstract {
+		if ( is_array( $callable ) ) {
+			return new \ReflectionMethod( $callable[0], $callable[1] );
+		}
+
+		if ( $callable instanceof \Closure || is_string( $callable ) ) {
+			return new \ReflectionFunction( $callable );
+		}
+
+		return null;
 	}
 }
