@@ -21,6 +21,7 @@ use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\FlowStepConfigFactory;
+use DataMachine\Core\Steps\FlowStepTargetResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -555,25 +556,19 @@ trait FlowHelpers {
 		$flow        = $this->db_flows->get_flow( $flow_id );
 		$flow_config = $flow['flow_config'] ?? array();
 
-		$step_type_to_flow_step = array();
-		foreach ( $flow_config as $flow_step_id => $step_data ) {
-			$step_type = $step_data['step_type'] ?? '';
-			if ( ! empty( $step_type ) ) {
-				$step_type_to_flow_step[ $step_type ] = $flow_step_id;
-			}
-		}
-
 		$update_flow_step_ability = new UpdateFlowStepAbility();
 
-		foreach ( $step_configs as $step_type => $config ) {
-			$flow_step_id = $step_type_to_flow_step[ $step_type ] ?? null;
-			if ( ! $flow_step_id ) {
-				$errors[] = array(
-					'step_type' => $step_type,
-					'error'     => "No step of type '{$step_type}' found in flow",
-				);
+		foreach ( $step_configs as $step_key => $config ) {
+			$config = is_array( $config ) ? $config : array();
+
+			$target = FlowStepTargetResolver::resolve( $flow_config, (string) $step_key, $config );
+			if ( empty( $target['success'] ) ) {
+				$errors[] = $target['error'];
 				continue;
 			}
+
+			$flow_step_id = $target['flow_step_id'];
+			$step_type    = $target['step_type'] ?? (string) $step_key;
 
 			// Multi-handler configs use handler_slugs/handler_configs; single-handler
 			// and handler-free configs use handler_slug/handler_config.

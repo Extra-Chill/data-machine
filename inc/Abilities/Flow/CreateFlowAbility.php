@@ -64,7 +64,7 @@ class CreateFlowAbility {
 							),
 							'step_configs'       => array(
 								'type'        => 'object',
-								'description' => __( 'Step configurations keyed by step_type (single mode)', 'data-machine' ),
+								'description' => __( 'Step configurations keyed by step_type (single mode). If a flow has duplicate step types, include flow_step_id, pipeline_step_id, or execution_order in the config.', 'data-machine' ),
 							),
 							'flows'              => array(
 								'type'        => 'array',
