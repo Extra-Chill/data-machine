@@ -12,7 +12,7 @@
 namespace DataMachine\Abilities\Job;
 
 use DataMachine\Abilities\StepTypeAbilities;
-use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Core\Steps\FlowStepConfigFactory;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -366,30 +366,22 @@ class ExecuteWorkflowAbility {
 				);
 			}
 
-			$flow_step_config = array(
-				'flow_step_id'     => $step_id,
-				'pipeline_step_id' => $pipeline_step_id,
-				'step_type'        => $step['type'],
-				'execution_order'  => $index,
-				'enabled_tools'    => $enabled_tools,
-				'prompt_queue'     => $prompt_queue,
-				'queue_mode'       => 'static',
-				'disabled_tools'   => $step['disabled_tools'] ?? array(),
-				'pipeline_id'      => 'direct',
-				'flow_id'          => 'direct',
+			$flow_step_config = FlowStepConfigFactory::build(
+				array(
+					'flow_step_id'     => $step_id,
+					'pipeline_step_id' => $pipeline_step_id,
+					'step_type'        => $step_type,
+					'execution_order'  => $index,
+					'enabled_tools'    => $enabled_tools,
+					'prompt_queue'     => $prompt_queue,
+					'queue_mode'       => 'static',
+					'disabled_tools'   => $step['disabled_tools'] ?? array(),
+					'pipeline_id'      => 'direct',
+					'flow_id'          => 'direct',
+					'handler_slug'     => $handler_slug,
+					'handler_config'   => $handler_config,
+				)
 			);
-
-			if ( ! empty( $handler_slug ) ) {
-				if ( FlowStepConfig::isMultiHandler( $flow_step_config ) ) {
-					$flow_step_config['handler_slugs']   = array( $handler_slug );
-					$flow_step_config['handler_configs'] = array( $handler_slug => $handler_config );
-				} else {
-					$flow_step_config['handler_slug']   = $handler_slug;
-					$flow_step_config['handler_config'] = $handler_config;
-				}
-			} elseif ( ! FlowStepConfig::usesHandler( $flow_step_config ) && ! empty( $handler_config ) ) {
-				$flow_step_config['handler_config'] = $handler_config;
-			}
 
 			$flow_config[ $step_id ] = $flow_step_config;
 
