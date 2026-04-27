@@ -72,32 +72,12 @@ trait FlowHelpers {
 
 			$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $pipeline_step_id, $flow_id );
 
-			$disabled_tools = $pipeline_config[ $pipeline_step_id ]['disabled_tools'] ?? array();
-
-			$step_type            = $step['step_type'] ?? '';
-			$queue_field_defaults = ( 'fetch' === $step_type )
-				? array( 'config_patch_queue' => array() )
-				: array( 'prompt_queue' => array() );
-
-			$step_config = FlowStepConfigFactory::build(
-				array_merge(
-					array(
-						'flow_step_id'     => $flow_step_id,
-						'step_type'        => $step_type,
-						'pipeline_step_id' => $pipeline_step_id,
-						'pipeline_id'      => $pipeline_id,
-						'flow_id'          => $flow_id,
-						'execution_order'  => $step['execution_order'] ?? 0,
-						'disabled_tools'   => $disabled_tools,
-						// queue_mode is the access pattern enum that drives both
-						// AI (prompt_queue) and Fetch (config_patch_queue)
-						// consumption (#1291). Default "static" preserves
-						// "first-entry-wins-every-tick" semantics for any
-						// freshly-scaffolded step.
-						'queue_mode'       => 'static',
-					),
-					$queue_field_defaults
-				)
+			$step_config = FlowStepConfigFactory::buildFromPipelineStep(
+				$step,
+				$pipeline_id,
+				$flow_id,
+				$flow_step_id,
+				$pipeline_config[ $pipeline_step_id ] ?? array()
 			);
 
 			$flow_config[ $flow_step_id ] = $step_config;
