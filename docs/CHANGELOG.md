@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.84.1] - 2026-04-27
+
+### Fixed
+- preserve handler-scoped tool definitions
+
 ## [0.84.0] - 2026-04-27
 
 ### Added
