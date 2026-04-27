@@ -304,6 +304,7 @@ class PipelineBatchScheduler {
 		// item's data overwriting all previous items).
 		$item_engine_data = $single_packet['metadata']['_engine_data'] ?? array();
 		if ( ! empty( $item_engine_data ) && is_array( $item_engine_data ) ) {
+			$item_engine_data = $this->removeReservedEngineDataKeys( $item_engine_data, $parent_job_id );
 			$child_engine = array_merge( $child_engine, $item_engine_data );
 		}
 
@@ -337,6 +338,65 @@ class PipelineBatchScheduler {
 		);
 
 		return $child_job_id;
+	}
+
+	/**
+	 * Remove packet-provided keys that belong to the canonical engine snapshot.
+	 *
+	 * Packet metadata may provide per-item context, but it must not overwrite
+	 * job/flow/pipeline/batch state cloned from the parent execution.
+	 *
+	 * @param array $engine_data   Packet-provided engine data.
+	 * @param int   $parent_job_id Parent job ID for logging context.
+	 * @return array Sanitized per-item engine data.
+	 */
+	private function removeReservedEngineDataKeys( array $engine_data, int $parent_job_id ): array {
+		$reserved = array();
+
+		foreach ( array_keys( $engine_data ) as $key ) {
+			if ( $this->isReservedEngineDataKey( (string) $key ) ) {
+				$reserved[] = (string) $key;
+				unset( $engine_data[ $key ] );
+			}
+		}
+
+		if ( $reserved ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Pipeline batch: dropped packet engine_data keys reserved for child job context',
+				array(
+					'parent_job_id' => $parent_job_id,
+					'keys'          => $reserved,
+				)
+			);
+		}
+
+		return $engine_data;
+	}
+
+	/**
+	 * Check whether a packet-provided engine_data key is reserved.
+	 *
+	 * @param string $key Engine data key.
+	 * @return bool
+	 */
+	private function isReservedEngineDataKey( string $key ): bool {
+		if ( str_starts_with( $key, 'batch' ) ) {
+			return true;
+		}
+
+		return in_array(
+			$key,
+			array(
+				'job',
+				'flow',
+				'pipeline',
+				'flow_config',
+				'pipeline_config',
+			),
+			true
+		);
 	}
 
 	/**

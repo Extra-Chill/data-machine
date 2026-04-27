@@ -436,6 +436,49 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertEquals( 'Hotel Vegas', $child_b_engine['venue_context']['name'] );
 	}
 
+	public function test_packet_engine_data_cannot_clobber_reserved_child_context(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+
+		$engine['job']['agent_id'] = 123;
+		$engine['job']['user_id']  = 456;
+		$engine['flow_config']     = array( 'original' => 'flow-config' );
+		$engine['pipeline_config'] = array( 'original' => 'pipeline-config' );
+
+		$packet = $this->make_data_packet( 'Reserved Context Attempt' );
+		$packet['metadata']['_engine_data'] = array(
+			'job'             => array( 'agent_id' => 999 ),
+			'flow_config'     => array(),
+			'pipeline_config' => array(),
+			'batch_total'     => 999,
+			'item_identifier' => 'safe-id',
+			'venue'           => 'Safe Venue',
+		);
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_abc_123', array( $packet ), $engine );
+		$scheduler->processChunk( $parent_id );
+
+		global $wpdb;
+		$table    = $wpdb->prefix . 'datamachine_jobs';
+		$children = $wpdb->get_results(
+			$wpdb->prepare( "SELECT job_id FROM {$table} WHERE parent_job_id = %d", $parent_id ),
+			ARRAY_A
+		);
+
+		$this->assertCount( 1, $children );
+
+		$child_engine = datamachine_get_engine_data( (int) $children[0]['job_id'] );
+
+		$this->assertEquals( 123, $child_engine['job']['agent_id'] );
+		$this->assertEquals( 456, $child_engine['job']['user_id'] );
+		$this->assertEquals( array( 'original' => 'flow-config' ), $child_engine['flow_config'] );
+		$this->assertEquals( array( 'original' => 'pipeline-config' ), $child_engine['pipeline_config'] );
+		$this->assertArrayNotHasKey( 'batch_total', $child_engine );
+		$this->assertEquals( 'safe-id', $child_engine['item_identifier'] );
+		$this->assertEquals( 'Safe Venue', $child_engine['venue'] );
+	}
+
 	public function test_child_jobs_work_without_engine_data_key(): void {
 		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );
