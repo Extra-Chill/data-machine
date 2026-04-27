@@ -13,6 +13,7 @@ defined( 'ABSPATH' ) || exit;
  * Immutable representation of flows/<slug>.json schema_version 1.
  */
 final class AgentBundleFlowFile {
+	use AgentBundleSlugTrait;
 
 	private string $slug;
 	private string $name;
@@ -55,10 +56,6 @@ final class AgentBundleFlowFile {
 			'max_items'      => $this->max_items,
 			'steps'          => $this->steps,
 		);
-	}
-
-	public function slug(): string {
-		return $this->slug;
 	}
 
 	private static function validate_steps( array $steps ): array {
