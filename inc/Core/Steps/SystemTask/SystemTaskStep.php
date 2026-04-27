@@ -328,7 +328,7 @@ class SystemTaskStep extends Step {
 
 			$child_job = $jobs_db->get_job( $child_job_id );
 			$status    = $child_job['status'] ?? '';
-			if ( 'PROCESSING' === $status ) {
+			if ( JobStatus::PROCESSING === $status ) {
 				$jobs_db->complete_job( $child_job_id, JobStatus::failed( 'Exception: ' . $error_msg )->toString() );
 			}
 		} finally {
@@ -345,7 +345,7 @@ class SystemTaskStep extends Step {
 		$child_status = $child_job['status'] ?? '';
 		$child_data   = $child_job['engine_data'] ?? array();
 
-		if ( $success && str_starts_with( $child_status, 'FAILED' ) ) {
+		if ( $success && JobStatus::isStatusFailure( $child_status ) ) {
 			$success   = false;
 			$error_msg = $child_data['error'] ?? 'Task reported failure';
 		}

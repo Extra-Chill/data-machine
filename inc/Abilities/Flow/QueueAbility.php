@@ -1443,18 +1443,6 @@ class QueueAbility {
 		$from_index   = (int) $from_index;
 		$to_index     = (int) $to_index;
 
-		if ( $from_index === $to_index ) {
-			return array(
-				'success'      => true,
-				'flow_id'      => $flow_id,
-				'flow_step_id' => $flow_step_id,
-				'from_index'   => $from_index,
-				'to_index'     => $to_index,
-				'queue_length' => 0,
-				'message'      => 'No move needed (same position).',
-			);
-		}
-
 		$flow_lookup = $this->loadFlowAndStepConfig( $flow_id, $flow_step_id, $slot );
 		if ( ! $flow_lookup['success'] ) {
 			return $flow_lookup;
@@ -1476,6 +1464,18 @@ class QueueAbility {
 			return array(
 				'success' => false,
 				'error'   => sprintf( 'to_index %d is out of range. Queue has %d item(s).', $to_index, $queue_length ),
+			);
+		}
+
+		if ( $from_index === $to_index ) {
+			return array(
+				'success'      => true,
+				'flow_id'      => $flow_id,
+				'flow_step_id' => $flow_step_id,
+				'from_index'   => $from_index,
+				'to_index'     => $to_index,
+				'queue_length' => $queue_length,
+				'message'      => 'No move needed (same position).',
 			);
 		}
 
