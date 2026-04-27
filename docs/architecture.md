@@ -189,24 +189,19 @@ $image_url = $engine_data['image_url'] ?? null;
 - **Filter Consistency**: Maintains architectural pattern of filter-based service discovery
 - **Flexible Storage**: Steps access only what they need via filter call
 
-### Services Layer Architecture (@since v0.4.0)
-**Performance Revolution**: Complete replacement of filter-based action system with OOP service managers for 3x performance improvement through direct method calls. Most services have been migrated to the WordPress 6.9 Abilities API.
+### Abilities-First Architecture (@since v0.11.7)
+**Performance Revolution**: Complete replacement of the older filter-based action and service-manager layers with direct ability classes. REST endpoints, WP-CLI commands, and chat tools all delegate to WordPress Abilities API registrations under `inc/Abilities/`.
 
-**Remaining Services** (utilities for cross-cutting concerns):
-- **JobManager** - Job execution monitoring and management
-- **LogsManager** - Centralized log access and filtering
-- **Cache Invalidation** - Ability-level `clearCache()` methods for handlers, step types, tools, and settings
+**Ability domains** (business logic):
+- **Flow abilities** - Flow CRUD, duplication, pause/resume, scheduling, webhooks, and queue management
+- **Pipeline abilities** - Pipeline CRUD, import/export, and pipeline-step template management
+- **Flow step abilities** - Individual flow step configuration and handler management
+- **Job abilities** - Workflow execution, retry/fail/delete/recovery, flow health, and summaries
+- **Processed item abilities** - Deduplication tracking across workflows
+- **Agent abilities** - Agent CRUD, access grants, tokens, remote calls, memory, and daily memory
+- **File abilities** - Agent files, flow uploads, cleanup, and memory scaffolding
 
-**Abilities API** (business logic):
-- **FlowAbilities** - Flow CRUD operations, duplication
-- **PipelineAbilities** - Pipeline CRUD operations with complete/simple creation modes
-- **FlowStepAbilities** - Individual flow step configuration and handler management
-- **PipelineStepAbilities** - Pipeline step template management
-- **ProcessedItemsAbilities** - Deduplication tracking across workflows
-- **AgentAbilities** - Agent CRUD, rename (with filesystem migration), deletion
-- **AgentMemoryAbilities** - Section-based memory read, write, append, search
-- **DailyMemoryAbilities** - Daily memory file CRUD and search
-- **WorkspaceAbilities** - Git-aware workspace file operations
+**Coding workspace note**: Git-aware workspace and GitHub coding operations moved to the `data-machine-code` extension plugin. Data Machine core no longer registers `WorkspaceAbilities` or GitHub issue abilities.
 
 **Benefits**:
 - **3x Performance Improvement**: Direct method calls eliminate filter indirection
@@ -216,10 +211,10 @@ $image_url = $engine_data['image_url'] ?? null;
 - **Backward Compatibility**: Maintains WordPress hook integration
 
 ### Step Types
-- **Fetch**: Data retrieval with clean content processing (Files, RSS, Reddit, Google Sheets, WordPress Local, WordPress Media, WordPress API, Workspace)
+- **Fetch**: Data retrieval with clean content processing (core handlers include Files, RSS, Email, WordPress Local, WordPress Media, and WordPress API; extension plugins can register more)
 - **AI**: Content processing with multi-provider support (OpenAI, Anthropic, Google, Grok)
-- **Publish**: Content distribution with modular handler architecture (Twitter, Facebook, Threads, Bluesky, WordPress, Workspace)
-- **Update**: Content modification (WordPress posts/pages)
+- **Publish**: Content distribution with modular handler architecture (core handlers include WordPress and Email; extension plugins can register social destinations)
+- **Upsert**: Content modification (WordPress posts/pages)
 - **System Task**: Execute system tasks within pipeline flows
 - **Agent Ping**: Outbound webhook notifications to external agents
 - **Webhook Gate**: Wait for inbound webhook before proceeding
@@ -252,17 +247,16 @@ Directives implement `DirectiveInterface` and return arrays of typed outputs:
 
 **Base Classes**:
 - **BaseAuthProvider** (`/inc/Core/OAuth/BaseAuthProvider.php`): Abstract base for all authentication providers with unified option storage, callback URL generation, and authentication state checking
-- **BaseOAuth1Provider** (`/inc/Core/OAuth/BaseOAuth1Provider.php`): OAuth 1.0a providers (TwitterAuth) extending BaseAuthProvider
-- **BaseOAuth2Provider** (`/inc/Core/OAuth/BaseOAuth2Provider.php`): OAuth 2.0 providers (RedditAuth, FacebookAuth, ThreadsAuth, GoogleSheetsAuth) extending BaseAuthProvider
+- **BaseOAuth1Provider** (`/inc/Core/OAuth/BaseOAuth1Provider.php`): Base for extension-provided OAuth 1.0a providers
+- **BaseOAuth2Provider** (`/inc/Core/OAuth/BaseOAuth2Provider.php`): Base for core and extension OAuth 2.0 providers
 
 **OAuth Handlers**:
 - **OAuth1Handler** (`/inc/Core/OAuth/OAuth1Handler.php`): Three-legged OAuth 1.0a flow implementation
 - **OAuth2Handler** (`/inc/Core/OAuth/OAuth2Handler.php`): Authorization code flow implementation
 
 **Authentication Providers**:
-- **OAuth 1.0a**: TwitterAuth extends BaseOAuth1Provider
-- **OAuth 2.0**: RedditAuth, FacebookAuth, ThreadsAuth, GoogleSheetsAuth extend BaseOAuth2Provider
-- **Direct**: BlueskyAuth extends BaseAuthProvider (app password authentication)
+- Core ships base classes plus concrete providers next to the handlers that need them, such as Email auth.
+- Extension plugins register their own providers through `datamachine_auth_providers`.
 
 **OAuth2 Flow**:
 1. Create state nonce for CSRF protection
@@ -296,7 +290,7 @@ Data Machine v0.2.0 introduced a universal Engine layer (`/inc/Engine/AI/`) that
 **Tool Categories**:
 - Handler-specific tools for publish/update operations
 - Global tools for search and analysis (GoogleSearch, LocalSearch, WebFetch, WordPressPostReader)
-- Workspace-scoped tools (WorkspaceTools, WorkspaceScopedTools) for agent file operations (**moved to data-machine-code extension**)
+- Coding workspace tools live in the `data-machine-code` extension plugin
 - Agent memory tools (AgentMemory, AgentDailyMemory) for runtime memory access
 - Chat-only tools for workflow building (@since v0.4.3):
   - AddPipelineStep, ApiQuery, AuthenticateHandler, ConfigureFlowSteps, ConfigurePipelineStep, CopyFlow, CreateFlow, CreatePipeline, CreateTaxonomyTerm, ExecuteWorkflowTool, GetHandlerDefaults, ManageLogs, ReadLogs, RunFlow, SearchTaxonomyTerms, SetHandlerDefaults, UpdateFlow
@@ -358,11 +352,11 @@ For detailed documentation:
 - **`datamachine_timeframe_limit`**: Shared timeframe parsing with discovery/conversion modes
   - Discovery mode: Returns available timeframe options for UI dropdowns
   - Conversion mode: Returns Unix timestamp for specified timeframe
-  - Used by: RSS, Reddit, WordPress Local, WordPress Media, WordPress API
+  - Used by: RSS, WordPress Local, WordPress Media, WordPress API, and extension fetch handlers
 - **`datamachine_keyword_search_match`**: Universal keyword matching with OR logic
   - Case-insensitive Unicode-safe matching
   - Comma-separated keyword support
-  - Used by: RSS, Reddit, WordPress Local, WordPress Media, WordPress API
+  - Used by: RSS, WordPress Local, WordPress Media, WordPress API, and extension fetch handlers
 - **`datamachine_data_packet`**: Standardized data packet creation and structure
   - Ensures type and timestamp fields are present
   - Maintains chronological ordering via array_unshift()

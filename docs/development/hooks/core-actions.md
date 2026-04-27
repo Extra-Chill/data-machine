@@ -150,53 +150,11 @@ do_action('datamachine_fail_job', $job_id, 'step_execution_failure', [
 3. Optionally cleans up job data files
 4. Stops pipeline execution
 
-## Configuration Actions
+## Configuration Hooks
 
-### `datamachine_update_system_prompt`
+Pipeline and flow-step configuration writes are ability-backed, not action-backed. Use `datamachine/update-pipeline-step`, `datamachine/update-flow-step`, or `datamachine/configure-flow-steps` through the Abilities API, REST API, WP-CLI, or chat tools.
 
-**Purpose**: Update pipeline-level system prompts
-
-**Parameters**:
-- `$pipeline_step_id` (string) - Pipeline step UUID
-- `$system_prompt` (string) - AI system prompt text
-
-**Usage**:
-```php
-do_action('datamachine_update_system_prompt', $pipeline_step_id, $system_prompt);
-```
-
-**Storage**: Stored in pipeline_config as reusable template
-
-### `datamachine_update_flow_user_message`
-
-**Purpose**: Update flow-level user messages
-
-**Parameters**:
-- `$flow_step_id` (string) - Flow step composite ID
-- `$user_message` (string) - AI user message text
-
-**Usage**:
-```php
-do_action('datamachine_update_flow_user_message', $flow_step_id, $user_message);
-```
-
-**Storage**: Stored in flow_config for instance-specific customization
-
-### `datamachine_save_tool_config`
-
-**Purpose**: Save tool configuration data
-
-**Parameters**:
-- `$tool_id` (string) - Tool identifier
-- `$config_data` (array) - Configuration data to save
-
-**Usage**:
-```php
-do_action('datamachine_save_tool_config', 'google_search', [
-    'api_key' => $api_key,
-    'search_engine_id' => $search_engine_id
-]);
-```
+Tool configuration uses the `datamachine_save_tool_config` **filter** from `BaseTool`; see [Core Filters](core-filters.md) for filter-oriented extension points.
 
 ## System Maintenance Actions
 
@@ -364,4 +322,3 @@ Input data is sanitized before processing:
 $pipeline_name = sanitize_text_field($data['pipeline_name'] ?? '');
 $config_json = wp_json_encode($config_data);
 ```
-

@@ -126,7 +126,7 @@ return [
 Uses processed items tracking to prevent duplicate processing:
 
 ```php
-$is_processed = apply_filters('datamachine_is_item_processed', false, $flow_step_id, 'wordpress_local', $post_id);
+$is_processed = $context->isItemProcessed((string) $post_id);
 ```
 
 **Tracking**: Each processed post is marked by flow step and post ID

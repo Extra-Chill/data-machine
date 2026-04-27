@@ -392,12 +392,12 @@ do_action('datamachine_update_job_status', $job_id, 'failed', 'Processing failed
 
 **Mark Item Processed**:
 ```php
-do_action('datamachine_mark_item_processed', $flow_step_id, 'rss', $item_id, $job_id);
+$context->markItemProcessed($item_id);
 ```
 
 **Check If Processed**:
 ```php
-$is_processed = apply_filters('datamachine_is_item_processed', false, $flow_step_id, 'rss', $item_id);
+$is_processed = $context->isItemProcessed($item_id);
 ```
 
 ### Chat Session Operations

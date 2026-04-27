@@ -130,20 +130,23 @@ $image_url = $engine_data['image_url'] ?? null;
 
 ### Processed Items Tracking
 
-All fetch handlers use the processed items system:
+Fetch handlers use the processed items system through `ExecutionContext` and `FetchHandler::filterProcessed()`:
 
 ```php
-// Check if already processed
-$is_processed = apply_filters('datamachine_is_item_processed', false, $flow_step_id, $source_type, $item_id);
-
-if (!$is_processed) {
-    // Mark as processed
-    do_action('datamachine_mark_item_processed', $flow_step_id, $source_type, $item_id, $job_id);
-    
-    // Process item
-    return [$data_packet];
+if (!$context->isItemProcessed($item_identifier)) {
+    return [
+        'items' => [[
+            'title' => $title,
+            'content' => $content,
+            'metadata' => [
+                'item_identifier' => $item_identifier,
+            ],
+        ]],
+    ];
 }
 ```
+
+Fetch handlers identify candidate items; completed items are marked processed after the full pipeline finishes successfully so downstream failures do not permanently drop content.
 
 **Scope**: Per-flow-step deduplication (same item can be processed by different flows)
 **Persistence**: Stored in `wp_datamachine_processed_items` table
@@ -153,12 +156,12 @@ if (!$is_processed) {
 
 - `wordpress_local` - Local WordPress posts
 - `wordpress_media` - Local media files  
+- `email` - IMAP email messages
 - `files` - File processing
 - `rss` - RSS feed items
-- `reddit` - Reddit posts
-- `google_sheets` - Spreadsheet data
 - `wordpress_api` - External WordPress API content
-- `universal_web_scraper` - Universal web scraper items
+
+Extension plugins can register additional fetch handlers and source type identifiers.
 
 ## Configuration Patterns
 
@@ -290,13 +293,16 @@ $result = $wordpress_handler->get_fetch_data(
 
 ```php
 foreach ($potential_items as $item) {
-    $is_processed = apply_filters('datamachine_is_item_processed', false, 
-        $flow_step_id, 'my_source', $item['id']);
-    
-    if (!$is_processed) {
-        do_action('datamachine_mark_item_processed', $flow_step_id, 
-            'my_source', $item['id'], $job_id);
-        return [$this->create_data_packet($item)];
+    if (!$context->isItemProcessed((string) $item['id'])) {
+        return [
+            [
+                'title' => $item['title'],
+                'content' => $item['content'],
+                'metadata' => [
+                    'item_identifier' => (string) $item['id'],
+                ],
+            ],
+        ];
     }
 }
 return ['processed_items' => []]; // No unprocessed items
@@ -307,38 +313,42 @@ return ['processed_items' => []]; // No unprocessed items
 ### Custom Fetch Handler
 
 ```php
-class CustomFetchHandler {
-    public function get_fetch_data(int $pipeline_id, array $handler_config, ?string $job_id = null): array {
+use DataMachine\Core\ExecutionContext;
+use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
+
+class CustomFetchHandler extends FetchHandler {
+    protected function executeFetch(array $config, ExecutionContext $context): array {
         // Extract configuration
-        $config = $handler_config['custom_source'] ?? [];
-        $flow_step_id = $handler_config['flow_step_id'] ?? null;
+        $source_config = $config['custom_source'] ?? [];
 
         // Fetch data from source
-        $items = $this->fetch_from_source($config);
+        $items = $this->fetch_from_source($source_config);
 
         // Process first unprocessed item
         foreach ($items as $item) {
-            if ($flow_step_id) {
-                $is_processed = apply_filters('datamachine_is_item_processed', false,
-                    $flow_step_id, 'custom_source', $item['id']);
-
-                if ($is_processed) continue;
-
-                do_action('datamachine_mark_item_processed', $flow_step_id,
-                    'custom_source', $item['id'], $job_id);
+            if ($context->isItemProcessed((string) $item['id'])) {
+                continue;
             }
 
             // Store engine data via centralized filter (array storage)
-            if ($job_id) {
-                apply_filters('datamachine_engine_data', null, $job_id, [
-                    'source_url' => $item['url'],
-                    'image_url' => $item['image'] ?? ''
-                ]);
-            }
+            $context->storeEngineData([
+                'source_url' => $item['url'],
+                'image_url' => $item['image'] ?? ''
+            ]);
 
-            return ['processed_items' => [$this->create_data_packet($item)]];
+            return [
+                'items' => [
+                    [
+                        'title' => $item['title'],
+                        'content' => $item['content'],
+                        'metadata' => [
+                            'item_identifier' => (string) $item['id'],
+                        ],
+                    ],
+                ],
+            ];
         }
 
-        return ['processed_items' => []];
+        return ['items' => []];
     }
 }

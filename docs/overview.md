@@ -91,13 +91,12 @@ See [WordPress as Agent Memory](core-system/wordpress-as-agent-memory.md) for th
 The Abilities API (DataMachine\Abilities) provides direct method calls for core operations via the WordPress 6.9 Abilities API:
 
 - `FlowAbilities`, `PipelineAbilities`, `FlowStepAbilities`, and `PipelineStepAbilities` handle creation, duplication, synchronization, and ordering.
-- `JobAbilities` monitors execution outcomes and updates statuses.
+- Job abilities monitor execution outcomes, retries, manual failure, recovery, summaries, and deletion.
 - `ProcessedItemsAbilities` deduplicates content across executions by tracking previously processed identifiers.
 - `AgentAbilities` manages agent CRUD, renaming (with filesystem migration), and deletion.
 - `AgentMemoryAbilities` provides section-based read, write, append, and search operations on memory files.
 - `DailyMemoryAbilities` manages daily memory files — read, write, list, search, and delete by date.
-**Remaining Services** (utilities for cross-cutting concerns):
-- `LogsManager` aggregates log entries in the `wp_datamachine_logs` table for filtering in the admin UI.
+- `LogAbilities` and the `LogRepository` aggregate log entries in the `wp_datamachine_logs` table for filtering in the admin UI.
 - Cache invalidation is handled by ability-level `clearCache()` methods to ensure dynamic handler and step type registrations are immediately reflected across the system.
 
 Abilities are the single source of truth for REST endpoints, CLI commands, and Chat tools, ensuring validation and sanitization before persisting data or enqueuing jobs.
@@ -151,7 +150,7 @@ wp datamachine jobs undo <job_id> --dry-run --allow-root
 
 ## Authentication & Security
 
-- **Authentication providers** extend BaseAuthProvider, BaseOAuth1Provider, or BaseOAuth2Provider under `/inc/Core/OAuth/`, covering Twitter, Reddit, Facebook, Threads, Google Sheets, and Bluesky (app passwords).
+- **Authentication providers** extend BaseAuthProvider, BaseOAuth1Provider, or BaseOAuth2Provider under `/inc/Core/OAuth/`; concrete providers live next to their handlers in core or extension plugins.
 - **OAuth handlers** (`OAuth1Handler`, `OAuth2Handler`) standardize callback handling, nonce validation, and credential storage.
 - **Capability checks** (`manage_options`) and WordPress nonces guard REST endpoints; inputs run through `sanitize_*` helpers before hitting services.
 - **Multi-agent permissions**: `PermissionHelper` handles agent-level access checks via `resolve_scoped_agent_id()`, `can_access_agent()`, and `owns_agent_resource()`.
@@ -163,7 +162,7 @@ wp datamachine jobs undo <job_id> --dry-run --allow-root
 - **Flow schedules** support manual runs, one-time execution, and recurring intervals (from 5 minutes to weekly). See [Scheduling Intervals](api/endpoints/intervals.md) for available options.
 - **System task scheduling**: DailyMemoryTask and other system tasks run on cron schedules via Action Scheduler.
 - **Batch execution**: Jobs support parent-child relationships via `parent_job_id` for processing multiple items in coordinated batches.
-- **JobManager** updates statuses, emits extensibility actions (`datamachine_update_job_status`), and links jobs to logs and processed items for auditing.
+- Job abilities and repositories update statuses, emit extensibility actions (`datamachine_update_job_status`), and link jobs to logs and processed items for auditing.
 
 ## Admin Interface
 
@@ -178,7 +177,7 @@ wp datamachine jobs undo <job_id> --dry-run --allow-root
 ## Key Capabilities
 
 - **Multi-agent support** with isolated identity, memory, and resources per agent on a single WordPress installation.
-- **Multi-platform publishing** via dedicated fetch/publish/upsert handlers for files, RSS, Reddit, Google Sheets, WordPress, Twitter, Threads, Bluesky, Facebook, and Google Sheets output.
+- **Multi-platform publishing** via core fetch/publish/upsert handlers for files, RSS, email, and WordPress, plus extension-provided handlers for social, business, and event destinations.
 - **Daily memory system** for automatic temporal knowledge management with AI-driven pruning.
 - **System tasks** for background AI operations (image generation, alt text, internal linking, meta descriptions) with undo support.
 - **Extension points** through filters such as `datamachine_handlers`, `datamachine_tools`, `datamachine_step_types`, `datamachine_auth_providers`, and `datamachine_engine_data`.
