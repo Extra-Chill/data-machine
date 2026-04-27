@@ -2,6 +2,32 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.84.0] - 2026-04-27
+
+### Added
+- add portable bundle schema
+- add fetch handler dry-run alias
+- collapse user_message into prompt_queue with queue_mode enum
+- split prompt_queue payload polymorphism into two slots (#1292)
+
+### Changed
+- remove stale cleanup shims
+- share fetch HTTP helper
+- collapse handler config shapes
+- share duplicate helper implementations
+- route cleanup through system tasks
+- consolidate three consumers onto shared consumeFromQueueSlot
+- drop FlowAbilities proxy class
+- refactor(system-task): replace per-task if-block with declarative passthrough
+
+### Fixed
+- remove redundant PHP version guard
+- run schema migrations on plugins_loaded, not just activation
+- migrate queue UI from queue_enabled boolean to queue_mode enum
+- patch three callsites missed by the #1291 collapse
+- route flow update prompt through user_message; rename --set-prompt → --set-user-message
+- consult active agent context before owner→agent fallback (#1268)
+
 ## [0.83.0] - 2026-04-25
 
 ### Added
