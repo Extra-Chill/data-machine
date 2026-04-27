@@ -264,7 +264,7 @@ class FlowStepConfig {
 		$scalar_slug    = is_string( $step_config['handler_slug'] ?? null ) ? $step_config['handler_slug'] : '';
 		$scalar_config  = is_array( $step_config['handler_config'] ?? null ) ? $step_config['handler_config'] : array();
 
-		unset( $step_config['handler_slug'], $step_config['handler_slugs'], $step_config['handler_config'], $step_config['handler_configs'] );
+		unset( $step_config['handler'], $step_config['handler_slug'], $step_config['handler_slugs'], $step_config['handler_config'], $step_config['handler_configs'] );
 
 		if ( ! $uses_handler ) {
 			$config = $scalar_config;

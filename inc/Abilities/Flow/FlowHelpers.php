@@ -89,7 +89,6 @@ trait FlowHelpers {
 						'flow_id'          => $flow_id,
 						'execution_order'  => $step['execution_order'] ?? 0,
 						'disabled_tools'   => $disabled_tools,
-						'handler'          => null,
 						// queue_mode is the access pattern enum that drives both
 						// AI (prompt_queue) and Fetch (config_patch_queue)
 						// consumption (#1291). Default "static" preserves

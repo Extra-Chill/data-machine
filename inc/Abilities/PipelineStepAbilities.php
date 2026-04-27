@@ -965,7 +965,6 @@ class PipelineStepAbilities {
 				'flow_id'          => $flow_id,
 				'execution_order'  => $step['execution_order'] ?? 0,
 				'disabled_tools'   => $disabled_tools,
-				'handler'          => null,
 			);
 		}
 

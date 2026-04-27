@@ -301,7 +301,6 @@ trait FlowStepHelpers {
 				'pipeline_step_id' => $pipeline_step_id,
 				'pipeline_id'      => $flow['pipeline_id'],
 				'flow_id'          => $flow_id,
-				'handler'          => null,
 			);
 		}
 

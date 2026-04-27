@@ -364,13 +364,6 @@ class ImportExport {
 			)
 		);
 
-		$primary_handler = FlowStepConfig::getPrimaryHandlerSlug( $step );
-		if ( null !== $primary_handler ) {
-			$step['handler'] = $primary_handler;
-		} else {
-			unset( $step['handler'] );
-		}
-
 		$flow_config[ $flow_step_id ] = $step;
 
 		$flow_config[ $flow_step_id ]['enabled'] = true;
