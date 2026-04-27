@@ -9,14 +9,14 @@
 
 namespace DataMachine\Tests\Unit\Abilities;
 
-use DataMachine\Abilities\PipelineAbilities;
+use DataMachine\Abilities\Pipeline\CreatePipelineAbility;
 use DataMachine\Abilities\PipelineStepAbilities;
 use WP_UnitTestCase;
 
 class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 
 	private PipelineStepAbilities $step_abilities;
-	private PipelineAbilities $pipeline_abilities;
+	private CreatePipelineAbility $create_pipeline_ability;
 	private int $test_pipeline_id;
 
 	/**
@@ -28,10 +28,10 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
 
-		$this->pipeline_abilities = new PipelineAbilities();
+		$this->create_pipeline_ability = new CreatePipelineAbility();
 		$this->step_abilities     = new PipelineStepAbilities();
 
-		$result                 = $this->pipeline_abilities->executeCreatePipeline(
+		$result                 = $this->create_pipeline_ability->execute(
 			array( 'pipeline_name' => 'Test Pipeline for Step Abilities' )
 		);
 		$this->test_pipeline_id = $result['pipeline_id'];

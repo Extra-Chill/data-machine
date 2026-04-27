@@ -3,7 +3,7 @@
  * WP-CLI Pipelines Command
  *
  * Provides CLI access to pipeline listing and management operations.
- * Wraps PipelineAbilities API primitives.
+ * Wraps concrete Pipeline ability primitives.
  *
  * @package DataMachine\Cli\Commands
  * @since 0.16.0 Added create, update, delete subcommands.
@@ -15,6 +15,10 @@ use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\AgentResolver;
 use DataMachine\Cli\UserResolver;
+use DataMachine\Abilities\Pipeline\CreatePipelineAbility;
+use DataMachine\Abilities\Pipeline\DeletePipelineAbility;
+use DataMachine\Abilities\Pipeline\GetPipelinesAbility;
+use DataMachine\Abilities\Pipeline\UpdatePipelineAbility;
 use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
@@ -225,10 +229,9 @@ class PipelinesCommand extends BaseCommand {
 		}
 
 		$scoping = AgentResolver::buildScopingInput( $assoc_args );
-		$ability = new \DataMachine\Abilities\PipelineAbilities();
 
 		if ( $pipeline_id ) {
-			$result = $ability->executeGetPipelines(
+			$result = ( new GetPipelinesAbility() )->execute(
 				array_merge(
 					$scoping,
 					array(
@@ -266,7 +269,7 @@ class PipelinesCommand extends BaseCommand {
 				$ability_input['search'] = $search;
 			}
 
-			$result = $ability->executeGetPipelines( $ability_input );
+			$result = ( new GetPipelinesAbility() )->execute( $ability_input );
 
 			if ( ! $result['success'] ) {
 				WP_CLI::error( $result['error'] ?? 'Failed to get pipelines' );
@@ -489,8 +492,7 @@ class PipelinesCommand extends BaseCommand {
 			);
 		}
 
-		$ability = new \DataMachine\Abilities\PipelineAbilities();
-		$result  = $ability->executeCreatePipeline( $input );
+		$result = ( new CreatePipelineAbility() )->execute( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to create pipeline' );
@@ -554,8 +556,7 @@ class PipelinesCommand extends BaseCommand {
 
 		// Update name if provided.
 		if ( $has_name ) {
-			$ability = new \DataMachine\Abilities\PipelineAbilities();
-			$result  = $ability->executeUpdatePipeline(
+			$result = ( new UpdatePipelineAbility() )->execute(
 				array(
 					'pipeline_id'   => $pipeline_id,
 					'pipeline_name' => $assoc_args['name'],
@@ -705,8 +706,7 @@ class PipelinesCommand extends BaseCommand {
 	 * @return array{step_id?: string, error?: string}
 	 */
 	private function resolveAiStep( int $pipeline_id ): array {
-		$ability = new \DataMachine\Abilities\PipelineAbilities();
-		$result  = $ability->executeGetPipelines(
+		$result = ( new GetPipelinesAbility() )->execute(
 			array(
 				'pipeline_id' => $pipeline_id,
 				'output_mode' => 'full',
@@ -858,8 +858,7 @@ class PipelinesCommand extends BaseCommand {
 		}
 
 		// First, get pipeline info for confirmation.
-		$ability = new \DataMachine\Abilities\PipelineAbilities();
-		$info    = $ability->executeGetPipelines( array( 'pipeline_id' => $pipeline_id ) );
+		$info = ( new GetPipelinesAbility() )->execute( array( 'pipeline_id' => $pipeline_id ) );
 
 		if ( ! $info['success'] || empty( $info['pipelines'] ) ) {
 			WP_CLI::error( 'Pipeline not found' );
@@ -880,7 +879,7 @@ class PipelinesCommand extends BaseCommand {
 			) );
 		}
 
-		$result = $ability->executeDeletePipeline( array( 'pipeline_id' => $pipeline_id ) );
+		$result = ( new DeletePipelineAbility() )->execute( array( 'pipeline_id' => $pipeline_id ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to delete pipeline' );

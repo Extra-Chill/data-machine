@@ -396,7 +396,7 @@ Handler-specific tools registered into the unified `datamachine_tools` registry 
 ## Tool Management
 
 **ToolManager** (`/inc/Engine/AI/Tools/ToolManager.php`) centralizes tool discovery and validation:
-- `get_global_tools()` - Discover global tools
+- `get_all_tools()` - Discover all tools
 - `is_tool_available()` - Validate global and step-specific enablement
 - `is_tool_configured()` - Check configuration requirements
 - `get_opt_out_defaults()` - WordPress-native tools (no config needed)

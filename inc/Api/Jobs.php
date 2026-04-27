@@ -4,7 +4,7 @@
  *
  * Provides REST API access to job execution history.
  * Requires WordPress manage_options capability for all operations.
- * Delegates to JobAbilities for core logic.
+ * Delegates to concrete Job abilities for core logic.
  *
  * Endpoints:
  * - GET /datamachine/v1/jobs - Retrieve jobs list with pagination and filtering
@@ -17,22 +17,14 @@
 namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Abilities\JobAbilities;
+use DataMachine\Abilities\Job\DeleteJobsAbility;
+use DataMachine\Abilities\Job\GetJobsAbility;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
 class Jobs {
-
-	private static ?JobAbilities $abilities = null;
-
-	private static function getAbilities(): JobAbilities {
-		if ( null === self::$abilities ) {
-			self::$abilities = new JobAbilities();
-		}
-		return self::$abilities;
-	}
 
 	/**
 	 * Register REST API routes
@@ -216,7 +208,7 @@ class Jobs {
 			$input['hide_children'] = true;
 		}
 
-		$result = self::getAbilities()->executeGetJobs( $input );
+		$result = ( new GetJobsAbility() )->execute( $input );
 
 		return rest_ensure_response(
 			array(
@@ -237,7 +229,7 @@ class Jobs {
 	public static function handle_get_job_by_id( $request ) {
 		$job_id = (int) $request->get_param( 'id' );
 
-		$result = self::getAbilities()->executeGetJobs( array( 'job_id' => $job_id ) );
+		$result = ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) );
 
 		if ( ! $result['success'] || empty( $result['jobs'] ) ) {
 			return new \WP_Error(
@@ -264,7 +256,7 @@ class Jobs {
 		$type              = $request->get_param( 'type' );
 		$cleanup_processed = (bool) $request->get_param( 'cleanup_processed' );
 
-		$result = self::getAbilities()->executeDeleteJobs(
+		$result = ( new DeleteJobsAbility() )->execute(
 			array(
 				'type'              => $type,
 				'cleanup_processed' => $cleanup_processed,

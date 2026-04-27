@@ -378,16 +378,6 @@ class ToolManager {
 	}
 
 	/**
-	 * Alias for get_all_tools() — backward compatibility.
-	 *
-	 * @deprecated Use get_all_tools() instead.
-	 * @return array All tools with resolved definitions.
-	 */
-	public function get_global_tools(): array {
-		return $this->get_all_tools();
-	}
-
-	/**
 	 * Get globally disabled tools (opt-out pattern).
 	 *
 	 * @return array Globally disabled tool IDs
@@ -422,7 +412,7 @@ class ToolManager {
 	 * @return bool True if requires config
 	 */
 	public function requires_configuration( string $tool_id ): bool {
-		$tools = $this->get_global_tools();
+		$tools = $this->get_all_tools();
 		return ! empty( $tools[ $tool_id ]['requires_config'] );
 	}
 
@@ -488,7 +478,7 @@ class ToolManager {
 	 * @return bool True if tool is available
 	 */
 	public function is_tool_available( string $tool_id, ?string $context_id = null ): bool {
-		$tools       = $this->get_global_tools();
+		$tools       = $this->get_all_tools();
 		$tool_config = $tools[ $tool_id ] ?? null;
 
 		if ( ! $tool_config ) {
@@ -526,7 +516,7 @@ class ToolManager {
 	 * @return bool True if valid selection
 	 */
 	public function validate_tool_selection( string $tool_id ): bool {
-		$tools = $this->get_global_tools();
+		$tools = $this->get_all_tools();
 		if ( ! isset( $tools[ $tool_id ] ) ) {
 			return false; // Tool doesn't exist
 		}
@@ -581,7 +571,7 @@ class ToolManager {
 	 */
 	public function get_tools_for_step_modal( string $context_id ): array {
 		return array(
-			'global_tools'         => $this->get_global_tools(),
+			'global_tools'         => $this->get_all_tools(),
 			'modal_disabled_tools' => $this->get_step_disabled_tools( $context_id ),
 			'pipeline_step_id'     => $context_id,
 		);
@@ -593,7 +583,7 @@ class ToolManager {
 	 * @return array All global tools with status
 	 */
 	public function get_tools_for_settings_page(): array {
-		$tools = $this->get_global_tools();
+		$tools = $this->get_all_tools();
 		$data  = array();
 
 		foreach ( $tools as $tool_id => $tool_config ) {
@@ -621,7 +611,7 @@ class ToolManager {
 			$resolver = new ToolPolicyResolver( $this );
 			$tools    = $resolver->resolve( array( 'mode' => $mode ) );
 		} else {
-			$tools = $this->get_global_tools();
+			$tools = $this->get_all_tools();
 		}
 
 		$formatted = array();

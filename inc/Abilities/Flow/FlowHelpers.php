@@ -13,7 +13,7 @@ namespace DataMachine\Abilities\Flow;
 
 use DataMachine\Abilities\PermissionHelper;
 
-use DataMachine\Abilities\FlowStepAbilities;
+use DataMachine\Abilities\FlowStep\UpdateFlowStepAbility;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Core\Admin\FlowFormatter;
 use DataMachine\Core\Database\Flows\Flows;
@@ -564,7 +564,7 @@ trait FlowHelpers {
 			}
 		}
 
-		$flow_step_abilities = new FlowStepAbilities();
+		$update_flow_step_ability = new UpdateFlowStepAbility();
 
 		foreach ( $step_configs as $step_type => $config ) {
 			$flow_step_id = $step_type_to_flow_step[ $step_type ] ?? null;
@@ -589,7 +589,7 @@ trait FlowHelpers {
 			if ( ! empty( $handler_slugs ) ) {
 				foreach ( $handler_slugs as $slug ) {
 					$slug_config = $handler_configs[ $slug ] ?? array();
-					$add_result  = $flow_step_abilities->executeUpdateFlowStep(
+					$add_result  = $update_flow_step_ability->execute(
 						array(
 							'flow_step_id'       => $flow_step_id,
 							'add_handler'        => $slug,
@@ -627,7 +627,7 @@ trait FlowHelpers {
 				continue;
 			}
 
-			$result = $flow_step_abilities->executeUpdateFlowStep( $update_input );
+			$result = $update_flow_step_ability->execute( $update_input );
 
 			if ( $result['success'] ) {
 				$applied[] = $flow_step_id;
@@ -673,7 +673,7 @@ trait FlowHelpers {
 			);
 		}
 
-		$flow_step_abilities = new FlowStepAbilities();
+		$update_flow_step_ability = new UpdateFlowStepAbility();
 
 		foreach ( $flow_config as $flow_step_id => $step_data ) {
 			$step_type = $step_data['step_type'] ?? '';
@@ -710,7 +710,7 @@ trait FlowHelpers {
 				continue;
 			}
 
-			$result = $flow_step_abilities->executeUpdateFlowStep(
+			$result = $update_flow_step_ability->execute(
 				array(
 					'flow_step_id'   => $flow_step_id,
 					'handler_slug'   => $default_handler_slug,

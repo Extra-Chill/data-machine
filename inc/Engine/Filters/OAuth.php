@@ -8,20 +8,6 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-/**
- * Get the standardized OAuth callback URL for a provider.
- * Kept for backward compatibility if needed, but prefer $provider->get_callback_url().
- *
- * @param string $provider Provider slug
- * @return string Callback URL
- */
-function datamachine_get_oauth_callback_url( string $provider ): string {
-	$url = site_url( "/datamachine-auth/{$provider}/" );
-
-	/** This filter is documented in inc/Core/OAuth/BaseAuthProvider.php */
-	return apply_filters( 'datamachine_oauth_callback_url', $url, $provider );
-}
-
 // Legacy storage functions removed. Use BaseAuthProvider methods instead.
 // datamachine_get_oauth_account, datamachine_save_oauth_account, etc.
 

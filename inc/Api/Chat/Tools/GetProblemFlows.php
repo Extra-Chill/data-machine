@@ -7,7 +7,7 @@
  * - Consecutive no-items (source is slow/exhausted, consider lowering interval)
  *
  * Uses the problem_flow_threshold setting by default.
- * Delegates to JobAbilities for core logic.
+ * Delegates to the concrete problem-flows ability for core logic.
  *
  * @package DataMachine\Api\Chat\Tools
  */

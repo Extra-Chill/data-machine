@@ -3,7 +3,7 @@
  * Delete Pipeline Tool
  *
  * Focused tool for deleting pipelines.
- * Uses PipelineAbilities API primitive for centralized logic.
+ * Uses the concrete delete-pipeline ability for centralized logic.
  *
  * @package DataMachine\Api\Chat\Tools
  */

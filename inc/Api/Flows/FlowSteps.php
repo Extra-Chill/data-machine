@@ -3,7 +3,7 @@
  * REST API Flow Steps Endpoint
  *
  * Provides REST API access to flow step configuration operations.
- * Delegates to FlowStepAbilities for core logic.
+ * Delegates to concrete FlowStep abilities for core logic.
  * Requires WordPress manage_options capability.
  *
  * @package DataMachine\Api\Flows
@@ -12,7 +12,8 @@
 namespace DataMachine\Api\Flows;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Abilities\FlowStepAbilities;
+use DataMachine\Abilities\FlowStep\GetFlowStepsAbility;
+use DataMachine\Abilities\FlowStep\UpdateFlowStepAbility;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\StepTypeAbilities;
 
@@ -180,7 +181,6 @@ class FlowSteps {
 		$handler_config = $request->get_param( 'handler_config' ) ?? array();
 		$user_message   = $request->get_param( 'user_message' );
 
-		$abilities = new FlowStepAbilities();
 		$input     = array( 'flow_step_id' => $flow_step_id );
 
 		if ( null !== $handler_slug ) {
@@ -195,7 +195,7 @@ class FlowSteps {
 			$input['user_message'] = $user_message;
 		}
 
-		$result = $abilities->executeUpdateFlowStep( $input );
+		$result = ( new UpdateFlowStepAbility() )->execute( $input );
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
@@ -235,8 +235,7 @@ class FlowSteps {
 	public static function handle_get_flow_config( $request ) {
 		$flow_id = (int) $request->get_param( 'flow_id' );
 
-		$abilities = new FlowStepAbilities();
-		$result    = $abilities->executeGetFlowSteps( array( 'flow_id' => $flow_id ) );
+		$result = ( new GetFlowStepsAbility() )->execute( array( 'flow_id' => $flow_id ) );
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
@@ -277,8 +276,7 @@ class FlowSteps {
 			);
 		}
 
-		$abilities = new FlowStepAbilities();
-		$result    = $abilities->executeGetFlowSteps( array( 'flow_step_id' => $flow_step_id ) );
+		$result = ( new GetFlowStepsAbility() )->execute( array( 'flow_step_id' => $flow_step_id ) );
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
@@ -344,8 +342,7 @@ class FlowSteps {
 		$pipeline_step_id = $parts['pipeline_step_id'];
 
 		try {
-			$abilities = new FlowStepAbilities();
-			$result    = $abilities->executeUpdateFlowStep(
+			$result = ( new UpdateFlowStepAbility() )->execute(
 				array(
 					'flow_step_id'   => $flow_step_id,
 					'handler_slug'   => $handler_slug,
@@ -427,8 +424,7 @@ class FlowSteps {
 		$flow_step_id = sanitize_text_field( $request->get_param( 'flow_step_id' ) );
 		$user_message = sanitize_textarea_field( $request->get_param( 'user_message' ) );
 
-		$abilities = new FlowStepAbilities();
-		$result    = $abilities->executeUpdateFlowStep(
+		$result = ( new UpdateFlowStepAbility() )->execute(
 			array(
 				'flow_step_id' => $flow_step_id,
 				'user_message' => $user_message,

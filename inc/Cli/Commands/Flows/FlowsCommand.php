@@ -1365,8 +1365,7 @@ class FlowsCommand extends BaseCommand {
 			$input['add_handler_config'] = $handler_config;
 		}
 
-		$ability = new \DataMachine\Abilities\FlowStepAbilities();
-		$result  = $ability->executeUpdateFlowStep( $input );
+		$result = ( new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility() )->execute( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to add handler' );
@@ -1400,8 +1399,7 @@ class FlowsCommand extends BaseCommand {
 			$step_id = $resolved['step_id'];
 		}
 
-		$ability = new \DataMachine\Abilities\FlowStepAbilities();
-		$result  = $ability->executeUpdateFlowStep(
+		$result = ( new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility() )->execute(
 			array(
 				'flow_step_id'   => $step_id,
 				'remove_handler' => $handler_slug,

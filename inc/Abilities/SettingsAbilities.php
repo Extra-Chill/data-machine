@@ -319,7 +319,7 @@ class SettingsAbilities {
 		$defaults = PluginSettings::getDefaults();
 
 		$tool_manager = new \DataMachine\Engine\AI\Tools\ToolManager();
-		$global_tools = $tool_manager->get_global_tools();
+		$global_tools = $tool_manager->get_all_tools();
 		$tools_keyed  = array();
 		foreach ( $global_tools as $tool_name => $tool_config ) {
 			$tools_keyed[ $tool_name ] = array(
@@ -648,7 +648,7 @@ class SettingsAbilities {
 		}
 
 		$tool_manager    = new \DataMachine\Engine\AI\Tools\ToolManager();
-		$global_tools    = $tool_manager->get_global_tools();
+		$global_tools    = $tool_manager->get_all_tools();
 		$tool_definition = $global_tools[ $tool_id ] ?? null;
 
 		if ( empty( $tool_definition ) || ! is_array( $tool_definition ) ) {
@@ -727,7 +727,7 @@ class SettingsAbilities {
 		}
 
 		$tool_manager    = new \DataMachine\Engine\AI\Tools\ToolManager();
-		$global_tools    = $tool_manager->get_global_tools();
+		$global_tools    = $tool_manager->get_all_tools();
 		$tool_definition = $global_tools[ $tool_id ] ?? null;
 
 		if ( empty( $tool_definition ) ) {

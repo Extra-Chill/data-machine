@@ -25,7 +25,7 @@ class PipelinesCommandTest extends TestCase {
 		$method = new ReflectionMethod( PipelinesCommand::class, 'resolveAiStep' );
 		$method->setAccessible( true );
 
-		// We need to mock PipelineAbilities — use a partial approach.
+		// We need to mock pipeline ability execution — use a partial approach.
 		// Since resolveAiStep creates its own ability instance, we test the
 		// method's logic by verifying it exists and has correct signature.
 		$this->assertTrue( $method->isPrivate() );

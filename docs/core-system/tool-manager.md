@@ -19,12 +19,12 @@ ToolManager (`/inc/Engine/AI/Tools/ToolManager.php`) provides centralized method
 
 ## Key Methods
 
-### get_global_tools()
+### get_all_tools()
 
 Returns all global tools available system-wide.
 
 ```php
-public function get_global_tools(): array
+public function get_all_tools(): array
 ```
 
 **Returns**: Array of global tool definitions
@@ -32,7 +32,7 @@ public function get_global_tools(): array
 **Usage**:
 ```php
 $tool_manager = new ToolManager();
-$global_tools = $tool_manager->get_global_tools();
+$global_tools = $tool_manager->get_all_tools();
 ```
 
 ### is_tool_available()
@@ -232,7 +232,7 @@ class AIStepModal {
         $tool_manager = new ToolManager();
 
         // Get global tools
-        $global_tools = $tool_manager->get_global_tools();
+        $global_tools = $tool_manager->get_all_tools();
 
         // Filter to only available tools for this context
         return array_filter($global_tools, function($tool_id) use ($tool_manager) {
