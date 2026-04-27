@@ -71,14 +71,9 @@ function build_task_scheduler_initial_data(
  * Mirror of ExecuteWorkflowAbility::execute() engine_data['job'] shape.
  */
 function build_engine_data_job_snapshot( int $job_id, array $initial_data ): array {
-	$engine_data = array(
-		'flow_config'     => array(),
-		'pipeline_config' => array(),
-	);
-
-	if ( ! empty( $initial_data ) && is_array( $initial_data ) ) {
-		$engine_data = array_merge( $engine_data, $initial_data );
-	}
+	$engine_data                    = $initial_data;
+	$engine_data['flow_config']     = array();
+	$engine_data['pipeline_config'] = array();
 
 	$job_snapshot = is_array( $engine_data['job'] ?? null ) ? $engine_data['job'] : array();
 	$job_snapshot = array_merge(
