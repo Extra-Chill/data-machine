@@ -401,7 +401,7 @@ public function handle_callback(
 
 ## Provider Registration via Filters
 
-Concrete OAuth providers self-register via the `datamachine_auth_providers` filter (typically through `HandlerRegistrationTrait`). Core data-machine does not ship a `inc/Core/OAuth/Providers/` directory — every concrete provider lives next to its handler in either core or an extension plugin.
+Concrete OAuth providers self-register via the `datamachine_auth_providers` filter (typically through `HandlerRegistrationTrait`). Core data-machine does not ship a central providers directory; every concrete provider lives next to its handler in either core or an extension plugin.
 
 **In core data-machine:**
 

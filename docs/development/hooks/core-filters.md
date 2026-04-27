@@ -791,18 +791,6 @@ $data = apply_filters('datamachine_data_packet', $data, $packet_data, $flow_step
 
 ## Data Processing Filters
 
-### `datamachine_is_item_processed`
-
-**Purpose**: Check if item was already processed
-
-**Parameters**:
-- `$processed` (bool) - Default processed status
-- `$flow_step_id` (string) - Flow step identifier
-- `$source_type` (string) - Handler source type
-- `$item_id` (mixed) - Item identifier
-
-**Return**: Boolean processed status
-
 ### `datamachine_should_reprocess_item`
 
 **Since**: v0.71.0
