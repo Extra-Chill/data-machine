@@ -156,6 +156,67 @@ class ExecuteStepFanOutFilterTest extends WP_UnitTestCase {
 		$this->assertCount( 2, $filtered );
 	}
 
+	public function test_ai_to_handler_step_routes_only_handler_packets_inline(): void {
+		$route = ExecuteStepAbility::resolveTransitionRoute(
+			array( 'step_type' => 'ai' ),
+			array(
+				'step_type'     => 'publish',
+				'handler_slugs' => array( 'publish_post' ),
+			),
+			array(
+				$this->make_packet( 'ai_handler_complete', array( 'tool_name' => 'publish_post', 'handler_tool' => 'publish_post' ) ),
+				$this->make_packet( 'tool_result', array( 'tool_name' => 'search' ) ),
+			)
+		);
+
+		$this->assertSame( 'inline', $route['mode'] );
+		$this->assertCount( 1, $route['packets'] );
+		$this->assertSame( 'ai_handler_complete', $route['packets'][0]['type'] );
+		$this->assertSame( 'publish_post', $route['packets'][0]['metadata']['handler_tool'] );
+	}
+
+	/**
+	 * Multiple AI non-handler packets before publish/upsert should fail the
+	 * current transition explicitly instead of creating child jobs that cannot
+	 * satisfy the handler-requiring next step.
+	 */
+	public function test_ai_to_handler_step_without_handler_packets_fails_transition(): void {
+		$route = ExecuteStepAbility::resolveTransitionRoute(
+			array( 'step_type' => 'ai' ),
+			array(
+				'step_type'     => 'upsert',
+				'handler_slugs' => array( 'upsert_event' ),
+			),
+			array(
+				$this->make_packet( 'tool_result', array( 'tool_name' => 'search' ) ),
+				$this->make_packet( 'ai_response', array( 'source_type' => 'custom' ) ),
+			)
+		);
+
+		$this->assertSame( 'fail', $route['mode'] );
+		$this->assertSame( array(), $route['packets'] );
+		$this->assertSame( 'handler_requiring_step_missing_handler_packets', $route['reason'] );
+	}
+
+	public function test_ai_to_multi_handler_step_keeps_handler_packets_together(): void {
+		$route = ExecuteStepAbility::resolveTransitionRoute(
+			array( 'step_type' => 'ai' ),
+			array(
+				'step_type'     => 'publish',
+				'handler_slugs' => array( 'publish_post', 'publish_pin' ),
+			),
+			array(
+				$this->make_packet( 'ai_handler_complete', array( 'tool_name' => 'publish_post', 'handler_tool' => 'publish_post' ) ),
+				$this->make_packet( 'ai_handler_complete', array( 'tool_name' => 'publish_pin', 'handler_tool' => 'publish_pin' ) ),
+			)
+		);
+
+		$this->assertSame( 'inline', $route['mode'] );
+		$this->assertCount( 2, $route['packets'] );
+		$this->assertSame( 'publish_post', $route['packets'][0]['metadata']['handler_tool'] );
+		$this->assertSame( 'publish_pin', $route['packets'][1]['metadata']['handler_tool'] );
+	}
+
 	public function test_filter_handles_empty_array(): void {
 		$this->assertSame( array(), ExecuteStepAbility::filterPacketsForFanOut( array() ) );
 	}

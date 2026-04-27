@@ -19,6 +19,7 @@ use DataMachine\Core\EngineData;
 use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileRetrieval;
 use DataMachine\Core\JobStatus;
+use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Engine\StepNavigator;
 
 defined( 'ABSPATH' ) || exit;
@@ -478,14 +479,35 @@ class ExecuteStepAbility {
 					);
 				}
 
-				// Filter packets before fan-out: only handler-complete packets
-				// carry data that downstream steps (UpsertStep) can use.
-				// Non-handler packets (tool_result, ai_response) would create
-				// child jobs guaranteed to fail with 'required_handler_tool_not_called'.
-				$fanout_packets = self::filterPacketsForFanOut( $dataPackets );
+				$engine                = $payload['engine'] ?? null;
+				$next_flow_step_config = $engine instanceof EngineData ? $engine->getFlowStepConfig( $next_flow_step_id ) : array();
+				$transition_route      = self::resolveTransitionRoute( $flow_step_config, $next_flow_step_config, $dataPackets );
+
+				if ( 'fail' === $transition_route['mode'] ) {
+					do_action(
+						'datamachine_fail_job',
+						$job_id,
+						'step_execution_failure',
+						array(
+							'flow_step_id'      => $flow_step_id,
+							'next_flow_step_id' => $next_flow_step_id,
+							'class'             => $step_class,
+							'reason'            => $transition_route['reason'],
+						)
+					);
+
+					return array(
+						'success'      => true,
+						'step_success' => false,
+						'outcome'      => 'failed',
+						'error'        => $transition_route['reason'],
+					);
+				}
+
+				$fanout_packets = $transition_route['packets'];
 
 				// After filtering, check if we're back to ≤1 packet — inline instead of fan-out.
-				if ( count( $fanout_packets ) <= 1 ) {
+				if ( 'inline' === $transition_route['mode'] || count( $fanout_packets ) <= 1 ) {
 					do_action(
 						'datamachine_schedule_next_step',
 						$job_id,
@@ -674,6 +696,45 @@ class ExecuteStepAbility {
 	}
 
 	/**
+	 * Resolve whether returned packets should continue inline, fan out, or fail.
+	 *
+	 * AI output headed into a handler-requiring step is a single logical
+	 * conversation result. Keep matching handler completions together so
+	 * PublishStep/UpsertStep can enforce their own multi-handler contracts.
+	 *
+	 * @param array $current_step_config Current flow step config.
+	 * @param array $next_step_config    Next flow step config.
+	 * @param array $dataPackets         Data packets returned from the current step.
+	 * @return array{mode: string, packets: array, reason?: string}
+	 */
+	public static function resolveTransitionRoute( array $current_step_config, array $next_step_config, array $dataPackets ): array {
+		$current_step_type = $current_step_config['step_type'] ?? '';
+		$next_step_type    = $next_step_config['step_type'] ?? '';
+
+		if ( 'ai' === $current_step_type && '' !== $next_step_type && FlowStepConfig::usesHandler( $next_step_config ) ) {
+			$handler_packets = self::getHandlerPacketsForFanOut( $dataPackets );
+
+			if ( empty( $handler_packets ) ) {
+				return array(
+					'mode'    => 'fail',
+					'packets' => array(),
+					'reason'  => 'handler_requiring_step_missing_handler_packets',
+				);
+			}
+
+			return array(
+				'mode'    => 'inline',
+				'packets' => $handler_packets,
+			);
+		}
+
+		return array(
+			'mode'    => 'fanout',
+			'packets' => self::filterPacketsForFanOut( $dataPackets ),
+		);
+	}
+
+	/**
 	 * Filter data packets to only those safe to fan out into child jobs.
 	 *
 	 * When the AI step produces multiple packets, the batch scheduler creates
@@ -705,6 +766,22 @@ class ExecuteStepAbility {
 	 * @return array Packets safe to fan out.
 	 */
 	public static function filterPacketsForFanOut( array $dataPackets ): array {
+		$handler_packets = self::getHandlerPacketsForFanOut( $dataPackets );
+
+		if ( empty( $handler_packets ) ) {
+			return $dataPackets;
+		}
+
+		return $handler_packets;
+	}
+
+	/**
+	 * Return de-duplicated ai_handler_complete packets.
+	 *
+	 * @param array $dataPackets Data packets returned from the step.
+	 * @return array Handler-complete packets only.
+	 */
+	private static function getHandlerPacketsForFanOut( array $dataPackets ): array {
 		$handler_packets = array_values(
 			array_filter(
 				$dataPackets,
@@ -715,7 +792,7 @@ class ExecuteStepAbility {
 		);
 
 		if ( empty( $handler_packets ) ) {
-			return $dataPackets;
+			return array();
 		}
 
 		// Deduplicate handler packets by tool_name. When the AI calls
