@@ -170,7 +170,7 @@ $pipeline_config = $engine->getPipelineConfig();
 
 Retrieve configuration for a specific pipeline step.
 
-Pipeline step config contains AI provider settings (`provider`, `model`, `system_prompt`) while flow step config contains flow-level overrides (`handler_slug`, `handler_config`, `user_message`).
+Pipeline step config contains AI provider settings (`provider`, `model`, `system_prompt`) while flow step config contains flow-level overrides (`handler_slug`, `handler_config`, `prompt_queue`, `config_patch_queue`, `queue_mode`). Legacy `user_message` inputs are normalized into a one-entry static `prompt_queue` before AIStep reads them.
 
 ```php
 public function getPipelineStepConfig(string $pipeline_step_id): array
@@ -194,7 +194,7 @@ $system_prompt = $pipeline_step_config['system_prompt'] ?? '';
 | Setting | Config Location | Method |
 |---------|-----------------|--------|
 | `provider`, `model`, `system_prompt` | `pipeline_config` | `getPipelineStepConfig()` |
-| `handler_slug`, `handler_config`, `user_message` | `flow_config` | `getFlowStepConfig()` |
+| `handler_slug`, `handler_config`, `prompt_queue`, `config_patch_queue`, `queue_mode` | `flow_config` | `getFlowStepConfig()` |
 
 ## Handler Usage
 

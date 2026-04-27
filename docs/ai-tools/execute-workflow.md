@@ -45,6 +45,8 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 }
 ```
 
+`user_message` remains the workflow JSON input for AI steps. During execution, Data Machine normalizes it into a one-entry static `prompt_queue`, which is the storage shape AIStep consumes.
+
 ### Publish Steps
 ```json
 {

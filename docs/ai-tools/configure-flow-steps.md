@@ -21,7 +21,7 @@ The `configure_flow_steps` tool enables configuration of flow steps after creati
 | `field_map` | object | No | Field mappings when switching handlers, e.g. `{"endpoint_url": "source_url"}`. |
 | `handler_config` | object | No*** | Handler config to merge into existing config |
 | `flow_configs` | array | No | Per-flow configurations for bulk mode. Array of `{flow_id: int, handler_config: object}`. |
-| `user_message` | string | No*** | User message/prompt for AI steps |
+| `user_message` | string | No*** | User message input for AI steps. Stored as a one-entry static `prompt_queue`. |
 
 **Validation Rules:**
 - *One of `flow_step_id` OR `pipeline_id` required
@@ -136,6 +136,8 @@ In this example, all matching steps get `timeframe_limit: "24_hours"`, but each 
   "user_message": "Summarize the content in 2-3 sentences"
 }
 ```
+
+`user_message` is an input convenience, not a persisted flow-step field. The ability writes it through the same path as `wp datamachine flows update --set-user-message`, replacing the step's `prompt_queue` with one `{prompt, added_at}` entry and setting `queue_mode` to `static`.
 
 ## Response Format
 
