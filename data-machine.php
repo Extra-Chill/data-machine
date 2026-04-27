@@ -707,22 +707,6 @@ require_once __DIR__ . '/inc/migrations/load.php';
 
 
 function datamachine_check_requirements() {
-	if ( version_compare( PHP_VERSION, '8.2', '<' ) ) {
-		add_action(
-			'admin_notices',
-			function () {
-				echo '<div class="notice notice-error"><p>';
-				printf(
-					esc_html( 'Data Machine requires PHP %2$s or higher. You are running PHP %1$s.' ),
-					esc_html( PHP_VERSION ),
-					'8.2'
-				);
-				echo '</p></div>';
-			}
-		);
-		return false;
-	}
-
 	global $wp_version;
 	$current_wp_version = $wp_version ?? '0.0.0';
 	if ( version_compare( $current_wp_version, '6.9', '<' ) ) {
