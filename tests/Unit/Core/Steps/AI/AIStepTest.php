@@ -8,6 +8,7 @@
 namespace DataMachine\Tests\Unit\Core\Steps\AI;
 
 use DataMachine\Core\Steps\AI\AIStep;
+use DataMachine\Engine\AI\Tools\ToolResultFinder;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 
@@ -182,6 +183,55 @@ class AIStepTest extends TestCase {
 		);
 
 		$this->assertSame( 'ticketmaster', $result[0]['metadata']['source_type'] );
+	}
+
+	public function test_successful_handler_tool_result_is_findable_by_downstream_handler_slug(): void {
+		$method = new ReflectionMethod( AIStep::class, 'processLoopResults' );
+		$method->setAccessible( true );
+
+		$loop_result = array(
+			'messages'               => array(
+				array( 'role' => 'assistant', 'content' => 'I updated the wiki article.' ),
+			),
+			'tool_execution_results' => array(
+				array(
+					'tool_name'       => 'wiki_upsert',
+					'result'          => array(
+						'success' => true,
+						'action'  => 'updated',
+						'article' => array( 'id' => 538, 'title' => 'WooCommerce Ownership Manager' ),
+					),
+					'parameters'      => array( 'title' => 'WooCommerce Ownership Manager' ),
+					'is_handler_tool' => true,
+					'turn_count'      => 2,
+				),
+			),
+		);
+
+		$result = $method->invoke(
+			null,
+			$loop_result,
+			array(
+				array(
+					'type'     => 'fetch',
+					'metadata' => array( 'source_type' => 'mcp' ),
+				),
+			),
+			array( 'flow_step_id' => 'ai_step' ),
+			array(
+				'wiki_upsert' => array(
+					'handler'        => 'wiki_upsert',
+					'handler_config' => array( 'fixed_parent_path' => 'woocommerce' ),
+				),
+			)
+		);
+
+		$this->assertCount( 1, $result );
+		$this->assertSame( 'ai_handler_complete', $result[0]['type'] );
+		$this->assertSame( 'wiki_upsert', $result[0]['metadata']['handler_tool'] );
+
+		$found = ToolResultFinder::findHandlerResult( $result, 'wiki_upsert', 'upsert_step', false );
+		$this->assertSame( $result[0], $found );
 	}
 
 	/**
