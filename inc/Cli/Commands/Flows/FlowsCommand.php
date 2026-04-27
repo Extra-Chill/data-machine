@@ -84,6 +84,9 @@ class FlowsCommand extends BaseCommand {
 	 * [--timestamp=<unix>]
 	 * : Unix timestamp for delayed execution (future time required).
 	 *
+	 * [--no-drain]
+	 * : Skip the default CLI drain of due datamachine_execute_step actions after an immediate run.
+	 *
 	 * [--pipeline_id=<id>]
 	 * : Pipeline ID for flow creation (create subcommand).
 	 *
@@ -313,7 +316,7 @@ class FlowsCommand extends BaseCommand {
 		} elseif ( ! empty( $args ) && 'run' === $args[0] ) {
 			// Handle 'run' subcommand: `flows run 42`.
 			if ( ! isset( $args[1] ) ) {
-				WP_CLI::error( 'Usage: wp datamachine flows run <flow_id> [--count=N] [--timestamp=T]' );
+				WP_CLI::error( 'Usage: wp datamachine flows run <flow_id> [--count=N] [--timestamp=T] [--no-drain]' );
 				return;
 			}
 			$this->runFlow( (int) $args[1], $assoc_args );
@@ -868,6 +871,7 @@ class FlowsCommand extends BaseCommand {
 	private function runFlow( int $flow_id, array $assoc_args ): void {
 		$count     = isset( $assoc_args['count'] ) ? (int) $assoc_args['count'] : 1;
 		$timestamp = isset( $assoc_args['timestamp'] ) ? (int) $assoc_args['timestamp'] : null;
+		$drain     = ! isset( $assoc_args['no-drain'] );
 
 		// Validate count range (1-10).
 		if ( $count < 1 || $count > 10 ) {
@@ -937,6 +941,43 @@ class FlowsCommand extends BaseCommand {
 			WP_CLI::success( sprintf( 'Flow %d: %d/%d runs started.', $flow_id, count( $job_ids ), $count ) );
 			WP_CLI::log( sprintf( 'Job IDs: %s', implode( ', ', array_filter( $job_ids ) ) ) );
 		}
+
+		if ( $drain ) {
+			$this->drainDueStepActions();
+		}
+	}
+
+	/**
+	 * Drain due Data Machine step actions after manual CLI flow runs.
+	 *
+	 * Studio/local CLI runs can enqueue due step actions without any HTTP traffic
+	 * to tick Action Scheduler. Reuse Action Scheduler's CLI runner and scope the
+	 * drain to DM step actions so manual `flow run` advances the work it just queued.
+	 */
+	private function drainDueStepActions(): void {
+		if ( ! class_exists( '\WP_CLI' ) || ! method_exists( WP_CLI::class, 'runcommand' ) ) {
+			return;
+		}
+
+		$result = WP_CLI::runcommand(
+			'action-scheduler run --hooks=datamachine_execute_step --quiet',
+			array(
+				'exit_error' => false,
+				'return'     => 'all',
+			)
+		);
+
+		if ( 0 === (int) ( $result->return_code ?? 1 ) ) {
+			WP_CLI::log( 'Drained due Data Machine step actions.' );
+			return;
+		}
+
+		$message = trim( (string) ( $result->stderr ?? '' ) );
+		if ( '' === $message ) {
+			$message = 'Action Scheduler CLI drain failed.';
+		}
+
+		WP_CLI::warning( $message );
 	}
 
 	/**
