@@ -4,7 +4,7 @@
  *
  * Configures handler settings or AI user messages on flow steps.
  * Supports both single-step and bulk pipeline-scoped operations.
- * Delegates to FlowStepAbilities for core logic.
+ * Delegates to concrete FlowStep abilities for core logic.
  *
  * @package DataMachine\Api\Chat\Tools
  * @since 0.4.2

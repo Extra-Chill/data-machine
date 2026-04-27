@@ -15,7 +15,12 @@ use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Cli\AgentResolver;
 use DataMachine\Cli\UserResolver;
-use DataMachine\Abilities\JobAbilities;
+use DataMachine\Abilities\Job\DeleteJobsAbility;
+use DataMachine\Abilities\Job\FailJobAbility;
+use DataMachine\Abilities\Job\GetJobsAbility;
+use DataMachine\Abilities\Job\JobsSummaryAbility;
+use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
+use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Engine\Tasks\TaskRegistry;
@@ -30,17 +35,6 @@ class JobsCommand extends BaseCommand {
 	 * @var array
 	 */
 	private array $default_fields = array( 'id', 'source', 'flow', 'status', 'created', 'completed' );
-
-	/**
-	 * Job abilities instance.
-	 *
-	 * @var JobAbilities
-	 */
-	private JobAbilities $abilities;
-
-	public function __construct() {
-		$this->abilities = new JobAbilities();
-	}
 
 	/**
 	 * Recover stuck jobs that have job_status in engine_data but status is 'processing'.
@@ -87,7 +81,7 @@ class JobsCommand extends BaseCommand {
 		$flow_id = isset( $assoc_args['flow'] ) ? (int) $assoc_args['flow'] : null;
 		$timeout = isset( $assoc_args['timeout'] ) ? max( 1, (int) $assoc_args['timeout'] ) : 2;
 
-		$result = $this->abilities->executeRecoverStuckJobs(
+		$result = ( new RecoverStuckJobsAbility() )->execute(
 			array(
 				'dry_run'       => $dry_run,
 				'flow_id'       => $flow_id,
@@ -253,7 +247,7 @@ class JobsCommand extends BaseCommand {
 			$input['since'] = gmdate( 'Y-m-d H:i:s', $timestamp );
 		}
 
-		$result = $this->abilities->executeGetJobs( $input );
+		$result = ( new GetJobsAbility() )->execute( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
@@ -356,7 +350,7 @@ class JobsCommand extends BaseCommand {
 			return;
 		}
 
-		$result = $this->abilities->executeGetJobs( array( 'job_id' => (int) $job_id ) );
+		$result = ( new GetJobsAbility() )->execute( array( 'job_id' => (int) $job_id ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
@@ -431,7 +425,7 @@ class JobsCommand extends BaseCommand {
 		$format = $assoc_args['format'] ?? 'text';
 		$raw    = isset( $assoc_args['raw'] );
 
-		$result = $this->abilities->executeGetJobs( array( 'job_id' => $job_id ) );
+		$result = ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
@@ -821,7 +815,7 @@ class JobsCommand extends BaseCommand {
 	 * @subcommand summary
 	 */
 	public function summary( array $args, array $assoc_args ): void {
-		$result = $this->abilities->executeGetJobsSummary( array() );
+		$result = ( new JobsSummaryAbility() )->execute( array() );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
@@ -877,7 +871,7 @@ class JobsCommand extends BaseCommand {
 			return;
 		}
 
-		$result = $this->abilities->executeFailJob(
+		$result = ( new FailJobAbility() )->execute(
 			array(
 				'job_id' => (int) $args[0],
 				'reason' => $assoc_args['reason'] ?? 'manual',
@@ -922,7 +916,7 @@ class JobsCommand extends BaseCommand {
 			return;
 		}
 
-		$result = $this->abilities->executeRetryJob(
+		$result = ( new RetryJobAbility() )->execute(
 			array(
 				'job_id' => (int) $args[0],
 				'force'  => isset( $assoc_args['force'] ),
@@ -1004,7 +998,7 @@ class JobsCommand extends BaseCommand {
 			WP_CLI::confirm( $message );
 		}
 
-		$result = $this->abilities->executeDeleteJobs(
+		$result = ( new DeleteJobsAbility() )->execute(
 			array(
 				'type'              => $type,
 				'cleanup_processed' => $cleanup_processed,

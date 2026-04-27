@@ -4,7 +4,7 @@
  *
  * Focused tool for creating pipelines with optional predefined steps.
  * Automatically creates an associated flow for immediate configuration.
- * Uses PipelineAbilities API primitive for centralized logic.
+ * Uses the concrete create-pipeline ability for centralized logic.
  *
  * @package DataMachine\Api\Chat\Tools
  */

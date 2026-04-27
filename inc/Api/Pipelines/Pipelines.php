@@ -3,7 +3,7 @@
  * REST API Pipelines Endpoint
  *
  * Provides REST API access to pipeline CRUD operations.
- * Uses PipelineAbilities API primitives for centralized logic.
+ * Uses concrete Pipeline abilities for centralized logic.
  * Requires WordPress manage_options capability.
  *
  * @package DataMachine\Api\Pipelines
@@ -12,7 +12,11 @@
 namespace DataMachine\Api\Pipelines;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Abilities\PipelineAbilities;
+use DataMachine\Abilities\Pipeline\CreatePipelineAbility;
+use DataMachine\Abilities\Pipeline\DeletePipelineAbility;
+use DataMachine\Abilities\Pipeline\GetPipelinesAbility;
+use DataMachine\Abilities\Pipeline\ImportExportAbility;
+use DataMachine\Abilities\Pipeline\UpdatePipelineAbility;
 use DataMachine\Core\Admin\DateFormatter;
 use WP_REST_Server;
 
@@ -285,8 +289,6 @@ class Pipelines {
 		$scoped_user_id  = PermissionHelper::resolve_scoped_user_id( $request );
 		$scoped_agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
 
-		$abilities = new PipelineAbilities();
-
 		// Handle CSV export
 		if ( 'csv' === $format ) {
 			$export_ids = array();
@@ -296,7 +298,7 @@ class Pipelines {
 				$export_ids = array( $pipeline_id );
 			}
 
-			$result = $abilities->executeExportPipelines(
+			$result = ( new ImportExportAbility() )->executeExport(
 				array( 'pipeline_ids' => $export_ids )
 			);
 
@@ -334,7 +336,7 @@ class Pipelines {
 			} elseif ( null !== $scoped_user_id ) {
 				$input['user_id'] = $scoped_user_id;
 			}
-			$result = $abilities->executeGetPipelines( $input );
+			$result = ( new GetPipelinesAbility() )->execute( $input );
 
 			if ( ! $result['success'] || empty( $result['pipelines'] ) ) {
 				return new \WP_Error(
@@ -386,7 +388,7 @@ class Pipelines {
 			if ( null !== $search && '' !== $search ) {
 				$input['search'] = $search;
 			}
-			$result = $abilities->executeGetPipelines( $input );
+			$result = ( new GetPipelinesAbility() )->execute( $input );
 
 			if ( ! $result['success'] ) {
 				return new \WP_Error(
@@ -435,8 +437,6 @@ class Pipelines {
 			);
 		}
 
-		$abilities = new PipelineAbilities();
-
 		$input = array(
 			'pipeline_name' => $params['pipeline_name'],
 			'steps'         => $params['steps'] ?? array(),
@@ -450,7 +450,7 @@ class Pipelines {
 			$input['agent_id'] = $scoped_agent_id;
 		}
 
-		$result = $abilities->executeCreatePipeline( $input );
+		$result = ( new CreatePipelineAbility() )->execute( $input );
 
 		if ( ! $result['success'] ) {
 			return new \WP_Error(
@@ -487,8 +487,7 @@ class Pipelines {
 			);
 		}
 
-		$abilities = new PipelineAbilities();
-		$result    = $abilities->executeDeletePipeline( array( 'pipeline_id' => $pipeline_id ) );
+		$result = ( new DeletePipelineAbility() )->execute( array( 'pipeline_id' => $pipeline_id ) );
 
 		if ( ! $result['success'] ) {
 			$status = 500;
@@ -535,8 +534,7 @@ class Pipelines {
 			);
 		}
 
-		$abilities = new PipelineAbilities();
-		$result    = $abilities->executeUpdatePipeline(
+		$result = ( new UpdatePipelineAbility() )->execute(
 			array(
 				'pipeline_id'   => $pipeline_id,
 				'pipeline_name' => $params['pipeline_name'],

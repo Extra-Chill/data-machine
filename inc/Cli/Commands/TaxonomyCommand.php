@@ -2,7 +2,7 @@
 /**
  * WP-CLI Taxonomy Command
  *
- * Wraps TaxonomyAbilities for taxonomy term management.
+ * Wraps concrete Taxonomy abilities for taxonomy term management.
  *
  * @package DataMachine\Cli\Commands
  * @since 0.41.0
@@ -12,8 +12,11 @@ namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
-use DataMachine\Abilities\TaxonomyAbilities;
+use DataMachine\Abilities\Taxonomy\CreateTaxonomyTermAbility;
+use DataMachine\Abilities\Taxonomy\DeleteTaxonomyTermAbility;
+use DataMachine\Abilities\Taxonomy\GetTaxonomyTermsAbility;
 use DataMachine\Abilities\Taxonomy\ResolveTermAbility;
+use DataMachine\Abilities\Taxonomy\UpdateTaxonomyTermAbility;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -98,7 +101,6 @@ class TaxonomyCommand extends BaseCommand {
 			return;
 		}
 
-		$ability = new TaxonomyAbilities();
 		$input   = array(
 			'taxonomy'   => $taxonomy,
 			'hide_empty' => false,
@@ -115,7 +117,7 @@ class TaxonomyCommand extends BaseCommand {
 			$input['parent'] = (int) $assoc_args['parent'];
 		}
 
-		$result = $ability->executeGetTaxonomyTerms( $input );
+		$result = ( new GetTaxonomyTermsAbility() )->execute( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to get taxonomy terms.' );
@@ -218,8 +220,7 @@ class TaxonomyCommand extends BaseCommand {
 			$input['description'] = $assoc_args['description'];
 		}
 
-		$ability = new TaxonomyAbilities();
-		$result  = $ability->executeCreateTaxonomyTerm( $input );
+		$result = ( new CreateTaxonomyTermAbility() )->execute( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to create term.' );
@@ -283,8 +284,7 @@ class TaxonomyCommand extends BaseCommand {
 			$input['parent'] = (int) $assoc_args['parent'];
 		}
 
-		$ability = new TaxonomyAbilities();
-		$result  = $ability->executeUpdateTaxonomyTerm( $input );
+		$result = ( new UpdateTaxonomyTermAbility() )->execute( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to update term.' );
@@ -325,8 +325,7 @@ class TaxonomyCommand extends BaseCommand {
 			WP_CLI::confirm( sprintf( 'Delete term %d?', $term_id ) );
 		}
 
-		$ability = new TaxonomyAbilities();
-		$result  = $ability->executeDeleteTaxonomyTerm( array( 'term_id' => $term_id ) );
+		$result = ( new DeleteTaxonomyTermAbility() )->execute( array( 'term_id' => $term_id ) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to delete term.' );

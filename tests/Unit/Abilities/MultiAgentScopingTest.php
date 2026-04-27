@@ -16,8 +16,8 @@ namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\AgentMemoryAbilities;
 use DataMachine\Abilities\File\AgentFileAbilities;
-use DataMachine\Abilities\PipelineAbilities;
-use DataMachine\Abilities\JobAbilities;
+use DataMachine\Abilities\Job\GetJobsAbility;
+use DataMachine\Abilities\Pipeline\GetPipelinesAbility;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -314,10 +314,10 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 			)
 		);
 
-		$pa = new PipelineAbilities();
+		$pa = new GetPipelinesAbility();
 
 		// Filter by agent A.
-		$result_a = $pa->executeGetPipelines(
+		$result_a = $pa->execute(
 			array( 'user_id' => $this->agent_a_id )
 		);
 		$this->assertTrue( $result_a['success'] );
@@ -326,7 +326,7 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 		$this->assertNotContains( 'Beta Pipeline', $names_a );
 
 		// Filter by agent B.
-		$result_b = $pa->executeGetPipelines(
+		$result_b = $pa->execute(
 			array( 'user_id' => $this->agent_b_id )
 		);
 		$this->assertTrue( $result_b['success'] );
@@ -349,8 +349,8 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 			)
 		);
 
-		$pa     = new PipelineAbilities();
-		$result = $pa->executeGetPipelines( array() );
+		$pa     = new GetPipelinesAbility();
+		$result = $pa->execute( array() );
 
 		$this->assertTrue( $result['success'] );
 		// Should return all pipelines (no user_id filter).
@@ -411,10 +411,10 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 			)
 		);
 
-		$ja = new JobAbilities();
+		$ja = new GetJobsAbility();
 
 		// Filter by agent A.
-		$result_a = $ja->executeGetJobs(
+		$result_a = $ja->execute(
 			array( 'user_id' => $this->agent_a_id )
 		);
 		$this->assertTrue( $result_a['success'] );
@@ -423,7 +423,7 @@ class MultiAgentScopingTest extends WP_UnitTestCase {
 		}
 
 		// Filter by agent B.
-		$result_b = $ja->executeGetJobs(
+		$result_b = $ja->execute(
 			array( 'user_id' => $this->agent_b_id )
 		);
 		$this->assertTrue( $result_b['success'] );

@@ -14,8 +14,9 @@
 namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\AgentAbilities;
-use DataMachine\Abilities\PipelineAbilities;
 use DataMachine\Abilities\AgentMemoryAbilities;
+use DataMachine\Abilities\Pipeline\CreatePipelineAbility;
+use DataMachine\Abilities\Pipeline\DuplicatePipelineAbility;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\Flows\Flows;
 use WP_UnitTestCase;
@@ -25,7 +26,8 @@ use WP_UnitTestCase;
  */
 class AgentContextPropagationTest extends WP_UnitTestCase {
 
-	private PipelineAbilities $pipeline_abilities;
+	private CreatePipelineAbility $create_pipeline_ability;
+	private DuplicatePipelineAbility $duplicate_pipeline_ability;
 	private int $admin_id;
 	private int $agent_id;
 
@@ -38,7 +40,8 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 		$this->admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $this->admin_id );
 
-		$this->pipeline_abilities = new PipelineAbilities();
+		$this->create_pipeline_ability    = new CreatePipelineAbility();
+		$this->duplicate_pipeline_ability = new DuplicatePipelineAbility();
 
 		// Create a test agent via the abilities layer.
 		$agent_result = AgentAbilities::createAgent(
@@ -70,7 +73,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 	 * Test creating a pipeline with agent_id stores it in DB.
 	 */
 	public function test_create_pipeline_with_agent_id(): void {
-		$result = $this->pipeline_abilities->executeCreatePipeline(
+		$result = $this->create_pipeline_ability->execute(
 			array(
 				'pipeline_name' => 'Agent-Scoped Pipeline',
 				'agent_id'      => $this->agent_id,
@@ -90,7 +93,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 	 * Test creating a pipeline without agent_id leaves it NULL.
 	 */
 	public function test_create_pipeline_without_agent_id(): void {
-		$result = $this->pipeline_abilities->executeCreatePipeline(
+		$result = $this->create_pipeline_ability->execute(
 			array( 'pipeline_name' => 'Unscoped Pipeline' )
 		);
 
@@ -105,7 +108,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 	 * Test creating a pipeline with flow_config cascades agent_id to flow.
 	 */
 	public function test_create_pipeline_cascades_agent_id_to_flow(): void {
-		$result = $this->pipeline_abilities->executeCreatePipeline(
+		$result = $this->create_pipeline_ability->execute(
 			array(
 				'pipeline_name' => 'Cascading Agent Pipeline',
 				'agent_id'      => $this->agent_id,
@@ -144,7 +147,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 	 */
 	public function test_create_flow_with_agent_id(): void {
 		// First create a pipeline.
-		$pipeline_result = $this->pipeline_abilities->executeCreatePipeline(
+		$pipeline_result = $this->create_pipeline_ability->execute(
 			array( 'pipeline_name' => 'Flow Test Pipeline' )
 		);
 		$pipeline_id     = $pipeline_result['pipeline_id'];
@@ -169,7 +172,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 	 * Test creating a flow without agent_id leaves it NULL.
 	 */
 	public function test_create_flow_without_agent_id(): void {
-		$pipeline_result = $this->pipeline_abilities->executeCreatePipeline(
+		$pipeline_result = $this->create_pipeline_ability->execute(
 			array( 'pipeline_name' => 'Flow Test Pipeline 2' )
 		);
 		$pipeline_id     = $pipeline_result['pipeline_id'];
@@ -208,7 +211,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 	 */
 	public function test_duplicate_pipeline_carries_agent_id(): void {
 		// Create source pipeline with agent_id.
-		$source = $this->pipeline_abilities->executeCreatePipeline(
+		$source = $this->create_pipeline_ability->execute(
 			array(
 				'pipeline_name' => 'Source Agent Pipeline',
 				'agent_id'      => $this->agent_id,
@@ -216,7 +219,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 		);
 		$this->assertTrue( $source['success'] );
 
-		$result = $this->pipeline_abilities->executeDuplicatePipeline(
+		$result = $this->duplicate_pipeline_ability->execute(
 			array( 'pipeline_id' => $source['pipeline_id'] )
 		);
 
@@ -243,7 +246,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 		$agent_id_2     = $agent_result_2['agent_id'];
 
 		// Create source pipeline with first agent.
-		$source = $this->pipeline_abilities->executeCreatePipeline(
+		$source = $this->create_pipeline_ability->execute(
 			array(
 				'pipeline_name' => 'Source for Override',
 				'agent_id'      => $this->agent_id,
@@ -251,7 +254,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 		);
 
 		// Duplicate with different agent_id.
-		$result = $this->pipeline_abilities->executeDuplicatePipeline(
+		$result = $this->duplicate_pipeline_ability->execute(
 			array(
 				'pipeline_id' => $source['pipeline_id'],
 				'agent_id'    => $agent_id_2,
@@ -322,7 +325,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 	 * Test bulk pipeline creation propagates agent_id.
 	 */
 	public function test_bulk_create_pipeline_propagates_agent_id(): void {
-		$result = $this->pipeline_abilities->executeCreatePipeline(
+		$result = $this->create_pipeline_ability->execute(
 			array(
 				'agent_id'  => $this->agent_id,
 				'pipelines' => array(

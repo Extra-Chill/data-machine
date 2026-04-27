@@ -11,7 +11,7 @@
 
 namespace DataMachine\Tests\Unit\Engine;
 
-use DataMachine\Abilities\PipelineAbilities;
+use DataMachine\Abilities\Pipeline\CreatePipelineAbility;
 use DataMachine\Abilities\PipelineStepAbilities;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
@@ -21,7 +21,7 @@ use WP_UnitTestCase;
 class ImportExportStepConfigTest extends WP_UnitTestCase {
 
 	private ImportExport $import_export;
-	private PipelineAbilities $pipeline_abilities;
+	private CreatePipelineAbility $create_pipeline_ability;
 	private PipelineStepAbilities $step_abilities;
 	private Pipelines $db_pipelines;
 	private Flows $db_flows;
@@ -33,7 +33,7 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 		wp_set_current_user( $user_id );
 
 		$this->import_export      = new ImportExport();
-		$this->pipeline_abilities = new PipelineAbilities();
+		$this->create_pipeline_ability = new CreatePipelineAbility();
 		$this->step_abilities     = new PipelineStepAbilities();
 		$this->db_pipelines       = new Pipelines();
 		$this->db_flows           = new Flows();
@@ -45,7 +45,7 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 
 	public function test_import_restores_step_config_from_export(): void {
 		// Build a source pipeline with a configured AI step.
-		$created            = $this->pipeline_abilities->executeCreatePipeline(
+		$created            = $this->create_pipeline_ability->execute(
 			array( 'pipeline_name' => 'Round Trip Source' )
 		);
 		$source_pipeline_id = $created['pipeline_id'];
@@ -150,7 +150,7 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 
 	public function test_import_restores_flow_and_handler_config_from_export(): void {
 		// Build a source pipeline with a fetch step and a flow configured with an RSS handler.
-		$created            = $this->pipeline_abilities->executeCreatePipeline(
+		$created            = $this->create_pipeline_ability->execute(
 			array(
 				'pipeline_name' => 'Flow Round Trip Source',
 				'flow_config'   => array( 'flow_name' => 'Morning Flow' ),
@@ -239,7 +239,7 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 	public function test_import_without_flow_rows_creates_default_flow_fallback(): void {
 		// Pipeline with only an AI step and no handler-bearing flow — export emits no flow
 		// rows, so import should still leave the pipeline with at least one flow.
-		$created            = $this->pipeline_abilities->executeCreatePipeline(
+		$created            = $this->create_pipeline_ability->execute(
 			array( 'pipeline_name' => 'Empty Flow Source' )
 		);
 		$source_pipeline_id = $created['pipeline_id'];

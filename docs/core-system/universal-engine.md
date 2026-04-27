@@ -93,7 +93,7 @@ Centralized tool management system that replaces distributed tool discovery and 
 ```php
 // Tool discovery and validation
 $tool_manager = new ToolManager();
-$global_tools = $tool_manager->get_global_tools();
+$global_tools = $tool_manager->get_all_tools();
 
 // Check tool availability (includes enablement and configuration)
 $is_available = $tool_manager->is_tool_available('google_search', $step_context_id);

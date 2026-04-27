@@ -46,11 +46,11 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/delete-flow-file',
 			'datamachine/cleanup-flow-files',
 			'datamachine/upload-flow-file',
-			// FlowStepAbilities (3)
+			// FlowStep abilities (3)
 			'datamachine/get-flow-steps',
 			'datamachine/update-flow-step',
 			'datamachine/configure-flow-steps',
-			// JobAbilities (5)
+			// Job abilities (5)
 			'datamachine/get-jobs',
 			'datamachine/delete-jobs',
 			'datamachine/run-flow',
@@ -61,7 +61,7 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/clear-logs',
 			'datamachine/read-logs',
 			'datamachine/get-log-metadata',
-			// PipelineAbilities (7)
+			// Pipeline abilities (7)
 			'datamachine/get-pipelines',
 			'datamachine/create-pipeline',
 			'datamachine/update-pipeline',
