@@ -452,7 +452,6 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 
 	public function test_rest_pipeline_step_config_schema_exposes_tool_policy_fields(): void {
 		$method = new \ReflectionMethod( PipelineSteps::class, 'get_step_config_args' );
-		$method->setAccessible( true );
 
 		$args = $method->invoke( null, true );
 
@@ -990,5 +989,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 				return $tools;
 			}
 		);
+
+		\DataMachine\Engine\AI\Tools\ToolManager::clearCache();
 	}
 }
