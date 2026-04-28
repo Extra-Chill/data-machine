@@ -126,11 +126,11 @@ class AgentBundler {
 		$bundle['flows'] = array();
 
 		foreach ( $flows as $flow ) {
-			$flow_id   = (int) $flow['flow_id'];
+			$flow_id       = (int) $flow['flow_id'];
 			$portable_slug = ! empty( $flow['portable_slug'] )
 				? $flow['portable_slug']
 				: PortableSlug::normalize( (string) $flow['flow_name'], 'flow' );
-			$flow_data = array(
+			$flow_data     = array(
 				'original_id'          => $flow_id,
 				'original_pipeline_id' => (int) $flow['pipeline_id'],
 				'portable_slug'        => $portable_slug,
@@ -190,7 +190,7 @@ class AgentBundler {
 			'source_ref'      => $bundle_source_ref,
 			'source_revision' => $bundle_source_revision,
 		);
-		$is_portable_bundle = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
+		$is_portable_bundle     = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
 
 		// Check for slug collision.
 		$existing = $this->agents_repo->get_by_slug( $slug );
@@ -254,13 +254,17 @@ class AgentBundler {
 
 		// 1. Create or update the agent record.
 		$incoming_config = $agent_data['agent_config'] ?? array();
+
 		$incoming_config = is_array( $incoming_config ) ? $incoming_config : array();
-		$config          = is_array( $existing['agent_config'] ?? null )
+
+		$config = is_array( $existing['agent_config'] ?? null )
 			? array_merge( $existing['agent_config'], $incoming_config )
 			: $incoming_config;
+
 		$existing_bundle_state = is_array( $existing['agent_config']['datamachine_bundle'] ?? null )
 			? $existing['agent_config']['datamachine_bundle']
 			: array();
+
 		$config['datamachine_bundle'] = array_merge(
 			$existing_bundle_state,
 			$bundle_metadata,
@@ -322,7 +326,7 @@ class AgentBundler {
 					$this->pipeline_artifact_payload( $existing_pipeline, $portable_slug )
 				)
 			) {
-				$conflicts[] = array(
+				$conflicts[]                = array(
 					'artifact_type' => 'pipeline',
 					'artifact_id'   => $portable_slug,
 					'reason'        => 'local_modified',
@@ -352,7 +356,7 @@ class AgentBundler {
 			}
 
 			if ( $new_pipeline_id ) {
-				$pipeline_id_map[ $old_id ] = (int) $new_pipeline_id;
+				$pipeline_id_map[ $old_id ]        = (int) $new_pipeline_id;
 				$artifact_records[ $artifact_key ] = $this->bundle_artifact_record(
 					$bundle_metadata,
 					'pipeline',
@@ -503,11 +507,11 @@ class AgentBundler {
 
 	private function flow_artifact_payload( array $flow, string $portable_slug ): array {
 		return array(
-			'portable_slug'      => $portable_slug,
-			'flow_name'          => (string) ( $flow['flow_name'] ?? '' ),
-			'flow_config'        => $this->flow_config_without_runtime_queues( is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array() ),
-			'scheduling_policy'  => 'create_paused_upgrade_preserve_existing',
-			'queue_policy'       => 'create_seed_upgrade_preserve_existing',
+			'portable_slug'     => $portable_slug,
+			'flow_name'         => (string) ( $flow['flow_name'] ?? '' ),
+			'flow_config'       => $this->flow_config_without_runtime_queues( is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array() ),
+			'scheduling_policy' => 'create_paused_upgrade_preserve_existing',
+			'queue_policy'      => 'create_seed_upgrade_preserve_existing',
 		);
 	}
 
@@ -590,9 +594,6 @@ class AgentBundler {
 				$files[ $filename ] = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 			}
 		}
-
-
-
 		return $files;
 	}
 
@@ -923,6 +924,7 @@ class AgentBundler {
 		try {
 			return AgentBundleLegacyAdapter::to_legacy_bundle( AgentBundleDirectory::read( $directory ) );
 		} catch ( BundleValidationException $e ) {
+			unset( $e );
 			// Fall through to the legacy monolithic manifest reader for old exports.
 		}
 

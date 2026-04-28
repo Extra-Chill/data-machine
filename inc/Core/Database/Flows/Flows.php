@@ -308,7 +308,7 @@ class Flows extends BaseRepository {
 	 * @return string|null Raw JSON string, or null when the flow is missing.
 	 */
 	public function get_flow_config_json( int $flow_id ): ?string {
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		$value = $this->wpdb->get_var(
 			$this->wpdb->prepare(
 				'SELECT flow_config FROM %i WHERE flow_id = %d',
@@ -316,6 +316,7 @@ class Flows extends BaseRepository {
 				$flow_id
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return null === $value ? null : (string) $value;
 	}
@@ -334,8 +335,7 @@ class Flows extends BaseRepository {
 	public function compare_and_swap_flow_config( int $flow_id, string $expected_config_json, array $new_flow_config ): bool {
 		$new_config_json = wp_json_encode( $new_flow_config );
 
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
 		$result = $this->wpdb->query(
 			$this->wpdb->prepare(
 				'UPDATE %i SET flow_config = %s WHERE flow_id = %d AND flow_config = %s',
@@ -345,7 +345,7 @@ class Flows extends BaseRepository {
 				$expected_config_json
 			)
 		);
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( false === $result ) {
 			do_action(
