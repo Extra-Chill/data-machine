@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.93.0] - 2026-04-28
+
+### Added
+- support workflow specs in bulk create
+
 ## [0.92.0] - 2026-04-28
 
 ### Added
