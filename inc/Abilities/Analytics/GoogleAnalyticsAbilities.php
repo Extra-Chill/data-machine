@@ -399,6 +399,13 @@ class GoogleAnalyticsAbilities {
 	private static function fetchReport( array $input, string $action, string $access_token, string $property_id ): array {
 		$request_body = self::buildReportRequestBody( $input, $action );
 
+		// Pull values needed for response shaping back out of the request body
+		// so we don't have to recompute defaults / comparison logic in two places.
+		$compare     = ! empty( $input['compare'] );
+		$date_ranges = $request_body['dateRanges'];
+		$start_date  = $date_ranges[0]['startDate'];
+		$end_date    = $date_ranges[0]['endDate'];
+
 		$api_url = self::API_BASE . $property_id . ':runReport';
 
 		$result = HttpClient::post(
