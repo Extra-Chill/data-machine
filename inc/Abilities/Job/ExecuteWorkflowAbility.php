@@ -13,6 +13,7 @@ namespace DataMachine\Abilities\Job;
 
 use DataMachine\Abilities\StepTypeAbilities;
 use DataMachine\Core\Steps\WorkflowConfigFactory;
+use DataMachine\Engine\ExecutionPlan;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -169,8 +170,24 @@ class ExecuteWorkflowAbility {
 
 		$this->db_jobs->store_engine_data( $job_id, $engine_data );
 
-		// Find first step
-		$first_step_id = $this->getFirstStepId( $configs['flow_config'] );
+		try {
+			$first_step_id = ExecutionPlan::from_flow_config( $configs['flow_config'] )->first_step_id();
+		} catch ( \InvalidArgumentException $e ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Workflow execution failed - invalid execution plan',
+				array(
+					'job_id' => $job_id,
+					'error'  => $e->getMessage(),
+				)
+			);
+
+			return array(
+				'success' => false,
+				'error'   => $e->getMessage(),
+			);
+		}
 
 		if ( ! $first_step_id ) {
 			return array(
@@ -319,18 +336,4 @@ class ExecuteWorkflowAbility {
 		return array( 'valid' => true );
 	}
 
-	/**
-	 * Get first step ID from flow_config.
-	 *
-	 * @param array $flow_config Flow configuration.
-	 * @return string|null First step ID or null if not found.
-	 */
-	private function getFirstStepId( array $flow_config ): ?string {
-		foreach ( $flow_config as $step_id => $config ) {
-			if ( ( $config['execution_order'] ?? -1 ) === 0 ) {
-				return $step_id;
-			}
-		}
-		return null;
-	}
 }

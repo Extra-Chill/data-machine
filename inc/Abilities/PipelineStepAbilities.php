@@ -16,6 +16,7 @@ use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Core\Steps\FlowStepConfigFactory;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -1013,16 +1014,12 @@ class PipelineStepAbilities {
 
 			$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $pipeline_step_id, $flow_id );
 
-			$disabled_tools = $pipeline_config[ $pipeline_step_id ]['disabled_tools'] ?? array();
-
-			$flow_config[ $flow_step_id ] = array(
-				'flow_step_id'     => $flow_step_id,
-				'step_type'        => $step['step_type'] ?? '',
-				'pipeline_step_id' => $pipeline_step_id,
-				'pipeline_id'      => $pipeline_id,
-				'flow_id'          => $flow_id,
-				'execution_order'  => $step['execution_order'] ?? 0,
-				'disabled_tools'   => $disabled_tools,
+			$flow_config[ $flow_step_id ] = FlowStepConfigFactory::buildFromPipelineStep(
+				$step,
+				$pipeline_id,
+				$flow_id,
+				$flow_step_id,
+				$pipeline_config[ $pipeline_step_id ] ?? array()
 			);
 		}
 
