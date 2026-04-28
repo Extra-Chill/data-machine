@@ -32,10 +32,10 @@ defined( 'ABSPATH' ) || exit;
 
 class UpsertPostAbility {
 
-	public const ABILITY_NAME           = 'datamachine/upsert-post';
-	public const META_CONTENT_HASH      = '_datamachine_content_hash';
-	public const META_RAW_SOURCE        = '_datamachine_raw_source';
-	public const META_STUB_MARKER       = '_datamachine_auto_stub';
+	public const ABILITY_NAME      = 'datamachine/upsert-post';
+	public const META_CONTENT_HASH = '_datamachine_content_hash';
+	public const META_RAW_SOURCE   = '_datamachine_raw_source';
+	public const META_STUB_MARKER  = '_datamachine_auto_stub';
 
 	private static bool $registered = false;
 
@@ -143,12 +143,15 @@ class UpsertPostAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'   => array( 'type' => 'boolean' ),
-							'action'    => array( 'type' => 'string', 'enum' => array( 'created', 'updated', 'no_change' ) ),
-							'message'   => array( 'type' => 'string' ),
-							'post_id'   => array( 'type' => 'integer' ),
-							'post_url'  => array( 'type' => 'string' ),
-							'path'      => array( 'type' => 'string' ),
+							'success'  => array( 'type' => 'boolean' ),
+							'action'   => array(
+								'type' => 'string',
+								'enum' => array( 'created', 'updated', 'no_change' ),
+							),
+							'message'  => array( 'type' => 'string' ),
+							'post_id'  => array( 'type' => 'integer' ),
+							'post_url' => array( 'type' => 'string' ),
+							'path'     => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute' ),
@@ -234,7 +237,7 @@ class UpsertPostAbility {
 					'type'        => 'integer',
 					'description' => 'Post author user ID (create only).',
 				),
-				'content_hash' => array(
+				'content_hash'   => array(
 					'type'        => 'string',
 					'description' => 'Hash for idempotency check.',
 				),
