@@ -48,19 +48,40 @@ class DailyMemoryTask extends SystemTask {
 			return;
 		}
 
+		$date     = $params['date'] ?? gmdate( 'Y-m-d' );
+		$user_id  = (int) ( $params['user_id'] ?? 0 );
+		$agent_id = (int) ( $params['agent_id'] ?? 0 );
+
 		$system_defaults = $this->resolveSystemModel( $params );
 		$provider        = $system_defaults['provider'];
 		$model           = $system_defaults['model'];
 
+		// Treat an unresolvable model as a no-op skip rather than a hard
+		// failure. The resolution chain checks five locations
+		// (agent.mode_models[system], agent.default_*, site.mode_models,
+		// site.default_*, network.default_*); if all five are empty the
+		// install simply hasn't picked a system model yet. That's a
+		// configuration state, not a runtime fault, so it should not
+		// generate failed-job noise or cascade through the engine as
+		// "empty_data_packet_returned". Once a model is configured
+		// anywhere in the chain, the next tick proceeds normally with
+		// no migration or manual reset needed. Mirrors the
+		// daily_memory_enabled = false branch above.
 		if ( empty( $provider ) || empty( $model ) ) {
-			$this->failJob( $jobId, 'No system agent AI provider/model configured.' );
+			$this->completeJob(
+				$jobId,
+				array(
+					'skipped' => true,
+					'reason'  => sprintf(
+						'No AI model resolvable for agent_id=%d in system mode. Configure mode_models.system or default_model at agent, site, or network level.',
+						$agent_id
+					),
+				)
+			);
 			return;
 		}
 
-		$date     = $params['date'] ?? gmdate( 'Y-m-d' );
-		$user_id  = (int) ( $params['user_id'] ?? 0 );
-		$agent_id = (int) ( $params['agent_id'] ?? 0 );
-		$daily    = new DailyMemory( $user_id, $agent_id );
+		$daily = new DailyMemory( $user_id, $agent_id );
 
 		// Read current MEMORY.md.
 		$memory = new AgentMemory( $user_id, $agent_id );
