@@ -13,6 +13,7 @@
 namespace DataMachine\Tests\Unit\Core\Database\Chat;
 
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
+use DataMachine\Engine\AI\MessageEnvelope;
 
 class InMemoryConversationStore implements ConversationStoreInterface {
 
@@ -173,11 +174,12 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 	public function count_unread( array $messages, ?string $last_read_at ): int {
 		$count = 0;
 		foreach ( $messages as $msg ) {
+			$msg = MessageEnvelope::normalize( $msg );
 			if ( ( $msg['role'] ?? '' ) !== 'assistant' ) {
 				continue;
 			}
-			$type = $msg['metadata']['type'] ?? 'text';
-			if ( 'tool_call' === $type || 'tool_result' === $type ) {
+			$type = $msg['type'] ?? MessageEnvelope::TYPE_TEXT;
+			if ( MessageEnvelope::TYPE_TOOL_CALL === $type || MessageEnvelope::TYPE_TOOL_RESULT === $type ) {
 				continue;
 			}
 			if ( null === $last_read_at ) {
