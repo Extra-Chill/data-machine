@@ -21,10 +21,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Chat Database Manager
  *
- * Implements {@see ConversationStoreInterface} so the conversation
- * storage backend can be swapped via the `datamachine_conversation_store`
- * filter. Resolve via {@see ConversationStoreFactory::get()} rather than
- * instantiating this class directly.
+ * Implements the aggregate {@see ConversationStoreInterface} by satisfying
+ * the narrower transcript, index, read-state, retention, and reporting
+ * contracts. Resolve via {@see ConversationStoreFactory::get()} rather
+ * than instantiating this class directly.
  */
 class Chat extends BaseRepository implements ConversationStoreInterface {
 
