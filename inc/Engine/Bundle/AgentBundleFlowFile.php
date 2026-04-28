@@ -48,6 +48,7 @@ final class AgentBundleFlowFile {
 		BundleSchema::assert_supported_version( $data, 'flow file' );
 		foreach ( array( 'slug', 'name', 'pipeline_slug', 'schedule', 'max_items', 'steps' ) as $field ) {
 			if ( ! array_key_exists( $field, $data ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception message, not direct output.
 				throw new BundleValidationException( "flow file is missing required field {$field}." );
 			}
 		}
@@ -79,6 +80,7 @@ final class AgentBundleFlowFile {
 			}
 			foreach ( array( 'step_position', 'handler_configs' ) as $field ) {
 				if ( ! array_key_exists( $field, $step ) ) {
+					// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception message, not direct output.
 					throw new BundleValidationException( "flow file step is missing required field {$field}." );
 				}
 			}
@@ -123,6 +125,7 @@ final class AgentBundleFlowFile {
 
 		if ( in_array( $field, array( 'handler_slugs', 'enabled_tools', 'disabled_tools' ), true ) ) {
 			if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception message, not direct output.
 				throw new BundleValidationException( "flow file {$field} must be a list." );
 			}
 			return array_values( array_map( 'strval', $value ) );
@@ -130,10 +133,12 @@ final class AgentBundleFlowFile {
 
 		if ( in_array( $field, array( 'prompt_queue', 'config_patch_queue' ), true ) ) {
 			if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception message, not direct output.
 				throw new BundleValidationException( "flow file {$field} must be a list of objects." );
 			}
 			foreach ( $value as $entry ) {
 				if ( ! is_array( $entry ) ) {
+					// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception message, not direct output.
 					throw new BundleValidationException( "flow file {$field} must be a list of objects." );
 				}
 			}

@@ -344,8 +344,6 @@ class AgentBundler {
 			}
 		}
 
-
-
 		return $files;
 	}
 
@@ -676,6 +674,8 @@ class AgentBundler {
 		try {
 			return AgentBundleLegacyAdapter::to_legacy_bundle( AgentBundleDirectory::read( $directory ) );
 		} catch ( BundleValidationException $e ) {
+			$legacy_fallback_reason = $e->getMessage();
+			unset( $legacy_fallback_reason );
 			// Fall through to the legacy monolithic manifest reader for old exports.
 		}
 
