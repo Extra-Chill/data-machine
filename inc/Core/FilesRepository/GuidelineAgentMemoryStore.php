@@ -130,6 +130,8 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 			update_post_meta( $existing->ID, self::META_HASH, $hash );
 			update_post_meta( $existing->ID, self::META_BYTES, $bytes );
 
+			$this->emit_guideline_updated_event( $existing->ID );
+
 			return AgentMemoryWriteResult::ok( $hash, $bytes );
 		}
 
@@ -160,8 +162,20 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		}
 
 		wp_set_object_terms( $post_id, array( self::TERM_MEMORY ), self::TAXONOMY, false );
+		$this->emit_guideline_updated_event( (int) $post_id );
 
 		return AgentMemoryWriteResult::ok( $hash, $bytes );
+	}
+
+	/**
+	 * Emit a logical guideline update event for consumers watching the substrate.
+	 *
+	 * @since next
+	 *
+	 * @param int $post_id Guideline post ID.
+	 */
+	private function emit_guideline_updated_event( int $post_id ): void {
+		do_action( 'datamachine_guideline_updated', $post_id, self::TERM_MEMORY );
 	}
 
 	/**
