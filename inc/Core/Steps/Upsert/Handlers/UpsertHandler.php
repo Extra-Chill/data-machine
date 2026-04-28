@@ -12,6 +12,7 @@
 namespace DataMachine\Core\Steps\Upsert\Handlers;
 
 use DataMachine\Core\EngineData;
+use DataMachine\Engine\Bundle\AuthRefHandlerConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -80,7 +81,16 @@ abstract class UpsertHandler {
 		$parameters['engine'] = $engine;
 
 		$handler_config = $tool_def['handler_config'] ?? array();
-		$result         = $this->executeUpsert( $parameters, $handler_config );
+		$handler_config = AuthRefHandlerConfig::resolve_runtime_config(
+			$handler_config,
+			(string) ( $tool_def['handler'] ?? static::class ),
+			array( 'job_id' => $job_id )
+		);
+		if ( is_wp_error( $handler_config ) ) {
+			return $this->errorResponse( 'Auth ref resolution failed: ' . $handler_config->get_error_message() );
+		}
+
+		$result = $this->executeUpsert( $parameters, $handler_config );
 
 		// Post origin tracking is applied centrally in ToolExecutor::executeTool()
 		// after every tool call — handler tools and ability tools share the same

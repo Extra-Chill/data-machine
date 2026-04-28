@@ -17,6 +17,7 @@ namespace DataMachine\Core\Steps\Publish\Handlers;
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Handlers\HttpRequestHelpers;
+use DataMachine\Engine\Bundle\AuthRefHandlerConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -68,7 +69,16 @@ abstract class PublishHandler {
 		$parameters['engine'] = $engine;
 
 		$handler_config = $tool_def['handler_config'] ?? array();
-		$result         = $this->executePublish( $parameters, $handler_config );
+		$handler_config = AuthRefHandlerConfig::resolve_runtime_config(
+			$handler_config,
+			(string) ( $tool_def['handler'] ?? $this->handler_type ),
+			array( 'job_id' => $job_id )
+		);
+		if ( is_wp_error( $handler_config ) ) {
+			return $this->errorResponse( 'Auth ref resolution failed: ' . $handler_config->get_error_message() );
+		}
+
+		$result = $this->executePublish( $parameters, $handler_config );
 
 		// Post origin tracking is applied centrally in ToolExecutor::executeTool()
 		// after every tool call — handler tools and ability tools share the same
@@ -342,5 +352,4 @@ abstract class PublishHandler {
 		$auth_abilities = new AuthAbilities();
 		return $auth_abilities->getProvider( $provider_key );
 	}
-
 }

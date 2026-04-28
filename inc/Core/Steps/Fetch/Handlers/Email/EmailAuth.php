@@ -83,6 +83,48 @@ class EmailAuth extends BaseAuthProvider {
 	}
 
 	/**
+	 * Convert inline IMAP credentials to the install-local default ref.
+	 *
+	 * @param array  $handler_config Handler config being exported.
+	 * @param string $handler_slug Handler slug.
+	 * @param array  $context Export context.
+	 * @return string|null Auth ref or null when config carries no IMAP credential shape.
+	 */
+	public function get_auth_ref_for_config( array $handler_config, string $handler_slug = '', array $context = array() ): ?string {
+		unset( $handler_slug, $context );
+
+		foreach ( array( 'imap_host', 'imap_user', 'imap_password' ) as $field ) {
+			if ( ! empty( $handler_config[ $field ] ) ) {
+				return 'email_imap:default';
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Resolve the default IMAP auth ref to local credentials.
+	 *
+	 * @param string $account Auth ref account/id segment.
+	 * @param string $handler_slug Handler slug requesting credentials.
+	 * @param array  $context Import/runtime context.
+	 * @return array|\WP_Error Local IMAP config or failure.
+	 */
+	public function resolve_auth_ref( string $account, string $handler_slug = '', array $context = array() ): array|\WP_Error {
+		unset( $handler_slug, $context );
+
+		if ( 'default' !== $account ) {
+			return new \WP_Error( 'auth_ref_unresolved', __( 'Email auth only supports the default local connection.', 'data-machine' ) );
+		}
+
+		if ( ! $this->is_authenticated() ) {
+			return new \WP_Error( 'auth_ref_unresolved', __( 'Email IMAP credentials are not configured on this install.', 'data-machine' ) );
+		}
+
+		return $this->get_config();
+	}
+
+	/**
 	 * Get IMAP host.
 	 *
 	 * @return string IMAP hostname.

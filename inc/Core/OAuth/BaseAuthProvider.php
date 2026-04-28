@@ -100,6 +100,78 @@ abstract class BaseAuthProvider {
 	abstract public function is_authenticated(): bool;
 
 	/**
+	 * Get this provider's registered slug.
+	 *
+	 * @return string Provider slug.
+	 */
+	public function get_provider_slug(): string {
+		return $this->provider_slug;
+	}
+
+	/**
+	 * Convert an inline handler config to a portable auth_ref.
+	 *
+	 * Providers that recognize their own credential shape can override this and
+	 * return a provider:account handle. The default is intentionally no-op so
+	 * unknown handler configs pass through unchanged on export.
+	 *
+	 * @param array  $handler_config Handler config being exported.
+	 * @param string $handler_slug Handler slug that owns the config.
+	 * @param array  $context Export/import context.
+	 * @return string|null Portable auth_ref or null when not recognized.
+	 */
+	public function get_auth_ref_for_config( array $handler_config, string $handler_slug = '', array $context = array() ): ?string {
+		unset( $handler_config, $handler_slug, $context );
+		return null;
+	}
+
+	/**
+	 * Resolve an auth_ref account id to local handler config values.
+	 *
+	 * Providers that support portable refs should override this. The default
+	 * returns a clear unresolved error without exposing stored credentials.
+	 *
+	 * @param string $account Auth ref account/id segment.
+	 * @param string $handler_slug Handler slug requesting credentials.
+	 * @param array  $context Import/runtime context.
+	 * @return array|\WP_Error Local handler config fragment or failure.
+	 */
+	public function resolve_auth_ref( string $account, string $handler_slug = '', array $context = array() ): array|\WP_Error {
+		unset( $handler_slug, $context );
+		return new \WP_Error(
+			'auth_ref_unresolved',
+			sprintf(
+				/* translators: 1: provider slug, 2: auth ref account id. */
+				__( 'No local %1$s auth connection is configured for ref "%2$s".', 'data-machine' ),
+				$this->provider_slug,
+				$account
+			)
+		);
+	}
+
+	/**
+	 * Strip credential-shaped keys from a handler config before export.
+	 *
+	 * @param array $handler_config Handler config.
+	 * @return array Config without token/secret/password/key material.
+	 */
+	public function strip_auth_config_secrets( array $handler_config ): array {
+		$secret_fields = array_fill_keys( $this->get_encrypted_fields(), true );
+		$clean         = array();
+
+		foreach ( $handler_config as $key => $value ) {
+			$key = (string) $key;
+			if ( isset( $secret_fields[ $key ] ) || preg_match( '/(secret|token|password|credential|key)/i', $key ) ) {
+				continue;
+			}
+
+			$clean[ $key ] = is_array( $value ) ? $this->strip_auth_config_secrets( $value ) : $value;
+		}
+
+		return $clean;
+	}
+
+	/**
 	 * Check if provider is properly configured
 	 *
 	 * @return bool True if configured
