@@ -16,14 +16,22 @@ final class AgentBundleManifest {
 
 	private string $exported_at;
 	private string $exported_by;
+	private string $bundle_slug;
+	private string $bundle_version;
+	private string $source_ref;
+	private string $source_revision;
 	private array $agent;
 	private array $included;
 
-	public function __construct( string $exported_at, string $exported_by, array $agent, array $included ) {
-		$this->exported_at = $exported_at;
-		$this->exported_by = $exported_by;
-		$this->agent       = self::validate_agent( $agent );
-		$this->included    = self::validate_included( $included );
+	public function __construct( string $exported_at, string $exported_by, string $bundle_slug, string $bundle_version, string $source_ref, string $source_revision, array $agent, array $included ) {
+		$this->exported_at     = $exported_at;
+		$this->exported_by     = $exported_by;
+		$this->bundle_slug     = PortableSlug::normalize( $bundle_slug, 'bundle' );
+		$this->bundle_version  = self::validate_version_string( $bundle_version, 'bundle_version' );
+		$this->source_ref      = self::validate_optional_string( $source_ref, 'source_ref' );
+		$this->source_revision = self::validate_optional_string( $source_revision, 'source_revision' );
+		$this->agent           = self::validate_agent( $agent );
+		$this->included        = self::validate_included( $included );
 	}
 
 	/**
@@ -35,7 +43,7 @@ final class AgentBundleManifest {
 	public static function from_array( array $data ): self {
 		BundleSchema::assert_supported_version( $data, 'manifest.json' );
 
-		foreach ( array( 'exported_at', 'exported_by', 'agent', 'included' ) as $field ) {
+		foreach ( array( 'exported_at', 'exported_by', 'bundle_slug', 'bundle_version', 'agent', 'included' ) as $field ) {
 			if ( ! array_key_exists( $field, $data ) ) {
 				throw new BundleValidationException( "manifest.json is missing required field {$field}." );
 			}
@@ -45,7 +53,16 @@ final class AgentBundleManifest {
 			throw new BundleValidationException( 'manifest.json agent and included fields must be objects.' );
 		}
 
-		return new self( (string) $data['exported_at'], (string) $data['exported_by'], $data['agent'], $data['included'] );
+		return new self(
+			(string) $data['exported_at'],
+			(string) $data['exported_by'],
+			(string) $data['bundle_slug'],
+			(string) $data['bundle_version'],
+			(string) ( $data['source_ref'] ?? '' ),
+			(string) ( $data['source_revision'] ?? '' ),
+			$data['agent'],
+			$data['included']
+		);
 	}
 
 	/**
@@ -55,16 +72,45 @@ final class AgentBundleManifest {
 	 */
 	public function to_array(): array {
 		return array(
-			'schema_version' => BundleSchema::VERSION,
-			'exported_at'    => $this->exported_at,
-			'exported_by'    => $this->exported_by,
-			'agent'          => $this->agent,
-			'included'       => $this->included,
+			'schema_version'   => BundleSchema::VERSION,
+			'bundle_slug'      => $this->bundle_slug,
+			'bundle_version'   => $this->bundle_version,
+			'source_ref'       => $this->source_ref,
+			'source_revision'  => $this->source_revision,
+			'exported_at'      => $this->exported_at,
+			'exported_by'      => $this->exported_by,
+			'agent'            => $this->agent,
+			'included'         => $this->included,
 		);
 	}
 
 	public function agent_slug(): string {
 		return (string) $this->agent['slug'];
+	}
+
+	public function bundle_slug(): string {
+		return $this->bundle_slug;
+	}
+
+	public function bundle_version(): string {
+		return $this->bundle_version;
+	}
+
+	public function source_ref(): string {
+		return $this->source_ref;
+	}
+
+	public function source_revision(): string {
+		return $this->source_revision;
+	}
+
+	public function version_metadata(): array {
+		return array(
+			'bundle_slug'     => $this->bundle_slug,
+			'bundle_version'  => $this->bundle_version,
+			'source_ref'      => $this->source_ref,
+			'source_revision' => $this->source_revision,
+		);
 	}
 
 	private static function validate_agent( array $agent ): array {
@@ -116,5 +162,27 @@ final class AgentBundleManifest {
 			'flows'        => $included['flows'],
 			'handler_auth' => $included['handler_auth'],
 		);
+	}
+
+	private static function validate_version_string( string $value, string $field ): string {
+		$value = trim( $value );
+		if ( '' === $value ) {
+			throw new BundleValidationException( "manifest.json {$field} must be a non-empty string." );
+		}
+
+		if ( strlen( $value ) > 191 ) {
+			throw new BundleValidationException( "manifest.json {$field} must be 191 characters or fewer." );
+		}
+
+		return $value;
+	}
+
+	private static function validate_optional_string( string $value, string $field ): string {
+		$value = trim( $value );
+		if ( strlen( $value ) > 191 ) {
+			throw new BundleValidationException( "manifest.json {$field} must be 191 characters or fewer." );
+		}
+
+		return $value;
 	}
 }
