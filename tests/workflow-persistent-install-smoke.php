@@ -57,6 +57,7 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfigFactory.php';
+require_once __DIR__ . '/../inc/Core/Steps/WorkflowSpecValidator.php';
 require_once __DIR__ . '/../inc/Core/Steps/WorkflowConfigFactory.php';
 
 use DataMachine\Core\Steps\WorkflowConfigFactory;
@@ -111,6 +112,17 @@ $workflow = array(
 		),
 	),
 );
+
+$ephemeral_config = WorkflowConfigFactory::buildEphemeralConfigs( $workflow );
+$ephemeral_steps  = array_values( $ephemeral_config['pipeline_config'] );
+
+assert_workflow_equals( 3, count( $ephemeral_config['pipeline_config'] ), 'ephemeral pipeline contains every workflow step', $failures, $passes );
+assert_workflow_equals( array( 'fetch', 'ai', 'ai' ), array_column( $ephemeral_steps, 'step_type' ), 'ephemeral pipeline preserves workflow step order', $failures, $passes );
+assert_workflow_equals( array( 0, 1, 2 ), array_column( $ephemeral_steps, 'execution_order' ), 'ephemeral pipeline stores contiguous execution order', $failures, $passes );
+assert_workflow_equals( 'Webhook Payload', $ephemeral_steps[0]['label'] ?? null, 'ephemeral pipeline preserves fetch label', $failures, $passes );
+assert_workflow_equals( 'Review Pull Request', $ephemeral_steps[1]['label'] ?? null, 'ephemeral pipeline preserves AI label', $failures, $passes );
+assert_workflow_equals( 'Review the PR.', $ephemeral_steps[1]['system_prompt'] ?? null, 'ephemeral pipeline preserves AI system prompt', $failures, $passes );
+assert_workflow_equals( array( 'datamachine/delete-flow' ), $ephemeral_steps[1]['disabled_tools'] ?? null, 'ephemeral pipeline preserves AI disabled tools', $failures, $passes );
 
 $pipeline_config = WorkflowConfigFactory::buildPersistentPipelineConfig( $workflow, 88 );
 $pipeline_steps  = array_values( $pipeline_config );
