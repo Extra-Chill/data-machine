@@ -27,6 +27,7 @@ WP_CLI::add_command( 'datamachine posts', Commands\PostsCommand::class );
 WP_CLI::add_command( 'datamachine logs', Commands\LogsCommand::class );
 WP_CLI::add_command( 'datamachine agent', Commands\AgentsCommand::class );
 WP_CLI::add_command( 'datamachine agents', Commands\AgentsCommand::class );
+WP_CLI::add_command( 'datamachine agent-bundle', Commands\AgentBundleCommand::class );
 
 // Canonical home for agent memory-file operations.
 WP_CLI::add_command( 'datamachine memory', Commands\MemoryCommand::class );

@@ -91,9 +91,22 @@ Schedule and queue policy is intentionally conservative:
 - Existing flow schedules are preserved during upgrades.
 - Queue slots (`prompt_queue`, `config_patch_queue`, `queue_mode`) seed new flows but are preserved on upgrades so runtime backlogs are not discarded.
 
+## CLI
+
+Bundle operations live under `wp datamachine agent-bundle`:
+
+- `install <path>` imports a local bundle path (`.zip`, `.json`, or directory).
+- `list` reports installed bundle-backed agents.
+- `status <slug>` reports installed version and tracked artifact state by agent slug or bundle slug.
+- `diff <path>` builds a read-only upgrade plan.
+- `upgrade <path>` applies clean updates and stages locally modified artifacts as PendingActions.
+- `apply <pending_action_id>` accepts a staged bundle PendingAction.
+
+Every read/preview command supports `--format=json` for automation.
+
 ## Follow-Ups
 
 - Add persistent DB storage for installed artifact records.
 - Wire importer/exporter paths for prompts, rubrics, tool policies, auth refs, and seed queues.
 - Use artifact statuses during bundle upgrade planning: auto-update `clean`, stage PendingActions for `modified`, surface `missing` and `orphaned` explicitly.
-- Add `wp datamachine agent-bundle list/status/diff/upgrade/apply` once the planner has a PendingAction-backed apply surface.
+- Add registered bundle sources once bundles move beyond local paths.
