@@ -13,6 +13,7 @@ Complete user documentation for Data Machine, the AI-first WordPress plugin that
 - **Changelog**: Historical summary of notable releases and architectural changes.
 
 ### Architecture Deep Dives
+- **Agent Memory Backends**: Store selection model for disk-backed memory, optional guideline-backed stores, and the DMC file-projection boundary ([architecture/agent-memory-backends.md](architecture/agent-memory-backends.md)).
 - **Pipeline Execution Axes**: Queue, fan-out, and per-step iteration semantics ([architecture/pipeline-execution-axes.md](architecture/pipeline-execution-axes.md)).
 - **Policy Resolvers**: Why `ToolPolicyResolver`, `MemoryPolicyResolver`, `ActionPolicyResolver`, and `PipelineTranscriptPolicy` stay as four single-purpose classes ([architecture/policy-resolvers.md](architecture/policy-resolvers.md)).
 - **Iteration Budget**: Shared bounded-iteration primitive backing `conversation_turns` and `chain_depth` budgets ([architecture/iteration-budget.md](architecture/iteration-budget.md)).
