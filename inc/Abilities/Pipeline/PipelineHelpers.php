@@ -18,6 +18,7 @@ use DataMachine\Abilities\StepTypeAbilities;
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Core\Steps\WorkflowSpecValidator;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -66,7 +67,7 @@ trait PipelineHelpers {
 		// Batch flow data to avoid N+1 queries across the list.
 		$pipeline_ids = array_map( fn( $p ) => (int) $p['pipeline_id'], $pipelines );
 
-		$flow_counts = array();
+		$flow_counts       = array();
 		$flows_by_pipeline = array();
 
 		if ( ! empty( $pipeline_ids ) ) {
@@ -210,33 +211,9 @@ trait PipelineHelpers {
 	 * @return bool|string True if valid, error message if not.
 	 */
 	protected function validateWorkflow( array $workflow ): bool|string {
-		if ( ! isset( $workflow['steps'] ) || ! is_array( $workflow['steps'] ) ) {
-			return 'Workflow must contain steps array';
-		}
+		$validation = WorkflowSpecValidator::validate( $workflow );
 
-		if ( empty( $workflow['steps'] ) ) {
-			return 'Workflow must have at least one step';
-		}
-
-		$step_type_abilities = new StepTypeAbilities();
-		$valid_types         = array_keys( $step_type_abilities->getAllStepTypes() );
-
-		foreach ( $workflow['steps'] as $index => $step ) {
-			if ( ! is_array( $step ) ) {
-				return "Workflow step at index {$index} must be an object";
-			}
-
-			$step_type = $step['type'] ?? null;
-			if ( empty( $step_type ) || ! is_string( $step_type ) ) {
-				return "Workflow step at index {$index} is missing required type";
-			}
-
-			if ( ! in_array( $step_type, $valid_types, true ) ) {
-				return "Workflow step at index {$index} has invalid type '{$step_type}'. Must be one of: " . implode( ', ', $valid_types );
-			}
-		}
-
-		return true;
+		return $validation['valid'] ? true : $validation['error'];
 	}
 
 	/**

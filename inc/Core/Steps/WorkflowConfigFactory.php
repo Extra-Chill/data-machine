@@ -28,14 +28,8 @@ class WorkflowConfigFactory {
 			$step_id          = "ephemeral_step_{$index}";
 			$pipeline_step_id = "ephemeral_pipeline_{$index}";
 
-			$flow_config[ $step_id ] = FlowStepConfigFactory::buildFromWorkflowStep( $step, $index );
-
-			if ( 'ai' === ( $step['type'] ?? '' ) ) {
-				$pipeline_config[ $pipeline_step_id ] = array(
-					'system_prompt'  => $step['system_prompt'] ?? '',
-					'disabled_tools' => $step['disabled_tools'] ?? array(),
-				);
-			}
+			$flow_config[ $step_id ]              = FlowStepConfigFactory::buildFromWorkflowStep( $step, $index );
+			$pipeline_config[ $pipeline_step_id ] = self::pipelineStepFromWorkflowStep( $step, $pipeline_step_id, $index );
 		}
 
 		return array(
@@ -55,7 +49,7 @@ class WorkflowConfigFactory {
 		$pipeline_config = array();
 
 		foreach ( $workflow['steps'] as $index => $step ) {
-			$pipeline_step_id                    = $pipeline_id . '_' . wp_generate_uuid4();
+			$pipeline_step_id                     = $pipeline_id . '_' . wp_generate_uuid4();
 			$pipeline_config[ $pipeline_step_id ] = self::pipelineStepFromWorkflowStep( $step, $pipeline_step_id, $index );
 		}
 

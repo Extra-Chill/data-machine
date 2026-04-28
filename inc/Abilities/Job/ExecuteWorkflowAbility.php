@@ -11,8 +11,8 @@
 
 namespace DataMachine\Abilities\Job;
 
-use DataMachine\Abilities\StepTypeAbilities;
 use DataMachine\Core\Steps\WorkflowConfigFactory;
+use DataMachine\Core\Steps\WorkflowSpecValidator;
 use DataMachine\Engine\ExecutionPlan;
 
 defined( 'ABSPATH' ) || exit;
@@ -103,7 +103,7 @@ class ExecuteWorkflowAbility {
 		$initial_data = is_array( $input['initial_data'] ?? null ) ? $input['initial_data'] : array();
 
 		// Validate workflow structure
-		$validation = $this->validateWorkflow( $workflow );
+		$validation = WorkflowSpecValidator::validate( $workflow );
 		if ( ! $validation['valid'] ) {
 			return array(
 				'success' => false,
@@ -284,56 +284,4 @@ class ExecuteWorkflowAbility {
 			'message'        => 'Ephemeral workflow scheduled for one-time execution at ' . wp_date( 'M j, Y g:i A', $timestamp ),
 		);
 	}
-
-	/**
-	 * Validate workflow structure.
-	 *
-	 * @param array|null $workflow Workflow to validate.
-	 * @return array Validation result with 'valid' boolean and optional 'error' string.
-	 */
-	private function validateWorkflow( $workflow ): array {
-		if ( ! isset( $workflow['steps'] ) || ! is_array( $workflow['steps'] ) ) {
-			return array(
-				'valid' => false,
-				'error' => 'Workflow must contain steps array',
-			);
-		}
-
-		if ( empty( $workflow['steps'] ) ) {
-			return array(
-				'valid' => false,
-				'error' => 'Workflow must have at least one step',
-			);
-		}
-
-		$step_type_abilities = new StepTypeAbilities();
-		$valid_types         = array_keys( $step_type_abilities->getAllStepTypes() );
-
-		foreach ( $workflow['steps'] as $index => $step ) {
-			if ( ! isset( $step['type'] ) ) {
-				return array(
-					'valid' => false,
-					'error' => "Step {$index} missing type",
-				);
-			}
-
-			if ( ! in_array( $step['type'], $valid_types, true ) ) {
-				return array(
-					'valid' => false,
-					'error' => "Step {$index} has invalid type: {$step['type']}. Valid types: " . implode( ', ', $valid_types ),
-				);
-			}
-		}
-
-		// Step types own their config requirements — handler_slug
-		// presence, handler_config shape, and any other per-type
-		// invariants are validated by each step's own executeStep() at
-		// runtime, not here. The workflow validator only enforces
-		// structural invariants (the workflow has steps; each step has
-		// a registered type) and leaves per-type validation to the
-		// step types themselves.
-
-		return array( 'valid' => true );
-	}
-
 }
