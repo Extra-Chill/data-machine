@@ -299,7 +299,7 @@ class SystemAbilities {
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
-						'task_type' => array(
+						'task_type'   => array(
 							'type'        => 'string',
 							'description' => 'Registered task type identifier (e.g. alt_text_generation, daily_memory_generation).',
 						),

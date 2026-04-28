@@ -117,17 +117,17 @@ class TaskRegistry {
 
 		foreach ( self::$handlers as $task_type => $handler_class ) {
 			$meta = array(
-				'label'           => '',
-				'description'     => '',
-				'setting_key'     => null,
-				'default_enabled' => true,
-				'trigger'         => 'On demand',
-				'trigger_type'    => 'manual',
-				'supports_run'    => false,
-				'mutates'         => false,
+				'label'            => '',
+				'description'      => '',
+				'setting_key'      => null,
+				'default_enabled'  => true,
+				'trigger'          => 'On demand',
+				'trigger_type'     => 'manual',
+				'supports_run'     => false,
+				'mutates'          => false,
 				'supports_dry_run' => false,
-				'requires_scope'  => false,
-				'params_schema'   => array(),
+				'requires_scope'   => false,
+				'params_schema'    => array(),
 			);
 
 			if ( method_exists( $handler_class, 'getTaskMeta' ) ) {
@@ -140,7 +140,7 @@ class TaskRegistry {
 			if ( ! empty( $bound ) ) {
 				$meta['trigger_type'] = 'scheduled';
 				if ( 1 === count( $bound ) ) {
-					$meta['trigger'] = $bound[0]['label'] ?: ucfirst( str_replace( '_', ' ', $bound[0]['interval'] ) );
+					$meta['trigger'] = ! empty( $bound[0]['label'] ) ? $bound[0]['label'] : ucfirst( str_replace( '_', ' ', $bound[0]['interval'] ) );
 				} else {
 					$meta['trigger'] = sprintf( '%d schedules', count( $bound ) );
 				}
