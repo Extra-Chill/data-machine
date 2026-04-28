@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.87.1] - 2026-04-28
+
+### Fixed
+- declare remote_path for deploy resolver
+
 ## [0.87.0] - 2026-04-28
 
 ### Added
