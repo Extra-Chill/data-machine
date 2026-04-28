@@ -305,8 +305,8 @@ class ToolPolicyResolver {
 				continue;
 			}
 
-			$handler_slugs       = FlowStepConfig::getConfiguredHandlerSlugs( $step_config );
-			$cache_scope         = $step_config['flow_step_id'] ?? ( $args['cache_scope'] ?? '' );
+			$handler_slugs = FlowStepConfig::getConfiguredHandlerSlugs( $step_config );
+			$cache_scope   = $step_config['flow_step_id'] ?? ( $args['cache_scope'] ?? '' );
 
 			foreach ( $handler_slugs as $slug ) {
 				$handler_config = FlowStepConfig::getHandlerConfigForSlug( $step_config, $slug );

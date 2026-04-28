@@ -117,11 +117,11 @@ class RequestInspector {
 			$missing_handler_slugs = FlowStepConfig::getMissingRequiredHandlerSlugsForAi( $required_handler_slugs, $tools );
 			if ( ! empty( $missing_handler_slugs ) ) {
 				return array(
-					'success'                       => false,
-					'error'                         => 'AI step requires adjacent handler tools that are not available to the model.',
-					'job_id'                        => $job_id,
-					'flow_step_id'                  => $flow_step_id,
-					'step_id'                       => $pipeline_step_id,
+					'success'                        => false,
+					'error'                          => 'AI step requires adjacent handler tools that are not available to the model.',
+					'job_id'                         => $job_id,
+					'flow_step_id'                   => $flow_step_id,
+					'step_id'                        => $pipeline_step_id,
 					'required_handler_slugs'         => $required_handler_slugs,
 					'missing_required_handler_slugs' => $missing_handler_slugs,
 					'available_handler_tool_slugs'   => FlowStepConfig::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $tools ),

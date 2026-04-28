@@ -79,7 +79,7 @@ class AIStep extends Step {
 
 		// Model/provider resolved exclusively via mode system (agent → site → network).
 		// Pipeline-level model/provider fields are ignored — mode_models is the authority.
-		$mode_model = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
+		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
 		$provider_name = $mode_model['provider'];
 		if ( empty( $provider_name ) ) {
 			do_action(
@@ -290,8 +290,8 @@ class AIStep extends Step {
 					$this->job_id,
 					'required_handler_tool_unavailable',
 					array(
-						'flow_step_id'                  => $this->flow_step_id,
-						'pipeline_step_id'              => $pipeline_step_id,
+						'flow_step_id'                   => $this->flow_step_id,
+						'pipeline_step_id'               => $pipeline_step_id,
 						'required_handler_slugs'         => $required_handler_slugs,
 						'missing_required_handler_slugs' => $missing_handler_slugs,
 						'available_handler_tool_slugs'   => FlowStepConfig::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools ),
@@ -310,7 +310,7 @@ class AIStep extends Step {
 		}
 
 		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
-		$mode_model = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
+		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
 		$provider_name = $mode_model['provider'];
 		$model_name    = $mode_model['model'];
 
