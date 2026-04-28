@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.97.0] - 2026-04-28
+
+### Added
+- add agent bundle CLI
+- update portable pipelines in place
+
 ## [0.96.0] - 2026-04-28
 
 ### Added
