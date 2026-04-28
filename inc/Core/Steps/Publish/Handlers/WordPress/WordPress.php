@@ -45,15 +45,22 @@ class WordPress extends PublishHandler {
 				if ( 'wordpress_publish' === $handler_slug ) {
 					// Base parameters (always present)
 					$base_parameters = array(
-						'title'   => array(
+						'title'          => array(
 							'type'        => 'string',
 							'required'    => true,
 							'description' => 'The title of the WordPress post or page',
 						),
-						'content' => array(
+						'content'        => array(
 							'type'        => 'string',
 							'required'    => true,
-							'description' => 'The main content of the post in HTML format. Do not include source URL attribution or images - these are handled automatically by the system.',
+							'description' => 'The main content of the post in the requested content_format. Markdown is preferred for AI-authored prose unless the workflow asks for HTML or blocks. Do not include source URL attribution or images - these are handled automatically by the system.',
+						),
+						'content_format' => array(
+							'type'        => 'string',
+							'required'    => false,
+							'enum'        => array( 'html', 'markdown', 'blocks' ),
+							'default'     => 'html',
+							'description' => 'Format of the supplied content before Data Machine converts it to the post type storage format.',
 						),
 					);
 
@@ -179,6 +186,7 @@ class WordPress extends PublishHandler {
 		$ability_input = array(
 			'title'                  => $parameters['title'] ?? '',
 			'content'                => $parameters['content'] ?? '',
+			'content_format'         => $parameters['content_format'] ?? 'html',
 			'post_type'              => $handler_config['post_type'] ?? '',
 			'post_status'            => WordPressSettingsResolver::getPostStatus( $handler_config ),
 			'post_author'            => WordPressSettingsResolver::getPostAuthor( $handler_config ),

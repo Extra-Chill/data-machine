@@ -9,7 +9,7 @@ Publish handlers distribute processed content to external platforms using AI too
 **WordPress** (`wordpress_publish`)
 - **Character Limit**: No limit
 - **Authentication**: None (local installation)
-- **Features**: Modular handler architecture with `WordPressPublishHelper`, `TaxonomyHandler`, `WordPressSettingsResolver`, configuration hierarchy, Gutenberg blocks
+- **Features**: Modular handler architecture with `WordPressPublishHelper`, `TaxonomyHandler`, `WordPressSettingsResolver`, configuration hierarchy, and storage-aware content format conversion
 - **API**: WordPress core functions
 
 ## Source URL Attribution
@@ -33,7 +33,7 @@ Publish handlers distribute processed content to external platforms using AI too
 
 | Platform | Separator | Character Count | Special Features |
 |----------|-----------|-----------------|------------------|
-| WordPress | Gutenberg blocks | No limit | Source attribution blocks |
+| WordPress | Source content format | No limit | Converts content to the post type's stored format before insertion |
 
 ### Engine Data Access Pattern
 

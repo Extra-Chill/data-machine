@@ -108,7 +108,7 @@ class WordPressPublishHelper {
 	 *
 	 * @param string      $content The content to modify.
 	 * @param string|null $source_url Source URL to append.
-	 * @param array       $config Handler configuration (checks 'link_handling').
+	 * @param array       $config Handler configuration (checks 'link_handling' and 'content_format').
 	 * @return string Modified content.
 	 */
 	public static function applySourceAttribution( string $content, ?string $source_url, array $config ): string {
@@ -121,10 +121,16 @@ class WordPressPublishHelper {
 		}
 
 		$sanitized_url = esc_url( $source_url );
-		$has_blocks    = self::contentHasBlocks( $content );
+		$content_format = isset( $config['content_format'] )
+			? sanitize_key( $config['content_format'] )
+			: ( self::contentHasBlocks( $content ) ? 'blocks' : 'html' );
+		$content_format = '' !== $content_format ? $content_format : 'html';
 
-		// Match attribution format to existing content to avoid mixed HTML/block markup.
-		if ( $has_blocks ) {
+		if ( 'markdown' === $content_format ) {
+			return $content . "\n\n**Source:** [{$sanitized_url}]({$sanitized_url})";
+		}
+
+		if ( 'blocks' === $content_format ) {
 			return $content . "\n\n<!-- wp:paragraph -->\n<p><strong>Source:</strong> <a href=\"{$sanitized_url}\">{$sanitized_url}</a></p>\n<!-- /wp:paragraph -->";
 		}
 
@@ -132,7 +138,7 @@ class WordPressPublishHelper {
 	}
 
 	/**
-	 * Determine whether the content already contains Gutenberg block markup.
+	 * Determine whether legacy callers passed block markup without an explicit format.
 	 */
 	private static function contentHasBlocks( string $content ): bool {
 		return strpos( $content, '<!-- wp:' ) !== false;

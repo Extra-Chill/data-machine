@@ -299,7 +299,7 @@ Available only when the adjacent step matches the handler slug or type, register
 - `bluesky_publish` - Post to Bluesky (300 char limit)  
 - `facebook_publish` - Post to Facebook (no limit)
 - `threads_publish` - Post to Threads (500 char limit)
-- `wordpress_publish` - Create WordPress posts
+- `wordpress_publish` - Create WordPress posts; accepts `content_format` (`markdown`, `html`, or `blocks`) and stores content in the post type's configured format
 - `google_sheets_publish` - Add data to Google Sheets
 
 **Update Tools**:
