@@ -57,6 +57,18 @@ function do_action( string $tag, ...$args ): void {
 	}
 }
 
+function did_action( string $hook = '' ): int {
+	return 0;
+}
+
+function doing_action( string $hook = '' ): bool {
+	return false;
+}
+
+function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+	// no-op
+}
+
 function wp_json_encode( $data, int $flags = 0 ) {
 	return json_encode( $data, $flags );
 }

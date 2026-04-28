@@ -13,6 +13,7 @@
 namespace DataMachine\Abilities\Content;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Content\ContentFormat;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -179,7 +180,15 @@ class GetPostBlocksAbility {
 			);
 		}
 
-		$blocks  = parse_blocks( $post->post_content );
+		$block_content = ContentFormat::storedToBlocks( (string) $post->post_content, (string) $post->post_type );
+		if ( is_wp_error( $block_content ) ) {
+			return array(
+				'success' => false,
+				'error'   => $block_content->get_error_message(),
+			);
+		}
+
+		$blocks  = parse_blocks( $block_content );
 		$results = array();
 
 		foreach ( $blocks as $index => $block ) {
