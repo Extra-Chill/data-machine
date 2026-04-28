@@ -44,6 +44,7 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\System\SystemTaskPromptRegistry;
 
 abstract class SystemTask {
 
@@ -292,12 +293,10 @@ abstract class SystemTask {
 
 		$overrides = self::getAllPromptOverrides();
 		$task_type = $this->getTaskType();
+		$artifact  = SystemTaskPromptRegistry::artifact_from_definition( $task_type, $prompt_key, $definitions[ $prompt_key ] );
+		$override  = $overrides[ $task_type ][ $prompt_key ] ?? null;
 
-		if ( isset( $overrides[ $task_type ][ $prompt_key ] ) && '' !== $overrides[ $task_type ][ $prompt_key ] ) {
-			return $overrides[ $task_type ][ $prompt_key ];
-		}
-
-		return $definitions[ $prompt_key ]['default'];
+		return SystemTaskPromptRegistry::resolve_effective_prompt( $task_type, $prompt_key, $artifact, is_string( $override ) ? $override : null )['content'];
 	}
 
 	/**
