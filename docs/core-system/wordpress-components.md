@@ -22,7 +22,7 @@ As of v0.2.7, WordPress-specific publishing operations are provided by WordPress
 
 **Key Features**:
 - Image attachment to WordPress posts as featured images
-- Source URL attribution with Gutenberg block generation
+- Source URL attribution in the caller's declared source format
 - Centralized WordPress publishing utilities
 
 **Static Methods**:
@@ -53,8 +53,8 @@ Apply source URL attribution to content based on configuration.
 **Process**:
 1. Check configuration (`link_handling` = 'append')
 2. Validate source URL
-3. Detect content type (Gutenberg blocks vs plain text)
-4. Generate appropriate attribution format
+3. Read the declared `content_format` from handler config (`html`, `markdown`, or `blocks`)
+4. Generate source attribution in the same source format
 5. Append to content
 
 **Returns**: Modified content with source attribution

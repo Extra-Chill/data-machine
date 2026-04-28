@@ -241,7 +241,8 @@ if ($http_code !== 200) {
 - `WordPressPublishHelper` for media attachment and source attribution
 - `TaxonomyHandler` with configuration-based processing (skip, AI-decided, pre-selected)
 - `WordPressSettingsResolver` for configuration hierarchy
-- Automatic Gutenberg block generation for source attribution
+- `content_format` support for markdown, HTML, or serialized block source content
+- Storage-format-aware conversion through the post type's canonical `post_content` format
 - Configuration hierarchy (system defaults override handler config)
 - Post status control (draft, publish, private)
 - Author assignment

@@ -600,6 +600,10 @@ wp datamachine links inject-category --category=news --links-per-post=3 --orphan
 
 Gutenberg block management. **Alias**: `block`. **Since**: 0.28.0
 
+These commands are storage-format aware: Data Machine converts the post type's
+canonical stored format to blocks for the edit, then writes back in the canonical
+format selected by `datamachine_post_content_format`.
+
 ```bash
 # List blocks in a post
 wp datamachine blocks list 123

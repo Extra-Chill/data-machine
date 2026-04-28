@@ -14,6 +14,22 @@ Creates posts in the local WordPress installation using a modular handler archit
 
 **Implementation**: Tool-first architecture via `handle_tool_call()` method for AI agents
 
+## Content Format Boundary
+
+`wordpress_publish` accepts source content in `content_format` (`markdown`,
+`html`, or `blocks`) and stores it in the target post type's canonical format:
+
+```
+content + content_format
+  -> source attribution in the same source format
+  -> DataMachine\Core\Content\ContentFormat::sourceToStored()
+  -> wp_insert_post() using the post type's canonical stored format
+```
+
+Omitted `content_format` defaults to `html` for raw ability/API compatibility.
+The stored format comes from `datamachine_post_content_format`, not from the
+caller.
+
 ### Handler Components
 
 **Main Handler** (`WordPress.php`):
@@ -196,6 +212,7 @@ The WordPress handler extends `PublishHandler` and implements the `executePublis
 
 ```php
 use DataMachine\Core\EngineData;
+use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\WordPress\WordPressPublishHelper;
 use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
@@ -226,15 +243,22 @@ class WordPress extends PublishHandler {
             $handler_config
         );
 
-        // 4. Resolve configuration with system defaults
+        // 4. Convert source content to the post type's stored format
+        $stored_content = ContentFormat::sourceToStored(
+            $content,
+            $parameters['content_format'] ?? 'html',
+            $handler_config['post_type']
+        );
+
+        // 5. Resolve configuration with system defaults
         $resolver = new WordPressSettingsResolver();
         $post_status = $resolver->resolvePostStatus($handler_config);
         $post_author = $resolver->resolvePostAuthor($handler_config);
 
-        // 5. Create WordPress post
+        // 6. Create WordPress post
         $post_data = [
             'post_title' => sanitize_text_field($parameters['title']),
-            'post_content' => $content,
+            'post_content' => $stored_content,
             'post_status' => $post_status,
             'post_type' => $handler_config['post_type'],
             'post_author' => $post_author
@@ -242,14 +266,14 @@ class WordPress extends PublishHandler {
 
         $post_id = wp_insert_post($post_data);
 
-        // 6. Process taxonomies
+        // 7. Process taxonomies
         $taxonomy_results = $this->taxonomy_handler->processTaxonomies(
             $post_id, 
             $parameters, 
             $handler_config
         );
 
-        // 7. Attach featured image using helper
+        // 8. Attach featured image using helper
         $image_path = $engine->getImagePath();
         $attachment_id = WordPressPublishHelper::attachImageToPost(
             $post_id, 
@@ -257,7 +281,7 @@ class WordPress extends PublishHandler {
             $handler_config
         );
 
-        // 8. Return standardized success response
+        // 9. Return standardized success response
         return $this->successResponse([
             'post_id' => $post_id,
             'post_url' => get_permalink($post_id),
@@ -407,7 +431,7 @@ $handler_config = [
 
 **Efficient Media Handling**: Uses WordPress native functions for optimal media processing.
 
-**Clean Integration**: Gutenberg block generation maintains WordPress standards and performance.
+**Clean Integration**: Content format conversion happens once at the publishing boundary, preserving WordPress standards without forcing every post type to store serialized block markup.
 
 **Comprehensive Logging**: All components provide detailed debug logging for monitoring and troubleshooting.
 
@@ -438,7 +462,7 @@ $attachment_id = WordPressPublishHelper::attachImageToPost($post_id, $image_path
 
 #### applySourceAttribution()
 
-Appends source URL to content with Gutenberg blocks or plain text.
+Appends source URL to content in the declared source format (`html`, `markdown`, or `blocks`).
 
 ```php
 $content = WordPressPublishHelper::applySourceAttribution($content, $source_url, $config);

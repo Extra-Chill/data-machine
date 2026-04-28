@@ -393,6 +393,13 @@ Chat-specific tools at `/inc/Api/Chat/Tools/`:
 
 Handler-specific tools registered into the unified `datamachine_tools` registry using HandlerRegistrationTrait in each handler class. Each entry carries a `_handler_callable` that is resolved at pipeline execution time with the adjacent step's runtime handler config.
 
+## Content Authoring Formats
+
+For normal prose, AI tools should write markdown and omit `content_format` unless
+a workflow explicitly asks for HTML or serialized blocks. Raw ability/API callers
+can still pass `content_format` explicitly; omitted raw `datamachine/upsert-post`
+calls keep the legacy block-markup default.
+
 ## Tool Management
 
 **ToolManager** (`/inc/Engine/AI/Tools/ToolManager.php`) centralizes tool discovery and validation:
