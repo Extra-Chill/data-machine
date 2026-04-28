@@ -217,8 +217,8 @@ class AgentBundleCommand extends BaseCommand {
 		);
 
 		if ( $plan->has_pending_approval() ) {
-			$agent      = $this->resolve_bundle_agent( $bundle, $slug );
-			$pending    = AgentBundleUpgradePendingAction::stage(
+			$agent                      = $this->resolve_bundle_agent( $bundle, $slug );
+			$pending                    = AgentBundleUpgradePendingAction::stage(
 				$plan,
 				array(
 					'bundle'           => $this->bundle_summary( $bundle, $slug ),
@@ -258,7 +258,7 @@ class AgentBundleCommand extends BaseCommand {
 			return;
 		}
 
-		$result = ResolvePendingActionAbility::execute(
+		$result               = ResolvePendingActionAbility::execute(
 			array(
 				'action_id' => $action_id,
 				'decision'  => 'accepted',
@@ -456,7 +456,7 @@ class AgentBundleCommand extends BaseCommand {
 
 		foreach ( $this->agents()->get_all() as $candidate ) {
 			$bundle = $candidate['agent_config']['datamachine_bundle'] ?? array();
-			if ( $slug === sanitize_title( (string) ( $bundle['bundle_slug'] ?? '' ) ) ) {
+			if ( sanitize_title( (string) ( $bundle['bundle_slug'] ?? '' ) ) === $slug ) {
 				return $candidate;
 			}
 		}
@@ -507,10 +507,10 @@ class AgentBundleCommand extends BaseCommand {
 		foreach ( array( 'auto_apply', 'needs_approval', 'warnings', 'no_op' ) as $bucket ) {
 			foreach ( $plan[ $bucket ] ?? array() as $entry ) {
 				$rows[] = array(
-					'bucket'        => $bucket,
-					'artifact_key'  => (string) ( $entry['artifact_key'] ?? '' ),
-					'reason'        => (string) ( $entry['reason'] ?? '' ),
-					'summary'       => (string) ( $entry['summary'] ?? '' ),
+					'bucket'       => $bucket,
+					'artifact_key' => (string) ( $entry['artifact_key'] ?? '' ),
+					'reason'       => (string) ( $entry['reason'] ?? '' ),
+					'summary'      => (string) ( $entry['summary'] ?? '' ),
 				);
 			}
 		}
