@@ -2,8 +2,8 @@
 /**
  * In-memory ConversationStoreInterface implementation for tests.
  *
- * Reference adapter demonstrating how a third-party store slots into the
- * `datamachine_conversation_store` filter without depending on `$wpdb`.
+ * Reference aggregate adapter demonstrating how a third-party store slots
+ * into the `datamachine_conversation_store` filter without depending on `$wpdb`.
  * Stays in lockstep with {@see \DataMachine\Core\Database\Chat\Chat}'s
  * observable shape so the chat abilities work identically against it.
  *

@@ -50,28 +50,29 @@ class ConversationStoreFactory {
 		/**
 		 * Filter: swap the chat conversation persistence backend.
 		 *
-		 * Return a {@see ConversationStoreInterface} instance to short-circuit
+		 * Return a {@see ConversationStoreInterface} aggregate to short-circuit
 		 * the default MySQL-table store. Return the default (or anything not
-		 * implementing the interface) to use the built-in {@see Chat} store.
+		 * implementing the aggregate) to use the built-in {@see Chat} store.
 		 *
 		 * The MySQL default preserves byte-for-byte the behavior Data Machine
 		 * had before this seam was introduced — self-hosted users see no
-		 * change. Managed-host consumers (e.g. Intelligence on WordPress.com)
-		 * can register an AI Framework-backed implementation conditionally:
+		 * change. Consumers can register an external-backend implementation
+		 * conditionally:
 		 *
 		 *     add_filter( 'datamachine_conversation_store', function ( $store ) {
-		 *         if ( $store instanceof My_AIFramework_Conversation_Store ) {
+		 *         if ( $store instanceof My_External_Conversation_Store ) {
 		 *             return $store; // already swapped
 		 *         }
-		 *         if ( ! function_exists( 'my_host_is_wpcom' ) || ! my_host_is_wpcom() ) {
-		 *             return $store; // self-hosted — keep MySQL default
+		 *         if ( ! function_exists( 'my_should_use_external_backend' ) || ! my_should_use_external_backend() ) {
+		 *             return $store; // keep MySQL default
 		 *         }
-		 *         return new My_AIFramework_Conversation_Store();
+		 *         return new My_External_Conversation_Store();
 		 *     }, 10, 1 );
 		 *
 		 * The store MUST normalize messages on read to Data Machine message
-		 * shape — see docs/development/hooks/core-filters.md for the full
-		 * contract.
+		 * shape. Implementations that only need a slice of the store surface can
+		 * target the narrower contracts, but this filter still expects the full
+		 * aggregate for behavior compatibility.
 		 *
 		 * @since next
 		 *

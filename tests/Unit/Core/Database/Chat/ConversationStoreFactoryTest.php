@@ -16,8 +16,13 @@ namespace DataMachine\Tests\Unit\Core\Database\Chat;
 
 use DataMachine\Abilities\Chat\ListChatSessionsAbility;
 use DataMachine\Core\Database\Chat\Chat;
+use DataMachine\Core\Database\Chat\ConversationReadStateInterface;
+use DataMachine\Core\Database\Chat\ConversationReportingInterface;
+use DataMachine\Core\Database\Chat\ConversationRetentionInterface;
+use DataMachine\Core\Database\Chat\ConversationSessionIndexInterface;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
+use DataMachine\Core\Database\Chat\ConversationTranscriptStoreInterface;
 use WP_UnitTestCase;
 
 class ConversationStoreFactoryTest extends WP_UnitTestCase {
@@ -41,7 +46,29 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$store = ConversationStoreFactory::get();
 
 		$this->assertInstanceOf( ConversationStoreInterface::class, $store );
+		$this->assertInstanceOf( ConversationTranscriptStoreInterface::class, $store );
+		$this->assertInstanceOf( ConversationSessionIndexInterface::class, $store );
+		$this->assertInstanceOf( ConversationReadStateInterface::class, $store );
+		$this->assertInstanceOf( ConversationRetentionInterface::class, $store );
+		$this->assertInstanceOf( ConversationReportingInterface::class, $store );
 		$this->assertInstanceOf( Chat::class, $store );
+	}
+
+	public function test_conversation_store_interface_is_composed_from_narrow_contracts(): void {
+		$reflection = new \ReflectionClass( ConversationStoreInterface::class );
+		$expected   = array(
+			ConversationTranscriptStoreInterface::class,
+			ConversationSessionIndexInterface::class,
+			ConversationReadStateInterface::class,
+			ConversationRetentionInterface::class,
+			ConversationReportingInterface::class,
+		);
+		$actual     = array_values( $reflection->getInterfaceNames() );
+
+		sort( $expected );
+		sort( $actual );
+
+		$this->assertSame( $expected, $actual );
 	}
 
 	public function test_filter_swaps_the_store(): void {
@@ -57,6 +84,11 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$resolved = ConversationStoreFactory::get();
 
 		$this->assertSame( $memory_store, $resolved );
+		$this->assertInstanceOf( ConversationTranscriptStoreInterface::class, $resolved );
+		$this->assertInstanceOf( ConversationSessionIndexInterface::class, $resolved );
+		$this->assertInstanceOf( ConversationReadStateInterface::class, $resolved );
+		$this->assertInstanceOf( ConversationRetentionInterface::class, $resolved );
+		$this->assertInstanceOf( ConversationReportingInterface::class, $resolved );
 		$this->assertNotInstanceOf( Chat::class, $resolved );
 	}
 
