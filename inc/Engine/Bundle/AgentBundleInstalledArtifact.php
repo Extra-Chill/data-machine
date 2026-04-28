@@ -19,19 +19,19 @@ final class AgentBundleInstalledArtifact {
 	private string $artifact_type;
 	private string $artifact_id;
 	private string $source_path;
-	private string $installed_hash;
+	private ?string $installed_hash;
 	private ?string $current_hash;
 	private string $status;
 	private string $installed_at;
 	private string $updated_at;
 
-	public function __construct( string $bundle_slug, string $bundle_version, string $artifact_type, string $artifact_id, string $source_path, string $installed_hash, ?string $current_hash, string $installed_at, string $updated_at ) {
+	public function __construct( string $bundle_slug, string $bundle_version, string $artifact_type, string $artifact_id, string $source_path, ?string $installed_hash, ?string $current_hash, string $installed_at, string $updated_at ) {
 		$this->bundle_slug    = PortableSlug::normalize( $bundle_slug, 'bundle' );
 		$this->bundle_version = self::non_empty_string( $bundle_version, 'bundle_version' );
 		$this->artifact_type  = self::validate_artifact_type( $artifact_type );
 		$this->artifact_id    = self::non_empty_string( $artifact_id, 'artifact_id' );
 		$this->source_path    = self::normalize_source_path( $source_path );
-		$this->installed_hash = self::non_empty_string( $installed_hash, 'installed_hash' );
+		$this->installed_hash = self::optional_string( $installed_hash );
 		$this->current_hash   = self::optional_string( $current_hash );
 		$this->status         = AgentBundleArtifactStatus::classify( $this->installed_hash, $this->current_hash );
 		$this->installed_at   = self::non_empty_string( $installed_at, 'installed_at' );
@@ -57,7 +57,7 @@ final class AgentBundleInstalledArtifact {
 			(string) $data['artifact_type'],
 			(string) $data['artifact_id'],
 			(string) $data['source_path'],
-			(string) $data['installed_hash'],
+			isset( $data['installed_hash'] ) ? (string) $data['installed_hash'] : null,
 			isset( $data['current_hash'] ) ? (string) $data['current_hash'] : null,
 			(string) $data['installed_at'],
 			(string) $data['updated_at']
@@ -121,7 +121,7 @@ final class AgentBundleInstalledArtifact {
 	private static function validate_artifact_type( string $type ): string {
 		$type = self::non_empty_string( $type, 'artifact_type' );
 		if ( ! in_array( $type, BundleSchema::ARTIFACT_TYPES, true ) ) {
-			throw new BundleValidationException( sprintf( 'installed bundle artifact_type must be one of: %s.', implode( ', ', BundleSchema::ARTIFACT_TYPES ) ) );
+			throw new BundleValidationException( sprintf( 'installed bundle artifact_type must be one of: %s.', esc_html( implode( ', ', BundleSchema::ARTIFACT_TYPES ) ) ) );
 		}
 
 		return $type;
@@ -142,7 +142,7 @@ final class AgentBundleInstalledArtifact {
 	}
 
 	private static function normalize_source_path( string $path ): string {
-		$path = str_replace( "\\", '/', self::non_empty_string( $path, 'source_path' ) );
+		$path = str_replace( '\\', '/', self::non_empty_string( $path, 'source_path' ) );
 		$path = ltrim( $path, '/' );
 		if ( str_contains( $path, '..' ) ) {
 			throw new BundleValidationException( 'installed bundle artifact source_path must be bundle-local.' );
