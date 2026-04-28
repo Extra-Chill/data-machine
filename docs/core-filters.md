@@ -119,6 +119,37 @@ Filters the final set of memory files after MemoryPolicyResolver resolves them f
 
 ---
 
+### `datamachine_oauth_can_handle_callback`
+
+Filters whether the current request is authorized to handle an OAuth callback for the given provider.
+
+This is the **primary authorization gate** for OAuth callback handling. The filter fires BEFORE provider lookup, so unknown-slug requests still receive a 404 (not a 403) regardless of authorization state.
+
+> ⚠️ **Security Warning:** Returning `true` from this filter authorizes the entire OAuth callback flow for this provider, which may write credentials to site/network options. Providers MUST validate authorization specific to their use case (e.g. nonce in state param, ownership of the resource being connected). Do not blanket-return `true` without additional provider-level checks.
+
+**Since:** 0.88.0
+
+```php
+add_filter( 'datamachine_oauth_can_handle_callback', function ( bool $can, string $provider_slug, array $request_params ): bool {
+    // Allow artist-owned Instagram OAuth callbacks.
+    if ( str_starts_with( $provider_slug, 'artist-instagram-' ) ) {
+        $artist_id = (int) substr( $provider_slug, strlen( 'artist-instagram-' ) );
+        return ec_can_manage_artist( get_current_user_id(), $artist_id );
+    }
+    return $can;
+}, 10, 3 );
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$can` | `bool` | Whether the current user can handle the callback. Default: `current_user_can( 'manage_options' )`. |
+| `$provider_slug` | `string` | The provider slug from the URL (e.g. `instagram`, `twitter`). |
+| `$request_params` | `array` | The raw `$_GET` parameters for the callback request. |
+
+**Return:** `bool` — `true` to authorize, `false` to reject with 403.
+
+---
+
 ## Classes
 
 ### `AgentModeRegistry`
