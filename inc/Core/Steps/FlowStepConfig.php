@@ -220,6 +220,79 @@ class FlowStepConfig {
 	}
 
 	/**
+	 * Resolve required handler slugs from the steps adjacent to an AI step.
+	 *
+	 * @param array|null $previous_step_config Previous adjacent flow step config.
+	 * @param array|null $next_step_config     Next adjacent flow step config.
+	 * @return array<int, string> Unique required handler slugs.
+	 */
+	public static function getAdjacentRequiredHandlerSlugsForAi( ?array $previous_step_config, ?array $next_step_config ): array {
+		$required_handler_slugs = array();
+
+		foreach ( array( $previous_step_config, $next_step_config ) as $adjacent_step_config ) {
+			if ( ! $adjacent_step_config ) {
+				continue;
+			}
+
+			$required_handler_slugs = array_merge(
+				$required_handler_slugs,
+				self::getRequiredHandlerSlugsForAi( $adjacent_step_config )
+			);
+		}
+
+		return array_values( array_unique( self::sanitizeSlugList( $required_handler_slugs ) ) );
+	}
+
+	/**
+	 * Return required handler slugs that are available as AI-callable tools.
+	 *
+	 * Completion tracking is keyed by handler slug, not by tool name: a handler
+	 * tool may expose a model-facing name that differs from the handler slug while
+	 * still carrying `handler => <slug>` metadata for the runtime.
+	 *
+	 * @param array<int, string> $required_handler_slugs Required handler slugs.
+	 * @param array             $available_tools         Resolved tools keyed by tool name.
+	 * @return array<int, string> Required handler slugs present in the tool set.
+	 */
+	public static function getAvailableRequiredHandlerSlugsForAi( array $required_handler_slugs, array $available_tools ): array {
+		$required_handler_slugs = array_values( array_unique( self::sanitizeSlugList( $required_handler_slugs ) ) );
+		if ( empty( $required_handler_slugs ) ) {
+			return array();
+		}
+
+		$available_handler_slugs = array();
+		foreach ( $available_tools as $tool_config ) {
+			if ( ! is_array( $tool_config ) ) {
+				continue;
+			}
+
+			$handler_slug = $tool_config['handler'] ?? '';
+			if ( is_string( $handler_slug ) && '' !== $handler_slug ) {
+				$available_handler_slugs[] = $handler_slug;
+			}
+		}
+
+		return array_values( array_intersect( $required_handler_slugs, array_unique( $available_handler_slugs ) ) );
+	}
+
+	/**
+	 * Return required handler slugs that are not available as AI-callable tools.
+	 *
+	 * @param array<int, string> $required_handler_slugs Required handler slugs.
+	 * @param array             $available_tools         Resolved tools keyed by tool name.
+	 * @return array<int, string> Missing required handler slugs.
+	 */
+	public static function getMissingRequiredHandlerSlugsForAi( array $required_handler_slugs, array $available_tools ): array {
+		$required_handler_slugs = array_values( array_unique( self::sanitizeSlugList( $required_handler_slugs ) ) );
+		if ( empty( $required_handler_slugs ) ) {
+			return array();
+		}
+
+		$available_required = self::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools );
+		return array_values( array_diff( $required_handler_slugs, $available_required ) );
+	}
+
+	/**
 	 * Get the primary handler config from a step config.
 	 *
 	 * @param array $step_config Step configuration array.

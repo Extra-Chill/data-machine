@@ -112,14 +112,23 @@ class RequestInspector {
 			)
 		);
 
-		$required_handler_slugs = array();
-		foreach ( array( $previous_step_config, $next_step_config ) as $adjacent_config ) {
-			if ( $adjacent_config ) {
-				$required_handler_slugs = array_merge( $required_handler_slugs, FlowStepConfig::getRequiredHandlerSlugsForAi( $adjacent_config ) );
-			}
-		}
+		$required_handler_slugs = FlowStepConfig::getAdjacentRequiredHandlerSlugsForAi( $previous_step_config, $next_step_config );
 		if ( ! empty( $required_handler_slugs ) ) {
-			$handler_tool_slugs = array_values( array_intersect( array_unique( $required_handler_slugs ), array_keys( $tools ) ) );
+			$missing_handler_slugs = FlowStepConfig::getMissingRequiredHandlerSlugsForAi( $required_handler_slugs, $tools );
+			if ( ! empty( $missing_handler_slugs ) ) {
+				return array(
+					'success'                       => false,
+					'error'                         => 'AI step requires adjacent handler tools that are not available to the model.',
+					'job_id'                        => $job_id,
+					'flow_step_id'                  => $flow_step_id,
+					'step_id'                       => $pipeline_step_id,
+					'required_handler_slugs'         => $required_handler_slugs,
+					'missing_required_handler_slugs' => $missing_handler_slugs,
+					'available_handler_tool_slugs'   => FlowStepConfig::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $tools ),
+				);
+			}
+
+			$handler_tool_slugs = FlowStepConfig::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $tools );
 			if ( ! empty( $handler_tool_slugs ) ) {
 				$payload['configured_handler_slugs'] = $handler_tool_slugs;
 			}
