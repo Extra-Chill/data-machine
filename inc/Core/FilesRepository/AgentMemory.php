@@ -195,6 +195,8 @@ class AgentMemory {
 			);
 		}
 
+		$this->emit_deleted_event();
+
 		return array(
 			'success' => true,
 			'message' => sprintf( '%s deleted.', $this->scope->filename ),
@@ -331,6 +333,8 @@ class AgentMemory {
 			);
 		}
 
+		$this->emit_updated_event( $content, $write );
+
 		$result = array(
 			'success'   => true,
 			'message'   => sprintf( '%s written.', $this->scope->filename ),
@@ -375,6 +379,8 @@ class AgentMemory {
 				'message' => sprintf( 'Failed to update section "%s" (%s).', $section_name, $write->error ?? 'unknown' ),
 			);
 		}
+
+		$this->emit_updated_event( $file_content, $write );
 
 		$result = array(
 			'success'   => true,
@@ -422,6 +428,8 @@ class AgentMemory {
 				'message' => sprintf( 'Failed to append to section "%s" (%s).', $section_name, $write->error ?? 'unknown' ),
 			);
 		}
+
+		$this->emit_updated_event( $file_content, $write );
 
 		$result = array(
 			'success'   => true,
@@ -594,6 +602,56 @@ class AgentMemory {
 		$after  = substr( $file_content, $position['end'] );
 
 		return $before . $new_content . "\n" . $after;
+	}
+
+	/**
+	 * Emit a successful memory update event for external projectors.
+	 *
+	 * @since next
+	 *
+	 * @param string                 $content Persisted full-file content.
+	 * @param AgentMemoryWriteResult $write   Successful store write result.
+	 */
+	private function emit_updated_event( string $content, AgentMemoryWriteResult $write ): void {
+		do_action(
+			'datamachine_agent_memory_updated',
+			$this->scope,
+			$content,
+			$this->event_metadata( $write )
+		);
+	}
+
+	/**
+	 * Emit a successful memory delete event for external projectors.
+	 *
+	 * @since next
+	 */
+	private function emit_deleted_event(): void {
+		do_action( 'datamachine_agent_memory_deleted', $this->scope );
+	}
+
+	/**
+	 * Build JSON-friendly metadata for memory change events.
+	 *
+	 * The AgentMemoryScope object remains the first event argument for typed PHP
+	 * consumers; duplicated scalar identity fields let queue/log/projector code
+	 * persist the event without inspecting the value object.
+	 *
+	 * @since next
+	 *
+	 * @param AgentMemoryWriteResult $write Successful store write result.
+	 * @return array{layer: string, user_id: int, agent_id: int, filename: string, key: string, hash: string, bytes: int}
+	 */
+	private function event_metadata( AgentMemoryWriteResult $write ): array {
+		return array(
+			'layer'    => $this->scope->layer,
+			'user_id'  => $this->scope->user_id,
+			'agent_id' => $this->scope->agent_id,
+			'filename' => $this->scope->filename,
+			'key'      => $this->scope->key(),
+			'hash'     => $write->hash,
+			'bytes'    => $write->bytes,
+		);
 	}
 
 	/**
