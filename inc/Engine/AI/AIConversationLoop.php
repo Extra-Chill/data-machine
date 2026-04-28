@@ -104,7 +104,7 @@ class AIConversationLoop {
 			return self::normalizeResultForRun( $result, $messages );
 		}
 
-		$loop = new self();
+		$loop   = new self();
 		$result = $loop->execute(
 			$messages,
 			$tools,
@@ -187,6 +187,8 @@ class AIConversationLoop {
 		$last_tool_calls        = array();
 		$tool_execution_results = array();
 		$last_request_metadata  = array();
+		$event_sink             = self::resolveEventSink( $payload );
+		$loop_payload           = self::payloadWithoutEventSink( $payload );
 
 		// Accumulate token usage across all turns.
 		$total_usage = array(
@@ -199,15 +201,15 @@ class AIConversationLoop {
 		// In pipeline mode, conversation should only complete when all handlers
 		// required by the adjacent step have fired, not just the first one.
 		$executed_handler_slugs = array();
-		$configured_handlers    = $payload['configured_handler_slugs'] ?? array();
+		$configured_handlers    = $loop_payload['configured_handler_slugs'] ?? array();
 		$configured_handlers    = is_array( $configured_handlers ) ? array_values( $configured_handlers ) : array();
 
 		// Build base log metadata from payload for consistent logging.
 		$base_log_context = array_filter(
 			array(
 				'mode'         => $mode,
-				'job_id'       => $payload['job_id'] ?? null,
-				'flow_step_id' => $payload['flow_step_id'] ?? null,
+				'job_id'       => $loop_payload['job_id'] ?? null,
+				'flow_step_id' => $loop_payload['flow_step_id'] ?? null,
 			),
 			fn( $v ) => null !== $v
 		);
@@ -216,16 +218,45 @@ class AIConversationLoop {
 			$turn_budget->increment();
 			$turn_count = $turn_budget->current();
 
+			self::emitLoopEvent(
+				$event_sink,
+				'turn_started',
+				array_merge(
+					$base_log_context,
+					array(
+						'turn_count'    => $turn_count,
+						'provider'      => $provider,
+						'model'         => $model,
+						'message_count' => count( $messages ),
+						'tool_count'    => count( $tools ),
+					)
+				)
+			);
+
 			// Build AI request using centralized RequestBuilder
-			$ai_response = RequestBuilder::build(
+			$ai_response           = RequestBuilder::build(
 				$messages,
 				$provider,
 				$model,
 				$tools,
 				$mode,
-				$payload
+				$loop_payload
 			);
 			$last_request_metadata = is_array( $ai_response['request_metadata'] ?? null ) ? $ai_response['request_metadata'] : array();
+			self::emitLoopEvent(
+				$event_sink,
+				'request_built',
+				array_merge(
+					$base_log_context,
+					array(
+						'turn_count'       => $turn_count,
+						'provider'         => $provider,
+						'model'            => $model,
+						'success'          => (bool) ( $ai_response['success'] ?? false ),
+						'request_metadata' => $last_request_metadata,
+					)
+				)
+			);
 
 			// Handle AI request failure
 			if ( ! $ai_response['success'] ) {
@@ -244,12 +275,12 @@ class AIConversationLoop {
 				);
 
 				$failure_result = array(
-					'messages'        => $messages,
-					'final_content'   => '',
-					'turn_count'      => $turn_count,
-					'completed'       => false,
-					'last_tool_calls' => array(),
-					'error'           => $ai_response['error'] ?? 'AI request failed',
+					'messages'         => $messages,
+					'final_content'    => '',
+					'turn_count'       => $turn_count,
+					'completed'        => false,
+					'last_tool_calls'  => array(),
+					'error'            => $ai_response['error'] ?? 'AI request failed',
 					'usage'            => $total_usage,
 					'request_metadata' => $last_request_metadata,
 				);
@@ -261,12 +292,25 @@ class AIConversationLoop {
 					$messages,
 					$provider,
 					$model,
-					$payload,
+					$loop_payload,
 					$failure_result
 				);
 				if ( '' !== $transcript_session_id ) {
 					$failure_result['transcript_session_id'] = $transcript_session_id;
 				}
+
+				self::emitLoopEvent(
+					$event_sink,
+					'failed',
+					array_merge(
+						$base_log_context,
+						array(
+							'turn_count' => $turn_count,
+							'provider'   => $ai_response['provider'] ?? $provider,
+							'error'      => $failure_result['error'],
+						)
+					)
+				);
 
 				return $failure_result;
 			}
@@ -293,7 +337,7 @@ class AIConversationLoop {
 				$messages[] = $ai_message;
 
 				// Fire hook for AI response events (used for system operations like title generation)
-				do_action( 'datamachine_ai_response_received', $mode, $messages, $payload );
+				do_action( 'datamachine_ai_response_received', $mode, $messages, $loop_payload );
 			}
 
 			// Process tool calls
@@ -330,6 +374,18 @@ class AIConversationLoop {
 								'turn'   => $turn_count,
 								'tool'   => $tool_name,
 								'params' => $tool_parameters,
+							)
+						)
+					);
+					self::emitLoopEvent(
+						$event_sink,
+						'tool_call',
+						array_merge(
+							$base_log_context,
+							array(
+								'turn_count' => $turn_count,
+								'tool_name'  => $tool_name,
+								'parameters' => $tool_parameters,
 							)
 						)
 					);
@@ -376,10 +432,10 @@ class AIConversationLoop {
 						$tool_name,
 						$tool_parameters,
 						$tools,
-						$payload,
+						$loop_payload,
 						$mode,
-						(int) ( $payload['agent_id'] ?? 0 ),
-						is_array( $payload['client_context'] ?? null ) ? $payload['client_context'] : array()
+						(int) ( $loop_payload['agent_id'] ?? 0 ),
+						is_array( $loop_payload['client_context'] ?? null ) ? $loop_payload['client_context'] : array()
 					);
 
 					do_action(
@@ -392,6 +448,19 @@ class AIConversationLoop {
 								'turn'    => $turn_count,
 								'tool'    => $tool_name,
 								'success' => $tool_result['success'] ?? false,
+							)
+						)
+					);
+					self::emitLoopEvent(
+						$event_sink,
+						'tool_result',
+						array_merge(
+							$base_log_context,
+							array(
+								'turn_count' => $turn_count,
+								'tool_name'  => $tool_name,
+								'success'    => (bool) ( $tool_result['success'] ?? false ),
+								'result'     => $tool_result,
 							)
 						)
 					);
@@ -547,14 +616,78 @@ class AIConversationLoop {
 			$messages,
 			$provider,
 			$model,
-			$payload,
+			$loop_payload,
 			$result
 		);
 		if ( '' !== $transcript_session_id ) {
 			$result['transcript_session_id'] = $transcript_session_id;
 		}
 
+		self::emitLoopEvent(
+			$event_sink,
+			'completed',
+			array_merge(
+				$base_log_context,
+				array(
+					'turn_count'        => $turn_count,
+					'completed'         => $is_completed,
+					'has_pending_tools' => ! empty( $last_tool_calls ) && ! $conversation_complete,
+					'usage'             => $total_usage,
+				)
+			)
+		);
+
 		return $result;
+	}
+
+	/**
+	 * Resolve the event sink carried by the loop payload.
+	 *
+	 * @param array $payload Loop payload.
+	 * @return LoopEventSinkInterface Event sink.
+	 */
+	private static function resolveEventSink( array $payload ): LoopEventSinkInterface {
+		$sink = $payload['event_sink'] ?? null;
+
+		if ( $sink instanceof LoopEventSinkInterface ) {
+			return $sink;
+		}
+
+		return new NullLoopEventSink();
+	}
+
+	/**
+	 * Remove observer-only payload values before dispatching requests or tools.
+	 *
+	 * @param array $payload Loop payload.
+	 * @return array Payload without the loop event sink object.
+	 */
+	private static function payloadWithoutEventSink( array $payload ): array {
+		unset( $payload['event_sink'] );
+		return $payload;
+	}
+
+	/**
+	 * Emit a loop event without letting observer failures change loop results.
+	 *
+	 * @param LoopEventSinkInterface $sink    Event sink.
+	 * @param string                 $event   Event name.
+	 * @param array                  $payload Event payload.
+	 */
+	private static function emitLoopEvent( LoopEventSinkInterface $sink, string $event, array $payload = array() ): void {
+		try {
+			$sink->emit( $event, $payload );
+		} catch ( \Throwable $e ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'AIConversationLoop: Event sink failed',
+				array(
+					'event' => $event,
+					'error' => $e->getMessage(),
+				)
+			);
+		}
 	}
 
 	/**
@@ -601,19 +734,19 @@ class AIConversationLoop {
 		$agent_id = (int) ( $payload['agent_id'] ?? 0 );
 
 		$metadata = array(
-			'source'        => 'pipeline_transcript',
-			'job_id'        => $payload['job_id'] ?? null,
-			'flow_step_id'  => $payload['flow_step_id'] ?? null,
-			'pipeline_id'   => $payload['pipeline_id'] ?? null,
-			'flow_id'       => $payload['flow_id'] ?? null,
-			'agent_id'      => $agent_id ?: null,
-			'owner_id'      => $user_id ?: null,
-			'provider'      => $provider,
-			'model'         => $model,
-			'turn_count'    => $result['turn_count'] ?? 0,
-			'completed'     => (bool) ( $result['completed'] ?? false ),
-			'error'         => $result['error'] ?? null,
-			'usage'         => $result['usage'] ?? array(),
+			'source'       => 'pipeline_transcript',
+			'job_id'       => $payload['job_id'] ?? null,
+			'flow_step_id' => $payload['flow_step_id'] ?? null,
+			'pipeline_id'  => $payload['pipeline_id'] ?? null,
+			'flow_id'      => $payload['flow_id'] ?? null,
+			'agent_id'     => $agent_id > 0 ? $agent_id : null,
+			'owner_id'     => $user_id > 0 ? $user_id : null,
+			'provider'     => $provider,
+			'model'        => $model,
+			'turn_count'   => $result['turn_count'] ?? 0,
+			'completed'    => (bool) ( $result['completed'] ?? false ),
+			'error'        => $result['error'] ?? null,
+			'usage'        => $result['usage'] ?? array(),
 		);
 
 		if ( ! empty( $result['request_metadata'] ) && is_array( $result['request_metadata'] ) ) {
