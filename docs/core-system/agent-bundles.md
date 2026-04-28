@@ -91,6 +91,14 @@ Schedule and queue policy is intentionally conservative:
 - Existing flow schedules are preserved during upgrades.
 - Queue slots (`prompt_queue`, `config_patch_queue`, `queue_mode`) seed new flows but are preserved on upgrades so runtime backlogs are not discarded.
 
+Portable flow-step policy fields are explicit in `flows/<flow-slug>.json`:
+
+- `enabled_tools`: flow-scoped AI allow-list consumed by `ToolPolicyResolver`.
+- `disabled_tools`: flow-scoped AI deny-list composed with pipeline-level disabled tools.
+- `prompt_queue`: AI seed queue entries shaped as `{ "prompt": "...", "added_at": "..." }`.
+- `config_patch_queue`: fetch seed queue entries shaped as `{ "patch": { ... }, "added_at": "..." }`.
+- `queue_mode`: one of `drain`, `loop`, or `static`; shared by both queue slots on that flow step.
+
 ## CLI
 
 Bundle operations live under `wp datamachine agent-bundle`:

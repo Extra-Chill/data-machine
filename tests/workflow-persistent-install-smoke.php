@@ -87,7 +87,7 @@ $workflow = array(
 			'label'              => 'Webhook Payload',
 			'handler_slug'       => 'webhook_payload',
 			'handler_config'     => array( 'payload_path' => 'pull_request' ),
-			'config_patch_queue' => array( array( 'after' => '2026-04-01' ) ),
+			'config_patch_queue' => array( array( 'patch' => array( 'after' => '2026-04-01' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
 			'queue_mode'         => 'drain',
 		),
 		array(
@@ -146,7 +146,7 @@ assert_workflow_equals( 88, $flow_steps[0]['pipeline_id'] ?? null, 'flow stores 
 assert_workflow_equals( 144, $flow_steps[0]['flow_id'] ?? null, 'flow stores target flow id', $failures, $passes );
 assert_workflow_equals( 'webhook_payload', $flow_steps[0]['handler_slug'] ?? null, 'flow preserves fetch handler slug', $failures, $passes );
 assert_workflow_equals( array( 'payload_path' => 'pull_request' ), $flow_steps[0]['handler_config'] ?? null, 'flow preserves fetch handler config', $failures, $passes );
-assert_workflow_equals( array( array( 'after' => '2026-04-01' ) ), $flow_steps[0]['config_patch_queue'] ?? null, 'flow preserves fetch config patch queue', $failures, $passes );
+assert_workflow_equals( array( 'after' => '2026-04-01' ), $flow_steps[0]['config_patch_queue'][0]['patch'] ?? null, 'flow preserves fetch config patch queue', $failures, $passes );
 assert_workflow_equals( 'drain', $flow_steps[0]['queue_mode'] ?? null, 'flow preserves explicit fetch queue mode', $failures, $passes );
 assert_workflow_equals( array( 'datamachine/get-github-pull-review-context', 'datamachine/upsert-github-pull-review-comment' ), $flow_steps[1]['enabled_tools'] ?? null, 'flow preserves AI enabled tools', $failures, $passes );
 assert_workflow_equals( 'Summarize findings.', $flow_steps[1]['prompt_queue'][0]['prompt'] ?? null, 'AI user_message becomes prompt_queue head', $failures, $passes );

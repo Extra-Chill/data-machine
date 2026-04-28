@@ -90,7 +90,7 @@ $workflow = array(
 			'label'              => 'Fetch Context',
 			'handler_slug'       => 'mcp',
 			'handler_config'     => array( 'provider' => 'github', 'query' => 'repo:Extra-Chill/data-machine' ),
-			'config_patch_queue' => array( array( 'query' => 'workflow spec' ) ),
+			'config_patch_queue' => array( array( 'patch' => array( 'query' => 'workflow spec' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
 			'queue_mode'         => 'drain',
 		),
 		array(
@@ -129,7 +129,7 @@ assert_bulk_workflow_equals( 2, count( $pipeline_config ), 'bulk workflow create
 assert_bulk_workflow_equals( 2, count( $flow_config ), 'bulk workflow creates persistent flow rows through shared factory', $failures, $passes );
 assert_bulk_workflow_equals( 'mcp', $flow_steps[0]['handler_slug'] ?? null, 'bulk workflow preserves handler slug', $failures, $passes );
 assert_bulk_workflow_equals( array( 'provider' => 'github', 'query' => 'repo:Extra-Chill/data-machine' ), $flow_steps[0]['handler_config'] ?? null, 'bulk workflow preserves handler config', $failures, $passes );
-assert_bulk_workflow_equals( array( array( 'query' => 'workflow spec' ) ), $flow_steps[0]['config_patch_queue'] ?? null, 'bulk workflow preserves config patch queue', $failures, $passes );
+assert_bulk_workflow_equals( array( 'query' => 'workflow spec' ), $flow_steps[0]['config_patch_queue'][0]['patch'] ?? null, 'bulk workflow preserves config patch queue', $failures, $passes );
 assert_bulk_workflow_equals( 'drain', $flow_steps[0]['queue_mode'] ?? null, 'bulk workflow preserves queue mode', $failures, $passes );
 assert_bulk_workflow_equals( array( 'datamachine/read-github-file' ), $flow_steps[1]['enabled_tools'] ?? null, 'bulk workflow preserves enabled tools', $failures, $passes );
 assert_bulk_workflow_equals( array( 'datamachine/delete-pipeline' ), $flow_steps[1]['disabled_tools'] ?? null, 'bulk workflow preserves disabled tools', $failures, $passes );

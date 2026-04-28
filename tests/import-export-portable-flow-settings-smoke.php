@@ -12,6 +12,8 @@ namespace DataMachine\Abilities\Flow {
 		class QueueAbility {
 			const SLOT_PROMPT_QUEUE       = 'prompt_queue';
 			const SLOT_CONFIG_PATCH_QUEUE = 'config_patch_queue';
+			const FIELD_PROMPT            = 'prompt';
+			const FIELD_PATCH             = 'patch';
 		}
 	}
 }
@@ -106,14 +108,19 @@ $fetch_settings = call_import_export_private(
 		'step_type'          => 'fetch',
 		'handler_slug'       => 'webhook_payload',
 		'handler_config'     => array( 'payload_path' => 'pull_request' ),
-		'config_patch_queue' => array( array( 'after' => '2026-04-01' ) ),
+		'config_patch_queue' => array(
+			array(
+				'patch'    => array( 'after' => '2026-04-01' ),
+				'added_at' => '2026-04-27T00:00:00Z',
+			),
+		),
 		'queue_mode'         => 'drain',
 	)
 );
 
 assert_csv_equals( 'webhook_payload', $fetch_settings['handler_slug'] ?? null, 'fetch handler_slug still exports', $failures, $passes );
 assert_csv_equals( array( 'payload_path' => 'pull_request' ), $fetch_settings['handler_config'] ?? null, 'fetch handler_config still exports', $failures, $passes );
-assert_csv_equals( array( array( 'after' => '2026-04-01' ) ), $fetch_settings['config_patch_queue'] ?? null, 'fetch config_patch_queue exports as portable settings', $failures, $passes );
+assert_csv_equals( array( 'after' => '2026-04-01' ), $fetch_settings['config_patch_queue'][0]['patch'] ?? null, 'fetch config_patch_queue exports canonical patch entry', $failures, $passes );
 assert_csv_equals( 'drain', $fetch_settings['queue_mode'] ?? null, 'fetch queue_mode exports as portable settings', $failures, $passes );
 
 $normalized = call_import_export_private(
@@ -131,6 +138,44 @@ assert_csv_equals( array( 'datamachine/read-github-file' ), $normalized['enabled
 assert_csv_equals( array( array( 'prompt' => 'Pinned prompt.' ) ), $normalized['prompt_queue'] ?? null, 'import normalization keeps prompt_queue', $failures, $passes );
 assert_csv_equals( 'static', $normalized['queue_mode'] ?? null, 'import normalization keeps queue_mode', $failures, $passes );
 assert_csv_equals( false, array_key_exists( 'handler_slug', $normalized ), 'portable normalization does not duplicate handler fields', $failures, $passes );
+
+$normalized_patch = call_import_export_private(
+	$import_export,
+	'normalize_portable_flow_step_settings',
+	array(
+		'config_patch_queue' => array(
+			array(
+				'patch'    => array( 'before' => '2026-05-01' ),
+				'added_at' => '2026-04-27T00:00:00Z',
+			),
+		),
+	)
+);
+assert_csv_equals( array( 'before' => '2026-05-01' ), $normalized_patch['config_patch_queue'][0]['patch'] ?? null, 'import normalization keeps canonical config_patch_queue entries', $failures, $passes );
+
+$threw = false;
+try {
+	call_import_export_private(
+		$import_export,
+		'normalize_portable_flow_step_settings',
+		array( 'enabled_tools' => array( 'valid-tool', array( 'not' => 'a string' ) ) )
+	);
+} catch ( InvalidArgumentException $e ) {
+	$threw = str_contains( $e->getMessage(), 'enabled_tools must be a list of strings' );
+}
+assert_csv_equals( true, $threw, 'malformed enabled_tools fails clearly', $failures, $passes );
+
+$threw = false;
+try {
+	call_import_export_private(
+		$import_export,
+		'normalize_portable_flow_step_settings',
+		array( 'config_patch_queue' => array( array( 'after' => '2026-04-01' ) ) )
+	);
+} catch ( InvalidArgumentException $e ) {
+	$threw = str_contains( $e->getMessage(), 'config_patch_queue entries must include an object patch' );
+}
+assert_csv_equals( true, $threw, 'malformed config_patch_queue fails clearly', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " portable flow settings assertions failed.\n";
