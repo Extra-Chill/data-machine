@@ -152,7 +152,7 @@ $parameters = [
 
 **Implementation**: `WordPressPublishHelper::applySourceAttribution()` static method
 
-**Purpose**: Appends source URLs to content with automatic Gutenberg block generation or plain text formatting.
+**Purpose**: Appends source URLs in the declared source content format, then lets the content-format boundary convert once to the post type's stored format.
 
 **Engine Data Source**: `source_url` retrieved from fetch handlers via `datamachine_engine_data` filter
 
@@ -170,22 +170,8 @@ $content = WordPressPublishHelper::applySourceAttribution($content, $source_url,
 **Source Processing**:
 - URL validation with `filter_var($url, FILTER_VALIDATE_URL)`
 - URL sanitization with `esc_url()`
-- Automatic content type detection with `has_blocks()`
-- Gutenberg block generation for block content
-- Plain text formatting for classic content
-
-**Block Generation** (for Gutenberg content):
-```php
-// Generated Gutenberg blocks
-"<!-- wp:separator --><hr class=\"wp-block-separator has-alpha-channel-opacity\"/><!-- /wp:separator -->
-
-<!-- wp:paragraph --><p>Source: <a href=\"{sanitized_url}\">{sanitized_url}</a></p><!-- /wp:paragraph -->"
-```
-
-**Plain Text Format** (for classic content):
-```php
-"\n\nSource: {sanitized_url}"
-```
+- Format-aware attribution for `html`, `markdown`, and `blocks`
+- Single conversion through `DataMachine\Core\Content\ContentFormat` before `wp_insert_post()`
 
 **Usage Example**:
 ```php
@@ -298,9 +284,10 @@ All configuration parameters must be provided in handler config:
 
 **Required**:
 - `title`: Post title (sanitized with `sanitize_text_field`)
-- `content`: Post content (sanitized with `wp_kses_post`)
+- `content`: Post content in the declared `content_format`
 
 **Optional**:
+- `content_format`: Source format for `content` (`html`, `markdown`, or `blocks`; defaults to `html` for compatibility). Data Machine converts this to the post type's stored format before insertion.
 - `image_url`: Featured image URL (processed by `WordPressPublishHelper`)
 - `source_url`: Source attribution URL (processed by `WordPressPublishHelper`)
 - `category`: Category assignment for `TaxonomyHandler`
@@ -406,7 +393,7 @@ $handler_config = [
 
 ## Security Features
 
-**Input Sanitization**: All components use WordPress security functions (`sanitize_text_field`, `wp_kses_post`, `esc_url`).
+**Input Sanitization**: Titles and URLs use WordPress security functions (`sanitize_text_field`, `esc_url`). HTML/block-backed post content is filtered after conversion; markdown-backed post types keep their markdown storage shape.
 
 **Permission Respect**: Honors WordPress user capabilities and post type permissions.
 

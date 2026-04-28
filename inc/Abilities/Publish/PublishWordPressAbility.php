@@ -11,7 +11,9 @@
 namespace DataMachine\Abilities\Publish;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\WordPress\PostTracking;
+use DataMachine\Core\WordPress\WordPressPublishHelper;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
 
 defined( 'ABSPATH' ) || exit;
@@ -47,7 +49,13 @@ class PublishWordPressAbility {
 							),
 							'content'                => array(
 								'type'        => 'string',
-								'description' => __( 'Post content in HTML format', 'data-machine' ),
+								'description' => __( 'Post content in the format declared by content_format', 'data-machine' ),
+							),
+							'content_format'         => array(
+								'type'        => 'string',
+								'enum'        => array( 'html', 'markdown', 'blocks' ),
+								'default'     => 'html',
+								'description' => __( 'Format of the supplied content before storage conversion', 'data-machine' ),
 							),
 							'post_type'              => array(
 								'type'        => 'string',
@@ -143,6 +151,8 @@ class PublishWordPressAbility {
 
 		$title                  = $config['title'];
 		$content                = $config['content'];
+		$content_format         = sanitize_key( $config['content_format'] );
+		$content_format         = '' !== $content_format ? $content_format : 'html';
 		$post_type              = $config['post_type'];
 		$post_status            = $config['post_status'];
 		$post_author            = $config['post_author'];
@@ -181,7 +191,6 @@ class PublishWordPressAbility {
 		}
 
 		$content = wp_unslash( $content );
-		$content = wp_filter_post_kses( $content );
 
 		if ( empty( trim( wp_strip_all_tags( $content ) ) ) ) {
 			$logs[] = array(
@@ -200,7 +209,37 @@ class PublishWordPressAbility {
 		}
 
 		if ( $add_source_attribution && ! empty( $source_url ) ) {
-			$content = $this->applySourceAttribution( $content, $source_url );
+			$content = WordPressPublishHelper::applySourceAttribution(
+				$content,
+				$source_url,
+				array(
+					'link_handling'  => 'append',
+					'content_format' => $content_format,
+				)
+			);
+		}
+
+		$stored_content = ContentFormat::sourceToStored( $content, $content_format, $post_type );
+		if ( is_wp_error( $stored_content ) ) {
+			$logs[] = array(
+				'level'   => 'error',
+				'message' => 'WordPress: Content format conversion failed',
+				'data'    => array(
+					'content_format' => $content_format,
+					'stored_format'  => ContentFormat::storedFormat( $post_type ),
+					'error'          => $stored_content->get_error_message(),
+				),
+			);
+			return array(
+				'success' => false,
+				'error'   => $stored_content->get_error_message(),
+				'logs'    => $logs,
+			);
+		}
+
+		$content = $stored_content;
+		if ( in_array( ContentFormat::storedFormat( $post_type ), array( 'html', 'blocks' ), true ) ) {
+			$content = wp_filter_post_kses( $content );
 		}
 
 		$post_data = array(
@@ -226,6 +265,8 @@ class PublishWordPressAbility {
 				'post_author'    => $post_data['post_author'],
 				'post_status'    => $post_data['post_status'],
 				'post_type'      => $post_data['post_type'],
+				'content_format' => $content_format,
+				'stored_format'  => ContentFormat::storedFormat( $post_type ),
 				'title_length'   => strlen( $post_data['post_title'] ),
 				'content_length' => strlen( $post_data['post_content'] ),
 			),
@@ -365,30 +406,13 @@ class PublishWordPressAbility {
 			'taxonomies'             => array(),
 			'featured_image_path'    => '',
 			'source_url'             => '',
+			'content_format'         => 'html',
 			'add_source_attribution' => true,
 			'post_parent'            => 0,
 			'job_id'                 => null,
 		);
 
 		return array_merge( $defaults, $input );
-	}
-
-	/**
-	 * Apply source attribution to content.
-	 */
-	private function applySourceAttribution( string $content, string $source_url ): string {
-		if ( empty( $source_url ) ) {
-			return $content;
-		}
-
-		$attribution = sprintf(
-			'<p class="datamachine-source-attribution">%s <a href="%s" target="_blank" rel="noopener noreferrer">%s</a></p>',
-			__( 'Source:', 'data-machine' ),
-			esc_url( $source_url ),
-			esc_html( $source_url )
-		);
-
-		return $content . "\n\n" . $attribution;
 	}
 
 	/**
