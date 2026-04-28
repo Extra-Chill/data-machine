@@ -15,12 +15,12 @@
 $root = dirname( __DIR__ );
 
 $sources = array(
-	'bootstrap' => file_get_contents( $root . '/inc/bootstrap.php' ),
-	'provider'  => file_get_contents( $root . '/inc/Engine/AI/System/SystemAgentServiceProvider.php' ),
-	'command'   => file_get_contents( $root . '/inc/Cli/Commands/RetentionCommand.php' ),
-	'files'     => file_get_contents( $root . '/inc/Core/FilesRepository/FileCleanup.php' ),
-	'chat'      => file_get_contents( $root . '/inc/Core/Database/Chat/Chat.php' ),
-	'cleanup'   => file_get_contents( $root . '/inc/Engine/AI/System/Tasks/Retention/RetentionCleanup.php' ),
+	'bootstrap' => file_get_contents( $root . '/inc/bootstrap.php' ) ?: '',
+	'provider'  => file_get_contents( $root . '/inc/Engine/AI/System/SystemAgentServiceProvider.php' ) ?: '',
+	'command'   => file_get_contents( $root . '/inc/Cli/Commands/RetentionCommand.php' ) ?: '',
+	'files'     => file_get_contents( $root . '/inc/Core/FilesRepository/FileCleanup.php' ) ?: '',
+	'chat'      => file_get_contents( $root . '/inc/Core/Database/Chat/Chat.php' ) ?: '',
+	'cleanup'   => file_get_contents( $root . '/inc/Engine/AI/System/Tasks/Retention/RetentionCleanup.php' ) ?: '',
 );
 
 $failed = 0;
@@ -36,6 +36,11 @@ function assert_retention( string $name, bool $condition, string $detail = '' ):
 
 	++$failed;
 	echo "  [FAIL] {$name}" . ( $detail ? " — {$detail}" : '' ) . "\n";
+}
+
+function retention_failed_count(): int {
+	global $failed;
+	return $failed;
 }
 
 echo "=== retention-system-tasks-smoke ===\n";
@@ -67,7 +72,7 @@ $task_classes = array(
 
 foreach ( $task_classes as $task_class ) {
 	$path = $root . '/inc/Engine/AI/System/Tasks/Retention/' . $task_class . '.php';
-	$task_source = file_exists( $path ) ? file_get_contents( $path ) : '';
+	$task_source = file_exists( $path ) ? file_get_contents( $path ) ?: '' : '';
 	assert_retention( "task class file exists: {$task_class}", file_exists( $path ) );
 	assert_retention( "provider imports {$task_class}", str_contains( $sources['provider'], $task_class . ';' ) );
 	assert_retention( "provider registers {$task_class}", str_contains( $sources['provider'], '= ' . $task_class . '::class;' ) );
@@ -125,7 +130,7 @@ assert_retention(
 		&& str_contains( $sources['cleanup'], '++$count;' )
 );
 
-if ( $failed > 0 ) {
+if ( retention_failed_count() > 0 ) {
 	echo "\nretention-system-tasks-smoke failed: {$failed}/{$total} assertions failed.\n";
 	exit( 1 );
 }

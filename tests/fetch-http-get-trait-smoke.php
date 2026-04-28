@@ -10,9 +10,9 @@
 $root = dirname( __DIR__ );
 
 $files = array(
-	'trait' => file_get_contents( $root . '/inc/Abilities/Fetch/FetchHttpGetTrait.php' ),
-	'rss'   => file_get_contents( $root . '/inc/Abilities/Fetch/FetchRssAbility.php' ),
-	'wpapi' => file_get_contents( $root . '/inc/Abilities/Fetch/FetchWordPressApiAbility.php' ),
+	'trait' => file_get_contents( $root . '/inc/Abilities/Fetch/FetchHttpGetTrait.php' ) ?: '',
+	'rss'   => file_get_contents( $root . '/inc/Abilities/Fetch/FetchRssAbility.php' ) ?: '',
+	'wpapi' => file_get_contents( $root . '/inc/Abilities/Fetch/FetchWordPressApiAbility.php' ) ?: '',
 );
 
 $failed = 0;
@@ -28,6 +28,11 @@ function assert_fetch_http_get_trait( string $name, bool $condition, string $det
 
 	++$failed;
 	echo "  [FAIL] {$name}" . ( $detail ? " - {$detail}" : '' ) . "\n";
+}
+
+function fetch_http_get_trait_failed_count(): int {
+	global $failed;
+	return $failed;
 }
 
 echo "=== fetch-http-get-trait-smoke ===\n";
@@ -65,7 +70,7 @@ assert_fetch_http_get_trait(
 		&& str_contains( $files['trait'], 'wp_remote_retrieve_body( $response )' )
 );
 
-if ( $failed > 0 ) {
+if ( fetch_http_get_trait_failed_count() > 0 ) {
 	echo "\nfetch-http-get-trait-smoke failed: {$failed}/{$total} assertions failed.\n";
 	exit( 1 );
 }
