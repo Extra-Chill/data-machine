@@ -152,7 +152,7 @@ class PipelineStepAbilities {
 			'datamachine/update-pipeline-step',
 			array(
 				'label'               => __( 'Update Pipeline Step', 'data-machine' ),
-				'description'         => __( 'Update pipeline step configuration (system prompt, disabled tools). Model/provider are configured via mode_models setting.', 'data-machine' ),
+				'description'         => __( 'Update pipeline step configuration (system prompt and AI tool policy). Model/provider are configured via mode_models setting.', 'data-machine' ),
 				'category'            => 'datamachine-pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -169,6 +169,12 @@ class PipelineStepAbilities {
 						'disabled_tools'   => array(
 							'type'        => 'array',
 							'description' => __( 'Array of disabled tool IDs for this step', 'data-machine' ),
+							'items'       => array( 'type' => 'string' ),
+						),
+						'tool_categories'  => array(
+							'type'        => 'array',
+							'description' => __( 'Array of ability categories allowed for this step', 'data-machine' ),
+							'items'       => array( 'type' => 'string' ),
 						),
 					),
 				),
@@ -523,16 +529,24 @@ class PipelineStepAbilities {
 			);
 		}
 
-		$system_prompt  = $input['system_prompt'] ?? null;
-		$disabled_tools = $input['disabled_tools'] ?? null;
+		$system_prompt = $input['system_prompt'] ?? null;
+		$policy_fields = array( 'disabled_tools', 'tool_categories' );
 
 		// provider/model are no longer configurable at the pipeline step level.
 		// Model resolution is handled exclusively by the mode system (mode_models setting).
 
-		if ( null === $system_prompt && null === $disabled_tools ) {
+		$has_policy_field = false;
+		foreach ( $policy_fields as $field ) {
+			if ( array_key_exists( $field, $input ) ) {
+				$has_policy_field = true;
+				break;
+			}
+		}
+
+		if ( null === $system_prompt && ! $has_policy_field ) {
 			return array(
 				'success' => false,
-				'error'   => 'At least one of system_prompt or disabled_tools is required',
+				'error'   => 'At least one of system_prompt, disabled_tools, or tool_categories is required',
 			);
 		}
 
@@ -566,12 +580,26 @@ class PipelineStepAbilities {
 			$updated_fields[]                  = 'system_prompt';
 		}
 
-		if ( null !== $disabled_tools && is_array( $disabled_tools ) ) {
-			$sanitized_tool_ids = array_map( 'sanitize_text_field', $disabled_tools );
-			$tools_manager      = new \DataMachine\Engine\AI\Tools\ToolManager();
+		foreach ( $policy_fields as $field ) {
+			if ( ! array_key_exists( $field, $input ) ) {
+				continue;
+			}
 
-			$step_config_data['disabled_tools'] = $tools_manager->save_step_tool_selections( $pipeline_step_id, $sanitized_tool_ids );
-			$updated_fields[]                   = 'disabled_tools';
+			$sanitized_values = self::sanitizeStringListField( $input[ $field ], $field );
+			if ( is_wp_error( $sanitized_values ) ) {
+				return array(
+					'success' => false,
+					'error'   => $sanitized_values->get_error_message(),
+				);
+			}
+
+			if ( 'disabled_tools' === $field ) {
+				$tools_manager    = new \DataMachine\Engine\AI\Tools\ToolManager();
+				$sanitized_values = $tools_manager->save_step_tool_selections( $pipeline_step_id, $sanitized_values );
+			}
+
+			$step_config_data[ $field ] = $sanitized_values;
+			$updated_fields[]           = $field;
 		}
 
 		$pipeline_config[ $pipeline_step_id ] = array_merge( $existing_config, $step_config_data );
@@ -606,6 +634,36 @@ class PipelineStepAbilities {
 			'updated_fields'   => $updated_fields,
 			'message'          => 'Pipeline step configuration updated successfully. Fields updated: ' . implode( ', ', $updated_fields ),
 		);
+	}
+
+	/**
+	 * Sanitize an array-of-strings configuration field.
+	 *
+	 * @param mixed  $value Input value.
+	 * @param string $field Field name for error messages.
+	 * @return array|\WP_Error Sanitized string list or validation error.
+	 */
+	public static function sanitizeStringListField( mixed $value, string $field ): array|\WP_Error {
+		if ( ! is_array( $value ) ) {
+			return new \WP_Error(
+				'invalid_' . $field,
+				sprintf( '%s must be an array of strings', $field )
+			);
+		}
+
+		$sanitized = array();
+		foreach ( $value as $item ) {
+			if ( ! is_string( $item ) ) {
+				return new \WP_Error(
+					'invalid_' . $field,
+					sprintf( '%s must contain only strings', $field )
+				);
+			}
+
+			$sanitized[] = sanitize_text_field( wp_unslash( $item ) );
+		}
+
+		return array_values( $sanitized );
 	}
 
 	/**
@@ -843,8 +901,8 @@ class PipelineStepAbilities {
 				);
 			}
 
-			$step                              = $steps_by_id[ $pipeline_step_id ];
-			$step['execution_order']           = $index;
+			$step                               = $steps_by_id[ $pipeline_step_id ];
+			$step['execution_order']            = $index;
 			$updated_steps[ $pipeline_step_id ] = $step;
 		}
 

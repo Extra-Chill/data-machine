@@ -11,8 +11,10 @@ namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\Pipeline\CreatePipelineAbility;
 use DataMachine\Abilities\PipelineStepAbilities;
+use DataMachine\Api\Pipelines\PipelineSteps;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use WP_REST_Request;
 use WP_UnitTestCase;
 
 class PipelineStepAbilitiesTest extends WP_UnitTestCase {
@@ -389,6 +391,123 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'system_prompt', $result['message'] );
 	}
 
+	public function test_update_pipeline_step_accepts_tool_policy_fields(): void {
+		$this->register_test_pipeline_tools();
+
+		$add_result       = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'ai',
+			)
+		);
+		$pipeline_step_id = $add_result['pipeline_step_id'];
+
+		$result = $this->step_abilities->executeUpdatePipelineStep(
+			array(
+				'pipeline_step_id' => $pipeline_step_id,
+				'disabled_tools'   => array( 'test_disabled_tool' ),
+				'tool_categories'  => array( 'datamachine-test' ),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( array( 'disabled_tools', 'tool_categories' ), $result['updated_fields'] );
+
+		$db_pipelines    = new Pipelines();
+		$pipeline_config = $db_pipelines->get_pipeline_config( $this->test_pipeline_id );
+
+		$this->assertSame( array( 'test_disabled_tool' ), $pipeline_config[ $pipeline_step_id ]['disabled_tools'] );
+		$this->assertSame( array( 'datamachine-test' ), $pipeline_config[ $pipeline_step_id ]['tool_categories'] );
+	}
+
+	public function test_update_pipeline_step_rejects_malformed_tool_policy_fields(): void {
+		$add_result       = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'ai',
+			)
+		);
+		$pipeline_step_id = $add_result['pipeline_step_id'];
+
+		$non_array_result = $this->step_abilities->executeUpdatePipelineStep(
+			array(
+				'pipeline_step_id' => $pipeline_step_id,
+				'disabled_tools'   => 'test_disabled_tool',
+			)
+		);
+		$this->assertFalse( $non_array_result['success'] );
+		$this->assertStringContainsString( 'disabled_tools must be an array of strings', $non_array_result['error'] );
+
+		$non_string_result = $this->step_abilities->executeUpdatePipelineStep(
+			array(
+				'pipeline_step_id' => $pipeline_step_id,
+				'tool_categories'  => array( 'datamachine-test', 123 ),
+			)
+		);
+		$this->assertFalse( $non_string_result['success'] );
+		$this->assertStringContainsString( 'tool_categories must contain only strings', $non_string_result['error'] );
+	}
+
+	public function test_rest_pipeline_step_config_schema_exposes_tool_policy_fields(): void {
+		$method = new \ReflectionMethod( PipelineSteps::class, 'get_step_config_args' );
+
+		$args = $method->invoke( null, true );
+
+		foreach ( array( 'disabled_tools', 'tool_categories' ) as $field ) {
+			$this->assertArrayHasKey( $field, $args );
+			$this->assertSame( 'array', $args[ $field ]['type'] );
+			$this->assertSame( array( 'type' => 'string' ), $args[ $field ]['items'] );
+		}
+		$this->assertArrayNotHasKey( 'enabled_tools', $args );
+	}
+
+	public function test_rest_pipeline_step_config_persists_tool_policy_fields(): void {
+		$this->register_test_pipeline_tools();
+
+		$add_result       = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'ai',
+			)
+		);
+		$pipeline_step_id = $add_result['pipeline_step_id'];
+
+		$request = new WP_REST_Request( 'PATCH', '/datamachine/v1/pipelines/steps/' . $pipeline_step_id . '/config' );
+		$request->set_param( 'pipeline_step_id', $pipeline_step_id );
+		$request->set_param( 'disabled_tools', array( 'test_disabled_tool' ) );
+		$request->set_param( 'tool_categories', array( 'datamachine-test' ) );
+
+		$response = PipelineSteps::handle_upsert_step_config( $request );
+
+		$this->assertNotInstanceOf( \WP_Error::class, $response );
+
+		$db_pipelines    = new Pipelines();
+		$pipeline_config = $db_pipelines->get_pipeline_config( $this->test_pipeline_id );
+
+		$this->assertSame( array( 'test_disabled_tool' ), $pipeline_config[ $pipeline_step_id ]['disabled_tools'] );
+		$this->assertSame( array( 'datamachine-test' ), $pipeline_config[ $pipeline_step_id ]['tool_categories'] );
+	}
+
+	public function test_rest_pipeline_step_config_rejects_malformed_tool_policy_fields(): void {
+		$add_result       = $this->step_abilities->executeAddPipelineStep(
+			array(
+				'pipeline_id' => $this->test_pipeline_id,
+				'step_type'   => 'ai',
+			)
+		);
+		$pipeline_step_id = $add_result['pipeline_step_id'];
+
+		$request = new WP_REST_Request( 'PATCH', '/datamachine/v1/pipelines/steps/' . $pipeline_step_id . '/config' );
+		$request->set_param( 'pipeline_step_id', $pipeline_step_id );
+		$request->set_param( 'disabled_tools', array( 'test_disabled_tool', 123 ) );
+
+		$response = PipelineSteps::handle_upsert_step_config( $request );
+
+		$this->assertInstanceOf( \WP_Error::class, $response );
+		$this->assertSame( 'invalid_disabled_tools', $response->get_error_code() );
+		$this->assertStringContainsString( 'disabled_tools must contain only strings', $response->get_error_message() );
+	}
+
 	public function test_update_pipeline_step_rejects_provider_and_model(): void {
 		$add_result       = $this->step_abilities->executeAddPipelineStep(
 			array(
@@ -409,7 +528,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		);
 
 		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'system_prompt or disabled_tools', $result['error'] );
+		$this->assertStringContainsString( 'system_prompt, disabled_tools, or tool_categories', $result['error'] );
 	}
 
 	public function test_update_pipeline_step_no_fields(): void {
@@ -848,5 +967,26 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		// Verify processed items are cleaned up
 		$this->assertFalse($processed_items_db->has_item_been_processed($flow_step_id, 'rss', 'test-item-1'));
 		$this->assertFalse($processed_items_db->has_item_been_processed($flow_step_id, 'rss', 'test-item-2'));
+	}
+
+	private function register_test_pipeline_tools(): void {
+		add_filter(
+			'datamachine_tools',
+			static function ( array $tools ): array {
+				$tools['test_pipeline_tool'] = array(
+					'name'        => 'test_pipeline_tool',
+					'description' => 'Test pipeline tool',
+					'modes'       => array( 'pipeline' ),
+				);
+				$tools['test_disabled_tool'] = array(
+					'name'        => 'test_disabled_tool',
+					'description' => 'Test disabled tool',
+					'modes'       => array( 'pipeline' ),
+				);
+				return $tools;
+			}
+		);
+
+		\DataMachine\Engine\AI\Tools\ToolManager::clearCache();
 	}
 }
