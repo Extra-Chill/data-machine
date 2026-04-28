@@ -59,6 +59,7 @@ require_once __DIR__ . '/../inc/Core/Steps/QueueableTrait.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Engine/AI/ConversationManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolResultFinder.php';
 require_once __DIR__ . '/../inc/Core/Steps/AI/AIStep.php';
