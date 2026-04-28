@@ -38,9 +38,11 @@ class ToolPolicyResolver {
 	public const MODE_SYSTEM   = 'system';
 
 	private ToolManager $tool_manager;
+	private ToolSourceRegistry $tool_source_registry;
 
 	public function __construct( ?ToolManager $tool_manager = null ) {
-		$this->tool_manager = $tool_manager ?? new ToolManager();
+		$this->tool_manager         = $tool_manager ?? new ToolManager();
+		$this->tool_source_registry = new ToolSourceRegistry( $this->tool_manager );
 	}
 
 	/**
@@ -303,138 +305,7 @@ class ToolPolicyResolver {
 	 * @return array Tools array.
 	 */
 	private function gatherByMode( string $mode, array $args ): array {
-		// Pipeline has special handling for adjacent step handler tools.
-		if ( self::MODE_PIPELINE === $mode ) {
-			return $this->gatherPipelineTools( $args );
-		}
-
-		// All other modes (chat, system, and any custom modes) use the
-		// generic gatherer — filter tools by their declared modes.
-		return $this->gatherToolsForMode( $mode );
-	}
-
-	/**
-	 * Filter resolved tools by agent mode.
-	 *
-	 * @param array  $tools Resolved tools array.
-	 * @param string $mode  Mode slug to filter by (e.g. 'chat', 'pipeline').
-	 * @return array Filtered tools.
-	 */
-	private function filterByMode( array $tools, string $mode ): array {
-		return array_filter(
-			$tools,
-			function ( $tool ) use ( $mode ) {
-				$modes = $tool['modes'] ?? array();
-				return in_array( $mode, $modes, true );
-			}
-		);
-	}
-
-	/**
-	 * Pipeline mode: mode-filtered tools + handler tools from adjacent steps.
-	 *
-	 * Handler tools are resolved from the unified `datamachine_tools` registry
-	 * via {@see ToolManager::resolveHandlerTools()}. Each adjacent step contributes
-	 * the handler tools owned by its handler_slug (exact match) plus any
-	 * cross-cutting tools registered against its handler type (e.g. `skip_item`
-	 * for fetch-type handlers).
-	 */
-	private function gatherPipelineTools( array $args ): array {
-		$available_tools = array();
-		$engine_data     = $args['engine_data'] ?? array();
-
-		// Handler tools from adjacent steps (dynamic, resolved per-execution).
-		//
-		// Reads every configured handler through FlowStepConfig's cardinality-
-		// agnostic helper because adjacent steps can be single-handler (fetch)
-		// or true multi-handler (publish/upsert). The AI must see tools for
-		// every adjacent handler, not just the primary.
-		foreach ( array( $args['previous_step_config'] ?? null, $args['next_step_config'] ?? null ) as $step_config ) {
-			if ( ! $step_config ) {
-				continue;
-			}
-
-			$handler_slugs = FlowStepConfig::getConfiguredHandlerSlugs( $step_config );
-			$cache_scope   = $step_config['flow_step_id'] ?? ( $args['cache_scope'] ?? '' );
-
-			foreach ( $handler_slugs as $slug ) {
-				$handler_config = FlowStepConfig::getHandlerConfigForSlug( $step_config, $slug );
-				$tools          = $this->tool_manager->resolveHandlerTools(
-					$slug,
-					$handler_config,
-					$engine_data,
-					$cache_scope
-				);
-
-				foreach ( $tools as $tool_name => $tool_config ) {
-					$available_tools[ $tool_name ] = $tool_config;
-				}
-			}
-		}
-
-		// Static registry tools filtered for 'pipeline' mode.
-		$all_tools      = $this->tool_manager->get_all_tools();
-		$pipeline_tools = $this->filterByMode( $all_tools, self::MODE_PIPELINE );
-
-		foreach ( $pipeline_tools as $tool_name => $tool_config ) {
-			if ( ! is_array( $tool_config ) ) {
-				continue;
-			}
-			// Skip handler tool registry wrappers — those are resolved above.
-			if ( isset( $tool_config['_handler_callable'] ) ) {
-				continue;
-			}
-			// Handler-scoped tools carry flow-specific config and completion
-			// metadata. If a global pipeline tool uses the same name, keep the
-			// adjacent handler definition so downstream steps can detect that the
-			// required handler tool actually ran.
-			if ( isset( $available_tools[ $tool_name ] ) ) {
-				continue;
-			}
-			if ( $this->tool_manager->is_tool_available( $tool_name, null ) ) {
-				$available_tools[ $tool_name ] = $tool_config;
-			}
-		}
-
-		return $available_tools;
-	}
-
-	/**
-	 * Gather tools for any mode slug.
-	 *
-	 * Filters the tool registry by declared modes, then applies availability
-	 * and enablement checks. Works with built-in modes (chat, system) and
-	 * any custom mode — third parties can register tools with custom mode
-	 * slugs and resolve them through the same path.
-	 *
-	 * @param string $mode Mode slug to filter by (e.g. 'chat', 'system', 'automation').
-	 * @return array Available tools for this mode.
-	 */
-	private function gatherToolsForMode( string $mode ): array {
-		$available_tools = array();
-
-		$all_tools  = $this->tool_manager->get_all_tools();
-		$mode_tools = $this->filterByMode( $all_tools, $mode );
-
-		foreach ( $mode_tools as $tool_name => $tool_config ) {
-			if ( ! is_array( $tool_config ) || empty( $tool_config ) ) {
-				continue;
-			}
-
-			// Tools with requires_config go through availability checks.
-			// Tools without it are always available unless globally disabled.
-			if ( ! empty( $tool_config['requires_config'] ) ) {
-				if ( ! $this->tool_manager->is_tool_available( $tool_name, null ) ) {
-					continue;
-				}
-			} elseif ( ! $this->tool_manager->is_globally_enabled( $tool_name ) ) {
-				continue;
-			}
-
-			$available_tools[ $tool_name ] = $tool_config;
-		}
-
-		return $available_tools;
+		return $this->tool_source_registry->gather( $mode, $args );
 	}
 
 	/**

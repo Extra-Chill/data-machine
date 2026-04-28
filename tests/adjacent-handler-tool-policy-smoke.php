@@ -36,6 +36,7 @@ namespace {
 	}
 
 	require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
+	require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 
 	$failures = array();
