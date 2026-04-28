@@ -130,14 +130,29 @@ $flow = AgentBundleFlowFile::from_array(
 		'max_items'      => array( 'mcp' => 5 ),
 		'steps'          => array(
 			array(
+				'step_position'   => 2,
+				'handler_configs' => array(),
+				'enabled_tools'   => array( 'datamachine/get-github-pull-review-context' ),
+				'prompt_queue'    => array(
+					array(
+						'prompt'   => 'Review this PR.',
+						'added_at' => '2026-04-27T00:00:00Z',
+					),
+				),
+				'queue_mode'      => 'loop',
+			),
+			array(
 				'step_position'   => 1,
 				'handler_slug'    => 'wordpress_publish',
 				'handler_configs' => array( 'wordpress_publish' => array( 'post_type' => 'wiki' ) ),
+				'disabled_tools'  => array( 'datamachine/delete-flow' ),
 			),
 			array(
 				'step_position'   => 0,
 				'handler_slug'    => 'mcp',
 				'handler_configs' => array( 'mcp' => array( 'auth_ref' => 'wpcom:default', 'provider' => 'mgs' ) ),
+				'config_patch_queue' => array( array( 'after' => '2026-04-01' ) ),
+				'queue_mode'         => 'drain',
 			),
 		),
 	)
@@ -145,6 +160,58 @@ $flow = AgentBundleFlowFile::from_array(
 $flow_array = $flow->to_array();
 assert_bundle_equals( 'flow references pipeline by slug, not source ID', 'wc-daily-ingest', $flow_array['pipeline_slug'] );
 assert_bundle_equals( 'flow step 0 first after normalization', 'mcp', $flow_array['steps'][0]['handler_slug'] );
+assert_bundle_equals( 'flow step preserves fetch config patch queue', array( array( 'after' => '2026-04-01' ) ), $flow_array['steps'][0]['config_patch_queue'] );
+assert_bundle_equals( 'flow step preserves AI enabled tools', array( 'datamachine/get-github-pull-review-context' ), $flow_array['steps'][2]['enabled_tools'] );
+assert_bundle_equals( 'flow step preserves AI prompt queue', 'Review this PR.', $flow_array['steps'][2]['prompt_queue'][0]['prompt'] );
+assert_bundle_equals( 'flow step preserves AI queue mode', 'loop', $flow_array['steps'][2]['queue_mode'] );
+
+$threw = false;
+try {
+	AgentBundleFlowFile::from_array(
+		array(
+			'schema_version' => 1,
+			'slug'           => 'Bad Flow',
+			'name'           => 'Bad Flow',
+			'pipeline_slug'  => 'WC Daily Ingest',
+			'schedule'       => 'daily',
+			'max_items'      => array(),
+			'steps'          => array(
+				array(
+					'step_position'   => 0,
+					'handler_configs' => array(),
+					'prompt_queue'    => array( 'not-an-object' ),
+				),
+			),
+		)
+	);
+} catch ( BundleValidationException $e ) {
+	$threw = str_contains( $e->getMessage(), 'prompt_queue must be a list of objects' );
+}
+assert_bundle( 'malformed prompt_queue fails clearly', $threw );
+
+$threw = false;
+try {
+	AgentBundleFlowFile::from_array(
+		array(
+			'schema_version' => 1,
+			'slug'           => 'Bad Queue Mode',
+			'name'           => 'Bad Queue Mode',
+			'pipeline_slug'  => 'WC Daily Ingest',
+			'schedule'       => 'daily',
+			'max_items'      => array(),
+			'steps'          => array(
+				array(
+					'step_position'   => 0,
+					'handler_configs' => array(),
+					'queue_mode'      => 'random',
+				),
+			),
+		)
+	);
+} catch ( BundleValidationException $e ) {
+	$threw = str_contains( $e->getMessage(), 'queue_mode must be one of drain, loop, static' );
+}
+assert_bundle( 'malformed queue_mode fails clearly', $threw );
 
 echo "\n[4] Directory write/read round-trips without DB access\n";
 $bundle = new AgentBundleDirectory(

@@ -22,6 +22,16 @@ final class AgentBundleFlowFile {
 	private array $max_items;
 	private array $steps;
 
+	private const OPTIONAL_STEP_FIELDS = array(
+		'handler_slug',
+		'handler_slugs',
+		'enabled_tools',
+		'disabled_tools',
+		'prompt_queue',
+		'config_patch_queue',
+		'queue_mode',
+	);
+
 	public function __construct( string $slug, string $name, string $pipeline_slug, string $schedule, array $max_items, array $steps ) {
 		$this->slug          = PortableSlug::normalize( $slug, 'flow' );
 		$this->name          = $name;
@@ -78,14 +88,10 @@ final class AgentBundleFlowFile {
 				'handler_configs' => $step['handler_configs'],
 			);
 
-			if ( array_key_exists( 'handler_slug', $step ) ) {
-				$normalized_step['handler_slug'] = (string) $step['handler_slug'];
-			}
-			if ( array_key_exists( 'handler_slugs', $step ) ) {
-				if ( ! is_array( $step['handler_slugs'] ) || ! array_is_list( $step['handler_slugs'] ) ) {
-					throw new BundleValidationException( 'flow file handler_slugs must be a list.' );
+			foreach ( self::OPTIONAL_STEP_FIELDS as $field ) {
+				if ( array_key_exists( $field, $step ) ) {
+					$normalized_step[ $field ] = self::normalize_optional_step_field( $field, $step[ $field ] );
 				}
-				$normalized_step['handler_slugs'] = array_values( array_map( 'strval', $step['handler_slugs'] ) );
 			}
 
 			$normalized[] = $normalized_step;
@@ -94,5 +100,39 @@ final class AgentBundleFlowFile {
 		usort( $normalized, fn( $a, $b ) => $a['step_position'] <=> $b['step_position'] );
 
 		return $normalized;
+	}
+
+	private static function normalize_optional_step_field( string $field, $value ) {
+		if ( 'handler_slug' === $field ) {
+			return (string) $value;
+		}
+
+		if ( in_array( $field, array( 'handler_slugs', 'enabled_tools', 'disabled_tools' ), true ) ) {
+			if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
+				throw new BundleValidationException( "flow file {$field} must be a list." );
+			}
+			return array_values( array_map( 'strval', $value ) );
+		}
+
+		if ( in_array( $field, array( 'prompt_queue', 'config_patch_queue' ), true ) ) {
+			if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
+				throw new BundleValidationException( "flow file {$field} must be a list of objects." );
+			}
+			foreach ( $value as $entry ) {
+				if ( ! is_array( $entry ) ) {
+					throw new BundleValidationException( "flow file {$field} must be a list of objects." );
+				}
+			}
+			return array_values( $value );
+		}
+
+		if ( 'queue_mode' === $field ) {
+			if ( ! in_array( $value, array( 'drain', 'loop', 'static' ), true ) ) {
+				throw new BundleValidationException( 'flow file queue_mode must be one of drain, loop, static.' );
+			}
+			return $value;
+		}
+
+		return $value;
 	}
 }

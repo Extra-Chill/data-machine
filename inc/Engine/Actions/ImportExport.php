@@ -11,6 +11,7 @@
 
 namespace DataMachine\Engine\Actions;
 
+use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\FlowStepConfigFactory;
 
@@ -359,8 +360,8 @@ class ImportExport {
 			$flow_config[ $flow_step_id ]['step_type'] = $step_type;
 		}
 
-
 		$step = FlowStepConfigFactory::withHandlerFields( $flow_config[ $flow_step_id ], $settings );
+		$step = array_merge( $step, $this->normalize_portable_flow_step_settings( $settings ) );
 
 		$flow_config[ $flow_step_id ] = $step;
 
@@ -438,24 +439,8 @@ class ImportExport {
 					$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $step['pipeline_step_id'], $flow['flow_id'] );
 					$flow_step    = $flow_config[ $flow_step_id ] ?? array();
 
-					$settings        = array();
+					$settings        = $this->export_flow_step_settings( $flow_step );
 					$primary_handler = FlowStepConfig::getPrimaryHandlerSlug( $flow_step ) ?? '';
-
-					if ( FlowStepConfig::isMultiHandler( $flow_step ) && ! empty( $primary_handler ) ) {
-						$settings = array(
-							'handler_slugs'   => FlowStepConfig::getHandlerSlugs( $flow_step ),
-							'handler_configs' => FlowStepConfig::getHandlerConfigs( $flow_step ),
-						);
-					} elseif ( FlowStepConfig::usesHandler( $flow_step ) && ! empty( $primary_handler ) ) {
-						$settings = array(
-							'handler_slug'   => $primary_handler,
-							'handler_config' => FlowStepConfig::getPrimaryHandlerConfig( $flow_step ),
-						);
-					} elseif ( ! FlowStepConfig::usesHandler( $flow_step ) && ! empty( $flow_step['handler_config'] ) ) {
-						$settings = array(
-							'handler_config' => $flow_step['handler_config'],
-						);
-					}
 
 					if ( ! empty( $settings ) ) {
 						$csv_rows[] = array(
@@ -487,6 +472,61 @@ class ImportExport {
 
 		do_action( 'datamachine_log', 'debug', 'Pipeline export completed', array( 'count' => count( $ids ) ) );
 		return $csv;
+	}
+
+	/**
+	 * Build portable flow-step settings for CSV export.
+	 *
+	 * Handler selection/config remains in its canonical handler fields. Queue and
+	 * AI tool-policy state is stored beside those fields because it is flow-scoped
+	 * runtime state, not pipeline structure.
+	 */
+	private function export_flow_step_settings( array $flow_step ): array {
+		$settings        = array();
+		$primary_handler = FlowStepConfig::getPrimaryHandlerSlug( $flow_step ) ?? '';
+
+		if ( FlowStepConfig::isMultiHandler( $flow_step ) && ! empty( $primary_handler ) ) {
+			$settings = array(
+				'handler_slugs'   => FlowStepConfig::getHandlerSlugs( $flow_step ),
+				'handler_configs' => FlowStepConfig::getHandlerConfigs( $flow_step ),
+			);
+		} elseif ( FlowStepConfig::usesHandler( $flow_step ) && ! empty( $primary_handler ) ) {
+			$settings = array(
+				'handler_slug'   => $primary_handler,
+				'handler_config' => FlowStepConfig::getPrimaryHandlerConfig( $flow_step ),
+			);
+		} elseif ( ! FlowStepConfig::usesHandler( $flow_step ) && ! empty( $flow_step['handler_config'] ) ) {
+			$settings = array(
+				'handler_config' => $flow_step['handler_config'],
+			);
+		}
+
+		return array_merge( $settings, $this->normalize_portable_flow_step_settings( $flow_step ) );
+	}
+
+	/**
+	 * Normalize portable flow-step fields for import/export.
+	 */
+	private function normalize_portable_flow_step_settings( array $source ): array {
+		$normalized = array();
+
+		foreach ( array( 'enabled_tools', 'disabled_tools' ) as $field ) {
+			if ( isset( $source[ $field ] ) && is_array( $source[ $field ] ) ) {
+				$normalized[ $field ] = array_values( array_map( 'strval', $source[ $field ] ) );
+			}
+		}
+
+		foreach ( array( QueueAbility::SLOT_PROMPT_QUEUE, QueueAbility::SLOT_CONFIG_PATCH_QUEUE ) as $field ) {
+			if ( isset( $source[ $field ] ) && is_array( $source[ $field ] ) && array_is_list( $source[ $field ] ) ) {
+				$normalized[ $field ] = $source[ $field ];
+			}
+		}
+
+		if ( isset( $source['queue_mode'] ) && in_array( $source['queue_mode'], array( 'drain', 'loop', 'static' ), true ) ) {
+			$normalized['queue_mode'] = $source['queue_mode'];
+		}
+
+		return $normalized;
 	}
 
 	/**
