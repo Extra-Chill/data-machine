@@ -192,12 +192,22 @@ assert_bundle_update_equals( 'upgrade preserves existing queue_mode', 'static', 
 $agent_bundler_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Agents/AgentBundler.php' ) ?: '';
 $pipelines_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Pipelines/Pipelines.php' ) ?: '';
 $flows_source         = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Flows/Flows.php' ) ?: '';
+$bootstrap_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Bootstrap.php' ) ?: '';
+$bundle_cli_source    = file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Commands/AgentBundleCommand.php' ) ?: '';
 assert_bundle_update( 'importer resolves existing pipelines by portable slug', str_contains( $agent_bundler_source, 'get_by_portable_slug( $agent_id, $portable_slug )' ) );
 assert_bundle_update( 'importer updates existing pipelines instead of duplicating', str_contains( $agent_bundler_source, 'update_pipeline(' ) );
 assert_bundle_update( 'importer resolves existing flows by portable slug', str_contains( $agent_bundler_source, 'get_by_portable_slug( (int) $new_pipeline_id, $portable_slug )' ) );
 assert_bundle_update( 'importer updates existing flows instead of duplicating', str_contains( $agent_bundler_source, 'update_flow(' ) );
 assert_bundle_update( 'pipelines repository exposes portable slug lookup', str_contains( $pipelines_source, 'function get_by_portable_slug' ) );
 assert_bundle_update( 'flows repository exposes portable slug lookup', str_contains( $flows_source, 'function get_by_portable_slug' ) );
+assert_bundle_update( 'agent-bundle CLI command is registered', str_contains( $bootstrap_source, "WP_CLI::add_command( 'datamachine agent-bundle', Commands\\AgentBundleCommand::class );" ) );
+assert_bundle_update( 'agent-bundle CLI exposes install command', str_contains( $bundle_cli_source, 'function install(' ) );
+assert_bundle_update( 'agent-bundle CLI exposes list command', str_contains( $bundle_cli_source, 'function list_(' ) );
+assert_bundle_update( 'agent-bundle CLI exposes status command', str_contains( $bundle_cli_source, 'function status(' ) );
+assert_bundle_update( 'agent-bundle CLI exposes diff command', str_contains( $bundle_cli_source, 'function diff(' ) );
+assert_bundle_update( 'agent-bundle CLI exposes upgrade command', str_contains( $bundle_cli_source, 'function upgrade(' ) );
+assert_bundle_update( 'agent-bundle CLI stages PendingActions for approval-required upgrades', str_contains( $bundle_cli_source, 'AgentBundleUpgradePendingAction::stage' ) );
+assert_bundle_update( 'agent-bundle CLI resolves staged apply actions', str_contains( $bundle_cli_source, 'ResolvePendingActionAbility::execute' ) );
 
 if ( ! empty( $failures ) ) {
 	echo "\nFAILED: " . count( $failures ) . " portable update assertions failed.\n";
