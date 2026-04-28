@@ -6,9 +6,14 @@
  * via the `datamachine_memory_store` filter, falling back to the
  * built-in {@see DiskAgentMemoryStore}.
  *
- * Single resolution point so every consumer (AgentMemory, AgentFileAbilities,
- * CoreMemoryFilesDirective) gets the same swap mechanism without duplicating
- * the filter call.
+ * Single resolution point so every consumer (AgentMemory, DailyMemory,
+ * AgentFileAbilities, CoreMemoryFilesDirective) gets the same swap mechanism
+ * without duplicating the filter call.
+ *
+ * A guideline-backed store can register here when a site provides
+ * `wp_guideline` (for example via Gutenberg or a plugin), but Data Machine
+ * does not require that post type. The built-in disk store remains the
+ * default and any implementation of AgentMemoryStoreInterface is valid.
  *
  * @package DataMachine\Core\FilesRepository
  * @since   next
