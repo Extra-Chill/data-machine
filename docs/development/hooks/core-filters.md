@@ -1303,7 +1303,10 @@ factory caches the store per request and applies the filter exactly once.
 
 **Message shape contract**
 
-Stores MUST normalize messages on read to Data Machine message shape:
+Stores MUST normalize messages on read to Data Machine message shape. The
+versioned runtime envelope is documented in
+[`ai-message-envelope.md`](../../core-system/ai-message-envelope.md), but the
+chat/session storage contract remains this JSON-friendly legacy shape:
 
 ```php
 [
@@ -1317,8 +1320,9 @@ Stores MUST normalize messages on read to Data Machine message shape:
 ```
 
 The five Chat Session abilities and the DM chat UI consume this shape.
-Adapter stores (e.g. around `WPCOM\AI\Message` with `data` instead of
-`metadata`) are responsible for aliasing on the way out.
+Adapter stores that wrap another host runtime are responsible for translating
+host-specific message objects into Data Machine's envelope at the boundary and
+returning `role/content/metadata` arrays on the way out.
 
 **Swap boundary**
 

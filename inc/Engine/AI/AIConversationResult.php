@@ -14,6 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Validates and normalizes AIConversationLoop result arrays.
  */
+// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Validation exceptions are not rendered output.
 class AIConversationResult {
 
 	/**
@@ -37,6 +38,14 @@ class AIConversationResult {
 			if ( ! is_array( $message ) ) {
 				throw self::invalid( $path, 'must be an array' );
 			}
+
+			try {
+				$message = MessageEnvelope::to_legacy_message( $message );
+			} catch ( \InvalidArgumentException $e ) {
+				throw self::invalid( $path, $e->getMessage() );
+			}
+
+			$result['messages'][ $index ] = $message;
 
 			if ( array_key_exists( 'role', $message ) && ! is_string( $message['role'] ) ) {
 				throw self::invalid( $path . '.role', 'must be a string when present' );

@@ -225,7 +225,10 @@ An adapter is responsible for:
 Data Machine makes no assumptions about how the adapter produces that result.
 A consumer can delegate to any external runtime — its own `Agent` subclass, a
 remote RPC service, a different language — as long as the return shape is
-honored.
+honored. Returned messages may use the legacy `role/content/metadata` shape or
+the versioned [AI Message Envelope](./ai-message-envelope.md); Data Machine
+normalizes envelopes back to the persisted legacy shape before callers store or
+render the result.
 
 ### Minimal adapter example
 
