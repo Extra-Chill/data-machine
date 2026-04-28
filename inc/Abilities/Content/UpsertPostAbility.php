@@ -74,11 +74,12 @@ class UpsertPostAbility {
 							),
 							'content'        => array(
 								'type'        => 'string',
-								'description' => 'Post content. Replaces existing content when updating.',
+								'description' => 'Post content. Replaces existing content when updating. Raw ability callers that omit content_format are treated as providing block markup for backwards compatibility.',
 							),
 							'content_format' => array(
 								'type'        => 'string',
-								'description' => 'Format of content. Defaults to blocks. Use markdown/html when passing non-block source content.',
+								'enum'        => array( 'blocks', 'html', 'markdown' ),
+								'description' => 'Authoring/source format of content, not the stored post_content format. Raw ability/API calls default to blocks for compatibility. Pass markdown or html when supplying those source formats; the post type stored format is decided by datamachine_post_content_format.',
 							),
 							'post_id'        => array(
 								'type'        => 'integer',
@@ -198,7 +199,7 @@ class UpsertPostAbility {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handleChatToolCall',
-			'description' => 'Idempotently create or update a WordPress post. Finds by identity (post_id, slug+parent, or custom meta), compares content hash, and returns created/updated/no_change. Use for pipeline-safe writes that avoid churn on re-runs.',
+			'description' => 'Idempotently create or update a WordPress post. For normal authored prose, write content as markdown and omit content_format; Data Machine converts that authoring format to the post type stored format. Only set content_format when you are intentionally providing html or serialized block markup.',
 			'parameters'  => array(
 				'post_type'      => array(
 					'type'        => 'string',
@@ -210,11 +211,12 @@ class UpsertPostAbility {
 				),
 				'content'        => array(
 					'type'        => 'string',
-					'description' => 'Post content.',
+					'description' => 'Post content to author. Use markdown for normal prose unless content_format explicitly says otherwise.',
 				),
 				'content_format' => array(
 					'type'        => 'string',
-					'description' => 'Format of content. Defaults to blocks.',
+					'enum'        => array( 'markdown', 'html', 'blocks' ),
+					'description' => 'Optional authoring/source format for content. Omit for normal prose; AI tool calls default to markdown. Set to html or blocks only when content is already in that format. This is distinct from the stored format chosen by the post type.',
 				),
 				'slug'           => array(
 					'type'        => 'string',
@@ -246,6 +248,10 @@ class UpsertPostAbility {
 	 */
 	public static function handleChatToolCall( array $params, array $tool_def = array() ): array {
 		$tool_def;
+		if ( empty( $params['content_format'] ) ) {
+			$params['content_format'] = 'markdown';
+		}
+
 		$result = self::execute( $params );
 		return array(
 			'success'   => ! empty( $result['success'] ),

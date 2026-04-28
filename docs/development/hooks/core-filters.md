@@ -483,6 +483,31 @@ add_filter( 'datamachine_pending_action_handlers', function ( $handlers ) {
 value (which is wrapped into the resolver response) or a `WP_Error` to
 surface failure.
 
+## Content Format Filters
+
+Data Machine separates **authoring/source format** from **stored format**.
+AI-facing tools should treat normal authored prose as markdown unless a workflow
+explicitly pins another source format. Storage-aware abilities then convert that
+source through Block Format Bridge into the post type's canonical stored shape.
+
+### `datamachine_post_content_format`
+
+**Purpose**: Choose the canonical `post_content` storage format for a post type.
+Core defaults to `blocks`, while storage-layer plugins can return formats such as
+`markdown` for post types they own.
+
+```php
+add_filter( 'datamachine_post_content_format', function ( string $format, string $post_type ): string {
+    return 'wiki' === $post_type ? 'markdown' : $format;
+}, 10, 2 );
+```
+
+`content_format` on abilities is the caller's source format (`markdown`, `html`,
+or `blocks`). It is not the storage decision. For example, the `upsert_post`
+chat tool defaults omitted `content_format` to markdown so agents can author
+ordinary prose naturally; raw ability/API calls keep the legacy omitted-format
+default of block markup for compatibility.
+
 ### `datamachine_pending_action_staged`
 
 **Purpose**: Fires when a tool invocation has been staged and is awaiting
