@@ -37,7 +37,7 @@ class TaskRegistryTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'internal_linking', $handlers );
 		$this->assertArrayHasKey( 'daily_memory_generation', $handlers );
 		$this->assertArrayHasKey( 'meta_description_generation', $handlers );
-		$this->assertArrayHasKey( 'agent_ping', $handlers );
+		$this->assertArrayHasKey( 'agent_call', $handlers );
 	}
 
 	public function test_is_registered_returns_true_for_known_task(): void {

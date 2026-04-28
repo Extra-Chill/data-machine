@@ -232,7 +232,7 @@ class SystemTaskStep extends Step {
 
 		// Inject the standard pipeline-execution context bundle when the
 		// task declares it needs it. Replaces the per-task `if` block
-		// that hardcoded agent_ping-specific knowledge into this step
+		// that hardcoded agent-specific knowledge into this step
 		// (#1297). Tasks opt in via SystemTask::needsPipelineContext().
 		if ( $task_for_passthrough->needsPipelineContext() ) {
 			$pipeline_context                  = $this->engine->getJobContext();

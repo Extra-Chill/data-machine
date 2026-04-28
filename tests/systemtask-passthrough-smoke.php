@@ -29,15 +29,15 @@
  *
  * Default implementations return "no extra passthrough" so
  * InternalLinkingTask, AltTextTask, MetaDescriptionTask, etc. remain
- * unchanged. AgentPingTask overrides both to declare its needs.
+ * unchanged. AgentCallTask overrides both to declare its needs.
  *
  * This smoke validates:
  *   1. Base class defaults.
- *   2. AgentPingTask overrides return the right shapes.
+ *   2. AgentCallTask overrides return the right shapes.
  *   3. The dead `if ('agent_ping' === $task_type)` block is gone from
  *      SystemTaskStep source.
  *   4. SystemTaskStep calls the new declarative methods (grep-level).
- *   5. Resolution simulation: AgentPingTask's contract produces the
+ *   5. Resolution simulation: AgentCallTask's contract produces the
  *      expected engine_data shape; a default-passthrough task does NOT
  *      get pipeline context or flow_step_config keys.
  *
@@ -96,15 +96,15 @@ abstract class FixtureSystemTask {
 }
 
 /**
- * Stand-in for AgentPingTask. The two override methods below mirror the
- * production class's overrides exactly — if the production AgentPingTask
+ * Stand-in for AgentCallTask. The two override methods below mirror the
+ * production class's overrides exactly — if the production AgentCallTask
  * contract drifts (e.g. someone forgets to declare a new field as
  * passthrough), the SECTION 5 grep below catches the file-level drift.
  */
-final class FixtureAgentPingTask extends FixtureSystemTask {
+final class FixtureAgentCallTask extends FixtureSystemTask {
 
 	public function getTaskType(): string {
-		return 'agent_ping';
+		return 'agent_call';
 	}
 
 	public function needsPipelineContext(): bool {
@@ -199,29 +199,29 @@ assert_passthrough(
 	array() === $default_task->getFlowStepConfigPassthrough()
 );
 
-// SECTION 2: AgentPingTask overrides declare its full contract.
-echo "\n[agent_ping:1] AgentPingTask declares pipeline context + queue_mode\n";
-$agent_ping = new FixtureAgentPingTask();
+// SECTION 2: AgentCallTask overrides declare its full contract.
+echo "\n[agent_call:1] AgentCallTask declares pipeline context + queue_mode\n";
+$agent_call = new FixtureAgentCallTask();
 assert_passthrough(
 	'needsPipelineContext() returns true',
-	true === $agent_ping->needsPipelineContext()
+	true === $agent_call->needsPipelineContext()
 );
 assert_passthrough(
 	'getFlowStepConfigPassthrough() returns ["queue_mode"]',
-	array( 'queue_mode' ) === $agent_ping->getFlowStepConfigPassthrough()
+	array( 'queue_mode' ) === $agent_call->getFlowStepConfigPassthrough()
 );
 
-// SECTION 3: Resolution for AgentPingTask produces the full bundle.
-echo "\n[resolve:1] AgentPingTask gets pipeline-context bundle + queue_mode\n";
+// SECTION 3: Resolution for AgentCallTask produces the full bundle.
+echo "\n[resolve:1] AgentCallTask gets pipeline-context bundle + queue_mode\n";
 $delta = resolve_passthrough_delta(
-	$agent_ping,
+	$agent_call,
 	array( 'flow_id' => 42, 'pipeline_id' => 7 ),
 	array( 'post_id' => 123, 'job' => array( 'job_id' => 99 ) ),
 	array( array( 'title' => 'pkt' ) ),
 	array(
 		'queue_mode'   => 'drain',
 		'irrelevant'   => 'should-not-leak',
-		'handler_slug' => 'agent_ping',
+		'handler_slug' => 'agent_call',
 	),
 	'42_step_uuid_3',
 	99
@@ -360,24 +360,24 @@ assert_passthrough(
 		&& false !== strpos( $base_src, "return array();\n\t}\n\n\t// ─── Job lifecycle helpers" )
 );
 
-echo "\n[source:3] AgentPingTask overrides match the test fixture\n";
+echo "\n[source:3] AgentCallTask overrides match the test fixture\n";
 $ping_src = (string) file_get_contents(
-	dirname( __DIR__ ) . '/inc/Engine/AI/System/Tasks/AgentPingTask.php'
+	dirname( __DIR__ ) . '/inc/Engine/AI/System/Tasks/AgentCallTask.php'
 );
 assert_passthrough(
-	'AgentPingTask overrides needsPipelineContext()',
+	'AgentCallTask overrides needsPipelineContext()',
 	false !== strpos( $ping_src, 'public function needsPipelineContext(): bool' )
 );
 assert_passthrough(
-	'AgentPingTask returns true from needsPipelineContext()',
+	'AgentCallTask returns true from needsPipelineContext()',
 	false !== strpos( $ping_src, "needsPipelineContext(): bool {\n\t\treturn true;" )
 );
 assert_passthrough(
-	'AgentPingTask overrides getFlowStepConfigPassthrough()',
+	'AgentCallTask overrides getFlowStepConfigPassthrough()',
 	false !== strpos( $ping_src, 'public function getFlowStepConfigPassthrough(): array' )
 );
 assert_passthrough(
-	"AgentPingTask declares 'queue_mode' as a flow_step_config passthrough",
+	"AgentCallTask declares 'queue_mode' as a flow_step_config passthrough",
 	false !== strpos(
 		$ping_src,
 		"return array( 'queue_mode' );"
@@ -392,7 +392,7 @@ $entries  = glob( $task_dir . '/*.php' );
 $opted_in = array();
 foreach ( $entries as $file ) {
 	$base = basename( $file );
-	if ( 'SystemTask.php' === $base || 'AgentPingTask.php' === $base ) {
+	if ( 'SystemTask.php' === $base || 'AgentCallTask.php' === $base ) {
 		continue;
 	}
 	$src = (string) file_get_contents( $file );
@@ -404,7 +404,7 @@ foreach ( $entries as $file ) {
 	}
 }
 assert_passthrough(
-	'AgentPingTask is the only task that opts into passthrough today',
+	'AgentCallTask is the only task that opts into passthrough today',
 	array() === $opted_in
 );
 

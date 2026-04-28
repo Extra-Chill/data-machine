@@ -157,7 +157,7 @@ $wpdb->rows['wp_datamachine_pipelines'] = array(
 				'system_pipeline' => array(
 					'step_type'       => 'system_task',
 					'handler_slugs'   => array( 'system_task' ),
-					'handler_configs' => array( 'system_task' => array( 'task' => 'agent_ping' ) ),
+					'handler_configs' => array( 'system_task' => array( 'task' => 'agent_call' ) ),
 				),
 			)
 		),
@@ -176,7 +176,7 @@ assert_equals( false, array_key_exists( 'handler_slugs', $flow_config['fetch_10'
 assert_equals( array( 'task' => 'daily_memory_generation' ), $flow_config['system_10']['handler_config'] ?? null, 'system_task config collapsed', $failures, $passes );
 assert_equals( false, array_key_exists( 'handler_slugs', $flow_config['system_10'] ), 'system_task synthetic slugs removed', $failures, $passes );
 assert_equals( array( 'wordpress_publish', 'email_publish' ), $flow_config['publish_10']['handler_slugs'] ?? null, 'publish multi slugs preserved', $failures, $passes );
-assert_equals( array( 'task' => 'agent_ping' ), $pipeline_config['system_pipeline']['handler_config'] ?? null, 'pipeline system_task config collapsed', $failures, $passes );
+assert_equals( array( 'task' => 'agent_call' ), $pipeline_config['system_pipeline']['handler_config'] ?? null, 'pipeline system_task config collapsed', $failures, $passes );
 
 echo "\n-----------------------------------\n";
 $total = $passes + count( $failures );

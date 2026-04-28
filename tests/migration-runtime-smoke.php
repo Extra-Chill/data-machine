@@ -117,6 +117,7 @@ $migration_chain = array(
 	'datamachine_drop_orphaned_agent_tables',
 	'datamachine_migrate_agent_ping_to_system_task',
 	'datamachine_migrate_agent_ping_pipeline_to_system_task',
+	'datamachine_migrate_agent_ping_task_to_agent_call',
 	'datamachine_migrate_update_to_upsert_step_type',
 	'datamachine_strip_pipeline_step_provider_model',
 	'datamachine_migrate_ai_enabled_tools',

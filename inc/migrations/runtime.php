@@ -90,6 +90,9 @@ function datamachine_run_schema_migrations(): void {
 	// Migrate agent_ping step types to pipeline configs (idempotent).
 	datamachine_migrate_agent_ping_pipeline_to_system_task();
 
+	// Migrate existing agent_ping system_task configs to agent_call (idempotent).
+	datamachine_migrate_agent_ping_task_to_agent_call();
+
 	// Migrate `update` step type to `upsert` in pipeline/flow configs (idempotent).
 	datamachine_migrate_update_to_upsert_step_type();
 
