@@ -79,7 +79,7 @@ class AIStep extends Step {
 
 		// Model/provider resolved exclusively via mode system (agent → site → network).
 		// Pipeline-level model/provider fields are ignored — mode_models is the authority.
-		$mode_model = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
+		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
 		$provider_name = $mode_model['provider'];
 		if ( empty( $provider_name ) ) {
 			do_action(
@@ -254,14 +254,7 @@ class AIStep extends Step {
 		$next_step_config  = $next_flow_step_id ? $this->engine->getFlowStepConfig( $next_flow_step_id ) : null;
 
 		// Collect required handler slugs from adjacent steps for completion tracking.
-		$required_handler_slugs = array();
-		foreach ( array( $previous_step_config, $next_step_config ) as $adj_step_config ) {
-			if ( ! $adj_step_config ) {
-				continue;
-			}
-			$handler_slugs          = FlowStepConfig::getRequiredHandlerSlugsForAi( $adj_step_config );
-			$required_handler_slugs = array_merge( $required_handler_slugs, $handler_slugs );
-		}
+		$required_handler_slugs = FlowStepConfig::getAdjacentRequiredHandlerSlugsForAi( $previous_step_config, $next_step_config );
 
 		$engine_data = $this->engine->all();
 
@@ -285,20 +278,31 @@ class AIStep extends Step {
 			)
 		);
 
-		// Filter required handler slugs to only those that are actual AI tools.
-		// Previous-step handler slugs (e.g. 'universal_web_scraper') are
-		// pipeline-level fetch handlers, not AI-callable tools. Including
-		// them in configured_handlers causes the conversation loop to wait
-		// forever for a handler that can never fire, resulting in the AI
-		// calling the same handler tool on every turn until max_turns.
-		// See: https://github.com/Extra-Chill/data-machine/issues/1108
+		// Required adjacent handler tools are flow plumbing, not optional research
+		// tools. If a publish/upsert handler required by the flow shape cannot be
+		// exposed to the model, fail before the model call instead of silently
+		// narrowing completion tracking to the visible subset.
 		if ( ! empty( $required_handler_slugs ) ) {
-			$ai_tool_handler_slugs = array_values(
-				array_intersect(
-					array_unique( $required_handler_slugs ),
-					array_keys( $available_tools )
-				)
-			);
+			$missing_handler_slugs = FlowStepConfig::getMissingRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools );
+			if ( ! empty( $missing_handler_slugs ) ) {
+				do_action(
+					'datamachine_fail_job',
+					$this->job_id,
+					'required_handler_tool_unavailable',
+					array(
+						'flow_step_id'                   => $this->flow_step_id,
+						'pipeline_step_id'               => $pipeline_step_id,
+						'required_handler_slugs'         => $required_handler_slugs,
+						'missing_required_handler_slugs' => $missing_handler_slugs,
+						'available_handler_tool_slugs'   => FlowStepConfig::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools ),
+						'error_message'                  => 'AI step requires adjacent handler tools that are not available to the model.',
+					)
+				);
+
+				return array();
+			}
+
+			$ai_tool_handler_slugs = FlowStepConfig::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools );
 
 			if ( ! empty( $ai_tool_handler_slugs ) ) {
 				$payload['configured_handler_slugs'] = $ai_tool_handler_slugs;
@@ -306,7 +310,7 @@ class AIStep extends Step {
 		}
 
 		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
-		$mode_model = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
+		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
 		$provider_name = $mode_model['provider'];
 		$model_name    = $mode_model['model'];
 

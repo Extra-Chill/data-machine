@@ -96,6 +96,18 @@ add_filter('datamachine_tools', function($tools) {
 against the adjacent pipeline step's `handler_slug` (or `handler_types` for
 cross-cutting tools like `skip_item`).
 
+Adjacent handler tools are **flow plumbing**, not optional global tools. In
+pipeline mode they bypass agent `tool_policy`, context `tool_categories`, and
+context `allow_only` filtering because the adjacent flow shape requires them for
+publish/upsert completion. Static/global pipeline tools still pass those policy
+layers normally.
+
+If a required adjacent publish/upsert handler has no AI-callable handler tool,
+the AI step fails before the model call with `required_handler_tool_unavailable`.
+The request inspector uses the same missing-handler check, so `wp datamachine ai
+inspect-request` reports the same unavailable-handler state without dispatching
+to a provider.
+
 #### 2. Global Tools (All Agents)
 
 Tools registered via `datamachine_global_tools` filter, available to all AI agents:

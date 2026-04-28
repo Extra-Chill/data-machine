@@ -58,27 +58,6 @@ function assert_not_contains( string $needle, string $haystack, string $name, ar
 	assert_equals( false, str_contains( $haystack, $needle ), $name, $failures, $passes );
 }
 
-function resolve_required_ai_handler_tools_for_test( ?array $previous_step_config, ?array $next_step_config, array $available_tools ): array {
-	$required_handler_slugs = array();
-	foreach ( array( $previous_step_config, $next_step_config ) as $adjacent_step_config ) {
-		if ( ! $adjacent_step_config ) {
-			continue;
-		}
-
-		$required_handler_slugs = array_merge(
-			$required_handler_slugs,
-			FlowStepConfig::getRequiredHandlerSlugsForAi( $adjacent_step_config )
-		);
-	}
-
-	return array_values(
-		array_intersect(
-			array_unique( $required_handler_slugs ),
-			array_keys( $available_tools )
-		)
-	);
-}
-
 echo "AI required handlers smoke\n";
 echo "--------------------------\n";
 
@@ -132,22 +111,58 @@ assert_equals(
 );
 
 $available_tools = array(
-	'wordpress_update' => array( 'handler' => 'wordpress_update' ),
-	'notion_update'    => array( 'handler' => 'notion_update' ),
+	'wordpress_update_tool' => array( 'handler' => 'wordpress_update' ),
+	'notion_update_tool'    => array( 'handler' => 'notion_update' ),
+);
+$required_handler_slugs = FlowStepConfig::getAdjacentRequiredHandlerSlugsForAi( null, $upsert_step );
+assert_equals(
+	array( 'notion_update' ),
+	$required_handler_slugs,
+	'adjacent helper resolves required upsert handler slug',
+	$failures,
+	$passes
 );
 assert_equals(
 	array( 'notion_update' ),
-	resolve_required_ai_handler_tools_for_test( null, $upsert_step, $available_tools ),
-	'AIStep-style payload tracks only required upsert handler tools',
+	FlowStepConfig::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools ),
+	'AIStep-style payload tracks required handler slugs via tool metadata, not tool names',
+	$failures,
+	$passes
+);
+assert_equals(
+	array(),
+	FlowStepConfig::getMissingRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools ),
+	'available required handler tools report no missing slugs',
+	$failures,
+	$passes
+);
+assert_equals(
+	array( 'notion_update' ),
+	FlowStepConfig::getMissingRequiredHandlerSlugsForAi( $required_handler_slugs, array() ),
+	'missing required handler tools are reported instead of silently dropped',
 	$failures,
 	$passes
 );
 
-$ai_step_source = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' );
+$ai_step_source = (string) file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' );
 assert_contains(
-	'FlowStepConfig::getRequiredHandlerSlugsForAi( $adj_step_config )',
+	'FlowStepConfig::getAdjacentRequiredHandlerSlugsForAi( $previous_step_config, $next_step_config )',
 	$ai_step_source,
-	'AIStep resolves adjacent required handlers through FlowStepConfig',
+	'AIStep resolves adjacent required handlers through shared FlowStepConfig helper',
+	$failures,
+	$passes
+);
+assert_contains(
+	'FlowStepConfig::getMissingRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools )',
+	$ai_step_source,
+	'AIStep fails before model call when required handler tools are unavailable',
+	$failures,
+	$passes
+);
+assert_not_contains(
+	'array_keys( $available_tools )',
+	$ai_step_source,
+	'AIStep no longer intersects required handlers against post-policy tool names',
 	$failures,
 	$passes
 );

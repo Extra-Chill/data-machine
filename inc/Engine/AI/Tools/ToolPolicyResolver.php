@@ -114,6 +114,8 @@ class ToolPolicyResolver {
 		}
 
 		// 3. Apply per-agent tool policy (from agent_config).
+		// Pipeline handler tools are required flow plumbing derived from adjacent
+		// steps, so per-agent allow/deny policy only filters optional tools.
 		if ( $agent_id > 0 ) {
 			$agent_policy = $this->getAgentToolPolicy( $agent_id );
 			$tools        = $this->applyAgentPolicy( $tools, $agent_policy );
@@ -126,10 +128,10 @@ class ToolPolicyResolver {
 			$tools = $this->filterByAbilityCategories( $tools, $categories );
 		}
 
-		// 5. Apply allowlist if specified (narrows to explicit subset).
+		// 5. Apply allowlist if specified (narrows optional tools to explicit subset).
 		$allow_only = $args['allow_only'] ?? array();
 		if ( ! empty( $allow_only ) ) {
-			$tools = array_intersect_key( $tools, array_flip( $allow_only ) );
+			$tools = $this->filterByAllowOnlyPreservingHandlerTools( $tools, $allow_only );
 		}
 
 		// 6. Apply deny list (always wins).
@@ -303,8 +305,8 @@ class ToolPolicyResolver {
 				continue;
 			}
 
-			$handler_slugs       = FlowStepConfig::getConfiguredHandlerSlugs( $step_config );
-			$cache_scope         = $step_config['flow_step_id'] ?? ( $args['cache_scope'] ?? '' );
+			$handler_slugs = FlowStepConfig::getConfiguredHandlerSlugs( $step_config );
+			$cache_scope   = $step_config['flow_step_id'] ?? ( $args['cache_scope'] ?? '' );
 
 			foreach ( $handler_slugs as $slug ) {
 				$handler_config = FlowStepConfig::getHandlerConfigForSlug( $step_config, $slug );
@@ -422,7 +424,7 @@ class ToolPolicyResolver {
 
 			// Handler tools bypass category filtering — they're already scoped
 			// by the pipeline engine to adjacent step handlers.
-			if ( isset( $tool['handler'] ) && ! isset( $tool['ability'] ) && ! isset( $tool['abilities'] ) ) {
+			if ( self::isPipelineHandlerTool( $tool ) ) {
 				$filtered[ $name ] = $tool;
 				continue;
 			}
@@ -547,18 +549,20 @@ class ToolPolicyResolver {
 		$mode              = $policy['mode'];
 		$tool_names        = $policy['tools'] ?? array();
 		$policy_categories = $policy['categories'] ?? array();
+		$handler_tools     = $this->getPipelineHandlerTools( $tools );
+		$optional_tools    = array_diff_key( $tools, $handler_tools );
 
-		// No tool names and no categories = no restrictions (deny) or no tools (allow).
+		// No tool names and no categories = no restrictions (deny) or no optional tools (allow).
 		if ( empty( $tool_names ) && empty( $policy_categories ) ) {
-			return 'allow' === $mode ? array() : $tools;
+			return 'allow' === $mode ? $handler_tools : $tools;
 		}
 
 		// Simple case: no categories, just tool names (original behavior).
 		if ( empty( $policy_categories ) ) {
 			if ( 'deny' === $mode ) {
-				return array_diff_key( $tools, array_flip( $tool_names ) );
+				return $handler_tools + array_diff_key( $optional_tools, array_flip( $tool_names ) );
 			}
-			return array_intersect_key( $tools, array_flip( $tool_names ) );
+			return $handler_tools + array_intersect_key( $optional_tools, array_flip( $tool_names ) );
 		}
 
 		// Category-aware filtering: check both tool names and categories.
@@ -567,7 +571,7 @@ class ToolPolicyResolver {
 		$categories_flip = array_flip( $policy_categories );
 		$filtered        = array();
 
-		foreach ( $tools as $name => $tool ) {
+		foreach ( $optional_tools as $name => $tool ) {
 			$matches_tool = isset( $tool_names_flip[ $name ] );
 			$matches_cat  = false;
 
@@ -599,7 +603,48 @@ class ToolPolicyResolver {
 			}
 		}
 
-		return $filtered;
+		return $handler_tools + $filtered;
+	}
+
+	/**
+	 * Return whether a tool is a pipeline handler tool resolved from adjacency.
+	 *
+	 * Handler tools are flow plumbing: they are controlled by the adjacent flow
+	 * shape and carry handler metadata for completion tracking. Optional/global
+	 * tool policy should not remove them.
+	 *
+	 * @param array $tool Tool definition.
+	 * @return bool Whether this is an adjacent handler tool.
+	 */
+	private static function isPipelineHandlerTool( array $tool ): bool {
+		return isset( $tool['handler'] ) && ! isset( $tool['ability'] ) && ! isset( $tool['abilities'] );
+	}
+
+	/**
+	 * Extract adjacent pipeline handler tools from a resolved tool set.
+	 *
+	 * @param array $tools Tool definitions keyed by tool name.
+	 * @return array Handler tools keyed by tool name.
+	 */
+	private function getPipelineHandlerTools( array $tools ): array {
+		return array_filter(
+			$tools,
+			static fn( $tool ) => is_array( $tool ) && self::isPipelineHandlerTool( $tool )
+		);
+	}
+
+	/**
+	 * Apply an allow-only list while preserving adjacent handler tools.
+	 *
+	 * @param array $tools      Tool definitions keyed by tool name.
+	 * @param array $allow_only Optional/global tool names to allow.
+	 * @return array Filtered tools.
+	 */
+	private function filterByAllowOnlyPreservingHandlerTools( array $tools, array $allow_only ): array {
+		$handler_tools  = $this->getPipelineHandlerTools( $tools );
+		$optional_tools = array_diff_key( $tools, $handler_tools );
+
+		return $handler_tools + array_intersect_key( $optional_tools, array_flip( $allow_only ) );
 	}
 
 	/**

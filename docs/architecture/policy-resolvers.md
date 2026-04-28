@@ -111,7 +111,9 @@ The ladders look similar because they are similar. They are not identical, and t
 
 Resolvers that gate by category (`ToolPolicyResolver`, `ActionPolicyResolver`) walk a tool's `ability` and `abilities` keys, look up each slug in `WP_Abilities_Registry::get_instance()`, and read `get_category()` on the ability. A tool's category is whatever its linked ability declares — there is no separate "tool category" registry.
 
-Tools without a linked ability are excluded when category filtering is active (they cannot be categorized) unless explicitly allow-listed. Handler tools (those with a `handler` key but no `ability` key) bypass category filtering — they are dynamically scoped by the pipeline engine to adjacent step handlers.
+Tools without a linked ability are excluded when category filtering is active (they cannot be categorized) unless explicitly allow-listed. Handler tools (those with a `handler` key but no `ability` key) are the exception: in pipeline mode they are required flow plumbing resolved from adjacent steps, so they bypass agent `tool_policy`, context category filtering, and context `allow_only` filtering. The flow shape decides whether they exist; optional/global tool policy only narrows research and utility tools.
+
+If a publish/upsert handler is required by the adjacent flow shape but no AI-callable handler tool is available, the AI step fails before the model call. Runtime and request inspection both use `FlowStepConfig::getMissingRequiredHandlerSlugsForAi()` so the inspector reports the same failure state the runtime would hit.
 
 ### 5. Mode-aware (`pipeline` / `chat` / `system`)
 
@@ -153,6 +155,7 @@ Each resolver invented something the others don't have. None of those inventions
 - An ability-permission gate (`filterByAbilityPermissions()`) that runs only in `chat` mode.
 - An `access_level` fallback (`public` / `authenticated` / `author` / `editor` / `admin`) for tools without a linked ability.
 - A category-aware `applyAgentPolicy()` that supports `tools[]` and `categories[]` composing in either deny or allow mode.
+- A pipeline handler-tool exception: adjacent handler tools are preserved through agent allow/deny policy and context allow/category filters because they are required flow plumbing, not optional global tools.
 
 `MemoryPolicyResolver` has:
 
