@@ -79,7 +79,7 @@ class AIStep extends Step {
 
 		// Model/provider resolved exclusively via mode system (agent → site → network).
 		// Pipeline-level model/provider fields are ignored — mode_models is the authority.
-		$mode_model = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
+		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
 		$provider_name = $mode_model['provider'];
 		if ( empty( $provider_name ) ) {
 			do_action(
@@ -274,14 +274,17 @@ class AIStep extends Step {
 
 		$resolver        = new ToolPolicyResolver();
 		$available_tools = $resolver->resolve(
-			array(
-				'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
-				'agent_id'             => $agent_id,
-				'previous_step_config' => $previous_step_config,
-				'next_step_config'     => $next_step_config,
-				'pipeline_step_id'     => $pipeline_step_id,
-				'engine_data'          => $engine_data,
-				'categories'           => $tool_categories,
+			array_merge(
+				array(
+					'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
+					'agent_id'             => $agent_id,
+					'previous_step_config' => $previous_step_config,
+					'next_step_config'     => $next_step_config,
+					'pipeline_step_id'     => $pipeline_step_id,
+					'engine_data'          => $engine_data,
+					'categories'           => $tool_categories,
+				),
+				ToolPolicyResolver::getPipelinePolicyArgs( $this->flow_step_config, $pipeline_step_config )
 			)
 		);
 
@@ -306,7 +309,7 @@ class AIStep extends Step {
 		}
 
 		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
-		$mode_model = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
+		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
 		$provider_name = $mode_model['provider'];
 		$model_name    = $mode_model['model'];
 

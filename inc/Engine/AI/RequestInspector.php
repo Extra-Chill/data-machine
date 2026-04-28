@@ -101,14 +101,17 @@ class RequestInspector {
 
 		$resolver = new ToolPolicyResolver();
 		$tools    = $resolver->resolve(
-			array(
-				'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
-				'agent_id'             => $agent_id,
-				'previous_step_config' => $previous_step_config,
-				'next_step_config'     => $next_step_config,
-				'pipeline_step_id'     => $pipeline_step_id,
-				'engine_data'          => $engine->all(),
-				'categories'           => $tool_categories,
+			array_merge(
+				array(
+					'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
+					'agent_id'             => $agent_id,
+					'previous_step_config' => $previous_step_config,
+					'next_step_config'     => $next_step_config,
+					'pipeline_step_id'     => $pipeline_step_id,
+					'engine_data'          => $engine->all(),
+					'categories'           => $tool_categories,
+				),
+				ToolPolicyResolver::getPipelinePolicyArgs( $flow_step_config, $pipeline_step_config )
 			)
 		);
 
