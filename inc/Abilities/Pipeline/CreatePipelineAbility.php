@@ -58,11 +58,11 @@ class CreatePipelineAbility {
 							),
 							'pipelines'     => array(
 								'type'        => 'array',
-								'description' => __( 'Bulk mode: create multiple pipelines. Each item: {name, steps?, flow_name?, scheduling_config?}', 'data-machine' ),
+								'description' => __( 'Bulk mode: create multiple pipelines. Each item: {name, workflow?, steps?, flow_name?, scheduling_config?}', 'data-machine' ),
 							),
 							'template'      => array(
 								'type'        => 'object',
-								'description' => __( 'Shared config for bulk mode applied to all pipelines: {steps, scheduling_config}', 'data-machine' ),
+								'description' => __( 'Shared config for bulk mode applied to all pipelines: {workflow, steps, scheduling_config}', 'data-machine' ),
 							),
 							'validate_only' => array(
 								'type'        => 'boolean',
@@ -152,7 +152,7 @@ class CreatePipelineAbility {
 		$workflow    = isset( $input['workflow'] ) && is_array( $input['workflow'] ) ? $input['workflow'] : array();
 		$flow_config = $input['flow_config'] ?? array();
 
-		$has_steps = ! empty( $steps ) && is_array( $steps );
+		$has_steps    = ! empty( $steps ) && is_array( $steps );
 		$has_workflow = ! empty( $workflow );
 
 		if ( $has_workflow ) {
@@ -321,9 +321,23 @@ class CreatePipelineAbility {
 		$template      = $input['template'] ?? array();
 		$validate_only = ! empty( $input['validate_only'] );
 
-		// Pre-validation: check handler slugs in template
-		$template_steps = $template['steps'] ?? array();
-		if ( ! empty( $template_steps ) ) {
+		// Pre-validation: check handler slugs in template.
+		$template_workflow = isset( $template['workflow'] ) && is_array( $template['workflow'] ) ? $template['workflow'] : array();
+		$template_steps    = $template['steps'] ?? array();
+		if ( ! empty( $template_workflow ) ) {
+			$validation = $this->validateWorkflow( $template_workflow );
+			if ( true !== $validation ) {
+				return array(
+					'success' => false,
+					'error'   => 'Template workflow validation failed: ' . $validation,
+				);
+			}
+
+			$handler_validation = $this->validateHandlerSlugs( $template_workflow['steps'] );
+			if ( true !== $handler_validation ) {
+				return $handler_validation;
+			}
+		} elseif ( ! empty( $template_steps ) ) {
 			$validation = $this->validateSteps( $template_steps );
 			if ( true !== $validation ) {
 				return array(
@@ -351,7 +365,29 @@ class CreatePipelineAbility {
 				continue;
 			}
 
-			// Validate per-pipeline steps if provided
+			$per_pipeline_workflow = isset( $pipeline_config['workflow'] ) && is_array( $pipeline_config['workflow'] ) ? $pipeline_config['workflow'] : array();
+
+			// Per-pipeline workflow wins over per-pipeline steps.
+			if ( ! empty( $per_pipeline_workflow ) ) {
+				$workflow_validation = $this->validateWorkflow( $per_pipeline_workflow );
+				if ( true !== $workflow_validation ) {
+					$validation_errors[] = array(
+						'index'       => $index,
+						'name'        => $name,
+						'error'       => 'Workflow validation failed: ' . $workflow_validation,
+						'remediation' => 'Fix the workflow configuration for this pipeline',
+					);
+					continue;
+				}
+
+				$handler_validation = $this->validateHandlerSlugs( $per_pipeline_workflow['steps'] );
+				if ( true !== $handler_validation ) {
+					$validation_errors[] = $this->handlerValidationError( $index, $name, $handler_validation );
+				}
+				continue;
+			}
+
+			// Validate per-pipeline steps if provided.
 			$per_pipeline_steps = $pipeline_config['steps'] ?? array();
 			if ( ! empty( $per_pipeline_steps ) ) {
 				$steps_validation = $this->validateSteps( $per_pipeline_steps );
@@ -367,12 +403,7 @@ class CreatePipelineAbility {
 
 				$handler_validation = $this->validateHandlerSlugs( $per_pipeline_steps );
 				if ( true !== $handler_validation ) {
-					$validation_errors[] = array(
-						'index'       => $index,
-						'name'        => $name,
-						'error'       => $handler_validation['error'],
-						'remediation' => 'Use valid handler slugs from the list_handlers tool',
-					);
+					$validation_errors[] = $this->handlerValidationError( $index, $name, $handler_validation );
 				}
 			}
 		}
@@ -389,12 +420,15 @@ class CreatePipelineAbility {
 		if ( $validate_only ) {
 			$preview = array();
 			foreach ( $pipelines as $index => $pipeline_config ) {
-				$name  = $pipeline_config['name'];
-				$steps = ! empty( $pipeline_config['steps'] ) ? $pipeline_config['steps'] : $template_steps;
+				$name     = $pipeline_config['name'];
+				$resolved = $this->resolveBulkPipelineSpec( $pipeline_config, $template_workflow, $template_steps );
+				$workflow = $resolved['workflow'];
+				$steps    = $resolved['steps'];
 
 				$preview_item = array(
-					'name'  => $name,
-					'steps' => count( $steps ),
+					'name'          => $name,
+					'steps'         => ! empty( $workflow ) ? count( $workflow['steps'] ?? array() ) : count( $steps ),
+					'creation_mode' => ! empty( $workflow ) ? 'workflow' : ( ! empty( $steps ) ? 'batch' : 'simple' ),
 				);
 
 				$has_flow = isset( $pipeline_config['flow_name'] ) || isset( $pipeline_config['scheduling_config'] ) || isset( $template['scheduling_config'] );
@@ -425,13 +459,20 @@ class CreatePipelineAbility {
 		$agent_id = isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
 
 		foreach ( $pipelines as $index => $pipeline_config ) {
-			$name  = $pipeline_config['name'];
-			$steps = ! empty( $pipeline_config['steps'] ) ? $pipeline_config['steps'] : $template_steps;
+			$name     = $pipeline_config['name'];
+			$resolved = $this->resolveBulkPipelineSpec( $pipeline_config, $template_workflow, $template_steps );
+			$workflow = $resolved['workflow'];
+			$steps    = $resolved['steps'];
 
 			$single_input = array(
 				'pipeline_name' => $name,
-				'steps'         => $steps,
 			);
+
+			if ( ! empty( $workflow ) ) {
+				$single_input['workflow'] = $workflow;
+			} else {
+				$single_input['steps'] = $steps;
+			}
 
 			if ( null !== $agent_id && $agent_id > 0 ) {
 				$single_input['agent_id'] = $agent_id;
@@ -506,6 +547,53 @@ class CreatePipelineAbility {
 			'partial'       => $partial,
 			'message'       => $message,
 			'creation_mode' => 'bulk',
+		);
+	}
+
+	/**
+	 * Resolve the effective step source for a bulk pipeline entry.
+	 *
+	 * @param array $pipeline_config Pipeline entry config.
+	 * @param array $template_workflow Shared workflow template.
+	 * @param array $template_steps Shared legacy steps template.
+	 * @return array{workflow: array, steps: array}
+	 */
+	private function resolveBulkPipelineSpec( array $pipeline_config, array $template_workflow, array $template_steps ): array {
+		$workflow = isset( $pipeline_config['workflow'] ) && is_array( $pipeline_config['workflow'] ) && ! empty( $pipeline_config['workflow'] )
+			? $pipeline_config['workflow']
+			: array();
+		$steps    = array();
+
+		if ( empty( $workflow ) ) {
+			if ( ! empty( $pipeline_config['steps'] ) ) {
+				$steps = $pipeline_config['steps'];
+			} elseif ( ! empty( $template_workflow ) ) {
+				$workflow = $template_workflow;
+			} else {
+				$steps = $template_steps;
+			}
+		}
+
+		return array(
+			'workflow' => $workflow,
+			'steps'    => $steps,
+		);
+	}
+
+	/**
+	 * Build a bulk validation error for invalid handler slugs.
+	 *
+	 * @param int   $index Pipeline entry index.
+	 * @param string $name Pipeline name.
+	 * @param array $handler_validation Handler validation result.
+	 * @return array<string,mixed> Validation error item.
+	 */
+	private function handlerValidationError( int $index, string $name, array $handler_validation ): array {
+		return array(
+			'index'       => $index,
+			'name'        => $name,
+			'error'       => $handler_validation['error'],
+			'remediation' => 'Use valid handler slugs from the list_handlers tool',
 		);
 	}
 }
