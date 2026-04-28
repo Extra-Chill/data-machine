@@ -9,10 +9,10 @@
  * are shared across all subsites on a multisite network. On single-site installs,
  * these behave identically to get_option()/update_option().
  *
- * Sensitive fields (tokens, secrets) are encrypted at rest using AES-256-CBC with
+ * Sensitive fields (tokens, secrets) are encrypted at rest using AES-256-GCM with
  * a key derived from wp_salt('auth'). Encrypted values use an envelope format:
  *
- *     dm:enc:v1:{base64(iv)}:{base64(ciphertext)}
+ *     dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}
  *
  * Plaintext values without the envelope prefix are read as-is for backward
  * compatibility. Values get encrypted opportunistically on next save.
@@ -42,7 +42,14 @@ abstract class BaseAuthProvider {
 	 *
 	 * @since 0.88.0
 	 */
-	const CIPHER_ALGO = 'aes-256-cbc';
+	const CIPHER_ALGO = 'aes-256-gcm';
+
+	/**
+	 * Authentication tag length for AES-GCM.
+	 *
+	 * @since 0.88.0
+	 */
+	const AUTH_TAG_LENGTH = 16;
 
 	/**
 	 * Fields that should be encrypted when stored.
@@ -314,10 +321,10 @@ abstract class BaseAuthProvider {
 	}
 
 	/**
-	 * Encrypt a single value using AES-256-CBC.
+	 * Encrypt a single value using AES-256-GCM.
 	 *
 	 * Returns the encrypted value in envelope format:
-	 *     dm:enc:v1:{base64(iv)}:{base64(ciphertext)}
+	 *     dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}
 	 *
 	 * @since 0.88.0
 	 * @param string $plaintext The value to encrypt.
@@ -332,20 +339,22 @@ abstract class BaseAuthProvider {
 		$iv_length = openssl_cipher_iv_length( self::CIPHER_ALGO );
 		$iv        = openssl_random_pseudo_bytes( $iv_length );
 
-		$ciphertext = openssl_encrypt( $plaintext, self::CIPHER_ALGO, $key, OPENSSL_RAW_DATA, $iv );
+		$tag        = '';
+		$ciphertext = openssl_encrypt( $plaintext, self::CIPHER_ALGO, $key, OPENSSL_RAW_DATA, $iv, $tag, '', self::AUTH_TAG_LENGTH );
 
-		if ( false === $ciphertext ) {
+		if ( false === $ciphertext || '' === $tag ) {
 			$this->log_encryption_error( 'Encryption failed' );
 			return null;
 		}
 
-		return self::ENCRYPTION_PREFIX . base64_encode( $iv ) . ':' . base64_encode( $ciphertext );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Encoding binary crypto envelope fields, not obfuscation.
+		return self::ENCRYPTION_PREFIX . base64_encode( $iv ) . ':' . base64_encode( $tag ) . ':' . base64_encode( $ciphertext );
 	}
 
 	/**
 	 * Decrypt a single value from the encryption envelope format.
 	 *
-	 * Expects input in format: dm:enc:v1:{base64(iv)}:{base64(ciphertext)}
+	 * Expects input in format: dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}
 	 *
 	 * @since 0.88.0
 	 * @param string $envelope The encrypted envelope string.
@@ -357,19 +366,23 @@ abstract class BaseAuthProvider {
 			return null;
 		}
 
-		// Strip prefix and split into iv:ciphertext.
+		// Strip prefix and split into iv:tag:ciphertext.
 		$payload = substr( $envelope, strlen( self::ENCRYPTION_PREFIX ) );
-		$parts   = explode( ':', $payload, 2 );
+		$parts   = explode( ':', $payload, 3 );
 
-		if ( 2 !== count( $parts ) ) {
+		if ( 3 !== count( $parts ) ) {
 			$this->log_encryption_error( 'Malformed encryption envelope: missing separator' );
 			return null;
 		}
 
-		$iv         = base64_decode( $parts[0], true );
-		$ciphertext = base64_decode( $parts[1], true );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding binary crypto envelope fields, not obfuscation.
+		$iv = base64_decode( $parts[0], true );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding binary crypto envelope fields, not obfuscation.
+		$tag = base64_decode( $parts[1], true );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding binary crypto envelope fields, not obfuscation.
+		$ciphertext = base64_decode( $parts[2], true );
 
-		if ( false === $iv || false === $ciphertext ) {
+		if ( false === $iv || false === $tag || false === $ciphertext ) {
 			$this->log_encryption_error( 'Malformed encryption envelope: invalid base64' );
 			return null;
 		}
@@ -380,7 +393,12 @@ abstract class BaseAuthProvider {
 			return null;
 		}
 
-		$plaintext = openssl_decrypt( $ciphertext, self::CIPHER_ALGO, $key, OPENSSL_RAW_DATA, $iv );
+		if ( strlen( $tag ) !== self::AUTH_TAG_LENGTH ) {
+			$this->log_encryption_error( 'Malformed encryption envelope: invalid authentication tag length' );
+			return null;
+		}
+
+		$plaintext = openssl_decrypt( $ciphertext, self::CIPHER_ALGO, $key, OPENSSL_RAW_DATA, $iv, $tag );
 
 		if ( false === $plaintext ) {
 			$this->log_encryption_error( 'Decryption failed (wrong key or corrupted data)' );
@@ -394,7 +412,7 @@ abstract class BaseAuthProvider {
 	 * Derive the encryption key from WordPress auth salts.
 	 *
 	 * Uses hash('sha256', wp_salt('auth') . 'datamachine-oauth') to produce
-	 * a 32-byte key suitable for AES-256. The 'datamachine-oauth' suffix
+	 * a 32-byte key suitable for AES-256-GCM. The 'datamachine-oauth' suffix
 	 * ensures key isolation from other WordPress subsystems.
 	 *
 	 * @since 0.88.0

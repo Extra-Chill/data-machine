@@ -289,20 +289,21 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 
 	public function test_malformed_envelope_invalid_base64_returns_original(): void {
 		$data = array(
-			'access_token' => 'dm:enc:v1:!!!invalid!!!:!!!invalid!!!',
+			'access_token' => 'dm:enc:v1:!!!invalid!!!:!!!invalid!!!:!!!invalid!!!',
 		);
 
 		$decrypted = $this->provider->test_decrypt_fields( $data );
 
 		// Should return the encrypted blob as-is on failure.
-		$this->assertSame( 'dm:enc:v1:!!!invalid!!!:!!!invalid!!!', $decrypted['access_token'] );
+		$this->assertSame( 'dm:enc:v1:!!!invalid!!!:!!!invalid!!!:!!!invalid!!!', $decrypted['access_token'] );
 	}
 
 	public function test_malformed_envelope_wrong_iv_length_returns_original(): void {
-		// Valid base64 but IV is too short (should be 16 bytes for AES-256-CBC).
+		// Valid base64 but IV is too short (should be 12 bytes for AES-256-GCM).
 		$short_iv   = base64_encode( 'short' );
+		$tag        = base64_encode( str_repeat( 't', BaseAuthProvider::AUTH_TAG_LENGTH ) );
 		$ciphertext = base64_encode( 'fakeciphertext' );
-		$envelope   = "dm:enc:v1:{$short_iv}:{$ciphertext}";
+		$envelope   = "dm:enc:v1:{$short_iv}:{$tag}:{$ciphertext}";
 
 		$data      = array( 'access_token' => $envelope );
 		$decrypted = $this->provider->test_decrypt_fields( $data );
@@ -317,7 +318,7 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 
 		// Corrupt the ciphertext portion.
 		$parts    = explode( ':', $encrypted['access_token'] );
-		$parts[4] = base64_encode( 'corrupted-garbage-data' );
+		$parts[5] = base64_encode( 'corrupted-garbage-data' );
 		$corrupted_envelope = implode( ':', $parts );
 
 		$corrupted_data = array( 'access_token' => $corrupted_envelope );
@@ -345,17 +346,31 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 		$this->assertSame( 'shared-token', $decrypted['access_token'] );
 	}
 
-	public function test_different_salts_cannot_decrypt_each_others_data(): void {
-		// Encrypt with salt A.
-		self::$current_salt = 'salt-alpha';
+	public function test_modified_auth_tag_cannot_decrypt_data(): void {
 		$data      = array( 'access_token' => 'secret-value' );
 		$encrypted = $this->provider->test_encrypt_fields( $data );
 
+		$parts    = explode( ':', $encrypted['access_token'] );
+		$parts[4] = base64_encode( str_repeat( 'x', BaseAuthProvider::AUTH_TAG_LENGTH ) );
+		$modified = implode( ':', $parts );
+
+		$decrypted = $this->provider->test_decrypt_fields( array( 'access_token' => $modified ) );
+
+		// Authenticated encryption must reject tampered envelopes.
+		$this->assertSame( $modified, $decrypted['access_token'] );
+	}
+
+	public function test_different_salts_cannot_decrypt_each_others_data(): void {
+		// Encrypt with salt A.
+		self::$current_salt = 'salt-alpha';
+		$data               = array( 'access_token' => 'secret-value' );
+		$encrypted          = $this->provider->test_encrypt_fields( $data );
+
 		// Attempt decrypt with salt B.
 		self::$current_salt = 'salt-beta';
-		$decrypted = $this->provider->test_decrypt_fields( $encrypted );
+		$decrypted          = $this->provider->test_decrypt_fields( $encrypted );
 
-		// Should fail to decrypt — returns the encrypted blob.
+		// Should fail to decrypt and return the encrypted blob.
 		$this->assertSame( $encrypted['access_token'], $decrypted['access_token'] );
 	}
 
@@ -391,26 +406,31 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 
 		$envelope = $encrypted['access_token'];
 
-		// Should match: dm:enc:v1:{base64}:{base64}
+		// Should match: dm:enc:v1:{base64}:{base64}:{base64}
 		$this->assertMatchesRegularExpression(
-			'/^dm:enc:v1:[A-Za-z0-9+\/=]+:[A-Za-z0-9+\/=]+$/',
+			'/^dm:enc:v1:[A-Za-z0-9+\/=]+:[A-Za-z0-9+\/=]+:[A-Za-z0-9+\/=]+$/',
 			$envelope
 		);
 
 		// Split and validate parts.
 		$parts = explode( ':', $envelope );
-		$this->assertCount( 5, $parts );
+		$this->assertCount( 6, $parts );
 		$this->assertSame( 'dm', $parts[0] );
 		$this->assertSame( 'enc', $parts[1] );
 		$this->assertSame( 'v1', $parts[2] );
 
-		// IV should decode to 16 bytes (AES-256-CBC IV length).
+		// IV should decode to the AES-256-GCM IV length.
 		$iv = base64_decode( $parts[3], true );
 		$this->assertNotFalse( $iv );
-		$this->assertSame( 16, strlen( $iv ) );
+		$this->assertSame( openssl_cipher_iv_length( BaseAuthProvider::CIPHER_ALGO ), strlen( $iv ) );
+
+		// Authentication tag should decode to the configured length.
+		$tag = base64_decode( $parts[4], true );
+		$this->assertNotFalse( $tag );
+		$this->assertSame( BaseAuthProvider::AUTH_TAG_LENGTH, strlen( $tag ) );
 
 		// Ciphertext should be valid base64.
-		$this->assertNotFalse( base64_decode( $parts[4], true ) );
+		$this->assertNotFalse( base64_decode( $parts[5], true ) );
 	}
 
 	// -------------------------------------------------------------------------
@@ -422,9 +442,13 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 	}
 
 	public function test_cipher_algo_constant(): void {
-		$this->assertSame( 'aes-256-cbc', BaseAuthProvider::CIPHER_ALGO );
+		$this->assertSame( 'aes-256-gcm', BaseAuthProvider::CIPHER_ALGO );
 		// Verify the algorithm is available on this system.
-		$this->assertContains( 'aes-256-cbc', openssl_get_cipher_methods() );
+		$this->assertContains( 'aes-256-gcm', openssl_get_cipher_methods() );
+	}
+
+	public function test_auth_tag_length_constant(): void {
+		$this->assertSame( 16, BaseAuthProvider::AUTH_TAG_LENGTH );
 	}
 
 	// -------------------------------------------------------------------------
