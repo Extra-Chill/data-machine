@@ -271,6 +271,37 @@ class Flows extends BaseRepository {
 	}
 
 	/**
+	 * Get a flow by stable bundle portable slug within a pipeline.
+	 */
+	public function get_by_portable_slug( int $pipeline_id, string $portable_slug ): ?array {
+		$portable_slug = sanitize_title( $portable_slug );
+		if ( $pipeline_id <= 0 || '' === $portable_slug ) {
+			return null;
+		}
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$flow = $this->wpdb->get_row(
+			$this->wpdb->prepare(
+				'SELECT * FROM %i WHERE pipeline_id = %d AND portable_slug = %s LIMIT 1',
+				$this->table_name,
+				$pipeline_id,
+				$portable_slug
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( ! $flow ) {
+			return null;
+		}
+
+		$flow['flow_config']       = json_decode( $flow['flow_config'], true ) ?? array();
+		$flow['scheduling_config'] = json_decode( $flow['scheduling_config'], true ) ?? array();
+
+		return $flow;
+	}
+
+	/**
 	 * Get the raw flow_config JSON blob for compare-and-swap updates.
 	 *
 	 * @param int $flow_id Flow ID.
@@ -728,6 +759,14 @@ class Flows extends BaseRepository {
 		if ( isset( $flow_data['scheduling_config'] ) ) {
 			$update_data['scheduling_config'] = wp_json_encode( $flow_data['scheduling_config'] );
 			$update_formats[]                 = '%s';
+		}
+
+		if ( isset( $flow_data['portable_slug'] ) ) {
+			$portable_slug = sanitize_title( (string) $flow_data['portable_slug'] );
+			if ( '' !== $portable_slug ) {
+				$update_data['portable_slug'] = $portable_slug;
+				$update_formats[]             = '%s';
+			}
 		}
 
 		if ( empty( $update_data ) ) {

@@ -88,6 +88,7 @@ final class AgentBundleLegacyAdapter {
 
 			$pipelines[] = array(
 				'original_id'           => $pipeline_id,
+				'portable_slug'         => $slug,
 				'pipeline_name'         => $pipeline['name'],
 				'pipeline_config'       => $pipeline_config,
 				'memory_file_contents'  => self::strip_memory_prefix( $memory_files, 'pipelines/' . $slug . '/' ),
@@ -113,6 +114,7 @@ final class AgentBundleLegacyAdapter {
 			$flows[] = array(
 				'original_id'           => $flow_id,
 				'original_pipeline_id'  => $pipeline_id,
+				'portable_slug'         => $slug,
 				'flow_name'             => $flow['name'],
 				'flow_config'           => $flow_config,
 				'scheduling_config'     => array(
@@ -125,9 +127,13 @@ final class AgentBundleLegacyAdapter {
 		}
 
 		return array(
-			'bundle_version'     => 1,
-			'exported_at'        => $manifest['exported_at'],
-			'agent'              => array(
+			'bundle_version'        => $manifest['bundle_version'],
+			'bundle_slug'           => $manifest['bundle_slug'],
+			'source_ref'            => $manifest['source_ref'] ?? '',
+			'source_revision'       => $manifest['source_revision'] ?? '',
+			'bundle_schema_version' => BundleSchema::VERSION,
+			'exported_at'           => $manifest['exported_at'],
+			'agent'                 => array(
 				'agent_slug'   => $manifest['agent']['slug'],
 				'agent_name'   => $manifest['agent']['label'],
 				'agent_config' => $manifest['agent']['agent_config'],
@@ -146,7 +152,13 @@ final class AgentBundleLegacyAdapter {
 		$used  = array();
 		$slugs = array();
 		foreach ( $pipelines as $index => $pipeline ) {
-			$slug = PortableSlug::dedupe( PortableSlug::normalize( (string) ( $pipeline['pipeline_name'] ?? 'pipeline' ), 'pipeline' ), $used );
+			$slug = PortableSlug::dedupe(
+				PortableSlug::normalize(
+					(string) ( $pipeline['portable_slug'] ?? ( $pipeline['pipeline_name'] ?? 'pipeline' ) ),
+					'pipeline'
+				),
+				$used
+			);
 			$used[]          = $slug;
 			$slugs[ $index ] = $slug;
 		}
@@ -158,7 +170,13 @@ final class AgentBundleLegacyAdapter {
 		$used  = array();
 		$slugs = array();
 		foreach ( $flows as $index => $flow ) {
-			$slug = PortableSlug::dedupe( PortableSlug::normalize( (string) ( $flow['flow_name'] ?? 'flow' ), 'flow' ), $used );
+			$slug = PortableSlug::dedupe(
+				PortableSlug::normalize(
+					(string) ( $flow['portable_slug'] ?? ( $flow['flow_name'] ?? 'flow' ) ),
+					'flow'
+				),
+				$used
+			);
 			$used[]          = $slug;
 			$slugs[ $index ] = $slug;
 		}
