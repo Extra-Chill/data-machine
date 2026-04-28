@@ -2,10 +2,17 @@
 /**
  * Daily Memory Storage Interface
  *
- * Contract for daily memory storage backends. The default implementation
- * is DailyMemory (flat markdown files). Plugins can provide alternative
- * implementations (WordPress pages, external services, etc.) by filtering
- * `datamachine_daily_memory_storage` in DailyMemoryAbilities.
+ * Contract for daily memory storage backends used by the Daily Memory
+ * abilities. The default implementation is {@see DailyMemory}, which
+ * delegates persistence to the active {@see AgentMemoryStoreInterface}
+ * resolved through `datamachine_memory_store`.
+ *
+ * `datamachine_daily_memory_storage` is a narrower escape hatch for
+ * replacing the ability-level daily memory backend entirely. When that
+ * filter returns a DailyMemoryStorage implementation, it takes precedence
+ * for Daily Memory abilities. Otherwise DailyMemory remains active and
+ * daily files are stored through the unified memory-store seam as
+ * `daily/YYYY/MM/DD.md` in the agent layer.
  *
  * @package DataMachine\Core\FilesRepository
  * @since 0.47.0
