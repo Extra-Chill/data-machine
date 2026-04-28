@@ -584,13 +584,16 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	 *     return $this->oauth2->get_authorization_url( $auth_endpoint, $params );
 	 *
 	 * @since 0.66.0
+	 * @since 0.88.0 Added optional $state_payload parameter.
+	 *
+	 * @param array $state_payload Optional payload to propagate through the OAuth state.
 	 * @return array Query parameters for the authorization URL.
 	 */
-	protected function build_auth_url_params(): array {
+	protected function build_auth_url_params( array $state_payload = array() ): array {
 		$params = array(
 			'response_type' => $this->get_oauth_response_type(),
 			'redirect_uri'  => $this->get_callback_url(),
-			'state'         => $this->oauth2->create_state( $this->provider_slug ),
+			'state'         => $this->oauth2->create_state( $this->provider_slug, $state_payload ),
 		);
 
 		if ( $this->uses_pkce() ) {
