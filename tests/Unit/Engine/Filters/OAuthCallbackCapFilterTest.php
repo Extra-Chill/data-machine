@@ -151,4 +151,18 @@ class OAuthCallbackCapFilterTest extends WP_UnitTestCase {
 
 		$this->assertFalse( $result, 'Editor should not pass manage_options check' );
 	}
+
+	/**
+	 * Unknown providers are resolved before the capability filter runs.
+	 */
+	public function test_provider_lookup_happens_before_cap_filter(): void {
+		$source = file_get_contents( dirname( __DIR__, 4 ) . '/inc/Engine/Filters/OAuth.php' );
+
+		$this->assertIsString( $source );
+		$this->assertLessThan(
+			strpos( $source, 'datamachine_oauth_can_handle_callback' ),
+			strpos( $source, '$auth_instance  = $auth_abilities->getProvider( $provider );' ),
+			'Provider lookup must run before the callback cap filter so unknown providers 404 instead of 403.'
+		);
+	}
 }

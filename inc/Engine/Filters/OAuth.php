@@ -41,6 +41,17 @@ function datamachine_register_oauth_system() {
 				return;
 			}
 
+			$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
+			$auth_instance  = $auth_abilities->getProvider( $provider );
+
+			if ( ! $auth_instance ) {
+				$auth_instance = $auth_abilities->getProviderForHandler( $provider );
+			}
+
+			if ( ! $auth_instance || ! method_exists( $auth_instance, 'handle_oauth_callback' ) ) {
+				wp_die( esc_html( 'Unknown OAuth provider.' ) );
+			}
+
 			/**
 			 * Filters whether the current request is authorized to handle an OAuth callback.
 			 *
@@ -77,18 +88,7 @@ function datamachine_register_oauth_system() {
 				);
 			}
 
-			$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-			$auth_instance  = $auth_abilities->getProvider( $provider );
-
-			if ( ! $auth_instance ) {
-				$auth_instance = $auth_abilities->getProviderForHandler( $provider );
-			}
-
-			if ( $auth_instance && method_exists( $auth_instance, 'handle_oauth_callback' ) ) {
-				$auth_instance->handle_oauth_callback();
-			} else {
-				wp_die( esc_html( 'Unknown OAuth provider.' ) );
-			}
+			$auth_instance->handle_oauth_callback();
 
 			exit;
 		},
