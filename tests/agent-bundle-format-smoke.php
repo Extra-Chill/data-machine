@@ -22,6 +22,12 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 	}
 }
 
+if ( ! function_exists( 'esc_html' ) ) {
+	function esc_html( $text ) {
+		return htmlspecialchars( (string) $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+	}
+}
+
 if ( ! function_exists( 'did_action' ) ) {
 	function did_action( $hook = '' ) {
 		return 0;
@@ -43,6 +49,7 @@ if ( ! function_exists( 'add_action' ) ) {
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
+use DataMachine\Engine\Bundle\AgentBundleDriftStatus;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
@@ -91,16 +98,20 @@ assert_bundle_equals( 'dedupes sibling slugs with numeric suffix', 'daily-ingest
 echo "\n[2] Manifest schema validates and normalizes included lists\n";
 $manifest = AgentBundleManifest::from_array(
 	array(
-		'schema_version' => 1,
-		'exported_at'    => '2026-04-26T15:30:00Z',
-		'exported_by'    => 'data-machine/0.84.0-test',
-		'agent'          => array(
+		'schema_version'   => 1,
+		'bundle_slug'      => 'WooCommerce Knowledge Bundle',
+		'bundle_version'   => '1.2.3',
+		'source_ref'       => 'refs/heads/main',
+		'source_revision'  => 'abc1234',
+		'exported_at'      => '2026-04-26T15:30:00Z',
+		'exported_by'      => 'data-machine/0.84.0-test',
+		'agent'            => array(
 			'slug'         => 'WooCommerce Agent',
 			'label'        => 'WooCommerce Knowledge Keeper',
 			'description'  => 'Maintains the WooCommerce wiki.',
 			'agent_config' => array( 'model' => array( 'default' => 'gpt-5.5' ) ),
 		),
-		'included'       => array(
+		'included'         => array(
 			'memory'       => array( 'MEMORY.md', 'SOUL.md' ),
 			'pipelines'    => array( 'wc-weekly-lint', 'wc-daily-ingest' ),
 			'flows'        => array( 'wc-weekly-lint-flow', 'wc-daily-ingest-flow' ),
@@ -110,6 +121,9 @@ $manifest = AgentBundleManifest::from_array(
 );
 $manifest_array = $manifest->to_array();
 assert_bundle_equals( 'schema version pinned to v1', 1, $manifest_array['schema_version'] );
+assert_bundle_equals( 'bundle slug normalized once', 'woocommerce-knowledge-bundle', $manifest_array['bundle_slug'] );
+assert_bundle_equals( 'bundle version preserved', '1.2.3', $manifest_array['bundle_version'] );
+assert_bundle_equals( 'source revision preserved', 'abc1234', $manifest_array['source_revision'] );
 assert_bundle_equals( 'agent slug normalized once', 'woocommerce-agent', $manifest_array['agent']['slug'] );
 assert_bundle_equals( 'included pipelines sorted for deterministic JSON', array( 'wc-daily-ingest', 'wc-weekly-lint' ), $manifest_array['included']['pipelines'] );
 assert_bundle_equals( 'handler_auth refs accepted', 'refs', $manifest_array['included']['handler_auth'] );
@@ -269,11 +283,13 @@ $threw = false;
 try {
 	AgentBundleManifest::from_array(
 		array(
-			'schema_version' => 2,
-			'exported_at'    => '2026-04-26T15:30:00Z',
-			'exported_by'    => 'data-machine/next',
-			'agent'          => array(),
-			'included'       => array(),
+			'schema_version'  => 2,
+			'bundle_slug'     => 'next',
+			'bundle_version'  => 'next',
+			'exported_at'     => '2026-04-26T15:30:00Z',
+			'exported_by'     => 'data-machine/next',
+			'agent'           => array(),
+			'included'        => array(),
 		)
 	);
 } catch ( BundleValidationException $e ) {
@@ -281,7 +297,57 @@ try {
 }
 assert_bundle( 'v2 manifest refused with clear message', $threw );
 
-echo "\n[7] Source schema exposes stable portable slug columns\n";
+echo "\n[7] Bundle drift status compares installed metadata to available manifests\n";
+$current_status = AgentBundleDriftStatus::compare(
+	$manifest,
+	array(
+		'bundle_slug'     => 'WooCommerce Knowledge Bundle',
+		'bundle_version'  => '1.2.3',
+		'source_ref'      => 'refs/heads/main',
+		'source_revision' => 'abc1234',
+	)
+);
+assert_bundle_equals( 'matching metadata is current', AgentBundleDriftStatus::CURRENT, $current_status['status'] );
+assert_bundle_equals( 'current metadata is not drifted', false, $current_status['is_drifted'] );
+
+$missing_status = AgentBundleDriftStatus::compare( $manifest, null );
+assert_bundle_equals( 'missing metadata reports not installed', AgentBundleDriftStatus::NOT_INSTALLED, $missing_status['status'] );
+assert_bundle_equals( 'missing metadata is drifted', true, $missing_status['is_drifted'] );
+
+$wrong_bundle_status = AgentBundleDriftStatus::compare(
+	$manifest,
+	array(
+		'bundle_slug'    => 'Other Bundle',
+		'bundle_version' => '1.2.3',
+	)
+);
+assert_bundle_equals( 'different bundle slug reports wrong bundle', AgentBundleDriftStatus::WRONG_BUNDLE, $wrong_bundle_status['status'] );
+assert_bundle_equals( 'wrong bundle difference is bundle_slug', array( 'bundle_slug' ), $wrong_bundle_status['differences'] );
+
+$version_drift_status = AgentBundleDriftStatus::compare(
+	$manifest,
+	array(
+		'bundle_slug'    => 'WooCommerce Knowledge Bundle',
+		'bundle_version' => '1.2.2',
+	)
+);
+assert_bundle_equals( 'different version reports version drift', AgentBundleDriftStatus::VERSION_DRIFT, $version_drift_status['status'] );
+assert_bundle_equals( 'version drift difference is bundle_version', array( 'bundle_version' ), $version_drift_status['differences'] );
+
+$source_drift_status = AgentBundleDriftStatus::compare(
+	$manifest,
+	array(
+		'bundle_slug'     => 'WooCommerce Knowledge Bundle',
+		'bundle_version'  => '1.2.3',
+		'source_ref'      => 'refs/heads/main',
+		'source_revision' => 'def5678',
+	)
+);
+assert_bundle_equals( 'same version with different revision reports source drift', AgentBundleDriftStatus::SOURCE_DRIFT, $source_drift_status['status'] );
+assert_bundle_equals( 'source drift difference is source_revision', array( 'source_revision' ), $source_drift_status['differences'] );
+assert_bundle_equals( 'installed metadata normalized through portable slug', 'woocommerce-knowledge-bundle', $source_drift_status['installed']['bundle_slug'] );
+
+echo "\n[8] Source schema exposes stable portable slug columns\n";
 $pipelines_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Pipelines/Pipelines.php' );
 $flows_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Flows/Flows.php' );
 assert_bundle( 'pipelines table has portable_slug column', str_contains( (string) $pipelines_source, 'portable_slug varchar(191) DEFAULT NULL' ) );
