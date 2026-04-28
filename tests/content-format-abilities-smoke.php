@@ -37,15 +37,27 @@ namespace {
 
 	class WP_Error {
 
+		private string $code;
 		private string $message;
+		/** @var mixed */
+		private $data;
 
-		public function __construct( string $code = '', string $message = '' ) {
-			unset( $code );
+		public function __construct( string $code = '', string $message = '', $data = null ) {
+			$this->code    = $code;
 			$this->message = $message;
+			$this->data    = $data;
+		}
+
+		public function get_error_code(): string {
+			return $this->code;
 		}
 
 		public function get_error_message(): string {
 			return $this->message;
+		}
+
+		public function get_error_data() {
+			return $this->data;
 		}
 	}
 
@@ -172,6 +184,10 @@ namespace {
 	function bfb_convert( string $content, string $from, string $to ) {
 		$GLOBALS['__content_ability_conversions'][] = array( $from, $to, $content );
 
+		if ( str_contains( $content, 'CONVERT_FAIL' ) ) {
+			return new WP_Error( 'bfb_conversion_failed', 'BFB conversion failed.', array( 'format' => $from ) );
+		}
+
 		if ( $from === $to ) {
 			return $content;
 		}
@@ -200,9 +216,9 @@ namespace {
 				foreach ( $matches as $match ) {
 					if ( '' !== ( $match[1] ?? '' ) ) {
 						$blocks[] = "<!-- wp:heading -->\n<h2>{$match[1]}</h2>\n<!-- /wp:heading -->";
-					} else {
-						$blocks[] = "<!-- wp:paragraph -->\n<p>{$match[2]}</p>\n<!-- /wp:paragraph -->";
-					}
+				} else {
+					$blocks[] = "<!-- wp:paragraph -->\n<p>" . ( $match[2] ?? '' ) . "</p>\n<!-- /wp:paragraph -->";
+				}
 				}
 				return implode( "\n", $blocks );
 			}
@@ -217,6 +233,23 @@ namespace {
 		}
 
 		return new WP_Error( 'unsupported', "Unsupported {$from} to {$to}." );
+	}
+
+	function bfb_normalize( string $content, string $format ) {
+		if ( 'blocks' === $format ) {
+			if ( str_contains( $content, '<!-- wp:' ) && ! str_contains( $content, '<!-- /wp:' ) ) {
+				return new WP_Error(
+					'bfb_blocks_unclosed_comment',
+					'Serialized block markup contains an unclosed block comment.',
+					array( 'open_blocks' => array( 'paragraph' ) )
+				);
+			}
+			if ( ! str_contains( $content, '<!-- wp:' ) ) {
+				return new WP_Error( 'bfb_blocks_missing_comments', 'Declared blocks content does not contain serialized block comments.' );
+			}
+		}
+
+		return str_replace( array( "\r\n", "\r" ), "\n", $content );
 	}
 
 	function parse_blocks( string $content ): array {
@@ -252,6 +285,10 @@ namespace {
 			$serialized[] = "<!-- wp:{$name} -->\n{$html}\n<!-- /wp:{$name} -->";
 		}
 		return implode( "\n", $serialized );
+	}
+
+	function content_ability_post_count(): int {
+		return count( $GLOBALS['__content_ability_posts'] );
 	}
 
 	add_filter(
@@ -355,6 +392,31 @@ namespace {
 	$blocks_to_markdown_post     = get_post( (int) ( $explicit_blocks_to_markdown['post_id'] ?? 0 ) );
 	assert_content_ability( 'explicit-blocks-format-succeeds', true === $explicit_blocks_to_markdown['success'] );
 	assert_content_ability( 'explicit-blocks-format-converts-to-markdown-storage', '# Blocks Heading' === ( $blocks_to_markdown_post->post_content ?? '' ) );
+
+	$posts_before_malformed = content_ability_post_count();
+	$malformed_blocks       = DataMachine\Abilities\Content\UpsertPostAbility::execute(
+		array(
+			'post_type'      => 'post',
+			'title'          => 'Malformed Blocks',
+			'content'        => '<!-- wp:paragraph --><p>Unclosed</p>',
+			'content_format' => 'blocks',
+		)
+	);
+	assert_content_ability( 'malformed-blocks-source-fails', false === $malformed_blocks['success'] );
+	assert_content_ability( 'malformed-blocks-source-preserves-bfb-error-code', 'bfb_blocks_unclosed_comment' === ( $malformed_blocks['error_code'] ?? '' ) );
+	assert_content_ability( 'malformed-blocks-source-preserves-bfb-error-data', array( 'paragraph' ) === ( $malformed_blocks['error_data']['open_blocks'] ?? array() ) );
+	assert_content_ability( 'malformed-blocks-source-does-not-write-post', $posts_before_malformed === content_ability_post_count() );
+
+	$conversion_error = DataMachine\Abilities\Content\UpsertPostAbility::execute(
+		array(
+			'post_type'      => 'post',
+			'title'          => 'Conversion Failure',
+			'content'        => 'CONVERT_FAIL',
+			'content_format' => 'markdown',
+		)
+	);
+	assert_content_ability( 'bfb-conversion-error-fails', false === $conversion_error['success'] );
+	assert_content_ability( 'bfb-conversion-error-code-is-distinct-from-missing-bfb', 'bfb_conversion_failed' === ( $conversion_error['error_code'] ?? '' ) );
 
 	$tool = DataMachine\Abilities\Content\UpsertPostAbility::getChatTool();
 	assert_content_ability( 'chat-tool-content-format-is-optional', ! in_array( 'content_format', $tool['required'] ?? array(), true ) );

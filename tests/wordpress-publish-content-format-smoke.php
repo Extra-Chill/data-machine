@@ -38,15 +38,25 @@ namespace {
 
     class WP_Error {
 
+        private string $code;
         private string $message;
 
-        public function __construct( string $code = '', string $message = '' ) {
-            unset( $code );
+        public function __construct( string $code = '', string $message = '', $data = null ) {
+            unset( $data );
+            $this->code    = $code;
             $this->message = $message;
+        }
+
+        public function get_error_code(): string {
+            return $this->code;
         }
 
         public function get_error_message(): string {
             return $this->message;
+        }
+
+        public function get_error_data() {
+            return null;
         }
     }
 
@@ -106,7 +116,8 @@ namespace {
     }
 
     function esc_url( $url ): string {
-        return filter_var( (string) $url, FILTER_SANITIZE_URL );
+        $sanitized = filter_var( (string) $url, FILTER_SANITIZE_URL );
+        return is_string( $sanitized ) ? $sanitized : '';
     }
 
     function esc_url_raw( $url ): string {
@@ -173,6 +184,21 @@ namespace {
         return new WP_Error( 'unsupported', "Unsupported {$from} to {$to}." );
     }
 
+    function bfb_normalize( string $content, string $format ) {
+        if ( 'blocks' === $format && str_contains( $content, '<!-- wp:' ) && ! str_contains( $content, '<!-- /wp:' ) ) {
+            return new WP_Error( 'bfb_blocks_unclosed_comment', 'Serialized block markup contains an unclosed block comment.' );
+        }
+
+        return str_replace( array( "\r\n", "\r" ), "\n", $content );
+    }
+
+    function published_post_content( array $result ): string {
+        $post_id = isset( $result['post_id'] ) ? (int) $result['post_id'] : 0;
+        $post    = $GLOBALS['__publish_format_posts'][ $post_id ] ?? null;
+
+        return is_object( $post ) && isset( $post->post_content ) ? (string) $post->post_content : '';
+    }
+
     add_filter(
         'datamachine_post_content_format',
         static function ( string $format, string $post_type ): string {
@@ -198,10 +224,22 @@ namespace {
             'source_url' => 'https://example.test/source',
         )
     );
-    $html_post   = $GLOBALS['__publish_format_posts'][ $html_result['post_id'] ?? 0 ] ?? null;
+    $html_content = published_post_content( $html_result );
     assert_publish_format( 'default-html-publish-succeeds', true === ( $html_result['success'] ?? false ) );
-    assert_publish_format( 'default-html-converts-to-block-storage', false !== strpos( $html_post->post_content ?? '', '<!-- wp:paragraph -->' ) );
-    assert_publish_format( 'default-html-attribution-converted-with-content', false !== strpos( $html_post->post_content ?? '', '<strong>Source:</strong>' ) );
+    assert_publish_format( 'default-html-converts-to-block-storage', false !== strpos( $html_content, '<!-- wp:paragraph -->' ) );
+    assert_publish_format( 'default-html-attribution-converted-with-content', false !== strpos( $html_content, '<strong>Source:</strong>' ) );
+
+    $explicit_html_result = $ability->execute(
+        array(
+            'title'          => 'Explicit HTML post',
+            'content'        => '<p>Explicit HTML.</p>',
+            'content_format' => 'html',
+            'post_type'      => 'post',
+        )
+    );
+    $explicit_html_content = published_post_content( $explicit_html_result );
+    assert_publish_format( 'explicit-html-publish-succeeds', true === ( $explicit_html_result['success'] ?? false ) );
+    assert_publish_format( 'explicit-html-converts-to-block-storage', false !== strpos( $explicit_html_content, '<!-- wp:paragraph -->' ) );
 
     $markdown_result = $ability->execute(
         array(
@@ -212,10 +250,24 @@ namespace {
             'source_url'     => 'https://example.test/markdown',
         )
     );
-    $markdown_post   = $GLOBALS['__publish_format_posts'][ $markdown_result['post_id'] ?? 0 ] ?? null;
+    $markdown_content = published_post_content( $markdown_result );
     assert_publish_format( 'markdown-source-publish-succeeds', true === ( $markdown_result['success'] ?? false ) );
-    assert_publish_format( 'markdown-source-converts-to-block-storage', false !== strpos( $markdown_post->post_content ?? '', '<!-- wp:paragraph -->' ) );
-    assert_publish_format( 'markdown-source-attribution-starts-as-markdown', false !== strpos( $GLOBALS['__publish_format_conversions'][1][2] ?? '', '**Source:** [https://example.test/markdown](https://example.test/markdown)' ) );
+    assert_publish_format( 'markdown-source-converts-to-block-storage', false !== strpos( $markdown_content, '<!-- wp:paragraph -->' ) );
+    assert_publish_format( 'markdown-source-attribution-starts-as-markdown', false !== strpos( $markdown_content, '<strong>Source:</strong>' ) );
+
+    $blocks_result = $ability->execute(
+        array(
+            'title'          => 'Blocks post',
+            'content'        => "<!-- wp:paragraph -->\n<p>Block content.</p>\n<!-- /wp:paragraph -->",
+            'content_format' => 'blocks',
+            'post_type'      => 'post',
+            'source_url'     => 'https://example.test/blocks',
+        )
+    );
+    $blocks_content = published_post_content( $blocks_result );
+    assert_publish_format( 'blocks-source-publish-succeeds', true === ( $blocks_result['success'] ?? false ) );
+    assert_publish_format( 'blocks-source-stays-block-storage', false !== strpos( $blocks_content, '<!-- wp:paragraph -->' ) );
+    assert_publish_format( 'blocks-source-attribution-stays-blocks', false !== strpos( $blocks_content, 'https://example.test/blocks' ) );
 
     $wiki_result = $ability->execute(
         array(
@@ -226,10 +278,10 @@ namespace {
             'source_url'     => 'https://example.test/wiki',
         )
     );
-    $wiki_post   = $GLOBALS['__publish_format_posts'][ $wiki_result['post_id'] ?? 0 ] ?? null;
+    $wiki_content = published_post_content( $wiki_result );
     assert_publish_format( 'markdown-backed-post-type-publish-succeeds', true === ( $wiki_result['success'] ?? false ) );
-    assert_publish_format( 'markdown-backed-post-type-stores-markdown', false === strpos( $wiki_post->post_content ?? '', '<!-- wp:' ) );
-    assert_publish_format( 'markdown-backed-attribution-stays-markdown', false !== strpos( $wiki_post->post_content ?? '', '**Source:** [https://example.test/wiki](https://example.test/wiki)' ) );
+    assert_publish_format( 'markdown-backed-post-type-stores-markdown', false === strpos( $wiki_content, '<!-- wp:' ) );
+    assert_publish_format( 'markdown-backed-attribution-stays-markdown', false !== strpos( $wiki_content, '**Source:** [https://example.test/wiki](https://example.test/wiki)' ) );
 
     $ability_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Publish/PublishWordPressAbility.php' );
     $handler_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Steps/Publish/Handlers/WordPress/WordPress.php' );

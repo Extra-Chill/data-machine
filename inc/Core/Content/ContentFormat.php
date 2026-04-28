@@ -36,6 +36,22 @@ class ContentFormat {
 		$from = sanitize_key( $from );
 		$to   = sanitize_key( $to );
 
+		if ( function_exists( 'bfb_normalize' ) ) {
+			$normalized = bfb_normalize( $content, $from );
+			if ( is_wp_error( $normalized ) ) {
+				return $normalized;
+			}
+
+			if ( ! is_string( $normalized ) ) {
+				return new \WP_Error(
+					'datamachine_content_format_invalid_normalization_result',
+					sprintf( 'Block Format Bridge returned a non-string result normalizing post content as %s.', $from )
+				);
+			}
+
+			$content = $normalized;
+		}
+
 		if ( $from === $to ) {
 			return $content;
 		}

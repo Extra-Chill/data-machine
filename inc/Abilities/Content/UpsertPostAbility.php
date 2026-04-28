@@ -295,8 +295,10 @@ class UpsertPostAbility {
 		$stored_content = ContentFormat::sourceToStored( (string) $content, $content_format, $post_type );
 		if ( is_wp_error( $stored_content ) ) {
 			return array(
-				'success' => false,
-				'error'   => $stored_content->get_error_message(),
+				'success'    => false,
+				'error'      => $stored_content->get_error_message(),
+				'error_code' => $stored_content->get_error_code(),
+				'error_data' => $stored_content->get_error_data(),
 			);
 		}
 

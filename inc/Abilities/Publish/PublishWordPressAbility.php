@@ -231,9 +231,11 @@ class PublishWordPressAbility {
 				),
 			);
 			return array(
-				'success' => false,
-				'error'   => $stored_content->get_error_message(),
-				'logs'    => $logs,
+				'success'    => false,
+				'error'      => $stored_content->get_error_message(),
+				'error_code' => $stored_content->get_error_code(),
+				'error_data' => $stored_content->get_error_data(),
+				'logs'       => $logs,
 			);
 		}
 
