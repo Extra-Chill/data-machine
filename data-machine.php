@@ -605,6 +605,8 @@ function datamachine_activate_for_site() {
 	$db_identity_index = new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex();
 	$db_identity_index->create_table();
 
+	\DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::create_table();
+
 	\DataMachine\Core\Database\Chat\Chat::create_table();
 	\DataMachine\Core\Database\Chat\Chat::ensure_mode_column();
 	\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();

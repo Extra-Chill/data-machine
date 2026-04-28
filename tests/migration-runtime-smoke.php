@@ -127,6 +127,7 @@ $migration_chain = array(
 	'datamachine_migrate_webhook_auth_v2',
 	'datamachine_migrate_agent_config_model_shape',
 	'datamachine_drop_redundant_post_pipeline_meta',
+	'datamachine_migrate_bundle_artifacts_table',
 );
 
 foreach ( $migration_chain as $fn ) {

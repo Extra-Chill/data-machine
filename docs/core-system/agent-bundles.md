@@ -39,6 +39,7 @@ Only `manifest.json`, `pipelines/`, `flows/`, and `memory/` have import/export a
 
 Bundle installs track artifacts independently of their runtime table. The foundation record shape is:
 
+- `agent_id`
 - `bundle_slug`
 - `bundle_version`
 - `artifact_type`
@@ -46,7 +47,7 @@ Bundle installs track artifacts independently of their runtime table. The founda
 - `source_path`
 - `installed_hash`
 - `current_hash`
-- `status`
+- `local_status`
 - `installed_at`
 - `updated_at`
 
@@ -83,6 +84,7 @@ Bundle-installed pipelines and flows use stable `portable_slug` values as their 
 - Flows resolve by `(pipeline_id, portable_slug)`.
 - Re-importing the same bundle updates the existing clean rows instead of creating duplicates.
 - Local edits are detected by comparing the current artifact hash with the install-time hash recorded in the owning agent's `datamachine_bundle.artifacts` config.
+- Installed artifact tracking is persisted in the site-scoped `datamachine_bundle_artifacts` table, keyed by `(agent_id, bundle_slug, artifact_type, artifact_id)`, so bundle state is independent of runtime tables.
 - Modified artifacts are reported as conflicts and are not overwritten by the import path.
 
 Schedule and queue policy is intentionally conservative:
@@ -114,7 +116,6 @@ Every read/preview command supports `--format=json` for automation.
 
 ## Follow-Ups
 
-- Add persistent DB storage for installed artifact records.
 - Wire importer/exporter paths for prompts, rubrics, tool policies, auth refs, and seed queues.
 - Use artifact statuses during bundle upgrade planning: auto-update `clean`, stage PendingActions for `modified`, surface `missing` and `orphaned` explicitly.
 - Add registered bundle sources once bundles move beyond local paths.

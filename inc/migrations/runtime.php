@@ -125,6 +125,9 @@ function datamachine_run_schema_migrations(): void {
 
 	// Drop redundant _datamachine_post_pipeline_id rows (#1091). Idempotent.
 	datamachine_drop_redundant_post_pipeline_meta();
+
+	// Ensure installed bundle artifact tracking table exists on upgraded installs (#1531).
+	datamachine_migrate_bundle_artifacts_table();
 }
 
 /**
