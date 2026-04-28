@@ -1,6 +1,6 @@
 {
 	"name": "datamachine",
-	"version": "0.90.0",
+	"version": "0.91.0",
 	"description": "AI-first WordPress plugin with Pipeline+Flow architecture",
 	"private": true,
 	"scripts": {
