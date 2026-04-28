@@ -174,8 +174,8 @@ class SystemCommand extends BaseCommand {
 	 * <task_type>
 	 * : The task type to run (e.g. alt_text_generation, daily_memory_generation).
 	 *
-	 * [--param=<key=value>]
-	 * : Structured task param. Repeatable.
+	 * [--param=<param>]
+	 * : Structured task param as key=value. Repeatable.
 	 *
 	 * [--params=<json>]
 	 * : JSON object of structured task params.
