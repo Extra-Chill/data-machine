@@ -19,6 +19,54 @@ import { updateSystemPrompt } from '../../utils/api';
 import { useStepTypes } from '../../queries/config';
 
 /**
+ * Normalize a tool policy field into displayable labels.
+ *
+ * @param {Array|string|Object} value Tool policy field value.
+ * @return {Array<string>} Display labels.
+ */
+const normalizeToolPolicyList = ( value ) => {
+	if ( Array.isArray( value ) ) {
+		return value.filter( Boolean ).map( String );
+	}
+
+	if ( typeof value === 'string' && value ) {
+		return [ value ];
+	}
+
+	if ( value && typeof value === 'object' ) {
+		return Object.entries( value )
+			.filter( ( [ , enabled ] ) => Boolean( enabled ) )
+			.map( ( [ key ] ) => key );
+	}
+
+	return [];
+};
+
+/**
+ * Render a read-only tool policy row.
+ *
+ * @param {string}        label  Policy label.
+ * @param {Array<string>} values Policy values.
+ * @return {React.ReactElement|null} Policy row.
+ */
+const renderToolPolicyRow = ( label, values ) => {
+	if ( ! values.length ) {
+		return null;
+	}
+
+	return (
+		<div className="datamachine-ai-tool-policy-row">
+			<strong>{ label }</strong>
+			<div className="datamachine-ai-tool-policy-values">
+				{ values.map( ( value ) => (
+					<code key={ value }>{ value }</code>
+				) ) }
+			</div>
+		</div>
+	);
+};
+
+/**
  * Pipeline Step Card Component
  *
  * @param {Object}   props                - Component props
@@ -40,6 +88,12 @@ export default function PipelineStepCard( {
 	const isSystemTask = step.step_type === 'system_task';
 
 	const stepConfig = pipelineConfig[ step.pipeline_step_id ] || null;
+	const enabledTools = normalizeToolPolicyList( stepConfig?.enabled_tools );
+	const disabledTools = normalizeToolPolicyList( stepConfig?.disabled_tools );
+	const toolCategories = normalizeToolPolicyList( stepConfig?.tool_categories );
+	const hasToolPolicy = Boolean(
+		enabledTools.length || disabledTools.length || toolCategories.length
+	);
 
 	// Resolve display label: step type registry, then legacy fallback for agent_ping.
 	const displayLabel = stepTypes[ step.step_type ]?.label
@@ -138,6 +192,31 @@ export default function PipelineStepCard( {
 							) }
 							rows={ 6 }
 						/>
+						{ hasToolPolicy && (
+							<div className="datamachine-ai-tool-policy-summary">
+								<h4>
+									{ __( 'Tool Policy', 'data-machine' ) }
+								</h4>
+								<p>
+									{ __(
+										'Read-only summary of the pipeline AI step policy. Handler tools required by adjacent steps are resolved separately at runtime.',
+										'data-machine'
+									) }
+								</p>
+								{ renderToolPolicyRow(
+									__( 'Allowlist', 'data-machine' ),
+									enabledTools
+								) }
+								{ renderToolPolicyRow(
+									__( 'Denylist', 'data-machine' ),
+									disabledTools
+								) }
+								{ renderToolPolicyRow(
+									__( 'Categories', 'data-machine' ),
+									toolCategories
+								) }
+							</div>
+						) }
 					</div>
 				) }
 
