@@ -11,6 +11,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+if ( ! class_exists( 'DM_System_Task_Config_Passthrough_QueueAbility_Stub', false ) ) {
+	class DM_System_Task_Config_Passthrough_QueueAbility_Stub {
+		const SLOT_PROMPT_QUEUE       = 'prompt_queue';
+		const SLOT_CONFIG_PATCH_QUEUE = 'config_patch_queue';
+	}
+}
+if ( ! class_exists( '\DataMachine\Abilities\Flow\QueueAbility', false ) ) {
+	class_alias( 'DM_System_Task_Config_Passthrough_QueueAbility_Stub', '\DataMachine\Abilities\Flow\QueueAbility' );
+}
+
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $hook, $value ) {
 		if ( 'datamachine_step_types' !== $hook ) {
@@ -36,57 +46,17 @@ if ( ! function_exists( 'do_action' ) ) {
 
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfigFactory.php';
+require_once __DIR__ . '/../inc/Core/Steps/WorkflowConfigFactory.php';
 
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\FlowStepConfigFactory;
+use DataMachine\Core\Steps\WorkflowConfigFactory;
 
 /**
- * Inline mirror of ExecuteWorkflowAbility::buildConfigsFromWorkflow().
+ * Inline mirror of ExecuteWorkflowAbility's workflow config builder call.
  */
 function build_configs_from_workflow_for_test( array $workflow ): array {
-	$flow_config     = array();
-	$pipeline_config = array();
-
-	foreach ( $workflow['steps'] as $index => $step ) {
-		$step_id          = "ephemeral_step_{$index}";
-		$pipeline_step_id = "ephemeral_pipeline_{$index}";
-		$handler_slug     = $step['handler_slug'] ?? '';
-		$handler_config   = $step['handler_config'] ?? array();
-		$step_type        = $step['type'];
-
-		$flow_step_config = FlowStepConfigFactory::build(
-			array(
-				'flow_step_id'     => $step_id,
-				'pipeline_step_id' => $pipeline_step_id,
-				'step_type'        => $step_type,
-				'execution_order'  => $index,
-				'enabled_tools'    => ( 'ai' === $step_type && ! empty( $step['enabled_tools'] ) && is_array( $step['enabled_tools'] ) )
-					? array_values( $step['enabled_tools'] )
-					: array(),
-				'prompt_queue'     => array(),
-				'queue_mode'       => 'static',
-				'disabled_tools'   => $step['disabled_tools'] ?? array(),
-				'pipeline_id'      => 'direct',
-				'flow_id'          => 'direct',
-				'handler_slug'     => $handler_slug,
-				'handler_config'   => $handler_config,
-			)
-		);
-
-		$flow_config[ $step_id ] = $flow_step_config;
-
-		if ( 'ai' === $step_type ) {
-			$pipeline_config[ $pipeline_step_id ] = array(
-				'system_prompt'  => $step['system_prompt'] ?? '',
-				'disabled_tools' => $step['disabled_tools'] ?? array(),
-			);
-		}
-	}
-
-	return array(
-		'flow_config'     => $flow_config,
-		'pipeline_config' => $pipeline_config,
-	);
+	return WorkflowConfigFactory::buildEphemeralConfigs( $workflow );
 }
 
 $failures = array();

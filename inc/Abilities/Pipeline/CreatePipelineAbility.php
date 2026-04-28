@@ -11,6 +11,7 @@
 namespace DataMachine\Abilities\Pipeline;
 
 use DataMachine\Abilities\StepTypeAbilities;
+use DataMachine\Core\Steps\WorkflowConfigFactory;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -46,6 +47,10 @@ class CreatePipelineAbility {
 							'steps'         => array(
 								'type'        => 'array',
 								'description' => __( 'Optional steps configuration (each with step_type, optional label)', 'data-machine' ),
+							),
+							'workflow'      => array(
+								'type'        => 'object',
+								'description' => __( 'Optional persistent workflow scaffold using the same steps shape as datamachine/execute-workflow. When provided, Data Machine creates matching pipeline steps and a flow whose step configs preserve handler config, enabled tools, queue state, user_message prompt queue, disabled tools, labels, and execution order.', 'data-machine' ),
 							),
 							'flow_config'   => array(
 								'type'        => 'object',
@@ -144,11 +149,21 @@ class CreatePipelineAbility {
 
 		$agent_id    = isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
 		$steps       = $input['steps'] ?? array();
+		$workflow    = isset( $input['workflow'] ) && is_array( $input['workflow'] ) ? $input['workflow'] : array();
 		$flow_config = $input['flow_config'] ?? array();
 
 		$has_steps = ! empty( $steps ) && is_array( $steps );
+		$has_workflow = ! empty( $workflow );
 
-		if ( $has_steps ) {
+		if ( $has_workflow ) {
+			$validation = $this->validateWorkflow( $workflow );
+			if ( true !== $validation ) {
+				return array(
+					'success' => false,
+					'error'   => $validation,
+				);
+			}
+		} elseif ( $has_steps ) {
 			$validation = $this->validateSteps( $steps );
 			if ( true !== $validation ) {
 				return array(
@@ -180,7 +195,17 @@ class CreatePipelineAbility {
 		$pipeline_config = array();
 		$steps_created   = 0;
 
-		if ( $has_steps ) {
+		if ( $has_workflow ) {
+			$pipeline_config = WorkflowConfigFactory::buildPersistentPipelineConfig( $workflow, $pipeline_id );
+			$steps_created   = count( $pipeline_config );
+
+			if ( ! empty( $pipeline_config ) ) {
+				$this->db_pipelines->update_pipeline(
+					$pipeline_id,
+					array( 'pipeline_config' => $pipeline_config )
+				);
+			}
+		} elseif ( $has_steps ) {
 			$step_type_abilities = new StepTypeAbilities();
 
 			foreach ( $steps as $index => $step_data ) {
@@ -219,7 +244,7 @@ class CreatePipelineAbility {
 		$flow_name     = null;
 		$flow_step_ids = array();
 
-		if ( ! empty( $flow_config ) ) {
+		if ( ! empty( $flow_config ) || $has_workflow ) {
 			$flow_name         = $flow_config['flow_name'] ?? $pipeline_name;
 			$scheduling_config = $flow_config['scheduling_config'] ?? array( 'interval' => 'manual' );
 
@@ -240,6 +265,20 @@ class CreatePipelineAbility {
 
 			if ( ! $flow_result || ! $flow_result['success'] ) {
 				do_action( 'datamachine_log', 'error', "Failed to create flow for pipeline {$pipeline_id}" );
+			}
+
+			if ( $flow_result && $flow_result['success'] && $has_workflow ) {
+				$persistent_flow_config = WorkflowConfigFactory::buildPersistentFlowConfig(
+					$workflow,
+					$pipeline_id,
+					(int) $flow_result['flow_id'],
+					$pipeline_config
+				);
+				$this->db_flows->update_flow(
+					(int) $flow_result['flow_id'],
+					array( 'flow_config' => $persistent_flow_config )
+				);
+				$flow_result['flow_data']['flow_config'] = $persistent_flow_config;
 			}
 
 			if ( $flow_result && $flow_result['success'] && ! empty( $flow_result['flow_data']['flow_config'] ) ) {
@@ -267,7 +306,7 @@ class CreatePipelineAbility {
 			'flow_name'     => $flow_name,
 			'steps_created' => $steps_created,
 			'flow_step_ids' => $flow_step_ids,
-			'creation_mode' => $has_steps ? 'batch' : 'simple',
+			'creation_mode' => $has_workflow ? 'workflow' : ( $has_steps ? 'batch' : 'simple' ),
 		);
 	}
 

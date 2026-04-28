@@ -231,8 +231,8 @@ $flow_helpers_src     = file_get_contents( __DIR__ . '/../inc/Abilities/Flow/Flo
 
 assert_factory_equals(
 	true,
-	false !== strpos( $execute_workflow_src, 'FlowStepConfigFactory::buildFromWorkflowStep( $step, $index )' ),
-	'ExecuteWorkflowAbility routes workflow rows through the factory scaffold',
+	false !== strpos( $execute_workflow_src, 'WorkflowConfigFactory::buildEphemeralConfigs( $workflow )' ),
+	'ExecuteWorkflowAbility routes workflow rows through the shared workflow factory',
 	$failures,
 	$passes
 );

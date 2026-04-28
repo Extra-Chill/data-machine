@@ -17,7 +17,7 @@
  * and were missed in the original PR — they kept writing the legacy
  * `user_message` slot AIStep no longer reads:
  *
- *   1. `ExecuteWorkflowAbility::buildConfigsFromWorkflow()` — assembles
+ *   1. `WorkflowConfigFactory::buildEphemeralConfigs()` — assembles
  *      an ephemeral in-memory flow_config from a workflow JSON spec.
  *      Wrote `user_message` to the flow_step_config root. Workflow
  *      spec input is silently dropped at runtime.
@@ -86,10 +86,10 @@ function assert_callsite( string $name, bool $cond, string $detail = '' ): void 
 }
 
 // ====================================================================
-// Bug 1: ExecuteWorkflowAbility::buildConfigsFromWorkflow
+// Bug 1: WorkflowConfigFactory::buildEphemeralConfigs
 // ====================================================================
 //
-// Inline mirror of the relevant slice of buildConfigsFromWorkflow
+// Inline mirror of the relevant slice of buildEphemeralConfigs
 // post-fix. The workflow JSON spec accepts `user_message` as an input
 // field (matches ExecuteWorkflowTool's documented shape); the helper
 // converts it into a 1-entry static prompt_queue so AIStep sees it.
