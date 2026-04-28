@@ -14,6 +14,8 @@ namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\FilesRepository\AgentMemory;
+use DataMachine\Engine\AI\Memory\MemorySectionPendingAction;
+use DataMachine\Engine\AI\Memory\SelfMemoryWritePolicy;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -27,6 +29,7 @@ class AgentMemoryAbilities {
 		}
 
 		$this->registerAbilities();
+		MemorySectionPendingAction::register();
 		self::$registered = true;
 	}
 
@@ -128,6 +131,73 @@ class AgentMemoryAbilities {
 					),
 					'execute_callback'    => array( self::class, 'updateMemory' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/write-self-memory',
+				array(
+					'label'               => 'Write Self Memory',
+					'description'         => 'Policy-constrained write to the current agent\'s operational memory. Cross-agent writes and durable facts are denied by default.',
+					'category'            => 'datamachine-memory',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'agent_id'           => array(
+								'type'        => array( 'integer', 'null' ),
+								'description' => 'Optional target agent. Defaults to the current acting agent; other agents require explicit delegation.',
+							),
+							'file'               => array(
+								'type'        => 'string',
+								'description' => 'Target memory file. Defaults to MEMORY.md.',
+								'default'     => 'MEMORY.md',
+							),
+							'section'            => array(
+								'type'        => 'string',
+								'description' => 'Section name to create or update.',
+							),
+							'section_type'       => array(
+								'type'        => 'string',
+								'description' => 'Operational section type, such as operating_note, source_quirk, run_lesson, or task_note.',
+								'default'     => 'operating_note',
+							),
+							'content'            => array(
+								'type'        => 'string',
+								'description' => 'Operational memory content to write.',
+							),
+							'mode'               => array(
+								'type'        => 'string',
+								'enum'        => array( 'set', 'append' ),
+								'description' => 'Write mode. Defaults to append.',
+								'default'     => 'append',
+							),
+							'reason'             => array(
+								'type'        => 'string',
+								'description' => 'Why this operational note should be recorded.',
+							),
+							'requires_approval'  => array(
+								'type'        => 'boolean',
+								'description' => 'Force PendingAction preview instead of direct write.',
+								'default'     => false,
+							),
+						),
+						'required'   => array( 'section', 'content' ),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'    => array( 'type' => 'boolean' ),
+							'message'    => array( 'type' => 'string' ),
+							'error'      => array( 'type' => 'string' ),
+							'error_code' => array( 'type' => 'string' ),
+							'staged'     => array( 'type' => 'boolean' ),
+							'action_id'  => array( 'type' => 'string' ),
+							'preview'    => array( 'type' => 'object' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'writeSelfMemory' ),
+					'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -299,6 +369,16 @@ class AgentMemoryAbilities {
 		}
 
 		return $memory->set_section( $section, $content );
+	}
+
+	/**
+	 * Policy-constrained write to the current agent's own operational memory.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result.
+	 */
+	public static function writeSelfMemory( array $input ): array {
+		return SelfMemoryWritePolicy::execute( $input );
 	}
 
 	/**
