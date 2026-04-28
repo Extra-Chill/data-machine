@@ -94,6 +94,11 @@ class AgentBundleCommand extends BaseCommand {
 			);
 		}
 
+		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) && empty( $items ) ) {
+			WP_CLI::line( '[]' );
+			return;
+		}
+
 		$this->format_items( $items, array( 'agent_id', 'agent_slug', 'bundle_slug', 'bundle_version', 'artifacts' ), $assoc_args, 'agent_id' );
 	}
 
