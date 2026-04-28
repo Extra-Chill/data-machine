@@ -6,7 +6,8 @@
 	"require": {
 		"php": ">=8.2",
 		"woocommerce/action-scheduler": "^3.9",
-		"chubes4/ai-http-client": "^2.0.13"
+		"chubes4/ai-http-client": "^2.0.13",
+		"chubes4/block-format-bridge": "dev-main"
 	},
 	"require-dev": {
 		"php-stubs/wordpress-stubs": "^6.9",
@@ -38,5 +39,10 @@
 		"allow-plugins": {
 			"dealerdirect/phpcodesniffer-composer-installer": true
 		}
-	}
+	},
+	"repositories": [{
+		"name": "block-format-bridge",
+		"type": "vcs",
+		"url": "https://github.com/chubes4/block-format-bridge"
+	}]
 }
