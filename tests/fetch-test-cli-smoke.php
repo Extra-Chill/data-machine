@@ -14,9 +14,9 @@
 $root = dirname( __DIR__ );
 
 $files = array(
-	'bootstrap' => file_get_contents( $root . '/inc/Cli/Bootstrap.php' ),
-	'test'      => file_get_contents( $root . '/inc/Cli/Commands/TestCommand.php' ),
-	'handlers'  => file_get_contents( $root . '/inc/Cli/Commands/HandlersCommand.php' ),
+	'bootstrap' => file_get_contents( $root . '/inc/Cli/Bootstrap.php' ) ?: '',
+	'test'      => file_get_contents( $root . '/inc/Cli/Commands/TestCommand.php' ) ?: '',
+	'handlers'  => file_get_contents( $root . '/inc/Cli/Commands/HandlersCommand.php' ) ?: '',
 );
 
 $failed = 0;
@@ -32,6 +32,11 @@ function assert_fetch_cli( string $name, bool $condition, string $detail = '' ):
 
 	++$failed;
 	echo "  [FAIL] {$name}" . ( $detail ? " — {$detail}" : '' ) . "\n";
+}
+
+function fetch_cli_failed_count(): int {
+	global $failed;
+	return $failed;
 }
 
 echo "=== fetch-test-cli-smoke ===\n";
@@ -71,7 +76,7 @@ assert_fetch_cli(
 	str_contains( $files['handlers'], "? array( 'slug', 'label', 'step_type', 'settings_class' )" )
 );
 
-if ( $failed > 0 ) {
+if ( fetch_cli_failed_count() > 0 ) {
 	echo "\nfetch-test-cli-smoke failed: {$failed}/{$total} assertions failed.\n";
 	exit( 1 );
 }
