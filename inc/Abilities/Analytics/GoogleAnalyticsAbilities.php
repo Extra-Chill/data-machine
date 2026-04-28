@@ -252,15 +252,16 @@ class GoogleAnalyticsAbilities {
 	}
 
 	/**
-	 * Fetch a standard GA4 report.
+	 * Build the GA4 runReport request body from ability input.
 	 *
-	 * @param array  $input        Ability input.
-	 * @param string $action       Report action.
-	 * @param string $access_token OAuth2 access token.
-	 * @param string $property_id  GA4 property ID.
-	 * @return array
+	 * Public for unit testing — request body construction is the testable surface
+	 * for filter / sort / pagination behavior without needing an HTTP round-trip.
+	 *
+	 * @param array  $input  Ability input.
+	 * @param string $action Report action (must be a key in self::ACTION_REPORTS).
+	 * @return array Request body for the GA4 runReport endpoint.
 	 */
-	private static function fetchReport( array $input, string $action, string $access_token, string $property_id ): array {
+	public static function buildReportRequestBody( array $input, string $action ): array {
 		$report_config = self::ACTION_REPORTS[ $action ];
 
 		$start_date = ! empty( $input['start_date'] ) ? sanitize_text_field( $input['start_date'] ) : gmdate( 'Y-m-d', strtotime( '-28 days' ) );
@@ -310,26 +311,27 @@ class GoogleAnalyticsAbilities {
 		// Build dimension filters.
 		$filters = array();
 
-		// Page path filter (for actions with pagePath or landingPage dimension).
+		// Page path filter. GA4 supports pagePath/landingPage as filter dimensions
+		// even when they aren't part of the report's dimensions array, so the filter
+		// applies to every action — not just those that group by page.
 		if ( ! empty( $input['page_filter'] ) ) {
-			$path_dim = null;
-			if ( in_array( 'pagePath', $report_config['dimensions'], true ) ) {
-				$path_dim = 'pagePath';
-			} elseif ( in_array( 'landingPage', $report_config['dimensions'], true ) ) {
-				$path_dim = 'landingPage';
-			}
+			// Prefer landingPage when the report groups by it (so the filter matches
+			// the dimension being returned); otherwise filter by pagePath, which
+			// scopes any action (date_stats, traffic_sources, top_events, etc.) to
+			// hits/sessions that touched matching paths.
+			$path_dim = in_array( 'landingPage', $report_config['dimensions'], true )
+				? 'landingPage'
+				: 'pagePath';
 
-			if ( $path_dim ) {
-				$filters[] = array(
-					'filter' => array(
-						'fieldName'    => $path_dim,
-						'stringFilter' => array(
-							'matchType' => 'CONTAINS',
-							'value'     => sanitize_text_field( $input['page_filter'] ),
-						),
+			$filters[] = array(
+				'filter' => array(
+					'fieldName'    => $path_dim,
+					'stringFilter' => array(
+						'matchType' => 'CONTAINS',
+						'value'     => sanitize_text_field( $input['page_filter'] ),
 					),
-				);
-			}
+				),
+			);
 		}
 
 		// Hostname filter for multisite properties.
@@ -381,6 +383,21 @@ class GoogleAnalyticsAbilities {
 				);
 			}
 		}
+
+		return $request_body;
+	}
+
+	/**
+	 * Fetch a standard GA4 report.
+	 *
+	 * @param array  $input        Ability input.
+	 * @param string $action       Report action.
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $property_id  GA4 property ID.
+	 * @return array
+	 */
+	private static function fetchReport( array $input, string $action, string $access_token, string $property_id ): array {
+		$request_body = self::buildReportRequestBody( $input, $action );
 
 		$api_url = self::API_BASE . $property_id . ':runReport';
 
