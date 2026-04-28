@@ -146,6 +146,56 @@ class ToolPolicyResolver {
 	}
 
 	/**
+	 * Build snapshot-derived pipeline policy arguments.
+	 *
+	 * Pipeline execution must honor the flow/pipeline config captured in the
+	 * current engine snapshot. Do not re-read persisted pipeline rows here:
+	 * direct workflows use synthetic IDs, and historical jobs must inspect the
+	 * policy that existed when they ran.
+	 *
+	 * @param array $flow_step_config     Current flow step config snapshot.
+	 * @param array $pipeline_step_config Current pipeline step config snapshot.
+	 * @return array Resolver args containing allow_only/deny when configured.
+	 */
+	public static function getPipelinePolicyArgs( array $flow_step_config, array $pipeline_step_config ): array {
+		$args          = array();
+		$enabled_tools = FlowStepConfig::getEnabledTools( $flow_step_config );
+
+		if ( ! empty( $enabled_tools ) ) {
+			$args['allow_only'] = self::sanitizeToolList( $enabled_tools );
+		}
+
+		$deny = array_merge(
+			self::sanitizeToolList( is_array( $pipeline_step_config['disabled_tools'] ?? null ) ? $pipeline_step_config['disabled_tools'] : array() ),
+			self::sanitizeToolList( is_array( $flow_step_config['disabled_tools'] ?? null ) ? $flow_step_config['disabled_tools'] : array() )
+		);
+
+		if ( ! empty( $deny ) ) {
+			$args['deny'] = array_values( array_unique( $deny ) );
+		}
+
+		return $args;
+	}
+
+	/**
+	 * Sanitize a list of tool slugs.
+	 *
+	 * @param array $tools Raw tool names.
+	 * @return array<int, string> Clean tool names.
+	 */
+	private static function sanitizeToolList( array $tools ): array {
+		$clean = array();
+		foreach ( $tools as $tool ) {
+			if ( ! is_string( $tool ) || '' === $tool ) {
+				continue;
+			}
+			$clean[] = $tool;
+		}
+
+		return array_values( array_unique( $clean ) );
+	}
+
+	/**
 	 * Filter tools by their linked ability permissions.
 	 *
 	 * For each tool that declares an `ability` or `abilities` key, checks
@@ -290,9 +340,8 @@ class ToolPolicyResolver {
 	 * for fetch-type handlers).
 	 */
 	private function gatherPipelineTools( array $args ): array {
-		$available_tools  = array();
-		$pipeline_step_id = $args['pipeline_step_id'] ?? null;
-		$engine_data      = $args['engine_data'] ?? array();
+		$available_tools = array();
+		$engine_data     = $args['engine_data'] ?? array();
 
 		// Handler tools from adjacent steps (dynamic, resolved per-execution).
 		//
@@ -342,7 +391,7 @@ class ToolPolicyResolver {
 			if ( isset( $available_tools[ $tool_name ] ) ) {
 				continue;
 			}
-			if ( $this->tool_manager->is_tool_available( $tool_name, $pipeline_step_id ) ) {
+			if ( $this->tool_manager->is_tool_available( $tool_name, null ) ) {
 				$available_tools[ $tool_name ] = $tool_config;
 			}
 		}
