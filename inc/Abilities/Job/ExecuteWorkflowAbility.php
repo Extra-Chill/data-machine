@@ -12,7 +12,7 @@
 namespace DataMachine\Abilities\Job;
 
 use DataMachine\Abilities\StepTypeAbilities;
-use DataMachine\Core\Steps\FlowStepConfigFactory;
+use DataMachine\Core\Steps\WorkflowConfigFactory;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -111,7 +111,7 @@ class ExecuteWorkflowAbility {
 		}
 
 		// Build configs from workflow
-		$configs = $this->buildConfigsFromWorkflow( $workflow );
+		$configs = WorkflowConfigFactory::buildEphemeralConfigs( $workflow );
 
 		// Create job record for direct execution. Honor parent_job_id
 		// from initial_data so callers (e.g. TaskScheduler scheduling
@@ -317,40 +317,6 @@ class ExecuteWorkflowAbility {
 		// step types themselves.
 
 		return array( 'valid' => true );
-	}
-
-	/**
-	 * Build flow_config and pipeline_config from workflow structure.
-	 *
-	 * @param array $workflow Workflow with steps.
-	 * @return array Array with 'flow_config' and 'pipeline_config' keys.
-	 */
-	private function buildConfigsFromWorkflow( array $workflow ): array {
-		$flow_config     = array();
-		$pipeline_config = array();
-
-		foreach ( $workflow['steps'] as $index => $step ) {
-			$step_id          = "ephemeral_step_{$index}";
-			$pipeline_step_id = "ephemeral_pipeline_{$index}";
-
-			$step_type        = $step['type'];
-			$flow_step_config = FlowStepConfigFactory::buildFromWorkflowStep( $step, $index );
-
-			$flow_config[ $step_id ] = $flow_step_config;
-
-			// Pipeline config (AI settings only — model/provider resolved via context system, not stored here).
-			if ( 'ai' === $step['type'] ) {
-				$pipeline_config[ $pipeline_step_id ] = array(
-					'system_prompt'  => $step['system_prompt'] ?? '',
-					'disabled_tools' => $step['disabled_tools'] ?? array(),
-				);
-			}
-		}
-
-		return array(
-			'flow_config'     => $flow_config,
-			'pipeline_config' => $pipeline_config,
-		);
 	}
 
 	/**

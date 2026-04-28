@@ -25,8 +25,7 @@ class FlowStepConfigFactory {
 	 */
 	public static function buildFromWorkflowStep( array $step, int $index ): array {
 		$step_type = $step['type'];
-
-		return self::build(
+		$config    = self::build(
 			array_merge(
 				array(
 					'flow_step_id'     => "ephemeral_step_{$index}",
@@ -48,6 +47,17 @@ class FlowStepConfigFactory {
 				)
 			)
 		);
+
+		$config = self::withQueueState( $config, $step );
+
+		$workflow_user_message = is_string( $step['user_message'] ?? null )
+			? trim( $step['user_message'] )
+			: '';
+		if ( 'ai' === $step_type && '' !== $workflow_user_message ) {
+			$config = self::withUserMessage( $config, $workflow_user_message );
+		}
+
+		return $config;
 	}
 
 	/**
