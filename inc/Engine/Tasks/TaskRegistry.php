@@ -124,6 +124,10 @@ class TaskRegistry {
 				'trigger'         => 'On demand',
 				'trigger_type'    => 'manual',
 				'supports_run'    => false,
+				'mutates'         => false,
+				'supports_dry_run' => false,
+				'requires_scope'  => false,
+				'params_schema'   => array(),
 			);
 
 			if ( method_exists( $handler_class, 'getTaskMeta' ) ) {
@@ -159,15 +163,19 @@ class TaskRegistry {
 			}
 
 			$registry[ $task_type ] = array(
-				'task_type'       => $task_type,
-				'label'           => $meta['label'] ? $meta['label'] : ucfirst( str_replace( '_', ' ', $task_type ) ),
-				'description'     => $meta['description'],
-				'setting_key'     => $meta['setting_key'],
-				'default_enabled' => $meta['default_enabled'],
-				'enabled'         => $enabled,
-				'trigger'         => $meta['trigger'],
-				'trigger_type'    => $meta['trigger_type'],
-				'supports_run'    => $meta['supports_run'],
+				'task_type'        => $task_type,
+				'label'            => $meta['label'] ? $meta['label'] : ucfirst( str_replace( '_', ' ', $task_type ) ),
+				'description'      => $meta['description'],
+				'setting_key'      => $meta['setting_key'],
+				'default_enabled'  => $meta['default_enabled'],
+				'enabled'          => $enabled,
+				'trigger'          => $meta['trigger'],
+				'trigger_type'     => $meta['trigger_type'],
+				'supports_run'     => $meta['supports_run'],
+				'mutates'          => (bool) $meta['mutates'],
+				'supports_dry_run' => (bool) $meta['supports_dry_run'],
+				'requires_scope'   => (bool) $meta['requires_scope'],
+				'params_schema'    => is_array( $meta['params_schema'] ) ? $meta['params_schema'] : array(),
 			);
 		}
 
