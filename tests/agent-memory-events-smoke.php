@@ -124,7 +124,8 @@ if ( ! class_exists( 'WP_Query' ) ) {
 }
 
 if ( ! function_exists( 'get_post_meta' ) ) {
-	function get_post_meta( int $post_id, string $key, bool $single = false ) {
+	function get_post_meta( int $post_id, string $key, bool $_single = false ) {
+		unset( $_single );
 		return $GLOBALS['datamachine_agent_memory_events_post_meta'][ $post_id ][ $key ] ?? '';
 	}
 }
@@ -137,7 +138,8 @@ if ( ! function_exists( 'update_post_meta' ) ) {
 }
 
 if ( ! function_exists( 'wp_insert_post' ) ) {
-	function wp_insert_post( array $postarr, bool $wp_error = false ): int {
+	function wp_insert_post( array $postarr, bool $_wp_error = false ): int {
+		unset( $_wp_error );
 		$post_id = $GLOBALS['datamachine_agent_memory_events_next_post_id']++;
 		$post    = new WP_Post(
 			array(
@@ -159,7 +161,8 @@ if ( ! function_exists( 'wp_insert_post' ) ) {
 }
 
 if ( ! function_exists( 'wp_update_post' ) ) {
-	function wp_update_post( array $postarr, bool $wp_error = false ): int {
+	function wp_update_post( array $postarr, bool $_wp_error = false ): int {
+		unset( $_wp_error );
 		$post_id = (int) ( $postarr['ID'] ?? 0 );
 		if ( ! isset( $GLOBALS['datamachine_agent_memory_events_posts'][ $post_id ] ) ) {
 			return 0;
@@ -172,20 +175,23 @@ if ( ! function_exists( 'wp_update_post' ) ) {
 }
 
 if ( ! function_exists( 'wp_delete_post' ) ) {
-	function wp_delete_post( int $post_id, bool $force_delete = false ) {
+	function wp_delete_post( int $post_id, bool $_force_delete = false ) {
+		unset( $_force_delete );
 		unset( $GLOBALS['datamachine_agent_memory_events_posts'][ $post_id ] );
 		return true;
 	}
 }
 
 if ( ! function_exists( 'wp_set_object_terms' ) ) {
-	function wp_set_object_terms( int $object_id, array $terms, string $taxonomy, bool $append = false ): array {
+	function wp_set_object_terms( int $_object_id, array $terms, string $_taxonomy, bool $_append = false ): array {
+		unset( $_object_id, $_taxonomy, $_append );
 		return $terms;
 	}
 }
 
 if ( ! function_exists( 'is_wp_error' ) ) {
-	function is_wp_error( $thing ): bool {
+	function is_wp_error( $_thing ): bool {
+		unset( $_thing );
 		return false;
 	}
 }
@@ -229,7 +235,8 @@ class AgentMemoryEventsFakeStore implements AgentMemoryStoreInterface {
 		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123 );
 	}
 
-	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null ): AgentMemoryWriteResult {
+	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null ): AgentMemoryWriteResult {
+		unset( $_if_match );
 		if ( $this->fail_next_write ) {
 			$this->fail_next_write = false;
 			return AgentMemoryWriteResult::failure( 'io' );
@@ -253,11 +260,13 @@ class AgentMemoryEventsFakeStore implements AgentMemoryStoreInterface {
 		return AgentMemoryWriteResult::ok( '', 0 );
 	}
 
-	public function list_layer( AgentMemoryScope $scope_query ): array {
+	public function list_layer( AgentMemoryScope $_scope_query ): array {
+		unset( $_scope_query );
 		return array();
 	}
 
-	public function list_subtree( AgentMemoryScope $scope_query, string $prefix ): array {
+	public function list_subtree( AgentMemoryScope $_scope_query, string $_prefix ): array {
+		unset( $_scope_query, $_prefix );
 		return array();
 	}
 }
@@ -286,7 +295,8 @@ function datamachine_agent_memory_events_matching( string $hook ): array {
 $store = new AgentMemoryEventsFakeStore();
 add_filter(
 	'datamachine_memory_store',
-	function ( $default, AgentMemoryScope $scope ) use ( $store ) {
+	function ( $_default, AgentMemoryScope $_scope ) use ( $store ) {
+		unset( $_default, $_scope );
 		return $store;
 	},
 	10,
