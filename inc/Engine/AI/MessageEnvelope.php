@@ -12,11 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Normalizes Data Machine AI messages into a stable typed envelope.
- *
- * The persisted chat/session shape remains `role/content/metadata`; this class
- * gives adapters a versioned JSON object to target without coupling Data
- * Machine core to any host-specific DTO.
+ * Normalizes Data Machine AI messages into the canonical typed envelope.
  */
 class MessageEnvelope {
 
@@ -55,18 +51,70 @@ class MessageEnvelope {
 	}
 
 	/**
+	 * Build a canonical text envelope.
+	 *
+	 * @param string       $role     Message role.
+	 * @param string|array $content  Message content.
+	 * @param array        $metadata Extension metadata.
+	 * @return array<string, mixed>
+	 */
+	public static function text( string $role, $content, array $metadata = array() ): array {
+		return self::buildEnvelope( $role, $content, self::inferContentType( $content, $metadata ), array(), $metadata, array() );
+	}
+
+	/**
+	 * Build a canonical tool-call envelope.
+	 *
+	 * @param string $content    Human-readable tool-call content.
+	 * @param string $tool_name  Tool identifier.
+	 * @param array  $parameters Tool parameters.
+	 * @param int    $turn       Conversation turn.
+	 * @param array  $metadata   Extension metadata.
+	 * @return array<string, mixed>
+	 */
+	public static function toolCall( string $content, string $tool_name, array $parameters, int $turn, array $metadata = array() ): array {
+		return self::buildEnvelope(
+			'assistant',
+			$content,
+			self::TYPE_TOOL_CALL,
+			array(
+				'tool_name'  => $tool_name,
+				'parameters' => $parameters,
+				'turn'       => $turn,
+			),
+			$metadata,
+			array()
+		);
+	}
+
+	/**
+	 * Build a canonical tool-result envelope.
+	 *
+	 * @param string $content  Human-readable tool-result content.
+	 * @param string $tool_name Tool identifier.
+	 * @param array  $payload  Type-specific result payload.
+	 * @param array  $metadata Extension metadata.
+	 * @return array<string, mixed>
+	 */
+	public static function toolResult( string $content, string $tool_name, array $payload, array $metadata = array() ): array {
+		$payload['tool_name'] = $tool_name;
+
+		return self::buildEnvelope( 'user', $content, self::TYPE_TOOL_RESULT, $payload, $metadata, array() );
+	}
+
+	/**
 	 * Normalize a legacy message or typed envelope to the canonical envelope.
 	 *
 	 * @param array $message Message array.
-	 * @return array Normalized envelope.
+	 * @return array<string, mixed> Normalized envelope.
 	 * @throws \InvalidArgumentException When the message is invalid.
 	 */
 	public static function normalize( array $message ): array {
-		$envelope = self::is_envelope( $message )
-			? self::normalize_envelope( $message )
-			: self::from_legacy_message( $message );
+		$envelope = self::isEnvelope( $message )
+			? self::normalizeEnvelope( $message )
+			: self::fromLegacyMessage( $message );
 
-		if ( false === self::json_encode( $envelope ) ) {
+		if ( false === self::jsonEncode( $envelope ) ) {
 			throw new \InvalidArgumentException( 'invalid_ai_message_envelope: envelope must be JSON serializable' );
 		}
 
@@ -91,61 +139,62 @@ class MessageEnvelope {
 	}
 
 	/**
-	 * Convert an envelope back to the current persisted Data Machine shape.
+	 * Project an envelope to the current ai-http-client request message shape.
 	 *
-	 * @param array $envelope Typed envelope or legacy message.
-	 * @return array Legacy message with role/content/metadata.
+	 * @param array $message Typed envelope or legacy message.
+	 * @return array<string, mixed> Provider-facing message.
 	 */
-	public static function to_legacy_message( array $envelope ): array {
-		$source_is_envelope  = self::is_envelope( $envelope );
-		$source_had_metadata = array_key_exists( 'metadata', $envelope );
-		$source_metadata     = is_array( $envelope['metadata'] ?? null ) ? $envelope['metadata'] : array();
-		$envelope            = self::normalize( $envelope );
-
+	public static function to_provider_message( array $message ): array {
+		$envelope = self::normalize( $message );
 		$metadata = $envelope['metadata'];
-		if ( $source_is_envelope || self::TYPE_TEXT !== $envelope['type'] || array_key_exists( 'type', $source_metadata ) ) {
+
+		if ( self::TYPE_TEXT !== $envelope['type'] || ! empty( $envelope['payload'] ) || ! empty( $metadata ) ) {
 			$metadata['type'] = $envelope['type'];
 		}
-
-		foreach ( $envelope['data'] as $key => $value ) {
+		foreach ( $envelope['payload'] as $key => $value ) {
 			if ( ! array_key_exists( $key, $metadata ) ) {
 				$metadata[ $key ] = $value;
 			}
 		}
 
-		$message = array(
+		$provider_message = array(
 			'role'    => $envelope['role'],
 			'content' => $envelope['content'],
 		);
 
-		if ( ! empty( $metadata ) || $source_is_envelope || $source_had_metadata ) {
-			$message['metadata'] = $metadata;
+		if ( ! empty( $metadata ) ) {
+			$provider_message['metadata'] = $metadata;
 		}
 
-		foreach ( array( 'id', 'created_at', 'updated_at' ) as $field ) {
-			if ( isset( $envelope[ $field ] ) && is_string( $envelope[ $field ] ) && '' !== $envelope[ $field ] ) {
-				$message[ $field ] = $envelope[ $field ];
-			}
-		}
-
-		return $message;
+		return $provider_message;
 	}
 
 	/**
-	 * Convert a message list back to the current persisted shape.
+	 * Project envelopes to the current ai-http-client request message shape.
 	 *
-	 * @param array $messages Message arrays or envelopes.
-	 * @return array<int, array<string, mixed>>
+	 * @param array $messages Typed envelopes or legacy messages.
+	 * @return array<int, array<string, mixed>> Provider-facing messages.
 	 */
-	public static function to_legacy_messages( array $messages ): array {
-		$legacy_messages = array();
+	public static function to_provider_messages( array $messages ): array {
+		$provider_messages = array();
 		foreach ( $messages as $message ) {
 			if ( ! is_array( $message ) ) {
 				throw new \InvalidArgumentException( 'invalid_ai_message_envelope: message must be an array' );
 			}
-			$legacy_messages[] = self::to_legacy_message( $message );
+			$provider_messages[] = self::to_provider_message( $message );
 		}
-		return $legacy_messages;
+		return $provider_messages;
+	}
+
+	/**
+	 * Extract the canonical type from a message.
+	 *
+	 * @param array $message Typed envelope or legacy message.
+	 * @return string Message type.
+	 */
+	public static function type( array $message ): string {
+		$envelope = self::normalize( $message );
+		return $envelope['type'];
 	}
 
 	/**
@@ -154,29 +203,34 @@ class MessageEnvelope {
 	 * @param array $message Message array.
 	 * @return bool
 	 */
-	private static function is_envelope( array $message ): bool {
+	private static function isEnvelope( array $message ): bool {
 		return isset( $message['version'], $message['type'] )
-			&& ( isset( $message['schema'] ) || array_key_exists( 'data', $message ) );
+			&& ( isset( $message['schema'] ) || array_key_exists( 'payload', $message ) || array_key_exists( 'data', $message ) );
 	}
 
 	/**
 	 * Normalize an already-typed envelope.
 	 *
 	 * @param array $message Raw envelope.
-	 * @return array Canonical envelope.
+	 * @return array<string, mixed> Canonical envelope.
 	 */
-	private static function normalize_envelope( array $message ): array {
+	private static function normalizeEnvelope( array $message ): array {
 		if ( self::VERSION !== (int) $message['version'] ) {
 			throw new \InvalidArgumentException( 'invalid_ai_message_envelope: unsupported version' );
 		}
 
-		$type = self::normalize_type( $message['type'] ?? self::TYPE_TEXT );
+		$type    = self::normalizeType( $message['type'] ?? self::TYPE_TEXT );
+		$payload = is_array( $message['payload'] ?? null ) ? $message['payload'] : array();
 
-		return self::build_envelope(
-			$message['role'] ?? self::role_for_type( $type ),
+		if ( empty( $payload ) && is_array( $message['data'] ?? null ) ) {
+			$payload = $message['data'];
+		}
+
+		return self::buildEnvelope(
+			$message['role'] ?? self::roleForType( $type ),
 			$message['content'] ?? '',
 			$type,
-			is_array( $message['data'] ?? null ) ? $message['data'] : array(),
+			$payload,
 			is_array( $message['metadata'] ?? null ) ? $message['metadata'] : array(),
 			$message
 		);
@@ -186,17 +240,17 @@ class MessageEnvelope {
 	 * Normalize the legacy role/content/metadata message shape.
 	 *
 	 * @param array $message Legacy message.
-	 * @return array Canonical envelope.
+	 * @return array<string, mixed> Canonical envelope.
 	 */
-	private static function from_legacy_message( array $message ): array {
+	private static function fromLegacyMessage( array $message ): array {
 		$metadata = is_array( $message['metadata'] ?? null ) ? $message['metadata'] : array();
-		$type     = self::infer_type( $message, $metadata );
+		$type     = self::inferType( $message, $metadata );
 
-		return self::build_envelope(
-			$message['role'] ?? self::role_for_type( $type ),
+		return self::buildEnvelope(
+			$message['role'] ?? self::roleForType( $type ),
 			$message['content'] ?? '',
 			$type,
-			self::data_from_legacy_metadata( $type, $metadata ),
+			self::payloadFromLegacyMetadata( $type, $metadata ),
 			$metadata,
 			$message
 		);
@@ -208,12 +262,12 @@ class MessageEnvelope {
 	 * @param mixed  $role     Raw role.
 	 * @param mixed  $content  Raw content.
 	 * @param string $type     Envelope type.
-	 * @param array  $data     Type-specific payload.
+	 * @param array  $payload  Type-specific payload.
 	 * @param array  $metadata Extension metadata.
 	 * @param array  $source   Source message.
-	 * @return array Canonical envelope.
+	 * @return array<string, mixed> Canonical envelope.
 	 */
-	private static function build_envelope( $role, $content, string $type, array $data, array $metadata, array $source ): array {
+	private static function buildEnvelope( $role, $content, string $type, array $payload, array $metadata, array $source ): array {
 		if ( ! is_string( $role ) || '' === $role ) {
 			throw new \InvalidArgumentException( 'invalid_ai_message_envelope: role must be a non-empty string' );
 		}
@@ -225,10 +279,10 @@ class MessageEnvelope {
 		$envelope = array(
 			'schema'   => self::SCHEMA,
 			'version'  => self::VERSION,
-			'type'     => self::normalize_type( $type ),
+			'type'     => self::normalizeType( $type ),
 			'role'     => $role,
 			'content'  => $content,
-			'data'     => $data,
+			'payload'  => $payload,
 			'metadata' => $metadata,
 		);
 
@@ -248,36 +302,48 @@ class MessageEnvelope {
 	 * @param array $metadata Legacy metadata.
 	 * @return string Envelope type.
 	 */
-	private static function infer_type( array $message, array $metadata ): string {
-		if ( isset( $metadata['type'] ) && is_string( $metadata['type'] ) && in_array( $metadata['type'], self::SUPPORTED_TYPES, true ) ) {
-			return $metadata['type'];
+	private static function inferType( array $message, array $metadata ): string {
+		$metadata_type = is_string( $metadata['type'] ?? null ) ? $metadata['type'] : '';
+		if ( in_array( $metadata_type, self::SUPPORTED_TYPES, true ) ) {
+			return $metadata_type;
+		}
+
+		if ( 'multimodal' === $metadata_type || is_array( $message['content'] ?? null ) ) {
+			return self::TYPE_MULTIMODAL_PART;
 		}
 
 		if ( isset( $metadata['error'] ) ) {
 			return self::TYPE_ERROR;
 		}
 
-		if ( is_array( $message['content'] ?? null ) ) {
-			return self::TYPE_MULTIMODAL_PART;
-		}
-
 		return self::TYPE_TEXT;
 	}
 
 	/**
-	 * Pull common legacy metadata fields into type-specific envelope data.
+	 * Infer the type for newly built messages.
+	 *
+	 * @param mixed $content  Message content.
+	 * @param array $metadata Message metadata.
+	 * @return string Envelope type.
+	 */
+	private static function inferContentType( $content, array $metadata ): string {
+		return self::inferType( array( 'content' => $content ), $metadata );
+	}
+
+	/**
+	 * Pull common legacy metadata fields into type-specific envelope payload.
 	 *
 	 * @param string $type     Envelope type.
 	 * @param array  $metadata Legacy metadata.
-	 * @return array Type-specific data.
+	 * @return array<string, mixed> Type-specific payload.
 	 */
-	private static function data_from_legacy_metadata( string $type, array $metadata ): array {
-		$data = array();
+	private static function payloadFromLegacyMetadata( string $type, array $metadata ): array {
+		$payload = array();
 
 		if ( self::TYPE_TOOL_CALL === $type ) {
 			foreach ( array( 'tool_name', 'parameters', 'turn' ) as $key ) {
 				if ( array_key_exists( $key, $metadata ) ) {
-					$data[ $key ] = $metadata[ $key ];
+					$payload[ $key ] = $metadata[ $key ];
 				}
 			}
 		}
@@ -285,12 +351,12 @@ class MessageEnvelope {
 		if ( self::TYPE_TOOL_RESULT === $type ) {
 			foreach ( array( 'tool_name', 'success', 'turn', 'tool_data', 'media', 'error' ) as $key ) {
 				if ( array_key_exists( $key, $metadata ) ) {
-					$data[ $key ] = $metadata[ $key ];
+					$payload[ $key ] = $metadata[ $key ];
 				}
 			}
 		}
 
-		return $data;
+		return $payload;
 	}
 
 	/**
@@ -299,7 +365,7 @@ class MessageEnvelope {
 	 * @param mixed $type Raw type.
 	 * @return string Supported type.
 	 */
-	private static function normalize_type( $type ): string {
+	private static function normalizeType( $type ): string {
 		if ( ! is_string( $type ) || ! in_array( $type, self::SUPPORTED_TYPES, true ) ) {
 			throw new \InvalidArgumentException( 'invalid_ai_message_envelope: unsupported type' );
 		}
@@ -312,7 +378,7 @@ class MessageEnvelope {
 	 * @param mixed $data Data to encode.
 	 * @return string|false Encoded JSON or false on failure.
 	 */
-	private static function json_encode( $data ) {
+	private static function jsonEncode( $data ) {
 		if ( function_exists( 'wp_json_encode' ) ) {
 			return wp_json_encode( $data );
 		}
@@ -327,7 +393,7 @@ class MessageEnvelope {
 	 * @param string $type Envelope type.
 	 * @return string Role.
 	 */
-	private static function role_for_type( string $type ): string {
+	private static function roleForType( string $type ): string {
 		if ( in_array( $type, array( self::TYPE_TOOL_RESULT, self::TYPE_INPUT_REQUIRED, self::TYPE_APPROVAL_REQUIRED ), true ) ) {
 			return 'tool';
 		}

@@ -9,11 +9,13 @@ Comprehensive reference for all WordPress filters used by Data Machine for servi
 **Purpose**: Register fetch, publish, and upsert handlers
 
 **Parameters**:
+
 - `$handlers` (array) - Current handlers array
 
 **Return**: Array of handler definitions
 
 **Handler Structure**:
+
 ```php
 $handlers['handler_slug'] = [
     'type' => 'fetch|publish|upsert',
@@ -25,6 +27,7 @@ $handlers['handler_slug'] = [
 ```
 
 **Usage Example**:
+
 ```php
 add_filter('datamachine_handlers', function($handlers) {
     $handlers['twitter'] = [
@@ -39,6 +42,7 @@ add_filter('datamachine_handlers', function($handlers) {
 ```
 
 **Handler Metadata**:
+
 - `requires_auth` (boolean): Optional metadata flag for performance optimization
 - Eliminates auth provider instantiation during handler settings modal load
 - Auth-enabled handlers: Twitter, Bluesky, Facebook, Threads, Google Sheets (publish & fetch), Reddit (fetch)
@@ -48,11 +52,13 @@ add_filter('datamachine_handlers', function($handlers) {
 **Purpose**: Register step types for pipeline execution
 
 **Parameters**:
+
 - `$steps` (array) - Current steps array
 
 **Return**: Array of step definitions
 
 **Step Structure**:
+
 ```php
 $steps['step_type'] = [
     'name' => __('Step Display Name', 'data-machine'),
@@ -66,6 +72,7 @@ $steps['step_type'] = [
 **Purpose**: Service discovery for OAuth 1.0a handler
 
 **Parameters**:
+
 - `$handler` (OAuth1Handler|null) - Current handler instance
 
 **Return**: OAuth1Handler instance
@@ -73,6 +80,7 @@ $steps['step_type'] = [
 **Location**: `/inc/Core/OAuth/OAuth1Handler.php`
 
 **Usage Example**:
+
 ```php
 $oauth1 = apply_filters('datamachine_get_oauth1_handler', null);
 $request_token = $oauth1->get_request_token($url, $key, $secret, $callback, 'twitter');
@@ -81,6 +89,7 @@ $result = $oauth1->handle_callback('twitter', $access_url, $key, $secret, $accou
 ```
 
 **Methods**:
+
 - `get_request_token()` - Obtain OAuth request token (step 1)
 - `get_authorization_url()` - Build authorization URL (step 2)
 - `handle_callback()` - Complete OAuth flow (step 3)
@@ -92,6 +101,7 @@ $result = $oauth1->handle_callback('twitter', $access_url, $key, $secret, $accou
 **Purpose**: Service discovery for OAuth 2.0 handler
 
 **Parameters**:
+
 - `$handler` (OAuth2Handler|null) - Current handler instance
 
 **Return**: OAuth2Handler instance
@@ -99,6 +109,7 @@ $result = $oauth1->handle_callback('twitter', $access_url, $key, $secret, $accou
 **Location**: `/inc/Core/OAuth/OAuth2Handler.php`
 
 **Usage Example**:
+
 ```php
 $oauth2 = apply_filters('datamachine_get_oauth2_handler', null);
 $state = $oauth2->create_state('provider_key');
@@ -107,6 +118,7 @@ $result = $oauth2->handle_callback($provider_key, $token_url, $token_params, $ac
 ```
 
 **Methods**:
+
 - `create_state()` - Generate OAuth state nonce
 - `verify_state()` - Verify OAuth state nonce
 - `get_authorization_url()` - Build authorization URL
@@ -123,15 +135,19 @@ Modern handler registration uses **HandlerRegistrationTrait** which automaticall
 The HandlerRegistrationTrait (`/inc/Core/Steps/HandlerRegistrationTrait.php`) automatically registers handlers with the following filters:
 
 #### datamachine_handlers
+
 Handler metadata registration (always registered)
 
 #### datamachine_auth_providers
+
 Authentication provider registration (conditional on `requires_auth=true`)
 
 #### datamachine_handler_settings
+
 Settings class registration (always registered if settings_class provided)
 
 #### datamachine_tools (handler tools)
+
 AI tool registration via callback (conditional on tools_callback provided). The
 trait wires the callback into the unified `datamachine_tools` registry as a
 deferred `_handler_callable` entry resolved at pipeline execution time.
@@ -168,6 +184,7 @@ datamachine_register_my_handler_filters();
 ### Example Implementation
 
 **Publish Handler with OAuth**:
+
 ```php
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -195,6 +212,7 @@ class TwitterFilters {
 ```
 
 **Fetch Handler without Auth**:
+
 ```php
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 
@@ -235,6 +253,7 @@ runtime-generated tools. Consumed by `ToolPolicyResolver` when gathering the
 available tool set for a pipeline or chat context.
 
 **Parameters**:
+
 - `$tools` (array) - Current tools registry (keyed by tool name or internal wrapper key)
 
 **Return**: Modified tools array
@@ -288,6 +307,7 @@ add_filter('datamachine_tools', function($tools) {
 ```
 
 Matching modes:
+
 - `'handler' => 'slug'` — entry applies only when the adjacent step's handler
   slug equals `'slug'`.
 - `'handler_types' => ['fetch', 'event_import']` — entry applies to any
@@ -333,6 +353,7 @@ the resolved definition follows the same shape:
 **Purpose**: Process AI requests with provider routing and modular directive system message injection
 
 **Parameters**:
+
 - `$request` (array) - AI request data
 - `$provider` (string) - AI provider slug
 - `$streaming_callback` (mixed) - Streaming callback function
@@ -349,6 +370,7 @@ All AI requests now use `RequestBuilder::build()` which integrates with `PromptB
 1. **Unified Directives** (`datamachine_directives` filter) - Centralized directive registration with priority and agent targeting
 
 **Request Structure**:
+
 ```php
 $ai_response = RequestBuilder::build(
     $messages,      // Messages array with role/content
@@ -363,17 +385,21 @@ $ai_response = RequestBuilder::build(
 **Current Directive Implementations**:
 
 **Global Directives** (all agents):
+
 - `GlobalSystemPromptDirective` - Background guidance for all AI agents
 - `SiteContextDirective` - WordPress environment information (optional)
 
 **Pipeline Agent Directives**:
+
 - `PipelineCoreDirective` - Foundational agent identity with tool instructions (priority 10)
 - `PipelineSystemPromptDirective` - User-defined system prompts (priority 20)
 
 **Chat Agent Directives**:
+
 - `ChatAgentDirective` - Chat agent identity and capabilities
 
 **Unified Directive Registration**:
+
 ```php
 // Register directives with priority and agent targeting
 add_filter('datamachine_directives', function($directives) {
@@ -400,6 +426,7 @@ add_filter('datamachine_directives', function($directives) {
 **Purpose**: Customize or replace the AI prompt used for generating session titles.
 
 **Parameters**:
+
 - `$default_prompt` (string) - The default prompt for title generation
 - `$context` (array) - Conversation context with the following keys:
   - `first_user_message` (string) - The first message from the user
@@ -411,6 +438,7 @@ add_filter('datamachine_directives', function($directives) {
 **Location**: `/inc/Abilities/SystemAbilities.php`
 
 **Usage Example**:
+
 ```php
 // Generate code names instead of descriptive titles
 add_filter('datamachine_session_title_prompt', function($prompt, $context) {
@@ -436,6 +464,7 @@ add_filter('datamachine_session_title_prompt', function($prompt, $context) {
 ```
 
 **Use Cases**:
+
 - Generate code names instead of descriptive titles
 - Add custom instructions to title generation
 - Create privacy-safe titles that don't expose chat content
@@ -545,12 +574,14 @@ declarations, and mode presets.
 **Abilities Integration**: Handled by `datamachine/create-pipeline` ability.
 
 **Parameters**:
+
 - `$pipeline_id` (null) - Placeholder for return value
 - `$data` (array) - Pipeline creation data
 
 **Return**: Integer pipeline ID or false
 
 **Data Structure**:
+
 ```php
 $data = [
     'pipeline_name' => 'Pipeline Name',
@@ -559,6 +590,7 @@ $data = [
 ```
 
 **Usage**:
+
 ```php
 // Abilities API
 $ability = wp_get_ability( 'datamachine/create-pipeline' );
@@ -575,12 +607,14 @@ $pipeline_id = apply_filters('datamachine_create_pipeline', null, $data);
 **Abilities Integration**: Handled by `datamachine/create-flow` ability.
 
 **Parameters**:
+
 - `$flow_id` (null) - Placeholder for return value
 - `$data` (array) - Flow creation data
 
 **Return**: Integer flow ID or false
 
 **Usage**:
+
 ```php
 // Abilities API
 $ability = wp_get_ability( 'datamachine/create-flow' );
@@ -595,6 +629,7 @@ $flow_id = apply_filters('datamachine_create_flow', null, $data);
 **Purpose**: Retrieve pipeline data
 
 **Parameters**:
+
 - `$pipelines` (array) - Empty array for return data
 - `$pipeline_id` (int|null) - Specific pipeline ID or null for all
 
@@ -605,6 +640,7 @@ $flow_id = apply_filters('datamachine_create_flow', null, $data);
 **Purpose**: Get flow configuration
 
 **Parameters**:
+
 - `$config` (array) - Empty array for return data
 - `$flow_id` (int) - Flow ID
 
@@ -615,6 +651,7 @@ $flow_id = apply_filters('datamachine_create_flow', null, $data);
 **Purpose**: Get specific flow step configuration
 
 **Parameters**:
+
 - `$config` (array) - Empty array for return data
 - `$flow_step_id` (string) - Composite flow step ID
 
@@ -627,11 +664,13 @@ $flow_id = apply_filters('datamachine_create_flow', null, $data);
 **Purpose**: Register OAuth authentication providers
 
 **Parameters**:
+
 - `$providers` (array) - Current auth providers
 
 **Return**: Array of authentication provider instances
 
 **Structure**:
+
 ```php
 $providers['provider_slug'] = new AuthProviderClass();
 ```
@@ -641,6 +680,7 @@ $providers['provider_slug'] = new AuthProviderClass();
 **Purpose**: Get stored OAuth account data
 
 **Parameters**:
+
 - `$account` (array) - Empty array for return data
 - `$handler` (string) - Handler slug
 
@@ -651,6 +691,7 @@ $providers['provider_slug'] = new AuthProviderClass();
 **Purpose**: Generate OAuth authorization URL
 
 **Parameters**:
+
 - `$url` (string) - Empty string for return data
 - `$provider` (string) - Provider slug
 
@@ -663,6 +704,7 @@ $providers['provider_slug'] = new AuthProviderClass();
 **Purpose**: Check if tool is properly configured
 
 **Parameters**:
+
 - `$configured` (bool) - Default configuration status
 - `$tool_id` (string) - Tool identifier
 
@@ -673,6 +715,7 @@ $providers['provider_slug'] = new AuthProviderClass();
 **Purpose**: Retrieve tool configuration data
 
 **Parameters**:
+
 - `$config` (array) - Empty array for return data
 - `$tool_id` (string) - Tool identifier
 
@@ -683,6 +726,7 @@ $providers['provider_slug'] = new AuthProviderClass();
 **Purpose**: Register handler settings classes
 
 **Parameters**:
+
 - `$settings` (array) - Current settings array
 
 **Return**: Array of settings class instances
@@ -694,12 +738,14 @@ $providers['provider_slug'] = new AuthProviderClass();
 **Purpose**: Centralized engine data access filter for retrieving stored engine parameters
 
 **Parameters**:
+
 - `$engine_data` (array) - Default empty array for return data
 - `$job_id` (int) - Job ID to retrieve engine data for
 
 **Return**: Array containing engine data (source_url, image_url, etc.)
 
 **Engine Data Structure**:
+
 ```php
 $engine_data = [
     'source_url' => $source_url,    // For link attribution and content updates
@@ -709,6 +755,7 @@ $engine_data = [
 ```
 
 **Core Implementation (EngineData.php)**:
+
 ```php
 add_filter('datamachine_engine_data', function($engine_data, $job_id) {
     if (empty($job_id)) {
@@ -724,6 +771,7 @@ add_filter('datamachine_engine_data', function($engine_data, $job_id) {
 ```
 
 **Usage by Steps**:
+
 ```php
 // Steps access engine data as needed
 $engine_data = apply_filters('datamachine_engine_data', [], $job_id);
@@ -732,6 +780,7 @@ $image_url = $engine_data['image_url'] ?? null;
 ```
 
 **Engine Data Storage (by Fetch Handlers)**:
+
 ```php
 // Fetch handlers store engine parameters in database via centralized filter (array storage)
 if ($job_id) {
@@ -743,6 +792,7 @@ if ($job_id) {
 ```
 
 **Benefits**:
+
 - ✅ **Centralized Access**: Single filter for all engine data retrieval
 - ✅ **Filter-Based Discovery**: Uses established database service discovery pattern
 - ✅ **Clean Separation**: Engine data separate from AI data packets
@@ -755,12 +805,14 @@ if ($job_id) {
 **Purpose**: Shared timeframe parsing across fetch handlers with discovery and conversion modes
 
 **Parameters**:
+
 - `$default` (mixed) - Default value (null or timestamp)
 - `$timeframe_limit` (string|null) - Timeframe specification
 
 **Return**: Array of options (discovery mode) or timestamp (conversion mode) or null
 
 **Discovery Mode** (when `$timeframe_limit` is null):
+
 ```php
 $timeframe_options = apply_filters('datamachine_timeframe_limit', null, null);
 // Returns:
@@ -774,6 +826,7 @@ $timeframe_options = apply_filters('datamachine_timeframe_limit', null, null);
 ```
 
 **Conversion Mode** (when `$timeframe_limit` is a string):
+
 ```php
 $cutoff_timestamp = apply_filters('datamachine_timeframe_limit', null, '24_hours');
 // Returns: Unix timestamp for 24 hours ago or null for 'all_time'
@@ -784,6 +837,7 @@ $cutoff_timestamp = apply_filters('datamachine_timeframe_limit', null, '24_hours
 **Purpose**: Universal keyword matching with OR logic for all fetch handlers
 
 **Parameters**:
+
 - `$default` (bool) - Default match result
 - `$content` (string) - Content to search in
 - `$search_term` (string) - Comma-separated keywords
@@ -791,12 +845,14 @@ $cutoff_timestamp = apply_filters('datamachine_timeframe_limit', null, '24_hours
 **Return**: Boolean indicating if any keyword matches
 
 **Usage**:
+
 ```php
 $matches = apply_filters('datamachine_keyword_search_match', true, $content, 'wordpress,ai,automation');
 // Returns true if content contains 'wordpress' OR 'ai' OR 'automation'
 ```
 
 **Features**:
+
 - **OR Logic**: Any keyword match passes the filter
 - **Case Insensitive**: Uses `mb_stripos()` for Unicode-safe matching
 - **Comma Separated**: Supports multiple keywords separated by commas
@@ -807,6 +863,7 @@ $matches = apply_filters('datamachine_keyword_search_match', true, $content, 'wo
 **Purpose**: Centralized data packet creation with standardized structure
 
 **Parameters**:
+
 - `$data` (array) - Current data packet array
 - `$packet_data` (array) - Packet data to add
 - `$flow_step_id` (string) - Flow step identifier
@@ -815,11 +872,13 @@ $matches = apply_filters('datamachine_keyword_search_match', true, $content, 'wo
 **Return**: Array with new packet added to front
 
 **Usage**:
+
 ```php
 $data = apply_filters('datamachine_data_packet', $data, $packet_data, $flow_step_id, $step_type);
 ```
 
 **Features**:
+
 - **Standardized Structure**: Ensures type and timestamp fields are present
 - **Preserves All Fields**: Merges packet_data while adding missing structure
 - **Front Addition**: Uses `array_unshift()` to add new packets to the beginning
@@ -835,6 +894,7 @@ $data = apply_filters('datamachine_data_packet', $data, $packet_data, $flow_step
 **Wire point**: `ExecutionContext::isItemProcessed()` — applied after the default seen/not-seen check runs. The filter is **not** invoked in `direct` or `standalone` execution modes, or when `flow_step_id` is empty.
 
 **Parameters**:
+
 - `$skip` (bool) — Current skip decision. `true` means "skip — already processed"; `false` means "process".
 - `$context` (array):
   - `flow_step_id` (string)
@@ -874,7 +934,6 @@ add_filter( 'datamachine_should_reprocess_item', function ( $skip, $ctx ) {
 
 **See also**: `ProcessedItems::get_processed_at()`, `ProcessedItems::has_been_processed_within()`, `ProcessedItems::find_stale()`, `ProcessedItems::find_never_processed()` — the time-windowed read API introduced in the same release.
 
-
 ## Duplicate Detection Filters
 
 ### `datamachine_duplicate_strategies`
@@ -884,12 +943,14 @@ add_filter( 'datamachine_should_reprocess_item', function ( $skip, $ctx ) {
 **Purpose**: Register domain-specific duplicate detection strategies for the `datamachine/check-duplicate` ability. Extensions use this to add post-type-specific matching logic (e.g., event identity via venue + date + ticket URL) that runs before core's generic title/source-URL strategies.
 
 **Parameters**:
+
 - `$strategies` (array) - Array of strategy definitions (see structure below)
 - `$post_type` (string) - The post type being checked
 
 **Return**: Array of strategy definitions
 
 **Strategy Definition Structure**:
+
 ```php
 [
     'id'        => 'event_identity_index',      // string, required. Stable id, surfaced as `strategy` in the ability result.
@@ -900,6 +961,7 @@ add_filter( 'datamachine_should_reprocess_item', function ( $skip, $ctx ) {
 ```
 
 **Cascade Order**:
+
 1. Extension strategies registered on this filter (sorted by `priority`, lowest first).
 2. Core `published_post_source_url` match (exact source URL via `PostIdentityIndex`).
 3. Core `published_post` title match (similarity engine).
@@ -1007,6 +1069,7 @@ There is no requirement to use `PostIdentityIndex` — the filter accepts any ca
 This filter, the strategy definition shape, the callback signature, and the return array shape are considered a public API as of 0.39.0. They will not change in a backward-incompatible way without a deprecation cycle.
 
 **See Also**:
+
 - Source: `inc/Abilities/DuplicateCheck/DuplicateCheckAbility.php::getStrategies()`
 - Canonical consumer: the event duplicate strategy in the `data-machine-events` extension plugin
 - Ability docs: [datamachine/check-duplicate](../../ai-tools/) in ai-tools reference
@@ -1018,6 +1081,7 @@ This filter, the strategy definition shape, the callback signature, and the retu
 **Purpose**: Access files repository service
 
 **Parameters**:
+
 - `$repositories` (array) - Empty array for repository services
 
 **Return**: Array with 'files' key containing repository instance
@@ -1031,11 +1095,13 @@ This filter, the strategy definition shape, the callback signature, and the retu
 **Purpose**: Unified directive registration with priority-based ordering and agent type targeting
 
 **Parameters**:
+
 - `$directives` (array) - Array of directive configurations
 
 **Return**: Modified directives array
 
 **Directive Configuration Structure**:
+
 ```php
 [
     'class' => DirectiveClass::class,   // Directive class name
@@ -1045,6 +1111,7 @@ This filter, the strategy definition shape, the callback signature, and the retu
 ```
 
 **Usage Example**:
+
 ```php
 add_filter('datamachine_directives', function($directives) {
     // Global directive (all agents)
@@ -1066,6 +1133,7 @@ add_filter('datamachine_directives', function($directives) {
 ```
 
 **Priority Guidelines**:
+
 - **10-19**: Core agent identity and foundational instructions
 - **20-29**: Global system prompts and universal behavior
 - **30-39**: Agent-specific system prompts and context
@@ -1080,6 +1148,7 @@ add_filter('datamachine_directives', function($directives) {
 **Purpose**: Modify global AI system directives applied across all AI interactions (pipeline + chat)
 
 **Migration Example**:
+
 ```php
 // LEGACY (pre-v0.2.5)
 add_filter('datamachine_global_directives', function($directives) {
@@ -1109,6 +1178,7 @@ add_filter('datamachine_directives', function($directives) {
 **Purpose**: Modify AI system directives for specific agent types (pipeline or chat)
 
 **Parameters**:
+
 - `$request` (array) - Current AI request being built
 - `$agent_type` (string) - Agent type ('pipeline' or 'chat')
 - `$provider` (string) - AI provider (openai, anthropic, etc.)
@@ -1118,6 +1188,7 @@ add_filter('datamachine_directives', function($directives) {
 **Return**: Modified request array
 
 **Migration Example**:
+
 ```php
 // LEGACY (pre-v0.2.5)
 add_filter('datamachine_agent_directives', function($request, $agent_type, $provider, $tools, $context) {
@@ -1148,6 +1219,7 @@ add_filter('datamachine_directives', function($directives) {
 **Purpose**: Find next step in flow execution sequence
 
 **Parameters**:
+
 - `$next_id` (null) - Placeholder for return value
 - `$current_flow_step_id` (string) - Current step ID
 
@@ -1167,12 +1239,15 @@ Data Machine's Universal Engine provides shared AI infrastructure serving both P
 **Core Methods**:
 
 #### `buildParameters()`
+
 ```php
 \DataMachine\Engine\AI\ToolParameters::buildParameters(array $data, ?string $job_id, ?string $flow_step_id): array
 ```
+
 Builds flat parameter structure for standard AI tools with content extraction and job context.
 
 **Returns**:
+
 ```php
 [
     'content_string' => 'Clean content text',
@@ -1183,12 +1258,15 @@ Builds flat parameter structure for standard AI tools with content extraction an
 ```
 
 #### `buildForHandlerTool()`
+
 ```php
 \DataMachine\Engine\AI\ToolParameters::buildForHandlerTool(array $data, array $tool_def, ?string $job_id, ?string $flow_step_id): array
 ```
+
 Builds parameters for handler-specific tools with engine data merging (source_url, image_url).
 
 **Returns**:
+
 ```php
 [
     // Standard parameters
@@ -1209,6 +1287,7 @@ Builds parameters for handler-specific tools with engine data merging (source_ur
 ```
 
 **Key Features**:
+
 - Content/title extraction from data packets
 - Flat parameter structure for AI simplicity
 - Tool metadata integration
@@ -1239,6 +1318,7 @@ $tools = $resolver->resolve( array(
 ```
 
 **Discovery Process**:
+
 1. Handler Tools - Retrieved via `datamachine_tools` filter (runtime-resolved `_handler_callable` entries)
 2. Global Tools - Retrieved via `datamachine_global_tools` filter
 3. Chat Tools - Retrieved via `datamachine_chat_tools` filter (chat only)
@@ -1284,6 +1364,7 @@ conversation. See [ai-conversation-loop.md](../../core-system/ai-conversation-lo
 for the full adapter contract.
 
 **Features**:
+
 - Automatic tool execution during conversation turns
 - Conversation completion detection
 - Turn-based state management with chronological ordering
@@ -1338,26 +1419,31 @@ factory caches the store per request and applies the filter exactly once.
 
 **Message shape contract**
 
-Stores MUST normalize messages on read to Data Machine message shape. The
-versioned runtime envelope is documented in
-[`ai-message-envelope.md`](../../core-system/ai-message-envelope.md), but the
-chat/session storage contract remains this JSON-friendly legacy shape:
+Stores MUST normalize messages on read to Data Machine's canonical AI message
+envelope, documented in
+[`ai-message-envelope.md`](../../core-system/ai-message-envelope.md). The
+chat/session storage contract is this JSON-friendly envelope shape:
 
 ```php
 [
-    'id'         => string,                 // Stable message identifier
-    'role'       => 'user'|'assistant'|'system'|'tool',
-    'content'    => string|array,
-    'metadata'   => array,                  // Tool calls, tokens, provider-specific fields
-    'created_at' => string,                 // MySQL DATETIME (UTC)
-    'updated_at' => string,                 // MySQL DATETIME (UTC)
+	'schema'     => 'datamachine.ai.message',
+	'version'    => 1,
+	'type'       => 'text'|'tool_call'|'tool_result'|...,
+	'role'       => 'user'|'assistant'|'system'|'tool',
+	'content'    => string|array,
+	'payload'    => array,                  // Type-specific fields.
+	'metadata'   => array,                  // Extension/provider details.
+	'id'         => string,                 // Optional stable message identifier.
+	'created_at' => string,                 // Optional MySQL DATETIME (UTC).
+	'updated_at' => string,                 // Optional MySQL DATETIME (UTC).
 ]
 ```
 
 The five Chat Session abilities and the DM chat UI consume this shape.
 Adapter stores that wrap another host runtime are responsible for translating
 host-specific message objects into Data Machine's envelope at the boundary and
-returning `role/content/metadata` arrays on the way out.
+returning envelopes on the way out. Provider-specific `role/content/metadata`
+arrays are projection shapes at provider boundaries, not the store contract.
 
 **Swap boundary**
 
@@ -1418,6 +1504,7 @@ add_filter( 'datamachine_memory_store', function ( $store, $scope ) {
 ```
 
 **Contract**:
+
 - `read( $scope )` → `AgentMemoryReadResult { exists, content, hash, bytes, updated_at }`
 - `write( $scope, $content, $if_match = null )` → `AgentMemoryWriteResult`
   (implementations supporting concurrency MUST honor `$if_match` and return
@@ -1452,6 +1539,7 @@ Outside plugins and extensions should follow the same pattern: instantiate `Agen
 **Purpose**: Message formatting utilities for AI requests.
 
 **Key Features**:
+
 - Message formatting for AI providers
 - Tool call recording and tracking
 - Conversation message normalization
@@ -1464,6 +1552,7 @@ Outside plugins and extensions should follow the same pattern: instantiate `Agen
 **Core Method**:
 
 #### `build()`
+
 ```php
 $response = \DataMachine\Engine\AI\RequestBuilder::build(
     array $messages,
@@ -1476,6 +1565,7 @@ $response = \DataMachine\Engine\AI\RequestBuilder::build(
 ```
 
 **Features**:
+
 - Directive application system (global, agent-specific, pipeline, chat)
 - Tool restructuring for AI provider compatibility
 - Integration with ai-http-client library

@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
 class ConversationManager {
 
 	/**
-	 * Build standardized conversation message structure.
+	 * Build standardized conversation message envelope.
 	 *
 	 * Content can be a plain string (text-only messages) or an array of content
 	 * blocks for multi-modal messages (text + images). When an array is provided,
@@ -36,14 +36,10 @@ class ConversationManager {
 	 * @param string       $role     Role identifier (user, assistant, system).
 	 * @param string|array $content  Message content — string for text, array for multi-modal content blocks.
 	 * @param array        $metadata Optional metadata for the message (e.g., type, tool_data, attachments).
-	 * @return array Message array with role, content, and metadata.
+	 * @return array Message envelope.
 	 */
 	public static function buildConversationMessage( string $role, $content, array $metadata = array() ): array {
-		return array(
-			'role'     => $role,
-			'content'  => $content,
-			'metadata' => array_merge( array( 'timestamp' => gmdate( 'c' ) ), $metadata ),
-		);
+		return MessageEnvelope::text( $role, $content, array_merge( array( 'timestamp' => gmdate( 'c' ) ), $metadata ) );
 	}
 
 	/**
@@ -129,14 +125,13 @@ class ConversationManager {
 			$message .= ' with parameters: ' . implode( ', ', $params_str );
 		}
 
-		$metadata = array(
-			'type'       => 'tool_call',
-			'tool_name'  => $tool_name,
-			'parameters' => $tool_parameters,
-			'turn'       => $turn_count,
+		return MessageEnvelope::toolCall(
+			$message,
+			$tool_name,
+			$tool_parameters,
+			$turn_count,
+			array( 'timestamp' => gmdate( 'c' ) )
 		);
-
-		return self::buildConversationMessage( 'assistant', $message, $metadata );
 	}
 
 	/**
@@ -158,15 +153,13 @@ class ConversationManager {
 			$content = $human_message;
 		}
 
-		$metadata = array(
-			'type'      => 'tool_result',
-			'tool_name' => $tool_name,
-			'success'   => $tool_result['success'] ?? false,
-			'turn'      => $turn_count,
+		$payload = array(
+			'success' => $tool_result['success'] ?? false,
+			'turn'    => $turn_count,
 		);
 
 		if ( ! empty( $tool_result['data'] ) ) {
-			$metadata['tool_data'] = $tool_result['data'];
+			$payload['tool_data'] = $tool_result['data'];
 
 			// Still append to content for AI context, but frontend can use metadata to hide it
 			if ( ! $is_handler_tool ) {
@@ -178,14 +171,14 @@ class ConversationManager {
 		// Tools can include a 'media' array in their result to signal renderable
 		// media (images, videos) that the frontend should display inline.
 		if ( ! empty( $tool_result['media'] ) ) {
-			$metadata['media'] = $tool_result['media'];
+			$payload['media'] = $tool_result['media'];
 		}
 
 		if ( isset( $tool_result['error'] ) ) {
-			$metadata['error'] = $tool_result['error'];
+			$payload['error'] = $tool_result['error'];
 		}
 
-		return self::buildConversationMessage( 'user', $content, $metadata );
+		return MessageEnvelope::toolResult( $content, $tool_name, $payload, array( 'timestamp' => gmdate( 'c' ) ) );
 	}
 
 	/**
@@ -305,18 +298,18 @@ class ConversationManager {
 
 		// Scan ALL previous tool_call messages, not just the most recent one.
 		for ( $i = count( $conversation_messages ) - 1; $i >= 0; $i-- ) {
-			$message = $conversation_messages[ $i ];
+			$message = MessageEnvelope::normalize( $conversation_messages[ $i ] );
 
 			if ( 'assistant' !== $message['role'] ) {
 				continue;
 			}
 
-			if ( ( $message['metadata']['type'] ?? null ) !== 'tool_call' ) {
+			if ( MessageEnvelope::TYPE_TOOL_CALL !== $message['type'] ) {
 				continue;
 			}
 
-			$prev_tool_name  = $message['metadata']['tool_name'] ?? null;
-			$prev_parameters = $message['metadata']['parameters'] ?? null;
+			$prev_tool_name  = $message['payload']['tool_name'] ?? null;
+			$prev_parameters = $message['payload']['parameters'] ?? null;
 
 			if ( ! is_string( $prev_tool_name ) || ! is_array( $prev_parameters ) ) {
 				continue;
@@ -346,9 +339,11 @@ class ConversationManager {
 	 * @return array|null Tool call details or null if not a tool call message
 	 */
 	public static function extractToolCallFromMessage( array $message ): ?array {
-		if ( ( $message['metadata']['type'] ?? null ) === 'tool_call' ) {
-			$tool_name  = $message['metadata']['tool_name'] ?? null;
-			$parameters = $message['metadata']['parameters'] ?? null;
+		$envelope = MessageEnvelope::normalize( $message );
+
+		if ( MessageEnvelope::TYPE_TOOL_CALL === $envelope['type'] ) {
+			$tool_name  = $envelope['payload']['tool_name'] ?? null;
+			$parameters = $envelope['payload']['parameters'] ?? null;
 
 			if ( is_string( $tool_name ) && is_array( $parameters ) ) {
 				return array(
@@ -358,11 +353,11 @@ class ConversationManager {
 			}
 		}
 
-		if ( 'assistant' !== $message['role'] || ! isset( $message['content'] ) ) {
+		if ( 'assistant' !== $envelope['role'] || ! isset( $envelope['content'] ) ) {
 			return null;
 		}
 
-		$content = $message['content'];
+		$content = $envelope['content'];
 
 		if ( ! preg_match( '/AI ACTION \(Turn \d+\): Executing (.+?)(?: with parameters: (.+))?$/', $content, $matches ) ) {
 			return null;

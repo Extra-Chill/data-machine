@@ -45,6 +45,7 @@ require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveInterface.php';
 require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectivePolicyResolver.php';
 require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveOutputValidator.php';
 require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveRenderer.php';
+require_once __DIR__ . '/../inc/Engine/AI/MessageEnvelope.php';
 require_once __DIR__ . '/../inc/Engine/AI/PromptBuilder.php';
 require_once __DIR__ . '/../inc/Engine/AI/RequestBuilder.php';
 
@@ -145,8 +146,8 @@ $request_json_bytes = strlen( wp_json_encode( $assembled['request'], JSON_UNESCA
 $messages_json_bytes = strlen( wp_json_encode( $assembled['request']['messages'], JSON_UNESCAPED_UNICODE ) );
 $tools_json_bytes = strlen( wp_json_encode( $assembled['request']['tools'], JSON_UNESCAPED_UNICODE ) );
 
-assert_test( 'request JSON byte count stable', 330 === $request_json_bytes, 'got ' . $request_json_bytes );
-assert_test( 'messages JSON byte count stable', 111 === $messages_json_bytes, 'got ' . $messages_json_bytes );
+assert_test( 'request JSON byte count stable', 504 === $request_json_bytes, 'got ' . $request_json_bytes );
+assert_test( 'messages JSON byte count stable', 285 === $messages_json_bytes, 'got ' . $messages_json_bytes );
 assert_test( 'tools JSON byte count stable', 178 === $tools_json_bytes, 'got ' . $tools_json_bytes );
 
 echo "\nCase 3: CLI command surface is registered and documented\n";
@@ -163,7 +164,7 @@ assert_test( 'json output path exists', false !== strpos( $command, "'json' === 
 assert_test( 'table output includes directive section', false !== strpos( $command, "Directives" ) );
 assert_test( 'table output includes largest tools section', false !== strpos( $command, "Largest tools" ) );
 
-$plugin = file_get_contents( __DIR__ . '/../data-machine.php' );
+$plugin  = file_get_contents( __DIR__ . '/../data-machine.php' );
 $ability = file_get_contents( __DIR__ . '/../inc/Abilities/AI/InspectRequestAbility.php' );
 
 assert_test( 'inspect request ability loaded by plugin bootstrap', false !== strpos( $plugin, 'InspectRequestAbility.php' ) );

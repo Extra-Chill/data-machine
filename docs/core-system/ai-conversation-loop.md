@@ -83,6 +83,7 @@ if (empty($tool_calls)) {
 ### State Management
 
 The loop maintains conversation state across turns, tracking:
+
 - Total message count
 - Current turn number
 - Final AI content response
@@ -227,8 +228,9 @@ A consumer can delegate to any external runtime — its own `Agent` subclass, a
 remote RPC service, a different language — as long as the return shape is
 honored. Returned messages may use the legacy `role/content/metadata` shape or
 the versioned [AI Message Envelope](./ai-message-envelope.md); Data Machine
-normalizes envelopes back to the persisted legacy shape before callers store or
-render the result.
+normalizes every returned message to the canonical envelope before callers store
+or render the result. Provider-specific `role/content/metadata` arrays are now a
+projection at the provider boundary, not the runtime/storage contract.
 
 ### Minimal adapter example
 
@@ -387,6 +389,7 @@ do_action('datamachine_log', 'warning', 'AIConversationLoop: Max turns reached',
 The conversation loop provides comprehensive logging at each stage:
 
 ### Loop Start
+
 ```php
 do_action('datamachine_log', 'debug', 'AIConversationLoop: Starting conversation loop', [
     'agent_type' => $agent_type,
@@ -399,6 +402,7 @@ do_action('datamachine_log', 'debug', 'AIConversationLoop: Starting conversation
 ```
 
 ### Turn Start
+
 ```php
 do_action('datamachine_log', 'debug', 'AIConversationLoop: Turn started', [
     'agent_type' => $agent_type,
@@ -408,6 +412,7 @@ do_action('datamachine_log', 'debug', 'AIConversationLoop: Turn started', [
 ```
 
 ### AI Response
+
 ```php
 do_action('datamachine_log', 'debug', 'AIConversationLoop: AI returned content', [
     'agent_type' => $agent_type,
@@ -418,6 +423,7 @@ do_action('datamachine_log', 'debug', 'AIConversationLoop: AI returned content',
 ```
 
 ### Tool Execution
+
 ```php
 do_action('datamachine_log', 'debug', 'AIConversationLoop: Processing tool calls', [
     'agent_type' => $agent_type,
@@ -428,6 +434,7 @@ do_action('datamachine_log', 'debug', 'AIConversationLoop: Processing tool calls
 ```
 
 ### Conversation Complete
+
 ```php
 do_action('datamachine_log', 'debug', 'AIConversationLoop: Conversation complete', [
     'agent_type' => $agent_type,
