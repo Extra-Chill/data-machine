@@ -174,6 +174,18 @@ class SystemCommand extends BaseCommand {
 	 * <task_type>
 	 * : The task type to run (e.g. alt_text_generation, daily_memory_generation).
 	 *
+	 * [--param=<key=value>]
+	 * : Structured task param. Repeatable.
+	 *
+	 * [--params=<json>]
+	 * : JSON object of structured task params.
+	 *
+	 * [--dry-run]
+	 * : Request preview mode for tasks that support it.
+	 *
+	 * [--apply]
+	 * : Request apply mode for mutating tasks.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -187,6 +199,7 @@ class SystemCommand extends BaseCommand {
 	 *
 	 *     wp datamachine system run daily_memory_generation
 	 *     wp datamachine system run alt_text_generation --format=json
+	 *     wp datamachine system run wiki_maintain --param=root_path=woocommerce --dry-run
 	 *
 	 * @subcommand run
 	 */
@@ -199,7 +212,18 @@ class SystemCommand extends BaseCommand {
 			return;
 		}
 
-		$result = SystemAbilities::runTask( array( 'task_type' => $task_type ) );
+		$params = self::parseRunTaskParams( $assoc_args );
+		if ( isset( $params['error'] ) ) {
+			WP_CLI::error( $params['error'] );
+			return;
+		}
+
+		$result = SystemAbilities::runTask(
+			array(
+				'task_type'   => $task_type,
+				'task_params' => $params,
+			)
+		);
 
 		if ( 'json' === $format ) {
 			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
@@ -212,6 +236,79 @@ class SystemCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( $result['message'] );
+	}
+
+	/**
+	 * Parse `system run` structured task params.
+	 *
+	 * @param array $assoc_args WP-CLI associative args.
+	 * @return array Parsed params, or array{error: string} on parse failure.
+	 */
+	private static function parseRunTaskParams( array $assoc_args ): array {
+		$params = array();
+
+		if ( isset( $assoc_args['params'] ) ) {
+			$decoded = json_decode( (string) $assoc_args['params'], true );
+			if ( ! is_array( $decoded ) || array_is_list( $decoded ) ) {
+				return array( 'error' => '--params must be a JSON object.' );
+			}
+			$params = $decoded;
+		}
+
+		$param_args = $assoc_args['param'] ?? array();
+		if ( is_string( $param_args ) ) {
+			$param_args = array( $param_args );
+		}
+		if ( ! is_array( $param_args ) ) {
+			return array( 'error' => '--param must be key=value.' );
+		}
+
+		foreach ( $param_args as $param_arg ) {
+			if ( ! is_string( $param_arg ) || ! str_contains( $param_arg, '=' ) ) {
+				return array( 'error' => '--param must be key=value.' );
+			}
+			list( $key, $value ) = explode( '=', $param_arg, 2 );
+			if ( '' === trim( $key ) ) {
+				return array( 'error' => '--param key cannot be empty.' );
+			}
+			$params[ trim( $key ) ] = self::coerceRunTaskParamValue( $value );
+		}
+
+		if ( ! empty( $assoc_args['dry-run'] ) && ! empty( $assoc_args['apply'] ) ) {
+			return array( 'error' => 'Use either --dry-run or --apply, not both.' );
+		}
+		if ( ! empty( $assoc_args['dry-run'] ) ) {
+			$params['dry_run'] = true;
+		}
+		if ( ! empty( $assoc_args['apply'] ) ) {
+			$params['dry_run'] = false;
+			$params['apply']   = true;
+		}
+
+		return $params;
+	}
+
+	/**
+	 * Coerce scalar CLI param values to simple JSON-like types.
+	 *
+	 * @param string $value Raw CLI value.
+	 * @return mixed
+	 */
+	private static function coerceRunTaskParamValue( string $value ): mixed {
+		$trimmed = trim( $value );
+		if ( 'true' === strtolower( $trimmed ) ) {
+			return true;
+		}
+		if ( 'false' === strtolower( $trimmed ) ) {
+			return false;
+		}
+		if ( 'null' === strtolower( $trimmed ) ) {
+			return null;
+		}
+		if ( is_numeric( $trimmed ) ) {
+			return str_contains( $trimmed, '.' ) ? (float) $trimmed : (int) $trimmed;
+		}
+		return $value;
 	}
 
 	/**

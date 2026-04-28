@@ -299,9 +299,13 @@ class SystemAbilities {
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
-						'task_type' => array(
+						'task_type'   => array(
 							'type'        => 'string',
 							'description' => 'Registered task type identifier (e.g. alt_text_generation, daily_memory_generation).',
+						),
+						'task_params' => array(
+							'type'        => 'object',
+							'description' => 'Structured task parameters passed through to the scheduled SystemTask.',
 						),
 					),
 					'required'   => array( 'task_type' ),
@@ -326,12 +330,13 @@ class SystemAbilities {
 	/**
 	 * Execute the run-task ability.
 	 *
-	 * @param array $input { task_type: string }
+	 * @param array $input { task_type: string, task_params?: array }
 	 * @return array Result with success, job_id, message.
 	 * @since 0.42.0
 	 */
 	public static function runTask( array $input ): array {
-		$task_type = $input['task_type'] ?? '';
+		$task_type   = $input['task_type'] ?? '';
+		$task_params = is_array( $input['task_params'] ?? null ) ? $input['task_params'] : array();
 
 		if ( empty( $task_type ) ) {
 			return array(
@@ -360,10 +365,21 @@ class SystemAbilities {
 			);
 		}
 
-		$job_id = TaskScheduler::schedule( $task_type, array(
+		$validation = self::validateRunTaskParams( $task_type, $meta, $task_params );
+		if ( ! $validation['success'] ) {
+			return array(
+				'success' => false,
+				'error'   => $validation['error'],
+				'message' => $validation['message'],
+			);
+		}
+
+		$task_params = $validation['task_params'];
+
+		$job_id = TaskScheduler::schedule( $task_type, array_merge( $task_params, array(
 			'source'       => 'admin_run_now',
 			'triggered_by' => get_current_user_id(),
-		) );
+		) ) );
 
 		if ( ! $job_id ) {
 			return array(
@@ -381,6 +397,114 @@ class SystemAbilities {
 			'job_id'    => $job_id,
 			'message'   => "{$label} scheduled (Job #{$job_id}).",
 		);
+	}
+
+	/**
+	 * Validate manual run params against task-declared safety metadata.
+	 *
+	 * The schema is intentionally small: task authors may declare accepted,
+	 * required, and scope param names without dragging JSON Schema into the
+	 * SystemTask contract.
+	 *
+	 * @param string $task_type Task type identifier.
+	 * @param array  $meta      Normalized task registry metadata.
+	 * @param array  $params    Proposed task params.
+	 * @return array{success: bool, task_params?: array, error?: string, message?: string}
+	 */
+	private static function validateRunTaskParams( string $task_type, array $meta, array $params ): array {
+		$schema          = is_array( $meta['params_schema'] ?? null ) ? $meta['params_schema'] : array();
+		$accepted_params = self::stringList( $schema['accepted'] ?? $schema['accepted_params'] ?? array() );
+		$required_params = self::stringList( $schema['required'] ?? $schema['required_params'] ?? array() );
+		$scope_params    = self::stringList( $schema['scope'] ?? $schema['scope_params'] ?? array() );
+
+		$core_params = array( 'dry_run', 'apply', 'mode' );
+		if ( ! empty( $accepted_params ) ) {
+			$allowed = array_unique( array_merge( $accepted_params, $required_params, $scope_params, $core_params ) );
+			$unknown = array_diff( array_keys( $params ), $allowed );
+			if ( ! empty( $unknown ) ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( "Task '%s' does not accept param(s): %s", $task_type, implode( ', ', $unknown ) ),
+					'message' => 'Remove unsupported task params or update the task params_schema.',
+				);
+			}
+		}
+
+		$missing = array();
+		foreach ( $required_params as $required_param ) {
+			if ( ! self::hasNonEmptyParam( $params, $required_param ) ) {
+				$missing[] = $required_param;
+			}
+		}
+		if ( ! empty( $missing ) ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( "Task '%s' is missing required param(s): %s", $task_type, implode( ', ', $missing ) ),
+				'message' => 'Provide the required task params and retry.',
+			);
+		}
+
+		if ( ! empty( $meta['requires_scope'] ) ) {
+			$scope_candidates = ! empty( $scope_params ) ? $scope_params : $required_params;
+			if ( empty( $scope_candidates ) ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( "Task '%s' declares requires_scope but no scope params_schema entries.", $task_type ),
+					'message' => 'Declare params_schema.scope for tasks that require scope.',
+				);
+			}
+
+			$has_scope = false;
+			foreach ( $scope_candidates as $scope_param ) {
+				if ( self::hasNonEmptyParam( $params, $scope_param ) ) {
+					$has_scope = true;
+					break;
+				}
+			}
+			if ( ! $has_scope ) {
+				return array(
+					'success' => false,
+					'error'   => sprintf( "Task '%s' requires an explicit scope param: %s", $task_type, implode( ', ', $scope_candidates ) ),
+					'message' => 'Provide a scope param before scheduling this task.',
+				);
+			}
+		}
+
+		if ( ! empty( $meta['mutates'] ) && ! empty( $meta['supports_dry_run'] ) && empty( $params['apply'] ) && ! array_key_exists( 'dry_run', $params ) ) {
+			$params['dry_run'] = true;
+		}
+
+		return array(
+			'success'     => true,
+			'task_params' => $params,
+		);
+	}
+
+	/**
+	 * Normalize a list of string param names.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return array<int, string>
+	 */
+	private static function stringList( mixed $value ): array {
+		if ( is_string( $value ) ) {
+			$value = array( $value );
+		}
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+		return array_values( array_filter( array_map( 'strval', $value ), static fn( string $item ): bool => '' !== $item ) );
+	}
+
+	/**
+	 * Whether a param exists with a non-empty value.
+	 *
+	 * @param array  $params Params array.
+	 * @param string $key    Param key.
+	 * @return bool
+	 */
+	private static function hasNonEmptyParam( array $params, string $key ): bool {
+		return array_key_exists( $key, $params ) && null !== $params[ $key ] && '' !== $params[ $key ];
 	}
 
 	public static function generateSessionTitle( array $input ): array {
