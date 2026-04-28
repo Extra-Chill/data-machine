@@ -69,6 +69,10 @@ Typed, permissioned functions registered via WordPress's Abilities API. Extensio
 | `datamachine/flow-execute` | Execute a flow programmatically |
 | ... | 40+ abilities across media, publishing, content, SEO, and infrastructure |
 
+### Content Formats
+
+Content and publish abilities accept `content_format` (`markdown`, `html`, or `blocks`) as the caller's source format. Data Machine stores content in the post type's canonical format from `datamachine_post_content_format`, converting through its bundled Block Format Bridge substrate.
+
 ### Multi-Agent
 
 Agents are scoped by user. Each agent gets its own:

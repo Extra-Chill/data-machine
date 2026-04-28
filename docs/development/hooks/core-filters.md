@@ -490,6 +490,12 @@ AI-facing tools should treat normal authored prose as markdown unless a workflow
 explicitly pins another source format. Storage-aware abilities then convert that
 source through Block Format Bridge into the post type's canonical stored shape.
 
+Block Format Bridge is bundled by Data Machine and is an internal substrate for
+these boundaries. Consumers should not require a standalone BFB plugin on a
+DM-powered site just to use Data Machine content abilities. Keep format repair,
+mixed-content detection, and malformed-input normalization in BFB (`bfb_normalize()`)
+rather than duplicating those checks in Data Machine call sites.
+
 ### `datamachine_post_content_format`
 
 **Purpose**: Choose the canonical `post_content` storage format for a post type.
@@ -507,6 +513,10 @@ or `blocks`). It is not the storage decision. For example, the `upsert_post`
 chat tool defaults omitted `content_format` to markdown so agents can author
 ordinary prose naturally; raw ability/API calls keep the legacy omitted-format
 default of block markup for compatibility.
+
+Publish handlers follow the same contract: `wordpress_publish` accepts
+`content_format`, appends source attribution in that source format, then stores
+the final content in the post type's canonical format.
 
 ### `datamachine_pending_action_staged`
 

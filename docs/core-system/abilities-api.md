@@ -220,6 +220,11 @@ per post type by `datamachine_post_content_format`. Normal AI-authored prose
 should be markdown; only set `content_format` when the caller intentionally
 supplies HTML or serialized block markup.
 
+The block editing abilities are storage-format aware. They read the post type's
+canonical stored format through `DataMachine\Core\Content\ContentFormat`, convert
+to block markup for the edit operation, then convert the result back before
+writing.
+
 ### Media (7 abilities)
 
 | Ability | Description | Location |
