@@ -124,8 +124,16 @@ $legacy_bundle = array(
 					'flow_id'            => 144,
 					'execution_order'    => 0,
 					'handler_slug'       => 'mcp',
-					'handler_config'     => array( 'provider' => 'github', 'auth_ref' => 'github:default' ),
-					'config_patch_queue' => array( array( 'patch' => array( 'after' => '2026-04-01' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
+					'handler_config'     => array(
+						'provider' => 'github',
+						'auth_ref' => 'github:default',
+					),
+					'config_patch_queue' => array(
+						array(
+							'patch'    => array( 'after' => '2026-04-01' ),
+							'added_at' => '2026-04-27T00:00:00Z',
+						),
+					),
 					'queue_mode'         => 'drain',
 					'enabled'            => true,
 				),
@@ -137,12 +145,24 @@ $legacy_bundle = array(
 					'execution_order'  => 1,
 					'enabled_tools'    => array( 'datamachine/get-github-pull-review-context' ),
 					'disabled_tools'   => array( 'datamachine/delete-flow' ),
-					'prompt_queue'     => array( array( 'prompt' => 'Review PR #1', 'added_at' => '2026-04-28T12:00:00Z' ) ),
+					'prompt_queue'     => array(
+						array(
+							'prompt'   => 'Review PR #1',
+							'added_at' => '2026-04-28T12:00:00Z',
+						),
+					),
 					'queue_mode'       => 'loop',
 				),
 			),
-			'scheduling_config'    => array( 'enabled' => true, 'interval' => 'hourly', 'max_items' => array( 'mcp' => 5 ) ),
-			'memory_file_contents' => array( 'flow.md' => "# Flow\n", 'files/context.json' => "{}\n" ),
+			'scheduling_config'    => array(
+				'enabled'   => true,
+				'interval'  => 'hourly',
+				'max_items' => array( 'mcp' => 5 ),
+			),
+			'memory_file_contents' => array(
+				'flow.md'            => "# Flow\n",
+				'files/context.json' => "{}\n",
+			),
 		),
 	),
 );
@@ -157,7 +177,14 @@ assert_adapter_equals( 'manifest uses portable agent slug', 'review-agent', $man
 assert_adapter_equals( 'pipeline document named by portable slug', 'pr-review-pipeline', $pipeline['slug'] );
 assert_adapter_equals( 'flow references pipeline by slug', 'pr-review-pipeline', $flow['pipeline_slug'] );
 assert_adapter_equals( 'pipeline document strips runtime pipeline_step_id', false, array_key_exists( 'pipeline_step_id', $pipeline['steps'][0]['step_config'] ) );
-assert_adapter_equals( 'flow document preserves handler config', array( 'provider' => 'github', 'auth_ref' => 'github:default' ), $flow['steps'][0]['handler_config'] );
+assert_adapter_equals(
+	'flow document preserves handler config',
+	array(
+		'provider' => 'github',
+		'auth_ref' => 'github:default',
+	),
+	$flow['steps'][0]['handler_config']
+);
 assert_adapter_equals( 'flow document preserves step type', 'fetch', $flow['steps'][0]['step_type'] );
 assert_adapter_equals( 'flow document preserves config patch queue', array( 'after' => '2026-04-01' ), $flow['steps'][0]['config_patch_queue'][0]['patch'] ?? null );
 assert_adapter_equals( 'flow document preserves AI enabled tools', array( 'datamachine/get-github-pull-review-context' ), $flow['steps'][1]['enabled_tools'] );
@@ -184,9 +211,19 @@ $round_steps    = array_values( $round_flow['flow_config'] );
 
 assert_adapter_equals( 'round-trip reconstructs one pipeline', 1, count( $round_trip['pipelines'] ) );
 assert_adapter_equals( 'round-trip reconstructs one flow', 1, count( $round_trip['flows'] ) );
+assert_adapter_equals( 'round-trip drops source pipeline install ID', 1, $round_trip['pipelines'][0]['original_id'] ?? null );
+assert_adapter_equals( 'round-trip drops source flow install ID', 1, $round_trip['flows'][0]['original_id'] ?? null );
+assert_adapter_equals( 'round-trip rewrites flow pipeline reference without source install ID', 1, $round_trip['flows'][0]['original_pipeline_id'] ?? null );
 assert_adapter_equals( 'round-trip preserves pipeline memory', "# Pipeline\n", $round_trip['pipelines'][0]['memory_file_contents']['pipeline.md'] ?? null );
 assert_adapter_equals( 'round-trip preserves flow file memory', "{}\n", $round_trip['flows'][0]['memory_file_contents']['files/context.json'] ?? null );
-assert_adapter_equals( 'round-trip preserves handler config', array( 'auth_ref' => 'github:default', 'provider' => 'github' ), $round_steps[0]['handler_config'] );
+assert_adapter_equals(
+	'round-trip preserves handler config',
+	array(
+		'auth_ref' => 'github:default',
+		'provider' => 'github',
+	),
+	$round_steps[0]['handler_config']
+);
 assert_adapter_equals( 'round-trip preserves step type', 'fetch', $round_steps[0]['step_type'] );
 assert_adapter_equals( 'round-trip preserves config patch queue', array( 'after' => '2026-04-01' ), $round_steps[0]['config_patch_queue'][0]['patch'] ?? null );
 assert_adapter_equals( 'round-trip preserves enabled flag', true, $round_steps[0]['enabled'] );
@@ -198,6 +235,11 @@ assert_adapter_equals( 'round-trip preserves scheduling interval', 'hourly', $ro
 
 echo "\n[3] AgentBundler directory methods route through the adapter\n";
 $agent_bundler_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Agents/AgentBundler.php' ) ?: '';
+assert_adapter( 'export builds AgentBundleDirectory value objects first', false !== strpos( $agent_bundler_source, 'public function export_directory_object' ) );
+assert_adapter( 'export adapts value-object directory back to legacy compatibility array', false !== strpos( $agent_bundler_source, 'AgentBundleLegacyAdapter::to_legacy_bundle( $directory )' ) );
+assert_adapter( 'export composes AgentBundleManifest directly', false !== strpos( $agent_bundler_source, 'new AgentBundleManifest' ) );
+assert_adapter( 'export composes AgentBundlePipelineFile directly', false !== strpos( $agent_bundler_source, 'new AgentBundlePipelineFile' ) );
+assert_adapter( 'export composes AgentBundleFlowFile directly', false !== strpos( $agent_bundler_source, 'new AgentBundleFlowFile' ) );
 assert_adapter( 'to_directory writes AgentBundleLegacyAdapter output', false !== strpos( $agent_bundler_source, 'AgentBundleLegacyAdapter::from_legacy_bundle( $bundle )->write( $directory )' ) );
 assert_adapter( 'from_directory reads AgentBundleDirectory before legacy fallback', false !== strpos( $agent_bundler_source, 'AgentBundleLegacyAdapter::to_legacy_bundle( AgentBundleDirectory::read( $directory ) )' ) );
 

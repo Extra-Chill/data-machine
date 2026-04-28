@@ -20,7 +20,10 @@ use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
+use DataMachine\Engine\Bundle\AgentBundleFlowFile;
 use DataMachine\Engine\Bundle\AgentBundleLegacyAdapter;
+use DataMachine\Engine\Bundle\AgentBundleManifest;
+use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Bundle\PortableSlug;
 
@@ -67,6 +70,37 @@ class AgentBundler {
 	 * @return array{success: bool, bundle?: array, error?: string}
 	 */
 	public function export( string $slug ): array {
+		$result = $this->export_directory_object( $slug );
+		if ( empty( $result['success'] ) ) {
+			return $result;
+		}
+
+		$directory = $result['directory'] ?? null;
+		if ( ! $directory instanceof AgentBundleDirectory ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to build agent bundle directory.',
+			);
+		}
+
+		$agent                         = is_array( $result['agent'] ?? null ) ? $result['agent'] : array();
+		$bundle                        = AgentBundleLegacyAdapter::to_legacy_bundle( $directory );
+		$bundle['abilities_manifest']  = $this->collect_abilities_manifest();
+		$bundle['agent']['site_scope'] = (string) ( $agent['site_scope'] ?? 'site' );
+
+		return array(
+			'success' => true,
+			'bundle'  => $bundle,
+		);
+	}
+
+	/**
+	 * Export an agent into review-friendly bundle directory value objects.
+	 *
+	 * @param string $slug Agent slug.
+	 * @return array{success: bool, directory?: AgentBundleDirectory, agent?: array, error?: string}
+	 */
+	public function export_directory_object( string $slug ): array {
 		$agent = $this->agents_repo->get_by_slug( sanitize_title( $slug ) );
 
 		if ( ! $agent ) {
@@ -78,84 +112,184 @@ class AgentBundler {
 
 		$agent_id = (int) $agent['agent_id'];
 
-		// 1. Agent identity.
-		$bundle = array(
-			'bundle_version'        => self::BUNDLE_VERSION,
-			'bundle_schema_version' => self::BUNDLE_VERSION,
-			'bundle_slug'           => sanitize_title( $agent['agent_slug'] ),
-			'exported_at'           => gmdate( 'c' ),
-			'agent'                 => array(
-				'agent_slug'   => $agent['agent_slug'],
-				'agent_name'   => $agent['agent_name'],
-				'agent_config' => $agent['agent_config'] ?? array(),
-				'site_scope'   => $agent['site_scope'],
-			),
-		);
+		$pipelines                 = $this->pipelines_repo->get_all_pipelines( null, $agent_id );
+		$flows                     = $this->flows_repo->get_all_flows( null, $agent_id );
+		$pipeline_documents        = array();
+		$flow_documents            = array();
+		$memory_files              = array();
+		$pipeline_slugs_by_id      = array();
+		$pipeline_step_types_by_id = array();
+		$used_pipeline_slugs       = array();
+		$used_flow_slugs           = array();
 
-		// 2. Agent identity files (SOUL.md, MEMORY.md).
-		$bundle['files'] = $this->collect_agent_files( $agent['agent_slug'] );
+		foreach ( $this->collect_agent_files( $agent['agent_slug'] ) as $path => $contents ) {
+			$memory_files[ 'agent/' . ltrim( (string) $path, '/' ) ] = $contents;
+		}
 
-		// 3. Owner's USER.md template (without sensitive data).
-		$owner_id                = (int) $agent['owner_id'];
-		$bundle['user_template'] = $this->collect_user_template( $owner_id );
-
-		// 4. Pipelines scoped to this agent.
-		$pipelines           = $this->pipelines_repo->get_all_pipelines( null, $agent_id );
-		$bundle['pipelines'] = array();
+		$owner_id      = (int) $agent['owner_id'];
+		$user_template = $this->collect_user_template( $owner_id );
+		if ( '' !== $user_template ) {
+			$memory_files['USER.md'] = $user_template;
+		}
 
 		foreach ( $pipelines as $pipeline ) {
-			$pipeline_id   = (int) $pipeline['pipeline_id'];
-			$portable_slug = ! empty( $pipeline['portable_slug'] )
-				? $pipeline['portable_slug']
+			$pipeline_id                          = (int) $pipeline['pipeline_id'];
+			$portable_slug                        = ! empty( $pipeline['portable_slug'] )
+				? PortableSlug::normalize( (string) $pipeline['portable_slug'], 'pipeline' )
 				: PortableSlug::normalize( (string) $pipeline['pipeline_name'], 'pipeline' );
-			$pipeline_data = array(
-				'original_id'     => $pipeline_id,
-				'portable_slug'   => $portable_slug,
-				'pipeline_name'   => $pipeline['pipeline_name'],
-				'pipeline_config' => $pipeline['pipeline_config'] ?? array(),
+			$portable_slug                        = PortableSlug::dedupe( $portable_slug, $used_pipeline_slugs );
+			$used_pipeline_slugs[]                = $portable_slug;
+			$pipeline_config                      = is_array( $pipeline['pipeline_config'] ?? null ) ? $pipeline['pipeline_config'] : array();
+			$pipeline_slugs_by_id[ $pipeline_id ] = $portable_slug;
+
+			foreach ( $pipeline_config as $pipeline_step_id => $pipeline_step ) {
+				if ( is_array( $pipeline_step ) ) {
+					$pipeline_step_types_by_id[ (string) $pipeline_step_id ] = (string) ( $pipeline_step['step_type'] ?? '' );
+				}
+			}
+
+			$pipeline_documents[] = new AgentBundlePipelineFile(
+				$portable_slug,
+				(string) $pipeline['pipeline_name'],
+				self::pipeline_document_steps_from_config( $pipeline_config )
 			);
 
-			// Collect pipeline memory files from disk.
-			$pipeline_data['memory_file_contents'] = $this->collect_pipeline_memory_files( $pipeline_id );
-
-			$bundle['pipelines'][] = $pipeline_data;
+			foreach ( $this->collect_pipeline_memory_files( $pipeline_id ) as $path => $contents ) {
+				$memory_files[ 'pipelines/' . $portable_slug . '/' . ltrim( (string) $path, '/' ) ] = $contents;
+			}
 		}
-
-		// 5. Flows scoped to this agent.
-		$flows           = $this->flows_repo->get_all_flows( null, $agent_id );
-		$bundle['flows'] = array();
 
 		foreach ( $flows as $flow ) {
-			$flow_id       = (int) $flow['flow_id'];
-			$portable_slug = ! empty( $flow['portable_slug'] )
-				? $flow['portable_slug']
+			$flow_id           = (int) $flow['flow_id'];
+			$pipeline_id       = (int) $flow['pipeline_id'];
+			$portable_slug     = ! empty( $flow['portable_slug'] )
+				? PortableSlug::normalize( (string) $flow['portable_slug'], 'flow' )
 				: PortableSlug::normalize( (string) $flow['flow_name'], 'flow' );
-			$flow_data     = array(
-				'original_id'          => $flow_id,
-				'original_pipeline_id' => (int) $flow['pipeline_id'],
-				'portable_slug'        => $portable_slug,
-				'flow_name'            => $flow['flow_name'],
-				'flow_config'          => $flow['flow_config'] ?? array(),
-				'scheduling_config'    => $this->sanitize_scheduling_config( $flow['scheduling_config'] ?? array() ),
+			$portable_slug     = PortableSlug::dedupe( $portable_slug, $used_flow_slugs );
+			$used_flow_slugs[] = $portable_slug;
+			$scheduling        = $this->sanitize_scheduling_config( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() );
+			$flow_documents[]  = new AgentBundleFlowFile(
+				$portable_slug,
+				(string) $flow['flow_name'],
+				$pipeline_slugs_by_id[ $pipeline_id ] ?? 'pipeline',
+				(string) ( $scheduling['interval'] ?? 'manual' ),
+				is_array( $scheduling['max_items'] ?? null ) ? $scheduling['max_items'] : array(),
+				self::flow_document_steps_from_config(
+					is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array(),
+					$pipeline_step_types_by_id
+				)
 			);
 
-			// Collect flow memory files from disk.
-			$flow_data['memory_file_contents'] = $this->collect_flow_memory_files(
-				(int) $flow['pipeline_id'],
-				$flow_id
-			);
-
-			$bundle['flows'][] = $flow_data;
+			foreach ( $this->collect_flow_memory_files( $pipeline_id, $flow_id ) as $path => $contents ) {
+				$memory_files[ 'flows/' . $portable_slug . '/' . ltrim( (string) $path, '/' ) ] = $contents;
+			}
 		}
 
-		// 6. Abilities manifest — list of ability slugs registered system-wide.
-		// Importers can use this to verify the target has matching abilities.
-		$bundle['abilities_manifest'] = $this->collect_abilities_manifest();
+		$pipeline_slugs = array_map( fn( AgentBundlePipelineFile $pipeline ) => $pipeline->slug(), $pipeline_documents );
+		$flow_slugs     = array_map( fn( AgentBundleFlowFile $flow ) => $flow->slug(), $flow_documents );
+		$manifest       = new AgentBundleManifest(
+			gmdate( 'c' ),
+			defined( 'DATAMACHINE_VERSION' ) ? 'data-machine/' . DATAMACHINE_VERSION : 'data-machine/unknown',
+			sanitize_title( (string) $agent['agent_slug'] ),
+			(string) self::BUNDLE_VERSION,
+			'',
+			'',
+			array(
+				'slug'         => $agent['agent_slug'],
+				'label'        => $agent['agent_name'],
+				'description'  => '',
+				'agent_config' => is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array(),
+			),
+			array(
+				'memory'       => array_keys( $memory_files ),
+				'pipelines'    => $pipeline_slugs,
+				'flows'        => $flow_slugs,
+				'handler_auth' => 'refs',
+			)
+		);
 
 		return array(
-			'success' => true,
-			'bundle'  => $bundle,
+			'success'   => true,
+			'agent'     => $agent,
+			'directory' => new AgentBundleDirectory( $manifest, $memory_files, $pipeline_documents, $flow_documents ),
 		);
+	}
+
+	/**
+	 * Convert runtime pipeline config rows to bundle pipeline document steps.
+	 *
+	 * @param array $pipeline_config Runtime pipeline config keyed by pipeline step ID.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function pipeline_document_steps_from_config( array $pipeline_config ): array {
+		$steps = array();
+		foreach ( $pipeline_config as $step ) {
+			if ( ! is_array( $step ) ) {
+				continue;
+			}
+
+			$step_config = $step;
+			unset( $step_config['pipeline_step_id'] );
+			$steps[] = array(
+				'step_position' => (int) ( $step['execution_order'] ?? count( $steps ) ),
+				'step_type'     => (string) ( $step['step_type'] ?? '' ),
+				'step_config'   => $step_config,
+			);
+		}
+		return $steps;
+	}
+
+	/**
+	 * Convert runtime flow config rows to bundle flow document steps.
+	 *
+	 * @param array $flow_config Runtime flow config keyed by flow step ID.
+	 * @param array $pipeline_step_types_by_id Pipeline step ID to step type map.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function flow_document_steps_from_config( array $flow_config, array $pipeline_step_types_by_id ): array {
+		$steps = array();
+		foreach ( $flow_config as $step ) {
+			if ( ! is_array( $step ) ) {
+				continue;
+			}
+
+			$pipeline_step_id = (string) ( $step['pipeline_step_id'] ?? '' );
+			$document_step    = array(
+				'step_position'   => (int) ( $step['execution_order'] ?? count( $steps ) ),
+				'handler_configs' => self::handler_configs_from_flow_step( $step ),
+			);
+
+			if ( ! isset( $step['step_type'] ) && isset( $pipeline_step_types_by_id[ $pipeline_step_id ] ) ) {
+				$document_step['step_type'] = $pipeline_step_types_by_id[ $pipeline_step_id ];
+			}
+
+			foreach ( array( 'step_type', 'handler_slug', 'handler_slugs', 'handler_config', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'enabled' ) as $field ) {
+				if ( array_key_exists( $field, $step ) ) {
+					$document_step[ $field ] = $step[ $field ];
+				}
+			}
+
+			$steps[] = $document_step;
+		}
+		return $steps;
+	}
+
+	/**
+	 * Extract handler config map from a runtime flow step row.
+	 *
+	 * @param array $step Runtime flow step row.
+	 * @return array<string,array<string,mixed>>
+	 */
+	private static function handler_configs_from_flow_step( array $step ): array {
+		if ( is_array( $step['handler_configs'] ?? null ) ) {
+			return $step['handler_configs'];
+		}
+
+		if ( is_string( $step['handler_slug'] ?? null ) && is_array( $step['handler_config'] ?? null ) ) {
+			return array( $step['handler_slug'] => $step['handler_config'] );
+		}
+
+		return array();
 	}
 
 	/**
