@@ -14,11 +14,11 @@ defined( 'ABSPATH' ) || exit;
  */
 final class AgentBundleDriftStatus {
 
-	public const CURRENT = 'current';
+	public const CURRENT       = 'current';
 	public const NOT_INSTALLED = 'not_installed';
-	public const WRONG_BUNDLE = 'wrong_bundle';
+	public const WRONG_BUNDLE  = 'wrong_bundle';
 	public const VERSION_DRIFT = 'version_drift';
-	public const SOURCE_DRIFT = 'source_drift';
+	public const SOURCE_DRIFT  = 'source_drift';
 
 	/**
 	 * Compare installed metadata to an available bundle manifest.

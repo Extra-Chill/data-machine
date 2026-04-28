@@ -45,7 +45,7 @@ final class AgentBundleManifest {
 
 		foreach ( array( 'exported_at', 'exported_by', 'bundle_slug', 'bundle_version', 'agent', 'included' ) as $field ) {
 			if ( ! array_key_exists( $field, $data ) ) {
-				throw new BundleValidationException( "manifest.json is missing required field {$field}." );
+				throw new BundleValidationException( sprintf( 'manifest.json is missing required field %s.', esc_html( $field ) ) );
 			}
 		}
 
@@ -72,15 +72,15 @@ final class AgentBundleManifest {
 	 */
 	public function to_array(): array {
 		return array(
-			'schema_version'   => BundleSchema::VERSION,
-			'bundle_slug'      => $this->bundle_slug,
-			'bundle_version'   => $this->bundle_version,
-			'source_ref'       => $this->source_ref,
-			'source_revision'  => $this->source_revision,
-			'exported_at'      => $this->exported_at,
-			'exported_by'      => $this->exported_by,
-			'agent'            => $this->agent,
-			'included'         => $this->included,
+			'schema_version'  => BundleSchema::VERSION,
+			'bundle_slug'     => $this->bundle_slug,
+			'bundle_version'  => $this->bundle_version,
+			'source_ref'      => $this->source_ref,
+			'source_revision' => $this->source_revision,
+			'exported_at'     => $this->exported_at,
+			'exported_by'     => $this->exported_by,
+			'agent'           => $this->agent,
+			'included'        => $this->included,
 		);
 	}
 
@@ -116,7 +116,7 @@ final class AgentBundleManifest {
 	private static function validate_agent( array $agent ): array {
 		foreach ( array( 'slug', 'label', 'description', 'agent_config' ) as $field ) {
 			if ( ! array_key_exists( $field, $agent ) ) {
-				throw new BundleValidationException( "manifest.json agent is missing required field {$field}." );
+				throw new BundleValidationException( sprintf( 'manifest.json agent is missing required field %s.', esc_html( $field ) ) );
 			}
 		}
 
@@ -138,13 +138,13 @@ final class AgentBundleManifest {
 	private static function validate_included( array $included ): array {
 		foreach ( array( 'memory', 'pipelines', 'flows', 'handler_auth' ) as $field ) {
 			if ( ! array_key_exists( $field, $included ) ) {
-				throw new BundleValidationException( "manifest.json included is missing required field {$field}." );
+				throw new BundleValidationException( sprintf( 'manifest.json included is missing required field %s.', esc_html( $field ) ) );
 			}
 		}
 
 		foreach ( array( 'memory', 'pipelines', 'flows' ) as $field ) {
 			if ( ! is_array( $included[ $field ] ) || ! array_is_list( $included[ $field ] ) ) {
-				throw new BundleValidationException( "manifest.json included.{$field} must be a list." );
+				throw new BundleValidationException( sprintf( 'manifest.json included.%s must be a list.', esc_html( $field ) ) );
 			}
 			$included[ $field ] = array_values( array_map( 'strval', $included[ $field ] ) );
 			sort( $included[ $field ], SORT_STRING );
@@ -167,11 +167,11 @@ final class AgentBundleManifest {
 	private static function validate_version_string( string $value, string $field ): string {
 		$value = trim( $value );
 		if ( '' === $value ) {
-			throw new BundleValidationException( "manifest.json {$field} must be a non-empty string." );
+			throw new BundleValidationException( sprintf( 'manifest.json %s must be a non-empty string.', esc_html( $field ) ) );
 		}
 
 		if ( strlen( $value ) > 191 ) {
-			throw new BundleValidationException( "manifest.json {$field} must be 191 characters or fewer." );
+			throw new BundleValidationException( sprintf( 'manifest.json %s must be 191 characters or fewer.', esc_html( $field ) ) );
 		}
 
 		return $value;
@@ -180,7 +180,7 @@ final class AgentBundleManifest {
 	private static function validate_optional_string( string $value, string $field ): string {
 		$value = trim( $value );
 		if ( strlen( $value ) > 191 ) {
-			throw new BundleValidationException( "manifest.json {$field} must be 191 characters or fewer." );
+			throw new BundleValidationException( sprintf( 'manifest.json %s must be 191 characters or fewer.', esc_html( $field ) ) );
 		}
 
 		return $value;
