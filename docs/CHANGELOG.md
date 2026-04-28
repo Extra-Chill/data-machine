@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.90.0] - 2026-04-28
+
+### Added
+- support workflow specs in bulk create
+
+### Fixed
+- repair system run param synopsis
+- centralize spec validation
+
 ## [0.89.0] - 2026-04-28
 
 ### Added
