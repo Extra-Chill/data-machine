@@ -6,6 +6,7 @@ use DataMachine\Core\DataPacket;
 use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
+use DataMachine\Engine\Bundle\AuthRefHandlerConfig;
 use DataMachine\Abilities\HandlerAbilities;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -129,6 +130,24 @@ class FetchStep extends Step {
 		$handler_settings['flow_step_id'] = $this->flow_step_config['flow_step_id'];
 		$handler_settings['pipeline_id']  = $this->flow_step_config['pipeline_id'];
 		$handler_settings['flow_id']      = $this->flow_step_config['flow_id'];
+
+		$resolved_handler_settings = AuthRefHandlerConfig::resolve_runtime_config(
+			$handler_settings,
+			(string) $handler,
+			array(
+				'flow_step_id' => $this->flow_step_config['flow_step_id'],
+				'pipeline_id'  => $this->flow_step_config['pipeline_id'],
+				'flow_id'      => $this->flow_step_config['flow_id'],
+				'job_id'       => $this->job_id,
+			)
+		);
+
+		if ( is_wp_error( $resolved_handler_settings ) ) {
+			$this->log( 'error', 'Fetch auth_ref resolution failed: ' . $resolved_handler_settings->get_error_message() );
+			return $this->dataPackets;
+		}
+
+		$handler_settings = $resolved_handler_settings;
 
 		$packets = $this->execute_handler( $handler, $handler_settings, (string) $this->job_id );
 

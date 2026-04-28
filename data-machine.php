@@ -79,6 +79,7 @@ function datamachine_run_datamachine_plugin() {
 
 	// Load and instantiate all handlers - they self-register via constructors
 	datamachine_load_handlers();
+	\DataMachine\Engine\Bundle\AuthRefHandlerConfig::register();
 
 	// Initialize FetchHandler to register skip_item tool for all fetch-type handlers
 	\DataMachine\Core\Steps\Fetch\Handlers\FetchHandler::init();
