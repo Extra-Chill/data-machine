@@ -315,6 +315,9 @@ class ToolManager {
 				if ( ! isset( $tool_def['handler'] ) ) {
 					$tool_def['handler'] = $handler_slug;
 				}
+				if ( ! isset( $tool_def['handler_config'] ) ) {
+					$tool_def['handler_config'] = $handler_config;
+				}
 
 				// Apply registry-level meta unless the resolved tool
 				// explicitly overrides.

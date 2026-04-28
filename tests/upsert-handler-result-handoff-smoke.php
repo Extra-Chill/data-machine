@@ -133,6 +133,8 @@ $available_tools = $resolver->resolve(
 assert_handoff_equals( true, isset( $available_tools['wiki_upsert'] ), 'handler-scoped wiki_upsert tool resolved', $failures, $passes );
 assert_handoff_equals( 'wiki_upsert', $available_tools['wiki_upsert']['handler'] ?? null, 'handler slug metadata survives name collision', $failures, $passes );
 assert_handoff_equals( 'Handler-scoped wiki upsert tool', $available_tools['wiki_upsert']['description'] ?? null, 'handler definition wins over global tool', $failures, $passes );
+assert_handoff_equals( array( 'fixed_parent_path' => 'woocommerce' ), $available_tools['wiki_upsert']['handler_config'] ?? null, 'handler config propagates to resolved tool definition', $failures, $passes );
+assert_handoff_equals( array( 'fixed_parent_path' => 'woocommerce' ), $available_tools['wiki_upsert']['config_seen'] ?? null, 'handler callback still receives the same config', $failures, $passes );
 
 $method = new ReflectionMethod( AIStep::class, 'processLoopResults' );
 
