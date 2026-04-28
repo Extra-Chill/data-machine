@@ -205,13 +205,20 @@ Workspace and GitHub coding abilities live in the `data-machine-code` extension 
 | `datamachine/query-posts` | Find posts created by Data Machine, filtered by handler/flow/pipeline | `inc/Abilities/PostQueryAbilities.php` |
 | `datamachine/list-posts` | List Data Machine posts with combinable filters | `inc/Abilities/PostQueryAbilities.php` |
 
-### Content / Block Editing (3 abilities)
+### Content / Block Editing (4 abilities)
 
 | Ability | Description | Location |
 |---------|-------------|----------|
+| `datamachine/upsert-post` | Create or update a post. AI/chat tool calls default to markdown authoring; raw ability/API callers that omit `content_format` keep the legacy block-markup default. | `inc/Abilities/Content/UpsertPostAbility.php` |
 | `datamachine/get-post-blocks` | Get Gutenberg blocks from a post | `inc/Abilities/Content/GetPostBlocksAbility.php` |
 | `datamachine/edit-post-blocks` | Update Gutenberg blocks in a post | `inc/Abilities/Content/EditPostBlocksAbility.php` |
 | `datamachine/replace-post-blocks` | Replace specific blocks in a post | `inc/Abilities/Content/ReplacePostBlocksAbility.php` |
+
+`content_format` is the caller's authoring/source format (`markdown`, `html`, or
+`blocks`). It is distinct from the stored `post_content` format, which is chosen
+per post type by `datamachine_post_content_format`. Normal AI-authored prose
+should be markdown; only set `content_format` when the caller intentionally
+supplies HTML or serialized block markup.
 
 ### Media (7 abilities)
 
