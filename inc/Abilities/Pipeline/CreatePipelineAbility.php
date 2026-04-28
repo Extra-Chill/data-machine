@@ -420,21 +420,18 @@ class CreatePipelineAbility {
 		if ( $validate_only ) {
 			$preview = array();
 			foreach ( $pipelines as $index => $pipeline_config ) {
-				$name     = $pipeline_config['name'];
-				$resolved = $this->resolveBulkPipelineSpec( $pipeline_config, $template_workflow, $template_steps );
-				$workflow = $resolved['workflow'];
-				$steps    = $resolved['steps'];
+				$entry = $this->resolveBulkPipelineEntry( $pipeline_config, $template_workflow, $template_steps );
 
 				$preview_item = array(
-					'name'          => $name,
-					'steps'         => ! empty( $workflow ) ? count( $workflow['steps'] ?? array() ) : count( $steps ),
-					'creation_mode' => ! empty( $workflow ) ? 'workflow' : ( ! empty( $steps ) ? 'batch' : 'simple' ),
+					'name'          => $entry['name'],
+					'steps'         => ! empty( $entry['workflow'] ) ? count( $entry['workflow']['steps'] ?? array() ) : count( $entry['steps'] ),
+					'creation_mode' => ! empty( $entry['workflow'] ) ? 'workflow' : ( ! empty( $entry['steps'] ) ? 'batch' : 'simple' ),
 				);
 
 				$has_flow = isset( $pipeline_config['flow_name'] ) || isset( $pipeline_config['scheduling_config'] ) || isset( $template['scheduling_config'] );
 				if ( $has_flow ) {
 					$scheduling_config          = $pipeline_config['scheduling_config'] ?? ( $template['scheduling_config'] ?? array( 'interval' => 'manual' ) );
-					$preview_item['flow_name']  = $pipeline_config['flow_name'] ?? $name;
+					$preview_item['flow_name']  = $pipeline_config['flow_name'] ?? $entry['name'];
 					$preview_item['scheduling'] = $scheduling_config['interval'] ?? 'manual';
 				}
 
@@ -459,19 +456,16 @@ class CreatePipelineAbility {
 		$agent_id = isset( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
 
 		foreach ( $pipelines as $index => $pipeline_config ) {
-			$name     = $pipeline_config['name'];
-			$resolved = $this->resolveBulkPipelineSpec( $pipeline_config, $template_workflow, $template_steps );
-			$workflow = $resolved['workflow'];
-			$steps    = $resolved['steps'];
+			$entry = $this->resolveBulkPipelineEntry( $pipeline_config, $template_workflow, $template_steps );
 
 			$single_input = array(
-				'pipeline_name' => $name,
+				'pipeline_name' => $entry['name'],
 			);
 
-			if ( ! empty( $workflow ) ) {
-				$single_input['workflow'] = $workflow;
+			if ( ! empty( $entry['workflow'] ) ) {
+				$single_input['workflow'] = $entry['workflow'];
 			} else {
-				$single_input['steps'] = $steps;
+				$single_input['steps'] = $entry['steps'];
 			}
 
 			if ( null !== $agent_id && $agent_id > 0 ) {
@@ -482,7 +476,7 @@ class CreatePipelineAbility {
 			$has_flow_config = isset( $pipeline_config['flow_name'] ) || isset( $pipeline_config['scheduling_config'] ) || isset( $template['scheduling_config'] );
 			if ( $has_flow_config ) {
 				$single_input['flow_config'] = array(
-					'flow_name'         => $pipeline_config['flow_name'] ?? $name,
+					'flow_name'         => $pipeline_config['flow_name'] ?? $entry['name'],
 					'scheduling_config' => $pipeline_config['scheduling_config'] ?? ( $template['scheduling_config'] ?? array( 'interval' => 'manual' ) ),
 				);
 			}
@@ -503,7 +497,7 @@ class CreatePipelineAbility {
 				++$failed_count;
 				$errors[] = array(
 					'index'       => $index,
-					'name'        => $name,
+					'name'        => $entry['name'],
 					'error'       => $single_result['error'],
 					'remediation' => 'Check the error message and fix the pipeline configuration',
 				);
@@ -577,6 +571,21 @@ class CreatePipelineAbility {
 		return array(
 			'workflow' => $workflow,
 			'steps'    => $steps,
+		);
+	}
+
+	/**
+	 * Resolve a bulk pipeline entry name and effective step source.
+	 *
+	 * @param array $pipeline_config Pipeline entry config.
+	 * @param array $template_workflow Shared workflow template.
+	 * @param array $template_steps Shared legacy steps template.
+	 * @return array{name: string, workflow: array, steps: array}
+	 */
+	private function resolveBulkPipelineEntry( array $pipeline_config, array $template_workflow, array $template_steps ): array {
+		return array_merge(
+			array( 'name' => $pipeline_config['name'] ),
+			$this->resolveBulkPipelineSpec( $pipeline_config, $template_workflow, $template_steps )
 		);
 	}
 

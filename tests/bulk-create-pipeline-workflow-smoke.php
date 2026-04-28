@@ -170,8 +170,8 @@ assert_bulk_workflow_equals( array(), $resolved['workflow'], 'per-pipeline legac
 assert_bulk_workflow_equals( $legacy_steps, $resolved['steps'], 'existing legacy bulk steps behavior remains available', $failures, $passes );
 
 $source = file_get_contents( __DIR__ . '/../inc/Abilities/Pipeline/CreatePipelineAbility.php' ) ?: '';
-assert_bulk_workflow_equals( true, false !== strpos( $source, '$single_input[\'workflow\'] = $workflow;' ), 'bulk execution forwards resolved workflow to single-mode creator', $failures, $passes );
-assert_bulk_workflow_equals( true, false !== strpos( $source, '$single_input[\'steps\'] = $steps;' ), 'bulk execution still forwards legacy steps to single-mode creator', $failures, $passes );
+assert_bulk_workflow_equals( true, false !== strpos( $source, '$single_input[\'workflow\'] = $entry[\'workflow\'];' ), 'bulk execution forwards resolved workflow to single-mode creator', $failures, $passes );
+assert_bulk_workflow_equals( true, false !== strpos( $source, '$single_input[\'steps\'] = $entry[\'steps\'];' ), 'bulk execution still forwards legacy steps to single-mode creator', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " bulk workflow assertions failed.\n";
