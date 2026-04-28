@@ -115,6 +115,38 @@ class Pipelines extends BaseRepository {
 	}
 
 	/**
+	 * Get a pipeline by stable bundle portable slug for an agent.
+	 */
+	public function get_by_portable_slug( int $agent_id, string $portable_slug ): ?array {
+		$portable_slug = sanitize_title( $portable_slug );
+		if ( $agent_id <= 0 || '' === $portable_slug ) {
+			return null;
+		}
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$pipeline = $this->wpdb->get_row(
+			$this->wpdb->prepare(
+				'SELECT * FROM %i WHERE agent_id = %d AND portable_slug = %s LIMIT 1',
+				$this->table_name,
+				$agent_id,
+				$portable_slug
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( ! $pipeline ) {
+			return null;
+		}
+
+		if ( ! empty( $pipeline['pipeline_config'] ) ) {
+			$pipeline['pipeline_config'] = json_decode( $pipeline['pipeline_config'], true ) ?? array();
+		}
+
+		return $pipeline;
+	}
+
+	/**
 	 * Get all pipelines from the database.
 	 *
 	 * When $per_page is a positive integer, results are paginated at the SQL layer.
@@ -242,6 +274,14 @@ class Pipelines extends BaseRepository {
 		if ( isset( $pipeline_data['pipeline_config'] ) ) {
 			$update_data['pipeline_config'] = wp_json_encode( $pipeline_data['pipeline_config'] );
 			$format[]                       = '%s';
+		}
+
+		if ( isset( $pipeline_data['portable_slug'] ) ) {
+			$portable_slug = sanitize_title( (string) $pipeline_data['portable_slug'] );
+			if ( '' !== $portable_slug ) {
+				$update_data['portable_slug'] = $portable_slug;
+				$format[]                     = '%s';
+			}
 		}
 
 		// Always update the updated_at timestamp

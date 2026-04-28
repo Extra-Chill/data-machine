@@ -75,8 +75,25 @@ Memory artifacts can be tracked at section granularity. Section records extend t
 
 Self-memory writes are policy-constrained: the default target is the current acting agent, allowed section types are operational (`operating_note`, `source_quirk`, `run_lesson`, `task_note`), durable facts are rejected, and bundle-owned sections are staged through PendingActions instead of overwritten directly.
 
+## Pipeline And Flow Updates
+
+Bundle-installed pipelines and flows use stable `portable_slug` values as their runtime identity:
+
+- Pipelines resolve by `(agent_id, portable_slug)`.
+- Flows resolve by `(pipeline_id, portable_slug)`.
+- Re-importing the same bundle updates the existing clean rows instead of creating duplicates.
+- Local edits are detected by comparing the current artifact hash with the install-time hash recorded in the owning agent's `datamachine_bundle.artifacts` config.
+- Modified artifacts are reported as conflicts and are not overwritten by the import path.
+
+Schedule and queue policy is intentionally conservative:
+
+- New flows are installed paused/manual. The source schedule is retained as `_original_interval` for operators to opt in later.
+- Existing flow schedules are preserved during upgrades.
+- Queue slots (`prompt_queue`, `config_patch_queue`, `queue_mode`) seed new flows but are preserved on upgrades so runtime backlogs are not discarded.
+
 ## Follow-Ups
 
 - Add persistent DB storage for installed artifact records.
 - Wire importer/exporter paths for prompts, rubrics, tool policies, auth refs, and seed queues.
 - Use artifact statuses during bundle upgrade planning: auto-update `clean`, stage PendingActions for `modified`, surface `missing` and `orphaned` explicitly.
+- Add `wp datamachine agent-bundle list/status/diff/upgrade/apply` once the planner has a PendingAction-backed apply surface.
