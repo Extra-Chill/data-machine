@@ -42,6 +42,7 @@ function wp_json_encode( $value, int $flags = 0 ) {
 }
 
 require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveInterface.php';
+require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectivePolicyResolver.php';
 require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveOutputValidator.php';
 require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveRenderer.php';
 require_once __DIR__ . '/../inc/Engine/AI/PromptBuilder.php';
