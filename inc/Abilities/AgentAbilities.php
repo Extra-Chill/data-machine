@@ -194,7 +194,7 @@ class AgentAbilities {
 							),
 							'on_conflict' => array(
 								'type'        => 'string',
-								'enum'        => array( 'error', 'replace', 'skip' ),
+								'enum'        => array( 'error', 'skip' ),
 								'description' => 'How to handle an existing target agent slug.',
 							),
 							'owner_id'    => array(
@@ -482,10 +482,10 @@ class AgentAbilities {
 	 */
 	public static function listAgents( array $input ): array {
 		// ---- Parameter resolution ----------------------------------------
-		$scope        = isset( $input['scope'] ) ? (string) $input['scope'] : 'mine';
+		$scope             = isset( $input['scope'] ) ? (string) $input['scope'] : 'mine';
 		$requested_user_id = isset( $input['user_id'] ) ? (int) $input['user_id'] : 0;
-		$site_id      = isset( $input['site_id'] ) ? (int) $input['site_id'] : get_current_blog_id();
-		$include_role = ! empty( $input['include_role'] );
+		$site_id           = isset( $input['site_id'] ) ? (int) $input['site_id'] : get_current_blog_id();
+		$include_role      = ! empty( $input['include_role'] );
 
 		if ( ! in_array( $scope, array( 'mine', 'all' ), true ) ) {
 			return array(
@@ -578,9 +578,9 @@ class AgentAbilities {
 		$agents = array();
 
 		foreach ( $candidates as $row ) {
-			$agent_id   = (int) $row['agent_id'];
-			$owner_id   = (int) $row['owner_id'];
-			$config     = is_array( $row['agent_config'] ?? null ) ? $row['agent_config'] : array();
+			$agent_id    = (int) $row['agent_id'];
+			$owner_id    = (int) $row['owner_id'];
+			$config      = is_array( $row['agent_config'] ?? null ) ? $row['agent_config'] : array();
 			$description = isset( $config['description'] ) ? (string) $config['description'] : '';
 
 			$item = array(
@@ -629,10 +629,10 @@ class AgentAbilities {
 		}
 
 		$on_conflict = (string) ( $input['on_conflict'] ?? 'error' );
-		if ( ! in_array( $on_conflict, array( 'error', 'replace', 'skip' ), true ) ) {
+		if ( ! in_array( $on_conflict, array( 'error', 'skip' ), true ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'on_conflict must be one of: error, replace, skip.',
+				'error'   => 'on_conflict must be one of: error, skip.',
 			);
 		}
 
@@ -653,13 +653,18 @@ class AgentAbilities {
 			);
 		}
 
-		$slug     = isset( $input['slug'] ) && '' !== trim( (string) $input['slug'] )
-			? sanitize_title( (string) $input['slug'] )
-			: sanitize_title( (string) ( $bundle['agent']['agent_slug'] ?? '' ) );
+		$slug = sanitize_title( (string) ( $bundle['agent']['agent_slug'] ?? '' ) );
+		if ( isset( $input['slug'] ) && '' !== trim( (string) $input['slug'] ) ) {
+			$slug = sanitize_title( (string) $input['slug'] );
+		}
 		if ( isset( $input['slug'] ) && '' !== $slug ) {
 			$bundle['agent']['agent_slug'] = $slug;
 		}
 		$existing = $slug ? ( new Agents() )->get_by_slug( $slug ) : null;
+
+		$auth_resolution = self::resolve_import_auth_refs( $bundle );
+		$bundle          = $auth_resolution['bundle'];
+		$auth_warnings   = $auth_resolution['warnings'];
 
 		if ( $existing && 'skip' === $on_conflict ) {
 			return array(
@@ -667,7 +672,7 @@ class AgentAbilities {
 				'skipped'       => true,
 				'agent_id'      => (int) $existing['agent_id'],
 				'agent_slug'    => $slug,
-				'auth_warnings' => self::collect_import_auth_warnings( $bundle ),
+				'auth_warnings' => $auth_warnings,
 				'message'       => sprintf( 'Agent "%s" already exists; import skipped.', $slug ),
 			);
 		}
@@ -677,12 +682,11 @@ class AgentAbilities {
 				'success'    => false,
 				'agent_id'   => (int) $existing['agent_id'],
 				'agent_slug' => $slug,
-				'error'      => sprintf( 'Agent slug "%s" already exists. Use on_conflict=replace to update it or on_conflict=skip to no-op.', $slug ),
+				'error'      => sprintf( 'Agent slug "%s" already exists. Use on_conflict=skip to no-op, or import with a new slug.', $slug ),
 			);
 		}
 
-		$auth_warnings = self::collect_import_auth_warnings( $bundle );
-		$result        = $bundler->import( $bundle, null, $owner_id, ! empty( $input['dry_run'] ) );
+		$result = $bundler->import( $bundle, null, $owner_id, ! empty( $input['dry_run'] ) );
 		if ( empty( $result['success'] ) ) {
 			$result['auth_warnings'] = $auth_warnings;
 			return $result;
@@ -734,28 +738,42 @@ class AgentAbilities {
 	}
 
 	/**
-	 * Resolve auth_ref markers far enough to surface missing target credentials.
+	 * Resolve auth_ref markers into local handler configs before import.
 	 *
 	 * @param array $bundle Legacy bundle array.
-	 * @return array<int,array<string,string>>
+	 * @return array{bundle: array, warnings: array<int,array<string,string>>}
 	 */
-	private static function collect_import_auth_warnings( array $bundle ): array {
+	private static function resolve_import_auth_refs( array $bundle ): array {
 		$warnings = array();
-		foreach ( $bundle['flows'] ?? array() as $flow ) {
+		if ( ! is_array( $bundle['flows'] ?? null ) ) {
+			return array(
+				'bundle'   => $bundle,
+				'warnings' => $warnings,
+			);
+		}
+
+		foreach ( $bundle['flows'] as $flow_index => &$flow ) {
 			if ( ! is_array( $flow ) ) {
 				continue;
 			}
-			foreach ( $flow['flow_config'] ?? array() as $flow_step_id => $step ) {
+			$disable_flow = false;
+			if ( ! is_array( $flow['flow_config'] ?? null ) ) {
+				continue;
+			}
+
+			foreach ( $flow['flow_config'] as $flow_step_id => &$step ) {
 				if ( ! is_array( $step ) || ! is_array( $step['handler_configs'] ?? null ) ) {
 					continue;
 				}
-				foreach ( $step['handler_configs'] as $handler_slug => $handler_config ) {
+				foreach ( $step['handler_configs'] as $handler_slug => &$handler_config ) {
 					if ( ! is_array( $handler_config ) || empty( $handler_config['auth_ref'] ) ) {
 						continue;
 					}
 
 					$resolved = apply_filters( 'datamachine_auth_ref_to_handler_config', $handler_config, (string) $handler_slug, array( 'import' => true ) );
 					if ( is_wp_error( $resolved ) ) {
+						$disable_flow = true;
+
 						$warnings[] = array(
 							'flow'         => (string) ( $flow['portable_slug'] ?? ( $flow['flow_name'] ?? '' ) ),
 							'flow_step_id' => (string) $flow_step_id,
@@ -764,12 +782,31 @@ class AgentAbilities {
 							'code'         => $resolved->get_error_code(),
 							'message'      => $resolved->get_error_message(),
 						);
+						continue;
+					}
+
+					if ( is_array( $resolved ) ) {
+						$handler_config = $resolved;
 					}
 				}
+				unset( $handler_config );
+			}
+			unset( $step );
+
+			if ( $disable_flow ) {
+				$scheduling_config                    = is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array();
+				$scheduling_config['enabled']         = false;
+				$scheduling_config['interval']        = 'manual';
+				$scheduling_config['disabled_reason'] = 'unresolved_auth_ref';
+				$flow['scheduling_config']            = $scheduling_config;
 			}
 		}
+		unset( $flow );
 
-		return $warnings;
+		return array(
+			'bundle'   => $bundle,
+			'warnings' => $warnings,
+		);
 	}
 
 	/**
@@ -1207,12 +1244,12 @@ class AgentAbilities {
 				$files    = new \RecursiveIteratorIterator( $iterator, \RecursiveIteratorIterator::CHILD_FIRST );
 				foreach ( $files as $file ) {
 					if ( $file->isDir() ) {
-						rmdir( $file->getRealPath() );
+						rmdir( $file->getRealPath() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- DirectoryManager owns agent filesystem paths.
 					} else {
-						wp_delete_file( $file->getRealPath( ) );
+						wp_delete_file( $file->getRealPath() );
 					}
 				}
-				rmdir( $agent_dir );
+				rmdir( $agent_dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- DirectoryManager owns agent filesystem paths.
 				$files_deleted = true;
 			}
 		}
