@@ -500,9 +500,9 @@ class WebhookTriggerAbility {
 				$template = \DataMachine\Api\WebhookAuthResolver::deep_merge( $template, $overrides );
 			}
 
-			// Normalise the template: force mode=hmac so filter-registered presets
-			// can't accidentally escape into other modes without an explicit decision.
-			$template['mode'] = 'hmac';
+			// Normalise the template: generic webhook auth remains HMAC unless the
+			// template names a verifier mode explicitly registered by an extension.
+			$template['mode'] = self::normalize_verifier_mode( $template['mode'] ?? 'hmac' );
 
 			// Secret resolution: explicit > generate > existing in secrets roster.
 			$explicit_secret = isset( $input['secret'] ) ? (string) $input['secret'] : '';
@@ -564,6 +564,22 @@ class WebhookTriggerAbility {
 		);
 
 		return $response;
+	}
+
+	/**
+	 * Resolve a stored verifier mode without weakening generic HMAC defaults.
+	 *
+	 * @param mixed $mode Candidate mode from the template.
+	 * @return string
+	 */
+	private static function normalize_verifier_mode( mixed $mode ): string {
+		$mode = is_scalar( $mode ) ? (string) $mode : '';
+		if ( '' === $mode || 'hmac' === $mode ) {
+			return 'hmac';
+		}
+
+		$modes = apply_filters( 'datamachine_webhook_verifier_modes', array() );
+		return is_array( $modes ) && isset( $modes[ $mode ] ) ? $mode : 'hmac';
 	}
 
 	/**
