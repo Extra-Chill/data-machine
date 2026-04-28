@@ -1065,6 +1065,16 @@ class AgentsCommand extends BaseCommand {
 	 * [--owner=<user>]
 	 * : Owner WordPress user ID, login, or email. Defaults to current user.
 	 *
+	 * [--on-conflict=<policy>]
+	 * : How to handle an existing target agent slug.
+	 * ---
+	 * default: error
+	 * options:
+	 *   - error
+	 *   - replace
+	 *   - skip
+	 * ---
+	 *
 	 * [--dry-run]
 	 * : Validate the bundle and show what would be imported without making changes.
 	 *
@@ -1094,6 +1104,7 @@ class AgentsCommand extends BaseCommand {
 		$path     = $args[0] ?? '';
 		$new_slug = $assoc_args['slug'] ?? null;
 		$dry_run  = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+		$format   = (string) ( $assoc_args['format'] ?? 'table' );
 
 		if ( empty( $path ) ) {
 			WP_CLI::error( 'Bundle path is required.' );
@@ -1105,64 +1116,67 @@ class AgentsCommand extends BaseCommand {
 			return;
 		}
 
-		$bundler = new AgentBundler();
-
-		// Parse the bundle based on path type.
-		if ( is_dir( $path ) ) {
-			$bundle = $bundler->from_directory( $path );
-		} elseif ( preg_match( '/\.zip$/i', $path ) ) {
-			$bundle = $bundler->from_zip( $path );
-		} elseif ( preg_match( '/\.json$/i', $path ) ) {
-			$json   = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-			$bundle = $bundler->from_json( $json );
-		} else {
-			WP_CLI::error( 'Unsupported bundle format. Use .zip, .json, or a directory path.' );
-			return;
-		}
-
-		if ( ! $bundle ) {
-			WP_CLI::error( 'Failed to parse bundle. Ensure the file is a valid agent bundle.' );
-			return;
-		}
-
-		// Display bundle info.
-		$agent_data  = $bundle['agent'] ?? array();
-		$target_slug = $new_slug ? sanitize_title( $new_slug ) : sanitize_title( $agent_data['agent_slug'] ?? 'unknown' );
-
-		WP_CLI::log( 'Bundle contents:' );
-		WP_CLI::log( sprintf( '  Agent:     %s (%s)', $agent_data['agent_name'] ?? '(unnamed)', $agent_data['agent_slug'] ?? '(no slug)' ) );
-		WP_CLI::log( sprintf( '  Target:    %s', $target_slug ) );
-		WP_CLI::log( sprintf( '  Files:     %d identity file(s)', count( $bundle['files'] ?? array() ) ) );
-		WP_CLI::log( sprintf( '  Pipelines: %d', count( $bundle['pipelines'] ?? array() ) ) );
-		WP_CLI::log( sprintf( '  Flows:     %d', count( $bundle['flows'] ?? array() ) ) );
-		WP_CLI::log( sprintf( '  Exported:  %s', $bundle['exported_at'] ?? 'unknown' ) );
-
 		// Resolve owner.
 		$owner_id = 0;
 		if ( isset( $assoc_args['owner'] ) ) {
 			$owner_id = $this->resolveUserId( $assoc_args['owner'] );
 		}
 
-		if ( $dry_run ) {
+		if ( $dry_run && 'json' !== $format ) {
 			WP_CLI::log( '' );
 			WP_CLI::log( WP_CLI::colorize( '%YDry run mode — validating bundle...%n' ) );
 		} elseif ( ! isset( $assoc_args['yes'] ) ) {
-			WP_CLI::confirm( sprintf( 'Import agent "%s"?', $target_slug ) );
+			WP_CLI::confirm( 'Import agent bundle?' );
 		}
 
-		$result = $bundler->import( $bundle, $new_slug, $owner_id, $dry_run );
+		$ability = wp_get_ability( 'datamachine/import-agent' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/import-agent ability is not registered.' );
+			return;
+		}
+
+		$result = $ability->execute(
+			array(
+				'source'      => $path,
+				'slug'        => $new_slug,
+				'owner_id'    => $owner_id,
+				'on_conflict' => (string) ( $assoc_args['on-conflict'] ?? 'error' ),
+				'dry_run'     => $dry_run,
+			)
+		);
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] );
 			return;
 		}
 
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		foreach ( $result['auth_warnings'] ?? array() as $warning ) {
+			WP_CLI::warning(
+				sprintf(
+					'%s: %s',
+					(string) ( $warning['auth_ref'] ?? 'auth_ref' ),
+					(string) ( $warning['message'] ?? 'unresolved auth reference' )
+				)
+			);
+		}
+
+		if ( ! empty( $result['skipped'] ) ) {
+			WP_CLI::success( (string) ( $result['message'] ?? 'Import skipped.' ) );
+			return;
+		}
+
 		if ( $dry_run ) {
 			$summary = $result['summary'] ?? array();
+			$slug    = (string) ( $summary['agent_slug'] ?? 'unknown' );
 
 			WP_CLI::log( '' );
 			WP_CLI::log( 'Import preview:' );
-			WP_CLI::log( sprintf( '  Agent slug:  %s', $summary['agent_slug'] ?? $target_slug ) );
+			WP_CLI::log( sprintf( '  Agent slug:  %s', $slug ) );
 			WP_CLI::log( sprintf( '  Agent name:  %s', $summary['agent_name'] ?? '(unnamed)' ) );
 			WP_CLI::log( sprintf( '  Owner ID:    %d', $summary['owner_id'] ?? 0 ) );
 			WP_CLI::log( sprintf( '  Files:       %d', $summary['files'] ?? 0 ) );
