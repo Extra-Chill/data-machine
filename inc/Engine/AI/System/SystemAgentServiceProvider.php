@@ -16,7 +16,7 @@ namespace DataMachine\Engine\AI\System;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\Database\Agents\Agents;
-use DataMachine\Engine\AI\System\Tasks\AgentPingTask;
+use DataMachine\Engine\AI\System\Tasks\AgentCallTask;
 use DataMachine\Engine\AI\System\Tasks\AltTextTask;
 use DataMachine\Engine\AI\System\Tasks\DailyMemoryTask;
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
@@ -101,7 +101,7 @@ class SystemAgentServiceProvider {
 	 * @return array Task handlers including built-in ones.
 	 */
 	public function getBuiltInTasks( array $tasks ): array {
-		$tasks['agent_ping']                  = AgentPingTask::class;
+		$tasks['agent_call']                  = AgentCallTask::class;
 		$tasks['image_generation']            = ImageGenerationTask::class;
 		$tasks['image_optimization']          = ImageOptimizationTask::class;
 		$tasks['alt_text_generation']         = AltTextTask::class;

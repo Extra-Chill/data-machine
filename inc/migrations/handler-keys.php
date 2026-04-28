@@ -95,7 +95,7 @@ function datamachine_migrate_handler_keys_to_plural() {
 				$step['handler_slugs']   = array( $slug );
 				$step['handler_configs'] = array( $slug => $config );
 			} else {
-				// Self-configuring steps (agent_ping, webhook_gate, system_task).
+				// Self-configuring steps (webhook_gate, system_task).
 				$step_type = $step['step_type'] ?? '';
 				if ( ! empty( $step_type ) && ! empty( $config ) ) {
 					$step['handler_slugs']   = array( $step_type );

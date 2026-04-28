@@ -9,7 +9,7 @@
  *
  *   - AIStep              uses `QueueableTrait::consumeFromPromptQueue()`
  *   - FetchStep           uses `QueueableTrait::consumeFromConfigPatchQueue()`
- *   - AgentPingTask       called `QueueAbility::popFromQueue() / ::loopFromQueue()`
+ *   - AgentCallTask       called `QueueAbility::popFromQueue() / ::loopFromQueue()`
  *                         directly — reimplementing pop logic minus the
  *                         static-peek branch.
  *
@@ -17,15 +17,15 @@
  * `private static popFromQueueSlot()` were near-duplicates (drain/loop
  * differed only in whether the popped entry was appended to the tail).
  * The duplication meant queue-mode shape changes had to land in two
- * places; AgentPingTask got a different log shape than the trait
- * consumers; AgentPingTask had no `queued_prompt_backup` write, so a
- * SendPingAbility failure after the pop silently lost the prompt.
+ * places; AgentCallTask got a different log shape than the trait
+ * consumers; AgentCallTask had no `queued_prompt_backup` write, so a
+ * delivery failure after the pop silently lost the prompt.
  *
  * #1299 promotes the consumer-agnostic core to
  * `QueueAbility::consumeFromQueueSlot()` (public static), deletes the
  * three orphan helpers (`popFromQueue`, `loopFromQueue`,
  * `popConfigPatchFromQueue` — the last had ZERO callers), and migrates
- * AgentPingTask to call the new method directly. Single source of truth
+ * AgentCallTask to call the new method directly. Single source of truth
  * for the drain / loop / static semantics regardless of consumer.
  *
  * This smoke validates:
@@ -33,10 +33,10 @@
  *   1. `QueueAbility::consumeFromQueueSlot` exists with the documented
  *      signature.
  *   2. Trait's wrapper methods delegate to the new public method.
- *   3. AgentPingTask calls `consumeFromQueueSlot` directly (no
+ *   3. AgentCallTask calls `consumeFromQueueSlot` directly (no
  *      `popFromQueue` / `loopFromQueue` references remain).
  *   4. The deleted helpers are truly gone from QueueAbility source.
- *   5. AgentPingTask now writes `queued_prompt_backup` for retry parity
+ *   5. AgentCallTask now writes `queued_prompt_backup` for retry parity
  *      with the trait consumers.
  *   6. `consumeFromQueueSlot` semantic correctness via in-memory
  *      simulation: drain pops+writes, loop pops+rotates+writes, static
@@ -125,15 +125,15 @@ assert_consolidation(
 );
 
 // ---------------------------------------------------------------
-// SECTION 3: AgentPingTask calls the new method directly.
+// SECTION 3: AgentCallTask calls the new method directly.
 // ---------------------------------------------------------------
 
-echo "\n[agent_ping:1] AgentPingTask calls QueueAbility::consumeFromQueueSlot()\n";
+echo "\n[agent_call:1] AgentCallTask calls QueueAbility::consumeFromQueueSlot()\n";
 $ping_src = (string) file_get_contents(
-	$root_dir . '/inc/Engine/AI/System/Tasks/AgentPingTask.php'
+	$root_dir . '/inc/Engine/AI/System/Tasks/AgentCallTask.php'
 );
 assert_consolidation(
-	'AgentPingTask calls QueueAbility::consumeFromQueueSlot()',
+	'AgentCallTask calls QueueAbility::consumeFromQueueSlot()',
 	false !== strpos( $ping_src, 'QueueAbility::consumeFromQueueSlot(' )
 );
 assert_consolidation(
@@ -148,13 +148,13 @@ assert_consolidation(
 	)
 );
 
-echo "\n[agent_ping:2] No references to the deleted helpers in AgentPingTask\n";
+echo "\n[agent_call:2] No references to the deleted helpers in AgentCallTask\n";
 assert_consolidation(
-	'AgentPingTask does NOT reference QueueAbility::popFromQueue',
+	'AgentCallTask does NOT reference QueueAbility::popFromQueue',
 	false === strpos( $ping_src, 'QueueAbility::popFromQueue' )
 );
 assert_consolidation(
-	'AgentPingTask does NOT reference QueueAbility::loopFromQueue',
+	'AgentCallTask does NOT reference QueueAbility::loopFromQueue',
 	false === strpos( $ping_src, 'QueueAbility::loopFromQueue' )
 );
 
@@ -217,12 +217,12 @@ assert_consolidation(
 );
 
 // ---------------------------------------------------------------
-// SECTION 5: AgentPingTask writes queued_prompt_backup for retry parity.
+// SECTION 5: AgentCallTask writes queued_prompt_backup for retry parity.
 // ---------------------------------------------------------------
 
-echo "\n[parity:1] AgentPingTask writes queued_prompt_backup after a mutating consume\n";
+echo "\n[parity:1] AgentCallTask writes queued_prompt_backup after a mutating consume\n";
 assert_consolidation(
-	'datamachine_merge_engine_data() called from AgentPingTask',
+	'datamachine_merge_engine_data() called from AgentCallTask',
 	false !== strpos( $ping_src, '\\datamachine_merge_engine_data(' )
 );
 assert_consolidation(

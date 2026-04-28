@@ -1529,7 +1529,7 @@ class QueueAbility {
 	 * Single source of truth for the drain / loop / static access
 	 * pattern (#1291) regardless of which consumer is reading. Used by
 	 * `QueueableTrait` (Step-side consumers AIStep + FetchStep) and
-	 * `AgentPingTask` (SystemTask consumer) — both share the same
+	 * `AgentCallTask` (SystemTask consumer) — both share the same
 	 * mutation, peek, rotation, and logging semantics.
 	 *
 	 *   - drain  → pop the head, discard. DB write.
@@ -1538,9 +1538,9 @@ class QueueAbility {
 	 *
 	 * Pre-#1299 this lived as `private static` on `QueueableTrait` with
 	 * three sibling helpers on `QueueAbility` (`popFromQueue`,
-	 * `loopFromQueue`, `popConfigPatchFromQueue`) that AgentPingTask
+	 * `loopFromQueue`, `popConfigPatchFromQueue`) that AgentCallTask
 	 * called instead — those reimplemented the same logic minus the
-	 * static-mode branch. The static helpers are gone; AgentPingTask
+	 * static-mode branch. The static helpers are gone; AgentCallTask
 	 * goes through this method now.
 	 *
 	 * @param int           $flow_id      Flow ID.

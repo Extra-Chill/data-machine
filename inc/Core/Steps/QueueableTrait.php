@@ -311,7 +311,7 @@ trait QueueableTrait {
 	// Note: the consumer-agnostic mode-aware reader lives on
 	// `QueueAbility::consumeFromQueueSlot()` (#1299). The trait
 	// delegates to it from `consumeOnceFromPromptQueue()` /
-	// `consumeOnceFromConfigPatchQueue()` above; AgentPingTask calls
+	// `consumeOnceFromConfigPatchQueue()` above; AgentCallTask calls
 	// it directly. Single source of truth for drain / loop / static
 	// semantics regardless of which consumer is reading.
 

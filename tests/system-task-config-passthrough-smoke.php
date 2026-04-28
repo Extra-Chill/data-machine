@@ -171,10 +171,10 @@ $system_task = FlowStepConfig::normalizeHandlerShape(
 	array(
 		'step_type'       => 'system_task',
 		'handler_slugs'   => array( 'system_task' ),
-		'handler_configs' => array( 'system_task' => array( 'task' => 'agent_ping' ) ),
+		'handler_configs' => array( 'system_task' => array( 'task' => 'agent_call' ) ),
 	)
 );
-assert_equals( array( 'task' => 'agent_ping' ), $system_task['handler_config'] ?? array(), 'legacy synthetic system_task config collapses', $failures, $passes );
+assert_equals( array( 'task' => 'agent_call' ), $system_task['handler_config'] ?? array(), 'legacy synthetic system_task config collapses', $failures, $passes );
 assert_absent( 'handler_slugs', $system_task, 'legacy synthetic system_task slugs removed', $failures, $passes );
 
 $fetch = FlowStepConfig::normalizeHandlerShape(

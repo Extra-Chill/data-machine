@@ -185,7 +185,7 @@ class Handlers {
 		$handler_info      = $handler_abilities->getHandler( $handler_slug );
 
 		// Fall back to step type settings if not a handler.
-		// Step types like agent_ping, webhook_gate register their own settings
+		// Step types like webhook_gate register their own settings
 		// via datamachine_handler_settings but are not in the handlers list.
 		if ( ! $handler_info ) {
 			$settings_display_service = new \DataMachine\Core\Steps\Settings\SettingsDisplayService();

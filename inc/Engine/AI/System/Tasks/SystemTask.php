@@ -128,7 +128,7 @@ abstract class SystemTask {
 	//
 	// Default implementations return "no extra passthrough", so existing
 	// tasks (InternalLinkingTask, AltTextTask, MetaDescriptionTask, etc.)
-	// keep working unchanged. Only AgentPingTask needs the pipeline
+	// keep working unchanged. Only AgentCallTask needs the pipeline
 	// context bundle today; future tasks can opt in.
 
 	/**
@@ -143,8 +143,8 @@ abstract class SystemTask {
 	 *   - engine_data        (the engine's full key/value snapshot)
 	 *   - job_id             (the parent job)
 	 *
-	 * Used by AgentPingTask to forward the in-flight pipeline state to
-	 * the SendPingAbility so the webhook receives the same shape it
+	 * Used by AgentCallTask to forward the in-flight pipeline state to
+	 * the agent_call ability so the webhook receives the same shape it
 	 * would see in a non-system-task path.
 	 *
 	 * @return bool
@@ -162,7 +162,7 @@ abstract class SystemTask {
 	 * placed at `engine_data[$key]` so executeTask() can read it from
 	 * `$params[$key]` without rummaging through nested config blobs.
 	 *
-	 * Used by AgentPingTask for `queue_mode` (post-#1291) so the queue
+	 * Used by AgentCallTask for `queue_mode` (post-#1291) so the queue
 	 * access pattern is available to the task at execution time without
 	 * SystemTaskStep needing to know which tasks care about which
 	 * flow_step_config fields.

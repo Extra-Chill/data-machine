@@ -19,7 +19,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class SendPing extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'send_ping', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'datamachine/send-ping' ) );
+		$this->registerTool( 'send_ping', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'datamachine/agent-call' ) );
 	}
 
 	/**
@@ -67,28 +67,35 @@ class SendPing extends BaseTool {
 	 * @return array Tool execution result.
 	 */
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
-		$ability = wp_get_ability( 'datamachine/send-ping' );
+		$ability = wp_get_ability( 'datamachine/agent-call' );
 
 		if ( ! $ability ) {
 			return array(
 				'success'   => false,
-				'error'     => 'datamachine/send-ping ability not available',
+				'error'     => 'datamachine/agent-call ability not available',
 				'tool_name' => 'send_ping',
 			);
 		}
 
 		$input = array(
-			'webhook_url' => $parameters['webhook_url'] ?? '',
+			'target'   => array(
+				'type' => 'webhook',
+				'id'   => $parameters['webhook_url'] ?? '',
+			),
+			'input'    => array(
+				'task'    => $parameters['prompt'] ?? '',
+				'context' => array(),
+			),
+			'delivery' => array(
+				'mode' => 'fire_and_forget',
+			),
 		);
 
-		if ( isset( $parameters['prompt'] ) ) {
-			$input['prompt'] = $parameters['prompt'];
-		}
 		if ( isset( $parameters['flow_id'] ) ) {
-			$input['flow_id'] = $parameters['flow_id'];
+			$input['input']['context']['flow_id'] = $parameters['flow_id'];
 		}
 		if ( isset( $parameters['pipeline_id'] ) ) {
-			$input['pipeline_id'] = $parameters['pipeline_id'];
+			$input['input']['context']['pipeline_id'] = $parameters['pipeline_id'];
 		}
 
 		$result = $ability->execute( $input );
