@@ -2,6 +2,29 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.88.0] - 2026-04-28
+
+### Added
+- add agent bundle version drift metadata
+- add loop event sink contract
+- add runtime tool declaration validator
+- compose tools from source providers
+- execute ability-backed tools
+- define resumable run state vocabulary
+- support WordPress content formats
+- define message envelope contract
+- introduce agent_call primitive
+- bundle block format bridge substrate
+- encrypt OAuth tokens at rest in BaseAuthProvider
+- filter OAuth callback capability check
+
+### Changed
+- split conversation store contracts
+
+### Fixed
+- unify runtime step config resolution
+- default AI upserts to markdown authoring
+
 ## [0.87.3] - 2026-04-28
 
 ### Added
