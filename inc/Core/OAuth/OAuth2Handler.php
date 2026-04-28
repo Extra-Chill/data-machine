@@ -27,18 +27,62 @@ class OAuth2Handler {
 	use OAuthRedirects;
 
 	// -------------------------------------------------------------------------
+	// Constants
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Maximum serialized payload size in bytes.
+	 *
+	 * Keeps transients sane — payloads larger than this are rejected at
+	 * create_state() time rather than silently bloating the options table.
+	 */
+	const MAX_PAYLOAD_SIZE = 4096;
+
+	// -------------------------------------------------------------------------
 	// State Management
 	// -------------------------------------------------------------------------
 
 	/**
 	 * Create OAuth state nonce and store in transient.
 	 *
+	 * The state parameter is the canonical place in OAuth 2.0 to carry
+	 * caller-defined context through the authorization dance. The payload
+	 * array is stored alongside the CSRF nonce and returned to the caller
+	 * on successful verify_state().
+	 *
+	 * @since 0.2.0
+	 * @since 0.88.0 Added optional $payload parameter.
+	 *
 	 * @param string $provider_key Provider identifier (e.g., 'reddit', 'facebook').
-	 * @return string Generated state value.
+	 * @param array  $payload      Optional caller-defined context to propagate through the OAuth flow.
+	 *                             Must serialize to <= 4 KB. Opaque to the OAuth provider.
+	 * @return string Generated state nonce value.
+	 *
+	 * @throws \InvalidArgumentException When serialized payload exceeds MAX_PAYLOAD_SIZE.
 	 */
-	public function create_state( string $provider_key ): string {
-		$state = bin2hex( random_bytes( 32 ) );
-		set_transient( "datamachine_{$provider_key}_oauth_state", $state, 15 * MINUTE_IN_SECONDS );
+	public function create_state( string $provider_key, array $payload = array() ): string {
+		// Validate payload size.
+		if ( ! empty( $payload ) ) {
+			$serialized_size = strlen( maybe_serialize( $payload ) );
+			if ( $serialized_size > self::MAX_PAYLOAD_SIZE ) {
+				throw new \InvalidArgumentException(
+					sprintf(
+						'OAuth state payload exceeds maximum size (%d bytes > %d bytes).',
+						$serialized_size,
+						self::MAX_PAYLOAD_SIZE
+					)
+				);
+			}
+		}
+
+		$nonce  = bin2hex( random_bytes( 32 ) );
+		$record = array(
+			'nonce'      => $nonce,
+			'payload'    => $payload,
+			'created_at' => time(),
+		);
+
+		set_transient( "datamachine_{$provider_key}_oauth_state", $record, 15 * MINUTE_IN_SECONDS );
 
 		do_action(
 			'datamachine_log',
@@ -46,28 +90,97 @@ class OAuth2Handler {
 			'OAuth2: Created state nonce',
 			array(
 				'provider'     => $provider_key,
-				'state_length' => strlen( $state ),
+				'state_length' => strlen( $nonce ),
+				'has_payload'  => ! empty( $payload ),
 			)
 		);
 
-		return $state;
+		return $nonce;
 	}
 
 	/**
-	 * Verify OAuth state nonce.
+	 * Verify OAuth state nonce and return the associated payload.
+	 *
+	 * Returns the caller-defined payload array on success, or false on failure.
+	 * The transient is consumed (deleted) on successful verification.
+	 *
+	 * Backward-compatible: legacy plain-string transients (from in-flight
+	 * authorizations during the deploy window) are handled gracefully —
+	 * they verify correctly and return an empty payload array.
+	 *
+	 * IMPORTANT: The return type changed from `bool` to `array|false`.
+	 * Callers MUST use `false !== $oauth2->verify_state(...)` instead of
+	 * the previous `if ( $oauth2->verify_state(...) )` pattern, because
+	 * an empty array `[]` is falsy in PHP boolean context.
+	 *
+	 * @since 0.2.0
+	 * @since 0.88.0 Return type changed from bool to array|false. Returns payload on success.
 	 *
 	 * @param string $provider_key Provider identifier.
-	 * @param string $state State value to verify.
-	 * @return bool True if state is valid.
+	 * @param string $state        State nonce value to verify.
+	 * @return array|false Payload array on success (may be empty), false on failure.
 	 */
-	public function verify_state( string $provider_key, string $state ): bool {
-		$stored_state = get_transient( "datamachine_{$provider_key}_oauth_state" );
-		$is_valid     = ! empty( $state ) && false !== $stored_state && hash_equals( $stored_state, $state );
-
-		if ( $is_valid ) {
-			delete_transient( "datamachine_{$provider_key}_oauth_state" );
+	public function verify_state( string $provider_key, string $state ) {
+		if ( empty( $state ) ) {
+			$this->log_state_verification( $provider_key, false );
+			return false;
 		}
 
+		$record = get_transient( "datamachine_{$provider_key}_oauth_state" );
+
+		if ( false === $record ) {
+			$this->log_state_verification( $provider_key, false );
+			return false;
+		}
+
+		// Backward compat: legacy plain-string state (pre-payload era).
+		if ( is_string( $record ) ) {
+			if ( hash_equals( $record, $state ) ) {
+				delete_transient( "datamachine_{$provider_key}_oauth_state" );
+				$this->log_state_verification( $provider_key, true );
+				return array();
+			}
+			$this->log_state_verification( $provider_key, false );
+			return false;
+		}
+
+		// New structured record format.
+		if ( ! is_array( $record ) || empty( $record['nonce'] ) ) {
+			$this->log_state_verification( $provider_key, false );
+			return false;
+		}
+
+		if ( ! hash_equals( $record['nonce'], $state ) ) {
+			$this->log_state_verification( $provider_key, false );
+			return false;
+		}
+
+		delete_transient( "datamachine_{$provider_key}_oauth_state" );
+		$this->log_state_verification( $provider_key, true );
+
+		return $record['payload'] ?? array();
+	}
+
+	/**
+	 * Alias for verify_state() — reads cleaner at call sites that want the payload.
+	 *
+	 * @since 0.88.0
+	 *
+	 * @param string $provider_key Provider identifier.
+	 * @param string $state        State nonce value to verify.
+	 * @return array|false Payload array on success, false on failure.
+	 */
+	public function get_state_payload( string $provider_key, string $state ) {
+		return $this->verify_state( $provider_key, $state );
+	}
+
+	/**
+	 * Log state verification result.
+	 *
+	 * @param string $provider_key Provider identifier.
+	 * @param bool   $is_valid     Whether the state was valid.
+	 */
+	private function log_state_verification( string $provider_key, bool $is_valid ): void {
 		do_action(
 			'datamachine_log',
 			$is_valid ? 'debug' : 'error',
@@ -77,8 +190,6 @@ class OAuth2Handler {
 				'valid'    => $is_valid,
 			)
 		);
-
-		return $is_valid;
 	}
 
 	// -------------------------------------------------------------------------
@@ -195,6 +306,13 @@ class OAuth2Handler {
 	 * When PKCE is enabled, the stored code_verifier is automatically included
 	 * in the token exchange parameters.
 	 *
+	 * The recovered state payload is passed to the storage callback as the second
+	 * argument, allowing providers to access caller-defined context that was
+	 * propagated through the OAuth dance via create_state().
+	 *
+	 * @since 0.2.0
+	 * @since 0.88.0 Storage callback now receives payload as second argument.
+	 *
 	 * @param string        $provider_key Provider identifier.
 	 * @param string        $token_url Token exchange endpoint URL.
 	 * @param array         $token_params Parameters for token exchange.
@@ -203,7 +321,7 @@ class OAuth2Handler {
 	 * @param callable|null $token_transform_fn Optional function to transform token data (for two-stage exchanges like Meta long-lived tokens).
 	 *                                          Signature: function(array $token_data): array|WP_Error
 	 * @param callable|null $storage_fn Optional callback to store account data.
-	 *                                  Signature: function(array $account_data): bool
+	 *                                  Signature: function(array $account_data, array $state_payload): bool
 	 * @return bool|\WP_Error True on success, WP_Error on failure.
 	 */
 	public function handle_callback(
@@ -238,8 +356,10 @@ class OAuth2Handler {
 			return new \WP_Error( 'oauth_denied', __( 'OAuth authorization denied.', 'data-machine' ) );
 		}
 
-		// Verify state
-		if ( ! $this->verify_state( $provider_key, $state ) ) {
+		// Verify state and recover payload.
+		$state_payload = $this->verify_state( $provider_key, $state );
+
+		if ( false === $state_payload ) {
 			do_action(
 				'datamachine_log',
 				'error',
@@ -322,10 +442,11 @@ class OAuth2Handler {
 			return $account_data;
 		}
 
-		// Store account data
+		// Store account data — pass recovered state payload as second argument
+		// so providers can access caller-defined context without touching OAuth2Handler directly.
 		$stored = false;
 		if ( $storage_fn ) {
-			$stored = call_user_func( $storage_fn, $account_data );
+			$stored = call_user_func( $storage_fn, $account_data, $state_payload );
 		} else {
 			do_action(
 				'datamachine_log',
