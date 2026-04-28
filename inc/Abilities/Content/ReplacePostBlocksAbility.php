@@ -12,6 +12,7 @@
 namespace DataMachine\Abilities\Content;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Engine\AI\Actions\PendingActionHelper;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 
@@ -192,7 +193,16 @@ class ReplacePostBlocksAbility {
 			);
 		}
 
-		$blocks       = parse_blocks( $post->post_content );
+		$block_content = ContentFormat::storedToBlocks( (string) $post->post_content, (string) $post->post_type );
+		if ( is_wp_error( $block_content ) ) {
+			return array(
+				'success' => false,
+				'post_id' => $post_id,
+				'error'   => $block_content->get_error_message(),
+			);
+		}
+
+		$blocks       = parse_blocks( $block_content );
 		$total_blocks = count( $blocks );
 		$changes      = array();
 
@@ -259,7 +269,15 @@ class ReplacePostBlocksAbility {
 			);
 		}
 
-		$new_content = BlockSanitizer::sanitizeAndSerialize( $blocks );
+		$new_content    = BlockSanitizer::sanitizeAndSerialize( $blocks );
+		$stored_content = ContentFormat::blocksToStored( $new_content, (string) $post->post_type );
+		if ( is_wp_error( $stored_content ) ) {
+			return array(
+				'success' => false,
+				'post_id' => $post_id,
+				'error'   => $stored_content->get_error_message(),
+			);
+		}
 
 		// --- Preview mode: stage pending action, return preview envelope ---
 		if ( $preview ) {
@@ -332,7 +350,7 @@ class ReplacePostBlocksAbility {
 		$result = wp_update_post(
 			array(
 				'ID'           => $post_id,
-				'post_content' => $new_content,
+				'post_content' => $stored_content,
 			),
 			true
 		);
