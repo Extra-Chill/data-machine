@@ -105,7 +105,7 @@ $tools = apply_filters( 'datamachine_tools', array() );
             'description' => 'Search query',
         ],
     ],
-    'modes'            => ['chat', 'pipeline'], // which modes can see this tool
+    'modes'            => ['chat'],             // which modes can see this tool
     'requires_config'  => true,                 // checked via datamachine_tool_configured
     'category'         => 'search',             // optional grouping
 ]
@@ -132,6 +132,8 @@ add_filter( 'datamachine_tools', function ( $tools ) {
     return $tools;
 } );
 ```
+
+Use `pipeline` mode only when a static/global tool is useful inside an automated pipeline AI step. Chat affordances and tools that duplicate engine-level validation should stay `chat`-only; pipeline AI steps already receive step-scoped handler tools plus pipeline/flow memory directives.
 
 > The legacy `datamachine_global_tools` and `datamachine_chat_tools` filters were consolidated into `datamachine_tools` in v0.68.0 (PR #1130). The old per-mode filters no longer exist.
 
