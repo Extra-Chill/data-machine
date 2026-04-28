@@ -12,6 +12,7 @@
     }
   },
   "changelog_target": "docs/CHANGELOG.md",
+  "remote_path": "wp-content/plugins/data-machine",
   "extensions": {
     "wordpress": {
       "php": "8.2",
