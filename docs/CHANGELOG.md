@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.93.1] - 2026-04-28
+
+### Fixed
+- pin BFB release
+
 ## [0.93.0] - 2026-04-28
 
 ### Added
