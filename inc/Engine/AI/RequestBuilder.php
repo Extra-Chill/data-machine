@@ -44,39 +44,11 @@ class RequestBuilder {
 		string $mode,
 		array $payload = array()
 	): array {
-
-		// 1. Initialize request with model and messages
-		$request = array(
-			'model'    => $model,
-			'messages' => $messages,
-		);
-
-		// 2. Restructure tools to standard format (ensures consistent tool structure for all providers)
-		$structured_tools = self::restructure_tools( $tools );
-
-		// 3. Apply directives via PromptBuilder
-		$promptBuilder = new PromptBuilder();
-		$promptBuilder->setMessages( $messages )->setTools( $structured_tools );
-
-		// Get registered directives
-		$directives = apply_filters( 'datamachine_directives', array() );
-
-		// Add each directive to the builder
-		foreach ( $directives as $directive ) {
-			$promptBuilder->addDirective(
-				$directive['class'],
-				$directive['priority'],
-				$directive['modes'] ?? array( 'all' )
-			);
-		}
-
-		// Build the request with directives applied
-		$request             = $promptBuilder->build( $mode, $provider, $payload );
-		$applied_directives  = $request['applied_directives'] ?? array();
-		$directive_metadata  = $request['directive_metadata'] ?? array();
-		unset( $request['applied_directives'] );
-		unset( $request['directive_metadata'] );
-		$request['model'] = $model;
+		$assembled           = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
+		$request             = $assembled['request'];
+		$structured_tools    = $assembled['structured_tools'];
+		$applied_directives  = $assembled['applied_directives'];
+		$directive_metadata  = $assembled['directive_metadata'];
 
 		$request_metadata = RequestMetadata::build(
 			$request,
@@ -170,6 +142,55 @@ class RequestBuilder {
 		}
 
 		return $response;
+	}
+
+	/**
+	 * Assemble a provider request without dispatching it.
+	 *
+	 * @param array  $messages Initial messages array with role/content.
+	 * @param string $provider AI provider name.
+	 * @param string $model    Model identifier.
+	 * @param array  $tools    Raw tools array from filters.
+	 * @param string $mode     Execution mode.
+	 * @param array  $payload  Step payload.
+	 * @return array Assembled request and inspection metadata.
+	 */
+	public static function assemble(
+		array $messages,
+		string $provider,
+		string $model,
+		array $tools,
+		string $mode,
+		array $payload = array()
+	): array {
+		$structured_tools = self::restructure_tools( $tools );
+
+		$promptBuilder = new PromptBuilder();
+		$promptBuilder->setMessages( $messages )->setTools( $structured_tools );
+
+		$directives = apply_filters( 'datamachine_directives', array() );
+		foreach ( $directives as $directive ) {
+			$promptBuilder->addDirective(
+				$directive['class'],
+				$directive['priority'],
+				$directive['modes'] ?? array( 'all' )
+			);
+		}
+
+		$request              = $promptBuilder->buildDetailed( $mode, $provider, $payload );
+		$applied_directives  = $request['applied_directives'] ?? array();
+		$directive_metadata  = $request['directive_metadata'] ?? array();
+		$directive_breakdown = $request['directive_breakdown'] ?? array();
+		unset( $request['applied_directives'], $request['directive_metadata'], $request['directive_breakdown'] );
+		$request['model']    = $model;
+
+		return array(
+			'request'             => $request,
+			'structured_tools'    => $structured_tools,
+			'applied_directives'  => $applied_directives,
+			'directive_metadata'  => $directive_metadata,
+			'directive_breakdown' => $directive_breakdown,
+		);
 	}
 
 	/**

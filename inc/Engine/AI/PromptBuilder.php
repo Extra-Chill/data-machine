@@ -91,9 +91,28 @@ class PromptBuilder {
 	 * @param string $mode     Agent mode ('pipeline', 'chat', etc.)
 	 * @param string $provider AI provider name
 	 * @param array  $payload  Request payload
-	 * @return array Request array with 'messages', 'tools', and 'applied_directives' metadata
+	 * @return array Request array with messages, tools, and directive metadata
 	 */
 	public function build( string $mode, string $provider, array $payload = array() ): array {
+		$detailed = $this->buildDetailed( $mode, $provider, $payload );
+
+		return array(
+			'messages'           => $detailed['messages'],
+			'tools'              => $detailed['tools'],
+			'applied_directives' => $detailed['applied_directives'],
+			'directive_metadata' => $detailed['directive_metadata'],
+		);
+	}
+
+	/**
+	 * Build the final AI request and include directive-level inspection metadata.
+	 *
+	 * @param string $mode     Agent mode ('pipeline', 'chat', etc.).
+	 * @param string $provider AI provider name.
+	 * @param array  $payload  Request payload.
+	 * @return array Request array with messages, tools, applied_directives, directive_metadata, and directive_breakdown.
+	 */
+	public function buildDetailed( string $mode, string $provider, array $payload = array() ): array {
 		usort(
 			$this->directives,
 			function ( $a, $b ) {
@@ -107,10 +126,11 @@ class PromptBuilder {
 		}
 
 		$conversation_messages = $this->messages;
-		$directive_outputs      = array();
-		$applied_directives     = array();
-		$directive_metadata     = array();
-		$validation_context     = array_filter(
+		$directive_outputs     = array();
+		$applied_directives    = array();
+		$directive_metadata    = array();
+		$directive_breakdown   = array();
+		$validation_context    = array_filter(
 			array(
 				'job_id'       => $payload['job_id'] ?? null,
 				'flow_step_id' => $payload['flow_step_id'] ?? null,
@@ -121,6 +141,7 @@ class PromptBuilder {
 		foreach ( $this->directives as $directiveConfig ) {
 			$directive = $directiveConfig['directive'];
 			$modes     = $directiveConfig['modes'];
+			$priority  = (int) ( $directiveConfig['priority'] ?? 10 );
 
 			if ( ! in_array( 'all', $modes, true ) && ! in_array( $mode, $modes, true ) ) {
 				continue;
@@ -130,43 +151,48 @@ class PromptBuilder {
 			$directive_class = is_string( $directive ) ? $directive : get_class( $directive );
 			$directive_name  = substr( $directive_class, strrpos( $directive_class, '\\' ) + 1 );
 
+			$outputs = null;
+
 			if ( is_string( $directive ) && class_exists( $directive ) && is_subclass_of( $directive, DirectiveInterface::class ) ) {
 				$outputs = $directive::get_outputs( $provider, $this->tools, $stepId, $payload );
-				if ( is_array( $outputs ) && ! empty( $outputs ) ) {
-					$directive_outputs = array_merge( $directive_outputs, $outputs );
-				}
-				$applied_directives[] = $directive_name;
-				$directive_metadata[] = self::describeDirectiveOutputs(
-					$directive_name,
-					(int) $directiveConfig['priority'],
-					is_array( $outputs ) ? $outputs : array()
-				);
+			} elseif ( is_object( $directive ) && $directive instanceof DirectiveInterface ) {
+				$outputs = $directive->get_outputs( $provider, $this->tools, $stepId, $payload );
+			}
+
+			if ( null === $outputs ) {
 				continue;
 			}
 
-			if ( is_object( $directive ) && $directive instanceof DirectiveInterface ) {
-				$outputs = $directive->get_outputs( $provider, $this->tools, $stepId, $payload );
-				if ( is_array( $outputs ) && ! empty( $outputs ) ) {
-					$directive_outputs = array_merge( $directive_outputs, $outputs );
-				}
-				$applied_directives[] = $directive_name;
-				$directive_metadata[] = self::describeDirectiveOutputs(
-					$directive_name,
-					(int) $directiveConfig['priority'],
-					is_array( $outputs ) ? $outputs : array()
-				);
-				continue;
+			$outputs = is_array( $outputs ) ? $outputs : array();
+			if ( ! empty( $outputs ) ) {
+				$directive_outputs = array_merge( $directive_outputs, $outputs );
 			}
+
+			$validated_outputs   = DirectiveOutputValidator::validateOutputs( $outputs, $validation_context );
+			$rendered_messages    = DirectiveRenderer::renderMessages( $validated_outputs );
+			$applied_directives[] = $directive_name;
+			$directive_metadata[] = self::describeDirectiveOutputs( $directive_name, $priority, $outputs );
+			$directive_breakdown[] = array(
+				'class'                  => $directive_class,
+				'name'                   => $directive_name,
+				'priority'               => $priority,
+				'output_count'           => count( $outputs ),
+				'validated_output_count' => count( $validated_outputs ),
+				'rendered_message_count' => count( $rendered_messages ),
+				'content_bytes'          => self::sumMessageContentBytes( $rendered_messages ),
+				'json_bytes'             => self::jsonBytes( $rendered_messages ),
+			);
 		}
 
 		$validated_outputs  = DirectiveOutputValidator::validateOutputs( $directive_outputs, $validation_context );
 		$directive_messages = DirectiveRenderer::renderMessages( $validated_outputs );
 
 		return array(
-			'messages'           => array_merge( $directive_messages, $conversation_messages ),
-			'tools'              => $this->tools,
-			'applied_directives' => $applied_directives,
-			'directive_metadata' => $directive_metadata,
+			'messages'            => array_merge( $directive_messages, $conversation_messages ),
+			'tools'               => $this->tools,
+			'applied_directives'  => $applied_directives,
+			'directive_metadata'  => $directive_metadata,
+			'directive_breakdown' => $directive_breakdown,
 		);
 	}
 
@@ -254,5 +280,23 @@ class PromptBuilder {
 		}
 
 		return '';
+	}
+
+	private static function jsonBytes( array $value ): int {
+		$json = wp_json_encode( $value, JSON_UNESCAPED_UNICODE );
+		return is_string( $json ) ? strlen( $json ) : 0;
+	}
+
+	private static function sumMessageContentBytes( array $messages ): int {
+		$total = 0;
+		foreach ( $messages as $message ) {
+			$content = $message['content'] ?? '';
+			if ( is_string( $content ) ) {
+				$total += strlen( $content );
+			} elseif ( is_array( $content ) ) {
+				$total += self::jsonBytes( $content );
+			}
+		}
+		return $total;
 	}
 }
