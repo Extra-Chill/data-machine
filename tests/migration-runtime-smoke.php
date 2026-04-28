@@ -124,6 +124,7 @@ $migration_chain = array(
 	'datamachine_migrate_split_queue_payload',
 	'datamachine_migrate_user_message_queue_mode',
 	'datamachine_migrate_webhook_auth_v2',
+	'datamachine_migrate_agent_config_model_shape',
 	'datamachine_drop_redundant_post_pipeline_meta',
 );
 

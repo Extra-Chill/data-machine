@@ -114,6 +114,12 @@ function datamachine_run_schema_migrations(): void {
 	// idempotent).
 	datamachine_migrate_webhook_auth_v2();
 
+	// Migrate stale agent_config.model.default.{provider,model} shape to
+	// top-level default_provider/default_model so the resolver can read it.
+	// Pairs with the writer fix in inc/Engine/Agents/register-agents.php.
+	// Idempotent.
+	datamachine_migrate_agent_config_model_shape();
+
 	// Drop redundant _datamachine_post_pipeline_id rows (#1091). Idempotent.
 	datamachine_drop_redundant_post_pipeline_meta();
 }

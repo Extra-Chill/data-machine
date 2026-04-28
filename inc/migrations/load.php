@@ -28,6 +28,7 @@ require_once __DIR__ . '/handler-slug-scalar.php';
 require_once __DIR__ . '/split-queue-payload.php';
 require_once __DIR__ . '/user-message-queue-mode.php';
 require_once __DIR__ . '/webhook-auth-v2.php';
+require_once __DIR__ . '/agent-config-model-shape.php';
 
 // Schema-migration runtime — defines `datamachine_run_schema_migrations()`
 // and `datamachine_maybe_run_deferred_migrations()`. Hooked at
