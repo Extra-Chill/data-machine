@@ -193,7 +193,12 @@ $flow = AgentBundleFlowFile::from_array(
 				'step_position'   => 0,
 				'handler_slug'    => 'mcp',
 				'handler_configs' => array( 'mcp' => array( 'auth_ref' => 'wpcom:default', 'provider' => 'mgs' ) ),
-				'config_patch_queue' => array( array( 'after' => '2026-04-01' ) ),
+				'config_patch_queue' => array(
+					array(
+						'patch'    => array( 'after' => '2026-04-01' ),
+						'added_at' => '2026-04-27T00:00:00Z',
+					),
+				),
 				'queue_mode'         => 'drain',
 			),
 		),
@@ -202,7 +207,7 @@ $flow = AgentBundleFlowFile::from_array(
 $flow_array = $flow->to_array();
 assert_bundle_equals( 'flow references pipeline by slug, not source ID', 'wc-daily-ingest', $flow_array['pipeline_slug'] );
 assert_bundle_equals( 'flow step 0 first after normalization', 'mcp', $flow_array['steps'][0]['handler_slug'] );
-assert_bundle_equals( 'flow step preserves fetch config patch queue', array( array( 'after' => '2026-04-01' ) ), $flow_array['steps'][0]['config_patch_queue'] );
+assert_bundle_equals( 'flow step preserves fetch config patch queue', array( 'after' => '2026-04-01' ), $flow_array['steps'][0]['config_patch_queue'][0]['patch'] );
 assert_bundle_equals( 'flow step preserves AI enabled tools', array( 'datamachine/get-github-pull-review-context' ), $flow_array['steps'][2]['enabled_tools'] );
 assert_bundle_equals( 'flow step preserves AI prompt queue', 'Review this PR.', $flow_array['steps'][2]['prompt_queue'][0]['prompt'] );
 assert_bundle_equals( 'flow step preserves AI queue mode', 'loop', $flow_array['steps'][2]['queue_mode'] );
@@ -254,6 +259,54 @@ try {
 	$threw = str_contains( $e->getMessage(), 'queue_mode must be one of drain, loop, static' );
 }
 assert_bundle( 'malformed queue_mode fails clearly', $threw );
+
+$threw = false;
+try {
+	AgentBundleFlowFile::from_array(
+		array(
+			'schema_version' => 1,
+			'slug'           => 'Bad Tools',
+			'name'           => 'Bad Tools',
+			'pipeline_slug'  => 'WC Daily Ingest',
+			'schedule'       => 'daily',
+			'max_items'      => array(),
+			'steps'          => array(
+				array(
+					'step_position'   => 0,
+					'handler_configs' => array(),
+					'enabled_tools'   => array( 'valid-tool', array( 'not' => 'a string' ) ),
+				),
+			),
+		)
+	);
+} catch ( BundleValidationException $e ) {
+	$threw = str_contains( $e->getMessage(), 'enabled_tools must be a list of strings' );
+}
+assert_bundle( 'malformed enabled_tools fails clearly', $threw );
+
+$threw = false;
+try {
+	AgentBundleFlowFile::from_array(
+		array(
+			'schema_version' => 1,
+			'slug'           => 'Bad Patch Queue',
+			'name'           => 'Bad Patch Queue',
+			'pipeline_slug'  => 'WC Daily Ingest',
+			'schedule'       => 'daily',
+			'max_items'      => array(),
+			'steps'          => array(
+				array(
+					'step_position'      => 0,
+					'handler_configs'    => array(),
+					'config_patch_queue' => array( array( 'after' => '2026-04-01' ) ),
+				),
+			),
+		)
+	);
+} catch ( BundleValidationException $e ) {
+	$threw = str_contains( $e->getMessage(), 'config_patch_queue entries must include an object patch' );
+}
+assert_bundle( 'malformed config_patch_queue fails clearly', $threw );
 
 echo "\n[4] Directory write/read round-trips without DB access\n";
 $bundle = new AgentBundleDirectory(

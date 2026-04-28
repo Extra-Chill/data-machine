@@ -136,7 +136,7 @@ $directory = new AgentBundleDirectory(
 					'handler_slug'        => 'mcp',
 					'handler_config'      => array( 'provider' => 'mgs' ),
 					'handler_configs'     => array( 'mcp' => array( 'provider' => 'mgs' ) ),
-					'config_patch_queue'  => array( array( 'query' => 'WooCommerce' ) ),
+					'config_patch_queue'  => array( array( 'patch' => array( 'query' => 'WooCommerce' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
 					'queue_mode'          => 'loop',
 				)
 			)
@@ -175,18 +175,18 @@ $incoming_flow_config = array(
 	'flow-step-1' => array(
 		'handler_slug'       => 'mcp',
 		'handler_config'     => array( 'provider' => 'mgs', 'query' => 'New seed' ),
-		'config_patch_queue' => array( array( 'query' => 'New seed' ) ),
+		'config_patch_queue' => array( array( 'patch' => array( 'query' => 'New seed' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
 		'queue_mode'         => 'drain',
 	),
 );
 $existing_flow_config = array(
 	'flow-step-1' => array(
-		'config_patch_queue' => array( array( 'query' => 'Local queue head' ) ),
+		'config_patch_queue' => array( array( 'patch' => array( 'query' => 'Local queue head' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
 		'queue_mode'         => 'static',
 	),
 );
 $preserved = call_bundle_private( $bundler, 'preserve_runtime_queue_fields', array( $incoming_flow_config, $existing_flow_config ) );
-assert_bundle_update_equals( 'upgrade preserves existing config_patch_queue', 'Local queue head', $preserved['flow-step-1']['config_patch_queue'][0]['query'] ?? null );
+assert_bundle_update_equals( 'upgrade preserves existing config_patch_queue', 'Local queue head', $preserved['flow-step-1']['config_patch_queue'][0]['patch']['query'] ?? null );
 assert_bundle_update_equals( 'upgrade preserves existing queue_mode', 'static', $preserved['flow-step-1']['queue_mode'] ?? null );
 
 $agent_bundler_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Agents/AgentBundler.php' ) ?: '';

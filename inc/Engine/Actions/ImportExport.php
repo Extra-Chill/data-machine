@@ -131,12 +131,17 @@ class ImportExport {
 				$settings['handler_slug'] = $row['handler'];
 			}
 
-			$this->restore_flow_step_config(
-				$imported_flow_id,
-				$pipeline_step_id,
-				$row['step_type'],
-				$settings
-			);
+			try {
+				$this->restore_flow_step_config(
+					$imported_flow_id,
+					$pipeline_step_id,
+					$row['step_type'],
+					$settings
+				);
+			} catch ( \InvalidArgumentException $e ) {
+				do_action( 'datamachine_log', 'error', 'Import: malformed portable flow-step settings: ' . $e->getMessage() );
+				return false;
+			}
 		}
 
 		// Ensure every imported pipeline has at least one flow (fallback for exports with
@@ -511,19 +516,90 @@ class ImportExport {
 		$normalized = array();
 
 		foreach ( array( 'enabled_tools', 'disabled_tools' ) as $field ) {
-			if ( isset( $source[ $field ] ) && is_array( $source[ $field ] ) ) {
-				$normalized[ $field ] = array_values( array_map( 'strval', $source[ $field ] ) );
+			if ( array_key_exists( $field, $source ) ) {
+				$normalized[ $field ] = $this->normalize_string_list_field( $field, $source[ $field ] );
 			}
 		}
 
-		foreach ( array( QueueAbility::SLOT_PROMPT_QUEUE, QueueAbility::SLOT_CONFIG_PATCH_QUEUE ) as $field ) {
-			if ( isset( $source[ $field ] ) && is_array( $source[ $field ] ) && array_is_list( $source[ $field ] ) ) {
-				$normalized[ $field ] = $source[ $field ];
-			}
+		if ( array_key_exists( QueueAbility::SLOT_PROMPT_QUEUE, $source ) ) {
+			$normalized[ QueueAbility::SLOT_PROMPT_QUEUE ] = $this->normalize_prompt_queue_field( $source[ QueueAbility::SLOT_PROMPT_QUEUE ] );
+		}
+
+		if ( array_key_exists( QueueAbility::SLOT_CONFIG_PATCH_QUEUE, $source ) ) {
+			$normalized[ QueueAbility::SLOT_CONFIG_PATCH_QUEUE ] = $this->normalize_config_patch_queue_field( $source[ QueueAbility::SLOT_CONFIG_PATCH_QUEUE ] );
 		}
 
 		if ( isset( $source['queue_mode'] ) && in_array( $source['queue_mode'], array( 'drain', 'loop', 'static' ), true ) ) {
 			$normalized['queue_mode'] = $source['queue_mode'];
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Normalize a portable string-list setting.
+	 */
+	private function normalize_string_list_field( string $field, $value ): array {
+		if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
+			throw new \InvalidArgumentException( "{$field} must be a list of strings." );
+		}
+
+		$normalized = array();
+		foreach ( $value as $item ) {
+			if ( ! is_string( $item ) ) {
+				throw new \InvalidArgumentException( "{$field} must be a list of strings." );
+			}
+			$normalized[] = $item;
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Normalize AI prompt queue entries from portable settings.
+	 */
+	private function normalize_prompt_queue_field( $value ): array {
+		if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
+			throw new \InvalidArgumentException( 'prompt_queue must be a list of objects.' );
+		}
+
+		$normalized = array();
+		foreach ( $value as $entry ) {
+			if ( ! is_array( $entry ) ) {
+				throw new \InvalidArgumentException( 'prompt_queue must be a list of objects.' );
+			}
+			if ( ! array_key_exists( QueueAbility::FIELD_PROMPT, $entry ) || ! is_string( $entry[ QueueAbility::FIELD_PROMPT ] ) ) {
+				throw new \InvalidArgumentException( 'prompt_queue entries must include a string prompt.' );
+			}
+			if ( array_key_exists( 'added_at', $entry ) && ! is_string( $entry['added_at'] ) ) {
+				throw new \InvalidArgumentException( 'prompt_queue added_at must be a string when present.' );
+			}
+			$normalized[] = $entry;
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Normalize fetch config-patch queue entries from portable settings.
+	 */
+	private function normalize_config_patch_queue_field( $value ): array {
+		if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
+			throw new \InvalidArgumentException( 'config_patch_queue must be a list of objects.' );
+		}
+
+		$normalized = array();
+		foreach ( $value as $entry ) {
+			if ( ! is_array( $entry ) ) {
+				throw new \InvalidArgumentException( 'config_patch_queue must be a list of objects.' );
+			}
+			if ( ! array_key_exists( QueueAbility::FIELD_PATCH, $entry ) || ! is_array( $entry[ QueueAbility::FIELD_PATCH ] ) ) {
+				throw new \InvalidArgumentException( 'config_patch_queue entries must include an object patch.' );
+			}
+			if ( array_key_exists( 'added_at', $entry ) && ! is_string( $entry['added_at'] ) ) {
+				throw new \InvalidArgumentException( 'config_patch_queue added_at must be a string when present.' );
+			}
+			$normalized[] = $entry;
 		}
 
 		return $normalized;

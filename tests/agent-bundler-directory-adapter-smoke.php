@@ -125,7 +125,7 @@ $legacy_bundle = array(
 					'execution_order'    => 0,
 					'handler_slug'       => 'mcp',
 					'handler_config'     => array( 'provider' => 'github', 'auth_ref' => 'github:default' ),
-					'config_patch_queue' => array( array( 'after' => '2026-04-01' ) ),
+					'config_patch_queue' => array( array( 'patch' => array( 'after' => '2026-04-01' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
 					'queue_mode'         => 'drain',
 					'enabled'            => true,
 				),
@@ -159,7 +159,7 @@ assert_adapter_equals( 'flow references pipeline by slug', 'pr-review-pipeline',
 assert_adapter_equals( 'pipeline document strips runtime pipeline_step_id', false, array_key_exists( 'pipeline_step_id', $pipeline['steps'][0]['step_config'] ) );
 assert_adapter_equals( 'flow document preserves handler config', array( 'provider' => 'github', 'auth_ref' => 'github:default' ), $flow['steps'][0]['handler_config'] );
 assert_adapter_equals( 'flow document preserves step type', 'fetch', $flow['steps'][0]['step_type'] );
-assert_adapter_equals( 'flow document preserves config patch queue', array( array( 'after' => '2026-04-01' ) ), $flow['steps'][0]['config_patch_queue'] );
+assert_adapter_equals( 'flow document preserves config patch queue', array( 'after' => '2026-04-01' ), $flow['steps'][0]['config_patch_queue'][0]['patch'] ?? null );
 assert_adapter_equals( 'flow document preserves AI enabled tools', array( 'datamachine/get-github-pull-review-context' ), $flow['steps'][1]['enabled_tools'] );
 assert_adapter_equals( 'flow document preserves AI disabled tools', array( 'datamachine/delete-flow' ), $flow['steps'][1]['disabled_tools'] );
 assert_adapter_equals( 'flow document preserves prompt queue', 'Review PR #1', $flow['steps'][1]['prompt_queue'][0]['prompt'] );
@@ -188,7 +188,7 @@ assert_adapter_equals( 'round-trip preserves pipeline memory', "# Pipeline\n", $
 assert_adapter_equals( 'round-trip preserves flow file memory', "{}\n", $round_trip['flows'][0]['memory_file_contents']['files/context.json'] ?? null );
 assert_adapter_equals( 'round-trip preserves handler config', array( 'auth_ref' => 'github:default', 'provider' => 'github' ), $round_steps[0]['handler_config'] );
 assert_adapter_equals( 'round-trip preserves step type', 'fetch', $round_steps[0]['step_type'] );
-assert_adapter_equals( 'round-trip preserves config patch queue', array( array( 'after' => '2026-04-01' ) ), $round_steps[0]['config_patch_queue'] );
+assert_adapter_equals( 'round-trip preserves config patch queue', array( 'after' => '2026-04-01' ), $round_steps[0]['config_patch_queue'][0]['patch'] ?? null );
 assert_adapter_equals( 'round-trip preserves enabled flag', true, $round_steps[0]['enabled'] );
 assert_adapter_equals( 'round-trip preserves enabled tools', array( 'datamachine/get-github-pull-review-context' ), $round_steps[1]['enabled_tools'] );
 assert_adapter_equals( 'round-trip preserves disabled tools', array( 'datamachine/delete-flow' ), $round_steps[1]['disabled_tools'] );
