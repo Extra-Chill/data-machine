@@ -21,7 +21,7 @@ use DataMachine\Core\FilesRepository\DirectoryManager;
 class AgentMemory extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'agent_memory', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'abilities' => array( 'datamachine/get-agent-memory', 'datamachine/update-agent-memory', 'datamachine/list-agent-memory-sections' ) ) );
+		$this->registerTool( 'agent_memory', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'abilities' => array( 'datamachine/get-agent-memory', 'datamachine/update-agent-memory', 'datamachine/list-agent-memory-sections' ) ) );
 	}
 
 	/**

@@ -6,14 +6,14 @@
 
 ## Overview
 
-The BaseTool class provides agent-agnostic tool registration patterns that dynamically create appropriate filters based on agent type. This enables unlimited agent specialization while maintaining consistent registration patterns across the entire AI tool ecosystem.
+The BaseTool class provides one registration path for tools in the unified `datamachine_tools` registry. Each tool declares the agent modes where it is visible, such as `chat` or `pipeline`.
 
 ## Key Features
 
 - **Unified Inheritance**: Single base class for all tools (global and chat)
-- **Agent-Agnostic Registration**: `registerTool()` method handles all agent types
-- **Dynamic Filter Creation**: Automatically creates `datamachine_{agentType}_tools` filters
-- **Extensible Architecture**: Supports current and future agent types (global, chat, frontend, etc.)
+- **Mode-Aware Registration**: `registerTool()` declares where each tool is visible
+- **Unified Registry**: Registers tools through the single `datamachine_tools` filter
+- **Extensible Architecture**: Supports current and future agent modes (chat, pipeline, system, etc.)
 - **Configuration Management**: Built-in support for tool configuration handlers
 - **Error Handling**: Standardized error response building with classification
 
@@ -21,27 +21,20 @@ The BaseTool class provides agent-agnostic tool registration patterns that dynam
 
 ### Tool Registration Methods
 
-#### `registerTool(string $agentType, string $toolName, array|callable $toolDefinition)`
+#### `registerTool(string $toolName, array|callable $toolDefinition, array $modes = [], array $meta = [])`
 
-Core registration method that dynamically creates the appropriate filter based on agent type.
+Core registration method that adds a tool to the unified registry with explicit mode visibility.
 
 **Parameters:**
-- `$agentType`: Agent type identifier (global, chat, frontend, etc.)
 - `$toolName`: Tool identifier
 - `$toolDefinition`: Tool definition array OR callable that returns it
+- `$modes`: Agent modes where this tool is visible, such as `['chat']` or `['chat', 'pipeline']`
+- `$meta`: Permission metadata, such as `ability`, `abilities`, or `access_level`
 
 **Example:**
 ```php
-$this->registerTool('chat', 'create_pipeline', [$this, 'getToolDefinition']);
+$this->registerTool('create_pipeline', [$this, 'getToolDefinition'], ['chat']);
 ```
-
-#### `registerGlobalTool(string $tool_name, array|callable $tool_definition)`
-
-Convenience method for registering tools available to all AI agents (pipeline + chat).
-
-#### `registerChatTool(string $tool_name, array|callable $tool_definition)`
-
-Convenience method for registering chat-specific tools.
 
 #### `registerConfigurationHandlers(string $tool_id)`
 
@@ -71,7 +64,7 @@ Build standardized error response with classification.
 
 ## Usage Patterns
 
-### Global Tool
+### Pipeline-Capable Tool
 
 ```php
 <?php
@@ -82,7 +75,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class GoogleSearch extends BaseTool {
 
     public function __construct() {
-        $this->registerGlobalTool('google_search', [$this, 'getToolDefinition']);
+        $this->registerTool('google_search', [$this, 'getToolDefinition'], ['chat', 'pipeline'], ['access_level' => 'admin']);
         $this->registerConfigurationHandlers('google_search');
     }
 
@@ -114,7 +107,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class CreatePipeline extends BaseTool {
 
     public function __construct() {
-        $this->registerChatTool('create_pipeline', [$this, 'getToolDefinition']);
+        $this->registerTool('create_pipeline', [$this, 'getToolDefinition'], ['chat'], ['access_level' => 'admin']);
     }
 
     public function getToolDefinition(): array {
@@ -152,9 +145,9 @@ class CreatePipeline extends BaseTool {
 
 - **Code Reduction**: Eliminates repetitive registration code across tool implementations
 - **Consistency**: Ensures uniform registration and error handling patterns across all AI tools
-- **Extensibility**: Supports unlimited agent types without code changes
+- **Extensibility**: Supports additional agent modes without code changes
 - **Maintainability**: Centralized registration and error handling logic in one base class
-- **Future-Proof**: Automatic support for new agent types through dynamic filter creation
+- **Future-Proof**: Tool definitions are mode-tagged before lazy definitions are resolved
 
 ## Integration with ToolManager
 
@@ -164,12 +157,8 @@ The BaseTool class integrates seamlessly with the ToolManager system:
 - **Configuration Validation**: `check_configuration()` methods are called during tool enablement checks
 - **Lazy Evaluation**: Tool definitions support callable format for deferred loading
 
-## Agent Type Support
+## Mode Support
 
-The class supports multiple agent types through dynamic filter creation:
+The class supports any mode string declared in the tool's `modes` array. Built-in modes are `chat`, `pipeline`, and `system`; third-party callers may resolve custom modes through `ToolPolicyResolver`.
 
-- **global**: `datamachine_global_tools` - Available to all agents
-- **chat**: `datamachine_chat_tools` - Chat agent specific
-- **pipeline**: `datamachine_pipeline_tools` - Pipeline agent specific
-- **frontend**: `datamachine_frontend_tools` - Frontend agent specific
-- **Custom**: Any agent type automatically gets `datamachine_{type}_tools` filter
+Only declare `pipeline` when the tool is useful inside automated pipeline AI steps. Chat affordances and tools that duplicate engine-level pipeline behavior should stay `chat`-only.

@@ -21,7 +21,7 @@ use DataMachine\Core\FilesRepository\DirectoryManager;
 class AgentDailyMemory extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'agent_daily_memory', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'abilities' => array( 'datamachine/daily-memory-read', 'datamachine/daily-memory-write', 'datamachine/daily-memory-list', 'datamachine/search-daily-memory' ) ) );
+		$this->registerTool( 'agent_daily_memory', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'abilities' => array( 'datamachine/daily-memory-read', 'datamachine/daily-memory-write', 'datamachine/daily-memory-list', 'datamachine/search-daily-memory' ) ) );
 	}
 
 	/**

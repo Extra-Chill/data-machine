@@ -14,7 +14,7 @@ namespace DataMachine\Engine\AI\Tools;
 
 defined( 'ABSPATH' ) || exit;
 
-// Tools available in chat and pipeline contexts.
+// Global tools. Each class declares the modes where its tool is visible.
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\AI\Tools\Global\AgentMemory;
 use DataMachine\Engine\AI\Tools\Global\AmazonAffiliateLink;
@@ -70,9 +70,8 @@ class ToolServiceProvider {
 	/**
 	 * Register all tools.
 	 *
-	 * Tools with contexts ['chat', 'pipeline'] are registered
-	 * first because chat-only tools may depend on handlers and step types
-	 * that they provide.
+		 * Global tools are registered first because chat-only tools may depend
+		 * on handlers and step types that they provide.
 	 */
 	public static function register(): void {
 		self::registerTools();
@@ -82,7 +81,7 @@ class ToolServiceProvider {
 	 * Register all tools with their context declarations.
 	 */
 	private static function registerTools(): void {
-		// Tools available in chat and pipeline contexts.
+		// Global tools. Each class declares its own mode visibility.
 		new AgentDailyMemory();
 		new AgentMemory();
 		new AmazonAffiliateLink();
