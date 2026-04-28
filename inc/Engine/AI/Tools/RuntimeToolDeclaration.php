@@ -16,11 +16,12 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Validates scoped runtime tool declarations before policy integration.
  */
+// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Validation exceptions are not rendered output.
 class RuntimeToolDeclaration {
 
-	public const SOURCE_CLIENT  = 'client';
+	public const SOURCE_CLIENT   = 'client';
 	public const EXECUTOR_CLIENT = 'client';
-	public const SCOPE_RUN      = 'run';
+	public const SCOPE_RUN       = 'run';
 
 	/**
 	 * Normalize a runtime tool declaration or throw a field-scoped error.
@@ -31,8 +32,13 @@ class RuntimeToolDeclaration {
 	public static function normalize( array $declaration ): array {
 		$errors = self::validate( $declaration );
 		if ( ! empty( $errors ) ) {
+			$message = sprintf(
+				'invalid_runtime_tool_declaration: %s',
+				implode( ', ', self::sanitizeErrorKeys( $errors ) )
+			);
+
 			throw new \InvalidArgumentException(
-				'invalid_runtime_tool_declaration: ' . implode( ', ', $errors )
+				$message
 			);
 		}
 
@@ -122,5 +128,21 @@ class RuntimeToolDeclaration {
 	public static function sourceFromName( string $name ): string {
 		$parts = explode( '/', $name, 2 );
 		return count( $parts ) === 2 ? $parts[0] : '';
+	}
+
+	/**
+	 * Sanitize validator field names without requiring WordPress functions.
+	 *
+	 * @param string[] $errors Raw validator field names.
+	 * @return string[] Sanitized field names.
+	 */
+	private static function sanitizeErrorKeys( array $errors ): array {
+		return array_map(
+			static function ( string $error ): string {
+				$sanitized = preg_replace( '/[^a-z0-9_-]/', '', strtolower( $error ) );
+				return is_string( $sanitized ) ? $sanitized : '';
+			},
+			$errors
+		);
 	}
 }
