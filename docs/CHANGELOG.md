@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.87.2] - 2026-04-28
+
+### Fixed
+- restore variables consumed by fetchReport response
+
 ## [0.87.1] - 2026-04-28
 
 ### Fixed
