@@ -16,6 +16,8 @@ use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Agents\AgentAccess;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Engine\Bundle\AgentBundleDirectory;
+use DataMachine\Engine\Bundle\BundleValidationException;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -34,6 +36,55 @@ class AgentAbilities {
 
 	private function registerAbilities(): void {
 		$register_callback = function () {
+			wp_register_ability(
+				'datamachine/export-agent',
+				array(
+					'label'               => 'Export Agent',
+					'description'         => 'Export an agent as a portable bundle directory or ZIP archive.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'agent_id' ),
+						'properties' => array(
+							'agent_id'    => array(
+								'type'        => 'integer',
+								'description' => 'Agent ID to export.',
+							),
+							'profile'     => array(
+								'type'        => 'string',
+								'enum'        => array( 'share', 'backup', 'fork' ),
+								'description' => 'Export profile. Defaults to share.',
+							),
+							'destination' => array(
+								'type'        => 'string',
+								'description' => 'Destination directory or ZIP file path. Defaults to <agent-slug>-bundle.',
+							),
+							'format'      => array(
+								'type'        => 'string',
+								'enum'        => array( 'directory', 'zip' ),
+								'description' => 'Output format. Defaults to directory.',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'    => array( 'type' => 'boolean' ),
+							'path'       => array( 'type' => 'string' ),
+							'format'     => array( 'type' => 'string' ),
+							'profile'    => array( 'type' => 'string' ),
+							'manifest'   => array( 'type' => 'object' ),
+							'agent_id'   => array( 'type' => 'integer' ),
+							'agent_slug' => array( 'type' => 'string' ),
+							'error'      => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'exportAgent' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
 			wp_register_ability(
 				'datamachine/rename-agent',
 				array(
@@ -1184,6 +1235,141 @@ class AgentAbilities {
 			'files_updated' => $files_updated,
 			'files_skipped' => $files_skipped,
 		);
+	}
+
+	/**
+	 * Export an agent to a portable bundle directory or ZIP file.
+	 *
+	 * @param array $input Export input.
+	 * @return array Result.
+	 */
+	public static function exportAgent( array $input ): array {
+		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		if ( $agent_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'agent_id is required.',
+			);
+		}
+
+		$agents_repo = new Agents();
+		$agent       = $agents_repo->get_agent( $agent_id );
+		if ( ! $agent ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Agent ID %d not found.', $agent_id ),
+			);
+		}
+
+		$format = (string) ( $input['format'] ?? 'directory' );
+		if ( 'dir' === $format ) {
+			$format = 'directory';
+		}
+		if ( ! in_array( $format, array( 'directory', 'zip' ), true ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'format must be directory or zip.',
+			);
+		}
+
+		$profile = (string) ( $input['profile'] ?? 'share' );
+		if ( ! in_array( $profile, array( 'share', 'backup', 'fork' ), true ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'profile must be share, backup, or fork.',
+			);
+		}
+
+		$agent_slug   = (string) $agent['agent_slug'];
+		$destination  = trim( (string) ( $input['destination'] ?? '' ) );
+		$destination  = '' !== $destination ? $destination : $agent_slug . '-bundle' . ( 'zip' === $format ? '.zip' : '' );
+		$bundler      = new AgentBundler();
+		$export       = $bundler->export_directory_object( $agent_slug, array( 'profile' => $profile ) );
+		$directory    = $export['directory'] ?? null;
+		$manifest     = $directory instanceof AgentBundleDirectory ? $directory->manifest()->to_array() : array();
+		$written_path = $destination;
+
+		if ( empty( $export['success'] ) || ! $directory instanceof AgentBundleDirectory ) {
+			return array(
+				'success' => false,
+				'error'   => (string) ( $export['error'] ?? 'Failed to build export bundle.' ),
+			);
+		}
+
+		try {
+			if ( 'directory' === $format ) {
+				$directory->write( $destination );
+			} else {
+				$written_path = self::writeBundleZip( $directory, $destination, $agent_slug );
+			}
+		} catch ( \Throwable $e ) {
+			return array(
+				'success' => false,
+				'error'   => $e->getMessage(),
+			);
+		}
+
+		return array(
+			'success'    => true,
+			'agent_id'   => $agent_id,
+			'agent_slug' => $agent_slug,
+			'profile'    => $profile,
+			'format'     => $format,
+			'path'       => $written_path,
+			'manifest'   => $manifest,
+		);
+	}
+
+	private static function writeBundleZip( AgentBundleDirectory $directory, string $zip_path, string $agent_slug ): string {
+		if ( ! class_exists( '\ZipArchive' ) ) {
+			throw new BundleValidationException( 'ZipArchive is not available.' );
+		}
+
+		$temp_dir   = sys_get_temp_dir() . '/datamachine-agent-export-' . uniqid( '', true );
+		$bundle_dir = $temp_dir . '/' . sanitize_title( $agent_slug );
+		wp_mkdir_p( $bundle_dir );
+		$directory->write( $bundle_dir );
+
+		$zip = new \ZipArchive();
+		if ( true !== $zip->open( $zip_path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE ) ) {
+			self::removeDirectory( $temp_dir );
+			throw new BundleValidationException( sprintf( 'Unable to create ZIP archive: %s', esc_html( $zip_path ) ) );
+		}
+
+		$iterator = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator( $bundle_dir, \RecursiveDirectoryIterator::SKIP_DOTS ),
+			\RecursiveIteratorIterator::SELF_FIRST
+		);
+		foreach ( $iterator as $item ) {
+			$relative_path = sanitize_title( $agent_slug ) . '/' . substr( $item->getPathname(), strlen( $bundle_dir ) + 1 );
+			if ( $item->isDir() ) {
+				$zip->addEmptyDir( $relative_path );
+			} else {
+				$zip->addFile( $item->getPathname(), $relative_path );
+			}
+		}
+		$zip->close();
+		self::removeDirectory( $temp_dir );
+
+		return $zip_path;
+	}
+
+	private static function removeDirectory( string $dir ): void {
+		if ( ! is_dir( $dir ) ) {
+			return;
+		}
+		$iterator = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator( $dir, \RecursiveDirectoryIterator::SKIP_DOTS ),
+			\RecursiveIteratorIterator::CHILD_FIRST
+		);
+		foreach ( $iterator as $item ) {
+			if ( $item->isDir() ) {
+				rmdir( $item->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+			} else {
+				wp_delete_file( $item->getPathname() );
+			}
+		}
+		rmdir( $dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
 	}
 
 	/**

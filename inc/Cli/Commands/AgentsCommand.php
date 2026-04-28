@@ -957,100 +957,91 @@ class AgentsCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
-	 * <slug>
-	 * : Agent slug to export.
+	 * <agent>
+	 * : Agent ID or slug to export.
+	 *
+	 * [--profile=<profile>]
+	 * : Export profile.
+	 * ---
+	 * default: share
+	 * options:
+	 *   - share
+	 *   - backup
+	 *   - fork
+	 * ---
 	 *
 	 * [--format=<format>]
 	 * : Bundle format.
 	 * ---
-	 * default: zip
+	 * default: directory
 	 * options:
 	 *   - zip
-	 *   - json
-	 *   - dir
+	 *   - directory
 	 * ---
 	 *
-	 * [--output=<path>]
-	 * : Output path. For zip/json, a file path. For dir, a directory path.
+	 * [--destination=<path>]
+	 * : Output path. For zip, a file path. For directory, a directory path.
 	 *   Defaults to current directory with auto-generated filename.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Export as ZIP (default)
-	 *     wp datamachine agents export mattic-agent
+	 *     # Export as directory (default)
+	 *     wp datamachine agents export 42
 	 *
-	 *     # Export as JSON
-	 *     wp datamachine agents export mattic-agent --format=json
+	 *     # Export as ZIP
+	 *     wp datamachine agents export mattic-agent --format=zip --destination=/tmp/mattic-agent.zip
 	 *
-	 *     # Export as directory
-	 *     wp datamachine agents export mattic-agent --format=dir --output=/tmp/mattic-bundle
-	 *
-	 *     # Export to specific file
-	 *     wp datamachine agents export mattic-agent --output=/tmp/mattic-agent.zip
+	 *     # Export backup profile as directory
+	 *     wp datamachine agents export mattic-agent --profile=backup --destination=/tmp/mattic-bundle
 	 *
 	 * @subcommand export
 	 */
 	public function export( array $args, array $assoc_args ): void {
-		$slug   = sanitize_title( $args[0] ?? '' );
-		$format = $assoc_args['format'] ?? 'zip';
-		$output = $assoc_args['output'] ?? null;
+		$identifier  = (string) ( $args[0] ?? '' );
+		$format      = (string) ( $assoc_args['format'] ?? 'directory' );
+		$destination = (string) ( $assoc_args['destination'] ?? ( $assoc_args['output'] ?? '' ) );
+		$profile     = (string) ( $assoc_args['profile'] ?? 'share' );
 
-		if ( empty( $slug ) ) {
-			WP_CLI::error( 'Agent slug is required.' );
+		if ( '' === trim( $identifier ) ) {
+			WP_CLI::error( 'Agent ID or slug is required.' );
 			return;
 		}
 
-		WP_CLI::log( sprintf( 'Exporting agent "%s"...', $slug ) );
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		$agent       = is_numeric( $identifier )
+			? $agents_repo->get_agent( (int) $identifier )
+			: $agents_repo->get_by_slug( sanitize_title( $identifier ) );
 
-		$bundler = new AgentBundler();
-		$result  = $bundler->export( $slug );
+		if ( ! $agent ) {
+			WP_CLI::error( sprintf( 'Agent "%s" not found.', $identifier ) );
+			return;
+		}
 
-		if ( ! $result['success'] ) {
+		$input = array(
+			'agent_id' => (int) $agent['agent_id'],
+			'profile'  => $profile,
+			'format'   => $format,
+		);
+		if ( '' !== trim( $destination ) ) {
+			$input['destination'] = $destination;
+		}
+
+		WP_CLI::log( sprintf( 'Exporting agent "%s"...', $agent['agent_slug'] ) );
+		$result = AgentAbilities::exportAgent( $input );
+		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( (string) ( $result['error'] ?? 'Failed to export agent.' ) );
 			return;
 		}
 
-		$bundle = is_array( $result['bundle'] ?? null ) ? $result['bundle'] : array();
-
-		// Log what's being exported.
-		WP_CLI::log( sprintf( '  Agent:     %s (%s)', $bundle['agent']['agent_name'], $bundle['agent']['agent_slug'] ) );
-		WP_CLI::log( sprintf( '  Files:     %d identity file(s)', count( $bundle['files'] ?? array() ) ) );
-		WP_CLI::log( sprintf( '  Pipelines: %d', count( $bundle['pipelines'] ?? array() ) ) );
-		WP_CLI::log( sprintf( '  Flows:     %d', count( $bundle['flows'] ?? array() ) ) );
-
-		switch ( $format ) {
-			case 'json':
-				$output = $output ?? $slug . '-bundle.json';
-				$json   = $bundler->to_json( $bundle );
-				file_put_contents( $output, $json ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-				WP_CLI::success( sprintf( 'Bundle exported to %s (%s)', $output, size_format( (int) filesize( $output ) ) ) );
-				break;
-
-			case 'dir':
-				$output = $output ?? $slug . '-bundle';
-				if ( is_dir( $output ) ) {
-					WP_CLI::error( sprintf( 'Directory "%s" already exists. Remove it first or use --output=<path>.', $output ) );
-					return;
-				}
-				$wrote = $bundler->to_directory( $bundle, $output );
-				if ( ! $wrote ) {
-					WP_CLI::error( 'Failed to write bundle directory.' );
-					return;
-				}
-				WP_CLI::success( sprintf( 'Bundle exported to directory: %s', $output ) );
-				break;
-
-			case 'zip':
-			default:
-				$output = $output ?? $slug . '-bundle.zip';
-				$wrote  = $bundler->to_zip( $bundle, $output );
-				if ( ! $wrote ) {
-					WP_CLI::error( 'Failed to create ZIP archive.' );
-					return;
-				}
-				WP_CLI::success( sprintf( 'Bundle exported to %s (%s)', $output, size_format( (int) filesize( $output ) ) ) );
-				break;
-		}
+		$manifest = is_array( $result['manifest'] ?? null ) ? $result['manifest'] : array();
+		$included = is_array( $manifest['included'] ?? null ) ? $manifest['included'] : array();
+		WP_CLI::log( sprintf( '  Agent:     %s (%s)', $manifest['agent']['label'] ?? $agent['agent_name'], $agent['agent_slug'] ) );
+		WP_CLI::log( sprintf( '  Profile:   %s', $result['profile'] ) );
+		WP_CLI::log( sprintf( '  Format:    %s', $result['format'] ) );
+		WP_CLI::log( sprintf( '  Memory:    %d file(s)', count( $included['memory'] ?? array() ) ) );
+		WP_CLI::log( sprintf( '  Pipelines: %d', count( $included['pipelines'] ?? array() ) ) );
+		WP_CLI::log( sprintf( '  Flows:     %d', count( $included['flows'] ?? array() ) ) );
+		WP_CLI::success( sprintf( 'Bundle exported to %s', $result['path'] ) );
 	}
 
 	/**

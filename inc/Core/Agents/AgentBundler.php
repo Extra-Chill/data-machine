@@ -101,7 +101,7 @@ class AgentBundler {
 	 * @param string $slug Agent slug.
 	 * @return array{success: bool, directory?: AgentBundleDirectory, agent?: array, error?: string}
 	 */
-	public function export_directory_object( string $slug ): array {
+	public function export_directory_object( string $slug, array $context = array() ): array {
 		$agent = $this->agents_repo->get_by_slug( sanitize_title( $slug ) );
 
 		if ( ! $agent ) {
@@ -111,7 +111,9 @@ class AgentBundler {
 			);
 		}
 
-		$agent_id = (int) $agent['agent_id'];
+		$agent_id        = (int) $agent['agent_id'];
+		$export_manifest = self::resolve_export_manifest( $agent_id, $context );
+		$handler_auth    = (string) $export_manifest['handler_auth'];
 
 		$pipelines                 = $this->pipelines_repo->get_all_pipelines( null, $agent_id );
 		$flows                     = $this->flows_repo->get_all_flows( null, $agent_id );
@@ -125,65 +127,87 @@ class AgentBundler {
 		$used_flow_slugs           = array();
 
 		foreach ( $this->collect_agent_files( $agent['agent_slug'] ) as $path => $contents ) {
+			if ( 'SOUL.md' === $path && empty( $export_manifest['soul'] ) ) {
+				continue;
+			}
+			if ( 'MEMORY.md' === $path && empty( $export_manifest['memory'] ) ) {
+				continue;
+			}
 			$memory_files[ 'agent/' . ltrim( (string) $path, '/' ) ] = $contents;
 		}
 
 		$owner_id      = (int) $agent['owner_id'];
 		$user_template = $this->collect_user_template( $owner_id );
-		if ( '' !== $user_template ) {
+		if ( ! empty( $export_manifest['user'] ) && '' !== $user_template ) {
 			$memory_files['USER.md'] = $user_template;
 		}
 
-		foreach ( $pipelines as $pipeline ) {
-			$pipeline_id                          = (int) $pipeline['pipeline_id'];
-			$portable_slug                        = ! empty( $pipeline['portable_slug'] )
-				? PortableSlug::normalize( (string) $pipeline['portable_slug'], 'pipeline' )
-				: PortableSlug::normalize( (string) $pipeline['pipeline_name'], 'pipeline' );
-			$portable_slug                        = PortableSlug::dedupe( $portable_slug, $used_pipeline_slugs );
-			$used_pipeline_slugs[]                = $portable_slug;
-			$pipeline_config                      = is_array( $pipeline['pipeline_config'] ?? null ) ? $pipeline['pipeline_config'] : array();
-			$pipeline_slugs_by_id[ $pipeline_id ] = $portable_slug;
+		if ( ! empty( $export_manifest['pipelines'] ) ) {
+			foreach ( $pipelines as $pipeline ) {
+				$pipeline_id                          = (int) $pipeline['pipeline_id'];
+				$portable_slug                        = ! empty( $pipeline['portable_slug'] )
+					? PortableSlug::normalize( (string) $pipeline['portable_slug'], 'pipeline' )
+					: PortableSlug::normalize( (string) $pipeline['pipeline_name'], 'pipeline' );
+				$portable_slug                        = PortableSlug::dedupe( $portable_slug, $used_pipeline_slugs );
+				$used_pipeline_slugs[]                = $portable_slug;
+				$pipeline_config                      = is_array( $pipeline['pipeline_config'] ?? null ) ? $pipeline['pipeline_config'] : array();
+				$pipeline_slugs_by_id[ $pipeline_id ] = $portable_slug;
 
-			foreach ( $pipeline_config as $pipeline_step_id => $pipeline_step ) {
-				if ( is_array( $pipeline_step ) ) {
-					$pipeline_step_types_by_id[ (string) $pipeline_step_id ] = (string) ( $pipeline_step['step_type'] ?? '' );
+				foreach ( $pipeline_config as $pipeline_step_id => $pipeline_step ) {
+					if ( is_array( $pipeline_step ) ) {
+						$pipeline_step_types_by_id[ (string) $pipeline_step_id ] = (string) ( $pipeline_step['step_type'] ?? '' );
+					}
 				}
-			}
 
-			$pipeline_documents[] = new AgentBundlePipelineFile(
-				$portable_slug,
-				(string) $pipeline['pipeline_name'],
-				self::pipeline_document_steps_from_config( $pipeline_config )
-			);
+				$pipeline_documents[] = new AgentBundlePipelineFile(
+					$portable_slug,
+					(string) $pipeline['pipeline_name'],
+					self::pipeline_document_steps_from_config( $pipeline_config )
+				);
 
-			foreach ( $this->collect_pipeline_memory_files( $pipeline_id ) as $path => $contents ) {
-				$memory_files[ 'pipelines/' . $portable_slug . '/' . ltrim( (string) $path, '/' ) ] = $contents;
+				if ( ! empty( $export_manifest['memory'] ) ) {
+					foreach ( $this->collect_pipeline_memory_files( $pipeline_id ) as $path => $contents ) {
+						$memory_files[ 'pipelines/' . $portable_slug . '/' . ltrim( (string) $path, '/' ) ] = $contents;
+					}
+				}
 			}
 		}
 
-		foreach ( $flows as $flow ) {
-			$flow_id           = (int) $flow['flow_id'];
-			$pipeline_id       = (int) $flow['pipeline_id'];
-			$portable_slug     = ! empty( $flow['portable_slug'] )
-				? PortableSlug::normalize( (string) $flow['portable_slug'], 'flow' )
-				: PortableSlug::normalize( (string) $flow['flow_name'], 'flow' );
-			$portable_slug     = PortableSlug::dedupe( $portable_slug, $used_flow_slugs );
-			$used_flow_slugs[] = $portable_slug;
-			$scheduling        = $this->sanitize_scheduling_config( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() );
-			$flow_documents[]  = new AgentBundleFlowFile(
-				$portable_slug,
-				(string) $flow['flow_name'],
-				$pipeline_slugs_by_id[ $pipeline_id ] ?? 'pipeline',
-				(string) ( $scheduling['interval'] ?? 'manual' ),
-				is_array( $scheduling['max_items'] ?? null ) ? $scheduling['max_items'] : array(),
-				self::flow_document_steps_from_config(
-					is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array(),
-					$pipeline_step_types_by_id
-				)
-			);
+		if ( ! empty( $export_manifest['flows'] ) ) {
+			foreach ( $flows as $flow ) {
+				$flow_id           = (int) $flow['flow_id'];
+				$pipeline_id       = (int) $flow['pipeline_id'];
+				$portable_slug     = ! empty( $flow['portable_slug'] )
+					? PortableSlug::normalize( (string) $flow['portable_slug'], 'flow' )
+					: PortableSlug::normalize( (string) $flow['flow_name'], 'flow' );
+				$portable_slug     = PortableSlug::dedupe( $portable_slug, $used_flow_slugs );
+				$used_flow_slugs[] = $portable_slug;
+				$scheduling        = $this->sanitize_scheduling_config( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() );
+				$flow_documents[]  = new AgentBundleFlowFile(
+					$portable_slug,
+					(string) $flow['flow_name'],
+					$pipeline_slugs_by_id[ $pipeline_id ] ?? 'pipeline',
+					(string) ( $scheduling['interval'] ?? 'manual' ),
+					is_array( $scheduling['max_items'] ?? null ) ? $scheduling['max_items'] : array(),
+					self::flow_document_steps_from_config(
+						is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array(),
+						$pipeline_step_types_by_id,
+						$handler_auth,
+						array_merge(
+							$context,
+							array(
+								'agent_id' => $agent_id,
+								'flow_id'  => $flow_id,
+							)
+						)
+					)
+				);
 
-			foreach ( $this->collect_flow_memory_files( $pipeline_id, $flow_id ) as $path => $contents ) {
-				$memory_files[ 'flows/' . $portable_slug . '/' . ltrim( (string) $path, '/' ) ] = $contents;
+				if ( ! empty( $export_manifest['memory'] ) ) {
+					foreach ( $this->collect_flow_memory_files( $pipeline_id, $flow_id ) as $path => $contents ) {
+						$memory_files[ 'flows/' . $portable_slug . '/' . ltrim( (string) $path, '/' ) ] = $contents;
+					}
+				}
 			}
 		}
 
@@ -208,7 +232,7 @@ class AgentBundler {
 				'pipelines'    => $pipeline_slugs,
 				'flows'        => $flow_slugs,
 				'extensions'   => array_values( array_filter( $extension_paths ) ),
-				'handler_auth' => 'refs',
+				'handler_auth' => $handler_auth,
 			)
 		);
 
@@ -250,7 +274,7 @@ class AgentBundler {
 	 * @param array $pipeline_step_types_by_id Pipeline step ID to step type map.
 	 * @return array<int,array<string,mixed>>
 	 */
-	private static function flow_document_steps_from_config( array $flow_config, array $pipeline_step_types_by_id ): array {
+	private static function flow_document_steps_from_config( array $flow_config, array $pipeline_step_types_by_id, string $handler_auth = 'refs', array $context = array() ): array {
 		$steps = array();
 		foreach ( $flow_config as $step ) {
 			if ( ! is_array( $step ) ) {
@@ -260,7 +284,7 @@ class AgentBundler {
 			$pipeline_step_id = (string) ( $step['pipeline_step_id'] ?? '' );
 			$document_step    = array(
 				'step_position'   => (int) ( $step['execution_order'] ?? count( $steps ) ),
-				'handler_configs' => self::handler_configs_from_flow_step( $step ),
+				'handler_configs' => self::handler_configs_from_flow_step( $step, $handler_auth, $context ),
 			);
 
 			if ( ! isset( $step['step_type'] ) && isset( $pipeline_step_types_by_id[ $pipeline_step_id ] ) ) {
@@ -284,16 +308,109 @@ class AgentBundler {
 	 * @param array $step Runtime flow step row.
 	 * @return array<string,array<string,mixed>>
 	 */
-	private static function handler_configs_from_flow_step( array $step ): array {
+	private static function handler_configs_from_flow_step( array $step, string $handler_auth = 'refs', array $context = array() ): array {
+		if ( 'omit' === $handler_auth ) {
+			return array();
+		}
+
 		if ( is_array( $step['handler_configs'] ?? null ) ) {
-			return $step['handler_configs'];
+			$configs = $step['handler_configs'];
+		} elseif ( is_string( $step['handler_slug'] ?? null ) && is_array( $step['handler_config'] ?? null ) ) {
+			$configs = array( $step['handler_slug'] => $step['handler_config'] );
+		} else {
+			return array();
 		}
 
-		if ( is_string( $step['handler_slug'] ?? null ) && is_array( $step['handler_config'] ?? null ) ) {
-			return array( $step['handler_slug'] => $step['handler_config'] );
+		if ( 'refs' !== $handler_auth ) {
+			return $configs;
 		}
 
-		return array();
+		$rewritten = array();
+		foreach ( $configs as $handler_slug => $handler_config ) {
+			if ( ! is_array( $handler_config ) ) {
+				continue;
+			}
+			$config = apply_filters( 'datamachine_handler_config_to_auth_ref', $handler_config, (string) $handler_slug, $context );
+			if ( is_wp_error( $config ) || ! is_array( $config ) ) {
+				$config = array();
+			}
+			$rewritten[ (string) $handler_slug ] = self::strip_secret_like_values( $config );
+		}
+
+		ksort( $rewritten, SORT_STRING );
+		return $rewritten;
+	}
+
+	private static function resolve_export_manifest( int $agent_id, array $context ): array {
+		$profile = (string) ( $context['profile'] ?? 'share' );
+		$default = array(
+			'soul'         => true,
+			'memory'       => false,
+			'user'         => false,
+			'daily_memory' => false,
+			'agent_config' => true,
+			'pipelines'    => true,
+			'flows'        => true,
+			'handler_auth' => 'refs',
+		);
+
+		$profiles = array(
+			'share'  => array(
+				'memory'       => false,
+				'user'         => false,
+				'daily_memory' => false,
+				'handler_auth' => 'refs',
+			),
+			'backup' => array(
+				'memory'       => true,
+				'user'         => true,
+				'daily_memory' => true,
+				'handler_auth' => 'full',
+			),
+			'fork'   => array(
+				'memory'       => false,
+				'user'         => false,
+				'daily_memory' => false,
+				'handler_auth' => 'omit',
+			),
+		);
+
+		if ( isset( $profiles[ $profile ] ) ) {
+			$default = array_merge( $default, $profiles[ $profile ] );
+		}
+
+		$context['profile'] = '' !== $profile ? $profile : null;
+		$manifest           = apply_filters( 'datamachine_agent_export_manifest', $default, $agent_id, $context );
+		if ( ! is_array( $manifest ) ) {
+			$manifest = $default;
+		}
+
+		$manifest = array_merge( $default, $manifest );
+		if ( ! in_array( $manifest['handler_auth'], array( 'refs', 'full', 'omit' ), true ) ) {
+			$manifest['handler_auth'] = 'refs';
+		}
+
+		foreach ( array( 'soul', 'memory', 'user', 'daily_memory', 'agent_config', 'pipelines', 'flows' ) as $flag ) {
+			$manifest[ $flag ] = ! empty( $manifest[ $flag ] );
+		}
+
+		return $manifest;
+	}
+
+	private static function strip_secret_like_values( array $value ): array {
+		$secret_keys = array( 'access_token', 'refresh_token', 'token', 'secret', 'client_secret', 'password', 'api_key', 'apikey', 'key' );
+		foreach ( $value as $key => $child ) {
+			$key_string = strtolower( (string) $key );
+			if ( in_array( $key_string, $secret_keys, true ) || str_contains( $key_string, 'secret' ) || str_contains( $key_string, 'token' ) || str_contains( $key_string, 'password' ) ) {
+				unset( $value[ $key ] );
+				continue;
+			}
+			if ( is_array( $child ) ) {
+				$value[ $key ] = self::strip_secret_like_values( $child );
+			}
+		}
+		ksort( $value, SORT_STRING );
+		return $value;
 	}
 
 	/**
