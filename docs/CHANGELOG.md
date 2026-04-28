@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.89.0] - 2026-04-28
+
+### Added
+- add run task params guardrails
+- route bundle directories through value objects
+
 ## [0.88.0] - 2026-04-28
 
 ### Added
