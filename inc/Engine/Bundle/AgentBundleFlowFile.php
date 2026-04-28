@@ -23,13 +23,16 @@ final class AgentBundleFlowFile {
 	private array $steps;
 
 	private const OPTIONAL_STEP_FIELDS = array(
+		'step_type',
 		'handler_slug',
 		'handler_slugs',
+		'handler_config',
 		'enabled_tools',
 		'disabled_tools',
 		'prompt_queue',
 		'config_patch_queue',
 		'queue_mode',
+		'enabled',
 	);
 
 	public function __construct( string $slug, string $name, string $pipeline_slug, string $schedule, array $max_items, array $steps ) {
@@ -103,8 +106,19 @@ final class AgentBundleFlowFile {
 	}
 
 	private static function normalize_optional_step_field( string $field, $value ) {
-		if ( 'handler_slug' === $field ) {
+		if ( in_array( $field, array( 'step_type', 'handler_slug' ), true ) ) {
 			return (string) $value;
+		}
+
+		if ( 'enabled' === $field ) {
+			return (bool) $value;
+		}
+
+		if ( 'handler_config' === $field ) {
+			if ( ! is_array( $value ) ) {
+				throw new BundleValidationException( 'flow file handler_config must be an object.' );
+			}
+			return $value;
 		}
 
 		if ( in_array( $field, array( 'handler_slugs', 'enabled_tools', 'disabled_tools' ), true ) ) {

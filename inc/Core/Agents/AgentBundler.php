@@ -17,6 +17,9 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Engine\Bundle\AgentBundleDirectory;
+use DataMachine\Engine\Bundle\AgentBundleLegacyAdapter;
+use DataMachine\Engine\Bundle\BundleValidationException;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -655,74 +658,12 @@ class AgentBundler {
 	 * @return bool True on success.
 	 */
 	public function to_directory( array $bundle, string $directory ): bool {
-		if ( ! wp_mkdir_p( $directory ) ) {
+		try {
+			AgentBundleLegacyAdapter::from_legacy_bundle( $bundle )->write( $directory );
+			return true;
+		} catch ( \Throwable $e ) {
 			return false;
 		}
-
-		// Write manifest.json (everything except file contents).
-		$manifest = $bundle;
-		unset( $manifest['files'] );
-		$manifest['pipelines'] = array_map( function ( $p ) {
-			unset( $p['memory_file_contents'] );
-			return $p;
-		}, $manifest['pipelines'] ?? array() );
-		$manifest['flows']     = array_map( function ( $f ) {
-			unset( $f['memory_file_contents'] );
-			return $f;
-		}, $manifest['flows'] ?? array() );
-		unset( $manifest['user_template'] );
-
-		file_put_contents( // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-			$directory . '/manifest.json',
-			wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES )
-		);
-
-		// Write agent identity files.
-		$agent_dir = $directory . '/agent';
-		wp_mkdir_p( $agent_dir );
-		foreach ( $bundle['files'] ?? array() as $filename => $content ) {
-			$path = $agent_dir . '/' . $filename;
-			$dir  = dirname( $path );
-			if ( ! is_dir( $dir ) ) {
-				wp_mkdir_p( $dir );
-			}
-			file_put_contents( $path, $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-		}
-
-		// Write USER.md template.
-		if ( ! empty( $bundle['user_template'] ) ) {
-			file_put_contents( $directory . '/USER.md', $bundle['user_template'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-		}
-
-		// Write pipeline memory files.
-		foreach ( $bundle['pipelines'] ?? array() as $i => $pipeline ) {
-			$pipeline_slug = sanitize_title( $pipeline['pipeline_name'] );
-			$pipeline_dir  = $directory . '/pipelines/' . $i . '-' . $pipeline_slug;
-			foreach ( $pipeline['memory_file_contents'] ?? array() as $filename => $content ) {
-				$path = $pipeline_dir . '/' . $filename;
-				$dir  = dirname( $path );
-				if ( ! is_dir( $dir ) ) {
-					wp_mkdir_p( $dir );
-				}
-				file_put_contents( $path, $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-			}
-		}
-
-		// Write flow memory files.
-		foreach ( $bundle['flows'] ?? array() as $i => $flow ) {
-			$flow_slug = sanitize_title( $flow['flow_name'] );
-			$flow_dir  = $directory . '/flows/' . $i . '-' . $flow_slug;
-			foreach ( $flow['memory_file_contents'] ?? array() as $filename => $content ) {
-				$path = $flow_dir . '/' . $filename;
-				$dir  = dirname( $path );
-				if ( ! is_dir( $dir ) ) {
-					wp_mkdir_p( $dir );
-				}
-				file_put_contents( $path, $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-			}
-		}
-
-		return true;
 	}
 
 	/**
@@ -732,6 +673,12 @@ class AgentBundler {
 	 * @return array|null Bundle data or null on failure.
 	 */
 	public function from_directory( string $directory ): ?array {
+		try {
+			return AgentBundleLegacyAdapter::to_legacy_bundle( AgentBundleDirectory::read( $directory ) );
+		} catch ( BundleValidationException $e ) {
+			// Fall through to the legacy monolithic manifest reader for old exports.
+		}
+
 		$manifest_path = $directory . '/manifest.json';
 		if ( ! file_exists( $manifest_path ) ) {
 			return null;
