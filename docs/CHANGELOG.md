@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.94.0] - 2026-04-28
+
+### Added
+- emit memory change events
+
+### Changed
+- cover content-format ability paths
+
 ## [0.93.1] - 2026-04-28
 
 ### Fixed
