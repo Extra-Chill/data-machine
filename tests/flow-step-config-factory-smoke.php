@@ -226,8 +226,9 @@ foreach ( $sync_cases as $name => $step ) {
 	);
 }
 
-$execute_workflow_src = file_get_contents( __DIR__ . '/../inc/Abilities/Job/ExecuteWorkflowAbility.php' ) ?: '';
-$flow_helpers_src     = file_get_contents( __DIR__ . '/../inc/Abilities/Flow/FlowHelpers.php' ) ?: '';
+$execute_workflow_src  = file_get_contents( __DIR__ . '/../inc/Abilities/Job/ExecuteWorkflowAbility.php' ) ?: '';
+$flow_helpers_src      = file_get_contents( __DIR__ . '/../inc/Abilities/Flow/FlowHelpers.php' ) ?: '';
+$pipeline_step_src     = file_get_contents( __DIR__ . '/../inc/Abilities/PipelineStepAbilities.php' ) ?: '';
 
 assert_factory_equals(
 	true,
@@ -241,6 +242,38 @@ assert_factory_equals(
 	true,
 	false !== strpos( $flow_helpers_src, 'FlowStepConfigFactory::buildFromPipelineStep(' ),
 	'FlowHelpers routes synced flow rows through the factory scaffold',
+	$failures,
+	$passes
+);
+
+assert_factory_equals(
+	true,
+	false !== strpos( $pipeline_step_src, 'FlowStepConfigFactory::buildFromPipelineStep(' ),
+	'PipelineStepAbilities routes add-step flow sync through the factory scaffold',
+	$failures,
+	$passes
+);
+
+assert_factory_equals(
+	false,
+	false !== strpos( $pipeline_step_src, '$flow_config[ $flow_step_id ] = array(' ),
+	'PipelineStepAbilities no longer hand-builds synced flow config rows',
+	$failures,
+	$passes
+);
+
+assert_factory_equals(
+	true,
+	false !== strpos( $execute_workflow_src, 'ExecutionPlan::from_flow_config( $configs[\'flow_config\'] )->first_step_id()' ),
+	'ExecuteWorkflowAbility resolves ephemeral first step through ExecutionPlan',
+	$failures,
+	$passes
+);
+
+assert_factory_equals(
+	false,
+	false !== strpos( $execute_workflow_src, 'private function getFirstStepId' ),
+	'ExecuteWorkflowAbility no longer has a private first-step scanner',
 	$failures,
 	$passes
 );
