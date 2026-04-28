@@ -80,7 +80,10 @@ final class AgentBundleUpgradePendingAction {
 			}
 			$key = sanitize_key( (string) ( $artifact['artifact_type'] ?? '' ) ) . ':' . (string) ( $artifact['artifact_id'] ?? '' );
 			if ( ! isset( $approved[ $key ] ) ) {
-				$skipped[] = array( 'artifact_key' => $key, 'reason' => 'not_approved' );
+				$skipped[] = array(
+					'artifact_key' => $key,
+					'reason'       => 'not_approved',
+				);
 				continue;
 			}
 
@@ -93,15 +96,24 @@ final class AgentBundleUpgradePendingAction {
 			 */
 			$result = apply_filters( 'datamachine_bundle_upgrade_apply_artifact', null, $artifact, $apply_input );
 			if ( is_wp_error( $result ) ) {
-				$failed[] = array( 'artifact_key' => $key, 'error' => $result->get_error_message() );
+				$failed[] = array(
+					'artifact_key' => $key,
+					'error'        => $result->get_error_message(),
+				);
 				continue;
 			}
 			if ( null === $result ) {
-				$failed[] = array( 'artifact_key' => $key, 'error' => 'No bundle artifact apply handler registered.' );
+				$failed[] = array(
+					'artifact_key' => $key,
+					'error'        => 'No bundle artifact apply handler registered.',
+				);
 				continue;
 			}
 
-			$applied[] = array( 'artifact_key' => $key, 'result' => $result );
+			$applied[] = array(
+				'artifact_key' => $key,
+				'result'       => $result,
+			);
 		}
 
 		return array(

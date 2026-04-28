@@ -54,8 +54,8 @@ final class AgentBundleUpgradePlanner {
 			}
 
 			if ( null === $installed_hash ) {
-				$bucket = null === $current_hash ? 'auto_apply' : 'needs_approval';
-				$reason = null === $current_hash ? 'new_artifact' : 'untracked_local_artifact';
+				$bucket               = null === $current_hash ? 'auto_apply' : 'needs_approval';
+				$reason               = null === $current_hash ? 'new_artifact' : 'untracked_local_artifact';
 				$buckets[ $bucket ][] = self::entry( $key, $target_artifact, null, $current_hash, $target_hash, $reason, $current_artifact );
 				continue;
 			}
