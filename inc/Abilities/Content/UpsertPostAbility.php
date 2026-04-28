@@ -25,6 +25,7 @@
 namespace DataMachine\Abilities\Content;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\WordPress\ResolvePostByPath;
 
 defined( 'ABSPATH' ) || exit;
@@ -73,7 +74,11 @@ class UpsertPostAbility {
 							),
 							'content'        => array(
 								'type'        => 'string',
-								'description' => 'Post content (HTML or blocks). Replaces existing content when updating.',
+								'description' => 'Post content. Replaces existing content when updating.',
+							),
+							'content_format' => array(
+								'type'        => 'string',
+								'description' => 'Format of content. Defaults to blocks. Use markdown/html when passing non-block source content.',
 							),
 							'post_id'        => array(
 								'type'        => 'integer',
@@ -195,31 +200,35 @@ class UpsertPostAbility {
 			'method'      => 'handleChatToolCall',
 			'description' => 'Idempotently create or update a WordPress post. Finds by identity (post_id, slug+parent, or custom meta), compares content hash, and returns created/updated/no_change. Use for pipeline-safe writes that avoid churn on re-runs.',
 			'parameters'  => array(
-				'post_type'    => array(
+				'post_type'      => array(
 					'type'        => 'string',
 					'description' => 'Post type slug.',
 				),
-				'title'        => array(
+				'title'          => array(
 					'type'        => 'string',
 					'description' => 'Post title.',
 				),
-				'content'      => array(
+				'content'        => array(
 					'type'        => 'string',
-					'description' => 'Post content (HTML or blocks).',
+					'description' => 'Post content.',
 				),
-				'slug'         => array(
+				'content_format' => array(
+					'type'        => 'string',
+					'description' => 'Format of content. Defaults to blocks.',
+				),
+				'slug'           => array(
 					'type'        => 'string',
 					'description' => 'Post slug for lookup.',
 				),
-				'parent_id'    => array(
+				'parent_id'      => array(
 					'type'        => 'integer',
 					'description' => 'Parent post ID.',
 				),
-				'parent_path'  => array(
+				'parent_path'    => array(
 					'type'        => 'string',
 					'description' => 'Slash-delimited parent path (e.g. "artist/link-pages").',
 				),
-				'post_author'  => array(
+				'post_author'    => array(
 					'type'        => 'integer',
 					'description' => 'Post author user ID (create only).',
 				),
@@ -236,6 +245,7 @@ class UpsertPostAbility {
 	 * Handle chat tool call.
 	 */
 	public static function handleChatToolCall( array $params, array $tool_def = array() ): array {
+		$tool_def;
 		$result = self::execute( $params );
 		return array(
 			'success'   => ! empty( $result['success'] ),
@@ -251,27 +261,36 @@ class UpsertPostAbility {
 	 * @return array Result with action: created|updated|no_change.
 	 */
 	public static function execute( array $input ): array {
-		$post_type    = sanitize_key( $input['post_type'] ?? '' );
-		$title        = trim( $input['title'] ?? '' );
-		$content      = $input['content'] ?? '';
-		$post_id      = absint( $input['post_id'] ?? 0 );
-		$slug         = sanitize_title( $input['slug'] ?? '' );
-		$parent_id    = absint( $input['parent_id'] ?? 0 );
-		$parent_path  = trim( $input['parent_path'] ?? '' );
-		$identity_meta = $input['identity_meta'] ?? array();
-		$content_hash = $input['content_hash'] ?? '';
-		$raw_source   = $input['raw_source'] ?? '';
-		$post_status  = sanitize_key( $input['post_status'] ?? 'publish' );
-		$post_author  = absint( $input['post_author'] ?? 0 );
-		$post_excerpt = $input['post_excerpt'] ?? '';
-		$taxonomies   = $input['taxonomies'] ?? array();
-		$meta_input   = $input['meta_input'] ?? array();
-		$create_stubs = ! empty( $input['create_stubs'] );
+		$post_type      = sanitize_key( $input['post_type'] ?? '' );
+		$title          = trim( $input['title'] ?? '' );
+		$content        = $input['content'] ?? '';
+		$content_format = sanitize_key( $input['content_format'] ?? 'blocks' );
+		$post_id        = absint( $input['post_id'] ?? 0 );
+		$slug           = sanitize_title( $input['slug'] ?? '' );
+		$parent_id      = absint( $input['parent_id'] ?? 0 );
+		$parent_path    = trim( $input['parent_path'] ?? '' );
+		$identity_meta  = $input['identity_meta'] ?? array();
+		$content_hash   = $input['content_hash'] ?? '';
+		$raw_source     = $input['raw_source'] ?? '';
+		$post_status    = sanitize_key( $input['post_status'] ?? 'publish' );
+		$post_author    = absint( $input['post_author'] ?? 0 );
+		$post_excerpt   = $input['post_excerpt'] ?? '';
+		$taxonomies     = $input['taxonomies'] ?? array();
+		$meta_input     = $input['meta_input'] ?? array();
+		$create_stubs   = ! empty( $input['create_stubs'] );
 
 		if ( '' === $post_type || '' === $title ) {
 			return array(
 				'success' => false,
 				'error'   => 'post_type and title are required.',
+			);
+		}
+
+		$stored_content = ContentFormat::sourceToStored( (string) $content, $content_format, $post_type );
+		if ( is_wp_error( $stored_content ) ) {
+			return array(
+				'success' => false,
+				'error'   => $stored_content->get_error_message(),
 			);
 		}
 
@@ -333,7 +352,7 @@ class UpsertPostAbility {
 		$post_data = array(
 			'post_type'    => $post_type,
 			'post_title'   => $title,
-			'post_content' => $content,
+			'post_content' => $stored_content,
 			'post_status'  => $post_status,
 		);
 
