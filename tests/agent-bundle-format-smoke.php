@@ -112,10 +112,15 @@ $manifest = AgentBundleManifest::from_array(
 			'agent_config' => array( 'model' => array( 'default' => 'gpt-5.5' ) ),
 		),
 		'included'         => array(
-			'memory'       => array( 'MEMORY.md', 'SOUL.md' ),
-			'pipelines'    => array( 'wc-weekly-lint', 'wc-daily-ingest' ),
-			'flows'        => array( 'wc-weekly-lint-flow', 'wc-daily-ingest-flow' ),
-			'handler_auth' => 'refs',
+			'memory'        => array( 'MEMORY.md', 'SOUL.md' ),
+			'pipelines'     => array( 'wc-weekly-lint', 'wc-daily-ingest' ),
+			'flows'         => array( 'wc-weekly-lint-flow', 'wc-daily-ingest-flow' ),
+			'prompts'       => array( 'extract-facts' ),
+			'rubrics'       => array( 'wiki-quality' ),
+			'tool_policies' => array( 'read-only-context' ),
+			'auth_refs'     => array( 'github:default', 'wpcom:default' ),
+			'seed_queues'   => array( 'mgs-topic-loop' ),
+			'handler_auth'  => 'refs',
 		),
 	)
 );
@@ -127,6 +132,11 @@ assert_bundle_equals( 'source revision preserved', 'abc1234', $manifest_array['s
 assert_bundle_equals( 'agent slug normalized once', 'woocommerce-agent', $manifest_array['agent']['slug'] );
 assert_bundle_equals( 'included pipelines sorted for deterministic JSON', array( 'wc-daily-ingest', 'wc-weekly-lint' ), $manifest_array['included']['pipelines'] );
 assert_bundle_equals( 'handler_auth refs accepted', 'refs', $manifest_array['included']['handler_auth'] );
+assert_bundle_equals( 'manifest can describe prompt artifacts', array( 'extract-facts' ), $manifest_array['included']['prompts'] );
+assert_bundle_equals( 'manifest can describe rubric artifacts', array( 'wiki-quality' ), $manifest_array['included']['rubrics'] );
+assert_bundle_equals( 'manifest can describe tool policy artifacts', array( 'read-only-context' ), $manifest_array['included']['tool_policies'] );
+assert_bundle_equals( 'manifest can describe auth refs without secrets', array( 'github:default', 'wpcom:default' ), $manifest_array['included']['auth_refs'] );
+assert_bundle_equals( 'manifest can describe seed queue artifacts', array( 'mgs-topic-loop' ), $manifest_array['included']['seed_queues'] );
 
 echo "\n[3] Pipeline and flow documents sort steps by position\n";
 $pipeline = AgentBundlePipelineFile::from_array(
@@ -354,6 +364,13 @@ assert_bundle( 'pipelines table has portable_slug column', str_contains( (string
 assert_bundle( 'pipelines table has agent-scoped portable_slug uniqueness', str_contains( (string) $pipelines_source, 'UNIQUE KEY agent_portable_slug (agent_id, portable_slug)' ) );
 assert_bundle( 'flows table has portable_slug column', str_contains( (string) $flows_source, 'portable_slug varchar(191) DEFAULT NULL' ) );
 assert_bundle( 'flows table has pipeline-scoped portable_slug uniqueness', str_contains( (string) $flows_source, 'UNIQUE KEY pipeline_portable_slug (pipeline_id, portable_slug)' ) );
+
+echo "\n[9] Bundle docs describe reserved artifact directories\n";
+$bundle_docs = file_get_contents( dirname( __DIR__ ) . '/docs/core-system/agent-bundles.md' ) ?: '';
+assert_bundle( 'docs include prompts directory', str_contains( $bundle_docs, 'prompts/<prompt-slug>.md' ) );
+assert_bundle( 'docs include rubrics directory', str_contains( $bundle_docs, 'rubrics/<rubric-slug>.md' ) );
+assert_bundle( 'docs include tool policies directory', str_contains( $bundle_docs, 'tool-policies/<policy-slug>.json' ) );
+assert_bundle( 'docs include seed queues directory', str_contains( $bundle_docs, 'seed-queues/<queue-slug>.json' ) );
 
 rm_tree( $tmp );
 

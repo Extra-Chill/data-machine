@@ -142,7 +142,11 @@ final class AgentBundleManifest {
 			}
 		}
 
-		foreach ( array( 'memory', 'pipelines', 'flows' ) as $field ) {
+		foreach ( array( 'prompts', 'rubrics', 'tool_policies', 'auth_refs', 'seed_queues' ) as $field ) {
+			$included[ $field ] = $included[ $field ] ?? array();
+		}
+
+		foreach ( array( 'memory', 'pipelines', 'flows', 'prompts', 'rubrics', 'tool_policies', 'auth_refs', 'seed_queues' ) as $field ) {
 			if ( ! is_array( $included[ $field ] ) || ! array_is_list( $included[ $field ] ) ) {
 				throw new BundleValidationException( sprintf( 'manifest.json included.%s must be a list.', esc_html( $field ) ) );
 			}
@@ -157,10 +161,15 @@ final class AgentBundleManifest {
 		$included['handler_auth'] = $handler_auth;
 
 		return array(
-			'memory'       => $included['memory'],
-			'pipelines'    => $included['pipelines'],
-			'flows'        => $included['flows'],
-			'handler_auth' => $included['handler_auth'],
+			'memory'        => $included['memory'],
+			'pipelines'     => $included['pipelines'],
+			'flows'         => $included['flows'],
+			'prompts'       => $included['prompts'],
+			'rubrics'       => $included['rubrics'],
+			'tool_policies' => $included['tool_policies'],
+			'auth_refs'     => $included['auth_refs'],
+			'seed_queues'   => $included['seed_queues'],
+			'handler_auth'  => $included['handler_auth'],
 		);
 	}
 
