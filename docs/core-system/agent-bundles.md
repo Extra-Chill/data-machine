@@ -61,6 +61,20 @@ Statuses:
 
 Hashing is deterministic: arrays are recursively sorted and JSON-encoded through `BundleSchema::encode_json()` before SHA-256 hashing. This makes formatting and associative key order irrelevant while preserving list order.
 
+### Memory Section Artifacts
+
+Memory artifacts can be tracked at section granularity. Section records extend the artifact identity with operational memory ownership fields:
+
+- `agent_id`
+- `section_id`
+- `section_heading`
+- `section_type`
+- `owner`: `bundle`, `user`, `runtime`, or `compaction`
+- `bundle_slug` and `bundle_version` for bundle-owned seed sections
+- `installed_hash`, `current_hash`, and `local_status`
+
+Self-memory writes are policy-constrained: the default target is the current acting agent, allowed section types are operational (`operating_note`, `source_quirk`, `run_lesson`, `task_note`), durable facts are rejected, and bundle-owned sections are staged through PendingActions instead of overwritten directly.
+
 ## Follow-Ups
 
 - Add persistent DB storage for installed artifact records.
