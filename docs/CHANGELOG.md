@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.96.0] - 2026-04-28
+
+### Added
+- add bundle-aware self-write policy
+- add upgrade planner pending actions
+- add prompt artifact auth ref contracts
+
 ## [0.95.0] - 2026-04-28
 
 ### Added
