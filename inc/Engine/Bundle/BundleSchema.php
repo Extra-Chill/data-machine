@@ -30,6 +30,8 @@ final class BundleSchema {
 
 	public const TOOL_POLICIES_DIR = 'tool-policies';
 
+	public const AUTH_REFS_DIR = 'auth-refs';
+
 	public const SEED_QUEUES_DIR = 'seed-queues';
 
 	public const ARTIFACT_TYPES = array(
