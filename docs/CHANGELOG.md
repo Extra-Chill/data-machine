@@ -2,6 +2,26 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.87.3] - 2026-04-28
+
+### Added
+- support payload propagation through OAuth state
+- expose pipeline tool policy writes
+- show AI tool policy summary
+
+### Changed
+- harden smoke source reads
+
+### Fixed
+- fix(daily-memory): skip cleanly when no AI model is configured
+- pass handler config to resolved tools
+- align agent_config writer with resolver schema
+- fix(import-export): preserve portable AI flow state
+- enforce snapshot pipeline tool policy
+- preserve required handler tools
+- restrict chat-only global tools
+- align prompt display and CLI step config
+
 ## [0.87.2] - 2026-04-28
 
 ### Fixed
