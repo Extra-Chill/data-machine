@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.92.0] - 2026-04-28
+
+### Added
+- make message envelopes canonical
+
 ## [0.91.0] - 2026-04-28
 
 ### Added
