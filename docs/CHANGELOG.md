@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.98.0] - 2026-04-28
+
+### Added
+- persist installed artifact tracking
+- add handler auth refs foundation
+- export agent bundles through value objects
+
+### Fixed
+- validate portable flow policy queues
+
 ## [0.97.1] - 2026-04-28
 
 ### Fixed
