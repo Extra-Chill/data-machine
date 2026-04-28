@@ -2,6 +2,23 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.86.0] - 2026-04-27
+
+### Added
+- install persistent workflows from scaffolds
+- inspect provider request shape
+- add request metadata guardrails
+
+### Changed
+- centralize flow step config overlays
+- centralize step config scaffolds
+- migrate legacy auth config once
+- share bundle slug accessor
+
+### Fixed
+- preserve registered verifier modes
+- centralize execution order planning
+
 ## [0.85.0] - 2026-04-27
 
 ### Added
