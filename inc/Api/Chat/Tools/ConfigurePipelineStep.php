@@ -3,7 +3,7 @@
  * Configure Pipeline Step Tool
  *
  * Tool for configuring pipeline-level AI step settings including
- * system prompt, provider, model, and enabled tools.
+ * system prompt and tool policy fields.
  * Delegates to Abilities API for core logic.
  *
  * @package DataMachine\Api\Chat\Tools
@@ -33,7 +33,7 @@ class ConfigurePipelineStep extends BaseTool {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handle_tool_call',
-			'description' => 'Configure pipeline-level AI step settings: system prompt and disabled tools. Model/provider are managed via the mode_models site setting, not per-pipeline. For flow-level settings (handler, handler_config, user_message), use configure_flow_steps instead.',
+			'description' => 'Configure pipeline-level AI step settings: system prompt and tool policy. Model/provider are managed via the mode_models site setting, not per-pipeline. For flow-level settings (handler, handler_config, user_message), use configure_flow_steps instead.',
 			'parameters'  => array(
 				'pipeline_step_id' => array(
 					'type'        => 'string',
@@ -45,10 +45,20 @@ class ConfigurePipelineStep extends BaseTool {
 					'required'    => false,
 					'description' => 'System prompt for the AI step - defines the AI persona and instructions',
 				),
+				'enabled_tools'    => array(
+					'type'        => 'array',
+					'required'    => false,
+					'description' => 'Array of tool slugs to allow for this AI step',
+				),
 				'disabled_tools'   => array(
 					'type'        => 'array',
 					'required'    => false,
 					'description' => 'Array of tool slugs to disable for this AI step',
+				),
+				'tool_categories'  => array(
+					'type'        => 'array',
+					'required'    => false,
+					'description' => 'Array of ability categories allowed for this AI step',
 				),
 			),
 		);

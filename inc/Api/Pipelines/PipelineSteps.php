@@ -192,6 +192,19 @@ class PipelineSteps {
 				'required'    => false,
 				'type'        => 'array',
 				'description' => __( 'Array of disabled tool IDs', 'data-machine' ),
+				'items'       => array( 'type' => 'string' ),
+			),
+			'enabled_tools'    => array(
+				'required'    => false,
+				'type'        => 'array',
+				'description' => __( 'Array of enabled tool IDs', 'data-machine' ),
+				'items'       => array( 'type' => 'string' ),
+			),
+			'tool_categories'  => array(
+				'required'    => false,
+				'type'        => 'array',
+				'description' => __( 'Array of ability categories allowed for this step', 'data-machine' ),
+				'items'       => array( 'type' => 'string' ),
 			),
 			'system_prompt'    => array(
 				'required'          => false,
@@ -489,22 +502,33 @@ class PipelineSteps {
 		// (PluginSettings::resolveModelForAgentMode). They are not accepted here.
 		$step_config_data = array();
 
-		$has_system_prompt  = $request->has_param( 'system_prompt' );
-		$has_disabled_tools = $request->has_param( 'disabled_tools' );
+		$has_system_prompt = $request->has_param( 'system_prompt' );
+		$policy_fields     = array( 'enabled_tools', 'disabled_tools', 'tool_categories' );
 
 		if ( $has_system_prompt ) {
 			$step_config_data['system_prompt'] = sanitize_textarea_field( $request->get_param( 'system_prompt' ) );
 		}
 
-		if ( $has_disabled_tools ) {
-			$disabled_tools_raw = $request->get_param( 'disabled_tools' );
-			$sanitized_tool_ids = array();
-			if ( is_array( $disabled_tools_raw ) ) {
-				$sanitized_tool_ids = array_map( 'sanitize_text_field', $disabled_tools_raw );
+		foreach ( $policy_fields as $field ) {
+			if ( ! $request->has_param( $field ) ) {
+				continue;
 			}
 
-			$tools_manager                      = new \DataMachine\Engine\AI\Tools\ToolManager();
-			$step_config_data['disabled_tools'] = $tools_manager->save_step_tool_selections( $pipeline_step_id, $sanitized_tool_ids );
+			$sanitized_values = PipelineStepAbilities::sanitizeStringListField( $request->get_param( $field ), $field );
+			if ( is_wp_error( $sanitized_values ) ) {
+				return new \WP_Error(
+					$sanitized_values->get_error_code(),
+					$sanitized_values->get_error_message(),
+					array( 'status' => 400 )
+				);
+			}
+
+			if ( 'disabled_tools' === $field ) {
+				$tools_manager    = new \DataMachine\Engine\AI\Tools\ToolManager();
+				$sanitized_values = $tools_manager->save_step_tool_selections( $pipeline_step_id, $sanitized_values );
+			}
+
+			$step_config_data[ $field ] = $sanitized_values;
 		}
 
 		if ( 'ai' === $step_type && empty( $step_config_data ) ) {
