@@ -9,6 +9,14 @@
  * are shared across all subsites on a multisite network. On single-site installs,
  * these behave identically to get_option()/update_option().
  *
+ * Sensitive fields (tokens, secrets) are encrypted at rest using AES-256-GCM with
+ * a key derived from wp_salt('auth'). Encrypted values use an envelope format:
+ *
+ *     dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}
+ *
+ * Plaintext values without the envelope prefix are read as-is for backward
+ * compatibility. Values get encrypted opportunistically on next save.
+ *
  * @package DataMachine
  * @subpackage Core\OAuth
  * @since 0.2.6
@@ -21,6 +29,47 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 abstract class BaseAuthProvider {
+
+	/**
+	 * Encryption envelope prefix.
+	 *
+	 * @since 0.88.0
+	 */
+	const ENCRYPTION_PREFIX = 'dm:enc:v1:';
+
+	/**
+	 * Cipher algorithm for at-rest encryption.
+	 *
+	 * @since 0.88.0
+	 */
+	const CIPHER_ALGO = 'aes-256-gcm';
+
+	/**
+	 * Authentication tag length for AES-GCM.
+	 *
+	 * @since 0.88.0
+	 */
+	const AUTH_TAG_LENGTH = 16;
+
+	/**
+	 * Fields that should be encrypted when stored.
+	 *
+	 * Providers can extend this list via the `datamachine_auth_encrypted_fields` filter.
+	 *
+	 * @since 0.88.0
+	 * @var array<string>
+	 */
+	const ENCRYPTED_FIELDS = array(
+		'access_token',
+		'refresh_token',
+		'oauth_token',
+		'oauth_token_secret',
+		'app_secret',
+		'client_secret',
+		'consumer_secret',
+		'api_secret',
+		'webhook_secret',
+	);
 
 	/**
 	 * @var string Provider slug (e.g., 'twitter', 'facebook')
@@ -87,25 +136,35 @@ abstract class BaseAuthProvider {
 	/**
 	 * Get OAuth account data directly from options.
 	 *
+	 * Automatically decrypts any encrypted fields. Plaintext legacy values
+	 * pass through unchanged.
+	 *
 	 * @return array Account data or empty array
 	 */
 	public function get_account(): array {
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
-		return $all_auth_data[ $this->provider_slug ]['account'] ?? array();
+		$account       = $all_auth_data[ $this->provider_slug ]['account'] ?? array();
+		return $this->decrypt_fields( $account );
 	}
 
 	/**
 	 * Get OAuth configuration keys directly from options.
 	 *
+	 * Automatically decrypts any encrypted fields. Plaintext legacy values
+	 * pass through unchanged.
+	 *
 	 * @return array Configuration data or empty array
 	 */
 	public function get_config(): array {
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
-		return $all_auth_data[ $this->provider_slug ]['config'] ?? array();
+		$config        = $all_auth_data[ $this->provider_slug ]['config'] ?? array();
+		return $this->decrypt_fields( $config );
 	}
 
 	/**
 	 * Store OAuth account data directly in options.
+	 *
+	 * Sensitive fields are automatically encrypted before storage.
 	 *
 	 * @param array $data Account data to store
 	 * @return bool True on success
@@ -115,12 +174,14 @@ abstract class BaseAuthProvider {
 		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) ) {
 			$all_auth_data[ $this->provider_slug ] = array();
 		}
-		$all_auth_data[ $this->provider_slug ]['account'] = $data;
+		$all_auth_data[ $this->provider_slug ]['account'] = $this->encrypt_fields( $data );
 		return update_site_option( 'datamachine_auth_data', $all_auth_data );
 	}
 
 	/**
 	 * Store OAuth configuration keys directly in options.
+	 *
+	 * Sensitive fields are automatically encrypted before storage.
 	 *
 	 * @param array $data Configuration data to store
 	 * @return bool True on success
@@ -130,7 +191,7 @@ abstract class BaseAuthProvider {
 		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) ) {
 			$all_auth_data[ $this->provider_slug ] = array();
 		}
-		$all_auth_data[ $this->provider_slug ]['config'] = $data;
+		$all_auth_data[ $this->provider_slug ]['config'] = $this->encrypt_fields( $data );
 		return update_site_option( 'datamachine_auth_data', $all_auth_data );
 	}
 
@@ -170,5 +231,226 @@ abstract class BaseAuthProvider {
 	 */
 	public function get_account_details(): ?array {
 		return $this->get_account();
+	}
+
+	// -------------------------------------------------------------------------
+	// Encryption
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Get the list of field names that should be encrypted at rest.
+	 *
+	 * Combines the built-in ENCRYPTED_FIELDS constant with any additions
+	 * from the `datamachine_auth_encrypted_fields` filter.
+	 *
+	 * @since 0.88.0
+	 * @return array<string> Field names to encrypt.
+	 */
+	protected function get_encrypted_fields(): array {
+		$fields = self::ENCRYPTED_FIELDS;
+
+		/**
+		 * Filters the list of auth data fields that are encrypted at rest.
+		 *
+		 * Providers can add custom field names that contain sensitive data
+		 * (e.g. non-standard token field names used by specific OAuth1 flows).
+		 *
+		 * @since 0.88.0
+		 *
+		 * @param array  $fields        Default list of field names.
+		 * @param string $provider_slug The provider this applies to.
+		 */
+		if ( function_exists( 'apply_filters' ) ) {
+			$fields = apply_filters( 'datamachine_auth_encrypted_fields', $fields, $this->provider_slug );
+		}
+
+		return $fields;
+	}
+
+	/**
+	 * Encrypt sensitive fields in a data array before storage.
+	 *
+	 * Only encrypts fields listed in get_encrypted_fields() that have
+	 * non-empty string values and are not already encrypted.
+	 *
+	 * @since 0.88.0
+	 * @param array $data Raw data array.
+	 * @return array Data with sensitive fields encrypted.
+	 */
+	protected function encrypt_fields( array $data ): array {
+		foreach ( $this->get_encrypted_fields() as $field ) {
+			if ( isset( $data[ $field ] ) && is_string( $data[ $field ] ) && '' !== $data[ $field ] ) {
+				// Don't double-encrypt values that already carry the envelope.
+				if ( str_starts_with( $data[ $field ], self::ENCRYPTION_PREFIX ) ) {
+					continue;
+				}
+				$encrypted = $this->encrypt_value( $data[ $field ] );
+				if ( null !== $encrypted ) {
+					$data[ $field ] = $encrypted;
+				}
+			}
+		}
+		return $data;
+	}
+
+	/**
+	 * Decrypt sensitive fields in a data array after retrieval.
+	 *
+	 * Only attempts decryption on fields that carry the encryption envelope
+	 * prefix. Plaintext values are returned unchanged for backward compatibility.
+	 *
+	 * @since 0.88.0
+	 * @param array $data Stored data array (may contain encrypted or plaintext values).
+	 * @return array Data with sensitive fields decrypted.
+	 */
+	protected function decrypt_fields( array $data ): array {
+		foreach ( $this->get_encrypted_fields() as $field ) {
+			if ( isset( $data[ $field ] ) && is_string( $data[ $field ] ) ) {
+				if ( str_starts_with( $data[ $field ], self::ENCRYPTION_PREFIX ) ) {
+					$decrypted = $this->decrypt_value( $data[ $field ] );
+					if ( null !== $decrypted ) {
+						$data[ $field ] = $decrypted;
+					}
+					// On decryption failure, leave the encrypted blob as-is
+					// so it doesn't silently become an empty string.
+				}
+				// else: plaintext legacy value — pass through unchanged.
+			}
+		}
+		return $data;
+	}
+
+	/**
+	 * Encrypt a single value using AES-256-GCM.
+	 *
+	 * Returns the encrypted value in envelope format:
+	 *     dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}
+	 *
+	 * @since 0.88.0
+	 * @param string $plaintext The value to encrypt.
+	 * @return string|null Encrypted envelope string, or null on failure.
+	 */
+	private function encrypt_value( string $plaintext ): ?string {
+		$key = $this->derive_encryption_key();
+		if ( null === $key ) {
+			return null;
+		}
+
+		$iv_length = openssl_cipher_iv_length( self::CIPHER_ALGO );
+		$iv        = openssl_random_pseudo_bytes( $iv_length );
+
+		$tag        = '';
+		$ciphertext = openssl_encrypt( $plaintext, self::CIPHER_ALGO, $key, OPENSSL_RAW_DATA, $iv, $tag, '', self::AUTH_TAG_LENGTH );
+
+		if ( false === $ciphertext || '' === $tag ) {
+			$this->log_encryption_error( 'Encryption failed' );
+			return null;
+		}
+
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Encoding binary crypto envelope fields, not obfuscation.
+		return self::ENCRYPTION_PREFIX . base64_encode( $iv ) . ':' . base64_encode( $tag ) . ':' . base64_encode( $ciphertext );
+	}
+
+	/**
+	 * Decrypt a single value from the encryption envelope format.
+	 *
+	 * Expects input in format: dm:enc:v1:{base64(iv)}:{base64(tag)}:{base64(ciphertext)}
+	 *
+	 * @since 0.88.0
+	 * @param string $envelope The encrypted envelope string.
+	 * @return string|null Decrypted plaintext, or null on failure.
+	 */
+	private function decrypt_value( string $envelope ): ?string {
+		$key = $this->derive_encryption_key();
+		if ( null === $key ) {
+			return null;
+		}
+
+		// Strip prefix and split into iv:tag:ciphertext.
+		$payload = substr( $envelope, strlen( self::ENCRYPTION_PREFIX ) );
+		$parts   = explode( ':', $payload, 3 );
+
+		if ( 3 !== count( $parts ) ) {
+			$this->log_encryption_error( 'Malformed encryption envelope: missing separator' );
+			return null;
+		}
+
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding binary crypto envelope fields, not obfuscation.
+		$iv = base64_decode( $parts[0], true );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding binary crypto envelope fields, not obfuscation.
+		$tag = base64_decode( $parts[1], true );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding binary crypto envelope fields, not obfuscation.
+		$ciphertext = base64_decode( $parts[2], true );
+
+		if ( false === $iv || false === $tag || false === $ciphertext ) {
+			$this->log_encryption_error( 'Malformed encryption envelope: invalid base64' );
+			return null;
+		}
+
+		$expected_iv_length = openssl_cipher_iv_length( self::CIPHER_ALGO );
+		if ( strlen( $iv ) !== $expected_iv_length ) {
+			$this->log_encryption_error( 'Malformed encryption envelope: invalid IV length' );
+			return null;
+		}
+
+		if ( strlen( $tag ) !== self::AUTH_TAG_LENGTH ) {
+			$this->log_encryption_error( 'Malformed encryption envelope: invalid authentication tag length' );
+			return null;
+		}
+
+		$plaintext = openssl_decrypt( $ciphertext, self::CIPHER_ALGO, $key, OPENSSL_RAW_DATA, $iv, $tag );
+
+		if ( false === $plaintext ) {
+			$this->log_encryption_error( 'Decryption failed (wrong key or corrupted data)' );
+			return null;
+		}
+
+		return $plaintext;
+	}
+
+	/**
+	 * Derive the encryption key from WordPress auth salts.
+	 *
+	 * Uses hash('sha256', wp_salt('auth') . 'datamachine-oauth') to produce
+	 * a 32-byte key suitable for AES-256-GCM. The 'datamachine-oauth' suffix
+	 * ensures key isolation from other WordPress subsystems.
+	 *
+	 * @since 0.88.0
+	 * @return string|null 32-byte binary key, or null if derivation fails.
+	 */
+	private function derive_encryption_key(): ?string {
+		if ( ! function_exists( 'wp_salt' ) ) {
+			return null;
+		}
+
+		$salt = wp_salt( 'auth' );
+
+		// Warn if WordPress is using default salts (insecure but functional).
+		if ( 'put your unique phrase here' === $salt ) {
+			$this->log_encryption_error(
+				'wp_salt(\'auth\') returns the WordPress default. '
+				. 'Set unique AUTH_KEY and AUTH_SALT in wp-config.php for proper security.'
+			);
+		}
+
+		// Return raw binary (32 bytes) for use as AES-256 key.
+		return hash( 'sha256', $salt . 'datamachine-oauth', true );
+	}
+
+	/**
+	 * Log an encryption-related error via the datamachine_log action.
+	 *
+	 * @since 0.88.0
+	 * @param string $message Error message.
+	 */
+	private function log_encryption_error( string $message ): void {
+		if ( function_exists( 'do_action' ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'OAuth Encryption: ' . $message,
+				array( 'provider' => $this->provider_slug )
+			);
+		}
 	}
 }
