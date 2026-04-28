@@ -159,7 +159,8 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 
 		$this->assertArrayHasKey( 'test_provider', $raw );
 		$this->assertArrayHasKey( 'account', $raw['test_provider'] );
-		$this->assertSame( 'tok_123', $raw['test_provider']['account']['access_token'] );
+		// Sensitive fields are encrypted at rest — raw stored value carries the envelope prefix.
+		$this->assertStringStartsWith( 'dm:enc:v1:', $raw['test_provider']['account']['access_token'] );
 	}
 
 	public function test_get_account_details_returns_account(): void {
