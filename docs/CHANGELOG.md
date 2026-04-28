@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.95.0] - 2026-04-28
+
+### Added
+- add agent bundle artifact foundations
+
 ## [0.94.0] - 2026-04-28
 
 ### Added
