@@ -24,6 +24,27 @@ final class BundleSchema {
 
 	public const FLOWS_DIR = 'flows';
 
+	public const PROMPTS_DIR = 'prompts';
+
+	public const RUBRICS_DIR = 'rubrics';
+
+	public const TOOL_POLICIES_DIR = 'tool-policies';
+
+	public const SEED_QUEUES_DIR = 'seed-queues';
+
+	public const ARTIFACT_TYPES = array(
+		'agent',
+		'memory',
+		'pipeline',
+		'flow',
+		'prompt',
+		'rubric',
+		'tool_policy',
+		'auth_ref',
+		'seed_queue',
+		'schedule',
+	);
+
 	/**
 	 * Encode bundle JSON in a stable, review-friendly shape.
 	 *

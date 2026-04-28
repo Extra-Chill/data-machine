@@ -28,6 +28,10 @@ final class AgentBundleLegacyAdapter {
 		$manifest = new AgentBundleManifest(
 			(string) ( $bundle['exported_at'] ?? gmdate( 'c' ) ),
 			self::exported_by(),
+			(string) ( $bundle['bundle_slug'] ?? ( $bundle['agent']['agent_slug'] ?? 'agent-bundle' ) ),
+			(string) ( $bundle['bundle_version'] ?? '1' ),
+			(string) ( $bundle['source_ref'] ?? '' ),
+			(string) ( $bundle['source_revision'] ?? '' ),
 			array(
 				'slug'         => $bundle['agent']['agent_slug'] ?? 'agent',
 				'label'        => $bundle['agent']['agent_name'] ?? ( $bundle['agent']['agent_slug'] ?? 'Agent' ),
