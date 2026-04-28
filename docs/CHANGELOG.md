@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.97.1] - 2026-04-28
+
+### Fixed
+- keep empty bundle list JSON parseable
+
 ## [0.97.0] - 2026-04-28
 
 ### Added
