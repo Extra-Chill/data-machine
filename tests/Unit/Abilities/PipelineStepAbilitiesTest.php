@@ -405,19 +405,17 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		$result = $this->step_abilities->executeUpdatePipelineStep(
 			array(
 				'pipeline_step_id' => $pipeline_step_id,
-				'enabled_tools'    => array( 'test_pipeline_tool' ),
 				'disabled_tools'   => array( 'test_disabled_tool' ),
 				'tool_categories'  => array( 'datamachine-test' ),
 			)
 		);
 
 		$this->assertTrue( $result['success'] );
-		$this->assertSame( array( 'enabled_tools', 'disabled_tools', 'tool_categories' ), $result['updated_fields'] );
+		$this->assertSame( array( 'disabled_tools', 'tool_categories' ), $result['updated_fields'] );
 
 		$db_pipelines    = new Pipelines();
 		$pipeline_config = $db_pipelines->get_pipeline_config( $this->test_pipeline_id );
 
-		$this->assertSame( array( 'test_pipeline_tool' ), $pipeline_config[ $pipeline_step_id ]['enabled_tools'] );
 		$this->assertSame( array( 'test_disabled_tool' ), $pipeline_config[ $pipeline_step_id ]['disabled_tools'] );
 		$this->assertSame( array( 'datamachine-test' ), $pipeline_config[ $pipeline_step_id ]['tool_categories'] );
 	}
@@ -434,11 +432,11 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		$non_array_result = $this->step_abilities->executeUpdatePipelineStep(
 			array(
 				'pipeline_step_id' => $pipeline_step_id,
-				'enabled_tools'    => 'test_pipeline_tool',
+				'disabled_tools'   => 'test_disabled_tool',
 			)
 		);
 		$this->assertFalse( $non_array_result['success'] );
-		$this->assertStringContainsString( 'enabled_tools must be an array of strings', $non_array_result['error'] );
+		$this->assertStringContainsString( 'disabled_tools must be an array of strings', $non_array_result['error'] );
 
 		$non_string_result = $this->step_abilities->executeUpdatePipelineStep(
 			array(
@@ -455,11 +453,12 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 
 		$args = $method->invoke( null, true );
 
-		foreach ( array( 'enabled_tools', 'disabled_tools', 'tool_categories' ) as $field ) {
+		foreach ( array( 'disabled_tools', 'tool_categories' ) as $field ) {
 			$this->assertArrayHasKey( $field, $args );
 			$this->assertSame( 'array', $args[ $field ]['type'] );
 			$this->assertSame( array( 'type' => 'string' ), $args[ $field ]['items'] );
 		}
+		$this->assertArrayNotHasKey( 'enabled_tools', $args );
 	}
 
 	public function test_rest_pipeline_step_config_persists_tool_policy_fields(): void {
@@ -475,7 +474,6 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 
 		$request = new WP_REST_Request( 'PATCH', '/datamachine/v1/pipelines/steps/' . $pipeline_step_id . '/config' );
 		$request->set_param( 'pipeline_step_id', $pipeline_step_id );
-		$request->set_param( 'enabled_tools', array( 'test_pipeline_tool' ) );
 		$request->set_param( 'disabled_tools', array( 'test_disabled_tool' ) );
 		$request->set_param( 'tool_categories', array( 'datamachine-test' ) );
 
@@ -486,7 +484,6 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		$db_pipelines    = new Pipelines();
 		$pipeline_config = $db_pipelines->get_pipeline_config( $this->test_pipeline_id );
 
-		$this->assertSame( array( 'test_pipeline_tool' ), $pipeline_config[ $pipeline_step_id ]['enabled_tools'] );
 		$this->assertSame( array( 'test_disabled_tool' ), $pipeline_config[ $pipeline_step_id ]['disabled_tools'] );
 		$this->assertSame( array( 'datamachine-test' ), $pipeline_config[ $pipeline_step_id ]['tool_categories'] );
 	}
@@ -531,7 +528,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		);
 
 		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'system_prompt, enabled_tools, disabled_tools, or tool_categories', $result['error'] );
+		$this->assertStringContainsString( 'system_prompt, disabled_tools, or tool_categories', $result['error'] );
 	}
 
 	public function test_update_pipeline_step_no_fields(): void {

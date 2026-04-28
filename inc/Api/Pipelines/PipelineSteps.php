@@ -194,12 +194,6 @@ class PipelineSteps {
 				'description' => __( 'Array of disabled tool IDs', 'data-machine' ),
 				'items'       => array( 'type' => 'string' ),
 			),
-			'enabled_tools'    => array(
-				'required'    => false,
-				'type'        => 'array',
-				'description' => __( 'Array of enabled tool IDs', 'data-machine' ),
-				'items'       => array( 'type' => 'string' ),
-			),
 			'tool_categories'  => array(
 				'required'    => false,
 				'type'        => 'array',
@@ -503,7 +497,7 @@ class PipelineSteps {
 		$step_config_data = array();
 
 		$has_system_prompt = $request->has_param( 'system_prompt' );
-		$policy_fields     = array( 'enabled_tools', 'disabled_tools', 'tool_categories' );
+		$policy_fields     = array( 'disabled_tools', 'tool_categories' );
 
 		if ( $has_system_prompt ) {
 			$step_config_data['system_prompt'] = sanitize_textarea_field( $request->get_param( 'system_prompt' ) );

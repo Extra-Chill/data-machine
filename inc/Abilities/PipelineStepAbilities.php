@@ -171,11 +171,6 @@ class PipelineStepAbilities {
 							'description' => __( 'Array of disabled tool IDs for this step', 'data-machine' ),
 							'items'       => array( 'type' => 'string' ),
 						),
-						'enabled_tools'    => array(
-							'type'        => 'array',
-							'description' => __( 'Array of enabled tool IDs for this step', 'data-machine' ),
-							'items'       => array( 'type' => 'string' ),
-						),
 						'tool_categories'  => array(
 							'type'        => 'array',
 							'description' => __( 'Array of ability categories allowed for this step', 'data-machine' ),
@@ -535,7 +530,7 @@ class PipelineStepAbilities {
 		}
 
 		$system_prompt = $input['system_prompt'] ?? null;
-		$policy_fields = array( 'enabled_tools', 'disabled_tools', 'tool_categories' );
+		$policy_fields = array( 'disabled_tools', 'tool_categories' );
 
 		// provider/model are no longer configurable at the pipeline step level.
 		// Model resolution is handled exclusively by the mode system (mode_models setting).
@@ -551,7 +546,7 @@ class PipelineStepAbilities {
 		if ( null === $system_prompt && ! $has_policy_field ) {
 			return array(
 				'success' => false,
-				'error'   => 'At least one of system_prompt, enabled_tools, disabled_tools, or tool_categories is required',
+				'error'   => 'At least one of system_prompt, disabled_tools, or tool_categories is required',
 			);
 		}
 
@@ -604,7 +599,7 @@ class PipelineStepAbilities {
 			}
 
 			$step_config_data[ $field ] = $sanitized_values;
-			$updated_fields[]          = $field;
+			$updated_fields[]           = $field;
 		}
 
 		$pipeline_config[ $pipeline_step_id ] = array_merge( $existing_config, $step_config_data );
@@ -906,8 +901,8 @@ class PipelineStepAbilities {
 				);
 			}
 
-			$step                              = $steps_by_id[ $pipeline_step_id ];
-			$step['execution_order']           = $index;
+			$step                               = $steps_by_id[ $pipeline_step_id ];
+			$step['execution_order']            = $index;
 			$updated_steps[ $pipeline_step_id ] = $step;
 		}
 

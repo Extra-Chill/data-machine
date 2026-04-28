@@ -45,11 +45,6 @@ class ConfigurePipelineStep extends BaseTool {
 					'required'    => false,
 					'description' => 'System prompt for the AI step - defines the AI persona and instructions',
 				),
-				'enabled_tools'    => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Array of tool slugs to allow for this AI step',
-				),
 				'disabled_tools'   => array(
 					'type'        => 'array',
 					'required'    => false,
