@@ -76,11 +76,11 @@ export default function FlowStepCard( {
 	// Determine the current prompt value based on step type.
 	const currentPrompt = useMemo( () => {
 		if ( isAiStep ) {
-			return flowStepConfig.user_message || '';
+			return promptQueue[ 0 ]?.prompt || '';
 		}
 		// Support both top-level prompt (legacy) and nested params.prompt (system_task).
 		return primaryConfig?.prompt || primaryConfig?.params?.prompt || '';
-	}, [ isAiStep, flowStepConfig.user_message, primaryConfig ] );
+	}, [ isAiStep, promptQueue, primaryConfig ] );
 
 	// Determine if this step type shows a prompt field.
 	// AI steps always get it. Other steps get it if they have a prompt in handler_config
@@ -105,6 +105,8 @@ export default function FlowStepCard( {
 			try {
 				let config;
 				if ( isAiStep ) {
+					// The ability accepts the public `user_message` input and stores it as
+					// a one-item static prompt_queue entry server-side.
 					config = { user_message: value };
 				} else if ( primaryConfig?.params?.prompt !== undefined ) {
 					// system_task with nested params (e.g. agent_ping).

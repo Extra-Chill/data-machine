@@ -24,7 +24,7 @@ import { AUTO_SAVE_DELAY } from '../../utils/constants';
  * @param {Object}   props                - Component props.
  * @param {number}   props.flowId         - Flow ID.
  * @param {string}   props.flowStepId     - Flow step ID.
- * @param {string}   props.prompt         - Current prompt value (from handler_config or user_message).
+ * @param {string}   props.prompt         - Current prompt value (from handler_config or prompt_queue head).
  * @param {Array}    props.promptQueue    - Prompt queue array.
  * @param {string}   props.queueMode      - Queue access mode: "drain" | "loop" | "static".
  * @param {string}   props.placeholder    - Placeholder text.

@@ -604,8 +604,6 @@ class PipelinesCommand extends BaseCommand {
 				// Map known step config fields.
 				$field_map = array(
 					'system_prompt'  => 'system_prompt',
-					'provider'       => 'provider',
-					'model'          => 'model',
 					'disabled_tools' => 'disabled_tools',
 				);
 
