@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.87.0] - 2026-04-28
+
+### Added
+- add per-agent directive policy
+
+### Fixed
+- apply page_filter to all GA4 actions
+
 ## [0.86.0] - 2026-04-27
 
 ### Added
