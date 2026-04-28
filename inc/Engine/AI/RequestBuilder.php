@@ -46,14 +46,16 @@ class RequestBuilder {
 		string $mode,
 		array $payload = array()
 	): array {
-		$assembled           = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
-		$request             = $assembled['request'];
-		$structured_tools    = $assembled['structured_tools'];
-		$applied_directives  = $assembled['applied_directives'];
-		$directive_metadata  = $assembled['directive_metadata'];
+		$assembled                    = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
+		$request                      = $assembled['request'];
+		$provider_request             = $request;
+		$provider_request['messages'] = MessageEnvelope::to_provider_messages( $request['messages'] ?? array() );
+		$structured_tools             = $assembled['structured_tools'];
+		$applied_directives           = $assembled['applied_directives'];
+		$directive_metadata           = $assembled['directive_metadata'];
 
 		$request_metadata = RequestMetadata::build(
-			$request,
+			$provider_request,
 			$structured_tools,
 			$directive_metadata,
 			$provider,
@@ -73,7 +75,7 @@ class RequestBuilder {
 					'flow_step_id'          => $payload['flow_step_id'] ?? null,
 					'provider'              => $provider,
 					'model'                 => $model,
-					'message_count'         => count( $request['messages'] ),
+					'message_count'         => count( $provider_request['messages'] ),
 					'tool_count'            => count( $structured_tools ),
 					'directives'            => $applied_directives,
 					'suppressed_directives' => ! empty( $assembled['suppressed_directives'] ) ? $assembled['suppressed_directives'] : null,
@@ -98,7 +100,7 @@ class RequestBuilder {
 		// surface. Once WordPress 7.0 is the minimum supported version, those layers
 		// will be migrated and ai-http-client will be removed entirely.
 		if ( WpAiClientAdapter::isAvailable( $provider ) ) {
-			$wp_ai_response = WpAiClientAdapter::dispatch( $request, $provider, $structured_tools );
+			$wp_ai_response = WpAiClientAdapter::dispatch( $provider_request, $provider, $structured_tools );
 
 			// dispatch() returns null when the bridge cannot translate the request
 			// (e.g. multi-modal content) so we transparently fall through to the
@@ -129,7 +131,7 @@ class RequestBuilder {
 		// Legacy path: ai-http-client via chubes_ai_request filter.
 		$response = apply_filters(
 			'chubes_ai_request',
-			$request,
+			$provider_request,
 			$provider,
 			null, // streaming_callback
 			$structured_tools,
@@ -179,8 +181,8 @@ class RequestBuilder {
 				'agent_id' => $payload['agent_id'] ?? 0,
 			)
 		);
-		$directives = $directive_policy['directives'];
-		$suppressed = $directive_policy['suppressed'] ?? array();
+		$directives       = $directive_policy['directives'];
+		$suppressed       = $directive_policy['suppressed'] ?? array();
 		foreach ( $directives as $directive ) {
 			$promptBuilder->addDirective(
 				$directive['class'],
@@ -189,18 +191,19 @@ class RequestBuilder {
 			);
 		}
 
-		$request              = $promptBuilder->buildDetailed( $mode, $provider, $payload );
+		$request             = $promptBuilder->buildDetailed( $mode, $provider, $payload );
+		$request['messages'] = MessageEnvelope::normalize_many( $request['messages'] ?? array() );
 		$applied_directives  = $request['applied_directives'] ?? array();
 		$directive_metadata  = $request['directive_metadata'] ?? array();
 		$directive_breakdown = $request['directive_breakdown'] ?? array();
 		unset( $request['applied_directives'], $request['directive_metadata'], $request['directive_breakdown'] );
-		$request['model']    = $model;
+		$request['model'] = $model;
 
 		return array(
-			'request'             => $request,
-			'structured_tools'    => $structured_tools,
-			'applied_directives'  => $applied_directives,
-			'directive_metadata'  => $directive_metadata,
+			'request'               => $request,
+			'structured_tools'      => $structured_tools,
+			'applied_directives'    => $applied_directives,
+			'directive_metadata'    => $directive_metadata,
 			'directive_breakdown'   => $directive_breakdown,
 			'suppressed_directives' => $suppressed,
 		);

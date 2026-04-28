@@ -40,7 +40,7 @@ class AIConversationResult {
 			}
 
 			try {
-				$message = MessageEnvelope::to_legacy_message( $message );
+				$message = MessageEnvelope::normalize( $message );
 			} catch ( \InvalidArgumentException $e ) {
 				throw self::invalid( $path, $e->getMessage() );
 			}
@@ -49,14 +49,6 @@ class AIConversationResult {
 
 			if ( array_key_exists( 'role', $message ) && ! is_string( $message['role'] ) ) {
 				throw self::invalid( $path . '.role', 'must be a string when present' );
-			}
-
-			if (
-				'assistant' === ( $message['role'] ?? '' )
-				&& array_key_exists( 'content', $message )
-				&& ! is_string( $message['content'] )
-			) {
-				throw self::invalid( $path . '.content', 'must be a string for assistant messages' );
 			}
 		}
 

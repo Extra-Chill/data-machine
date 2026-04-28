@@ -168,10 +168,10 @@ class PromptBuilder {
 				$directive_outputs = array_merge( $directive_outputs, $outputs );
 			}
 
-			$validated_outputs   = DirectiveOutputValidator::validateOutputs( $outputs, $validation_context );
-			$rendered_messages    = DirectiveRenderer::renderMessages( $validated_outputs );
-			$applied_directives[] = $directive_name;
-			$directive_metadata[] = self::describeDirectiveOutputs( $directive_name, $priority, $outputs );
+			$validated_outputs     = DirectiveOutputValidator::validateOutputs( $outputs, $validation_context );
+			$rendered_messages     = DirectiveRenderer::renderMessages( $validated_outputs );
+			$applied_directives[]  = $directive_name;
+			$directive_metadata[]  = self::describeDirectiveOutputs( $directive_name, $priority, $outputs );
 			$directive_breakdown[] = array(
 				'class'                  => $directive_class,
 				'name'                   => $directive_name,
@@ -188,7 +188,7 @@ class PromptBuilder {
 		$directive_messages = DirectiveRenderer::renderMessages( $validated_outputs );
 
 		return array(
-			'messages'            => array_merge( $directive_messages, $conversation_messages ),
+			'messages'            => MessageEnvelope::normalize_many( array_merge( $directive_messages, $conversation_messages ) ),
 			'tools'               => $this->tools,
 			'applied_directives'  => $applied_directives,
 			'directive_metadata'  => $directive_metadata,

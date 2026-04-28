@@ -13,6 +13,7 @@ namespace DataMachine\Core\Database\Chat;
 
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Engine\AI\MessageEnvelope;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -244,7 +245,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				'metadata'   => wp_json_encode( $metadata ),
 				'provider'   => null,
 				'model'      => null,
-				'mode' => $mode,
+				'mode'       => $mode,
 				'expires_at' => null,
 			),
 			array( '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
@@ -258,7 +259,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				array(
 					'user_id' => $user_id,
 					'error'   => $wpdb->last_error,
-					'mode' => $mode,
+					'mode'    => $mode,
 				)
 			);
 			return '';
@@ -272,7 +273,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				'session_id' => $session_id,
 				'user_id'    => $user_id,
 				'agent_id'   => $agent_id,
-				'mode' => $mode,
+				'mode'       => $mode,
 			)
 		);
 
@@ -304,7 +305,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return null;
 		}
 
-		$session['messages'] = json_decode( $session['messages'], true ) ?? array();
+		$session['messages'] = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
 		$session['metadata'] = json_decode( $session['metadata'], true ) ?? array();
 
 		return $session;
@@ -331,8 +332,24 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 
 		$table_name = self::get_prefixed_table_name();
 
+		try {
+			$normalized_messages = MessageEnvelope::normalize_many( $messages );
+		} catch ( \InvalidArgumentException $e ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to normalize chat session messages for update',
+				array(
+					'session_id' => $session_id,
+					'error'      => $e->getMessage(),
+					'mode'       => 'chat',
+				)
+			);
+			return false;
+		}
+
 		$update_data = array(
-			'messages' => wp_json_encode( $messages ),
+			'messages' => wp_json_encode( $normalized_messages ),
 			'metadata' => wp_json_encode( $metadata ),
 		);
 
@@ -365,7 +382,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				array(
 					'session_id' => $session_id,
 					'error'      => $wpdb->last_error,
-					'mode' => 'chat',
+					'mode'       => 'chat',
 				)
 			);
 			return false;
@@ -400,7 +417,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				array(
 					'session_id' => $session_id,
 					'error'      => $wpdb->last_error,
-					'mode' => 'chat',
+					'mode'       => 'chat',
 				)
 			);
 			return false;
@@ -412,7 +429,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			'Chat session deleted',
 			array(
 				'session_id' => $session_id,
-				'mode' => 'chat',
+				'mode'       => 'chat',
 			)
 		);
 
@@ -445,7 +462,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				'Cleaned up expired chat sessions',
 				array(
 					'deleted_count' => $deleted,
-					'mode' => 'chat',
+					'mode'          => 'chat',
 				)
 			);
 		}
@@ -552,11 +569,11 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 
 		$result = array();
 		foreach ( $sessions as $session ) {
-			$messages      = json_decode( $session['messages'] ?? '[]', true ) ?? array();
+			$messages      = self::normalize_messages( json_decode( $session['messages'] ?? '[]', true ) ?? array() );
 			$first_message = '';
 			foreach ( $messages as $msg ) {
 				if ( ( $msg['role'] ?? '' ) === 'user' ) {
-					$first_message = $msg['content'] ?? '';
+					$first_message = self::message_content_text( $msg );
 					break;
 				}
 			}
@@ -568,7 +585,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			$result[] = array(
 				'session_id'    => $session['session_id'],
 				'title'         => $session['title'] ?? null,
-				'mode' => $session['mode'] ?? 'chat',
+				'mode'          => $session['mode'] ?? 'chat',
 				'first_message' => mb_substr( $first_message, 0, 100 ),
 				'message_count' => count( $messages ),
 				'unread_count'  => $this->count_unread( $messages, $last_read_at ),
@@ -700,16 +717,18 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$query .= ' ORDER BY created_at DESC LIMIT 1';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$session = $wpdb->get_row(
 			$wpdb->prepare( $query, $params ),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL
 
 		if ( ! $session ) {
 			return null;
 		}
 
-		$session['messages'] = json_decode( $session['messages'], true ) ?? array();
+		$session['messages'] = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
 		$session['metadata'] = json_decode( $session['metadata'], true ) ?? array();
 
 		return $session;
@@ -744,7 +763,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				array(
 					'session_id' => $session_id,
 					'error'      => $wpdb->last_error,
-					'mode' => 'chat',
+					'mode'       => 'chat',
 				)
 			);
 			return false;
@@ -770,13 +789,14 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$count = 0;
 
 		foreach ( $messages as $msg ) {
+			$msg = MessageEnvelope::normalize( $msg );
 			if ( ( $msg['role'] ?? '' ) !== 'assistant' ) {
 				continue;
 			}
 
 			// Skip tool call/result messages — only count visible assistant responses.
-			$type = $msg['metadata']['type'] ?? 'text';
-			if ( 'tool_call' === $type || 'tool_result' === $type ) {
+			$type = $msg['type'] ?? MessageEnvelope::TYPE_TEXT;
+			if ( MessageEnvelope::TYPE_TOOL_CALL === $type || MessageEnvelope::TYPE_TOOL_RESULT === $type ) {
 				continue;
 			}
 
@@ -792,6 +812,41 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		}
 
 		return $count;
+	}
+
+	/**
+	 * Normalize a decoded message list to the canonical Data Machine envelope.
+	 *
+	 * @param array $messages Decoded messages.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private static function normalize_messages( array $messages ): array {
+		try {
+			return MessageEnvelope::normalize_many( $messages );
+		} catch ( \InvalidArgumentException $e ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Chat: Failed to normalize stored messages',
+				array( 'error' => $e->getMessage() )
+			);
+			return array();
+		}
+	}
+
+	/**
+	 * Render envelope content to a summary-safe string.
+	 *
+	 * @param array $message Message envelope.
+	 * @return string Summary text.
+	 */
+	private static function message_content_text( array $message ): string {
+		$content = $message['content'] ?? '';
+		if ( is_string( $content ) ) {
+			return $content;
+		}
+
+		return (string) wp_json_encode( $content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 	}
 
 	/**
@@ -868,7 +923,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 					'deleted_count'  => $deleted,
 					'retention_days' => $retention_days,
 					'cutoff_date'    => $cutoff_date,
-					'mode' => 'chat',
+					'mode'           => 'chat',
 				)
 			);
 		}
@@ -905,10 +960,10 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM %i
+				'DELETE FROM %i
 				WHERE mode = %s
 				AND metadata LIKE %s
-				AND updated_at < %s",
+				AND updated_at < %s',
 				$table_name,
 				'pipeline',
 				'%"source":"pipeline_transcript"%',
@@ -972,7 +1027,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 					'deleted_count'   => $deleted,
 					'hours_threshold' => $hours,
 					'cutoff_time'     => $cutoff_time,
-					'mode' => 'chat',
+					'mode'            => 'chat',
 				)
 			);
 		}
@@ -1020,7 +1075,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			$result[] = array(
 				'session_id' => (string) $row['session_id'],
 				'title'      => isset( $row['title'] ) ? (string) $row['title'] : null,
-				'mode' => isset($row['mode']) ? (string) $row['mode'] : 'chat',
+				'mode'       => isset($row['mode']) ? (string) $row['mode'] : 'chat',
 				'created_at' => (string) $row['created_at'],
 			);
 		}

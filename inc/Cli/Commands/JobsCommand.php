@@ -23,6 +23,7 @@ use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Engine\AI\MessageEnvelope;
 use DataMachine\Engine\Tasks\TaskRegistry;
 
 defined( 'ABSPATH' ) || exit;
@@ -471,12 +472,12 @@ class JobsCommand extends BaseCommand {
 
 		if ( 'json' === $format ) {
 			$payload = $raw ? $messages : array(
-				'job_id'         => $job_id,
-				'session_id'     => $transcript_session_id,
-				'metadata'       => $metadata,
-				'provider'       => $session['provider'] ?? null,
-				'model'          => $session['model'] ?? null,
-				'messages'       => $messages,
+				'job_id'     => $job_id,
+				'session_id' => $transcript_session_id,
+				'metadata'   => $metadata,
+				'provider'   => $session['provider'] ?? null,
+				'model'      => $session['model'] ?? null,
+				'messages'   => $messages,
 			);
 			WP_CLI::log( wp_json_encode( $payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
 			return;
@@ -544,10 +545,11 @@ class JobsCommand extends BaseCommand {
 		WP_CLI::log( '' );
 
 		foreach ( $messages as $idx => $message ) {
-			$role     = $message['role'] ?? 'unknown';
-			$type     = $message['metadata']['type'] ?? 'text';
-			$content  = $message['content'] ?? '';
-			$header   = sprintf( '[%d] %s (%s)', $idx, $role, $type );
+			$message = MessageEnvelope::normalize( $message );
+			$role    = $message['role'] ?? 'unknown';
+			$type    = $message['type'] ?? MessageEnvelope::TYPE_TEXT;
+			$content = $message['content'] ?? '';
+			$header  = sprintf( '[%d] %s (%s)', $idx, $role, $type );
 
 			WP_CLI::log( $header );
 			WP_CLI::log( str_repeat( '-', min( 80, strlen( $header ) ) ) );
@@ -1252,8 +1254,8 @@ class JobsCommand extends BaseCommand {
 				$preview_effects = $engine_data['effects'] ?? array();
 				if ( empty( $preview_effects ) ) {
 					foreach ( $jobs_db->get_children( (int) $jid ) as $child ) {
-						$child_data    = is_array( $child['engine_data'] ?? null ) ? $child['engine_data'] : array();
-						$child_effects = $child_data['effects'] ?? array();
+						$child_data      = is_array( $child['engine_data'] ?? null ) ? $child['engine_data'] : array();
+						$child_effects   = $child_data['effects'] ?? array();
 						$preview_effects = array_merge( $preview_effects, $child_effects );
 					}
 				}

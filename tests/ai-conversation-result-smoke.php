@@ -9,6 +9,7 @@ require_once __DIR__ . '/bootstrap-unit.php';
 
 use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\AIConversationResult;
+use DataMachine\Engine\AI\MessageEnvelope;
 
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $hook, $value ) {
@@ -52,8 +53,13 @@ $valid_result = array(
 
 $normalized = AIConversationResult::normalize( $valid_result );
 datamachine_ai_conversation_result_assert(
-	$valid_result === $normalized,
-	'Valid built-in-shaped result should pass unchanged.'
+	MessageEnvelope::TYPE_TEXT === $normalized['messages'][0]['type'],
+	'Valid built-in-shaped result should normalize messages to canonical envelopes.'
+);
+++$assertions;
+datamachine_ai_conversation_result_assert(
+	'Done.' === $normalized['messages'][0]['content'],
+	'Canonical envelope preserves message content.'
 );
 ++$assertions;
 

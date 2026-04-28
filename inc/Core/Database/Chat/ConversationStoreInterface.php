@@ -15,7 +15,7 @@
  * clarification with no behavior change.
  *
  * Implementations are responsible for:
- * - normalizing messages on read to Data Machine message shape
+ * - normalizing messages on read to Data Machine's canonical AI message envelope
  *   (see docs/development/hooks/core-filters.md#message-shape-contract);
  * - preserving per-session identity via UUIDv4 session IDs;
  * - honoring the `(user_id, agent_id, context)` triple when listing.

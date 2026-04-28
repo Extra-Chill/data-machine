@@ -14,6 +14,7 @@ namespace DataMachine\Abilities;
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Engine\AI\RequestBuilder;
+use DataMachine\Engine\AI\MessageEnvelope;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\Tasks\TaskScheduler;
@@ -546,8 +547,10 @@ class SystemAbilities {
 		$first_assistant_response = null;
 
 		foreach ( $messages as $msg ) {
+			$msg     = MessageEnvelope::normalize( $msg );
 			$role    = $msg['role'] ?? '';
 			$content = $msg['content'] ?? '';
+			$content = is_string( $content ) ? $content : wp_json_encode( $content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 
 			if ( 'user' === $role && null === $first_user_message && ! empty($content) ) {
 				$first_user_message = $content;
