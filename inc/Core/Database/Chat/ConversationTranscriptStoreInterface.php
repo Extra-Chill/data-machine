@@ -1,11 +1,17 @@
 <?php
 /**
- * Conversation transcript store contract.
+ * Agent conversation transcript persistence contract.
  *
- * Covers session row creation, transcript reads/writes, title updates,
- * and retry deduplication. Backends that only need to persist complete
- * conversation transcripts can implement this contract without taking on
- * list, read-state, retention, or metrics responsibilities.
+ * This is the narrow, generic storage seam for complete conversation
+ * transcripts. It covers session row creation, transcript reads/writes,
+ * deletion, retry deduplication, and the stored display title that belongs
+ * to a transcript row. It deliberately does not include chat UI listing,
+ * read-state, retention scheduling, or reporting/metrics responsibilities.
+ *
+ * The interface still lives under the Data Machine chat namespace while the
+ * Agents API extraction is in-place. Conceptually, this is the contract that
+ * a future Agents API package can own; Data Machine's chat product consumes it
+ * through {@see ConversationStoreInterface} and {@see ConversationStoreFactory}.
  *
  * @package DataMachine\Core\Database\Chat
  * @since   next
@@ -18,18 +24,18 @@ defined( 'ABSPATH' ) || exit;
 interface ConversationTranscriptStoreInterface {
 
 	/**
-	 * Create a new chat session and return its ID.
+	 * Create a new conversation transcript session and return its ID.
 	 *
 	 * @param int    $user_id  WordPress user ID owning the session.
 	 * @param int    $agent_id Agent ID (0 = legacy agent-less session).
 	 * @param array  $metadata Arbitrary session metadata (JSON-serializable).
-	 * @param string $context  Execution context ('chat', 'pipeline', 'system').
+	 * @param string $context  Execution mode ('chat', 'pipeline', 'system').
 	 * @return string Session ID (UUIDv4), or empty string on failure.
 	 */
 	public function create_session( int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string;
 
 	/**
-	 * Retrieve a session by ID.
+	 * Retrieve a transcript session by ID.
 	 *
 	 * Returns the session as an associative array with keys:
 	 * session_id, user_id, agent_id, title, messages (decoded array),
@@ -78,7 +84,10 @@ interface ConversationTranscriptStoreInterface {
 	public function get_recent_pending_session( int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array;
 
 	/**
-	 * Set a session's display title.
+	 * Set a transcript session's stored display title.
+	 *
+	 * Title generation and UI policy stay above the store. This mutator remains
+	 * here because the persisted title is part of the transcript/session record.
 	 *
 	 * @param string $session_id Session UUID.
 	 * @param string $title      New title.

@@ -61,6 +61,29 @@ foreach ( $narrow_contracts as $contract ) {
 	$assert_true( $aggregate->implementsInterface( $contract ), "aggregate composes {$contract}" );
 }
 
+$transcript_ref = new ReflectionClass( ConversationTranscriptStoreInterface::class );
+$assert_true( ! $transcript_ref->implementsInterface( ConversationSessionIndexInterface::class ), 'transcript contract does not include session index surface' );
+$assert_true( ! $transcript_ref->implementsInterface( ConversationReadStateInterface::class ), 'transcript contract does not include read-state surface' );
+$assert_true( ! $transcript_ref->implementsInterface( ConversationRetentionInterface::class ), 'transcript contract does not include retention surface' );
+$assert_true( ! $transcript_ref->implementsInterface( ConversationReportingInterface::class ), 'transcript contract does not include reporting surface' );
+
+$transcript_methods = array_map(
+	static fn( ReflectionMethod $method ): string => $method->getName(),
+	$transcript_ref->getMethods()
+);
+sort( $transcript_methods );
+$assert_true(
+	array(
+		'create_session',
+		'delete_session',
+		'get_recent_pending_session',
+		'get_session',
+		'update_session',
+		'update_title',
+	) === $transcript_methods,
+	'transcript contract stays limited to transcript/session CRUD methods'
+);
+
 foreach ( $narrow_contracts as $contract ) {
 	$chat_ref = new ReflectionClass( Chat::class );
 	$test_ref = new ReflectionClass( InMemoryConversationStore::class );
