@@ -11,6 +11,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
 }
 
+if ( class_exists( 'PHPUnit\\Framework\\TestCase', false ) ) {
+	return;
+}
+
 $GLOBALS['__bundle_extension_filters'] = array();
 
 if ( ! function_exists( 'wp_json_encode' ) ) {
