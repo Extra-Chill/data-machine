@@ -13,7 +13,7 @@ The initial untangling wave is complete:
 - Ability-native tool execution is separated from Data Machine pending-action and post-tracking decorators.
 - Declarative agent registration is separated from Data Machine materialization.
 - Memory store ownership is documented behind a neutral store contract.
-- Conversation transcript storage is narrowed behind a transcript facade.
+- Conversation transcript storage is narrowed behind a transcript facade, and the aggregate chat-product store is documented as a Data Machine compatibility layer rather than the default extraction target.
 - The runner request boundary exists.
 
 This branch starts the naming phase by renaming the neutral runner result/request seam from `AIConversation*` to `AgentConversation*` while leaving `AIConversationLoop` as the temporary compatibility facade.
@@ -61,13 +61,14 @@ Target shape:
 
 ### 4. Conversation Storage Boundary
 
-The transcript interfaces are now separated, but the storage implementation still lives under `Core\Database\Chat` and the aggregate store includes chat UI concerns.
+The transcript interface is now separated from the aggregate chat-product store. The implementation still lives under `Core\Database\Chat` while extraction is in-place, but the dependency direction is explicit: runtime transcript persistence depends on `ConversationTranscriptStoreInterface`, while Data Machine chat UI/REST/CLI/retention/reporting depend on the broader `ConversationStoreInterface` aggregate.
 
 Target shape:
 
 - Extract transcript CRUD first.
 - Keep read state, reporting, retention, and session list behavior optional or Data Machine-owned until proven generic.
 - Keep Data Machine chat UI as product surface.
+- Do not expose `datamachine_conversation_store` as the future Agents API transcript filter without narrowing its contract; it currently requires the Data Machine aggregate for behavior compatibility.
 
 ### 5. Memory Store Boundary
 

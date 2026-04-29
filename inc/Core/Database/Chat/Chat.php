@@ -20,12 +20,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Chat Database Manager
+ * Data Machine chat database manager.
  *
- * Implements {@see ConversationStoreInterface} so the conversation
- * storage backend can be swapped via the `datamachine_conversation_store`
- * filter. Resolve via {@see ConversationStoreFactory::get()} rather than
- * instantiating this class directly.
+ * Implements the full {@see ConversationStoreInterface} aggregate for the
+ * Data Machine chat product: transcript CRUD, session switcher indexes,
+ * read state, retention cleanup, and reporting. Runtime code that only needs
+ * transcript persistence should depend on
+ * {@see ConversationTranscriptStoreInterface} via
+ * {@see ConversationStoreFactory::get_transcript_store()}.
  */
 class Chat extends BaseRepository implements ConversationStoreInterface {
 

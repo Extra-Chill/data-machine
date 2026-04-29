@@ -14,7 +14,7 @@ Mirror the WordPress Abilities API shape instead of importing Data Machine, wpco
 | `AgentRegistry` | `WP_Agents_Registry` | Registry should collect definitions. Persistence/adoption can remain adapter territory. |
 | `datamachine_register_agents` | `wp_agents_api_init` or `wp_register_agents` | Prefer a core-shaped init hook; exact name needs review against Abilities API precedent. |
 | `MessageEnvelope` | `WP_Agent_Message` or neutral envelope | Contract is generic. Data Machine schema/name is not. |
-| `ConversationStoreInterface` | `WP_Agent_Conversation_Store_Interface` | Keep transcript/session/read-state split if it remains boring. |
+| `ConversationTranscriptStoreInterface` | `WP_Agent_Conversation_Transcript_Store_Interface` | Transcript CRUD is the first extractable storage contract. Keep chat-product listing/read-state/reporting separate. |
 | `AgentMemoryStoreInterface` | `WP_Agent_Memory_Store_Interface` | Generic identity tuple needs naming review; Data Machine scaffolding/abilities stay outside the store contract. |
 | `RuntimeToolDeclaration` | `WP_Agent_Tool_Declaration` | Should stay ability-native and run-scoped. |
 | `LoopEventSinkInterface` | `WP_Agent_Run_Event_Sink_Interface` | Useful for logs, streaming, chat UIs, and async workers. |
@@ -33,7 +33,7 @@ Use these checks before moving anything:
 
 | Bucket | Meaning | Current examples |
 |---|---|---|
-| Agents API public candidate | Generic WordPress-shaped contract or value object. | Message envelopes, conversation store interfaces, memory store interface, runtime tool declaration validation, agent registration vocabulary. |
+| Agents API public candidate | Generic WordPress-shaped contract or value object. | Message envelopes, transcript store interface, memory store interface, runtime tool declaration validation, agent registration vocabulary. |
 | Agents API implementation candidate | Generic implementation, but naming or assumptions need cleanup first. | Built-in loop, request assembly, tool executor, guideline memory store, directive renderer. |
 | Data Machine adapter | Glue that turns flows/jobs/pipelines into generic runtime inputs. | `AIStep`, pipeline tool-policy args, transcript persistence policy, adjacent handler tools. |
 | Data Machine product | Data Machine automation/product layer. | Jobs, flows, pipelines, handlers, queues, retention, content abilities, admin UI. |
@@ -56,13 +56,14 @@ These are closest to generic public contracts. Most should be extracted as contr
 | `AgentMemoryReadResult` | `inc/Core/FilesRepository/AgentMemoryReadResult.php` | Store-neutral read result. | Generic result value object can move unchanged after naming cleanup. |
 | `AgentMemoryWriteResult` | `inc/Core/FilesRepository/AgentMemoryWriteResult.php` | Store-neutral write result with hash/bytes/error shape. | Generic result value object can move unchanged after naming cleanup. |
 | `AgentMemoryListEntry` | `inc/Core/FilesRepository/AgentMemoryListEntry.php` | Store-neutral list entry. | Good candidate if file-backed memory stays in scope. |
-| `ConversationTranscriptStoreInterface` | `inc/Core/Database/Chat/ConversationTranscriptStoreInterface.php` | Transcript CRUD is generic conversation persistence. | Rename chat/session wording to agent conversation wording where appropriate. |
-| `ConversationSessionIndexInterface` | `inc/Core/Database/Chat/ConversationSessionIndexInterface.php` | Conversation listing is generic. | Keep `(user_id, agent_id, context)` only if Agents API adopts that identity model. |
-| `ConversationReadStateInterface` | `inc/Core/Database/Chat/ConversationReadStateInterface.php` | Read-state is generic session UI behavior. | Could be optional interface in Agents API. |
-| `ConversationRetentionInterface` | `inc/Core/Database/Chat/ConversationRetentionInterface.php` | Cleanup contract is generic, but scheduling is not. | Interface may move; Data Machine retention tasks stay product. |
-| `ConversationReportingInterface` | `inc/Core/Database/Chat/ConversationReportingInterface.php` | Metrics/reporting reads are generic. | Could be optional interface in Agents API. |
-| `ConversationStoreInterface` | `inc/Core/Database/Chat/ConversationStoreInterface.php` | Aggregate conversation store contract. | Extract after deciding whether the aggregate remains public or only narrow interfaces move. |
-| `datamachine_conversation_store` filter | `ConversationStoreFactory::get()` | Store swap seam is generic. | Target should be an Agents API store resolver/filter. |
+| `ConversationTranscriptStoreInterface` | `inc/Core/Database/Chat/ConversationTranscriptStoreInterface.php` | Transcript CRUD is generic conversation persistence. | First extraction candidate. Rename namespace/vocabulary later; do not require chat UI listing/read-state/reporting for transcript-only backends. |
+| `ConversationSessionIndexInterface` | `inc/Core/Database/Chat/ConversationSessionIndexInterface.php` | Session listing can be generic for UIs, but it is not required for transcript persistence. | Treat as optional until Agents API adopts an identity/listing model. Data Machine chat switcher uses it today. |
+| `ConversationReadStateInterface` | `inc/Core/Database/Chat/ConversationReadStateInterface.php` | Read-state is generic UI behavior, not transcript CRUD. | Optional interface at most. Data Machine chat unread state keeps consuming it. |
+| `ConversationRetentionInterface` | `inc/Core/Database/Chat/ConversationRetentionInterface.php` | Cleanup methods can be backend-generic, but retention policy/scheduling is product behavior. | Data Machine retention tasks stay product; future Agents API may expose only optional backend cleanup. |
+| `ConversationReportingInterface` | `inc/Core/Database/Chat/ConversationReportingInterface.php` | Metrics/reporting reads are useful but product-shaped today. | Optional interface at most. Data Machine daily memory and retention CLI keep consuming it. |
+| `ConversationStoreInterface` | `inc/Core/Database/Chat/ConversationStoreInterface.php` | Aggregate Data Machine chat-product compatibility contract. | Do not extract as the default public contract unless Agents API deliberately wants the full aggregate. Prefer the transcript interface first. |
+| `ConversationStoreFactory::get_transcript_store()` | `inc/Core/Database/Chat/ConversationStoreFactory.php` | Narrow resolver for runtime transcript persistence. | Current implementation reuses the Data Machine aggregate filter for compatibility; future Agents API can own a transcript-specific resolver/filter. |
+| `datamachine_conversation_store` filter | `ConversationStoreFactory::get()` | Existing Data Machine aggregate store swap seam. | Keep while code lives in Data Machine. A future Agents API filter should not force chat UI/listing/read-state/reporting responsibilities onto transcript-only backends. |
 | `datamachine_conversation_runner` filter | `AIConversationLoop::run()` | Runner replacement seam is generic. | Target should be a runtime runner interface/filter, not Data Machine named. |
 | `datamachine_guideline_updated` action | `GuidelineAgentMemoryStore` | Logical memory/guideline change event is generic. | Target event must not assume Data Machine option names or storage. |
 | `datamachine_register_agent()` helper | `inc/Engine/Agents/register-agents.php` | Declarative agent registration is core-shaped. | Public helper should become `wp_register_agent()`; persistence reconciliation should not be part of the helper contract. |
@@ -125,6 +126,21 @@ These should stay in Data Machine as compatibility glue if a generic runtime plu
 | `Api\Agents`, `Api\AgentFiles`, `Api\AgentPing` | `inc/Api/` | Current REST routes are Data Machine API shape. They can adapt to future `wp-agents/v1` contracts. |
 | `AgentsCommand`, `MemoryCommand` | `inc/Cli/Commands/` | Operator CLI wrapping current Data Machine repositories and abilities. Generic WP-CLI commands should be designed separately. |
 
+## Conversation Storage Boundary
+
+Conversation storage is split in place, but only the narrow transcript surface is ready to treat as a generic Agents API candidate.
+
+| Layer | Current surface | Boundary decision |
+|---|---|---|
+| Generic transcript CRUD | `ConversationTranscriptStoreInterface`, `ConversationStoreFactory::get_transcript_store()` | Candidate for Agents API ownership. Runtime persistence should depend on this surface when it only needs complete transcript sessions. |
+| Data Machine compatibility aggregate | `ConversationStoreInterface`, `ConversationStoreFactory::get()`, `datamachine_conversation_store` | Stays in Data Machine for now so chat UI, REST, CLI, retention, and reporting keep one behavior-preserving resolver. |
+| Chat UI/session switcher | `ConversationSessionIndexInterface`, chat REST/abilities/UI callers | Product behavior today. It may become an optional Agents API UI contract later, but transcript-only backends should not implement it by default. |
+| Read state | `ConversationReadStateInterface` | Optional UI behavior. Not part of transcript persistence. |
+| Retention | `ConversationRetentionInterface`, retention system tasks/CLI | Backend cleanup methods may be generic, but scheduling and retention policy are Data Machine product. |
+| Reporting | `ConversationReportingInterface`, daily memory/retention status readers | Product-shaped metrics today. Keep separate from transcript CRUD. |
+
+Do not decide an `agents_session` CPT, wpcom `Conversation_Storage`, or a new Agents API filter name in this in-place clarification. The current goal is only to make the dependency direction obvious: Data Machine chat product consumes transcript persistence; transcript persistence does not require Data Machine chat product behavior.
+
 ## Data Machine Product
 
 These should stay in Data Machine. They may consume Agents API later, but should not move into it.
@@ -172,7 +188,7 @@ These are reference points only. Do not expose them as public Data Machine or Ag
 | Hook/filter | Bucket | Notes |
 |---|---|---|
 | `datamachine_conversation_runner` | Agents API public candidate | Generic runtime replacement seam. Rename and formalize result contract. |
-| `datamachine_conversation_store` | Agents API public candidate | Generic conversation persistence swap seam. Rename and keep narrow contracts. |
+| `datamachine_conversation_store` | Data Machine compatibility seam today | Existing aggregate store swap seam. A future Agents API transcript-store filter should be narrower instead of carrying Data Machine chat product responsibilities. |
 | `datamachine_memory_store` | Agents API public candidate | Generic memory persistence swap seam. Keep as Data Machine's current public behavior until extraction; introduce a neutral Agents API filter only when that package owns the resolver and migration path. |
 | `datamachine_register_agents` | Agents API public candidate | Registration hook should become WordPress-shaped. |
 | `datamachine_registered_agent_reconciled` | Agents API implementation candidate | Lifecycle event is useful, current reconciliation semantics are Data Machine implementation. |
@@ -194,7 +210,7 @@ These tests currently pin the substrate most relevant to extraction.
 |---|---|---|
 | `tests/ai-message-envelope-smoke.php` | Message envelope normalization/projection and result validation. | Move with message/result contracts. |
 | `tests/agent-conversation-result-smoke.php` | Conversation result shape validation. | Move with runner result contract. |
-| `tests/conversation-store-contracts-smoke.php` | Split store interfaces and factory return type. | Move with conversation store contracts. |
+| `tests/conversation-store-contracts-smoke.php` | Split store interfaces, transcript-only method boundary, and factory return types. | Move transcript CRUD coverage with the generic contract; keep aggregate/product assertions with Data Machine. |
 | `tests/guideline-agent-memory-store-smoke.php` | Optional guideline-backed memory implementation. | Move or duplicate if Agents API ships memory store implementations. |
 | `tests/daily-memory-store-seam-smoke.php` | Daily memory through memory store seam. | Data Machine product consuming generic memory store. |
 | `tests/agent-memory-events-smoke.php` | Memory/guideline change events. | Move event contract after naming review. |
