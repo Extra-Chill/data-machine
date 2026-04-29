@@ -48,6 +48,8 @@ These are closest to generic public contracts. Most should be extracted as contr
 |---|---|---|---|
 | `AgentMessageEnvelope` | `inc/Engine/AI/AgentMessageEnvelope.php` | JSON-friendly canonical message envelope independent of flows/jobs. | Schema is `agents-api.message`; review whether physical extraction keeps this class name or adopts `WP_Agent_Message`. |
 | `AgentConversationResult` | `inc/Engine/AI/AgentConversationResult.php` | Validates result arrays from any runtime runner. | Rename to `WP_Agent_Run_Result` or split into result value object plus validator. |
+| `AgentConversationCompletionPolicyInterface` | `inc/Engine/AI/AgentConversationCompletionPolicyInterface.php` | Generic runtime collaborator for deciding whether a tool result completes a run. | Keep Data Machine handler semantics in adapter implementations, not in the loop contract. |
+| `AgentConversationTranscriptPersisterInterface` | `inc/Engine/AI/AgentConversationTranscriptPersisterInterface.php` | Generic runtime collaborator for optional transcript persistence. | Future extraction should pair this with the transcript store contract and keep job/flow metadata in Data Machine adapters. |
 | `LoopEventSinkInterface` | `inc/Engine/AI/LoopEventSinkInterface.php` | Transport-neutral event sink for logs, streaming, CLI, REST, or chat UIs. | Make event vocabulary public and provider-neutral before extraction. |
 | `NullLoopEventSink` | `inc/Engine/AI/NullLoopEventSink.php` | Generic no-op implementation for optional event sinks. | Implementation can move with the interface. |
 | `RuntimeToolDeclaration` | `inc/Engine/AI/Tools/RuntimeToolDeclaration.php` | Validates run-scoped client/runtime tool declarations without Data Machine state. | Rename around `WP_Agent_Tool_Declaration`; keep executor/source/scope vocabulary generic. |
@@ -76,7 +78,7 @@ These are plausibly generic implementations, but should not move until naming an
 
 | Surface | Current location | Why it is not public-ready yet | Extraction direction |
 |---|---|---|---|
-| `AIConversationLoop` | `inc/Engine/AI/AIConversationLoop.php` | Name says AI, result shape and payload include Data Machine job/flow context, and built-in completion behavior knows handler tools. | Split generic turn loop from Data Machine completion policy and pipeline handler tracking. |
+| `AIConversationLoop` | `inc/Engine/AI/AIConversationLoop.php` | Name says AI and still carries the compatibility facade/result shape, but handler completion and transcript persistence now route through runtime collaborators. | Keep shrinking the compatibility adapter by extracting provider request assembly and Data Machine logging policy next. |
 | `RequestBuilder` | `inc/Engine/AI/RequestBuilder.php` | Mostly generic request assembly, but dispatch falls back to `chubes_ai_request` and applies Data Machine directives. | Extract assembler separately from provider dispatch and Data Machine directive policy. |
 | `WpAiClientAdapter` | `inc/Engine/AI/WpAiClientAdapter.php` | Generic bridge to WordPress AI client, but currently lives as Data Machine implementation detail. | Good implementation candidate once request/message contracts are generic. |
 | `RequestMetadata` | `inc/Engine/AI/RequestMetadata.php` | Generic inspection/size metadata. | Move after field names are checked against Agents API message/tool vocabulary. |
@@ -116,12 +118,13 @@ These should stay in Data Machine as compatibility glue if a generic runtime plu
 | `AIStep` | `inc/Core/Steps/AI/AIStep.php` | Converts flow-step config, data packets, queue prompt head, image engine data, adjacent steps, job snapshot, and transcript policy into a runtime run. |
 | `ToolPolicyResolver::getPipelinePolicyArgs()` | `inc/Engine/AI/Tools/ToolPolicyResolver.php` | Translates `FlowStepConfig` enabled/disabled tool fields into generic resolver args. This is a prime adapter extraction seam. |
 | `ToolPolicyResolver::gatherPipelineTools()` | `inc/Engine/AI/Tools/ToolPolicyResolver.php` | Knows pipeline handler/tool behavior and should not become public Agents API. |
-| `PipelineTranscriptPolicy` | `inc/Engine/AI/PipelineTranscriptPolicy.php` | Reads flow/pipeline config and site option to decide transcript persistence. Generic runtime should receive an already-normalized boolean/policy. |
+| `PipelineTranscriptPolicy` | `inc/Engine/AI/PipelineTranscriptPolicy.php` | Reads flow/pipeline config and site option to decide transcript persistence. Generic runtime receives the normalized decision through `DataMachinePipelineTranscriptPersister`. |
 | `ToolSourceRegistry::SOURCE_ADJACENT_HANDLERS` | `inc/Engine/AI/Tools/ToolSourceRegistry.php` | Data Machine-specific source that exposes publish/upsert handler tools next to AI steps. |
 | `ToolSourceRegistry::SOURCE_STATIC_REGISTRY` / `DataMachineToolRegistrySource` | `inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php` | Data Machine-specific source that adapts the curated `datamachine_tools` registry into runtime tool resolution. |
 | `FlowStepConfig::getAdjacentRequiredHandlerSlugsForAi()` consumers | `AIStep` and tool policy code | Converts pipeline topology into handler completion requirements. |
 | `QueueableTrait` prompt consumption in `AIStep` | `inc/Core/Steps/AI/AIStep.php` | Data Machine flow queue semantics (`static`, `drain`, `loop`) feeding a runtime user-message slot. |
-| `ConversationManager` transcript persistence calls from `AIStep` | `AIStep`/`ConversationManager` | Adapts a pipeline job run to the conversation store. Generic runtime should not know jobs. |
+| `DataMachinePipelineTranscriptPersister` | `inc/Engine/AI/DataMachinePipelineTranscriptPersister.php` | Adapts a pipeline job run to the transcript store. Generic runtime calls the transcript persister contract and does not own job metadata. |
+| `DataMachineHandlerCompletionPolicy` | `inc/Engine/AI/DataMachineHandlerCompletionPolicy.php` | Adapts adjacent-handler completion rules into a runtime completion policy. Generic runtime calls the policy contract and does not own pipeline handler semantics. |
 | `SystemAgentServiceProvider` task registration | `inc/Engine/AI/System/SystemAgentServiceProvider.php` | Registers Data Machine system tasks into Data Machine scheduling. The generic runtime may supply a task interface, not these tasks. |
 | `AgentCallTask` | `inc/Engine/AI/System/Tasks/AgentCallTask.php` | Bridges scheduled/system tasks into the agent-call primitive. |
 | `AgentBundler` and bundle CLI adapters | `inc/Core/Agents/AgentBundler.php`, `inc/Cli/Commands/AgentBundleCommand.php` | Convert Data Machine pipelines/flows into portable agent bundle artifacts. Bundle primitives may split, but flow/pipeline import/export remains adapter/product. |
@@ -212,6 +215,7 @@ These tests currently pin the substrate most relevant to extraction.
 |---|---|---|
 | `tests/ai-message-envelope-smoke.php` | Agent message envelope normalization/projection and result validation. | Move with message/result contracts. |
 | `tests/agent-conversation-result-smoke.php` | Conversation result shape validation. | Move with runner result contract. |
+| `tests/agent-conversation-runtime-policy-smoke.php` | Runtime completion and transcript collaborator seams. | Split generic policy/persister contracts from Data Machine handler/transcript adapter assertions during extraction. |
 | `tests/conversation-store-contracts-smoke.php` | Split store interfaces, transcript-only method boundary, and factory return types. | Move transcript CRUD coverage with the generic contract; keep aggregate/product assertions with Data Machine. |
 | `tests/guideline-agent-memory-store-smoke.php` | Optional guideline-backed memory implementation. | Move or duplicate if Agents API ships memory store implementations. |
 | `tests/daily-memory-store-seam-smoke.php` | Daily memory through memory store seam. | Data Machine product consuming generic memory store. |
@@ -231,8 +235,8 @@ These tests currently pin the substrate most relevant to extraction.
 
 1. Split pipeline policy translation out of `ToolPolicyResolver` so the resolver no longer imports or reads `FlowStepConfig`.
 2. Split `AgentRegistry` into a pure registry and a Data Machine reconciler that creates database rows, access rows, directories, and scaffold files.
-3. Split `AIConversationLoop` completion policy so handler-tool completion is injected by Data Machine rather than built into a generic loop.
-4. Rename and stabilize message/result/store interfaces in place before moving namespaces.
+3. Rename and stabilize message/result/store interfaces in place before moving namespaces.
+4. Split provider request assembly from `RequestBuilder` so Data Machine directives/logging and `chubes_ai_request` fallback are adapter behavior.
 5. Split `ToolExecutor` into ability-native runtime execution plus Data Machine product hooks for pending actions and post-origin tracking.
 6. Decide whether Agents API owns persistence tables or only contracts plus optional stores.
 7. Keep wpcom/AI Framework classes behind adapters. No public contract should require `\WPCOM\AI\Message`, `\Agent`, `\AgentsStore`, or `Conversation_Storage`.

@@ -15,6 +15,7 @@ The initial untangling wave is complete:
 - Conversation transcript storage is narrowed behind a transcript facade, and the aggregate chat-product store is documented as a Data Machine compatibility layer rather than the default extraction target.
 - Memory store ownership is documented behind an Agents API-shaped store contract and filter name.
 - The runner request boundary exists.
+- The built-in loop now receives runtime completion and transcript collaborators. Data Machine's handler-completion and pipeline-transcript behavior lives behind adapter classes instead of being hardcoded as generic loop state.
 
 This branch starts the naming phase by renaming the neutral runner result/request seam from `AIConversation*` to `AgentConversation*` while leaving `AIConversationLoop` as the temporary compatibility facade.
 
@@ -29,6 +30,7 @@ Target shape:
 - `AgentConversationRunnerInterface` is the public runtime boundary.
 - `AgentConversationRequest` and `AgentConversationResult` are neutral value contracts.
 - `AIConversationLoop` remains a Data Machine compatibility facade until callers are moved to the new name.
+- `AgentConversationCompletionPolicyInterface` and `AgentConversationTranscriptPersisterInterface` are in-place runtime collaborator seams; Data Machine provides the current handler-completion and transcript adapters.
 - A future `AgentConversationLoop` or `WP_Agent_Runner` should not know about `job_id`, `flow_step_id`, `pipeline_id`, or handler completion policy.
 
 ### 2. Runtime Hooks And Filters
