@@ -91,7 +91,7 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 	public function test_is_network_key(): void {
 		$this->assertTrue( NetworkSettings::isNetworkKey( 'default_provider' ) );
 		$this->assertTrue( NetworkSettings::isNetworkKey( 'default_model' ) );
-		$this->assertTrue( NetworkSettings::isNetworkKey( 'agent_models' ) );
+		$this->assertTrue( NetworkSettings::isNetworkKey( 'mode_models' ) );
 		$this->assertFalse( NetworkSettings::isNetworkKey( 'disabled_tools' ) );
 		$this->assertFalse( NetworkSettings::isNetworkKey( 'site_context_enabled' ) );
 	}
@@ -105,16 +105,16 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 		$this->assertSame( 'anthropic', $raw['default_provider'] );
 	}
 
-	public function test_agent_models_stored_at_network_level(): void {
-		$agent_models = array(
+	public function test_mode_models_stored_at_network_level(): void {
+		$mode_models = array(
 			'chat'     => array( 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-20250514' ),
 			'pipeline' => array( 'provider' => 'openai', 'model' => 'gpt-4o-mini' ),
 		);
 
-		NetworkSettings::update( array( 'agent_models' => $agent_models ) );
+		NetworkSettings::update( array( 'mode_models' => $mode_models ) );
 		NetworkSettings::clearCache();
 
-		$this->assertSame( $agent_models, NetworkSettings::get( 'agent_models' ) );
+		$this->assertSame( $mode_models, NetworkSettings::get( 'mode_models' ) );
 	}
 
 	// --- PluginSettings::resolve() cascade ---
@@ -165,14 +165,14 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 
 	public function test_get_agent_model_site_override_wins(): void {
 		update_option( 'datamachine_settings', array(
-			'agent_models' => array(
+			'mode_models' => array(
 				'chat' => array( 'provider' => 'openai', 'model' => 'gpt-4o' ),
 			),
 		) );
 		PluginSettings::clearCache();
 
 		NetworkSettings::update( array(
-			'agent_models' => array(
+			'mode_models' => array(
 				'chat' => array( 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-20250514' ),
 			),
 		) );
@@ -183,12 +183,12 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 		$this->assertSame( 'gpt-4o', $result['model'] );
 	}
 
-	public function test_get_agent_model_falls_back_to_network_agent_models(): void {
+	public function test_get_agent_model_falls_back_to_network_mode_models(): void {
 		update_option( 'datamachine_settings', array() );
 		PluginSettings::clearCache();
 
 		NetworkSettings::update( array(
-			'agent_models' => array(
+			'mode_models' => array(
 				'pipeline' => array( 'provider' => 'openai', 'model' => 'gpt-4o-mini' ),
 			),
 		) );
@@ -228,14 +228,14 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 		// Site has provider override for chat, but no model.
 		// Network has model for chat.
 		update_option( 'datamachine_settings', array(
-			'agent_models' => array(
+			'mode_models' => array(
 				'chat' => array( 'provider' => 'openai', 'model' => '' ),
 			),
 		) );
 		PluginSettings::clearCache();
 
 		NetworkSettings::update( array(
-			'agent_models' => array(
+			'mode_models' => array(
 				'chat' => array( 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-20250514' ),
 			),
 		) );
