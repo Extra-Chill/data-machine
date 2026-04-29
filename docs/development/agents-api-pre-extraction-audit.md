@@ -52,12 +52,14 @@ Target shape:
 
 ### 3. Message Envelope Vocabulary
 
-`MessageEnvelope` is generic but still declares the schema `datamachine.ai.message`.
+`AgentMessageEnvelope` is the in-place Agents API-shaped name for the generic
+message contract. Its schema is `agents-api.message` while the class still lives
+inside Data Machine.
 
 Target shape:
 
-- Decide whether the public class is `WP_Agent_Message`, `AgentMessageEnvelope`, or a lower-level normalizer.
-- Rename schema metadata away from `datamachine.ai.message` before physical extraction.
+- Review whether the physically extracted public class should stay `AgentMessageEnvelope` or become `WP_Agent_Message`.
+- Keep schema metadata generic; do not reintroduce Data Machine-owned schema names for the shared contract.
 - Keep wpcom message DTOs as adapters/source material, not public dependency vocabulary.
 
 ### 4. Conversation Storage Boundary

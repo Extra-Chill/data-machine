@@ -13,7 +13,7 @@ Mirror the WordPress Abilities API shape instead of importing Data Machine, wpco
 | `datamachine_register_agent()` | `wp_register_agent()` | Same declarative pattern, but without DB reconciliation side effects in the public helper. |
 | `AgentRegistry` | `WP_Agents_Registry` | Registry should collect definitions. Persistence/adoption can remain adapter territory. |
 | `datamachine_register_agents` | `wp_agents_api_init` or `wp_register_agents` | Prefer a core-shaped init hook; exact name needs review against Abilities API precedent. |
-| `MessageEnvelope` | `WP_Agent_Message` or neutral envelope | Contract is generic. Data Machine schema/name is not. |
+| `AgentMessageEnvelope` | `WP_Agent_Message` or same class name | Contract is generic and now uses Agents API-shaped vocabulary in place. |
 | `ConversationTranscriptStoreInterface` | `WP_Agent_Conversation_Transcript_Store_Interface` | Transcript CRUD is the first extractable storage contract. Keep chat-product listing/read-state/reporting separate. |
 | `AgentMemoryStoreInterface` | `WP_Agent_Memory_Store_Interface` | Generic identity tuple needs naming review; Data Machine scaffolding/abilities stay outside the store contract. |
 | `RuntimeToolDeclaration` | `WP_Agent_Tool_Declaration` | Should stay ability-native and run-scoped. |
@@ -46,7 +46,7 @@ These are closest to generic public contracts. Most should be extracted as contr
 
 | Surface | Current location | Why it fits | Target notes |
 |---|---|---|---|
-| `MessageEnvelope` | `inc/Engine/AI/MessageEnvelope.php` | JSON-friendly canonical message envelope independent of flows/jobs. | Rename schema away from `datamachine.ai.message`; review whether public class is `WP_Agent_Message` or a neutral envelope helper. |
+| `AgentMessageEnvelope` | `inc/Engine/AI/AgentMessageEnvelope.php` | JSON-friendly canonical message envelope independent of flows/jobs. | Schema is `agents-api.message`; review whether physical extraction keeps this class name or adopts `WP_Agent_Message`. |
 | `AgentConversationResult` | `inc/Engine/AI/AgentConversationResult.php` | Validates result arrays from any runtime runner. | Rename to `WP_Agent_Run_Result` or split into result value object plus validator. |
 | `LoopEventSinkInterface` | `inc/Engine/AI/LoopEventSinkInterface.php` | Transport-neutral event sink for logs, streaming, CLI, REST, or chat UIs. | Make event vocabulary public and provider-neutral before extraction. |
 | `NullLoopEventSink` | `inc/Engine/AI/NullLoopEventSink.php` | Generic no-op implementation for optional event sinks. | Implementation can move with the interface. |
@@ -210,7 +210,7 @@ These tests currently pin the substrate most relevant to extraction.
 
 | Test | Covers | Extraction signal |
 |---|---|---|
-| `tests/ai-message-envelope-smoke.php` | Message envelope normalization/projection and result validation. | Move with message/result contracts. |
+| `tests/ai-message-envelope-smoke.php` | Agent message envelope normalization/projection and result validation. | Move with message/result contracts. |
 | `tests/agent-conversation-result-smoke.php` | Conversation result shape validation. | Move with runner result contract. |
 | `tests/conversation-store-contracts-smoke.php` | Split store interfaces, transcript-only method boundary, and factory return types. | Move transcript CRUD coverage with the generic contract; keep aggregate/product assertions with Data Machine. |
 | `tests/guideline-agent-memory-store-smoke.php` | Optional guideline-backed memory implementation. | Move or duplicate if Agents API ships memory store implementations. |

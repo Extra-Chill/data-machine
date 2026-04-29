@@ -23,7 +23,8 @@ use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
-use DataMachine\Engine\AI\MessageEnvelope;
+use DataMachine\Engine\AI\AgentMessageEnvelope;
+use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\Tasks\TaskRegistry;
 
 defined( 'ABSPATH' ) || exit;
@@ -374,7 +375,8 @@ class JobsCommand extends BaseCommand {
 		}
 
 		if ( 'yaml' === $format ) {
-			WP_CLI::log( \Spyc::YAMLDump( $job, false, false, true ) );
+			/** @phpstan-ignore-next-line Spyc is provided by WP-CLI at runtime. */
+			WP_CLI::log( (string) call_user_func( array( 'Spyc', 'YAMLDump' ), $job, false, false, true ) );
 			return;
 		}
 
@@ -492,7 +494,8 @@ class JobsCommand extends BaseCommand {
 				'model'      => $session['model'] ?? null,
 				'messages'   => $messages,
 			);
-			WP_CLI::log( \Spyc::YAMLDump( $payload, false, false, true ) );
+			/** @phpstan-ignore-next-line Spyc is provided by WP-CLI at runtime. */
+			WP_CLI::log( (string) call_user_func( array( 'Spyc', 'YAMLDump' ), $payload, false, false, true ) );
 			return;
 		}
 
@@ -545,9 +548,9 @@ class JobsCommand extends BaseCommand {
 		WP_CLI::log( '' );
 
 		foreach ( $messages as $idx => $message ) {
-			$message = MessageEnvelope::normalize( $message );
+			$message = AgentMessageEnvelope::normalize( $message );
 			$role    = $message['role'] ?? 'unknown';
-			$type    = $message['type'] ?? MessageEnvelope::TYPE_TEXT;
+			$type    = $message['type'] ?? AgentMessageEnvelope::TYPE_TEXT;
 			$content = $message['content'] ?? '';
 			$header  = sprintf( '[%d] %s (%s)', $idx, $role, $type );
 
@@ -720,6 +723,7 @@ class JobsCommand extends BaseCommand {
 
 		// Get the latest log message (usually contains failure reason).
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		/** @var object{message?: string, log_date_gmt?: string}|null $log */
 		$log = $wpdb->get_row(
 			$wpdb->prepare(
 				'SELECT message, log_date_gmt
@@ -733,7 +737,8 @@ class JobsCommand extends BaseCommand {
 		);
 
 		if ( $log && ! empty( $log->message ) ) {
-			WP_CLI::log( sprintf( '  Last Log: %s (%s)', $log->message, $log->log_date_gmt ) );
+			$log_date_gmt = is_string( $log->log_date_gmt ?? null ) ? $log->log_date_gmt : '';
+			WP_CLI::log( sprintf( '  Last Log: %s (%s)', $log->message, $log_date_gmt ) );
 		}
 	}
 
@@ -1240,6 +1245,11 @@ class JobsCommand extends BaseCommand {
 			}
 
 			$task = new $handlers[ $jtype ]();
+			if ( ! $task instanceof SystemTask ) {
+				WP_CLI::warning( sprintf( 'Job #%d: task type "%s" is not a SystemTask.', $jid, $jtype ) );
+				++$total_skipped;
+				continue;
+			}
 
 			if ( ! $task->supportsUndo() ) {
 				WP_CLI::log( sprintf( '  Job #%d: task type "%s" does not support undo.', $jid, $jtype ) );
@@ -1251,11 +1261,11 @@ class JobsCommand extends BaseCommand {
 			// the parent has no own effects; aggregate from children
 			// via Jobs::get_children so the preview is accurate.
 			if ( $dry_run ) {
-				$preview_effects = $engine_data['effects'] ?? array();
+				$preview_effects = is_array( $engine_data['effects'] ?? null ) ? $engine_data['effects'] : array();
 				if ( empty( $preview_effects ) ) {
 					foreach ( $jobs_db->get_children( (int) $jid ) as $child ) {
 						$child_data      = is_array( $child['engine_data'] ?? null ) ? $child['engine_data'] : array();
-						$child_effects   = $child_data['effects'] ?? array();
+						$child_effects   = is_array( $child_data['effects'] ?? null ) ? $child_data['effects'] : array();
 						$preview_effects = array_merge( $preview_effects, $child_effects );
 					}
 				}
@@ -1282,9 +1292,9 @@ class JobsCommand extends BaseCommand {
 			WP_CLI::log( sprintf( '  Job #%d (%s): undoing...', $jid, $jtype ) );
 			$result = $task->undo( $jid, $engine_data );
 
-			$reverted = is_array( $result['reverted'] ?? null ) ? $result['reverted'] : array();
-			$skipped  = is_array( $result['skipped'] ?? null ) ? $result['skipped'] : array();
-			$failed   = is_array( $result['failed'] ?? null ) ? $result['failed'] : array();
+			$reverted = $result['reverted'];
+			$skipped  = $result['skipped'];
+			$failed   = $result['failed'];
 
 			if ( empty( $reverted ) && empty( $skipped ) && empty( $failed ) ) {
 				WP_CLI::log( sprintf( '  Job #%d (%s): no effects to undo.', $jid, $jtype ) );

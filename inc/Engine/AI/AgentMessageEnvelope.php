@@ -1,6 +1,6 @@
 <?php
 /**
- * JSON-friendly AI message envelope contract.
+ * JSON-friendly agent message envelope contract.
  *
  * @package DataMachine\Engine\AI
  */
@@ -12,11 +12,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Normalizes Data Machine AI messages into the canonical typed envelope.
+ * Normalizes agent messages into the canonical typed envelope.
  */
-class MessageEnvelope {
+class AgentMessageEnvelope {
 
-	public const SCHEMA  = 'datamachine.ai.message';
+	public const SCHEMA  = 'agents-api.message';
 	public const VERSION = 1;
 
 	public const TYPE_TEXT              = 'text';

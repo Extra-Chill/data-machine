@@ -227,7 +227,7 @@ Data Machine makes no assumptions about how the adapter produces that result.
 A consumer can delegate to any external runtime — its own `Agent` subclass, a
 remote RPC service, a different language — as long as the return shape is
 honored. Returned messages may use the legacy `role/content/metadata` shape or
-the versioned [AI Message Envelope](./ai-message-envelope.md); Data Machine
+the versioned [Agent Message Envelope](./ai-message-envelope.md); Data Machine
 normalizes every returned message to the canonical envelope before callers store
 or render the result. Provider-specific `role/content/metadata` arrays are now a
 projection at the provider boundary, not the runtime/storage contract.

@@ -1419,14 +1419,14 @@ factory caches the store per request and applies the filter exactly once.
 
 **Message shape contract**
 
-Stores MUST normalize messages on read to Data Machine's canonical AI message
-envelope, documented in
+Stores MUST normalize messages on read to the canonical agent message envelope,
+documented in
 [`ai-message-envelope.md`](../../core-system/ai-message-envelope.md). The
 chat/session storage contract is this JSON-friendly envelope shape:
 
 ```php
 [
-	'schema'     => 'datamachine.ai.message',
+	'schema'     => 'agents-api.message',
 	'version'    => 1,
 	'type'       => 'text'|'tool_call'|'tool_result'|...,
 	'role'       => 'user'|'assistant'|'system'|'tool',
@@ -1441,7 +1441,7 @@ chat/session storage contract is this JSON-friendly envelope shape:
 
 The five Chat Session abilities and the DM chat UI consume this shape.
 Adapter stores that wrap another host runtime are responsible for translating
-host-specific message objects into Data Machine's envelope at the boundary and
+host-specific message objects into the canonical envelope at the boundary and
 returning envelopes on the way out. Provider-specific `role/content/metadata`
 arrays are projection shapes at provider boundaries, not the store contract.
 
