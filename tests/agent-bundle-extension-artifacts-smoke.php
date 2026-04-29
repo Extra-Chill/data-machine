@@ -233,7 +233,7 @@ $manifest = new AgentBundleManifest(
 		'handler_auth' => 'refs',
 	)
 );
-$directory = new AgentBundleDirectory( $manifest, array(), array(), array(), $export_artifacts );
+$directory = new AgentBundleDirectory( $manifest, array(), array(), array(), array(), $export_artifacts );
 $tmp       = sys_get_temp_dir() . '/datamachine-extension-bundle-' . getmypid();
 extension_rm_tree( $tmp );
 $directory->write( $tmp );
