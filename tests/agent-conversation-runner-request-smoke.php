@@ -128,10 +128,10 @@ assert_runner_request( array( 'wiki_upsert' ) === $request->adapterContext()['co
 assert_runner_request( false === $request->adapterContext()['persist_transcript'], 'adapter context carries transcript policy' );
 assert_runner_request( array( 'snapshot' => 'present' ) === $request->adapterContext()['engine'], 'adapter context carries engine snapshot' );
 
-// 2. The legacy facade still passes the old argument list to the runner filter.
+// 2. The compatibility facade passes the historical argument list to the Agents API runner filter.
 $legacy_filter_args = null;
 add_filter(
-	'datamachine_conversation_runner',
+	'agents_api_conversation_runner',
 	function ( $result, ...$args ) use ( &$legacy_filter_args ) {
 		$legacy_filter_args = array_merge( array( $result ), $args );
 		return null;
@@ -192,6 +192,29 @@ assert_runner_request( array() === $result['tool_execution_results'], 'facade no
 assert_runner_request( 5 === ( $result['usage']['total_tokens'] ?? null ), 'facade preserves usage totals' );
 assert_runner_request( is_array( $dispatched_request ), 'built-in runner dispatched a provider request' );
 assert_runner_request( array( 'turn_started', 'request_built', 'completed' ) === array_column( $sink->events, 'event' ), 'event sink survives request boundary' );
+
+$legacy_filter_ran = false;
+add_filter(
+	'datamachine_conversation_runner',
+	function ( $result ) use ( &$legacy_filter_ran ) {
+		$legacy_filter_ran = true;
+		return $result;
+	},
+	10,
+	1
+);
+
+AIConversationLoop::run(
+	$messages,
+	$tools,
+	'openai',
+	'gpt-smoke',
+	'pipeline',
+	$payload,
+	7,
+	true
+);
+assert_runner_request( false === $legacy_filter_ran, 'legacy Data Machine conversation-runner filter is no longer mirrored' );
 
 if ( runner_request_failure_count() > 0 ) {
 	exit( 1 );

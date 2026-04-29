@@ -1343,15 +1343,15 @@ $final_response = \DataMachine\Engine\AI\AIConversationLoop::run(
 ): array
 ```
 
-`run()` internally applies the `datamachine_conversation_runner` filter, giving
+`run()` internally applies the `agents_api_conversation_runner` filter, giving
 a registered runtime adapter the chance to short-circuit the built-in loop. If
 no adapter returns an array, Data Machine's built-in `execute()` runs.
 
-**Filter: `datamachine_conversation_runner`**
+**Filter: `agents_api_conversation_runner`**
 
 ```php
 apply_filters(
-    'datamachine_conversation_runner',
+    'agents_api_conversation_runner',
     null,           // Return non-null array to short-circuit
     $messages, $tools, $provider, $model,
     $context, $payload, $max_turns, $single_turn
@@ -1370,7 +1370,7 @@ for the full adapter contract.
 - Turn-based state management with chronological ordering
 - Duplicate message prevention
 - Maximum turn limiting (default: 25)
-- Runtime-swappable via `datamachine_conversation_runner`
+- Runtime-swappable via `agents_api_conversation_runner`
 
 ### ConversationStoreInterface (`/inc/Core/Database/Chat/ConversationStoreInterface.php`)
 

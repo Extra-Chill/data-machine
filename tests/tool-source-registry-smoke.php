@@ -199,7 +199,7 @@ assert_source_equals( array( 'custom_static_tool' ), array_keys( resolve_source_
 echo "\n[3] filters can add a source without disturbing default order:\n";
 remove_all_filters_for_source_smoke();
 add_filter(
-	'datamachine_tool_sources',
+	'agents_api_tool_sources',
 	static function ( array $sources, string $mode, array $args, ToolManager $tool_manager ): array {
 		unset( $mode, $args, $tool_manager );
 		$sources['extra_source'] = static function (): array {
@@ -213,7 +213,7 @@ add_filter(
 	4
 );
 add_filter(
-	'datamachine_tool_sources_for_mode',
+	'agents_api_tool_sources_for_mode',
 	static function ( array $sources, string $mode, array $args ): array {
 		unset( $args );
 		if ( ToolPolicyResolver::MODE_CHAT === $mode ) {
@@ -226,6 +226,30 @@ add_filter(
 );
 $tools = resolve_source_tools( ToolPolicyResolver::MODE_CHAT, new SourcePolicyToolManager() );
 assert_source_equals( array( 'chat_static_tool', 'extra_tool' ), array_keys( $tools ), 'filter appends extra source after static source', $failures, $passes );
+remove_all_filters_for_source_smoke();
+add_filter(
+	'datamachine_tool_sources',
+	static function ( array $sources ): array {
+		$sources['legacy_source'] = static function (): array {
+			return array(
+				'legacy_tool' => array( 'origin' => 'legacy', 'access_level' => 'public' ),
+			);
+		};
+		return $sources;
+	},
+	10,
+	1
+);
+add_filter(
+	'datamachine_tool_sources_for_mode',
+	static function ( array $sources ): array {
+		$sources[] = 'legacy_source';
+		return $sources;
+	},
+	10,
+	1
+);
+assert_source_equals( array( 'chat_static_tool' ), array_keys( resolve_source_tools( ToolPolicyResolver::MODE_CHAT, new SourcePolicyToolManager() ) ), 'legacy Data Machine tool-source filters are no longer mirrored', $failures, $passes );
 
 echo "\n[4] Data Machine source adapters own product vocabulary:\n";
 $registry_source          = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php' );

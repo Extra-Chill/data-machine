@@ -103,7 +103,7 @@ shape.
 
 ## Adapter Guidance
 
-Runtime adapters using `datamachine_conversation_runner` may return messages in
+Runtime adapters using `agents_api_conversation_runner` may return messages in
 either legacy or envelope shape. `AgentConversationResult::normalize()` normalizes
 every returned message to the canonical envelope before callers store or render
 the result.

@@ -111,7 +111,7 @@ if ($turn_count >= $max_turns && !$conversation_complete) {
 
 All callers should use the static `AIConversationLoop::run()` entry point. It
 accepts the same arguments as `execute()` and returns the same result shape,
-but first gives a registered runtime adapter (via the `datamachine_conversation_runner`
+but first gives a registered runtime adapter (via the `agents_api_conversation_runner`
 filter) the opportunity to short-circuit the built-in loop. See
 [Runtime Adapters](#runtime-adapters) below.
 
@@ -195,7 +195,7 @@ about that runtime.
 
 ```php
 apply_filters(
-    'datamachine_conversation_runner',
+    'agents_api_conversation_runner',
     null,           // Return non-null to short-circuit the built-in loop
     $messages,
     $tools,
@@ -236,7 +236,7 @@ projection at the provider boundary, not the runtime/storage contract.
 
 ```php
 add_filter(
-    'datamachine_conversation_runner',
+    'agents_api_conversation_runner',
     function ( $result, $messages, $tools, $provider, $model, $context, $payload, $max_turns, $single_turn ) {
         // Only take over for a specific context.
         if ( 'chat' !== $context ) {
@@ -272,7 +272,7 @@ conversation is run.
 Runtime adapters and the upcoming wp-ai-client migration operate at different
 layers and are independent:
 
-- `datamachine_conversation_runner` replaces the **conversation loop** — turn
+- `agents_api_conversation_runner` replaces the **conversation loop** — turn
   management, tool execution, completion detection.
 - The wp-ai-client migration (see Extra-Chill/data-machine#1027) replaces the
   **LLM request layer** that the built-in loop calls internally — a single
@@ -280,7 +280,7 @@ layers and are independent:
 
 When wp-ai-client lands, Data Machine's built-in `execute()` will call
 `wp_ai_client_prompt()` in place of `apply_filters('chubes_ai_request', ...)`.
-The `run()` entry point and the `datamachine_conversation_runner` filter
+The `run()` entry point and the `agents_api_conversation_runner` filter
 contract are unchanged, and adapters that replace the entire loop are
 unaffected — they bring their own LLM client as part of their runtime.
 

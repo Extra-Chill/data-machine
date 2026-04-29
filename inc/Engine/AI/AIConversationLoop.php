@@ -32,7 +32,7 @@ class AIConversationLoop {
 	 *
 	 * This is the canonical entry point every caller should use instead of
 	 * instantiating AIConversationLoop directly. It exposes a single filter
-	 * (`datamachine_conversation_runner`) that lets a consumer short-circuit the
+	 * (`agents_api_conversation_runner`) that lets a consumer short-circuit the
 	 * built-in loop with an alternative runtime while receiving the exact
 	 * same argument list and returning the exact same result shape. If the
 	 * filter returns null (the default), the built-in loop runs unchanged.
@@ -98,7 +98,7 @@ class AIConversationLoop {
 		 * @param bool       $single_turn  Single-turn mode flag.
 		 */
 		$filter_args = array(
-			'datamachine_conversation_runner',
+			'agents_api_conversation_runner',
 			null,
 			$messages,
 			$tools,

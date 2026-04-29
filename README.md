@@ -225,11 +225,11 @@ OpenAI, Anthropic, Google, Grok, OpenRouter — configure a global default per-s
 
 ## Runtime Adapters
 
-Data Machine ships its own multi-turn conversation loop and uses it by default. The loop is also swappable: a single filter (`datamachine_conversation_runner`) lets an external runtime take over while Data Machine still provides pipelines, flows, tool resolution, abilities, and memory.
+Data Machine ships its own multi-turn conversation loop and uses it by default. The loop is also swappable: a single Agents API-shaped filter (`agents_api_conversation_runner`) lets an external runtime take over while Data Machine still provides pipelines, flows, tool resolution, abilities, and memory.
 
 ```php
 add_filter(
-    'datamachine_conversation_runner',
+    'agents_api_conversation_runner',
     function ( $result, $messages, $tools, $provider, $model, $context, $payload, $max_turns, $single_turn ) {
         // Return an array matching AIConversationLoop::execute()'s shape to
         // replace the built-in loop, or null to let Data Machine run it.
