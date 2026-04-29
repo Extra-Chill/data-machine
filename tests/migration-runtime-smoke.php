@@ -1,5 +1,4 @@
 <?php
-// @phpstan-ignore-file
 
 /**
  * Pure-PHP smoke test for the schema-migration runtime (#1301).
