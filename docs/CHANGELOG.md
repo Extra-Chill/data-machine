@@ -2,6 +2,26 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.99.0] - 2026-04-29
+
+### Added
+- support plugin-defined artifact extensions
+- materialize artifact directories
+
+### Changed
+- baseline runtime smoke analysis
+- narrow transcript store resolution
+- split execution core from Data Machine decorators
+- clarify agent memory store boundary
+- split registry materialization
+- split adjacent handler source from registry
+- move pipeline policy args out of resolver
+
+### Fixed
+- skip recurring schedule reconciliation during install
+- migrate legacy mode model settings
+- skip deferred migrations during install
+
 ## [0.98.0] - 2026-04-28
 
 ### Added
