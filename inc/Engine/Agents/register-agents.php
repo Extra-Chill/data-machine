@@ -191,7 +191,13 @@ function datamachine_register_default_admin_agent(): void {
 
 	$default_config = array();
 	if ( class_exists( '\\DataMachine\\Core\\PluginSettings' ) ) {
-		$resolved = \DataMachine\Core\PluginSettings::getModelForMode( 'chat' );
+		$resolved = array_merge(
+			array(
+				'provider' => '',
+				'model'    => '',
+			),
+			\DataMachine\Core\PluginSettings::getModelForMode( 'chat' )
+		);
 		$provider = (string) $resolved['provider'];
 		$model    = (string) $resolved['model'];
 
