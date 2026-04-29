@@ -158,6 +158,10 @@ function datamachine_run_schema_migrations(): void {
  * @return void
  */
 function datamachine_maybe_run_deferred_migrations(): void {
+	if ( defined( 'WP_INSTALLING' ) && WP_INSTALLING ) {
+		return;
+	}
+
 	// Cheap path: option matches code. Most requests on a stable install.
 	$persisted = get_option( 'datamachine_db_version', '' );
 	if ( DATAMACHINE_VERSION === $persisted ) {
