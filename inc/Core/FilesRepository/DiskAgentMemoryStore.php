@@ -3,9 +3,13 @@
  * Disk Agent Memory Store
  *
  * Default implementation of {@see AgentMemoryStoreInterface} that persists
- * agent memory files on the local filesystem under wp-uploads. Preserves
- * the byte-for-byte behavior the codebase used before the store seam was
- * introduced.
+ * agent memory records as markdown files on the local filesystem under
+ * wp-uploads. Preserves the byte-for-byte behavior the codebase used before
+ * the store seam was introduced.
+ *
+ * This name describes the current Data Machine implementation. In a future
+ * Agents API extraction, the same behavior may be documented as a markdown or
+ * local-file memory store; no public rename happens in this PR.
  *
  * Concurrency: this implementation does not implement compare-and-swap.
  * The `$if_match` parameter on write() is accepted but ignored — the
@@ -111,12 +115,10 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 
 		$deleted = wp_delete_file( $filepath );
 
-		// wp_delete_file returns void; verify by re-checking existence.
-		if ( file_exists( $filepath ) ) {
+		if ( ! $deleted ) {
 			return AgentMemoryWriteResult::failure( 'io' );
 		}
 
-		unset( $deleted );
 		return AgentMemoryWriteResult::ok( '', 0 );
 	}
 

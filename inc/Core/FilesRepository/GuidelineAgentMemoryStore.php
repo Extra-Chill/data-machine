@@ -3,14 +3,14 @@
  * Guideline Agent Memory Store
  *
  * Optional {@see AgentMemoryStoreInterface} implementation that persists
- * agent memory files as `wp_guideline` posts tagged with
+ * agent memory records as `wp_guideline` posts tagged with
  * `wp_guideline_type=memory`.
  *
  * Data Machine does not register the Guidelines substrate and does not make
  * this store the default. Consumers that run on a host where Guidelines are
  * available can feature-detect {@see self::is_available()} and opt in via the
- * `datamachine_memory_store` filter. When unavailable, the built-in disk store
- * remains the default behavior.
+ * current `datamachine_memory_store` filter. When unavailable, the built-in
+ * disk store remains the default behavior.
  *
  * Identity model: one post = one (layer, user_id, agent_id, filename) tuple.
  * Filename is the relative path within the layer (`MEMORY.md`,

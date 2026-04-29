@@ -15,7 +15,7 @@ Mirror the WordPress Abilities API shape instead of importing Data Machine, wpco
 | `datamachine_register_agents` | `wp_agents_api_init` or `wp_register_agents` | Prefer a core-shaped init hook; exact name needs review against Abilities API precedent. |
 | `MessageEnvelope` | `WP_Agent_Message` or neutral envelope | Contract is generic. Data Machine schema/name is not. |
 | `ConversationStoreInterface` | `WP_Agent_Conversation_Store_Interface` | Keep transcript/session/read-state split if it remains boring. |
-| `AgentMemoryStoreInterface` | `WP_Agent_Memory_Store_Interface` | Generic identity tuple needs naming review. |
+| `AgentMemoryStoreInterface` | `WP_Agent_Memory_Store_Interface` | Generic identity tuple needs naming review; Data Machine scaffolding/abilities stay outside the store contract. |
 | `RuntimeToolDeclaration` | `WP_Agent_Tool_Declaration` | Should stay ability-native and run-scoped. |
 | `LoopEventSinkInterface` | `WP_Agent_Run_Event_Sink_Interface` | Useful for logs, streaming, chat UIs, and async workers. |
 | REST `datamachine/v1` agent routes | REST `wp-agents/v1` | Data Machine product routes stay under `datamachine/v1`. |
@@ -173,7 +173,7 @@ These are reference points only. Do not expose them as public Data Machine or Ag
 |---|---|---|
 | `datamachine_conversation_runner` | Agents API public candidate | Generic runtime replacement seam. Rename and formalize result contract. |
 | `datamachine_conversation_store` | Agents API public candidate | Generic conversation persistence swap seam. Rename and keep narrow contracts. |
-| `datamachine_memory_store` | Agents API public candidate | Generic memory persistence swap seam. Rename to Agents API vocabulary. |
+| `datamachine_memory_store` | Agents API public candidate | Generic memory persistence swap seam. Keep as Data Machine's current public behavior until extraction; introduce a neutral Agents API filter only when that package owns the resolver and migration path. |
 | `datamachine_register_agents` | Agents API public candidate | Registration hook should become WordPress-shaped. |
 | `datamachine_registered_agent_reconciled` | Agents API implementation candidate | Lifecycle event is useful, current reconciliation semantics are Data Machine implementation. |
 | `datamachine_guideline_updated` | Agents API public candidate | Generic memory/guideline change event after naming review. |
