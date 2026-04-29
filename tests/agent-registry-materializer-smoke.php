@@ -248,8 +248,10 @@ namespace {
 	assert_agent_materializer_equals( 1, count( ScaffoldAbilities::$ability->calls ), 'existing row does not scaffold again', $failures, $passes );
 
 	echo "\n[4] materializer owns Data Machine side-effect dependencies:\n";
+	$registration_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/Agents/register-agents.php' );
 	$registry_source     = (string) file_get_contents( __DIR__ . '/../inc/Engine/Agents/AgentRegistry.php' );
 	$materializer_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/Agents/AgentMaterializer.php' );
+	assert_agent_materializer_equals( false, (bool) preg_match( '/function\s+datamachine_register_agent[^{]*{[^}]*wp_register_agent\s*\(/s', $registration_source ), 'legacy helper writes directly to Data Machine registry instead of delegating to wp_register_agent', $failures, $passes );
 	assert_agent_materializer_equals( false, false !== strpos( $registry_source, 'Core\\Database\\Agents' ), 'registry no longer imports agent database repositories', $failures, $passes );
 	assert_agent_materializer_equals( false, false !== strpos( $registry_source, 'ScaffoldAbilities' ), 'registry no longer imports scaffold ability', $failures, $passes );
 	assert_agent_materializer_equals( true, false !== strpos( $materializer_source, 'Core\\Database\\Agents' ), 'materializer owns agent database repositories', $failures, $passes );

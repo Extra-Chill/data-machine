@@ -61,7 +61,7 @@ if ( ! function_exists( 'wp_register_agent' ) ) {
  * @return void
  */
 function datamachine_register_agent( string $slug, array $args = array() ): void {
-	wp_register_agent( $slug, $args );
+	AgentRegistry::register( $slug, $args );
 }
 
 /**
