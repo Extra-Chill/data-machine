@@ -728,7 +728,7 @@ class AIConversationLoop {
 			return '';
 		}
 
-		$store = ConversationStoreFactory::get();
+		$store = ConversationStoreFactory::get_transcript_store();
 
 		$user_id  = (int) ( $payload['user_id'] ?? 0 );
 		$agent_id = (int) ( $payload['agent_id'] ?? 0 );

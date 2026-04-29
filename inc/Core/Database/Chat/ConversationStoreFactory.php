@@ -78,6 +78,7 @@ class ConversationStoreFactory {
 		 *
 		 * @param ConversationStoreInterface $store Default MySQL-table store.
 		 */
+		/** @var mixed $resolved */
 		$resolved = apply_filters( 'datamachine_conversation_store', $default );
 
 		if ( $resolved instanceof ConversationStoreInterface ) {
@@ -96,6 +97,20 @@ class ConversationStoreFactory {
 
 		self::$instance = $default;
 		return self::$instance;
+	}
+
+	/**
+	 * Resolve the active transcript store.
+	 *
+	 * This intentionally reuses the aggregate store/filter resolution so the
+	 * existing `datamachine_conversation_store` seam and chat UI callers keep
+	 * their current behavior while runtime transcript persistence depends only
+	 * on the narrow CRUD contract.
+	 *
+	 * @return ConversationTranscriptStoreInterface
+	 */
+	public static function get_transcript_store(): ConversationTranscriptStoreInterface {
+		return self::get();
 	}
 
 	/**
