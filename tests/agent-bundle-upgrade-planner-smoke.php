@@ -123,6 +123,7 @@ if ( ! class_exists( 'WP_Error' ) ) {
 	class WP_Error {
 		private string $message;
 		public function __construct( string $code = '', string $message = '' ) {
+			unset( $code );
 			$this->message = $message;
 		}
 		public function get_error_message() {
@@ -136,8 +137,11 @@ require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleUpgradeActionHa
 
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
+use DataMachine\Engine\Bundle\AgentBundleDirectory;
+use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
+use DataMachine\Engine\Bundle\BundleSchema;
 
 $failures = 0;
 $total    = 0;
@@ -221,7 +225,7 @@ echo "\n[2] Preview diff is artifact-level and secret-safe\n";
 $approval = $plan_array['needs_approval'][0] ?? array();
 assert_upgrade_plan( 'approval entry includes before payload', isset( $approval['diff']['before']['note'] ) );
 assert_upgrade_plan_equals( 'secret-like target keys are redacted', '[redacted]', $approval['diff']['after']['api_token'] ?? null );
-assert_upgrade_plan( 'raw secret value is absent from preview', false === strpos( json_encode( $plan_array ), 'secret-token-value' ) );
+assert_upgrade_plan( 'raw secret value is absent from preview', false === strpos( (string) json_encode( $plan_array ), 'secret-token-value' ) );
 
 echo "\n[3] PendingAction stages bundle-upgrade previews\n";
 $staged = AgentBundleUpgradePendingAction::stage(
@@ -261,7 +265,71 @@ assert_upgrade_plan_equals( 'only approved artifact writer ran', array( 'pipelin
 assert_upgrade_plan_equals( 'apply result records one applied artifact', 1, count( $resolved['result']['applied'] ?? array() ) );
 assert_upgrade_plan_equals( 'unapproved target artifacts are skipped', 3, count( $resolved['result']['skipped'] ?? array() ) );
 
+echo "\n[5] Directory artifacts materialize every advertised artifact type\n";
+$directory = new AgentBundleDirectory(
+	new AgentBundleManifest(
+		'2026-04-28T12:00:00Z',
+		'data-machine/test',
+		'Bundle Artifact Dirs',
+		'1.0.0',
+		'refs/heads/main',
+		'abc123',
+		array(
+			'slug'         => 'bundle-agent',
+			'label'        => 'Bundle Agent',
+			'description'  => 'Tests materialized bundle artifacts.',
+			'agent_config' => array(),
+		),
+		array(
+			'memory'        => array( 'MEMORY.md' ),
+			'pipelines'     => array(),
+			'flows'         => array(),
+			'prompts'       => array( 'extract-facts' ),
+			'rubrics'       => array( 'wiki-quality' ),
+			'tool_policies' => array( 'read-only-context' ),
+			'auth_refs'     => array( 'github-default' ),
+			'seed_queues'   => array( 'mgs-topic-loop' ),
+			'handler_auth'  => 'refs',
+		)
+	),
+	array( 'MEMORY.md' => "memory\n" ),
+	array(),
+	array(),
+	array(
+		BundleSchema::PROMPTS_DIR       => array( 'extract-facts.md' => "Extract facts.\n" ),
+		BundleSchema::RUBRICS_DIR       => array( 'wiki-quality.json' => array( 'threshold' => 4 ) ),
+		BundleSchema::TOOL_POLICIES_DIR => array( 'read-only-context.json' => array( 'allow' => array( 'datamachine/search' ) ) ),
+		BundleSchema::AUTH_REFS_DIR     => array(
+			'github-default.json' => array(
+				'ref'        => 'github:default',
+				'account_id' => 42,
+				'api_key'    => 'do-not-show',
+				'nested'     => array( 'refresh_token' => 'also-secret' ),
+			),
+		),
+		BundleSchema::SEED_QUEUES_DIR   => array( 'mgs-topic-loop.json' => array( 'items' => array( 'launch history' ) ) ),
+	)
+);
+$artifacts          = AgentBundleUpgradePlanner::artifacts_from_bundle( $directory );
+$artifacts_by_key   = array();
+foreach ( $artifacts as $artifact ) {
+	$artifacts_by_key[ $artifact['artifact_type'] . ':' . $artifact['artifact_id'] ] = $artifact;
+}
+assert_upgrade_plan( 'prompt artifact emitted from prompts directory', isset( $artifacts_by_key['prompt:extract-facts'] ) );
+assert_upgrade_plan( 'rubric artifact emitted from rubrics directory', isset( $artifacts_by_key['rubric:wiki-quality'] ) );
+assert_upgrade_plan( 'tool policy artifact emitted from tool-policies directory', isset( $artifacts_by_key['tool_policy:read-only-context'] ) );
+assert_upgrade_plan( 'auth ref artifact emitted from auth-refs directory', isset( $artifacts_by_key['auth_ref:github-default'] ) );
+assert_upgrade_plan( 'seed queue artifact emitted from seed-queues directory', isset( $artifacts_by_key['seed_queue:mgs-topic-loop'] ) );
+assert_upgrade_plan_equals( 'prompt source path is deterministic', 'prompts/extract-facts.md', $artifacts_by_key['prompt:extract-facts']['source_path'] ?? null );
+
+$auth_plan = AgentBundleUpgradePlanner::plan( array(), array(), array( $artifacts_by_key['auth_ref:github-default'] ) )->to_array();
+$auth_diff = $auth_plan['auto_apply'][0]['diff']['after'] ?? array();
+assert_upgrade_plan_equals( 'auth ref api_key is redacted in preview', '[redacted]', $auth_diff['api_key'] ?? null );
+assert_upgrade_plan_equals( 'auth ref nested refresh token is redacted in preview', '[redacted]', $auth_diff['nested']['refresh_token'] ?? null );
+assert_upgrade_plan( 'auth ref preview does not leak raw secret values', false === strpos( (string) json_encode( $auth_plan ), 'do-not-show' ) && false === strpos( (string) json_encode( $auth_plan ), 'also-secret' ) );
+
 echo "\nTotal assertions: {$total}\n";
+// @phpstan-ignore-next-line Smoke assertions mutate this counter through a global helper.
 if ( 0 !== $failures ) {
 	echo "Failures: {$failures}\n";
 	exit( 1 );

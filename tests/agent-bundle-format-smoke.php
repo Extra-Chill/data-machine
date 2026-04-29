@@ -317,7 +317,14 @@ $bundle = new AgentBundleDirectory(
 		'daily/2026-04-26.md' => "# Daily\n",
 	),
 	array( $pipeline ),
-	array( $flow )
+	array( $flow ),
+	array(
+		BundleSchema::PROMPTS_DIR       => array( 'extract-facts.md' => "Extract facts.\n" ),
+		BundleSchema::RUBRICS_DIR       => array( 'wiki-quality.json' => array( 'min_score' => 4, 'slug' => 'wiki-quality' ) ),
+		BundleSchema::TOOL_POLICIES_DIR => array( 'read-only-context.json' => array( 'allow' => array( 'datamachine/search' ) ) ),
+		BundleSchema::AUTH_REFS_DIR     => array( 'github-default.json' => array( 'ref' => 'github:default', 'metadata' => array( 'account_id' => 42 ) ) ),
+		BundleSchema::SEED_QUEUES_DIR   => array( 'mgs-topic-loop.json' => array( 'mode' => 'loop', 'items' => array( 'launch history' ) ) ),
+	)
 );
 $tmp = sys_get_temp_dir() . '/datamachine-agent-bundle-' . getmypid();
 rm_tree( $tmp );
@@ -327,6 +334,11 @@ assert_bundle( 'manifest.json written', is_file( $tmp . '/manifest.json' ) );
 assert_bundle( 'memory/SOUL.md written as markdown file', is_file( $tmp . '/memory/SOUL.md' ) );
 assert_bundle( 'pipeline file named by portable slug', is_file( $tmp . '/pipelines/wc-daily-ingest.json' ) );
 assert_bundle( 'flow file named by portable slug', is_file( $tmp . '/flows/wc-daily-ingest-flow.json' ) );
+assert_bundle( 'prompt artifact written', is_file( $tmp . '/prompts/extract-facts.md' ) );
+assert_bundle( 'rubric artifact written', is_file( $tmp . '/rubrics/wiki-quality.json' ) );
+assert_bundle( 'tool policy artifact written', is_file( $tmp . '/tool-policies/read-only-context.json' ) );
+assert_bundle( 'auth ref artifact written', is_file( $tmp . '/auth-refs/github-default.json' ) );
+assert_bundle( 'seed queue artifact written', is_file( $tmp . '/seed-queues/mgs-topic-loop.json' ) );
 
 $read = AgentBundleDirectory::read( $tmp );
 assert_bundle_equals( 'read manifest preserves agent slug', 'woocommerce-agent', $read->manifest()->agent_slug() );
@@ -334,6 +346,18 @@ assert_bundle_equals( 'read memory files preserve nested daily file', "# Daily\n
 assert_bundle_equals( 'one pipeline read', 1, count( $read->pipelines() ) );
 assert_bundle_equals( 'one flow read', 1, count( $read->flows() ) );
 assert_bundle_equals( 'round-trip manifest array stable', $manifest->to_array(), $read->manifest()->to_array() );
+assert_bundle_equals( 'read prompt artifact keeps text payload', "Extract facts.\n", $read->prompts()['extract-facts.md'] ?? null );
+assert_bundle_equals( 'read rubric artifact decodes JSON payload', 4, $read->rubrics()['wiki-quality.json']['min_score'] ?? null );
+assert_bundle_equals( 'read tool policy artifact decodes JSON payload', array( 'datamachine/search' ), $read->tool_policies()['read-only-context.json']['allow'] ?? null );
+assert_bundle_equals( 'read auth ref artifact decodes JSON payload', 'github:default', $read->auth_refs()['github-default.json']['ref'] ?? null );
+assert_bundle_equals( 'read seed queue artifact decodes JSON payload', 'launch history', $read->seed_queues()['mgs-topic-loop.json']['items'][0] ?? null );
+
+$round_trip = sys_get_temp_dir() . '/datamachine-agent-bundle-round-trip-' . getmypid();
+rm_tree( $round_trip );
+$read->write( $round_trip );
+assert_bundle_equals( 'round-trip prompt contents preserved', "Extract facts.\n", file_get_contents( $round_trip . '/prompts/extract-facts.md' ) );
+assert_bundle_equals( 'round-trip auth ref JSON is deterministic', file_get_contents( $tmp . '/auth-refs/github-default.json' ), file_get_contents( $round_trip . '/auth-refs/github-default.json' ) );
+rm_tree( $round_trip );
 
 echo "\n[5] JSON output is stable and review-friendly\n";
 $encoded_manifest = file_get_contents( $tmp . '/manifest.json' );
