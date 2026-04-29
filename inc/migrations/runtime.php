@@ -123,6 +123,10 @@ function datamachine_run_schema_migrations(): void {
 	// Idempotent.
 	datamachine_migrate_agent_config_model_shape();
 
+	// Migrate legacy site/network context_models and agent_models settings to
+	// canonical mode_models storage (idempotent).
+	datamachine_migrate_settings_mode_models();
+
 	// Drop redundant _datamachine_post_pipeline_id rows (#1091). Idempotent.
 	datamachine_drop_redundant_post_pipeline_meta();
 
