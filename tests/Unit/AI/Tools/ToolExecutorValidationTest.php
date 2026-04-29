@@ -7,6 +7,7 @@
 
 namespace DataMachine\Tests\Unit\AI\Tools;
 
+use DataMachine\Engine\AI\Tools\Execution\ToolExecutionCore;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use WP_UnitTestCase;
@@ -263,7 +264,7 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 	}
 
 	private function invokeValidateMethod( array $tool_parameters, array $tool_def ): array {
-		$reflection = new ReflectionClass( ToolExecutor::class );
+		$reflection = new ReflectionClass( ToolExecutionCore::class );
 		$method     = $reflection->getMethod( 'validateRequiredParameters' );
 		$method->setAccessible( true );
 

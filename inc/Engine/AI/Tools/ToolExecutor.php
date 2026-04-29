@@ -14,6 +14,7 @@ namespace DataMachine\Engine\AI\Tools;
 use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
 use DataMachine\Engine\AI\Actions\PendingActionHelper;
+use DataMachine\Engine\AI\Tools\Execution\ToolExecutionCore;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -55,33 +56,15 @@ class ToolExecutor {
 		int $agent_id = 0,
 		array $client_context = array()
 	): array {
-		$tool_def = $available_tools[ $tool_name ] ?? null;
-		if ( ! $tool_def ) {
-			return array(
-				'success'   => false,
-				'error'     => "Tool '{$tool_name}' not found",
-				'tool_name' => $tool_name,
-			);
+		$core     = new ToolExecutionCore();
+		$prepared = $core->prepareToolCall( $tool_name, $tool_parameters, $available_tools, $payload );
+		if ( empty( $prepared['ready'] ) ) {
+			unset( $prepared['ready'] );
+			return $prepared;
 		}
 
-		$validation = self::validateRequiredParameters( $tool_parameters, $tool_def );
-		if ( ! $validation['valid'] ) {
-			return array(
-				'success'   => false,
-				'error'     => sprintf(
-					'%s requires the following parameters: %s. Please provide these parameters and try again.',
-					ucwords( str_replace( '_', ' ', $tool_name ) ),
-					implode( ', ', $validation['missing'] )
-				),
-				'tool_name' => $tool_name,
-			);
-		}
-
-		$complete_parameters = ToolParameters::buildParameters(
-			$tool_parameters,
-			$payload,
-			$tool_def
-		);
+		$tool_def            = $prepared['tool_def'];
+		$complete_parameters = $prepared['parameters'];
 
 		// Resolve the action policy for this invocation. Tools without
 		// action_policy metadata resolve to 'direct' and behave exactly
@@ -155,11 +138,7 @@ class ToolExecutor {
 		}
 
 		// Policy is 'direct' (or 'preview' fell back) — execute the tool normally.
-		if ( self::isAbilityOnlyTool( $tool_def ) ) {
-			$tool_result = self::executeAbilityTool( $tool_name, $complete_parameters, $tool_def );
-		} else {
-			$tool_result = self::executeLegacyTool( $tool_name, $complete_parameters, $tool_def );
-		}
+		$tool_result = $core->executePreparedTool( $tool_name, $complete_parameters, $tool_def );
 
 		// Automatic post origin tracking — applies to every tool whose result
 		// contains an extractable post_id. This covers both handler tools
@@ -178,139 +157,6 @@ class ToolExecutor {
 		}
 
 		return $tool_result;
-	}
-
-	/**
-	 * Whether a tool should execute directly through a linked WordPress Ability.
-	 *
-	 * Legacy class/method definitions stay authoritative during the migration.
-	 * This branch only handles the new ability-native shape for a single linked
-	 * ability; composed multi-ability tools remain on their existing adapters.
-	 *
-	 * @param array $tool_def Tool definition.
-	 * @return bool
-	 */
-	private static function isAbilityOnlyTool( array $tool_def ): bool {
-		return ! empty( $tool_def['ability'] )
-			&& empty( $tool_def['class'] )
-			&& empty( $tool_def['method'] );
-	}
-
-	/**
-	 * Execute a tool through its linked WordPress Ability.
-	 *
-	 * @param string $tool_name  Tool name.
-	 * @param array  $parameters Complete tool parameters.
-	 * @param array  $tool_def   Tool definition.
-	 * @return array Tool execution result.
-	 */
-	private static function executeAbilityTool( string $tool_name, array $parameters, array $tool_def ): array {
-		$ability_slug = (string) $tool_def['ability'];
-		if ( ! class_exists( '\\WP_Abilities_Registry' ) ) {
-			return array(
-				'success'   => false,
-				'error'     => sprintf( "Tool '%s' references ability '%s', but the WordPress Abilities API is not available.", $tool_name, $ability_slug ),
-				'tool_name' => $tool_name,
-				'ability'   => $ability_slug,
-			);
-		}
-
-		$registry     = \WP_Abilities_Registry::get_instance();
-		$ability      = $registry ? $registry->get_registered( $ability_slug ) : null;
-
-		if ( ! $ability ) {
-			return array(
-				'success'   => false,
-				'error'     => sprintf( "Tool '%s' references missing ability '%s'.", $tool_name, $ability_slug ),
-				'tool_name' => $tool_name,
-				'ability'   => $ability_slug,
-			);
-		}
-
-		$permission = $ability->check_permissions( $parameters );
-		if ( is_wp_error( $permission ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $permission->get_error_message(),
-				'tool_name' => $tool_name,
-				'ability'   => $ability_slug,
-			);
-		}
-
-		if ( true !== $permission ) {
-			return array(
-				'success'   => false,
-				'error'     => sprintf( "Tool '%s' is not permitted by ability '%s'.", $tool_name, $ability_slug ),
-				'tool_name' => $tool_name,
-				'ability'   => $ability_slug,
-			);
-		}
-
-		$result = $ability->execute( $parameters );
-		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $result->get_error_message(),
-				'tool_name' => $tool_name,
-				'ability'   => $ability_slug,
-			);
-		}
-
-		if ( is_array( $result ) ) {
-			return $result;
-		}
-
-		return array(
-			'success'   => true,
-			'tool_name' => $tool_name,
-			'ability'   => $ability_slug,
-			'result'    => $result,
-		);
-	}
-
-	/**
-	 * Execute a legacy class/method tool definition.
-	 *
-	 * @param string $tool_name  Tool name.
-	 * @param array  $parameters Complete tool parameters.
-	 * @param array  $tool_def   Tool definition.
-	 * @return array Tool execution result.
-	 */
-	private static function executeLegacyTool( string $tool_name, array $parameters, array $tool_def ): array {
-		// Ensure tool definition has required 'class' key.
-		if ( ! isset( $tool_def['class'] ) || empty( $tool_def['class'] ) ) {
-			return array(
-				'success'   => false,
-				'error'     => "Tool '{$tool_name}' is missing required 'class' definition. This may indicate the tool was not properly resolved from a callable.",
-				'tool_name' => $tool_name,
-			);
-		}
-
-		$class_name = $tool_def['class'];
-		if ( ! class_exists( $class_name ) ) {
-			return array(
-				'success'   => false,
-				'error'     => "Tool class '{$class_name}' not found",
-				'tool_name' => $tool_name,
-			);
-		}
-
-		$method = $tool_def['method'] ?? null;
-		if ( ! $method || ! method_exists( $class_name, $method ) ) {
-			return array(
-				'success'   => false,
-				'error'     => sprintf(
-					"Tool '%s' definition is missing required 'method' key or method '%s' does not exist on class '%s'.",
-					$tool_name,
-					$method ?? '(none)',
-					$class_name
-				),
-				'tool_name' => $tool_name,
-			);
-		}
-
-		$tool_handler = new $class_name();
-		return $tool_handler->$method( $parameters, $tool_def );
 	}
 
 	/**
@@ -382,37 +228,4 @@ class ToolExecutor {
 		return array_diff_key( $parameters, $redact );
 	}
 
-	/**
-	 * Validate that all required parameters are present.
-	 *
-	 * @param  array $tool_parameters Parameters from AI
-	 * @param  array $tool_def        Tool definition with parameter specs
-	 * @return array Validation result with 'valid', 'required', and 'missing' keys
-	 */
-	private static function validateRequiredParameters( array $tool_parameters, array $tool_def ): array {
-		$required = array();
-		$missing  = array();
-
-		$param_defs = $tool_def['parameters'] ?? array();
-
-		foreach ( $param_defs as $param_name => $param_config ) {
-			if ( ! is_array( $param_config ) ) {
-				continue;
-			}
-
-			if ( ! empty( $param_config['required'] ) ) {
-				$required[] = $param_name;
-
-				if ( ! isset( $tool_parameters[ $param_name ] ) || '' === $tool_parameters[ $param_name ] ) {
-					$missing[] = $param_name;
-				}
-			}
-		}
-
-		return array(
-			'valid'    => empty( $missing ),
-			'required' => $required,
-			'missing'  => $missing,
-		);
-	}
 }
