@@ -167,7 +167,7 @@ class SystemCommand extends BaseCommand {
 	 *
 	 * Triggers a registered system task for immediate execution via the
 	 * datamachine/run-task ability. Only tasks with supports_run: true
-	 * can be triggered (currently alt_text_generation and daily_memory_generation).
+	 * can be triggered.
 	 *
 	 * ## OPTIONS
 	 *
@@ -199,7 +199,7 @@ class SystemCommand extends BaseCommand {
 	 *
 	 *     wp datamachine system run daily_memory_generation
 	 *     wp datamachine system run alt_text_generation --format=json
-	 *     wp datamachine system run wiki_maintain --param=root_path=woocommerce --dry-run
+	 *     wp datamachine system run retention_logs --dry-run
 	 *
 	 * @subcommand run
 	 */
