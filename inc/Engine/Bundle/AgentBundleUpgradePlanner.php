@@ -135,6 +135,10 @@ final class AgentBundleUpgradePlanner {
 			}
 		}
 
+		foreach ( $bundle->extension_artifacts() as $artifact ) {
+			$artifacts[] = $artifact;
+		}
+
 		return $artifacts;
 	}
 

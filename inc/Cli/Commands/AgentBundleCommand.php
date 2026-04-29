@@ -13,6 +13,7 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
+use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
 use DataMachine\Engine\Bundle\PortableSlug;
@@ -222,6 +223,7 @@ class AgentBundleCommand extends BaseCommand {
 				$plan,
 				array(
 					'bundle'           => $this->bundle_summary( $bundle, $slug ),
+					'agent'            => $agent ? $agent : array(),
 					'target_artifacts' => $this->bundle_artifacts( $bundle ),
 					'summary'          => 'Review locally modified bundle artifacts before applying.',
 					'agent_id'         => $agent ? (int) $agent['agent_id'] : 0,
@@ -355,6 +357,10 @@ class AgentBundleCommand extends BaseCommand {
 			);
 		}
 
+		foreach ( AgentBundleArtifactExtensions::normalize_artifacts( is_array( $bundle['extension_artifacts'] ?? null ) ? $bundle['extension_artifacts'] : array() ) as $artifact ) {
+			$artifacts[] = $artifact;
+		}
+
 		return $artifacts;
 	}
 
@@ -401,6 +407,15 @@ class AgentBundleCommand extends BaseCommand {
 				);
 			}
 		}
+
+		$artifacts = array_merge(
+			$artifacts,
+			AgentBundleArtifactExtensions::current_artifacts(
+				$agent,
+				$installed,
+				array( 'agent_id' => $agent_id )
+			)
+		);
 
 		return $artifacts;
 	}
@@ -534,8 +549,9 @@ class AgentBundleCommand extends BaseCommand {
 			return (int) $value;
 		}
 		$user = is_email( $value ) ? get_user_by( 'email', $value ) : get_user_by( 'login', $value );
-		if ( ! $user ) {
+		if ( ! $user instanceof \WP_User ) {
 			WP_CLI::error( sprintf( 'User "%s" not found.', (string) $value ) );
+			return 0;
 		}
 
 		return (int) $user->ID;

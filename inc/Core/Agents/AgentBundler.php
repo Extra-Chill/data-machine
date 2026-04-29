@@ -18,6 +18,7 @@ use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
+use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
@@ -116,6 +117,7 @@ class AgentBundler {
 		$flows                     = $this->flows_repo->get_all_flows( null, $agent_id );
 		$pipeline_documents        = array();
 		$flow_documents            = array();
+		$extension_artifacts       = AgentBundleArtifactExtensions::export_artifacts( $agent, array( 'agent_id' => $agent_id ) );
 		$memory_files              = array();
 		$pipeline_slugs_by_id      = array();
 		$pipeline_step_types_by_id = array();
@@ -185,9 +187,10 @@ class AgentBundler {
 			}
 		}
 
-		$pipeline_slugs = array_map( fn( AgentBundlePipelineFile $pipeline ) => $pipeline->slug(), $pipeline_documents );
-		$flow_slugs     = array_map( fn( AgentBundleFlowFile $flow ) => $flow->slug(), $flow_documents );
-		$manifest       = new AgentBundleManifest(
+		$pipeline_slugs  = array_map( fn( AgentBundlePipelineFile $pipeline ) => $pipeline->slug(), $pipeline_documents );
+		$flow_slugs      = array_map( fn( AgentBundleFlowFile $flow ) => $flow->slug(), $flow_documents );
+		$extension_paths = array_map( static fn( array $artifact ) => (string) ( $artifact['source_path'] ?? '' ), $extension_artifacts );
+		$manifest        = new AgentBundleManifest(
 			gmdate( 'c' ),
 			defined( 'DATAMACHINE_VERSION' ) ? 'data-machine/' . DATAMACHINE_VERSION : 'data-machine/unknown',
 			sanitize_title( (string) $agent['agent_slug'] ),
@@ -204,6 +207,7 @@ class AgentBundler {
 				'memory'       => array_keys( $memory_files ),
 				'pipelines'    => $pipeline_slugs,
 				'flows'        => $flow_slugs,
+				'extensions'   => array_values( array_filter( $extension_paths ) ),
 				'handler_auth' => 'refs',
 			)
 		);
@@ -211,7 +215,7 @@ class AgentBundler {
 		return array(
 			'success'   => true,
 			'agent'     => $agent,
-			'directory' => new AgentBundleDirectory( $manifest, $memory_files, $pipeline_documents, $flow_documents ),
+			'directory' => new AgentBundleDirectory( $manifest, $memory_files, $pipeline_documents, $flow_documents, array(), $extension_artifacts ),
 		);
 	}
 
@@ -315,7 +319,7 @@ class AgentBundler {
 			? sanitize_title( $new_slug )
 			: sanitize_title( $agent_data['agent_slug'] );
 		$bundle_slug            = PortableSlug::normalize( (string) ( $bundle['bundle_slug'] ?? $slug ), 'bundle' );
-		$bundle_version         = trim( (string) ( $bundle['bundle_version'] ?? self::BUNDLE_VERSION ) );
+		$bundle_version         = trim( (string) $bundle['bundle_version'] );
 		$bundle_source_ref      = trim( (string) ( $bundle['source_ref'] ?? '' ) );
 		$bundle_source_revision = trim( (string) ( $bundle['source_revision'] ?? '' ) );
 		$bundle_metadata        = array(
@@ -360,16 +364,17 @@ class AgentBundler {
 
 		// Build summary for dry-run reporting.
 		$summary = array(
-			'agent_slug'        => $slug,
-			'agent_name'        => $agent_data['agent_name'],
-			'owner_id'          => $owner_id,
-			'bundle_slug'       => $bundle_slug,
-			'bundle_version'    => $bundle_version,
-			'files'             => count( $bundle['files'] ?? array() ),
-			'pipelines'         => count( $bundle['pipelines'] ?? array() ),
-			'flows'             => count( $bundle['flows'] ?? array() ),
-			'has_user_template' => ! empty( $bundle['user_template'] ),
-			'upgrade'           => (bool) $existing,
+			'agent_slug'          => $slug,
+			'agent_name'          => $agent_data['agent_name'],
+			'owner_id'            => $owner_id,
+			'bundle_slug'         => $bundle_slug,
+			'bundle_version'      => $bundle_version,
+			'files'               => count( $bundle['files'] ?? array() ),
+			'pipelines'           => count( $bundle['pipelines'] ?? array() ),
+			'flows'               => count( $bundle['flows'] ?? array() ),
+			'extension_artifacts' => count( $bundle['extension_artifacts'] ?? array() ),
+			'has_user_template'   => ! empty( $bundle['user_template'] ),
+			'upgrade'             => (bool) $existing,
 		);
 
 		if ( $dry_run ) {
@@ -438,7 +443,7 @@ class AgentBundler {
 			$this->write_user_template( $owner_id, $bundle['user_template'] );
 		}
 
-		$artifact_records = $config['datamachine_bundle']['artifacts'] ?? array();
+		$artifact_records = $config['datamachine_bundle']['artifacts'];
 		$conflicts        = array();
 
 		// 4. Import pipelines — build old→new ID map.
@@ -596,6 +601,66 @@ class AgentBundler {
 			}
 		}
 
+		// 6. Apply plugin-owned artifacts through their owning plugin.
+		$agent_context               = array_merge(
+			$agent_data,
+			array(
+				'agent_id'   => $agent_id,
+				'agent_slug' => $slug,
+				'agent_name' => $agent_data['agent_name'] ?? $slug,
+				'owner_id'   => $owner_id,
+			)
+		);
+		$current_extension_artifacts = self::index_artifacts(
+			AgentBundleArtifactExtensions::current_artifacts(
+				$agent_context,
+				array_values( $artifact_records ),
+				array( 'bundle' => $bundle_metadata )
+			)
+		);
+
+		foreach ( AgentBundleArtifactExtensions::normalize_artifacts( is_array( $bundle['extension_artifacts'] ?? null ) ? $bundle['extension_artifacts'] : array() ) as $artifact ) {
+			$artifact_key = self::artifact_key( (string) $artifact['artifact_type'], (string) $artifact['artifact_id'] );
+			$current      = $current_extension_artifacts[ $artifact_key ] ?? null;
+
+			if (
+				$current
+				&& $this->artifact_has_local_modifications(
+					$artifact_records[ $artifact_key ] ?? null,
+					$current['payload'] ?? null
+				)
+			) {
+				$conflicts[] = array(
+					'artifact_type' => $artifact['artifact_type'],
+					'artifact_id'   => $artifact['artifact_id'],
+					'reason'        => 'local_modified',
+				);
+				continue;
+			}
+
+			$result = AgentBundleArtifactExtensions::apply_artifact(
+				$artifact,
+				$agent_context,
+				array( 'bundle' => $bundle_metadata )
+			);
+			if ( null === $result || is_wp_error( $result ) ) {
+				$conflicts[] = array(
+					'artifact_type' => $artifact['artifact_type'],
+					'artifact_id'   => $artifact['artifact_id'],
+					'reason'        => is_wp_error( $result ) ? $result->get_error_message() : 'missing_apply_handler',
+				);
+				continue;
+			}
+
+			$artifact_records[ $artifact_key ] = $this->bundle_artifact_record(
+				$bundle_metadata,
+				(string) $artifact['artifact_type'],
+				(string) $artifact['artifact_id'],
+				(string) $artifact['source_path'],
+				$artifact['payload'] ?? null
+			);
+		}
+
 		$summary['agent_id']           = $agent_id;
 		$summary['pipelines_imported'] = count( $pipeline_id_map );
 		$summary['flows_imported']     = $flow_count;
@@ -628,6 +693,9 @@ class AgentBundler {
 				return true;
 			}
 		}
+		if ( ! empty( $bundle['extension_artifacts'] ) ) {
+			return true;
+		}
 		return false;
 	}
 
@@ -649,7 +717,7 @@ class AgentBundler {
 		);
 	}
 
-	private function artifact_has_local_modifications( ?array $record, array $current_payload ): bool {
+	private function artifact_has_local_modifications( ?array $record, mixed $current_payload ): bool {
 		if ( empty( $record['installed_hash'] ) ) {
 			return false;
 		}
@@ -660,7 +728,7 @@ class AgentBundler {
 		);
 	}
 
-	private function bundle_artifact_record( array $bundle_metadata, string $type, string $id, string $source_path, array $payload ): array {
+	private function bundle_artifact_record( array $bundle_metadata, string $type, string $id, string $source_path, mixed $payload ): array {
 		$hash = AgentBundleArtifactHasher::hash( $payload );
 		$now  = gmdate( 'c' );
 
@@ -676,6 +744,20 @@ class AgentBundler {
 			'installed_at'   => $now,
 			'updated_at'     => $now,
 		);
+	}
+
+	/** @param array<int,array<string,mixed>> $artifacts */
+	private static function index_artifacts( array $artifacts ): array {
+		$indexed = array();
+		foreach ( $artifacts as $artifact ) {
+			$indexed[ self::artifact_key( (string) ( $artifact['artifact_type'] ?? '' ), (string) ( $artifact['artifact_id'] ?? '' ) ) ] = $artifact;
+		}
+
+		return $indexed;
+	}
+
+	private static function artifact_key( string $type, string $id ): string {
+		return sanitize_key( $type ) . ':' . $id;
 	}
 
 	private function preserve_runtime_queue_fields( array $incoming_flow_config, array $existing_flow_config ): array {
@@ -725,7 +807,7 @@ class AgentBundler {
 		foreach ( $identity_files as $filename ) {
 			$path = $agent_dir . '/' . $filename;
 			if ( file_exists( $path ) ) {
-				$files[ $filename ] = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+				$files[ $filename ] = $this->read_text_file( $path );
 			}
 		}
 		return $files;
@@ -742,7 +824,7 @@ class AgentBundler {
 		$path     = $user_dir . '/USER.md';
 
 		if ( file_exists( $path ) ) {
-			return file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			return $this->read_text_file( $path );
 		}
 
 		return '';
@@ -809,7 +891,7 @@ class AgentBundler {
 			}
 
 			$relative_path           = $prefix . $file->getFilename();
-			$files[ $relative_path ] = file_get_contents( $file->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			$files[ $relative_path ] = $this->read_text_file( $file->getPathname() );
 		}
 
 		return $files;
@@ -1067,7 +1149,7 @@ class AgentBundler {
 			return null;
 		}
 
-		$manifest = json_decode( file_get_contents( $manifest_path ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		$manifest = json_decode( $this->read_text_file( $manifest_path ), true );
 		if ( ! is_array( $manifest ) ) {
 			return null;
 		}
@@ -1084,13 +1166,13 @@ class AgentBundler {
 		// Read USER.md template.
 		$user_md_path            = $directory . '/USER.md';
 		$bundle['user_template'] = file_exists( $user_md_path )
-			? file_get_contents( $user_md_path ) // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			? $this->read_text_file( $user_md_path )
 			: '';
 
 		// Read pipeline memory files.
 		$pipelines_dir = $directory . '/pipelines';
 		if ( is_dir( $pipelines_dir ) ) {
-			$pipeline_dirs = glob( $pipelines_dir . '/*', GLOB_ONLYDIR );
+			$pipeline_dirs = $this->glob_directories( $pipelines_dir );
 			foreach ( $pipeline_dirs as $i => $pipeline_dir ) {
 				if ( isset( $bundle['pipelines'][ $i ] ) ) {
 					$bundle['pipelines'][ $i ]['memory_file_contents'] = $this->read_directory_recursive( $pipeline_dir );
@@ -1101,7 +1183,7 @@ class AgentBundler {
 		// Read flow memory files.
 		$flows_dir = $directory . '/flows';
 		if ( is_dir( $flows_dir ) ) {
-			$flow_dirs = glob( $flows_dir . '/*', GLOB_ONLYDIR );
+			$flow_dirs = $this->glob_directories( $flows_dir );
 			foreach ( $flow_dirs as $i => $flow_dir ) {
 				if ( isset( $bundle['flows'][ $i ] ) ) {
 					$bundle['flows'][ $i ]['memory_file_contents'] = $this->read_directory_recursive( $flow_dir );
@@ -1140,7 +1222,7 @@ class AgentBundler {
 			} elseif ( $item->isFile() ) {
 				$ext = strtolower( $item->getExtension() );
 				if ( in_array( $ext, array( 'md', 'txt', 'json', 'yaml', 'yml', 'csv' ), true ) ) {
-					$files[ $relative ] = file_get_contents( $item->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+					$files[ $relative ] = $this->read_text_file( $item->getPathname() );
 				}
 			}
 		}
@@ -1208,7 +1290,7 @@ class AgentBundler {
 			$bundle = $this->from_directory( $temp_dir );
 		} else {
 			// Look one level deep.
-			$subdirs = glob( $temp_dir . '/*', GLOB_ONLYDIR );
+			$subdirs = $this->glob_directories( $temp_dir );
 			foreach ( $subdirs as $subdir ) {
 				if ( file_exists( $subdir . '/manifest.json' ) ) {
 					$bundle = $this->from_directory( $subdir );
@@ -1219,6 +1301,28 @@ class AgentBundler {
 
 		$this->rm_rf( $temp_dir );
 		return $bundle;
+	}
+
+	/**
+	 * Read a text file as a string.
+	 *
+	 * @param string $path File path.
+	 * @return string File contents, or empty string when unreadable.
+	 */
+	private function read_text_file( string $path ): string {
+		$contents = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		return is_string( $contents ) ? $contents : '';
+	}
+
+	/**
+	 * Return one-level child directories for a path.
+	 *
+	 * @param string $directory Directory path.
+	 * @return string[] Child directory paths.
+	 */
+	private function glob_directories( string $directory ): array {
+		$directories = glob( $directory . '/*', GLOB_ONLYDIR );
+		return is_array( $directories ) ? $directories : array();
 	}
 
 	/**

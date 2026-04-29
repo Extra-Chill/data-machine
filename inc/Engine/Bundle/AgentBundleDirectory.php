@@ -25,6 +25,8 @@ final class AgentBundleDirectory {
 	private array $flows;
 	/** @var array<string,array<string,array|string>> */
 	private array $artifact_files;
+	/** @var array<int,array<string,mixed>> */
+	private array $extension_artifacts;
 
 	/**
 	 * @param AgentBundleManifest       $manifest Bundle manifest.
@@ -32,13 +34,15 @@ final class AgentBundleDirectory {
 	 * @param AgentBundlePipelineFile[] $pipelines Pipeline files.
 	 * @param AgentBundleFlowFile[]     $flows Flow files.
 	 * @param array<string,array<string,array|string>> $artifact_files Artifact directory => relative path => decoded JSON payload or text contents.
+	 * @param array<int,array<string,mixed>> $extension_artifacts Plugin-owned artifact envelopes.
 	 */
-	public function __construct( AgentBundleManifest $manifest, array $memory_files, array $pipelines, array $flows, array $artifact_files = array() ) {
-		$this->manifest       = $manifest;
-		$this->memory_files   = self::normalize_memory_files( $memory_files );
-		$this->pipelines      = self::sort_documents_by_slug( $pipelines, AgentBundlePipelineFile::class );
-		$this->flows          = self::sort_documents_by_slug( $flows, AgentBundleFlowFile::class );
-		$this->artifact_files = self::normalize_artifact_files( $artifact_files );
+	public function __construct( AgentBundleManifest $manifest, array $memory_files, array $pipelines, array $flows, array $artifact_files = array(), array $extension_artifacts = array() ) {
+		$this->manifest            = $manifest;
+		$this->memory_files        = self::normalize_memory_files( $memory_files );
+		$this->pipelines           = self::sort_documents_by_slug( $pipelines, AgentBundlePipelineFile::class );
+		$this->flows               = self::sort_documents_by_slug( $flows, AgentBundleFlowFile::class );
+		$this->artifact_files      = self::normalize_artifact_files( $artifact_files );
+		$this->extension_artifacts = AgentBundleArtifactExtensions::normalize_artifacts( $extension_artifacts );
 	}
 
 	public static function read( string $directory ): self {
@@ -53,7 +57,7 @@ final class AgentBundleDirectory {
 		}
 
 		$manifest = AgentBundleManifest::from_array(
-			BundleSchema::decode_json( (string) file_get_contents( $manifest_path ), 'manifest.json' )
+			BundleSchema::decode_json( self::read_file( $manifest_path ), 'manifest.json' )
 		);
 
 		return new self(
@@ -61,7 +65,8 @@ final class AgentBundleDirectory {
 			self::read_memory_files( $directory . '/' . BundleSchema::MEMORY_DIR ),
 			self::read_documents( $directory . '/' . BundleSchema::PIPELINES_DIR, AgentBundlePipelineFile::class ),
 			self::read_documents( $directory . '/' . BundleSchema::FLOWS_DIR, AgentBundleFlowFile::class ),
-			self::read_artifact_directories( $directory )
+			self::read_artifact_directories( $directory ),
+			self::read_extension_artifacts( $directory . '/' . BundleSchema::EXTENSIONS_DIR )
 		);
 	}
 
@@ -74,29 +79,36 @@ final class AgentBundleDirectory {
 		foreach ( self::artifact_directories() as $artifact_directory ) {
 			self::ensure_directory( $directory . '/' . $artifact_directory );
 		}
+		self::ensure_directory( $directory . '/' . BundleSchema::EXTENSIONS_DIR );
 
-		file_put_contents( $directory . '/' . BundleSchema::MANIFEST_FILE, BundleSchema::encode_json( $this->manifest->to_array() ) );
+		self::write_file( $directory . '/' . BundleSchema::MANIFEST_FILE, BundleSchema::encode_json( $this->manifest->to_array() ) );
 
 		foreach ( $this->memory_files as $relative_path => $contents ) {
 			$path = $directory . '/' . BundleSchema::MEMORY_DIR . '/' . $relative_path;
 			self::ensure_directory( dirname( $path ) );
-			file_put_contents( $path, $contents );
+			self::write_file( $path, $contents );
 		}
 
 		foreach ( $this->pipelines as $pipeline ) {
-			file_put_contents( $directory . '/' . BundleSchema::PIPELINES_DIR . '/' . $pipeline->slug() . '.json', BundleSchema::encode_json( $pipeline->to_array() ) );
+			self::write_file( $directory . '/' . BundleSchema::PIPELINES_DIR . '/' . $pipeline->slug() . '.json', BundleSchema::encode_json( $pipeline->to_array() ) );
 		}
 
 		foreach ( $this->flows as $flow ) {
-			file_put_contents( $directory . '/' . BundleSchema::FLOWS_DIR . '/' . $flow->slug() . '.json', BundleSchema::encode_json( $flow->to_array() ) );
+			self::write_file( $directory . '/' . BundleSchema::FLOWS_DIR . '/' . $flow->slug() . '.json', BundleSchema::encode_json( $flow->to_array() ) );
 		}
 
 		foreach ( $this->artifact_files as $artifact_directory => $files ) {
 			foreach ( $files as $relative_path => $payload ) {
 				$path = $directory . '/' . $artifact_directory . '/' . $relative_path;
 				self::ensure_directory( dirname( $path ) );
-				file_put_contents( $path, is_array( $payload ) ? BundleSchema::encode_json( $payload ) : $payload );
+				self::write_file( $path, is_array( $payload ) ? BundleSchema::encode_json( $payload ) : $payload );
 			}
+		}
+
+		foreach ( $this->extension_artifacts as $artifact ) {
+			$path = $directory . '/' . $artifact['source_path'];
+			self::ensure_directory( dirname( $path ) );
+			self::write_file( $path, BundleSchema::encode_json( $artifact ) );
 		}
 	}
 
@@ -142,6 +154,11 @@ final class AgentBundleDirectory {
 	/** @return array<string,array|string> */
 	public function seed_queues(): array {
 		return $this->artifact_files[ BundleSchema::SEED_QUEUES_DIR ];
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	public function extension_artifacts(): array {
+		return $this->extension_artifacts;
 	}
 
 	private static function ensure_directory( string $directory ): void {
@@ -206,7 +223,7 @@ final class AgentBundleDirectory {
 			}
 			$path               = $file->getPathname();
 			$relative           = str_replace( '\\', '/', substr( $path, strlen( $directory ) + 1 ) );
-			$files[ $relative ] = (string) file_get_contents( $path );
+			$files[ $relative ] = self::read_file( $path );
 		}
 		ksort( $files, SORT_STRING );
 		return $files;
@@ -236,7 +253,7 @@ final class AgentBundleDirectory {
 			}
 			$path               = $file->getPathname();
 			$relative           = str_replace( '\\', '/', substr( $path, strlen( $directory ) + 1 ) );
-			$contents           = (string) file_get_contents( $path );
+			$contents           = self::read_file( $path );
 			$files[ $relative ] = str_ends_with( $relative, '.json' ) ? BundleSchema::decode_json( $contents, $relative ) : $contents;
 		}
 		ksort( $files, SORT_STRING );
@@ -252,13 +269,36 @@ final class AgentBundleDirectory {
 
 		$documents = array();
 		$paths     = glob( $directory . '/*.json' );
-		$paths     = false === $paths ? array() : $paths;
+		$paths     = is_array( $paths ) ? $paths : array();
 		sort( $paths, SORT_STRING );
 		foreach ( $paths as $path ) {
-			$documents[] = $document_class::from_array( BundleSchema::decode_json( (string) file_get_contents( $path ), basename( $path ) ) );
+			$documents[] = $document_class::from_array( BundleSchema::decode_json( self::read_file( $path ), basename( $path ) ) );
 		}
 
 		return self::sort_documents_by_slug( $documents, $document_class );
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	private static function read_extension_artifacts( string $directory ): array {
+		if ( ! is_dir( $directory ) ) {
+			return array();
+		}
+
+		$artifacts = array();
+		$iterator  = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $directory, \FilesystemIterator::SKIP_DOTS ) );
+		foreach ( $iterator as $file ) {
+			if ( ! $file->isFile() || 'json' !== strtolower( $file->getExtension() ) ) {
+				continue;
+			}
+
+			$artifact = BundleSchema::decode_json( self::read_file( $file->getPathname() ), $file->getFilename() );
+			if ( ! isset( $artifact['source_path'] ) ) {
+				$artifact['source_path'] = BundleSchema::EXTENSIONS_DIR . '/' . str_replace( '\\', '/', substr( $file->getPathname(), strlen( $directory ) + 1 ) );
+			}
+			$artifacts[] = $artifact;
+		}
+
+		return AgentBundleArtifactExtensions::normalize_artifacts( $artifacts );
 	}
 
 	/** @return array */
@@ -291,5 +331,14 @@ final class AgentBundleDirectory {
 		}
 
 		return $relative_path;
+	}
+
+	private static function read_file( string $path ): string {
+		$contents = file_get_contents( $path );
+		return is_string( $contents ) ? $contents : '';
+	}
+
+	private static function write_file( string $path, string $contents ): void {
+		file_put_contents( $path, $contents );
 	}
 }
