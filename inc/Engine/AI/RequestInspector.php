@@ -14,6 +14,7 @@ use DataMachine\Core\EngineData;
 use DataMachine\Core\FilesRepository\FileRetrieval;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Steps\AI\AIStep;
+use DataMachine\Core\Steps\AI\ToolPolicy\PipelineToolPolicyArgs;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
@@ -111,7 +112,7 @@ class RequestInspector {
 					'engine_data'          => $engine->all(),
 					'categories'           => $tool_categories,
 				),
-				ToolPolicyResolver::getPipelinePolicyArgs( $flow_step_config, $pipeline_step_config )
+				PipelineToolPolicyArgs::fromConfigs( $flow_step_config, $pipeline_step_config )
 			)
 		);
 

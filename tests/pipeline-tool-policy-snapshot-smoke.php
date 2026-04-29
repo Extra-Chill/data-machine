@@ -60,10 +60,12 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfigFactory.php';
 require_once __DIR__ . '/../inc/Core/Steps/WorkflowConfigFactory.php';
+require_once __DIR__ . '/../inc/Core/Steps/AI/ToolPolicy/PipelineToolPolicyArgs.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 
+use DataMachine\Core\Steps\AI\ToolPolicy\PipelineToolPolicyArgs;
 use DataMachine\Core\Steps\WorkflowConfigFactory;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
@@ -121,7 +123,7 @@ function resolve_policy_tools_for_test( array $flow_step_config, array $pipeline
 				'engine_data'          => array(),
 				'categories'           => array(),
 			),
-			ToolPolicyResolver::getPipelinePolicyArgs( $flow_step_config, $pipeline_step_config )
+			PipelineToolPolicyArgs::fromConfigs( $flow_step_config, $pipeline_step_config )
 		)
 	);
 }
@@ -183,8 +185,30 @@ assert_policy_equals( array( null, null, null ), $manager->availability_contexts
 echo "\n[4] RequestInspector and AIStep share policy input helper:\n";
 $ai_step_source   = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' ) ?: '';
 $inspector_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/RequestInspector.php' ) ?: '';
-assert_policy_equals( 1, substr_count( $ai_step_source, 'ToolPolicyResolver::getPipelinePolicyArgs' ), 'AIStep uses shared policy helper once', $failures, $passes );
-assert_policy_equals( 1, substr_count( $inspector_source, 'ToolPolicyResolver::getPipelinePolicyArgs' ), 'RequestInspector uses shared policy helper once', $failures, $passes );
+assert_policy_equals( 1, substr_count( $ai_step_source, 'PipelineToolPolicyArgs::fromConfigs' ), 'AIStep uses pipeline policy helper once', $failures, $passes );
+assert_policy_equals( 1, substr_count( $inspector_source, 'PipelineToolPolicyArgs::fromConfigs' ), 'RequestInspector uses pipeline policy helper once', $failures, $passes );
+
+echo "\n[5] helper translates flow/pipeline policy fields into resolver args:\n";
+$args = PipelineToolPolicyArgs::fromConfigs(
+	array(
+		'step_type'      => 'ai',
+		'enabled_tools'  => array( 'alpha_tool', '', 'alpha_tool', 42, 'beta_tool' ),
+		'disabled_tools' => array( 'flow_denied', 'shared_denied', '', 'flow_denied' ),
+	),
+	array(
+		'disabled_tools' => array( 'pipeline_denied', 'shared_denied', false, 'pipeline_denied' ),
+	)
+);
+assert_policy_equals(
+	array(
+		'allow_only' => array( 'alpha_tool', 'beta_tool' ),
+		'deny'       => array( 'pipeline_denied', 'shared_denied', 'flow_denied' ),
+	),
+	$args,
+	'enabled_tools and disabled_tools map to allow_only and deny args with original ordering',
+	$failures,
+	$passes
+);
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " pipeline policy assertions failed.\n";

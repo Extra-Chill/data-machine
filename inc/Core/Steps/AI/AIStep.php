@@ -8,6 +8,7 @@ use DataMachine\Core\DataPacket;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Core\Steps\AI\ToolPolicy\PipelineToolPolicyArgs;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Engine\AI\AIConversationLoop;
@@ -277,7 +278,7 @@ class AIStep extends Step {
 					'engine_data'          => $engine_data,
 					'categories'           => $tool_categories,
 				),
-				ToolPolicyResolver::getPipelinePolicyArgs( $this->flow_step_config, $pipeline_step_config )
+				PipelineToolPolicyArgs::fromConfigs( $this->flow_step_config, $pipeline_step_config )
 			)
 		);
 
