@@ -75,6 +75,7 @@ class WP_Abilities_Registry {
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
@@ -199,7 +200,8 @@ echo "\n[3] filters can add a source without disturbing default order:\n";
 remove_all_filters_for_source_smoke();
 add_filter(
 	'datamachine_tool_sources',
-	static function ( array $sources ): array {
+	static function ( array $sources, string $mode, array $args, ToolManager $tool_manager ): array {
+		unset( $mode, $args, $tool_manager );
 		$sources['extra_source'] = static function (): array {
 			return array(
 				'extra_tool' => array( 'origin' => 'extra', 'access_level' => 'public' ),
@@ -212,7 +214,8 @@ add_filter(
 );
 add_filter(
 	'datamachine_tool_sources_for_mode',
-	static function ( array $sources, string $mode ): array {
+	static function ( array $sources, string $mode, array $args ): array {
+		unset( $args );
 		if ( ToolPolicyResolver::MODE_CHAT === $mode ) {
 			$sources[] = 'extra_source';
 		}
@@ -224,11 +227,14 @@ add_filter(
 $tools = resolve_source_tools( ToolPolicyResolver::MODE_CHAT, new SourcePolicyToolManager() );
 assert_source_equals( array( 'chat_static_tool', 'extra_tool' ), array_keys( $tools ), 'filter appends extra source after static source', $failures, $passes );
 
-echo "\n[4] adjacent-handler source owns pipeline config vocabulary:\n";
-$registry_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php' );
-$adjacent_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php' );
+echo "\n[4] Data Machine source adapters own product vocabulary:\n";
+$registry_source          = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php' );
+$adjacent_source          = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php' );
+$datamachine_tool_source  = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php' );
 assert_source_equals( false, false !== strpos( $registry_source, 'FlowStepConfig' ), 'generic registry no longer imports FlowStepConfig', $failures, $passes );
 assert_source_equals( true, false !== strpos( $adjacent_source, 'FlowStepConfig' ), 'adjacent-handler source owns FlowStepConfig lookup', $failures, $passes );
+assert_source_equals( false, false !== strpos( $registry_source, 'get_all_tools' ), 'generic registry no longer reads Data Machine tool registry', $failures, $passes );
+assert_source_equals( true, false !== strpos( $datamachine_tool_source, 'get_all_tools' ), 'Data Machine registry source owns legacy registry lookup', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " tool source assertions failed.\n";

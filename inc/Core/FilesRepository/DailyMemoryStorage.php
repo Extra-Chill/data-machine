@@ -5,7 +5,7 @@
  * Contract for daily memory storage backends used by the Daily Memory
  * abilities. The default implementation is {@see DailyMemory}, which
  * delegates persistence to the active {@see AgentMemoryStoreInterface}
- * resolved through `datamachine_memory_store`.
+ * resolved through `agents_api_memory_store`.
  *
  * `datamachine_daily_memory_storage` is a narrower escape hatch for
  * replacing the ability-level daily memory backend entirely. When that

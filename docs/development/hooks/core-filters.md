@@ -1476,11 +1476,11 @@ default ([`DiskAgentMemoryStore`](../../../inc/Core/FilesRepository/DiskAgentMem
 preserves byte-for-byte the filesystem behavior the codebase used before this
 seam was introduced.
 
-**Current filter: `datamachine_memory_store`**
+**Current filter: `agents_api_memory_store`**
 
 ```php
 apply_filters(
-    'datamachine_memory_store',
+    'agents_api_memory_store',
     null,                       // Return AgentMemoryStoreInterface to short-circuit
     AgentMemoryScope $scope     // Identifies (layer, user_id, agent_id, filename)
 );
@@ -1490,17 +1490,18 @@ Return an [`AgentMemoryStoreInterface`](../../../inc/Core/FilesRepository/AgentM
 implementation to replace the disk default for this scope. Return `null` (the
 default) to let Data Machine read and write through the filesystem.
 
-This is the only runtime filter in Data Machine today. A future Agents API
-extraction should introduce a neutral resolver/filter name in the extracted
-package with an explicit migration path; Data Machine does not mirror this hook
-under a second alias before ownership moves.
+This is the only runtime filter in Data Machine today. It replaces the earlier
+`datamachine_memory_store` name in-place so the memory-store seam already uses
+Agents API vocabulary before physical extraction. Data Machine does not mirror
+the old name under a second alias because that would create a permanent
+compatibility ladder instead of moving ownership.
 
 **Use case**: managed-host environments where the local filesystem is not
 writable (e.g. WordPress.com, VIP). A consumer plugin (e.g. Intelligence)
 ships a DB-backed implementation and registers it conditionally:
 
 ```php
-add_filter( 'datamachine_memory_store', function ( $store, $scope ) {
+add_filter( 'agents_api_memory_store', function ( $store, $scope ) {
     if ( $store instanceof AgentMemoryStoreInterface ) {
         return $store;  // someone else already swapped
     }
