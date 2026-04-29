@@ -61,7 +61,7 @@ class ToolSourceRegistry {
 	private function getRegisteredSources( string $mode, array $args ): array {
 		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
 		$sources = apply_filters(
-			'datamachine_tool_sources',
+			'agents_api_tool_sources',
 			array(
 				self::SOURCE_STATIC_REGISTRY   => new DataMachineToolRegistrySource( $this->tool_manager ),
 				self::SOURCE_ADJACENT_HANDLERS => new AdjacentHandlerToolSource(),
@@ -87,7 +87,7 @@ class ToolSourceRegistry {
 			: array( self::SOURCE_STATIC_REGISTRY );
 
 		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
-		$sources = apply_filters( 'datamachine_tool_sources_for_mode', $sources, $mode, $args );
+		$sources = apply_filters( 'agents_api_tool_sources_for_mode', $sources, $mode, $args );
 
 		if ( ! is_array( $sources ) ) {
 			return array();

@@ -38,11 +38,11 @@ Target shape:
 These generic seams still need Agents API naming decisions or have already moved
 in place:
 
-- `datamachine_conversation_runner`
+- `agents_api_conversation_runner`
 - `datamachine_conversation_store`
 - `agents_api_memory_store`
-- `datamachine_tool_sources`
-- `datamachine_tool_sources_for_mode`
+- `agents_api_tool_sources`
+- `agents_api_tool_sources_for_mode`
 - `wp_agents_api_init`
 - `datamachine_guideline_updated`
 

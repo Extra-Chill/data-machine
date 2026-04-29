@@ -15,7 +15,7 @@ if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $hook, $value ) {
 		global $datamachine_test_conversation_runner_result;
 
-		if ( 'datamachine_conversation_runner' === $hook ) {
+		if ( 'agents_api_conversation_runner' === $hook ) {
 			return $datamachine_test_conversation_runner_result;
 		}
 

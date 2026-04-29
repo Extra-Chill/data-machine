@@ -66,7 +66,7 @@ These are closest to generic public contracts. Most should be extracted as contr
 | `ConversationStoreInterface` | `inc/Core/Database/Chat/ConversationStoreInterface.php` | Aggregate Data Machine chat-product compatibility contract. | Do not extract as the default public contract unless Agents API deliberately wants the full aggregate. Prefer the transcript interface first. |
 | `ConversationStoreFactory::get_transcript_store()` | `inc/Core/Database/Chat/ConversationStoreFactory.php` | Narrow resolver for runtime transcript persistence. | Current implementation reuses the Data Machine aggregate filter for compatibility; future Agents API can own a transcript-specific resolver/filter. |
 | `datamachine_conversation_store` filter | `ConversationStoreFactory::get()` | Existing Data Machine aggregate store swap seam. | Keep while code lives in Data Machine. A future Agents API filter should not force chat UI/listing/read-state/reporting responsibilities onto transcript-only backends. |
-| `datamachine_conversation_runner` filter | `AIConversationLoop::run()` | Runner replacement seam is generic. | Target should be a runtime runner interface/filter, not Data Machine named. |
+| `agents_api_conversation_runner` filter | `AIConversationLoop::run()` | Runner replacement seam is generic. | Renamed in place from `datamachine_conversation_runner`; do not mirror the old hook under a runtime alias. |
 | `datamachine_guideline_updated` action | `GuidelineAgentMemoryStore` | Logical memory/guideline change event is generic. | Target event must not assume Data Machine option names or storage. |
 | `wp_register_agent()` helper | `inc/Engine/Agents/register-agents.php` | Declarative agent registration is core-shaped. | Public helper contributes definitions only; persistence reconciliation is not part of the helper contract. |
 | `wp_agents_api_init` action | `inc/Engine/Agents/register-agents.php` | Registration collection hook is generic. | Keep as the in-place Agents API-shaped hook while Data Machine hosts the substrate. |
@@ -188,18 +188,36 @@ These are reference points only. Do not expose them as public Data Machine or Ag
 | `Conversation_Storage` | Reference for compaction/resilience. Keep Data Machine/Agents API conversation store contracts portable and site-owned unless explicitly swapped. |
 | Dolly agent architecture | Reference for WordPress-hosted agent UX and memory injection, not a dependency or target vocabulary. |
 
+## Hook Name Map
+
+This map records the in-place hook vocabulary while Data Machine still hosts the
+Agents API substrate. Generic runtime seams should use Agents API-shaped names;
+Data Machine product and compatibility seams keep Data Machine names.
+
+| Previous hook/filter | Current hook/filter | Decision |
+|---|---|---|
+| `datamachine_conversation_runner` | `agents_api_conversation_runner` | Hard-cut rename. Generic runtime replacement seam. |
+| `datamachine_tool_sources` | `agents_api_tool_sources` | Hard-cut rename. Generic source-provider composition seam; Data Machine sources remain providers. |
+| `datamachine_tool_sources_for_mode` | `agents_api_tool_sources_for_mode` | Hard-cut rename. Generic mode-to-source ordering seam. |
+| `datamachine_memory_store` | `agents_api_memory_store` | Already renamed in place; old hook is intentionally not mirrored. |
+| `wp_agents_api_init` | `wp_agents_api_init` | Already WordPress-shaped registration hook. |
+| `datamachine_conversation_store` | `datamachine_conversation_store` | Keep. This swaps Data Machine's aggregate chat store; a future Agents API transcript hook must be narrower. |
+| `datamachine_guideline_updated` | `datamachine_guideline_updated` | Keep for this slice. Event payload and external projection consumers need a narrower Agents API memory-event decision. |
+| `datamachine_registered_agent_reconciled` | `datamachine_registered_agent_reconciled` | Keep. This is Data Machine materialization/persistence lifecycle, not pure declarative registration. |
+| `datamachine_tools` | `datamachine_tools` | Keep. Legacy/product tool registry; Agents API should prefer ability-native runtime declarations. |
+
 ## Hook And Filter Classification
 
 | Hook/filter | Bucket | Notes |
 |---|---|---|
-| `datamachine_conversation_runner` | Agents API public candidate | Generic runtime replacement seam. Rename and formalize result contract. |
+| `agents_api_conversation_runner` | Agents API public candidate | Generic runtime replacement seam. Renamed in place from `datamachine_conversation_runner`. |
 | `datamachine_conversation_store` | Data Machine compatibility seam today | Existing aggregate store swap seam. A future Agents API transcript-store filter should be narrower instead of carrying Data Machine chat product responsibilities. |
 | `wp_agents_api_init` | Agents API public candidate | Registration hook is now WordPress-shaped in-place; Data Machine still fires the legacy hook while it hosts the substrate. |
 | `agents_api_memory_store` | Agents API public candidate | Generic memory persistence swap seam. Renamed in place from `datamachine_memory_store`; do not mirror the old hook under a runtime alias. |
 | `datamachine_registered_agent_reconciled` | Agents API implementation candidate | Lifecycle event is useful, current reconciliation semantics are Data Machine implementation. |
 | `datamachine_guideline_updated` | Agents API public candidate | Generic memory/guideline change event after naming review. |
-| `datamachine_tool_sources` | Agents API implementation candidate | Generic source-provider idea; current defaults include Data Machine adjacent handlers. |
-| `datamachine_tool_sources_for_mode` | Agents API implementation candidate | Generic mode policy idea; mode names need Agents API contract. |
+| `agents_api_tool_sources` | Agents API implementation candidate | Generic source-provider idea; current defaults include Data Machine adjacent handlers as Data Machine providers. |
+| `agents_api_tool_sources_for_mode` | Agents API implementation candidate | Generic mode policy idea; mode names need Agents API contract. |
 | `datamachine_tools` | Data Machine product today | Current registry includes legacy Data Machine handler/class shapes. Ability-native subset can inform Agents API. |
 | `datamachine_directives` | Agents API implementation candidate | Generic prompt/guideline provider idea, but current directive classes use Data Machine modes. |
 | `datamachine_pre_ai_step_check` | Data Machine adapter | Pipeline AI-step skip hook. |
