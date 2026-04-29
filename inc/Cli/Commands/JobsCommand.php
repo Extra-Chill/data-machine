@@ -23,7 +23,7 @@ use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
-use DataMachine\Engine\AI\MessageEnvelope;
+use DataMachine\Engine\AI\AgentMessageEnvelope;
 use DataMachine\Engine\Tasks\TaskRegistry;
 
 defined( 'ABSPATH' ) || exit;
@@ -545,9 +545,9 @@ class JobsCommand extends BaseCommand {
 		WP_CLI::log( '' );
 
 		foreach ( $messages as $idx => $message ) {
-			$message = MessageEnvelope::normalize( $message );
+			$message = AgentMessageEnvelope::normalize( $message );
 			$role    = $message['role'] ?? 'unknown';
-			$type    = $message['type'] ?? MessageEnvelope::TYPE_TEXT;
+			$type    = $message['type'] ?? AgentMessageEnvelope::TYPE_TEXT;
 			$content = $message['content'] ?? '';
 			$header  = sprintf( '[%d] %s (%s)', $idx, $role, $type );
 

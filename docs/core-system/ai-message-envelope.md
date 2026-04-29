@@ -1,18 +1,17 @@
-# AI Message Envelope
+# Agent Message Envelope
 
-**File**: `/inc/Engine/AI/MessageEnvelope.php`
+**File**: `/inc/Engine/AI/AgentMessageEnvelope.php`
 
-Data Machine's canonical internal AI message shape is a JSON-friendly typed
-envelope. Runtime code, chat storage, and transcript storage should store and
-return envelopes. Provider-specific `role/content/metadata` arrays are a
-projection used at the current `ai-http-client` boundary, not the internal
-contract.
+The canonical agent message shape is a JSON-friendly typed envelope. Runtime
+code, chat storage, and transcript storage should store and return envelopes.
+Provider-specific `role/content/metadata` arrays are a projection used at the
+current `ai-http-client` boundary, not the internal contract.
 
 ## Envelope Shape
 
 ```php
 [
-    'schema'   => 'datamachine.ai.message',
+    'schema'   => 'agents-api.message',
     'version'  => 1,
     'type'     => 'text',
     'role'     => 'assistant',
@@ -39,22 +38,23 @@ Supported `type` values:
 - `delta`
 - `multimodal_part`
 
-Use `payload` for type-specific fields that Data Machine understands, such as
-tool names, tool parameters, turn numbers, and tool result data. Use `metadata`
-for extension/provider details that should be preserved but are not part of the
-type contract.
+Use `payload` for type-specific fields that the agent runtime understands, such
+as tool names, tool parameters, turn numbers, and tool result data. Use
+`metadata` for extension/provider details that should be preserved but are not
+part of the type contract.
 
 ## Compatibility
 
-`MessageEnvelope::normalize()` accepts existing `role/content/metadata` rows and
-versioned envelopes. It also accepts the short-lived `data` envelope key from the
-initial envelope draft as a read-time compatibility input and rewrites it to
+`AgentMessageEnvelope::normalize()` accepts existing `role/content/metadata` rows
+and versioned envelopes. It also accepts the short-lived `data` envelope key from
+the initial envelope draft as a read-time compatibility input and rewrites it to
 `payload`.
 
 New writes should store canonical envelopes. Current provider requests use
-`MessageEnvelope::to_provider_message()` / `to_provider_messages()` to project
-envelopes into the `role/content/metadata` shape expected by `ai-http-client`.
-That projection folds the envelope `type` and `payload` into provider metadata.
+`AgentMessageEnvelope::to_provider_message()` / `to_provider_messages()` to
+project envelopes into the `role/content/metadata` shape expected by
+`ai-http-client`. That projection folds the envelope `type` and `payload` into
+provider metadata.
 
 ## Type Payload
 
@@ -77,7 +77,7 @@ normalize to:
 
 ```php
 [
-    'schema'  => 'datamachine.ai.message',
+    'schema'  => 'agents-api.message',
     'version' => 1,
     'type'    => 'tool_call',
     'role'    => 'assistant',

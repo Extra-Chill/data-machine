@@ -49,7 +49,7 @@ class RequestBuilder {
 		$assembled                    = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
 		$request                      = $assembled['request'];
 		$provider_request             = $request;
-		$provider_request['messages'] = MessageEnvelope::to_provider_messages( $request['messages'] ?? array() );
+		$provider_request['messages'] = AgentMessageEnvelope::to_provider_messages( $request['messages'] ?? array() );
 		$structured_tools             = $assembled['structured_tools'];
 		$applied_directives           = $assembled['applied_directives'];
 		$directive_metadata           = $assembled['directive_metadata'];
@@ -192,7 +192,7 @@ class RequestBuilder {
 		}
 
 		$request             = $promptBuilder->buildDetailed( $mode, $provider, $payload );
-		$request['messages'] = MessageEnvelope::normalize_many( $request['messages'] ?? array() );
+		$request['messages'] = AgentMessageEnvelope::normalize_many( $request['messages'] ?? array() );
 		$applied_directives  = $request['applied_directives'] ?? array();
 		$directive_metadata  = $request['directive_metadata'] ?? array();
 		$directive_breakdown = $request['directive_breakdown'] ?? array();

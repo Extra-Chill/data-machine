@@ -188,7 +188,7 @@ class PromptBuilder {
 		$directive_messages = DirectiveRenderer::renderMessages( $validated_outputs );
 
 		return array(
-			'messages'            => MessageEnvelope::normalize_many( array_merge( $directive_messages, $conversation_messages ) ),
+			'messages'            => AgentMessageEnvelope::normalize_many( array_merge( $directive_messages, $conversation_messages ) ),
 			'tools'               => $this->tools,
 			'applied_directives'  => $applied_directives,
 			'directive_metadata'  => $directive_metadata,
