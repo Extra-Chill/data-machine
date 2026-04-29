@@ -68,16 +68,16 @@
         },
         {
             "name": "chubes4/block-format-bridge",
-            "version": "v0.6.0",
+            "version": "v0.6.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/chubes4/block-format-bridge.git",
-                "reference": "d7cfaa385f76fcc1e086dc095e86fdb118c7df90"
+                "reference": "bf7a4d724498573ae583503669a24c31f0cb1a2e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/chubes4/block-format-bridge/zipball/d7cfaa385f76fcc1e086dc095e86fdb118c7df90",
-                "reference": "d7cfaa385f76fcc1e086dc095e86fdb118c7df90",
+                "url": "https://api.github.com/repos/chubes4/block-format-bridge/zipball/bf7a4d724498573ae583503669a24c31f0cb1a2e",
+                "reference": "bf7a4d724498573ae583503669a24c31f0cb1a2e",
                 "shasum": ""
             },
             "require": {
@@ -112,10 +112,10 @@
             "description": "WordPress plugin orchestrating bidirectional content format conversion (HTML, Blocks, Markdown) via a unified adapter API.",
             "homepage": "https://github.com/chubes4/block-format-bridge",
             "support": {
-                "source": "https://github.com/chubes4/block-format-bridge/tree/v0.6.0",
+                "source": "https://github.com/chubes4/block-format-bridge/tree/v0.6.1",
                 "issues": "https://github.com/chubes4/block-format-bridge/issues"
             },
-            "time": "2026-04-29T19:59:14+00:00"
+            "time": "2026-04-29T20:26:23+00:00"
         },
         {
             "name": "dflydev/dot-access-data",

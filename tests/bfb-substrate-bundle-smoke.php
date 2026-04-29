@@ -39,6 +39,8 @@ function assert_bfb_bundle( string $name, bool $condition ): void {
 
 $GLOBALS['__bfb_bundle_actions'] = array();
 $GLOBALS['__bfb_bundle_filters'] = array();
+$GLOBALS['__bfb_bundle_ability_categories'] = array();
+$GLOBALS['__bfb_bundle_abilities'] = array();
 
 if ( ! function_exists( 'did_action' ) ) {
 	function did_action( $hook = '' ) {
@@ -132,11 +134,25 @@ if ( ! function_exists( '__' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_register_ability_category' ) ) {
+	function wp_register_ability_category( string $slug, array $args ): void {
+		$GLOBALS['__bfb_bundle_ability_categories'][ $slug ] = $args;
+	}
+}
+
+if ( ! function_exists( 'wp_register_ability' ) ) {
+	function wp_register_ability( string $name, array $args ): void {
+		$GLOBALS['__bfb_bundle_abilities'][ $name ] = $args;
+	}
+}
+
 // --- Composer/package assertions ------------------------------------
 
 $root          = dirname( __DIR__ );
-$composer_json = json_decode( file_get_contents( $root . '/composer.json' ), true );
-$composer_lock = json_decode( file_get_contents( $root . '/composer.lock' ), true );
+$composer_json_contents = file_get_contents( $root . '/composer.json' );
+$composer_lock_contents = file_get_contents( $root . '/composer.lock' );
+$composer_json          = json_decode( false === $composer_json_contents ? '{}' : $composer_json_contents, true );
+$composer_lock          = json_decode( false === $composer_lock_contents ? '{}' : $composer_lock_contents, true );
 
 assert_bfb_bundle(
 	'composer-json-requires-bfb',
@@ -183,8 +199,45 @@ foreach ( $h2bc_globals as $class_name ) {
 	assert_bfb_bundle( "global-{$class_name}-not-created", ! class_exists( $class_name, false ) );
 }
 
+$registered_actions = $GLOBALS['__bfb_bundle_actions'];
+/** @var array<int, array{hook:string, callback:mixed}> $registered_actions */
+foreach ( $registered_actions as $action ) {
+	if ( 'wp_abilities_api_categories_init' === $action['hook'] && is_callable( $action['callback'] ) ) {
+		call_user_func( $action['callback'] );
+	}
+}
+
+$registered_actions = $GLOBALS['__bfb_bundle_actions'];
+/** @var array<int, array{hook:string, callback:mixed}> $registered_actions */
+foreach ( $registered_actions as $action ) {
+	if ( 'wp_abilities_api_init' === $action['hook'] && is_callable( $action['callback'] ) ) {
+		call_user_func( $action['callback'] );
+	}
+}
+
+$registered_ability_categories = $GLOBALS['__bfb_bundle_ability_categories'];
+$registered_abilities          = $GLOBALS['__bfb_bundle_abilities'];
+/** @var array<string, array<string, mixed>> $registered_ability_categories */
+/** @var array<string, array<string, mixed>> $registered_abilities */
+
+assert_bfb_bundle( 'bfb-ability-category-registered', isset( $registered_ability_categories['block-format-bridge'] ) );
+
+$bfb_ability_names = array(
+	'block-format-bridge/get-capabilities',
+	'block-format-bridge/convert',
+	'block-format-bridge/normalize',
+);
+
+foreach ( $bfb_ability_names as $ability_name ) {
+	assert_bfb_bundle( "{$ability_name}-registered", isset( $registered_abilities[ $ability_name ] ) );
+	assert_bfb_bundle(
+		"{$ability_name}-has-category",
+		'block-format-bridge' === ( $registered_abilities[ $ability_name ]['category'] ?? null )
+	);
+}
+
 echo "\nBFB substrate bundle smoke: {$total} assertions, {$failed} failures.\n";
 
-if ( $failed > 0 ) {
+if ( $failed > 0 ) { // @phpstan-ignore-line Smoke assertion counter is mutated through assert_bfb_bundle().
 	exit( 1 );
 }
