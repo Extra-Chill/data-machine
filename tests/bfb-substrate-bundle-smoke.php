@@ -39,6 +39,8 @@ function assert_bfb_bundle( string $name, bool $condition ): void {
 
 $GLOBALS['__bfb_bundle_actions'] = array();
 $GLOBALS['__bfb_bundle_filters'] = array();
+$GLOBALS['__bfb_bundle_ability_categories'] = array();
+$GLOBALS['__bfb_bundle_abilities'] = array();
 
 if ( ! function_exists( 'did_action' ) ) {
 	function did_action( $hook = '' ) {
@@ -132,6 +134,18 @@ if ( ! function_exists( '__' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_register_ability_category' ) ) {
+	function wp_register_ability_category( string $slug, array $args ): void {
+		$GLOBALS['__bfb_bundle_ability_categories'][ $slug ] = $args;
+	}
+}
+
+if ( ! function_exists( 'wp_register_ability' ) ) {
+	function wp_register_ability( string $name, array $args ): void {
+		$GLOBALS['__bfb_bundle_abilities'][ $name ] = $args;
+	}
+}
+
 // --- Composer/package assertions ------------------------------------
 
 $root          = dirname( __DIR__ );
@@ -181,6 +195,34 @@ $h2bc_globals = array(
 
 foreach ( $h2bc_globals as $class_name ) {
 	assert_bfb_bundle( "global-{$class_name}-not-created", ! class_exists( $class_name, false ) );
+}
+
+foreach ( $GLOBALS['__bfb_bundle_actions'] as $action ) {
+	if ( 'wp_abilities_api_categories_init' === $action['hook'] && is_callable( $action['callback'] ) ) {
+		call_user_func( $action['callback'] );
+	}
+}
+
+foreach ( $GLOBALS['__bfb_bundle_actions'] as $action ) {
+	if ( 'wp_abilities_api_init' === $action['hook'] && is_callable( $action['callback'] ) ) {
+		call_user_func( $action['callback'] );
+	}
+}
+
+assert_bfb_bundle( 'bfb-ability-category-registered', isset( $GLOBALS['__bfb_bundle_ability_categories']['block-format-bridge'] ) );
+
+$bfb_ability_names = array(
+	'block-format-bridge/get-capabilities',
+	'block-format-bridge/convert',
+	'block-format-bridge/normalize',
+);
+
+foreach ( $bfb_ability_names as $ability_name ) {
+	assert_bfb_bundle( "{$ability_name}-registered", isset( $GLOBALS['__bfb_bundle_abilities'][ $ability_name ] ) );
+	assert_bfb_bundle(
+		"{$ability_name}-has-category",
+		'block-format-bridge' === ( $GLOBALS['__bfb_bundle_abilities'][ $ability_name ]['category'] ?? null )
+	);
 }
 
 echo "\nBFB substrate bundle smoke: {$total} assertions, {$failed} failures.\n";
