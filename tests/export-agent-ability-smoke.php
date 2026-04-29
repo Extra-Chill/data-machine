@@ -66,6 +66,7 @@ require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleSlugTrait.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleManifest.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundlePipelineFile.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleFlowFile.php';
+require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleDirectory.php';
 require_once __DIR__ . '/../inc/Core/Agents/AgentBundler.php';
 

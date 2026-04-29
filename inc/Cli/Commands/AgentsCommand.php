@@ -1111,7 +1111,6 @@ class AgentsCommand extends BaseCommand {
 			WP_CLI::error( sprintf( 'Path not found: %s', $path ) );
 			return;
 		}
-
 		// Resolve owner.
 		$owner_id = 0;
 		if ( isset( $assoc_args['owner'] ) ) {
@@ -1142,7 +1141,7 @@ class AgentsCommand extends BaseCommand {
 		);
 
 		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+			WP_CLI::error( $result['error'] ?? 'Failed to import agent bundle.' );
 			return;
 		}
 
@@ -1198,7 +1197,7 @@ class AgentsCommand extends BaseCommand {
 		WP_CLI::log( sprintf( '  Pipelines:   %d imported', $summary['pipelines_imported'] ?? 0 ) );
 		WP_CLI::log( sprintf( '  Flows:       %d imported (paused)', $summary['flows_imported'] ?? 0 ) );
 
-		WP_CLI::success( $result['message'] );
+		WP_CLI::success( $result['message'] ?? 'Agent bundle imported.' );
 	}
 
 	/**
