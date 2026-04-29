@@ -87,7 +87,7 @@ class AIConversationLoop {
 		 * @param int        $max_turns    Maximum conversation turns.
 		 * @param bool       $single_turn  Single-turn mode flag.
 		 */
-		$result = apply_filters(
+		$filter_args = array(
 			'datamachine_conversation_runner',
 			null,
 			$messages,
@@ -97,8 +97,9 @@ class AIConversationLoop {
 			$mode,
 			$payload,
 			$max_turns,
-			$single_turn
+			$single_turn,
 		);
+		$result      = call_user_func_array( 'apply_filters', $filter_args );
 
 		if ( is_array( $result ) ) {
 			return self::normalizeResultForRun( $result, $messages );
