@@ -39,7 +39,7 @@ CoreMemoryFilesDirective
         |
         v
 AgentMemoryStoreFactory
-  datamachine_memory_store filter
+  agents_api_memory_store filter
         |
         +--> DiskAgentMemoryStore (default)
         |
@@ -62,11 +62,11 @@ The disk store intentionally does not implement compare-and-swap writes; it acce
 
 ## Backend Selection
 
-Data Machine resolves memory persistence through one current filter:
+Data Machine resolves memory persistence through one current Agents API-shaped filter:
 
 ```php
 apply_filters(
-    'datamachine_memory_store',
+    'agents_api_memory_store',
     null,
     AgentMemoryScope $scope
 );
@@ -74,7 +74,7 @@ apply_filters(
 
 Return an `AgentMemoryStoreInterface` implementation to replace the disk default for the given scope. Return `null` to keep `DiskAgentMemoryStore`.
 
-Future Agents API extraction should introduce its neutral resolver/filter name in the extracted package with a migration plan. Data Machine does not add a second alias today; `datamachine_memory_store` remains the active public behavior until ownership actually moves.
+`agents_api_memory_store` replaces the earlier `datamachine_memory_store` name in-place. Data Machine intentionally does not call both filters; consumers should migrate to the Agents API-shaped hook rather than relying on a permanent alias.
 
 Backend selection should be capability-driven:
 
@@ -95,7 +95,7 @@ DMC should be treated as a projection provider, not the memory model:
 | Logical memory identity and access | Data Machine (`AgentMemoryScope`, `AgentMemory`) |
 | Registered memory files and mode-aware injection | Data Machine (`MemoryFileRegistry`, directives) |
 | Disk file projection for local coding agents | DMC + `DiskAgentMemoryStore` environment capability |
-| Managed-host alternate backend | Consumer plugin via `datamachine_memory_store` |
+| Managed-host alternate backend | Consumer plugin via `agents_api_memory_store` |
 
 `MEMORY.md` is not deprecated. On disk-capable installs it remains the agent's persistent knowledge file. On hosts without disk, the same logical `MEMORY.md` may be represented by another backend while still appearing to Data Machine as `(agent, user_id, agent_id, MEMORY.md)`.
 

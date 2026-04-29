@@ -9,7 +9,7 @@
  * Data Machine does not register the Guidelines substrate and does not make
  * this store the default. Consumers that run on a host where Guidelines are
  * available can feature-detect {@see self::is_available()} and opt in via the
- * current `datamachine_memory_store` filter. When unavailable, the built-in
+ * `agents_api_memory_store` filter. When unavailable, the built-in
  * disk store remains the default behavior.
  *
  * Identity model: one post = one (layer, user_id, agent_id, filename) tuple.
