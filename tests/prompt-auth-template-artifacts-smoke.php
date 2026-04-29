@@ -68,6 +68,40 @@ if ( ! function_exists( 'trailingslashit' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WP_REST_Request' ) ) {
+	class WP_REST_Request {
+		private array $params;
+
+		public function __construct( array $params = array() ) {
+			$this->params = $params;
+		}
+
+		public function get_param( string $key ) {
+			return $this->params[ $key ] ?? null;
+		}
+	}
+}
+
+if ( ! function_exists( 'rest_ensure_response' ) ) {
+	function rest_ensure_response( $response ) {
+		return $response;
+	}
+}
+
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		public function __construct( ...$args ) {
+			unset( $args );
+		}
+	}
+}
+
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $value ): bool {
+		return $value instanceof WP_Error;
+	}
+}
+
 if ( ! function_exists( 'plugin_dir_url' ) ) {
 	function plugin_dir_url( $file ) {
 		return 'http://example.test/plugin/';
@@ -93,6 +127,7 @@ require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
 use DataMachine\Engine\AI\System\SystemTaskPromptRegistry;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
+use DataMachine\Api\System\System;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 use DataMachine\Engine\Bundle\AuthRef;
@@ -118,6 +153,11 @@ function prompt_artifact_assert( string $label, bool $condition ): void {
 
 function prompt_artifact_assert_equals( string $label, $expected, $actual ): void {
 	prompt_artifact_assert( $label, $expected === $actual );
+}
+
+function prompt_artifact_failure_count(): int {
+	global $failures;
+	return (int) $failures;
 }
 
 final class FixturePromptTask extends SystemTask {
@@ -146,13 +186,26 @@ final class FixturePromptTask extends SystemTask {
 
 final class FixtureAuthRefResolver implements AuthRefResolverInterface {
 
+	/**
+	 * @return array{resolved:bool,ref:string,provider:string,account:string,config?:array,warning?:string}
+	 */
 	public function resolve( AuthRef $ref, array $context = array() ): array {
+		unset( $context );
 		if ( 'github:automattic' !== $ref->ref() ) {
-			return AuthRefResolver::unresolved( $ref, 'Fixture resolver skipped ref.' );
+			return array(
+				'resolved' => false,
+				'ref'      => $ref->ref(),
+				'provider' => $ref->provider(),
+				'account'  => $ref->account(),
+				'warning'  => 'Fixture resolver skipped ref.',
+			);
 		}
 
 		return array(
 			'resolved' => true,
+			'ref'      => $ref->ref(),
+			'provider' => $ref->provider(),
+			'account'  => $ref->account(),
 			'config'   => array(
 				'account_id'   => 42,
 				'access_token' => 'should-not-export',
@@ -218,7 +271,8 @@ SystemTask::setPromptOverride( 'fixture_generation', 'generate', '' );
 
 add_filter(
 	'datamachine_system_task_effective_prompt',
-	static function ( array $resolved, string $task_type, string $prompt_key ): array {
+	static function ( array $resolved, string $task_type, string $prompt_key, ?PromptArtifact $artifact = null, ?string $override = null ): array {
+		unset( $artifact, $override );
 		if ( 'fixture_generation' === $task_type && 'generate' === $prompt_key ) {
 			$resolved['content'] = 'Filtered artifact prompt.';
 			$resolved['source']  = 'filter';
@@ -234,6 +288,30 @@ $definition_artifact = SystemTaskPromptRegistry::artifact_from_definition( 'fixt
 prompt_artifact_assert( 'definition produces a prompt artifact', $definition_artifact instanceof PromptArtifact );
 prompt_artifact_assert_equals( 'default artifact ID is stable', 'system-task:fixture_generation:generate', $definition_artifact->artifact_id() );
 prompt_artifact_assert_equals( 'definition version propagates to artifact', '2026.04.28', $definition_artifact->version() );
+
+add_filter(
+	'datamachine_tasks',
+	static function ( array $tasks ): array {
+		$tasks['fixture_generation'] = FixturePromptTask::class;
+		return $tasks;
+	},
+	10,
+	1
+);
+
+$prompt_list_response = System::get_prompts( new WP_REST_Request() );
+/** @var array{data: array<int,array<string,mixed>>} $prompt_list_response */
+$prompt_row           = $prompt_list_response['data'][0] ?? array();
+prompt_artifact_assert_equals( 'REST prompt list exposes artifact ID', 'system-task:fixture_generation:generate', $prompt_row['artifact_id'] ?? null );
+prompt_artifact_assert_equals( 'REST prompt list exposes artifact version', '2026.04.28', $prompt_row['artifact_version'] ?? null );
+prompt_artifact_assert_equals( 'REST prompt list exposes filtered effective source', 'filter', $prompt_row['effective_source'] ?? null );
+prompt_artifact_assert_equals( 'REST prompt list hash matches effective content', hash( 'sha256', 'Filtered artifact prompt.' ), $prompt_row['effective_hash'] ?? null );
+
+$prompt_detail_response = System::get_prompt( new WP_REST_Request( array( 'task_type' => 'fixture_generation', 'prompt_key' => 'generate' ) ) );
+/** @var array{data: array<string,mixed>} $prompt_detail_response */
+$prompt_detail          = $prompt_detail_response['data'];
+prompt_artifact_assert_equals( 'REST prompt detail exposes artifact source path', 'system-tasks/fixture_generation/generate.md', $prompt_detail['artifact_source_path'] ?? null );
+prompt_artifact_assert_equals( 'REST prompt detail exposes default artifact hash', hash( 'sha256', 'Write about {{topic}}.' ), $prompt_detail['artifact_hash'] ?? null );
 
 echo "\n[3] Agent template source/version metadata round-trips\n";
 $manifest       = AgentBundleManifest::from_array(
@@ -297,7 +375,8 @@ prompt_artifact_assert( 'malformed auth refs fail clearly', $threw );
 
 add_filter(
 	'datamachine_auth_ref_resolvers',
-	static function ( array $resolvers ): array {
+	static function ( array $resolvers, array $context = array() ): array {
+		unset( $context );
 		$resolvers[] = new FixtureAuthRefResolver();
 		return $resolvers;
 	},
@@ -317,6 +396,6 @@ echo "\n=== Results ===\n";
 echo "Passed: {$passes}\n";
 echo "Failed: {$failures}\n";
 
-if ( $failures > 0 ) {
+if ( prompt_artifact_failure_count() > 0 || getenv( 'DATAMACHINE_FORCE_PROMPT_ARTIFACT_FAILURE' ) ) {
 	exit( 1 );
 }

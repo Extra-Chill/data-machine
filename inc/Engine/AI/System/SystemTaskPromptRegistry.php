@@ -86,10 +86,17 @@ final class SystemTaskPromptRegistry {
 		 */
 		$resolved = apply_filters( 'datamachine_system_task_effective_prompt', $resolved, $task_type, $prompt_key, $artifact, $override );
 
+		$final_content = isset( $resolved['content'] ) ? (string) $resolved['content'] : $content;
+		$initial_hash  = hash( 'sha256', $content );
+		$content_hash  = isset( $resolved['content_hash'] ) ? (string) $resolved['content_hash'] : hash( 'sha256', $final_content );
+		if ( $final_content !== $content && $content_hash === $initial_hash ) {
+			$content_hash = hash( 'sha256', $final_content );
+		}
+
 		return array(
-			'content'      => isset( $resolved['content'] ) ? (string) $resolved['content'] : $content,
+			'content'      => $final_content,
 			'artifact_id'  => isset( $resolved['artifact_id'] ) ? (string) $resolved['artifact_id'] : ( $artifact ? $artifact->artifact_id() : self::artifact_id( $task_type, $prompt_key ) ),
-			'content_hash' => isset( $resolved['content_hash'] ) ? (string) $resolved['content_hash'] : hash( 'sha256', isset( $resolved['content'] ) ? (string) $resolved['content'] : $content ),
+			'content_hash' => $content_hash,
 			'source'       => isset( $resolved['source'] ) ? (string) $resolved['source'] : $source,
 			'version'      => isset( $resolved['version'] ) ? (string) $resolved['version'] : ( $artifact ? $artifact->version() : '' ),
 			'artifact'     => $resolved['artifact'] ?? $artifact,
