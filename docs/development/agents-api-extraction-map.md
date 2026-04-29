@@ -193,6 +193,9 @@ These are reference points only. Do not expose them as public Data Machine or Ag
 This map records the in-place hook vocabulary while Data Machine still hosts the
 Agents API substrate. Generic runtime seams should use Agents API-shaped names;
 Data Machine product and compatibility seams keep Data Machine names.
+Hard-cut hook renames assume active cross-repo consumers are updated in lockstep;
+this slice's known companion is the Intelligence tier-3 runner adapter update in
+Automattic/intelligence#285.
 
 | Previous hook/filter | Current hook/filter | Decision |
 |---|---|---|
