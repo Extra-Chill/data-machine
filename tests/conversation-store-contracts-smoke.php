@@ -38,17 +38,15 @@ use DataMachine\Core\Database\Chat\ConversationStoreInterface;
 use DataMachine\Core\Database\Chat\ConversationTranscriptStoreInterface;
 use DataMachine\Tests\Unit\Core\Database\Chat\InMemoryConversationStore;
 
-$failures = array();
-
-function assert_true( bool $condition, string $label ): void {
-	global $failures;
+$failures    = array();
+$assert_true = static function ( bool $condition, string $label ) use ( &$failures ): void {
 	if ( $condition ) {
 		echo "PASS: {$label}\n";
 		return;
 	}
 	echo "FAIL: {$label}\n";
 	$failures[] = $label;
-}
+};
 
 $narrow_contracts = array(
 	ConversationTranscriptStoreInterface::class,
@@ -60,19 +58,24 @@ $narrow_contracts = array(
 
 $aggregate = new ReflectionClass( ConversationStoreInterface::class );
 foreach ( $narrow_contracts as $contract ) {
-	assert_true( $aggregate->implementsInterface( $contract ), "aggregate composes {$contract}" );
+	$assert_true( $aggregate->implementsInterface( $contract ), "aggregate composes {$contract}" );
 }
 
 foreach ( $narrow_contracts as $contract ) {
-	assert_true( is_subclass_of( Chat::class, $contract ), "Chat implements {$contract}" );
-	assert_true( is_subclass_of( InMemoryConversationStore::class, $contract ), "InMemoryConversationStore implements {$contract}" );
+	$chat_ref = new ReflectionClass( Chat::class );
+	$test_ref = new ReflectionClass( InMemoryConversationStore::class );
+	$assert_true( $chat_ref->implementsInterface( $contract ), "Chat implements {$contract}" );
+	$assert_true( $test_ref->implementsInterface( $contract ), "InMemoryConversationStore implements {$contract}" );
 }
 
-assert_true( is_subclass_of( Chat::class, ConversationStoreInterface::class ), 'Chat remains a ConversationStoreInterface aggregate' );
-assert_true( is_subclass_of( InMemoryConversationStore::class, ConversationStoreInterface::class ), 'test adapter remains a ConversationStoreInterface aggregate' );
+$assert_true( ( new ReflectionClass( Chat::class ) )->implementsInterface( ConversationStoreInterface::class ), 'Chat remains a ConversationStoreInterface aggregate' );
+$assert_true( ( new ReflectionClass( InMemoryConversationStore::class ) )->implementsInterface( ConversationStoreInterface::class ), 'test adapter remains a ConversationStoreInterface aggregate' );
 
 $factory_get = new ReflectionMethod( ConversationStoreFactory::class, 'get' );
-assert_true( ConversationStoreInterface::class === (string) $factory_get->getReturnType(), 'factory still returns the aggregate contract' );
+$assert_true( ConversationStoreInterface::class === (string) $factory_get->getReturnType(), 'factory still returns the aggregate contract' );
+
+$factory_transcript_get = new ReflectionMethod( ConversationStoreFactory::class, 'get_transcript_store' );
+$assert_true( ConversationTranscriptStoreInterface::class === (string) $factory_transcript_get->getReturnType(), 'factory exposes the narrow transcript contract' );
 
 echo "\n";
 if ( empty( $failures ) ) {

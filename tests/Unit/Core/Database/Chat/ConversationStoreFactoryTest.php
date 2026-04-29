@@ -54,6 +54,14 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$this->assertInstanceOf( Chat::class, $store );
 	}
 
+	public function test_transcript_resolution_returns_narrow_contract(): void {
+		$store = ConversationStoreFactory::get_transcript_store();
+
+		$this->assertInstanceOf( ConversationTranscriptStoreInterface::class, $store );
+		$this->assertInstanceOf( ConversationStoreInterface::class, ConversationStoreFactory::get() );
+		$this->assertSame( ConversationStoreFactory::get(), $store );
+	}
+
 	public function test_conversation_store_interface_is_composed_from_narrow_contracts(): void {
 		$reflection = new \ReflectionClass( ConversationStoreInterface::class );
 		$expected   = array(
@@ -90,6 +98,22 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$this->assertInstanceOf( ConversationRetentionInterface::class, $resolved );
 		$this->assertInstanceOf( ConversationReportingInterface::class, $resolved );
 		$this->assertNotInstanceOf( Chat::class, $resolved );
+	}
+
+	public function test_transcript_resolution_uses_conversation_store_filter(): void {
+		$memory_store = new InMemoryConversationStore();
+
+		add_filter(
+			'datamachine_conversation_store',
+			static fn() => $memory_store,
+			10,
+			1
+		);
+
+		$resolved = ConversationStoreFactory::get_transcript_store();
+
+		$this->assertSame( $memory_store, $resolved );
+		$this->assertInstanceOf( ConversationTranscriptStoreInterface::class, $resolved );
 	}
 
 	public function test_misbehaving_filter_falls_back_to_default(): void {
@@ -211,6 +235,64 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 
 		$metrics = $store->get_storage_metrics();
 		$this->assertSame( 3, $metrics['rows'] );
+	}
+
+	public function test_transcript_only_contract_can_persist_messages(): void {
+		$store      = new InMemoryConversationStore();
+		$transcript = $this->persist_fixture_transcript( $store );
+
+		$this->assertSame( 'openai', $transcript['provider'] );
+		$this->assertSame( 'gpt-test', $transcript['model'] );
+		$this->assertSame( 'pipeline', $transcript['context'] );
+		$this->assertSame( 'assistant response', $transcript['messages'][1]['content'] );
+		$this->assertSame( 99, $transcript['metadata']['job_id'] );
+	}
+
+	/**
+	 * Persist a transcript through only the narrow runtime contract.
+	 *
+	 * @param ConversationTranscriptStoreInterface $store Transcript store.
+	 * @return array<string, mixed>
+	 */
+	private function persist_fixture_transcript( ConversationTranscriptStoreInterface $store ): array {
+		$session_id = $store->create_session(
+			5,
+			7,
+			array(
+				'source' => 'pipeline_transcript',
+				'job_id' => 99,
+			),
+			'pipeline'
+		);
+
+		$this->assertNotSame( '', $session_id );
+
+		$updated = $store->update_session(
+			$session_id,
+			array(
+				array(
+					'role'    => 'user',
+					'content' => 'input',
+				),
+				array(
+					'role'    => 'assistant',
+					'content' => 'assistant response',
+				),
+			),
+			array(
+				'source' => 'pipeline_transcript',
+				'job_id' => 99,
+			),
+			'openai',
+			'gpt-test'
+		);
+
+		$this->assertTrue( $updated );
+
+		$session = $store->get_session( $session_id );
+		$this->assertNotNull( $session );
+
+		return $session;
 	}
 
 	public function test_list_sessions_for_day_observed_by_swapped_store_through_factory(): void {
