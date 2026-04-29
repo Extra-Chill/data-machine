@@ -2,12 +2,12 @@
 /**
  * Agent Registry
  *
- * Declarative registration surface for Data Machine agents. Plugins
- * (and DM core itself) declare agent roles by calling
- * `datamachine_register_agent()` inside a `datamachine_register_agents`
- * action callback. The registry collects definitions; Data Machine's
- * materializer reconciles them against the `datamachine_agents` table
- * on init.
+ * Declarative registration surface for agents. Plugins (and DM core
+ * itself) declare agent roles by calling `wp_register_agent()` inside a
+ * `wp_agents_api_init` action callback. The registry collects definitions;
+ * Data Machine's materializer consumes them and reconciles them against
+ * the `datamachine_agents` table on init while Data Machine hosts the
+ * substrate.
  *
  * Registration is side-effect free — adding a slug to the registry
  * does not touch the database. Reconciliation materializes missing
@@ -15,7 +15,7 @@
  * leaves existing rows alone (owner_id, agent_config, and other
  * mutable fields remain DB-owned).
  *
- * Plugins ship declarative agent definitions; DM owns the runtime.
+ * Plugins ship declarative agent definitions; DM owns today's runtime.
  * The split mirrors the WordPress pattern where
  * `register_post_type()` is declarative and the posts table stays
  * operator-mutable.
@@ -38,7 +38,7 @@ class AgentRegistry {
 	private static array $agents = array();
 
 	/**
-	 * Whether the `datamachine_register_agents` action has fired.
+	 * Whether the agent registration actions have fired.
 	 *
 	 * @var bool
 	 */
@@ -47,7 +47,7 @@ class AgentRegistry {
 	/**
 	 * Register an agent definition.
 	 *
-	 * Call from inside a `datamachine_register_agents` action callback.
+	 * Call from inside a `wp_agents_api_init` action callback.
 	 * Later registrations for the same slug overwrite earlier ones — this
 	 * matches WordPress hook semantics, so plugins can override core or
 	 * other plugins via action priority.
@@ -113,7 +113,7 @@ class AgentRegistry {
 	/**
 	 * Get all registered agent definitions.
 	 *
-	 * Fires the `datamachine_register_agents` action once per request so
+	 * Fires the `wp_agents_api_init` action once per request so
 	 * callers can lazily collect registrations without needing to worry
 	 * about hook ordering.
 	 *
@@ -164,7 +164,7 @@ class AgentRegistry {
 	}
 
 	/**
-	 * Ensure the `datamachine_register_agents` action has fired.
+	 * Ensure the agent registration actions have fired.
 	 *
 	 * Plugins register their agents inside action callbacks — collecting
 	 * them lazily lets callers of `get_all()` / `reconcile()` / `get()`
@@ -180,12 +180,23 @@ class AgentRegistry {
 		self::$registration_fired = true;
 
 		/**
-		 * Fires to let plugins register Data Machine agents.
+		 * Fires to let plugins register agents.
 		 *
-		 * Callbacks should call `datamachine_register_agent()` to contribute
+		 * Callbacks should call `wp_register_agent()` to contribute
 		 * one or more agent definitions. Registrations are collected into a
 		 * central registry and reconciled against the `datamachine_agents`
 		 * table on `init` (priority 15).
+		 *
+		 * @since 0.99.0
+		 */
+		do_action( 'wp_agents_api_init' );
+
+		/**
+		 * Fires to let existing Data Machine consumers register agents.
+		 *
+		 * This hook remains while the Agents API surface lives in Data Machine.
+		 * New code should use `wp_agents_api_init` and `wp_register_agent()` so
+		 * the registry vocabulary can move cleanly when Agents API is extracted.
 		 *
 		 * @since 0.71.0
 		 */
