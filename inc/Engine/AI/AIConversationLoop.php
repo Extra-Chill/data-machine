@@ -11,7 +11,6 @@
 
 namespace DataMachine\Engine\AI;
 
-use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\IterationBudgetRegistry;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
@@ -190,7 +189,9 @@ class AIConversationLoop {
 		$tool_execution_results = array();
 		$last_request_metadata  = array();
 		$event_sink             = self::resolveEventSink( $payload );
-		$loop_payload           = self::payloadWithoutEventSink( $payload );
+		$completion_policy      = self::resolveCompletionPolicy( $mode, $payload );
+		$transcript_persister   = self::resolveTranscriptPersister( $payload );
+		$loop_payload           = self::payloadWithoutRuntimeObjects( $payload );
 
 		// Accumulate token usage across all turns.
 		$total_usage = array(
@@ -198,13 +199,6 @@ class AIConversationLoop {
 			'completion_tokens' => 0,
 			'total_tokens'      => 0,
 		);
-
-		// Track which handler tools have been executed for multi-handler support.
-		// In pipeline mode, conversation should only complete when all handlers
-		// required by the adjacent step have fired, not just the first one.
-		$executed_handler_slugs = array();
-		$configured_handlers    = $loop_payload['configured_handler_slugs'] ?? array();
-		$configured_handlers    = is_array( $configured_handlers ) ? array_values( $configured_handlers ) : array();
 
 		// Build base log metadata from payload for consistent logging.
 		$base_log_context = array_filter(
@@ -290,7 +284,7 @@ class AIConversationLoop {
 				// Persist transcript on the error path too — this is exactly
 				// the scenario the feature exists for. Failing silently here
 				// would defeat the debugging value.
-				$transcript_session_id = self::maybePersistTranscript(
+				$transcript_session_id = $transcript_persister->persist(
 					$messages,
 					$provider,
 					$model,
@@ -471,64 +465,21 @@ class AIConversationLoop {
 					$tool_def        = $tools[ $tool_name ] ?? null;
 					$is_handler_tool = $tool_def && isset( $tool_def['handler'] );
 
-					// Track handler tool execution in pipeline mode.
-					// Only complete when ALL configured handlers have fired (multi-handler support).
-					if ( 'pipeline' === $mode && $is_handler_tool && ( $tool_result['success'] ?? false ) ) {
-						$handler_slug = $tool_def['handler'] ?? null;
-						if ( $handler_slug ) {
-							$executed_handler_slugs[] = $handler_slug;
-						}
-
-						// If we know which handlers are configured, wait for all of them.
-						// Otherwise fall back to completing on first handler (backward compat).
-						if ( ! empty( $configured_handlers ) ) {
-							$remaining = array_diff( $configured_handlers, array_unique( $executed_handler_slugs ) );
-							if ( empty( $remaining ) ) {
-								$conversation_complete = true;
-								do_action(
-									'datamachine_log',
-									'debug',
-									'AIConversationLoop: All configured handlers executed, ending conversation',
-									array_merge(
-										$base_log_context,
-										array(
-											'tool_name'  => $tool_name,
-											'turn_count' => $turn_count,
-											'executed_handlers' => array_unique( $executed_handler_slugs ),
-											'configured_handlers' => $configured_handlers,
-										)
-									)
-								);
-							} else {
-								do_action(
-									'datamachine_log',
-									'debug',
-									'AIConversationLoop: Handler executed, waiting for remaining handlers',
-									array_merge(
-										$base_log_context,
-										array(
-											'tool_name' => $tool_name,
-											'remaining_handlers' => array_values( $remaining ),
-										)
-									)
-								);
-							}
-						} else {
-							// No handler list available — legacy behavior: complete on first handler
-							$conversation_complete = true;
-							do_action(
-								'datamachine_log',
-								'debug',
-								'AIConversationLoop: Handler tool executed (legacy mode), ending conversation',
-								array_merge(
-									$base_log_context,
-									array(
-										'tool_name'  => $tool_name,
-										'turn_count' => $turn_count,
-									)
-								)
-							);
-						}
+					$completion_decision   = $completion_policy->recordToolResult(
+						$tool_name,
+						is_array( $tool_def ) ? $tool_def : null,
+						$tool_result,
+						$mode,
+						$turn_count
+					);
+					$conversation_complete = $completion_decision->isComplete();
+					if ( '' !== $completion_decision->message() ) {
+						do_action(
+							'datamachine_log',
+							'debug',
+							$completion_decision->message(),
+							array_merge( $base_log_context, $completion_decision->context() )
+						);
 					}
 
 					// Store tool execution result separately for data packet processing
@@ -614,7 +565,7 @@ class AIConversationLoop {
 			$result['max_turns_reached'] = true;
 		}
 
-		$transcript_session_id = self::maybePersistTranscript(
+		$transcript_session_id = $transcript_persister->persist(
 			$messages,
 			$provider,
 			$model,
@@ -659,14 +610,58 @@ class AIConversationLoop {
 	}
 
 	/**
-	 * Remove observer-only payload values before dispatching requests or tools.
+	 * Remove runtime-only payload values before dispatching requests or tools.
 	 *
 	 * @param array $payload Loop payload.
-	 * @return array Payload without the loop event sink object.
+	 * @return array Payload without runtime collaborator objects.
 	 */
-	private static function payloadWithoutEventSink( array $payload ): array {
+	private static function payloadWithoutRuntimeObjects( array $payload ): array {
 		unset( $payload['event_sink'] );
+		unset( $payload['completion_policy'] );
+		unset( $payload['transcript_persister'] );
 		return $payload;
+	}
+
+	/**
+	 * Resolve the runtime completion policy carried by the adapter payload.
+	 *
+	 * @param string $mode    Execution mode.
+	 * @param array  $payload Loop payload.
+	 * @return AgentConversationCompletionPolicyInterface Completion policy.
+	 */
+	private static function resolveCompletionPolicy( string $mode, array $payload ): AgentConversationCompletionPolicyInterface {
+		$policy = $payload['completion_policy'] ?? null;
+		if ( $policy instanceof AgentConversationCompletionPolicyInterface ) {
+			return $policy;
+		}
+
+		$configured_handlers = $payload['configured_handler_slugs'] ?? array();
+		$configured_handlers = is_array( $configured_handlers ) ? array_values( $configured_handlers ) : array();
+
+		if ( ! empty( $configured_handlers ) || 'pipeline' === $mode ) {
+			return new DataMachineHandlerCompletionPolicy( $configured_handlers );
+		}
+
+		return new DefaultAgentConversationCompletionPolicy();
+	}
+
+	/**
+	 * Resolve the runtime transcript persister carried by the adapter payload.
+	 *
+	 * @param array $payload Loop payload.
+	 * @return AgentConversationTranscriptPersisterInterface Transcript persister.
+	 */
+	private static function resolveTranscriptPersister( array $payload ): AgentConversationTranscriptPersisterInterface {
+		$persister = $payload['transcript_persister'] ?? null;
+		if ( $persister instanceof AgentConversationTranscriptPersisterInterface ) {
+			return $persister;
+		}
+
+		if ( ! empty( $payload['persist_transcript'] ) ) {
+			return new DataMachinePipelineTranscriptPersister();
+		}
+
+		return new NullAgentConversationTranscriptPersister();
 	}
 
 	/**
@@ -690,117 +685,5 @@ class AIConversationLoop {
 				)
 			);
 		}
-	}
-
-	/**
-	 * Persist the conversation transcript when the caller has opted in.
-	 *
-	 * Opt-in is signaled by `$payload['persist_transcript']` (resolved in
-	 * AIStep::executeStep() via PipelineTranscriptPolicy). When enabled,
-	 * a chat session is created with `mode='pipeline'` and metadata
-	 * `source='pipeline_transcript'` so it can be filtered out of the
-	 * human chat session list.
-	 *
-	 * Persistence is opportunistic: any failure (store unavailable,
-	 * insert error) is logged at debug level and returns an empty
-	 * string. Transcript persistence MUST NOT break the AI step.
-	 *
-	 * @param array  $messages Final conversation messages.
-	 * @param string $provider Provider identifier.
-	 * @param string $model    Model identifier.
-	 * @param array  $payload  Loop payload (job_id, agent_id, etc.).
-	 * @param array  $result   Loop result so far (used for outcome metadata).
-	 * @return string Session ID on success, empty string when not persisted.
-	 */
-	private static function maybePersistTranscript(
-		array $messages,
-		string $provider,
-		string $model,
-		array $payload,
-		array $result
-	): string {
-		if ( empty( $payload['persist_transcript'] ) ) {
-			return '';
-		}
-
-		// Without messages there's nothing useful to persist. This guards
-		// against the early-failure path where the first AI request errored
-		// before any message was assembled.
-		if ( empty( $messages ) ) {
-			return '';
-		}
-
-		$store = ConversationStoreFactory::get_transcript_store();
-
-		$user_id  = (int) ( $payload['user_id'] ?? 0 );
-		$agent_id = (int) ( $payload['agent_id'] ?? 0 );
-
-		$metadata = array(
-			'source'       => 'pipeline_transcript',
-			'job_id'       => $payload['job_id'] ?? null,
-			'flow_step_id' => $payload['flow_step_id'] ?? null,
-			'pipeline_id'  => $payload['pipeline_id'] ?? null,
-			'flow_id'      => $payload['flow_id'] ?? null,
-			'agent_id'     => $agent_id > 0 ? $agent_id : null,
-			'owner_id'     => $user_id > 0 ? $user_id : null,
-			'provider'     => $provider,
-			'model'        => $model,
-			'turn_count'   => $result['turn_count'] ?? 0,
-			'completed'    => (bool) ( $result['completed'] ?? false ),
-			'error'        => $result['error'] ?? null,
-			'usage'        => $result['usage'] ?? array(),
-		);
-
-		if ( ! empty( $result['request_metadata'] ) && is_array( $result['request_metadata'] ) ) {
-			$metadata['request_metadata'] = $result['request_metadata'];
-		}
-
-		$session_id = $store->create_session( $user_id, $agent_id, $metadata, 'pipeline' );
-
-		if ( '' === $session_id ) {
-			do_action(
-				'datamachine_log',
-				'debug',
-				'AIConversationLoop: Failed to create transcript session',
-				array(
-					'job_id'       => $payload['job_id'] ?? null,
-					'flow_step_id' => $payload['flow_step_id'] ?? null,
-				)
-			);
-			return '';
-		}
-
-		$updated = $store->update_session( $session_id, $messages, $metadata, $provider, $model );
-		if ( ! $updated ) {
-			do_action(
-				'datamachine_log',
-				'debug',
-				'AIConversationLoop: Failed to write transcript messages',
-				array(
-					'session_id'   => $session_id,
-					'job_id'       => $payload['job_id'] ?? null,
-					'flow_step_id' => $payload['flow_step_id'] ?? null,
-				)
-			);
-			// Best-effort cleanup so we don't leave an empty pipeline-mode
-			// row behind. Failure to delete is non-fatal — retention will
-			// catch it eventually.
-			$store->delete_session( $session_id );
-			return '';
-		}
-
-		do_action(
-			'datamachine_log',
-			'debug',
-			'AIConversationLoop: Transcript persisted',
-			array(
-				'session_id'   => $session_id,
-				'job_id'       => $payload['job_id'] ?? null,
-				'flow_step_id' => $payload['flow_step_id'] ?? null,
-				'turn_count'   => $result['turn_count'] ?? 0,
-			)
-		);
-
-		return $session_id;
 	}
 }
