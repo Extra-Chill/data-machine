@@ -40,13 +40,13 @@ These are still Data Machine-named even when the seam is generic:
 - `datamachine_memory_store`
 - `datamachine_tool_sources`
 - `datamachine_tool_sources_for_mode`
-- `datamachine_register_agents`
+- `wp_agents_api_init`
 - `datamachine_guideline_updated`
 
 Target shape:
 
 - Decide the `agents_api_*` / `wp_agents_api_*` hook names before extraction.
-- Keep existing Data Machine hooks while code is in this repository.
+- Keep existing Data Machine hooks while code is in this repository, but make new registrations use the WordPress-shaped hook/helper.
 - Do not add runtime fallback ladders that survive extraction. When Agents API owns the seam, migrate consumers to the new hook names directly.
 
 ### 3. Message Envelope Vocabulary
@@ -92,11 +92,11 @@ Target shape:
 
 ### 7. Agent Registry And Identity
 
-Declarative registration is separated from materialization, but the public helper is still `datamachine_register_agent()` and persistence still targets Data Machine tables.
+Declarative registration is separated from materialization, and the public vocabulary is now mirrored in-place as `wp_register_agent()`, `WP_Agent`, `WP_Agents_Registry`, and `wp_agents_api_init`. Persistence still targets Data Machine tables through the materializer while Data Machine hosts the substrate.
 
 Target shape:
 
-- Mirror Abilities API: `wp_register_agent()`, `WP_Agent`, `WP_Agents_Registry`, `wp_agents_api_init`.
+- Extract the WordPress-shaped facade/registry contract before moving Data Machine persistence repositories.
 - Data Machine reconciler continues to create its rows/access records from registered definitions while Data Machine hosts the substrate.
 - Decide whether Agents API owns persistence tables, only contracts, or optional stores before moving repositories.
 

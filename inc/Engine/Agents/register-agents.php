@@ -1,14 +1,14 @@
 <?php
 /**
- * Agent Registration — global helper + hook wiring.
+ * Agent Registration — global helpers + hook wiring.
  *
- * Defines the top-level `datamachine_register_agent()` function that
- * plugins call from inside a `datamachine_register_agents` action
- * callback to declare agents. Wires reconciliation on `init` and a
- * scaffold generator that surfaces each registered agent's bundled
- * `memory_seeds` entries as scaffold content for their respective
- * agent-layer memory files (SOUL.md, MEMORY.md, or any custom file
- * registered via `MemoryFileRegistry::register()`).
+ * Defines the top-level `wp_register_agent()` function that plugins call
+ * from inside a `wp_agents_api_init` action callback to declare agents.
+ * Wires reconciliation on `init` and a scaffold generator that surfaces
+ * each registered agent's bundled `memory_seeds` entries as scaffold
+ * content for their respective agent-layer memory files (SOUL.md,
+ * MEMORY.md, or any custom file registered via
+ * `MemoryFileRegistry::register()`).
  *
  * Also dogfoods the API: DM itself registers the site's default
  * administrator agent through the same hook plugins use. On existing
@@ -25,12 +25,34 @@ use DataMachine\Engine\Agents\AgentRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
+require_once __DIR__ . '/class-wp-agent.php';
+require_once __DIR__ . '/class-wp-agents-registry.php';
+
+if ( ! function_exists( 'wp_register_agent' ) ) {
+	/**
+	 * Register an agent.
+	 *
+	 * Call from inside a `wp_agents_api_init` action callback. The registry
+	 * collects all definitions; Data Machine reconciles them against the
+	 * `datamachine_agents` table on `init` priority 15 while it hosts the
+	 * in-place substrate.
+	 *
+	 * @since 0.99.0
+	 *
+	 * @param string|WP_Agent $agent Agent slug or definition object.
+	 * @param array           $args  Registration arguments. See AgentRegistry::register().
+	 * @return void
+	 */
+	function wp_register_agent( $agent, array $args = array() ): void {
+		WP_Agents_Registry::register( $agent, $args );
+	}
+}
+
 /**
  * Register a Data Machine agent.
  *
- * Call from inside a `datamachine_register_agents` action callback.
- * The registry collects all definitions and reconciles them against
- * the `datamachine_agents` table on `init` priority 15.
+ * Existing Data Machine-named wrapper for the in-place transition. New
+ * declarations should use `wp_register_agent()` from `wp_agents_api_init`.
  *
  * @since 0.71.0
  *
@@ -39,7 +61,7 @@ defined( 'ABSPATH' ) || exit;
  * @return void
  */
 function datamachine_register_agent( string $slug, array $args = array() ): void {
-	AgentRegistry::register( $slug, $args );
+	wp_register_agent( $slug, $args );
 }
 
 /**
@@ -133,7 +155,7 @@ add_filter(
  * default admin-agent registration can `remove_action()` it cleanly:
  *
  *     remove_action(
- *         'datamachine_register_agents',
+ *         'wp_agents_api_init',
  *         'datamachine_register_default_admin_agent',
  *         10
  *     );
@@ -170,8 +192,8 @@ function datamachine_register_default_admin_agent(): void {
 	$default_config = array();
 	if ( class_exists( '\\DataMachine\\Core\\PluginSettings' ) ) {
 		$resolved = \DataMachine\Core\PluginSettings::getModelForMode( 'chat' );
-		$provider = isset( $resolved['provider'] ) ? (string) $resolved['provider'] : '';
-		$model    = isset( $resolved['model'] ) ? (string) $resolved['model'] : '';
+		$provider = (string) $resolved['provider'];
+		$model    = (string) $resolved['model'];
 
 		if ( '' !== $provider ) {
 			$default_config['default_provider'] = $provider;
@@ -181,7 +203,7 @@ function datamachine_register_default_admin_agent(): void {
 		}
 	}
 
-	datamachine_register_agent(
+	wp_register_agent(
 		$slug,
 		array(
 			'label'          => (string) $user->display_name,
@@ -191,4 +213,4 @@ function datamachine_register_default_admin_agent(): void {
 		)
 	);
 }
-add_action( 'datamachine_register_agents', 'datamachine_register_default_admin_agent', 10 );
+add_action( 'wp_agents_api_init', 'datamachine_register_default_admin_agent', 10 );

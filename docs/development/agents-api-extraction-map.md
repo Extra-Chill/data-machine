@@ -10,9 +10,9 @@ Mirror the WordPress Abilities API shape instead of importing Data Machine, wpco
 
 | Current Data Machine surface | Possible Agents API vocabulary | Notes |
 |---|---|---|
-| `datamachine_register_agent()` | `wp_register_agent()` | Same declarative pattern, but without DB reconciliation side effects in the public helper. |
-| `AgentRegistry` | `WP_Agents_Registry` | Registry should collect definitions. Persistence/adoption can remain adapter territory. |
-| `datamachine_register_agents` | `wp_agents_api_init` or `wp_register_agents` | Prefer a core-shaped init hook; exact name needs review against Abilities API precedent. |
+| `wp_register_agent()` | `wp_register_agent()` | Same declarative pattern as Abilities API-style registration; no DB reconciliation side effects in the public helper. |
+| `WP_Agent` / `WP_Agents_Registry` | `WP_Agent` / `WP_Agents_Registry` | Registry collects definitions. Persistence/adoption remains Data Machine adapter territory. |
+| `wp_agents_api_init` | `wp_agents_api_init` | Core-shaped init hook mirrored in-place while Data Machine hosts the substrate. |
 | `MessageEnvelope` | `WP_Agent_Message` or neutral envelope | Contract is generic. Data Machine schema/name is not. |
 | `ConversationStoreInterface` | `WP_Agent_Conversation_Store_Interface` | Keep transcript/session/read-state split if it remains boring. |
 | `AgentMemoryStoreInterface` | `WP_Agent_Memory_Store_Interface` | Generic identity tuple needs naming review; Data Machine scaffolding/abilities stay outside the store contract. |
@@ -65,8 +65,8 @@ These are closest to generic public contracts. Most should be extracted as contr
 | `datamachine_conversation_store` filter | `ConversationStoreFactory::get()` | Store swap seam is generic. | Target should be an Agents API store resolver/filter. |
 | `datamachine_conversation_runner` filter | `AIConversationLoop::run()` | Runner replacement seam is generic. | Target should be a runtime runner interface/filter, not Data Machine named. |
 | `datamachine_guideline_updated` action | `GuidelineAgentMemoryStore` | Logical memory/guideline change event is generic. | Target event must not assume Data Machine option names or storage. |
-| `datamachine_register_agent()` helper | `inc/Engine/Agents/register-agents.php` | Declarative agent registration is core-shaped. | Public helper should become `wp_register_agent()`; persistence reconciliation should not be part of the helper contract. |
-| `datamachine_register_agents` action | `inc/Engine/Agents/register-agents.php` | Registration collection hook is generic. | Rename to `wp_agents_api_init` or a core-reviewed equivalent. |
+| `wp_register_agent()` helper | `inc/Engine/Agents/register-agents.php` | Declarative agent registration is core-shaped. | Public helper contributes definitions only; persistence reconciliation is not part of the helper contract. |
+| `wp_agents_api_init` action | `inc/Engine/Agents/register-agents.php` | Registration collection hook is generic. | Keep as the in-place Agents API-shaped hook while Data Machine hosts the substrate. |
 | `datamachine_registered_agent_reconciled` action | `AgentRegistry::reconcile()` | Useful lifecycle event, but current name includes persistence behavior. | Public API should define lifecycle events separately from Data Machine DB reconciliation. |
 
 ## Agents API Implementation Candidate
@@ -101,7 +101,7 @@ These are plausibly generic implementations, but should not move until naming an
 | `GuidelineAgentMemoryStore` | `inc/Core/FilesRepository/GuidelineAgentMemoryStore.php` | Generic implementation for `wp_guideline`, but Data Machine does not own that substrate. | Agents API can ship it as optional implementation guarded by `post_type_exists()`. |
 | `DiskAgentMemoryStore` | `inc/Core/FilesRepository/DiskAgentMemoryStore.php` | Generic self-hosted implementation, but path conventions are Data Machine runtime conventions. | Extract only if Agents API deliberately supports disk memory. |
 | `AgentMemoryStoreFactory` | `inc/Core/FilesRepository/AgentMemoryStoreFactory.php` | Generic store resolver pattern. | Rename filter and return type; preserve single resolution point. |
-| `AgentRegistry` | `inc/Engine/Agents/AgentRegistry.php` | Generic declarative registry mixed with Data Machine DB reconciliation/scaffolding. | Split into registry contract plus Data Machine reconciler. |
+| `WP_Agent` / `WP_Agents_Registry` / `AgentRegistry` | `inc/Engine/Agents/class-wp-agent.php`, `inc/Engine/Agents/class-wp-agents-registry.php`, `inc/Engine/Agents/AgentRegistry.php` | Generic declarative registry now has WordPress-shaped facade; Data Machine reconciliation is delegated to `AgentMaterializer`. | Extract facade/registry contract first; keep Data Machine materializer as consumer. |
 | `Agents`, `AgentAccess`, `AgentTokens` repositories | `inc/Core/Database/Agents/` | Generic identity/access/token data model, but table names and permissions are Data Machine-owned. | Extract only after deciding whether Agents API owns persistence tables or just contracts. |
 | `AgentAbilities`, `AgentTokenAbilities`, `AgentRemoteCallAbilities`, `AgentCallAbilities` | `inc/Abilities/` | Ability shapes are generic candidates, but slugs and permission helpers are Data Machine-specific. | Re-register as `wp-agents/v1`/Agents API abilities after permission model settles. |
 
@@ -174,7 +174,7 @@ These are reference points only. Do not expose them as public Data Machine or Ag
 | `datamachine_conversation_runner` | Agents API public candidate | Generic runtime replacement seam. Rename and formalize result contract. |
 | `datamachine_conversation_store` | Agents API public candidate | Generic conversation persistence swap seam. Rename and keep narrow contracts. |
 | `datamachine_memory_store` | Agents API public candidate | Generic memory persistence swap seam. Keep as Data Machine's current public behavior until extraction; introduce a neutral Agents API filter only when that package owns the resolver and migration path. |
-| `datamachine_register_agents` | Agents API public candidate | Registration hook should become WordPress-shaped. |
+| `wp_agents_api_init` | Agents API public candidate | Registration hook is now WordPress-shaped in-place; Data Machine still fires the legacy hook while it hosts the substrate. |
 | `datamachine_registered_agent_reconciled` | Agents API implementation candidate | Lifecycle event is useful, current reconciliation semantics are Data Machine implementation. |
 | `datamachine_guideline_updated` | Agents API public candidate | Generic memory/guideline change event after naming review. |
 | `datamachine_tool_sources` | Agents API implementation candidate | Generic source-provider idea; current defaults include Data Machine adjacent handlers. |

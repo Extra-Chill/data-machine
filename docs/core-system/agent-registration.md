@@ -1,23 +1,23 @@
 # Agent Registration
 
-Declarative agent registration via the `datamachine_register_agents` action. Plugins (and Data Machine itself) declare agent roles once; DM's registry reconciles those declarations against the `datamachine_agents` table on `init`.
+Declarative agent registration via the `wp_agents_api_init` action. Plugins (and Data Machine itself) declare agent roles once; the side-effect-free registry collects those declarations, and Data Machine's materializer reconciles them against the `datamachine_agents` table on `init` while Data Machine hosts the in-place substrate.
 
 **Since:** 0.71.0
-**Source:** `inc/Engine/Agents/AgentRegistry.php`, `inc/Engine/Agents/register-agents.php`
+**Source:** `inc/Engine/Agents/class-wp-agent.php`, `inc/Engine/Agents/class-wp-agents-registry.php`, `inc/Engine/Agents/AgentRegistry.php`, `inc/Engine/Agents/register-agents.php`
 
 ## Why
 
 Agents were previously materialized imperatively — either via `AgentAbilities::createAgent()` from CLI/REST, or lazily via `datamachine_resolve_or_create_agent_id()` on first chat turn. That works for per-user personal agents but doesn't give extensions a clean way to ship a bundled agent role (e.g. a wiki-generator, a support-triage bot, a content-reviewer).
 
-The registry mirrors the `register_post_type()` / `register_taxonomy()` pattern: plugins declare the role, DM owns the runtime. The same API DM uses internally is the API any plugin uses. DM dogfoods it — the default site administrator agent is now registered through the hook.
+The registry mirrors the `register_post_type()` / `register_taxonomy()` pattern: plugins declare the role, Data Machine owns today's runtime. The public vocabulary mirrors the Abilities API direction (`wp_register_agent()`, `WP_Agent`, `WP_Agents_Registry`, `wp_agents_api_init`) so the generic registry can move cleanly if Agents API is extracted later. Data Machine dogfoods it — the default site administrator agent is registered through the same hook.
 
 ## Declaring an agent
 
 Inside your plugin:
 
 ```php
-add_action( 'datamachine_register_agents', function () {
-    datamachine_register_agent( 'wiki-generator', array(
+add_action( 'wp_agents_api_init', function () {
+    wp_register_agent( 'wiki-generator', array(
         'label'        => __( 'Wiki Generator', 'my-plugin' ),
         'description'  => __( 'Fetches sources, distills into wiki articles, cross-links.', 'my-plugin' ),
         'memory_seeds' => array(
@@ -36,7 +36,7 @@ That's it. On the next request where `init` fires, DM reconciles the registratio
 
 ## Registration arguments
 
-`datamachine_register_agent( string $slug, array $args )`
+`wp_register_agent( string|WP_Agent $agent, array $args = array() )`
 
 | Key | Type | Description |
 |---|---|---|
@@ -55,10 +55,10 @@ Slugs are passed through `sanitize_title()`. They must be unique across a site (
 Reconciliation runs on `init` at priority 15:
 
 - Priority 10: `wp_abilities_api_init` fires. Abilities register.
-- **Priority 15: `AgentRegistry::reconcile()` fires the `datamachine_register_agents` action, collects registrations, creates missing DB rows, scaffolds agent-layer memory files.**
+- **Priority 15: `AgentRegistry::reconcile()` fires the `wp_agents_api_init` action, collects registrations, creates missing DB rows, scaffolds agent-layer memory files.**
 - Priority 20: existing `datamachine_needs_scaffold` transient check. No-op when the registry has already scaffolded.
 
-The `datamachine_register_agents` action is also fired lazily by `AgentRegistry::get_all()` / `get()` / `reconcile()` — so any caller can query the registry regardless of hook ordering.
+The `wp_agents_api_init` action is also fired lazily by `AgentRegistry::get_all()` / `get()` / `reconcile()` — so any caller can query the registry regardless of hook ordering. The legacy `datamachine_register_agents` hook and `datamachine_register_agent()` wrapper still fire while this surface lives in Data Machine; new code should use the WordPress-shaped names.
 
 ## Memory seed resolution
 
@@ -96,11 +96,11 @@ do_action( 'datamachine_registered_agent_reconciled', int $agent_id, string $slu
 Data Machine registers its default site administrator agent through the same hook:
 
 ```php
-add_action( 'datamachine_register_agents', function () {
+add_action( 'wp_agents_api_init', function () {
     $default_user_id = DirectoryManager::get_default_agent_user_id();
     $user            = get_user_by( 'id', $default_user_id );
 
-    datamachine_register_agent(
+    wp_register_agent(
         sanitize_title( $user->user_login ),
         array(
             'label'          => $user->display_name,
@@ -117,7 +117,7 @@ Same API. Same hook priority as any plugin. On existing installs this is a no-op
 
 | Scenario | Pattern |
 |---|---|
-| A role bundled with a plugin, same on every install | **Register** via `datamachine_register_agents` |
+| A role bundled with a plugin, same on every install | **Register** via `wp_agents_api_init` |
 | A user-created agent with install-specific name, owner, config | **Create imperatively** via `AgentAbilities::createAgent()` |
 | Lazy provisioning of a per-user agent on first chat turn | **Use** `datamachine_resolve_or_create_agent_id($user_id)` |
 
@@ -132,8 +132,8 @@ Two override paths. Pick based on what you're trying to change.
 Hook at a higher priority and re-register with the same slug:
 
 ```php
-add_action( 'datamachine_register_agents', function () {
-    datamachine_register_agent( 'wiki-generator', array(
+add_action( 'wp_agents_api_init', function () {
+    wp_register_agent( 'wiki-generator', array(
         'label'        => __( 'Custom Wiki Generator', 'my-override' ),
         'memory_seeds' => array(
             'SOUL.md' => __DIR__ . '/custom-wiki-soul.md',
@@ -158,7 +158,7 @@ Every DM core registration is a **named function** — callers can remove it cle
 
 ```php
 remove_action(
-    'datamachine_register_agents',
+    'wp_agents_api_init',
     'datamachine_register_default_admin_agent',
     10
 );
@@ -180,6 +180,6 @@ Registry-level overrides are the right tool for declaring defaults; content-leve
 ## Related
 
 - `docs/core-system/multi-agent-architecture.md` — agents table schema, access control, filesystem layout
-- `docs/core-filters.md` — the `datamachine_register_agents` action, `datamachine_registered_agent_reconciled` action, `datamachine_scaffold_content` filter
+- `docs/core-filters.md` — the `wp_agents_api_init` action, `datamachine_registered_agent_reconciled` action, `datamachine_scaffold_content` filter
 - `inc/Abilities/File/ScaffoldAbilities.php` — scaffold ability that honors registered `memory_seeds` content
 - `inc/migrations/scaffolding.php` — default `datamachine_scaffold_content` generators

@@ -2,17 +2,17 @@
 
 ## Actions
 
-### `datamachine_register_agents`
+### `wp_agents_api_init`
 
-Fires once per request when the AgentRegistry is first consumed. Plugins declare agent roles inside this callback; DM reconciles declarations against the `datamachine_agents` table on `init` priority 15.
+Fires once per request when the AgentRegistry is first consumed. Plugins declare agent roles inside this callback; DM reconciles declarations against the `datamachine_agents` table on `init` priority 15 while Data Machine hosts the in-place Agents API substrate.
 
-Same API DM itself uses to register the default site administrator agent. Registrations are collected statically; last-wins on slug collision so plugins can override via hook priority.
+Same API DM itself uses to register the default site administrator agent. Registrations are collected statically; last-wins on slug collision so plugins can override via hook priority. The legacy `datamachine_register_agents` action and `datamachine_register_agent()` wrapper still fire while this surface lives in Data Machine, but new code should use the WordPress-shaped names.
 
-**Since:** 0.71.0
+**Since:** 0.99.0
 
 ```php
-add_action( 'datamachine_register_agents', function () {
-    datamachine_register_agent( 'wiki-generator', array(
+add_action( 'wp_agents_api_init', function () {
+    wp_register_agent( 'wiki-generator', array(
         'label'        => 'Wiki Generator',
         'description'  => 'Fetches sources, distills into wiki articles.',
         'memory_seeds' => array(
