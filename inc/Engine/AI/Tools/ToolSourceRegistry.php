@@ -9,7 +9,7 @@
 
 namespace DataMachine\Engine\AI\Tools;
 
-use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Engine\AI\Tools\Sources\AdjacentHandlerToolSource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -62,7 +62,7 @@ class ToolSourceRegistry {
 			'datamachine_tool_sources',
 			array(
 				self::SOURCE_STATIC_REGISTRY   => array( $this, 'gatherStaticRegistryTools' ),
-				self::SOURCE_ADJACENT_HANDLERS => array( $this, 'gatherAdjacentHandlerTools' ),
+				self::SOURCE_ADJACENT_HANDLERS => new AdjacentHandlerToolSource(),
 			),
 			$mode,
 			$args,
@@ -157,47 +157,6 @@ class ToolSourceRegistry {
 			}
 
 			$available_tools[ $tool_name ] = $tool_config;
-		}
-
-		return $available_tools;
-	}
-
-	/**
-	 * Gather handler tools from adjacent pipeline steps.
-	 *
-	 * @param string $mode Agent mode slug.
-	 * @param array  $args Full resolution arguments.
-	 * @return array Tools keyed by tool name.
-	 */
-	public function gatherAdjacentHandlerTools( string $mode, array $args ): array {
-		if ( ToolPolicyResolver::MODE_PIPELINE !== $mode ) {
-			return array();
-		}
-
-		$available_tools = array();
-		$engine_data     = $args['engine_data'] ?? array();
-
-		foreach ( array( $args['previous_step_config'] ?? null, $args['next_step_config'] ?? null ) as $step_config ) {
-			if ( ! $step_config ) {
-				continue;
-			}
-
-			$handler_slugs = FlowStepConfig::getConfiguredHandlerSlugs( $step_config );
-			$cache_scope   = $step_config['flow_step_id'] ?? ( $args['cache_scope'] ?? '' );
-
-			foreach ( $handler_slugs as $slug ) {
-				$handler_config = FlowStepConfig::getHandlerConfigForSlug( $step_config, $slug );
-				$tools          = $this->tool_manager->resolveHandlerTools(
-					$slug,
-					$handler_config,
-					$engine_data,
-					$cache_scope
-				);
-
-				foreach ( $tools as $tool_name => $tool_config ) {
-					$available_tools[ $tool_name ] = $tool_config;
-				}
-			}
 		}
 
 		return $available_tools;
