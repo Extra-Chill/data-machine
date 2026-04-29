@@ -47,6 +47,7 @@ require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveOutputValidator.ph
 require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveRenderer.php';
 require_once __DIR__ . '/../inc/Engine/AI/AgentMessageEnvelope.php';
 require_once __DIR__ . '/../inc/Engine/AI/PromptBuilder.php';
+require_once __DIR__ . '/../inc/Engine/AI/ProviderRequestAssembler.php';
 require_once __DIR__ . '/../inc/Engine/AI/RequestBuilder.php';
 
 class Test_Request_Inspector_Directive implements \DataMachine\Engine\AI\Directives\DirectiveInterface {
@@ -76,9 +77,10 @@ function assert_test( string $name, bool $cond, string $detail = '' ): void {
 	}
 }
 
-echo "Case 1: RequestBuilder::assemble builds the request without provider dispatch\n";
+echo "Case 1: ProviderRequestAssembler builds without Data Machine hooks or dispatch\n";
 
-$dispatch_count = 0;
+$dispatch_count             = 0;
+$directive_discovery_count  = 0;
 add_filter(
 	'chubes_ai_request',
 	function ( $request ) use ( &$dispatch_count ) {
@@ -89,12 +91,8 @@ add_filter(
 
 add_filter(
 	'datamachine_directives',
-	function ( array $directives ): array {
-		$directives[] = array(
-			'class'    => Test_Request_Inspector_Directive::class,
-			'priority' => 20,
-			'modes'    => array( 'pipeline' ),
-		);
+	function ( array $directives ) use ( &$directive_discovery_count ): array {
+		++$directive_discovery_count;
 		return $directives;
 	}
 );
@@ -117,6 +115,45 @@ $tools = array(
 	),
 );
 
+$generic_assembled = ( new \DataMachine\Engine\AI\ProviderRequestAssembler() )->assemble(
+	$messages,
+	'openai',
+	'gpt-test',
+	$tools,
+	'pipeline',
+	array(
+		'job_id'       => 1423,
+		'flow_step_id' => 'ai_step_1',
+		'step_id'      => 'pipeline_ai_1',
+	),
+	array(
+		array(
+			'class'    => Test_Request_Inspector_Directive::class,
+			'priority' => 20,
+			'modes'    => array( 'pipeline' ),
+		),
+	)
+);
+
+assert_test( 'generic assembler did not call chubes_ai_request', 0 === $dispatch_count );
+assert_test( 'generic assembler did not discover datamachine_directives', 0 === $directive_discovery_count );
+assert_test( 'generic assembler set model', 'gpt-test' === ( $generic_assembled['request']['model'] ?? '' ) );
+assert_test( 'generic assembler restructured tool', 'inspect_tool' === ( $generic_assembled['structured_tools']['inspect_tool']['name'] ?? '' ) );
+
+echo "\nCase 2: RequestBuilder::assemble applies Data Machine directive policy without provider dispatch\n";
+
+add_filter(
+	'datamachine_directives',
+	function ( array $directives ): array {
+		$directives[] = array(
+			'class'    => Test_Request_Inspector_Directive::class,
+			'priority' => 20,
+			'modes'    => array( 'pipeline' ),
+		);
+		return $directives;
+	}
+);
+
 $assembled = \DataMachine\Engine\AI\RequestBuilder::assemble(
 	$messages,
 	'openai',
@@ -131,12 +168,13 @@ $assembled = \DataMachine\Engine\AI\RequestBuilder::assemble(
 );
 
 assert_test( 'assemble did not call chubes_ai_request', 0 === $dispatch_count );
+assert_test( 'RequestBuilder discovered datamachine directives once', 1 === $directive_discovery_count );
 assert_test( 'request model set', 'gpt-test' === ( $assembled['request']['model'] ?? '' ) );
 assert_test( 'directive prepended a system message', 'system' === ( $assembled['request']['messages'][0]['role'] ?? '' ) );
 assert_test( 'original user message preserved', 'Original user packet' === ( $assembled['request']['messages'][1]['content'] ?? '' ) );
 assert_test( 'tool restructured with explicit name', 'inspect_tool' === ( $assembled['structured_tools']['inspect_tool']['name'] ?? '' ) );
 
-echo "\nCase 2: directive breakdown and byte counts are deterministic\n";
+echo "\nCase 3: directive breakdown and byte counts are deterministic\n";
 
 $breakdown = $assembled['directive_breakdown'][0] ?? array();
 assert_test( 'fake directive appears in breakdown', Test_Request_Inspector_Directive::class === ( $breakdown['class'] ?? '' ) );
@@ -152,7 +190,7 @@ assert_test( 'request JSON byte count stable', 496 === $request_json_bytes, 'got
 assert_test( 'messages JSON byte count stable', 277 === $messages_json_bytes, 'got ' . $messages_json_bytes );
 assert_test( 'tools JSON byte count stable', 178 === $tools_json_bytes, 'got ' . $tools_json_bytes );
 
-echo "\nCase 3: CLI command surface is registered and documented\n";
+echo "\nCase 4: CLI command surface is registered and documented\n";
 
 $bootstrap = (string) file_get_contents( __DIR__ . '/../inc/Cli/Bootstrap.php' );
 $command   = (string) file_get_contents( __DIR__ . '/../inc/Cli/Commands/AICommand.php' );

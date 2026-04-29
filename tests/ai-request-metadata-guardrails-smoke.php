@@ -82,7 +82,7 @@ require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 use DataMachine\Cli\Commands\JobsCommand;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
-use DataMachine\Engine\AI\AIConversationLoop;
+use DataMachine\Engine\AI\DataMachinePipelineTranscriptPersister;
 use DataMachine\Engine\AI\Directives\DirectiveInterface;
 use DataMachine\Engine\AI\RequestBuilder;
 
@@ -214,9 +214,7 @@ $store    = new RequestMetadataSmokeStore();
 $property = new ReflectionProperty( ConversationStoreFactory::class, 'instance' );
 $property->setValue( null, $store );
 
-$method = new ReflectionMethod( AIConversationLoop::class, 'maybePersistTranscript' );
-$session_id = $method->invoke(
-	null,
+$session_id = ( new DataMachinePipelineTranscriptPersister() )->persist(
 	array( array( 'role' => 'user', 'content' => 'hello' ) ),
 	'openai',
 	'gpt-smoke',
