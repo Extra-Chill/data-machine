@@ -173,7 +173,7 @@ datamachine_agent_memory_store_contract_assert( "# Memory\n" === $read->content,
 datamachine_agent_memory_store_contract_reset_filters();
 add_filter(
 	'datamachine_memory_store',
-	static fn() => new stdClass(),
+	static fn( $_store, $_scope ) => new stdClass(),
 	10,
 	2
 );
@@ -183,7 +183,7 @@ datamachine_agent_memory_store_contract_assert( $invalid_store instanceof DiskAg
 datamachine_agent_memory_store_contract_reset_filters();
 add_filter(
 	'agents_api_memory_store',
-	static function () use ( $fake_store ) {
+	static function ( $_store, $_scope ) use ( $fake_store ) {
 		return $fake_store;
 	},
 	10,

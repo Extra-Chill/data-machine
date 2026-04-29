@@ -115,12 +115,10 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 
 		$deleted = wp_delete_file( $filepath );
 
-		// wp_delete_file returns void; verify by re-checking existence.
-		if ( file_exists( $filepath ) ) {
+		if ( ! $deleted ) {
 			return AgentMemoryWriteResult::failure( 'io' );
 		}
 
-		unset( $deleted );
 		return AgentMemoryWriteResult::ok( '', 0 );
 	}
 
