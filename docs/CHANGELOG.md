@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.100.0] - 2026-04-29
+
+### Added
+- add export-agent ability
+- add import-agent ability
+
+### Changed
+- rename message envelope vocabulary
+- rename memory store seam
+- split Data Machine tool registry source
+- rename agent conversation seam
+- add conversation runner request boundary
+
 ## [0.99.0] - 2026-04-29
 
 ### Added
