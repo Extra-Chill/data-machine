@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.101.1] - 2026-04-29
+
+### Changed
+- split runtime loop policy boundary
+
+### Fixed
+- update Block Format Bridge to v0.6.2
+
 ## [0.101.0] - 2026-04-29
 
 ### Added
