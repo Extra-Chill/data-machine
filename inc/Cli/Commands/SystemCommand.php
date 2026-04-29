@@ -67,7 +67,7 @@ class SystemCommand extends BaseCommand {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -153,7 +153,7 @@ class SystemCommand extends BaseCommand {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -226,7 +226,7 @@ class SystemCommand extends BaseCommand {
 		);
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -348,7 +348,10 @@ class SystemCommand extends BaseCommand {
 				continue;
 			}
 
-			$task        = new $handler_class();
+			$task = new $handler_class();
+			if ( ! $task instanceof SystemTask ) {
+				continue;
+			}
 			$definitions = $task->getPromptDefinitions();
 
 			if ( empty( $definitions ) ) {
@@ -430,7 +433,7 @@ class SystemCommand extends BaseCommand {
 		$effective    = $has_override ? $overrides[ $task_type ][ $prompt_key ] : $definition['default'];
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( array(
+			WP_CLI::line( (string) wp_json_encode( array(
 				'task_type'    => $task_type,
 				'prompt_key'   => $prompt_key,
 				'label'        => $definition['label'],
@@ -569,7 +572,11 @@ class SystemCommand extends BaseCommand {
 			return null;
 		}
 
-		$task        = new $handler_class();
+		$task = new $handler_class();
+		if ( ! $task instanceof SystemTask ) {
+			WP_CLI::error( sprintf( 'Task handler class is not a SystemTask: %s', $handler_class ) );
+			return null;
+		}
 		$definitions = $task->getPromptDefinitions();
 
 		if ( ! isset( $definitions[ $prompt_key ] ) ) {
