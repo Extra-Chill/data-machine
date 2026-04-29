@@ -123,17 +123,42 @@ final class AgentBundleUpgradePlanner {
 			);
 		}
 
+		foreach ( self::materialized_artifact_directories() as $directory => $type ) {
+			$method = str_replace( '-', '_', $directory );
+			foreach ( $bundle->{$method}() as $relative_path => $payload ) {
+				$artifacts[] = array(
+					'artifact_type' => $type,
+					'artifact_id'   => self::artifact_id_from_relative_path( (string) $relative_path ),
+					'source_path'   => $directory . '/' . $relative_path,
+					'payload'       => $payload,
+				);
+			}
+		}
+
 		return $artifacts;
+	}
+
+	/** @return array<string,string> */
+	private static function materialized_artifact_directories(): array {
+		return array(
+			BundleSchema::PROMPTS_DIR       => 'prompt',
+			BundleSchema::RUBRICS_DIR       => 'rubric',
+			BundleSchema::TOOL_POLICIES_DIR => 'tool_policy',
+			BundleSchema::AUTH_REFS_DIR     => 'auth_ref',
+			BundleSchema::SEED_QUEUES_DIR   => 'seed_queue',
+		);
+	}
+
+	private static function artifact_id_from_relative_path( string $relative_path ): string {
+		$relative_path = preg_replace( '/\.(json|md|txt)$/i', '', $relative_path );
+		return null === $relative_path ? '' : $relative_path;
 	}
 
 	/** @param array<int,array<string,mixed>|AgentBundleInstalledArtifact> $artifacts */
 	private static function index_installed_artifacts( array $artifacts ): array {
 		$indexed = array();
 		foreach ( $artifacts as $artifact ) {
-			$row = $artifact instanceof AgentBundleInstalledArtifact ? $artifact->to_array() : $artifact;
-			if ( ! is_array( $row ) ) {
-				continue;
-			}
+			$row             = $artifact instanceof AgentBundleInstalledArtifact ? $artifact->to_array() : $artifact;
 			$key             = self::artifact_key( (string) ( $row['artifact_type'] ?? '' ), (string) ( $row['artifact_id'] ?? '' ) );
 			$indexed[ $key ] = $row;
 		}
@@ -146,9 +171,6 @@ final class AgentBundleUpgradePlanner {
 	private static function index_artifacts( array $artifacts ): array {
 		$indexed = array();
 		foreach ( $artifacts as $artifact ) {
-			if ( ! is_array( $artifact ) ) {
-				continue;
-			}
 			$key             = self::artifact_key( (string) ( $artifact['artifact_type'] ?? '' ), (string) ( $artifact['artifact_id'] ?? '' ) );
 			$indexed[ $key ] = $artifact;
 		}
