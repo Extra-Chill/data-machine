@@ -17,7 +17,7 @@ namespace {
 			private string $message;
 
 			public function __construct( string $code = '', string $message = '' ) {
-				$this->message = $message;
+				$this->message = '' !== $message ? $message : $code;
 			}
 
 			public function get_error_message(): string {
@@ -34,6 +34,23 @@ namespace {
 
 	if ( ! function_exists( 'do_action' ) ) {
 		function do_action( ...$args ) {
+		}
+	}
+
+	if ( ! function_exists( 'wp_strip_all_tags' ) ) {
+		function wp_strip_all_tags( string $text ): string {
+			return strip_tags( $text );
+		}
+	}
+
+	if ( ! function_exists( 'wp_trim_words' ) ) {
+		function wp_trim_words( string $text, int $num_words = 55, ?string $more = null ): string {
+			$words = preg_split( '/\s+/', trim( $text ) );
+			if ( ! is_array( $words ) || count( $words ) <= $num_words ) {
+				return $text;
+			}
+
+			return implode( ' ', array_slice( $words, 0, $num_words ) ) . ( $more ?? '...' );
 		}
 	}
 
@@ -100,10 +117,27 @@ namespace DataMachine\Engine\AI\Actions {
 			return $args['tool_def']['action_policy'] ?? self::POLICY_DIRECT;
 		}
 	}
+
+	class PendingActionHelper {
+		/** @var list<array<string, mixed>> */
+		public static array $staged = array();
+
+		public static function stage( array $args ): array {
+			self::$staged[] = $args;
+
+			return array(
+				'staged'    => true,
+				'action_id' => 'pending_1',
+				'kind'      => $args['kind'] ?? '',
+				'summary'   => $args['summary'] ?? '',
+			);
+		}
+	}
 }
 
 namespace DataMachine\Core\WordPress {
 	class PostTracking {
+		/** @var list<array<string, mixed>> */
 		public static array $stored = array();
 
 		public static function extractPostId( array $tool_result ): int {
@@ -118,9 +152,12 @@ namespace DataMachine\Core\WordPress {
 
 namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
+	use DataMachine\Engine\AI\Actions\PendingActionHelper;
+	use DataMachine\Engine\AI\Tools\Execution\ToolExecutionCore;
 	use DataMachine\Engine\AI\Tools\ToolExecutor;
 
 	require_once dirname( __DIR__ ) . '/inc/Engine/AI/Tools/ToolParameters.php';
+	require_once dirname( __DIR__ ) . '/inc/Engine/AI/Tools/Execution/ToolExecutionCore.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/AI/Tools/ToolExecutor.php';
 
 	$failed = 0;
@@ -136,6 +173,18 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 
 		echo "  FAIL: {$name}\n";
 		++$failed;
+	}
+
+	function post_tracking_count(): int {
+		return count( \DataMachine\Core\WordPress\PostTracking::$stored );
+	}
+
+	function first_pending_apply_job_id(): ?int {
+		return PendingActionHelper::$staged[0]['apply_input']['job_id'] ?? null;
+	}
+
+	function ability_execute_count( \Ability_Native_Smoke_Ability $ability ): int {
+		return $ability->execute_count;
 	}
 
 	class LegacyTool {
@@ -202,7 +251,64 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	assert_smoke( 'ability execute callback ran exactly once', 1 === $ability->execute_count );
 	assert_smoke( 'AI parameter reached ability input', 'hello' === ( $result['received']['message'] ?? null ) );
 	assert_smoke( 'payload parameter reached ability input', 42 === ( $result['received']['job_id'] ?? null ) );
-	assert_smoke( 'successful ability result still participates in post tracking', 1 === count( \DataMachine\Core\WordPress\PostTracking::$stored ) );
+	assert_smoke( 'successful ability result still participates in post tracking', 1 === post_tracking_count() );
+
+	echo "\n[core:1] Generic execution core runs without Data Machine decorators\n";
+	\DataMachine\Core\WordPress\PostTracking::$stored = array();
+	$core_ability = new \Ability_Native_Smoke_Ability(
+		fn( $input ) => true,
+		fn( $input ) => 'scalar-ok'
+	);
+	$registry->register_for_smoke( 'datamachine/core-ability', $core_ability );
+	$core_result = ( new ToolExecutionCore() )->executeTool(
+		'core_ability_tool',
+		array( 'message' => 'core' ),
+		array(
+			'core_ability_tool' => array(
+				'ability'    => 'datamachine/core-ability',
+				'parameters' => array(
+					'message' => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+				),
+			),
+		),
+		array( 'job_id' => 42 )
+	);
+	assert_smoke( 'core wraps scalar ability result with normalized envelope', true === ( $core_result['success'] ?? false ) && 'scalar-ok' === ( $core_result['result'] ?? null ) );
+	assert_smoke( 'core result includes ability slug', 'datamachine/core-ability' === ( $core_result['ability'] ?? null ) );
+	assert_smoke( 'core path does not perform post tracking decoration', 0 === post_tracking_count() );
+
+	echo "\n[decorator:1] ToolExecutor still stages pending actions before direct execution\n";
+	PendingActionHelper::$staged = array();
+	$preview_ability             = new \Ability_Native_Smoke_Ability(
+		fn( $input ) => true,
+		fn( $input ) => array(
+			'success' => true,
+			'post_id' => 456,
+		)
+	);
+	$registry->register_for_smoke( 'datamachine/preview-ability', $preview_ability );
+	$result = execute_tool(
+		'preview_tool',
+		array( 'message' => 'needs approval' ),
+		array(
+			'ability'       => 'datamachine/preview-ability',
+			'action_policy' => ActionPolicyResolver::POLICY_PREVIEW,
+			'action_kind'   => 'preview_kind',
+			'parameters'    => array(
+				'message' => array(
+					'type'     => 'string',
+					'required' => true,
+				),
+			),
+		)
+	);
+	assert_smoke( 'preview policy returns staged action result', true === ( $result['staged'] ?? false ) && 'pending_1' === ( $result['action_id'] ?? null ) );
+	assert_smoke( 'pending action helper received complete merged parameters', 42 === first_pending_apply_job_id() );
+	assert_smoke( 'preview policy does not execute ability directly', 0 === ability_execute_count( $preview_ability ) );
+	assert_smoke( 'preview policy does not post-track unexecuted action', 0 === post_tracking_count() );
 
 	echo "\n[legacy:1] Legacy class/method tool still executes\n";
 	LegacyTool::$calls = 0;
@@ -244,11 +350,9 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		)
 	);
 	assert_smoke( 'permission-denied ability fails', false === ( $result['success'] ?? true ) );
-	assert_smoke( 'permission-denied ability execute callback did not run', 0 === $denied->execute_count );
+	assert_smoke( 'permission-denied ability execute callback did not run', 0 === ability_execute_count( $denied ) );
 	assert_smoke( 'permission-denied error names the ability slug', false !== strpos( $result['error'] ?? '', 'datamachine/denied-ability' ) );
 
 	echo "\nAssertions: " . ( $total - $failed ) . " passed, {$failed} failed, {$total} total\n";
-	if ( $failed > 0 ) {
-		exit( 1 );
-	}
+	exit( (int) $failed );
 }
