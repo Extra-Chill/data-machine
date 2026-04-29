@@ -20,14 +20,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Data Machine chat database manager.
+ * Chat Database Manager
  *
- * Implements the full {@see ConversationStoreInterface} aggregate for the
- * Data Machine chat product: transcript CRUD, session switcher indexes,
- * read state, retention cleanup, and reporting. Runtime code that only needs
- * transcript persistence should depend on
- * {@see ConversationTranscriptStoreInterface} via
- * {@see ConversationStoreFactory::get_transcript_store()}.
+ * Implements {@see ConversationStoreInterface} so the conversation
+ * storage backend can be swapped via the `datamachine_conversation_store`
+ * filter. Resolve via {@see ConversationStoreFactory::get()} rather than
+ * instantiating this class directly.
  */
 class Chat extends BaseRepository implements ConversationStoreInterface {
 
@@ -904,12 +902,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	public function cleanup_old_sessions( int $retention_days ): int {
 		global $wpdb;
 
-		$table_name       = self::get_prefixed_table_name();
-		$cutoff_timestamp = strtotime( "-{$retention_days} days" );
-		if ( false === $cutoff_timestamp ) {
-			return 0;
-		}
-		$cutoff_date = gmdate( 'Y-m-d H:i:s', $cutoff_timestamp );
+		$table_name  = self::get_prefixed_table_name();
+		$cutoff_date = gmdate( 'Y-m-d H:i:s', strtotime( "-{$retention_days} days" ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->query(
@@ -960,12 +954,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return 0;
 		}
 
-		$table_name       = self::get_prefixed_table_name();
-		$cutoff_timestamp = strtotime( "-{$retention_days} days" );
-		if ( false === $cutoff_timestamp ) {
-			return 0;
-		}
-		$cutoff_date = gmdate( 'Y-m-d H:i:s', $cutoff_timestamp );
+		$table_name  = self::get_prefixed_table_name();
+		$cutoff_date = gmdate( 'Y-m-d H:i:s', strtotime( "-{$retention_days} days" ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->query(
