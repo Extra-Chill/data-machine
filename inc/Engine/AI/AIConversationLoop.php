@@ -61,6 +61,17 @@ class AIConversationLoop {
 		int $max_turns = PluginSettings::DEFAULT_MAX_TURNS,
 		bool $single_turn = false
 	): array {
+		$request = AIConversationRequest::fromRunArgs(
+			$messages,
+			$tools,
+			$provider,
+			$model,
+			$mode,
+			$payload,
+			$max_turns,
+			$single_turn
+		);
+
 		/**
 		 * Filter: allow a consumer to replace Data Machine's built-in
 		 * conversation loop with an alternative runtime.
@@ -105,17 +116,7 @@ class AIConversationLoop {
 			return self::normalizeResultForRun( $result, $messages );
 		}
 
-		$loop   = new self();
-		$result = $loop->execute(
-			$messages,
-			$tools,
-			$provider,
-			$model,
-			$mode,
-			$payload,
-			$max_turns,
-			$single_turn
-		);
+		$result = ( new BuiltInAIConversationRunner() )->run( $request );
 
 		return self::normalizeResultForRun( $result, $messages );
 	}
