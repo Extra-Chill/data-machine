@@ -294,7 +294,7 @@ function datamachine_agent_memory_events_matching( string $hook ): array {
 
 $store = new AgentMemoryEventsFakeStore();
 add_filter(
-	'datamachine_memory_store',
+	'agents_api_memory_store',
 	function ( $_default, AgentMemoryScope $_scope ) use ( $store ) {
 		unset( $_default, $_scope );
 		return $store;

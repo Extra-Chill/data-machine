@@ -7,7 +7,7 @@
  * on any agent file (MEMORY.md, SOUL.md, USER.md, etc.).
  *
  * Persistence is delegated to an {@see AgentMemoryStoreInterface} resolved
- * via the `datamachine_memory_store` filter. The default store
+ * via the `agents_api_memory_store` filter. The default store
  * ({@see DiskAgentMemoryStore}) preserves the byte-for-byte filesystem
  * behavior the codebase used before the store seam was introduced.
  *
@@ -472,7 +472,7 @@ class AgentMemory {
 	 * @param string      $query         Search term.
 	 * @param string|null $section       Optional section filter (exact name without ##).
 	 * @param int         $context_lines Number of context lines above/below each match.
-	 * @return array{success: bool, query: string, matches: array, match_count: int}
+	 * @return array{success: bool, query: string, matches: array, match_count: int, message?: string}
 	 */
 	public function search( string $query, ?string $section = null, int $context_lines = 2 ): array {
 		$result = $this->store->read( $this->scope );
@@ -480,6 +480,7 @@ class AgentMemory {
 		if ( ! $result->exists ) {
 			return array(
 				'success'     => false,
+				'query'       => $query,
 				'message'     => sprintf( 'File %s does not exist.', $this->scope->filename ),
 				'matches'     => array(),
 				'match_count' => 0,
@@ -676,7 +677,8 @@ class AgentMemory {
 		}
 
 		// If scaffold didn't create it (no template for this file), create a stub.
-		if ( ! $this->store->exists( $this->scope ) ) {
+		$current = $this->store->read( $this->scope );
+		if ( ! $current->exists ) {
 			$this->store->write( $this->scope, "# {$this->scope->filename}\n", null );
 		}
 	}
@@ -693,7 +695,7 @@ class AgentMemory {
 	 * @return string Sanitized filename.
 	 */
 	private function sanitize_filename( string $filename ): string {
-		$segments = array_filter( explode( '/', $filename ), 'strlen' );
+		$segments = array_filter( explode( '/', $filename ), static fn( string $segment ): bool => '' !== $segment );
 		$clean    = array();
 		foreach ( $segments as $segment ) {
 			$clean[] = preg_replace( '/[^a-zA-Z0-9._-]/', '', basename( $segment ) );

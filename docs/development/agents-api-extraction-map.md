@@ -51,7 +51,7 @@ These are closest to generic public contracts. Most should be extracted as contr
 | `LoopEventSinkInterface` | `inc/Engine/AI/LoopEventSinkInterface.php` | Transport-neutral event sink for logs, streaming, CLI, REST, or chat UIs. | Make event vocabulary public and provider-neutral before extraction. |
 | `NullLoopEventSink` | `inc/Engine/AI/NullLoopEventSink.php` | Generic no-op implementation for optional event sinks. | Implementation can move with the interface. |
 | `RuntimeToolDeclaration` | `inc/Engine/AI/Tools/RuntimeToolDeclaration.php` | Validates run-scoped client/runtime tool declarations without Data Machine state. | Rename around `WP_Agent_Tool_Declaration`; keep executor/source/scope vocabulary generic. |
-| `AgentMemoryStoreInterface` | `inc/Core/FilesRepository/AgentMemoryStoreInterface.php` | Generic memory persistence seam. | Rename `AgentMemoryScope` tuple fields only if needed; keep CAS/hash behavior. |
+| `AgentMemoryStoreInterface` | `inc/Core/FilesRepository/AgentMemoryStoreInterface.php` | Generic memory persistence seam using the `agents_api_memory_store` resolver hook. | Rename `AgentMemoryScope` tuple fields only if needed; keep CAS/hash behavior. |
 | `AgentMemoryScope` | `inc/Core/FilesRepository/AgentMemoryScope.php` | Encodes memory identity independently of disk/database implementations. | Review `layer`, `user_id`, `agent_id`, `filename` as the public model. |
 | `AgentMemoryReadResult` | `inc/Core/FilesRepository/AgentMemoryReadResult.php` | Store-neutral read result. | Generic result value object can move unchanged after naming cleanup. |
 | `AgentMemoryWriteResult` | `inc/Core/FilesRepository/AgentMemoryWriteResult.php` | Store-neutral write result with hash/bytes/error shape. | Generic result value object can move unchanged after naming cleanup. |
@@ -175,7 +175,7 @@ These are reference points only. Do not expose them as public Data Machine or Ag
 |---|---|---|
 | `datamachine_conversation_runner` | Agents API public candidate | Generic runtime replacement seam. Rename and formalize result contract. |
 | `datamachine_conversation_store` | Agents API public candidate | Generic conversation persistence swap seam. Rename and keep narrow contracts. |
-| `datamachine_memory_store` | Agents API public candidate | Generic memory persistence swap seam. Keep as Data Machine's current public behavior until extraction; introduce a neutral Agents API filter only when that package owns the resolver and migration path. |
+| `agents_api_memory_store` | Agents API public candidate | Generic memory persistence swap seam. Renamed in place from `datamachine_memory_store`; do not mirror the old hook under a runtime alias. |
 | `datamachine_register_agents` | Agents API public candidate | Registration hook should become WordPress-shaped. |
 | `datamachine_registered_agent_reconciled` | Agents API implementation candidate | Lifecycle event is useful, current reconciliation semantics are Data Machine implementation. |
 | `datamachine_guideline_updated` | Agents API public candidate | Generic memory/guideline change event after naming review. |

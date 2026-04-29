@@ -4,13 +4,13 @@
  *
  * Resolves the active {@see AgentMemoryStoreInterface} implementation.
  *
- * This is Data Machine's current resolver for a generic agent-memory
- * persistence contract. It intentionally keeps one public swap point: the
- * existing `datamachine_memory_store` filter, until an Agents API extraction
- * can introduce its own vocabulary and migration path. No caller should branch
- * on the concrete backend.
+ * This is Data Machine's in-place resolver for a generic agent-memory
+ * persistence contract. It intentionally keeps one public swap point using
+ * Agents API vocabulary: the `agents_api_memory_store` filter. The previous
+ * `datamachine_memory_store` name is not mirrored at runtime; consumers should
+ * migrate to the new hook instead of relying on a permanent alias.
  *
- * Single resolution point so every consumer (AgentMemory, DailyMemory,
+ * Single resolution point so every Data Machine consumer (AgentMemory, DailyMemory,
  * AgentFileAbilities, CoreMemoryFilesDirective) gets the same swap mechanism
  * without duplicating the filter call.
  *
@@ -48,10 +48,10 @@ class AgentMemoryStoreFactory {
 		 * the default disk-backed store. Return null (the default) to use the
 		 * built-in {@see DiskAgentMemoryStore}.
 		 *
-		 * This remains the only runtime filter in Data Machine. A future extracted
-		 * Agents API can add a neutral filter name when it owns the resolver; adding
-		 * a second alias here would create a permanent compatibility surface without
-		 * moving ownership.
+		 * This is the only runtime filter for memory-store replacement. It replaces
+		 * the earlier `datamachine_memory_store` name in-place so the seam already
+		 * uses Agents API vocabulary before physical extraction. Data Machine does
+		 * not call both names because a dual-hook ladder would become permanent API.
 		 *
 		 * The disk default preserves byte-for-byte the behavior Data Machine
 		 * had before this seam was introduced — self-hosted users see no
@@ -64,7 +64,7 @@ class AgentMemoryStoreFactory {
 		 *                                              or a swap implementation.
 		 * @param AgentMemoryScope               $scope The scope being acted on.
 		 */
-		$store = apply_filters( 'datamachine_memory_store', null, $scope );
+		$store = apply_filters( 'agents_api_memory_store', null, $scope );
 
 		if ( $store instanceof AgentMemoryStoreInterface ) {
 			return $store;

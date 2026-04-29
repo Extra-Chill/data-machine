@@ -159,7 +159,7 @@ function datamachine_daily_memory_store_seam_assert( bool $condition, string $me
 
 $store = new DailyMemorySeamFakeStore();
 add_filter(
-	'datamachine_memory_store',
+	'agents_api_memory_store',
 	function ( $default, AgentMemoryScope $scope ) use ( $store ) {
 		return $store;
 	},
@@ -174,7 +174,7 @@ datamachine_daily_memory_store_seam_assert( true === $append['success'], 'append
 
 $read = $daily->read( '2026', '04', '28' );
 datamachine_daily_memory_store_seam_assert( true === $read['success'], 'read succeeds through the fake memory store' );
-datamachine_daily_memory_store_seam_assert( false !== strpos( $read['content'], 'First note.' ), 'read returns content written by append' );
+datamachine_daily_memory_store_seam_assert( isset( $read['content'] ) && false !== strpos( $read['content'], 'First note.' ), 'read returns content written by append' );
 
 $daily->write( '2026', '04', '29', 'Second note.' );
 
