@@ -132,6 +132,11 @@ function extension_rm_tree( string $dir ): void {
 	rmdir( $dir );
 }
 
+function extension_json_encode( array $value ): string {
+	$encoded = json_encode( $value );
+	return is_string( $encoded ) ? $encoded : '';
+}
+
 add_filter(
 	'datamachine_agent_bundle_artifact_types',
 	static function ( array $types ): array {
@@ -199,7 +204,7 @@ assert_extension_bundle_equals( 'export hook saw agent slug', 'bundle-agent', $e
 assert_extension_bundle_equals( 'unknown artifact types are ignored', 1, count( $export_artifacts ) );
 assert_extension_bundle_equals( 'export artifact payload preserved', 'Seed', $export_artifacts[0]['payload']['label'] ?? null );
 
-$current_artifacts = AgentBundleArtifactExtensions::current_artifacts( $agent, array( 'installed-row' ), array( 'phase' => 'plan' ) );
+$current_artifacts = AgentBundleArtifactExtensions::current_artifacts( $agent, array( array( 'artifact_id' => 'installed-row' ) ), array( 'phase' => 'plan' ) );
 assert_extension_bundle_equals( 'current hook returns fake artifact', 'fake_plugin_artifact', $current_artifacts[0]['artifact_type'] ?? null );
 
 echo "\n[2] Directory bundles persist plugin artifacts under extensions/\n";
@@ -240,12 +245,12 @@ $current_payload = $export_artifacts[0]['payload'];
 $clean_plan      = AgentBundleUpgradePlanner::plan( array( $installed ), AgentBundleArtifactExtensions::current_artifacts( $agent, array( $installed->to_array() ) ), array( $target_artifact ) )->to_array();
 assert_extension_bundle_equals( 'clean installed plugin artifact auto-applies', 'fake_plugin_artifact:seed', $clean_plan['auto_apply'][0]['artifact_key'] ?? null );
 assert_extension_bundle_equals( 'secret-like plugin target keys are redacted', '[redacted]', $clean_plan['auto_apply'][0]['diff']['after']['api_token'] ?? null );
-assert_extension_bundle( 'raw plugin secret is absent from plan', false === strpos( json_encode( $clean_plan ), 'target-secret-token' ) );
+assert_extension_bundle( 'raw plugin secret is absent from plan', false === strpos( extension_json_encode( $clean_plan ), 'target-secret-token' ) );
 
 $current_payload = array( 'label' => 'Locally edited', 'api_token' => 'local-secret-token' );
 $modified_plan   = AgentBundleUpgradePlanner::plan( array( $installed ), AgentBundleArtifactExtensions::current_artifacts( $agent, array( $installed->to_array() ) ), array( $target_artifact ) )->to_array();
 assert_extension_bundle_equals( 'locally modified plugin artifact needs approval', 'fake_plugin_artifact:seed', $modified_plan['needs_approval'][0]['artifact_key'] ?? null );
-assert_extension_bundle( 'raw local plugin secret is absent from plan', false === strpos( json_encode( $modified_plan ), 'local-secret-token' ) );
+assert_extension_bundle( 'raw local plugin secret is absent from plan', false === strpos( extension_json_encode( $modified_plan ), 'local-secret-token' ) );
 
 echo "\n[4] PendingAction apply routes approved plugin artifacts to plugin callback\n";
 $apply_result = AgentBundleUpgradePendingAction::apply(
@@ -262,7 +267,7 @@ assert_extension_bundle_equals( 'unapproved plugin artifact is staged/skipped', 
 extension_rm_tree( $tmp );
 
 echo "\nTotal assertions: {$total}\n";
-if ( 0 !== $failures ) {
+if ( 0 !== (int) $GLOBALS['failures'] ) {
 	echo "Failures: {$failures}\n";
 	exit( 1 );
 }

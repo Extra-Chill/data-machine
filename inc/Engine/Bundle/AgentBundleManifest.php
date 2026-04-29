@@ -150,7 +150,7 @@ final class AgentBundleManifest {
 			if ( ! is_array( $included[ $field ] ) || ! array_is_list( $included[ $field ] ) ) {
 				throw new BundleValidationException( sprintf( 'manifest.json included.%s must be a list.', esc_html( $field ) ) );
 			}
-			$included[ $field ] = array_values( array_map( 'strval', $included[ $field ] ) );
+			$included[ $field ] = array_map( 'strval', $included[ $field ] );
 			sort( $included[ $field ], SORT_STRING );
 		}
 
