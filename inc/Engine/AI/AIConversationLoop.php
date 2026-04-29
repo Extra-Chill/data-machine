@@ -61,7 +61,7 @@ class AIConversationLoop {
 		int $max_turns = PluginSettings::DEFAULT_MAX_TURNS,
 		bool $single_turn = false
 	): array {
-		$request = AIConversationRequest::fromRunArgs(
+		$request = AgentConversationRequest::fromRunArgs(
 			$messages,
 			$tools,
 			$provider,
@@ -116,7 +116,7 @@ class AIConversationLoop {
 			return self::normalizeResultForRun( $result, $messages );
 		}
 
-		$result = ( new BuiltInAIConversationRunner() )->run( $request );
+		$result = ( new BuiltInAgentConversationRunner() )->run( $request );
 
 		return self::normalizeResultForRun( $result, $messages );
 	}
@@ -130,7 +130,7 @@ class AIConversationLoop {
 	 */
 	private static function normalizeResultForRun( array $result, array $fallback_messages ): array {
 		try {
-			return AIConversationResult::normalize( $result );
+			return AgentConversationResult::normalize( $result );
 		} catch ( \InvalidArgumentException $e ) {
 			return array(
 				'messages'               => $fallback_messages,

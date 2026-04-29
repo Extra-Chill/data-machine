@@ -1,6 +1,6 @@
 <?php
 /**
- * AI conversation result contract.
+ * Agent conversation result contract.
  *
  * @package DataMachine\Engine\AI
  */
@@ -12,10 +12,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Validates and normalizes AIConversationLoop result arrays.
+ * Validates and normalizes agent conversation result arrays.
  */
 // phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Validation exceptions are not rendered output.
-class AIConversationResult {
+class AgentConversationResult {
 
 	/**
 	 * Validate and normalize a loop result.
@@ -99,6 +99,6 @@ class AIConversationResult {
 	 * @return \InvalidArgumentException Validation exception.
 	 */
 	private static function invalid( string $path, string $reason ): \InvalidArgumentException {
-		return new \InvalidArgumentException( 'invalid_ai_conversation_result: ' . $path . ' ' . $reason );
+		return new \InvalidArgumentException( 'invalid_agent_conversation_result: ' . $path . ' ' . $reason );
 	}
 }

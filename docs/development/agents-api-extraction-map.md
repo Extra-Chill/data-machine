@@ -47,7 +47,7 @@ These are closest to generic public contracts. Most should be extracted as contr
 | Surface | Current location | Why it fits | Target notes |
 |---|---|---|---|
 | `MessageEnvelope` | `inc/Engine/AI/MessageEnvelope.php` | JSON-friendly canonical message envelope independent of flows/jobs. | Rename schema away from `datamachine.ai.message`; review whether public class is `WP_Agent_Message` or a neutral envelope helper. |
-| `AIConversationResult` | `inc/Engine/AI/AIConversationResult.php` | Validates result arrays from any runtime runner. | Rename to `WP_Agent_Run_Result` or split into result value object plus validator. |
+| `AgentConversationResult` | `inc/Engine/AI/AgentConversationResult.php` | Validates result arrays from any runtime runner. | Rename to `WP_Agent_Run_Result` or split into result value object plus validator. |
 | `LoopEventSinkInterface` | `inc/Engine/AI/LoopEventSinkInterface.php` | Transport-neutral event sink for logs, streaming, CLI, REST, or chat UIs. | Make event vocabulary public and provider-neutral before extraction. |
 | `NullLoopEventSink` | `inc/Engine/AI/NullLoopEventSink.php` | Generic no-op implementation for optional event sinks. | Implementation can move with the interface. |
 | `RuntimeToolDeclaration` | `inc/Engine/AI/Tools/RuntimeToolDeclaration.php` | Validates run-scoped client/runtime tool declarations without Data Machine state. | Rename around `WP_Agent_Tool_Declaration`; keep executor/source/scope vocabulary generic. |
@@ -193,7 +193,7 @@ These tests currently pin the substrate most relevant to extraction.
 | Test | Covers | Extraction signal |
 |---|---|---|
 | `tests/ai-message-envelope-smoke.php` | Message envelope normalization/projection and result validation. | Move with message/result contracts. |
-| `tests/ai-conversation-result-smoke.php` | Conversation result shape validation. | Move with runner result contract. |
+| `tests/agent-conversation-result-smoke.php` | Conversation result shape validation. | Move with runner result contract. |
 | `tests/conversation-store-contracts-smoke.php` | Split store interfaces and factory return type. | Move with conversation store contracts. |
 | `tests/guideline-agent-memory-store-smoke.php` | Optional guideline-backed memory implementation. | Move or duplicate if Agents API ships memory store implementations. |
 | `tests/daily-memory-store-seam-smoke.php` | Daily memory through memory store seam. | Data Machine product consuming generic memory store. |

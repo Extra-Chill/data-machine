@@ -1,6 +1,6 @@
 <?php
 /**
- * AI conversation runner request contract.
+ * Agent conversation runner request contract.
  *
  * @package DataMachine\Engine\AI
  */
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Neutral request object for conversation runner implementations.
  */
-class AIConversationRequest {
+class AgentConversationRequest {
 
 	/** @var array Initial conversation messages. */
 	private array $messages;
