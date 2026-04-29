@@ -904,8 +904,12 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	public function cleanup_old_sessions( int $retention_days ): int {
 		global $wpdb;
 
-		$table_name  = self::get_prefixed_table_name();
-		$cutoff_date = gmdate( 'Y-m-d H:i:s', strtotime( "-{$retention_days} days" ) );
+		$table_name       = self::get_prefixed_table_name();
+		$cutoff_timestamp = strtotime( "-{$retention_days} days" );
+		if ( false === $cutoff_timestamp ) {
+			return 0;
+		}
+		$cutoff_date = gmdate( 'Y-m-d H:i:s', $cutoff_timestamp );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->query(
@@ -956,8 +960,12 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return 0;
 		}
 
-		$table_name  = self::get_prefixed_table_name();
-		$cutoff_date = gmdate( 'Y-m-d H:i:s', strtotime( "-{$retention_days} days" ) );
+		$table_name       = self::get_prefixed_table_name();
+		$cutoff_timestamp = strtotime( "-{$retention_days} days" );
+		if ( false === $cutoff_timestamp ) {
+			return 0;
+		}
+		$cutoff_date = gmdate( 'Y-m-d H:i:s', $cutoff_timestamp );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->query(
