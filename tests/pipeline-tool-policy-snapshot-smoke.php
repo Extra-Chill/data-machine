@@ -62,6 +62,7 @@ require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfigFactory.php';
 require_once __DIR__ . '/../inc/Core/Steps/WorkflowConfigFactory.php';
 require_once __DIR__ . '/../inc/Core/Steps/AI/ToolPolicy/PipelineToolPolicyArgs.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 

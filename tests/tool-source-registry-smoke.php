@@ -75,6 +75,7 @@ class WP_Abilities_Registry {
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 
@@ -222,6 +223,12 @@ add_filter(
 );
 $tools = resolve_source_tools( ToolPolicyResolver::MODE_CHAT, new SourcePolicyToolManager() );
 assert_source_equals( array( 'chat_static_tool', 'extra_tool' ), array_keys( $tools ), 'filter appends extra source after static source', $failures, $passes );
+
+echo "\n[4] adjacent-handler source owns pipeline config vocabulary:\n";
+$registry_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php' );
+$adjacent_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php' );
+assert_source_equals( false, false !== strpos( $registry_source, 'FlowStepConfig' ), 'generic registry no longer imports FlowStepConfig', $failures, $passes );
+assert_source_equals( true, false !== strpos( $adjacent_source, 'FlowStepConfig' ), 'adjacent-handler source owns FlowStepConfig lookup', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " tool source assertions failed.\n";
