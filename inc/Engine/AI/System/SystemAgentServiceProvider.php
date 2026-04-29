@@ -32,6 +32,7 @@ use DataMachine\Engine\AI\System\Tasks\Retention\RetentionFilesTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionLogsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionProcessedItemsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionStaleClaimsTask;
+use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\Tasks\RecurringScheduleRegistry;
 use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Tasks\TaskRegistry;
@@ -101,13 +102,13 @@ class SystemAgentServiceProvider {
 	 * @return array Task handlers including built-in ones.
 	 */
 	public function getBuiltInTasks( array $tasks ): array {
-		$tasks['agent_call']                  = AgentCallTask::class;
-		$tasks['image_generation']            = ImageGenerationTask::class;
-		$tasks['image_optimization']          = ImageOptimizationTask::class;
-		$tasks['alt_text_generation']         = AltTextTask::class;
-		$tasks['internal_linking']            = InternalLinkingTask::class;
-		$tasks['daily_memory_generation']     = DailyMemoryTask::class;
-		$tasks['meta_description_generation'] = MetaDescriptionTask::class;
+		$tasks['agent_call']                             = AgentCallTask::class;
+		$tasks['image_generation']                       = ImageGenerationTask::class;
+		$tasks['image_optimization']                     = ImageOptimizationTask::class;
+		$tasks['alt_text_generation']                    = AltTextTask::class;
+		$tasks['internal_linking']                       = InternalLinkingTask::class;
+		$tasks['daily_memory_generation']                = DailyMemoryTask::class;
+		$tasks['meta_description_generation']            = MetaDescriptionTask::class;
 		$tasks[ RetentionCleanup::TASK_COMPLETED_JOBS ]  = RetentionCompletedJobsTask::class;
 		$tasks[ RetentionCleanup::TASK_FAILED_JOBS ]     = RetentionFailedJobsTask::class;
 		$tasks[ RetentionCleanup::TASK_LOGS ]            = RetentionLogsTask::class;
@@ -353,6 +354,10 @@ class SystemAgentServiceProvider {
 	 * @since 0.72.0 Also unschedules legacy datamachine_task_handle.
 	 */
 	public function manageRecurringTaskSchedules(): void {
+		if ( function_exists( 'wp_installing' ) && wp_installing() ) {
+			return;
+		}
+
 		// Upgrade cleanup: strip legacy hooks.
 		RecurringScheduler::unschedule( self::LEGACY_DAILY_MEMORY_HOOK, array() );
 
@@ -388,7 +393,7 @@ class SystemAgentServiceProvider {
 				$enabled
 			);
 
-			if ( is_wp_error( $result ) ) {
+			if ( $result instanceof \WP_Error ) {
 				do_action(
 					'datamachine_log',
 					'warning',
@@ -435,7 +440,10 @@ class SystemAgentServiceProvider {
 				'datamachine_log',
 				'warning',
 				"Task retry: Job #{$jobId} not found",
-				array( 'job_id' => $jobId, 'context' => 'system' )
+				array(
+					'job_id'  => $jobId,
+					'context' => 'system',
+				)
 			);
 			return;
 		}
@@ -448,7 +456,10 @@ class SystemAgentServiceProvider {
 				'datamachine_log',
 				'warning',
 				"Task retry: No task_type in engine_data for job #{$jobId}",
-				array( 'job_id' => $jobId, 'context' => 'system' )
+				array(
+					'job_id'  => $jobId,
+					'context' => 'system',
+				)
 			);
 			return;
 		}
@@ -460,13 +471,21 @@ class SystemAgentServiceProvider {
 				'datamachine_log',
 				'error',
 				"Task retry: Handler not found for '{$task_type}' (job #{$jobId})",
-				array( 'job_id' => $jobId, 'task_type' => $task_type, 'context' => 'system' )
+				array(
+					'job_id'    => $jobId,
+					'task_type' => $task_type,
+					'context'   => 'system',
+				)
 			);
 			return;
 		}
 
 		try {
 			$handler = new $handler_class();
+			if ( ! $handler instanceof SystemTask ) {
+				return;
+			}
+
 			$handler->executeTask( $jobId, $engine_data );
 		} catch ( \Throwable $e ) {
 			do_action(
