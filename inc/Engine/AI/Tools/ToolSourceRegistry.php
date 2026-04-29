@@ -10,6 +10,7 @@
 namespace DataMachine\Engine\AI\Tools;
 
 use DataMachine\Engine\AI\Tools\Sources\AdjacentHandlerToolSource;
+use DataMachine\Engine\AI\Tools\Sources\DataMachineToolRegistrySource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -58,10 +59,11 @@ class ToolSourceRegistry {
 	 * @return array<string, callable> Source callbacks keyed by source slug.
 	 */
 	private function getRegisteredSources( string $mode, array $args ): array {
+		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
 		$sources = apply_filters(
 			'datamachine_tool_sources',
 			array(
-				self::SOURCE_STATIC_REGISTRY   => array( $this, 'gatherStaticRegistryTools' ),
+				self::SOURCE_STATIC_REGISTRY   => new DataMachineToolRegistrySource( $this->tool_manager ),
 				self::SOURCE_ADJACENT_HANDLERS => new AdjacentHandlerToolSource(),
 			),
 			$mode,
@@ -84,6 +86,7 @@ class ToolSourceRegistry {
 			? array( self::SOURCE_ADJACENT_HANDLERS, self::SOURCE_STATIC_REGISTRY )
 			: array( self::SOURCE_STATIC_REGISTRY );
 
+		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
 		$sources = apply_filters( 'datamachine_tool_sources_for_mode', $sources, $mode, $args );
 
 		if ( ! is_array( $sources ) ) {
@@ -118,64 +121,4 @@ class ToolSourceRegistry {
 		return is_array( $tools ) ? $tools : array();
 	}
 
-	/**
-	 * Gather mode-filtered tools from the static registry.
-	 *
-	 * @param string $mode Agent mode slug.
-	 * @return array Tools keyed by tool name.
-	 */
-	public function gatherStaticRegistryTools( string $mode ): array {
-		$available_tools = array();
-		$all_tools       = $this->tool_manager->get_all_tools();
-		$mode_tools      = $this->filterByMode( $all_tools, $mode );
-
-		foreach ( $mode_tools as $tool_name => $tool_config ) {
-			if ( ! is_array( $tool_config ) || empty( $tool_config ) ) {
-				continue;
-			}
-
-			if ( ToolPolicyResolver::MODE_PIPELINE === $mode ) {
-				if ( isset( $tool_config['_handler_callable'] ) ) {
-					continue;
-				}
-
-				if ( $this->tool_manager->is_tool_available( $tool_name, null ) ) {
-					$available_tools[ $tool_name ] = $tool_config;
-				}
-
-				continue;
-			}
-
-			// Tools with requires_config go through availability checks.
-			// Tools without it are always available unless globally disabled.
-			if ( ! empty( $tool_config['requires_config'] ) ) {
-				if ( ! $this->tool_manager->is_tool_available( $tool_name, null ) ) {
-					continue;
-				}
-			} elseif ( ! $this->tool_manager->is_globally_enabled( $tool_name ) ) {
-				continue;
-			}
-
-			$available_tools[ $tool_name ] = $tool_config;
-		}
-
-		return $available_tools;
-	}
-
-	/**
-	 * Filter resolved tools by agent mode.
-	 *
-	 * @param array  $tools Resolved tools array.
-	 * @param string $mode  Mode slug to filter by.
-	 * @return array Filtered tools.
-	 */
-	private function filterByMode( array $tools, string $mode ): array {
-		return array_filter(
-			$tools,
-			static function ( $tool ) use ( $mode ) {
-				$modes = $tool['modes'] ?? array();
-				return in_array( $mode, $modes, true );
-			}
-		);
-	}
 }

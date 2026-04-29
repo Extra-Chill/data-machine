@@ -84,6 +84,8 @@ Target shape:
 
 The execution core is split, but `ToolManager` still centers on `datamachine_tools` and legacy handler/class tool declarations.
 
+The source-composition seam is now clearer: `ToolSourceRegistry` composes named providers, while `DataMachineToolRegistrySource` adapts the legacy/product `datamachine_tools` registry and `AdjacentHandlerToolSource` adapts pipeline-neighbor handler tools. Those providers are Data Machine consumers of the generic source idea, not the future Agents API tool registry.
+
 Target shape:
 
 - Agents API should prefer Ability-native tools and runtime tool declarations.
