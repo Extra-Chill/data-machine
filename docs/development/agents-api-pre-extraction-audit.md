@@ -123,6 +123,8 @@ Target shape:
 - Do not move these into Agents API.
 - Rename namespaces later if useful, but treat them as Data Machine automation/product surface.
 - Use them as consumers of Agents API, not part of the substrate.
+- Keep `System\*`, `System\Tasks\*`, `System\Tasks\Retention\*`, `Actions\*`, `Tools\Global\*`, `Tools\Sources\DataMachineToolRegistrySource`, `Tools\Sources\AdjacentHandlerToolSource`, `PipelineTranscriptPolicy`, `DataMachinePipelineTranscriptPersister`, and `DataMachineHandlerCompletionPolicy` in the Data Machine adapter/product bucket until there is a narrow, behavior-preserving move.
+- Use `inc/Engine/AI/README.md` and the extraction map's `Current Engine\AI Namespace Split` table as the grep guide while this namespace remains mixed.
 
 ## Lingering Entanglement Checklist
 

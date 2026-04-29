@@ -40,6 +40,24 @@ Use these checks before moving anything:
 | Intelligence domain | Intelligence plugin concerns, not Data Machine or Agents API. | Wiki, briefings, digests, domain brains. |
 | wpcom source material | Useful precedent only. | `\WPCOM\AI\Message`, `\Agent`, `\AgentsStore`, `Conversation_Storage`. |
 
+## Current `Engine\AI` Namespace Split
+
+The current namespace is intentionally mixed while extraction stays in place. Treat `DataMachine\Engine\AI` as a staging namespace, not as an extraction boundary. Grep for the class or subnamespace below before assuming a file is part of the future Agents API runtime.
+
+| Current namespace/surface | Bucket | Boundary decision |
+|---|---|---|
+| `DataMachine\Engine\AI\AgentMessageEnvelope`, `AgentConversationRequest`, `AgentConversationResult`, `AgentConversationRunnerInterface`, `AgentConversationCompletionPolicyInterface`, `AgentConversationTranscriptPersisterInterface`, `LoopEventSinkInterface` | Agents API public candidate | Generic contracts/value objects. These are extraction candidates after vocabulary settles. |
+| `DataMachine\Engine\AI\BuiltInAgentConversationRunner`, `AIConversationLoop`, `RequestBuilder`, `WpAiClientAdapter`, `RequestInspector`, `RequestMetadata`, `ConversationManager` | Agents API implementation candidate | Runtime implementation candidates, but still hosted by Data Machine and still carrying compatibility/provider/logging assumptions. |
+| `DataMachine\Engine\AI\Tools\RuntimeToolDeclaration`, `Tools\Execution\ToolExecutionCore`, `Tools\ToolSourceRegistry`, `Tools\ToolResultFinder` | Mixed runtime candidate | Generic pieces exist here, but keep source providers and Data Machine decorators out of the public Agents API surface. |
+| `DataMachine\Engine\AI\Tools\Sources\DataMachineToolRegistrySource`, `Tools\Sources\AdjacentHandlerToolSource`, `Tools\ToolManager`, pipeline-specific methods on `Tools\ToolPolicyResolver`, `Tools\ToolParameters` payload merging | Data Machine adapter/product | These translate Data Machine handler, pipeline, queue, and legacy tool registry concepts into runtime inputs. They stay Data Machine. |
+| `DataMachine\Engine\AI\Tools\Global\*` | Data Machine product | Curated product/site-ops tools. Individual capabilities may move to abilities later, but the bundle is not the Agents API registry. |
+| `DataMachine\Engine\AI\System\*` and `System\Tasks\*` | Data Machine product | System tasks, task prompts, retention cleanup, and scheduled maintenance stay in Data Machine. A future Agents API may provide a task contract, not these tasks. |
+| `DataMachine\Engine\AI\Actions\*` | Data Machine product | Pending-action storage, approval policy, and action-resolution abilities stay Data Machine. Generic approval can be designed later without inheriting these tables/routes. |
+| `DataMachine\Engine\AI\Memory\*`, `MemoryFileRegistry`, `SectionRegistry`, `ComposableFileGenerator`, `ComposableFileInvalidation` | Data Machine adapter/product | Memory policy artifacts and file composition are Data Machine's operator/product layer around the generic memory store contract. |
+| `PipelineTranscriptPolicy`, `DataMachinePipelineTranscriptPersister`, `DataMachineHandlerCompletionPolicy` | Data Machine adapter | Pipeline/job metadata and adjacent-handler completion are normalized for the runtime through collaborator interfaces, but the implementations stay Data Machine. |
+
+Exit rule for this in-place phase: do not physically move broad namespaces just because they sit under `Engine\AI`. Move only once a class is generic by dependency direction, vocabulary, and tests; otherwise document it as a Data Machine adapter or product surface.
+
 ## Agents API Public Candidate
 
 These are closest to generic public contracts. Most should be extracted as contracts/value objects before services.
