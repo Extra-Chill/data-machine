@@ -52,56 +52,62 @@ namespace {
 	function is_wp_error( mixed $thing ): bool {
 		return $thing instanceof WP_Error;
 	}
-}
 
-namespace DataMachine\Core\Agents {
-	class AgentBundler {
-		public static array $last_import = array();
+	eval(
+		<<<'PHP'
+		namespace DataMachine\Core\Agents;
 
-		public function from_directory( string $source ): ?array {
-			return null;
+		class AgentBundler {
+			public static array $last_import = array();
+
+			public function from_directory( string $source ): ?array {
+				return null;
+			}
+
+			public function from_zip( string $source ): ?array {
+				return null;
+			}
+
+			public function from_json( string $json ): ?array {
+				$bundle = json_decode( $json, true );
+				return is_array( $bundle ) ? $bundle : null;
+			}
+
+			public function import( array $bundle, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false ): array {
+				self::$last_import = compact( 'bundle', 'new_slug', 'owner_id', 'dry_run' );
+
+				return array(
+					'success' => true,
+					'summary' => array(
+						'agent_id'           => 123,
+						'agent_slug'         => (string) ( $bundle['agent']['agent_slug'] ?? '' ),
+						'pipelines_imported' => count( $bundle['pipelines'] ?? array() ),
+						'flows_imported'     => count( $bundle['flows'] ?? array() ),
+						'files'              => count( $bundle['files'] ?? array() ),
+					),
+				);
+			}
+		}
+		PHP
+	);
+
+	eval(
+		<<<'PHP'
+		namespace DataMachine\Core\Database\Agents;
+
+		class Agents {
+			public static array $by_slug = array();
+
+			public function get_by_slug( string $slug ): ?array {
+				return self::$by_slug[ $slug ] ?? null;
+			}
 		}
 
-		public function from_zip( string $source ): ?array {
-			return null;
-		}
+		class AgentAccess {}
+		PHP
+	);
 
-		public function from_json( string $json ): ?array {
-			$bundle = json_decode( $json, true );
-			return is_array( $bundle ) ? $bundle : null;
-		}
-
-		public function import( array $bundle, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false ): array {
-			self::$last_import = compact( 'bundle', 'new_slug', 'owner_id', 'dry_run' );
-
-			return array(
-				'success' => true,
-				'summary' => array(
-					'agent_id'           => 123,
-					'agent_slug'         => (string) ( $bundle['agent']['agent_slug'] ?? '' ),
-					'pipelines_imported' => count( $bundle['pipelines'] ?? array() ),
-					'flows_imported'     => count( $bundle['flows'] ?? array() ),
-					'files'              => count( $bundle['files'] ?? array() ),
-				),
-			);
-		}
-	}
-}
-
-namespace DataMachine\Core\Database\Agents {
-	class Agents {
-		public static array $by_slug = array();
-
-		public function get_by_slug( string $slug ): ?array {
-			return self::$by_slug[ $slug ] ?? null;
-		}
-	}
-
-	class AgentAccess {}
-}
-
-namespace DataMachine\Core\FilesRepository {
-	class DirectoryManager {}
+	eval( 'namespace DataMachine\\Core\\FilesRepository; class DirectoryManager {}' );
 }
 
 namespace DataMachine\Abilities {
