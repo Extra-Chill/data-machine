@@ -176,10 +176,12 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	}
 
 	function post_tracking_count(): int {
+		// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 		return count( \DataMachine\Core\WordPress\PostTracking::$stored );
 	}
 
 	function first_pending_apply_job_id(): ?int {
+		// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 		return PendingActionHelper::$staged[0]['apply_input']['job_id'] ?? null;
 	}
 
@@ -254,6 +256,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	assert_smoke( 'successful ability result still participates in post tracking', 1 === post_tracking_count() );
 
 	echo "\n[core:1] Generic execution core runs without Data Machine decorators\n";
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	\DataMachine\Core\WordPress\PostTracking::$stored = array();
 	$core_ability = new \Ability_Native_Smoke_Ability(
 		fn( $input ) => true,
@@ -281,6 +284,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	assert_smoke( 'core path does not perform post tracking decoration', 0 === post_tracking_count() );
 
 	echo "\n[decorator:1] ToolExecutor still stages pending actions before direct execution\n";
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	PendingActionHelper::$staged = array();
 	$preview_ability             = new \Ability_Native_Smoke_Ability(
 		fn( $input ) => true,
