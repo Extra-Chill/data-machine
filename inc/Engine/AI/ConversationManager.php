@@ -39,7 +39,7 @@ class ConversationManager {
 	 * @return array Message envelope.
 	 */
 	public static function buildConversationMessage( string $role, $content, array $metadata = array() ): array {
-		return MessageEnvelope::text( $role, $content, array_merge( array( 'timestamp' => gmdate( 'c' ) ), $metadata ) );
+		return AgentMessageEnvelope::text( $role, $content, array_merge( array( 'timestamp' => gmdate( 'c' ) ), $metadata ) );
 	}
 
 	/**
@@ -125,7 +125,7 @@ class ConversationManager {
 			$message .= ' with parameters: ' . implode( ', ', $params_str );
 		}
 
-		return MessageEnvelope::toolCall(
+		return AgentMessageEnvelope::toolCall(
 			$message,
 			$tool_name,
 			$tool_parameters,
@@ -178,7 +178,7 @@ class ConversationManager {
 			$payload['error'] = $tool_result['error'];
 		}
 
-		return MessageEnvelope::toolResult( $content, $tool_name, $payload, array( 'timestamp' => gmdate( 'c' ) ) );
+		return AgentMessageEnvelope::toolResult( $content, $tool_name, $payload, array( 'timestamp' => gmdate( 'c' ) ) );
 	}
 
 	/**
@@ -189,8 +189,8 @@ class ConversationManager {
 	 * @param array  $tool_parameters Original tool parameters
 	 * @return string Human-readable success/failure message
 	 */
+	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Kept for callers that pass original tool params alongside result data.
 	public static function generateSuccessMessage( string $tool_name, array $tool_result, array $tool_parameters ): string {
-		$tool_parameters;
 		$success = $tool_result['success'] ?? false;
 		$data    = $tool_result['data'] ?? array();
 
@@ -298,13 +298,13 @@ class ConversationManager {
 
 		// Scan ALL previous tool_call messages, not just the most recent one.
 		for ( $i = count( $conversation_messages ) - 1; $i >= 0; $i-- ) {
-			$message = MessageEnvelope::normalize( $conversation_messages[ $i ] );
+			$message = AgentMessageEnvelope::normalize( $conversation_messages[ $i ] );
 
 			if ( 'assistant' !== $message['role'] ) {
 				continue;
 			}
 
-			if ( MessageEnvelope::TYPE_TOOL_CALL !== $message['type'] ) {
+			if ( AgentMessageEnvelope::TYPE_TOOL_CALL !== $message['type'] ) {
 				continue;
 			}
 
@@ -339,9 +339,9 @@ class ConversationManager {
 	 * @return array|null Tool call details or null if not a tool call message
 	 */
 	public static function extractToolCallFromMessage( array $message ): ?array {
-		$envelope = MessageEnvelope::normalize( $message );
+		$envelope = AgentMessageEnvelope::normalize( $message );
 
-		if ( MessageEnvelope::TYPE_TOOL_CALL === $envelope['type'] ) {
+		if ( AgentMessageEnvelope::TYPE_TOOL_CALL === $envelope['type'] ) {
 			$tool_name  = $envelope['payload']['tool_name'] ?? null;
 			$parameters = $envelope['payload']['parameters'] ?? null;
 

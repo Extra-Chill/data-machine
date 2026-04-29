@@ -9,7 +9,7 @@ require_once __DIR__ . '/bootstrap-unit.php';
 
 use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\AgentConversationResult;
-use DataMachine\Engine\AI\MessageEnvelope;
+use DataMachine\Engine\AI\AgentMessageEnvelope;
 
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $hook, $value ) {
@@ -53,7 +53,7 @@ $valid_result = array(
 
 $normalized = AgentConversationResult::normalize( $valid_result );
 datamachine_agent_conversation_result_assert(
-	MessageEnvelope::TYPE_TEXT === $normalized['messages'][0]['type'],
+	AgentMessageEnvelope::TYPE_TEXT === $normalized['messages'][0]['type'],
 	'Valid built-in-shaped result should normalize messages to canonical envelopes.'
 );
 ++$assertions;

@@ -13,7 +13,7 @@ namespace DataMachine\Core\Database\Chat;
 
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\Database\BaseRepository;
-use DataMachine\Engine\AI\MessageEnvelope;
+use DataMachine\Engine\AI\AgentMessageEnvelope;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -333,7 +333,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$table_name = self::get_prefixed_table_name();
 
 		try {
-			$normalized_messages = MessageEnvelope::normalize_many( $messages );
+			$normalized_messages = AgentMessageEnvelope::normalize_many( $messages );
 		} catch ( \InvalidArgumentException $e ) {
 			do_action(
 				'datamachine_log',
@@ -789,14 +789,14 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$count = 0;
 
 		foreach ( $messages as $msg ) {
-			$msg = MessageEnvelope::normalize( $msg );
+			$msg = AgentMessageEnvelope::normalize( $msg );
 			if ( ( $msg['role'] ?? '' ) !== 'assistant' ) {
 				continue;
 			}
 
 			// Skip tool call/result messages — only count visible assistant responses.
-			$type = $msg['type'] ?? MessageEnvelope::TYPE_TEXT;
-			if ( MessageEnvelope::TYPE_TOOL_CALL === $type || MessageEnvelope::TYPE_TOOL_RESULT === $type ) {
+			$type = $msg['type'] ?? AgentMessageEnvelope::TYPE_TEXT;
+			if ( AgentMessageEnvelope::TYPE_TOOL_CALL === $type || AgentMessageEnvelope::TYPE_TOOL_RESULT === $type ) {
 				continue;
 			}
 
@@ -822,7 +822,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 */
 	private static function normalize_messages( array $messages ): array {
 		try {
-			return MessageEnvelope::normalize_many( $messages );
+			return AgentMessageEnvelope::normalize_many( $messages );
 		} catch ( \InvalidArgumentException $e ) {
 			do_action(
 				'datamachine_log',
@@ -862,7 +862,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		global $wpdb;
 
 		$table_name   = self::get_prefixed_table_name();
-		$last_read_at = current_time( 'mysql', true );
+		$last_read_at = (string) current_time( 'mysql', true );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $wpdb->update(
@@ -903,7 +903,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		global $wpdb;
 
 		$table_name  = self::get_prefixed_table_name();
-		$cutoff_date = gmdate( 'Y-m-d H:i:s', strtotime( "-{$retention_days} days" ) );
+		$cutoff_date = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->query(
@@ -955,7 +955,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		}
 
 		$table_name  = self::get_prefixed_table_name();
-		$cutoff_date = gmdate( 'Y-m-d H:i:s', strtotime( "-{$retention_days} days" ) );
+		$cutoff_date = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->query(

@@ -40,7 +40,7 @@ class AgentConversationResult {
 			}
 
 			try {
-				$message = MessageEnvelope::normalize( $message );
+				$message = AgentMessageEnvelope::normalize( $message );
 			} catch ( \InvalidArgumentException $e ) {
 				throw self::invalid( $path, $e->getMessage() );
 			}
