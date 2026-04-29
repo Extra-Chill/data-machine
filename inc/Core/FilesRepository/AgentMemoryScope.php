@@ -2,12 +2,12 @@
 /**
  * Agent Memory Scope
  *
- * Immutable value object that uniquely identifies an agent memory file
+ * Immutable value object that uniquely identifies an agent memory record
  * across the four-tuple primary key (layer, user_id, agent_id, filename).
  *
  * Same identity model as the on-disk path encoding, just decoupled from
- * the filesystem so an alternate store (e.g. database-backed) can map it
- * to its own physical key.
+ * the filesystem so an alternate store (e.g. database-backed, guideline-backed,
+ * or host-native) can map it to its own physical key.
  *
  * @package DataMachine\Core\FilesRepository
  * @since   next

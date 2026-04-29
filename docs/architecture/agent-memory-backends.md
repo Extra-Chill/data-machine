@@ -1,6 +1,6 @@
 # Agent Memory Backends
 
-Data Machine treats agent memory as logical markdown files. The storage backend is replaceable, but the identity, registry, injection, and editing rules stay in Data Machine.
+Data Machine treats agent memory as logical memory records that usually render as markdown files. The storage backend is replaceable, but the current registry, injection, editing rules, abilities, and scaffolding stay in Data Machine.
 
 This lets self-hosted installs keep the current disk-backed workflow while managed hosts can project the same logical memory into a WordPress-native store such as `wp_guideline` when that substrate exists.
 
@@ -20,6 +20,8 @@ Every memory file is addressed by an `AgentMemoryScope` four-tuple:
 | `filename` | File name or relative path within the layer, such as `MEMORY.md`, `contexts/editor.md`, or `daily/2026/04/17.md`. |
 
 Backends translate that tuple to their own physical key: a filesystem path, a database row, a post, or another host-owned identifier. Callers should use `AgentMemory` and should not branch on the concrete backend.
+
+This tuple is the candidate Agents API memory identity. Data Machine-specific concerns such as seed scaffolding, file editability, prompt-injection policy, and operator abilities are intentionally outside the persistence-store contract.
 
 ## Runtime Flow
 
@@ -60,7 +62,7 @@ The disk store intentionally does not implement compare-and-swap writes; it acce
 
 ## Backend Selection
 
-Data Machine resolves memory persistence through one filter:
+Data Machine resolves memory persistence through one current filter:
 
 ```php
 apply_filters(
@@ -71,6 +73,8 @@ apply_filters(
 ```
 
 Return an `AgentMemoryStoreInterface` implementation to replace the disk default for the given scope. Return `null` to keep `DiskAgentMemoryStore`.
+
+Future Agents API extraction should introduce its neutral resolver/filter name in the extracted package with a migration plan. Data Machine does not add a second alias today; `datamachine_memory_store` remains the active public behavior until ownership actually moves.
 
 Backend selection should be capability-driven:
 
@@ -116,7 +120,7 @@ The memory-store seam is not a replacement for AI Framework. Data Machine still 
 - Read and write memory through `AgentMemory`, not `AgentMemoryStoreFactory` directly.
 - Implement `AgentMemoryStoreInterface` when replacing persistence.
 - Preserve the four-tuple identity model exactly, even if the physical backend has different keys.
-- Keep section parsing, scaffolding, editability gating, and registry semantics above the store layer.
+- Keep section parsing, scaffolding, editability gating, ability permissions, prompt-injection policy, and registry semantics above the store layer.
 - Gate guideline-backed stores on real substrate availability; do not assume `wp_guideline` exists.
 - Prefer disk when DMC/local writable filesystem support exists, because that is the projection external coding agents can inspect.
 

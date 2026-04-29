@@ -1469,11 +1469,14 @@ arrays are projection shapes at provider boundaries, not the store contract.
 ### AgentMemoryStoreInterface (`/inc/Core/FilesRepository/AgentMemoryStoreInterface.php`)
 
 **Purpose**: Single seam between agent memory operations and the underlying
-persistence backend. The disk default ([`DiskAgentMemoryStore`](../../../inc/Core/FilesRepository/DiskAgentMemoryStore.php))
+persistence backend. The contract is generic agent-memory persistence: it does
+not own section parsing, scaffold/default-file creation, editability, ability
+permissions, prompt injection, flows, jobs, or pipeline behavior. The disk
+default ([`DiskAgentMemoryStore`](../../../inc/Core/FilesRepository/DiskAgentMemoryStore.php))
 preserves byte-for-byte the filesystem behavior the codebase used before this
 seam was introduced.
 
-**Filter: `datamachine_memory_store`**
+**Current filter: `datamachine_memory_store`**
 
 ```php
 apply_filters(
@@ -1486,6 +1489,11 @@ apply_filters(
 Return an [`AgentMemoryStoreInterface`](../../../inc/Core/FilesRepository/AgentMemoryStoreInterface.php)
 implementation to replace the disk default for this scope. Return `null` (the
 default) to let Data Machine read and write through the filesystem.
+
+This is the only runtime filter in Data Machine today. A future Agents API
+extraction should introduce a neutral resolver/filter name in the extracted
+package with an explicit migration path; Data Machine does not mirror this hook
+under a second alias before ownership moves.
 
 **Use case**: managed-host environments where the local filesystem is not
 writable (e.g. WordPress.com, VIP). A consumer plugin (e.g. Intelligence)
@@ -1513,9 +1521,10 @@ add_filter( 'datamachine_memory_store', function ( $store, $scope ) {
 - `delete( $scope )` → `AgentMemoryWriteResult` (idempotent)
 - `list_layer( $scope_query )` → `AgentMemoryListEntry[]` (enumerates one layer)
 
-Section parsing, scaffolding, editability gating, and registry-driven
-convention-path semantics stay in `AgentMemory` (the high-level facade).
-The store is the dumb persistence layer underneath.
+Section parsing, scaffolding, editability gating, ability permissions,
+prompt-injection policy, and registry-driven convention-path semantics stay in
+`AgentMemory` and its higher-level callers. The store is the persistence layer
+underneath.
 
 **Single consumer of the store**: `\DataMachine\Core\FilesRepository\AgentMemory`.
 

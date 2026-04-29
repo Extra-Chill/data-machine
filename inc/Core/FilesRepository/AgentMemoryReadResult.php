@@ -2,7 +2,7 @@
 /**
  * Agent Memory Read Result
  *
- * Immutable value object returned by AgentMemoryStoreInterface::read().
+ * Store-neutral value object returned by AgentMemoryStoreInterface::read().
  *
  * @package DataMachine\Core\FilesRepository
  * @since   next

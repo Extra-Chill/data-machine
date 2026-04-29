@@ -2,9 +2,13 @@
 /**
  * Agent Memory Store Factory
  *
- * Resolves the active {@see AgentMemoryStoreInterface} implementation
- * via the `datamachine_memory_store` filter, falling back to the
- * built-in {@see DiskAgentMemoryStore}.
+ * Resolves the active {@see AgentMemoryStoreInterface} implementation.
+ *
+ * This is Data Machine's current resolver for a generic agent-memory
+ * persistence contract. It intentionally keeps one public swap point: the
+ * existing `datamachine_memory_store` filter, until an Agents API extraction
+ * can introduce its own vocabulary and migration path. No caller should branch
+ * on the concrete backend.
  *
  * Single resolution point so every consumer (AgentMemory, DailyMemory,
  * AgentFileAbilities, CoreMemoryFilesDirective) gets the same swap mechanism
@@ -43,6 +47,11 @@ class AgentMemoryStoreFactory {
 		 * Return an {@see AgentMemoryStoreInterface} instance to short-circuit
 		 * the default disk-backed store. Return null (the default) to use the
 		 * built-in {@see DiskAgentMemoryStore}.
+		 *
+		 * This remains the only runtime filter in Data Machine. A future extracted
+		 * Agents API can add a neutral filter name when it owns the resolver; adding
+		 * a second alias here would create a permanent compatibility surface without
+		 * moving ownership.
 		 *
 		 * The disk default preserves byte-for-byte the behavior Data Machine
 		 * had before this seam was introduced — self-hosted users see no

@@ -2,12 +2,16 @@
 /**
  * Agent Memory Store Interface
  *
- * Single seam between agent memory operations and the underlying
- * persistence backend. Default implementation ({@see DiskAgentMemoryStore})
- * preserves today's filesystem behavior. Consumers can swap in an
- * alternate store via the `datamachine_memory_store` filter
- * (e.g. a DB-backed store on managed hosts where the filesystem is
- * not writable).
+ * Generic persistence contract for agent memory. Data Machine consumes this
+ * seam today, but the contract deliberately describes agent-memory storage:
+ * not flows, pipelines, jobs, abilities, scaffolding, or prompt injection.
+ *
+ * Default implementation ({@see DiskAgentMemoryStore}) preserves today's
+ * filesystem behavior. Consumers can swap in an alternate store via the
+ * current `datamachine_memory_store` filter (e.g. a DB-backed store on
+ * managed hosts where the filesystem is not writable). A future Agents API
+ * extraction should rename the resolver/filter in that plugin's vocabulary;
+ * this interface is the behavior to carry forward.
  *
  * Implementations are responsible for:
  * - translating an {@see AgentMemoryScope} to a physical key (path, row, URL);
@@ -16,11 +20,12 @@
  * - honoring the layer + user_id + agent_id + filename four-tuple as the
  *   identity model.
  *
- * Section parsing, scaffolding, editability gating, and registry-driven
- * convention-path semantics all stay in the higher-level callers
+ * Section parsing, scaffold/default-file creation, editability gating,
+ * ability permissions, prompt-injection policy, and registry-driven
+ * convention-path semantics all stay in higher-level callers
  * ({@see AgentMemory}, {@see \DataMachine\Abilities\File\AgentFileAbilities},
  * {@see \DataMachine\Engine\AI\MemoryFileRegistry}). The store is the
- * dumb persistence layer underneath.
+ * persistence layer underneath.
  *
  * @package DataMachine\Core\FilesRepository
  * @since   next

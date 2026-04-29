@@ -2,7 +2,7 @@
 /**
  * Agent Memory List Entry
  *
- * Immutable value object representing a single file in a layer listing
+ * Store-neutral value object representing a single file in a layer listing
  * returned by AgentMemoryStoreInterface::list_layer().
  *
  * @package DataMachine\Core\FilesRepository

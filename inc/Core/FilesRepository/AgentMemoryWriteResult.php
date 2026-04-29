@@ -2,7 +2,7 @@
 /**
  * Agent Memory Write Result
  *
- * Immutable value object returned by AgentMemoryStoreInterface::write()
+ * Store-neutral value object returned by AgentMemoryStoreInterface::write()
  * and ::delete().
  *
  * @package DataMachine\Core\FilesRepository
