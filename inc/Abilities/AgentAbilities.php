@@ -677,7 +677,7 @@ class AgentAbilities {
 			);
 		}
 
-		if ( $existing && 'error' === $on_conflict ) {
+		if ( $existing ) {
 			return array(
 				'success'    => false,
 				'agent_id'   => (int) $existing['agent_id'],

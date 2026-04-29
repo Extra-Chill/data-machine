@@ -166,7 +166,9 @@ namespace {
 	};
 
 	$reset = function (): void {
+		// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 		AgentBundler::$last_import                   = array();
+		// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 		Agents::$by_slug                             = array();
 		$GLOBALS['datamachine_test_current_user_id'] = 42;
 		$GLOBALS['datamachine_test_auth_resolver']   = null;
@@ -176,6 +178,7 @@ namespace {
 
 	echo "\n[1] Conflict modes\n";
 	$reset();
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	Agents::$by_slug['portable-agent'] = array( 'agent_id' => 77 );
 	$bundle_path                       = $write_bundle( $base_bundle() );
 	$result                            = AgentAbilities::importAgent(
@@ -185,6 +188,7 @@ namespace {
 		)
 	);
 	$assert( 'conflict error fails', false === $result['success'] );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	$assert( 'conflict error happens before import writes', array() === AgentBundler::$last_import );
 
 	$result = AgentAbilities::importAgent(
@@ -195,6 +199,7 @@ namespace {
 	);
 	$assert( 'conflict skip succeeds', true === $result['success'] );
 	$assert( 'conflict skip marks skipped', true === $result['skipped'] );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	$assert( 'conflict skip does not import', array() === AgentBundler::$last_import );
 
 	$result = AgentAbilities::importAgent(
@@ -217,9 +222,13 @@ namespace {
 		)
 	);
 	$assert( 'accepted import succeeds', true === $result['success'] );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	$assert( 'accepted import reaches bundler import', ! empty( AgentBundler::$last_import ) );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	$assert( 'slug override rewrites bundle before import', 'renamed-agent' === AgentBundler::$last_import['bundle']['agent']['agent_slug'] );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	$assert( 'owner_id passes through to bundler import', 99 === AgentBundler::$last_import['owner_id'] );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	$assert( 'ability lets bundler use rewritten bundle slug, not new_slug', null === AgentBundler::$last_import['new_slug'] );
 
 	echo "\n[3] Auth ref resolution\n";
@@ -243,6 +252,7 @@ namespace {
 	);
 	$bundle_path                                      = $write_bundle( $bundle );
 	$result                                           = AgentAbilities::importAgent( array( 'source' => $bundle_path ) );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
 	$imported_bundle                                  = AgentBundler::$last_import['bundle'];
 	$resolved_config                                  = $imported_bundle['flows'][0]['flow_config']['step-one']['handler_configs']['resolvable'];
 	$unresolved_config                                = $imported_bundle['flows'][0]['flow_config']['step-two']['handler_configs']['missing'];
