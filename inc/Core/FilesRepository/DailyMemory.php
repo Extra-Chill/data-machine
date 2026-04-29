@@ -12,7 +12,7 @@
  *
  * Persistence is delegated to the {@see AgentMemoryStoreInterface}
  * registered for the agent layer (resolved through the
- * `datamachine_memory_store` filter). Daily files are addressed as
+ * `agents_api_memory_store` filter). Daily files are addressed as
  * relative paths within the agent layer (`daily/YYYY/MM/DD.md`), so a
  * single store swap covers MEMORY.md, daily memory, and context files
  * uniformly.
@@ -199,7 +199,7 @@ class DailyMemory implements DailyMemoryStorage {
 		if ( empty( $result['success'] ) ) {
 			return array(
 				'success' => false,
-				'message' => $result['message'] ?? sprintf( 'Failed to write daily memory for %s-%s-%s.', $year, $month, $day ),
+				'message' => $result['message'],
 			);
 		}
 
@@ -240,7 +240,7 @@ class DailyMemory implements DailyMemoryStorage {
 		if ( empty( $result['success'] ) ) {
 			return array(
 				'success' => false,
-				'message' => $result['message'] ?? sprintf( 'Failed to append to daily memory for %s-%s-%s.', $year, $month, $day ),
+				'message' => $result['message'],
 			);
 		}
 
@@ -273,7 +273,7 @@ class DailyMemory implements DailyMemoryStorage {
 		if ( empty( $result['success'] ) ) {
 			return array(
 				'success' => false,
-				'message' => $result['message'] ?? sprintf( 'Failed to delete daily memory for %s-%s-%s.', $year, $month, $day ),
+				'message' => $result['message'],
 			);
 		}
 
@@ -393,7 +393,7 @@ class DailyMemory implements DailyMemoryStorage {
 					continue;
 				}
 
-				$lines      = explode( "\n", $result['content'] );
+				$lines      = explode( "\n", $result['content'] ?? '' );
 				$line_count = count( $lines );
 
 				foreach ( $lines as $index => $line ) {

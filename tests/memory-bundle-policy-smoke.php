@@ -256,7 +256,7 @@ function memory_policy_assert( bool $condition, string $message ): void {
 
 $store = new MemoryPolicyFakeStore();
 add_filter(
-	'datamachine_memory_store',
+	'agents_api_memory_store',
 	static function ( $_default, AgentMemoryScope $_scope ) use ( $store ) {
 		unset( $_default, $_scope );
 		return $store;

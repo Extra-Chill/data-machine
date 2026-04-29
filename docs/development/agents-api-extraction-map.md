@@ -51,7 +51,7 @@ These are closest to generic public contracts. Most should be extracted as contr
 | `LoopEventSinkInterface` | `inc/Engine/AI/LoopEventSinkInterface.php` | Transport-neutral event sink for logs, streaming, CLI, REST, or chat UIs. | Make event vocabulary public and provider-neutral before extraction. |
 | `NullLoopEventSink` | `inc/Engine/AI/NullLoopEventSink.php` | Generic no-op implementation for optional event sinks. | Implementation can move with the interface. |
 | `RuntimeToolDeclaration` | `inc/Engine/AI/Tools/RuntimeToolDeclaration.php` | Validates run-scoped client/runtime tool declarations without Data Machine state. | Rename around `WP_Agent_Tool_Declaration`; keep executor/source/scope vocabulary generic. |
-| `AgentMemoryStoreInterface` | `inc/Core/FilesRepository/AgentMemoryStoreInterface.php` | Generic memory persistence seam. | Rename `AgentMemoryScope` tuple fields only if needed; keep CAS/hash behavior. |
+| `AgentMemoryStoreInterface` | `inc/Core/FilesRepository/AgentMemoryStoreInterface.php` | Generic memory persistence seam using the `agents_api_memory_store` resolver hook. | Rename `AgentMemoryScope` tuple fields only if needed; keep CAS/hash behavior. |
 | `AgentMemoryScope` | `inc/Core/FilesRepository/AgentMemoryScope.php` | Encodes memory identity independently of disk/database implementations. | Review `layer`, `user_id`, `agent_id`, `filename` as the public model. |
 | `AgentMemoryReadResult` | `inc/Core/FilesRepository/AgentMemoryReadResult.php` | Store-neutral read result. | Generic result value object can move unchanged after naming cleanup. |
 | `AgentMemoryWriteResult` | `inc/Core/FilesRepository/AgentMemoryWriteResult.php` | Store-neutral write result with hash/bytes/error shape. | Generic result value object can move unchanged after naming cleanup. |
@@ -94,8 +94,9 @@ These are plausibly generic implementations, but should not move until naming an
 | `ConversationManager` | `inc/Engine/AI/ConversationManager.php` | Formats tool call/result messages and conversation artifacts. | Split message formatting helpers from Data Machine transcript details. |
 | `ToolExecutor` | `inc/Engine/AI/Tools/ToolExecutor.php` | Executes ability-native and legacy tools with policy staging. | Extract only the ability-native execution path; leave Data Machine post tracking and pending-action glue behind. |
 | `RuntimeToolDeclaration` validators in tests | `tests/runtime-tool-declaration-smoke.php` | Tests generic declaration shape. | Move with the declaration contract. |
-| `ToolSourceRegistry` | `inc/Engine/AI/Tools/ToolSourceRegistry.php` | Source-provider idea is generic, but adjacent handler source is Data Machine-specific. | Extract source registry, leave adjacent-handler source as Data Machine provider. |
-| `ToolManager` | `inc/Engine/AI/Tools/ToolManager.php` | Tool registry/normalization is generic-ish, but still based on `datamachine_tools`. | Rename registry and separate legacy class/method tools from ability-native tools. |
+| `ToolSourceRegistry` | `inc/Engine/AI/Tools/ToolSourceRegistry.php` | Source-provider composition is generic, but the default providers are Data Machine adapters. | Extract the source registry contract separately from `DataMachineToolRegistrySource` and `AdjacentHandlerToolSource`. |
+| `DataMachineToolRegistrySource` | `inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php` | Adapts Data Machine's legacy/product `datamachine_tools` registry into source-provider composition. | Keep in Data Machine; Ability-native tool declarations should inform Agents API instead. |
+| `ToolManager` | `inc/Engine/AI/Tools/ToolManager.php` | Data Machine registry/normalization is based on `datamachine_tools`, legacy class/method tools, handler wrappers, configuration, and UI status. | Keep as Data Machine adapter/product layer; do not make it the public Agents API registry. |
 | `ToolParameters` | `inc/Engine/AI/Tools/ToolParameters.php` | Parameter merge helper is useful, but payload includes job/flow/packet fields. | Keep generic parameter validation; move Data Machine payload merge rules to adapter. |
 | `ToolResultFinder` | `inc/Engine/AI/Tools/ToolResultFinder.php` | Generic enough if it only finds tool result envelopes. | Verify it does not rely on handler result naming before moving. |
 | `BaseTool` | `inc/Engine/AI/Tools/BaseTool.php` | Useful base class for built-in tools, but public API should favor abilities. | Do not make base-tool inheritance the primary Agents API extension point. |
@@ -117,6 +118,7 @@ These should stay in Data Machine as compatibility glue if a generic runtime plu
 | `ToolPolicyResolver::gatherPipelineTools()` | `inc/Engine/AI/Tools/ToolPolicyResolver.php` | Knows pipeline handler/tool behavior and should not become public Agents API. |
 | `PipelineTranscriptPolicy` | `inc/Engine/AI/PipelineTranscriptPolicy.php` | Reads flow/pipeline config and site option to decide transcript persistence. Generic runtime should receive an already-normalized boolean/policy. |
 | `ToolSourceRegistry::SOURCE_ADJACENT_HANDLERS` | `inc/Engine/AI/Tools/ToolSourceRegistry.php` | Data Machine-specific source that exposes publish/upsert handler tools next to AI steps. |
+| `ToolSourceRegistry::SOURCE_STATIC_REGISTRY` / `DataMachineToolRegistrySource` | `inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php` | Data Machine-specific source that adapts the curated `datamachine_tools` registry into runtime tool resolution. |
 | `FlowStepConfig::getAdjacentRequiredHandlerSlugsForAi()` consumers | `AIStep` and tool policy code | Converts pipeline topology into handler completion requirements. |
 | `QueueableTrait` prompt consumption in `AIStep` | `inc/Core/Steps/AI/AIStep.php` | Data Machine flow queue semantics (`static`, `drain`, `loop`) feeding a runtime user-message slot. |
 | `ConversationManager` transcript persistence calls from `AIStep` | `AIStep`/`ConversationManager` | Adapts a pipeline job run to the conversation store. Generic runtime should not know jobs. |
@@ -189,7 +191,7 @@ These are reference points only. Do not expose them as public Data Machine or Ag
 |---|---|---|
 | `datamachine_conversation_runner` | Agents API public candidate | Generic runtime replacement seam. Rename and formalize result contract. |
 | `datamachine_conversation_store` | Data Machine compatibility seam today | Existing aggregate store swap seam. A future Agents API transcript-store filter should be narrower instead of carrying Data Machine chat product responsibilities. |
-| `datamachine_memory_store` | Agents API public candidate | Generic memory persistence swap seam. Keep as Data Machine's current public behavior until extraction; introduce a neutral Agents API filter only when that package owns the resolver and migration path. |
+| `agents_api_memory_store` | Agents API public candidate | Generic memory persistence swap seam. Renamed in place from `datamachine_memory_store`; do not mirror the old hook under a runtime alias. |
 | `datamachine_register_agents` | Agents API public candidate | Registration hook should become WordPress-shaped. |
 | `datamachine_registered_agent_reconciled` | Agents API implementation candidate | Lifecycle event is useful, current reconciliation semantics are Data Machine implementation. |
 | `datamachine_guideline_updated` | Agents API public candidate | Generic memory/guideline change event after naming review. |

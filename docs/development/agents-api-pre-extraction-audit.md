@@ -12,8 +12,8 @@ The initial untangling wave is complete:
 - Adjacent handler tools are a Data Machine provider instead of generic source-registry behavior.
 - Ability-native tool execution is separated from Data Machine pending-action and post-tracking decorators.
 - Declarative agent registration is separated from Data Machine materialization.
-- Memory store ownership is documented behind a neutral store contract.
 - Conversation transcript storage is narrowed behind a transcript facade, and the aggregate chat-product store is documented as a Data Machine compatibility layer rather than the default extraction target.
+- Memory store ownership is documented behind an Agents API-shaped store contract and filter name.
 - The runner request boundary exists.
 
 This branch starts the naming phase by renaming the neutral runner result/request seam from `AIConversation*` to `AgentConversation*` while leaving `AIConversationLoop` as the temporary compatibility facade.
@@ -33,11 +33,12 @@ Target shape:
 
 ### 2. Runtime Hooks And Filters
 
-These are still Data Machine-named even when the seam is generic:
+These generic seams still need Agents API naming decisions or have already moved
+in place:
 
 - `datamachine_conversation_runner`
 - `datamachine_conversation_store`
-- `datamachine_memory_store`
+- `agents_api_memory_store`
 - `datamachine_tool_sources`
 - `datamachine_tool_sources_for_mode`
 - `datamachine_register_agents`
@@ -46,8 +47,8 @@ These are still Data Machine-named even when the seam is generic:
 Target shape:
 
 - Decide the `agents_api_*` / `wp_agents_api_*` hook names before extraction.
-- Keep existing Data Machine hooks while code is in this repository.
-- Do not add runtime fallback ladders that survive extraction. When Agents API owns the seam, migrate consumers to the new hook names directly.
+- Keep existing Data Machine hooks while code is in this repository unless a seam can move cleanly to Agents API vocabulary in place.
+- Do not add runtime fallback ladders that survive extraction. When a seam moves to a new hook name, migrate consumers to the new hook directly.
 
 ### 3. Message Envelope Vocabulary
 
@@ -81,9 +82,17 @@ Target shape:
 - `DiskAgentMemoryStore` becomes `MarkdownMemoryStore` only if disk-backed agent memory is part of the public Agents API product.
 - Data Machine file scaffolding stays a Data Machine adapter.
 
+Current in-place migration:
+
+- `agents_api_memory_store` is the active memory-store resolver hook.
+- The previous `datamachine_memory_store` hook is intentionally not mirrored; pre-1.0 consumers should register on `agents_api_memory_store`.
+- `DiskAgentMemoryStore` keeps its class name until a physical Agents API package decides whether disk/markdown memory is part of the public product.
+
 ### 6. Tool Registry And Execution
 
 The execution core is split, but `ToolManager` still centers on `datamachine_tools` and legacy handler/class tool declarations.
+
+The source-composition seam is now clearer: `ToolSourceRegistry` composes named providers, while `DataMachineToolRegistrySource` adapts the legacy/product `datamachine_tools` registry and `AdjacentHandlerToolSource` adapts pipeline-neighbor handler tools. Those providers are Data Machine consumers of the generic source idea, not the future Agents API tool registry.
 
 Target shape:
 

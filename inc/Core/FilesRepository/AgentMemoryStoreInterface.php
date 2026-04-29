@@ -8,10 +8,9 @@
  *
  * Default implementation ({@see DiskAgentMemoryStore}) preserves today's
  * filesystem behavior. Consumers can swap in an alternate store via the
- * current `datamachine_memory_store` filter (e.g. a DB-backed store on
- * managed hosts where the filesystem is not writable). A future Agents API
- * extraction should rename the resolver/filter in that plugin's vocabulary;
- * this interface is the behavior to carry forward.
+ * `agents_api_memory_store` filter (e.g. a DB-backed store on managed hosts
+ * where the filesystem is not writable). This interface is the behavior to
+ * carry forward when Agents API owns the contract physically.
  *
  * Implementations are responsible for:
  * - translating an {@see AgentMemoryScope} to a physical key (path, row, URL);
