@@ -138,8 +138,27 @@ function assert_true( bool $condition, string $label ): void {
 }
 
 function failure_count(): int {
+	return count( smoke_failures() );
+}
+
+function smoke_failures(): array {
 	global $failures;
-	return count( $failures );
+	return array_values( $failures );
+}
+
+function smoke_logs(): array {
+	$logs = $GLOBALS['datamachine_test_logs'] ?? array();
+	return is_array( $logs ) ? array_values( $logs ) : array();
+}
+
+function count_guardrail_warnings(): int {
+	$count = 0;
+	foreach ( smoke_logs() as $entry ) {
+		if ( is_array( $entry ) && 'warning' === ( $entry[0] ?? '' ) && 'AI request size guardrail warning' === ( $entry[1] ?? '' ) ) {
+			++$count;
+		}
+	}
+	return $count;
 }
 
 function reset_smoke_state(): void {
@@ -198,8 +217,7 @@ foreach ( array( 'datamachine_ai_request_warning_bytes', 'datamachine_ai_message
 	add_filter( $filter, fn() => 1 );
 }
 $response = build_smoke_request();
-// @phpstan-ignore-next-line Smoke logs are mutated indirectly through the do_action() stub.
-assert_true( count( $GLOBALS['datamachine_test_logs'] ) > 0, 'oversized request emits a pre-dispatch warning' );
+assert_true( count( smoke_logs() ) > 0, 'oversized request emits a pre-dispatch warning' );
 assert_true( isset( $response['request_metadata']['request_json_bytes'] ), 'response carries request metadata' );
 assert_true( 'RULES.md' === ( $response['request_metadata']['memory_files'][0]['filename'] ?? '' ), 'memory file metadata is compactly captured' );
 
@@ -209,13 +227,7 @@ foreach ( array( 'datamachine_ai_request_warning_bytes', 'datamachine_ai_message
 	add_filter( $filter, fn() => 999999999 );
 }
 build_smoke_request();
-$guardrail_warnings = array_filter(
-	$GLOBALS['datamachine_test_logs'],
-	// @phpstan-ignore-next-line Smoke logs are runtime-mutated arrays from do_action().
-	fn( $entry ) => is_array( $entry ) && isset( $entry[0], $entry[1] ) && 'warning' === $entry[0] && 'AI request size guardrail warning' === $entry[1]
-);
-// @phpstan-ignore-next-line Smoke logs are mutated indirectly through the do_action() stub.
-assert_true( 0 === count( $guardrail_warnings ), 'small request does not emit guardrail warning' );
+assert_true( 0 === count_guardrail_warnings(), 'small request does not emit guardrail warning' );
 
 // 3. Simulated persisted pipeline transcript stores request_metadata in session metadata.
 $store    = new RequestMetadataSmokeStore();
@@ -246,14 +258,13 @@ $render->invoke(
 assert_true( in_array( 'Transcript for job 279', WP_CLI::$logs, true ), 'legacy transcript renders without request metadata' );
 
 echo "\n";
-if ( 0 === failure_count() ) {
-	echo "All AI request metadata guardrail smoke tests passed.\n";
-	exit( 0 );
+if ( failure_count() > 0 ) {
+	echo sprintf( "%d failure(s):\n", failure_count() );
+	foreach ( smoke_failures() as $failure ) {
+		echo "  - {$failure}\n";
+	}
+	exit( 1 );
 }
 
-echo sprintf( "%d failure(s):\n", count( $failures ) );
-// @phpstan-ignore-next-line Smoke assertions mutate failures through assert_true().
-foreach ( $failures as $failure ) {
-	echo "  - {$failure}\n";
-}
-exit( 1 );
+echo "All AI request metadata guardrail smoke tests passed.\n";
+exit( 0 );
