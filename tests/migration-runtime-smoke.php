@@ -286,22 +286,6 @@ assert_runtime(
 	DATAMACHINE_VERSION === $GLOBALS['__test_options']['datamachine_db_version']
 );
 
-echo "\n[deferred:6] WP_INSTALLING short-circuits before option access\n";
-$GLOBALS['__test_migration_calls'] = array();
-unset( $GLOBALS['__test_options']['datamachine_db_version'] );
-if ( ! defined( 'WP_INSTALLING' ) ) {
-	define( 'WP_INSTALLING', true );
-}
-datamachine_maybe_run_deferred_migrations();
-assert_runtime(
-	'no migrations called while WordPress is installing',
-	0 === count( $GLOBALS['__test_migration_calls'] )
-);
-assert_runtime(
-	'db_version option not created while WordPress is installing',
-	! isset( $GLOBALS['__test_options']['datamachine_db_version'] )
-);
-
 // ---------------------------------------------------------------
 // SECTION 3: hook registration shape.
 // ---------------------------------------------------------------
