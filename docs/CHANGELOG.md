@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.101.0] - 2026-04-29
+
+### Added
+- add WordPress-shaped registry vocabulary
+
+### Fixed
+- update BFB ability category metadata
+
 ## [0.100.0] - 2026-04-29
 
 ### Added
