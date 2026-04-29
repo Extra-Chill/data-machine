@@ -246,11 +246,11 @@ See [`docs/core-system/ai-conversation-loop.md`](docs/core-system/ai-conversatio
 
 ## Memory Storage Adapters
 
-Agent memory files (MEMORY.md, SOUL.md, USER.md, NETWORK.md, AGENTS.md, plus any custom files registered through `MemoryFileRegistry`) persist on the local filesystem by default. The persistence layer is swappable through a single filter (`datamachine_memory_store`), enabling DB-backed implementations on managed hosts that don't expose a writable filesystem.
+Agent memory files (MEMORY.md, SOUL.md, USER.md, NETWORK.md, AGENTS.md, plus any custom files registered through `MemoryFileRegistry`) persist on the local filesystem by default. The persistence layer is swappable through a single Agents API-shaped filter (`agents_api_memory_store`), enabling DB-backed implementations on managed hosts that don't expose a writable filesystem.
 
 ```php
 add_filter(
-    'datamachine_memory_store',
+    'agents_api_memory_store',
     function ( $store, $scope ) {
         // Return an AgentMemoryStoreInterface to replace the disk default
         // for this scope, or null to let Data Machine read/write through
