@@ -106,18 +106,21 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_get_flows_by_handler_slug(): void {
+		$step_ability = wp_get_ability( 'datamachine/add-pipeline-step' );
 		$flow_ability = wp_get_ability( 'datamachine/create-flow' );
+		$step_ability->execute( [
+			'pipeline_id' => $this->test_pipeline_id,
+			'step_type'   => 'fetch',
+		] );
 
 		$flow = $flow_ability->execute( [
 			'pipeline_id'       => $this->test_pipeline_id,
 			'flow_name'         => 'RSS Test Flow',
 			'scheduling_config' => [ 'interval' => 'manual' ],
-			'flow_config'       => [
-				'step1' => [
-					'step_type'        => 'fetch',
-					'handler_slugs'    => [ 'rss' ],
-					'handler_configs'  => [ 'rss' => [] ],
-					'pipeline_step_id' => 'step1',
+			'step_configs'      => [
+				'fetch' => [
+					'handler_slug'   => 'rss',
+					'handler_config' => [],
 				],
 			],
 		] );
@@ -336,8 +339,7 @@ class FlowAbilitiesTest extends WP_UnitTestCase {
 			'offset' => 0
 		]);
 
-		$this->assertTrue($result['success']);
-		$this->assertEquals('full', $result['output_mode']);
+		$this->assertWPError( $result );
 	}
 
 	public function test_single_flow_with_output_modes(): void {

@@ -440,7 +440,9 @@ class ImportExport {
 
 				// Export flow configurations
 				foreach ( $flows as $flow ) {
-					$flow_config  = json_decode( $flow['flow_config'], true ) ?? array();
+					$flow_config  = is_string( $flow['flow_config'] ?? null )
+						? ( json_decode( $flow['flow_config'], true ) ?? array() )
+						: ( $flow['flow_config'] ?? array() );
 					$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $step['pipeline_step_id'], $flow['flow_id'] );
 					$flow_step    = $flow_config[ $flow_step_id ] ?? array();
 

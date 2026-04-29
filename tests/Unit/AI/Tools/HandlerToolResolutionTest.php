@@ -127,6 +127,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 				'mode'             => ToolPolicyResolver::MODE_PIPELINE,
 				'next_step_config' => array(
 					'flow_step_id'    => 'fs_wiki_upsert',
+					'step_type'       => 'upsert',
 					'handler_slugs'   => array( 'wiki_upsert' ),
 					'handler_configs' => array( 'wiki_upsert' => array( 'fixed_parent_path' => 'woocommerce' ) ),
 				),
@@ -379,6 +380,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 				'mode'             => ToolPolicyResolver::MODE_PIPELINE,
 				'next_step_config' => array(
 					'flow_step_id'    => 'fs_pipeline_test',
+					'step_type'       => 'publish',
 					'handler_slugs'   => array( 'pubtest' ),
 					'handler_configs' => array( 'pubtest' => array( 'site' => 'example.com' ) ),
 				),

@@ -65,12 +65,10 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 					'pipeline_id'     => $this->pipeline_id,
 					'flow_id'         => $this->flow_id_1,
 					'execution_order' => 0,
-					'handler_slugs'   => array( 'rss' ),
-					'handler_configs' => array(
-						'rss' => array(
-							'feed_url'  => 'https://example.com/feed',
-							'max_items' => 5,
-						),
+					'handler_slug'    => 'rss',
+					'handler_config'  => array(
+						'feed_url'  => 'https://example.com/feed',
+						'max_items' => 5,
 					),
 				),
 			),
@@ -93,12 +91,10 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 					'pipeline_id'     => $this->pipeline_id,
 					'flow_id'         => $this->flow_id_2,
 					'execution_order' => 0,
-					'handler_slugs'   => array( 'rss' ),
-					'handler_configs' => array(
-						'rss' => array(
-							'feed_url'  => 'https://example.com/other-feed',
-							'max_items' => 3,
-						),
+					'handler_slug'    => 'rss',
+					'handler_config'  => array(
+						'feed_url'  => 'https://example.com/other-feed',
+						'max_items' => 3,
 					),
 				),
 			),
@@ -126,11 +122,11 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 
 		// Verify both flows got the new max_items.
 		$flow_1 = $this->flows->get_flow( $this->flow_id_1 );
-		$config_1 = $flow_1['flow_config'][ $this->flow_step_id_1 ]['handler_configs']['rss'] ?? array();
+		$config_1 = $flow_1['flow_config'][ $this->flow_step_id_1 ]['handler_config'] ?? array();
 		$this->assertSame( 10, $config_1['max_items'] );
 
 		$flow_2 = $this->flows->get_flow( $this->flow_id_2 );
-		$config_2 = $flow_2['flow_config'][ $this->flow_step_id_2 ]['handler_configs']['rss'] ?? array();
+		$config_2 = $flow_2['flow_config'][ $this->flow_step_id_2 ]['handler_config'] ?? array();
 		$this->assertSame( 10, $config_2['max_items'] );
 	}
 
@@ -144,7 +140,7 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 
 		// feed_url should be preserved (merge, not replace).
 		$flow_1  = $this->flows->get_flow( $this->flow_id_1 );
-		$config  = $flow_1['flow_config'][ $this->flow_step_id_1 ]['handler_configs']['rss'] ?? array();
+		$config  = $flow_1['flow_config'][ $this->flow_step_id_1 ]['handler_config'] ?? array();
 		$this->assertSame( 'https://example.com/feed', $config['feed_url'] );
 		$this->assertSame( 20, $config['max_items'] );
 	}
@@ -177,7 +173,7 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 
 		// Verify nothing was actually changed.
 		$flow_1  = $this->flows->get_flow( $this->flow_id_1 );
-		$config  = $flow_1['flow_config'][ $this->flow_step_id_1 ]['handler_configs']['rss'] ?? array();
+		$config  = $flow_1['flow_config'][ $this->flow_step_id_1 ]['handler_config'] ?? array();
 		$this->assertSame( 5, $config['max_items'] );
 	}
 
@@ -194,7 +190,7 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 
 		// Verify both flows updated.
 		$flow_1  = $this->flows->get_flow( $this->flow_id_1 );
-		$config_1 = $flow_1['flow_config'][ $this->flow_step_id_1 ]['handler_configs']['rss'] ?? array();
+		$config_1 = $flow_1['flow_config'][ $this->flow_step_id_1 ]['handler_config'] ?? array();
 		$this->assertSame( 7, $config_1['max_items'] );
 	}
 
@@ -228,12 +224,12 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 
 		// Flow 1 gets the shared config.
 		$flow_1  = $this->flows->get_flow( $this->flow_id_1 );
-		$config_1 = $flow_1['flow_config'][ $this->flow_step_id_1 ]['handler_configs']['rss'] ?? array();
+		$config_1 = $flow_1['flow_config'][ $this->flow_step_id_1 ]['handler_config'] ?? array();
 		$this->assertSame( 10, $config_1['max_items'] );
 
 		// Flow 2 gets the per-flow override (wins over shared).
 		$flow_2  = $this->flows->get_flow( $this->flow_id_2 );
-		$config_2 = $flow_2['flow_config'][ $this->flow_step_id_2 ]['handler_configs']['rss'] ?? array();
+		$config_2 = $flow_2['flow_config'][ $this->flow_step_id_2 ]['handler_config'] ?? array();
 		$this->assertSame( 25, $config_2['max_items'] );
 	}
 

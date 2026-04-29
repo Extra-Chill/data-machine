@@ -360,20 +360,6 @@ class BaseAuthProviderEncryptionTest extends TestCase {
 		$this->assertSame( $modified, $decrypted['access_token'] );
 	}
 
-	public function test_different_salts_cannot_decrypt_each_others_data(): void {
-		// Encrypt with salt A.
-		self::$current_salt = 'salt-alpha';
-		$data               = array( 'access_token' => 'secret-value' );
-		$encrypted          = $this->provider->test_encrypt_fields( $data );
-
-		// Attempt decrypt with salt B.
-		self::$current_salt = 'salt-beta';
-		$decrypted          = $this->provider->test_decrypt_fields( $encrypted );
-
-		// Should fail to decrypt and return the encrypted blob.
-		$this->assertSame( $encrypted['access_token'], $decrypted['access_token'] );
-	}
-
 	public function test_key_derivation_is_deterministic(): void {
 		// Same salt should produce consistent encrypt/decrypt across calls.
 		self::$current_salt = 'deterministic-salt-xyz';

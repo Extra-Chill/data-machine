@@ -56,6 +56,7 @@ class UpsertStepTest extends WP_UnitTestCase {
 		$result = $step->execute(
 			$this->buildPayload(
 				array(
+					'step_type'       => 'upsert',
 					'handler_slugs'   => array( 'upsert_event' ),
 					'handler_configs' => array(),
 				)
@@ -90,6 +91,7 @@ class UpsertStepTest extends WP_UnitTestCase {
 		$result = $step->execute(
 			$this->buildPayload(
 				array(
+					'step_type'               => 'upsert',
 					'handler_slugs'           => array( 'upsert_event', 'publish_post' ),
 					'required_handler_slugs'  => array( 'publish_post' ),
 					'handler_configs'         => array(),
@@ -144,6 +146,7 @@ class UpsertStepTest extends WP_UnitTestCase {
 		$result = $step->execute(
 			$this->buildPayload(
 				array(
+					'step_type'       => 'upsert',
 					'handler_slugs'   => array( 'upsert_event' ),
 					'handler_configs' => array(),
 				),

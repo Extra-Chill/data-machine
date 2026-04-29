@@ -61,6 +61,7 @@ class PipelineToolsAvailabilityTest extends WP_UnitTestCase {
 		$tools_with_disabled = $this->resolver->resolve( [
 			'mode'              => ToolPolicyResolver::MODE_PIPELINE,
 			'pipeline_step_id' => $pipeline_step_id,
+			'deny'             => [ 'web_fetch' ],
 		] );
 		$this->assertIsArray( $tools_with_disabled );
 		$this->assertArrayNotHasKey( 'web_fetch', $tools_with_disabled );

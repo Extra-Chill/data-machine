@@ -36,32 +36,32 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 			'SOUL.md',
 			10,
 			array(
-				'layer'    => MemoryFileRegistry::LAYER_AGENT,
-				'contexts' => array( 'all' ),
+				'layer' => MemoryFileRegistry::LAYER_AGENT,
+				'modes' => array( 'all' ),
 			)
 		);
 		MemoryFileRegistry::register(
 			'MEMORY.md',
 			20,
 			array(
-				'layer'    => MemoryFileRegistry::LAYER_AGENT,
-				'contexts' => array( 'all' ),
+				'layer' => MemoryFileRegistry::LAYER_AGENT,
+				'modes' => array( 'all' ),
 			)
 		);
 		MemoryFileRegistry::register(
 			'USER.md',
 			30,
 			array(
-				'layer'    => MemoryFileRegistry::LAYER_USER,
-				'contexts' => array( 'chat', 'pipeline' ),
+				'layer' => MemoryFileRegistry::LAYER_USER,
+				'modes' => array( 'chat', 'pipeline' ),
 			)
 		);
 		MemoryFileRegistry::register(
 			'CHAT_ONLY.md',
 			40,
 			array(
-				'layer'    => MemoryFileRegistry::LAYER_AGENT,
-				'contexts' => array( 'chat' ),
+				'layer' => MemoryFileRegistry::LAYER_AGENT,
+				'modes' => array( 'chat' ),
 			)
 		);
 
