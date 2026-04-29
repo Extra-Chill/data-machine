@@ -49,7 +49,7 @@ class DailyMemoryAbilities {
 	 *
 	 * Returns the default DailyMemory unless a plugin provides an
 	 * alternative via the `datamachine_daily_memory_storage` filter.
-		 * DailyMemory itself writes through `agents_api_memory_store`; the
+	 * DailyMemory itself writes through `agents_api_memory_store`; the
 	 * daily-specific filter is only for replacing the whole ability backend.
 	 *
 	 * @since 0.47.0
