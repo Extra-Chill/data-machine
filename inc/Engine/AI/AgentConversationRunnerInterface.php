@@ -1,6 +1,6 @@
 <?php
 /**
- * AI conversation runner interface.
+ * Agent conversation runner interface.
  *
  * @package DataMachine\Engine\AI
  */
@@ -14,13 +14,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Transport-neutral runner boundary for conversation execution.
  */
-interface AIConversationRunnerInterface {
+interface AgentConversationRunnerInterface {
 
 	/**
 	 * Run an AI conversation request.
 	 *
-	 * @param AIConversationRequest $request Conversation request.
+	 * @param AgentConversationRequest $request Conversation request.
 	 * @return array Raw AIConversationLoop result shape.
 	 */
-	public function run( AIConversationRequest $request ): array;
+	public function run( AgentConversationRequest $request ): array;
 }

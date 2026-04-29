@@ -9,7 +9,7 @@
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
-use DataMachine\Engine\AI\AIConversationResult;
+use DataMachine\Engine\AI\AgentConversationResult;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\MessageEnvelope;
 
@@ -150,7 +150,7 @@ $multimodal_envelope = MessageEnvelope::normalize( $multimodal_legacy );
 datamachine_message_envelope_assert( MessageEnvelope::TYPE_MULTIMODAL_PART === $multimodal_envelope['type'], 'Array content infers multimodal_part type.' );
 datamachine_message_envelope_count();
 
-$result = AIConversationResult::normalize(
+$result = AgentConversationResult::normalize(
 	array(
 		'messages'               => array( $typed_final_result ),
 		'final_content'          => 'Finished.',
@@ -162,7 +162,7 @@ $result = AIConversationResult::normalize(
 	)
 );
 
-datamachine_message_envelope_assert( MessageEnvelope::TYPE_FINAL_RESULT === $result['messages'][0]['type'], 'AIConversationResult accepts typed envelopes and returns canonical envelopes.' );
+datamachine_message_envelope_assert( MessageEnvelope::TYPE_FINAL_RESULT === $result['messages'][0]['type'], 'AgentConversationResult accepts typed envelopes and returns canonical envelopes.' );
 datamachine_message_envelope_count();
 
 try {

@@ -1,6 +1,6 @@
 <?php
 /**
- * Built-in AI conversation runner.
+ * Built-in agent conversation runner.
  *
  * @package DataMachine\Engine\AI
  */
@@ -14,15 +14,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Adapter that runs Data Machine's existing conversation loop implementation.
  */
-class BuiltInAIConversationRunner implements AIConversationRunnerInterface {
+class BuiltInAgentConversationRunner implements AgentConversationRunnerInterface {
 
 	/**
 	 * Run an AI conversation request through the legacy loop implementation.
 	 *
-	 * @param AIConversationRequest $request Conversation request.
+	 * @param AgentConversationRequest $request Conversation request.
 	 * @return array Raw AIConversationLoop result shape.
 	 */
-	public function run( AIConversationRequest $request ): array {
+	public function run( AgentConversationRequest $request ): array {
 		$loop = new AIConversationLoop();
 
 		return $loop->execute( ...$request->toLegacyArgs() );

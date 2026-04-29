@@ -1,8 +1,8 @@
 <?php
 /**
- * Smoke test for the AI conversation request/runner boundary.
+ * Smoke test for the agent conversation request/runner boundary.
  *
- * Run with: php tests/ai-conversation-runner-request-smoke.php
+ * Run with: php tests/agent-conversation-runner-request-smoke.php
  *
  * @package DataMachine\Tests
  */
@@ -50,7 +50,7 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 require_once __DIR__ . '/bootstrap-unit.php';
 
 use DataMachine\Engine\AI\AIConversationLoop;
-use DataMachine\Engine\AI\AIConversationRequest;
+use DataMachine\Engine\AI\AgentConversationRequest;
 use DataMachine\Engine\AI\LoopEventSinkInterface;
 
 class RunnerRequestSmokeSink implements LoopEventSinkInterface {
@@ -103,7 +103,7 @@ $payload  = array(
 );
 
 // 1. The request object exposes generic runner inputs and Data Machine adapter context.
-$request = AIConversationRequest::fromRunArgs(
+$request = AgentConversationRequest::fromRunArgs(
 	$messages,
 	$tools,
 	'openai',
@@ -197,4 +197,4 @@ if ( runner_request_failure_count() > 0 ) {
 	exit( 1 );
 }
 
-echo "\nAll AI conversation runner request smoke tests passed.\n";
+echo "\nAll agent conversation runner request smoke tests passed.\n";
