@@ -36,6 +36,7 @@ final class AgentBundleUpgradePendingAction {
 				'summary'      => (string) ( $args['summary'] ?? 'Review bundle upgrade artifacts.' ),
 				'apply_input'  => array(
 					'bundle'             => isset( $args['bundle'] ) && is_array( $args['bundle'] ) ? $args['bundle'] : array(),
+					'agent'              => isset( $args['agent'] ) && is_array( $args['agent'] ) ? $args['agent'] : array(),
 					'approved_artifacts' => $approved,
 					'target_artifacts'   => $target_artifacts,
 					'plan'               => $plan_array,
@@ -70,6 +71,7 @@ final class AgentBundleUpgradePendingAction {
 			: array();
 		$approved = array_fill_keys( $approved, true );
 		$targets  = isset( $apply_input['target_artifacts'] ) && is_array( $apply_input['target_artifacts'] ) ? $apply_input['target_artifacts'] : array();
+		$agent    = isset( $apply_input['agent'] ) && is_array( $apply_input['agent'] ) ? $apply_input['agent'] : array();
 		$applied  = array();
 		$skipped  = array();
 		$failed   = array();
@@ -94,7 +96,8 @@ final class AgentBundleUpgradePendingAction {
 			 * @param array $artifact Target artifact payload.
 			 * @param array $apply_input Full PendingAction input.
 			 */
-			$result = apply_filters( 'datamachine_bundle_upgrade_apply_artifact', null, $artifact, $apply_input );
+			$result = AgentBundleArtifactExtensions::apply_artifact( $artifact, $agent, $apply_input );
+			$result = apply_filters( 'datamachine_bundle_upgrade_apply_artifact', $result, $artifact, $apply_input );
 			if ( is_wp_error( $result ) ) {
 				$failed[] = array(
 					'artifact_key' => $key,

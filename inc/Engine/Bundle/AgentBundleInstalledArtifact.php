@@ -119,9 +119,11 @@ final class AgentBundleInstalledArtifact {
 	}
 
 	private static function validate_artifact_type( string $type ): string {
-		$type = self::non_empty_string( $type, 'artifact_type' );
-		if ( ! in_array( $type, BundleSchema::ARTIFACT_TYPES, true ) ) {
-			throw new BundleValidationException( sprintf( 'installed bundle artifact_type must be one of: %s.', esc_html( implode( ', ', BundleSchema::ARTIFACT_TYPES ) ) ) );
+		$type    = self::non_empty_string( $type, 'artifact_type' );
+		$allowed = BundleSchema::artifact_types();
+		if ( ! in_array( $type, $allowed, true ) ) {
+			$allowed_label = implode( ', ', $allowed );
+			throw new BundleValidationException( sprintf( 'installed bundle artifact_type must be one of: %s.', esc_html( $allowed_label ) ) );
 		}
 
 		return $type;

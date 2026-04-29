@@ -34,7 +34,9 @@ final class BundleSchema {
 
 	public const SEED_QUEUES_DIR = 'seed-queues';
 
-	public const ARTIFACT_TYPES = array(
+	public const EXTENSIONS_DIR = 'extensions';
+
+	public const CORE_ARTIFACT_TYPES = array(
 		'agent',
 		'memory',
 		'pipeline',
@@ -46,6 +48,60 @@ final class BundleSchema {
 		'seed_queue',
 		'schedule',
 	);
+
+	public const ARTIFACT_TYPES = self::CORE_ARTIFACT_TYPES;
+
+	/**
+	 * Return all artifact types known to the bundle runtime.
+	 *
+	 * Plugins register their own artifact types here while keeping semantics in
+	 * the owning plugin. Data Machine only hashes, diffs, and routes envelopes.
+	 *
+	 * @return string[]
+	 */
+	public static function artifact_types(): array {
+		$types = self::CORE_ARTIFACT_TYPES;
+
+		/**
+		 * Register plugin-owned agent bundle artifact types.
+		 *
+		 * @param string[] $types Known artifact type slugs.
+		 */
+		$types = self::apply_filter( 'datamachine_agent_bundle_artifact_types', $types );
+		if ( ! is_array( $types ) ) {
+			$types = self::CORE_ARTIFACT_TYPES;
+		}
+
+		$normalized = array();
+		foreach ( $types as $type ) {
+			$type = self::sanitize_key( (string) $type );
+			if ( '' !== $type ) {
+				$normalized[] = $type;
+			}
+		}
+
+		$normalized = array_values( array_unique( $normalized ) );
+		sort( $normalized, SORT_STRING );
+
+		return $normalized;
+	}
+
+	private static function apply_filter( string $hook, array $value ): mixed {
+		if ( ! \function_exists( 'apply_filters' ) ) {
+			return $value;
+		}
+
+		return call_user_func_array( 'apply_filters', array( $hook, $value ) );
+	}
+
+	private static function sanitize_key( string $key ): string {
+		if ( \function_exists( 'sanitize_key' ) ) {
+			return \sanitize_key( $key );
+		}
+
+		$sanitized = preg_replace( '/[^a-zA-Z0-9_\-]/', '', $key );
+		return strtolower( is_string( $sanitized ) ? $sanitized : '' );
+	}
 
 	/**
 	 * Encode bundle JSON in a stable, review-friendly shape.
@@ -72,7 +128,7 @@ final class BundleSchema {
 	public static function decode_json( string $json, string $label ): array {
 		$data = json_decode( $json, true );
 		if ( ! is_array( $data ) ) {
-			throw new BundleValidationException( sprintf( '%s is not valid JSON.', $label ) );
+			throw new BundleValidationException( sprintf( '%s is not valid JSON.', esc_html( $label ) ) );
 		}
 
 		return $data;
@@ -85,10 +141,11 @@ final class BundleSchema {
 	 * @param string $label Human-readable document label.
 	 */
 	public static function assert_supported_version( array $data, string $label ): void {
-		$version = (int) ( $data['schema_version'] ?? 0 );
+		$version           = (int) ( $data['schema_version'] ?? 0 );
+		$supported_version = self::VERSION;
 		if ( self::VERSION !== $version ) {
 			throw new BundleValidationException(
-				sprintf( '%s uses unsupported schema_version %d; this Data Machine build supports schema_version %d.', $label, $version, self::VERSION )
+				sprintf( '%s uses unsupported schema_version %s; this Data Machine build supports schema_version %s.', esc_html( $label ), esc_html( (string) $version ), esc_html( (string) $supported_version ) )
 			);
 		}
 	}

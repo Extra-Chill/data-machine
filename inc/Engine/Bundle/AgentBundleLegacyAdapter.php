@@ -50,7 +50,9 @@ final class AgentBundleLegacyAdapter {
 			$manifest,
 			self::memory_files_from_legacy( $bundle, $pipeline_slugs, $flow_slugs ),
 			self::pipeline_files_from_legacy( $bundle['pipelines'] ?? array(), $pipeline_slugs ),
-			self::flow_files_from_legacy( $bundle['flows'] ?? array(), $bundle['pipelines'] ?? array(), $pipeline_slugs, $flow_slugs )
+			self::flow_files_from_legacy( $bundle['flows'] ?? array(), $bundle['pipelines'] ?? array(), $pipeline_slugs, $flow_slugs ),
+			array(),
+			is_array( $bundle['extension_artifacts'] ?? null ) ? $bundle['extension_artifacts'] : array()
 		);
 	}
 
@@ -143,6 +145,7 @@ final class AgentBundleLegacyAdapter {
 			'user_template'         => $memory_files['USER.md'] ?? '',
 			'pipelines'             => $pipelines,
 			'flows'                 => $flows,
+			'extension_artifacts'   => $directory->extension_artifacts(),
 			'abilities_manifest'    => array(),
 		);
 	}

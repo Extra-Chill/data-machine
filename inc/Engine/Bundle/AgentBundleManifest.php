@@ -142,15 +142,15 @@ final class AgentBundleManifest {
 			}
 		}
 
-		foreach ( array( 'prompts', 'rubrics', 'tool_policies', 'auth_refs', 'seed_queues' ) as $field ) {
+		foreach ( array( 'prompts', 'rubrics', 'tool_policies', 'auth_refs', 'seed_queues', 'extensions' ) as $field ) {
 			$included[ $field ] = $included[ $field ] ?? array();
 		}
 
-		foreach ( array( 'memory', 'pipelines', 'flows', 'prompts', 'rubrics', 'tool_policies', 'auth_refs', 'seed_queues' ) as $field ) {
+		foreach ( array( 'memory', 'pipelines', 'flows', 'prompts', 'rubrics', 'tool_policies', 'auth_refs', 'seed_queues', 'extensions' ) as $field ) {
 			if ( ! is_array( $included[ $field ] ) || ! array_is_list( $included[ $field ] ) ) {
 				throw new BundleValidationException( sprintf( 'manifest.json included.%s must be a list.', esc_html( $field ) ) );
 			}
-			$included[ $field ] = array_values( array_map( 'strval', $included[ $field ] ) );
+			$included[ $field ] = array_map( 'strval', $included[ $field ] );
 			sort( $included[ $field ], SORT_STRING );
 		}
 
@@ -169,6 +169,7 @@ final class AgentBundleManifest {
 			'tool_policies' => $included['tool_policies'],
 			'auth_refs'     => $included['auth_refs'],
 			'seed_queues'   => $included['seed_queues'],
+			'extensions'    => $included['extensions'],
 			'handler_auth'  => $included['handler_auth'],
 		);
 	}
