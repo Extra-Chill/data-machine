@@ -189,8 +189,8 @@ class ConversationManager {
 	 * @param array  $tool_parameters Original tool parameters
 	 * @return string Human-readable success/failure message
 	 */
+	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Kept for callers that pass original tool params alongside result data.
 	public static function generateSuccessMessage( string $tool_name, array $tool_result, array $tool_parameters ): string {
-		$tool_parameters;
 		$success = $tool_result['success'] ?? false;
 		$data    = $tool_result['data'] ?? array();
 

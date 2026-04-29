@@ -862,7 +862,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		global $wpdb;
 
 		$table_name   = self::get_prefixed_table_name();
-		$last_read_at = current_time( 'mysql', true );
+		$last_read_at = (string) current_time( 'mysql', true );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $wpdb->update(
@@ -903,7 +903,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		global $wpdb;
 
 		$table_name  = self::get_prefixed_table_name();
-		$cutoff_date = gmdate( 'Y-m-d H:i:s', strtotime( "-{$retention_days} days" ) );
+		$cutoff_date = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->query(
@@ -955,7 +955,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		}
 
 		$table_name  = self::get_prefixed_table_name();
-		$cutoff_date = gmdate( 'Y-m-d H:i:s', strtotime( "-{$retention_days} days" ) );
+		$cutoff_date = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$deleted = $wpdb->query(

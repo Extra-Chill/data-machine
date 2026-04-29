@@ -148,8 +148,12 @@ class PromptBuilder {
 			}
 
 			$stepId          = $payload['step_id'] ?? null;
-			$directive_class = is_string( $directive ) ? $directive : get_class( $directive );
-			$directive_name  = substr( $directive_class, strrpos( $directive_class, '\\' ) + 1 );
+			$directive_class = is_string( $directive ) ? $directive : ( is_object( $directive ) ? get_class( $directive ) : '' );
+			if ( '' === $directive_class ) {
+				continue;
+			}
+			$namespace_pos  = strrpos( $directive_class, '\\' );
+			$directive_name = false === $namespace_pos ? $directive_class : substr( $directive_class, $namespace_pos + 1 );
 
 			$outputs = null;
 
@@ -163,7 +167,6 @@ class PromptBuilder {
 				continue;
 			}
 
-			$outputs = is_array( $outputs ) ? $outputs : array();
 			if ( ! empty( $outputs ) ) {
 				$directive_outputs = array_merge( $directive_outputs, $outputs );
 			}

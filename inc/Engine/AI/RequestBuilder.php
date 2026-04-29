@@ -129,6 +129,7 @@ class RequestBuilder {
 		}
 
 		// Legacy path: ai-http-client via chubes_ai_request filter.
+		/** @phpstan-ignore-next-line WordPress filters accept context arguments beyond the filtered value. */
 		$response = apply_filters(
 			'chubes_ai_request',
 			$provider_request,
@@ -182,7 +183,7 @@ class RequestBuilder {
 			)
 		);
 		$directives       = $directive_policy['directives'];
-		$suppressed       = $directive_policy['suppressed'] ?? array();
+		$suppressed       = $directive_policy['suppressed'];
 		foreach ( $directives as $directive ) {
 			$promptBuilder->addDirective(
 				$directive['class'],

@@ -208,8 +208,8 @@ class SystemAbilities {
 	 * @param array $options Optional check options
 	 * @return array System diagnostic results
 	 */
+	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Shared diagnostic callback signature receives per-check options.
 	private function runSystemDiagnostics( array $options = array() ): array {
-		$options;
 		return array(
 			'version'     => defined( 'DATAMACHINE_VERSION' ) ? DATAMACHINE_VERSION : 'unknown',
 			'php_version' => PHP_VERSION,
@@ -246,7 +246,7 @@ class SystemAbilities {
 	 */
 	private function checkRestApi(): array {
 		$server     = rest_get_server();
-		$namespaces = $server ? $server->get_namespaces() : array();
+		$namespaces = $server->get_namespaces();
 
 		return array(
 			'namespace_registered' => in_array( 'datamachine/v1', $namespaces, true ),
@@ -410,7 +410,7 @@ class SystemAbilities {
 	 * @param string $task_type Task type identifier.
 	 * @param array  $meta      Normalized task registry metadata.
 	 * @param array  $params    Proposed task params.
-	 * @return array{success: bool, task_params?: array, error?: string, message?: string}
+	 * @return array{success:false,error:string,message:string}|array{success:true,task_params:array}
 	 */
 	private static function validateRunTaskParams( string $task_type, array $meta, array $params ): array {
 		$schema          = is_array( $meta['params_schema'] ?? null ) ? $meta['params_schema'] : array();
@@ -659,6 +659,7 @@ class SystemAbilities {
 		 *     @type string $conversation_context     Formatted "User: ... Assistant: ..." context string.
 		 * }
 		 */
+		/** @phpstan-ignore-next-line WordPress filters accept context arguments beyond the filtered value. */
 		$prompt = apply_filters(
 			'datamachine_session_title_prompt',
 			$default_prompt,

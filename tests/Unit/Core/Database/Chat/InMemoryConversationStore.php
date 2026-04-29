@@ -219,7 +219,7 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 	}
 
 	public function cleanup_old_sessions( int $retention_days ): int {
-		$cutoff  = gmdate( 'Y-m-d H:i:s', strtotime( "-{$retention_days} days" ) );
+		$cutoff  = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
 		$deleted = 0;
 		foreach ( $this->sessions as $id => $session ) {
 			if ( $session['updated_at'] < $cutoff ) {
