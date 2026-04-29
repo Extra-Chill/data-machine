@@ -245,7 +245,13 @@ class AgentsCommand extends BaseCommand {
 
 		$config = array();
 		if ( isset( $assoc_args['config'] ) ) {
-			$config = json_decode( wp_unslash( $assoc_args['config'] ), true );
+			$config_json = wp_unslash( $assoc_args['config'] );
+			if ( ! is_string( $config_json ) ) {
+				WP_CLI::error( 'Invalid JSON in --config.' );
+				return;
+			}
+
+			$config = json_decode( $config_json, true );
 			if ( null === $config ) {
 				WP_CLI::error( 'Invalid JSON in --config.' );
 				return;
@@ -269,7 +275,7 @@ class AgentsCommand extends BaseCommand {
 		WP_CLI::success( $result['message'] );
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 		} else {
 			WP_CLI::log( sprintf( 'Agent ID:  %d', $result['agent_id'] ) );
 			WP_CLI::log( sprintf( 'Slug:      %s', $result['agent_slug'] ) );
@@ -321,7 +327,7 @@ class AgentsCommand extends BaseCommand {
 		$agent = $result['agent'];
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( wp_json_encode( $agent, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::line( (string) wp_json_encode( $agent, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -340,7 +346,7 @@ class AgentsCommand extends BaseCommand {
 		if ( ! empty( $agent['agent_config'] ) ) {
 			WP_CLI::log( '' );
 			WP_CLI::log( 'Config:' );
-			WP_CLI::log( wp_json_encode( $agent['agent_config'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $agent['agent_config'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 		}
 
 		// Access grants.
@@ -733,7 +739,7 @@ class AgentsCommand extends BaseCommand {
 		$format = $assoc_args['format'] ?? 'table';
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $tokens, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $tokens, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -747,7 +753,7 @@ class AgentsCommand extends BaseCommand {
 			$items[] = array(
 				'token_id'  => $token['token_id'],
 				'prefix'    => $token['token_prefix'] . '...',
-				'label'     => $token['label'] ?: '(none)',
+				'label'     => ! empty( $token['label'] ) ? $token['label'] : '(none)',
 				'last_used' => $token['last_used_at'] ?? 'never',
 				'expires'   => $token['expires_at'] ?? 'never',
 				'status'    => $expired ? 'expired' : 'active',
@@ -865,7 +871,7 @@ class AgentsCommand extends BaseCommand {
 			}
 
 			if ( 'json' === $format ) {
-				WP_CLI::log( wp_json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+				WP_CLI::log( (string) wp_json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			} else {
 				$items = array();
 				foreach ( $config as $key => $value ) {
@@ -1000,11 +1006,11 @@ class AgentsCommand extends BaseCommand {
 		$result  = $bundler->export( $slug );
 
 		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] );
+			WP_CLI::error( (string) ( $result['error'] ?? 'Failed to export agent.' ) );
 			return;
 		}
 
-		$bundle = $result['bundle'];
+		$bundle = is_array( $result['bundle'] ?? null ) ? $result['bundle'] : array();
 
 		// Log what's being exported.
 		WP_CLI::log( sprintf( '  Agent:     %s (%s)', $bundle['agent']['agent_name'], $bundle['agent']['agent_slug'] ) );
@@ -1017,7 +1023,7 @@ class AgentsCommand extends BaseCommand {
 				$output = $output ?? $slug . '-bundle.json';
 				$json   = $bundler->to_json( $bundle );
 				file_put_contents( $output, $json ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-				WP_CLI::success( sprintf( 'Bundle exported to %s (%s)', $output, size_format( filesize( $output ) ) ) );
+				WP_CLI::success( sprintf( 'Bundle exported to %s (%s)', $output, size_format( (int) filesize( $output ) ) ) );
 				break;
 
 			case 'dir':
@@ -1042,7 +1048,7 @@ class AgentsCommand extends BaseCommand {
 					WP_CLI::error( 'Failed to create ZIP archive.' );
 					return;
 				}
-				WP_CLI::success( sprintf( 'Bundle exported to %s (%s)', $output, size_format( filesize( $output ) ) ) );
+				WP_CLI::success( sprintf( 'Bundle exported to %s (%s)', $output, size_format( (int) filesize( $output ) ) ) );
 				break;
 		}
 	}
@@ -1064,6 +1070,15 @@ class AgentsCommand extends BaseCommand {
 	 *
 	 * [--owner=<user>]
 	 * : Owner WordPress user ID, login, or email. Defaults to current user.
+	 *
+	 * [--on-conflict=<policy>]
+	 * : How to handle an existing target agent slug.
+	 * ---
+	 * default: error
+	 * options:
+	 *   - error
+	 *   - skip
+	 * ---
 	 *
 	 * [--dry-run]
 	 * : Validate the bundle and show what would be imported without making changes.
@@ -1094,6 +1109,7 @@ class AgentsCommand extends BaseCommand {
 		$path     = $args[0] ?? '';
 		$new_slug = $assoc_args['slug'] ?? null;
 		$dry_run  = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+		$format   = (string) ( $assoc_args['format'] ?? 'table' );
 
 		if ( empty( $path ) ) {
 			WP_CLI::error( 'Bundle path is required.' );
@@ -1105,64 +1121,67 @@ class AgentsCommand extends BaseCommand {
 			return;
 		}
 
-		$bundler = new AgentBundler();
-
-		// Parse the bundle based on path type.
-		if ( is_dir( $path ) ) {
-			$bundle = $bundler->from_directory( $path );
-		} elseif ( preg_match( '/\.zip$/i', $path ) ) {
-			$bundle = $bundler->from_zip( $path );
-		} elseif ( preg_match( '/\.json$/i', $path ) ) {
-			$json   = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-			$bundle = $bundler->from_json( $json );
-		} else {
-			WP_CLI::error( 'Unsupported bundle format. Use .zip, .json, or a directory path.' );
-			return;
-		}
-
-		if ( ! $bundle ) {
-			WP_CLI::error( 'Failed to parse bundle. Ensure the file is a valid agent bundle.' );
-			return;
-		}
-
-		// Display bundle info.
-		$agent_data  = $bundle['agent'] ?? array();
-		$target_slug = $new_slug ? sanitize_title( $new_slug ) : sanitize_title( $agent_data['agent_slug'] ?? 'unknown' );
-
-		WP_CLI::log( 'Bundle contents:' );
-		WP_CLI::log( sprintf( '  Agent:     %s (%s)', $agent_data['agent_name'] ?? '(unnamed)', $agent_data['agent_slug'] ?? '(no slug)' ) );
-		WP_CLI::log( sprintf( '  Target:    %s', $target_slug ) );
-		WP_CLI::log( sprintf( '  Files:     %d identity file(s)', count( $bundle['files'] ?? array() ) ) );
-		WP_CLI::log( sprintf( '  Pipelines: %d', count( $bundle['pipelines'] ?? array() ) ) );
-		WP_CLI::log( sprintf( '  Flows:     %d', count( $bundle['flows'] ?? array() ) ) );
-		WP_CLI::log( sprintf( '  Exported:  %s', $bundle['exported_at'] ?? 'unknown' ) );
-
 		// Resolve owner.
 		$owner_id = 0;
 		if ( isset( $assoc_args['owner'] ) ) {
 			$owner_id = $this->resolveUserId( $assoc_args['owner'] );
 		}
 
-		if ( $dry_run ) {
+		if ( $dry_run && 'json' !== $format ) {
 			WP_CLI::log( '' );
 			WP_CLI::log( WP_CLI::colorize( '%YDry run mode — validating bundle...%n' ) );
 		} elseif ( ! isset( $assoc_args['yes'] ) ) {
-			WP_CLI::confirm( sprintf( 'Import agent "%s"?', $target_slug ) );
+			WP_CLI::confirm( 'Import agent bundle?' );
 		}
 
-		$result = $bundler->import( $bundle, $new_slug, $owner_id, $dry_run );
+		$ability = wp_get_ability( 'datamachine/import-agent' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/import-agent ability is not registered.' );
+			return;
+		}
+
+		$result = $ability->execute(
+			array(
+				'source'      => $path,
+				'slug'        => $new_slug,
+				'owner_id'    => $owner_id,
+				'on_conflict' => (string) ( $assoc_args['on-conflict'] ?? 'error' ),
+				'dry_run'     => $dry_run,
+			)
+		);
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] );
 			return;
 		}
 
+		if ( 'json' === $format ) {
+			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			return;
+		}
+
+		foreach ( $result['auth_warnings'] ?? array() as $warning ) {
+			WP_CLI::warning(
+				sprintf(
+					'%s: %s',
+					(string) ( $warning['auth_ref'] ?? 'auth_ref' ),
+					(string) ( $warning['message'] ?? 'unresolved auth reference' )
+				)
+			);
+		}
+
+		if ( ! empty( $result['skipped'] ) ) {
+			WP_CLI::success( (string) ( $result['message'] ?? 'Import skipped.' ) );
+			return;
+		}
+
 		if ( $dry_run ) {
 			$summary = $result['summary'] ?? array();
+			$slug    = (string) ( $summary['agent_slug'] ?? 'unknown' );
 
 			WP_CLI::log( '' );
 			WP_CLI::log( 'Import preview:' );
-			WP_CLI::log( sprintf( '  Agent slug:  %s', $summary['agent_slug'] ?? $target_slug ) );
+			WP_CLI::log( sprintf( '  Agent slug:  %s', $slug ) );
 			WP_CLI::log( sprintf( '  Agent name:  %s', $summary['agent_name'] ?? '(unnamed)' ) );
 			WP_CLI::log( sprintf( '  Owner ID:    %d', $summary['owner_id'] ?? 0 ) );
 			WP_CLI::log( sprintf( '  Files:       %d', $summary['files'] ?? 0 ) );
@@ -1284,6 +1303,7 @@ class AgentsCommand extends BaseCommand {
 			$user = get_user_by( 'id', (int) $value );
 			if ( ! $user ) {
 				WP_CLI::error( sprintf( 'User ID %d not found.', (int) $value ) );
+				return 0;
 			}
 			return $user->ID;
 		}
@@ -1292,6 +1312,7 @@ class AgentsCommand extends BaseCommand {
 			$user = get_user_by( 'email', $value );
 			if ( ! $user ) {
 				WP_CLI::error( sprintf( 'User with email "%s" not found.', $value ) );
+				return 0;
 			}
 			return $user->ID;
 		}
@@ -1299,6 +1320,7 @@ class AgentsCommand extends BaseCommand {
 		$user = get_user_by( 'login', $value );
 		if ( ! $user ) {
 			WP_CLI::error( sprintf( 'User with login "%s" not found.', $value ) );
+			return 0;
 		}
 		return $user->ID;
 	}

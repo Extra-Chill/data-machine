@@ -12,6 +12,7 @@
 namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Agents\AgentAccess;
 use DataMachine\Core\FilesRepository\DirectoryManager;
@@ -169,6 +170,58 @@ class AgentAbilities {
 					),
 					'execute_callback'    => array( self::class, 'createAgent' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage() || PermissionHelper::can( 'create_own_agent' ),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/import-agent',
+				array(
+					'label'               => 'Import Agent',
+					'description'         => 'Materialize a portable agent bundle from a local bundle directory, JSON file, or ZIP archive.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'source' ),
+						'properties' => array(
+							'source'      => array(
+								'type'        => 'string',
+								'description' => 'Local bundle source path. Supports bundle directories, .json files, and .zip archives.',
+							),
+							'slug'        => array(
+								'type'        => 'string',
+								'description' => 'Optional target agent slug override.',
+							),
+							'on_conflict' => array(
+								'type'        => 'string',
+								'enum'        => array( 'error', 'skip' ),
+								'description' => 'How to handle an existing target agent slug.',
+							),
+							'owner_id'    => array(
+								'type'        => 'integer',
+								'description' => 'WordPress user ID that should own the imported agent.',
+							),
+							'dry_run'     => array(
+								'type'        => 'boolean',
+								'description' => 'Validate and summarize without writing.',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'       => array( 'type' => 'boolean' ),
+							'skipped'       => array( 'type' => 'boolean' ),
+							'agent_id'      => array( 'type' => 'integer' ),
+							'agent_slug'    => array( 'type' => 'string' ),
+							'imported'      => array( 'type' => 'object' ),
+							'auth_warnings' => array( 'type' => 'array' ),
+							'summary'       => array( 'type' => 'object' ),
+							'error'         => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'importAgent' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -429,10 +482,10 @@ class AgentAbilities {
 	 */
 	public static function listAgents( array $input ): array {
 		// ---- Parameter resolution ----------------------------------------
-		$scope        = isset( $input['scope'] ) ? (string) $input['scope'] : 'mine';
+		$scope             = isset( $input['scope'] ) ? (string) $input['scope'] : 'mine';
 		$requested_user_id = isset( $input['user_id'] ) ? (int) $input['user_id'] : 0;
-		$site_id      = isset( $input['site_id'] ) ? (int) $input['site_id'] : get_current_blog_id();
-		$include_role = ! empty( $input['include_role'] );
+		$site_id           = isset( $input['site_id'] ) ? (int) $input['site_id'] : get_current_blog_id();
+		$include_role      = ! empty( $input['include_role'] );
 
 		if ( ! in_array( $scope, array( 'mine', 'all' ), true ) ) {
 			return array(
@@ -525,9 +578,9 @@ class AgentAbilities {
 		$agents = array();
 
 		foreach ( $candidates as $row ) {
-			$agent_id   = (int) $row['agent_id'];
-			$owner_id   = (int) $row['owner_id'];
-			$config     = is_array( $row['agent_config'] ?? null ) ? $row['agent_config'] : array();
+			$agent_id    = (int) $row['agent_id'];
+			$owner_id    = (int) $row['owner_id'];
+			$config      = is_array( $row['agent_config'] ?? null ) ? $row['agent_config'] : array();
 			$description = isset( $config['description'] ) ? (string) $config['description'] : '';
 
 			$item = array(
@@ -557,6 +610,202 @@ class AgentAbilities {
 		return array(
 			'success' => true,
 			'agents'  => $agents,
+		);
+	}
+
+	/**
+	 * Import an agent bundle through the generic ability surface.
+	 *
+	 * @param array $input Import parameters.
+	 * @return array<string,mixed>
+	 */
+	public static function importAgent( array $input ): array {
+		$source = trim( (string) ( $input['source'] ?? '' ) );
+		if ( '' === $source || ! file_exists( $source ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Bundle source not found.',
+			);
+		}
+
+		$on_conflict = (string) ( $input['on_conflict'] ?? 'error' );
+		if ( ! in_array( $on_conflict, array( 'error', 'skip' ), true ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'on_conflict must be one of: error, skip.',
+			);
+		}
+
+		$owner_id = self::resolve_import_owner_id( isset( $input['owner_id'] ) ? (int) $input['owner_id'] : 0 );
+		if ( $owner_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => 'Unable to resolve import owner. Pass owner_id, authenticate as a user, or set datamachine_default_owner_id.',
+			);
+		}
+
+		$bundler = new AgentBundler();
+		$bundle  = self::load_import_bundle( $bundler, $source );
+		if ( ! is_array( $bundle ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to parse bundle. Use a bundle directory, .json file, or .zip archive.',
+			);
+		}
+
+		$slug = sanitize_title( (string) ( $bundle['agent']['agent_slug'] ?? '' ) );
+		if ( isset( $input['slug'] ) && '' !== trim( (string) $input['slug'] ) ) {
+			$slug = sanitize_title( (string) $input['slug'] );
+		}
+		if ( isset( $input['slug'] ) && '' !== $slug ) {
+			$bundle['agent']['agent_slug'] = $slug;
+		}
+		$existing = $slug ? ( new Agents() )->get_by_slug( $slug ) : null;
+
+		$auth_resolution = self::resolve_import_auth_refs( $bundle );
+		$bundle          = $auth_resolution['bundle'];
+		$auth_warnings   = $auth_resolution['warnings'];
+
+		if ( $existing && 'skip' === $on_conflict ) {
+			return array(
+				'success'       => true,
+				'skipped'       => true,
+				'agent_id'      => (int) $existing['agent_id'],
+				'agent_slug'    => $slug,
+				'auth_warnings' => $auth_warnings,
+				'message'       => sprintf( 'Agent "%s" already exists; import skipped.', $slug ),
+			);
+		}
+
+		if ( $existing ) {
+			return array(
+				'success'    => false,
+				'agent_id'   => (int) $existing['agent_id'],
+				'agent_slug' => $slug,
+				'error'      => sprintf( 'Agent slug "%s" already exists. Use on_conflict=skip to no-op, or import with a new slug.', $slug ),
+			);
+		}
+
+		$result = $bundler->import( $bundle, null, $owner_id, ! empty( $input['dry_run'] ) );
+		if ( empty( $result['success'] ) ) {
+			$result['auth_warnings'] = $auth_warnings;
+			return $result;
+		}
+
+		$summary  = is_array( $result['summary'] ?? null ) ? $result['summary'] : array();
+		$imported = array(
+			'pipelines' => (int) ( $summary['pipelines_imported'] ?? 0 ),
+			'flows'     => (int) ( $summary['flows_imported'] ?? 0 ),
+			'files'     => (int) ( $summary['files'] ?? 0 ),
+		);
+
+		$result['agent_id']      = (int) ( $summary['agent_id'] ?? 0 );
+		$result['agent_slug']    = (string) ( $summary['agent_slug'] ?? $slug );
+		$result['imported']      = $imported;
+		$result['auth_warnings'] = $auth_warnings;
+
+		return $result;
+	}
+
+	private static function load_import_bundle( AgentBundler $bundler, string $source ): ?array {
+		if ( is_dir( $source ) ) {
+			return $bundler->from_directory( $source );
+		}
+
+		if ( preg_match( '/\.zip$/i', $source ) ) {
+			return $bundler->from_zip( $source );
+		}
+
+		if ( preg_match( '/\.json$/i', $source ) ) {
+			return $bundler->from_json( (string) file_get_contents( $source ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		}
+
+		return null;
+	}
+
+	private static function resolve_import_owner_id( int $explicit_owner_id ): int {
+		if ( $explicit_owner_id > 0 ) {
+			return $explicit_owner_id;
+		}
+
+		$current_user_id = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
+		if ( $current_user_id > 0 ) {
+			return $current_user_id;
+		}
+
+		$default_owner_id = function_exists( 'get_option' ) ? (int) get_option( 'datamachine_default_owner_id', 0 ) : 0;
+		return $default_owner_id > 0 ? $default_owner_id : 0;
+	}
+
+	/**
+	 * Resolve auth_ref markers into local handler configs before import.
+	 *
+	 * @param array $bundle Legacy bundle array.
+	 * @return array{bundle: array, warnings: array<int,array<string,string>>}
+	 */
+	private static function resolve_import_auth_refs( array $bundle ): array {
+		$warnings = array();
+		if ( ! is_array( $bundle['flows'] ?? null ) ) {
+			return array(
+				'bundle'   => $bundle,
+				'warnings' => $warnings,
+			);
+		}
+
+		foreach ( $bundle['flows'] as $flow_index => &$flow ) {
+			if ( ! is_array( $flow ) ) {
+				continue;
+			}
+			$disable_flow = false;
+			if ( ! is_array( $flow['flow_config'] ?? null ) ) {
+				continue;
+			}
+
+			foreach ( $flow['flow_config'] as $flow_step_id => &$step ) {
+				if ( ! is_array( $step ) || ! is_array( $step['handler_configs'] ?? null ) ) {
+					continue;
+				}
+				foreach ( $step['handler_configs'] as $handler_slug => &$handler_config ) {
+					if ( ! is_array( $handler_config ) || empty( $handler_config['auth_ref'] ) ) {
+						continue;
+					}
+
+					$resolved = apply_filters( 'datamachine_auth_ref_to_handler_config', $handler_config, (string) $handler_slug, array( 'import' => true ) );
+					if ( is_wp_error( $resolved ) ) {
+						$disable_flow = true;
+
+						$warnings[] = array(
+							'flow'         => (string) ( $flow['portable_slug'] ?? ( $flow['flow_name'] ?? '' ) ),
+							'flow_step_id' => (string) $flow_step_id,
+							'handler_slug' => (string) $handler_slug,
+							'auth_ref'     => (string) $handler_config['auth_ref'],
+							'code'         => $resolved->get_error_code(),
+							'message'      => $resolved->get_error_message(),
+						);
+						continue;
+					}
+
+					if ( is_array( $resolved ) ) {
+						$handler_config = $resolved;
+					}
+				}
+				unset( $handler_config );
+			}
+			unset( $step );
+
+			if ( $disable_flow ) {
+				$scheduling_config                    = is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array();
+				$scheduling_config['enabled']         = false;
+				$scheduling_config['interval']        = 'manual';
+				$scheduling_config['disabled_reason'] = 'unresolved_auth_ref';
+				$flow['scheduling_config']            = $scheduling_config;
+			}
+		}
+		unset( $flow );
+
+		return array(
+			'bundle'   => $bundle,
+			'warnings' => $warnings,
 		);
 	}
 
@@ -995,12 +1244,12 @@ class AgentAbilities {
 				$files    = new \RecursiveIteratorIterator( $iterator, \RecursiveIteratorIterator::CHILD_FIRST );
 				foreach ( $files as $file ) {
 					if ( $file->isDir() ) {
-						rmdir( $file->getRealPath() );
+						rmdir( $file->getRealPath() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- DirectoryManager owns agent filesystem paths.
 					} else {
-						wp_delete_file( $file->getRealPath( ) );
+						wp_delete_file( $file->getRealPath() );
 					}
 				}
-				rmdir( $agent_dir );
+				rmdir( $agent_dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- DirectoryManager owns agent filesystem paths.
 				$files_deleted = true;
 			}
 		}
