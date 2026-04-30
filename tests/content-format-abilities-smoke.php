@@ -291,6 +291,32 @@ namespace {
 		return count( $GLOBALS['__content_ability_posts'] );
 	}
 
+	function content_ability_raw_upsert_execute_callers(): array {
+		$root     = dirname( __DIR__ );
+		$matches  = array();
+		$iterator = new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator( $root . '/inc', FilesystemIterator::SKIP_DOTS )
+		);
+
+		foreach ( $iterator as $file ) {
+			if ( ! $file instanceof SplFileInfo || 'php' !== $file->getExtension() ) {
+				continue;
+			}
+
+			$path = $file->getPathname();
+			if ( str_ends_with( $path, '/UpsertPostAbility.php' ) ) {
+				continue;
+			}
+
+			$source = file_get_contents( $path );
+			if ( false !== $source && false !== strpos( $source, 'UpsertPostAbility::execute' ) ) {
+				$matches[] = str_replace( $root . '/', '', $path );
+			}
+		}
+
+		return $matches;
+	}
+
 	add_filter(
 		'datamachine_post_content_format',
 		static function ( string $format, string $post_type ): string {
@@ -352,7 +378,12 @@ namespace {
 	$chat_id       = $chat_upsert['data']['post_id'] ?? 0;
 	$chat_post     = get_post( (int) $chat_id );
 	$chat_content  = $chat_post->post_content ?? '';
-	$last_convert  = end( $GLOBALS['__content_ability_conversions'] );
+	/** @var array<int, array{0:string, 1:string, 2:string}> $conversions */
+	$conversions   = $GLOBALS['__content_ability_conversions'];
+	$last_convert  = array();
+	if ( count( $conversions ) > 0 ) {
+		$last_convert = $conversions[ count( $conversions ) - 1 ];
+	}
 	assert_content_ability( 'chat-upsert-default-succeeds', true === $chat_upsert['success'] );
 	assert_content_ability( 'chat-upsert-defaults-authoring-format-to-markdown', array( 'markdown', 'blocks', "# AI Heading\n\nAI paragraph." ) === $last_convert );
 	assert_content_ability( 'chat-upsert-markdown-default-stores-blocks-for-block-backed-post-type', false !== strpos( $chat_content, '<!-- wp:heading -->' ) );
@@ -368,6 +399,19 @@ namespace {
 	);
 	$raw_post   = get_post( (int) ( $raw_upsert['post_id'] ?? 0 ) );
 	assert_content_ability( 'raw-upsert-omitted-format-preserves-compat-block-default', $raw_blocks === ( $raw_post->post_content ?? '' ) );
+
+	$posts_before_raw_markdown_default = content_ability_post_count();
+	$raw_markdown_without_format       = DataMachine\Abilities\Content\UpsertPostAbility::execute(
+		array(
+			'post_type' => 'post',
+			'title'     => 'Raw Markdown Without Format',
+			'content'   => "# Missing Declaration\n\nThis is markdown, not serialized blocks.",
+		)
+	);
+	assert_content_ability( 'raw-upsert-omitted-format-treats-markdown-as-blocks', false === $raw_markdown_without_format['success'] );
+	assert_content_ability( 'raw-upsert-omitted-markdown-fails-loudly', 'bfb_blocks_missing_comments' === ( $raw_markdown_without_format['error_code'] ?? '' ) );
+	assert_content_ability( 'raw-upsert-omitted-markdown-does-not-write-post', $posts_before_raw_markdown_default === content_ability_post_count() );
+	assert_content_ability( 'internal-upsert-execute-callers-are-explicitly-audited', array() === content_ability_raw_upsert_execute_callers() );
 
 	$html_upsert = DataMachine\Abilities\Content\UpsertPostAbility::execute(
 		array(
