@@ -6,7 +6,7 @@
  * are executed outside Data Machine. This class only validates the declaration
  * shape; it intentionally does not register, expose, or execute those tools.
  *
- * @package DataMachine\Engine\AI\Tools
+ * @package AgentsAPI
  */
 
 namespace DataMachine\Engine\AI\Tools;

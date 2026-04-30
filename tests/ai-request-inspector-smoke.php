@@ -45,7 +45,7 @@ require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveInterface.php';
 require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectivePolicyResolver.php';
 require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveOutputValidator.php';
 require_once __DIR__ . '/../inc/Engine/AI/Directives/DirectiveRenderer.php';
-require_once __DIR__ . '/../inc/Engine/AI/AgentMessageEnvelope.php';
+require_once __DIR__ . '/../agents-api/agents-api.php';
 require_once __DIR__ . '/../inc/Engine/AI/PromptBuilder.php';
 require_once __DIR__ . '/../inc/Engine/AI/ProviderRequestAssembler.php';
 require_once __DIR__ . '/../inc/Engine/AI/RequestBuilder.php';

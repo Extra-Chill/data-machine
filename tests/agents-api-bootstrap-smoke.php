@@ -64,6 +64,9 @@ assert_agents_api_equals( true, defined( 'AGENTS_API_LOADED' ), 'module marks it
 assert_agents_api_equals( true, function_exists( 'wp_register_agent' ), 'wp_register_agent helper is available', $failures, $passes );
 assert_agents_api_equals( true, class_exists( 'WP_Agent' ), 'WP_Agent value object is available', $failures, $passes );
 assert_agents_api_equals( true, class_exists( 'WP_Agents_Registry' ), 'WP_Agents_Registry facade is available', $failures, $passes );
+assert_agents_api_equals( true, class_exists( 'DataMachine\\Engine\\AI\\AgentMessageEnvelope' ), 'AgentMessageEnvelope contract is available', $failures, $passes );
+assert_agents_api_equals( true, class_exists( 'DataMachine\\Engine\\AI\\AgentConversationResult' ), 'AgentConversationResult contract is available', $failures, $passes );
+assert_agents_api_equals( true, class_exists( 'DataMachine\\Engine\\AI\\Tools\\RuntimeToolDeclaration' ), 'RuntimeToolDeclaration contract is available', $failures, $passes );
 assert_agents_api_equals( false, class_exists( 'DataMachine\\Engine\\Agents\\AgentRegistry', false ), 'Data Machine registry is not loaded by module bootstrap', $failures, $passes );
 
 echo "\n[2] Public registration hook collects definitions once and stays side-effect free:\n";

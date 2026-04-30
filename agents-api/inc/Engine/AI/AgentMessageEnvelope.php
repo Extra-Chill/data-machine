@@ -2,7 +2,7 @@
 /**
  * JSON-friendly agent message envelope contract.
  *
- * @package DataMachine\Engine\AI
+ * @package AgentsAPI
  */
 
 namespace DataMachine\Engine\AI;

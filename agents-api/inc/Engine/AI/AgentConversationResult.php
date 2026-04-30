@@ -2,7 +2,7 @@
 /**
  * Agent conversation result contract.
  *
- * @package DataMachine\Engine\AI
+ * @package AgentsAPI
  */
 
 namespace DataMachine\Engine\AI;
