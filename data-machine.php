@@ -352,7 +352,7 @@ function datamachine_should_load_full_runtime(): bool {
 		return true;
 	}
 
-	return (bool) apply_filters( 'datamachine_should_load_full_runtime', false, $request_uri );
+	return (bool) apply_filters( 'datamachine_should_load_full_runtime', false );
 }
 
 
@@ -431,6 +431,9 @@ function datamachine_load_handlers() {
  */
 function datamachine_scan_and_instantiate( $directory ) {
 	$files = glob( $directory . '/*.php' );
+	if ( false === $files ) {
+		return;
+	}
 
 	foreach ( $files as $file ) {
 		// Skip if it's a *Filters.php file (will be deleted)
@@ -754,7 +757,7 @@ function datamachine_on_new_site( \WP_Site $new_site ) {
 		return;
 	}
 
-	switch_to_blog( $new_site->blog_id );
+	switch_to_blog( (int) $new_site->blog_id );
 	datamachine_activate_defaults_for_site();
 	datamachine_activate_for_site();
 	restore_current_blog();
