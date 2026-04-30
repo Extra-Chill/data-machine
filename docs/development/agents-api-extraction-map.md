@@ -6,7 +6,7 @@ Parent issue: [Explore splitting Agents API out of Data Machine](https://github.
 
 Strategy update: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)
 
-Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
+Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
 
 ## Current Strategy
 
@@ -28,6 +28,8 @@ Treat `data-machine/agents-api/` like WordPress core substrate while it still li
 - Data Machine may import and consume `agents-api` as product code.
 - `agents-api` owns runner interfaces, value objects, and generic contracts first; Data Machine keeps `AIConversationLoop` and the built-in compatibility runner while they still carry Data Machine job, flow, handler, logging, transcript, and legacy result-shape assumptions.
 - Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, pending actions, content operations, and admin UI.
+- `agents-api` is backend-only and invisible by default: no admin menus, screens, human CRUD forms, React apps, or Data Machine product UI.
+- Data Machine and other product consumers own any admin/product UI they build on top of the substrate.
 - Later standalone extraction means moving the already-bounded module into its own plugin/repo and adding plugin bootstrap, release, dependency, and distribution ceremony.
 - `ai-http-client` is not future architecture. It is only packaging precedent for bundled-then-extracted code.
 - The future runtime dependency direction is `Data Machine -> agents-api -> wp-ai-client`; `ai-http-client` dies as part of [#1027](https://github.com/Extra-Chill/data-machine/issues/1027) / [#1633](https://github.com/Extra-Chill/data-machine/issues/1633).
@@ -42,7 +44,7 @@ Data Machine pipelines/product
 
 ## Target Vocabulary
 
-Mirror the WordPress Abilities API shape instead of importing Data Machine, wpcom, or Automattic AI Framework names into the public contract.
+Mirror the WordPress Abilities API shape instead of importing Data Machine product names or host-specific implementation names into the public contract.
 
 | Current Data Machine surface | Possible Agents API vocabulary | Notes |
 |---|---|---|
@@ -63,7 +65,26 @@ Use these checks before moving anything:
 - If a plugin can use it without knowing about flows, pipeline steps, handlers, queues, jobs, or Data Machine content operations, it is an Agents API candidate.
 - If it translates Data Machine concepts into runtime concepts, it is a Data Machine adapter.
 - If it owns flows, jobs, queues, handlers, scheduled automation, retention, admin UI, or content ops, it stays Data Machine product.
-- If it uses wpcom or Automattic AI Framework vocabulary directly, treat that code as source material only until normalized behind WordPress-shaped contracts.
+- If it uses host-specific implementation vocabulary directly, treat that code as source material only until normalized behind WordPress-shaped contracts.
+
+## Backend-Only UI Boundary
+
+Agents API is a generic WordPress-shaped substrate. It should be usable by any plugin that wants to register, run, persist, or observe agents without adopting Data Machine as a product.
+
+`agents-api` may own backend contracts and implementations for:
+
+- registration vocabulary and registries.
+- runtime request/result/message contracts.
+- memory, transcript, tool, event, and permission-ceiling contracts.
+- direct public WordPress APIs such as Abilities API and `wp-ai-client`.
+
+`agents-api` must not own product/admin surfaces:
+
+- admin menus, screens, list tables, settings forms, or React admin apps.
+- human agent CRUD screens or workflows.
+- Data Machine flow, pipeline, chat, bundle, queue, job, retention, or content-operation UI.
+
+Substrate CRUD is allowed when it is backend-only and generic: interfaces/services for definitions, sessions, memories, transcripts, tools, and run state. Product CRUD belongs to consumers: screens, forms, routes, workflows, and opinionated management UX. Data Machine may provide those product surfaces while consuming `agents-api`; the dependency direction must not reverse.
 
 ## Bucket Summary
 
@@ -74,7 +95,7 @@ Use these checks before moving anything:
 | Data Machine adapter | Glue that turns flows/jobs/pipelines into generic runtime inputs. | `AIStep`, pipeline tool-policy args, transcript persistence policy, adjacent handler tools. |
 | Data Machine product | Data Machine automation/product layer. | Jobs, flows, pipelines, handlers, queues, retention, content abilities, admin UI. |
 | Intelligence domain | Intelligence plugin concerns, not Data Machine or Agents API. | Wiki, briefings, digests, domain brains. |
-| wpcom source material | Useful precedent only. | `\WPCOM\AI\Message`, `\Agent`, `\AgentsStore`, `Conversation_Storage`. |
+| External host source material | Useful precedent only. | Normalize behind generic WordPress-shaped contracts before anything becomes public API. |
 
 ## Current `Engine\AI` Namespace Split
 
@@ -214,7 +235,7 @@ Conversation storage is split in place, but only the narrow transcript surface i
 | Retention | `ConversationRetentionInterface`, retention system tasks/CLI | Backend cleanup methods may be generic, but scheduling and retention policy are Data Machine product. |
 | Reporting | `ConversationReportingInterface`, daily memory/retention status readers | Product-shaped metrics today. Keep separate from transcript CRUD. |
 
-Do not decide an `agents_session` CPT, wpcom `Conversation_Storage`, or a new Agents API filter name in this in-place clarification. The current goal is only to make the dependency direction obvious: Data Machine chat product consumes transcript persistence; transcript persistence does not require Data Machine chat product behavior.
+Do not decide an `agents_session` CPT, a host-specific storage backend, or a new Agents API filter name in this in-place clarification. The current goal is only to make the dependency direction obvious: Data Machine chat product consumes transcript persistence; transcript persistence does not require Data Machine chat product behavior.
 
 ## Data Machine Product
 
@@ -245,18 +266,6 @@ Data Machine should not absorb Intelligence-specific vocabulary during extractio
 | Briefings and digests | Intelligence | Domain workflows built on top of runtime and search abilities. |
 | Domain brains and generated/shared wikis | Intelligence | Product/domain policy, not Agents API. |
 | Intelligence memory policy additions | Intelligence | May consume generic memory contracts, but policy names and wiki roots stay outside Agents API. |
-
-## wpcom Source Material
-
-These are reference points only. Do not expose them as public Data Machine or Agents API vocabulary.
-
-| Source | How to use it |
-|---|---|
-| `\WPCOM\AI\Message` | Reference for message object semantics. Normalize behind `WP_Agent_Message` or neutral envelopes. |
-| `\Agent` / AI Framework agent classes | Reference for run-loop integration and provider routing. Do not require inheritance from wpcom classes. |
-| `\AgentsStore` | Reference for persistence/adoption semantics. Do not leak storage names into public API. |
-| `Conversation_Storage` | Reference for compaction/resilience. Keep Data Machine/Agents API conversation store contracts portable and site-owned unless explicitly swapped. |
-| Dolly agent architecture | Reference for WordPress-hosted agent UX and memory injection, not a dependency or target vocabulary. |
 
 ## Hook Name Map
 
@@ -333,14 +342,14 @@ These tests currently pin the substrate most relevant to extraction.
 5. Split provider request assembly from `RequestBuilder` so Data Machine directives/logging stay adapter behavior and provider dispatch targets `wp-ai-client`, not `ai-http-client`.
 6. Split `ToolExecutor` into ability-native runtime execution plus Data Machine product hooks for pending actions and post-origin tracking.
 7. Decide whether Agents API owns persistence tables or only contracts plus optional stores.
-8. Keep wpcom/AI Framework classes behind adapters. No public contract should require `\WPCOM\AI\Message`, `\Agent`, `\AgentsStore`, or `Conversation_Storage`.
+8. Keep host-specific implementation classes behind adapters. No public contract should require a host-owned message, agent, store, or conversation-storage class.
 
 ## Non-Goals
 
 - Do not move files as part of this map.
 - Do not frame the next step as direct external repository extraction; the next code step is the in-repo `data-machine/agents-api/` module.
 - Do not rename runtime classes before the target contracts are settled.
-- Do not make Data Machine depend on wpcom or Automattic AI Framework vocabulary.
+- Do not make Data Machine depend on host-specific implementation vocabulary.
 - Do not make Agents API depend on `ai-http-client`; that package is only a packaging precedent and a removal target.
 - Do not move Data Machine flows, pipelines, jobs, handlers, queues, retention, content ops, or admin UI into Agents API.
 - Do not move Intelligence wiki/briefing/domain-brain vocabulary into Data Machine or Agents API.
