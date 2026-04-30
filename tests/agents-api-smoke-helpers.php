@@ -1,0 +1,64 @@
+<?php
+/**
+ * Shared pure-PHP harness for Agents API module smokes.
+ *
+ * @package DataMachine\Tests
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', __DIR__ . '/' );
+}
+
+$GLOBALS['__agents_api_smoke_actions'] = array();
+
+function sanitize_title( string $value ): string {
+	$value = strtolower( $value );
+	$value = preg_replace( '/[^a-z0-9]+/', '-', $value );
+	return trim( (string) $value, '-' );
+}
+
+function sanitize_file_name( string $value ): string {
+	return basename( $value );
+}
+
+function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+	unset( $accepted_args );
+	$GLOBALS['__agents_api_smoke_actions'][ $hook ][ $priority ][] = $callback;
+}
+
+function do_action( string $hook, ...$args ): void {
+	$callbacks = $GLOBALS['__agents_api_smoke_actions'][ $hook ] ?? array();
+	ksort( $callbacks );
+
+	foreach ( $callbacks as $priority_callbacks ) {
+		foreach ( $priority_callbacks as $callback ) {
+			call_user_func_array( $callback, $args );
+		}
+	}
+}
+
+function agents_api_smoke_assert_equals( $expected, $actual, string $name, array &$failures, int &$passes ): void {
+	if ( $expected === $actual ) {
+		++$passes;
+		echo "  PASS {$name}\n";
+		return;
+	}
+
+	$failures[] = $name;
+	echo "  FAIL {$name}\n";
+	echo '    expected: ' . var_export( $expected, true ) . "\n";
+	echo '    actual:   ' . var_export( $actual, true ) . "\n";
+}
+
+function agents_api_smoke_require_module(): void {
+	require_once __DIR__ . '/../agents-api/agents-api.php';
+}
+
+function agents_api_smoke_finish( string $label, array $failures, int $passes ): void {
+	if ( $failures ) {
+		echo "\nFAILED: " . count( $failures ) . " {$label} assertions failed.\n";
+		exit( 1 );
+	}
+
+	echo "\nAll {$passes} {$label} assertions passed.\n";
+}
