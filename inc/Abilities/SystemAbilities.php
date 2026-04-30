@@ -693,20 +693,20 @@ class SystemAbilities {
 				array() // No payload needed
 			);
 
-			if ( ! $response['success'] ) {
+			if ( $response instanceof \WP_Error ) {
 				do_action(
 					'datamachine_log',
 					'error',
 					'Session title AI generation failed',
 					array(
-						'error'   => $response['error'] ?? 'Unknown error',
+						'error'   => $response->get_error_message(),
 						'context' => 'system',
 					)
 				);
 					return null;
 			}
 
-			$content = $response['data']['content'] ?? '';
+			$content = RequestBuilder::resultText( $response );
 			if ( empty($content) ) {
 				return null;
 			}

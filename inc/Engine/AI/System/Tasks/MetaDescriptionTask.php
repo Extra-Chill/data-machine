@@ -20,7 +20,7 @@ use DataMachine\Engine\AI\RequestBuilder;
 
 class MetaDescriptionTask extends SystemTask {
 
-	const MAX_LENGTH            = 155;
+	const MAX_LENGTH             = 155;
 	const CONTENT_EXCERPT_LENGTH = 1500;
 
 	/**
@@ -95,12 +95,12 @@ class MetaDescriptionTask extends SystemTask {
 			$ai_payload
 		);
 
-		if ( empty( $response['success'] ) ) {
-			$this->failJob( $jobId, 'AI request failed: ' . ( $response['error'] ?? 'Unknown error' ) );
+		if ( $response instanceof \WP_Error ) {
+			$this->failJob( $jobId, 'AI request failed: ' . $response->get_error_message() );
 			return;
 		}
 
-		$content     = $response['data']['content'] ?? '';
+		$content     = RequestBuilder::resultText( $response );
 		$description = $this->normalizeDescription( $content );
 
 		if ( empty( $description ) ) {
@@ -206,7 +206,8 @@ class MetaDescriptionTask extends SystemTask {
 	private function buildPrompt( \WP_Post $post ): string {
 		$context_lines = array();
 
-		$title = wp_strip_all_tags( $post->post_title );
+		$post_data = (array) $post;
+		$title     = isset( $post_data['post_title'] ) && is_string( $post_data['post_title'] ) ? wp_strip_all_tags( $post_data['post_title'] ) : '';
 		if ( ! empty( $title ) ) {
 			$context_lines[] = 'Title: ' . $title;
 		}
@@ -222,12 +223,12 @@ class MetaDescriptionTask extends SystemTask {
 		}
 
 		$categories = wp_get_post_categories( $post->ID, array( 'fields' => 'names' ) );
-		if ( ! empty( $categories ) && ! is_wp_error( $categories ) ) {
+		if ( is_array( $categories ) && ! empty( $categories ) ) {
 			$context_lines[] = 'Categories: ' . implode( ', ', $categories );
 		}
 
 		$tags = wp_get_post_tags( $post->ID, array( 'fields' => 'names' ) );
-		if ( ! empty( $tags ) && ! is_wp_error( $tags ) ) {
+		if ( is_array( $tags ) && ! empty( $tags ) ) {
 			$context_lines[] = 'Tags: ' . implode( ', ', $tags );
 		}
 

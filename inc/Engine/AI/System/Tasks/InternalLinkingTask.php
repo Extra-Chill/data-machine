@@ -22,7 +22,7 @@ use DataMachine\Engine\AI\RequestBuilder;
 
 class InternalLinkingTask extends SystemTask {
 
-	private const MIN_RELEVANCE_SCORE  = 3;
+	private const MIN_RELEVANCE_SCORE   = 3;
 	private const TITLE_WORD_MAX_WEIGHT = 5.0;
 
 	/**
@@ -62,6 +62,8 @@ class InternalLinkingTask extends SystemTask {
 
 		$categories = wp_get_post_categories( $post_id, array( 'fields' => 'ids' ) );
 		$tags       = wp_get_post_tags( $post_id, array( 'fields' => 'ids' ) );
+		$categories = is_array( $categories ) ? $categories : array();
+		$tags       = is_array( $tags ) ? $tags : array();
 
 		if ( empty( $categories ) && empty( $tags ) ) {
 			$this->completeJob( $jobId, array(
@@ -143,11 +145,11 @@ class InternalLinkingTask extends SystemTask {
 				$ai_payload
 			);
 
-			if ( empty( $response['success'] ) ) {
+			if ( $response instanceof \WP_Error ) {
 				continue;
 			}
 
-			$new_html = trim( $response['data']['content'] ?? '' );
+			$new_html = trim( RequestBuilder::resultText( $response ) );
 
 			if ( empty( $new_html ) || $new_html === $candidate['inner_html'] ) {
 				continue;
@@ -294,13 +296,14 @@ class InternalLinkingTask extends SystemTask {
 	private function findCandidateParagraph( array $blocks, array $related_post, array $replacements ): ?array {
 		$used_indices = array_column( $replacements, 'block_index' );
 
-		$title_words = array_filter(
-			preg_split( '/\s+/', strtolower( $related_post['title'] ) ),
+		$split_title_words = preg_split( '/\s+/', strtolower( $related_post['title'] ) );
+		$title_words       = array_filter(
+			false !== $split_title_words ? $split_title_words : array(),
 			fn( $word ) => strlen( $word ) >= 3
 		);
 
 		$related_tags = wp_get_post_tags( $related_post['id'], array( 'fields' => 'names' ) );
-		$related_tags = array_map( 'strtolower', $related_tags );
+		$related_tags = is_array( $related_tags ) ? array_map( 'strtolower', $related_tags ) : array();
 
 		$best_block = null;
 		$best_score = 0;
@@ -402,6 +405,8 @@ class InternalLinkingTask extends SystemTask {
 			$score          = 0;
 			$candidate_cats = wp_get_post_categories( $candidate_id, array( 'fields' => 'ids' ) );
 			$candidate_tags = wp_get_post_tags( $candidate_id, array( 'fields' => 'ids' ) );
+			$candidate_cats = is_array( $candidate_cats ) ? $candidate_cats : array();
+			$candidate_tags = is_array( $candidate_tags ) ? $candidate_tags : array();
 
 			$shared_cats = array_intersect( $categories, $candidate_cats );
 			$shared_tags = array_intersect( $tags, $candidate_tags );
@@ -478,18 +483,76 @@ class InternalLinkingTask extends SystemTask {
 
 	private function extractTitleWords( string $title ): array {
 		$stop_words = array(
-			'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had',
-			'her', 'was', 'one', 'our', 'out', 'has', 'his', 'how', 'its', 'may',
-			'new', 'now', 'old', 'see', 'way', 'who', 'did', 'get', 'let', 'say',
-			'she', 'too', 'use', 'what', 'when', 'where', 'which', 'why', 'will',
-			'with', 'this', 'that', 'from', 'they', 'been', 'have', 'many', 'some',
-			'them', 'than', 'each', 'make', 'like', 'into', 'over', 'such', 'your',
-			'about', 'their', 'would', 'could', 'other', 'these', 'there', 'after',
+			'the',
+			'and',
+			'for',
+			'are',
+			'but',
+			'not',
+			'you',
+			'all',
+			'can',
+			'had',
+			'her',
+			'was',
+			'one',
+			'our',
+			'out',
+			'has',
+			'his',
+			'how',
+			'its',
+			'may',
+			'new',
+			'now',
+			'old',
+			'see',
+			'way',
+			'who',
+			'did',
+			'get',
+			'let',
+			'say',
+			'she',
+			'too',
+			'use',
+			'what',
+			'when',
+			'where',
+			'which',
+			'why',
+			'will',
+			'with',
+			'this',
+			'that',
+			'from',
+			'they',
+			'been',
+			'have',
+			'many',
+			'some',
+			'them',
+			'than',
+			'each',
+			'make',
+			'like',
+			'into',
+			'over',
+			'such',
+			'your',
+			'about',
+			'their',
+			'would',
+			'could',
+			'other',
+			'these',
+			'there',
+			'after',
 			'being',
 		);
 
 		$words = preg_split( '/[\s\-—:,.|]+/', strtolower( $title ) );
-		$words = array_filter( $words, fn( $w ) => strlen( $w ) >= 3 );
+		$words = array_filter( false !== $words ? $words : array(), fn( $w ) => strlen( $w ) >= 3 );
 		$words = array_diff( $words, $stop_words );
 
 		return array_values( $words );
