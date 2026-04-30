@@ -67,6 +67,7 @@ class AgentMemoryStoreFactory {
 		 *                                              or a swap implementation.
 		 * @param AgentMemoryScope               $scope The scope being acted on.
 		 */
+		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
 		$store = apply_filters( 'agents_api_memory_store', null, $scope );
 
 		if ( $store instanceof AgentMemoryStoreInterface ) {
