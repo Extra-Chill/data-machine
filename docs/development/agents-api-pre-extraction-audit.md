@@ -8,7 +8,7 @@ This audit records the remaining work after the first in-place untangling wave. 
 
 The initial untangling wave is complete:
 
-- Pipeline tool policy translation is separated from generic tool policy resolution.
+- Pipeline tool policy translation is separated from generic tool policy filtering.
 - Adjacent handler tools are a Data Machine provider instead of generic source-registry behavior.
 - Ability-native tool execution is separated from Data Machine pending-action and post-tracking decorators.
 - Declarative agent registration is separated from Data Machine materialization.
@@ -98,11 +98,14 @@ The execution core is split, but `ToolManager` still centers on `datamachine_too
 
 The source-composition seam is now clearer: `ToolSourceRegistry` composes named providers, while `DataMachineToolRegistrySource` adapts the legacy/product `datamachine_tools` registry and `AdjacentHandlerToolSource` adapts pipeline-neighbor handler tools. Those providers are Data Machine consumers of the generic source idea, not the future Agents API tool registry.
 
+The policy-filtering seam is also split in place: `ToolPolicyFilter` owns reusable allow/deny/category/capability filtering, while `ToolPolicyResolver` remains the Data Machine adapter that gathers Data Machine sources, reads persisted agent policy, preserves adjacent handler tools, and delegates permission checks to `DataMachineToolAccessPolicy`.
+
 Target shape:
 
 - Agents API should prefer Ability-native tools and runtime tool declarations.
 - Data Machine can keep its curated `datamachine_tools` compatibility/product registry.
 - Adjacent handler tools stay Data Machine-only.
+- Data Machine permission helpers, persisted agent table reads, and mandatory handler-tool preservation stay adapter-only.
 
 ### 7. Agent Registry And Identity
 

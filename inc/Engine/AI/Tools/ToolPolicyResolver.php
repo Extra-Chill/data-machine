@@ -21,9 +21,10 @@
 
 namespace DataMachine\Engine\AI\Tools;
 
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Engine\AI\Tools\Policy\DataMachineAgentToolPolicyProvider;
 use DataMachine\Engine\AI\Tools\Policy\DataMachineMandatoryToolPolicy;
+use DataMachine\Engine\AI\Tools\Policy\DataMachineToolAccessPolicy;
+use DataMachine\Engine\AI\Tools\Policy\ToolPolicyFilter;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -40,16 +41,22 @@ class ToolPolicyResolver {
 	private ToolSourceRegistry $tool_source_registry;
 	private DataMachineAgentToolPolicyProvider $agent_policy_provider;
 	private DataMachineMandatoryToolPolicy $mandatory_tool_policy;
+	private DataMachineToolAccessPolicy $tool_access_policy;
+	private ToolPolicyFilter $policy_filter;
 
 	public function __construct(
 		?ToolManager $tool_manager = null,
 		?DataMachineAgentToolPolicyProvider $agent_policy_provider = null,
-		?DataMachineMandatoryToolPolicy $mandatory_tool_policy = null
+		?DataMachineMandatoryToolPolicy $mandatory_tool_policy = null,
+		?DataMachineToolAccessPolicy $tool_access_policy = null,
+		?ToolPolicyFilter $policy_filter = null
 	) {
 		$this->tool_manager           = $tool_manager ?? new ToolManager();
 		$this->tool_source_registry   = new ToolSourceRegistry( $this->tool_manager );
 		$this->agent_policy_provider  = $agent_policy_provider ?? new DataMachineAgentToolPolicyProvider();
 		$this->mandatory_tool_policy  = $mandatory_tool_policy ?? new DataMachineMandatoryToolPolicy();
+		$this->tool_access_policy     = $tool_access_policy ?? new DataMachineToolAccessPolicy();
+		$this->policy_filter          = $policy_filter ?? new ToolPolicyFilter();
 	}
 
 	/**
@@ -79,24 +86,7 @@ class ToolPolicyResolver {
 		$deny     = $args['deny'] ?? array();
 		$agent_id = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
 
-		// 0. Optional legacy baseline gate.
-		//
-		// Historically chat tool resolution short-circuited to zero tools when the
-		// acting user lacked datamachine_use_tools. That made chat tool access an
-		// all-or-nothing switch and blocked lower-privilege tool tiers for regular
-		// authenticated users.
-		//
-		// Going forward, chat tool visibility should be resolved per-tool via:
-		// - linked ability permission callbacks
-		// - explicit access_level metadata
-		// - agent tool policy
-		//
-		// The legacy behavior is still available behind a filter for installs that
-		// want to preserve the coarse gate during migration.
-		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
-		$require_use_tools_for_chat = apply_filters( 'datamachine_require_use_tools_for_chat_tools', false, $args );
-
-		if ( self::MODE_CHAT === $mode && $require_use_tools_for_chat && ! PermissionHelper::can( 'use_tools' ) ) {
+		if ( self::MODE_CHAT === $mode && ! $this->tool_access_policy->passesLegacyChatGate( $args ) ) {
 			return array();
 		}
 
@@ -106,7 +96,10 @@ class ToolPolicyResolver {
 		// 2. Filter by linked ability permissions (from Abilities API).
 		// Only applies in chat mode — pipeline/system run as admin.
 		if ( self::MODE_CHAT === $mode ) {
-			$tools = $this->filterByAbilityPermissions( $tools );
+			$tools = $this->policy_filter->filterByAbilityPermissions(
+				$tools,
+				array( $this->tool_access_policy, 'canAccessLevel' )
+			);
 		}
 
 		// 3. Apply per-agent tool policy (from agent_config).
@@ -121,7 +114,11 @@ class ToolPolicyResolver {
 		// belongs to one of the specified categories).
 		$categories = $args['categories'] ?? array();
 		if ( ! empty( $categories ) ) {
-			$tools = $this->filterByAbilityCategories( $tools, $categories );
+			$tools = $this->policy_filter->filterByAbilityCategories(
+				$tools,
+				$categories,
+				array( $this->mandatory_tool_policy, 'isMandatory' )
+			);
 		}
 
 		// 5. Apply allowlist if specified (narrows optional tools to explicit subset).
@@ -143,106 +140,6 @@ class ToolPolicyResolver {
 	}
 
 	/**
-	 * Filter tools by their linked ability permissions.
-	 *
-	 * For each tool that declares an `ability` or `abilities` key, checks
-	 * the ability's permission_callback via WP_Abilities_Registry. If ANY
-	 * linked ability fails the permission check, the tool is removed.
-	 *
-	 * Tools without a linked ability fall back to their `access_level` field.
-	 * Tools with neither default to 'admin' (safe fallback — untagged tools
-	 * are admin-only until explicitly categorized).
-	 *
-	 * @since 0.54.0
-	 *
-	 * @param array $tools Resolved tools array keyed by tool name.
-	 * @return array Filtered tools.
-	 */
-	private function filterByAbilityPermissions( array $tools ): array {
-		$registry = \WP_Abilities_Registry::get_instance();
-
-		$filtered = array();
-
-		foreach ( $tools as $name => $tool ) {
-			if ( ! is_array( $tool ) ) {
-				continue;
-			}
-
-			// Collect all ability slugs to check.
-			$ability_slugs = array();
-
-			if ( ! empty( $tool['ability'] ) ) {
-				$ability_slugs[] = $tool['ability'];
-			}
-
-			if ( ! empty( $tool['abilities'] ) && is_array( $tool['abilities'] ) ) {
-				$ability_slugs = array_merge( $ability_slugs, $tool['abilities'] );
-			}
-
-			// Tools with linked abilities: check each ability's permission.
-			if ( ! empty( $ability_slugs ) ) {
-				$permitted = true;
-
-				foreach ( $ability_slugs as $slug ) {
-					$ability = $registry->get_registered( $slug );
-
-					if ( ! $ability ) {
-						// Ability not registered — deny (safe default).
-						$permitted = false;
-						break;
-					}
-
-					if ( ! $ability->check_permissions() ) {
-						$permitted = false;
-						break;
-					}
-				}
-
-				if ( $permitted ) {
-					$filtered[ $name ] = $tool;
-				}
-
-				continue;
-			}
-
-			// No linked ability — fall back to access_level.
-			$access_level = $tool['access_level'] ?? 'admin';
-
-			if ( $this->checkAccessLevel( $access_level ) ) {
-				$filtered[ $name ] = $tool;
-			}
-		}
-
-		return $filtered;
-	}
-
-	/**
-	 * Check if the current user meets an access level requirement.
-	 *
-	 * @since 0.54.0
-	 *
-	 * @param string $access_level One of: 'public', 'authenticated', 'author', 'editor', 'admin'.
-	 * @return bool Whether the current user has sufficient capabilities.
-	 */
-	private function checkAccessLevel( string $access_level ): bool {
-		if ( 'public' === $access_level ) {
-			return true;
-		}
-
-		// Map access levels to PermissionHelper actions for consistent
-		// permission resolution (WP-CLI bypass, manage_options fallback).
-		$action_map = array(
-			'authenticated' => 'chat',
-			'author'        => 'use_tools',
-			'editor'        => 'view_logs',
-			'admin'         => 'manage_settings',
-		);
-
-		$action = $action_map[ $access_level ] ?? 'manage_settings';
-		return \DataMachine\Abilities\PermissionHelper::can( $action );
-	}
-
-	/**
 	 * Gather tools by mode preset.
 	 *
 	 * @param string $mode Agent mode slug.
@@ -251,77 +148,6 @@ class ToolPolicyResolver {
 	 */
 	private function gatherByMode( string $mode, array $args ): array {
 		return $this->tool_source_registry->gather( $mode, $args );
-	}
-
-	/**
-	 * Filter tools by their linked ability's category.
-	 *
-	 * For each tool, resolves its ability category via the Abilities API registry.
-	 * Only tools whose ability belongs to one of the allowed categories pass through.
-	 *
-	 * Handler tools (those with a 'handler' key but no 'ability' key) are always
-	 * included — they are dynamically scoped by the pipeline engine and should not
-	 * be filtered by category.
-	 *
-	 * Tools without any ability linkage are excluded when category filtering is
-	 * active, since they cannot be categorized. To include them, add their names
-	 * to the context's `allow_only` list as an escape hatch.
-	 *
-	 * @since 0.55.0
-	 *
-	 * @param array    $tools      Resolved tools array keyed by tool name.
-	 * @param string[] $categories Allowed category slugs (e.g. 'datamachine-content').
-	 * @return array Filtered tools.
-	 */
-	private function filterByAbilityCategories( array $tools, array $categories ): array {
-		if ( empty( $categories ) ) {
-			return $tools;
-		}
-
-		$registry        = \WP_Abilities_Registry::get_instance();
-		$categories_flip = array_flip( $categories );
-		$filtered        = array();
-
-		foreach ( $tools as $name => $tool ) {
-			if ( ! is_array( $tool ) ) {
-				continue;
-			}
-
-			// Handler tools bypass category filtering — they're already scoped
-			// by the pipeline engine to adjacent step handlers.
-			if ( $this->mandatory_tool_policy->isMandatory( $tool ) ) {
-				$filtered[ $name ] = $tool;
-				continue;
-			}
-
-			// Collect ability slugs from tool metadata.
-			$ability_slugs = array();
-
-			if ( ! empty( $tool['ability'] ) ) {
-				$ability_slugs[] = $tool['ability'];
-			}
-
-			if ( ! empty( $tool['abilities'] ) && is_array( $tool['abilities'] ) ) {
-				$ability_slugs = array_merge( $ability_slugs, $tool['abilities'] );
-			}
-
-			// No ability linkage — cannot determine category, excluded.
-			if ( empty( $ability_slugs ) ) {
-				continue;
-			}
-
-			// Check if ANY linked ability belongs to an allowed category.
-			foreach ( $ability_slugs as $slug ) {
-				$ability = $registry->get_registered( $slug );
-
-				if ( $ability && isset( $categories_flip[ $ability->get_category() ] ) ) {
-					$filtered[ $name ] = $tool;
-					break;
-				}
-			}
-		}
-
-		return $filtered;
 	}
 
 	/**
@@ -358,69 +184,11 @@ class ToolPolicyResolver {
 	 * @return array Filtered tools array.
 	 */
 	public function applyAgentPolicy( array $tools, ?array $policy ): array {
-		if ( null === $policy ) {
-			return $tools;
-		}
-
-		$mode              = $policy['mode'];
-		$tool_names        = $policy['tools'] ?? array();
-		$policy_categories = $policy['categories'] ?? array();
-		$policy_tools      = $this->mandatory_tool_policy->split( $tools );
-		$handler_tools     = $policy_tools['mandatory'];
-		$optional_tools    = $policy_tools['optional'];
-
-		// No tool names and no categories = no restrictions (deny) or no optional tools (allow).
-		if ( empty( $tool_names ) && empty( $policy_categories ) ) {
-			return 'allow' === $mode ? $handler_tools : $tools;
-		}
-
-		// Simple case: no categories, just tool names (original behavior).
-		if ( empty( $policy_categories ) ) {
-			if ( 'deny' === $mode ) {
-				return $handler_tools + array_diff_key( $optional_tools, array_flip( $tool_names ) );
-			}
-			return $handler_tools + array_intersect_key( $optional_tools, array_flip( $tool_names ) );
-		}
-
-		// Category-aware filtering: check both tool names and categories.
-		$registry        = \WP_Abilities_Registry::get_instance();
-		$tool_names_flip = ! empty( $tool_names ) ? array_flip( $tool_names ) : array();
-		$categories_flip = array_flip( $policy_categories );
-		$filtered        = array();
-
-		foreach ( $optional_tools as $name => $tool ) {
-			$matches_tool = isset( $tool_names_flip[ $name ] );
-			$matches_cat  = false;
-
-			if ( ! $matches_tool && is_array( $tool ) ) {
-				$ability_slugs = array();
-
-				if ( ! empty( $tool['ability'] ) ) {
-					$ability_slugs[] = $tool['ability'];
-				}
-				if ( ! empty( $tool['abilities'] ) && is_array( $tool['abilities'] ) ) {
-					$ability_slugs = array_merge( $ability_slugs, $tool['abilities'] );
-				}
-
-				foreach ( $ability_slugs as $slug ) {
-					$ability = $registry->get_registered( $slug );
-					if ( $ability && isset( $categories_flip[ $ability->get_category() ] ) ) {
-						$matches_cat = true;
-						break;
-					}
-				}
-			}
-
-			$matches = $matches_tool || $matches_cat;
-
-			if ( 'allow' === $mode && $matches ) {
-				$filtered[ $name ] = $tool;
-			} elseif ( 'deny' === $mode && ! $matches ) {
-				$filtered[ $name ] = $tool;
-			}
-		}
-
-		return $handler_tools + $filtered;
+		return $this->policy_filter->applyNamedPolicy(
+			$tools,
+			$policy,
+			array( $this->mandatory_tool_policy, 'isMandatory' )
+		);
 	}
 
 	/**
@@ -431,11 +199,11 @@ class ToolPolicyResolver {
 	 * @return array Filtered tools.
 	 */
 	private function filterByAllowOnlyPreservingHandlerTools( array $tools, array $allow_only ): array {
-		$policy_tools   = $this->mandatory_tool_policy->split( $tools );
-		$handler_tools  = $policy_tools['mandatory'];
-		$optional_tools = $policy_tools['optional'];
-
-		return $handler_tools + array_intersect_key( $optional_tools, array_flip( $allow_only ) );
+		return $this->policy_filter->filterByAllowOnly(
+			$tools,
+			$allow_only,
+			array( $this->mandatory_tool_policy, 'isMandatory' )
+		);
 	}
 
 	/**
