@@ -156,18 +156,18 @@ class DailyMemoryTask extends SystemTask {
 			$ai_payload
 		);
 
-		if ( empty( $response['success'] ) ) {
+		if ( $response instanceof \WP_Error ) {
 			do_action(
 				'datamachine_log',
 				'warning',
-				'Daily memory AI request failed: ' . ( $response['error'] ?? 'Unknown error' ),
+				'Daily memory AI request failed: ' . $response->get_error_message(),
 				array( 'date' => $date )
 			);
-			$this->failJob( $jobId, 'AI request failed: ' . ( $response['error'] ?? 'Unknown error' ) );
+			$this->failJob( $jobId, 'AI request failed: ' . $response->get_error_message() );
 			return;
 		}
 
-		$ai_output = trim( $response['data']['content'] ?? '' );
+		$ai_output = trim( RequestBuilder::resultText( $response ) );
 		$ai_output = str_replace( '\n', "\n", $ai_output );
 
 		if ( empty( $ai_output ) ) {
@@ -302,7 +302,7 @@ class DailyMemoryTask extends SystemTask {
 
 		$write_result = $memory->replace_all( $new_content );
 		if ( empty( $write_result['success'] ) ) {
-			$this->failJob( $jobId, $write_result['message'] ?? 'Failed to persist cleaned memory.' );
+			$this->failJob( $jobId, $write_result['message'] );
 			return;
 		}
 

@@ -9,6 +9,32 @@
  */
 
 namespace {
+	if ( ! class_exists( 'WP_Error' ) ) {
+		class WP_Error {
+			private string $code;
+			private string $message;
+
+			public function __construct( string $code = '', string $message = '' ) {
+				$this->code    = $code;
+				$this->message = $message;
+			}
+
+			public function get_error_code(): string {
+				return $this->code;
+			}
+
+			public function get_error_message(): string {
+				return $this->message;
+			}
+		}
+	}
+
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $thing ): bool {
+			return $thing instanceof \WP_Error;
+		}
+	}
+
 	if ( ! function_exists( 'wp_supports_ai' ) ) {
 		function wp_supports_ai(): bool {
 			return true;
@@ -61,6 +87,7 @@ namespace DataMachine\Tests\Unit\Support {
 		private string $system_instruction = '';
 		private array $history = array();
 		private array $function_declarations = array();
+		private string $aspect_ratio = '';
 
 		public function __construct( string $prompt = '' ) {
 			$this->prompt = $prompt;
@@ -76,11 +103,21 @@ namespace DataMachine\Tests\Unit\Support {
 			return $this;
 		}
 
+		public function using_model_config( $model_config ): self {
+			unset( $model_config );
+			return $this;
+		}
+
 		public function as_output_file_type( $file_type ): self {
 			return $this;
 		}
 
 		public function as_output_media_orientation( $orientation ): self {
+			return $this;
+		}
+
+		public function as_output_media_aspect_ratio( string $aspect_ratio ): self {
+			$this->aspect_ratio = $aspect_ratio;
 			return $this;
 		}
 
@@ -139,6 +176,11 @@ namespace DataMachine\Tests\Unit\Support {
 			}
 
 			foreach ( $this->history as $message ) {
+				if ( is_array( $message ) ) {
+					$messages[] = $message;
+					continue;
+				}
+
 				$role = $message instanceof \WordPress\AiClient\Messages\DTO\ModelMessage ? 'assistant' : 'user';
 				foreach ( $message->getParts() as $part ) {
 					$messages[] = array(
@@ -158,11 +200,12 @@ namespace DataMachine\Tests\Unit\Support {
 			}
 
 			return array(
-				'provider' => $this->provider,
-				'model'    => $this->model,
-				'prompt'   => $this->prompt,
-				'messages' => $messages,
-				'tools'    => $tools,
+				'provider'     => $this->provider,
+				'model'        => $this->model,
+				'prompt'       => $this->prompt,
+				'aspect_ratio' => $this->aspect_ratio,
+				'messages'     => $messages,
+				'tools'        => $tools,
 			);
 		}
 	}
@@ -237,6 +280,18 @@ namespace WordPress\AiClient\Providers {
 			public function getRegisteredProviderIds(): array {
 				$ids = $GLOBALS['datamachine_test_wp_ai_client_provider_ids'] ?? array( 'openai', 'fake_provider', 'gemini' );
 				return is_array( $ids ) ? $ids : array();
+			}
+
+			public function hasProvider( string $provider ): bool {
+				return in_array( $provider, $this->getRegisteredProviderIds(), true );
+			}
+
+			public function getProviderId( string $provider ): string {
+				if ( ! $this->hasProvider( $provider ) ) {
+					throw new \InvalidArgumentException( 'Provider is not registered' );
+				}
+
+				return $provider;
 			}
 
 			public function setProviderRequestAuthentication( string $provider, $auth ): void {
@@ -450,6 +505,22 @@ namespace WordPress\AiClient\Results\DTO {
 
 			public function getTokenUsage(): TokenUsageDouble {
 				return $this->token_usage;
+			}
+
+			public function toText(): string {
+				$content = '';
+				if ( empty( $this->candidates ) ) {
+					return $content;
+				}
+
+				foreach ( $this->candidates[0]->getMessage()->getParts() as $part ) {
+					$text = $part->getText();
+					if ( null !== $text && '' !== $text ) {
+						$content .= ( '' === $content ) ? $text : "\n" . $text;
+					}
+				}
+
+				return $content;
 			}
 		}
 	}

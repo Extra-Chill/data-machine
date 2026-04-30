@@ -231,15 +231,15 @@ class AIConversationLoop {
 			);
 
 			// Build AI request using centralized RequestBuilder
-			$ai_response           = RequestBuilder::build(
+			$ai_response = RequestBuilder::build(
 				$messages,
 				$provider,
 				$model,
 				$tools,
 				$mode,
-				$loop_payload
+				$loop_payload,
+				$last_request_metadata
 			);
-			$last_request_metadata = is_array( $ai_response['request_metadata'] ?? null ) ? $ai_response['request_metadata'] : array();
 			self::emitLoopEvent(
 				$event_sink,
 				'request_built',
@@ -249,14 +249,14 @@ class AIConversationLoop {
 						'turn_count'       => $turn_count,
 						'provider'         => $provider,
 						'model'            => $model,
-						'success'          => (bool) ( $ai_response['success'] ?? false ),
+						'success'          => ! is_wp_error( $ai_response ),
 						'request_metadata' => $last_request_metadata,
 					)
 				)
 			);
 
 			// Handle AI request failure
-			if ( ! $ai_response['success'] ) {
+			if ( $ai_response instanceof \WP_Error ) {
 				do_action(
 					'datamachine_log',
 					'error',
@@ -265,8 +265,8 @@ class AIConversationLoop {
 						$base_log_context,
 						array(
 							'turn_count' => $turn_count,
-							'error'      => $ai_response['error'] ?? 'Unknown error',
-							'provider'   => $ai_response['provider'] ?? 'Unknown',
+							'error'      => $ai_response->get_error_message(),
+							'provider'   => $provider,
 						)
 					)
 				);
@@ -277,7 +277,7 @@ class AIConversationLoop {
 					'turn_count'       => $turn_count,
 					'completed'        => false,
 					'last_tool_calls'  => array(),
-					'error'            => $ai_response['error'] ?? 'AI request failed',
+					'error'            => $ai_response->get_error_message(),
 					'usage'            => $total_usage,
 					'request_metadata' => $last_request_metadata,
 				);
@@ -303,7 +303,7 @@ class AIConversationLoop {
 						$base_log_context,
 						array(
 							'turn_count' => $turn_count,
-							'provider'   => $ai_response['provider'] ?? $provider,
+							'provider'   => $provider,
 							'error'      => $failure_result['error'],
 						)
 					)
@@ -312,16 +312,16 @@ class AIConversationLoop {
 				return $failure_result;
 			}
 
-			$tool_calls = $ai_response['data']['tool_calls'] ?? array();
-			$ai_content = $ai_response['data']['content'] ?? '';
+			/** @var \WordPress\AiClient\Results\DTO\GenerativeAiResult $ai_result */
+			$ai_result  = $ai_response;
+			$tool_calls = self::extractToolCallsFromResult( $ai_result );
+			$ai_content = RequestBuilder::resultText( $ai_result );
 
 			// Accumulate token usage from this turn.
-			$turn_usage = $ai_response['data']['usage'] ?? array();
-			if ( ! empty( $turn_usage ) ) {
-				$total_usage['prompt_tokens']     += (int) ( $turn_usage['prompt_tokens'] ?? 0 );
-				$total_usage['completion_tokens'] += (int) ( $turn_usage['completion_tokens'] ?? 0 );
-				$total_usage['total_tokens']      += (int) ( $turn_usage['total_tokens'] ?? 0 );
-			}
+			$token_usage                       = $ai_result->getTokenUsage();
+			$total_usage['prompt_tokens']     += $token_usage->getPromptTokens();
+			$total_usage['completion_tokens'] += $token_usage->getCompletionTokens();
+			$total_usage['total_tokens']      += $token_usage->getTotalTokens();
 
 			// Store final content from this turn
 			if ( ! empty( $ai_content ) ) {
@@ -342,8 +342,8 @@ class AIConversationLoop {
 				$last_tool_calls = $tool_calls;
 
 				foreach ( $tool_calls as $tool_call ) {
-					$tool_name       = $tool_call['name'] ?? '';
-					$tool_parameters = $tool_call['parameters'] ?? array();
+					$tool_name       = $tool_call['name'];
+					$tool_parameters = $tool_call['parameters'];
 
 					if ( empty( $tool_name ) ) {
 						do_action(
@@ -663,6 +663,60 @@ class AIConversationLoop {
 		}
 
 		return new NullAgentConversationTranscriptPersister();
+	}
+
+	/**
+	 * Extract Data Machine tool execution inputs from wp-ai-client function-call parts.
+	 *
+	 * @param \WordPress\AiClient\Results\DTO\GenerativeAiResult $result wp-ai-client result.
+	 * @return array<int, array{name:string,parameters:array,id:mixed}>
+	 */
+	private static function extractToolCallsFromResult( \WordPress\AiClient\Results\DTO\GenerativeAiResult $result ): array {
+		$tool_calls = array();
+		$candidates = $result->getCandidates();
+		if ( empty( $candidates ) ) {
+			return $tool_calls;
+		}
+
+		foreach ( $candidates[0]->getMessage()->getParts() as $part ) {
+			$function_call = $part->getFunctionCall();
+			if ( null === $function_call ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => (string) $function_call->getName(),
+				'parameters' => self::normalizeFunctionArgs( $function_call->getArgs() ),
+				'id'         => $function_call->getId(),
+			);
+		}
+
+		return $tool_calls;
+	}
+
+	/**
+	 * Coerce wp-ai-client function call args into Data Machine tool parameters.
+	 *
+	 * @param mixed $args Args returned by FunctionCall::getArgs().
+	 * @return array
+	 */
+	private static function normalizeFunctionArgs( $args ): array {
+		if ( is_array( $args ) ) {
+			return $args;
+		}
+
+		if ( is_string( $args ) && '' !== $args ) {
+			$decoded = json_decode( $args, true );
+			if ( is_array( $decoded ) ) {
+				return $decoded;
+			}
+		}
+
+		if ( is_object( $args ) ) {
+			return (array) $args;
+		}
+
+		return array();
 	}
 
 	/**

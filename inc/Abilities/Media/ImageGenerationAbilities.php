@@ -15,7 +15,6 @@
 
 namespace DataMachine\Abilities\Media;
 
-use AgentsAPI\AI\WpAiClient;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
@@ -185,7 +184,7 @@ class ImageGenerationAbilities {
 			);
 		}
 
-		$unavailable_reason = WpAiClient::unavailable_reason( $provider );
+		$unavailable_reason = RequestBuilder::wpAiClientUnavailableReason( $provider );
 		if ( null !== $unavailable_reason ) {
 			return array(
 				'success' => false,
@@ -211,23 +210,54 @@ class ImageGenerationAbilities {
 			$aspect_ratio = self::DEFAULT_ASPECT_RATIO;
 		}
 
-		$image_file = WpAiClient::generate_image_file(
-			$prompt,
-			$provider,
-			$model,
-			$aspect_ratio,
-			\DataMachine\Engine\AI\WpAiClientProviderAdmin::resolveApiKey( $provider )
-		);
+		try {
+			$registry = \WordPress\AiClient\AiClient::defaultRegistry();
+			/** @var callable $has_provider wp-ai-client exposes this through __call() in some versions. */
+			$has_provider = array( $registry, 'hasProvider' );
+			if ( ! call_user_func( $has_provider, $provider ) ) {
+				throw new \InvalidArgumentException( sprintf( 'Provider %s is not registered in wp-ai-client', esc_html( $provider ) ) );
+			}
 
-		if ( $image_file instanceof \WP_Error ) {
+			/** @var callable $provider_id_resolver wp-ai-client exposes this through __call() in some versions. */
+			$provider_id_resolver = array( $registry, 'getProviderId' );
+			$provider_id          = call_user_func( $provider_id_resolver, $provider );
+			$api_key              = \DataMachine\Engine\AI\WpAiClientProviderAdmin::resolveApiKey( $provider );
+			if ( '' !== $api_key ) {
+				$registry->setProviderRequestAuthentication(
+					$provider_id,
+					new \WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication( $api_key )
+				);
+			}
+
+			/** @var callable $model_resolver wp-ai-client exposes this through __call() in some versions. */
+			$model_resolver = array( $registry, 'getProviderModel' );
+			$image_builder  = \wp_ai_client_prompt( $prompt )
+				->using_provider( $provider_id )
+				->using_model( call_user_func( $model_resolver, $provider_id, $model, null ) )
+				->as_output_file_type( \WordPress\AiClient\Files\Enums\FileTypeEnum::remote() )
+				->as_output_media_aspect_ratio( $aspect_ratio );
+
+			$supported = $image_builder->is_supported_for_image_generation();
+			if ( is_wp_error( $supported ) ) {
+				$image_file = $supported;
+			} elseif ( ! $supported ) {
+				$image_file = new \WP_Error( 'wp_ai_client_image_unsupported', sprintf( 'wp-ai-client model "%s" does not support image generation for provider "%s"', $model, $provider_id ) );
+			} else {
+				$image_file = $image_builder->generate_image();
+			}
+		} catch ( \Throwable $e ) {
+			$image_file = new \WP_Error( 'wp_ai_client_image_exception', 'wp-ai-client image generation threw: ' . $e->getMessage() );
+		}
+
+		if ( $image_file instanceof \WP_Error || ! is_object( $image_file ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to generate image: ' . $image_file->get_error_message(),
+				'error'   => 'Failed to generate image: ' . ( $image_file instanceof \WP_Error ? $image_file->get_error_message() : 'wp-ai-client returned no image file.' ),
 			);
 		}
 
-		$image_url      = method_exists( $image_file, 'getUrl' ) ? (string) $image_file->getUrl() : '';
-		$image_data_uri = method_exists( $image_file, 'getDataUri' ) ? (string) $image_file->getDataUri() : '';
+		$image_url      = (string) $image_file->getUrl();
+		$image_data_uri = (string) $image_file->getDataUri();
 
 		if ( '' === $image_url && '' === $image_data_uri ) {
 			return array(
@@ -344,13 +374,13 @@ class ImageGenerationAbilities {
 			array( 'purpose' => 'image_prompt_refinement' )
 		);
 
-		if ( empty( $response['success'] ) ) {
+		if ( $response instanceof \WP_Error ) {
 			do_action(
 				'datamachine_log',
 				'warning',
 				'Image Generation: Prompt refinement AI request failed',
 				array(
-					'error'      => $response['error'] ?? 'Unknown error',
+					'error'      => $response->get_error_message(),
 					'raw_prompt' => $raw_prompt,
 					'provider'   => $provider,
 				)
@@ -358,7 +388,7 @@ class ImageGenerationAbilities {
 			return null;
 		}
 
-		$refined = trim( $response['data']['content'] ?? '' );
+		$refined = trim( RequestBuilder::resultText( $response ) );
 
 		if ( empty( $refined ) ) {
 			return null;
@@ -449,7 +479,7 @@ class ImageGenerationAbilities {
 		$provider = $config['default_provider'] ?? self::DEFAULT_PROVIDER;
 		$model    = $config['default_model'] ?? self::DEFAULT_MODEL;
 
-		return ! empty( $provider ) && ! empty( $model ) && null === WpAiClient::unavailable_reason( (string) $provider );
+		return ! empty( $provider ) && ! empty( $model ) && null === RequestBuilder::wpAiClientUnavailableReason( (string) $provider );
 	}
 
 	/**

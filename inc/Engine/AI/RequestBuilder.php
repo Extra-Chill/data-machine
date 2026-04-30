@@ -12,7 +12,6 @@
 
 namespace DataMachine\Engine\AI;
 
-use AgentsAPI\AI\WpAiClient;
 use DataMachine\Engine\AI\Directives\DirectivePolicyResolver;
 
 defined( 'ABSPATH' ) || exit;
@@ -36,7 +35,8 @@ class RequestBuilder {
 	 * @param array  $tools       Raw tools array from filters
 	 * @param string $mode     Execution mode: 'chat' or 'pipeline'
 	 * @param array  $payload     Step payload (session_id, job_id, flow_step_id, data, etc)
-	 * @return array AI response from provider
+	 * @param array|null $request_metadata Optional output parameter for request metadata.
+	 * @return \WordPress\AiClient\Results\DTO\GenerativeAiResult|\WP_Error AI response from wp-ai-client.
 	 */
 	public static function build(
 		array $messages,
@@ -44,8 +44,9 @@ class RequestBuilder {
 		string $model,
 		array $tools,
 		string $mode,
-		array $payload = array()
-	): array {
+		array $payload = array(),
+		?array &$request_metadata = null
+	) {
 		$assembled          = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
 		$request            = $assembled['request'];
 		$provider_request   = ProviderRequestAssembler::toProviderRequest( $request );
@@ -87,11 +88,8 @@ class RequestBuilder {
 		);
 
 		// 4. Dispatch the request. wp-ai-client is the only runtime provider path.
-		$unavailable_reason = WpAiClient::unavailable_reason( $provider );
+		$unavailable_reason = self::wpAiClientUnavailableReason( $provider );
 		if ( null !== $unavailable_reason ) {
-			$response                     = self::errorResponse( $provider, $unavailable_reason );
-			$response['request_metadata'] = $request_metadata;
-
 			do_action(
 				'datamachine_log',
 				'error',
@@ -109,19 +107,92 @@ class RequestBuilder {
 				)
 			);
 
-			return $response;
+			return new \WP_Error( 'wp_ai_client_unavailable', $unavailable_reason );
 		}
 
-		$agents_api_result = WpAiClient::generate_text(
-			$provider,
-			$model,
-			$request['messages'] ?? array(),
-			$structured_tools,
-			$provider_request,
-			WpAiClientProviderAdmin::resolveApiKey( $provider )
-		);
+		$result = null;
+		try {
+			$registry = \WordPress\AiClient\AiClient::defaultRegistry();
+			/** @var callable $has_provider wp-ai-client exposes this through __call() in some versions. */
+			$has_provider = array( $registry, 'hasProvider' );
+			if ( ! call_user_func( $has_provider, $provider ) ) {
+				throw new \InvalidArgumentException( sprintf( 'Provider %s is not registered in wp-ai-client', esc_html( $provider ) ) );
+			}
 
-		$wp_ai_response = self::fromAgentsApiResult( $agents_api_result, $provider );
+			/** @var callable $provider_id_resolver wp-ai-client exposes this through __call() in some versions. */
+			$provider_id_resolver = array( $registry, 'getProviderId' );
+			$provider_id          = call_user_func( $provider_id_resolver, $provider );
+			$api_key              = WpAiClientProviderAdmin::resolveApiKey( $provider );
+			if ( '' !== $api_key ) {
+				$registry->setProviderRequestAuthentication(
+					$provider_id,
+					new \WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication( $api_key )
+				);
+			}
+
+			/** @var callable $model_resolver wp-ai-client exposes this through __call() in some versions. */
+			$model_resolver = array( $registry, 'getProviderModel' );
+			$model_instance = call_user_func( $model_resolver, $provider_id, $model, null );
+			$builder        = \wp_ai_client_prompt()
+				->using_provider( $provider_id )
+				->using_model( $model_instance );
+
+			$model_config = self::productModelConfig( $provider_request );
+			if ( null !== $model_config ) {
+				$builder = $builder->using_model_config( $model_config );
+			}
+
+			$history      = array();
+			$system_parts = array();
+			foreach ( $request['messages'] ?? array() as $message ) {
+				if ( ! is_array( $message ) ) {
+					continue;
+				}
+
+				$role    = (string) ( $message['role'] ?? '' );
+				$content = $message['content'] ?? '';
+				if ( '' === $content || array() === $content ) {
+					continue;
+				}
+
+				if ( 'system' === $role && is_string( $content ) ) {
+					$system_parts[] = $content;
+					continue;
+				}
+
+				$history[] = $message;
+			}
+
+			if ( ! empty( $system_parts ) ) {
+				$builder = $builder->using_system_instruction( implode( "\n\n", $system_parts ) );
+			}
+
+			if ( ! empty( $history ) ) {
+				$builder = $builder->with_history( ...$history );
+			}
+
+			$function_declarations = array();
+			foreach ( $structured_tools as $tool_name => $tool_config ) {
+				$name = (string) ( $tool_config['name'] ?? $tool_name );
+				if ( '' === $name ) {
+					continue;
+				}
+
+				$function_declarations[] = new \WordPress\AiClient\Tools\DTO\FunctionDeclaration(
+					$name,
+					(string) ( $tool_config['description'] ?? '' ),
+					self::normalizeLegacyToolSchema( $tool_config['parameters'] ?? array() )
+				);
+			}
+
+			if ( ! empty( $function_declarations ) ) {
+				$builder = $builder->using_function_declarations( ...$function_declarations );
+			}
+
+			$result = $builder->generate_text_result();
+		} catch ( \Throwable $e ) {
+			$result = new \WP_Error( 'wp_ai_client_text_exception', 'wp-ai-client request failed: ' . $e->getMessage() );
+		}
 
 		do_action(
 			'datamachine_log',
@@ -134,74 +205,13 @@ class RequestBuilder {
 					'flow_step_id' => $payload['flow_step_id'] ?? null,
 					'provider'     => $provider,
 					'model'        => $model,
-					'success'      => $wp_ai_response['success'] ?? false,
+					'success'      => ! is_wp_error( $result ),
 				),
 				fn( $v ) => null !== $v
 			)
 		);
 
-		$wp_ai_response['request_metadata'] = $request_metadata;
-		return $wp_ai_response;
-	}
-
-	/**
-	 * Convert an Agents API runtime result into Data Machine's conversation turn shape.
-	 *
-	 * @param array  $result   Agents API runtime result.
-	 * @param string $provider Provider identifier.
-	 * @return array
-	 */
-	private static function fromAgentsApiResult( array $result, string $provider ): array {
-		$response = array(
-			'success'  => ! empty( $result['success'] ),
-			'provider' => $provider,
-			'data'     => array(
-				'content'    => (string) ( $result['content'] ?? '' ),
-				'tool_calls' => is_array( $result['tool_calls'] ?? null ) ? $result['tool_calls'] : array(),
-				'usage'      => is_array( $result['usage'] ?? null ) ? $result['usage'] : array(),
-			),
-		);
-
-		if ( isset( $result['error'] ) && '' !== $result['error'] ) {
-			$response['error'] = (string) $result['error'];
-		}
-
-		if ( isset( $result['error_code'] ) && '' !== $result['error_code'] ) {
-			$response['error_code'] = (string) $result['error_code'];
-		}
-
-		return $response;
-	}
-
-	/**
-	 * Build an error response in Data Machine's conversation turn shape.
-	 *
-	 * @param string      $provider Provider identifier.
-	 * @param string      $message  Error message.
-	 * @param string|null $code     Optional error code.
-	 * @return array
-	 */
-	private static function errorResponse( string $provider, string $message, ?string $code = null ): array {
-		$response = array(
-			'success'  => false,
-			'provider' => $provider,
-			'error'    => $message,
-			'data'     => array(
-				'content'    => '',
-				'tool_calls' => array(),
-				'usage'      => array(
-					'prompt_tokens'     => 0,
-					'completion_tokens' => 0,
-					'total_tokens'      => 0,
-				),
-			),
-		);
-
-		if ( null !== $code && '' !== $code ) {
-			$response['error_code'] = $code;
-		}
-
-		return $response;
+		return $result;
 	}
 
 	/**
@@ -276,5 +286,141 @@ class RequestBuilder {
 		}
 
 		return $payload;
+	}
+
+	/**
+	 * Explain why wp-ai-client cannot handle the requested provider.
+	 *
+	 * Agents API sits above wp-ai-client; this product execution path calls the
+	 * core provider primitive directly instead of reimplementing its dispatch API.
+	 *
+	 * @param string $provider Provider identifier registered with wp-ai-client.
+	 * @return string|null Human-readable failure reason, or null when available.
+	 */
+	public static function wpAiClientUnavailableReason( string $provider ): ?string {
+		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
+			return 'wp-ai-client is unavailable: wp_ai_client_prompt() is not defined';
+		}
+
+		if ( ! function_exists( 'wp_supports_ai' ) ) {
+			return 'wp-ai-client is unavailable: wp_supports_ai() is not defined';
+		}
+
+		if ( ! wp_supports_ai() ) {
+			return 'wp-ai-client is unavailable: WordPress reports AI support is disabled';
+		}
+
+		if ( ! class_exists( '\\WordPress\\AiClient\\AiClient' ) ) {
+			return 'wp-ai-client is unavailable: WordPress\\AiClient\\AiClient is not loaded';
+		}
+
+		try {
+			$registry = \WordPress\AiClient\AiClient::defaultRegistry();
+			/** @var callable $has_provider wp-ai-client exposes this through __call() in some versions. */
+			$has_provider = array( $registry, 'hasProvider' );
+			if ( ! call_user_func( $has_provider, $provider ) ) {
+				return sprintf( 'wp-ai-client provider registry failed: Provider %s is not registered in wp-ai-client', esc_html( $provider ) );
+			}
+		} catch ( \Throwable $e ) {
+			return 'wp-ai-client provider registry failed: ' . $e->getMessage();
+		}
+
+		return null;
+	}
+
+	/**
+	 * Extract content text from a wp-ai-client result for Data Machine product tasks.
+	 *
+	 * @param \WordPress\AiClient\Results\DTO\GenerativeAiResult $result The wp-ai-client result.
+	 * @return string Text content.
+	 */
+	public static function resultText( \WordPress\AiClient\Results\DTO\GenerativeAiResult $result ): string {
+		return (string) $result->toText();
+	}
+
+	/**
+	 * Build product model config from Data Machine's provider request fields.
+	 *
+	 * @param array $request Request fields.
+	 * @return \WordPress\AiClient\Providers\Models\DTO\ModelConfig|null
+	 */
+	private static function productModelConfig( array $request ): ?\WordPress\AiClient\Providers\Models\DTO\ModelConfig {
+		$config = array();
+
+		if ( isset( $request['temperature'] ) && is_numeric( $request['temperature'] ) ) {
+			$config[ \WordPress\AiClient\Providers\Models\DTO\ModelConfig::KEY_TEMPERATURE ] = (float) $request['temperature'];
+		}
+
+		if ( isset( $request['max_tokens'] ) && is_numeric( $request['max_tokens'] ) ) {
+			$config[ \WordPress\AiClient\Providers\Models\DTO\ModelConfig::KEY_MAX_TOKENS ] = (int) $request['max_tokens'];
+		}
+
+		if ( empty( $config ) ) {
+			return null;
+		}
+
+		try {
+			return \WordPress\AiClient\Providers\Models\DTO\ModelConfig::fromArray( $config );
+		} catch ( \Throwable $e ) {
+			return null;
+		}
+	}
+
+	/**
+	 * Normalize Data Machine's legacy tool parameter map into a JSON Schema object.
+	 *
+	 * @param mixed $parameters Raw parameters definition.
+	 * @return array<string, mixed>|null
+	 */
+	private static function normalizeLegacyToolSchema( $parameters ): ?array {
+		if ( ! is_array( $parameters ) || empty( $parameters ) ) {
+			return null;
+		}
+
+		$schema = $parameters;
+		if ( ! isset( $schema['type'] ) && ! isset( $schema['properties'] ) && ! isset( $schema['$ref'] ) ) {
+			$schema = array(
+				'type'       => 'object',
+				'properties' => $schema,
+			);
+		}
+
+		return self::normalizeLegacyRequiredFlags( $schema );
+	}
+
+	/**
+	 * Convert property-level required flags to JSON Schema object-level required list.
+	 *
+	 * @param array<string, mixed> $schema JSON schema.
+	 * @return array<string, mixed>
+	 */
+	private static function normalizeLegacyRequiredFlags( array $schema ): array {
+		if ( empty( $schema['properties'] ) || ! is_array( $schema['properties'] ) ) {
+			return $schema;
+		}
+
+		$required = isset( $schema['required'] ) && is_array( $schema['required'] ) ? $schema['required'] : array();
+
+		foreach ( $schema['properties'] as $property_name => $property_schema ) {
+			if ( ! is_array( $property_schema ) || ! array_key_exists( 'required', $property_schema ) ) {
+				continue;
+			}
+
+			if ( true === $property_schema['required'] ) {
+				$required[] = (string) $property_name;
+			}
+
+			unset( $property_schema['required'] );
+			$schema['properties'][ $property_name ] = $property_schema;
+		}
+
+		$required = array_values( array_unique( array_filter( $required, 'is_string' ) ) );
+		if ( ! empty( $required ) ) {
+			$schema['required'] = $required;
+		} else {
+			unset( $schema['required'] );
+		}
+
+		return $schema;
 	}
 }
