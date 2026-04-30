@@ -9,7 +9,7 @@ Centralized AI request construction ensuring consistent request structure across
 
 The `RequestBuilder` class consolidates all AI request building logic into a single, unified interface. This prevents behavioral differences between Pipeline and Chat agents by ensuring both use identical request construction, tool formatting, and directive application patterns.
 
-**Critical Rule**: Never call `ai-http-client` directly. Always use `RequestBuilder::build()` to ensure consistent request structure and directive application.
+**Critical Rule**: Never call provider clients directly. Always use `RequestBuilder::build()` to ensure consistent request structure, directive application, metadata, and wp-ai-client dispatch.
 
 ## Architecture
 
@@ -30,8 +30,8 @@ Request Building Flow:
 │     • Priority-based sorting and agent targeting    │
 │     • Unified directive management                   │
 │                                                      │
-│  4. Send to ai-http-client                          │
-│     • chubes_ai_request filter                      │
+│  4. Send to wp-ai-client                            │
+│     • WpAiClientAdapter capability gate             │
 │     • Returns standardized AI response              │
 └─────────────────────────────────────────────────────┘
 ```
@@ -220,32 +220,15 @@ $structured_tools['twitter_publish'] = [
 ];
 ```
 
-## Integration with ai-http-client
+## Integration with wp-ai-client
 
-The RequestBuilder sends the finalized request to the ai-http-client library via the `chubes_ai_request` filter:
+The RequestBuilder gates runtime availability through `WpAiClientCapability`, then sends the finalized request through `WpAiClientAdapter`. The gate requires:
 
-```php
-return apply_filters(
-    'chubes_ai_request',
-    $request,
-    $provider,
-    null, // streaming_callback
-    $structured_tools,
-    $context['step_id'] ?? $context['session_id'] ?? null,
-    [
-        'agent_type' => $agent_type,
-        'context' => $context
-    ]
-);
-```
+- `wp_ai_client_prompt()` being defined.
+- `wp_supports_ai()` being defined and returning true.
+- The requested provider, or its known alias, being registered in the wp-ai-client default provider registry.
 
-**Parameters**:
-- `$request` - Complete request array (model, messages, tools)
-- `$provider` - AI provider name (openai, anthropic, google, grok, openrouter)
-- `null` - Streaming callback (not used in current implementation)
-- `$structured_tools` - Restructured tools array
-- `$context['step_id'] ?? $context['session_id']` - Identifier for logging
-- `['agent_type' => ..., 'context' => ...]` - Additional metadata
+If the gate fails, RequestBuilder returns a structured request error with `request_metadata`. It does not fall back to `chubes_ai_request` / `ai-http-client`.
 
 **Response Structure**:
 ```php
@@ -268,7 +251,7 @@ return apply_filters(
 
 ## Context Parameter
 
-The `$context` array provides information to directives and the ai-http-client:
+The `$context` array provides information to directives, logging, transcripts, and request metadata:
 
 ### Pipeline Context
 
@@ -362,12 +345,12 @@ if (!$ai_response['success']) {
 
 ### Configuration Errors
 
-Missing or invalid configuration (model not set, provider not configured) are handled by ai-http-client:
+Missing or invalid runtime configuration (wp-ai-client unavailable, model not set, provider not configured) is returned in the standard response shape:
 
 ```php
 [
     'success' => false,
-    'error' => 'Invalid provider configuration'
+    'error' => 'wp-ai-client provider "openai" is not registered'
 ]
 ```
 
@@ -416,7 +399,7 @@ $ai_response = RequestBuilder::build(
 **Incorrect** (bypasses directive system and tool restructuring):
 ```php
 // NEVER DO THIS
-$ai_response = apply_filters('chubes_ai_request', $request, $provider, null, $tools);
+$ai_response = wp_ai_client_prompt()->generate_text_result();
 ```
 
 ### Provide Complete Context

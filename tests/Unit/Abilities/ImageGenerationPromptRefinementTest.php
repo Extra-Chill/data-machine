@@ -9,7 +9,10 @@ namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\Media\ImageGenerationAbilities;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 use WP_UnitTestCase;
+
+require_once dirname( __DIR__ ) . '/Support/WpAiClientTestDoubles.php';
 
 class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 
@@ -19,22 +22,15 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
 
-		// The bundled ai-http-client vendor registers its own \`chubes_ai_request\`
-		// filter at priority 99 that ignores the \$request payload and always
-		// attempts a real provider call (returning an error when no API key is
-		// configured, as in the test environment). That overrides any lower-
-		// priority mock we register, so we clear the hook before each test.
-		remove_all_filters( 'chubes_ai_request' );
-
-		// Mock the RequestBuilder for testing AI requests
-		add_filter( 'chubes_ai_request', [ $this, 'mock_ai_response' ], 10, 6 );
+		WpAiClientTestDouble::reset();
+		WpAiClientTestDouble::set_response_callback( [ $this, 'mock_ai_response' ] );
 	}
 
 	public function tear_down(): void {
 		delete_site_option( 'datamachine_image_generation_config' );
 		delete_option( 'datamachine_settings' );
 		PluginSettings::clearCache();
-		remove_filter( 'chubes_ai_request', [ $this, 'mock_ai_response' ] );
+		WpAiClientTestDouble::reset();
 		parent::tear_down();
 	}
 
@@ -61,7 +57,7 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 	 * @param array $request Request parameters.
 	 * @return array Mocked response.
 	 */
-	public function mock_ai_response( $request, $provider = '', $streaming = null, $tools = array(), $step_id = null, $context = array() ) {
+	public function mock_ai_response( array $request ): array {
 		// Return a refined prompt for testing
 		return array(
 			'success' => true,
@@ -144,14 +140,13 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 
 		// Capture the AI request to verify context is included.
 		$captured_request = null;
-		remove_filter( 'chubes_ai_request', array( $this, 'mock_ai_response' ) );
-		add_filter( 'chubes_ai_request', function ( $request ) use ( &$captured_request ) {
+		WpAiClientTestDouble::set_response_callback( function ( array $request ) use ( &$captured_request ): array {
 			$captured_request = $request;
 			return array(
 				'success' => true,
 				'data'    => array( 'content' => 'refined prompt with context' ),
 			);
-		}, 10, 6 );
+		} );
 
 		ImageGenerationAbilities::refine_prompt( 'Crane meaning', 'This article explores the spiritual symbolism of cranes in various cultures.' );
 
@@ -181,14 +176,13 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		
 		// Track the AI request to verify custom style guide is used
 		$captured_request = null;
-		remove_filter( 'chubes_ai_request', [ $this, 'mock_ai_response' ] );
-		add_filter( 'chubes_ai_request', function( $request ) use ( &$captured_request ) {
+		WpAiClientTestDouble::set_response_callback( function( array $request ) use ( &$captured_request ): array {
 			$captured_request = $request;
 			return [
 				'success' => true,
 				'data' => [ 'content' => 'refined prompt with custom style' ]
 			];
-		}, 10, 6 );
+		} );
 		
 		ImageGenerationAbilities::refine_prompt( 'Test prompt', '', $config );
 		
@@ -223,13 +217,12 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		) );
 		
 		// Mock AI failure
-		remove_filter( 'chubes_ai_request', [ $this, 'mock_ai_response' ] );
-		add_filter( 'chubes_ai_request', function() {
+		WpAiClientTestDouble::set_response_callback( function(): array {
 			return [
 				'success' => false,
 				'error' => 'API error'
 			];
-		}, 10, 6 );
+		} );
 		
 		$refined = ImageGenerationAbilities::refine_prompt( 'Test prompt' );
 		
@@ -243,13 +236,12 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		) );
 		
 		// Mock empty AI response
-		remove_filter( 'chubes_ai_request', [ $this, 'mock_ai_response' ] );
-		add_filter( 'chubes_ai_request', function() {
+		WpAiClientTestDouble::set_response_callback( function(): array {
 			return [
 				'success' => true,
 				'data' => [ 'content' => '' ]
 			];
-		}, 10, 6 );
+		} );
 		
 		$refined = ImageGenerationAbilities::refine_prompt( 'Test prompt' );
 		

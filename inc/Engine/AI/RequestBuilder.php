@@ -25,10 +25,9 @@ class RequestBuilder {
 	 * build identical request structures. Handles tool restructuring, directive
 	 * application via PromptBuilder, and request dispatch.
 	 *
-	 * Dispatch path is feature-detected at runtime: when WordPress core's wp-ai-client
-	 * is available and a provider plugin has registered the requested provider, the
-	 * request is sent through {@see WpAiClientAdapter::dispatch()}. Otherwise it falls
-	 * back to the bundled ai-http-client library via the `chubes_ai_request` filter.
+	 * Dispatch requires WordPress core's wp-ai-client plus a provider plugin that has
+	 * registered the requested provider. Missing wp-ai-client support is surfaced as a
+	 * request error; agents-api must not silently fall back to ai-http-client.
 	 *
 	 * @param array  $messages    Initial messages array with role/content
 	 * @param string $provider    AI provider name (openai, anthropic, google, grok, openrouter)
@@ -86,67 +85,82 @@ class RequestBuilder {
 			)
 		);
 
-		// 4. Dispatch the request.
-		//
-		// When WordPress core's AI client is available AND a provider plugin has
-		// registered the requested provider, route the request through wp-ai-client.
-		// Otherwise fall back to the bundled ai-http-client library via the
-		// `chubes_ai_request` filter — preserving today's behavior on sites that
-		// haven't adopted core's provider plugins yet.
-		//
-		// This bridge is request-execution-only. Admin UI, providers REST endpoint,
-		// settings, and key storage continue to flow through the chubes_ai_* filter
-		// surface. Once WordPress 7.0 is the minimum supported version, those layers
-		// will be migrated and ai-http-client will be removed entirely.
-		if ( WpAiClientAdapter::isAvailable( $provider ) ) {
-			$wp_ai_response = WpAiClientAdapter::dispatch( $provider_request, $provider, $structured_tools );
+		// 4. Dispatch the request. wp-ai-client is the only runtime provider path.
+		$unavailable_reason = WpAiClientCapability::unavailableReason( $provider );
+		if ( null !== $unavailable_reason ) {
+			$response = array(
+				'success'          => false,
+				'provider'         => $provider,
+				'error'            => $unavailable_reason,
+				'data'             => array(
+					'content'    => '',
+					'tool_calls' => array(),
+					'usage'      => array(
+						'prompt_tokens'     => 0,
+						'completion_tokens' => 0,
+						'total_tokens'      => 0,
+					),
+				),
+				'request_metadata' => $request_metadata,
+			);
 
-			// dispatch() returns null when the bridge cannot translate the request
-			// (e.g. multi-modal content) so we transparently fall through to the
-			// legacy path below.
-			if ( null !== $wp_ai_response ) {
-				do_action(
-					'datamachine_log',
-					'debug',
-					'AI request dispatched via wp-ai-client',
-					array_filter(
-						array(
-							'mode'         => $mode,
-							'job_id'       => $payload['job_id'] ?? null,
-							'flow_step_id' => $payload['flow_step_id'] ?? null,
-							'provider'     => $provider,
-							'model'        => $model,
-							'success'      => $wp_ai_response['success'] ?? false,
-						),
-						fn( $v ) => null !== $v
-					)
-				);
+			do_action(
+				'datamachine_log',
+				'error',
+				'AI request blocked: wp-ai-client unavailable',
+				array_filter(
+					array(
+						'mode'         => $mode,
+						'job_id'       => $payload['job_id'] ?? null,
+						'flow_step_id' => $payload['flow_step_id'] ?? null,
+						'provider'     => $provider,
+						'model'        => $model,
+						'error'        => $unavailable_reason,
+					),
+					fn( $v ) => null !== $v
+				)
+			);
 
-				$wp_ai_response['request_metadata'] = $request_metadata;
-				return $wp_ai_response;
-			}
+			return $response;
 		}
 
-		// Legacy path: ai-http-client via chubes_ai_request filter.
-		/** @phpstan-ignore-next-line WordPress filters accept context arguments beyond the filtered value. */
-		$response = apply_filters(
-			'chubes_ai_request',
-			$provider_request,
-			$provider,
-			null, // streaming_callback
-			$structured_tools,
-			$payload['step_id'] ?? $payload['session_id'] ?? null,
-			array(
-				'mode'    => $mode,
-				'payload' => $payload,
+		$wp_ai_response = WpAiClientAdapter::dispatch( $provider_request, $provider, $structured_tools );
+		if ( null === $wp_ai_response ) {
+			$wp_ai_response = array(
+				'success'  => false,
+				'provider' => $provider,
+				'error'    => 'wp-ai-client adapter cannot translate this request shape yet',
+				'data'     => array(
+					'content'    => '',
+					'tool_calls' => array(),
+					'usage'      => array(
+						'prompt_tokens'     => 0,
+						'completion_tokens' => 0,
+						'total_tokens'      => 0,
+					),
+				),
+			);
+		}
+
+		do_action(
+			'datamachine_log',
+			'debug',
+			'AI request dispatched via wp-ai-client',
+			array_filter(
+				array(
+					'mode'         => $mode,
+					'job_id'       => $payload['job_id'] ?? null,
+					'flow_step_id' => $payload['flow_step_id'] ?? null,
+					'provider'     => $provider,
+					'model'        => $model,
+					'success'      => $wp_ai_response['success'] ?? false,
+				),
+				fn( $v ) => null !== $v
 			)
 		);
 
-		if ( is_array( $response ) ) {
-			$response['request_metadata'] = $request_metadata;
-		}
-
-		return $response;
+		$wp_ai_response['request_metadata'] = $request_metadata;
+		return $wp_ai_response;
 	}
 
 	/**
