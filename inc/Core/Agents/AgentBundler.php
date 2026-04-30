@@ -25,6 +25,7 @@ use DataMachine\Engine\Bundle\AgentBundleFlowFile;
 use DataMachine\Engine\Bundle\AgentBundleLegacyAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
+use DataMachine\Engine\Bundle\AgentPackageProjection;
 use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Bundle\PortableSlug;
 
@@ -236,11 +237,34 @@ class AgentBundler {
 			)
 		);
 
+		$directory = new AgentBundleDirectory( $manifest, $memory_files, $pipeline_documents, $flow_documents, array(), $extension_artifacts );
+
 		return array(
 			'success'   => true,
 			'agent'     => $agent,
-			'directory' => new AgentBundleDirectory( $manifest, $memory_files, $pipeline_documents, $flow_documents, array(), $extension_artifacts ),
+			'directory' => $directory,
+			'package'   => AgentPackageProjection::from_directory( $directory ),
 		);
+	}
+
+	/**
+	 * Project a legacy bundle array to the Core-shaped package contract.
+	 *
+	 * @param array<string,mixed> $bundle Legacy bundle array.
+	 * @return \WP_Agent_Package
+	 */
+	public static function package_from_bundle( array $bundle ): \WP_Agent_Package {
+		return AgentPackageProjection::from_legacy_bundle( $bundle );
+	}
+
+	/**
+	 * Project a bundle directory to the Core-shaped package contract.
+	 *
+	 * @param AgentBundleDirectory $directory Bundle directory.
+	 * @return \WP_Agent_Package
+	 */
+	public static function package_from_directory( AgentBundleDirectory $directory ): \WP_Agent_Package {
+		return AgentPackageProjection::from_directory( $directory );
 	}
 
 	/**

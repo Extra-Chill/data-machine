@@ -51,6 +51,7 @@ require_once __DIR__ . '/Api/StepTypes.php';
 require_once __DIR__ . '/Api/Handlers.php';
 require_once __DIR__ . '/Api/Tools.php';
 require_once __DIR__ . '/Api/Chat/ChatFilters.php';
+require_once __DIR__ . '/Engine/Bundle/register-agent-package-artifacts.php';
 require_once __DIR__ . '/Engine/Bundle/AgentBundleUpgradeActionHandlers.php';
 require_once __DIR__ . '/Engine/AI/Directives/CoreMemoryFilesDirective.php';
 require_once __DIR__ . '/Engine/AI/Directives/AgentModeDirective.php';
