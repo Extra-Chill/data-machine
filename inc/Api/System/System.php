@@ -16,6 +16,7 @@ use WP_REST_Request;
 use WP_Error;
 use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
+use DataMachine\Engine\AI\System\SystemTaskPromptRegistry;
 use DataMachine\Core\Database\Jobs\JobsOperations;
 
 if ( ! defined('ABSPATH') ) {
@@ -176,7 +177,7 @@ class System {
 	 * @return array|WP_Error Response data or error
 	 */
 	public static function get_status( WP_REST_Request $request ) {
-		$request;
+		unset( $request );
 		return rest_ensure_response(
 			array(
 				'success' => true,
@@ -197,7 +198,7 @@ class System {
 	 * @since 0.32.0
 	 */
 	public static function get_tasks( WP_REST_Request $request ) {
-		$request;
+		unset( $request );
 		$registry  = TaskRegistry::getRegistry();
 		$last_runs = self::get_last_runs( array_keys( $registry ) );
 
@@ -270,7 +271,7 @@ class System {
 	 * @since 0.41.0
 	 */
 	public static function get_prompts( WP_REST_Request $request ) {
-		$request;
+		unset( $request );
 		$handlers  = TaskRegistry::getHandlers();
 		$overrides = SystemTask::getAllPromptOverrides();
 
@@ -281,7 +282,11 @@ class System {
 				continue;
 			}
 
-			$task        = new $handler_class();
+			$task = new $handler_class();
+			if ( ! $task instanceof SystemTask ) {
+				continue;
+			}
+
 			$definitions = $task->getPromptDefinitions();
 
 			if ( empty( $definitions ) ) {
@@ -306,20 +311,16 @@ class System {
 				 */
 				$variables = apply_filters(
 					'datamachine_task_prompt_variable_definitions',
-					$definition['variables'] ?? array(),
+					$definition['variables'],
 					$task_type,
 					$prompt_key
 				);
 
-				$prompts[] = array(
-					'task_type'    => $task_type,
-					'prompt_key'   => $prompt_key,
-					'label'        => $definition['label'],
-					'description'  => $definition['description'],
-					'default'      => $definition['default'],
-					'variables'    => $variables,
-					'has_override' => $has_override,
-					'override'     => $has_override ? $overrides[ $task_type ][ $prompt_key ] : null,
+				$prompts[] = self::format_prompt_response(
+					$task_type,
+					$prompt_key,
+					array_merge( $definition, array( 'variables' => $variables ) ),
+					$has_override ? $overrides[ $task_type ][ $prompt_key ] : null
 				);
 			}
 		}
@@ -334,7 +335,7 @@ class System {
 	 * Get a specific prompt's definition and current value.
 	 *
 	 * @param WP_REST_Request $request Request with task_type and prompt_key.
-	 * @return \WP_REST_Response|WP_Error
+	 * @return \WP_REST_Response|WP_Error|array
 	 * @since 0.41.0
 	 */
 	public static function get_prompt( WP_REST_Request $request ) {
@@ -343,7 +344,7 @@ class System {
 
 		$definition = self::resolve_prompt_definition( $task_type, $prompt_key );
 
-		if ( is_wp_error( $definition ) ) {
+		if ( $definition instanceof WP_Error ) {
 			return $definition;
 		}
 
@@ -353,25 +354,49 @@ class System {
 
 		return rest_ensure_response( array(
 			'success' => true,
-			'data'    => array(
-				'task_type'    => $task_type,
-				'prompt_key'   => $prompt_key,
-				'label'        => $definition['label'],
-				'description'  => $definition['description'],
-				'default'      => $definition['default'],
-				'variables'    => $definition['variables'],
-				'has_override' => $has_override,
-				'override'     => $has_override ? $overrides[ $task_type ][ $prompt_key ] : null,
-				'effective'    => $has_override ? $overrides[ $task_type ][ $prompt_key ] : $definition['default'],
-			),
+			'data'    => self::format_prompt_response( $task_type, $prompt_key, $definition, $has_override ? $overrides[ $task_type ][ $prompt_key ] : null ),
 		) );
+	}
+
+	/**
+	 * Format a system task prompt response with versioned artifact metadata.
+	 *
+	 * @param string      $task_type   Task type identifier.
+	 * @param string      $prompt_key  Prompt key within the task.
+	 * @param array       $definition  Prompt definition.
+	 * @param string|null $override    Local override content.
+	 * @return array<string,mixed>
+	 */
+	private static function format_prompt_response( string $task_type, string $prompt_key, array $definition, ?string $override ): array {
+		$artifact = SystemTaskPromptRegistry::artifact_from_definition( $task_type, $prompt_key, $definition );
+		$resolved = SystemTaskPromptRegistry::resolve_effective_prompt( $task_type, $prompt_key, $artifact, $override );
+
+		return array(
+			'task_type'            => $task_type,
+			'prompt_key'           => $prompt_key,
+			'label'                => $definition['label'],
+			'description'          => $definition['description'],
+			'default'              => $definition['default'],
+			'variables'            => $definition['variables'],
+			'has_override'         => null !== $override && '' !== $override,
+			'override'             => $override,
+			'effective'            => $resolved['content'],
+			'effective_source'     => $resolved['source'],
+			'effective_hash'       => $resolved['content_hash'],
+			'artifact_id'          => $resolved['artifact_id'],
+			'artifact_type'        => $artifact ? $artifact->artifact_type() : 'prompt',
+			'artifact_version'     => $resolved['version'],
+			'artifact_source_path' => $artifact ? $artifact->source_path() : '',
+			'artifact_hash'        => $artifact ? $artifact->content_hash() : '',
+			'artifact_changelog'   => $artifact ? $artifact->version_metadata()['changelog'] : '',
+		);
 	}
 
 	/**
 	 * Set a prompt override for a specific task prompt.
 	 *
 	 * @param WP_REST_Request $request Request with task_type, prompt_key, and prompt.
-	 * @return \WP_REST_Response|WP_Error
+	 * @return \WP_REST_Response|WP_Error|array
 	 * @since 0.41.0
 	 */
 	public static function set_prompt( WP_REST_Request $request ) {
@@ -381,7 +406,7 @@ class System {
 
 		$definition = self::resolve_prompt_definition( $task_type, $prompt_key );
 
-		if ( is_wp_error( $definition ) ) {
+		if ( $definition instanceof WP_Error ) {
 			return $definition;
 		}
 
@@ -409,7 +434,7 @@ class System {
 	 * Reset a prompt override to default (remove the override).
 	 *
 	 * @param WP_REST_Request $request Request with task_type and prompt_key.
-	 * @return \WP_REST_Response|WP_Error
+	 * @return \WP_REST_Response|WP_Error|array
 	 * @since 0.41.0
 	 */
 	public static function reset_prompt( WP_REST_Request $request ) {
@@ -418,7 +443,7 @@ class System {
 
 		$definition = self::resolve_prompt_definition( $task_type, $prompt_key );
 
-		if ( is_wp_error( $definition ) ) {
+		if ( $definition instanceof WP_Error ) {
 			return $definition;
 		}
 
@@ -466,7 +491,16 @@ class System {
 			);
 		}
 
-		$task        = new $handler_class();
+		$task = new $handler_class();
+		if ( ! $task instanceof SystemTask ) {
+			return new WP_Error(
+				'invalid_task_class',
+			// translators: %s: fully-qualified task handler class name.
+				sprintf( __( 'Task handler class is not a SystemTask: %s', 'data-machine' ), $handler_class ),
+				array( 'status' => 500 )
+			);
+		}
+
 		$definitions = $task->getPromptDefinitions();
 
 		if ( ! isset( $definitions[ $prompt_key ] ) ) {
