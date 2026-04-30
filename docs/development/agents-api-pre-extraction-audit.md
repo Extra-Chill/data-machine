@@ -2,7 +2,45 @@
 
 Parent issue: [Explore splitting Agents API out of Data Machine](https://github.com/Extra-Chill/data-machine/issues/1561)
 
-This audit records the remaining work after the first in-place untangling wave. The boundary is now mostly visible: Data Machine owns pipelines and automation; the future Agents API owns generic agent runtime primitives. The next phase is to make those primitives look like Agents API while they still live in this repository.
+Strategy issue: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)
+
+Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
+
+This audit records the remaining work after the first in-place untangling wave. The boundary is now mostly visible: Data Machine owns pipelines and automation; the future Agents API owns generic agent runtime primitives. The next phase is to make those primitives live behind an in-repo `data-machine/agents-api/` module boundary while they still ship with Data Machine.
+
+## Strategy Update
+
+The next step is not direct slice-by-slice extraction to an external repository. Build an in-repo module first:
+
+```text
+data-machine/
+  agents-api/
+    agents-api.php
+    inc/
+    tests/
+  inc/
+    ...Data Machine pipelines/product code...
+```
+
+Treat `data-machine/agents-api/` like WordPress core substrate while it still lives inside Data Machine:
+
+- `agents-api` owns the WordPress-shaped agent runtime vocabulary and contracts.
+- Data Machine consumes `agents-api` as product code.
+- `agents-api` must not import Data Machine product namespaces.
+- Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, pending actions, content operations, and admin UI.
+- Later standalone extraction means moving the already-bounded module into its own plugin/repo and adding plugin bootstrap, dependency, release, and distribution ceremony.
+
+Dependency direction:
+
+```text
+WordPress / wp-ai-client
+        ↑
+data-machine/agents-api
+        ↑
+Data Machine pipelines/product
+```
+
+`ai-http-client` is not future architecture. It is only packaging precedent for bundled-then-extracted code. The future runtime dependency direction is `Data Machine -> agents-api -> wp-ai-client`; `ai-http-client` dies as part of [#1027](https://github.com/Extra-Chill/data-machine/issues/1027) / [#1633](https://github.com/Extra-Chill/data-machine/issues/1633).
 
 ## Current State
 
@@ -18,7 +56,17 @@ The initial untangling wave is complete:
 - `AgentConversationRequest::payload()` now exposes the generic runtime payload with Data Machine job/flow/pipeline/handler/transcript fields removed. Data Machine keeps those fields in `adapterContext()` and reconstructs the historical flat payload through `adapterPayload()` until the loop, prompt builder, and tool executor stop consuming the compatibility shape.
 - The built-in loop now receives runtime completion and transcript collaborators. Data Machine's handler-completion and pipeline-transcript behavior lives behind adapter classes instead of being hardcoded as generic loop state.
 
-This branch starts the naming phase by renaming the neutral runner result/request seam from `AIConversation*` to `AgentConversation*` while leaving `AIConversationLoop` as the temporary compatibility facade.
+This branch starts the naming phase by renaming the neutral runner result/request seam from `AIConversation*` to `AgentConversation*` while leaving `AIConversationLoop` as the temporary compatibility facade. The target home for boring generic runtime pieces is the in-repo `data-machine/agents-api/` module, not an immediate standalone plugin.
+
+## In-Repo Module Gate
+
+Before standalone extraction, the in-repo module should satisfy these gates:
+
+- `data-machine/agents-api/` exists and loads before Data Machine product runtime bootstraps.
+- A bootstrap smoke can load `agents-api` without Data Machine product code.
+- No `agents-api` file imports `DataMachine\Core\Steps`, `DataMachine\Core\Database\Jobs`, handler, queue, retention, pending-action, admin UI, or content-operation namespaces.
+- Data Machine product code imports the module as a dependency instead of reaching across same-layer runtime/product paths.
+- Provider runtime code targets `wp-ai-client`; no `ai-http-client` fallback is introduced or preserved inside `agents-api`.
 
 ## Remaining In-Place Rename Work
 
@@ -139,6 +187,7 @@ Before physical extraction, verify that generic runtime candidates do not:
 - Call Data Machine job/engine APIs directly.
 - Emit `datamachine_log` directly instead of using a generic event sink.
 - Depend on `datamachine_tools` legacy class/method declarations.
+- Depend on `ai-http-client` or `chubes_ai_*` filters.
 - Mention wpcom classes in public signatures.
 
 ## What Agents API Can Enable Without Data Machine
