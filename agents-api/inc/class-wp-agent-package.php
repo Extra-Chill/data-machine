@@ -48,7 +48,7 @@ if ( ! class_exists( 'WP_Agent_Package' ) ) {
 		/**
 		 * Generic artifact definitions.
 		 *
-		 * @var array<int, array<string, string>>
+		 * @var array<int, WP_Agent_Package_Artifact>
 		 */
 		private array $artifacts = array();
 
@@ -136,7 +136,7 @@ if ( ! class_exists( 'WP_Agent_Package' ) ) {
 		/**
 		 * Retrieves artifact definitions.
 		 *
-		 * @return array<int, array<string, string>>
+		 * @return array<int, WP_Agent_Package_Artifact>
 		 */
 		public function get_artifacts(): array {
 			return $this->artifacts;
@@ -162,7 +162,12 @@ if ( ! class_exists( 'WP_Agent_Package' ) ) {
 				'version'      => $this->version,
 				'agent'        => $this->agent->to_array(),
 				'capabilities' => $this->capabilities,
-				'artifacts'    => $this->artifacts,
+				'artifacts'    => array_map(
+					static function ( WP_Agent_Package_Artifact $artifact ): array {
+						return $artifact->to_array();
+					},
+					$this->artifacts
+				),
 				'meta'         => $this->meta,
 			);
 		}
@@ -238,7 +243,7 @@ if ( ! class_exists( 'WP_Agent_Package' ) ) {
 		 * Prepares artifact declarations.
 		 *
 		 * @param mixed $artifacts Raw artifacts.
-		 * @return array<int, array<string, string>>
+		 * @return array<int, WP_Agent_Package_Artifact>
 		 */
 		private function prepare_artifacts( $artifacts ): array {
 			if ( ! is_array( $artifacts ) ) {
@@ -247,31 +252,22 @@ if ( ! class_exists( 'WP_Agent_Package' ) ) {
 
 			$prepared = array();
 			foreach ( $artifacts as $artifact ) {
+				if ( $artifact instanceof WP_Agent_Package_Artifact ) {
+					$prepared[] = $artifact;
+					continue;
+				}
+
 				if ( ! is_array( $artifact ) ) {
 					throw new InvalidArgumentException( 'Agent package artifacts must be objects.' );
 				}
 
-				$type = sanitize_title( (string) ( $artifact['type'] ?? '' ) );
-				$slug = sanitize_title( (string) ( $artifact['slug'] ?? '' ) );
-				if ( '' === $type || '' === $slug ) {
-					throw new InvalidArgumentException( 'Agent package artifacts require type and slug.' );
-				}
-
-				$row = array(
-					'type'        => $type,
-					'slug'        => $slug,
-					'label'       => isset( $artifact['label'] ) ? trim( (string) $artifact['label'] ) : $slug,
-					'description' => isset( $artifact['description'] ) ? trim( (string) $artifact['description'] ) : '',
-					'source'      => isset( $artifact['source'] ) ? trim( (string) $artifact['source'] ) : '',
-				);
-
-				$prepared[] = $row;
+				$prepared[] = new WP_Agent_Package_Artifact( $artifact );
 			}
 
 			usort(
 				$prepared,
-				static function ( array $a, array $b ): int {
-					return array( $a['type'], $a['slug'] ) <=> array( $b['type'], $b['slug'] );
+				static function ( WP_Agent_Package_Artifact $a, WP_Agent_Package_Artifact $b ): int {
+					return array( $a->get_type(), $a->get_slug() ) <=> array( $b->get_type(), $b->get_slug() );
 				}
 			);
 

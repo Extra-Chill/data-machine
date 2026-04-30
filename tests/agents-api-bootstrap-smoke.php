@@ -37,8 +37,16 @@ agents_api_smoke_assert_equals( true, function_exists( 'wp_get_agent' ), 'wp_get
 agents_api_smoke_assert_equals( true, function_exists( 'wp_get_agents' ), 'wp_get_agents helper is available', $failures, $passes );
 agents_api_smoke_assert_equals( true, function_exists( 'wp_has_agent' ), 'wp_has_agent helper is available', $failures, $passes );
 agents_api_smoke_assert_equals( true, function_exists( 'wp_unregister_agent' ), 'wp_unregister_agent helper is available', $failures, $passes );
+agents_api_smoke_assert_equals( true, function_exists( 'wp_register_agent_package_artifact_type' ), 'wp_register_agent_package_artifact_type helper is available', $failures, $passes );
+agents_api_smoke_assert_equals( true, function_exists( 'wp_get_agent_package_artifact_type' ), 'wp_get_agent_package_artifact_type helper is available', $failures, $passes );
+agents_api_smoke_assert_equals( true, function_exists( 'wp_get_agent_package_artifact_types' ), 'wp_get_agent_package_artifact_types helper is available', $failures, $passes );
+agents_api_smoke_assert_equals( true, function_exists( 'wp_has_agent_package_artifact_type' ), 'wp_has_agent_package_artifact_type helper is available', $failures, $passes );
+agents_api_smoke_assert_equals( true, function_exists( 'wp_unregister_agent_package_artifact_type' ), 'wp_unregister_agent_package_artifact_type helper is available', $failures, $passes );
 agents_api_smoke_assert_equals( true, class_exists( 'WP_Agent' ), 'WP_Agent value object is available', $failures, $passes );
 agents_api_smoke_assert_equals( true, class_exists( 'WP_Agents_Registry' ), 'WP_Agents_Registry facade is available', $failures, $passes );
+agents_api_smoke_assert_equals( true, class_exists( 'WP_Agent_Package_Artifact' ), 'WP_Agent_Package_Artifact value object is available', $failures, $passes );
+agents_api_smoke_assert_equals( true, class_exists( 'WP_Agent_Package_Artifact_Type' ), 'WP_Agent_Package_Artifact_Type value object is available', $failures, $passes );
+agents_api_smoke_assert_equals( true, class_exists( 'WP_Agent_Package_Artifacts_Registry' ), 'WP_Agent_Package_Artifacts_Registry facade is available', $failures, $passes );
 foreach ( $namespace_map as $legacy_class => $target_class ) {
 	agents_api_smoke_assert_equals( true, class_exists( $target_class ) || interface_exists( $target_class ), $target_class . ' contract is available', $failures, $passes );
 	agents_api_smoke_assert_equals( false, class_exists( $legacy_class, false ) || interface_exists( $legacy_class, false ), $legacy_class . ' compatibility alias is not loaded', $failures, $passes );
