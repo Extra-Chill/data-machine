@@ -1466,7 +1466,7 @@ arrays are projection shapes at provider boundaries, not the store contract.
 - `list_sessions_for_day` — day-scoped summary rows for the Daily Memory Task
 - `get_storage_metrics` — row count + on-disk size for the `wp datamachine retention status` CLI; return `null` to opt out
 
-### AgentMemoryStoreInterface (`/inc/Core/FilesRepository/AgentMemoryStoreInterface.php`)
+### AgentMemoryStoreInterface (`/agents-api/inc/Core/FilesRepository/AgentMemoryStoreInterface.php`)
 
 **Purpose**: Single seam between agent memory operations and the underlying
 persistence backend. The contract is generic agent-memory persistence: it does
@@ -1486,7 +1486,7 @@ apply_filters(
 );
 ```
 
-Return an [`AgentMemoryStoreInterface`](../../../inc/Core/FilesRepository/AgentMemoryStoreInterface.php)
+Return an [`AgentMemoryStoreInterface`](../../../agents-api/inc/Core/FilesRepository/AgentMemoryStoreInterface.php)
 implementation to replace the disk default for this scope. Return `null` (the
 default) to let Data Machine read and write through the filesystem.
 

@@ -5,7 +5,7 @@
  * Store-neutral value object representing a single file in a layer listing
  * returned by AgentMemoryStoreInterface::list_layer().
  *
- * @package DataMachine\Core\FilesRepository
+ * @package AgentsAPI
  * @since   next
  */
 

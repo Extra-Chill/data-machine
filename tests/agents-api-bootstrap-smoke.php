@@ -68,9 +68,12 @@ assert_agents_api_equals( true, interface_exists( 'DataMachine\\Core\\Database\\
 assert_agents_api_equals( true, class_exists( 'DataMachine\\Engine\\AI\\AgentMessageEnvelope' ), 'AgentMessageEnvelope contract is available', $failures, $passes );
 assert_agents_api_equals( true, class_exists( 'DataMachine\\Engine\\AI\\AgentConversationResult' ), 'AgentConversationResult contract is available', $failures, $passes );
 assert_agents_api_equals( true, class_exists( 'DataMachine\\Engine\\AI\\Tools\\RuntimeToolDeclaration' ), 'RuntimeToolDeclaration contract is available', $failures, $passes );
+assert_agents_api_equals( true, interface_exists( 'DataMachine\\Core\\FilesRepository\\AgentMemoryStoreInterface' ), 'AgentMemoryStoreInterface contract is available', $failures, $passes );
+assert_agents_api_equals( true, class_exists( 'DataMachine\\Core\\FilesRepository\\AgentMemoryScope' ), 'AgentMemoryScope contract is available', $failures, $passes );
 assert_agents_api_equals( false, class_exists( 'DataMachine\\Engine\\Agents\\AgentRegistry', false ), 'Data Machine registry is not loaded by module bootstrap', $failures, $passes );
 assert_agents_api_equals( false, class_exists( 'DataMachine\\Engine\\AI\\AIConversationLoop', false ), 'Data Machine compatibility loop is not loaded by module bootstrap', $failures, $passes );
 assert_agents_api_equals( false, class_exists( 'DataMachine\\Engine\\AI\\BuiltInAgentConversationRunner', false ), 'Data Machine built-in runner is not loaded by module bootstrap', $failures, $passes );
+assert_agents_api_equals( false, class_exists( 'DataMachine\\Core\\FilesRepository\\DiskAgentMemoryStore', false ), 'Data Machine disk memory store is not loaded by module bootstrap', $failures, $passes );
 
 echo "\n[2] Public registration hook collects definitions once and stays side-effect free:\n";
 add_action(
