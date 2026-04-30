@@ -170,6 +170,7 @@ class RequestBuilder {
 		array $payload = array()
 	): array {
 		$structured_tools = self::restructure_tools( $tools );
+		$payload          = self::withDirectiveContext( $payload );
 
 		$promptBuilder = new PromptBuilder();
 		$promptBuilder->setMessages( $messages )->setTools( $structured_tools );
@@ -234,5 +235,36 @@ class RequestBuilder {
 		}
 
 		return $structured;
+	}
+
+	/**
+	 * Carry Data Machine validation identifiers through an explicit directive context.
+	 *
+	 * PromptBuilder is the generic prompt/directive assembly surface; it should not
+	 * know about jobs or flow steps directly. RequestBuilder is still the Data
+	 * Machine adapter layer, so it maps the existing payload shape into the neutral
+	 * context consumed by directive validation/logging.
+	 *
+	 * @param array $payload Step or chat payload.
+	 * @return array Payload with directive_context populated when available.
+	 */
+	private static function withDirectiveContext( array $payload ): array {
+		if ( isset( $payload['directive_context'] ) && is_array( $payload['directive_context'] ) ) {
+			return $payload;
+		}
+
+		$context = array_filter(
+			array(
+				'job_id'       => $payload['job_id'] ?? null,
+				'flow_step_id' => $payload['flow_step_id'] ?? null,
+			),
+			fn( $value ) => null !== $value
+		);
+
+		if ( ! empty( $context ) ) {
+			$payload['directive_context'] = $context;
+		}
+
+		return $payload;
 	}
 }

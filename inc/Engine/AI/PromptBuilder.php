@@ -130,13 +130,9 @@ class PromptBuilder {
 		$applied_directives    = array();
 		$directive_metadata    = array();
 		$directive_breakdown   = array();
-		$validation_context    = array_filter(
-			array(
-				'job_id'       => $payload['job_id'] ?? null,
-				'flow_step_id' => $payload['flow_step_id'] ?? null,
-			),
-			fn( $v ) => null !== $v
-		);
+		$validation_context    = is_array( $payload['directive_context'] ?? null )
+			? $payload['directive_context']
+			: array();
 
 		foreach ( $this->directives as $directiveConfig ) {
 			$directive = $directiveConfig['directive'];
