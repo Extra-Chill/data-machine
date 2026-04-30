@@ -72,6 +72,17 @@ function agents_api_memory_assert_same( $expected, $actual, string $name ): void
 	echo '    actual:   ' . var_export( $actual, true ) . "\n";
 }
 
+/**
+ * Keep the final failure gate opaque to static analysis; the point of this
+ * smoke is runtime assertion output, not compile-time proof of every branch.
+ *
+ * @param string[] $failures Assertion failure names.
+ * @return bool
+ */
+function agents_api_memory_has_failures( array $failures ): bool {
+	return count( $failures ) > 0;
+}
+
 class AgentsApiMemoryFakeStore implements AgentMemoryStoreInterface {
 
 	/** @var array<string, string> */
@@ -181,7 +192,7 @@ $delete = $store->delete( $scope );
 agents_api_memory_assert_same( true, $delete->success, 'delete succeeds' );
 agents_api_memory_assert_same( false, $store->exists( $scope ), 'exists reflects delete' );
 
-if ( $failures ) {
+if ( agents_api_memory_has_failures( $failures ) ) {
 	echo "\nFAILED: " . count( $failures ) . " Agents API memory assertions failed.\n";
 	exit( 1 );
 }
