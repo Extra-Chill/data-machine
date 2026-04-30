@@ -514,7 +514,7 @@ class AgentBundleCommand extends BaseCommand {
 
 	private function output_plan( array $plan, array $assoc_args ): void {
 		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
-			WP_CLI::line( wp_json_encode( $plan, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( (string) wp_json_encode( $plan, JSON_PRETTY_PRINT ) );
 			return;
 		}
 
@@ -543,7 +543,7 @@ class AgentBundleCommand extends BaseCommand {
 
 	private function output( array $value, array $assoc_args, array $table_fields ): void {
 		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
-			WP_CLI::line( wp_json_encode( $value, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( (string) wp_json_encode( $value, JSON_PRETTY_PRINT ) );
 			return;
 		}
 

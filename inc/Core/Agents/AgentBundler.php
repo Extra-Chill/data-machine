@@ -1236,7 +1236,7 @@ class AgentBundler {
 	 * @return string JSON string.
 	 */
 	public function to_json( array $bundle ): string {
-		return wp_json_encode( $bundle, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		return (string) wp_json_encode( $bundle, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 	}
 
 	/**
