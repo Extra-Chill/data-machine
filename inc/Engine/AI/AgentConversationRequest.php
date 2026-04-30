@@ -39,11 +39,14 @@ class AgentConversationRequest {
 	/** @var LoopEventSinkInterface Event sink carried by the request. */
 	private LoopEventSinkInterface $event_sink;
 
-	/** @var array Original loop payload. */
+	/** @var array Generic runtime payload with Data Machine adapter fields removed. */
 	private array $payload;
 
 	/** @var array Data Machine adapter context. */
 	private array $adapter_context;
+
+	/** @var array Historical flat Data Machine payload for compatibility callers. */
+	private array $adapter_payload;
 
 	/**
 	 * Build a request from the legacy AIConversationLoop::run() argument list.
@@ -104,11 +107,12 @@ class AgentConversationRequest {
 		$this->tools           = $tools;
 		$this->model_config    = $model_config;
 		$this->mode            = $mode;
-		$this->payload         = $payload;
+		$this->adapter_context = self::buildAdapterContext( $payload );
+		$this->payload         = self::buildRuntimePayload( $payload );
+		$this->adapter_payload = $payload;
 		$this->max_turns       = $max_turns;
 		$this->single_turn     = $single_turn;
 		$this->event_sink      = self::resolveEventSink( $payload );
-		$this->adapter_context = self::buildAdapterContext( $payload );
 	}
 
 	/** @return array Initial conversation messages. */
@@ -156,7 +160,7 @@ class AgentConversationRequest {
 		return $this->event_sink;
 	}
 
-	/** @return array Original loop payload. */
+	/** @return array Generic runtime payload with Data Machine adapter fields removed. */
 	public function payload(): array {
 		return $this->payload;
 	}
@@ -164,6 +168,20 @@ class AgentConversationRequest {
 	/** @return array Data Machine adapter context. */
 	public function adapterContext(): array {
 		return $this->adapter_context;
+	}
+
+	/**
+	 * Return the Data Machine compatibility payload for legacy loop consumers.
+	 *
+	 * Generic runner implementations should use {@see self::payload()} and
+	 * {@see self::adapterContext()} separately. Data Machine's in-place runtime
+	 * still needs the historical flat payload while the loop, prompt builder, and
+	 * tool executor are peeled apart.
+	 *
+	 * @return array Legacy adapter payload.
+	 */
+	public function adapterPayload(): array {
+		return $this->adapter_payload;
 	}
 
 	/**
@@ -178,10 +196,24 @@ class AgentConversationRequest {
 			$this->provider(),
 			$this->model(),
 			$this->mode,
-			$this->payload,
+			$this->adapterPayload(),
 			$this->max_turns,
 			$this->single_turn,
 		);
+	}
+
+	/**
+	 * Remove Data Machine adapter fields from the generic runtime payload.
+	 *
+	 * @param array $payload Loop payload.
+	 * @return array Runtime payload.
+	 */
+	private static function buildRuntimePayload( array $payload ): array {
+		foreach ( array_keys( self::buildAdapterContext( $payload ) ) as $key ) {
+			unset( $payload[ $key ] );
+		}
+
+		return $payload;
 	}
 
 	/**

@@ -122,11 +122,19 @@ assert_runner_request( 'pipeline' === $request->mode(), 'request exposes mode' )
 assert_runner_request( 7 === $request->maxTurns(), 'request exposes max turns' );
 assert_runner_request( true === $request->singleTurn(), 'request exposes single-turn flag' );
 assert_runner_request( $sink === $request->eventSink(), 'request exposes event sink' );
+assert_runner_request( ! array_key_exists( 'job_id', $request->payload() ), 'generic payload excludes job id' );
+assert_runner_request( ! array_key_exists( 'flow_step_id', $request->payload() ), 'generic payload excludes flow step id' );
+assert_runner_request( ! array_key_exists( 'pipeline_id', $request->payload() ), 'generic payload excludes pipeline id' );
+assert_runner_request( ! array_key_exists( 'flow_id', $request->payload() ), 'generic payload excludes flow id' );
+assert_runner_request( ! array_key_exists( 'configured_handler_slugs', $request->payload() ), 'generic payload excludes handler completion policy' );
+assert_runner_request( ! array_key_exists( 'persist_transcript', $request->payload() ), 'generic payload excludes transcript policy' );
+assert_runner_request( ! array_key_exists( 'engine', $request->payload() ), 'generic payload excludes engine object' );
 assert_runner_request( 1569 === $request->adapterContext()['job_id'], 'adapter context carries job id' );
 assert_runner_request( 31 === $request->adapterContext()['pipeline_id'], 'adapter context carries pipeline id' );
 assert_runner_request( array( 'wiki_upsert' ) === $request->adapterContext()['configured_handler_slugs'], 'adapter context carries handler completion policy' );
 assert_runner_request( false === $request->adapterContext()['persist_transcript'], 'adapter context carries transcript policy' );
 assert_runner_request( array( 'snapshot' => 'present' ) === $request->adapterContext()['engine'], 'adapter context carries engine snapshot' );
+assert_runner_request( $payload === $request->adapterPayload(), 'adapter payload reconstructs the legacy Data Machine payload' );
 
 // 2. The compatibility facade passes the historical argument list to the Agents API runner filter.
 $legacy_filter_args = null;
