@@ -599,6 +599,31 @@ class ExecuteStepAbility {
 		}
 
 		// Non-fetch steps: empty data packet is an actual failure.
+		$already_failed_status = $this->getAlreadyFailedJobStatus( $job_id );
+		if ( null !== $already_failed_status ) {
+			do_action(
+				'datamachine_log',
+				'debug',
+				'Step returned no data after job was already marked failed',
+				array(
+					'job_id'       => $job_id,
+					'pipeline_id'  => $pipeline_id,
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'step_class'   => $step_class,
+					'step_type'    => $step_type,
+					'job_status'   => $already_failed_status,
+				)
+			);
+
+			return array(
+				'success'      => true,
+				'step_success' => false,
+				'outcome'      => 'failed',
+				'error'        => $already_failed_status,
+			);
+		}
+
 		do_action(
 			'datamachine_log',
 			'error',
@@ -628,6 +653,34 @@ class ExecuteStepAbility {
 			'step_success' => false,
 			'outcome'      => 'failed',
 		);
+	}
+
+	/**
+	 * Return the persisted failure status when the step itself already failed the job.
+	 *
+	 * Some steps, notably AIStep, call datamachine_fail_job with a precise failure
+	 * reason and then return no packets. Do not reclassify that empty packet list as
+	 * a generic execution failure.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return string|null Persisted failed status, or null when the job has not already failed.
+	 */
+	private function getAlreadyFailedJobStatus( int $job_id ): ?string {
+		if ( ! isset( $this->db_jobs ) ) {
+			return null;
+		}
+
+		$job = $this->db_jobs->get_job( $job_id );
+		if ( ! is_array( $job ) ) {
+			return null;
+		}
+
+		$status = $job['status'] ?? '';
+		if ( ! is_string( $status ) || '' === $status ) {
+			return null;
+		}
+
+		return JobStatus::isStatusFailure( $status ) ? $status : null;
 	}
 
 	/**
