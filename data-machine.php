@@ -344,6 +344,13 @@ function datamachine_should_load_full_runtime(): bool {
 		return true;
 	}
 
+	// WordPress PHPUnit loads plugins through a frontend-shaped request. Keep the
+	// full runtime available so ability/tool registration tests exercise the same
+	// surfaces as CLI, REST, admin, cron, and Ajax entry points.
+	if ( defined( 'WP_TESTS_DOMAIN' ) || defined( 'WP_TESTS_EMAIL' ) || defined( 'WP_TESTS_TITLE' ) ) {
+		return true;
+	}
+
 	if ( is_admin() || wp_doing_ajax() || wp_doing_cron() ) {
 		return true;
 	}
