@@ -69,8 +69,8 @@ class WpAiClient {
 			$api_key
 		);
 
-		if ( is_wp_error( $result ) ) {
-			$response = self::error_result( 'wp-ai-client request failed: ' . $result->get_error_message() );
+		if ( $result instanceof \WP_Error ) {
+			$response               = self::error_result( 'wp-ai-client request failed: ' . $result->get_error_message() );
 			$response['error_code'] = $result->get_error_code();
 			return $response;
 		}

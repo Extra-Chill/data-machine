@@ -219,28 +219,17 @@ class ImageGenerationAbilities {
 			\DataMachine\Engine\AI\WpAiClientProviderAdmin::resolveApiKey( $provider )
 		);
 
-		if ( is_wp_error( $image_file ) ) {
-			$result = array(
-				'success' => false,
-				'error'   => $image_file->get_error_message(),
-			);
-		} else {
-			$result = array(
-				'success'        => true,
-				'image_url'      => is_object( $image_file ) && method_exists( $image_file, 'getUrl' ) ? (string) $image_file->getUrl() : '',
-				'image_data_uri' => is_object( $image_file ) && method_exists( $image_file, 'getDataUri' ) ? (string) $image_file->getDataUri() : '',
-				'provider'       => $provider,
-			);
-		}
-
-		if ( ! $result['success'] ) {
+		if ( $image_file instanceof \WP_Error ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to generate image: ' . ( $result['error'] ?? 'Unknown error' ),
+				'error'   => 'Failed to generate image: ' . $image_file->get_error_message(),
 			);
 		}
 
-		if ( empty( $result['image_url'] ) && empty( $result['image_data_uri'] ) ) {
+		$image_url      = method_exists( $image_file, 'getUrl' ) ? (string) $image_file->getUrl() : '';
+		$image_data_uri = method_exists( $image_file, 'getDataUri' ) ? (string) $image_file->getDataUri() : '';
+
+		if ( '' === $image_url && '' === $image_data_uri ) {
 			return array(
 				'success' => false,
 				'error'   => 'wp-ai-client image generation returned no usable image.',
@@ -265,9 +254,9 @@ class ImageGenerationAbilities {
 		$jobId = TaskScheduler::schedule(
 			'image_generation',
 			array(
-				'image_url'       => $result['image_url'] ?? '',
-				'image_data_uri'  => $result['image_data_uri'] ?? '',
-				'provider'        => $result['provider'] ?? $provider,
+				'image_url'       => $image_url,
+				'image_data_uri'  => $image_data_uri,
+				'provider'        => $provider,
 				'model'           => $model,
 				'prompt'          => $prompt,
 				'original_prompt' => $original_prompt,
@@ -288,7 +277,7 @@ class ImageGenerationAbilities {
 			'success'   => true,
 			'pending'   => true,
 			'job_id'    => $jobId,
-			'image_url' => $result['image_url'] ?? '',
+			'image_url' => $image_url,
 			'message'   => "Image generation scheduled (Job #{$jobId}). Model: {$model}, aspect ratio: {$aspect_ratio}."
 				. ( $prompt !== $original_prompt ? ' Prompt was refined by AI.' : '' ),
 		);
