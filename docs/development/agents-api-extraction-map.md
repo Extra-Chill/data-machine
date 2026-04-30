@@ -32,14 +32,14 @@ Treat `data-machine/agents-api/` like WordPress core substrate while it still li
 - Data Machine and other product consumers own any admin/product UI they build on top of the substrate.
 - Later standalone extraction means moving the already-bounded module into its own plugin/repo and adding plugin bootstrap, release, dependency, and distribution ceremony.
 - `ai-http-client` is not future architecture. It is only packaging precedent for bundled-then-extracted code.
-- The future runtime dependency direction is `Data Machine -> agents-api -> wp-ai-client`; `ai-http-client` dies as part of [#1027](https://github.com/Extra-Chill/data-machine/issues/1027) / [#1633](https://github.com/Extra-Chill/data-machine/issues/1633).
+- The future runtime dependency direction is `Data Machine product adapter -> Agents API run request -> wp-ai-client public API`; `ai-http-client` dies as part of [#1027](https://github.com/Extra-Chill/data-machine/issues/1027) / [#1633](https://github.com/Extra-Chill/data-machine/issues/1633).
 
 ```text
-WordPress / wp-ai-client
+wp-ai-client public API
         ↑
-data-machine/agents-api
+Agents API run request
         ↑
-Data Machine pipelines/product
+Data Machine product adapter
 ```
 
 ## Target Vocabulary
@@ -65,7 +65,7 @@ Use these checks before moving anything:
 - If a plugin can use it without knowing about flows, pipeline steps, handlers, queues, jobs, or Data Machine content operations, it is an Agents API candidate.
 - If it translates Data Machine concepts into runtime concepts, it is a Data Machine adapter.
 - If it owns flows, jobs, queues, handlers, scheduled automation, retention, admin UI, or content ops, it stays Data Machine product.
-- If it uses host-specific implementation vocabulary directly, treat that code as source material only until normalized behind WordPress-shaped contracts.
+- If it uses host-specific provider, storage, or implementation vocabulary directly, treat that code as source material only until normalized behind WordPress-shaped contracts.
 
 ## Backend-Only UI Boundary
 
@@ -95,7 +95,7 @@ Substrate CRUD is allowed when it is backend-only and generic: interfaces/servic
 | Data Machine adapter | Glue that turns flows/jobs/pipelines into generic runtime inputs. | `AIStep`, pipeline tool-policy args, transcript persistence policy, adjacent handler tools. |
 | Data Machine product | Data Machine automation/product layer. | Jobs, flows, pipelines, handlers, queues, retention, content abilities, admin UI. |
 | Intelligence domain | Intelligence plugin concerns, not Data Machine or Agents API. | Wiki, briefings, digests, domain brains. |
-| External host source material | Useful precedent only. | Normalize behind generic WordPress-shaped contracts before anything becomes public API. |
+| Host-specific source material | Useful precedent only. | Provider/storage implementations that must be normalized behind WordPress-shaped contracts before they can inform Agents API. |
 
 ## Current `Engine\AI` Namespace Split
 
@@ -169,8 +169,8 @@ These are plausibly generic implementations, but should not move until naming an
 |---|---|---|---|
 | `AIConversationLoop` | `inc/Engine/AI/AIConversationLoop.php` | Name says AI and still carries the compatibility facade/result shape, but handler completion and transcript persistence now route through runtime collaborators. | Keep shrinking the compatibility adapter by extracting provider request assembly and Data Machine logging policy next. |
 | `ProviderRequestAssembler` | `inc/Engine/AI/ProviderRequestAssembler.php` | Normalizes messages, tools, model, and caller-selected directives without dispatching, logging, or discovering Data Machine directives. | Good in-place request assembly candidate once prompt/directive vocabulary is settled. |
-| `RequestBuilder` | `inc/Engine/AI/RequestBuilder.php` | Data Machine adapter around provider assembly: discovers/directive-policies `datamachine_directives`, emits `datamachine_log`, applies request-size guardrails, and still carries legacy provider-dispatch compatibility. | Keep as Data Machine adapter unless/until the `ai-http-client` / `chubes_ai_request` bridge is removed in favor of `wp-ai-client`. |
-| `WpAiClientAdapter` | `inc/Engine/AI/WpAiClientAdapter.php` | Generic bridge to WordPress AI client, but currently lives as Data Machine implementation detail. | Good implementation candidate once request/message contracts are generic. |
+| `RequestBuilder` | `inc/Engine/AI/RequestBuilder.php` | Data Machine adapter around provider assembly: discovers/directive-policies `datamachine_directives`, emits `datamachine_log`, applies request-size guardrails, and still carries Data Machine request-array compatibility. | Keep as Data Machine adapter while those product concerns remain. Provider dispatch should consume `wp-ai-client` directly. |
+| `WpAiClientAdapter` | `inc/Engine/AI/WpAiClientAdapter.php` | Data Machine adapter that maps the assembled provider request array onto the wp-ai-client public API and normalizes the result back to Data Machine's historical response array. | Keep in Data Machine until request/message contracts are generic enough for an Agents API provider runtime implementation. |
 | `RequestMetadata` | `inc/Engine/AI/RequestMetadata.php` | Generic inspection/size metadata. | Move after field names are checked against Agents API message/tool vocabulary. |
 | `RequestInspector` | `inc/Engine/AI/RequestInspector.php` | Generic debugging/inspection value, likely useful across runtimes. | Rename away from Data Machine only if public debug surface is desired. |
 | `PromptBuilder` | `inc/Engine/AI/PromptBuilder.php` | Generic system-message composition engine, but wired to Data Machine directives. | Extract lower-level composer after directive contract is settled. |
@@ -235,7 +235,7 @@ Conversation storage is split in place, but only the narrow transcript surface i
 | Retention | `ConversationRetentionInterface`, retention system tasks/CLI | Backend cleanup methods may be generic, but scheduling and retention policy are Data Machine product. |
 | Reporting | `ConversationReportingInterface`, daily memory/retention status readers | Product-shaped metrics today. Keep separate from transcript CRUD. |
 
-Do not decide an `agents_session` CPT, a host-specific storage backend, or a new Agents API filter name in this in-place clarification. The current goal is only to make the dependency direction obvious: Data Machine chat product consumes transcript persistence; transcript persistence does not require Data Machine chat product behavior.
+Do not decide an `agents_session` CPT, host-specific conversation storage, or a new Agents API filter name in this in-place clarification. The current goal is only to make the dependency direction obvious: Data Machine chat product consumes transcript persistence; transcript persistence does not require Data Machine chat product behavior.
 
 ## Data Machine Product
 
@@ -266,6 +266,18 @@ Data Machine should not absorb Intelligence-specific vocabulary during extractio
 | Briefings and digests | Intelligence | Domain workflows built on top of runtime and search abilities. |
 | Domain brains and generated/shared wikis | Intelligence | Product/domain policy, not Agents API. |
 | Intelligence memory policy additions | Intelligence | May consume generic memory contracts, but policy names and wiki roots stay outside Agents API. |
+
+## Host-Specific Source Material
+
+These are reference points only. Do not expose them as public Data Machine or Agents API vocabulary.
+
+| Source | How to use it |
+|---|---|
+| Host message DTOs | Reference for message object semantics. Normalize behind `WP_Agent_Message` or neutral envelopes. |
+| Host agent runtime classes | Reference for run-loop integration and provider routing. Do not require inheritance from host runtime classes. |
+| Host agent stores | Reference for persistence/adoption semantics. Do not leak storage names into public API. |
+| Host conversation storage | Reference for compaction/resilience. Keep Data Machine/Agents API conversation store contracts portable and site-owned unless explicitly swapped. |
+| Host agent UX precedents | Reference for WordPress-hosted agent UX and memory injection, not a dependency or target vocabulary. |
 
 ## Hook Name Map
 
@@ -342,14 +354,14 @@ These tests currently pin the substrate most relevant to extraction.
 5. Split provider request assembly from `RequestBuilder` so Data Machine directives/logging stay adapter behavior and provider dispatch targets `wp-ai-client`, not `ai-http-client`.
 6. Split `ToolExecutor` into ability-native runtime execution plus Data Machine product hooks for pending actions and post-origin tracking.
 7. Decide whether Agents API owns persistence tables or only contracts plus optional stores.
-8. Keep host-specific implementation classes behind adapters. No public contract should require a host-owned message, agent, store, or conversation-storage class.
+8. Keep host-specific provider and storage classes behind adapters. No public contract should require implementation-specific message, agent, or conversation-storage DTOs.
 
 ## Non-Goals
 
 - Do not move files as part of this map.
 - Do not frame the next step as direct external repository extraction; the next code step is the in-repo `data-machine/agents-api/` module.
 - Do not rename runtime classes before the target contracts are settled.
-- Do not make Data Machine depend on host-specific implementation vocabulary.
+- Do not make Data Machine or Agents API depend on host-specific provider or storage vocabulary.
 - Do not make Agents API depend on `ai-http-client`; that package is only a packaging precedent and a removal target.
 - Do not move Data Machine flows, pipelines, jobs, handlers, queues, retention, content ops, or admin UI into Agents API.
 - Do not move Intelligence wiki/briefing/domain-brain vocabulary into Data Machine or Agents API.

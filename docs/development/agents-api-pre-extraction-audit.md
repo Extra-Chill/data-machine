@@ -36,14 +36,14 @@ Treat `data-machine/agents-api/` like WordPress core substrate while it still li
 Dependency direction:
 
 ```text
-WordPress / wp-ai-client
+wp-ai-client public API
         ↑
-data-machine/agents-api
+Agents API run request
         ↑
-Data Machine pipelines/product
+Data Machine product adapter
 ```
 
-`ai-http-client` is not future architecture. It is only packaging precedent for bundled-then-extracted code. The future runtime dependency direction is `Data Machine -> agents-api -> wp-ai-client`; `ai-http-client` dies as part of [#1027](https://github.com/Extra-Chill/data-machine/issues/1027) / [#1633](https://github.com/Extra-Chill/data-machine/issues/1633).
+`ai-http-client` is not future architecture. It is only packaging precedent for bundled-then-extracted code. The future runtime dependency direction is `Data Machine product adapter -> Agents API run request -> wp-ai-client public API`; `ai-http-client` dies as part of [#1027](https://github.com/Extra-Chill/data-machine/issues/1027) / [#1633](https://github.com/Extra-Chill/data-machine/issues/1633).
 
 ## Current State
 
