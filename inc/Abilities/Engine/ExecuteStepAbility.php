@@ -20,6 +20,7 @@ use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileRetrieval;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Core\Steps\Step;
 use DataMachine\Engine\StepNavigator;
 
 defined( 'ABSPATH' ) || exit;
@@ -163,6 +164,9 @@ class ExecuteStepAbility {
 
 			$step_class = $step_definition['class'] ?? '';
 			$flow_step  = new $step_class();
+			if ( ! $flow_step instanceof Step ) {
+				throw new \RuntimeException( sprintf( 'Step class "%s" must extend DataMachine\\Core\\Steps\\Step.', $step_class ) );
+			}
 
 			$payload = array(
 				'job_id'       => $job_id,
@@ -172,23 +176,6 @@ class ExecuteStepAbility {
 			);
 
 			$dataPackets = $flow_step->execute( $payload );
-
-			if ( ! is_array( $dataPackets ) ) {
-				do_action(
-					'datamachine_fail_job',
-					$job_id,
-					'step_execution_failure',
-					array(
-						'flow_step_id' => $flow_step_id,
-						'class'        => $step_class,
-						'reason'       => 'non_array_payload_returned',
-					)
-				);
-				return array(
-					'success' => false,
-					'error'   => 'Step returned non-array payload.',
-				);
-			}
 
 			$payload['data'] = $dataPackets;
 			$step_success    = $this->evaluateStepSuccess( $dataPackets, $job_id, $flow_step_id );
@@ -248,9 +235,9 @@ class ExecuteStepAbility {
 	 * @param string     $flow_step_id    Flow step ID.
 	 * @param int        $job_id          Job ID.
 	 * @param array      $engine_snapshot Raw engine snapshot data.
-	 * @return array|null Flow step config or null.
+	 * @return array Flow step config, or an empty array when not found.
 	 */
-	private function resolveFlowStepConfig( EngineData $engine, string $flow_step_id, int $job_id, array $engine_snapshot ): ?array {
+	private function resolveFlowStepConfig( EngineData $engine, string $flow_step_id, int $job_id, array $engine_snapshot ): array {
 		$flow_step_config = $engine->getFlowStepConfig( $flow_step_id );
 
 		if ( ! $flow_step_config ) {
@@ -484,6 +471,7 @@ class ExecuteStepAbility {
 				$transition_route      = self::resolveTransitionRoute( $flow_step_config, $next_flow_step_config, $dataPackets );
 
 				if ( 'fail' === $transition_route['mode'] ) {
+					$transition_failure_reason = $transition_route['reason'] ?? 'transition_route_failed';
 					do_action(
 						'datamachine_fail_job',
 						$job_id,
@@ -492,7 +480,7 @@ class ExecuteStepAbility {
 							'flow_step_id'      => $flow_step_id,
 							'next_flow_step_id' => $next_flow_step_id,
 							'class'             => $step_class,
-							'reason'            => $transition_route['reason'],
+							'reason'            => $transition_failure_reason,
 						)
 					);
 
@@ -500,7 +488,7 @@ class ExecuteStepAbility {
 						'success'      => true,
 						'step_success' => false,
 						'outcome'      => 'failed',
-						'error'        => $transition_route['reason'],
+						'error'        => $transition_failure_reason,
 					);
 				}
 
@@ -599,6 +587,31 @@ class ExecuteStepAbility {
 		}
 
 		// Non-fetch steps: empty data packet is an actual failure.
+		$already_failed_status = $this->getAlreadyFailedJobStatus( $job_id );
+		if ( null !== $already_failed_status ) {
+			do_action(
+				'datamachine_log',
+				'debug',
+				'Step returned no data after job was already marked failed',
+				array(
+					'job_id'       => $job_id,
+					'pipeline_id'  => $pipeline_id,
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'step_class'   => $step_class,
+					'step_type'    => $step_type,
+					'job_status'   => $already_failed_status,
+				)
+			);
+
+			return array(
+				'success'      => true,
+				'step_success' => false,
+				'outcome'      => 'failed',
+				'error'        => $already_failed_status,
+			);
+		}
+
 		do_action(
 			'datamachine_log',
 			'error',
@@ -628,6 +641,34 @@ class ExecuteStepAbility {
 			'step_success' => false,
 			'outcome'      => 'failed',
 		);
+	}
+
+	/**
+	 * Return the persisted failure status when the step itself already failed the job.
+	 *
+	 * Some steps, notably AIStep, call datamachine_fail_job with a precise failure
+	 * reason and then return no packets. Do not reclassify that empty packet list as
+	 * a generic execution failure.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return string|null Persisted failed status, or null when the job has not already failed.
+	 */
+	private function getAlreadyFailedJobStatus( int $job_id ): ?string {
+		if ( ! isset( $this->db_jobs ) ) {
+			return null;
+		}
+
+		$job = $this->db_jobs->get_job( $job_id );
+		if ( ! is_array( $job ) ) {
+			return null;
+		}
+
+		$status = $job['status'] ?? '';
+		if ( ! is_string( $status ) || '' === $status ) {
+			return null;
+		}
+
+		return JobStatus::isStatusFailure( $status ) ? $status : null;
 	}
 
 	/**
@@ -829,7 +870,7 @@ class ExecuteStepAbility {
 	 * Extract failure reason from step packets.
 	 *
 	 * @param array  $dataPackets Data packets from step execution.
-	 * @param string $default Default reason when none found.
+	 * @param string $default_value Default reason when none found.
 	 * @return string
 	 */
 	private function getFailureReasonFromPackets( array $dataPackets, string $default_value ): string {
