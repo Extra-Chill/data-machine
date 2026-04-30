@@ -4,7 +4,7 @@ Parent issue: [Explore splitting Agents API out of Data Machine](https://github.
 
 Strategy issue: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)
 
-Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
+Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
 
 This audit records the remaining work after the first in-place untangling wave. The boundary is now mostly visible: Data Machine owns pipelines and automation; the future Agents API owns generic agent runtime primitives. The next phase is to make those primitives live behind an in-repo `data-machine/agents-api/` module boundary while they still ship with Data Machine.
 
@@ -29,6 +29,8 @@ Treat `data-machine/agents-api/` like WordPress core substrate while it still li
 - `agents-api` must not import Data Machine product namespaces.
 - `agents-api` owns runner interfaces, value objects, and generic contracts first; Data Machine keeps `AIConversationLoop` and the built-in compatibility runner until the loop no longer carries Data Machine job, flow, handler, logging, transcript, or legacy payload/result assumptions.
 - Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, pending actions, content operations, and admin UI.
+- `agents-api` is backend-only and invisible by default: no admin menus, screens, human CRUD forms, React apps, or Data Machine product UI.
+- Data Machine and other product consumers own any admin/product UI they build on top of the substrate.
 - Later standalone extraction means moving the already-bounded module into its own plugin/repo and adding plugin bootstrap, dependency, release, and distribution ceremony.
 
 Dependency direction:
@@ -66,6 +68,7 @@ Before standalone extraction, the in-repo module should satisfy these gates:
 - `data-machine/agents-api/` exists and loads before Data Machine product runtime bootstraps.
 - A bootstrap smoke can load `agents-api` without Data Machine product code.
 - No `agents-api` file imports `DataMachine\Core\Steps`, `DataMachine\Core\Database\Jobs`, handler, queue, retention, pending-action, admin UI, or content-operation namespaces.
+- No `agents-api` file registers admin menus, admin screens, settings forms, or admin-only UI hooks.
 - Data Machine product code imports the module as a dependency instead of reaching across same-layer runtime/product paths.
 - Provider runtime code targets `wp-ai-client`; no `ai-http-client` fallback is introduced or preserved inside `agents-api`.
 
@@ -113,7 +116,7 @@ Target shape:
 
 - Review whether the physically extracted public class should stay `AgentMessageEnvelope` or become `WP_Agent_Message`.
 - Keep schema metadata generic; do not reintroduce Data Machine-owned schema names for the shared contract.
-- Keep wpcom message DTOs as adapters/source material, not public dependency vocabulary.
+- Keep host-specific message DTOs as adapters/source material, not public dependency vocabulary.
 
 ### 4. Conversation Storage Boundary
 
@@ -190,7 +193,7 @@ Before physical extraction, verify that generic runtime candidates do not:
 - Emit `datamachine_log` directly instead of using a generic event sink.
 - Depend on `datamachine_tools` legacy class/method declarations.
 - Depend on `ai-http-client` or `chubes_ai_*` filters.
-- Mention wpcom classes in public signatures.
+- Mention host-specific classes in public signatures.
 
 ## What Agents API Can Enable Without Data Machine
 
@@ -202,7 +205,7 @@ Agents API should be useful even when a site does not install Data Machine. In t
 - A code-review or repository agent that uses GitHub abilities without adopting Data Machine pipelines.
 - A Slack, email, or helpdesk assistant that owns its own channel adapter and delegates only the runtime loop to Agents API.
 - A domain expert agent bundled by another plugin, with default memory/guidelines and a constrained tool policy.
-- A WordPress.com-hosted agent that uses wpcom provider/storage adapters while sharing the same public WordPress-shaped contracts.
+- A hosted agent that uses environment-specific provider/storage adapters while sharing the same public WordPress-shaped contracts.
 
 Agents API should provide the substrate for those products:
 
