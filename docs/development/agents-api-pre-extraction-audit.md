@@ -4,7 +4,7 @@ Parent issue: [Explore splitting Agents API out of Data Machine](https://github.
 
 Strategy issue: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)
 
-Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
+Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
 
 This audit records the remaining work after the first in-place untangling wave. The boundary is now mostly visible: Data Machine owns pipelines and automation; the future Agents API owns generic agent runtime primitives. The next phase is to make those primitives live behind an in-repo `data-machine/agents-api/` module boundary while they still ship with Data Machine.
 
@@ -27,6 +27,7 @@ Treat `data-machine/agents-api/` like WordPress core substrate while it still li
 - `agents-api` owns the WordPress-shaped agent runtime vocabulary and contracts.
 - Data Machine consumes `agents-api` as product code.
 - `agents-api` must not import Data Machine product namespaces.
+- `agents-api` owns runner interfaces, value objects, and generic contracts first; Data Machine keeps `AIConversationLoop` and the built-in compatibility runner until the loop no longer carries Data Machine job, flow, handler, logging, transcript, or legacy payload/result assumptions.
 - Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, pending actions, content operations, and admin UI.
 - Later standalone extraction means moving the already-bounded module into its own plugin/repo and adding plugin bootstrap, dependency, release, and distribution ceremony.
 
@@ -72,7 +73,7 @@ Before standalone extraction, the in-repo module should satisfy these gates:
 
 ### 1. Runner Facade
 
-`AIConversationLoop` still carries the old runtime name and owns built-in loop execution. It should not be physically extracted until the generic loop and the Data Machine completion/transcript policies are separated further.
+`AIConversationLoop` still carries the old runtime name and owns built-in loop execution. It should not be physically extracted until the generic loop and the Data Machine completion/transcript policies are separated further. The current decision for [#1634](https://github.com/Extra-Chill/data-machine/issues/1634) is to keep `AIConversationLoop` and `BuiltInAgentConversationRunner` in Data Machine, while `agents-api` grows the runner contracts and value objects that a future generic loop would consume.
 
 Target shape:
 
@@ -81,6 +82,7 @@ Target shape:
 - `AIConversationLoop` remains a Data Machine compatibility facade until callers are moved to the new name.
 - `AgentConversationCompletionPolicyInterface` and `AgentConversationTranscriptPersisterInterface` are in-place runtime collaborator seams; Data Machine provides the current handler-completion and transcript adapters.
 - A future `AgentConversationLoop` or `WP_Agent_Runner` should not know about `job_id`, `flow_step_id`, `pipeline_id`, or handler completion policy.
+- The built-in compatibility loop must not move into `agents-api` while it preserves historical `AIConversationLoop::execute()` result normalization, Data Machine logging/transcript metadata, adjacent-handler completion, or `ai-http-client` / `chubes_ai_*` provider compatibility.
 
 ### 2. Runtime Hooks And Filters
 

@@ -68,6 +68,8 @@ assert_agents_api_equals( true, class_exists( 'DataMachine\\Engine\\AI\\AgentMes
 assert_agents_api_equals( true, class_exists( 'DataMachine\\Engine\\AI\\AgentConversationResult' ), 'AgentConversationResult contract is available', $failures, $passes );
 assert_agents_api_equals( true, class_exists( 'DataMachine\\Engine\\AI\\Tools\\RuntimeToolDeclaration' ), 'RuntimeToolDeclaration contract is available', $failures, $passes );
 assert_agents_api_equals( false, class_exists( 'DataMachine\\Engine\\Agents\\AgentRegistry', false ), 'Data Machine registry is not loaded by module bootstrap', $failures, $passes );
+assert_agents_api_equals( false, class_exists( 'DataMachine\\Engine\\AI\\AIConversationLoop', false ), 'Data Machine compatibility loop is not loaded by module bootstrap', $failures, $passes );
+assert_agents_api_equals( false, class_exists( 'DataMachine\\Engine\\AI\\BuiltInAgentConversationRunner', false ), 'Data Machine built-in runner is not loaded by module bootstrap', $failures, $passes );
 
 echo "\n[2] Public registration hook collects definitions once and stays side-effect free:\n";
 add_action(
@@ -96,6 +98,7 @@ assert_agents_api_equals( array( 'example-agent' ), array_keys( WP_Agents_Regist
 
 echo "\n[3] agents-api files do not import Data Machine product namespaces:\n";
 $forbidden_import = false;
+$forbidden_loop   = false;
 $iterator         = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( __DIR__ . '/../agents-api' ) );
 foreach ( $iterator as $file ) {
 	if ( ! $file->isFile() || 'php' !== $file->getExtension() ) {
@@ -105,10 +108,18 @@ foreach ( $iterator as $file ) {
 	$source = (string) file_get_contents( $file->getPathname() );
 	if ( preg_match( '/(?:use\s+|new\s+|extends\s+|implements\s+|::|instanceof\s+)\\?DataMachine\\\\/', $source ) ) {
 		$forbidden_import = true;
+	}
+
+	if ( preg_match( '/\\b(?:AIConversationLoop|BuiltInAgentConversationRunner)\\b/', $source ) ) {
+		$forbidden_loop = true;
+	}
+
+	if ( $forbidden_import || $forbidden_loop ) {
 		break;
 	}
 }
 assert_agents_api_equals( false, $forbidden_import, 'agents-api has no DataMachine namespace imports', $failures, $passes );
+assert_agents_api_equals( false, $forbidden_loop, 'agents-api does not contain Data Machine loop implementation classes', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " Agents API bootstrap assertions failed.\n";
