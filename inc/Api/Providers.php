@@ -57,7 +57,7 @@ class Providers {
 	 * Returns provider metadata including labels and available models.
 	 *
 	 * @since 0.1.2
-	 * @return \WP_REST_Response Providers response
+	 * @return \WP_REST_Response|\WP_Error Providers response or error.
 	 */
 	public static function handle_get_providers() {
 		try {

@@ -120,7 +120,11 @@ class WpAiClientAdapter {
 		$model_config = self::buildModelConfig( $request );
 
 		try {
-			$model_instance = $registry->getProviderModel( $resolved_id, $model, $model_config );
+			if ( ! method_exists( $registry, 'getProviderModel' ) ) {
+				return self::errorResponse( $provider, 'wp-ai-client registry cannot resolve provider models' );
+			}
+
+			$model_instance = call_user_func( array( $registry, 'getProviderModel' ), $resolved_id, $model, $model_config );
 		} catch ( \Throwable $e ) {
 			return self::errorResponse( $provider, 'wp-ai-client model resolution failed: ' . $e->getMessage() );
 		}

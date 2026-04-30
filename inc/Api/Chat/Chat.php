@@ -278,7 +278,7 @@ class Chat {
 			);
 		}
 
-		$auth_header = $request->get_header( 'Authorization' );
+		$auth_header = self::get_request_header( $request, 'authorization' );
 
 		if ( empty( $auth_header ) ) {
 			return new WP_Error(
@@ -314,9 +314,10 @@ class Chat {
 	 * @return WP_REST_Response|WP_Error Response data or error.
 	 */
 	public static function handle_ping( WP_REST_Request $request ) {
-		$message = sanitize_textarea_field( wp_unslash( $request->get_param( 'message' ) ) );
-		$prompt  = sanitize_textarea_field( wp_unslash( $request->get_param( 'prompt' ) ?? '' ) );
-		$context = $request->get_param( 'context' ) ?? array();
+		$message  = sanitize_textarea_field( wp_unslash( $request->get_param( 'message' ) ) );
+		$prompt   = sanitize_textarea_field( wp_unslash( $request->get_param( 'prompt' ) ?? '' ) );
+		$context  = $request->get_param( 'context' ) ?? array();
+		$agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
 
 		$agent_config = PluginSettings::resolveModelForAgentMode( $agent_id, 'chat' );
 		$provider     = $agent_config['provider'];
@@ -342,11 +343,11 @@ class Chat {
 
 		$result = ChatOrchestrator::processPing( $full_message, $provider, $model );
 
-		if ( is_wp_error( $result ) ) {
+		if ( $result instanceof WP_Error ) {
 			return $result;
 		}
 
-		return rest_ensure_response(
+		return new WP_REST_Response(
 			array(
 				'success' => true,
 				'data'    => $result,
@@ -358,7 +359,7 @@ class Chat {
 	 * List all chat sessions for current user.
 	 *
 	 * @param WP_REST_Request $request Request object.
-	 * @return WP_REST_Response Response data.
+	 * @return WP_REST_Response|WP_Error Response data or error.
 	 */
 	public static function list_sessions( WP_REST_Request $request ) {
 		return self::execute_ability(
@@ -431,7 +432,7 @@ class Chat {
 	 */
 	public static function handle_chat( WP_REST_Request $request ) {
 		// --- Idempotency check ---
-		$request_id = $request->get_header( 'X-Request-ID' );
+		$request_id = self::get_request_header( $request, 'x-request-id' );
 		if ( $request_id ) {
 			$request_id      = sanitize_text_field( $request_id );
 			$cache_key       = 'datamachine_chat_request_' . $request_id;
@@ -491,7 +492,7 @@ class Chat {
 
 		$result = $ability->execute( $input );
 
-		if ( is_wp_error( $result ) ) {
+		if ( $result instanceof WP_Error ) {
 			return $result;
 		}
 
@@ -522,11 +523,11 @@ class Chat {
 
 		$result = ChatOrchestrator::processContinue( $session_id, get_current_user_id() );
 
-		if ( is_wp_error( $result ) ) {
+		if ( $result instanceof WP_Error ) {
 			return $result;
 		}
 
-		return rest_ensure_response(
+		return new WP_REST_Response(
 			array(
 				'success' => true,
 				'data'    => $result,
@@ -539,7 +540,7 @@ class Chat {
 	 *
 	 * @since 0.53.0
 	 *
-	 * @param array $attachments Raw attachments from request.
+	 * @param mixed $attachments Raw attachments from request.
 	 * @return array Sanitized attachments.
 	 */
 	public static function sanitize_attachments( $attachments ): array {
@@ -579,6 +580,23 @@ class Chat {
 		}
 
 		return $sanitized;
+	}
+
+	/**
+	 * Read a REST request header without depending on stub coverage for get_header().
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @param string          $name    Lowercase header name.
+	 * @return string Header value, or empty string.
+	 */
+	private static function get_request_header( WP_REST_Request $request, string $name ): string {
+		if ( ! method_exists( $request, 'get_header' ) ) {
+			return '';
+		}
+
+		$value = call_user_func( array( $request, 'get_header' ), $name );
+
+		return is_scalar( $value ) ? (string) $value : '';
 	}
 
 	/**

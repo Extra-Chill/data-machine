@@ -315,7 +315,7 @@ class SettingsAbilities {
 	}
 
 	public function executeGetSettings( array $input ): array {
-		$input;
+		unset( $input );
 		$settings = PluginSettings::all();
 		$defaults = PluginSettings::getDefaults();
 
@@ -549,9 +549,8 @@ class SettingsAbilities {
 		 *
 		 * @since 0.40.0
 		 *
-		 * @param array $all_settings  Current settings array (will be saved to DB).
-		 * @param array $input         Raw input from the settings update request.
-		 * @param array $handled_keys  Keys already handled by core.
+		 * @param array $filtered Filter result with settings and handled keys.
+		 * @param array $input    Raw input from the settings update request.
 		 * @return array Associative array with 'settings' and 'handled_keys'.
 		 */
 		$filtered = apply_filters(
@@ -586,7 +585,7 @@ class SettingsAbilities {
 	}
 
 	public function executeGetSchedulingIntervals( array $input ): array {
-		$input;
+		unset( $input );
 		$intervals = apply_filters( 'datamachine_scheduler_intervals', array() );
 
 		$frontend_intervals = array();
@@ -760,7 +759,7 @@ class SettingsAbilities {
 	}
 
 	public function executeGetHandlerDefaults( array $input ): array {
-		$input;
+		unset( $input );
 		$defaults = get_option( self::HANDLER_DEFAULTS_OPTION, null );
 
 		if ( null === $defaults ) {
