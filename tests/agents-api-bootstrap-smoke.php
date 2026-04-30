@@ -49,7 +49,7 @@ agents_api_smoke_assert_equals( false, class_exists( 'DataMachine\\Engine\\AI\\A
 agents_api_smoke_assert_equals( false, class_exists( 'DataMachine\\Engine\\AI\\BuiltInAgentConversationRunner', false ), 'Data Machine built-in runner is not loaded by module bootstrap', $failures, $passes );
 agents_api_smoke_assert_equals( false, class_exists( 'DataMachine\\Core\\FilesRepository\\DiskAgentMemoryStore', false ), 'Data Machine disk memory store is not loaded by module bootstrap', $failures, $passes );
 
-echo "\n[2] Module source keeps Data Machine namespaces out of agents-api contracts:\n";
+echo "\n[2] Module source keeps Data Machine vocabulary out of agents-api contracts:\n";
 $agents_api_files = new RecursiveIteratorIterator(
 	new RecursiveDirectoryIterator( AGENTS_API_PATH, FilesystemIterator::SKIP_DOTS )
 );
@@ -63,6 +63,13 @@ foreach ( $agents_api_files as $file ) {
 		0,
 		preg_match( '/^\s*(namespace|use)\s+DataMachine\\\\/m', is_string( $contents ) ? $contents : '' ),
 		'agents-api source has no Data Machine namespace declaration/import: ' . str_replace( AGENTS_API_PATH, '', $file->getPathname() ),
+		$failures,
+		$passes
+	);
+	agents_api_smoke_assert_equals(
+		false,
+		false !== strpos( is_string( $contents ) ? $contents : '', 'Data Machine' ),
+		'agents-api source has no Data Machine prose coupling: ' . str_replace( AGENTS_API_PATH, '', $file->getPathname() ),
 		$failures,
 		$passes
 	);

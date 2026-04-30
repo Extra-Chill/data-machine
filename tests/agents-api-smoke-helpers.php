@@ -11,6 +11,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $GLOBALS['__agents_api_smoke_actions'] = array();
 $GLOBALS['__agents_api_smoke_wrong']   = array();
+$GLOBALS['__agents_api_smoke_current'] = array();
+$GLOBALS['__agents_api_smoke_done']    = array();
 
 function sanitize_title( string $value ): string {
 	$value = strtolower( $value );
@@ -28,6 +30,7 @@ function add_action( string $hook, callable $callback, int $priority = 10, int $
 }
 
 function do_action( string $hook, ...$args ): void {
+	$GLOBALS['__agents_api_smoke_current'][] = $hook;
 	$callbacks = $GLOBALS['__agents_api_smoke_actions'][ $hook ] ?? array();
 	ksort( $callbacks );
 
@@ -36,6 +39,21 @@ function do_action( string $hook, ...$args ): void {
 			call_user_func_array( $callback, $args );
 		}
 	}
+
+	array_pop( $GLOBALS['__agents_api_smoke_current'] );
+	$GLOBALS['__agents_api_smoke_done'][ $hook ] = ( $GLOBALS['__agents_api_smoke_done'][ $hook ] ?? 0 ) + 1;
+}
+
+function doing_action( string $hook ): bool {
+	return in_array( $hook, $GLOBALS['__agents_api_smoke_current'], true );
+}
+
+function did_action( string $hook ): int {
+	return (int) ( $GLOBALS['__agents_api_smoke_done'][ $hook ] ?? 0 );
+}
+
+function esc_html( string $value ): string {
+	return htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' );
 }
 
 function _doing_it_wrong( string $function_name, string $message, string $version ): void {

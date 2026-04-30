@@ -19,7 +19,26 @@ if ( ! function_exists( 'wp_register_agent' ) ) {
 	 * @return WP_Agent|null Registered agent, or null on invalid arguments.
 	 */
 	function wp_register_agent( $agent, array $args = array() ): ?WP_Agent {
-		return WP_Agents_Registry::get_instance()->register_agent( $agent, $args );
+		$slug = $agent instanceof WP_Agent ? $agent->get_slug() : (string) $agent;
+		if ( ! doing_action( 'wp_agents_api_init' ) ) {
+			_doing_it_wrong(
+				__FUNCTION__,
+				sprintf(
+					'Agents must be registered on the %1$s action. The agent %2$s was not registered.',
+					'<code>wp_agents_api_init</code>',
+					'<code>' . esc_html( $slug ) . '</code>'
+				),
+				'0.102.8'
+			);
+			return null;
+		}
+
+		$registry = WP_Agents_Registry::get_instance();
+		if ( null === $registry ) {
+			return null;
+		}
+
+		return $registry->register( $agent, $args );
 	}
 }
 
@@ -31,7 +50,12 @@ if ( ! function_exists( 'wp_get_agent' ) ) {
 	 * @return WP_Agent|null Registered agent, or null when not registered.
 	 */
 	function wp_get_agent( string $slug ): ?WP_Agent {
-		return WP_Agents_Registry::get_registered( $slug );
+		$registry = WP_Agents_Registry::get_instance();
+		if ( null === $registry ) {
+			return null;
+		}
+
+		return $registry->get_registered( $slug );
 	}
 }
 
@@ -42,7 +66,12 @@ if ( ! function_exists( 'wp_get_agents' ) ) {
 	 * @return array<string, WP_Agent>
 	 */
 	function wp_get_agents(): array {
-		return WP_Agents_Registry::get_all_registered();
+		$registry = WP_Agents_Registry::get_instance();
+		if ( null === $registry ) {
+			return array();
+		}
+
+		return $registry->get_all_registered();
 	}
 }
 
@@ -54,7 +83,12 @@ if ( ! function_exists( 'wp_has_agent' ) ) {
 	 * @return bool
 	 */
 	function wp_has_agent( string $slug ): bool {
-		return WP_Agents_Registry::has( $slug );
+		$registry = WP_Agents_Registry::get_instance();
+		if ( null === $registry ) {
+			return false;
+		}
+
+		return $registry->is_registered( $slug );
 	}
 }
 
@@ -66,6 +100,11 @@ if ( ! function_exists( 'wp_unregister_agent' ) ) {
 	 * @return WP_Agent|null Removed agent, or null when not registered.
 	 */
 	function wp_unregister_agent( string $slug ): ?WP_Agent {
-		return WP_Agents_Registry::unregister( $slug );
+		$registry = WP_Agents_Registry::get_instance();
+		if ( null === $registry ) {
+			return null;
+		}
+
+		return $registry->unregister( $slug );
 	}
 }

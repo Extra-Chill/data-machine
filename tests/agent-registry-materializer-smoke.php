@@ -14,6 +14,8 @@ namespace {
 
 	$GLOBALS['__agent_materializer_actions'] = array();
 	$GLOBALS['__agent_materializer_hooks']   = array();
+	$GLOBALS['__agent_materializer_current'] = array();
+	$GLOBALS['__agent_materializer_done']    = array();
 
 	function sanitize_title( string $value ): string {
 		$value = strtolower( $value );
@@ -26,6 +28,7 @@ namespace {
 	}
 
 	function do_action( string $hook, ...$args ): void {
+		$GLOBALS['__agent_materializer_current'][] = $hook;
 		$GLOBALS['__agent_materializer_actions'][ $hook ][] = $args;
 		$callbacks = $GLOBALS['__agent_materializer_hooks'][ $hook ] ?? array();
 		ksort( $callbacks );
@@ -35,6 +38,21 @@ namespace {
 				call_user_func_array( $callback, $args );
 			}
 		}
+
+		array_pop( $GLOBALS['__agent_materializer_current'] );
+		$GLOBALS['__agent_materializer_done'][ $hook ] = ( $GLOBALS['__agent_materializer_done'][ $hook ] ?? 0 ) + 1;
+	}
+
+	function doing_action( string $hook ): bool {
+		return in_array( $hook, $GLOBALS['__agent_materializer_current'], true );
+	}
+
+	function did_action( string $hook ): int {
+		return (int) ( $GLOBALS['__agent_materializer_done'][ $hook ] ?? 0 );
+	}
+
+	function esc_html( string $value ): string {
+		return htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' );
 	}
 
 	function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
@@ -166,25 +184,33 @@ namespace {
 		ScaffoldAbilities::$ability                      = new ScaffoldAbilityStub();
 		$GLOBALS['__agent_materializer_actions'] = array();
 		$GLOBALS['__agent_materializer_hooks']   = array();
+		$GLOBALS['__agent_materializer_current'] = array();
+		$GLOBALS['__agent_materializer_done']    = array();
+		do_action( 'init' );
 	}
 
 	echo "agent-registry-materializer-smoke\n";
 
 	echo "\n[1] WordPress-shaped registry vocabulary collects definitions without materializing rows:\n";
 	reset_agent_materializer_smoke();
-	wp_register_agent(
-		new WP_Agent(
-			'Example Agent!',
-			array(
-				'label'          => 'Example Agent',
-				'description'    => 'Collect only',
-				'memory_seeds'   => array( '../SOUL.md' => '/tmp/seed-soul.md' ),
-				'owner_resolver' => static fn() => 7,
-				'default_config' => array( 'default_provider' => 'openai' ),
-			)
-		)
+	add_action(
+		'wp_agents_api_init',
+		static function (): void {
+			wp_register_agent(
+				new WP_Agent(
+					'Example Agent!',
+					array(
+						'label'          => 'Example Agent',
+						'description'    => 'Collect only',
+						'memory_seeds'   => array( '../SOUL.md' => '/tmp/seed-soul.md' ),
+						'owner_resolver' => static fn() => 7,
+						'default_config' => array( 'default_provider' => 'openai' ),
+					)
+				)
+			);
+		}
 	);
-	$definitions = WP_Agents_Registry::get_all();
+	$definitions = AgentRegistry::get_all();
 	assert_agent_materializer_equals( true, class_exists( 'WP_Agent' ), 'WP_Agent definition object is available', $failures, $passes );
 	assert_agent_materializer_equals( true, class_exists( 'WP_Agents_Registry' ), 'WP_Agents_Registry facade is available', $failures, $passes );
 	assert_agent_materializer_equals( array( 'example-agent' ), array_keys( $definitions ), 'definition slug is normalized', $failures, $passes );
@@ -223,15 +249,20 @@ namespace {
 
 	echo "\n[2] reconciliation creates rows, access grants, directories, scaffold calls, and action hooks:\n";
 	reset_agent_materializer_smoke();
-	wp_register_agent(
-		'Example Agent!',
-		array(
-			'label'          => 'Example Agent',
-			'description'    => 'Collect only',
-			'memory_seeds'   => array( '../SOUL.md' => '/tmp/seed-soul.md' ),
-			'owner_resolver' => static fn() => 7,
-			'default_config' => array( 'default_provider' => 'openai' ),
-		)
+	add_action(
+		'wp_agents_api_init',
+		static function (): void {
+			wp_register_agent(
+				'Example Agent!',
+				array(
+					'label'          => 'Example Agent',
+					'description'    => 'Collect only',
+					'memory_seeds'   => array( '../SOUL.md' => '/tmp/seed-soul.md' ),
+					'owner_resolver' => static fn() => 7,
+					'default_config' => array( 'default_provider' => 'openai' ),
+				)
+			);
+		}
 	);
 	$summary = AgentRegistry::reconcile();
 	assert_agent_materializer_equals( array( 'created' => array( 'example-agent' ), 'existing' => array(), 'skipped' => array() ), $summary, 'created summary matches pre-split registry behavior', $failures, $passes );

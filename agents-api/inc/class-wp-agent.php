@@ -261,5 +261,23 @@ if ( ! class_exists( 'WP_Agent' ) ) {
 				_doing_it_wrong( $function_name, $message, '0.71.0' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- _doing_it_wrong receives a message, not direct output.
 			}
 		}
+
+		/**
+		 * Wakeup magic method.
+		 *
+		 * @throws LogicException If the agent object is unserialized.
+		 */
+		public function __wakeup(): void {
+			throw new LogicException( __CLASS__ . ' should never be unserialized.' );
+		}
+
+		/**
+		 * Sleep magic method.
+		 *
+		 * @throws LogicException If the agent object is serialized.
+		 */
+		public function __sleep(): array {
+			throw new LogicException( __CLASS__ . ' should never be serialized.' );
+		}
 	}
 }
