@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.102.8] - 2026-04-30
+
+### Changed
+- align agents api execution with wp-ai-client
+- refactor(agents-api): align agent registry with core lifecycle
+
+### Fixed
+- claim in-flight source items
+
 ## [0.102.7] - 2026-04-30
 
 ### Fixed
