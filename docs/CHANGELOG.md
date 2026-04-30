@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.102.4] - 2026-04-30
+
+### Changed
+- route image generation through wp-ai-client
+- migrate provider admin settings to wp-ai-client
+- lock upsert-post format defaults
+- remove ai http client runtime dependency
+- enforce backend-only agents api boundary
+- add agents api module boundary smokes
+- move memory contracts into agents api module
+- move transcript contract into agents api module
+- add tool substrate boundary smoke
+- require wp ai client for agent runtime
+- consolidate agents api substrate contracts
+
 ## [0.102.3] - 2026-04-29
 
 ### Changed
