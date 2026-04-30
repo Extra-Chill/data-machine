@@ -3,9 +3,8 @@
  * Tool Policy Resolver
  *
  * Single entry point for determining which tools are available for any
- * execution context. Reads from the unified `datamachine_tools` registry
- * and filters by context (pipeline/chat/system), then applies
- * per-agent tool policies from agent_config.
+ * execution context. Composes tools from registered sources, filters by
+ * context (pipeline/chat/system), then applies per-agent tool policies.
  *
  * Resolution precedence (highest to lowest):
  * 1. Explicit deny list (always wins)
@@ -22,8 +21,9 @@
 
 namespace DataMachine\Engine\AI\Tools;
 
-use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Engine\AI\Tools\Policy\DataMachineAgentToolPolicyProvider;
+use DataMachine\Engine\AI\Tools\Policy\DataMachineMandatoryToolPolicy;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -38,10 +38,18 @@ class ToolPolicyResolver {
 
 	private ToolManager $tool_manager;
 	private ToolSourceRegistry $tool_source_registry;
+	private DataMachineAgentToolPolicyProvider $agent_policy_provider;
+	private DataMachineMandatoryToolPolicy $mandatory_tool_policy;
 
-	public function __construct( ?ToolManager $tool_manager = null ) {
-		$this->tool_manager         = $tool_manager ?? new ToolManager();
-		$this->tool_source_registry = new ToolSourceRegistry( $this->tool_manager );
+	public function __construct(
+		?ToolManager $tool_manager = null,
+		?DataMachineAgentToolPolicyProvider $agent_policy_provider = null,
+		?DataMachineMandatoryToolPolicy $mandatory_tool_policy = null
+	) {
+		$this->tool_manager           = $tool_manager ?? new ToolManager();
+		$this->tool_source_registry   = new ToolSourceRegistry( $this->tool_manager );
+		$this->agent_policy_provider  = $agent_policy_provider ?? new DataMachineAgentToolPolicyProvider();
+		$this->mandatory_tool_policy  = $mandatory_tool_policy ?? new DataMachineMandatoryToolPolicy();
 	}
 
 	/**
@@ -66,20 +74,6 @@ class ToolPolicyResolver {
 	 * }
 	 * @return array Resolved tools array keyed by tool name.
 	 */
-	/**
-	 * Valid access levels for tools without a linked ability, ordered from
-	 * least to most privileged. Used by filterByAccessLevel().
-	 *
-	 * @since 0.54.0
-	 */
-	private const ACCESS_LEVELS = array(
-		'public'        => '',
-		'authenticated' => 'datamachine_chat',
-		'author'        => 'datamachine_use_tools',
-		'editor'        => 'datamachine_view_logs',
-		'admin'         => 'datamachine_manage_settings',
-	);
-
 	public function resolve( array $args ): array {
 		$mode     = $args['mode'] ?? self::MODE_PIPELINE;
 		$deny     = $args['deny'] ?? array();
@@ -99,6 +93,7 @@ class ToolPolicyResolver {
 		//
 		// The legacy behavior is still available behind a filter for installs that
 		// want to preserve the coarse gate during migration.
+		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
 		$require_use_tools_for_chat = apply_filters( 'datamachine_require_use_tools_for_chat_tools', false, $args );
 
 		if ( self::MODE_CHAT === $mode && $require_use_tools_for_chat && ! PermissionHelper::can( 'use_tools' ) ) {
@@ -141,6 +136,7 @@ class ToolPolicyResolver {
 		}
 
 		// 7. Allow external filtering of resolved tools.
+		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
 		$tools = apply_filters( 'datamachine_resolved_tools', $tools, $mode, $args );
 
 		return $tools;
@@ -184,7 +180,7 @@ class ToolPolicyResolver {
 			}
 
 			// Tools with linked abilities: check each ability's permission.
-			if ( ! empty( $ability_slugs ) && $registry ) {
+			if ( ! empty( $ability_slugs ) ) {
 				$permitted = true;
 
 				foreach ( $ability_slugs as $slug ) {
@@ -293,7 +289,7 @@ class ToolPolicyResolver {
 
 			// Handler tools bypass category filtering — they're already scoped
 			// by the pipeline engine to adjacent step handlers.
-			if ( self::isPipelineHandlerTool( $tool ) ) {
+			if ( $this->mandatory_tool_policy->isMandatory( $tool ) ) {
 				$filtered[ $name ] = $tool;
 				continue;
 			}
@@ -315,14 +311,12 @@ class ToolPolicyResolver {
 			}
 
 			// Check if ANY linked ability belongs to an allowed category.
-			if ( $registry ) {
-				foreach ( $ability_slugs as $slug ) {
-					$ability = $registry->get_registered( $slug );
+			foreach ( $ability_slugs as $slug ) {
+				$ability = $registry->get_registered( $slug );
 
-					if ( $ability && isset( $categories_flip[ $ability->get_category() ] ) ) {
-						$filtered[ $name ] = $tool;
-						break;
-					}
+				if ( $ability && isset( $categories_flip[ $ability->get_category() ] ) ) {
+					$filtered[ $name ] = $tool;
+					break;
 				}
 			}
 		}
@@ -341,54 +335,7 @@ class ToolPolicyResolver {
 	 * @return array|null Tool policy array with 'mode' and 'tools' keys, or null.
 	 */
 	public function getAgentToolPolicy( int $agent_id ): ?array {
-		if ( $agent_id <= 0 ) {
-			return null;
-		}
-
-		$agents_repo = new Agents();
-		$agent       = $agents_repo->get_agent( $agent_id );
-
-		if ( ! $agent ) {
-			return null;
-		}
-
-		$config = $agent['agent_config'] ?? array();
-
-		if ( empty( $config['tool_policy'] ) || ! is_array( $config['tool_policy'] ) ) {
-			return null;
-		}
-
-		$policy = $config['tool_policy'];
-
-		// Validate structure: must have 'mode'.
-		if ( ! isset( $policy['mode'] ) ) {
-			return null;
-		}
-
-		// Validate mode is one of the allowed values.
-		if ( ! in_array( $policy['mode'], array( 'deny', 'allow' ), true ) ) {
-			return null;
-		}
-
-		// Ensure tools is present and an array (may be empty — see note below).
-		if ( ! isset( $policy['tools'] ) || ! is_array( $policy['tools'] ) ) {
-			$policy['tools'] = array();
-		}
-
-		// Normalize categories: must be an array if present.
-		if ( isset( $policy['categories'] ) && ! is_array( $policy['categories'] ) ) {
-			return null;
-		}
-
-		// An empty tools + empty categories list is only meaningful for allow
-		// mode (means "allow nothing"). Deny mode with empty lists is a no-op
-		// and we treat it as no policy to avoid a wasted pass through
-		// applyAgentPolicy.
-		if ( empty( $policy['tools'] ) && empty( $policy['categories'] ?? array() ) && 'allow' !== $policy['mode'] ) {
-			return null;
-		}
-
-		return $policy;
+		return $this->agent_policy_provider->getForAgent( $agent_id );
 	}
 
 	/**
@@ -418,8 +365,9 @@ class ToolPolicyResolver {
 		$mode              = $policy['mode'];
 		$tool_names        = $policy['tools'] ?? array();
 		$policy_categories = $policy['categories'] ?? array();
-		$handler_tools     = $this->getPipelineHandlerTools( $tools );
-		$optional_tools    = array_diff_key( $tools, $handler_tools );
+		$policy_tools      = $this->mandatory_tool_policy->split( $tools );
+		$handler_tools     = $policy_tools['mandatory'];
+		$optional_tools    = $policy_tools['optional'];
 
 		// No tool names and no categories = no restrictions (deny) or no optional tools (allow).
 		if ( empty( $tool_names ) && empty( $policy_categories ) ) {
@@ -444,7 +392,7 @@ class ToolPolicyResolver {
 			$matches_tool = isset( $tool_names_flip[ $name ] );
 			$matches_cat  = false;
 
-			if ( ! $matches_tool && is_array( $tool ) && $registry ) {
+			if ( ! $matches_tool && is_array( $tool ) ) {
 				$ability_slugs = array();
 
 				if ( ! empty( $tool['ability'] ) ) {
@@ -476,33 +424,6 @@ class ToolPolicyResolver {
 	}
 
 	/**
-	 * Return whether a tool is a pipeline handler tool resolved from adjacency.
-	 *
-	 * Handler tools are flow plumbing: they are controlled by the adjacent flow
-	 * shape and carry handler metadata for completion tracking. Optional/global
-	 * tool policy should not remove them.
-	 *
-	 * @param array $tool Tool definition.
-	 * @return bool Whether this is an adjacent handler tool.
-	 */
-	private static function isPipelineHandlerTool( array $tool ): bool {
-		return isset( $tool['handler'] ) && ! isset( $tool['ability'] ) && ! isset( $tool['abilities'] );
-	}
-
-	/**
-	 * Extract adjacent pipeline handler tools from a resolved tool set.
-	 *
-	 * @param array $tools Tool definitions keyed by tool name.
-	 * @return array Handler tools keyed by tool name.
-	 */
-	private function getPipelineHandlerTools( array $tools ): array {
-		return array_filter(
-			$tools,
-			static fn( $tool ) => is_array( $tool ) && self::isPipelineHandlerTool( $tool )
-		);
-	}
-
-	/**
 	 * Apply an allow-only list while preserving adjacent handler tools.
 	 *
 	 * @param array $tools      Tool definitions keyed by tool name.
@@ -510,8 +431,9 @@ class ToolPolicyResolver {
 	 * @return array Filtered tools.
 	 */
 	private function filterByAllowOnlyPreservingHandlerTools( array $tools, array $allow_only ): array {
-		$handler_tools  = $this->getPipelineHandlerTools( $tools );
-		$optional_tools = array_diff_key( $tools, $handler_tools );
+		$policy_tools   = $this->mandatory_tool_policy->split( $tools );
+		$handler_tools  = $policy_tools['mandatory'];
+		$optional_tools = $policy_tools['optional'];
 
 		return $handler_tools + array_intersect_key( $optional_tools, array_flip( $allow_only ) );
 	}
