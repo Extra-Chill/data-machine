@@ -620,16 +620,58 @@ class WpAiClientAdapter {
 			return null;
 		}
 
+		$schema = $parameters;
+
 		// Already a JSON-schema-shaped object.
-		if ( isset( $parameters['type'] ) || isset( $parameters['properties'] ) || isset( $parameters['$ref'] ) ) {
-			return $parameters;
+		if ( ! isset( $schema['type'] ) && ! isset( $schema['properties'] ) && ! isset( $schema['$ref'] ) ) {
+			// Best effort: assume the array IS the properties map, wrap it.
+			$schema = array(
+				'type'       => 'object',
+				'properties' => $schema,
+			);
 		}
 
-		// Best effort: assume the array IS the properties map, wrap it.
-		return array(
-			'type'       => 'object',
-			'properties' => $parameters,
-		);
+		return self::normalizeJsonSchemaRequiredFlags( $schema );
+	}
+
+	/**
+	 * Convert Data Machine's legacy property-level required flags to JSON Schema.
+	 *
+	 * Some tools historically declared required fields as
+	 * `{ properties: { foo: { required: true } } }`. OpenAI's tool schema accepts
+	 * the standard object-level `required: [ "foo" ]` shape instead.
+	 *
+	 * @param array<string, mixed> $schema JSON schema.
+	 * @return array<string, mixed>
+	 */
+	private static function normalizeJsonSchemaRequiredFlags( array $schema ): array {
+		if ( empty( $schema['properties'] ) || ! is_array( $schema['properties'] ) ) {
+			return $schema;
+		}
+
+		$required = isset( $schema['required'] ) && is_array( $schema['required'] ) ? $schema['required'] : array();
+
+		foreach ( $schema['properties'] as $property_name => $property_schema ) {
+			if ( ! is_array( $property_schema ) || ! array_key_exists( 'required', $property_schema ) ) {
+				continue;
+			}
+
+			if ( true === $property_schema['required'] ) {
+				$required[] = (string) $property_name;
+			}
+
+			unset( $property_schema['required'] );
+			$schema['properties'][ $property_name ] = $property_schema;
+		}
+
+		$required = array_values( array_unique( array_filter( $required, 'is_string' ) ) );
+		if ( ! empty( $required ) ) {
+			$schema['required'] = $required;
+		} else {
+			unset( $schema['required'] );
+		}
+
+		return $schema;
 	}
 
 	/**
