@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.102.5] - 2026-04-30
+
+### Fixed
+- normalize tool schema required flags
+
 ## [0.102.4] - 2026-04-30
 
 ### Changed
