@@ -8,15 +8,13 @@
  * to a transcript row. It deliberately does not include chat UI listing,
  * read-state, retention scheduling, or reporting/metrics responsibilities.
  *
- * The interface keeps its current namespace while the Agents API extraction is
- * in-place. Conceptually, this is the contract that a future Agents API package
- * can own; Data Machine's chat product consumes it through its aggregate store
- * and factory adapters.
+ * Data Machine's chat product consumes this neutral contract through its
+ * aggregate store and factory adapters.
  *
  * @package AgentsAPI
  */
 
-namespace DataMachine\Core\Database\Chat;
+namespace AgentsAPI\Core\Database\Chat;
 
 defined( 'ABSPATH' ) || exit;
 

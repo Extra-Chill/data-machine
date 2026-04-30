@@ -46,12 +46,12 @@ require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryStore
 require_once __DIR__ . '/../inc/Core/FilesRepository/DiskAgentMemoryStore.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryStoreFactory.php';
 
-use DataMachine\Core\FilesRepository\AgentMemoryListEntry;
-use DataMachine\Core\FilesRepository\AgentMemoryReadResult;
-use DataMachine\Core\FilesRepository\AgentMemoryScope;
+use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
+use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
+use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
 use DataMachine\Core\FilesRepository\AgentMemoryStoreFactory;
-use DataMachine\Core\FilesRepository\AgentMemoryStoreInterface;
-use DataMachine\Core\FilesRepository\AgentMemoryWriteResult;
+use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
+use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
 use DataMachine\Core\FilesRepository\DiskAgentMemoryStore;
 
 class AgentMemoryStoreContractFakeStore implements AgentMemoryStoreInterface {

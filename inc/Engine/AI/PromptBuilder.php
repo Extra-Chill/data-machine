@@ -11,6 +11,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use AgentsAPI\Engine\AI\AgentMessageEnvelope;
 use DataMachine\Engine\AI\Directives\DirectiveInterface;
 use DataMachine\Engine\AI\Directives\DirectiveOutputValidator;
 use DataMachine\Engine\AI\Directives\DirectiveRenderer;

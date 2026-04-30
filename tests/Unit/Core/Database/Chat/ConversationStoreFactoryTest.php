@@ -22,7 +22,7 @@ use DataMachine\Core\Database\Chat\ConversationRetentionInterface;
 use DataMachine\Core\Database\Chat\ConversationSessionIndexInterface;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
-use DataMachine\Core\Database\Chat\ConversationTranscriptStoreInterface;
+use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
 use WP_UnitTestCase;
 
 class ConversationStoreFactoryTest extends WP_UnitTestCase {

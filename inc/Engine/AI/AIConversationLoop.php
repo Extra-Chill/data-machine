@@ -11,6 +11,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use AgentsAPI\Engine\AI\AgentConversationResult;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\IterationBudgetRegistry;
 use DataMachine\Engine\AI\Tools\ToolExecutor;

@@ -14,7 +14,7 @@ namespace DataMachine\Abilities;
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Engine\AI\RequestBuilder;
-use DataMachine\Engine\AI\AgentMessageEnvelope;
+use AgentsAPI\Engine\AI\AgentMessageEnvelope;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\Tasks\TaskScheduler;

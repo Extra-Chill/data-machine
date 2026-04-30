@@ -25,6 +25,9 @@
 
 namespace DataMachine\Core\FilesRepository;
 
+use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
+use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
+
 defined( 'ABSPATH' ) || exit;
 
 class AgentMemoryStoreFactory {
@@ -64,6 +67,7 @@ class AgentMemoryStoreFactory {
 		 *                                              or a swap implementation.
 		 * @param AgentMemoryScope               $scope The scope being acted on.
 		 */
+		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
 		$store = apply_filters( 'agents_api_memory_store', null, $scope );
 
 		if ( $store instanceof AgentMemoryStoreInterface ) {

@@ -10,6 +10,8 @@
 
 namespace DataMachine\Engine\AI;
 
+use AgentsAPI\Engine\AI\AgentMessageEnvelope;
+
 defined( 'ABSPATH' ) || exit;
 
 class ProviderRequestAssembler {

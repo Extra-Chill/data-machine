@@ -22,6 +22,8 @@
 
 namespace DataMachine\Core\Database\Chat;
 
+use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
+
 defined( 'ABSPATH' ) || exit;
 
 class ConversationStoreFactory {

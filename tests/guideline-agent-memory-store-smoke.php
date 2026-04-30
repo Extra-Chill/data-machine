@@ -33,7 +33,7 @@ require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryWrite
 require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryStoreInterface.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/GuidelineAgentMemoryStore.php';
 
-use DataMachine\Core\FilesRepository\AgentMemoryScope;
+use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
 use DataMachine\Core\FilesRepository\GuidelineAgentMemoryStore;
 
 function datamachine_guideline_memory_assert( bool $condition, string $message ): void {
