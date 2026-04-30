@@ -82,7 +82,7 @@ if ( ! class_exists( 'WP_Agent_Package_Artifact' ) ) {
 			$this->slug        = $this->prepare_slug( $artifact['slug'] ?? '' );
 			$this->label       = isset( $artifact['label'] ) ? trim( (string) $artifact['label'] ) : $this->slug;
 			$this->description = isset( $artifact['description'] ) ? trim( (string) $artifact['description'] ) : '';
-			$this->source      = isset( $artifact['source'] ) ? trim( (string) $artifact['source'] ) : '';
+			$this->source      = $this->prepare_source( $artifact['source'] ?? '' );
 			$this->checksum    = isset( $artifact['checksum'] ) ? trim( (string) $artifact['checksum'] ) : '';
 
 			if ( isset( $artifact['requires'] ) ) {
@@ -230,6 +230,35 @@ if ( ! class_exists( 'WP_Agent_Package_Artifact' ) ) {
 			}
 
 			return $slug;
+		}
+
+		/**
+		 * Prepares the package-relative source path.
+		 *
+		 * @param mixed $source Raw source path.
+		 * @return string
+		 */
+		private function prepare_source( $source ): string {
+			$source = trim( str_replace( '\\', '/', (string) $source ) );
+			if ( '' === $source ) {
+				return '';
+			}
+
+			if ( str_starts_with( $source, '/' ) || preg_match( '/^[A-Za-z]:\//', $source ) ) {
+				throw new InvalidArgumentException( 'Agent package artifact source must be relative to the package.' );
+			}
+
+			$parts = array_filter(
+				explode( '/', $source ),
+				static function ( string $part ): bool {
+					return '' !== $part;
+				}
+			);
+			if ( in_array( '..', $parts, true ) ) {
+				throw new InvalidArgumentException( 'Agent package artifact source cannot contain parent directory segments.' );
+			}
+
+			return implode( '/', $parts );
 		}
 
 		/**
