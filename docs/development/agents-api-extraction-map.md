@@ -126,7 +126,7 @@ These are closest to generic public contracts. Most should be extracted as contr
 | `AgentMemoryReadResult` | `inc/Core/FilesRepository/AgentMemoryReadResult.php` | Store-neutral read result. | Generic result value object can move unchanged after naming cleanup. |
 | `AgentMemoryWriteResult` | `inc/Core/FilesRepository/AgentMemoryWriteResult.php` | Store-neutral write result with hash/bytes/error shape. | Generic result value object can move unchanged after naming cleanup. |
 | `AgentMemoryListEntry` | `inc/Core/FilesRepository/AgentMemoryListEntry.php` | Store-neutral list entry. | Good candidate if file-backed memory stays in scope. |
-| `ConversationTranscriptStoreInterface` | `inc/Core/Database/Chat/ConversationTranscriptStoreInterface.php` | Transcript CRUD is generic conversation persistence. | First extraction candidate. Rename namespace/vocabulary later; do not require chat UI listing/read-state/reporting for transcript-only backends. |
+| `ConversationTranscriptStoreInterface` | `agents-api/inc/Core/Database/Chat/ConversationTranscriptStoreInterface.php` | Transcript CRUD is generic conversation persistence. | Now lives in the in-repo Agents API module while preserving its namespace for behavior compatibility. Rename namespace/vocabulary later; do not require chat UI listing/read-state/reporting for transcript-only backends. |
 | `ConversationSessionIndexInterface` | `inc/Core/Database/Chat/ConversationSessionIndexInterface.php` | Session listing can be generic for UIs, but it is not required for transcript persistence. | Treat as optional until Agents API adopts an identity/listing model. Data Machine chat switcher uses it today. |
 | `ConversationReadStateInterface` | `inc/Core/Database/Chat/ConversationReadStateInterface.php` | Read-state is generic UI behavior, not transcript CRUD. | Optional interface at most. Data Machine chat unread state keeps consuming it. |
 | `ConversationRetentionInterface` | `inc/Core/Database/Chat/ConversationRetentionInterface.php` | Cleanup methods can be backend-generic, but retention policy/scheduling is product behavior. | Data Machine retention tasks stay product; future Agents API may expose only optional backend cleanup. |
@@ -207,7 +207,7 @@ Conversation storage is split in place, but only the narrow transcript surface i
 
 | Layer | Current surface | Boundary decision |
 |---|---|---|
-| Generic transcript CRUD | `ConversationTranscriptStoreInterface`, `ConversationStoreFactory::get_transcript_store()` | Candidate for Agents API ownership. Runtime persistence should depend on this surface when it only needs complete transcript sessions. |
+| Generic transcript CRUD | `ConversationTranscriptStoreInterface`, `ConversationStoreFactory::get_transcript_store()` | The interface now lives in `agents-api/`; Data Machine's factory remains the product adapter. Runtime persistence should depend on this surface when it only needs complete transcript sessions. |
 | Data Machine compatibility aggregate | `ConversationStoreInterface`, `ConversationStoreFactory::get()`, `datamachine_conversation_store` | Stays in Data Machine for now so chat UI, REST, CLI, retention, and reporting keep one behavior-preserving resolver. |
 | Chat UI/session switcher | `ConversationSessionIndexInterface`, chat REST/abilities/UI callers | Product behavior today. It may become an optional Agents API UI contract later, but transcript-only backends should not implement it by default. |
 | Read state | `ConversationReadStateInterface` | Optional UI behavior. Not part of transcript persistence. |
