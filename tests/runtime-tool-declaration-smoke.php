@@ -19,6 +19,39 @@ function datamachine_runtime_tool_assert( bool $condition, string $message ): vo
 
 $assertions = 0;
 
+$runtime_tool_file = dirname( __DIR__ ) . '/agents-api/inc/Engine/AI/Tools/RuntimeToolDeclaration.php';
+$legacy_tool_file  = dirname( __DIR__ ) . '/inc/Engine/AI/Tools/RuntimeToolDeclaration.php';
+
+datamachine_runtime_tool_assert(
+	is_file( $runtime_tool_file ),
+	'RuntimeToolDeclaration should live in the in-repo Agents API module.'
+);
+++$assertions;
+datamachine_runtime_tool_assert(
+	! file_exists( $legacy_tool_file ),
+	'RuntimeToolDeclaration should not exist in the Data Machine product tool tree.'
+);
+++$assertions;
+
+$runtime_tool_source = (string) file_get_contents( $runtime_tool_file );
+$forbidden_tokens    = array(
+	'datamachine_tools',
+	'FlowStepConfig',
+	'AdjacentHandlerToolSource',
+	'DataMachineToolRegistrySource',
+	'ToolPolicyResolver',
+	'PendingAction',
+	'post_origin',
+	'handler_slug',
+);
+foreach ( $forbidden_tokens as $token ) {
+	datamachine_runtime_tool_assert(
+		! str_contains( $runtime_tool_source, $token ),
+		'RuntimeToolDeclaration should not mention Data Machine product token: ' . $token
+	);
+	++$assertions;
+}
+
 $valid = array(
 	'name'        => 'client/select_block',
 	'description' => 'Select a block in the active editor.',
