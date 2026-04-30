@@ -244,7 +244,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 	/**
 	 * Test successful alt text generation.
 	 */
-	public function test_execute_returns_failure_for_file_part_until_wp_ai_client_adapter_supports_files(): void {
+	public function test_execute_returns_failure_for_file_part_until_wp_ai_client_supports_files(): void {
 		// Mock PluginSettings
 		$settings_filter = function( $pre_option ) {
 			return [

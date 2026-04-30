@@ -12,6 +12,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use AgentsAPI\Engine\AI\WpAiClient;
 use DataMachine\Engine\AI\Directives\DirectivePolicyResolver;
 
 defined( 'ABSPATH' ) || exit;
@@ -86,23 +87,10 @@ class RequestBuilder {
 		);
 
 		// 4. Dispatch the request. wp-ai-client is the only runtime provider path.
-		$unavailable_reason = WpAiClientCapability::unavailableReason( $provider );
+		$unavailable_reason = WpAiClient::unavailable_reason( $provider );
 		if ( null !== $unavailable_reason ) {
-			$response = array(
-				'success'          => false,
-				'provider'         => $provider,
-				'error'            => $unavailable_reason,
-				'data'             => array(
-					'content'    => '',
-					'tool_calls' => array(),
-					'usage'      => array(
-						'prompt_tokens'     => 0,
-						'completion_tokens' => 0,
-						'total_tokens'      => 0,
-					),
-				),
-				'request_metadata' => $request_metadata,
-			);
+			$response                     = self::errorResponse( $provider, $unavailable_reason );
+			$response['request_metadata'] = $request_metadata;
 
 			do_action(
 				'datamachine_log',
@@ -124,23 +112,16 @@ class RequestBuilder {
 			return $response;
 		}
 
-		$wp_ai_response = WpAiClientAdapter::dispatch( $provider_request, $provider, $structured_tools );
-		if ( null === $wp_ai_response ) {
-			$wp_ai_response = array(
-				'success'  => false,
-				'provider' => $provider,
-				'error'    => 'wp-ai-client adapter cannot translate this request shape yet',
-				'data'     => array(
-					'content'    => '',
-					'tool_calls' => array(),
-					'usage'      => array(
-						'prompt_tokens'     => 0,
-						'completion_tokens' => 0,
-						'total_tokens'      => 0,
-					),
-				),
-			);
-		}
+		$agents_api_result = WpAiClient::generate_text(
+			$provider,
+			$model,
+			$request['messages'] ?? array(),
+			$structured_tools,
+			$provider_request,
+			WpAiClientProviderAdmin::resolveApiKey( $provider )
+		);
+
+		$wp_ai_response = self::fromAgentsApiResult( $agents_api_result, $provider );
 
 		do_action(
 			'datamachine_log',
@@ -161,6 +142,66 @@ class RequestBuilder {
 
 		$wp_ai_response['request_metadata'] = $request_metadata;
 		return $wp_ai_response;
+	}
+
+	/**
+	 * Convert an Agents API runtime result into Data Machine's conversation turn shape.
+	 *
+	 * @param array  $result   Agents API runtime result.
+	 * @param string $provider Provider identifier.
+	 * @return array
+	 */
+	private static function fromAgentsApiResult( array $result, string $provider ): array {
+		$response = array(
+			'success'  => ! empty( $result['success'] ),
+			'provider' => $provider,
+			'data'     => array(
+				'content'    => (string) ( $result['content'] ?? '' ),
+				'tool_calls' => is_array( $result['tool_calls'] ?? null ) ? $result['tool_calls'] : array(),
+				'usage'      => is_array( $result['usage'] ?? null ) ? $result['usage'] : array(),
+			),
+		);
+
+		if ( isset( $result['error'] ) && '' !== $result['error'] ) {
+			$response['error'] = (string) $result['error'];
+		}
+
+		if ( isset( $result['error_code'] ) && '' !== $result['error_code'] ) {
+			$response['error_code'] = (string) $result['error_code'];
+		}
+
+		return $response;
+	}
+
+	/**
+	 * Build an error response in Data Machine's conversation turn shape.
+	 *
+	 * @param string      $provider Provider identifier.
+	 * @param string      $message  Error message.
+	 * @param string|null $code     Optional error code.
+	 * @return array
+	 */
+	private static function errorResponse( string $provider, string $message, ?string $code = null ): array {
+		$response = array(
+			'success'  => false,
+			'provider' => $provider,
+			'error'    => $message,
+			'data'     => array(
+				'content'    => '',
+				'tool_calls' => array(),
+				'usage'      => array(
+					'prompt_tokens'     => 0,
+					'completion_tokens' => 0,
+					'total_tokens'      => 0,
+				),
+			),
+		);
+
+		if ( null !== $code && '' !== $code ) {
+			$response['error_code'] = $code;
+		}
+
+		return $response;
 	}
 
 	/**

@@ -59,11 +59,19 @@ function size_format( $bytes ): string {
 	return $bytes . ' B';
 }
 
-require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 require_once dirname( __DIR__ ) . '/agents-api/agents-api.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Directives/DirectiveInterface.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Directives/DirectiveOutputValidator.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Directives/DirectiveRenderer.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Directives/DirectivePolicyResolver.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/PromptBuilder.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/ProviderRequestAssembler.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/RequestMetadata.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/WpAiClientProviderAdmin.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/RequestBuilder.php';
 
+use AgentsAPI\Engine\AI\WpAiClient;
 use DataMachine\Engine\AI\RequestBuilder;
-use DataMachine\Engine\AI\WpAiClientCapability;
 
 $failures = array();
 
@@ -100,9 +108,9 @@ add_filter(
 	1
 );
 
-$reason = WpAiClientCapability::unavailableReason( 'openai' );
+$reason = WpAiClient::unavailable_reason( 'openai' );
 assert_smoke( is_string( $reason ) && str_contains( $reason, 'wp-ai-client is unavailable' ), 'missing wp-ai-client produces a capability-gate reason', (string) $reason );
-assert_smoke( is_string( WpAiClientCapability::unavailableReason( 'openai' ) ), 'gate reason remains stable on repeated calls' );
+assert_smoke( is_string( WpAiClient::unavailable_reason( 'openai' ) ), 'gate reason remains stable on repeated calls' );
 
 $response = RequestBuilder::build(
 	array(
@@ -124,12 +132,13 @@ assert_smoke( isset( $response['request_metadata']['request_json_bytes'] ), 'blo
 assert_smoke( str_contains( (string) ( $response['error'] ?? '' ), 'wp-ai-client is unavailable' ), 'blocked request error names wp-ai-client gate', (string) ( $response['error'] ?? '' ) );
 
 $request_builder_source = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Engine/AI/RequestBuilder.php' );
-$capability_source      = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Engine/AI/WpAiClientCapability.php' );
+$agents_api_source      = (string) file_get_contents( dirname( __DIR__ ) . '/agents-api/inc/Engine/AI/WpAiClient.php' );
 
 assert_smoke( false === str_contains( $request_builder_source, "'chubes_ai_request'" ), 'RequestBuilder source has no chubes_ai_request dispatch' );
 assert_smoke( false === str_contains( $request_builder_source, 'Legacy path: ai-http-client' ), 'RequestBuilder source has no legacy provider path comment' );
-assert_smoke( str_contains( $request_builder_source, 'WpAiClientCapability::unavailableReason' ), 'RequestBuilder uses the capability-gate helper' );
-assert_smoke( str_contains( $capability_source, 'public static function unavailableReason' ), 'single capability-gate helper exists' );
+assert_smoke( str_contains( $request_builder_source, 'WpAiClient::unavailable_reason' ), 'RequestBuilder uses the Agents API wp-ai-client gate' );
+assert_smoke( str_contains( $request_builder_source, 'WpAiClient::generate_text' ), 'RequestBuilder dispatches through Agents API wp-ai-client execution' );
+assert_smoke( str_contains( $agents_api_source, 'wp_ai_client_prompt()' ), 'Agents API wp-ai-client execution calls wp_ai_client_prompt directly' );
 
 echo "\n" . smoke_failure_count() . " failures\n";
 if ( smoke_failure_count() > 0 ) {

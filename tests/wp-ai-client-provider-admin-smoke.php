@@ -182,7 +182,7 @@ namespace {
 	$assert( 'OpenAI' === $providers['openai']['label'], 'connector label wins over provider metadata' );
 	$assert( 'gpt-5.4' === ( $providers['openai']['models'][0]['id'] ?? null ), 'models are discovered from wp-ai-client metadata directory' );
 	$assert( WpAiClientProviderAdmin::isProviderRegistered( 'openai' ), 'registered provider validates' );
-	$assert( WpAiClientProviderAdmin::isProviderRegistered( 'google' ), 'historical google provider alias validates against gemini' );
+	$assert( ! WpAiClientProviderAdmin::isProviderRegistered( 'google' ), 'historical google provider alias is not preserved' );
 	$assert( ! WpAiClientProviderAdmin::isProviderRegistered( 'unknown' ), 'unknown provider fails validation' );
 	$assert( 'sk-openai-secret-1234' === WpAiClientProviderAdmin::resolveApiKey( 'openai' ), 'connector option key resolves for runtime auth' );
 
@@ -214,7 +214,8 @@ namespace {
 		'inc/Api/Providers.php',
 		'inc/Api/Chat/Chat.php',
 		'inc/Abilities/SettingsAbilities.php',
-		'inc/Engine/AI/WpAiClientAdapter.php',
+		'inc/Engine/AI/RequestBuilder.php',
+		'inc/Engine/AI/WpAiClientProviderAdmin.php',
 		'inc/Engine/Filters/DataMachineFilters.php',
 	);
 

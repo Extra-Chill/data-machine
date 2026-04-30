@@ -15,11 +15,10 @@
 
 namespace DataMachine\Abilities\Media;
 
+use AgentsAPI\Engine\AI\WpAiClient;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
-use DataMachine\Engine\AI\WpAiClientAdapter;
-use DataMachine\Engine\AI\WpAiClientCapability;
 use DataMachine\Engine\Tasks\TaskScheduler;
 
 defined( 'ABSPATH' ) || exit;
@@ -186,7 +185,7 @@ class ImageGenerationAbilities {
 			);
 		}
 
-		$unavailable_reason = WpAiClientCapability::unavailableReason( $provider );
+		$unavailable_reason = WpAiClient::unavailable_reason( $provider );
 		if ( null !== $unavailable_reason ) {
 			return array(
 				'success' => false,
@@ -212,7 +211,27 @@ class ImageGenerationAbilities {
 			$aspect_ratio = self::DEFAULT_ASPECT_RATIO;
 		}
 
-		$result = WpAiClientAdapter::generateImage( $prompt, $provider, $model, $aspect_ratio );
+		$image_file = WpAiClient::generate_image_file(
+			$prompt,
+			$provider,
+			$model,
+			$aspect_ratio,
+			\DataMachine\Engine\AI\WpAiClientProviderAdmin::resolveApiKey( $provider )
+		);
+
+		if ( is_wp_error( $image_file ) ) {
+			$result = array(
+				'success' => false,
+				'error'   => $image_file->get_error_message(),
+			);
+		} else {
+			$result = array(
+				'success'        => true,
+				'image_url'      => is_object( $image_file ) && method_exists( $image_file, 'getUrl' ) ? (string) $image_file->getUrl() : '',
+				'image_data_uri' => is_object( $image_file ) && method_exists( $image_file, 'getDataUri' ) ? (string) $image_file->getDataUri() : '',
+				'provider'       => $provider,
+			);
+		}
 
 		if ( ! $result['success'] ) {
 			return array(
@@ -441,7 +460,7 @@ class ImageGenerationAbilities {
 		$provider = $config['default_provider'] ?? self::DEFAULT_PROVIDER;
 		$model    = $config['default_model'] ?? self::DEFAULT_MODEL;
 
-		return ! empty( $provider ) && ! empty( $model ) && null === WpAiClientCapability::unavailableReason( (string) $provider );
+		return ! empty( $provider ) && ! empty( $model ) && null === WpAiClient::unavailable_reason( (string) $provider );
 	}
 
 	/**

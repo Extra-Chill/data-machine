@@ -22,6 +22,7 @@ require_once AGENTS_API_PATH . 'inc/register-agents.php';
 require_once AGENTS_API_PATH . 'inc/Core/Database/Chat/ConversationTranscriptStoreInterface.php';
 require_once AGENTS_API_PATH . 'inc/Engine/AI/AgentMessageEnvelope.php';
 require_once AGENTS_API_PATH . 'inc/Engine/AI/AgentConversationResult.php';
+require_once AGENTS_API_PATH . 'inc/Engine/AI/WpAiClient.php';
 require_once AGENTS_API_PATH . 'inc/Engine/AI/Tools/RuntimeToolDeclaration.php';
 require_once AGENTS_API_PATH . 'inc/Core/FilesRepository/AgentMemoryScope.php';
 require_once AGENTS_API_PATH . 'inc/Core/FilesRepository/AgentMemoryListEntry.php';
