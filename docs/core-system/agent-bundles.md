@@ -103,10 +103,10 @@ Portable flow-step policy fields are explicit in `flows/<flow-slug>.json`:
 
 ## CLI
 
-Bundle operations live under `wp datamachine agent-bundle`:
+Agent package operations live under `wp datamachine agent`:
 
 - `install <path>` imports a local bundle path (`.zip`, `.json`, or directory).
-- `list` reports installed bundle-backed agents.
+- `installed` reports installed package-backed agents without clobbering `agent list`.
 - `status <slug>` reports installed version and tracked artifact state by agent slug or bundle slug.
 - `diff <path>` builds a read-only upgrade plan.
 - `upgrade <path>` applies clean updates and stages locally modified artifacts as PendingActions.
