@@ -43,6 +43,9 @@ if ( ! class_exists( 'ActionScheduler' ) ) {
 
 
 function datamachine_run_datamachine_plugin() {
+	if ( ! datamachine_should_load_full_runtime() ) {
+		return;
+	}
 
 	// Set Action Scheduler timeout to 10 minutes (600 seconds) for large tasks
 	add_filter(
@@ -320,6 +323,38 @@ function datamachine_run_datamachine_plugin() {
 	);
 }
 
+/**
+ * Determine whether the full Data Machine runtime is needed for this request.
+ *
+ * Normal frontend page views do not need the agent, REST, tool, queue, or admin
+ * runtime. Keeping that machinery out of the hot path protects theme rendering
+ * while preserving every interactive/background entry point.
+ *
+ * @return bool True when full runtime registration should run.
+ */
+function datamachine_should_load_full_runtime(): bool {
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		return true;
+	}
+
+	if ( is_admin() || wp_doing_ajax() || wp_doing_cron() ) {
+		return true;
+	}
+
+	$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) $_SERVER['REQUEST_URI'] : '';
+	$path        = (string) wp_parse_url( $request_uri, PHP_URL_PATH );
+
+	if ( str_starts_with( $path, '/wp-json/' ) || str_starts_with( $path, '/datamachine-auth/' ) ) {
+		return true;
+	}
+
+	if ( isset( $_GET['rest_route'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Request-shape detection only.
+		return true;
+	}
+
+	return (bool) apply_filters( 'datamachine_should_load_full_runtime', false );
+}
+
 
 // Plugin activation hook to initialize default settings
 register_activation_hook( __FILE__, 'datamachine_activate_plugin_defaults' );
@@ -396,6 +431,9 @@ function datamachine_load_handlers() {
  */
 function datamachine_scan_and_instantiate( $directory ) {
 	$files = glob( $directory . '/*.php' );
+	if ( false === $files ) {
+		return;
+	}
 
 	foreach ( $files as $file ) {
 		// Skip if it's a *Filters.php file (will be deleted)
@@ -719,7 +757,7 @@ function datamachine_on_new_site( \WP_Site $new_site ) {
 		return;
 	}
 
-	switch_to_blog( $new_site->blog_id );
+	switch_to_blog( (int) $new_site->blog_id );
 	datamachine_activate_defaults_for_site();
 	datamachine_activate_for_site();
 	restore_current_blog();
