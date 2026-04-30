@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.101.2] - 2026-04-29
+
+### Changed
+- define agents api hook names
+
+### Fixed
+- skip heavy bootstrap on frontend views
+
 ## [0.101.1] - 2026-04-29
 
 ### Changed
