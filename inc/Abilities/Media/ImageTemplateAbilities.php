@@ -3,7 +3,7 @@
  * Image Template Abilities
  *
  * Ability for rendering images from registered GD templates.
-	 * Complements ImageGenerationAbilities (AI image models) with
+ * Complements ImageGenerationAbilities (AI image models) with
  * deterministic, text-heavy, brand-consistent graphic output.
  *
  * @package DataMachine\Abilities\Media
@@ -20,7 +20,8 @@ class ImageTemplateAbilities {
 
 	private static bool $registered = false;
 
-	public function __construct() {		if ( self::$registered ) {
+	public function __construct() {
+		if ( self::$registered ) {
 			return;
 		}
 		$this->registerAbilities();
@@ -317,13 +318,14 @@ class ImageTemplateAbilities {
 				continue;
 			}
 
-			$ext       = strtolower( pathinfo( $source_path, PATHINFO_EXTENSION ) ) ?: 'png';
+			$ext       = strtolower( pathinfo( $source_path, PATHINFO_EXTENSION ) );
+			$ext       = '' !== $ext ? $ext : 'png';
 			$suffix    = count( $file_paths ) > 1 ? '-' . ( $index + 1 ) : '';
 			$filename  = $key . $suffix . '.' . $ext;
 			$dest_path = trailingslashit( $bucket_dir ) . $filename;
 			$dest_url  = trailingslashit( $bucket_url ) . $filename;
 
-			if ( ! @copy( $source_path, $dest_path ) ) {
+			if ( ! copy( $source_path, $dest_path ) ) {
 				$failures[] = basename( $source_path );
 				continue;
 			}
@@ -361,7 +363,7 @@ class ImageTemplateAbilities {
 	 * @return array Result with template definitions.
 	 */
 	public static function listTemplates( array $input ): array {
-		$input;
+		unset( $input );
 		return array(
 			'success'   => true,
 			'templates' => TemplateRegistry::get_template_definitions(),

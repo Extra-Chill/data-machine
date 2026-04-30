@@ -129,7 +129,7 @@ class ImageCommand extends BaseCommand {
 		$format = $assoc_args['format'] ?? 'table';
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( \wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( self::encode_json( $result ) );
 			return;
 		}
 
@@ -284,7 +284,7 @@ class ImageCommand extends BaseCommand {
 		$format = $assoc_args['format'] ?? 'table';
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( \wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( self::encode_json( $result ) );
 			return;
 		}
 
@@ -446,7 +446,7 @@ class ImageCommand extends BaseCommand {
 		);
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( \wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( self::encode_json( $result ) );
 			return;
 		}
 
@@ -568,7 +568,7 @@ class ImageCommand extends BaseCommand {
 		);
 
 		if ( 'json' === $format ) {
-			WP_CLI::line( \wp_json_encode( $result, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( self::encode_json( $result ) );
 			return;
 		}
 
@@ -605,5 +605,16 @@ class ImageCommand extends BaseCommand {
 		if ( ! empty( $result['batch_id'] ) ) {
 			WP_CLI::log( sprintf( 'Batch ID: %d — track progress with: wp datamachine jobs list --parent_id=%d', $result['batch_id'], $result['batch_id'] ) );
 		}
+	}
+
+	/**
+	 * Encode CLI JSON output.
+	 *
+	 * @param array $data Data to encode.
+	 * @return string JSON payload.
+	 */
+	private static function encode_json( array $data ): string {
+		$encoded = \wp_json_encode( $data, JSON_PRETTY_PRINT );
+		return false === $encoded ? '{}' : $encoded;
 	}
 }
