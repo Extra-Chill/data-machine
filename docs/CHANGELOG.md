@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.102.6] - 2026-04-30
+
+### Changed
+- refactor(agents-api): move substrate contracts to neutral namespace
+- refactor(agents-api): harden agent registration facade
+- refactor(agents-api): neutralize conversation tool result contract
+
 ## [0.102.5] - 2026-04-30
 
 ### Fixed
