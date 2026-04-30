@@ -20,9 +20,9 @@ require_once __DIR__ . '/agents-api-smoke-helpers.php';
 agents_api_smoke_require_module();
 
 $namespace_map = array(
-	'DataMachine\\Engine\\AI\\AgentMessageEnvelope'                         => 'AgentsAPI\\Engine\\AI\\AgentMessageEnvelope',
-	'DataMachine\\Engine\\AI\\AgentConversationResult'                      => 'AgentsAPI\\Engine\\AI\\AgentConversationResult',
-	'DataMachine\\Engine\\AI\\Tools\\RuntimeToolDeclaration'                => 'AgentsAPI\\Engine\\AI\\Tools\\RuntimeToolDeclaration',
+	'DataMachine\\Engine\\AI\\AgentMessageEnvelope'                         => 'AgentsAPI\\AI\\AgentMessageEnvelope',
+	'DataMachine\\Engine\\AI\\AgentConversationResult'                      => 'AgentsAPI\\AI\\AgentConversationResult',
+	'DataMachine\\Engine\\AI\\Tools\\RuntimeToolDeclaration'                => 'AgentsAPI\\AI\\Tools\\RuntimeToolDeclaration',
 	'DataMachine\\Core\\Database\\Chat\\ConversationTranscriptStoreInterface' => 'AgentsAPI\\Core\\Database\\Chat\\ConversationTranscriptStoreInterface',
 	'DataMachine\\Core\\FilesRepository\\AgentMemoryStoreInterface'           => 'AgentsAPI\\Core\\FilesRepository\\AgentMemoryStoreInterface',
 	'DataMachine\\Core\\FilesRepository\\AgentMemoryScope'                    => 'AgentsAPI\\Core\\FilesRepository\\AgentMemoryScope',
