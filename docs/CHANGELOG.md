@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.102.1] - 2026-04-29
+
+### Fixed
+- refresh BFB to 0.6.4
+
 ## [0.102.0] - 2026-04-29
 
 ### Added
