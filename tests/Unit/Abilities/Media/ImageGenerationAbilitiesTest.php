@@ -8,7 +8,10 @@
 namespace DataMachine\Tests\Unit\Abilities\Media;
 
 use DataMachine\Abilities\Media\ImageGenerationAbilities;
+use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 use WP_UnitTestCase;
+
+require_once dirname( dirname( __DIR__ ) ) . '/Support/WpAiClientTestDoubles.php';
 
 class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 
@@ -17,20 +20,31 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 	public function set_up(): void {
 		parent::set_up();
 
-		$user_id = self::factory()->user->create( [ 'role' => 'administrator' ] );
+		datamachine_register_capabilities();
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
+
+		WpAiClientTestDouble::reset();
+		WpAiClientTestDouble::set_response_callback( array( $this, 'mock_image_response' ) );
 
 		$this->abilities = new ImageGenerationAbilities();
 	}
 
 	public function tear_down(): void {
 		delete_site_option( 'datamachine_image_generation_config' );
+		WpAiClientTestDouble::reset();
 		parent::tear_down();
 	}
 
-	/**
-	 * Test ability registration.
-	 */
+	public function mock_image_response( array $request ): array {
+		return array(
+			'success' => true,
+			'data'    => array(
+				'image_url' => 'https://example.com/generated.png',
+			),
+		);
+	}
+
 	public function test_ability_registered(): void {
 		$ability = wp_get_ability( 'datamachine/generate-image' );
 
@@ -38,199 +52,107 @@ class ImageGenerationAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 'datamachine/generate-image', $ability->get_name() );
 	}
 
-	/**
-	 * Test generateImage with missing prompt.
-	 */
 	public function test_generate_image_missing_prompt(): void {
-		$result = ImageGenerationAbilities::generateImage( [] );
+		$result = ImageGenerationAbilities::generateImage( array() );
 
 		$this->assertFalse( $result['success'] );
 		$this->assertStringContainsString( 'requires a prompt', $result['error'] );
 	}
 
-	/**
-	 * Test generateImage with empty prompt.
-	 */
 	public function test_generate_image_empty_prompt(): void {
-		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => '' ] );
+		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => '' ) );
 
 		$this->assertFalse( $result['success'] );
 		$this->assertStringContainsString( 'requires a prompt', $result['error'] );
 	}
 
-	/**
-	 * Test generateImage with missing config.
-	 */
-	public function test_generate_image_missing_config(): void {
-		delete_site_option( 'datamachine_image_generation_config' );
+	public function test_generate_image_missing_provider(): void {
+		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => '', 'default_model' => 'gpt-image-1' ) );
 
-		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'Test prompt' ] );
+		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
 
 		$this->assertFalse( $result['success'] );
 		$this->assertStringContainsString( 'not configured', $result['error'] );
 	}
 
-	/**
-	 * Test generateImage with missing API key in config.
-	 */
-	public function test_generate_image_missing_api_key(): void {
-		update_site_option( 'datamachine_image_generation_config', [
-			'default_model' => 'google/imagen-4-fast'
-		] );
+	public function test_generate_image_unregistered_provider(): void {
+		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'missing-provider', 'default_model' => 'image-model' ) );
 
-		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'Test prompt' ] );
+		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
 
 		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'not configured', $result['error'] );
+		$this->assertStringContainsString( 'not registered', $result['error'] );
 	}
 
-	/**
-	 * Test generateImage with HTTP error.
-	 */
-	public function test_generate_image_http_error(): void {
-		update_site_option( 'datamachine_image_generation_config', [
-			'api_key' => 'test-key'
-		] );
+	public function test_generate_image_support_check_failure(): void {
+		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'text-only-model' ) );
+		WpAiClientTestDouble::set_response_callback( function (): array {
+			return array( 'success' => true, 'supported' => false );
+		} );
 
-		$filter = function( $result, $parsed_args, $url ) {
-			if ( str_contains( $url, 'replicate.com' ) ) {
-				return new \WP_Error( 'http_request_failed', 'Network timeout' );
-			}
-			return $result;
-		};
-		add_filter( 'pre_http_request', $filter, 10, 3 );
-
-		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'Test prompt' ] );
+		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
 
 		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Failed to start image generation', $result['error'] );
-
-		remove_filter( 'pre_http_request', $filter, 10 );
+		$this->assertStringContainsString( 'does not support image generation', $result['error'] );
 	}
 
-	/**
-	 * Test generateImage with invalid JSON response.
-	 */
-	public function test_generate_image_invalid_json(): void {
-		update_site_option( 'datamachine_image_generation_config', [
-			'api_key' => 'test-key'
-		] );
+	public function test_generate_image_provider_error(): void {
+		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
+		WpAiClientTestDouble::set_response_callback( function (): array {
+			return array( 'success' => false, 'error' => 'Provider unavailable' );
+		} );
 
-		$filter = function( $result, $parsed_args, $url ) {
-			if ( str_contains( $url, 'replicate.com' ) ) {
-				return array(
-					'response' => array( 'code' => 200, 'message' => 'OK' ),
-					'body'     => 'invalid json response',
-					'headers'  => array(),
-					'cookies'  => array(),
-				);
-			}
-			return $result;
-		};
-		add_filter( 'pre_http_request', $filter, 10, 3 );
-
-		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'Test prompt' ] );
+		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
 
 		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Invalid response from Replicate API', $result['error'] );
-
-		remove_filter( 'pre_http_request', $filter, 10 );
+		$this->assertStringContainsString( 'Failed to generate image', $result['error'] );
+		$this->assertStringContainsString( 'Provider unavailable', $result['error'] );
 	}
 
-	/**
-	 * Test generateImage with missing prediction ID in response.
-	 */
-	public function test_generate_image_missing_prediction_id(): void {
-		update_site_option( 'datamachine_image_generation_config', [
-			'api_key' => 'test-key'
-		] );
+	public function test_generate_image_success_schedules_job(): void {
+		update_site_option( 'datamachine_image_generation_config', array(
+			'default_provider'     => 'openai',
+			'default_model'        => 'gpt-image-1',
+			'default_aspect_ratio' => '3:4',
+		) );
 
-		$filter = function( $result, $parsed_args, $url ) {
-			if ( str_contains( $url, 'replicate.com' ) ) {
-				return array(
-					'response' => array( 'code' => 200, 'message' => 'OK' ),
-					'body'     => wp_json_encode( array( 'status' => 'starting' ) ),
-					'headers'  => array(),
-					'cookies'  => array(),
-				);
-			}
-			return $result;
-		};
-		add_filter( 'pre_http_request', $filter, 10, 3 );
+		$captured_request = null;
+		WpAiClientTestDouble::set_response_callback( function ( array $request ) use ( &$captured_request ): array {
+			$captured_request = $request;
+			return array(
+				'success' => true,
+				'data'    => array( 'image_url' => 'https://example.com/generated.png' ),
+			);
+		} );
 
-		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'Test prompt' ] );
-
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'Invalid response from Replicate API', $result['error'] );
-
-		remove_filter( 'pre_http_request', $filter, 10 );
-	}
-
-	/**
-	 * Test generateImage success — Replicate returns prediction, scheduler creates job.
-	 */
-	public function test_generate_image_success(): void {
-		update_site_option( 'datamachine_image_generation_config', [
-			'api_key' => 'test-key',
-			'default_model' => 'google/imagen-4-fast',
-			'default_aspect_ratio' => '3:4'
-		] );
-
-		$filter = function( $result, $parsed_args, $url ) {
-			if ( str_contains( $url, 'replicate.com' ) ) {
-				$body = json_decode( $parsed_args['body'], true );
-				$this->assertSame( 'Test prompt', $body['input']['prompt'] );
-
-				return array(
-					'response' => array( 'code' => 201, 'message' => 'Created' ),
-					'body'     => wp_json_encode( array( 'id' => 'pred_123' ) ),
-					'headers'  => array(),
-					'cookies'  => array(),
-				);
-			}
-			return $result;
-		};
-		add_filter( 'pre_http_request', $filter, 10, 3 );
-
-		$result = ImageGenerationAbilities::generateImage( [ 'prompt' => 'Test prompt' ] );
+		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'Test prompt' ) );
 
 		$this->assertTrue( $result['success'] );
 		$this->assertTrue( $result['pending'] );
 		$this->assertIsInt( $result['job_id'] );
-		$this->assertSame( 'pred_123', $result['prediction_id'] );
-
-		remove_filter( 'pre_http_request', $filter, 10 );
+		$this->assertSame( 'https://example.com/generated.png', $result['image_url'] );
+		$this->assertSame( 'Test prompt', $captured_request['prompt'] ?? '' );
+		$this->assertSame( 'openai', $captured_request['provider'] ?? '' );
+		$this->assertSame( 'gpt-image-1', $captured_request['model'] ?? '' );
 	}
 
-	/**
-	 * Test is_configured returns false when no config.
-	 */
-	public function test_is_configured_false(): void {
-		delete_site_option( 'datamachine_image_generation_config' );
+	public function test_is_configured_false_when_provider_unavailable(): void {
+		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'missing-provider', 'default_model' => 'gpt-image-1' ) );
 		$this->assertFalse( ImageGenerationAbilities::is_configured() );
 	}
 
-	/**
-	 * Test is_configured returns true when api_key present.
-	 */
-	public function test_is_configured_true(): void {
-		update_site_option( 'datamachine_image_generation_config', [ 'api_key' => 'test-key' ] );
+	public function test_is_configured_true_when_provider_and_model_available(): void {
+		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
 		$this->assertTrue( ImageGenerationAbilities::is_configured() );
 	}
 
-	/**
-	 * Test get_config returns empty array by default.
-	 */
 	public function test_get_config_empty(): void {
 		delete_site_option( 'datamachine_image_generation_config' );
-		$this->assertSame( [], ImageGenerationAbilities::get_config() );
+		$this->assertSame( array(), ImageGenerationAbilities::get_config() );
 	}
 
-	/**
-	 * Test get_config returns stored configuration.
-	 */
 	public function test_get_config_returns_stored(): void {
-		$config = [ 'api_key' => 'test-key', 'default_model' => 'custom-model' ];
+		$config = array( 'default_provider' => 'openai', 'default_model' => 'custom-model' );
 		update_site_option( 'datamachine_image_generation_config', $config );
 		$this->assertSame( $config, ImageGenerationAbilities::get_config() );
 	}

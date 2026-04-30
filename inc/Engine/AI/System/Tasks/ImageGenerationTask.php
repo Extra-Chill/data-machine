@@ -2,8 +2,7 @@
 /**
  * Image Generation Task for System Agent.
  *
- * Handles async image generation through Replicate API. Polls for prediction
- * status and handles completion, failure, or rescheduling for continued polling.
+ * Handles async media processing for wp-ai-client generated images.
  *
  * @package DataMachine\Engine\AI\System\Tasks
  * @since 0.22.4
@@ -14,104 +13,43 @@ namespace DataMachine\Engine\AI\System\Tasks;
 
 defined( 'ABSPATH' ) || exit;
 
-use DataMachine\Core\HttpClient;
-
 class ImageGenerationTask extends SystemTask {
 
-	const MAX_ATTEMPTS = 24;
 	const JPEG_QUALITY = 85;
 
 	/**
 	 * Execute image generation task.
 	 *
 	 * @param int   $jobId  Job ID from DM Jobs table.
-	 * @param array $params Task parameters containing prediction_id, api_key, etc.
+	 * @param array $params Task parameters containing generated image file data.
 	 */
 	public function executeTask( int $jobId, array $params ): void {
-		$prediction_id = $params['prediction_id'] ?? '';
-		$model         = $params['model'] ?? 'unknown';
+		$image_url      = $params['image_url'] ?? '';
+		$image_data_uri = $params['image_data_uri'] ?? '';
+		$model          = $params['model'] ?? 'unknown';
+		$prompt         = $params['prompt'] ?? '';
+		$aspect_ratio   = $params['aspect_ratio'] ?? '';
 
-		$config       = \DataMachine\Abilities\Media\ImageGenerationAbilities::get_config();
-		$api_key      = $config['api_key'] ?? '';
-		$prompt       = $params['prompt'] ?? '';
-		$aspect_ratio = $params['aspect_ratio'] ?? '';
-
-		if ( empty( $prediction_id ) ) {
-			$this->failJob( $jobId, 'Missing prediction_id in task parameters' );
+		if ( empty( $image_url ) && empty( $image_data_uri ) ) {
+			$this->failJob( $jobId, 'Missing generated image file in task parameters' );
 			return;
 		}
 
-		if ( empty( $api_key ) ) {
-			$this->failJob( $jobId, 'Replicate API key not configured' );
-			return;
-		}
-
-		$jobs_db     = new \DataMachine\Core\Database\Jobs\Jobs();
-		$job         = $jobs_db->get_job( $jobId );
-		$engine_data = $job['engine_data'] ?? array();
-		if ( ! isset( $engine_data['max_attempts'] ) ) {
-			$engine_data['max_attempts'] = self::MAX_ATTEMPTS;
-			$jobs_db->store_engine_data( $jobId, $engine_data );
-		}
-
-		$result = HttpClient::get(
-			"https://api.replicate.com/v1/predictions/{$prediction_id}",
-			array(
-				'timeout' => 15,
-				'headers' => array(
-					'Authorization' => 'Token ' . $api_key,
-				),
-				'context' => 'System Agent Image Generation Poll',
-			)
+		$this->handleSuccess(
+			$jobId,
+			array( 'output' => ! empty( $image_url ) ? $image_url : $image_data_uri ),
+			$model,
+			$prompt,
+			$aspect_ratio,
+			$params
 		);
-
-		if ( ! $result['success'] ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				"System Agent image generation HTTP error for job {$jobId}: " . ( $result['error'] ?? 'Unknown error' ),
-				array(
-					'job_id'        => $jobId,
-					'task_type'     => $this->getTaskType(),
-					'context'       => 'system',
-					'prediction_id' => $prediction_id,
-					'error'         => $result['error'] ?? 'Unknown HTTP error',
-				)
-			);
-
-			$this->reschedule( $jobId, 5 );
-			return;
-		}
-
-		$status_data = json_decode( $result['data'], true );
-		$status      = $status_data['status'] ?? '';
-
-		switch ( $status ) {
-			case 'succeeded':
-				$this->handleSuccess( $jobId, $status_data, $model, $prompt, $aspect_ratio, $params );
-				break;
-
-			case 'failed':
-			case 'canceled':
-				$error = $status_data['error'] ?? "Prediction {$status}";
-				$this->failJob( $jobId, "Replicate prediction failed: {$error}" );
-				break;
-
-			case 'starting':
-			case 'processing':
-				$this->reschedule( $jobId, 5 );
-				break;
-
-			default:
-				$this->failJob( $jobId, "Unknown prediction status: {$status}" );
-		}
 	}
 
 	/**
 	 * Handle successful prediction completion.
 	 *
 	 * @param int    $jobId       Job ID.
-	 * @param array  $statusData  Replicate prediction status data.
+	 * @param array  $statusData  Generated image status data.
 	 * @param string $model       Model used for generation.
 	 * @param string $prompt      Original prompt.
 	 * @param string $aspectRatio Original aspect ratio.
@@ -128,7 +66,7 @@ class ImageGenerationTask extends SystemTask {
 		}
 
 		if ( empty( $image_url ) ) {
-			$this->failJob( $jobId, 'Replicate prediction succeeded but no image URL found in output' );
+			$this->failJob( $jobId, 'Image generation succeeded but no image file found in output' );
 			return;
 		}
 
@@ -137,7 +75,7 @@ class ImageGenerationTask extends SystemTask {
 
 		$sideload_result = $this->sideloadImage( $image_url, $prompt, $model );
 
-		if ( is_wp_error( $sideload_result ) ) {
+		if ( $sideload_result instanceof \WP_Error ) {
 			do_action(
 				'datamachine_log',
 				'warning',
@@ -150,9 +88,9 @@ class ImageGenerationTask extends SystemTask {
 					'error'     => $sideload_result->get_error_message(),
 				)
 			);
-		} else {
-			$attachment_id  = $sideload_result['attachment_id'];
-			$attachment_url = $sideload_result['attachment_url'];
+		} elseif ( is_array( $sideload_result ) ) {
+			$attachment_id  = (int) ( $sideload_result['attachment_id'] ?? 0 );
+			$attachment_url = (string) ( $sideload_result['attachment_url'] ?? '' );
 		}
 
 		$image_file_path = null;
@@ -230,7 +168,12 @@ class ImageGenerationTask extends SystemTask {
 				'datamachine_log',
 				'debug',
 				"System Agent: Post #{$post_id} already has a featured image, skipping",
-				array( 'job_id' => $jobId, 'post_id' => $post_id, 'attachment_id' => $attachmentId, 'context' => 'system' )
+				array(
+					'job_id'        => $jobId,
+					'post_id'       => $post_id,
+					'attachment_id' => $attachmentId,
+					'context'       => 'system',
+				)
 			);
 			return array();
 		}
@@ -242,7 +185,12 @@ class ImageGenerationTask extends SystemTask {
 				'datamachine_log',
 				'info',
 				"System Agent: Featured image set on post #{$post_id} (attachment #{$attachmentId})",
-				array( 'job_id' => $jobId, 'post_id' => $post_id, 'attachment_id' => $attachmentId, 'context' => 'system' )
+				array(
+					'job_id'        => $jobId,
+					'post_id'       => $post_id,
+					'attachment_id' => $attachmentId,
+					'context'       => 'system',
+				)
 			);
 
 			return array(
@@ -283,15 +231,17 @@ class ImageGenerationTask extends SystemTask {
 			require_once ABSPATH . 'wp-admin/includes/image.php';
 		}
 
-		$tmp_file = download_url( $image_url );
+		$tmp_file = str_starts_with( $image_url, 'data:' )
+			? $this->dataUriToTempFile( $image_url )
+			: download_url( $image_url );
 
-		if ( is_wp_error( $tmp_file ) ) {
+		if ( $tmp_file instanceof \WP_Error ) {
 			return $tmp_file;
 		}
 
 		$tmp_file = $this->maybeConvertToJpeg( $tmp_file );
 
-		if ( is_wp_error( $tmp_file ) ) {
+		if ( $tmp_file instanceof \WP_Error ) {
 			return $tmp_file;
 		}
 
@@ -305,12 +255,14 @@ class ImageGenerationTask extends SystemTask {
 
 		$attachment_id = media_handle_sideload( $file_array, 0 );
 
-		if ( is_wp_error( $attachment_id ) ) {
+		if ( $attachment_id instanceof \WP_Error ) {
 			if ( file_exists( $tmp_file ) ) {
 				wp_delete_file( $tmp_file );
 			}
 			return $attachment_id;
 		}
+
+		$attachment_id = (int) $attachment_id;
 
 		$title = mb_substr( $prompt, 0, 200 );
 		wp_update_post( array(
@@ -331,6 +283,41 @@ class ImageGenerationTask extends SystemTask {
 		);
 	}
 
+	protected function dataUriToTempFile( string $dataUri ): string|\WP_Error {
+		if ( ! preg_match( '/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/', $dataUri, $matches ) ) {
+			return new \WP_Error(
+				'datamachine_invalid_image_data_uri',
+				'Generated image data URI is invalid.'
+			);
+		}
+
+		$decoded = base64_decode( $matches[2], true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+		if ( false === $decoded ) {
+			return new \WP_Error(
+				'datamachine_invalid_image_base64',
+				'Generated image data could not be decoded.'
+			);
+		}
+
+		$tmp_file = wp_tempnam( 'datamachine-generated-image' );
+		if ( ! $tmp_file ) {
+			return new \WP_Error(
+				'datamachine_image_tempfile_failed',
+				'Could not create a temporary file for generated image data.'
+			);
+		}
+
+		if ( false === file_put_contents( $tmp_file, $decoded ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			wp_delete_file( $tmp_file );
+			return new \WP_Error(
+				'datamachine_image_tempfile_write_failed',
+				'Could not write generated image data to a temporary file.'
+			);
+		}
+
+		return $tmp_file;
+	}
+
 	protected function maybeConvertToJpeg( string $tmp_file ): string|\WP_Error {
 		$check = wp_get_image_mime( $tmp_file );
 
@@ -343,20 +330,24 @@ class ImageGenerationTask extends SystemTask {
 		}
 
 		$editor = wp_get_image_editor( $tmp_file );
-		if ( is_wp_error( $editor ) ) {
+		if ( $editor instanceof \WP_Error ) {
 			return $tmp_file;
 		}
 
 		$editor->set_quality( self::JPEG_QUALITY );
 		$converted = $editor->save( $tmp_file . '.jpg', 'image/jpeg' );
 
-		if ( is_wp_error( $converted ) ) {
+		if ( $converted instanceof \WP_Error ) {
+			return $tmp_file;
+		}
+
+		if ( empty( $converted['path'] ) ) {
 			return $tmp_file;
 		}
 
 		wp_delete_file( $tmp_file );
 
-		return $converted['path'];
+		return (string) $converted['path'];
 	}
 
 	protected function insertImageInContent( int $jobId, int $attachmentId, array $params ): array {
@@ -377,7 +368,7 @@ class ImageGenerationTask extends SystemTask {
 		}
 
 		$post = get_post( $post_id );
-		if ( ! $post ) {
+		if ( ! $post instanceof \WP_Post ) {
 			return array();
 		}
 
@@ -494,7 +485,11 @@ class ImageGenerationTask extends SystemTask {
 				$total_blocks = count( $blocks );
 				$gaps         = array();
 
-				$gaps[] = array( 'start' => 0, 'end' => $image_positions[0], 'size' => $image_positions[0] );
+				$gaps[] = array(
+					'start' => 0,
+					'end'   => $image_positions[0],
+					'size'  => $image_positions[0],
+				);
 
 				$image_positions_count = count( $image_positions );
 				for ( $j = 0; $j < $image_positions_count - 1; $j++ ) {
@@ -506,7 +501,11 @@ class ImageGenerationTask extends SystemTask {
 				}
 
 				$last   = end( $image_positions );
-				$gaps[] = array( 'start' => $last, 'end' => $total_blocks, 'size' => $total_blocks - $last );
+				$gaps[] = array(
+					'start' => $last,
+					'end'   => $total_blocks,
+					'size'  => $total_blocks - $last,
+				);
 
 				usort( $gaps, fn( $a, $b ) => $b['size'] <=> $a['size'] );
 				$largest = $gaps[0];
@@ -529,7 +528,7 @@ class ImageGenerationTask extends SystemTask {
 	public static function getTaskMeta(): array {
 		return array(
 			'label'           => 'Image Generation',
-			'description'     => 'Generate images via Replicate API and assign as featured images or insert into content.',
+			'description'     => 'Process wp-ai-client generated images and assign as featured images or insert into content.',
 			'setting_key'     => null,
 			'default_enabled' => true,
 			'trigger'         => 'AI tool call',

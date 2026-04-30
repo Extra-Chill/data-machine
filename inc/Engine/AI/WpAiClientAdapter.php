@@ -24,6 +24,163 @@ defined( 'ABSPATH' ) || exit;
 class WpAiClientAdapter {
 
 	/**
+	 * Generate an image through wp-ai-client and return the generated file handle.
+	 *
+	 * Data Machine owns prompt refinement, post-context handling, and media insertion.
+	 * Provider dispatch belongs to wp-ai-client, so this method deliberately returns
+	 * only the generated file pointer/data plus a normalized error envelope.
+	 *
+	 * @since next
+	 *
+	 * @param string $prompt       Image generation prompt.
+	 * @param string $provider     Provider identifier.
+	 * @param string $model        Model identifier.
+	 * @param string $aspect_ratio Requested product-level aspect ratio.
+	 * @return array Generated image response.
+	 */
+	public static function generateImage( string $prompt, string $provider, string $model, string $aspect_ratio ): array {
+		if ( '' === trim( $prompt ) ) {
+			return self::errorResponse( $provider, 'wp-ai-client image generation requires a prompt' );
+		}
+
+		if ( '' === trim( $model ) ) {
+			return self::errorResponse( $provider, 'wp-ai-client image generation requires a model identifier' );
+		}
+
+		try {
+			$registry    = \WordPress\AiClient\AiClient::defaultRegistry();
+			$resolved_id = self::resolveRegisteredProviderId( $registry, $provider );
+		} catch ( \Throwable $e ) {
+			return self::errorResponse( $provider, 'wp-ai-client image provider resolution failed: ' . $e->getMessage() );
+		}
+
+		$api_key = WpAiClientProviderAdmin::resolveApiKey( $provider );
+		if ( '' !== $api_key ) {
+			try {
+				$registry->setProviderRequestAuthentication(
+					$resolved_id,
+					new \WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication( $api_key )
+				);
+			} catch ( \Throwable $e ) {
+				return self::errorResponse( $provider, 'wp-ai-client image auth setup failed: ' . $e->getMessage() );
+			}
+		}
+
+		try {
+			$model_instance = self::getProviderModel( $registry, $resolved_id, $model, null );
+
+			$builder = \wp_ai_client_prompt( $prompt )
+				->using_provider( $resolved_id )
+				->using_model( $model_instance );
+
+			if ( class_exists( '\\WordPress\\AiClient\\Files\\Enums\\FileTypeEnum' ) ) {
+				$builder = self::callBuilderMethod( $builder, 'as_output_file_type', \WordPress\AiClient\Files\Enums\FileTypeEnum::remote() );
+			}
+
+			$builder = self::applyImageAspectRatio( $builder, $aspect_ratio );
+
+			$support_check = array( $builder, 'is_supported_for_image_generation' );
+			if ( ! is_callable( $support_check ) ) {
+				return self::errorResponse( $provider, 'wp-ai-client image support checks are unavailable' );
+			}
+
+			$supported = call_user_func( $support_check );
+			if ( is_wp_error( $supported ) ) {
+				return self::errorResponse(
+					$provider,
+					'wp-ai-client image support check failed: ' . $supported->get_error_message()
+				);
+			}
+
+			if ( ! $supported ) {
+				return self::errorResponse(
+					$provider,
+					sprintf(
+						'wp-ai-client model "%s" does not support image generation for provider "%s"',
+						$model,
+						$resolved_id
+					)
+				);
+			}
+
+			$image_generator = array( $builder, 'generate_image' );
+			if ( ! is_callable( $image_generator ) ) {
+				return self::errorResponse( $provider, 'wp-ai-client image generation API is unavailable' );
+			}
+
+			$file = call_user_func( $image_generator );
+			if ( is_wp_error( $file ) ) {
+				return self::errorResponse( $provider, 'wp-ai-client image generation failed: ' . $file->get_error_message() );
+			}
+		} catch ( \Throwable $e ) {
+			return self::errorResponse( $provider, 'wp-ai-client image generation threw: ' . $e->getMessage() );
+		}
+
+		if ( ! is_object( $file ) ) {
+			return self::errorResponse( $provider, 'wp-ai-client image generation returned an invalid file object' );
+		}
+
+		$image_url      = method_exists( $file, 'getUrl' ) ? call_user_func( array( $file, 'getUrl' ) ) : null;
+		$image_data_uri = method_exists( $file, 'getDataUri' ) ? call_user_func( array( $file, 'getDataUri' ) ) : null;
+
+		if ( empty( $image_url ) && empty( $image_data_uri ) ) {
+			return self::errorResponse( $provider, 'wp-ai-client image generation returned no usable image file' );
+		}
+
+		$response = array(
+			'success'  => true,
+			'provider' => $resolved_id,
+			'model'    => $model,
+		);
+
+		if ( ! empty( $image_url ) ) {
+			$response['image_url'] = $image_url;
+		}
+
+		if ( ! empty( $image_data_uri ) ) {
+			$response['image_data_uri'] = $image_data_uri;
+		}
+
+		return $response;
+	}
+
+	/**
+	 * Apply Data Machine's historical aspect-ratio vocabulary to wp-ai-client.
+	 *
+	 * wp-ai-client's OpenAI-compatible model base supports a small exact-ratio set;
+	 * for DM's existing portrait/landscape presets, request orientation instead of
+	 * inventing provider-specific size parameters.
+	 *
+	 * @param object $builder      WP_AI_Client_Prompt_Builder-like object.
+	 * @param string $aspect_ratio Product-level aspect ratio.
+	 * @return object Builder instance.
+	 */
+	private static function applyImageAspectRatio( object $builder, string $aspect_ratio ): object {
+		if ( ! class_exists( '\\WordPress\\AiClient\\Files\\Enums\\MediaOrientationEnum' ) ) {
+			return $builder;
+		}
+
+		$orientation_setter = array( $builder, 'as_output_media_orientation' );
+		if ( ! is_callable( $orientation_setter ) ) {
+			return $builder;
+		}
+
+		if ( '1:1' === $aspect_ratio ) {
+			return call_user_func( $orientation_setter, \WordPress\AiClient\Files\Enums\MediaOrientationEnum::square() );
+		}
+
+		if ( in_array( $aspect_ratio, array( '3:4', '9:16' ), true ) ) {
+			return call_user_func( $orientation_setter, \WordPress\AiClient\Files\Enums\MediaOrientationEnum::portrait() );
+		}
+
+		if ( in_array( $aspect_ratio, array( '4:3', '16:9' ), true ) ) {
+			return call_user_func( $orientation_setter, \WordPress\AiClient\Files\Enums\MediaOrientationEnum::landscape() );
+		}
+
+		return $builder;
+	}
+
+	/**
 	 * Determine whether the wp-ai-client path should handle the given provider.
 	 *
 	 * Three conditions must all hold:
@@ -120,11 +277,7 @@ class WpAiClientAdapter {
 		$model_config = self::buildModelConfig( $request );
 
 		try {
-			if ( ! method_exists( $registry, 'getProviderModel' ) ) {
-				return self::errorResponse( $provider, 'wp-ai-client registry cannot resolve provider models' );
-			}
-
-			$model_instance = call_user_func( array( $registry, 'getProviderModel' ), $resolved_id, $model, $model_config );
+			$model_instance = self::getProviderModel( $registry, $resolved_id, $model, $model_config );
 		} catch ( \Throwable $e ) {
 			return self::errorResponse( $provider, 'wp-ai-client model resolution failed: ' . $e->getMessage() );
 		}
@@ -135,21 +288,30 @@ class WpAiClientAdapter {
 				->using_model( $model_instance );
 
 			if ( null !== $conversation['system'] && '' !== $conversation['system'] ) {
-				$builder = $builder->using_system_instruction( $conversation['system'] );
+				$builder = self::callBuilderMethod( $builder, 'using_system_instruction', $conversation['system'] );
 			}
 
 			if ( ! empty( $conversation['history'] ) ) {
-				$builder = $builder->with_history( ...$conversation['history'] );
+				$builder = self::callBuilderMethod( $builder, 'with_history', ...$conversation['history'] );
 			}
 
 			$declarations = self::buildFunctionDeclarations( $tools );
 			if ( ! empty( $declarations ) ) {
-				$builder = $builder->using_function_declarations( ...$declarations );
+				$builder = self::callBuilderMethod( $builder, 'using_function_declarations', ...$declarations );
 			}
 
-			$result = $builder->generate_text_result();
+			$generator = array( $builder, 'generate_text_result' );
+			if ( ! is_callable( $generator ) ) {
+				return self::errorResponse( $provider, 'wp-ai-client text generation API is unavailable' );
+			}
+
+			$result = call_user_func( $generator );
 		} catch ( \Throwable $e ) {
 			return self::errorResponse( $provider, 'wp-ai-client request threw: ' . $e->getMessage() );
+		}
+
+		if ( is_wp_error( $result ) ) {
+			return self::errorResponse( $provider, 'wp-ai-client request failed: ' . $result->get_error_message() );
 		}
 
 		return self::normalizeResult( $result, $provider );
@@ -356,6 +518,39 @@ class WpAiClientAdapter {
 		}
 
 		return array();
+	}
+
+	/**
+	 * Resolve a provider model through wp-ai-client's registry.
+	 *
+	 * @param \WordPress\AiClient\Providers\ProviderRegistry $registry Provider registry.
+	 * @param string                                          $provider Provider identifier.
+	 * @param string                                          $model    Model identifier.
+	 * @param mixed                                           $config   Optional model config.
+	 * @return mixed Provider model instance.
+	 */
+	private static function getProviderModel( \WordPress\AiClient\Providers\ProviderRegistry $registry, string $provider, string $model, $config ) {
+		/** @var callable $callback wp-ai-client exposes this through __call() in some versions. */
+		$callback = array( $registry, 'getProviderModel' );
+		return call_user_func( $callback, $provider, $model, $config );
+	}
+
+	/**
+	 * Call a wp-ai-client builder method exposed directly or through __call().
+	 *
+	 * @param object $builder Builder instance.
+	 * @param string $method  Builder method name.
+	 * @param mixed  ...$args Method arguments.
+	 * @return object Builder instance.
+	 */
+	private static function callBuilderMethod( object $builder, string $method, ...$args ): object {
+		$callback = array( $builder, $method );
+		if ( ! is_callable( $callback ) ) {
+			return $builder;
+		}
+
+		$result = call_user_func( $callback, ...$args );
+		return is_object( $result ) ? $result : $builder;
 	}
 
 	/**

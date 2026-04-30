@@ -16,8 +16,8 @@ namespace {
 	}
 
 	if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
-		function wp_ai_client_prompt(): \DataMachine\Tests\Unit\Support\WpAiClientPromptBuilderDouble {
-			return new \DataMachine\Tests\Unit\Support\WpAiClientPromptBuilderDouble();
+		function wp_ai_client_prompt( $prompt = null ): \DataMachine\Tests\Unit\Support\WpAiClientPromptBuilderDouble {
+			return new \DataMachine\Tests\Unit\Support\WpAiClientPromptBuilderDouble( is_string( $prompt ) ? $prompt : '' );
 		}
 	}
 }
@@ -55,11 +55,16 @@ namespace DataMachine\Tests\Unit\Support {
 	}
 
 	class WpAiClientPromptBuilderDouble {
+		private string $prompt = '';
 		private string $provider = '';
 		private mixed $model = null;
 		private string $system_instruction = '';
 		private array $history = array();
 		private array $function_declarations = array();
+
+		public function __construct( string $prompt = '' ) {
+			$this->prompt = $prompt;
+		}
 
 		public function using_provider( string $provider ): self {
 			$this->provider = $provider;
@@ -69,6 +74,37 @@ namespace DataMachine\Tests\Unit\Support {
 		public function using_model( $model ): self {
 			$this->model = $model;
 			return $this;
+		}
+
+		public function as_output_file_type( $file_type ): self {
+			return $this;
+		}
+
+		public function as_output_media_orientation( $orientation ): self {
+			return $this;
+		}
+
+		public function is_supported_for_image_generation(): bool {
+			$request  = $this->to_request_array();
+			$response = WpAiClientTestDouble::dispatch( $request + array( 'capability_check' => 'image_generation' ), $this->provider );
+
+			return $response['supported'] ?? true;
+		}
+
+		public function generate_image(): \WordPress\AiClient\Files\DTO\File|\WP_Error {
+			$request  = $this->to_request_array();
+			$response = WpAiClientTestDouble::dispatch( $request + array( 'capability' => 'image_generation' ), $this->provider );
+
+			if ( empty( $response['success'] ) ) {
+				return new \WP_Error( 'test_image_generation_failed', $response['error'] ?? 'Image generation failed' );
+			}
+
+			$file = (string) ( $response['data']['image_url'] ?? $response['data']['image_data_uri'] ?? '' );
+			if ( '' === $file ) {
+				return new \WP_Error( 'test_image_generation_empty', 'No image returned' );
+			}
+
+			return new \WordPress\AiClient\Files\DTO\File( $file, $response['data']['mime_type'] ?? 'image/png' );
 		}
 
 		public function using_system_instruction( string $system_instruction ): self {
@@ -124,9 +160,63 @@ namespace DataMachine\Tests\Unit\Support {
 			return array(
 				'provider' => $this->provider,
 				'model'    => $this->model,
+				'prompt'   => $this->prompt,
 				'messages' => $messages,
 				'tools'    => $tools,
 			);
+		}
+	}
+}
+
+namespace WordPress\AiClient\Files\Enums {
+	if ( ! class_exists( FileTypeEnum::class ) ) {
+		class FileTypeEnum {
+			public static function remote(): self {
+				return new self();
+			}
+		}
+	}
+
+	if ( ! class_exists( MediaOrientationEnum::class ) ) {
+		class MediaOrientationEnum {
+			public static function square(): self {
+				return new self();
+			}
+
+			public static function portrait(): self {
+				return new self();
+			}
+
+			public static function landscape(): self {
+				return new self();
+			}
+		}
+	}
+}
+
+namespace WordPress\AiClient\Files\DTO {
+	if ( ! class_exists( File::class ) ) {
+		class File {
+			private ?string $url = null;
+			private ?string $data_uri = null;
+
+			public function __construct( string $file, ?string $mime_type = null ) {
+				unset( $mime_type );
+
+				if ( str_starts_with( $file, 'data:' ) ) {
+					$this->data_uri = $file;
+				} else {
+					$this->url = $file;
+				}
+			}
+
+			public function getUrl(): ?string {
+				return $this->url;
+			}
+
+			public function getDataUri(): ?string {
+				return $this->data_uri;
+			}
 		}
 	}
 }
