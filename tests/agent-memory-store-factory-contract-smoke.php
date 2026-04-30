@@ -38,11 +38,11 @@ if ( ! function_exists( 'apply_filters' ) ) {
 require_once __DIR__ . '/../inc/Engine/AI/MemoryFileRegistry.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DirectoryManager.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/FilesystemHelper.php';
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryScope.php';
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryReadResult.php';
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryWriteResult.php';
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryListEntry.php';
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryStoreInterface.php';
+require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryScope.php';
+require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryReadResult.php';
+require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryWriteResult.php';
+require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryListEntry.php';
+require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryStoreInterface.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DiskAgentMemoryStore.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryStoreFactory.php';
 

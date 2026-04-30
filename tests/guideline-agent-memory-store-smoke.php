@@ -26,11 +26,11 @@ if ( ! function_exists( 'taxonomy_exists' ) ) {
 	}
 }
 
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryScope.php';
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryListEntry.php';
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryReadResult.php';
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryWriteResult.php';
-require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryStoreInterface.php';
+require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryScope.php';
+require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryListEntry.php';
+require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryReadResult.php';
+require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryWriteResult.php';
+require_once __DIR__ . '/../agents-api/inc/Core/FilesRepository/AgentMemoryStoreInterface.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/GuidelineAgentMemoryStore.php';
 
 use DataMachine\Core\FilesRepository\AgentMemoryScope;

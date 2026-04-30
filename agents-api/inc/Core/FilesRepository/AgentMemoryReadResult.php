@@ -4,7 +4,7 @@
  *
  * Store-neutral value object returned by AgentMemoryStoreInterface::read().
  *
- * @package DataMachine\Core\FilesRepository
+ * @package AgentsAPI
  * @since   next
  */
 

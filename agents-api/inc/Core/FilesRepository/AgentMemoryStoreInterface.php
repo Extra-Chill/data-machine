@@ -2,15 +2,9 @@
 /**
  * Agent Memory Store Interface
  *
- * Generic persistence contract for agent memory. Data Machine consumes this
- * seam today, but the contract deliberately describes agent-memory storage:
- * not flows, pipelines, jobs, abilities, scaffolding, or prompt injection.
- *
- * Default implementation ({@see DiskAgentMemoryStore}) preserves today's
- * filesystem behavior. Consumers can swap in an alternate store via the
- * `agents_api_memory_store` filter (e.g. a DB-backed store on managed hosts
- * where the filesystem is not writable). This interface is the behavior to
- * carry forward when Agents API owns the contract physically.
+ * Generic persistence contract for agent memory. The contract deliberately
+ * describes agent-memory storage: not flows, pipelines, jobs, abilities,
+ * scaffolding, or prompt injection.
  *
  * Implementations are responsible for:
  * - translating an {@see AgentMemoryScope} to a physical key (path, row, URL);
@@ -21,12 +15,10 @@
  *
  * Section parsing, scaffold/default-file creation, editability gating,
  * ability permissions, prompt-injection policy, and registry-driven
- * convention-path semantics all stay in higher-level callers
- * ({@see AgentMemory}, {@see \DataMachine\Abilities\File\AgentFileAbilities},
- * {@see \DataMachine\Engine\AI\MemoryFileRegistry}). The store is the
- * persistence layer underneath.
+ * convention-path semantics all stay in higher-level callers. The store is
+ * the persistence layer underneath.
  *
- * @package DataMachine\Core\FilesRepository
+ * @package AgentsAPI
  * @since   next
  */
 
@@ -52,8 +44,7 @@ interface AgentMemoryStoreInterface {
 	 * a matching hash. On hash mismatch, return a failure result with
 	 * error = 'conflict'.
 	 *
-	 * Implementations without concurrency support (e.g. the disk default)
-	 * MAY ignore $if_match.
+ * Implementations without concurrency support MAY ignore $if_match.
 	 *
 	 * @param AgentMemoryScope $scope    Identifies the target file.
 	 * @param string           $content  Full content to persist.

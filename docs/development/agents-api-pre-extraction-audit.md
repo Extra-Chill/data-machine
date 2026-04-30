@@ -52,7 +52,7 @@ The initial untangling wave is complete:
 - Ability-native tool execution is separated from Data Machine pending-action and post-tracking decorators.
 - Declarative agent registration is separated from Data Machine materialization.
 - Conversation transcript storage is narrowed behind a transcript facade, and the aggregate chat-product store is documented as a Data Machine compatibility layer rather than the default extraction target.
-- Memory store ownership is documented behind an Agents API-shaped store contract and filter name.
+- Memory store contracts/value objects live in the in-repo `agents-api/` module; Data Machine still owns the behavior-preserving factory/default store adapter.
 - The runner request boundary exists.
 - `AgentConversationRequest::payload()` now exposes the generic runtime payload with Data Machine job/flow/pipeline/handler/transcript fields removed. Data Machine keeps those fields in `adapterContext()` and reconstructs the historical flat payload through `adapterPayload()` until the loop, prompt builder, and tool executor stop consuming the compatibility shape.
 - The built-in loop now receives runtime completion and transcript collaborators. Data Machine's handler-completion and pipeline-transcript behavior lives behind adapter classes instead of being hardcoded as generic loop state.
@@ -132,14 +132,14 @@ The memory store contract is close to extractable.
 
 Target shape:
 
-- `AgentMemoryStoreInterface` becomes a WordPress-shaped Agents API contract.
-- `GuidelineAgentMemoryStore` becomes the core-friendly/default implementation where `wp_guideline` exists.
-- `DiskAgentMemoryStore` becomes `MarkdownMemoryStore` only if disk-backed agent memory is part of the public Agents API product.
-- Data Machine file scaffolding stays a Data Machine adapter.
+- `AgentMemoryStoreInterface`, `AgentMemoryScope`, `AgentMemoryReadResult`, `AgentMemoryWriteResult`, and `AgentMemoryListEntry` are WordPress-shaped Agents API contracts/value objects hosted in `agents-api/` with current namespaces preserved for compatibility.
+- `AgentMemoryStoreFactory` stays Data Machine-owned for now because its behavior-preserving fallback constructs `DiskAgentMemoryStore`.
+- `GuidelineAgentMemoryStore` may become an optional Agents API implementation later, guarded by `post_type_exists( 'wp_guideline' )` and taxonomy availability checks.
+- `DiskAgentMemoryStore` stays Data Machine product/adapter behavior with file scaffolding, SOUL/MEMORY/USER composition, section editing, and operator CLI surfaces.
 
 Current in-place migration:
 
-- `agents_api_memory_store` is the active memory-store resolver hook.
+- `agents_api_memory_store` remains the active memory-store resolver hook through Data Machine's factory.
 - The previous `datamachine_memory_store` hook is intentionally not mirrored; pre-1.0 consumers should register on `agents_api_memory_store`.
 - `DiskAgentMemoryStore` keeps its class name until a physical Agents API package decides whether disk/markdown memory is part of the public product.
 

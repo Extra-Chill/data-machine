@@ -5,7 +5,7 @@
  * Store-neutral value object returned by AgentMemoryStoreInterface::write()
  * and ::delete().
  *
- * @package DataMachine\Core\FilesRepository
+ * @package AgentsAPI
  * @since   next
  */
 

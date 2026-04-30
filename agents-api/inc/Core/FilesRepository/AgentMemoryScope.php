@@ -9,7 +9,7 @@
  * the filesystem so an alternate store (e.g. database-backed, guideline-backed,
  * or host-native) can map it to its own physical key.
  *
- * @package DataMachine\Core\FilesRepository
+ * @package AgentsAPI
  * @since   next
  */
 
@@ -20,7 +20,7 @@ defined( 'ABSPATH' ) || exit;
 final class AgentMemoryScope {
 
 	/**
-	 * @param string $layer    One of MemoryFileRegistry::LAYER_* (shared|agent|user|network).
+	 * @param string $layer    Memory layer identifier (for example shared, agent, user, or network).
 	 * @param int    $user_id  Effective WordPress user ID. 0 = legacy shared / no user.
 	 * @param int    $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
 	 * @param string $filename Filename or relative path within the layer
