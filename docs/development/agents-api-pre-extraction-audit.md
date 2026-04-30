@@ -4,7 +4,7 @@ Parent issue: [Explore splitting Agents API out of Data Machine](https://github.
 
 Strategy issue: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)
 
-Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
+Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
 
 This audit records the remaining work after the first in-place untangling wave. The boundary is now mostly visible: Data Machine owns pipelines and automation; the future Agents API owns generic agent runtime primitives. The next phase is to make those primitives live behind an in-repo `data-machine/agents-api/` module boundary while they still ship with Data Machine.
 
@@ -71,6 +71,72 @@ Before standalone extraction, the in-repo module should satisfy these gates:
 - No `agents-api` file registers admin menus, admin screens, settings forms, or admin-only UI hooks.
 - Data Machine product code imports the module as a dependency instead of reaching across same-layer runtime/product paths.
 - Provider runtime code targets `wp-ai-client`; no `ai-http-client` fallback is introduced or preserved inside `agents-api`.
+
+## Core-Shape Decisions
+
+These decisions keep the first standalone shape small enough to extract without freezing Data Machine product vocabulary into the substrate.
+
+### Agent Categories And Capability Metadata
+
+Decision for [#1669](https://github.com/Extra-Chill/data-machine/issues/1669): **no first-class agent category registry in v1**.
+
+Agents differ from Abilities API abilities in the part of the system that needs discovery:
+
+- Abilities are executable units. Core's Abilities API requires category registration because categories organize many small callable actions and drive REST filtering through `GET /wp-abilities/v1/categories` and the `category` collection parameter.
+- Agents are runtime definitions. Their tool surface should be discovered through abilities/runtime tool declarations, not through a second category hierarchy on the agent definition itself.
+- Data Machine UI grouping is not a valid reason to add a generic substrate field. Product UIs can group agents through their own settings, bundles, roles, or persisted metadata.
+- Tool policy and memory policy should key off explicit policy fields, tool declarations, abilities, or run context. They should not infer permissions from a display category.
+
+The v1 extension path is **lightweight metadata**, not category parity:
+
+- Allow a future `metadata`/`annotations` object on `WP_Agent` definitions after the public class contract is finalized.
+- Suggested generic keys, if proven by consumers: `type` for broad role hints, `capabilities` for declarative non-security affordances, and `annotations` for machine-readable hints.
+- Metadata must be descriptive only in v1. It must not grant REST visibility, tool access, memory access, owner access, or execution permission by itself.
+- If a future consumer proves that category parity is necessary, add it as a separate issue with Abilities API-style registration timing, validation, and REST discovery. Do not smuggle category semantics into `default_config`.
+
+### `wp-agents/v1` REST Surface
+
+Decision for [#1670](https://github.com/Extra-Chill/data-machine/issues/1670): **defer public `wp-agents/v1` routes from the first standalone extraction**.
+
+The first extraction should prove the backend PHP substrate before publishing an HTTP contract. A premature REST controller would force decisions that are still unsettled: persistence ownership, visibility flags, run/session identity, transcript exposure, memory exposure, and permission ceilings.
+
+The deferred shape is reserved as a backend substrate namespace, not a Data Machine product API:
+
+- `GET /wp-agents/v1/agents` may list registered agent definitions that explicitly opt into REST discovery.
+- `GET /wp-agents/v1/agents/{slug}` may read one registered definition.
+- `POST /wp-agents/v1/agents/{slug}/runs` may eventually execute a generic `AgentConversationRequest` through `AgentConversationRunnerInterface`.
+- Any future transcript, memory, run-state, or session routes require separate decisions. They must not inherit Data Machine chat-session switcher, jobs, flows, pipelines, queues, or pending-action vocabulary.
+
+The v1 standalone skeleton should therefore document that `wp-agents/v1` is intentionally absent. Data Machine's existing `datamachine/v1` routes remain product REST for flows, pipelines, jobs, chat UI, agent files, and automation surfaces. They may adapt to Agents API contracts later, but they do not define the public substrate.
+
+REST acceptance gates before any future controller lands:
+
+- Define a `show_in_rest`-equivalent visibility flag or intentionally choose authenticated-only discovery with no public listing.
+- Define list/read/run schemas with no Data Machine table names, job IDs, flow IDs, pipeline IDs, or handler slugs in the public contract.
+- Define permission callbacks separately for list, read, and run. `current_user_can( 'read' )` is not automatically sufficient for agent execution.
+- Define whether run endpoints are synchronous only, asynchronous only, or both. Do not reuse Action Scheduler job semantics unless the route is explicitly Data Machine-owned.
+- Decide whether metadata is exposed, and if so which keys are public versus edit-context only.
+
+## Extraction Readiness Checklist
+
+[#1596](https://github.com/Extra-Chill/data-machine/issues/1596) is blocked until every **must-fix** item below is complete or explicitly reclassified in a follow-up decision.
+
+| Gate | Status | Proof issue |
+|---|---|---|
+| In-repo `agents-api/` module loads before Data Machine product runtime and can boot in a smoke without product code. | Must fix | [#1631](https://github.com/Extra-Chill/data-machine/issues/1631), [#1618](https://github.com/Extra-Chill/data-machine/issues/1618) |
+| Public contract candidates live in the module or have a documented reason to stay in Data Machine for compatibility. | Must fix | [#1632](https://github.com/Extra-Chill/data-machine/issues/1632) |
+| No public `agents-api/` contract imports `DataMachine\` product namespaces or requires jobs, flows, pipelines, handlers, queues, pending actions, content operations, or admin UI. | Must fix | [#1631](https://github.com/Extra-Chill/data-machine/issues/1631), [#1672](https://github.com/Extra-Chill/data-machine/issues/1672) |
+| `WP_Agent`, `WP_Agents_Registry`, `wp_register_agent()`, and registry lifecycle are validated and documented. | Must fix | [#1618](https://github.com/Extra-Chill/data-machine/issues/1618), [#1632](https://github.com/Extra-Chill/data-machine/issues/1632) |
+| Registration helper parity is decided for `wp_get_agent()`, `wp_get_agents()`, `wp_has_agent()`, and `wp_unregister_agent()`. | Must fix | [#1618](https://github.com/Extra-Chill/data-machine/issues/1618) |
+| Agent categories/capabilities decision is recorded: no v1 category registry; future descriptive metadata only. | Complete | [#1669](https://github.com/Extra-Chill/data-machine/issues/1669) |
+| `wp-agents/v1` REST decision is recorded: defer public REST from first standalone extraction, reserve namespace for backend substrate. | Complete | [#1670](https://github.com/Extra-Chill/data-machine/issues/1670) |
+| Generic run/result/message contracts contain no Data Machine pipeline/handler vocabulary. | Must fix | [#1596](https://github.com/Extra-Chill/data-machine/issues/1596), [#1634](https://github.com/Extra-Chill/data-machine/issues/1634) |
+| Built-in loop ownership is settled: Data Machine keeps compatibility loop until completion/transcript/provider/logging assumptions are behind generic collaborators. | Must fix | [#1634](https://github.com/Extra-Chill/data-machine/issues/1634) |
+| Provider runtime depends directly on `wp-ai-client`; no `ai-http-client` or `chubes_ai_request` runtime fallback survives inside `agents-api`. | Must fix | [#1633](https://github.com/Extra-Chill/data-machine/issues/1633), [#1027](https://github.com/Extra-Chill/data-machine/issues/1027), [#1660](https://github.com/Extra-Chill/data-machine/issues/1660), [#1661](https://github.com/Extra-Chill/data-machine/issues/1661) |
+| Memory and transcript interfaces are generic and UI-free. Data Machine chat/session switcher/read-state/reporting remain product adapters unless separately adopted. | Must fix | [#1632](https://github.com/Extra-Chill/data-machine/issues/1632), [#1651](https://github.com/Extra-Chill/data-machine/issues/1651) |
+| Data Machine adapters own flows, jobs, pipelines, handlers, pending actions, bundles, queues, retention, content operations, and chat/admin UI. | Must fix | [#1561](https://github.com/Extra-Chill/data-machine/issues/1561), [#1640](https://github.com/Extra-Chill/data-machine/issues/1640), [#1651](https://github.com/Extra-Chill/data-machine/issues/1651) |
+| Standalone skeleton documents that `wp-agents/v1` is absent in v1 and includes no REST controllers until the REST acceptance gates are satisfied. | Must fix | [#1618](https://github.com/Extra-Chill/data-machine/issues/1618), [#1670](https://github.com/Extra-Chill/data-machine/issues/1670) |
+| Optional future stores, sessions, async run state, REST controllers, category parity, and product UI are deferred until the core backend contracts are extractable. | Can follow | [#1596](https://github.com/Extra-Chill/data-machine/issues/1596), [#1670](https://github.com/Extra-Chill/data-machine/issues/1670), [#1669](https://github.com/Extra-Chill/data-machine/issues/1669) |
 
 ## Remaining In-Place Rename Work
 

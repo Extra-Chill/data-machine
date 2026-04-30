@@ -6,7 +6,7 @@ Parent issue: [Explore splitting Agents API out of Data Machine](https://github.
 
 Strategy update: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)
 
-Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
+Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
 
 ## Current Strategy
 
@@ -51,12 +51,13 @@ Mirror the WordPress Abilities API shape instead of importing Data Machine produ
 | `wp_register_agent()` | `wp_register_agent()` | Same declarative pattern as Abilities API-style registration; no DB reconciliation side effects in the public helper. |
 | `WP_Agent` / `WP_Agents_Registry` | `WP_Agent` / `WP_Agents_Registry` | Registry collects definitions. Persistence/adoption remains Data Machine adapter territory. |
 | `wp_agents_api_init` | `wp_agents_api_init` | Core-shaped init hook mirrored in-place while Data Machine hosts the substrate. |
+| Agent categories | No v1 registry | [#1669](https://github.com/Extra-Chill/data-machine/issues/1669) decides against `WP_Agent_Category` parity for v1. Future metadata/annotations may describe agents but must not grant permission or visibility. |
 | `AgentMessageEnvelope` | `WP_Agent_Message` or same class name | Contract is generic and now uses Agents API-shaped vocabulary in place. |
 | `ConversationTranscriptStoreInterface` | `WP_Agent_Conversation_Transcript_Store_Interface` | Transcript CRUD is the first extractable storage contract. Keep chat-product listing/read-state/reporting separate. |
 | `AgentMemoryStoreInterface` | `WP_Agent_Memory_Store_Interface` | Generic identity tuple needs naming review; Data Machine scaffolding/abilities stay outside the store contract. |
 | `RuntimeToolDeclaration` | `WP_Agent_Tool_Declaration` | Should stay ability-native and run-scoped. |
 | `LoopEventSinkInterface` | `WP_Agent_Run_Event_Sink_Interface` | Useful for logs, streaming, chat UIs, and async workers. |
-| REST `datamachine/v1` agent routes | REST `wp-agents/v1` | Data Machine product routes stay under `datamachine/v1`. |
+| REST `datamachine/v1` agent routes | REST `wp-agents/v1` deferred | [#1670](https://github.com/Extra-Chill/data-machine/issues/1670) reserves the namespace but defers public REST controllers from the first standalone extraction. Data Machine product routes stay under `datamachine/v1`. |
 
 ## Boundary Rules
 
@@ -85,6 +86,42 @@ Agents API is a generic WordPress-shaped substrate. It should be usable by any p
 - Data Machine flow, pipeline, chat, bundle, queue, job, retention, or content-operation UI.
 
 Substrate CRUD is allowed when it is backend-only and generic: interfaces/services for definitions, sessions, memories, transcripts, tools, and run state. Product CRUD belongs to consumers: screens, forms, routes, workflows, and opinionated management UX. Data Machine may provide those product surfaces while consuming `agents-api`; the dependency direction must not reverse.
+
+## Category And Metadata Boundary
+
+Abilities API categories are not copied into Agents API v1.
+
+Core's Abilities API uses categories because abilities are many small executable actions. Category registration validates ability definitions, powers REST category discovery, and lets clients filter `GET /wp-abilities/v1/abilities` by action class. Agents are different: an agent is a runtime definition whose executable surface is its abilities/tool declarations, memory policy, run request, and permission ceiling.
+
+The v1 boundary is therefore:
+
+- No `WP_Agent_Category`, `WP_Agent_Categories_Registry`, or `wp_register_agent_category()` in the first standalone module.
+- No category-based permission, tool policy, memory policy, or REST visibility.
+- Data Machine UI grouping stays Data Machine product behavior.
+- Future `WP_Agent` metadata can carry descriptive fields such as `type`, `capabilities`, or `annotations`, but those fields are non-authoritative unless a later issue gives them explicit semantics.
+
+If a future REST or UI consumer proves category parity is needed, it should be added with Abilities API-style registration timing and validation instead of inferred from free-form metadata.
+
+## REST Boundary
+
+`wp-agents/v1` is reserved for a future backend substrate REST namespace, but the first standalone extraction should ship without public REST controllers.
+
+Reasons:
+
+- The PHP contracts are the extraction target; REST would freeze unsettled persistence, visibility, run-state, session, transcript, and permission decisions.
+- Data Machine already owns product REST for flows, pipelines, jobs, chat/session switcher, agent files, bundles, and automation UI under `datamachine/v1`.
+- A generic run endpoint must use `AgentConversationRunnerInterface` and generic request/result schemas, not Data Machine Action Scheduler jobs or pipeline execution vocabulary.
+
+Reserved future shape:
+
+| Route | Status | Notes |
+|---|---|---|
+| `GET /wp-agents/v1/agents` | Deferred | Lists explicitly visible registered definitions only. Requires a visibility decision before implementation. |
+| `GET /wp-agents/v1/agents/{slug}` | Deferred | Reads one visible definition. Must not expose private memory, owner state, tokens, or mutable config by default. |
+| `POST /wp-agents/v1/agents/{slug}/runs` | Deferred | Executes a generic run request. Needs permission ceiling, sync/async, event sink, transcript, and provider error contracts first. |
+| Transcript, memory, session, async run-state routes | Deferred separately | These are not implied by the namespace. Each needs its own storage and visibility decision. |
+
+Standalone skeleton docs should state that `wp-agents/v1` is intentionally absent in v1. Adding REST later requires route schemas, permission callbacks, visibility flags, and non-goals that keep Data Machine product REST out of the substrate.
 
 ## Bucket Summary
 
