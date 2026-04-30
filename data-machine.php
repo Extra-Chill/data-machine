@@ -301,6 +301,7 @@ function datamachine_run_datamachine_plugin() {
 	// Deferred scaffold: during plugin activation the Abilities API is unavailable
 	// because init fires before the plugin file is included. A transient signals that
 	// the scaffold needs to run on the first normal request where abilities are ready.
+	// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
 	add_action(
 		'init',
 		function () {
@@ -352,6 +353,7 @@ function datamachine_activate_defaults_for_site() {
 	add_option( 'datamachine_settings', $default_settings );
 }
 
+// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
 add_action( 'plugins_loaded', 'datamachine_run_datamachine_plugin', 20 );
 
 
@@ -398,6 +400,9 @@ function datamachine_load_handlers() {
  */
 function datamachine_scan_and_instantiate( $directory ) {
 	$files = glob( $directory . '/*.php' );
+	if ( false === $files ) {
+		return;
+	}
 
 	foreach ( $files as $file ) {
 		// Skip if it's a *Filters.php file (will be deleted)
@@ -423,6 +428,7 @@ add_filter( 'upload_mimes', 'datamachine_allow_json_upload' );
 
 add_action( 'update_option_datamachine_settings', array( \DataMachine\Core\PluginSettings::class, 'clearCache' ) );
 
+// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
 add_action(
 	'plugins_loaded',
 	function () {
@@ -721,11 +727,12 @@ function datamachine_on_new_site( \WP_Site $new_site ) {
 		return;
 	}
 
-	switch_to_blog( $new_site->blog_id );
+	switch_to_blog( (int) $new_site->blog_id );
 	datamachine_activate_defaults_for_site();
 	datamachine_activate_for_site();
 	restore_current_blog();
 }
+// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
 add_action( 'wp_initialize_site', 'datamachine_on_new_site', 200 );
 
 // Migrations, scaffolding, and activation helpers.
