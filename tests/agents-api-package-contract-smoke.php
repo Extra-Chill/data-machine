@@ -115,6 +115,34 @@ try {
 }
 agents_api_smoke_assert_equals( true, $threw, 'malformed artifact is rejected', $failures, $passes );
 
+$threw = false;
+try {
+	WP_Agent_Package::from_array(
+		array(
+			'slug'      => 'valid-package',
+			'agent'     => array( 'slug' => 'valid-agent' ),
+			'artifacts' => array( array( 'type' => 'example/file', 'slug' => 'bad-source', 'source' => '../outside.json' ) ),
+		)
+	);
+} catch ( InvalidArgumentException $e ) {
+	$threw = str_contains( $e->getMessage(), 'source cannot contain parent directory segments' );
+}
+agents_api_smoke_assert_equals( true, $threw, 'artifact source rejects traversal', $failures, $passes );
+
+$threw = false;
+try {
+	WP_Agent_Package::from_array(
+		array(
+			'slug'      => 'valid-package',
+			'agent'     => array( 'slug' => 'valid-agent' ),
+			'artifacts' => array( array( 'type' => 'example/file', 'slug' => 'absolute-source', 'source' => '/tmp/outside.json' ) ),
+		)
+	);
+} catch ( InvalidArgumentException $e ) {
+	$threw = str_contains( $e->getMessage(), 'source must be relative to the package' );
+}
+agents_api_smoke_assert_equals( true, $threw, 'artifact source rejects absolute paths', $failures, $passes );
+
 echo "\n[3] Artifact type registry mirrors agent registration lifecycle:\n";
 agents_api_package_artifacts_reset();
 $validate_callback = static function ( WP_Agent_Package_Artifact $artifact ): bool {
