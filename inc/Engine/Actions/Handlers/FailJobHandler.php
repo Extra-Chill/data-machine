@@ -121,6 +121,7 @@ class FailJobHandler {
 		}
 
 		$db_processed_items->delete_processed_items( array( 'job_id' => $job_id ) );
+		self::releaseInFlightSourceClaims( $db_processed_items, $job_id, $engine_data );
 
 		$cleanup_files = \DataMachine\Core\PluginSettings::get( 'cleanup_job_data_on_failure', true );
 		$files_cleaned = false;
@@ -151,5 +152,60 @@ class FailJobHandler {
 		);
 
 		return true;
+	}
+
+	/**
+	 * Release in-flight source-item claims for failed jobs.
+	 *
+	 * Parent fetch jobs own claims by job_id until their children are scheduled;
+	 * child jobs carry item_identifier/source_type in engine_data. Release both
+	 * shapes so failed downstream work can retry on the next fetch tick.
+	 *
+	 * @param \DataMachine\Core\Database\ProcessedItems\ProcessedItems $db_processed_items Processed items repository.
+	 * @param int                                                        $job_id             Failed job ID.
+	 * @param array                                                      $engine_data        Failed job engine data.
+	 * @return void
+	 */
+	private static function releaseInFlightSourceClaims( \DataMachine\Core\Database\ProcessedItems\ProcessedItems $db_processed_items, int $job_id, array $engine_data ): void {
+		$db_processed_items->release_claims_for_job( $job_id );
+
+		$item_identifier = $engine_data['item_identifier'] ?? null;
+		$source_type     = $engine_data['source_type'] ?? null;
+		if ( empty( $item_identifier ) || empty( $source_type ) ) {
+			return;
+		}
+
+		$fetch_flow_step_id = self::resolveFetchFlowStepId( $engine_data );
+		if ( empty( $fetch_flow_step_id ) ) {
+			return;
+		}
+
+		$db_processed_items->release_claim( $fetch_flow_step_id, (string) $source_type, (string) $item_identifier );
+	}
+
+	/**
+	 * Resolve the fetch/event_import step ID from a job engine snapshot.
+	 *
+	 * @param array $engine_data Job engine data.
+	 * @return string|null Fetch flow step ID, or null when unavailable.
+	 */
+	private static function resolveFetchFlowStepId( array $engine_data ): ?string {
+		$flow_config = $engine_data['flow_config'] ?? array();
+		if ( ! is_array( $flow_config ) ) {
+			return null;
+		}
+
+		foreach ( $flow_config as $step_id => $config ) {
+			if ( ! is_array( $config ) ) {
+				continue;
+			}
+
+			$step_type = $config['step_type'] ?? '';
+			if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) ) {
+				return (string) $step_id;
+			}
+		}
+
+		return null;
 	}
 }

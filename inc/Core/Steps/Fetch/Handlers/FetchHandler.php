@@ -77,11 +77,11 @@ abstract class FetchHandler {
 			? $result['items']
 			: array( $result );
 
-		// Dedup: filter out already-processed items.
+		// Dedup: filter out already-processed and actively claimed items.
 		// Items with metadata['item_identifier'] are checked against the processed items
-		// database. Already-processed items are removed. New items are NOT yet
-		// marked — marking happens after the max_items cap so we don't permanently
-		// discard items that simply didn't fit in this batch.
+		// database. Already-processed/claimed items are removed. New items are NOT yet
+		// claimed — claim creation happens after the max_items cap so we don't block
+		// items that simply didn't fit in this batch.
 		$items = $this->filterProcessed( $items, $context );
 
 		// Apply max_items cap.
@@ -91,6 +91,11 @@ abstract class FetchHandler {
 		if ( $max_items > 0 && count( $items ) > $max_items ) {
 			$items = array_slice( $items, 0, $max_items );
 		}
+
+		// Claim only the items this fetch will actually schedule. Claims close the
+		// race between parallel parent flow ticks while still deferring final
+		// processed marking until the downstream pipeline completes successfully.
+		$items = $this->claimItems( $items, $context );
 
 		// NOTE: Items are NOT marked as processed here. Marking is deferred
 		// to ExecuteStepAbility::markCompletedItemProcessed() which runs when
@@ -106,11 +111,11 @@ abstract class FetchHandler {
 	}
 
 	/**
-	 * Filter out already-processed items WITHOUT marking new ones.
+	 * Filter out already-processed or actively claimed items WITHOUT marking new ones.
 	 *
 	 * Items with metadata['item_identifier'] are checked against the processed items
-	 * database. Already-processed items are removed. New items pass through
-	 * but are NOT marked as processed here — marking is deferred to
+	 * database. Already-processed and actively claimed items are removed. New
+	 * items pass through but are NOT marked as processed here — marking is deferred to
 	 * ExecuteStepAbility::markCompletedItemProcessed() when the full pipeline
 	 * completes successfully, so failed downstream steps don't cause dropped items.
 	 *
@@ -136,8 +141,49 @@ abstract class FetchHandler {
 				continue;
 			}
 
-			// Already processed — skip.
+			// Already processed or actively claimed by another in-flight run — skip.
 			if ( $context->isItemProcessed( (string) $item_identifier ) ) {
+				continue;
+			}
+
+			if ( $context->isItemClaimed( (string) $item_identifier ) ) {
+				continue;
+			}
+
+			$result[] = $item;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Claim items that survived dedup and max_items selection.
+	 *
+	 * A failed claim means another parallel fetch won the race after our initial
+	 * filter check. Drop that item from this run so only one child pipeline job
+	 * is scheduled for the source item.
+	 *
+	 * @param array            $items   Items selected for scheduling.
+	 * @param ExecutionContext $context Execution context.
+	 * @return array Items whose claim was acquired, plus identifier-less items.
+	 */
+	private function claimItems( array $items, ExecutionContext $context ): array {
+		$result = array();
+
+		foreach ( $items as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+
+			$item_identifier = $item['metadata']['item_identifier'] ?? null;
+
+			// No item_identifier — no dedupe contract, pass through unchanged.
+			if ( null === $item_identifier || '' === $item_identifier ) {
+				$result[] = $item;
+				continue;
+			}
+
+			if ( ! $context->claimItemForProcessing( (string) $item_identifier ) ) {
 				continue;
 			}
 
