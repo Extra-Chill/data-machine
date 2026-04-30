@@ -3,7 +3,7 @@
 Declarative agent registration via the `wp_agents_api_init` action. Plugins (and Data Machine itself) declare agent roles once; the side-effect-free registry collects those declarations, and Data Machine's materializer reconciles them against the `datamachine_agents` table on `init` while Data Machine hosts the in-place substrate.
 
 **Since:** 0.71.0
-**Source:** `inc/Engine/Agents/class-wp-agent.php`, `inc/Engine/Agents/class-wp-agents-registry.php`, `inc/Engine/Agents/AgentRegistry.php`, `inc/Engine/Agents/register-agents.php`
+**Source:** `agents-api/inc/class-wp-agent.php`, `agents-api/inc/class-wp-agents-registry.php`, `agents-api/inc/register-agents.php`, `inc/Engine/Agents/AgentRegistry.php`, `inc/Engine/Agents/datamachine-register-agents.php`
 
 ## Why
 

@@ -31,18 +31,11 @@ defined( 'ABSPATH' ) || exit;
 class AgentRegistry {
 
 	/**
-	 * Registered agent definitions, keyed by slug.
-	 *
-	 * @var array<string, array>
-	 */
-	private static array $agents = array();
-
-	/**
-	 * Whether the agent registration actions have fired.
+	 * Whether the legacy Data Machine registration action has fired.
 	 *
 	 * @var bool
 	 */
-	private static bool $registration_fired = false;
+	private static bool $legacy_registration_fired = false;
 
 	/**
 	 * Register an agent definition.
@@ -79,35 +72,7 @@ class AgentRegistry {
 	 * @return void
 	 */
 	public static function register( string $slug, array $args = array() ): void {
-		$slug = sanitize_title( $slug );
-		if ( '' === $slug ) {
-			return;
-		}
-
-		$label = isset( $args['label'] ) ? (string) $args['label'] : '';
-		if ( '' === $label ) {
-			$label = $slug;
-		}
-
-		$memory_seeds = array();
-		if ( isset( $args['memory_seeds'] ) && is_array( $args['memory_seeds'] ) ) {
-			foreach ( $args['memory_seeds'] as $filename => $path ) {
-				$filename = sanitize_file_name( (string) $filename );
-				$path     = (string) $path;
-				if ( '' !== $filename && '' !== $path ) {
-					$memory_seeds[ $filename ] = $path;
-				}
-			}
-		}
-
-		self::$agents[ $slug ] = array(
-			'slug'           => $slug,
-			'label'          => $label,
-			'description'    => isset( $args['description'] ) ? (string) $args['description'] : '',
-			'memory_seeds'   => $memory_seeds,
-			'owner_resolver' => isset( $args['owner_resolver'] ) && is_callable( $args['owner_resolver'] ) ? $args['owner_resolver'] : null,
-			'default_config' => isset( $args['default_config'] ) && is_array( $args['default_config'] ) ? $args['default_config'] : array(),
-		);
+		\WP_Agents_Registry::register( $slug, $args );
 	}
 
 	/**
@@ -122,8 +87,8 @@ class AgentRegistry {
 	 * @return array<string, array>
 	 */
 	public static function get_all(): array {
-		self::ensure_fired();
-		return self::$agents;
+		self::ensure_legacy_fired();
+		return \WP_Agents_Registry::get_all();
 	}
 
 	/**
@@ -135,9 +100,8 @@ class AgentRegistry {
 	 * @return array|null Definition, or null if not registered.
 	 */
 	public static function get( string $slug ): ?array {
-		self::ensure_fired();
-		$slug = sanitize_title( $slug );
-		return self::$agents[ $slug ] ?? null;
+		self::ensure_legacy_fired();
+		return \WP_Agents_Registry::get( $slug );
 	}
 
 	/**
@@ -172,24 +136,14 @@ class AgentRegistry {
 	 *
 	 * @return void
 	 */
-	private static function ensure_fired(): void {
-		if ( self::$registration_fired ) {
+	private static function ensure_legacy_fired(): void {
+		\WP_Agents_Registry::get_all();
+
+		if ( self::$legacy_registration_fired ) {
 			return;
 		}
 
-		self::$registration_fired = true;
-
-		/**
-		 * Fires to let plugins register agents.
-		 *
-		 * Callbacks should call `wp_register_agent()` to contribute
-		 * one or more agent definitions. Registrations are collected into a
-		 * central registry and reconciled against the `datamachine_agents`
-		 * table on `init` (priority 15).
-		 *
-		 * @since 0.99.0
-		 */
-		do_action( 'wp_agents_api_init' );
+		self::$legacy_registration_fired = true;
 
 		/**
 		 * Fires to let existing Data Machine consumers register agents.
@@ -212,7 +166,7 @@ class AgentRegistry {
 	 * @return void
 	 */
 	public static function reset_for_tests(): void {
-		self::$agents             = array();
-		self::$registration_fired = false;
+		self::$legacy_registration_fired = false;
+		\WP_Agents_Registry::reset_for_tests();
 	}
 }

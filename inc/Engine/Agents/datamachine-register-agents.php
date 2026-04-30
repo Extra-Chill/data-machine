@@ -1,20 +1,6 @@
 <?php
 /**
- * Agent Registration — global helpers + hook wiring.
- *
- * Defines the top-level `wp_register_agent()` function that plugins call
- * from inside a `wp_agents_api_init` action callback to declare agents.
- * Wires reconciliation on `init` and a scaffold generator that surfaces
- * each registered agent's bundled `memory_seeds` entries as scaffold
- * content for their respective agent-layer memory files (SOUL.md,
- * MEMORY.md, or any custom file registered via
- * `MemoryFileRegistry::register()`).
- *
- * Also dogfoods the API: DM itself registers the site's default
- * administrator agent through the same hook plugins use. On existing
- * installs the registration is a no-op because the agent already
- * exists in the `datamachine_agents` table. On fresh installs the
- * registry is the primary creation path for the default agent.
+ * Data Machine agent registration integration.
  *
  * @package DataMachine\Engine\Agents
  * @since   0.71.0
@@ -24,29 +10,6 @@ use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\Agents\AgentRegistry;
 
 defined( 'ABSPATH' ) || exit;
-
-require_once __DIR__ . '/class-wp-agent.php';
-require_once __DIR__ . '/class-wp-agents-registry.php';
-
-if ( ! function_exists( 'wp_register_agent' ) ) {
-	/**
-	 * Register an agent.
-	 *
-	 * Call from inside a `wp_agents_api_init` action callback. The registry
-	 * collects all definitions; Data Machine reconciles them against the
-	 * `datamachine_agents` table on `init` priority 15 while it hosts the
-	 * in-place substrate.
-	 *
-	 * @since 0.99.0
-	 *
-	 * @param string|WP_Agent $agent Agent slug or definition object.
-	 * @param array           $args  Registration arguments. See AgentRegistry::register().
-	 * @return void
-	 */
-	function wp_register_agent( $agent, array $args = array() ): void {
-		WP_Agents_Registry::register( $agent, $args );
-	}
-}
 
 /**
  * Register a Data Machine agent.
@@ -67,12 +30,10 @@ function datamachine_register_agent( string $slug, array $args = array() ): void
 /**
  * Reconcile registered agents on `init`.
  *
- * Priority 15 runs after ability registration (priority 10) so the
- * scaffold ability is available when reconciliation triggers SOUL/MEMORY
- * creation for newly-materialized agents, and before the existing
- * `datamachine_needs_scaffold` transient check at priority 20.
- *
- * @since 0.71.0
+ * Priority 15 runs after ability registration (priority 10) so the scaffold
+ * ability is available when reconciliation triggers SOUL/MEMORY creation for
+ * newly-materialized agents, and before the existing `datamachine_needs_scaffold`
+ * transient check at priority 20.
  */
 add_action(
 	'init',
@@ -84,19 +45,6 @@ add_action(
 
 /**
  * Memory-seed scaffold generator — surface registered `memory_seeds` as content.
- *
- * Priority 5 runs before DM's default site-context scaffold generators
- * (priority 10 in inc/migrations/scaffolding.php). When a registered
- * agent declares a `memory_seeds` entry for the current filename, the
- * bundled file's contents become the scaffold content. Filenames without
- * a seed entry fall through untouched; the default generator produces
- * the generic site-context default.
- *
- * Symmetric across any registered agent-layer memory file — SOUL.md,
- * MEMORY.md, or any custom filename a plugin registers via
- * `MemoryFileRegistry::register()` and seeds through `memory_seeds`.
- *
- * @since 0.71.0
  *
  * @param string $content  Current content (empty if no prior generator).
  * @param string $filename Filename being scaffolded.
@@ -145,27 +93,8 @@ add_filter(
 /**
  * DM core dogfood — register the default site administrator agent.
  *
- * Declares the site's default admin-owned agent through the same
- * hook plugins use. Uses the site admin's `user_login` as the slug —
- * the same identity `datamachine_resolve_or_create_agent_id()` produces
- * on a user's first chat turn — so this registration is a no-op on
- * existing installs where that agent already exists.
- *
- * Named function (not a closure) so plugins that want to suppress the
- * default admin-agent registration can `remove_action()` it cleanly:
- *
- *     remove_action(
- *         'wp_agents_api_init',
- *         'datamachine_register_default_admin_agent',
- *         10
- *     );
- *
- * Plugins that want to *replace* (rather than suppress) the default
- * admin agent can hook at a higher priority and re-register with the
- * same slug — standard WordPress last-wins semantics apply at the
- * registry level. Note: reconciliation is create-if-missing, so
- * re-registration only affects fresh installs where the DB row has
- * not yet been materialized.
+ * Declares the site's default admin-owned agent through the same hook plugins
+ * use. Named function (not a closure) so plugins can remove or replace it.
  *
  * @since 0.71.0
  */
