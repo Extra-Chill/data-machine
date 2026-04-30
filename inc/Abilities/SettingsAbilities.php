@@ -14,6 +14,7 @@ use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Core\NetworkSettings;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\WpAiClientProviderAdmin;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -314,7 +315,7 @@ class SettingsAbilities {
 	}
 
 	public function executeGetSettings( array $input ): array {
-		$input;
+		unset( $input );
 		$settings = PluginSettings::all();
 		$defaults = PluginSettings::getDefaults();
 
@@ -331,19 +332,7 @@ class SettingsAbilities {
 			);
 		}
 
-		$raw_keys    = apply_filters( 'chubes_ai_provider_api_keys', null ) ?? array();
-		$masked_keys = array();
-		foreach ( $raw_keys as $provider => $key ) {
-			if ( ! empty( $key ) ) {
-				if ( strlen( $key ) > 12 ) {
-					$masked_keys[ $provider ] = substr( $key, 0, 4 ) . '****************' . substr( $key, -4 );
-				} else {
-					$masked_keys[ $provider ] = '****************';
-				}
-			} else {
-				$masked_keys[ $provider ] = '';
-			}
-		}
+		$masked_keys = WpAiClientProviderAdmin::getMaskedApiKeys();
 
 		$network_defaults = NetworkSettings::all();
 
@@ -479,19 +468,7 @@ class SettingsAbilities {
 		}
 
 		if ( isset( $input['ai_provider_keys'] ) && is_array( $input['ai_provider_keys'] ) ) {
-			$current_keys = apply_filters( 'chubes_ai_provider_api_keys', null );
-			if ( ! is_array( $current_keys ) ) {
-				$current_keys = array();
-			}
-			foreach ( $input['ai_provider_keys'] as $provider => $key ) {
-				$provider_key = sanitize_key( $provider );
-				$new_key      = sanitize_text_field( $key );
-
-				if ( strpos( $new_key, '****' ) === false ) {
-					$current_keys[ $provider_key ] = $new_key;
-				}
-			}
-			apply_filters( 'chubes_ai_provider_api_keys', $current_keys );
+			WpAiClientProviderAdmin::updateApiKeys( $input['ai_provider_keys'] );
 			$handled_keys[] = 'ai_provider_keys';
 		}
 
@@ -572,9 +549,8 @@ class SettingsAbilities {
 		 *
 		 * @since 0.40.0
 		 *
-		 * @param array $all_settings  Current settings array (will be saved to DB).
-		 * @param array $input         Raw input from the settings update request.
-		 * @param array $handled_keys  Keys already handled by core.
+		 * @param array $filtered Filter result with settings and handled keys.
+		 * @param array $input    Raw input from the settings update request.
 		 * @return array Associative array with 'settings' and 'handled_keys'.
 		 */
 		$filtered = apply_filters(
@@ -609,7 +585,7 @@ class SettingsAbilities {
 	}
 
 	public function executeGetSchedulingIntervals( array $input ): array {
-		$input;
+		unset( $input );
 		$intervals = apply_filters( 'datamachine_scheduler_intervals', array() );
 
 		$frontend_intervals = array();
@@ -783,7 +759,7 @@ class SettingsAbilities {
 	}
 
 	public function executeGetHandlerDefaults( array $input ): array {
-		$input;
+		unset( $input );
 		$defaults = get_option( self::HANDLER_DEFAULTS_OPTION, null );
 
 		if ( null === $defaults ) {

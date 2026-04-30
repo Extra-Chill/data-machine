@@ -101,9 +101,7 @@ class WpAiClientAdapter {
 			return self::errorResponse( $provider, 'wp-ai-client provider resolution failed: ' . $e->getMessage() );
 		}
 
-		// Apply Data Machine's API key to the provider for this request. DM remains the
-		// source of truth for keys until the full migration; we only borrow them here.
-		$api_key = self::resolveApiKey( $provider );
+		$api_key = WpAiClientProviderAdmin::resolveApiKey( $provider );
 		if ( '' !== $api_key ) {
 			try {
 				$registry->setProviderRequestAuthentication(
@@ -122,7 +120,11 @@ class WpAiClientAdapter {
 		$model_config = self::buildModelConfig( $request );
 
 		try {
-			$model_instance = $registry->getProviderModel( $resolved_id, $model, $model_config );
+			if ( ! method_exists( $registry, 'getProviderModel' ) ) {
+				return self::errorResponse( $provider, 'wp-ai-client registry cannot resolve provider models' );
+			}
+
+			$model_instance = call_user_func( array( $registry, 'getProviderModel' ), $resolved_id, $model, $model_config );
 		} catch ( \Throwable $e ) {
 			return self::errorResponse( $provider, 'wp-ai-client model resolution failed: ' . $e->getMessage() );
 		}
@@ -354,39 +356,6 @@ class WpAiClientAdapter {
 		}
 
 		return array();
-	}
-
-	/**
-	 * Resolve the API key for this provider via DM's existing key plumbing.
-	 *
-	 * Reads the same `chubes_ai_provider_api_keys` filter that ai-http-client uses,
-	 * so admin UX, network settings, and key persistence remain unchanged while
-	 * Data Machine request assembly consumes wp-ai-client directly.
-	 *
-	 * @since 0.69.1
-	 *
-	 * @param string $provider Provider identifier.
-	 * @return string API key, or empty string when none is configured.
-	 */
-	private static function resolveApiKey( string $provider ): string {
-		$keys = apply_filters( 'chubes_ai_provider_api_keys', null );
-
-		if ( ! is_array( $keys ) ) {
-			return '';
-		}
-
-		// Direct hit on provider id.
-		if ( ! empty( $keys[ $provider ] ) && is_string( $keys[ $provider ] ) ) {
-			return $keys[ $provider ];
-		}
-
-		// Some sites may have stored keys under provider-specific aliases (e.g. "google" vs "gemini").
-		$alias = self::normalizeProviderId( $provider );
-		if ( $alias !== $provider && ! empty( $keys[ $alias ] ) && is_string( $keys[ $alias ] ) ) {
-			return $keys[ $alias ];
-		}
-
-		return '';
 	}
 
 	/**
