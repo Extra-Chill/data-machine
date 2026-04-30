@@ -785,7 +785,7 @@ class JobsCommand extends BaseCommand {
 			if ( is_array( $value ) ) {
 				$count             = count( $value );
 				$json              = wp_json_encode( $value );
-				$size              = strlen( $json );
+				$size              = strlen( is_string( $json ) ? $json : '' );
 				$summary[ $label ] = sprintf( 'array (%d items, %s)', $count, size_format( $size ) );
 			} elseif ( is_bool( $value ) ) {
 				$summary[ $label ] = $value ? 'true' : 'false';
