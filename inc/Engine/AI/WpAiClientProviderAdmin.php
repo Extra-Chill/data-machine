@@ -153,6 +153,10 @@ class WpAiClientProviderAdmin {
 		}
 
 		try {
+			if ( ! method_exists( $registry, 'getRegisteredProviderIds' ) ) {
+				return array();
+			}
+
 			$provider_ids = $registry->getRegisteredProviderIds();
 		} catch ( \Throwable $e ) {
 			return array();
@@ -175,6 +179,9 @@ class WpAiClientProviderAdmin {
 
 		try {
 			self::bindApiKeyToRegistry( $registry, $provider_id );
+			if ( ! method_exists( $registry, 'getProviderClassName' ) ) {
+				return array();
+			}
 
 			$provider_class = $registry->getProviderClassName( $provider_id );
 			$directory      = $provider_class::modelMetadataDirectory();
@@ -223,6 +230,10 @@ class WpAiClientProviderAdmin {
 		$registry = self::registry();
 		if ( null !== $registry ) {
 			try {
+				if ( ! method_exists( $registry, 'getProviderClassName' ) ) {
+					return ucwords( str_replace( array( '_', '-' ), ' ', $provider_id ) );
+				}
+
 				$provider_class = $registry->getProviderClassName( $provider_id );
 				$metadata       = $provider_class::metadata();
 				if ( is_object( $metadata ) && method_exists( $metadata, 'getName' ) ) {
@@ -232,7 +243,7 @@ class WpAiClientProviderAdmin {
 					}
 				}
 			} catch ( \Throwable $e ) {
-				// Fall through to generated label.
+				unset( $e );
 			}
 		}
 
@@ -262,7 +273,7 @@ class WpAiClientProviderAdmin {
 				new \WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication( $api_key )
 			);
 		} catch ( \Throwable $e ) {
-			// Model discovery will surface as an empty model list below.
+			unset( $e );
 		}
 	}
 
@@ -365,7 +376,7 @@ class WpAiClientProviderAdmin {
 			return null;
 		}
 
-		return is_object( $registry ) ? $registry : null;
+		return $registry;
 	}
 
 	/**
