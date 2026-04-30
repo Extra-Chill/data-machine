@@ -119,7 +119,7 @@ function datamachine_run_schema_migrations(): void {
 
 	// Migrate stale agent_config.model.default.{provider,model} shape to
 	// top-level default_provider/default_model so the resolver can read it.
-	// Pairs with the writer fix in inc/Engine/Agents/register-agents.php.
+	// Pairs with the writer fix in inc/Engine/Agents/datamachine-register-agents.php.
 	// Idempotent.
 	datamachine_migrate_agent_config_model_shape();
 

@@ -2,8 +2,7 @@
 /**
  * WP_Agent definition object.
  *
- * @package DataMachine\Engine\Agents
- * @since   0.99.0
+ * @package AgentsAPI
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -12,12 +11,9 @@ if ( ! class_exists( 'WP_Agent' ) ) {
 	/**
 	 * Declarative agent definition.
 	 *
-	 * This mirrors WordPress value-object vocabulary while the underlying
-	 * registry still lives in Data Machine. Constructing an agent definition
-	 * does not create Data Machine DB rows, access records, directories, or
-	 * scaffold files.
-	 *
-	 * @since 0.99.0
+	 * Constructing an agent definition only prepares registration arguments. It
+	 * does not create database rows, access records, directories, or scaffold
+	 * files.
 	 */
 	class WP_Agent {
 

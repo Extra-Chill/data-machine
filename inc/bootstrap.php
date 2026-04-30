@@ -12,6 +12,8 @@
 
 defined( 'ABSPATH' ) || exit;
 
+require_once dirname( __DIR__ ) . '/agents-api/agents-api.php';
+
 /*
 |--------------------------------------------------------------------------
 | Procedural function files (no namespace, no class)
@@ -53,7 +55,7 @@ require_once __DIR__ . '/Engine/Bundle/AgentBundleUpgradeActionHandlers.php';
 require_once __DIR__ . '/Engine/AI/Directives/CoreMemoryFilesDirective.php';
 require_once __DIR__ . '/Engine/AI/Directives/AgentModeDirective.php';
 require_once __DIR__ . '/Engine/AI/Directives/CallerContextDirective.php';
-require_once __DIR__ . '/Engine/Agents/register-agents.php';
+require_once __DIR__ . '/Engine/Agents/datamachine-register-agents.php';
 
 /*
 |--------------------------------------------------------------------------

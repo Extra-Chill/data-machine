@@ -3,7 +3,7 @@
  * Data Machine — Migrate stale `agent_config.model.default.*` shape to
  * `agent_config.default_provider` / `agent_config.default_model`.
  *
- * `inc/Engine/Agents/register-agents.php` previously persisted newly
+ * `inc/Engine/Agents/datamachine-register-agents.php` previously persisted newly
  * registered agents with `agent_config = { model: { default: { provider,
  * model } } }`. The reader (`PluginSettings::resolveModelForAgentMode()`)
  * has read `agent_config.mode_models[mode]` plus top-level
