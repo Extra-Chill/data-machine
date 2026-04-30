@@ -67,15 +67,14 @@ class WpAiClientAdapter {
 		}
 
 		try {
-			$model_instance = $registry->getProviderModel( $resolved_id, $model, null );
+			$model_instance = self::getProviderModel( $registry, $resolved_id, $model, null );
 
-			/** @var \WP_AI_Client_Prompt_Builder $builder */
 			$builder = \wp_ai_client_prompt( $prompt )
 				->using_provider( $resolved_id )
 				->using_model( $model_instance );
 
 			if ( class_exists( '\\WordPress\\AiClient\\Files\\Enums\\FileTypeEnum' ) ) {
-				$builder = $builder->as_output_file_type( \WordPress\AiClient\Files\Enums\FileTypeEnum::remote() );
+				$builder = self::callBuilderMethod( $builder, 'as_output_file_type', \WordPress\AiClient\Files\Enums\FileTypeEnum::remote() );
 			}
 
 			$builder = self::applyImageAspectRatio( $builder, $aspect_ratio );
@@ -161,17 +160,21 @@ class WpAiClientAdapter {
 			return $builder;
 		}
 
-		/** @var \WP_AI_Client_Prompt_Builder $builder */
+		$orientation_setter = array( $builder, 'as_output_media_orientation' );
+		if ( ! is_callable( $orientation_setter ) ) {
+			return $builder;
+		}
+
 		if ( '1:1' === $aspect_ratio ) {
-			return $builder->as_output_media_orientation( \WordPress\AiClient\Files\Enums\MediaOrientationEnum::square() );
+			return call_user_func( $orientation_setter, \WordPress\AiClient\Files\Enums\MediaOrientationEnum::square() );
 		}
 
 		if ( in_array( $aspect_ratio, array( '3:4', '9:16' ), true ) ) {
-			return $builder->as_output_media_orientation( \WordPress\AiClient\Files\Enums\MediaOrientationEnum::portrait() );
+			return call_user_func( $orientation_setter, \WordPress\AiClient\Files\Enums\MediaOrientationEnum::portrait() );
 		}
 
 		if ( in_array( $aspect_ratio, array( '4:3', '16:9' ), true ) ) {
-			return $builder->as_output_media_orientation( \WordPress\AiClient\Files\Enums\MediaOrientationEnum::landscape() );
+			return call_user_func( $orientation_setter, \WordPress\AiClient\Files\Enums\MediaOrientationEnum::landscape() );
 		}
 
 		return $builder;
@@ -274,31 +277,35 @@ class WpAiClientAdapter {
 		$model_config = self::buildModelConfig( $request );
 
 		try {
-			$model_instance = $registry->getProviderModel( $resolved_id, $model, $model_config );
+			$model_instance = self::getProviderModel( $registry, $resolved_id, $model, $model_config );
 		} catch ( \Throwable $e ) {
 			return self::errorResponse( $provider, 'wp-ai-client model resolution failed: ' . $e->getMessage() );
 		}
 
 		try {
-			/** @var \WP_AI_Client_Prompt_Builder $builder */
 			$builder = \wp_ai_client_prompt()
 				->using_provider( $resolved_id )
 				->using_model( $model_instance );
 
 			if ( null !== $conversation['system'] && '' !== $conversation['system'] ) {
-				$builder = $builder->using_system_instruction( $conversation['system'] );
+				$builder = self::callBuilderMethod( $builder, 'using_system_instruction', $conversation['system'] );
 			}
 
 			if ( ! empty( $conversation['history'] ) ) {
-				$builder = $builder->with_history( ...$conversation['history'] );
+				$builder = self::callBuilderMethod( $builder, 'with_history', ...$conversation['history'] );
 			}
 
 			$declarations = self::buildFunctionDeclarations( $tools );
 			if ( ! empty( $declarations ) ) {
-				$builder = $builder->using_function_declarations( ...$declarations );
+				$builder = self::callBuilderMethod( $builder, 'using_function_declarations', ...$declarations );
 			}
 
-			$result = $builder->generate_text_result();
+			$generator = array( $builder, 'generate_text_result' );
+			if ( ! is_callable( $generator ) ) {
+				return self::errorResponse( $provider, 'wp-ai-client text generation API is unavailable' );
+			}
+
+			$result = call_user_func( $generator );
 		} catch ( \Throwable $e ) {
 			return self::errorResponse( $provider, 'wp-ai-client request threw: ' . $e->getMessage() );
 		}
@@ -511,6 +518,39 @@ class WpAiClientAdapter {
 		}
 
 		return array();
+	}
+
+	/**
+	 * Resolve a provider model through wp-ai-client's registry.
+	 *
+	 * @param \WordPress\AiClient\Providers\ProviderRegistry $registry Provider registry.
+	 * @param string                                          $provider Provider identifier.
+	 * @param string                                          $model    Model identifier.
+	 * @param mixed                                           $config   Optional model config.
+	 * @return mixed Provider model instance.
+	 *
+	 * @throws \RuntimeException When the registry cannot resolve models.
+	 */
+	private static function getProviderModel( \WordPress\AiClient\Providers\ProviderRegistry $registry, string $provider, string $model, $config ) {
+		return call_user_func( array( $registry, 'getProviderModel' ), $provider, $model, $config );
+	}
+
+	/**
+	 * Call a wp-ai-client builder method exposed directly or through __call().
+	 *
+	 * @param object $builder Builder instance.
+	 * @param string $method  Builder method name.
+	 * @param mixed  ...$args Method arguments.
+	 * @return object Builder instance.
+	 */
+	private static function callBuilderMethod( object $builder, string $method, ...$args ): object {
+		$callback = array( $builder, $method );
+		if ( ! is_callable( $callback ) ) {
+			return $builder;
+		}
+
+		$result = call_user_func( $callback, ...$args );
+		return is_object( $result ) ? $result : $builder;
 	}
 
 	/**
