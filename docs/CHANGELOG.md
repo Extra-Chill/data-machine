@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.102.7] - 2026-04-30
+
+### Fixed
+- preserve explicit AI failure statuses
+
 ## [0.102.6] - 2026-04-30
 
 ### Changed
