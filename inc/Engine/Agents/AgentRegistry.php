@@ -72,7 +72,12 @@ class AgentRegistry {
 	 * @return void
 	 */
 	public static function register( string $slug, array $args = array() ): void {
-		\WP_Agents_Registry::register( $slug, $args );
+		$registry = \WP_Agents_Registry::get_instance();
+		if ( null === $registry ) {
+			return;
+		}
+
+		$registry->register( $slug, $args );
 	}
 
 	/**
@@ -88,7 +93,15 @@ class AgentRegistry {
 	 */
 	public static function get_all(): array {
 		self::ensure_legacy_fired();
-		return \WP_Agents_Registry::get_all();
+		$registry = \WP_Agents_Registry::get_instance();
+		if ( null === $registry ) {
+			return array();
+		}
+
+		return array_map(
+			static fn( \WP_Agent $agent ): array => $agent->to_array(),
+			$registry->get_all_registered()
+		);
 	}
 
 	/**
@@ -101,7 +114,17 @@ class AgentRegistry {
 	 */
 	public static function get( string $slug ): ?array {
 		self::ensure_legacy_fired();
-		return \WP_Agents_Registry::get( $slug );
+		$registry = \WP_Agents_Registry::get_instance();
+		if ( null === $registry ) {
+			return null;
+		}
+
+		if ( ! $registry->is_registered( $slug ) ) {
+			return null;
+		}
+
+		$agent = $registry->get_registered( $slug );
+		return $agent instanceof \WP_Agent ? $agent->to_array() : null;
 	}
 
 	/**
@@ -137,7 +160,7 @@ class AgentRegistry {
 	 * @return void
 	 */
 	private static function ensure_legacy_fired(): void {
-		\WP_Agents_Registry::get_all();
+		\WP_Agents_Registry::get_instance();
 
 		if ( self::$legacy_registration_fired ) {
 			return;

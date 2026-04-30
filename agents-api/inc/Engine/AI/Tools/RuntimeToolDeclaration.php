@@ -3,7 +3,7 @@
  * Runtime tool declaration validator.
  *
  * Runtime tools are declared by a client or transport for one agent run and
- * are executed outside Data Machine. This class only validates the declaration
+ * are executed by the client. This class only validates the declaration
  * shape; it intentionally does not register, expose, or execute those tools.
  *
  * @package AgentsAPI

@@ -2,8 +2,7 @@
 /**
  * Agents API bootstrap.
  *
- * In-repo WordPress-shaped agent substrate bundled by Data Machine while the
- * extraction boundary is still being proven in place.
+ * WordPress-shaped agent substrate.
  *
  * @package AgentsAPI
  */

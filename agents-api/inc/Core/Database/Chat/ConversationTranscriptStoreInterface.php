@@ -8,9 +8,6 @@
  * to a transcript row. It deliberately does not include chat UI listing,
  * read-state, retention scheduling, or reporting/metrics responsibilities.
  *
- * Data Machine's chat product consumes this neutral contract through its
- * aggregate store and factory adapters.
- *
  * @package AgentsAPI
  */
 

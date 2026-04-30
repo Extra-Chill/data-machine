@@ -9,12 +9,9 @@ defined( 'ABSPATH' ) || exit;
 
 if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 	/**
-	 * WordPress-shaped declarative agent registry.
-	 *
-	 * The registry collects definitions only. Data Machine consumes these
-	 * definitions later when it materializes rows/access/scaffolding.
+	 * Manages the registration and lookup of agents.
 	 */
-	class WP_Agents_Registry {
+	final class WP_Agents_Registry {
 
 		/**
 		 * Singleton instance.
@@ -31,38 +28,22 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 		private array $registered_agents = array();
 
 		/**
-		 * Whether the public registration action has fired.
-		 *
-		 * @var bool
-		 */
-		private static bool $registration_fired = false;
-
-		/**
-		 * Register an agent definition.
-		 *
-		 * @param string|WP_Agent $agent Agent slug or definition object.
-		 * @param array           $args  Registration arguments when `$agent` is a slug.
-		 * @return WP_Agent|null Registered agent, or null on invalid arguments.
-		 */
-		public static function register( $agent, array $args = array() ): ?WP_Agent {
-			return self::get_instance()->register_agent( $agent, $args );
-		}
-
-		/**
 		 * Register an agent definition on this registry instance.
 		 *
-		 * Duplicate slugs intentionally remain last-wins while the registry is
-		 * in-repo: Data Machine uses hook priority for fresh-install overrides.
-		 *
 		 * @param string|WP_Agent $agent Agent slug or definition object.
 		 * @param array           $args  Registration arguments when `$agent` is a slug.
 		 * @return WP_Agent|null Registered agent, or null on invalid arguments.
 		 */
-		public function register_agent( $agent, array $args = array() ): ?WP_Agent {
+		public function register( $agent, array $args = array() ): ?WP_Agent {
 			try {
 				$agent = $agent instanceof WP_Agent ? $agent : new WP_Agent( (string) $agent, $args );
 			} catch ( InvalidArgumentException $e ) {
 				$this->notice_invalid_registration( __METHOD__, $e->getMessage() );
+				return null;
+			}
+
+			if ( $this->is_registered( $agent->get_slug() ) ) {
+				$this->notice_invalid_registration( __METHOD__, sprintf( 'Agent "%s" is already registered.', $agent->get_slug() ) );
 				return null;
 			}
 
@@ -71,39 +52,12 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 		}
 
 		/**
-		 * Get all registered agent definitions.
-		 *
-		 * @return array<string, array>
-		 */
-		public static function get_all(): array {
-			self::ensure_fired();
-			return array_map(
-				static fn( WP_Agent $agent ): array => $agent->to_array(),
-				self::get_instance()->registered_agents
-			);
-		}
-
-		/**
 		 * Get all registered agent objects.
 		 *
 		 * @return array<string, WP_Agent>
 		 */
-		public static function get_all_registered(): array {
-			self::ensure_fired();
-			return self::get_instance()->registered_agents;
-		}
-
-		/**
-		 * Get a single registered agent definition by slug.
-		 *
-		 * @param string $slug Agent slug.
-		 * @return array|null Definition, or null if not registered.
-		 */
-		public static function get( string $slug ): ?array {
-			self::ensure_fired();
-			$slug  = sanitize_title( $slug );
-			$agent = self::get_instance()->registered_agents[ $slug ] ?? null;
-			return $agent instanceof WP_Agent ? $agent->to_array() : null;
+		public function get_all_registered(): array {
+			return $this->registered_agents;
 		}
 
 		/**
@@ -112,10 +66,14 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 		 * @param string $slug Agent slug.
 		 * @return WP_Agent|null Agent object, or null when not registered.
 		 */
-		public static function get_registered( string $slug ): ?WP_Agent {
-			self::ensure_fired();
+		public function get_registered( string $slug ): ?WP_Agent {
 			$slug = sanitize_title( $slug );
-			return self::get_instance()->registered_agents[ $slug ] ?? null;
+			if ( ! $this->is_registered( $slug ) ) {
+				$this->notice_invalid_registration( __METHOD__, sprintf( 'Agent "%s" not found.', $slug ) );
+				return null;
+			}
+
+			return $this->registered_agents[ $slug ];
 		}
 
 		/**
@@ -124,20 +82,9 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 		 * @param string $slug Agent slug.
 		 * @return bool
 		 */
-		public static function has( string $slug ): bool {
-			self::ensure_fired();
+		public function is_registered( string $slug ): bool {
 			$slug = sanitize_title( $slug );
-			return isset( self::get_instance()->registered_agents[ $slug ] );
-		}
-
-		/**
-		 * Check whether an agent is registered.
-		 *
-		 * @param string $slug Agent slug.
-		 * @return bool
-		 */
-		public static function is_registered( string $slug ): bool {
-			return self::has( $slug );
+			return isset( $this->registered_agents[ $slug ] );
 		}
 
 		/**
@@ -146,16 +93,15 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 		 * @param string $slug Agent slug.
 		 * @return WP_Agent|null Removed agent, or null when not registered.
 		 */
-		public static function unregister( string $slug ): ?WP_Agent {
-			self::ensure_fired();
+		public function unregister( string $slug ): ?WP_Agent {
 			$slug = sanitize_title( $slug );
-			if ( ! isset( self::get_instance()->registered_agents[ $slug ] ) ) {
-				self::get_instance()->notice_invalid_registration( __METHOD__, sprintf( 'Agent "%s" not found.', $slug ) );
+			if ( ! $this->is_registered( $slug ) ) {
+				$this->notice_invalid_registration( __METHOD__, sprintf( 'Agent "%s" not found.', $slug ) );
 				return null;
 			}
 
-			$agent = self::get_instance()->registered_agents[ $slug ];
-			unset( self::get_instance()->registered_agents[ $slug ] );
+			$agent = $this->registered_agents[ $slug ];
+			unset( $this->registered_agents[ $slug ] );
 
 			return $agent;
 		}
@@ -163,36 +109,32 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 		/**
 		 * Retrieve the registry singleton.
 		 *
-		 * @return self
+		 * @return self|null Registry instance, or null when init has not fired.
 		 */
-		public static function get_instance(): self {
+		public static function get_instance(): ?self {
+			if ( function_exists( 'did_action' ) && ! did_action( 'init' ) ) {
+				_doing_it_wrong(
+					__METHOD__,
+					'Agents API should not be initialized before the <code>init</code> action has fired.',
+					'0.102.8'
+				);
+				return null;
+			}
+
 			if ( null === self::$instance ) {
 				self::$instance = new self();
+
+				/**
+				 * Fires to let plugins register agents.
+				 *
+				 * Callbacks should call `wp_register_agent()` to contribute one or more
+				 * agent definitions. The registry only collects definitions; consumers
+				 * decide whether and how to materialize them.
+				 */
+				do_action( 'wp_agents_api_init', self::$instance );
 			}
 
 			return self::$instance;
-		}
-
-		/**
-		 * Ensure the public registration action has fired.
-		 *
-		 * @return void
-		 */
-		private static function ensure_fired(): void {
-			if ( self::$registration_fired ) {
-				return;
-			}
-
-			self::$registration_fired = true;
-
-			/**
-			 * Fires to let plugins register agents.
-			 *
-			 * Callbacks should call `wp_register_agent()` to contribute one or more
-			 * agent definitions. The registry only collects definitions; consumers
-			 * decide whether and how to materialize them.
-			 */
-			do_action( 'wp_agents_api_init' );
 		}
 
 		/**
@@ -202,8 +144,25 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 		 * @return void
 		 */
 		public static function reset_for_tests(): void {
-			self::$instance           = new self();
-			self::$registration_fired = false;
+			self::$instance = null;
+		}
+
+		/**
+		 * Wakeup magic method.
+		 *
+		 * @throws LogicException If the registry object is unserialized.
+		 */
+		public function __wakeup(): void {
+			throw new LogicException( __CLASS__ . ' should never be unserialized.' );
+		}
+
+		/**
+		 * Sleep magic method.
+		 *
+		 * @throws LogicException If the registry object is serialized.
+		 */
+		public function __sleep(): array {
+			throw new LogicException( __CLASS__ . ' should never be serialized.' );
 		}
 
 		/**
