@@ -62,7 +62,7 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 			try {
 				$agent = $agent instanceof WP_Agent ? $agent : new WP_Agent( (string) $agent, $args );
 			} catch ( InvalidArgumentException $e ) {
-				$this->doing_it_wrong( __METHOD__, $e->getMessage() );
+				$this->notice_invalid_registration( __METHOD__, $e->getMessage() );
 				return null;
 			}
 
@@ -150,7 +150,7 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 			self::ensure_fired();
 			$slug = sanitize_title( $slug );
 			if ( ! isset( self::get_instance()->registered_agents[ $slug ] ) ) {
-				self::get_instance()->doing_it_wrong( __METHOD__, sprintf( 'Agent "%s" not found.', $slug ) );
+				self::get_instance()->notice_invalid_registration( __METHOD__, sprintf( 'Agent "%s" not found.', $slug ) );
 				return null;
 			}
 
@@ -213,7 +213,7 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 		 * @param string $message       Notice message.
 		 * @return void
 		 */
-		private function doing_it_wrong( string $function_name, string $message ): void {
+		private function notice_invalid_registration( string $function_name, string $message ): void {
 			if ( function_exists( '_doing_it_wrong' ) ) {
 				$function_name = function_exists( 'esc_html' ) ? esc_html( $function_name ) : $function_name;
 				$message       = function_exists( 'esc_html' ) ? esc_html( $message ) : $message;

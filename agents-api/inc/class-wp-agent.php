@@ -81,7 +81,7 @@ if ( ! class_exists( 'WP_Agent' ) ) {
 			$properties = $this->prepare_properties( $args );
 			foreach ( $properties as $property_name => $property_value ) {
 				if ( ! property_exists( $this, $property_name ) ) {
-					$this->doing_it_wrong( __METHOD__, sprintf( 'Property "%s" is not a valid property for agent "%s".', $property_name, $this->slug ) );
+					$this->notice_invalid_property( __METHOD__, sprintf( 'Property "%s" is not a valid property for agent "%s".', $property_name, $this->slug ) );
 					continue;
 				}
 
@@ -254,7 +254,7 @@ if ( ! class_exists( 'WP_Agent' ) ) {
 		 * @param string $message       Notice message.
 		 * @return void
 		 */
-		private function doing_it_wrong( string $function_name, string $message ): void {
+		private function notice_invalid_property( string $function_name, string $message ): void {
 			if ( function_exists( '_doing_it_wrong' ) ) {
 				$function_name = function_exists( 'esc_html' ) ? esc_html( $function_name ) : $function_name;
 				$message       = function_exists( 'esc_html' ) ? esc_html( $message ) : $message;
