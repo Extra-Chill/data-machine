@@ -43,6 +43,9 @@ if ( ! class_exists( 'ActionScheduler' ) ) {
 
 
 function datamachine_run_datamachine_plugin() {
+	if ( ! datamachine_should_load_full_runtime() ) {
+		return;
+	}
 
 	// Set Action Scheduler timeout to 10 minutes (600 seconds) for large tasks
 	add_filter(
@@ -318,6 +321,38 @@ function datamachine_run_datamachine_plugin() {
 			$index->delete( (int) $post_id );
 		}
 	);
+}
+
+/**
+ * Determine whether the full Data Machine runtime is needed for this request.
+ *
+ * Normal frontend page views do not need the agent, REST, tool, queue, or admin
+ * runtime. Keeping that machinery out of the hot path protects theme rendering
+ * while preserving every interactive/background entry point.
+ *
+ * @return bool True when full runtime registration should run.
+ */
+function datamachine_should_load_full_runtime(): bool {
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		return true;
+	}
+
+	if ( is_admin() || wp_doing_ajax() || wp_doing_cron() ) {
+		return true;
+	}
+
+	$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) $_SERVER['REQUEST_URI'] : '';
+	$path        = (string) wp_parse_url( $request_uri, PHP_URL_PATH );
+
+	if ( str_starts_with( $path, '/wp-json/' ) || str_starts_with( $path, '/datamachine-auth/' ) ) {
+		return true;
+	}
+
+	if ( isset( $_GET['rest_route'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Request-shape detection only.
+		return true;
+	}
+
+	return (bool) apply_filters( 'datamachine_should_load_full_runtime', false, $request_uri );
 }
 
 
