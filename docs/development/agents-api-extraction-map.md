@@ -281,7 +281,7 @@ Automattic/intelligence#285.
 | `datamachine_pre_ai_step_check` | Data Machine adapter | Pipeline AI-step skip hook. |
 | `datamachine_log` | Data Machine product | Product logging surface. Generic runtime events should use loop event sinks. |
 | `chubes_ai_request` | Legacy provider bridge to delete | Legacy `ai-http-client` provider-dispatch filter. Do not carry this into Agents API public vocabulary or architecture; removal belongs to #1027 / #1633. |
-| `wp_ai_client` feature detection through `WpAiClientAdapter` | Agents API implementation candidate | WordPress AI client routing is the target provider direction, normalized behind Agents API contracts. |
+| `WpAiClientCapability::unavailableReason()` | Agents API implementation candidate | Single wp-ai-client runtime capability gate. Missing support is surfaced as a request error; no `ai-http-client` fallback belongs in Agents API. |
 
 ## Test Coverage Map
 
@@ -307,6 +307,7 @@ These tests currently pin the substrate most relevant to extraction.
 | `tests/agent-call-migration-smoke.php` | Agent-call migration. | Agent-call primitive may inform Agents API; migration stays Data Machine. |
 | `tests/agent-bundle-*.php` | Bundle format, artifact store, upgrade planner, portable update. | Split pure manifest/auth/template artifacts from flow/pipeline file adapters. |
 | `tests/ai-request-inspector-smoke.php` | Provider request assembly without dispatch plus Data Machine request inspection surface. | Split generic `ProviderRequestAssembler` assertions from Data Machine `RequestBuilder` directive-policy assertions during extraction. |
+| `tests/wp-ai-client-runtime-gate-smoke.php` | wp-ai-client capability gate and no `chubes_ai_request` runtime fallback. | Move with provider runtime boundary if Agents API owns provider dispatch. |
 
 ## First Seams To Make Boring
 

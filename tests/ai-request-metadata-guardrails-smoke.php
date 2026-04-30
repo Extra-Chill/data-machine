@@ -168,6 +168,8 @@ function reset_smoke_state(): void {
 }
 
 function build_smoke_request(): array {
+	$GLOBALS['datamachine_test_legacy_request_dispatches'] = 0;
+
 	add_filter(
 		'datamachine_directives',
 		function ( array $directives ): array {
@@ -183,6 +185,7 @@ function build_smoke_request(): array {
 	add_filter(
 		'chubes_ai_request',
 		function ( array $request ) {
+			++$GLOBALS['datamachine_test_legacy_request_dispatches'];
 			$GLOBALS['datamachine_test_dispatched_request'] = $request;
 			return array(
 				'success' => true,
@@ -220,6 +223,8 @@ $response = build_smoke_request();
 assert_true( count( smoke_logs() ) > 0, 'oversized request emits a pre-dispatch warning' );
 assert_true( isset( $response['request_metadata']['request_json_bytes'] ), 'response carries request metadata' );
 assert_true( 'RULES.md' === ( $response['request_metadata']['memory_files'][0]['filename'] ?? '' ), 'memory file metadata is compactly captured' );
+assert_true( 0 === ( $GLOBALS['datamachine_test_legacy_request_dispatches'] ?? 0 ), 'request dispatch does not fall back to chubes_ai_request' );
+assert_true( false === ( $response['success'] ?? true ), 'missing wp-ai-client returns a structured request error' );
 
 // 2. Large thresholds keep normal requests quiet.
 reset_smoke_state();
