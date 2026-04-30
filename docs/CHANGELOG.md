@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.102.3] - 2026-04-29
+
+### Changed
+- create agents api module boundary
+
+### Fixed
+- refresh BFB to 0.6.6
+
 ## [0.102.2] - 2026-04-29
 
 ### Fixed
