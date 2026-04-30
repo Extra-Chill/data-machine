@@ -275,6 +275,56 @@ class ExecutionContext {
 	}
 
 	/**
+	 * Check if an item has an active in-flight claim.
+	 *
+	 * Active claims are separate from final processed rows and intentionally do
+	 * not run through `datamachine_should_reprocess_item`; a claimed item is
+	 * already being worked by another job and should not be scheduled again.
+	 *
+	 * @param string $item_identifier Item identifier.
+	 * @return bool True if actively claimed.
+	 */
+	public function isItemClaimed( string $item_identifier ): bool {
+		if ( $this->isDirect() || $this->isStandalone() || ! $this->flow_step_id ) {
+			return false;
+		}
+
+		$db_processed_items = new ProcessedItems();
+		return $db_processed_items->has_active_claim(
+			$this->flow_step_id,
+			$this->handler_type,
+			$item_identifier
+		);
+	}
+
+	/**
+	 * Atomically claim an item for this job's in-flight processing.
+	 *
+	 * In direct/standalone modes there is no persisted dedupe surface, so claims
+	 * are treated as successful no-ops.
+	 *
+	 * @param string $item_identifier Item identifier.
+	 * @return bool True when the item may be scheduled.
+	 */
+	public function claimItemForProcessing( string $item_identifier ): bool {
+		if ( $this->isDirect() || $this->isStandalone() || ! $this->flow_step_id ) {
+			return true;
+		}
+
+		if ( empty( $this->job_id ) ) {
+			return false;
+		}
+
+		$db_processed_items = new ProcessedItems();
+		return $db_processed_items->claim_item(
+			$this->flow_step_id,
+			$this->handler_type,
+			$item_identifier,
+			(int) $this->job_id
+		);
+	}
+
+	/**
 	 * Mark an item as processed.
 	 *
 	 * In direct mode, does nothing (no deduplication tracking).

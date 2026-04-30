@@ -15,6 +15,7 @@
 namespace DataMachine\Abilities\Engine;
 
 use DataMachine\Abilities\StepTypeAbilities;
+use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileRetrieval;
@@ -378,6 +379,8 @@ class ExecuteStepAbility {
 			// Failed overrides should NOT mark items as processed.
 			if ( str_starts_with( $status_override, JobStatus::FAILED ) === false ) {
 				$this->markCompletedItemProcessed( $job_id );
+			} else {
+				$this->releaseInFlightItemClaim( $job_id );
 			}
 			$this->db_jobs->complete_job( $job_id, $status_override );
 
@@ -734,6 +737,43 @@ class ExecuteStepAbility {
 				'fetch_flow_step_id' => $fetch_flow_step_id,
 			)
 		);
+	}
+
+	/**
+	 * Release this job's in-flight source claim after a failed status override.
+	 *
+	 * Most failures flow through datamachine_fail_job, whose handler releases
+	 * claims centrally. Failed status overrides complete the job directly, so
+	 * they need the same release here.
+	 *
+	 * @param int $job_id Failed job ID.
+	 */
+	private function releaseInFlightItemClaim( int $job_id ): void {
+		$engine_data = datamachine_get_engine_data( $job_id );
+
+		$item_identifier = $engine_data['item_identifier'] ?? null;
+		$source_type     = $engine_data['source_type'] ?? null;
+
+		if ( empty( $item_identifier ) || empty( $source_type ) ) {
+			return;
+		}
+
+		$fetch_flow_step_id = null;
+		$flow_config        = $engine_data['flow_config'] ?? array();
+
+		foreach ( $flow_config as $step_id => $config ) {
+			$step_type = $config['step_type'] ?? '';
+			if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) ) {
+				$fetch_flow_step_id = $step_id;
+				break;
+			}
+		}
+
+		if ( empty( $fetch_flow_step_id ) ) {
+			return;
+		}
+
+		( new ProcessedItems() )->release_claim( $fetch_flow_step_id, (string) $source_type, (string) $item_identifier );
 	}
 
 	/**

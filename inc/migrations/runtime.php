@@ -135,6 +135,9 @@ function datamachine_run_schema_migrations(): void {
 
 	// Ensure installed bundle artifact tracking table exists on upgraded installs (#1531).
 	datamachine_migrate_bundle_artifacts_table();
+
+	// Add in-flight source-item claim state to processed_items (#1682).
+	datamachine_migrate_processed_item_claims();
 }
 
 /**

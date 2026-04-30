@@ -20,7 +20,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class ProcessedItems extends BaseRepository {
 
-	const TABLE_NAME = 'datamachine_processed_items';
+	const TABLE_NAME                = 'datamachine_processed_items';
+	const STATUS_CLAIMED            = 'claimed';
+	const STATUS_PROCESSED          = 'processed';
+	const DEFAULT_CLAIM_TTL_SECONDS = 3600;
 
 
 	/**
@@ -33,7 +36,39 @@ class ProcessedItems extends BaseRepository {
 	 */
 	public function has_item_been_processed( string $flow_step_id, string $source_type, string $item_identifier ): bool {
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$count = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s', $this->table_name, $flow_step_id, $source_type, $item_identifier ) );
+		$count = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND status = %s', $this->table_name, $flow_step_id, $source_type, $item_identifier, self::STATUS_PROCESSED ) );
+
+		return $count > 0;
+	}
+
+	/**
+	 * Checks if a source item is actively claimed by an in-flight job.
+	 *
+	 * Expired claims are ignored and cleaned before checking.
+	 *
+	 * @param string $flow_step_id    Flow step ID.
+	 * @param string $source_type     Source type.
+	 * @param string $item_identifier Unique item identifier.
+	 * @return bool True when an active claim exists.
+	 */
+	public function has_active_claim( string $flow_step_id, string $source_type, string $item_identifier ): bool {
+		$this->delete_expired_claims();
+
+		$now = current_time( 'mysql', true );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with %i table placeholder.
+		$count = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT COUNT(*) FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND status = %s AND (claim_expires_at IS NULL OR claim_expires_at > %s)',
+				$this->table_name,
+				$flow_step_id,
+				$source_type,
+				$item_identifier,
+				self::STATUS_CLAIMED,
+				$now
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return $count > 0;
 	}
@@ -49,7 +84,7 @@ class ProcessedItems extends BaseRepository {
 	 */
 	public function has_processed_items( string $flow_step_id ): bool {
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$count = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE flow_step_id = %s LIMIT 1', $this->table_name, $flow_step_id ) );
+		$count = $this->wpdb->get_var( $this->wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE flow_step_id = %s AND status = %s LIMIT 1', $this->table_name, $flow_step_id, self::STATUS_PROCESSED ) );
 
 		return $count > 0;
 	}
@@ -72,11 +107,12 @@ class ProcessedItems extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$value = $this->wpdb->get_var(
 			$this->wpdb->prepare(
-				'SELECT UNIX_TIMESTAMP(processed_timestamp) FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s',
+				'SELECT UNIX_TIMESTAMP(processed_timestamp) FROM %i WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND status = %s',
 				$this->table_name,
 				$flow_step_id,
 				$source_type,
-				$item_identifier
+				$item_identifier,
+				self::STATUS_PROCESSED
 			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -148,18 +184,21 @@ class ProcessedItems extends BaseRepository {
 		$placeholders = implode( ',', array_fill( 0, count( $candidates ), '%s' ) );
 
 		$sql = sprintf(
-			'SELECT item_identifier FROM %%i WHERE flow_step_id = %%s AND source_type = %%s AND processed_timestamp < %%s AND item_identifier IN (%s) ORDER BY processed_timestamp ASC LIMIT %%d',
+			'SELECT item_identifier FROM %%i WHERE flow_step_id = %%s AND source_type = %%s AND status = %%s AND processed_timestamp < %%s AND item_identifier IN (%s) ORDER BY processed_timestamp ASC LIMIT %%d',
 			$placeholders
 		);
+		/** @var literal-string $sql */
 
 		$prepare_args = array_merge(
-			array( $this->table_name, $flow_step_id, $source_type, $cutoff_datetime ),
+			array( $this->table_name, $flow_step_id, $source_type, self::STATUS_PROCESSED, $cutoff_datetime ),
 			$candidates,
 			array( $limit )
 		);
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Dynamic IN() placeholder list.
 		$rows = $this->wpdb->get_col( $this->wpdb->prepare( $sql, ...$prepare_args ) );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return array_map( 'strval', (array) $rows );
 	}
@@ -199,17 +238,20 @@ class ProcessedItems extends BaseRepository {
 		$placeholders = implode( ',', array_fill( 0, count( $candidates ), '%s' ) );
 
 		$sql = sprintf(
-			'SELECT item_identifier FROM %%i WHERE flow_step_id = %%s AND source_type = %%s AND item_identifier IN (%s)',
+			'SELECT item_identifier FROM %%i WHERE flow_step_id = %%s AND source_type = %%s AND status = %%s AND item_identifier IN (%s)',
 			$placeholders
 		);
+		/** @var literal-string $sql */
 
 		$prepare_args = array_merge(
-			array( $this->table_name, $flow_step_id, $source_type ),
+			array( $this->table_name, $flow_step_id, $source_type, self::STATUS_PROCESSED ),
 			$candidates
 		);
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Dynamic IN() placeholder list.
 		$existing = $this->wpdb->get_col( $this->wpdb->prepare( $sql, ...$prepare_args ) );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 		$existing = array_flip( array_map( 'strval', (array) $existing ) );
 
 		$result = array();
@@ -236,10 +278,28 @@ class ProcessedItems extends BaseRepository {
 	 * @return bool True on successful insertion, false otherwise.
 	 */
 	public function add_processed_item( string $flow_step_id, string $source_type, string $item_identifier, int $job_id ): bool {
+		$now = current_time( 'mysql', true );
 
-		// Check if it exists first to avoid unnecessary insert attempts and duplicate key errors
-		if ( $this->has_item_been_processed( $flow_step_id, $source_type, $item_identifier ) ) {
-			// Item already processed - return true to indicate success (idempotent behavior)
+		// Convert an existing in-flight claim to final processed state, or refresh
+		// an existing processed row idempotently. The unique key guarantees one row
+		// per source item, so this is safe across child-job races.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with %i table placeholder.
+		$updated = $this->wpdb->query(
+			$this->wpdb->prepare(
+				'UPDATE %i SET job_id = %d, status = %s, processed_timestamp = %s, claim_expires_at = NULL WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s',
+				$this->table_name,
+				$job_id,
+				self::STATUS_PROCESSED,
+				$now,
+				$flow_step_id,
+				$source_type,
+				$item_identifier
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+		if ( false !== $updated && $updated > 0 ) {
 			return true;
 		}
 
@@ -251,13 +311,15 @@ class ProcessedItems extends BaseRepository {
 				'source_type'     => $source_type,
 				'item_identifier' => $item_identifier,
 				'job_id'          => $job_id,
-				// processed_timestamp defaults to NOW()
+				'status'          => self::STATUS_PROCESSED,
+				// processed_timestamp defaults to NOW().
 			),
 			array(
 				'%s', // flow_step_id
 				'%s', // source_type
 				'%s', // item_identifier
 				'%d', // job_id
+				'%s', // status
 			)
 		);
 
@@ -287,6 +349,129 @@ class ProcessedItems extends BaseRepository {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Atomically claim a source item for in-flight processing.
+	 *
+	 * @param string $flow_step_id     Flow step ID.
+	 * @param string $source_type      Source type.
+	 * @param string $item_identifier  Unique item identifier.
+	 * @param int    $job_id           Job creating the claim.
+	 * @param int    $ttl_seconds      Claim TTL in seconds.
+	 * @return bool True when this caller owns the claim; false when already processed or actively claimed.
+	 */
+	public function claim_item( string $flow_step_id, string $source_type, string $item_identifier, int $job_id, int $ttl_seconds = self::DEFAULT_CLAIM_TTL_SECONDS ): bool {
+		if ( $ttl_seconds < 1 ) {
+			$ttl_seconds = self::DEFAULT_CLAIM_TTL_SECONDS;
+		}
+
+		$this->delete_expired_claims();
+
+		$expires_at = gmdate( 'Y-m-d H:i:s', time() + $ttl_seconds );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $this->wpdb->insert(
+			$this->table_name,
+			array(
+				'flow_step_id'     => $flow_step_id,
+				'source_type'      => $source_type,
+				'item_identifier'  => $item_identifier,
+				'job_id'           => $job_id,
+				'status'           => self::STATUS_CLAIMED,
+				'claim_expires_at' => $expires_at,
+			),
+			array( '%s', '%s', '%s', '%d', '%s', '%s' )
+		);
+
+		if ( false !== $result ) {
+			return true;
+		}
+
+		// If the reprocess filter let a completed row through, atomically convert
+		// that processed row into a claim. Active claims remain untouched, so a
+		// parallel fetch still loses the race.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with %i table placeholder.
+		$claimed_existing_processed = $this->wpdb->query(
+			$this->wpdb->prepare(
+				'UPDATE %i SET job_id = %d, status = %s, claim_expires_at = %s WHERE flow_step_id = %s AND source_type = %s AND item_identifier = %s AND status = %s',
+				$this->table_name,
+				$job_id,
+				self::STATUS_CLAIMED,
+				$expires_at,
+				$flow_step_id,
+				$source_type,
+				$item_identifier,
+				self::STATUS_PROCESSED
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+		return false !== $claimed_existing_processed && $claimed_existing_processed > 0;
+	}
+
+	/**
+	 * Release an in-flight claim so failed downstream work can retry later.
+	 *
+	 * @param string $flow_step_id    Flow step ID.
+	 * @param string $source_type     Source type.
+	 * @param string $item_identifier Unique item identifier.
+	 * @return int|false Number of rows released, or false on error.
+	 */
+	public function release_claim( string $flow_step_id, string $source_type, string $item_identifier ): int|false {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $this->wpdb->delete(
+			$this->table_name,
+			array(
+				'flow_step_id'    => $flow_step_id,
+				'source_type'     => $source_type,
+				'item_identifier' => $item_identifier,
+				'status'          => self::STATUS_CLAIMED,
+			),
+			array( '%s', '%s', '%s', '%s' )
+		);
+	}
+
+	/**
+	 * Release all in-flight claims owned by a job.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return int|false Number of rows released, or false on error.
+	 */
+	public function release_claims_for_job( int $job_id ): int|false {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $this->wpdb->delete(
+			$this->table_name,
+			array(
+				'job_id' => $job_id,
+				'status' => self::STATUS_CLAIMED,
+			),
+			array( '%d', '%s' )
+		);
+	}
+
+	/**
+	 * Delete expired in-flight claims.
+	 *
+	 * @return int|false Number of rows deleted, or false on error.
+	 */
+	public function delete_expired_claims(): int|false {
+		$now = current_time( 'mysql', true );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Prepared with %i table placeholder.
+		$result = $this->wpdb->query(
+			$this->wpdb->prepare(
+				'DELETE FROM %i WHERE status = %s AND claim_expires_at IS NOT NULL AND claim_expires_at <= %s',
+				$this->table_name,
+				self::STATUS_CLAIMED,
+				$now
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+		return false === $result ? false : (int) $result;
 	}
 
 	/**
@@ -397,7 +582,7 @@ class ProcessedItems extends BaseRepository {
 			)
 		);
 
-		return $result;
+		return false === $result ? false : (int) $result;
 	}
 
 	/**
@@ -423,12 +608,14 @@ class ProcessedItems extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$result = $this->wpdb->query(
 			$this->wpdb->prepare(
-				'DELETE FROM %i WHERE processed_timestamp < %s',
+				'DELETE FROM %i WHERE status = %s AND processed_timestamp < %s',
 				$this->table_name,
+				self::STATUS_PROCESSED,
 				$cutoff_datetime
 			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL
+		$result = false === $result ? false : (int) $result;
 
 		do_action(
 			'datamachine_log',
@@ -464,8 +651,9 @@ class ProcessedItems extends BaseRepository {
 		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		$count = $this->wpdb->get_var(
 			$this->wpdb->prepare(
-				'SELECT COUNT(*) FROM %i WHERE processed_timestamp < %s',
+				'SELECT COUNT(*) FROM %i WHERE status = %s AND processed_timestamp < %s',
 				$this->table_name,
+				self::STATUS_PROCESSED,
 				$cutoff_datetime
 			)
 		);
@@ -488,12 +676,15 @@ class ProcessedItems extends BaseRepository {
             source_type VARCHAR(50) NOT NULL,
             item_identifier VARCHAR(255) NOT NULL,
             job_id BIGINT(20) UNSIGNED NOT NULL,
+			status VARCHAR(20) NOT NULL DEFAULT 'processed',
+			claim_expires_at DATETIME NULL,
             processed_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
             PRIMARY KEY  (id),
             UNIQUE KEY `flow_source_item` (flow_step_id, source_type, item_identifier(191)),
             KEY `flow_step_id` (flow_step_id),
             KEY `source_type` (source_type),
             KEY `job_id` (job_id),
+			KEY `status_claim_expires` (status, claim_expires_at),
             KEY `flow_source_ts` (flow_step_id, source_type, processed_timestamp)
         ) $charset_collate;";
 
@@ -505,6 +696,7 @@ class ProcessedItems extends BaseRepository {
 
 		// dbDelta is also unreliable at adding regular indexes to existing tables.
 		self::ensure_flow_source_ts_index( $this->table_name );
+		self::ensure_claim_columns( $this->table_name );
 
 		// Log table creation
 		do_action(
@@ -617,5 +809,35 @@ class ProcessedItems extends BaseRepository {
 			'Added composite index flow_source_ts to processed_items table',
 			array( 'table_name' => $table_name )
 		);
+	}
+
+	/**
+	 * Ensure in-flight claim columns and index exist on upgraded installs.
+	 *
+	 * @param string $table_name Full table name.
+	 */
+	public static function ensure_claim_columns( string $table_name ): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$status_column = $wpdb->get_var( "SHOW COLUMNS FROM {$table_name} LIKE 'status'" );
+		if ( ! $status_column ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'processed'" );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$claim_column = $wpdb->get_var( "SHOW COLUMNS FROM {$table_name} LIKE 'claim_expires_at'" );
+		if ( ! $claim_column ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN claim_expires_at DATETIME NULL" );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$index = $wpdb->get_row( "SHOW INDEX FROM {$table_name} WHERE Key_name = 'status_claim_expires'" );
+		if ( ! $index ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->query( "ALTER TABLE {$table_name} ADD KEY `status_claim_expires` (status, claim_expires_at)" );
+		}
 	}
 }
