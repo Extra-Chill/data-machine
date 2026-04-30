@@ -266,6 +266,10 @@ class UpsertPostAbility {
 	/**
 	 * Execute the upsert.
 	 *
+	 * Raw ability/API callers that omit content_format keep the legacy blocks
+	 * default. AI/chat/tool paths should route through handleChatToolCall() or pass
+	 * content_format explicitly when supplying markdown or HTML source content.
+	 *
 	 * @param array $input Input parameters.
 	 * @return array Result with action: created|updated|no_change.
 	 */
