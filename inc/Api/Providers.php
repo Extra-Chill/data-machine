@@ -12,6 +12,7 @@
 namespace DataMachine\Api;
 
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\WpAiClientProviderAdmin;
 use WP_REST_Server;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -60,25 +61,7 @@ class Providers {
 	 */
 	public static function handle_get_providers() {
 		try {
-			// Use AI HTTP Client library's filters directly
-			$library_providers = apply_filters( 'chubes_ai_providers', array() );
-
-			// Get all API keys for model fetching
-			$all_api_keys = apply_filters( 'chubes_ai_provider_api_keys', null );
-
-			$providers = array();
-			foreach ( $library_providers as $key => $provider_info ) {
-				// Get API key for this provider
-				$api_key = $all_api_keys[ $key ] ?? '';
-
-				// Get models for this provider via filter with API key
-				$models = apply_filters( 'chubes_ai_models', $key, array( 'api_key' => $api_key ) );
-
-				$providers[ $key ] = array(
-					'label'  => $provider_info['name'] ?? ucfirst( $key ),
-					'models' => $models,
-				);
-			}
+			$providers = WpAiClientProviderAdmin::getProviders();
 
 			// Get default settings
 			$defaults = array(
@@ -103,7 +86,7 @@ class Providers {
 		} catch ( \Exception $e ) {
 			return new \WP_Error(
 				'providers_api_error',
-				__( 'Failed to communicate with AI HTTP Client library.', 'data-machine' ),
+				__( 'Failed to communicate with wp-ai-client.', 'data-machine' ),
 				array( 'status' => 500 )
 			);
 		}

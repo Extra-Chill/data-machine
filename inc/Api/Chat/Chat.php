@@ -16,6 +16,7 @@ namespace DataMachine\Api\Chat;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\WpAiClientProviderAdmin;
 use WP_REST_Response;
 use WP_REST_Server;
 use WP_REST_Request;
@@ -74,8 +75,7 @@ class Chat {
 							if ( empty( $param ) ) {
 								return true;
 							}
-							$providers = apply_filters( 'chubes_ai_providers', array() );
-							return isset( $providers[ $param ] );
+							return WpAiClientProviderAdmin::isProviderRegistered( (string) $param );
 						},
 						'description'       => __( 'AI provider (optional, uses default if not provided)', 'data-machine' ),
 						'sanitize_callback' => 'sanitize_text_field',
