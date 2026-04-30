@@ -51,10 +51,12 @@ require_once __DIR__ . '/../inc/Engine/AI/RequestBuilder.php';
 
 class Test_Request_Inspector_Directive implements \DataMachine\Engine\AI\Directives\DirectiveInterface {
 	public static function get_outputs( string $_provider_name, array $_tools, ?string $_step_id = null, array $payload = array() ): array {
+		$directive_context = is_array( $payload['directive_context'] ?? null ) ? $payload['directive_context'] : array();
+
 		return array(
 			array(
 				'type'    => 'system_text',
-				'content' => 'Inspect directive for job ' . ( $payload['job_id'] ?? 'none' ),
+				'content' => 'Inspect directive for job ' . ( $directive_context['job_id'] ?? 'none' ),
 			),
 		);
 	}
@@ -170,6 +172,15 @@ $ability = (string) file_get_contents( __DIR__ . '/../inc/Abilities/AI/InspectRe
 assert_test( 'inspect request ability loaded by plugin bootstrap', false !== strpos( $plugin, 'InspectRequestAbility.php' ) );
 assert_test( 'inspect request ability instantiated by plugin bootstrap', false !== strpos( $plugin, 'new \\DataMachine\\Abilities\\AI\\InspectRequestAbility()' ) );
 assert_test( 'ability registers datamachine/inspect-ai-request', false !== strpos( $ability, 'datamachine/inspect-ai-request' ) );
+
+echo "\nCase 4: prompt validation context is adapter-provided\n";
+
+$prompt_builder_source  = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/PromptBuilder.php' );
+$request_builder_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/RequestBuilder.php' );
+
+assert_test( 'PromptBuilder no longer reads job_id directly', false === strpos( $prompt_builder_source, "\$payload['job_id']" ) );
+assert_test( 'PromptBuilder no longer reads flow_step_id directly', false === strpos( $prompt_builder_source, "\$payload['flow_step_id']" ) );
+assert_test( 'RequestBuilder maps legacy identifiers into directive_context', false !== strpos( $request_builder_source, "'directive_context'" ) );
 
 echo "\n$total assertions, $failed failures\n";
 $failed_count = (int) ( $GLOBALS['failed'] ?? $failed );
