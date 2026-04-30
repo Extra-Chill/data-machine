@@ -38,6 +38,8 @@ namespace {
 	require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php';
+	require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineToolAccessPolicy.php';
+	require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/ToolPolicyFilter.php';
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php';
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
@@ -121,10 +123,15 @@ namespace {
 	$resolver_source  = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php' );
 	$mandatory_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php' );
 	$agent_source     = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php' );
+	$filter_source    = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Policy/ToolPolicyFilter.php' );
+	$access_source    = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineToolAccessPolicy.php' );
 	assert_same_policy( false, false !== strpos( $resolver_source, 'DataMachine\\Core\\Database\\Agents\\Agents' ), 'resolver no longer imports Data Machine agent table repository', $failures, $passes );
 	assert_same_policy( false, false !== strpos( $resolver_source, 'isPipelineHandlerTool' ), 'resolver no longer owns handler-tool classifier', $failures, $passes );
+	assert_same_policy( false, false !== strpos( $filter_source, "\nuse DataMachine\\" ), 'generic tool policy filter has no Data Machine imports', $failures, $passes );
+	assert_same_policy( false, false !== strpos( $filter_source, 'FlowStepConfig' ), 'generic tool policy filter has no flow-step imports', $failures, $passes );
 	assert_same_policy( true, false !== strpos( $mandatory_source, 'isset( $tool[\'handler\'] )' ), 'mandatory policy adapter owns handler metadata classifier', $failures, $passes );
 	assert_same_policy( true, false !== strpos( $agent_source, 'new Agents()' ), 'agent policy provider owns persisted agent config lookup', $failures, $passes );
+	assert_same_policy( true, false !== strpos( $access_source, 'PermissionHelper' ), 'Data Machine access adapter owns permission helper mapping', $failures, $passes );
 
 	echo "\n-------------------------------------------\n";
 	$total = $passes + count( $failures );
