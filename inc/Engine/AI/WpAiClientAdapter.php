@@ -523,16 +523,21 @@ class WpAiClientAdapter {
 	/**
 	 * Resolve a provider model through wp-ai-client's registry.
 	 *
-	 * @param \WordPress\AiClient\Providers\ProviderRegistry $registry Provider registry.
-	 * @param string                                          $provider Provider identifier.
-	 * @param string                                          $model    Model identifier.
-	 * @param mixed                                           $config   Optional model config.
+	 * @param object $registry Provider registry.
+	 * @param string $provider Provider identifier.
+	 * @param string $model    Model identifier.
+	 * @param mixed  $config   Optional model config.
 	 * @return mixed Provider model instance.
 	 *
 	 * @throws \RuntimeException When the registry cannot resolve models.
 	 */
-	private static function getProviderModel( \WordPress\AiClient\Providers\ProviderRegistry $registry, string $provider, string $model, $config ) {
-		return call_user_func( array( $registry, 'getProviderModel' ), $provider, $model, $config );
+	private static function getProviderModel( object $registry, string $provider, string $model, $config ) {
+		$callback = array( $registry, 'getProviderModel' );
+		if ( ! is_callable( $callback ) ) {
+			throw new \RuntimeException( 'wp-ai-client provider registry cannot resolve models.' );
+		}
+
+		return call_user_func( $callback, $provider, $model, $config );
 	}
 
 	/**
