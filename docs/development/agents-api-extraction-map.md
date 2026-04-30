@@ -6,7 +6,7 @@ Parent issue: [Explore splitting Agents API out of Data Machine](https://github.
 
 Strategy update: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)
 
-Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
+Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
 
 ## Current Strategy
 
@@ -26,6 +26,7 @@ Treat `data-machine/agents-api/` like WordPress core substrate while it still li
 
 - `agents-api` must not import Data Machine product namespaces.
 - Data Machine may import and consume `agents-api` as product code.
+- `agents-api` owns runner interfaces, value objects, and generic contracts first; Data Machine keeps `AIConversationLoop` and the built-in compatibility runner while they still carry Data Machine job, flow, handler, logging, transcript, and legacy result-shape assumptions.
 - Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, pending actions, content operations, and admin UI.
 - Later standalone extraction means moving the already-bounded module into its own plugin/repo and adding plugin bootstrap, release, dependency, and distribution ceremony.
 - `ai-http-client` is not future architecture. It is only packaging precedent for bundled-then-extracted code.
@@ -92,6 +93,20 @@ The current namespace is intentionally mixed while extraction stays in place. Tr
 | `PipelineTranscriptPolicy`, `DataMachinePipelineTranscriptPersister`, `DataMachineHandlerCompletionPolicy` | Data Machine adapter | Pipeline/job metadata and adjacent-handler completion are normalized for the runtime through collaborator interfaces, but the implementations stay Data Machine. |
 
 Exit rule for this in-place phase: do not physically move broad namespaces just because they sit under `Engine\AI`. Move only once a class is generic by dependency direction, vocabulary, and tests; otherwise document it as a Data Machine adapter or product surface.
+
+## Built-In Loop Ownership Decision
+
+The in-repo `agents-api` module does not own Data Machine's built-in loop implementation yet. Its current ownership line is the generic contract surface: runner interfaces, request/result value objects, message envelopes, runtime tool declarations, and collaborator contracts that a loop can depend on without knowing Data Machine product concepts.
+
+Data Machine keeps `AIConversationLoop` and `BuiltInAgentConversationRunner` until the compatibility loop no longer needs Data Machine-owned assumptions. The loop must stay outside `agents-api` while it knows about or directly preserves any of these product concerns:
+
+- job, flow, pipeline, flow-step, handler, or queue payload keys.
+- Data Machine logging and transcript metadata.
+- adjacent-handler completion semantics.
+- historical `AIConversationLoop::execute()` result normalization.
+- `ai-http-client` / `chubes_ai_*` provider compatibility.
+
+Future extraction can move a generic loop only after those concerns are pushed behind collaborators such as completion policy, transcript persister, provider caller, request assembler, event sink, and Data Machine adapters. Until then, the enforceable boundary is: `agents-api` defines the contract shape; Data Machine owns the built-in compatibility loop that implements it for existing pipelines and chat callers.
 
 ## Agents API Public Candidate
 
