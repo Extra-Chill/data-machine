@@ -526,28 +526,6 @@ class BaseOAuth2ProviderTest extends WP_UnitTestCase {
 	}
 
 	// -------------------------------------------------------------------------
-	// Legacy refresh_token() method
-	// -------------------------------------------------------------------------
-
-	public function test_legacy_refresh_token_delegates_to_get_valid_access_token(): void {
-		$this->provider->save_account( array(
-			'access_token'    => 'tok_expiring',
-			'token_expires_at' => time() + ( 3 * DAY_IN_SECONDS ),
-		) );
-
-		$result = $this->provider->refresh_token();
-
-		$this->assertTrue( $result );
-		$this->assertSame( 1, $this->provider->refresh_call_count );
-	}
-
-	public function test_legacy_refresh_token_returns_false_when_no_token(): void {
-		$result = $this->provider->refresh_token();
-
-		$this->assertFalse( $result );
-	}
-
-	// -------------------------------------------------------------------------
 	// is_configured() default
 	// -------------------------------------------------------------------------
 

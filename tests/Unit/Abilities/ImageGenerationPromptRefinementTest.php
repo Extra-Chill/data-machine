@@ -15,6 +15,9 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_register_capabilities();
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $user_id );
 
 		// The bundled ai-http-client vendor registers its own \`chubes_ai_request\`
 		// filter at priority 99 that ignores the \$request payload and always

@@ -172,12 +172,10 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 		$source_flow      = $this->db_flows->get_flow( (int) $source_flow_id );
 		$flow_config      = $source_flow['flow_config'] ?? array();
 		$source_flow_step = apply_filters( 'datamachine_generate_flow_step_id', '', $source_step_id, (int) $source_flow_id );
-		$flow_config[ $source_flow_step ]['handler_slugs']   = array( 'rss' );
-		$flow_config[ $source_flow_step ]['handler_configs'] = array(
-			'rss' => array(
-				'feed_url' => 'https://example.com/feed',
-				'max_items' => 25,
-			),
+		$flow_config[ $source_flow_step ]['handler_slug']    = 'rss';
+		$flow_config[ $source_flow_step ]['handler_config']  = array(
+			'feed_url'  => 'https://example.com/feed',
+			'max_items' => 25,
 		);
 		$flow_config[ $source_flow_step ]['enabled'] = true;
 		$this->db_flows->update_flow( (int) $source_flow_id, array( 'flow_config' => $flow_config ) );
@@ -225,13 +223,13 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( $imported_flow_step_id, $imported_flow_config );
 		$imported_step = $imported_flow_config[ $imported_flow_step_id ];
 
-		$this->assertSame( array( 'rss' ), $imported_step['handler_slugs'] );
+		$this->assertSame( 'rss', $imported_step['handler_slug'] );
 		$this->assertSame(
 			array(
 				'feed_url'  => 'https://example.com/feed',
 				'max_items' => 25,
 			),
-			$imported_step['handler_configs']['rss']
+			$imported_step['handler_config']
 		);
 		$this->assertTrue( $imported_step['enabled'] );
 	}

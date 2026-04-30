@@ -70,7 +70,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 	 */
 	public function test_execute_missing_attachment_id(): void {
 		$this->expectOutputString( '' );
-		$this->task->execute( 1, [] );
+		$this->task->executeTask( 1, [] );
 		
 		// Check if job failed - we'd need to mock the failJob method
 		$this->assertTrue( true ); // Placeholder assertion
@@ -81,7 +81,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 	 */
 	public function test_execute_invalid_attachment_id(): void {
 		$this->expectOutputString( '' );
-		$this->task->execute( 1, [ 'attachment_id' => 99999 ] );
+		$this->task->executeTask( 1, [ 'attachment_id' => 99999 ] );
 		
 		$this->assertTrue( true ); // Placeholder assertion
 	}
@@ -96,7 +96,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		] );
 
 		$this->expectOutputString( '' );
-		$this->task->execute( 1, [ 'attachment_id' => $text_attachment ] );
+		$this->task->executeTask( 1, [ 'attachment_id' => $text_attachment ] );
 		
 		$this->assertTrue( true ); // Placeholder assertion
 	}
@@ -108,7 +108,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		update_post_meta( $this->attachment_id, '_wp_attachment_image_alt', 'Existing alt text' );
 
 		$this->expectOutputString( '' );
-		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
+		$this->task->executeTask( 1, [ 'attachment_id' => $this->attachment_id ] );
 		
 		$this->assertTrue( true ); // Placeholder assertion
 	}
@@ -141,7 +141,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		add_filter( 'chubes_ai_request', $request_filter, 10, 6 );
 
 		$this->expectOutputString( '' );
-		$this->task->execute( 1, [
+		$this->task->executeTask( 1, [
 			'attachment_id' => $this->attachment_id,
 			'force' => true
 		] );
@@ -161,7 +161,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		wp_delete_file( $this->test_image_path );
 
 		$this->expectOutputString( '' );
-		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
+		$this->task->executeTask( 1, [ 'attachment_id' => $this->attachment_id ] );
 		
 		$this->assertTrue( true ); // Placeholder assertion
 	}
@@ -180,7 +180,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		PluginSettings::clearCache();
 
 		$this->expectOutputString( '' );
-		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
+		$this->task->executeTask( 1, [ 'attachment_id' => $this->attachment_id ] );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 		$this->assertTrue( true ); // Placeholder assertion
@@ -210,7 +210,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		add_filter( 'chubes_ai_request', $request_filter, 10, 6 );
 
 		$this->expectOutputString( '' );
-		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
+		$this->task->executeTask( 1, [ 'attachment_id' => $this->attachment_id ] );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 		remove_filter( 'chubes_ai_request', $request_filter, 10 );
@@ -243,7 +243,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		add_filter( 'chubes_ai_request', $request_filter, 10, 6 );
 
 		$this->expectOutputString( '' );
-		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
+		$this->task->executeTask( 1, [ 'attachment_id' => $this->attachment_id ] );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 		remove_filter( 'chubes_ai_request', $request_filter, 10 );
@@ -281,7 +281,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		add_filter( 'chubes_ai_request', $request_filter, 10, 6 );
 
 		$this->expectOutputString( '' );
-		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
+		$this->task->executeTask( 1, [ 'attachment_id' => $this->attachment_id ] );
 
 		$alt_text = get_post_meta( $this->attachment_id, '_wp_attachment_image_alt', true );
 		$this->assertSame( 'A colorful test image for unit testing.', $alt_text );
@@ -325,7 +325,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 			};
 			add_filter( 'chubes_ai_request', $request_filter, 10, 6 );
 
-			$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
+			$this->task->executeTask( 1, [ 'attachment_id' => $this->attachment_id ] );
 
 			$alt_text = get_post_meta( $this->attachment_id, '_wp_attachment_image_alt', true );
 			$this->assertSame( $expected_alt, $alt_text, "Failed for input: {$ai_response}" );
@@ -388,7 +388,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		};
 		add_filter( 'chubes_ai_request', $request_filter, 10, 6 );
 
-		$this->task->execute( 1, [ 'attachment_id' => $this->attachment_id ] );
+		$this->task->executeTask( 1, [ 'attachment_id' => $this->attachment_id ] );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 		remove_filter( 'chubes_ai_request', $request_filter, 10 );

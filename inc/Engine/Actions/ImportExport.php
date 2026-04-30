@@ -337,6 +337,7 @@ class ImportExport {
 			return false;
 		}
 
+		/** @phpstan-ignore-next-line WordPress filters accept context arguments beyond the filtered value. */
 		$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $pipeline_step_id, $flow_id );
 		if ( empty( $flow_step_id ) ) {
 			return false;
@@ -440,7 +441,10 @@ class ImportExport {
 
 				// Export flow configurations
 				foreach ( $flows as $flow ) {
-					$flow_config  = json_decode( $flow['flow_config'], true ) ?? array();
+					$flow_config = is_string( $flow['flow_config'] ?? null )
+						? ( json_decode( $flow['flow_config'], true ) ?? array() )
+						: ( $flow['flow_config'] ?? array() );
+					/** @phpstan-ignore-next-line WordPress filters accept context arguments beyond the filtered value. */
 					$flow_step_id = apply_filters( 'datamachine_generate_flow_step_id', '', $step['pipeline_step_id'], $flow['flow_id'] );
 					$flow_step    = $flow_config[ $flow_step_id ] ?? array();
 
@@ -541,13 +545,13 @@ class ImportExport {
 	 */
 	private function normalize_string_list_field( string $field, $value ): array {
 		if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
-			throw new \InvalidArgumentException( "{$field} must be a list of strings." );
+			throw new \InvalidArgumentException( sprintf( '%s must be a list of strings.', esc_html( $field ) ) );
 		}
 
 		$normalized = array();
 		foreach ( $value as $item ) {
 			if ( ! is_string( $item ) ) {
-				throw new \InvalidArgumentException( "{$field} must be a list of strings." );
+				throw new \InvalidArgumentException( sprintf( '%s must be a list of strings.', esc_html( $field ) ) );
 			}
 			$normalized[] = $item;
 		}

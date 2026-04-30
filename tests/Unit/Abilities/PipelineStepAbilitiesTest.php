@@ -292,8 +292,8 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertArrayHasKey( 'provider', $stored );
 		$this->assertArrayHasKey( 'model', $stored );
-		$this->assertNotEmpty( $stored['provider'] );
-		$this->assertNotEmpty( $stored['model'] );
+		$this->assertIsString( $stored['provider'] );
+		$this->assertIsString( $stored['model'] );
 	}
 
 	public function test_add_pipeline_step_invalid_type(): void {

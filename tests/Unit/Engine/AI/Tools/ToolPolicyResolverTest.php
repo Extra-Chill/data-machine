@@ -25,6 +25,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
+		add_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
 
 		ToolManager::clearCache();
 		$this->resolver = new ToolPolicyResolver();
@@ -32,6 +33,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 	public function tear_down(): void {
 		ToolManager::clearCache();
+		remove_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
 		parent::tear_down();
 	}
 
@@ -279,6 +281,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 			array(
 				'mode'             => ToolPolicyResolver::MODE_PIPELINE,
 				'pipeline_step_id' => $pipeline_step_id,
+				'deny'             => array( 'web_fetch' ),
 			)
 		);
 

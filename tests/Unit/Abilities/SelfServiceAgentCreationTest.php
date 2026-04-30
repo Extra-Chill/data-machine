@@ -31,6 +31,8 @@ class SelfServiceAgentCreationTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		datamachine_register_capabilities();
+		add_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
 
 		$this->admin_id      = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		$this->subscriber_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
@@ -48,6 +50,7 @@ class SelfServiceAgentCreationTest extends WP_UnitTestCase {
 
 		// Remove any filters a test may have added.
 		remove_all_filters( 'datamachine_max_agents_per_user' );
+		remove_filter( 'datamachine_cli_bypass_permissions', '__return_false' );
 		remove_all_actions( 'datamachine_agent_created' );
 
 		parent::tear_down();
@@ -172,7 +175,10 @@ class SelfServiceAgentCreationTest extends WP_UnitTestCase {
 
 		for ( $i = 0; $i < 5; $i++ ) {
 			$result = AgentAbilities::createAgent(
-				array( 'agent_slug' => "admin-bot-{$i}" )
+				array(
+					'agent_slug' => "admin-bot-{$i}",
+					'owner_id'   => $this->admin_id,
+				)
 			);
 			$this->assertTrue( $result['success'], "Admin creation #{$i} should succeed" );
 		}
