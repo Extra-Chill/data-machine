@@ -530,7 +530,8 @@ class WpAiClientAdapter {
 	 * @return mixed Provider model instance.
 	 */
 	private static function getProviderModel( \WordPress\AiClient\Providers\ProviderRegistry $registry, string $provider, string $model, $config ) {
-		return $registry->getProviderModel( $provider, $model, $config );
+		$callback = array( $registry, 'getProviderModel' );
+		return call_user_func( $callback, $provider, $model, $config );
 	}
 
 	/**
