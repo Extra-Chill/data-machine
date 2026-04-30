@@ -31,6 +31,7 @@ $assert = static function ( string $name, bool $condition ) use ( &$failed, &$to
 
 $assert( 'runtime-gate-function-exists', str_contains( $source, 'function datamachine_should_load_full_runtime(): bool' ) );
 $assert( 'main-runtime-checks-gate-first', (bool) preg_match( '/function datamachine_run_datamachine_plugin\(\) \{\s*if \( ! datamachine_should_load_full_runtime\(\) \)/', $source ) );
+$assert( 'wp-tests-get-full-runtime', str_contains( $source, "defined( 'WP_TESTS_DOMAIN' )" ) );
 $assert( 'wp-cli-gets-full-runtime', str_contains( $source, "defined( 'WP_CLI' ) && WP_CLI" ) );
 $assert( 'admin-ajax-cron-get-full-runtime', str_contains( $source, 'is_admin() || wp_doing_ajax() || wp_doing_cron()' ) );
 $assert( 'rest-path-gets-full-runtime', str_contains( $source, 'str_starts_with( $path, \'/wp-json/\' )' ) );

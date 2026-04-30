@@ -336,6 +336,10 @@ function datamachine_run_datamachine_plugin() {
  * @return bool True when full runtime registration should run.
  */
 function datamachine_should_load_full_runtime(): bool {
+	if ( defined( 'WP_TESTS_DOMAIN' ) || defined( 'WP_TESTS_CONFIG_FILE_PATH' ) ) {
+		return true;
+	}
+
 	if ( defined( 'WP_CLI' ) && WP_CLI ) {
 		return true;
 	}
