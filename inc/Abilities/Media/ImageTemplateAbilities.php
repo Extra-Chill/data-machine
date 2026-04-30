@@ -3,7 +3,7 @@
  * Image Template Abilities
  *
  * Ability for rendering images from registered GD templates.
- * Complements ImageGenerationAbilities (AI/Replicate) with
+	 * Complements ImageGenerationAbilities (AI image models) with
  * deterministic, text-heavy, brand-consistent graphic output.
  *
  * @package DataMachine\Abilities\Media

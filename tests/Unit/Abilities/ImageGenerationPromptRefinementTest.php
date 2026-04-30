@@ -249,9 +249,9 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 	}
 
 	public function test_generate_image_applies_refinement_when_enabled(): void {
-		// Configure image generation and AI provider
 		update_site_option( 'datamachine_image_generation_config', array(
-			'api_key'                   => 'test-replicate-key',
+			'default_provider'          => 'openai',
+			'default_model'             => 'gpt-image-1',
 			'prompt_refinement_enabled' => true,
 		) );
 		$this->set_plugin_settings( array(
@@ -259,53 +259,40 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 			'default_model'    => 'gpt-4',
 		) );
 
-		// Mock Replicate API — HttpClient::post() expects 201 for POST requests.
-		$http_filter = function ( $preempt, $args, $url ) {
-			if ( str_contains( $url, 'replicate.com' ) ) {
+		WpAiClientTestDouble::set_response_callback( function ( array $request ): array {
+			if ( ( $request['capability'] ?? '' ) === 'image_generation' ) {
 				return array(
-					'response' => array( 'code' => 201, 'message' => 'Created' ),
-					'body'     => wp_json_encode( array( 'id' => 'test-prediction-id' ) ),
-					'headers'  => array(),
-					'cookies'  => array(),
+					'success' => true,
+					'data'    => array( 'image_url' => 'https://example.com/refined.png' ),
 				);
 			}
-			return $preempt;
-		};
-		add_filter( 'pre_http_request', $http_filter, 10, 3 );
+
+			return $this->mock_ai_response( $request );
+		} );
 
 		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'The Spiritual Meaning of Cranes' ) );
 
 		$this->assertTrue( $result['success'], 'generateImage should succeed. Error: ' . ( $result['error'] ?? 'none' ) );
 		$this->assertStringContainsString( 'Prompt was refined', $result['message'] );
-
-		remove_filter( 'pre_http_request', $http_filter, 10 );
 	}
 
 	public function test_generate_image_skips_refinement_when_disabled(): void {
 		update_site_option( 'datamachine_image_generation_config', array(
-			'api_key'                   => 'test-replicate-key',
+			'default_provider'          => 'openai',
+			'default_model'             => 'gpt-image-1',
 			'prompt_refinement_enabled' => false,
 		) );
 
-		// Mock Replicate API.
-		$http_filter = function ( $preempt, $args, $url ) {
-			if ( str_contains( $url, 'replicate.com' ) ) {
-				return array(
-					'response' => array( 'code' => 201, 'message' => 'Created' ),
-					'body'     => wp_json_encode( array( 'id' => 'test-prediction-id' ) ),
-					'headers'  => array(),
-					'cookies'  => array(),
-				);
-			}
-			return $preempt;
-		};
-		add_filter( 'pre_http_request', $http_filter, 10, 3 );
+		WpAiClientTestDouble::set_response_callback( function (): array {
+			return array(
+				'success' => true,
+				'data'    => array( 'image_url' => 'https://example.com/unrefined.png' ),
+			);
+		} );
 
 		$result = ImageGenerationAbilities::generateImage( array( 'prompt' => 'The Spiritual Meaning of Cranes' ) );
 
 		$this->assertTrue( $result['success'] );
 		$this->assertStringNotContainsString( 'Prompt was refined', $result['message'] );
-
-		remove_filter( 'pre_http_request', $http_filter, 10 );
 	}
 }

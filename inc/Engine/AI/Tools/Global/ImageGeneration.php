@@ -32,7 +32,7 @@ class ImageGeneration extends BaseTool {
 	/**
 	 * Execute image generation by delegating to the ability.
 	 *
-	 * @param array $parameters Contains 'prompt' and optional 'model', 'aspect_ratio'.
+	 * @param array $parameters Contains 'prompt' and optional 'provider', 'model', 'aspect_ratio'.
 	 * @param array $tool_def   Tool definition (unused).
 	 * @return array Result with pending status on success.
 	 */
@@ -48,6 +48,7 @@ class ImageGeneration extends BaseTool {
 
 		$input = array(
 			'prompt'       => $parameters['prompt'] ?? '',
+			'provider'     => $parameters['provider'] ?? '',
 			'model'        => $parameters['model'] ?? '',
 			'aspect_ratio' => $parameters['aspect_ratio'] ?? '',
 		);
@@ -88,7 +89,7 @@ class ImageGeneration extends BaseTool {
 		return array(
 			'class'           => __CLASS__,
 			'method'          => 'handle_tool_call',
-			'description'     => 'Generate images using AI models (Google Imagen 4, Flux, etc.) via Replicate. Returns a URL to the generated image. Use descriptive, detailed prompts for best results. Default aspect ratio is 3:4 (portrait, ideal for Pinterest and blog featured images).',
+			'description'     => 'Generate images using wp-ai-client image models. Returns a pending image-generation job that will sideload the generated image and optionally set it as featured media. Use descriptive, detailed prompts for best results. Default aspect ratio is 3:4 (portrait, ideal for Pinterest and blog featured images).',
 			'requires_config' => true,
 			'parameters'      => array(
 				'prompt'       => array(
@@ -99,7 +100,12 @@ class ImageGeneration extends BaseTool {
 				'model'        => array(
 					'type'        => 'string',
 					'required'    => false,
-					'description' => 'Replicate model identifier (default: google/imagen-4-fast). Other options: black-forest-labs/flux-schnell, etc.',
+					'description' => 'wp-ai-client model identifier. Defaults to the image generation tool configuration.',
+				),
+				'provider'     => array(
+					'type'        => 'string',
+					'required'    => false,
+					'description' => 'wp-ai-client provider identifier. Defaults to the image generation tool configuration.',
 				),
 				'aspect_ratio' => array(
 					'type'        => 'string',
@@ -159,26 +165,32 @@ class ImageGeneration extends BaseTool {
 	}
 
 	/**
-	 * Save configuration from settings page.
+	 * Get configuration option name.
 	 *
-	 * @param string $tool_id     Tool identifier.
-	 * @param array  $config_data Configuration data.
+	 * @return string
 	 */
 	protected function get_config_option_name(): string {
 		return ImageGenerationAbilities::CONFIG_OPTION;
 	}
 
+	/**
+	 * Validate and normalize settings-page configuration.
+	 *
+	 * @param array $config_data Configuration data.
+	 * @return array
+	 */
 	protected function validate_and_build_config( array $config_data ): array {
-		$api_key = sanitize_text_field( $config_data['api_key'] ?? '' );
+		$provider = sanitize_text_field( $config_data['default_provider'] ?? ImageGenerationAbilities::DEFAULT_PROVIDER );
+		$model    = sanitize_text_field( $config_data['default_model'] ?? ImageGenerationAbilities::DEFAULT_MODEL );
 
-		if ( empty( $api_key ) ) {
-			return array( 'error' => __( 'Replicate API key is required', 'data-machine' ) );
+		if ( empty( $provider ) || empty( $model ) ) {
+			return array( 'error' => __( 'wp-ai-client provider and model are required', 'data-machine' ) );
 		}
 
 		return array(
 			'config'  => array(
-				'api_key'                   => $api_key,
-				'default_model'             => sanitize_text_field( $config_data['default_model'] ?? ImageGenerationAbilities::DEFAULT_MODEL ),
+				'default_provider'          => $provider,
+				'default_model'             => $model,
 				'default_aspect_ratio'      => sanitize_text_field( $config_data['default_aspect_ratio'] ?? ImageGenerationAbilities::DEFAULT_ASPECT_RATIO ),
 				'prompt_refinement_enabled' => ! empty( $config_data['prompt_refinement_enabled'] ),
 				'prompt_style_guide'        => sanitize_textarea_field( $config_data['prompt_style_guide'] ?? '' ),
@@ -200,19 +212,19 @@ class ImageGeneration extends BaseTool {
 		}
 
 		return array(
-			'api_key'                   => array(
-				'type'        => 'password',
-				'label'       => __( 'Replicate API Key', 'data-machine' ),
-				'placeholder' => __( 'Enter your Replicate API key', 'data-machine' ),
+			'default_provider'          => array(
+				'type'        => 'text',
+				'label'       => __( 'Default Provider', 'data-machine' ),
+				'placeholder' => ImageGenerationAbilities::DEFAULT_PROVIDER,
 				'required'    => true,
-				'description' => __( 'Get your API key from replicate.com/account/api-tokens', 'data-machine' ),
+				'description' => __( 'wp-ai-client provider identifier. API keys are configured through the provider settings, not this tool.', 'data-machine' ),
 			),
 			'default_model'             => array(
 				'type'        => 'text',
 				'label'       => __( 'Default Model', 'data-machine' ),
 				'placeholder' => ImageGenerationAbilities::DEFAULT_MODEL,
 				'required'    => false,
-				'description' => __( 'Replicate model identifier. Default: google/imagen-4-fast. AI agents can override per-call.', 'data-machine' ),
+				'description' => __( 'wp-ai-client image model identifier. AI agents can override per-call.', 'data-machine' ),
 			),
 			'default_aspect_ratio'      => array(
 				'type'        => 'select',

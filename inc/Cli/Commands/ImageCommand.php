@@ -2,7 +2,7 @@
 /**
  * WP-CLI Image Command
  *
- * Provides CLI access to AI image generation (Replicate) and
+ * Provides CLI access to AI image generation (wp-ai-client) and
  * GD template rendering. Wraps ImageGenerationAbilities and
  * ImageTemplateAbilities.
  *
@@ -23,10 +23,10 @@ defined( 'ABSPATH' ) || exit;
 class ImageCommand extends BaseCommand {
 
 	/**
-	 * Generate an AI image via Replicate.
+	 * Generate an AI image via wp-ai-client.
 	 *
-	 * Starts an async prediction on Replicate and schedules a System Agent
-	 * task to poll for completion. Optionally refines the prompt via the
+	 * Generates the image through wp-ai-client and schedules a System Agent
+	 * task for media handling and post updates. Optionally refines the prompt via the
 	 * configured AI provider before sending to the image model.
 	 *
 	 * ## OPTIONS
@@ -38,7 +38,10 @@ class ImageCommand extends BaseCommand {
 	 * : Post ID to attach the generated image to.
 	 *
 	 * [--model=<model>]
-	 * : Replicate model identifier (default: google/imagen-4-fast).
+	 * : wp-ai-client model identifier.
+	 *
+	 * [--provider=<provider>]
+	 * : wp-ai-client provider identifier.
 	 *
 	 * [--aspect_ratio=<ratio>]
 	 * : Image aspect ratio: 1:1, 3:4, 4:3, 9:16, 16:9 (default: 3:4).
@@ -86,7 +89,7 @@ class ImageCommand extends BaseCommand {
 		}
 
 		if ( ! ImageGenerationAbilities::is_configured() ) {
-			WP_CLI::error( 'Image generation not configured. Add a Replicate API key in Settings → Image Generation.' );
+			WP_CLI::error( 'Image generation not configured. Select a wp-ai-client provider/model in Settings → Image Generation and configure provider credentials.' );
 			return;
 		}
 
@@ -97,6 +100,9 @@ class ImageCommand extends BaseCommand {
 		}
 		if ( ! empty( $assoc_args['model'] ) ) {
 			$input['model'] = $assoc_args['model'];
+		}
+		if ( ! empty( $assoc_args['provider'] ) ) {
+			$input['provider'] = $assoc_args['provider'];
 		}
 		if ( ! empty( $assoc_args['aspect_ratio'] ) ) {
 			$input['aspect_ratio'] = $assoc_args['aspect_ratio'];
@@ -131,13 +137,13 @@ class ImageCommand extends BaseCommand {
 
 		$items = array(
 			array(
-				'job_id'        => $result['job_id'] ?? '',
-				'prediction_id' => $result['prediction_id'] ?? '',
-				'status'        => $result['pending'] ? 'pending' : 'complete',
+				'job_id'    => $result['job_id'] ?? '',
+				'image_url' => $result['image_url'] ?? '',
+				'status'    => $result['pending'] ? 'pending' : 'complete',
 			),
 		);
 
-		$this->format_items( $items, array( 'job_id', 'prediction_id', 'status' ), $assoc_args );
+		$this->format_items( $items, array( 'job_id', 'image_url', 'status' ), $assoc_args );
 	}
 
 	/**
@@ -336,7 +342,7 @@ class ImageCommand extends BaseCommand {
 	/**
 	 * Check image generation configuration status.
 	 *
-	 * Shows whether the Replicate API key is configured and prompt
+	 * Shows whether wp-ai-client image generation is configured and prompt
 	 * refinement is enabled.
 	 *
 	 * ## EXAMPLES
@@ -349,13 +355,18 @@ class ImageCommand extends BaseCommand {
 		$configured    = ImageGenerationAbilities::is_configured();
 		$refinement    = ImageGenerationAbilities::is_refinement_enabled();
 		$config        = ImageGenerationAbilities::get_config();
+		$provider      = $config['default_provider'] ?? ImageGenerationAbilities::DEFAULT_PROVIDER;
 		$default_model = $config['default_model'] ?? ImageGenerationAbilities::DEFAULT_MODEL;
 		$default_ratio = $config['default_aspect_ratio'] ?? ImageGenerationAbilities::DEFAULT_ASPECT_RATIO;
 
 		$items = array(
 			array(
-				'setting' => 'Replicate API Key',
+				'setting' => 'wp-ai-client Image Provider',
 				'value'   => $configured ? 'Configured' : 'Not configured',
+			),
+			array(
+				'setting' => 'Default Provider',
+				'value'   => $provider,
 			),
 			array(
 				'setting' => 'Prompt Refinement',

@@ -9,7 +9,10 @@ namespace DataMachine\Tests\Unit\Engine\AI\Tools\Global;
 
 use DataMachine\Engine\AI\Tools\Global\ImageGeneration;
 use DataMachine\Abilities\Media\ImageGenerationAbilities;
+use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 use WP_UnitTestCase;
+
+require_once dirname( __DIR__, 4 ) . '/Support/WpAiClientTestDoubles.php';
 
 class ImageGenerationTest extends WP_UnitTestCase {
 
@@ -23,10 +26,12 @@ class ImageGenerationTest extends WP_UnitTestCase {
 		wp_set_current_user( $admin_id );
 
 		$this->tool = new ImageGeneration();
+		WpAiClientTestDouble::reset();
 	}
 
 	public function tear_down(): void {
 		delete_site_option( 'datamachine_image_generation_config' );
+		WpAiClientTestDouble::reset();
 		parent::tear_down();
 	}
 
@@ -35,8 +40,8 @@ class ImageGenerationTest extends WP_UnitTestCase {
 		$this->assertFalse( ImageGeneration::is_configured() );
 	}
 
-	public function test_is_configured_returns_true_when_api_key_set(): void {
-		update_site_option( 'datamachine_image_generation_config', [ 'api_key' => 'test-key' ] );
+	public function test_is_configured_returns_true_when_provider_and_model_set(): void {
+		update_site_option( 'datamachine_image_generation_config', [ 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ] );
 		$this->assertTrue( ImageGeneration::is_configured() );
 	}
 
@@ -46,7 +51,7 @@ class ImageGenerationTest extends WP_UnitTestCase {
 	}
 
 	public function test_get_config_returns_stored_config(): void {
-		$config = [ 'api_key' => 'test-key', 'default_model' => 'flux' ];
+		$config = [ 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ];
 		update_site_option( 'datamachine_image_generation_config', $config );
 		$this->assertSame( $config, ImageGeneration::get_config() );
 	}
@@ -60,7 +65,7 @@ class ImageGenerationTest extends WP_UnitTestCase {
 		delete_site_option( 'datamachine_image_generation_config' );
 		$this->assertFalse( $this->tool->check_configuration( true, 'image_generation' ) );
 
-		update_site_option( 'datamachine_image_generation_config', [ 'api_key' => 'test-key' ] );
+		update_site_option( 'datamachine_image_generation_config', [ 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ] );
 		$this->assertTrue( $this->tool->check_configuration( false, 'image_generation' ) );
 	}
 
@@ -70,14 +75,14 @@ class ImageGenerationTest extends WP_UnitTestCase {
 	}
 
 	public function test_get_configuration_returns_config_for_image_generation(): void {
-		$config = [ 'api_key' => 'test-key' ];
+		$config = [ 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ];
 		update_site_option( 'datamachine_image_generation_config', $config );
 		$this->assertSame( $config, $this->tool->get_configuration( [], 'image_generation' ) );
 	}
 
 	public function test_get_config_fields_returns_fields_for_image_generation(): void {
 		$fields = $this->tool->get_config_fields( [], 'image_generation' );
-		$this->assertArrayHasKey( 'api_key', $fields );
+		$this->assertArrayHasKey( 'default_provider', $fields );
 		$this->assertArrayHasKey( 'default_model', $fields );
 		$this->assertArrayHasKey( 'default_aspect_ratio', $fields );
 	}
@@ -89,7 +94,7 @@ class ImageGenerationTest extends WP_UnitTestCase {
 
 	public function test_get_config_fields_returns_fields_when_tool_id_empty(): void {
 		$fields = $this->tool->get_config_fields( [], '' );
-		$this->assertArrayHasKey( 'api_key', $fields );
+		$this->assertArrayHasKey( 'default_provider', $fields );
 	}
 
 	public function test_get_tool_definition_has_required_keys(): void {

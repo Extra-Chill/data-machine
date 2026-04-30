@@ -3,7 +3,7 @@
  * Tests for ImageGeneration tool handle_tool_call method.
  *
  * Tests the tool layer's delegation to the ability and response handling.
- * Uses pre_http_request filter to mock Replicate API.
+ * Uses wp-ai-client test doubles to mock provider dispatch.
  *
  * @package DataMachine\Tests\Unit\AI\Tools
  */
@@ -11,8 +11,10 @@
 namespace DataMachine\Tests\Unit\AI\Tools;
 
 use DataMachine\Engine\AI\Tools\Global\ImageGeneration;
+use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 use WP_UnitTestCase;
-use WP_Error;
+
+require_once dirname( dirname( __DIR__ ) ) . '/Support/WpAiClientTestDoubles.php';
 
 class ImageGenerationToolCallTest extends WP_UnitTestCase {
 
@@ -25,114 +27,78 @@ class ImageGenerationToolCallTest extends WP_UnitTestCase {
 		wp_set_current_user( $admin_id );
 
 		$this->tool = new ImageGeneration();
+		WpAiClientTestDouble::reset();
+		WpAiClientTestDouble::set_response_callback( array( $this, 'mock_image_response' ) );
 	}
 
 	public function tear_down(): void {
 		delete_site_option( 'datamachine_image_generation_config' );
+		WpAiClientTestDouble::reset();
 		parent::tear_down();
 	}
 
-	/**
-	 * Helper: add pre_http_request filter that returns a successful Replicate prediction.
-	 *
-	 * @param string $prediction_id Prediction ID to return.
-	 * @return callable The filter callback (for removal).
-	 */
-	private function mock_replicate_success( string $prediction_id = 'pred_abc123' ): callable {
-		$filter = function ( $preempt, $parsed_args, $url ) use ( $prediction_id ) {
-			if ( str_contains( $url, 'replicate.com' ) ) {
-				return array(
-					'response' => array( 'code' => 201, 'message' => 'Created' ),
-					'body'     => wp_json_encode( array( 'id' => $prediction_id, 'status' => 'starting' ) ),
-					'headers'  => array(),
-					'cookies'  => array(),
-				);
-			}
-			return $preempt;
-		};
-		add_filter( 'pre_http_request', $filter, 10, 3 );
-		return $filter;
+	public function mock_image_response( array $request ): array {
+		return array(
+			'success' => true,
+			'data'    => array( 'image_url' => 'https://example.com/generated.png' ),
+		);
 	}
 
 	/**
-	 * Test handle_tool_call handles WP_Error from HTTP failure.
+	 * Test handle_tool_call handles provider failure.
 	 */
 	public function test_handle_tool_call_wp_error(): void {
-		$filter = function ( $preempt, $parsed_args, $url ) {
-			if ( str_contains( $url, 'replicate.com' ) ) {
-				return new WP_Error( 'http_request_failed', 'Replicate API connection failed' );
-			}
-			return $preempt;
-		};
-		add_filter( 'pre_http_request', $filter, 10, 3 );
+		WpAiClientTestDouble::set_response_callback( function (): array {
+			return array( 'success' => false, 'error' => 'Provider connection failed' );
+		} );
 
-		update_site_option( 'datamachine_image_generation_config', array( 'api_key' => 'test-key' ) );
+		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
 
 		$result = $this->tool->handle_tool_call( array( 'prompt' => 'A beautiful sunset' ) );
 
 		$this->assertFalse( $result['success'] );
 		$this->assertStringContainsString( 'failed', strtolower( $result['error'] ) );
 		$this->assertSame( 'image_generation', $result['tool_name'] );
-
-		remove_filter( 'pre_http_request', $filter, 10 );
 	}
 
 	/**
 	 * Test handle_tool_call handles error from ability result.
 	 */
 	public function test_handle_tool_call_ability_error(): void {
-		$filter = function ( $preempt, $parsed_args, $url ) {
-			if ( str_contains( $url, 'replicate.com' ) ) {
-				return array(
-					'response' => array( 'code' => 401, 'message' => 'Unauthorized' ),
-					'body'     => wp_json_encode( array( 'detail' => 'Invalid API key' ) ),
-					'headers'  => array(),
-					'cookies'  => array(),
-				);
-			}
-			return $preempt;
-		};
-		add_filter( 'pre_http_request', $filter, 10, 3 );
-
-		update_site_option( 'datamachine_image_generation_config', array( 'api_key' => 'bad-key' ) );
+		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'missing-provider', 'default_model' => 'gpt-image-1' ) );
 
 		$result = $this->tool->handle_tool_call( array( 'prompt' => 'A beautiful sunset' ) );
 
 		$this->assertFalse( $result['success'] );
 		$this->assertNotEmpty( $result['error'] );
 		$this->assertSame( 'image_generation', $result['tool_name'] );
-
-		remove_filter( 'pre_http_request', $filter, 10 );
 	}
 
 	/**
 	 * Test handle_tool_call delegates to ability successfully.
 	 */
 	public function test_handle_tool_call_success_basic(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'api_key' => 'test-key' ) );
-		$filter = $this->mock_replicate_success( 'pred_abc123' );
+		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
 
 		$result = $this->tool->handle_tool_call( array( 'prompt' => 'A beautiful sunset' ) );
 
 		$this->assertTrue( $result['success'] );
 		$this->assertTrue( $result['pending'] );
 		$this->assertIsInt( $result['job_id'] );
-		$this->assertSame( 'pred_abc123', $result['prediction_id'] );
+		$this->assertSame( 'https://example.com/generated.png', $result['image_url'] );
 		$this->assertSame( 'image_generation', $result['tool_name'] );
-
-		remove_filter( 'pre_http_request', $filter, 10 );
 	}
 
 	/**
 	 * Test handle_tool_call passes parameters through.
 	 */
 	public function test_handle_tool_call_with_parameters(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'api_key' => 'test-key' ) );
-		$filter = $this->mock_replicate_success( 'pred_xyz789' );
+		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
 
 		$result = $this->tool->handle_tool_call( array(
 			'prompt'       => 'A serene mountain landscape',
-			'model'        => 'google/imagen-4-fast',
+			'provider'     => 'openai',
+			'model'        => 'gpt-image-1',
 			'aspect_ratio' => '16:9',
 			'job_id'       => 456,
 		) );
@@ -140,23 +106,18 @@ class ImageGenerationToolCallTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] );
 		$this->assertTrue( $result['pending'] );
 		$this->assertIsInt( $result['job_id'] );
-		$this->assertSame( 'pred_xyz789', $result['prediction_id'] );
+		$this->assertSame( 'https://example.com/generated.png', $result['image_url'] );
 		$this->assertSame( 'image_generation', $result['tool_name'] );
-
-		remove_filter( 'pre_http_request', $filter, 10 );
 	}
 
 	/**
 	 * Test handle_tool_call always returns tool_name.
 	 */
 	public function test_handle_tool_call_returns_tool_name(): void {
-		update_site_option( 'datamachine_image_generation_config', array( 'api_key' => 'test-key' ) );
-		$filter = $this->mock_replicate_success( 'pred_name111' );
+		update_site_option( 'datamachine_image_generation_config', array( 'default_provider' => 'openai', 'default_model' => 'gpt-image-1' ) );
 
 		$result = $this->tool->handle_tool_call( array( 'prompt' => 'Test image' ) );
 
 		$this->assertSame( 'image_generation', $result['tool_name'] );
-
-		remove_filter( 'pre_http_request', $filter, 10 );
 	}
 }
