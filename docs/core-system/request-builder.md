@@ -226,7 +226,7 @@ The RequestBuilder gates runtime availability through `WpAiClientCapability`, th
 
 - `wp_ai_client_prompt()` being defined.
 - `wp_supports_ai()` being defined and returning true.
-- The requested provider, or its known alias, being registered in `WordPress\AiClient\AiClient::defaultRegistry()`.
+- The requested provider, or its known alias, being registered in the wp-ai-client default provider registry.
 
 If the gate fails, RequestBuilder returns a structured request error with `request_metadata`. It does not fall back to `chubes_ai_request` / `ai-http-client`.
 
