@@ -1,6 +1,6 @@
 <?php
 /**
- * Agent bundle WP-CLI command.
+ * Agent package lifecycle helpers for WP-CLI.
  *
  * @package DataMachine\Cli\Commands
  */
@@ -22,17 +22,21 @@ use WP_CLI;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Install, inspect, and upgrade portable agent bundles.
+ * Install, inspect, and upgrade portable agent packages.
+ *
+ * This class is intentionally not registered as a top-level command. Its
+ * public lifecycle methods are inherited by AgentsCommand so operators use
+ * `wp datamachine agent ...` as the canonical surface.
  */
 class AgentBundleCommand extends BaseCommand {
 
 	/**
-	 * Install a bundle from a local file or directory.
+	 * Install an agent package from a local file or directory.
 	 *
 	 * ## OPTIONS
 	 *
 	 * <path>
-	 * : Bundle path (.zip, .json, or directory).
+	 * : Package path (.zip, .json, or directory).
 	 *
 	 * [--slug=<slug>]
 	 * : Override target agent slug.
@@ -60,7 +64,7 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	/**
-	 * List installed agent bundles.
+	 * List installed package-backed agents.
 	 *
 	 * ## OPTIONS
 	 *
@@ -74,9 +78,9 @@ class AgentBundleCommand extends BaseCommand {
 	 *   - csv
 	 *   - count
 	 * ---
-	 * @subcommand list
+	 * @subcommand installed
 	 */
-	public function list_( array $args, array $assoc_args ): void {
+	public function installed( array $args, array $assoc_args ): void {
 		unset( $args );
 
 		$items = array();
@@ -104,12 +108,12 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	/**
-	 * Show installed bundle status for an agent or bundle slug.
+	 * Show installed package status for an agent or package slug.
 	 *
 	 * ## OPTIONS
 	 *
 	 * <slug>
-	 * : Agent slug or bundle slug.
+	 * : Agent slug or package slug.
 	 *
 	 * [--format=<format>]
 	 * : Output format.
@@ -132,12 +136,12 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	/**
-	 * Show an upgrade diff for a bundle path.
+	 * Show an upgrade diff for a package path.
 	 *
 	 * ## OPTIONS
 	 *
 	 * <path>
-	 * : Bundle path (.zip, .json, or directory).
+	 * : Package path (.zip, .json, or directory).
 	 *
 	 * [--slug=<slug>]
 	 * : Override target agent slug.
@@ -158,7 +162,7 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	/**
-	 * Upgrade an installed bundle.
+	 * Upgrade an installed agent package.
 	 *
 	 * Clean artifacts are applied through the importer. Approval-required changes
 	 * are staged as PendingActions.
@@ -166,7 +170,7 @@ class AgentBundleCommand extends BaseCommand {
 	 * ## OPTIONS
 	 *
 	 * <path>
-	 * : Bundle path (.zip, .json, or directory).
+	 * : Package path (.zip, .json, or directory).
 	 *
 	 * [--slug=<slug>]
 	 * : Override target agent slug.
@@ -237,7 +241,7 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	/**
-	 * Resolve a staged bundle PendingAction.
+	 * Resolve a staged package PendingAction.
 	 *
 	 * ## OPTIONS
 	 *

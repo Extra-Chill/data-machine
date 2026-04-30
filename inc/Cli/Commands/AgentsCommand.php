@@ -11,9 +11,7 @@
 namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
-use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\AgentAbilities;
-use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 
 defined( 'ABSPATH' ) || exit;
@@ -23,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * @since 0.37.0
  */
-class AgentsCommand extends BaseCommand {
+class AgentsCommand extends AgentBundleCommand {
 
 	/**
 	 * List registered agent identities.
