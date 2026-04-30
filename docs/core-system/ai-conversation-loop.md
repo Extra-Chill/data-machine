@@ -259,11 +259,9 @@ add_filter(
 );
 ```
 
-### Mirrors the AI HTTP Client provider pattern
+### Mirrors the provider-runtime pattern
 
-This is the same extension shape Data Machine's AI HTTP Client uses to allow
-different LLM providers (OpenAI, Anthropic, Gemini, Grok, OpenRouter) to be
-registered via `chubes_ai_request`. A runtime adapter is the same idea, one
+Runtime adapters use the same separation of concerns as provider runtimes, one
 layer up: providers swap how the LLM is called; runtime adapters swap how the
 conversation is run.
 
@@ -278,11 +276,11 @@ layers and are independent:
   **LLM request layer** that the built-in loop calls internally — a single
   HTTP call to an LLM provider.
 
-When wp-ai-client lands, Data Machine's built-in `execute()` will call
-`wp_ai_client_prompt()` in place of `apply_filters('chubes_ai_request', ...)`.
-The `run()` entry point and the `agents_api_conversation_runner` filter
-contract are unchanged, and adapters that replace the entire loop are
-unaffected — they bring their own LLM client as part of their runtime.
+Data Machine's built-in `execute()` calls `wp_ai_client_prompt()` through the
+wp-ai-client adapter. The `run()` entry point and the
+`agents_api_conversation_runner` filter contract are unchanged, and adapters
+that replace the entire loop are unaffected — they bring their own LLM client
+as part of their runtime.
 
 ## Configuration
 

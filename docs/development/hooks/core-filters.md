@@ -348,9 +348,10 @@ the resolved definition follows the same shape:
 ]
 ```
 
-### `chubes_ai_request`
+### `chubes_ai_request` (removed runtime path)
 
-**Purpose**: Process AI requests with provider routing and modular directive system message injection
+**Purpose**: Historical provider-dispatch filter. Agent runtime requests now go
+through `RequestBuilder::build()` and the wp-ai-client adapter instead.
 
 **Parameters**:
 
@@ -360,7 +361,7 @@ the resolved definition follows the same shape:
 - `$tools` (array) - Available tools array
 - `$pipeline_step_id` (string|null) - Pipeline step ID for context
 
-**Return**: Array with AI response
+**Return**: Historical array response shape.
 
 **Universal Engine Directive System** (@since v0.2.0): Centralized AI request construction via `RequestBuilder` with hierarchical directive application through filter-based architecture.
 
@@ -419,7 +420,7 @@ add_filter('datamachine_directives', function($directives) {
 });
 ```
 
-**Note**: All AI request building now uses `RequestBuilder::build()` to ensure consistent request structure and directive application. Direct calls to `chubes_ai_request` filter are deprecated - use RequestBuilder instead.
+**Note**: All AI request building now uses `RequestBuilder::build()` to ensure consistent request structure and directive application. Do not add new `chubes_ai_request` dispatch sites.
 
 ### `datamachine_session_title_prompt`
 
@@ -1578,5 +1579,5 @@ $response = \DataMachine\Engine\AI\RequestBuilder::build(
 
 - Directive application system (global, agent-specific, pipeline, chat)
 - Tool restructuring for AI provider compatibility
-- Integration with ai-http-client library
+- Integration with the wp-ai-client runtime adapter
 - Unified request format across all providers

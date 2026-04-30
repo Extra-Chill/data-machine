@@ -27,8 +27,8 @@ class ConversationManager {
 	 *         ['type' => 'file', 'file_path' => '/path/to/image.jpg', 'mime_type' => 'image/jpeg'],
 	 *     ]
 	 *
-	 * The ai-http-client provider layer (Anthropic, OpenAI, Gemini, OpenRouter)
-	 * already handles array content via process_multimodal_messages().
+	 * RequestBuilder currently supports string content for provider dispatch; callers
+	 * should pass array content only when the active runtime can translate it.
 	 *
 	 * @since 0.2.1
 	 * @since 0.53.0 Accepts array content for multi-modal messages.

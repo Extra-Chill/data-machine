@@ -48,10 +48,12 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 }
 
 require_once __DIR__ . '/bootstrap-unit.php';
+require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
 
 use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\AgentConversationRequest;
 use DataMachine\Engine\AI\LoopEventSinkInterface;
+use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 
 class RunnerRequestSmokeSink implements LoopEventSinkInterface {
 	public array $events = array();
@@ -149,10 +151,9 @@ add_filter(
 );
 
 $dispatched_request = null;
-add_filter(
-	'chubes_ai_request',
-	function ( array $request_body, ...$args ) use ( &$dispatched_request ) {
-		unset( $args );
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function ( array $request_body ) use ( &$dispatched_request ) {
 		$dispatched_request = $request_body;
 
 		return array(
@@ -167,9 +168,7 @@ add_filter(
 				),
 			),
 		);
-	},
-	10,
-	6
+	}
 );
 
 $result = AIConversationLoop::run(

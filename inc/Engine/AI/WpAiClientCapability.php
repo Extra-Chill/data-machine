@@ -15,7 +15,7 @@ class WpAiClientCapability {
 	 * Explain why wp-ai-client cannot handle this request.
 	 *
 	 * This is the single request-runtime capability gate. It intentionally does not
-	 * preserve an ai-http-client fallback path; unavailable wp-ai-client support is
+	 * preserve a secondary provider fallback path; unavailable wp-ai-client support is
 	 * a configuration/runtime error that should surface before dispatch.
 	 *
 	 * @since next

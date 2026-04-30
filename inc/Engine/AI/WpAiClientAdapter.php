@@ -3,16 +3,12 @@
  * WordPress AI Client adapter.
  *
  * Bridges Data Machine's RequestBuilder to WordPress core's `wp_ai_client_prompt()`
- * fluent API (introduced in WordPress 7.0). When core's AI client is present and a
- * provider plugin (e.g. `ai-provider-for-openai`) has registered the requested
- * provider, this adapter dispatches the request through core. Otherwise the caller
- * falls back to the bundled `ai-http-client` library via the `chubes_ai_request`
- * filter.
+ * fluent API. Core's AI client plus registered provider plugins are the only
+ * supported agent-runtime provider path.
  *
  * Scope: this class is the request-execution bridge only. Admin UI, REST endpoints,
  * settings, and provider/model discovery continue to flow through the existing
- * `chubes_ai_*` filter surface. Once WordPress 7.0 is the minimum supported version
- * those layers will be migrated and `ai-http-client` will be removed entirely.
+ * legacy filter surface until those layers are migrated separately.
  *
  * @package DataMachine\Engine\AI
  * @since 0.69.1
@@ -33,9 +29,8 @@ class WpAiClientAdapter {
 	 *   3. The requested provider is registered in the default registry — i.e. a
 	 *      provider plugin like `ai-provider-for-openai` is installed and active.
 	 *
-	 * If any condition fails, callers must fall back to the legacy
-	 * `chubes_ai_request` filter so behavior is preserved on sites that haven't
-	 * adopted core's provider plugins yet.
+	 * If any condition fails, callers surface a request-runtime error instead of
+	 * falling back to a secondary provider client.
 	 *
 	 * @since 0.69.1
 	 *
@@ -52,9 +47,9 @@ class WpAiClientAdapter {
 		}
 
 		try {
-			$registry        = \WordPress\AiClient\AiClient::defaultRegistry();
-			$registered_ids  = $registry->getRegisteredProviderIds();
-			$normalized_id   = self::normalizeProviderId( $provider );
+			$registry       = \WordPress\AiClient\AiClient::defaultRegistry();
+			$registered_ids = $registry->getRegisteredProviderIds();
+			$normalized_id  = self::normalizeProviderId( $provider );
 		} catch ( \Throwable $e ) {
 			return false;
 		}
@@ -66,12 +61,12 @@ class WpAiClientAdapter {
 	/**
 	 * Dispatch a Data Machine request through wp-ai-client and normalize the result.
 	 *
-	 * Returns the same array shape as `apply_filters('chubes_ai_request', ...)` so the
-	 * conversation loop, tool executor, and downstream consumers do not change.
+	 * Returns Data Machine's existing normalized response shape so the conversation
+	 * loop, tool executor, and downstream consumers do not change.
 	 *
 	 * If the request contains content that the bridge does not yet translate (currently:
 	 * any non-string message content such as multi-modal blocks), this method returns
-	 * `null` so the caller can fall back to the legacy path.
+	 * `null` so the caller can surface an unsupported request-shape error.
 	 *
 	 * @since 0.69.1
 	 *
@@ -79,11 +74,10 @@ class WpAiClientAdapter {
 	 * @param string $provider  Provider identifier.
 	 * @param array  $tools     Structured tools (name => ['name', 'description', 'parameters', ...]).
 	 * @return array|null Response array on success, error response array on AI failure, or null if the
-	 *                    bridge cannot handle this request and the caller should fall back.
+	 *                    bridge cannot handle this request shape.
 	 */
 	public static function dispatch( array $request, string $provider, array $tools ): ?array {
-		// Bail to the legacy path on any non-string content (multi-modal, attachments, etc.).
-		// These cases will be handled by ai-http-client, which already supports them.
+		// Bail on request shapes the wp-ai-client bridge does not translate yet.
 		foreach ( $request['messages'] ?? array() as $message ) {
 			if ( isset( $message['content'] ) && ! is_string( $message['content'] ) ) {
 				return null;
@@ -96,8 +90,8 @@ class WpAiClientAdapter {
 		}
 
 		try {
-			$registry      = \WordPress\AiClient\AiClient::defaultRegistry();
-			$resolved_id   = self::resolveRegisteredProviderId( $registry, $provider );
+			$registry    = \WordPress\AiClient\AiClient::defaultRegistry();
+			$resolved_id = self::resolveRegisteredProviderId( $registry, $provider );
 		} catch ( \Throwable $e ) {
 			return self::errorResponse( $provider, 'wp-ai-client provider resolution failed: ' . $e->getMessage() );
 		}
@@ -149,10 +143,6 @@ class WpAiClientAdapter {
 			$result = $builder->generate_text_result();
 		} catch ( \Throwable $e ) {
 			return self::errorResponse( $provider, 'wp-ai-client request threw: ' . $e->getMessage() );
-		}
-
-		if ( $result instanceof \WP_Error ) {
-			return self::errorResponse( $provider, $result->get_error_message(), $result->get_error_code() );
 		}
 
 		return self::normalizeResult( $result, $provider );
@@ -364,9 +354,8 @@ class WpAiClientAdapter {
 	/**
 	 * Resolve the API key for this provider via DM's existing key plumbing.
 	 *
-	 * Reads the same `chubes_ai_provider_api_keys` filter that ai-http-client uses,
-	 * so admin UX, network settings, and key persistence remain unchanged during
-	 * the bridge period.
+	 * Reads Data Machine's existing provider-key filter so admin UX, network
+	 * settings, and key persistence remain unchanged until those surfaces migrate.
 	 *
 	 * @since 0.69.1
 	 *
@@ -406,7 +395,7 @@ class WpAiClientAdapter {
 	 * @param string                                          $provider
 	 * @return string The registered provider id to use with the registry.
 	 *
-	 * @throws \WordPress\AiClient\Common\Exception\InvalidArgumentException When the provider is not registered.
+	 * @throws \InvalidArgumentException When the provider is not registered.
 	 */
 	private static function resolveRegisteredProviderId( \WordPress\AiClient\Providers\ProviderRegistry $registry, string $provider ): string {
 		$registered = $registry->getRegisteredProviderIds();
@@ -421,8 +410,8 @@ class WpAiClientAdapter {
 		}
 
 		// Surface a clear failure; caller will translate to an error response.
-		throw new \WordPress\AiClient\Common\Exception\InvalidArgumentException(
-			sprintf( 'Provider %s is not registered in wp-ai-client', $provider )
+		throw new \InvalidArgumentException(
+			sprintf( 'Provider %s is not registered in wp-ai-client', esc_html( $provider ) )
 		);
 	}
 

@@ -139,7 +139,7 @@ class AgentMessageEnvelope {
 	}
 
 	/**
-	 * Project an envelope to the current ai-http-client request message shape.
+	 * Project an envelope to Data Machine's provider request message shape.
 	 *
 	 * @param array $message Typed envelope or legacy message.
 	 * @return array<string, mixed> Provider-facing message.
@@ -170,7 +170,7 @@ class AgentMessageEnvelope {
 	}
 
 	/**
-	 * Project envelopes to the current ai-http-client request message shape.
+	 * Project envelopes to Data Machine's provider request message shape.
 	 *
 	 * @param array $messages Typed envelopes or legacy messages.
 	 * @return array<int, array<string, mixed>> Provider-facing messages.

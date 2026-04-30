@@ -48,10 +48,12 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 }
 
 require_once __DIR__ . '/bootstrap-unit.php';
+require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
 
 use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\LoopEventSinkInterface;
 use DataMachine\Engine\AI\NullLoopEventSink;
+use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 
 class LoopEventSinkSmokeCollector implements LoopEventSinkInterface {
 	public array $events = array();
@@ -147,10 +149,9 @@ reset_loop_event_sink_smoke();
 $dispatch_count = 0;
 $collector      = new LoopEventSinkSmokeCollector();
 
-add_filter(
-	'chubes_ai_request',
-	function ( ...$args ) use ( &$dispatch_count ) {
-		unset( $args );
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$dispatch_count ) {
 		++$dispatch_count;
 
 		if ( 1 === $dispatch_count ) {
@@ -177,9 +178,7 @@ add_filter(
 				'usage'      => array( 'prompt_tokens' => 4, 'completion_tokens' => 1, 'total_tokens' => 5 ),
 			),
 		);
-	},
-	10,
-	6
+	}
 );
 
 $result = ( new AIConversationLoop() )->execute(
@@ -212,15 +211,11 @@ assert_loop_event_sink( ! array_key_exists( 'event_sink', LoopEventSinkSmokeTool
 // 3. Failure events are emitted on AI request failure without changing the return array.
 reset_loop_event_sink_smoke();
 $failure_sink = new LoopEventSinkSmokeCollector();
-add_filter(
-	'chubes_ai_request',
-	fn( ...$args ) => array(
-		'success'  => false,
-		'error'    => 'provider offline',
-		'provider' => 'openai',
-	),
-	10,
-	6
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () {
+		throw new RuntimeException( 'provider offline' );
+	}
 );
 
 $failure_result = ( new AIConversationLoop() )->execute(
@@ -234,23 +229,21 @@ $failure_result = ( new AIConversationLoop() )->execute(
 );
 
 assert_loop_event_sink( false === $failure_result['completed'], 'failure path preserves completed=false result shape' );
-assert_loop_event_sink( 'provider offline' === ( $failure_result['error'] ?? null ), 'failure path preserves error message' );
+assert_loop_event_sink( str_contains( (string) ( $failure_result['error'] ?? '' ), 'provider offline' ), 'failure path preserves error message' );
 assert_loop_event_sink( array( 'turn_started', 'request_built', 'failed' ) === loop_event_sink_event_names( $failure_sink ), 'failure path emits failed after request_built' );
-assert_loop_event_sink( 'provider offline' === ( $failure_sink->events[2]['payload']['error'] ?? null ), 'failed payload includes the provider error' );
+assert_loop_event_sink( str_contains( (string) ( $failure_sink->events[2]['payload']['error'] ?? '' ), 'provider offline' ), 'failed payload includes the provider error' );
 
 // 4. Sink failures are logged and never change loop output.
 reset_loop_event_sink_smoke();
-add_filter(
-	'chubes_ai_request',
-	fn( ...$args ) => array(
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	fn() => array(
 		'success' => true,
 		'data'    => array(
 			'content'    => 'still done',
 			'tool_calls' => array(),
 		),
-	),
-	10,
-	6
+	)
 );
 
 $throwing_result = ( new AIConversationLoop() )->execute(
@@ -274,6 +267,7 @@ if ( 0 === $failure_count ) {
 }
 
 echo sprintf( "%d failure(s):\n", $failure_count );
+/** @var array<int, string> $failures */
 foreach ( $failures as $failure ) {
 	echo "  - {$failure}\n";
 }
