@@ -30,7 +30,7 @@ function add_action( string $hook, callable $callback, int $priority = 10, int $
 
 require_once __DIR__ . '/../agents-api/agents-api.php';
 
-use DataMachine\Core\Database\Chat\ConversationTranscriptStoreInterface;
+use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
 
 $failures = array();
 $passes   = 0;

@@ -23,7 +23,7 @@ use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
-use DataMachine\Engine\AI\AgentMessageEnvelope;
+use AgentsAPI\Engine\AI\AgentMessageEnvelope;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\Tasks\TaskRegistry;
 

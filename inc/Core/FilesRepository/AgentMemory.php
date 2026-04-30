@@ -19,6 +19,11 @@
 
 namespace DataMachine\Core\FilesRepository;
 
+use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
+use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
+use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
+use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
+use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;

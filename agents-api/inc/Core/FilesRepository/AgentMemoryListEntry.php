@@ -9,7 +9,7 @@
  * @since   next
  */
 
-namespace DataMachine\Core\FilesRepository;
+namespace AgentsAPI\Core\FilesRepository;
 
 defined( 'ABSPATH' ) || exit;
 

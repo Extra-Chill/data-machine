@@ -35,7 +35,7 @@ use DataMachine\Core\Database\Chat\ConversationRetentionInterface;
 use DataMachine\Core\Database\Chat\ConversationSessionIndexInterface;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
-use DataMachine\Core\Database\Chat\ConversationTranscriptStoreInterface;
+use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
 use DataMachine\Tests\Unit\Core\Database\Chat\InMemoryConversationStore;
 
 $failures    = array();

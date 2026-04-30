@@ -25,6 +25,9 @@
 
 namespace DataMachine\Core\FilesRepository;
 
+use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
+use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
+
 defined( 'ABSPATH' ) || exit;
 
 class AgentMemoryStoreFactory {

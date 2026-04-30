@@ -16,6 +16,7 @@
 	},
 	"autoload": {
 		"psr-4": {
+			"AgentsAPI\\": "agents-api/inc/",
 			"DataMachine\\Abilities\\": "inc/Abilities/",
 			"DataMachine\\Api\\": "inc/Api/",
 			"DataMachine\\Cli\\": "inc/Cli/",

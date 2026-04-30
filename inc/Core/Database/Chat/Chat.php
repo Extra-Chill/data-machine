@@ -13,7 +13,7 @@ namespace DataMachine\Core\Database\Chat;
 
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\Database\BaseRepository;
-use DataMachine\Engine\AI\AgentMessageEnvelope;
+use AgentsAPI\Engine\AI\AgentMessageEnvelope;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

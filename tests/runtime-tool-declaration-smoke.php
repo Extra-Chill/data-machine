@@ -9,7 +9,7 @@
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
-use DataMachine\Engine\AI\Tools\RuntimeToolDeclaration;
+use AgentsAPI\Engine\AI\Tools\RuntimeToolDeclaration;
 
 function datamachine_runtime_tool_assert( bool $condition, string $message ): void {
 	if ( ! $condition ) {

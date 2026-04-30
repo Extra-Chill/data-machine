@@ -632,7 +632,7 @@ class AgentFileAbilities {
 	 * @param string $filename Filename to resolve.
 	 * @param int    $user_id  Effective user ID.
 	 * @param int    $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
-	 * @return array{0: AgentMemory, 1: \DataMachine\Core\FilesRepository\AgentMemoryReadResult}|null
+	 * @return array{0: AgentMemory, 1: \AgentsAPI\Core\FilesRepository\AgentMemoryReadResult}|null
 	 */
 	private function locateMemory( string $filename, int $user_id, int $agent_id ): ?array {
 		$layer_order = array();

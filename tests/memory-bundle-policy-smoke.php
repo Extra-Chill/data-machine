@@ -191,11 +191,11 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Core\FilesRepository\AgentMemoryListEntry;
-use DataMachine\Core\FilesRepository\AgentMemoryReadResult;
-use DataMachine\Core\FilesRepository\AgentMemoryScope;
-use DataMachine\Core\FilesRepository\AgentMemoryStoreInterface;
-use DataMachine\Core\FilesRepository\AgentMemoryWriteResult;
+use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
+use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
+use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
+use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
+use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\AI\Memory\MemorySectionArtifact;
