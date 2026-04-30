@@ -150,6 +150,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/HandlerAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/StepTypeAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/LocalSearchAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/SourceAggregateAbility.php';
 	require_once __DIR__ . '/inc/Abilities/SystemAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/AltTextAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/ImageGenerationAbilities.php';
@@ -247,6 +248,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\HandlerAbilities();
 	new \DataMachine\Abilities\StepTypeAbilities();
 	new \DataMachine\Abilities\LocalSearchAbilities();
+	new \DataMachine\Abilities\SourceAggregateAbility();
 	new \DataMachine\Abilities\SystemAbilities();
 	new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();
 	new \DataMachine\Abilities\Media\AltTextAbilities();
@@ -302,6 +304,7 @@ function datamachine_run_datamachine_plugin() {
 	// Deferred scaffold: during plugin activation the Abilities API is unavailable
 	// because init fires before the plugin file is included. A transient signals that
 	// the scaffold needs to run on the first normal request where abilities are ready.
+	// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
 	add_action(
 		'init',
 		function () {
@@ -385,6 +388,7 @@ function datamachine_activate_defaults_for_site() {
 	add_option( 'datamachine_settings', $default_settings );
 }
 
+// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
 add_action( 'plugins_loaded', 'datamachine_run_datamachine_plugin', 20 );
 
 
@@ -459,6 +463,7 @@ add_filter( 'upload_mimes', 'datamachine_allow_json_upload' );
 
 add_action( 'update_option_datamachine_settings', array( \DataMachine\Core\PluginSettings::class, 'clearCache' ) );
 
+// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
 add_action(
 	'plugins_loaded',
 	function () {
@@ -762,6 +767,7 @@ function datamachine_on_new_site( \WP_Site $new_site ) {
 	datamachine_activate_for_site();
 	restore_current_blog();
 }
+// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
 add_action( 'wp_initialize_site', 'datamachine_on_new_site', 200 );
 
 // Migrations, scaffolding, and activation helpers.
