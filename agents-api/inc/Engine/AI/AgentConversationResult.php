@@ -79,8 +79,8 @@ class AgentConversationResult {
 				throw self::invalid( $path . '.parameters', 'must be an array' );
 			}
 
-			if ( ! array_key_exists( 'is_handler_tool', $tool_result ) || ! is_bool( $tool_result['is_handler_tool'] ) ) {
-				throw self::invalid( $path . '.is_handler_tool', 'must be a boolean' );
+			if ( array_key_exists( 'is_handler_tool', $tool_result ) && ! is_bool( $tool_result['is_handler_tool'] ) ) {
+				throw self::invalid( $path . '.is_handler_tool', 'must be a boolean when present' );
 			}
 
 			if ( ! array_key_exists( 'turn_count', $tool_result ) || ! is_int( $tool_result['turn_count'] ) ) {

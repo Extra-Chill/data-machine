@@ -63,6 +63,31 @@ datamachine_agent_conversation_result_assert(
 );
 ++$assertions;
 
+$generic_tool_result = $valid_result;
+unset( $generic_tool_result['tool_execution_results'][0]['is_handler_tool'] );
+$generic_tool_result['tool_execution_results'][0]['tool_name'] = 'search_knowledge_base';
+$generic_tool_result['tool_execution_results'][0]['result']    = array( 'success' => true, 'items' => array() );
+$normalized_generic_tool_result = AgentConversationResult::normalize( $generic_tool_result );
+datamachine_agent_conversation_result_assert(
+	! array_key_exists( 'is_handler_tool', $normalized_generic_tool_result['tool_execution_results'][0] ),
+	'Generic tool execution result should not require Data Machine handler metadata.'
+);
+++$assertions;
+
+$malformed_handler_metadata = $valid_result;
+$malformed_handler_metadata['tool_execution_results'][0]['is_handler_tool'] = 'yes';
+
+try {
+	AgentConversationResult::normalize( $malformed_handler_metadata );
+	throw new RuntimeException( 'Malformed handler metadata should throw.' );
+} catch ( InvalidArgumentException $e ) {
+	datamachine_agent_conversation_result_assert(
+		str_contains( $e->getMessage(), 'invalid_agent_conversation_result: tool_execution_results[0].is_handler_tool' ),
+		'Present handler-tool metadata should still be type checked.'
+	);
+	++$assertions;
+}
+
 $without_tool_results = $valid_result;
 unset( $without_tool_results['tool_execution_results'] );
 $normalized_without_tools = AgentConversationResult::normalize( $without_tool_results );
