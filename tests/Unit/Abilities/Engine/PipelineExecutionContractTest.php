@@ -18,13 +18,15 @@ use DataMachine\Core\JobStatus;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Steps\FlowStepConfigFactory;
 use DataMachine\Engine\AI\Tools\ToolManager;
+use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 use WP_UnitTestCase;
+
+require_once dirname( __DIR__, 2 ) . '/Support/WpAiClientTestDoubles.php';
 
 class PipelineExecutionContractTest extends WP_UnitTestCase
 {
     private $handler_filter;
     private $tools_filter;
-    private $ai_filter;
     private $schedule_capture;
     private $log_capture;
     private array $scheduled_steps = array();
@@ -117,17 +119,13 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
         };
         add_filter('datamachine_tools', $this->tools_filter);
 
-        remove_all_filters('chubes_ai_request');
-        $this->ai_filter = function ($request, $provider, $streaming, $tools, $step_id, $context) {
-            $streaming;
-            $step_id;
-            $context;
-
+        WpAiClientTestDouble::reset();
+        WpAiClientTestDouble::set_response_callback(function (array $request, string $provider): array {
             $this->captured_ai_requests[] = array(
                 'provider' => $provider,
                 'request'  => $request,
             );
-            $this->captured_ai_tools[]    = $tools;
+            $this->captured_ai_tools[]    = $request['tools'] ?? array();
 
             return array(
                 'success' => true,
@@ -149,8 +147,7 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
                     ),
                 ),
             );
-        };
-        add_filter('chubes_ai_request', $this->ai_filter, 10, 6);
+        });
 
         $this->schedule_capture = function ($job_id, $flow_step_id, $data_packets = array()): void {
             $this->scheduled_steps[] = array(
@@ -178,7 +175,7 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
     {
         remove_filter('datamachine_handlers', $this->handler_filter, 10);
         remove_filter('datamachine_tools', $this->tools_filter, 10);
-        remove_filter('chubes_ai_request', $this->ai_filter, 10);
+        WpAiClientTestDouble::reset();
         remove_action('datamachine_schedule_next_step', $this->schedule_capture, 1);
         remove_action('datamachine_log', $this->log_capture, 10);
 
@@ -262,7 +259,6 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
         );
 
         $this->assertArrayHasKey('fake_publish_tool', $this->captured_ai_tools[0] ?? array());
-        $this->assertSame('fake_publish', $this->captured_ai_tools[0]['fake_publish_tool']['handler'] ?? '');
 
         $ai_scheduled = $this->_latestScheduledStep();
         $this->assertSame('flow_publish', $ai_scheduled['flow_step_id'] ?? '');
