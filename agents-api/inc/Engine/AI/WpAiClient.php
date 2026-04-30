@@ -58,6 +58,13 @@ class WpAiClient {
 	 * @return array{success:bool,content:string,tool_calls:array,usage:array,error?:string,error_code?:string}
 	 */
 	public static function generate_text( string $provider, string $model, array $messages, array $tools = array(), array $request = array(), string $api_key = '' ): array {
+		$unsupported_reason = self::unsupported_message_part_reason( $messages );
+		if ( null !== $unsupported_reason ) {
+			$response               = self::error_result( $unsupported_reason );
+			$response['error_code'] = 'wp_ai_client_unsupported_message_part';
+			return $response;
+		}
+
 		$core_messages = self::build_core_messages( $messages );
 		$result        = self::generate_text_result(
 			$provider,
@@ -253,6 +260,31 @@ class WpAiClient {
 		}
 
 		return $declarations;
+	}
+
+	/**
+	 * Detect message parts that the current wp-ai-client text path cannot express.
+	 *
+	 * @param array $messages Message envelopes or legacy role/content messages.
+	 * @return string|null Failure reason, or null when the text path can proceed.
+	 */
+	private static function unsupported_message_part_reason( array $messages ): ?string {
+		foreach ( $messages as $message ) {
+			if ( ! is_array( $message ) ) {
+				continue;
+			}
+
+			$type = is_string( $message['type'] ?? null ) ? $message['type'] : '';
+			if ( AgentMessageEnvelope::TYPE_MULTIMODAL_PART === $type ) {
+				return 'wp-ai-client text generation does not support multimodal message parts yet';
+			}
+
+			if ( is_array( $message['content'] ?? null ) ) {
+				return 'wp-ai-client text generation does not support multimodal message parts yet';
+			}
+		}
+
+		return null;
 	}
 
 	/**
