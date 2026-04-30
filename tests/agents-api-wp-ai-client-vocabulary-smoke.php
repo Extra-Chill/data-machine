@@ -21,9 +21,9 @@ $scanned_files = array(
 	'docs/development/agents-api-extraction-map.md',
 	'docs/development/agents-api-pre-extraction-audit.md',
 	'docs/core-system/request-builder.md',
+	'agents-api/inc/AI/WpAiClient.php',
 	'inc/Engine/AI/RequestBuilder.php',
-	'inc/Engine/AI/WpAiClientAdapter.php',
-	'inc/Engine/AI/WpAiClientCapability.php',
+	'inc/Engine/AI/WpAiClientProviderAdmin.php',
 );
 
 $provider_slug        = 'wp-' . 'ai-client';
@@ -51,6 +51,10 @@ foreach ( $scanned_files as $relative_path ) {
 }
 
 agents_api_smoke_assert_equals( array(), $matches, 'docs/comments avoid forbidden final-architecture provider wording', $failures, $passes );
+$deleted_adapter_path    = '/inc/Engine/AI/WpAiClient' . 'Adapter.php';
+$deleted_capability_path = '/inc/Engine/AI/WpAiClient' . 'Capability.php';
+agents_api_smoke_assert_equals( false, is_file( (string) $root . $deleted_adapter_path ), 'Data Machine provider adapter file is deleted', $failures, $passes );
+agents_api_smoke_assert_equals( false, is_file( (string) $root . $deleted_capability_path ), 'Data Machine capability alias wrapper is deleted', $failures, $passes );
 
 $agents_api_dir = (string) $root . '/agents-api';
 $host_terms     = array( 'wpcom', 'wpcOM', 'dolly', 'odie', 'wordpress.com', 'automattic ai framework' );

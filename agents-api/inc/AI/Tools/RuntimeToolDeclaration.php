@@ -9,7 +9,7 @@
  * @package AgentsAPI
  */
 
-namespace AgentsAPI\Engine\AI\Tools;
+namespace AgentsAPI\AI\Tools;
 
 defined( 'ABSPATH' ) || exit;
 

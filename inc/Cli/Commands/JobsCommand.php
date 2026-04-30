@@ -23,7 +23,7 @@ use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
-use AgentsAPI\Engine\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\AgentMessageEnvelope;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\Tasks\TaskRegistry;
 
@@ -785,7 +785,7 @@ class JobsCommand extends BaseCommand {
 			if ( is_array( $value ) ) {
 				$count             = count( $value );
 				$json              = wp_json_encode( $value );
-				$size              = strlen( $json );
+				$size              = strlen( is_string( $json ) ? $json : '' );
 				$summary[ $label ] = sprintf( 'array (%d items, %s)', $count, size_format( $size ) );
 			} elseif ( is_bool( $value ) ) {
 				$summary[ $label ] = $value ? 'true' : 'false';

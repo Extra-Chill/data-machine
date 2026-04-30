@@ -10,7 +10,7 @@
 
 namespace DataMachine\Engine\AI;
 
-use AgentsAPI\Engine\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\AgentMessageEnvelope;
 
 defined( 'ABSPATH' ) || exit;
 

@@ -15,11 +15,10 @@
 
 namespace DataMachine\Abilities\Media;
 
+use AgentsAPI\AI\WpAiClient;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
-use DataMachine\Engine\AI\WpAiClientAdapter;
-use DataMachine\Engine\AI\WpAiClientCapability;
 use DataMachine\Engine\Tasks\TaskScheduler;
 
 defined( 'ABSPATH' ) || exit;
@@ -186,7 +185,7 @@ class ImageGenerationAbilities {
 			);
 		}
 
-		$unavailable_reason = WpAiClientCapability::unavailableReason( $provider );
+		$unavailable_reason = WpAiClient::unavailable_reason( $provider );
 		if ( null !== $unavailable_reason ) {
 			return array(
 				'success' => false,
@@ -212,16 +211,25 @@ class ImageGenerationAbilities {
 			$aspect_ratio = self::DEFAULT_ASPECT_RATIO;
 		}
 
-		$result = WpAiClientAdapter::generateImage( $prompt, $provider, $model, $aspect_ratio );
+		$image_file = WpAiClient::generate_image_file(
+			$prompt,
+			$provider,
+			$model,
+			$aspect_ratio,
+			\DataMachine\Engine\AI\WpAiClientProviderAdmin::resolveApiKey( $provider )
+		);
 
-		if ( ! $result['success'] ) {
+		if ( $image_file instanceof \WP_Error ) {
 			return array(
 				'success' => false,
-				'error'   => 'Failed to generate image: ' . ( $result['error'] ?? 'Unknown error' ),
+				'error'   => 'Failed to generate image: ' . $image_file->get_error_message(),
 			);
 		}
 
-		if ( empty( $result['image_url'] ) && empty( $result['image_data_uri'] ) ) {
+		$image_url      = method_exists( $image_file, 'getUrl' ) ? (string) $image_file->getUrl() : '';
+		$image_data_uri = method_exists( $image_file, 'getDataUri' ) ? (string) $image_file->getDataUri() : '';
+
+		if ( '' === $image_url && '' === $image_data_uri ) {
 			return array(
 				'success' => false,
 				'error'   => 'wp-ai-client image generation returned no usable image.',
@@ -246,9 +254,9 @@ class ImageGenerationAbilities {
 		$jobId = TaskScheduler::schedule(
 			'image_generation',
 			array(
-				'image_url'       => $result['image_url'] ?? '',
-				'image_data_uri'  => $result['image_data_uri'] ?? '',
-				'provider'        => $result['provider'] ?? $provider,
+				'image_url'       => $image_url,
+				'image_data_uri'  => $image_data_uri,
+				'provider'        => $provider,
 				'model'           => $model,
 				'prompt'          => $prompt,
 				'original_prompt' => $original_prompt,
@@ -269,7 +277,7 @@ class ImageGenerationAbilities {
 			'success'   => true,
 			'pending'   => true,
 			'job_id'    => $jobId,
-			'image_url' => $result['image_url'] ?? '',
+			'image_url' => $image_url,
 			'message'   => "Image generation scheduled (Job #{$jobId}). Model: {$model}, aspect ratio: {$aspect_ratio}."
 				. ( $prompt !== $original_prompt ? ' Prompt was refined by AI.' : '' ),
 		);
@@ -441,7 +449,7 @@ class ImageGenerationAbilities {
 		$provider = $config['default_provider'] ?? self::DEFAULT_PROVIDER;
 		$model    = $config['default_model'] ?? self::DEFAULT_MODEL;
 
-		return ! empty( $provider ) && ! empty( $model ) && null === WpAiClientCapability::unavailableReason( (string) $provider );
+		return ! empty( $provider ) && ! empty( $model ) && null === WpAiClient::unavailable_reason( (string) $provider );
 	}
 
 	/**

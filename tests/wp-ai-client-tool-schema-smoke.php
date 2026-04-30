@@ -30,12 +30,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once $root . '/tests/Unit/Support/WpAiClientTestDoubles.php';
-require_once $root . '/inc/Engine/AI/WpAiClientAdapter.php';
+require_once $root . '/agents-api/agents-api.php';
 
-$method = new ReflectionMethod( DataMachine\Engine\AI\WpAiClientAdapter::class, 'ensureJsonSchema' );
-
-$schema = $method->invoke(
-	null,
+$declaration = AgentsAPI\AI\WpAiClient::function_declaration(
+	'client/test_tool',
+	'Test tool.',
 	array(
 		'reason' => array(
 			'type'        => 'string',
@@ -48,6 +47,7 @@ $schema = $method->invoke(
 		),
 	)
 );
+$schema      = $declaration->parameters;
 
 $assert( is_array( $schema ), 'legacy parameter map normalizes to a schema array' );
 $assert( 'object' === ( $schema['type'] ?? null ), 'legacy parameter map is wrapped as an object schema' );

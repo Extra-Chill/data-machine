@@ -48,14 +48,9 @@ class WpAiClientProviderAdmin {
 	 */
 	public static function isProviderRegistered( string $provider ): bool {
 		$provider_ids = self::registeredProviderIds();
+		$provider     = sanitize_key( $provider );
 
-		foreach ( self::providerAliases( $provider ) as $candidate ) {
-			if ( in_array( $candidate, $provider_ids, true ) ) {
-				return true;
-			}
-		}
-
-		return false;
+		return '' !== $provider && in_array( $provider, $provider_ids, true );
 	}
 
 	/**
@@ -67,26 +62,19 @@ class WpAiClientProviderAdmin {
 	 * @return string API key, or empty string when none is configured.
 	 */
 	public static function resolveApiKey( string $provider ): string {
-		foreach ( self::providerAliases( $provider ) as $candidate ) {
-			$connector = self::connector( $candidate );
-			$auth      = is_array( $connector['authentication'] ?? null ) ? $connector['authentication'] : array();
+		$provider  = sanitize_key( $provider );
+		$connector = self::connector( $provider );
+		$auth      = is_array( $connector['authentication'] ?? null ) ? $connector['authentication'] : array();
 
-			if ( 'api_key' !== ( $auth['method'] ?? 'api_key' ) ) {
-				continue;
-			}
-
-			$key = self::resolveConnectorApiKey(
-				(string) ( $auth['setting_name'] ?? self::defaultConnectorSettingName( $candidate ) ),
-				(string) ( $auth['env_var_name'] ?? self::defaultApiKeyConstantName( $candidate ) ),
-				(string) ( $auth['constant_name'] ?? self::defaultApiKeyConstantName( $candidate ) )
-			);
-
-			if ( '' !== $key ) {
-				return $key;
-			}
+		if ( 'api_key' !== ( $auth['method'] ?? 'api_key' ) ) {
+			return '';
 		}
 
-		return '';
+		return self::resolveConnectorApiKey(
+			(string) ( $auth['setting_name'] ?? self::defaultConnectorSettingName( $provider ) ),
+			(string) ( $auth['env_var_name'] ?? self::defaultApiKeyConstantName( $provider ) ),
+			(string) ( $auth['constant_name'] ?? self::defaultApiKeyConstantName( $provider ) )
+		);
 	}
 
 	/**
@@ -310,18 +298,15 @@ class WpAiClientProviderAdmin {
 	 * @return string
 	 */
 	private static function settingNameForProvider( string $provider_id ): string {
-		foreach ( self::providerAliases( $provider_id ) as $candidate ) {
-			$connector = self::connector( $candidate );
-			$auth      = is_array( $connector['authentication'] ?? null ) ? $connector['authentication'] : array();
+		$provider_id = sanitize_key( $provider_id );
+		$connector   = self::connector( $provider_id );
+		$auth        = is_array( $connector['authentication'] ?? null ) ? $connector['authentication'] : array();
 
-			if ( 'api_key' !== ( $auth['method'] ?? 'api_key' ) ) {
-				continue;
-			}
-
-			return (string) ( $auth['setting_name'] ?? self::defaultConnectorSettingName( $candidate ) );
+		if ( 'api_key' !== ( $auth['method'] ?? 'api_key' ) ) {
+			return '';
 		}
 
-		return '';
+		return (string) ( $auth['setting_name'] ?? self::defaultConnectorSettingName( $provider_id ) );
 	}
 
 	/**
@@ -377,27 +362,6 @@ class WpAiClientProviderAdmin {
 		}
 
 		return $registry;
-	}
-
-	/**
-	 * Return provider id aliases shared with Data Machine's historical ids.
-	 *
-	 * @param string $provider Provider identifier.
-	 * @return list<string>
-	 */
-	private static function providerAliases( string $provider ): array {
-		$provider = sanitize_key( $provider );
-		$aliases  = array( $provider );
-
-		if ( 'google' === $provider ) {
-			$aliases[] = 'gemini';
-		}
-
-		if ( 'gemini' === $provider ) {
-			$aliases[] = 'google';
-		}
-
-		return array_values( array_unique( array_filter( $aliases ) ) );
 	}
 
 	/**

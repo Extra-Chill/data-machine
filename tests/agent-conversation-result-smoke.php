@@ -8,8 +8,8 @@
 require_once __DIR__ . '/bootstrap-unit.php';
 
 use DataMachine\Engine\AI\AIConversationLoop;
-use AgentsAPI\Engine\AI\AgentConversationResult;
-use AgentsAPI\Engine\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\AgentConversationResult;
+use AgentsAPI\AI\AgentMessageEnvelope;
 
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $hook, $value ) {

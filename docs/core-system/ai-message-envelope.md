@@ -1,6 +1,6 @@
 # Agent Message Envelope
 
-**File**: `/agents-api/inc/Engine/AI/AgentMessageEnvelope.php`
+**File**: `/agents-api/inc/AI/AgentMessageEnvelope.php`
 
 The canonical agent message shape is a JSON-friendly typed envelope. Runtime
 code, chat storage, and transcript storage should store and return envelopes.
