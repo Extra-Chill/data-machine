@@ -60,6 +60,7 @@ function size_format( $bytes ): string {
 }
 
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
+require_once dirname( __DIR__ ) . '/agents-api/agents-api.php';
 
 use DataMachine\Engine\AI\RequestBuilder;
 use DataMachine\Engine\AI\WpAiClientCapability;

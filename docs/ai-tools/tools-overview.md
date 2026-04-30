@@ -672,7 +672,7 @@ AI agents receive available tools based on:
 - Centralized AI request construction for all agents
 - Directive application system (global, agent-specific, pipeline, chat)
 - Tool restructuring for AI provider compatibility
-- Integration with ai-http-client library
+- Integration with the wp-ai-client runtime adapter
 
 **Tool Results Processing**:
 - Tool responses formatted by ConversationManager for AI consumption

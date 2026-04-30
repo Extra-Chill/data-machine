@@ -212,7 +212,7 @@ The Chat endpoint uses the Universal Engine architecture at `/inc/Engine/AI/` fo
 - Centralized AI request construction
 - Hierarchical directive application (global → agent → chat-specific)
 - Tool restructuring for provider compatibility
-- Integration with ai-http-client
+- Integration with the wp-ai-client runtime adapter
 
 **ToolExecutor**
 - Universal tool discovery via filters (`datamachine_global_tools`, `datamachine_chat_tools`)

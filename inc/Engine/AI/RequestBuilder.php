@@ -27,7 +27,7 @@ class RequestBuilder {
 	 *
 	 * Dispatch requires WordPress core's wp-ai-client plus a provider plugin that has
 	 * registered the requested provider. Missing wp-ai-client support is surfaced as a
-	 * request error; agents-api must not silently fall back to ai-http-client.
+	 * request error; agents-api must not silently fall back to another provider client.
 	 *
 	 * @param array  $messages    Initial messages array with role/content
 	 * @param string $provider    AI provider name (openai, anthropic, google, grok, openrouter)
