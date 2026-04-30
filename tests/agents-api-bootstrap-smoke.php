@@ -24,6 +24,10 @@ agents_api_smoke_assert_equals( true, defined( 'AGENTS_API_LOADED' ), 'module ma
 agents_api_smoke_assert_equals( true, defined( 'AGENTS_API_PATH' ), 'module path constant is available', $failures, $passes );
 agents_api_smoke_assert_equals( realpath( __DIR__ . '/../agents-api' ) . '/', AGENTS_API_PATH, 'module path points at agents-api directory', $failures, $passes );
 agents_api_smoke_assert_equals( true, function_exists( 'wp_register_agent' ), 'wp_register_agent helper is available', $failures, $passes );
+agents_api_smoke_assert_equals( true, function_exists( 'wp_get_agent' ), 'wp_get_agent helper is available', $failures, $passes );
+agents_api_smoke_assert_equals( true, function_exists( 'wp_get_agents' ), 'wp_get_agents helper is available', $failures, $passes );
+agents_api_smoke_assert_equals( true, function_exists( 'wp_has_agent' ), 'wp_has_agent helper is available', $failures, $passes );
+agents_api_smoke_assert_equals( true, function_exists( 'wp_unregister_agent' ), 'wp_unregister_agent helper is available', $failures, $passes );
 agents_api_smoke_assert_equals( true, class_exists( 'WP_Agent' ), 'WP_Agent value object is available', $failures, $passes );
 agents_api_smoke_assert_equals( true, class_exists( 'WP_Agents_Registry' ), 'WP_Agents_Registry facade is available', $failures, $passes );
 agents_api_smoke_assert_equals( true, interface_exists( 'DataMachine\\Core\\Database\\Chat\\ConversationTranscriptStoreInterface' ), 'ConversationTranscriptStoreInterface contract is available', $failures, $passes );

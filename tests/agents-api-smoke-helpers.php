@@ -10,6 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $GLOBALS['__agents_api_smoke_actions'] = array();
+$GLOBALS['__agents_api_smoke_wrong']   = array();
 
 function sanitize_title( string $value ): string {
 	$value = strtolower( $value );
@@ -35,6 +36,14 @@ function do_action( string $hook, ...$args ): void {
 			call_user_func_array( $callback, $args );
 		}
 	}
+}
+
+function _doing_it_wrong( string $function_name, string $message, string $version ): void {
+	$GLOBALS['__agents_api_smoke_wrong'][] = array(
+		'function' => $function_name,
+		'message'  => $message,
+		'version'  => $version,
+	);
 }
 
 function agents_api_smoke_assert_equals( $expected, $actual, string $name, array &$failures, int &$passes ): void {
