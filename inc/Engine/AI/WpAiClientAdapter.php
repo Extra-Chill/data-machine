@@ -80,7 +80,12 @@ class WpAiClientAdapter {
 
 			$builder = self::applyImageAspectRatio( $builder, $aspect_ratio );
 
-			$supported = call_user_func( array( $builder, 'is_supported_for_image_generation' ) );
+			$support_check = array( $builder, 'is_supported_for_image_generation' );
+			if ( ! is_callable( $support_check ) ) {
+				return self::errorResponse( $provider, 'wp-ai-client image support checks are unavailable' );
+			}
+
+			$supported = call_user_func( $support_check );
 			if ( is_wp_error( $supported ) ) {
 				return self::errorResponse(
 					$provider,
@@ -99,7 +104,12 @@ class WpAiClientAdapter {
 				);
 			}
 
-			$file = call_user_func( array( $builder, 'generate_image' ) );
+			$image_generator = array( $builder, 'generate_image' );
+			if ( ! is_callable( $image_generator ) ) {
+				return self::errorResponse( $provider, 'wp-ai-client image generation API is unavailable' );
+			}
+
+			$file = call_user_func( $image_generator );
 			if ( is_wp_error( $file ) ) {
 				return self::errorResponse( $provider, 'wp-ai-client image generation failed: ' . $file->get_error_message() );
 			}
