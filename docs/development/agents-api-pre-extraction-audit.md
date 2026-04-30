@@ -115,7 +115,7 @@ Target shape:
 
 ### 4. Conversation Storage Boundary
 
-The transcript interface is now separated from the aggregate chat-product store. The implementation still lives under `Core\Database\Chat` while extraction is in-place, but the dependency direction is explicit: runtime transcript persistence depends on `ConversationTranscriptStoreInterface`, while Data Machine chat UI/REST/CLI/retention/reporting depend on the broader `ConversationStoreInterface` aggregate.
+The transcript interface is now separated from the aggregate chat-product store. The interface lives in the in-repo `agents-api/` module while preserving its current namespace for behavior compatibility, and the dependency direction is explicit: runtime transcript persistence depends on `ConversationTranscriptStoreInterface`, while Data Machine chat UI/REST/CLI/retention/reporting depend on the broader `ConversationStoreInterface` aggregate.
 
 Target shape:
 
