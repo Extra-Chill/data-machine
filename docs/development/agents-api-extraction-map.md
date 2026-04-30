@@ -97,7 +97,8 @@ These are plausibly generic implementations, but should not move until naming an
 | Surface | Current location | Why it is not public-ready yet | Extraction direction |
 |---|---|---|---|
 | `AIConversationLoop` | `inc/Engine/AI/AIConversationLoop.php` | Name says AI and still carries the compatibility facade/result shape, but handler completion and transcript persistence now route through runtime collaborators. | Keep shrinking the compatibility adapter by extracting provider request assembly and Data Machine logging policy next. |
-| `RequestBuilder` | `inc/Engine/AI/RequestBuilder.php` | Mostly generic request assembly, but dispatch falls back to `chubes_ai_request` and applies Data Machine directives. | Extract assembler separately from provider dispatch and Data Machine directive policy. |
+| `ProviderRequestAssembler` | `inc/Engine/AI/ProviderRequestAssembler.php` | Normalizes messages, tools, model, and caller-selected directives without dispatching, logging, or discovering Data Machine directives. | Good in-place request assembly candidate once prompt/directive vocabulary is settled. |
+| `RequestBuilder` | `inc/Engine/AI/RequestBuilder.php` | Data Machine adapter around provider assembly: discovers/directive-policies `datamachine_directives`, emits `datamachine_log`, applies request-size guardrails, and dispatches via wp-ai-client or `chubes_ai_request`. | Keep as Data Machine adapter unless/until the legacy provider dispatch bridge is replaced. |
 | `WpAiClientAdapter` | `inc/Engine/AI/WpAiClientAdapter.php` | Generic bridge to WordPress AI client, but currently lives as Data Machine implementation detail. | Good implementation candidate once request/message contracts are generic. |
 | `RequestMetadata` | `inc/Engine/AI/RequestMetadata.php` | Generic inspection/size metadata. | Move after field names are checked against Agents API message/tool vocabulary. |
 | `RequestInspector` | `inc/Engine/AI/RequestInspector.php` | Generic debugging/inspection value, likely useful across runtimes. | Rename away from Data Machine only if public debug surface is desired. |
@@ -270,6 +271,7 @@ These tests currently pin the substrate most relevant to extraction.
 | `tests/system-task-agent-context-smoke.php` | Agent context propagation through system tasks. | Data Machine adapter/product. |
 | `tests/agent-call-migration-smoke.php` | Agent-call migration. | Agent-call primitive may inform Agents API; migration stays Data Machine. |
 | `tests/agent-bundle-*.php` | Bundle format, artifact store, upgrade planner, portable update. | Split pure manifest/auth/template artifacts from flow/pipeline file adapters. |
+| `tests/ai-request-inspector-smoke.php` | Provider request assembly without dispatch plus Data Machine request inspection surface. | Split generic `ProviderRequestAssembler` assertions from Data Machine `RequestBuilder` directive-policy assertions during extraction. |
 
 ## First Seams To Make Boring
 

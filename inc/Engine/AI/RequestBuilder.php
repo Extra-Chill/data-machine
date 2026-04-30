@@ -46,13 +46,12 @@ class RequestBuilder {
 		string $mode,
 		array $payload = array()
 	): array {
-		$assembled                    = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
-		$request                      = $assembled['request'];
-		$provider_request             = $request;
-		$provider_request['messages'] = AgentMessageEnvelope::to_provider_messages( $request['messages'] ?? array() );
-		$structured_tools             = $assembled['structured_tools'];
-		$applied_directives           = $assembled['applied_directives'];
-		$directive_metadata           = $assembled['directive_metadata'];
+		$assembled          = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
+		$request            = $assembled['request'];
+		$provider_request   = ProviderRequestAssembler::toProviderRequest( $request );
+		$structured_tools   = $assembled['structured_tools'];
+		$applied_directives = $assembled['applied_directives'];
+		$directive_metadata = $assembled['directive_metadata'];
 
 		$request_metadata = RequestMetadata::build(
 			$provider_request,
@@ -169,12 +168,7 @@ class RequestBuilder {
 		string $mode,
 		array $payload = array()
 	): array {
-		$structured_tools = self::restructure_tools( $tools );
 		$payload          = self::withDirectiveContext( $payload );
-
-		$promptBuilder = new PromptBuilder();
-		$promptBuilder->setMessages( $messages )->setTools( $structured_tools );
-
 		$directives       = apply_filters( 'datamachine_directives', array() );
 		$directive_policy = ( new DirectivePolicyResolver() )->resolve(
 			$directives,
@@ -185,56 +179,17 @@ class RequestBuilder {
 		);
 		$directives       = $directive_policy['directives'];
 		$suppressed       = $directive_policy['suppressed'];
-		foreach ( $directives as $directive ) {
-			$promptBuilder->addDirective(
-				$directive['class'],
-				$directive['priority'],
-				$directive['modes'] ?? array( 'all' )
-			);
-		}
 
-		$request             = $promptBuilder->buildDetailed( $mode, $provider, $payload );
-		$request['messages'] = AgentMessageEnvelope::normalize_many( $request['messages'] ?? array() );
-		$applied_directives  = $request['applied_directives'] ?? array();
-		$directive_metadata  = $request['directive_metadata'] ?? array();
-		$directive_breakdown = $request['directive_breakdown'] ?? array();
-		unset( $request['applied_directives'], $request['directive_metadata'], $request['directive_breakdown'] );
-		$request['model'] = $model;
+		$assembled = ( new ProviderRequestAssembler() )->assemble( $messages, $provider, $model, $tools, $mode, $payload, $directives );
 
 		return array(
-			'request'               => $request,
-			'structured_tools'      => $structured_tools,
-			'applied_directives'    => $applied_directives,
-			'directive_metadata'    => $directive_metadata,
-			'directive_breakdown'   => $directive_breakdown,
+			'request'               => $assembled['request'],
+			'structured_tools'      => $assembled['structured_tools'],
+			'applied_directives'    => $assembled['applied_directives'],
+			'directive_metadata'    => $assembled['directive_metadata'],
+			'directive_breakdown'   => $assembled['directive_breakdown'],
 			'suppressed_directives' => $suppressed,
 		);
-	}
-
-	/**
-	 * Restructure tools with explicit field mapping
-	 *
-	 * Normalizes raw tool definitions to ensure all tools have consistent structure
-	 * with name, description, parameters, handler, and handler_config fields.
-	 * Prevents tool format mismatches with AI providers.
-	 *
-	 * @param array $raw_tools Raw tools array from filters
-	 * @return array Structured tools with explicit fields
-	 */
-	private static function restructure_tools( array $raw_tools ): array {
-		$structured = array();
-
-		foreach ( $raw_tools as $tool_name => $tool_config ) {
-			$structured[ $tool_name ] = array(
-				'name'           => $tool_name,
-				'description'    => $tool_config['description'] ?? '',
-				'parameters'     => $tool_config['parameters'] ?? array(),
-				'handler'        => $tool_config['handler'] ?? null,
-				'handler_config' => $tool_config['handler_config'] ?? array(),
-			);
-		}
-
-		return $structured;
 	}
 
 	/**

@@ -82,7 +82,7 @@ require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 use DataMachine\Cli\Commands\JobsCommand;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
-use DataMachine\Engine\AI\AIConversationLoop;
+use DataMachine\Engine\AI\DataMachinePipelineTranscriptPersister;
 use DataMachine\Engine\AI\Directives\DirectiveInterface;
 use DataMachine\Engine\AI\RequestBuilder;
 
@@ -137,6 +137,30 @@ function assert_true( bool $condition, string $label ): void {
 	$failures[] = $label;
 }
 
+function failure_count(): int {
+	return count( smoke_failures() );
+}
+
+function smoke_failures(): array {
+	global $failures;
+	return array_values( $failures );
+}
+
+function smoke_logs(): array {
+	$logs = $GLOBALS['datamachine_test_logs'] ?? array();
+	return is_array( $logs ) ? array_values( $logs ) : array();
+}
+
+function count_guardrail_warnings(): int {
+	$count = 0;
+	foreach ( smoke_logs() as $entry ) {
+		if ( is_array( $entry ) && 'warning' === ( $entry[0] ?? '' ) && 'AI request size guardrail warning' === ( $entry[1] ?? '' ) ) {
+			++$count;
+		}
+	}
+	return $count;
+}
+
 function reset_smoke_state(): void {
 	$GLOBALS['datamachine_test_filters'] = array();
 	$GLOBALS['datamachine_test_logs']    = array();
@@ -169,7 +193,7 @@ function build_smoke_request(): array {
 			);
 		},
 		10,
-		6
+		1
 	);
 
 	return RequestBuilder::build(
@@ -193,7 +217,7 @@ foreach ( array( 'datamachine_ai_request_warning_bytes', 'datamachine_ai_message
 	add_filter( $filter, fn() => 1 );
 }
 $response = build_smoke_request();
-assert_true( ! empty( $GLOBALS['datamachine_test_logs'] ), 'oversized request emits a pre-dispatch warning' );
+assert_true( count( smoke_logs() ) > 0, 'oversized request emits a pre-dispatch warning' );
 assert_true( isset( $response['request_metadata']['request_json_bytes'] ), 'response carries request metadata' );
 assert_true( 'RULES.md' === ( $response['request_metadata']['memory_files'][0]['filename'] ?? '' ), 'memory file metadata is compactly captured' );
 
@@ -203,20 +227,14 @@ foreach ( array( 'datamachine_ai_request_warning_bytes', 'datamachine_ai_message
 	add_filter( $filter, fn() => 999999999 );
 }
 build_smoke_request();
-$guardrail_warnings = array_filter(
-	$GLOBALS['datamachine_test_logs'],
-	fn( $entry ) => 'warning' === ( $entry[0] ?? '' ) && 'AI request size guardrail warning' === ( $entry[1] ?? '' )
-);
-assert_true( empty( $guardrail_warnings ), 'small request does not emit guardrail warning' );
+assert_true( 0 === count_guardrail_warnings(), 'small request does not emit guardrail warning' );
 
 // 3. Simulated persisted pipeline transcript stores request_metadata in session metadata.
 $store    = new RequestMetadataSmokeStore();
 $property = new ReflectionProperty( ConversationStoreFactory::class, 'instance' );
 $property->setValue( null, $store );
 
-$method = new ReflectionMethod( AIConversationLoop::class, 'maybePersistTranscript' );
-$session_id = $method->invoke(
-	null,
+$session_id = ( new DataMachinePipelineTranscriptPersister() )->persist(
 	array( array( 'role' => 'user', 'content' => 'hello' ) ),
 	'openai',
 	'gpt-smoke',
@@ -240,13 +258,13 @@ $render->invoke(
 assert_true( in_array( 'Transcript for job 279', WP_CLI::$logs, true ), 'legacy transcript renders without request metadata' );
 
 echo "\n";
-if ( empty( $failures ) ) {
-	echo "All AI request metadata guardrail smoke tests passed.\n";
-	exit( 0 );
+if ( failure_count() > 0 ) {
+	echo sprintf( "%d failure(s):\n", failure_count() );
+	foreach ( smoke_failures() as $failure ) {
+		echo "  - {$failure}\n";
+	}
+	exit( 1 );
 }
 
-echo sprintf( "%d failure(s):\n", count( $failures ) );
-foreach ( $failures as $failure ) {
-	echo "  - {$failure}\n";
-}
-exit( 1 );
+echo "All AI request metadata guardrail smoke tests passed.\n";
+exit( 0 );
