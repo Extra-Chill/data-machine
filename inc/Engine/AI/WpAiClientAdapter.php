@@ -2,13 +2,16 @@
 /**
  * WordPress AI Client adapter.
  *
- * Bridges Data Machine's RequestBuilder to WordPress core's `wp_ai_client_prompt()`
- * fluent API. Core's AI client plus registered provider plugins are the only
- * supported agent-runtime provider path.
+ * Data Machine request-execution adapter for WordPress core's `wp_ai_client_prompt()`
+ * fluent API. RequestBuilder stays in the Data Machine product layer while it carries
+ * directive discovery, logging, and legacy request-array normalization; the provider
+ * runtime it consumes is the wp-ai-client public API.
  *
- * Scope: this class is the request-execution bridge only. Admin UI, REST endpoints,
- * settings, and provider/model discovery continue to flow through the existing
- * legacy filter surface until those layers are migrated separately.
+ * Scope: this class converts Data Machine's assembled provider request shape into
+ * wp-ai-client calls and normalizes the result back to Data Machine's historical
+ * response array. It is adapter vocabulary because it belongs to Data Machine's
+ * product/runtime compatibility layer, not because Agents API requires a bridge to
+ * wp-ai-client.
  *
  * @package DataMachine\Engine\AI
  * @since 0.69.1
@@ -29,8 +32,9 @@ class WpAiClientAdapter {
 	 *   3. The requested provider is registered in the default registry — i.e. a
 	 *      provider plugin like `ai-provider-for-openai` is installed and active.
 	 *
-	 * If any condition fails, callers surface a request-runtime error instead of
-	 * falling back to a secondary provider client.
+	 * If any condition fails, callers surface a structured request error. The
+	 * provider runtime path is wp-ai-client; there is no ai-http-client fallback in
+	 * this Agents API direction.
 	 *
 	 * @since 0.69.1
 	 *
@@ -64,9 +68,9 @@ class WpAiClientAdapter {
 	 * Returns Data Machine's existing normalized response shape so the conversation
 	 * loop, tool executor, and downstream consumers do not change.
 	 *
-	 * If the request contains content that the bridge does not yet translate (currently:
+	 * If the request contains content that the adapter does not yet translate (currently:
 	 * any non-string message content such as multi-modal blocks), this method returns
-	 * `null` so the caller can surface an unsupported request-shape error.
+	 * `null` so the caller can return a structured unsupported-shape error.
 	 *
 	 * @since 0.69.1
 	 *
@@ -74,10 +78,11 @@ class WpAiClientAdapter {
 	 * @param string $provider  Provider identifier.
 	 * @param array  $tools     Structured tools (name => ['name', 'description', 'parameters', ...]).
 	 * @return array|null Response array on success, error response array on AI failure, or null if the
-	 *                    bridge cannot handle this request shape.
+	 *                    adapter cannot handle this request shape.
 	 */
 	public static function dispatch( array $request, string $provider, array $tools ): ?array {
-		// Bail on request shapes the wp-ai-client bridge does not translate yet.
+		// Bail with an unsupported-shape signal on non-string content until this adapter
+		// can map multi-modal request parts into wp-ai-client DTOs.
 		foreach ( $request['messages'] ?? array() as $message ) {
 			if ( isset( $message['content'] ) && ! is_string( $message['content'] ) ) {
 				return null;
@@ -354,8 +359,9 @@ class WpAiClientAdapter {
 	/**
 	 * Resolve the API key for this provider via DM's existing key plumbing.
 	 *
-	 * Reads Data Machine's existing provider-key filter so admin UX, network
-	 * settings, and key persistence remain unchanged until those surfaces migrate.
+	 * Reads the same `chubes_ai_provider_api_keys` filter that ai-http-client uses,
+	 * so admin UX, network settings, and key persistence remain unchanged while
+	 * Data Machine request assembly consumes wp-ai-client directly.
 	 *
 	 * @since 0.69.1
 	 *
