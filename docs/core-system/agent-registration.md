@@ -46,6 +46,21 @@ That's it. On the next request where `init` fires, DM reconciles the registratio
 | `owner_resolver` | callable | Returns `int user_id`. Called once at row-creation time. Defaults to `DirectoryManager::get_default_agent_user_id()`. |
 | `default_config` | array | Initial `agent_config` persisted on creation. Subsequent config changes go through the DB — the registration never overrides user-edited config. |
 
+### Category and metadata policy
+
+The current registry intentionally does **not** implement Abilities API-style categories.
+
+Abilities need first-class categories because abilities are many small executable actions exposed through REST discovery and filtering. Agents are runtime definitions; their executable surface should be discovered through abilities/runtime tool declarations and explicit policy, not through a second category hierarchy on the agent object.
+
+Agents API v1 should therefore keep category semantics out of `WP_Agent`:
+
+- No `WP_Agent_Category` registry in the first standalone extraction.
+- No category-derived permissions, REST visibility, tool policy, or memory policy.
+- Data Machine admin grouping remains Data Machine product behavior.
+- Future descriptive `metadata`, `type`, `capabilities`, or `annotations` fields can be added after the public class contract is finalized, but they must be non-authoritative until a separate issue defines their semantics.
+
+See `docs/development/agents-api-pre-extraction-audit.md` for the extraction checklist and the comparison to Abilities API categories.
+
 ### Slug semantics
 
 Slugs are passed through `sanitize_title()`. They must be unique across a site (DB column has a UNIQUE constraint on `agent_slug`). Two plugins registering the same slug is resolved by **last-wins** — this matches WP action/filter semantics, so plugins can override core or other plugins by hooking at a higher priority.
