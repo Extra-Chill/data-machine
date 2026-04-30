@@ -21,7 +21,7 @@ $scanned_files = array(
 	'docs/development/agents-api-extraction-map.md',
 	'docs/development/agents-api-pre-extraction-audit.md',
 	'docs/core-system/request-builder.md',
-	'agents-api/inc/Engine/AI/WpAiClient.php',
+	'agents-api/inc/AI/WpAiClient.php',
 	'inc/Engine/AI/RequestBuilder.php',
 	'inc/Engine/AI/WpAiClientProviderAdmin.php',
 );

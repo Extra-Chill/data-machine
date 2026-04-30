@@ -25,7 +25,7 @@ $assert = function ( bool $condition, string $message ) use ( &$assertions, &$fa
 
 $root    = dirname( __DIR__ );
 $ability = (string) file_get_contents( $root . '/inc/Abilities/Media/ImageGenerationAbilities.php' );
-$agents  = (string) file_get_contents( $root . '/agents-api/inc/Engine/AI/WpAiClient.php' );
+$agents  = (string) file_get_contents( $root . '/agents-api/inc/AI/WpAiClient.php' );
 $task    = (string) file_get_contents( $root . '/inc/Engine/AI/System/Tasks/ImageGenerationTask.php' );
 $tool    = (string) file_get_contents( $root . '/inc/Engine/AI/Tools/Global/ImageGeneration.php' );
 $cli     = (string) file_get_contents( $root . '/inc/Cli/Commands/ImageCommand.php' );

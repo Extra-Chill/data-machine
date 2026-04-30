@@ -12,7 +12,7 @@
 
 namespace DataMachine\Engine\AI;
 
-use AgentsAPI\Engine\AI\WpAiClient;
+use AgentsAPI\AI\WpAiClient;
 use DataMachine\Engine\AI\Directives\DirectivePolicyResolver;
 
 defined( 'ABSPATH' ) || exit;

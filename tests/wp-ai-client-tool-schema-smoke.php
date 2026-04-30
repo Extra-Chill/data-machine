@@ -32,7 +32,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once $root . '/tests/Unit/Support/WpAiClientTestDoubles.php';
 require_once $root . '/agents-api/agents-api.php';
 
-$declaration = AgentsAPI\Engine\AI\WpAiClient::function_declaration(
+$declaration = AgentsAPI\AI\WpAiClient::function_declaration(
 	'client/test_tool',
 	'Test tool.',
 	array(

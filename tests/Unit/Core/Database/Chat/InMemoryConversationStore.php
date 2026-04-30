@@ -13,7 +13,7 @@
 namespace DataMachine\Tests\Unit\Core\Database\Chat;
 
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
-use AgentsAPI\Engine\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\AgentMessageEnvelope;
 
 class InMemoryConversationStore implements ConversationStoreInterface {
 

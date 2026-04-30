@@ -70,7 +70,7 @@ require_once dirname( __DIR__ ) . '/inc/Engine/AI/RequestMetadata.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/WpAiClientProviderAdmin.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/RequestBuilder.php';
 
-use AgentsAPI\Engine\AI\WpAiClient;
+use AgentsAPI\AI\WpAiClient;
 use DataMachine\Engine\AI\RequestBuilder;
 
 $failures = array();
@@ -132,7 +132,7 @@ assert_smoke( isset( $response['request_metadata']['request_json_bytes'] ), 'blo
 assert_smoke( str_contains( (string) ( $response['error'] ?? '' ), 'wp-ai-client is unavailable' ), 'blocked request error names wp-ai-client gate', (string) ( $response['error'] ?? '' ) );
 
 $request_builder_source = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Engine/AI/RequestBuilder.php' );
-$agents_api_source      = (string) file_get_contents( dirname( __DIR__ ) . '/agents-api/inc/Engine/AI/WpAiClient.php' );
+$agents_api_source      = (string) file_get_contents( dirname( __DIR__ ) . '/agents-api/inc/AI/WpAiClient.php' );
 
 assert_smoke( false === str_contains( $request_builder_source, "'chubes_ai_request'" ), 'RequestBuilder source has no chubes_ai_request dispatch' );
 assert_smoke( false === str_contains( $request_builder_source, 'Legacy path: ai-http-client' ), 'RequestBuilder source has no legacy provider path comment' );

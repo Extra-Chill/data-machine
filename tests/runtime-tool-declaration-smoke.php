@@ -9,7 +9,7 @@
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
-use AgentsAPI\Engine\AI\Tools\RuntimeToolDeclaration;
+use AgentsAPI\AI\Tools\RuntimeToolDeclaration;
 
 function datamachine_runtime_tool_assert( bool $condition, string $message ): void {
 	if ( ! $condition ) {
@@ -19,7 +19,7 @@ function datamachine_runtime_tool_assert( bool $condition, string $message ): vo
 
 $assertions = 0;
 
-$runtime_tool_file = dirname( __DIR__ ) . '/agents-api/inc/Engine/AI/Tools/RuntimeToolDeclaration.php';
+$runtime_tool_file = dirname( __DIR__ ) . '/agents-api/inc/AI/Tools/RuntimeToolDeclaration.php';
 $legacy_tool_file  = dirname( __DIR__ ) . '/inc/Engine/AI/Tools/RuntimeToolDeclaration.php';
 
 datamachine_runtime_tool_assert(

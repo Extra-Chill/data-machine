@@ -5,7 +5,7 @@
  * @package AgentsAPI
  */
 
-namespace AgentsAPI\Engine\AI;
+namespace AgentsAPI\AI;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

@@ -9,9 +9,9 @@
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
-use AgentsAPI\Engine\AI\AgentConversationResult;
+use AgentsAPI\AI\AgentConversationResult;
 use DataMachine\Engine\AI\ConversationManager;
-use AgentsAPI\Engine\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\AgentMessageEnvelope;
 
 function datamachine_message_envelope_assert( bool $condition, string $message ): void {
 	if ( ! $condition ) {

@@ -15,7 +15,7 @@
 
 namespace DataMachine\Abilities\Media;
 
-use AgentsAPI\Engine\AI\WpAiClient;
+use AgentsAPI\AI\WpAiClient;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\RequestBuilder;
