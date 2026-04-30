@@ -2,6 +2,26 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.102.0] - 2026-04-29
+
+### Added
+- expose system prompt artifact metadata
+- add pageable source aggregation primitive
+
+### Changed
+- split request assembly boundary
+- pass directive context through adapter
+- split generic tool policy filter
+- split runtime payload adapter context
+- split Data Machine tool policy adapters
+
+### Fixed
+- refresh BFB to 0.6.3
+- move package lifecycle CLI under agent
+- load full runtime in WordPress unit tests
+- load full runtime during PHPUnit
+- refresh broad unit suite expectations
+
 ## [0.101.2] - 2026-04-29
 
 ### Changed
