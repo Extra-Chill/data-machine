@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.1] - 2026-05-01
+
+### Fixed
+- convert wp-ai-client history to message DTOs
+
 ## [0.103.0] - 2026-05-01
 
 ### Added
