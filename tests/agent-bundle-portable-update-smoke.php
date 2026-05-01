@@ -189,6 +189,24 @@ $preserved = call_bundle_private( $bundler, 'preserve_runtime_queue_fields', arr
 assert_bundle_update_equals( 'upgrade preserves existing config_patch_queue', 'Local queue head', $preserved['flow-step-1']['config_patch_queue'][0]['patch']['query'] ?? null );
 assert_bundle_update_equals( 'upgrade preserves existing queue_mode', 'static', $preserved['flow-step-1']['queue_mode'] ?? null );
 
+$runtime_stripped_payload = call_bundle_private(
+	$bundler,
+	'flow_artifact_payload',
+	array(
+		array(
+			'flow_name'   => 'Runtime queue revision test',
+			'flow_config' => array(
+				'2_bundle_step_0_4' => array(
+					'pipeline_step_id'         => '2_bundle_step_0',
+					'_queue_consume_revision' => 17,
+				),
+			),
+		),
+		'runtime-queue-revision-test',
+	)
+);
+assert_bundle_update( 'flow artifact hashing ignores queue consume revision', ! isset( $runtime_stripped_payload['flow_config']['2_bundle_step_0_4']['_queue_consume_revision'] ) );
+
 $remapped_pipeline = call_bundle_private(
 	$bundler,
 	'remap_pipeline_step_ids',
@@ -228,6 +246,29 @@ assert_bundle_update_equals( 'flow step metadata pipeline_step_id remaps', '3_bu
 assert_bundle_update_equals( 'flow step metadata pipeline_id remaps', 3, $remapped_flow['3_bundle_step_0_9']['pipeline_id'] ?? null );
 assert_bundle_update_equals( 'flow step metadata flow_id remaps', 9, $remapped_flow['3_bundle_step_0_9']['flow_id'] ?? null );
 
+$normalized_existing_flow_payload = call_bundle_private(
+	$bundler,
+	'normalized_existing_flow_payload',
+	array(
+		array(
+			'flow_id'     => 9,
+			'flow_name'   => 'Existing stale flow',
+			'flow_config' => array(
+				'3_bundle_step_0_9' => array(
+					'flow_step_id'     => '2_bundle_step_0_9',
+					'pipeline_step_id' => '2_bundle_step_0',
+					'pipeline_id'      => 2,
+					'flow_id'          => 9,
+				),
+			),
+		),
+		'existing-stale-flow',
+		3,
+	)
+);
+assert_bundle_update( 'existing stale flow payload normalizes step key', isset( $normalized_existing_flow_payload['flow_config']['3_bundle_step_0_9'] ) );
+assert_bundle_update_equals( 'existing stale flow payload normalizes pipeline metadata', 3, $normalized_existing_flow_payload['flow_config']['3_bundle_step_0_9']['pipeline_id'] ?? null );
+
 $agent_bundler_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Agents/AgentBundler.php' ) ?: '';
 $pipelines_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Pipelines/Pipelines.php' ) ?: '';
 $flows_source         = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Flows/Flows.php' ) ?: '';
@@ -251,6 +292,7 @@ assert_bundle_update( 'package CLI exposes diff command', str_contains( $bundle_
 assert_bundle_update( 'package CLI exposes upgrade command', str_contains( $bundle_cli_source, 'function upgrade(' ) );
 assert_bundle_update( 'package CLI stages PendingActions for approval-required upgrades', str_contains( $bundle_cli_source, 'AgentBundleUpgradePendingAction::stage' ) );
 assert_bundle_update( 'package CLI resolves staged apply actions', str_contains( $bundle_cli_source, 'ResolvePendingActionAbility::execute' ) );
+assert_bundle_update( 'package CLI plans target artifacts in installed ID space', str_contains( $bundle_cli_source, 'bundle_artifacts_for_agent' ) );
 
 $failure_count = is_array( $GLOBALS['failures'] ?? null ) ? count( $GLOBALS['failures'] ) : 0;
 if ( 0 !== $failure_count ) {

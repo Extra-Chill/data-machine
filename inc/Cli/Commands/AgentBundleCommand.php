@@ -327,19 +327,45 @@ class AgentBundleCommand extends BaseCommand {
 		return AgentBundleUpgradePlanner::plan(
 			$installed,
 			$this->current_artifacts( $agent, $installed ),
-			$this->bundle_artifacts( $bundle ),
+			$this->bundle_artifacts_for_agent( $bundle, $agent ),
 			$this->bundle_summary( $bundle, $slug )
 		);
 	}
 
 	/** @return array<int,array<string,mixed>> */
 	private function bundle_artifacts( array $bundle ): array {
+		return $this->bundle_artifacts_for_agent( $bundle, null );
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	private function bundle_artifacts_for_agent( array $bundle, ?array $agent ): array {
 		$artifacts = array();
+		$agent_id  = is_array( $agent ) ? (int) ( $agent['agent_id'] ?? 0 ) : 0;
+		$pipeline_id_map            = array();
+		$existing_pipelines_by_slug = array();
+
+		if ( $agent_id > 0 ) {
+			foreach ( $this->pipelines()->get_all_pipelines( null, $agent_id ) as $pipeline ) {
+				$existing_pipelines_by_slug[ (string) ( $pipeline['portable_slug'] ?? '' ) ] = $pipeline;
+			}
+		}
+
 		foreach ( $bundle['pipelines'] ?? array() as $pipeline ) {
 			if ( ! is_array( $pipeline ) ) {
 				continue;
 			}
-			$slug        = PortableSlug::normalize( (string) ( $pipeline['portable_slug'] ?? ( $pipeline['pipeline_name'] ?? 'pipeline' ) ), 'pipeline' );
+			$slug = PortableSlug::normalize( (string) ( $pipeline['portable_slug'] ?? ( $pipeline['pipeline_name'] ?? 'pipeline' ) ), 'pipeline' );
+			if ( isset( $existing_pipelines_by_slug[ $slug ] ) ) {
+				$old_id                        = (int) ( $pipeline['original_id'] ?? 0 );
+				$new_id                        = (int) ( $existing_pipelines_by_slug[ $slug ]['pipeline_id'] ?? 0 );
+				$pipeline_id_map[ $old_id ]     = $new_id;
+				$pipeline['pipeline_config']    = $this->remap_pipeline_step_ids(
+					is_array( $pipeline['pipeline_config'] ?? null ) ? $pipeline['pipeline_config'] : array(),
+					$old_id,
+					$new_id
+				);
+			}
+
 			$artifacts[] = array(
 				'artifact_type' => 'pipeline',
 				'artifact_id'   => $slug,
@@ -352,7 +378,20 @@ class AgentBundleCommand extends BaseCommand {
 			if ( ! is_array( $flow ) ) {
 				continue;
 			}
-			$slug        = PortableSlug::normalize( (string) ( $flow['portable_slug'] ?? ( $flow['flow_name'] ?? 'flow' ) ), 'flow' );
+			$slug            = PortableSlug::normalize( (string) ( $flow['portable_slug'] ?? ( $flow['flow_name'] ?? 'flow' ) ), 'flow' );
+			$old_pipeline_id = (int) ( $flow['original_pipeline_id'] ?? 0 );
+			$new_pipeline_id = (int) ( $pipeline_id_map[ $old_pipeline_id ] ?? 0 );
+			$existing_flow   = $new_pipeline_id > 0 ? $this->flows()->get_by_portable_slug( $new_pipeline_id, $slug ) : null;
+
+			if ( $existing_flow ) {
+				$flow['flow_config'] = $this->remap_flow_step_ids(
+					is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array(),
+					$old_pipeline_id,
+					$new_pipeline_id,
+					(int) $existing_flow['flow_id']
+				);
+			}
+
 			$artifacts[] = array(
 				'artifact_type' => 'flow',
 				'artifact_id'   => $slug,
@@ -403,11 +442,12 @@ class AgentBundleCommand extends BaseCommand {
 				);
 			}
 			if ( 'flow' === $type && isset( $flow_by_slug[ $id ] ) ) {
+				$flow = $this->normalize_current_flow_ids( $flow_by_slug[ $id ] );
 				$artifacts[] = array(
 					'artifact_type' => 'flow',
 					'artifact_id'   => $id,
 					'source_path'   => (string) ( $record['source_path'] ?? '' ),
-					'payload'       => $this->flow_payload( $flow_by_slug[ $id ], $id ),
+					'payload'       => $this->flow_payload( $flow, $id ),
 				);
 			}
 		}
@@ -445,12 +485,80 @@ class AgentBundleCommand extends BaseCommand {
 	private function flow_config_without_runtime_queues( array $flow_config ): array {
 		foreach ( $flow_config as &$step ) {
 			if ( is_array( $step ) ) {
-				unset( $step['prompt_queue'], $step['config_patch_queue'], $step['queue_mode'] );
+				unset( $step['prompt_queue'], $step['config_patch_queue'], $step['queue_mode'], $step['_queue_consume_revision'] );
 			}
 		}
 		unset( $step );
 
 		return $flow_config;
+	}
+
+	private function normalize_current_flow_ids( array $flow ): array {
+		$new_pipeline_id = (int) ( $flow['pipeline_id'] ?? 0 );
+		$flow_id         = (int) ( $flow['flow_id'] ?? 0 );
+		$flow_config     = is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array();
+
+		foreach ( $flow_config as $step_config ) {
+			if ( ! is_array( $step_config ) || ! isset( $step_config['pipeline_id'] ) ) {
+				continue;
+			}
+
+			$old_pipeline_id = (int) $step_config['pipeline_id'];
+			if ( $old_pipeline_id > 0 && $new_pipeline_id > 0 && $flow_id > 0 ) {
+				$flow['flow_config'] = $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, $new_pipeline_id, $flow_id );
+			}
+
+			break;
+		}
+
+		return $flow;
+	}
+
+	private function remap_pipeline_step_ids( array $pipeline_config, int $old_pipeline_id, int $new_pipeline_id ): array {
+		$remapped = array();
+
+		foreach ( $pipeline_config as $pipeline_step_id => $step_config ) {
+			$new_pipeline_step_id = $this->remap_step_id_prefix( (string) $pipeline_step_id, $old_pipeline_id, $new_pipeline_id );
+			if ( is_array( $step_config ) ) {
+				$step_config['pipeline_step_id'] = $new_pipeline_step_id;
+			}
+
+			$remapped[ $new_pipeline_step_id ] = $step_config;
+		}
+
+		return $remapped;
+	}
+
+	private function remap_flow_step_ids( array $flow_config, int $old_pipeline_id, int $new_pipeline_id, int $new_flow_id ): array {
+		$remapped = array();
+
+		foreach ( $flow_config as $flow_step_id => $step_config ) {
+			$pipeline_step_id = is_array( $step_config ) && is_string( $step_config['pipeline_step_id'] ?? null )
+				? $step_config['pipeline_step_id']
+				: preg_replace( '/_\d+$/', '', (string) $flow_step_id );
+			$pipeline_step_id = $this->remap_step_id_prefix( (string) $pipeline_step_id, $old_pipeline_id, $new_pipeline_id );
+			$new_flow_step_id = $pipeline_step_id . '_' . $new_flow_id;
+
+			if ( is_array( $step_config ) ) {
+				$step_config['pipeline_step_id'] = $pipeline_step_id;
+				$step_config['pipeline_id']      = $new_pipeline_id;
+				$step_config['flow_id']          = $new_flow_id;
+				$step_config['flow_step_id']     = $new_flow_step_id;
+			}
+
+			$remapped[ $new_flow_step_id ] = $step_config;
+		}
+
+		return $remapped;
+	}
+
+	private function remap_step_id_prefix( string $step_id, int $old_pipeline_id, int $new_pipeline_id ): string {
+		$prefix = $old_pipeline_id . '_';
+		if ( $old_pipeline_id === $new_pipeline_id || ! str_starts_with( $step_id, $prefix ) ) {
+			return $step_id;
+		}
+
+		return $new_pipeline_id . '_' . substr( $step_id, strlen( $prefix ) );
 	}
 
 	private function resolve_bundle_agent( array $bundle, string $slug = '' ): ?array {
