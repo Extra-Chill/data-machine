@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.5] - 2026-05-01
+
+### Fixed
+- remap installed workflow step metadata
+
 ## [0.103.4] - 2026-05-01
 
 ### Fixed
