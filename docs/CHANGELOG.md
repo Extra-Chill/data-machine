@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.7] - 2026-05-01
+
+### Fixed
+- align upgrade planner assignments
+- normalize package upgrade artifacts
+
 ## [0.103.6] - 2026-05-01
 
 ### Fixed
