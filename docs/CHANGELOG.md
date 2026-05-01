@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.3] - 2026-05-01
+
+### Fixed
+- archive runaway memory before AI compaction
+
 ## [0.103.2] - 2026-05-01
 
 ### Fixed
