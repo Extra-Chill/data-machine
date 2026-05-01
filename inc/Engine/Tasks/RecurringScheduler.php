@@ -116,7 +116,7 @@ class RecurringScheduler {
 		if ( 'one_time' === $interval ) {
 			$timestamp = $options['timestamp'] ?? null;
 			if ( ! $timestamp ) {
-				return new \WP_Error(
+				return self::error(
 					'missing_timestamp',
 					'Timestamp required for one-time scheduling',
 					array( 'status' => 400 )
@@ -124,7 +124,7 @@ class RecurringScheduler {
 			}
 
 			if ( ! function_exists( 'as_schedule_single_action' ) ) {
-				return new \WP_Error(
+				return self::error(
 					'scheduler_unavailable',
 					'Action Scheduler not available',
 					array( 'status' => 500 )
@@ -157,7 +157,7 @@ class RecurringScheduler {
 		if ( 'cron' === $interval ) {
 			$cron_expression = $options['cron_expression'] ?? null;
 			if ( empty( $cron_expression ) ) {
-				return new \WP_Error(
+				return self::error(
 					'missing_cron_expression',
 					'cron_expression required when interval is cron',
 					array( 'status' => 400 )
@@ -177,7 +177,7 @@ class RecurringScheduler {
 		$interval_seconds  = $intervals[ $resolved_interval ]['seconds'] ?? null;
 
 		if ( ! $interval_seconds ) {
-			return new \WP_Error(
+			return self::error(
 				'invalid_interval',
 				"Invalid interval: {$interval}",
 				array( 'status' => 400 )
@@ -185,7 +185,7 @@ class RecurringScheduler {
 		}
 
 		if ( ! function_exists( 'as_schedule_recurring_action' ) ) {
-			return new \WP_Error(
+			return self::error(
 				'scheduler_unavailable',
 				'Action Scheduler not available',
 				array( 'status' => 500 )
@@ -221,7 +221,7 @@ class RecurringScheduler {
 		// Verify persistence. AS can silently drop actions when its tables
 		// aren't ready (e.g. CLI context during plugin activation).
 		if ( ! self::isScheduled( $hook, $args, $group ) ) {
-			return new \WP_Error(
+			return self::error(
 				'schedule_not_persisted',
 				'Action Scheduler accepted the schedule but no pending action was found. AS tables may not be ready.',
 				array( 'status' => 500 )
@@ -263,6 +263,23 @@ class RecurringScheduler {
 			return false;
 		}
 		return false !== as_next_scheduled_action( $hook, $args, $group );
+	}
+
+	/**
+	 * Create a WP_Error with optional data without tripping scoped PHPStan stubs.
+	 *
+	 * @param string $code    Error code.
+	 * @param string $message Error message.
+	 * @param array  $data    Optional error data.
+	 * @return \WP_Error Error object.
+	 */
+	private static function error( string $code, string $message, array $data = array() ): \WP_Error {
+		$error = new \WP_Error( $code, $message );
+		if ( ! empty( $data ) ) {
+			$error->add_data( $data );
+		}
+
+		return $error;
 	}
 
 	/**
@@ -521,7 +538,7 @@ class RecurringScheduler {
 	 */
 	private static function scheduleCron( string $hook, array $args, string $cron_expression, string $group, bool $force_reschedule = false ) {
 		if ( ! self::isValidCronExpression( $cron_expression ) ) {
-			return new \WP_Error(
+			return self::error(
 				'invalid_cron_expression',
 				sprintf( 'Invalid cron expression: "%s"', $cron_expression ),
 				array( 'status' => 400 )
@@ -529,7 +546,7 @@ class RecurringScheduler {
 		}
 
 		if ( ! function_exists( 'as_schedule_cron_action' ) ) {
-			return new \WP_Error(
+			return self::error(
 				'scheduler_unavailable',
 				'Action Scheduler not available',
 				array( 'status' => 500 )
@@ -550,7 +567,7 @@ class RecurringScheduler {
 		$action_id = as_schedule_cron_action( time(), $cron_expression, $hook, $args, $group );
 
 		if ( ! self::isScheduled( $hook, $args, $group ) ) {
-			return new \WP_Error(
+			return self::error(
 				'schedule_not_persisted',
 				'Action Scheduler accepted the cron schedule but no pending action was found.',
 				array( 'status' => 500 )
