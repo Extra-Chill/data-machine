@@ -191,33 +191,30 @@ class RequestInspector {
 		$messages = array();
 
 		if ( ! empty( $data_packets ) ) {
-			$messages[] = array(
-				'role'    => 'user',
-				'content' => wp_json_encode( array( 'data_packets' => AIStep::sanitizeDataPacketsForAi( $data_packets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE ),
+			$messages[] = ConversationManager::buildConversationMessage(
+				'user',
+				wp_json_encode( array( 'data_packets' => AIStep::sanitizeDataPacketsForAi( $data_packets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE )
 			);
 		}
 
 		$file_path = $engine->get( 'image_file_path' );
 		if ( $file_path && file_exists( $file_path ) ) {
 			$file_info  = wp_check_filetype( $file_path );
-			$messages[] = array(
-				'role'    => 'user',
-				'content' => array(
+			$messages[] = ConversationManager::buildConversationMessage(
+				'user',
+				array(
 					array(
 						'type'      => 'file',
 						'file_path' => $file_path,
 						'mime_type' => $file_info['type'] ?? '',
 					),
-				),
+				)
 			);
 		}
 
 		$user_message = $this->peekPromptQueueValue( $flow_step_config );
 		if ( '' !== $user_message ) {
-			$messages[] = array(
-				'role'    => 'user',
-				'content' => $user_message,
-			);
+			$messages[] = ConversationManager::buildConversationMessage( 'user', $user_message );
 		}
 
 		return $messages;

@@ -34,7 +34,7 @@ class PromptBuilder {
 	private array $directives = array();
 
 	/**
-	 * Initial messages
+	 * Initial canonical message envelopes.
 	 *
 	 * @var array
 	 */
@@ -48,13 +48,16 @@ class PromptBuilder {
 	private array $tools = array();
 
 	/**
-	 * Set initial messages
+	 * Set initial messages.
 	 *
-	 * @param array $messages Initial conversation messages
+	 * Adapter callers may pass legacy role/content arrays, but the builder stores
+	 * canonical Agents API envelopes internally.
+	 *
+	 * @param array $messages Initial conversation messages.
 	 * @return self
 	 */
 	public function setMessages( array $messages ): self {
-		$this->messages = $messages;
+		$this->messages = AgentMessageEnvelope::normalize_many( $messages );
 		return $this;
 	}
 

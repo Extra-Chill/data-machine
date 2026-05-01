@@ -133,10 +133,7 @@ class InternalLinkingTask extends SystemTask {
 			}
 			$response = RequestBuilder::build(
 				array(
-					array(
-						'role'    => 'user',
-						'content' => $prompt,
-					),
+					\DataMachine\Engine\AI\ConversationManager::buildConversationMessage( 'user', $prompt ),
 				),
 				$provider,
 				$model,

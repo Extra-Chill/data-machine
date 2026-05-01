@@ -40,7 +40,7 @@ class RequestBuilder {
 	 * request error. Data Machine uses this direct provider path for one-shot/pipeline
 	 * requests; Agents API is only needed when callers require durable runtime semantics.
 	 *
-	 * @param array  $messages    Initial messages array with role/content
+	 * @param array  $messages    Initial canonical message envelopes.
 	 * @param string $provider    AI provider name (openai, anthropic, google, grok, openrouter)
 	 * @param string $model       Model identifier
 	 * @param array  $tools       Raw tools array from filters

@@ -16,6 +16,7 @@ namespace DataMachine\Engine\AI\System\Tasks;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\RequestBuilder;
 
 class MetaDescriptionTask extends SystemTask {
@@ -72,10 +73,7 @@ class MetaDescriptionTask extends SystemTask {
 
 		$prompt   = $this->buildPrompt( $post );
 		$messages = array(
-			array(
-				'role'    => 'user',
-				'content' => $prompt,
-			),
+			ConversationManager::buildConversationMessage( 'user', $prompt ),
 		);
 
 		$ai_payload = array( 'post_id' => $post_id );

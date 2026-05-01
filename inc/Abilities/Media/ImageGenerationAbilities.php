@@ -355,14 +355,8 @@ class ImageGenerationAbilities {
 		}
 
 		$messages = array(
-			array(
-				'role'    => 'system',
-				'content' => $style_guide,
-			),
-			array(
-				'role'    => 'user',
-				'content' => $user_message,
-			),
+			\DataMachine\Engine\AI\ConversationManager::buildConversationMessage( 'system', $style_guide ),
+			\DataMachine\Engine\AI\ConversationManager::buildConversationMessage( 'user', $user_message ),
 		);
 
 		$response = RequestBuilder::build(

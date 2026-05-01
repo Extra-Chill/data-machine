@@ -7,6 +7,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use AgentsAPI\AI\AgentMessageEnvelope;
 use DataMachine\Core\PluginSettings;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -103,7 +104,7 @@ class AgentConversationRequest {
 		int $max_turns = PluginSettings::DEFAULT_MAX_TURNS,
 		bool $single_turn = false
 	) {
-		$this->messages        = $messages;
+		$this->messages        = AgentMessageEnvelope::normalize_many( $messages );
 		$this->tools           = $tools;
 		$this->model_config    = $model_config;
 		$this->mode            = $mode;
