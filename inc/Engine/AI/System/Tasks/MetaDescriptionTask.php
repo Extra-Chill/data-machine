@@ -16,6 +16,7 @@ namespace DataMachine\Engine\AI\System\Tasks;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\RequestBuilder;
 
 class MetaDescriptionTask extends SystemTask {
@@ -40,17 +41,19 @@ class MetaDescriptionTask extends SystemTask {
 
 		$post = get_post( $post_id );
 
-		if ( ! $post ) {
+		if ( ! $post instanceof \WP_Post ) {
 			$this->failJob( $jobId, "Post #{$post_id} not found" );
 			return;
 		}
 
-		if ( 'publish' !== $post->post_status && 'future' !== $post->post_status ) {
-			$this->failJob( $jobId, "Post #{$post_id} is not published (status: {$post->post_status})" );
+		$post_status = get_post_status( $post_id );
+		if ( 'publish' !== $post_status && 'future' !== $post_status ) {
+			$this->failJob( $jobId, "Post #{$post_id} is not published (status: {$post_status})" );
 			return;
 		}
 
-		$current_excerpt = trim( $post->post_excerpt );
+		$current_excerpt = get_post_field( 'post_excerpt', $post_id );
+		$current_excerpt = is_string( $current_excerpt ) ? trim( $current_excerpt ) : '';
 
 		if ( ! $force && '' !== $current_excerpt ) {
 			$this->completeJob( $jobId, array(
@@ -72,10 +75,7 @@ class MetaDescriptionTask extends SystemTask {
 
 		$prompt   = $this->buildPrompt( $post );
 		$messages = array(
-			array(
-				'role'    => 'user',
-				'content' => $prompt,
-			),
+			ConversationManager::buildConversationMessage( 'user', $prompt ),
 		);
 
 		$ai_payload = array( 'post_id' => $post_id );
@@ -212,8 +212,9 @@ class MetaDescriptionTask extends SystemTask {
 			$context_lines[] = 'Title: ' . $title;
 		}
 
-		$content = wp_strip_all_tags( strip_shortcodes( $post->post_content ) );
-		$content = preg_replace( '/\s+/', ' ', trim( $content ) );
+		$post_content = get_post_field( 'post_content', $post->ID );
+		$content      = is_string( $post_content ) ? wp_strip_all_tags( strip_shortcodes( $post_content ) ) : '';
+		$content      = preg_replace( '/\s+/', ' ', trim( $content ) );
 		if ( ! empty( $content ) ) {
 			$snippet = mb_substr( $content, 0, self::CONTENT_EXCERPT_LENGTH );
 			if ( mb_strlen( $content ) > self::CONTENT_EXCERPT_LENGTH ) {

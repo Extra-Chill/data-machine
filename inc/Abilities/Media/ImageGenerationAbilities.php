@@ -233,9 +233,12 @@ class ImageGenerationAbilities {
 			$model_resolver = array( $registry, 'getProviderModel' );
 			$image_builder  = \wp_ai_client_prompt( $prompt )
 				->using_provider( $provider_id )
-				->using_model( call_user_func( $model_resolver, $provider_id, $model, null ) )
-				->as_output_file_type( \WordPress\AiClient\Files\Enums\FileTypeEnum::remote() )
-				->as_output_media_aspect_ratio( $aspect_ratio );
+				->using_model( call_user_func( $model_resolver, $provider_id, $model, null ) );
+
+			/** @var callable $file_type_setter wp-ai-client prompt builders expose this through __call() in some versions. */
+			$file_type_setter = array( $image_builder, 'as_output_file_type' );
+			$image_builder    = call_user_func( $file_type_setter, \WordPress\AiClient\Files\Enums\FileTypeEnum::remote() );
+			$image_builder    = $image_builder->as_output_media_aspect_ratio( $aspect_ratio );
 
 			$supported = $image_builder->is_supported_for_image_generation();
 			if ( is_wp_error( $supported ) ) {
@@ -256,8 +259,8 @@ class ImageGenerationAbilities {
 			);
 		}
 
-		$image_url      = (string) $image_file->getUrl();
-		$image_data_uri = (string) $image_file->getDataUri();
+		$image_url      = is_callable( array( $image_file, 'getUrl' ) ) ? (string) call_user_func( array( $image_file, 'getUrl' ) ) : '';
+		$image_data_uri = is_callable( array( $image_file, 'getDataUri' ) ) ? (string) call_user_func( array( $image_file, 'getDataUri' ) ) : '';
 
 		if ( '' === $image_url && '' === $image_data_uri ) {
 			return array(
@@ -355,14 +358,8 @@ class ImageGenerationAbilities {
 		}
 
 		$messages = array(
-			array(
-				'role'    => 'system',
-				'content' => $style_guide,
-			),
-			array(
-				'role'    => 'user',
-				'content' => $user_message,
-			),
+			\DataMachine\Engine\AI\ConversationManager::buildConversationMessage( 'system', $style_guide ),
+			\DataMachine\Engine\AI\ConversationManager::buildConversationMessage( 'user', $user_message ),
 		);
 
 		$response = RequestBuilder::build(

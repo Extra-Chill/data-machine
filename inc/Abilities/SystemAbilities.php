@@ -671,10 +671,7 @@ class SystemAbilities {
 		);
 
 		$messages = array(
-			array(
-				'role'    => 'user',
-				'content' => $prompt,
-			),
+			\DataMachine\Engine\AI\ConversationManager::buildConversationMessage( 'user', $prompt ),
 		);
 
 		$request = array(

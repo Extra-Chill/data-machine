@@ -144,10 +144,7 @@ class DailyMemoryTask extends SystemTask {
 		);
 
 		$messages = array(
-			array(
-				'role'    => 'user',
-				'content' => $prompt,
-			),
+			\DataMachine\Engine\AI\ConversationManager::buildConversationMessage( 'user', $prompt ),
 		);
 
 		$ai_payload = array();

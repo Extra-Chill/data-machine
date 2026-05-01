@@ -89,7 +89,7 @@ class AIConversationLoop {
 		 *
 		 * @param array|null $result       Null to run the built-in loop, or an
 		 *                                 AIConversationLoop::execute() return array.
-		 * @param array      $messages     Initial conversation messages.
+		 * @param array      $messages     Initial canonical conversation messages.
 		 * @param array      $tools        Available tools for AI.
 		 * @param string     $provider     AI provider identifier.
 		 * @param string     $model        AI model identifier.
@@ -101,7 +101,7 @@ class AIConversationLoop {
 		$filter_args = array(
 			'agents_api_conversation_runner',
 			null,
-			$messages,
+			$request->messages(),
 			$tools,
 			$provider,
 			$model,
@@ -113,12 +113,12 @@ class AIConversationLoop {
 		$result      = call_user_func_array( 'apply_filters', $filter_args );
 
 		if ( is_array( $result ) ) {
-			return self::normalizeResultForRun( $result, $messages );
+			return self::normalizeResultForRun( $result, $request->messages() );
 		}
 
 		$result = ( new BuiltInAgentConversationRunner() )->run( $request );
 
-		return self::normalizeResultForRun( $result, $messages );
+		return self::normalizeResultForRun( $result, $request->messages() );
 	}
 
 	/**

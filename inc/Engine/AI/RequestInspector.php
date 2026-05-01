@@ -139,8 +139,8 @@ class RequestInspector {
 		}
 
 		$mode_model = PluginSettings::resolveModelForAgentMode( $agent_id, ToolPolicyResolver::MODE_PIPELINE );
-		$provider   = (string) ( $mode_model['provider'] ?? '' );
-		$model      = (string) ( $mode_model['model'] ?? '' );
+		$provider   = (string) $mode_model['provider'];
+		$model      = (string) $mode_model['model'];
 
 		$assembled = RequestBuilder::assemble(
 			$messages,
@@ -191,33 +191,32 @@ class RequestInspector {
 		$messages = array();
 
 		if ( ! empty( $data_packets ) ) {
-			$messages[] = array(
-				'role'    => 'user',
-				'content' => wp_json_encode( array( 'data_packets' => AIStep::sanitizeDataPacketsForAi( $data_packets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE ),
+			$data_packet_content = wp_json_encode( array( 'data_packets' => AIStep::sanitizeDataPacketsForAi( $data_packets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
+			$messages[]          = ConversationManager::buildConversationMessage(
+				'user',
+				false === $data_packet_content ? '' : $data_packet_content
 			);
 		}
 
 		$file_path = $engine->get( 'image_file_path' );
 		if ( $file_path && file_exists( $file_path ) ) {
 			$file_info  = wp_check_filetype( $file_path );
-			$messages[] = array(
-				'role'    => 'user',
-				'content' => array(
+			$mime_type  = is_string( $file_info['type'] ) ? $file_info['type'] : '';
+			$messages[] = ConversationManager::buildConversationMessage(
+				'user',
+				array(
 					array(
 						'type'      => 'file',
 						'file_path' => $file_path,
-						'mime_type' => $file_info['type'] ?? '',
+						'mime_type' => $mime_type,
 					),
-				),
+				)
 			);
 		}
 
 		$user_message = $this->peekPromptQueueValue( $flow_step_config );
 		if ( '' !== $user_message ) {
-			$messages[] = array(
-				'role'    => 'user',
-				'content' => $user_message,
-			);
+			$messages[] = ConversationManager::buildConversationMessage( 'user', $user_message );
 		}
 
 		return $messages;

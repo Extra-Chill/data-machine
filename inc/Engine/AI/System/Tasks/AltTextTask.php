@@ -14,6 +14,7 @@ namespace DataMachine\Engine\AI\System\Tasks;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\RequestBuilder;
 
 class AltTextTask extends SystemTask {
@@ -68,20 +69,17 @@ class AltTextTask extends SystemTask {
 
 		$prompt   = $this->buildPrompt( $attachment_id );
 		$messages = array(
-			array(
-				'role'    => 'user',
-				'content' => array(
+			ConversationManager::buildConversationMessage(
+				'user',
+				array(
 					array(
 						'type'      => 'file',
 						'file_path' => $file_path,
 						'mime_type' => $mime_type,
 					),
-				),
+				)
 			),
-			array(
-				'role'    => 'user',
-				'content' => $prompt,
-			),
+			ConversationManager::buildConversationMessage( 'user', $prompt ),
 		);
 
 		$ai_payload = array( 'attachment_id' => $attachment_id );

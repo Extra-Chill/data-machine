@@ -184,36 +184,34 @@ class AIStep extends Step {
 		if ( $engine_image && file_exists( $engine_image ) ) {
 			$file_path = $engine_image;
 			$file_info = wp_check_filetype( $engine_image );
-			$mime_type = $file_info['type'] ?? '';
+			$mime_type = is_string( $file_info['type'] ) ? $file_info['type'] : '';
 		}
 
 		$messages = array();
 
 		if ( ! empty( $this->dataPackets ) ) {
-			$messages[] = array(
-				'role'    => 'user',
-				'content' => wp_json_encode( array( 'data_packets' => self::sanitizeDataPacketsForAi( $this->dataPackets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE ),
+			$data_packet_content = wp_json_encode( array( 'data_packets' => self::sanitizeDataPacketsForAi( $this->dataPackets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
+			$messages[]          = ConversationManager::buildConversationMessage(
+				'user',
+				false === $data_packet_content ? '' : $data_packet_content
 			);
 		}
 
 		if ( $file_path && file_exists( $file_path ) ) {
-			$messages[] = array(
-				'role'    => 'user',
-				'content' => array(
+			$messages[] = ConversationManager::buildConversationMessage(
+				'user',
+				array(
 					array(
 						'type'      => 'file',
 						'file_path' => $file_path,
-						'mime_type' => $mime_type ?? '',
+						'mime_type' => $mime_type,
 					),
-				),
+				)
 			);
 		}
 
 		if ( ! empty( $user_message ) ) {
-			$messages[] = array(
-				'role'    => 'user',
-				'content' => $user_message,
-			);
+			$messages[] = ConversationManager::buildConversationMessage( 'user', $user_message );
 		}
 
 		$pipeline_step_id = $this->flow_step_config['pipeline_step_id'];

@@ -67,6 +67,7 @@ use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\AgentConversationRequest;
 use DataMachine\Engine\AI\LoopEventSinkInterface;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
+use AgentsAPI\AI\AgentMessageEnvelope;
 
 class RunnerRequestSmokeSink implements LoopEventSinkInterface {
 	public array $events = array();
@@ -129,7 +130,12 @@ $request = AgentConversationRequest::fromRunArgs(
 	true
 );
 
-assert_runner_request( $messages === $request->messages(), 'request keeps messages as generic input' );
+$canonical_messages = $request->messages();
+assert_runner_request( $messages !== $canonical_messages, 'request normalizes legacy messages instead of preserving raw identity' );
+assert_runner_request( AgentMessageEnvelope::SCHEMA === ( $canonical_messages[0]['schema'] ?? null ), 'request stores canonical message schema' );
+assert_runner_request( AgentMessageEnvelope::TYPE_TEXT === ( $canonical_messages[0]['type'] ?? null ), 'request stores canonical text message type' );
+assert_runner_request( 'user' === ( $canonical_messages[0]['role'] ?? null ), 'request preserves normalized message role' );
+assert_runner_request( 'hello runner boundary' === ( $canonical_messages[0]['content'] ?? null ), 'request preserves normalized message content' );
 assert_runner_request( $tools === $request->tools(), 'request keeps tools as generic input' );
 assert_runner_request( 'openai' === $request->provider(), 'request exposes provider from model config' );
 assert_runner_request( 'gpt-smoke' === $request->model(), 'request exposes model from model config' );
@@ -196,7 +202,7 @@ $result = AIConversationLoop::run(
 );
 
 assert_runner_request( array_key_exists( 0, $legacy_filter_args ) && null === $legacy_filter_args[0], 'runner filter still receives nullable result seed first' );
-assert_runner_request( $messages === ( $legacy_filter_args[1] ?? null ), 'runner filter still receives legacy messages argument' );
+assert_runner_request( $canonical_messages === ( $legacy_filter_args[1] ?? null ), 'runner filter receives canonical messages argument' );
 assert_runner_request( $tools === ( $legacy_filter_args[2] ?? null ), 'runner filter still receives legacy tools argument' );
 assert_runner_request( 'openai' === ( $legacy_filter_args[3] ?? null ), 'runner filter still receives legacy provider argument' );
 assert_runner_request( 'gpt-smoke' === ( $legacy_filter_args[4] ?? null ), 'runner filter still receives legacy model argument' );
