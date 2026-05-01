@@ -41,9 +41,7 @@ class AgentRegistry {
 	 * Register an agent definition.
 	 *
 	 * Call from inside a `wp_agents_api_init` action callback.
-	 * Later registrations for the same slug overwrite earlier ones — this
-	 * matches WordPress hook semantics, so plugins can override core or
-	 * other plugins via action priority.
+	 * Duplicate slugs are rejected by the underlying Agents API registry.
 	 *
 	 * @since 0.71.0
 	 *
@@ -83,9 +81,7 @@ class AgentRegistry {
 	/**
 	 * Get all registered agent definitions.
 	 *
-	 * Fires the `wp_agents_api_init` action once per request so
-	 * callers can lazily collect registrations without needing to worry
-	 * about hook ordering.
+	 * Reads the definitions collected during `wp_agents_api_init`.
 	 *
 	 * @since 0.71.0
 	 *
@@ -153,9 +149,9 @@ class AgentRegistry {
 	/**
 	 * Ensure the agent registration actions have fired.
 	 *
-	 * Plugins register their agents inside action callbacks — collecting
-	 * them lazily lets callers of `get_all()` / `reconcile()` / `get()`
-	 * work regardless of hook ordering.
+	 * The Agents API module fires `wp_agents_api_init` from WordPress `init`.
+	 * Data Machine keeps its legacy in-repo hook behind this adapter while the
+	 * substrate is hosted here.
 	 *
 	 * @return void
 	 */
