@@ -46,12 +46,13 @@ class MetaDescriptionTask extends SystemTask {
 			return;
 		}
 
-		if ( 'publish' !== $post->post_status && 'future' !== $post->post_status ) {
-			$this->failJob( $jobId, "Post #{$post_id} is not published (status: {$post->post_status})" );
+		$post_status = get_post_status( $post_id );
+		if ( 'publish' !== $post_status && 'future' !== $post_status ) {
+			$this->failJob( $jobId, "Post #{$post_id} is not published (status: {$post_status})" );
 			return;
 		}
 
-		$current_excerpt = trim( $post->post_excerpt );
+		$current_excerpt = trim( (string) get_post_field( 'post_excerpt', $post_id ) );
 
 		if ( ! $force && '' !== $current_excerpt ) {
 			$this->completeJob( $jobId, array(
@@ -210,7 +211,7 @@ class MetaDescriptionTask extends SystemTask {
 			$context_lines[] = 'Title: ' . $title;
 		}
 
-		$content = wp_strip_all_tags( strip_shortcodes( $post->post_content ) );
+		$content = isset( $post_data['post_content'] ) && is_string( $post_data['post_content'] ) ? wp_strip_all_tags( strip_shortcodes( $post_data['post_content'] ) ) : '';
 		$content = preg_replace( '/\s+/', ' ', trim( $content ) );
 		if ( ! empty( $content ) ) {
 			$snippet = mb_substr( $content, 0, self::CONTENT_EXCERPT_LENGTH );

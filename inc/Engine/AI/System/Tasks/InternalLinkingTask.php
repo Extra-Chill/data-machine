@@ -43,7 +43,8 @@ class InternalLinkingTask extends SystemTask {
 
 		$post = get_post( $post_id );
 
-		if ( ! $post instanceof \WP_Post || 'publish' !== $post->post_status ) {
+		$post_status = get_post_status( $post_id );
+		if ( ! $post instanceof \WP_Post || 'publish' !== $post_status ) {
 			$this->failJob( $jobId, "Post #{$post_id} does not exist or is not published" );
 			return;
 		}
@@ -90,7 +91,7 @@ class InternalLinkingTask extends SystemTask {
 
 		$paragraph_blocks = $blocks_result['blocks'];
 
-		$related = $this->findRelatedPosts( $post_id, $post->post_title, $categories, $tags, $links_per_post );
+		$related = $this->findRelatedPosts( $post_id, get_the_title( $post_id ), $categories, $tags, $links_per_post );
 
 		$all_block_html = implode( "\n", array_column( $paragraph_blocks, 'inner_html' ) );
 		$related        = $this->filterAlreadyLinked( $related, $all_block_html );
@@ -430,12 +431,12 @@ class InternalLinkingTask extends SystemTask {
 		$related = array();
 
 		foreach ( $top_ids as $rel_id ) {
-			$rel_post  = get_post( $rel_id );
+			$content   = (string) get_post_field( 'post_content', $rel_id );
 			$related[] = array(
 				'id'      => $rel_id,
 				'url'     => get_permalink( $rel_id ),
 				'title'   => get_the_title( $rel_id ),
-				'excerpt' => wp_trim_words( $rel_post->post_content, 30, '...' ),
+				'excerpt' => wp_trim_words( $content, 30, '...' ),
 				'score'   => $scored[ $rel_id ],
 			);
 		}
