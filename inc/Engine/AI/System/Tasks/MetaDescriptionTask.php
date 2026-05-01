@@ -52,7 +52,8 @@ class MetaDescriptionTask extends SystemTask {
 			return;
 		}
 
-		$current_excerpt = trim( (string) get_post_field( 'post_excerpt', $post_id ) );
+		$current_excerpt = get_post_field( 'post_excerpt', $post_id );
+		$current_excerpt = is_string( $current_excerpt ) ? trim( $current_excerpt ) : '';
 
 		if ( ! $force && '' !== $current_excerpt ) {
 			$this->completeJob( $jobId, array(
@@ -211,8 +212,9 @@ class MetaDescriptionTask extends SystemTask {
 			$context_lines[] = 'Title: ' . $title;
 		}
 
-		$content = isset( $post_data['post_content'] ) && is_string( $post_data['post_content'] ) ? wp_strip_all_tags( strip_shortcodes( $post_data['post_content'] ) ) : '';
-		$content = preg_replace( '/\s+/', ' ', trim( $content ) );
+		$post_content = get_post_field( 'post_content', $post->ID );
+		$content      = is_string( $post_content ) ? wp_strip_all_tags( strip_shortcodes( $post_content ) ) : '';
+		$content      = preg_replace( '/\s+/', ' ', trim( $content ) );
 		if ( ! empty( $content ) ) {
 			$snippet = mb_substr( $content, 0, self::CONTENT_EXCERPT_LENGTH );
 			if ( mb_strlen( $content ) > self::CONTENT_EXCERPT_LENGTH ) {

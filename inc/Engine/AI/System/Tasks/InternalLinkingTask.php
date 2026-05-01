@@ -431,7 +431,8 @@ class InternalLinkingTask extends SystemTask {
 		$related = array();
 
 		foreach ( $top_ids as $rel_id ) {
-			$content   = (string) get_post_field( 'post_content', $rel_id );
+			$content   = get_post_field( 'post_content', $rel_id );
+			$content   = is_string( $content ) ? $content : '';
 			$related[] = array(
 				'id'      => $rel_id,
 				'url'     => get_permalink( $rel_id ),
