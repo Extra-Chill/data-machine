@@ -9,7 +9,7 @@ Centralized AI request construction ensuring consistent request structure across
 
 The `RequestBuilder` class consolidates all AI request building logic into a single, unified interface. This prevents behavioral differences between Pipeline and Chat agents by ensuring both use identical request construction, tool formatting, and directive application patterns.
 
-**Critical Rule**: Never call provider clients directly. Always use `RequestBuilder::build()` to ensure consistent request structure, directive application, metadata, and wp-ai-client dispatch.
+**Critical Rule**: Data Machine runtime code should not bypass its own request assembly. Use `RequestBuilder::build()` for Data Machine chat and pipeline AI steps so directive application, metadata, request guardrails, and wp-ai-client dispatch stay consistent. This rule is not an Agents API boundary: plugins that only need one-shot AI operations may call `wp-ai-client` directly without routing through Data Machine or Agents API.
 
 ## Architecture
 
@@ -31,7 +31,7 @@ Request Building Flow:
 │     • Unified directive management                   │
 │                                                      │
 │  4. Send to wp-ai-client                            │
-│     • WpAiClientAdapter capability gate             │
+│     • RequestBuilder capability gate                │
 │     • Returns standardized AI response              │
 └─────────────────────────────────────────────────────┘
 ```

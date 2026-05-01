@@ -2,6 +2,17 @@
 
 `DataMachine\Engine\AI` is a staging namespace while the future Agents API runtime is clarified in place. It is not itself the extraction boundary.
 
+Layer boundaries:
+
+| Layer | Responsibility |
+|---|---|
+| Abilities API | Actions and tools. |
+| wp-ai-client | Direct provider/model prompt execution for one-shot AI operations. |
+| Agents API | Durable agent runtime: registration, memory, transcripts, sessions, locks, event sinks, multi-turn tool loops, and portable declarations. |
+| Data Machine | Automation product: flows, pipelines, jobs, handlers, queues, retention, content operations, and admin UI. |
+
+Data Machine pipeline AI steps should not move to Agents API solely for provider dispatch. They should use the direct `wp-ai-client` path through Data Machine request assembly unless the feature needs durable agent runtime semantics.
+
 Use this quick map before moving or renaming files:
 
 | Area | Boundary |

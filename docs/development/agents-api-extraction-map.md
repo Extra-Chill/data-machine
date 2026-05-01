@@ -6,7 +6,7 @@ Parent issue: [Explore splitting Agents API out of Data Machine](https://github.
 
 Strategy update: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)
 
-Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
+Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), [one-shot AI boundary](https://github.com/Extra-Chill/data-machine/issues/1693), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
 
 ## Namespace Map
 
@@ -48,14 +48,15 @@ Treat `data-machine/agents-api/` like WordPress core substrate while it still li
 - Data Machine and other product consumers own any admin/product UI they build on top of the substrate.
 - Later standalone extraction means moving the already-bounded module into its own plugin/repo and adding plugin bootstrap, release, dependency, and distribution ceremony.
 - `ai-http-client` is not future architecture. It is only packaging precedent for bundled-then-extracted code.
-- The future runtime dependency direction is `Data Machine product adapter -> Agents API run request -> wp-ai-client public API`; `ai-http-client` dies as part of [#1027](https://github.com/Extra-Chill/data-machine/issues/1027) / [#1633](https://github.com/Extra-Chill/data-machine/issues/1633).
+- The future provider primitive is `wp-ai-client`, not Agents API. `ai-http-client` dies as part of [#1027](https://github.com/Extra-Chill/data-machine/issues/1027) / [#1633](https://github.com/Extra-Chill/data-machine/issues/1633).
+- One-shot AI operations call `wp-ai-client` directly. Durable agent runs use Agents API, and Agents API provider code consumes `wp-ai-client` directly inside that runtime.
+- Data Machine pipeline AI steps should not move to Agents API solely for provider dispatch. They only need Agents API when the product needs durable runtime semantics such as sessions, locks, memory composition, event sinks, multi-turn tool loops, or portable agent declarations.
 
 ```text
-wp-ai-client public API
-        ↑
-Agents API run request
-        ↑
-Data Machine product adapter
+Abilities API  -> actions and tools
+wp-ai-client   -> provider/model prompt execution
+Agents API     -> durable agent runtime behavior
+Data Machine   -> automation product built on those substrates
 ```
 
 ## Target Vocabulary
@@ -83,6 +84,8 @@ Use these checks before moving anything:
 - If it translates Data Machine concepts into runtime concepts, it is a Data Machine adapter.
 - If it owns flows, jobs, queues, handlers, scheduled automation, retention, admin UI, or content ops, it stays Data Machine product.
 - If it uses host-specific provider, storage, or implementation vocabulary directly, treat that code as source material only until normalized behind WordPress-shaped contracts.
+- If it only needs to execute a single prompt/model request, it should use `wp-ai-client` directly instead of introducing Agents API.
+- If it needs durable agent runtime behavior, it should use Agents API and let that runtime call `wp-ai-client` directly for provider execution.
 
 ## Backend-Only UI Boundary
 
@@ -94,6 +97,7 @@ Agents API is a generic WordPress-shaped substrate. It should be usable by any p
 - runtime request/result/message contracts.
 - memory, transcript, tool, event, and permission-ceiling contracts.
 - direct public WordPress APIs such as Abilities API and `wp-ai-client`.
+- durable agent runtime behavior built above those public APIs.
 
 `agents-api` must not own product/admin surfaces:
 
@@ -157,7 +161,7 @@ The current namespace is intentionally mixed while extraction stays in place. Tr
 | Current namespace/surface | Bucket | Boundary decision |
 |---|---|---|
 | `AgentsAPI\AI\AgentMessageEnvelope`, `AgentsAPI\AI\AgentConversationResult`, plus `DataMachine\Engine\AI\AgentConversationRequest`, `AgentConversationRunnerInterface`, `AgentConversationCompletionPolicyInterface`, `AgentConversationTranscriptPersisterInterface`, `LoopEventSinkInterface` | Agents API public candidate | Generic contracts/value objects. `AgentMessageEnvelope` and `AgentConversationResult` now live in the in-repo `agents-api/` module under neutral namespaces. `AgentConversationRequest` keeps Data Machine job/flow/pipeline/handler/transcript fields in adapter context rather than the generic runtime payload, so it remains outside until that compatibility shape is gone. |
-| `DataMachine\Engine\AI\BuiltInAgentConversationRunner`, `AIConversationLoop`, `RequestBuilder`, `WpAiClientAdapter`, `RequestInspector`, `RequestMetadata`, `ConversationManager` | Agents API implementation candidate | Runtime implementation candidates, but still hosted by Data Machine and still carrying compatibility/provider/logging assumptions. Future provider direction is `wp-ai-client`; `ai-http-client` is removal work, not an Agents API runtime layer. |
+| `DataMachine\Engine\AI\BuiltInAgentConversationRunner`, `AIConversationLoop`, `RequestBuilder`, `RequestInspector`, `RequestMetadata`, `ConversationManager` | Agents API implementation candidate | Runtime implementation candidates, but still hosted by Data Machine and still carrying compatibility/provider/logging assumptions. Future provider primitive is direct `wp-ai-client`; `ai-http-client` is removal work, not an Agents API runtime layer. |
 | `AgentsAPI\AI\Tools\RuntimeToolDeclaration`, plus `DataMachine\Engine\AI\Tools\Execution\ToolExecutionCore`, `Tools\ToolSourceRegistry`, `Tools\Policy\ToolPolicyFilter`, `Tools\ToolResultFinder` | Mixed runtime candidate | `RuntimeToolDeclaration` now lives in the in-repo `agents-api/` module under a neutral namespace. The remaining generic-looking pieces still sit next to Data Machine adapters and should move only after their source-provider, policy, and execution boundaries are proven generic. |
 | `DataMachine\Engine\AI\Tools\Sources\DataMachineToolRegistrySource`, `Tools\Sources\AdjacentHandlerToolSource`, `Tools\Policy\DataMachineAgentToolPolicyProvider`, `Tools\Policy\DataMachineMandatoryToolPolicy`, `Tools\Policy\DataMachineToolAccessPolicy`, `Tools\ToolManager`, `Tools\ToolPolicyResolver`, `Tools\ToolParameters` payload merging | Data Machine adapter/product | These translate Data Machine handler, pipeline, queue, permission, persisted-agent, and legacy tool registry concepts into runtime inputs. They stay Data Machine. |
 | `DataMachine\Engine\AI\Tools\Global\*` | Data Machine product | Curated product/site-ops tools. Individual capabilities may move to abilities later, but the bundle is not the Agents API registry. |
@@ -222,8 +226,7 @@ These are plausibly generic implementations, but should not move until naming an
 |---|---|---|---|
 | `AIConversationLoop` | `inc/Engine/AI/AIConversationLoop.php` | Name says AI and still carries the compatibility facade/result shape, but handler completion and transcript persistence now route through runtime collaborators. | Keep shrinking the compatibility adapter by extracting provider request assembly and Data Machine logging policy next. |
 | `ProviderRequestAssembler` | `inc/Engine/AI/ProviderRequestAssembler.php` | Normalizes messages, tools, model, and caller-selected directives without dispatching, logging, or discovering Data Machine directives. | Good in-place request assembly candidate once prompt/directive vocabulary is settled. |
-| `RequestBuilder` | `inc/Engine/AI/RequestBuilder.php` | Data Machine adapter around provider assembly: discovers/directive-policies `datamachine_directives`, emits `datamachine_log`, applies request-size guardrails, and still carries Data Machine request-array compatibility. | Keep as Data Machine adapter while those product concerns remain. Provider dispatch should consume `wp-ai-client` directly. |
-| `WpAiClientAdapter` | `inc/Engine/AI/WpAiClientAdapter.php` | Data Machine adapter that maps the assembled provider request array onto the wp-ai-client public API and normalizes the result back to Data Machine's historical response array. | Keep in Data Machine until request/message contracts are generic enough for an Agents API provider runtime implementation. |
+| `RequestBuilder` | `inc/Engine/AI/RequestBuilder.php` | Data Machine adapter around provider assembly: discovers/directive-policies `datamachine_directives`, emits `datamachine_log`, applies request-size guardrails, maps Data Machine's request array onto the `wp-ai-client` public API, and still carries Data Machine response compatibility. | Keep as Data Machine adapter while those product concerns remain. Do not move pipeline AI steps to Agents API solely to reach provider dispatch; one-shot/pipeline requests should consume `wp-ai-client` directly unless they need durable agent runtime semantics. |
 | `RequestMetadata` | `inc/Engine/AI/RequestMetadata.php` | Generic inspection/size metadata. | Move after field names are checked against Agents API message/tool vocabulary. |
 | `RequestInspector` | `inc/Engine/AI/RequestInspector.php` | Generic debugging/inspection value, likely useful across runtimes. | Rename away from Data Machine only if public debug surface is desired. |
 | `PromptBuilder` | `inc/Engine/AI/PromptBuilder.php` | Generic system-message composition engine, but wired to Data Machine directives. | Extract lower-level composer after directive contract is settled. |
@@ -370,7 +373,7 @@ Automattic/intelligence#285.
 | `datamachine_pre_ai_step_check` | Data Machine adapter | Pipeline AI-step skip hook. |
 | `datamachine_log` | Data Machine product | Product logging surface. Generic runtime events should use loop event sinks. |
 | `chubes_ai_request` | Legacy provider bridge to delete | Legacy `ai-http-client` provider-dispatch filter. Do not carry this into Agents API public vocabulary or architecture; removal belongs to #1027 / #1633. |
-| `WpAiClientCapability::unavailableReason()` | Agents API implementation candidate | Single wp-ai-client runtime capability gate. Missing support is surfaced as a request error; no `ai-http-client` fallback belongs in Agents API. |
+| `RequestBuilder::wpAiClientUnavailableReason()` | Data Machine adapter today | Product-level `wp-ai-client` capability gate. Missing support is surfaced as a request error; no `ai-http-client` fallback belongs in Agents API. |
 
 ## Test Coverage Map
 
