@@ -395,7 +395,11 @@ class AIConversationLoop {
 					);
 
 					if ( $validation_result['is_duplicate'] ) {
-						$correction_message = ConversationManager::generateDuplicateToolCallMessage( $tool_name, $turn_count );
+						$correction_message = ConversationManager::generateDuplicateToolCallMessage(
+							$tool_name,
+							$turn_count,
+							$mode
+						);
 						$messages[]         = $correction_message;
 
 						do_action(

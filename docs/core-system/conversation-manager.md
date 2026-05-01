@@ -341,23 +341,46 @@ $extracted = ConversationManager::extractToolCallFromMessage($message);
 
 #### generateDuplicateToolCallMessage()
 
-Generate a user message for duplicate tool call prevention.
+Generate a tool-result message for duplicate tool call prevention. The
+correction message is **mode-aware** so the AI receives continuation guidance
+appropriate to the current execution mode.
 
 **Signature**:
 ```php
-public static function generateDuplicateToolCallMessage(string $tool_name): array
+public static function generateDuplicateToolCallMessage(
+    string $tool_name,
+    int $turn_count = 0,
+    string $mode = 'chat'
+): array
 ```
 
 **Parameters**:
 - `$tool_name` (string) - Tool name that was duplicated
+- `$turn_count` (int) - Current conversation turn (0 = no turn display)
+- `$mode` (string) - Execution mode (`'chat'`, `'pipeline'`, `'bridge'`, ...). Defaults to `'chat'` so existing callers retain prior behavior.
 
-**Returns**: Formatted user message with correction guidance
+**Returns**: Formatted tool-result envelope (`success: false`, `error: <mode-shaped guidance>`)
+
+**Mode behavior**:
+- `'chat'` (default) — instructs the AI to **end the conversation**. The tool's success IS the answer to the user's question.
+- `'pipeline'` — instructs the AI to **call the publish handler tool now** to complete the step. Pipeline conversations have downstream work after the duplicated tool call.
+- `'bridge'` — instructs the AI to **continue its response to the user** using the result it already has.
+- Unknown modes fall back to chat semantics.
 
 **Example**:
 ```php
-$message = ConversationManager::generateDuplicateToolCallMessage('google_search');
-// Returns: ['role' => 'user', 'content' => 'You just called the Google Search tool with the exact same parameters as your previous action. Please try a different approach or use different parameters instead.']
+// Chat: AI is told the task is done.
+$msg = ConversationManager::generateDuplicateToolCallMessage('google_search');
+
+// Pipeline: AI is told to move on to the publish handler.
+$msg = ConversationManager::generateDuplicateToolCallMessage(
+    'queue_validator',
+    $turn_count,
+    'pipeline'
+);
 ```
+
+**Background**: see [data-machine #1441](https://github.com/Extra-Chill/data-machine/issues/1441) — chat-shaped guidance was previously emitted for every mode, which caused pipeline AI steps to silently end mid-conversation after a duplicate tool call instead of finishing the publish step.
 
 ---
 

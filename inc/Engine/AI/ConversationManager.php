@@ -398,17 +398,48 @@ class ConversationManager {
 	/**
 	 * Generate a tool result message for duplicate tool call prevention.
 	 *
-	 * @param string $tool_name Tool name that was duplicated
+	 * The correction message is mode-aware. Chat-mode conversations end after a
+	 * duplicate (the tool's result IS the answer to the user's question), but
+	 * pipeline-mode conversations still have downstream work — typically a
+	 * publish handler tool — so the AI must be told to keep going. Bridge mode
+	 * is treated like chat-with-continuation since the conversation is with a
+	 * remote user. Unknown modes fall back to chat semantics.
+	 *
+	 * @param string $tool_name  Tool name that was duplicated
 	 * @param int    $turn_count Current conversation turn
+	 * @param string $mode       Execution mode ('chat', 'pipeline', 'bridge', ...). Defaults to 'chat'.
 	 * @return array Formatted tool result message
 	 */
-	public static function generateDuplicateToolCallMessage( string $tool_name, int $turn_count = 0 ): array {
+	public static function generateDuplicateToolCallMessage(
+		string $tool_name,
+		int $turn_count = 0,
+		string $mode = 'chat'
+	): array {
 		$tool_result = array(
 			'success' => false,
-			'error'   => "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters earlier in this conversation and it succeeded. Do NOT call it again. Do NOT call skip_item about this. The task is done — end the conversation.",
+			'error'   => self::buildDuplicateToolCallError( $tool_name, $mode ),
 		);
 
 		return self::formatToolResultMessage( $tool_name, $tool_result, array(), false, $turn_count );
+	}
+
+	/**
+	 * Build the mode-appropriate correction text for a duplicate tool call.
+	 *
+	 * @param string $tool_name Tool name that was duplicated.
+	 * @param string $mode      Execution mode slug.
+	 * @return string Correction message routed to the AI.
+	 */
+	private static function buildDuplicateToolCallError( string $tool_name, string $mode ): string {
+		switch ( $mode ) {
+			case 'pipeline':
+				return "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters earlier in this conversation. Do NOT call it again. Move on — call the publish handler tool now to complete this step.";
+			case 'bridge':
+				return "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters. Do NOT call it again. Continue your response to the user using the result you already have.";
+			case 'chat':
+			default:
+				return "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters earlier in this conversation and it succeeded. Do NOT call it again. Do NOT call skip_item about this. The task is done — end the conversation.";
+		}
 	}
 
 	/**
