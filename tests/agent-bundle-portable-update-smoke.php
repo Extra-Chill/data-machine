@@ -189,6 +189,45 @@ $preserved = call_bundle_private( $bundler, 'preserve_runtime_queue_fields', arr
 assert_bundle_update_equals( 'upgrade preserves existing config_patch_queue', 'Local queue head', $preserved['flow-step-1']['config_patch_queue'][0]['patch']['query'] ?? null );
 assert_bundle_update_equals( 'upgrade preserves existing queue_mode', 'static', $preserved['flow-step-1']['queue_mode'] ?? null );
 
+$remapped_pipeline = call_bundle_private(
+	$bundler,
+	'remap_pipeline_step_ids',
+	array(
+		array(
+			'2_bundle_step_0' => array(
+				'pipeline_step_id' => '2_bundle_step_0',
+				'step_type'        => 'fetch',
+			),
+		),
+		2,
+		3,
+	)
+);
+assert_bundle_update( 'pipeline step key remaps to installed pipeline ID', isset( $remapped_pipeline['3_bundle_step_0'] ) );
+assert_bundle_update_equals( 'pipeline step metadata remaps to installed pipeline ID', '3_bundle_step_0', $remapped_pipeline['3_bundle_step_0']['pipeline_step_id'] ?? null );
+
+$remapped_flow = call_bundle_private(
+	$bundler,
+	'remap_flow_step_ids',
+	array(
+		array(
+			'2_bundle_step_0_4' => array(
+				'flow_step_id'     => '2_bundle_step_0_4',
+				'pipeline_step_id' => '2_bundle_step_0',
+				'pipeline_id'      => 2,
+				'flow_id'          => 4,
+			),
+		),
+		2,
+		3,
+		9,
+	)
+);
+assert_bundle_update( 'flow step key remaps to installed pipeline and flow IDs', isset( $remapped_flow['3_bundle_step_0_9'] ) );
+assert_bundle_update_equals( 'flow step metadata pipeline_step_id remaps', '3_bundle_step_0', $remapped_flow['3_bundle_step_0_9']['pipeline_step_id'] ?? null );
+assert_bundle_update_equals( 'flow step metadata pipeline_id remaps', 3, $remapped_flow['3_bundle_step_0_9']['pipeline_id'] ?? null );
+assert_bundle_update_equals( 'flow step metadata flow_id remaps', 9, $remapped_flow['3_bundle_step_0_9']['flow_id'] ?? null );
+
 $agent_bundler_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Agents/AgentBundler.php' ) ?: '';
 $pipelines_source     = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Pipelines/Pipelines.php' ) ?: '';
 $flows_source         = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Database/Flows/Flows.php' ) ?: '';
