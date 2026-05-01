@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.6] - 2026-05-01
+
+### Fixed
+- make duplicate tool call message mode-aware
+
 ## [0.103.5] - 2026-05-01
 
 ### Fixed
