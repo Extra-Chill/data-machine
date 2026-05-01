@@ -17,6 +17,12 @@ if ( ! function_exists( 'add_filter' ) ) {
 	}
 }
 
+if ( ! function_exists( 'add_action' ) ) {
+	function add_action( string $tag, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+		add_filter( $tag, $callback, $priority, $accepted_args );
+	}
+}
+
 if ( ! function_exists( 'remove_filter' ) ) {
 	function remove_filter( string $tag, callable $callback, int $priority = 10 ): void {
 		foreach ( $GLOBALS['datamachine_timeout_test_filters'][ $tag ][ $priority ] ?? array() as $index => $entry ) {
@@ -131,11 +137,12 @@ class TimeoutPromptBuilderDouble {
 
 	public function generate_text_result() {
 		self::$captured_request = array(
-			'provider' => $this->provider,
-			'model'    => $this->model,
-			'prompt'   => $this->prompt,
-			'timeout'  => $this->request_timeout,
-			'history'  => $this->history,
+			'provider'          => $this->provider,
+			'model'             => $this->model,
+			'prompt'            => $this->prompt,
+			'timeout'           => $this->request_timeout,
+			'history'           => $this->history,
+			'curl_filter_count' => timeout_smoke_filter_count( 'http_api_curl' ),
 		);
 
 		return \WordPress\AiClient\Results\DTO\GenerativeAiResult::fromData(
@@ -227,8 +234,10 @@ assert_timeout_smoke( 'gpt-smoke' === ( $timeout_context['model'] ?? null ), 'Da
 $captured_history = TimeoutPromptBuilderDouble::$captured_request['history'] ?? array();
 assert_timeout_smoke( isset( $captured_history[0] ) && $captured_history[0] instanceof \WordPress\AiClient\Messages\DTO\UserMessage, 'Data Machine converts user history arrays to wp-ai-client UserMessage DTOs' );
 assert_timeout_smoke( isset( $captured_history[1] ) && $captured_history[1] instanceof \WordPress\AiClient\Messages\DTO\ModelMessage, 'Data Machine converts assistant history arrays to wp-ai-client ModelMessage DTOs' );
+assert_timeout_smoke( 1 === ( TimeoutPromptBuilderDouble::$captured_request['curl_filter_count'] ?? null ), 'Data Machine scopes cURL low-speed settings during wp-ai-client dispatch' );
 
 assert_timeout_smoke( 0 === timeout_smoke_filter_count( 'wp_ai_client_default_request_timeout' ), 'Data Machine removes temporary wp-ai-client timeout filter after dispatch' );
+assert_timeout_smoke( 0 === timeout_smoke_filter_count( 'http_api_curl' ), 'Data Machine removes temporary cURL low-speed filter after dispatch' );
 
 if ( timeout_smoke_failure_count() > 0 ) {
 	exit( 1 );

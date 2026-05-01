@@ -126,9 +126,19 @@ class RequestBuilder {
 		$timeout_filter  = static function ( $default_timeout ) use ( $request_timeout ) {
 			return max( (float) $default_timeout, $request_timeout );
 		};
+		$curl_filter     = static function ( $handle ) use ( $request_timeout ) {
+			if ( defined( 'CURLOPT_LOW_SPEED_TIME' ) ) {
+				curl_setopt( $handle, CURLOPT_LOW_SPEED_TIME, (int) ceil( $request_timeout ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress exposes the cURL handle only through this hook.
+			}
+
+			if ( defined( 'CURLOPT_LOW_SPEED_LIMIT' ) ) {
+				curl_setopt( $handle, CURLOPT_LOW_SPEED_LIMIT, 1 ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress exposes the cURL handle only through this hook.
+			}
+		};
 
 		try {
 			add_filter( 'wp_ai_client_default_request_timeout', $timeout_filter, 10, 1 );
+			add_action( 'http_api_curl', $curl_filter, 10, 1 );
 
 			$registry = \WordPress\AiClient\AiClient::defaultRegistry();
 			/** @var callable $has_provider wp-ai-client exposes this through __call() in some versions. */
@@ -216,6 +226,7 @@ class RequestBuilder {
 		} finally {
 			if ( function_exists( 'remove_filter' ) ) {
 				remove_filter( 'wp_ai_client_default_request_timeout', $timeout_filter, 10 );
+				remove_filter( 'http_api_curl', $curl_filter, 10 );
 			}
 		}
 
