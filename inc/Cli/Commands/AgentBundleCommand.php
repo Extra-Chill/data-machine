@@ -339,8 +339,8 @@ class AgentBundleCommand extends BaseCommand {
 
 	/** @return array<int,array<string,mixed>> */
 	private function bundle_artifacts_for_agent( array $bundle, ?array $agent ): array {
-		$artifacts = array();
-		$agent_id  = is_array( $agent ) ? (int) ( $agent['agent_id'] ?? 0 ) : 0;
+		$artifacts                  = array();
+		$agent_id                   = is_array( $agent ) ? (int) ( $agent['agent_id'] ?? 0 ) : 0;
 		$pipeline_id_map            = array();
 		$existing_pipelines_by_slug = array();
 
@@ -356,10 +356,11 @@ class AgentBundleCommand extends BaseCommand {
 			}
 			$slug = PortableSlug::normalize( (string) ( $pipeline['portable_slug'] ?? ( $pipeline['pipeline_name'] ?? 'pipeline' ) ), 'pipeline' );
 			if ( isset( $existing_pipelines_by_slug[ $slug ] ) ) {
-				$old_id                        = (int) ( $pipeline['original_id'] ?? 0 );
-				$new_id                        = (int) ( $existing_pipelines_by_slug[ $slug ]['pipeline_id'] ?? 0 );
-				$pipeline_id_map[ $old_id ]     = $new_id;
-				$pipeline['pipeline_config']    = $this->remap_pipeline_step_ids(
+				$old_id = (int) ( $pipeline['original_id'] ?? 0 );
+				$new_id = (int) ( $existing_pipelines_by_slug[ $slug ]['pipeline_id'] ?? 0 );
+
+				$pipeline_id_map[ $old_id ]  = $new_id;
+				$pipeline['pipeline_config'] = $this->remap_pipeline_step_ids(
 					is_array( $pipeline['pipeline_config'] ?? null ) ? $pipeline['pipeline_config'] : array(),
 					$old_id,
 					$new_id
@@ -443,6 +444,7 @@ class AgentBundleCommand extends BaseCommand {
 			}
 			if ( 'flow' === $type && isset( $flow_by_slug[ $id ] ) ) {
 				$flow = $this->normalize_current_flow_ids( $flow_by_slug[ $id ] );
+
 				$artifacts[] = array(
 					'artifact_type' => 'flow',
 					'artifact_id'   => $id,
