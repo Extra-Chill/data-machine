@@ -19,6 +19,16 @@ defined( 'ABSPATH' ) || exit;
 class RequestBuilder {
 
 	/**
+	 * Default timeout for Data Machine wp-ai-client requests.
+	 *
+	 * WordPress AI Client defaults to 30 seconds, which is too short for
+	 * non-streaming LLM requests with large prompts. Studio's cURL low-speed
+	 * watchdog is longer than this; without raising the AI Client request
+	 * timeout, the request-level cap wins first.
+	 */
+	private const DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT = 300.0;
+
+	/**
 	 * Build standardized AI request for any execution mode.
 	 *
 	 * Centralizes request construction logic to ensure chat and pipeline flows
@@ -111,8 +121,15 @@ class RequestBuilder {
 			return new \WP_Error( 'wp_ai_client_unavailable', $unavailable_reason );
 		}
 
-		$result = null;
+		$result          = null;
+		$request_timeout = self::wpAiClientRequestTimeout( $mode, $provider, $model, $payload );
+		$timeout_filter  = static function ( $default_timeout ) use ( $request_timeout ) {
+			return max( (float) $default_timeout, $request_timeout );
+		};
+
 		try {
+			add_filter( 'wp_ai_client_default_request_timeout', $timeout_filter, 10, 1 );
+
 			$registry = \WordPress\AiClient\AiClient::defaultRegistry();
 			/** @var callable $has_provider wp-ai-client exposes this through __call() in some versions. */
 			$has_provider = array( $registry, 'hasProvider' );
@@ -193,6 +210,10 @@ class RequestBuilder {
 			$result = $builder->generate_text_result();
 		} catch ( \Throwable $e ) {
 			$result = new \WP_Error( 'wp_ai_client_text_exception', 'wp-ai-client request failed: ' . $e->getMessage() );
+		} finally {
+			if ( function_exists( 'remove_filter' ) ) {
+				remove_filter( 'wp_ai_client_default_request_timeout', $timeout_filter, 10 );
+			}
 		}
 
 		do_action(
@@ -213,6 +234,32 @@ class RequestBuilder {
 		);
 
 		return $result;
+	}
+
+	/**
+	 * Resolve the request timeout Data Machine applies to wp-ai-client calls.
+	 *
+	 * @param string $mode     Execution mode.
+	 * @param string $provider Provider identifier.
+	 * @param string $model    Model identifier.
+	 * @param array  $payload  Step payload.
+	 * @return float Timeout in seconds.
+	 */
+	private static function wpAiClientRequestTimeout( string $mode, string $provider, string $model, array $payload ): float {
+		$timeout = apply_filters(
+			'datamachine_wp_ai_client_request_timeout',
+			self::DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT,
+			$mode,
+			$provider,
+			$model,
+			$payload
+		);
+
+		if ( ! is_numeric( $timeout ) ) {
+			return self::DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT;
+		}
+
+		return max( 0.0, (float) $timeout );
 	}
 
 	/**
