@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.9] - 2026-05-01
+
+### Fixed
+- allow tool-only result text
+
 ## [0.103.8] - 2026-05-01
 
 ### Fixed
