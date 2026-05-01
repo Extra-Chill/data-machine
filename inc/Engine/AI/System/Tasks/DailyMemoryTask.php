@@ -101,6 +101,17 @@ class DailyMemoryTask extends SystemTask {
 		$memory_content = $result['content'];
 		$original_size  = strlen( $memory_content );
 
+		$overflow_result = $this->maybeHandleDeterministicOverflow( $jobId, $memory, $daily, $memory_content, $original_size, $date );
+		if ( null !== $overflow_result ) {
+			if ( empty( $overflow_result['success'] ) ) {
+				$this->failJob( $jobId, $overflow_result['message'] ?? 'Daily memory overflow split failed.' );
+				return;
+			}
+
+			$this->completeJob( $jobId, $overflow_result );
+			return;
+		}
+
 		// Skip if MEMORY.md is within the recommended threshold and no activity context.
 		$context = $this->gatherContext( $params );
 		if ( $original_size <= AgentMemory::MAX_FILE_SIZE && empty( $context ) ) {
@@ -363,6 +374,165 @@ class DailyMemoryTask extends SystemTask {
 				'new_size'      => $new_size,
 				'archived_size' => $archived_size,
 			)
+		);
+	}
+
+	/**
+	 * Deterministically split very large MEMORY.md files before invoking AI.
+	 *
+	 * Extremely large memory files can exceed the practical request envelope for
+	 * non-streaming provider calls. This path archives whole tail sections verbatim
+	 * and leaves a small persistent file with an archive pointer, preserving every
+	 * byte without asking the model to process the entire oversized file.
+	 *
+	 * @param int         $jobId          Job ID.
+	 * @param AgentMemory $memory         Agent memory facade.
+	 * @param DailyMemory $daily          Daily memory facade.
+	 * @param string      $memory_content Current MEMORY.md content.
+	 * @param int         $original_size  Original byte size.
+	 * @param string      $date           Archive date.
+	 * @return array|null Result array when handled, null when normal AI compaction should proceed.
+	 */
+	private function maybeHandleDeterministicOverflow( int $jobId, AgentMemory $memory, DailyMemory $daily, string $memory_content, int $original_size, string $date ): ?array {
+		$threshold = (int) apply_filters(
+			'datamachine_daily_memory_overflow_threshold',
+			AgentMemory::MAX_FILE_SIZE * 4,
+			array(
+				'job_id'        => $jobId,
+				'date'          => $date,
+				'original_size' => $original_size,
+			)
+		);
+
+		if ( $threshold <= 0 || $original_size <= $threshold ) {
+			return null;
+		}
+
+		$target_size = (int) apply_filters(
+			'datamachine_daily_memory_overflow_target_size',
+			AgentMemory::MAX_FILE_SIZE,
+			array(
+				'job_id'        => $jobId,
+				'date'          => $date,
+				'original_size' => $original_size,
+			)
+		);
+		$target_size = max( 1024, $target_size );
+
+		$split = self::splitMemorySectionsForOverflow( $memory_content, $target_size, $date );
+		if ( empty( $split['archived'] ) ) {
+			return null;
+		}
+
+		$write_result = $memory->replace_all( $split['persistent'] );
+		if ( empty( $write_result['success'] ) ) {
+			return array(
+				'success' => false,
+				'message' => $write_result['message'],
+			);
+		}
+
+		$parts        = explode( '-', $date );
+		$archive_body = "\n### Archived from oversized MEMORY.md\n\n" . $split['archived'] . "\n";
+		$append       = $daily->append( $parts[0], $parts[1], $parts[2], $archive_body );
+		if ( empty( $append['success'] ) ) {
+			return array(
+				'success' => false,
+				'message' => $append['message'],
+			);
+		}
+
+		$archived_size = strlen( $split['archived'] );
+		$new_size      = strlen( $split['persistent'] );
+
+		do_action(
+			'datamachine_log',
+			'info',
+			sprintf(
+				'Daily memory overflow split complete: %s -> %s (%s archived verbatim to daily/%s)',
+				size_format( $original_size ),
+				size_format( $new_size ),
+				size_format( $archived_size ),
+				$date
+			),
+			array(
+				'date'              => $date,
+				'original_size'     => $original_size,
+				'new_size'          => $new_size,
+				'archived_size'     => $archived_size,
+				'archived_blocks'   => $split['archived_blocks'],
+				'persistent_blocks' => $split['persistent_blocks'],
+			)
+		);
+
+		return array(
+			'success'           => true,
+			'date'              => $date,
+			'original_size'     => $original_size,
+			'new_size'          => $new_size,
+			'archived_size'     => $archived_size,
+			'overflow_split'    => true,
+			'archived_blocks'   => $split['archived_blocks'],
+			'persistent_blocks' => $split['persistent_blocks'],
+		);
+	}
+
+	/**
+	 * Split markdown into persistent head sections and archived tail sections.
+	 *
+	 * @param string $content     Full MEMORY.md content.
+	 * @param int    $target_size Target persistent size in bytes.
+	 * @param string $date        Archive date.
+	 * @return array{persistent: string, archived: string, persistent_blocks: int, archived_blocks: int}
+	 */
+	private static function splitMemorySectionsForOverflow( string $content, int $target_size, string $date ): array {
+		$blocks = preg_split( '/(?=^## .+$)/m', trim( $content ), -1, PREG_SPLIT_NO_EMPTY );
+		if ( ! is_array( $blocks ) || count( $blocks ) < 2 ) {
+			return array(
+				'persistent'        => $content,
+				'archived'          => '',
+				'persistent_blocks' => count( is_array( $blocks ) ? $blocks : array() ),
+				'archived_blocks'   => 0,
+			);
+		}
+
+		$persistent = array();
+		$archived   = array();
+		$pointer    = sprintf(
+			"\n## Archived Memory Overflow\n\nOn %s, Daily Memory archived older MEMORY.md sections verbatim to `daily/%s`. Use daily memory search/read when those details are needed.\n",
+			$date,
+			str_replace( '-', '/', $date ) . '.md'
+		);
+
+		foreach ( $blocks as $index => $block ) {
+			$block = trim( $block );
+			if ( '' === $block ) {
+				continue;
+			}
+
+			$candidate = implode( "\n\n", array_merge( $persistent, array( $block ) ) ) . $pointer;
+			if ( 0 === $index || strlen( $candidate ) <= $target_size ) {
+				$persistent[] = $block;
+				continue;
+			}
+
+			$archived[] = $block;
+		}
+
+		if ( empty( $archived ) ) {
+			return array(
+				'persistent'        => $content,
+				'archived'          => '',
+				'persistent_blocks' => count( $persistent ),
+				'archived_blocks'   => 0,
+			);
+		}
+
+		return array(
+			'persistent'        => rtrim( implode( "\n\n", $persistent ) . $pointer ) . "\n",
+			'archived'          => implode( "\n\n", $archived ),
+			'persistent_blocks' => count( $persistent ),
+			'archived_blocks'   => count( $archived ),
 		);
 	}
 
