@@ -326,7 +326,14 @@ $validation_result = ConversationManager::validateToolCall(
 );
 
 if ($validation_result['is_duplicate']) {
-    $correction_message = ConversationManager::generateDuplicateToolCallMessage($tool_name);
+    // $mode is the loop's current execution mode ('chat', 'pipeline', 'bridge', ...).
+    // The correction message is shaped per-mode so pipeline AI steps are told to
+    // call the publish handler instead of ending the conversation. See #1441.
+    $correction_message = ConversationManager::generateDuplicateToolCallMessage(
+        $tool_name,
+        $turn_count,
+        $mode
+    );
     $messages[] = $correction_message;
     continue; // Skip execution
 }
