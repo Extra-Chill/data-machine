@@ -5,6 +5,8 @@
  * @package DataMachine\Tests
  */
 
+require_once __DIR__ . '/agents-api-loader.php';
+
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
@@ -78,7 +80,7 @@ function agents_api_smoke_assert_equals( $expected, $actual, string $name, array
 }
 
 function agents_api_smoke_require_module(): void {
-	require_once __DIR__ . '/../agents-api/agents-api.php';
+	datamachine_tests_require_agents_api();
 }
 
 function agents_api_smoke_finish( string $label, array $failures, int $passes ): void {

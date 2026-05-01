@@ -28,7 +28,8 @@ function add_action( string $hook, callable $callback, int $priority = 10, int $
 	$GLOBALS['__agents_api_transcript_smoke_actions'][ $hook ][ $priority ][] = $callback;
 }
 
-require_once __DIR__ . '/../agents-api/agents-api.php';
+require_once __DIR__ . '/agents-api-loader.php';
+datamachine_tests_require_agents_api();
 
 use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
 

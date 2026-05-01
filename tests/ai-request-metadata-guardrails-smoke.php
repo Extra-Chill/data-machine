@@ -31,6 +31,22 @@ class WP_CLI {
 	}
 }
 
+class WP_Error {
+	public function __construct( private string $code = '', private string $message = '' ) {}
+
+	public function get_error_code(): string {
+		return $this->code;
+	}
+
+	public function get_error_message(): string {
+		return $this->message;
+	}
+}
+
+function is_wp_error( $thing ): bool {
+	return $thing instanceof WP_Error;
+}
+
 $GLOBALS['datamachine_test_filters'] = array();
 $GLOBALS['datamachine_test_logs']    = array();
 
@@ -78,7 +94,8 @@ function size_format( $bytes ): string {
 }
 
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
-require_once dirname( __DIR__ ) . '/agents-api/agents-api.php';
+require_once __DIR__ . '/agents-api-loader.php';
+datamachine_tests_require_agents_api();
 
 use DataMachine\Cli\Commands\JobsCommand;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
@@ -162,13 +179,32 @@ function count_guardrail_warnings(): int {
 	return $count;
 }
 
+function request_metadata_from_logs(): array {
+	$metadata = $GLOBALS['datamachine_test_request_metadata'] ?? array();
+	if ( is_array( $metadata ) && ! empty( $metadata ) ) {
+		return $metadata;
+	}
+
+	foreach ( smoke_logs() as $entry ) {
+		if ( ! is_array( $entry ) || 'debug' !== ( $entry[0] ?? '' ) || 'AI request built' !== ( $entry[1] ?? '' ) ) {
+			continue;
+		}
+
+		$context = $entry[2] ?? array();
+		return is_array( $context['request_metadata'] ?? null ) ? $context['request_metadata'] : array();
+	}
+
+	return array();
+}
+
 function reset_smoke_state(): void {
 	$GLOBALS['datamachine_test_filters'] = array();
 	$GLOBALS['datamachine_test_logs']    = array();
+	$GLOBALS['datamachine_test_request_metadata'] = array();
 	WP_CLI::$logs                        = array();
 }
 
-function build_smoke_request(): array {
+function build_smoke_request() {
 	$GLOBALS['datamachine_test_legacy_request_dispatches'] = 0;
 
 	add_filter(
@@ -200,7 +236,8 @@ function build_smoke_request(): array {
 		1
 	);
 
-	return RequestBuilder::build(
+	$request_metadata = array();
+	$response         = RequestBuilder::build(
 		array( array( 'role' => 'user', 'content' => 'hello' ) ),
 		'openai',
 		'gpt-smoke',
@@ -211,8 +248,13 @@ function build_smoke_request(): array {
 			),
 		),
 		'pipeline',
-		array( 'job_id' => 279, 'flow_step_id' => 12, 'persist_transcript' => true )
+		array( 'job_id' => 279, 'flow_step_id' => 12, 'persist_transcript' => true ),
+		$request_metadata
 	);
+
+	$GLOBALS['datamachine_test_request_metadata'] = $request_metadata;
+
+	return $response;
 }
 
 // 1. Tiny thresholds warn before dispatch, and compact metadata is attached to the response.
@@ -221,11 +263,12 @@ foreach ( array( 'datamachine_ai_request_warning_bytes', 'datamachine_ai_message
 	add_filter( $filter, fn() => 1 );
 }
 $response = build_smoke_request();
+$request_metadata = request_metadata_from_logs();
 assert_true( count( smoke_logs() ) > 0, 'oversized request emits a pre-dispatch warning' );
-assert_true( isset( $response['request_metadata']['request_json_bytes'] ), 'response carries request metadata' );
-assert_true( 'RULES.md' === ( $response['request_metadata']['memory_files'][0]['filename'] ?? '' ), 'memory file metadata is compactly captured' );
+assert_true( isset( $request_metadata['request_json_bytes'] ), 'request build log carries request metadata' );
+assert_true( 'RULES.md' === ( $request_metadata['memory_files'][0]['filename'] ?? '' ), 'memory file metadata is compactly captured' );
 assert_true( 0 === ( $GLOBALS['datamachine_test_legacy_request_dispatches'] ?? 0 ), 'request dispatch does not fall back to chubes_ai_request' );
-assert_true( false === ( $response['success'] ?? true ), 'missing wp-ai-client returns a structured request error' );
+assert_true( $response instanceof WP_Error && 'wp_ai_client_unavailable' === $response->get_error_code(), 'missing wp-ai-client returns a structured request error' );
 
 // 2. Large thresholds keep normal requests quiet.
 reset_smoke_state();
@@ -245,7 +288,7 @@ $session_id = ( new DataMachinePipelineTranscriptPersister() )->persist(
 	'openai',
 	'gpt-smoke',
 	array( 'persist_transcript' => true, 'job_id' => 279, 'flow_step_id' => 12, 'user_id' => 1, 'agent_id' => 2 ),
-	array( 'turn_count' => 1, 'completed' => false, 'request_metadata' => $response['request_metadata'] )
+	array( 'turn_count' => 1, 'completed' => false, 'request_metadata' => $request_metadata )
 );
 assert_true( 'smoke-session' === $session_id, 'simulated pipeline transcript is persisted' );
 assert_true( isset( $store->updated['smoke-session']['metadata']['request_metadata'] ), 'transcript metadata includes request_metadata' );

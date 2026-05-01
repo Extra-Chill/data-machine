@@ -33,7 +33,8 @@ if ( ! function_exists( 'do_action' ) ) {
 	function do_action( string $_hook, ...$_args ): void {}
 }
 
-require_once __DIR__ . '/../agents-api/agents-api.php';
+require_once __DIR__ . '/agents-api-loader.php';
+datamachine_tests_require_agents_api();
 
 use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
 use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;

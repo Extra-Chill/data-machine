@@ -84,11 +84,13 @@ $current_module_files = array(
  'inc/Core/FilesRepository/AgentMemoryStoreInterface.php',
 );
 
+
+$agents_api_vendor_path = dirname( datamachine_tests_agents_api_bootstrap_path() );
 foreach ( $current_module_files as $relative_path ) {
 	agents_api_smoke_assert_equals(
 		true,
-		file_exists( __DIR__ . '/../agents-api/' . $relative_path ),
-		'current in-repo module file exists: ' . $relative_path,
+		file_exists( $agents_api_vendor_path . '/' . $relative_path ),
+		'standalone dependency file exists: ' . $relative_path,
 		$failures,
 		$passes
 	);

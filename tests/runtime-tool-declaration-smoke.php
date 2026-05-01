@@ -19,12 +19,12 @@ function datamachine_runtime_tool_assert( bool $condition, string $message ): vo
 
 $assertions = 0;
 
-$runtime_tool_file = dirname( __DIR__ ) . '/agents-api/inc/AI/Tools/RuntimeToolDeclaration.php';
+$runtime_tool_file = AGENTS_API_PATH . 'inc/AI/Tools/RuntimeToolDeclaration.php';
 $legacy_tool_file  = dirname( __DIR__ ) . '/inc/Engine/AI/Tools/RuntimeToolDeclaration.php';
 
 datamachine_runtime_tool_assert(
 	is_file( $runtime_tool_file ),
-	'RuntimeToolDeclaration should live in the in-repo Agents API module.'
+	'RuntimeToolDeclaration should live in the standalone Agents API dependency.'
 );
 ++$assertions;
 datamachine_runtime_tool_assert(

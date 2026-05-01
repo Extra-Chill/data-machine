@@ -1,6 +1,6 @@
 # Agents API Extraction Map
 
-This map classifies Data Machine's current agent/runtime surface for the next Agents API phase. The next phase is not direct slice-by-slice extraction into an external repository. The next phase is an in-repo, core-style `data-machine/agents-api/` module that Data Machine consumes as product code while it still ships in this repository.
+This map classifies Data Machine's current agent/runtime surface for the Agents API extraction. The in-repo module phase is complete: Data Machine now consumes the standalone `extra-chill/agents-api` package/plugin for public contracts while keeping Data Machine product adapters in this repository.
 
 Parent issue: [Explore splitting Agents API out of Data Machine](https://github.com/Extra-Chill/data-machine/issues/1561)
 
@@ -26,7 +26,7 @@ Public contracts inside `agents-api/` use neutral `AgentsAPI\...` namespaces. Da
 
 ## Current Strategy
 
-Build the Agents API as an in-repo module first:
+The first phase built Agents API as an in-repo module:
 
 ```text
 data-machine/
@@ -38,7 +38,7 @@ data-machine/
     ...Data Machine pipelines/product code...
 ```
 
-Treat `data-machine/agents-api/` like WordPress core substrate while it still lives inside Data Machine:
+Data Machine now treats the standalone `extra-chill/agents-api` package/plugin as that substrate:
 
 - `agents-api` must not import Data Machine product namespaces.
 - Data Machine may import and consume `agents-api` as product code.
@@ -46,7 +46,7 @@ Treat `data-machine/agents-api/` like WordPress core substrate while it still li
 - Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, pending actions, content operations, and admin UI.
 - `agents-api` is backend-only and invisible by default: no admin menus, screens, human CRUD forms, React apps, or Data Machine product UI.
 - Data Machine and other product consumers own any admin/product UI they build on top of the substrate.
-- Later standalone extraction means moving the already-bounded module into its own plugin/repo and adding plugin bootstrap, release, dependency, and distribution ceremony.
+- Standalone extraction means the bounded module now lives in its own plugin/repo with plugin bootstrap, release, dependency, and distribution ceremony.
 - `ai-http-client` is not future architecture. It is only packaging precedent for bundled-then-extracted code.
 - The future provider primitive is `wp-ai-client`, not Agents API. `ai-http-client` dies as part of [#1027](https://github.com/Extra-Chill/data-machine/issues/1027) / [#1633](https://github.com/Extra-Chill/data-machine/issues/1633).
 - One-shot AI operations call `wp-ai-client` directly. Durable agent runs use Agents API, and Agents API provider code consumes `wp-ai-client` directly inside that runtime.
@@ -89,7 +89,7 @@ Mirror the WordPress Abilities API shape instead of importing Data Machine produ
 | Materialization | Abilities are registered definitions; consumers decide how to use them. | Agent definitions are registered definitions; Data Machine materializes rows at `init` priority 15 after registration has completed. |
 | Divergence | Abilities are executable REST-discoverable units with categories. | Agents stay backend-only in v1: no category registry, no public `wp-agents/v1` routes, and no persistence side effects in `wp_register_agent()`. |
 
-The remaining intentional divergence is product ownership, not hook timing: Data Machine owns today's materializer, tables, agent directories, access rows, scaffolding, and admin/CLI product surfaces while the in-repo Agents API owns only backend registration vocabulary and generic runtime contracts.
+The remaining intentional divergence is product ownership, not hook timing: Data Machine owns today's materializer, tables, agent directories, access rows, scaffolding, and admin/CLI product surfaces while standalone Agents API owns only backend registration vocabulary and generic runtime contracts.
 
 ## Boundary Rules
 
@@ -189,7 +189,7 @@ Exit rule for this in-place phase: do not physically move broad namespaces just 
 
 ## Built-In Loop Ownership Decision
 
-The in-repo `agents-api` module does not own Data Machine's built-in loop implementation yet. Its current ownership line is the generic contract surface: runner interfaces, request/result value objects, message envelopes, runtime tool declarations, and collaborator contracts that a loop can depend on without knowing Data Machine product concepts.
+The standalone `agents-api` package does not own Data Machine's built-in loop implementation yet. Its current ownership line is the generic contract surface: runner interfaces, request/result value objects, message envelopes, runtime tool declarations, and collaborator contracts that a loop can depend on without knowing Data Machine product concepts.
 
 Data Machine keeps `AIConversationLoop` and `BuiltInAgentConversationRunner` until the compatibility loop no longer needs Data Machine-owned assumptions. The loop must stay outside `agents-api` while it knows about or directly preserves any of these product concerns:
 
@@ -418,7 +418,7 @@ These tests currently pin the substrate most relevant to extraction.
 
 ## First Seams To Make Boring
 
-1. Create `data-machine/agents-api/` as the in-repo module boundary before moving broad code into another repository.
+1. Consume `extra-chill/agents-api` as the standalone package/plugin boundary before moving broad code into that repository.
 2. Split pipeline policy translation out of `ToolPolicyResolver` so the resolver no longer imports or reads `FlowStepConfig`.
 3. Split `AgentRegistry` into a pure registry and a Data Machine reconciler that creates database rows, access rows, directories, and scaffold files.
 4. Rename and stabilize message/result/store interfaces in place before moving namespaces.
@@ -430,7 +430,7 @@ These tests currently pin the substrate most relevant to extraction.
 ## Non-Goals
 
 - Do not move files as part of this map.
-- Do not frame the next step as direct external repository extraction; the next code step is the in-repo `data-machine/agents-api/` module.
+- Do not move broad runtime implementations into the standalone repository until their dependency direction, vocabulary, and tests prove they are generic substrate rather than Data Machine adapters.
 - Do not rename runtime classes before the target contracts are settled.
 - Do not make Data Machine or Agents API depend on host-specific provider or storage vocabulary.
 - Do not make Agents API depend on `ai-http-client`; that package is only a packaging precedent and a removal target.
