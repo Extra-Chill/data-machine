@@ -79,6 +79,7 @@ class LocalSearch extends BaseTool {
 					'type'        => 'array',
 					'required'    => false,
 					'description' => 'Post types to search (default: ["post", "page"]). Use ["datamachine_events"] for events.',
+					'items'       => array( 'type' => 'string' ),
 				),
 				'title_only' => array(
 					'type'        => 'boolean',
