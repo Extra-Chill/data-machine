@@ -458,7 +458,15 @@ class RequestBuilder {
 	 * @return string Text content.
 	 */
 	public static function resultText( \WordPress\AiClient\Results\DTO\GenerativeAiResult $result ): string {
-		return (string) $result->toText();
+		try {
+			return (string) $result->toText();
+		} catch ( \Throwable $e ) {
+			if ( str_contains( $e->getMessage(), 'No text content found' ) ) {
+				return '';
+			}
+
+			throw $e;
+		}
 	}
 
 	/**
