@@ -46,7 +46,7 @@ if ( ! function_exists( 'apply_filters' ) ) {
 
 if ( ! function_exists( 'do_action' ) ) {
 	function do_action( string $tag, ...$args ): void {
-		unset( $tag, $args );
+		$GLOBALS['datamachine_timeout_test_last_action'] = array( $tag, $args );
 	}
 }
 
@@ -82,6 +82,9 @@ if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 }
 
 class TimeoutPromptBuilderDouble {
+	/** @var array<string, mixed> */
+	public static array $captured_request = array();
+
 	private string $provider = '';
 	private mixed $model = null;
 	private array $history = array();
@@ -127,7 +130,7 @@ class TimeoutPromptBuilderDouble {
 	}
 
 	public function generate_text_result() {
-		$GLOBALS['datamachine_timeout_captured_request'] = array(
+		self::$captured_request = array(
 			'provider' => $this->provider,
 			'model'    => $this->model,
 			'prompt'   => $this->prompt,
@@ -170,8 +173,21 @@ function timeout_smoke_failure_count(): int {
 	return count( $failures );
 }
 
-$GLOBALS['datamachine_timeout_captured_request'] = null;
-$timeout_context                              = null;
+function timeout_smoke_filter_count( string $tag ): int {
+	$filters = $GLOBALS['datamachine_timeout_test_filters'];
+	if ( ! is_array( $filters ) || ! isset( $filters[ $tag ] ) || ! is_array( $filters[ $tag ] ) ) {
+		return 0;
+	}
+
+	$count = 0;
+	foreach ( $filters[ $tag ] as $callbacks ) {
+		$count += is_array( $callbacks ) ? count( $callbacks ) : 0;
+	}
+
+	return $count;
+}
+
+$timeout_context = null;
 
 add_filter(
 	'datamachine_wp_ai_client_request_timeout',
@@ -197,23 +213,14 @@ $result = RequestBuilder::build(
 	array( 'job_id' => 1695 )
 );
 
-if ( is_wp_error( $result ) ) {
-	echo 'RequestBuilder error: ' . $result->get_error_message() . "\n";
-}
-
 assert_timeout_smoke( ! is_wp_error( $result ), 'RequestBuilder dispatch succeeds with wp-ai-client test double' );
-assert_timeout_smoke( 240.0 === ( $GLOBALS['datamachine_timeout_captured_request']['timeout'] ?? null ), 'Data Machine applies scoped wp-ai-client request timeout' );
+assert_timeout_smoke( 240.0 === ( TimeoutPromptBuilderDouble::$captured_request['timeout'] ?? null ), 'Data Machine applies scoped wp-ai-client request timeout' );
 assert_timeout_smoke( 300.0 === ( $timeout_context['timeout'] ?? null ), 'Data Machine timeout filter receives product default' );
 assert_timeout_smoke( 'pipeline' === ( $timeout_context['mode'] ?? null ), 'Data Machine timeout filter receives execution mode' );
 assert_timeout_smoke( 'openai' === ( $timeout_context['provider'] ?? null ), 'Data Machine timeout filter receives provider' );
 assert_timeout_smoke( 'gpt-smoke' === ( $timeout_context['model'] ?? null ), 'Data Machine timeout filter receives model' );
 
-$remaining_wp_ai_filters = 0;
-foreach ( $GLOBALS['datamachine_timeout_test_filters']['wp_ai_client_default_request_timeout'] ?? array() as $callbacks ) {
-	$remaining_wp_ai_filters += count( $callbacks );
-}
-
-assert_timeout_smoke( 0 === $remaining_wp_ai_filters, 'Data Machine removes temporary wp-ai-client timeout filter after dispatch' );
+assert_timeout_smoke( 0 === timeout_smoke_filter_count( 'wp_ai_client_default_request_timeout' ), 'Data Machine removes temporary wp-ai-client timeout filter after dispatch' );
 
 if ( timeout_smoke_failure_count() > 0 ) {
 	exit( 1 );
