@@ -178,7 +178,10 @@ class RequestBuilder {
 					continue;
 				}
 
-				$history[] = $message;
+				$history_message = self::wpAiClientHistoryMessage( $message );
+				if ( null !== $history_message ) {
+					$history[] = $history_message;
+				}
 			}
 
 			if ( ! empty( $system_parts ) ) {
@@ -234,6 +237,67 @@ class RequestBuilder {
 		);
 
 		return $result;
+	}
+
+	/**
+	 * Convert Data Machine's canonical provider-message array into a wp-ai-client message DTO.
+	 *
+	 * @param array $message Provider-message array.
+	 * @return \WordPress\AiClient\Messages\DTO\Message|null Message DTO, or null when the shape is unsupported.
+	 */
+	private static function wpAiClientHistoryMessage( array $message ): ?\WordPress\AiClient\Messages\DTO\Message {
+		$role = (string) ( $message['role'] ?? '' );
+		$text = self::wpAiClientMessageText( $message['content'] ?? '' );
+		if ( null === $text ) {
+			return null;
+		}
+
+		$parts = array( new \WordPress\AiClient\Messages\DTO\MessagePart( $text ) );
+
+		if ( 'assistant' === $role || 'model' === $role ) {
+			return new \WordPress\AiClient\Messages\DTO\ModelMessage( $parts );
+		}
+
+		if ( 'user' === $role ) {
+			return new \WordPress\AiClient\Messages\DTO\UserMessage( $parts );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Extract text content from canonical message content shapes.
+	 *
+	 * @param mixed $content Message content.
+	 * @return string|null Text content, or null when no text is available.
+	 */
+	private static function wpAiClientMessageText( $content ): ?string {
+		if ( is_string( $content ) ) {
+			return '' !== $content ? $content : null;
+		}
+
+		if ( ! is_array( $content ) ) {
+			return null;
+		}
+
+		$parts = array();
+		foreach ( $content as $part ) {
+			if ( is_string( $part ) && '' !== $part ) {
+				$parts[] = $part;
+				continue;
+			}
+
+			if ( ! is_array( $part ) ) {
+				continue;
+			}
+
+			$text = $part['text'] ?? $part['content'] ?? null;
+			if ( is_string( $text ) && '' !== $text ) {
+				$parts[] = $text;
+			}
+		}
+
+		return ! empty( $parts ) ? implode( "\n\n", $parts ) : null;
 	}
 
 	/**
