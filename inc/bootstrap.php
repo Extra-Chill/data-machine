@@ -12,8 +12,6 @@
 
 defined( 'ABSPATH' ) || exit;
 
-require_once dirname( __DIR__ ) . '/agents-api/agents-api.php';
-
 /*
 |--------------------------------------------------------------------------
 | Procedural function files (no namespace, no class)

@@ -4,11 +4,13 @@ Parent issue: [Agents API extraction: create initial standalone plugin skeleton 
 
 Refs: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [pre-extraction audit](agents-api-pre-extraction-audit.md), [extraction map](agents-api-extraction-map.md)
 
-This plan turns the current in-repo `agents-api/` module into the first reviewable standalone-plugin extraction step. It is intentionally a skeleton plan, not the physical extraction PR. The first external plugin should prove the public WordPress-shaped surface and dependency direction before moving behavior-heavy runtime services.
+This plan turned the bounded in-repo `agents-api/` module into the first reviewable standalone-plugin extraction step. The standalone repository now provides the public WordPress-shaped surface and dependency direction before behavior-heavy runtime services move.
+
+Status update for [#1596](https://github.com/Extra-Chill/data-machine/issues/1596): Data Machine consumes `extra-chill/agents-api` as a Composer/plugin dependency and no longer carries an authoritative in-repo copy of the module.
 
 ## Goal
 
-Create a minimal `agents-api` plugin/repo that can boot on a clean WordPress install, expose the same backend PHP contracts that are already bounded in `data-machine/agents-api/`, and let Data Machine consume those contracts as a product dependency.
+Create a minimal `agents-api` plugin/repo that can boot on a clean WordPress install, expose the same backend PHP contracts that were bounded during the in-repo module phase, and let Data Machine consume those contracts as a product dependency.
 
 The skeleton should make [#1596](https://github.com/Extra-Chill/data-machine/issues/1596) actionable only after the remaining gates in the pre-extraction audit are complete.
 
@@ -164,7 +166,7 @@ Data Machine should remain the product adapter after the first skeleton exists:
 ## Extraction Sequence
 
 1. Finish the in-repo gates in `agents-api-pre-extraction-audit.md`.
-2. Create the standalone plugin skeleton by copying only `data-machine/agents-api/` contracts and bootstrap into the new repo.
+2. Create the standalone plugin skeleton by copying only the bounded `agents-api` contracts and bootstrap into the new repo.
 3. Add standalone bootstrap and no-product-import smokes in the new repo.
 4. Add `agents-api` as a required Data Machine dependency and remove the in-repo module copy from Data Machine.
 5. Update Data Machine imports/autoloading to consume the external plugin package.
@@ -203,7 +205,7 @@ Use this checklist on the first standalone skeleton PR:
 - [ ] The standalone plugin boots without Data Machine installed.
 - [ ] The standalone plugin has no admin UI, no REST controllers, and no database schema.
 - [ ] Public names match the table in this plan.
-- [ ] The moved files are limited to current `data-machine/agents-api/` contracts/value objects and bootstrap ceremony.
+- [ ] The moved files are limited to the bounded Agents API contracts/value objects and bootstrap ceremony.
 - [ ] Data Machine depends on the standalone plugin/package instead of carrying a second copy.
 - [ ] Data Machine pipeline behavior is unchanged.
 - [ ] Intelligence wiki behavior is unchanged.

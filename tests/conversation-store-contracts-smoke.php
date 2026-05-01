@@ -26,6 +26,8 @@ function add_filter( string $tag, callable $callback, int $priority = 10, int $a
 	// no-op
 }
 
+require_once __DIR__ . '/agents-api-loader.php';
+datamachine_tests_require_agents_api();
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
 use DataMachine\Core\Database\Chat\Chat;

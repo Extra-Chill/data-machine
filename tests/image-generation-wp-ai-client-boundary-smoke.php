@@ -30,10 +30,9 @@ $tool    = (string) file_get_contents( $root . '/inc/Engine/AI/Tools/Global/Imag
 $cli     = (string) file_get_contents( $root . '/inc/Cli/Commands/ImageCommand.php' );
 $deleted_adapter_path = $root . '/inc/Engine/AI/WpAiClient' . 'Adapter.php';
 $deleted_adapter_name = 'WpAiClient' . 'Adapter';
-$deleted_agents_wrapper_path = $root . '/agents-api/inc/AI/WpAiClient.php';
 
 $assert( ! is_file( $deleted_adapter_path ), 'Data Machine provider adapter file is deleted' );
-$assert( ! is_file( $deleted_agents_wrapper_path ), 'Agents API low-level wp-ai-client execution wrapper is deleted' );
+$assert( ! is_file( $root . '/vendor/extra-chill/agents-api/inc/AI/WpAiClient.php' ), 'Agents API carries no low-level wp-ai-client execution wrapper' );
 $assert( ! str_contains( $ability, $deleted_adapter_name ), 'image ability does not reference a Data Machine adapter' );
 $assert( str_contains( $ability, 'wp_ai_client_prompt( $prompt )' ), 'image ability calls wp_ai_client_prompt directly' );
 $assert( ! str_contains( $ability, 'HttpClient::post' ), 'image ability does not start direct HTTP predictions' );

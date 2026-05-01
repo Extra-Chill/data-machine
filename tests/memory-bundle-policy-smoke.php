@@ -188,6 +188,8 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 	}
 }
 
+require_once __DIR__ . '/agents-api-loader.php';
+datamachine_tests_require_agents_api();
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use DataMachine\Abilities\PermissionHelper;

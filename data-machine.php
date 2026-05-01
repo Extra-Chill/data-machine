@@ -6,6 +6,7 @@
  * Version:           0.102.8
  * Requires at least: 6.9
  * Requires PHP:     8.2
+ * Requires Plugins: agents-api
  * Author:          Chris Huber, extrachill
  * Author URI:      https://chubes.net
  * License:         GPL v2 or later
@@ -27,6 +28,13 @@ define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
 
 require_once __DIR__ . '/vendor/autoload.php';
+
+if ( ! defined( 'AGENTS_API_LOADED' ) ) {
+	$datamachine_agents_api_bootstrap = __DIR__ . '/vendor/extra-chill/agents-api/agents-api.php';
+	if ( file_exists( $datamachine_agents_api_bootstrap ) ) {
+		require_once $datamachine_agents_api_bootstrap;
+	}
+}
 
 // WP-CLI integration
 if ( defined( 'WP_CLI' ) && WP_CLI ) {

@@ -147,7 +147,8 @@ namespace DataMachine\Abilities\File {
 }
 
 namespace {
-	require_once __DIR__ . '/../agents-api/agents-api.php';
+	require_once __DIR__ . '/agents-api-loader.php';
+	datamachine_tests_require_agents_api();
 	require_once __DIR__ . '/../inc/Engine/Agents/AgentMaterializer.php';
 	require_once __DIR__ . '/../inc/Engine/Agents/AgentRegistry.php';
 	require_once __DIR__ . '/../inc/Engine/Agents/datamachine-register-agents.php';
@@ -283,7 +284,7 @@ namespace {
 	assert_agent_materializer_equals( 1, count( ScaffoldAbilities::$ability->calls ), 'existing row does not scaffold again', $failures, $passes );
 
 	echo "\n[4] materializer owns Data Machine side-effect dependencies:\n";
-	$registration_source = (string) file_get_contents( __DIR__ . '/../agents-api/inc/register-agents.php' );
+	$registration_source = (string) file_get_contents( AGENTS_API_PATH . 'inc/register-agents.php' );
 	$registry_source     = (string) file_get_contents( __DIR__ . '/../inc/Engine/Agents/AgentRegistry.php' );
 	$materializer_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/Agents/AgentMaterializer.php' );
 	assert_agent_materializer_equals( false, false !== strpos( $registration_source, 'datamachine_register_agent' ), 'Agents API registration helper does not define Data Machine legacy wrapper', $failures, $passes );

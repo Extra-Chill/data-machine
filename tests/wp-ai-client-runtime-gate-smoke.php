@@ -83,7 +83,8 @@ function size_format( $bytes ): string {
 	return $bytes . ' B';
 }
 
-require_once dirname( __DIR__ ) . '/agents-api/agents-api.php';
+require_once __DIR__ . '/agents-api-loader.php';
+datamachine_tests_require_agents_api();
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Directives/DirectiveInterface.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Directives/DirectiveOutputValidator.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Directives/DirectiveRenderer.php';
@@ -159,7 +160,8 @@ assert_smoke( false === str_contains( $request_builder_source, "'chubes_ai_reque
 assert_smoke( false === str_contains( $request_builder_source, 'Legacy path: ai-http-client' ), 'RequestBuilder source has no legacy provider path comment' );
 assert_smoke( str_contains( $request_builder_source, 'wpAiClientUnavailableReason' ), 'RequestBuilder owns product-level wp-ai-client gate' );
 assert_smoke( str_contains( $request_builder_source, 'wp_ai_client_prompt()' ), 'RequestBuilder calls wp_ai_client_prompt directly' );
-assert_smoke( ! is_file( dirname( __DIR__ ) . '/agents-api/inc/AI/WpAiClient.php' ), 'Agents API no longer carries a low-level wp-ai-client execution wrapper' );
+
+assert_smoke( ! is_file( AGENTS_API_PATH . 'inc/AI/WpAiClient.php' ), 'Agents API carries no low-level wp-ai-client execution wrapper' );
 
 echo "\n" . smoke_failure_count() . " failures\n";
 if ( smoke_failure_count() > 0 ) {

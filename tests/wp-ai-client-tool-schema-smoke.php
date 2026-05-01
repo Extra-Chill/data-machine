@@ -30,7 +30,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once $root . '/tests/Unit/Support/WpAiClientTestDoubles.php';
-require_once $root . '/agents-api/agents-api.php';
+require_once __DIR__ . '/agents-api-loader.php';
+datamachine_tests_require_agents_api();
 require_once $root . '/inc/Engine/AI/Directives/DirectiveInterface.php';
 require_once $root . '/inc/Engine/AI/Directives/DirectiveOutputValidator.php';
 require_once $root . '/inc/Engine/AI/Directives/DirectiveRenderer.php';

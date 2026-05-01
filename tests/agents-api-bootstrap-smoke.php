@@ -1,6 +1,6 @@
 <?php
 /**
- * Pure-PHP smoke test for the in-repo Agents API module boundary (#1631/#1639).
+ * Pure-PHP smoke test for the standalone Agents API dependency boundary (#1596).
  *
  * Run with: php tests/agents-api-bootstrap-smoke.php
  *
@@ -31,7 +31,7 @@ $namespace_map = array(
 echo "\n[1] Module bootstrap exposes registration facade without Data Machine product code:\n";
 agents_api_smoke_assert_equals( true, defined( 'AGENTS_API_LOADED' ), 'module marks itself loaded', $failures, $passes );
 agents_api_smoke_assert_equals( true, defined( 'AGENTS_API_PATH' ), 'module path constant is available', $failures, $passes );
-agents_api_smoke_assert_equals( realpath( __DIR__ . '/../agents-api' ) . '/', AGENTS_API_PATH, 'module path points at agents-api directory', $failures, $passes );
+agents_api_smoke_assert_equals( dirname( datamachine_tests_agents_api_bootstrap_path() ) . '/', AGENTS_API_PATH, 'module path points at standalone Agents API dependency', $failures, $passes );
 agents_api_smoke_assert_equals( true, function_exists( 'wp_register_agent' ), 'wp_register_agent helper is available', $failures, $passes );
 agents_api_smoke_assert_equals( true, function_exists( 'wp_get_agent' ), 'wp_get_agent helper is available', $failures, $passes );
 agents_api_smoke_assert_equals( true, function_exists( 'wp_get_agents' ), 'wp_get_agents helper is available', $failures, $passes );
@@ -66,18 +66,23 @@ foreach ( $agents_api_files as $file ) {
 		continue;
 	}
 
+	$relative_path = str_replace( AGENTS_API_PATH, '', $file->getPathname() );
+	if ( str_starts_with( $relative_path, 'tests/' ) ) {
+		continue;
+	}
+
 	$contents = file_get_contents( $file->getPathname() );
 	agents_api_smoke_assert_equals(
 		0,
 		preg_match( '/^\s*(namespace|use)\s+DataMachine\\\\/m', is_string( $contents ) ? $contents : '' ),
-		'agents-api source has no Data Machine namespace declaration/import: ' . str_replace( AGENTS_API_PATH, '', $file->getPathname() ),
+		'agents-api source has no Data Machine namespace declaration/import: ' . $relative_path,
 		$failures,
 		$passes
 	);
 	agents_api_smoke_assert_equals(
 		false,
 		false !== strpos( is_string( $contents ) ? $contents : '', 'Data Machine' ),
-		'agents-api source has no Data Machine prose coupling: ' . str_replace( AGENTS_API_PATH, '', $file->getPathname() ),
+		'agents-api source has no Data Machine prose coupling: ' . $relative_path,
 		$failures,
 		$passes
 	);

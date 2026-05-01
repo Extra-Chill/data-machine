@@ -6,11 +6,11 @@ Strategy issue: [Agents API blocker: update extraction docs around in-repo modul
 
 Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618) ([docs](agents-api-standalone-skeleton-plan.md)), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [registration lifecycle](https://github.com/Extra-Chill/data-machine/issues/1671), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), [one-shot AI boundary](https://github.com/Extra-Chill/data-machine/issues/1693), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
 
-This audit records the remaining work after the first in-place untangling wave. The boundary is now mostly visible: Data Machine owns pipelines and automation; the future Agents API owns generic agent runtime primitives. The next phase is to make those primitives live behind an in-repo `data-machine/agents-api/` module boundary while they still ship with Data Machine.
+This audit records the work that made the Agents API boundary extractable. Data Machine owns pipelines and automation; Agents API owns generic agent runtime primitives. The in-repo module phase is complete, and Data Machine now consumes the standalone `extra-chill/agents-api` package/plugin instead of carrying a second authoritative copy.
 
 ## Strategy Update
 
-The next step is not direct slice-by-slice extraction to an external repository. Build an in-repo module first:
+The previous step was an in-repo module boundary before direct external extraction:
 
 ```text
 data-machine/
@@ -22,7 +22,7 @@ data-machine/
     ...Data Machine pipelines/product code...
 ```
 
-Treat `data-machine/agents-api/` like WordPress core substrate while it still lives inside Data Machine:
+That module was treated like WordPress core substrate while it lived inside Data Machine:
 
 - `agents-api` owns the WordPress-shaped agent runtime vocabulary and contracts.
 - Data Machine consumes `agents-api` as product code.
@@ -31,7 +31,7 @@ Treat `data-machine/agents-api/` like WordPress core substrate while it still li
 - Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, pending actions, content operations, and admin UI.
 - `agents-api` is backend-only and invisible by default: no admin menus, screens, human CRUD forms, React apps, or Data Machine product UI.
 - Data Machine and other product consumers own any admin/product UI they build on top of the substrate.
-- Later standalone extraction means moving the already-bounded module into its own plugin/repo and adding plugin bootstrap, dependency, release, and distribution ceremony.
+- Standalone extraction moves the already-bounded module into its own plugin/repo and adds plugin bootstrap, dependency, release, and distribution ceremony.
 
 WordPress substrate boundary:
 
@@ -62,13 +62,13 @@ The initial untangling wave is complete:
 - `AgentConversationRequest::payload()` now exposes the generic runtime payload with Data Machine job/flow/pipeline/handler/transcript fields removed. Data Machine keeps those fields in `adapterContext()` and reconstructs the historical flat payload through `adapterPayload()` until the loop, prompt builder, and tool executor stop consuming the compatibility shape.
 - The built-in loop now receives runtime completion and transcript collaborators. Data Machine's handler-completion and pipeline-transcript behavior lives behind adapter classes instead of being hardcoded as generic loop state.
 
-This branch starts the naming phase by renaming the neutral runner result/request seam from `AIConversation*` to `AgentConversation*` while leaving `AIConversationLoop` as the temporary compatibility facade. The target home for boring generic runtime pieces is the in-repo `data-machine/agents-api/` module, not an immediate standalone plugin. `AgentMessageEnvelope`, `AgentConversationResult`, and `RuntimeToolDeclaration` have moved into that module with their existing namespaces preserved for behavior compatibility.
+The naming phase renamed the neutral runner result/request seam from `AIConversation*` to `AgentConversation*` while leaving `AIConversationLoop` as the temporary compatibility facade. The first generic runtime contracts now live in the standalone `extra-chill/agents-api` package with their `AgentsAPI\...` namespaces preserved.
 
 ## In-Repo Module Gate
 
 Before standalone extraction, the in-repo module should satisfy these gates:
 
-- `data-machine/agents-api/` exists and loads before Data Machine product runtime bootstraps.
+- `extra-chill/agents-api` loads before Data Machine product runtime bootstraps.
 - A bootstrap smoke can load `agents-api` without Data Machine product code.
 - No `agents-api` file imports `DataMachine\Core\Steps`, `DataMachine\Core\Database\Jobs`, handler, queue, retention, pending-action, admin UI, or content-operation namespaces.
 - No `agents-api` file registers admin menus, admin screens, settings forms, or admin-only UI hooks.

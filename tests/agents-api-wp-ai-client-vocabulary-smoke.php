@@ -66,12 +66,12 @@ agents_api_smoke_assert_equals( true, str_contains( $request_docs, 'plugins that
 
 $deleted_adapter_path    = '/inc/Engine/AI/WpAiClient' . 'Adapter.php';
 $deleted_capability_path = '/inc/Engine/AI/WpAiClient' . 'Capability.php';
-$deleted_agents_wrapper  = '/agents-api/inc/AI/WpAiClient.php';
 agents_api_smoke_assert_equals( false, is_file( (string) $root . $deleted_adapter_path ), 'Data Machine provider adapter file is deleted', $failures, $passes );
 agents_api_smoke_assert_equals( false, is_file( (string) $root . $deleted_capability_path ), 'Data Machine capability alias wrapper is deleted', $failures, $passes );
-agents_api_smoke_assert_equals( false, is_file( (string) $root . $deleted_agents_wrapper ), 'Agents API low-level wp-ai-client execution wrapper is deleted', $failures, $passes );
 
-$agents_api_dir = (string) $root . '/agents-api';
+agents_api_smoke_assert_equals( false, is_file( (string) $root . '/vendor/extra-chill/agents-api/inc/AI/WpAiClient.php' ), 'Agents API carries no low-level wp-ai-client execution wrapper', $failures, $passes );
+
+$agents_api_dir = (string) $root . '/vendor/extra-chill/agents-api';
 $host_terms     = array( 'wpcom', 'wpcOM', 'dolly', 'odie', 'wordpress.com', 'automattic ai framework' );
 $host_matches   = array();
 $iterator       = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $agents_api_dir ) );

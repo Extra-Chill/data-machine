@@ -14,7 +14,7 @@ echo "agents-api-no-product-imports-smoke\n";
 
 require_once __DIR__ . '/agents-api-smoke-helpers.php';
 
-$agents_api_dir = realpath( __DIR__ . '/../agents-api' );
+$agents_api_dir = realpath( dirname( datamachine_tests_agents_api_bootstrap_path() ) );
 agents_api_smoke_assert_equals( true, is_string( $agents_api_dir ), 'agents-api directory exists', $failures, $passes );
 
 $forbidden_namespaces = array(
@@ -58,27 +58,32 @@ foreach ( $iterator as $file ) {
 		continue;
 	}
 
+	$relative_path = str_replace( (string) $agents_api_dir . '/', '', $file->getPathname() );
+	if ( str_starts_with( $relative_path, 'tests/' ) ) {
+		continue;
+	}
+
 	$source = (string) file_get_contents( $file->getPathname() );
 	foreach ( $forbidden_namespaces as $namespace ) {
 		$quoted = preg_quote( $namespace, '/' );
 		if ( preg_match( '/(?:use\s+|new\s+|extends\s+|implements\s+|instanceof\s+|\\\\)' . $quoted . '(?:\\\\|;|\s|\(|::)/', $source ) ) {
-			$matches[] = str_replace( (string) $agents_api_dir . '/', '', $file->getPathname() ) . ' imports ' . $namespace;
+			$matches[] = $relative_path . ' imports ' . $namespace;
 		}
 	}
 
 	if ( preg_match( '/(?:use\s+|new\s+|extends\s+|implements\s+|instanceof\s+)\\?DataMachine\\\\/', $source ) ) {
-		$matches[] = str_replace( (string) $agents_api_dir . '/', '', $file->getPathname() ) . ' imports a DataMachine namespace';
+		$matches[] = $relative_path . ' imports a DataMachine namespace';
 	}
 
 	foreach ( $forbidden_admin_apis as $function_name ) {
 		if ( preg_match( '/\\b' . preg_quote( $function_name, '/' ) . '\\s*\(/', $source ) ) {
-			$matches[] = str_replace( (string) $agents_api_dir . '/', '', $file->getPathname() ) . ' registers admin UI via ' . $function_name;
+			$matches[] = $relative_path . ' registers admin UI via ' . $function_name;
 		}
 	}
 
 	foreach ( $forbidden_admin_hooks as $hook_name ) {
 		if ( preg_match( '/add_action\s*\(\s*[\'\"]' . preg_quote( $hook_name, '/' ) . '/', $source ) ) {
-			$matches[] = str_replace( (string) $agents_api_dir . '/', '', $file->getPathname() ) . ' registers admin hook ' . $hook_name;
+			$matches[] = $relative_path . ' registers admin hook ' . $hook_name;
 		}
 	}
 }

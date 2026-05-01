@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "11d03bfa8bd031c217381d7eeafd94e0",
+    "content-hash": "78ed37a349a1e0db755b321b841a69dc",
     "packages": [
         {
             "name": "chubes4/block-format-bridge",
@@ -131,6 +131,41 @@
                 "source": "https://github.com/dflydev/dflydev-dot-access-data/tree/v3.0.3"
             },
             "time": "2024-07-08T12:26:09+00:00"
+        },
+        {
+            "name": "extra-chill/agents-api",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Extra-Chill/agents-api.git",
+                "reference": "64ce3f8fae0362774d11eb4faff98f0f1b32c9c9"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Extra-Chill/agents-api/zipball/64ce3f8fae0362774d11eb4faff98f0f1b32c9c9",
+                "reference": "64ce3f8fae0362774d11eb4faff98f0f1b32c9c9",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.1"
+            },
+            "default-branch": true,
+            "type": "wordpress-plugin",
+            "scripts": {
+                "test": [
+                    "php tests/bootstrap-smoke.php",
+                    "php tests/no-product-imports-smoke.php"
+                ]
+            },
+            "license": [
+                "GPL-2.0-or-later"
+            ],
+            "description": "WordPress-shaped agent runtime substrate.",
+            "support": {
+                "source": "https://github.com/Extra-Chill/agents-api/tree/main",
+                "issues": "https://github.com/Extra-Chill/agents-api/issues"
+            },
+            "time": "2026-05-01T13:46:38+00:00"
         },
         {
             "name": "league/commonmark",
@@ -1498,7 +1533,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "extra-chill/agents-api": 20
+    },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {

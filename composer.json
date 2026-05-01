@@ -6,6 +6,7 @@
 	"require": {
 		"php": ">=8.2",
 		"woocommerce/action-scheduler": "^3.9",
+		"extra-chill/agents-api": "dev-main",
 		"chubes4/block-format-bridge": "^0.6"
 	},
 	"require-dev": {
@@ -16,7 +17,6 @@
 	},
 	"autoload": {
 		"psr-4": {
-			"AgentsAPI\\": "agents-api/inc/",
 			"DataMachine\\Abilities\\": "inc/Abilities/",
 			"DataMachine\\Api\\": "inc/Api/",
 			"DataMachine\\Cli\\": "inc/Cli/",
@@ -40,9 +40,16 @@
 			"dealerdirect/phpcodesniffer-composer-installer": true
 		}
 	},
-	"repositories": [{
-		"name": "block-format-bridge",
-		"type": "vcs",
-		"url": "https://github.com/chubes4/block-format-bridge"
-	}]
+	"repositories": [
+		{
+			"name": "agents-api",
+			"type": "vcs",
+			"url": "https://github.com/Extra-Chill/agents-api"
+		},
+		{
+			"name": "block-format-bridge",
+			"type": "vcs",
+			"url": "https://github.com/chubes4/block-format-bridge"
+		}
+	]
 }

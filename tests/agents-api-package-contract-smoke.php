@@ -224,19 +224,19 @@ agents_api_smoke_assert_equals( 'wordpress-com-wiki', $result->get_agent_slug(),
 
 echo "\n[5] Public package contract has no product vocabulary:\n";
 $contract_files = array(
-	'agents-api/inc/class-wp-agent-package.php',
-	'agents-api/inc/class-wp-agent-package-artifact.php',
-	'agents-api/inc/class-wp-agent-package-artifact-type.php',
-	'agents-api/inc/class-wp-agent-package-artifacts-registry.php',
-	'agents-api/inc/class-wp-agent-package-adopter-interface.php',
-	'agents-api/inc/class-wp-agent-package-adoption-diff.php',
-	'agents-api/inc/class-wp-agent-package-adoption-result.php',
-	'agents-api/inc/register-agent-package-artifacts.php',
+	'inc/class-wp-agent-package.php',
+	'inc/class-wp-agent-package-artifact.php',
+	'inc/class-wp-agent-package-artifact-type.php',
+	'inc/class-wp-agent-package-artifacts-registry.php',
+	'inc/class-wp-agent-package-adopter-interface.php',
+	'inc/class-wp-agent-package-adoption-diff.php',
+	'inc/class-wp-agent-package-adoption-result.php',
+	'inc/register-agent-package-artifacts.php',
 );
 $forbidden = array( 'DataMachine\\', 'pipeline', 'flow', 'job', 'handler', 'Intelligence', 'wpcom', 'Dolly', 'Odie' );
 $matches   = array();
 foreach ( $contract_files as $contract_file ) {
-	$source = (string) file_get_contents( dirname( __DIR__ ) . '/' . $contract_file );
+	$source = (string) file_get_contents( AGENTS_API_PATH . $contract_file );
 	foreach ( $forbidden as $needle ) {
 		if ( str_contains( $source, $needle ) ) {
 			$matches[] = $contract_file . ' contains ' . $needle;

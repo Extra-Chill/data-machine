@@ -78,7 +78,8 @@ function size_format( $bytes ): string {
 }
 
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
-require_once dirname( __DIR__ ) . '/agents-api/agents-api.php';
+require_once __DIR__ . '/agents-api-loader.php';
+datamachine_tests_require_agents_api();
 
 use DataMachine\Cli\Commands\JobsCommand;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
