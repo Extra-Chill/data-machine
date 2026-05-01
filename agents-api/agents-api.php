@@ -36,3 +36,5 @@ require_once AGENTS_API_PATH . 'inc/Core/FilesRepository/AgentMemoryListEntry.ph
 require_once AGENTS_API_PATH . 'inc/Core/FilesRepository/AgentMemoryReadResult.php';
 require_once AGENTS_API_PATH . 'inc/Core/FilesRepository/AgentMemoryWriteResult.php';
 require_once AGENTS_API_PATH . 'inc/Core/FilesRepository/AgentMemoryStoreInterface.php';
+
+add_action( 'init', array( 'WP_Agents_Registry', 'init' ), 10 );

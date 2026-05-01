@@ -21,6 +21,13 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 		private static ?self $instance = null;
 
 		/**
+		 * Whether the public registration hook has fired.
+		 *
+		 * @var bool
+		 */
+		private static bool $initialized = false;
+
+		/**
 		 * Registered agent definitions, keyed by slug.
 		 *
 		 * @var array<string, WP_Agent>
@@ -107,31 +114,57 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 		}
 
 		/**
+		 * Initialize the registry and fire the public registration hook.
+		 *
+		 * This is wired to WordPress' `init` action by the module bootstrap so
+		 * `wp_agents_api_init` follows the same deterministic lifecycle shape as
+		 * the Abilities API's registration hook. Late reads may still initialize
+		 * the registry object, but they do not reopen the registration window.
+		 *
+		 * @return self|null Registry instance, or null when init has not fired.
+		 */
+		public static function init(): ?self {
+			$registry = self::get_instance();
+			if ( null === $registry || self::$initialized ) {
+				return $registry;
+			}
+
+			self::$initialized = true;
+
+			/**
+			 * Fires to let plugins register agents.
+			 *
+			 * Callbacks should call `wp_register_agent()` to contribute one or more
+			 * agent definitions. The registry only collects definitions; consumers
+			 * decide whether and how to materialize them.
+			 */
+			do_action( 'wp_agents_api_init', $registry );
+
+			return $registry;
+		}
+
+		/**
 		 * Retrieve the registry singleton.
 		 *
 		 * @return self|null Registry instance, or null when init has not fired.
 		 */
 		public static function get_instance(): ?self {
-			if ( function_exists( 'did_action' ) && ! did_action( 'init' ) ) {
-				_doing_it_wrong(
-					__METHOD__,
-					'Agents API should not be initialized before the <code>init</code> action has fired.',
-					'0.102.8'
-				);
+			$init_started = function_exists( 'did_action' ) && did_action( 'init' );
+			$doing_init   = function_exists( 'doing_action' ) && doing_action( 'init' );
+
+			if ( ! $init_started && ! $doing_init ) {
+				if ( function_exists( '_doing_it_wrong' ) ) {
+					_doing_it_wrong(
+						__METHOD__,
+						'Agents API should not be initialized before the <code>init</code> action has fired.',
+						'0.102.8'
+					);
+				}
 				return null;
 			}
 
 			if ( null === self::$instance ) {
 				self::$instance = new self();
-
-				/**
-				 * Fires to let plugins register agents.
-				 *
-				 * Callbacks should call `wp_register_agent()` to contribute one or more
-				 * agent definitions. The registry only collects definitions; consumers
-				 * decide whether and how to materialize them.
-				 */
-				do_action( 'wp_agents_api_init', self::$instance );
 			}
 
 			return self::$instance;
@@ -144,7 +177,8 @@ if ( ! class_exists( 'WP_Agents_Registry' ) ) {
 		 * @return void
 		 */
 		public static function reset_for_tests(): void {
-			self::$instance = null;
+			self::$instance    = null;
+			self::$initialized = false;
 		}
 
 		/**

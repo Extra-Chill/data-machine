@@ -186,7 +186,7 @@ namespace {
 		$GLOBALS['__agent_materializer_hooks']   = array();
 		$GLOBALS['__agent_materializer_current'] = array();
 		$GLOBALS['__agent_materializer_done']    = array();
-		do_action( 'init' );
+		add_action( 'init', array( 'WP_Agents_Registry', 'init' ), 10 );
 	}
 
 	echo "agent-registry-materializer-smoke\n";
@@ -210,6 +210,7 @@ namespace {
 			);
 		}
 	);
+	do_action( 'init' );
 	$definitions = AgentRegistry::get_all();
 	assert_agent_materializer_equals( true, class_exists( 'WP_Agent' ), 'WP_Agent definition object is available', $failures, $passes );
 	assert_agent_materializer_equals( true, class_exists( 'WP_Agents_Registry' ), 'WP_Agents_Registry facade is available', $failures, $passes );
@@ -243,6 +244,7 @@ namespace {
 			);
 		}
 	);
+	do_action( 'init' );
 	$definitions = AgentRegistry::get_all();
 	assert_agent_materializer_equals( array( 'hook-agent', 'legacy-agent' ), array_keys( $definitions ), 'new and in-repo legacy hooks both contribute definitions', $failures, $passes );
 	assert_agent_materializer_equals( array(), Agents::$rows, 'hook collection remains side-effect free', $failures, $passes );
@@ -264,6 +266,7 @@ namespace {
 			);
 		}
 	);
+	do_action( 'init' );
 	$summary = AgentRegistry::reconcile();
 	assert_agent_materializer_equals( array( 'created' => array( 'example-agent' ), 'existing' => array(), 'skipped' => array() ), $summary, 'created summary matches pre-split registry behavior', $failures, $passes );
 	assert_agent_materializer_equals( 7, Agents::$rows['example-agent']['owner_id'] ?? 0, 'owner resolver controls created row owner', $failures, $passes );

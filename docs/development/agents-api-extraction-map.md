@@ -6,7 +6,7 @@ Parent issue: [Explore splitting Agents API out of Data Machine](https://github.
 
 Strategy update: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)
 
-Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618) ([docs](agents-api-standalone-skeleton-plan.md)), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), [one-shot AI boundary](https://github.com/Extra-Chill/data-machine/issues/1693), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
+Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618) ([docs](agents-api-standalone-skeleton-plan.md)), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [registration lifecycle](https://github.com/Extra-Chill/data-machine/issues/1671), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), [one-shot AI boundary](https://github.com/Extra-Chill/data-machine/issues/1693), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
 
 ## Namespace Map
 
@@ -75,6 +75,21 @@ Mirror the WordPress Abilities API shape instead of importing Data Machine produ
 | `RuntimeToolDeclaration` | `WP_Agent_Tool_Declaration` | Should stay ability-native and run-scoped. |
 | `LoopEventSinkInterface` | `WP_Agent_Run_Event_Sink_Interface` | Useful for logs, streaming, chat UIs, and async workers. |
 | REST `datamachine/v1` agent routes | REST `wp-agents/v1` deferred | [#1670](https://github.com/Extra-Chill/data-machine/issues/1670) reserves the namespace but defers public REST controllers from the first standalone extraction. Data Machine product routes stay under `datamachine/v1`. |
+
+## Registration Lifecycle
+
+`wp_agents_api_init` intentionally mirrors the Abilities API registration window where practical: the module wires registry initialization to WordPress `init`, callbacks register definitions only while the public hook is running, and reads after initialization do not replay the hook.
+
+| Lifecycle concern | Abilities API shape | Agents API in-repo shape |
+|---|---|---|
+| Bootstrap hook | WordPress fires `wp_abilities_api_init` during `init`. | `agents-api/agents-api.php` hooks `WP_Agents_Registry::init()` to `init`, which fires `wp_agents_api_init`. |
+| Registration helper timing | `wp_register_ability()` is valid only during `wp_abilities_api_init`. | `wp_register_agent()` is valid only during `wp_agents_api_init`; calls before or after the hook return `null` and emit `_doing_it_wrong()`. |
+| Pre-init reads | Registry access before `init` is invalid. | `WP_Agents_Registry::get_instance()` returns `null` before `init` and emits `_doing_it_wrong()`; public getters return empty/null/false. |
+| Lazy reads | Reads do not reopen the registration window after the hook has fired. | `wp_get_agents()`, `wp_get_agent()`, and Data Machine reconciliation read the initialized registry without refiring `wp_agents_api_init`. |
+| Materialization | Abilities are registered definitions; consumers decide how to use them. | Agent definitions are registered definitions; Data Machine materializes rows at `init` priority 15 after registration has completed. |
+| Divergence | Abilities are executable REST-discoverable units with categories. | Agents stay backend-only in v1: no category registry, no public `wp-agents/v1` routes, and no persistence side effects in `wp_register_agent()`. |
+
+The remaining intentional divergence is product ownership, not hook timing: Data Machine owns today's materializer, tables, agent directories, access rows, scaffolding, and admin/CLI product surfaces while the in-repo Agents API owns only backend registration vocabulary and generic runtime contracts.
 
 ## Boundary Rules
 

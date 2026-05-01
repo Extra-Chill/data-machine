@@ -4,7 +4,7 @@ Parent issue: [Explore splitting Agents API out of Data Machine](https://github.
 
 Strategy issue: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)
 
-Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618) ([docs](agents-api-standalone-skeleton-plan.md)), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), [one-shot AI boundary](https://github.com/Extra-Chill/data-machine/issues/1693), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
+Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618) ([docs](agents-api-standalone-skeleton-plan.md)), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [registration lifecycle](https://github.com/Extra-Chill/data-machine/issues/1671), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), [one-shot AI boundary](https://github.com/Extra-Chill/data-machine/issues/1693), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
 
 This audit records the remaining work after the first in-place untangling wave. The boundary is now mostly visible: Data Machine owns pipelines and automation; the future Agents API owns generic agent runtime primitives. The next phase is to make those primitives live behind an in-repo `data-machine/agents-api/` module boundary while they still ship with Data Machine.
 
@@ -75,6 +75,15 @@ Before standalone extraction, the in-repo module should satisfy these gates:
 - Data Machine product code imports the module as a dependency instead of reaching across same-layer runtime/product paths.
 - Provider runtime code targets `wp-ai-client`; no `ai-http-client` fallback is introduced or preserved inside `agents-api`.
 - One-shot AI calls may use `wp-ai-client` directly without Agents API. Data Machine pipeline AI steps should not move to Agents API solely for provider dispatch.
+
+Registration lifecycle gate for [#1671](https://github.com/Extra-Chill/data-machine/issues/1671):
+
+- `agents-api/agents-api.php` wires `WP_Agents_Registry::init()` to WordPress `init`.
+- `WP_Agents_Registry::init()` fires `wp_agents_api_init` once per request, matching the Abilities API's deterministic registration-window shape.
+- `wp_register_agent()` is valid only while `wp_agents_api_init` is running; calls before or after that hook return `null` and emit `_doing_it_wrong()`.
+- Public reads before `init` return empty/null/false and emit `_doing_it_wrong()` through `WP_Agents_Registry::get_instance()`.
+- Public reads after `init` do not replay the hook, so callbacks added after initialization are not collected lazily.
+- Data Machine materialization remains product-owned: `AgentRegistry::reconcile()` runs at `init` priority 15, after `wp_agents_api_init` has collected definitions and before existing scaffold checks.
 
 ## Core-Shape Decisions
 
