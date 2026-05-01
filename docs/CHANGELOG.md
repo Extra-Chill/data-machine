@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.4] - 2026-05-01
+
+### Fixed
+- normalize internal message envelopes
+
 ## [0.103.3] - 2026-05-01
 
 ### Fixed
