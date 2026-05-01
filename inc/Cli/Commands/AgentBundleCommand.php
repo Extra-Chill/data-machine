@@ -500,19 +500,21 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	private function bundle_summary( array $bundle, string $slug = '' ): array {
-		$agent = is_array( $bundle['agent'] ?? null ) ? $bundle['agent'] : array();
+		$package = AgentBundler::package_from_bundle( $bundle );
+
 		return array(
-			'bundle_slug'    => (string) ( $bundle['bundle_slug'] ?? sanitize_title( (string) ( $agent['agent_slug'] ?? 'agent-bundle' ) ) ),
-			'bundle_version' => (string) ( $bundle['bundle_version'] ?? '' ),
-			'target_slug'    => '' !== $slug ? sanitize_title( $slug ) : sanitize_title( (string) ( $agent['agent_slug'] ?? '' ) ),
+			'bundle_slug'    => $package->get_slug(),
+			'bundle_version' => $package->get_version(),
+			'target_slug'    => '' !== $slug ? sanitize_title( $slug ) : $package->get_agent()->get_slug(),
 			'pipelines'      => count( $bundle['pipelines'] ?? array() ),
 			'flows'          => count( $bundle['flows'] ?? array() ),
+			'artifacts'      => count( $package->get_artifacts() ),
 		);
 	}
 
 	private function output_plan( array $plan, array $assoc_args ): void {
 		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
-			WP_CLI::line( wp_json_encode( $plan, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( (string) wp_json_encode( $plan, JSON_PRETTY_PRINT ) );
 			return;
 		}
 
@@ -541,7 +543,7 @@ class AgentBundleCommand extends BaseCommand {
 
 	private function output( array $value, array $assoc_args, array $table_fields ): void {
 		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
-			WP_CLI::line( wp_json_encode( $value, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( (string) wp_json_encode( $value, JSON_PRETTY_PRINT ) );
 			return;
 		}
 
