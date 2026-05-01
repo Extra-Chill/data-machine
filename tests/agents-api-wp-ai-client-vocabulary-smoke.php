@@ -50,6 +50,20 @@ foreach ( $scanned_files as $relative_path ) {
 }
 
 agents_api_smoke_assert_equals( array(), $matches, 'docs/comments avoid forbidden final-architecture provider wording', $failures, $passes );
+
+$extraction_map = strtolower( (string) file_get_contents( (string) $root . '/docs/development/agents-api-extraction-map.md' ) );
+$audit_doc      = strtolower( (string) file_get_contents( (string) $root . '/docs/development/agents-api-pre-extraction-audit.md' ) );
+$engine_readme  = strtolower( (string) file_get_contents( (string) $root . '/inc/Engine/AI/README.md' ) );
+$request_docs   = strtolower( (string) file_get_contents( (string) $root . '/docs/core-system/request-builder.md' ) );
+
+agents_api_smoke_assert_equals( true, str_contains( $extraction_map, 'abilities api' ), 'extraction map names Abilities API layer', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $extraction_map, 'one-shot ai operations call `wp-ai-client` directly' ), 'extraction map preserves direct one-shot wp-ai-client usage', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $extraction_map, 'pipeline ai steps should not move to agents api solely for provider dispatch' ), 'extraction map blocks pipeline AI migration for provider dispatch only', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $audit_doc, 'wp-ai-client` remains the direct wordpress provider primitive for one-shot ai operations' ), 'pre-extraction audit preserves direct one-shot provider primitive', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $audit_doc, 'durable agent runtime behavior' ), 'pre-extraction audit names durable runtime boundary', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $engine_readme, 'wp-ai-client | direct provider/model prompt execution for one-shot ai operations' ), 'Engine AI README names direct wp-ai-client layer', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $request_docs, 'plugins that only need one-shot ai operations may call `wp-ai-client` directly' ), 'RequestBuilder docs do not force all plugins through Agents API', $failures, $passes );
+
 $deleted_adapter_path    = '/inc/Engine/AI/WpAiClient' . 'Adapter.php';
 $deleted_capability_path = '/inc/Engine/AI/WpAiClient' . 'Capability.php';
 $deleted_agents_wrapper  = '/agents-api/inc/AI/WpAiClient.php';

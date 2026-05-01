@@ -4,7 +4,7 @@ Parent issue: [Explore splitting Agents API out of Data Machine](https://github.
 
 Strategy issue: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)
 
-Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
+Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), [one-shot AI boundary](https://github.com/Extra-Chill/data-machine/issues/1693), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
 
 This audit records the remaining work after the first in-place untangling wave. The boundary is now mostly visible: Data Machine owns pipelines and automation; the future Agents API owns generic agent runtime primitives. The next phase is to make those primitives live behind an in-repo `data-machine/agents-api/` module boundary while they still ship with Data Machine.
 
@@ -33,17 +33,20 @@ Treat `data-machine/agents-api/` like WordPress core substrate while it still li
 - Data Machine and other product consumers own any admin/product UI they build on top of the substrate.
 - Later standalone extraction means moving the already-bounded module into its own plugin/repo and adding plugin bootstrap, dependency, release, and distribution ceremony.
 
-Dependency direction:
+WordPress substrate boundary:
 
 ```text
-wp-ai-client public API
-        ↑
-Agents API run request
-        ↑
-Data Machine product adapter
+Abilities API  -> actions and tools
+wp-ai-client   -> provider/model prompt execution
+Agents API     -> durable agent runtime behavior
+Data Machine   -> automation product built on those substrates
 ```
 
-`ai-http-client` is not future architecture. It is only packaging precedent for bundled-then-extracted code. The future runtime dependency direction is `Data Machine product adapter -> Agents API run request -> wp-ai-client public API`; `ai-http-client` dies as part of [#1027](https://github.com/Extra-Chill/data-machine/issues/1027) / [#1633](https://github.com/Extra-Chill/data-machine/issues/1633).
+`wp-ai-client` remains the direct WordPress provider primitive for one-shot AI operations: summarize text, classify content, generate titles/excerpts, transform content, produce a structured response from one prompt, or run a non-durable pipeline AI step where the product owns orchestration and storage. Agents API provider code may consume `wp-ai-client` directly when implementing durable agent runs, but that does not make Agents API the required path for every model call.
+
+Use Agents API when the caller needs durable agent runtime behavior: agent registration and lookup, chat/session persistence, multi-turn tool loops, memory/guideline composition, conversation locks or queued messages, event sinks, progress/streaming runtime events, provider-agnostic run lifecycle, or portable agent declarations. Data Machine pipeline AI steps should not move to Agents API solely for provider dispatch; they should keep using the direct `wp-ai-client` path unless they need those durable runtime semantics.
+
+`ai-http-client` is not future architecture. It is only packaging precedent for bundled-then-extracted code. The future dependency direction is not "all AI calls -> Agents API -> wp-ai-client"; it is "durable agent runs -> Agents API -> wp-ai-client" plus "one-shot AI operations -> wp-ai-client". `ai-http-client` dies as part of [#1027](https://github.com/Extra-Chill/data-machine/issues/1027) / [#1633](https://github.com/Extra-Chill/data-machine/issues/1633).
 
 ## Current State
 
@@ -71,6 +74,7 @@ Before standalone extraction, the in-repo module should satisfy these gates:
 - No `agents-api` file registers admin menus, admin screens, settings forms, or admin-only UI hooks.
 - Data Machine product code imports the module as a dependency instead of reaching across same-layer runtime/product paths.
 - Provider runtime code targets `wp-ai-client`; no `ai-http-client` fallback is introduced or preserved inside `agents-api`.
+- One-shot AI calls may use `wp-ai-client` directly without Agents API. Data Machine pipeline AI steps should not move to Agents API solely for provider dispatch.
 
 ## Core-Shape Decisions
 
