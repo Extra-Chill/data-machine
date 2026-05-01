@@ -14,7 +14,7 @@
  *   - Look up interval seconds from the datamachine_scheduler_intervals filter.
  *   - Compute a deterministic stagger offset so co-scheduled actions don't
  *     all fire at the same moment.
- *   - Clear existing actions before rescheduling (idempotent reschedule).
+ *   - Preserve matching pending actions and only reschedule changed slots.
  *   - Verify persistence after scheduling (AS can silently drop actions if
  *     its tables aren't ready during CLI activation).
  *   - Unschedule cleanly when a schedule is disabled.
@@ -60,9 +60,10 @@ class RecurringScheduler {
 	 *   - interval key from the datamachine_scheduler_intervals filter
 	 *     (or its aliases)                 → as_schedule_recurring_action.
 	 *
-	 * Always clears any existing action for (hook, args, group) before
-	 * scheduling to guarantee idempotent rescheduling, and verifies AS
-	 * actually persisted the action before returning success.
+	 * Preserves an existing pending action for (hook, args, group) when its
+	 * schedule semantics already match the requested configuration. Clears and
+	 * recreates the slot only when missing or changed, and verifies AS actually
+	 * persisted newly-created actions before returning success.
 	 *
 	 * @param string      $hook    Action Scheduler hook name to schedule.
 	 * @param array       $args    Arguments passed to the hook (also used as AS
@@ -82,10 +83,12 @@ class RecurringScheduler {
 	 *                                            takes precedence over stagger.
 	 *                                            Default: time() + stagger offset.
 	 *     @type string      $group               AS group. Default self::GROUP.
+	 *     @type bool        $force_reschedule    When true, replace existing matching
+	 *                                            pending actions. Default false.
 	 * }
 	 * @param bool        $enabled  When false, unschedule the action and return.
 	 *                              Default true.
-	 * @return array{interval:string,scheduled:bool}|\WP_Error Metadata on success,
+	 * @return array{interval:'manual',scheduled:false}|array{interval:'one_time',scheduled:true,timestamp:int,scheduled_time:string,preserved?:bool}|array{interval:'cron',scheduled:true,cron_expression:string,first_run?:string|null,action_id?:int,preserved?:bool}|array{interval:string,scheduled:true,interval_seconds:int,first_run:string,preserved?:bool}|\WP_Error Metadata on success,
 	 *                              or WP_Error on failure. Return shape includes
 	 *                              any relevant computed fields (interval_seconds,
 	 *                              first_run, cron_expression, timestamp) so
@@ -128,6 +131,16 @@ class RecurringScheduler {
 				);
 			}
 
+			if ( empty( $options['force_reschedule'] ) && self::hasMatchingSingleAction( $hook, $args, $group, (int) $timestamp ) ) {
+				return array(
+					'interval'       => 'one_time',
+					'scheduled'      => true,
+					'timestamp'      => $timestamp,
+					'scheduled_time' => wp_date( 'c', $timestamp ),
+					'preserved'      => true,
+				);
+			}
+
 			self::unschedule( $hook, $args, $group );
 
 			as_schedule_single_action( $timestamp, $hook, $args, $group );
@@ -150,7 +163,7 @@ class RecurringScheduler {
 					array( 'status' => 400 )
 				);
 			}
-			return self::scheduleCron( $hook, $args, $cron_expression, $group );
+			return self::scheduleCron( $hook, $args, $cron_expression, $group, ! empty( $options['force_reschedule'] ) );
 		}
 
 		// Auto-detect cron expression passed as the interval value.
@@ -179,8 +192,6 @@ class RecurringScheduler {
 			);
 		}
 
-		self::unschedule( $hook, $args, $group );
-
 		// Determine first-run timestamp. Caller override wins (e.g. "tomorrow
 		// midnight UTC" for daily memory). Otherwise compute from stagger seed.
 		if ( isset( $options['first_run_timestamp'] ) ) {
@@ -192,6 +203,18 @@ class RecurringScheduler {
 				: 0;
 			$first_run_time = time() + $stagger_offset;
 		}
+
+		if ( empty( $options['force_reschedule'] ) && self::hasMatchingRecurringAction( $hook, $args, $group, (int) $interval_seconds ) ) {
+			return array(
+				'interval'         => $resolved_interval,
+				'scheduled'        => true,
+				'interval_seconds' => (int) $interval_seconds,
+				'first_run'        => wp_date( 'c', $first_run_time ),
+				'preserved'        => true,
+			);
+		}
+
+		self::unschedule( $hook, $args, $group );
 
 		as_schedule_recurring_action( $first_run_time, $interval_seconds, $hook, $args, $group );
 
@@ -240,6 +263,127 @@ class RecurringScheduler {
 			return false;
 		}
 		return false !== as_next_scheduled_action( $hook, $args, $group );
+	}
+
+	/**
+	 * Find the next pending action object for a schedule slot.
+	 *
+	 * @param string $hook  Hook name.
+	 * @param array  $args  Action args.
+	 * @param string $group AS group.
+	 * @return object|null ActionScheduler_Action-like object, or null.
+	 */
+	private static function getPendingAction( string $hook, array $args, string $group ): ?object {
+		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
+			return null;
+		}
+
+		$actions = as_get_scheduled_actions(
+			array(
+				'hook'     => $hook,
+				'args'     => $args,
+				'group'    => $group,
+				'status'   => 'pending',
+				'orderby'  => 'date',
+				'order'    => 'ASC',
+				'per_page' => 1,
+			),
+			'OBJECT'
+		);
+
+		$action = reset( $actions );
+		return is_object( $action ) ? $action : null;
+	}
+
+	/**
+	 * Check whether the existing pending action is a one-time action at timestamp.
+	 *
+	 * @param string $hook      Hook name.
+	 * @param array  $args      Action args.
+	 * @param string $group     AS group.
+	 * @param int    $timestamp Expected timestamp.
+	 * @return bool True when the existing pending action already matches.
+	 */
+	private static function hasMatchingSingleAction( string $hook, array $args, string $group, int $timestamp ): bool {
+		$action = self::getPendingAction( $hook, $args, $group );
+		if ( ! $action || ! method_exists( $action, 'get_schedule' ) ) {
+			return false;
+		}
+
+		$schedule = $action->get_schedule();
+		if ( ! is_object( $schedule ) || ! method_exists( $schedule, 'is_recurring' ) || $schedule->is_recurring() ) {
+			return false;
+		}
+
+		return self::scheduleTimestampMatches( $schedule, $timestamp );
+	}
+
+	/**
+	 * Check whether the existing pending action has the requested interval recurrence.
+	 *
+	 * @param string $hook             Hook name.
+	 * @param array  $args             Action args.
+	 * @param string $group            AS group.
+	 * @param int    $interval_seconds Expected recurrence in seconds.
+	 * @return bool True when the existing pending action already matches.
+	 */
+	private static function hasMatchingRecurringAction( string $hook, array $args, string $group, int $interval_seconds ): bool {
+		$action = self::getPendingAction( $hook, $args, $group );
+		if ( ! $action || ! method_exists( $action, 'get_schedule' ) ) {
+			return false;
+		}
+
+		$schedule = $action->get_schedule();
+		if ( ! is_object( $schedule ) || ! method_exists( $schedule, 'is_recurring' ) || ! $schedule->is_recurring() ) {
+			return false;
+		}
+		if ( ! method_exists( $schedule, 'get_recurrence' ) ) {
+			return false;
+		}
+
+		return (int) $schedule->get_recurrence() === $interval_seconds;
+	}
+
+	/**
+	 * Check whether the existing pending action has the requested cron recurrence.
+	 *
+	 * @param string $hook            Hook name.
+	 * @param array  $args            Action args.
+	 * @param string $group           AS group.
+	 * @param string $cron_expression Expected cron expression.
+	 * @return bool True when the existing pending action already matches.
+	 */
+	private static function hasMatchingCronAction( string $hook, array $args, string $group, string $cron_expression ): bool {
+		$action = self::getPendingAction( $hook, $args, $group );
+		if ( ! $action || ! method_exists( $action, 'get_schedule' ) ) {
+			return false;
+		}
+
+		$schedule = $action->get_schedule();
+		if ( ! is_object( $schedule ) || ! method_exists( $schedule, 'is_recurring' ) || ! $schedule->is_recurring() ) {
+			return false;
+		}
+		if ( ! method_exists( $schedule, 'get_recurrence' ) ) {
+			return false;
+		}
+
+		return (string) $schedule->get_recurrence() === $cron_expression;
+	}
+
+	/**
+	 * Check whether a schedule object's run date matches a timestamp.
+	 *
+	 * @param object $schedule  Action Scheduler schedule object.
+	 * @param int    $timestamp Expected timestamp.
+	 * @return bool True when the schedule date matches.
+	 */
+	private static function scheduleTimestampMatches( object $schedule, int $timestamp ): bool {
+		if ( ! method_exists( $schedule, 'get_date' ) ) {
+			return false;
+		}
+
+		$date = $schedule->get_date();
+		return $date instanceof \DateTimeInterface && $date->getTimestamp() === $timestamp;
 	}
 
 	/**
@@ -301,6 +445,9 @@ class RecurringScheduler {
 		}
 
 		$parts = preg_split( '/\s+/', trim( $value ) );
+		if ( ! is_array( $parts ) ) {
+			return false;
+		}
 		if ( count( $parts ) < 5 || count( $parts ) > 6 ) {
 			return false;
 		}
@@ -370,9 +517,9 @@ class RecurringScheduler {
 	 * @param array  $args            Action args.
 	 * @param string $cron_expression Cron expression.
 	 * @param string $group           AS group.
-	 * @return array|\WP_Error
+	 * @return array{interval:'cron',scheduled:true,cron_expression:string,first_run?:string|null,action_id?:int,preserved?:bool}|\WP_Error
 	 */
-	private static function scheduleCron( string $hook, array $args, string $cron_expression, string $group ) {
+	private static function scheduleCron( string $hook, array $args, string $cron_expression, string $group, bool $force_reschedule = false ) {
 		if ( ! self::isValidCronExpression( $cron_expression ) ) {
 			return new \WP_Error(
 				'invalid_cron_expression',
@@ -386,6 +533,15 @@ class RecurringScheduler {
 				'scheduler_unavailable',
 				'Action Scheduler not available',
 				array( 'status' => 500 )
+			);
+		}
+
+		if ( ! $force_reschedule && self::hasMatchingCronAction( $hook, $args, $group, $cron_expression ) ) {
+			return array(
+				'interval'        => 'cron',
+				'scheduled'       => true,
+				'cron_expression' => $cron_expression,
+				'preserved'       => true,
 			);
 		}
 
