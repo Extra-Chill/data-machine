@@ -443,13 +443,11 @@ class AgentBundleCommand extends BaseCommand {
 				);
 			}
 			if ( 'flow' === $type && isset( $flow_by_slug[ $id ] ) ) {
-				$flow = $this->normalize_current_flow_ids( $flow_by_slug[ $id ] );
-
 				$artifacts[] = array(
 					'artifact_type' => 'flow',
 					'artifact_id'   => $id,
 					'source_path'   => (string) ( $record['source_path'] ?? '' ),
-					'payload'       => $this->flow_payload( $flow, $id ),
+					'payload'       => $this->flow_payload( $flow_by_slug[ $id ], $id ),
 				);
 			}
 		}
@@ -493,27 +491,6 @@ class AgentBundleCommand extends BaseCommand {
 		unset( $step );
 
 		return $flow_config;
-	}
-
-	private function normalize_current_flow_ids( array $flow ): array {
-		$new_pipeline_id = (int) ( $flow['pipeline_id'] ?? 0 );
-		$flow_id         = (int) ( $flow['flow_id'] ?? 0 );
-		$flow_config     = is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array();
-
-		foreach ( $flow_config as $step_config ) {
-			if ( ! is_array( $step_config ) || ! isset( $step_config['pipeline_id'] ) ) {
-				continue;
-			}
-
-			$old_pipeline_id = (int) $step_config['pipeline_id'];
-			if ( $old_pipeline_id > 0 && $new_pipeline_id > 0 && $flow_id > 0 ) {
-				$flow['flow_config'] = $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, $new_pipeline_id, $flow_id );
-			}
-
-			break;
-		}
-
-		return $flow;
 	}
 
 	private function remap_pipeline_step_ids( array $pipeline_config, int $old_pipeline_id, int $new_pipeline_id ): array {
