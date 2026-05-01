@@ -2,6 +2,22 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.0] - 2026-05-01
+
+### Added
+- feat(agents-api): consume standalone package
+- project bundles as agent packages
+- feat(agents-api): add package artifact registry
+- feat(agents-api): add agent package contract
+
+### Changed
+- call wp-ai-client directly
+
+### Fixed
+- preserve matching recurring schedules
+- fix(agents-api): align registration lifecycle
+- extend wp-ai-client request timeout
+
 ## [0.102.8] - 2026-04-30
 
 ### Changed
