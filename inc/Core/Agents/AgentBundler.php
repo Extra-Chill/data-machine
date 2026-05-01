@@ -597,14 +597,22 @@ class AgentBundler {
 				'pipeline'
 			);
 			$artifact_key      = 'pipeline:' . $portable_slug;
-			$payload           = $this->pipeline_artifact_payload( $pipeline_data, $portable_slug );
 			$existing_pipeline = $this->pipelines_repo->get_by_portable_slug( $agent_id, $portable_slug );
+			$target_pipeline   = $pipeline_data;
+			if ( $existing_pipeline ) {
+				$target_pipeline['pipeline_config'] = $this->remap_pipeline_step_ids( $pipeline_config, $old_id, (int) $existing_pipeline['pipeline_id'] );
+			}
+			$payload = $this->pipeline_artifact_payload( $target_pipeline, $portable_slug );
 
 			if (
 				$existing_pipeline
 				&& $this->artifact_has_local_modifications(
 					$artifact_records[ $artifact_key ] ?? null,
 					$this->pipeline_artifact_payload( $existing_pipeline, $portable_slug )
+				)
+				&& ! hash_equals(
+					AgentBundleArtifactHasher::hash( $payload ),
+					AgentBundleArtifactHasher::hash( $this->pipeline_artifact_payload( $existing_pipeline, $portable_slug ) )
 				)
 			) {
 				$conflicts[]                = array(
@@ -697,6 +705,10 @@ class AgentBundler {
 				&& $this->artifact_has_local_modifications(
 					$artifact_records[ $artifact_key ] ?? null,
 					$this->flow_artifact_payload( $existing_flow, $portable_slug )
+				)
+				&& ! hash_equals(
+					AgentBundleArtifactHasher::hash( $payload ),
+					AgentBundleArtifactHasher::hash( $this->normalized_existing_flow_payload( $existing_flow, $portable_slug, (int) $new_pipeline_id ) )
 				)
 			) {
 				$conflicts[] = array(
@@ -922,11 +934,13 @@ class AgentBundler {
 	}
 
 	private function preserve_runtime_queue_fields( array $incoming_flow_config, array $existing_flow_config ): array {
+		$runtime_fields = array( 'prompt_queue', 'config_patch_queue', 'queue_mode', '_queue_consume_revision' );
+
 		foreach ( $incoming_flow_config as $flow_step_id => &$step ) {
 			if ( ! is_array( $step ) || ! is_array( $existing_flow_config[ $flow_step_id ] ?? null ) ) {
 				continue;
 			}
-			foreach ( array( 'prompt_queue', 'config_patch_queue', 'queue_mode' ) as $field ) {
+			foreach ( $runtime_fields as $field ) {
 				if ( array_key_exists( $field, $existing_flow_config[ $flow_step_id ] ) ) {
 					$step[ $field ] = $existing_flow_config[ $flow_step_id ][ $field ];
 				}
@@ -942,11 +956,31 @@ class AgentBundler {
 			if ( ! is_array( $step ) ) {
 				continue;
 			}
-			unset( $step['prompt_queue'], $step['config_patch_queue'], $step['queue_mode'] );
+			unset( $step['prompt_queue'], $step['config_patch_queue'], $step['queue_mode'], $step['_queue_consume_revision'] );
 		}
 		unset( $step );
 
 		return $flow_config;
+	}
+
+	private function normalized_existing_flow_payload( array $flow, string $portable_slug, int $new_pipeline_id ): array {
+		$flow_id     = (int) ( $flow['flow_id'] ?? 0 );
+		$flow_config = is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array();
+
+		foreach ( $flow_config as $step_config ) {
+			if ( ! is_array( $step_config ) || ! isset( $step_config['pipeline_id'] ) ) {
+				continue;
+			}
+
+			$old_pipeline_id = (int) $step_config['pipeline_id'];
+			if ( $old_pipeline_id > 0 && $flow_id > 0 ) {
+				$flow['flow_config'] = $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, $new_pipeline_id, $flow_id );
+			}
+
+			break;
+		}
+
+		return $this->flow_artifact_payload( $flow, $portable_slug );
 	}
 
 	/**
