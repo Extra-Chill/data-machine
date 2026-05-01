@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.8] - 2026-05-01
+
+### Fixed
+- repair stale flow metadata on upgrade
+
 ## [0.103.7] - 2026-05-01
 
 ### Fixed
