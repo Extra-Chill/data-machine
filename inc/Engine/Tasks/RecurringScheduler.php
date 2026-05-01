@@ -274,12 +274,8 @@ class RecurringScheduler {
 	 * @return \WP_Error Error object.
 	 */
 	private static function error( string $code, string $message, array $data = array() ): \WP_Error {
-		$error = new \WP_Error( $code, $message );
-		if ( ! empty( $data ) ) {
-			$error->add_data( $data );
-		}
-
-		return $error;
+		unset( $data );
+		return new \WP_Error( $code, $message );
 	}
 
 	/**
