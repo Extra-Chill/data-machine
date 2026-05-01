@@ -144,8 +144,8 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		] );
 
 		$updated_alt = get_post_meta( $this->attachment_id, '_wp_attachment_image_alt', true );
-		$this->assertSame( 'Existing alt text', $updated_alt );
-		$this->assertFalse( $called, 'Unsupported file-part requests should fail before provider dispatch.' );
+		$this->assertSame( 'A small test image showing minimal JPEG data.', $updated_alt );
+		$this->assertTrue( $called, 'Canonical file-part envelopes should dispatch through the request builder.' );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 	}
@@ -244,7 +244,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 	/**
 	 * Test successful alt text generation.
 	 */
-	public function test_execute_returns_failure_for_file_part_until_wp_ai_client_supports_files(): void {
+	public function test_execute_supports_file_part_envelopes(): void {
 		// Mock PluginSettings
 		$settings_filter = function( $pre_option ) {
 			return [
@@ -261,7 +261,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 			// Verify the request structure
 			$this->assertIsArray( $request['messages'] );
 			$this->assertSame( 'gpt-4', $request['model'] );
-			$this->assertSame( 'openai', $provider );
+			$this->assertSame( 'openai', $request['provider'] ?? '' );
 
 			return [
 				'success' => true,
@@ -275,8 +275,8 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		$this->task->executeTask( 1, [ 'attachment_id' => $this->attachment_id ] );
 
 		$alt_text = get_post_meta( $this->attachment_id, '_wp_attachment_image_alt', true );
-		$this->assertSame( '', $alt_text );
-		$this->assertFalse( $called, 'Unsupported file-part requests should fail before provider dispatch.' );
+		$this->assertSame( 'A colorful test image for unit testing.', $alt_text );
+		$this->assertTrue( $called, 'Canonical file-part envelopes should dispatch through the request builder.' );
 
 		remove_filter( 'pre_option_datamachine_settings', $settings_filter, 10 );
 	}

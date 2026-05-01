@@ -190,9 +190,10 @@ class AIStep extends Step {
 		$messages = array();
 
 		if ( ! empty( $this->dataPackets ) ) {
-			$messages[] = ConversationManager::buildConversationMessage(
+			$data_packet_content = wp_json_encode( array( 'data_packets' => self::sanitizeDataPacketsForAi( $this->dataPackets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
+			$messages[]          = ConversationManager::buildConversationMessage(
 				'user',
-				wp_json_encode( array( 'data_packets' => self::sanitizeDataPacketsForAi( $this->dataPackets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE )
+				false === $data_packet_content ? '' : $data_packet_content
 			);
 		}
 

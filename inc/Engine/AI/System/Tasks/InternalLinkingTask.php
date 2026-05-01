@@ -43,7 +43,7 @@ class InternalLinkingTask extends SystemTask {
 
 		$post = get_post( $post_id );
 
-		if ( ! $post || 'publish' !== $post->post_status ) {
+		if ( ! $post instanceof \WP_Post || 'publish' !== $post->post_status ) {
 			$this->failJob( $jobId, "Post #{$post_id} does not exist or is not published" );
 			return;
 		}
