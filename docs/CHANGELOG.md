@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.2] - 2026-05-01
+
+### Fixed
+- extend wp-ai-client curl low-speed window
+
 ## [0.103.1] - 2026-05-01
 
 ### Fixed
