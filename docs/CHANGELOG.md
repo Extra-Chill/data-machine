@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.10] - 2026-05-01
+
+### Fixed
+- declare items schema on local_search post_types
+
 ## [0.103.9] - 2026-05-01
 
 ### Fixed
