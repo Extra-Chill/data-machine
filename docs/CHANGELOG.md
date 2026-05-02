@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.11] - 2026-05-02
+
+### Changed
+- make SITE.md and NETWORK.md composable via SectionRegistry
+
+### Fixed
+- satisfy CI lint for flow command
+- run drain actions by id
+- drain Data Machine batch actions
+- persist wp-ai-client metadata cache
+
 ## [0.103.10] - 2026-05-01
 
 ### Fixed
