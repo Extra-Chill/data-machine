@@ -118,11 +118,9 @@ function datamachine_migrate_user_md_to_network_scope(): void {
 
 	$network_md = trailingslashit( $network_dir ) . 'NETWORK.md';
 	if ( ! file_exists( $network_md ) ) {
-		$content = datamachine_get_network_scaffold_content();
-		if ( ! empty( $content ) ) {
-			$fs->put_contents( $network_md, $content, FS_CHMOD_FILE );
-			\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $network_md );
-		}
+		// Compose from registered sections. Generator self-skips on single-site
+		// installs because every NETWORK.md section returns an empty string.
+		\DataMachine\Engine\AI\ComposableFileGenerator::regenerate( 'NETWORK.md' );
 	}
 
 	$network_index = trailingslashit( $network_dir ) . 'index.php';
