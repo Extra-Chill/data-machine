@@ -132,12 +132,14 @@ add_action(
 );
 
 // Shared layer — site-wide context, visible to all agents.
+// Composable: content assembled from sections registered against SectionRegistry
+// (see inc/migrations/site-md.php). `editable` is forced to false by composable=true.
 MemoryFileRegistry::register( 'SITE.md', 10, array(
 	'layer'       => MemoryFileRegistry::LAYER_SHARED,
 	'protected'   => true,
-	'editable'    => false,
+	'composable'  => true,
 	'label'       => 'Site Context',
-	'description' => 'Auto-generated site context. Read-only — extend via PHP filters.',
+	'description' => 'Auto-generated site context. Composable — extend via SectionRegistry.',
 ) );
 MemoryFileRegistry::register( 'RULES.md', 15, array(
 	'layer'       => MemoryFileRegistry::LAYER_SHARED,
@@ -179,25 +181,20 @@ MemoryFileRegistry::register( 'USER.md', 25, array(
 ) );
 
 // Network layer — multisite topology, only meaningful on multisite installs.
+// Composable: content assembled from sections registered against SectionRegistry.
 MemoryFileRegistry::register( 'NETWORK.md', 5, array(
 	'layer'       => MemoryFileRegistry::LAYER_NETWORK,
 	'protected'   => true,
-	'editable'    => false,
+	'composable'  => true,
 	'label'       => 'Network Context',
-	'description' => 'Auto-generated multisite network topology. Read-only — extend via PHP filters.',
+	'description' => 'Auto-generated multisite network topology. Composable — extend via SectionRegistry.',
 ) );
 
-// SITE.md auto-regeneration — replaces the former SiteContext + SiteContextDirective system.
-// SITE.md is now the single source of truth for site context, auto-refreshing on structural changes.
-add_action( 'init', 'datamachine_register_site_md_invalidation' );
-
-// NETWORK.md auto-regeneration — keeps multisite topology in sync with live WordPress state.
-// Only registers hooks on multisite installs (guard is inside the function).
-add_action( 'init', 'datamachine_register_network_md_invalidation' );
-
-// Composable file auto-regeneration — rebuilds AGENTS.md (and any other composable files) on
-// plugin (de)activation plus any hooks plugins register via datamachine_composable_invalidation_hooks.
-// Runs on `init` so plugin filters registered during `plugins_loaded` are already in place.
+// Composable file auto-regeneration — rebuilds AGENTS.md, SITE.md, NETWORK.md, and any other
+// composable files on plugin (de)activation plus any hooks plugins register via
+// datamachine_composable_invalidation_hooks (SITE.md and NETWORK.md core hooks live in
+// inc/migrations/site-md.php). Runs on `init` so plugin filters registered during
+// `plugins_loaded` are already in place.
 add_action( 'init', array( \DataMachine\Engine\AI\ComposableFileInvalidation::class, 'register_hooks' ) );
 
 require_once __DIR__ . '/Engine/AI/Directives/ClientContextDirective.php';

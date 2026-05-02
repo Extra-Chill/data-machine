@@ -118,11 +118,9 @@ function datamachine_migrate_user_md_to_network_scope(): void {
 
 	$network_md = trailingslashit( $network_dir ) . 'NETWORK.md';
 	if ( ! file_exists( $network_md ) ) {
-		$content = datamachine_get_network_scaffold_content();
-		if ( ! empty( $content ) ) {
-			$fs->put_contents( $network_md, $content, FS_CHMOD_FILE );
-			\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $network_md );
-		}
+		// Compose from registered sections. Generator self-skips on single-site
+		// installs because every NETWORK.md section returns an empty string.
+		\DataMachine\Engine\AI\ComposableFileGenerator::regenerate( 'NETWORK.md' );
 	}
 
 	$network_index = trailingslashit( $network_dir ) . 'index.php';
@@ -182,13 +180,15 @@ function datamachine_migrate_agents_to_network_scope() {
 		// Skip the main site — its prefix IS the base_prefix, so the table is already network-level.
 		if ( $site_prefix === $wpdb->base_prefix ) {
 			// Set site_scope on existing main-site agents that don't have one yet.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// Table name is built from $wpdb->base_prefix, not user input — safe to interpolate.
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$wpdb->query(
 				$wpdb->prepare(
 					"UPDATE `{$network_agents_table}` SET site_scope = %d WHERE site_scope IS NULL",
 					(int) $blog_id
 				)
 			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			continue;
 		}
 
@@ -215,7 +215,8 @@ function datamachine_migrate_agents_to_network_scope() {
 			$old_agent_id = (int) $agent['agent_id'];
 
 			// Check if slug already exists in network table.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// Table name from $wpdb->base_prefix — safe to interpolate.
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$existing = $wpdb->get_row(
 				$wpdb->prepare(
 					"SELECT agent_id FROM `{$network_agents_table}` WHERE agent_slug = %s",
@@ -223,6 +224,7 @@ function datamachine_migrate_agents_to_network_scope() {
 				),
 				ARRAY_A
 			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 			if ( $existing ) {
 				// Slug already exists in network table — skip this agent.
@@ -254,11 +256,13 @@ function datamachine_migrate_agents_to_network_scope() {
 			++$migrated_agents;
 
 			// Migrate access grants for this agent.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// Table name from per-site $wpdb->prefix — safe to interpolate.
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$site_access = $wpdb->get_results(
 				$wpdb->prepare( "SELECT * FROM `{$site_access_table}` WHERE agent_id = %d", $old_agent_id ),
 				ARRAY_A
 			);
+			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 			foreach ( $site_access as $access ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -279,11 +283,13 @@ function datamachine_migrate_agents_to_network_scope() {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$token_table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $site_tokens_table ) );
 			if ( $token_table_exists ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				// Table name from per-site $wpdb->prefix — safe to interpolate.
+				// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$site_tokens = $wpdb->get_results(
 					$wpdb->prepare( "SELECT * FROM `{$site_tokens_table}` WHERE agent_id = %d", $old_agent_id ),
 					ARRAY_A
 				);
+				// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 				foreach ( $site_tokens as $token ) {
 					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery

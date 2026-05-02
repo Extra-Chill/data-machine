@@ -55,8 +55,9 @@ function datamachine_migrate_to_layered_architecture(): void {
 
 	$site_md = trailingslashit( $shared_dir ) . 'SITE.md';
 	if ( ! file_exists( $site_md ) ) {
-		$fs->put_contents( $site_md, datamachine_get_site_scaffold_content(), FS_CHMOD_FILE );
-		\DataMachine\Core\FilesRepository\FilesystemHelper::make_group_writable( $site_md );
+		// Compose from registered sections. Caller already guarantees the
+		// shared dir exists; ComposableFileGenerator will set permissions.
+		\DataMachine\Engine\AI\ComposableFileGenerator::regenerate( 'SITE.md' );
 	}
 
 	$index_file = trailingslashit( $shared_dir ) . 'index.php';

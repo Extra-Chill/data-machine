@@ -151,7 +151,24 @@ The difference between useful memory and noise is structure. Each core file has 
 
 ### SITE.md — Site-Wide Context (Shared Layer)
 
-SITE.md contains information about the WordPress installation that all agents share. It is **read-only** — fully regenerated from live WordPress data whenever site structure changes (plugin activations, theme switches, post/term lifecycle, option updates). To extend it, use the `datamachine_site_scaffold_content` filter.
+SITE.md contains information about the WordPress installation that all agents share. It is **read-only and composable** — fully regenerated from live WordPress data whenever site structure changes (plugin activations, theme switches, post/term lifecycle, option updates).
+
+To extend it, register a section against the `SectionRegistry` (the same API used for `AGENTS.md`):
+
+```php
+add_action( 'datamachine_sections', function () {
+    \DataMachine\Engine\AI\SectionRegistry::register(
+        'SITE.md',
+        'my-platform',
+        35, // priority — slots between post-types (30) and taxonomies (40)
+        function () {
+            return "## My Platform\n- Custom context line 1\n- Custom context line 2";
+        }
+    );
+} );
+```
+
+The legacy `datamachine_site_scaffold_content` whole-string filter still fires on the assembled output for backwards compatibility but emits a `_doing_it_wrong` deprecation notice. Migrate to `SectionRegistry::register()`.
 
 **Sections generated:**
 

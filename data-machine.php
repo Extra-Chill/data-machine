@@ -690,11 +690,12 @@ function datamachine_activate_for_site() {
 	// `datamachine_db_version` option (#1301).
 	datamachine_run_schema_migrations();
 
-	// Regenerate SITE.md with enriched content and clean up legacy SiteContext transient.
-	// Activation-only — SITE.md regeneration is heavy and shouldn't fire on
+	// Regenerate every composable memory file (SITE.md, NETWORK.md, AGENTS.md, …)
+	// from their registered sections, and clean up the legacy SiteContext transient.
+	// Activation-only — composable regeneration is heavy and shouldn't fire on
 	// every deploy (the version-gated runtime path is for schema-shape drift,
 	// not opportunistic content refresh).
-	datamachine_regenerate_site_md();
+	\DataMachine\Engine\AI\ComposableFileGenerator::regenerate_all();
 	delete_transient( 'datamachine_site_context_data' );
 
 	// Clean up legacy per-agent-type log level options (idempotent).
