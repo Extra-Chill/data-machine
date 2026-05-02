@@ -209,6 +209,27 @@ namespace DataMachine\Tests\Unit\Support {
 			);
 		}
 	}
+
+	class WpAiClientModelDouble {
+		private string $model;
+		private ?\WordPress\AiClient\Providers\Http\DTO\RequestOptions $request_options = null;
+
+		public function __construct( string $model ) {
+			$this->model = $model;
+		}
+
+		public function setRequestOptions( \WordPress\AiClient\Providers\Http\DTO\RequestOptions $request_options ): void {
+			$this->request_options = $request_options;
+		}
+
+		public function getRequestOptions(): ?\WordPress\AiClient\Providers\Http\DTO\RequestOptions {
+			return $this->request_options;
+		}
+
+		public function __toString(): string {
+			return $this->model;
+		}
+	}
 }
 
 namespace WordPress\AiClient\Files\Enums {
@@ -297,7 +318,12 @@ namespace WordPress\AiClient\Providers {
 			public function setProviderRequestAuthentication( string $provider, $auth ): void {
 			}
 
-			public function getProviderModel( string $provider, string $model, $config = null ): string {
+			public function getProviderModel( string $provider, string $model, $config = null ) {
+				unset( $provider, $config );
+				if ( ! empty( $GLOBALS['datamachine_test_wp_ai_client_model_with_request_options'] ) ) {
+					return new \DataMachine\Tests\Unit\Support\WpAiClientModelDouble( $model );
+				}
+
 				return $model;
 			}
 		}
@@ -305,6 +331,29 @@ namespace WordPress\AiClient\Providers {
 }
 
 namespace WordPress\AiClient\Providers\Http\DTO {
+	if ( ! class_exists( RequestOptions::class ) ) {
+		class RequestOptions {
+			private ?float $timeout = null;
+			private ?float $connect_timeout = null;
+
+			public function setTimeout( ?float $timeout ): void {
+				$this->timeout = $timeout;
+			}
+
+			public function setConnectTimeout( ?float $timeout ): void {
+				$this->connect_timeout = $timeout;
+			}
+
+			public function getTimeout(): ?float {
+				return $this->timeout;
+			}
+
+			public function getConnectTimeout(): ?float {
+				return $this->connect_timeout;
+			}
+		}
+	}
+
 	if ( ! class_exists( ApiKeyRequestAuthentication::class ) ) {
 		class ApiKeyRequestAuthentication {
 			private string $api_key;
