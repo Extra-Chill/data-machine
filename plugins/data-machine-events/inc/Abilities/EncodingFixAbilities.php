@@ -44,7 +44,7 @@ class EncodingFixAbilities {
 				array(
 					'label'               => __( 'Fix Encoding', 'data-machine-events' ),
 					'description'         => __( 'Fix Unicode encoding issues in event block attributes', 'data-machine-events' ),
-					'category'            => 'datamachine-events/events',
+					'category'            => 'datamachine-events-events',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(

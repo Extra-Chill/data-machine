@@ -18,10 +18,10 @@ class AbilityCategories {
 	/**
 	 * Category slug constants for use in ability registrations.
 	 */
-	public const EVENTS   = 'datamachine-events/events';
-	public const VENUES   = 'datamachine-events/venues';
-	public const TESTING  = 'datamachine-events/testing';
-	public const SETTINGS = 'datamachine-events/settings';
+	public const EVENTS   = 'datamachine-events-events';
+	public const VENUES   = 'datamachine-events-venues';
+	public const TESTING  = 'datamachine-events-testing';
+	public const SETTINGS = 'datamachine-events-settings';
 
 	private static bool $registered = false;
 
