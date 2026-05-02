@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.13] - 2026-05-02
+
+### Fixed
+- propagate wp-ai-client request timeouts
+
 ## [0.103.12] - 2026-05-02
 
 ### Fixed
