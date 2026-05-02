@@ -165,7 +165,18 @@ class RequestBuilder {
 			/** @var callable $model_resolver wp-ai-client exposes this through __call() in some versions. */
 			$model_resolver = array( $registry, 'getProviderModel' );
 			$model_instance = call_user_func( $model_resolver, $provider_id, $model, null );
-			$builder        = \wp_ai_client_prompt()
+			if (
+				is_object( $model_instance )
+				&& method_exists( $model_instance, 'setRequestOptions' )
+				&& class_exists( '\WordPress\AiClient\Providers\Http\DTO\RequestOptions' )
+			) {
+				$request_options = new \WordPress\AiClient\Providers\Http\DTO\RequestOptions();
+				$request_options->setTimeout( $request_timeout );
+				$request_options->setConnectTimeout( min( 30.0, $request_timeout ) );
+				$model_instance->setRequestOptions( $request_options );
+			}
+
+			$builder = \wp_ai_client_prompt()
 				->using_provider( $provider_id )
 				->using_model( $model_instance );
 

@@ -195,6 +195,7 @@ function timeout_smoke_filter_count( string $tag ): int {
 }
 
 $timeout_context = null;
+$GLOBALS['datamachine_test_wp_ai_client_model_with_request_options'] = true;
 
 add_filter(
 	'datamachine_wp_ai_client_request_timeout',
@@ -230,6 +231,12 @@ assert_timeout_smoke( 300.0 === ( $timeout_context['timeout'] ?? null ), 'Data M
 assert_timeout_smoke( 'pipeline' === ( $timeout_context['mode'] ?? null ), 'Data Machine timeout filter receives execution mode' );
 assert_timeout_smoke( 'openai' === ( $timeout_context['provider'] ?? null ), 'Data Machine timeout filter receives provider' );
 assert_timeout_smoke( 'gpt-smoke' === ( $timeout_context['model'] ?? null ), 'Data Machine timeout filter receives model' );
+
+$captured_model           = TimeoutPromptBuilderDouble::$captured_request['model'] ?? null;
+$captured_request_options = is_object( $captured_model ) && method_exists( $captured_model, 'getRequestOptions' ) ? $captured_model->getRequestOptions() : null;
+assert_timeout_smoke( $captured_request_options instanceof \WordPress\AiClient\Providers\Http\DTO\RequestOptions, 'Data Machine applies wp-ai-client RequestOptions to API-based models' );
+assert_timeout_smoke( 240.0 === $captured_request_options?->getTimeout(), 'Data Machine sets RequestOptions timeout from scoped request timeout' );
+assert_timeout_smoke( 30.0 === $captured_request_options?->getConnectTimeout(), 'Data Machine caps RequestOptions connect timeout at 30 seconds' );
 
 $captured_history = TimeoutPromptBuilderDouble::$captured_request['history'] ?? array();
 assert_timeout_smoke( isset( $captured_history[0] ) && $captured_history[0] instanceof \WordPress\AiClient\Messages\DTO\UserMessage, 'Data Machine converts user history arrays to wp-ai-client UserMessage DTOs' );
