@@ -61,7 +61,8 @@ function datamachine_run_conversation(
 	// Strip runtime objects from the loop payload before passing to tools/requests.
 	$loop_payload = datamachine_payload_without_runtime_objects( $payload );
 
-	// Clamp max_turns via the IterationBudget system.
+	// Build the turns budget through DM's registry (site-config-aware ceiling
+	// resolution). The upstream loop owns increment + exceeded checks.
 	$turn_budget = IterationBudgetRegistry::create( 'conversation_turns', 0, $max_turns );
 	$max_turns   = $turn_budget->ceiling();
 
@@ -100,18 +101,15 @@ function datamachine_run_conversation(
 		$loop_payload,
 		$event_sink,
 		$base_log_context,
-		$turn_budget,
 		$completion_policy,
 		$last_request_metadata,
 		$total_usage
 	);
 
-	// Build should_continue callback.
-	$should_continue = static function ( array $result, array $turn_context ) use ( $single_turn, $turn_budget ): bool {
+	// Build should_continue callback. Budget enforcement is handled by
+	// upstream via the budgets option — we only check DM-specific conditions.
+	$should_continue = static function ( array $result, array $turn_context ) use ( $single_turn ): bool {
 		if ( $single_turn ) {
-			return false;
-		}
-		if ( $turn_budget->exceeded() ) {
 			return false;
 		}
 		// The DM turn runner sets conversation_complete when the completion
@@ -129,6 +127,7 @@ function datamachine_run_conversation(
 			$turn_runner,
 			array(
 				'max_turns'            => $max_turns,
+				'budgets'              => array( $turn_budget ),
 				'context'              => array_merge( $loop_payload, array( 'mode' => $mode ) ),
 				'should_continue'      => $should_continue,
 				'transcript_persister' => $transcript_persister,
@@ -147,6 +146,7 @@ function datamachine_run_conversation(
 			'error'                  => $e->getMessage(),
 			'usage'                  => $total_usage,
 			'request_metadata'       => $last_request_metadata,
+			'status'                 => 'error',
 		);
 	}
 
@@ -169,6 +169,16 @@ function datamachine_run_conversation(
 	$result['usage']            = $total_usage;
 	$result['request_metadata'] = $last_request_metadata;
 
+	// Map upstream budget_exceeded status to DM's max_turns_reached flag
+	// for backward compatibility with ChatOrchestrator response shaping.
+	if ( 'budget_exceeded' === ( $result['status'] ?? '' ) && 'conversation_turns' === ( $result['budget'] ?? '' ) ) {
+		$result['max_turns_reached'] = true;
+		$result['warning']           = sprintf(
+			'Maximum conversation turns (%d) reached. Response may be incomplete.',
+			$turn_budget->ceiling()
+		);
+	}
+
 	return $result;
 }
 
@@ -187,7 +197,6 @@ function datamachine_run_conversation(
  * @param array                                           $loop_payload           Cleaned payload.
  * @param LoopEventSinkInterface                          $event_sink             DM event sink.
  * @param array                                           $base_log_context       Base log context.
- * @param \DataMachine\Engine\AI\IterationBudget          $turn_budget            Turn budget.
  * @param AgentConversationCompletionPolicyInterface       $completion_policy      Completion policy.
  * @param array                                           &$last_request_metadata Mutable request metadata.
  * @param array                                           &$total_usage           Mutable usage accumulator.
@@ -201,7 +210,6 @@ function datamachine_build_turn_runner(
 	array $loop_payload,
 	LoopEventSinkInterface $event_sink,
 	array $base_log_context,
-	$turn_budget,
 	AgentConversationCompletionPolicyInterface $completion_policy,
 	array &$last_request_metadata,
 	array &$total_usage
@@ -214,13 +222,12 @@ function datamachine_build_turn_runner(
 		$loop_payload,
 		$event_sink,
 		$base_log_context,
-		$turn_budget,
 		$completion_policy,
 		&$last_request_metadata,
 		&$total_usage
 	): array {
-		$turn_budget->increment();
-		$turn_count = $turn_budget->current();
+		// The upstream loop provides the turn number via turn_context.
+		$turn_count = (int) ( $turn_context['turn'] ?? 1 );
 
 		// Build and dispatch AI request using centralized RequestBuilder.
 		$ai_response = RequestBuilder::build(

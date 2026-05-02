@@ -24,6 +24,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use AgentsAPI\AI\IterationBudget;
 use DataMachine\Core\PluginSettings;
 
 defined( 'ABSPATH' ) || exit;
