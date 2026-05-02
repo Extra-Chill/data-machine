@@ -9,6 +9,8 @@ namespace DataMachine\Engine\AI;
 
 defined( 'ABSPATH' ) || exit;
 
+require_once __DIR__ . '/WpAiClientCache.php';
+
 /**
  * Reads provider metadata and API-key settings through wp-ai-client / Connectors.
  */
@@ -354,6 +356,8 @@ class WpAiClientProviderAdmin {
 		if ( ! class_exists( $ai_client_class ) ) {
 			return null;
 		}
+
+		WpAiClientCache::install();
 
 		try {
 			$registry = $ai_client_class::defaultRegistry();

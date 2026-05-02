@@ -67,7 +67,10 @@ require_once __DIR__ . '/Engine/Agents/datamachine-register-agents.php';
 use DataMachine\Engine\AI\MemoryFileRegistry;
 use DataMachine\Engine\AI\AgentModeRegistry;
 use DataMachine\Engine\AI\IterationBudgetRegistry;
+use DataMachine\Engine\AI\WpAiClientCache;
 use DataMachine\Core\PluginSettings;
+
+add_action( 'plugins_loaded', array( WpAiClientCache::class, 'install' ), 20 );
 
 /*
 |--------------------------------------------------------------------------

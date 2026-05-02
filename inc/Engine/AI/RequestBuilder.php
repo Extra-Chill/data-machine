@@ -16,6 +16,8 @@ use DataMachine\Engine\AI\Directives\DirectivePolicyResolver;
 
 defined( 'ABSPATH' ) || exit;
 
+require_once __DIR__ . '/WpAiClientCache.php';
+
 class RequestBuilder {
 
 	/**
@@ -58,6 +60,8 @@ class RequestBuilder {
 		array $payload = array(),
 		?array &$request_metadata = null
 	) {
+		WpAiClientCache::install();
+
 		$assembled          = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
 		$request            = $assembled['request'];
 		$provider_request   = ProviderRequestAssembler::toProviderRequest( $request );
@@ -436,6 +440,8 @@ class RequestBuilder {
 		if ( ! class_exists( '\\WordPress\\AiClient\\AiClient' ) ) {
 			return 'wp-ai-client is unavailable: WordPress\\AiClient\\AiClient is not loaded';
 		}
+
+		WpAiClientCache::install();
 
 		try {
 			$registry = \WordPress\AiClient\AiClient::defaultRegistry();
