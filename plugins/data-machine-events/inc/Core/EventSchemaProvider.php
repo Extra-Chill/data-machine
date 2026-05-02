@@ -87,6 +87,7 @@ class EventSchemaProvider {
 		),
 		'occurrenceDates' => array(
 			'type'            => 'array',
+			'items'           => array( 'type' => 'string' ),
 			'required'        => false,
 			'description'     => 'For recurring events: array of specific dates (YYYY-MM-DD) when the event occurs within the start/end range. If provided, event displays only on these dates instead of every day in the range.',
 			'schema_property' => null,
@@ -329,6 +330,15 @@ class EventSchemaProvider {
 
 			if ( ! empty( $field['enum'] ) ) {
 				$param['enum'] = $field['enum'];
+			}
+
+			// JSON Schema requires `items` on every array type, and OpenAI's
+			// strict tool schema validation rejects arrays without it.
+			// Propagate `items` from the field declaration; default to a string
+			// array when the declaration is incomplete to avoid emitting an
+			// invalid schema that would fail at runtime.
+			if ( 'array' === ( $field['type'] ?? '' ) ) {
+				$param['items'] = $field['items'] ?? array( 'type' => 'string' );
 			}
 
 			$params[ $key ] = $param;
