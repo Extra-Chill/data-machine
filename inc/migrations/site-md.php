@@ -295,16 +295,12 @@ function datamachine_site_section_taxonomies(): string {
 			'taxonomy'   => $tax->name,
 			'hide_empty' => false,
 		) );
-		// wp_count_terms returns int|numeric-string|WP_Error. Narrow to int
-		// before formatting so phpstan stays happy and output is consistent.
-		if ( is_wp_error( $term_count_raw ) ) {
-			$term_count = 0;
-		} elseif ( is_numeric( $term_count_raw ) ) {
-			$term_count = (int) $term_count_raw;
-		} else {
-			$term_count = 0;
-		}
-		$hier = $tax->hierarchical ? 'hierarchical' : 'flat';
+		// wp_count_terms returns int|numeric-string|WP_Error. The is_wp_error()
+		// guard narrows away WP_Error at runtime, but phpstan's WP stubs don't
+		// model that narrowing — suppress the residual cast complaint.
+		// @phpstan-ignore-next-line cast.int
+		$term_count = is_wp_error( $term_count_raw ) ? 0 : (int) $term_count_raw;
+		$hier       = $tax->hierarchical ? 'hierarchical' : 'flat';
 		// WP_Taxonomy::$object_type is array<string>, not nullable — use it directly.
 		$associated = implode( ', ', $tax->object_type );
 		$lines[]    = sprintf( '| %s | %s | %d | %s | %s |', $tax->label, $tax->name, $term_count, $hier, $associated );
