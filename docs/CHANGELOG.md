@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.12] - 2026-05-02
+
+### Fixed
+- run drain action command in-process
+
 ## [0.103.11] - 2026-05-02
 
 ### Changed
