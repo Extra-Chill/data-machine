@@ -6,7 +6,7 @@
 	"require": {
 		"php": ">=8.2",
 		"woocommerce/action-scheduler": "^3.9",
-		"extra-chill/agents-api": "dev-main",
+		"automattic/agents-api": "dev-main",
 		"chubes4/block-format-bridge": "^0.6"
 	},
 	"require-dev": {
@@ -44,7 +44,7 @@
 		{
 			"name": "agents-api",
 			"type": "vcs",
-			"url": "https://github.com/Extra-Chill/agents-api"
+			"url": "https://github.com/Automattic/agents-api"
 		},
 		{
 			"name": "block-format-bridge",
