@@ -43,6 +43,7 @@ assert_drain_contains( "datamachine_execute_step'", $drain_src, 'drain includes 
 assert_drain_contains( 'getDuePendingActionIds', $drain_src, 'drain queries concrete due Data Machine action IDs' );
 assert_drain_contains( 'action-scheduler action run ', $drain_src, 'drain runs concrete action IDs instead of generic queue runner' );
 assert_drain_contains( "'exit_error' => false", $drain_src, 'drain failure is surfaced as warning instead of fataling after job start' );
+assert_drain_contains( "'launch'     => false", $drain_src, 'drain runs nested WP-CLI command in-process for Studio compatibility' );
 assert_drain_contains( "'return'     => 'all'", $drain_src, 'drain captures Action Scheduler command result' );
 assert_drain_contains( "'remaining_pending'", $drain_src, 'drain reports remaining pending actions' );
 assert_drain_contains( "'batch_chunks'", $drain_src, 'drain reports batch chunk counts' );

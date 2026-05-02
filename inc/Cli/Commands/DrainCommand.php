@@ -156,6 +156,7 @@ class DrainCommand extends BaseCommand {
 			'action-scheduler action run ' . implode( ' ', array_map( 'intval', $action_ids ) ),
 			array(
 				'exit_error' => false,
+				'launch'     => false,
 				'return'     => 'all',
 			)
 		);
