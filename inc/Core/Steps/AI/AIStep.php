@@ -11,8 +11,9 @@ use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\AI\ToolPolicy\PipelineToolPolicyArgs;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Steps\QueueableTrait;
-use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\ConversationManager;
+
+use function DataMachine\Engine\AI\datamachine_run_conversation;
 use DataMachine\Engine\AI\PipelineTranscriptPolicy;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
@@ -355,8 +356,8 @@ class AIStep extends Step {
 		}
 
 		try {
-			// Execute conversation loop via runtime-adapter-aware entry point.
-			$loop_result = AIConversationLoop::run(
+			// Execute conversation loop via agents-api substrate.
+			$loop_result = datamachine_run_conversation(
 				$messages,
 				$available_tools,
 				$provider_name,

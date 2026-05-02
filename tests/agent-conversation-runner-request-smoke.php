@@ -1,6 +1,9 @@
 <?php
 /**
- * Smoke test for the agent conversation request/runner boundary.
+ * Smoke test for datamachine_run_conversation() substrate integration.
+ *
+ * Verifies that DM's conversation entry point correctly delegates to the
+ * upstream AgentConversationLoop::run() and returns a normalized result.
  *
  * Run with: php tests/agent-conversation-runner-request-smoke.php
  *
@@ -9,28 +12,16 @@
 
 declare(strict_types=1);
 
-$GLOBALS['datamachine_runner_request_filters'] = array();
-$GLOBALS['datamachine_runner_request_logs']    = array();
+$GLOBALS['datamachine_runner_request_logs'] = array();
 
 if ( ! function_exists( 'add_filter' ) ) {
 	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-		$GLOBALS['datamachine_runner_request_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+		// No-op for smoke tests.
 	}
 }
 
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $hook, $value, ...$args ) {
-		$callbacks = $GLOBALS['datamachine_runner_request_filters'][ $hook ] ?? array();
-		ksort( $callbacks );
-
-		foreach ( $callbacks as $priority_callbacks ) {
-			foreach ( $priority_callbacks as $entry ) {
-				$callback      = $entry[0];
-				$accepted_args = $entry[1];
-				$value         = $callback( ...array_slice( array_merge( array( $value ), $args ), 0, $accepted_args ) );
-			}
-		}
-
 		return $value;
 	}
 }
@@ -63,11 +54,11 @@ if ( ! function_exists( 'get_option' ) ) {
 require_once __DIR__ . '/bootstrap-unit.php';
 require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
 
-use DataMachine\Engine\AI\AIConversationLoop;
-use DataMachine\Engine\AI\AgentConversationRequest;
 use DataMachine\Engine\AI\LoopEventSinkInterface;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 use AgentsAPI\AI\AgentMessageEnvelope;
+
+use function DataMachine\Engine\AI\datamachine_run_conversation;
 
 class RunnerRequestSmokeSink implements LoopEventSinkInterface {
 	public array $events = array();
@@ -105,70 +96,10 @@ $messages = array(
 		'content' => 'hello runner boundary',
 	),
 );
-$tools    = array();
-$sink     = new RunnerRequestSmokeSink();
-$payload  = array(
-	'job_id'                   => 1569,
-	'flow_step_id'             => 'flow-step-smoke',
-	'pipeline_id'              => 31,
-	'flow_id'                  => 41,
-	'configured_handler_slugs' => array( 'wiki_upsert' ),
-	'persist_transcript'       => false,
-	'engine'                   => array( 'snapshot' => 'present' ),
-	'event_sink'               => $sink,
-);
+$tools = array();
+$sink  = new RunnerRequestSmokeSink();
 
-// 1. The request object exposes generic runner inputs and Data Machine adapter context.
-$request = AgentConversationRequest::fromRunArgs(
-	$messages,
-	$tools,
-	'openai',
-	'gpt-smoke',
-	'pipeline',
-	$payload,
-	7,
-	true
-);
-
-$canonical_messages = $request->messages();
-assert_runner_request( $messages !== $canonical_messages, 'request normalizes legacy messages instead of preserving raw identity' );
-assert_runner_request( AgentMessageEnvelope::SCHEMA === ( $canonical_messages[0]['schema'] ?? null ), 'request stores canonical message schema' );
-assert_runner_request( AgentMessageEnvelope::TYPE_TEXT === ( $canonical_messages[0]['type'] ?? null ), 'request stores canonical text message type' );
-assert_runner_request( 'user' === ( $canonical_messages[0]['role'] ?? null ), 'request preserves normalized message role' );
-assert_runner_request( 'hello runner boundary' === ( $canonical_messages[0]['content'] ?? null ), 'request preserves normalized message content' );
-assert_runner_request( $tools === $request->tools(), 'request keeps tools as generic input' );
-assert_runner_request( 'openai' === $request->provider(), 'request exposes provider from model config' );
-assert_runner_request( 'gpt-smoke' === $request->model(), 'request exposes model from model config' );
-assert_runner_request( 'pipeline' === $request->mode(), 'request exposes mode' );
-assert_runner_request( 7 === $request->maxTurns(), 'request exposes max turns' );
-assert_runner_request( true === $request->singleTurn(), 'request exposes single-turn flag' );
-assert_runner_request( $sink === $request->eventSink(), 'request exposes event sink' );
-assert_runner_request( ! array_key_exists( 'job_id', $request->payload() ), 'generic payload excludes job id' );
-assert_runner_request( ! array_key_exists( 'flow_step_id', $request->payload() ), 'generic payload excludes flow step id' );
-assert_runner_request( ! array_key_exists( 'pipeline_id', $request->payload() ), 'generic payload excludes pipeline id' );
-assert_runner_request( ! array_key_exists( 'flow_id', $request->payload() ), 'generic payload excludes flow id' );
-assert_runner_request( ! array_key_exists( 'configured_handler_slugs', $request->payload() ), 'generic payload excludes handler completion policy' );
-assert_runner_request( ! array_key_exists( 'persist_transcript', $request->payload() ), 'generic payload excludes transcript policy' );
-assert_runner_request( ! array_key_exists( 'engine', $request->payload() ), 'generic payload excludes engine object' );
-assert_runner_request( 1569 === $request->adapterContext()['job_id'], 'adapter context carries job id' );
-assert_runner_request( 31 === $request->adapterContext()['pipeline_id'], 'adapter context carries pipeline id' );
-assert_runner_request( array( 'wiki_upsert' ) === $request->adapterContext()['configured_handler_slugs'], 'adapter context carries handler completion policy' );
-assert_runner_request( false === $request->adapterContext()['persist_transcript'], 'adapter context carries transcript policy' );
-assert_runner_request( array( 'snapshot' => 'present' ) === $request->adapterContext()['engine'], 'adapter context carries engine snapshot' );
-assert_runner_request( $payload === $request->adapterPayload(), 'adapter payload reconstructs the legacy Data Machine payload' );
-
-// 2. The compatibility facade passes the historical argument list to the Agents API runner filter.
-$legacy_filter_args = null;
-add_filter(
-	'agents_api_conversation_runner',
-	function ( $result, ...$args ) use ( &$legacy_filter_args ) {
-		$legacy_filter_args = array_merge( array( $result ), $args );
-		return null;
-	},
-	10,
-	9
-);
-
+// 1. datamachine_run_conversation dispatches via upstream substrate and returns a normalized result.
 $dispatched_request = null;
 WpAiClientTestDouble::reset();
 WpAiClientTestDouble::set_response_callback(
@@ -178,7 +109,7 @@ WpAiClientTestDouble::set_response_callback(
 		return array(
 			'success' => true,
 			'data'    => array(
-				'content'    => 'facade ok',
+				'content'    => 'substrate ok',
 				'tool_calls' => array(),
 				'usage'      => array(
 					'prompt_tokens'     => 2,
@@ -190,57 +121,50 @@ WpAiClientTestDouble::set_response_callback(
 	}
 );
 
-$result = AIConversationLoop::run(
+$result = datamachine_run_conversation(
 	$messages,
 	$tools,
 	'openai',
 	'gpt-smoke',
 	'pipeline',
-	$payload,
+	array(
+		'job_id'       => 1569,
+		'flow_step_id' => 'flow-step-smoke',
+		'event_sink'   => $sink,
+	),
 	7,
 	true
 );
 
-assert_runner_request( array_key_exists( 0, $legacy_filter_args ) && null === $legacy_filter_args[0], 'runner filter still receives nullable result seed first' );
-assert_runner_request( $canonical_messages === ( $legacy_filter_args[1] ?? null ), 'runner filter receives canonical messages argument' );
-assert_runner_request( $tools === ( $legacy_filter_args[2] ?? null ), 'runner filter still receives legacy tools argument' );
-assert_runner_request( 'openai' === ( $legacy_filter_args[3] ?? null ), 'runner filter still receives legacy provider argument' );
-assert_runner_request( 'gpt-smoke' === ( $legacy_filter_args[4] ?? null ), 'runner filter still receives legacy model argument' );
-assert_runner_request( 'pipeline' === ( $legacy_filter_args[5] ?? null ), 'runner filter still receives legacy mode argument' );
-assert_runner_request( $payload === ( $legacy_filter_args[6] ?? null ), 'runner filter still receives legacy payload argument' );
-assert_runner_request( 7 === ( $legacy_filter_args[7] ?? null ), 'runner filter still receives legacy max-turns argument' );
-assert_runner_request( true === ( $legacy_filter_args[8] ?? null ), 'runner filter still receives legacy single-turn argument' );
+assert_runner_request( 'substrate ok' === ( $result['final_content'] ?? null ), 'result preserves final content from provider' );
+assert_runner_request( true === ( $result['completed'] ?? null ), 'result marks conversation complete when no tools called' );
+assert_runner_request( 1 === ( $result['turn_count'] ?? null ), 'result preserves turn count' );
+assert_runner_request( is_array( $result['tool_execution_results'] ?? null ), 'result includes tool execution results' );
+assert_runner_request( 5 === ( $result['usage']['total_tokens'] ?? null ), 'result preserves accumulated usage totals' );
+assert_runner_request( is_array( $dispatched_request ), 'substrate dispatched a provider request' );
+assert_runner_request( ! empty( $sink->events ), 'DM event sink received events through the substrate bridge' );
 
-assert_runner_request( 'facade ok' === $result['final_content'], 'facade result comes back through built-in runner path' );
-assert_runner_request( true === $result['completed'], 'facade preserves completed result shape' );
-assert_runner_request( 1 === $result['turn_count'], 'facade preserves turn count' );
-assert_runner_request( array() === $result['tool_execution_results'], 'facade normalizes optional tool execution results' );
-assert_runner_request( 5 === ( $result['usage']['total_tokens'] ?? null ), 'facade preserves usage totals' );
-assert_runner_request( is_array( $dispatched_request ), 'built-in runner dispatched a provider request' );
-assert_runner_request( array( 'turn_started', 'request_built', 'completed' ) === array_column( $sink->events, 'event' ), 'event sink survives request boundary' );
+// 2. Error path returns a structured error result without throwing.
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () {
+		throw new RuntimeException( 'provider offline' );
+	}
+);
 
-$legacy_filter_ran = false;
-add_filter(
-	'datamachine_conversation_runner',
-	function ( $result ) use ( &$legacy_filter_ran ) {
-		$legacy_filter_ran = true;
-		return $result;
-	},
-	10,
+$error_result = datamachine_run_conversation(
+	$messages,
+	$tools,
+	'openai',
+	'gpt-smoke',
+	'pipeline',
+	array(),
 	1
 );
 
-AIConversationLoop::run(
-	$messages,
-	$tools,
-	'openai',
-	'gpt-smoke',
-	'pipeline',
-	$payload,
-	7,
-	true
-);
-assert_runner_request( false === $legacy_filter_ran, 'legacy Data Machine conversation-runner filter is no longer mirrored' );
+assert_runner_request( isset( $error_result['error'] ), 'error path returns a structured error field' );
+assert_runner_request( str_contains( (string) ( $error_result['error'] ?? '' ), 'provider offline' ), 'error path preserves the provider error message' );
+assert_runner_request( false === ( $error_result['completed'] ?? true ), 'error path marks conversation not completed' );
 
 if ( runner_request_failure_count() > 0 ) {
 	exit( 1 );

@@ -54,9 +54,10 @@ use AgentsAPI\AI\AgentConversationCompletionDecision;
 use AgentsAPI\AI\AgentConversationCompletionPolicyInterface;
 use AgentsAPI\AI\AgentConversationRequest;
 use AgentsAPI\AI\AgentConversationTranscriptPersisterInterface;
-use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\DataMachineHandlerCompletionPolicy;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
+
+use function DataMachine\Engine\AI\datamachine_run_conversation;
 
 class RuntimePolicySmokeCompletionPolicy implements AgentConversationCompletionPolicyInterface {
 	public array $calls = array();
@@ -181,7 +182,7 @@ WpAiClientTestDouble::set_response_callback(
 	}
 );
 
-$result = AIConversationLoop::run(
+$result = datamachine_run_conversation(
 	array( array( 'role' => 'user', 'content' => 'run one tool' ) ),
 	array(
 		'runtime_policy_tool' => array(
