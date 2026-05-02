@@ -7,6 +7,9 @@
 
 namespace DataMachine\Engine\AI;
 
+use AgentsAPI\AI\AgentConversationCompletionDecision;
+use AgentsAPI\AI\AgentConversationCompletionPolicyInterface;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -17,8 +20,8 @@ class DefaultAgentConversationCompletionPolicy implements AgentConversationCompl
 	/**
 	 * @inheritDoc
 	 */
-	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, string $mode, int $turn_count ): AgentConversationCompletionDecision {
-		unset( $tool_name, $tool_def, $tool_result, $mode, $turn_count );
+	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $runtime_context, int $turn_count ): AgentConversationCompletionDecision {
+		unset( $tool_name, $tool_def, $tool_result, $runtime_context, $turn_count );
 
 		return AgentConversationCompletionDecision::incomplete();
 	}
