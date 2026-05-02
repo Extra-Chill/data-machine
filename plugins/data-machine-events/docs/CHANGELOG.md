@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.31.1] - 2026-05-02
+
+### Fixed
+- declare array items for upsert_event tool to satisfy OpenAI strict mode
+- flatten category slugs for WP 7.0 compatibility
+
 ## [0.31.0] - 2026-04-25
 
 ### Added
