@@ -41,22 +41,22 @@ use DataMachine\Engine\AI\SectionRegistry;
  */
 function datamachine_register_core_sections(): void {
 	// SITE.md sections — assembled into shared/SITE.md.
-	SectionRegistry::register( 'SITE.md', 'header',       0,  'datamachine_site_section_header' );
-	SectionRegistry::register( 'SITE.md', 'identity',     10, 'datamachine_site_section_identity' );
-	SectionRegistry::register( 'SITE.md', 'structure',    20, 'datamachine_site_section_structure' );
-	SectionRegistry::register( 'SITE.md', 'post-types',   30, 'datamachine_site_section_post_types' );
-	SectionRegistry::register( 'SITE.md', 'taxonomies',   40, 'datamachine_site_section_taxonomies' );
-	SectionRegistry::register( 'SITE.md', 'user-roles',   50, 'datamachine_site_section_user_roles' );
-	SectionRegistry::register( 'SITE.md', 'plugins',      60, 'datamachine_site_section_plugins' );
-	SectionRegistry::register( 'SITE.md', 'mu-plugins',   65, 'datamachine_site_section_mu_plugins' );
-	SectionRegistry::register( 'SITE.md', 'dropins',      70, 'datamachine_site_section_dropins' );
-	SectionRegistry::register( 'SITE.md', 'rest-api',     80, 'datamachine_site_section_rest_api' );
+	SectionRegistry::register( 'SITE.md', 'header', 0, 'datamachine_site_section_header' );
+	SectionRegistry::register( 'SITE.md', 'identity', 10, 'datamachine_site_section_identity' );
+	SectionRegistry::register( 'SITE.md', 'structure', 20, 'datamachine_site_section_structure' );
+	SectionRegistry::register( 'SITE.md', 'post-types', 30, 'datamachine_site_section_post_types' );
+	SectionRegistry::register( 'SITE.md', 'taxonomies', 40, 'datamachine_site_section_taxonomies' );
+	SectionRegistry::register( 'SITE.md', 'user-roles', 50, 'datamachine_site_section_user_roles' );
+	SectionRegistry::register( 'SITE.md', 'plugins', 60, 'datamachine_site_section_plugins' );
+	SectionRegistry::register( 'SITE.md', 'mu-plugins', 65, 'datamachine_site_section_mu_plugins' );
+	SectionRegistry::register( 'SITE.md', 'dropins', 70, 'datamachine_site_section_dropins' );
+	SectionRegistry::register( 'SITE.md', 'rest-api', 80, 'datamachine_site_section_rest_api' );
 
 	// NETWORK.md sections — only meaningful on multisite (callbacks self-guard).
-	SectionRegistry::register( 'NETWORK.md', 'header',          0,  'datamachine_network_section_header' );
-	SectionRegistry::register( 'NETWORK.md', 'identity',        10, 'datamachine_network_section_identity' );
-	SectionRegistry::register( 'NETWORK.md', 'sites',           20, 'datamachine_network_section_sites' );
-	SectionRegistry::register( 'NETWORK.md', 'plugins',         30, 'datamachine_network_section_plugins' );
+	SectionRegistry::register( 'NETWORK.md', 'header', 0, 'datamachine_network_section_header' );
+	SectionRegistry::register( 'NETWORK.md', 'identity', 10, 'datamachine_network_section_identity' );
+	SectionRegistry::register( 'NETWORK.md', 'sites', 20, 'datamachine_network_section_sites' );
+	SectionRegistry::register( 'NETWORK.md', 'plugins', 30, 'datamachine_network_section_plugins' );
 	SectionRegistry::register( 'NETWORK.md', 'shared-resources', 40, 'datamachine_network_section_shared_resources' );
 }
 add_action( 'datamachine_sections', 'datamachine_register_core_sections' );
@@ -253,7 +253,12 @@ function datamachine_site_section_structure(): string {
  * @return string
  */
 function datamachine_site_section_post_types(): string {
+	// The bundled phpstan stub for get_post_types() only declares one param,
+	// but the WP signature is (array $args, string $output, string $operator)
+	// and we need 'objects' to access WP_Post_Type properties below.
+	// @phpstan-ignore-next-line arguments.count
 	$post_types = get_post_types( array( 'public' => true ), 'objects' );
+	/** @var WP_Post_Type[] $post_types */
 
 	$lines   = array();
 	$lines[] = '## Post Types';
@@ -277,6 +282,7 @@ function datamachine_site_section_post_types(): string {
  * @return string
  */
 function datamachine_site_section_taxonomies(): string {
+	/** @var WP_Taxonomy[] $taxonomies */
 	$taxonomies = get_taxonomies( array( 'public' => true ), 'objects' );
 
 	$lines   = array();
@@ -285,16 +291,23 @@ function datamachine_site_section_taxonomies(): string {
 	$lines[] = '|-------|------|-------|------|------------|';
 
 	foreach ( $taxonomies as $tax ) {
-		$term_count = wp_count_terms( array(
+		$term_count_raw = wp_count_terms( array(
 			'taxonomy'   => $tax->name,
 			'hide_empty' => false,
 		) );
-		if ( is_wp_error( $term_count ) ) {
+		// wp_count_terms returns int|numeric-string|WP_Error. Narrow to int
+		// before formatting so phpstan stays happy and output is consistent.
+		if ( is_wp_error( $term_count_raw ) ) {
+			$term_count = 0;
+		} elseif ( is_numeric( $term_count_raw ) ) {
+			$term_count = (int) $term_count_raw;
+		} else {
 			$term_count = 0;
 		}
-		$hier       = $tax->hierarchical ? 'hierarchical' : 'flat';
-		$associated = implode( ', ', $tax->object_type ?? array() );
-		$lines[]    = sprintf( '| %s | %s | %d | %s | %s |', $tax->label, $tax->name, (int) $term_count, $hier, $associated );
+		$hier = $tax->hierarchical ? 'hierarchical' : 'flat';
+		// WP_Taxonomy::$object_type is array<string>, not nullable — use it directly.
+		$associated = implode( ', ', $tax->object_type );
+		$lines[]    = sprintf( '| %s | %s | %d | %s | %s |', $tax->label, $tax->name, $term_count, $hier, $associated );
 	}
 
 	return implode( "\n", $lines );
@@ -344,6 +357,7 @@ function datamachine_site_section_plugins(): string {
 
 	$entries = array();
 	foreach ( $active_plugins as $plugin_file ) {
+		$plugin_file = (string) $plugin_file;
 		$plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
 		if ( function_exists( 'get_plugin_data' ) && file_exists( $plugin_path ) ) {
 			$plugin_data = get_plugin_data( $plugin_path, false, false );
@@ -603,7 +617,11 @@ function datamachine_network_section_plugins(): string {
 	$network_plugins = get_site_option( 'active_sitewide_plugins', array() );
 	$plugin_names    = array();
 
-	foreach ( array_keys( $network_plugins ) as $plugin_file ) {
+	foreach ( array_keys( (array) $network_plugins ) as $plugin_file ) {
+		// active_sitewide_plugins is keyed by plugin file path (strings), but
+		// array_keys() returns array<int, int|string>. Cast for strict-typing tools.
+		$plugin_file = (string) $plugin_file;
+
 		if ( 0 === strpos( $plugin_file, 'data-machine/' ) ) {
 			continue;
 		}
