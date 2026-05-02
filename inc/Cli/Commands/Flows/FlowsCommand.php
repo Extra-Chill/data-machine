@@ -482,7 +482,7 @@ class FlowsCommand extends BaseCommand {
 				continue;
 			}
 
-			$step_type = $step_data['step_type'] ?? '';
+			$step_type = (string) $step_data['step_type'];
 			$order     = $step_data['execution_order'] ?? '';
 			$slugs     = FlowStepConfig::getConfiguredHandlerSlugs( $step_data );
 			$configs   = FlowStepConfig::getHandlerConfigs( $step_data );
@@ -1095,10 +1095,6 @@ class FlowsCommand extends BaseCommand {
 				)
 			);
 
-			if ( is_wp_error( $step_result ) ) {
-				WP_CLI::error( $step_result->get_error_message() );
-			}
-
 			if ( ! $step_result['success'] ) {
 				WP_CLI::error( $step_result['error'] ?? 'Failed to update user_message' );
 				return;
@@ -1132,10 +1128,6 @@ class FlowsCommand extends BaseCommand {
 
 			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
 			$step_result  = $step_ability->execute( $step_input );
-
-			if ( is_wp_error( $step_result ) ) {
-				WP_CLI::error( $step_result->get_error_message() );
-			}
 
 			if ( ! $step_result['success'] ) {
 				WP_CLI::error( $step_result['error'] ?? 'Failed to update handler config' );
@@ -1204,10 +1196,6 @@ class FlowsCommand extends BaseCommand {
 			$handler_configs = FlowStepConfig::getHandlerConfigs( $step_data );
 
 			foreach ( $handler_configs as $hconfig ) {
-				if ( ! is_array( $hconfig ) ) {
-					continue;
-				}
-
 				// Coordinates (location field with lat,lon).
 				if ( ! empty( $hconfig['location'] ) && strpos( $hconfig['location'], ',' ) !== false ) {
 					$loc     = $hconfig['location'];
@@ -1223,7 +1211,7 @@ class FlowsCommand extends BaseCommand {
 				// Source URL — show domain only.
 				if ( ! empty( $hconfig['source_url'] ) ) {
 					$host    = wp_parse_url( $hconfig['source_url'], PHP_URL_HOST );
-					$parts[] = $host ?: $hconfig['source_url'];
+					$parts[] = $host ? $host : $hconfig['source_url'];
 				}
 
 				// Venue/source name.
@@ -1235,7 +1223,7 @@ class FlowsCommand extends BaseCommand {
 				$feed_url = $hconfig['feed_url'] ?? $hconfig['url'] ?? '';
 				if ( $feed_url && empty( $hconfig['source_url'] ) ) {
 					$host    = wp_parse_url( $feed_url, PHP_URL_HOST );
-					$parts[] = $host ?: $feed_url;
+					$parts[] = $host ? $host : $feed_url;
 				}
 
 				// Taxonomy term selections (any taxonomy_*_selection key).
@@ -1256,7 +1244,7 @@ class FlowsCommand extends BaseCommand {
 			$summary = mb_substr( $summary, 0, 57 ) . '...';
 		}
 
-		return $summary ?: '—';
+		return '' !== $summary ? $summary : '—';
 	}
 
 	/**
@@ -1326,12 +1314,9 @@ class FlowsCommand extends BaseCommand {
 			}
 
 			$handler_configs = FlowStepConfig::getHandlerConfigs( $step_data );
-			if ( ! is_array( $handler_configs ) ) {
-				continue;
-			}
 
 			foreach ( $handler_configs as $handler_slug => $handler_config ) {
-				if ( ! is_array( $handler_config ) || ! array_key_exists( 'max_items', $handler_config ) ) {
+				if ( ! array_key_exists( 'max_items', $handler_config ) ) {
 					continue;
 				}
 
@@ -1463,7 +1448,7 @@ class FlowsCommand extends BaseCommand {
 				continue;
 			}
 
-			$step_type = $step['step_type'] ?? '';
+			$step_type = (string) $step['step_type'];
 
 			$slugs   = FlowStepConfig::getConfiguredHandlerSlugs( $step );
 			$configs = FlowStepConfig::getHandlerConfigs( $step );

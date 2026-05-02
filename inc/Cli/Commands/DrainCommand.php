@@ -75,7 +75,7 @@ class DrainCommand extends BaseCommand {
 		);
 
 		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
-			WP_CLI::line( wp_json_encode( $stats, JSON_PRETTY_PRINT ) );
+			WP_CLI::line( (string) wp_json_encode( $stats, JSON_PRETTY_PRINT ) );
 			return;
 		}
 
@@ -112,10 +112,18 @@ class DrainCommand extends BaseCommand {
 			if ( $limit > 0 ) {
 				$current_batch_size = min( $batch_size, $limit - (int) $stats['actions_processed'] );
 			}
+			if ( $current_batch_size <= 0 ) {
+				break;
+			}
+
+			$action_ids = self::getDuePendingActionIds( $current_batch_size );
+			if ( empty( $action_ids ) ) {
+				break;
+			}
 
 			$due_before    = self::getDuePendingCount();
 			$status_before = self::getStatusCounts();
-			$result        = self::runActionSchedulerBatch( $current_batch_size );
+			$result        = self::runActionSchedulerActions( $action_ids );
 			++$batches;
 
 			if ( 0 !== (int) ( $result->return_code ?? 1 ) ) {
@@ -138,19 +146,14 @@ class DrainCommand extends BaseCommand {
 	}
 
 	/**
-	 * Run one scoped Action Scheduler batch.
+	 * Run specific due Action Scheduler actions.
 	 *
-	 * @param int $batch_size Batch size.
+	 * @param int[] $action_ids Action IDs.
 	 * @return object WP_CLI::runcommand result object.
 	 */
-	private static function runActionSchedulerBatch( int $batch_size ): object {
+	private static function runActionSchedulerActions( array $action_ids ): object {
 		return WP_CLI::runcommand(
-			sprintf(
-				'action-scheduler run --hooks=%s --group=%s --batch-size=%d --batches=1 --quiet --force',
-				implode( ',', self::hooks() ),
-				self::GROUP,
-				$batch_size
-			),
+			'action-scheduler action run ' . implode( ' ', array_map( 'intval', $action_ids ) ),
 			array(
 				'exit_error' => false,
 				'return'     => 'all',
@@ -236,6 +239,43 @@ class DrainCommand extends BaseCommand {
 	 */
 	private static function getPendingCount(): int {
 		return self::countActions( false );
+	}
+
+	/**
+	 * Get due pending Data Machine action IDs in execution order.
+	 *
+	 * @param int $limit Maximum IDs to return.
+	 * @return int[] Action IDs.
+	 */
+	private static function getDuePendingActionIds( int $limit ): array {
+		global $wpdb;
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$ids = $wpdb->get_col(
+			$wpdb->prepare(
+				'SELECT a.action_id
+				FROM %i a
+				INNER JOIN %i g ON g.group_id = a.group_id
+				WHERE a.hook IN (%s, %s)
+				AND a.status = \'pending\'
+				AND g.slug = %s
+				AND a.scheduled_date_gmt <= %s
+				ORDER BY a.scheduled_date_gmt ASC, a.action_id ASC
+				LIMIT %d',
+				$actions_table,
+				$groups_table,
+				self::HOOK_BATCH_CHUNK,
+				self::HOOK_EXECUTE_STEP,
+				self::GROUP,
+				gmdate( 'Y-m-d H:i:s' ),
+				$limit
+			)
+		);
+
+		return array_map( 'intval', $ids );
 	}
 
 	/**

@@ -40,7 +40,8 @@ assert_drain_contains( 'DrainCommand::drain()', $src, 'immediate run calls first
 assert_drain_contains( "WP_CLI::add_command( 'datamachine drain'", $boot_src, 'first-class datamachine drain command is registered' );
 assert_drain_contains( "datamachine_pipeline_batch_chunk'", $drain_src, 'drain includes pipeline batch chunk hook' );
 assert_drain_contains( "datamachine_execute_step'", $drain_src, 'drain includes execute step hook' );
-assert_drain_contains( 'action-scheduler run --hooks=%s --group=%s --batch-size=%d --batches=1 --quiet --force', $drain_src, 'drain runs scoped Action Scheduler batches' );
+assert_drain_contains( 'getDuePendingActionIds', $drain_src, 'drain queries concrete due Data Machine action IDs' );
+assert_drain_contains( 'action-scheduler action run ', $drain_src, 'drain runs concrete action IDs instead of generic queue runner' );
 assert_drain_contains( "'exit_error' => false", $drain_src, 'drain failure is surfaced as warning instead of fataling after job start' );
 assert_drain_contains( "'return'     => 'all'", $drain_src, 'drain captures Action Scheduler command result' );
 assert_drain_contains( "'remaining_pending'", $drain_src, 'drain reports remaining pending actions' );
