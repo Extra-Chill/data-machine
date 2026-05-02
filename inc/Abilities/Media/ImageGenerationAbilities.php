@@ -211,6 +211,8 @@ class ImageGenerationAbilities {
 		}
 
 		try {
+			\DataMachine\Engine\AI\WpAiClientCache::install();
+
 			$registry = \WordPress\AiClient\AiClient::defaultRegistry();
 			/** @var callable $has_provider wp-ai-client exposes this through __call() in some versions. */
 			$has_provider = array( $registry, 'hasProvider' );
