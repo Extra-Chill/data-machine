@@ -34,6 +34,7 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
+use AgentsAPI\AI\Tools\ActionPolicy;
 use DataMachine\Core\Database\Agents\Agents;
 
 defined( 'ABSPATH' ) || exit;
@@ -50,10 +51,13 @@ class ActionPolicyResolver {
 
 	/**
 	 * Valid policy values. Returned by resolveForTool().
+	 *
+	 * Keep the legacy Data Machine constant names as public aliases while the
+	 * generic vocabulary lives in Agents API.
 	 */
-	public const POLICY_DIRECT    = 'direct';
-	public const POLICY_PREVIEW   = 'preview';
-	public const POLICY_FORBIDDEN = 'forbidden';
+	public const POLICY_DIRECT    = ActionPolicy::DIRECT;
+	public const POLICY_PREVIEW   = ActionPolicy::PREVIEW;
+	public const POLICY_FORBIDDEN = ActionPolicy::FORBIDDEN;
 
 	/**
 	 * Resolve the action policy for a single tool invocation.
@@ -277,23 +281,14 @@ class ActionPolicyResolver {
 	/**
 	 * Normalize a user-supplied policy value.
 	 *
-	 * Returns one of the POLICY_* constants, or an empty string when the
+	 * Returns one of the Agents API policy constants, or an empty string when the
 	 * value is not recognized (caller drops it).
 	 *
 	 * @param mixed $value Raw value from config or tool def.
 	 * @return string Normalized policy or ''.
 	 */
 	private function normalizePolicyValue( $value ): string {
-		if ( class_exists( 'AgentsAPI\\AI\\Tools\\ActionPolicy' ) ) {
-			return \AgentsAPI\AI\Tools\ActionPolicy::normalize( $value ) ?? '';
-		}
-
-		if ( ! is_string( $value ) ) {
-			return '';
-		}
-
-		$value = strtolower( trim( $value ) );
-		return in_array( $value, array( self::POLICY_DIRECT, self::POLICY_PREVIEW, self::POLICY_FORBIDDEN ), true ) ? $value : '';
+		return ActionPolicy::normalize( $value ) ?? '';
 	}
 
 	/**

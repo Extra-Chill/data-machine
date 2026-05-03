@@ -77,7 +77,7 @@ foreach ( $expected_agents_api_approval_primitives as $class_name => $primitive 
 }
 datamachine_pending_actions_assert( str_contains( $adapter_source, 'implements PendingActionStoreInterface' ), 'store adapter implements Agents API PendingActionStoreInterface', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'implements PendingActionResolverInterface' ), 'resolver adapter implements Agents API PendingActionResolverInterface', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $action_policy, 'AgentsAPI\\AI\\Tools\\ActionPolicy::normalize' ), 'ActionPolicyResolver feature-detects Agents API ActionPolicy vocabulary', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $action_policy, 'use AgentsAPI\\AI\\Tools\\ActionPolicy;' ) && str_contains( $action_policy, 'ActionPolicy::normalize' ), 'ActionPolicyResolver consumes Agents API ActionPolicy vocabulary', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'ApprovalDecision' ), 'resolver adapter consumes Agents API ApprovalDecision vocabulary', $failures, $passes );
 
 echo "\n[2] Durable storage preserves legacy lookup while retaining audit rows:\n";
