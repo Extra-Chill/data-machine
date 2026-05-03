@@ -43,7 +43,7 @@ Data Machine now treats the standalone `extra-chill/agents-api` package/plugin a
 - `agents-api` must not import Data Machine product namespaces.
 - Data Machine may import and consume `agents-api` as product code.
 - `agents-api` owns runner interfaces, value objects, and generic contracts first; Data Machine keeps `AIConversationLoop` and the built-in compatibility runner while they still carry Data Machine job, flow, handler, logging, transcript, and legacy result-shape assumptions.
-- Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, pending actions, content operations, and admin UI.
+- Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, concrete pending-action storage/resolution, content operations, and admin UI. The generic pending-action / diff-approval contract vocabulary belongs in a later Agents API extraction stage.
 - `agents-api` is backend-only and invisible by default: no admin menus, screens, human CRUD forms, React apps, or Data Machine product UI.
 - Data Machine and other product consumers own any admin/product UI they build on top of the substrate.
 - Standalone extraction means the bounded module now lives in its own plugin/repo with plugin bootstrap, release, dependency, and distribution ceremony.
@@ -74,6 +74,7 @@ Mirror the WordPress Abilities API shape instead of importing Data Machine produ
 | `AgentMemoryStoreInterface` | `WP_Agent_Memory_Store_Interface` | Generic identity tuple needs naming review; Data Machine scaffolding/abilities stay outside the store contract. |
 | `RuntimeToolDeclaration` | `WP_Agent_Tool_Declaration` | Should stay ability-native and run-scoped. |
 | `LoopEventSinkInterface` | `WP_Agent_Run_Event_Sink_Interface` | Useful for logs, streaming, chat UIs, and async workers. |
+| Data Machine pending actions / diff approvals | Future Agents API approval contract | Agents API should own the generic contract/value/envelope/policy vocabulary for approval-gated agent effects. Data Machine keeps the current transient/database implementation, resolver ability, REST route, chat wrapper, product handlers, and permission checks. |
 | REST `datamachine/v1` agent routes | REST `wp-agents/v1` deferred | [#1670](https://github.com/Extra-Chill/data-machine/issues/1670) reserves the namespace but defers public REST controllers from the first standalone extraction. Data Machine product routes stay under `datamachine/v1`. |
 
 ## Registration Lifecycle
@@ -101,6 +102,7 @@ Use these checks before moving anything:
 - If it uses host-specific provider, storage, or implementation vocabulary directly, treat that code as source material only until normalized behind WordPress-shaped contracts.
 - If it only needs to execute a single prompt/model request, it should use `wp-ai-client` directly instead of introducing Agents API.
 - If it needs durable agent runtime behavior, it should use Agents API and let that runtime call `wp-ai-client` directly for provider execution.
+- If it describes approval-gated agent effects, diff envelopes, or action-resolution policy without Data Machine storage/routes/UI, it is an Agents API contract candidate. If it persists, resolves, displays, or permission-checks Data Machine pending actions, it stays a Data Machine adapter/product surface.
 
 ## Backend-Only UI Boundary
 
@@ -181,7 +183,7 @@ The current namespace is intentionally mixed while extraction stays in place. Tr
 | `DataMachine\Engine\AI\Tools\Sources\DataMachineToolRegistrySource`, `Tools\Sources\AdjacentHandlerToolSource`, `Tools\Policy\DataMachineAgentToolPolicyProvider`, `Tools\Policy\DataMachineMandatoryToolPolicy`, `Tools\Policy\DataMachineToolAccessPolicy`, `Tools\ToolManager`, `Tools\ToolPolicyResolver`, `Tools\ToolParameters` payload merging | Data Machine adapter/product | These translate Data Machine handler, pipeline, queue, permission, persisted-agent, and legacy tool registry concepts into runtime inputs. They stay Data Machine. |
 | `DataMachine\Engine\AI\Tools\Global\*` | Data Machine product | Curated product/site-ops tools. Individual capabilities may move to abilities later, but the bundle is not the Agents API registry. |
 | `DataMachine\Engine\AI\System\*` and `System\Tasks\*` | Data Machine product | System tasks, task prompts, retention cleanup, and scheduled maintenance stay in Data Machine. A future Agents API may provide a task contract, not these tasks. |
-| `DataMachine\Engine\AI\Actions\*` | Data Machine product | Pending-action storage, approval policy, and action-resolution abilities stay Data Machine. Generic approval can be designed later without inheriting these tables/routes. |
+| `DataMachine\Engine\AI\Actions\*` | Mixed source material / Data Machine product | Generic pending-action and diff-approval vocabulary should be promoted to Agents API in a later extraction stage, but the current transient/database store, approval resolver implementation, `datamachine/resolve-pending-action`, `datamachine/v1/actions/resolve`, chat wrapper, product handlers, and permission checks stay Data Machine. Do not import non-existent upstream approval classes yet. |
 | `DataMachine\Engine\AI\Memory\*`, `MemoryFileRegistry`, `SectionRegistry`, `ComposableFileGenerator`, `ComposableFileInvalidation` | Data Machine adapter/product | Memory policy artifacts and file composition are Data Machine's operator/product layer around the generic memory store contract. |
 | `PipelineTranscriptPolicy`, `DataMachinePipelineTranscriptPersister`, `DataMachineHandlerCompletionPolicy` | Data Machine adapter | Pipeline/job metadata and adjacent-handler completion are normalized for the runtime through collaborator interfaces, but the implementations stay Data Machine. |
 
@@ -255,7 +257,7 @@ These are plausibly generic implementations, but should not move until naming an
 | `ClientContextDirective` | `inc/Engine/AI/Directives/ClientContextDirective.php` | Generic client-provided context injection. | Candidate if sanitized context contract is public. |
 | `CallerContextDirective` | `inc/Engine/AI/Directives/CallerContextDirective.php` | Generic caller metadata injection. | Candidate if caller context becomes part of Agents API run input. |
 | `ConversationManager` | `inc/Engine/AI/ConversationManager.php` | Formats tool call/result messages and conversation artifacts. | Split message formatting helpers from Data Machine transcript details. |
-| `ToolExecutor` | `inc/Engine/AI/Tools/ToolExecutor.php` | Executes ability-native and legacy tools with policy staging. | Extract only the ability-native execution path; leave Data Machine post tracking and pending-action glue behind. |
+| `ToolExecutor` | `inc/Engine/AI/Tools/ToolExecutor.php` | Executes ability-native and legacy tools with policy staging. | Extract only the ability-native execution path; leave Data Machine post tracking and concrete pending-action glue behind. A future Agents API approval contract can inform this split after its vocabulary exists. |
 | `RuntimeToolDeclaration` validators in tests | `tests/runtime-tool-declaration-smoke.php` | Tests generic declaration shape. | Move with the declaration contract. |
 | `ToolPolicyFilter` | `inc/Engine/AI/Tools/Policy/ToolPolicyFilter.php` | Generic allow/deny/category/capability filter that takes adapter callbacks for access and mandatory-tool preservation. | Move only with a generic access callback contract; Data Machine permission and handler preservation stay in adapters. |
 | `ToolSourceRegistry` | `inc/Engine/AI/Tools/ToolSourceRegistry.php` | Source-provider composition is generic, but the default providers are Data Machine adapters. | Extract the source registry contract separately from `DataMachineToolRegistrySource` and `AdjacentHandlerToolSource`. |
@@ -287,6 +289,7 @@ These should stay in Data Machine as compatibility glue if a generic runtime plu
 | `QueueableTrait` prompt consumption in `AIStep` | `inc/Core/Steps/AI/AIStep.php` | Data Machine flow queue semantics (`static`, `drain`, `loop`) feeding a runtime user-message slot. |
 | `DataMachinePipelineTranscriptPersister` | `inc/Engine/AI/DataMachinePipelineTranscriptPersister.php` | Adapts a pipeline job run to the transcript store. Generic runtime calls the transcript persister contract and does not own job metadata. |
 | `DataMachineHandlerCompletionPolicy` | `inc/Engine/AI/DataMachineHandlerCompletionPolicy.php` | Adapts adjacent-handler completion rules into a runtime completion policy. Generic runtime calls the policy contract and does not own pipeline handler semantics. |
+| `DataMachine\Engine\AI\Actions\*` storage/resolution | `inc/Engine/AI/Actions/**` | Implements Data Machine's pending-action store, product handlers, resolver ability, REST endpoint, chat wrapper, and permission checks. These adapt current product workflows to the planned generic approval vocabulary. |
 | `SystemAgentServiceProvider` task registration | `inc/Engine/AI/System/SystemAgentServiceProvider.php` | Registers Data Machine system tasks into Data Machine scheduling. The generic runtime may supply a task interface, not these tasks. |
 | `AgentCallTask` | `inc/Engine/AI/System/Tasks/AgentCallTask.php` | Bridges scheduled/system tasks into the agent-call primitive. |
 | `AgentBundler` and bundle CLI adapters | `inc/Core/Agents/AgentBundler.php`, `inc/Cli/Commands/AgentBundleCommand.php` | Convert Data Machine pipelines/flows into portable agent bundle artifacts. Bundle primitives may split, but flow/pipeline import/export remains adapter/product. |
@@ -322,7 +325,7 @@ These should stay in Data Machine. They may consume Agents API later, but should
 | Queue modes and config patch queues | flow queue abilities, `QueueableTrait` | Data Machine scheduling/backfill behavior. |
 | Retention tasks | `inc/Engine/AI/System/Tasks/Retention/**`, `RetentionCommand` | Product cleanup for Data Machine tables/files/Action Scheduler state. |
 | Content operations | post, taxonomy, block, alt text, meta description, image, link, IndexNow abilities | Data Machine content automation. |
-| Pending actions store and approval workflows | `inc/Engine/AI/Actions/**` | Generic approval may exist later, but current implementation is product storage/policy. |
+| Pending-action store and approval adapters | `inc/Engine/AI/Actions/**`, `datamachine/resolve-pending-action`, `datamachine/v1/actions/resolve` | Agents API should own the generic pending-action / diff-approval contract vocabulary later; Data Machine keeps today's storage, resolver ability, REST route, chat wrapper, product handlers, and permission checks. |
 | Admin UI and React pipeline editor | `src/`, `inc/Core/Admin/**` | Data Machine product UI. |
 | Global tools for site ops | `WebFetch`, `WordPressPostReader`, analytics/search console/page speed/image tools | Some tools can become abilities, but the curated Data Machine tool bundle is product. |
 | Agent memory CLI command behavior | `MemoryCommand` | Product/operator surface; generic API should define contracts first. |
@@ -423,7 +426,7 @@ These tests currently pin the substrate most relevant to extraction.
 3. Split `AgentRegistry` into a pure registry and a Data Machine reconciler that creates database rows, access rows, directories, and scaffold files.
 4. Rename and stabilize message/result/store interfaces in place before moving namespaces.
 5. Split provider request assembly from `RequestBuilder` so Data Machine directives/logging stay adapter behavior and provider dispatch targets `wp-ai-client`, not `ai-http-client`.
-6. Split `ToolExecutor` into ability-native runtime execution plus Data Machine product hooks for pending actions and post-origin tracking.
+6. Split `ToolExecutor` into ability-native runtime execution plus Data Machine product hooks for post-origin tracking and current pending-action adapters; promote only the generic approval contract/value/envelope/policy vocabulary to Agents API once that upstream stage exists.
 7. Decide whether Agents API owns persistence tables or only contracts plus optional stores.
 8. Keep host-specific provider and storage classes behind adapters. No public contract should require implementation-specific message, agent, or conversation-storage DTOs.
 

@@ -28,7 +28,8 @@ That module was treated like WordPress core substrate while it lived inside Data
 - Data Machine consumes `agents-api` as product code.
 - `agents-api` must not import Data Machine product namespaces.
 - `agents-api` owns runner interfaces, value objects, and generic contracts first; Data Machine keeps `AIConversationLoop` and the built-in compatibility runner until the loop no longer carries Data Machine job, flow, handler, logging, transcript, or legacy payload/result assumptions.
-- Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, pending actions, content operations, and admin UI.
+- `agents-api` should also own generic pending-action / diff-approval contract vocabulary in a later extraction stage: approval action values, diff/change envelopes, resolver result shapes, and policy/permission-ceiling concepts that are not tied to Data Machine storage or routes.
+- Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, concrete pending-action storage/resolution, content operations, and admin UI.
 - `agents-api` is backend-only and invisible by default: no admin menus, screens, human CRUD forms, React apps, or Data Machine product UI.
 - Data Machine and other product consumers own any admin/product UI they build on top of the substrate.
 - Standalone extraction moves the already-bounded module into its own plugin/repo and adds plugin bootstrap, dependency, release, and distribution ceremony.
@@ -54,7 +55,7 @@ The initial untangling wave is complete:
 
 - Pipeline tool policy translation is separated from generic tool policy filtering.
 - Adjacent handler tools are a Data Machine provider instead of generic source-registry behavior.
-- Ability-native tool execution is separated from Data Machine pending-action and post-tracking decorators.
+- Ability-native tool execution is separated from Data Machine pending-action and post-tracking decorators. The current decorators remain Data Machine product adapters, while their generic approval/diff vocabulary is upstream source material for Agents API.
 - Declarative agent registration is separated from Data Machine materialization.
 - Conversation transcript storage is narrowed behind a transcript facade, and the aggregate chat-product store is documented as a Data Machine compatibility layer rather than the default extraction target.
 - Memory store contracts/value objects live in the in-repo `agents-api/` module; Data Machine still owns the behavior-preserving factory/default store adapter.
@@ -70,7 +71,7 @@ Before standalone extraction, the in-repo module should satisfy these gates:
 
 - `extra-chill/agents-api` loads before Data Machine product runtime bootstraps.
 - A bootstrap smoke can load `agents-api` without Data Machine product code.
-- No `agents-api` file imports `DataMachine\Core\Steps`, `DataMachine\Core\Database\Jobs`, handler, queue, retention, pending-action, admin UI, or content-operation namespaces.
+- No `agents-api` file imports `DataMachine\Core\Steps`, `DataMachine\Core\Database\Jobs`, handler, queue, retention, Data Machine pending-action implementation, admin UI, or content-operation namespaces.
 - No `agents-api` file registers admin menus, admin screens, settings forms, or admin-only UI hooks.
 - Data Machine product code imports the module as a dependency instead of reaching across same-layer runtime/product paths.
 - Provider runtime code targets `wp-ai-client`; no `ai-http-client` fallback is introduced or preserved inside `agents-api`.
@@ -118,7 +119,7 @@ The deferred shape is reserved as a backend substrate namespace, not a Data Mach
 - `GET /wp-agents/v1/agents` may list registered agent definitions that explicitly opt into REST discovery.
 - `GET /wp-agents/v1/agents/{slug}` may read one registered definition.
 - `POST /wp-agents/v1/agents/{slug}/runs` may eventually execute a generic `AgentConversationRequest` through `AgentConversationRunnerInterface`.
-- Any future transcript, memory, run-state, or session routes require separate decisions. They must not inherit Data Machine chat-session switcher, jobs, flows, pipelines, queues, or pending-action vocabulary.
+- Any future transcript, memory, run-state, approval, or session routes require separate decisions. They must not inherit Data Machine chat-session switcher, jobs, flows, pipelines, queues, or concrete pending-action route/storage vocabulary.
 
 The v1 standalone skeleton should therefore document that `wp-agents/v1` is intentionally absent. Data Machine's existing `datamachine/v1` routes remain product REST for flows, pipelines, jobs, chat UI, agent files, and automation surfaces. They may adapt to Agents API contracts later, but they do not define the public substrate.
 
@@ -138,7 +139,7 @@ REST acceptance gates before any future controller lands:
 |---|---|---|
 | In-repo `agents-api/` module loads before Data Machine product runtime and can boot in a smoke without product code. | Must fix | [#1631](https://github.com/Extra-Chill/data-machine/issues/1631), [#1618](https://github.com/Extra-Chill/data-machine/issues/1618) |
 | Public contract candidates live in the module or have a documented reason to stay in Data Machine for compatibility. | Must fix | [#1632](https://github.com/Extra-Chill/data-machine/issues/1632) |
-| No public `agents-api/` contract imports `DataMachine\` product namespaces or requires jobs, flows, pipelines, handlers, queues, pending actions, content operations, or admin UI. | Must fix | [#1631](https://github.com/Extra-Chill/data-machine/issues/1631), [#1672](https://github.com/Extra-Chill/data-machine/issues/1672) |
+| No public `agents-api/` contract imports `DataMachine\` product namespaces or requires jobs, flows, pipelines, handlers, queues, Data Machine pending-action implementations, content operations, or admin UI. Generic approval contracts must use upstream vocabulary, not Data Machine storage/route names. | Must fix | [#1631](https://github.com/Extra-Chill/data-machine/issues/1631), [#1672](https://github.com/Extra-Chill/data-machine/issues/1672) |
 | `WP_Agent`, `WP_Agents_Registry`, `wp_register_agent()`, and registry lifecycle are validated and documented. | Must fix | [#1618](https://github.com/Extra-Chill/data-machine/issues/1618), [#1632](https://github.com/Extra-Chill/data-machine/issues/1632) |
 | Registration helper parity is decided for `wp_get_agent()`, `wp_get_agents()`, `wp_has_agent()`, and `wp_unregister_agent()`. | Must fix | [#1618](https://github.com/Extra-Chill/data-machine/issues/1618) |
 | Agent categories/capabilities decision is recorded: no v1 category registry; future descriptive metadata only. | Complete | [#1669](https://github.com/Extra-Chill/data-machine/issues/1669) |
@@ -147,7 +148,7 @@ REST acceptance gates before any future controller lands:
 | Built-in loop ownership is settled: Data Machine keeps compatibility loop until completion/transcript/provider/logging assumptions are behind generic collaborators. | Must fix | [#1634](https://github.com/Extra-Chill/data-machine/issues/1634) |
 | Provider runtime depends directly on `wp-ai-client`; no `ai-http-client` or `chubes_ai_request` runtime fallback survives inside `agents-api`. | Must fix | [#1633](https://github.com/Extra-Chill/data-machine/issues/1633), [#1027](https://github.com/Extra-Chill/data-machine/issues/1027), [#1660](https://github.com/Extra-Chill/data-machine/issues/1660), [#1661](https://github.com/Extra-Chill/data-machine/issues/1661) |
 | Memory and transcript interfaces are generic and UI-free. Data Machine chat/session switcher/read-state/reporting remain product adapters unless separately adopted. | Must fix | [#1632](https://github.com/Extra-Chill/data-machine/issues/1632), [#1651](https://github.com/Extra-Chill/data-machine/issues/1651) |
-| Data Machine adapters own flows, jobs, pipelines, handlers, pending actions, bundles, queues, retention, content operations, and chat/admin UI. | Must fix | [#1561](https://github.com/Extra-Chill/data-machine/issues/1561), [#1640](https://github.com/Extra-Chill/data-machine/issues/1640), [#1651](https://github.com/Extra-Chill/data-machine/issues/1651) |
+| Data Machine adapters own flows, jobs, pipelines, handlers, concrete pending-action storage/resolution, bundles, queues, retention, content operations, and chat/admin UI. Agents API owns only planned generic approval contract/value/envelope/policy vocabulary. | Must fix | [#1561](https://github.com/Extra-Chill/data-machine/issues/1561), [#1640](https://github.com/Extra-Chill/data-machine/issues/1640), [#1651](https://github.com/Extra-Chill/data-machine/issues/1651) |
 | Standalone skeleton documents that `wp-agents/v1` is absent in v1 and includes no REST controllers until the REST acceptance gates are satisfied. | Must fix | [#1618](https://github.com/Extra-Chill/data-machine/issues/1618), [#1670](https://github.com/Extra-Chill/data-machine/issues/1670) |
 | Optional future stores, sessions, async run state, REST controllers, category parity, and product UI are deferred until the core backend contracts are extractable. | Can follow | [#1596](https://github.com/Extra-Chill/data-machine/issues/1596), [#1670](https://github.com/Extra-Chill/data-machine/issues/1670), [#1669](https://github.com/Extra-Chill/data-machine/issues/1669) |
 
@@ -250,13 +251,24 @@ Target shape:
 - Data Machine reconciler continues to create its rows/access records from registered definitions while Data Machine hosts the substrate.
 - Decide whether Agents API owns persistence tables, only contracts, or optional stores before moving repositories.
 
-### 8. Data Machine Product Still Under `Engine\AI`
+### 8. Pending-Action / Approval Boundary
 
-System tasks, retention tasks, pending actions, and several product tools still live under `Engine\AI`.
+The current Data Machine pending-action implementation is not the upstream contract, but it identifies a generic seam that should be promoted later.
 
 Target shape:
 
-- Do not move these into Agents API.
+- Agents API owns the generic approval contract vocabulary: pending-action/action value objects, diff/change envelopes, resolver result shapes, and policy/permission-ceiling concepts.
+- Data Machine owns the transient/database implementation, `datamachine/resolve-pending-action`, `datamachine/v1/actions/resolve`, the chat wrapper, product handlers, and Data Machine permission checks.
+- Do not import or reference non-existent upstream approval classes from Data Machine yet; phrase current work as source material for the next extraction stage.
+- Keep Data Machine route names and storage keys out of future Agents API public contracts.
+
+### 9. Data Machine Product Still Under `Engine\AI`
+
+System tasks, retention tasks, concrete pending-action adapters, and several product tools still live under `Engine\AI`.
+
+Target shape:
+
+- Do not move these implementations into Agents API.
 - Rename namespaces later if useful, but treat them as Data Machine automation/product surface.
 - Use them as consumers of Agents API, not part of the substrate.
 - Keep `System\*`, `System\Tasks\*`, `System\Tasks\Retention\*`, `Actions\*`, `Tools\Global\*`, `Tools\Sources\DataMachineToolRegistrySource`, `Tools\Sources\AdjacentHandlerToolSource`, `PipelineTranscriptPolicy`, `DataMachinePipelineTranscriptPersister`, and `DataMachineHandlerCompletionPolicy` in the Data Machine adapter/product bucket until there is a narrow, behavior-preserving move.
@@ -292,6 +304,7 @@ Agents API should provide the substrate for those products:
 - Message/result contracts.
 - Conversation runner contract.
 - Tool declaration and execution contracts.
+- Generic pending-action / diff-approval contract vocabulary.
 - Memory store contract and default memory implementations.
 - Conversation transcript contract.
 - Event sink / streaming / observation contract.
