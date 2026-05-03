@@ -29,12 +29,18 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
+use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\Approvals\PendingAction;
+
 defined( 'ABSPATH' ) || exit;
 
 class PendingActionHelper {
 
 	/**
 	 * Stage a tool invocation for user approval.
+	 *
+	 * The returned value is an Agents API approval_required envelope with the
+	 * legacy staged-action fields mirrored at the top level for existing clients.
 	 *
 	 * @param array $args {
 	 *     Staging arguments.
@@ -130,7 +136,10 @@ class PendingActionHelper {
 		 */
 		do_action( 'datamachine_pending_action_staged', $action_id, $payload );
 
-		return array(
+		$expires_at = isset( $stored_payload['expires_at'] ) ? (int) $stored_payload['expires_at'] : null;
+		$created_at = isset( $stored_payload['created_at'] ) ? (int) $stored_payload['created_at'] : time();
+
+		$legacy_payload = array(
 			'staged'         => true,
 			'action_id'      => $action_id,
 			'kind'           => $kind,
@@ -142,7 +151,52 @@ class PendingActionHelper {
 				'decision'  => '<accepted|rejected>',
 			),
 			'instruction'    => 'Show this preview to the user and wait for their confirmation. Do not call resolve_pending_action until they explicitly approve or reject. If the user asks to modify, call the original tool again with updated parameters instead of resolving this action.',
-			'expires_at'     => isset( $stored_payload['expires_at'] ) ? (int) $stored_payload['expires_at'] : null,
+			'expires_at'     => $expires_at,
 		);
+
+		$pending_action = array(
+			'action_id'   => $action_id,
+			'kind'        => 'tool_action',
+			'summary'     => $payload['summary'],
+			'preview'     => $preview_data,
+			'apply_input' => $apply_input,
+			'created_by'  => $user_id > 0 ? (string) $user_id : null,
+			'agent_id'    => $agent_id > 0 ? (string) $agent_id : null,
+			'context'     => $context,
+			'created_at'  => gmdate( 'c', $created_at ),
+			'expires_at'  => null !== $expires_at ? gmdate( 'c', $expires_at ) : null,
+		);
+
+		if ( class_exists( PendingAction::class ) ) {
+			$pending_action = PendingAction::from_array( $pending_action )->to_array();
+		}
+
+		$envelope_payload  = array_merge(
+			$legacy_payload,
+			array(
+				'pending_action' => $pending_action,
+			)
+		);
+		$envelope_metadata = array(
+			'adapter'     => 'data-machine',
+			'datamachine' => array(
+				'kind'         => $kind,
+				'resolve_with' => 'resolve_pending_action',
+			),
+		);
+
+		$envelope = method_exists( AgentMessageEnvelope::class, 'approvalRequired' )
+			? AgentMessageEnvelope::approvalRequired( $payload['summary'], $envelope_payload, $envelope_metadata )
+			: array(
+				'schema'   => AgentMessageEnvelope::SCHEMA,
+				'version'  => AgentMessageEnvelope::VERSION,
+				'type'     => AgentMessageEnvelope::TYPE_APPROVAL_REQUIRED,
+				'role'     => 'tool',
+				'content'  => $payload['summary'],
+				'payload'  => $envelope_payload,
+				'metadata' => $envelope_metadata,
+			);
+
+		return array_merge( $envelope, $legacy_payload );
 	}
 }
