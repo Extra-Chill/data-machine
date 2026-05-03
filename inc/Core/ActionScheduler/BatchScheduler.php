@@ -176,6 +176,15 @@ class BatchScheduler {
 			)
 		);
 
+		\DataMachine\Core\RunMetrics::start(
+			$parent_job_id,
+			array(
+				'batch_context'             => $context,
+				'batch_total'               => $total,
+				'batch_completion_strategy' => $completion_strategy,
+			)
+		);
+
 		if ( function_exists( 'as_schedule_single_action' ) ) {
 			as_schedule_single_action(
 				time(),

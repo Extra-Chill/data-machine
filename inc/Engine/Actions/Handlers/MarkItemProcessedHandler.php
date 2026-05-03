@@ -60,6 +60,12 @@ class MarkItemProcessedHandler {
 
 		$db_processed_items = new \DataMachine\Core\Database\ProcessedItems\ProcessedItems();
 
-		return $db_processed_items->add_processed_item( $flow_step_id, $source_type, $item_identifier, $job_id );
+		$result = $db_processed_items->add_processed_item( $flow_step_id, $source_type, $item_identifier, $job_id );
+
+		if ( $result ) {
+			\DataMachine\Core\RunMetrics::increment( $job_id, 'processed' );
+		}
+
+		return $result;
 	}
 }

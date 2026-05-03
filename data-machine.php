@@ -239,6 +239,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Job\ProblemFlowsAbility();
 	new \DataMachine\Abilities\Job\RecoverStuckJobsAbility();
 	new \DataMachine\Abilities\Job\JobsSummaryAbility();
+	new \DataMachine\Abilities\Job\RunMetricsAbility();
 	new \DataMachine\Abilities\Job\FailJobAbility();
 	new \DataMachine\Abilities\Job\RetryJobAbility();
 	new \DataMachine\Abilities\LogAbilities();

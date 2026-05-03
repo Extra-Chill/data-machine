@@ -115,6 +115,7 @@ class RetryJobAbility {
 		$engine_data = $this->db_jobs->retrieve_engine_data( $job_id );
 
 		// Mark as failed for retry.
+		\DataMachine\Core\RunMetrics::increment( $job_id, 'retried' );
 		$this->db_jobs->complete_job( $job_id, 'failed - manual_retry' );
 
 		do_action( 'datamachine_job_complete', $job_id, 'failed' );

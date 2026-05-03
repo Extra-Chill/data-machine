@@ -16,6 +16,7 @@ namespace DataMachine\Core\Database\Jobs;
 
 use DataMachine\Core\Database\BaseRepository;
 use DataMachine\Core\JobStatus;
+use DataMachine\Core\RunMetrics;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -46,6 +47,10 @@ class JobsStatus extends BaseRepository {
 			array( '%s' ), // Format for data
 			array( '%d' )  // Format for WHERE
 		);
+
+		if ( false !== $updated ) {
+			RunMetrics::start( $job_id, array( 'status' => $status ) );
+		}
 
 		return false !== $updated;
 	}
@@ -85,6 +90,7 @@ class JobsStatus extends BaseRepository {
 		);
 
 		if ( false !== $updated ) {
+			RunMetrics::complete( $job_id, $status );
 			do_action( 'datamachine_job_complete', $job_id, $status );
 		}
 
