@@ -284,6 +284,17 @@ class Pipelines extends BaseRepository {
 			}
 		}
 
+		if ( array_key_exists( 'agent_id', $pipeline_data ) ) {
+			$agent_id = $pipeline_data['agent_id'];
+			if ( null === $agent_id ) {
+				$update_data['agent_id'] = null;
+				$format[]                = null;
+			} else {
+				$update_data['agent_id'] = absint( $agent_id );
+				$format[]                = '%d';
+			}
+		}
+
 		// Always update the updated_at timestamp
 		$update_data['updated_at'] = current_time( 'mysql', true );
 		$format[]                  = '%s';
@@ -782,5 +793,97 @@ class Pipelines extends BaseRepository {
 				'action'     => 'create_table',
 			)
 		);
+	}
+
+	/**
+	 * Bulk-reassign agent_id on pipelines.
+	 *
+	 * @param int|null $from_agent_id Source agent ID, or null to target rows where agent_id IS NULL.
+	 * @param int      $to_agent_id   Destination agent ID.
+	 * @return int Number of rows updated, or -1 on DB error.
+	 */
+	public function reassign_agent_id( ?int $from_agent_id, int $to_agent_id ): int {
+		if ( null === $from_agent_id ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $this->table_name, not user input.
+			$result = $this->wpdb->query(
+				$this->wpdb->prepare(
+					"UPDATE {$this->table_name} SET agent_id = %d, updated_at = %s WHERE agent_id IS NULL",
+					$to_agent_id,
+					current_time( 'mysql', true )
+				)
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+		} else {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $this->table_name, not user input.
+			$result = $this->wpdb->query(
+				$this->wpdb->prepare(
+					"UPDATE {$this->table_name} SET agent_id = %d, updated_at = %s WHERE agent_id = %d",
+					$to_agent_id,
+					current_time( 'mysql', true ),
+					$from_agent_id
+				)
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+		}
+
+		if ( false === $result ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to reassign pipeline agent_id',
+				array(
+					'from_agent_id' => $from_agent_id,
+					'to_agent_id'   => $to_agent_id,
+					'db_error'      => $this->wpdb->last_error,
+				)
+			);
+			return -1;
+		}
+
+		if ( $result > 0 ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Reassigned pipeline agent_id',
+				array(
+					'from_agent_id' => $from_agent_id,
+					'to_agent_id'   => $to_agent_id,
+					'rows_updated'  => $result,
+				)
+			);
+		}
+
+		return (int) $result;
+	}
+
+	/**
+	 * Count pipelines by agent_id.
+	 *
+	 * @param int|null $agent_id Agent ID, or null to count rows where agent_id IS NULL.
+	 * @return int Row count.
+	 */
+	public function count_by_agent_id( ?int $agent_id ): int {
+		if ( null === $agent_id ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			// phpcs:disable WordPress.DB.PreparedSQL
+			$count = $this->wpdb->get_var(
+				"SELECT COUNT(*) FROM {$this->table_name} WHERE agent_id IS NULL"
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+		} else {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			// phpcs:disable WordPress.DB.PreparedSQL
+			$count = $this->wpdb->get_var(
+				$this->wpdb->prepare(
+					"SELECT COUNT(*) FROM {$this->table_name} WHERE agent_id = %d",
+					$agent_id
+				)
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL
+		}
+
+		return (int) $count;
 	}
 }

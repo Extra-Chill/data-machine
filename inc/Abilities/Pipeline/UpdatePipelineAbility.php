@@ -42,6 +42,10 @@ class UpdatePipelineAbility {
 								'type'        => 'string',
 								'description' => __( 'New pipeline name', 'data-machine' ),
 							),
+							'agent_id'      => array(
+								'type'        => 'integer',
+								'description' => __( 'New agent ID to assign', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -77,6 +81,7 @@ class UpdatePipelineAbility {
 	public function execute( array $input ): array {
 		$pipeline_id   = $input['pipeline_id'] ?? null;
 		$pipeline_name = $input['pipeline_name'] ?? null;
+		$agent_id      = $input['agent_id'] ?? null;
 
 		if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
 			return array(
@@ -87,10 +92,10 @@ class UpdatePipelineAbility {
 
 		$pipeline_id = (int) $pipeline_id;
 
-		if ( null === $pipeline_name ) {
+		if ( null === $pipeline_name && null === $agent_id ) {
 			return array(
 				'success' => false,
-				'error'   => 'Must provide pipeline_name to update',
+				'error'   => 'Must provide pipeline_name or agent_id to update',
 			);
 		}
 
@@ -102,17 +107,26 @@ class UpdatePipelineAbility {
 			);
 		}
 
-		$pipeline_name = sanitize_text_field( wp_unslash( $pipeline_name ) );
-		if ( empty( trim( $pipeline_name ) ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Pipeline name cannot be empty',
-			);
+		$update_data = array();
+
+		if ( null !== $pipeline_name ) {
+			$pipeline_name = sanitize_text_field( wp_unslash( $pipeline_name ) );
+			if ( empty( trim( $pipeline_name ) ) ) {
+				return array(
+					'success' => false,
+					'error'   => 'Pipeline name cannot be empty',
+				);
+			}
+			$update_data['pipeline_name'] = $pipeline_name;
+		}
+
+		if ( null !== $agent_id ) {
+			$update_data['agent_id'] = absint( $agent_id );
 		}
 
 		$success = $this->db_pipelines->update_pipeline(
 			$pipeline_id,
-			array( 'pipeline_name' => $pipeline_name )
+			$update_data
 		);
 
 		if ( ! $success ) {
@@ -122,20 +136,23 @@ class UpdatePipelineAbility {
 			);
 		}
 
+		$updated_pipeline = $this->db_pipelines->get_pipeline( $pipeline_id );
+		$final_name       = $updated_pipeline['pipeline_name'] ?? $pipeline_name ?? '';
+
 		do_action(
 			'datamachine_log',
 			'info',
 			'Pipeline updated via ability',
 			array(
-				'pipeline_id'   => $pipeline_id,
-				'pipeline_name' => $pipeline_name,
+				'pipeline_id'    => $pipeline_id,
+				'updated_fields' => array_keys( $update_data ),
 			)
 		);
 
 		return array(
 			'success'       => true,
 			'pipeline_id'   => $pipeline_id,
-			'pipeline_name' => $pipeline_name,
+			'pipeline_name' => $final_name,
 			'message'       => 'Pipeline updated successfully',
 		);
 	}

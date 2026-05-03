@@ -172,6 +172,12 @@ class DuplicateFlowAbility {
 			'scheduling_config' => $scheduling_config,
 		);
 
+		// Propagate agent_id from source flow (or override from input).
+		$agent_id = $input['agent_id'] ?? ( $source_flow['agent_id'] ?? null );
+		if ( ! empty( $agent_id ) ) {
+			$flow_data['agent_id'] = (int) $agent_id;
+		}
+
 		$new_flow_id = $this->db_flows->create_flow( $flow_data );
 		if ( ! $new_flow_id ) {
 			do_action(

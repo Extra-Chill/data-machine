@@ -148,8 +148,8 @@ class PostTracking {
 	 *
 	 * Reads _datamachine_post_flow_id from post meta and resolves the
 	 * agent ID via the flows table. datamachine_flows.agent_id is set at
-	 * flow creation (see Flows::create_flow) and is not mutated by
-	 * update_flow, so the resolution is stable.
+	 * flow creation and can be changed via update_flow or CLI reassign.
+	 * Resolution reflects the current agent_id at query time.
 	 *
 	 * @param int $post_id WordPress post ID.
 	 * @return int Agent ID, or 0 if the post was not produced by DM,
@@ -179,8 +179,8 @@ class PostTracking {
 	 *
 	 * Used to translate "posts produced by agent N" queries into
 	 * meta_query clauses on _datamachine_post_flow_id, since agent_id
-	 * is not stored on posts. datamachine_flows.agent_id is set at flow
-	 * creation and is not mutated by update_flow.
+	 * is not stored on posts. datamachine_flows.agent_id can be changed
+	 * via update_flow or CLI reassign; resolution reflects current state.
 	 *
 	 * @param int $agent_id Agent ID.
 	 * @return int[] Flow IDs belonging to the agent. Empty array if none.

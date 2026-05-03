@@ -51,6 +51,10 @@ class UpdateFlowAbility {
 									'interval' => array( 'type' => 'string' ),
 								),
 							),
+							'agent_id'          => array(
+								'type'        => 'integer',
+								'description' => __( 'New agent ID to assign', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -88,6 +92,7 @@ class UpdateFlowAbility {
 		$flow_id           = $input['flow_id'] ?? null;
 		$flow_name         = $input['flow_name'] ?? null;
 		$scheduling_config = $input['scheduling_config'] ?? null;
+		$agent_id          = $input['agent_id'] ?? null;
 
 		if ( ! is_numeric( $flow_id ) || (int) $flow_id <= 0 ) {
 			return array(
@@ -98,10 +103,10 @@ class UpdateFlowAbility {
 
 		$flow_id = (int) $flow_id;
 
-		if ( null === $flow_name && null === $scheduling_config ) {
+		if ( null === $flow_name && null === $scheduling_config && null === $agent_id ) {
 			return array(
 				'success' => false,
-				'error'   => 'Must provide flow_name or scheduling_config to update',
+				'error'   => 'Must provide flow_name, scheduling_config, or agent_id to update',
 			);
 		}
 
@@ -131,6 +136,20 @@ class UpdateFlowAbility {
 				return array(
 					'success' => false,
 					'error'   => 'Failed to update flow name',
+				);
+			}
+		}
+
+		if ( null !== $agent_id ) {
+			$success = $this->db_flows->update_flow(
+				$flow_id,
+				array( 'agent_id' => absint( $agent_id ) )
+			);
+
+			if ( ! $success ) {
+				return array(
+					'success' => false,
+					'error'   => 'Failed to update flow agent_id',
 				);
 			}
 		}

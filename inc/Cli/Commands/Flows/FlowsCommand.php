@@ -138,11 +138,24 @@ class FlowsCommand extends BaseCommand {
 	 * [--pipeline=<id>]
 	 * : Pipeline ID for pause/resume scoping.
 	 *
-	 * [--agent=<slug_or_id>]
-	 * : Agent slug or ID for scoping (pause/resume/list).
-	 *
-	 * [--yes]
-	 * : Skip confirmation prompt (delete subcommand).
+ * [--agent=<slug_or_id>]
+ * : Agent slug or ID. For update: set the flow's agent_id.
+ *   For pause/resume/list: scope by agent.
+ *   For reassign: see --from-agent / --to-agent instead.
+ *
+ * [--from-agent=<id>]
+ * : Source agent ID for bulk reassign. Accepts raw numeric ID (need not exist in agents table).
+ *   Mutually exclusive with --where-null.
+ *
+ * [--where-null]
+ * : Target rows where agent_id IS NULL (reassign subcommand).
+ *   Mutually exclusive with --from-agent.
+ *
+ * [--to-agent=<slug_or_id>]
+ * : Destination agent slug or ID for bulk reassign. Must be a valid agent.
+ *
+ * [--yes]
+ * : Skip confirmation prompt (delete/reassign subcommands).
 	 *
 	 * ## EXAMPLES
 	 *
@@ -203,9 +216,21 @@ class FlowsCommand extends BaseCommand {
 	 *     # Resume a single flow
 	 *     wp datamachine flows resume 42
 	 *
-	 *     # Resume all flows for an agent
-	 *     wp datamachine flows resume --agent=my-agent
-	 */
+ *     # Resume all flows for an agent
+ *     wp datamachine flows resume --agent=my-agent
+ *
+ *     # Update flow agent
+ *     wp datamachine flows update 42 --agent=events-bot
+ *
+ *     # Bulk reassign: move orphan flows → events-bot
+ *     wp datamachine flows reassign --where-null --to-agent=events-bot
+ *
+ *     # Bulk reassign: move flows from agent_id=1 → events-bot
+ *     wp datamachine flows reassign --from-agent=1 --to-agent=events-bot
+ *
+ *     # Dry-run reassign
+ *     wp datamachine flows reassign --where-null --to-agent=events-bot --dry-run
+ */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$flow_id     = null;
 		$pipeline_id = null;
@@ -266,6 +291,12 @@ class FlowsCommand extends BaseCommand {
 				return;
 			}
 			$this->deleteFlow( (int) $args[1], $assoc_args );
+			return;
+		}
+
+		// Handle 'reassign' subcommand.
+		if ( ! empty( $args ) && 'reassign' === $args[0] ) {
+			$this->reassignFlows( $assoc_args );
 			return;
 		}
 
@@ -1015,6 +1046,7 @@ class FlowsCommand extends BaseCommand {
 		$name           = $assoc_args['name'] ?? null;
 		$scheduling     = $assoc_args['scheduling'] ?? null;
 		$scheduled_at   = $assoc_args['scheduled-at'] ?? null;
+		$has_agent      = isset( $assoc_args['agent'] );
 		$user_message   = isset( $assoc_args['set-user-message'] )
 			? wp_kses_post( wp_unslash( $assoc_args['set-user-message'] ) )
 			: null;
@@ -1033,9 +1065,28 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
-		if ( null === $name && null === $scheduling && null === $user_message && null === $handler_config ) {
-			WP_CLI::error( 'Must provide --name, --scheduling, --set-user-message, --scheduled-at, or --handler-config to update' );
+		if ( null === $name && null === $scheduling && null === $user_message && null === $handler_config && ! $has_agent ) {
+			WP_CLI::error( 'Must provide --name, --scheduling, --set-user-message, --scheduled-at, --handler-config, or --agent to update' );
 			return;
+		}
+
+		// Update agent_id if --agent provided.
+		if ( $has_agent ) {
+			$new_agent_id = AgentResolver::resolve( $assoc_args );
+			if ( null === $new_agent_id ) {
+				WP_CLI::error( 'Could not resolve --agent to a valid agent.' );
+				return;
+			}
+
+			$flows_repo = new \DataMachine\Core\Database\Flows\Flows();
+			$success    = $flows_repo->update_flow( $flow_id, array( 'agent_id' => $new_agent_id ) );
+
+			if ( ! $success ) {
+				WP_CLI::error( 'Failed to update flow agent_id.' );
+				return;
+			}
+
+			WP_CLI::success( sprintf( 'Flow %d agent set to agent_id=%d.', $flow_id, $new_agent_id ) );
 		}
 
 		// Validate step resolution BEFORE any writes (atomic: fail fast, change nothing).
@@ -1795,5 +1846,102 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		return array( 'interval' => $scheduling );
+	}
+
+	/**
+	 * Bulk-reassign agent_id on flows.
+	 *
+	 * Requires exactly one of --from-agent or --where-null, plus --to-agent.
+	 *
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function reassignFlows( array $assoc_args ): void {
+		$has_from = isset( $assoc_args['from-agent'] );
+		$has_null = isset( $assoc_args['where-null'] );
+		$has_to   = isset( $assoc_args['to-agent'] );
+		$dry_run  = isset( $assoc_args['dry-run'] );
+		$skip     = isset( $assoc_args['yes'] );
+		$format   = $assoc_args['format'] ?? 'table';
+
+		if ( ! $has_to ) {
+			WP_CLI::error( '--to-agent is required.' );
+			return;
+		}
+
+		if ( ! $has_from && ! $has_null ) {
+			WP_CLI::error( 'Must provide --from-agent=<id> or --where-null to specify which flows to reassign.' );
+			return;
+		}
+
+		if ( $has_from && $has_null ) {
+			WP_CLI::error( '--from-agent and --where-null are mutually exclusive.' );
+			return;
+		}
+
+		// Resolve --to-agent through AgentResolver (must be a valid agent).
+		$to_agent_id = AgentResolver::resolve( array( 'agent' => $assoc_args['to-agent'] ) );
+		if ( null === $to_agent_id ) {
+			WP_CLI::error( 'Could not resolve --to-agent to a valid agent.' );
+			return;
+		}
+
+		// Parse --from-agent as raw integer (may reference a stale/non-existent agent_id).
+		$from_agent_id = null;
+		if ( $has_from ) {
+			$from_agent_id = absint( $assoc_args['from-agent'] );
+			if ( $from_agent_id <= 0 ) {
+				WP_CLI::error( '--from-agent must be a positive integer.' );
+				return;
+			}
+			if ( $from_agent_id === $to_agent_id ) {
+				WP_CLI::error( '--from-agent and --to-agent resolve to the same agent_id.' );
+				return;
+			}
+		}
+
+		$flows_repo = new \DataMachine\Core\Database\Flows\Flows();
+		$flow_count = $flows_repo->count_by_agent_id( $from_agent_id );
+
+		$source_label = null === $from_agent_id ? 'NULL' : (string) $from_agent_id;
+
+		if ( 0 === $flow_count ) {
+			WP_CLI::warning( sprintf( 'No flows found with agent_id=%s. Nothing to do.', $source_label ) );
+			return;
+		}
+
+		WP_CLI::log( sprintf(
+			'Found %d flow(s) with agent_id=%s → reassign to agent_id=%d.',
+			$flow_count,
+			$source_label,
+			$to_agent_id
+		) );
+
+		if ( $dry_run ) {
+			WP_CLI::success( 'Dry-run complete. No changes made.' );
+			return;
+		}
+
+		if ( ! $skip ) {
+			WP_CLI::confirm( sprintf(
+				'Reassign %d flow(s) from agent_id=%s to agent_id=%d?',
+				$flow_count,
+				$source_label,
+				$to_agent_id
+			) );
+		}
+
+		$flows_updated = $flows_repo->reassign_agent_id( $from_agent_id, $to_agent_id );
+
+		if ( $flows_updated < 0 ) {
+			WP_CLI::error( 'Database error during flow reassignment.' );
+			return;
+		}
+
+		WP_CLI::success( sprintf(
+			'Done. %d flow(s) reassigned from agent_id=%s to agent_id=%d.',
+			$flows_updated,
+			$source_label,
+			$to_agent_id
+		) );
 	}
 }
