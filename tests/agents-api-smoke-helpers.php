@@ -12,6 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $GLOBALS['__agents_api_smoke_actions'] = array();
+$GLOBALS['__agents_api_smoke_filters'] = array();
 $GLOBALS['__agents_api_smoke_wrong']   = array();
 $GLOBALS['__agents_api_smoke_current'] = array();
 $GLOBALS['__agents_api_smoke_done']    = array();
@@ -29,6 +30,23 @@ function sanitize_file_name( string $value ): string {
 function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
 	unset( $accepted_args );
 	$GLOBALS['__agents_api_smoke_actions'][ $hook ][ $priority ][] = $callback;
+}
+
+function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+	$GLOBALS['__agents_api_smoke_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+}
+
+function apply_filters( string $hook, $value, ...$args ) {
+	$callbacks = $GLOBALS['__agents_api_smoke_filters'][ $hook ] ?? array();
+	ksort( $callbacks );
+
+	foreach ( $callbacks as $priority_callbacks ) {
+		foreach ( $priority_callbacks as $registration ) {
+			$value = call_user_func_array( $registration[0], array_slice( array_merge( array( $value ), $args ), 0, $registration[1] ) );
+		}
+	}
+
+	return $value;
 }
 
 function do_action( string $hook, ...$args ): void {
@@ -56,6 +74,37 @@ function did_action( string $hook ): int {
 
 function esc_html( string $value ): string {
 	return htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' );
+}
+
+function __( string $text, string $domain = 'default' ): string {
+	unset( $domain );
+	return $text;
+}
+
+function _x( string $text, string $context, string $domain = 'default' ): string {
+	unset( $context, $domain );
+	return $text;
+}
+
+function post_type_exists( string $post_type ): bool {
+	return isset( $GLOBALS['__agents_api_smoke_post_types'][ $post_type ] );
+}
+
+function register_post_type( string $post_type, array $args = array() ): object {
+	$GLOBALS['__agents_api_smoke_post_types'][ $post_type ] = $args;
+	return (object) array( 'name' => $post_type );
+}
+
+function taxonomy_exists( string $taxonomy ): bool {
+	return isset( $GLOBALS['__agents_api_smoke_taxonomies'][ $taxonomy ] );
+}
+
+function register_taxonomy( string $taxonomy, $object_type, array $args = array() ): object {
+	$GLOBALS['__agents_api_smoke_taxonomies'][ $taxonomy ] = array(
+		'object_type' => $object_type,
+		'args'        => $args,
+	);
+	return (object) array( 'name' => $taxonomy );
 }
 
 function _doing_it_wrong( string $function_name, string $message, string $version ): void {

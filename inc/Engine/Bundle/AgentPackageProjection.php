@@ -129,6 +129,26 @@ final class AgentPackageProjection {
 			}
 		}
 
+		foreach ( $directory->extension_artifacts() as $artifact ) {
+			$artifact_id   = (string) ( $artifact['artifact_id'] ?? '' );
+			$artifact_type = (string) ( $artifact['artifact_type'] ?? '' );
+			$source_path   = (string) ( $artifact['source_path'] ?? '' );
+			if ( '' === $artifact_id || '' === $artifact_type || '' === $source_path ) {
+				continue;
+			}
+
+			$artifacts[] = self::artifact(
+				AgentBundleArtifactExtensions::package_artifact_type( $artifact_type ),
+				$artifact_id,
+				$artifact_id,
+				$source_path,
+				array(
+					'extension_artifact_type' => $artifact_type,
+					'payload_kind'            => 'json',
+				)
+			);
+		}
+
 		return $artifacts;
 	}
 

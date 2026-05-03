@@ -50,6 +50,16 @@ agents_api_smoke_assert_equals( true, wp_has_agent_package_artifact_type( 'datam
 agents_api_smoke_assert_equals( 'Data Machine pipeline', $pipeline_type instanceof WP_Agent_Package_Artifact_Type ? $pipeline_type->get_label() : '', 'registered type carries Data Machine metadata outside agents-api', $failures, $passes );
 
 echo "\n[2] Bundle directories project to Core-shaped WP_Agent_Package identity:\n";
+add_filter(
+	'datamachine_agent_bundle_artifact_types',
+	static function ( array $types ): array {
+		$types[] = 'intelligence/wiki-brain';
+		$types[] = 'legacy_plugin_artifact';
+		return $types;
+	},
+	10,
+	1
+);
 $directory = new AgentBundleDirectory(
 	new AgentBundleManifest(
 		'2026-04-30T12:00:00Z',
@@ -73,7 +83,10 @@ $directory = new AgentBundleDirectory(
 			'tool_policies' => array( 'read-only-context' ),
 			'auth_refs'     => array( 'github-default' ),
 			'seed_queues'   => array( 'mgs-topic-loop' ),
-			'extensions'    => array(),
+			'extensions'    => array(
+				'extensions/intelligence/wiki-brain/woocommerce.json',
+				'extensions/legacy-plugin/seed.json',
+			),
 			'handler_auth'  => 'refs',
 		)
 	),
@@ -113,6 +126,20 @@ $directory = new AgentBundleDirectory(
 		BundleSchema::TOOL_POLICIES_DIR => array( 'read-only-context.json' => array( 'allow' => array( 'datamachine/search' ) ) ),
 		BundleSchema::AUTH_REFS_DIR     => array( 'github-default.json' => array( 'ref' => 'github:default' ) ),
 		BundleSchema::SEED_QUEUES_DIR   => array( 'mgs-topic-loop.json' => array( 'mode' => 'loop', 'items' => array( 'HPOS' ) ) ),
+	),
+	array(
+		array(
+			'artifact_type' => 'intelligence/wiki-brain',
+			'artifact_id'   => 'woocommerce',
+			'source_path'   => 'extensions/intelligence/wiki-brain/woocommerce.json',
+			'payload'       => array( 'root' => 'woocommerce' ),
+		),
+		array(
+			'artifact_type' => 'legacy_plugin_artifact',
+			'artifact_id'   => 'seed',
+			'source_path'   => 'extensions/legacy-plugin/seed.json',
+			'payload'       => array( 'label' => 'Seed' ),
+		),
 	)
 );
 
@@ -126,14 +153,18 @@ agents_api_smoke_assert_equals( 'pipelines/daily-ingest.json', $artifacts['datam
 agents_api_smoke_assert_equals( 'flows/daily-ingest-flow.json', $artifacts['datamachine/flow:daily-ingest-flow']['source'] ?? '', 'flow artifact keeps package-local source', $failures, $passes );
 agents_api_smoke_assert_equals( 'prompts/extract-facts.md', $artifacts['datamachine/prompt:extract-facts']['source'] ?? '', 'prompt artifact is typed without moving prompt fields into agents-api', $failures, $passes );
 agents_api_smoke_assert_equals( 'seed-queues/mgs-topic-loop.json', $artifacts['datamachine/queue-seed:mgs-topic-loop']['source'] ?? '', 'queue seed artifact is typed as a Data Machine payload', $failures, $passes );
+agents_api_smoke_assert_equals( 'extensions/intelligence/wiki-brain/woocommerce.json', $artifacts['intelligence/wiki-brain:woocommerce']['source'] ?? '', 'namespaced plugin artifact projects with package-relative extension source', $failures, $passes );
+agents_api_smoke_assert_equals( 'extensions/legacy-plugin/seed.json', $artifacts['datamachine-extension/legacy_plugin_artifact:seed']['source'] ?? '', 'legacy plugin artifact maps to generic package namespace', $failures, $passes );
+agents_api_smoke_assert_equals( 'legacy_plugin_artifact', $artifacts['datamachine-extension/legacy_plugin_artifact:seed']['meta']['extension_artifact_type'] ?? '', 'legacy plugin artifact preserves bundle artifact type in metadata', $failures, $passes );
 
 echo "\n[3] Existing bundle paths can read package identity from WP_Agent_Package:\n";
 $legacy_bundle   = AgentBundleLegacyAdapter::to_legacy_bundle( $directory );
 $legacy_package  = AgentBundler::package_from_bundle( $legacy_bundle );
+$legacy_artifacts = datamachine_package_smoke_artifacts_by_type( $legacy_package );
 $command_source  = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Commands/AgentBundleCommand.php' );
 $bundler_source  = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Core/Agents/AgentBundler.php' );
 agents_api_smoke_assert_equals( 'woocommerce-wiki-package', $legacy_package->get_slug(), 'legacy bundle projection preserves package identity', $failures, $passes );
-agents_api_smoke_assert_equals( 'daily-ingest-flow', $legacy_package->get_artifacts()[0]->get_slug(), 'legacy bundle projection preserves typed artifact payloads', $failures, $passes );
+agents_api_smoke_assert_equals( 'flows/daily-ingest-flow.json', $legacy_artifacts['datamachine/flow:daily-ingest-flow']['source'] ?? '', 'legacy bundle projection preserves typed artifact payloads', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $command_source, 'AgentBundler::package_from_bundle( $bundle )' ), 'package install/diff summary reads identity through WP_Agent_Package', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $bundler_source, '\'package\'   => AgentPackageProjection::from_directory( $directory )' ), 'export directory path exposes package projection alongside Data Machine directory', $failures, $passes );
 
