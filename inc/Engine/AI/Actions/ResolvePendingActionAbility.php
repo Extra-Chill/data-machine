@@ -38,6 +38,8 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
+use AgentsAPI\AI\Approvals\ApprovalDecision;
+use AgentsAPI\AI\Approvals\PendingActionHandlerInterface;
 use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
@@ -63,6 +65,7 @@ class ResolvePendingActionAbility {
 	 */
 	public static function adapter(): PendingActionResolverAdapter {
 		if ( null === self::$adapter ) {
+			self::loadApprovalContracts();
 			self::$adapter = new PendingActionResolverAdapter();
 		}
 
@@ -187,22 +190,25 @@ class ResolvePendingActionAbility {
 	 * @return array
 	 */
 	public static function execute( array $input ): array {
-		$action_id = isset( $input['action_id'] ) ? sanitize_text_field( $input['action_id'] ) : '';
-		$decision  = isset( $input['decision'] ) ? sanitize_text_field( $input['decision'] ) : '';
+		$action_id      = isset( $input['action_id'] ) ? sanitize_text_field( $input['action_id'] ) : '';
+		$decision_value = isset( $input['decision'] ) ? sanitize_text_field( $input['decision'] ) : '';
 
-		if ( '' === $action_id || '' === $decision ) {
+		if ( '' === $action_id || '' === $decision_value ) {
 			return array(
 				'success' => false,
 				'error'   => 'action_id and decision are required.',
 			);
 		}
 
-		if ( ! in_array( $decision, array( 'accepted', 'rejected' ), true ) ) {
+		$decision = self::approvalDecisionFromValue( $decision_value );
+		if ( null === $decision ) {
 			return array(
 				'success' => false,
 				'error'   => 'decision must be "accepted" or "rejected".',
 			);
 		}
+
+		$decision_value = $decision->value();
 
 		$payload = PendingActionStore::get( $action_id );
 		if ( null === $payload ) {
@@ -233,9 +239,9 @@ class ResolvePendingActionAbility {
 
 		if ( ! is_array( $handler ) || empty( $handler['apply'] ) || ! self::isApplyHandler( $handler['apply'] ) ) {
 			// No handler registered — can't apply, but reject is still safe.
-			if ( 'rejected' === $decision ) {
+			if ( $decision->is_rejected() ) {
 				PendingActionStore::record_resolution( $action_id, PendingActionStore::STATUS_REJECTED, null, null );
-				self::fireResolvedAction( $decision, $action_id, $kind, $payload, null );
+				self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, null );
 				return array(
 					'success'   => true,
 					'decision'  => 'rejected',
@@ -254,7 +260,7 @@ class ResolvePendingActionAbility {
 
 		// Optional permission hook per kind.
 		if ( ! empty( $handler['can_resolve'] ) && is_callable( $handler['can_resolve'] ) ) {
-			$allowed = call_user_func( $handler['can_resolve'], $payload, $decision, $user_id );
+			$allowed = call_user_func( $handler['can_resolve'], $payload, $decision_value, $user_id );
 			if ( is_wp_error( $allowed ) ) {
 				return array(
 					'success'   => false,
@@ -273,9 +279,9 @@ class ResolvePendingActionAbility {
 			}
 		}
 
-		if ( 'rejected' === $decision ) {
+		if ( $decision->is_rejected() ) {
 			PendingActionStore::record_resolution( $action_id, PendingActionStore::STATUS_REJECTED, null, null );
-			self::fireResolvedAction( $decision, $action_id, $kind, $payload, null );
+			self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, null );
 			return array(
 				'success'   => true,
 				'decision'  => 'rejected',
@@ -285,11 +291,11 @@ class ResolvePendingActionAbility {
 		}
 
 		// Accepted: invoke the apply handler with the stored input.
-		$result = self::applyHandler( $handler, $apply_input, $payload, $resolver_payload, $resolver_context );
+		$result = self::applyHandler( $handler, $decision, $apply_input, $payload, $resolver_payload, $resolver_context );
 
 		if ( is_wp_error( $result ) ) {
 			PendingActionStore::record_resolution( $action_id, PendingActionStore::STATUS_ACCEPTED, null, $result->get_error_message() );
-			self::fireResolvedAction( $decision, $action_id, $kind, $payload, $result );
+			self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, $result );
 			return array(
 				'success'   => false,
 				'decision'  => 'accepted',
@@ -301,7 +307,7 @@ class ResolvePendingActionAbility {
 
 		if ( is_array( $result ) && array_key_exists( 'success', $result ) && false === $result['success'] ) {
 			PendingActionStore::record_resolution( $action_id, PendingActionStore::STATUS_ACCEPTED, $result, $result['error'] ?? 'Apply handler reported failure.' );
-			self::fireResolvedAction( $decision, $action_id, $kind, $payload, $result );
+			self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, $result );
 			return array(
 				'success'   => false,
 				'decision'  => 'accepted',
@@ -313,7 +319,7 @@ class ResolvePendingActionAbility {
 		}
 
 		PendingActionStore::record_resolution( $action_id, PendingActionStore::STATUS_ACCEPTED, $result, null );
-		self::fireResolvedAction( $decision, $action_id, $kind, $payload, $result );
+		self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, $result );
 
 		return array(
 			'success'   => true,
@@ -356,22 +362,19 @@ class ResolvePendingActionAbility {
 	 * implement it and be placed under the same `apply` key without introducing a
 	 * parallel Data Machine primitive.
 	 *
-	 * @param array $handler     Handler configuration.
-	 * @param array $apply_input Stored apply input.
-	 * @param array $payload     Stored pending action payload.
-	 * @param array $resolver_payload Fresh resolver payload.
-	 * @param array $resolver_context Optional resolver context.
+	 * @param array            $handler          Handler configuration.
+	 * @param ApprovalDecision $decision         Accepted/rejected decision.
+	 * @param array            $apply_input      Stored apply input.
+	 * @param array            $payload          Stored pending action payload.
+	 * @param array            $resolver_payload Fresh resolver payload.
+	 * @param array            $resolver_context Optional resolver context.
 	 * @return mixed
 	 */
-	private static function applyHandler( array $handler, array $apply_input, array $payload, array $resolver_payload = array(), array $resolver_context = array() ) {
+	private static function applyHandler( array $handler, ApprovalDecision $decision, array $apply_input, array $payload, array $resolver_payload = array(), array $resolver_context = array() ) {
+		self::loadApprovalContracts();
+
 		$apply = $handler['apply'];
-		if (
-			is_object( $apply )
-			&& interface_exists( 'AgentsAPI\\AI\\Approvals\\PendingActionHandlerInterface' )
-			&& is_a( $apply, 'AgentsAPI\\AI\\Approvals\\PendingActionHandlerInterface' )
-			&& class_exists( 'AgentsAPI\\AI\\Approvals\\ApprovalDecision' )
-		) {
-			$decision = \AgentsAPI\AI\Approvals\ApprovalDecision::accepted();
+		if ( $apply instanceof PendingActionHandlerInterface ) {
 			return $apply->handle_pending_action( $decision, $apply_input, $resolver_payload, $resolver_context );
 		}
 
@@ -389,9 +392,42 @@ class ResolvePendingActionAbility {
 			return true;
 		}
 
-		return is_object( $apply )
-			&& interface_exists( 'AgentsAPI\\AI\\Approvals\\PendingActionHandlerInterface' )
-			&& is_a( $apply, 'AgentsAPI\\AI\\Approvals\\PendingActionHandlerInterface' );
+		self::loadApprovalContracts();
+
+		return $apply instanceof PendingActionHandlerInterface;
+	}
+
+	/**
+	 * Normalize an external decision value to the Agents API approval contract.
+	 *
+	 * @param string $value Request decision value.
+	 * @return ApprovalDecision|null
+	 */
+	private static function approvalDecisionFromValue( string $value ): ?ApprovalDecision {
+		self::loadApprovalContracts();
+
+		try {
+			return ApprovalDecision::from_string( $value );
+		} catch ( \InvalidArgumentException $e ) {
+			return null;
+		}
+	}
+
+	/**
+	 * Load Composer-installed Agents API approval contracts when the plugin is not active.
+	 */
+	private static function loadApprovalContracts(): void {
+		if ( class_exists( ApprovalDecision::class ) && interface_exists( PendingActionHandlerInterface::class ) ) {
+			return;
+		}
+
+		$approvals_path = dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Approvals/';
+		foreach ( array( 'ApprovalDecision.php', 'PendingActionHandlerInterface.php', 'PendingActionResolverInterface.php' ) as $file ) {
+			$path = $approvals_path . $file;
+			if ( file_exists( $path ) ) {
+				require_once $path;
+			}
+		}
 	}
 
 	/**
