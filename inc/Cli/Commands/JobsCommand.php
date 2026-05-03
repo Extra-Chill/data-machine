@@ -21,6 +21,7 @@ use DataMachine\Abilities\Job\GetJobsAbility;
 use DataMachine\Abilities\Job\JobsSummaryAbility;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
+use DataMachine\Abilities\Job\RunMetricsAbility;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use AgentsAPI\AI\AgentMessageEnvelope;
@@ -878,6 +879,88 @@ class JobsCommand extends BaseCommand {
 		}
 
 		$this->format_items( $items, array( 'status', 'count' ), $assoc_args );
+	}
+
+	/**
+	 * Show run metrics for a job.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <job_id>
+	 * : The job ID to inspect.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Show run metrics for a long backfill parent job
+	 *     wp datamachine jobs metrics 844
+	 *
+	 *     # Machine-readable metrics
+	 *     wp datamachine jobs metrics 844 --format=json
+	 *
+	 * @subcommand metrics
+	 */
+	public function metrics( array $args, array $assoc_args ): void {
+		if ( empty( $args[0] ) || ! is_numeric( $args[0] ) || (int) $args[0] <= 0 ) {
+			WP_CLI::error( 'Job ID is required and must be a positive integer.' );
+			return;
+		}
+
+		$result = ( new RunMetricsAbility() )->execute( array( 'job_id' => (int) $args[0] ) );
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
+			return;
+		}
+
+		$metrics = $result['metrics'] ?? array();
+		$format  = $assoc_args['format'] ?? 'table';
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $metrics, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( 'yaml' === $format ) {
+			/** @phpstan-ignore-next-line Spyc is provided by WP-CLI at runtime. */
+			WP_CLI::log( (string) call_user_func( array( 'Spyc', 'YAMLDump' ), $metrics, false, false, true ) );
+			return;
+		}
+
+		$counts     = $metrics['counts'] ?? array();
+		$children   = $metrics['child_jobs'] ?? array();
+		$timestamps = $metrics['timestamps'] ?? array();
+
+		WP_CLI::log( sprintf( 'Job ID: %d', $metrics['job_id'] ?? 0 ) );
+		WP_CLI::log( sprintf( 'Status: %s', $metrics['status'] ?? '' ) );
+		WP_CLI::log( sprintf( 'Source: %s', $metrics['source'] ?? '' ) );
+		WP_CLI::log( sprintf( 'Label: %s', $metrics['label'] ?? '' ) );
+		WP_CLI::log( sprintf( 'Flow ID: %s', $metrics['flow_id'] ?? 'N/A' ) );
+		WP_CLI::log( sprintf( 'Pipeline ID: %s', $metrics['pipeline_id'] ?? 'N/A' ) );
+		WP_CLI::log( sprintf( 'Started: %s', $timestamps['started_at'] ?? '-' ) );
+		WP_CLI::log( sprintf( 'Last Activity: %s', $timestamps['last_activity_at'] ?? '-' ) );
+		WP_CLI::log( sprintf( 'Completed: %s', $timestamps['completed_at'] ?? '-' ) );
+		WP_CLI::log( sprintf( 'Duration: %s seconds', null === ( $metrics['duration_seconds'] ?? null ) ? '-' : (string) $metrics['duration_seconds'] ) );
+		WP_CLI::log( '' );
+
+		WP_CLI::log( 'Counts:' );
+		foreach ( $counts as $key => $value ) {
+			WP_CLI::log( sprintf( '  %s: %d', $key, (int) $value ) );
+		}
+		WP_CLI::log( '' );
+
+		WP_CLI::log( 'Child Jobs:' );
+		foreach ( $children as $key => $value ) {
+			WP_CLI::log( sprintf( '  %s: %d', $key, (int) $value ) );
+		}
 	}
 
 	/**

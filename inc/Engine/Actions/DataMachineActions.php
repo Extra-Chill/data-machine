@@ -64,6 +64,34 @@ function datamachine_register_core_actions() {
 	add_action( 'datamachine_fail_job', array( FailJobHandler::class, 'handle' ), 10, 3 );
 	add_action( 'datamachine_job_complete', array( JobCompleteHandler::class, 'handle' ), 10, 2 );
 	add_action( 'datamachine_log', array( LogHandler::class, 'handle' ), 10, 3 );
+	add_action(
+		'datamachine_pending_action_staged',
+		function ( string $action_id, array $payload ): void {
+			$context = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
+			$job_id  = (int) ( $context['job_id'] ?? 0 );
+			if ( $job_id > 0 ) {
+				\DataMachine\Core\RunMetrics::increment( $job_id, 'staged_actions' );
+			}
+		},
+		10,
+		2
+	);
+	add_action(
+		'datamachine_pending_action_resolved',
+		function ( string $decision, string $action_id, string $kind, array $payload ): void {
+			$action_id;
+			$kind;
+			$context = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
+			$job_id  = (int) ( $context['job_id'] ?? 0 );
+			if ( $job_id <= 0 ) {
+				return;
+			}
+			$key = 'accepted' === $decision ? 'accepted_actions' : 'rejected_actions';
+			\DataMachine\Core\RunMetrics::increment( $job_id, $key );
+		},
+		10,
+		5
+	);
 
 	// AI library error logging — universal handler for all AI interactions (pipeline agents, chat agents).
 	add_action(
