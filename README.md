@@ -12,6 +12,8 @@ Data Machine turns a WordPress site into an agent runtime — persistent identit
 - **Multi-agent** — Multiple agents with scoped pipelines, flows, jobs, and filesystem directories
 - **Self-scheduling** — Agents schedule their own recurring tasks using flows, prompt queues, and Agent Pings
 
+Data Machine builds on [Agents API](https://github.com/Automattic/agents-api) for generic agent runtime contracts and durable agent primitives. Data Machine owns the WordPress automation product layer: pipelines, flows, jobs, handlers, tools, abilities, memory files, system tasks, and admin/CLI surfaces.
+
 ## Architecture
 
 ### Pipelines
@@ -227,7 +229,7 @@ OpenAI, Anthropic, Google, Grok, OpenRouter — configure a global default per-s
 
 ## Runtime Adapters
 
-Data Machine ships its own multi-turn conversation loop and uses it by default. The loop is also swappable: a single Agents API-shaped filter (`agents_api_conversation_runner`) lets an external runtime take over while Data Machine still provides pipelines, flows, tool resolution, abilities, and memory.
+Data Machine's runtime seams use Agents API vocabulary. The conversation loop is swappable through `agents_api_conversation_runner`, letting another durable agent runtime take over while Data Machine still provides pipelines, flows, jobs, tool resolution, abilities, and memory integration.
 
 ```php
 add_filter(
