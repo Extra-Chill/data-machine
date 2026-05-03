@@ -1,6 +1,10 @@
 <?php
 /**
- * Pure-PHP smoke coverage for Data Machine pending-action approval surfaces.
+ * Static smoke coverage for Data Machine pending-action approval adapter surfaces.
+ *
+ * This pins the #1741 boundary without duplicating the behavior tests owned by
+ * #1742-#1745: Agents API owns generic approval primitives, while Data Machine
+ * owns concrete storage, routes, abilities, handlers, CLI, and upgrade paths.
  *
  * Run with: php tests/pending-actions-agents-api-contract-smoke.php
  *
@@ -41,20 +45,40 @@ $cli_bootstrap      = datamachine_pending_actions_source( 'inc/Cli/Bootstrap.php
 $cli_command_source = datamachine_pending_actions_source( 'inc/Cli/Commands/PendingActionsCommand.php' );
 $plugin_source      = datamachine_pending_actions_source( 'data-machine.php' );
 $runtime_source     = datamachine_pending_actions_source( 'inc/migrations/runtime.php' );
-$agents_store       = datamachine_pending_actions_source( 'vendor/automattic/agents-api/src/Approvals/PendingActionStoreInterface.php' );
-$agents_policy      = datamachine_pending_actions_source( 'vendor/automattic/agents-api/src/Tools/ActionPolicy.php' );
-$agents_resolver    = datamachine_pending_actions_source( 'vendor/automattic/agents-api/src/Approvals/PendingActionResolverInterface.php' );
-$agents_handler     = datamachine_pending_actions_source( 'vendor/automattic/agents-api/src/Approvals/PendingActionHandlerInterface.php' );
 $action_policy      = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/ActionPolicyResolver.php' );
 
+$expected_agents_api_approval_primitives = array(
+	'AgentsAPI\\AI\\Approvals\\PendingActionStoreInterface'    => array(
+		'path' => 'vendor/automattic/agents-api/src/Approvals/PendingActionStoreInterface.php',
+		'type' => 'interface PendingActionStoreInterface',
+	),
+	'AgentsAPI\\AI\\Approvals\\PendingActionResolverInterface' => array(
+		'path' => 'vendor/automattic/agents-api/src/Approvals/PendingActionResolverInterface.php',
+		'type' => 'interface PendingActionResolverInterface',
+	),
+	'AgentsAPI\\AI\\Approvals\\PendingActionHandlerInterface'  => array(
+		'path' => 'vendor/automattic/agents-api/src/Approvals/PendingActionHandlerInterface.php',
+		'type' => 'interface PendingActionHandlerInterface',
+	),
+	'AgentsAPI\\AI\\Approvals\\ApprovalDecision'               => array(
+		'path' => 'vendor/automattic/agents-api/src/Approvals/ApprovalDecision.php',
+		'type' => 'final class ApprovalDecision',
+	),
+	'AgentsAPI\\AI\\Tools\\ActionPolicy'                       => array(
+		'path' => 'vendor/automattic/agents-api/src/Tools/ActionPolicy.php',
+		'type' => 'final class ActionPolicy',
+	),
+);
+
 echo "\n[1] Data Machine adapts to merged Agents API contracts:\n";
+foreach ( $expected_agents_api_approval_primitives as $class_name => $primitive ) {
+	$primitive_source = datamachine_pending_actions_source( $primitive['path'] );
+	datamachine_pending_actions_assert( str_contains( $primitive_source, $primitive['type'] ), $class_name . ' is available from the installed Agents API dependency', $failures, $passes );
+}
 datamachine_pending_actions_assert( str_contains( $adapter_source, 'implements PendingActionStoreInterface' ), 'store adapter implements Agents API PendingActionStoreInterface', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'implements PendingActionResolverInterface' ), 'resolver adapter implements Agents API PendingActionResolverInterface', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $action_policy, 'AgentsAPI\\AI\\Tools\\ActionPolicy::normalize' ), 'ActionPolicyResolver feature-detects Agents API ActionPolicy vocabulary', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $agents_store, 'interface PendingActionStoreInterface' ), 'installed Agents API exposes the pending action store contract', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $agents_policy, 'final class ActionPolicy' ), 'installed Agents API exposes the action policy vocabulary', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $agents_resolver, 'interface PendingActionResolverInterface' ), 'installed Agents API exposes the resolver contract', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $agents_handler, 'interface PendingActionHandlerInterface' ), 'installed Agents API exposes the handler contract', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'ApprovalDecision' ), 'resolver adapter consumes Agents API ApprovalDecision vocabulary', $failures, $passes );
 
 echo "\n[2] Durable storage preserves legacy lookup while retaining audit rows:\n";
 datamachine_pending_actions_assert( str_contains( $store_source, 'CREATE TABLE {$table_name}' ), 'PendingActionStore creates a durable table', $failures, $passes );
