@@ -174,18 +174,18 @@ class JobRetryPolicy {
 		$retryable = (bool) apply_filters( 'datamachine_job_error_retryable', $retryable, $job_id, $reason, $context_data, $engine_data, $job );
 
 		$policy = array(
-			'retryable'     => $retryable,
-			'max_attempts'  => self::DEFAULT_MAX_ATTEMPTS,
-			'base_delay'    => self::DEFAULT_BASE_DELAY,
-			'max_delay'     => self::DEFAULT_MAX_DELAY,
-			'backoff'       => 'exponential',
-			'jitter'        => 0,
-			'retry_after'   => self::extractRetryAfter( $context_data ),
-			'provider'      => $context_data['ai_provider'] ?? $engine_data['provider'] ?? null,
-			'source_type'   => $engine_data['source_type'] ?? null,
-			'pipeline_id'   => $job['pipeline_id'] ?? ( $engine_data['job']['pipeline_id'] ?? null ),
-			'flow_id'       => $job['flow_id'] ?? ( $engine_data['job']['flow_id'] ?? null ),
-			'flow_step_id'  => $context_data['flow_step_id'] ?? null,
+			'retryable'    => $retryable,
+			'max_attempts' => self::DEFAULT_MAX_ATTEMPTS,
+			'base_delay'   => self::DEFAULT_BASE_DELAY,
+			'max_delay'    => self::DEFAULT_MAX_DELAY,
+			'backoff'      => 'exponential',
+			'jitter'       => 0,
+			'retry_after'  => self::extractRetryAfter( $context_data ),
+			'provider'     => $context_data['ai_provider'] ?? $engine_data['provider'] ?? null,
+			'source_type'  => $engine_data['source_type'] ?? null,
+			'pipeline_id'  => $job['pipeline_id'] ?? ( $engine_data['job']['pipeline_id'] ?? null ),
+			'flow_id'      => $job['flow_id'] ?? ( $engine_data['job']['flow_id'] ?? null ),
+			'flow_step_id' => $context_data['flow_step_id'] ?? null,
 		);
 
 		/**
