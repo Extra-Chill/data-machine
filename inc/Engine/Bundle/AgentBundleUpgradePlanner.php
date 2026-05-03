@@ -202,7 +202,7 @@ final class AgentBundleUpgradePlanner {
 	}
 
 	private static function artifact_key( string $type, string $id ): string {
-		return sanitize_key( $type ) . ':' . $id;
+		return AgentBundleArtifactExtensions::artifact_key( $type, $id );
 	}
 
 	private static function artifact_hash( ?array $artifact ): ?string {

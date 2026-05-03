@@ -930,7 +930,7 @@ class AgentBundler {
 	}
 
 	private static function artifact_key( string $type, string $id ): string {
-		return sanitize_key( $type ) . ':' . $id;
+		return AgentBundleArtifactExtensions::artifact_key( $type, $id );
 	}
 
 	private function preserve_runtime_queue_fields( array $incoming_flow_config, array $existing_flow_config ): array {

@@ -80,7 +80,7 @@ final class AgentBundleUpgradePendingAction {
 			if ( ! is_array( $artifact ) ) {
 				continue;
 			}
-			$key = sanitize_key( (string) ( $artifact['artifact_type'] ?? '' ) ) . ':' . (string) ( $artifact['artifact_id'] ?? '' );
+			$key = AgentBundleArtifactExtensions::artifact_key( (string) ( $artifact['artifact_type'] ?? '' ), (string) ( $artifact['artifact_id'] ?? '' ) );
 			if ( ! isset( $approved[ $key ] ) ) {
 				$skipped[] = array(
 					'artifact_key' => $key,

@@ -93,7 +93,7 @@ final class AgentBundleArtifactExtensions {
 		$normalized = array();
 
 		foreach ( $artifacts as $artifact ) {
-			$type        = self::sanitize_key( (string) ( $artifact['artifact_type'] ?? '' ) );
+			$type        = self::sanitize_artifact_type( (string) ( $artifact['artifact_type'] ?? '' ) );
 			$id          = trim( (string) ( $artifact['artifact_id'] ?? '' ) );
 			$source_path = self::source_path( (string) ( $artifact['source_path'] ?? '' ), $type, $id );
 			if ( '' === $type || '' === $id || ! in_array( $type, $allowed, true ) ) {
@@ -139,6 +139,28 @@ final class AgentBundleArtifactExtensions {
 
 	private static function default_source_path( string $type, string $id ): string {
 		return BundleSchema::EXTENSIONS_DIR . '/' . $type . '/' . self::sanitize_path_id( $id ) . '.json';
+	}
+
+	public static function package_artifact_type( string $artifact_type ): string {
+		$artifact_type = self::sanitize_artifact_type( $artifact_type );
+		if ( str_contains( $artifact_type, '/' ) ) {
+			return $artifact_type;
+		}
+
+		return 'datamachine-extension/' . $artifact_type;
+	}
+
+	public static function artifact_key( string $artifact_type, string $artifact_id ): string {
+		return self::sanitize_artifact_type( $artifact_type ) . ':' . $artifact_id;
+	}
+
+	private static function sanitize_artifact_type( string $type ): string {
+		$type = strtolower( trim( str_replace( '\\', '/', $type ) ) );
+		$type = preg_replace( '/[^a-z0-9_\.\/-]+/', '', $type );
+		$type = preg_replace( '#/+#', '/', is_string( $type ) ? $type : '' );
+		$type = trim( is_string( $type ) ? $type : '', '/' );
+
+		return $type;
 	}
 
 	private static function sanitize_key( string $key ): string {

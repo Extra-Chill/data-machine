@@ -74,7 +74,7 @@ final class BundleSchema {
 
 		$normalized = array();
 		foreach ( $types as $type ) {
-			$type = self::sanitize_key( (string) $type );
+			$type = self::sanitize_artifact_type( (string) $type );
 			if ( '' !== $type ) {
 				$normalized[] = $type;
 			}
@@ -92,6 +92,15 @@ final class BundleSchema {
 		}
 
 		return call_user_func_array( 'apply_filters', array( $hook, $value ) );
+	}
+
+	private static function sanitize_artifact_type( string $type ): string {
+		$type = strtolower( trim( str_replace( '\\', '/', $type ) ) );
+		$type = preg_replace( '/[^a-z0-9_\.\/-]+/', '', $type );
+		$type = preg_replace( '#/+#', '/', is_string( $type ) ? $type : '' );
+		$type = trim( is_string( $type ) ? $type : '', '/' );
+
+		return $type;
 	}
 
 	private static function sanitize_key( string $key ): string {
