@@ -78,7 +78,9 @@ function datamachine_register_core_actions() {
 	);
 	add_action(
 		'datamachine_pending_action_resolved',
-		function ( string $decision, string $action_id, string $kind, array $payload, $result ): void {
+		function ( string $decision, string $action_id, string $kind, array $payload ): void {
+			$action_id;
+			$kind;
 			$context = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
 			$job_id  = (int) ( $context['job_id'] ?? 0 );
 			if ( $job_id <= 0 ) {

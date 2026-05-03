@@ -65,7 +65,7 @@ class RunMetrics {
 			$metrics['counts'][ $key ] = 0;
 		}
 
-		$metrics['counts'][ $key ] = max( 0, (int) $metrics['counts'][ $key ] + $amount );
+		$metrics['counts'][ $key ]   = max( 0, (int) $metrics['counts'][ $key ] + $amount );
 		$metrics['last_activity_at'] = self::now();
 
 		$engine[ self::KEY ] = $metrics;
@@ -107,10 +107,11 @@ class RunMetrics {
 		$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
 		$status  = (string) ( $job['status'] ?? '' );
 
-		$started_at = $metrics['started_at'] ?: ( $engine['started_at'] ?? ( $job['created_at'] ?? null ) );
-		$ended_at   = $metrics['completed_at'] ?: ( $job['completed_at'] ?? null );
-		$last       = $metrics['last_activity_at'] ?: ( $ended_at ?: $started_at );
-		$counts     = $metrics['counts'];
+		$started_at   = ! empty( $metrics['started_at'] ) ? $metrics['started_at'] : ( $engine['started_at'] ?? ( $job['created_at'] ?? null ) );
+		$ended_at     = ! empty( $metrics['completed_at'] ) ? $metrics['completed_at'] : ( $job['completed_at'] ?? null );
+		$last         = ! empty( $metrics['last_activity_at'] ) ? $metrics['last_activity_at'] : ( ! empty( $ended_at ) ? $ended_at : $started_at );
+		$counts       = $metrics['counts'];
+		$duration_end = ! empty( $ended_at ) ? $ended_at : self::now();
 
 		foreach ( self::inferCountsFromEngine( $engine, $status ) as $key => $value ) {
 			$counts[ $key ] = max( (int) ( $counts[ $key ] ?? 0 ), (int) $value );
@@ -132,7 +133,7 @@ class RunMetrics {
 				'last_activity_at' => $last,
 				'completed_at'     => $ended_at,
 			),
-			'duration_seconds' => self::durationSeconds( $started_at, $ended_at ?: self::now() ),
+			'duration_seconds' => self::durationSeconds( $started_at, $duration_end ),
 			'context'          => $metrics['context'],
 			'token_usage'      => self::tokenUsage( $engine ),
 			'cost'             => self::cost( $engine ),
@@ -148,13 +149,13 @@ class RunMetrics {
 		}
 
 		return array(
-			'counts'            => $counts,
-			'started_at'        => isset( $metrics['started_at'] ) ? (string) $metrics['started_at'] : null,
-			'last_activity_at'  => isset( $metrics['last_activity_at'] ) ? (string) $metrics['last_activity_at'] : null,
-			'completed_at'      => isset( $metrics['completed_at'] ) ? (string) $metrics['completed_at'] : null,
-			'duration_seconds'  => isset( $metrics['duration_seconds'] ) ? max( 0, (int) $metrics['duration_seconds'] ) : null,
-			'terminal_status'   => isset( $metrics['terminal_status'] ) ? (string) $metrics['terminal_status'] : null,
-			'context'           => is_array( $metrics['context'] ?? null ) ? $metrics['context'] : array(),
+			'counts'           => $counts,
+			'started_at'       => isset( $metrics['started_at'] ) ? (string) $metrics['started_at'] : null,
+			'last_activity_at' => isset( $metrics['last_activity_at'] ) ? (string) $metrics['last_activity_at'] : null,
+			'completed_at'     => isset( $metrics['completed_at'] ) ? (string) $metrics['completed_at'] : null,
+			'duration_seconds' => isset( $metrics['duration_seconds'] ) ? max( 0, (int) $metrics['duration_seconds'] ) : null,
+			'terminal_status'  => isset( $metrics['terminal_status'] ) ? (string) $metrics['terminal_status'] : null,
+			'context'          => is_array( $metrics['context'] ?? null ) ? $metrics['context'] : array(),
 		);
 	}
 
@@ -242,10 +243,14 @@ class RunMetrics {
 					SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
 					SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS processing,
 					SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
-					SUM(CASE WHEN status LIKE 'agent_skipped%%' OR status LIKE 'completed_no_items%%' THEN 1 ELSE 0 END) AS skipped,
-					SUM(CASE WHEN status LIKE 'failed%%' THEN 1 ELSE 0 END) AS failed
-				FROM {$table}
+					SUM(CASE WHEN status LIKE %s OR status LIKE %s THEN 1 ELSE 0 END) AS skipped,
+					SUM(CASE WHEN status LIKE %s THEN 1 ELSE 0 END) AS failed
+				FROM %i
 				WHERE parent_job_id = %d",
+				$wpdb->esc_like( JobStatus::AGENT_SKIPPED ) . '%',
+				$wpdb->esc_like( JobStatus::COMPLETED_NO_ITEMS ) . '%',
+				$wpdb->esc_like( JobStatus::FAILED ) . '%',
+				$table,
 				$job_id
 			),
 			ARRAY_A
