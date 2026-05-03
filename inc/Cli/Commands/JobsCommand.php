@@ -103,7 +103,7 @@ class JobsCommand extends BaseCommand {
 			return;
 		}
 
-		WP_CLI::log( sprintf( 'Found %d stuck jobs with job_status in engine_data.', count( $jobs ) ) );
+		WP_CLI::log( sprintf( 'Found %d stuck jobs or stale actions.', count( $jobs ) ) );
 
 		if ( $dry_run ) {
 			WP_CLI::log( 'Dry run - no changes will be made.' );
@@ -130,6 +130,26 @@ class JobsCommand extends BaseCommand {
 				WP_CLI::log( sprintf( 'Would timeout job %d (flow %d)', $job['job_id'], $job['flow_id'] ) );
 			} elseif ( 'timed_out' === $job['status'] ) {
 				WP_CLI::log( sprintf( 'Timed out job %d (flow %d)', $job['job_id'], $job['flow_id'] ) );
+			} elseif ( 'would_reconcile_action' === $job['status'] ) {
+				WP_CLI::log(
+					sprintf(
+						'Would reconcile Action Scheduler action %d for terminal job %d (flow %d, status %s)',
+						$job['action_id'],
+						$job['job_id'],
+						$job['flow_id'],
+						$job['target_status']
+					)
+				);
+			} elseif ( 'reconciled_action' === $job['status'] ) {
+				WP_CLI::log(
+					sprintf(
+						'Reconciled Action Scheduler action %d for terminal job %d (flow %d, status %s)',
+						$job['action_id'],
+						$job['job_id'],
+						$job['flow_id'],
+						$job['target_status']
+					)
+				);
 			}
 		}
 
