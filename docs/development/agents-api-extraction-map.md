@@ -6,7 +6,7 @@ Parent issue: [Explore splitting Agents API out of Data Machine](https://github.
 
 Strategy update: [Agents API blocker: update extraction docs around in-repo module strategy](https://github.com/Extra-Chill/data-machine/issues/1640)
 
-Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618) ([docs](agents-api-standalone-skeleton-plan.md)), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [registration lifecycle](https://github.com/Extra-Chill/data-machine/issues/1671), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), [one-shot AI boundary](https://github.com/Extra-Chill/data-machine/issues/1693), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
+Related blockers: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machine/issues/1596), [standalone skeleton plan](https://github.com/Extra-Chill/data-machine/issues/1618) ([docs](agents-api-standalone-skeleton-plan.md)), [in-repo module boundary](https://github.com/Extra-Chill/data-machine/issues/1631), [candidate relocation](https://github.com/Extra-Chill/data-machine/issues/1632), [wp-ai-client dependency contract](https://github.com/Extra-Chill/data-machine/issues/1633), [built-in loop ownership](https://github.com/Extra-Chill/data-machine/issues/1634), [backend-only boundary](https://github.com/Extra-Chill/data-machine/issues/1651), [agent category/capability metadata](https://github.com/Extra-Chill/data-machine/issues/1669), [REST surface decision](https://github.com/Extra-Chill/data-machine/issues/1670), [registration lifecycle](https://github.com/Extra-Chill/data-machine/issues/1671), [core-shape readiness checklist](https://github.com/Extra-Chill/data-machine/issues/1672), [one-shot AI boundary](https://github.com/Extra-Chill/data-machine/issues/1693), [approval primitive migration umbrella](https://github.com/Extra-Chill/data-machine/issues/1741), [pending-action store adapter](https://github.com/Extra-Chill/data-machine/issues/1742), [approval-required envelope adapter](https://github.com/Extra-Chill/data-machine/issues/1743), [approval resolver adapter](https://github.com/Extra-Chill/data-machine/issues/1744), [action-policy vocabulary adapter](https://github.com/Extra-Chill/data-machine/issues/1745), and [ai-http-client removal](https://github.com/Extra-Chill/data-machine/issues/1027).
 
 ## Namespace Map
 
@@ -43,7 +43,7 @@ Data Machine now treats the standalone `extra-chill/agents-api` package/plugin a
 - `agents-api` must not import Data Machine product namespaces.
 - Data Machine may import and consume `agents-api` as product code.
 - `agents-api` owns runner interfaces, value objects, and generic contracts first; Data Machine keeps `AIConversationLoop` and the built-in compatibility runner while they still carry Data Machine job, flow, handler, logging, transcript, and legacy result-shape assumptions.
-- Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, concrete pending-action storage/resolution, content operations, and admin UI. The generic pending-action / diff-approval contract vocabulary belongs in a later Agents API extraction stage.
+- Data Machine keeps flows, pipelines, jobs, handlers, queues, retention, concrete pending-action storage/resolution, content operations, and admin UI. Generic approval primitives now come from Agents API; Data Machine's pending-action work is an adapter migration tracked by [#1741](https://github.com/Extra-Chill/data-machine/issues/1741) and split across [#1742](https://github.com/Extra-Chill/data-machine/issues/1742)-[#1745](https://github.com/Extra-Chill/data-machine/issues/1745).
 - `agents-api` is backend-only and invisible by default: no admin menus, screens, human CRUD forms, React apps, or Data Machine product UI.
 - Data Machine and other product consumers own any admin/product UI they build on top of the substrate.
 - Standalone extraction means the bounded module now lives in its own plugin/repo with plugin bootstrap, release, dependency, and distribution ceremony.
@@ -74,7 +74,7 @@ Mirror the WordPress Abilities API shape instead of importing Data Machine produ
 | `AgentMemoryStoreInterface` | `WP_Agent_Memory_Store_Interface` | Generic identity tuple needs naming review; Data Machine scaffolding/abilities stay outside the store contract. |
 | `RuntimeToolDeclaration` | `WP_Agent_Tool_Declaration` | Should stay ability-native and run-scoped. |
 | `LoopEventSinkInterface` | `WP_Agent_Run_Event_Sink_Interface` | Useful for logs, streaming, chat UIs, and async workers. |
-| Data Machine pending actions / diff approvals | Future Agents API approval contract | Agents API should own the generic contract/value/envelope/policy vocabulary for approval-gated agent effects. Data Machine keeps the current transient/database implementation, resolver ability, REST route, chat wrapper, product handlers, and permission checks. |
+| Data Machine pending actions / diff approvals | Agents API approval primitives consumed through Data Machine adapters | Agents API owns generic approval contracts and policy vocabulary. Data Machine keeps concrete pending-action persistence, resolver ability, REST route, chat wrapper, product handlers, and permission checks while adapting to those primitives. |
 | REST `datamachine/v1` agent routes | REST `wp-agents/v1` deferred | [#1670](https://github.com/Extra-Chill/data-machine/issues/1670) reserves the namespace but defers public REST controllers from the first standalone extraction. Data Machine product routes stay under `datamachine/v1`. |
 
 ## Registration Lifecycle
@@ -102,7 +102,20 @@ Use these checks before moving anything:
 - If it uses host-specific provider, storage, or implementation vocabulary directly, treat that code as source material only until normalized behind WordPress-shaped contracts.
 - If it only needs to execute a single prompt/model request, it should use `wp-ai-client` directly instead of introducing Agents API.
 - If it needs durable agent runtime behavior, it should use Agents API and let that runtime call `wp-ai-client` directly for provider execution.
-- If it describes approval-gated agent effects, diff envelopes, or action-resolution policy without Data Machine storage/routes/UI, it is an Agents API contract candidate. If it persists, resolves, displays, or permission-checks Data Machine pending actions, it stays a Data Machine adapter/product surface.
+- If it describes approval-gated agent effects, diff envelopes, action-resolution policy, or approve/reject decisions without Data Machine storage/routes/UI, consume the Agents API approval primitive. If it persists, resolves, displays, audits, or permission-checks Data Machine pending actions, it stays a Data Machine adapter/product surface.
+
+## Approval Primitive Adapter Migration
+
+[#1741](https://github.com/Extra-Chill/data-machine/issues/1741) is the umbrella for making Data Machine consume Agents API approval primitives without moving Data Machine product surfaces into the substrate. The migration is intentionally file-scoped so each adapter can land independently and preserve existing preview/approve behavior.
+
+| Slice | Data Machine surface | Agents API primitive to consume | Boundary rule |
+|---|---|---|---|
+| [#1742](https://github.com/Extra-Chill/data-machine/issues/1742) | `PendingActionStore` / store adapter | `AgentsAPI\AI\Approvals\PendingActionStoreInterface` | Keep Data Machine's concrete storage, table/transient compatibility, TTL, audit rows, and lookup behavior in Data Machine. |
+| [#1743](https://github.com/Extra-Chill/data-machine/issues/1743) | `PendingActionHelper` staging result | Agents API `approval_required` envelope vocabulary | Preserve compatibility fields such as `staged`, `action_id`, `resolve_with`, and `resolve_params`; keep Data Machine route/tool names as adapter metadata. |
+| [#1744](https://github.com/Extra-Chill/data-machine/issues/1744) | `ResolvePendingActionAbility` / resolver adapter | `AgentsAPI\AI\Approvals\ApprovalDecision`, `PendingActionResolverInterface`, and `PendingActionHandlerInterface` | Keep `datamachine/resolve-pending-action`, `datamachine/v1/actions/resolve`, permission checks, and `datamachine_pending_action_handlers` compatibility. |
+| [#1745](https://github.com/Extra-Chill/data-machine/issues/1745) | `ActionPolicyResolver` / `ToolExecutor` policy checks | `AgentsAPI\AI\Tools\ActionPolicy` | Preserve Data Machine precedence for deny lists, agent overrides, category overrides, tool defaults, mode presets, and `datamachine_tool_action_policy`. |
+
+Acceptance guard: `tests/pending-actions-agents-api-contract-smoke.php` should stay a static boundary smoke. It pins the expected Agents API classes Data Machine consumes and verifies that Data Machine remains the adapter for storage, routes, abilities, handlers, CLI, and upgrade paths. It must not grow into a behavioral clone of the child-issue tests.
 
 ## Backend-Only UI Boundary
 
