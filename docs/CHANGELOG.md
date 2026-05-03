@@ -2,6 +2,23 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.103.14] - 2026-05-03
+
+### Changed
+- Consume Agents API pending store contract
+- Consume Agents API action policy vocabulary
+- Consume Agents API approval resolver contracts
+- Adopt Agents API approval envelopes
+- Persist pending actions durably
+- Expose generic run metrics
+- Add generic job retry backoff policy
+- full end-to-end adoption of agents-api substrate, remove DM product loop
+
+### Fixed
+- project plugin bundle artifacts into packages
+- satisfy stale action recovery lint
+- reconcile terminal-backed stale actions
+
 ## [0.103.13] - 2026-05-02
 
 ### Fixed
