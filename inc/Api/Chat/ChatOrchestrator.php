@@ -20,10 +20,10 @@ use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\Tools\ToolManager;
-
-use function DataMachine\Engine\AI\datamachine_run_conversation;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use WP_Error;
+
+use function DataMachine\Engine\AI\datamachine_run_conversation;
 
 defined( 'ABSPATH' ) || exit;
 

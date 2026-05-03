@@ -109,6 +109,7 @@ function datamachine_run_conversation(
 	// Build should_continue callback. Budget enforcement is handled by
 	// upstream via the budgets option — we only check DM-specific conditions.
 	$should_continue = static function ( array $result, array $turn_context ) use ( $single_turn ): bool {
+		unset( $turn_context ); // Required by upstream callable signature.
 		if ( $single_turn ) {
 			return false;
 		}
@@ -271,6 +272,7 @@ function datamachine_build_turn_runner(
 				)
 			);
 
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception message is caught by upstream loop and returned as structured array, never rendered as HTML.
 			throw new \RuntimeException( $ai_response->get_error_message() );
 		}
 
@@ -308,7 +310,13 @@ function datamachine_build_turn_runner(
 						'datamachine_log',
 						'warning',
 						'datamachine_run_conversation: Tool call missing name',
-						array_merge( $base_log_context, array( 'turn_count' => $turn_count, 'tool_call' => $tool_call ) )
+						array_merge(
+							$base_log_context,
+							array(
+								'turn_count' => $turn_count,
+								'tool_call'  => $tool_call,
+							)
+						)
 					);
 					continue;
 				}
@@ -317,7 +325,14 @@ function datamachine_build_turn_runner(
 					'datamachine_log',
 					'debug',
 					'datamachine_run_conversation: Tool call',
-					array_merge( $base_log_context, array( 'turn' => $turn_count, 'tool' => $tool_name, 'params' => $tool_parameters ) )
+					array_merge(
+						$base_log_context,
+						array(
+							'turn'   => $turn_count,
+							'tool'   => $tool_name,
+							'params' => $tool_parameters,
+						)
+					)
 				);
 
 				// Validate for duplicate tool calls.
@@ -328,7 +343,13 @@ function datamachine_build_turn_runner(
 						'datamachine_log',
 						'info',
 						'datamachine_run_conversation: Duplicate tool call prevented',
-						array_merge( $base_log_context, array( 'turn_count' => $turn_count, 'tool_name' => $tool_name ) )
+						array_merge(
+							$base_log_context,
+							array(
+								'turn_count' => $turn_count,
+								'tool_name'  => $tool_name,
+							)
+						)
 					);
 					continue;
 				}
@@ -351,14 +372,21 @@ function datamachine_build_turn_runner(
 					'datamachine_log',
 					'debug',
 					'datamachine_run_conversation: Tool result',
-					array_merge( $base_log_context, array( 'turn' => $turn_count, 'tool' => $tool_name, 'success' => $tool_result['success'] ?? false ) )
+					array_merge(
+						$base_log_context,
+						array(
+							'turn'    => $turn_count,
+							'tool'    => $tool_name,
+							'success' => $tool_result['success'] ?? false,
+						)
+					)
 				);
 
 				$tool_def        = $tools[ $tool_name ] ?? null;
 				$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
 
 				// Evaluate the DM completion policy.
-				$completion_decision = $completion_policy->recordToolResult(
+				$completion_decision   = $completion_policy->recordToolResult(
 					$tool_name,
 					is_array( $tool_def ) ? $tool_def : null,
 					$tool_result,
@@ -539,7 +567,10 @@ function datamachine_emit_loop_event( LoopEventSinkInterface $sink, string $even
 			'datamachine_log',
 			'warning',
 			'datamachine_run_conversation: Event sink failed',
-			array( 'event' => $event, 'error' => $e->getMessage() )
+			array(
+				'event' => $event,
+				'error' => $e->getMessage(),
+			)
 		);
 	}
 }
