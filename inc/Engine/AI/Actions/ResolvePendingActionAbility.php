@@ -190,7 +190,7 @@ class ResolvePendingActionAbility {
 	 * @return array
 	 */
 	public static function execute( array $input ): array {
-		$action_id = isset( $input['action_id'] ) ? sanitize_text_field( $input['action_id'] ) : '';
+		$action_id      = isset( $input['action_id'] ) ? sanitize_text_field( $input['action_id'] ) : '';
 		$decision_value = isset( $input['decision'] ) ? sanitize_text_field( $input['decision'] ) : '';
 
 		if ( '' === $action_id || '' === $decision_value ) {
