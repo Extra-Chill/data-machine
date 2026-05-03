@@ -284,16 +284,16 @@ class ActionPolicyResolver {
 	 * @return string Normalized policy or ''.
 	 */
 	private function normalizePolicyValue( $value ): string {
+		if ( class_exists( 'AgentsAPI\\AI\\Tools\\ActionPolicy' ) ) {
+			return \AgentsAPI\AI\Tools\ActionPolicy::normalize( $value ) ?? '';
+		}
+
 		if ( ! is_string( $value ) ) {
 			return '';
 		}
+
 		$value = strtolower( trim( $value ) );
-		$allowed = array(
-			self::POLICY_DIRECT,
-			self::POLICY_PREVIEW,
-			self::POLICY_FORBIDDEN,
-		);
-		return in_array( $value, $allowed, true ) ? $value : '';
+		return in_array( $value, array( self::POLICY_DIRECT, self::POLICY_PREVIEW, self::POLICY_FORBIDDEN ), true ) ? $value : '';
 	}
 
 	/**

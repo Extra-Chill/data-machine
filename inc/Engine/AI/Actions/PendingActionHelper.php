@@ -70,9 +70,9 @@ class PendingActionHelper {
 
 		if ( '' === $kind ) {
 			return array(
-				'staged'      => false,
-				'error'       => 'PendingActionHelper::stage() requires a non-empty kind.',
-				'error_code'  => 'invalid_kind',
+				'staged'     => false,
+				'error'      => 'PendingActionHelper::stage() requires a non-empty kind.',
+				'error_code' => 'invalid_kind',
 			);
 		}
 
@@ -99,6 +99,12 @@ class PendingActionHelper {
 			'created_by'   => $user_id,
 			'context'      => $context,
 		);
+		if ( isset( $args['ttl'] ) ) {
+			$payload['ttl'] = (int) $args['ttl'];
+		}
+		if ( isset( $args['expires_at'] ) ) {
+			$payload['expires_at'] = $args['expires_at'];
+		}
 
 		$stored = PendingActionStore::store( $action_id, $payload );
 		if ( ! $stored ) {
@@ -108,6 +114,8 @@ class PendingActionHelper {
 				'error_code' => 'store_failed',
 			);
 		}
+
+		$stored_payload = PendingActionStore::get( $action_id ) ?? $payload;
 
 		/**
 		 * Fires when a pending action has been staged and is awaiting resolution.
@@ -134,7 +142,7 @@ class PendingActionHelper {
 				'decision'  => '<accepted|rejected>',
 			),
 			'instruction'    => 'Show this preview to the user and wait for their confirmation. Do not call resolve_pending_action until they explicitly approve or reject. If the user asks to modify, call the original tool again with updated parameters instead of resolving this action.',
-			'expires_at'     => time() + HOUR_IN_SECONDS,
+			'expires_at'     => isset( $stored_payload['expires_at'] ) ? (int) $stored_payload['expires_at'] : null,
 		);
 	}
 }
