@@ -54,15 +54,16 @@ class RecoverStuckJobsAbility {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success'   => array( 'type' => 'boolean' ),
-							'recovered' => array( 'type' => 'integer' ),
-							'skipped'   => array( 'type' => 'integer' ),
-							'timed_out' => array( 'type' => 'integer' ),
-							'requeued'  => array( 'type' => 'integer' ),
-							'dry_run'   => array( 'type' => 'boolean' ),
-							'jobs'      => array( 'type' => 'array' ),
-							'message'   => array( 'type' => 'string' ),
-							'error'     => array( 'type' => 'string' ),
+							'success'       => array( 'type' => 'boolean' ),
+							'recovered'     => array( 'type' => 'integer' ),
+							'skipped'       => array( 'type' => 'integer' ),
+							'timed_out'     => array( 'type' => 'integer' ),
+							'stale_actions' => array( 'type' => 'integer' ),
+							'requeued'      => array( 'type' => 'integer' ),
+							'dry_run'       => array( 'type' => 'boolean' ),
+							'jobs'          => array( 'type' => 'array' ),
+							'message'       => array( 'type' => 'string' ),
+							'error'         => array( 'type' => 'string' ),
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
@@ -196,8 +197,9 @@ class RecoverStuckJobsAbility {
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
-		$timed_out = 0;
-		$requeued  = 0;
+		$timed_out     = 0;
+		$stale_actions = 0;
+		$requeued      = 0;
 
 		foreach ( $timed_out_jobs as $job ) {
 			$engine_data = json_decode( $job->engine_data, true );
@@ -291,33 +293,259 @@ class RecoverStuckJobsAbility {
 			}
 		}
 
-		$message = $dry_run
-			? sprintf( 'Dry run complete. Would recover %d jobs, timeout %d jobs.', $recovered, $timed_out )
-			: sprintf( 'Recovery complete. Recovered: %d, Timed out: %d, Requeued: %d', $recovered, $timed_out, $requeued );
+		$terminal_actions = $this->getTerminalBackedInProgressActions( $flow_id );
+		foreach ( $terminal_actions as $action ) {
+			$job_id         = (int) $action['job_id'];
+			$action_id      = (int) $action['action_id'];
+			$job_flow_id    = (int) $action['flow_id'];
+			$terminal_state = (string) $action['job_status'];
 
-		if ( ! $dry_run && ( $recovered > 0 || $timed_out > 0 ) ) {
+			if ( $dry_run ) {
+				++$stale_actions;
+				$jobs[] = array(
+					'job_id'        => $job_id,
+					'flow_id'       => $job_flow_id,
+					'action_id'     => $action_id,
+					'status'        => 'would_reconcile_action',
+					'target_status' => $terminal_state,
+				);
+				continue;
+			}
+
+			if ( $this->completeTerminalBackedAction( $action_id, $job_id, $terminal_state ) ) {
+				++$stale_actions;
+				$jobs[] = array(
+					'job_id'        => $job_id,
+					'flow_id'       => $job_flow_id,
+					'action_id'     => $action_id,
+					'status'        => 'reconciled_action',
+					'target_status' => $terminal_state,
+				);
+			} else {
+				++$skipped;
+				$jobs[] = array(
+					'job_id'    => $job_id,
+					'flow_id'   => $job_flow_id,
+					'action_id' => $action_id,
+					'status'    => 'skipped',
+					'reason'    => 'Action Scheduler reconciliation failed',
+				);
+			}
+		}
+
+		$message = $dry_run
+			? sprintf( 'Dry run complete. Would recover %d jobs, timeout %d jobs, reconcile %d terminal-backed actions.', $recovered, $timed_out, $stale_actions )
+			: sprintf( 'Recovery complete. Recovered: %d, Timed out: %d, Reconciled actions: %d, Requeued: %d', $recovered, $timed_out, $stale_actions, $requeued );
+
+		if ( ! $dry_run && ( $recovered > 0 || $timed_out > 0 || $stale_actions > 0 ) ) {
 			do_action(
 				'datamachine_log',
 				'info',
 				'Stuck jobs recovered via ability',
 				array(
-					'recovered' => $recovered,
-					'timed_out' => $timed_out,
-					'requeued'  => $requeued,
-					'flow_id'   => $flow_id,
+					'recovered'     => $recovered,
+					'timed_out'     => $timed_out,
+					'stale_actions' => $stale_actions,
+					'requeued'      => $requeued,
+					'flow_id'       => $flow_id,
 				)
 			);
 		}
 
 		return array(
-			'success'   => true,
-			'recovered' => $recovered,
-			'skipped'   => $skipped,
-			'timed_out' => $timed_out,
-			'requeued'  => $requeued,
-			'dry_run'   => $dry_run,
-			'jobs'      => $jobs,
-			'message'   => $message,
+			'success'       => true,
+			'recovered'     => $recovered,
+			'skipped'       => $skipped,
+			'timed_out'     => $timed_out,
+			'stale_actions' => $stale_actions,
+			'requeued'      => $requeued,
+			'dry_run'       => $dry_run,
+			'jobs'          => $jobs,
+			'message'       => $message,
 		);
+	}
+
+	/**
+	 * Find in-progress Action Scheduler step actions whose Data Machine job is terminal.
+	 *
+	 * @param int|null $flow_id Optional flow filter.
+	 * @return array<int,array{action_id:int,job_id:int,flow_id:int,job_status:string}>
+	 */
+	private function getTerminalBackedInProgressActions( ?int $flow_id ): array {
+		global $wpdb;
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$jobs_table    = $wpdb->prefix . 'datamachine_jobs';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated from the WP prefix.
+		$actions = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT action_id, args
+				 FROM {$actions_table}
+				 WHERE hook = %s
+				 AND status = %s
+				 AND args LIKE %s",
+				'datamachine_execute_step',
+				'in-progress',
+				'%"job_id"%'
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		if ( empty( $actions ) ) {
+			return array();
+		}
+
+		$action_job_ids = array();
+		foreach ( $actions as $action ) {
+			$job_id = $this->extractActionJobId( (string) ( $action->args ?? '' ) );
+			if ( $job_id > 0 ) {
+				$action_job_ids[ (int) $action->action_id ] = $job_id;
+			}
+		}
+
+		if ( empty( $action_job_ids ) ) {
+			return array();
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $action_job_ids ), '%d' ) );
+		$query_args   = array_values( $action_job_ids );
+		$query_args   = array_merge( $query_args, JobStatus::FINAL_STATUSES );
+
+		$where = "WHERE job_id IN ({$placeholders}) AND status IN (%s,%s,%s,%s)";
+		if ( $flow_id ) {
+			$where        .= ' AND flow_id = %d';
+			$query_args[] = $flow_id;
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic placeholder list is prepared below.
+		$terminal_jobs = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT job_id, flow_id, status
+				 FROM {$jobs_table}
+				 {$where}",
+				$query_args
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		if ( empty( $terminal_jobs ) ) {
+			return array();
+		}
+
+		$jobs_by_id = array();
+		foreach ( $terminal_jobs as $job ) {
+			$jobs_by_id[ (int) $job['job_id'] ] = $job;
+		}
+
+		$terminal_actions = array();
+		foreach ( $action_job_ids as $action_id => $job_id ) {
+			if ( ! isset( $jobs_by_id[ $job_id ] ) ) {
+				continue;
+			}
+
+			$job = $jobs_by_id[ $job_id ];
+			$terminal_actions[] = array(
+				'action_id'  => (int) $action_id,
+				'job_id'     => (int) $job_id,
+				'flow_id'    => (int) $job['flow_id'],
+				'job_status' => (string) $job['status'],
+			);
+		}
+
+		return $terminal_actions;
+	}
+
+	/**
+	 * Extract the Data Machine job ID from Action Scheduler args.
+	 *
+	 * @param string $args Action Scheduler args payload.
+	 * @return int Job ID, or 0 when unavailable.
+	 */
+	private function extractActionJobId( string $args ): int {
+		$decoded = json_decode( $args, true );
+		if ( is_array( $decoded ) ) {
+			if ( isset( $decoded['job_id'] ) && is_numeric( $decoded['job_id'] ) ) {
+				return (int) $decoded['job_id'];
+			}
+
+			foreach ( $decoded as $value ) {
+				if ( is_array( $value ) && isset( $value['job_id'] ) && is_numeric( $value['job_id'] ) ) {
+					return (int) $value['job_id'];
+				}
+			}
+		}
+
+		$unserialized = maybe_unserialize( $args );
+		if ( is_array( $unserialized ) ) {
+			if ( isset( $unserialized['job_id'] ) && is_numeric( $unserialized['job_id'] ) ) {
+				return (int) $unserialized['job_id'];
+			}
+
+			foreach ( $unserialized as $value ) {
+				if ( is_array( $value ) && isset( $value['job_id'] ) && is_numeric( $value['job_id'] ) ) {
+					return (int) $value['job_id'];
+				}
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Complete a stale in-progress Action Scheduler action without touching the terminal job.
+	 *
+	 * @param int    $action_id Action Scheduler action ID.
+	 * @param int    $job_id Data Machine job ID.
+	 * @param string $job_status Terminal Data Machine job status.
+	 * @return bool Whether the Action Scheduler row was reconciled.
+	 */
+	private function completeTerminalBackedAction( int $action_id, int $job_id, string $job_status ): bool {
+		global $wpdb;
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$logs_table    = $wpdb->prefix . 'actionscheduler_logs';
+		$now_gmt       = current_time( 'mysql', true );
+		$now_local     = current_time( 'mysql', false );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->update(
+			$actions_table,
+			array(
+				'status'             => 'complete',
+				'claim_id'           => 0,
+				'last_attempt_gmt'   => $now_gmt,
+				'last_attempt_local' => $now_local,
+			),
+			array(
+				'action_id' => $action_id,
+				'status'    => 'in-progress',
+			),
+			array( '%s', '%d', '%s', '%s' ),
+			array( '%d', '%s' )
+		);
+
+		if ( false === $result || 0 === (int) $result ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->insert(
+			$logs_table,
+			array(
+				'action_id'      => $action_id,
+				'message'        => sprintf(
+					'Data Machine reconciled stale in-progress action: job %d is already terminal (%s).',
+					$job_id,
+					$job_status
+				),
+				'log_date_gmt'   => $now_gmt,
+				'log_date_local' => $now_local,
+			),
+			array( '%d', '%s', '%s', '%s' )
+		);
+
+		return true;
 	}
 }
