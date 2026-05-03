@@ -1,0 +1,275 @@
+<?php
+/**
+ * Pure-PHP smoke coverage for pending-action resolver contract adaptation.
+ *
+ * Run with: php tests/pending-action-resolver-contract-smoke.php
+ *
+ * @package DataMachine\Tests
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
+}
+
+$GLOBALS['__resolver_filters']    = array();
+$GLOBALS['__resolver_transients'] = array();
+
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+	function sanitize_text_field( $value ) {
+		return trim( wp_strip_all_tags( (string) $value ) );
+	}
+}
+if ( ! function_exists( 'sanitize_key' ) ) {
+	function sanitize_key( $key ) {
+		return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) );
+	}
+}
+if ( ! function_exists( 'wp_strip_all_tags' ) ) {
+	function wp_strip_all_tags( $text ) {
+		return strip_tags( (string) $text );
+	}
+}
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $data, $options = 0, $depth = 512 ) {
+		return json_encode( $data, $options, $depth );
+	}
+}
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	function get_current_user_id() {
+		return 123;
+	}
+}
+if ( ! function_exists( 'did_action' ) ) {
+	function did_action( $hook = '' ) {
+		unset( $hook );
+		return 0;
+	}
+}
+if ( ! function_exists( 'doing_action' ) ) {
+	function doing_action( $hook = '' ) {
+		unset( $hook );
+		return false;
+	}
+}
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+		$GLOBALS['__resolver_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+		ksort( $GLOBALS['__resolver_filters'][ $hook ], SORT_NUMERIC );
+		return true;
+	}
+}
+if ( ! function_exists( 'add_action' ) ) {
+	function add_action( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+		return add_filter( $hook, $callback, $priority, $accepted_args );
+	}
+}
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( $hook, $value, ...$args ) {
+		if ( empty( $GLOBALS['__resolver_filters'][ $hook ] ) ) {
+			return $value;
+		}
+
+		foreach ( $GLOBALS['__resolver_filters'][ $hook ] as $callbacks ) {
+			foreach ( $callbacks as $registration ) {
+				$value = call_user_func_array( $registration[0], array_slice( array_merge( array( $value ), $args ), 0, $registration[1] ) );
+			}
+		}
+
+		return $value;
+	}
+}
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( $hook, ...$args ) {
+		apply_filters( $hook, null, ...$args );
+	}
+}
+if ( ! function_exists( 'set_transient' ) ) {
+	function set_transient( $key, $value, $expiration = 0 ) {
+		unset( $expiration );
+		$GLOBALS['__resolver_transients'][ $key ] = $value;
+		return true;
+	}
+}
+if ( ! function_exists( 'get_transient' ) ) {
+	function get_transient( $key ) {
+		return $GLOBALS['__resolver_transients'][ $key ] ?? false;
+	}
+}
+if ( ! function_exists( 'delete_transient' ) ) {
+	function delete_transient( $key ) {
+		unset( $GLOBALS['__resolver_transients'][ $key ] );
+		return true;
+	}
+}
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $value ) {
+		return $value instanceof WP_Error;
+	}
+}
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		private string $message;
+
+		public function __construct( string $code = '', string $message = '' ) {
+			unset( $code );
+			$this->message = $message;
+		}
+
+		public function get_error_message() {
+			return $this->message;
+		}
+	}
+}
+
+require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/agents-api.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionResolverAdapter.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/ResolvePendingActionAbility.php';
+
+use AgentsAPI\AI\Approvals\ApprovalDecision;
+use AgentsAPI\AI\Approvals\PendingActionHandlerInterface;
+use AgentsAPI\AI\Approvals\PendingActionResolverInterface;
+use DataMachine\Engine\AI\Actions\PendingActionStore;
+use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
+
+$failures = array();
+$passes   = 0;
+
+function resolver_smoke_assert( bool $condition, string $message, array &$failures, int &$passes ): void {
+	if ( $condition ) {
+		++$passes;
+		echo "PASS: {$message}\n";
+		return;
+	}
+
+	$failures[] = $message;
+	echo "FAIL: {$message}\n";
+}
+
+echo "pending-action-resolver-contract-smoke\n";
+
+$adapter = ResolvePendingActionAbility::adapter();
+resolver_smoke_assert( $adapter instanceof PendingActionResolverInterface, 'resolver adapter implements Agents API resolver contract', $failures, $passes );
+
+$handler_calls   = array();
+$permission_seen = array();
+$handler         = new class( $handler_calls ) implements PendingActionHandlerInterface {
+	public function __construct( private array &$handler_calls ) {}
+
+	public function handle_pending_action( ApprovalDecision $decision, array $apply_input, array $payload = array(), array $context = array() ): mixed {
+		$this->handler_calls[] = array(
+			'decision' => $decision->value(),
+			'apply'    => $apply_input,
+			'payload'  => $payload,
+			'context'  => $context,
+		);
+
+		return array(
+			'success'  => true,
+			'decision' => $decision->value(),
+			'target'   => $apply_input['target'] ?? null,
+			'reason'   => $payload['reason'] ?? null,
+			'actor'    => $context['actor'] ?? null,
+		);
+	}
+};
+
+add_filter(
+	'datamachine_pending_action_handlers',
+	static function ( array $handlers ) use ( $handler, &$permission_seen ) {
+		$handlers['contract_kind'] = array(
+			'apply'       => $handler,
+			'can_resolve' => static function ( array $payload, string $decision, int $user_id ) use ( &$permission_seen ) {
+				$permission_seen[] = array(
+					'kind'     => $payload['kind'] ?? null,
+					'decision' => $decision,
+					'user_id'  => $user_id,
+				);
+				return true;
+			},
+		);
+
+		return $handlers;
+	},
+	10,
+	1
+);
+
+PendingActionStore::store(
+	'act_contract_accept',
+	array(
+		'kind'        => 'contract_kind',
+		'summary'     => 'Apply contract handler.',
+		'apply_input' => array( 'target' => 'diff-123' ),
+	)
+);
+
+$accepted = $adapter->resolve_pending_action(
+	'act_contract_accept',
+	ApprovalDecision::accepted(),
+	array( 'reason' => 'looks-good' ),
+	array( 'actor' => 'reviewer' )
+);
+
+resolver_smoke_assert( true === ( $accepted['success'] ?? false ), 'accepted contract resolution succeeds', $failures, $passes );
+resolver_smoke_assert( 'accepted' === ( $accepted['decision'] ?? null ), 'accepted response keeps Data Machine decision string', $failures, $passes );
+resolver_smoke_assert( 'accepted' === ( $handler_calls[0]['decision'] ?? null ), 'contract handler receives ApprovalDecision object value', $failures, $passes );
+resolver_smoke_assert( 'looks-good' === ( $handler_calls[0]['payload']['reason'] ?? null ), 'contract handler receives resolver payload', $failures, $passes );
+resolver_smoke_assert( 'reviewer' === ( $handler_calls[0]['context']['actor'] ?? null ), 'contract handler receives resolver context', $failures, $passes );
+resolver_smoke_assert( 'accepted' === ( $permission_seen[0]['decision'] ?? null ), 'legacy can_resolve receives decision string for compatibility', $failures, $passes );
+
+$legacy_apply_calls = 0;
+add_filter(
+	'datamachine_pending_action_handlers',
+	static function ( array $handlers ) use ( &$legacy_apply_calls ) {
+		$handlers['legacy_kind'] = array(
+			'apply' => static function ( array $apply_input, array $payload ) use ( &$legacy_apply_calls ) {
+				unset( $apply_input, $payload );
+				++$legacy_apply_calls;
+				return array( 'success' => true );
+			},
+		);
+
+		return $handlers;
+	},
+	20,
+	1
+);
+
+PendingActionStore::store(
+	'act_legacy_reject',
+	array(
+		'kind'        => 'legacy_kind',
+		'summary'     => 'Reject legacy handler.',
+		'apply_input' => array( 'target' => 'diff-456' ),
+	)
+);
+
+$rejected = ResolvePendingActionAbility::execute(
+	array(
+		'action_id' => 'act_legacy_reject',
+		'decision'  => 'rejected',
+	)
+);
+
+resolver_smoke_assert( true === ( $rejected['success'] ?? false ), 'rejected legacy resolution succeeds', $failures, $passes );
+resolver_smoke_assert( 'rejected' === ( $rejected['decision'] ?? null ), 'rejected response keeps Data Machine decision string', $failures, $passes );
+resolver_smoke_assert( 0 === $legacy_apply_calls, 'rejected resolution does not invoke apply handler', $failures, $passes );
+
+$invalid = ResolvePendingActionAbility::execute(
+	array(
+		'action_id' => 'act_missing',
+		'decision'  => 'approved',
+	)
+);
+resolver_smoke_assert( false === ( $invalid['success'] ?? true ), 'unknown Agents API approval decision is rejected', $failures, $passes );
+
+if ( ! empty( $failures ) ) {
+	echo "\nFailures:\n";
+	foreach ( $failures as $failure ) {
+		echo '- ' . $failure . "\n";
+	}
+	exit( 1 );
+}
+
+echo "\nPending-action resolver contract smoke passed ({$passes} assertions).\n";
