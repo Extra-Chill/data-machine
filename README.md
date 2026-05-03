@@ -1,6 +1,6 @@
 # Data Machine
 
-Agentic infrastructure for WordPress.
+Agentic workflow automation for WordPress.
 
 ## What It Does
 
