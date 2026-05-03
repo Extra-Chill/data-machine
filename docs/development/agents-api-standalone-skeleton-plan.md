@@ -57,7 +57,7 @@ agents-api/
     no-product-imports-smoke.php
 ```
 
-Do not start with admin assets, React code, REST controllers, Data Machine adapters, or persistence tables. Add those only when a later issue proves they are generic substrate instead of product behavior.
+Do not start with admin assets, React code, REST controllers, Data Machine adapters, or persistence tables. Add those only when a later issue proves they are generic substrate instead of product behavior. Pending-action / diff-approval primitives are not part of this first skeleton, but their generic contract vocabulary belongs upstream when the next extraction stage defines it.
 
 ## Plugin Bootstrap
 
@@ -109,10 +109,11 @@ Rules:
 
 - No `wp-agents/v1` REST routes.
 - No admin UI, React app, settings screen, list table, or agent CRUD screen.
-- No Data Machine flow, pipeline, job, queue, handler, retention, pending-action, content-operation, or chat/session-switcher behavior.
+- No Data Machine flow, pipeline, job, queue, handler, retention, concrete pending-action implementation, content-operation, or chat/session-switcher behavior.
 - No default persistence tables unless a separate issue decides that Agents API owns persistence rather than contracts.
 - No built-in Data Machine compatibility loop.
 - No agent category registry. Descriptive metadata can be considered later, but it must not grant permission, visibility, tool access, or memory access.
+- No generic approval classes yet. A later Agents API stage should define pending-action/action values, diff/change envelopes, resolver result shapes, and approval policy vocabulary without importing Data Machine route, table, or handler names.
 - No Intelligence wiki, briefing, digest, or domain-brain vocabulary.
 
 ## First Files To Move
@@ -160,7 +161,8 @@ Data Machine should remain the product adapter after the first skeleton exists:
 - `AIConversationLoop`, `BuiltInAgentConversationRunner`, `RequestBuilder`, `WpAiClientAdapter`, `PromptBuilder`, and Data Machine directive/logging policy until their Data Machine assumptions are removed.
 - Data Machine transcript persister and handler completion policy implementations.
 - `ToolPolicyResolver`, `DataMachineToolRegistrySource`, `AdjacentHandlerToolSource`, legacy `datamachine_tools`, and mandatory adjacent handler preservation.
-- Jobs, flows, pipelines, handlers, retention tasks, pending actions, content abilities, admin UI, chat UI, and bundle import/export adapters.
+- Jobs, flows, pipelines, handlers, retention tasks, concrete pending-action storage/resolution, content abilities, admin UI, chat UI, and bundle import/export adapters.
+- `datamachine/resolve-pending-action`, `datamachine/v1/actions/resolve`, chat pending-action wrappers, product handlers, and Data Machine permission checks until Agents API has a real upstream approval contract to adapt to.
 - `AgentMemoryStoreFactory`, `DiskAgentMemoryStore`, and Data Machine memory file composition until the default-store decision is separate from the interface.
 
 ## Extraction Sequence
@@ -180,7 +182,7 @@ The first physical extraction PR is not complete until these checks pass:
 | Area | Required proof |
 |---|---|
 | Standalone boot | A clean WordPress/PHP smoke loads `agents-api.php`, exposes `AGENTS_API_LOADED`, `wp_register_agent()`, `WP_Agent`, `WP_Agents_Registry`, package artifact helpers, message/result contracts, runtime tool declarations, transcript store interface, and memory store contracts without loading Data Machine classes. |
-| Product boundary | Static smoke proves standalone `agents-api/` imports no `DataMachine\` namespaces and registers no admin menus, settings screens, REST routes, cron hooks, jobs, flows, queues, handlers, retention tasks, pending actions, or content operations. |
+| Product boundary | Static smoke proves standalone `agents-api/` imports no `DataMachine\` namespaces and registers no admin menus, settings screens, REST routes, cron hooks, jobs, flows, queues, handlers, retention tasks, Data Machine pending-action implementations, or content operations. |
 | Data Machine pipeline behavior | A focused Data Machine AI/pipeline smoke still runs through `AIStep`, tool policy, provider request assembly, transcript persistence, and handler-completion behavior after Data Machine consumes the external plugin. |
 | Intelligence wiki behavior | Intelligence wiki create/read/update or wiki-generator smoke still works with Data Machine plus external Agents API. Wiki behavior must remain Intelligence/Data Machine product behavior, not Agents API vocabulary. |
 | Memory store seam | Existing memory store smoke proves `agents_api_memory_store` resolution, guideline-backed memory if available, and Data Machine default memory behavior still work after contracts move out. |
@@ -194,6 +196,7 @@ Do not start the physical extraction issue until these gates are complete or exp
 - Public registration helper parity is settled: `wp_register_agent()`, `wp_get_agent()`, `wp_get_agents()`, `wp_has_agent()`, and `wp_unregister_agent()`.
 - Generic run/result/message/tool/transcript/memory contracts contain no Data Machine pipeline/handler vocabulary.
 - Built-in loop ownership remains Data Machine until Data Machine completion/transcript/provider/logging assumptions are behind generic collaborators.
+- Pending-action / diff-approval vocabulary is tracked as a later Agents API contract stage, while Data Machine keeps current storage, resolver ability, REST route, chat wrapper, product handlers, and permission checks.
 - Provider/admin settings migration off `chubes_ai_*` surfaces is complete or does not leak into standalone skeleton scope.
 - The v1 REST decision remains explicit: `wp-agents/v1` is absent until separate acceptance gates exist.
 - Data Machine adapter/product responsibilities are still documented in the extraction map.
