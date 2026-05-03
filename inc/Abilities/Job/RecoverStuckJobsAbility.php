@@ -408,24 +408,24 @@ class RecoverStuckJobsAbility {
 			return array();
 		}
 
-		$job_placeholders = implode( ',', array_fill( 0, count( $action_job_ids ), '%d' ) );
+		$job_placeholders    = implode( ',', array_fill( 0, count( $action_job_ids ), '%d' ) );
 		$status_placeholders = implode( ',', array_fill( 0, count( JobStatus::FINAL_STATUSES ), '%s' ) );
-		$query_args = array_values( $action_job_ids );
-		$query_args = array_merge( $query_args, JobStatus::FINAL_STATUSES );
+		$query_args          = array_values( $action_job_ids );
+		$query_args          = array_merge( $query_args, JobStatus::FINAL_STATUSES );
 
 		$sql = "SELECT job_id, flow_id, status
 			 FROM {$jobs_table}
 			 WHERE job_id IN ({$job_placeholders})
-			 AND status IN ({$status_placeholders})";
+				 AND status IN ({$status_placeholders})";
 		if ( $flow_id ) {
-			$sql .= ' AND flow_id = %d';
+			$sql         .= ' AND flow_id = %d';
 			$query_args[] = $flow_id;
 		}
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic placeholder list is prepared below.
 		$terminal_jobs = $wpdb->get_results(
-			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- The dynamic SQL contains only generated placeholders; values are supplied in matching order.
 			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- The dynamic SQL contains only generated placeholders; values are supplied in matching order.
 				$sql,
 				$query_args
 			),
@@ -448,7 +448,7 @@ class RecoverStuckJobsAbility {
 				continue;
 			}
 
-			$job = $jobs_by_id[ $job_id ];
+			$job                = $jobs_by_id[ $job_id ];
 			$terminal_actions[] = array(
 				'action_id'  => (int) $action_id,
 				'job_id'     => (int) $job_id,
