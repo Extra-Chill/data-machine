@@ -292,6 +292,7 @@ function datamachine_run_datamachine_plugin() {
 	// ActionPolicy + unified pending-action resolver. Content abilities register
 	// themselves on `datamachine_pending_action_handlers` via
 	// inc/Abilities/Content/ContentActionHandlers.php (required above).
+	new \DataMachine\Engine\AI\Actions\PendingActionInspectionAbility();
 	new \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility();
 	new \DataMachine\Engine\AI\Actions\ResolvePendingAction();
 
@@ -673,6 +674,8 @@ function datamachine_activate_for_site() {
 	\DataMachine\Core\Database\Chat\Chat::ensure_mode_column();
 	\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();
 	\DataMachine\Core\Database\Chat\Chat::ensure_last_read_at_column();
+
+	\DataMachine\Engine\AI\Actions\PendingActionStore::create_table();
 
 	// Ensure default agent memory files exist.
 	// During activation the Abilities API is unavailable (init already fired before

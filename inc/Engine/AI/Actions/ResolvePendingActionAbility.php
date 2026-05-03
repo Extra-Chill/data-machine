@@ -51,6 +51,24 @@ class ResolvePendingActionAbility {
 	 */
 	private static bool $registered = false;
 
+	/**
+	 * Agents API resolver adapter singleton.
+	 *
+	 * @var PendingActionResolverAdapter|null
+	 */
+	private static ?PendingActionResolverAdapter $adapter = null;
+
+	/**
+	 * Return the Agents API resolver adapter.
+	 */
+	public static function adapter(): PendingActionResolverAdapter {
+		if ( null === self::$adapter ) {
+			self::$adapter = new PendingActionResolverAdapter();
+		}
+
+		return self::$adapter;
+	}
+
 	public function __construct() {
 		if ( self::$registered ) {
 			return;
@@ -198,6 +216,8 @@ class ResolvePendingActionAbility {
 		$kind        = (string) ( $payload['kind'] ?? '' );
 		$user_id     = get_current_user_id();
 		$apply_input = isset( $payload['apply_input'] ) && is_array( $payload['apply_input'] ) ? $payload['apply_input'] : array();
+		$resolver_payload = isset( $input['payload'] ) && is_array( $input['payload'] ) ? $input['payload'] : array();
+		$resolver_context = isset( $input['context'] ) && is_array( $input['context'] ) ? $input['context'] : array();
 
 		if ( '' === $kind ) {
 			PendingActionStore::delete( $action_id );
@@ -211,10 +231,10 @@ class ResolvePendingActionAbility {
 		$handlers = self::getKindHandlers();
 		$handler  = $handlers[ $kind ] ?? null;
 
-		if ( ! is_array( $handler ) || empty( $handler['apply'] ) || ! is_callable( $handler['apply'] ) ) {
+		if ( ! is_array( $handler ) || empty( $handler['apply'] ) || ! self::isApplyHandler( $handler['apply'] ) ) {
 			// No handler registered — can't apply, but reject is still safe.
 			if ( 'rejected' === $decision ) {
-				PendingActionStore::delete( $action_id );
+				PendingActionStore::record_resolution( $action_id, PendingActionStore::STATUS_REJECTED, null, null );
 				self::fireResolvedAction( $decision, $action_id, $kind, $payload, null );
 				return array(
 					'success'   => true,
@@ -253,10 +273,8 @@ class ResolvePendingActionAbility {
 			}
 		}
 
-		// Always clean up the stored payload after a decision is made.
-		PendingActionStore::delete( $action_id );
-
 		if ( 'rejected' === $decision ) {
+			PendingActionStore::record_resolution( $action_id, PendingActionStore::STATUS_REJECTED, null, null );
 			self::fireResolvedAction( $decision, $action_id, $kind, $payload, null );
 			return array(
 				'success'   => true,
@@ -267,11 +285,11 @@ class ResolvePendingActionAbility {
 		}
 
 		// Accepted: invoke the apply handler with the stored input.
-		$result = call_user_func( $handler['apply'], $apply_input, $payload );
-
-		self::fireResolvedAction( $decision, $action_id, $kind, $payload, $result );
+		$result = self::applyHandler( $handler, $apply_input, $payload, $resolver_payload, $resolver_context );
 
 		if ( is_wp_error( $result ) ) {
+			PendingActionStore::record_resolution( $action_id, PendingActionStore::STATUS_ACCEPTED, null, $result->get_error_message() );
+			self::fireResolvedAction( $decision, $action_id, $kind, $payload, $result );
 			return array(
 				'success'   => false,
 				'decision'  => 'accepted',
@@ -282,6 +300,8 @@ class ResolvePendingActionAbility {
 		}
 
 		if ( is_array( $result ) && array_key_exists( 'success', $result ) && false === $result['success'] ) {
+			PendingActionStore::record_resolution( $action_id, PendingActionStore::STATUS_ACCEPTED, $result, $result['error'] ?? 'Apply handler reported failure.' );
+			self::fireResolvedAction( $decision, $action_id, $kind, $payload, $result );
 			return array(
 				'success'   => false,
 				'decision'  => 'accepted',
@@ -291,6 +311,9 @@ class ResolvePendingActionAbility {
 				'error'     => $result['error'] ?? 'Apply handler reported failure.',
 			);
 		}
+
+		PendingActionStore::record_resolution( $action_id, PendingActionStore::STATUS_ACCEPTED, $result, null );
+		self::fireResolvedAction( $decision, $action_id, $kind, $payload, $result );
 
 		return array(
 			'success'   => true,
@@ -323,6 +346,52 @@ class ResolvePendingActionAbility {
 		 */
 		$handlers = apply_filters( 'datamachine_pending_action_handlers', array() );
 		return is_array( $handlers ) ? $handlers : array();
+	}
+
+	/**
+	 * Apply a pending-action handler.
+	 *
+	 * The legacy Data Machine handler map remains the compatibility surface today.
+	 * When Agents API PR #51's handler contract is installed, object handlers can
+	 * implement it and be placed under the same `apply` key without introducing a
+	 * parallel Data Machine primitive.
+	 *
+	 * @param array $handler     Handler configuration.
+	 * @param array $apply_input Stored apply input.
+	 * @param array $payload     Stored pending action payload.
+	 * @param array $resolver_payload Fresh resolver payload.
+	 * @param array $resolver_context Optional resolver context.
+	 * @return mixed
+	 */
+	private static function applyHandler( array $handler, array $apply_input, array $payload, array $resolver_payload = array(), array $resolver_context = array() ) {
+		$apply = $handler['apply'];
+		if (
+			is_object( $apply )
+			&& interface_exists( 'AgentsAPI\\AI\\Approvals\\PendingActionHandlerInterface' )
+			&& is_a( $apply, 'AgentsAPI\\AI\\Approvals\\PendingActionHandlerInterface' )
+			&& class_exists( 'AgentsAPI\\AI\\Approvals\\ApprovalDecision' )
+		) {
+			$decision = \AgentsAPI\AI\Approvals\ApprovalDecision::accepted();
+			return $apply->handle_pending_action( $decision, $apply_input, $resolver_payload, $resolver_context );
+		}
+
+		return call_user_func( $apply, $apply_input, $payload );
+	}
+
+	/**
+	 * Determine if a handler entry can apply accepted actions.
+	 *
+	 * @param mixed $apply Handler entry.
+	 * @return bool
+	 */
+	private static function isApplyHandler( $apply ): bool {
+		if ( is_callable( $apply ) ) {
+			return true;
+		}
+
+		return is_object( $apply )
+			&& interface_exists( 'AgentsAPI\\AI\\Approvals\\PendingActionHandlerInterface' )
+			&& is_a( $apply, 'AgentsAPI\\AI\\Approvals\\PendingActionHandlerInterface' );
 	}
 
 	/**

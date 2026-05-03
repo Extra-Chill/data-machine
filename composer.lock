@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "22fe638f510ed03c4d2a4fddf8f5c631b9e1de66"
+                "reference": "969cf5572f9df05feaf48e98efd2d6a592e96eb8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/22fe638f510ed03c4d2a4fddf8f5c631b9e1de66",
-                "reference": "22fe638f510ed03c4d2a4fddf8f5c631b9e1de66",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/969cf5572f9df05feaf48e98efd2d6a592e96eb8",
+                "reference": "969cf5572f9df05feaf48e98efd2d6a592e96eb8",
                 "shasum": ""
             },
             "require": {
@@ -30,7 +30,10 @@
                     "php tests/bootstrap-smoke.php",
                     "php tests/registry-smoke.php",
                     "php tests/execution-principal-smoke.php",
+                    "php tests/action-policy-values-smoke.php",
                     "php tests/tool-runtime-smoke.php",
+                    "php tests/pending-action-store-contract-smoke.php",
+                    "php tests/approval-resolver-contract-smoke.php",
                     "php tests/identity-smoke.php",
                     "php tests/compaction-item-smoke.php",
                     "php tests/conversation-runner-contracts-smoke.php",
@@ -56,7 +59,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-05-02T23:25:36+00:00"
+            "time": "2026-05-03T15:11:07+00:00"
         },
         {
             "name": "chubes4/block-format-bridge",
@@ -1558,6 +1561,6 @@
     "platform": {
         "php": ">=8.2"
     },
-    "platform-dev": [],
-    "plugin-api-version": "2.6.0"
+    "platform-dev": {},
+    "plugin-api-version": "2.9.0"
 }
