@@ -8,6 +8,8 @@
 
 namespace DataMachine\Engine\Actions\Handlers;
 
+use DataMachine\Core\JobRetryPolicy;
+
 /**
  * Central job failure handling with cleanup, re-queue, and logging.
  */
@@ -42,6 +44,11 @@ class FailJobHandler {
 
 		$specific_reason = $context_data['reason'] ?? $reason;
 		$status          = \DataMachine\Core\JobStatus::failed( $specific_reason );
+		$retry_result    = JobRetryPolicy::maybeRetry( $job_id, (string) $specific_reason, is_array( $context_data ) ? $context_data : array(), $db_jobs );
+
+		if ( ! empty( $retry_result['retried'] ) ) {
+			return true;
+		}
 
 		// Persist structured error context into engine_data so it is
 		// available from `wp datamachine jobs show` without grepping PHP logs.
@@ -55,6 +62,7 @@ class FailJobHandler {
 			'error_trace'   => isset( $context_data['exception_trace'] )
 				? mb_substr( $context_data['exception_trace'], 0, 2000 )
 				: null,
+			'retry_result'  => $retry_result,
 		);
 		// Strip null values so we only store keys that carry information.
 		$error_data = array_filter( $error_data, fn( $v ) => null !== $v );
