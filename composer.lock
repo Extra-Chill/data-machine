@@ -4,8 +4,60 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "78ed37a349a1e0db755b321b841a69dc",
+    "content-hash": "f74eed0e0e85754e1a534a824f6e862a",
     "packages": [
+        {
+            "name": "automattic/agents-api",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Automattic/agents-api.git",
+                "reference": "22fe638f510ed03c4d2a4fddf8f5c631b9e1de66"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/22fe638f510ed03c4d2a4fddf8f5c631b9e1de66",
+                "reference": "22fe638f510ed03c4d2a4fddf8f5c631b9e1de66",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.1"
+            },
+            "default-branch": true,
+            "type": "wordpress-plugin",
+            "scripts": {
+                "test": [
+                    "php tests/bootstrap-smoke.php",
+                    "php tests/registry-smoke.php",
+                    "php tests/execution-principal-smoke.php",
+                    "php tests/tool-runtime-smoke.php",
+                    "php tests/identity-smoke.php",
+                    "php tests/compaction-item-smoke.php",
+                    "php tests/conversation-runner-contracts-smoke.php",
+                    "php tests/conversation-compaction-smoke.php",
+                    "php tests/markdown-section-compaction-smoke.php",
+                    "php tests/conversation-loop-smoke.php",
+                    "php tests/conversation-loop-tool-execution-smoke.php",
+                    "php tests/conversation-loop-completion-policy-smoke.php",
+                    "php tests/conversation-loop-transcript-persister-smoke.php",
+                    "php tests/conversation-loop-events-smoke.php",
+                    "php tests/iteration-budget-smoke.php",
+                    "php tests/conversation-loop-budgets-smoke.php",
+                    "php tests/guidelines-substrate-smoke.php",
+                    "php tests/no-product-imports-smoke.php"
+                ]
+            },
+            "license": [
+                "GPL-2.0-or-later"
+            ],
+            "description": "WordPress-shaped agent runtime substrate.",
+            "homepage": "https://github.com/Automattic/agents-api",
+            "support": {
+                "issues": "https://github.com/Automattic/agents-api/issues",
+                "source": "https://github.com/Automattic/agents-api"
+            },
+            "time": "2026-05-02T23:25:36+00:00"
+        },
         {
             "name": "chubes4/block-format-bridge",
             "version": "v0.6.6",
@@ -131,41 +183,6 @@
                 "source": "https://github.com/dflydev/dflydev-dot-access-data/tree/v3.0.3"
             },
             "time": "2024-07-08T12:26:09+00:00"
-        },
-        {
-            "name": "extra-chill/agents-api",
-            "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/Extra-Chill/agents-api.git",
-                "reference": "64ce3f8fae0362774d11eb4faff98f0f1b32c9c9"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/Extra-Chill/agents-api/zipball/64ce3f8fae0362774d11eb4faff98f0f1b32c9c9",
-                "reference": "64ce3f8fae0362774d11eb4faff98f0f1b32c9c9",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=8.1"
-            },
-            "default-branch": true,
-            "type": "wordpress-plugin",
-            "scripts": {
-                "test": [
-                    "php tests/bootstrap-smoke.php",
-                    "php tests/no-product-imports-smoke.php"
-                ]
-            },
-            "license": [
-                "GPL-2.0-or-later"
-            ],
-            "description": "WordPress-shaped agent runtime substrate.",
-            "support": {
-                "source": "https://github.com/Extra-Chill/agents-api/tree/main",
-                "issues": "https://github.com/Extra-Chill/agents-api/issues"
-            },
-            "time": "2026-05-01T13:46:38+00:00"
         },
         {
             "name": "league/commonmark",
@@ -1534,13 +1551,13 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "extra-chill/agents-api": 20
+        "automattic/agents-api": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
         "php": ">=8.2"
     },
-    "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "platform-dev": [],
+    "plugin-api-version": "2.6.0"
 }

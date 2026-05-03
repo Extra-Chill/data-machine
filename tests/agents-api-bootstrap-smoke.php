@@ -53,8 +53,8 @@ foreach ( $namespace_map as $legacy_class => $target_class ) {
 }
 agents_api_smoke_assert_equals( false, class_exists( 'DataMachine\\Engine\\Agents\\AgentRegistry', false ), 'Data Machine registry is not loaded by module bootstrap', $failures, $passes );
 agents_api_smoke_assert_equals( false, class_exists( 'DataMachine\\Core\\Database\\Jobs\\Jobs', false ), 'Data Machine jobs repository is not loaded by module bootstrap', $failures, $passes );
-agents_api_smoke_assert_equals( false, class_exists( 'DataMachine\\Engine\\AI\\AIConversationLoop', false ), 'Data Machine compatibility loop is not loaded by module bootstrap', $failures, $passes );
-agents_api_smoke_assert_equals( false, class_exists( 'DataMachine\\Engine\\AI\\BuiltInAgentConversationRunner', false ), 'Data Machine built-in runner is not loaded by module bootstrap', $failures, $passes );
+agents_api_smoke_assert_equals( false, class_exists( 'DataMachine\\Engine\\AI\\AIConversationLoop', false ), 'Data Machine product loop class no longer exists', $failures, $passes );
+agents_api_smoke_assert_equals( false, class_exists( 'DataMachine\\Engine\\AI\\BuiltInAgentConversationRunner', false ), 'Data Machine runner adapter class no longer exists', $failures, $passes );
 agents_api_smoke_assert_equals( false, class_exists( 'DataMachine\\Core\\FilesRepository\\DiskAgentMemoryStore', false ), 'Data Machine disk memory store is not loaded by module bootstrap', $failures, $passes );
 
 echo "\n[2] Module source keeps Data Machine vocabulary out of agents-api contracts:\n";

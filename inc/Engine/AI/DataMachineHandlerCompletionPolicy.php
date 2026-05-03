@@ -7,6 +7,9 @@
 
 namespace DataMachine\Engine\AI;
 
+use AgentsAPI\AI\AgentConversationCompletionDecision;
+use AgentsAPI\AI\AgentConversationCompletionPolicyInterface;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -30,8 +33,9 @@ class DataMachineHandlerCompletionPolicy implements AgentConversationCompletionP
 	/**
 	 * @inheritDoc
 	 */
-	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, string $mode, int $turn_count ): AgentConversationCompletionDecision {
+	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $runtime_context, int $turn_count ): AgentConversationCompletionDecision {
 		$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
+		$mode            = (string) ( $runtime_context['mode'] ?? '' );
 
 		if ( 'pipeline' !== $mode || ! $is_handler_tool || ! ( $tool_result['success'] ?? false ) ) {
 			return AgentConversationCompletionDecision::incomplete();

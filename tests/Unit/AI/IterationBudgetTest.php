@@ -7,7 +7,7 @@
 
 namespace DataMachine\Tests\Unit\AI;
 
-use DataMachine\Engine\AI\IterationBudget;
+use AgentsAPI\AI\IterationBudget;
 use DataMachine\Engine\AI\IterationBudgetRegistry;
 use WP_UnitTestCase;
 
@@ -72,16 +72,6 @@ class IterationBudgetTest extends WP_UnitTestCase {
 		$budget = new IterationBudget( 'x', 3, 7 );
 		$this->assertSame( 7, $budget->current() );
 		$this->assertTrue( $budget->exceeded() );
-	}
-
-	public function test_response_flag_naming(): void {
-		$budget = new IterationBudget( 'chain_depth', 3 );
-		$this->assertSame( 'max_chain_depth_reached', $budget->toResponseFlag() );
-	}
-
-	public function test_warning_format(): void {
-		$budget = new IterationBudget( 'chain_depth', 3 );
-		$this->assertSame( 'Maximum chain depth (3) reached.', $budget->toWarning() );
 	}
 
 	public function test_registry_register_and_get_config(): void {

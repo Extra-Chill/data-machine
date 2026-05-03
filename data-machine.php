@@ -30,7 +30,7 @@ define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
 require_once __DIR__ . '/vendor/autoload.php';
 
 if ( ! defined( 'AGENTS_API_LOADED' ) ) {
-	$datamachine_agents_api_bootstrap = __DIR__ . '/vendor/extra-chill/agents-api/agents-api.php';
+	$datamachine_agents_api_bootstrap = __DIR__ . '/vendor/automattic/agents-api/agents-api.php';
 	if ( file_exists( $datamachine_agents_api_bootstrap ) ) {
 		require_once $datamachine_agents_api_bootstrap;
 	}

@@ -7,21 +7,8 @@
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
-use DataMachine\Engine\AI\AIConversationLoop;
 use AgentsAPI\AI\AgentConversationResult;
 use AgentsAPI\AI\AgentMessageEnvelope;
-
-if ( ! function_exists( 'apply_filters' ) ) {
-	function apply_filters( string $hook, $value ) {
-		global $datamachine_test_conversation_runner_result;
-
-		if ( 'agents_api_conversation_runner' === $hook ) {
-			return $datamachine_test_conversation_runner_result;
-		}
-
-		return $value;
-	}
-}
 
 function datamachine_agent_conversation_result_assert( bool $condition, string $message ): void {
 	if ( ! $condition ) {
@@ -144,47 +131,24 @@ try {
 	++$assertions;
 }
 
-$datamachine_test_conversation_runner_result = $malformed_tool_result;
-$runner_result = AIConversationLoop::run(
-	array( array( 'role' => 'user', 'content' => 'Process this.' ) ),
-	array(),
-	'test-provider',
-	'test-model',
-	'pipeline',
-	array(),
-	1
-);
+// Verify that malformed tool results produce a machine-readable validation error.
+try {
+	AgentConversationResult::normalize( $malformed_tool_result );
+	throw new RuntimeException( 'Malformed tool result should throw.' );
+} catch ( InvalidArgumentException $e ) {
+	datamachine_agent_conversation_result_assert(
+		str_contains( $e->getMessage(), 'invalid_agent_conversation_result: tool_execution_results[0].parameters' ),
+		'Malformed tool result validation error should preserve the machine-readable field path.'
+	);
+	++$assertions;
+}
 
-datamachine_agent_conversation_result_assert(
-	isset( $runner_result['error'] ),
-	'Malformed runner output should return an explicit AI loop error.'
-);
-++$assertions;
-datamachine_agent_conversation_result_assert(
-	str_contains( $runner_result['error'], 'invalid_agent_conversation_result: tool_execution_results[0].parameters' ),
-	'Runner validation error should preserve the machine-readable field path.'
-);
-++$assertions;
-datamachine_agent_conversation_result_assert(
-	array() === $runner_result['tool_execution_results'],
-	'Runner validation failure should expose an empty tool result list.'
-);
-++$assertions;
-
-$datamachine_test_conversation_runner_result = $valid_result;
-$runner_valid_result = AIConversationLoop::run(
-	array( array( 'role' => 'user', 'content' => 'Process this.' ) ),
-	array(),
-	'test-provider',
-	'test-model',
-	'pipeline',
-	array(),
-	1
-);
+// Verify that valid results normalize without error.
+$runner_valid_result = AgentConversationResult::normalize( $valid_result );
 
 datamachine_agent_conversation_result_assert(
 	! isset( $runner_valid_result['error'] ),
-	'Valid runner output should not become an error result.'
+	'Valid output should not become an error result.'
 );
 ++$assertions;
 datamachine_agent_conversation_result_assert(

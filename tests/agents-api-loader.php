@@ -6,7 +6,7 @@
  */
 
 function datamachine_tests_agents_api_bootstrap_path(): string {
-	$path = dirname( __DIR__ ) . '/vendor/extra-chill/agents-api/agents-api.php';
+	$path = dirname( __DIR__ ) . '/vendor/automattic/agents-api/agents-api.php';
 	if ( ! file_exists( $path ) ) {
 		throw new RuntimeException( 'Agents API dependency is missing. Run composer install before this smoke.' );
 	}

@@ -50,17 +50,20 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 require_once __DIR__ . '/bootstrap-unit.php';
 require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
 
-use DataMachine\Engine\AI\AIConversationLoop;
-use DataMachine\Engine\AI\AgentConversationCompletionDecision;
-use DataMachine\Engine\AI\AgentConversationCompletionPolicyInterface;
-use DataMachine\Engine\AI\AgentConversationTranscriptPersisterInterface;
+use AgentsAPI\AI\AgentConversationCompletionDecision;
+use AgentsAPI\AI\AgentConversationCompletionPolicyInterface;
+use AgentsAPI\AI\AgentConversationRequest;
+use AgentsAPI\AI\AgentConversationTranscriptPersisterInterface;
 use DataMachine\Engine\AI\DataMachineHandlerCompletionPolicy;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
+
+use function DataMachine\Engine\AI\datamachine_run_conversation;
 
 class RuntimePolicySmokeCompletionPolicy implements AgentConversationCompletionPolicyInterface {
 	public array $calls = array();
 
-	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, string $mode, int $turn_count ): AgentConversationCompletionDecision {
+	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $runtime_context, int $turn_count ): AgentConversationCompletionDecision {
+		$mode = (string) ( $runtime_context['mode'] ?? '' );
 		$this->calls[] = compact( 'tool_name', 'tool_def', 'tool_result', 'mode', 'turn_count' );
 
 		return AgentConversationCompletionDecision::complete(
@@ -73,7 +76,11 @@ class RuntimePolicySmokeCompletionPolicy implements AgentConversationCompletionP
 class RuntimePolicySmokeTranscriptPersister implements AgentConversationTranscriptPersisterInterface {
 	public array $calls = array();
 
-	public function persist( array $messages, string $provider, string $model, array $payload, array $result ): string {
+	public function persist( array $messages, AgentConversationRequest $request, array $result ): string {
+		$metadata = $request->metadata();
+		$provider = (string) ( $metadata['provider'] ?? '' );
+		$model    = (string) ( $metadata['model'] ?? '' );
+		$payload  = $request->runtimeContext();
 		$this->calls[] = compact( 'messages', 'provider', 'model', 'payload', 'result' );
 
 		return 'runtime-policy-transcript';
@@ -131,14 +138,14 @@ $first_decision = $handler_policy->recordToolResult(
 	'publish_wordpress',
 	array( 'handler' => 'wordpress_publish' ),
 	array( 'success' => true ),
-	'pipeline',
+	array( 'mode' => 'pipeline' ),
 	1
 );
 $second_decision = $handler_policy->recordToolResult(
 	'publish_pinterest',
 	array( 'handler' => 'pinterest_publish' ),
 	array( 'success' => true ),
-	'pipeline',
+	array( 'mode' => 'pipeline' ),
 	2
 );
 
@@ -175,7 +182,7 @@ WpAiClientTestDouble::set_response_callback(
 	}
 );
 
-$result = ( new AIConversationLoop() )->execute(
+$result = datamachine_run_conversation(
 	array( array( 'role' => 'user', 'content' => 'run one tool' ) ),
 	array(
 		'runtime_policy_tool' => array(

@@ -19,10 +19,11 @@ namespace DataMachine\Api\Chat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\ConversationManager;
-use DataMachine\Engine\AI\AIConversationLoop;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use WP_Error;
+
+use function DataMachine\Engine\AI\datamachine_run_conversation;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -675,7 +676,7 @@ class ChatOrchestrator {
 				$loop_context['client_context'] = $client_context;
 			}
 
-			$loop_result = AIConversationLoop::run(
+			$loop_result = datamachine_run_conversation(
 				$messages,
 				$all_tools,
 				$provider,
