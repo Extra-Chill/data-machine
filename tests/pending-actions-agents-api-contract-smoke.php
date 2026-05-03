@@ -75,6 +75,8 @@ foreach ( $expected_agents_api_approval_primitives as $class_name => $primitive 
 	$primitive_source = datamachine_pending_actions_source( $primitive['path'] );
 	datamachine_pending_actions_assert( str_contains( $primitive_source, $primitive['type'] ), $class_name . ' is available from the installed Agents API dependency', $failures, $passes );
 }
+datamachine_pending_actions_assert( str_contains( $store_source, 'use AgentsAPI\\AI\\Approvals\\PendingActionStoreInterface;' ), 'concrete store consumes Agents API PendingActionStoreInterface', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $store_source, 'public static function adapter(): PendingActionStoreInterface' ), 'concrete store exposes the Agents API store contract', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $adapter_source, 'implements PendingActionStoreInterface' ), 'store adapter implements Agents API PendingActionStoreInterface', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'implements PendingActionResolverInterface' ), 'resolver adapter implements Agents API PendingActionResolverInterface', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $action_policy, 'use AgentsAPI\\AI\\Tools\\ActionPolicy;' ) && str_contains( $action_policy, 'ActionPolicy::normalize' ), 'ActionPolicyResolver consumes Agents API ActionPolicy vocabulary', $failures, $passes );
@@ -104,6 +106,86 @@ datamachine_pending_actions_assert( str_contains( $resolver_source, 'PendingActi
 datamachine_pending_actions_assert( str_contains( $plugin_source, 'new \\DataMachine\\Engine\\AI\\Actions\\ResolvePendingActionAbility();' ), 'existing resolve ability remains registered', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $plugin_source, 'new \\DataMachine\\Engine\\AI\\Actions\\ResolvePendingAction();' ), 'existing chat resolver tool remains registered', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $runtime_source, 'datamachine_migrate_pending_actions_table' ), 'upgrade path creates pending-action table on deployed installs', $failures, $passes );
+
+echo "\n[5] Store contract adapter preserves transient fallback behavior:\n";
+
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
+}
+
+$GLOBALS['datamachine_pending_actions_transients'] = array();
+
+if ( ! function_exists( 'set_transient' ) ) {
+	function set_transient( string $key, $value, int $expiration = 0 ): bool {
+		$GLOBALS['datamachine_pending_actions_transients'][ $key ] = array(
+			'value'      => $value,
+			'expiration' => $expiration,
+			'expires'    => $expiration > 0 ? time() + $expiration : 0,
+		);
+
+		return true;
+	}
+}
+
+if ( ! function_exists( 'get_transient' ) ) {
+	function get_transient( string $key ) {
+		$transient = $GLOBALS['datamachine_pending_actions_transients'][ $key ] ?? null;
+		if ( ! is_array( $transient ) ) {
+			return false;
+		}
+
+		if ( $transient['expires'] > 0 && $transient['expires'] <= time() ) {
+			unset( $GLOBALS['datamachine_pending_actions_transients'][ $key ] );
+			return false;
+		}
+
+		return $transient['value'];
+	}
+}
+
+if ( ! function_exists( 'delete_transient' ) ) {
+	function delete_transient( string $key ): bool {
+		unset( $GLOBALS['datamachine_pending_actions_transients'][ $key ] );
+		return true;
+	}
+}
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $_hook_name, $value ) {
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'wp_generate_uuid4' ) ) {
+	function wp_generate_uuid4(): string {
+		return '11111111-2222-4333-8444-555555555555';
+	}
+}
+
+require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Approvals/PendingActionStoreInterface.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStoreAdapter.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
+
+$store     = \DataMachine\Engine\AI\Actions\PendingActionStore::adapter();
+$action_id = \DataMachine\Engine\AI\Actions\PendingActionStore::generate_id();
+$payload   = array(
+	'kind'         => 'contract_smoke',
+	'summary'      => 'Contract smoke',
+	'preview_data' => array( 'ok' => true ),
+	'apply_input'  => array( 'value' => 1 ),
+	'ttl'          => 10,
+);
+
+datamachine_pending_actions_assert( $store instanceof \AgentsAPI\AI\Approvals\PendingActionStoreInterface, 'PendingActionStore adapter is an Agents API store', $failures, $passes );
+datamachine_pending_actions_assert( str_starts_with( $action_id, 'act_' ), 'legacy generate_id returns namespaced action IDs', $failures, $passes );
+datamachine_pending_actions_assert( $store->store( $action_id, $payload ), 'contract store writes through transient fallback', $failures, $passes );
+
+$stored = $store->get( $action_id );
+datamachine_pending_actions_assert( is_array( $stored ) && 'contract_smoke' === ( $stored['kind'] ?? '' ), 'contract get reads the stored pending action', $failures, $passes );
+datamachine_pending_actions_assert( isset( $stored['action_id'] ) && $action_id === $stored['action_id'], 'contract store preserves action ID in payload', $failures, $passes );
+datamachine_pending_actions_assert( isset( $stored['expires_at'], $stored['created_at'] ) && $stored['expires_at'] >= $stored['created_at'] + 3600, 'transient fallback preserves minimum TTL behavior', $failures, $passes );
+datamachine_pending_actions_assert( $store->delete( $action_id ), 'contract delete removes transient fallback payload', $failures, $passes );
+datamachine_pending_actions_assert( null === $store->get( $action_id ), 'contract get returns null after delete', $failures, $passes );
 
 if ( ! empty( $failures ) ) {
 	echo "\nFailures:\n";

@@ -34,6 +34,8 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
+use AgentsAPI\AI\Approvals\PendingActionStoreInterface;
+
 defined( 'ABSPATH' ) || exit;
 
 class PendingActionStore {
@@ -68,11 +70,11 @@ class PendingActionStore {
 	private const TRANSIENT_PREFIX = 'dm_pa_';
 
 	/**
-	 * Agents API store adapter singleton.
+	 * Agents API store contract singleton.
 	 *
-	 * @var PendingActionStoreAdapter|null
+	 * @var PendingActionStoreInterface|null
 	 */
-	private static ?PendingActionStoreAdapter $adapter = null;
+	private static ?PendingActionStoreInterface $adapter = null;
 
 	/**
 	 * Create or update the durable pending-actions table.
@@ -124,7 +126,7 @@ class PendingActionStore {
 	/**
 	 * Return the Agents API store adapter when the contract is available.
 	 */
-	public static function adapter(): PendingActionStoreAdapter {
+	public static function adapter(): PendingActionStoreInterface {
 		if ( null === self::$adapter ) {
 			self::$adapter = new PendingActionStoreAdapter();
 		}
