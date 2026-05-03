@@ -66,9 +66,9 @@ Directives are registered via the `datamachine_directives` filter:
 ```php
 add_filter('datamachine_directives', function($directives) {
     $directives[] = [
-        'class' => GlobalSystemPromptDirective::class,
+        'class' => MyDirective::class,
         'priority' => 20,
-        'agent_types' => ['all']
+        'modes' => ['all']
     ];
 
     return $directives;
@@ -79,24 +79,19 @@ add_filter('datamachine_directives', function($directives) {
 
 **Priority Order** (lower = applied first):
 
-- **10-19**: Core agent identity and foundational instructions
-- **20-29**: Global system prompts and universal behavior
-- **30-39**: Agent-specific system prompts and context
-- **40-49**: Workflow and execution context directives
-- **50+**: Environmental and site-specific directives
+- **20**: Registered memory files
+- **22**: Runtime agent-mode guidance
+- **25-35**: Caller, daily memory, and client-reported context
+- **40-50**: Pipeline, flow, chat inventory, and workflow-specific directives
 
 ## Current Directive Implementations
 
-### Global Directives (apply to all agents)
-- `GlobalSystemPromptDirective` - User-configured global AI behavior (priority 20)
-- `SiteContextDirective` - WordPress site context injection (priority 50)
-
-### Pipeline Directives
-- `PipelineCoreDirective` - Foundational pipeline agent identity (priority 10)
-- `PipelineSystemPromptDirective` - User-defined pipeline prompts (priority 30)
-
-### Chat Directives
-- `ChatAgentDirective` - Chat agent identity and capabilities (priority 10)
+- `CoreMemoryFilesDirective` - Registered memory files from shared, agent, and user layers (priority 20)
+- `AgentModeDirective` - Runtime mode guidance for chat, pipeline, system, and extension modes (priority 22)
+- `CallerContextDirective` - Authenticated cross-site caller identity (priority 25)
+- `AgentDailyMemoryDirective` and `ClientContextDirective` - Optional daily memory and client context (priority 35)
+- `PipelineMemoryFilesDirective`, `FlowMemoryFilesDirective`, and `PipelineSystemPromptDirective` - Pipeline-specific context (priorities 40, 45, 50)
+- `ChatPipelinesDirective` - Pipeline and flow inventory for chat (priority 45)
 
 ## Integration with RequestBuilder
 
@@ -109,7 +104,7 @@ $promptBuilder->setMessages($messages)
               ->setTools($structured_tools);
 
 // Apply directives via PromptBuilder
-$request = $promptBuilder->build($agent_type, $provider, $context);
+$request = $promptBuilder->build($agent_mode, $provider, $context);
 ```
 
 ## Migration from Legacy System
@@ -118,7 +113,7 @@ $request = $promptBuilder->build($agent_type, $provider, $context);
 ```php
 // Separate filters with inconsistent ordering
 add_filter('datamachine_global_directives', 'apply_global_directive', 10, 5); // LEGACY - use datamachine_directives instead
-add_filter('datamachine_agent_directives', 'apply_agent_directive', 10, 5); // LEGACY - use datamachine_directives with agent_types to target 'pipeline'/'chat'
+add_filter('datamachine_agent_directives', 'apply_agent_directive', 10, 5); // LEGACY - use datamachine_directives with modes to target 'pipeline'/'chat'
 ```
 
 ### After (v0.2.5+)
@@ -128,7 +123,7 @@ add_filter('datamachine_directives', function($directives) {
     $directives[] = [
         'class' => MyDirective::class,
         'priority' => 25,
-        'agent_types' => ['all']
+        'modes' => ['all']
     ];
     return $directives;
 });
