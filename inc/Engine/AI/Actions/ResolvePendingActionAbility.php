@@ -213,9 +213,9 @@ class ResolvePendingActionAbility {
 			);
 		}
 
-		$kind        = (string) ( $payload['kind'] ?? '' );
-		$user_id     = get_current_user_id();
-		$apply_input = isset( $payload['apply_input'] ) && is_array( $payload['apply_input'] ) ? $payload['apply_input'] : array();
+		$kind             = (string) ( $payload['kind'] ?? '' );
+		$user_id          = get_current_user_id();
+		$apply_input      = isset( $payload['apply_input'] ) && is_array( $payload['apply_input'] ) ? $payload['apply_input'] : array();
 		$resolver_payload = isset( $input['payload'] ) && is_array( $input['payload'] ) ? $input['payload'] : array();
 		$resolver_context = isset( $input['context'] ) && is_array( $input['context'] ) ? $input['context'] : array();
 

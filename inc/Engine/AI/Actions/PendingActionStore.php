@@ -359,11 +359,11 @@ class PendingActionStore {
 		$rows = self::list( array_merge( $filters, array( 'limit' => $filters['limit'] ?? 200 ) ) );
 
 		$summary = array(
-			'total'        => count( $rows ),
-			'by_status'    => array(),
-			'by_kind'      => array(),
-			'by_agent_id'  => array(),
-			'by_context'   => array(),
+			'total'       => count( $rows ),
+			'by_status'   => array(),
+			'by_kind'     => array(),
+			'by_agent_id' => array(),
+			'by_context'  => array(),
 		);
 
 		foreach ( $rows as $row ) {
@@ -442,24 +442,24 @@ class PendingActionStore {
 		$expires_at = self::mysql_to_timestamp( (string) ( $row['expires_at'] ?? '' ) );
 
 		return array(
-			'action_id'          => (string) ( $row['action_id'] ?? '' ),
-			'kind'               => (string) ( $row['kind'] ?? '' ),
-			'summary'            => (string) ( $row['summary'] ?? '' ),
-			'preview_data'       => self::decode_json( $row['preview_data'] ?? null ),
-			'preview'            => self::decode_json( $row['preview_data'] ?? null ),
-			'apply_input'        => self::decode_json( $row['apply_input'] ?? null ),
-			'agent_id'           => isset( $row['agent_id'] ) ? (int) $row['agent_id'] : 0,
-			'created_by'         => isset( $row['created_by'] ) ? (int) $row['created_by'] : 0,
-			'context'            => self::decode_json( $row['context'] ?? null ),
-			'status'             => (string) ( $row['status'] ?? self::STATUS_PENDING ),
-			'created_at'         => $created_at,
-			'created_at_iso'     => $created_at > 0 ? gmdate( 'c', $created_at ) : null,
-			'expires_at'         => $expires_at,
-			'expires_at_iso'     => $expires_at > 0 ? gmdate( 'c', $expires_at ) : null,
-			'resolved_at'        => self::mysql_to_timestamp( (string) ( $row['resolved_at'] ?? '' ) ),
-			'resolved_by'        => isset( $row['resolved_by'] ) ? (int) $row['resolved_by'] : 0,
-			'resolution_result'  => self::decode_json( $row['resolution_result'] ?? null ),
-			'resolution_error'   => isset( $row['resolution_error'] ) ? (string) $row['resolution_error'] : null,
+			'action_id'         => (string) ( $row['action_id'] ?? '' ),
+			'kind'              => (string) ( $row['kind'] ?? '' ),
+			'summary'           => (string) ( $row['summary'] ?? '' ),
+			'preview_data'      => self::decode_json( $row['preview_data'] ?? null ),
+			'preview'           => self::decode_json( $row['preview_data'] ?? null ),
+			'apply_input'       => self::decode_json( $row['apply_input'] ?? null ),
+			'agent_id'          => isset( $row['agent_id'] ) ? (int) $row['agent_id'] : 0,
+			'created_by'        => isset( $row['created_by'] ) ? (int) $row['created_by'] : 0,
+			'context'           => self::decode_json( $row['context'] ?? null ),
+			'status'            => (string) ( $row['status'] ?? self::STATUS_PENDING ),
+			'created_at'        => $created_at,
+			'created_at_iso'    => $created_at > 0 ? gmdate( 'c', $created_at ) : null,
+			'expires_at'        => $expires_at,
+			'expires_at_iso'    => $expires_at > 0 ? gmdate( 'c', $expires_at ) : null,
+			'resolved_at'       => self::mysql_to_timestamp( (string) ( $row['resolved_at'] ?? '' ) ),
+			'resolved_by'       => isset( $row['resolved_by'] ) ? (int) $row['resolved_by'] : 0,
+			'resolution_result' => self::decode_json( $row['resolution_result'] ?? null ),
+			'resolution_error'  => isset( $row['resolution_error'] ) ? (string) $row['resolution_error'] : null,
 		);
 	}
 

@@ -146,15 +146,25 @@ final class PendingActionInspectionAbility {
 	public static function get_action( array $input ): array {
 		$action_id = isset( $input['action_id'] ) ? sanitize_text_field( (string) $input['action_id'] ) : '';
 		if ( '' === $action_id ) {
-			return array( 'success' => false, 'error' => 'action_id is required.' );
+			return array(
+				'success' => false,
+				'error'   => 'action_id is required.',
+			);
 		}
 
 		$action = PendingActionStore::inspect( $action_id );
 		if ( null === $action ) {
-			return array( 'success' => false, 'error' => 'Pending action not found.', 'action_id' => $action_id );
+			return array(
+				'success'   => false,
+				'error'     => 'Pending action not found.',
+				'action_id' => $action_id,
+			);
 		}
 
-		return array( 'success' => true, 'action' => $action );
+		return array(
+			'success' => true,
+			'action'  => $action,
+		);
 	}
 
 	/**
@@ -220,8 +230,14 @@ final class PendingActionInspectionAbility {
 				'context'        => array( 'type' => 'object' ),
 				'created_after'  => array( 'type' => 'string' ),
 				'created_before' => array( 'type' => 'string' ),
-				'limit'          => array( 'type' => 'integer', 'default' => 50 ),
-				'offset'         => array( 'type' => 'integer', 'default' => 0 ),
+				'limit'          => array(
+					'type'    => 'integer',
+					'default' => 50,
+				),
+				'offset'         => array(
+					'type'    => 'integer',
+					'default' => 0,
+				),
 			),
 		);
 	}

@@ -70,9 +70,9 @@ class PendingActionHelper {
 
 		if ( '' === $kind ) {
 			return array(
-				'staged'      => false,
-				'error'       => 'PendingActionHelper::stage() requires a non-empty kind.',
-				'error_code'  => 'invalid_kind',
+				'staged'     => false,
+				'error'      => 'PendingActionHelper::stage() requires a non-empty kind.',
+				'error_code' => 'invalid_kind',
 			);
 		}
 
