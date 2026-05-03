@@ -1,6 +1,6 @@
 # WP-CLI Commands
 
-Data Machine provides 23 WP-CLI command namespaces for managing pipelines, flows, jobs, agents, and more from the command line. All commands are registered under the `datamachine` namespace via `inc/Cli/Bootstrap.php`.
+Data Machine provides a broad WP-CLI surface for managing pipelines, flows, jobs, agents, memory, system tasks, and more from the command line. Commands and their singular/plural aliases are registered under the `datamachine` namespace via `inc/Cli/Bootstrap.php`; use `wp help datamachine` for the authoritative list in a running install.
 
 > **Note:** The `wp datamachine workspace` and `wp datamachine github` commands have been moved to the `data-machine-code` extension plugin.
 
@@ -288,6 +288,7 @@ wp datamachine memory paths
 wp datamachine memory paths --agent=my-agent --format=json
 ```
 
+### datamachine system
 
 System tasks and health checks. **Since**: 0.41.0
 
@@ -324,6 +325,8 @@ wp datamachine batch status 42
 
 # Cancel a running batch
 wp datamachine batch cancel 42
+```
+
 ### datamachine image
 
 Image generation and optimization. **Since**: 0.33.0
@@ -664,6 +667,18 @@ wp datamachine indexnow key show
 wp datamachine indexnow enable
 wp datamachine indexnow disable
 ```
+
+### Other registered commands
+
+The root namespace also registers specialized commands that are documented most accurately by WP-CLI help in the running install:
+
+- `wp datamachine ai`
+- `wp datamachine drain`
+- `wp datamachine email`
+- `wp datamachine external`
+- `wp datamachine retention`
+- `wp datamachine test`
+- `wp datamachine fetch test`
 
 ## Global Options
 

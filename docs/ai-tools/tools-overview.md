@@ -55,24 +55,26 @@ Available to all AI agents (pipeline + chat + standalone) via `datamachine_globa
 - **Features**: Post type and category filtering, force rebuild option, internal/external/all scope for broken link checks, configurable result limits
 - **Use Cases**: SEO link auditing, orphaned content discovery, broken link detection
 
-**GitHub Tools** — multi-tool class (@since v0.24.0, **moved to data-machine-code extension**)
+**GitHub Tools** — multi-tool class (@since v0.24.0, **data-machine-code extension only**)
 - `create_github_issue` — Create a GitHub issue in a repository. Async — uses System Agent for execution.
 - `list_github_issues` — List issues from a GitHub repository with state, label, and pagination filters
 - `get_github_issue` — Get a single GitHub issue with full details including body, labels, and comments
 - `manage_github_issue` — Update, close, or comment on a GitHub issue
 - `list_github_pulls` — List pull requests from a repository with state filtering
 - `list_github_repos` — List GitHub repositories for a user or organization
-- **Configuration**: GitHub PAT required
+- **Configuration**: GitHub PAT required in the `data-machine-code` extension
 - **Use Cases**: Bug reports, feature requests, task tracking from AI workflows
+- **Availability**: Not registered by Data Machine core.
 
-**Workspace Tools** — multi-tool class (@since v0.37.0, **moved to data-machine-code extension**)
+**Workspace Tools** — multi-tool class (@since v0.37.0, **data-machine-code extension only**)
 - `workspace_path` — Get the Data Machine workspace path, optionally ensure it exists
 - `workspace_list` — List repositories currently present in the workspace
 - `workspace_show` — Show detailed repo info (branch, remote, latest commit, dirty count)
 - `workspace_ls` — List directory contents within a workspace repository
 - `workspace_read` — Read a text file from a workspace repo with optional offset/limit for large files
-- **Configuration**: None required
+- **Configuration**: Configure and operate through the `data-machine-code` extension
 - **Use Cases**: Repository browsing, code review, workspace navigation
+- **Availability**: Not registered by Data Machine core.
 
 **Image Generation** (`image_generation`)
 - **Purpose**: Generate images using AI models (Google Imagen 4, Flux, etc.) via Replicate. Returns a URL to the generated image. Async — uses System Agent.

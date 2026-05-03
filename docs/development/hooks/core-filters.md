@@ -378,42 +378,35 @@ $ai_response = RequestBuilder::build(
     $provider,      // AI provider name
     $model,         // Model identifier
     $tools,         // Raw tools array from filters
-    $agent_type,    // 'chat' or 'pipeline'
+    $agent_mode,    // 'chat', 'pipeline', 'system', or extension mode
     $context        // Agent-specific context
 );
 ```
 
 **Current Directive Implementations**:
 
-**Global Directives** (all agents):
-
-- `GlobalSystemPromptDirective` - Background guidance for all AI agents
-- `SiteContextDirective` - WordPress environment information (optional)
-
-**Pipeline Agent Directives**:
-
-- `PipelineCoreDirective` - Foundational agent identity with tool instructions (priority 10)
-- `PipelineSystemPromptDirective` - User-defined system prompts (priority 20)
-
-**Chat Agent Directives**:
-
-- `ChatAgentDirective` - Chat agent identity and capabilities
+- `CoreMemoryFilesDirective` - Registered memory files from shared, agent, and user layers (priority 20)
+- `AgentModeDirective` - Mode-specific guidance for chat, pipeline, system, and extension modes (priority 22)
+- `CallerContextDirective` - Authenticated cross-site caller identity (priority 25)
+- `AgentDailyMemoryDirective` and `ClientContextDirective` - Optional daily memory and client context (priority 35)
+- `PipelineMemoryFilesDirective`, `FlowMemoryFilesDirective`, and `PipelineSystemPromptDirective` - Pipeline-specific context (priorities 40, 45, 50)
+- `ChatPipelinesDirective` - Pipeline and flow inventory for chat (priority 45)
 
 **Unified Directive Registration**:
 
 ```php
-// Register directives with priority and agent targeting
+// Register directives with priority and mode targeting
 add_filter('datamachine_directives', function($directives) {
     $directives[] = [
         'class' => MyGlobalDirective::class,
         'priority' => 20,  // Lower = applied first
-        'agent_types' => ['all']  // 'all', 'pipeline', 'chat', or array
+        'modes' => ['all']  // 'all', 'pipeline', 'chat', 'system', or extension mode
     ];
 
     $directives[] = [
         'class' => MyPipelineDirective::class,
         'priority' => 30,
-        'agent_types' => ['pipeline']
+        'modes' => ['pipeline']
     ];
 
     return $directives;
@@ -1107,7 +1100,7 @@ This filter, the strategy definition shape, the callback signature, and the retu
 [
     'class' => DirectiveClass::class,   // Directive class name
     'priority' => 20,                    // Priority (lower = applied first)
-    'agent_types' => ['all']             // 'all', 'pipeline', 'chat', or array
+    'modes' => ['all']                   // 'all', 'pipeline', 'chat', 'system', or extension mode
 ]
 ```
 
@@ -1119,14 +1112,14 @@ add_filter('datamachine_directives', function($directives) {
     $directives[] = [
         'class' => MyGlobalDirective::class,
         'priority' => 25,
-        'agent_types' => ['all']
+        'modes' => ['all']
     ];
 
     // Pipeline-specific directive
     $directives[] = [
         'class' => MyPipelineDirective::class,
         'priority' => 35,
-        'agent_types' => ['pipeline']
+        'modes' => ['pipeline']
     ];
 
     return $directives;
@@ -1135,16 +1128,15 @@ add_filter('datamachine_directives', function($directives) {
 
 **Priority Guidelines**:
 
-- **10-19**: Core agent identity and foundational instructions
-- **20-29**: Global system prompts and universal behavior
-- **30-39**: Agent-specific system prompts and context
-- **40-49**: Workflow and execution context directives
-- **50+**: Environmental and site-specific directives
+- **20**: Registered memory files
+- **22**: Runtime agent-mode guidance
+- **25-35**: Caller, daily memory, and client-reported context
+- **40-50**: Pipeline, flow, chat inventory, and workflow-specific directives
 
 ### `datamachine_global_directives` (LEGACY — use `datamachine_directives`)
 
 **Deprecated**: v0.2.5
-**Replacement**: Use `datamachine_directives` with `agent_types => ['all']`
+**Replacement**: Use `datamachine_directives` with `modes => ['all']`
 
 **Purpose**: Modify global AI system directives applied across all AI interactions (pipeline + chat)
 
@@ -1165,7 +1157,7 @@ add_filter('datamachine_directives', function($directives) {
     $directives[] = [
         'class' => MyGlobalDirective::class,
         'priority' => 25,
-        'agent_types' => ['all']
+        'modes' => ['all']
     ];
     return $directives;
 });
@@ -1174,14 +1166,14 @@ add_filter('datamachine_directives', function($directives) {
 ### `datamachine_agent_directives` (LEGACY — use `datamachine_directives`)
 
 **Deprecated**: v0.2.5
-**Replacement**: Use `datamachine_directives` with agent-specific `agent_types` targeting
+**Replacement**: Use `datamachine_directives` with mode-specific `modes` targeting
 
 **Purpose**: Modify AI system directives for specific agent types (pipeline or chat)
 
 **Parameters**:
 
 - `$request` (array) - Current AI request being built
-- `$agent_type` (string) - Agent type ('pipeline' or 'chat')
+- `$agent_type` (string) - Legacy agent type ('pipeline' or 'chat')
 - `$provider` (string) - AI provider (openai, anthropic, etc.)
 - `$tools` (array) - Available tools for the agent
 - `$context` (array) - Agent-specific context data
@@ -1207,7 +1199,7 @@ add_filter('datamachine_directives', function($directives) {
     $directives[] = [
         'class' => MyPipelineDirective::class,
         'priority' => 30,
-        'agent_types' => ['pipeline']
+        'modes' => ['pipeline']
     ];
     return $directives;
 });
@@ -1487,7 +1479,7 @@ apply_filters(
 );
 ```
 
-Return an [`AgentMemoryStoreInterface`](../../../agents-api/inc/Core/FilesRepository/AgentMemoryStoreInterface.php)
+Return an `AgentMemoryStoreInterface`
 implementation to replace the disk default for this scope. Return `null` (the
 default) to let Data Machine read and write through the filesystem.
 

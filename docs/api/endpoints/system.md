@@ -108,13 +108,23 @@ curl https://example.com/wp-json/datamachine/v1/system/tasks \
 
 | Task Type | Class | Description |
 |---|---|---|
+| `agent_call` | `AgentCallTask` | Call a remote or external agent |
 | `image_generation` | `ImageGenerationTask` | Generate images using AI models via Replicate |
 | `image_optimization` | `ImageOptimizationTask` | Optimize images for web delivery |
 | `alt_text_generation` | `AltTextTask` | Generate descriptive alt text for images |
-| `github_create_issue` | `GitHubIssueTask` | Create GitHub issues from AI workflows |
 | `internal_linking` | `InternalLinkingTask` | Analyze and suggest internal link improvements |
 | `daily_memory_generation` | `DailyMemoryTask` | Generate daily memory summaries |
 | `meta_description_generation` | `MetaDescriptionTask` | Generate meta descriptions for SEO |
+| `retention_completed_jobs` | `RetentionCompletedJobsTask` | Clean completed jobs according to retention policy |
+| `retention_failed_jobs` | `RetentionFailedJobsTask` | Clean failed jobs according to retention policy |
+| `retention_logs` | `RetentionLogsTask` | Clean logs according to retention policy |
+| `retention_processed_items` | `RetentionProcessedItemsTask` | Clean processed-item records according to retention policy |
+| `retention_as_actions` | `RetentionActionSchedulerTask` | Clean Action Scheduler actions according to retention policy |
+| `retention_stale_claims` | `RetentionStaleClaimsTask` | Clean stale processed-item claims |
+| `retention_files` | `RetentionFilesTask` | Clean managed files according to retention policy |
+| `retention_chat_sessions` | `RetentionChatSessionsTask` | Clean chat sessions according to retention policy |
+
+GitHub issue creation moved to the `data-machine-code` extension and is not a Data Machine core system task.
 
 ### POST /system/tasks/{task_type}/run
 

@@ -252,12 +252,12 @@ add_filter('datamachine_tool_enabled', function($enabled, $tool_name, $tool_conf
 
 **Directive Registration** (@since v0.2.5):
 ```php
-// Current: Unified directive registration with agent type targeting
+// Current: Unified directive registration with mode targeting
 add_filter('datamachine_directives', function($directives) {
     $directives[] = [
-        'class' => ChatAgentDirective::class,
-        'priority' => 10,
-        'agent_types' => ['chat']
+        'class' => MyChatDirective::class,
+        'priority' => 45,
+        'modes' => ['chat']
     ];
     return $directives;
 });
@@ -333,7 +333,7 @@ Chat agent discovers tools via three sources:
 
 ### Unified Directive System (@since v0.2.5)
 
-Directives are registered via the `datamachine_directives` filter with priority and agent targeting:
+Directives are registered via the `datamachine_directives` filter with priority and mode targeting:
 
 ```php
 add_filter('datamachine_directives', function($directives) {
@@ -341,14 +341,14 @@ add_filter('datamachine_directives', function($directives) {
     $directives[] = [
         'class' => MyDirective::class,
         'priority' => 25,
-        'agent_types' => ['all']  // Applies to chat and pipeline agents
+        'modes' => ['all']  // Applies to all agent modes
     ];
 
     // Chat-specific directive
     $directives[] = [
         'class' => MyChatDirective::class,
-        'priority' => 15,
-        'agent_types' => ['chat']  // Applies only to chat agent
+        'priority' => 45,
+        'modes' => ['chat']  // Applies only to chat mode
     ];
 
     return $directives;
@@ -356,11 +356,10 @@ add_filter('datamachine_directives', function($directives) {
 ```
 
 **Priority Guidelines**:
-- **10-19**: Core agent identity and foundational instructions
-- **20-29**: Global system prompts and universal behavior
-- **30-39**: Agent-specific system prompts and context
-- **40-49**: Workflow and execution context directives
-- **50+**: Environmental and site-specific directives
+- **20**: Registered memory files
+- **22**: Runtime agent-mode guidance
+- **25-35**: Caller, daily memory, and client-reported context
+- **40-50**: Pipeline, flow, chat inventory, and workflow-specific directives
 
 
 

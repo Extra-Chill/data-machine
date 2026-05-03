@@ -95,16 +95,13 @@ datamachine-files/
 │   │   └── MEMORY.md
 │   └── 2/
 │       └── USER.md
-└── pipeline-{id}/       # Pipeline-scoped files
-    ├── context/
-    └── flow-{id}/
 ```
 
 **CoreMemoryFilesDirective** (Priority 20) loads files from layers in order:
 1. SITE.md → RULES.md from the shared layer
 2. SOUL.md → MEMORY.md from the agent layer
 3. USER.md → MEMORY.md from the user layer
-4. Custom files from `MemoryFileRegistry` (extensions)
+4. Custom files from `MemoryFileRegistry` (extensions), including files selected by pipelines and flows
 
 See [WordPress as Agent Memory](core-system/wordpress-as-agent-memory.md) for full memory documentation.
 
@@ -142,7 +139,7 @@ Background AI operations that run outside the normal pipeline model:
     │                                          │
 ImageGenerationTask  AltTextTask  DailyMemoryTask
 ImageOptimizationTask  InternalLinkingTask
-GitHubIssueTask  MetaDescriptionTask
+AgentCallTask  MetaDescriptionTask  RetentionTask
 ```
 
 **Undo System**: Tasks that record effects in `engine_data` can be reversed:
@@ -153,13 +150,13 @@ GitHubIssueTask  MetaDescriptionTask
 
 ### Workspace System
 
-Secure file management outside the web root for agent operations. **Moved to data-machine-code extension.**
+Secure file management outside the web root for agent operations lives in the `data-machine-code` extension plugin, not Data Machine core.
 
-- **Location**: `/var/lib/datamachine/workspace/` (or `DATAMACHINE_WORKSPACE_PATH`)
+- **Location**: Managed by data-machine-code workspace settings
 - **Git-aware**: Clone, status, pull, add, commit, push, log, diff
 - **File ops**: Read (with pagination), write, edit (find-replace), list directory
 - **Security**: Outside web root; mutating ops are CLI-only (not REST-exposed)
-- **CLI**: `wp datamachine-code workspace {path,list,clone,remove,show,read,ls,write,edit,git}`
+- **CLI**: `wp datamachine-code workspace {path,list,clone,remove,show,read,ls,write,edit,git,worktree}`
 
 ### Engine Data Architecture
 
@@ -201,7 +198,7 @@ $image_url = $engine_data['image_url'] ?? null;
 - **Agent abilities** - Agent CRUD, access grants, tokens, remote calls, memory, and daily memory
 - **File abilities** - Agent files, flow uploads, cleanup, and memory scaffolding
 
-**Coding workspace note**: Git-aware workspace and GitHub coding operations moved to the `data-machine-code` extension plugin. Data Machine core no longer registers `WorkspaceAbilities` or GitHub issue abilities.
+**Coding workspace note**: Git-aware workspace and GitHub coding operations live in the `data-machine-code` extension plugin. Data Machine core no longer registers `WorkspaceAbilities` or GitHub issue abilities.
 
 **Benefits**:
 - **3x Performance Improvement**: Direct method calls eliminate filter indirection
@@ -225,16 +222,15 @@ Priority-ordered context injection into every AI request:
 
 | Priority | Directive | Context | Purpose |
 |----------|-----------|---------|---------|
-| 10 | `PipelineCoreDirective` | Pipeline | Base pipeline identity |
-| 15 | `ChatAgentDirective` | Chat | Chat agent instructions |
 | 20 | `CoreMemoryFilesDirective` | All | Layer files + custom registry |
-| 20 | `SystemAgentDirective` | System | System task identity |
+| 22 | `AgentModeDirective` | All | Mode-specific guidance for chat, pipeline, and system |
+| 25 | `CallerContextDirective` | All, cross-site only | Authenticated A2A caller identity |
+| 35 | `AgentDailyMemoryDirective` | Chat, pipeline | Recent daily archives when enabled |
+| 35 | `ClientContextDirective` | All | Free-form client-reported context |
 | 40 | `PipelineMemoryFilesDirective` | Pipeline | Per-pipeline memory files |
 | 45 | `ChatPipelinesDirective` | Chat | Pipeline/flow context |
 | 45 | `FlowMemoryFilesDirective` | Pipeline | Per-flow memory files |
-| 46 | `DailyMemorySelectorDirective` | Pipeline | Selected daily memory |
 | 50 | `PipelineSystemPromptDirective` | Pipeline | Workflow instructions |
-| 80 | `SiteContextDirective` | All | WordPress metadata (filterable) |
 
 Directives implement `DirectiveInterface` and return arrays of typed outputs:
 - `system_text` — plain text content
