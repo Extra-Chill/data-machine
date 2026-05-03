@@ -394,9 +394,12 @@ class AIStep extends Step {
 				$this->job_id,
 				'ai_processing_failed',
 				array(
-					'flow_step_id' => $this->flow_step_id,
-					'ai_error'     => $loop_result['error'],
-					'ai_provider'  => $provider_name,
+					'flow_step_id'        => $this->flow_step_id,
+					'ai_error'            => $loop_result['error'],
+					'ai_provider'         => $provider_name,
+					'retry_after'         => $loop_result['retry_after'] ?? null,
+					'retry_after_seconds' => $loop_result['retry_after_seconds'] ?? null,
+					'headers'             => is_array( $loop_result['headers'] ?? null ) ? $loop_result['headers'] : array(),
 				)
 			);
 			return array();
