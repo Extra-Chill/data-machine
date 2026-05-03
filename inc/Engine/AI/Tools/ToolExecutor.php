@@ -11,6 +11,7 @@
 
 namespace DataMachine\Engine\AI\Tools;
 
+use AgentsAPI\AI\Tools\ActionPolicy;
 use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
 use DataMachine\Engine\AI\Actions\PendingActionHelper;
@@ -80,7 +81,7 @@ class ToolExecutor {
 			)
 		);
 
-		if ( ActionPolicyResolver::POLICY_FORBIDDEN === $policy ) {
+		if ( ActionPolicy::refusesExecution( $policy ) ) {
 			return array(
 				'success'        => false,
 				'error'          => sprintf( 'Tool "%s" is not permitted in the current context (action_policy=forbidden).', $tool_name ),
@@ -89,7 +90,7 @@ class ToolExecutor {
 			);
 		}
 
-		if ( ActionPolicyResolver::POLICY_PREVIEW === $policy ) {
+		if ( ActionPolicy::stagesApproval( $policy ) ) {
 			// Tool must declare how to build an action kind and summary.
 			// If it hasn't opted into the preview pipeline properly, fall
 			// back to 'direct' and log a warning — preview is a contract,

@@ -156,6 +156,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	use DataMachine\Engine\AI\Tools\Execution\ToolExecutionCore;
 	use DataMachine\Engine\AI\Tools\ToolExecutor;
 
+	require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Tools/ActionPolicy.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/AI/Tools/ToolParameters.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/AI/Tools/Execution/ToolExecutionCore.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/AI/Tools/ToolExecutor.php';

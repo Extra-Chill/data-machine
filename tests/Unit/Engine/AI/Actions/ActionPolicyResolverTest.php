@@ -16,9 +16,14 @@
 
 namespace DataMachine\Tests\Unit\Engine\AI\Actions;
 
+use AgentsAPI\AI\Tools\ActionPolicy;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
 use WP_UnitTestCase;
+
+if ( ! class_exists( ActionPolicy::class ) ) {
+	require_once dirname( __DIR__, 5 ) . '/vendor/automattic/agents-api/src/Tools/ActionPolicy.php';
+}
 
 class ActionPolicyResolverTest extends WP_UnitTestCase {
 
@@ -46,6 +51,12 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		);
 
 		$this->assertSame( ActionPolicyResolver::POLICY_DIRECT, $policy );
+	}
+
+	public function test_legacy_policy_constants_alias_agents_api_vocabulary(): void {
+		$this->assertSame( ActionPolicy::DIRECT, ActionPolicyResolver::POLICY_DIRECT );
+		$this->assertSame( ActionPolicy::PREVIEW, ActionPolicyResolver::POLICY_PREVIEW );
+		$this->assertSame( ActionPolicy::FORBIDDEN, ActionPolicyResolver::POLICY_FORBIDDEN );
 	}
 
 	public function test_tool_declared_default_overrides_global_default(): void {
