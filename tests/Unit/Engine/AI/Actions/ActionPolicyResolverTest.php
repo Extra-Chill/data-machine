@@ -21,6 +21,8 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
 use WP_UnitTestCase;
 
+require_once dirname( __DIR__, 5 ) . '/vendor/automattic/agents-api/src/Tools/ActionPolicy.php';
+
 class ActionPolicyResolverTest extends WP_UnitTestCase {
 
 	private ActionPolicyResolver $resolver;
