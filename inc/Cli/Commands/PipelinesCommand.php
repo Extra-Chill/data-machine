@@ -470,7 +470,7 @@ class PipelinesCommand extends BaseCommand {
 		}
 
 		$summary = implode( ' | ', array_unique( $parts ) );
-		return $summary ?: '—';
+		return '' !== $summary ? $summary : '—';
 	}
 
 	/**
@@ -976,13 +976,13 @@ class PipelinesCommand extends BaseCommand {
 	 * @param array $assoc_args Associative arguments.
 	 */
 	private function reassignPipelines( array $assoc_args ): void {
-		$has_from     = isset( $assoc_args['from-agent'] );
-		$has_null     = isset( $assoc_args['where-null'] );
-		$has_to       = isset( $assoc_args['to-agent'] );
-		$dry_run      = isset( $assoc_args['dry-run'] );
-		$force        = isset( $assoc_args['force'] );
-		$no_cascade   = isset( $assoc_args['no-cascade-flows'] );
-		$format       = $assoc_args['format'] ?? 'table';
+		$has_from   = isset( $assoc_args['from-agent'] );
+		$has_null   = isset( $assoc_args['where-null'] );
+		$has_to     = isset( $assoc_args['to-agent'] );
+		$dry_run    = isset( $assoc_args['dry-run'] );
+		$force      = isset( $assoc_args['force'] );
+		$no_cascade = isset( $assoc_args['no-cascade-flows'] );
+		$format     = $assoc_args['format'] ?? 'table';
 
 		if ( ! $has_to ) {
 			WP_CLI::error( '--to-agent is required.' );
