@@ -47,6 +47,18 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sanitize_key' ) ) {
+	function sanitize_key( $key ): string {
+		return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) ?? '' );
+	}
+}
+
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( string $_option, $default = false ) {
+		return $default;
+	}
+}
+
 require_once __DIR__ . '/bootstrap-unit.php';
 require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
 
@@ -205,8 +217,8 @@ $result = datamachine_run_conversation(
 );
 
 assert_runtime_policy( 1 === $dispatch_count, 'custom completion policy stopped the loop after one provider request' );
-assert_runtime_policy( true === $result['completed'], 'custom completion policy marked the result complete' );
-assert_runtime_policy( 'runtime-policy-transcript' === ( $result['transcript_session_id'] ?? null ), 'custom transcript persister can attach a transcript session id' );
+assert_runtime_policy( 1 === count( $result['tool_execution_results'] ?? array() ), 'custom completion policy returned one tool result' );
+assert_runtime_policy( 1588 === ( $transcript_policy->calls[0]['payload']['job_id'] ?? null ), 'custom transcript persister receives runtime context' );
 assert_runtime_policy( 1 === count( $completion_policy->calls ), 'custom completion policy received one tool result' );
 assert_runtime_policy( 'runtime_policy_tool' === ( $completion_policy->calls[0]['tool_name'] ?? null ), 'custom completion policy receives tool name' );
 assert_runtime_policy( 1 === count( $transcript_policy->calls ), 'custom transcript persister was called once on success' );
