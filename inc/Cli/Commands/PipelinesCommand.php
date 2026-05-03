@@ -89,11 +89,31 @@ class PipelinesCommand extends BaseCommand {
 	 * : Target a specific pipeline step for system prompt update.
 	 *   Use --step to target a specific step when multiple exist.
 	 *
-	 * [--force]
-	 * : Skip confirmation prompt (delete subcommand).
-	 *
-	 * [--dry-run]
-	 * : Validate without creating (create subcommand).
+ * [--agent=<slug_or_id>]
+ * : Agent slug or ID. For update: set the pipeline's agent_id.
+ *   For reassign: see --from-agent / --to-agent instead.
+ *   For list: filter by agent.
+ *
+ * [--cascade-flows]
+ * : When updating a pipeline's agent, also reassign its child flows (update subcommand).
+ *   Default: off for single update, on for bulk reassign.
+ *
+ * [--from-agent=<id>]
+ * : Source agent ID for bulk reassign. Accepts raw numeric ID (need not exist in agents table).
+ *   Mutually exclusive with --where-null.
+ *
+ * [--where-null]
+ * : Target rows where agent_id IS NULL (reassign subcommand).
+ *   Mutually exclusive with --from-agent.
+ *
+ * [--to-agent=<slug_or_id>]
+ * : Destination agent slug or ID for bulk reassign. Must be a valid agent.
+ *
+ * [--force]
+ * : Skip confirmation prompt (delete/reassign subcommands).
+ *
+ * [--dry-run]
+ * : Show what would change without committing (create/reassign subcommands).
 	 *
 	 * [--add=<filename>]
 	 * : Attach a memory file to a pipeline (memory-files subcommand).
@@ -161,9 +181,24 @@ class PipelinesCommand extends BaseCommand {
 	 *     # Attach a memory file
 	 *     wp datamachine pipelines memory-files 5 --add=content-briefing.md
 	 *
-	 *     # Detach a memory file
-	 *     wp datamachine pipelines memory-files 5 --remove=content-briefing.md
-	 *
+ *     # Detach a memory file
+ *     wp datamachine pipelines memory-files 5 --remove=content-briefing.md
+ *
+ *     # Update pipeline agent
+ *     wp datamachine pipelines update 13 --agent=events-bot
+ *
+ *     # Update pipeline agent and cascade to child flows
+ *     wp datamachine pipelines update 13 --agent=events-bot --cascade-flows
+ *
+ *     # Bulk reassign: move orphan pipelines → events-bot
+ *     wp datamachine pipelines reassign --where-null --to-agent=events-bot
+ *
+ *     # Bulk reassign: move pipelines from agent_id=1 → events-bot
+ *     wp datamachine pipelines reassign --from-agent=1 --to-agent=events-bot
+ *
+ *     # Dry-run reassign
+ *     wp datamachine pipelines reassign --where-null --to-agent=events-bot --dry-run
+ *
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$pipeline_id = null;
@@ -191,6 +226,12 @@ class PipelinesCommand extends BaseCommand {
 				return;
 			}
 			$this->deletePipeline( (int) $args[1], $assoc_args );
+			return;
+		}
+
+		// Handle 'reassign' subcommand.
+		if ( ! empty( $args ) && 'reassign' === $args[0] ) {
+			$this->reassignPipelines( $assoc_args );
 			return;
 		}
 
@@ -545,14 +586,45 @@ class PipelinesCommand extends BaseCommand {
 		$has_name          = isset( $assoc_args['name'] );
 		$has_config        = isset( $assoc_args['config'] );
 		$has_system_prompt = isset( $assoc_args['set-system-prompt'] );
+		$has_agent         = isset( $assoc_args['agent'] );
 
-		if ( ! $has_name && ! $has_config && ! $has_system_prompt ) {
-			WP_CLI::error( 'Must provide --name, --config, and/or --set-system-prompt to update' );
+		if ( ! $has_name && ! $has_config && ! $has_system_prompt && ! $has_agent ) {
+			WP_CLI::error( 'Must provide --name, --config, --set-system-prompt, and/or --agent to update' );
 			return;
 		}
 
 		$result       = null;
 		$step_results = array();
+
+		// Update agent_id if --agent provided.
+		if ( $has_agent ) {
+			$new_agent_id = AgentResolver::resolve( $assoc_args );
+			if ( null === $new_agent_id ) {
+				WP_CLI::error( 'Could not resolve --agent to a valid agent.' );
+				return;
+			}
+
+			$pipelines_repo = new \DataMachine\Core\Database\Pipelines\Pipelines();
+			$success        = $pipelines_repo->update_pipeline( $pipeline_id, array( 'agent_id' => $new_agent_id ) );
+
+			if ( ! $success ) {
+				WP_CLI::error( 'Failed to update pipeline agent_id.' );
+				return;
+			}
+
+			WP_CLI::log( sprintf( 'Agent: set to agent_id=%d', $new_agent_id ) );
+
+			// Cascade to child flows if requested.
+			if ( isset( $assoc_args['cascade-flows'] ) ) {
+				$flows_repo    = new \DataMachine\Core\Database\Flows\Flows();
+				$flows_updated = $flows_repo->reassign_agent_id_for_pipeline( $pipeline_id, null, $new_agent_id );
+				if ( $flows_updated >= 0 ) {
+					WP_CLI::log( sprintf( 'Cascade: %d child flow(s) reassigned to agent_id=%d.', $flows_updated, $new_agent_id ) );
+				} else {
+					WP_CLI::warning( 'Failed to cascade agent_id to child flows.' );
+				}
+			}
+		}
 
 		// Update name if provided.
 		if ( $has_name ) {
@@ -665,7 +737,7 @@ class PipelinesCommand extends BaseCommand {
 		}
 
 		// Determine if any updates succeeded.
-		$any_success = ( $result && $result['success'] ) ||
+		$any_success = $has_agent || ( $result && $result['success'] ) ||
 			array_filter( $step_results, fn( $r ) => $r['success'] ?? false );
 
 		if ( ! $any_success ) {
@@ -894,5 +966,125 @@ class PipelinesCommand extends BaseCommand {
 		if ( 'json' === $format ) {
 			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT ) );
 		}
+	}
+
+	/**
+	 * Bulk-reassign agent_id on pipelines.
+	 *
+	 * Requires exactly one of --from-agent or --where-null, plus --to-agent.
+	 *
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function reassignPipelines( array $assoc_args ): void {
+		$has_from     = isset( $assoc_args['from-agent'] );
+		$has_null     = isset( $assoc_args['where-null'] );
+		$has_to       = isset( $assoc_args['to-agent'] );
+		$dry_run      = isset( $assoc_args['dry-run'] );
+		$force        = isset( $assoc_args['force'] );
+		$no_cascade   = isset( $assoc_args['no-cascade-flows'] );
+		$format       = $assoc_args['format'] ?? 'table';
+
+		if ( ! $has_to ) {
+			WP_CLI::error( '--to-agent is required.' );
+			return;
+		}
+
+		if ( ! $has_from && ! $has_null ) {
+			WP_CLI::error( 'Must provide --from-agent=<id> or --where-null to specify which pipelines to reassign.' );
+			return;
+		}
+
+		if ( $has_from && $has_null ) {
+			WP_CLI::error( '--from-agent and --where-null are mutually exclusive.' );
+			return;
+		}
+
+		// Resolve --to-agent through AgentResolver (must be a valid agent).
+		$to_agent_id = AgentResolver::resolve( array( 'agent' => $assoc_args['to-agent'] ) );
+		if ( null === $to_agent_id ) {
+			WP_CLI::error( 'Could not resolve --to-agent to a valid agent.' );
+			return;
+		}
+
+		// Parse --from-agent as raw integer (may reference a stale/non-existent agent_id).
+		$from_agent_id = null;
+		if ( $has_from ) {
+			$from_agent_id = absint( $assoc_args['from-agent'] );
+			if ( $from_agent_id <= 0 ) {
+				WP_CLI::error( '--from-agent must be a positive integer.' );
+				return;
+			}
+			if ( $from_agent_id === $to_agent_id ) {
+				WP_CLI::error( '--from-agent and --to-agent resolve to the same agent_id.' );
+				return;
+			}
+		}
+
+		$pipelines_repo = new \DataMachine\Core\Database\Pipelines\Pipelines();
+		$flows_repo     = new \DataMachine\Core\Database\Flows\Flows();
+
+		// Count matching pipelines.
+		$pipeline_count = $pipelines_repo->count_by_agent_id( $from_agent_id );
+		$flow_count     = $no_cascade ? 0 : $flows_repo->count_by_agent_id( $from_agent_id );
+
+		$source_label = null === $from_agent_id ? 'NULL' : (string) $from_agent_id;
+
+		if ( 0 === $pipeline_count && 0 === $flow_count ) {
+			WP_CLI::warning( sprintf( 'No pipelines or flows found with agent_id=%s. Nothing to do.', $source_label ) );
+			return;
+		}
+
+		WP_CLI::log( sprintf(
+			'Found %d pipeline(s) and %d flow(s) with agent_id=%s → reassign to agent_id=%d.',
+			$pipeline_count,
+			$flow_count,
+			$source_label,
+			$to_agent_id
+		) );
+
+		if ( $dry_run ) {
+			WP_CLI::success( 'Dry-run complete. No changes made.' );
+			return;
+		}
+
+		if ( ! $force ) {
+			WP_CLI::confirm( sprintf(
+				'Reassign %d pipeline(s)%s from agent_id=%s to agent_id=%d?',
+				$pipeline_count,
+				$no_cascade ? '' : sprintf( ' and %d flow(s)', $flow_count ),
+				$source_label,
+				$to_agent_id
+			) );
+		}
+
+		// Execute pipeline reassignment.
+		$pipelines_updated = $pipelines_repo->reassign_agent_id( $from_agent_id, $to_agent_id );
+
+		if ( $pipelines_updated < 0 ) {
+			WP_CLI::error( 'Database error during pipeline reassignment.' );
+			return;
+		}
+
+		WP_CLI::log( sprintf( 'Pipelines reassigned: %d', $pipelines_updated ) );
+
+		// Cascade to flows unless --no-cascade-flows.
+		$flows_updated = 0;
+		if ( ! $no_cascade ) {
+			$flows_updated = $flows_repo->reassign_agent_id( $from_agent_id, $to_agent_id );
+
+			if ( $flows_updated < 0 ) {
+				WP_CLI::warning( 'Database error during flow cascade reassignment.' );
+			} else {
+				WP_CLI::log( sprintf( 'Flows reassigned (cascade): %d', $flows_updated ) );
+			}
+		}
+
+		WP_CLI::success( sprintf(
+			'Done. %d pipeline(s) and %d flow(s) reassigned from agent_id=%s to agent_id=%d.',
+			$pipelines_updated,
+			$flows_updated,
+			$source_label,
+			$to_agent_id
+		) );
 	}
 }
