@@ -24,6 +24,7 @@ $namespace_map = array(
 	'DataMachine\\Engine\\AI\\AgentConversationResult'                      => 'AgentsAPI\\AI\\AgentConversationResult',
 	'DataMachine\\Engine\\AI\\Tools\\RuntimeToolDeclaration'                => 'AgentsAPI\\AI\\Tools\\RuntimeToolDeclaration',
 	'DataMachine\\Core\\Database\\Chat\\ConversationTranscriptStoreInterface' => 'AgentsAPI\\Core\\Database\\Chat\\ConversationTranscriptStoreInterface',
+	'DataMachine\\Core\\Database\\Chat\\ConversationTranscriptLockInterface' => 'AgentsAPI\\Core\\Database\\Chat\\ConversationTranscriptLockInterface',
 	'DataMachine\\Core\\FilesRepository\\AgentMemoryStoreInterface'           => 'AgentsAPI\\Core\\FilesRepository\\AgentMemoryStoreInterface',
 	'DataMachine\\Core\\FilesRepository\\AgentMemoryScope'                    => 'AgentsAPI\\Core\\FilesRepository\\AgentMemoryScope',
 );

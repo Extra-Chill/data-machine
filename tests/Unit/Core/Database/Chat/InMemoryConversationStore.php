@@ -25,6 +25,19 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 	 */
 	private array $sessions = array();
 
+	/** @var array<string, array{token: string, expires_at: int}> */
+	private array $locks = array();
+
+	/** @var int|null Test-controlled clock. */
+	private ?int $now = null;
+
+	/** @var int Lock token counter. */
+	private int $lock_counter = 0;
+
+	public function set_clock( int $now ): void {
+		$this->now = $now;
+	}
+
 	public function create_session( ...$args ): string {
 		list( $workspace, $user_id, $agent_id, $metadata, $context ) = $this->normalize_create_session_args( $args );
 
@@ -121,6 +134,36 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 			$this->sessions[ $session_id ]['model'] = $model;
 		}
 
+		return true;
+	}
+
+	public function acquire_session_lock( string $session_id, int $ttl_seconds = 300 ): ?string {
+		if ( ! isset( $this->sessions[ $session_id ] ) ) {
+			return null;
+		}
+
+		$now    = $this->now ?? time();
+		$active = $this->locks[ $session_id ] ?? null;
+		if ( null !== $active && $active['expires_at'] > $now ) {
+			return null;
+		}
+
+		$token                       = 'mem-lock-' . ++$this->lock_counter;
+		$this->locks[ $session_id ] = array(
+			'token'      => $token,
+			'expires_at' => $now + max( 1, $ttl_seconds ),
+		);
+
+		return $token;
+	}
+
+	public function release_session_lock( string $session_id, string $lock_token ): bool {
+		$active = $this->locks[ $session_id ] ?? null;
+		if ( null === $active || $active['token'] !== $lock_token ) {
+			return false;
+		}
+
+		unset( $this->locks[ $session_id ] );
 		return true;
 	}
 

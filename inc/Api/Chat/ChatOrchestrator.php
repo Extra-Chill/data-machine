@@ -133,6 +133,11 @@ class ChatOrchestrator {
 			}
 		}
 
+		$lock_token = $chat_db->acquire_session_lock( $session_id );
+		if ( null === $lock_token ) {
+			return self::sessionLockContentionError();
+		}
+
 		// --- Build user message (text or multi-modal with attachments) ---
 		$attachments = $options['attachments'] ?? array();
 
@@ -197,6 +202,7 @@ class ChatOrchestrator {
 		);
 
 		if ( is_wp_error( $result ) ) {
+			$chat_db->release_session_lock( $session_id, $lock_token );
 			return $result;
 		}
 
@@ -242,6 +248,7 @@ class ChatOrchestrator {
 			$provider,
 			$model
 		);
+		$chat_db->release_session_lock( $session_id, $lock_token );
 
 		// --- Title generation for new/untitled sessions ---
 		if ( $update_success ) {
@@ -348,6 +355,10 @@ class ChatOrchestrator {
 		$model                = $session['model'] ?? $chat_defaults['model'];
 		$message_count_before = count( $messages );
 		$selected_pipeline_id = $metadata['selected_pipeline_id'] ?? null;
+		$lock_token           = $chat_db->acquire_session_lock( $session_id );
+		if ( null === $lock_token ) {
+			return self::sessionLockContentionError();
+		}
 
 		$result = self::executeConversationTurn(
 			$session_id,
@@ -364,6 +375,7 @@ class ChatOrchestrator {
 		);
 
 		if ( is_wp_error( $result ) ) {
+			$chat_db->release_session_lock( $session_id, $lock_token );
 			return $result;
 		}
 
@@ -408,6 +420,7 @@ class ChatOrchestrator {
 			$provider,
 			$model
 		);
+		$chat_db->release_session_lock( $session_id, $lock_token );
 
 		$continue_response = array(
 			'session_id'        => $session_id,
@@ -424,6 +437,19 @@ class ChatOrchestrator {
 		do_action( 'datamachine_chat_response_complete', $session_id, $continue_response, (int) ( $session['agent_id'] ?? 0 ), $user_id );
 
 		return $continue_response;
+	}
+
+	/**
+	 * Build a standard response for an actively locked chat transcript.
+	 *
+	 * @return WP_Error
+	 */
+	private static function sessionLockContentionError(): WP_Error {
+		return new WP_Error(
+			'session_lock_contention',
+			__( 'This chat session is already processing another request.', 'data-machine' ),
+			array( 'status' => 409 )
+		);
 	}
 
 	/**
