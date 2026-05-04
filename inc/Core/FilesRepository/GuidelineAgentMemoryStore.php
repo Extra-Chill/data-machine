@@ -48,6 +48,13 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	const META_HASH           = '_datamachine_memory_hash';
 	const META_BYTES          = '_datamachine_memory_bytes';
 
+	const GUIDELINE_META_SCOPE        = '_wp_guideline_scope';
+	const GUIDELINE_META_USER_ID      = '_wp_guideline_user_id';
+	const GUIDELINE_META_WORKSPACE_ID = '_wp_guideline_workspace_id';
+
+	const GUIDELINE_SCOPE_PRIVATE_MEMORY     = 'private_user_workspace_memory';
+	const GUIDELINE_SCOPE_WORKSPACE_GUIDANCE = 'workspace_shared_guidance';
+
 	/**
 	 * Whether the host has the Guidelines substrate this store needs.
 	 *
@@ -90,6 +97,10 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 			return AgentMemoryReadResult::not_found();
 		}
 
+		if ( ! $this->can_read_post( $post ) ) {
+			return AgentMemoryReadResult::not_found();
+		}
+
 		$content = (string) $post->post_content;
 		$hash    = (string) get_post_meta( $post->ID, self::META_HASH, true );
 		if ( '' === $hash ) {
@@ -128,9 +139,18 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 			}
 		}
 
-		$hash   = sha1( $content );
-		$bytes  = strlen( $content );
-		$author = $scope->user_id > 0 ? $scope->user_id : 0;
+		if ( $existing instanceof \WP_Post && ! $this->can_write_post( $existing ) ) {
+			return AgentMemoryWriteResult::failure( 'capability' );
+		}
+
+		if ( ! $existing instanceof \WP_Post && ! $this->can_create_scope( $scope ) ) {
+			return AgentMemoryWriteResult::failure( 'capability' );
+		}
+
+		$hash               = sha1( $content );
+		$bytes              = strlen( $content );
+		$author             = $scope->user_id > 0 ? $scope->user_id : 0;
+		$guideline_metadata = $this->guideline_metadata_for_scope( $scope );
 
 		if ( $existing instanceof \WP_Post ) {
 			$updated = wp_update_post(
@@ -151,11 +171,28 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 			update_post_meta( $existing->ID, self::META_BYTES, $bytes );
 			update_post_meta( $existing->ID, self::META_WORKSPACE_TYPE, $scope->workspace_type );
 			update_post_meta( $existing->ID, self::META_WORKSPACE_ID, $scope->workspace_id );
+			foreach ( $guideline_metadata as $meta_key => $meta_value ) {
+				update_post_meta( $existing->ID, $meta_key, $meta_value );
+			}
 
 			$this->emit_guideline_updated_event( $existing->ID );
 
 			return AgentMemoryWriteResult::ok( $hash, $bytes );
 		}
+
+		$meta_input = array_merge(
+			array(
+				self::META_LAYER          => $scope->layer,
+				self::META_WORKSPACE_TYPE => $scope->workspace_type,
+				self::META_WORKSPACE_ID   => $scope->workspace_id,
+				self::META_USER_ID        => $scope->user_id,
+				self::META_AGENT_ID       => $scope->agent_id,
+				self::META_FILENAME       => $scope->filename,
+				self::META_HASH           => $hash,
+				self::META_BYTES          => $bytes,
+			),
+			$guideline_metadata
+		);
 
 		$post_id = wp_insert_post(
 			array(
@@ -167,16 +204,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 				'post_author'    => $author,
 				'comment_status' => 'closed',
 				'ping_status'    => 'closed',
-				'meta_input'     => array(
-					self::META_LAYER          => $scope->layer,
-					self::META_WORKSPACE_TYPE => $scope->workspace_type,
-					self::META_WORKSPACE_ID   => $scope->workspace_id,
-					self::META_USER_ID        => $scope->user_id,
-					self::META_AGENT_ID       => $scope->agent_id,
-					self::META_FILENAME       => $scope->filename,
-					self::META_HASH           => $hash,
-					self::META_BYTES          => $bytes,
-				),
+				'meta_input'     => $meta_input,
 			),
 			true
 		);
@@ -206,7 +234,8 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * @inheritDoc
 	 */
 	public function exists( AgentMemoryScope $scope ): bool {
-		return $this->find_post( $scope ) instanceof \WP_Post;
+		$post = $this->find_post( $scope );
+		return $post instanceof \WP_Post && $this->can_read_post( $post );
 	}
 
 	/**
@@ -216,6 +245,10 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		$post = $this->find_post( $scope );
 		if ( ! $post instanceof \WP_Post ) {
 			return AgentMemoryWriteResult::ok( '', 0 );
+		}
+
+		if ( ! $this->can_write_post( $post ) ) {
+			return AgentMemoryWriteResult::failure( 'capability' );
 		}
 
 		$deleted = wp_delete_post( $post->ID, true );
@@ -236,6 +269,10 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		$entries = array();
 
 		foreach ( $posts as $post ) {
+			if ( ! $this->can_read_post( $post ) ) {
+				continue;
+			}
+
 			$filename = (string) get_post_meta( $post->ID, self::META_FILENAME, true );
 			if ( '' === $filename || false !== strpos( $filename, '/' ) ) {
 				continue;
@@ -263,6 +300,10 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		$entries = array();
 
 		foreach ( $posts as $post ) {
+			if ( ! $this->can_read_post( $post ) ) {
+				continue;
+			}
+
 			$filename = (string) get_post_meta( $post->ID, self::META_FILENAME, true );
 			if ( 0 !== strpos( $filename, $prefix . '/' ) ) {
 				continue;
@@ -395,5 +436,112 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		$updated = false === $updated ? null : (int) $updated;
 
 		return new AgentMemoryListEntry( $filename, $layer, $bytes, $updated );
+	}
+
+	/**
+	 * Build the shared wp_guideline metadata required by Agents API.
+	 *
+	 * @param AgentMemoryScope $scope Memory scope.
+	 * @return array<string, string|int>
+	 */
+	private function guideline_metadata_for_scope( AgentMemoryScope $scope ): array {
+		return array(
+			self::GUIDELINE_META_SCOPE        => $this->guideline_scope_for_layer( $scope->layer ),
+			self::GUIDELINE_META_USER_ID      => $scope->user_id,
+			self::GUIDELINE_META_WORKSPACE_ID => $scope->workspace_id,
+		);
+	}
+
+	/**
+	 * Map Data Machine memory layers to Agents API guideline scopes.
+	 *
+	 * @param string $layer Memory layer.
+	 * @return string Guideline scope value.
+	 */
+	private function guideline_scope_for_layer( string $layer ): string {
+		if ( 'shared' === $layer || 'network' === $layer ) {
+			return self::GUIDELINE_SCOPE_WORKSPACE_GUIDANCE;
+		}
+
+		return self::GUIDELINE_SCOPE_PRIVATE_MEMORY;
+	}
+
+	/**
+	 * Check whether the current context may read a guideline-backed memory post.
+	 *
+	 * @param \WP_Post $post Memory post.
+	 * @return bool Whether read is allowed.
+	 */
+	private function can_read_post( \WP_Post $post ): bool {
+		if ( $this->should_bypass_capability_checks() ) {
+			return true;
+		}
+
+		return $this->is_private_memory_post( $post )
+			? current_user_can( 'read_private_agent_memory', $post->ID )
+			: current_user_can( 'read_workspace_guidelines', $post->ID );
+	}
+
+	/**
+	 * Check whether the current context may edit/delete a guideline-backed memory post.
+	 *
+	 * @param \WP_Post $post Memory post.
+	 * @return bool Whether write is allowed.
+	 */
+	private function can_write_post( \WP_Post $post ): bool {
+		if ( $this->should_bypass_capability_checks() ) {
+			return true;
+		}
+
+		return $this->is_private_memory_post( $post )
+			? current_user_can( 'edit_private_agent_memory', $post->ID )
+			: current_user_can( 'edit_workspace_guidelines', $post->ID );
+	}
+
+	/**
+	 * Check whether the current context may create memory for a scope.
+	 *
+	 * @param AgentMemoryScope $scope Target scope.
+	 * @return bool Whether create is allowed.
+	 */
+	private function can_create_scope( AgentMemoryScope $scope ): bool {
+		if ( $this->should_bypass_capability_checks() ) {
+			return true;
+		}
+
+		if ( self::GUIDELINE_SCOPE_PRIVATE_MEMORY === $this->guideline_scope_for_layer( $scope->layer ) ) {
+			return $this->current_user_owns_scope( $scope ) && current_user_can( 'edit_agent_memory' );
+		}
+
+		return current_user_can( 'edit_workspace_guidelines' );
+	}
+
+	/**
+	 * Whether capability checks should be bypassed for privileged non-interactive execution.
+	 *
+	 * @return bool Whether to bypass.
+	 */
+	private function should_bypass_capability_checks(): bool {
+		return ( defined( 'WP_CLI' ) && WP_CLI ) || ! function_exists( 'current_user_can' );
+	}
+
+	/**
+	 * Check if a memory post is private user-workspace memory.
+	 *
+	 * @param \WP_Post $post Memory post.
+	 * @return bool Whether post is private memory.
+	 */
+	private function is_private_memory_post( \WP_Post $post ): bool {
+		return self::GUIDELINE_SCOPE_PRIVATE_MEMORY === get_post_meta( $post->ID, self::GUIDELINE_META_SCOPE, true );
+	}
+
+	/**
+	 * Check if the current user owns a private memory scope.
+	 *
+	 * @param AgentMemoryScope $scope Memory scope.
+	 * @return bool Whether the current user owns the scope.
+	 */
+	private function current_user_owns_scope( AgentMemoryScope $scope ): bool {
+		return function_exists( 'get_current_user_id' ) && $scope->user_id > 0 && get_current_user_id() === $scope->user_id;
 	}
 }
