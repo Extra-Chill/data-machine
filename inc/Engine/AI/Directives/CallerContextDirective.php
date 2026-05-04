@@ -49,6 +49,8 @@ class CallerContextDirective {
 	 * @return array Directive outputs (one system_text entry, or empty array).
 	 */
 	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
+		unset( $provider_name, $tools, $step_id, $payload );
+
 		$caller = PermissionHelper::get_caller_context();
 
 		// Only render for genuine cross-site A2A calls. Local calls (admin UI,

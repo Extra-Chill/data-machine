@@ -163,11 +163,11 @@ class AgentAuthMiddleware {
 					$depth_budget->ceiling()
 				),
 				array(
-					'status'      => 429,
-					'retry_after' => 60,
+					'status'                => 429,
+					'retry_after'           => 60,
 					'chain_root_request_id' => $inbound_ctx->chain_root_request_id,
 					'chain_depth'           => $inbound_ctx->chain_depth,
-					'ceiling'     => $depth_budget->ceiling(),
+					'ceiling'               => $depth_budget->ceiling(),
 				)
 			);
 		}

@@ -148,7 +148,7 @@ class RemoteAgentClient {
 			// code can trust chain_depth + chain_root_request_id semantics.
 			$caller_headers = $args['headers'];
 			$caller_headers = self::strip_controlled_headers( $caller_headers );
-			$headers = array_merge( $headers, $caller_headers );
+			$headers        = array_merge( $headers, $caller_headers );
 		}
 
 		$body_raw = null;
@@ -405,7 +405,6 @@ class RemoteAgentClient {
 		$inbound = class_exists( PermissionHelper::class )
 			? PermissionHelper::get_caller_context()
 			: null;
-
 
 		$root_request_id = $inbound instanceof \WP_Agent_Caller_Context
 			? $inbound->chain_root_request_id
