@@ -97,7 +97,6 @@ class AgentsApiMemoryFakeStore implements AgentMemoryStoreInterface {
 	}
 
 	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
-		unset( $metadata_fields );
 		$key = $scope->key();
 
 		if ( ! array_key_exists( $key, $this->records ) ) {

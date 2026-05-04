@@ -56,7 +56,6 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * @inheritDoc
 	 */
 	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
-		unset( $metadata_fields );
 		$filepath = $this->resolve_filepath( $scope );
 
 		if ( ! file_exists( $filepath ) ) {

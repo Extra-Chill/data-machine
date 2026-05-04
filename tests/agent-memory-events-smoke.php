@@ -231,7 +231,6 @@ class AgentMemoryEventsFakeStore implements AgentMemoryStoreInterface {
 	}
 
 	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
-		unset( $metadata_fields );
 		if ( ! array_key_exists( $scope->key(), $this->files ) ) {
 			return AgentMemoryReadResult::not_found();
 		}

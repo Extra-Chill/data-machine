@@ -32,6 +32,7 @@ require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
 
 use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
+use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
 
 $failures = array();
 $passes   = 0;
