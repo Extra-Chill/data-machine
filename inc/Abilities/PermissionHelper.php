@@ -8,6 +8,8 @@
 
 namespace DataMachine\Abilities;
 
+use AgentsAPI\AI\AgentExecutionPrincipal;
+
 /**
  * Helper class for ability permission checks.
  *
@@ -96,7 +98,15 @@ class PermissionHelper {
 	 * @since 0.47.0
 	 * @var array|null
 	 */
-	private static ?array $agent_token_capabilities = null;
+	private static ?\WP_Agent_Capability_Ceiling $capability_ceiling = null;
+
+	/**
+	 * Agents API execution principal for the current request.
+	 *
+	 * @since 0.103.15
+	 * @var AgentExecutionPrincipal|null
+	 */
+	private static ?AgentExecutionPrincipal $execution_principal = null;
 
 	/**
 	 * Cross-site caller context for the current request.
@@ -257,7 +267,34 @@ class PermissionHelper {
 		self::$acting_agent_id          = $agent_id;
 		self::$acting_token_id          = $token_id;
 		self::$agent_owner_id           = $owner_id;
-		self::$agent_token_capabilities = $capabilities;
+		self::$capability_ceiling       = new \WP_Agent_Capability_Ceiling(
+			$owner_id,
+			$capabilities,
+			array(
+				'agent_id' => $agent_id,
+				'token_id' => $token_id,
+			)
+		);
+		self::$execution_principal      = null !== $token_id
+			? AgentExecutionPrincipal::agent_token(
+				$owner_id,
+				(string) $agent_id,
+				$token_id,
+				AgentExecutionPrincipal::REQUEST_CONTEXT_REST,
+				array(),
+				null,
+				null,
+				self::$capability_ceiling
+			)
+			: AgentExecutionPrincipal::user_session(
+				$owner_id,
+				(string) $agent_id,
+				AgentExecutionPrincipal::REQUEST_CONTEXT_REST,
+				array(),
+				null,
+				null,
+				self::$capability_ceiling
+			);
 	}
 
 	/**
@@ -269,8 +306,34 @@ class PermissionHelper {
 		self::$acting_agent_id          = null;
 		self::$acting_token_id          = null;
 		self::$agent_owner_id           = 0;
-		self::$agent_token_capabilities = null;
+		self::$capability_ceiling       = null;
+		self::$execution_principal      = null;
 		self::$caller_context           = null;
+	}
+
+	/**
+	 * Set the Agents API execution principal for the current request.
+	 *
+	 * @since 0.103.15
+	 *
+	 * @param AgentExecutionPrincipal $principal Execution principal.
+	 */
+	public static function set_execution_principal( AgentExecutionPrincipal $principal ): void {
+		self::$execution_principal = $principal;
+		if ( property_exists( $principal, 'capability_ceiling' ) && $principal->capability_ceiling instanceof \WP_Agent_Capability_Ceiling ) {
+			self::$capability_ceiling = $principal->capability_ceiling;
+		}
+	}
+
+	/**
+	 * Get the current Agents API execution principal, if one is active.
+	 *
+	 * @since 0.103.15
+	 *
+	 * @return AgentExecutionPrincipal|null
+	 */
+	public static function get_execution_principal(): ?AgentExecutionPrincipal {
+		return self::$execution_principal;
 	}
 
 	/**
@@ -361,26 +424,27 @@ class PermissionHelper {
 	 * @return bool
 	 */
 	private static function agent_can( string $action ): bool {
-		// Check token-level capability restrictions.
-		if ( null !== self::$agent_token_capabilities ) {
-			$mapped_capability = self::CAPABILITY_MAP[ $action ] ?? null;
-
-			if ( empty( $mapped_capability ) ) {
-				return false;
-			}
-
-			// Token must explicitly include this capability.
-			if ( ! in_array( $mapped_capability, self::$agent_token_capabilities, true ) ) {
-				return false;
-			}
+		$capability = self::CAPABILITY_MAP[ $action ] ?? null;
+		if ( empty( $capability ) || self::$agent_owner_id <= 0 ) {
+			return false;
 		}
 
-		// Ceiling check: owner must have this WordPress capability.
-		if ( self::$agent_owner_id > 0 ) {
-			return self::user_can( self::$agent_owner_id, $action );
-		}
+		$principal = self::$execution_principal ?? AgentExecutionPrincipal::user_session(
+			self::$agent_owner_id,
+			(string) self::$acting_agent_id,
+			AgentExecutionPrincipal::REQUEST_CONTEXT_REST,
+			array(),
+			null,
+			null,
+			self::$capability_ceiling
+		);
 
-		return false;
+		$policy = new \WP_Agent_WordPress_Authorization_Policy(
+			null,
+			static fn( int $user_id, string $required_capability ): bool => self::user_has_capability( $user_id, $required_capability )
+		);
+
+		return $policy->can( $principal, $capability, array( 'capability_ceiling' => self::$capability_ceiling ) );
 	}
 
 	/**
@@ -580,7 +644,8 @@ class PermissionHelper {
 
 		// Check explicit access grants.
 		$access_repo = new \DataMachine\Core\Database\Agents\AgentAccess();
-		$can_access  = $access_repo->user_can_access( $agent_id, $user_id, $minimum_role );
+		$grant       = $access_repo->get_access( (string) $agent_id, $user_id );
+		$can_access  = $grant instanceof \WP_Agent_Access_Grant && $grant->role_meets( $minimum_role );
 
 		/**
 		 * Filter whether a user can access an agent.
@@ -640,15 +705,22 @@ class PermissionHelper {
 			return false;
 		}
 
-		if ( user_can( $user_id, $mapped_capability ) ) {
-			return true;
-		}
+		return self::user_has_capability( $user_id, $mapped_capability );
+	}
 
-		// Backward compatibility for legacy installs/roles.
-		if ( user_can( $user_id, 'manage_options' ) ) {
-			return true;
-		}
-
-		return false;
+	/**
+	 * Check a concrete WordPress capability for a user under Data Machine policy.
+	 *
+	 * Administrators retain Data Machine admin behavior through manage_options;
+	 * named Data Machine caps remain the narrower operator/viewer surface.
+	 *
+	 * @since 0.103.15
+	 *
+	 * @param int    $user_id    User ID.
+	 * @param string $capability WordPress capability.
+	 * @return bool
+	 */
+	private static function user_has_capability( int $user_id, string $capability ): bool {
+		return user_can( $user_id, $capability ) || user_can( $user_id, 'manage_options' );
 	}
 }

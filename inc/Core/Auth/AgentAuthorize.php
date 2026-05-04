@@ -323,7 +323,7 @@ class AgentAuthorize {
 		$tokens_repo = new AgentTokens();
 		$token_label = ! empty( $label ) ? $label : 'authorize-flow-' . gmdate( 'Y-m-d' );
 
-		$result = $tokens_repo->create_token(
+		$result = $tokens_repo->create_bearer_token(
 			(int) $agent['agent_id'],
 			$agent['agent_slug'],
 			$token_label,
@@ -380,7 +380,8 @@ class AgentAuthorize {
 
 		// Check access grants.
 		$access_repo = new AgentAccess();
-		return $access_repo->user_can_access( (int) $agent['agent_id'], $user_id, 'admin' );
+		$grant = $access_repo->get_access( (string) (int) $agent['agent_id'], $user_id );
+		return $grant instanceof \WP_Agent_Access_Grant && $grant->role_meets( \WP_Agent_Access_Grant::ROLE_ADMIN );
 	}
 
 	/**

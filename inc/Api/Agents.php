@@ -614,18 +614,18 @@ class Agents {
 		}
 
 		$access_repo = new AgentAccess();
-		$grants      = $access_repo->get_users_for_agent( $agent_id );
+		$grants      = $access_repo->get_users_for_agent( (string) $agent_id );
 
 		// Enrich with user display names.
 		$data = array();
 		foreach ( $grants as $grant ) {
-			$user   = get_user_by( 'id', $grant['user_id'] );
+			$user   = get_user_by( 'id', $grant->user_id );
 			$data[] = array(
-				'user_id'      => (int) $grant['user_id'],
+				'user_id'      => $grant->user_id,
 				'display_name' => $user ? $user->display_name : __( '(unknown user)', 'data-machine' ),
 				'user_email'   => $user ? $user->user_email : '',
-				'role'         => (string) $grant['role'],
-				'granted_at'   => $grant['granted_at'] ?? '',
+				'role'         => $grant->role,
+				'granted_at'   => $grant->granted_at ?? '',
 			);
 		}
 
@@ -671,7 +671,12 @@ class Agents {
 		}
 
 		$access_repo = new AgentAccess();
-		$ok          = $access_repo->grant_access( $agent_id, $user_id, $role );
+		try {
+			$access_repo->grant_access( new \WP_Agent_Access_Grant( (string) $agent_id, $user_id, (string) $role ) );
+			$ok = true;
+		} catch ( \Throwable $e ) {
+			$ok = false;
+		}
 
 		if ( ! $ok ) {
 			return new WP_Error(
@@ -726,7 +731,7 @@ class Agents {
 		}
 
 		$access_repo = new AgentAccess();
-		$ok          = $access_repo->revoke_access( $agent_id, $user_id );
+		$ok          = $access_repo->revoke_access( (string) $agent_id, $user_id );
 
 		if ( ! $ok ) {
 			return new WP_Error(

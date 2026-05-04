@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class AgentAccess extends BaseRepository {
+class AgentAccess extends BaseRepository implements \WP_Agent_Access_Store_Interface {
 
 	/**
 	 * Table name (without prefix).
@@ -31,7 +31,7 @@ class AgentAccess extends BaseRepository {
 	 * - operator: run flows, view jobs, manage queue
 	 * - viewer: read-only access to pipelines, flows, jobs
 	 */
-	const VALID_ROLES = array( 'admin', 'operator', 'viewer' );
+	const VALID_ROLES = array( \WP_Agent_Access_Grant::ROLE_ADMIN, \WP_Agent_Access_Grant::ROLE_OPERATOR, \WP_Agent_Access_Grant::ROLE_VIEWER );
 
 	/**
 	 * Use network-level prefix so access grants are shared across the multisite network.
@@ -81,12 +81,11 @@ class AgentAccess extends BaseRepository {
 	 * @param string $role     Access role (admin, operator, viewer).
 	 * @return bool True on success.
 	 */
-	public function grant_access( int $agent_id, int $user_id, string $role = 'viewer' ): bool {
-		if ( ! in_array( $role, self::VALID_ROLES, true ) ) {
-			return false;
-		}
-
-		$existing = $this->get_access( $agent_id, $user_id );
+	public function grant_access( \WP_Agent_Access_Grant $grant ): \WP_Agent_Access_Grant {
+		$agent_id = (int) $grant->agent_id;
+		$user_id  = $grant->user_id;
+		$role     = $grant->role;
+		$existing = $this->get_access( $grant->agent_id, $user_id, $grant->workspace_id );
 
 		if ( $existing ) {
 			// Update existing role.
@@ -102,7 +101,12 @@ class AgentAccess extends BaseRepository {
 				array( '%d', '%d' )
 			);
 
-			return false !== $result;
+			if ( false === $result ) {
+				throw new \RuntimeException( 'datamachine_agent_access_update_failed' );
+			}
+
+			$updated = $this->get_access( $grant->agent_id, $user_id, $grant->workspace_id );
+			return $updated ?? $grant;
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -117,7 +121,12 @@ class AgentAccess extends BaseRepository {
 			array( '%d', '%d', '%s', '%s' )
 		);
 
-		return false !== $result;
+		if ( false === $result ) {
+			throw new \RuntimeException( 'datamachine_agent_access_insert_failed' );
+		}
+
+		$created = $this->get_access( $grant->agent_id, $user_id, $grant->workspace_id );
+		return $created ?? $grant;
 	}
 
 	/**
@@ -127,12 +136,12 @@ class AgentAccess extends BaseRepository {
 	 * @param int $user_id  WordPress user ID.
 	 * @return bool True on success.
 	 */
-	public function revoke_access( int $agent_id, int $user_id ): bool {
+	public function revoke_access( string $agent_id, int $user_id, ?string $workspace_id = null ): bool {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $this->wpdb->delete(
 			$this->table_name,
 			array(
-				'agent_id' => $agent_id,
+				'agent_id' => (int) $agent_id,
 				'user_id'  => $user_id,
 			),
 			array( '%d', '%d' )
@@ -148,20 +157,20 @@ class AgentAccess extends BaseRepository {
 	 * @param int $user_id  WordPress user ID.
 	 * @return array|null Access row or null.
 	 */
-	public function get_access( int $agent_id, int $user_id ): ?array {
+	public function get_access( string $agent_id, int $user_id, ?string $workspace_id = null ): ?\WP_Agent_Access_Grant {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
 				'SELECT * FROM %i WHERE agent_id = %d AND user_id = %d',
 				$this->table_name,
-				$agent_id,
+				(int) $agent_id,
 				$user_id
 			),
 			ARRAY_A
 		);
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 
-		return $row ? $row : null;
+		return $row ? self::grant_from_row( $row ) : null;
 	}
 
 	/**
@@ -171,7 +180,7 @@ class AgentAccess extends BaseRepository {
 	 * @param string|null $minimum_role Minimum role to filter by (null = any role).
 	 * @return int[] Array of agent IDs.
 	 */
-	public function get_agent_ids_for_user( int $user_id, ?string $minimum_role = null ): array {
+	public function get_agent_ids_for_user( int $user_id, ?string $minimum_role = null, ?string $workspace_id = null ): array {
 		if ( null !== $minimum_role ) {
 			$allowed_roles = $this->roles_at_or_above( $minimum_role );
 			if ( empty( $allowed_roles ) ) {
@@ -209,19 +218,19 @@ class AgentAccess extends BaseRepository {
 	 * @param int $agent_id Agent ID.
 	 * @return array[] Array of access rows.
 	 */
-	public function get_users_for_agent( int $agent_id ): array {
+	public function get_users_for_agent( string $agent_id, ?string $workspace_id = null ): array {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$results = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				'SELECT * FROM %i WHERE agent_id = %d ORDER BY granted_at ASC',
 				$this->table_name,
-				$agent_id
+				(int) $agent_id
 			),
 			ARRAY_A
 		);
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 
-		return $results ? $results : array();
+		return array_map( array( self::class, 'grant_from_row' ), $results ? $results : array() );
 	}
 
 	/**
@@ -233,13 +242,13 @@ class AgentAccess extends BaseRepository {
 	 * @return bool True if user has the required access level.
 	 */
 	public function user_can_access( int $agent_id, int $user_id, string $minimum_role = 'viewer' ): bool {
-		$access = $this->get_access( $agent_id, $user_id );
+		$access = $this->get_access( (string) $agent_id, $user_id );
 
 		if ( ! $access ) {
 			return false;
 		}
 
-		return $this->role_meets_minimum( $access['role'], $minimum_role );
+		return $access->role_meets( $minimum_role );
 	}
 
 	/**
@@ -252,7 +261,30 @@ class AgentAccess extends BaseRepository {
 	 * @return bool True on success.
 	 */
 	public function bootstrap_owner_access( int $agent_id, int $owner_id ): bool {
-		return $this->grant_access( $agent_id, $owner_id, 'admin' );
+		try {
+			$this->grant_access( new \WP_Agent_Access_Grant( (string) $agent_id, $owner_id, \WP_Agent_Access_Grant::ROLE_ADMIN ) );
+			return true;
+		} catch ( \Throwable $e ) {
+			return false;
+		}
+	}
+
+	/**
+	 * Convert a persisted access row into the Agents API grant contract.
+	 *
+	 * @param array<string,mixed> $row Database row.
+	 */
+	private static function grant_from_row( array $row ): \WP_Agent_Access_Grant {
+		return new \WP_Agent_Access_Grant(
+			(string) ( $row['agent_id'] ?? '' ),
+			(int) ( $row['user_id'] ?? 0 ),
+			(string) ( $row['role'] ?? \WP_Agent_Access_Grant::ROLE_VIEWER ),
+			null,
+			isset( $row['id'] ) ? (int) $row['id'] : null,
+			null,
+			isset( $row['granted_at'] ) ? (string) $row['granted_at'] : null,
+			array( 'source' => 'datamachine_agent_access' )
+		);
 	}
 
 	/**

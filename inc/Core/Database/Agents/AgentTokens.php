@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class AgentTokens extends BaseRepository {
+class AgentTokens extends BaseRepository implements \WP_Agent_Token_Store_Interface {
 
 	/**
 	 * Table name (without prefix).
@@ -87,21 +87,63 @@ class AgentTokens extends BaseRepository {
 	 * @param string|null $expires_at   Expiry datetime string (null = never).
 	 * @return array{token_id: int, raw_token: string, token_prefix: string}|null Created token data or null on failure.
 	 */
-	public function create_token( int $agent_id, string $agent_slug, string $label = '', ?array $capabilities = null, ?string $expires_at = null ): ?array {
+	public function create_bearer_token( int $agent_id, string $agent_slug, string $label = '', ?array $capabilities = null, ?string $expires_at = null ): ?array {
 		// Generate cryptographically random token.
 		$random_bytes = bin2hex( random_bytes( 32 ) );
 		$raw_token    = self::TOKEN_PREFIX . $agent_slug . '_' . $random_bytes;
-		$token_hash   = hash( 'sha256', $raw_token );
+		$token_hash   = \WP_Agent_Token::hash_token( $raw_token );
 		$prefix       = substr( $raw_token, 0, 12 );
+		$agents_repo  = new Agents();
+		$agent        = $agents_repo->get_agent( $agent_id );
+
+		if ( ! $agent ) {
+			return null;
+		}
+
+		try {
+			$token = $this->create_token(
+				new \WP_Agent_Token(
+					1,
+					(string) $agent_id,
+					(int) $agent['owner_id'],
+					$token_hash,
+					$prefix,
+					sanitize_text_field( $label ),
+					$capabilities,
+					$expires_at,
+					null,
+					current_time( 'mysql', true ),
+					null,
+					null,
+					array( 'agent_slug' => $agent_slug )
+				)
+			);
+		} catch ( \Throwable $e ) {
+			$this->log_db_error( 'Create agent token', array( 'agent_id' => $agent_id ) );
+			return null;
+		}
+
+		return array(
+			'token_id'     => $token->token_id,
+			'raw_token'    => $raw_token,
+			'token_prefix' => $token->token_prefix,
+		);
+	}
+
+	/**
+	 * Create a token metadata record for a pre-hashed token.
+	 */
+	public function create_token( \WP_Agent_Token $token ): \WP_Agent_Token {
+		$agent_id = (int) $token->agent_id;
 
 		$insert_data = array(
 			'agent_id'     => $agent_id,
-			'token_hash'   => $token_hash,
-			'token_prefix' => $prefix,
-			'label'        => sanitize_text_field( $label ),
-			'capabilities' => null !== $capabilities ? wp_json_encode( $capabilities ) : null,
-			'expires_at'   => $expires_at,
-			'created_at'   => current_time( 'mysql', true ),
+			'token_hash'   => $token->token_hash,
+			'token_prefix' => $token->token_prefix,
+			'label'        => sanitize_text_field( $token->label ),
+			'capabilities' => null !== $token->allowed_capabilities ? wp_json_encode( $token->allowed_capabilities ) : null,
+			'expires_at'   => $token->expires_at,
+			'created_at'   => $token->created_at ?? current_time( 'mysql', true ),
 		);
 
 		$formats = array( '%d', '%s', '%s', '%s', '%s', '%s', '%s' );
@@ -111,14 +153,11 @@ class AgentTokens extends BaseRepository {
 
 		if ( false === $result ) {
 			$this->log_db_error( 'Create agent token', array( 'agent_id' => $agent_id ) );
-			return null;
+			throw new \RuntimeException( 'datamachine_agent_token_insert_failed' );
 		}
 
-		return array(
-			'token_id'     => (int) $this->wpdb->insert_id,
-			'raw_token'    => $raw_token,
-			'token_prefix' => $prefix,
-		);
+		$created = $this->get_token( (int) $this->wpdb->insert_id );
+		return $created ?? $token;
 	}
 
 	/**
@@ -131,8 +170,7 @@ class AgentTokens extends BaseRepository {
 	 * @param string $raw_token Raw bearer token from Authorization header.
 	 * @return array|null Token record (with agent_id) or null if not found/expired.
 	 */
-	public function resolve_token( string $raw_token ): ?array {
-		$token_hash = hash( 'sha256', $raw_token );
+	public function resolve_token_hash( string $token_hash ): ?\WP_Agent_Token {
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$row = $this->wpdb->get_row(
@@ -149,20 +187,7 @@ class AgentTokens extends BaseRepository {
 			return null;
 		}
 
-		// Check expiry.
-		if ( ! empty( $row['expires_at'] ) ) {
-			$expires_timestamp = strtotime( $row['expires_at'] );
-			if ( $expires_timestamp && $expires_timestamp < time() ) {
-				return null;
-			}
-		}
-
-		// Decode capabilities JSON.
-		if ( ! empty( $row['capabilities'] ) ) {
-			$row['capabilities'] = json_decode( $row['capabilities'], true );
-		}
-
-		return $row;
+		return $this->token_from_row( $row );
 	}
 
 	/**
@@ -173,11 +198,11 @@ class AgentTokens extends BaseRepository {
 	 * @param int $token_id Token ID.
 	 * @return void
 	 */
-	public function touch_last_used( int $token_id ): void {
+	public function touch_token( int $token_id, ?string $used_at = null ): void {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$this->wpdb->update(
 			$this->table_name,
-			array( 'last_used_at' => current_time( 'mysql', true ) ),
+			array( 'last_used_at' => $used_at ?? current_time( 'mysql', true ) ),
 			array( 'token_id' => $token_id ),
 			array( '%s' ),
 			array( '%d' )
@@ -191,13 +216,13 @@ class AgentTokens extends BaseRepository {
 	 * @param int $agent_id Agent ID (for authorization — ensures token belongs to this agent).
 	 * @return bool True if deleted, false if not found or wrong agent.
 	 */
-	public function revoke_token( int $token_id, int $agent_id ): bool {
+	public function revoke_token( int $token_id, string $agent_id ): bool {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $this->wpdb->delete(
 			$this->table_name,
 			array(
 				'token_id' => $token_id,
-				'agent_id' => $agent_id,
+				'agent_id' => (int) $agent_id,
 			),
 			array( '%d', '%d' )
 		);
@@ -213,11 +238,11 @@ class AgentTokens extends BaseRepository {
 	 * @param int $agent_id Agent ID.
 	 * @return int Number of tokens revoked.
 	 */
-	public function revoke_all_for_agent( int $agent_id ): int {
+	public function revoke_all_tokens_for_agent( string $agent_id ): int {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $this->wpdb->delete(
 			$this->table_name,
-			array( 'agent_id' => $agent_id ),
+			array( 'agent_id' => (int) $agent_id ),
 			array( '%d' )
 		);
 
@@ -232,13 +257,13 @@ class AgentTokens extends BaseRepository {
 	 * @param int $agent_id Agent ID.
 	 * @return array[] Array of token metadata rows.
 	 */
-	public function list_tokens( int $agent_id ): array {
+	public function list_tokens( string $agent_id ): array {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$results = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				'SELECT token_id, agent_id, token_prefix, label, capabilities, last_used_at, expires_at, created_at FROM %i WHERE agent_id = %d ORDER BY created_at DESC',
+				'SELECT token_id, agent_id, token_hash, token_prefix, label, capabilities, last_used_at, expires_at, created_at FROM %i WHERE agent_id = %d ORDER BY created_at DESC',
 				$this->table_name,
-				$agent_id
+				(int) $agent_id
 			),
 			ARRAY_A
 		);
@@ -248,13 +273,7 @@ class AgentTokens extends BaseRepository {
 			return array();
 		}
 
-		foreach ( $results as &$row ) {
-			if ( ! empty( $row['capabilities'] ) ) {
-				$row['capabilities'] = json_decode( $row['capabilities'], true );
-			}
-		}
-
-		return $results;
+		return array_values( array_filter( array_map( array( $this, 'token_from_row' ), $results ) ) );
 	}
 
 	/**
@@ -263,11 +282,11 @@ class AgentTokens extends BaseRepository {
 	 * @param int $token_id Token ID.
 	 * @return array|null Token metadata or null.
 	 */
-	public function get_token( int $token_id ): ?array {
+	public function get_token( int $token_id ): ?\WP_Agent_Token {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
-				'SELECT token_id, agent_id, token_prefix, label, capabilities, last_used_at, expires_at, created_at FROM %i WHERE token_id = %d',
+				'SELECT token_id, agent_id, token_hash, token_prefix, label, capabilities, last_used_at, expires_at, created_at FROM %i WHERE token_id = %d',
 				$this->table_name,
 				$token_id
 			),
@@ -275,15 +294,7 @@ class AgentTokens extends BaseRepository {
 		);
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 
-		if ( ! $row ) {
-			return null;
-		}
-
-		if ( ! empty( $row['capabilities'] ) ) {
-			$row['capabilities'] = json_decode( $row['capabilities'], true );
-		}
-
-		return $row;
+		return $row ? $this->token_from_row( $row ) : null;
 	}
 
 	/**
@@ -294,5 +305,42 @@ class AgentTokens extends BaseRepository {
 	 */
 	public function count_tokens( int $agent_id ): int {
 		return $this->count_rows( 'agent_id = %d', array( $agent_id ) );
+	}
+
+	/**
+	 * Convert a persisted token row into the Agents API token contract.
+	 *
+	 * @param array<string,mixed> $row Database row.
+	 */
+	private function token_from_row( array $row ): ?\WP_Agent_Token {
+		$agent_id    = (int) ( $row['agent_id'] ?? 0 );
+		$agents_repo = new Agents();
+		$agent       = $agents_repo->get_agent( $agent_id );
+
+		if ( ! $agent ) {
+			return null;
+		}
+
+		$capabilities = null;
+		if ( ! empty( $row['capabilities'] ) ) {
+			$decoded      = json_decode( (string) $row['capabilities'], true );
+			$capabilities = is_array( $decoded ) ? array_values( array_map( 'strval', $decoded ) ) : null;
+		}
+
+		return new \WP_Agent_Token(
+			(int) ( $row['token_id'] ?? 0 ),
+			(string) $agent_id,
+			(int) $agent['owner_id'],
+			(string) ( $row['token_hash'] ?? str_repeat( '0', 64 ) ),
+			(string) ( $row['token_prefix'] ?? '' ),
+			(string) ( $row['label'] ?? '' ),
+			$capabilities,
+			isset( $row['expires_at'] ) ? (string) $row['expires_at'] : null,
+			isset( $row['last_used_at'] ) ? (string) $row['last_used_at'] : null,
+			isset( $row['created_at'] ) ? (string) $row['created_at'] : null,
+			null,
+			null,
+			array( 'agent_slug' => (string) $agent['agent_slug'] )
+		);
 	}
 }

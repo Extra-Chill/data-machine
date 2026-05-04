@@ -648,8 +648,8 @@ class AgentAbilities {
 				if ( $target_user_id > 0 && $owner_id === $target_user_id ) {
 					$item['user_role'] = 'admin';
 				} elseif ( $target_user_id > 0 ) {
-					$grant             = $access_repo->get_access( $agent_id, $target_user_id );
-					$item['user_role'] = $grant && isset( $grant['role'] ) ? (string) $grant['role'] : null;
+					$grant             = $access_repo->get_access( (string) $agent_id, $target_user_id );
+					$item['user_role'] = $grant instanceof \WP_Agent_Access_Grant ? $grant->role : null;
 				} else {
 					$item['user_role'] = null;
 				}
@@ -1040,7 +1040,10 @@ class AgentAbilities {
 
 		// Enrich with access grants.
 		$access_repo = new \DataMachine\Core\Database\Agents\AgentAccess();
-		$access      = $access_repo->get_users_for_agent( (int) $agent['agent_id'] );
+		$access      = array_map(
+			static fn( \WP_Agent_Access_Grant $grant ): array => $grant->to_array(),
+			$access_repo->get_users_for_agent( (string) (int) $agent['agent_id'] )
+		);
 
 		// Check for agent directory.
 		$directory_manager = new DirectoryManager();

@@ -101,7 +101,7 @@ class AgentsListEndpointTest extends WP_UnitTestCase {
 	 */
 	public function test_non_admin_granted_user_sees_agent_with_granted_role(): void {
 		$agent_id = $this->repo->create_if_missing( 'shared-agent', 'Shared Agent', $this->owner_user );
-		$this->access_repo->grant_access( $agent_id, $this->granted_user, 'operator' );
+		$this->access_repo->grant_access( new \WP_Agent_Access_Grant( (string) $agent_id, $this->granted_user, 'operator' ) );
 
 		wp_set_current_user( $this->granted_user );
 		$result = $this->call_handle_list();
@@ -117,7 +117,7 @@ class AgentsListEndpointTest extends WP_UnitTestCase {
 	public function test_non_admin_sees_union_of_owned_and_granted_agents(): void {
 		$owned_id   = $this->repo->create_if_missing( 'owned', 'Owned', $this->granted_user );
 		$granted_id = $this->repo->create_if_missing( 'granted', 'Granted', $this->owner_user );
-		$this->access_repo->grant_access( $granted_id, $this->granted_user, 'viewer' );
+		$this->access_repo->grant_access( new \WP_Agent_Access_Grant( (string) $granted_id, $this->granted_user, 'viewer' ) );
 
 		wp_set_current_user( $this->granted_user );
 		$result = $this->call_handle_list();
@@ -144,7 +144,7 @@ class AgentsListEndpointTest extends WP_UnitTestCase {
 	 */
 	public function test_owned_and_granted_dedupes_with_admin_role_wins(): void {
 		$agent_id = $this->repo->create_if_missing( 'mine', 'Mine', $this->owner_user );
-		$this->access_repo->grant_access( $agent_id, $this->owner_user, 'viewer' );
+		$this->access_repo->grant_access( new \WP_Agent_Access_Grant( (string) $agent_id, $this->owner_user, 'viewer' ) );
 
 		wp_set_current_user( $this->owner_user );
 		$result = $this->call_handle_list();

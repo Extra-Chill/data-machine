@@ -207,7 +207,7 @@ class AgentTokenAbilities {
 		}
 
 		$tokens_repo = new AgentTokens();
-		$result      = $tokens_repo->create_token(
+		$result      = $tokens_repo->create_bearer_token(
 			$agent_id,
 			$agent['agent_slug'],
 			$label,
@@ -319,7 +319,10 @@ class AgentTokenAbilities {
 		}
 
 		$tokens_repo = new AgentTokens();
-		$tokens      = $tokens_repo->list_tokens( $agent_id );
+		$tokens      = array_map(
+			static fn( \WP_Agent_Token $token ): array => $token->to_metadata_array(),
+			$tokens_repo->list_tokens( (string) $agent_id )
+		);
 
 		return array(
 			'success' => true,
