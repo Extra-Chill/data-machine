@@ -61,8 +61,11 @@ require_once __DIR__ . '/../inc/Core/FilesRepository/DailyMemoryStorage.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DailyMemory.php';
 
 use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
+use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
+use AgentsAPI\Core\FilesRepository\AgentMemoryQuery;
 use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
 use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
+use AgentsAPI\Core\FilesRepository\AgentMemoryStoreCapabilities;
 use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
 use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
 use DataMachine\Core\FilesRepository\DailyMemory;
@@ -81,7 +84,11 @@ class DailyMemorySeamFakeStore implements AgentMemoryStoreInterface {
 	/** @var string[] */
 	public array $list_prefixes = array();
 
-	public function read( AgentMemoryScope $scope ): AgentMemoryReadResult {
+	public function capabilities(): AgentMemoryStoreCapabilities {
+		return AgentMemoryStoreCapabilities::none();
+	}
+
+	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
 		$this->record( 'read', $scope );
 
 		if ( ! array_key_exists( $scope->key(), $this->files ) ) {
@@ -92,7 +99,7 @@ class DailyMemorySeamFakeStore implements AgentMemoryStoreInterface {
 		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123 );
 	}
 
-	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null ): AgentMemoryWriteResult {
+	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
 		$this->record( 'write', $scope );
 		$this->files[ $scope->key() ] = $content;
 
@@ -111,18 +118,19 @@ class DailyMemorySeamFakeStore implements AgentMemoryStoreInterface {
 		return AgentMemoryWriteResult::ok( '', 0 );
 	}
 
-	public function list_layer( AgentMemoryScope $scope_query ): array {
+	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
 		$this->record( 'list_layer', $scope_query );
 		return array();
 	}
 
-	public function list_subtree( AgentMemoryScope $scope_query, string $prefix ): array {
+	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
 		$this->record( 'list_subtree', $scope_query );
 		$this->list_prefixes[] = $prefix;
 
 		$entries = array();
 		foreach ( $this->files as $key => $content ) {
-			[ $layer, $user_id, $agent_id, $filename ] = explode( ':', $key, 4 );
+			[ $layer, $workspace_type, $workspace_id, $user_id, $agent_id, $filename ] = explode( ':', $key, 6 );
+			unset( $workspace_type, $workspace_id );
 			if ( $layer !== $scope_query->layer || (int) $user_id !== $scope_query->user_id || (int) $agent_id !== $scope_query->agent_id ) {
 				continue;
 			}

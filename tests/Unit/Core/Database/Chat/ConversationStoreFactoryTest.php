@@ -14,6 +14,8 @@
 
 namespace DataMachine\Tests\Unit\Core\Database\Chat;
 
+use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
+use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
 use DataMachine\Abilities\Chat\ListChatSessionsAbility;
 use DataMachine\Core\Database\Chat\Chat;
 use DataMachine\Core\Database\Chat\ConversationReadStateInterface;
@@ -22,7 +24,6 @@ use DataMachine\Core\Database\Chat\ConversationRetentionInterface;
 use DataMachine\Core\Database\Chat\ConversationSessionIndexInterface;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
-use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
 use WP_UnitTestCase;
 
 class ConversationStoreFactoryTest extends WP_UnitTestCase {
@@ -177,8 +178,9 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 	// -----------------------------------------------------------------
 
 	public function test_list_sessions_for_day_returns_rows_in_chronological_order(): void {
-		$store = new InMemoryConversationStore();
-		$user  = 42;
+		$store     = new InMemoryConversationStore();
+		$workspace = AgentWorkspaceScope::from_parts( 'site', '1' );
+		$user      = 42;
 
 		// Seed three sessions across two days with explicit created_at values
 		// by updating the in-memory rows directly via reflection — we don't
@@ -186,9 +188,9 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$today     = gmdate( 'Y-m-d' );
 		$yesterday = gmdate( 'Y-m-d', time() - DAY_IN_SECONDS );
 
-		$a = $store->create_session( $user );
-		$b = $store->create_session( $user );
-		$c = $store->create_session( $user );
+		$a = $store->create_session( $workspace, $user );
+		$b = $store->create_session( $workspace, $user );
+		$c = $store->create_session( $workspace, $user );
 
 		$ref      = new \ReflectionClass( $store );
 		$sessions = $ref->getProperty( 'sessions' );
@@ -220,7 +222,8 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 	}
 
 	public function test_get_storage_metrics_returns_rows_shape(): void {
-		$store = new InMemoryConversationStore();
+		$store     = new InMemoryConversationStore();
+		$workspace = AgentWorkspaceScope::from_parts( 'site', '1' );
 
 		$metrics = $store->get_storage_metrics();
 
@@ -229,9 +232,9 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'size_mb', $metrics );
 		$this->assertSame( 0, $metrics['rows'] );
 
-		$store->create_session( 1 );
-		$store->create_session( 1 );
-		$store->create_session( 2 );
+		$store->create_session( $workspace, 1 );
+		$store->create_session( $workspace, 1 );
+		$store->create_session( $workspace, 2 );
 
 		$metrics = $store->get_storage_metrics();
 		$this->assertSame( 3, $metrics['rows'] );
@@ -256,6 +259,7 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 	 */
 	private function persist_fixture_transcript( ConversationTranscriptStoreInterface $store ): array {
 		$session_id = $store->create_session(
+			AgentWorkspaceScope::from_parts( 'site', '1' ),
 			5,
 			7,
 			array(
@@ -305,7 +309,7 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		);
 		ConversationStoreFactory::reset();
 
-		$session_id = $store->create_session( 7, 0, array(), 'chat' );
+		$session_id = $store->create_session( AgentWorkspaceScope::from_parts( 'site', '1' ), 7, 0, array(), 'chat' );
 		$ref        = new \ReflectionClass( $store );
 		$sessions   = $ref->getProperty( 'sessions' );
 		$sessions->setAccessible( true );
@@ -326,7 +330,7 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		wp_set_current_user( $user_id );
 
 		// Seed the in-memory store with a session under the target user.
-		$session_id = $memory_store->create_session( $user_id, 0, array(), 'chat' );
+		$session_id = $memory_store->create_session( AgentWorkspaceScope::from_parts( 'site', '1' ), $user_id, 0, array(), 'chat' );
 		$memory_store->update_session(
 			$session_id,
 			array(

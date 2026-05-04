@@ -37,8 +37,11 @@ require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
 
 use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
+use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
+use AgentsAPI\Core\FilesRepository\AgentMemoryQuery;
 use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
 use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
+use AgentsAPI\Core\FilesRepository\AgentMemoryStoreCapabilities;
 use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
 use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
 
@@ -89,7 +92,11 @@ class AgentsApiMemoryFakeStore implements AgentMemoryStoreInterface {
 	/** @var array<string, string> */
 	private array $records = array();
 
-	public function read( AgentMemoryScope $scope ): AgentMemoryReadResult {
+	public function capabilities(): AgentMemoryStoreCapabilities {
+		return AgentMemoryStoreCapabilities::none();
+	}
+
+	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
 		$key = $scope->key();
 
 		if ( ! array_key_exists( $key, $this->records ) ) {
@@ -100,7 +107,7 @@ class AgentsApiMemoryFakeStore implements AgentMemoryStoreInterface {
 		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123 );
 	}
 
-	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null ): AgentMemoryWriteResult {
+	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
 		$current = $this->read( $scope );
 		if ( null !== $if_match && $current->hash !== $if_match ) {
 			return AgentMemoryWriteResult::failure( 'conflict' );
@@ -119,16 +126,17 @@ class AgentsApiMemoryFakeStore implements AgentMemoryStoreInterface {
 		return AgentMemoryWriteResult::ok( '', 0 );
 	}
 
-	public function list_layer( AgentMemoryScope $scope_query ): array {
+	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
 		return $this->list_subtree( $scope_query, '' );
 	}
 
-	public function list_subtree( AgentMemoryScope $scope_query, string $prefix ): array {
+	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
 		$entries = array();
 		$prefix  = trim( $prefix, '/' );
 
 		foreach ( $this->records as $key => $content ) {
-			list( $layer, $user_id, $agent_id, $filename ) = explode( ':', $key, 4 );
+			list( $layer, $workspace_type, $workspace_id, $user_id, $agent_id, $filename ) = explode( ':', $key, 6 );
+			unset( $workspace_type, $workspace_id );
 			if ( $layer !== $scope_query->layer || (int) $user_id !== $scope_query->user_id || (int) $agent_id !== $scope_query->agent_id ) {
 				continue;
 			}
@@ -157,11 +165,11 @@ agents_api_memory_assert( ! class_exists( 'DataMachine\Core\FilesRepository\Agen
 
 echo "\n[2] Fake store satisfies the contract shape in isolation:\n";
 $store = new AgentsApiMemoryFakeStore();
-$scope = new AgentMemoryScope( 'agent', 7, 42, 'MEMORY.md' );
+$scope = new AgentMemoryScope( 'agent', 'site', '1', 7, 42, 'MEMORY.md' );
 
 $missing = $store->read( $scope );
 agents_api_memory_assert_same( false, $missing->exists, 'missing read returns not-found sentinel' );
-agents_api_memory_assert_same( 'agent:7:42:MEMORY.md', $scope->key(), 'scope exposes stable key' );
+agents_api_memory_assert_same( 'agent:site:1:7:42:MEMORY.md', $scope->key(), 'scope exposes stable key' );
 
 $write = $store->write( $scope, "First memory\n" );
 agents_api_memory_assert_same( true, $write->success, 'write succeeds' );
@@ -180,13 +188,13 @@ agents_api_memory_assert_same( 'conflict', $conflict->error, 'compare-and-swap c
 $cas_write = $store->write( $scope, "Second memory\n", $read->hash );
 agents_api_memory_assert_same( true, $cas_write->success, 'compare-and-swap write succeeds with matching hash' );
 
-$daily_scope = new AgentMemoryScope( 'agent', 7, 42, 'daily/2026/04/17.md' );
+$daily_scope = new AgentMemoryScope( 'agent', 'site', '1', 7, 42, 'daily/2026/04/17.md' );
 $store->write( $daily_scope, "Daily memory\n" );
 
-$layer_entries = $store->list_layer( new AgentMemoryScope( 'agent', 7, 42, '' ) );
+$layer_entries = $store->list_layer( new AgentMemoryScope( 'agent', 'site', '1', 7, 42, '' ) );
 agents_api_memory_assert_same( array( 'MEMORY.md', 'daily/2026/04/17.md' ), array_map( static fn( AgentMemoryListEntry $entry ): string => $entry->filename, $layer_entries ), 'layer list returns scoped entries' );
 
-$subtree_entries = $store->list_subtree( new AgentMemoryScope( 'agent', 7, 42, '' ), 'daily' );
+$subtree_entries = $store->list_subtree( new AgentMemoryScope( 'agent', 'site', '1', 7, 42, '' ), 'daily' );
 agents_api_memory_assert_same( array( 'daily/2026/04/17.md' ), array_map( static fn( AgentMemoryListEntry $entry ): string => $entry->filename, $subtree_entries ), 'subtree list filters by prefix' );
 
 $delete = $store->delete( $scope );

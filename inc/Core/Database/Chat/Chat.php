@@ -14,6 +14,7 @@ namespace DataMachine\Core\Database\Chat;
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\Database\BaseRepository;
 use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -218,21 +219,31 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	/**
 	 * Create new chat session
 	 *
-	 * @param int    $user_id  WordPress user ID
-	 * @param array  $metadata Optional session metadata
-	 * @param string $mode  Execution mode (chat, pipeline, system)
+	 * @param AgentWorkspaceScope $workspace Workspace owning the session.
+	 * @param int                 $user_id   WordPress user ID.
+	 * @param int                 $agent_id  Agent ID.
+	 * @param array               $metadata  Optional session metadata.
+	 * @param string              $context   Execution mode (chat, pipeline, system).
 	 * @return string Session ID (UUID)
 	 */
 	public function create_session(
+		AgentWorkspaceScope $workspace,
 		int $user_id,
 		int $agent_id = 0,
 		array $metadata = array(),
-		string $mode = 'chat'
+		string $context = 'chat'
 	): string {
 		global $wpdb;
 
 		$session_id = wp_generate_uuid4();
 		$table_name = self::get_prefixed_table_name();
+		$metadata   = array_merge(
+			$metadata,
+			array(
+				'workspace_type' => $workspace->workspace_type,
+				'workspace_id'   => $workspace->workspace_id,
+			)
+		);
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$result = $wpdb->insert(
@@ -245,7 +256,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				'metadata'   => wp_json_encode( $metadata ),
 				'provider'   => null,
 				'model'      => null,
-				'mode'       => $mode,
+				'mode'       => $context,
 				'expires_at' => null,
 			),
 			array( '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
@@ -259,7 +270,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				array(
 					'user_id' => $user_id,
 					'error'   => $wpdb->last_error,
-					'mode'    => $mode,
+					'mode'    => $context,
 				)
 			);
 			return '';
@@ -273,7 +284,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				'session_id' => $session_id,
 				'user_id'    => $user_id,
 				'agent_id'   => $agent_id,
-				'mode'       => $mode,
+				'mode'       => $context,
 			)
 		);
 
@@ -305,8 +316,11 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return null;
 		}
 
-		$session['messages'] = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
-		$session['metadata'] = json_decode( $session['metadata'], true ) ?? array();
+		$session['messages']       = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
+		$session['metadata']       = json_decode( $session['metadata'], true ) ?? array();
+		$session['workspace_type'] = (string) ( $session['metadata']['workspace_type'] ?? 'site' );
+		$session['workspace_id']   = (string) ( $session['metadata']['workspace_id'] ?? (string) get_current_blog_id() );
+		$session['context']        = $session['mode'] ?? 'chat';
 
 		return $session;
 	}
@@ -676,16 +690,18 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * instead of creating a new one.
 	 *
 	 * @since 0.9.8
-	 * @param int      $user_id WordPress user ID
-	 * @param int      $seconds Lookback window in seconds (default 600 = 10 minutes)
-	 * @param string $mode Mode filter
-	 * @param int|null $token_id Optional token ID for login-scoped deduplication.
+	 * @param AgentWorkspaceScope $workspace Workspace owning the session.
+	 * @param int                 $user_id   WordPress user ID.
+	 * @param int                 $seconds   Lookback window in seconds (default 600 = 10 minutes).
+	 * @param string              $context   Context filter.
+	 * @param int|null            $token_id  Optional token ID for login-scoped deduplication.
 	 * @return array|null Session data or null if none found
 	 */
 	public function get_recent_pending_session(
+		AgentWorkspaceScope $workspace,
 		int $user_id,
 		int $seconds = 600,
-		string $mode = 'chat',
+		string $context = 'chat',
 		?int $token_id = null
 	): ?array {
 		global $wpdb;
@@ -704,10 +720,14 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$params = array(
 			$table_name,
 			$user_id,
-			$mode,
+			$context,
 			$cutoff_time,
 			'%"status":"processing"%',
 		);
+
+		$query   .= ' AND metadata LIKE %s AND metadata LIKE %s';
+		$params[] = '%"workspace_type":"' . $wpdb->esc_like( $workspace->workspace_type ) . '"%';
+		$params[] = '%"workspace_id":"' . $wpdb->esc_like( $workspace->workspace_id ) . '"%';
 
 		if ( null !== $token_id ) {
 			$query   .= ' AND metadata LIKE %s';
@@ -728,8 +748,11 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return null;
 		}
 
-		$session['messages'] = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
-		$session['metadata'] = json_decode( $session['metadata'], true ) ?? array();
+		$session['messages']       = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
+		$session['metadata']       = json_decode( $session['metadata'], true ) ?? array();
+		$session['workspace_type'] = (string) ( $session['metadata']['workspace_type'] ?? $workspace->workspace_type );
+		$session['workspace_id']   = (string) ( $session['metadata']['workspace_id'] ?? $workspace->workspace_id );
+		$session['context']        = $session['mode'] ?? $context;
 
 		return $session;
 	}
