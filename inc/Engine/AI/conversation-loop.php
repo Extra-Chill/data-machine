@@ -69,9 +69,9 @@ function datamachine_run_conversation(
 
 	// Mutable state accumulated across turns by the turn runner.
 	$last_request_metadata = array();
-	$last_tool_calls        = array();
-	$final_content          = '';
-	$turns_run              = 0;
+	$last_tool_calls       = array();
+	$final_content         = '';
+	$turns_run             = 0;
 	$total_usage           = array(
 		'prompt_tokens'     => 0,
 		'completion_tokens' => 0,
@@ -313,9 +313,9 @@ function datamachine_build_turn_runner(
 		}
 
 		/** @var \WordPress\AiClient\Results\DTO\GenerativeAiResult $ai_result */
-		$ai_result  = $ai_response;
-		$tool_calls = datamachine_extract_tool_calls( $ai_result );
-		$ai_content = RequestBuilder::resultText( $ai_result );
+		$ai_result       = $ai_response;
+		$tool_calls      = datamachine_extract_tool_calls( $ai_result );
+		$ai_content      = RequestBuilder::resultText( $ai_result );
 		$last_tool_calls = $tool_calls;
 		if ( '' !== $ai_content ) {
 			$final_content = $ai_content;
