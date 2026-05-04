@@ -88,8 +88,6 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * `$if_match` is intentionally ignored — see class docblock.
 	 */
 	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
-		unset( $metadata );
-
 		$filepath = $this->resolve_filepath( $scope );
 		$dir      = dirname( $filepath );
 
@@ -150,8 +148,6 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * @inheritDoc
 	 */
 	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
-		unset( $query );
-
 		$layer_dir = $this->resolve_layer_directory( $scope_query );
 
 		if ( ! is_dir( $layer_dir ) ) {
@@ -193,8 +189,6 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * including the prefix (e.g. `daily/2026/04/17.md`).
 	 */
 	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
-		unset( $query );
-
 		$prefix = trim( $prefix, '/' );
 		if ( '' === $prefix ) {
 			return array();
