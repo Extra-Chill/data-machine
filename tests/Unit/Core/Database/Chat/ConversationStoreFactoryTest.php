@@ -23,6 +23,7 @@ use DataMachine\Core\Database\Chat\ConversationSessionIndexInterface;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
 use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
+use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
 use WP_UnitTestCase;
 
 class ConversationStoreFactoryTest extends WP_UnitTestCase {
