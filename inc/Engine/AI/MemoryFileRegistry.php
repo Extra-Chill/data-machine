@@ -129,9 +129,9 @@ class MemoryFileRegistry {
 			'modes'           => $modes,
 			'label'           => $args['label'] ?? self::filename_to_label( $filename ),
 			'description'     => $args['description'] ?? '',
-			'retrieval_policy'=> WP_Agent_Context_Injection_Policy::normalize( $args['retrieval_policy'] ?? WP_Agent_Context_Injection_Policy::ALWAYS ),
-			'authority_tier'  => $args['authority_tier'] ?? self::default_authority_tier( $layer, $filename ),
-			'provenance'      => is_array( $args['provenance'] ?? null ) ? $args['provenance'] : self::default_provenance( $filename ),
+			'retrieval_policy' => WP_Agent_Context_Injection_Policy::normalize( $args['retrieval_policy'] ?? WP_Agent_Context_Injection_Policy::ALWAYS ),
+			'authority_tier'   => $args['authority_tier'] ?? self::default_authority_tier( $layer, $filename ),
+			'provenance'       => is_array( $args['provenance'] ?? null ) ? $args['provenance'] : self::default_provenance( $filename ),
 		);
 
 		self::$files[ $filename ] = $metadata;

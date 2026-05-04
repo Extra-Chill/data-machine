@@ -286,15 +286,20 @@ $store    = new RequestMetadataSmokeStore();
 $property = new ReflectionProperty( ConversationStoreFactory::class, 'instance' );
 $property->setValue( null, $store );
 
+$transcript_request = new AgentConversationRequest(
+	array( array( 'role' => 'user', 'content' => 'hello' ) ),
+	array(),
+	null,
+	array( 'persist_transcript' => true, 'job_id' => 279, 'flow_step_id' => 12, 'user_id' => 1, 'agent_id' => 2 ),
+	array( 'provider' => 'openai', 'model' => 'gpt-smoke' ),
+	10,
+	false,
+	AgentWorkspaceScope::from_parts( 'wordpress_site', 'default' )
+);
+
 $session_id = ( new DataMachinePipelineTranscriptPersister() )->persist(
 	array( array( 'role' => 'user', 'content' => 'hello' ) ),
-	new AgentConversationRequest(
-		array( array( 'role' => 'user', 'content' => 'hello' ) ),
-		array(),
-		null,
-		array( 'persist_transcript' => true, 'job_id' => 279, 'flow_step_id' => 12, 'user_id' => 1, 'agent_id' => 2 ),
-		array( 'provider' => 'openai', 'model' => 'gpt-smoke' )
-	),
+	$transcript_request,
 	array( 'turn_count' => 1, 'completed' => false, 'request_metadata' => $request_metadata )
 );
 assert_true( 'smoke-session' === $session_id, 'simulated pipeline transcript is persisted' );
