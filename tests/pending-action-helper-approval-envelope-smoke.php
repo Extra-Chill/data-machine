@@ -112,8 +112,8 @@ $pending_action = $result['payload']['pending_action'];
 datamachine_pending_action_helper_assert( $result['action_id'] === $pending_action['action_id'], 'Agents API pending action carries the staged action ID.' );
 datamachine_pending_action_helper_assert( 'tool_action' === $pending_action['kind'], 'Agents API pending action keeps a generic action kind.' );
 datamachine_pending_action_helper_assert( array( 'diff' => "- old\n+ new" ) === $pending_action['preview'], 'Agents API pending action carries preview data.' );
-datamachine_pending_action_helper_assert( '123' === $pending_action['created_by'], 'Agents API pending action records creator identity as a string.' );
-datamachine_pending_action_helper_assert( '456' === $pending_action['agent_id'], 'Agents API pending action records agent identity as a string.' );
+datamachine_pending_action_helper_assert( '123' === $pending_action['creator'], 'Agents API pending action records creator identity as a string.' );
+datamachine_pending_action_helper_assert( '456' === $pending_action['agent'], 'Agents API pending action records agent identity as a string.' );
 datamachine_pending_action_helper_assert( isset( $pending_action['created_at'] ) && is_string( $pending_action['created_at'] ), 'Agents API pending action carries an ISO creation timestamp.' );
 datamachine_pending_action_helper_assert( isset( $pending_action['expires_at'] ) && is_string( $pending_action['expires_at'] ), 'Agents API pending action carries an ISO expiration timestamp.' );
 

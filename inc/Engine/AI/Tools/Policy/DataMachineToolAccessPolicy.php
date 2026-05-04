@@ -50,4 +50,55 @@ final class DataMachineToolAccessPolicy {
 		$action = $action_map[ $access_level ] ?? 'manage_settings';
 		return PermissionHelper::can( $action );
 	}
+
+	/**
+	 * Check if the current user can access a tool declaration.
+	 *
+	 * @param array  $tool Tool definition.
+	 * @param string $name Tool name.
+	 * @return bool Whether the current request can access the tool.
+	 */
+	public function canAccessTool( array $tool, string $name ): bool {
+		unset( $name );
+
+		$ability_slugs = $this->getAbilitySlugs( $tool );
+		if ( ! empty( $ability_slugs ) ) {
+			$registry = \WP_Abilities_Registry::get_instance();
+			foreach ( $ability_slugs as $slug ) {
+				$ability = $registry->get_registered( $slug );
+				if ( ! $ability || ! $ability->check_permissions() ) {
+					return false;
+				}
+			}
+
+			return true;
+		}
+
+		$access_level = $tool['access_level'] ?? 'admin';
+		return is_string( $access_level ) && $this->canAccessLevel( $access_level );
+	}
+
+	/**
+	 * Return linked ability slugs from a tool declaration.
+	 *
+	 * @param array $tool Tool definition.
+	 * @return string[] Ability slugs.
+	 */
+	private function getAbilitySlugs( array $tool ): array {
+		$ability_slugs = array();
+
+		if ( ! empty( $tool['ability'] ) && is_string( $tool['ability'] ) ) {
+			$ability_slugs[] = $tool['ability'];
+		}
+
+		if ( ! empty( $tool['abilities'] ) && is_array( $tool['abilities'] ) ) {
+			foreach ( $tool['abilities'] as $slug ) {
+				if ( is_string( $slug ) && '' !== $slug ) {
+					$ability_slugs[] = $slug;
+				}
+			}
+		}
+
+		return array_values( array_unique( $ability_slugs ) );
+	}
 }
