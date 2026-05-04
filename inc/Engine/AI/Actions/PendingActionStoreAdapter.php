@@ -7,9 +7,9 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
+use AgentsAPI\AI\Approvals\PendingActionStoreInterface;
 use AgentsAPI\AI\Approvals\ApprovalDecision;
 use AgentsAPI\AI\Approvals\PendingAction;
-use AgentsAPI\AI\Approvals\PendingActionStoreInterface;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -20,46 +20,33 @@ defined( 'ABSPATH' ) || exit;
 final class PendingActionStoreAdapter implements PendingActionStoreInterface {
 
 	/**
-	 * Persist a pending action payload.
-	 *
-	 * @param PendingAction $action Durable pending action record.
-	 * @return bool
+	 * Persist a pending action record.
 	 */
 	public function store( PendingAction $action ): bool {
-		$payload = $this->payload_from_action( $action );
+		$payload = self::payload_from_action( $action );
 		return PendingActionStore::store( $action->get_action_id(), $payload );
 	}
 
 	/**
-	 * Retrieve a pending action payload.
-	 *
-	 * Agents API's merged contract is intentionally minimal and describes only
-	 * the live pending lifecycle. Data Machine's richer inspect/list surfaces
-	 * expose resolved audit rows separately.
-	 *
-	 * @param string $action_id        Durable action identifier.
-	 * @param bool   $include_resolved Whether terminal audit rows may be returned.
-	 * @return PendingAction|null
+	 * Retrieve a pending action record.
 	 */
 	public function get( string $action_id, bool $include_resolved = false ): ?PendingAction {
 		$payload = PendingActionStore::get( $action_id, $include_resolved );
-		return is_array( $payload ) ? $this->action_from_payload( $payload ) : null;
+		return is_array( $payload ) ? self::action_from_payload( $payload ) : null;
 	}
 
 	/**
 	 * List durable pending action records.
 	 *
-	 * @param array<string,mixed> $filters Query filters.
 	 * @return array<int,PendingAction>
 	 */
 	public function list( array $filters = array() ): array {
-		return array_values( array_filter( array_map( array( $this, 'action_from_payload' ), PendingActionStore::list( $filters ) ) ) );
+		return array_values( array_filter( array_map( array( self::class, 'action_from_payload' ), PendingActionStore::list( $filters ) ) ) );
 	}
 
 	/**
 	 * Summarize durable pending action records.
 	 *
-	 * @param array<string,mixed> $filters Query filters.
 	 * @return array<string,mixed>
 	 */
 	public function summary( array $filters = array() ): array {
@@ -67,27 +54,20 @@ final class PendingActionStoreAdapter implements PendingActionStoreInterface {
 	}
 
 	/**
-	 * Record a terminal resolution while retaining audit data.
+	 * Record a terminal resolution while retaining the action for audit.
 	 *
-	 * @param string           $action_id Durable action identifier.
-	 * @param ApprovalDecision $decision  Accepted/rejected decision.
-	 * @param string           $resolver  Resolver identifier.
-	 * @param mixed|null       $result    Resolution result.
-	 * @param string|null      $error     Resolution error.
-	 * @param array<string,mixed> $metadata Resolution metadata.
-	 * @return bool
+	 * @param mixed|null $result Resolution result.
 	 */
 	public function record_resolution( string $action_id, ApprovalDecision $decision, string $resolver, $result = null, ?string $error = null, array $metadata = array() ): bool {
+		unset( $resolver, $metadata );
 		return PendingActionStore::record_resolution( $action_id, $decision->value(), $result, $error );
 	}
 
 	/**
 	 * Mark due pending actions as expired.
-	 *
-	 * @param string|null $before Timestamp boundary.
-	 * @return int
 	 */
 	public function expire( ?string $before = null ): int {
+		unset( $before );
 		return PendingActionStore::expire_due_actions();
 	}
 
@@ -102,48 +82,56 @@ final class PendingActionStoreAdapter implements PendingActionStoreInterface {
 	}
 
 	/**
-	 * Convert an Agents API record into Data Machine's durable payload shape.
+	 * Convert an Agents API action into Data Machine's persisted payload shape.
 	 *
-	 * @param PendingAction $action Durable pending action record.
 	 * @return array<string,mixed>
 	 */
-	private function payload_from_action( PendingAction $action ): array {
+	private static function payload_from_action( PendingAction $action ): array {
 		$data = $action->to_array();
-
-		$data['preview_data'] = $data['preview'];
-		$data['agent_id']     = is_numeric( $data['agent'] ?? null ) ? (int) $data['agent'] : 0;
-		$data['created_by']   = is_numeric( $data['creator'] ?? null ) ? (int) $data['creator'] : 0;
-		$data['context']      = is_array( $data['metadata'] ?? null ) ? $data['metadata'] : array();
-
-		return $data;
+		return array(
+			'kind'         => $data['kind'],
+			'summary'      => $data['summary'],
+			'preview_data' => $data['preview'],
+			'preview'      => $data['preview'],
+			'apply_input'  => $data['apply_input'],
+			'agent_id'     => isset( $data['agent'] ) && is_numeric( $data['agent'] ) ? (int) $data['agent'] : 0,
+			'created_by'   => isset( $data['creator'] ) && is_numeric( $data['creator'] ) ? (int) $data['creator'] : 0,
+			'context'      => array(
+				'workspace' => $data['workspace'] ?? null,
+				'metadata'  => $data['metadata'] ?? array(),
+			),
+			'created_at'   => $data['created_at'],
+			'expires_at'   => $data['expires_at'] ?? null,
+		);
 	}
 
 	/**
-	 * Convert Data Machine's payload shape into the Agents API value object.
+	 * Convert a Data Machine payload into an Agents API pending-action record.
 	 *
-	 * @param array<string,mixed> $payload Stored payload.
-	 * @return PendingAction|null
+	 * @param array<string,mixed> $payload Pending action payload.
 	 */
-	private function action_from_payload( array $payload ): ?PendingAction {
+	private static function action_from_payload( array $payload ): ?PendingAction {
 		try {
+			$context = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
 			return PendingAction::from_array(
 				array(
 					'action_id'           => (string) ( $payload['action_id'] ?? '' ),
 					'kind'                => (string) ( $payload['kind'] ?? '' ),
-					'summary'             => (string) ( $payload['summary'] ?? 'Pending action' ),
-					'preview'             => $payload['preview'] ?? $payload['preview_data'] ?? array(),
+					'summary'             => (string) ( $payload['summary'] ?? '' ),
+					'preview'             => $payload['preview'] ?? ( $payload['preview_data'] ?? array() ),
 					'apply_input'         => $payload['apply_input'] ?? array(),
-					'agent'               => isset( $payload['agent_id'] ) ? (string) (int) $payload['agent_id'] : null,
-					'creator'             => isset( $payload['created_by'] ) ? (string) (int) $payload['created_by'] : null,
+					'workspace'           => $context['workspace'] ?? null,
+					'agent'               => isset( $payload['agent_id'] ) && (int) $payload['agent_id'] > 0 ? (string) (int) $payload['agent_id'] : null,
+					'creator'             => isset( $payload['created_by'] ) && (int) $payload['created_by'] > 0 ? (string) (int) $payload['created_by'] : null,
 					'status'              => (string) ( $payload['status'] ?? PendingActionStore::STATUS_PENDING ),
-					'created_at'          => $this->iso_time( $payload['created_at'] ?? $payload['created_at_iso'] ?? null ),
-					'expires_at'          => $this->optional_iso_time( $payload['expires_at'] ?? $payload['expires_at_iso'] ?? null ),
-					'resolved_at'         => $this->optional_iso_time( $payload['resolved_at'] ?? null ),
-					'resolver'            => ! empty( $payload['resolved_by'] ) ? (string) (int) $payload['resolved_by'] : null,
+					'created_at'          => self::timestamp_to_iso( $payload['created_at'] ?? null ),
+					'expires_at'          => self::optional_timestamp_to_iso( $payload['expires_at'] ?? null ),
+					'resolved_at'         => self::optional_timestamp_to_iso( $payload['resolved_at'] ?? null ),
+					'resolver'            => isset( $payload['resolved_by'] ) && (int) $payload['resolved_by'] > 0 ? (string) (int) $payload['resolved_by'] : null,
 					'resolution_result'   => $payload['resolution_result'] ?? null,
 					'resolution_error'    => $payload['resolution_error'] ?? null,
 					'resolution_metadata' => array(),
-					'metadata'            => isset( $payload['context'] ) && is_array( $payload['context'] ) ? $payload['context'] : array(),
+					'metadata'            => is_array( $context['metadata'] ?? null ) ? $context['metadata'] : array(),
 				)
 			);
 		} catch ( \InvalidArgumentException $error ) {
@@ -152,27 +140,29 @@ final class PendingActionStoreAdapter implements PendingActionStoreInterface {
 	}
 
 	/**
-	 * Normalize a required timestamp to ISO-8601.
+	 * Convert timestamp-like values into the required ISO-ish string.
 	 *
-	 * @param mixed $value Timestamp value.
-	 * @return string
+	 * @param mixed $value Timestamp-like value.
 	 */
-	private function iso_time( $value ): string {
-		$timestamp = is_numeric( $value ) ? (int) $value : strtotime( (string) $value );
-		return gmdate( 'c', false === $timestamp || $timestamp <= 0 ? time() : $timestamp );
+	private static function timestamp_to_iso( $value ): string {
+		return self::optional_timestamp_to_iso( $value ) ?? gmdate( 'c' );
 	}
 
 	/**
-	 * Normalize an optional timestamp to ISO-8601.
+	 * Convert optional timestamp-like values into ISO-ish strings.
 	 *
-	 * @param mixed $value Timestamp value.
-	 * @return string|null
+	 * @param mixed $value Timestamp-like value.
 	 */
-	private function optional_iso_time( $value ): ?string {
-		if ( null === $value || '' === $value || 0 === $value || '0' === $value ) {
-			return null;
+	private static function optional_timestamp_to_iso( $value ): ?string {
+		if ( is_numeric( $value ) && (int) $value > 0 ) {
+			return gmdate( 'c', (int) $value );
 		}
 
-		return $this->iso_time( $value );
+		if ( is_string( $value ) && '' !== trim( $value ) ) {
+			$timestamp = strtotime( $value );
+			return false === $timestamp ? null : gmdate( 'c', $timestamp );
+		}
+
+		return null;
 	}
 }

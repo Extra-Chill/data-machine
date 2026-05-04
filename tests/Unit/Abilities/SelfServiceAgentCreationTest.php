@@ -201,10 +201,10 @@ class SelfServiceAgentCreationTest extends WP_UnitTestCase {
 		$this->assertTrue( $result['success'] );
 
 		$access_repo = new AgentAccess();
-		$grant       = $access_repo->get_access( (int) $result['agent_id'], $this->subscriber_id );
+		$grant       = $access_repo->get_access( (string) (int) $result['agent_id'], $this->subscriber_id );
 
 		$this->assertNotNull( $grant, 'Owner access row must exist after self-service creation' );
-		$this->assertSame( 'admin', (string) $grant['role'] );
+		$this->assertSame( 'admin', $grant->role );
 	}
 
 	// ---------------------------------------------------------------

@@ -27,6 +27,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Agents\AgentTokens;
 use DataMachine\Engine\AI\IterationBudgetRegistry;
+use AgentsAPI\AI\AgentExecutionPrincipal;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -75,11 +76,12 @@ class AgentAuthMiddleware {
 			return null; // Not our token — pass through to WordPress/other auth.
 		}
 
-		// Resolve token hash against database.
-		$tokens_repo  = new AgentTokens();
-		$token_record = $tokens_repo->resolve_token( $raw_token );
+		// Resolve token through the generic Agents API token contract.
+		$tokens_repo   = new AgentTokens();
+		$authenticator = new \WP_Agent_Token_Authenticator( $tokens_repo, self::TOKEN_PREFIX );
+		$principal     = $authenticator->authenticate_bearer_token( $raw_token, AgentExecutionPrincipal::REQUEST_CONTEXT_REST );
 
-		if ( ! $token_record ) {
+		if ( ! $principal ) {
 			do_action(
 				'datamachine_log',
 				'warning',
@@ -94,8 +96,9 @@ class AgentAuthMiddleware {
 			);
 		}
 
-		$agent_id = (int) $token_record['agent_id'];
-		$token_id = (int) $token_record['token_id'];
+		$agent_id = (int) $principal->effective_agent_id;
+		$token_id = (int) $principal->token_id;
+		$token    = $tokens_repo->get_token( $token_id );
 
 		// Verify agent exists.
 		$agents_repo = new Agents();
@@ -122,12 +125,9 @@ class AgentAuthMiddleware {
 			);
 		}
 
-		// Track token usage.
-		$tokens_repo->touch_last_used( $token_id );
-
 		// Parse cross-site caller context from A2A headers (no-op for non-A2A requests).
-		$request      = self::current_rest_request();
-		$inbound_ctx  = $request !== null
+		$request     = self::current_rest_request();
+		$inbound_ctx = null !== $request
 			? CallerContext::fromRequest( $request )
 			: new CallerContext();
 
@@ -176,9 +176,10 @@ class AgentAuthMiddleware {
 		wp_set_current_user( $owner_id );
 
 		// Set agent execution context in PermissionHelper.
-		// This adds the agent_id scoping layer and optional capability restrictions.
-		$token_capabilities = $token_record['capabilities'] ?? null;
+		// This adds the agent_id scoping layer and the Agents API capability ceiling.
+		$token_capabilities = $token instanceof \WP_Agent_Token ? $token->allowed_capabilities : null;
 		PermissionHelper::set_agent_context( $agent_id, $owner_id, $token_capabilities, $token_id );
+		PermissionHelper::set_execution_principal( $principal );
 
 		// Expose the caller context for downstream code (ChatOrchestrator,
 		// abilities, logging) that wants to know who's calling and where
@@ -195,7 +196,7 @@ class AgentAuthMiddleware {
 					'agent_slug'           => $agent['agent_slug'],
 					'owner_id'             => $owner_id,
 					'token_id'             => $token_id,
-					'token_label'          => $token_record['label'] ?? '',
+					'token_label'          => $principal->request_metadata['token_label'] ?? '',
 					'has_cap_restrictions' => null !== $token_capabilities,
 				),
 				$inbound_ctx->toLogContext()

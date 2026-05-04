@@ -104,10 +104,12 @@ class AgentsApiMemoryFakeStore implements AgentMemoryStoreInterface {
 		}
 
 		$content = $this->records[ $key ];
-		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123 );
+		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123, null, $metadata_fields );
 	}
 
 	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
+		unset( $metadata );
+
 		$current = $this->read( $scope );
 		if ( null !== $if_match && $current->hash !== $if_match ) {
 			return AgentMemoryWriteResult::failure( 'conflict' );
@@ -127,17 +129,20 @@ class AgentsApiMemoryFakeStore implements AgentMemoryStoreInterface {
 	}
 
 	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
+		unset( $query );
+
 		return $this->list_subtree( $scope_query, '' );
 	}
 
 	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
+		unset( $query );
+
 		$entries = array();
 		$prefix  = trim( $prefix, '/' );
 
 		foreach ( $this->records as $key => $content ) {
 			list( $layer, $workspace_type, $workspace_id, $user_id, $agent_id, $filename ) = explode( ':', $key, 6 );
-			unset( $workspace_type, $workspace_id );
-			if ( $layer !== $scope_query->layer || (int) $user_id !== $scope_query->user_id || (int) $agent_id !== $scope_query->agent_id ) {
+			if ( $layer !== $scope_query->layer || $workspace_type !== $scope_query->workspace_type || $workspace_id !== $scope_query->workspace_id || (int) $user_id !== $scope_query->user_id || (int) $agent_id !== $scope_query->agent_id ) {
 				continue;
 			}
 

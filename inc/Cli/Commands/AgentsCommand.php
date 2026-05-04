@@ -493,7 +493,7 @@ class AgentsCommand extends AgentBundleCommand {
 
 		switch ( $action ) {
 			case 'list':
-				$grants = $access_repo->get_users_for_agent( $agent_id );
+				$grants = $access_repo->get_users_for_agent( (string) $agent_id );
 
 				if ( empty( $grants ) ) {
 					WP_CLI::warning( sprintf( 'No access grants for agent "%s".', $slug ) );
@@ -502,11 +502,11 @@ class AgentsCommand extends AgentBundleCommand {
 
 				$items = array();
 				foreach ( $grants as $grant ) {
-					$user    = get_user_by( 'id', $grant['user_id'] );
+					$user    = get_user_by( 'id', $grant->user_id );
 					$items[] = array(
-						'user_id' => $grant['user_id'],
+						'user_id' => $grant->user_id,
 						'login'   => $user ? $user->user_login : '(deleted)',
-						'role'    => $grant['role'],
+						'role'    => $grant->role,
 					);
 				}
 
@@ -523,7 +523,12 @@ class AgentsCommand extends AgentBundleCommand {
 				$user_id = $this->resolveUserId( $user_value );
 				$role    = $assoc_args['role'] ?? 'operator';
 
-				$ok = $access_repo->grant_access( $agent_id, $user_id, $role );
+				try {
+					$access_repo->grant_access( new \WP_Agent_Access_Grant( (string) $agent_id, $user_id, (string) $role ) );
+					$ok = true;
+				} catch ( \Throwable $e ) {
+					$ok = false;
+				}
 				if ( $ok ) {
 					$user = get_user_by( 'id', $user_id );
 					WP_CLI::success( sprintf(
@@ -545,7 +550,7 @@ class AgentsCommand extends AgentBundleCommand {
 				}
 
 				$user_id = $this->resolveUserId( $user_value );
-				$ok      = $access_repo->revoke_access( $agent_id, $user_id );
+				$ok      = $access_repo->revoke_access( (string) $agent_id, $user_id );
 
 				if ( $ok ) {
 					WP_CLI::success( sprintf( 'Revoked access for user %d on agent "%s".', $user_id, $slug ) );

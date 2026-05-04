@@ -94,7 +94,7 @@ class ChatOrchestrator {
 			$session_metadata = $session['metadata'] ?? array();
 		} else {
 			// Check for recent pending session to prevent duplicates from timeout retries.
-			$pending_session = $chat_db->get_recent_pending_session( AgentWorkspaceScope::from_parts( 'site', (string) get_current_blog_id() ), $user_id, 600, 'chat', $acting_token_id );
+			$pending_session = $chat_db->get_recent_pending_session( self::workspace_scope(), $user_id, 600, 'chat', $acting_token_id );
 
 			if ( $pending_session ) {
 				$session_id       = $pending_session['session_id'];
@@ -598,7 +598,7 @@ class ChatOrchestrator {
 			$metadata['source'] = $source;
 		}
 
-		$session_id = $chat_db->create_session( AgentWorkspaceScope::from_parts( 'site', (string) get_current_blog_id() ), $user_id, $agent_id, $metadata, 'chat' );
+		$session_id = $chat_db->create_session( self::workspace_scope(), $user_id, $agent_id, $metadata, 'chat' );
 
 		if ( empty( $session_id ) ) {
 			return new WP_Error(
@@ -761,5 +761,12 @@ class ChatOrchestrator {
 				array( 'status' => 500 )
 			);
 		}
+	}
+
+	/**
+	 * Resolve the current site workspace for transcript storage.
+	 */
+	private static function workspace_scope(): AgentWorkspaceScope {
+		return AgentWorkspaceScope::from_parts( 'site', (string) get_current_blog_id() );
 	}
 }

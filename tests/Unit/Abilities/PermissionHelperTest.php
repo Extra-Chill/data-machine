@@ -21,6 +21,9 @@ class PermissionHelperTest extends WP_UnitTestCase {
 	 * Reset state after each test.
 	 */
 	public function tear_down(): void {
+		PermissionHelper::clear_agent_context();
+		wp_set_current_user( 0 );
+
 		// Ensure authenticated context is always reset.
 		// Use reflection since there's no public reset method.
 		$reflection = new \ReflectionClass( PermissionHelper::class );
@@ -180,5 +183,36 @@ class PermissionHelperTest extends WP_UnitTestCase {
 		// After all calls complete, context must be reset.
 		$this->assertFalse( PermissionHelper::is_authenticated_context() );
 		$this->assertFalse( PermissionHelper::can_manage() );
+	}
+
+	public function test_agent_token_context_uses_agents_api_capability_ceiling(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+
+		PermissionHelper::set_agent_context(
+			123,
+			$user_id,
+			array( 'datamachine_chat' ),
+			456
+		);
+
+		$principal = PermissionHelper::get_execution_principal();
+
+		$this->assertInstanceOf( \AgentsAPI\AI\AgentExecutionPrincipal::class, $principal );
+		$this->assertSame( \AgentsAPI\AI\AgentExecutionPrincipal::AUTH_SOURCE_AGENT_TOKEN, $principal->auth_source );
+		$this->assertTrue( PermissionHelper::can( 'chat' ) );
+		$this->assertFalse( PermissionHelper::can( 'manage_agents' ) );
+	}
+
+	public function test_user_session_agent_context_uses_owner_ceiling_without_token_id(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+
+		PermissionHelper::set_agent_context( 123, $user_id );
+
+		$principal = PermissionHelper::get_execution_principal();
+
+		$this->assertInstanceOf( \AgentsAPI\AI\AgentExecutionPrincipal::class, $principal );
+		$this->assertSame( \AgentsAPI\AI\AgentExecutionPrincipal::AUTH_SOURCE_USER, $principal->auth_source );
+		$this->assertNull( $principal->token_id );
+		$this->assertTrue( PermissionHelper::can( 'manage_agents' ) );
 	}
 }

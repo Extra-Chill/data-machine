@@ -6,7 +6,6 @@
  * Version:           0.103.14
  * Requires at least: 6.9
  * Requires PHP:     8.2
- * Requires Plugins: agents-api
  * Author:          Chris Huber, extrachill
  * Author URI:      https://chubes.net
  * License:         GPL v2 or later

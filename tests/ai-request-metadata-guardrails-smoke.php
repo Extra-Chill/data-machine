@@ -119,7 +119,7 @@ class RequestMetadataSmokeStore implements ConversationStoreInterface {
 	public array $sessions = array();
 	public array $updated  = array();
 
-	public function create_session( int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
+	public function create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope $workspace, int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
 		$this->sessions['smoke-session'] = compact( 'user_id', 'agent_id', 'metadata', 'context' );
 		return 'smoke-session';
 	}
@@ -132,7 +132,7 @@ class RequestMetadataSmokeStore implements ConversationStoreInterface {
 	public function delete_session( string $session_id ): bool { return true; }
 	public function get_user_sessions( int $user_id, int $limit = 20, int $offset = 0, ?string $context = null, ?int $agent_id = null ): array { return array(); }
 	public function get_user_session_count( int $user_id, ?string $context = null, ?int $agent_id = null ): int { return 0; }
-	public function get_recent_pending_session( int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array { return null; }
+	public function get_recent_pending_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array { return null; }
 	public function update_title( string $session_id, string $title ): bool { return true; }
 	public function count_unread( array $messages, ?string $last_read_at ): int { return 0; }
 	public function mark_session_read( string $session_id, int $user_id ) { return gmdate( 'Y-m-d H:i:s' ); }

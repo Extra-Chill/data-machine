@@ -87,7 +87,7 @@ class ListAgentsAbilityTest extends WP_UnitTestCase {
 
 	public function test_default_scope_returns_granted_agents_for_non_admin(): void {
 		$agent_id = $this->repo->create_if_missing( 'shared', 'Shared', $this->owner_user );
-		$this->access_repo->grant_access( $agent_id, $this->granted_user, 'operator' );
+		$this->access_repo->grant_access( new \WP_Agent_Access_Grant( (string) $agent_id, $this->granted_user, 'operator' ) );
 
 		wp_set_current_user( $this->granted_user );
 		$result = AgentAbilities::listAgents( array() );
@@ -100,10 +100,10 @@ class ListAgentsAbilityTest extends WP_UnitTestCase {
 	public function test_default_scope_unions_owned_and_granted_without_dupes(): void {
 		$owned_id   = $this->repo->create_if_missing( 'owned', 'Owned', $this->granted_user );
 		$granted_id = $this->repo->create_if_missing( 'granted', 'Granted', $this->owner_user );
-		$this->access_repo->grant_access( $granted_id, $this->granted_user, 'viewer' );
+		$this->access_repo->grant_access( new \WP_Agent_Access_Grant( (string) $granted_id, $this->granted_user, 'viewer' ) );
 
 		// Also grant access on an agent the user owns — must not duplicate the row.
-		$this->access_repo->grant_access( $owned_id, $this->granted_user, 'viewer' );
+		$this->access_repo->grant_access( new \WP_Agent_Access_Grant( (string) $owned_id, $this->granted_user, 'viewer' ) );
 
 		wp_set_current_user( $this->granted_user );
 		$result = AgentAbilities::listAgents( array() );
@@ -214,7 +214,7 @@ class ListAgentsAbilityTest extends WP_UnitTestCase {
 
 	public function test_include_role_returns_granted_role(): void {
 		$agent_id = $this->repo->create_if_missing( 'shared', 'Shared', $this->owner_user );
-		$this->access_repo->grant_access( $agent_id, $this->granted_user, 'operator' );
+		$this->access_repo->grant_access( new \WP_Agent_Access_Grant( (string) $agent_id, $this->granted_user, 'operator' ) );
 
 		wp_set_current_user( $this->granted_user );
 		$result = AgentAbilities::listAgents( array( 'include_role' => true ) );
@@ -224,7 +224,7 @@ class ListAgentsAbilityTest extends WP_UnitTestCase {
 
 	public function test_include_role_reflects_target_user_not_caller(): void {
 		$agent_id = $this->repo->create_if_missing( 'shared', 'Shared', $this->owner_user );
-		$this->access_repo->grant_access( $agent_id, $this->granted_user, 'viewer' );
+		$this->access_repo->grant_access( new \WP_Agent_Access_Grant( (string) $agent_id, $this->granted_user, 'viewer' ) );
 
 		// Admin queries on behalf of granted_user — role must be 'viewer' (granted_user's role),
 		// not 'admin' (caller's role).

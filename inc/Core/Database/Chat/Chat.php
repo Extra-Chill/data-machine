@@ -223,7 +223,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * @param int                 $user_id   WordPress user ID.
 	 * @param int                 $agent_id  Agent ID.
 	 * @param array               $metadata  Optional session metadata.
-	 * @param string              $context   Execution mode (chat, pipeline, system).
+	 * @param string              $context   Execution context (chat, pipeline, system).
 	 * @return string Session ID (UUID)
 	 */
 	public function create_session(
@@ -316,11 +316,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return null;
 		}
 
-		$session['messages']       = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
-		$session['metadata']       = json_decode( $session['metadata'], true ) ?? array();
-		$session['workspace_type'] = (string) ( $session['metadata']['workspace_type'] ?? 'site' );
-		$session['workspace_id']   = (string) ( $session['metadata']['workspace_id'] ?? (string) get_current_blog_id() );
-		$session['context']        = $session['mode'] ?? 'chat';
+		$session['messages'] = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
+		$session['metadata'] = json_decode( $session['metadata'], true ) ?? array();
 
 		return $session;
 	}
@@ -748,11 +745,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return null;
 		}
 
-		$session['messages']       = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
-		$session['metadata']       = json_decode( $session['metadata'], true ) ?? array();
-		$session['workspace_type'] = (string) ( $session['metadata']['workspace_type'] ?? $workspace->workspace_type );
-		$session['workspace_id']   = (string) ( $session['metadata']['workspace_id'] ?? $workspace->workspace_id );
-		$session['context']        = $session['mode'] ?? $context;
+		$session['messages'] = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
+		$session['metadata'] = json_decode( $session['metadata'], true ) ?? array();
 
 		return $session;
 	}

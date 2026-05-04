@@ -32,7 +32,6 @@ require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
 
 use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
-use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
 
 $failures = array();
 $passes   = 0;
@@ -55,27 +54,24 @@ class AgentsApiFakeTranscriptStore implements ConversationTranscriptStoreInterfa
 	 */
 	private array $sessions = array();
 
-	public function create_session( AgentWorkspaceScope $workspace, int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
+	public function create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope $workspace, int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
 		$session_id = 'session-' . ( count( $this->sessions ) + 1 );
-		$metadata   = array_merge( $metadata, $workspace->to_array() );
 
 		$this->sessions[ $session_id ] = array(
-			'session_id'     => $session_id,
-			'user_id'        => $user_id,
-			'agent_id'       => $agent_id,
-			'title'          => '',
-			'messages'       => array(),
-			'metadata'       => $metadata,
-			'provider'       => '',
-			'model'          => '',
-			'context'        => $context,
-			'mode'           => $context,
-			'workspace_type' => $workspace->workspace_type,
-			'workspace_id'   => $workspace->workspace_id,
-			'created_at'     => gmdate( 'Y-m-d H:i:s' ),
-			'updated_at'     => gmdate( 'Y-m-d H:i:s' ),
-			'last_read_at'   => null,
-			'expires_at'     => null,
+			'session_id'   => $session_id,
+			'user_id'      => $user_id,
+			'agent_id'     => $agent_id,
+			'title'        => '',
+			'messages'     => array(),
+			'metadata'     => $metadata,
+			'provider'     => '',
+			'model'        => '',
+			'context'      => $context,
+			'mode'         => $context,
+			'created_at'   => gmdate( 'Y-m-d H:i:s' ),
+			'updated_at'   => gmdate( 'Y-m-d H:i:s' ),
+			'last_read_at' => null,
+			'expires_at'   => null,
 		);
 
 		return $session_id;
@@ -104,11 +100,11 @@ class AgentsApiFakeTranscriptStore implements ConversationTranscriptStoreInterfa
 		return true;
 	}
 
-	public function get_recent_pending_session( AgentWorkspaceScope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array {
-		unset( $seconds, $token_id );
+	public function get_recent_pending_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array {
+		unset( $workspace, $seconds, $token_id );
 
 		foreach ( array_reverse( $this->sessions ) as $session ) {
-			if ( $workspace->workspace_type === $session['workspace_type'] && $workspace->workspace_id === $session['workspace_id'] && $user_id === $session['user_id'] && $context === $session['context'] && array() === $session['messages'] ) {
+			if ( $user_id === $session['user_id'] && $context === $session['context'] && array() === $session['messages'] ) {
 				return $session;
 			}
 		}
@@ -136,7 +132,7 @@ $assert_true( false === interface_exists( 'DataMachine\\Core\\Database\\Chat\\Co
 $store = new AgentsApiFakeTranscriptStore();
 $assert_true( in_array( ConversationTranscriptStoreInterface::class, class_implements( $store ), true ), 'fake store can implement transcript contract without chat product interfaces' );
 
-$workspace  = AgentWorkspaceScope::from_parts( 'site', '1' );
+$workspace  = \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', '1' );
 $session_id = $store->create_session( $workspace, 7, 3, array( 'source' => 'smoke' ), 'pipeline' );
 $assert_true( 'session-1' === $session_id, 'fake store creates transcript session IDs' );
 $assert_true( null !== $store->get_recent_pending_session( $workspace, 7, 600, 'pipeline' ), 'fake store can query pending transcript sessions' );
