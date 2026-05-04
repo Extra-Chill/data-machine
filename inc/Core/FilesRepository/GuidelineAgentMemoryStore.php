@@ -478,7 +478,9 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		}
 
 		return $this->is_private_memory_post( $post )
+			// phpcs:ignore WordPress.WP.Capabilities.Unknown -- Agents API registers this guideline capability.
 			? current_user_can( 'read_private_agent_memory', $post->ID )
+			// phpcs:ignore WordPress.WP.Capabilities.Unknown -- Agents API registers this guideline capability.
 			: current_user_can( 'read_workspace_guidelines', $post->ID );
 	}
 
@@ -494,7 +496,9 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		}
 
 		return $this->is_private_memory_post( $post )
+			// phpcs:ignore WordPress.WP.Capabilities.Unknown -- Agents API registers this guideline capability.
 			? current_user_can( 'edit_private_agent_memory', $post->ID )
+			// phpcs:ignore WordPress.WP.Capabilities.Unknown -- Agents API registers this guideline capability.
 			: current_user_can( 'edit_workspace_guidelines', $post->ID );
 	}
 
@@ -510,9 +514,11 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		}
 
 		if ( self::GUIDELINE_SCOPE_PRIVATE_MEMORY === $this->guideline_scope_for_layer( $scope->layer ) ) {
+			// phpcs:ignore WordPress.WP.Capabilities.Unknown -- Agents API registers this guideline capability.
 			return $this->current_user_owns_scope( $scope ) && current_user_can( 'edit_agent_memory' );
 		}
 
+		// phpcs:ignore WordPress.WP.Capabilities.Unknown -- Agents API registers this guideline capability.
 		return current_user_can( 'edit_workspace_guidelines' );
 	}
 
