@@ -129,10 +129,10 @@ function datamachine_run_conversation(
 			$messages,
 			$turn_runner,
 			array(
-				'max_turns'            => $max_turns,
-				'budgets'              => array( $turn_budget ),
-				'context'              => array_merge( $loop_payload, array( 'mode' => $mode ) ),
-				'request'              => new \AgentsAPI\AI\AgentConversationRequest(
+				'max_turns'             => $max_turns,
+				'budgets'               => array( $turn_budget ),
+				'context'               => array_merge( $loop_payload, array( 'mode' => $mode ) ),
+				'request'               => new \AgentsAPI\AI\AgentConversationRequest(
 					$messages,
 					array(),
 					null,
@@ -146,12 +146,12 @@ function datamachine_run_conversation(
 					$single_turn,
 					WordPressWorkspaceScope::current()
 				),
-				'should_continue'      => $should_continue,
-				'transcript_persister' => $transcript_persister,
-				'transcript_lock'      => $transcript_lock,
+				'should_continue'       => $should_continue,
+				'transcript_persister'  => $transcript_persister,
+				'transcript_lock'       => $transcript_lock,
 				'transcript_session_id' => (string) ( $loop_payload['transcript_session_id'] ?? $loop_payload['session_id'] ?? '' ),
-				'transcript_lock_ttl'  => (int) ( $payload['transcript_lock_ttl'] ?? 300 ),
-				'on_event'             => $on_event,
+				'transcript_lock_ttl'   => (int) ( $payload['transcript_lock_ttl'] ?? 300 ),
+				'on_event'              => $on_event,
 			)
 		);
 	} catch ( \RuntimeException $e ) {
