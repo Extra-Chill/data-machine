@@ -111,16 +111,16 @@ class PermissionHelper {
 	/**
 	 * Cross-site caller context for the current request.
 	 *
-	 * Populated by AgentAuthMiddleware from X-Datamachine-Caller-*
-	 * and X-Datamachine-Chain-* headers after bearer-token resolution.
+	 * Populated by AgentAuthMiddleware from canonical Agents API caller headers
+	 * after bearer-token resolution.
 	 * Describes who is calling and where this request sits in an
 	 * agent-to-agent chain. Null means no A2A caller context is set —
 	 * typically a top-of-chain request (admin UI, CLI, direct /chat call).
 	 *
 	 * @since 0.71.0
-	 * @var \DataMachine\Core\Auth\CallerContext|null
+	 * @var \WP_Agent_Caller_Context|null
 	 */
-	private static ?\DataMachine\Core\Auth\CallerContext $caller_context = null;
+	private static ?\WP_Agent_Caller_Context $caller_context = null;
 
 	/**
 	 * Check if current context has admin-level permissions.
@@ -340,13 +340,13 @@ class PermissionHelper {
 	 * Set the cross-site caller context for the current request.
 	 *
 	 * Called by {@see \DataMachine\Core\Auth\AgentAuthMiddleware} after
-	 * parsing X-Datamachine-Caller-* and X-Datamachine-Chain-* headers.
+	 * parsing canonical Agents API caller headers.
 	 *
 	 * @since 0.71.0
 	 *
-	 * @param \DataMachine\Core\Auth\CallerContext $context
+	 * @param \WP_Agent_Caller_Context $context
 	 */
-	public static function set_caller_context( \DataMachine\Core\Auth\CallerContext $context ): void {
+	public static function set_caller_context( \WP_Agent_Caller_Context $context ): void {
 		self::$caller_context = $context;
 	}
 
@@ -355,16 +355,16 @@ class PermissionHelper {
 	 *
 	 * @since 0.71.0
 	 *
-	 * @return \DataMachine\Core\Auth\CallerContext|null
+	 * @return \WP_Agent_Caller_Context|null
 	 */
-	public static function get_caller_context(): ?\DataMachine\Core\Auth\CallerContext {
+	public static function get_caller_context(): ?\WP_Agent_Caller_Context {
 		return self::$caller_context;
 	}
 
 	/**
 	 * Whether the current request originated from another DM site.
 	 *
-	 * Convenience wrapper over {@see CallerContext::isCrossSite()} that
+	 * Convenience wrapper over {@see \WP_Agent_Caller_Context::is_cross_site()} that
 	 * treats the absence of a caller context as "not cross-site".
 	 *
 	 * @since 0.71.0
@@ -372,7 +372,7 @@ class PermissionHelper {
 	 * @return bool
 	 */
 	public static function in_cross_site_context(): bool {
-		return null !== self::$caller_context && self::$caller_context->isCrossSite();
+		return null !== self::$caller_context && self::$caller_context->is_cross_site();
 	}
 
 	/**

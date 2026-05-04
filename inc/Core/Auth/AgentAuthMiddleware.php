@@ -76,10 +76,12 @@ class AgentAuthMiddleware {
 			return null; // Not our token — pass through to WordPress/other auth.
 		}
 
+		$request = self::current_rest_request();
+
 		// Resolve token through the generic Agents API token contract.
 		$tokens_repo   = new AgentTokens();
 		$authenticator = new \WP_Agent_Token_Authenticator( $tokens_repo, self::TOKEN_PREFIX );
-		$principal     = $authenticator->authenticate_bearer_token( $raw_token, AgentExecutionPrincipal::REQUEST_CONTEXT_REST );
+		$principal     = $authenticator->authenticate_bearer_token( $raw_token, AgentExecutionPrincipal::REQUEST_CONTEXT_REST, array(), $request );
 
 		if ( ! $principal ) {
 			do_action(
@@ -125,16 +127,16 @@ class AgentAuthMiddleware {
 			);
 		}
 
-		// Parse cross-site caller context from A2A headers (no-op for non-A2A requests).
-		$request     = self::current_rest_request();
-		$inbound_ctx = null !== $request
-			? CallerContext::fromRequest( $request )
-			: new CallerContext();
+		// Agents API parses cross-site caller context during token auth so malformed
+		// caller headers fail closed before any agent work runs.
+		$inbound_ctx = $principal->caller_context instanceof \WP_Agent_Caller_Context
+			? $principal->caller_context
+			: \WP_Agent_Caller_Context::top_of_chain();
 
 		// Enforce chain_depth budget on the incoming call. Depth >= ceiling
 		// means this call is the Nth+1 hop in a chain that has already
 		// exhausted its budget — reject before running any work.
-		$depth_budget = IterationBudgetRegistry::create( 'chain_depth', $inbound_ctx->chainDepth() );
+		$depth_budget = IterationBudgetRegistry::create( 'chain_depth', $inbound_ctx->chain_depth );
 
 		if ( $depth_budget->exceeded() ) {
 			do_action(
@@ -149,7 +151,7 @@ class AgentAuthMiddleware {
 						'ceiling'    => $depth_budget->ceiling(),
 						'current'    => $depth_budget->current(),
 					),
-					$inbound_ctx->toLogContext()
+					$inbound_ctx->to_array()
 				)
 			);
 
@@ -163,8 +165,8 @@ class AgentAuthMiddleware {
 				array(
 					'status'      => 429,
 					'retry_after' => 60,
-					'chain_id'    => $inbound_ctx->chainId(),
-					'chain_depth' => $inbound_ctx->chainDepth(),
+					'chain_root_request_id' => $inbound_ctx->chain_root_request_id,
+					'chain_depth'           => $inbound_ctx->chain_depth,
 					'ceiling'     => $depth_budget->ceiling(),
 				)
 			);
@@ -199,7 +201,7 @@ class AgentAuthMiddleware {
 					'token_label'          => $principal->request_metadata['token_label'] ?? '',
 					'has_cap_restrictions' => null !== $token_capabilities,
 				),
-				$inbound_ctx->toLogContext()
+				$inbound_ctx->to_array()
 			)
 		);
 
@@ -211,9 +213,8 @@ class AgentAuthMiddleware {
 	 *
 	 * The `rest_authentication_errors` filter runs before the dispatcher
 	 * assigns the request to a handler, so WP_REST_Request isn't directly
-	 * available here. Fall back to synthesizing one from $_SERVER so
-	 * CallerContext can resolve headers consistently via the same API
-	 * it uses in tests.
+	 * available here. Fall back to synthesizing one from $_SERVER so the
+	 * Agents API caller context parser can resolve headers consistently.
 	 *
 	 * @return \WP_REST_Request|null
 	 */

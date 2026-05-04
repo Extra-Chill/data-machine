@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "109576b004ef61783456e27ad841e553aa59f25a"
+                "reference": "3697c0414950633fcb86a5654df07bc3de173b94"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/109576b004ef61783456e27ad841e553aa59f25a",
-                "reference": "109576b004ef61783456e27ad841e553aa59f25a",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/3697c0414950633fcb86a5654df07bc3de173b94",
+                "reference": "3697c0414950633fcb86a5654df07bc3de173b94",
                 "shasum": ""
             },
             "require": {
@@ -31,6 +31,7 @@
                     "php tests/message-envelope-smoke.php",
                     "php tests/registry-smoke.php",
                     "php tests/execution-principal-smoke.php",
+                    "php tests/caller-context-smoke.php",
                     "php tests/authorization-smoke.php",
                     "php tests/action-policy-values-smoke.php",
                     "php tests/consent-policy-smoke.php",
@@ -45,6 +46,7 @@
                     "php tests/workspace-scope-smoke.php",
                     "php tests/compaction-item-smoke.php",
                     "php tests/conversation-runner-contracts-smoke.php",
+                    "php tests/conversation-transcript-lock-smoke.php",
                     "php tests/conversation-compaction-smoke.php",
                     "php tests/markdown-section-compaction-smoke.php",
                     "php tests/context-registry-smoke.php",
@@ -69,7 +71,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-05-04T15:07:00+00:00"
+            "time": "2026-05-04T19:27:48+00:00"
         },
         {
             "name": "chubes4/block-format-bridge",
