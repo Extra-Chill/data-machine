@@ -12,6 +12,11 @@
  * Also handles individual Eventbrite event pages that contain a single
  * Event JSON-LD object.
  *
+ * For recurring/series events, the JSON-LD startDate is the *first* occurrence
+ * (often in the past). The extractor detects series events via the embedded
+ * `isSeries`/`nextAvailableSession` fields and uses the next upcoming session
+ * as the effective start date so the pipeline does not skip them as past events.
+ *
  * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors
  * @since   0.15.5
  */
@@ -44,14 +49,17 @@ class EventbriteExtractor extends BaseExtractor {
 	/**
 	 * Extract all events from Eventbrite JSON-LD.
 	 *
-	 * Handles two patterns:
+	 * Handles three patterns:
 	 * 1. Organizer pages: ItemList > ListItem > Event (returns ALL events)
 	 * 2. Single event pages: direct Event object
+	 * 3. Series/recurring events: detects isSeries flag and uses nextAvailableSession
 	 */
 	public function extract( string $html, string $source_url ): array {
 		if ( ! preg_match_all( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is', $html, $matches ) ) {
 			return array();
 		}
+
+		$series_meta = $this->extractSeriesMeta( $html );
 
 		$events = array();
 
@@ -84,7 +92,7 @@ class EventbriteExtractor extends BaseExtractor {
 					}
 
 					if ( null !== $event_data ) {
-						$parsed = $this->parseEventbriteEvent( $event_data );
+						$parsed = $this->parseEventbriteEvent( $event_data, $series_meta );
 						if ( null !== $parsed ) {
 							$events[] = $parsed;
 						}
@@ -94,7 +102,7 @@ class EventbriteExtractor extends BaseExtractor {
 
 			// Pattern 2: Single Event object (individual event page).
 			if ( isset( $data['@type'] ) && 'Event' === $data['@type'] ) {
-				$parsed = $this->parseEventbriteEvent( $data );
+				$parsed = $this->parseEventbriteEvent( $data, $series_meta );
 				if ( null !== $parsed ) {
 					$events[] = $parsed;
 				}
@@ -112,9 +120,10 @@ class EventbriteExtractor extends BaseExtractor {
 	 * Parse an Eventbrite Event JSON-LD object to standardized format.
 	 *
 	 * @param array $event_data JSON-LD Event object.
+	 * @param array $series_meta Series metadata extracted from page (isSeries, nextAvailableSession).
 	 * @return array|null Standardized event or null if invalid.
 	 */
-	private function parseEventbriteEvent( array $event_data ): ?array {
+	private function parseEventbriteEvent( array $event_data, array $series_meta = array() ): ?array {
 		$title = html_entity_decode( (string) ( $event_data['name'] ?? '' ) );
 
 		if ( empty( $title ) ) {
@@ -126,7 +135,7 @@ class EventbriteExtractor extends BaseExtractor {
 			'description' => $event_data['description'] ?? '',
 		);
 
-		$this->parseDates( $event, $event_data );
+		$this->parseDates( $event, $event_data, $series_meta );
 
 		if ( empty( $event['startDate'] ) ) {
 			return null;
@@ -143,8 +152,16 @@ class EventbriteExtractor extends BaseExtractor {
 
 	/**
 	 * Parse date/time from Eventbrite ISO 8601 datetime strings.
+	 *
+	 * For series events where the JSON-LD startDate is in the past,
+	 * uses nextAvailableSession from the page's embedded data as the
+	 * effective start date.
+	 *
+	 * @param array $event      Event array to populate (passed by reference).
+	 * @param array $event_data JSON-LD Event object.
+	 * @param array $series_meta Series metadata from extractSeriesMeta().
 	 */
-	private function parseDates( array &$event, array $event_data ): void {
+	private function parseDates( array &$event, array $event_data, array $series_meta = array() ): void {
 		if ( ! empty( $event_data['startDate'] ) ) {
 			$parsed             = $this->parseIsoDatetime( $event_data['startDate'] );
 			$event['startDate'] = $parsed['date'];
@@ -159,6 +176,18 @@ class EventbriteExtractor extends BaseExtractor {
 			$parsed           = $this->parseIsoDatetime( $event_data['endDate'] );
 			$event['endDate'] = $parsed['date'];
 			$event['endTime'] = $parsed['time'];
+		}
+
+		if ( ! empty( $series_meta['nextAvailableSession'] ) ) {
+			$next_session = $series_meta['nextAvailableSession'];
+			$parsed       = $this->parseIsoDatetime( $next_session );
+
+			$event['startDate'] = $parsed['date'];
+			$event['startTime'] = '00:00' !== $parsed['time'] ? $parsed['time'] : '';
+
+			if ( ! empty( $parsed['timezone'] ) ) {
+				$event['venueTimezone'] = $parsed['timezone'];
+			}
 		}
 	}
 
@@ -274,5 +303,37 @@ class EventbriteExtractor extends BaseExtractor {
 		} else {
 			$event['imageUrl'] = $image;
 		}
+	}
+
+	/**
+	 * Extract series/recurring event metadata from the Eventbrite page HTML.
+	 *
+	 * Eventbrite embeds series information outside of JSON-LD in the page's
+	 * server-rendered data. This method parses:
+	 * - `isSeries`: Whether the event is a recurring series
+	 * - `nextAvailableSession`: The next upcoming occurrence datetime
+	 *
+	 * The data is embedded in a JSON-like structure near `goodToKnow.highlights`.
+	 *
+	 * @param string $html Full page HTML.
+	 * @return array{isSeries: bool, nextAvailableSession: string}
+	 */
+	private function extractSeriesMeta( string $html ): array {
+		$meta = array(
+			'isSeries'             => false,
+			'nextAvailableSession' => '',
+		);
+
+		if ( false === strpos( $html, '"isSeries":true' ) ) {
+			return $meta;
+		}
+
+		$meta['isSeries'] = true;
+
+		if ( preg_match( '/"nextAvailableSession":"([^"]+)"/', $html, $match ) ) {
+			$meta['nextAvailableSession'] = $match[1];
+		}
+
+		return $meta;
 	}
 }
