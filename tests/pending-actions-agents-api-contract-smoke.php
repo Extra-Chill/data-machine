@@ -214,6 +214,27 @@ $stored = $store->get( $action_id );
 datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && 'contract_smoke' === $stored->get_kind(), 'contract get reads the stored PendingAction', $failures, $passes );
 datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && $action_id === $stored->get_action_id(), 'contract store preserves action ID in payload', $failures, $passes );
 datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && null !== $stored->get_expires_at(), 'transient fallback preserves expiration audit data', $failures, $passes );
+
+$legacy_action_id = \DataMachine\Engine\AI\Actions\PendingActionStore::generate_id();
+$legacy_payload   = array(
+	'action_id'    => $legacy_action_id,
+	'kind'         => 'legacy_smoke',
+	'summary'      => 'Legacy smoke',
+	'preview_data' => array( 'legacy' => true ),
+	'apply_input'  => array( 'legacy_value' => 2 ),
+	'created_at'   => time(),
+	'expires_at'   => time() + 10,
+);
+
+datamachine_pending_actions_assert( \DataMachine\Engine\AI\Actions\PendingActionStore::store( $legacy_action_id, $legacy_payload ), 'legacy Data Machine payload arrays still read through the product payload API', $failures, $passes );
+
+$legacy_stored = $store->get( $legacy_action_id );
+datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\PendingAction, 'legacy Data Machine payload arrays normalize to PendingAction value objects', $failures, $passes );
+datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\PendingAction && 'legacy_smoke' === $legacy_stored->get_kind(), 'value-object conversion preserves Data Machine handler kind', $failures, $passes );
+datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\PendingAction && array( 'legacy' => true ) === $legacy_stored->get_preview(), 'value-object conversion preserves preview payload', $failures, $passes );
+datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\PendingAction && array( 'legacy_value' => 2 ) === $legacy_stored->get_apply_input(), 'value-object conversion preserves apply input', $failures, $passes );
+datamachine_pending_actions_assert( $store->delete( $legacy_action_id ), 'contract delete removes legacy transient fallback payload', $failures, $passes );
+
 datamachine_pending_actions_assert( $store->delete( $action_id ), 'contract delete removes transient fallback payload', $failures, $passes );
 datamachine_pending_actions_assert( null === $store->get( $action_id ), 'contract get returns null after delete', $failures, $passes );
 
