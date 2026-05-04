@@ -781,5 +781,4 @@ class AgentMemory {
 			)
 		);
 	}
-
 }
