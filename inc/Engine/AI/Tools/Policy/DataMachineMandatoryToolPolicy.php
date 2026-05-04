@@ -13,7 +13,24 @@ namespace DataMachine\Engine\AI\Tools\Policy;
 
 defined( 'ABSPATH' ) || exit;
 
-final class DataMachineMandatoryToolPolicy {
+if ( ! interface_exists( '\WP_Agent_Tool_Access_Policy_Interface' ) ) {
+	require_once dirname( __DIR__, 5 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy-interface.php';
+}
+
+final class DataMachineMandatoryToolPolicy implements \WP_Agent_Tool_Access_Policy_Interface {
+
+	/**
+	 * Provide mandatory Data Machine plumbing tools to Agents API.
+	 *
+	 * @param array $context Runtime context.
+	 * @return array|null Tool policy fragment, or null for no opinion.
+	 */
+	public function get_tool_policy( array $context ): ?array {
+		$tools = is_array( $context['datamachine_tools'] ?? null ) ? $context['datamachine_tools'] : array();
+		$names = array_keys( $this->extract( $tools ) );
+
+		return empty( $names ) ? null : array( 'mandatory_tools' => $names );
+	}
 
 	/**
 	 * Return whether a tool is mandatory Data Machine pipeline plumbing.

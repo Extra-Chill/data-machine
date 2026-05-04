@@ -14,7 +14,23 @@ use DataMachine\Core\Database\Agents\Agents;
 
 defined( 'ABSPATH' ) || exit;
 
-final class DataMachineAgentToolPolicyProvider {
+if ( ! interface_exists( '\WP_Agent_Tool_Access_Policy_Interface' ) ) {
+	require_once dirname( __DIR__, 5 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy-interface.php';
+}
+
+final class DataMachineAgentToolPolicyProvider implements \WP_Agent_Tool_Access_Policy_Interface {
+
+	/**
+	 * Provide persisted Data Machine agent policy to Agents API.
+	 *
+	 * @param array $context Runtime context.
+	 * @return array|null Tool policy fragment, or null for no opinion.
+	 */
+	public function get_tool_policy( array $context ): ?array {
+		$agent_id = isset( $context['agent_id'] ) ? (int) $context['agent_id'] : 0;
+
+		return $this->getForAgent( $agent_id );
+	}
 
 	/**
 	 * Get tool policy from an agent's persisted config.

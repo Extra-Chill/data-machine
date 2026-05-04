@@ -35,9 +35,16 @@
 namespace DataMachine\Engine\AI\Actions;
 
 use AgentsAPI\AI\Tools\ActionPolicy;
-use DataMachine\Core\Database\Agents\Agents;
 
 defined( 'ABSPATH' ) || exit;
+
+if ( ! class_exists( '\WP_Agent_Action_Policy_Resolver' ) ) {
+	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy-interface.php';
+	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
+	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy.php';
+	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-action-policy-provider-interface.php';
+	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-action-policy-resolver.php';
+}
 
 class ActionPolicyResolver {
 
@@ -59,6 +66,17 @@ class ActionPolicyResolver {
 	public const POLICY_PREVIEW   = ActionPolicy::PREVIEW;
 	public const POLICY_FORBIDDEN = ActionPolicy::FORBIDDEN;
 
+	private \WP_Agent_Action_Policy_Resolver $resolver;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param \WP_Agent_Action_Policy_Resolver|null $resolver Agents API action policy resolver.
+	 */
+	public function __construct( ?\WP_Agent_Action_Policy_Resolver $resolver = null ) {
+		$this->resolver = $resolver ?? new \WP_Agent_Action_Policy_Resolver( array( new DataMachineModeActionPolicyProvider() ) );
+	}
+
 	/**
 	 * Resolve the action policy for a single tool invocation.
 	 *
@@ -75,59 +93,10 @@ class ActionPolicyResolver {
 	 * @return string One of the POLICY_* constants.
 	 */
 	public function resolveForTool( array $context ): string {
-		$tool_name      = (string) ( $context['tool_name'] ?? '' );
-		$mode           = (string) ( $context['mode'] ?? self::MODE_CHAT );
-		$tool_def       = is_array( $context['tool_def'] ?? null ) ? $context['tool_def'] : array();
-		$agent_id       = isset( $context['agent_id'] ) ? (int) $context['agent_id'] : 0;
-		$deny           = is_array( $context['deny'] ?? null ) ? $context['deny'] : array();
-		$client_context = is_array( $context['client_context'] ?? null ) ? $context['client_context'] : array();
+		$context = $this->withAgentConfig( $context );
+		$policy  = $this->resolver->resolve_for_tool( $context );
 
-		if ( '' === $tool_name ) {
-			return self::POLICY_DIRECT;
-		}
-
-		// 1. Explicit deny list always wins.
-		if ( in_array( $tool_name, $deny, true ) ) {
-			return $this->applyFilter( self::POLICY_FORBIDDEN, $tool_name, $mode, $context );
-		}
-
-		// 2 + 3. Per-agent overrides (tool-specific, then category).
-		if ( $agent_id > 0 ) {
-			$agent_policy = $this->getAgentActionPolicy( $agent_id );
-
-			if ( null !== $agent_policy ) {
-				$tool_override = $this->agentToolOverride( $agent_policy, $tool_name );
-				if ( null !== $tool_override ) {
-					return $this->applyFilter( $tool_override, $tool_name, $mode, $context );
-				}
-
-				$category_override = $this->agentCategoryOverride( $agent_policy, $tool_def );
-				if ( null !== $category_override ) {
-					return $this->applyFilter( $category_override, $tool_name, $mode, $context );
-				}
-			}
-		}
-
-		// 4. Tool-declared default.
-		$tool_default = $this->toolDeclaredDefault( $tool_def );
-		if ( null !== $tool_default ) {
-			// Mode can still upgrade a 'direct' default to 'preview' in chat
-			// if the tool opts in via action_policy_chat. Check step 5 first.
-			$mode_preset = $this->modePreset( $tool_def, $mode );
-			if ( null !== $mode_preset && self::POLICY_PREVIEW === $mode_preset && self::POLICY_DIRECT === $tool_default ) {
-				return $this->applyFilter( $mode_preset, $tool_name, $mode, $context );
-			}
-			return $this->applyFilter( $tool_default, $tool_name, $mode, $context );
-		}
-
-		// 5. Mode preset (only meaningful when the tool has opted in).
-		$mode_preset = $this->modePreset( $tool_def, $mode );
-		if ( null !== $mode_preset ) {
-			return $this->applyFilter( $mode_preset, $tool_name, $mode, $context );
-		}
-
-		// 6. Global default.
-		return $this->applyFilter( self::POLICY_DIRECT, $tool_name, $mode, $context );
+		return $this->applyDataMachineFilter( $policy, (string) ( $context['tool_name'] ?? '' ), (string) ( $context['mode'] ?? self::MODE_CHAT ), $context );
 	}
 
 	/**
@@ -148,177 +117,68 @@ class ActionPolicyResolver {
 	 * @return array|null { tools?: map, categories?: map } or null.
 	 */
 	public function getAgentActionPolicy( int $agent_id ): ?array {
-		if ( $agent_id <= 0 ) {
-			return null;
-		}
-
-		$agents_repo = new Agents();
-		$agent       = $agents_repo->get_agent( $agent_id );
-
-		if ( ! $agent ) {
-			return null;
-		}
-
-		$config = $agent['agent_config'] ?? array();
+		$config = $this->getAgentConfig( $agent_id );
 		if ( empty( $config['action_policy'] ) || ! is_array( $config['action_policy'] ) ) {
 			return null;
 		}
 
-		$policy = $config['action_policy'];
-
-		$tools      = ( isset( $policy['tools'] ) && is_array( $policy['tools'] ) )
-			? array_filter( array_map( array( $this, 'normalizePolicyValue' ), $policy['tools'] ) )
-			: array();
-		$categories = ( isset( $policy['categories'] ) && is_array( $policy['categories'] ) )
-			? array_filter( array_map( array( $this, 'normalizePolicyValue' ), $policy['categories'] ) )
-			: array();
-
-		if ( empty( $tools ) && empty( $categories ) ) {
-			return null;
-		}
-
-		return array(
-			'tools'      => $tools,
-			'categories' => $categories,
-		);
+		return empty( $config['action_policy']['tools'] ?? array() ) && empty( $config['action_policy']['categories'] ?? array() )
+			? null
+			: $config['action_policy'];
 	}
 
 	/**
-	 * Look up a per-tool override in an agent policy.
+	 * Add persisted Data Machine agent config to the Agents API resolver context.
 	 *
-	 * @param array  $policy    Normalized agent policy.
-	 * @param string $tool_name Tool being resolved.
-	 * @return string|null Policy value, or null if no override.
+	 * @param array $context Resolution context.
+	 * @return array Context with agent_config when available.
 	 */
-	private function agentToolOverride( array $policy, string $tool_name ): ?string {
-		$tools = $policy['tools'] ?? array();
-		return isset( $tools[ $tool_name ] ) ? $tools[ $tool_name ] : null;
+	private function withAgentConfig( array $context ): array {
+		if ( is_array( $context['agent_config'] ?? null ) ) {
+			return $context;
+		}
+
+		$agent_id = isset( $context['agent_id'] ) ? (int) $context['agent_id'] : 0;
+		$config   = $this->getAgentConfig( $agent_id );
+		if ( ! empty( $config ) ) {
+			$context['agent_config'] = $config;
+		} else {
+			unset( $context['agent_id'] );
+		}
+
+		return $context;
 	}
 
 	/**
-	 * Look up a per-category override in an agent policy.
+	 * Read persisted Data Machine agent configuration.
 	 *
-	 * Walks the tool's linked abilities (`ability` + `abilities`) and
-	 * returns the first matching override.
-	 *
-	 * @param array $policy   Normalized agent policy.
-	 * @param array $tool_def Tool definition.
-	 * @return string|null Policy value, or null if no override.
+	 * @param int $agent_id Agent ID.
+	 * @return array Agent config.
 	 */
-	private function agentCategoryOverride( array $policy, array $tool_def ): ?string {
-		$categories = $policy['categories'] ?? array();
-		if ( empty( $categories ) ) {
-			return null;
+	private function getAgentConfig( int $agent_id ): array {
+		if ( $agent_id <= 0 ) {
+			return array();
 		}
 
-		$registry = \WP_Abilities_Registry::get_instance();
-		if ( ! $registry ) {
-			return null;
-		}
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		$agent       = $agents_repo->get_agent( $agent_id );
 
-		$ability_slugs = array();
-		if ( ! empty( $tool_def['ability'] ) ) {
-			$ability_slugs[] = (string) $tool_def['ability'];
-		}
-		if ( ! empty( $tool_def['abilities'] ) && is_array( $tool_def['abilities'] ) ) {
-			foreach ( $tool_def['abilities'] as $slug ) {
-				$ability_slugs[] = (string) $slug;
-			}
-		}
-
-		foreach ( $ability_slugs as $slug ) {
-			$ability = $registry->get_registered( $slug );
-			if ( $ability ) {
-				$cat = $ability->get_category();
-				if ( isset( $categories[ $cat ] ) ) {
-					return $categories[ $cat ];
-				}
-			}
-		}
-
-		return null;
+		return is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
 	}
 
 	/**
-	 * Tool-declared default policy.
+	 * Apply the Data Machine product filter after Agents API resolves policy.
 	 *
-	 * Tools opt into ActionPolicy by declaring `action_policy` in their
-	 * definition (returned by BaseTool::getToolDefinition()). Unopted tools
-	 * return null and fall through to mode preset / global default.
-	 *
-	 * @param array $tool_def Tool definition.
-	 * @return string|null
-	 */
-	private function toolDeclaredDefault( array $tool_def ): ?string {
-		if ( empty( $tool_def['action_policy'] ) ) {
-			return null;
-		}
-		$value = $this->normalizePolicyValue( $tool_def['action_policy'] );
-		return '' === $value ? null : $value;
-	}
-
-	/**
-	 * Mode preset.
-	 *
-	 * Tools can declare mode-specific defaults via `action_policy_chat`,
-	 * `action_policy_pipeline`, `action_policy_system`. In chat mode this
-	 * lets a tool default to 'preview' conversationally while leaving
-	 * pipeline execution at 'direct' (no user to confirm).
-	 *
-	 * @param array  $tool_def Tool definition.
-	 * @param string $mode     Agent mode.
-	 * @return string|null
-	 */
-	private function modePreset( array $tool_def, string $mode ): ?string {
-		$key = 'action_policy_' . $mode;
-		if ( empty( $tool_def[ $key ] ) ) {
-			return null;
-		}
-		$value = $this->normalizePolicyValue( $tool_def[ $key ] );
-		return '' === $value ? null : $value;
-	}
-
-	/**
-	 * Normalize a user-supplied policy value.
-	 *
-	 * Returns one of the Agents API policy constants, or an empty string when the
-	 * value is not recognized (caller drops it).
-	 *
-	 * @param mixed $value Raw value from config or tool def.
-	 * @return string Normalized policy or ''.
-	 */
-	private function normalizePolicyValue( $value ): string {
-		return ActionPolicy::normalize( $value ) ?? '';
-	}
-
-	/**
-	 * Apply the datamachine_tool_action_policy filter and validate the result.
-	 *
-	 * @param string $policy    Policy computed by the resolver.
+	 * @param string $policy    Policy computed by Agents API.
 	 * @param string $tool_name Tool being resolved.
 	 * @param string $mode      Agent mode.
 	 * @param array  $context   Full resolution context.
-	 * @return string Filtered policy (falls back to computed value if filter returns garbage).
+	 * @return string Filtered policy.
 	 */
-	private function applyFilter( string $policy, string $tool_name, string $mode, array $context ): string {
-		/**
-		 * Filter the resolved action policy for a single tool invocation.
-		 *
-		 * Runs after all layered resolution. Allows plugins to force a
-		 * specific policy (e.g. network admin override, audit-mode wrapper)
-		 * without touching agent_config.
-		 *
-		 * @since 0.72.0
-		 *
-		 * @param string $policy    Computed policy (direct/preview/forbidden).
-		 * @param string $tool_name Tool name.
-		 * @param string $mode      Agent mode.
-		 * @param array  $context   Resolution context.
-		 */
+	private function applyDataMachineFilter( string $policy, string $tool_name, string $mode, array $context ): string {
 		$filtered = apply_filters( 'datamachine_tool_action_policy', $policy, $tool_name, $mode, $context );
 
-		$normalized = $this->normalizePolicyValue( $filtered );
-		return '' === $normalized ? $policy : $normalized;
+		return ActionPolicy::normalize( $filtered ) ?? $policy;
 	}
 
 	/**
