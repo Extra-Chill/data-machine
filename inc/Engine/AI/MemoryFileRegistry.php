@@ -23,6 +23,10 @@ namespace DataMachine\Engine\AI;
 
 defined( 'ABSPATH' ) || exit;
 
+use WP_Agent_Context_Injection_Policy;
+use WP_Agent_Memory_Layer;
+use WP_Agent_Memory_Registry;
+
 class MemoryFileRegistry {
 
 	/**
@@ -92,10 +96,7 @@ class MemoryFileRegistry {
 			return;
 		}
 
-		$layer = $args['layer'] ?? self::LAYER_AGENT;
-		if ( ! in_array( $layer, array( self::LAYER_SHARED, self::LAYER_AGENT, self::LAYER_USER, self::LAYER_NETWORK ), true ) ) {
-			$layer = self::LAYER_AGENT;
-		}
+		$layer = self::normalize_layer( $args['layer'] ?? self::LAYER_AGENT );
 
 		// Composable files are auto-generated — never hand-editable.
 		$composable = (bool) ( $args['composable'] ?? false );
@@ -117,17 +118,44 @@ class MemoryFileRegistry {
 		// Convention path: relative path from ABSPATH for an additional copy.
 		$convention_path = isset( $args['convention_path'] ) ? ltrim( $args['convention_path'], '/' ) : '';
 
-		self::$files[ $filename ] = array(
-			'filename'        => $filename,
-			'priority'        => $priority,
-			'layer'           => $layer,
-			'protected'       => (bool) ( $args['protected'] ?? false ),
-			'editable'        => $editable,
-			'composable'      => $composable,
-			'convention_path' => $convention_path,
-			'modes'           => $modes,
-			'label'           => $args['label'] ?? self::filename_to_label( $filename ),
-			'description'     => $args['description'] ?? '',
+		$metadata = array(
+			'filename'         => $filename,
+			'priority'         => $priority,
+			'layer'            => $layer,
+			'protected'        => (bool) ( $args['protected'] ?? false ),
+			'editable'         => $editable,
+			'composable'       => $composable,
+			'convention_path'  => $convention_path,
+			'modes'            => $modes,
+			'label'            => $args['label'] ?? self::filename_to_label( $filename ),
+			'description'      => $args['description'] ?? '',
+			'retrieval_policy' => WP_Agent_Context_Injection_Policy::normalize( $args['retrieval_policy'] ?? WP_Agent_Context_Injection_Policy::ALWAYS ),
+			'authority_tier'   => $args['authority_tier'] ?? self::default_authority_tier( $layer, $filename ),
+			'provenance'       => is_array( $args['provenance'] ?? null ) ? $args['provenance'] : self::default_provenance( $filename ),
+		);
+
+		self::$files[ $filename ] = $metadata;
+
+		WP_Agent_Memory_Registry::register(
+			self::source_id_for_filename( $filename ),
+			array(
+				'layer'            => $layer,
+				'priority'         => $priority,
+				'protected'        => $metadata['protected'],
+				'editable'         => $editable,
+				'modes'            => $modes,
+				'retrieval_policy' => $metadata['retrieval_policy'],
+				'composable'       => $composable,
+				'context_slug'     => self::context_slug_for_filename( $filename ),
+				'convention_path'  => $convention_path,
+				'label'            => $metadata['label'],
+				'description'      => $metadata['description'],
+				'meta'             => array(
+					'filename'       => $filename,
+					'authority_tier' => $metadata['authority_tier'],
+					'provenance'     => $metadata['provenance'],
+				),
+			)
 		);
 	}
 
@@ -138,7 +166,9 @@ class MemoryFileRegistry {
 	 * @return void
 	 */
 	public static function deregister( string $filename ): void {
-		unset( self::$files[ sanitize_file_name( $filename ) ] );
+		$filename = sanitize_file_name( $filename );
+		unset( self::$files[ $filename ] );
+		WP_Agent_Memory_Registry::unregister( self::source_id_for_filename( $filename ) );
 	}
 
 	/**
@@ -453,6 +483,7 @@ class MemoryFileRegistry {
 	public static function reset(): void {
 		self::$files          = array();
 		self::$filter_applied = false;
+		WP_Agent_Memory_Registry::reset();
 	}
 
 	/**
@@ -481,7 +512,7 @@ class MemoryFileRegistry {
 			self::$filter_applied = true;
 		}
 
-		$files = self::$files;
+		$files = self::from_agents_api_sources( WP_Agent_Memory_Registry::get_all() );
 		uasort(
 			$files,
 			function ( $a, $b ) {
@@ -490,6 +521,75 @@ class MemoryFileRegistry {
 		);
 
 		return $files;
+	}
+
+	/**
+	 * Convert Agents API source registrations back to Data Machine's filename-keyed product shape.
+	 *
+	 * @param array<string, array<string, mixed>> $sources Agents API source metadata.
+	 * @return array<string, array>
+	 */
+	private static function from_agents_api_sources( array $sources ): array {
+		$files = array();
+		foreach ( $sources as $source ) {
+			$filename = $source['meta']['filename'] ?? null;
+			if ( ! is_string( $filename ) || '' === $filename ) {
+				continue;
+			}
+
+			$files[ $filename ] = array(
+				'filename'         => $filename,
+				'priority'         => (int) ( $source['priority'] ?? 50 ),
+				'layer'            => self::normalize_layer( $source['layer'] ?? self::LAYER_AGENT ),
+				'protected'        => (bool) ( $source['protected'] ?? false ),
+				'editable'         => $source['editable'] ?? true,
+				'composable'       => (bool) ( $source['composable'] ?? false ),
+				'convention_path'  => is_string( $source['convention_path'] ?? null ) ? $source['convention_path'] : '',
+				'modes'            => is_array( $source['modes'] ?? null ) ? $source['modes'] : array( self::MODE_ALL ),
+				'label'            => is_string( $source['label'] ?? null ) ? $source['label'] : self::filename_to_label( $filename ),
+				'description'      => is_string( $source['description'] ?? null ) ? $source['description'] : '',
+				'retrieval_policy' => is_string( $source['retrieval_policy'] ?? null ) ? $source['retrieval_policy'] : WP_Agent_Context_Injection_Policy::ALWAYS,
+				'authority_tier'   => is_string( $source['meta']['authority_tier'] ?? null ) ? $source['meta']['authority_tier'] : self::default_authority_tier( self::normalize_layer( $source['layer'] ?? self::LAYER_AGENT ), $filename ),
+				'provenance'       => is_array( $source['meta']['provenance'] ?? null ) ? $source['meta']['provenance'] : self::default_provenance( $filename ),
+			);
+		}
+
+		return $files;
+	}
+
+	private static function source_id_for_filename( string $filename ): string {
+		return 'datamachine/' . strtolower( $filename );
+	}
+
+	public static function context_slug_for_filename( string $filename ): string {
+		return sanitize_key( str_replace( '.', '-', strtolower( $filename ) ) );
+	}
+
+	private static function normalize_layer( string $layer ): string {
+		return WP_Agent_Memory_Layer::normalize( $layer, self::LAYER_AGENT );
+	}
+
+	private static function default_authority_tier( string $layer, string $filename ): string {
+		if ( self::LAYER_SHARED === $layer || self::LAYER_NETWORK === $layer ) {
+			return \AgentsAPI\AI\Context\ContextAuthorityTier::WORKSPACE_SHARED;
+		}
+
+		if ( self::LAYER_USER === $layer ) {
+			return \AgentsAPI\AI\Context\ContextAuthorityTier::USER_GLOBAL;
+		}
+
+		if ( 'SOUL.md' === $filename ) {
+			return \AgentsAPI\AI\Context\ContextAuthorityTier::AGENT_IDENTITY;
+		}
+
+		return \AgentsAPI\AI\Context\ContextAuthorityTier::AGENT_MEMORY;
+	}
+
+	private static function default_provenance( string $filename ): array {
+		return array(
+			'source_type' => 'datamachine_memory_file',
+			'source_ref'  => $filename,
+		);
 	}
 
 	/**

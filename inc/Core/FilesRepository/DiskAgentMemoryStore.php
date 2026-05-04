@@ -78,7 +78,7 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 			$bytes,
 			false === $updated_at ? null : (int) $updated_at,
 			null,
-			$metadata_fields,
+			$this->capabilities()->unsupported_metadata_fields( $metadata_fields, 'read' )
 		);
 	}
 
@@ -88,8 +88,6 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * `$if_match` is intentionally ignored — see class docblock.
 	 */
 	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
-		unset( $metadata );
-
 		$filepath = $this->resolve_filepath( $scope );
 		$dir      = dirname( $filepath );
 
@@ -111,7 +109,12 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 		FilesystemHelper::make_group_writable( $filepath );
 
 		$bytes = strlen( $content );
-		return AgentMemoryWriteResult::ok( sha1( $content ), $bytes );
+		return AgentMemoryWriteResult::ok(
+			sha1( $content ),
+			$bytes,
+			null,
+			null === $metadata ? array() : $this->capabilities()->unsupported_metadata_fields( array_keys( $metadata->to_array() ), 'persist' )
+		);
 	}
 
 	/**
@@ -145,8 +148,6 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * @inheritDoc
 	 */
 	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
-		unset( $query );
-
 		$layer_dir = $this->resolve_layer_directory( $scope_query );
 
 		if ( ! is_dir( $layer_dir ) ) {
@@ -172,6 +173,8 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 				$scope_query->layer,
 				(int) filesize( $path ),
 				false === $mtime ? null : (int) $mtime,
+				null,
+				$this->unsupported_query_fields( $query )
 			);
 		}
 
@@ -186,8 +189,6 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * including the prefix (e.g. `daily/2026/04/17.md`).
 	 */
 	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
-		unset( $query );
-
 		$prefix = trim( $prefix, '/' );
 		if ( '' === $prefix ) {
 			return array();
@@ -224,6 +225,8 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 				$scope_query->layer,
 				(int) $file_info->getSize(),
 				false === $mtime ? null : (int) $mtime,
+				null,
+				$this->unsupported_query_fields( $query )
 			);
 		}
 
@@ -234,6 +237,22 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 		);
 
 		return $entries;
+	}
+
+	/**
+	 * @return string[]
+	 */
+	private function unsupported_query_fields( ?AgentMemoryQuery $query ): array {
+		if ( null === $query ) {
+			return array();
+		}
+
+		$capabilities = $this->capabilities();
+		return array_values( array_unique( array_merge(
+			$capabilities->unsupported_metadata_fields( $query->metadata_fields, 'read' ),
+			$capabilities->unsupported_metadata_fields( $query->filter_fields(), 'filter' ),
+			null === $query->order_by ? array() : $capabilities->unsupported_metadata_fields( array( $query->order_by ), 'rank' )
+		) ) );
 	}
 
 	// =========================================================================

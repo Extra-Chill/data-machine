@@ -18,6 +18,8 @@ namespace DataMachine\Engine\AI;
 
 defined( 'ABSPATH' ) || exit;
 
+use WP_Agent_Context_Section_Registry;
+
 class SectionRegistry {
 
 	/**
@@ -63,12 +65,33 @@ class SectionRegistry {
 			self::$sections[ $filename ] = array();
 		}
 
+		$section_callback = static function ( array $context, array $section ) use ( $callback ) {
+			unset( $section );
+			return call_user_func( $callback, $context );
+		};
+
 		self::$sections[ $filename ][ $slug ] = array(
 			'slug'        => $slug,
 			'priority'    => $priority,
-			'callback'    => $callback,
+			'callback'    => $section_callback,
 			'label'       => $args['label'] ?? self::slug_to_label( $slug ),
 			'description' => $args['description'] ?? '',
+		);
+
+		WP_Agent_Context_Section_Registry::register(
+			MemoryFileRegistry::context_slug_for_filename( $filename ),
+			$slug,
+			$priority,
+			$section_callback,
+			array(
+				'label'            => self::$sections[ $filename ][ $slug ]['label'],
+				'description'      => self::$sections[ $filename ][ $slug ]['description'],
+				'retrieval_policy' => $args['retrieval_policy'] ?? null,
+				'modes'            => $args['modes'] ?? array( MemoryFileRegistry::MODE_ALL ),
+				'meta'             => array(
+					'filename' => $filename,
+				),
+			)
 		);
 	}
 
@@ -86,6 +109,7 @@ class SectionRegistry {
 		$slug     = sanitize_key( $slug );
 
 		unset( self::$sections[ $filename ][ $slug ] );
+		WP_Agent_Context_Section_Registry::unregister( MemoryFileRegistry::context_slug_for_filename( $filename ), $slug );
 	}
 
 	/**
@@ -126,18 +150,10 @@ class SectionRegistry {
 	 * @return string Assembled file content.
 	 */
 	public static function generate( string $filename, array $context = array() ): string {
-		$sections = self::get_sections( $filename );
-		$parts    = array();
+		self::ensure_action_fired();
 
-		foreach ( $sections as $slug => $section ) {
-			$output = call_user_func( $section['callback'], $context );
-
-			if ( is_string( $output ) && '' !== trim( $output ) ) {
-				$parts[] = trim( $output );
-			}
-		}
-
-		$content = implode( "\n\n", $parts );
+		$composition = WP_Agent_Context_Section_Registry::compose( MemoryFileRegistry::context_slug_for_filename( $filename ), $context );
+		$content     = $composition->content;
 
 		/**
 		 * Filter the assembled content of a composable file.
@@ -200,6 +216,7 @@ class SectionRegistry {
 	public static function reset(): void {
 		self::$sections     = array();
 		self::$action_fired = false;
+		WP_Agent_Context_Section_Registry::reset();
 	}
 
 	/**
