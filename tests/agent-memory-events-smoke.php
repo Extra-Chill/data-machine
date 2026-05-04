@@ -352,7 +352,7 @@ $GLOBALS['datamachine_agent_memory_events_taxonomies'] = array( GuidelineAgentMe
 $GLOBALS['datamachine_agent_memory_events_actions']    = array();
 
 $guideline_store = new GuidelineAgentMemoryStore();
-$guideline_scope = new AgentMemoryScope( 'agent', 'site', '1', 7, 42, 'GUIDELINE.md' );
+$guideline_scope = new AgentMemoryScope( 'agent', 'site', 'https://example.test', 7, 42, 'GUIDELINE.md' );
 $guideline_write = $guideline_store->write( $guideline_scope, 'Guideline content' );
 datamachine_agent_memory_events_assert( true === $guideline_write->success, 'guideline-backed write succeeds when substrate exists' );
 
@@ -364,7 +364,7 @@ datamachine_agent_memory_events_assert( GuidelineAgentMemoryStore::TERM_MEMORY =
 $GLOBALS['datamachine_agent_memory_events_post_types'] = array();
 $GLOBALS['datamachine_agent_memory_events_taxonomies'] = array();
 $GLOBALS['datamachine_agent_memory_events_actions']    = array();
-$capability_write                                      = $guideline_store->write( new AgentMemoryScope( 'agent', 'site', '1', 7, 42, 'UNAVAILABLE.md' ), 'No substrate' );
+$capability_write                                      = $guideline_store->write( new AgentMemoryScope( 'agent', 'site', 'https://example.test', 7, 42, 'UNAVAILABLE.md' ), 'No substrate' );
 datamachine_agent_memory_events_assert( false === $capability_write->success, 'guideline-backed write fails cleanly without substrate' );
 datamachine_agent_memory_events_assert( array() === datamachine_agent_memory_events_matching( 'datamachine_guideline_updated' ), 'unavailable guideline substrate does not emit guideline event' );
 

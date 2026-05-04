@@ -194,13 +194,13 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 use DataMachine\Abilities\PermissionHelper;
 use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
-use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
-use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
-use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
-use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
 use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
 use AgentsAPI\Core\FilesRepository\AgentMemoryQuery;
+use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
+use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
 use AgentsAPI\Core\FilesRepository\AgentMemoryStoreCapabilities;
+use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
+use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\AI\Memory\MemorySectionArtifact;
@@ -219,6 +219,7 @@ class MemoryPolicyFakeStore implements AgentMemoryStoreInterface {
 	}
 
 	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
+		unset( $metadata_fields );
 		if ( ! array_key_exists( $scope->key(), $this->files ) ) {
 			return AgentMemoryReadResult::not_found();
 		}
@@ -227,8 +228,8 @@ class MemoryPolicyFakeStore implements AgentMemoryStoreInterface {
 		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123 );
 	}
 
-	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null, ?AgentMemoryMetadata $_metadata = null ): AgentMemoryWriteResult {
-		unset( $_if_match, $_metadata );
+	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
+		unset( $_if_match, $metadata );
 		$this->files[ $scope->key() ] = $content;
 		return AgentMemoryWriteResult::ok( sha1( $content ), strlen( $content ) );
 	}
@@ -242,13 +243,15 @@ class MemoryPolicyFakeStore implements AgentMemoryStoreInterface {
 		return AgentMemoryWriteResult::ok( '', 0 );
 	}
 
-	public function list_layer( AgentMemoryScope $_scope_query, ?AgentMemoryQuery $_query = null ): array {
-		unset( $_scope_query, $_query );
+	public function list_layer( AgentMemoryScope $_scope_query, ?AgentMemoryQuery $query = null ): array {
+		unset( $query );
+		unset( $_scope_query );
 		return array();
 	}
 
-	public function list_subtree( AgentMemoryScope $_scope_query, string $_prefix, ?AgentMemoryQuery $_query = null ): array {
-		unset( $_scope_query, $_prefix, $_query );
+	public function list_subtree( AgentMemoryScope $_scope_query, string $_prefix, ?AgentMemoryQuery $query = null ): array {
+		unset( $query );
+		unset( $_scope_query, $_prefix );
 		return array();
 	}
 }

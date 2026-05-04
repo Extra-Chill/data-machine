@@ -12,7 +12,7 @@
  * `agents_api_memory_store` filter. When unavailable, the built-in
  * disk store remains the default behavior.
  *
- * Identity model: one post = one (layer, user_id, agent_id, filename) tuple.
+	 * Identity model: one post = one (layer, workspace, user_id, agent_id, filename) tuple.
  * Filename is the relative path within the layer (`MEMORY.md`,
  * `daily/2026/04/17.md`, `contexts/chat.md`).
  *

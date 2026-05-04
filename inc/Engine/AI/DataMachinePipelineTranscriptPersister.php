@@ -10,6 +10,7 @@ namespace DataMachine\Engine\AI;
 use AgentsAPI\AI\AgentConversationRequest;
 use AgentsAPI\AI\AgentConversationTranscriptPersisterInterface;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -38,13 +39,16 @@ class DataMachinePipelineTranscriptPersister implements AgentConversationTranscr
 			return '';
 		}
 
-		$store = ConversationStoreFactory::get_transcript_store();
+		$store     = ConversationStoreFactory::get_transcript_store();
+		$workspace = $request->workspace() ?? WordPressWorkspaceScope::current();
 
 		$user_id  = (int) ( $runtime_context['user_id'] ?? 0 );
 		$agent_id = (int) ( $runtime_context['agent_id'] ?? 0 );
 
 		$store_metadata = array(
 			'source'       => 'pipeline_transcript',
+			'workspace'    => $workspace->to_array(),
+			'wordpress'    => WordPressWorkspaceScope::metadata(),
 			'job_id'       => $runtime_context['job_id'] ?? null,
 			'flow_step_id' => $runtime_context['flow_step_id'] ?? null,
 			'pipeline_id'  => $runtime_context['pipeline_id'] ?? null,
@@ -69,7 +73,6 @@ class DataMachinePipelineTranscriptPersister implements AgentConversationTranscr
 			$store_metadata['request_metadata'] = $result['request_metadata'];
 		}
 
-		$workspace  = $request->workspace() ?? ConversationStoreFactory::default_workspace();
 		$session_id = $store->create_session( $workspace, $user_id, $agent_id, $store_metadata, 'pipeline' );
 
 		if ( '' === $session_id ) {

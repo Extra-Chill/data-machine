@@ -97,12 +97,21 @@ class AgentMemoryStoreContractFakeStore implements AgentMemoryStoreInterface {
 
 	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
 		unset( $query );
-
 		$this->scopes[] = $scope_query;
 		$entries        = array();
 
 		foreach ( $this->files as $key => $content ) {
-			[ $layer, $workspace_type, $workspace_id, $user_id, $agent_id, $filename ] = explode( ':', $key, 6 );
+			$parts = explode( ':', $key );
+			if ( count( $parts ) < 6 ) {
+				continue;
+			}
+
+			$layer          = array_shift( $parts );
+			$workspace_type = array_shift( $parts );
+			$filename       = (string) array_pop( $parts );
+			$agent_id       = (int) array_pop( $parts );
+			$user_id        = (int) array_pop( $parts );
+			$workspace_id   = implode( ':', $parts );
 			if ( $layer !== $scope_query->layer || $workspace_type !== $scope_query->workspace_type || $workspace_id !== $scope_query->workspace_id || (int) $user_id !== $scope_query->user_id || (int) $agent_id !== $scope_query->agent_id ) {
 				continue;
 			}
@@ -118,6 +127,7 @@ class AgentMemoryStoreContractFakeStore implements AgentMemoryStoreInterface {
 	}
 
 	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
+		unset( $query );
 		$this->scopes[] = $scope_query;
 		unset( $prefix, $query );
 		return array();
@@ -147,7 +157,7 @@ function datamachine_agent_memory_store_contract_round_trip( AgentMemoryStoreInt
 	return $store->read( $scope );
 }
 
-$scope = new AgentMemoryScope( 'agent', 'site', '1', 7, 42, 'MEMORY.md' );
+$scope = new AgentMemoryScope( 'agent', 'site', 'https://example.test', 7, 42, 'MEMORY.md' );
 
 datamachine_agent_memory_store_contract_reset_filters();
 $default_store = AgentMemoryStoreFactory::for_scope( $scope );
