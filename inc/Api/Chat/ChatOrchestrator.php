@@ -774,5 +774,4 @@ class ChatOrchestrator {
 			);
 		}
 	}
-
 }
