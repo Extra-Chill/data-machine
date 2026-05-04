@@ -89,6 +89,7 @@ class DailyMemorySeamFakeStore implements AgentMemoryStoreInterface {
 	}
 
 	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
+		unset( $metadata_fields );
 		$this->record( 'read', $scope );
 
 		if ( ! array_key_exists( $scope->key(), $this->files ) ) {
@@ -100,6 +101,7 @@ class DailyMemorySeamFakeStore implements AgentMemoryStoreInterface {
 	}
 
 	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
+		unset( $metadata );
 		$this->record( 'write', $scope );
 		$this->files[ $scope->key() ] = $content;
 
@@ -119,11 +121,13 @@ class DailyMemorySeamFakeStore implements AgentMemoryStoreInterface {
 	}
 
 	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
+		unset( $query );
 		$this->record( 'list_layer', $scope_query );
 		return array();
 	}
 
 	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
+		unset( $query );
 		$this->record( 'list_subtree', $scope_query );
 		$this->list_prefixes[] = $prefix;
 

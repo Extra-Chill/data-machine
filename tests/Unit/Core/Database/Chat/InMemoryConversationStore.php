@@ -32,6 +32,8 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 
 		$this->sessions[ $session_id ] = array(
 			'session_id'   => $session_id,
+			'workspace_type' => $workspace->workspace_type,
+			'workspace_id' => $workspace->workspace_id,
 			'user_id'      => $user_id,
 			'agent_id'     => $agent_id > 0 ? $agent_id : null,
 			'title'        => null,
@@ -145,7 +147,7 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		$best   = null;
 
 		foreach ( $this->sessions as $session ) {
-			if ( (int) $session['user_id'] !== $user_id ) {
+			if ( $session['workspace_type'] !== $workspace->workspace_type || $session['workspace_id'] !== $workspace->workspace_id || (int) $session['user_id'] !== $user_id ) {
 				continue;
 			}
 			if ( $session['context'] !== $context ) {

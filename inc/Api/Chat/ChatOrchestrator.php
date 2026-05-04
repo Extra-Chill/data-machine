@@ -18,6 +18,7 @@ namespace DataMachine\Api\Chat;
 
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\DataMachineAgentConsentPolicy;
 use DataMachine\Engine\AI\Tools\ToolManager;
@@ -102,7 +103,7 @@ class ChatOrchestrator {
 			$session_metadata = $session['metadata'] ?? array();
 		} else {
 			// Check for recent pending session to prevent duplicates from timeout retries.
-			$pending_session = $chat_db->get_recent_pending_session( self::workspace_scope(), $user_id, 600, 'chat', $acting_token_id );
+			$pending_session = $chat_db->get_recent_pending_session( WordPressWorkspaceScope::current(), $user_id, 600, 'chat', $acting_token_id );
 
 			if ( $pending_session ) {
 				$session_id       = $pending_session['session_id'];
@@ -609,7 +610,7 @@ class ChatOrchestrator {
 			$metadata['source'] = $source;
 		}
 
-		$session_id = $chat_db->create_session( self::workspace_scope(), $user_id, $agent_id, $metadata, 'chat' );
+		$session_id = $chat_db->create_session( WordPressWorkspaceScope::current(), $user_id, $agent_id, $metadata, 'chat' );
 
 		if ( empty( $session_id ) ) {
 			return new WP_Error(
@@ -774,10 +775,4 @@ class ChatOrchestrator {
 		}
 	}
 
-	/**
-	 * Resolve the current site workspace for transcript storage.
-	 */
-	private static function workspace_scope(): \AgentsAPI\Core\Workspace\AgentWorkspaceScope {
-		return ConversationStoreFactory::default_workspace();
-	}
 }

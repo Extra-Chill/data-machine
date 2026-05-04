@@ -186,9 +186,9 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$today     = gmdate( 'Y-m-d' );
 		$yesterday = gmdate( 'Y-m-d', time() - DAY_IN_SECONDS );
 
-		$a = $store->create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', '1' ), $user );
-		$b = $store->create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', '1' ), $user );
-		$c = $store->create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', '1' ), $user );
+		$a = $store->create_session( $this->workspace(), $user );
+		$b = $store->create_session( $this->workspace(), $user );
+		$c = $store->create_session( $this->workspace(), $user );
 
 		$ref      = new \ReflectionClass( $store );
 		$sessions = $ref->getProperty( 'sessions' );
@@ -229,9 +229,9 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'size_mb', $metrics );
 		$this->assertSame( 0, $metrics['rows'] );
 
-		$store->create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', '1' ), 1 );
-		$store->create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', '1' ), 1 );
-		$store->create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', '1' ), 2 );
+		$store->create_session( $this->workspace(), 1 );
+		$store->create_session( $this->workspace(), 1 );
+		$store->create_session( $this->workspace(), 2 );
 
 		$metrics = $store->get_storage_metrics();
 		$this->assertSame( 3, $metrics['rows'] );
@@ -256,7 +256,7 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 	 */
 	private function persist_fixture_transcript( ConversationTranscriptStoreInterface $store ): array {
 		$session_id = $store->create_session(
-			\AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', '1' ),
+			$this->workspace(),
 			5,
 			7,
 			array(
@@ -306,7 +306,7 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		);
 		ConversationStoreFactory::reset();
 
-		$session_id = $store->create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', '1' ), 7, 0, array(), 'chat' );
+		$session_id = $store->create_session( $this->workspace(), 7, 0, array(), 'chat' );
 		$ref        = new \ReflectionClass( $store );
 		$sessions   = $ref->getProperty( 'sessions' );
 		$sessions->setAccessible( true );
@@ -327,7 +327,7 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		wp_set_current_user( $user_id );
 
 		// Seed the in-memory store with a session under the target user.
-		$session_id = $memory_store->create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', '1' ), $user_id, 0, array(), 'chat' );
+		$session_id = $memory_store->create_session( $this->workspace(), $user_id, 0, array(), 'chat' );
 		$memory_store->update_session(
 			$session_id,
 			array(
@@ -361,5 +361,9 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$this->assertCount( 1, $result['sessions'] );
 		$this->assertSame( $session_id, $result['sessions'][0]['session_id'] );
 		$this->assertSame( 'hello', $result['sessions'][0]['first_message'] );
+	}
+
+	private function workspace(): AgentWorkspaceScope {
+		return AgentWorkspaceScope::from_parts( 'site', 'https://example.test' );
 	}
 }

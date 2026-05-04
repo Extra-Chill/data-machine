@@ -21,6 +21,7 @@ use AgentsAPI\AI\AgentConversationTranscriptPersisterInterface;
 use AgentsAPI\AI\AgentMessageEnvelope;
 use AgentsAPI\AI\NullAgentConversationTranscriptPersister;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 
 defined( 'ABSPATH' ) || exit;
@@ -130,6 +131,20 @@ function datamachine_run_conversation(
 				'max_turns'            => $max_turns,
 				'budgets'              => array( $turn_budget ),
 				'context'              => array_merge( $loop_payload, array( 'mode' => $mode ) ),
+				'request'              => new \AgentsAPI\AI\AgentConversationRequest(
+					$messages,
+					array(),
+					null,
+					array_merge( $loop_payload, array( 'mode' => $mode ) ),
+					array(
+						'provider'  => $provider,
+						'model'     => $model,
+						'wordpress' => WordPressWorkspaceScope::metadata(),
+					),
+					$max_turns,
+					$single_turn,
+					WordPressWorkspaceScope::current()
+				),
 				'should_continue'      => $should_continue,
 				'transcript_persister' => $transcript_persister,
 				'on_event'             => $on_event,

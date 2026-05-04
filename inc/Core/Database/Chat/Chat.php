@@ -15,6 +15,7 @@ use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\Database\BaseRepository;
 use AgentsAPI\AI\AgentMessageEnvelope;
 use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -50,6 +51,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 
 		$sql = "CREATE TABLE {$table_name} (
 			session_id VARCHAR(50) NOT NULL,
+			workspace_type VARCHAR(50) NOT NULL,
+			workspace_id VARCHAR(191) NOT NULL,
 			user_id BIGINT(20) UNSIGNED NOT NULL,
 			agent_id BIGINT(20) UNSIGNED NULL,
 			title VARCHAR(100) NULL,
@@ -63,6 +66,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			last_read_at DATETIME NULL,
 			expires_at DATETIME NULL,
 			PRIMARY KEY  (session_id),
+			KEY workspace (workspace_type, workspace_id),
 			KEY user_id (user_id),
 			KEY agent_id (agent_id),
 			KEY mode (mode),
@@ -74,6 +78,43 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+	}
+
+	/**
+	 * Ensure workspace columns exist for Agents API-scoped transcript rows.
+	 *
+	 * Existing rows are stamped with the current site scope because the prefixed
+	 * WordPress table was already site-local before this generic boundary existed.
+	 *
+	 * @return void
+	 */
+	public static function ensure_workspace_columns(): void {
+		global $wpdb;
+
+		$table_name = self::get_prefixed_table_name();
+		$workspace  = WordPressWorkspaceScope::current();
+
+		if ( ! self::column_exists( $table_name, 'workspace_type', $wpdb ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN workspace_type VARCHAR(50) NULL', $table_name ) );
+		}
+
+		if ( ! self::column_exists( $table_name, 'workspace_id', $wpdb ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN workspace_id VARCHAR(191) NULL', $table_name ) );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query(
+			$wpdb->prepare(
+				'UPDATE %i SET workspace_type = %s, workspace_id = %s WHERE workspace_type IS NULL OR workspace_type = %s OR workspace_id IS NULL OR workspace_id = %s',
+				$table_name,
+				$workspace->workspace_type,
+				$workspace->workspace_id,
+				'',
+				''
+			)
+		);
 	}
 
 	/**
@@ -249,17 +290,19 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$result = $wpdb->insert(
 			$table_name,
 			array(
-				'session_id' => $session_id,
-				'user_id'    => $user_id,
-				'agent_id'   => $agent_id > 0 ? $agent_id : null,
-				'messages'   => wp_json_encode( array() ),
-				'metadata'   => wp_json_encode( $metadata ),
-				'provider'   => null,
-				'model'      => null,
-				'mode'       => $context,
-				'expires_at' => null,
+				'session_id'     => $session_id,
+				'workspace_type' => $workspace->workspace_type,
+				'workspace_id'   => $workspace->workspace_id,
+				'user_id'        => $user_id,
+				'agent_id'       => $agent_id > 0 ? $agent_id : null,
+				'messages'       => wp_json_encode( array() ),
+				'metadata'       => wp_json_encode( $metadata ),
+				'provider'       => null,
+				'model'          => null,
+				'mode'           => $context,
+				'expires_at'     => null,
 			),
-			array( '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
+			array( '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( false === $result ) {
@@ -707,7 +750,9 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$cutoff_time = gmdate( 'Y-m-d H:i:s', time() - $seconds );
 
 		$query  = "SELECT * FROM %i
-				WHERE user_id = %d
+				WHERE workspace_type = %s
+				AND workspace_id = %s
+				AND user_id = %d
 				AND mode = %s
 				AND created_at >= %s
 				AND (
@@ -716,6 +761,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				)";
 		$params = array(
 			$table_name,
+			$workspace->workspace_type,
+			$workspace->workspace_id,
 			$user_id,
 			$context,
 			$cutoff_time,

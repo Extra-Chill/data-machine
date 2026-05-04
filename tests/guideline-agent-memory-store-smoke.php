@@ -163,9 +163,9 @@ datamachine_guideline_memory_assert(
 
 echo "\nTest: deterministic scope key encoding\n";
 
-$scope = new AgentMemoryScope( 'agent', 'site', '1', 7, 42, 'MEMORY.md' );
-$same  = new AgentMemoryScope( 'agent', 'site', '1', 7, 42, 'MEMORY.md' );
-$daily = new AgentMemoryScope( 'agent', 'site', '1', 7, 42, 'daily/2026/04/17.md' );
+$scope = new AgentMemoryScope( 'agent', 'site', 'https://example.test', 7, 42, 'MEMORY.md' );
+$same  = new AgentMemoryScope( 'agent', 'site', 'https://example.test', 7, 42, 'MEMORY.md' );
+$daily = new AgentMemoryScope( 'agent', 'site', 'https://example.test', 7, 42, 'daily/2026/04/17.md' );
 
 $post_name = GuidelineAgentMemoryStore::post_name_for_scope( $scope );
 datamachine_guideline_memory_assert(
@@ -174,7 +174,7 @@ datamachine_guideline_memory_assert(
 );
 
 datamachine_guideline_memory_assert(
-	'memory-' . sha1( 'agent:site:1:7:42:MEMORY.md' ) === $post_name,
+	'memory-' . sha1( $scope->key() ) === $post_name,
 	'post_name is memory- prefixed sha1 of AgentMemoryScope::key()'
 );
 
@@ -191,7 +191,7 @@ datamachine_guideline_memory_assert(
 echo "\nTest: subtree filenames and Data Machine meta keys\n";
 
 datamachine_guideline_memory_assert(
-	$daily->key() === 'agent:site:1:7:42:daily/2026/04/17.md',
+	$daily->key() === 'agent:site:https://example.test:7:42:daily/2026/04/17.md',
 	'Scope key preserves daily/... filenames'
 );
 

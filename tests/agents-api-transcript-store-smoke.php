@@ -58,20 +58,22 @@ class AgentsApiFakeTranscriptStore implements ConversationTranscriptStoreInterfa
 		$session_id = 'session-' . ( count( $this->sessions ) + 1 );
 
 		$this->sessions[ $session_id ] = array(
-			'session_id'   => $session_id,
-			'user_id'      => $user_id,
-			'agent_id'     => $agent_id,
-			'title'        => '',
-			'messages'     => array(),
-			'metadata'     => $metadata,
-			'provider'     => '',
-			'model'        => '',
-			'context'      => $context,
-			'mode'         => $context,
-			'created_at'   => gmdate( 'Y-m-d H:i:s' ),
-			'updated_at'   => gmdate( 'Y-m-d H:i:s' ),
-			'last_read_at' => null,
-			'expires_at'   => null,
+			'session_id'     => $session_id,
+			'workspace_type' => $workspace->workspace_type,
+			'workspace_id'   => $workspace->workspace_id,
+			'user_id'        => $user_id,
+			'agent_id'       => $agent_id,
+			'title'          => '',
+			'messages'       => array(),
+			'metadata'       => $metadata,
+			'provider'       => '',
+			'model'          => '',
+			'context'        => $context,
+			'mode'           => $context,
+			'created_at'     => gmdate( 'Y-m-d H:i:s' ),
+			'updated_at'     => gmdate( 'Y-m-d H:i:s' ),
+			'last_read_at'   => null,
+			'expires_at'     => null,
 		);
 
 		return $session_id;
@@ -132,7 +134,7 @@ $assert_true( false === interface_exists( 'DataMachine\\Core\\Database\\Chat\\Co
 $store = new AgentsApiFakeTranscriptStore();
 $assert_true( in_array( ConversationTranscriptStoreInterface::class, class_implements( $store ), true ), 'fake store can implement transcript contract without chat product interfaces' );
 
-$workspace  = \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', '1' );
+$workspace  = AgentWorkspaceScope::from_parts( 'site', 'https://example.test' );
 $session_id = $store->create_session( $workspace, 7, 3, array( 'source' => 'smoke' ), 'pipeline' );
 $assert_true( 'session-1' === $session_id, 'fake store creates transcript session IDs' );
 $assert_true( null !== $store->get_recent_pending_session( $workspace, 7, 600, 'pipeline' ), 'fake store can query pending transcript sessions' );

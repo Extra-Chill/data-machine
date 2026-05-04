@@ -38,6 +38,7 @@ use AgentsAPI\AI\Approvals\ApprovalDecision;
 use AgentsAPI\AI\Approvals\PendingAction;
 use AgentsAPI\AI\Approvals\PendingActionStatus;
 use AgentsAPI\AI\Approvals\PendingActionStoreInterface;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -105,6 +106,7 @@ class PendingActionStore {
 			resolution_error text NULL,
 			resolution_metadata longtext NULL,
 			PRIMARY KEY  (action_id),
+			KEY workspace (workspace_type, workspace_id),
 			KEY status (status),
 			KEY kind (kind),
 			KEY agent_id (agent_id),
@@ -112,12 +114,50 @@ class PendingActionStore {
 			KEY created_by (created_by),
 			KEY creator (creator),
 			KEY resolver (resolver),
-			KEY workspace (workspace_type, workspace_id),
 			KEY expires_at (expires_at),
 			KEY created_at (created_at)
 		) {$charset_collate};";
 
 		dbDelta( $sql );
+		self::ensure_workspace_columns();
+	}
+
+	/**
+	 * Ensure workspace columns exist on previously-created audit tables.
+	 *
+	 * @return void
+	 */
+	public static function ensure_workspace_columns(): void {
+		global $wpdb;
+
+		if ( ! self::has_database() ) {
+			return;
+		}
+
+		$table_name = self::get_table_name();
+		$workspace  = WordPressWorkspaceScope::current();
+
+		if ( ! self::column_exists( $table_name, 'workspace_type' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN workspace_type varchar(50) NULL', $table_name ) );
+		}
+
+		if ( ! self::column_exists( $table_name, 'workspace_id' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN workspace_id varchar(191) NULL', $table_name ) );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query(
+			$wpdb->prepare(
+				'UPDATE %i SET workspace_type = %s, workspace_id = %s WHERE workspace_type IS NULL OR workspace_type = %s OR workspace_id IS NULL OR workspace_id = %s',
+				$table_name,
+				$workspace->workspace_type,
+				$workspace->workspace_id,
+				'',
+				''
+			)
+		);
 	}
 
 	/**
@@ -151,6 +191,14 @@ class PendingActionStore {
 	 */
 	public static function store( string $action_id, array $payload ): bool {
 		global $wpdb;
+
+		$workspace            = isset( $payload['workspace'] ) && is_array( $payload['workspace'] )
+			? \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_array( $payload['workspace'] )
+			: WordPressWorkspaceScope::current();
+		$payload['workspace'] = $workspace->to_array();
+		$context              = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
+		$context['wordpress'] = $context['wordpress'] ?? WordPressWorkspaceScope::metadata();
+		$payload['context']   = $context;
 
 		if ( ! self::has_database() ) {
 			$payload['created_at'] = time();
@@ -320,14 +368,14 @@ class PendingActionStore {
 		$args  = array();
 
 		self::add_filter_clause( $where, $args, $filters, 'status', 'status', '%s' );
+		self::add_filter_clause( $where, $args, $filters, 'workspace_type', 'workspace_type', '%s' );
+		self::add_filter_clause( $where, $args, $filters, 'workspace_id', 'workspace_id', '%s' );
 		self::add_filter_clause( $where, $args, $filters, 'kind', 'kind', '%s' );
 		self::add_filter_clause( $where, $args, $filters, 'agent_id', 'agent_id', '%d' );
 		self::add_filter_clause( $where, $args, $filters, 'agent', 'agent', '%s' );
 		self::add_filter_clause( $where, $args, $filters, 'created_by', 'created_by', '%d' );
 		self::add_filter_clause( $where, $args, $filters, 'creator', 'creator', '%s' );
 		self::add_filter_clause( $where, $args, $filters, 'resolver', 'resolver', '%s' );
-		self::add_filter_clause( $where, $args, $filters, 'workspace_type', 'workspace_type', '%s' );
-		self::add_filter_clause( $where, $args, $filters, 'workspace_id', 'workspace_id', '%s' );
 
 		if ( ! empty( $filters['context'] ) && is_array( $filters['context'] ) ) {
 			foreach ( $filters['context'] as $key => $value ) {
@@ -623,6 +671,18 @@ class PendingActionStore {
 
 		$where[] = $column . ' = ' . $format;
 		$args[]  = '%d' === $format ? (int) $filters[ $filter_key ] : (string) $filters[ $filter_key ];
+	}
+
+	/**
+	 * Check whether a pending-action table column exists.
+	 */
+	private static function column_exists( string $table_name, string $column ): bool {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, $column ) );
+
+		return null !== $result;
 	}
 
 	/**

@@ -12,6 +12,7 @@ namespace DataMachine\Tests\Unit\Abilities;
 use DataMachine\Abilities\SystemAbilities;
 use DataMachine\Core\Database\Chat\Chat as ChatDatabase;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use WP_UnitTestCase;
 
 class SystemAbilitiesTest extends WP_UnitTestCase {
@@ -47,7 +48,7 @@ class SystemAbilitiesTest extends WP_UnitTestCase {
 	 */
 	private function create_test_session( array $messages, ?string $title = null ): string {
 		$session_id = $this->chat_db->create_session(
-			\AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', '1' ),
+			WordPressWorkspaceScope::current(),
 			$this->test_user_id,
 			0,
 			array( 'status' => 'completed' ),

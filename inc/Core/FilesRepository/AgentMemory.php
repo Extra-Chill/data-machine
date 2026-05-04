@@ -25,6 +25,7 @@ use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
 use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
 use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
 use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
@@ -73,12 +74,12 @@ class AgentMemory {
 		$this->directory_manager = new DirectoryManager();
 		$effective_user_id       = $this->directory_manager->get_effective_user_id( $user_id );
 		$safe_filename           = $this->sanitize_filename( $filename );
-		$workspace               = self::workspace_parts();
+		$workspace               = WordPressWorkspaceScope::current();
 
 		$this->scope = new AgentMemoryScope(
 			$layer ?? self::resolve_layer_for( $safe_filename ),
-			$workspace['type'],
-			$workspace['id'],
+			$workspace->workspace_type,
+			$workspace->workspace_id,
 			$effective_user_id,
 			$agent_id,
 			$safe_filename
@@ -230,8 +231,8 @@ class AgentMemory {
 	public static function list_layer( string $layer, int $user_id = 0, int $agent_id = 0 ): array {
 		$dm                = new DirectoryManager();
 		$effective_user_id = $dm->get_effective_user_id( $user_id );
-		$workspace         = self::workspace_parts();
-		$scope_query       = new AgentMemoryScope( $layer, $workspace['type'], $workspace['id'], $effective_user_id, $agent_id, '' );
+		$workspace         = WordPressWorkspaceScope::current();
+		$scope_query       = new AgentMemoryScope( $layer, $workspace->workspace_type, $workspace->workspace_id, $effective_user_id, $agent_id, '' );
 		$store             = AgentMemoryStoreFactory::for_scope( $scope_query );
 
 		return $store->list_layer( $scope_query );
@@ -259,8 +260,8 @@ class AgentMemory {
 	public static function list_subtree( string $layer, int $user_id, int $agent_id, string $prefix ): array {
 		$dm                = new DirectoryManager();
 		$effective_user_id = $dm->get_effective_user_id( $user_id );
-		$workspace         = self::workspace_parts();
-		$scope_query       = new AgentMemoryScope( $layer, $workspace['type'], $workspace['id'], $effective_user_id, $agent_id, '' );
+		$workspace         = WordPressWorkspaceScope::current();
+		$scope_query       = new AgentMemoryScope( $layer, $workspace->workspace_type, $workspace->workspace_id, $effective_user_id, $agent_id, '' );
 		$store             = AgentMemoryStoreFactory::for_scope( $scope_query );
 
 		return $store->list_subtree( $scope_query, $prefix );
@@ -723,19 +724,6 @@ class AgentMemory {
 			$clean[] = preg_replace( '/[^a-zA-Z0-9._-]/', '', basename( $segment ) );
 		}
 		return implode( '/', $clean );
-	}
-
-	/**
-	 * Resolve the current site workspace identity for memory storage.
-	 *
-	 * @since next
-	 * @return array{type:string,id:string}
-	 */
-	private static function workspace_parts(): array {
-		return array(
-			'type' => 'site',
-			'id'   => function_exists( 'get_current_blog_id' ) ? (string) get_current_blog_id() : '1',
-		);
 	}
 
 	/**
