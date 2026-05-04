@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.31.2] - 2026-05-04
+
+### Fixed
+- handle Eventbrite recurring/series events with nextAvailableSession
+
 ## [0.31.1] - 2026-05-02
 
 ### Fixed
