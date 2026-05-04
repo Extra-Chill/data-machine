@@ -103,6 +103,8 @@ use DataMachine\Core\Database\Chat\ConversationStoreInterface;
 use DataMachine\Engine\AI\DataMachinePipelineTranscriptPersister;
 use DataMachine\Engine\AI\Directives\DirectiveInterface;
 use DataMachine\Engine\AI\RequestBuilder;
+use AgentsAPI\AI\AgentConversationRequest;
+use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
 
 class RequestMetadataSmokeDirective implements DirectiveInterface {
 	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
@@ -119,7 +121,8 @@ class RequestMetadataSmokeStore implements ConversationStoreInterface {
 	public array $sessions = array();
 	public array $updated  = array();
 
-	public function create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope $workspace, int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
+	public function create_session( AgentWorkspaceScope $workspace, int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
+		$metadata['workspace'] = $workspace->to_array();
 		$this->sessions['smoke-session'] = compact( 'user_id', 'agent_id', 'metadata', 'context' );
 		return 'smoke-session';
 	}
@@ -132,7 +135,7 @@ class RequestMetadataSmokeStore implements ConversationStoreInterface {
 	public function delete_session( string $session_id ): bool { return true; }
 	public function get_user_sessions( int $user_id, int $limit = 20, int $offset = 0, ?string $context = null, ?int $agent_id = null ): array { return array(); }
 	public function get_user_session_count( int $user_id, ?string $context = null, ?int $agent_id = null ): int { return 0; }
-	public function get_recent_pending_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array { return null; }
+	public function get_recent_pending_session( AgentWorkspaceScope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array { return null; }
 	public function update_title( string $session_id, string $title ): bool { return true; }
 	public function count_unread( array $messages, ?string $last_read_at ): int { return 0; }
 	public function mark_session_read( string $session_id, int $user_id ) { return gmdate( 'Y-m-d H:i:s' ); }
@@ -285,9 +288,13 @@ $property->setValue( null, $store );
 
 $session_id = ( new DataMachinePipelineTranscriptPersister() )->persist(
 	array( array( 'role' => 'user', 'content' => 'hello' ) ),
-	'openai',
-	'gpt-smoke',
-	array( 'persist_transcript' => true, 'job_id' => 279, 'flow_step_id' => 12, 'user_id' => 1, 'agent_id' => 2 ),
+	new AgentConversationRequest(
+		array( array( 'role' => 'user', 'content' => 'hello' ) ),
+		array(),
+		null,
+		array( 'persist_transcript' => true, 'job_id' => 279, 'flow_step_id' => 12, 'user_id' => 1, 'agent_id' => 2 ),
+		array( 'provider' => 'openai', 'model' => 'gpt-smoke' )
+	),
 	array( 'turn_count' => 1, 'completed' => false, 'request_metadata' => $request_metadata )
 );
 assert_true( 'smoke-session' === $session_id, 'simulated pipeline transcript is persisted' );

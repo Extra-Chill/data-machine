@@ -14,6 +14,7 @@ namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\FilesRepository\AgentMemory;
+use DataMachine\Engine\AI\DataMachineAgentConsentPolicy;
 use DataMachine\Engine\AI\Memory\MemorySectionPendingAction;
 use DataMachine\Engine\AI\Memory\SelfMemoryWritePolicy;
 
@@ -144,39 +145,39 @@ class AgentMemoryAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'agent_id'           => array(
+							'agent_id'          => array(
 								'type'        => array( 'integer', 'null' ),
 								'description' => 'Optional target agent. Defaults to the current acting agent; other agents require explicit delegation.',
 							),
-							'file'               => array(
+							'file'              => array(
 								'type'        => 'string',
 								'description' => 'Target memory file. Defaults to MEMORY.md.',
 								'default'     => 'MEMORY.md',
 							),
-							'section'            => array(
+							'section'           => array(
 								'type'        => 'string',
 								'description' => 'Section name to create or update.',
 							),
-							'section_type'       => array(
+							'section_type'      => array(
 								'type'        => 'string',
 								'description' => 'Operational section type, such as operating_note, source_quirk, run_lesson, or task_note.',
 								'default'     => 'operating_note',
 							),
-							'content'            => array(
+							'content'           => array(
 								'type'        => 'string',
 								'description' => 'Operational memory content to write.',
 							),
-							'mode'               => array(
+							'mode'              => array(
 								'type'        => 'string',
 								'enum'        => array( 'set', 'append' ),
 								'description' => 'Write mode. Defaults to append.',
 								'default'     => 'append',
 							),
-							'reason'             => array(
+							'reason'            => array(
 								'type'        => 'string',
 								'description' => 'Why this operational note should be recorded.',
 							),
-							'requires_approval'  => array(
+							'requires_approval' => array(
 								'type'        => 'boolean',
 								'description' => 'Force PendingAction preview instead of direct write.',
 								'default'     => false,
@@ -336,6 +337,23 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function updateMemory( array $input ): array {
+		$consent_decision = DataMachineAgentConsentPolicy::get()->can_store_memory(
+			array(
+				'mode'               => 'ability',
+				'interactive'        => true,
+				'permission_granted' => PermissionHelper::can_manage(),
+				'agent_id'           => (int) ( $input['agent_id'] ?? 0 ),
+				'user_id'            => (int) ( $input['user_id'] ?? 0 ),
+			)
+		);
+		if ( ! $consent_decision->is_allowed() ) {
+			return array(
+				'success'          => false,
+				'message'          => 'Memory write consent denied.',
+				'consent_decision' => $consent_decision->to_array(),
+			);
+		}
+
 		$memory  = self::resolveMemory( $input );
 		$section = $input['section'];
 		$content = $input['content'];

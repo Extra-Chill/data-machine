@@ -9,6 +9,7 @@ namespace DataMachine\Engine\AI\Memory;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\FilesRepository\AgentMemory;
+use DataMachine\Engine\AI\DataMachineAgentConsentPolicy;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -35,6 +36,19 @@ final class SelfMemoryWritePolicy {
 		$current_agent_id = PermissionHelper::get_acting_agent_id();
 		if ( null === $current_agent_id ) {
 			return self::deny( 'Self-memory writes require an active agent context.', 'missing_agent_context' );
+		}
+
+		$consent_decision = DataMachineAgentConsentPolicy::get()->can_store_memory(
+			array(
+				'mode'               => 'self_memory',
+				'interactive'        => false,
+				'permission_granted' => true,
+				'agent_id'           => $current_agent_id,
+				'user_id'            => PermissionHelper::acting_user_id(),
+			)
+		);
+		if ( ! $consent_decision->is_allowed() ) {
+			return self::deny( 'Self-memory write consent denied.', $consent_decision->reason() );
 		}
 
 		$target_agent_id = absint( $input['agent_id'] ?? $current_agent_id );
