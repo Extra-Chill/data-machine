@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 $GLOBALS['datamachine_event_sink_test_filters'] = array();
 $GLOBALS['datamachine_event_sink_test_logs']    = array();
+$GLOBALS['datamachine_event_sink_test_actions'] = array();
 
 if ( ! function_exists( 'add_filter' ) ) {
 	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
@@ -38,12 +39,41 @@ if ( ! function_exists( 'apply_filters' ) ) {
 if ( ! function_exists( 'do_action' ) ) {
 	function do_action( string $hook, ...$args ): void {
 		$GLOBALS['datamachine_event_sink_test_logs'][] = array_merge( array( $hook ), $args );
+
+		$callbacks = $GLOBALS['datamachine_event_sink_test_actions'][ $hook ] ?? array();
+		ksort( $callbacks );
+
+		foreach ( $callbacks as $priority_callbacks ) {
+			foreach ( $priority_callbacks as $entry ) {
+				$callback      = $entry[0];
+				$accepted_args = $entry[1];
+				$callback( ...array_slice( $args, 0, $accepted_args ) );
+			}
+		}
+	}
+}
+
+if ( ! function_exists( 'add_action' ) ) {
+	function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+		$GLOBALS['datamachine_event_sink_test_actions'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
 	}
 }
 
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $data, int $flags = 0 ) {
 		return json_encode( $data, $flags );
+	}
+}
+
+if ( ! function_exists( 'sanitize_key' ) ) {
+	function sanitize_key( $key ): string {
+		return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) );
+	}
+}
+
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( string $_option, $default = false ) {
+		return $default;
 	}
 }
 
@@ -105,6 +135,7 @@ function assert_loop_event_sink( bool $condition, string $label ): void {
 function reset_loop_event_sink_smoke(): void {
 	$GLOBALS['datamachine_event_sink_test_filters'] = array();
 	$GLOBALS['datamachine_event_sink_test_logs']    = array();
+	$GLOBALS['datamachine_event_sink_test_actions'] = array();
 }
 
 function loop_event_sink_event_names( LoopEventSinkSmokeCollector $sink ): array {
@@ -215,7 +246,69 @@ assert_loop_event_sink( isset( $first_request_built['payload']['request_metadata
 
 assert_loop_event_sink( ! array_key_exists( 'event_sink', LoopEventSinkSmokeTool::$last_parameters ), 'event sink object is not forwarded into tool parameters' );
 
-// 3. Failure events are emitted on AI request failure without changing the return array.
+// 3. Cross-cutting observers receive the canonical Agents API loop action.
+reset_loop_event_sink_smoke();
+$action_events  = array();
+$dispatch_count = 0;
+add_action(
+	'agents_api_loop_event',
+	static function ( string $event, array $payload ) use ( &$action_events ): void {
+		$action_events[] = array(
+			'event'   => $event,
+			'payload' => $payload,
+		);
+	},
+	10,
+	2
+);
+
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$dispatch_count ) {
+		++$dispatch_count;
+
+		if ( 1 === $dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => '',
+					'tool_calls' => array(
+						array(
+							'name'       => 'smoke_tool',
+							'parameters' => array( 'name' => 'Grace' ),
+						),
+					),
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => 'done through action',
+				'tool_calls' => array(),
+			),
+		);
+	}
+);
+
+$action_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'observe via action' ) ),
+	loop_event_sink_tools(),
+	'openai',
+	'gpt-smoke',
+	'pipeline',
+	array( 'job_id' => 1774 ),
+	3
+);
+
+$action_event_names = array_map( fn( array $entry ): string => $entry['event'], $action_events );
+assert_loop_event_sink( true === $action_result['completed'], 'canonical action observer does not require a per-run sink' );
+assert_loop_event_sink( in_array( 'turn_started', $action_event_names, true ), 'canonical action observer receives turn_started' );
+assert_loop_event_sink( in_array( 'completed', $action_event_names, true ), 'canonical action observer receives completed' );
+assert_loop_event_sink( ! in_array( 'request_built', $action_event_names, true ), 'Data Machine request_built event stays product-specific' );
+
+// 4. Failure events are emitted on AI request failure without changing the return array.
 reset_loop_event_sink_smoke();
 $failure_sink = new LoopEventSinkSmokeCollector();
 WpAiClientTestDouble::reset();
@@ -250,7 +343,7 @@ if ( $failed_event ) {
 	assert_loop_event_sink( true, 'failure event sink recorded events (failed event may be implicit)' );
 }
 
-// 4. Sink failures are logged and never change loop output.
+// 5. Sink failures are logged and never change loop output.
 reset_loop_event_sink_smoke();
 WpAiClientTestDouble::reset();
 WpAiClientTestDouble::set_response_callback(
