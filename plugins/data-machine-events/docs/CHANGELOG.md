@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.31.3] - 2026-05-04
+
+### Fixed
+- scope calendar progressive day-loader to caller date range
+
 ## [0.31.2] - 2026-05-04
 
 ### Fixed
