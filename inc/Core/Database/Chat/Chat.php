@@ -316,8 +316,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return null;
 		}
 
-		$session['messages'] = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
-		$session['metadata'] = json_decode( $session['metadata'], true ) ?? array();
+		$session['messages']       = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
+		$session['metadata']       = json_decode( $session['metadata'], true ) ?? array();
 		$session['workspace_type'] = (string) ( $session['metadata']['workspace_type'] ?? 'site' );
 		$session['workspace_id']   = (string) ( $session['metadata']['workspace_id'] ?? (string) get_current_blog_id() );
 		$session['context']        = $session['mode'] ?? 'chat';
@@ -748,8 +748,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return null;
 		}
 
-		$session['messages'] = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
-		$session['metadata'] = json_decode( $session['metadata'], true ) ?? array();
+		$session['messages']       = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
+		$session['metadata']       = json_decode( $session['metadata'], true ) ?? array();
 		$session['workspace_type'] = (string) ( $session['metadata']['workspace_type'] ?? $workspace->workspace_type );
 		$session['workspace_id']   = (string) ( $session['metadata']['workspace_id'] ?? $workspace->workspace_id );
 		$session['context']        = $session['mode'] ?? $context;
