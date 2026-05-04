@@ -264,10 +264,10 @@ class PermissionHelper {
 	 * @param int|null   $token_id     Token ID for login-level runtime scoping.
 	 */
 	public static function set_agent_context( int $agent_id, int $owner_id, ?array $capabilities = null, ?int $token_id = null ): void {
-		self::$acting_agent_id          = $agent_id;
-		self::$acting_token_id          = $token_id;
-		self::$agent_owner_id           = $owner_id;
-		self::$capability_ceiling       = new \WP_Agent_Capability_Ceiling(
+		self::$acting_agent_id     = $agent_id;
+		self::$acting_token_id     = $token_id;
+		self::$agent_owner_id      = $owner_id;
+		self::$capability_ceiling  = new \WP_Agent_Capability_Ceiling(
 			$owner_id,
 			$capabilities,
 			array(
@@ -275,7 +275,7 @@ class PermissionHelper {
 				'token_id' => $token_id,
 			)
 		);
-		self::$execution_principal      = null !== $token_id
+		self::$execution_principal = null !== $token_id
 			? AgentExecutionPrincipal::agent_token(
 				$owner_id,
 				(string) $agent_id,
@@ -303,12 +303,12 @@ class PermissionHelper {
 	 * @since 0.47.0
 	 */
 	public static function clear_agent_context(): void {
-		self::$acting_agent_id          = null;
-		self::$acting_token_id          = null;
-		self::$agent_owner_id           = 0;
-		self::$capability_ceiling       = null;
-		self::$execution_principal      = null;
-		self::$caller_context           = null;
+		self::$acting_agent_id     = null;
+		self::$acting_token_id     = null;
+		self::$agent_owner_id      = 0;
+		self::$capability_ceiling  = null;
+		self::$execution_principal = null;
+		self::$caller_context      = null;
 	}
 
 	/**
@@ -372,7 +372,7 @@ class PermissionHelper {
 	 * @return bool
 	 */
 	public static function in_cross_site_context(): bool {
-		return self::$caller_context !== null && self::$caller_context->isCrossSite();
+		return null !== self::$caller_context && self::$caller_context->isCrossSite();
 	}
 
 	/**

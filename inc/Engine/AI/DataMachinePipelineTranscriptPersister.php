@@ -9,7 +9,6 @@ namespace DataMachine\Engine\AI;
 
 use AgentsAPI\AI\AgentConversationRequest;
 use AgentsAPI\AI\AgentConversationTranscriptPersisterInterface;
-use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 
 defined( 'ABSPATH' ) || exit;
@@ -64,7 +63,7 @@ class DataMachinePipelineTranscriptPersister implements AgentConversationTranscr
 			$store_metadata['request_metadata'] = $result['request_metadata'];
 		}
 
-		$session_id = $store->create_session( AgentWorkspaceScope::from_parts( 'site', (string) get_current_blog_id() ), $user_id, $agent_id, $store_metadata, 'pipeline' );
+		$session_id = $store->create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', (string) get_current_blog_id() ), $user_id, $agent_id, $store_metadata, 'pipeline' );
 
 		if ( '' === $session_id ) {
 			do_action(

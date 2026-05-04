@@ -39,12 +39,14 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	const TAXONOMY    = 'wp_guideline_type';
 	const TERM_MEMORY = 'memory';
 
-	const META_LAYER    = '_datamachine_memory_layer';
-	const META_USER_ID  = '_datamachine_memory_user_id';
-	const META_AGENT_ID = '_datamachine_memory_agent_id';
-	const META_FILENAME = '_datamachine_memory_filename';
-	const META_HASH     = '_datamachine_memory_hash';
-	const META_BYTES    = '_datamachine_memory_bytes';
+	const META_LAYER          = '_datamachine_memory_layer';
+	const META_WORKSPACE_TYPE = '_datamachine_memory_workspace_type';
+	const META_WORKSPACE_ID   = '_datamachine_memory_workspace_id';
+	const META_USER_ID        = '_datamachine_memory_user_id';
+	const META_AGENT_ID       = '_datamachine_memory_agent_id';
+	const META_FILENAME       = '_datamachine_memory_filename';
+	const META_HASH           = '_datamachine_memory_hash';
+	const META_BYTES          = '_datamachine_memory_bytes';
 
 	/**
 	 * Whether the host has the Guidelines substrate this store needs.
@@ -100,13 +102,15 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		$updated = strtotime( (string) $post->post_modified_gmt );
 		$updated = false === $updated ? null : (int) $updated;
 
-		return new AgentMemoryReadResult( true, $content, $hash, $bytes, $updated, null, $this->capabilities()->unsupported_metadata_fields( $metadata_fields, 'read' ) );
+		return new AgentMemoryReadResult( true, $content, $hash, $bytes, $updated, null, $metadata_fields );
 	}
 
 	/**
 	 * @inheritDoc
 	 */
 	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
+		unset( $metadata );
+
 		if ( ! self::is_available() ) {
 			return AgentMemoryWriteResult::failure( 'capability' );
 		}
@@ -145,6 +149,8 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 
 			update_post_meta( $existing->ID, self::META_HASH, $hash );
 			update_post_meta( $existing->ID, self::META_BYTES, $bytes );
+			update_post_meta( $existing->ID, self::META_WORKSPACE_TYPE, $scope->workspace_type );
+			update_post_meta( $existing->ID, self::META_WORKSPACE_ID, $scope->workspace_id );
 
 			$this->emit_guideline_updated_event( $existing->ID );
 
@@ -162,12 +168,14 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 				'comment_status' => 'closed',
 				'ping_status'    => 'closed',
 				'meta_input'     => array(
-					self::META_LAYER    => $scope->layer,
-					self::META_USER_ID  => $scope->user_id,
-					self::META_AGENT_ID => $scope->agent_id,
-					self::META_FILENAME => $scope->filename,
-					self::META_HASH     => $hash,
-					self::META_BYTES    => $bytes,
+					self::META_LAYER          => $scope->layer,
+					self::META_WORKSPACE_TYPE => $scope->workspace_type,
+					self::META_WORKSPACE_ID   => $scope->workspace_id,
+					self::META_USER_ID        => $scope->user_id,
+					self::META_AGENT_ID       => $scope->agent_id,
+					self::META_FILENAME       => $scope->filename,
+					self::META_HASH           => $hash,
+					self::META_BYTES          => $bytes,
 				),
 			),
 			true
@@ -222,6 +230,8 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * @inheritDoc
 	 */
 	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
+		unset( $query );
+
 		$posts   = $this->query_scope_posts( $scope_query, null );
 		$entries = array();
 
@@ -242,6 +252,8 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * @inheritDoc
 	 */
 	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
+		unset( $query );
+
 		$prefix = trim( $prefix, '/' );
 		if ( '' === $prefix ) {
 			return array();
@@ -307,6 +319,16 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 			array(
 				'key'     => self::META_LAYER,
 				'value'   => $scope_query->layer,
+				'compare' => '=',
+			),
+			array(
+				'key'     => self::META_WORKSPACE_TYPE,
+				'value'   => $scope_query->workspace_type,
+				'compare' => '=',
+			),
+			array(
+				'key'     => self::META_WORKSPACE_ID,
+				'value'   => $scope_query->workspace_id,
 				'compare' => '=',
 			),
 			array(

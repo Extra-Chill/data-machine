@@ -236,11 +236,11 @@ class AgentMemoryEventsFakeStore implements AgentMemoryStoreInterface {
 		}
 
 		$content = $this->files[ $scope->key() ];
-		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123 );
+		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123, null, $metadata_fields );
 	}
 
-	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null, ?AgentMemoryMetadata $_metadata = null ): AgentMemoryWriteResult {
-		unset( $_if_match, $_metadata );
+	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
+		unset( $_if_match, $metadata );
 		if ( $this->fail_next_write ) {
 			$this->fail_next_write = false;
 			return AgentMemoryWriteResult::failure( 'io' );
@@ -264,13 +264,13 @@ class AgentMemoryEventsFakeStore implements AgentMemoryStoreInterface {
 		return AgentMemoryWriteResult::ok( '', 0 );
 	}
 
-	public function list_layer( AgentMemoryScope $_scope_query, ?AgentMemoryQuery $_query = null ): array {
-		unset( $_scope_query, $_query );
+	public function list_layer( AgentMemoryScope $_scope_query, ?AgentMemoryQuery $query = null ): array {
+		unset( $_scope_query, $query );
 		return array();
 	}
 
-	public function list_subtree( AgentMemoryScope $_scope_query, string $_prefix, ?AgentMemoryQuery $_query = null ): array {
-		unset( $_scope_query, $_prefix, $_query );
+	public function list_subtree( AgentMemoryScope $_scope_query, string $_prefix, ?AgentMemoryQuery $query = null ): array {
+		unset( $_scope_query, $_prefix, $query );
 		return array();
 	}
 }

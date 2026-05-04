@@ -106,6 +106,8 @@ datamachine_guideline_memory_assert(
 
 $expected_meta = array(
 	'_datamachine_memory_layer',
+	'_datamachine_memory_workspace_type',
+	'_datamachine_memory_workspace_id',
 	'_datamachine_memory_user_id',
 	'_datamachine_memory_agent_id',
 	'_datamachine_memory_filename',
@@ -116,7 +118,7 @@ $expected_meta = array(
 $reflection  = new ReflectionClass( GuidelineAgentMemoryStore::class );
 $actual_meta = array_values( array_intersect_key(
 	$reflection->getConstants(),
-	array_flip( array( 'META_LAYER', 'META_USER_ID', 'META_AGENT_ID', 'META_FILENAME', 'META_HASH', 'META_BYTES' ) )
+	array_flip( array( 'META_LAYER', 'META_WORKSPACE_TYPE', 'META_WORKSPACE_ID', 'META_USER_ID', 'META_AGENT_ID', 'META_FILENAME', 'META_HASH', 'META_BYTES' ) )
 ) );
 
 datamachine_guideline_memory_assert(

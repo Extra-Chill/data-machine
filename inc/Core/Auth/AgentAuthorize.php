@@ -380,7 +380,7 @@ class AgentAuthorize {
 
 		// Check access grants.
 		$access_repo = new AgentAccess();
-		$grant = $access_repo->get_access( (string) (int) $agent['agent_id'], $user_id );
+		$grant       = $access_repo->get_access( (string) (int) $agent['agent_id'], $user_id );
 		return $grant instanceof \WP_Agent_Access_Grant && $grant->role_meets( \WP_Agent_Access_Grant::ROLE_ADMIN );
 	}
 
@@ -616,19 +616,19 @@ class AgentAuthorize {
 
 		<dl class="agent-info">
 			<dt>Agent</dt>
-			<dd>' . $agent_name . ' <code style="font-size:0.8125rem;color:#646970">(' . $agent_slug . ')</code></dd>
+			<dd>' . esc_html( $agent_name ) . ' <code style="font-size:0.8125rem;color:#646970">(' . esc_html( $agent_slug ) . ')</code></dd>
 			<dt>Owner</dt>
-			<dd>' . $owner_name . '</dd>
+			<dd>' . esc_html( $owner_name ) . '</dd>
 			<dt>Redirect</dt>
-			<dd><code style="font-size:0.8125rem">' . $uri_display . '</code></dd>
+			<dd><code style="font-size:0.8125rem">' . esc_html( $uri_display ) . '</code></dd>
 		</dl>
 
 		<div class="auth-notice">
-			This will create a bearer token granting <strong>' . $agent_name . '</strong> API access to this site with your permissions. The token does not expire.
+			This will create a bearer token granting <strong>' . esc_html( $agent_name ) . '</strong> API access to this site with your permissions. The token does not expire.
 		</div>
 
 		<form method="POST" action="' . esc_url( $action_url ) . '">
-			<input type="hidden" name="agent_slug" value="' . $agent_slug . '">
+			<input type="hidden" name="agent_slug" value="' . esc_attr( $agent_slug ) . '">
 			<input type="hidden" name="redirect_uri" value="' . esc_attr( $redirect_uri ) . '">
 			<input type="hidden" name="label" value="' . esc_attr( $label ) . '">
 			<input type="hidden" name="_authorize_nonce" value="' . esc_attr( $nonce ) . '">' .
@@ -645,7 +645,7 @@ class AgentAuthorize {
 			</div>
 		</form>
 
-		<div class="auth-user">Signed in as <strong>' . $user_name . '</strong></div>
+		<div class="auth-user">Signed in as <strong>' . esc_html( $user_name ) . '</strong></div>
 	</div>
 </body>
 </html>';

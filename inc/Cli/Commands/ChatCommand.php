@@ -11,7 +11,6 @@
 namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
-use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 
@@ -287,7 +286,7 @@ class ChatCommand extends BaseCommand {
 		);
 
 		$chat_db    = ConversationStoreFactory::get();
-		$session_id = $chat_db->create_session( AgentWorkspaceScope::from_parts( 'site', (string) get_current_blog_id() ), $user_id, $agent_id, $metadata, $context );
+		$session_id = $chat_db->create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_parts( 'site', (string) get_current_blog_id() ), $user_id, $agent_id, $metadata, $context );
 
 		if ( empty( $session_id ) ) {
 			WP_CLI::error( 'Failed to create chat session.' );

@@ -126,8 +126,8 @@ class AgentAuthMiddleware {
 		}
 
 		// Parse cross-site caller context from A2A headers (no-op for non-A2A requests).
-		$request      = self::current_rest_request();
-		$inbound_ctx  = $request !== null
+		$request     = self::current_rest_request();
+		$inbound_ctx = null !== $request
 			? CallerContext::fromRequest( $request )
 			: new CallerContext();
 

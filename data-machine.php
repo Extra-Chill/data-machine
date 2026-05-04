@@ -6,7 +6,6 @@
  * Version:           0.103.14
  * Requires at least: 6.9
  * Requires PHP:     8.2
- * Requires Plugins: agents-api
  * Author:          Chris Huber, extrachill
  * Author URI:      https://chubes.net
  * License:         GPL v2 or later
@@ -35,31 +34,6 @@ if ( ! defined( 'AGENTS_API_LOADED' ) ) {
 		require_once $datamachine_agents_api_bootstrap;
 	}
 }
-
-$datamachine_agents_api_auth_contracts = array(
-	'WP_Agent_Capability_Ceiling'              => 'src/Auth/class-wp-agent-capability-ceiling.php',
-	'AgentsAPI\\AI\\AgentExecutionPrincipal' => 'src/Runtime/AgentExecutionPrincipal.php',
-	'WP_Agent_Access_Grant'                    => 'src/Auth/class-wp-agent-access-grant.php',
-	'WP_Agent_Access_Store_Interface'          => 'src/Auth/class-wp-agent-access-store-interface.php',
-	'WP_Agent_Token'                           => 'src/Auth/class-wp-agent-token.php',
-	'WP_Agent_Token_Store_Interface'           => 'src/Auth/class-wp-agent-token-store-interface.php',
-	'WP_Agent_Authorization_Policy_Interface'  => 'src/Auth/class-wp-agent-authorization-policy-interface.php',
-	'WP_Agent_Token_Authenticator'             => 'src/Auth/class-wp-agent-token-authenticator.php',
-	'WP_Agent_WordPress_Authorization_Policy'  => 'src/Auth/class-wp-agent-wordpress-authorization-policy.php',
-);
-
-foreach ( $datamachine_agents_api_auth_contracts as $datamachine_agents_api_symbol => $datamachine_agents_api_relative_path ) {
-	if ( class_exists( $datamachine_agents_api_symbol, false ) || interface_exists( $datamachine_agents_api_symbol, false ) ) {
-		continue;
-	}
-
-	$datamachine_agents_api_contract_path = __DIR__ . '/vendor/automattic/agents-api/' . $datamachine_agents_api_relative_path;
-	if ( file_exists( $datamachine_agents_api_contract_path ) ) {
-		require_once $datamachine_agents_api_contract_path;
-	}
-}
-
-unset( $datamachine_agents_api_auth_contracts, $datamachine_agents_api_symbol, $datamachine_agents_api_relative_path, $datamachine_agents_api_contract_path );
 
 // WP-CLI integration
 if ( defined( 'WP_CLI' ) && WP_CLI ) {

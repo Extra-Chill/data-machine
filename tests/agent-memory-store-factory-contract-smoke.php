@@ -48,8 +48,8 @@ use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
 use AgentsAPI\Core\FilesRepository\AgentMemoryQuery;
 use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
 use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
-use DataMachine\Core\FilesRepository\AgentMemoryStoreFactory;
 use AgentsAPI\Core\FilesRepository\AgentMemoryStoreCapabilities;
+use DataMachine\Core\FilesRepository\AgentMemoryStoreFactory;
 use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
 use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
 use DataMachine\Core\FilesRepository\DiskAgentMemoryStore;
@@ -72,11 +72,11 @@ class AgentMemoryStoreContractFakeStore implements AgentMemoryStoreInterface {
 		}
 
 		$content = $this->files[ $scope->key() ];
-		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123 );
+		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123, null, $metadata_fields );
 	}
 
-	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null, ?AgentMemoryMetadata $_metadata = null ): AgentMemoryWriteResult {
-		unset( $_if_match, $_metadata );
+	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
+		unset( $_if_match, $metadata );
 		$this->scopes[] = $scope;
 		$this->files[ $scope->key() ] = $content;
 
@@ -96,13 +96,14 @@ class AgentMemoryStoreContractFakeStore implements AgentMemoryStoreInterface {
 	}
 
 	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
+		unset( $query );
+
 		$this->scopes[] = $scope_query;
 		$entries        = array();
 
 		foreach ( $this->files as $key => $content ) {
 			[ $layer, $workspace_type, $workspace_id, $user_id, $agent_id, $filename ] = explode( ':', $key, 6 );
-			unset( $workspace_type, $workspace_id );
-			if ( $layer !== $scope_query->layer || (int) $user_id !== $scope_query->user_id || (int) $agent_id !== $scope_query->agent_id ) {
+			if ( $layer !== $scope_query->layer || $workspace_type !== $scope_query->workspace_type || $workspace_id !== $scope_query->workspace_id || (int) $user_id !== $scope_query->user_id || (int) $agent_id !== $scope_query->agent_id ) {
 				continue;
 			}
 
@@ -118,7 +119,7 @@ class AgentMemoryStoreContractFakeStore implements AgentMemoryStoreInterface {
 
 	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
 		$this->scopes[] = $scope_query;
-		unset( $prefix );
+		unset( $prefix, $query );
 		return array();
 	}
 }
