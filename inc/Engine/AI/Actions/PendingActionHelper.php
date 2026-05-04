@@ -102,8 +102,18 @@ class PendingActionHelper {
 			'apply_input'  => $apply_input,
 			'preview_data' => $preview_data,
 			'agent_id'     => $agent_id,
+			'agent'        => $agent_id > 0 ? 'agent:' . $agent_id : null,
 			'created_by'   => $user_id,
+			'creator'      => $user_id > 0 ? 'user:' . $user_id : null,
 			'context'      => $context,
+			'metadata'     => array(
+				'datamachine' => array(
+					'agent_id'     => $agent_id,
+					'created_by'   => $user_id,
+					'context'      => $context,
+					'resolve_with' => 'resolve_pending_action',
+				),
+			),
 		);
 		if ( isset( $args['ttl'] ) ) {
 			$payload['ttl'] = (int) $args['ttl'];
@@ -156,13 +166,13 @@ class PendingActionHelper {
 
 		$pending_action = array(
 			'action_id'   => $action_id,
-			'kind'        => 'tool_action',
+			'kind'        => $kind,
 			'summary'     => $payload['summary'],
 			'preview'     => $preview_data,
 			'apply_input' => $apply_input,
-			'creator'     => $user_id > 0 ? (string) $user_id : null,
-			'agent'       => $agent_id > 0 ? (string) $agent_id : null,
-			'context'     => $context,
+			'creator'     => $payload['creator'],
+			'agent'       => $payload['agent'],
+			'metadata'    => $payload['metadata'],
 			'created_at'  => gmdate( 'c', $created_at ),
 			'expires_at'  => null !== $expires_at ? gmdate( 'c', $expires_at ) : null,
 		);

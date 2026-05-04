@@ -60,6 +60,14 @@ $expected_agents_api_approval_primitives = array(
 		'path' => 'vendor/automattic/agents-api/src/Approvals/PendingActionHandlerInterface.php',
 		'type' => 'interface PendingActionHandlerInterface',
 	),
+	'AgentsAPI\\AI\\Approvals\\PendingAction'                  => array(
+		'path' => 'vendor/automattic/agents-api/src/Approvals/PendingAction.php',
+		'type' => 'class PendingAction',
+	),
+	'AgentsAPI\\AI\\Approvals\\PendingActionStatus'            => array(
+		'path' => 'vendor/automattic/agents-api/src/Approvals/PendingActionStatus.php',
+		'type' => 'final class PendingActionStatus',
+	),
 	'AgentsAPI\\AI\\Approvals\\ApprovalDecision'               => array(
 		'path' => 'vendor/automattic/agents-api/src/Approvals/ApprovalDecision.php',
 		'type' => 'final class ApprovalDecision',
@@ -78,6 +86,8 @@ foreach ( $expected_agents_api_approval_primitives as $class_name => $primitive 
 datamachine_pending_actions_assert( str_contains( $store_source, 'use AgentsAPI\\AI\\Approvals\\PendingActionStoreInterface;' ), 'concrete store consumes Agents API PendingActionStoreInterface', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $store_source, 'public static function adapter(): PendingActionStoreInterface' ), 'concrete store exposes the Agents API store contract', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $adapter_source, 'implements PendingActionStoreInterface' ), 'store adapter implements Agents API PendingActionStoreInterface', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $adapter_source, 'store( PendingAction $action )' ), 'store adapter accepts Agents API PendingAction records', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $adapter_source, 'record_resolution( string $action_id, ApprovalDecision $decision, string $resolver' ), 'store adapter records Agents API resolution audit metadata', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'implements PendingActionResolverInterface' ), 'resolver adapter implements Agents API PendingActionResolverInterface', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $action_policy, 'use AgentsAPI\\AI\\Tools\\ActionPolicy;' ) && str_contains( $action_policy, 'ActionPolicy::normalize' ), 'ActionPolicyResolver consumes Agents API ActionPolicy vocabulary', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'ApprovalDecision' ), 'resolver adapter consumes Agents API ApprovalDecision vocabulary', $failures, $passes );
@@ -87,8 +97,9 @@ datamachine_pending_actions_assert( str_contains( $store_source, 'CREATE TABLE {
 datamachine_pending_actions_assert( str_contains( $store_source, 'datamachine_pending_actions' ), 'durable table uses Data Machine pending-actions table name', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $store_source, 'public static function get( string $action_id, bool $include_resolved = false )' ), 'legacy get defaults to live-pending rows only', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $store_source, 'public static function inspect( string $action_id ): ?array' ), 'inspect surface can fetch resolved audit rows', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $resolver_source, 'record_resolution( $action_id, PendingActionStore::STATUS_ACCEPTED' ), 'accepted resolutions are retained instead of transient-deleted', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $resolver_source, 'record_resolution( $action_id, PendingActionStore::STATUS_REJECTED' ), 'rejected resolutions are retained instead of transient-deleted', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $store_source, 'PendingActionStatus::normalize' ), 'lifecycle vocabulary is delegated to Agents API PendingActionStatus', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_source, 'record_resolution( $action_id, PendingActionStatus::ACCEPTED' ), 'accepted resolutions are retained instead of transient-deleted', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_source, 'record_resolution( $action_id, PendingActionStatus::REJECTED' ), 'rejected resolutions are retained instead of transient-deleted', $failures, $passes );
 
 echo "\n[3] List/get/summary surfaces are registered for agents and operators:\n";
 foreach ( array( 'datamachine/list-pending-actions', 'datamachine/get-pending-action', 'datamachine/summarize-pending-actions' ) as $ability ) {
@@ -100,9 +111,9 @@ foreach ( array( '/actions', '/actions/(?P<action_id>', '/actions/summary' ) as 
 datamachine_pending_actions_assert( str_contains( $cli_bootstrap, 'datamachine pending-actions' ), 'pending-actions CLI command is registered', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $cli_command_source, 'public function list' ) && str_contains( $cli_command_source, 'public function get' ) && str_contains( $cli_command_source, 'public function summary' ), 'CLI exposes list/get/summary subcommands', $failures, $passes );
 
-echo "\n[4] Existing resolver and handler compatibility remains the canonical resolution path:\n";
+echo "\n[4] Existing resolver and Agents API handler contracts remain the canonical resolution path:\n";
 datamachine_pending_actions_assert( str_contains( $resolver_source, 'datamachine_pending_action_handlers' ), 'legacy pending action handler filter remains in resolver', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $resolver_source, 'PendingActionHandlerInterface' ), 'Agents API handler contract is bridged through the existing handler filter', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_source, 'can_resolve_pending_action' ) && str_contains( $resolver_source, 'handle_pending_action( $pending_action, $decision' ), 'Agents API handler permission and apply contracts are used through the existing handler filter', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $plugin_source, 'new \\DataMachine\\Engine\\AI\\Actions\\ResolvePendingActionAbility();' ), 'existing resolve ability remains registered', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $plugin_source, 'new \\DataMachine\\Engine\\AI\\Actions\\ResolvePendingAction();' ), 'existing chat resolver tool remains registered', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $runtime_source, 'datamachine_migrate_pending_actions_table' ), 'upgrade path creates pending-action table on deployed installs', $failures, $passes );
@@ -156,15 +167,20 @@ if ( ! function_exists( 'apply_filters' ) ) {
 	}
 }
 
+if ( ! function_exists( 'add_action' ) ) {
+	function add_action( string $_hook_name, $callback, int $_priority = 10, int $_accepted_args = 1 ): bool {
+		unset( $callback );
+		return true;
+	}
+}
+
 if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	function wp_generate_uuid4(): string {
 		return '11111111-2222-4333-8444-555555555555';
 	}
 }
 
-require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Approvals/PendingActionStoreInterface.php';
-require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Approvals/PendingActionStatus.php';
-require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Approvals/PendingAction.php';
+require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/agents-api.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStoreAdapter.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
 
@@ -177,20 +193,27 @@ $action    = \AgentsAPI\AI\Approvals\PendingAction::from_array(
 		'summary'     => 'Contract smoke',
 		'preview'     => array( 'ok' => true ),
 		'apply_input' => array( 'value' => 1 ),
+		'creator'     => 'user:123',
+		'agent'       => 'agent:456',
 		'created_at'  => gmdate( 'c' ),
-		'metadata'    => array( 'ttl' => 10 ),
+		'expires_at'  => gmdate( 'c', time() + 10 ),
+		'metadata'    => array(
+			'datamachine' => array(
+				'created_by' => 123,
+				'agent_id'   => 456,
+			),
+		),
 	)
 );
 
 datamachine_pending_actions_assert( $store instanceof \AgentsAPI\AI\Approvals\PendingActionStoreInterface, 'PendingActionStore adapter is an Agents API store', $failures, $passes );
 datamachine_pending_actions_assert( str_starts_with( $action_id, 'act_' ), 'legacy generate_id returns namespaced action IDs', $failures, $passes );
-datamachine_pending_actions_assert( $store->store( $action ), 'contract store writes through transient fallback', $failures, $passes );
+datamachine_pending_actions_assert( $store->store( $action ), 'contract store writes PendingAction through transient fallback', $failures, $passes );
 
 $stored = $store->get( $action_id );
-datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && 'contract_smoke' === $stored->get_kind(), 'contract get reads the stored pending action', $failures, $passes );
+datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && 'contract_smoke' === $stored->get_kind(), 'contract get reads the stored PendingAction', $failures, $passes );
 datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && $action_id === $stored->get_action_id(), 'contract store preserves action ID in payload', $failures, $passes );
-$stored_payload = \DataMachine\Engine\AI\Actions\PendingActionStore::get( $action_id );
-datamachine_pending_actions_assert( isset( $stored_payload['expires_at'], $stored_payload['created_at'] ) && $stored_payload['expires_at'] >= $stored_payload['created_at'] + 3600, 'transient fallback preserves minimum TTL behavior', $failures, $passes );
+datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && null !== $stored->get_expires_at(), 'transient fallback preserves expiration audit data', $failures, $passes );
 datamachine_pending_actions_assert( $store->delete( $action_id ), 'contract delete removes transient fallback payload', $failures, $passes );
 datamachine_pending_actions_assert( null === $store->get( $action_id ), 'contract get returns null after delete', $failures, $passes );
 

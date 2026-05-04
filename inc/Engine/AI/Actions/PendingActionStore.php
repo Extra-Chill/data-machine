@@ -34,20 +34,14 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
+use AgentsAPI\AI\Approvals\ApprovalDecision;
+use AgentsAPI\AI\Approvals\PendingAction;
+use AgentsAPI\AI\Approvals\PendingActionStatus;
 use AgentsAPI\AI\Approvals\PendingActionStoreInterface;
 
 defined( 'ABSPATH' ) || exit;
 
 class PendingActionStore {
-
-	/**
-	 * Pending status values.
-	 */
-	public const STATUS_PENDING  = 'pending';
-	public const STATUS_ACCEPTED = 'accepted';
-	public const STATUS_REJECTED = 'rejected';
-	public const STATUS_EXPIRED  = 'expired';
-	public const STATUS_DELETED  = 'deleted';
 
 	/**
 	 * Database table name without WordPress prefix.
@@ -94,20 +88,31 @@ class PendingActionStore {
 			preview_data longtext NULL,
 			apply_input longtext NULL,
 			agent_id bigint(20) unsigned NULL,
+			agent varchar(191) NULL,
+			workspace_type varchar(100) NULL,
+			workspace_id varchar(191) NULL,
 			created_by bigint(20) unsigned NULL,
+			creator varchar(191) NULL,
 			context longtext NULL,
+			metadata longtext NULL,
 			status varchar(20) NOT NULL DEFAULT 'pending',
 			created_at datetime NOT NULL,
 			expires_at datetime NULL,
 			resolved_at datetime NULL,
 			resolved_by bigint(20) unsigned NULL,
+			resolver varchar(191) NULL,
 			resolution_result longtext NULL,
 			resolution_error text NULL,
+			resolution_metadata longtext NULL,
 			PRIMARY KEY  (action_id),
 			KEY status (status),
 			KEY kind (kind),
 			KEY agent_id (agent_id),
+			KEY agent (agent),
 			KEY created_by (created_by),
+			KEY creator (creator),
+			KEY resolver (resolver),
+			KEY workspace (workspace_type, workspace_id),
 			KEY expires_at (expires_at),
 			KEY created_at (created_at)
 		) {$charset_collate};";
@@ -151,7 +156,7 @@ class PendingActionStore {
 			$payload['created_at'] = time();
 			$payload['expires_at'] = time() + self::resolve_ttl( $payload );
 			$payload['action_id']  = $action_id;
-			$payload['status']     = self::STATUS_PENDING;
+			$payload['status']     = PendingActionStatus::PENDING;
 
 			return set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) );
 		}
@@ -164,7 +169,7 @@ class PendingActionStore {
 		$payload['created_at'] = $created_at;
 		$payload['expires_at'] = $expires_at;
 		$payload['action_id']  = $action_id;
-		$payload['status']     = self::STATUS_PENDING;
+		$payload['status']     = PendingActionStatus::PENDING;
 
 		$row = array(
 			'action_id'         => $action_id,
@@ -173,18 +178,25 @@ class PendingActionStore {
 			'preview_data'      => self::encode_json( $payload['preview_data'] ?? array() ),
 			'apply_input'       => self::encode_json( $payload['apply_input'] ?? array() ),
 			'agent_id'          => self::nullable_positive_int( $payload['agent_id'] ?? null ),
+			'agent'             => self::nullable_string( $payload['agent'] ?? ( isset( $payload['agent_id'] ) && (int) $payload['agent_id'] > 0 ? 'agent:' . (int) $payload['agent_id'] : null ) ),
+			'workspace_type'    => self::nullable_string( $payload['workspace']['workspace_type'] ?? null ),
+			'workspace_id'      => self::nullable_string( $payload['workspace']['workspace_id'] ?? null ),
 			'created_by'        => self::nullable_positive_int( $payload['created_by'] ?? null ),
+			'creator'           => self::nullable_string( $payload['creator'] ?? ( isset( $payload['created_by'] ) && (int) $payload['created_by'] > 0 ? 'user:' . (int) $payload['created_by'] : null ) ),
 			'context'           => self::encode_json( $payload['context'] ?? array() ),
-			'status'            => self::STATUS_PENDING,
+			'metadata'          => self::encode_json( $payload['metadata'] ?? array() ),
+			'status'            => PendingActionStatus::PENDING,
 			'created_at'        => gmdate( 'Y-m-d H:i:s', $created_at ),
 			'expires_at'        => $expires_at > 0 ? gmdate( 'Y-m-d H:i:s', $expires_at ) : null,
 			'resolved_at'       => null,
 			'resolved_by'       => null,
+			'resolver'          => null,
 			'resolution_result' => null,
 			'resolution_error'  => null,
+			'resolution_metadata' => null,
 		);
 
-		$formats = array( '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s' );
+		$formats = array( '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$stored = $wpdb->replace( self::get_table_name(), $row, $formats );
@@ -210,12 +222,12 @@ class PendingActionStore {
 			return null;
 		}
 
-		if ( ! $include_resolved && self::STATUS_PENDING !== $row['status'] ) {
+		if ( ! $include_resolved && PendingActionStatus::PENDING !== $row['status'] ) {
 			return null;
 		}
 
-		if ( self::STATUS_PENDING === $row['status'] && self::is_expired_row( $row ) ) {
-			self::record_resolution( $action_id, self::STATUS_EXPIRED, null, 'Pending action expired.' );
+		if ( PendingActionStatus::PENDING === $row['status'] && self::is_expired_row( $row ) ) {
+			self::record_resolution( $action_id, PendingActionStatus::EXPIRED, null, 'Pending action expired.', 'system:expiration' );
 			if ( ! $include_resolved ) {
 				return null;
 			}
@@ -245,7 +257,7 @@ class PendingActionStore {
 			return delete_transient( self::TRANSIENT_PREFIX . $action_id );
 		}
 
-		return self::record_resolution( $action_id, self::STATUS_DELETED, null, 'Pending action deleted.' );
+		return self::record_resolution( $action_id, PendingActionStatus::DELETED, null, 'Pending action deleted.', self::current_resolver() );
 	}
 
 	/**
@@ -257,7 +269,7 @@ class PendingActionStore {
 	 * @param string|null $error     Resolution error.
 	 * @return bool Whether the row was updated.
 	 */
-	public static function record_resolution( string $action_id, string $decision, $result = null, ?string $error = null ): bool {
+	public static function record_resolution( string $action_id, string $decision, $result = null, ?string $error = null, ?string $resolver = null, array $metadata = array() ): bool {
 		global $wpdb;
 
 		if ( ! self::has_database() ) {
@@ -276,11 +288,13 @@ class PendingActionStore {
 				'status'            => $status,
 				'resolved_at'       => current_time( 'mysql', true ),
 				'resolved_by'       => get_current_user_id(),
+				'resolver'          => self::nullable_string( $resolver ?? self::current_resolver() ),
 				'resolution_result' => self::encode_json( $result ),
 				'resolution_error'  => $error,
+				'resolution_metadata' => self::encode_json( $metadata ),
 			),
 			array( 'action_id' => $action_id ),
-			array( '%s', '%s', '%d', '%s', '%s' ),
+			array( '%s', '%s', '%d', '%s', '%s', '%s', '%s' ),
 			array( '%s' )
 		);
 
@@ -308,7 +322,12 @@ class PendingActionStore {
 		self::add_filter_clause( $where, $args, $filters, 'status', 'status', '%s' );
 		self::add_filter_clause( $where, $args, $filters, 'kind', 'kind', '%s' );
 		self::add_filter_clause( $where, $args, $filters, 'agent_id', 'agent_id', '%d' );
+		self::add_filter_clause( $where, $args, $filters, 'agent', 'agent', '%s' );
 		self::add_filter_clause( $where, $args, $filters, 'created_by', 'created_by', '%d' );
+		self::add_filter_clause( $where, $args, $filters, 'creator', 'creator', '%s' );
+		self::add_filter_clause( $where, $args, $filters, 'resolver', 'resolver', '%s' );
+		self::add_filter_clause( $where, $args, $filters, 'workspace_type', 'workspace_type', '%s' );
+		self::add_filter_clause( $where, $args, $filters, 'workspace_id', 'workspace_id', '%s' );
 
 		if ( ! empty( $filters['context'] ) && is_array( $filters['context'] ) ) {
 			foreach ( $filters['context'] as $key => $value ) {
@@ -388,23 +407,25 @@ class PendingActionStore {
 	 *
 	 * @return int Number of rows updated.
 	 */
-	public static function expire_due_actions(): int {
+	public static function expire_due_actions( ?string $before = null ): int {
 		global $wpdb;
 
 		if ( ! self::has_database() ) {
 			return 0;
 		}
 
+		$boundary = null !== $before ? gmdate( 'Y-m-d H:i:s', self::normalize_timestamp( $before ) ) : current_time( 'mysql', true );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$updated = $wpdb->query(
 			$wpdb->prepare(
 				'UPDATE %i SET status = %s, resolved_at = %s, resolution_error = %s WHERE status = %s AND expires_at IS NOT NULL AND expires_at <= %s',
 				self::get_table_name(),
-				self::STATUS_EXPIRED,
-				current_time( 'mysql', true ),
+				PendingActionStatus::EXPIRED,
+				$boundary,
 				'Pending action expired.',
-				self::STATUS_PENDING,
-				current_time( 'mysql', true )
+				PendingActionStatus::PENDING,
+				$boundary
 			)
 		);
 
@@ -418,6 +439,54 @@ class PendingActionStore {
 	 */
 	public static function generate_id(): string {
 		return 'act_' . wp_generate_uuid4();
+	}
+
+	/**
+	 * Store an Agents API pending-action value object.
+	 */
+	public static function store_action( PendingAction $action ): bool {
+		return self::store( $action->get_action_id(), self::action_to_payload( $action ) );
+	}
+
+	/**
+	 * Fetch a pending action as an Agents API value object.
+	 */
+	public static function get_action( string $action_id, bool $include_resolved = false ): ?PendingAction {
+		$payload = self::get( $action_id, $include_resolved );
+		if ( null === $payload ) {
+			return null;
+		}
+
+		try {
+			return PendingAction::from_array( self::payload_to_action_array( $payload ) );
+		} catch ( \InvalidArgumentException $error ) {
+			return null;
+		}
+	}
+
+	/**
+	 * List pending actions as Agents API value objects.
+	 *
+	 * @return array<int,PendingAction>
+	 */
+	public static function list_actions( array $filters = array() ): array {
+		$actions = array();
+		foreach ( self::list( $filters ) as $payload ) {
+			try {
+				$actions[] = PendingAction::from_array( self::payload_to_action_array( $payload ) );
+			} catch ( \InvalidArgumentException $error ) {
+				continue;
+			}
+		}
+
+		return $actions;
+	}
+
+	/**
+	 * Record a resolution from the Agents API store contract.
+	 */
+	public static function record_action_resolution( string $action_id, ApprovalDecision $decision, string $resolver, $result = null, ?string $error = null, array $metadata = array() ): bool {
+		return self::record_resolution( $action_id, $decision->value(), $result, $error, $resolver, $metadata );
 	}
 
 	/**
@@ -451,17 +520,96 @@ class PendingActionStore {
 			'preview'           => self::decode_json( $row['preview_data'] ?? null ),
 			'apply_input'       => self::decode_json( $row['apply_input'] ?? null ),
 			'agent_id'          => isset( $row['agent_id'] ) ? (int) $row['agent_id'] : 0,
+			'agent'             => isset( $row['agent'] ) ? (string) $row['agent'] : null,
+			'workspace'         => ! empty( $row['workspace_type'] ) && ! empty( $row['workspace_id'] ) ? array(
+				'workspace_type' => (string) $row['workspace_type'],
+				'workspace_id'   => (string) $row['workspace_id'],
+			) : null,
 			'created_by'        => isset( $row['created_by'] ) ? (int) $row['created_by'] : 0,
+			'creator'           => isset( $row['creator'] ) ? (string) $row['creator'] : null,
 			'context'           => self::decode_json( $row['context'] ?? null ),
-			'status'            => (string) ( $row['status'] ?? self::STATUS_PENDING ),
+			'metadata'          => self::decode_json( $row['metadata'] ?? null ),
+			'status'            => (string) ( $row['status'] ?? PendingActionStatus::PENDING ),
 			'created_at'        => $created_at,
 			'created_at_iso'    => $created_at > 0 ? gmdate( 'c', $created_at ) : null,
 			'expires_at'        => $expires_at,
 			'expires_at_iso'    => $expires_at > 0 ? gmdate( 'c', $expires_at ) : null,
 			'resolved_at'       => self::mysql_to_timestamp( (string) ( $row['resolved_at'] ?? '' ) ),
+			'resolved_at_iso'   => self::mysql_to_timestamp( (string) ( $row['resolved_at'] ?? '' ) ) > 0 ? gmdate( 'c', self::mysql_to_timestamp( (string) ( $row['resolved_at'] ?? '' ) ) ) : null,
 			'resolved_by'       => isset( $row['resolved_by'] ) ? (int) $row['resolved_by'] : 0,
+			'resolver'          => isset( $row['resolver'] ) ? (string) $row['resolver'] : null,
 			'resolution_result' => self::decode_json( $row['resolution_result'] ?? null ),
 			'resolution_error'  => isset( $row['resolution_error'] ) ? (string) $row['resolution_error'] : null,
+			'resolution_metadata' => self::decode_json( $row['resolution_metadata'] ?? null ),
+		);
+	}
+
+	/**
+	 * Convert an Agents API pending action to Data Machine's persisted payload.
+	 */
+	private static function action_to_payload( PendingAction $action ): array {
+		$data     = $action->to_array();
+		$metadata = isset( $data['metadata'] ) && is_array( $data['metadata'] ) ? $data['metadata'] : array();
+
+		return array(
+			'action_id'             => $data['action_id'],
+			'kind'                  => $data['kind'],
+			'summary'               => $data['summary'],
+			'preview_data'          => $data['preview'],
+			'apply_input'           => $data['apply_input'],
+			'workspace'             => $data['workspace'],
+			'agent'                 => $data['agent'],
+			'creator'               => $data['creator'],
+			'agent_id'              => $metadata['datamachine']['agent_id'] ?? null,
+			'created_by'            => $metadata['datamachine']['created_by'] ?? null,
+			'context'               => $metadata['datamachine']['context'] ?? array(),
+			'metadata'              => $metadata,
+			'status'                => $data['status'],
+			'created_at'            => $data['created_at'],
+			'expires_at'            => $data['expires_at'],
+			'resolver'              => $data['resolver'],
+			'resolution_result'     => $data['resolution_result'],
+			'resolution_error'      => $data['resolution_error'],
+			'resolution_metadata'   => $data['resolution_metadata'],
+		);
+	}
+
+	/**
+	 * Convert Data Machine's row payload to the canonical Agents API value shape.
+	 */
+	private static function payload_to_action_array( array $payload ): array {
+		$created_at  = isset( $payload['created_at_iso'] ) ? $payload['created_at_iso'] : gmdate( 'c', (int) ( $payload['created_at'] ?? time() ) );
+		$expires_at  = isset( $payload['expires_at_iso'] ) ? $payload['expires_at_iso'] : ( ! empty( $payload['expires_at'] ) ? gmdate( 'c', (int) $payload['expires_at'] ) : null );
+		$resolved_at = isset( $payload['resolved_at_iso'] ) ? $payload['resolved_at_iso'] : ( ! empty( $payload['resolved_at'] ) ? gmdate( 'c', (int) $payload['resolved_at'] ) : null );
+		$metadata    = isset( $payload['metadata'] ) && is_array( $payload['metadata'] ) ? $payload['metadata'] : array();
+
+		$metadata['datamachine'] = array_merge(
+			isset( $metadata['datamachine'] ) && is_array( $metadata['datamachine'] ) ? $metadata['datamachine'] : array(),
+			array(
+				'agent_id'   => $payload['agent_id'] ?? 0,
+				'created_by' => $payload['created_by'] ?? 0,
+				'context'    => $payload['context'] ?? array(),
+			)
+		);
+
+		return array(
+			'action_id'           => (string) ( $payload['action_id'] ?? '' ),
+			'kind'                => (string) ( $payload['kind'] ?? '' ),
+			'summary'             => (string) ( $payload['summary'] ?? '' ),
+			'preview'             => $payload['preview'] ?? $payload['preview_data'] ?? array(),
+			'apply_input'         => $payload['apply_input'] ?? array(),
+			'workspace'           => $payload['workspace'] ?? null,
+			'agent'               => $payload['agent'] ?? ( ! empty( $payload['agent_id'] ) ? 'agent:' . (int) $payload['agent_id'] : null ),
+			'creator'             => $payload['creator'] ?? ( ! empty( $payload['created_by'] ) ? 'user:' . (int) $payload['created_by'] : null ),
+			'status'              => (string) ( $payload['status'] ?? PendingActionStatus::PENDING ),
+			'created_at'          => $created_at,
+			'expires_at'          => $expires_at,
+			'resolved_at'         => $resolved_at,
+			'resolver'            => $payload['resolver'] ?? null,
+			'resolution_result'   => $payload['resolution_result'] ?? null,
+			'resolution_error'    => $payload['resolution_error'] ?? null,
+			'resolution_metadata' => isset( $payload['resolution_metadata'] ) && is_array( $payload['resolution_metadata'] ) ? $payload['resolution_metadata'] : array(),
+			'metadata'            => $metadata,
 		);
 	}
 
@@ -566,8 +714,31 @@ class PendingActionStore {
 	 * Normalize terminal status values.
 	 */
 	private static function normalize_status( string $status ): string {
-		$allowed = array( self::STATUS_PENDING, self::STATUS_ACCEPTED, self::STATUS_REJECTED, self::STATUS_EXPIRED, self::STATUS_DELETED );
-		return in_array( $status, $allowed, true ) ? $status : '';
+		try {
+			return PendingActionStatus::normalize( $status );
+		} catch ( \InvalidArgumentException $error ) {
+			return '';
+		}
+	}
+
+	/**
+	 * Normalize nullable strings.
+	 */
+	private static function nullable_string( $value ): ?string {
+		if ( null === $value ) {
+			return null;
+		}
+
+		$value = trim( (string) $value );
+		return '' === $value ? null : $value;
+	}
+
+	/**
+	 * Return the current resolver audit identifier.
+	 */
+	private static function current_resolver(): string {
+		$user_id = get_current_user_id();
+		return $user_id > 0 ? 'user:' . $user_id : 'system:anonymous';
 	}
 
 	/**
