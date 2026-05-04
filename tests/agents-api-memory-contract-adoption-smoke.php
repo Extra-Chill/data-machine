@@ -1,0 +1,135 @@
+<?php
+/**
+ * Smoke coverage for Data Machine's Agents API memory/context contract adoption.
+ *
+ * Run with: php tests/agents-api-memory-contract-adoption-smoke.php
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
+}
+
+if ( ! function_exists( '__' ) ) {
+	function __( $text, $domain = null ) {
+		unset( $domain );
+		return $text;
+	}
+}
+
+if ( ! function_exists( 'sanitize_key' ) ) {
+	function sanitize_key( $key ) {
+		$key = strtolower( (string) $key );
+		return preg_replace( '/[^a-z0-9_\-]/', '', $key );
+	}
+}
+
+if ( ! function_exists( 'sanitize_file_name' ) ) {
+	function sanitize_file_name( $filename ) {
+		return preg_replace( '/[^a-zA-Z0-9._\-]/', '', basename( (string) $filename ) );
+	}
+}
+
+$GLOBALS['datamachine_contract_adoption_actions'] = array();
+$GLOBALS['datamachine_contract_adoption_filters'] = array();
+
+if ( ! function_exists( 'add_action' ) ) {
+	function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
+		$GLOBALS['datamachine_contract_adoption_actions'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+	}
+}
+
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( string $hook, ...$args ): void {
+		$callbacks = $GLOBALS['datamachine_contract_adoption_actions'][ $hook ] ?? array();
+		ksort( $callbacks );
+		foreach ( $callbacks as $priority_callbacks ) {
+			foreach ( $priority_callbacks as $callback ) {
+				call_user_func_array( $callback[0], array_slice( $args, 0, $callback[1] ) );
+			}
+		}
+	}
+}
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $hook, $value, ...$args ) {
+		$callbacks = $GLOBALS['datamachine_contract_adoption_filters'][ $hook ] ?? array();
+		ksort( $callbacks );
+		foreach ( $callbacks as $priority_callbacks ) {
+			foreach ( $priority_callbacks as $callback ) {
+				$value = call_user_func_array( $callback[0], array_merge( array( $value ), array_slice( $args, 0, $callback[1] - 1 ) ) );
+			}
+		}
+		return $value;
+	}
+}
+
+require_once __DIR__ . '/../vendor/automattic/agents-api/agents-api.php';
+require_once __DIR__ . '/../inc/Engine/AI/MemoryFileRegistry.php';
+require_once __DIR__ . '/../inc/Engine/AI/SectionRegistry.php';
+require_once __DIR__ . '/../inc/Core/FilesRepository/DiskAgentMemoryStore.php';
+require_once __DIR__ . '/../inc/Core/FilesRepository/GuidelineAgentMemoryStore.php';
+
+use AgentsAPI\AI\Context\ContextAuthorityTier;
+use AgentsAPI\AI\Context\ContextConflictKind;
+use AgentsAPI\AI\Context\DefaultContextConflictResolver;
+use AgentsAPI\AI\Context\RetrievedContextItem;
+use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
+use DataMachine\Core\FilesRepository\DiskAgentMemoryStore;
+use DataMachine\Core\FilesRepository\GuidelineAgentMemoryStore;
+use DataMachine\Engine\AI\MemoryFileRegistry;
+use DataMachine\Engine\AI\SectionRegistry;
+
+function datamachine_contract_adoption_assert( bool $condition, string $message ): void {
+	static $assertions = 0;
+	++$assertions;
+	if ( ! $condition ) {
+		fwrite( STDERR, "Assertion failed: {$message}\n" );
+		exit( 1 );
+	}
+	echo "ok {$assertions} - {$message}\n";
+}
+
+echo "agents-api-memory-contract-adoption-smoke\n";
+
+MemoryFileRegistry::reset();
+MemoryFileRegistry::register(
+	'SITE.md',
+	10,
+	array(
+		'layer'      => MemoryFileRegistry::LAYER_SHARED,
+		'protected'  => true,
+		'composable' => true,
+		'label'      => 'Site Context',
+	)
+);
+
+$datamachine_file = MemoryFileRegistry::get( 'SITE.md' );
+$agents_source    = WP_Agent_Memory_Registry::get( 'datamachine/site.md' );
+datamachine_contract_adoption_assert( null !== $agents_source, 'Data Machine registration creates an Agents API memory source' );
+datamachine_contract_adoption_assert( 'SITE.md' === ( $agents_source['meta']['filename'] ?? null ), 'Agents API source retains Data Machine filename adapter metadata' );
+datamachine_contract_adoption_assert( ContextAuthorityTier::WORKSPACE_SHARED === $datamachine_file['authority_tier'], 'shared memory file receives workspace authority tier' );
+datamachine_contract_adoption_assert( false === $datamachine_file['editable'], 'composable files remain non-editable through the adapter' );
+
+SectionRegistry::reset();
+SectionRegistry::register( 'SITE.md', 'one', 20, static fn(): string => "## One\nFirst" );
+SectionRegistry::register( 'SITE.md', 'zero', 10, static fn(): string => "## Zero\nBefore" );
+$content = SectionRegistry::generate( 'SITE.md' );
+datamachine_contract_adoption_assert( "## Zero\nBefore\n\n## One\nFirst" === $content, 'Data Machine section composition stays priority-stable through Agents API' );
+
+$disk_store = ( new ReflectionClass( DiskAgentMemoryStore::class ) )->newInstanceWithoutConstructor();
+$disk_caps  = $disk_store->capabilities();
+$unsupported = $disk_caps->unsupported_metadata_fields( array( 'source_type', 'authority_tier' ), 'persist' );
+datamachine_contract_adoption_assert( array( 'source_type', 'authority_tier' ) === $unsupported, 'disk store declares unsupported metadata instead of dropping silently' );
+
+$guideline_caps = ( new GuidelineAgentMemoryStore() )->capabilities();
+datamachine_contract_adoption_assert( array() === $guideline_caps->unsupported_metadata_fields( AgentMemoryMetadata::FIELDS, 'persist' ), 'guideline store declares full metadata persistence support' );
+
+$resolver = new DefaultContextConflictResolver();
+$items    = array(
+	new RetrievedContextItem( 'agent memory says no', array( 'filename' => 'MEMORY.md' ), ContextAuthorityTier::AGENT_MEMORY, array(), ContextConflictKind::AUTHORITATIVE_FACT, 'policy:x' ),
+	new RetrievedContextItem( 'workspace says yes', array( 'filename' => 'SITE.md' ), ContextAuthorityTier::WORKSPACE_SHARED, array(), ContextConflictKind::AUTHORITATIVE_FACT, 'policy:x' ),
+);
+$resolution = $resolver->resolve( $items )['policy:x'] ?? null;
+datamachine_contract_adoption_assert( null !== $resolution && 'workspace says yes' === $resolution->winner->content, 'authority cascade rejects lower-scope memory for authoritative fact conflicts' );
+
+echo "Agents API memory contract adoption smoke passed.\n";

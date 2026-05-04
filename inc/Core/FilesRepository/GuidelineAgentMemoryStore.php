@@ -47,6 +47,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	const META_FILENAME       = '_datamachine_memory_filename';
 	const META_HASH           = '_datamachine_memory_hash';
 	const META_BYTES          = '_datamachine_memory_bytes';
+	const META_METADATA       = '_datamachine_memory_metadata';
 
 	const GUIDELINE_META_SCOPE        = '_wp_guideline_scope';
 	const GUIDELINE_META_USER_ID      = '_wp_guideline_user_id';
@@ -85,7 +86,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * @inheritDoc
 	 */
 	public function capabilities(): AgentMemoryStoreCapabilities {
-		return AgentMemoryStoreCapabilities::none();
+		return AgentMemoryStoreCapabilities::all();
 	}
 
 	/**
@@ -112,16 +113,13 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 
 		$updated = strtotime( (string) $post->post_modified_gmt );
 		$updated = false === $updated ? null : (int) $updated;
-
-		return new AgentMemoryReadResult( true, $content, $hash, $bytes, $updated, null, $metadata_fields );
+		return new AgentMemoryReadResult( true, $content, $hash, $bytes, $updated, $this->metadata_for_post( $post, $metadata_fields ) );
 	}
 
 	/**
 	 * @inheritDoc
 	 */
 	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
-		unset( $metadata );
-
 		if ( ! self::is_available() ) {
 			return AgentMemoryWriteResult::failure( 'capability' );
 		}
@@ -150,6 +148,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		$hash               = sha1( $content );
 		$bytes              = strlen( $content );
 		$author             = $scope->user_id > 0 ? $scope->user_id : 0;
+		$metadata           = ( $metadata ?? new AgentMemoryMetadata() )->with_defaults();
 		$guideline_metadata = $this->guideline_metadata_for_scope( $scope );
 
 		if ( $existing instanceof \WP_Post ) {
@@ -174,10 +173,11 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 			foreach ( $guideline_metadata as $meta_key => $meta_value ) {
 				update_post_meta( $existing->ID, $meta_key, $meta_value );
 			}
+			update_post_meta( $existing->ID, self::META_METADATA, $metadata->to_array() );
 
 			$this->emit_guideline_updated_event( $existing->ID );
 
-			return AgentMemoryWriteResult::ok( $hash, $bytes );
+			return AgentMemoryWriteResult::ok( $hash, $bytes, $metadata );
 		}
 
 		$meta_input = array_merge(
@@ -190,6 +190,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 				self::META_FILENAME       => $scope->filename,
 				self::META_HASH           => $hash,
 				self::META_BYTES          => $bytes,
+				self::META_METADATA       => $metadata->to_array(),
 			),
 			$guideline_metadata
 		);
@@ -216,7 +217,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		wp_set_object_terms( $post_id, array( self::TERM_MEMORY ), self::TAXONOMY, false );
 		$this->emit_guideline_updated_event( (int) $post_id );
 
-		return AgentMemoryWriteResult::ok( $hash, $bytes );
+		return AgentMemoryWriteResult::ok( $hash, $bytes, $metadata );
 	}
 
 	/**
@@ -263,8 +264,6 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * @inheritDoc
 	 */
 	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
-		unset( $query );
-
 		$posts   = $this->query_scope_posts( $scope_query, null );
 		$entries = array();
 
@@ -278,10 +277,17 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 				continue;
 			}
 
-			$entries[] = $this->entry_for( $post, $filename, $scope_query->layer );
+			$entry = $this->entry_for( $post, $filename, $scope_query->layer, $query?->metadata_fields ?? AgentMemoryMetadata::FIELDS );
+			if ( $this->entry_matches_query( $entry, $query ) ) {
+				$entries[] = $entry;
+			}
 		}
 
-		usort( $entries, static fn( $a, $b ) => strcmp( $a->filename, $b->filename ) );
+		if ( null !== $query && null !== $query->order_by ) {
+			$entries = $this->sort_entries( $entries, $query );
+		} else {
+			usort( $entries, static fn( $a, $b ) => strcmp( $a->filename, $b->filename ) );
+		}
 		return $entries;
 	}
 
@@ -289,8 +295,6 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * @inheritDoc
 	 */
 	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
-		unset( $query );
-
 		$prefix = trim( $prefix, '/' );
 		if ( '' === $prefix ) {
 			return array();
@@ -309,10 +313,17 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 				continue;
 			}
 
-			$entries[] = $this->entry_for( $post, $filename, $scope_query->layer );
+			$entry = $this->entry_for( $post, $filename, $scope_query->layer, $query?->metadata_fields ?? AgentMemoryMetadata::FIELDS );
+			if ( $this->entry_matches_query( $entry, $query ) ) {
+				$entries[] = $entry;
+			}
 		}
 
-		usort( $entries, static fn( $a, $b ) => strcmp( $a->filename, $b->filename ) );
+		if ( null !== $query && null !== $query->order_by ) {
+			$entries = $this->sort_entries( $entries, $query );
+		} else {
+			usort( $entries, static fn( $a, $b ) => strcmp( $a->filename, $b->filename ) );
+		}
 		return $entries;
 	}
 
@@ -428,14 +439,85 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * @param string   $layer    Scope layer.
 	 * @return AgentMemoryListEntry
 	 */
-	private function entry_for( \WP_Post $post, string $filename, string $layer ): AgentMemoryListEntry {
+	private function entry_for( \WP_Post $post, string $filename, string $layer, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryListEntry {
 		$bytes_meta = get_post_meta( $post->ID, self::META_BYTES, true );
 		$bytes      = is_numeric( $bytes_meta ) ? (int) $bytes_meta : strlen( (string) $post->post_content );
 
 		$updated = strtotime( (string) $post->post_modified_gmt );
 		$updated = false === $updated ? null : (int) $updated;
 
-		return new AgentMemoryListEntry( $filename, $layer, $bytes, $updated );
+		return new AgentMemoryListEntry( $filename, $layer, $bytes, $updated, $this->metadata_for_post( $post, $metadata_fields ) );
+	}
+
+	private function metadata_for_post( \WP_Post $post, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryMetadata {
+		$raw = get_post_meta( $post->ID, self::META_METADATA, true );
+		if ( ! is_array( $raw ) ) {
+			$raw = array();
+		}
+
+		return AgentMemoryMetadata::from_array( $raw )->with_defaults()->only_fields( $metadata_fields );
+	}
+
+	private function entry_matches_query( AgentMemoryListEntry $entry, ?AgentMemoryQuery $query ): bool {
+		if ( null === $query || null === $entry->metadata ) {
+			return true;
+		}
+
+		$metadata = $entry->metadata;
+		if ( array() !== $query->source_types && ! in_array( (string) $metadata->source_type, $query->source_types, true ) ) {
+			return false;
+		}
+
+		if ( null !== $query->min_confidence && ( null === $metadata->confidence || $metadata->confidence < $query->min_confidence ) ) {
+			return false;
+		}
+
+		if ( array() !== $query->authority_tiers && ! in_array( (string) $metadata->authority_tier, $query->authority_tiers, true ) ) {
+			return false;
+		}
+
+		return array() === $query->validators || in_array( (string) $metadata->validator, $query->validators, true );
+	}
+
+	/**
+	 * @param AgentMemoryListEntry[] $entries Entries to sort.
+	 * @return AgentMemoryListEntry[]
+	 */
+	private function sort_entries( array $entries, ?AgentMemoryQuery $query ): array {
+		if ( null === $query || null === $query->order_by ) {
+			return $entries;
+		}
+
+		$order_by = $query->order_by;
+		$order    = 'asc' === strtolower( $query->order ) ? 'asc' : 'desc';
+		usort(
+			$entries,
+			static function ( AgentMemoryListEntry $left, AgentMemoryListEntry $right ) use ( $order_by, $order ): int {
+				$left_value  = self::entry_sort_value( $left, $order_by );
+				$right_value = self::entry_sort_value( $right, $order_by );
+				$delta       = $left_value <=> $right_value;
+				return 'asc' === $order ? $delta : -$delta;
+			}
+		);
+
+		return $entries;
+	}
+
+	private static function entry_sort_value( AgentMemoryListEntry $entry, string $field ) {
+		if ( 'updated_at' === $field ) {
+			return $entry->updated_at ?? 0;
+		}
+
+		if ( null === $entry->metadata ) {
+			return null;
+		}
+
+		return match ( $field ) {
+			'confidence'     => $entry->metadata->confidence,
+			'authority_tier' => $entry->metadata->authority_tier,
+			'created_at'     => $entry->metadata->created_at,
+			default          => null,
+		};
 	}
 
 	/**
