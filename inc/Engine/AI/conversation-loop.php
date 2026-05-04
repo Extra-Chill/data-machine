@@ -58,6 +58,7 @@ function datamachine_run_conversation(
 	$event_sink           = datamachine_resolve_event_sink( $payload );
 	$completion_policy    = datamachine_resolve_completion_policy( $mode, $payload );
 	$transcript_persister = datamachine_resolve_transcript_persister( $payload );
+	$transcript_lock      = $payload['transcript_lock'] ?? $payload['transcript_lock_store'] ?? null;
 
 	// Strip runtime objects from the loop payload before passing to tools/requests.
 	$loop_payload = datamachine_payload_without_runtime_objects( $payload );
@@ -147,6 +148,9 @@ function datamachine_run_conversation(
 				),
 				'should_continue'      => $should_continue,
 				'transcript_persister' => $transcript_persister,
+				'transcript_lock'      => $transcript_lock,
+				'transcript_session_id' => (string) ( $loop_payload['transcript_session_id'] ?? $loop_payload['session_id'] ?? '' ),
+				'transcript_lock_ttl'  => (int) ( $payload['transcript_lock_ttl'] ?? 300 ),
 				'on_event'             => $on_event,
 			)
 		);
@@ -563,7 +567,7 @@ function datamachine_resolve_transcript_persister( array $payload ): AgentConver
  * @return array Clean payload.
  */
 function datamachine_payload_without_runtime_objects( array $payload ): array {
-	unset( $payload['event_sink'], $payload['completion_policy'], $payload['transcript_persister'] );
+	unset( $payload['event_sink'], $payload['completion_policy'], $payload['transcript_persister'], $payload['transcript_lock'], $payload['transcript_lock_store'] );
 	return $payload;
 }
 

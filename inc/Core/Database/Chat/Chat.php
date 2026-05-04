@@ -65,6 +65,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			last_read_at DATETIME NULL,
 			expires_at DATETIME NULL,
+			transcript_lock_token VARCHAR(64) NULL,
+			transcript_lock_expires_at DATETIME NULL,
 			PRIMARY KEY  (session_id),
 			KEY workspace (workspace_type, workspace_id),
 			KEY user_id (user_id),
@@ -73,7 +75,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			KEY user_mode (user_id, mode),
 			KEY created_at (created_at),
 			KEY updated_at (updated_at),
-			KEY expires_at (expires_at)
+			KEY expires_at (expires_at),
+			KEY transcript_lock_expires_at (transcript_lock_expires_at)
 		) {$charset_collate};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -215,6 +218,27 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it. Column position
 		// is cosmetic — both engines accept the bare ADD COLUMN form.
 		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN last_read_at DATETIME NULL', $table_name ) );
+	}
+
+	/**
+	 * Ensure transcript lock columns exist for Agents API single-writer locking.
+	 *
+	 * @return void
+	 */
+	public static function ensure_transcript_lock_columns(): void {
+		global $wpdb;
+
+		$table_name = self::get_prefixed_table_name();
+
+		if ( ! self::column_exists( $table_name, 'transcript_lock_token', $wpdb ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN transcript_lock_token VARCHAR(64) NULL', $table_name ) );
+		}
+
+		if ( ! self::column_exists( $table_name, 'transcript_lock_expires_at', $wpdb ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN transcript_lock_expires_at DATETIME NULL', $table_name ) );
+		}
 	}
 
 	/**
@@ -491,6 +515,90 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Acquire an advisory transcript lock for a chat session.
+	 *
+	 * @param string $session_id   Session UUID.
+	 * @param int    $ttl_seconds  Lock TTL in seconds.
+	 * @return string|null Lock token, or null when another active writer owns it.
+	 */
+	public function acquire_session_lock( string $session_id, int $ttl_seconds = 300 ): ?string {
+		global $wpdb;
+
+		$table_name = self::get_prefixed_table_name();
+		$token      = $this->generate_lock_token();
+		$now        = current_time( 'mysql', true );
+		$expires_at = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + max( 1, $ttl_seconds ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$result = $wpdb->query(
+			$wpdb->prepare(
+				'UPDATE %i
+				SET transcript_lock_token = %s, transcript_lock_expires_at = %s
+				WHERE session_id = %s
+				AND (
+					transcript_lock_token IS NULL
+					OR transcript_lock_token = %s
+					OR transcript_lock_expires_at IS NULL
+					OR transcript_lock_expires_at <= %s
+				)',
+				$table_name,
+				$token,
+				$expires_at,
+				$session_id,
+				'',
+				$now
+			)
+		);
+
+		if ( 1 !== (int) $result ) {
+			return null;
+		}
+
+		return $token;
+	}
+
+	/**
+	 * Release an advisory transcript lock if the active token matches.
+	 *
+	 * @param string $session_id  Session UUID.
+	 * @param string $lock_token  Token returned by acquire_session_lock().
+	 * @return bool True when the active lock was released.
+	 */
+	public function release_session_lock( string $session_id, string $lock_token ): bool {
+		global $wpdb;
+
+		$table_name = self::get_prefixed_table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$result = $wpdb->query(
+			$wpdb->prepare(
+				'UPDATE %i
+				SET transcript_lock_token = NULL, transcript_lock_expires_at = NULL
+				WHERE session_id = %s AND transcript_lock_token = %s',
+				$table_name,
+				$session_id,
+				$lock_token
+			)
+		);
+
+		return 1 === (int) $result;
+	}
+
+	/**
+	 * Generate an opaque lock ownership token.
+	 *
+	 * @return string
+	 */
+	private function generate_lock_token(): string {
+		try {
+			return bin2hex( random_bytes( 32 ) );
+		} catch ( \Throwable $e ) {
+			unset( $e );
+			return str_replace( '-', '', wp_generate_uuid4() ) . str_replace( '.', '', uniqid( '', true ) );
+		}
 	}
 
 	/**

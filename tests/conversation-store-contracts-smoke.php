@@ -37,6 +37,7 @@ use DataMachine\Core\Database\Chat\ConversationRetentionInterface;
 use DataMachine\Core\Database\Chat\ConversationSessionIndexInterface;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
+use AgentsAPI\Core\Database\Chat\ConversationTranscriptLockInterface;
 use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
 use DataMachine\Tests\Unit\Core\Database\Chat\InMemoryConversationStore;
 
@@ -52,6 +53,7 @@ $assert_true = static function ( bool $condition, string $label ) use ( &$failur
 
 $narrow_contracts = array(
 	ConversationTranscriptStoreInterface::class,
+	ConversationTranscriptLockInterface::class,
 	ConversationSessionIndexInterface::class,
 	ConversationReadStateInterface::class,
 	ConversationRetentionInterface::class,
@@ -64,6 +66,7 @@ foreach ( $narrow_contracts as $contract ) {
 }
 
 $transcript_ref = new ReflectionClass( ConversationTranscriptStoreInterface::class );
+$lock_ref       = new ReflectionClass( ConversationTranscriptLockInterface::class );
 $assert_true( ! $transcript_ref->implementsInterface( ConversationSessionIndexInterface::class ), 'transcript contract does not include session index surface' );
 $assert_true( ! $transcript_ref->implementsInterface( ConversationReadStateInterface::class ), 'transcript contract does not include read-state surface' );
 $assert_true( ! $transcript_ref->implementsInterface( ConversationRetentionInterface::class ), 'transcript contract does not include retention surface' );
@@ -84,6 +87,19 @@ $assert_true(
 		'update_title',
 	) === $transcript_methods,
 	'transcript contract stays limited to transcript/session CRUD methods'
+);
+
+$lock_methods = array_map(
+	static fn( ReflectionMethod $method ): string => $method->getName(),
+	$lock_ref->getMethods()
+);
+sort( $lock_methods );
+$assert_true(
+	array(
+		'acquire_session_lock',
+		'release_session_lock',
+	) === $lock_methods,
+	'transcript lock contract stays limited to acquire/release methods'
 );
 
 foreach ( $narrow_contracts as $contract ) {
