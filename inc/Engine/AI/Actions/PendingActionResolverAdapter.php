@@ -23,15 +23,17 @@ final class PendingActionResolverAdapter implements PendingActionResolverInterfa
 	 *
 	 * @param string           $pending_action_id Stable pending-action identifier.
 	 * @param ApprovalDecision $decision          Accepted/rejected decision.
+	 * @param string           $resolver          Resolver audit identifier.
 	 * @param array            $payload           Fresh resolver payload.
 	 * @param array            $context           Optional caller context.
 	 * @return mixed
 	 */
-	public function resolve_pending_action( string $pending_action_id, ApprovalDecision $decision, array $payload = array(), array $context = array() ): mixed {
+	public function resolve_pending_action( string $pending_action_id, ApprovalDecision $decision, string $resolver, array $payload = array(), array $context = array() ): mixed {
 		return ResolvePendingActionAbility::execute(
 			array(
 				'action_id' => $pending_action_id,
 				'decision'  => $decision->value(),
+				'resolver'  => $resolver,
 				'payload'   => $payload,
 				'context'   => $context,
 			)

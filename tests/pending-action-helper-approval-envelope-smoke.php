@@ -110,10 +110,12 @@ datamachine_pending_action_helper_assert( 'Update Wiki Page' === $result['conten
 
 $pending_action = $result['payload']['pending_action'];
 datamachine_pending_action_helper_assert( $result['action_id'] === $pending_action['action_id'], 'Agents API pending action carries the staged action ID.' );
-datamachine_pending_action_helper_assert( 'tool_action' === $pending_action['kind'], 'Agents API pending action keeps a generic action kind.' );
+datamachine_pending_action_helper_assert( 'wiki_upsert' === $pending_action['kind'], 'Agents API pending action carries the product handler kind.' );
 datamachine_pending_action_helper_assert( array( 'diff' => "- old\n+ new" ) === $pending_action['preview'], 'Agents API pending action carries preview data.' );
-datamachine_pending_action_helper_assert( '123' === $pending_action['creator'], 'Agents API pending action records creator identity as a string.' );
-datamachine_pending_action_helper_assert( '456' === $pending_action['agent'], 'Agents API pending action records agent identity as a string.' );
+datamachine_pending_action_helper_assert( 'user:123' === $pending_action['creator'], 'Agents API pending action records creator identity.' );
+datamachine_pending_action_helper_assert( 'agent:456' === $pending_action['agent'], 'Agents API pending action records agent identity.' );
+datamachine_pending_action_helper_assert( 123 === $pending_action['metadata']['datamachine']['created_by'], 'Data Machine created_by audit field is retained in pending action metadata.' );
+datamachine_pending_action_helper_assert( 456 === $pending_action['metadata']['datamachine']['agent_id'], 'Data Machine agent_id audit field is retained in pending action metadata.' );
 datamachine_pending_action_helper_assert( isset( $pending_action['created_at'] ) && is_string( $pending_action['created_at'] ), 'Agents API pending action carries an ISO creation timestamp.' );
 datamachine_pending_action_helper_assert( isset( $pending_action['expires_at'] ) && is_string( $pending_action['expires_at'] ), 'Agents API pending action carries an ISO expiration timestamp.' );
 

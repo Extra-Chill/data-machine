@@ -127,6 +127,7 @@ require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionResolverA
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/ResolvePendingActionAbility.php';
 
 use AgentsAPI\AI\Approvals\ApprovalDecision;
+use AgentsAPI\AI\Approvals\PendingAction;
 use AgentsAPI\AI\Approvals\PendingActionHandlerInterface;
 use AgentsAPI\AI\Approvals\PendingActionResolverInterface;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
@@ -156,10 +157,22 @@ $permission_seen = array();
 $handler         = new class( $handler_calls ) implements PendingActionHandlerInterface {
 	public function __construct( private array &$handler_calls ) {}
 
-	public function handle_pending_action( ApprovalDecision $decision, array $apply_input, array $payload = array(), array $context = array() ): mixed {
+	public function can_resolve_pending_action( PendingAction $action, ApprovalDecision $decision, array $payload = array(), array $context = array() ): bool {
 		$this->handler_calls[] = array(
+			'permission_action_id' => $action->get_action_id(),
+			'permission_decision'  => $decision->value(),
+			'permission_payload'   => $payload,
+			'permission_context'   => $context,
+		);
+
+		return true;
+	}
+
+	public function handle_pending_action( PendingAction $action, ApprovalDecision $decision, array $payload = array(), array $context = array() ): mixed {
+		$this->handler_calls[] = array(
+			'action_id' => $action->get_action_id(),
 			'decision' => $decision->value(),
-			'apply'    => $apply_input,
+			'apply'    => $action->get_apply_input(),
 			'payload'  => $payload,
 			'context'  => $context,
 		);
@@ -167,7 +180,7 @@ $handler         = new class( $handler_calls ) implements PendingActionHandlerIn
 		return array(
 			'success'  => true,
 			'decision' => $decision->value(),
-			'target'   => $apply_input['target'] ?? null,
+			'target'   => $action->get_apply_input()['target'] ?? null,
 			'reason'   => $payload['reason'] ?? null,
 			'actor'    => $context['actor'] ?? null,
 		);
@@ -207,16 +220,19 @@ PendingActionStore::store(
 $accepted = $adapter->resolve_pending_action(
 	'act_contract_accept',
 	ApprovalDecision::accepted(),
+	'user:123',
 	array( 'reason' => 'looks-good' ),
 	array( 'actor' => 'reviewer' )
 );
 
 resolver_smoke_assert( true === ( $accepted['success'] ?? false ), 'accepted contract resolution succeeds', $failures, $passes );
 resolver_smoke_assert( 'accepted' === ( $accepted['decision'] ?? null ), 'accepted response keeps Data Machine decision string', $failures, $passes );
-resolver_smoke_assert( 'accepted' === ( $handler_calls[0]['decision'] ?? null ), 'contract handler receives ApprovalDecision object value', $failures, $passes );
-resolver_smoke_assert( 'looks-good' === ( $handler_calls[0]['payload']['reason'] ?? null ), 'contract handler receives resolver payload', $failures, $passes );
-resolver_smoke_assert( 'reviewer' === ( $handler_calls[0]['context']['actor'] ?? null ), 'contract handler receives resolver context', $failures, $passes );
-resolver_smoke_assert( 'accepted' === ( $permission_seen[0]['decision'] ?? null ), 'legacy can_resolve receives decision string for compatibility', $failures, $passes );
+resolver_smoke_assert( 'accepted' === ( $handler_calls[0]['permission_decision'] ?? null ), 'contract handler permission receives ApprovalDecision object value', $failures, $passes );
+resolver_smoke_assert( 'act_contract_accept' === ( $handler_calls[1]['action_id'] ?? null ), 'contract handler receives PendingAction value object', $failures, $passes );
+resolver_smoke_assert( 'accepted' === ( $handler_calls[1]['decision'] ?? null ), 'contract handler receives ApprovalDecision object value', $failures, $passes );
+resolver_smoke_assert( 'looks-good' === ( $handler_calls[1]['payload']['reason'] ?? null ), 'contract handler receives resolver payload', $failures, $passes );
+resolver_smoke_assert( 'reviewer' === ( $handler_calls[1]['context']['actor'] ?? null ), 'contract handler receives resolver context', $failures, $passes );
+resolver_smoke_assert( empty( $permission_seen ), 'legacy can_resolve is not duplicated for Agents API handler objects', $failures, $passes );
 
 $legacy_apply_calls = 0;
 add_filter(
@@ -255,6 +271,51 @@ $rejected = ResolvePendingActionAbility::execute(
 resolver_smoke_assert( true === ( $rejected['success'] ?? false ), 'rejected legacy resolution succeeds', $failures, $passes );
 resolver_smoke_assert( 'rejected' === ( $rejected['decision'] ?? null ), 'rejected response keeps Data Machine decision string', $failures, $passes );
 resolver_smoke_assert( 0 === $legacy_apply_calls, 'rejected resolution does not invoke apply handler', $failures, $passes );
+
+$denied_apply_calls = 0;
+$denying_handler    = new class( $denied_apply_calls ) implements PendingActionHandlerInterface {
+	public function __construct( private int &$denied_apply_calls ) {}
+
+	public function can_resolve_pending_action( PendingAction $action, ApprovalDecision $decision, array $payload = array(), array $context = array() ): bool {
+		unset( $action, $decision, $payload, $context );
+		return false;
+	}
+
+	public function handle_pending_action( PendingAction $action, ApprovalDecision $decision, array $payload = array(), array $context = array() ): mixed {
+		unset( $action, $decision, $payload, $context );
+		++$this->denied_apply_calls;
+		return array( 'success' => true );
+	}
+};
+
+add_filter(
+	'datamachine_pending_action_handlers',
+	static function ( array $handlers ) use ( $denying_handler ) {
+		$handlers['denied_kind'] = array( 'apply' => $denying_handler );
+		return $handlers;
+	},
+	30,
+	1
+);
+
+PendingActionStore::store(
+	'act_contract_denied',
+	array(
+		'kind'        => 'denied_kind',
+		'summary'     => 'Denied contract handler.',
+		'apply_input' => array( 'target' => 'diff-789' ),
+	)
+);
+
+$denied = ResolvePendingActionAbility::execute(
+	array(
+		'action_id' => 'act_contract_denied',
+		'decision'  => 'accepted',
+	)
+);
+
+resolver_smoke_assert( false === ( $denied['success'] ?? true ), 'contract handler permission denial fails resolution', $failures, $passes );
+resolver_smoke_assert( 0 === $denied_apply_calls, 'permission denial does not invoke contract apply handler', $failures, $passes );
 
 $invalid = ResolvePendingActionAbility::execute(
 	array(
