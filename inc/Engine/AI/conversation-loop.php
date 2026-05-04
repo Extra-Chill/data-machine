@@ -70,6 +70,9 @@ function datamachine_run_conversation(
 
 	// Mutable state accumulated across turns by the turn runner.
 	$last_request_metadata = array();
+	$last_tool_calls       = array();
+	$final_content         = '';
+	$turns_run             = 0;
 	$total_usage           = array(
 		'prompt_tokens'     => 0,
 		'completion_tokens' => 0,
@@ -105,6 +108,9 @@ function datamachine_run_conversation(
 		$base_log_context,
 		$completion_policy,
 		$last_request_metadata,
+		$last_tool_calls,
+		$final_content,
+		$turns_run,
 		$total_usage
 	);
 
@@ -159,9 +165,9 @@ function datamachine_run_conversation(
 		return array(
 			'messages'               => $messages,
 			'final_content'          => '',
-			'turn_count'             => $turn_budget->current(),
+			'turn_count'             => $turns_run,
 			'completed'              => false,
-			'last_tool_calls'        => array(),
+			'last_tool_calls'        => $last_tool_calls,
 			'tool_execution_results' => array(),
 			'error'                  => $e->getMessage(),
 			'usage'                  => $total_usage,
@@ -188,11 +194,16 @@ function datamachine_run_conversation(
 
 	$result['usage']            = $total_usage;
 	$result['request_metadata'] = $last_request_metadata;
+	$result['final_content']    = $final_content;
+	$result['turn_count']       = $turns_run;
+	$result['completed']        = 'budget_exceeded' !== ( $result['status'] ?? '' );
+	$result['last_tool_calls']  = $last_tool_calls;
 
 	// Map upstream budget_exceeded status to DM's max_turns_reached flag
 	// for backward compatibility with ChatOrchestrator response shaping.
-	if ( 'budget_exceeded' === ( $result['status'] ?? '' ) && 'conversation_turns' === ( $result['budget'] ?? '' ) ) {
+	if ( 'budget_exceeded' === ( $result['status'] ?? '' ) && in_array( $result['budget'] ?? '', array( 'conversation_turns', 'turns' ), true ) ) {
 		$result['max_turns_reached'] = true;
+		$result['completed']         = false;
 		$result['warning']           = sprintf(
 			'Maximum conversation turns (%d) reached. Response may be incomplete.',
 			$turn_budget->ceiling()
@@ -219,6 +230,9 @@ function datamachine_run_conversation(
  * @param array                                           $base_log_context       Base log context.
  * @param AgentConversationCompletionPolicyInterface       $completion_policy      Completion policy.
  * @param array                                           &$last_request_metadata Mutable request metadata.
+ * @param array                                           &$last_tool_calls        Mutable last tool calls.
+ * @param string                                          &$final_content          Mutable final assistant content.
+ * @param int                                             &$turns_run              Mutable executed turn count.
  * @param array                                           &$total_usage           Mutable usage accumulator.
  * @return callable Turn runner closure.
  */
@@ -232,6 +246,9 @@ function datamachine_build_turn_runner(
 	array $base_log_context,
 	AgentConversationCompletionPolicyInterface $completion_policy,
 	array &$last_request_metadata,
+	array &$last_tool_calls,
+	string &$final_content,
+	int &$turns_run,
 	array &$total_usage
 ): callable {
 	return static function ( array $messages, array $turn_context ) use (
@@ -244,10 +261,14 @@ function datamachine_build_turn_runner(
 		$base_log_context,
 		$completion_policy,
 		&$last_request_metadata,
+		&$last_tool_calls,
+		&$final_content,
+		&$turns_run,
 		&$total_usage
 	): array {
 		// The upstream loop provides the turn number via turn_context.
 		$turn_count = (int) ( $turn_context['turn'] ?? 1 );
+		$turns_run  = max( $turns_run, $turn_count );
 
 		// Build and dispatch AI request using centralized RequestBuilder.
 		$ai_response = RequestBuilder::build(
@@ -296,9 +317,13 @@ function datamachine_build_turn_runner(
 		}
 
 		/** @var \WordPress\AiClient\Results\DTO\GenerativeAiResult $ai_result */
-		$ai_result  = $ai_response;
-		$tool_calls = datamachine_extract_tool_calls( $ai_result );
-		$ai_content = RequestBuilder::resultText( $ai_result );
+		$ai_result       = $ai_response;
+		$tool_calls      = datamachine_extract_tool_calls( $ai_result );
+		$ai_content      = RequestBuilder::resultText( $ai_result );
+		$last_tool_calls = $tool_calls;
+		if ( '' !== $ai_content ) {
+			$final_content = $ai_content;
+		}
 
 		// Accumulate token usage.
 		$token_usage                       = $ai_result->getTokenUsage();

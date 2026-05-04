@@ -1,13 +1,13 @@
 # AI Conversation Loop
 
-**File**: `/inc/Engine/AI/AIConversationLoop.php`
+**File**: `/inc/Engine/AI/conversation-loop.php`
 **Since**: 0.2.0
 
 Multi-turn conversation execution engine for AI agents. Handles automatic tool execution, result feedback, and conversation completion detection for both Pipeline AI and Chat API agents.
 
 ## Purpose
 
-The `AIConversationLoop` class provides centralized multi-turn conversation management, eliminating duplicate conversation logic between Pipeline and Chat agents. It orchestrates the conversation flow, executes tools, manages turn limits, and determines when conversations are complete.
+Data Machine's `datamachine_run_conversation()` adapter provides centralized multi-turn conversation management while delegating generic turn sequencing to `AgentsAPI\AI\AgentConversationLoop`. It orchestrates Data Machine request assembly, product-specific tool execution, turn limits, transcript persistence, and completion detection for Pipeline and Chat agents.
 
 ## Architecture
 
@@ -109,16 +109,12 @@ if ($turn_count >= $max_turns && !$conversation_complete) {
 
 ### Canonical entry point
 
-All callers should use the static `AIConversationLoop::run()` entry point. It
-accepts the same arguments as `execute()` and returns the same result shape,
-but first gives a registered runtime adapter (via the `agents_api_conversation_runner`
-filter) the opportunity to short-circuit the built-in loop. See
-[Runtime Adapters](#runtime-adapters) below.
+All callers should use `DataMachine\Engine\AI\datamachine_run_conversation()`. The function builds a Data Machine turn runner and passes it to `AgentsAPI\AI\AgentConversationLoop::run()` so generic lifecycle behavior stays in Agents API while product adapters own Data Machine request and tool semantics.
 
 ```php
-use DataMachine\Engine\AI\AIConversationLoop;
+use function DataMachine\Engine\AI\datamachine_run_conversation;
 
-$result = AIConversationLoop::run(
+$result = datamachine_run_conversation(
     $messages,        // Initial conversation messages
     $tools,           // Available tools for AI
     $provider,        // AI provider (openai, anthropic, etc.)
@@ -389,64 +385,27 @@ do_action('datamachine_log', 'warning', 'AIConversationLoop: Max turns reached',
 ]);
 ```
 
-## Logging
+## Observability
 
-The conversation loop provides comprehensive logging at each stage:
-
-### Loop Start
+Generic loop lifecycle events come from the Agents API substrate. Cross-cutting observers should subscribe to the canonical `agents_api_loop_event` action instead of Data Machine-local loop conventions:
 
 ```php
-do_action('datamachine_log', 'debug', 'AIConversationLoop: Starting conversation loop', [
-    'agent_type' => $agent_type,
-    'provider' => $provider,
-    'model' => $model,
-    'initial_message_count' => count($messages),
-    'tool_count' => count($tools),
-    'max_turns' => $max_turns
-]);
+add_action(
+    'agents_api_loop_event',
+    static function ( string $event, array $payload ): void {
+        // Generic events include turn_started, completed, failed,
+        // budget_exceeded, and transcript_lock_contention.
+    },
+    10,
+    2
+);
 ```
 
-### Turn Start
+Per-run callers that need direct handling can still pass an `event_sink` in the payload. Data Machine bridges that sink to Agents API's `on_event` option so the caller receives the same generic lifecycle vocabulary for that run.
 
-```php
-do_action('datamachine_log', 'debug', 'AIConversationLoop: Turn started', [
-    'agent_type' => $agent_type,
-    'turn_count' => $turn_count,
-    'message_count' => count($messages)
-]);
-```
+Data Machine-specific observability remains product-specific. Request metadata such as `request_built`, AI request failures, duplicate tool-call prevention, and Data Machine tool execution details continue to use Data Machine's event sink or `datamachine_log` rather than being forced into the generic Agents API lifecycle surface.
 
-### AI Response
-
-```php
-do_action('datamachine_log', 'debug', 'AIConversationLoop: AI returned content', [
-    'agent_type' => $agent_type,
-    'turn_count' => $turn_count,
-    'content_length' => strlen($ai_content),
-    'has_tool_calls' => !empty($tool_calls)
-]);
-```
-
-### Tool Execution
-
-```php
-do_action('datamachine_log', 'debug', 'AIConversationLoop: Processing tool calls', [
-    'agent_type' => $agent_type,
-    'turn_count' => $turn_count,
-    'tool_call_count' => count($tool_calls),
-    'tools' => array_column($tool_calls, 'name')
-]);
-```
-
-### Conversation Complete
-
-```php
-do_action('datamachine_log', 'debug', 'AIConversationLoop: Conversation complete', [
-    'agent_type' => $agent_type,
-    'turn_count' => $turn_count,
-    'final_message_count' => count($messages)
-]);
-```
+Agents API swallows observer exceptions for both `on_event` and `agents_api_loop_event`, and Data Machine's local event sink wrapper also logs sink failures without changing successful loop results.
 
 ## Best Practices
 
