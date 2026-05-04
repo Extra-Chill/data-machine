@@ -75,6 +75,8 @@ class AgentMemory {
 
 		$this->scope = new AgentMemoryScope(
 			$layer ?? self::resolve_layer_for( $safe_filename ),
+			'site',
+			self::workspace_id(),
 			$effective_user_id,
 			$agent_id,
 			$safe_filename
@@ -104,6 +106,13 @@ class AgentMemory {
 	 */
 	public function get_scope(): AgentMemoryScope {
 		return $this->scope;
+	}
+
+	/**
+	 * Resolve the current WordPress site workspace ID.
+	 */
+	private static function workspace_id(): string {
+		return function_exists( 'get_current_blog_id' ) ? (string) get_current_blog_id() : '1';
 	}
 
 	/**
@@ -226,7 +235,7 @@ class AgentMemory {
 	public static function list_layer( string $layer, int $user_id = 0, int $agent_id = 0 ): array {
 		$dm                = new DirectoryManager();
 		$effective_user_id = $dm->get_effective_user_id( $user_id );
-		$scope_query       = new AgentMemoryScope( $layer, $effective_user_id, $agent_id, '' );
+		$scope_query       = new AgentMemoryScope( $layer, 'site', self::workspace_id(), $effective_user_id, $agent_id, '' );
 		$store             = AgentMemoryStoreFactory::for_scope( $scope_query );
 
 		return $store->list_layer( $scope_query );
@@ -254,7 +263,7 @@ class AgentMemory {
 	public static function list_subtree( string $layer, int $user_id, int $agent_id, string $prefix ): array {
 		$dm                = new DirectoryManager();
 		$effective_user_id = $dm->get_effective_user_id( $user_id );
-		$scope_query       = new AgentMemoryScope( $layer, $effective_user_id, $agent_id, '' );
+		$scope_query       = new AgentMemoryScope( $layer, 'site', self::workspace_id(), $effective_user_id, $agent_id, '' );
 		$store             = AgentMemoryStoreFactory::for_scope( $scope_query );
 
 		return $store->list_subtree( $scope_query, $prefix );

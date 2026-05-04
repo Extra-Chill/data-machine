@@ -163,27 +163,33 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 }
 
 require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Approvals/PendingActionStoreInterface.php';
+require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Approvals/PendingActionStatus.php';
+require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Approvals/PendingAction.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStoreAdapter.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
 
 $store     = \DataMachine\Engine\AI\Actions\PendingActionStore::adapter();
 $action_id = \DataMachine\Engine\AI\Actions\PendingActionStore::generate_id();
 $payload   = array(
+	'action_id'    => $action_id,
 	'kind'         => 'contract_smoke',
 	'summary'      => 'Contract smoke',
+	'preview'      => array( 'ok' => true ),
 	'preview_data' => array( 'ok' => true ),
 	'apply_input'  => array( 'value' => 1 ),
+	'created_at'   => gmdate( 'c' ),
+	'expires_at'   => gmdate( 'c', time() + 3600 ),
 	'ttl'          => 10,
 );
 
 datamachine_pending_actions_assert( $store instanceof \AgentsAPI\AI\Approvals\PendingActionStoreInterface, 'PendingActionStore adapter is an Agents API store', $failures, $passes );
 datamachine_pending_actions_assert( str_starts_with( $action_id, 'act_' ), 'legacy generate_id returns namespaced action IDs', $failures, $passes );
-datamachine_pending_actions_assert( $store->store( $action_id, $payload ), 'contract store writes through transient fallback', $failures, $passes );
+datamachine_pending_actions_assert( $store->store( \AgentsAPI\AI\Approvals\PendingAction::from_array( $payload ) ), 'contract store writes through transient fallback', $failures, $passes );
 
 $stored = $store->get( $action_id );
-datamachine_pending_actions_assert( is_array( $stored ) && 'contract_smoke' === ( $stored['kind'] ?? '' ), 'contract get reads the stored pending action', $failures, $passes );
-datamachine_pending_actions_assert( isset( $stored['action_id'] ) && $action_id === $stored['action_id'], 'contract store preserves action ID in payload', $failures, $passes );
-datamachine_pending_actions_assert( isset( $stored['expires_at'], $stored['created_at'] ) && $stored['expires_at'] >= $stored['created_at'] + 3600, 'transient fallback preserves minimum TTL behavior', $failures, $passes );
+datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && 'contract_smoke' === $stored->get_kind(), 'contract get reads the stored pending action', $failures, $passes );
+datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && $action_id === $stored->get_action_id(), 'contract store preserves action ID in payload', $failures, $passes );
+datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && null !== $stored->get_expires_at() && strtotime( $stored->get_expires_at() ) >= strtotime( $stored->get_created_at() ) + 3600, 'transient fallback preserves minimum TTL behavior', $failures, $passes );
 datamachine_pending_actions_assert( $store->delete( $action_id ), 'contract delete removes transient fallback payload', $failures, $passes );
 datamachine_pending_actions_assert( null === $store->get( $action_id ), 'contract get returns null after delete', $failures, $passes );
 

@@ -11,6 +11,8 @@
 
 namespace DataMachine\Abilities\Chat;
 
+use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
+
 defined( 'ABSPATH' ) || exit;
 
 class CreateChatSessionAbility {
@@ -123,7 +125,7 @@ class CreateChatSessionAbility {
 			$session_metadata = array_merge( $session_metadata, $input['metadata'] );
 		}
 
-		$session_id = $this->chat_db->create_session( $user_id, $agent_id, $session_metadata, $mode );
+		$session_id = $this->chat_db->create_session( AgentWorkspaceScope::from_parts( 'site', (string) get_current_blog_id() ), $user_id, $agent_id, $session_metadata, $mode );
 
 		if ( empty( $session_id ) ) {
 			return array(

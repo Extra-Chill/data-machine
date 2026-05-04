@@ -14,6 +14,7 @@ namespace DataMachine\Tests\Unit\Core\Database\Chat;
 
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
 use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
 
 class InMemoryConversationStore implements ConversationStoreInterface {
 
@@ -24,9 +25,10 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 	 */
 	private array $sessions = array();
 
-	public function create_session( int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
+	public function create_session( AgentWorkspaceScope $workspace, int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
 		$session_id = 'mem-' . bin2hex( random_bytes( 6 ) );
 		$now        = gmdate( 'Y-m-d H:i:s' );
+		$metadata   = array_merge( $metadata, $workspace->to_array() );
 
 		$this->sessions[ $session_id ] = array(
 			'session_id'   => $session_id,
@@ -38,6 +40,8 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 			'provider'     => null,
 			'model'        => null,
 			'context'      => $context,
+			'workspace_type' => $workspace->workspace_type,
+			'workspace_id'   => $workspace->workspace_id,
 			'created_at'   => $now,
 			'updated_at'   => $now,
 			'last_read_at' => null,
@@ -79,6 +83,9 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		$rows = array();
 
 		foreach ( $this->sessions as $session ) {
+			if ( ( $session['workspace_type'] ?? '' ) !== $workspace->workspace_type || ( $session['workspace_id'] ?? '' ) !== $workspace->workspace_id ) {
+				continue;
+			}
 			if ( (int) $session['user_id'] !== $user_id ) {
 				continue;
 			}
@@ -136,7 +143,7 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		return $count;
 	}
 
-	public function get_recent_pending_session( int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array {
+	public function get_recent_pending_session( AgentWorkspaceScope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array {
 		$cutoff = gmdate( 'Y-m-d H:i:s', time() - $seconds );
 		$best   = null;
 

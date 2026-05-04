@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "15e4e0de554bbfe5e474544c157365f655faf028"
+                "reference": "109576b004ef61783456e27ad841e553aa59f25a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/15e4e0de554bbfe5e474544c157365f655faf028",
-                "reference": "15e4e0de554bbfe5e474544c157365f655faf028",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/109576b004ef61783456e27ad841e553aa59f25a",
+                "reference": "109576b004ef61783456e27ad841e553aa59f25a",
                 "shasum": ""
             },
             "require": {
@@ -31,16 +31,23 @@
                     "php tests/message-envelope-smoke.php",
                     "php tests/registry-smoke.php",
                     "php tests/execution-principal-smoke.php",
+                    "php tests/authorization-smoke.php",
                     "php tests/action-policy-values-smoke.php",
+                    "php tests/consent-policy-smoke.php",
+                    "php tests/tool-policy-contracts-smoke.php",
+                    "php tests/action-policy-resolver-smoke.php",
                     "php tests/tool-runtime-smoke.php",
                     "php tests/pending-action-store-contract-smoke.php",
                     "php tests/approval-resolver-contract-smoke.php",
                     "php tests/identity-smoke.php",
+                    "php tests/memory-metadata-contract-smoke.php",
                     "php tests/approval-action-value-shape-smoke.php",
+                    "php tests/workspace-scope-smoke.php",
                     "php tests/compaction-item-smoke.php",
                     "php tests/conversation-runner-contracts-smoke.php",
                     "php tests/conversation-compaction-smoke.php",
                     "php tests/markdown-section-compaction-smoke.php",
+                    "php tests/context-registry-smoke.php",
                     "php tests/conversation-loop-smoke.php",
                     "php tests/conversation-loop-tool-execution-smoke.php",
                     "php tests/conversation-loop-completion-policy-smoke.php",
@@ -48,6 +55,7 @@
                     "php tests/conversation-loop-events-smoke.php",
                     "php tests/iteration-budget-smoke.php",
                     "php tests/conversation-loop-budgets-smoke.php",
+                    "php tests/context-authority-smoke.php",
                     "php tests/guidelines-substrate-smoke.php",
                     "php tests/no-product-imports-smoke.php"
                 ]
@@ -61,7 +69,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-05-03T15:27:13+00:00"
+            "time": "2026-05-04T15:07:00+00:00"
         },
         {
             "name": "chubes4/block-format-bridge",

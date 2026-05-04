@@ -44,9 +44,12 @@ require_once __DIR__ . '/../inc/Core/FilesRepository/DiskAgentMemoryStore.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryStoreFactory.php';
 
 use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
+use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
+use AgentsAPI\Core\FilesRepository\AgentMemoryQuery;
 use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
 use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
 use DataMachine\Core\FilesRepository\AgentMemoryStoreFactory;
+use AgentsAPI\Core\FilesRepository\AgentMemoryStoreCapabilities;
 use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
 use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
 use DataMachine\Core\FilesRepository\DiskAgentMemoryStore;
@@ -58,7 +61,11 @@ class AgentMemoryStoreContractFakeStore implements AgentMemoryStoreInterface {
 	/** @var AgentMemoryScope[] */
 	public array $scopes = array();
 
-	public function read( AgentMemoryScope $scope ): AgentMemoryReadResult {
+	public function capabilities(): AgentMemoryStoreCapabilities {
+		return AgentMemoryStoreCapabilities::none();
+	}
+
+	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
 		$this->scopes[] = $scope;
 		if ( ! array_key_exists( $scope->key(), $this->files ) ) {
 			return AgentMemoryReadResult::not_found();
@@ -68,8 +75,8 @@ class AgentMemoryStoreContractFakeStore implements AgentMemoryStoreInterface {
 		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123 );
 	}
 
-	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null ): AgentMemoryWriteResult {
-		unset( $_if_match );
+	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null, ?AgentMemoryMetadata $_metadata = null ): AgentMemoryWriteResult {
+		unset( $_if_match, $_metadata );
 		$this->scopes[] = $scope;
 		$this->files[ $scope->key() ] = $content;
 
@@ -88,12 +95,13 @@ class AgentMemoryStoreContractFakeStore implements AgentMemoryStoreInterface {
 		return AgentMemoryWriteResult::ok( '', 0 );
 	}
 
-	public function list_layer( AgentMemoryScope $scope_query ): array {
+	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
 		$this->scopes[] = $scope_query;
 		$entries        = array();
 
 		foreach ( $this->files as $key => $content ) {
-			[ $layer, $user_id, $agent_id, $filename ] = explode( ':', $key, 4 );
+			[ $layer, $workspace_type, $workspace_id, $user_id, $agent_id, $filename ] = explode( ':', $key, 6 );
+			unset( $workspace_type, $workspace_id );
 			if ( $layer !== $scope_query->layer || (int) $user_id !== $scope_query->user_id || (int) $agent_id !== $scope_query->agent_id ) {
 				continue;
 			}
@@ -108,7 +116,7 @@ class AgentMemoryStoreContractFakeStore implements AgentMemoryStoreInterface {
 		return $entries;
 	}
 
-	public function list_subtree( AgentMemoryScope $scope_query, string $prefix ): array {
+	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
 		$this->scopes[] = $scope_query;
 		unset( $prefix );
 		return array();
@@ -138,7 +146,7 @@ function datamachine_agent_memory_store_contract_round_trip( AgentMemoryStoreInt
 	return $store->read( $scope );
 }
 
-$scope = new AgentMemoryScope( 'agent', 7, 42, 'MEMORY.md' );
+$scope = new AgentMemoryScope( 'agent', 'site', '1', 7, 42, 'MEMORY.md' );
 
 datamachine_agent_memory_store_contract_reset_filters();
 $default_store = AgentMemoryStoreFactory::for_scope( $scope );

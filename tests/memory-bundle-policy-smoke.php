@@ -198,6 +198,9 @@ use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
 use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
 use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
 use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
+use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
+use AgentsAPI\Core\FilesRepository\AgentMemoryQuery;
+use AgentsAPI\Core\FilesRepository\AgentMemoryStoreCapabilities;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\AI\Memory\MemorySectionArtifact;
@@ -211,7 +214,11 @@ class MemoryPolicyFakeStore implements AgentMemoryStoreInterface {
 	/** @var array<string, string> */
 	public array $files = array();
 
-	public function read( AgentMemoryScope $scope ): AgentMemoryReadResult {
+	public function capabilities(): AgentMemoryStoreCapabilities {
+		return AgentMemoryStoreCapabilities::none();
+	}
+
+	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
 		if ( ! array_key_exists( $scope->key(), $this->files ) ) {
 			return AgentMemoryReadResult::not_found();
 		}
@@ -220,8 +227,8 @@ class MemoryPolicyFakeStore implements AgentMemoryStoreInterface {
 		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123 );
 	}
 
-	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null ): AgentMemoryWriteResult {
-		unset( $_if_match );
+	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null, ?AgentMemoryMetadata $_metadata = null ): AgentMemoryWriteResult {
+		unset( $_if_match, $_metadata );
 		$this->files[ $scope->key() ] = $content;
 		return AgentMemoryWriteResult::ok( sha1( $content ), strlen( $content ) );
 	}
@@ -235,13 +242,13 @@ class MemoryPolicyFakeStore implements AgentMemoryStoreInterface {
 		return AgentMemoryWriteResult::ok( '', 0 );
 	}
 
-	public function list_layer( AgentMemoryScope $_scope_query ): array {
-		unset( $_scope_query );
+	public function list_layer( AgentMemoryScope $_scope_query, ?AgentMemoryQuery $_query = null ): array {
+		unset( $_scope_query, $_query );
 		return array();
 	}
 
-	public function list_subtree( AgentMemoryScope $_scope_query, string $_prefix ): array {
-		unset( $_scope_query, $_prefix );
+	public function list_subtree( AgentMemoryScope $_scope_query, string $_prefix, ?AgentMemoryQuery $_query = null ): array {
+		unset( $_scope_query, $_prefix, $_query );
 		return array();
 	}
 }
@@ -269,7 +276,7 @@ add_filter(
 MemorySectionPendingAction::register();
 PermissionHelper::set_agent_context( 42, 7 );
 
-$scope_key                  = 'agent:7:42:MEMORY.md';
+$scope_key                  = 'agent:site:1:7:42:MEMORY.md';
 $store->files[ $scope_key ] = "# MEMORY.md\n\n## Source quirks\nExisting note.\n";
 
 echo "\n[1] Memory sections are bundle artifacts with ownership/status metadata\n";

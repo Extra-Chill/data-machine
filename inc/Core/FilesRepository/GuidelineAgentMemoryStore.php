@@ -23,8 +23,11 @@
 namespace DataMachine\Core\FilesRepository;
 
 use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
+use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
+use AgentsAPI\Core\FilesRepository\AgentMemoryQuery;
 use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
 use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
+use AgentsAPI\Core\FilesRepository\AgentMemoryStoreCapabilities;
 use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
 use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
 
@@ -72,7 +75,14 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * @inheritDoc
 	 */
-	public function read( AgentMemoryScope $scope ): AgentMemoryReadResult {
+	public function capabilities(): AgentMemoryStoreCapabilities {
+		return AgentMemoryStoreCapabilities::none();
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
 		$post = $this->find_post( $scope );
 		if ( ! $post instanceof \WP_Post ) {
 			return AgentMemoryReadResult::not_found();
@@ -90,13 +100,13 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		$updated = strtotime( (string) $post->post_modified_gmt );
 		$updated = false === $updated ? null : (int) $updated;
 
-		return new AgentMemoryReadResult( true, $content, $hash, $bytes, $updated );
+		return new AgentMemoryReadResult( true, $content, $hash, $bytes, $updated, null, $this->capabilities()->unsupported_metadata_fields( $metadata_fields, 'read' ) );
 	}
 
 	/**
 	 * @inheritDoc
 	 */
-	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null ): AgentMemoryWriteResult {
+	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
 		if ( ! self::is_available() ) {
 			return AgentMemoryWriteResult::failure( 'capability' );
 		}
@@ -211,7 +221,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * @inheritDoc
 	 */
-	public function list_layer( AgentMemoryScope $scope_query ): array {
+	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
 		$posts   = $this->query_scope_posts( $scope_query, null );
 		$entries = array();
 
@@ -231,7 +241,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * @inheritDoc
 	 */
-	public function list_subtree( AgentMemoryScope $scope_query, string $prefix ): array {
+	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
 		$prefix = trim( $prefix, '/' );
 		if ( '' === $prefix ) {
 			return array();
