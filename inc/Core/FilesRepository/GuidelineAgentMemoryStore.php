@@ -85,13 +85,6 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * @inheritDoc
 	 */
-	public function capabilities(): AgentMemoryStoreCapabilities {
-		return AgentMemoryStoreCapabilities::all();
-	}
-
-	/**
-	 * @inheritDoc
-	 */
 	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
 		$post = $this->find_post( $scope );
 		if ( ! $post instanceof \WP_Post ) {

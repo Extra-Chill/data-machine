@@ -69,7 +69,8 @@ class DataMachinePipelineTranscriptPersister implements AgentConversationTranscr
 			$store_metadata['request_metadata'] = $result['request_metadata'];
 		}
 
-		$session_id = $store->create_session( ConversationStoreFactory::default_workspace(), $user_id, $agent_id, $store_metadata, 'pipeline' );
+		$workspace  = $request->workspace() ?? ConversationStoreFactory::default_workspace();
+		$session_id = $store->create_session( $workspace, $user_id, $agent_id, $store_metadata, 'pipeline' );
 
 		if ( '' === $session_id ) {
 			do_action(
