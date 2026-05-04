@@ -267,14 +267,10 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * @param string              $context   Execution context (chat, pipeline, system).
 	 * @return string Session ID (UUID)
 	 */
-	public function create_session(
-		AgentWorkspaceScope $workspace,
-		int $user_id,
-		int $agent_id = 0,
-		array $metadata = array(),
-		string $context = 'chat'
-	): string {
+	public function create_session( ...$args ): string {
 		global $wpdb;
+
+		list( $workspace, $user_id, $agent_id, $metadata, $context ) = self::normalize_create_session_args( $args );
 
 		$session_id = wp_generate_uuid4();
 		$table_name = self::get_prefixed_table_name();
@@ -332,6 +328,58 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		);
 
 		return $session_id;
+	}
+
+	/**
+	 * Normalize create-session arguments across current and workspace-aware contracts.
+	 *
+	 * @param array $args Raw method arguments.
+	 * @return array{0:AgentWorkspaceScope,1:int,2:int,3:array,4:string}
+	 */
+	private static function normalize_create_session_args( array $args ): array {
+		if ( isset( $args[0] ) && $args[0] instanceof AgentWorkspaceScope ) {
+			return array(
+				$args[0],
+				(int) ( $args[1] ?? 0 ),
+				(int) ( $args[2] ?? 0 ),
+				is_array( $args[3] ?? null ) ? $args[3] : array(),
+				(string) ( $args[4] ?? 'chat' ),
+			);
+		}
+
+		return array(
+			WordPressWorkspaceScope::current(),
+			(int) ( $args[0] ?? 0 ),
+			(int) ( $args[1] ?? 0 ),
+			is_array( $args[2] ?? null ) ? $args[2] : array(),
+			(string) ( $args[3] ?? 'chat' ),
+		);
+	}
+
+	/**
+	 * Normalize pending-session arguments across current and workspace-aware contracts.
+	 *
+	 * @param array $args Raw method arguments.
+	 * @return array{0:AgentWorkspaceScope,1:int,2:int,3:string,4:int|null}
+	 */
+	private static function normalize_recent_pending_session_args( array $args ): array {
+		if ( isset( $args[0] ) && $args[0] instanceof AgentWorkspaceScope ) {
+			return array(
+				$args[0],
+				(int) ( $args[1] ?? 0 ),
+				(int) ( $args[2] ?? 600 ),
+				(string) ( $args[3] ?? 'chat' ),
+				isset( $args[4] ) ? (int) $args[4] : null,
+			);
+		}
+
+		return array(
+			WordPressWorkspaceScope::current(),
+			(int) ( $args[0] ?? 0 ),
+			(int) ( $args[1] ?? 600 ),
+			(string) ( $args[2] ?? 'chat' ),
+			isset( $args[3] ) ? (int) $args[3] : null,
+		);
 	}
 
 	/**
@@ -737,14 +785,10 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * @param int|null            $token_id  Optional token ID for login-scoped deduplication.
 	 * @return array|null Session data or null if none found
 	 */
-	public function get_recent_pending_session(
-		AgentWorkspaceScope $workspace,
-		int $user_id,
-		int $seconds = 600,
-		string $context = 'chat',
-		?int $token_id = null
-	): ?array {
+	public function get_recent_pending_session( ...$args ): ?array {
 		global $wpdb;
+
+		list( $workspace, $user_id, $seconds, $context, $token_id ) = self::normalize_recent_pending_session_args( $args );
 
 		$table_name  = self::get_prefixed_table_name();
 		$cutoff_time = gmdate( 'Y-m-d H:i:s', time() - $seconds );
