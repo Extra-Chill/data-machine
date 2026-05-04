@@ -248,7 +248,7 @@ datamachine_guideline_memory_assert(
 echo "\nTest: private memory requires explicit owner capability metadata\n";
 
 $store         = new GuidelineAgentMemoryStore();
-$private_scope = new AgentMemoryScope( 'user', 7, 42, 'USER.md' );
+$private_scope = new AgentMemoryScope( 'user', 'site', '1', 7, 42, 'USER.md' );
 $post_id       = 200;
 
 $GLOBALS['datamachine_guideline_posts'][ $post_id ] = new WP_Post(
@@ -294,7 +294,7 @@ datamachine_guideline_memory_assert(
 
 echo "\nTest: workspace-shared guidance uses workspace guideline capabilities\n";
 
-$shared_scope = new AgentMemoryScope( 'shared', 7, 42, 'RULES.md' );
+$shared_scope = new AgentMemoryScope( 'shared', 'site', '1', 7, 42, 'RULES.md' );
 $post_id      = 201;
 
 $GLOBALS['datamachine_guideline_posts'][ $post_id ] = new WP_Post(
