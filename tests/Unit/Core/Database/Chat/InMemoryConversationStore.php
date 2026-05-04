@@ -83,9 +83,6 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		$rows = array();
 
 		foreach ( $this->sessions as $session ) {
-			if ( ( $session['workspace_type'] ?? '' ) !== $workspace->workspace_type || ( $session['workspace_id'] ?? '' ) !== $workspace->workspace_id ) {
-				continue;
-			}
 			if ( (int) $session['user_id'] !== $user_id ) {
 				continue;
 			}
