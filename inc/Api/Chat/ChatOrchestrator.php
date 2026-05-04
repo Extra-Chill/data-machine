@@ -22,7 +22,6 @@ use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\DataMachineAgentConsentPolicy;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
-use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
 use WP_Error;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
@@ -778,7 +777,7 @@ class ChatOrchestrator {
 	/**
 	 * Resolve the current site workspace for transcript storage.
 	 */
-	private static function workspace_scope(): AgentWorkspaceScope {
-		return AgentWorkspaceScope::from_parts( 'site', (string) get_current_blog_id() );
+	private static function workspace_scope(): \AgentsAPI\Core\Workspace\AgentWorkspaceScope {
+		return ConversationStoreFactory::default_workspace();
 	}
 }
