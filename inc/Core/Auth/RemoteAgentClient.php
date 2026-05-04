@@ -140,22 +140,15 @@ class RemoteAgentClient {
 		// incoming chain if we're extending one, or starts a fresh chain
 		// if we're top-of-chain.
 		$caller_ctx = self::build_outbound_caller_context();
-		$headers    = array_merge( $headers, $caller_ctx->toOutboundHeaders() );
+		$headers    = array_merge( $headers, $caller_ctx->to_headers() );
 
 		if ( ! empty( $args['headers'] ) && is_array( $args['headers'] ) ) {
 			// Caller-provided headers win except for Authorization and
 			// our A2A headers, which we always control so downstream
-			// code can trust chain_depth + chain_id semantics.
+			// code can trust chain_depth + chain_root_request_id semantics.
 			$caller_headers = $args['headers'];
-			unset(
-				$caller_headers['Authorization'],
-				$caller_headers['authorization'],
-				$caller_headers[ CallerContext::HEADER_CALLER_SITE ],
-				$caller_headers[ CallerContext::HEADER_CALLER_AGENT ],
-				$caller_headers[ CallerContext::HEADER_CHAIN_ID ],
-				$caller_headers[ CallerContext::HEADER_CHAIN_DEPTH ]
-			);
-			$headers = array_merge( $headers, $caller_headers );
+			$caller_headers = self::strip_controlled_headers( $caller_headers );
+			$headers        = array_merge( $headers, $caller_headers );
 		}
 
 		$body_raw = null;
@@ -379,20 +372,22 @@ class RemoteAgentClient {
 	}
 
 	/**
-	 * Build the {@see CallerContext} to emit on this outbound call.
+	 * Build the Agents API caller context to emit on this outbound call.
 	 *
 	 * Resolves the calling site's host and the acting agent's slug
 	 * (from PermissionHelper if we're running in an agent context),
 	 * then propagates the incoming chain context if one exists on
 	 * PermissionHelper — otherwise starts a fresh chain.
 	 *
-	 * @return CallerContext
+	 * @return \WP_Agent_Caller_Context
 	 */
-	private static function build_outbound_caller_context(): CallerContext {
-		$site = '';
+	private static function build_outbound_caller_context(): \WP_Agent_Caller_Context {
+		$site = \WP_Agent_Caller_Context::SELF_HOST;
 		if ( function_exists( 'network_home_url' ) ) {
-			$host = wp_parse_url( network_home_url(), PHP_URL_HOST );
-			$site = is_string( $host ) ? (string) $host : '';
+			$home = network_home_url();
+			if ( is_string( $home ) && '' !== $home ) {
+				$site = rtrim( $home, '/' );
+			}
 		}
 
 		$agent_slug = '';
@@ -411,6 +406,47 @@ class RemoteAgentClient {
 			? PermissionHelper::get_caller_context()
 			: null;
 
-		return CallerContext::forOutbound( $site, $agent_slug, $inbound );
+		$root_request_id = $inbound instanceof \WP_Agent_Caller_Context
+			? $inbound->chain_root_request_id
+			: \WP_Agent_Caller_Context::top_of_chain()->chain_root_request_id;
+		$chain_depth     = $inbound instanceof \WP_Agent_Caller_Context
+			? $inbound->chain_depth + 1
+			: 1;
+
+		return new \WP_Agent_Caller_Context(
+			$agent_slug,
+			PermissionHelper::acting_user_id(),
+			$site,
+			$chain_depth,
+			$root_request_id
+		);
+	}
+
+	/**
+	 * Remove caller-controlled headers that Data Machine must own.
+	 *
+	 * @param array $headers Caller-provided headers.
+	 * @return array
+	 */
+	private static function strip_controlled_headers( array $headers ): array {
+		$blocked = array_map(
+			'strtolower',
+			array(
+				'Authorization',
+				\WP_Agent_Caller_Context::HEADER_CALLER_AGENT,
+				\WP_Agent_Caller_Context::HEADER_CALLER_USER,
+				\WP_Agent_Caller_Context::HEADER_CALLER_HOST,
+				\WP_Agent_Caller_Context::HEADER_CHAIN_DEPTH,
+				\WP_Agent_Caller_Context::HEADER_CHAIN_ROOT,
+			)
+		);
+
+		foreach ( $headers as $name => $_value ) {
+			if ( in_array( strtolower( (string) $name ), $blocked, true ) ) {
+				unset( $headers[ $name ] );
+			}
+		}
+
+		return $headers;
 	}
 }

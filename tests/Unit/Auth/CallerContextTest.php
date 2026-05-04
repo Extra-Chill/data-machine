@@ -1,151 +1,202 @@
 <?php
 /**
- * Tests for CallerContext value object.
+ * Tests for the Agents API caller context primitive.
  *
  * @package DataMachine\Tests\Unit\Auth
  */
 
 namespace DataMachine\Tests\Unit\Auth;
 
-use DataMachine\Core\Auth\CallerContext;
 use WP_UnitTestCase;
 
 class CallerContextTest extends WP_UnitTestCase {
 
 	public function test_default_construction(): void {
-		$ctx = new CallerContext();
-		$this->assertSame( '', $ctx->callerSite() );
-		$this->assertSame( '', $ctx->callerAgent() );
-		$this->assertSame( '', $ctx->chainId() );
-		$this->assertSame( 0, $ctx->chainDepth() );
-		$this->assertFalse( $ctx->isCrossSite() );
+		$ctx = \WP_Agent_Caller_Context::top_of_chain( 'root-1' );
+		$this->assertSame( '', $ctx->caller_agent_id );
+		$this->assertSame( 0, $ctx->caller_user_id );
+		$this->assertSame( \WP_Agent_Caller_Context::SELF_HOST, $ctx->caller_host );
+		$this->assertSame( 'root-1', $ctx->chain_root_request_id );
+		$this->assertSame( 0, $ctx->chain_depth );
+		$this->assertFalse( $ctx->is_cross_site() );
 	}
 
 	public function test_from_request_with_full_headers(): void {
 		$request = new \WP_REST_Request();
-		$request->set_header( CallerContext::HEADER_CALLER_SITE, 'chubes.net' );
-		$request->set_header( CallerContext::HEADER_CALLER_AGENT, 'franklin' );
-		$request->set_header( CallerContext::HEADER_CHAIN_ID, 'abc-123' );
-		$request->set_header( CallerContext::HEADER_CHAIN_DEPTH, '2' );
+		$request->set_header( \WP_Agent_Caller_Context::HEADER_CALLER_HOST, 'https://chubes.net' );
+		$request->set_header( \WP_Agent_Caller_Context::HEADER_CALLER_AGENT, 'franklin' );
+		$request->set_header( \WP_Agent_Caller_Context::HEADER_CALLER_USER, '42' );
+		$request->set_header( \WP_Agent_Caller_Context::HEADER_CHAIN_ROOT, 'abc-123' );
+		$request->set_header( \WP_Agent_Caller_Context::HEADER_CHAIN_DEPTH, '2' );
 
-		$ctx = CallerContext::fromRequest( $request );
+		$ctx = \WP_Agent_Caller_Context::from_headers( $request );
 
-		$this->assertSame( 'chubes.net', $ctx->callerSite() );
-		$this->assertSame( 'franklin', $ctx->callerAgent() );
-		$this->assertSame( 'abc-123', $ctx->chainId() );
-		$this->assertSame( 2, $ctx->chainDepth() );
-		$this->assertTrue( $ctx->isCrossSite() );
+		$this->assertSame( 'https://chubes.net', $ctx->caller_host );
+		$this->assertSame( 'franklin', $ctx->caller_agent_id );
+		$this->assertSame( 42, $ctx->caller_user_id );
+		$this->assertSame( 'abc-123', $ctx->chain_root_request_id );
+		$this->assertSame( 2, $ctx->chain_depth );
+		$this->assertTrue( $ctx->is_cross_site() );
 	}
 
-	public function test_from_request_missing_chain_id_generates_one(): void {
+	public function test_from_request_without_headers_generates_top_of_chain(): void {
 		$request = new \WP_REST_Request();
 
-		$ctx = CallerContext::fromRequest( $request );
+		$ctx = \WP_Agent_Caller_Context::from_headers( $request );
 
-		$this->assertNotEmpty( $ctx->chainId(), 'Missing chain_id header auto-generates a UUID' );
-		$this->assertSame( 0, $ctx->chainDepth() );
-		$this->assertFalse( $ctx->isCrossSite() );
+		$this->assertNotEmpty( $ctx->chain_root_request_id, 'Missing chain root header auto-generates a UUID' );
+		$this->assertSame( 0, $ctx->chain_depth );
+		$this->assertFalse( $ctx->is_cross_site() );
 	}
 
-	public function test_from_request_negative_depth_clamped_to_zero(): void {
+	public function test_from_request_negative_depth_fails_closed(): void {
 		$request = new \WP_REST_Request();
-		$request->set_header( CallerContext::HEADER_CHAIN_DEPTH, '-5' );
+		$request->set_header( \WP_Agent_Caller_Context::HEADER_CHAIN_DEPTH, '-5' );
 
-		$ctx = CallerContext::fromRequest( $request );
-
-		$this->assertSame( 0, $ctx->chainDepth() );
+		$this->expectException( \InvalidArgumentException::class );
+		\WP_Agent_Caller_Context::from_headers( $request );
 	}
 
 	public function test_from_request_accepts_plain_header_array(): void {
 		$headers = array(
-			CallerContext::HEADER_CALLER_SITE  => 'extrachill.com',
-			CallerContext::HEADER_CALLER_AGENT => 'sarai',
-			CallerContext::HEADER_CHAIN_ID     => 'chain-xyz',
-			CallerContext::HEADER_CHAIN_DEPTH  => '1',
+			\WP_Agent_Caller_Context::HEADER_CALLER_HOST  => 'https://extrachill.com',
+			\WP_Agent_Caller_Context::HEADER_CALLER_AGENT => 'sarai',
+			\WP_Agent_Caller_Context::HEADER_CHAIN_ROOT   => 'chain-xyz',
+			\WP_Agent_Caller_Context::HEADER_CHAIN_DEPTH  => '1',
 		);
 
-		$ctx = CallerContext::fromRequest( $headers );
+		$ctx = \WP_Agent_Caller_Context::from_headers( $headers );
 
-		$this->assertSame( 'extrachill.com', $ctx->callerSite() );
-		$this->assertSame( 'sarai', $ctx->callerAgent() );
-		$this->assertSame( 'chain-xyz', $ctx->chainId() );
-		$this->assertSame( 1, $ctx->chainDepth() );
+		$this->assertSame( 'https://extrachill.com', $ctx->caller_host );
+		$this->assertSame( 'sarai', $ctx->caller_agent_id );
+		$this->assertSame( 'chain-xyz', $ctx->chain_root_request_id );
+		$this->assertSame( 1, $ctx->chain_depth );
 	}
 
 	public function test_from_request_header_lookup_is_case_insensitive(): void {
 		$headers = array(
-			'x-datamachine-caller-site'  => 'chubes.net',
-			'X-DATAMACHINE-CHAIN-ID'     => 'mixed-case',
-			'x-datamachine-chain-depth'  => '3',
+			'x-agents-api-caller-agent' => 'franklin',
+			'X-AGENTS-API-CALLER-HOST'  => 'https://chubes.net',
+			'X-AGENTS-API-CHAIN-ROOT'   => 'mixed-case',
+			'x-agents-api-chain-depth'  => '3',
 		);
 
-		$ctx = CallerContext::fromRequest( $headers );
+		$ctx = \WP_Agent_Caller_Context::from_headers( $headers );
 
-		$this->assertSame( 'chubes.net', $ctx->callerSite() );
-		$this->assertSame( 'mixed-case', $ctx->chainId() );
-		$this->assertSame( 3, $ctx->chainDepth() );
+		$this->assertSame( 'https://chubes.net', $ctx->caller_host );
+		$this->assertSame( 'mixed-case', $ctx->chain_root_request_id );
+		$this->assertSame( 3, $ctx->chain_depth );
 	}
 
-	public function test_is_cross_site_requires_both_depth_and_site(): void {
-		// Depth without site — not cross-site.
-		$a = new CallerContext( '', 'some-agent', 'cid', 2 );
-		$this->assertFalse( $a->isCrossSite() );
+	public function test_is_cross_site_requires_remote_host(): void {
+		$local = new \WP_Agent_Caller_Context( 'some-agent', 0, \WP_Agent_Caller_Context::SELF_HOST, 2, 'cid' );
+		$this->assertFalse( $local->is_cross_site() );
 
-		// Site without depth — not cross-site (depth 0 = top of chain).
-		$b = new CallerContext( 'chubes.net', 'some-agent', 'cid', 0 );
-		$this->assertFalse( $b->isCrossSite() );
-
-		// Both — cross-site.
-		$c = new CallerContext( 'chubes.net', 'some-agent', 'cid', 1 );
-		$this->assertTrue( $c->isCrossSite() );
+		$remote = new \WP_Agent_Caller_Context( 'some-agent', 0, 'https://chubes.net', 1, 'cid' );
+		$this->assertTrue( $remote->is_cross_site() );
 	}
 
-	public function test_for_outbound_fresh_chain(): void {
-		$ctx = CallerContext::forOutbound( 'intelligence-chubes4.local', 'franklin' );
+	public function test_outbound_fresh_chain_shape(): void {
+		$top = \WP_Agent_Caller_Context::top_of_chain( 'fresh-root' );
+		$ctx = new \WP_Agent_Caller_Context( 'franklin', 7, 'https://intelligence-chubes4.local', 1, $top->chain_root_request_id );
 
-		$this->assertSame( 'intelligence-chubes4.local', $ctx->callerSite() );
-		$this->assertSame( 'franklin', $ctx->callerAgent() );
-		$this->assertNotEmpty( $ctx->chainId(), 'Fresh chain generates a UUID' );
-		$this->assertSame( 1, $ctx->chainDepth(), 'Top-of-chain outbound is depth 1' );
+		$this->assertSame( 'https://intelligence-chubes4.local', $ctx->caller_host );
+		$this->assertSame( 'franklin', $ctx->caller_agent_id );
+		$this->assertSame( 7, $ctx->caller_user_id );
+		$this->assertSame( 'fresh-root', $ctx->chain_root_request_id );
+		$this->assertSame( 1, $ctx->chain_depth, 'Top-of-chain outbound is depth 1' );
 	}
 
-	public function test_for_outbound_propagates_inbound_chain(): void {
-		$inbound = new CallerContext( 'chubes.net', 'chubes-bot', 'original-chain', 2 );
-		$ctx     = CallerContext::forOutbound( 'intelligence-chubes4.local', 'franklin', $inbound );
+	public function test_outbound_propagates_inbound_chain(): void {
+		$inbound = new \WP_Agent_Caller_Context( 'chubes-bot', 9, 'https://chubes.net', 2, 'original-chain' );
+		$ctx     = new \WP_Agent_Caller_Context( 'franklin', 7, 'https://intelligence-chubes4.local', $inbound->chain_depth + 1, $inbound->chain_root_request_id );
 
-		$this->assertSame( 'original-chain', $ctx->chainId(), 'Chain ID propagates from inbound' );
-		$this->assertSame( 3, $ctx->chainDepth(), 'Depth increments by 1 for each hop' );
-		$this->assertSame( 'intelligence-chubes4.local', $ctx->callerSite(), 'Site reflects current site, not inbound' );
-		$this->assertSame( 'franklin', $ctx->callerAgent(), 'Agent reflects current site, not inbound' );
+		$this->assertSame( 'original-chain', $ctx->chain_root_request_id, 'Chain root propagates from inbound' );
+		$this->assertSame( 3, $ctx->chain_depth, 'Depth increments by 1 for each hop' );
+		$this->assertSame( 'https://intelligence-chubes4.local', $ctx->caller_host, 'Host reflects current site, not inbound' );
+		$this->assertSame( 'franklin', $ctx->caller_agent_id, 'Agent reflects current site, not inbound' );
 	}
 
 	public function test_to_outbound_headers_includes_required_fields(): void {
-		$ctx     = new CallerContext( 'chubes.net', 'franklin', 'cid-1', 2 );
-		$headers = $ctx->toOutboundHeaders();
+		$ctx     = new \WP_Agent_Caller_Context( 'franklin', 7, 'https://chubes.net', 2, 'cid-1' );
+		$headers = $ctx->to_headers();
 
-		$this->assertSame( 'chubes.net', $headers[ CallerContext::HEADER_CALLER_SITE ] );
-		$this->assertSame( 'franklin', $headers[ CallerContext::HEADER_CALLER_AGENT ] );
-		$this->assertSame( 'cid-1', $headers[ CallerContext::HEADER_CHAIN_ID ] );
-		$this->assertSame( '2', $headers[ CallerContext::HEADER_CHAIN_DEPTH ] );
+		$this->assertSame( 'https://chubes.net', $headers[ \WP_Agent_Caller_Context::HEADER_CALLER_HOST ] );
+		$this->assertSame( 'franklin', $headers[ \WP_Agent_Caller_Context::HEADER_CALLER_AGENT ] );
+		$this->assertSame( '7', $headers[ \WP_Agent_Caller_Context::HEADER_CALLER_USER ] );
+		$this->assertSame( 'cid-1', $headers[ \WP_Agent_Caller_Context::HEADER_CHAIN_ROOT ] );
+		$this->assertSame( '2', $headers[ \WP_Agent_Caller_Context::HEADER_CHAIN_DEPTH ] );
 	}
 
-	public function test_to_outbound_headers_omits_empty_identity_fields(): void {
-		$ctx     = new CallerContext( '', '', 'cid-1', 0 );
-		$headers = $ctx->toOutboundHeaders();
+	public function test_remote_agent_client_emits_canonical_outbound_headers(): void {
+		update_option(
+			\DataMachine\Core\Auth\AgentAuthCallback::OPTION_KEY,
+			array(
+				'remote.example/sarai' => array(
+					'token' => 'datamachine_test_token',
+				),
+			),
+			false
+		);
 
-		$this->assertArrayNotHasKey( CallerContext::HEADER_CALLER_SITE, $headers );
-		$this->assertArrayNotHasKey( CallerContext::HEADER_CALLER_AGENT, $headers );
-		$this->assertArrayHasKey( CallerContext::HEADER_CHAIN_ID, $headers );
-		$this->assertArrayHasKey( CallerContext::HEADER_CHAIN_DEPTH, $headers );
+		$captured = null;
+		$filter   = static function ( $preempt, $args, $url ) use ( &$captured ) {
+			$captured = array(
+				'args' => $args,
+				'url'  => $url,
+			);
+
+			return array(
+				'headers'  => array(),
+				'body'     => '{}',
+				'response' => array(
+					'code'    => 200,
+					'message' => 'OK',
+				),
+				'cookies'  => array(),
+			);
+		};
+
+		add_filter( 'pre_http_request', $filter, 10, 3 );
+
+		try {
+			\DataMachine\Core\Auth\RemoteAgentClient::request( 'remote.example', 'sarai', 'POST', '/wp-json/datamachine/v1/chat' );
+		} finally {
+			remove_filter( 'pre_http_request', $filter, 10 );
+			delete_option( \DataMachine\Core\Auth\AgentAuthCallback::OPTION_KEY );
+		}
+
+		$this->assertIsArray( $captured );
+		$headers = $captured['args']['headers'];
+
+		$this->assertSame( 'Bearer datamachine_test_token', $headers['Authorization'] );
+		$this->assertArrayHasKey( \WP_Agent_Caller_Context::HEADER_CALLER_AGENT, $headers );
+		$this->assertArrayHasKey( \WP_Agent_Caller_Context::HEADER_CALLER_USER, $headers );
+		$this->assertArrayHasKey( \WP_Agent_Caller_Context::HEADER_CALLER_HOST, $headers );
+		$this->assertArrayHasKey( \WP_Agent_Caller_Context::HEADER_CHAIN_ROOT, $headers );
+		$this->assertSame( '1', $headers[ \WP_Agent_Caller_Context::HEADER_CHAIN_DEPTH ] );
+		$this->assertArrayNotHasKey( 'X-Datamachine-Caller-Site', $headers );
+		$this->assertArrayNotHasKey( 'X-Datamachine-Chain-Id', $headers );
+	}
+
+	public function test_top_of_chain_headers_include_canonical_self_shape(): void {
+		$ctx     = \WP_Agent_Caller_Context::top_of_chain( 'cid-1' );
+		$headers = $ctx->to_headers();
+
+		$this->assertSame( '', $headers[ \WP_Agent_Caller_Context::HEADER_CALLER_AGENT ] );
+		$this->assertSame( '0', $headers[ \WP_Agent_Caller_Context::HEADER_CALLER_USER ] );
+		$this->assertSame( \WP_Agent_Caller_Context::SELF_HOST, $headers[ \WP_Agent_Caller_Context::HEADER_CALLER_HOST ] );
+		$this->assertSame( 'cid-1', $headers[ \WP_Agent_Caller_Context::HEADER_CHAIN_ROOT ] );
+		$this->assertSame( '0', $headers[ \WP_Agent_Caller_Context::HEADER_CHAIN_DEPTH ] );
 	}
 
 	public function test_to_log_context_shape(): void {
-		$ctx = new CallerContext( 'chubes.net', 'franklin', 'cid-1', 2 );
-		$log = $ctx->toLogContext();
+		$ctx = new \WP_Agent_Caller_Context( 'franklin', 7, 'https://chubes.net', 2, 'cid-1' );
+		$log = $ctx->to_array();
 
-		$this->assertSame( 'chubes.net', $log['caller_site'] );
-		$this->assertSame( 'franklin', $log['caller_agent'] );
-		$this->assertSame( 'cid-1', $log['chain_id'] );
+		$this->assertSame( 'https://chubes.net', $log['caller_host'] );
+		$this->assertSame( 'franklin', $log['caller_agent_id'] );
+		$this->assertSame( 'cid-1', $log['chain_root_request_id'] );
 		$this->assertSame( 2, $log['chain_depth'] );
 	}
 

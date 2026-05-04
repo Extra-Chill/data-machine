@@ -8,8 +8,7 @@
  *
  * Data source is {@see \DataMachine\Abilities\PermissionHelper::get_caller_context()},
  * populated by {@see \DataMachine\Core\Auth\AgentAuthMiddleware} after bearer-token
- * resolution from the four A2A headers (`X-Datamachine-Caller-Site`,
- * `-Caller-Agent`, `-Chain-Id`, `-Chain-Depth`). This data is authenticated —
+ * resolution from the canonical Agents API A2A headers. This data is authenticated —
  * it cannot be spoofed by the client because the headers are read from the
  * incoming HTTP request and validated by the middleware.
  *
@@ -50,19 +49,21 @@ class CallerContextDirective {
 	 * @return array Directive outputs (one system_text entry, or empty array).
 	 */
 	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
+		unset( $provider_name, $tools, $step_id, $payload );
+
 		$caller = PermissionHelper::get_caller_context();
 
 		// Only render for genuine cross-site A2A calls. Local calls (admin UI,
 		// CLI, same-site) produce no output — the normal directive chain is
 		// sufficient.
-		if ( null === $caller || ! $caller->isCrossSite() ) {
+		if ( null === $caller || ! $caller->is_cross_site() ) {
 			return array();
 		}
 
-		$caller_site  = $caller->callerSite();
-		$caller_agent = $caller->callerAgent();
-		$chain_id     = $caller->chainId();
-		$chain_depth  = $caller->chainDepth();
+		$caller_site  = $caller->caller_host;
+		$caller_agent = $caller->caller_agent_id;
+		$chain_id     = $caller->chain_root_request_id;
+		$chain_depth  = $caller->chain_depth;
 
 		$lines   = array();
 		$lines[] = '# Cross-Site Caller Context';
