@@ -230,7 +230,8 @@ class AIStep extends Step {
 		// Resolution order: flow > pipeline > site option (default false).
 		// The boolean is threaded through $payload so the loop doesn't need
 		// to repeat the lookup every turn.
-		$persist_transcript = PipelineTranscriptPolicy::shouldPersist( $this->engine );
+		$transcript_consent_decision = PipelineTranscriptPolicy::decision( $this->engine );
+		$persist_transcript          = $transcript_consent_decision->is_allowed();
 
 		$payload = array(
 			'job_id'             => $this->job_id,
@@ -242,7 +243,8 @@ class AIStep extends Step {
 			'agent_id'           => $agent_id,
 			'pipeline_id'        => $job_snapshot['pipeline_id'] ?? null,
 			'flow_id'            => $job_snapshot['flow_id'] ?? null,
-			'persist_transcript' => $persist_transcript,
+			'persist_transcript'          => $persist_transcript,
+			'transcript_consent_decision' => $transcript_consent_decision->to_array(),
 		);
 
 		$navigator             = new \DataMachine\Engine\StepNavigator();

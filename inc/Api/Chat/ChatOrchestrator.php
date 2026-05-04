@@ -19,6 +19,7 @@ namespace DataMachine\Api\Chat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\ConversationManager;
+use DataMachine\Engine\AI\DataMachineAgentConsentPolicy;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
@@ -66,9 +67,17 @@ class ChatOrchestrator {
 		$request_id           = $options['request_id'] ?? null;
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 
-		$chat_db          = ConversationStoreFactory::get();
-		$session_metadata = array();
-		$acting_token_id  = \DataMachine\Abilities\PermissionHelper::get_acting_token_id();
+		$chat_db                     = ConversationStoreFactory::get();
+		$session_metadata            = array();
+		$acting_token_id             = \DataMachine\Abilities\PermissionHelper::get_acting_token_id();
+		$transcript_consent_decision = DataMachineAgentConsentPolicy::get()->can_store_transcript(
+			array(
+				'mode'        => 'chat',
+				'interactive' => true,
+				'user_id'     => $user_id,
+				'agent_id'    => $agent_id,
+			)
+		);
 
 		// --- Session resolution ---
 		if ( $session_id ) {
@@ -144,9 +153,12 @@ class ChatOrchestrator {
 			array_merge(
 				$session_metadata,
 				array(
-					'status'        => 'processing',
-					'started_at'    => current_time( 'mysql', true ),
-					'message_count' => count( $messages ),
+					'status'            => 'processing',
+					'started_at'        => current_time( 'mysql', true ),
+					'message_count'     => count( $messages ),
+					'consent_decisions' => array(
+						'store_transcript' => $transcript_consent_decision->to_array(),
+					),
 				)
 			),
 			$provider,

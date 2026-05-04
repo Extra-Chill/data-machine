@@ -25,6 +25,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use AgentsAPI\AI\Consent\AgentConsentDecision;
 use DataMachine\Core\EngineData;
 
 defined( 'ABSPATH' ) || exit;
@@ -51,20 +52,61 @@ class PipelineTranscriptPolicy {
 	 * @return bool True when the AI loop should persist its $messages array.
 	 */
 	public static function shouldPersist( EngineData $engine ): bool {
+		return self::decision( $engine )->is_allowed();
+	}
+
+	/**
+	 * Resolve the Agents API consent decision for pipeline transcript storage.
+	 *
+	 * @param EngineData $engine Engine data snapshot for the running job.
+	 * @return AgentConsentDecision Consent decision with audit metadata.
+	 */
+	public static function decision( EngineData $engine ): AgentConsentDecision {
 		$flow_config     = $engine->getFlowConfig();
 		$pipeline_config = $engine->getPipelineConfig();
+		$job_snapshot    = $engine->get( 'job' );
+		$context         = array(
+			'mode'        => 'pipeline',
+			'interactive' => false,
+			'agent_id'    => (int) ( $job_snapshot['agent_id'] ?? 0 ),
+			'user_id'     => (int) ( $job_snapshot['user_id'] ?? 0 ),
+		);
 
 		$flow_override = self::extract( $flow_config );
 		if ( null !== $flow_override ) {
-			return $flow_override;
+			return DataMachineAgentConsentPolicy::get()->can_store_transcript(
+				array_merge(
+					$context,
+					array(
+						'persist_transcript' => $flow_override,
+						'configured_setting' => 'flow.persist_transcripts',
+					)
+				)
+			);
 		}
 
 		$pipeline_override = self::extract( $pipeline_config );
 		if ( null !== $pipeline_override ) {
-			return $pipeline_override;
+			return DataMachineAgentConsentPolicy::get()->can_store_transcript(
+				array_merge(
+					$context,
+					array(
+						'persist_transcript' => $pipeline_override,
+						'configured_setting' => 'pipeline.persist_transcripts',
+					)
+				)
+			);
 		}
 
-		return (bool) get_option( self::OPTION_NAME, false );
+		return DataMachineAgentConsentPolicy::get()->can_store_transcript(
+			array_merge(
+				$context,
+				array(
+					'persist_transcript' => (bool) get_option( self::OPTION_NAME, false ),
+					'configured_setting' => self::OPTION_NAME,
+				)
+			)
+		);
 	}
 
 	/**

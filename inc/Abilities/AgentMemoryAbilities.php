@@ -14,6 +14,7 @@ namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\FilesRepository\AgentMemory;
+use DataMachine\Engine\AI\DataMachineAgentConsentPolicy;
 use DataMachine\Engine\AI\Memory\MemorySectionPendingAction;
 use DataMachine\Engine\AI\Memory\SelfMemoryWritePolicy;
 
@@ -336,6 +337,23 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function updateMemory( array $input ): array {
+		$consent_decision = DataMachineAgentConsentPolicy::get()->can_store_memory(
+			array(
+				'mode'               => 'ability',
+				'interactive'        => true,
+				'permission_granted' => PermissionHelper::can_manage(),
+				'agent_id'           => (int) ( $input['agent_id'] ?? 0 ),
+				'user_id'            => (int) ( $input['user_id'] ?? 0 ),
+			)
+		);
+		if ( ! $consent_decision->is_allowed() ) {
+			return array(
+				'success'          => false,
+				'message'          => 'Memory write consent denied.',
+				'consent_decision' => $consent_decision->to_array(),
+			);
+		}
+
 		$memory  = self::resolveMemory( $input );
 		$section = $input['section'];
 		$content = $input['content'];

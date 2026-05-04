@@ -59,6 +59,12 @@ class DataMachinePipelineTranscriptPersister implements AgentConversationTranscr
 			'usage'        => $result['usage'] ?? array(),
 		);
 
+		if ( ! empty( $runtime_context['transcript_consent_decision'] ) && is_array( $runtime_context['transcript_consent_decision'] ) ) {
+			$store_metadata['consent_decisions'] = array(
+				'store_transcript' => $runtime_context['transcript_consent_decision'],
+			);
+		}
+
 		if ( ! empty( $result['request_metadata'] ) && is_array( $result['request_metadata'] ) ) {
 			$store_metadata['request_metadata'] = $result['request_metadata'];
 		}
