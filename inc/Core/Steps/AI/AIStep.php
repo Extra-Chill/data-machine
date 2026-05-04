@@ -234,15 +234,15 @@ class AIStep extends Step {
 		$persist_transcript          = $transcript_consent_decision->is_allowed();
 
 		$payload = array(
-			'job_id'             => $this->job_id,
-			'flow_step_id'       => $this->flow_step_id,
-			'step_id'            => $pipeline_step_id,
-			'data'               => $this->dataPackets,
-			'engine'             => $this->engine,
-			'user_id'            => $user_id,
-			'agent_id'           => $agent_id,
-			'pipeline_id'        => $job_snapshot['pipeline_id'] ?? null,
-			'flow_id'            => $job_snapshot['flow_id'] ?? null,
+			'job_id'                      => $this->job_id,
+			'flow_step_id'                => $this->flow_step_id,
+			'step_id'                     => $pipeline_step_id,
+			'data'                        => $this->dataPackets,
+			'engine'                      => $this->engine,
+			'user_id'                     => $user_id,
+			'agent_id'                    => $agent_id,
+			'pipeline_id'                 => $job_snapshot['pipeline_id'] ?? null,
+			'flow_id'                     => $job_snapshot['flow_id'] ?? null,
 			'persist_transcript'          => $persist_transcript,
 			'transcript_consent_decision' => $transcript_consent_decision->to_array(),
 		);
