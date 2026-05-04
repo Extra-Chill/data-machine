@@ -27,6 +27,9 @@ use DataMachine\Core\PluginSettings;
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Engine\AI\RequestBuilder;
+use AgentsAPI\AI\AgentConversationCompaction;
+use AgentsAPI\AI\AgentMarkdownSectionCompactionAdapter;
+use AgentsAPI\AI\AgentMessageEnvelope;
 
 class DailyMemoryTask extends SystemTask {
 
@@ -416,7 +419,7 @@ class DailyMemoryTask extends SystemTask {
 		);
 		$target_size = max( 1024, $target_size );
 
-		$split = self::splitMemorySectionsForOverflow( $memory_content, $target_size, $date );
+		$split = self::planMemoryOverflowArchive( $memory_content, $target_size, $date );
 		if ( empty( $split['archived'] ) ) {
 			return null;
 		}
@@ -475,62 +478,125 @@ class DailyMemoryTask extends SystemTask {
 	}
 
 	/**
-	 * Split markdown into persistent head sections and archived tail sections.
+	 * Plan a deterministic overflow archive through Agents API compaction primitives.
 	 *
 	 * @param string $content     Full MEMORY.md content.
 	 * @param int    $target_size Target persistent size in bytes.
 	 * @param string $date        Archive date.
 	 * @return array{persistent: string, archived: string, persistent_blocks: int, archived_blocks: int}
 	 */
-	private static function splitMemorySectionsForOverflow( string $content, int $target_size, string $date ): array {
-		$blocks = preg_split( '/(?=^## .+$)/m', trim( $content ), -1, PREG_SPLIT_NO_EMPTY );
-		if ( ! is_array( $blocks ) || count( $blocks ) < 2 ) {
+	private static function planMemoryOverflowArchive( string $content, int $target_size, string $date ): array {
+		$items         = AgentMarkdownSectionCompactionAdapter::parse( $content );
+		$section_count = 0;
+		foreach ( $items as $item ) {
+			if ( AgentMarkdownSectionCompactionAdapter::TYPE_SECTION === ( $item['type'] ?? '' ) ) {
+				++$section_count;
+			}
+		}
+
+		if ( $section_count < 2 ) {
 			return array(
 				'persistent'        => $content,
 				'archived'          => '',
-				'persistent_blocks' => count( is_array( $blocks ) ? $blocks : array() ),
+				'persistent_blocks' => count( $items ),
 				'archived_blocks'   => 0,
 			);
 		}
 
-		$persistent = array();
-		$archived   = array();
-		$pointer    = sprintf(
+		$pointer         = self::buildOverflowArchivePointer( $date );
+		$retained_budget = max( 1, $target_size - strlen( $pointer ) );
+		$messages        = array();
+
+		// Agents API's overflow archive strategy archives the start of a stream.
+		// Daily Memory overflow needs tail-section archival, so project sections in
+		// reverse order and restore markdown order after Agents API chooses the cut.
+		foreach ( array_reverse( $items ) as $item ) {
+			$messages[] = AgentMessageEnvelope::text(
+				'system',
+				(string) ( $item['content'] ?? '' ),
+				array(
+					'datamachine_markdown_item' => $item,
+				)
+			);
+		}
+
+		$result = AgentConversationCompaction::compact(
+			$messages,
+			array(
+				'overflow_archive_enabled'   => true,
+				'overflow_threshold_bytes'   => 1,
+				'overflow_retained_messages' => max( 1, count( $messages ) - 1 ),
+				'overflow_retained_bytes'    => $retained_budget,
+				'overflow_stub_prefix'       => 'Daily Memory overflow archived without summarization.',
+				'preserve_tool_boundaries'   => false,
+			),
+			static function (): string {
+				throw new \RuntimeException( 'Daily Memory deterministic overflow must not invoke a summarizer.' );
+			}
+		);
+
+		$status = (string) ( $result['metadata']['compaction']['status'] ?? '' );
+		if ( AgentConversationCompaction::STATUS_ARCHIVED !== $status || empty( $result['archive_items'] ) ) {
+			return array(
+				'persistent'        => $content,
+				'archived'          => '',
+				'persistent_blocks' => count( $items ),
+				'archived_blocks'   => 0,
+			);
+		}
+
+		$archived_items   = self::markdownItemsFromCompactionMessages( $result['archive_items'] );
+		$persistent_items = self::markdownItemsFromCompactionMessages( $result['messages'] );
+
+		return array(
+			'persistent'        => rtrim( AgentMarkdownSectionCompactionAdapter::reconstruct( $persistent_items ) . $pointer ) . "\n",
+			'archived'          => AgentMarkdownSectionCompactionAdapter::reconstruct( $archived_items ),
+			'persistent_blocks' => count( $persistent_items ),
+			'archived_blocks'   => count( $archived_items ),
+		);
+	}
+
+	/**
+	 * Build the Data Machine-owned overflow archive pointer text.
+	 *
+	 * @param string $date Archive date.
+	 * @return string Pointer markdown.
+	 */
+	private static function buildOverflowArchivePointer( string $date ): string {
+		return sprintf(
 			"\n## Archived Memory Overflow\n\nOn %s, Daily Memory archived older MEMORY.md sections verbatim to `daily/%s`. Use daily memory search/read when those details are needed.\n",
 			$date,
 			str_replace( '-', '/', $date ) . '.md'
 		);
+	}
 
-		foreach ( $blocks as $index => $block ) {
-			$block = trim( $block );
-			if ( '' === $block ) {
-				continue;
+	/**
+	 * Extract original markdown items from Agents API compaction messages.
+	 *
+	 * @param array<int, array<string, mixed>> $messages Compaction messages.
+	 * @return array<int, array<string, mixed>> Markdown items in source document order.
+	 */
+	private static function markdownItemsFromCompactionMessages( array $messages ): array {
+		$items = array();
+		foreach ( $messages as $message ) {
+			$metadata = is_array( $message['metadata'] ?? null ) ? $message['metadata'] : array();
+			$item     = $metadata['datamachine_markdown_item'] ?? null;
+			if ( is_array( $item ) ) {
+				$items[] = $item;
 			}
-
-			$candidate = implode( "\n\n", array_merge( $persistent, array( $block ) ) ) . $pointer;
-			if ( 0 === $index || strlen( $candidate ) <= $target_size ) {
-				$persistent[] = $block;
-				continue;
-			}
-
-			$archived[] = $block;
 		}
 
-		if ( empty( $archived ) ) {
-			return array(
-				'persistent'        => $content,
-				'archived'          => '',
-				'persistent_blocks' => count( $persistent ),
-				'archived_blocks'   => 0,
-			);
-		}
+		usort(
+			$items,
+			static function ( array $left, array $right ): int {
+				$left_order  = (int) ( $left['metadata']['order'] ?? 0 );
+				$right_order = (int) ( $right['metadata']['order'] ?? 0 );
 
-		return array(
-			'persistent'        => rtrim( implode( "\n\n", $persistent ) . $pointer ) . "\n",
-			'archived'          => implode( "\n\n", $archived ),
-			'persistent_blocks' => count( $persistent ),
-			'archived_blocks'   => count( $archived ),
+				return $left_order <=> $right_order;
+			}
 		);
+
+		return $items;
 	}
 
 	/**
