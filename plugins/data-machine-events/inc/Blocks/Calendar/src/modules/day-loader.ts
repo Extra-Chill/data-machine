@@ -216,9 +216,16 @@ function injectDayHtml(
 ): void {
 	const temp = document.createElement( 'div' );
 	temp.innerHTML = html;
-	const sourceWrapper = temp.querySelector(
-		'.data-machine-events-wrapper'
-	);
+
+	// Scope the source wrapper lookup to the matching date group so we never
+	// inject the wrong day's events even if the response contains multiple
+	// date groups (defensive against backend regressions).
+	const date = getDateFromWrapper( wrapper );
+	const sourceWrapper = date
+		? temp.querySelector(
+				`.data-machine-date-group[data-date="${ date }"] .data-machine-events-wrapper`
+		  ) || temp.querySelector( '.data-machine-events-wrapper' )
+		: temp.querySelector( '.data-machine-events-wrapper' );
 
 	if ( sourceWrapper ) {
 		wrapper.innerHTML = sourceWrapper.innerHTML;

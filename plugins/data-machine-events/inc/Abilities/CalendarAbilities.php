@@ -214,59 +214,101 @@ class CalendarAbilities {
 		$total_event_count = $date_data['total_events'];
 		$events_per_date   = $date_data['events_per_date'];
 
-		$date_boundaries = PageBoundary::get_date_boundaries_for_page(
-			$unique_dates,
-			$current_page,
-			$total_event_count,
-			$events_per_date
-		);
+		$user_date_range = ! empty( $base_params['user_date_range'] );
 
-		$max_pages    = $date_boundaries['max_pages'];
-		$current_page = max( 1, min( $current_page, max( 1, $max_pages ) ) );
-
-		$query_params = $base_params;
-		$range_start  = '';
-		$range_end    = '';
-
-		if ( ! empty( $date_boundaries['start_date'] ) && ! empty( $date_boundaries['end_date'] ) ) {
-			$range_start = $show_past ? $date_boundaries['end_date'] : $date_boundaries['start_date'];
-			$range_end   = $show_past ? $date_boundaries['start_date'] : $date_boundaries['end_date'];
-
-			if ( empty( $user_date_start ) ) {
-				$query_params['date_start'] = $range_start;
-			}
-			if ( empty( $user_date_end ) ) {
-				$query_params['date_end'] = $range_end;
-			}
-		}
-
-		// Determine progressive rendering: only query the first day's events
-		// when the page has enough events to benefit from deferred loading.
+		$query_params   = $base_params;
+		$range_start    = '';
+		$range_end      = '';
 		$progressive    = $input['progressive'] ?? false;
 		$deferred_dates = array();
 
-		if ( $progressive && $range_start && $range_end ) {
-			// Get the dates within this page's range.
-			$page_dates = array_filter(
-				$unique_dates,
-				function ( $d ) use ( $range_start, $range_end ) {
-					return $d >= $range_start && $d <= $range_end;
-				}
-			);
-			$page_dates = array_values( $page_dates );
+		if ( $user_date_range ) {
+			// Caller passed an explicit date_start/date_end (e.g. progressive
+			// day-loader requesting a single deferred day). Honor the caller's
+			// range as authoritative — skip pagination boundary computation
+			// and the progressive branch entirely, and scope the counter /
+			// pagination metadata to the requested range. When only one of
+			// date_start/date_end is provided, use the populated value for
+			// both bounds so the counter still reflects a sensible window.
+			$effective_lower = '' !== $user_date_start ? $user_date_start : $user_date_end;
+			$effective_upper = '' !== $user_date_end ? $user_date_end : $user_date_start;
 
-			// Only go progressive if enough events on this page.
-			$page_event_total = 0;
-			foreach ( $page_dates as $d ) {
-				$page_event_total += $events_per_date[ $d ] ?? 0;
+			$range_start = $effective_lower;
+			$range_end   = $effective_upper;
+
+			$query_params['date_start'] = $user_date_start;
+			$query_params['date_end']   = $user_date_end;
+
+			// Restrict events_per_date and total_event_count to the requested
+			// range so the counter ("Viewing X – Y (N of M Events)") reflects
+			// what was actually asked for, not the full upcoming universe.
+			$filtered_per_date = array();
+			$filtered_total    = 0;
+			foreach ( $events_per_date as $date_key => $count ) {
+				if (
+					( '' === $effective_lower || $date_key >= $effective_lower )
+					&& ( '' === $effective_upper || $date_key <= $effective_upper )
+				) {
+					$filtered_per_date[ $date_key ] = $count;
+					$filtered_total                += $count;
+				}
+			}
+			$events_per_date   = $filtered_per_date;
+			$total_event_count = $filtered_total;
+
+			$max_pages       = 1;
+			$current_page    = 1;
+			$date_boundaries = array(
+				'start_date' => $effective_lower,
+				'end_date'   => $effective_upper,
+				'max_pages'  => 1,
+			);
+		} else {
+			$date_boundaries = PageBoundary::get_date_boundaries_for_page(
+				$unique_dates,
+				$current_page,
+				$total_event_count,
+				$events_per_date
+			);
+
+			$max_pages    = $date_boundaries['max_pages'];
+			$current_page = max( 1, min( $current_page, max( 1, $max_pages ) ) );
+
+			if ( ! empty( $date_boundaries['start_date'] ) && ! empty( $date_boundaries['end_date'] ) ) {
+				$range_start = $show_past ? $date_boundaries['end_date'] : $date_boundaries['start_date'];
+				$range_end   = $show_past ? $date_boundaries['start_date'] : $date_boundaries['end_date'];
+
+				$query_params['date_start'] = $range_start;
+				$query_params['date_end']   = $range_end;
 			}
 
-			if ( $page_event_total >= EventRenderer::PROGRESSIVE_THRESHOLD && count( $page_dates ) > 1 ) {
-				// Query only the first day.
-				$first_date                 = $page_dates[0];
-				$query_params['date_start'] = $first_date;
-				$query_params['date_end']   = $first_date;
-				$deferred_dates             = array_slice( $page_dates, 1 );
+			// Determine progressive rendering: only query the first day's events
+			// when the page has enough events to benefit from deferred loading.
+			// Gated on ! $user_date_range because a single-day request from the
+			// day-loader has nothing to defer.
+			if ( $progressive && $range_start && $range_end ) {
+				// Get the dates within this page's range.
+				$page_dates = array_filter(
+					$unique_dates,
+					function ( $d ) use ( $range_start, $range_end ) {
+						return $d >= $range_start && $d <= $range_end;
+					}
+				);
+				$page_dates = array_values( $page_dates );
+
+				// Only go progressive if enough events on this page.
+				$page_event_total = 0;
+				foreach ( $page_dates as $d ) {
+					$page_event_total += $events_per_date[ $d ] ?? 0;
+				}
+
+				if ( $page_event_total >= EventRenderer::PROGRESSIVE_THRESHOLD && count( $page_dates ) > 1 ) {
+					// Query only the first day.
+					$first_date                 = $page_dates[0];
+					$query_params['date_start'] = $first_date;
+					$query_params['date_end']   = $first_date;
+					$deferred_dates             = array_slice( $page_dates, 1 );
+				}
 			}
 		}
 
