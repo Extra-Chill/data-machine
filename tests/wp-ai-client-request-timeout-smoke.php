@@ -217,6 +217,10 @@ $result = RequestBuilder::build(
 			'role'    => 'assistant',
 			'content' => 'hi there',
 		),
+		array(
+			'role'    => 'user',
+			'content' => 'continue',
+		),
 	),
 	'openai',
 	'gpt-smoke',
@@ -239,8 +243,10 @@ assert_timeout_smoke( 240.0 === $captured_request_options?->getTimeout(), 'Data 
 assert_timeout_smoke( 30.0 === $captured_request_options?->getConnectTimeout(), 'Data Machine caps RequestOptions connect timeout at 30 seconds' );
 
 $captured_history = TimeoutPromptBuilderDouble::$captured_request['history'] ?? array();
+$captured_prompt  = TimeoutPromptBuilderDouble::$captured_request['prompt'] ?? null;
 assert_timeout_smoke( isset( $captured_history[0] ) && $captured_history[0] instanceof \WordPress\AiClient\Messages\DTO\UserMessage, 'Data Machine converts user history arrays to wp-ai-client UserMessage DTOs' );
 assert_timeout_smoke( isset( $captured_history[1] ) && $captured_history[1] instanceof \WordPress\AiClient\Messages\DTO\ModelMessage, 'Data Machine converts assistant history arrays to wp-ai-client ModelMessage DTOs' );
+assert_timeout_smoke( 'continue' === $captured_prompt, 'Data Machine passes latest user message as wp-ai-client prompt' );
 assert_timeout_smoke( 1 === ( TimeoutPromptBuilderDouble::$captured_request['curl_filter_count'] ?? null ), 'Data Machine scopes cURL low-speed settings during wp-ai-client dispatch' );
 
 assert_timeout_smoke( 0 === timeout_smoke_filter_count( 'wp_ai_client_default_request_timeout' ), 'Data Machine removes temporary wp-ai-client timeout filter after dispatch' );

@@ -65,6 +65,10 @@ class RequestBuilder {
 		$assembled          = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
 		$request            = $assembled['request'];
 		$provider_request   = ProviderRequestAssembler::toProviderRequest( $request );
+		$prompt_context     = self::wpAiClientPromptContext( $request['messages'] ?? array() );
+		if ( '' !== $prompt_context['prompt'] ) {
+			$provider_request['prompt'] = $prompt_context['prompt'];
+		}
 		$structured_tools   = $assembled['structured_tools'];
 		$applied_directives = $assembled['applied_directives'];
 		$directive_metadata = $assembled['directive_metadata'];
@@ -176,7 +180,7 @@ class RequestBuilder {
 				$model_instance->setRequestOptions( $request_options );
 			}
 
-			$builder = \wp_ai_client_prompt()
+			$builder = \wp_ai_client_prompt( $prompt_context['prompt'] )
 				->using_provider( $provider_id )
 				->using_model( $model_instance );
 
@@ -185,36 +189,12 @@ class RequestBuilder {
 				$builder = $builder->using_model_config( $model_config );
 			}
 
-			$history      = array();
-			$system_parts = array();
-			foreach ( $request['messages'] ?? array() as $message ) {
-				if ( ! is_array( $message ) ) {
-					continue;
-				}
-
-				$role    = (string) ( $message['role'] ?? '' );
-				$content = $message['content'] ?? '';
-				if ( '' === $content || array() === $content ) {
-					continue;
-				}
-
-				if ( 'system' === $role && is_string( $content ) ) {
-					$system_parts[] = $content;
-					continue;
-				}
-
-				$history_message = self::wpAiClientHistoryMessage( $message );
-				if ( null !== $history_message ) {
-					$history[] = $history_message;
-				}
+			if ( ! empty( $prompt_context['system_parts'] ) ) {
+				$builder = $builder->using_system_instruction( implode( "\n\n", $prompt_context['system_parts'] ) );
 			}
 
-			if ( ! empty( $system_parts ) ) {
-				$builder = $builder->using_system_instruction( implode( "\n\n", $system_parts ) );
-			}
-
-			if ( ! empty( $history ) ) {
-				$builder = $builder->with_history( ...$history );
+			if ( ! empty( $prompt_context['history'] ) ) {
+				$builder = $builder->with_history( ...$prompt_context['history'] );
 			}
 
 			$function_declarations = array();
@@ -289,6 +269,68 @@ class RequestBuilder {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Split Data Machine messages into wp-ai-client's current prompt + history.
+	 *
+	 * wp-ai-client requires a current prompt passed to wp_ai_client_prompt().
+	 * Supplying only with_history() makes provider dispatch fail with an empty
+	 * prompt even when Data Machine has valid user messages. The latest user
+	 * message is the current prompt; earlier conversational turns remain history.
+	 *
+	 * @param array $messages Canonical message envelopes.
+	 * @return array{prompt:string,system_parts:array<int,string>,history:array<int,\WordPress\AiClient\Messages\DTO\Message>}
+	 */
+	private static function wpAiClientPromptContext( array $messages ): array {
+		$prompt_index = null;
+		$prompt       = '';
+		$system_parts = array();
+
+		foreach ( $messages as $index => $message ) {
+			if ( ! is_array( $message ) ) {
+				continue;
+			}
+
+			$role    = (string) ( $message['role'] ?? '' );
+			$content = $message['content'] ?? '';
+			if ( '' === $content || array() === $content ) {
+				continue;
+			}
+
+			if ( 'system' === $role && is_string( $content ) ) {
+				$system_parts[] = $content;
+				continue;
+			}
+
+			if ( 'user' !== $role ) {
+				continue;
+			}
+
+			$text = self::wpAiClientMessageText( $content );
+			if ( null !== $text ) {
+				$prompt_index = $index;
+				$prompt       = $text;
+			}
+		}
+
+		$history = array();
+		foreach ( $messages as $index => $message ) {
+			if ( $index === $prompt_index || ! is_array( $message ) ) {
+				continue;
+			}
+
+			$history_message = self::wpAiClientHistoryMessage( $message );
+			if ( null !== $history_message ) {
+				$history[] = $history_message;
+			}
+		}
+
+		return array(
+			'prompt'       => $prompt,
+			'system_parts' => $system_parts,
+			'history'      => $history,
+		);
 	}
 
 	/**
