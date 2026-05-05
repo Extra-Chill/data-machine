@@ -98,7 +98,7 @@ class ToolPolicyResolver {
 		$mode     = $args['mode'] ?? self::MODE_PIPELINE;
 		$agent_id = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
 
-		if ( self::MODE_CHAT === $mode && ! $this->tool_access_policy->passesLegacyChatGate( $args ) ) {
+		if ( self::MODE_CHAT === $mode && ! $this->tool_access_policy->passesChatGate( $args ) ) {
 			return array();
 		}
 

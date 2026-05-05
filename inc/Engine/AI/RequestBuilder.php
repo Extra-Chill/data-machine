@@ -213,7 +213,7 @@ class RequestBuilder {
 				$function_declarations[] = new \WordPress\AiClient\Tools\DTO\FunctionDeclaration(
 					$name,
 					(string) ( $tool_config['description'] ?? '' ),
-					self::normalizeLegacyToolSchema( $tool_config['parameters'] ?? array() )
+					self::normalizeToolSchema( $tool_config['parameters'] ?? array() )
 				);
 			}
 
@@ -563,12 +563,12 @@ class RequestBuilder {
 	}
 
 	/**
-	 * Normalize Data Machine's legacy tool parameter map into a JSON Schema object.
+	 * Normalize Data Machine's tool parameter map into a JSON Schema object.
 	 *
 	 * @param mixed $parameters Raw parameters definition.
 	 * @return array<string, mixed>|null
 	 */
-	private static function normalizeLegacyToolSchema( $parameters ): ?array {
+	private static function normalizeToolSchema( $parameters ): ?array {
 		if ( ! is_array( $parameters ) || empty( $parameters ) ) {
 			return null;
 		}
@@ -581,7 +581,7 @@ class RequestBuilder {
 			);
 		}
 
-		return self::normalizeLegacyRequiredFlags( $schema );
+		return self::normalizeRequiredFlags( $schema );
 	}
 
 	/**
@@ -590,7 +590,7 @@ class RequestBuilder {
 	 * @param array<string, mixed> $schema JSON schema.
 	 * @return array<string, mixed>
 	 */
-	private static function normalizeLegacyRequiredFlags( array $schema ): array {
+	private static function normalizeRequiredFlags( array $schema ): array {
 		if ( empty( $schema['properties'] ) || ! is_array( $schema['properties'] ) ) {
 			return $schema;
 		}

@@ -554,7 +554,7 @@ class PendingActionStore {
 	}
 
 	/**
-	 * Convert a DB row to the legacy plus durable public payload shape.
+	 * Convert a DB row to the public pending-action payload shape.
 	 */
 	private static function row_to_payload( array $row ): array {
 		$created_at = self::mysql_to_timestamp( (string) ( $row['created_at'] ?? '' ) );

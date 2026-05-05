@@ -1,6 +1,6 @@
 <?php
 /**
- * Adapter between legacy agent bundle arrays and directory value objects.
+ * Adapter between agent bundle arrays and directory value objects.
  *
  * @package DataMachine\Engine\Bundle
  */
@@ -10,18 +10,18 @@ namespace DataMachine\Engine\Bundle;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Converts AgentBundler's legacy runtime-state bundle arrays to the reviewable
+ * Converts AgentBundler's runtime-state bundle arrays to the reviewable
  * schema_version 1 directory documents, and back again for the existing importer.
  */
-final class AgentBundleLegacyAdapter {
+final class AgentBundleArrayAdapter {
 
 	/**
-	 * Convert a legacy AgentBundler bundle array into directory value objects.
+	 * Convert an AgentBundler bundle array into directory value objects.
 	 *
-	 * @param array $bundle Legacy bundle array.
+	 * @param array $bundle Bundle array.
 	 * @return AgentBundleDirectory
 	 */
-	public static function from_legacy_bundle( array $bundle ): AgentBundleDirectory {
+	public static function from_array_bundle( array $bundle ): AgentBundleDirectory {
 		$pipeline_slugs = self::pipeline_slugs( $bundle['pipelines'] ?? array() );
 		$flow_slugs     = self::flow_slugs( $bundle['flows'] ?? array() );
 
@@ -39,7 +39,7 @@ final class AgentBundleLegacyAdapter {
 				'agent_config' => is_array( $bundle['agent']['agent_config'] ?? null ) ? $bundle['agent']['agent_config'] : array(),
 			),
 			array(
-				'memory'       => self::memory_paths_from_legacy( $bundle, $pipeline_slugs, $flow_slugs ),
+				'memory'       => self::memory_paths_from_array_bundle( $bundle, $pipeline_slugs, $flow_slugs ),
 				'pipelines'    => array_values( $pipeline_slugs ),
 				'flows'        => array_values( $flow_slugs ),
 				'handler_auth' => 'refs',
@@ -48,21 +48,21 @@ final class AgentBundleLegacyAdapter {
 
 		return new AgentBundleDirectory(
 			$manifest,
-			self::memory_files_from_legacy( $bundle, $pipeline_slugs, $flow_slugs ),
-			self::pipeline_files_from_legacy( $bundle['pipelines'] ?? array(), $pipeline_slugs ),
-			self::flow_files_from_legacy( $bundle['flows'] ?? array(), $bundle['pipelines'] ?? array(), $pipeline_slugs, $flow_slugs ),
+			self::memory_files_from_array_bundle( $bundle, $pipeline_slugs, $flow_slugs ),
+			self::pipeline_files_from_array_bundle( $bundle['pipelines'] ?? array(), $pipeline_slugs ),
+			self::flow_files_from_array_bundle( $bundle['flows'] ?? array(), $bundle['pipelines'] ?? array(), $pipeline_slugs, $flow_slugs ),
 			array(),
 			is_array( $bundle['extension_artifacts'] ?? null ) ? $bundle['extension_artifacts'] : array()
 		);
 	}
 
 	/**
-	 * Convert directory value objects back into the legacy bundle array shape.
+	 * Convert directory value objects back into the bundle array shape.
 	 *
 	 * @param AgentBundleDirectory $directory Bundle directory value object.
-	 * @return array Legacy bundle array.
+	 * @return array Bundle array.
 	 */
-	public static function to_legacy_bundle( AgentBundleDirectory $directory ): array {
+	public static function to_array_bundle( AgentBundleDirectory $directory ): array {
 		$manifest      = $directory->manifest()->to_array();
 		$memory_files  = $directory->memory_files();
 		$pipeline_ids  = array();
@@ -193,11 +193,11 @@ final class AgentBundleLegacyAdapter {
 		return 'data-machine/unknown';
 	}
 
-	private static function memory_paths_from_legacy( array $bundle, array $pipeline_slugs, array $flow_slugs ): array {
-		return array_keys( self::memory_files_from_legacy( $bundle, $pipeline_slugs, $flow_slugs ) );
+	private static function memory_paths_from_array_bundle( array $bundle, array $pipeline_slugs, array $flow_slugs ): array {
+		return array_keys( self::memory_files_from_array_bundle( $bundle, $pipeline_slugs, $flow_slugs ) );
 	}
 
-	private static function memory_files_from_legacy( array $bundle, array $pipeline_slugs, array $flow_slugs ): array {
+	private static function memory_files_from_array_bundle( array $bundle, array $pipeline_slugs, array $flow_slugs ): array {
 		$memory = array();
 		foreach ( $bundle['files'] ?? array() as $path => $contents ) {
 			$memory[ 'agent/' . ltrim( (string) $path, '/' ) ] = (string) $contents;
@@ -221,7 +221,7 @@ final class AgentBundleLegacyAdapter {
 		return $memory;
 	}
 
-	private static function pipeline_files_from_legacy( array $pipelines, array $pipeline_slugs ): array {
+	private static function pipeline_files_from_array_bundle( array $pipelines, array $pipeline_slugs ): array {
 		$files = array();
 		foreach ( $pipelines as $index => $pipeline ) {
 			$files[] = new AgentBundlePipelineFile(
@@ -233,7 +233,7 @@ final class AgentBundleLegacyAdapter {
 		return $files;
 	}
 
-	private static function flow_files_from_legacy( array $flows, array $pipelines, array $pipeline_slugs, array $flow_slugs ): array {
+	private static function flow_files_from_array_bundle( array $flows, array $pipelines, array $pipeline_slugs, array $flow_slugs ): array {
 		$pipeline_slugs_by_id      = array();
 		$pipeline_step_types_by_id = array();
 		foreach ( $pipelines as $index => $pipeline ) {

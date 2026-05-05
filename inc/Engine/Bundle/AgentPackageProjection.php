@@ -35,13 +35,13 @@ final class AgentPackageProjection {
 	}
 
 	/**
-	 * Build a package from a legacy bundle array.
+	 * Build a package from a bundle array.
 	 *
 	 * @param array<string,mixed> $bundle Legacy bundle array.
 	 * @return \WP_Agent_Package
 	 */
-	public static function from_legacy_bundle( array $bundle ): \WP_Agent_Package {
-		return self::from_directory( AgentBundleLegacyAdapter::from_legacy_bundle( $bundle ) );
+	public static function from_array_bundle( array $bundle ): \WP_Agent_Package {
+		return self::from_directory( AgentBundleArrayAdapter::from_array_bundle( $bundle ) );
 	}
 
 	/**

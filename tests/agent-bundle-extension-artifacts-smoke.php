@@ -93,7 +93,7 @@ use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
-use DataMachine\Engine\Bundle\AgentBundleLegacyAdapter;
+use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
@@ -255,7 +255,7 @@ $directory->write( $tmp );
 assert_extension_bundle( 'extension artifact file written', is_file( $tmp . '/extensions/fake-plugin/seed.json' ) );
 $read = AgentBundleDirectory::read( $tmp );
 assert_extension_bundle_equals( 'extension artifact read from directory', 'seed', $read->extension_artifacts()[0]['artifact_id'] ?? null );
-assert_extension_bundle_equals( 'legacy adapter preserves extension artifacts', 'seed', AgentBundleLegacyAdapter::to_legacy_bundle( $read )['extension_artifacts'][0]['artifact_id'] ?? null );
+assert_extension_bundle_equals( 'array adapter preserves extension artifacts', 'seed', AgentBundleArrayAdapter::to_array_bundle( $read )['extension_artifacts'][0]['artifact_id'] ?? null );
 
 echo "\n[3] Planner treats plugin artifacts like core artifacts and redacts secrets\n";
 $target_artifact = extension_artifact( 'seed', array( 'label' => 'Target', 'api_token' => 'target-secret-token' ) );

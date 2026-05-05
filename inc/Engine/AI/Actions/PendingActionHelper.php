@@ -40,7 +40,7 @@ class PendingActionHelper {
 	 * Stage a tool invocation for user approval.
 	 *
 	 * The returned value is an Agents API approval_required envelope with the
-	 * legacy staged-action fields mirrored at the top level for existing clients.
+	 * Data Machine staged-action fields mirrored at the top level for clients.
 	 *
 	 * @param array $args {
 	 *     Staging arguments.
@@ -149,7 +149,7 @@ class PendingActionHelper {
 		$expires_at = isset( $stored_payload['expires_at'] ) ? (int) $stored_payload['expires_at'] : null;
 		$created_at = isset( $stored_payload['created_at'] ) ? (int) $stored_payload['created_at'] : time();
 
-		$legacy_payload = array(
+		$staged_action_payload = array(
 			'staged'         => true,
 			'action_id'      => $action_id,
 			'kind'           => $kind,
@@ -182,7 +182,7 @@ class PendingActionHelper {
 		}
 
 		$envelope_payload  = array_merge(
-			$legacy_payload,
+			$staged_action_payload,
 			array(
 				'pending_action' => $pending_action,
 			)
@@ -207,6 +207,6 @@ class PendingActionHelper {
 				'metadata' => $envelope_metadata,
 			);
 
-		return array_merge( $envelope, $legacy_payload );
+		return array_merge( $envelope, $staged_action_payload );
 	}
 }

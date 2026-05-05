@@ -379,7 +379,7 @@ class ResolvePendingActionAbility {
 	/**
 	 * Apply a pending-action handler.
 	 *
-	 * The legacy Data Machine handler map remains the compatibility surface today.
+	 * The Data Machine handler map remains the product extension surface today.
 	 * When Agents API PR #51's handler contract is installed, object handlers can
 	 * implement it and be placed under the same `apply` key without introducing a
 	 * parallel Data Machine primitive.

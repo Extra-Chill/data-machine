@@ -31,11 +31,11 @@ defined( 'ABSPATH' ) || exit;
 class AgentRegistry {
 
 	/**
-	 * Whether the legacy Data Machine registration action has fired.
+	 * Whether the Data Machine registration action has fired.
 	 *
 	 * @var bool
 	 */
-	private static bool $legacy_registration_fired = false;
+	private static bool $datamachine_registration_fired = false;
 
 	/**
 	 * Register an agent definition.
@@ -88,7 +88,7 @@ class AgentRegistry {
 	 * @return array<string, array>
 	 */
 	public static function get_all(): array {
-		self::ensure_legacy_fired();
+		self::ensure_datamachine_registration_fired();
 		$registry = \WP_Agents_Registry::get_instance();
 		if ( null === $registry ) {
 			return array();
@@ -109,7 +109,7 @@ class AgentRegistry {
 	 * @return array|null Definition, or null if not registered.
 	 */
 	public static function get( string $slug ): ?array {
-		self::ensure_legacy_fired();
+		self::ensure_datamachine_registration_fired();
 		$registry = \WP_Agents_Registry::get_instance();
 		if ( null === $registry ) {
 			return null;
@@ -150,19 +150,19 @@ class AgentRegistry {
 	 * Ensure the agent registration actions have fired.
 	 *
 	 * The Agents API module fires `wp_agents_api_init` from WordPress `init`.
-	 * Data Machine keeps its legacy in-repo hook behind this adapter while the
+	 * Data Machine keeps its in-repo hook behind this adapter while the
 	 * substrate is hosted here.
 	 *
 	 * @return void
 	 */
-	private static function ensure_legacy_fired(): void {
+	private static function ensure_datamachine_registration_fired(): void {
 		\WP_Agents_Registry::get_instance();
 
-		if ( self::$legacy_registration_fired ) {
+		if ( self::$datamachine_registration_fired ) {
 			return;
 		}
 
-		self::$legacy_registration_fired = true;
+		self::$datamachine_registration_fired = true;
 
 		/**
 		 * Fires to let existing Data Machine consumers register agents.
@@ -185,7 +185,7 @@ class AgentRegistry {
 	 * @return void
 	 */
 	public static function reset_for_tests(): void {
-		self::$legacy_registration_fired = false;
+		self::$datamachine_registration_fired = false;
 		\WP_Agents_Registry::reset_for_tests();
 	}
 }
