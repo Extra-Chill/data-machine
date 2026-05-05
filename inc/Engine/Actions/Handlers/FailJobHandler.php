@@ -131,10 +131,18 @@ class FailJobHandler {
 		$db_processed_items->delete_processed_items( array( 'job_id' => $job_id ) );
 		self::releaseInFlightSourceClaims( $db_processed_items, $job_id, $engine_data );
 
-		$cleanup_files = \DataMachine\Core\PluginSettings::get( 'cleanup_job_data_on_failure', true );
-		$files_cleaned = false;
+		$cleanup_files          = \DataMachine\Core\PluginSettings::get( 'cleanup_job_data_on_failure', true );
+		$files_cleaned          = false;
+		$retry_pending          = self::hasPendingRetry( $engine_data );
 
-		if ( $cleanup_files ) {
+		// Skip cleanup whenever a retry is already scheduled for this job.
+		// JobRetryPolicy::recordRetry writes the next_retry_at timestamp before
+		// rescheduling the next Action Scheduler attempt; deleting the packet
+		// file before that retry runs would orphan the next attempt with no
+		// input data. This is defense-in-depth on top of the duplicate-fail-job
+		// guard in ExecuteStepAbility — even if a future caller fires fail-job
+		// during a pending retry, the data file survives until retry exhausts.
+		if ( $cleanup_files && ! $retry_pending ) {
 			$job = $db_jobs->get_job( $job_id );
 			if ( $job && function_exists( 'datamachine_get_file_context' ) && ! empty( $job['flow_id'] ) ) {
 				$cleanup       = new \DataMachine\Core\FilesRepository\FileCleanup();
@@ -156,10 +164,28 @@ class FailJobHandler {
 				'processed_items_cleaned' => true,
 				'files_cleanup_enabled'   => $cleanup_files,
 				'files_cleaned'           => $files_cleaned,
+				'retry_pending'           => $retry_pending,
 			)
 		);
 
 		return true;
+	}
+
+	/**
+	 * Detect whether the engine snapshot already reflects a scheduled retry.
+	 *
+	 * `JobRetryPolicy::recordRetry` stamps `engine_data['retry']['next_retry_at']`
+	 * before rescheduling the next attempt. Any non-empty value means the policy
+	 * has taken ownership of the failure path — finalizing the failure here would
+	 * race ahead of that retry and (when cleanup is enabled) orphan the rescheduled
+	 * attempt with no input data.
+	 *
+	 * @param array $engine_data Engine snapshot read prior to fail finalization.
+	 * @return bool
+	 */
+	private static function hasPendingRetry( array $engine_data ): bool {
+		$retry = is_array( $engine_data['retry'] ?? null ) ? $engine_data['retry'] : array();
+		return ! empty( $retry['next_retry_at'] );
 	}
 
 	/**
