@@ -161,7 +161,6 @@ namespace DataMachine\Tests\Smoke {
 
 namespace {
 	require_once __DIR__ . '/../inc/Engine/AI/WpAiClientProviderAdmin.php';
-	require_once __DIR__ . '/../inc/migrations/ai-provider-keys.php';
 
 	use DataMachine\Engine\AI\WpAiClientProviderAdmin;
 
@@ -197,18 +196,6 @@ namespace {
 	);
 	$assert( 'sk-new-secret' === get_option( 'connectors_ai_openai_api_key' ), 'settings update writes unmasked key to connector option' );
 	$assert( '' === get_option( 'connectors_ai_gemini_api_key', '' ), 'settings update ignores masked round-trip value' );
-
-	$GLOBALS['datamachine_provider_admin_site_options']['chubes_ai_http_shared_api_keys'] = serialize(
-		array(
-			'openai' => 'legacy-openai',
-			'gemini' => 'legacy-gemini',
-		)
-	);
-	$GLOBALS['datamachine_provider_admin_options']['connectors_ai_openai_api_key']       = 'already-present';
-	datamachine_migrate_ai_provider_keys_to_connectors();
-	$assert( 'already-present' === get_option( 'connectors_ai_openai_api_key' ), 'migration preserves existing connector key' );
-	$assert( 'legacy-gemini' === get_option( 'connectors_ai_gemini_api_key' ), 'migration copies missing serialized legacy key' );
-	$assert( true === get_option( 'datamachine_ai_provider_keys_migrated' ), 'migration records completion flag' );
 
 	$production_files = array(
 		'inc/Api/Providers.php',

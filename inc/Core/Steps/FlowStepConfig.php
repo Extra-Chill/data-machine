@@ -364,59 +364,35 @@ class FlowStepConfig {
 		$is_multi     = self::isMultiHandler( $step_config );
 		$step_type    = $step_config['step_type'] ?? '';
 
-		$legacy_slugs   = self::sanitizeSlugList( is_array( $step_config['handler_slugs'] ?? null ) ? $step_config['handler_slugs'] : array() );
-		$legacy_configs = is_array( $step_config['handler_configs'] ?? null ) ? $step_config['handler_configs'] : array();
-		$config_slugs   = self::sanitizeSlugList( array_keys( $legacy_configs ) );
 		$scalar_slug    = is_string( $step_config['handler_slug'] ?? null ) ? $step_config['handler_slug'] : '';
 		$scalar_config  = is_array( $step_config['handler_config'] ?? null ) ? $step_config['handler_config'] : array();
+		$handler_slugs  = self::sanitizeSlugList( is_array( $step_config['handler_slugs'] ?? null ) ? $step_config['handler_slugs'] : array() );
+		$handler_configs = is_array( $step_config['handler_configs'] ?? null ) ? $step_config['handler_configs'] : array();
 
 		unset( $step_config['handler'], $step_config['handler_slug'], $step_config['handler_slugs'], $step_config['handler_config'], $step_config['handler_configs'] );
 
 		if ( ! $uses_handler ) {
-			$config = $scalar_config;
-			if ( empty( $config ) && '' !== $step_type && isset( $legacy_configs[ $step_type ] ) && is_array( $legacy_configs[ $step_type ] ) ) {
-				$config = $legacy_configs[ $step_type ];
-			}
-			if ( ! empty( $config ) ) {
-				$step_config['handler_config'] = $config;
+			if ( ! empty( $scalar_config ) ) {
+				$step_config['handler_config'] = $scalar_config;
 			}
 			return $step_config;
 		}
 
 		if ( $is_multi ) {
-			$slugs = $legacy_slugs;
-			if ( empty( $slugs ) && '' !== $scalar_slug ) {
-				$slugs = array( $scalar_slug );
+			if ( ! empty( $handler_slugs ) ) {
+				$step_config['handler_slugs'] = $handler_slugs;
 			}
-			if ( empty( $slugs ) && ! empty( $config_slugs ) ) {
-				$slugs = $config_slugs;
-			}
-
-			$configs = $legacy_configs;
-			if ( empty( $configs ) && ! empty( $scalar_config ) && ! empty( $slugs ) ) {
-				$configs = array( $slugs[0] => $scalar_config );
-			}
-
-			if ( ! empty( $slugs ) ) {
-				$step_config['handler_slugs'] = $slugs;
-			}
-			if ( ! empty( $configs ) ) {
-				$step_config['handler_configs'] = $configs;
+			if ( ! empty( $handler_configs ) ) {
+				$step_config['handler_configs'] = $handler_configs;
 			}
 			return $step_config;
 		}
 
-		$slug = '' !== $scalar_slug ? $scalar_slug : ( $legacy_slugs[0] ?? ( $config_slugs[0] ?? '' ) );
-		if ( '' !== $slug ) {
-			$step_config['handler_slug'] = $slug;
+		if ( '' !== $scalar_slug ) {
+			$step_config['handler_slug'] = $scalar_slug;
 		}
-
-		$config = $scalar_config;
-		if ( empty( $config ) && '' !== $slug && isset( $legacy_configs[ $slug ] ) && is_array( $legacy_configs[ $slug ] ) ) {
-			$config = $legacy_configs[ $slug ];
-		}
-		if ( ! empty( $config ) || '' !== $slug ) {
-			$step_config['handler_config'] = $config;
+		if ( ! empty( $scalar_config ) || '' !== $scalar_slug ) {
+			$step_config['handler_config'] = $scalar_config;
 		}
 		return $step_config;
 	}
@@ -424,10 +400,7 @@ class FlowStepConfig {
 	/**
 	 * Get the AI step's enabled tools.
 	 *
-	 * Reads the dedicated `enabled_tools` field. The pre-Phase 2b shape
-	 * (AI tools stored under `handler_slugs`) is migrated on activation
-	 * by inc/migrations/ai-enabled-tools.php — there is no runtime
-	 * fallback to legacy data.
+	 * Reads the dedicated `enabled_tools` field.
 	 *
 	 * @since 0.81.0
 	 *

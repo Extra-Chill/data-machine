@@ -166,59 +166,37 @@ assert_absent( 'handler_slug', $step0, 'AI has no handler_slug', $failures, $pas
 assert_absent( 'handler_slugs', $step0, 'AI has no handler_slugs', $failures, $passes );
 assert_equals( 'be helpful', $built['pipeline_config']['ephemeral_pipeline_0']['system_prompt'] ?? null, 'AI system_prompt lands in pipeline_config', $failures, $passes );
 
-echo "\n[6] normalize legacy rows to canonical storage:\n";
+echo "\n[6] normalize canonical rows without cross-shape inference:\n";
 $system_task = FlowStepConfig::normalizeHandlerShape(
 	array(
-		'step_type'       => 'system_task',
-		'handler_slugs'   => array( 'system_task' ),
-		'handler_configs' => array( 'system_task' => array( 'task' => 'agent_call' ) ),
+		'step_type'      => 'system_task',
+		'handler_config' => array( 'task' => 'agent_call' ),
 	)
 );
-assert_equals( array( 'task' => 'agent_call' ), $system_task['handler_config'] ?? array(), 'legacy synthetic system_task config collapses', $failures, $passes );
-assert_absent( 'handler_slugs', $system_task, 'legacy synthetic system_task slugs removed', $failures, $passes );
+assert_equals( array( 'task' => 'agent_call' ), $system_task['handler_config'] ?? array(), 'system_task config preserved', $failures, $passes );
+assert_absent( 'handler_slugs', $system_task, 'system_task slugs remain absent', $failures, $passes );
 
 $fetch = FlowStepConfig::normalizeHandlerShape(
 	array(
-		'step_type'       => 'fetch',
-		'handler_slugs'   => array( 'rss' ),
-		'handler_configs' => array( 'rss' => array( 'url' => 'https://example.com/feed.xml' ) ),
+		'step_type'      => 'fetch',
+		'handler_slug'   => 'rss',
+		'handler_config' => array( 'url' => 'https://example.com/feed.xml' ),
 	)
 );
-assert_equals( 'rss', $fetch['handler_slug'] ?? null, 'legacy fetch slug becomes scalar', $failures, $passes );
-assert_equals( array( 'url' => 'https://example.com/feed.xml' ), $fetch['handler_config'] ?? array(), 'legacy fetch config becomes scalar', $failures, $passes );
-assert_absent( 'handler_slugs', $fetch, 'legacy fetch plural slugs removed', $failures, $passes );
-
-$fetch_configs_only = FlowStepConfig::normalizeHandlerShape(
-	array(
-		'step_type'       => 'fetch',
-		'handler_configs' => array( 'rss' => array( 'url' => 'https://example.com/feed.xml' ) ),
-	)
-);
-assert_equals( 'rss', $fetch_configs_only['handler_slug'] ?? null, 'legacy fetch infers scalar slug from config key', $failures, $passes );
-assert_equals( array( 'url' => 'https://example.com/feed.xml' ), $fetch_configs_only['handler_config'] ?? array(), 'legacy fetch keeps config when slug list missing', $failures, $passes );
+assert_equals( 'rss', $fetch['handler_slug'] ?? null, 'fetch scalar slug preserved', $failures, $passes );
+assert_equals( array( 'url' => 'https://example.com/feed.xml' ), $fetch['handler_config'] ?? array(), 'fetch scalar config preserved', $failures, $passes );
+assert_absent( 'handler_slugs', $fetch, 'fetch plural slugs remain absent', $failures, $passes );
 
 $publish = FlowStepConfig::normalizeHandlerShape(
 	array(
-		'step_type'      => 'publish',
-		'handler_slug'   => 'wordpress_publish',
-		'handler_config' => array( 'post_type' => 'post' ),
-	)
-);
-assert_equals( array( 'wordpress_publish' ), $publish['handler_slugs'] ?? array(), 'legacy publish scalar slug becomes list', $failures, $passes );
-assert_equals( array( 'wordpress_publish' => array( 'post_type' => 'post' ) ), $publish['handler_configs'] ?? array(), 'legacy publish scalar config becomes map', $failures, $passes );
-assert_absent( 'handler_slug', $publish, 'legacy publish scalar slug removed', $failures, $passes );
-
-$publish_configs_only = FlowStepConfig::normalizeHandlerShape(
-	array(
 		'step_type'       => 'publish',
-		'handler_configs' => array(
-			'wordpress_publish' => array( 'post_type' => 'post' ),
-			'email_publish'     => array( 'to' => 'ops@example.com' ),
-		),
+		'handler_slugs'   => array( 'wordpress_publish' ),
+		'handler_configs' => array( 'wordpress_publish' => array( 'post_type' => 'post' ) ),
 	)
 );
-assert_equals( array( 'wordpress_publish', 'email_publish' ), $publish_configs_only['handler_slugs'] ?? array(), 'legacy publish infers slugs from config keys', $failures, $passes );
-assert_equals( array( 'to' => 'ops@example.com' ), $publish_configs_only['handler_configs']['email_publish'] ?? array(), 'legacy publish keeps all inferred configs', $failures, $passes );
+assert_equals( array( 'wordpress_publish' ), $publish['handler_slugs'] ?? array(), 'publish slugs preserved', $failures, $passes );
+assert_equals( array( 'wordpress_publish' => array( 'post_type' => 'post' ) ), $publish['handler_configs'] ?? array(), 'publish configs preserved', $failures, $passes );
+assert_absent( 'handler_slug', $publish, 'publish scalar slug remains absent', $failures, $passes );
 
 echo "\n-----------------------------------\n";
 $total = $passes + count( $failures );
