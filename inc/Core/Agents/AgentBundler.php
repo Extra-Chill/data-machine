@@ -472,7 +472,7 @@ class AgentBundler {
 			'source_revision' => $bundle_source_revision,
 		);
 		$is_portable_bundle     = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
-		$reconcile_runtime     = ! empty( $options['reconcile_runtime'] );
+		$reconcile_runtime      = ! empty( $options['reconcile_runtime'] );
 
 		// Check for slug collision.
 		$existing = $this->agents_repo->get_by_slug( $slug );

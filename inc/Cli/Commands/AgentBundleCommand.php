@@ -374,7 +374,7 @@ class AgentBundleCommand extends BaseCommand {
 					),
 				)
 			);
-			$preview = AgentBundleRuntimeDrift::preview( $flow_slug, $existing_flow, $target_flow, $decision );
+			$preview     = AgentBundleRuntimeDrift::preview( $flow_slug, $existing_flow, $target_flow, $decision );
 			if ( null !== $preview ) {
 				$drifts[] = $preview;
 			}

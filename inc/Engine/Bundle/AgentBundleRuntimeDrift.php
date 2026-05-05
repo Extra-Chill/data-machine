@@ -32,26 +32,26 @@ final class AgentBundleRuntimeDrift {
 		}
 
 		return array(
-			'artifact_key' => 'flow:' . $artifact_id,
+			'artifact_key'  => 'flow:' . $artifact_id,
 			'artifact_type' => 'flow',
-			'artifact_id' => $artifact_id,
-			'reason' => 'runtime_queue_drift',
-			'summary' => sprintf( 'flow %s: preserved runtime queue or scheduling differs from bundle seed', $artifact_id ),
-			'decision' => $decision,
-			'queue_depth' => array(
+			'artifact_id'   => $artifact_id,
+			'reason'        => 'runtime_queue_drift',
+			'summary'       => sprintf( 'flow %s: preserved runtime queue or scheduling differs from bundle seed', $artifact_id ),
+			'decision'      => $decision,
+			'queue_depth'   => array(
 				'current' => self::queue_depth( $current_flow_config ),
-				'target' => self::queue_depth( $target_flow_config ),
+				'target'  => self::queue_depth( $target_flow_config ),
 			),
-			'queue_mode' => array(
+			'queue_mode'    => array(
 				'current' => self::queue_modes( $current_flow_config ),
-				'target' => self::queue_modes( $target_flow_config ),
+				'target'  => self::queue_modes( $target_flow_config ),
 			),
-			'scheduling' => array(
+			'scheduling'    => array(
 				'current' => $current_schedule,
-				'target' => $target_schedule,
+				'target'  => $target_schedule,
 				'changed' => $scheduling_changed,
 			),
-			'steps' => $step_diffs,
+			'steps'         => $step_diffs,
 		);
 	}
 
@@ -94,8 +94,8 @@ final class AgentBundleRuntimeDrift {
 
 			$diffs[] = array(
 				'flow_step_id' => (string) $flow_step_id,
-				'current' => $current,
-				'target' => $target,
+				'current'      => $current,
+				'target'       => $target,
 			);
 		}
 
@@ -104,17 +104,17 @@ final class AgentBundleRuntimeDrift {
 
 	private static function step_runtime_preview( array $step ): array {
 		return array(
-			'queue_mode' => (string) ( $step['queue_mode'] ?? '' ),
-			'prompt_queue_depth' => self::list_depth( $step['prompt_queue'] ?? array() ),
+			'queue_mode'               => (string) ( $step['queue_mode'] ?? '' ),
+			'prompt_queue_depth'       => self::list_depth( $step['prompt_queue'] ?? array() ),
 			'config_patch_queue_depth' => self::list_depth( $step['config_patch_queue'] ?? array() ),
 		);
 	}
 
 	private static function queue_depth( array $flow_config ): array {
 		$depth = array(
-			'prompt_queue' => 0,
+			'prompt_queue'       => 0,
 			'config_patch_queue' => 0,
-			'total' => 0,
+			'total'              => 0,
 		);
 
 		foreach ( $flow_config as $step ) {
@@ -142,8 +142,8 @@ final class AgentBundleRuntimeDrift {
 
 	private static function scheduling_preview( array $scheduling ): array {
 		return array(
-			'enabled' => (bool) ( $scheduling['enabled'] ?? false ),
-			'interval' => (string) ( $scheduling['interval'] ?? 'manual' ),
+			'enabled'   => (bool) ( $scheduling['enabled'] ?? false ),
+			'interval'  => (string) ( $scheduling['interval'] ?? 'manual' ),
 			'max_items' => is_array( $scheduling['max_items'] ?? null ) ? $scheduling['max_items'] : array(),
 		);
 	}
