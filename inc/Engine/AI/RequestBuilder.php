@@ -137,7 +137,11 @@ class RequestBuilder {
 		$timeout_filter  = static function ( $default_timeout ) use ( $request_timeout ) {
 			return max( (float) $default_timeout, $request_timeout );
 		};
-		$curl_filter     = static function ( $handle ) use ( $request_timeout ) {
+		$curl_filter     = static function ( $handle ) use ( $request_timeout, $connect_timeout ) {
+			if ( defined( 'CURLOPT_CONNECTTIMEOUT' ) ) {
+				curl_setopt( $handle, CURLOPT_CONNECTTIMEOUT, (int) ceil( $connect_timeout ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress exposes the cURL handle only through this hook.
+			}
+
 			if ( defined( 'CURLOPT_LOW_SPEED_TIME' ) ) {
 				curl_setopt( $handle, CURLOPT_LOW_SPEED_TIME, (int) ceil( $request_timeout ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress exposes the cURL handle only through this hook.
 			}
