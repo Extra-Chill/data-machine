@@ -62,33 +62,33 @@ if ( ! function_exists( 'get_option' ) ) {
 require_once __DIR__ . '/bootstrap-unit.php';
 require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
 
-use AgentsAPI\AI\AgentConversationCompletionDecision;
-use AgentsAPI\AI\AgentConversationCompletionPolicyInterface;
-use AgentsAPI\AI\AgentConversationRequest;
-use AgentsAPI\AI\AgentConversationTranscriptPersisterInterface;
+use AgentsAPI\AI\WP_Agent_Conversation_Completion_Decision;
+use AgentsAPI\AI\WP_Agent_Conversation_Completion_Policy;
+use AgentsAPI\AI\WP_Agent_Conversation_Request;
+use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use DataMachine\Engine\AI\DataMachineHandlerCompletionPolicy;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
 
-class RuntimePolicySmokeCompletionPolicy implements AgentConversationCompletionPolicyInterface {
+class RuntimePolicySmokeCompletionPolicy implements WP_Agent_Conversation_Completion_Policy {
 	public array $calls = array();
 
-	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $runtime_context, int $turn_count ): AgentConversationCompletionDecision {
+	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $runtime_context, int $turn_count ): WP_Agent_Conversation_Completion_Decision {
 		$mode = (string) ( $runtime_context['mode'] ?? '' );
 		$this->calls[] = compact( 'tool_name', 'tool_def', 'tool_result', 'mode', 'turn_count' );
 
-		return AgentConversationCompletionDecision::complete(
+		return WP_Agent_Conversation_Completion_Decision::complete(
 			'RuntimePolicySmoke: custom policy completed',
 			array( 'tool_name' => $tool_name )
 		);
 	}
 }
 
-class RuntimePolicySmokeTranscriptPersister implements AgentConversationTranscriptPersisterInterface {
+class RuntimePolicySmokeTranscriptPersister implements WP_Agent_Transcript_Persister {
 	public array $calls = array();
 
-	public function persist( array $messages, AgentConversationRequest $request, array $result ): string {
+	public function persist( array $messages, WP_Agent_Conversation_Request $request, array $result ): string {
 		$metadata = $request->metadata();
 		$provider = (string) ( $metadata['provider'] ?? '' );
 		$model    = (string) ( $metadata['model'] ?? '' );

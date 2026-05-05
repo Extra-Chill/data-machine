@@ -7,8 +7,8 @@
 
 namespace DataMachine\Engine\AI;
 
-use AgentsAPI\AI\AgentConversationRequest;
-use AgentsAPI\AI\AgentConversationTranscriptPersisterInterface;
+use AgentsAPI\AI\WP_Agent_Conversation_Request;
+use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 
@@ -17,12 +17,12 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Persists opted-in pipeline transcripts through Data Machine's transcript store.
  */
-class DataMachinePipelineTranscriptPersister implements AgentConversationTranscriptPersisterInterface {
+class DataMachinePipelineTranscriptPersister implements WP_Agent_Transcript_Persister {
 
 	/**
 	 * @inheritDoc
 	 */
-	public function persist( array $messages, AgentConversationRequest $request, array $result ): string {
+	public function persist( array $messages, WP_Agent_Conversation_Request $request, array $result ): string {
 		$runtime_context = $request->runtimeContext();
 		$metadata        = $request->metadata();
 		$provider        = (string) ( $metadata['provider'] ?? '' );

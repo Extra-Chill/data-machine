@@ -571,18 +571,18 @@ class MemoryFileRegistry {
 
 	private static function default_authority_tier( string $layer, string $filename ): string {
 		if ( self::LAYER_SHARED === $layer || self::LAYER_NETWORK === $layer ) {
-			return \AgentsAPI\AI\Context\ContextAuthorityTier::WORKSPACE_SHARED;
+			return \AgentsAPI\AI\Context\WP_Agent_Context_Authority_Tier::WORKSPACE_SHARED;
 		}
 
 		if ( self::LAYER_USER === $layer ) {
-			return \AgentsAPI\AI\Context\ContextAuthorityTier::USER_GLOBAL;
+			return \AgentsAPI\AI\Context\WP_Agent_Context_Authority_Tier::USER_GLOBAL;
 		}
 
 		if ( 'SOUL.md' === $filename ) {
-			return \AgentsAPI\AI\Context\ContextAuthorityTier::AGENT_IDENTITY;
+			return \AgentsAPI\AI\Context\WP_Agent_Context_Authority_Tier::AGENT_IDENTITY;
 		}
 
-		return \AgentsAPI\AI\Context\ContextAuthorityTier::AGENT_MEMORY;
+		return \AgentsAPI\AI\Context\WP_Agent_Context_Authority_Tier::AGENT_MEMORY;
 	}
 
 	private static function default_provenance( string $filename ): array {

@@ -6,10 +6,10 @@
 	"require": {
 		"php": ">=8.2",
 		"woocommerce/action-scheduler": "^3.9",
-		"automattic/agents-api": "dev-main",
 		"chubes4/block-format-bridge": "^0.6"
 	},
 	"require-dev": {
+		"automattic/agents-api": "dev-main",
 		"php-stubs/wordpress-stubs": "^6.9",
 		"wp-coding-standards/wpcs": "^3.1",
 		"phpcsstandards/phpcsutils": "^1.0",

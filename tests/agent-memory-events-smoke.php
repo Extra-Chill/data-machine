@@ -206,17 +206,17 @@ require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemory.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/GuidelineAgentMemoryStore.php';
 
 use DataMachine\Core\FilesRepository\AgentMemory;
-use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
-use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
-use AgentsAPI\Core\FilesRepository\AgentMemoryQuery;
-use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
-use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
-use AgentsAPI\Core\FilesRepository\AgentMemoryStoreCapabilities;
-use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
-use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_List_Entry;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Metadata;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Query;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Read_Result;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Scope;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store_Capabilities;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
 use DataMachine\Core\FilesRepository\GuidelineAgentMemoryStore;
 
-class AgentMemoryEventsFakeStore implements AgentMemoryStoreInterface {
+class AgentMemoryEventsFakeStore implements WP_Agent_Memory_Store {
 
 	/**
 	 * @var array<string, string>
@@ -226,50 +226,50 @@ class AgentMemoryEventsFakeStore implements AgentMemoryStoreInterface {
 	public bool $fail_next_write  = false;
 	public bool $fail_next_delete = false;
 
-	public function capabilities(): AgentMemoryStoreCapabilities {
-		return AgentMemoryStoreCapabilities::none();
+	public function capabilities(): WP_Agent_Memory_Store_Capabilities {
+		return WP_Agent_Memory_Store_Capabilities::none();
 	}
 
-	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
+	public function read( WP_Agent_Memory_Scope $scope, array $metadata_fields = WP_Agent_Memory_Metadata::FIELDS ): WP_Agent_Memory_Read_Result {
 		if ( ! array_key_exists( $scope->key(), $this->files ) ) {
-			return AgentMemoryReadResult::not_found();
+			return WP_Agent_Memory_Read_Result::not_found();
 		}
 
 		$content = $this->files[ $scope->key() ];
-		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123, null, $metadata_fields );
+		return new WP_Agent_Memory_Read_Result( true, $content, sha1( $content ), strlen( $content ), 123, null, $metadata_fields );
 	}
 
-	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
+	public function write( WP_Agent_Memory_Scope $scope, string $content, ?string $_if_match = null, ?WP_Agent_Memory_Metadata $metadata = null ): WP_Agent_Memory_Write_Result {
 		unset( $_if_match, $metadata );
 		if ( $this->fail_next_write ) {
 			$this->fail_next_write = false;
-			return AgentMemoryWriteResult::failure( 'io' );
+			return WP_Agent_Memory_Write_Result::failure( 'io' );
 		}
 
 		$this->files[ $scope->key() ] = $content;
-		return AgentMemoryWriteResult::ok( sha1( $content ), strlen( $content ) );
+		return WP_Agent_Memory_Write_Result::ok( sha1( $content ), strlen( $content ) );
 	}
 
-	public function exists( AgentMemoryScope $scope ): bool {
+	public function exists( WP_Agent_Memory_Scope $scope ): bool {
 		return array_key_exists( $scope->key(), $this->files );
 	}
 
-	public function delete( AgentMemoryScope $scope ): AgentMemoryWriteResult {
+	public function delete( WP_Agent_Memory_Scope $scope ): WP_Agent_Memory_Write_Result {
 		if ( $this->fail_next_delete ) {
 			$this->fail_next_delete = false;
-			return AgentMemoryWriteResult::failure( 'io' );
+			return WP_Agent_Memory_Write_Result::failure( 'io' );
 		}
 
 		unset( $this->files[ $scope->key() ] );
-		return AgentMemoryWriteResult::ok( '', 0 );
+		return WP_Agent_Memory_Write_Result::ok( '', 0 );
 	}
 
-	public function list_layer( AgentMemoryScope $_scope_query, ?AgentMemoryQuery $query = null ): array {
+	public function list_layer( WP_Agent_Memory_Scope $_scope_query, ?WP_Agent_Memory_Query $query = null ): array {
 		unset( $_scope_query, $query );
 		return array();
 	}
 
-	public function list_subtree( AgentMemoryScope $_scope_query, string $_prefix, ?AgentMemoryQuery $query = null ): array {
+	public function list_subtree( WP_Agent_Memory_Scope $_scope_query, string $_prefix, ?WP_Agent_Memory_Query $query = null ): array {
 		unset( $_scope_query, $_prefix, $query );
 		return array();
 	}
@@ -299,7 +299,7 @@ function datamachine_agent_memory_events_matching( string $hook ): array {
 $store = new AgentMemoryEventsFakeStore();
 add_filter(
 	'agents_api_memory_store',
-	function ( $_default, AgentMemoryScope $_scope ) use ( $store ) {
+	function ( $_default, WP_Agent_Memory_Scope $_scope ) use ( $store ) {
 		unset( $_default, $_scope );
 		return $store;
 	},
@@ -315,7 +315,7 @@ datamachine_agent_memory_events_assert( true === $write['success'], 'replace_all
 
 $updates = datamachine_agent_memory_events_matching( 'datamachine_agent_memory_updated' );
 datamachine_agent_memory_events_assert( 1 === count( $updates ), 'successful write emits one memory update event' );
-datamachine_agent_memory_events_assert( $updates[0]['args'][0] instanceof AgentMemoryScope, 'update event includes AgentMemoryScope argument' );
+datamachine_agent_memory_events_assert( $updates[0]['args'][0] instanceof WP_Agent_Memory_Scope, 'update event includes WP_Agent_Memory_Scope argument' );
 datamachine_agent_memory_events_assert( "# Memory\n" === $updates[0]['args'][1], 'update event includes persisted full content' );
 
 $metadata = $updates[0]['args'][2];
@@ -338,7 +338,7 @@ $delete = $memory->delete();
 datamachine_agent_memory_events_assert( true === $delete['success'], 'delete succeeds through the fake store' );
 $deletes = datamachine_agent_memory_events_matching( 'datamachine_agent_memory_deleted' );
 datamachine_agent_memory_events_assert( 1 === count( $deletes ), 'successful delete emits one memory delete event' );
-datamachine_agent_memory_events_assert( $deletes[0]['args'][0] instanceof AgentMemoryScope, 'delete event includes AgentMemoryScope argument' );
+datamachine_agent_memory_events_assert( $deletes[0]['args'][0] instanceof WP_Agent_Memory_Scope, 'delete event includes WP_Agent_Memory_Scope argument' );
 datamachine_agent_memory_events_assert( 'agent:site:1:7:42:MEMORY.md' === $deletes[0]['args'][0]->key(), 'delete event scope identifies deleted memory' );
 
 $GLOBALS['datamachine_agent_memory_events_actions'] = array();
@@ -352,7 +352,7 @@ $GLOBALS['datamachine_agent_memory_events_taxonomies'] = array( GuidelineAgentMe
 $GLOBALS['datamachine_agent_memory_events_actions']    = array();
 
 $guideline_store = new GuidelineAgentMemoryStore();
-$guideline_scope = new AgentMemoryScope( 'agent', 'site', 'https://example.test', 7, 42, 'GUIDELINE.md' );
+$guideline_scope = new WP_Agent_Memory_Scope( 'agent', 'site', 'https://example.test', 7, 42, 'GUIDELINE.md' );
 $guideline_write = $guideline_store->write( $guideline_scope, 'Guideline content' );
 datamachine_agent_memory_events_assert( true === $guideline_write->success, 'guideline-backed write succeeds when substrate exists' );
 
@@ -364,7 +364,7 @@ datamachine_agent_memory_events_assert( GuidelineAgentMemoryStore::TERM_MEMORY =
 $GLOBALS['datamachine_agent_memory_events_post_types'] = array();
 $GLOBALS['datamachine_agent_memory_events_taxonomies'] = array();
 $GLOBALS['datamachine_agent_memory_events_actions']    = array();
-$capability_write                                      = $guideline_store->write( new AgentMemoryScope( 'agent', 'site', 'https://example.test', 7, 42, 'UNAVAILABLE.md' ), 'No substrate' );
+$capability_write                                      = $guideline_store->write( new WP_Agent_Memory_Scope( 'agent', 'site', 'https://example.test', 7, 42, 'UNAVAILABLE.md' ), 'No substrate' );
 datamachine_agent_memory_events_assert( false === $capability_write->success, 'guideline-backed write fails cleanly without substrate' );
 datamachine_agent_memory_events_assert( array() === datamachine_agent_memory_events_matching( 'datamachine_guideline_updated' ), 'unavailable guideline substrate does not emit guideline event' );
 

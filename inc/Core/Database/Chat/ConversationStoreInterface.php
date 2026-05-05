@@ -8,7 +8,7 @@
  * aggregate store via the `datamachine_conversation_store` filter.
  *
  * This aggregate is intentionally broader than the generic Agents API storage
- * candidate. {@see ConversationTranscriptStoreInterface} is the narrow generic
+ * candidate. {@see WP_Agent_Conversation_Store} is the narrow generic
  * transcript CRUD seam. The other composed interfaces are Data Machine chat
  * product surfaces today: session switcher indexes, read state, retention
  * cleanup, and reporting/metrics. They may become optional Agents API
@@ -36,14 +36,14 @@
 
 namespace DataMachine\Core\Database\Chat;
 
-use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
-use AgentsAPI\Core\Database\Chat\ConversationTranscriptLockInterface;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Lock;
 
 defined( 'ABSPATH' ) || exit;
 
 interface ConversationStoreInterface extends
-	ConversationTranscriptStoreInterface,
-	ConversationTranscriptLockInterface,
+	WP_Agent_Conversation_Store,
+	WP_Agent_Conversation_Lock,
 	ConversationSessionIndexInterface,
 	ConversationReadStateInterface,
 	ConversationRetentionInterface,

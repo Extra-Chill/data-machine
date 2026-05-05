@@ -9,9 +9,9 @@
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
-use AgentsAPI\AI\AgentConversationResult;
+use AgentsAPI\AI\WP_Agent_Conversation_Result;
 use DataMachine\Engine\AI\ConversationManager;
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Message;
 
 function datamachine_message_envelope_assert( bool $condition, string $message ): void {
 	if ( ! $condition ) {
@@ -30,16 +30,16 @@ $legacy_text = array(
 	'content' => 'Hello world.',
 );
 
-$text_envelope = AgentMessageEnvelope::normalize( $legacy_text );
-datamachine_message_envelope_assert( AgentMessageEnvelope::SCHEMA === $text_envelope['schema'], 'Legacy text normalizes to the Agents API schema.' );
+$text_envelope = WP_Agent_Message::normalize( $legacy_text );
+datamachine_message_envelope_assert( WP_Agent_Message::SCHEMA === $text_envelope['schema'], 'Legacy text normalizes to the Agents API schema.' );
 datamachine_message_envelope_count();
-datamachine_message_envelope_assert( AgentMessageEnvelope::VERSION === $text_envelope['version'], 'Legacy text normalizes to the current envelope version.' );
+datamachine_message_envelope_assert( WP_Agent_Message::VERSION === $text_envelope['version'], 'Legacy text normalizes to the current envelope version.' );
 datamachine_message_envelope_count();
-datamachine_message_envelope_assert( AgentMessageEnvelope::TYPE_TEXT === $text_envelope['type'], 'Legacy text infers text type.' );
+datamachine_message_envelope_assert( WP_Agent_Message::TYPE_TEXT === $text_envelope['type'], 'Legacy text infers text type.' );
 datamachine_message_envelope_count();
 datamachine_message_envelope_assert( array() === $text_envelope['payload'], 'Plain legacy text normalizes with an empty payload.' );
 datamachine_message_envelope_count();
-datamachine_message_envelope_assert( $legacy_text === AgentMessageEnvelope::to_provider_message( $legacy_text ), 'Plain legacy text projects without provider metadata churn.' );
+datamachine_message_envelope_assert( $legacy_text === WP_Agent_Message::to_provider_message( $legacy_text ), 'Plain legacy text projects without provider metadata churn.' );
 datamachine_message_envelope_count();
 
 $legacy_tool_call = array(
@@ -53,18 +53,18 @@ $legacy_tool_call = array(
 	),
 );
 
-$tool_call_envelope = AgentMessageEnvelope::normalize( $legacy_tool_call );
-datamachine_message_envelope_assert( AgentMessageEnvelope::TYPE_TOOL_CALL === $tool_call_envelope['type'], 'Legacy tool call keeps explicit tool_call type.' );
+$tool_call_envelope = WP_Agent_Message::normalize( $legacy_tool_call );
+datamachine_message_envelope_assert( WP_Agent_Message::TYPE_TOOL_CALL === $tool_call_envelope['type'], 'Legacy tool call keeps explicit tool_call type.' );
 datamachine_message_envelope_count();
 datamachine_message_envelope_assert( 'wiki_upsert' === $tool_call_envelope['payload']['tool_name'], 'Tool call tool_name is promoted to envelope payload.' );
 datamachine_message_envelope_count();
 datamachine_message_envelope_assert( array( 'title' => 'Demo' ) === $tool_call_envelope['payload']['parameters'], 'Tool call parameters are promoted to envelope payload.' );
 datamachine_message_envelope_count();
-datamachine_message_envelope_assert( $legacy_tool_call === AgentMessageEnvelope::to_provider_message( $tool_call_envelope ), 'Tool call envelope projects back to provider message shape.' );
+datamachine_message_envelope_assert( $legacy_tool_call === WP_Agent_Message::to_provider_message( $tool_call_envelope ), 'Tool call envelope projects back to provider message shape.' );
 datamachine_message_envelope_count();
 
 $built_tool_call = ConversationManager::formatToolCallMessage( 'wiki_upsert', array( 'title' => 'Demo' ), 3 );
-datamachine_message_envelope_assert( AgentMessageEnvelope::TYPE_TOOL_CALL === $built_tool_call['type'], 'ConversationManager emits tool_call envelopes.' );
+datamachine_message_envelope_assert( WP_Agent_Message::TYPE_TOOL_CALL === $built_tool_call['type'], 'ConversationManager emits tool_call envelopes.' );
 datamachine_message_envelope_count();
 datamachine_message_envelope_assert( 'wiki_upsert' === $built_tool_call['payload']['tool_name'], 'ConversationManager stores tool call details in payload.' );
 datamachine_message_envelope_count();
@@ -81,60 +81,60 @@ $legacy_tool_result = array(
 	),
 );
 
-$tool_result_envelope = AgentMessageEnvelope::normalize( $legacy_tool_result );
-datamachine_message_envelope_assert( AgentMessageEnvelope::TYPE_TOOL_RESULT === $tool_result_envelope['type'], 'Legacy tool result keeps explicit tool_result type.' );
+$tool_result_envelope = WP_Agent_Message::normalize( $legacy_tool_result );
+datamachine_message_envelope_assert( WP_Agent_Message::TYPE_TOOL_RESULT === $tool_result_envelope['type'], 'Legacy tool result keeps explicit tool_result type.' );
 datamachine_message_envelope_count();
 datamachine_message_envelope_assert( true === $tool_result_envelope['payload']['success'], 'Tool result success is promoted to envelope payload.' );
 datamachine_message_envelope_count();
 datamachine_message_envelope_assert( array( 'post_id' => 123 ) === $tool_result_envelope['payload']['tool_data'], 'Tool result data is promoted to envelope payload.' );
 datamachine_message_envelope_count();
-datamachine_message_envelope_assert( $legacy_tool_result === AgentMessageEnvelope::to_provider_message( $tool_result_envelope ), 'Tool result envelope projects back to provider message shape.' );
+datamachine_message_envelope_assert( $legacy_tool_result === WP_Agent_Message::to_provider_message( $tool_result_envelope ), 'Tool result envelope projects back to provider message shape.' );
 datamachine_message_envelope_count();
 
 $typed_final_result = array(
-	'schema'   => AgentMessageEnvelope::SCHEMA,
-	'version'  => AgentMessageEnvelope::VERSION,
-	'type'     => AgentMessageEnvelope::TYPE_FINAL_RESULT,
+	'schema'   => WP_Agent_Message::SCHEMA,
+	'version'  => WP_Agent_Message::VERSION,
+	'type'     => WP_Agent_Message::TYPE_FINAL_RESULT,
 	'role'     => 'assistant',
 	'content'  => 'Finished.',
 	'payload'  => array( 'status' => 'complete' ),
 	'metadata' => array( 'provider_message_id' => 'msg_123' ),
 );
 
-$typed_envelope = AgentMessageEnvelope::normalize( $typed_final_result );
+$typed_envelope = WP_Agent_Message::normalize( $typed_final_result );
 datamachine_message_envelope_assert( 'assistant' === $typed_envelope['role'], 'Future typed envelope keeps role in canonical output.' );
 datamachine_message_envelope_count();
 datamachine_message_envelope_assert( 'Finished.' === $typed_envelope['content'], 'Future typed envelope keeps content in canonical output.' );
 datamachine_message_envelope_count();
-datamachine_message_envelope_assert( AgentMessageEnvelope::TYPE_FINAL_RESULT === $typed_envelope['type'], 'Future typed envelope keeps type as a top-level field.' );
+datamachine_message_envelope_assert( WP_Agent_Message::TYPE_FINAL_RESULT === $typed_envelope['type'], 'Future typed envelope keeps type as a top-level field.' );
 datamachine_message_envelope_count();
 datamachine_message_envelope_assert( 'complete' === $typed_envelope['payload']['status'], 'Future typed envelope keeps type-specific data in payload.' );
 datamachine_message_envelope_count();
 datamachine_message_envelope_assert( 'msg_123' === $typed_envelope['metadata']['provider_message_id'], 'Future typed envelope preserves extension metadata.' );
 datamachine_message_envelope_count();
 
-$typed_provider = AgentMessageEnvelope::to_provider_message( $typed_envelope );
-datamachine_message_envelope_assert( AgentMessageEnvelope::TYPE_FINAL_RESULT === $typed_provider['metadata']['type'], 'Provider projection folds type into metadata.' );
+$typed_provider = WP_Agent_Message::to_provider_message( $typed_envelope );
+datamachine_message_envelope_assert( WP_Agent_Message::TYPE_FINAL_RESULT === $typed_provider['metadata']['type'], 'Provider projection folds type into metadata.' );
 datamachine_message_envelope_count();
 datamachine_message_envelope_assert( 'complete' === $typed_provider['metadata']['status'], 'Provider projection folds payload into metadata.' );
 datamachine_message_envelope_count();
 
 $typed_delta = array(
-	'schema'  => AgentMessageEnvelope::SCHEMA,
-	'version' => AgentMessageEnvelope::VERSION,
-	'type'    => AgentMessageEnvelope::TYPE_DELTA,
+	'schema'  => WP_Agent_Message::SCHEMA,
+	'version' => WP_Agent_Message::VERSION,
+	'type'    => WP_Agent_Message::TYPE_DELTA,
 	'content' => 'partial token',
 	'payload' => array( 'index' => 0 ),
 );
 
-$delta_envelope = AgentMessageEnvelope::normalize( $typed_delta );
+$delta_envelope = WP_Agent_Message::normalize( $typed_delta );
 datamachine_message_envelope_assert( 'assistant' === $delta_envelope['role'], 'Typed delta envelope gets assistant default role.' );
 datamachine_message_envelope_count();
 
 $old_data_envelope = $typed_delta;
 $old_data_envelope['data'] = $old_data_envelope['payload'];
 unset( $old_data_envelope['payload'] );
-$old_data_normalized = AgentMessageEnvelope::normalize( $old_data_envelope );
+$old_data_normalized = WP_Agent_Message::normalize( $old_data_envelope );
 datamachine_message_envelope_assert( array( 'index' => 0 ) === $old_data_normalized['payload'], 'Old data envelope key is accepted as a read-time compatibility input.' );
 datamachine_message_envelope_count();
 
@@ -146,11 +146,11 @@ $multimodal_legacy = array(
 	),
 );
 
-$multimodal_envelope = AgentMessageEnvelope::normalize( $multimodal_legacy );
-datamachine_message_envelope_assert( AgentMessageEnvelope::TYPE_MULTIMODAL_PART === $multimodal_envelope['type'], 'Array content infers multimodal_part type.' );
+$multimodal_envelope = WP_Agent_Message::normalize( $multimodal_legacy );
+datamachine_message_envelope_assert( WP_Agent_Message::TYPE_MULTIMODAL_PART === $multimodal_envelope['type'], 'Array content infers multimodal_part type.' );
 datamachine_message_envelope_count();
 
-$result = AgentConversationResult::normalize(
+$result = WP_Agent_Conversation_Result::normalize(
 	array(
 		'messages'               => array( $typed_final_result ),
 		'final_content'          => 'Finished.',
@@ -162,14 +162,14 @@ $result = AgentConversationResult::normalize(
 	)
 );
 
-datamachine_message_envelope_assert( AgentMessageEnvelope::TYPE_FINAL_RESULT === $result['messages'][0]['type'], 'AgentConversationResult accepts typed envelopes and returns canonical envelopes.' );
+datamachine_message_envelope_assert( WP_Agent_Message::TYPE_FINAL_RESULT === $result['messages'][0]['type'], 'WP_Agent_Conversation_Result accepts typed envelopes and returns canonical envelopes.' );
 datamachine_message_envelope_count();
 
 try {
-	AgentMessageEnvelope::normalize(
+	WP_Agent_Message::normalize(
 		array(
-			'schema'  => AgentMessageEnvelope::SCHEMA,
-			'version' => AgentMessageEnvelope::VERSION,
+			'schema'  => WP_Agent_Message::SCHEMA,
+			'version' => WP_Agent_Message::VERSION,
 			'type'    => 'unknown_type',
 			'content' => 'bad',
 		)

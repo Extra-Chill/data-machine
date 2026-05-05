@@ -13,8 +13,8 @@ namespace DataMachine\Core\Database\Chat;
 
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\Database\BaseRepository;
-use AgentsAPI\AI\AgentMessageEnvelope;
-use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
+use AgentsAPI\AI\WP_Agent_Message;
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -60,6 +60,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			metadata LONGTEXT NULL,
 			provider VARCHAR(50) NULL,
 			model VARCHAR(100) NULL,
+			provider_response_id VARCHAR(191) NULL,
 			mode VARCHAR(20) NOT NULL DEFAULT 'chat',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -284,7 +285,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	/**
 	 * Create new chat session
 	 *
-	 * @param AgentWorkspaceScope $workspace Workspace owning the session.
+	 * @param WP_Agent_Workspace_Scope $workspace Workspace owning the session.
 	 * @param int                 $user_id   WordPress user ID.
 	 * @param int                 $agent_id  Agent ID.
 	 * @param array               $metadata  Optional session metadata.
@@ -358,10 +359,10 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * Normalize create-session arguments across current and workspace-aware contracts.
 	 *
 	 * @param array $args Raw method arguments.
-	 * @return array{0:AgentWorkspaceScope,1:int,2:int,3:array,4:string}
+	 * @return array{0:WP_Agent_Workspace_Scope,1:int,2:int,3:array,4:string}
 	 */
 	private static function normalize_create_session_args( array $args ): array {
-		if ( isset( $args[0] ) && $args[0] instanceof AgentWorkspaceScope ) {
+		if ( isset( $args[0] ) && $args[0] instanceof WP_Agent_Workspace_Scope ) {
 			return array(
 				$args[0],
 				(int) ( $args[1] ?? 0 ),
@@ -384,10 +385,10 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * Normalize pending-session arguments across current and workspace-aware contracts.
 	 *
 	 * @param array $args Raw method arguments.
-	 * @return array{0:AgentWorkspaceScope,1:int,2:int,3:string,4:int|null}
+	 * @return array{0:WP_Agent_Workspace_Scope,1:int,2:int,3:string,4:int|null}
 	 */
 	private static function normalize_recent_pending_session_args( array $args ): array {
-		if ( isset( $args[0] ) && $args[0] instanceof AgentWorkspaceScope ) {
+		if ( isset( $args[0] ) && $args[0] instanceof WP_Agent_Workspace_Scope ) {
 			return array(
 				$args[0],
 				(int) ( $args[1] ?? 0 ),
@@ -445,6 +446,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * @param array  $metadata   Updated metadata
 	 * @param string $provider   AI provider
 	 * @param string $model      AI model
+	 * @param string|null $provider_response_id Provider-side response/state ID.
 	 * @return bool Success
 	 */
 	public function update_session(
@@ -452,14 +454,15 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		array $messages,
 		array $metadata = array(),
 		string $provider = '',
-		string $model = ''
+		string $model = '',
+		?string $provider_response_id = null
 	): bool {
 		global $wpdb;
 
 		$table_name = self::get_prefixed_table_name();
 
 		try {
-			$normalized_messages = AgentMessageEnvelope::normalize_many( $messages );
+			$normalized_messages = WP_Agent_Message::normalize_many( $messages );
 		} catch ( \InvalidArgumentException $e ) {
 			do_action(
 				'datamachine_log',
@@ -489,6 +492,11 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		if ( ! empty( $model ) ) {
 			$update_data['model'] = $model;
 			$update_format[]      = '%s';
+		}
+
+		if ( null !== $provider_response_id ) {
+			$update_data['provider_response_id'] = $provider_response_id;
+			$update_format[]                     = '%s';
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -886,7 +894,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * instead of creating a new one.
 	 *
 	 * @since 0.9.8
-	 * @param AgentWorkspaceScope $workspace Workspace owning the session.
+	 * @param WP_Agent_Workspace_Scope $workspace Workspace owning the session.
 	 * @param int                 $user_id   WordPress user ID.
 	 * @param int                 $seconds   Lookback window in seconds (default 600 = 10 minutes).
 	 * @param string              $context   Context filter.
@@ -1005,14 +1013,14 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$count = 0;
 
 		foreach ( $messages as $msg ) {
-			$msg = AgentMessageEnvelope::normalize( $msg );
+			$msg = WP_Agent_Message::normalize( $msg );
 			if ( ( $msg['role'] ?? '' ) !== 'assistant' ) {
 				continue;
 			}
 
 			// Skip tool call/result messages — only count visible assistant responses.
-			$type = $msg['type'] ?? AgentMessageEnvelope::TYPE_TEXT;
-			if ( AgentMessageEnvelope::TYPE_TOOL_CALL === $type || AgentMessageEnvelope::TYPE_TOOL_RESULT === $type ) {
+			$type = $msg['type'] ?? WP_Agent_Message::TYPE_TEXT;
+			if ( WP_Agent_Message::TYPE_TOOL_CALL === $type || WP_Agent_Message::TYPE_TOOL_RESULT === $type ) {
 				continue;
 			}
 
@@ -1038,7 +1046,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 */
 	private static function normalize_messages( array $messages ): array {
 		try {
-			return AgentMessageEnvelope::normalize_many( $messages );
+			return WP_Agent_Message::normalize_many( $messages );
 		} catch ( \InvalidArgumentException $e ) {
 			do_action(
 				'datamachine_log',

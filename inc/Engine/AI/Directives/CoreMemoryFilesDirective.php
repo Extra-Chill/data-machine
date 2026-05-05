@@ -25,9 +25,9 @@
 
 namespace DataMachine\Engine\AI\Directives;
 
-use AgentsAPI\AI\Context\ContextConflictKind;
-use AgentsAPI\AI\Context\DefaultContextConflictResolver;
-use AgentsAPI\AI\Context\RetrievedContextItem;
+use AgentsAPI\AI\Context\WP_Agent_Context_Conflict_Kind;
+use AgentsAPI\AI\Context\WP_Agent_Default_Context_Conflict_Resolver;
+use AgentsAPI\AI\Context\WP_Agent_Context_Item;
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\AI\Memory\MemoryPolicyResolver;
@@ -92,15 +92,15 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 				continue;
 			}
 
-			$items[] = new RetrievedContextItem(
+			$items[] = new WP_Agent_Context_Item(
 				$content,
 				array(
 					'filename' => $filename,
 					'layer'    => $layer,
 				),
-				$meta['authority_tier'] ?? MemoryFileRegistry::get( $filename )['authority_tier'] ?? \AgentsAPI\AI\Context\ContextAuthorityTier::AGENT_MEMORY,
+				$meta['authority_tier'] ?? MemoryFileRegistry::get( $filename )['authority_tier'] ?? \AgentsAPI\AI\Context\WP_Agent_Context_Authority_Tier::AGENT_MEMORY,
 				$meta['provenance'] ?? array( 'source_ref' => $filename ),
-				$meta['conflict_kind'] ?? ContextConflictKind::AUTHORITATIVE_FACT,
+				$meta['conflict_kind'] ?? WP_Agent_Context_Conflict_Kind::AUTHORITATIVE_FACT,
 				is_string( $meta['conflict_key'] ?? null ) ? $meta['conflict_key'] : null,
 				array(
 					'priority' => (int) ( $meta['priority'] ?? 50 ),
@@ -118,16 +118,16 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 	 * resolved by the generic conflict resolver, so product/support/workspace
 	 * authority can beat lower-scope agent memory when both assert the same fact.
 	 *
-	 * @param RetrievedContextItem[] $items   Retrieved memory context items.
+	 * @param WP_Agent_Context_Item[] $items   Retrieved memory context items.
 	 * @param array                  $payload Runtime payload.
-	 * @return RetrievedContextItem[] Items that should be injected, preserving original order.
+	 * @return WP_Agent_Context_Item[] Items that should be injected, preserving original order.
 	 */
 	private static function resolve_context_conflicts( array $items, array $payload ): array {
 		$items = apply_filters( 'datamachine_retrieved_memory_context_items', $items, $payload );
-		$items = array_values( array_filter( $items, static fn( $item ): bool => $item instanceof RetrievedContextItem ) );
+		$items = array_values( array_filter( $items, static fn( $item ): bool => $item instanceof WP_Agent_Context_Item ) );
 
-		$resolver    = apply_filters( 'datamachine_context_conflict_resolver', new DefaultContextConflictResolver(), $payload );
-		$resolutions = $resolver instanceof \AgentsAPI\AI\Context\ContextConflictResolverInterface
+		$resolver    = apply_filters( 'datamachine_context_conflict_resolver', new WP_Agent_Default_Context_Conflict_Resolver(), $payload );
+		$resolutions = $resolver instanceof \AgentsAPI\AI\Context\WP_Agent_Context_Conflict_Resolver
 			? $resolver->resolve( $items, $payload )
 			: array();
 
@@ -141,18 +141,18 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		return array_values(
 			array_filter(
 				$items,
-				static fn( RetrievedContextItem $item ): bool => ! in_array( spl_object_id( $item ), $rejected, true )
+				static fn( WP_Agent_Context_Item $item ): bool => ! in_array( spl_object_id( $item ), $rejected, true )
 			)
 		);
 	}
 
 	/**
-	 * @param RetrievedContextItem[] $items Context items to inject.
+	 * @param WP_Agent_Context_Item[] $items Context items to inject.
 	 * @return array<int, array{type: string, content: string}>
 	 */
 	private static function items_to_outputs( array $items ): array {
 		return array_map(
-			static fn( RetrievedContextItem $item ): array => array(
+			static fn( WP_Agent_Context_Item $item ): array => array(
 				'type'    => 'system_text',
 				'content' => $item->content,
 			),

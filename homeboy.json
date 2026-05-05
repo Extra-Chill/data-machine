@@ -21,7 +21,10 @@
       "mysql_host": "localhost",
       "mysql_database": "wptests",
       "mysql_user": "root",
-      "mysql_password": ""
+      "mysql_password": "",
+      "settings": {
+        "validation_dependencies": "agents-api"
+      }
     }
   },
   "id": "data-machine",

@@ -48,33 +48,33 @@ $runtime_source     = datamachine_pending_actions_source( 'inc/migrations/runtim
 $action_policy      = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/ActionPolicyResolver.php' );
 
 $expected_agents_api_approval_primitives = array(
-	'AgentsAPI\\AI\\Approvals\\PendingActionStoreInterface'    => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/PendingActionStoreInterface.php',
-		'type' => 'interface PendingActionStoreInterface',
+	'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action_Store'    => array(
+		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-pending-action-store.php',
+		'type' => 'interface WP_Agent_Pending_Action_Store',
 	),
-	'AgentsAPI\\AI\\Approvals\\PendingActionResolverInterface' => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/PendingActionResolverInterface.php',
-		'type' => 'interface PendingActionResolverInterface',
+	'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action_Resolver' => array(
+		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-pending-action-resolver.php',
+		'type' => 'interface WP_Agent_Pending_Action_Resolver',
 	),
-	'AgentsAPI\\AI\\Approvals\\PendingActionHandlerInterface'  => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/PendingActionHandlerInterface.php',
-		'type' => 'interface PendingActionHandlerInterface',
+	'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action_Handler'  => array(
+		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-pending-action-handler.php',
+		'type' => 'interface WP_Agent_Pending_Action_Handler',
 	),
-	'AgentsAPI\\AI\\Approvals\\PendingAction'                  => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/PendingAction.php',
-		'type' => 'class PendingAction',
+	'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action'                  => array(
+		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-pending-action.php',
+		'type' => 'class WP_Agent_Pending_Action',
 	),
-	'AgentsAPI\\AI\\Approvals\\PendingActionStatus'            => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/PendingActionStatus.php',
-		'type' => 'final class PendingActionStatus',
+	'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action_Status'            => array(
+		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-pending-action-status.php',
+		'type' => 'final class WP_Agent_Pending_Action_Status',
 	),
-	'AgentsAPI\\AI\\Approvals\\ApprovalDecision'               => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/ApprovalDecision.php',
-		'type' => 'final class ApprovalDecision',
+	'AgentsAPI\\AI\\Approvals\\WP_Agent_Approval_Decision'               => array(
+		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-approval-decision.php',
+		'type' => 'final class WP_Agent_Approval_Decision',
 	),
-	'AgentsAPI\\AI\\Tools\\ActionPolicy'                       => array(
-		'path' => 'vendor/automattic/agents-api/src/Tools/ActionPolicy.php',
-		'type' => 'final class ActionPolicy',
+	'AgentsAPI\\AI\\Tools\\WP_Agent_Action_Policy'                       => array(
+		'path' => 'vendor/automattic/agents-api/src/Tools/class-wp-agent-action-policy.php',
+		'type' => 'final class WP_Agent_Action_Policy',
 	),
 );
 
@@ -83,23 +83,23 @@ foreach ( $expected_agents_api_approval_primitives as $class_name => $primitive 
 	$primitive_source = datamachine_pending_actions_source( $primitive['path'] );
 	datamachine_pending_actions_assert( str_contains( $primitive_source, $primitive['type'] ), $class_name . ' is available from the installed Agents API dependency', $failures, $passes );
 }
-datamachine_pending_actions_assert( str_contains( $store_source, 'use AgentsAPI\\AI\\Approvals\\PendingActionStoreInterface;' ), 'concrete store consumes Agents API PendingActionStoreInterface', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $store_source, 'public static function adapter(): PendingActionStoreInterface' ), 'concrete store exposes the Agents API store contract', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $adapter_source, 'implements PendingActionStoreInterface' ), 'store adapter implements Agents API PendingActionStoreInterface', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $adapter_source, 'store( PendingAction $action )' ), 'store adapter accepts Agents API PendingAction records', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $adapter_source, 'record_resolution( string $action_id, ApprovalDecision $decision, string $resolver' ), 'store adapter records Agents API resolution audit metadata', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'implements PendingActionResolverInterface' ), 'resolver adapter implements Agents API PendingActionResolverInterface', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $action_policy, 'use AgentsAPI\\AI\\Tools\\ActionPolicy;' ) && str_contains( $action_policy, 'ActionPolicy::normalize' ), 'ActionPolicyResolver consumes Agents API ActionPolicy vocabulary', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'ApprovalDecision' ), 'resolver adapter consumes Agents API ApprovalDecision vocabulary', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $store_source, 'use AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action_Store;' ), 'concrete store consumes Agents API WP_Agent_Pending_Action_Store', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $store_source, 'public static function adapter(): WP_Agent_Pending_Action_Store' ), 'concrete store exposes the Agents API store contract', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $adapter_source, 'implements WP_Agent_Pending_Action_Store' ), 'store adapter implements Agents API WP_Agent_Pending_Action_Store', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $adapter_source, 'store( WP_Agent_Pending_Action $action )' ), 'store adapter accepts Agents API WP_Agent_Pending_Action records', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $adapter_source, 'record_resolution( string $action_id, WP_Agent_Approval_Decision $decision, string $resolver' ), 'store adapter records Agents API resolution audit metadata', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'implements WP_Agent_Pending_Action_Resolver' ), 'resolver adapter implements Agents API WP_Agent_Pending_Action_Resolver', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $action_policy, 'use AgentsAPI\\AI\\Tools\\WP_Agent_Action_Policy;' ) && str_contains( $action_policy, 'WP_Agent_Action_Policy::normalize' ), 'ActionPolicyResolver consumes Agents API WP_Agent_Action_Policy vocabulary', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'WP_Agent_Approval_Decision' ), 'resolver adapter consumes Agents API WP_Agent_Approval_Decision vocabulary', $failures, $passes );
 
 echo "\n[2] Durable storage preserves legacy lookup while retaining audit rows:\n";
 datamachine_pending_actions_assert( str_contains( $store_source, 'CREATE TABLE {$table_name}' ), 'PendingActionStore creates a durable table', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $store_source, 'datamachine_pending_actions' ), 'durable table uses Data Machine pending-actions table name', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $store_source, 'public static function get( string $action_id, bool $include_resolved = false )' ), 'legacy get defaults to live-pending rows only', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $store_source, 'public static function inspect( string $action_id ): ?array' ), 'inspect surface can fetch resolved audit rows', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $store_source, 'PendingActionStatus::normalize' ), 'lifecycle vocabulary is delegated to Agents API PendingActionStatus', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $resolver_source, 'record_resolution( $action_id, PendingActionStatus::ACCEPTED' ), 'accepted resolutions are retained instead of transient-deleted', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $resolver_source, 'record_resolution( $action_id, PendingActionStatus::REJECTED' ), 'rejected resolutions are retained instead of transient-deleted', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $store_source, 'WP_Agent_Pending_Action_Status::normalize' ), 'lifecycle vocabulary is delegated to Agents API WP_Agent_Pending_Action_Status', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_source, 'record_resolution( $action_id, WP_Agent_Pending_Action_Status::ACCEPTED' ), 'accepted resolutions are retained instead of transient-deleted', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $resolver_source, 'record_resolution( $action_id, WP_Agent_Pending_Action_Status::REJECTED' ), 'rejected resolutions are retained instead of transient-deleted', $failures, $passes );
 
 echo "\n[3] List/get/summary surfaces are registered for agents and operators:\n";
 foreach ( array( 'datamachine/list-pending-actions', 'datamachine/get-pending-action', 'datamachine/summarize-pending-actions' ) as $ability ) {
@@ -181,12 +181,13 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 }
 
 require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/agents-api.php';
+require_once dirname( __DIR__ ) . '/inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStoreAdapter.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
 
 $store     = \DataMachine\Engine\AI\Actions\PendingActionStore::adapter();
 $action_id = \DataMachine\Engine\AI\Actions\PendingActionStore::generate_id();
-$action    = \AgentsAPI\AI\Approvals\PendingAction::from_array(
+$action    = \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action::from_array(
 	array(
 		'action_id'   => $action_id,
 		'kind'        => 'contract_smoke',
@@ -206,14 +207,14 @@ $action    = \AgentsAPI\AI\Approvals\PendingAction::from_array(
 	)
 );
 
-datamachine_pending_actions_assert( $store instanceof \AgentsAPI\AI\Approvals\PendingActionStoreInterface, 'PendingActionStore adapter is an Agents API store', $failures, $passes );
+datamachine_pending_actions_assert( $store instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Store, 'PendingActionStore adapter is an Agents API store', $failures, $passes );
 datamachine_pending_actions_assert( str_starts_with( $action_id, 'act_' ), 'legacy generate_id returns namespaced action IDs', $failures, $passes );
-datamachine_pending_actions_assert( $store->store( $action ), 'contract store writes PendingAction through transient fallback', $failures, $passes );
+datamachine_pending_actions_assert( $store->store( $action ), 'contract store writes WP_Agent_Pending_Action through transient fallback', $failures, $passes );
 
 $stored = $store->get( $action_id );
-datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && 'contract_smoke' === $stored->get_kind(), 'contract get reads the stored PendingAction', $failures, $passes );
-datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && $action_id === $stored->get_action_id(), 'contract store preserves action ID in payload', $failures, $passes );
-datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\PendingAction && null !== $stored->get_expires_at(), 'transient fallback preserves expiration audit data', $failures, $passes );
+datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action && 'contract_smoke' === $stored->get_kind(), 'contract get reads the stored WP_Agent_Pending_Action', $failures, $passes );
+datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action && $action_id === $stored->get_action_id(), 'contract store preserves action ID in payload', $failures, $passes );
+datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action && null !== $stored->get_expires_at(), 'transient fallback preserves expiration audit data', $failures, $passes );
 
 $legacy_action_id = \DataMachine\Engine\AI\Actions\PendingActionStore::generate_id();
 $legacy_payload   = array(
@@ -229,10 +230,10 @@ $legacy_payload   = array(
 datamachine_pending_actions_assert( \DataMachine\Engine\AI\Actions\PendingActionStore::store( $legacy_action_id, $legacy_payload ), 'legacy Data Machine payload arrays still read through the product payload API', $failures, $passes );
 
 $legacy_stored = $store->get( $legacy_action_id );
-datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\PendingAction, 'legacy Data Machine payload arrays normalize to PendingAction value objects', $failures, $passes );
-datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\PendingAction && 'legacy_smoke' === $legacy_stored->get_kind(), 'value-object conversion preserves Data Machine handler kind', $failures, $passes );
-datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\PendingAction && array( 'legacy' => true ) === $legacy_stored->get_preview(), 'value-object conversion preserves preview payload', $failures, $passes );
-datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\PendingAction && array( 'legacy_value' => 2 ) === $legacy_stored->get_apply_input(), 'value-object conversion preserves apply input', $failures, $passes );
+datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action, 'legacy Data Machine payload arrays normalize to WP_Agent_Pending_Action value objects', $failures, $passes );
+datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action && 'legacy_smoke' === $legacy_stored->get_kind(), 'value-object conversion preserves Data Machine handler kind', $failures, $passes );
+datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action && array( 'legacy' => true ) === $legacy_stored->get_preview(), 'value-object conversion preserves preview payload', $failures, $passes );
+datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action && array( 'legacy_value' => 2 ) === $legacy_stored->get_apply_input(), 'value-object conversion preserves apply input', $failures, $passes );
 datamachine_pending_actions_assert( $store->delete( $legacy_action_id ), 'contract delete removes legacy transient fallback payload', $failures, $passes );
 
 datamachine_pending_actions_assert( $store->delete( $action_id ), 'contract delete removes transient fallback payload', $failures, $passes );

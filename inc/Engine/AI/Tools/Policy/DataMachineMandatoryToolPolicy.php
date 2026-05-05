@@ -13,11 +13,7 @@ namespace DataMachine\Engine\AI\Tools\Policy;
 
 defined( 'ABSPATH' ) || exit;
 
-if ( ! interface_exists( '\WP_Agent_Tool_Access_Policy_Interface' ) ) {
-	require_once dirname( __DIR__, 5 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy-interface.php';
-}
-
-final class DataMachineMandatoryToolPolicy implements \WP_Agent_Tool_Access_Policy_Interface {
+final class DataMachineMandatoryToolPolicy implements \WP_Agent_Tool_Access_Policy {
 
 	/**
 	 * Provide mandatory Data Machine plumbing tools to Agents API.

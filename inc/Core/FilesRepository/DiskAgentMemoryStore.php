@@ -2,7 +2,7 @@
 /**
  * Disk Agent Memory Store
  *
- * Default implementation of {@see AgentMemoryStoreInterface} that persists
+ * Default implementation of {@see WP_Agent_Memory_Store} that persists
  * agent memory records as markdown files on the local filesystem under
  * wp-uploads. Preserves the byte-for-byte behavior the codebase used before
  * the store seam was introduced.
@@ -22,19 +22,19 @@
 
 namespace DataMachine\Core\FilesRepository;
 
-use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
-use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
-use AgentsAPI\Core\FilesRepository\AgentMemoryQuery;
-use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
-use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
-use AgentsAPI\Core\FilesRepository\AgentMemoryStoreCapabilities;
-use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
-use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_List_Entry;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Metadata;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Query;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Read_Result;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Scope;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store_Capabilities;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
-class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
+class DiskAgentMemoryStore implements WP_Agent_Memory_Store {
 
 	/**
 	 * @var DirectoryManager
@@ -48,30 +48,30 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * @inheritDoc
 	 */
-	public function capabilities(): AgentMemoryStoreCapabilities {
-		return AgentMemoryStoreCapabilities::none();
+	public function capabilities(): WP_Agent_Memory_Store_Capabilities {
+		return WP_Agent_Memory_Store_Capabilities::none();
 	}
 
 	/**
 	 * @inheritDoc
 	 */
-	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
+	public function read( WP_Agent_Memory_Scope $scope, array $metadata_fields = WP_Agent_Memory_Metadata::FIELDS ): WP_Agent_Memory_Read_Result {
 		$filepath = $this->resolve_filepath( $scope );
 
 		if ( ! file_exists( $filepath ) ) {
-			return AgentMemoryReadResult::not_found();
+			return WP_Agent_Memory_Read_Result::not_found();
 		}
 
 		$fs = FilesystemHelper::get();
 		if ( ! $fs ) {
-			return AgentMemoryReadResult::not_found();
+			return WP_Agent_Memory_Read_Result::not_found();
 		}
 
 		$content    = (string) $fs->get_contents( $filepath );
 		$bytes      = strlen( $content );
 		$updated_at = filemtime( $filepath );
 
-		return new AgentMemoryReadResult(
+		return new WP_Agent_Memory_Read_Result(
 			true,
 			$content,
 			sha1( $content ),
@@ -87,29 +87,29 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	 *
 	 * `$if_match` is intentionally ignored — see class docblock.
 	 */
-	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
+	public function write( WP_Agent_Memory_Scope $scope, string $content, ?string $if_match = null, ?WP_Agent_Memory_Metadata $metadata = null ): WP_Agent_Memory_Write_Result {
 		$filepath = $this->resolve_filepath( $scope );
 		$dir      = dirname( $filepath );
 
 		if ( ! $this->directory_manager->ensure_directory_exists( $dir ) ) {
-			return AgentMemoryWriteResult::failure( 'io' );
+			return WP_Agent_Memory_Write_Result::failure( 'io' );
 		}
 
 		$fs = FilesystemHelper::get();
 		if ( ! $fs ) {
-			return AgentMemoryWriteResult::failure( 'io' );
+			return WP_Agent_Memory_Write_Result::failure( 'io' );
 		}
 
 		$ok = $fs->put_contents( $filepath, $content, FS_CHMOD_FILE );
 
 		if ( false === $ok ) {
-			return AgentMemoryWriteResult::failure( 'io' );
+			return WP_Agent_Memory_Write_Result::failure( 'io' );
 		}
 
 		FilesystemHelper::make_group_writable( $filepath );
 
 		$bytes = strlen( $content );
-		return AgentMemoryWriteResult::ok(
+		return WP_Agent_Memory_Write_Result::ok(
 			sha1( $content ),
 			$bytes,
 			null,
@@ -120,34 +120,34 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * @inheritDoc
 	 */
-	public function exists( AgentMemoryScope $scope ): bool {
+	public function exists( WP_Agent_Memory_Scope $scope ): bool {
 		return file_exists( $this->resolve_filepath( $scope ) );
 	}
 
 	/**
 	 * @inheritDoc
 	 */
-	public function delete( AgentMemoryScope $scope ): AgentMemoryWriteResult {
+	public function delete( WP_Agent_Memory_Scope $scope ): WP_Agent_Memory_Write_Result {
 		$filepath = $this->resolve_filepath( $scope );
 
 		if ( ! file_exists( $filepath ) ) {
 			// Idempotent: deleting a missing file is success.
-			return AgentMemoryWriteResult::ok( '', 0 );
+			return WP_Agent_Memory_Write_Result::ok( '', 0 );
 		}
 
 		$deleted = wp_delete_file( $filepath );
 
 		if ( ! $deleted ) {
-			return AgentMemoryWriteResult::failure( 'io' );
+			return WP_Agent_Memory_Write_Result::failure( 'io' );
 		}
 
-		return AgentMemoryWriteResult::ok( '', 0 );
+		return WP_Agent_Memory_Write_Result::ok( '', 0 );
 	}
 
 	/**
 	 * @inheritDoc
 	 */
-	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
+	public function list_layer( WP_Agent_Memory_Scope $scope_query, ?WP_Agent_Memory_Query $query = null ): array {
 		$layer_dir = $this->resolve_layer_directory( $scope_query );
 
 		if ( ! is_dir( $layer_dir ) ) {
@@ -168,7 +168,7 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 			}
 
 			$mtime     = filemtime( $path );
-			$entries[] = new AgentMemoryListEntry(
+			$entries[] = new WP_Agent_Memory_List_Entry(
 				$entry,
 				$scope_query->layer,
 				(int) filesize( $path ),
@@ -188,7 +188,7 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * Returned filenames are relative paths from the layer root,
 	 * including the prefix (e.g. `daily/2026/04/17.md`).
 	 */
-	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
+	public function list_subtree( WP_Agent_Memory_Scope $scope_query, string $prefix, ?WP_Agent_Memory_Query $query = null ): array {
 		$prefix = trim( $prefix, '/' );
 		if ( '' === $prefix ) {
 			return array();
@@ -220,7 +220,7 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 			$relative = ltrim( substr( $path, strlen( $layer_dir ) ), '/' );
 
 			$mtime     = $file_info->getMTime();
-			$entries[] = new AgentMemoryListEntry(
+			$entries[] = new WP_Agent_Memory_List_Entry(
 				$relative,
 				$scope_query->layer,
 				(int) $file_info->getSize(),
@@ -242,7 +242,7 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * @return string[]
 	 */
-	private function unsupported_query_fields( ?AgentMemoryQuery $query ): array {
+	private function unsupported_query_fields( ?WP_Agent_Memory_Query $query ): array {
 		if ( null === $query ) {
 			return array();
 		}
@@ -263,7 +263,7 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * Resolve a scope to its absolute filesystem path, honoring registered
 	 * convention paths (e.g. AGENTS.md at ABSPATH).
 	 */
-	private function resolve_filepath( AgentMemoryScope $scope ): string {
+	private function resolve_filepath( WP_Agent_Memory_Scope $scope ): string {
 		$layer_dir = $this->resolve_layer_directory( $scope );
 
 		// Convention-path files (e.g. AGENTS.md) override the layer directory.
@@ -278,7 +278,7 @@ class DiskAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * Resolve the on-disk directory for a given (layer, user_id, agent_id).
 	 */
-	private function resolve_layer_directory( AgentMemoryScope $scope ): string {
+	private function resolve_layer_directory( WP_Agent_Memory_Scope $scope ): string {
 		switch ( $scope->layer ) {
 			case MemoryFileRegistry::LAYER_SHARED:
 				return $this->directory_manager->get_shared_directory();

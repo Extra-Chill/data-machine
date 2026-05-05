@@ -29,7 +29,7 @@ The Universal Engine consolidates this shared functionality into a centralized l
 │  └──────────────────┘      └──────────────────┘   │
 │                                                      │
 │  ┌──────────────────┐      ┌──────────────────┐   │
-│  │ ToolParameters   │      │ ToolResultFinder │   │
+│  │ WP_Agent_Tool_Parameters   │      │ ToolResultFinder │   │
 │  │ Parameter        │      │ Result search    │   │
 │  │ building         │      │ utility          │   │
 │  └──────────────────┘      └──────────────────┘   │
@@ -67,7 +67,7 @@ The Universal Engine consists of eight core components that provide shared AI in
 - **RequestBuilder** - Centralized AI request construction with directive application
 - **ToolExecutor** - Universal tool discovery, validation, and execution
 - **ToolManager** - Centralized tool management and validation (@since v0.2.1)
-- **ToolParameters** - Standardized parameter building for tool handlers
+- **WP_Agent_Tool_Parameters** - Standardized parameter building for tool handlers
 - **ConversationManager** - Message formatting, validation, and conversation utilities
 - **ToolResultFinder** - Universal tool result search and interpretation
 - **BaseTool** - Unified base class for all AI tools with registration and error handling (@since v0.14.10)

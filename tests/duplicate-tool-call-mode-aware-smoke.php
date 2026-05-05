@@ -15,7 +15,7 @@
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Message;
 use DataMachine\Engine\AI\ConversationManager;
 
 function datamachine_dup_msg_assert( bool $condition, string $message ): void {
@@ -46,7 +46,7 @@ datamachine_dup_msg_assert(
 	'Default arg renders the duplicated tool name into the error.'
 );
 datamachine_dup_msg_assert(
-	AgentMessageEnvelope::TYPE_TOOL_RESULT === $default_envelope['type'],
+	WP_Agent_Message::TYPE_TOOL_RESULT === $default_envelope['type'],
 	'Duplicate-correction message is emitted as a tool_result envelope.'
 );
 datamachine_dup_msg_assert(

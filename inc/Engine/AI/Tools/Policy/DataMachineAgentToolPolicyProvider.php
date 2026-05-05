@@ -14,11 +14,7 @@ use DataMachine\Core\Database\Agents\Agents;
 
 defined( 'ABSPATH' ) || exit;
 
-if ( ! interface_exists( '\WP_Agent_Tool_Access_Policy_Interface' ) ) {
-	require_once dirname( __DIR__, 5 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy-interface.php';
-}
-
-final class DataMachineAgentToolPolicyProvider implements \WP_Agent_Tool_Access_Policy_Interface {
+final class DataMachineAgentToolPolicyProvider implements \WP_Agent_Tool_Access_Policy {
 
 	/**
 	 * Provide persisted Data Machine agent policy to Agents API.

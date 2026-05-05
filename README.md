@@ -256,7 +256,7 @@ Agent memory files (MEMORY.md, SOUL.md, USER.md, NETWORK.md, AGENTS.md, plus any
 add_filter(
     'agents_api_memory_store',
     function ( $store, $scope ) {
-        // Return an AgentMemoryStoreInterface to replace the disk default
+        // Return an WP_Agent_Memory_Store to replace the disk default
         // for this scope, or null to let Data Machine read/write through
         // the filesystem.
         return new My_DB_Agent_Memory_Store();

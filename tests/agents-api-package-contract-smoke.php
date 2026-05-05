@@ -194,7 +194,7 @@ wp_register_agent_package_artifact_type( 'outside/hook', array( 'label' => 'Outs
 agents_api_smoke_assert_equals( 1, count( $GLOBALS['__agents_api_smoke_wrong'] ), 'outside-hook direct artifact type registration is rejected', $failures, $passes );
 
 echo "\n[4] Adopter contracts stay runtime-neutral:\n";
-class Agents_API_Package_Smoke_Adopter implements WP_Agent_Package_Adopter_Interface {
+class Agents_API_Package_Smoke_Adopter implements WP_Agent_Package_Adopter {
 	public function diff( WP_Agent_Package $package ): WP_Agent_Package_Adoption_Diff {
 		return new WP_Agent_Package_Adoption_Diff(
 			'needs-adoption',
@@ -228,7 +228,7 @@ $contract_files = array(
 	'inc/class-wp-agent-package-artifact.php',
 	'inc/class-wp-agent-package-artifact-type.php',
 	'inc/class-wp-agent-package-artifacts-registry.php',
-	'inc/class-wp-agent-package-adopter-interface.php',
+	'inc/class-wp-agent-package-adopter.php',
 	'inc/class-wp-agent-package-adoption-diff.php',
 	'inc/class-wp-agent-package-adoption-result.php',
 	'inc/register-agent-package-artifacts.php',

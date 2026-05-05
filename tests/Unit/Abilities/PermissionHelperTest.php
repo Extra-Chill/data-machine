@@ -197,8 +197,8 @@ class PermissionHelperTest extends WP_UnitTestCase {
 
 		$principal = PermissionHelper::get_execution_principal();
 
-		$this->assertInstanceOf( \AgentsAPI\AI\AgentExecutionPrincipal::class, $principal );
-		$this->assertSame( \AgentsAPI\AI\AgentExecutionPrincipal::AUTH_SOURCE_AGENT_TOKEN, $principal->auth_source );
+		$this->assertInstanceOf( \AgentsAPI\AI\WP_Agent_Execution_Principal::class, $principal );
+		$this->assertSame( \AgentsAPI\AI\WP_Agent_Execution_Principal::AUTH_SOURCE_AGENT_TOKEN, $principal->auth_source );
 		$this->assertTrue( PermissionHelper::can( 'chat' ) );
 		$this->assertFalse( PermissionHelper::can( 'manage_agents' ) );
 	}
@@ -210,8 +210,8 @@ class PermissionHelperTest extends WP_UnitTestCase {
 
 		$principal = PermissionHelper::get_execution_principal();
 
-		$this->assertInstanceOf( \AgentsAPI\AI\AgentExecutionPrincipal::class, $principal );
-		$this->assertSame( \AgentsAPI\AI\AgentExecutionPrincipal::AUTH_SOURCE_USER, $principal->auth_source );
+		$this->assertInstanceOf( \AgentsAPI\AI\WP_Agent_Execution_Principal::class, $principal );
+		$this->assertSame( \AgentsAPI\AI\WP_Agent_Execution_Principal::AUTH_SOURCE_USER, $principal->auth_source );
 		$this->assertNull( $principal->token_id );
 		$this->assertTrue( PermissionHelper::can( 'manage_agents' ) );
 	}

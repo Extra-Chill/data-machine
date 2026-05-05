@@ -13,7 +13,7 @@ The repository covers two responsibility groups:
 
 - **Flow file primitives** — `DirectoryManager`, `FileStorage`, `FileRetrieval`, `FileCleanup`, `RemoteFileDownloader`, `FilesystemHelper`
 - **Validation primitives** — `ImageValidator`, `MediaValidator`, `VideoValidator`, `VideoMetadata`
-- **Agent memory primitives** — `AgentMemory`, `AgentMemoryStoreInterface`, `AgentMemoryStoreFactory`, `DiskAgentMemoryStore`, `AgentMemoryScope`, `AgentMemoryReadResult`, `AgentMemoryWriteResult`, `AgentMemoryListEntry`, `DailyMemory`, `DailyMemoryStorage`
+- **Agent memory primitives** — `AgentMemory`, `WP_Agent_Memory_Store`, `AgentMemoryStoreFactory`, `DiskAgentMemoryStore`, `WP_Agent_Memory_Scope`, `WP_Agent_Memory_Read_Result`, `WP_Agent_Memory_Write_Result`, `WP_Agent_Memory_List_Entry`, `DailyMemory`, `DailyMemoryStorage`
 
 ## Components
 

@@ -34,7 +34,7 @@ require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
-use AgentsAPI\Core\Database\Chat\ConversationTranscriptLockInterface;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Lock;
 use DataMachine\Tests\Unit\Core\Database\Chat\InMemoryConversationStore;
 
 $failures = array();
@@ -57,7 +57,7 @@ $store = new InMemoryConversationStore();
 $store->set_clock( 1000 );
 $session_id = $store->create_session( 1, 0, array(), 'chat' );
 
-$assert_equals( true, $store instanceof ConversationTranscriptLockInterface, 'Data Machine aggregate store implements Agents API lock contract' );
+$assert_equals( true, $store instanceof WP_Agent_Conversation_Lock, 'Data Machine aggregate store implements Agents API lock contract' );
 
 echo "\n[1] Acquire then release succeeds:\n";
 $token = $store->acquire_session_lock( $session_id, 30 );

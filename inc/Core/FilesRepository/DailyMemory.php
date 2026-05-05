@@ -10,7 +10,7 @@
  * It is NOT logs (operational telemetry). It persists agent knowledge and
  * is never auto-cleared.
  *
- * Persistence is delegated to the {@see AgentMemoryStoreInterface}
+ * Persistence is delegated to the {@see WP_Agent_Memory_Store}
  * registered for the agent layer (resolved through the
  * `agents_api_memory_store` filter). Daily files are addressed as
  * relative paths within the agent layer (`daily/YYYY/MM/DD.md`), so a

@@ -11,7 +11,7 @@ Data Machine uses an engine data filter architecture that provides clean data se
 1. **Engine Data Propagation** - Fetch handlers store engine data via centralized filters; engine bundles the data into the payload passed to every step and tool
 2. **Clean Data Separation** - AI receives clean data packets without URLs; handlers receive engine parameters via the payload-supplied engine data
 3. **Unified Interface** - All steps, handlers, and tools use consistent parameter formats with required `job_id` for engine data access
-4. **Tool-Based Parameter Building** - ToolParameters class (Universal Engine) provides standardized parameter construction
+4. **Tool-Based Parameter Building** - WP_Agent_Tool_Parameters class (Universal Engine) provides standardized parameter construction
 5. **Required Job ID** - All tools must include `job_id` parameter to enable engine data access and workflow continuity
 
 ## Core Payload Structure
@@ -117,12 +117,12 @@ class MyFetchHandler {
 ```
 
 ### Publish Handlers (Tool-Based)
-Use `ToolParameters::buildForHandlerTool()` for parameter building with engine data access:
+Use `WP_Agent_Tool_Parameters::buildForHandlerTool()` for parameter building with engine data access:
 
 ```php
 class MyPublishHandler {
     public function handle_tool_call(array $parameters, array $tool_def = []): array {
-        // Parameters built by ToolParameters::buildParameters()
+        // Parameters built by WP_Agent_Tool_Parameters::buildParameters()
         // Already contain: content, title, job_id, flow_step_id, handler_config
         // Engine data accessed via filter for handler tools
 
@@ -165,7 +165,7 @@ class MyUpdateHandler {
 
 ## AI Tool Parameter Building
 
-### ToolParameters Class (Universal Engine)
+### WP_Agent_Tool_Parameters Class (Universal Engine)
 **File**: `/inc/Engine/AI/Tools/ToolParameters.php`
 **Since**: 0.2.0
 
@@ -175,7 +175,7 @@ Centralized parameter building for AI tool execution:
 use DataMachine\Engine\AI\Tools\ToolParameters;
 
 // Unified parameter building for all tool types
-$parameters = ToolParameters::buildParameters(
+$parameters = WP_Agent_Tool_Parameters::buildParameters(
     $ai_tool_parameters,     // Parameters from AI tool call
     $payload,                // Step payload (job_id, flow_step_id, data, flow_step_config, engine_data)
     $tool_definition         // Tool definition array

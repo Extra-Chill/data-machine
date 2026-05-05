@@ -9,7 +9,7 @@
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Message;
 use DataMachine\Engine\AI\Actions\PendingActionHelper;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 
@@ -94,8 +94,8 @@ $result = PendingActionHelper::stage(
 	)
 );
 
-datamachine_pending_action_helper_assert( AgentMessageEnvelope::SCHEMA === $result['schema'], 'Result uses the Agents API envelope schema.' );
-datamachine_pending_action_helper_assert( AgentMessageEnvelope::TYPE_APPROVAL_REQUIRED === $result['type'], 'Result is an approval_required envelope.' );
+datamachine_pending_action_helper_assert( WP_Agent_Message::SCHEMA === $result['schema'], 'Result uses the Agents API envelope schema.' );
+datamachine_pending_action_helper_assert( WP_Agent_Message::TYPE_APPROVAL_REQUIRED === $result['type'], 'Result is an approval_required envelope.' );
 datamachine_pending_action_helper_assert( 'tool' === $result['role'], 'Approval-required envelope uses the tool role.' );
 
 datamachine_pending_action_helper_assert( true === $result['staged'], 'Legacy top-level staged flag is preserved.' );
@@ -128,8 +128,8 @@ datamachine_pending_action_helper_assert( is_array( $stored ), 'Pending action i
 datamachine_pending_action_helper_assert( 'wiki_upsert' === $stored['kind'], 'Stored Data Machine resolver kind is unchanged.' );
 datamachine_pending_action_helper_assert( array( 'title' => 'Demo', 'content' => 'Updated content.' ) === $stored['apply_input'], 'Stored apply input is unchanged.' );
 
-$normalized = AgentMessageEnvelope::normalize( $result );
-datamachine_pending_action_helper_assert( AgentMessageEnvelope::TYPE_APPROVAL_REQUIRED === $normalized['type'], 'Result normalizes as an approval_required envelope.' );
+$normalized = WP_Agent_Message::normalize( $result );
+datamachine_pending_action_helper_assert( WP_Agent_Message::TYPE_APPROVAL_REQUIRED === $normalized['type'], 'Result normalizes as an approval_required envelope.' );
 datamachine_pending_action_helper_assert( $result['payload'] === $normalized['payload'], 'Envelope payload survives normalization.' );
 
 echo "PendingActionHelper approval envelope smoke passed.\n";

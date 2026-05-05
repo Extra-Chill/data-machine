@@ -37,8 +37,8 @@ use DataMachine\Core\Database\Chat\ConversationRetentionInterface;
 use DataMachine\Core\Database\Chat\ConversationSessionIndexInterface;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
-use AgentsAPI\Core\Database\Chat\ConversationTranscriptLockInterface;
-use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Lock;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store;
 use DataMachine\Tests\Unit\Core\Database\Chat\InMemoryConversationStore;
 
 $failures    = array();
@@ -52,8 +52,8 @@ $assert_true = static function ( bool $condition, string $label ) use ( &$failur
 };
 
 $narrow_contracts = array(
-	ConversationTranscriptStoreInterface::class,
-	ConversationTranscriptLockInterface::class,
+	WP_Agent_Conversation_Store::class,
+	WP_Agent_Conversation_Lock::class,
 	ConversationSessionIndexInterface::class,
 	ConversationReadStateInterface::class,
 	ConversationRetentionInterface::class,
@@ -65,8 +65,8 @@ foreach ( $narrow_contracts as $contract ) {
 	$assert_true( $aggregate->implementsInterface( $contract ), "aggregate composes {$contract}" );
 }
 
-$transcript_ref = new ReflectionClass( ConversationTranscriptStoreInterface::class );
-$lock_ref       = new ReflectionClass( ConversationTranscriptLockInterface::class );
+$transcript_ref = new ReflectionClass( WP_Agent_Conversation_Store::class );
+$lock_ref       = new ReflectionClass( WP_Agent_Conversation_Lock::class );
 $assert_true( ! $transcript_ref->implementsInterface( ConversationSessionIndexInterface::class ), 'transcript contract does not include session index surface' );
 $assert_true( ! $transcript_ref->implementsInterface( ConversationReadStateInterface::class ), 'transcript contract does not include read-state surface' );
 $assert_true( ! $transcript_ref->implementsInterface( ConversationRetentionInterface::class ), 'transcript contract does not include retention surface' );
@@ -116,7 +116,7 @@ $factory_get = new ReflectionMethod( ConversationStoreFactory::class, 'get' );
 $assert_true( ConversationStoreInterface::class === (string) $factory_get->getReturnType(), 'factory still returns the aggregate contract' );
 
 $factory_transcript_get = new ReflectionMethod( ConversationStoreFactory::class, 'get_transcript_store' );
-$assert_true( ConversationTranscriptStoreInterface::class === (string) $factory_transcript_get->getReturnType(), 'factory exposes the narrow transcript contract' );
+$assert_true( WP_Agent_Conversation_Store::class === (string) $factory_transcript_get->getReturnType(), 'factory exposes the narrow transcript contract' );
 
 echo "\n";
 if ( empty( $failures ) ) {

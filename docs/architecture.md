@@ -278,7 +278,7 @@ Data Machine v0.2.0 introduced a universal Engine layer (`/inc/Engine/AI/`) that
 
 - **AIConversationLoop**: Multi-turn conversation execution with tool calling, completion detection, and state management
 - **ToolExecutor**: Universal tool discovery, enablement validation, and execution across agent types
-- **ToolParameters**: Centralized parameter building for AI tools with data packet integration
+- **WP_Agent_Tool_Parameters**: Centralized parameter building for AI tools with data packet integration
 - **ConversationManager**: Message formatting and conversation state management
 - **RequestBuilder**: AI request construction with directive application and tool restructuring
 - **ToolResultFinder**: Utility for finding tool execution results in data packets
@@ -453,7 +453,7 @@ Complete extension system for custom handlers and tools:
 - **Universal Engine Architecture**: Shared AI infrastructure via `/inc/Engine/AI/` components:
   - AIConversationLoop for multi-turn conversation execution with automatic tool calling
   - ToolExecutor for universal tool discovery and execution
-  - ToolParameters for centralized parameter building (`buildParameters()` for standard tools, `buildForHandlerTool()` for handler tools with engine data)
+  - WP_Agent_Tool_Parameters for centralized parameter building (`buildParameters()` for standard tools, `buildForHandlerTool()` for handler tools with engine data)
   - ConversationManager for message formatting and conversation utilities
   - RequestBuilder for centralized AI request construction with directive application
   - ToolResultFinder for universal tool result search in data packets

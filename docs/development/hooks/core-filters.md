@@ -1225,7 +1225,7 @@ add_filter('datamachine_directives', function($directives) {
 
 Data Machine's Universal Engine provides shared AI infrastructure serving both Pipeline and Chat agents. See `/docs/core-system/universal-engine.md` for complete architecture documentation.
 
-### ToolParameters (`/inc/Engine/AI/Tools/ToolParameters.php`)
+### WP_Agent_Tool_Parameters (`/inc/Engine/AI/Tools/ToolParameters.php`)
 
 **Purpose**: Centralized parameter building for all AI tools with unified flat structure.
 
@@ -1234,7 +1234,7 @@ Data Machine's Universal Engine provides shared AI infrastructure serving both P
 #### `buildParameters()`
 
 ```php
-\DataMachine\Engine\AI\ToolParameters::buildParameters(array $data, ?string $job_id, ?string $flow_step_id): array
+\DataMachine\Engine\AI\WP_Agent_Tool_Parameters::buildParameters(array $data, ?string $job_id, ?string $flow_step_id): array
 ```
 
 Builds flat parameter structure for standard AI tools with content extraction and job context.
@@ -1253,7 +1253,7 @@ Builds flat parameter structure for standard AI tools with content extraction an
 #### `buildForHandlerTool()`
 
 ```php
-\DataMachine\Engine\AI\ToolParameters::buildForHandlerTool(array $data, array $tool_def, ?string $job_id, ?string $flow_step_id): array
+\DataMachine\Engine\AI\WP_Agent_Tool_Parameters::buildForHandlerTool(array $data, array $tool_def, ?string $job_id, ?string $flow_step_id): array
 ```
 
 Builds parameters for handler-specific tools with engine data merging (source_url, image_url).
@@ -1459,7 +1459,7 @@ arrays are projection shapes at provider boundaries, not the store contract.
 - `list_sessions_for_day` — day-scoped summary rows for the Daily Memory Task
 - `get_storage_metrics` — row count + on-disk size for the `wp datamachine retention status` CLI; return `null` to opt out
 
-### AgentMemoryStoreInterface (`/agents-api/inc/Core/FilesRepository/AgentMemoryStoreInterface.php`)
+### WP_Agent_Memory_Store (`/agents-api/inc/Core/FilesRepository/WP_Agent_Memory_Store.php`)
 
 **Purpose**: Single seam between agent memory operations and the underlying
 persistence backend. The contract is generic agent-memory persistence: it does
@@ -1474,12 +1474,12 @@ seam was introduced.
 ```php
 apply_filters(
     'agents_api_memory_store',
-    null,                       // Return AgentMemoryStoreInterface to short-circuit
-    AgentMemoryScope $scope     // Identifies (layer, user_id, agent_id, filename)
+    null,                       // Return WP_Agent_Memory_Store to short-circuit
+    WP_Agent_Memory_Scope $scope     // Identifies (layer, user_id, agent_id, filename)
 );
 ```
 
-Return an `AgentMemoryStoreInterface`
+Return an `WP_Agent_Memory_Store`
 implementation to replace the disk default for this scope. Return `null` (the
 default) to let Data Machine read and write through the filesystem.
 
@@ -1495,7 +1495,7 @@ ships a DB-backed implementation and registers it conditionally:
 
 ```php
 add_filter( 'agents_api_memory_store', function ( $store, $scope ) {
-    if ( $store instanceof AgentMemoryStoreInterface ) {
+    if ( $store instanceof WP_Agent_Memory_Store ) {
         return $store;  // someone else already swapped
     }
     if ( filesystem_is_writable_here() ) {
@@ -1507,13 +1507,13 @@ add_filter( 'agents_api_memory_store', function ( $store, $scope ) {
 
 **Contract**:
 
-- `read( $scope )` → `AgentMemoryReadResult { exists, content, hash, bytes, updated_at }`
-- `write( $scope, $content, $if_match = null )` → `AgentMemoryWriteResult`
+- `read( $scope )` → `WP_Agent_Memory_Read_Result { exists, content, hash, bytes, updated_at }`
+- `write( $scope, $content, $if_match = null )` → `WP_Agent_Memory_Write_Result`
   (implementations supporting concurrency MUST honor `$if_match` and return
   `error = 'conflict'` on hash mismatch)
 - `exists( $scope )` → `bool`
-- `delete( $scope )` → `AgentMemoryWriteResult` (idempotent)
-- `list_layer( $scope_query )` → `AgentMemoryListEntry[]` (enumerates one layer)
+- `delete( $scope )` → `WP_Agent_Memory_Write_Result` (idempotent)
+- `list_layer( $scope_query )` → `WP_Agent_Memory_List_Entry[]` (enumerates one layer)
 
 Section parsing, scaffolding, editability gating, ability permissions,
 prompt-injection policy, and registry-driven convention-path semantics stay in
@@ -1525,8 +1525,8 @@ underneath.
 `AgentMemory` is the only class in core that talks to `AgentMemoryStoreFactory`. It exposes:
 
 - Section-level ops: `get_section()`, `set_section()`, `append_to_section()`, `get_sections()`, `search()`
-- Whole-file ops: `read()` (returns `AgentMemoryReadResult`), `get_all()`, `replace_all()`, `exists()`, `delete()`
-- Static layer enumerator: `AgentMemory::list_layer( $layer, $user_id, $agent_id )` → `AgentMemoryListEntry[]`
+- Whole-file ops: `read()` (returns `WP_Agent_Memory_Read_Result`), `get_all()`, `replace_all()`, `exists()`, `delete()`
+- Static layer enumerator: `AgentMemory::list_layer( $layer, $user_id, $agent_id )` → `WP_Agent_Memory_List_Entry[]`
 
 Higher-level consumers all go through this facade rather than instantiating store types directly:
 

@@ -6,7 +6,7 @@ Refs: [standalone extraction umbrella](https://github.com/Extra-Chill/data-machi
 
 This plan turned the bounded in-repo `agents-api/` module into the first reviewable standalone-plugin extraction step. The standalone repository now provides the public WordPress-shaped surface and dependency direction before behavior-heavy runtime services move.
 
-Status update for [#1596](https://github.com/Extra-Chill/data-machine/issues/1596): Data Machine consumes `extra-chill/agents-api` as a Composer/plugin dependency and no longer carries an authoritative in-repo copy of the module.
+Status update for [#1596](https://github.com/Extra-Chill/data-machine/issues/1596): Data Machine consumes `automattic/agents-api` as a Composer/plugin dependency and no longer carries an authoritative in-repo copy of the module.
 
 ## Goal
 
@@ -35,23 +35,23 @@ agents-api/
     class-wp-agent-package-artifacts-registry.php
     class-wp-agent-package-adoption-diff.php
     class-wp-agent-package-adoption-result.php
-    class-wp-agent-package-adopter-interface.php
+    class-wp-agent-package-adopter.php
     register-agent-package-artifacts.php
     AI/
-      AgentMessageEnvelope.php
-      AgentConversationResult.php
+      WP_Agent_Message.php
+      WP_Agent_Conversation_Result.php
       Tools/
-        RuntimeToolDeclaration.php
+        WP_Agent_Tool_Declaration.php
     Core/
       Database/
         Chat/
-          ConversationTranscriptStoreInterface.php
+          WP_Agent_Conversation_Store.php
       FilesRepository/
-        AgentMemoryScope.php
-        AgentMemoryListEntry.php
-        AgentMemoryReadResult.php
-        AgentMemoryWriteResult.php
-        AgentMemoryStoreInterface.php
+        WP_Agent_Memory_Scope.php
+        WP_Agent_Memory_List_Entry.php
+        WP_Agent_Memory_Read_Result.php
+        WP_Agent_Memory_Write_Result.php
+        WP_Agent_Memory_Store.php
   tests/
     bootstrap-smoke.php
     no-product-imports-smoke.php
@@ -86,10 +86,10 @@ The first skeleton freezes only the names already used by the in-repo module:
 | Agent value object | `WP_Agent` |
 | Agent registry | `WP_Agents_Registry` |
 | Package artifacts | `WP_Agent_Package*` classes and `wp_register_agent_package_artifact_type()` helpers |
-| Message/result contracts | `AgentsAPI\AI\AgentMessageEnvelope`, `AgentsAPI\AI\AgentConversationResult` |
-| Tool declaration | `AgentsAPI\AI\Tools\RuntimeToolDeclaration` |
-| Transcript contract | `AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface` |
-| Memory contracts | `AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface`, `AgentMemoryScope`, `AgentMemoryListEntry`, `AgentMemoryReadResult`, and `AgentMemoryWriteResult` |
+| Message/result contracts | `AgentsAPI\AI\WP_Agent_Message`, `AgentsAPI\AI\WP_Agent_Conversation_Result` |
+| Tool declaration | `AgentsAPI\AI\Tools\WP_Agent_Tool_Declaration` |
+| Transcript contract | `AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store` |
+| Memory contracts | `AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store`, `WP_Agent_Memory_Scope`, `WP_Agent_Memory_List_Entry`, `WP_Agent_Memory_Read_Result`, and `WP_Agent_Memory_Write_Result` |
 
 Do not add aliases back to old `DataMachine\...` class names. Data Machine is pre-1.0 and should hard-cut to the standalone package when the extraction PR lands.
 
@@ -124,9 +124,9 @@ Move contracts/value objects before services. The first extraction PR should be 
 |---|---|---|
 | `WP_Agent`, `WP_Agents_Registry`, and registration helpers | `agents-api/inc/class-wp-agent.php`, `class-wp-agents-registry.php`, `register-agents.php` | Public registration facade; no Data Machine product import. |
 | Agent package artifact contracts/helpers | `agents-api/inc/class-wp-agent-package*.php`, `register-agent-package-artifacts.php` | Bundle/package contract is already backend-only. |
-| `AgentMessageEnvelope` and `AgentConversationResult` | `agents-api/inc/AI/` | Generic run/message value contracts. |
-| `RuntimeToolDeclaration` | `agents-api/inc/AI/Tools/` | Generic run-scoped tool declaration validation. |
-| `ConversationTranscriptStoreInterface` | `agents-api/inc/Core/Database/Chat/` | Narrow transcript CRUD contract; does not require Data Machine chat UI. |
+| `WP_Agent_Message` and `WP_Agent_Conversation_Result` | `agents-api/inc/AI/` | Generic run/message value contracts. |
+| `WP_Agent_Tool_Declaration` | `agents-api/inc/AI/Tools/` | Generic run-scoped tool declaration validation. |
+| `WP_Agent_Conversation_Store` | `agents-api/inc/Core/Database/Chat/` | Narrow transcript CRUD contract; does not require Data Machine chat UI. |
 | Memory store value objects/interfaces | `agents-api/inc/Core/FilesRepository/` | Generic memory seam; Data Machine default store remains an adapter. |
 
 Current in-repo source checklist for the first move:
@@ -141,17 +141,17 @@ Current in-repo source checklist for the first move:
 - `inc/class-wp-agent-package-artifacts-registry.php`
 - `inc/class-wp-agent-package-adoption-diff.php`
 - `inc/class-wp-agent-package-adoption-result.php`
-- `inc/class-wp-agent-package-adopter-interface.php`
+- `inc/class-wp-agent-package-adopter.php`
 - `inc/register-agent-package-artifacts.php`
-- `inc/AI/AgentMessageEnvelope.php`
-- `inc/AI/AgentConversationResult.php`
-- `inc/AI/Tools/RuntimeToolDeclaration.php`
-- `inc/Core/Database/Chat/ConversationTranscriptStoreInterface.php`
-- `inc/Core/FilesRepository/AgentMemoryScope.php`
-- `inc/Core/FilesRepository/AgentMemoryListEntry.php`
-- `inc/Core/FilesRepository/AgentMemoryReadResult.php`
-- `inc/Core/FilesRepository/AgentMemoryWriteResult.php`
-- `inc/Core/FilesRepository/AgentMemoryStoreInterface.php`
+- `inc/AI/WP_Agent_Message.php`
+- `inc/AI/WP_Agent_Conversation_Result.php`
+- `inc/AI/Tools/WP_Agent_Tool_Declaration.php`
+- `inc/Core/Database/Chat/WP_Agent_Conversation_Store.php`
+- `inc/Core/FilesRepository/WP_Agent_Memory_Scope.php`
+- `inc/Core/FilesRepository/WP_Agent_Memory_List_Entry.php`
+- `inc/Core/FilesRepository/WP_Agent_Memory_Read_Result.php`
+- `inc/Core/FilesRepository/WP_Agent_Memory_Write_Result.php`
+- `inc/Core/FilesRepository/WP_Agent_Memory_Store.php`
 
 ## Keep In Data Machine For Now
 

@@ -7,7 +7,7 @@
 
 namespace DataMachine\Core\Workspace;
 
-use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -22,10 +22,10 @@ class WordPressWorkspaceScope {
 	 * WordPress-specific details such as blog ID and network ID stay in adapter
 	 * metadata; the generic boundary is the Agents API workspace value object.
 	 *
-	 * @return AgentWorkspaceScope
+	 * @return WP_Agent_Workspace_Scope
 	 */
-	public static function current(): AgentWorkspaceScope {
-		return AgentWorkspaceScope::from_parts( 'site', self::current_site_id() );
+	public static function current(): WP_Agent_Workspace_Scope {
+		return WP_Agent_Workspace_Scope::from_parts( 'site', self::current_site_id() );
 	}
 
 	/**

@@ -224,7 +224,7 @@ The Chat endpoint uses the Universal Engine architecture at `/inc/Engine/AI/` fo
 - Tool call/result message generation
 - Duplicate detection logic
 
-**ToolParameters**
+**WP_Agent_Tool_Parameters**
 - Unified parameter building for tools
 - Automatic content/title extraction
 - Session context integration
@@ -290,7 +290,7 @@ $context = [
 Used by:
 - RequestBuilder for directive application
 - ToolExecutor for tool execution
-- ToolParameters for parameter building
+- WP_Agent_Tool_Parameters for parameter building
 
 ### Tool Discovery
 

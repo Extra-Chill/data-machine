@@ -1,6 +1,6 @@
 # Agent Message Envelope
 
-**File**: `/agents-api/inc/AI/AgentMessageEnvelope.php`
+**File**: `/agents-api/inc/AI/WP_Agent_Message.php`
 
 The canonical agent message shape is a JSON-friendly typed envelope. Runtime
 code, chat storage, and transcript storage should store and return envelopes.
@@ -45,13 +45,13 @@ part of the type contract.
 
 ## Compatibility
 
-`AgentMessageEnvelope::normalize()` accepts existing `role/content/metadata` rows
+`WP_Agent_Message::normalize()` accepts existing `role/content/metadata` rows
 and versioned envelopes. It also accepts the short-lived `data` envelope key from
 the initial envelope draft as a read-time compatibility input and rewrites it to
 `payload`.
 
 New writes should store canonical envelopes. Current provider requests use
-`AgentMessageEnvelope::to_provider_message()` / `to_provider_messages()` to
+`WP_Agent_Message::to_provider_message()` / `to_provider_messages()` to
 project envelopes into Data Machine's `role/content/metadata` provider-message
 shape. That projection folds the envelope `type` and `payload` into provider
 metadata.
@@ -104,7 +104,7 @@ shape.
 ## Adapter Guidance
 
 Runtime adapters using `agents_api_conversation_runner` may return messages in
-either legacy or envelope shape. `AgentConversationResult::normalize()` normalizes
+either legacy or envelope shape. `WP_Agent_Conversation_Result::normalize()` normalizes
 every returned message to the canonical envelope before callers store or render
 the result.
 

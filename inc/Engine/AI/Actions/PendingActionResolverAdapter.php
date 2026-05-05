@@ -7,8 +7,8 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
-use AgentsAPI\AI\Approvals\ApprovalDecision;
-use AgentsAPI\AI\Approvals\PendingActionResolverInterface;
+use AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Resolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -16,19 +16,19 @@ defined( 'ABSPATH' ) || exit;
  * Implements the generic Agents API resolver contract while preserving
  * `datamachine/resolve-pending-action` as the single Data Machine resolver.
  */
-final class PendingActionResolverAdapter implements PendingActionResolverInterface {
+final class PendingActionResolverAdapter implements WP_Agent_Pending_Action_Resolver {
 
 	/**
 	 * Resolve a pending action by identifier.
 	 *
 	 * @param string           $pending_action_id Stable pending-action identifier.
-	 * @param ApprovalDecision $decision          Accepted/rejected decision.
+	 * @param WP_Agent_Approval_Decision $decision          Accepted/rejected decision.
 	 * @param string           $resolver          Resolver audit identifier.
 	 * @param array            $payload           Fresh resolver payload.
 	 * @param array            $context           Optional caller context.
 	 * @return mixed
 	 */
-	public function resolve_pending_action( string $pending_action_id, ApprovalDecision $decision, string $resolver, array $payload = array(), array $context = array() ): mixed {
+	public function resolve_pending_action( string $pending_action_id, WP_Agent_Approval_Decision $decision, string $resolver, array $payload = array(), array $context = array() ): mixed {
 		return ResolvePendingActionAbility::execute(
 			array(
 				'action_id' => $pending_action_id,

@@ -78,7 +78,7 @@ add_action( 'plugins_loaded', array( WpAiClientCache::class, 'install' ), 20 );
 |--------------------------------------------------------------------------
 | Named bounded-iteration budgets shared across the engine. Each budget
 | declares its ceiling-resolution rules (default, site-setting key,
-| clamp bounds). Consumers instantiate a fresh IterationBudget per run
+| clamp bounds). Consumers instantiate a fresh WP_Agent_Iteration_Budget per run
 | via IterationBudgetRegistry::create().
 |
 | Registration is side-effect free (static map mutation) and safe to

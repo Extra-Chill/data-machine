@@ -34,10 +34,10 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
-use AgentsAPI\AI\Approvals\ApprovalDecision;
-use AgentsAPI\AI\Approvals\PendingAction;
-use AgentsAPI\AI\Approvals\PendingActionStatus;
-use AgentsAPI\AI\Approvals\PendingActionStoreInterface;
+use AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Status;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Store;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 
 defined( 'ABSPATH' ) || exit;
@@ -67,9 +67,9 @@ class PendingActionStore {
 	/**
 	 * Agents API store contract singleton.
 	 *
-	 * @var PendingActionStoreInterface|null
+	 * @var WP_Agent_Pending_Action_Store|null
 	 */
-	private static ?PendingActionStoreInterface $adapter = null;
+	private static ?WP_Agent_Pending_Action_Store $adapter = null;
 
 	/**
 	 * Create or update the durable pending-actions table.
@@ -171,7 +171,7 @@ class PendingActionStore {
 	/**
 	 * Return the Agents API store adapter when the contract is available.
 	 */
-	public static function adapter(): PendingActionStoreInterface {
+	public static function adapter(): WP_Agent_Pending_Action_Store {
 		if ( null === self::$adapter ) {
 			self::$adapter = new PendingActionStoreAdapter();
 		}
@@ -193,7 +193,7 @@ class PendingActionStore {
 		global $wpdb;
 
 		$workspace            = isset( $payload['workspace'] ) && is_array( $payload['workspace'] )
-			? \AgentsAPI\Core\Workspace\AgentWorkspaceScope::from_array( $payload['workspace'] )
+			? \AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope::from_array( $payload['workspace'] )
 			: WordPressWorkspaceScope::current();
 		$payload['workspace'] = $workspace->to_array();
 		$context              = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
@@ -204,7 +204,7 @@ class PendingActionStore {
 			$payload['created_at'] = time();
 			$payload['expires_at'] = time() + self::resolve_ttl( $payload );
 			$payload['action_id']  = $action_id;
-			$payload['status']     = PendingActionStatus::PENDING;
+			$payload['status']     = WP_Agent_Pending_Action_Status::PENDING;
 
 			return set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) );
 		}
@@ -217,7 +217,7 @@ class PendingActionStore {
 		$payload['created_at'] = $created_at;
 		$payload['expires_at'] = $expires_at;
 		$payload['action_id']  = $action_id;
-		$payload['status']     = PendingActionStatus::PENDING;
+		$payload['status']     = WP_Agent_Pending_Action_Status::PENDING;
 
 		$row = array(
 			'action_id'           => $action_id,
@@ -233,7 +233,7 @@ class PendingActionStore {
 			'creator'             => self::nullable_string( $payload['creator'] ?? ( isset( $payload['created_by'] ) && (int) $payload['created_by'] > 0 ? 'user:' . (int) $payload['created_by'] : null ) ),
 			'context'             => self::encode_json( $payload['context'] ?? array() ),
 			'metadata'            => self::encode_json( $payload['metadata'] ?? array() ),
-			'status'              => PendingActionStatus::PENDING,
+			'status'              => WP_Agent_Pending_Action_Status::PENDING,
 			'created_at'          => gmdate( 'Y-m-d H:i:s', $created_at ),
 			'expires_at'          => $expires_at > 0 ? gmdate( 'Y-m-d H:i:s', $expires_at ) : null,
 			'resolved_at'         => null,
@@ -270,12 +270,12 @@ class PendingActionStore {
 			return null;
 		}
 
-		if ( ! $include_resolved && PendingActionStatus::PENDING !== $row['status'] ) {
+		if ( ! $include_resolved && WP_Agent_Pending_Action_Status::PENDING !== $row['status'] ) {
 			return null;
 		}
 
-		if ( PendingActionStatus::PENDING === $row['status'] && self::is_expired_row( $row ) ) {
-			self::record_resolution( $action_id, PendingActionStatus::EXPIRED, null, 'Pending action expired.', 'system:expiration' );
+		if ( WP_Agent_Pending_Action_Status::PENDING === $row['status'] && self::is_expired_row( $row ) ) {
+			self::record_resolution( $action_id, WP_Agent_Pending_Action_Status::EXPIRED, null, 'Pending action expired.', 'system:expiration' );
 			if ( ! $include_resolved ) {
 				return null;
 			}
@@ -305,7 +305,7 @@ class PendingActionStore {
 			return delete_transient( self::TRANSIENT_PREFIX . $action_id );
 		}
 
-		return self::record_resolution( $action_id, PendingActionStatus::DELETED, null, 'Pending action deleted.', self::current_resolver() );
+		return self::record_resolution( $action_id, WP_Agent_Pending_Action_Status::DELETED, null, 'Pending action deleted.', self::current_resolver() );
 	}
 
 	/**
@@ -469,10 +469,10 @@ class PendingActionStore {
 			$wpdb->prepare(
 				'UPDATE %i SET status = %s, resolved_at = %s, resolution_error = %s WHERE status = %s AND expires_at IS NOT NULL AND expires_at <= %s',
 				self::get_table_name(),
-				PendingActionStatus::EXPIRED,
+				WP_Agent_Pending_Action_Status::EXPIRED,
 				$boundary,
 				'Pending action expired.',
-				PendingActionStatus::PENDING,
+				WP_Agent_Pending_Action_Status::PENDING,
 				$boundary
 			)
 		);
@@ -492,21 +492,21 @@ class PendingActionStore {
 	/**
 	 * Store an Agents API pending-action value object.
 	 */
-	public static function store_action( PendingAction $action ): bool {
+	public static function store_action( WP_Agent_Pending_Action $action ): bool {
 		return self::store( $action->get_action_id(), self::action_to_payload( $action ) );
 	}
 
 	/**
 	 * Fetch a pending action as an Agents API value object.
 	 */
-	public static function get_action( string $action_id, bool $include_resolved = false ): ?PendingAction {
+	public static function get_action( string $action_id, bool $include_resolved = false ): ?WP_Agent_Pending_Action {
 		$payload = self::get( $action_id, $include_resolved );
 		if ( null === $payload ) {
 			return null;
 		}
 
 		try {
-			return PendingAction::from_array( self::payload_to_action_array( $payload ) );
+			return WP_Agent_Pending_Action::from_array( self::payload_to_action_array( $payload ) );
 		} catch ( \InvalidArgumentException $error ) {
 			return null;
 		}
@@ -515,13 +515,13 @@ class PendingActionStore {
 	/**
 	 * List pending actions as Agents API value objects.
 	 *
-	 * @return array<int,PendingAction>
+	 * @return array<int,WP_Agent_Pending_Action>
 	 */
 	public static function list_actions( array $filters = array() ): array {
 		$actions = array();
 		foreach ( self::list( $filters ) as $payload ) {
 			try {
-				$actions[] = PendingAction::from_array( self::payload_to_action_array( $payload ) );
+				$actions[] = WP_Agent_Pending_Action::from_array( self::payload_to_action_array( $payload ) );
 			} catch ( \InvalidArgumentException $error ) {
 				continue;
 			}
@@ -533,7 +533,7 @@ class PendingActionStore {
 	/**
 	 * Record a resolution from the Agents API store contract.
 	 */
-	public static function record_action_resolution( string $action_id, ApprovalDecision $decision, string $resolver, $result = null, ?string $error = null, array $metadata = array() ): bool {
+	public static function record_action_resolution( string $action_id, WP_Agent_Approval_Decision $decision, string $resolver, $result = null, ?string $error = null, array $metadata = array() ): bool {
 		return self::record_resolution( $action_id, $decision->value(), $result, $error, $resolver, $metadata );
 	}
 
@@ -577,7 +577,7 @@ class PendingActionStore {
 			'creator'             => isset( $row['creator'] ) ? (string) $row['creator'] : null,
 			'context'             => self::decode_json( $row['context'] ?? null ),
 			'metadata'            => self::decode_json( $row['metadata'] ?? null ),
-			'status'              => (string) ( $row['status'] ?? PendingActionStatus::PENDING ),
+			'status'              => (string) ( $row['status'] ?? WP_Agent_Pending_Action_Status::PENDING ),
 			'created_at'          => $created_at,
 			'created_at_iso'      => $created_at > 0 ? gmdate( 'c', $created_at ) : null,
 			'expires_at'          => $expires_at,
@@ -595,7 +595,7 @@ class PendingActionStore {
 	/**
 	 * Convert an Agents API pending action to Data Machine's persisted payload.
 	 */
-	private static function action_to_payload( PendingAction $action ): array {
+	private static function action_to_payload( WP_Agent_Pending_Action $action ): array {
 		$data     = $action->to_array();
 		$metadata = isset( $data['metadata'] ) && is_array( $data['metadata'] ) ? $data['metadata'] : array();
 
@@ -649,7 +649,7 @@ class PendingActionStore {
 			'workspace'           => $payload['workspace'] ?? null,
 			'agent'               => $payload['agent'] ?? ( ! empty( $payload['agent_id'] ) ? 'agent:' . (int) $payload['agent_id'] : null ),
 			'creator'             => $payload['creator'] ?? ( ! empty( $payload['created_by'] ) ? 'user:' . (int) $payload['created_by'] : null ),
-			'status'              => (string) ( $payload['status'] ?? PendingActionStatus::PENDING ),
+			'status'              => (string) ( $payload['status'] ?? WP_Agent_Pending_Action_Status::PENDING ),
 			'created_at'          => $created_at,
 			'expires_at'          => $expires_at,
 			'resolved_at'         => $resolved_at,
@@ -775,7 +775,7 @@ class PendingActionStore {
 	 */
 	private static function normalize_status( string $status ): string {
 		try {
-			return PendingActionStatus::normalize( $status );
+			return WP_Agent_Pending_Action_Status::normalize( $status );
 		} catch ( \InvalidArgumentException $error ) {
 			return '';
 		}

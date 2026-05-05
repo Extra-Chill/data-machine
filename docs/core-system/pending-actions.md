@@ -12,14 +12,14 @@ Data Machine implements the Agents API pending-action approval storage contract 
 
 Data Machine directly adapts to these merged contracts from `automattic/agents-api`:
 
-- `AgentsAPI\AI\Approvals\PendingActionStoreInterface`
-- `AgentsAPI\AI\Approvals\PendingActionResolverInterface`
-- `AgentsAPI\AI\Approvals\PendingActionHandlerInterface`
-- `AgentsAPI\AI\Approvals\ApprovalDecision`
+- `AgentsAPI\AI\Approvals\PendingAction_Store`
+- `AgentsAPI\AI\Approvals\PendingAction_Resolver`
+- `AgentsAPI\AI\Approvals\PendingAction_Handler`
+- `AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision`
 - `AgentsAPI\AI\Approvals\PendingAction`
 - `AgentsAPI\AI\Tools\ActionPolicy`
 
-The compatibility seam remains the existing `datamachine_pending_action_handlers` map. Handler objects that implement `AgentsAPI\AI\Approvals\PendingActionHandlerInterface` can be placed under the same `apply` key and Data Machine will dispatch to the Agents API handler method. Legacy callable handlers continue to receive the stored `apply_input` and full Data Machine payload.
+The compatibility seam remains the existing `datamachine_pending_action_handlers` map. Handler objects that implement `AgentsAPI\AI\Approvals\PendingAction_Handler` can be placed under the same `apply` key and Data Machine will dispatch to the Agents API handler method. Legacy callable handlers continue to receive the stored `apply_input` and full Data Machine payload.
 
 ## Surfaces
 

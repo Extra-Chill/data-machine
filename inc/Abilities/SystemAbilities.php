@@ -14,7 +14,7 @@ namespace DataMachine\Abilities;
 use DataMachine\Abilities\PermissionHelper;
 
 use DataMachine\Engine\AI\RequestBuilder;
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Message;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\Tasks\TaskScheduler;
@@ -547,7 +547,7 @@ class SystemAbilities {
 		$first_assistant_response = null;
 
 		foreach ( $messages as $msg ) {
-			$msg     = AgentMessageEnvelope::normalize( $msg );
+			$msg     = WP_Agent_Message::normalize( $msg );
 			$role    = $msg['role'] ?? '';
 			$content = $msg['content'] ?? '';
 			$content = is_string( $content ) ? $content : wp_json_encode( $content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
