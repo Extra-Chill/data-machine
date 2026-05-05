@@ -565,7 +565,6 @@ class PendingActionStore {
 			'kind'                => (string) ( $row['kind'] ?? '' ),
 			'summary'             => (string) ( $row['summary'] ?? '' ),
 			'preview_data'        => self::decode_json( $row['preview_data'] ?? null ),
-			'preview'             => self::decode_json( $row['preview_data'] ?? null ),
 			'apply_input'         => self::decode_json( $row['apply_input'] ?? null ),
 			'agent_id'            => isset( $row['agent_id'] ) ? (int) $row['agent_id'] : 0,
 			'agent'               => isset( $row['agent'] ) ? (string) $row['agent'] : null,

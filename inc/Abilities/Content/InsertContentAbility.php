@@ -317,6 +317,8 @@ class InsertContentAbility {
 			array(
 				'success'         => true,
 				'is_preview'      => true,
+				'kind'            => 'insert_content',
+				'preview'         => $diff,
 				'post_id'         => $post_id,
 				'position'        => $position,
 				'insertion_point' => $insertion_point,

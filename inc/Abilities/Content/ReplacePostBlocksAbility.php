@@ -340,6 +340,8 @@ class ReplacePostBlocksAbility {
 				array(
 					'success'         => true,
 					'is_preview'      => true,
+					'kind'            => 'replace_post_blocks',
+					'preview'         => $diff,
 					'post_id'         => $post_id,
 					'blocks_replaced' => $clean_changes,
 				)
