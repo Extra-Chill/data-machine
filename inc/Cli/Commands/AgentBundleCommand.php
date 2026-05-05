@@ -16,6 +16,7 @@ use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
+use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
 use DataMachine\Engine\Bundle\PortableSlug;
 use WP_CLI;
 
@@ -49,6 +50,9 @@ class AgentBundleCommand extends BaseCommand {
 	 *
 	 * [--yes]
 	 * : Skip confirmation.
+	 *
+	 * [--reconcile-runtime]
+	 * : Replace preserved flow runtime queues and scheduling with the bundle seed on existing bundle-owned flows.
 	 *
 	 * [--format=<format>]
 	 * : Output format.
@@ -157,7 +161,11 @@ class AgentBundleCommand extends BaseCommand {
 	 */
 	public function diff( array $args, array $assoc_args ): void {
 		$bundle = $this->load_bundle_arg( $args );
-		$plan   = $this->plan_for_bundle( $bundle, (string) ( $assoc_args['slug'] ?? '' ) )->to_array();
+		$plan   = $this->add_runtime_drift_to_plan(
+			$this->plan_for_bundle( $bundle, (string) ( $assoc_args['slug'] ?? '' ) )->to_array(),
+			$bundle,
+			(string) ( $assoc_args['slug'] ?? '' )
+		);
 		$this->output_plan( $plan, $assoc_args );
 	}
 
@@ -184,6 +192,9 @@ class AgentBundleCommand extends BaseCommand {
 	 * [--yes]
 	 * : Skip confirmation.
 	 *
+	 * [--reconcile-runtime]
+	 * : Replace preserved flow runtime queues and scheduling with the bundle seed on existing bundle-owned flows.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -194,13 +205,17 @@ class AgentBundleCommand extends BaseCommand {
 	 * ---
 	 */
 	public function upgrade( array $args, array $assoc_args ): void {
-		$bundle  = $this->load_bundle_arg( $args );
-		$slug    = (string) ( $assoc_args['slug'] ?? '' );
-		$plan    = $this->plan_for_bundle( $bundle, $slug );
-		$dry_run = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+		$bundle            = $this->load_bundle_arg( $args );
+		$slug              = (string) ( $assoc_args['slug'] ?? '' );
+		$plan              = $this->plan_for_bundle( $bundle, $slug );
+		$dry_run           = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+		$reconcile_runtime = \WP_CLI\Utils\get_flag_value( $assoc_args, 'reconcile-runtime', false );
 
 		if ( $dry_run ) {
-			$this->output_plan( $plan->to_array(), $assoc_args );
+			$this->output_plan(
+				$this->add_runtime_drift_to_plan( $plan->to_array(), $bundle, $slug, $reconcile_runtime ? 'replace_bundle_seed' : 'preserve_existing' ),
+				$assoc_args
+			);
 			return;
 		}
 
@@ -209,7 +224,7 @@ class AgentBundleCommand extends BaseCommand {
 		}
 
 		$owner_id = isset( $assoc_args['owner'] ) ? $this->resolve_user_id( $assoc_args['owner'] ) : 0;
-		$result   = $this->bundler()->import( $bundle, '' !== $slug ? $slug : null, $owner_id, false );
+		$result   = $this->bundler()->import( $bundle, '' !== $slug ? $slug : null, $owner_id, false, array( 'reconcile_runtime' => $reconcile_runtime ) );
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( (string) ( $result['error'] ?? 'Bundle upgrade failed.' ) );
 			return;
@@ -275,17 +290,97 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	private function run_install( array $args, array $assoc_args ): void {
-		$bundle  = $this->load_bundle_arg( $args );
-		$slug    = isset( $assoc_args['slug'] ) ? sanitize_title( (string) $assoc_args['slug'] ) : null;
-		$owner   = isset( $assoc_args['owner'] ) ? $this->resolve_user_id( $assoc_args['owner'] ) : 0;
-		$dry_run = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+		$bundle            = $this->load_bundle_arg( $args );
+		$slug              = isset( $assoc_args['slug'] ) ? sanitize_title( (string) $assoc_args['slug'] ) : null;
+		$owner             = isset( $assoc_args['owner'] ) ? $this->resolve_user_id( $assoc_args['owner'] ) : 0;
+		$dry_run           = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+		$reconcile_runtime = \WP_CLI\Utils\get_flag_value( $assoc_args, 'reconcile-runtime', false );
 
 		if ( ! $dry_run && ! isset( $assoc_args['yes'] ) ) {
 			WP_CLI::confirm( sprintf( 'Install agent bundle "%s"?', $this->bundle_summary( $bundle, (string) $slug )['target_slug'] ) );
 		}
 
-		$result = $this->bundler()->import( $bundle, $slug, $owner, $dry_run );
+		$result = $this->bundler()->import( $bundle, $slug, $owner, $dry_run, array( 'reconcile_runtime' => $reconcile_runtime ) );
+		$agent  = $this->resolve_bundle_agent( $bundle, (string) $slug );
+		if ( $agent ) {
+			$result['runtime_drift'] = $this->runtime_drifts_for_bundle( $bundle, $agent, $reconcile_runtime ? 'replace_bundle_seed' : 'preserve_existing' );
+		}
 		$this->output( $result, $assoc_args, array( 'success', 'message' ) );
+	}
+
+	private function add_runtime_drift_to_plan( array $plan, array $bundle, string $slug = '', string $decision = 'preserve_existing' ): array {
+		$agent = $this->resolve_bundle_agent( $bundle, $slug );
+		if ( ! $agent ) {
+			return $plan;
+		}
+
+		$drifts = $this->runtime_drifts_for_bundle( $bundle, $agent, $decision );
+		if ( empty( $drifts ) ) {
+			return $plan;
+		}
+
+		$plan['runtime_drift'] = $drifts;
+		foreach ( $drifts as $drift ) {
+			$plan['warnings'][] = $drift;
+		}
+		$plan['counts']['warnings'] = count( $plan['warnings'] ?? array() );
+
+		return $plan;
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	private function runtime_drifts_for_bundle( array $bundle, array $agent, string $decision ): array {
+		$agent_id                   = (int) ( $agent['agent_id'] ?? 0 );
+		$pipeline_id_map            = array();
+		$existing_pipelines_by_slug = array();
+		$drifts                     = array();
+
+		foreach ( $this->pipelines()->get_all_pipelines( null, $agent_id ) as $pipeline ) {
+			$existing_pipelines_by_slug[ (string) ( $pipeline['portable_slug'] ?? '' ) ] = $pipeline;
+		}
+
+		foreach ( $bundle['pipelines'] ?? array() as $pipeline ) {
+			if ( ! is_array( $pipeline ) ) {
+				continue;
+			}
+			$slug = PortableSlug::normalize( (string) ( $pipeline['portable_slug'] ?? ( $pipeline['pipeline_name'] ?? 'pipeline' ) ), 'pipeline' );
+			if ( isset( $existing_pipelines_by_slug[ $slug ] ) ) {
+				$pipeline_id_map[ (int) ( $pipeline['original_id'] ?? 0 ) ] = (int) ( $existing_pipelines_by_slug[ $slug ]['pipeline_id'] ?? 0 );
+			}
+		}
+
+		foreach ( $bundle['flows'] ?? array() as $flow ) {
+			if ( ! is_array( $flow ) ) {
+				continue;
+			}
+			$old_pipeline_id = (int) ( $flow['original_pipeline_id'] ?? 0 );
+			$new_pipeline_id = (int) ( $pipeline_id_map[ $old_pipeline_id ] ?? 0 );
+			if ( $new_pipeline_id <= 0 ) {
+				continue;
+			}
+			$flow_slug     = PortableSlug::normalize( (string) ( $flow['portable_slug'] ?? ( $flow['flow_name'] ?? 'flow' ) ), 'flow' );
+			$existing_flow = $this->flows()->get_by_portable_slug( $new_pipeline_id, $flow_slug );
+			if ( ! $existing_flow ) {
+				continue;
+			}
+			$target_flow = array_merge(
+				$flow,
+				array(
+					'flow_config' => $this->remap_flow_step_ids(
+						is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array(),
+						$old_pipeline_id,
+						$new_pipeline_id,
+						(int) $existing_flow['flow_id']
+					),
+				)
+			);
+			$preview = AgentBundleRuntimeDrift::preview( $flow_slug, $existing_flow, $target_flow, $decision );
+			if ( null !== $preview ) {
+				$drifts[] = $preview;
+			}
+		}
+
+		return $drifts;
 	}
 
 	private function load_bundle_arg( array $args ): array {

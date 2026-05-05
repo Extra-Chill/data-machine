@@ -24,6 +24,7 @@ use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
 use DataMachine\Engine\Bundle\AgentBundleLegacyAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
+use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
 use DataMachine\Engine\Bundle\BundleValidationException;
@@ -444,9 +445,10 @@ class AgentBundler {
 	 * @param string|null $new_slug Optional override slug.
 	 * @param int         $owner_id WordPress user ID to own the imported agent.
 	 * @param bool        $dry_run  If true, validate without writing.
+	 * @param array       $options  Import options.
 	 * @return array{success: bool, message?: string, error?: string, summary?: array}
 	 */
-	public function import( array $bundle, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false ): array {
+	public function import( array $bundle, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false, array $options = array() ): array {
 		// Validate bundle.
 		if ( empty( $bundle['bundle_version'] ) || empty( $bundle['agent'] ) ) {
 			return array(
@@ -470,6 +472,7 @@ class AgentBundler {
 			'source_revision' => $bundle_source_revision,
 		);
 		$is_portable_bundle     = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
+		$reconcile_runtime     = ! empty( $options['reconcile_runtime'] );
 
 		// Check for slug collision.
 		$existing = $this->agents_repo->get_by_slug( $slug );
@@ -516,6 +519,7 @@ class AgentBundler {
 			'extension_artifacts' => count( $bundle['extension_artifacts'] ?? array() ),
 			'has_user_template'   => ! empty( $bundle['user_template'] ),
 			'upgrade'             => (bool) $existing,
+			'runtime_policy'      => $reconcile_runtime ? 'replace_bundle_seed' : 'preserve_existing',
 		);
 
 		if ( $dry_run ) {
@@ -586,6 +590,7 @@ class AgentBundler {
 
 		$artifact_records = $config['datamachine_bundle']['artifacts'];
 		$conflicts        = array();
+		$runtime_drift    = array();
 
 		// 4. Import pipelines — build old→new ID map.
 		$pipeline_id_map = array(); // old_id => new_id.
@@ -690,15 +695,28 @@ class AgentBundler {
 
 			$flow_config         = is_array( $flow_data['flow_config'] ?? null ) ? $flow_data['flow_config'] : array();
 			$existing_flow       = $this->flows_repo->get_by_portable_slug( (int) $new_pipeline_id, $portable_slug );
+			$target_flow_config  = $existing_flow
+				? $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, (int) $existing_flow['flow_id'] )
+				: $flow_config;
 			$flow_payload_source = array_merge(
 				$flow_data,
 				array(
-					'flow_config' => $existing_flow
-						? $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, (int) $existing_flow['flow_id'] )
-						: $flow_config,
+					'flow_config' => $target_flow_config,
 				)
 			);
 			$payload             = $this->flow_artifact_payload( $flow_payload_source, $portable_slug );
+
+			if ( $existing_flow ) {
+				$preview = AgentBundleRuntimeDrift::preview(
+					$portable_slug,
+					$existing_flow,
+					array_merge( $flow_data, array( 'flow_config' => $target_flow_config ) ),
+					$reconcile_runtime ? 'replace_bundle_seed' : 'preserve_existing'
+				);
+				if ( null !== $preview ) {
+					$runtime_drift[] = $preview;
+				}
+			}
 
 			if (
 				$existing_flow
@@ -722,14 +740,20 @@ class AgentBundler {
 			if ( $existing_flow ) {
 				$new_flow_id = (int) $existing_flow['flow_id'];
 				$flow_config = $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, $new_flow_id );
-				$flow_config = $this->preserve_runtime_queue_fields( $flow_config, $existing_flow['flow_config'] ?? array() );
+				$flow_config = $reconcile_runtime
+					? AgentBundleRuntimeDrift::replace_runtime_queue_fields( $flow_config, $target_flow_config )
+					: $this->preserve_runtime_queue_fields( $flow_config, $existing_flow['flow_config'] ?? array() );
+				$update_data = array(
+					'flow_name'     => $flow_data['flow_name'],
+					'flow_config'   => $flow_config,
+					'portable_slug' => $portable_slug,
+				);
+				if ( $reconcile_runtime ) {
+					$update_data['scheduling_config'] = $flow_data['scheduling_config'] ?? array();
+				}
 				$this->flows_repo->update_flow(
 					$new_flow_id,
-					array(
-						'flow_name'     => $flow_data['flow_name'],
-						'flow_config'   => $flow_config,
-						'portable_slug' => $portable_slug,
-					)
+					$update_data
 				);
 			} else {
 				$new_flow_id = $this->flows_repo->create_flow( array(
@@ -838,6 +862,7 @@ class AgentBundler {
 		$summary['pipelines_imported'] = count( $pipeline_id_map );
 		$summary['flows_imported']     = $flow_count;
 		$summary['conflicts']          = $conflicts;
+		$summary['runtime_drift']      = $runtime_drift;
 
 		$config['datamachine_bundle']['artifacts'] = $artifact_records;
 		$this->agents_repo->update_agent( $agent_id, array( 'agent_config' => $config ) );
