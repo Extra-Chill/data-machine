@@ -645,6 +645,41 @@ function datamachine_create_network_agent_tables() {
 function datamachine_activate_for_site() {
 	datamachine_register_capabilities();
 
+	// Ensure every Data Machine database table exists. dbDelta is idempotent.
+	datamachine_ensure_all_tables();
+
+	// Ensure default agent memory files exist.
+	// During activation the Abilities API is unavailable (init already fired before
+	// the plugin was included via plugin_sandbox_scrape, so our init callback that
+	// registers abilities never ran). Set a transient so the scaffold runs on the
+	// first normal request where the full hook sequence fires in order.
+	if ( ! datamachine_ensure_default_memory_files() ) {
+		set_transient( 'datamachine_needs_scaffold', 1, HOUR_IN_SECONDS );
+	}
+
+	// Regenerate every composable memory file (SITE.md, NETWORK.md, AGENTS.md, …)
+	// from their registered sections.
+	// Activation-only — composable regeneration is heavy and shouldn't fire on
+	// every deploy.
+	\DataMachine\Engine\AI\ComposableFileGenerator::regenerate_all();
+
+	// Re-schedule any flows with non-manual scheduling
+	datamachine_activate_scheduled_flows();
+
+	// Track DB schema version so deploy-time migrations auto-run.
+	update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );
+}
+
+/**
+ * Create or update every Data Machine database table.
+ *
+ * Shared by activation and the deploy-time deferred runtime. dbDelta and
+ * the per-table column ensures are idempotent, so this is safe to call on
+ * every version bump.
+ *
+ * @return void
+ */
+function datamachine_ensure_all_tables() {
 	// Create logs table first — other table migrations log messages during creation.
 	\DataMachine\Core\Database\Logs\LogRepository::create_table();
 
@@ -679,30 +714,6 @@ function datamachine_activate_for_site() {
 	\DataMachine\Core\Database\Chat\Chat::ensure_transcript_lock_columns();
 
 	\DataMachine\Engine\AI\Actions\PendingActionStore::create_table();
-
-	// Ensure default agent memory files exist.
-	// During activation the Abilities API is unavailable (init already fired before
-	// the plugin was included via plugin_sandbox_scrape, so our init callback that
-	// registers abilities never ran). Set a transient so the scaffold runs on the
-	// first normal request where the full hook sequence fires in order.
-	if ( ! datamachine_ensure_default_memory_files() ) {
-		set_transient( 'datamachine_needs_scaffold', 1, HOUR_IN_SECONDS );
-	}
-
-	// Ensure current deploy-time schema additions exist.
-	datamachine_run_schema_migrations();
-
-	// Regenerate every composable memory file (SITE.md, NETWORK.md, AGENTS.md, …)
-	// from their registered sections.
-	// Activation-only — composable regeneration is heavy and shouldn't fire on
-	// every deploy.
-	\DataMachine\Engine\AI\ComposableFileGenerator::regenerate_all();
-
-	// Re-schedule any flows with non-manual scheduling
-	datamachine_activate_scheduled_flows();
-
-	// Track DB schema version so deploy-time migrations auto-run.
-	update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );
 }
 
 /**

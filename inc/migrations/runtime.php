@@ -16,11 +16,19 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Ensure current deploy-time schema additions exist for the current site.
  *
+ * Creates or updates every Data Machine database table and runs the
+ * version-gated schema ensures. dbDelta is idempotent, so this is cheap to
+ * re-run on every DATAMACHINE_VERSION bump and safe on fresh installs whose
+ * activation hook never fired (test harness, deploy-in-place, etc).
+ *
  * @since 0.84.0
  * @return void
  */
 function datamachine_run_schema_migrations(): void {
-	// Ensure current deploy-time schema exists on installs updated in place.
+	if ( function_exists( 'datamachine_ensure_all_tables' ) ) {
+		datamachine_ensure_all_tables();
+	}
+
 	datamachine_migrate_bundle_artifacts_table();
 	datamachine_migrate_processed_item_claims();
 	datamachine_migrate_pending_actions_table();

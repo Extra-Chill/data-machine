@@ -364,9 +364,9 @@ class FlowStepConfig {
 		$is_multi     = self::isMultiHandler( $step_config );
 		$step_type    = $step_config['step_type'] ?? '';
 
-		$scalar_slug    = is_string( $step_config['handler_slug'] ?? null ) ? $step_config['handler_slug'] : '';
-		$scalar_config  = is_array( $step_config['handler_config'] ?? null ) ? $step_config['handler_config'] : array();
-		$handler_slugs  = self::sanitizeSlugList( is_array( $step_config['handler_slugs'] ?? null ) ? $step_config['handler_slugs'] : array() );
+		$scalar_slug     = is_string( $step_config['handler_slug'] ?? null ) ? $step_config['handler_slug'] : '';
+		$scalar_config   = is_array( $step_config['handler_config'] ?? null ) ? $step_config['handler_config'] : array();
+		$handler_slugs   = self::sanitizeSlugList( is_array( $step_config['handler_slugs'] ?? null ) ? $step_config['handler_slugs'] : array() );
 		$handler_configs = is_array( $step_config['handler_configs'] ?? null ) ? $step_config['handler_configs'] : array();
 
 		unset( $step_config['handler'], $step_config['handler_slug'], $step_config['handler_slugs'], $step_config['handler_config'], $step_config['handler_configs'] );
