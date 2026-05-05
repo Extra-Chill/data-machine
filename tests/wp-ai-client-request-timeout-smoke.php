@@ -278,6 +278,10 @@ assert_timeout_smoke( isset( $captured_history[1] ) && $captured_history[1] inst
 assert_timeout_smoke( 'continue' === $captured_prompt, 'Data Machine passes latest user message as wp-ai-client prompt' );
 assert_timeout_smoke( 1 === ( TimeoutPromptBuilderDouble::$captured_request['curl_filter_count'] ?? null ), 'Data Machine scopes cURL low-speed settings during wp-ai-client dispatch' );
 
+$request_builder_source = file_get_contents( __DIR__ . '/../inc/Engine/AI/RequestBuilder.php' );
+assert_timeout_smoke( is_string( $request_builder_source ) && str_contains( $request_builder_source, 'CURLOPT_CONNECTTIMEOUT' ), 'Data Machine scopes cURL connect timeout during wp-ai-client dispatch' );
+assert_timeout_smoke( is_string( $request_builder_source ) && str_contains( $request_builder_source, 'use ( $request_timeout, $connect_timeout )' ), 'Data Machine cURL timeout hook receives request and connect timeouts' );
+
 assert_timeout_smoke( 0 === timeout_smoke_filter_count( 'wp_ai_client_default_request_timeout' ), 'Data Machine removes temporary wp-ai-client timeout filter after dispatch' );
 assert_timeout_smoke( 0 === timeout_smoke_filter_count( 'http_api_curl' ), 'Data Machine removes temporary cURL low-speed filter after dispatch' );
 
