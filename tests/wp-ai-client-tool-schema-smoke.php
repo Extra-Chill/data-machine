@@ -155,9 +155,9 @@ $assert( null !== $function_call, 'tool-call result remains a wp-ai-client Funct
 $assert( 'client/test_tool' === $function_call->getName(), 'tool-call name is read from FunctionCall DTO' );
 $assert( array( 'reason' => 'covered' ) === $function_call->getArgs(), 'tool-call args are read from FunctionCall DTO' );
 $assert( 7 === $response->getTokenUsage()->getTotalTokens(), 'token usage is read from token usage DTO' );
+$assert( 'Describe this file.' === ( $captured_request['prompt'] ?? null ), 'latest user message becomes the wp-ai-client prompt' );
 $assert( 'System directive.' === ( $captured_request['messages'][0]['content'] ?? null ), 'system instruction reaches wp-ai-client builder' );
-$assert( 'Run tool.' === ( $captured_request['messages'][1]['content'] ?? null ), 'user message reaches wp-ai-client builder' );
-$assert( is_array( $captured_request['messages'][2]['content'] ?? null ), 'multimodal message content passes through to wp-ai-client builder' );
+$assert( 'Run tool.' === ( $captured_request['messages'][1]['content'] ?? null ), 'earlier user message remains wp-ai-client history' );
 $assert( is_array( $schema ), 'legacy parameter map normalizes to a schema array' );
 $assert( 'object' === ( $schema['type'] ?? null ), 'legacy parameter map is wrapped as an object schema' );
 $assert( array( 'reason' ) === ( $schema['required'] ?? null ), 'property-level required=true is lifted to object-level required array' );
