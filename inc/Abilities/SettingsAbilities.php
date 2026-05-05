@@ -110,6 +110,10 @@ class SettingsAbilities {
 							'description' => 'Per-mode provider/model overrides keyed by mode id',
 						),
 						'max_turns'                      => array( 'type' => 'integer' ),
+						'wp_ai_client_connect_timeout'  => array(
+							'type'        => 'number',
+							'description' => 'Connection timeout in seconds for wp-ai-client provider requests.',
+						),
 						'disabled_tools'                 => array( 'type' => 'object' ),
 						'ai_provider_keys'               => array( 'type' => 'object' ),
 						'queue_tuning'                   => array(
@@ -353,6 +357,7 @@ class SettingsAbilities {
 				'default_model'                  => $settings['default_model'] ?? '',
 				'mode_models'                    => $settings['mode_models'] ?? array(),
 				'max_turns'                      => $settings['max_turns'] ?? $defaults['max_turns'],
+				'wp_ai_client_connect_timeout'  => $settings['wp_ai_client_connect_timeout'] ?? $defaults['wp_ai_client_connect_timeout'],
 				'disabled_tools'                 => $settings['disabled_tools'] ?? array(),
 				'ai_provider_keys'               => $masked_keys,
 				'queue_tuning'                   => wp_parse_args( $settings['queue_tuning'] ?? array(), $defaults['queue_tuning'] ),
@@ -455,6 +460,11 @@ class SettingsAbilities {
 			$turns                     = absint( $input['max_turns'] );
 			$all_settings['max_turns'] = max( 1, min( 50, $turns ) );
 			$handled_keys[]            = 'max_turns';
+		}
+
+		if ( isset( $input['wp_ai_client_connect_timeout'] ) && is_numeric( $input['wp_ai_client_connect_timeout'] ) ) {
+			$all_settings['wp_ai_client_connect_timeout'] = max( 0.0, min( 300.0, (float) $input['wp_ai_client_connect_timeout'] ) );
+			$handled_keys[]                              = 'wp_ai_client_connect_timeout';
 		}
 
 		if ( isset( $input['disabled_tools'] ) ) {
