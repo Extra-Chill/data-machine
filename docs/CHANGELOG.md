@@ -2,6 +2,33 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.104.0] - 2026-05-05
+
+### Added
+- CLI commands to reassign agent_id on pipelines and flows
+
+### Changed
+- Preserve job data when retry is pending
+- Revert #1790 and finish wp-ai-client prompt-dispatch fix
+- Soft-skip AI steps that produce no actionable output
+- Report bundle runtime queue drift
+- Consume Agents API overflow strategy
+- Consume Agents API loop events
+- Consume Agents API transcript lock contract
+- Consume Agents API caller context
+- Consume Agents API workspace scope
+- Consume Agents API memory context contracts
+- Consume durable Agents API approval contracts
+- Harden guideline-backed memory capability checks
+- Consume Agents API consent policy contracts
+- Consume Agents API tool policy contracts
+- Adopt agent authorization contracts
+- Consume updated Agents API substrate
+
+### Fixed
+- Fix flow user message step resolution
+- Fix wp-ai-client pipeline prompt dispatch
+
 ## [0.103.14] - 2026-05-03
 
 ### Changed
