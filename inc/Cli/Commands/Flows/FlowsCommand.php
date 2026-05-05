@@ -1090,15 +1090,26 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		// Validate step resolution BEFORE any writes (atomic: fail fast, change nothing).
-		$needs_step = null !== $user_message || null !== $handler_config;
+		// AI prompt updates target AI steps; handler config updates target handler-backed steps.
+		$message_step = $step;
+		$handler_step = $step;
 
-		if ( $needs_step && null === $step ) {
-			$resolved = $this->resolveHandlerStep( $flow_id );
-			if ( $resolved['error'] ) {
+		if ( null !== $user_message && null === $message_step ) {
+			$resolved = $this->resolveAiStep( $flow_id );
+			if ( ! empty( $resolved['error'] ) ) {
 				WP_CLI::error( $resolved['error'] );
 				return;
 			}
-			$step = $resolved['step_id'];
+			$message_step = $resolved['step_id'];
+		}
+
+		if ( null !== $handler_config && null === $handler_step ) {
+			$resolved = $this->resolveHandlerStep( $flow_id );
+			if ( ! empty( $resolved['error'] ) ) {
+				WP_CLI::error( $resolved['error'] );
+				return;
+			}
+			$handler_step = $resolved['step_id'];
 		}
 
 		// Phase 1: Flow-level updates (name, scheduling).
@@ -1141,7 +1152,7 @@ class FlowsCommand extends BaseCommand {
 			$step_ability = new \DataMachine\Abilities\FlowStep\UpdateFlowStepAbility();
 			$step_result  = $step_ability->execute(
 				array(
-					'flow_step_id' => $step,
+					'flow_step_id' => $message_step,
 					'user_message' => $user_message,
 				)
 			);
@@ -1151,7 +1162,7 @@ class FlowsCommand extends BaseCommand {
 				return;
 			}
 
-			WP_CLI::success( 'User message updated for step: ' . $step );
+			WP_CLI::success( 'User message updated for step: ' . $message_step );
 		}
 
 		if ( null !== $handler_config ) {
@@ -1169,7 +1180,7 @@ class FlowsCommand extends BaseCommand {
 			}
 
 			$step_input = array(
-				'flow_step_id'   => $step,
+				'flow_step_id'   => $handler_step,
 				'handler_config' => $unwrapped_config,
 			);
 
@@ -1186,8 +1197,70 @@ class FlowsCommand extends BaseCommand {
 			}
 
 			$updated_keys = implode( ', ', array_keys( $unwrapped_config ) );
-			WP_CLI::success( sprintf( 'Handler config updated for step %s: %s', $step, $updated_keys ) );
+			WP_CLI::success( sprintf( 'Handler config updated for step %s: %s', $handler_step, $updated_keys ) );
 		}
+	}
+
+	/**
+	 * Resolve the AI step for a flow when --step is not provided.
+	 *
+	 * @param int $flow_id Flow ID.
+	 * @return array{step_id: string|null, error: string|null}
+	 */
+	private function resolveAiStep( int $flow_id ): array {
+		global $wpdb;
+
+		$flow = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT flow_config FROM {$wpdb->prefix}datamachine_flows WHERE flow_id = %d",
+				$flow_id
+			),
+			ARRAY_A
+		);
+
+		if ( ! $flow ) {
+			return array(
+				'step_id' => null,
+				'error'   => 'Flow not found',
+			);
+		}
+
+		$flow_config = json_decode( $flow['flow_config'], true );
+		if ( empty( $flow_config ) ) {
+			return array(
+				'step_id' => null,
+				'error'   => 'Flow has no steps',
+			);
+		}
+
+		$ai_steps = array();
+		foreach ( $flow_config as $step_id => $step_data ) {
+			if ( 'ai' === ( $step_data['step_type'] ?? '' ) ) {
+				$ai_steps[] = $step_id;
+			}
+		}
+
+		if ( empty( $ai_steps ) ) {
+			return array(
+				'step_id' => null,
+				'error'   => 'Flow has no AI steps',
+			);
+		}
+
+		if ( count( $ai_steps ) > 1 ) {
+			return array(
+				'step_id' => null,
+				'error'   => sprintf(
+					'Flow has multiple AI steps. Use --step=<id> to specify. Available: %s',
+					implode( ', ', $ai_steps )
+				),
+			);
+		}
+
+		return array(
+			'step_id' => $ai_steps[0],
+			'error'   => null,
+		);
 	}
 
 	/**
