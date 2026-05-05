@@ -62,10 +62,10 @@ class RequestBuilder {
 	) {
 		WpAiClientCache::install();
 
-		$assembled          = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
-		$request            = $assembled['request'];
-		$provider_request   = ProviderRequestAssembler::toProviderRequest( $request );
-		$prompt_context     = self::wpAiClientPromptContext( $request['messages'] ?? array() );
+		$assembled        = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
+		$request          = $assembled['request'];
+		$provider_request = ProviderRequestAssembler::toProviderRequest( $request );
+		$prompt_context   = self::wpAiClientPromptContext( $request['messages'] ?? array() );
 		if ( '' !== $prompt_context['prompt'] ) {
 			$provider_request['prompt'] = $prompt_context['prompt'];
 		}

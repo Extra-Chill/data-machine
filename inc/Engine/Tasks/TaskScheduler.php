@@ -75,7 +75,10 @@ class TaskScheduler {
 				'datamachine_log',
 				'error',
 				"TaskScheduler: Handler class not found for '{$taskType}'",
-				array( 'task_type' => $taskType, 'handler_class' => $handler_class )
+				array(
+					'task_type'     => $taskType,
+					'handler_class' => $handler_class,
+				)
 			);
 			return false;
 		}
@@ -88,7 +91,10 @@ class TaskScheduler {
 				'datamachine_log',
 				'error',
 				"TaskScheduler: getWorkflow() returned empty steps for '{$taskType}'",
-				array( 'task_type' => $taskType, 'params' => $params )
+				array(
+					'task_type' => $taskType,
+					'params'    => $params,
+				)
 			);
 			return false;
 		}
@@ -235,8 +241,8 @@ class TaskScheduler {
 		// caller passed a parent_job_id, link this batch parent to it
 		// so the chain caller → batch_parent is preserved even though
 		// per-item children chain off the caller directly (below).
-		$jobs_db          = new Jobs();
-		$batch_id         = 'dm_batch_' . wp_generate_uuid4();
+		$jobs_db           = new Jobs();
+		$batch_id          = 'dm_batch_' . wp_generate_uuid4();
 		$batch_create_args = array(
 			'pipeline_id' => 'direct',
 			'flow_id'     => 'direct',
@@ -253,7 +259,10 @@ class TaskScheduler {
 				'datamachine_log',
 				'error',
 				'TaskScheduler: failed to create batch parent job',
-				array( 'task_type' => $taskType, 'total' => count( $itemParams ) )
+				array(
+					'task_type' => $taskType,
+					'total'     => count( $itemParams ),
+				)
 			);
 			return false;
 		}
@@ -334,7 +343,10 @@ class TaskScheduler {
 				'datamachine_log',
 				'warning',
 				'TaskScheduler: Batch parent not resolvable',
-				array( 'arg' => $parentJobIdOrBatchId, 'context' => 'system' )
+				array(
+					'arg'     => $parentJobIdOrBatchId,
+					'context' => 'system',
+				)
 			);
 			return;
 		}

@@ -66,10 +66,12 @@ class OAuth2Handler {
 			$serialized_size = strlen( maybe_serialize( $payload ) );
 			if ( $serialized_size > self::MAX_PAYLOAD_SIZE ) {
 				throw new \InvalidArgumentException(
-					sprintf(
-						'OAuth state payload exceeds maximum size (%d bytes > %d bytes).',
-						$serialized_size,
-						self::MAX_PAYLOAD_SIZE
+					esc_html(
+						sprintf(
+							'OAuth state payload exceeds maximum size (%d bytes > %d bytes).',
+							$serialized_size,
+							self::MAX_PAYLOAD_SIZE
+						)
 					)
 				);
 			}
@@ -247,6 +249,7 @@ class OAuth2Handler {
 	 * @return string Base64url-encoded string.
 	 */
 	private function base64url_encode( string $data ): string {
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- OAuth PKCE/state requires RFC 4648 base64url encoding.
 		return rtrim( strtr( base64_encode( $data ), '+/', '-_' ), '=' );
 	}
 
@@ -759,5 +762,4 @@ class OAuth2Handler {
 
 		return $token_data;
 	}
-
 }
