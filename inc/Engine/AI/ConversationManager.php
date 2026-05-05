@@ -433,7 +433,7 @@ class ConversationManager {
 	private static function buildDuplicateToolCallError( string $tool_name, string $mode ): string {
 		switch ( $mode ) {
 			case 'pipeline':
-				return "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters earlier in this conversation. Do NOT call it again. Move on — call the publish handler tool now to complete this step.";
+				return "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters earlier in this conversation. Do NOT call it again. Move on to the next required pipeline action using the result you already have.";
 			case 'bridge':
 				return "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters. Do NOT call it again. Continue your response to the user using the result you already have.";
 			case 'chat':

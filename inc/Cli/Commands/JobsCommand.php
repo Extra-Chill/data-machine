@@ -465,6 +465,9 @@ class JobsCommand extends BaseCommand {
 		$job                   = $jobs[0];
 		$engine_data           = $job['engine_data'] ?? array();
 		$transcript_session_id = $engine_data['transcript_session_id'] ?? '';
+		if ( empty( $transcript_session_id ) ) {
+			$transcript_session_id = $this->findTranscriptSessionIdForJob( $job_id );
+		}
 
 		if ( empty( $transcript_session_id ) ) {
 			WP_CLI::error(
@@ -521,6 +524,30 @@ class JobsCommand extends BaseCommand {
 		}
 
 		$this->renderTranscriptText( $job_id, (string) $transcript_session_id, $session, $messages, $metadata );
+	}
+
+	/**
+	 * Locate a pipeline transcript by metadata for jobs created before engine_data
+	 * stored transcript_session_id.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return string Transcript session ID, or empty string when none exists.
+	 */
+	private function findTranscriptSessionIdForJob( int $job_id ): string {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'datamachine_chat_sessions';
+		$like  = '%"job_id":' . $job_id . '%';
+		$row   = $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT session_id FROM %i WHERE mode = %s AND metadata LIKE %s ORDER BY created_at DESC LIMIT 1',
+				$table,
+				'pipeline',
+				$like
+			)
+		);
+
+		return is_string( $row ) ? $row : '';
 	}
 
 	/**
