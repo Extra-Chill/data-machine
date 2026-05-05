@@ -12,6 +12,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\Directives\DirectivePolicyResolver;
 
 defined( 'ABSPATH' ) || exit;
@@ -130,7 +131,9 @@ class RequestBuilder {
 		}
 
 		$result          = null;
+		$request_options = null;
 		$request_timeout = self::wpAiClientRequestTimeout( $mode, $provider, $model, $payload );
+		$connect_timeout = self::wpAiClientConnectTimeout( $mode, $provider, $model, $payload, $request_timeout );
 		$timeout_filter  = static function ( $default_timeout ) use ( $request_timeout ) {
 			return max( (float) $default_timeout, $request_timeout );
 		};
@@ -169,15 +172,13 @@ class RequestBuilder {
 			/** @var callable $model_resolver wp-ai-client exposes this through __call() in some versions. */
 			$model_resolver = array( $registry, 'getProviderModel' );
 			$model_instance = call_user_func( $model_resolver, $provider_id, $model, null );
-			if (
-				is_object( $model_instance )
-				&& method_exists( $model_instance, 'setRequestOptions' )
-				&& class_exists( '\WordPress\AiClient\Providers\Http\DTO\RequestOptions' )
-			) {
+			if ( class_exists( '\WordPress\AiClient\Providers\Http\DTO\RequestOptions' ) ) {
 				$request_options = new \WordPress\AiClient\Providers\Http\DTO\RequestOptions();
 				$request_options->setTimeout( $request_timeout );
-				$request_options->setConnectTimeout( min( 30.0, $request_timeout ) );
-				$model_instance->setRequestOptions( $request_options );
+				$request_options->setConnectTimeout( $connect_timeout );
+				if ( is_object( $model_instance ) && method_exists( $model_instance, 'setRequestOptions' ) ) {
+					$model_instance->setRequestOptions( $request_options );
+				}
 			}
 
 			// wp-ai-client refuses to construct a MessagePart from an empty
@@ -187,6 +188,9 @@ class RequestBuilder {
 			$builder = '' !== $prompt_context['prompt']
 				? \wp_ai_client_prompt( $prompt_context['prompt'] )
 				: \wp_ai_client_prompt();
+			if ( null !== $request_options && is_callable( array( $builder, 'using_request_options' ) ) ) {
+				$builder = $builder->using_request_options( $request_options );
+			}
 			$builder = $builder->using_provider( $provider_id )
 				->using_model( $model_instance );
 
@@ -395,6 +399,43 @@ class RequestBuilder {
 
 		if ( ! is_numeric( $timeout ) ) {
 			return self::DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT;
+		}
+
+		return max( 0.0, (float) $timeout );
+	}
+
+	/**
+	 * Resolve the connection timeout Data Machine applies to wp-ai-client calls.
+	 *
+	 * @param string $mode            Execution mode.
+	 * @param string $provider        Provider identifier.
+	 * @param string $model           Model identifier.
+	 * @param array  $payload         Step payload.
+	 * @param float  $request_timeout Resolved full request timeout in seconds.
+	 * @return float Timeout in seconds.
+	 */
+	private static function wpAiClientConnectTimeout( string $mode, string $provider, string $model, array $payload, float $request_timeout ): float {
+		$setting_default = PluginSettings::get(
+			'wp_ai_client_connect_timeout',
+			PluginSettings::DEFAULT_WP_AI_CLIENT_CONNECT_TIMEOUT
+		);
+		if ( ! is_numeric( $setting_default ) ) {
+			$setting_default = PluginSettings::DEFAULT_WP_AI_CLIENT_CONNECT_TIMEOUT;
+		}
+
+		$default_timeout = min( max( 0.0, (float) $setting_default ), $request_timeout );
+		$timeout = apply_filters(
+			'datamachine_wp_ai_client_connect_timeout',
+			$default_timeout,
+			$mode,
+			$provider,
+			$model,
+			$payload,
+			$request_timeout
+		);
+
+		if ( ! is_numeric( $timeout ) ) {
+			return $default_timeout;
 		}
 
 		return max( 0.0, (float) $timeout );

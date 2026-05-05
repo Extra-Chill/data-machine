@@ -93,6 +93,7 @@ class TimeoutPromptBuilderDouble {
 
 	private string $provider = '';
 	private mixed $model = null;
+	private mixed $request_options = null;
 	private array $history = array();
 	private float $request_timeout = 30.0;
 
@@ -118,6 +119,11 @@ class TimeoutPromptBuilderDouble {
 		return $this;
 	}
 
+	public function using_request_options( $request_options ): self {
+		$this->request_options = $request_options;
+		return $this;
+	}
+
 	public function using_system_instruction( string $system_instruction ): self {
 		$this->history[] = array( 'role' => 'system', 'content' => $system_instruction );
 		return $this;
@@ -139,6 +145,7 @@ class TimeoutPromptBuilderDouble {
 		self::$captured_request = array(
 			'provider'          => $this->provider,
 			'model'             => $this->model,
+			'request_options'   => $this->request_options,
 			'prompt'            => $this->prompt,
 			'timeout'           => $this->request_timeout,
 			'history'           => $this->history,
@@ -194,7 +201,8 @@ function timeout_smoke_filter_count( string $tag ): int {
 	return $count;
 }
 
-$timeout_context = null;
+$timeout_context         = null;
+$connect_timeout_context = null;
 $GLOBALS['datamachine_test_wp_ai_client_model_with_request_options'] = true;
 
 add_filter(
@@ -205,6 +213,16 @@ add_filter(
 	},
 	10,
 	5
+);
+
+add_filter(
+	'datamachine_wp_ai_client_connect_timeout',
+	function ( float $timeout, string $mode, string $provider, string $model, array $payload, float $request_timeout ) use ( &$connect_timeout_context ): float {
+		$connect_timeout_context = compact( 'timeout', 'mode', 'provider', 'model', 'payload', 'request_timeout' );
+		return 120.0;
+	},
+	10,
+	6
 );
 
 $result = RequestBuilder::build(
@@ -240,7 +258,18 @@ $captured_model           = TimeoutPromptBuilderDouble::$captured_request['model
 $captured_request_options = is_object( $captured_model ) && method_exists( $captured_model, 'getRequestOptions' ) ? $captured_model->getRequestOptions() : null;
 assert_timeout_smoke( $captured_request_options instanceof \WordPress\AiClient\Providers\Http\DTO\RequestOptions, 'Data Machine applies wp-ai-client RequestOptions to API-based models' );
 assert_timeout_smoke( 240.0 === $captured_request_options?->getTimeout(), 'Data Machine sets RequestOptions timeout from scoped request timeout' );
-assert_timeout_smoke( 30.0 === $captured_request_options?->getConnectTimeout(), 'Data Machine caps RequestOptions connect timeout at 30 seconds' );
+assert_timeout_smoke( 120.0 === $captured_request_options?->getConnectTimeout(), 'Data Machine sets RequestOptions connect timeout from scoped connect timeout' );
+
+$captured_builder_request_options = TimeoutPromptBuilderDouble::$captured_request['request_options'] ?? null;
+assert_timeout_smoke( $captured_builder_request_options instanceof \WordPress\AiClient\Providers\Http\DTO\RequestOptions, 'Data Machine applies wp-ai-client RequestOptions to PromptBuilder' );
+assert_timeout_smoke( 240.0 === $captured_builder_request_options?->getTimeout(), 'Data Machine sets PromptBuilder RequestOptions timeout from scoped request timeout' );
+assert_timeout_smoke( 120.0 === $captured_builder_request_options?->getConnectTimeout(), 'Data Machine sets PromptBuilder RequestOptions connect timeout from scoped connect timeout' );
+
+assert_timeout_smoke( 30.0 === ( $connect_timeout_context['timeout'] ?? null ), 'Data Machine connect timeout filter receives product default' );
+assert_timeout_smoke( 240.0 === ( $connect_timeout_context['request_timeout'] ?? null ), 'Data Machine connect timeout filter receives resolved request timeout' );
+assert_timeout_smoke( 'pipeline' === ( $connect_timeout_context['mode'] ?? null ), 'Data Machine connect timeout filter receives execution mode' );
+assert_timeout_smoke( 'openai' === ( $connect_timeout_context['provider'] ?? null ), 'Data Machine connect timeout filter receives provider' );
+assert_timeout_smoke( 'gpt-smoke' === ( $connect_timeout_context['model'] ?? null ), 'Data Machine connect timeout filter receives model' );
 
 $captured_history = TimeoutPromptBuilderDouble::$captured_request['history'] ?? array();
 $captured_prompt  = TimeoutPromptBuilderDouble::$captured_request['prompt'] ?? null;
