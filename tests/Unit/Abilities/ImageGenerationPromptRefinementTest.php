@@ -151,11 +151,12 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		ImageGenerationAbilities::refine_prompt( 'Crane meaning', 'This article explores the spiritual symbolism of cranes in various cultures.' );
 
 		$this->assertNotNull( $captured_request );
-		// Directives prepend messages, so find the last user message (our refinement request).
-		$user_message = '';
+		// wp-ai-client receives the current user turn as `prompt`; older dispatch
+		// shapes may still carry it as the last user message.
+		$user_message = $captured_request['prompt'] ?? '';
 		foreach ( array_reverse( $captured_request['messages'] ) as $msg ) {
 			if ( ( $msg['role'] ?? '' ) === 'user' ) {
-				$user_message = $msg['content'] ?? '';
+				$user_message = $user_message ?: ( $msg['content'] ?? '' );
 				break;
 			}
 		}
