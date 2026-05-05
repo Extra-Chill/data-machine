@@ -156,6 +156,91 @@ function resolve_ai_active_prompt_for_test( array $step_data ): array {
 	);
 }
 
+/**
+ * Inline reimplementation of FlowsCommand::resolveAiStep(). Used by
+ * `flow update --set-user-message` when --step is omitted.
+ */
+function resolve_ai_step_for_test( array $flow_config ): array {
+	if ( empty( $flow_config ) ) {
+		return array(
+			'step_id' => null,
+			'error'   => 'Flow has no steps',
+		);
+	}
+
+	$ai_steps = array();
+	foreach ( $flow_config as $step_id => $step_data ) {
+		if ( 'ai' === ( $step_data['step_type'] ?? '' ) ) {
+			$ai_steps[] = $step_id;
+		}
+	}
+
+	if ( empty( $ai_steps ) ) {
+		return array(
+			'step_id' => null,
+			'error'   => 'Flow has no AI steps',
+		);
+	}
+
+	if ( count( $ai_steps ) > 1 ) {
+		return array(
+			'step_id' => null,
+			'error'   => sprintf(
+				'Flow has multiple AI steps. Use --step=<id> to specify. Available: %s',
+				implode( ', ', $ai_steps )
+			),
+		);
+	}
+
+	return array(
+		'step_id' => $ai_steps[0],
+		'error'   => null,
+	);
+}
+
+/**
+ * Inline reimplementation of FlowsCommand::resolveHandlerStep(). Used by
+ * handler-config updates when --step is omitted.
+ */
+function resolve_handler_step_for_test( array $flow_config ): array {
+	if ( empty( $flow_config ) ) {
+		return array(
+			'step_id' => null,
+			'error'   => 'Flow has no steps',
+		);
+	}
+
+	$handler_steps = array();
+	foreach ( $flow_config as $step_id => $step_data ) {
+		$handler_slugs = $step_data['handler_slugs'] ?? array();
+		if ( ! empty( $handler_slugs ) ) {
+			$handler_steps[] = $step_id;
+		}
+	}
+
+	if ( empty( $handler_steps ) ) {
+		return array(
+			'step_id' => null,
+			'error'   => 'Flow has no handler steps',
+		);
+	}
+
+	if ( count( $handler_steps ) > 1 ) {
+		return array(
+			'step_id' => null,
+			'error'   => sprintf(
+				'Flow has multiple handler steps. Use --step=<id> to specify. Available: %s',
+				implode( ', ', $handler_steps )
+			),
+		);
+	}
+
+	return array(
+		'step_id' => $handler_steps[0],
+		'error'   => null,
+	);
+}
+
 $failed = 0;
 $total  = 0;
 
@@ -493,6 +578,64 @@ assert_test(
 assert_test(
 	'queue head still resolves',
 	'queue_head' === $resolved['slot'] && 'pinned' === $resolved['value']
+);
+
+// --- Case 13: --set-user-message auto-resolves an AI-only flow.
+echo "\nCase 13: --set-user-message resolves AI-only flow without handler steps\n";
+
+$ai_only_flow_config = array(
+	'19_d8270fc9-0554-4826-a7e4-0fa863f2c4c3_13' => array(
+		'step_type'       => 'ai',
+		'handler_slugs'   => array(),
+		'handler_configs' => array(),
+	),
+);
+
+$resolved_ai_only = resolve_ai_step_for_test( $ai_only_flow_config );
+
+assert_test(
+	'AI-only flow resolves the AI step id for user message updates',
+	'19_d8270fc9-0554-4826-a7e4-0fa863f2c4c3_13' === $resolved_ai_only['step_id']
+		&& null === $resolved_ai_only['error']
+);
+
+$resolved_handler_only = resolve_handler_step_for_test( $ai_only_flow_config );
+
+assert_test(
+	'handler config updates still require handler steps',
+	'Flow has no handler steps' === $resolved_handler_only['error']
+);
+
+// --- Case 14: handler resolution still picks the single handler-backed step.
+echo "\nCase 14: handler-config auto-resolution still targets handler-backed steps\n";
+
+$mixed_flow_config = array(
+	'pstep_ai_uuid_1'    => array(
+		'step_type'       => 'ai',
+		'handler_slugs'   => array(),
+		'handler_configs' => array(),
+	),
+	'pstep_fetch_uuid_1' => array(
+		'step_type'       => 'fetch',
+		'handler_slugs'   => array( 'reddit' ),
+		'handler_configs' => array( 'reddit' => array() ),
+	),
+);
+
+$resolved_handler = resolve_handler_step_for_test( $mixed_flow_config );
+
+assert_test(
+	'handler config resolver ignores AI steps and selects fetch handler step',
+	'pstep_fetch_uuid_1' === $resolved_handler['step_id']
+		&& null === $resolved_handler['error']
+);
+
+$resolved_ai = resolve_ai_step_for_test( $mixed_flow_config );
+
+assert_test(
+	'user message resolver ignores handler steps and selects AI step',
+	'pstep_ai_uuid_1' === $resolved_ai['step_id']
+		&& null === $resolved_ai['error']
 );
 
 echo "\n--- Summary ---\n";
