@@ -427,7 +427,50 @@ class AIStep extends Step {
 		}
 
 		// Process loop results into data packets
-		return self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
+		$outputPackets = self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
+
+		// Soft-skip terminal: the AI loop completed without an error but
+		// produced no actionable output (no handler tool, no other tool
+		// result, no AI text content). For autonomous brain flows this is
+		// an intentional skip — the model decided the fetched packet was
+		// not worth writing — not a failure.
+		//
+		// Mark the job as agent_skipped via the engine status override so
+		// the engine routes through routeAfterExecution()'s status_override
+		// branch, completing the child cleanly and preventing parent
+		// batches from rolling these up as "All N child jobs failed".
+		//
+		// Defaults to enabled. Pipelines that genuinely need an empty AI
+		// step to fail can opt out via the filter below.
+		$soft_skip_enabled = (bool) apply_filters(
+			'datamachine_ai_step_soft_skip_on_empty_output',
+			true,
+			$this->engine,
+			$this->flow_step_config,
+			$this->job_id
+		);
+
+		if ( $soft_skip_enabled && empty( $outputPackets ) && ! empty( $this->dataPackets ) ) {
+			$this->engine->set(
+				'job_status',
+				\DataMachine\Core\JobStatus::AGENT_SKIPPED . ' - ai_step_no_actionable_output'
+			);
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'AI step produced no actionable output — soft-skipping job',
+				array(
+					'job_id'        => $this->job_id,
+					'flow_step_id'  => $this->flow_step_id,
+					'turn_count'    => count( $loop_result['messages'] ?? array() ),
+					'tool_results'  => count( $loop_result['tool_execution_results'] ?? array() ),
+					'input_packets' => count( $this->dataPackets ),
+				)
+			);
+		}
+
+		return $outputPackets;
 	}
 
 	/**
