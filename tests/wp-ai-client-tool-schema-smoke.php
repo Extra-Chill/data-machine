@@ -165,6 +165,54 @@ $assert( ! isset( $schema['properties']['reason']['required'] ), 'required flag 
 $assert( ! isset( $schema['properties']['note']['required'] ), 'required flag is removed from optional property schema' );
 $assert( 'string' === ( $schema['properties']['reason']['type'] ?? null ), 'property schema fields are preserved' );
 
+// --- Empty-prompt fallback ----------------------------------------------------
+//
+// Regression coverage for https://github.com/Extra-Chill/data-machine/issues/1789.
+// When DM has no non-empty user content (e.g. early conversation turns where
+// system + assistant are the only messages), wp-ai-client refuses to construct
+// a MessagePart from an empty string. RequestBuilder must call
+// wp_ai_client_prompt() with no arg in that case.
+$captured_request = array();
+\DataMachine\Tests\Unit\Support\WpAiClientTestDouble::reset();
+\DataMachine\Tests\Unit\Support\WpAiClientTestDouble::set_response_callback(
+	function ( array $request ) use ( &$captured_request ): array {
+		$captured_request = $request;
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content' => 'ok',
+				'usage'   => array(
+					'prompt_tokens'     => 1,
+					'completion_tokens' => 1,
+					'total_tokens'      => 2,
+				),
+			),
+		);
+	},
+);
+
+$response_no_user = \DataMachine\Engine\AI\RequestBuilder::build(
+	array(
+		array(
+			'role'    => 'system',
+			'content' => 'System directive only.',
+		),
+		array(
+			'role'    => 'assistant',
+			'content' => 'Earlier assistant turn.',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array(),
+	'pipeline',
+	array( 'job_id' => 1685 )
+);
+
+$assert( $response_no_user instanceof \WordPress\AiClient\Results\DTO\GenerativeAiResult, 'RequestBuilder dispatches when no user message is present' );
+$assert( '' === ( $captured_request['prompt'] ?? null ), 'no user message → wp-ai-client receives empty prompt (built without a MessagePart)' );
+$assert( 'System directive only.' === ( $captured_request['messages'][0]['content'] ?? null ), 'system instruction still reaches the builder when prompt is empty' );
+
 echo "\n{$assertions} assertions, " . count( $failures ) . " failures\n";
 
 if ( ! empty( $failures ) ) {

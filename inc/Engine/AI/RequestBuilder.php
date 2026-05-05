@@ -180,8 +180,14 @@ class RequestBuilder {
 				$model_instance->setRequestOptions( $request_options );
 			}
 
-			$builder = \wp_ai_client_prompt( $prompt_context['prompt'] )
-				->using_provider( $provider_id )
+			// wp-ai-client refuses to construct a MessagePart from an empty
+			// string. Only pass the prompt text when it is non-empty; otherwise
+			// fall back to instantiating the builder without a prompt and let
+			// history + system instruction carry the conversation.
+			$builder = '' !== $prompt_context['prompt']
+				? \wp_ai_client_prompt( $prompt_context['prompt'] )
+				: \wp_ai_client_prompt();
+			$builder = $builder->using_provider( $provider_id )
 				->using_model( $model_instance );
 
 			$model_config = self::productModelConfig( $provider_request );
