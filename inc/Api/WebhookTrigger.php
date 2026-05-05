@@ -77,11 +77,10 @@ class WebhookTrigger {
 	 *
 	 * Flow:
 	 * 1. Load the flow by id.
-	 * 2. Silently migrate legacy v1 HMAC fields into the canonical v2 shape.
-	 * 3. Route to the `authenticate_bearer` or `authenticate_via_verifier`
+	 * 2. Route to the `authenticate_bearer` or `authenticate_via_verifier`
 	 *    path based on `webhook_auth_mode`.
-	 * 4. Enforce rate limiting.
-	 * 5. Delegate to the `datamachine/run-flow` ability.
+	 * 3. Enforce rate limiting.
+	 * 4. Delegate to the `datamachine/run-flow` ability.
 	 *
 	 * Returns a generic 401 (or 413 for oversized HMAC payloads) for all auth
 	 * failures to prevent information leakage. The real failure reason is

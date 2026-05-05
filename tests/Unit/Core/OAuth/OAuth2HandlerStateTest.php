@@ -8,7 +8,6 @@
  * - Oversized payload rejection
  * - Malformed transient handling
  * - Expired transient handling
- * - Legacy plain-string state migration
  *
  * @package DataMachine\Tests\Unit\Core\OAuth
  */
@@ -32,7 +31,6 @@ class OAuth2HandlerStateTest extends WP_UnitTestCase {
 		delete_transient( 'datamachine_test_provider_oauth_state' );
 		delete_transient( 'datamachine_test_roundtrip_oauth_state' );
 		delete_transient( 'datamachine_test_empty_oauth_state' );
-		delete_transient( 'datamachine_test_legacy_oauth_state' );
 		delete_transient( 'datamachine_test_malformed_oauth_state' );
 		delete_transient( 'datamachine_test_oversize_oauth_state' );
 		delete_transient( 'datamachine_test_expired_oauth_state' );
@@ -214,40 +212,6 @@ class OAuth2HandlerStateTest extends WP_UnitTestCase {
 		delete_transient( 'datamachine_test_expired_oauth_state' );
 
 		$result = $this->handler->verify_state( 'test_expired', $state );
-
-		$this->assertFalse( $result );
-	}
-
-	// -------------------------------------------------------------------------
-	// Legacy plain-string state migration
-	// -------------------------------------------------------------------------
-
-	public function test_legacy_plain_string_state_verifies_correctly(): void {
-		// Simulate the old format: plain hex string stored directly in transient.
-		$legacy_state = bin2hex( random_bytes( 32 ) );
-		set_transient( 'datamachine_test_legacy_oauth_state', $legacy_state, 900 );
-
-		$result = $this->handler->verify_state( 'test_legacy', $legacy_state );
-
-		$this->assertIsArray( $result );
-		$this->assertSame( array(), $result ); // Legacy states have no payload.
-	}
-
-	public function test_legacy_plain_string_state_deletes_transient_on_success(): void {
-		$legacy_state = bin2hex( random_bytes( 32 ) );
-		set_transient( 'datamachine_test_legacy_oauth_state', $legacy_state, 900 );
-
-		$this->handler->verify_state( 'test_legacy', $legacy_state );
-
-		// Transient should be consumed.
-		$this->assertFalse( get_transient( 'datamachine_test_legacy_oauth_state' ) );
-	}
-
-	public function test_legacy_plain_string_state_rejects_wrong_nonce(): void {
-		$legacy_state = bin2hex( random_bytes( 32 ) );
-		set_transient( 'datamachine_test_legacy_oauth_state', $legacy_state, 900 );
-
-		$result = $this->handler->verify_state( 'test_legacy', 'wrong_value' );
 
 		$this->assertFalse( $result );
 	}

@@ -120,9 +120,9 @@ assert_retention(
 	! str_contains( $sources['chat'], 'datamachine_cleanup_chat_sessions' )
 );
 assert_retention(
-	'Provider hard-unschedules old retention hooks on upgrade',
-	str_contains( $sources['provider'], 'LEGACY_RETENTION_HOOKS' )
-		&& str_contains( $sources['provider'], 'as_unschedule_all_actions( $legacy_hook[0], array(), $legacy_hook[1] );' )
+	'Provider no longer carries legacy retention hook cleanup',
+	! str_contains( $sources['provider'], 'LEGACY_RETENTION_HOOKS' )
+		&& ! str_contains( $sources['provider'], 'datamachine_task_handle' )
 );
 assert_retention(
 	'file dry-run counter includes old job directories',
