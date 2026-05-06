@@ -27,6 +27,11 @@ class JobRetryPolicy {
 	private const DEFAULT_BASE_DELAY = 60;
 
 	/**
+	 * Short base delay in seconds for cheap AI transport/connect retries.
+	 */
+	private const AI_TRANSPORT_BASE_DELAY = 15;
+
+	/**
 	 * Default maximum delay in seconds.
 	 */
 	private const DEFAULT_MAX_DELAY = 3600;
@@ -131,6 +136,7 @@ class JobRetryPolicy {
 				'attempt'       => $attempt,
 				'max_attempts'  => $max_attempts,
 				'delay_seconds' => $delay_seconds,
+				'retry_class'   => $policy['retry_class'] ?? null,
 				'action_id'     => $action_id,
 				'reason'        => $reason,
 				'provider'      => $context_data['ai_provider'] ?? $engine_data['provider'] ?? null,
@@ -145,6 +151,7 @@ class JobRetryPolicy {
 			'max_attempts'  => $max_attempts,
 			'next_retry_at' => gmdate( 'c', $timestamp ),
 			'retry_after'   => $delay_seconds,
+			'retry_class'   => $policy['retry_class'] ?? 'generic',
 		);
 	}
 
@@ -159,7 +166,8 @@ class JobRetryPolicy {
 	 * @return array
 	 */
 	private static function resolvePolicy( int $job_id, string $reason, array $context_data, array $engine_data, array $job ): array {
-		$retryable = self::isRetryableFailure( $reason, $context_data );
+		$retry_class = self::classifyFailure( $reason, $context_data );
+		$retryable   = self::isRetryableFailure( $reason, $context_data );
 
 		/**
 		 * Filter whether a job failure is retryable.
@@ -176,11 +184,12 @@ class JobRetryPolicy {
 		$policy = array(
 			'retryable'    => $retryable,
 			'max_attempts' => self::DEFAULT_MAX_ATTEMPTS,
-			'base_delay'   => self::DEFAULT_BASE_DELAY,
+			'base_delay'   => self::isShortTransportRetryClass( $retry_class ) ? self::AI_TRANSPORT_BASE_DELAY : self::DEFAULT_BASE_DELAY,
 			'max_delay'    => self::DEFAULT_MAX_DELAY,
 			'backoff'      => 'exponential',
 			'jitter'       => 0,
 			'retry_after'  => self::extractRetryAfter( $context_data ),
+			'retry_class'  => $retry_class,
 			'provider'     => $context_data['ai_provider'] ?? $engine_data['provider'] ?? null,
 			'source_type'  => $engine_data['source_type'] ?? null,
 			'pipeline_id'  => $job['pipeline_id'] ?? ( $engine_data['job']['pipeline_id'] ?? null ),
@@ -222,6 +231,10 @@ class JobRetryPolicy {
 			return true;
 		}
 
+		if ( self::isShortTransportRetryClass( self::classifyFailure( $reason, $context_data ) ) ) {
+			return true;
+		}
+
 		$message = strtolower( implode( ' ', array_filter( array(
 			$reason,
 			$context_data['error_message'] ?? '',
@@ -236,6 +249,67 @@ class JobRetryPolicy {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Classify retryable failures so cheap transport blips can retry sooner.
+	 *
+	 * @param string $reason       Failure reason.
+	 * @param array  $context_data Failure context.
+	 * @return string
+	 */
+	private static function classifyFailure( string $reason, array $context_data ): string {
+		$message = strtolower( implode( ' ', array_filter( array(
+			$reason,
+			$context_data['error_code'] ?? '',
+			$context_data['error_message'] ?? '',
+			$context_data['exception_message'] ?? '',
+			$context_data['ai_error'] ?? '',
+		) ) ) );
+
+		if ( '' === $message ) {
+			return 'generic';
+		}
+
+		foreach ( array( 'rate limit', 'rate-limit', 'too many requests', '429', 'throttle', 'throttled' ) as $needle ) {
+			if ( str_contains( $message, $needle ) ) {
+				return 'provider_rate_limit';
+			}
+		}
+
+		foreach ( array( 'overloaded', 'overload', '503', '502', '504', 'service unavailable' ) as $needle ) {
+			if ( str_contains( $message, $needle ) ) {
+				return 'provider_overload';
+			}
+		}
+
+		foreach ( array( 'could not resolve host', 'couldn\'t resolve host', 'name or service not known', 'curl error 6', 'dns' ) as $needle ) {
+			if ( str_contains( $message, $needle ) ) {
+				return 'transport_dns';
+			}
+		}
+
+		foreach ( array( 'curl error 7', 'failed to connect', 'connection refused', 'connection reset', 'network is unreachable', 'no route to host' ) as $needle ) {
+			if ( str_contains( $message, $needle ) ) {
+				return 'transport_network';
+			}
+		}
+
+		if ( str_contains( $message, 'curl error 28' ) || str_contains( $message, 'connection timed out' ) || str_contains( $message, 'connect timed out' ) ) {
+			return 'transport_connect_timeout';
+		}
+
+		return 'generic';
+	}
+
+	/**
+	 * Whether a retry class should use the short AI transport delay.
+	 *
+	 * @param string $retry_class Retry classification.
+	 * @return bool
+	 */
+	private static function isShortTransportRetryClass( string $retry_class ): bool {
+		return in_array( $retry_class, array( 'transport_connect_timeout', 'transport_dns', 'transport_network' ), true );
 	}
 
 	/**
@@ -382,6 +456,7 @@ class JobRetryPolicy {
 				'flow_step_id'  => $context_data['flow_step_id'] ?? null,
 				'provider'      => $policy['provider'] ?? null,
 				'source_type'   => $policy['source_type'] ?? null,
+				'retry_class'   => $policy['retry_class'] ?? null,
 				'delay_seconds' => $delay_seconds,
 				'next_retry_at' => gmdate( 'c', $timestamp ),
 				'recorded_at'   => gmdate( 'c' ),
@@ -399,6 +474,7 @@ class JobRetryPolicy {
 					'delay_seconds'  => $delay_seconds,
 					'last_reason'    => $reason,
 					'last_retryable' => true,
+					'retry_class'    => $policy['retry_class'] ?? null,
 					'provider'       => $policy['provider'] ?? null,
 					'source_type'    => $policy['source_type'] ?? null,
 					'history'        => $history,
