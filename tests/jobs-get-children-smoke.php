@@ -4,7 +4,7 @@
  *
  * Run with: php tests/jobs-get-children-smoke.php
  *
- * Verifies the row-shaping logic that JobsOperations::get_children
+ * Verifies the row-shaping logic that Jobs::get_children
  * applies to wpdb->get_results output:
  *   - Empty result set → empty array.
  *   - Each row's engine_data is JSON-decoded into an array.
@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Mirror of the row-shaping foreach inside JobsOperations::get_children.
+ * Mirror of the row-shaping foreach inside Jobs::get_children.
  * Kept literally byte-equivalent so any drift surfaces as a diff between
  * this harness and the source.
  */

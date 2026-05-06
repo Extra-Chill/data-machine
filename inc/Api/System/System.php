@@ -17,7 +17,6 @@ use WP_Error;
 use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\AI\System\SystemTaskPromptRegistry;
-use DataMachine\Core\Database\Jobs\JobsOperations;
 
 if ( ! defined('ABSPATH') ) {
 	exit;
