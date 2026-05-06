@@ -388,6 +388,7 @@ class AIStep extends Step {
 
 		// Check for errors
 		if ( isset( $loop_result['error'] ) ) {
+			$request_metadata = is_array( $loop_result['request_metadata'] ?? null ) ? $loop_result['request_metadata'] : array();
 			// Record the transcript on the failure path too so operators
 			// can `wp datamachine jobs transcript <id>` and see exactly
 			// what the model received before the AI request died. This
@@ -408,6 +409,8 @@ class AIStep extends Step {
 					'flow_step_id'        => $this->flow_step_id,
 					'ai_error'            => $loop_result['error'],
 					'ai_provider'         => $provider_name,
+					'request_metadata'    => $request_metadata,
+					'transport_profile'   => is_array( $request_metadata['transport'] ?? null ) ? $request_metadata['transport'] : array(),
 					'retry_after'         => $loop_result['retry_after'] ?? null,
 					'retry_after_seconds' => $loop_result['retry_after_seconds'] ?? null,
 					'headers'             => is_array( $loop_result['headers'] ?? null ) ? $loop_result['headers'] : array(),
