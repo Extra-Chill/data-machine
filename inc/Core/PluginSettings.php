@@ -20,11 +20,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class PluginSettings {
 
-	public const DEFAULT_MAX_TURNS = 25;
+	public const DEFAULT_MAX_TURNS                    = 25;
 	public const DEFAULT_WP_AI_CLIENT_CONNECT_TIMEOUT = 15.0;
 	public const DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT = 300.0;
-	public const MAX_WP_AI_CLIENT_CONNECT_TIMEOUT = 300.0;
-	public const MAX_WP_AI_CLIENT_REQUEST_TIMEOUT = 900.0;
+	public const MAX_WP_AI_CLIENT_CONNECT_TIMEOUT     = 300.0;
+	public const MAX_WP_AI_CLIENT_REQUEST_TIMEOUT     = 900.0;
 
 	private static ?array $cache            = null;
 	private static array $agent_model_cache = array();

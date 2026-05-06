@@ -53,10 +53,10 @@ class RequestBuilder {
 	) {
 		WpAiClientCache::install();
 
-		$assembled          = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
-		$request            = $assembled['request'];
-		$provider_request   = ProviderRequestAssembler::toProviderRequest( $request );
-		$prompt_context     = self::wpAiClientPromptContext( $request['messages'] ?? array() );
+		$assembled        = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
+		$request          = $assembled['request'];
+		$provider_request = ProviderRequestAssembler::toProviderRequest( $request );
+		$prompt_context   = self::wpAiClientPromptContext( $request['messages'] ?? array() );
 		if ( '' !== $prompt_context['prompt'] ) {
 			$provider_request['prompt'] = $prompt_context['prompt'];
 		}
@@ -175,7 +175,7 @@ class RequestBuilder {
 				$request_options->setTimeout( $request_timeout );
 				$request_options->setConnectTimeout( $connect_timeout );
 				$transport_profile['request_options_used'] = true;
-				$request_metadata['transport']              = $transport_profile;
+				$request_metadata['transport']             = $transport_profile;
 				if ( is_object( $model_instance ) && method_exists( $model_instance, 'setRequestOptions' ) ) {
 					$model_instance->setRequestOptions( $request_options );
 				}
@@ -412,7 +412,7 @@ class RequestBuilder {
 			0.0,
 			min( PluginSettings::MAX_WP_AI_CLIENT_REQUEST_TIMEOUT, (float) $setting_default )
 		);
-		$timeout = apply_filters(
+		$timeout         = apply_filters(
 			'datamachine_wp_ai_client_request_timeout',
 			$default_timeout,
 			$mode,
@@ -454,7 +454,7 @@ class RequestBuilder {
 			),
 			$request_timeout
 		);
-		$timeout = apply_filters(
+		$timeout         = apply_filters(
 			'datamachine_wp_ai_client_connect_timeout',
 			$default_timeout,
 			$mode,

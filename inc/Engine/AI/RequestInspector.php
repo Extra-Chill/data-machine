@@ -142,7 +142,7 @@ class RequestInspector {
 		$provider   = (string) $mode_model['provider'];
 		$model      = (string) $mode_model['model'];
 
-		$assembled = RequestBuilder::assemble(
+		$assembled         = RequestBuilder::assemble(
 			$messages,
 			$provider,
 			$model,

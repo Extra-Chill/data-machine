@@ -11,7 +11,7 @@
 import { useEffect } from '@wordpress/element';
 
 /**
- * Internal dependencies
+ * External dependencies
  */
 import { useSettings, useUpdateSettings } from '@shared/queries/settings';
 import { useFormState } from '@shared/hooks/useFormState';

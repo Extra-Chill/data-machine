@@ -110,11 +110,11 @@ class SettingsAbilities {
 							'description' => 'Per-mode provider/model overrides keyed by mode id',
 						),
 						'max_turns'                      => array( 'type' => 'integer' ),
-						'wp_ai_client_connect_timeout'  => array(
+						'wp_ai_client_connect_timeout'   => array(
 							'type'        => 'number',
 							'description' => 'Connection timeout in seconds for wp-ai-client provider requests.',
 						),
-						'wp_ai_client_request_timeout'  => array(
+						'wp_ai_client_request_timeout'   => array(
 							'type'        => 'number',
 							'description' => 'Full request timeout in seconds for wp-ai-client provider requests.',
 						),
@@ -361,8 +361,8 @@ class SettingsAbilities {
 				'default_model'                  => $settings['default_model'] ?? '',
 				'mode_models'                    => $settings['mode_models'] ?? array(),
 				'max_turns'                      => $settings['max_turns'] ?? $defaults['max_turns'],
-				'wp_ai_client_connect_timeout'  => $settings['wp_ai_client_connect_timeout'] ?? $defaults['wp_ai_client_connect_timeout'],
-				'wp_ai_client_request_timeout'  => $settings['wp_ai_client_request_timeout'] ?? $defaults['wp_ai_client_request_timeout'],
+				'wp_ai_client_connect_timeout'   => $settings['wp_ai_client_connect_timeout'] ?? $defaults['wp_ai_client_connect_timeout'],
+				'wp_ai_client_request_timeout'   => $settings['wp_ai_client_request_timeout'] ?? $defaults['wp_ai_client_request_timeout'],
 				'disabled_tools'                 => $settings['disabled_tools'] ?? array(),
 				'ai_provider_keys'               => $masked_keys,
 				'queue_tuning'                   => wp_parse_args( $settings['queue_tuning'] ?? array(), $defaults['queue_tuning'] ),
@@ -472,7 +472,7 @@ class SettingsAbilities {
 				0.0,
 				min( PluginSettings::MAX_WP_AI_CLIENT_CONNECT_TIMEOUT, (float) $input['wp_ai_client_connect_timeout'] )
 			);
-			$handled_keys[]                              = 'wp_ai_client_connect_timeout';
+			$handled_keys[]                               = 'wp_ai_client_connect_timeout';
 		}
 
 		if ( isset( $input['wp_ai_client_request_timeout'] ) && is_numeric( $input['wp_ai_client_request_timeout'] ) ) {
@@ -480,7 +480,7 @@ class SettingsAbilities {
 				0.0,
 				min( PluginSettings::MAX_WP_AI_CLIENT_REQUEST_TIMEOUT, (float) $input['wp_ai_client_request_timeout'] )
 			);
-			$handled_keys[]                              = 'wp_ai_client_request_timeout';
+			$handled_keys[]                               = 'wp_ai_client_request_timeout';
 		}
 
 		if ( isset( $input['disabled_tools'] ) ) {
