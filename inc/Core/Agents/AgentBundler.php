@@ -445,15 +445,21 @@ class AgentBundler {
 	 * @param string|null $new_slug Optional override slug.
 	 * @param int         $owner_id WordPress user ID to own the imported agent.
 	 * @param bool        $dry_run  If true, validate without writing.
-	 * @param array       $options  Import options.
-	 * @return array{success: bool, message?: string, error?: string, summary?: array}
+	 * @param array       $options  Import options. Supported keys:
+	 *                              - reconcile_runtime (bool) Replace preserved runtime queue/scheduling fields.
+	 *                              - is_upgrade (bool) Treat an existing agent with the same slug as the upgrade
+	 *                                target instead of returning a slug-collision error. Required when the live
+	 *                                pipelines/flows have been edited (`local_modified`) so the importer can stage
+	 *                                conflicts and the CLI can hand them to the planner / PendingActions.
+	 * @return array{success: bool, message?: string, error?: string, error_code?: string, summary?: array}
 	 */
 	public function import( array $bundle, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false, array $options = array() ): array {
 		// Validate bundle.
 		if ( empty( $bundle['bundle_version'] ) || empty( $bundle['agent'] ) ) {
 			return array(
-				'success' => false,
-				'error'   => 'Invalid bundle: missing bundle_version or agent data.',
+				'success'    => false,
+				'error_code' => 'install_invalid_bundle',
+				'error'      => 'Invalid bundle: missing bundle_version or agent data.',
 			);
 		}
 
@@ -473,21 +479,27 @@ class AgentBundler {
 		);
 		$is_portable_bundle     = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
 		$reconcile_runtime      = ! empty( $options['reconcile_runtime'] );
+		$is_upgrade             = ! empty( $options['is_upgrade'] );
 
 		// Check for slug collision.
+		// On install: existing slug + (renamed-to-collision OR non-portable bundle) is a hard error.
+		// On upgrade: an existing slug is the upgrade target. Bundle-slug mismatch is still an error so we
+		// don't silently overwrite an unrelated agent that happens to share the slug.
 		$existing = $this->agents_repo->get_by_slug( $slug );
-		if ( $existing && ( $new_slug || ! $is_portable_bundle ) ) {
+		if ( $existing && ! $is_upgrade && ( $new_slug || ! $is_portable_bundle ) ) {
 			return array(
-				'success' => false,
-				'error'   => sprintf( 'Agent slug "%s" already exists. Use --slug=<new-slug> to rename on import.', $slug ),
+				'success'    => false,
+				'error_code' => 'install_slug_collision',
+				'error'      => sprintf( 'Agent slug "%s" already exists. Use --slug=<new-slug> to rename on import, or run `agent upgrade` to update the existing install.', $slug ),
 			);
 		}
 		if ( $existing ) {
 			$installed_bundle = $existing['agent_config']['datamachine_bundle'] ?? array();
 			if ( ! empty( $installed_bundle['bundle_slug'] ) && $installed_bundle['bundle_slug'] !== $bundle_slug ) {
 				return array(
-					'success' => false,
-					'error'   => sprintf( 'Agent slug "%s" is installed from bundle "%s", not "%s".', $slug, $installed_bundle['bundle_slug'], $bundle_slug ),
+					'success'    => false,
+					'error_code' => 'install_bundle_slug_mismatch',
+					'error'      => sprintf( 'Agent slug "%s" is installed from bundle "%s", not "%s".', $slug, $installed_bundle['bundle_slug'], $bundle_slug ),
 				);
 			}
 		}
@@ -535,6 +547,21 @@ class AgentBundler {
 		}
 
 		// --- Actual import ---
+		//
+		// Everything below this point is the post-claim mutation block. Any failure must be reported as
+		// `success: false` with a typed error_code and the agent row (if newly created) must be removed so
+		// `agent list` doesn't show a half-installed entry. Pre-claim guards above guarantee no DB writes
+		// have happened yet.
+		$created_agent_id      = 0; // Tracks an agent row this call inserted, for manual rollback.
+		$created_pipeline_ids  = array();
+		$created_flow_ids      = array();
+		$transaction_started   = $this->begin_transaction();
+
+		try {
+			// Test fault-injection seam. Production code path is a no-op. Tests load the
+			// `DataMachine\Tests\Support\AgentBundlerImportFaultInjector` and trigger a typed failure to
+			// exercise rollback semantics without waiting for a live SQLite race.
+			do_action( 'datamachine_bundle_import_post_claim_started', $bundle_metadata, $slug );
 
 		// 1. Create or update the agent record.
 		$incoming_config = $agent_data['agent_config'] ?? array();
@@ -557,13 +584,15 @@ class AgentBundler {
 
 		if ( $existing ) {
 			$agent_id = (int) $existing['agent_id'];
-			$this->agents_repo->update_agent(
+			if ( ! $this->agents_repo->update_agent(
 				$agent_id,
 				array(
 					'agent_name'   => $agent_data['agent_name'] ?? $slug,
 					'agent_config' => $config,
 				)
-			);
+			) ) {
+				throw new \RuntimeException( 'Failed to update existing agent record.' );
+			}
 		} else {
 			$agent_id = $this->agents_repo->create_if_missing(
 				$slug,
@@ -571,13 +600,10 @@ class AgentBundler {
 				$owner_id,
 				$config
 			);
-		}
-
-		if ( ! $agent_id ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to create agent record.',
-			);
+			if ( ! $agent_id ) {
+				throw new \RuntimeException( 'Failed to create agent record.' );
+			}
+			$created_agent_id = $agent_id;
 		}
 
 		// 2. Write agent identity files.
@@ -639,34 +665,38 @@ class AgentBundler {
 					'agent_id'        => $agent_id,
 					'user_id'         => $owner_id,
 				) );
+				if ( ! $new_pipeline_id ) {
+					throw new \RuntimeException( sprintf( 'Failed to create pipeline "%s".', $portable_slug ) );
+				}
+				$created_pipeline_ids[] = (int) $new_pipeline_id;
 			}
 
-			if ( $new_pipeline_id ) {
-				$pipeline_config = $this->remap_pipeline_step_ids( $pipeline_config, $old_id, (int) $new_pipeline_id );
-				$this->pipelines_repo->update_pipeline(
-					(int) $new_pipeline_id,
-					array(
-						'pipeline_name'   => $pipeline_data['pipeline_name'],
-						'pipeline_config' => $pipeline_config,
-						'portable_slug'   => $portable_slug,
-					)
-				);
-
-				$pipeline_id_map[ $old_id ]        = (int) $new_pipeline_id;
-				$artifact_records[ $artifact_key ] = $this->bundle_artifact_record(
-					$bundle_metadata,
-					'pipeline',
-					$portable_slug,
-					'pipelines/' . $portable_slug . '.json',
-					$payload
-				);
-
-				// Write pipeline memory files to disk.
-				$this->write_pipeline_memory_files(
-					(int) $new_pipeline_id,
-					$pipeline_data['memory_file_contents'] ?? array()
-				);
+			$pipeline_config = $this->remap_pipeline_step_ids( $pipeline_config, $old_id, (int) $new_pipeline_id );
+			if ( ! $this->pipelines_repo->update_pipeline(
+				(int) $new_pipeline_id,
+				array(
+					'pipeline_name'   => $pipeline_data['pipeline_name'],
+					'pipeline_config' => $pipeline_config,
+					'portable_slug'   => $portable_slug,
+				)
+			) ) {
+				throw new \RuntimeException( sprintf( 'Failed to update pipeline "%s".', $portable_slug ) );
 			}
+
+			$pipeline_id_map[ $old_id ]        = (int) $new_pipeline_id;
+			$artifact_records[ $artifact_key ] = $this->bundle_artifact_record(
+				$bundle_metadata,
+				'pipeline',
+				$portable_slug,
+				'pipelines/' . $portable_slug . '.json',
+				$payload
+			);
+
+			// Write pipeline memory files to disk.
+			$this->write_pipeline_memory_files(
+				(int) $new_pipeline_id,
+				$pipeline_data['memory_file_contents'] ?? array()
+			);
 		}
 
 		// 5. Import flows: create paused, preserve local schedules/queues on update.
@@ -751,10 +781,9 @@ class AgentBundler {
 				if ( $reconcile_runtime ) {
 					$update_data['scheduling_config'] = $flow_data['scheduling_config'] ?? array();
 				}
-				$this->flows_repo->update_flow(
-					$new_flow_id,
-					$update_data
-				);
+				if ( ! $this->flows_repo->update_flow( $new_flow_id, $update_data ) ) {
+					throw new \RuntimeException( sprintf( 'Failed to update flow "%s".', $portable_slug ) );
+				}
 			} else {
 				$new_flow_id = $this->flows_repo->create_flow( array(
 					'pipeline_id'       => $new_pipeline_id,
@@ -766,36 +795,39 @@ class AgentBundler {
 					'user_id'           => $owner_id,
 				) );
 
-				if ( $new_flow_id ) {
-					$flow_config = $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, (int) $new_flow_id );
-					$this->flows_repo->update_flow(
-						(int) $new_flow_id,
-						array(
-							'flow_name'     => $flow_data['flow_name'],
-							'flow_config'   => $flow_config,
-							'portable_slug' => $portable_slug,
-						)
-					);
+				if ( ! $new_flow_id ) {
+					throw new \RuntimeException( sprintf( 'Failed to create flow "%s".', $portable_slug ) );
+				}
+				$created_flow_ids[] = (int) $new_flow_id;
+
+				$flow_config = $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, (int) $new_flow_id );
+				if ( ! $this->flows_repo->update_flow(
+					(int) $new_flow_id,
+					array(
+						'flow_name'     => $flow_data['flow_name'],
+						'flow_config'   => $flow_config,
+						'portable_slug' => $portable_slug,
+					)
+				) ) {
+					throw new \RuntimeException( sprintf( 'Failed to update freshly-created flow "%s".', $portable_slug ) );
 				}
 			}
 
-			if ( $new_flow_id ) {
-				++$flow_count;
-				$artifact_records[ $artifact_key ] = $this->bundle_artifact_record(
-					$bundle_metadata,
-					'flow',
-					$portable_slug,
-					'flows/' . $portable_slug . '.json',
-					$payload
-				);
+			++$flow_count;
+			$artifact_records[ $artifact_key ] = $this->bundle_artifact_record(
+				$bundle_metadata,
+				'flow',
+				$portable_slug,
+				'flows/' . $portable_slug . '.json',
+				$payload
+			);
 
-				// Write flow memory files to disk.
-				$this->write_flow_memory_files(
-					$new_pipeline_id,
-					(int) $new_flow_id,
-					$flow_data['memory_file_contents'] ?? array()
-				);
-			}
+			// Write flow memory files to disk.
+			$this->write_flow_memory_files(
+				$new_pipeline_id,
+				(int) $new_flow_id,
+				$flow_data['memory_file_contents'] ?? array()
+			);
 		}
 
 		// 6. Apply plugin-owned artifacts through their owning plugin.
@@ -865,7 +897,35 @@ class AgentBundler {
 		$summary['runtime_drift']      = $runtime_drift;
 
 		$config['datamachine_bundle']['artifacts'] = $artifact_records;
-		$this->agents_repo->update_agent( $agent_id, array( 'agent_config' => $config ) );
+		if ( ! $this->agents_repo->update_agent( $agent_id, array( 'agent_config' => $config ) ) ) {
+			throw new \RuntimeException( 'Failed to persist final agent_config with bundle artifact registry.' );
+		}
+
+		// Test fault-injection seam — fires after every mutation but before commit so a test handler
+		// can throw and exercise the rollback path without waiting for a SQLite race.
+		do_action( 'datamachine_bundle_import_pre_commit', $bundle_metadata, $slug, $agent_id );
+
+		// Verify persistence end-to-end. SQLite under Studio has been observed silently rolling back the
+		// outer mutations under contention (#1801): the in-memory bundler thinks everything wrote, but a
+		// fresh SELECT shows no agent row and no artifacts. Re-fetching closes the door on that path —
+		// if the row isn't there, we surface the failure instead of returning a ghost agent_id.
+		$persisted = $this->agents_repo->get_agent( $agent_id );
+		if ( ! $persisted ) {
+			throw new \RuntimeException( sprintf( 'Agent row for ID %d disappeared after install — possible silent rollback.', $agent_id ) );
+		}
+		$persisted_artifacts = is_array( $persisted['agent_config']['datamachine_bundle']['artifacts'] ?? null )
+			? $persisted['agent_config']['datamachine_bundle']['artifacts']
+			: array();
+		if ( count( $persisted_artifacts ) < count( $artifact_records ) ) {
+			throw new \RuntimeException( sprintf(
+				'Agent ID %d persisted %d artifact records but %d were written — possible silent rollback.',
+				$agent_id,
+				count( $persisted_artifacts ),
+				count( $artifact_records )
+			) );
+		}
+
+		$this->commit_transaction( $transaction_started );
 
 		return array(
 			'success' => true,
@@ -878,6 +938,95 @@ class AgentBundler {
 			),
 			'summary' => $summary,
 		);
+		} catch ( \Throwable $e ) {
+			// Roll back any DB writes from this call. Run native ROLLBACK first; if the underlying engine
+			// (e.g. the SQLite drop-in) silently no-ops on rollback, fall back to manual cleanup of rows
+			// we created so the next install attempt sees a clean slate.
+			$this->rollback_transaction( $transaction_started );
+			$this->manual_rollback( $created_agent_id, $created_pipeline_ids, $created_flow_ids );
+
+			do_action(
+				'datamachine_log',
+				'error',
+				'AgentBundler::import post-claim failure — rolled back.',
+				array(
+					'agent_slug'    => $slug,
+					'bundle_slug'   => $bundle_slug,
+					'is_upgrade'    => $is_upgrade,
+					'error'         => $e->getMessage(),
+					'error_class'   => get_class( $e ),
+				)
+			);
+
+			return array(
+				'success'    => false,
+				'error_code' => 'install_post_claim_failure',
+				'error'      => sprintf( 'Agent install rolled back: %s', $e->getMessage() ),
+			);
+		}
+	}
+
+	/**
+	 * Open a DB transaction for the import critical section.
+	 *
+	 * Returns true when the engine accepted `START TRANSACTION`. SQLite via the Studio drop-in maps this
+	 * to `BEGIN`. If the engine refuses (returns false), we still proceed — the manual_rollback() path
+	 * is the safety net that cleans up any rows we know we created.
+	 */
+	private function begin_transaction(): bool {
+		if ( ! isset( $this->agents_repo ) ) {
+			return false;
+		}
+
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$result = $wpdb->query( 'START TRANSACTION' );
+
+		return false !== $result;
+	}
+
+	private function commit_transaction( bool $started ): void {
+		if ( ! $started ) {
+			return;
+		}
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( 'COMMIT' );
+	}
+
+	private function rollback_transaction( bool $started ): void {
+		if ( ! $started ) {
+			return;
+		}
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( 'ROLLBACK' );
+	}
+
+	/**
+	 * Manually undo writes from a failed import.
+	 *
+	 * Belt-and-braces: if the engine ignored ROLLBACK we still delete the agent row and any
+	 * pipelines/flows this call created so a retry sees the same shape as a fresh install. We never
+	 * delete rows that pre-existed.
+	 *
+	 * @param int   $created_agent_id     Agent row this call inserted (0 if upgrade).
+	 * @param int[] $created_pipeline_ids Pipeline rows this call inserted.
+	 * @param int[] $created_flow_ids     Flow rows this call inserted.
+	 */
+	private function manual_rollback( int $created_agent_id, array $created_pipeline_ids, array $created_flow_ids ): void {
+		foreach ( $created_flow_ids as $flow_id ) {
+			$this->flows_repo->delete_flow( (int) $flow_id );
+		}
+		foreach ( $created_pipeline_ids as $pipeline_id ) {
+			$this->pipelines_repo->delete_pipeline( (int) $pipeline_id );
+		}
+		if ( $created_agent_id > 0 ) {
+			global $wpdb;
+			$agents_table = $wpdb->base_prefix . 'datamachine_agents';
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->delete( $agents_table, array( 'agent_id' => (int) $created_agent_id ), array( '%d' ) );
+		}
 	}
 
 	private function bundle_has_portable_artifacts( array $bundle ): bool {
