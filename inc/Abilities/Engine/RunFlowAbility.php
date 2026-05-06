@@ -43,17 +43,21 @@ class RunFlowAbility {
 						'type'       => 'object',
 						'required'   => array( 'flow_id' ),
 						'properties' => array(
-							'flow_id'      => array(
+							'flow_id'        => array(
 								'type'        => 'integer',
 								'description' => __( 'Flow ID to execute.', 'data-machine' ),
 							),
-							'job_id'       => array(
+							'job_id'         => array(
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Pre-created job ID (optional, for API-triggered executions).', 'data-machine' ),
 							),
-							'initial_data' => array(
+							'initial_data'   => array(
 								'type'        => 'object',
 								'description' => __( 'Optional initial engine data to merge (e.g. webhook payloads, API context).', 'data-machine' ),
+							),
+							'respect_paused' => array(
+								'type'        => 'boolean',
+								'description' => __( 'Internal scheduler safety flag. When true, paused flows are skipped.', 'data-machine' ),
 							),
 						),
 					),
@@ -91,7 +95,7 @@ class RunFlowAbility {
 	/**
 	 * Execute the run-flow ability.
 	 *
-	 * @param array $input Input with flow_id, optional job_id and initial_data.
+	 * @param array $input Input with flow_id, optional job_id, initial_data, and respect_paused.
 	 * @return array Result with success status and execution details.
 	 */
 	public function execute( array $input ): array {
@@ -107,10 +111,12 @@ class RunFlowAbility {
 			);
 		}
 
-		// Check if flow is paused (enabled=false). Safety net for AS hooks
-		// that were already queued before the flow was paused.
+		// Check if flow is paused only for scheduler-triggered executions.
+		// Direct ability/manual runs are allowed even when recurring schedules
+		// are paused.
 		$scheduling_config = $flow['scheduling_config'] ?? array();
-		if ( ! \DataMachine\Core\Database\Flows\Flows::is_flow_enabled( $scheduling_config ) ) {
+		$respect_paused    = true === ( $input['respect_paused'] ?? false );
+		if ( $respect_paused && ! \DataMachine\Core\Database\Flows\Flows::is_flow_enabled( $scheduling_config ) ) {
 			do_action(
 				'datamachine_log',
 				'info',
