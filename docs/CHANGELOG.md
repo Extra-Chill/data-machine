@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.104.1] - 2026-05-06
+
+### Changed
+- Project DataPackets before AI prompt serialization
+- Apply wp-ai-client connect timeout to curl
+- Allow tuning wp-ai-client connect timeout
+
+### Fixed
+- Fix pipeline transcript lookup
+
 ## [0.104.0] - 2026-05-05
 
 ### Added
