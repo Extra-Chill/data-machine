@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.105.0] - 2026-05-06
+
+### Added
+- add FreshCandidateCollector primitive for selection-time filtering
+- add synchronous job drain ability
+
+### Changed
+- collapse JobsOperations/JobsStatus passthrough into Jobs
+- Require explicit memory modes for prompt injection
+
+### Fixed
+- Fix silent agent install rollback and misleading upgrade rejection (#1801)
+
 ## [0.104.1] - 2026-05-06
 
 ### Changed
