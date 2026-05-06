@@ -24,6 +24,8 @@ const EMPTY_FORM = {
 	file_retention_days: 7,
 	chat_retention_days: 90,
 	chat_ai_titles_enabled: true,
+	wp_ai_client_connect_timeout: 15,
+	wp_ai_client_request_timeout: 300,
 	flows_per_page: 20,
 	jobs_per_page: 50,
 	queue_tuning: {
@@ -65,6 +67,10 @@ const GeneralTab = () => {
 		chunk_size: 10,
 		chunk_delay: 30,
 	};
+	const transportDefaults = {
+		connectTimeout: data?.defaults?.wp_ai_client_connect_timeout ?? 15,
+		requestTimeout: data?.defaults?.wp_ai_client_request_timeout ?? 300,
+	};
 
 	const form = useFormState( {
 		initialData: EMPTY_FORM,
@@ -87,6 +93,10 @@ const GeneralTab = () => {
 					data.settings.chat_retention_days ?? EMPTY_FORM.chat_retention_days,
 				chat_ai_titles_enabled:
 					data.settings.chat_ai_titles_enabled ?? EMPTY_FORM.chat_ai_titles_enabled,
+				wp_ai_client_connect_timeout:
+					data.settings.wp_ai_client_connect_timeout ?? transportDefaults.connectTimeout,
+				wp_ai_client_request_timeout:
+					data.settings.wp_ai_client_request_timeout ?? transportDefaults.requestTimeout,
 				flows_per_page:
 					data.settings.flows_per_page ?? EMPTY_FORM.flows_per_page,
 				jobs_per_page:
@@ -168,6 +178,70 @@ const GeneralTab = () => {
 									for debugging purposes. Processed items in
 									database are always cleaned up to allow
 									retry.
+								</p>
+							</fieldset>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row">AI connect timeout</th>
+						<td>
+							<fieldset>
+								<input
+									type="number"
+									id="wp_ai_client_connect_timeout"
+									value={ form.data.wp_ai_client_connect_timeout }
+									onChange={ ( e ) =>
+										updateField(
+											'wp_ai_client_connect_timeout',
+											clamp(
+												e.target.value,
+												0,
+												300,
+												transportDefaults.connectTimeout
+											)
+										)
+									}
+									min="0"
+									max="300"
+									className="small-text"
+								/>
+								<p className="description">
+									Seconds allowed to establish the provider
+									connection. Default:{ ' ' }
+									{ transportDefaults.connectTimeout }.
+								</p>
+							</fieldset>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row">AI request timeout</th>
+						<td>
+							<fieldset>
+								<input
+									type="number"
+									id="wp_ai_client_request_timeout"
+									value={ form.data.wp_ai_client_request_timeout }
+									onChange={ ( e ) =>
+										updateField(
+											'wp_ai_client_request_timeout',
+											clamp(
+												e.target.value,
+												0,
+												900,
+												transportDefaults.requestTimeout
+											)
+										)
+									}
+									min="0"
+									max="900"
+									className="small-text"
+								/>
+								<p className="description">
+									Seconds allowed for the full non-streaming AI
+									response. Default:{ ' ' }
+									{ transportDefaults.requestTimeout }.
 								</p>
 							</fieldset>
 						</td>

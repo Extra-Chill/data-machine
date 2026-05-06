@@ -150,6 +150,12 @@ class RequestInspector {
 			ToolPolicyResolver::MODE_PIPELINE,
 			$payload
 		);
+		$transport_profile = RequestBuilder::wpAiClientTransportProfile(
+			ToolPolicyResolver::MODE_PIPELINE,
+			$provider,
+			$model,
+			$payload
+		);
 
 		return array_merge(
 			array(
@@ -160,6 +166,7 @@ class RequestInspector {
 				'provider'     => $provider,
 				'model'        => $model,
 				'mode'         => ToolPolicyResolver::MODE_PIPELINE,
+				'transport'    => $transport_profile,
 			),
 			$this->measure( $assembled, $data_packets, $messages, $packet_projection_context )
 		);

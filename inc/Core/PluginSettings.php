@@ -21,7 +21,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 class PluginSettings {
 
 	public const DEFAULT_MAX_TURNS = 25;
-	public const DEFAULT_WP_AI_CLIENT_CONNECT_TIMEOUT = 30.0;
+	public const DEFAULT_WP_AI_CLIENT_CONNECT_TIMEOUT = 15.0;
+	public const DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT = 300.0;
+	public const MAX_WP_AI_CLIENT_CONNECT_TIMEOUT = 300.0;
+	public const MAX_WP_AI_CLIENT_REQUEST_TIMEOUT = 900.0;
 
 	private static ?array $cache            = null;
 	private static array $agent_model_cache = array();
@@ -55,12 +58,13 @@ class PluginSettings {
 	/**
 	 * Get centralized plugin defaults used by backend and admin UI.
 	 *
-	 * @return array{max_turns:int,wp_ai_client_connect_timeout:float,queue_tuning:array{concurrent_batches:int,batch_size:int,time_limit:int,chunk_size:int,chunk_delay:int}}
+	 * @return array{max_turns:int,wp_ai_client_connect_timeout:float,wp_ai_client_request_timeout:float,queue_tuning:array{concurrent_batches:int,batch_size:int,time_limit:int,chunk_size:int,chunk_delay:int}}
 	 */
 	public static function getDefaults(): array {
 		return array(
 			'max_turns'                    => self::DEFAULT_MAX_TURNS,
 			'wp_ai_client_connect_timeout' => self::DEFAULT_WP_AI_CLIENT_CONNECT_TIMEOUT,
+			'wp_ai_client_request_timeout' => self::DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT,
 			'queue_tuning'                 => self::getDefaultQueueTuning(),
 		);
 	}
