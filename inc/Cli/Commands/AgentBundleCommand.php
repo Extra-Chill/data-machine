@@ -224,7 +224,20 @@ class AgentBundleCommand extends BaseCommand {
 		}
 
 		$owner_id = isset( $assoc_args['owner'] ) ? $this->resolve_user_id( $assoc_args['owner'] ) : 0;
-		$result   = $this->bundler()->import( $bundle, '' !== $slug ? $slug : null, $owner_id, false, array( 'reconcile_runtime' => $reconcile_runtime ) );
+		$result   = $this->bundler()->import(
+			$bundle,
+			'' !== $slug ? $slug : null,
+			$owner_id,
+			false,
+			array(
+				'reconcile_runtime' => $reconcile_runtime,
+				// Mark this as an upgrade so the importer treats an existing agent row as the upgrade
+				// target instead of returning "Agent slug already exists" when local pipelines/flows
+				// have been edited (#1801). Local-modified artifacts come back in `result.conflicts`
+				// and get staged as PendingActions below.
+				'is_upgrade'        => true,
+			)
+		);
 		if ( empty( $result['success'] ) ) {
 			WP_CLI::error( (string) ( $result['error'] ?? 'Bundle upgrade failed.' ) );
 			return;

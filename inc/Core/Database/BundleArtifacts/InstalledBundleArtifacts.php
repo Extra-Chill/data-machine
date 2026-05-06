@@ -23,6 +23,33 @@ final class InstalledBundleArtifacts extends BaseRepository {
 	public const TABLE_NAME = 'datamachine_bundle_artifacts';
 
 	/**
+	 * Wire cleanup hooks once per request.
+	 *
+	 * Currently registers a `datamachine_agent_deleted` listener that wipes any tracked artifact rows
+	 * for the deleted agent. The importer does not write to this table today, but extensions can — and
+	 * a stale row here would mis-classify a fresh install as an upgrade against a non-existent agent.
+	 * Registering the listener defensively closes that door (#1801).
+	 *
+	 * @return void
+	 */
+	public static function register(): void {
+		add_action(
+			'datamachine_agent_deleted',
+			static function ( int $agent_id ): void {
+				if ( $agent_id <= 0 ) {
+					return;
+				}
+				global $wpdb;
+				$table = $wpdb->prefix . self::TABLE_NAME;
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$wpdb->delete( $table, array( 'agent_id' => $agent_id ), array( '%d' ) );
+			},
+			10,
+			1
+		);
+	}
+
+	/**
 	 * Create installed bundle artifact tracking table.
 	 *
 	 * Safe to call during activation or deploy-time migrations; dbDelta is idempotent.
