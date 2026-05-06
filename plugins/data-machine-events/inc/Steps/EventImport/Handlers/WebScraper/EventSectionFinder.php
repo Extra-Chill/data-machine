@@ -11,6 +11,7 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 
 use DataMachine\Core\ExecutionContext;
+use DataMachine\Core\Steps\Fetch\FreshCandidateCollector;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -19,9 +20,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class EventSectionFinder {
 
 	/**
-	 * @var callable(string): bool
+	 * @var FreshCandidateCollector
 	 */
-	private $is_item_processed;
+	private FreshCandidateCollector $fresh_candidates;
 
 	/**
 	 * @var callable(string): string
@@ -34,12 +35,12 @@ final class EventSectionFinder {
 	private $is_past_event;
 
 	/**
-	 * @param callable(string): bool $is_item_processed Check if item identifier has been processed
+	 * @param FreshCandidateCollector $fresh_candidates Selection-time fresh candidate collector.
 	 * @param callable(string): string $clean_html_for_ai Clean HTML for AI processing
 	 * @param callable(string): bool $is_past_event Check if Y-m-d date is in the past
 	 */
-	public function __construct( callable $is_item_processed, callable $clean_html_for_ai, callable $is_past_event ) {
-		$this->is_item_processed = $is_item_processed;
+	public function __construct( FreshCandidateCollector $fresh_candidates, callable $clean_html_for_ai, callable $is_past_event ) {
+		$this->fresh_candidates  = $fresh_candidates;
 		$this->clean_html_for_ai = $clean_html_for_ai;
 		$this->is_past_event     = $is_past_event;
 	}
@@ -96,7 +97,7 @@ final class EventSectionFinder {
 					// Build stable identifier from decoded data
 					$event_identifier = md5( $url . $summary . ( $event_data['start'] ?? '' ) );
 
-					if ( call_user_func( $this->is_item_processed, $event_identifier ) ) {
+					if ( ! $this->fresh_candidates->offer( $event_identifier ) ) {
 						continue;
 					}
 
@@ -128,12 +129,12 @@ final class EventSectionFinder {
 				$content_hash     = md5( $raw_html );
 				$event_identifier = md5( $url . $content_hash );
 
-				if ( call_user_func( $this->is_item_processed, $event_identifier ) ) {
+				$cleaned_html = call_user_func( $this->clean_html_for_ai, $raw_html );
+				if ( empty( $cleaned_html ) || strlen( $cleaned_html ) < 30 ) {
 					continue;
 				}
 
-				$cleaned_html = call_user_func( $this->clean_html_for_ai, $raw_html );
-				if ( empty( $cleaned_html ) || strlen( $cleaned_html ) < 30 ) {
+				if ( ! $this->fresh_candidates->offer( $event_identifier ) ) {
 					continue;
 				}
 

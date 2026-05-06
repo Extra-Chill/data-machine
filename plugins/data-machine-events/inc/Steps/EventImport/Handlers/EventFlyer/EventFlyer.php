@@ -12,6 +12,7 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\EventFlyer;
 
 use DataMachine\Core\ExecutionContext;
+use DataMachine\Core\Steps\Fetch\FreshCandidateCollector;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\Handlers\VenueFieldsTrait;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
@@ -140,6 +141,12 @@ class EventFlyer extends EventImportHandler {
 
 		$image_extensions = array( 'jpg', 'jpeg', 'png', 'gif', 'webp' );
 
+		// Selection-time prefilter via Data Machine core primitive.
+		// FreshCandidateCollector skips already-processed and currently-claimed
+		// images consistently with FetchHandler's authoritative dedup. Authoritative
+		// dedup/claim/cap still runs in FetchHandler::get_fetch_data() after this.
+		$collector = new FreshCandidateCollector( $context, 1 );
+
 		foreach ( $repo_files as $file ) {
 			$extension = strtolower( pathinfo( $file['filename'], PATHINFO_EXTENSION ) );
 
@@ -148,23 +155,25 @@ class EventFlyer extends EventImportHandler {
 			}
 
 			$file_identifier = $file['path'];
-
-			// Pre-filter: skip already-processed images to find the next one.
-			// This is a selection mechanism, not dedup — dedup happens in FetchHandler::dedup().
-			if ( $context->isItemProcessed( $file_identifier ) ) {
-				continue;
-			}
-
-			return array(
+			$image           = array(
 				'original_name'   => $file['filename'],
 				'persistent_path' => $file['path'],
 				'size'            => $file['size'],
 				'mime_type'       => $this->getMimeType( $file['path'] ),
 				'uploaded_at'     => gmdate( 'Y-m-d H:i:s', $file['modified'] ),
 			);
+
+			$collector->offer( $file_identifier, $image );
+
+			if ( $collector->isFull() ) {
+				break;
+			}
 		}
 
-		return null;
+		$collector->markExhausted();
+
+		$accepted = $collector->getAccepted();
+		return $accepted[0] ?? null;
 	}
 
 	private function getMimeType( string $file_path ): string {

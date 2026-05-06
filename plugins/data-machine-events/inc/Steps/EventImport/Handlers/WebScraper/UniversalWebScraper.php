@@ -48,6 +48,7 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 
 use DataMachine\Core\ExecutionContext;
+use DataMachine\Core\Steps\Fetch\FreshCandidateCollector;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ExtractorInterface;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WixEventsExtractor;
@@ -469,12 +470,18 @@ class UniversalWebScraper extends EventImportHandler {
 		ExecutionContext $context,
 		int $current_page
 	): ?array {
-		$skipped_identifiers = array();
+		// Selection-time prefilter via Data Machine core primitive.
+		// The collector skips processed/claimed/duplicate sections while this
+		// method keeps event-specific filters (HTML validity, title keywords,
+		// include/exclude keywords). FetchHandler remains authoritative after
+		// executeFetch() returns.
+		$section_collector = new FreshCandidateCollector( $context );
 
 		while ( true ) {
-			$event_section = $this->extract_event_sections( $html_content, $current_url, $context, $skipped_identifiers );
+			$event_section = $this->extract_event_sections( $html_content, $current_url, $context, $section_collector );
 
 			if ( empty( $event_section ) ) {
+				$section_collector->markExhausted();
 				break;
 			}
 
@@ -490,13 +497,11 @@ class UniversalWebScraper extends EventImportHandler {
 			$raw_html_data = $this->extract_raw_html_section( $event_section['raw_html'], $current_url, $context, $config );
 
 			if ( ! $raw_html_data ) {
-				$skipped_identifiers[ $event_section['identifier'] ] = true;
 				continue;
 			}
 
 			$section_title = $this->extract_section_title( $raw_html_data );
 			if ( '' !== $section_title && $this->shouldSkipEventTitle( $section_title ) ) {
-				$skipped_identifiers[ $event_section['identifier'] ] = true;
 				continue;
 			}
 
@@ -511,7 +516,6 @@ class UniversalWebScraper extends EventImportHandler {
 						'source_url'         => $current_url,
 					)
 				);
-				$skipped_identifiers[ $event_section['identifier'] ] = true;
 				continue;
 			}
 
@@ -524,7 +528,6 @@ class UniversalWebScraper extends EventImportHandler {
 						'source_url'         => $current_url,
 					)
 				);
-				$skipped_identifiers[ $event_section['identifier'] ] = true;
 				continue;
 			}
 
@@ -740,11 +743,11 @@ class UniversalWebScraper extends EventImportHandler {
 	}
 
 	/**
-	 * Extract first non-processed event HTML section from content.
+	 * Extract first fresh event HTML section from content.
 	 */
-	private function extract_event_sections( string $html_content, string $url, ExecutionContext $context, array $skipped_identifiers = array() ): ?array {
+	private function extract_event_sections( string $html_content, string $url, ExecutionContext $context, FreshCandidateCollector $section_collector ): ?array {
 		$finder = new EventSectionFinder(
-			fn ( string $identifier ): bool => isset( $skipped_identifiers[ $identifier ] ) || $context->isItemProcessed( $identifier ),
+			$section_collector,
 			fn ( string $html ): string => $this->clean_html_for_ai( $html ),
 			fn ( string $ymd ): bool => $this->isPastEvent( $ymd )
 		);

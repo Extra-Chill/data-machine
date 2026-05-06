@@ -13,6 +13,7 @@
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 
 use DataMachine\Core\ExecutionContext;
+use DataMachine\Core\Steps\Fetch\FreshCandidateCollector;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
@@ -76,41 +77,57 @@ class VisionExtractionProcessor {
 			)
 		);
 
+		// Selection-time prefilter via Data Machine core primitive.
+		// FreshCandidateCollector skips already-processed and currently-claimed
+		// images consistently with FetchHandler's authoritative dedup. Authoritative
+		// dedup/claim/cap still runs in FetchHandler::get_fetch_data() after this.
+		$collector = new FreshCandidateCollector( $context, 1 );
 		foreach ( $candidates as $candidate ) {
-			$image_url = $candidate['url'];
-
-			// Generate content-based identifier for cross-run tracking.
+			$image_url        = $candidate['url'];
+			// Content-based identifier for cross-run tracking.
 			$image_identifier = md5( $url . $image_url );
 
-			// Pre-filter: skip already-processed images to find the next candidate.
-			// This is a selection mechanism, not dedup — dedup happens in FetchHandler::dedup().
-			if ( $context->isItemProcessed( $image_identifier ) ) {
-				$context->log(
-					'debug',
-					'VisionExtractor: Skipping processed image',
-					array( 'image_url' => $image_url )
-				);
-				continue;
+			$collector->offer(
+				$image_identifier,
+				array(
+					'image_url'        => $image_url,
+					'image_identifier' => $image_identifier,
+					'score'            => $candidate['score'] ?? 0,
+				)
+			);
+
+			if ( $collector->isFull() ) {
+				break;
 			}
+		}
+		$collector->markExhausted();
+
+		$accepted = $collector->getAccepted();
+		if ( ! empty( $accepted ) ) {
+			$selected         = $accepted[0];
+			$image_url        = $selected['image_url'];
+			$image_identifier = $selected['image_identifier'];
 
 			$context->log(
 				'debug',
 				'VisionExtractor: Processing image candidate',
 				array(
 					'image_url' => $image_url,
-					'score'     => $candidate['score'],
+					'score'     => $selected['score'],
 				)
 			);
 
 			// Download to persistent storage.
 			$file_path = $this->downloadImageToPersistentStorage( $image_url, $context );
 
-			// Mark as processed AFTER download attempt (success or fail).
-			// Direct call — this is a pre-filter, not dedup. Centralized dedup
-			// in FetchHandler::dedup() runs after executeFetch() returns.
-			$context->markItemProcessed( $image_identifier );
-
 			if ( ! $file_path ) {
+				// Mark this candidate as processed even though download failed,
+				// so the next run advances to the next candidate instead of
+				// retrying a permanently broken URL. This is a retry-prevention
+				// concern separate from candidate prefiltering - the collector
+				// only reads processed state, it does not mark.
+				$context->markItemProcessed( $image_identifier );
+
 				$context->log(
 					'warning',
 					'VisionExtractor: Failed to download image, will try next candidate on next run',

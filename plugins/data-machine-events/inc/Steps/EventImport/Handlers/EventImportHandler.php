@@ -111,39 +111,6 @@ abstract class EventImportHandler extends FetchHandler {
 	}
 
 	/**
-	 * Check if item has been processed (uses ExecutionContext).
-	 *
-	 * @deprecated Use metadata['item_identifier'] instead. Dedup is now centralized in FetchHandler::dedup().
-	 *
-	 * @param ExecutionContext $context Execution context
-	 * @param string           $item_identifier Item identifier
-	 * @return bool True if already processed
-	 */
-	public function checkItemProcessed( ExecutionContext $context, string $item_identifier ): bool {
-		return $context->isItemProcessed( $item_identifier );
-	}
-
-	/**
-	 * Mark item as processed (uses ExecutionContext).
-	 *
-	 * Also stores item context in engine data for the skip_item tool.
-	 *
-	 * @deprecated Use metadata['item_identifier'] instead. Dedup is now centralized in FetchHandler::dedup().
-	 *
-	 * @param ExecutionContext $context Execution context
-	 * @param string           $item_identifier Item identifier
-	 */
-	public function markItemAsProcessed( ExecutionContext $context, string $item_identifier ): void {
-		$context->markItemProcessed( $item_identifier );
-
-		// Store item context for skip_item tool
-		$job_id = $context->getJobId();
-		if ( $job_id ) {
-			EventEngineData::storeItemContext( (int) $job_id, $item_identifier, $this->handler_type );
-		}
-	}
-
-	/**
 	 * Called by FetchHandler::dedup() after marking an item as processed.
 	 *
 	 * Stores item context (item_identifier + source_type) in engine data so the
