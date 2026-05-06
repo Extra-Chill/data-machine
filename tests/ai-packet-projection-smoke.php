@@ -11,6 +11,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+$test_filters = array();
+
+function add_filter( string $hook, callable $callback, int $priority = 10, int $_accepted_args = 1 ): void {
+	global $test_filters;
+	$test_filters[ $hook ][ $priority ][] = $callback;
+}
+
+function apply_filters( string $hook, $value, ...$args ) {
+	global $test_filters;
+	if ( empty( $test_filters[ $hook ] ) ) {
+		return $value;
+	}
+
+	ksort( $test_filters[ $hook ] );
+	foreach ( $test_filters[ $hook ] as $callbacks ) {
+		foreach ( $callbacks as $callback ) {
+			$value = $callback( $value, ...$args );
+		}
+	}
+
+	return $value;
+}
+
 function wp_json_encode( $value, int $flags = 0 ) {
 	return json_encode( $value, $flags );
 }
@@ -34,39 +57,21 @@ function assert_projection( string $name, bool $condition, string $detail = '' )
 
 echo "AI DataPacket prompt projection smoke\n";
 
-$raw_item = array(
-	'id'               => 'mgs-624',
-	'title'            => 'Data Download, April 14, 2026',
-	'url'              => 'https://example.com/a8c/post',
-	'date'             => '2026-04-14T12:00:00Z',
-	'author'           => 'Chris',
-	'matching_content' => array(
-		'Gutenlypso <em>Rollout</em> Plan...',
-		'We are getting close to shipping Gutenlypso...',
-		'Triaging/fixing Gutenberg bugs...',
-	),
-	'tags'             => array( 'mgs', 'history' ),
-);
-
 $canonical = array(
 	array(
 		'type'      => 'fetch',
 		'timestamp' => 1770000000,
 		'data'      => array(
-			'title' => 'Wrapped MGS item',
-			'body'  => wp_json_encode( $raw_item, JSON_UNESCAPED_UNICODE ),
+			'title'     => 'Generic packet',
+			'body'      => 'Plain source text',
+			'file_info' => array(
+				'file_path' => '/tmp/runtime-only.jpg',
+				'mime_type' => 'image/jpeg',
+			),
 		),
 		'metadata'  => array(
-			'source_type'     => 'mcp',
-			'pipeline_id'     => 3,
-			'flow_id'         => 2,
-			'handler'         => 'mcp_fetch',
-			'mcp_provider'    => 'WordPress.com MGS',
-			'mcp_server'      => 'wordpress-com',
-			'mcp_tool'        => 'search',
-			'mcp_url'         => 'https://example.com/a8c/post',
-			'mcp_raw_item'    => $raw_item,
-			'item_identifier' => 'mgs-624',
+			'source_type' => 'generic_source',
+			'custom_key'   => 'custom value',
 		),
 	),
 );
@@ -74,40 +79,60 @@ $canonical = array(
 $canonical_before = $canonical;
 $projected        = \DataMachine\Engine\AI\DataPacketPromptProjector::project( $canonical );
 
-assert_projection( 'canonical packet unchanged after projection', $canonical_before === $canonical );
-assert_projection( 'MGS title flattened from source body', 'Data Download, April 14, 2026' === ( $projected[0]['data']['title'] ?? '' ) );
-assert_projection(
-	'MGS snippet array strips em highlight tags per item',
-	array(
-		'Gutenlypso Rollout Plan...',
-		'We are getting close to shipping Gutenlypso...',
-		'Triaging/fixing Gutenberg bugs...',
-	) === ( $projected[0]['data']['matching_content'] ?? array() )
+assert_projection( 'canonical packet unchanged after generic projection', $canonical_before === $canonical );
+assert_projection( 'generic title preserved', 'Generic packet' === ( $projected[0]['data']['title'] ?? '' ) );
+assert_projection( 'generic body preserved', 'Plain source text' === ( $projected[0]['data']['body'] ?? '' ) );
+assert_projection( 'generic metadata preserved', 'custom value' === ( $projected[0]['metadata']['custom_key'] ?? '' ) );
+assert_projection( 'runtime file_path stripped from prompt data', ! array_key_exists( 'file_path', $projected[0]['data']['file_info'] ?? array() ) );
+
+add_filter(
+	'datamachine_ai_project_data_packet',
+	static function ( array $projected_packet, array $canonical_packet ): array {
+		if ( 'integration_owned_source' !== ( $canonical_packet['metadata']['source_type'] ?? '' ) ) {
+			return $projected_packet;
+		}
+
+		return array(
+			'type'     => $canonical_packet['type'],
+			'data'     => array(
+				'title'   => $canonical_packet['data']['title'],
+				'snippet' => 'Source-specific compact projection',
+			),
+			'metadata' => array( 'source_type' => $canonical_packet['metadata']['source_type'] ),
+		);
+	},
+	10,
+	2
 );
-assert_projection( 'mcp_raw_item omitted from prompt metadata', ! array_key_exists( 'mcp_raw_item', $projected[0]['metadata'] ?? array() ) );
-assert_projection( 'engine plumbing omitted from prompt metadata', ! array_key_exists( 'pipeline_id', $projected[0]['metadata'] ?? array() ) );
-assert_projection( 'stable item identifier preserved', 'mgs-624' === ( $projected[0]['metadata']['item_identifier'] ?? '' ) );
 
-$canonical_bytes = strlen( wp_json_encode( $canonical, JSON_UNESCAPED_UNICODE ) );
-$projected_bytes = strlen( wp_json_encode( $projected, JSON_UNESCAPED_UNICODE ) );
-
-assert_projection( 'projected packet JSON is smaller than canonical JSON', $projected_bytes < $canonical_bytes, "canonical=$canonical_bytes projected=$projected_bytes" );
-
-$prompt_json = wp_json_encode( array( 'data_packets' => $projected ), JSON_UNESCAPED_UNICODE );
-assert_projection( 'prompt JSON is compact by default', ! str_contains( $prompt_json, "\n" ) );
-
-$unknown_json_packet = array(
+$source_specific = array(
 	array(
 		'type'     => 'fetch',
 		'data'     => array(
-			'title' => 'Unknown JSON packet',
-			'body'  => '{"title":"Nested title","custom":"important"}',
+			'title' => 'Verbose integration packet',
+			'body'  => str_repeat( 'Long duplicated source text. ', 20 ),
 		),
-		'metadata' => array( 'source_type' => 'custom_json_feed' ),
+		'metadata' => array(
+			'source_type' => 'integration_owned_source',
+			'raw_payload'  => array( 'duplicated' => true ),
+		),
 	),
 );
-$unknown_projected = \DataMachine\Engine\AI\DataPacketPromptProjector::project( $unknown_json_packet );
-assert_projection( 'unknown JSON body packets use conservative fallback', $unknown_json_packet === $unknown_projected );
+$source_specific_before = $source_specific;
+$compact                 = \DataMachine\Engine\AI\DataPacketPromptProjector::project( $source_specific );
+
+assert_projection( 'filter projection leaves canonical source packet unchanged', $source_specific_before === $source_specific );
+assert_projection( 'filter projection can remove verbose body', ! array_key_exists( 'body', $compact[0]['data'] ?? array() ) );
+assert_projection( 'filter projection can remove source-specific raw metadata', ! array_key_exists( 'raw_payload', $compact[0]['metadata'] ?? array() ) );
+assert_projection( 'filter projection keeps compact source text', 'Source-specific compact projection' === ( $compact[0]['data']['snippet'] ?? '' ) );
+
+$canonical_bytes = strlen( wp_json_encode( $source_specific, JSON_UNESCAPED_UNICODE ) );
+$projected_bytes = strlen( wp_json_encode( $compact, JSON_UNESCAPED_UNICODE ) );
+
+assert_projection( 'filter-projected packet JSON is smaller than canonical JSON', $projected_bytes < $canonical_bytes, "canonical=$canonical_bytes projected=$projected_bytes" );
+
+$prompt_json = wp_json_encode( array( 'data_packets' => $compact ), JSON_UNESCAPED_UNICODE );
+assert_projection( 'prompt JSON is compact by default', ! str_contains( $prompt_json, "\n" ) );
 
 echo "\n$total assertions, $failed failures\n";
 if ( $failed > 0 ) {

@@ -80,69 +80,6 @@ class AIStepTest extends TestCase {
 		$this->assertSame( $data_packets, AIStep::sanitizeDataPacketsForAi( $data_packets ) );
 	}
 
-	public function test_prompt_projection_flattens_mcp_packet_and_preserves_canonical_packet(): void {
-		$raw_item = array(
-			'id'               => 'mgs-123',
-			'title'            => 'Data Download, April 14, 2026',
-			'url'              => 'https://example.com/p2/post',
-			'date'             => '2026-04-14T12:00:00Z',
-			'author'           => 'Chris',
-			'matching_content' => array(
-				'Gutenlypso <em>Rollout</em> Plan...',
-				'We are getting close to shipping Gutenlypso...',
-				'Triaging/fixing Gutenberg bugs...',
-			),
-			'tags'             => array( 'mgs', 'history' ),
-		);
-		$canonical = array(
-			array(
-				'type'      => 'fetch',
-				'timestamp' => 1770000000,
-				'data'      => array(
-					'title' => 'Wrapped title',
-					'body'  => wp_json_encode( $raw_item, JSON_UNESCAPED_UNICODE ),
-				),
-				'metadata'  => array(
-					'source_type'     => 'mcp',
-					'pipeline_id'     => 3,
-					'flow_id'         => 2,
-					'handler'         => 'mcp_fetch',
-					'mcp_provider'    => 'WordPress.com MGS',
-					'mcp_server'      => 'wordpress-com',
-					'mcp_tool'        => 'search',
-					'mcp_url'         => 'https://example.com/p2/post',
-					'mcp_raw_item'    => $raw_item,
-					'item_identifier' => 'mgs-123',
-				),
-			),
-		);
-
-		$canonical_before = $canonical;
-		$projected        = DataPacketPromptProjector::project( $canonical );
-
-		$this->assertSame( $canonical_before, $canonical, 'Projection must not mutate canonical packets.' );
-		$this->assertSame( 'Data Download, April 14, 2026', $projected[0]['data']['title'] );
-		$this->assertSame( 'https://example.com/p2/post', $projected[0]['data']['url'] );
-		$this->assertSame(
-			array(
-				'Gutenlypso Rollout Plan...',
-				'We are getting close to shipping Gutenlypso...',
-				'Triaging/fixing Gutenberg bugs...',
-			),
-			$projected[0]['data']['matching_content']
-		);
-		$this->assertSame( array( 'mgs', 'history' ), $projected[0]['data']['tags'] );
-		$this->assertSame( 'mcp', $projected[0]['metadata']['source_type'] );
-		$this->assertSame( 'mgs-123', $projected[0]['metadata']['item_identifier'] );
-		$this->assertArrayNotHasKey( 'mcp_raw_item', $projected[0]['metadata'] );
-		$this->assertArrayNotHasKey( 'pipeline_id', $projected[0]['metadata'] );
-
-		$canonical_bytes = strlen( wp_json_encode( $canonical, JSON_UNESCAPED_UNICODE ) );
-		$projected_bytes = strlen( wp_json_encode( $projected, JSON_UNESCAPED_UNICODE ) );
-
-		$this->assertLessThan( $canonical_bytes, $projected_bytes );
-	}
-
 	public function test_prompt_projection_generic_fallback_preserves_unknown_packet_shape(): void {
 		$canonical = array(
 			array(
@@ -185,6 +122,47 @@ class AIStepTest extends TestCase {
 		);
 
 		$this->assertSame( $canonical, DataPacketPromptProjector::project( $canonical ) );
+	}
+
+	public function test_prompt_projection_filter_can_replace_prompt_packet_without_mutating_canonical(): void {
+		$canonical = array(
+			array(
+				'type'     => 'fetch',
+				'data'     => array(
+					'title' => 'Verbose packet',
+					'body'  => 'Long source-specific body that an integration understands.',
+				),
+				'metadata' => array(
+					'source_type' => 'integration_owned_source',
+					'raw_payload'  => array( 'duplicated' => true ),
+				),
+			),
+		);
+
+		add_filter(
+			'datamachine_ai_project_data_packet',
+			static function ( array $projected, array $packet ): array {
+				if ( 'integration_owned_source' !== ( $packet['metadata']['source_type'] ?? '' ) ) {
+					return $projected;
+				}
+
+				return array(
+					'type'     => $packet['type'],
+					'data'     => array( 'title' => $packet['data']['title'] ),
+					'metadata' => array( 'source_type' => $packet['metadata']['source_type'] ),
+				);
+			},
+			10,
+			2
+		);
+
+		$canonical_before = $canonical;
+		$projected        = DataPacketPromptProjector::project( $canonical );
+
+		$this->assertSame( $canonical_before, $canonical );
+		$this->assertSame( 'Verbose packet', $projected[0]['data']['title'] );
+		$this->assertArrayNotHasKey( 'body', $projected[0]['data'] );
+		$this->assertArrayNotHasKey( 'raw_payload', $projected[0]['metadata'] );
 	}
 
 	/**
