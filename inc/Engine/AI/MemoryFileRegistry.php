@@ -43,6 +43,14 @@ class MemoryFileRegistry {
 	const MODE_ALL = 'all';
 
 	/**
+	 * Default mode list for registered files.
+	 *
+	 * Files without explicit modes are registered and manageable, but are not
+	 * injected into AI prompts. Prompt injection must be an explicit opt-in.
+	 */
+	const MODES_NONE = array();
+
+	/**
 	 * Registered memory files.
 	 *
 	 * @var array<string, array> Filename => file metadata.
@@ -77,13 +85,13 @@ class MemoryFileRegistry {
 	 *                                        A capability string (e.g. 'manage_options') = editable only
 	 *                                        by users with that WordPress capability. Default true.
 	 *                                        Forced to false when composable is true.
-	 *     @type string[]    $modes           Execution modes where this file is available.
+	 *     @type string[]    $modes           Execution modes where this file is available for prompt injection.
 	 *                                        Array of mode slugs (e.g. 'chat', 'editor', 'pipeline',
 	 *                                        'system') or array( 'all' ) to make available everywhere.
-	 *                                        Default array( 'all' ).
+	 *                                        Default empty array: registered but never injected.
 	 *     @type string      $retrieval_policy Context injection policy. Only `always` files are injected
-	 *                                        by CoreMemoryFilesDirective. Use `never` for files that exist
-	 *                                        for external/runtime projection only.
+	 *                                        by CoreMemoryFilesDirective. Defaults to `never` when modes are
+	 *                                        omitted, otherwise `always`.
 	 *     @type bool        $composable      Whether this file is auto-generated from registered sections
 	 *                                        via SectionRegistry. Composable files are regenerated on
 	 *                                        demand and are not hand-editable. Default false.
@@ -111,12 +119,15 @@ class MemoryFileRegistry {
 			$editable = true;
 		}
 
-		// Normalize modes: array of slugs, or ['all'] (default).
-		$modes = $args['modes'] ?? array( self::MODE_ALL );
-		if ( ! is_array( $modes ) || empty( $modes ) ) {
-			$modes = array( self::MODE_ALL );
+		// Normalize modes: omitted means registered but not prompt-injected.
+		$modes = $args['modes'] ?? self::MODES_NONE;
+		if ( ! is_array( $modes ) ) {
+			$modes = self::MODES_NONE;
 		}
 		$modes = array_values( array_unique( array_map( 'sanitize_key', $modes ) ) );
+		$default_retrieval_policy = empty( $modes )
+			? WP_Agent_Context_Injection_Policy::NEVER
+			: WP_Agent_Context_Injection_Policy::ALWAYS;
 
 		// Convention path: relative path from ABSPATH for an additional copy.
 		$convention_path = isset( $args['convention_path'] ) ? ltrim( $args['convention_path'], '/' ) : '';
@@ -132,7 +143,7 @@ class MemoryFileRegistry {
 			'modes'            => $modes,
 			'label'            => $args['label'] ?? self::filename_to_label( $filename ),
 			'description'      => $args['description'] ?? '',
-			'retrieval_policy' => WP_Agent_Context_Injection_Policy::normalize( $args['retrieval_policy'] ?? WP_Agent_Context_Injection_Policy::ALWAYS ),
+			'retrieval_policy' => WP_Agent_Context_Injection_Policy::normalize( $args['retrieval_policy'] ?? $default_retrieval_policy ),
 			'authority_tier'   => $args['authority_tier'] ?? self::default_authority_tier( $layer, $filename ),
 			'provenance'       => is_array( $args['provenance'] ?? null ) ? $args['provenance'] : self::default_provenance( $filename ),
 		);
@@ -388,7 +399,7 @@ class MemoryFileRegistry {
 	 * Get always-injected files applicable to a specific agent mode.
 	 *
 	 * Returns files that either list the mode in their `modes` array
-	 * or are registered with `['all']` (the default), excluding files
+	 * or are registered with `['all']`, excluding files
 	 * whose retrieval policy says they should not be injected eagerly.
 	 *
 	 * @since 0.60.0
@@ -412,7 +423,11 @@ class MemoryFileRegistry {
 					return false;
 				}
 
-				$modes = $meta['modes'] ?? array( self::MODE_ALL );
+				$modes = $meta['modes'] ?? self::MODES_NONE;
+				if ( empty( $modes ) ) {
+					return false;
+				}
+
 				return in_array( self::MODE_ALL, $modes, true )
 					|| in_array( $mode, $modes, true );
 			}
@@ -554,7 +569,7 @@ class MemoryFileRegistry {
 				'editable'         => $source['editable'] ?? true,
 				'composable'       => (bool) ( $source['composable'] ?? false ),
 				'convention_path'  => is_string( $source['convention_path'] ?? null ) ? $source['convention_path'] : '',
-				'modes'            => is_array( $source['modes'] ?? null ) ? $source['modes'] : array( self::MODE_ALL ),
+				'modes'            => is_array( $source['modes'] ?? null ) ? $source['modes'] : self::MODES_NONE,
 				'label'            => is_string( $source['label'] ?? null ) ? $source['label'] : self::filename_to_label( $filename ),
 				'description'      => is_string( $source['description'] ?? null ) ? $source['description'] : '',
 				'retrieval_policy' => is_string( $source['retrieval_policy'] ?? null ) ? $source['retrieval_policy'] : WP_Agent_Context_Injection_Policy::ALWAYS,

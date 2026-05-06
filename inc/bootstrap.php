@@ -138,6 +138,7 @@ MemoryFileRegistry::register( 'SITE.md', 10, array(
 	'layer'       => MemoryFileRegistry::LAYER_SHARED,
 	'protected'   => true,
 	'composable'  => true,
+	'modes'       => array( MemoryFileRegistry::MODE_ALL ),
 	'label'       => 'Site Context',
 	'description' => 'Auto-generated site context. Composable — extend via SectionRegistry.',
 ) );
@@ -145,6 +146,7 @@ MemoryFileRegistry::register( 'RULES.md', 15, array(
 	'layer'       => MemoryFileRegistry::LAYER_SHARED,
 	'protected'   => true,
 	'editable'    => 'manage_options',
+	'modes'       => array( MemoryFileRegistry::MODE_ALL ),
 	'label'       => 'Site Rules',
 	'description' => 'Behavioral constraints that apply to every agent. Admin-editable.',
 ) );
@@ -186,6 +188,7 @@ MemoryFileRegistry::register( 'NETWORK.md', 5, array(
 	'layer'       => MemoryFileRegistry::LAYER_NETWORK,
 	'protected'   => true,
 	'composable'  => true,
+	'modes'       => array( MemoryFileRegistry::MODE_ALL ),
 	'label'       => 'Network Context',
 	'description' => 'Auto-generated multisite network topology. Composable — extend via SectionRegistry.',
 ) );

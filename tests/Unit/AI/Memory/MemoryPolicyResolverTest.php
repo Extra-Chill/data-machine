@@ -68,9 +68,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 			'EXTERNAL_RUNTIME.md',
 			50,
 			array(
-				'layer'            => MemoryFileRegistry::LAYER_SHARED,
-				'modes'            => array( 'all' ),
-				'retrieval_policy' => \WP_Agent_Context_Injection_Policy::NEVER,
+				'layer' => MemoryFileRegistry::LAYER_SHARED,
 			)
 		);
 
@@ -116,7 +114,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $files );
 	}
 
-	public function test_registered_never_retrieval_policy_is_not_injected_in_any_mode(): void {
+	public function test_registered_file_without_modes_is_not_injected_in_any_mode(): void {
 		$chat_files = $this->resolver->resolveRegistered(
 			array(
 				'mode' => MemoryPolicyResolver::MODE_CHAT,
@@ -131,6 +129,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $chat_files );
 		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $pipeline_files );
 		$this->assertArrayHasKey( 'EXTERNAL_RUNTIME.md', MemoryFileRegistry::get_all() );
+		$this->assertSame( \WP_Agent_Context_Injection_Policy::NEVER, MemoryFileRegistry::get_all()['EXTERNAL_RUNTIME.md']['retrieval_policy'] );
 	}
 
 	public function test_registered_preserves_metadata(): void {
