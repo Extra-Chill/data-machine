@@ -77,10 +77,13 @@ class MemoryFileRegistry {
 	 *                                        A capability string (e.g. 'manage_options') = editable only
 	 *                                        by users with that WordPress capability. Default true.
 	 *                                        Forced to false when composable is true.
-	 *     @type string[]    $modes           Execution modes where this file should be injected.
+	 *     @type string[]    $modes           Execution modes where this file is available.
 	 *                                        Array of mode slugs (e.g. 'chat', 'editor', 'pipeline',
-	 *                                        'system') or array( 'all' ) to inject everywhere.
+	 *                                        'system') or array( 'all' ) to make available everywhere.
 	 *                                        Default array( 'all' ).
+	 *     @type string      $retrieval_policy Context injection policy. Only `always` files are injected
+	 *                                        by CoreMemoryFilesDirective. Use `never` for files that exist
+	 *                                        for external/runtime projection only.
 	 *     @type bool        $composable      Whether this file is auto-generated from registered sections
 	 *                                        via SectionRegistry. Composable files are regenerated on
 	 *                                        demand and are not hand-editable. Default false.
@@ -382,10 +385,11 @@ class MemoryFileRegistry {
 	}
 
 	/**
-	 * Get all files applicable to a specific agent mode.
+	 * Get always-injected files applicable to a specific agent mode.
 	 *
 	 * Returns files that either list the mode in their `modes` array
-	 * or are registered with `['all']` (the default).
+	 * or are registered with `['all']` (the default), excluding files
+	 * whose retrieval policy says they should not be injected eagerly.
 	 *
 	 * @since 0.60.0
 	 * @since 0.68.0 Internal key renamed from contexts to modes.
@@ -403,6 +407,11 @@ class MemoryFileRegistry {
 		return array_filter(
 			self::get_resolved(),
 			function ( $meta ) use ( $mode ) {
+				$retrieval_policy = $meta['retrieval_policy'] ?? WP_Agent_Context_Injection_Policy::ALWAYS;
+				if ( ! WP_Agent_Context_Injection_Policy::is_always_injected( $retrieval_policy ) ) {
+					return false;
+				}
+
 				$modes = $meta['modes'] ?? array( self::MODE_ALL );
 				return in_array( self::MODE_ALL, $modes, true )
 					|| in_array( $mode, $modes, true );
