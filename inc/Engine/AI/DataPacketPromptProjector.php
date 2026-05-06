@@ -94,7 +94,7 @@ class DataPacketPromptProjector {
 				'url'              => self::firstString( $source, $metadata, $data, array( 'url', 'link', 'permalink', 'source_url', 'mcp_url' ) ),
 				'date'             => self::firstString( $source, $metadata, array(), array( 'date', 'created_at', 'updated_at', 'modified_at', 'mcp_date' ) ),
 				'author'           => self::firstString( $source, $metadata, array(), array( 'author', 'byline', 'user', 'mcp_author' ) ),
-				'matching_content' => self::cleanSnippet( self::firstString( $source, $metadata, array(), array( 'matching_content', 'snippet', 'excerpt' ) ) ),
+				'matching_content' => self::firstSnippetValue( $source, $metadata, array(), array( 'matching_content', 'snippet', 'excerpt' ) ),
 				'tags'             => self::firstValue( $source, $metadata, array(), array( 'tags', 'mcp_tags' ) ),
 				'source_id'        => self::firstString( $source, $metadata, array(), array( 'id', 'guid', 'item_identifier', 'source_id' ) ),
 			),
@@ -206,6 +206,41 @@ class DataPacketPromptProjector {
 					return $source[ $key ];
 				}
 			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Return the first snippet value, preserving real MGS snippet arrays.
+	 *
+	 * @param array $primary Primary source.
+	 * @param array $secondary Secondary source.
+	 * @param array $tertiary Tertiary source.
+	 * @param array $keys Candidate keys.
+	 * @return string|array|null
+	 */
+	private static function firstSnippetValue( array $primary, array $secondary, array $tertiary, array $keys ): string|array|null {
+		$value = self::firstValue( $primary, $secondary, $tertiary, $keys );
+
+		if ( is_array( $value ) ) {
+			$snippets = array();
+			foreach ( $value as $snippet ) {
+				if ( ! is_scalar( $snippet ) ) {
+					continue;
+				}
+
+				$cleaned = self::cleanSnippet( (string) $snippet );
+				if ( null !== $cleaned ) {
+					$snippets[] = $cleaned;
+				}
+			}
+
+			return empty( $snippets ) ? null : $snippets;
+		}
+
+		if ( is_scalar( $value ) ) {
+			return self::cleanSnippet( (string) $value );
 		}
 
 		return null;

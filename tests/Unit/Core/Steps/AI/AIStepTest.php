@@ -87,7 +87,11 @@ class AIStepTest extends TestCase {
 			'url'              => 'https://example.com/p2/post',
 			'date'             => '2026-04-14T12:00:00Z',
 			'author'           => 'Chris',
-			'matching_content' => 'A <em>highlighted</em> source snippet.',
+			'matching_content' => array(
+				'Gutenlypso <em>Rollout</em> Plan...',
+				'We are getting close to shipping Gutenlypso...',
+				'Triaging/fixing Gutenberg bugs...',
+			),
 			'tags'             => array( 'mgs', 'history' ),
 		);
 		$canonical = array(
@@ -119,7 +123,14 @@ class AIStepTest extends TestCase {
 		$this->assertSame( $canonical_before, $canonical, 'Projection must not mutate canonical packets.' );
 		$this->assertSame( 'Data Download, April 14, 2026', $projected[0]['data']['title'] );
 		$this->assertSame( 'https://example.com/p2/post', $projected[0]['data']['url'] );
-		$this->assertSame( 'A highlighted source snippet.', $projected[0]['data']['matching_content'] );
+		$this->assertSame(
+			array(
+				'Gutenlypso Rollout Plan...',
+				'We are getting close to shipping Gutenlypso...',
+				'Triaging/fixing Gutenberg bugs...',
+			),
+			$projected[0]['data']['matching_content']
+		);
 		$this->assertSame( array( 'mgs', 'history' ), $projected[0]['data']['tags'] );
 		$this->assertSame( 'mcp', $projected[0]['metadata']['source_type'] );
 		$this->assertSame( 'mgs-123', $projected[0]['metadata']['item_identifier'] );

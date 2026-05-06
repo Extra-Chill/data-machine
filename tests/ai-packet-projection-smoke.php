@@ -40,7 +40,11 @@ $raw_item = array(
 	'url'              => 'https://example.com/a8c/post',
 	'date'             => '2026-04-14T12:00:00Z',
 	'author'           => 'Chris',
-	'matching_content' => 'Useful <em>highlight</em> for the model.',
+	'matching_content' => array(
+		'Gutenlypso <em>Rollout</em> Plan...',
+		'We are getting close to shipping Gutenlypso...',
+		'Triaging/fixing Gutenberg bugs...',
+	),
 	'tags'             => array( 'mgs', 'history' ),
 );
 
@@ -72,7 +76,14 @@ $projected        = \DataMachine\Engine\AI\DataPacketPromptProjector::project( $
 
 assert_projection( 'canonical packet unchanged after projection', $canonical_before === $canonical );
 assert_projection( 'MGS title flattened from source body', 'Data Download, April 14, 2026' === ( $projected[0]['data']['title'] ?? '' ) );
-assert_projection( 'snippet strips em highlight tags', 'Useful highlight for the model.' === ( $projected[0]['data']['matching_content'] ?? '' ) );
+assert_projection(
+	'MGS snippet array strips em highlight tags per item',
+	array(
+		'Gutenlypso Rollout Plan...',
+		'We are getting close to shipping Gutenlypso...',
+		'Triaging/fixing Gutenberg bugs...',
+	) === ( $projected[0]['data']['matching_content'] ?? array() )
+);
 assert_projection( 'mcp_raw_item omitted from prompt metadata', ! array_key_exists( 'mcp_raw_item', $projected[0]['metadata'] ?? array() ) );
 assert_projection( 'engine plumbing omitted from prompt metadata', ! array_key_exists( 'pipeline_id', $projected[0]['metadata'] ?? array() ) );
 assert_projection( 'stable item identifier preserved', 'mgs-624' === ( $projected[0]['metadata']['item_identifier'] ?? '' ) );
