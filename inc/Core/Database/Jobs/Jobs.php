@@ -452,7 +452,7 @@ class Jobs extends BaseRepository {
 			return array();
 		}
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared on the next line.
 		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				'SELECT * FROM %i WHERE parent_job_id = %d ORDER BY job_id ASC',
@@ -461,6 +461,7 @@ class Jobs extends BaseRepository {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( empty( $rows ) ) {
 			return array();
