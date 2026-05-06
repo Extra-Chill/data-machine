@@ -48,6 +48,23 @@ if ( ! class_exists( 'ActionScheduler' ) ) {
 	require_once __DIR__ . '/vendor/woocommerce/action-scheduler/action-scheduler.php';
 }
 
+if ( function_exists( 'wp_installing' ) && wp_installing() ) {
+	add_action( 'wp_loaded', 'datamachine_skip_action_scheduler_migration_during_install', 0 );
+}
+
+/**
+ * Prevent AS migration scheduling during wp-phpunit install bootstrap.
+ *
+ * @return void
+ */
+function datamachine_skip_action_scheduler_migration_during_install(): void {
+	if ( ! class_exists( '\Action_Scheduler\Migration\Controller' ) ) {
+		return;
+	}
+
+	remove_action( 'wp_loaded', array( \Action_Scheduler\Migration\Controller::instance(), 'schedule_migration' ) );
+}
+
 
 function datamachine_run_datamachine_plugin() {
 	if ( ! datamachine_should_load_full_runtime() ) {
