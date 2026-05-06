@@ -7,8 +7,8 @@
  *
  * Uses ExecutionContext for deduplication, engine data, file storage, and logging.
  *
- * Also registers the skip_item tool available to all fetch-type handlers, allowing
- * the pipeline agent to explicitly skip items that don't meet processing criteria.
+ * Also registers explicit reject/defer tools available to all fetch-type handlers,
+ * allowing the pipeline agent to mark source rejections or release retriable items.
  *
  * @package    Data_Machine
  * @subpackage Core\Steps\Fetch\Handlers
@@ -21,7 +21,7 @@ use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\FilesRepository\FileStorage;
-use DataMachine\Core\Steps\Fetch\Tools\SkipItemTool;
+use DataMachine\Core\Steps\Fetch\Tools\FetchItemDispositionTool;
 use DataMachine\Core\Steps\Handlers\HttpRequestHelpers;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -227,7 +227,7 @@ abstract class FetchHandler {
 	 *
 	 * Override in subclasses to add handler-specific side effects.
 	 * For example, EventImportHandler stores item context in engine data
-	 * for the skip_item AI tool.
+	 * for the fetch disposition AI tools.
 	 *
 	 * @param ExecutionContext $context Execution context.
 	 * @param array            $item    The item that was just marked as processed.
@@ -412,7 +412,7 @@ abstract class FetchHandler {
 	/**
 	 * Initialize FetchHandler static functionality.
 	 *
-	 * Registers the skip_item tool in the unified `datamachine_tools` registry
+	 * Registers fetch disposition tools in the unified `datamachine_tools` registry
 	 * as a cross-cutting handler tool — ToolPolicyResolver resolves it for any
 	 * adjacent step whose handler type is `fetch` or `event_import`.
 	 *
@@ -422,8 +422,8 @@ abstract class FetchHandler {
 		add_filter(
 			'datamachine_tools',
 			static function ( array $tools ): array {
-				$tools['__handler_tools_skip_item'] = array(
-					'_handler_callable' => array( self::class, 'resolveSkipItemTool' ),
+				$tools['__handler_tools_fetch_dispositions'] = array(
+					'_handler_callable' => array( self::class, 'resolveFetchDispositionTools' ),
 					'handler_types'     => array( 'fetch', 'event_import' ),
 					'modes'             => array( 'pipeline' ),
 					'access_level'      => 'admin',
@@ -434,7 +434,7 @@ abstract class FetchHandler {
 	}
 
 	/**
-	 * Resolve the skip_item tool for a specific fetch-type handler.
+	 * Resolve fetch disposition tools for a specific fetch-type handler.
 	 *
 	 * Invoked lazily by ToolManager::resolveHandlerTools() when ANY adjacent
 	 * step handler's registered type is `fetch` or `event_import`. The tool
@@ -444,38 +444,66 @@ abstract class FetchHandler {
 	 * @param string $handler_slug   Resolved adjacent-step handler slug.
 	 * @param array  $handler_config Handler configuration.
 	 * @param array  $engine_data    Engine data snapshot (unused).
-	 * @return array{skip_item: array} Tool map with the skip_item definition.
+	 * @return array{reject_source: array, defer_item: array} Tool map with disposition definitions.
 	 * @since 0.9.7
 	 */
-	public static function resolveSkipItemTool(
+	public static function resolveFetchDispositionTools(
 		string $handler_slug,
 		array $handler_config,
 		array $engine_data
 	): array {
 		unset( $engine_data );
 		return array(
-			'skip_item' => self::getSkipItemToolDefinition( $handler_slug, $handler_config ),
+			'reject_source' => self::getRejectSourceToolDefinition( $handler_slug, $handler_config ),
+			'defer_item'    => self::getDeferItemToolDefinition( $handler_slug, $handler_config ),
 		);
 	}
 
 	/**
-	 * Get the skip_item tool definition.
+	 * Get the reject_source tool definition.
 	 *
 	 * @param string $handler_slug   Handler slug to associate with
 	 * @param array  $handler_config Handler configuration
 	 * @return array Tool definition
 	 * @since 0.9.7
 	 */
-	private static function getSkipItemToolDefinition( string $handler_slug, array $handler_config ): array {
+	private static function getRejectSourceToolDefinition( string $handler_slug, array $handler_config ): array {
 		return array(
-			'class'          => SkipItemTool::class,
+			'class'          => FetchItemDispositionTool::class,
 			'method'         => 'handle_tool_call',
 			'handler'        => $handler_slug,
-			'description'    => 'Skip processing this item. Use when the item does not meet quality or relevance criteria defined in the pipeline rules (RULES.md). The item will be marked as processed and will not be refetched on subsequent runs.',
+			'disposition'    => 'reject_source',
+			'description'    => 'Reject this fetched source item after reasoned content/source evaluation. Use when the source itself is irrelevant, too thin, duplicate, noisy, spammy, or otherwise fails the pipeline quality or relevance criteria. The source item will be marked as processed and will not normally be refetched.',
 			'parameters'     => array(
 				'reason' => array(
 					'type'        => 'string',
-					'description' => 'Concise 2-5 word categorical skip reason, following the vocabulary defined in the pipeline system prompt or RULES.md. Do NOT write sentences — just the category.',
+					'description' => 'Concise categorical rejection reason, following the vocabulary defined in the pipeline system prompt or RULES.md.',
+					'required'    => true,
+				),
+			),
+			'handler_config' => $handler_config,
+		);
+	}
+
+	/**
+	 * Get the defer_item tool definition.
+	 *
+	 * @param string $handler_slug   Handler slug to associate with.
+	 * @param array  $handler_config Handler configuration.
+	 * @return array Tool definition.
+	 * @since 0.9.7
+	 */
+	private static function getDeferItemToolDefinition( string $handler_slug, array $handler_config ): array {
+		return array(
+			'class'          => FetchItemDispositionTool::class,
+			'method'         => 'handle_tool_call',
+			'handler'        => $handler_slug,
+			'disposition'    => 'defer_item',
+			'description'    => 'Defer this fetched source item when the agent cannot safely complete processing now because of runtime failures, tool errors, missing context, uncertainty, or temporary limitations. The source claim will be released and the item will remain eligible to be fetched and retried later; it will not be marked processed.',
+			'parameters'     => array(
+				'reason' => array(
+					'type'        => 'string',
+					'description' => 'Concise reason explaining why processing cannot safely complete now and should be retried later.',
 					'required'    => true,
 				),
 			),
