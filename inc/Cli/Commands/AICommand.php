@@ -105,6 +105,14 @@ class AICommand extends BaseCommand {
 				'value'  => (int) $result['conversation_user_message_bytes'],
 			),
 			array(
+				'metric' => 'canonical_packet_json_bytes',
+				'value'  => (int) $result['canonical_packet_json_bytes'],
+			),
+			array(
+				'metric' => 'projected_packet_json_bytes',
+				'value'  => (int) $result['projected_packet_json_bytes'],
+			),
+			array(
 				'metric' => 'conversation_packet_json_bytes',
 				'value'  => (int) $result['conversation_packet_json_bytes'],
 			),

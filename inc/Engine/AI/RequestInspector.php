@@ -13,7 +13,6 @@ use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\FilesRepository\FileRetrieval;
 use DataMachine\Core\PluginSettings;
-use DataMachine\Core\Steps\AI\AIStep;
 use DataMachine\Core\Steps\AI\ToolPolicy\PipelineToolPolicyArgs;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Abilities\Flow\QueueAbility;
@@ -191,7 +190,7 @@ class RequestInspector {
 		$messages = array();
 
 		if ( ! empty( $data_packets ) ) {
-			$data_packet_content = wp_json_encode( array( 'data_packets' => AIStep::sanitizeDataPacketsForAi( $data_packets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
+			$data_packet_content = wp_json_encode( array( 'data_packets' => DataPacketPromptProjector::project( $data_packets ) ), JSON_UNESCAPED_UNICODE );
 			$messages[]          = ConversationManager::buildConversationMessage(
 				'user',
 				false === $data_packet_content ? '' : $data_packet_content
@@ -272,6 +271,8 @@ class RequestInspector {
 		$messages         = $request['messages'] ?? array();
 		$tools            = $request['tools'] ?? array();
 
+		$projected_packets = DataPacketPromptProjector::project( $data_packets );
+
 		return array(
 			'message_count'                   => count( $messages ),
 			'initial_message_count'           => count( $initial_messages ),
@@ -279,7 +280,9 @@ class RequestInspector {
 			'messages_json_bytes'             => self::jsonBytes( $messages ),
 			'tools_json_bytes'                => self::jsonBytes( $tools ),
 			'conversation_user_message_bytes' => self::sumUserMessageBytes( $initial_messages ),
-			'conversation_packet_json_bytes'  => self::jsonBytes( AIStep::sanitizeDataPacketsForAi( $data_packets ) ),
+			'canonical_packet_json_bytes'     => self::jsonBytes( $data_packets ),
+			'projected_packet_json_bytes'     => self::jsonBytes( $projected_packets ),
+			'conversation_packet_json_bytes'  => self::jsonBytes( $projected_packets ),
 			'directives'                      => $assembled['directive_breakdown'],
 			'tool_count'                      => count( $structured_tools ),
 			'largest_tools'                   => $this->largestTools( $structured_tools ),

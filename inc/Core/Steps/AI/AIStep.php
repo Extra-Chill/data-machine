@@ -12,6 +12,7 @@ use DataMachine\Core\Steps\AI\ToolPolicy\PipelineToolPolicyArgs;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Engine\AI\ConversationManager;
+use DataMachine\Engine\AI\DataPacketPromptProjector;
 use DataMachine\Engine\AI\PipelineTranscriptPolicy;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
@@ -191,7 +192,7 @@ class AIStep extends Step {
 		$messages = array();
 
 		if ( ! empty( $this->dataPackets ) ) {
-			$data_packet_content = wp_json_encode( array( 'data_packets' => self::sanitizeDataPacketsForAi( $this->dataPackets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
+			$data_packet_content = wp_json_encode( array( 'data_packets' => DataPacketPromptProjector::project( $this->dataPackets ) ), JSON_UNESCAPED_UNICODE );
 			$messages[]          = ConversationManager::buildConversationMessage(
 				'user',
 				false === $data_packet_content ? '' : $data_packet_content
@@ -431,58 +432,16 @@ class AIStep extends Step {
 	}
 
 	/**
-	 * Remove local-only file paths before serializing data packets to AI.
+	 * Project data packets before serializing them to AI.
 	 *
-	 * Fetch handlers may include file_info.file_path so downstream runtime steps
-	 * can attach images or access files. That internal path should not be exposed
-	 * in the AI-visible JSON payload because models can copy it into generated
-	 * content. The original packets remain unchanged for runtime use.
+	 * Kept as a compatibility wrapper for older tests/call sites. Canonical
+	 * packets remain unchanged for runtime and storage use.
 	 *
 	 * @param array $data_packets Original data packets.
-	 * @return array Sanitized copy safe for AI serialization.
+	 * @return array Projected copy safe for AI serialization.
 	 */
 	public static function sanitizeDataPacketsForAi( array $data_packets ): array {
-		$sanitized_packets = array();
-
-		foreach ( $data_packets as $packet ) {
-			if ( ! is_array( $packet ) ) {
-				$sanitized_packets[] = $packet;
-				continue;
-			}
-
-			$sanitized_packet = $packet;
-
-			if ( isset( $sanitized_packet['data'] ) && is_array( $sanitized_packet['data'] ) ) {
-				$sanitized_packet['data'] = self::sanitizePacketDataForAi( $sanitized_packet['data'] );
-			}
-
-			$sanitized_packets[] = $sanitized_packet;
-		}
-
-		return $sanitized_packets;
-	}
-
-	/**
-	 * Remove internal file path fields from packet data.
-	 *
-	 * @param array $packet_data Packet data array.
-	 * @return array Sanitized packet data.
-	 */
-	private static function sanitizePacketDataForAi( array $packet_data ): array {
-		if ( ! isset( $packet_data['file_info'] ) || ! is_array( $packet_data['file_info'] ) ) {
-			return $packet_data;
-		}
-
-		$sanitized_file_info = $packet_data['file_info'];
-		unset( $sanitized_file_info['file_path'] );
-
-		if ( empty( $sanitized_file_info ) ) {
-			unset( $packet_data['file_info'] );
-			return $packet_data;
-		}
-
-		$packet_data['file_info'] = $sanitized_file_info;
-		return $packet_data;
+		return DataPacketPromptProjector::project( $data_packets );
 	}
 
 	/**

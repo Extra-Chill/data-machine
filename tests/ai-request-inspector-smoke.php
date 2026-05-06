@@ -202,6 +202,8 @@ assert_test( 'CLI routes through inspect request ability', false !== strpos( $co
 assert_test( '--job option documented', false !== strpos( $command, '--job=<job_id>' ) );
 assert_test( '--step option documented', false !== strpos( $command, '--step=<flow_step_id>' ) );
 assert_test( 'json output path exists', false !== strpos( $command, "'json' === \$format" ) );
+assert_test( 'table output includes canonical packet bytes', false !== strpos( $command, 'canonical_packet_json_bytes' ) );
+assert_test( 'table output includes projected packet bytes', false !== strpos( $command, 'projected_packet_json_bytes' ) );
 assert_test( 'table output includes directive section', false !== strpos( $command, "Directives" ) );
 assert_test( 'table output includes largest tools section', false !== strpos( $command, "Largest tools" ) );
 

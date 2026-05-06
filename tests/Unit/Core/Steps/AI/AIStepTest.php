@@ -8,6 +8,7 @@
 namespace DataMachine\Tests\Unit\Core\Steps\AI;
 
 use DataMachine\Core\Steps\AI\AIStep;
+use DataMachine\Engine\AI\DataPacketPromptProjector;
 use DataMachine\Engine\AI\Tools\ToolResultFinder;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
@@ -77,6 +78,102 @@ class AIStepTest extends TestCase {
 		);
 
 		$this->assertSame( $data_packets, AIStep::sanitizeDataPacketsForAi( $data_packets ) );
+	}
+
+	public function test_prompt_projection_flattens_mcp_packet_and_preserves_canonical_packet(): void {
+		$raw_item = array(
+			'id'               => 'mgs-123',
+			'title'            => 'Data Download, April 14, 2026',
+			'url'              => 'https://example.com/p2/post',
+			'date'             => '2026-04-14T12:00:00Z',
+			'author'           => 'Chris',
+			'matching_content' => 'A <em>highlighted</em> source snippet.',
+			'tags'             => array( 'mgs', 'history' ),
+		);
+		$canonical = array(
+			array(
+				'type'      => 'fetch',
+				'timestamp' => 1770000000,
+				'data'      => array(
+					'title' => 'Wrapped title',
+					'body'  => wp_json_encode( $raw_item, JSON_UNESCAPED_UNICODE ),
+				),
+				'metadata'  => array(
+					'source_type'     => 'mcp',
+					'pipeline_id'     => 3,
+					'flow_id'         => 2,
+					'handler'         => 'mcp_fetch',
+					'mcp_provider'    => 'WordPress.com MGS',
+					'mcp_server'      => 'wordpress-com',
+					'mcp_tool'        => 'search',
+					'mcp_url'         => 'https://example.com/p2/post',
+					'mcp_raw_item'    => $raw_item,
+					'item_identifier' => 'mgs-123',
+				),
+			),
+		);
+
+		$canonical_before = $canonical;
+		$projected        = DataPacketPromptProjector::project( $canonical );
+
+		$this->assertSame( $canonical_before, $canonical, 'Projection must not mutate canonical packets.' );
+		$this->assertSame( 'Data Download, April 14, 2026', $projected[0]['data']['title'] );
+		$this->assertSame( 'https://example.com/p2/post', $projected[0]['data']['url'] );
+		$this->assertSame( 'A highlighted source snippet.', $projected[0]['data']['matching_content'] );
+		$this->assertSame( array( 'mgs', 'history' ), $projected[0]['data']['tags'] );
+		$this->assertSame( 'mcp', $projected[0]['metadata']['source_type'] );
+		$this->assertSame( 'mgs-123', $projected[0]['metadata']['item_identifier'] );
+		$this->assertArrayNotHasKey( 'mcp_raw_item', $projected[0]['metadata'] );
+		$this->assertArrayNotHasKey( 'pipeline_id', $projected[0]['metadata'] );
+
+		$canonical_bytes = strlen( wp_json_encode( $canonical, JSON_UNESCAPED_UNICODE ) );
+		$projected_bytes = strlen( wp_json_encode( $projected, JSON_UNESCAPED_UNICODE ) );
+
+		$this->assertLessThan( $canonical_bytes, $projected_bytes );
+	}
+
+	public function test_prompt_projection_generic_fallback_preserves_unknown_packet_shape(): void {
+		$canonical = array(
+			array(
+				'type'     => 'fetch',
+				'data'     => array(
+					'title'     => 'RSS item',
+					'body'      => 'Keep body',
+					'file_info' => array(
+						'file_path' => '/tmp/runtime-only.jpg',
+						'mime_type' => 'image/jpeg',
+					),
+				),
+				'metadata' => array(
+					'source_type' => 'rss',
+					'custom_key'   => 'custom value',
+				),
+			),
+		);
+
+		$projected = DataPacketPromptProjector::project( $canonical );
+
+		$this->assertSame( 'RSS item', $projected[0]['data']['title'] );
+		$this->assertSame( 'Keep body', $projected[0]['data']['body'] );
+		$this->assertSame( 'rss', $projected[0]['metadata']['source_type'] );
+		$this->assertSame( 'custom value', $projected[0]['metadata']['custom_key'] );
+		$this->assertArrayNotHasKey( 'file_path', $projected[0]['data']['file_info'] );
+		$this->assertSame( '/tmp/runtime-only.jpg', $canonical[0]['data']['file_info']['file_path'] );
+	}
+
+	public function test_prompt_projection_does_not_flatten_unknown_json_body_packets(): void {
+		$canonical = array(
+			array(
+				'type'     => 'fetch',
+				'data'     => array(
+					'title' => 'Unknown JSON packet',
+					'body'  => '{"title":"Nested title","custom":"important"}',
+				),
+				'metadata' => array( 'source_type' => 'custom_json_feed' ),
+			),
+		);
+
+		$this->assertSame( $canonical, DataPacketPromptProjector::project( $canonical ) );
 	}
 
 	/**
