@@ -23,9 +23,10 @@ class DataPacketPromptProjector {
 	 * filter while canonical storage/engine packets remain unchanged.
 	 *
 	 * @param array $data_packets Canonical packets from storage/engine state.
+	 * @param array $context      Source-agnostic runtime context for projection filters.
 	 * @return array Prompt-facing packet copies.
 	 */
-	public static function project( array $data_packets ): array {
+	public static function project( array $data_packets, array $context = array() ): array {
 		$projected_packets = array();
 
 		foreach ( $data_packets as $packet ) {
@@ -34,7 +35,7 @@ class DataPacketPromptProjector {
 				continue;
 			}
 
-			$projected_packets[] = self::projectPacket( $packet );
+			$projected_packets[] = self::projectPacket( $packet, $context );
 		}
 
 		return $projected_packets;
@@ -43,17 +44,18 @@ class DataPacketPromptProjector {
 	/**
 	 * Project one packet using the generic default and filter extension point.
 	 *
-	 * @param array $packet Canonical packet.
+	 * @param array $packet  Canonical packet.
+	 * @param array $context Source-agnostic runtime context for projection filters.
 	 * @return array Prompt-facing packet.
 	 */
-	private static function projectPacket( array $packet ): array {
+	private static function projectPacket( array $packet, array $context ): array {
 		$projected = $packet;
 		if ( isset( $projected['data'] ) && is_array( $projected['data'] ) ) {
 			$projected['data'] = self::sanitizePacketData( $projected['data'] );
 		}
 
 		if ( function_exists( 'apply_filters' ) ) {
-			$filtered = apply_filters( 'datamachine_ai_project_data_packet', $projected, $packet );
+			$filtered = apply_filters( 'datamachine_ai_project_data_packet', $projected, $packet, $context );
 			if ( is_array( $filtered ) ) {
 				return $filtered;
 			}

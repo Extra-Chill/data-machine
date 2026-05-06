@@ -165,6 +165,41 @@ class AIStepTest extends TestCase {
 		$this->assertArrayNotHasKey( 'raw_payload', $projected[0]['metadata'] );
 	}
 
+	public function test_prompt_projection_filter_receives_source_agnostic_context(): void {
+		$canonical = array(
+			array(
+				'type'     => 'fetch',
+				'data'     => array( 'title' => 'Context packet' ),
+				'metadata' => array( 'source_type' => 'context_source' ),
+			),
+		);
+		$context   = array(
+			'job_id'           => 1799,
+			'pipeline_id'      => 3,
+			'flow_id'          => 2,
+			'flow_step_id'     => 'flow_step_ai',
+			'pipeline_step_id' => 'pipeline_step_ai',
+		);
+		$received  = array();
+
+		add_filter(
+			'datamachine_ai_project_data_packet',
+			static function ( array $projected, array $packet, array $filter_context ) use ( &$received ): array {
+				if ( 'context_source' === ( $packet['metadata']['source_type'] ?? '' ) ) {
+					$received = $filter_context;
+				}
+
+				return $projected;
+			},
+			10,
+			3
+		);
+
+		DataPacketPromptProjector::project( $canonical, $context );
+
+		$this->assertSame( $context, $received );
+	}
+
 	/**
 	 * Test that processLoopResults does NOT carry forward input DataPackets.
 	 *

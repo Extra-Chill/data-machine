@@ -189,10 +189,25 @@ class AIStep extends Step {
 			$mime_type = is_string( $file_info['type'] ) ? $file_info['type'] : '';
 		}
 
+		$pipeline_step_id = $this->flow_step_config['pipeline_step_id'];
+
+		// Resolve user_id and agent_id from engine snapshot (set by RunFlowAbility).
+		$job_snapshot = $this->engine->get( 'job' );
+		$agent_id     = (int) ( $job_snapshot['agent_id'] ?? 0 );
+		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
+
+		$packet_projection_context = array(
+			'job_id'           => $this->job_id,
+			'pipeline_id'      => $job_snapshot['pipeline_id'] ?? null,
+			'flow_id'          => $job_snapshot['flow_id'] ?? null,
+			'flow_step_id'     => $this->flow_step_id,
+			'pipeline_step_id' => $pipeline_step_id,
+		);
+
 		$messages = array();
 
 		if ( ! empty( $this->dataPackets ) ) {
-			$data_packet_content = wp_json_encode( array( 'data_packets' => DataPacketPromptProjector::project( $this->dataPackets ) ), JSON_UNESCAPED_UNICODE );
+			$data_packet_content = wp_json_encode( array( 'data_packets' => DataPacketPromptProjector::project( $this->dataPackets, $packet_projection_context ) ), JSON_UNESCAPED_UNICODE );
 			$messages[]          = ConversationManager::buildConversationMessage(
 				'user',
 				false === $data_packet_content ? '' : $data_packet_content
@@ -216,16 +231,9 @@ class AIStep extends Step {
 			$messages[] = ConversationManager::buildConversationMessage( 'user', $user_message );
 		}
 
-		$pipeline_step_id = $this->flow_step_config['pipeline_step_id'];
-
 		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
 
 		$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
-
-		// Resolve user_id and agent_id from engine snapshot (set by RunFlowAbility).
-		$job_snapshot = $this->engine->get( 'job' );
-		$agent_id     = (int) ( $job_snapshot['agent_id'] ?? 0 );
-		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
 
 		// Resolve transcript persistence policy once per AI step invocation.
 		// Resolution order: flow > pipeline > site option (default false).

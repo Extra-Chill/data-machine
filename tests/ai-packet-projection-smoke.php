@@ -15,7 +15,10 @@ $test_filters = array();
 
 function add_filter( string $hook, callable $callback, int $priority = 10, int $_accepted_args = 1 ): void {
 	global $test_filters;
-	$test_filters[ $hook ][ $priority ][] = $callback;
+	$test_filters[ $hook ][ $priority ][] = array(
+		'callback'      => $callback,
+		'accepted_args' => $_accepted_args,
+	);
 }
 
 function apply_filters( string $hook, $value, ...$args ) {
@@ -26,8 +29,10 @@ function apply_filters( string $hook, $value, ...$args ) {
 
 	ksort( $test_filters[ $hook ] );
 	foreach ( $test_filters[ $hook ] as $callbacks ) {
-		foreach ( $callbacks as $callback ) {
-			$value = $callback( $value, ...$args );
+		foreach ( $callbacks as $filter ) {
+			$accepted_args = max( 1, (int) $filter['accepted_args'] );
+			$filter_args   = array_slice( array_merge( array( $value ), $args ), 0, $accepted_args );
+			$value         = $filter['callback']( ...$filter_args );
 		}
 	}
 
@@ -119,12 +124,32 @@ $source_specific = array(
 	),
 );
 $source_specific_before = $source_specific;
-$compact                 = \DataMachine\Engine\AI\DataPacketPromptProjector::project( $source_specific );
+$context                = array(
+	'job_id'           => 1799,
+	'pipeline_id'      => 3,
+	'flow_id'          => 2,
+	'flow_step_id'     => 'flow_step_ai',
+	'pipeline_step_id' => 'pipeline_step_ai',
+);
+$received_context       = array();
+
+add_filter(
+	'datamachine_ai_project_data_packet',
+	static function ( array $projected_packet, array $_canonical_packet, array $filter_context ) use ( &$received_context ): array {
+		$received_context = $filter_context;
+		return $projected_packet;
+	},
+	20,
+	3
+);
+
+$compact = \DataMachine\Engine\AI\DataPacketPromptProjector::project( $source_specific, $context );
 
 assert_projection( 'filter projection leaves canonical source packet unchanged', $source_specific_before === $source_specific );
 assert_projection( 'filter projection can remove verbose body', ! array_key_exists( 'body', $compact[0]['data'] ?? array() ) );
 assert_projection( 'filter projection can remove source-specific raw metadata', ! array_key_exists( 'raw_payload', $compact[0]['metadata'] ?? array() ) );
 assert_projection( 'filter projection keeps compact source text', 'Source-specific compact projection' === ( $compact[0]['data']['snippet'] ?? '' ) );
+assert_projection( 'three-argument filter receives projection context', $context === $received_context );
 
 $canonical_bytes = strlen( wp_json_encode( $source_specific, JSON_UNESCAPED_UNICODE ) );
 $projected_bytes = strlen( wp_json_encode( $compact, JSON_UNESCAPED_UNICODE ) );
