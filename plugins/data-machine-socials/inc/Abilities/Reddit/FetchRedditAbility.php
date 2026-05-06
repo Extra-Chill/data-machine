@@ -15,6 +15,7 @@
 namespace DataMachineSocials\Abilities\Reddit;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Steps\Fetch\FreshCandidateCollector;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -92,11 +93,6 @@ class FetchRedditAbility {
 								'default'     => '',
 								'description' => __( 'Search term to filter posts', 'data-machine-socials' ),
 							),
-							'processed_items'   => array(
-								'type'        => 'array',
-								'default'     => array(),
-								'description' => __( 'Array of already processed item IDs to skip', 'data-machine-socials' ),
-							),
 							'fetch_batch_size'  => array(
 								'type'        => 'integer',
 								'default'     => 100,
@@ -147,15 +143,57 @@ class FetchRedditAbility {
 	}
 
 	/**
-	 * Execute Reddit fetch ability.
+	 * Execute Reddit fetch ability without selection-time eligibility filtering.
 	 *
-	 * Returns all eligible posts across all pages. The pipeline engine
-	 * fans each one out into its own child job automatically.
+	 * Used for direct ability invocations (REST, MCP, ad-hoc PHP calls) where
+	 * there is no Data Machine pipeline context to consult for processed/claim
+	 * state. Returns every Reddit-side eligible post the pagination loop
+	 * surfaces, capped only by `max_pages` and Reddit's natural pagination.
+	 *
+	 * Pipeline-driven fetches go through `executeWithCollector()` so that the
+	 * Data Machine core `FreshCandidateCollector` owns processed/claimed/
+	 * reprocess eligibility decisions and pagination keeps scanning until the
+	 * collector fills up or the source is exhausted.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with fetched data or error.
+	 * @return array|\WP_Error Result with fetched data or error.
 	 */
 	public function execute( array $input ): array|\WP_Error {
+		return $this->runFetch( $input, null );
+	}
+
+	/**
+	 * Execute Reddit fetch ability with a Data Machine fresh-candidate collector.
+	 *
+	 * The collector receives every Reddit-side eligible candidate as we paginate,
+	 * and decides processed/claimed/reprocess eligibility using
+	 * `ExecutionContext::isItemProcessed()` / `isItemClaimed()` (so the
+	 * `datamachine_should_reprocess_item` filter applies consistently with the
+	 * authoritative `FetchHandler::get_fetch_data()` final dedupe). Pagination
+	 * continues until the collector is full or Reddit pagination terminates.
+	 *
+	 * @param array                   $input     Input parameters.
+	 * @param FreshCandidateCollector $collector Selection-time collector.
+	 * @return array|\WP_Error Result with fetched data or error.
+	 */
+	public function executeWithCollector( array $input, FreshCandidateCollector $collector ): array|\WP_Error {
+		return $this->runFetch( $input, $collector );
+	}
+
+	/**
+	 * Internal pagination loop shared by `execute()` and `executeWithCollector()`.
+	 *
+	 * @param array                        $input     Input parameters.
+	 * @param FreshCandidateCollector|null $collector Optional core fresh-candidate
+	 *                                                collector. When provided,
+	 *                                                pagination stops once the
+	 *                                                collector is full and the
+	 *                                                returned `items` come from
+	 *                                                `$collector->getAccepted()`.
+	 *                                                When null, every Reddit-side
+	 *                                                eligible candidate is returned.
+	 */
+	private function runFetch( array $input, ?FreshCandidateCollector $collector ): array|\WP_Error {
 		$logs   = array();
 		$config = $this->normalizeConfig( $input );
 
@@ -168,7 +206,6 @@ class FetchRedditAbility {
 		$min_comment_count     = $config['min_comment_count'];
 		$comment_count_setting = $config['comment_count'];
 		$search_term           = $config['search'];
-		$processed_items       = $config['processed_items'];
 		$fetch_batch_size      = $config['fetch_batch_size'];
 		$max_pages             = $config['max_pages'];
 		$download_images       = $config['download_images'];
@@ -183,7 +220,14 @@ class FetchRedditAbility {
 				'level'   => 'error',
 				'message' => 'Reddit: Either subreddit or query must be provided.',
 			);
-			return new \WP_Error( 'missing_param', 'Either subreddit or query must be provided', array( 'status' => 400, 'logs' => $logs ) );
+			return new \WP_Error(
+				'missing_param',
+				'Either subreddit or query must be provided',
+				array(
+					'status' => 400,
+					'logs'   => $logs,
+				)
+			);
 		}
 
 		if ( ! empty( $subreddit ) && ! preg_match( '/^[a-zA-Z0-9_]+$/', $subreddit ) ) {
@@ -192,7 +236,14 @@ class FetchRedditAbility {
 				'message' => 'Reddit: Invalid subreddit name format.',
 				'data'    => array( 'subreddit' => $subreddit ),
 			);
-			return new \WP_Error( 'missing_param', 'Invalid subreddit name format', array( 'status' => 400, 'logs' => $logs ) );
+			return new \WP_Error(
+				'missing_param',
+				'Invalid subreddit name format',
+				array(
+					'status' => 400,
+					'logs'   => $logs,
+				)
+			);
 		}
 
 		$valid_sorts = array( 'hot', 'new', 'top', 'rising', 'controversial', 'relevance' );
@@ -205,7 +256,14 @@ class FetchRedditAbility {
 					'valid_sorts'  => $valid_sorts,
 				),
 			);
-			return new \WP_Error( 'missing_param', 'Invalid sort parameter', array( 'status' => 400, 'logs' => $logs ) );
+			return new \WP_Error(
+				'missing_param',
+				'Invalid sort parameter',
+				array(
+					'status' => 400,
+					'logs'   => $logs,
+				)
+			);
 		}
 
 		$mode_label = $is_global_search ? 'global search' : ( $is_subreddit_search ? "r/{$subreddit} search" : "r/{$subreddit}" );
@@ -270,7 +328,14 @@ class FetchRedditAbility {
 						'message' => 'Reddit: API request failed.',
 						'data'    => array( 'error' => $result['error'] ),
 					);
-					return new \WP_Error( 'api_error', $result['error'], array( 'status' => 500, 'logs' => $logs ) );
+					return new \WP_Error(
+						'api_error',
+						$result['error'],
+						array(
+							'status' => 500,
+							'logs'   => $logs,
+						)
+					);
 				} else {
 					break;
 				}
@@ -299,7 +364,14 @@ class FetchRedditAbility {
 						'message' => 'Reddit: Invalid JSON response.',
 						'data'    => array( 'error' => $error_message ),
 					);
-					return new \WP_Error( 'api_error', $error_message, array( 'status' => 500, 'logs' => $logs ) );
+					return new \WP_Error(
+						'api_error',
+						$error_message,
+						array(
+							'status' => 500,
+							'logs'   => $logs,
+						)
+					);
 				} else {
 					break;
 				}
@@ -354,15 +426,6 @@ class FetchRedditAbility {
 						);
 						continue;
 					}
-				}
-
-				if ( in_array( $current_item_id, $processed_items, true ) ) {
-					$logs[] = array(
-						'level'   => 'debug',
-						'message' => 'Reddit: Skipping item (already processed).',
-						'data'    => array( 'item_id' => $current_item_id ),
-					);
-					continue;
 				}
 
 				if ( $min_comment_count > 0 ) {
@@ -467,21 +530,66 @@ class FetchRedditAbility {
 					),
 				);
 
-				$eligible_items[] = array(
+				$candidate = array(
 					'data'       => $raw_data,
 					'source_url' => $source_url,
 					'item_id'    => $current_item_id,
 				);
+
+				if ( null === $collector ) {
+					// Direct REST/MCP/ad-hoc invocation — no DM core eligibility
+					// surface to consult; surface every Reddit-side eligible item.
+					$eligible_items[] = $candidate;
+					continue;
+				}
+
+				// Pipeline-driven fetch: defer processed/claimed/reprocess
+				// decisions to the core fresh-candidate collector. The
+				// collector also de-duplicates within this scan, so we don't
+				// need to track seen IDs ourselves.
+				if ( ! $collector->offer( (string) $current_item_id, $candidate ) ) {
+					if ( $collector->isFull() ) {
+						break;
+					}
+					continue;
+				}
+
+				if ( $collector->isFull() ) {
+					break;
+				}
+			}
+
+			if ( null !== $collector && $collector->isFull() ) {
+				$logs[] = array(
+					'level'   => 'debug',
+					'message' => 'Reddit: Fresh-candidate collector full, ending pagination.',
+					'data'    => array( 'page' => $pages_fetched ),
+				);
+				break;
 			}
 
 			$after_param = $response_data['data']['after'] ?? null;
 			if ( ! $after_param ) {
+				if ( null !== $collector ) {
+					$collector->markExhausted();
+				}
 				$logs[] = array(
 					'level'   => 'debug',
 					'message' => "Reddit: No 'after' parameter found, ending pagination.",
 				);
 				break;
 			}
+		}
+
+		// If we exited the pagination loop because we hit `max_pages` without
+		// either filling the collector or running out of Reddit `after`
+		// cursors, that is "scan budget exhausted", not source exhaustion —
+		// leave `source_exhausted=false` so callers can distinguish the two.
+
+		// Pipeline path: emit collector accepted set as the result so handler
+		// post-processing iterates only the items the core primitive blessed.
+		if ( null !== $collector ) {
+			$eligible_items = $collector->getAccepted();
 		}
 
 		if ( empty( $eligible_items ) ) {
@@ -531,7 +639,6 @@ class FetchRedditAbility {
 			'min_comment_count' => 0,
 			'comment_count'     => 0,
 			'search'            => '',
-			'processed_items'   => array(),
 			'fetch_batch_size'  => 100,
 			'max_pages'         => 5,
 			'download_images'   => true,

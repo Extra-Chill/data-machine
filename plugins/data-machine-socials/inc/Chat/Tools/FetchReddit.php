@@ -170,7 +170,6 @@ class FetchReddit extends BaseTool {
 			'min_comment_count' => absint( $parameters['min_comment_count'] ?? 0 ),
 			'comment_count'     => absint( $parameters['comment_count'] ?? 0 ),
 			'search'            => $parameters['search'] ?? '',
-			'processed_items'   => array(),
 			'fetch_batch_size'  => 100,
 			'max_pages'         => 5,
 			'download_images'   => false,
@@ -183,11 +182,8 @@ class FetchReddit extends BaseTool {
 			return $this->buildErrorResponse( $error, $tool_name );
 		}
 
-		// The ability returns 'items' for multiple results, 'data' for single.
+		// The ability returns an 'items' array for all Reddit fetch results.
 		$items = $result['items'] ?? array();
-		if ( empty( $items ) && ! empty( $result['data'] ) ) {
-			$items = array( array( 'data' => $result['data'], 'source_url' => $result['source_url'] ?? '', 'item_id' => $result['item_id'] ?? '' ) );
-		}
 
 		if ( empty( $items ) ) {
 			$context_label = ! empty( $input['subreddit'] ) ? 'r/' . $input['subreddit'] : 'Reddit';

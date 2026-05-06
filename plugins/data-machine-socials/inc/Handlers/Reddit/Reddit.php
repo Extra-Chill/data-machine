@@ -14,6 +14,7 @@
 namespace DataMachineSocials\Handlers\Reddit;
 
 use DataMachine\Core\ExecutionContext;
+use DataMachine\Core\Steps\Fetch\FreshCandidateCollector;
 use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
 use DataMachineSocials\Abilities\Reddit\FetchRedditAbility;
@@ -98,8 +99,18 @@ class Reddit extends FetchHandler {
 	/**
 	 * Fetch Reddit posts with timeframe and keyword filtering.
 	 *
-	 * Delegates to FetchRedditAbility for core logic. Returns all eligible
-	 * posts as raw arrays for batch fan-out.
+	 * Delegates to FetchRedditAbility for Reddit-specific concerns
+	 * (pagination, API parameters, source filtering, identifier extraction)
+	 * and to the Data Machine core FreshCandidateCollector primitive for
+	 * processed/claimed/reprocess eligibility decisions.
+	 *
+	 * The collector lets pagination keep scanning past already-processed
+	 * top-of-feed results until it has enough fresh candidates for this
+	 * fetch cycle, instead of returning a no-item run when the most recent
+	 * subreddit posts have all already been imported.
+	 *
+	 * Final dedupe/claim/cap remain authoritative inside
+	 * `FetchHandler::get_fetch_data()`.
 	 *
 	 * Uses get_valid_access_token() for automatic token lifecycle management.
 	 */
@@ -117,10 +128,15 @@ class Reddit extends FetchHandler {
 			return array();
 		}
 
-		// Build processed items array from context
-		$processed_items = array();
+		// Build the core fresh-candidate collector. Selection-time eligibility
+		// (processed/claimed/reprocess) is decided by Data Machine core, not by
+		// Reddit. The ability paginates Reddit and offers each candidate to the
+		// collector; the collector stops the scan once we have enough fresh
+		// candidates to satisfy this fetch cycle's max_items target.
+		$max_items = (int) ( $config['max_items'] ?? $this->getDefaultMaxItems() );
+		$collector = new FreshCandidateCollector( $context, $max_items );
 
-		// Delegate to ability
+		// Delegate Reddit-specific concerns to the ability.
 		$ability_input = array(
 			'subreddit'         => $config['subreddit'] ?? '',
 			'access_token'      => $access_token,
@@ -130,14 +146,13 @@ class Reddit extends FetchHandler {
 			'min_comment_count' => isset( $config['min_comment_count'] ) ? absint( $config['min_comment_count'] ) : 0,
 			'comment_count'     => isset( $config['comment_count'] ) ? absint( $config['comment_count'] ) : 0,
 			'search'            => $config['search'] ?? '',
-			'processed_items'   => $processed_items,
 			'fetch_batch_size'  => 100,
 			'max_pages'         => 5,
 			'download_images'   => true,
 		);
 
 		$ability = new FetchRedditAbility();
-		$result  = $ability->execute( $ability_input );
+		$result  = $ability->executeWithCollector( $ability_input, $collector );
 
 		// Log ability logs
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
@@ -154,7 +169,16 @@ class Reddit extends FetchHandler {
 			return array();
 		}
 
-		// No eligible items
+		// Surface collector diagnostics so an operator can tell whether a
+		// no-item run was caused by full top-of-feed processing vs. natural
+		// source exhaustion.
+		$context->log(
+			'debug',
+			'Reddit: Fresh-candidate scan complete',
+			$collector->getDiagnostics()
+		);
+
+		// No eligible items after selection-time filtering.
 		if ( empty( $result['items'] ) ) {
 			return array();
 		}
@@ -165,9 +189,11 @@ class Reddit extends FetchHandler {
 			$data    = $item['data'];
 			$item_id = $item['item_id'] ?? ( $data['metadata']['original_id'] ?? '' );
 
-			// Set dedup_key for centralized dedup in FetchHandler::dedup().
+			// Wire the canonical Data Machine dedupe key so
+			// FetchHandler::get_fetch_data() can run final
+			// dedupe/claim/cap on these items.
 			if ( $item_id ) {
-				$data['metadata']['dedup_key'] = $item_id;
+				$data['metadata']['item_identifier'] = (string) $item_id;
 			}
 
 			// Download image if present

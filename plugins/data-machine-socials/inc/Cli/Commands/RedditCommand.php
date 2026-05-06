@@ -561,7 +561,6 @@ class RedditCommand {
 			'min_comment_count' => absint( $assoc_args['min-comments'] ?? 0 ),
 			'comment_count'     => absint( $assoc_args['comments'] ?? 0 ),
 			'search'            => $assoc_args['search'] ?? '',
-			'processed_items'   => array(),
 			'fetch_batch_size'  => 100,
 			'max_pages'         => 5,
 			'download_images'   => false, // CLI doesn't download images by default.
@@ -588,11 +587,6 @@ class RedditCommand {
 
 		// The ability returns 'items' array for multiple results.
 		$items = $result['items'] ?? array();
-
-		// Backward compat: single-result 'data' key.
-		if ( empty( $items ) && ! empty( $result['data'] ) ) {
-			$items = is_array( $result['data'] ) ? array( array( 'data' => $result['data'], 'source_url' => $result['source_url'] ?? '', 'item_id' => $result['item_id'] ?? '' ) ) : array();
-		}
 
 		if ( empty( $items ) ) {
 			WP_CLI::warning( 'No eligible posts found with the given filters.' );
