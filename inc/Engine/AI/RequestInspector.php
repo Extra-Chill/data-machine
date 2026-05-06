@@ -142,12 +142,18 @@ class RequestInspector {
 		$provider   = (string) $mode_model['provider'];
 		$model      = (string) $mode_model['model'];
 
-		$assembled = RequestBuilder::assemble(
+		$assembled         = RequestBuilder::assemble(
 			$messages,
 			$provider,
 			$model,
 			$tools,
 			ToolPolicyResolver::MODE_PIPELINE,
+			$payload
+		);
+		$transport_profile = RequestBuilder::wpAiClientTransportProfile(
+			ToolPolicyResolver::MODE_PIPELINE,
+			$provider,
+			$model,
 			$payload
 		);
 
@@ -160,6 +166,7 @@ class RequestInspector {
 				'provider'     => $provider,
 				'model'        => $model,
 				'mode'         => ToolPolicyResolver::MODE_PIPELINE,
+				'transport'    => $transport_profile,
 			),
 			$this->measure( $assembled, $data_packets, $messages, $packet_projection_context )
 		);

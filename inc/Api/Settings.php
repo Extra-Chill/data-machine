@@ -323,6 +323,7 @@ class Settings {
 				'success' => true,
 				'data'    => array(
 					'settings'     => $result['settings'],
+					'defaults'     => $result['defaults'] ?? array(),
 					'global_tools' => $result['global_tools'],
 				),
 			)
