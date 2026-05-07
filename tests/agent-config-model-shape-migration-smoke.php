@@ -35,9 +35,9 @@ if ( ! defined( 'ARRAY_A' ) ) {
 
 $options = array();
 
-function get_option( string $key, $default = false ) {
+function get_option( string $key, $default_value = false ) {
 	global $options;
-	return array_key_exists( $key, $options ) ? $options[ $key ] : $default;
+	return array_key_exists( $key, $options ) ? $options[ $key ] : $default_value;
 }
 
 function update_option( string $key, $value, bool $autoload = true ): bool {

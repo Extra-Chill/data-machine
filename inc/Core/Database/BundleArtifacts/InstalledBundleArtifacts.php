@@ -258,10 +258,10 @@ final class InstalledBundleArtifacts extends BaseRepository {
 		$result = $this->wpdb->delete(
 			$this->table_name,
 			array(
-				'agent_id'       => max( 0, $agent_id ),
-				'bundle_slug'    => $bundle_slug,
-				'artifact_type'  => $artifact_type,
-				'artifact_id'    => $artifact_id,
+				'agent_id'      => max( 0, $agent_id ),
+				'bundle_slug'   => $bundle_slug,
+				'artifact_type' => $artifact_type,
+				'artifact_id'   => $artifact_id,
 			),
 			array( '%d', '%s', '%s', '%s' )
 		);
@@ -311,11 +311,11 @@ final class InstalledBundleArtifacts extends BaseRepository {
 
 	private function safe_log_context( array $row ): array {
 		return array(
-			'agent_id'       => (int) $row['agent_id'],
-			'bundle_slug'    => (string) $row['bundle_slug'],
-			'artifact_type'  => (string) $row['artifact_type'],
-			'artifact_id'    => (string) $row['artifact_id'],
-			'local_status'   => AgentBundleArtifactStatus::classify( (string) $row['installed_hash'], isset( $row['current_hash'] ) ? (string) $row['current_hash'] : null ),
+			'agent_id'      => (int) $row['agent_id'],
+			'bundle_slug'   => (string) $row['bundle_slug'],
+			'artifact_type' => (string) $row['artifact_type'],
+			'artifact_id'   => (string) $row['artifact_id'],
+			'local_status'  => AgentBundleArtifactStatus::classify( (string) $row['installed_hash'], isset( $row['current_hash'] ) ? (string) $row['current_hash'] : null ),
 		);
 	}
 }

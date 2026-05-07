@@ -67,9 +67,9 @@ function sanitize_key( $key ): string {
 	return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) ?? '' );
 }
 
-function get_option( string $option, $default = false ) {
+function get_option( string $option, $default_value = false ) {
 	unset( $option );
-	return $default;
+	return $default_value;
 }
 
 $captured_request = array();

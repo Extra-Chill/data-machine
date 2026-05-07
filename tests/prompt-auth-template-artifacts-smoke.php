@@ -111,8 +111,8 @@ if ( ! function_exists( 'plugin_dir_url' ) ) {
 $GLOBALS['__prompt_smoke_options'] = array();
 
 if ( ! function_exists( 'get_option' ) ) {
-	function get_option( $key, $default = false ) {
-		return $GLOBALS['__prompt_smoke_options'][ $key ] ?? $default;
+	function get_option( $key, $default_value = false ) {
+		return $GLOBALS['__prompt_smoke_options'][ $key ] ?? $default_value;
 	}
 }
 

@@ -63,8 +63,8 @@ final class AgentBundleArtifactRebase {
 		$artifact_type = (string) ( $artifact['artifact_type'] ?? '' );
 		$artifact_id   = (string) ( $artifact['artifact_id'] ?? '' );
 		$artifact_key  = AgentBundleArtifactExtensions::artifact_key( $artifact_type, $artifact_id );
-		$base          = $artifact['base']   ?? null;
-		$local         = $artifact['local']  ?? null;
+		$base          = $artifact['base'] ?? null;
+		$local         = $artifact['local'] ?? null;
 		$remote        = $artifact['remote'] ?? null;
 
 		$policies = self::policies();
@@ -101,18 +101,18 @@ final class AgentBundleArtifactRebase {
 		$remote_hash = null === $remote ? null : AgentBundleArtifactHasher::hash( $remote );
 
 		return array(
-			'artifact_key'   => $artifact_key,
-			'artifact_type'  => $artifact_type,
-			'artifact_id'    => $artifact_id,
-			'source_path'    => (string) ( $artifact['source_path'] ?? '' ),
-			'policy'         => $policy_name,
-			'merged'         => $merged,
-			'merged_hash'    => $merged_hash,
-			'base_hash'      => $base_hash,
-			'local_hash'     => $local_hash,
-			'remote_hash'    => $remote_hash,
-			'decisions'      => $decisions,
-			'ambiguous'      => $ambiguous,
+			'artifact_key'      => $artifact_key,
+			'artifact_type'     => $artifact_type,
+			'artifact_id'       => $artifact_id,
+			'source_path'       => (string) ( $artifact['source_path'] ?? '' ),
+			'policy'            => $policy_name,
+			'merged'            => $merged,
+			'merged_hash'       => $merged_hash,
+			'base_hash'         => $base_hash,
+			'local_hash'        => $local_hash,
+			'remote_hash'       => $remote_hash,
+			'decisions'         => $decisions,
+			'ambiguous'         => $ambiguous,
 			'requires_approval' => ! empty( $ambiguous ),
 		);
 	}
@@ -198,8 +198,8 @@ final class AgentBundleArtifactRebase {
 			return self::policy_conservative( $input );
 		}
 
-		$base   = is_array( $input['base'] ?? null )   ? $input['base']   : array();
-		$local  = is_array( $input['local'] ?? null )  ? $input['local']  : array();
+		$base   = is_array( $input['base'] ?? null ) ? $input['base'] : array();
+		$local  = is_array( $input['local'] ?? null ) ? $input['local'] : array();
 		$remote = is_array( $input['remote'] ?? null ) ? $input['remote'] : array();
 
 		$decisions = array();
@@ -210,16 +210,16 @@ final class AgentBundleArtifactRebase {
 		// fight runtime cron throttles; if they need to force a schedule change,
 		// it must be explicit (not in scope for v1).
 		if ( array_key_exists( 'scheduling_config', $local ) ) {
-			$merged['scheduling_config']      = $local['scheduling_config'];
-			$decisions['scheduling_config']   = array(
+			$merged['scheduling_config']    = $local['scheduling_config'];
+			$decisions['scheduling_config'] = array(
 				'source' => 'local',
 				'reason' => 'burn_in_preserve_scheduling',
 			);
 		}
 
 		// Walk flow_config step by step, merging per-step keys.
-		$base_steps   = is_array( $base['flow_config']   ?? null ) ? $base['flow_config']   : array();
-		$local_steps  = is_array( $local['flow_config']  ?? null ) ? $local['flow_config']  : array();
+		$base_steps   = is_array( $base['flow_config'] ?? null ) ? $base['flow_config'] : array();
+		$local_steps  = is_array( $local['flow_config'] ?? null ) ? $local['flow_config'] : array();
 		$remote_steps = is_array( $remote['flow_config'] ?? null ) ? $remote['flow_config'] : array();
 		$merged_steps = is_array( $merged['flow_config'] ?? null ) ? $merged['flow_config'] : array();
 
@@ -231,19 +231,19 @@ final class AgentBundleArtifactRebase {
 		);
 
 		foreach ( $step_ids as $step_id ) {
-			$base_step   = is_array( $base_steps[ $step_id ]   ?? null ) ? $base_steps[ $step_id ]   : array();
-			$local_step  = is_array( $local_steps[ $step_id ]  ?? null ) ? $local_steps[ $step_id ]  : array();
+			$base_step   = is_array( $base_steps[ $step_id ] ?? null ) ? $base_steps[ $step_id ] : array();
+			$local_step  = is_array( $local_steps[ $step_id ] ?? null ) ? $local_steps[ $step_id ] : array();
 			$remote_step = is_array( $remote_steps[ $step_id ] ?? null ) ? $remote_steps[ $step_id ] : array();
 
 			if ( empty( $remote_step ) && ! empty( $local_step ) ) {
 				// Remote dropped this step; without explicit policy, keep local
 				// and flag as ambiguous so operator confirms.
-				$merged_steps[ $step_id ]                            = $local_step;
-				$decisions[ "flow_config.{$step_id}" ]               = array(
+				$merged_steps[ $step_id ]              = $local_step;
+				$decisions[ "flow_config.{$step_id}" ] = array(
 					'source' => 'ambiguous',
 					'reason' => 'remote_dropped_step',
 				);
-				$ambiguous[] = "flow_config.{$step_id}";
+				$ambiguous[]                           = "flow_config.{$step_id}";
 				continue;
 			}
 
@@ -252,8 +252,8 @@ final class AgentBundleArtifactRebase {
 			// Preserve per-step runtime queue fields from local.
 			foreach ( array( 'prompt_queue', 'config_patch_queue', 'queue_mode', '_queue_consume_revision' ) as $rt_field ) {
 				if ( array_key_exists( $rt_field, $local_step ) ) {
-					$merged_step[ $rt_field ]                                       = $local_step[ $rt_field ];
-					$decisions[ "flow_config.{$step_id}.{$rt_field}" ]              = array(
+					$merged_step[ $rt_field ]                          = $local_step[ $rt_field ];
+					$decisions[ "flow_config.{$step_id}.{$rt_field}" ] = array(
 						'source' => 'local',
 						'reason' => 'burn_in_preserve_runtime_queue',
 					);
@@ -263,12 +263,12 @@ final class AgentBundleArtifactRebase {
 			}
 
 			// Merge handler_config keys (single-handler shape).
-			$base_hc   = is_array( $base_step['handler_config']   ?? null ) ? $base_step['handler_config']   : array();
-			$local_hc  = is_array( $local_step['handler_config']  ?? null ) ? $local_step['handler_config']  : array();
+			$base_hc   = is_array( $base_step['handler_config'] ?? null ) ? $base_step['handler_config'] : array();
+			$local_hc  = is_array( $local_step['handler_config'] ?? null ) ? $local_step['handler_config'] : array();
 			$remote_hc = is_array( $remote_step['handler_config'] ?? null ) ? $remote_step['handler_config'] : array();
 
 			if ( ! empty( $local_hc ) || ! empty( $remote_hc ) ) {
-				$merged_hc                               = self::merge_handler_config(
+				$merged_hc                     = self::merge_handler_config(
 					$base_hc,
 					$local_hc,
 					$remote_hc,
@@ -276,21 +276,21 @@ final class AgentBundleArtifactRebase {
 					$decisions,
 					$ambiguous
 				);
-				$merged_step['handler_config']           = $merged_hc;
+				$merged_step['handler_config'] = $merged_hc;
 			}
 
 			// Merge handler_configs (multi-handler shape: keyed by handler slug).
-			$base_hcs   = is_array( $base_step['handler_configs']   ?? null ) ? $base_step['handler_configs']   : array();
-			$local_hcs  = is_array( $local_step['handler_configs']  ?? null ) ? $local_step['handler_configs']  : array();
+			$base_hcs   = is_array( $base_step['handler_configs'] ?? null ) ? $base_step['handler_configs'] : array();
+			$local_hcs  = is_array( $local_step['handler_configs'] ?? null ) ? $local_step['handler_configs'] : array();
 			$remote_hcs = is_array( $remote_step['handler_configs'] ?? null ) ? $remote_step['handler_configs'] : array();
 
 			if ( ! empty( $local_hcs ) || ! empty( $remote_hcs ) ) {
 				$merged_hcs = array();
 				$slugs      = array_unique( array_merge( array_keys( $local_hcs ), array_keys( $remote_hcs ) ) );
 				foreach ( $slugs as $slug ) {
-					$lc                  = is_array( $local_hcs[ $slug ]  ?? null ) ? $local_hcs[ $slug ]  : array();
+					$lc                  = is_array( $local_hcs[ $slug ] ?? null ) ? $local_hcs[ $slug ] : array();
 					$rc                  = is_array( $remote_hcs[ $slug ] ?? null ) ? $remote_hcs[ $slug ] : array();
-					$bc                  = is_array( $base_hcs[ $slug ]   ?? null ) ? $base_hcs[ $slug ]   : array();
+					$bc                  = is_array( $base_hcs[ $slug ] ?? null ) ? $base_hcs[ $slug ] : array();
 					$merged_hcs[ $slug ] = self::merge_handler_config(
 						$bc,
 						$lc,
@@ -314,7 +314,7 @@ final class AgentBundleArtifactRebase {
 		// it ambiguous so an operator confirms.
 		$top_keys = array_unique(
 			array_merge(
-				array_keys( is_array( $local )  ? $local  : array() ),
+				array_keys( is_array( $local ) ? $local : array() ),
 				array_keys( is_array( $remote ) ? $remote : array() )
 			)
 		);
@@ -322,8 +322,8 @@ final class AgentBundleArtifactRebase {
 			if ( in_array( $key, array( 'flow_config', 'scheduling_config' ), true ) ) {
 				continue;
 			}
-			$base_val   = $base[ $key ]   ?? null;
-			$local_val  = $local[ $key ]  ?? null;
+			$base_val   = $base[ $key ] ?? null;
+			$local_val  = $local[ $key ] ?? null;
 			$remote_val = $remote[ $key ] ?? null;
 
 			if ( $local_val === $remote_val ) {
@@ -334,12 +334,12 @@ final class AgentBundleArtifactRebase {
 			$remote_changed = $remote_val !== $base_val;
 
 			if ( $local_changed && $remote_changed ) {
-				$merged[ $key ]      = $local_val;
-				$decisions[ $key ]   = array(
+				$merged[ $key ]    = $local_val;
+				$decisions[ $key ] = array(
 					'source' => 'ambiguous',
 					'reason' => 'both_diverged_from_base',
 				);
-				$ambiguous[]         = $key;
+				$ambiguous[]       = $key;
 				continue;
 			}
 
@@ -395,12 +395,12 @@ final class AgentBundleArtifactRebase {
 		$merged = array();
 
 		foreach ( $keys as $key ) {
-			$base_val   = $base[ $key ]   ?? null;
-			$local_val  = $local[ $key ]  ?? null;
+			$base_val   = $base[ $key ] ?? null;
+			$local_val  = $local[ $key ] ?? null;
 			$remote_val = $remote[ $key ] ?? null;
 			$path       = $path_prefix . '.' . (string) $key;
 
-			$local_changed  = array_key_exists( $key, $local )  && $local_val  !== $base_val;
+			$local_changed  = array_key_exists( $key, $local ) && $local_val !== $base_val;
 			$remote_changed = array_key_exists( $key, $remote ) && $remote_val !== $base_val;
 
 			// Identical local and remote → take it, no decision noise.
@@ -414,7 +414,7 @@ final class AgentBundleArtifactRebase {
 			// Local-preserved throttle key: keep local if it diverged from base.
 			if ( in_array( (string) $key, $local_preserve_keys, true ) ) {
 				if ( $local_changed && ! $remote_changed ) {
-					$merged[ $key ]    = $local_val;
+					$merged[ $key ]     = $local_val;
 					$decisions[ $path ] = array(
 						'source' => 'local',
 						'reason' => 'burn_in_preserve_throttle',
@@ -423,18 +423,18 @@ final class AgentBundleArtifactRebase {
 				}
 				if ( $local_changed && $remote_changed ) {
 					// Both moved this throttle. Default to local (safer) but flag ambiguous.
-					$merged[ $key ]    = $local_val;
+					$merged[ $key ]     = $local_val;
 					$decisions[ $path ] = array(
 						'source' => 'ambiguous',
 						'reason' => 'throttle_diverged_in_local_and_remote',
 					);
-					$ambiguous[]       = $path;
+					$ambiguous[]        = $path;
 					continue;
 				}
 				// Local unchanged from base; safe to take remote when remote moved
 				// (e.g. bundle deliberately raised throttle and local never overrode).
 				if ( array_key_exists( $key, $remote ) ) {
-					$merged[ $key ]    = $remote_val;
+					$merged[ $key ]     = $remote_val;
 					$decisions[ $path ] = array(
 						'source' => 'remote',
 						'reason' => 'local_unchanged_from_base',
@@ -447,7 +447,7 @@ final class AgentBundleArtifactRebase {
 
 			// Source-shape keys default to remote when remote diverged.
 			if ( $remote_changed && ! $local_changed ) {
-				$merged[ $key ]    = $remote_val;
+				$merged[ $key ]     = $remote_val;
 				$decisions[ $path ] = array(
 					'source' => 'remote',
 					'reason' => 'remote_source_shape_change',
@@ -456,7 +456,7 @@ final class AgentBundleArtifactRebase {
 			}
 
 			if ( $local_changed && ! $remote_changed ) {
-				$merged[ $key ]    = $local_val;
+				$merged[ $key ]     = $local_val;
 				$decisions[ $path ] = array(
 					'source' => 'local',
 					'reason' => 'remote_unchanged_from_base',
@@ -467,12 +467,12 @@ final class AgentBundleArtifactRebase {
 			if ( $local_changed && $remote_changed ) {
 				// Both moved a non-throttle key. Default merged value to local
 				// (don't silently clobber) and flag for approval.
-				$merged[ $key ]    = $local_val;
+				$merged[ $key ]     = $local_val;
 				$decisions[ $path ] = array(
 					'source' => 'ambiguous',
 					'reason' => 'both_diverged_from_base',
 				);
-				$ambiguous[]       = $path;
+				$ambiguous[]        = $path;
 				continue;
 			}
 
@@ -510,7 +510,7 @@ final class AgentBundleArtifactRebase {
 		$keys  = array_unique( array_merge( array_keys( $local ), array_keys( $remote ) ) );
 		foreach ( $keys as $key ) {
 			$child_prefix = '' === $prefix ? (string) $key : $prefix . '.' . (string) $key;
-			$lv           = $local[ $key ]  ?? null;
+			$lv           = $local[ $key ] ?? null;
 			$rv           = $remote[ $key ] ?? null;
 			if ( $lv === $rv ) {
 				continue;

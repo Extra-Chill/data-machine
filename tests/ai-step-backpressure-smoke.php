@@ -39,10 +39,10 @@ class DataMachineAIBackpressureSmokeAction {
 	}
 }
 
-function get_option( string $name, mixed $default = false ): mixed {
+function get_option( string $name, mixed $default_value = false ): mixed {
 	return array_key_exists( $name, $GLOBALS['datamachine_ai_backpressure_options'] )
 		? $GLOBALS['datamachine_ai_backpressure_options'][ $name ]
-		: $default;
+		: $default_value;
 }
 
 function add_option( string $name, mixed $value = '', mixed $deprecated = '', mixed $autoload = null ): bool {

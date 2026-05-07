@@ -47,8 +47,8 @@ function current_action(): string {
 	return '';
 }
 
-function get_option( string $key, $default = false ) {
-	return $default;
+function get_option( string $key, $default_value = false ) {
+	return $default_value;
 }
 
 require_once __DIR__ . '/../inc/Core/DataPacket.php';

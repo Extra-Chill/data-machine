@@ -23,8 +23,8 @@ namespace {
 		return trim( (string) $value );
 	}
 
-	function get_option( string $name, $default = false ) {
-		return $GLOBALS['datamachine_provider_admin_options'][ $name ] ?? $default;
+	function get_option( string $name, $default_value = false ) {
+		return $GLOBALS['datamachine_provider_admin_options'][ $name ] ?? $default_value;
 	}
 
 	function update_option( string $name, $value, bool $autoload = true ): bool {
@@ -33,8 +33,8 @@ namespace {
 		return true;
 	}
 
-	function get_site_option( string $name, $default = false ) {
-		return $GLOBALS['datamachine_provider_admin_site_options'][ $name ] ?? $default;
+	function get_site_option( string $name, $default_value = false ) {
+		return $GLOBALS['datamachine_provider_admin_site_options'][ $name ] ?? $default_value;
 	}
 
 	function maybe_unserialize( $value ) {

@@ -14,9 +14,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 $options      = array();
 $site_options = array();
 
-function get_option( string $key, $default = false ) {
+function get_option( string $key, $default_value = false ) {
 	global $options;
-	return array_key_exists( $key, $options ) ? $options[ $key ] : $default;
+	return array_key_exists( $key, $options ) ? $options[ $key ] : $default_value;
 }
 
 function update_option( string $key, $value, bool $autoload = true ): bool {
@@ -25,9 +25,9 @@ function update_option( string $key, $value, bool $autoload = true ): bool {
 	return true;
 }
 
-function get_site_option( string $key, $default = false ) {
+function get_site_option( string $key, $default_value = false ) {
 	global $site_options;
-	return array_key_exists( $key, $site_options ) ? $site_options[ $key ] : $default;
+	return array_key_exists( $key, $site_options ) ? $site_options[ $key ] : $default_value;
 }
 
 function update_site_option( string $key, $value ): bool {

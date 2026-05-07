@@ -54,8 +54,8 @@ function assert_equals( $expected, $actual, string $name, array &$failures, int 
 	echo '    actual:   ' . var_export( $actual, true ) . "\n";
 }
 
-function assert_absent( string $key, array $array, string $name, array &$failures, int &$passes ): void {
-	assert_equals( false, array_key_exists( $key, $array ), $name, $failures, $passes );
+function assert_absent( string $key, array $array_value, string $name, array &$failures, int &$passes ): void {
+	assert_equals( false, array_key_exists( $key, $array_value ), $name, $failures, $passes );
 }
 
 function assert_not_contains( string $needle, string $haystack, string $name, array &$failures, int &$passes ): void {
