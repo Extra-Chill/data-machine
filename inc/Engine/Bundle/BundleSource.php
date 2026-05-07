@@ -84,9 +84,9 @@ final class BundleSource {
 			return $source;
 		}
 
-		$fetch_url = self::normalize_github_url( $source );
+		$fetch_url = self::normalize_github_url( $source, $context );
 
-		if ( ! preg_match( '#\.(zip|json)(\?.*)?$#i', $fetch_url ) ) {
+		if ( ! preg_match( '#\.(zip|json)(\?.*)?$#i', $fetch_url ) && ! self::is_github_api_zipball_url( $fetch_url ) ) {
 			return new WP_Error(
 				'datamachine_bundle_source_invalid',
 				sprintf(
@@ -143,7 +143,12 @@ final class BundleSource {
 		// fetch_to_tempfile() streams to a tempfile with no extension. The
 		// downstream parser branches on extension (.zip vs .json), so
 		// rename the temp file to preserve the extension from the URL.
+		// api.github.com/repos/<o>/<r>/zipball/<ref> URLs have no .zip
+		// suffix but always produce a zip archive.
 		$expected_ext = preg_match( '#\.(zip|json)(\?.*)?$#i', $fetch_url, $m ) ? strtolower( $m[1] ) : '';
+		if ( '' === $expected_ext && self::is_github_api_zipball_url( $fetch_url ) ) {
+			$expected_ext = 'zip';
+		}
 		if ( '' !== $expected_ext ) {
 			$with_ext = $temp_file . '.' . $expected_ext;
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename,WordPress.PHP.NoSilencedErrors.Discouraged
@@ -209,6 +214,14 @@ final class BundleSource {
 	 * WP_Http's 'stream' + 'filename' args so multi-MB bundles never sit
 	 * in PHP memory.
 	 *
+	 * Cross-host redirects strip the Authorization header before they
+	 * fly. WordPress's bundled Requests library forwards all original
+	 * headers on redirect, which would re-send a GitHub PAT to the S3
+	 * signed URL that `api.github.com/zipball` returns and trigger an
+	 * HTTP 400 from S3 ("unrecognized auth scheme"). We follow redirects
+	 * manually with `redirection => 0` so we can drop the Authorization
+	 * header on every cross-host hop.
+	 *
 	 * @param string $fetch_url Normalized URL.
 	 * @param array  $args      Request args (already passed through the
 	 *                          datamachine_bundle_source_download_args filter).
@@ -226,24 +239,66 @@ final class BundleSource {
 		// Strip the internal handle before the request flies.
 		unset( $args['datamachine_bundle_source'] );
 
-		$args['stream']   = true;
-		$args['filename'] = $temp_path;
+		// Manage redirects ourselves so we can strip the Authorization
+		// header on cross-host hops. Cap matches WP's default of 5.
+		$max_redirects       = isset( $args['redirection'] ) ? max( 0, (int) $args['redirection'] ) : 5;
+		$args['redirection'] = 0;
+		$args['stream']      = true;
+		$args['filename']    = $temp_path;
 
-		$response = wp_safe_remote_get( $fetch_url, $args );
+		$current_url = $fetch_url;
+		$response    = null;
 
-		if ( is_wp_error( $response ) ) {
-			if ( file_exists( $temp_path ) ) {
-				wp_delete_file( $temp_path );
+		for ( $hop = 0; $hop <= $max_redirects; $hop++ ) {
+			$response = wp_safe_remote_get( $current_url, $args );
+
+			if ( is_wp_error( $response ) ) {
+				if ( file_exists( $temp_path ) ) {
+					wp_delete_file( $temp_path );
+				}
+
+				return new WP_Error(
+					'datamachine_bundle_source_download_failed',
+					sprintf(
+						'Failed to download bundle from %s: %s',
+						$current_url,
+						$response->get_error_message()
+					)
+				);
 			}
 
-			return new WP_Error(
-				'datamachine_bundle_source_download_failed',
-				sprintf(
-					'Failed to download bundle from %s: %s',
-					$fetch_url,
-					$response->get_error_message()
-				)
-			);
+			$code = (int) wp_remote_retrieve_response_code( $response );
+
+			if ( $code >= 300 && $code < 400 ) {
+				$location = trim( (string) wp_remote_retrieve_header( $response, 'location' ) );
+				if ( '' === $location ) {
+					break;
+				}
+
+				$next_url = self::resolve_redirect_url( $current_url, $location );
+				if ( '' === $next_url ) {
+					break;
+				}
+
+				// Cross-host hop → strip Authorization. Same-host hops
+				// keep it (mirrors browser/Requests behavior).
+				if ( ! self::same_host( $current_url, $next_url ) ) {
+					$args = self::strip_authorization( $args );
+				}
+
+				// Streaming target needs to be reset because the previous
+				// hop may have written response data (a 302 normally has
+				// an empty body, but defensively truncate).
+				if ( file_exists( $temp_path ) ) {
+					// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents,WordPress.PHP.NoSilencedErrors.Discouraged
+					@file_put_contents( $temp_path, '' );
+				}
+
+				$current_url = $next_url;
+				continue;
+			}
+
+			break;
 		}
 
 		$code = (int) wp_remote_retrieve_response_code( $response );
@@ -259,14 +314,21 @@ final class BundleSource {
 					sprintf(
 						'Authentication required (HTTP %d) for %s. Configure a token via DATAMACHINE_GITHUB_TOKEN, the datamachine_bundle_source_download_args filter, or the --token / --token-env CLI flags.',
 						$code,
-						$fetch_url
+						$current_url
 					)
+				);
+			}
+
+			if ( $code >= 300 && $code < 400 ) {
+				return new WP_Error(
+					'datamachine_bundle_source_too_many_redirects',
+					sprintf( 'Too many redirects fetching %s', $fetch_url )
 				);
 			}
 
 			return new WP_Error(
 				'datamachine_bundle_source_http_error',
-				sprintf( 'HTTP %d fetching %s', $code, $fetch_url )
+				sprintf( 'HTTP %d fetching %s', $code, $current_url )
 			);
 		}
 
@@ -278,6 +340,86 @@ final class BundleSource {
 			'etag' => '' !== $etag ? $etag : null,
 			'sha'  => $sha,
 		);
+	}
+
+	/**
+	 * Resolve a redirect Location header against its source URL.
+	 *
+	 * Handles absolute and protocol-relative URLs. Returns '' when the
+	 * Location can't be resolved.
+	 *
+	 * @param string $base     URL the response came from.
+	 * @param string $location Location header value.
+	 * @return string Absolute URL or '' on failure.
+	 */
+	private static function resolve_redirect_url( string $base, string $location ): string {
+		$location = trim( $location );
+		if ( '' === $location ) {
+			return '';
+		}
+
+		if ( preg_match( '#^https?://#i', $location ) ) {
+			return $location;
+		}
+
+		// Protocol-relative — //host/path.
+		if ( 0 === strpos( $location, '//' ) ) {
+			$scheme = wp_parse_url( $base, PHP_URL_SCHEME );
+			if ( ! is_string( $scheme ) || '' === $scheme ) {
+				$scheme = 'https';
+			}
+			return $scheme . ':' . $location;
+		}
+
+		// Absolute path — /path → reuse scheme + host from base.
+		if ( '' !== $location && '/' === $location[0] ) {
+			$scheme = wp_parse_url( $base, PHP_URL_SCHEME );
+			$host   = wp_parse_url( $base, PHP_URL_HOST );
+			if ( ! is_string( $scheme ) || '' === $scheme || ! is_string( $host ) || '' === $host ) {
+				return '';
+			}
+			return $scheme . '://' . $host . $location;
+		}
+
+		return '';
+	}
+
+	/**
+	 * Are these two URLs on the same host (case-insensitive)?
+	 *
+	 * @param string $a First URL.
+	 * @param string $b Second URL.
+	 * @return bool
+	 */
+	private static function same_host( string $a, string $b ): bool {
+		$ha = wp_parse_url( $a, PHP_URL_HOST );
+		$hb = wp_parse_url( $b, PHP_URL_HOST );
+		if ( ! is_string( $ha ) || ! is_string( $hb ) || '' === $ha || '' === $hb ) {
+			return false;
+		}
+		return 0 === strcasecmp( $ha, $hb );
+	}
+
+	/**
+	 * Drop Authorization headers (case-insensitive) from request args.
+	 *
+	 * Used before following a cross-host redirect so we never re-send a
+	 * GitHub PAT to the signed S3 URL that `api.github.com/zipball`
+	 * redirects to.
+	 *
+	 * @param array $args HTTP args.
+	 * @return array
+	 */
+	private static function strip_authorization( array $args ): array {
+		if ( empty( $args['headers'] ) || ! is_array( $args['headers'] ) ) {
+			return $args;
+		}
+		foreach ( $args['headers'] as $name => $value ) {
+			if ( 0 === strcasecmp( (string) $name, 'authorization' ) ) {
+				unset( $args['headers'][ $name ] );
+			}
+		}
+		return $args;
 	}
 
 	/**
@@ -331,20 +473,40 @@ final class BundleSource {
 	 * Normalize a GitHub URL into a downloadable archive or raw URL.
 	 *
 	 * Cases handled:
-	 * - archive/refs/heads/<branch>.zip → unchanged
-	 * - archive/<sha>.zip → unchanged
+	 * - archive/refs/heads/<branch>.zip → API zipball when token configured, else unchanged
+	 * - archive/<sha>.zip → API zipball when token configured, else unchanged
 	 * - blob/<ref>/<path>.{zip,json} → raw.githubusercontent.com/.../<ref>/<path>
 	 * - raw/<ref>/<path> → already raw, pass through
-	 * - tree/<branch> → archive/refs/heads/<branch>.zip
+	 * - tree/<branch> → API zipball when token configured, else archive/refs/heads/<branch>.zip
 	 *
 	 * Bare repo URLs (https://github.com/<org>/<repo>) and any other
 	 * shape are returned unchanged. The caller validates the final
 	 * extension and rejects unsupported targets.
 	 *
-	 * @param string $url URL to normalize.
+	 * The web-host archive endpoint (`github.com/<o>/<r>/archive/...`)
+	 * does not accept Personal Access Token authentication — it returns
+	 * HTTP 404 even with a valid PAT. The API endpoint
+	 * (`api.github.com/repos/<o>/<r>/zipball/<ref>`) accepts both
+	 * fine-grained and classic PATs and returns a 302 to a signed S3 URL
+	 * containing the archive. To preserve current public-install behavior
+	 * (no API rate-limit penalty for unauthenticated users), API routing
+	 * only happens when {@see BundleSourceAuth::token_for()} resolves a
+	 * token for `api.github.com` from the supplied context — either a
+	 * CLI-supplied token or one of the env/constant/option/filter slots.
+	 *
+	 * GHE follow-up: GHE has the same `api.<host>/repos/.../zipball/<ref>`
+	 * pattern, but the current `datamachine_bundle_source_ghe_hosts`
+	 * filter shape doesn't carry an API host. GHE archive auth remains
+	 * unfixed in this pass and is tracked separately. See PR for #1840.
+	 *
+	 * @param string $url     URL to normalize.
+	 * @param array  $context Optional resolution context — recognized keys
+	 *                        match {@see BundleSource::resolve()}. Used to
+	 *                        decide whether a token is available before
+	 *                        rewriting to the API endpoint.
 	 * @return string Normalized URL.
 	 */
-	public static function normalize_github_url( string $url ): string {
+	public static function normalize_github_url( string $url, array $context = array() ): string {
 		$url = trim( $url );
 
 		if ( ! preg_match( '#^https?://github\.com/#i', $url ) && ! preg_match( '#^https?://raw\.githubusercontent\.com/#i', $url ) ) {
@@ -356,9 +518,14 @@ final class BundleSource {
 			return $url;
 		}
 
-		// Already an archive URL — pass through.
-		if ( preg_match( '#^https?://github\.com/[^/]+/[^/]+/archive/.+\.zip$#i', $url ) ) {
-			return $url;
+		// archive/refs/heads/<branch>.zip → API zipball when token configured.
+		if ( preg_match( '#^https?://github\.com/([^/]+)/([^/]+)/archive/refs/heads/(.+)\.zip$#i', $url, $m ) ) {
+			return self::route_github_archive( $m[1], $m[2], $m[3], $url, $context );
+		}
+
+		// archive/<sha>.zip → API zipball when token configured.
+		if ( preg_match( '#^https?://github\.com/([^/]+)/([^/]+)/archive/([0-9a-f]{7,40})\.zip$#i', $url, $m ) ) {
+			return self::route_github_archive( $m[1], $m[2], $m[3], $url, $context );
 		}
 
 		// blob/<ref>/<path> → raw URL.
@@ -371,12 +538,74 @@ final class BundleSource {
 			return "https://raw.githubusercontent.com/{$m[1]}/{$m[2]}/{$m[3]}";
 		}
 
-		// tree/<branch> → archive zip for that branch.
+		// tree/<branch> → API zipball when token configured, else web-host archive.
 		if ( preg_match( '#^https?://github\.com/([^/]+)/([^/]+)/tree/([^/]+)/?$#i', $url, $m ) ) {
-			return "https://github.com/{$m[1]}/{$m[2]}/archive/refs/heads/{$m[3]}.zip";
+			return self::route_github_archive( $m[1], $m[2], $m[3], $url, $context );
 		}
 
 		return $url;
+	}
+
+	/**
+	 * Choose between API and web-host endpoints for a github.com archive.
+	 *
+	 * Returns the API endpoint when a token is available for
+	 * `api.github.com` (CLI/env/constant/option/filter). Falls back to the
+	 * web-host archive URL otherwise so unauthenticated public installs
+	 * keep using the same shape they always have.
+	 *
+	 * @param string $owner       Repo owner (URL segment, not validated).
+	 * @param string $repo        Repo name (URL segment, not validated).
+	 * @param string $ref         Branch name or commit SHA.
+	 * @param string $original    Original web-host URL — returned as the
+	 *                            fallback when no token is available.
+	 * @param array  $context     Resolution context.
+	 * @return string
+	 */
+	private static function route_github_archive( string $owner, string $repo, string $ref, string $original, array $context ): string {
+		// BundleSourceAuth lives in the same namespace and loads via the
+		// PSR-4 autoloader. Use class_exists() to keep the dependency
+		// soft for any consumer that imports BundleSource without the
+		// auth helper (e.g. test harnesses).
+		if ( class_exists( BundleSourceAuth::class ) ) {
+			$token = BundleSourceAuth::token_for( 'https://api.github.com/', $context );
+			if ( null !== $token && '' !== $token ) {
+				return sprintf(
+					'https://api.github.com/repos/%s/%s/zipball/%s',
+					$owner,
+					$repo,
+					$ref
+				);
+			}
+		}
+
+		// Default to the web-host archive shape (works unauthenticated for
+		// public repos, matches the long-standing behavior).
+		if ( preg_match( '#/archive/refs/heads/.+\.zip$#i', $original )
+			|| preg_match( '#/archive/[0-9a-f]{7,40}\.zip$#i', $original )
+		) {
+			return $original;
+		}
+
+		return sprintf(
+			'https://github.com/%s/%s/archive/refs/heads/%s.zip',
+			$owner,
+			$repo,
+			$ref
+		);
+	}
+
+	/**
+	 * Is this URL the api.github.com zipball endpoint?
+	 *
+	 * @param string $url URL to test.
+	 * @return bool
+	 */
+	private static function is_github_api_zipball_url( string $url ): bool {
+		return (bool) preg_match(
+			'#^https?://api\.github\.com/repos/[^/]+/[^/]+/(zipball|tarball)(/|$)#i',
+			$url
+		);
 	}
 
 	/**

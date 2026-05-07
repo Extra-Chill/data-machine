@@ -195,6 +195,8 @@ wp datamachine agent install https://github.com/private-org/private-repo/archive
 
 A 401/403/404 response surfaces as `WP_Error( 'datamachine_bundle_source_auth_required', ... )` with a hint about the configured token slots.
 
+**URL routing.** When a token is available for `api.github.com`, web-host archive URLs (`github.com/<o>/<r>/archive/refs/heads/<branch>.zip`, `archive/<sha>.zip`, and `tree/<branch>`) are rewritten to `api.github.com/repos/<o>/<r>/zipball/<ref>` before the request flies. The web-host archive endpoint rejects Personal Access Tokens with HTTP 404; the API endpoint accepts both fine-grained and classic PATs and returns a 302 to a signed S3 URL. Public installs (no token configured) keep using the web-host URL so they don't pay the API rate-limit cost. The `Authorization` header is dropped on cross-host redirects so it never leaks to S3 (which would 400 on the unrecognized auth scheme).
+
 ### Example 2 — GHE archive via filter-configured host + constant
 
 ```php
