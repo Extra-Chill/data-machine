@@ -300,11 +300,17 @@ final class BundleSourceAuth {
 	/**
 	 * Is the given host one of the built-in github.com hosts?
 	 *
+	 * Includes the API host (`api.github.com`) so the same
+	 * `DATAMACHINE_GITHUB_TOKEN` env/constant/option slot covers all
+	 * three endpoints used by the bundle resolver.
+	 *
 	 * @param string $host Lower-cased host.
 	 * @return bool
 	 */
 	private static function is_github_host( string $host ): bool {
-		return 'github.com' === $host || 'raw.githubusercontent.com' === $host;
+		return 'github.com' === $host
+			|| 'raw.githubusercontent.com' === $host
+			|| 'api.github.com' === $host;
 	}
 
 	/**
