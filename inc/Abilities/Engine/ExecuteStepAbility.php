@@ -692,7 +692,7 @@ class ExecuteStepAbility {
 			return $status;
 		}
 
-		if ( JobStatus::PENDING === JobStatus::fromString( $status )->getBaseStatus() && $this->hasPendingRetry( $job_id ) ) {
+		if ( JobStatus::PENDING === JobStatus::fromString( $status )->getBaseStatus() && ( $this->hasPendingRetry( $job_id ) || $this->hasPendingAIConcurrencyThrottle( $job_id ) ) ) {
 			return $status;
 		}
 
@@ -719,6 +719,27 @@ class ExecuteStepAbility {
 		$retry       = is_array( $engine_data['retry'] ?? null ) ? $engine_data['retry'] : array();
 
 		return ! empty( $retry['next_retry_at'] );
+	}
+
+	/**
+	 * Check whether the job has a future AI concurrency defer recorded.
+	 *
+	 * AIStep parks above-limit work back to pending and reschedules the same
+	 * step. Treat that as an already-routed outcome, not as an empty-packet
+	 * failure, so throttling remains distinct from provider/model errors.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return bool
+	 */
+	private function hasPendingAIConcurrencyThrottle( int $job_id ): bool {
+		if ( ! function_exists( 'datamachine_get_engine_data' ) ) {
+			return false;
+		}
+
+		$engine_data = datamachine_get_engine_data( $job_id );
+		$throttle    = is_array( $engine_data['ai_concurrency_throttle'] ?? null ) ? $engine_data['ai_concurrency_throttle'] : array();
+
+		return ! empty( $throttle['next_retry_at'] );
 	}
 
 	/**
