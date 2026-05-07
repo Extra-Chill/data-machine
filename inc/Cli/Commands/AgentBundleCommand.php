@@ -445,15 +445,24 @@ class AgentBundleCommand extends BaseCommand {
 				continue;
 			}
 
-			// Reconstruct the base payload by hash. We don't persist the original
-			// payload, only its hash, so the rebase falls back to "no base info"
-			// for installed rows missing a snapshot. Conservative policy is fine
-			// without a base; burn-in-safe degrades by treating remote as the
-			// changed side and local as the changed side without merge guidance.
-			$base_payload = null;
+			// Reconstruct the base payload from the install-time snapshot. New
+			// installs/upgrades persist `installed_payload` on the agent_config
+			// record (see AgentBundler::bundle_artifact_record()) so 3-way merge
+			// has full fidelity. Pre-snapshot rows leave `installed_payload`
+			// missing — burn-in-safe degrades to flagging more fields ambiguous
+			// rather than silently merging without a real base.
+			//
+			// `payload` (no `installed_` prefix) is checked as a back-compat alias
+			// for older test fixtures and any custom writers; new code should use
+			// `installed_payload`.
+			$base_payload  = null;
 			$installed_row = $installed_index[ $key ] ?? null;
-			if ( is_array( $installed_row ) && isset( $installed_row['payload'] ) ) {
-				$base_payload = $installed_row['payload'];
+			if ( is_array( $installed_row ) ) {
+				if ( array_key_exists( 'installed_payload', $installed_row ) ) {
+					$base_payload = $installed_row['installed_payload'];
+				} elseif ( array_key_exists( 'payload', $installed_row ) ) {
+					$base_payload = $installed_row['payload'];
+				}
 			}
 
 			$results[] = AgentBundleArtifactRebase::rebase(
