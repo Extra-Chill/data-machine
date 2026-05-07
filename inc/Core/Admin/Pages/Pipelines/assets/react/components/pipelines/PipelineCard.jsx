@@ -45,10 +45,6 @@ export default function PipelineCard( {
 	const deleteStepMutation = useDeletePipelineStep();
 	const { openModal } = useUIStore();
 
-	if ( ! pipeline ) {
-		return null;
-	}
-
 	/**
 	 * Handle pipeline name change
 	 */
@@ -69,13 +65,13 @@ export default function PipelineCard( {
 	 */
 	const handleStepAdded = useCallback(
 		( pipelineId ) => {
-			const nextOrder = ( pipeline.pipeline_steps || [] ).length + 1;
+			const nextOrder = ( pipeline?.pipeline_steps || [] ).length + 1;
 			openModal( MODAL_TYPES.STEP_SELECTION, {
 				pipelineId,
 				nextExecutionOrder: nextOrder,
 			} );
 		},
-		[ pipeline.pipeline_steps, openModal ]
+		[ pipeline?.pipeline_steps, openModal ]
 	);
 
 	/**
@@ -85,7 +81,7 @@ export default function PipelineCard( {
 		async ( stepId ) => {
 			try {
 				await deleteStepMutation.mutateAsync( {
-					pipelineId: pipeline.pipeline_id,
+					pipelineId: pipeline?.pipeline_id,
 					stepId,
 				} );
 			} catch ( error ) {
@@ -98,7 +94,7 @@ export default function PipelineCard( {
 				);
 			}
 		},
-		[ pipeline.pipeline_id, deleteStepMutation ]
+		[ pipeline?.pipeline_id, deleteStepMutation ]
 	);
 
 	/**
@@ -106,18 +102,22 @@ export default function PipelineCard( {
 	 */
 	const handleOpenContextFiles = useCallback( () => {
 		openModal( MODAL_TYPES.CONTEXT_FILES, {
-			pipelineId: pipeline.pipeline_id,
+			pipelineId: pipeline?.pipeline_id,
 		} );
-	}, [ pipeline.pipeline_id, openModal ] );
+	}, [ pipeline?.pipeline_id, openModal ] );
 
 	/**
 	 * Handle memory files modal open
 	 */
 	const handleOpenMemoryFiles = useCallback( () => {
 		openModal( MODAL_TYPES.MEMORY_FILES, {
-			pipelineId: pipeline.pipeline_id,
+			pipelineId: pipeline?.pipeline_id,
 		} );
-	}, [ pipeline.pipeline_id, openModal ] );
+	}, [ pipeline?.pipeline_id, openModal ] );
+
+	if ( ! pipeline ) {
+		return null;
+	}
 
 	return (
 		<Card className="datamachine-pipeline-card" size="large">
