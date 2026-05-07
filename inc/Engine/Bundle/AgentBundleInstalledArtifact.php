@@ -21,21 +21,34 @@ final class AgentBundleInstalledArtifact {
 	private string $source_path;
 	private ?string $installed_hash;
 	private ?string $current_hash;
+	private mixed $installed_payload;
 	private string $status;
 	private string $installed_at;
 	private string $updated_at;
 
-	public function __construct( string $bundle_slug, string $bundle_version, string $artifact_type, string $artifact_id, string $source_path, ?string $installed_hash, ?string $current_hash, string $installed_at, string $updated_at ) {
-		$this->bundle_slug    = PortableSlug::normalize( $bundle_slug, 'bundle' );
-		$this->bundle_version = self::non_empty_string( $bundle_version, 'bundle_version' );
-		$this->artifact_type  = self::validate_artifact_type( $artifact_type );
-		$this->artifact_id    = self::non_empty_string( $artifact_id, 'artifact_id' );
-		$this->source_path    = self::normalize_source_path( $source_path );
-		$this->installed_hash = self::optional_string( $installed_hash );
-		$this->current_hash   = self::optional_string( $current_hash );
-		$this->status         = AgentBundleArtifactStatus::classify( $this->installed_hash, $this->current_hash );
-		$this->installed_at   = self::non_empty_string( $installed_at, 'installed_at' );
-		$this->updated_at     = self::non_empty_string( $updated_at, 'updated_at' );
+	public function __construct(
+		string $bundle_slug,
+		string $bundle_version,
+		string $artifact_type,
+		string $artifact_id,
+		string $source_path,
+		?string $installed_hash,
+		?string $current_hash,
+		string $installed_at,
+		string $updated_at,
+		mixed $installed_payload = null
+	) {
+		$this->bundle_slug       = PortableSlug::normalize( $bundle_slug, 'bundle' );
+		$this->bundle_version    = self::non_empty_string( $bundle_version, 'bundle_version' );
+		$this->artifact_type     = self::validate_artifact_type( $artifact_type );
+		$this->artifact_id       = self::non_empty_string( $artifact_id, 'artifact_id' );
+		$this->source_path       = self::normalize_source_path( $source_path );
+		$this->installed_hash    = self::optional_string( $installed_hash );
+		$this->current_hash      = self::optional_string( $current_hash );
+		$this->installed_payload = $installed_payload;
+		$this->status            = AgentBundleArtifactStatus::classify( $this->installed_hash, $this->current_hash );
+		$this->installed_at      = self::non_empty_string( $installed_at, 'installed_at' );
+		$this->updated_at        = self::non_empty_string( $updated_at, 'updated_at' );
 	}
 
 	/**
@@ -60,7 +73,8 @@ final class AgentBundleInstalledArtifact {
 			isset( $data['installed_hash'] ) ? (string) $data['installed_hash'] : null,
 			isset( $data['current_hash'] ) ? (string) $data['current_hash'] : null,
 			(string) $data['installed_at'],
-			(string) $data['updated_at']
+			(string) $data['updated_at'],
+			array_key_exists( 'installed_payload', $data ) ? $data['installed_payload'] : null
 		);
 	}
 
@@ -77,7 +91,18 @@ final class AgentBundleInstalledArtifact {
 	 */
 	public static function from_installed_payload( AgentBundleManifest $manifest, string $artifact_type, string $artifact_id, string $source_path, mixed $artifact_payload, string $timestamp ): self {
 		$hash = AgentBundleArtifactHasher::hash( $artifact_payload );
-		return new self( $manifest->bundle_slug(), $manifest->bundle_version(), $artifact_type, $artifact_id, $source_path, $hash, $hash, $timestamp, $timestamp );
+		return new self(
+			$manifest->bundle_slug(),
+			$manifest->bundle_version(),
+			$artifact_type,
+			$artifact_id,
+			$source_path,
+			$hash,
+			$hash,
+			$timestamp,
+			$timestamp,
+			$artifact_payload
+		);
 	}
 
 	/**
@@ -99,12 +124,25 @@ final class AgentBundleInstalledArtifact {
 			$this->installed_hash,
 			$current_hash,
 			$this->installed_at,
-			$updated_at
+			$updated_at,
+			$this->installed_payload
 		);
 	}
 
+	/**
+	 * Return the persisted install-time payload snapshot, when available.
+	 *
+	 * Returns null when this row predates the snapshot field or was reconstructed
+	 * from a hash-only source (e.g. orphaned runtime artifacts). Callers that
+	 * need 3-way merge fidelity (e.g. AgentBundleArtifactRebase) should treat
+	 * null as "no base info" and fall back to a more conservative policy.
+	 */
+	public function installed_payload(): mixed {
+		return $this->installed_payload;
+	}
+
 	public function to_array(): array {
-		return array(
+		$row = array(
 			'bundle_slug'    => $this->bundle_slug,
 			'bundle_version' => $this->bundle_version,
 			'artifact_type'  => $this->artifact_type,
@@ -116,6 +154,10 @@ final class AgentBundleInstalledArtifact {
 			'installed_at'   => $this->installed_at,
 			'updated_at'     => $this->updated_at,
 		);
+		if ( null !== $this->installed_payload ) {
+			$row['installed_payload'] = $this->installed_payload;
+		}
+		return $row;
 	}
 
 	private static function validate_artifact_type( string $type ): string {

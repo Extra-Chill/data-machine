@@ -1186,17 +1186,23 @@ class AgentBundler {
 		$hash = AgentBundleArtifactHasher::hash( $payload );
 		$now  = gmdate( 'c' );
 
+		// installed_payload is the install-time snapshot. AgentBundleArtifactRebase
+		// uses it as the `base` side of the 3-way merge so burn-in-safe can tell
+		// "local moved this field away from base" from "local just inherited base".
+		// Without it, the rebase primitive degrades to flagging more hunks
+		// ambiguous than necessary (#1832 follow-up).
 		return array(
-			'bundle_slug'    => $bundle_metadata['bundle_slug'],
-			'bundle_version' => $bundle_metadata['bundle_version'],
-			'artifact_type'  => $type,
-			'artifact_id'    => $id,
-			'source_path'    => $source_path,
-			'installed_hash' => $hash,
-			'current_hash'   => $hash,
-			'status'         => AgentBundleArtifactStatus::CLEAN,
-			'installed_at'   => $now,
-			'updated_at'     => $now,
+			'bundle_slug'       => $bundle_metadata['bundle_slug'],
+			'bundle_version'    => $bundle_metadata['bundle_version'],
+			'artifact_type'     => $type,
+			'artifact_id'       => $id,
+			'source_path'       => $source_path,
+			'installed_hash'    => $hash,
+			'current_hash'      => $hash,
+			'installed_payload' => $payload,
+			'status'            => AgentBundleArtifactStatus::CLEAN,
+			'installed_at'      => $now,
+			'updated_at'        => $now,
 		);
 	}
 
