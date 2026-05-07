@@ -6,7 +6,29 @@
  */
 
 namespace {
-	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
+	// Use a throwaway ABSPATH so BundleSource's require_once resolves to
+	// a stub file in /tmp instead of polluting the plugin tree.
+	$datamachine_test_abspath = sys_get_temp_dir() . '/datamachine-import-agent-test-' . uniqid() . '/';
+	@mkdir( $datamachine_test_abspath . 'wp-admin/includes', 0777, true );
+	@file_put_contents( $datamachine_test_abspath . 'wp-admin/includes/file.php', "<?php\n// test stub\n" );
+	define( 'ABSPATH', $datamachine_test_abspath );
+
+	register_shutdown_function( function () use ( $datamachine_test_abspath ) {
+		if ( ! is_dir( $datamachine_test_abspath ) ) {
+			return;
+		}
+		foreach ( new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator( $datamachine_test_abspath, RecursiveDirectoryIterator::SKIP_DOTS ),
+			RecursiveIteratorIterator::CHILD_FIRST
+		) as $item ) {
+			if ( $item->isDir() ) {
+				@rmdir( $item->getPathname() );
+			} else {
+				@unlink( $item->getPathname() );
+			}
+		}
+		@rmdir( $datamachine_test_abspath );
+	} );
 
 	class WP_Error {
 		private string $code;
@@ -52,6 +74,18 @@ namespace {
 	function is_wp_error( mixed $thing ): bool {
 		return $thing instanceof WP_Error;
 	}
+
+	function wp_delete_file( string $path ): void {
+		if ( file_exists( $path ) ) {
+			unlink( $path ); // phpcs:ignore
+		}
+	}
+
+	function download_url( string $url, int $timeout = 30 ): mixed {
+		return new WP_Error( 'no_stub', 'download_url is not stubbed.' );
+	}
+
+
 
 	eval(
 		<<<'PHP'
@@ -108,6 +142,10 @@ namespace {
 	);
 
 	eval( 'namespace DataMachine\\Core\\FilesRepository; class DirectoryManager {}' );
+}
+
+namespace DataMachine\Engine\Bundle {
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSource.php';
 }
 
 namespace DataMachine\Abilities {

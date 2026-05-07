@@ -17,6 +17,7 @@ use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
+use DataMachine\Engine\Bundle\BundleSource;
 use DataMachine\Engine\Bundle\PortableSlug;
 use WP_CLI;
 
@@ -397,22 +398,40 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	private function load_bundle_arg( array $args ): array {
-		$path = (string) ( $args[0] ?? '' );
-		if ( '' === $path || ! file_exists( $path ) ) {
-			WP_CLI::error( 'Bundle path not found.' );
+		$source = (string) ( $args[0] ?? '' );
+		if ( '' === $source ) {
+			WP_CLI::error( 'Bundle source is required.' );
+		}
+
+		$resolved = BundleSource::resolve( $source );
+		if ( is_wp_error( $resolved ) ) {
+			WP_CLI::error( $resolved->get_error_message() );
 		}
 
 		$bundle = null;
-		if ( is_dir( $path ) ) {
-			$bundle = $this->bundler()->from_directory( $path );
-		} elseif ( preg_match( '/\.zip$/i', $path ) ) {
-			$bundle = $this->bundler()->from_zip( $path );
-		} elseif ( preg_match( '/\.json$/i', $path ) ) {
-			$bundle = $this->bundler()->from_json( (string) file_get_contents( $path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		if ( is_dir( $resolved ) ) {
+			$bundle = $this->bundler()->from_directory( $resolved );
+		} elseif ( preg_match( '/\.zip$/i', $resolved ) ) {
+			$bundle = $this->bundler()->from_zip( $resolved );
+		} elseif ( preg_match( '/\.json$/i', $resolved ) ) {
+			$bundle = $this->bundler()->from_json( (string) file_get_contents( $resolved ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		}
+
+		// Resolver downloaded a temp file for remote sources; from_zip()
+		// extracts to its own tempdir and from_json() reads contents into
+		// memory, so the downloaded file is safe to clean up now.
+		BundleSource::cleanup( $resolved, $source );
 
 		if ( ! is_array( $bundle ) ) {
 			WP_CLI::error( 'Failed to parse bundle. Use .zip, .json, or a bundle directory.' );
+		}
+
+		// Stamp the original source URL into the bundle so installed
+		// metadata records where this came from. AgentBundler::import()
+		// reads $bundle['source_ref']. source_revision is left empty in
+		// v1 — GitHub archive responses don't expose a usable SHA.
+		if ( BundleSource::is_remote( $source ) && empty( $bundle['source_ref'] ) ) {
+			$bundle['source_ref'] = $source;
 		}
 
 		return $bundle;

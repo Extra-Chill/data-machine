@@ -13,6 +13,7 @@ namespace DataMachine\Cli\Commands;
 use WP_CLI;
 use DataMachine\Abilities\AgentAbilities;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Engine\Bundle\BundleSource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -1106,11 +1107,16 @@ class AgentsCommand extends AgentBundleCommand {
 		$format   = (string) ( $assoc_args['format'] ?? 'table' );
 
 		if ( empty( $path ) ) {
-			WP_CLI::error( 'Bundle path is required.' );
+			WP_CLI::error( 'Bundle source is required.' );
 			return;
 		}
 
-		if ( ! file_exists( $path ) ) {
+		// Validate locally before forwarding to the ability so that
+		// obvious garbage (typos, missing local file) fails fast with a
+		// human-friendly CLI error instead of a generic ability response.
+		// The ability re-runs BundleSource::resolve() to actually
+		// hydrate any temp file.
+		if ( ! BundleSource::is_remote( $path ) && ! file_exists( $path ) ) {
 			WP_CLI::error( sprintf( 'Path not found: %s', $path ) );
 			return;
 		}

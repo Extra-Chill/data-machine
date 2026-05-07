@@ -17,6 +17,7 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Agents\AgentAccess;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
+use DataMachine\Engine\Bundle\BundleSource;
 use DataMachine\Engine\Bundle\BundleValidationException;
 
 defined( 'ABSPATH' ) || exit;
@@ -237,7 +238,7 @@ class AgentAbilities {
 						'properties' => array(
 							'source'      => array(
 								'type'        => 'string',
-								'description' => 'Local bundle source path. Supports bundle directories, .json files, and .zip archives.',
+								'description' => 'Bundle source: local path (directory, .zip, .json) or remote URL (HTTPS to a .zip/.json or a GitHub blob/tree/archive URL).',
 							),
 							'slug'        => array(
 								'type'        => 'string',
@@ -672,15 +673,24 @@ class AgentAbilities {
 	 */
 	public static function importAgent( array $input ): array {
 		$source = trim( (string) ( $input['source'] ?? '' ) );
-		if ( '' === $source || ! file_exists( $source ) ) {
+		if ( '' === $source ) {
 			return array(
 				'success' => false,
-				'error'   => 'Bundle source not found.',
+				'error'   => 'Bundle source is required.',
+			);
+		}
+
+		$resolved = BundleSource::resolve( $source );
+		if ( is_wp_error( $resolved ) ) {
+			return array(
+				'success' => false,
+				'error'   => $resolved->get_error_message(),
 			);
 		}
 
 		$on_conflict = (string) ( $input['on_conflict'] ?? 'error' );
 		if ( ! in_array( $on_conflict, array( 'error', 'skip' ), true ) ) {
+			BundleSource::cleanup( $resolved, $source );
 			return array(
 				'success' => false,
 				'error'   => 'on_conflict must be one of: error, skip.',
@@ -689,6 +699,7 @@ class AgentAbilities {
 
 		$owner_id = self::resolve_import_owner_id( isset( $input['owner_id'] ) ? (int) $input['owner_id'] : 0 );
 		if ( $owner_id <= 0 ) {
+			BundleSource::cleanup( $resolved, $source );
 			return array(
 				'success' => false,
 				'error'   => 'Unable to resolve import owner. Pass owner_id, authenticate as a user, or set datamachine_default_owner_id.',
@@ -696,12 +707,25 @@ class AgentAbilities {
 		}
 
 		$bundler = new AgentBundler();
-		$bundle  = self::load_import_bundle( $bundler, $source );
+		$bundle  = self::load_import_bundle( $bundler, $resolved );
+
+		// from_zip() extracts to its own tempdir and from_json() reads
+		// the file into memory, so the resolver's temp file is safe to
+		// remove now (success or failure of parse).
+		BundleSource::cleanup( $resolved, $source );
+
 		if ( ! is_array( $bundle ) ) {
 			return array(
 				'success' => false,
 				'error'   => 'Failed to parse bundle. Use a bundle directory, .json file, or .zip archive.',
 			);
+		}
+
+		// Stamp the original remote source so installed bundle metadata
+		// records where this came from. v1 leaves source_revision empty
+		// because GitHub archive responses don't expose a usable SHA.
+		if ( BundleSource::is_remote( $source ) && empty( $bundle['source_ref'] ) ) {
+			$bundle['source_ref'] = $source;
 		}
 
 		$slug = sanitize_title( (string) ( $bundle['agent']['agent_slug'] ?? '' ) );
