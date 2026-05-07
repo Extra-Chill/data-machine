@@ -72,6 +72,7 @@ final class InstalledBundleArtifacts extends BaseRepository {
 			source_path VARCHAR(500) NOT NULL,
 			installed_hash CHAR(64) NULL DEFAULT NULL,
 			current_hash CHAR(64) NULL DEFAULT NULL,
+			installed_payload LONGTEXT NULL DEFAULT NULL,
 			local_status VARCHAR(20) NOT NULL DEFAULT 'clean',
 			installed_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL,
@@ -96,26 +97,31 @@ final class InstalledBundleArtifacts extends BaseRepository {
 	 * @return bool
 	 */
 	public function upsert( AgentBundleInstalledArtifact $artifact, int $agent_id = 0 ): bool {
-		$artifact_row = $artifact->to_array();
-		$row          = array(
-			'agent_id'       => max( 0, $agent_id ),
-			'bundle_slug'    => $artifact_row['bundle_slug'],
-			'bundle_version' => $artifact_row['bundle_version'],
-			'artifact_type'  => $artifact_row['artifact_type'],
-			'artifact_id'    => $artifact_row['artifact_id'],
-			'source_path'    => $artifact_row['source_path'],
-			'installed_hash' => '' !== (string) $artifact_row['installed_hash'] ? $artifact_row['installed_hash'] : null,
-			'current_hash'   => '' !== (string) $artifact_row['current_hash'] ? $artifact_row['current_hash'] : null,
-			'local_status'   => $artifact_row['status'],
-			'installed_at'   => $artifact_row['installed_at'],
-			'updated_at'     => $artifact_row['updated_at'],
+		$artifact_row      = $artifact->to_array();
+		$installed_payload = $artifact->installed_payload();
+		$encoded_payload   = null === $installed_payload
+			? null
+			: ( is_string( $installed_payload ) ? $installed_payload : wp_json_encode( $installed_payload ) );
+		$row               = array(
+			'agent_id'          => max( 0, $agent_id ),
+			'bundle_slug'       => $artifact_row['bundle_slug'],
+			'bundle_version'    => $artifact_row['bundle_version'],
+			'artifact_type'     => $artifact_row['artifact_type'],
+			'artifact_id'       => $artifact_row['artifact_id'],
+			'source_path'       => $artifact_row['source_path'],
+			'installed_hash'    => '' !== (string) $artifact_row['installed_hash'] ? $artifact_row['installed_hash'] : null,
+			'current_hash'      => '' !== (string) $artifact_row['current_hash'] ? $artifact_row['current_hash'] : null,
+			'installed_payload' => $encoded_payload,
+			'local_status'      => $artifact_row['status'],
+			'installed_at'      => $artifact_row['installed_at'],
+			'updated_at'        => $artifact_row['updated_at'],
 		);
-		$record_id    = $this->existing_record_id( $row );
-		$format       = array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' );
+		$record_id         = $this->existing_record_id( $row );
+		$format            = array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' );
 
 		if ( null !== $record_id ) {
-			$row        = array_merge( array( 'artifact_record_id' => $record_id ), $row );
-			$format     = array_merge( array( '%d' ), $format );
+			$row    = array_merge( array( 'artifact_record_id' => $record_id ), $row );
+			$format = array_merge( array( '%d' ), $format );
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -264,19 +270,26 @@ final class InstalledBundleArtifacts extends BaseRepository {
 	}
 
 	private function artifact_from_row( array $row ): AgentBundleInstalledArtifact {
-		return AgentBundleInstalledArtifact::from_array(
-			array(
-				'bundle_slug'    => (string) $row['bundle_slug'],
-				'bundle_version' => (string) $row['bundle_version'],
-				'artifact_type'  => (string) $row['artifact_type'],
-				'artifact_id'    => (string) $row['artifact_id'],
-				'source_path'    => (string) $row['source_path'],
-				'installed_hash' => (string) $row['installed_hash'],
-				'current_hash'   => isset( $row['current_hash'] ) ? (string) $row['current_hash'] : null,
-				'installed_at'   => (string) $row['installed_at'],
-				'updated_at'     => (string) $row['updated_at'],
-			)
+		$data = array(
+			'bundle_slug'    => (string) $row['bundle_slug'],
+			'bundle_version' => (string) $row['bundle_version'],
+			'artifact_type'  => (string) $row['artifact_type'],
+			'artifact_id'    => (string) $row['artifact_id'],
+			'source_path'    => (string) $row['source_path'],
+			'installed_hash' => (string) $row['installed_hash'],
+			'current_hash'   => isset( $row['current_hash'] ) ? (string) $row['current_hash'] : null,
+			'installed_at'   => (string) $row['installed_at'],
+			'updated_at'     => (string) $row['updated_at'],
 		);
+
+		// Pre-snapshot rows have NULL/missing installed_payload — propagate as
+		// "no base info" so callers know to fall back to conservative behavior.
+		if ( ! empty( $row['installed_payload'] ) ) {
+			$decoded                   = json_decode( (string) $row['installed_payload'], true );
+			$data['installed_payload'] = ( JSON_ERROR_NONE === json_last_error() ) ? $decoded : (string) $row['installed_payload'];
+		}
+
+		return AgentBundleInstalledArtifact::from_array( $data );
 	}
 
 	private function existing_record_id( array $row ): ?int {
