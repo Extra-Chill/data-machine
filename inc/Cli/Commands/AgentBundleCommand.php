@@ -14,6 +14,7 @@ use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
+use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
@@ -196,6 +197,18 @@ class AgentBundleCommand extends BaseCommand {
 	 * [--reconcile-runtime]
 	 * : Replace preserved flow runtime queues and scheduling with the bundle seed on existing bundle-owned flows.
 	 *
+	 * [--rebase-local]
+	 * : 3-way rebase locally modified artifacts against the target using a merge policy. Preview only unless --yes is set.
+	 *
+	 * [--policy=<policy>]
+	 * : Rebase policy name. Defaults to "conservative" (no auto-merge).
+	 * ---
+	 * default: conservative
+	 * options:
+	 *   - conservative
+	 *   - burn-in-safe
+	 * ---
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -211,12 +224,20 @@ class AgentBundleCommand extends BaseCommand {
 		$plan              = $this->plan_for_bundle( $bundle, $slug );
 		$dry_run           = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
 		$reconcile_runtime = \WP_CLI\Utils\get_flag_value( $assoc_args, 'reconcile-runtime', false );
+		$rebase_local      = \WP_CLI\Utils\get_flag_value( $assoc_args, 'rebase-local', false );
+		$policy_name       = (string) ( $assoc_args['policy'] ?? AgentBundleArtifactRebase::POLICY_CONSERVATIVE );
 
 		if ( $dry_run ) {
-			$this->output_plan(
-				$this->add_runtime_drift_to_plan( $plan->to_array(), $bundle, $slug, $reconcile_runtime ? 'replace_bundle_seed' : 'preserve_existing' ),
-				$assoc_args
+			$plan_array = $this->add_runtime_drift_to_plan(
+				$plan->to_array(),
+				$bundle,
+				$slug,
+				$reconcile_runtime ? 'replace_bundle_seed' : 'preserve_existing'
 			);
+			if ( $rebase_local ) {
+				$plan_array['rebase'] = $this->rebase_locally_modified( $plan, $bundle, $slug, $policy_name );
+			}
+			$this->output_plan( $plan_array, $assoc_args );
 			return;
 		}
 
@@ -251,19 +272,26 @@ class AgentBundleCommand extends BaseCommand {
 		);
 
 		if ( $plan->has_pending_approval() ) {
-			$agent                      = $this->resolve_bundle_agent( $bundle, $slug );
+			$agent             = $this->resolve_bundle_agent( $bundle, $slug );
+			$rebased_artifacts = $rebase_local
+				? $this->rebase_locally_modified( $plan, $bundle, $slug, $policy_name )
+				: array();
 			$pending                    = AgentBundleUpgradePendingAction::stage(
 				$plan,
 				array(
-					'bundle'           => $this->bundle_summary( $bundle, $slug ),
-					'agent'            => $agent ? $agent : array(),
-					'target_artifacts' => $this->bundle_artifacts( $bundle ),
-					'summary'          => 'Review locally modified bundle artifacts before applying.',
-					'agent_id'         => $agent ? (int) $agent['agent_id'] : 0,
-					'user_id'          => get_current_user_id(),
+					'bundle'            => $this->bundle_summary( $bundle, $slug ),
+					'agent'             => $agent ? $agent : array(),
+					'target_artifacts'  => $this->bundle_artifacts( $bundle ),
+					'rebased_artifacts' => $rebased_artifacts,
+					'summary'           => 'Review locally modified bundle artifacts before applying.',
+					'agent_id'          => $agent ? (int) $agent['agent_id'] : 0,
+					'user_id'           => get_current_user_id(),
 				)
 			);
 			$response['pending_action'] = $pending;
+			if ( ! empty( $rebased_artifacts ) ) {
+				$response['rebase'] = $rebased_artifacts;
+			}
 		}
 
 		$this->output( $response, $assoc_args, array( 'success' ) );
@@ -301,6 +329,147 @@ class AgentBundleCommand extends BaseCommand {
 		);
 		$assoc_args['format'] = $assoc_args['format'] ?? 'json';
 		$this->output( $result, $assoc_args, array( 'success', 'action_id', 'kind' ) );
+	}
+
+	/**
+	 * 3-way rebase locally modified bundle artifacts against a target package.
+	 *
+	 * Always emits the merged preview. Use `upgrade --rebase-local` to stage
+	 * a PendingAction with merged payloads attached.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <path>
+	 * : Package path (.zip, .json, or directory).
+	 *
+	 * [--slug=<slug>]
+	 * : Override target agent slug.
+	 *
+	 * [--policy=<policy>]
+	 * : Rebase policy name.
+	 * ---
+	 * default: conservative
+	 * options:
+	 *   - conservative
+	 *   - burn-in-safe
+	 * ---
+	 *
+	 * [--artifact=<key>]
+	 * : Limit output to one artifact_key (e.g. "flow:wordpress-com-history").
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: json
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 */
+	public function rebase( array $args, array $assoc_args ): void {
+		$bundle      = $this->load_bundle_arg( $args );
+		$slug        = (string) ( $assoc_args['slug'] ?? '' );
+		$plan        = $this->plan_for_bundle( $bundle, $slug );
+		$policy_name = (string) ( $assoc_args['policy'] ?? AgentBundleArtifactRebase::POLICY_CONSERVATIVE );
+		$only        = isset( $assoc_args['artifact'] ) ? (string) $assoc_args['artifact'] : '';
+
+		$rebased = $this->rebase_locally_modified( $plan, $bundle, $slug, $policy_name );
+		if ( '' !== $only ) {
+			$rebased = array_values(
+				array_filter(
+					$rebased,
+					static fn( array $entry ) => ( $entry['artifact_key'] ?? '' ) === $only
+				)
+			);
+		}
+
+		$response = array(
+			'policy'  => $policy_name,
+			'count'   => count( $rebased ),
+			'rebased' => $rebased,
+		);
+
+		$assoc_args['format'] = $assoc_args['format'] ?? 'json';
+		$this->output( $response, $assoc_args, array( 'policy', 'count' ) );
+	}
+
+	/**
+	 * Build rebased artifact entries for every needs_approval plan row.
+	 *
+	 * @param \DataMachine\Engine\Bundle\AgentBundleUpgradePlan $plan Upgrade plan.
+	 * @param array<string,mixed>                                $bundle Parsed bundle payload.
+	 * @param string                                             $slug Optional agent slug override.
+	 * @param string                                             $policy_name Rebase policy.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function rebase_locally_modified( \DataMachine\Engine\Bundle\AgentBundleUpgradePlan $plan, array $bundle, string $slug, string $policy_name ): array {
+		$needs_approval = $plan->bucket( 'needs_approval' );
+		if ( empty( $needs_approval ) ) {
+			return array();
+		}
+
+		$agent = $this->resolve_bundle_agent( $bundle, $slug );
+		if ( ! $agent ) {
+			return array();
+		}
+
+		$bundle_state    = is_array( $agent['agent_config']['datamachine_bundle'] ?? null ) ? $agent['agent_config']['datamachine_bundle'] : array();
+		$installed       = is_array( $bundle_state['artifacts'] ?? null ) ? $bundle_state['artifacts'] : array();
+		$installed_index = array();
+		foreach ( $installed as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			$key = AgentBundleArtifactExtensions::artifact_key( (string) ( $row['artifact_type'] ?? '' ), (string) ( $row['artifact_id'] ?? '' ) );
+			$installed_index[ $key ] = $row;
+		}
+
+		$current_index = array();
+		foreach ( $this->current_artifacts( $agent, $installed ) as $artifact ) {
+			$key                   = AgentBundleArtifactExtensions::artifact_key( (string) $artifact['artifact_type'], (string) $artifact['artifact_id'] );
+			$current_index[ $key ] = $artifact;
+		}
+
+		$target_index = array();
+		foreach ( $this->bundle_artifacts_for_agent( $bundle, $agent ) as $artifact ) {
+			$key                  = AgentBundleArtifactExtensions::artifact_key( (string) $artifact['artifact_type'], (string) $artifact['artifact_id'] );
+			$target_index[ $key ] = $artifact;
+		}
+
+		$results = array();
+		foreach ( $needs_approval as $entry ) {
+			$key    = (string) ( $entry['artifact_key'] ?? '' );
+			$target = $target_index[ $key ] ?? null;
+			$local  = $current_index[ $key ] ?? null;
+			if ( ! is_array( $target ) || ! is_array( $local ) ) {
+				continue;
+			}
+
+			// Reconstruct the base payload by hash. We don't persist the original
+			// payload, only its hash, so the rebase falls back to "no base info"
+			// for installed rows missing a snapshot. Conservative policy is fine
+			// without a base; burn-in-safe degrades by treating remote as the
+			// changed side and local as the changed side without merge guidance.
+			$base_payload = null;
+			$installed_row = $installed_index[ $key ] ?? null;
+			if ( is_array( $installed_row ) && isset( $installed_row['payload'] ) ) {
+				$base_payload = $installed_row['payload'];
+			}
+
+			$results[] = AgentBundleArtifactRebase::rebase(
+				array(
+					'artifact_type' => (string) $target['artifact_type'],
+					'artifact_id'   => (string) $target['artifact_id'],
+					'source_path'   => (string) ( $target['source_path'] ?? '' ),
+					'base'          => $base_payload,
+					'local'         => $local['payload']  ?? null,
+					'remote'        => $target['payload'] ?? null,
+				),
+				$policy_name
+			);
+		}
+
+		return $results;
 	}
 
 	private function run_install( array $args, array $assoc_args ): void {
