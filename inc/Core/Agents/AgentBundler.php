@@ -238,7 +238,8 @@ class AgentBundler {
 			)
 		);
 
-		$directory = new AgentBundleDirectory( $manifest, $memory_files, $pipeline_documents, $flow_documents, array(), $extension_artifacts );
+		$extras    = self::collect_export_extras( $agent_id, $agent );
+		$directory = new AgentBundleDirectory( $manifest, $memory_files, $pipeline_documents, $flow_documents, array(), $extension_artifacts, $extras );
 
 		return array(
 			'success'   => true,
@@ -246,6 +247,52 @@ class AgentBundler {
 			'directory' => $directory,
 			'package'   => AgentPackageProjection::from_directory( $directory ),
 		);
+	}
+
+	/**
+	 * Collect plugin-owned extras to fold into the exported bundle.
+	 *
+	 * Data Machine has no opinion about extras content, so it never reads them
+	 * from disk. Consumer plugins return their own `extras` map keyed by a
+	 * top-level directory name (e.g. `wiki`, `datasets`). Conflicts on the
+	 * same key are last-write-wins; collisions are logged.
+	 *
+	 * @param int   $agent_id Agent ID being exported.
+	 * @param array $agent    Agent row.
+	 * @return array<string,array<string,string>> Validated extras map.
+	 */
+	private static function collect_export_extras( int $agent_id, array $agent ): array {
+		/**
+		 * Filters the bundle extras map produced for export.
+		 *
+		 * Each consumer adds entries keyed by their top-level directory name.
+		 * Values are maps of `<key>/path` => string contents. Data Machine
+		 * validates the shape (path prefix, key naming, no `..` segments) and
+		 * drops empty maps. Reserved bundle directory names cannot be used.
+		 *
+		 * @param array<string,array<string,string>> $extras   Accumulated extras.
+		 * @param int                                $agent_id Agent ID being exported.
+		 * @param array                              $agent    Agent row.
+		 */
+		$extras = apply_filters( 'datamachine_bundle_export_extras', array(), $agent_id, $agent );
+		if ( ! is_array( $extras ) ) {
+			return array();
+		}
+
+		try {
+			return \DataMachine\Engine\Bundle\BundleSchema::validate_extras( $extras );
+		} catch ( \DataMachine\Engine\Bundle\BundleValidationException $e ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'AgentBundler::collect_export_extras dropped invalid extras payload.',
+				array(
+					'agent_id' => $agent_id,
+					'error'    => $e->getMessage(),
+				)
+			);
+			return array();
+		}
 	}
 
 	/**
@@ -926,6 +973,66 @@ class AgentBundler {
 		}
 
 		$this->commit_transaction( $transaction_started );
+
+		$extras = is_array( $bundle['extras'] ?? null ) ? $bundle['extras'] : array();
+		try {
+			$extras = \DataMachine\Engine\Bundle\BundleSchema::validate_extras( $extras );
+		} catch ( \DataMachine\Engine\Bundle\BundleValidationException $e ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'AgentBundler::import dropped invalid extras payload before success hook.',
+				array(
+					'agent_slug' => $slug,
+					'error'      => $e->getMessage(),
+				)
+			);
+			$extras = array();
+		}
+
+		/**
+		 * Fires after a bundle install/upgrade succeeds and the transaction commits.
+		 *
+		 * Consumers can react to bundle installation — e.g. import bundle-carried
+		 * content into other plugins. The full extras payload is included so
+		 * consumers do not need to re-read the bundle from disk.
+		 *
+		 * Listeners are fire-and-forget; their failures do not roll back the
+		 * install. PHP exceptions thrown by listeners are caught, logged, and
+		 * suppressed.
+		 *
+		 * @param int    $agent_id        Newly installed/upgraded agent ID.
+		 * @param string $slug            Agent slug.
+		 * @param array  $bundle_metadata bundle_slug, bundle_version, source_ref, source_revision.
+		 * @param array  $extras          Map of extras-tree name => file map (path => contents).
+		 * @param array  $context         is_upgrade flag, summary, etc.
+		 */
+		try {
+			do_action(
+				'datamachine_bundle_install_succeeded',
+				$agent_id,
+				$slug,
+				$bundle_metadata,
+				$extras,
+				array(
+					'is_upgrade' => $is_upgrade,
+					'summary'    => $summary,
+				)
+			);
+		} catch ( \Throwable $hook_error ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'datamachine_bundle_install_succeeded listener threw — install already committed.',
+				array(
+					'agent_slug'  => $slug,
+					'agent_id'    => $agent_id,
+					'is_upgrade'  => $is_upgrade,
+					'error'       => $hook_error->getMessage(),
+					'error_class' => get_class( $hook_error ),
+				)
+			);
+		}
 
 		return array(
 			'success' => true,

@@ -13,10 +13,68 @@ Agent bundles are portable, versioned packages for an agent's runtime behavior. 
 ├── prompts/<prompt-slug>.md
 ├── rubrics/<rubric-slug>.md
 ├── tool-policies/<policy-slug>.json
-└── seed-queues/<queue-slug>.json
+├── seed-queues/<queue-slug>.json
+├── extensions/
+└── <extras-key>/                     # Plugin-owned opaque extras (e.g. wiki/, datasets/)
 ```
 
-Only `manifest.json`, `pipelines/`, `flows/`, and `memory/` have import/export adapters today. The remaining directories are reserved schema surface for prompts, rubrics, tool policies, auth references, and seed queue artifacts.
+Only `manifest.json`, `pipelines/`, `flows/`, and `memory/` have import/export adapters today. The remaining directories are reserved schema surface for prompts, rubrics, tool policies, auth references, seed queue artifacts, and plugin-owned extension artifacts.
+
+### Reserved Trees And Extras
+
+Data Machine owns the directory names listed in `BundleSchema::RESERVED_TREES` plus the manifest filename. Anything else at the bundle root is **opaque to the Bundle layer** and round-trips as an *extra*: a top-level directory whose contents are carried as a file map (`<key>/<relative-path>` => string contents) under `bundle["extras"]`.
+
+Reserved trees as of `schema_version 1`:
+
+- `manifest.json`, `agent/`, `memory/`
+- `pipelines/`, `flows/`
+- `prompts/`, `rubrics/`, `tool-policies/`, `auth-refs/`, `seed-queues/`
+- `extensions/`
+
+Extras rules:
+
+- Extras keys are slug-like directory names (ASCII alphanumerics, dashes, underscores; no slashes).
+- Each path inside an extra must start with `<key>/`, must not contain `..` or `.` segments, and must not be absolute.
+- Empty extras directories are dropped on read.
+- Hidden entries (names starting with `.`), symlinks that escape the bundle root, and binary files (NUL-byte heuristic) are skipped on read with a logged warning.
+- Data Machine does NOT auto-extract extras to disk on install. Consumers persist extras themselves via the post-install hook below.
+
+### Consumer Pattern
+
+Plugins claim extras keys through two hooks. Data Machine ships the transport; the consumer ships the semantics.
+
+```php
+// At export time, contribute extras the consumer wants packaged.
+add_filter(
+    'datamachine_bundle_export_extras',
+    function ( array $extras, int $agent_id, array $agent ): array {
+        $files = my_plugin_collect_wiki_files_for_agent( $agent_id );
+        if ( ! empty( $files ) ) {
+            $extras['wiki'] = $files; // keys must start with 'wiki/'
+        }
+        return $extras;
+    },
+    10,
+    3
+);
+
+// At import time, claim and persist extras the consumer owns.
+add_action(
+    'datamachine_bundle_install_succeeded',
+    function ( int $agent_id, string $slug, array $bundle_metadata, array $extras, array $context ): void {
+        if ( empty( $extras['wiki'] ) ) {
+            return;
+        }
+        my_plugin_import_wiki_files( $agent_id, $extras['wiki'], $context['is_upgrade'] );
+    },
+    10,
+    5
+);
+```
+
+The hook fires after the install/upgrade transaction commits — never on dry-run, never on failure. Listener exceptions are caught, logged, and suppressed; they do not roll back the install.
+
+See `Automattic/intelligence#467` for the reference consumer that claims the `wiki/` extras key.
 
 ## Manifest Schema
 

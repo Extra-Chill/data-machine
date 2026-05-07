@@ -27,6 +27,8 @@ final class AgentBundleDirectory {
 	private array $artifact_files;
 	/** @var array<int,array<string,mixed>> */
 	private array $extension_artifacts;
+	/** @var array<string,array<string,string>> */
+	private array $extras;
 
 	/**
 	 * @param AgentBundleManifest       $manifest Bundle manifest.
@@ -35,14 +37,16 @@ final class AgentBundleDirectory {
 	 * @param AgentBundleFlowFile[]     $flows Flow files.
 	 * @param array<string,array<string,array|string>> $artifact_files Artifact directory => relative path => decoded JSON payload or text contents.
 	 * @param array<int,array<string,mixed>> $extension_artifacts Plugin-owned artifact envelopes.
+	 * @param array<string,array<string,string>> $extras Plugin-owned opaque file maps keyed by top-level directory.
 	 */
-	public function __construct( AgentBundleManifest $manifest, array $memory_files, array $pipelines, array $flows, array $artifact_files = array(), array $extension_artifacts = array() ) {
+	public function __construct( AgentBundleManifest $manifest, array $memory_files, array $pipelines, array $flows, array $artifact_files = array(), array $extension_artifacts = array(), array $extras = array() ) {
 		$this->manifest            = $manifest;
 		$this->memory_files        = self::normalize_memory_files( $memory_files );
 		$this->pipelines           = self::sort_documents_by_slug( $pipelines, AgentBundlePipelineFile::class );
 		$this->flows               = self::sort_documents_by_slug( $flows, AgentBundleFlowFile::class );
 		$this->artifact_files      = self::normalize_artifact_files( $artifact_files );
 		$this->extension_artifacts = AgentBundleArtifactExtensions::normalize_artifacts( $extension_artifacts );
+		$this->extras              = BundleSchema::validate_extras( $extras );
 	}
 
 	public static function read( string $directory ): self {
@@ -66,7 +70,8 @@ final class AgentBundleDirectory {
 			self::read_documents( $directory . '/' . BundleSchema::PIPELINES_DIR, AgentBundlePipelineFile::class ),
 			self::read_documents( $directory . '/' . BundleSchema::FLOWS_DIR, AgentBundleFlowFile::class ),
 			self::read_artifact_directories( $directory ),
-			self::read_extension_artifacts( $directory . '/' . BundleSchema::EXTENSIONS_DIR )
+			self::read_extension_artifacts( $directory . '/' . BundleSchema::EXTENSIONS_DIR ),
+			self::read_extras( $directory )
 		);
 	}
 
@@ -109,6 +114,15 @@ final class AgentBundleDirectory {
 			$path = $directory . '/' . $artifact['source_path'];
 			self::ensure_directory( dirname( $path ) );
 			self::write_file( $path, BundleSchema::encode_json( $artifact ) );
+		}
+
+		foreach ( $this->extras as $extras_key => $files ) {
+			self::ensure_directory( $directory . '/' . $extras_key );
+			foreach ( $files as $relative_path => $contents ) {
+				$path = $directory . '/' . $relative_path;
+				self::ensure_directory( dirname( $path ) );
+				self::write_file( $path, $contents );
+			}
 		}
 	}
 
@@ -159,6 +173,15 @@ final class AgentBundleDirectory {
 	/** @return array<int,array<string,mixed>> */
 	public function extension_artifacts(): array {
 		return $this->extension_artifacts;
+	}
+
+	/**
+	 * Plugin-owned opaque file maps keyed by top-level directory.
+	 *
+	 * @return array<string,array<string,string>>
+	 */
+	public function extras(): array {
+		return $this->extras;
 	}
 
 	private static function ensure_directory( string $directory ): void {
@@ -276,6 +299,143 @@ final class AgentBundleDirectory {
 		}
 
 		return self::sort_documents_by_slug( $documents, $document_class );
+	}
+
+	/**
+	 * Read opaque extras directories at the bundle root.
+	 *
+	 * Skips files at the root, reserved trees, hidden entries (names starting
+	 * with `.`), symlinks that escape the bundle root, binary files, and
+	 * unreadable files. Empty extras directories are dropped.
+	 *
+	 * @param string $bundle_root Bundle root directory (no trailing slash).
+	 * @return array<string,array<string,string>> Map of extras key => path => contents.
+	 */
+	private static function read_extras( string $bundle_root ): array {
+		if ( ! is_dir( $bundle_root ) ) {
+			return array();
+		}
+
+		$bundle_real = realpath( $bundle_root );
+		if ( false === $bundle_real ) {
+			return array();
+		}
+
+		$extras  = array();
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- scandir() warns on unreadable directory; we treat that as "no extras" rather than fatal.
+		$entries = @scandir( $bundle_root );
+		if ( ! is_array( $entries ) ) {
+			return array();
+		}
+		sort( $entries, SORT_STRING );
+
+		foreach ( $entries as $entry ) {
+			if ( '' === $entry || '.' === $entry[0] ) {
+				continue;
+			}
+			if ( in_array( $entry, BundleSchema::RESERVED_ROOT_ENTRIES, true ) ) {
+				continue;
+			}
+			$path = $bundle_root . '/' . $entry;
+			if ( ! is_dir( $path ) ) {
+				// Files at the root are out of scope; only directories become extras.
+				continue;
+			}
+
+			$files = self::collect_extras_files( $path, $bundle_real, $entry );
+			if ( array() === $files ) {
+				continue;
+			}
+
+			ksort( $files, SORT_STRING );
+			$extras[ $entry ] = $files;
+		}
+
+		ksort( $extras, SORT_STRING );
+		return $extras;
+	}
+
+	/**
+	 * Recursively collect text files from an extras directory.
+	 *
+	 * @param string $directory   Extras directory path.
+	 * @param string $bundle_real Realpath of the bundle root for symlink containment checks.
+	 * @param string $extras_key  Top-level extras directory name (used as path prefix).
+	 * @return array<string,string> Relative path (`<extras_key>/...`) => file contents.
+	 */
+	private static function collect_extras_files( string $directory, string $bundle_real, string $extras_key ): array {
+		$collected = array();
+		try {
+			$iterator = new \RecursiveIteratorIterator(
+				new \RecursiveDirectoryIterator( $directory, \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::FOLLOW_SYMLINKS )
+			);
+		} catch ( \UnexpectedValueException $e ) {
+			return array();
+		}
+
+		foreach ( $iterator as $file ) {
+			if ( ! $file->isFile() ) {
+				continue;
+			}
+			$basename = $file->getFilename();
+			if ( '' === $basename || '.' === $basename[0] ) {
+				continue;
+			}
+
+			$path = $file->getPathname();
+			if ( $file->isLink() ) {
+				$target = realpath( $path );
+				if ( false === $target || ! str_starts_with( $target, $bundle_real . DIRECTORY_SEPARATOR ) ) {
+					self::log_extras_warning( 'symlink target escapes bundle root', $path );
+					continue;
+				}
+			}
+
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Unreadable files are skipped with a logged warning; bundle extras are loaded outside the WordPress filesystem abstraction.
+			$contents = @file_get_contents( $path );
+			if ( false === $contents ) {
+				self::log_extras_warning( 'extras file unreadable', $path );
+				continue;
+			}
+			if ( ! self::is_text_payload( $contents ) ) {
+				self::log_extras_warning( 'extras binary file skipped', $path );
+				continue;
+			}
+
+			$relative = str_replace( '\\', '/', substr( $path, strlen( $directory ) + 1 ) );
+			if ( '' === $relative ) {
+				continue;
+			}
+
+			$collected[ $extras_key . '/' . $relative ] = $contents;
+		}
+
+		return $collected;
+	}
+
+	private static function is_text_payload( string $contents ): bool {
+		if ( '' === $contents ) {
+			return true;
+		}
+		// NUL byte is the canonical "this is binary" signal.
+		if ( false !== strpos( $contents, "\0" ) ) {
+			return false;
+		}
+		return true;
+	}
+
+	private static function log_extras_warning( string $reason, string $path ): void {
+		if ( \function_exists( 'do_action' ) ) {
+			\do_action(
+				'datamachine_log',
+				'warning',
+				'AgentBundleDirectory: skipping extras file',
+				array(
+					'reason' => $reason,
+					'path'   => $path,
+				)
+			);
+		}
 	}
 
 	/** @return array<int,array<string,mixed>> */
