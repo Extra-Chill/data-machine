@@ -313,9 +313,62 @@ rebase_assert_equals( 'multi: rss feed from remote (local unchanged)', 'https://
 rebase_assert( 'multi: no ambiguous fields', empty( $multi_result['ambiguous'] ) );
 
 // ---------------------------------------------------------------------------
-// [6] Hashes are recomputed for the merged payload.
+// [6] Equivalent legacy/canonical handler config shapes keep throttle in sync.
 // ---------------------------------------------------------------------------
-echo "\n[6] Rebase output carries reproducible hashes\n";
+echo "\n[6] handler_config max_items mirrors into handler_configs\n";
+$shape_result = AgentBundleArtifactRebase::rebase(
+	array(
+		'artifact_type' => 'flow',
+		'artifact_id'   => 'shape-transition',
+		'base'          => array(
+			'flow_config' => array(
+				'1_step_1' => array(
+					'handler_config' => array(
+						'owner'     => 'old',
+						'max_items' => 25,
+					),
+				),
+			),
+		),
+		'local' => array(
+			'flow_config' => array(
+				'1_step_1' => array(
+					'handler_config' => array(
+						'owner'     => 'old',
+						'max_items' => 1,
+					),
+				),
+			),
+		),
+		'remote' => array(
+			'flow_config' => array(
+				'1_step_1' => array(
+					'handler_config'  => array(
+						'owner'     => 'Automattic',
+						'max_items' => 25,
+					),
+					'handler_configs' => array(
+						'github-a8c' => array(
+							'owner'     => 'Automattic',
+							'max_items' => 25,
+						),
+					),
+				),
+			),
+		),
+	),
+	AgentBundleArtifactRebase::POLICY_BURN_IN_SAFE
+);
+
+$shape_step = $shape_result['merged']['flow_config']['1_step_1'] ?? array();
+rebase_assert_equals( 'shape: single handler throttle from local', 1, $shape_step['handler_config']['max_items'] ?? null );
+rebase_assert_equals( 'shape: multi handler throttle mirrors local', 1, $shape_step['handler_configs']['github-a8c']['max_items'] ?? null );
+rebase_assert_equals( 'shape: multi handler source-shape remains remote', 'Automattic', $shape_step['handler_configs']['github-a8c']['owner'] ?? null );
+
+// ---------------------------------------------------------------------------
+// [7] Hashes are recomputed for the merged payload.
+// ---------------------------------------------------------------------------
+echo "\n[7] Rebase output carries reproducible hashes\n";
 $hashed_result = AgentBundleArtifactRebase::rebase(
 	array(
 		'artifact_type' => 'flow',
@@ -332,9 +385,9 @@ rebase_assert( 'remote_hash is set', is_string( $hashed_result['remote_hash'] ) 
 rebase_assert( 'base_hash is set', is_string( $hashed_result['base_hash'] ) );
 
 // ---------------------------------------------------------------------------
-// [7] Default policy is conservative when an unknown policy name is supplied.
+// [8] Default policy is conservative when an unknown policy name is supplied.
 // ---------------------------------------------------------------------------
-echo "\n[7] Unknown policy falls back to conservative\n";
+echo "\n[8] Unknown policy falls back to conservative\n";
 $unknown_result = AgentBundleArtifactRebase::rebase(
 	array(
 		'artifact_type' => 'flow',
