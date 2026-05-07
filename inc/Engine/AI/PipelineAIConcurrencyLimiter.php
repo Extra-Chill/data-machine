@@ -19,6 +19,8 @@ class PipelineAIConcurrencyLimiter {
 	private const DEFAULT_LIMIT          = 1;
 	private const DEFAULT_THROTTLE_DELAY = 10;
 	private const DEFAULT_TTL            = 600;
+	private const EXECUTE_STEP_HOOK      = 'datamachine_execute_step';
+	private const ACTION_SCHEDULER_GROUP = 'data-machine';
 
 	/**
 	 * Attempt to acquire pipeline AI capacity.
@@ -125,6 +127,11 @@ class PipelineAIConcurrencyLimiter {
 				$existing = false;
 			}
 
+			if ( is_array( $existing ) && self::isAdvancedOwnerLease( $existing ) ) {
+				delete_option( $option_name );
+				$existing = false;
+			}
+
 			if ( false !== $existing ) {
 				++$active;
 				continue;
@@ -193,6 +200,56 @@ class PipelineAIConcurrencyLimiter {
 	 */
 	private static function optionName( string $scope, int $slot ): string {
 		return 'datamachine_pipeline_ai_lease_' . md5( $scope ) . '_' . $slot;
+	}
+
+	/**
+	 * Check whether a lease owner has already moved to another scheduled step.
+	 *
+	 * @param array $lease Existing lease option value.
+	 */
+	private static function isAdvancedOwnerLease( array $lease ): bool {
+		$job_id       = (int) ( $lease['job_id'] ?? 0 );
+		$flow_step_id = (string) ( $lease['flow_step_id'] ?? '' );
+
+		if ( $job_id <= 0 || '' === $flow_step_id || ! function_exists( 'as_get_scheduled_actions' ) || ! self::isActionSchedulerReady() ) {
+			return false;
+		}
+
+		$actions = as_get_scheduled_actions(
+			array(
+				'hook'     => self::EXECUTE_STEP_HOOK,
+				'group'    => self::ACTION_SCHEDULER_GROUP,
+				'status'   => 'pending',
+				'orderby'  => 'date',
+				'order'    => 'ASC',
+				'per_page' => 250,
+			),
+			'OBJECT'
+		);
+
+		foreach ( $actions as $action ) {
+			$args = is_object( $action ) && method_exists( $action, 'get_args' ) ? $action->get_args() : array();
+			if ( $job_id === (int) ( $args['job_id'] ?? 0 ) && $flow_step_id !== (string) ( $args['flow_step_id'] ?? '' ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check whether Action Scheduler can safely answer scheduled-action queries.
+	 */
+	private static function isActionSchedulerReady(): bool {
+		if ( function_exists( 'did_action' ) && 0 === did_action( 'action_scheduler_init' ) ) {
+			return false;
+		}
+
+		if ( ! class_exists( '\ActionScheduler' ) || ! method_exists( '\ActionScheduler', 'is_initialized' ) ) {
+			return true;
+		}
+
+		return \ActionScheduler::is_initialized();
 	}
 
 	/**
