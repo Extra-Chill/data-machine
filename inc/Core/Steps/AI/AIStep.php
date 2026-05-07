@@ -5,6 +5,7 @@ namespace DataMachine\Core\Steps\AI;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\FlowStepConfig;
@@ -13,6 +14,8 @@ use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Engine\AI\ConversationManager;
 use DataMachine\Engine\AI\DataPacketPromptProjector;
+use DataMachine\Engine\AI\PipelineAIConcurrencyLease;
+use DataMachine\Engine\AI\PipelineAIConcurrencyLimiter;
 use DataMachine\Engine\AI\PipelineTranscriptPolicy;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
@@ -141,7 +144,39 @@ class AIStep extends Step {
 			return $this->dataPackets;
 		}
 
-		// AIStep reads a single prompt slot — `prompt_queue` — under one
+		$pipeline_step_id = $this->flow_step_config['pipeline_step_id'];
+
+		// Resolve user_id and agent_id from engine snapshot (set by RunFlowAbility).
+		$job_snapshot = $this->engine->get( 'job' );
+		$agent_id     = (int) ( $job_snapshot['agent_id'] ?? 0 );
+		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
+
+		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
+		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
+		$provider_name = $mode_model['provider'];
+		$model_name    = $mode_model['model'];
+
+		$lease_result = PipelineAIConcurrencyLimiter::acquire(
+			$provider_name,
+			array(
+				'job_id'           => $this->job_id,
+				'flow_step_id'     => $this->flow_step_id,
+				'pipeline_step_id' => $pipeline_step_id,
+				'pipeline_id'      => $job_snapshot['pipeline_id'] ?? null,
+				'flow_id'          => $job_snapshot['flow_id'] ?? null,
+				'mode'             => 'pipeline',
+			)
+		);
+
+		if ( empty( $lease_result['acquired'] ) ) {
+			$this->deferForAIConcurrency( $provider_name, $lease_result );
+			return array();
+		}
+
+		$ai_concurrency_lease = $lease_result['lease'] ?? null;
+
+		try {
+			// AIStep reads a single prompt slot — `prompt_queue` — under one
 		// of three access modes (#1291). Pre-collapse this branched on
 		// `queue_enabled` plus a `user_message` fallback; post-collapse
 		// the mode picks the access pattern and the queue head is the
@@ -188,13 +223,6 @@ class AIStep extends Step {
 			$file_info = wp_check_filetype( $engine_image );
 			$mime_type = is_string( $file_info['type'] ) ? $file_info['type'] : '';
 		}
-
-		$pipeline_step_id = $this->flow_step_config['pipeline_step_id'];
-
-		// Resolve user_id and agent_id from engine snapshot (set by RunFlowAbility).
-		$job_snapshot = $this->engine->get( 'job' );
-		$agent_id     = (int) ( $job_snapshot['agent_id'] ?? 0 );
-		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
 
 		$packet_projection_context = array(
 			'job_id'           => $this->job_id,
@@ -323,11 +351,6 @@ class AIStep extends Step {
 			}
 		}
 
-		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
-		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
-		$provider_name = $mode_model['provider'];
-		$model_name    = $mode_model['model'];
-
 		// Establish agent execution context before firing the conversation loop.
 		//
 		// Pipelines run inside the Action Scheduler queue where no WordPress user
@@ -440,6 +463,83 @@ class AIStep extends Step {
 
 		// Process loop results into data packets
 		return self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
+		} finally {
+			if ( $ai_concurrency_lease instanceof PipelineAIConcurrencyLease ) {
+				$ai_concurrency_lease->release();
+			}
+		}
+	}
+
+	/**
+	 * Reschedule this AI step because provider/site concurrency is saturated.
+	 *
+	 * @param string $provider_name Provider slug.
+	 * @param array  $lease_result  Limiter result.
+	 */
+	private function deferForAIConcurrency( string $provider_name, array $lease_result ): void {
+		$delay_seconds = max( 1, (int) ( $lease_result['delay'] ?? 10 ) );
+		$timestamp     = time() + $delay_seconds;
+		$action_id     = false;
+
+		if ( function_exists( 'as_schedule_single_action' ) ) {
+			$action_id = as_schedule_single_action(
+				$timestamp,
+				'datamachine_execute_step',
+				array(
+					'job_id'       => $this->job_id,
+					'flow_step_id' => $this->flow_step_id,
+				),
+				'data-machine'
+			);
+		}
+
+		if ( false === $action_id ) {
+			do_action(
+				'datamachine_fail_job',
+				$this->job_id,
+				'ai_concurrency_defer_failed',
+				array(
+					'flow_step_id'  => $this->flow_step_id,
+					'ai_provider'   => $provider_name,
+					'error_message' => 'AI concurrency throttle could not reschedule the step.',
+				)
+			);
+			return;
+		}
+
+		( new Jobs() )->update_job_status( $this->job_id, 'pending' );
+
+		datamachine_merge_engine_data(
+			$this->job_id,
+			array(
+				'ai_concurrency_throttle' => array(
+					'next_retry_at'           => gmdate( 'c', $timestamp ),
+					'rescheduled_for_seconds' => $delay_seconds,
+					'reason'                  => 'ai_concurrency_limit',
+					'provider'                => $provider_name,
+					'flow_step_id'            => $this->flow_step_id,
+					'limit'                   => (int) ( $lease_result['limit'] ?? 0 ),
+					'active'                  => (int) ( $lease_result['active'] ?? 0 ),
+					'action_id'               => $action_id,
+				),
+			)
+		);
+
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Pipeline AI step deferred by concurrency limit',
+			array(
+				'job_id'                    => $this->job_id,
+				'flow_step_id'              => $this->flow_step_id,
+				'provider'                  => $provider_name,
+				'reason'                    => 'ai_concurrency_limit',
+				'limit'                     => (int) ( $lease_result['limit'] ?? 0 ),
+				'active'                    => (int) ( $lease_result['active'] ?? 0 ),
+				'rescheduled_for_seconds' => $delay_seconds,
+				'action_id'               => $action_id,
+			)
+		);
 	}
 
 	/**
