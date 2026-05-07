@@ -495,6 +495,45 @@ class JobRetryPolicy {
 	 * @return void
 	 */
 	private static function recordPoisonItem( int $job_id, string $reason, array $context_data, array $engine_data, int $attempt, int $max_attempts ): void {
+		$retry_class = self::classifyFailure( $reason, $context_data );
+		if ( ! self::shouldPoisonSourceItem( $retry_class ) ) {
+			\datamachine_merge_engine_data(
+				$job_id,
+				array(
+					'retry' => array(
+						'attempts'       => $attempt,
+						'max_attempts'   => $max_attempts,
+						'last_reason'    => $reason,
+						'last_retryable' => true,
+						'retry_class'    => $retry_class,
+						'exhausted'      => true,
+					),
+				)
+			);
+
+			do_action(
+				'datamachine_log',
+				'error',
+				'Job retry policy exhausted provider/system retry without isolating source item',
+				array_filter(
+					array(
+						'job_id'          => $job_id,
+						'item_identifier' => $engine_data['item_identifier'] ?? null,
+						'source_type'     => $engine_data['source_type'] ?? null,
+						'flow_step_id'    => $context_data['flow_step_id'] ?? null,
+						'reason'          => $reason,
+						'retry_class'     => $retry_class,
+						'attempts'        => $attempt,
+						'max_attempts'    => $max_attempts,
+						'recorded_at'     => gmdate( 'c' ),
+					),
+					fn( $value ) => null !== $value
+				)
+			);
+
+			return;
+		}
+
 		$poison = array_filter(
 			array(
 				'isolated'        => true,
@@ -529,6 +568,24 @@ class JobRetryPolicy {
 			'error',
 			'Job retry policy isolated poison item after retry exhaustion',
 			$poison
+		);
+	}
+
+	/**
+	 * Whether retry exhaustion should isolate the current source item.
+	 *
+	 * Provider and transport failures are not evidence that the source item is
+	 * malformed. Marking them as poison hides retryable source work behind an
+	 * infrastructure outage.
+	 *
+	 * @param string $retry_class Retry classification.
+	 * @return bool
+	 */
+	private static function shouldPoisonSourceItem( string $retry_class ): bool {
+		return ! in_array(
+			$retry_class,
+			array( 'transport_connect_timeout', 'transport_dns', 'transport_network', 'provider_rate_limit', 'provider_overload' ),
+			true
 		);
 	}
 }
