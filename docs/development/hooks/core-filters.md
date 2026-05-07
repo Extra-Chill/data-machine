@@ -1250,6 +1250,86 @@ add_filter(
 
 The paired post-install hook is `datamachine_bundle_install_succeeded` (see core-actions.md). See [Agent Bundles → Extras](../../core-system/agent-bundles.md#reserved-trees-and-extras) for the full contract.
 
+### `datamachine_bundle_source_download_args`
+
+**Purpose**: Mutate the HTTP args used by `BundleSource::resolve()` when downloading a remote bundle. Consumers attach `Authorization` headers, custom user-agents, or any other arg supported by `wp_safe_remote_get()`. The body is streamed to disk via `'stream' => true` + `'filename'`; consumers should leave those keys alone.
+
+**Parameters**:
+
+- `$args` (array) - HTTP args. Includes `timeout`, `headers`, `redirection`, `user-agent`, and a private `datamachine_bundle_source` handle carrying the original `$source` and any caller `$context` (e.g. `cli_token`). The internal handle is stripped before the request flies.
+- `$source` (string) - Original (un-normalized) source string.
+- `$fetch_url` (string) - Normalized URL the request will hit.
+
+**Return**: HTTP args array.
+
+**Usage**:
+```php
+add_filter(
+    'datamachine_bundle_source_download_args',
+    function ( array $args, string $source, string $fetch_url ): array {
+        if ( str_starts_with( $fetch_url, 'https://artifacts.example.com/' ) ) {
+            $args['headers']['Authorization'] = 'Bearer ' . my_secrets_lookup( 'artifacts.example.com' );
+        }
+        return $args;
+    },
+    10,
+    3
+);
+```
+
+Tokens must never be logged. Data Machine does not persist tokens; the host plugin is responsible for retrieval and lifecycle.
+
+### `datamachine_bundle_source_token_for_url`
+
+**Purpose**: Fallback token lookup for hosts that aren't covered by the built-in env / constant / option chain. Fires only when the env var, PHP constant, and (for github.com) WP option `datamachine_bundle_source_github_token` all returned empty. Useful for sigillo, AWS Secrets Manager, Vault, and similar secret stores.
+
+**Parameters**:
+
+- `$token` (string|null) - Always `null` when this filter fires.
+- `$fetch_url` (string) - Normalized URL.
+- `$host` (string) - Lower-cased host portion of the URL.
+- `$context` (array) - Resolution context (e.g. `cli_token`).
+
+**Return**: Token string, or `null`/empty to leave the lookup unresolved.
+
+**Usage**:
+```php
+add_filter(
+    'datamachine_bundle_source_token_for_url',
+    function ( $token, string $url, string $host, array $context ) {
+        if ( null !== $token ) {
+            return $token;
+        }
+        return my_sigillo_client()->get( "bundle-source/{$host}" );
+    },
+    10,
+    4
+);
+```
+
+### `datamachine_bundle_source_ghe_hosts`
+
+**Purpose**: Register GitHub Enterprise hosts that should auto-receive `Authorization: Bearer` headers from `BundleSourceAuth`. The filter value maps each host to the env-var/PHP-constant name that holds its token, mirroring the github.com flow.
+
+**Parameters**:
+
+- `$hosts` (array<string,string>) - Map of `host` → `ENV_OR_CONSTANT_NAME`. Hosts are lower-cased before comparison.
+
+**Return**: Map array.
+
+**Usage**:
+```php
+add_filter(
+    'datamachine_bundle_source_ghe_hosts',
+    function ( array $hosts ): array {
+        $hosts['github.a8c.com'] = 'DATAMACHINE_A8C_GHE_TOKEN';
+        return $hosts;
+    }
+);
+```
+
+With this filter and a `DATAMACHINE_A8C_GHE_TOKEN` env var (or PHP constant) configured, `wp datamachine agent install https://github.a8c.com/team/brain/archive/refs/heads/main.zip` succeeds without any per-call flag. See [Agent Bundles → Authenticated Bundle Sources](../../core-system/agent-bundles.md#authenticated-bundle-sources) for end-to-end examples.
+
 ### `datamachine_agent_export_manifest`
 
 **Purpose**: Adjust the export profile (`soul`, `memory`, `user`, `daily_memory`, `agent_config`, `pipelines`, `flows`, `handler_auth`) used by `AgentBundler::export_directory_object()`. Passed through `share`, `backup`, and `fork` profile defaults before this filter runs.

@@ -1081,6 +1081,12 @@ class AgentsCommand extends AgentBundleCommand {
 	 * [--yes]
 	 * : Skip confirmation prompt.
 	 *
+	 * [--token=<token>]
+	 * : Auth token for private archive downloads. Used for this single resolve(); never persisted, never logged.
+	 *
+	 * [--token-env=<varname>]
+	 * : Environment variable (or PHP constant) name to read the auth token from. Preferred over --token for shell-history hygiene.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Import from ZIP
@@ -1139,15 +1145,24 @@ class AgentsCommand extends AgentBundleCommand {
 			return;
 		}
 
-		$result = $ability->execute(
-			array(
-				'source'      => $path,
-				'slug'        => $new_slug,
-				'owner_id'    => $owner_id,
-				'on_conflict' => (string) ( $assoc_args['on-conflict'] ?? 'error' ),
-				'dry_run'     => $dry_run,
-			)
+		$ability_input = array(
+			'source'      => $path,
+			'slug'        => $new_slug,
+			'owner_id'    => $owner_id,
+			'on_conflict' => (string) ( $assoc_args['on-conflict'] ?? 'error' ),
+			'dry_run'     => $dry_run,
 		);
+
+		// Forward token / token_env to the ability schema. The ability
+		// honors them inside BundleSource::resolve() via $context.
+		if ( isset( $assoc_args['token'] ) ) {
+			$ability_input['token'] = (string) $assoc_args['token'];
+		}
+		if ( isset( $assoc_args['token-env'] ) ) {
+			$ability_input['token_env'] = (string) $assoc_args['token-env'];
+		}
+
+		$result = $ability->execute( $ability_input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to import agent bundle.' );

@@ -19,6 +19,7 @@ use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
 use DataMachine\Engine\Bundle\BundleSource;
+use DataMachine\Engine\Bundle\BundleSourceAuth;
 use DataMachine\Engine\Bundle\PortableSlug;
 use WP_CLI;
 
@@ -55,6 +56,12 @@ class AgentBundleCommand extends BaseCommand {
 	 *
 	 * [--reconcile-runtime]
 	 * : Replace preserved flow runtime queues and scheduling with the bundle seed on existing bundle-owned flows.
+	 *
+	 * [--token=<token>]
+	 * : Auth token for private archive downloads. Used for this single resolve(); never persisted, never logged.
+	 *
+	 * [--token-env=<varname>]
+	 * : Environment variable (or PHP constant) name to read the auth token from. Preferred over --token for shell-history hygiene.
 	 *
 	 * [--format=<format>]
 	 * : Output format.
@@ -152,6 +159,12 @@ class AgentBundleCommand extends BaseCommand {
 	 * [--slug=<slug>]
 	 * : Override target agent slug.
 	 *
+	 * [--token=<token>]
+	 * : Auth token for private archive downloads. Used for this single resolve(); never persisted, never logged.
+	 *
+	 * [--token-env=<varname>]
+	 * : Environment variable (or PHP constant) name to read the auth token from. Preferred over --token for shell-history hygiene.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -162,7 +175,7 @@ class AgentBundleCommand extends BaseCommand {
 	 * ---
 	 */
 	public function diff( array $args, array $assoc_args ): void {
-		$bundle = $this->load_bundle_arg( $args );
+		$bundle = $this->load_bundle_arg( $args, $assoc_args );
 		$plan   = $this->add_runtime_drift_to_plan(
 			$this->plan_for_bundle( $bundle, (string) ( $assoc_args['slug'] ?? '' ) )->to_array(),
 			$bundle,
@@ -209,6 +222,12 @@ class AgentBundleCommand extends BaseCommand {
 	 *   - burn-in-safe
 	 * ---
 	 *
+	 * [--token=<token>]
+	 * : Auth token for private archive downloads. Used for this single resolve(); never persisted, never logged.
+	 *
+	 * [--token-env=<varname>]
+	 * : Environment variable (or PHP constant) name to read the auth token from. Preferred over --token for shell-history hygiene.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -219,7 +238,7 @@ class AgentBundleCommand extends BaseCommand {
 	 * ---
 	 */
 	public function upgrade( array $args, array $assoc_args ): void {
-		$bundle            = $this->load_bundle_arg( $args );
+		$bundle            = $this->load_bundle_arg( $args, $assoc_args );
 		$slug              = (string) ( $assoc_args['slug'] ?? '' );
 		$plan              = $this->plan_for_bundle( $bundle, $slug );
 		$dry_run           = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
@@ -482,7 +501,7 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	private function run_install( array $args, array $assoc_args ): void {
-		$bundle            = $this->load_bundle_arg( $args );
+		$bundle            = $this->load_bundle_arg( $args, $assoc_args );
 		$slug              = isset( $assoc_args['slug'] ) ? sanitize_title( (string) $assoc_args['slug'] ) : null;
 		$owner             = isset( $assoc_args['owner'] ) ? $this->resolve_user_id( $assoc_args['owner'] ) : 0;
 		$dry_run           = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
@@ -575,16 +594,21 @@ class AgentBundleCommand extends BaseCommand {
 		return $drifts;
 	}
 
-	private function load_bundle_arg( array $args ): array {
+	private function load_bundle_arg( array $args, array $assoc_args = array() ): array {
 		$source = (string) ( $args[0] ?? '' );
 		if ( '' === $source ) {
 			WP_CLI::error( 'Bundle source is required.' );
 		}
 
-		$resolved = BundleSource::resolve( $source );
+		$context  = $this->build_resolve_context( $assoc_args );
+		$resolved = BundleSource::resolve( $source, $context );
 		if ( is_wp_error( $resolved ) ) {
 			WP_CLI::error( $resolved->get_error_message() );
 		}
+
+		// Snapshot the revision before any downstream resolve() call
+		// resets it (e.g. via re-entry through abilities).
+		$revision = BundleSource::is_remote( $source ) ? BundleSource::last_resolved_revision() : null;
 
 		$bundle = null;
 		if ( is_dir( $resolved ) ) {
@@ -606,13 +630,42 @@ class AgentBundleCommand extends BaseCommand {
 
 		// Stamp the original source URL into the bundle so installed
 		// metadata records where this came from. AgentBundler::import()
-		// reads $bundle['source_ref']. source_revision is left empty in
-		// v1 — GitHub archive responses don't expose a usable SHA.
+		// reads $bundle['source_ref']. source_revision is best-effort:
+		// captured from the response ETag for GitHub archives (#1830).
 		if ( BundleSource::is_remote( $source ) && empty( $bundle['source_ref'] ) ) {
 			$bundle['source_ref'] = $source;
 		}
+		if ( null !== $revision && empty( $bundle['source_revision'] ) ) {
+			$bundle['source_revision'] = $revision;
+		}
 
 		return $bundle;
+	}
+
+	/**
+	 * Build the {@see BundleSource::resolve()} context array from CLI
+	 * --token / --token-env flags. The CLI token short-circuits the
+	 * env/constant/option/filter chain in BundleSourceAuth::token_for().
+	 *
+	 * @param array $assoc_args WP_CLI assoc args.
+	 * @return array
+	 */
+	private function build_resolve_context( array $assoc_args ): array {
+		$token     = isset( $assoc_args['token'] ) ? (string) $assoc_args['token'] : null;
+		$token_env = isset( $assoc_args['token-env'] ) ? (string) $assoc_args['token-env'] : null;
+
+		$context = BundleSourceAuth::build_resolve_context( $token, $token_env );
+
+		if ( null !== $token_env && '' !== trim( (string) $token_env ) && empty( $context['cli_token'] ) && null === $token ) {
+			WP_CLI::warning(
+				sprintf(
+					'--token-env=%s did not resolve to a non-empty token. Falling back to environment/constant/option chain.',
+					trim( (string) $token_env )
+				)
+			);
+		}
+
+		return $context;
 	}
 
 	private function plan_for_bundle( array $bundle, string $slug = '' ): \DataMachine\Engine\Bundle\AgentBundleUpgradePlan {
