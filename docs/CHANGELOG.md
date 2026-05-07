@@ -2,6 +2,30 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.106.0] - 2026-05-07
+
+### Added
+- support auth headers for private GitHub/GHE archives (#1830)
+- policy-driven rebase for locally modified artifacts (#1832)
+- generic extras transport + post-install success hook (#1828)
+- accept remote URLs for agent install/import/upgrade (#1826)
+
+### Fixed
+- mirror rebased handler throttles
+- route GitHub archive URLs to api.github.com/zipball for PAT auth (#1840)
+- fix(pipeline-card): hoist hooks above early-return guard (rules-of-hooks)
+- fix(auth-providers): hoist useState above early-return guard in CallbackUrlDisplay
+- clear advanced AI concurrency leases
+- avoid poisoning source items on transport exhaustion
+- throttle concurrent pipeline AI steps
+- allow manual runs for paused flows
+- shorten AI transport retry delays
+- Fix wp-ai-client timeout semantics
+- split fetch item dispositions
+- guard scheduler checks before AS datastore init
+- restore queue backups only for drain mode
+- inspect wp-ai-client prompt slot in refinement context test
+
 ## [0.105.0] - 2026-05-06
 
 ### Added
