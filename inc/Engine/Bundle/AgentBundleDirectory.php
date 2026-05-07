@@ -321,7 +321,7 @@ final class AgentBundleDirectory {
 			return array();
 		}
 
-		$extras  = array();
+		$extras = array();
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- scandir() warns on unreadable directory; we treat that as "no extras" rather than fatal.
 		$entries = @scandir( $bundle_root );
 		if ( ! is_array( $entries ) ) {
