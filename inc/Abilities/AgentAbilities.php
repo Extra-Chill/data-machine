@@ -18,6 +18,7 @@ use DataMachine\Core\Database\Agents\AgentAccess;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\BundleSource;
+use DataMachine\Engine\Bundle\BundleSourceAuth;
 use DataMachine\Engine\Bundle\BundleValidationException;
 
 defined( 'ABSPATH' ) || exit;
@@ -256,6 +257,14 @@ class AgentAbilities {
 							'dry_run'     => array(
 								'type'        => 'boolean',
 								'description' => 'Validate and summarize without writing.',
+							),
+							'token'       => array(
+								'type'        => 'string',
+								'description' => 'Auth token for private archive downloads (e.g. GitHub PAT, GHE PAT). Used for this single resolve(); never persisted, never logged. Prefer token_env for repeated use.',
+							),
+							'token_env'   => array(
+								'type'        => 'string',
+								'description' => 'Environment variable (or PHP constant) name to read the auth token from. Used for this single resolve(); never persisted, never logged.',
 							),
 						),
 					),
@@ -680,13 +689,18 @@ class AgentAbilities {
 			);
 		}
 
-		$resolved = BundleSource::resolve( $source );
+		$context  = self::build_resolve_context( $input );
+		$resolved = BundleSource::resolve( $source, $context );
 		if ( is_wp_error( $resolved ) ) {
 			return array(
 				'success' => false,
 				'error'   => $resolved->get_error_message(),
 			);
 		}
+
+		// Snapshot the revision before any nested resolve() call could
+		// reset it.
+		$revision = BundleSource::is_remote( $source ) ? BundleSource::last_resolved_revision() : null;
 
 		$on_conflict = (string) ( $input['on_conflict'] ?? 'error' );
 		if ( ! in_array( $on_conflict, array( 'error', 'skip' ), true ) ) {
@@ -722,10 +736,13 @@ class AgentAbilities {
 		}
 
 		// Stamp the original remote source so installed bundle metadata
-		// records where this came from. v1 leaves source_revision empty
-		// because GitHub archive responses don't expose a usable SHA.
+		// records where this came from. source_revision is best-effort
+		// from the response ETag for GitHub archives (#1830).
 		if ( BundleSource::is_remote( $source ) && empty( $bundle['source_ref'] ) ) {
 			$bundle['source_ref'] = $source;
+		}
+		if ( null !== $revision && empty( $bundle['source_revision'] ) ) {
+			$bundle['source_revision'] = $revision;
 		}
 
 		$slug = sanitize_title( (string) ( $bundle['agent']['agent_slug'] ?? '' ) );
@@ -780,6 +797,23 @@ class AgentAbilities {
 		$result['auth_warnings'] = $auth_warnings;
 
 		return $result;
+	}
+
+	/**
+	 * Build the {@see BundleSource::resolve()} context array from the
+	 * import-agent ability inputs. Honors `token` (literal) and
+	 * `token_env` (env-var or PHP constant name) — both short-circuit
+	 * the env/constant/option/filter chain in
+	 * {@see \DataMachine\Engine\Bundle\BundleSourceAuth::token_for()}.
+	 *
+	 * @param array $input Ability input.
+	 * @return array
+	 */
+	private static function build_resolve_context( array $input ): array {
+		return BundleSourceAuth::build_resolve_context(
+			isset( $input['token'] ) ? (string) $input['token'] : null,
+			isset( $input['token_env'] ) ? (string) $input['token_env'] : null
+		);
 	}
 
 	private static function load_import_bundle( AgentBundler $bundler, string $source ): ?array {
