@@ -138,11 +138,11 @@ class PipelineAIConcurrencyLimiter {
 			}
 
 			$lease = array(
-				'token'       => $token,
-				'provider'    => $provider,
-				'created_at'  => $now,
-				'expires_at'  => $now + self::ttl( $provider, $context ),
-				'job_id'      => (int) ( $context['job_id'] ?? 0 ),
+				'token'        => $token,
+				'provider'     => $provider,
+				'created_at'   => $now,
+				'expires_at'   => $now + self::ttl( $provider, $context ),
+				'job_id'       => (int) ( $context['job_id'] ?? 0 ),
 				'flow_step_id' => (string) ( $context['flow_step_id'] ?? '' ),
 			);
 
@@ -229,7 +229,7 @@ class PipelineAIConcurrencyLimiter {
 
 		foreach ( $actions as $action ) {
 			$args = is_object( $action ) && method_exists( $action, 'get_args' ) ? $action->get_args() : array();
-			if ( $job_id === (int) ( $args['job_id'] ?? 0 ) && $flow_step_id !== (string) ( $args['flow_step_id'] ?? '' ) ) {
+			if ( (int) ( $args['job_id'] ?? 0 ) === $job_id && (string) ( $args['flow_step_id'] ?? '' ) !== $flow_step_id ) {
 				return true;
 			}
 		}
