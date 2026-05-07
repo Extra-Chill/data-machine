@@ -429,7 +429,7 @@ final class AgentBundleArtifactRebase {
 			if ( null === $max_items ) {
 				continue;
 			}
-			$merged_step['handler_config']['max_items'] = $max_items;
+			$merged_step['handler_config']['max_items']                     = $max_items;
 			$decisions[ "flow_config.{$step_id}.handler_config.max_items" ] = array(
 				'source' => 'local',
 				'reason' => 'burn_in_preserve_throttle_shape_mirror',
