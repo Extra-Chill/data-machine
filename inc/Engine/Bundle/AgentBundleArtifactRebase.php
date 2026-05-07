@@ -303,6 +303,16 @@ final class AgentBundleArtifactRebase {
 				$merged_step['handler_configs'] = $merged_hcs;
 			}
 
+			self::mirror_preserved_handler_throttle(
+				$base_hc,
+				$local_hc,
+				$base_hcs,
+				$local_hcs,
+				$step_id,
+				$merged_step,
+				$decisions
+			);
+
 			$merged_steps[ $step_id ] = $merged_step;
 		}
 
@@ -314,8 +324,8 @@ final class AgentBundleArtifactRebase {
 		// it ambiguous so an operator confirms.
 		$top_keys = array_unique(
 			array_merge(
-				array_keys( is_array( $local ) ? $local : array() ),
-				array_keys( is_array( $remote ) ? $remote : array() )
+				array_keys( $local ),
+				array_keys( $remote )
 			)
 		);
 		foreach ( $top_keys as $key ) {
@@ -364,6 +374,87 @@ final class AgentBundleArtifactRebase {
 			'decisions' => $decisions,
 			'ambiguous' => $ambiguous,
 		);
+	}
+
+	/**
+	 * Keep local burn-in max_items consistent across legacy and canonical shapes.
+	 *
+	 * Flow payloads may carry both `handler_config` and `handler_configs` while
+	 * installs migrate between old and new representations. The two shapes are
+	 * equivalent runtime inputs, so a locally lowered throttle must not be
+	 * preserved in only one of them.
+	 *
+	 * @param array<string,mixed>                $base_hc Single-handler base config.
+	 * @param array<string,mixed>                $local_hc Single-handler local config.
+	 * @param array<string,mixed>                $base_hcs Multi-handler base config.
+	 * @param array<string,mixed>                $local_hcs Multi-handler local config.
+	 * @param string|int                         $step_id Flow step ID.
+	 * @param array<string,mixed>                $merged_step In/out merged step.
+	 * @param array<string,array<string,string>> $decisions In/out decisions map.
+	 */
+	private static function mirror_preserved_handler_throttle(
+		array $base_hc,
+		array $local_hc,
+		array $base_hcs,
+		array $local_hcs,
+		string|int $step_id,
+		array &$merged_step,
+		array &$decisions
+	): void {
+		$single_throttle = self::local_preserved_max_items( $base_hc, $local_hc );
+		if ( null !== $single_throttle && is_array( $merged_step['handler_configs'] ?? null ) ) {
+			foreach ( $merged_step['handler_configs'] as $slug => &$handler_config ) {
+				if ( ! is_array( $handler_config ) ) {
+					continue;
+				}
+				$handler_config['max_items'] = $single_throttle;
+				$decisions[ "flow_config.{$step_id}.handler_configs.{$slug}.max_items" ] = array(
+					'source' => 'local',
+					'reason' => 'burn_in_preserve_throttle_shape_mirror',
+				);
+			}
+			unset( $handler_config );
+		}
+
+		if ( ! is_array( $merged_step['handler_config'] ?? null ) ) {
+			return;
+		}
+
+		foreach ( $local_hcs as $slug => $local_config ) {
+			if ( ! is_array( $local_config ) ) {
+				continue;
+			}
+			$base_config = is_array( $base_hcs[ $slug ] ?? null ) ? $base_hcs[ $slug ] : array();
+			$max_items   = self::local_preserved_max_items( $base_config, $local_config );
+			if ( null === $max_items ) {
+				continue;
+			}
+			$merged_step['handler_config']['max_items'] = $max_items;
+			$decisions[ "flow_config.{$step_id}.handler_config.max_items" ] = array(
+				'source' => 'local',
+				'reason' => 'burn_in_preserve_throttle_shape_mirror',
+			);
+			return;
+		}
+	}
+
+	/**
+	 * Return locally changed max_items, or null when local did not change it.
+	 *
+	 * @param array<string,mixed> $base Base handler config.
+	 * @param array<string,mixed> $local Local handler config.
+	 */
+	private static function local_preserved_max_items( array $base, array $local ): mixed {
+		if ( ! array_key_exists( 'max_items', $local ) ) {
+			return null;
+		}
+
+		$base_has = array_key_exists( 'max_items', $base );
+		if ( $base_has && $local['max_items'] === $base['max_items'] ) {
+			return null;
+		}
+
+		return $local['max_items'];
 	}
 
 	/**
@@ -421,7 +512,7 @@ final class AgentBundleArtifactRebase {
 					);
 					continue;
 				}
-				if ( $local_changed && $remote_changed ) {
+				if ( $local_changed ) {
 					// Both moved this throttle. Default to local (safer) but flag ambiguous.
 					$merged[ $key ]     = $local_val;
 					$decisions[ $path ] = array(
@@ -464,7 +555,7 @@ final class AgentBundleArtifactRebase {
 				continue;
 			}
 
-			if ( $local_changed && $remote_changed ) {
+			if ( $local_changed ) {
 				// Both moved a non-throttle key. Default merged value to local
 				// (don't silently clobber) and flag for approval.
 				$merged[ $key ]     = $local_val;
