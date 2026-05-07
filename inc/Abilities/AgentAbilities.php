@@ -247,7 +247,7 @@ class AgentAbilities {
 							),
 							'on_conflict' => array(
 								'type'        => 'string',
-								'enum'        => array( 'error', 'skip' ),
+								'enum'        => array( 'error', 'skip', 'upgrade' ),
 								'description' => 'How to handle an existing target agent slug.',
 							),
 							'owner_id'    => array(
@@ -703,11 +703,11 @@ class AgentAbilities {
 		$revision = BundleSource::is_remote( $source ) ? BundleSource::last_resolved_revision() : null;
 
 		$on_conflict = (string) ( $input['on_conflict'] ?? 'error' );
-		if ( ! in_array( $on_conflict, array( 'error', 'skip' ), true ) ) {
+		if ( ! in_array( $on_conflict, array( 'error', 'skip', 'upgrade' ), true ) ) {
 			BundleSource::cleanup( $resolved, $source );
 			return array(
 				'success' => false,
-				'error'   => 'on_conflict must be one of: error, skip.',
+				'error'   => 'on_conflict must be one of: error, skip, upgrade.',
 			);
 		}
 
@@ -769,16 +769,25 @@ class AgentAbilities {
 			);
 		}
 
-		if ( $existing ) {
+		if ( $existing && 'upgrade' !== $on_conflict ) {
 			return array(
 				'success'    => false,
 				'agent_id'   => (int) $existing['agent_id'],
 				'agent_slug' => $slug,
-				'error'      => sprintf( 'Agent slug "%s" already exists. Use on_conflict=skip to no-op, or import with a new slug.', $slug ),
+				'error'      => sprintf( 'Agent slug "%s" already exists. Use on_conflict=skip to no-op, on_conflict=upgrade to reconcile bundle artifacts, or import with a new slug.', $slug ),
 			);
 		}
 
-		$result = $bundler->import( $bundle, null, $owner_id, ! empty( $input['dry_run'] ) );
+		$result = $bundler->import(
+			$bundle,
+			null,
+			$owner_id,
+			! empty( $input['dry_run'] ),
+			array(
+				'is_upgrade'        => 'upgrade' === $on_conflict,
+				'reconcile_runtime' => 'upgrade' === $on_conflict,
+			)
+		);
 		if ( empty( $result['success'] ) ) {
 			$result['auth_warnings'] = $auth_warnings;
 			return $result;
