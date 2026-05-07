@@ -39,6 +39,13 @@ function wp_rand( int $min, int $max ): int {
 	return $min;
 }
 
+$merged_engine_data = array();
+function datamachine_merge_engine_data( int $job_id, array $data ): void {
+	global $merged_engine_data;
+	$job_id;
+	$merged_engine_data = $data;
+}
+
 require_once __DIR__ . '/../inc/Core/JobRetryPolicy.php';
 
 $reflection          = new ReflectionClass( DataMachine\Core\JobRetryPolicy::class );
@@ -48,6 +55,7 @@ $is_retryable        = $reflection->getMethod( 'isRetryableFailure' );
 $resolve_delay       = $reflection->getMethod( 'resolveDelay' );
 $classify_failure    = $reflection->getMethod( 'classifyFailure' );
 $resolve_policy      = $reflection->getMethod( 'resolvePolicy' );
+$record_poison_item  = $reflection->getMethod( 'recordPoisonItem' );
 
 echo "Case 1: Retry-After values are normalized\n";
 assert_retry_policy_smoke( 'numeric Retry-After is seconds', 90 === $extract_retry_after->invoke( null, array( 'retry_after' => '90' ) ) );
@@ -92,7 +100,27 @@ assert_retry_policy_smoke( 'rate limit is classified separately', 'provider_rate
 assert_retry_policy_smoke( 'rate limit keeps default base delay', 60 === $rate_delay, 'delay was ' . $rate_delay );
 assert_retry_policy_smoke( 'generic retryable AI failure keeps default base delay', 60 === $generic_delay, 'delay was ' . $generic_delay );
 
-echo "Case 5: Production code exposes retry/backoff hooks and metadata\n";
+echo "Case 5: Transport retry exhaustion does not poison source items\n";
+$merged_engine_data = array();
+$record_poison_item->invoke(
+	null,
+	123,
+	'ai_processing_failed',
+	array(
+		'flow_step_id' => 'step-1',
+		'ai_error'     => 'Network error occurred while sending request: cURL error 28: Connection timed out after 15000 milliseconds',
+	),
+	array(
+		'item_identifier' => 'source-item-1',
+		'source_type'     => 'mcp',
+	),
+	3,
+	3
+);
+assert_retry_policy_smoke( 'exhausted transport failures mark retry exhausted', true === ( $merged_engine_data['retry']['exhausted'] ?? false ) );
+assert_retry_policy_smoke( 'exhausted transport failures do not isolate source item', ! isset( $merged_engine_data['poison_item'] ) );
+
+echo "Case 6: Production code exposes retry/backoff hooks and metadata\n";
 $policy_src = file_get_contents( __DIR__ . '/../inc/Core/JobRetryPolicy.php' ) ?: '';
 $fail_src   = file_get_contents( __DIR__ . '/../inc/Engine/Actions/Handlers/FailJobHandler.php' ) ?: '';
 $ai_src     = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' ) ?: '';
