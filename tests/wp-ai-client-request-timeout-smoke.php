@@ -78,11 +78,11 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 }
 
 if ( ! function_exists( 'get_option' ) ) {
-	function get_option( string $option, $default = false ) {
+	function get_option( string $option, $default_value = false ) {
 		if ( 'datamachine_settings' === $option ) {
 			return $GLOBALS['datamachine_timeout_test_settings'];
 		}
-		return $default;
+		return $default_value;
 	}
 }
 

@@ -117,15 +117,15 @@ final class AgentBundleUpgradePendingAction {
 			$apply_artifact = $artifact;
 			$rebase_meta    = null;
 			if ( isset( $rebased_by_key[ $key ] ) ) {
-				$rebase_entry           = $rebased_by_key[ $key ];
+				$rebase_entry              = $rebased_by_key[ $key ];
 				$apply_artifact['payload'] = $rebase_entry['merged'] ?? $artifact['payload'] ?? null;
 				if ( isset( $rebase_entry['merged_hash'] ) ) {
 					$apply_artifact['hash'] = (string) $rebase_entry['merged_hash'];
 				}
 				$rebase_meta = array(
-					'policy'     => (string) ( $rebase_entry['policy'] ?? '' ),
+					'policy'      => (string) ( $rebase_entry['policy'] ?? '' ),
 					'merged_hash' => isset( $rebase_entry['merged_hash'] ) ? (string) $rebase_entry['merged_hash'] : null,
-					'decisions'  => is_array( $rebase_entry['decisions'] ?? null ) ? $rebase_entry['decisions'] : array(),
+					'decisions'   => is_array( $rebase_entry['decisions'] ?? null ) ? $rebase_entry['decisions'] : array(),
 				);
 			}
 

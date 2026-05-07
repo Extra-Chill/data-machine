@@ -272,8 +272,8 @@ class AgentBundleCommand extends BaseCommand {
 		);
 
 		if ( $plan->has_pending_approval() ) {
-			$agent             = $this->resolve_bundle_agent( $bundle, $slug );
-			$rebased_artifacts = $rebase_local
+			$agent                      = $this->resolve_bundle_agent( $bundle, $slug );
+			$rebased_artifacts          = $rebase_local
 				? $this->rebase_locally_modified( $plan, $bundle, $slug, $policy_name )
 				: array();
 			$pending                    = AgentBundleUpgradePendingAction::stage(
@@ -420,7 +420,7 @@ class AgentBundleCommand extends BaseCommand {
 			if ( ! is_array( $row ) ) {
 				continue;
 			}
-			$key = AgentBundleArtifactExtensions::artifact_key( (string) ( $row['artifact_type'] ?? '' ), (string) ( $row['artifact_id'] ?? '' ) );
+			$key                     = AgentBundleArtifactExtensions::artifact_key( (string) ( $row['artifact_type'] ?? '' ), (string) ( $row['artifact_id'] ?? '' ) );
 			$installed_index[ $key ] = $row;
 		}
 
@@ -471,7 +471,7 @@ class AgentBundleCommand extends BaseCommand {
 					'artifact_id'   => (string) $target['artifact_id'],
 					'source_path'   => (string) ( $target['source_path'] ?? '' ),
 					'base'          => $base_payload,
-					'local'         => $local['payload']  ?? null,
+					'local'         => $local['payload'] ?? null,
 					'remote'        => $target['payload'] ?? null,
 				),
 				$policy_name

@@ -46,11 +46,11 @@ class TranscriptPolicyEngineDataStub {
 // Stub get_option() for site-level resolution.
 $GLOBALS['transcript_policy_test_site_option'] = false;
 if ( ! function_exists( 'get_option' ) ) {
-	function get_option( $name, $default = false ) {
+	function get_option( $name, $default_value = false ) {
 		if ( 'datamachine_persist_pipeline_transcripts' === $name ) {
-			return $GLOBALS['transcript_policy_test_site_option'] ?? $default;
+			return $GLOBALS['transcript_policy_test_site_option'] ?? $default_value;
 		}
-		return $default;
+		return $default_value;
 	}
 }
 

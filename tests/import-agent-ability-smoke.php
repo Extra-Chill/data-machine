@@ -58,8 +58,8 @@ namespace {
 		return (int) ( $GLOBALS['datamachine_test_current_user_id'] ?? 0 );
 	}
 
-	function get_option( string $name, mixed $default = false ): mixed {
-		return $GLOBALS['datamachine_test_options'][ $name ] ?? $default;
+	function get_option( string $name, mixed $default_value = false ): mixed {
+		return $GLOBALS['datamachine_test_options'][ $name ] ?? $default_value;
 	}
 
 	function apply_filters( string $hook_name, mixed $value, mixed ...$args ): mixed {

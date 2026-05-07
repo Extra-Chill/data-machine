@@ -169,7 +169,7 @@ function datamachine_daily_memory_store_seam_assert( bool $condition, string $me
 $store = new DailyMemorySeamFakeStore();
 add_filter(
 	'agents_api_memory_store',
-	function ( $default, AgentMemoryScope $scope ) use ( $store ) {
+	function ( $default_value, AgentMemoryScope $scope ) use ( $store ) {
 		return $store;
 	},
 	10,
