@@ -25,6 +25,19 @@ function assert_ai_backpressure_smoke( string $name, bool $cond, string $detail 
 }
 
 $GLOBALS['datamachine_ai_backpressure_options'] = array();
+$GLOBALS['datamachine_ai_backpressure_actions'] = array();
+
+class DataMachineAIBackpressureSmokeAction {
+	public function __construct( private array $action ) {}
+
+	public function get_args(): array {
+		return $this->action['args'] ?? array();
+	}
+
+	public function get_field( string $field ): mixed {
+		return $this->action[ $field ] ?? null;
+	}
+}
 
 function get_option( string $name, mixed $default = false ): mixed {
 	return array_key_exists( $name, $GLOBALS['datamachine_ai_backpressure_options'] )
@@ -57,6 +70,29 @@ function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
 		return 7;
 	}
 	return $value;
+}
+
+function as_get_scheduled_actions( array $query = array(), string $return_format = 'OBJECT' ): array {
+	unset( $return_format );
+
+	return array_values(
+		array_filter(
+			$GLOBALS['datamachine_ai_backpressure_actions'],
+			static function ( DataMachineAIBackpressureSmokeAction $action ) use ( $query ): bool {
+				foreach ( array( 'hook', 'group', 'status' ) as $field ) {
+					if ( isset( $query[ $field ] ) && $action->get_field( $field ) !== $query[ $field ] ) {
+						return false;
+					}
+				}
+
+				return true;
+			}
+		)
+	);
+}
+
+function did_action( string $hook ): int {
+	return 'action_scheduler_init' === $hook ? 1 : 0;
 }
 
 function sanitize_key( string $key ): string {
@@ -96,7 +132,27 @@ $after_release = PipelineAIConcurrencyLimiter::acquire( 'openai', array( 'job_id
 assert_ai_backpressure_smoke( 'slot can be acquired after release', true === $after_release['acquired'] );
 $after_release['lease']->release();
 
-echo "Case 4: production wiring preserves pipeline semantics\n";
+echo "Case 4: advanced owner step clears stale live lease\n";
+$stale_owner = PipelineAIConcurrencyLimiter::acquire( 'openai', array( 'job_id' => 201, 'flow_step_id' => 'ai-old' ) );
+assert_ai_backpressure_smoke( 'stale owner initially acquires slot', true === $stale_owner['acquired'] );
+$GLOBALS['datamachine_ai_backpressure_actions'][] = new DataMachineAIBackpressureSmokeAction(
+	array(
+		'hook'   => 'datamachine_execute_step',
+		'group'  => 'data-machine',
+		'status' => 'pending',
+		'job_id' => 201,
+		'args'   => array(
+			'job_id'       => 201,
+			'flow_step_id' => 'publish-next',
+		),
+	)
+);
+$after_advanced_owner = PipelineAIConcurrencyLimiter::acquire( 'openai', array( 'job_id' => 202, 'flow_step_id' => 'ai-new' ) );
+assert_ai_backpressure_smoke( 'advanced owner lease does not block new AI work', true === $after_advanced_owner['acquired'] );
+$after_advanced_owner['lease']->release();
+$GLOBALS['datamachine_ai_backpressure_actions'] = array();
+
+echo "Case 5: production wiring preserves pipeline semantics\n";
 $ai_src       = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' ) ?: '';
 $engine_src   = file_get_contents( __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php' ) ?: '';
 $retry_src    = file_get_contents( __DIR__ . '/../inc/Core/JobRetryPolicy.php' ) ?: '';
@@ -111,6 +167,7 @@ assert_ai_backpressure_smoke( 'fetch steps do not use AI limiter', ! str_contain
 assert_ai_backpressure_smoke( 'upsert steps do not use AI limiter', ! str_contains( $upsert_src, 'PipelineAIConcurrencyLimiter' ) );
 assert_ai_backpressure_smoke( 'existing transport retry classifier remains intact', str_contains( $retry_src, 'transport_connect_timeout' ) && str_contains( $retry_src, 'AI_TRANSPORT_BASE_DELAY' ) );
 assert_ai_backpressure_smoke( 'throttle log includes requested metadata', str_contains( $ai_src, 'rescheduled_for_seconds' ) && str_contains( $ai_src, "'active'" ) && str_contains( $ai_src, "'limit'" ) );
+assert_ai_backpressure_smoke( 'limiter checks for advanced owner leases generically', str_contains( file_get_contents( __DIR__ . '/../inc/Engine/AI/PipelineAIConcurrencyLimiter.php' ) ?: '', 'isAdvancedOwnerLease' ) );
 
 echo "\nAI step backpressure smoke complete: {$total} assertions, {$failed} failures.\n";
 if ( $failed > 0 ) {
