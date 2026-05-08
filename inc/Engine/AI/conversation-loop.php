@@ -357,7 +357,7 @@ function datamachine_build_turn_runner(
 		// Process tool calls.
 		$tool_execution_results = array();
 		$conversation_complete  = false;
-		$completion_nudge      = '';
+		$completion_nudge       = '';
 		if ( ! empty( $tool_calls ) ) {
 			foreach ( $tool_calls as $tool_call ) {
 				$tool_name       = $tool_call['name'];
@@ -572,7 +572,7 @@ function datamachine_record_completion_nudge(
 	array $decision_context,
 	int $turn_count
 ): void {
-	$diagnostic = datamachine_completion_nudge_diagnostic( $decision_context, $turn_count, count( $completion_nudges ) + 1 );
+	$diagnostic          = datamachine_completion_nudge_diagnostic( $decision_context, $turn_count, count( $completion_nudges ) + 1 );
 	$completion_nudges[] = $diagnostic;
 
 	$event_payload = array_merge(
