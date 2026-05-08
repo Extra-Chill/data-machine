@@ -102,7 +102,7 @@ class Agents {
 		// Single agent: get, update, delete. Slug routes are preferred; numeric ID
 		// routes remain for compatibility with existing integrations.
 		foreach ( $agent_resource_routes as $agent_resource_route ) {
-		register_rest_route(
+			register_rest_route(
 			'datamachine/v1',
 			$agent_resource_route,
 			array(
@@ -160,7 +160,7 @@ class Agents {
 					),
 				),
 			)
-		);
+			);
 		}
 
 		$agent_access_routes = array(
@@ -170,7 +170,7 @@ class Agents {
 
 		// Agent access management.
 		foreach ( $agent_access_routes as $agent_access_route ) {
-		register_rest_route(
+			register_rest_route(
 			'datamachine/v1',
 			$agent_access_route,
 			array(
@@ -196,13 +196,13 @@ class Agents {
 							'required'          => false,
 							'sanitize_callback' => 'sanitize_text_field',
 						),
-						'user_id'  => array(
+						'user_id' => array(
 							'type'              => 'integer',
 							'required'          => true,
 							'description'       => __( 'WordPress user ID to grant access to.', 'data-machine' ),
 							'sanitize_callback' => 'absint',
 						),
-						'role'     => array(
+						'role'    => array(
 							'type'              => 'string',
 							'required'          => false,
 							'default'           => 'viewer',
@@ -215,7 +215,7 @@ class Agents {
 					),
 				),
 			)
-		);
+			);
 		}
 
 		$agent_revoke_routes = array(
@@ -225,7 +225,7 @@ class Agents {
 
 		// Revoke access (DELETE with user_id in URL).
 		foreach ( $agent_revoke_routes as $agent_revoke_route ) {
-		register_rest_route(
+			register_rest_route(
 			'datamachine/v1',
 			$agent_revoke_route,
 			array(
@@ -238,14 +238,14 @@ class Agents {
 						'required'          => false,
 						'sanitize_callback' => 'sanitize_text_field',
 					),
-					'user_id'  => array(
+					'user_id' => array(
 						'type'              => 'integer',
 						'required'          => true,
 						'sanitize_callback' => 'absint',
 					),
 				),
 			)
-		);
+			);
 		}
 
 		$agent_token_routes = array(
@@ -255,7 +255,7 @@ class Agents {
 
 		// Agent tokens: list and create.
 		foreach ( $agent_token_routes as $agent_token_route ) {
-		register_rest_route(
+			register_rest_route(
 			'datamachine/v1',
 			$agent_token_route,
 			array(
@@ -301,7 +301,7 @@ class Agents {
 					),
 				),
 			)
-		);
+			);
 		}
 
 		$agent_revoke_token_routes = array(
@@ -311,7 +311,7 @@ class Agents {
 
 		// Revoke a specific token.
 		foreach ( $agent_revoke_token_routes as $agent_revoke_token_route ) {
-		register_rest_route(
+			register_rest_route(
 			'datamachine/v1',
 			$agent_revoke_token_route,
 			array(
@@ -319,7 +319,7 @@ class Agents {
 				'callback'            => array( self::class, 'handle_revoke_token' ),
 				'permission_callback' => $manage_permission,
 				'args'                => array(
-					'agent'   => array(
+					'agent'    => array(
 						'type'              => 'string',
 						'required'          => false,
 						'sanitize_callback' => 'sanitize_text_field',
@@ -331,7 +331,7 @@ class Agents {
 					),
 				),
 			)
-		);
+			);
 		}
 	}
 
@@ -704,8 +704,8 @@ class Agents {
 			return $agent_id;
 		}
 
-		$user_id  = (int) $request->get_param( 'user_id' );
-		$role     = $request->get_param( 'role' );
+		$user_id = (int) $request->get_param( 'user_id' );
+		$role    = $request->get_param( 'role' );
 
 		// Verify agent exists.
 		$agents_repo = new AgentsRepository();
@@ -770,7 +770,7 @@ class Agents {
 			return $agent_id;
 		}
 
-		$user_id  = (int) $request->get_param( 'user_id' );
+		$user_id = (int) $request->get_param( 'user_id' );
 
 		// Verify agent exists.
 		$agents_repo = new AgentsRepository();
