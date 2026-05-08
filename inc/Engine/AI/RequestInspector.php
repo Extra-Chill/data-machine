@@ -261,8 +261,8 @@ class RequestInspector {
 		EngineData $engine,
 		array $job
 	): array {
-		$job_snapshot = $engine->getJobContext();
-		$user_id      = (int) ( $job_snapshot['user_id'] ?? ( $job['user_id'] ?? 0 ) );
+		$job_snapshot     = $engine->getJobContext();
+		$user_id          = (int) ( $job_snapshot['user_id'] ?? ( $job['user_id'] ?? 0 ) );
 		$identity_context = array_filter(
 			array(
 				'agent_slug' => $job_snapshot['agent_slug'] ?? null,

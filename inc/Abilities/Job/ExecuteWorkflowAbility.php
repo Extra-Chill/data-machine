@@ -153,8 +153,8 @@ class ExecuteWorkflowAbility {
 		// 'job' snapshot in initial_data with agent_id/user_id; this
 		// layers our authoritative job_id on top of any caller-provided
 		// snapshot.
-		$caller_snapshot = is_array( $engine_data['job'] ?? null ) ? $engine_data['job'] : array();
-		$job_snapshot    = array_merge(
+		$caller_snapshot  = is_array( $engine_data['job'] ?? null ) ? $engine_data['job'] : array();
+		$job_snapshot     = array_merge(
 			array( 'user_id' => (int) ( $initial_data['user_id'] ?? 0 ) ),
 			$caller_snapshot,
 			array( 'job_id' => $job_id )

@@ -199,9 +199,9 @@ class SystemTaskStep extends Step {
 		$parent_user_id      = (int) ( $parent_job_snapshot['user_id'] ?? 0 );
 		if ( ! empty( $parent_job_snapshot['agent_slug'] ) || $parent_agent_id > 0 ) {
 			try {
-				$identity            = ( new AgentIdentityResolver() )->resolve_agent_identity( $parent_job_snapshot );
-				$parent_agent_id     = $identity->agent_id;
-				$parent_agent_slug   = $identity->agent_slug;
+				$identity          = ( new AgentIdentityResolver() )->resolve_agent_identity( $parent_job_snapshot );
+				$parent_agent_id   = $identity->agent_id;
+				$parent_agent_slug = $identity->agent_slug;
 			} catch ( \InvalidArgumentException $e ) {
 				$parent_agent_slug = ! empty( $parent_job_snapshot['agent_slug'] ) ? sanitize_title( (string) $parent_job_snapshot['agent_slug'] ) : '';
 			}

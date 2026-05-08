@@ -397,7 +397,7 @@ function datamachine_build_turn_runner(
 				// Validate for duplicate tool calls.
 				$validation_result = ConversationManager::validateToolCall( $tool_name, $tool_parameters, $messages );
 				if ( $validation_result['is_duplicate'] ) {
-					$messages[] = ConversationManager::generateDuplicateToolCallMessage( $tool_name, $turn_count, $mode );
+					$messages[]         = ConversationManager::generateDuplicateToolCallMessage( $tool_name, $turn_count, $mode );
 					$duplicate_rejected = true;
 					do_action(
 						'datamachine_log',
@@ -544,10 +544,10 @@ function datamachine_build_turn_runner(
 		}
 
 		return array(
-			'messages'               => $messages,
-			'tool_execution_results' => $tool_execution_results,
-			'conversation_complete'  => $conversation_complete,
-			'completion_nudge'       => $completion_nudge ?? '',
+			'messages'                     => $messages,
+			'tool_execution_results'       => $tool_execution_results,
+			'conversation_complete'        => $conversation_complete,
+			'completion_nudge'             => $completion_nudge ?? '',
 			'duplicate_tool_call_rejected' => $duplicate_rejected,
 		);
 	};
