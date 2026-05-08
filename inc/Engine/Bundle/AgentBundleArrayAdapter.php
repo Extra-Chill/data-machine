@@ -121,7 +121,7 @@ final class AgentBundleArrayAdapter {
 				'flow_name'            => $flow['name'],
 				'flow_config'          => $flow_config,
 				'scheduling_config'    => array(
-					'enabled'   => false,
+					'enabled'   => 'manual' !== $flow['schedule'],
 					'interval'  => $flow['schedule'],
 					'max_items' => $flow['max_items'],
 				),

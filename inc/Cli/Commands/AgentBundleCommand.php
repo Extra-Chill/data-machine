@@ -831,13 +831,26 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	private function flow_payload( array $flow, string $portable_slug ): array {
+		$scheduling_policy = $this->flow_scheduling_policy( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() );
+
 		return array(
 			'portable_slug'     => $portable_slug,
 			'flow_name'         => (string) ( $flow['flow_name'] ?? '' ),
 			'flow_config'       => $this->flow_config_without_runtime_queues( is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array() ),
-			'scheduling_policy' => 'create_paused_upgrade_preserve_existing',
+			'scheduling_policy' => $scheduling_policy,
 			'queue_policy'      => 'create_seed_upgrade_preserve_existing',
 		);
+	}
+
+	private function flow_scheduling_policy( array $config ): string {
+		$interval = (string) ( $config['interval'] ?? 'manual' );
+		$enabled  = array_key_exists( 'enabled', $config ) ? false !== $config['enabled'] : 'manual' !== $interval;
+
+		if ( 'manual' === $interval || ! $enabled ) {
+			return 'create_paused_upgrade_preserve_existing';
+		}
+
+		return 'create_bundle_schedule_upgrade_preserve_existing';
 	}
 
 	private function flow_config_without_runtime_queues( array $flow_config ): array {

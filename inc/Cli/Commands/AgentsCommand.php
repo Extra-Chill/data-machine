@@ -1052,8 +1052,8 @@ class AgentsCommand extends AgentBundleCommand {
 	 * Import an agent from a portable bundle.
 	 *
 	 * Creates a new agent from a previously exported bundle. Pipelines and
-	 * flows are recreated with new IDs. Flows are imported in paused/manual
-	 * state to prevent immediate execution.
+	 * flows are recreated with new IDs. Flow scheduling follows the bundle's
+	 * reviewed schedule on create and preserves local schedules on upgrade.
 	 *
 	 * ## OPTIONS
 	 *

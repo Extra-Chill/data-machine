@@ -116,6 +116,29 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		);
 	}
 
+	public function test_import_honors_scheduled_bundle_flows_on_create(): void {
+		$bundle = $this->fixture_bundle( 'scheduled-agent' );
+		$bundle['flows'][0]['scheduling_config'] = array(
+			'enabled'  => true,
+			'interval' => 'daily',
+			'max_items' => array(
+				'mcp' => 5,
+			),
+		);
+
+		$result = $this->bundler->import( $bundle, null, $this->owner_id );
+
+		$this->assertTrue( (bool) $result['success'], 'Scheduled bundle import succeeds.' );
+
+		$agent    = $this->agents_repo->get_by_slug( 'scheduled-agent' );
+		$pipeline = $this->pipelines_repo->get_by_portable_slug( (int) $agent['agent_id'], 'static-site-pipeline' );
+		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
+
+		$this->assertSame( 'daily', $flow['scheduling_config']['interval'] ?? null, 'Importer preserves the bundle interval.' );
+		$this->assertTrue( $flow['scheduling_config']['enabled'] ?? false, 'Importer keeps scheduled bundle flows enabled.' );
+		$this->assertSame( array( 'mcp' => 5 ), $flow['scheduling_config']['max_items'] ?? null, 'Importer preserves bundle max item caps.' );
+	}
+
 	/**
 	 * The silent-partial-success regression in #1801: a failure after the agent row was claimed used
 	 * to return `success: true` with a populated agent_id summary, while the row was rolled back at
