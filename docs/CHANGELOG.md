@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.106.1] - 2026-05-08
+
+### Changed
+- run Homeboy tests on WordPress 7.0
+- Consume Agents API as plugin dependency
+
+### Fixed
+- run agents dependency tests on WordPress 7.0
+- keep PHPUnit runtime loading
+- boot after late plugin inclusion
+- initialize system tasks after ability hooks
+- register abilities after api init
+- allow bundle artifact upgrades on import
+- Fix Agents API dependency PR checks
+
 ## [0.106.0] - 2026-05-07
 
 ### Added
