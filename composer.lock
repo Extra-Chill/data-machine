@@ -820,12 +820,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "ec60bd98ce25f4d4cc4481cc08e6377a48e741b0"
+                "reference": "9d3d06a28402a66b9b74cf6b54ce90f59e4cab8a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/ec60bd98ce25f4d4cc4481cc08e6377a48e741b0",
-                "reference": "ec60bd98ce25f4d4cc4481cc08e6377a48e741b0",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/9d3d06a28402a66b9b74cf6b54ce90f59e4cab8a",
+                "reference": "9d3d06a28402a66b9b74cf6b54ce90f59e4cab8a",
                 "shasum": ""
             },
             "require": {
@@ -839,6 +839,7 @@
                     "php tests/message-envelope-smoke.php",
                     "php tests/registry-smoke.php",
                     "php tests/execution-principal-smoke.php",
+                    "php tests/effective-agent-resolver-smoke.php",
                     "php tests/caller-context-smoke.php",
                     "php tests/authorization-smoke.php",
                     "php tests/action-policy-values-smoke.php",
@@ -879,7 +880,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-05-05T01:09:16+00:00"
+            "time": "2026-05-08T14:27:01+00:00"
         },
         {
             "name": "dealerdirect/phpcodesniffer-composer-installer",

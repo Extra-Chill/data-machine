@@ -16,6 +16,7 @@ namespace DataMachine\Cli;
 
 use WP_CLI;
 use DataMachine\Core\Database\Agents\Agents;
+use DataMachine\Core\FilesRepository\DirectoryManager;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -92,6 +93,56 @@ class AgentResolver {
 	}
 
 	/**
+	 * Resolve effective agent context for agent-scoped operations.
+	 *
+	 * Explicit `--agent` remains authoritative. Without it, the Agents API
+	 * effective-agent resolver may derive the agent from the execution principal
+	 * or from a single unambiguous owner candidate. Ambiguous owner fallbacks fail
+	 * closed instead of silently selecting the first owned agent.
+	 *
+	 * @param array $assoc_args Command arguments.
+	 * @return array{agent_id: int|null, user_id: int|null, agent_slug: string|null}
+	 */
+	public static function resolveEffectiveContext( array $assoc_args ): array {
+		$explicit = self::resolveContext( $assoc_args );
+		if ( null !== $explicit['agent_id'] ) {
+			$agents_repo = new Agents();
+			$agent       = $agents_repo->get_agent( (int) $explicit['agent_id'] );
+
+			return array(
+				'agent_id'   => (int) $explicit['agent_id'],
+				'user_id'    => null !== $explicit['user_id'] ? (int) $explicit['user_id'] : null,
+				'agent_slug' => $agent ? (string) $agent['agent_slug'] : null,
+			);
+		}
+
+		$directory_manager = new DirectoryManager();
+		$user_id           = UserResolver::resolve( $assoc_args );
+		$effective_user_id = $directory_manager->get_effective_user_id( $user_id );
+
+		$agent_slug = self::resolveEffectiveAgentSlugForUser( $effective_user_id );
+		if ( '' === $agent_slug ) {
+			return array(
+				'agent_id'   => null,
+				'user_id'    => $effective_user_id,
+				'agent_slug' => null,
+			);
+		}
+
+		$agents_repo = new Agents();
+		$agent       = $agents_repo->get_by_slug( $agent_slug );
+		if ( ! $agent ) {
+			WP_CLI::error( sprintf( 'Resolved effective agent "%s" was not found.', $agent_slug ) );
+		}
+
+		return array(
+			'agent_id'   => (int) $agent['agent_id'],
+			'user_id'    => (int) $agent['owner_id'],
+			'agent_slug' => (string) $agent['agent_slug'],
+		);
+	}
+
+	/**
 	 * Build scoping input from CLI flags.
 	 *
 	 * Resolves --agent (preferred) or --user (fallback) into input
@@ -116,5 +167,41 @@ class AgentResolver {
 
 		// No scoping — return empty (show all).
 		return array();
+	}
+
+	/**
+	 * Resolve an effective agent slug for an owner using Agents API semantics.
+	 *
+	 * @param int $owner_user_id Owner WordPress user ID.
+	 * @return string Effective agent slug, or empty string when none exists.
+	 */
+	private static function resolveEffectiveAgentSlugForUser( int $owner_user_id ): string {
+		if ( ! class_exists( '\\AgentsAPI\\AI\\WP_Agent_Effective_Agent_Resolver' ) ) {
+			WP_CLI::error( 'Agents API effective agent resolver is unavailable. Update the agents-api dependency or pass --agent explicitly.' );
+		}
+
+		$agents_repo = new Agents();
+		$owned       = $agents_repo->get_all_by_owner_id( $owner_user_id );
+		$slugs       = array_values( array_filter( array_map( static fn( $agent ) => (string) ( $agent['agent_slug'] ?? '' ), $owned ) ) );
+
+		$principal_context = array();
+		if ( class_exists( '\\AgentsAPI\\AI\\WP_Agent_Execution_Principal' ) ) {
+			$principal_context['request_context'] = \AgentsAPI\AI\WP_Agent_Execution_Principal::REQUEST_CONTEXT_CLI;
+		}
+
+		try {
+			return \AgentsAPI\AI\WP_Agent_Effective_Agent_Resolver::resolve(
+				array(
+					'owner_user_id'     => $owner_user_id,
+					'owner_agent_slugs' => $slugs,
+					'resolve_principal' => true,
+					'principal_context' => $principal_context,
+				)
+			);
+		} catch ( \InvalidArgumentException $e ) {
+			WP_CLI::error( $e->getMessage() );
+		}
+
+		return '';
 	}
 }
