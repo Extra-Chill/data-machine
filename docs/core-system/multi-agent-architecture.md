@@ -214,21 +214,23 @@ Creating an agent:
 |--------|----------|-------------|------------|
 | `GET` | `/datamachine/v1/agents` | List agents (scoped by access grants for non-admins) | Logged-in user |
 | `POST` | `/datamachine/v1/agents` | Create new agent | `manage_agents` |
-| `GET` | `/datamachine/v1/agents/{agent_id}` | Get single agent with details | `manage_agents` |
-| `PUT/PATCH` | `/datamachine/v1/agents/{agent_id}` | Update agent fields | `manage_agents` |
-| `DELETE` | `/datamachine/v1/agents/{agent_id}` | Delete agent (optional `delete_files`) | `manage_agents` |
+| `GET` | `/datamachine/v1/agents/{agent_slug}` | Get single agent with details | `manage_agents` |
+| `PUT/PATCH` | `/datamachine/v1/agents/{agent_slug}` | Update agent fields | `manage_agents` |
+| `DELETE` | `/datamachine/v1/agents/{agent_slug}` | Delete agent (optional `delete_files`) | `manage_agents` |
 
 ### Access Management
 
 | Method | Endpoint | Description | Permission |
 |--------|----------|-------------|------------|
-| `GET` | `/datamachine/v1/agents/{agent_id}/access` | List access grants (enriched with user display names) | `manage_agents` |
-| `POST` | `/datamachine/v1/agents/{agent_id}/access` | Grant access (`user_id` + `role`) | `manage_agents` |
-| `DELETE` | `/datamachine/v1/agents/{agent_id}/access/{user_id}` | Revoke access (blocked for owner) | `manage_agents` |
+| `GET` | `/datamachine/v1/agents/{agent_slug}/access` | List access grants (enriched with user display names) | `manage_agents` |
+| `POST` | `/datamachine/v1/agents/{agent_slug}/access` | Grant access (`user_id` + `role`) | `manage_agents` |
+| `DELETE` | `/datamachine/v1/agents/{agent_slug}/access/{user_id}` | Revoke access (blocked for owner) | `manage_agents` |
+
+Numeric `{agent_id}` routes remain supported for compatibility, but new public integrations should use `{agent_slug}`.
 
 **List scoping:** The `GET /agents` endpoint is accessible to any logged-in user. Admins see all agents. Non-admin users only see agents they have explicit access grants for — the endpoint queries `AgentAccess::get_agent_ids_for_user()` to filter results.
 
-**Owner protection:** The `DELETE /agents/{agent_id}/access/{user_id}` endpoint prevents revoking the owner's access. Ownership must be transferred before the owner's grant can be removed.
+**Owner protection:** The `DELETE /agents/{agent_slug}/access/{user_id}` endpoint prevents revoking the owner's access. Ownership must be transferred before the owner's grant can be removed.
 
 ## CLI
 

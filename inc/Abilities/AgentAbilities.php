@@ -13,6 +13,7 @@ namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Agents\AgentBundler;
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Agents\AgentAccess;
 use DataMachine\Core\FilesRepository\DirectoryManager;
@@ -46,11 +47,18 @@ class AgentAbilities {
 					'category'            => 'datamachine-agent',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'agent_id' ),
 						'properties' => array(
+							'agent'       => array(
+								'type'        => 'string',
+								'description' => 'Agent slug or ID to export. Slugs are preferred.',
+							),
+							'agent_slug'  => array(
+								'type'        => 'string',
+								'description' => 'Agent slug to export. Prefer agent for new callers.',
+							),
 							'agent_id'    => array(
 								'type'        => 'integer',
-								'description' => 'Agent ID to export.',
+								'description' => 'Agent ID to export. Supported for compatibility; prefer agent slug.',
 							),
 							'profile'     => array(
 								'type'        => 'string',
@@ -334,11 +342,18 @@ class AgentAbilities {
 					'category'            => 'datamachine-agent',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'agent_id' ),
 						'properties' => array(
+							'agent'        => array(
+								'type'        => 'string',
+								'description' => 'Agent slug or ID to update. Slugs are preferred.',
+							),
+							'agent_slug'   => array(
+								'type'        => 'string',
+								'description' => 'Agent slug to update. Prefer agent for new callers.',
+							),
 							'agent_id'     => array(
 								'type'        => 'integer',
-								'description' => 'Agent ID to update.',
+								'description' => 'Agent ID to update. Supported for compatibility; prefer agent slug.',
 							),
 							'agent_name'   => array(
 								'type'        => 'string',
@@ -373,13 +388,17 @@ class AgentAbilities {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
+							'agent'        => array(
+								'type'        => 'string',
+								'description' => 'Agent slug or ID to delete. Slugs are preferred.',
+							),
 							'agent_slug'   => array(
 								'type'        => 'string',
-								'description' => 'Agent slug (provide this or agent_id).',
+								'description' => 'Agent slug to delete. Prefer agent for new callers.',
 							),
 							'agent_id'     => array(
 								'type'        => 'integer',
-								'description' => 'Agent ID (provide this or agent_slug).',
+								'description' => 'Agent ID to delete. Supported for compatibility; prefer agent slug.',
 							),
 							'delete_files' => array(
 								'type'        => 'boolean',
@@ -1083,20 +1102,64 @@ class AgentAbilities {
 	}
 
 	/**
+	 * Resolve public agent ability input to the internal agent ID.
+	 *
+	 * Accepts the slug-first `agent`/`agent_slug` inputs and keeps `agent_id`
+	 * working for callers that still pass the storage key.
+	 *
+	 * @param array $input Ability input.
+	 * @return int|\WP_Error Agent ID or error.
+	 */
+	private static function resolve_agent_input_id( array $input ): int|\WP_Error {
+		$context = array();
+
+		if ( isset( $input['agent'] ) && '' !== (string) $input['agent'] ) {
+			$context['agent'] = (string) $input['agent'];
+		}
+
+		if ( isset( $input['agent_slug'] ) && '' !== (string) $input['agent_slug'] ) {
+			$context['agent_slug'] = (string) $input['agent_slug'];
+		}
+
+		if ( isset( $input['agent_id'] ) && (int) $input['agent_id'] > 0 ) {
+			$context['agent_id'] = (int) $input['agent_id'];
+		}
+
+		if ( isset( $context['agent'] ) ) {
+			try {
+				$identity = ( new AgentIdentityResolver() )->resolve_agent_identity( $context['agent'] );
+				unset( $context['agent'] );
+				$context['agent_id']   = $context['agent_id'] ?? $identity->agent_id;
+				$context['agent_slug'] = $context['agent_slug'] ?? $identity->agent_slug;
+			} catch ( \InvalidArgumentException $e ) {
+				return new \WP_Error( 'agent_not_found', $e->getMessage() );
+			}
+		}
+
+		try {
+			return ( new AgentIdentityResolver() )->resolve_agent_identity( $context )->agent_id;
+		} catch ( \InvalidArgumentException $e ) {
+			return new \WP_Error( 'agent_not_found', $e->getMessage() );
+		}
+	}
+
+	/**
 	 * Get a single agent by slug or ID.
 	 *
 	 * @param array $input { agent_slug or agent_id }.
 	 * @return array Agent data or error.
 	 */
 	public static function getAgent( array $input ): array {
-		$agents_repo = new Agents();
-		$agent       = null;
-
-		if ( ! empty( $input['agent_slug'] ) ) {
-			$agent = $agents_repo->get_by_slug( sanitize_title( $input['agent_slug'] ) );
-		} elseif ( ! empty( $input['agent_id'] ) ) {
-			$agent = $agents_repo->get_agent( (int) $input['agent_id'] );
+		$agent_id = self::resolve_agent_input_id( $input );
+		if ( is_wp_error( $agent_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => $agent_id->get_error_message(),
+			);
 		}
+
+		$agents_repo = new Agents();
+		$agent       = $agents_repo->get_agent( $agent_id );
 
 		if ( ! $agent ) {
 			return array(
@@ -1142,12 +1205,11 @@ class AgentAbilities {
 	 * @return array Result with updated agent data.
 	 */
 	public static function updateAgent( array $input ): array {
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-
-		if ( $agent_id <= 0 ) {
+		$agent_id = self::resolve_agent_input_id( $input );
+		if ( is_wp_error( $agent_id ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'agent_id is required.',
+				'error'   => $agent_id->get_error_message(),
 			);
 		}
 
@@ -1314,11 +1376,11 @@ class AgentAbilities {
 	 * @return array Result.
 	 */
 	public static function exportAgent( array $input ): array {
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		if ( $agent_id <= 0 ) {
+		$agent_id = self::resolve_agent_input_id( $input );
+		if ( is_wp_error( $agent_id ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'agent_id is required.',
+				'error'   => $agent_id->get_error_message(),
 			);
 		}
 
@@ -1452,14 +1514,16 @@ class AgentAbilities {
 	 * @return array Result.
 	 */
 	public static function deleteAgent( array $input ): array {
-		$agents_repo = new Agents();
-		$agent       = null;
-
-		if ( ! empty( $input['agent_slug'] ) ) {
-			$agent = $agents_repo->get_by_slug( sanitize_title( $input['agent_slug'] ) );
-		} elseif ( ! empty( $input['agent_id'] ) ) {
-			$agent = $agents_repo->get_agent( (int) $input['agent_id'] );
+		$agent_id = self::resolve_agent_input_id( $input );
+		if ( is_wp_error( $agent_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => $agent_id->get_error_message(),
+			);
 		}
+
+		$agents_repo = new Agents();
+		$agent       = $agents_repo->get_agent( $agent_id );
 
 		if ( ! $agent ) {
 			return array(
