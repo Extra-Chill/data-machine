@@ -71,8 +71,14 @@ class FlowFormatter {
 				$primary_config = FlowStepConfig::getPrimaryHandlerConfig( $step_data );
 				$with_defaults  = $handler_abilities->applyDefaults( $effective_slug, $primary_config );
 
-				if ( FlowStepConfig::isMultiHandler( $step_data ) ) {
-					$step_data['handler_configs'][ $effective_slug ] = $with_defaults;
+				if ( FlowStepConfig::usesHandler( $step_data ) ) {
+					$handler_slugs = FlowStepConfig::getHandlerSlugs( $step_data );
+					if ( ! in_array( $effective_slug, $handler_slugs, true ) ) {
+						$handler_slugs[] = $effective_slug;
+					}
+					$step_data['handler_slugs']                          = $handler_slugs;
+					$step_data['handler_configs'][ $effective_slug ]     = $with_defaults;
+					unset( $step_data['handler_slug'], $step_data['handler_config'] );
 				} else {
 					$step_data['handler_config'] = $with_defaults;
 				}

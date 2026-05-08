@@ -103,7 +103,7 @@ assert_absent( 'handler_slug', $step0, 'system_task has no handler_slug', $failu
 assert_absent( 'handler_slugs', $step0, 'system_task has no handler_slugs', $failures, $passes );
 assert_absent( 'handler_configs', $step0, 'system_task has no handler_configs', $failures, $passes );
 
-echo "\n[2] fetch stores scalar handler_slug + handler_config:\n";
+echo "\n[2] fetch stores handler_slugs + handler_configs:\n";
 $built = build_configs_from_workflow_for_test(
 	array(
 		'steps' => array(
@@ -116,11 +116,13 @@ $built = build_configs_from_workflow_for_test(
 	)
 );
 $step0 = $built['flow_config']['ephemeral_step_0'];
-assert_equals( 'mcp', FlowStepConfig::getHandlerSlug( $step0 ), 'fetch handler slug is scalar', $failures, $passes );
+assert_equals( 'mcp', FlowStepConfig::getHandlerSlug( $step0 ), 'fetch handler slug accessor reads primary slug', $failures, $passes );
 assert_equals( array( 'mcp' ), FlowStepConfig::getConfiguredHandlerSlugs( $step0 ), 'fetch generic slug list has one slug', $failures, $passes );
 assert_equals( array( 'server' => 'a8c' ), FlowStepConfig::getPrimaryHandlerConfig( $step0 ), 'fetch config reachable', $failures, $passes );
-assert_absent( 'handler_slugs', $step0, 'fetch has no handler_slugs', $failures, $passes );
-assert_absent( 'handler_configs', $step0, 'fetch has no handler_configs', $failures, $passes );
+assert_equals( array( 'mcp' ), $step0['handler_slugs'] ?? array(), 'fetch stores plural handler_slugs', $failures, $passes );
+assert_equals( array( 'mcp' => array( 'server' => 'a8c' ) ), $step0['handler_configs'] ?? array(), 'fetch stores plural handler_configs', $failures, $passes );
+assert_absent( 'handler_slug', $step0, 'fetch has no scalar handler_slug', $failures, $passes );
+assert_absent( 'handler_config', $step0, 'fetch has no scalar handler_config', $failures, $passes );
 
 echo "\n[3] publish keeps multi-handler list shape:\n";
 $built = build_configs_from_workflow_for_test(
@@ -183,9 +185,10 @@ $fetch = FlowStepConfig::normalizeHandlerShape(
 		'handler_config' => array( 'url' => 'https://example.com/feed.xml' ),
 	)
 );
-assert_equals( 'rss', $fetch['handler_slug'] ?? null, 'fetch scalar slug preserved', $failures, $passes );
-assert_equals( array( 'url' => 'https://example.com/feed.xml' ), $fetch['handler_config'] ?? array(), 'fetch scalar config preserved', $failures, $passes );
-assert_absent( 'handler_slugs', $fetch, 'fetch plural slugs remain absent', $failures, $passes );
+assert_equals( array( 'rss' ), $fetch['handler_slugs'] ?? array(), 'fetch singular slug normalizes to plural list', $failures, $passes );
+assert_equals( array( 'rss' => array( 'url' => 'https://example.com/feed.xml' ) ), $fetch['handler_configs'] ?? array(), 'fetch singular config normalizes to plural map', $failures, $passes );
+assert_absent( 'handler_slug', $fetch, 'fetch scalar slug is removed', $failures, $passes );
+assert_absent( 'handler_config', $fetch, 'fetch scalar config is removed', $failures, $passes );
 
 $publish = FlowStepConfig::normalizeHandlerShape(
 	array(

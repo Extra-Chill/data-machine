@@ -67,7 +67,11 @@ class ConfigureFlowStepsAbility {
 							),
 							'handler_config'      => array(
 								'type'        => 'object',
-								'description' => __( 'Handler configuration to apply to all matching steps', 'data-machine' ),
+								'description' => __( 'Single handler configuration to apply to matching steps. Prefer handler_configs for new callers.', 'data-machine' ),
+							),
+							'handler_configs'     => array(
+								'type'        => 'object',
+								'description' => __( 'Canonical handler configuration map keyed by handler slug.', 'data-machine' ),
 							),
 							'flow_configs'        => array(
 								'type'        => 'array',
@@ -146,6 +150,7 @@ class ConfigureFlowStepsAbility {
 		$handler_slug        = $input['handler_slug'] ?? null;
 		$target_handler_slug = $input['target_handler_slug'] ?? null;
 		$field_map           = $input['field_map'] ?? array();
+		$handler_configs     = is_array( $input['handler_configs'] ?? null ) ? $input['handler_configs'] : array();
 		$handler_config      = $input['handler_config'] ?? array();
 		$flow_configs        = $input['flow_configs'] ?? array();
 		$user_message        = $input['user_message'] ?? null;
@@ -164,6 +169,11 @@ class ConfigureFlowStepsAbility {
 				'success' => false,
 				'error'   => "Target handler '{$target_handler_slug}' not found",
 			);
+		}
+
+		if ( empty( $handler_config ) && ! empty( $handler_configs ) ) {
+			$config_slug    = is_string( $target_handler_slug ) && '' !== $target_handler_slug ? $target_handler_slug : $handler_slug;
+			$handler_config = is_string( $config_slug ) && is_array( $handler_configs[ $config_slug ] ?? null ) ? $handler_configs[ $config_slug ] : array();
 		}
 
 		$flows = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
@@ -210,7 +220,13 @@ class ConfigureFlowStepsAbility {
 		$flow_configs_by_id = array();
 		foreach ( $flow_configs as $fc ) {
 			if ( isset( $fc['flow_id'] ) ) {
-				$flow_configs_by_id[ (int) $fc['flow_id'] ] = $fc['handler_config'] ?? array();
+				$flow_handler_configs = is_array( $fc['handler_configs'] ?? null ) ? $fc['handler_configs'] : array();
+				if ( ! empty( $flow_handler_configs ) ) {
+					$config_slug = is_string( $target_handler_slug ) && '' !== $target_handler_slug ? $target_handler_slug : $handler_slug;
+					$flow_configs_by_id[ (int) $fc['flow_id'] ] = is_string( $config_slug ) && is_array( $flow_handler_configs[ $config_slug ] ?? null ) ? $flow_handler_configs[ $config_slug ] : array();
+				} else {
+					$flow_configs_by_id[ (int) $fc['flow_id'] ] = $fc['handler_config'] ?? array();
+				}
 			}
 		}
 

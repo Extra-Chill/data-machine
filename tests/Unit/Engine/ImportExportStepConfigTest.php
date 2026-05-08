@@ -15,6 +15,7 @@ use DataMachine\Abilities\Pipeline\CreatePipelineAbility;
 use DataMachine\Abilities\PipelineStepAbilities;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Engine\Actions\ImportExport;
 use WP_UnitTestCase;
 
@@ -223,13 +224,13 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( $imported_flow_step_id, $imported_flow_config );
 		$imported_step = $imported_flow_config[ $imported_flow_step_id ];
 
-		$this->assertSame( 'rss', $imported_step['handler_slug'] );
+		$this->assertSame( array( 'rss' ), $imported_step['handler_slugs'] );
 		$this->assertSame(
 			array(
 				'feed_url'  => 'https://example.com/feed',
 				'max_items' => 25,
 			),
-			$imported_step['handler_config']
+			FlowStepConfig::getPrimaryHandlerConfig( $imported_step )
 		);
 		$this->assertTrue( $imported_step['enabled'] );
 	}

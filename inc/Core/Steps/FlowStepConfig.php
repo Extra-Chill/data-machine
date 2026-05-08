@@ -90,10 +90,10 @@ class FlowStepConfig {
 	}
 
 	/**
-	 * Return whether this step type supports multiple handlers.
+	 * Return whether this step type supports more than one handler.
 	 *
 	 * @param array $step_config Step configuration array.
-	 * @return bool True when the step stores handler_slugs as a list.
+	 * @return bool True when the step can store multiple handler slugs.
 	 */
 	public static function isMultiHandler( array $step_config ): bool {
 		$capabilities = self::getCapabilities( $step_config );
@@ -101,11 +101,11 @@ class FlowStepConfig {
 	}
 
 	/**
-	 * Get the scalar handler slug for single-handler step types.
+	 * Get the primary handler slug.
 	 *
-	 * Calling this on a multi-handler step is a contract violation: callers
-	 * that need every handler must use getHandlerSlugs(). Handler-free steps
-	 * return null.
+	 * Handler-backed steps use the same `handler_slugs` list in storage whether
+	 * they support one handler or many. This convenience accessor returns the
+	 * first configured handler for callers that operate on a primary handler.
 	 *
 	 * @param array $step_config Step configuration array.
 	 * @return string|null Handler slug, or null when not configured/applicable.
@@ -115,41 +115,20 @@ class FlowStepConfig {
 			return null;
 		}
 
-		if ( self::isMultiHandler( $step_config ) ) {
-			self::warnContractViolation( 'getHandlerSlug() called for a multi-handler step', $step_config );
-			return null;
-		}
-
-		$slug = $step_config['handler_slug'] ?? null;
-		if ( ! is_string( $slug ) || '' === $slug ) {
-			return null;
-		}
-
-		return $slug;
+		$slugs = self::getConfiguredHandlerSlugs( $step_config );
+		return $slugs[0] ?? null;
 	}
 
 	/**
-	 * Get handler slugs for multi-handler step types.
+	 * Get configured handler slugs.
 	 *
-	 * Calling this on a single-handler step is a contract violation: callers
-	 * that need the single slug must use getHandlerSlug(). Handler-free steps
-	 * return an empty array.
+	 * Handler-free steps return an empty array.
 	 *
 	 * @param array $step_config Step configuration array.
 	 * @return array<int, string> Handler slugs.
 	 */
 	public static function getHandlerSlugs( array $step_config ): array {
-		if ( ! self::usesHandler( $step_config ) ) {
-			return array();
-		}
-
-		if ( ! self::isMultiHandler( $step_config ) ) {
-			self::warnContractViolation( 'getHandlerSlugs() called for a single-handler step', $step_config );
-			return array();
-		}
-
-		$slugs = $step_config['handler_slugs'] ?? array();
-		return self::sanitizeSlugList( is_array( $slugs ) ? $slugs : array() );
+		return self::getConfiguredHandlerSlugs( $step_config );
 	}
 
 	/**
@@ -166,12 +145,12 @@ class FlowStepConfig {
 			return array();
 		}
 
-		if ( self::isMultiHandler( $step_config ) ) {
-			$slugs = $step_config['handler_slugs'] ?? array();
-			return self::sanitizeSlugList( is_array( $slugs ) ? $slugs : array() );
+		$slugs = self::sanitizeSlugList( is_array( $step_config['handler_slugs'] ?? null ) ? $step_config['handler_slugs'] : array() );
+		if ( ! empty( $slugs ) ) {
+			return $slugs;
 		}
 
-		$slug = $step_config['handler_slug'] ?? '';
+		$slug = $step_config['handler_slug'] ?? null;
 		return is_string( $slug ) && '' !== $slug ? array( $slug ) : array();
 	}
 
@@ -299,12 +278,13 @@ class FlowStepConfig {
 	 * @return array Primary handler configuration.
 	 */
 	public static function getPrimaryHandlerConfig( array $step_config ): array {
-		if ( self::isMultiHandler( $step_config ) ) {
+		if ( self::usesHandler( $step_config ) ) {
 			$slug = self::getPrimaryHandlerSlug( $step_config );
-			if ( ! empty( $slug ) && ! empty( $step_config['handler_configs'][ $slug ] ) && is_array( $step_config['handler_configs'][ $slug ] ) ) {
-				return $step_config['handler_configs'][ $slug ];
+			if ( null === $slug ) {
+				return array();
 			}
-			return array();
+
+			return self::getHandlerConfigForSlug( $step_config, $slug );
 		}
 
 		$config = $step_config['handler_config'] ?? array();
@@ -319,8 +299,14 @@ class FlowStepConfig {
 	 * @return array Handler configuration.
 	 */
 	public static function getHandlerConfigForSlug( array $step_config, string $slug ): array {
-		if ( self::isMultiHandler( $step_config ) ) {
-			$config = $step_config['handler_configs'][ $slug ] ?? array();
+		if ( self::usesHandler( $step_config ) ) {
+			$configs = is_array( $step_config['handler_configs'] ?? null ) ? $step_config['handler_configs'] : array();
+			if ( array_key_exists( $slug, $configs ) ) {
+				$config = $configs[ $slug ];
+				return is_array( $config ) ? $config : array();
+			}
+
+			$config = $slug === ( $step_config['handler_slug'] ?? null ) ? ( $step_config['handler_config'] ?? array() ) : array();
 			return is_array( $config ) ? $config : array();
 		}
 
@@ -339,9 +325,15 @@ class FlowStepConfig {
 	 * @return array<string, array> Handler/settings configs keyed by slug.
 	 */
 	public static function getHandlerConfigs( array $step_config ): array {
-		if ( self::isMultiHandler( $step_config ) ) {
-			$configs = $step_config['handler_configs'] ?? array();
-			return is_array( $configs ) ? $configs : array();
+		if ( self::usesHandler( $step_config ) ) {
+			$configs = is_array( $step_config['handler_configs'] ?? null ) ? $step_config['handler_configs'] : array();
+			foreach ( self::getConfiguredHandlerSlugs( $step_config ) as $slug ) {
+				if ( ! array_key_exists( $slug, $configs ) ) {
+					$configs[ $slug ] = self::getHandlerConfigForSlug( $step_config, $slug );
+				}
+			}
+
+			return array_filter( $configs, 'is_array' );
 		}
 
 		$slug   = self::getEffectiveSlug( $step_config );
@@ -361,9 +353,6 @@ class FlowStepConfig {
 	 */
 	public static function normalizeHandlerShape( array $step_config ): array {
 		$uses_handler = self::usesHandler( $step_config );
-		$is_multi     = self::isMultiHandler( $step_config );
-		$step_type    = $step_config['step_type'] ?? '';
-
 		$scalar_slug     = is_string( $step_config['handler_slug'] ?? null ) ? $step_config['handler_slug'] : '';
 		$scalar_config   = is_array( $step_config['handler_config'] ?? null ) ? $step_config['handler_config'] : array();
 		$handler_slugs   = self::sanitizeSlugList( is_array( $step_config['handler_slugs'] ?? null ) ? $step_config['handler_slugs'] : array() );
@@ -378,21 +367,18 @@ class FlowStepConfig {
 			return $step_config;
 		}
 
-		if ( $is_multi ) {
-			if ( ! empty( $handler_slugs ) ) {
-				$step_config['handler_slugs'] = $handler_slugs;
-			}
-			if ( ! empty( $handler_configs ) ) {
-				$step_config['handler_configs'] = $handler_configs;
-			}
-			return $step_config;
+		if ( empty( $handler_slugs ) && '' !== $scalar_slug ) {
+			$handler_slugs = array( $scalar_slug );
+		}
+		if ( '' !== $scalar_slug && ! array_key_exists( $scalar_slug, $handler_configs ) ) {
+			$handler_configs[ $scalar_slug ] = $scalar_config;
 		}
 
-		if ( '' !== $scalar_slug ) {
-			$step_config['handler_slug'] = $scalar_slug;
+		if ( ! empty( $handler_slugs ) ) {
+			$step_config['handler_slugs'] = $handler_slugs;
 		}
-		if ( ! empty( $scalar_config ) || '' !== $scalar_slug ) {
-			$step_config['handler_config'] = $scalar_config;
+		if ( ! empty( $handler_configs ) ) {
+			$step_config['handler_configs'] = array_filter( $handler_configs, 'is_array' );
 		}
 		return $step_config;
 	}
