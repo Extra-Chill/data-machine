@@ -17,11 +17,12 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Abilities\PermissionHelper;
 
 class AgentDailyMemory extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'agent_daily_memory', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'abilities' => array( 'datamachine/daily-memory-read', 'datamachine/daily-memory-write', 'datamachine/daily-memory-list', 'datamachine/search-daily-memory' ) ) );
+		$this->registerTool( 'agent_daily_memory', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline_policy' ), array( 'abilities' => array( 'datamachine/daily-memory-read', 'datamachine/daily-memory-write', 'datamachine/daily-memory-list', 'datamachine/search-daily-memory' ) ) );
 	}
 
 	/**
@@ -54,7 +55,7 @@ class AgentDailyMemory extends BaseTool {
 	 */
 	private function handleRead( array $parameters ): array {
 		$ability = wp_get_ability( 'datamachine/daily-memory-read' );
-		$user_id = $this->resolve_user_id( $parameters );
+		$scope   = $this->resolve_scope( $parameters );
 
 		if ( ! $ability ) {
 			return $this->buildErrorResponse(
@@ -65,8 +66,9 @@ class AgentDailyMemory extends BaseTool {
 
 		$result = $ability->execute(
 			array(
-				'user_id' => $user_id,
-				'date'    => $parameters['date'] ?? gmdate( 'Y-m-d' ),
+				'user_id'  => $scope['user_id'],
+				'agent_id' => $scope['agent_id'],
+				'date'     => $parameters['date'] ?? gmdate( 'Y-m-d' ),
 			)
 		);
 
@@ -96,7 +98,7 @@ class AgentDailyMemory extends BaseTool {
 	 */
 	private function handleWrite( array $parameters ): array {
 		$content = $parameters['content'] ?? '';
-		$user_id = $this->resolve_user_id( $parameters );
+		$scope   = $this->resolve_scope( $parameters );
 
 		if ( '' === $content ) {
 			return $this->buildErrorResponse(
@@ -116,10 +118,11 @@ class AgentDailyMemory extends BaseTool {
 
 		$result = $ability->execute(
 			array(
-				'user_id' => $user_id,
-				'content' => $content,
-				'date'    => $parameters['date'] ?? gmdate( 'Y-m-d' ),
-				'mode'    => $parameters['mode'] ?? 'append',
+				'user_id'  => $scope['user_id'],
+				'agent_id' => $scope['agent_id'],
+				'content'  => $content,
+				'date'     => $parameters['date'] ?? gmdate( 'Y-m-d' ),
+				'mode'     => $parameters['mode'] ?? 'append',
 			)
 		);
 
@@ -148,7 +151,7 @@ class AgentDailyMemory extends BaseTool {
 	 */
 	private function handleList( array $parameters = array() ): array {
 		$ability = wp_get_ability( 'datamachine/daily-memory-list' );
-		$user_id = $this->resolve_user_id( $parameters );
+		$scope   = $this->resolve_scope( $parameters );
 
 		if ( ! $ability ) {
 			return $this->buildErrorResponse(
@@ -157,7 +160,7 @@ class AgentDailyMemory extends BaseTool {
 			);
 		}
 
-		$result = $ability->execute( array( 'user_id' => $user_id ) );
+		$result = $ability->execute( $scope );
 
 		if ( is_wp_error( $result ) ) {
 			return $this->buildErrorResponse( $result->get_error_message(), 'agent_daily_memory' );
@@ -185,7 +188,7 @@ class AgentDailyMemory extends BaseTool {
 	 */
 	private function handleSearch( array $parameters ): array {
 		$query   = $parameters['query'] ?? '';
-		$user_id = $this->resolve_user_id( $parameters );
+		$scope   = $this->resolve_scope( $parameters );
 
 		if ( '' === $query ) {
 			return $this->buildErrorResponse(
@@ -205,10 +208,11 @@ class AgentDailyMemory extends BaseTool {
 
 		$result = $ability->execute(
 			array(
-				'user_id' => $user_id,
-				'query'   => $query,
-				'from'    => $parameters['from'] ?? null,
-				'to'      => $parameters['to'] ?? null,
+				'user_id'  => $scope['user_id'],
+				'agent_id' => $scope['agent_id'],
+				'query'    => $query,
+				'from'     => $parameters['from'] ?? null,
+				'to'       => $parameters['to'] ?? null,
 			)
 		);
 
@@ -287,25 +291,42 @@ class AgentDailyMemory extends BaseTool {
 	}
 
 	/**
-	 * Resolve scoped user ID from tool parameters.
+	 * Resolve scoped memory identifiers from execution context.
 	 *
 	 * @param array $parameters Tool parameters.
-	 * @return int
+	 * @return array{user_id: int, agent_id: int}
 	 */
-	private function resolve_user_id( array $parameters ): int {
+	private function resolve_scope( array $parameters ): array {
 		$directory_manager = new DirectoryManager();
+
+		if ( PermissionHelper::in_agent_context() ) {
+			return array(
+				'user_id'  => $directory_manager->get_effective_user_id( PermissionHelper::acting_user_id() ),
+				'agent_id' => (int) PermissionHelper::get_acting_agent_id(),
+			);
+		}
+
 		$raw_user_id       = (int) ( $parameters['user_id'] ?? 0 );
 
 		if ( $raw_user_id > 0 ) {
-			return $directory_manager->get_effective_user_id( $raw_user_id );
+			return array(
+				'user_id'  => $directory_manager->get_effective_user_id( $raw_user_id ),
+				'agent_id' => 0,
+			);
 		}
 
 		$current_user_id = get_current_user_id();
 		if ( $current_user_id > 0 ) {
-			return $directory_manager->get_effective_user_id( $current_user_id );
+			return array(
+				'user_id'  => $directory_manager->get_effective_user_id( $current_user_id ),
+				'agent_id' => 0,
+			);
 		}
 
-		return $directory_manager->get_effective_user_id( 0 );
+		return array(
+			'user_id'  => $directory_manager->get_effective_user_id( 0 ),
+			'agent_id' => 0,
+		);
 	}
 
 	/**
