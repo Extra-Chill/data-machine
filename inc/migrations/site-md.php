@@ -8,15 +8,6 @@
  * handled generically by ComposableFileGenerator + ComposableFileInvalidation;
  * this file owns the *content* of the core sections only.
  *
- * Migration history:
- * - 0.36.1 — initial SiteContext class injecting JSON into prompts.
- * - 0.48.0 — replaced with monolithic SITE.md/NETWORK.md generators and a
- *            single whole-string filter per file.
- * - x.y.z  — files made composable; monolithic generators broken into
- *            per-section callbacks. Legacy whole-string filters preserved
- *            via `datamachine_composable_content` shim with a deprecation
- *            notice.
- *
  * @package DataMachine
  * @since   0.60.0
  */
@@ -97,59 +88,6 @@ function datamachine_register_core_invalidation_hooks( array $hooks ): array {
 	return $hooks;
 }
 add_filter( 'datamachine_composable_invalidation_hooks', 'datamachine_register_core_invalidation_hooks' );
-
-/**
- * Soft-deprecation shim for the legacy whole-string filters.
- *
- * `datamachine_site_scaffold_content` and `datamachine_network_scaffold_content`
- * are superseded by `SectionRegistry::register()`. To minimize breakage, we
- * still fire them on the assembled output of SITE.md / NETWORK.md so existing
- * consumers keep working, but emit a `_doing_it_wrong` notice when a callback
- * is attached so consumers know to migrate.
- *
- * Will be removed in a future major version.
- *
- * @since x.y.z
- *
- * @param string $content  Assembled file content.
- * @param string $filename Composable filename.
- * @return string
- */
-function datamachine_legacy_scaffold_filter_shim( string $content, string $filename ): string {
-	$legacy_filter = '';
-	$replacement   = '';
-
-	if ( 'SITE.md' === $filename ) {
-		$legacy_filter = 'datamachine_site_scaffold_content';
-		$replacement   = "SectionRegistry::register( 'SITE.md', '<your-slug>', <priority>, <callback> )";
-	} elseif ( 'NETWORK.md' === $filename ) {
-		$legacy_filter = 'datamachine_network_scaffold_content';
-		$replacement   = "SectionRegistry::register( 'NETWORK.md', '<your-slug>', <priority>, <callback> )";
-	}
-
-	if ( '' === $legacy_filter ) {
-		return $content;
-	}
-
-	if ( has_filter( $legacy_filter ) ) {
-		_doing_it_wrong(
-			esc_html( $legacy_filter ),
-			sprintf(
-				/* translators: 1: legacy filter name, 2: replacement code snippet */
-				esc_html__( 'The %1$s filter is deprecated. Register a SectionRegistry section instead: %2$s', 'data-machine' ),
-				esc_html( $legacy_filter ),
-				esc_html( $replacement )
-			),
-			'x.y.z'
-		);
-
-		/** This filter is documented in inc/migrations/site-md.php (legacy). */
-		$content = (string) apply_filters( $legacy_filter, $content );
-	}
-
-	return $content;
-}
-add_filter( 'datamachine_composable_content', 'datamachine_legacy_scaffold_filter_shim', 10, 2 );
 
 // -----------------------------------------------------------------------------
 // SITE.md sections.
@@ -664,79 +602,4 @@ function datamachine_network_section_shared_resources(): string {
 	$lines[] = '- **Media:** per-site uploads';
 
 	return implode( "\n", $lines );
-}
-
-// -----------------------------------------------------------------------------
-// Backwards-compat shims for callers that still build SITE.md / NETWORK.md
-// content directly (activation, layered-architecture migration, network-scope
-// migration). These delegate to ComposableFileGenerator and remain available
-// so external callers don't break across the migration.
-// -----------------------------------------------------------------------------
-
-/**
- * Build SITE.md content via the SectionRegistry.
- *
- * Preserved for backwards compatibility with any external callers that
- * imported the legacy function. Internal callers should use
- * `\DataMachine\Engine\AI\SectionRegistry::generate( 'SITE.md' )` directly.
- *
- * @since 0.36.1
- * @since x.y.z Delegates to SectionRegistry. The whole-string filter
- *              `datamachine_site_scaffold_content` is now applied via the
- *              `datamachine_composable_content` shim and emits a deprecation
- *              notice when used.
- * @return string
- */
-function datamachine_get_site_scaffold_content(): string {
-	$content = SectionRegistry::generate( 'SITE.md' );
-	return '' === $content ? '' : $content . "\n";
-}
-
-/**
- * Build NETWORK.md content via the SectionRegistry.
- *
- * Preserved for backwards compatibility. Returns an empty string on
- * single-site installs (every NETWORK.md section short-circuits there).
- *
- * @since 0.48.0
- * @since x.y.z Delegates to SectionRegistry.
- * @return string
- */
-function datamachine_get_network_scaffold_content(): string {
-	if ( ! is_multisite() ) {
-		return '';
-	}
-	$content = SectionRegistry::generate( 'NETWORK.md' );
-	return '' === $content ? '' : $content . "\n";
-}
-
-/**
- * Regenerate SITE.md on disk.
- *
- * @since 0.48.0
- * @since x.y.z Delegates to ComposableFileGenerator.
- * @return void
- */
-function datamachine_regenerate_site_md(): void {
-	if ( ! \DataMachine\Core\PluginSettings::get( 'site_context_enabled', true ) ) {
-		return;
-	}
-	\DataMachine\Engine\AI\ComposableFileGenerator::regenerate( 'SITE.md' );
-}
-
-/**
- * Regenerate NETWORK.md on disk.
- *
- * @since 0.49.1
- * @since x.y.z Delegates to ComposableFileGenerator.
- * @return void
- */
-function datamachine_regenerate_network_md(): void {
-	if ( ! is_multisite() ) {
-		return;
-	}
-	if ( ! \DataMachine\Core\PluginSettings::get( 'site_context_enabled', true ) ) {
-		return;
-	}
-	\DataMachine\Engine\AI\ComposableFileGenerator::regenerate( 'NETWORK.md' );
 }

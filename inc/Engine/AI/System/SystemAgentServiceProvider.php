@@ -8,7 +8,7 @@
  *
  * @package DataMachine\Engine\AI\System
  * @since 0.22.4
- * @since 0.72.0 Removed datamachine_task_handle; all scheduling routes through execute-workflow.
+ * @since 0.72.0
  */
 
 namespace DataMachine\Engine\AI\System;
@@ -39,36 +39,6 @@ use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachine\Engine\Tasks\TaskScheduler;
 
 class SystemAgentServiceProvider {
-
-	/**
-	 * Legacy Action Scheduler hook for daily memory generation.
-	 *
-	 * Used solely to unschedule stale AS actions queued under the old name.
-	 */
-	private const LEGACY_DAILY_MEMORY_HOOK = 'datamachine_system_agent_daily_memory';
-
-	/**
-	 * Legacy task handle hook — unschedule on upgrade.
-	 *
-	 * @since 0.72.0
-	 */
-	private const LEGACY_TASK_HANDLE_HOOK = 'datamachine_task_handle';
-
-	/**
-	 * Legacy retention hooks replaced by retention SystemTasks.
-	 *
-	 * @var array<int, array{0:string,1:string}>
-	 */
-	private const LEGACY_RETENTION_HOOKS = array(
-		array( 'datamachine_cleanup_stale_claims', 'datamachine-maintenance' ),
-		array( 'datamachine_cleanup_failed_jobs', 'datamachine-maintenance' ),
-		array( 'datamachine_cleanup_completed_jobs', 'datamachine-maintenance' ),
-		array( 'datamachine_cleanup_logs', 'datamachine-maintenance' ),
-		array( 'datamachine_cleanup_processed_items', 'datamachine-maintenance' ),
-		array( 'datamachine_cleanup_as_actions', 'datamachine-maintenance' ),
-		array( 'datamachine_cleanup_old_files', 'datamachine-files' ),
-		array( 'datamachine_cleanup_chat_sessions', 'datamachine-chat' ),
-	);
 
 	/**
 	 * Constructor - registers all task infrastructure.
@@ -255,16 +225,13 @@ class SystemAgentServiceProvider {
 	/**
 	 * Register Action Scheduler hooks.
 	 *
-	 * Post-migration hooks:
+	 * Hooks:
 	 *   - datamachine_task_process_batch  → process batch chunks
 	 *   - datamachine_task_retry          → retry polling tasks (e.g. image generation)
 	 *   - datamachine_system_agent_set_featured_image → deferred featured image
 	 *   - datamachine_recurring_<task>    → per-schedule ticks via TaskScheduler
 	 *
-	 * The legacy datamachine_task_handle hook is no longer registered.
-	 * All task scheduling routes through datamachine/execute-workflow.
-	 *
-	 * @since 0.72.0 Removed datamachine_task_handle; added datamachine_task_retry.
+	 * @since 0.72.0
 	 */
 	private function registerActionSchedulerHooks(): void {
 		add_action( 'datamachine_task_process_batch', array( $this, 'handleBatchChunk' ) );
@@ -348,26 +315,11 @@ class SystemAgentServiceProvider {
 	/**
 	 * Reconcile all registered recurring schedules with Action Scheduler.
 	 *
-	 * Also cleans up legacy hooks from pre-migration versions.
-	 *
 	 * @since 0.71.0
-	 * @since 0.72.0 Also unschedules legacy datamachine_task_handle.
 	 */
 	public function manageRecurringTaskSchedules(): void {
 		if ( function_exists( 'wp_installing' ) && wp_installing() ) {
 			return;
-		}
-
-		// Upgrade cleanup: strip legacy hooks.
-		RecurringScheduler::unschedule( self::LEGACY_DAILY_MEMORY_HOOK, array() );
-
-		// Unschedule any orphaned datamachine_task_handle actions from pre-0.72.0.
-		if ( function_exists( 'as_unschedule_all_actions' ) ) {
-			as_unschedule_all_actions( self::LEGACY_TASK_HANDLE_HOOK );
-
-			foreach ( self::LEGACY_RETENTION_HOOKS as $legacy_hook ) {
-				as_unschedule_all_actions( $legacy_hook[0], array(), $legacy_hook[1] );
-			}
 		}
 
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {

@@ -6,8 +6,7 @@
  *
  * Verifies the parent_job_id resolution logic that gates whether
  * children land linked to the original caller (so SystemTask::undo can
- * walk them via Jobs::get_children) or fall through to the legacy
- * unlinked behaviour.
+ * walk them via Jobs::get_children) or remain grouped under the batch parent.
  *
  * Three resolution paths in production:
  *
@@ -109,7 +108,7 @@ $resolved = resolve_small_batch_parent_id( $context );
 dm_assert( 64 === $resolved, 'small-batch path resolves caller parent_job_id from context' );
 
 // -----------------------------------------------------------------
-echo "\n[2] small batch without parent_job_id → resolves to 0 (legacy unlinked)\n";
+echo "\n[2] small batch without parent_job_id → resolves to 0\n";
 $context  = array( 'agent_id' => 2 );
 $resolved = resolve_small_batch_parent_id( $context );
 dm_assert( 0 === $resolved, 'no parent_job_id in context → 0 (no link)' );
@@ -166,10 +165,10 @@ dm_assert( 100 === $resolved, 'children chain to batch parent when caller did no
 echo "\n[9] large batch chunk — missing caller_parent_job_id key → falls back to batch_parent\n";
 $extra = array(
 	'task_type' => 'alt_text',
-	// no caller_parent_job_id key at all (legacy in-flight chunk).
+	// no caller_parent_job_id key at all.
 );
 $resolved = resolve_chunk_child_parent_id( $extra, 100 );
-dm_assert( 100 === $resolved, 'missing caller_parent_job_id key → batch parent (legacy compat)' );
+dm_assert( 100 === $resolved, 'missing caller_parent_job_id key → batch parent' );
 
 // -----------------------------------------------------------------
 echo "\n[10] ExecuteWorkflowAbility — parent_job_id from initial_data → create_args\n";

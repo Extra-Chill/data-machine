@@ -22,7 +22,7 @@ use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
-use DataMachine\Engine\Bundle\AgentBundleLegacyAdapter;
+use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
@@ -87,7 +87,7 @@ class AgentBundler {
 		}
 
 		$agent                         = is_array( $result['agent'] ?? null ) ? $result['agent'] : array();
-		$bundle                        = AgentBundleLegacyAdapter::to_legacy_bundle( $directory );
+		$bundle                        = AgentBundleArrayAdapter::to_array_bundle( $directory );
 		$bundle['abilities_manifest']  = $this->collect_abilities_manifest();
 		$bundle['agent']['site_scope'] = (string) ( $agent['site_scope'] ?? 'site' );
 
@@ -302,7 +302,7 @@ class AgentBundler {
 	 * @return \WP_Agent_Package
 	 */
 	public static function package_from_bundle( array $bundle ): \WP_Agent_Package {
-		return AgentPackageProjection::from_legacy_bundle( $bundle );
+		return AgentPackageProjection::from_array_bundle( $bundle );
 	}
 
 	/**
@@ -1649,7 +1649,7 @@ class AgentBundler {
 	 */
 	public function to_directory( array $bundle, string $directory ): bool {
 		try {
-			AgentBundleLegacyAdapter::from_legacy_bundle( $bundle )->write( $directory );
+			AgentBundleArrayAdapter::from_array_bundle( $bundle )->write( $directory );
 			return true;
 		} catch ( \Throwable $e ) {
 			return false;
@@ -1664,7 +1664,7 @@ class AgentBundler {
 	 */
 	public function from_directory( string $directory ): ?array {
 		try {
-			return AgentBundleLegacyAdapter::to_legacy_bundle( AgentBundleDirectory::read( $directory ) );
+			return AgentBundleArrayAdapter::to_array_bundle( AgentBundleDirectory::read( $directory ) );
 		} catch ( BundleValidationException $e ) {
 			unset( $e );
 			// Fall through to the legacy monolithic manifest reader for old exports.

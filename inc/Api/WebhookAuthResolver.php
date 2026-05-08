@@ -9,10 +9,6 @@
  *   scheduling_config[ 'webhook_auth' ]      = <template config>
  *   scheduling_config[ 'webhook_secrets' ]   = [ [...], ... ]
  *
- * Legacy v1 flows (`webhook_auth_mode = hmac_sha256` + `webhook_signature_*`
- * + singular `webhook_secret`) are normalized by the schema migration chain
- * before runtime webhook code reads them.
- *
  * No provider names live in this file.
  *
  * @package DataMachine\Api

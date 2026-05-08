@@ -3,7 +3,7 @@
  * Generic AI tool execution core.
  *
  * Handles the tool definition lookup, required-parameter validation, parameter
- * assembly, and direct ability/legacy tool execution. Data Machine product
+ * assembly, and direct ability/class-method tool execution. Data Machine product
  * decorators such as action staging and post-origin tracking stay in
  * ToolExecutor.
  *
@@ -76,7 +76,7 @@ class ToolExecutionCore {
 			return $this->executeAbilityTool( $tool_name, $parameters, $tool_def );
 		}
 
-		return $this->executeLegacyTool( $tool_name, $parameters, $tool_def );
+		return $this->executeClassMethodTool( $tool_name, $parameters, $tool_def );
 	}
 
 	/**
@@ -217,14 +217,14 @@ class ToolExecutionCore {
 	}
 
 	/**
-	 * Execute a legacy class/method tool definition.
+	 * Execute a class/method tool definition.
 	 *
 	 * @param string $tool_name  Tool name.
 	 * @param array  $parameters Complete tool parameters.
 	 * @param array  $tool_def   Tool definition.
 	 * @return array Tool execution result.
 	 */
-	private function executeLegacyTool( string $tool_name, array $parameters, array $tool_def ): array {
+	private function executeClassMethodTool( string $tool_name, array $parameters, array $tool_def ): array {
 		if ( ! isset( $tool_def['class'] ) || empty( $tool_def['class'] ) ) {
 			return array(
 				'success'   => false,

@@ -217,7 +217,7 @@ datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\W
 datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action && null !== $stored->get_expires_at(), 'transient fallback preserves expiration audit data', $failures, $passes );
 
 $legacy_action_id = \DataMachine\Engine\AI\Actions\PendingActionStore::generate_id();
-$legacy_payload   = array(
+$product_payload  = array(
 	'action_id'    => $legacy_action_id,
 	'kind'         => 'legacy_smoke',
 	'summary'      => 'Legacy smoke',
@@ -227,7 +227,7 @@ $legacy_payload   = array(
 	'expires_at'   => time() + 10,
 );
 
-datamachine_pending_actions_assert( \DataMachine\Engine\AI\Actions\PendingActionStore::store( $legacy_action_id, $legacy_payload ), 'legacy Data Machine payload arrays still read through the product payload API', $failures, $passes );
+datamachine_pending_actions_assert( \DataMachine\Engine\AI\Actions\PendingActionStore::store( $legacy_action_id, $product_payload ), 'Data Machine payload arrays read through the product payload API', $failures, $passes );
 
 $legacy_stored = $store->get( $legacy_action_id );
 datamachine_pending_actions_assert( $legacy_stored instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action, 'legacy Data Machine payload arrays normalize to WP_Agent_Pending_Action value objects', $failures, $passes );

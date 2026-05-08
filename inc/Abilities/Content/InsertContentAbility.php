@@ -146,6 +146,8 @@ class InsertContentAbility {
 	 * @return array Result.
 	 */
 	public static function handleChatToolCall( array $params, array $tool_def = array() ): array {
+		unset( $tool_def );
+
 		return self::execute( $params );
 	}
 
@@ -317,6 +319,8 @@ class InsertContentAbility {
 			array(
 				'success'         => true,
 				'is_preview'      => true,
+				'kind'            => 'insert_content',
+				'preview'         => $diff,
 				'post_id'         => $post_id,
 				'position'        => $position,
 				'insertion_point' => $insertion_point,

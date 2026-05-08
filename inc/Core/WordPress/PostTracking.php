@@ -23,9 +23,7 @@
  *               tools receive the same origin meta as handler tools
  *               (#1084).
  * @since 0.69.1 Dropped redundant pipeline_id post meta — derivable from
- *               flow_id via the flows table (#1091). Existing legacy rows
- *               are cleared by the datamachine_drop_redundant_post_pipeline_meta
- *               migration.
+ *               flow_id via the flows table (#1091).
  */
 
 namespace DataMachine\Core\WordPress;

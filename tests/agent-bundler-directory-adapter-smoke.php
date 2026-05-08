@@ -38,7 +38,7 @@ if ( ! function_exists( 'add_action' ) ) {
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
-use DataMachine\Engine\Bundle\AgentBundleLegacyAdapter;
+use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 
 $failures = array();
 $passes   = 0;
@@ -74,7 +74,7 @@ function rm_adapter_tree( string $path ): void {
 
 echo "=== AgentBundler Directory Adapter Smoke (#1501) ===\n";
 
-$legacy_bundle = array(
+$array_bundle = array(
 	'bundle_version' => 1,
 	'exported_at'    => '2026-04-28T12:00:00Z',
 	'agent'          => array(
@@ -168,7 +168,7 @@ $legacy_bundle = array(
 );
 
 echo "\n[1] Legacy bundle converts to value-object directory documents\n";
-$directory = AgentBundleLegacyAdapter::from_legacy_bundle( $legacy_bundle );
+$directory = AgentBundleArrayAdapter::from_array_bundle( $array_bundle );
 $manifest  = $directory->manifest()->to_array();
 $pipeline  = $directory->pipelines()[0]->to_array();
 $flow      = $directory->flows()[0]->to_array();
@@ -205,7 +205,7 @@ assert_adapter( 'flow JSON written by portable slug', is_file( $tmp . '/flows/pr
 assert_adapter( 'agent memory written under memory/agent', is_file( $tmp . '/memory/agent/SOUL.md' ) );
 
 $read_directory = AgentBundleDirectory::read( $tmp );
-$round_trip     = AgentBundleLegacyAdapter::to_legacy_bundle( $read_directory );
+$round_trip     = AgentBundleArrayAdapter::to_array_bundle( $read_directory );
 $round_flow     = $round_trip['flows'][0];
 $round_steps    = array_values( $round_flow['flow_config'] );
 
@@ -236,12 +236,12 @@ assert_adapter_equals( 'round-trip preserves scheduling interval', 'hourly', $ro
 echo "\n[3] AgentBundler directory methods route through the adapter\n";
 $agent_bundler_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Agents/AgentBundler.php' ) ?: '';
 assert_adapter( 'export builds AgentBundleDirectory value objects first', false !== strpos( $agent_bundler_source, 'public function export_directory_object' ) );
-assert_adapter( 'export adapts value-object directory back to legacy compatibility array', false !== strpos( $agent_bundler_source, 'AgentBundleLegacyAdapter::to_legacy_bundle( $directory )' ) );
+assert_adapter( 'export adapts value-object directory back to bundle array', false !== strpos( $agent_bundler_source, 'AgentBundleArrayAdapter::to_array_bundle( $directory )' ) );
 assert_adapter( 'export composes AgentBundleManifest directly', false !== strpos( $agent_bundler_source, 'new AgentBundleManifest' ) );
 assert_adapter( 'export composes AgentBundlePipelineFile directly', false !== strpos( $agent_bundler_source, 'new AgentBundlePipelineFile' ) );
 assert_adapter( 'export composes AgentBundleFlowFile directly', false !== strpos( $agent_bundler_source, 'new AgentBundleFlowFile' ) );
-assert_adapter( 'to_directory writes AgentBundleLegacyAdapter output', false !== strpos( $agent_bundler_source, 'AgentBundleLegacyAdapter::from_legacy_bundle( $bundle )->write( $directory )' ) );
-assert_adapter( 'from_directory reads AgentBundleDirectory before legacy fallback', false !== strpos( $agent_bundler_source, 'AgentBundleLegacyAdapter::to_legacy_bundle( AgentBundleDirectory::read( $directory ) )' ) );
+assert_adapter( 'to_directory writes AgentBundleArrayAdapter output', false !== strpos( $agent_bundler_source, 'AgentBundleArrayAdapter::from_array_bundle( $bundle )->write( $directory )' ) );
+assert_adapter( 'from_directory reads AgentBundleDirectory before array fallback', false !== strpos( $agent_bundler_source, 'AgentBundleArrayAdapter::to_array_bundle( AgentBundleDirectory::read( $directory ) )' ) );
 
 rm_adapter_tree( $tmp );
 

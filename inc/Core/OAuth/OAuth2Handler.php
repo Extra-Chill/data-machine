@@ -66,10 +66,12 @@ class OAuth2Handler {
 			$serialized_size = strlen( maybe_serialize( $payload ) );
 			if ( $serialized_size > self::MAX_PAYLOAD_SIZE ) {
 				throw new \InvalidArgumentException(
-					sprintf(
-						'OAuth state payload exceeds maximum size (%d bytes > %d bytes).',
-						$serialized_size,
-						self::MAX_PAYLOAD_SIZE
+					esc_html(
+						sprintf(
+							'OAuth state payload exceeds maximum size (%d bytes > %d bytes).',
+							$serialized_size,
+							self::MAX_PAYLOAD_SIZE
+						)
 					)
 				);
 			}
@@ -104,10 +106,6 @@ class OAuth2Handler {
 	 * Returns the caller-defined payload array on success, or false on failure.
 	 * The transient is consumed (deleted) on successful verification.
 	 *
-	 * Backward-compatible: legacy plain-string transients (from in-flight
-	 * authorizations during the deploy window) are handled gracefully —
-	 * they verify correctly and return an empty payload array.
-	 *
 	 * IMPORTANT: The return type changed from `bool` to `array|false`.
 	 * Callers MUST use `false !== $oauth2->verify_state(...)` instead of
 	 * the previous `if ( $oauth2->verify_state(...) )` pattern, because
@@ -133,18 +131,6 @@ class OAuth2Handler {
 			return false;
 		}
 
-		// Backward compat: legacy plain-string state (pre-payload era).
-		if ( is_string( $record ) ) {
-			if ( hash_equals( $record, $state ) ) {
-				delete_transient( "datamachine_{$provider_key}_oauth_state" );
-				$this->log_state_verification( $provider_key, true );
-				return array();
-			}
-			$this->log_state_verification( $provider_key, false );
-			return false;
-		}
-
-		// New structured record format.
 		if ( ! is_array( $record ) || empty( $record['nonce'] ) ) {
 			$this->log_state_verification( $provider_key, false );
 			return false;
@@ -263,6 +249,7 @@ class OAuth2Handler {
 	 * @return string Base64url-encoded string.
 	 */
 	private function base64url_encode( string $data ): string {
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- OAuth PKCE/state requires RFC 4648 base64url encoding.
 		return rtrim( strtr( base64_encode( $data ), '+/', '-_' ), '=' );
 	}
 
@@ -775,5 +762,4 @@ class OAuth2Handler {
 
 		return $token_data;
 	}
-
 }

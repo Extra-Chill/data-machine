@@ -48,7 +48,7 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 
 		if ( empty( $this->configured_handlers ) ) {
 			return WP_Agent_Conversation_Completion_Decision::complete(
-				'AIConversationLoop: Handler tool executed (legacy mode), ending conversation',
+				'AIConversationLoop: Handler tool executed without configured handler list, ending conversation',
 				array(
 					'tool_name'  => $tool_name,
 					'turn_count' => $turn_count,

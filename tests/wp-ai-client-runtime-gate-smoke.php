@@ -123,7 +123,7 @@ add_filter(
 		return array(
 			'success' => true,
 			'data'    => array(
-				'content'    => 'legacy fallback should not run',
+				'content'    => 'removed provider fallback should not run',
 				'tool_calls' => array(),
 			),
 		);

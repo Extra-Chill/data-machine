@@ -26,7 +26,7 @@
  *   )
  *
 	 * Uses durable WordPress database storage in normal runtime. Pure-PHP smoke
-	 * tests and pre-table boot can still fall back to the legacy transient path.
+	 * tests and pre-table boot can still fall back to transient storage.
  *
  * @package DataMachine\Engine\AI\Actions
  * @since   0.72.0
@@ -554,7 +554,7 @@ class PendingActionStore {
 	}
 
 	/**
-	 * Convert a DB row to the legacy plus durable public payload shape.
+	 * Convert a DB row to the public pending-action payload shape.
 	 */
 	private static function row_to_payload( array $row ): array {
 		$created_at = self::mysql_to_timestamp( (string) ( $row['created_at'] ?? '' ) );
@@ -565,7 +565,6 @@ class PendingActionStore {
 			'kind'                => (string) ( $row['kind'] ?? '' ),
 			'summary'             => (string) ( $row['summary'] ?? '' ),
 			'preview_data'        => self::decode_json( $row['preview_data'] ?? null ),
-			'preview'             => self::decode_json( $row['preview_data'] ?? null ),
 			'apply_input'         => self::decode_json( $row['apply_input'] ?? null ),
 			'agent_id'            => isset( $row['agent_id'] ) ? (int) $row['agent_id'] : 0,
 			'agent'               => isset( $row['agent'] ) ? (string) $row['agent'] : null,

@@ -5,23 +5,10 @@
  *
  * Tools that opt into WP_Agent_Action_Policy should never hand-roll the store/envelope
  * shape. Call PendingActionHelper::stage() from the 'preview' branch of the
- * tool handler and return its result directly. The AI sees a standardized
- * envelope that tells it to show the preview to the user and wait for
- * confirmation.
- *
- * Envelope shape returned to the AI:
- *
- *   array(
- *       'staged'         => true,
- *       'action_id'      => 'act_abc123',
- *       'kind'           => 'socials_publish_instagram',
- *       'summary'        => 'Post to Instagram: "NEW EP 🎸"',
- *       'preview'        => array( ... preview_data ... ),
- *       'resolve_with'   => 'resolve_pending_action',
- *       'resolve_params' => array( 'action_id' => 'act_abc123', 'decision' => 'accepted'|'rejected' ),
- *       'instruction'    => 'Show the preview to the user and wait for confirmation. Do not auto-accept.',
- *       'expires_at'     => <unix ts>,
- *   )
+ * tool handler and return its result directly. The AI sees the Agents API
+ * approval-required envelope: read pending_action.action_id and call
+ * `resolve_pending_action` with `accepted` or `rejected` once the user
+ * decides.
  *
  * @package DataMachine\Engine\AI\Actions
  * @since   0.72.0
@@ -39,8 +26,10 @@ class PendingActionHelper {
 	/**
 	 * Stage a tool invocation for user approval.
 	 *
-	 * The returned value is an Agents API approval_required envelope with the
-	 * legacy staged-action fields mirrored at the top level for existing clients.
+	 * The returned value is an Agents API approval_required envelope. The
+	 * envelope payload carries a `pending_action` value object plus the
+	 * `resolve_with` / `resolve_params` directives the AI uses to confirm
+	 * or reject the invocation.
 	 *
 	 * @param array $args {
 	 *     Staging arguments.
@@ -62,7 +51,8 @@ class PendingActionHelper {
 	 *     @type int|null $user_id      Optional. Acting user ID (defaults to current user).
 	 *     @type array    $context      Optional. Free-form context (session_id, bridge_app, etc.).
 	 * }
-	 * @return array Envelope for the AI (see class docblock).
+	 * @return array Agents API approval_required envelope, or a `staged=>false`
+	 *               error array when staging fails.
 	 */
 	public static function stage( array $args ): array {
 		$kind         = isset( $args['kind'] ) ? sanitize_key( $args['kind'] ) : '';
@@ -126,7 +116,7 @@ class PendingActionHelper {
 		if ( ! $stored ) {
 			return array(
 				'staged'     => false,
-				'error'      => 'Failed to persist pending action (transient write failed).',
+				'error'      => 'Failed to persist pending action.',
 				'error_code' => 'store_failed',
 			);
 		}
@@ -149,21 +139,6 @@ class PendingActionHelper {
 		$expires_at = isset( $stored_payload['expires_at'] ) ? (int) $stored_payload['expires_at'] : null;
 		$created_at = isset( $stored_payload['created_at'] ) ? (int) $stored_payload['created_at'] : time();
 
-		$legacy_payload = array(
-			'staged'         => true,
-			'action_id'      => $action_id,
-			'kind'           => $kind,
-			'summary'        => $payload['summary'],
-			'preview'        => $preview_data,
-			'resolve_with'   => 'resolve_pending_action',
-			'resolve_params' => array(
-				'action_id' => $action_id,
-				'decision'  => '<accepted|rejected>',
-			),
-			'instruction'    => 'Show this preview to the user and wait for their confirmation. Do not call resolve_pending_action until they explicitly approve or reject. If the user asks to modify, call the original tool again with updated parameters instead of resolving this action.',
-			'expires_at'     => $expires_at,
-		);
-
 		$pending_action = array(
 			'action_id'   => $action_id,
 			'kind'        => $kind,
@@ -181,12 +156,16 @@ class PendingActionHelper {
 			$pending_action = WP_Agent_Pending_Action::from_array( $pending_action )->to_array();
 		}
 
-		$envelope_payload  = array_merge(
-			$legacy_payload,
-			array(
-				'pending_action' => $pending_action,
-			)
+		$envelope_payload = array(
+			'pending_action' => $pending_action,
+			'resolve_with'   => 'resolve_pending_action',
+			'resolve_params' => array(
+				'action_id' => $action_id,
+				'decision'  => '<accepted|rejected>',
+			),
+			'instruction'    => 'Show this preview to the user and wait for their confirmation. Do not call resolve_pending_action until they explicitly approve or reject. If the user asks to modify, call the original tool again with updated parameters instead of resolving this action.',
 		);
+
 		$envelope_metadata = array(
 			'adapter'     => 'data-machine',
 			'datamachine' => array(
@@ -207,6 +186,18 @@ class PendingActionHelper {
 				'metadata' => $envelope_metadata,
 			);
 
-		return array_merge( $envelope, $legacy_payload );
+		// Surface staged + action_id at the top level so internal callers
+		// (content abilities, ToolExecutor, bundle/memory pending actions)
+		// can detect success and reference the new pending action without
+		// digging into the envelope payload. Everything else — kind,
+		// summary, preview, resolve_with, instruction, timestamps — lives
+		// inside the Agents API envelope payload (envelope.payload.pending_action).
+		return array_merge(
+			$envelope,
+			array(
+				'staged'    => true,
+				'action_id' => $action_id,
+			)
+		);
 	}
 }

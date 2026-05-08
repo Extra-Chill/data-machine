@@ -149,10 +149,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	}
 
 	/**
-	 * Ensure the mode column exists, migrating from legacy `context` (or even
-	 * older `agent_type`) columns if present.
-	 *
-	 * Idempotent. Existing rows keep their values under the new `mode` name.
+	 * Ensure the mode column and indexes exist.
 	 *
 	 * @return void
 	 */
@@ -162,31 +159,17 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$table_name = self::get_prefixed_table_name();
 
 		if ( ! self::column_exists( $table_name, 'mode', $wpdb ) ) {
-			if ( self::column_exists( $table_name, 'context', $wpdb ) ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i CHANGE COLUMN context mode VARCHAR(20) NOT NULL DEFAULT %s', $table_name, 'chat' ) );
-			} elseif ( self::column_exists( $table_name, 'agent_type', $wpdb ) ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i CHANGE COLUMN agent_type mode VARCHAR(20) NOT NULL DEFAULT %s', $table_name, 'chat' ) );
-			} else {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-				// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it. Column position
-				// is cosmetic — both engines accept the bare ADD COLUMN form.
-				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN mode VARCHAR(20) NOT NULL DEFAULT %s', $table_name, 'chat' ) );
-			}
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			// `AFTER <col>` is MySQL-only; SQLite (Studio) rejects it. Column position
+			// is cosmetic — both engines accept the bare ADD COLUMN form.
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN mode VARCHAR(20) NOT NULL DEFAULT %s', $table_name, 'chat' ) );
 		}
 
-		// Idempotent index normalization: drop legacy indexes, add new — only when needed.
+		// Idempotent index normalization: add current indexes when needed.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$indexes       = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i', $table_name ) );
 		$existing_keys = array_unique( array_column( $indexes, 'Key_name' ) );
 
-		foreach ( array( 'agent_type', 'user_agent', 'context', 'user_context' ) as $legacy_key ) {
-			if ( in_array( $legacy_key, $existing_keys, true ) ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
-				$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP KEY ' . $legacy_key, $table_name ) );
-			}
-		}
 		if ( ! in_array( 'mode', $existing_keys, true ) ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
 			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD KEY mode (mode)', $table_name ) );

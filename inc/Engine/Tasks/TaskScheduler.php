@@ -75,7 +75,10 @@ class TaskScheduler {
 				'datamachine_log',
 				'error',
 				"TaskScheduler: Handler class not found for '{$taskType}'",
-				array( 'task_type' => $taskType, 'handler_class' => $handler_class )
+				array(
+					'task_type'     => $taskType,
+					'handler_class' => $handler_class,
+				)
 			);
 			return false;
 		}
@@ -88,7 +91,10 @@ class TaskScheduler {
 				'datamachine_log',
 				'error',
 				"TaskScheduler: getWorkflow() returned empty steps for '{$taskType}'",
-				array( 'task_type' => $taskType, 'params' => $params )
+				array(
+					'task_type' => $taskType,
+					'params'    => $params,
+				)
 			);
 			return false;
 		}
@@ -235,8 +241,8 @@ class TaskScheduler {
 		// caller passed a parent_job_id, link this batch parent to it
 		// so the chain caller → batch_parent is preserved even though
 		// per-item children chain off the caller directly (below).
-		$jobs_db          = new Jobs();
-		$batch_id         = 'dm_batch_' . wp_generate_uuid4();
+		$jobs_db           = new Jobs();
+		$batch_id          = 'dm_batch_' . wp_generate_uuid4();
 		$batch_create_args = array(
 			'pipeline_id' => 'direct',
 			'flow_id'     => 'direct',
@@ -253,7 +259,10 @@ class TaskScheduler {
 				'datamachine_log',
 				'error',
 				'TaskScheduler: failed to create batch parent job',
-				array( 'task_type' => $taskType, 'total' => count( $itemParams ) )
+				array(
+					'task_type' => $taskType,
+					'total'     => count( $itemParams ),
+				)
 			);
 			return false;
 		}
@@ -323,14 +332,8 @@ class TaskScheduler {
 	/**
 	 * Process a batch chunk (Action Scheduler callback).
 	 *
-	 * Pre-0.82.0 this was called with a string $batchId and looked up
-	 * state in a transient. The new BatchScheduler pipes the parent job
-	 * ID instead — the state lives on its engine_data. The legacy
-	 * string-key path is retained for one cycle so any in-flight
-	 * Action Scheduler entries still resolve.
-	 *
-	 * @param int|string $parentJobIdOrBatchId Parent job ID (current) or
-	 *                                         legacy batch ID (pre-0.82.0).
+	 * @param int|string $parentJobIdOrBatchId Parent job ID. Numeric strings
+	 *                                         from Action Scheduler are coerced.
 	 */
 	public static function processBatchChunk( int|string $parentJobIdOrBatchId ): void {
 		$parent_job_id = self::resolveParentJobId( $parentJobIdOrBatchId );
@@ -340,7 +343,10 @@ class TaskScheduler {
 				'datamachine_log',
 				'warning',
 				'TaskScheduler: Batch parent not resolvable',
-				array( 'arg' => $parentJobIdOrBatchId, 'context' => 'system' )
+				array(
+					'arg'     => $parentJobIdOrBatchId,
+					'context' => 'system',
+				)
 			);
 			return;
 		}
@@ -463,12 +469,10 @@ class TaskScheduler {
 	/**
 	 * Resolve the parent job ID for a chunk callback argument.
 	 *
-	 * BatchScheduler always passes the parent job ID. Legacy in-flight
-	 * Action Scheduler entries (scheduled before 0.82.0) carry the
-	 * string batch ID and are resolved by looking up the parent job
-	 * whose engine_data['batch_id'] matches.
+	 * BatchScheduler passes the parent job ID. Action Scheduler may deliver it
+	 * back as a numeric string, so that form is accepted too.
 	 *
-	 * @param int|string $arg Parent job ID or legacy batch ID string.
+	 * @param int|string $arg Parent job ID.
 	 * @return int Parent job ID, or 0 when unresolvable.
 	 */
 	private static function resolveParentJobId( int|string $arg ): int {
@@ -481,27 +485,7 @@ class TaskScheduler {
 			return (int) $arg;
 		}
 
-		// Legacy batch_id path. Look the parent up by engine_data field.
-		// Only invoked for in-flight pre-migration jobs; new batches use
-		// the int parent_job_id path.
-		global $wpdb;
-		$table = $wpdb->prefix . 'datamachine_jobs';
-
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix.
-		$row = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT job_id FROM {$table}
-				WHERE source = 'batch'
-				  AND engine_data LIKE %s
-				ORDER BY job_id DESC
-				LIMIT 1",
-				'%' . $wpdb->esc_like( $arg ) . '%'
-			)
-		);
-		// phpcs:enable
-
-		return $row ? (int) $row : 0;
+		return 0;
 	}
 
 	/**
@@ -547,9 +531,7 @@ class TaskScheduler {
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL
 
-		// Pull total from batch_total (BatchScheduler) with fallback to
-		// the legacy `total` key for any pre-migration rows.
-		$total = (int) ( $engine_data['batch_total'] ?? $engine_data['total'] ?? 0 );
+		$total = (int) ( $engine_data['batch_total'] ?? 0 );
 
 		return array(
 			'batch_job_id'        => $batchJobId,

@@ -350,6 +350,8 @@ class EditPostBlocksAbility {
 				array(
 					'success'         => true,
 					'is_preview'      => true,
+					'kind'            => 'edit_post_blocks',
+					'preview'         => $diff,
 					'post_id'         => $post_id,
 					'changes_applied' => $changes,
 				)

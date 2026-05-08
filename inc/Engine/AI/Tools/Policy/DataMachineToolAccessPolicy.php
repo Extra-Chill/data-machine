@@ -2,7 +2,7 @@
 /**
  * Data Machine tool access policy.
  *
- * Adapts Data Machine permission helpers and legacy chat gating into the
+ * Adapts Data Machine permission helpers and chat gating into the
  * generic tool policy filter's access-level callback shape.
  *
  * @package DataMachine\Engine\AI\Tools\Policy
@@ -17,12 +17,12 @@ defined( 'ABSPATH' ) || exit;
 final class DataMachineToolAccessPolicy {
 
 	/**
-	 * Return whether chat tools require the legacy coarse permission gate.
+	 * Return whether chat tools pass the coarse permission gate.
 	 *
 	 * @param array $args Resolution arguments.
-	 * @return bool Whether the caller can proceed past the legacy gate.
+	 * @return bool Whether the caller can proceed past the chat gate.
 	 */
-	public function passesLegacyChatGate( array $args ): bool {
+	public function passesChatGate( array $args ): bool {
 		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
 		$require_use_tools_for_chat = apply_filters( 'datamachine_require_use_tools_for_chat_tools', false, $args );
 

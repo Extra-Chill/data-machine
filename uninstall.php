@@ -47,27 +47,6 @@ function datamachine_uninstall_site() {
 	// Unified auth data.
 	delete_option( 'datamachine_auth_data' );
 
-	// Legacy per-provider auth data.
-	$datamachine_auth_providers = array( 'twitter', 'facebook', 'threads', 'googlesheets', 'reddit', 'bluesky', 'wordpress_publish', 'wordpress_posts' );
-	foreach ( $datamachine_auth_providers as $datamachine_provider ) {
-		delete_option( "{$datamachine_provider}_auth_data" );
-	}
-
-	// Legacy meta/key options.
-	delete_option( 'datamachine_openai_api_key' );
-	delete_option( 'datamachine_openai_user_meta' );
-	delete_option( 'datamachine_bluesky_user_meta' );
-	delete_option( 'datamachine_twitter_user_meta' );
-	delete_option( 'datamachine_reddit_user_meta' );
-	delete_option( 'datamachine_threads_user_meta' );
-	delete_option( 'datamachine_facebook_user_meta' );
-
-	// Log level options.
-	$datamachine_log_types = array( 'pipeline', 'system', 'chat' );
-	foreach ( $datamachine_log_types as $datamachine_log_type ) {
-		delete_option( "datamachine_log_level_{$datamachine_log_type}" );
-	}
-
 	// --- User meta ---
 
 	$datamachine_pattern = 'datamachine_%';

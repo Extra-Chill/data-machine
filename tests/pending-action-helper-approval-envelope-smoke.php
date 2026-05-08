@@ -4,6 +4,13 @@
  *
  * Run with: php tests/pending-action-helper-approval-envelope-smoke.php
  *
+ * Contract:
+ *   - Successful stage() returns the Agents API approval_required envelope
+ *     plus two top-level convenience fields: staged=true and action_id.
+ *   - Every other detail (kind, summary, preview, resolve_with, etc.) lives
+ *     inside envelope.payload / envelope.payload.pending_action.
+ *   - Failure stage() returns array( 'staged' => false, 'error' => ... ).
+ *
  * @package DataMachine\Tests
  */
 
@@ -97,27 +104,36 @@ $result = PendingActionHelper::stage(
 datamachine_pending_action_helper_assert( WP_Agent_Message::SCHEMA === $result['schema'], 'Result uses the Agents API envelope schema.' );
 datamachine_pending_action_helper_assert( WP_Agent_Message::TYPE_APPROVAL_REQUIRED === $result['type'], 'Result is an approval_required envelope.' );
 datamachine_pending_action_helper_assert( 'tool' === $result['role'], 'Approval-required envelope uses the tool role.' );
-
-datamachine_pending_action_helper_assert( true === $result['staged'], 'Legacy top-level staged flag is preserved.' );
-datamachine_pending_action_helper_assert( true === $result['payload']['staged'], 'Payload staged flag is available to envelope-aware clients.' );
-datamachine_pending_action_helper_assert( $result['action_id'] === $result['payload']['action_id'], 'Legacy action_id is mirrored in the envelope payload.' );
-datamachine_pending_action_helper_assert( 'wiki_upsert' === $result['kind'], 'Legacy Data Machine action kind is preserved at top level.' );
-datamachine_pending_action_helper_assert( 'wiki_upsert' === $result['payload']['kind'], 'Legacy Data Machine action kind is preserved in payload.' );
-datamachine_pending_action_helper_assert( 'resolve_pending_action' === $result['resolve_with'], 'Legacy resolver tool name is preserved at top level.' );
-datamachine_pending_action_helper_assert( 'resolve_pending_action' === $result['payload']['resolve_with'], 'Legacy resolver tool name is preserved in payload.' );
-datamachine_pending_action_helper_assert( 'Update Wiki Page' === $result['summary'], 'Summary is sanitized for legacy clients.' );
 datamachine_pending_action_helper_assert( 'Update Wiki Page' === $result['content'], 'Envelope content carries the human summary.' );
 
-$pending_action = $result['payload']['pending_action'];
-datamachine_pending_action_helper_assert( $result['action_id'] === $pending_action['action_id'], 'Agents API pending action carries the staged action ID.' );
-datamachine_pending_action_helper_assert( 'wiki_upsert' === $pending_action['kind'], 'Agents API pending action carries the product handler kind.' );
-datamachine_pending_action_helper_assert( array( 'diff' => "- old\n+ new" ) === $pending_action['preview'], 'Agents API pending action carries preview data.' );
-datamachine_pending_action_helper_assert( 'user:123' === $pending_action['creator'], 'Agents API pending action records creator identity.' );
-datamachine_pending_action_helper_assert( 'agent:456' === $pending_action['agent'], 'Agents API pending action records agent identity.' );
-datamachine_pending_action_helper_assert( 123 === $pending_action['metadata']['datamachine']['created_by'], 'Data Machine created_by audit field is retained in pending action metadata.' );
-datamachine_pending_action_helper_assert( 456 === $pending_action['metadata']['datamachine']['agent_id'], 'Data Machine agent_id audit field is retained in pending action metadata.' );
-datamachine_pending_action_helper_assert( isset( $pending_action['created_at'] ) && is_string( $pending_action['created_at'] ), 'Agents API pending action carries an ISO creation timestamp.' );
-datamachine_pending_action_helper_assert( isset( $pending_action['expires_at'] ) && is_string( $pending_action['expires_at'] ), 'Agents API pending action carries an ISO expiration timestamp.' );
+datamachine_pending_action_helper_assert( true === $result['staged'], 'Successful stage exposes a top-level staged=true.' );
+datamachine_pending_action_helper_assert( ! empty( $result['action_id'] ) && str_starts_with( $result['action_id'], 'act_' ), 'Successful stage exposes a top-level action_id.' );
+
+datamachine_pending_action_helper_assert( ! isset( $result['kind'] ), 'Top level no longer mirrors kind.' );
+datamachine_pending_action_helper_assert( ! isset( $result['summary'] ), 'Top level no longer mirrors summary.' );
+datamachine_pending_action_helper_assert( ! isset( $result['preview'] ), 'Top level no longer mirrors preview.' );
+datamachine_pending_action_helper_assert( ! isset( $result['resolve_with'] ), 'Top level no longer mirrors resolve_with.' );
+datamachine_pending_action_helper_assert( ! isset( $result['resolve_params'] ), 'Top level no longer mirrors resolve_params.' );
+datamachine_pending_action_helper_assert( ! isset( $result['instruction'] ), 'Top level no longer mirrors instruction.' );
+datamachine_pending_action_helper_assert( ! isset( $result['expires_at'] ), 'Top level no longer mirrors expires_at.' );
+
+$payload = $result['payload'];
+datamachine_pending_action_helper_assert( 'resolve_pending_action' === $payload['resolve_with'], 'Envelope payload carries resolve_with.' );
+datamachine_pending_action_helper_assert( $result['action_id'] === $payload['resolve_params']['action_id'], 'Envelope payload resolve_params carries the action_id.' );
+datamachine_pending_action_helper_assert( '<accepted|rejected>' === $payload['resolve_params']['decision'], 'Envelope payload resolve_params describes the decision shape.' );
+datamachine_pending_action_helper_assert( is_string( $payload['instruction'] ?? null ) && '' !== $payload['instruction'], 'Envelope payload carries the operator instruction.' );
+
+$pending_action = $payload['pending_action'];
+datamachine_pending_action_helper_assert( $result['action_id'] === $pending_action['action_id'], 'pending_action carries the staged action_id.' );
+datamachine_pending_action_helper_assert( 'wiki_upsert' === $pending_action['kind'], 'pending_action carries the product handler kind.' );
+datamachine_pending_action_helper_assert( 'Update Wiki Page' === $pending_action['summary'], 'pending_action carries the sanitized summary.' );
+datamachine_pending_action_helper_assert( array( 'diff' => "- old\n+ new" ) === $pending_action['preview'], 'pending_action carries preview data.' );
+datamachine_pending_action_helper_assert( 'user:123' === $pending_action['creator'], 'pending_action records creator identity.' );
+datamachine_pending_action_helper_assert( 'agent:456' === $pending_action['agent'], 'pending_action records agent identity.' );
+datamachine_pending_action_helper_assert( 123 === $pending_action['metadata']['datamachine']['created_by'], 'Data Machine created_by audit field is retained in pending_action metadata.' );
+datamachine_pending_action_helper_assert( 456 === $pending_action['metadata']['datamachine']['agent_id'], 'Data Machine agent_id audit field is retained in pending_action metadata.' );
+datamachine_pending_action_helper_assert( isset( $pending_action['created_at'] ) && is_string( $pending_action['created_at'] ), 'pending_action carries an ISO creation timestamp.' );
+datamachine_pending_action_helper_assert( isset( $pending_action['expires_at'] ) && is_string( $pending_action['expires_at'] ), 'pending_action carries an ISO expiration timestamp.' );
 
 datamachine_pending_action_helper_assert( 'data-machine' === $result['metadata']['adapter'], 'Data Machine is identified as adapter metadata.' );
 datamachine_pending_action_helper_assert( 'wiki_upsert' === $result['metadata']['datamachine']['kind'], 'Data Machine handler kind lives in adapter metadata.' );
@@ -127,9 +143,15 @@ $stored = PendingActionStore::get( $result['action_id'] );
 datamachine_pending_action_helper_assert( is_array( $stored ), 'Pending action is still stored through the existing store.' );
 datamachine_pending_action_helper_assert( 'wiki_upsert' === $stored['kind'], 'Stored Data Machine resolver kind is unchanged.' );
 datamachine_pending_action_helper_assert( array( 'title' => 'Demo', 'content' => 'Updated content.' ) === $stored['apply_input'], 'Stored apply input is unchanged.' );
+datamachine_pending_action_helper_assert( ! array_key_exists( 'preview', $stored ), 'Store no longer mirrors a legacy preview key on payload.' );
 
 $normalized = WP_Agent_Message::normalize( $result );
 datamachine_pending_action_helper_assert( WP_Agent_Message::TYPE_APPROVAL_REQUIRED === $normalized['type'], 'Result normalizes as an approval_required envelope.' );
 datamachine_pending_action_helper_assert( $result['payload'] === $normalized['payload'], 'Envelope payload survives normalization.' );
+
+// Failure shape: missing kind/apply_input still returns staged=false.
+$failure = PendingActionHelper::stage( array() );
+datamachine_pending_action_helper_assert( false === $failure['staged'], 'Missing kind returns staged=false.' );
+datamachine_pending_action_helper_assert( 'invalid_kind' === ( $failure['error_code'] ?? '' ), 'Missing kind reports invalid_kind.' );
 
 echo "PendingActionHelper approval envelope smoke passed.\n";

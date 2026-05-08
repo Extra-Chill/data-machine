@@ -223,10 +223,8 @@ function datamachine_run_datamachine_plugin() {
 	// when the registry fires lazily (always after init), so translations are
 	// already loaded by execution time.
 	//
-	// Previously this was wrapped in add_action('init', ...) at priority 10, but
-	// datamachine_maybe_run_migrations() at init priority 5 triggers the registry
-	// via ScaffoldAbilities::get_ability() → WP_Abilities_Registry::get_instance(),
-	// firing wp_abilities_api_init before the hooks were registered.
+	// Register eagerly so any later lazy WP_Abilities_Registry initialization sees
+	// every ability hook in this request.
 	new \DataMachine\Abilities\AuthAbilities();
 	new \DataMachine\Abilities\AI\InspectRequestAbility();
 	new \DataMachine\Abilities\File\AgentFileAbilities();
@@ -673,6 +671,41 @@ function datamachine_create_network_agent_tables() {
 function datamachine_activate_for_site() {
 	datamachine_register_capabilities();
 
+	// Ensure every Data Machine database table exists. dbDelta is idempotent.
+	datamachine_ensure_all_tables();
+
+	// Ensure default agent memory files exist.
+	// During activation the Abilities API is unavailable (init already fired before
+	// the plugin was included via plugin_sandbox_scrape, so our init callback that
+	// registers abilities never ran). Set a transient so the scaffold runs on the
+	// first normal request where the full hook sequence fires in order.
+	if ( ! datamachine_ensure_default_memory_files() ) {
+		set_transient( 'datamachine_needs_scaffold', 1, HOUR_IN_SECONDS );
+	}
+
+	// Regenerate every composable memory file (SITE.md, NETWORK.md, AGENTS.md, …)
+	// from their registered sections.
+	// Activation-only — composable regeneration is heavy and shouldn't fire on
+	// every deploy.
+	\DataMachine\Engine\AI\ComposableFileGenerator::regenerate_all();
+
+	// Re-schedule any flows with non-manual scheduling
+	datamachine_activate_scheduled_flows();
+
+	// Track DB schema version so deploy-time migrations auto-run.
+	update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );
+}
+
+/**
+ * Create or update every Data Machine database table.
+ *
+ * Shared by activation and the deploy-time deferred runtime. dbDelta and
+ * the per-table column ensures are idempotent, so this is safe to call on
+ * every version bump.
+ *
+ * @return void
+ */
+function datamachine_ensure_all_tables() {
 	// Create logs table first — other table migrations log messages during creation.
 	\DataMachine\Core\Database\Logs\LogRepository::create_table();
 
@@ -707,41 +740,6 @@ function datamachine_activate_for_site() {
 	\DataMachine\Core\Database\Chat\Chat::ensure_transcript_lock_columns();
 
 	\DataMachine\Engine\AI\Actions\PendingActionStore::create_table();
-
-	// Ensure default agent memory files exist.
-	// During activation the Abilities API is unavailable (init already fired before
-	// the plugin was included via plugin_sandbox_scrape, so our init callback that
-	// registers abilities never ran). Set a transient so the scaffold runs on the
-	// first normal request where the full hook sequence fires in order.
-	if ( ! datamachine_ensure_default_memory_files() ) {
-		set_transient( 'datamachine_needs_scaffold', 1, HOUR_IN_SECONDS );
-	}
-
-	// Run the shared migration chain. Each migration is idempotent and
-	// option-gated; this same function fires from
-	// `datamachine_maybe_run_deferred_migrations()` at plugins_loaded:5
-	// when a deploy advances DATAMACHINE_VERSION past the persisted
-	// `datamachine_db_version` option (#1301).
-	datamachine_run_schema_migrations();
-
-	// Regenerate every composable memory file (SITE.md, NETWORK.md, AGENTS.md, …)
-	// from their registered sections, and clean up the legacy SiteContext transient.
-	// Activation-only — composable regeneration is heavy and shouldn't fire on
-	// every deploy (the version-gated runtime path is for schema-shape drift,
-	// not opportunistic content refresh).
-	\DataMachine\Engine\AI\ComposableFileGenerator::regenerate_all();
-	delete_transient( 'datamachine_site_context_data' );
-
-	// Clean up legacy per-agent-type log level options (idempotent).
-	foreach ( array( 'pipeline', 'chat', 'system' ) as $legacy_agent_type ) {
-		delete_option( "datamachine_log_level_{$legacy_agent_type}" );
-	}
-
-	// Re-schedule any flows with non-manual scheduling
-	datamachine_activate_scheduled_flows();
-
-	// Track DB schema version so deploy-time migrations auto-run.
-	update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );
 }
 
 /**

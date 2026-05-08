@@ -55,7 +55,7 @@ use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
-use DataMachine\Engine\Bundle\AgentBundleLegacyAdapter;
+use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
@@ -144,11 +144,11 @@ $directory = new AgentBundleDirectory(
 	)
 );
 
-$legacy_bundle = AgentBundleLegacyAdapter::to_legacy_bundle( $directory );
-assert_bundle_update_equals( 'directory adapter preserves bundle slug for updater', 'woo-brain', $legacy_bundle['bundle_slug'] ?? null );
-assert_bundle_update_equals( 'directory adapter preserves semantic bundle version', '2026.04.28', $legacy_bundle['bundle_version'] ?? null );
-assert_bundle_update_equals( 'pipeline carries portable slug into legacy importer', 'daily-ingest', $legacy_bundle['pipelines'][0]['portable_slug'] ?? null );
-assert_bundle_update_equals( 'flow carries portable slug into legacy importer', 'daily-ingest-flow', $legacy_bundle['flows'][0]['portable_slug'] ?? null );
+$array_bundle = AgentBundleArrayAdapter::to_array_bundle( $directory );
+assert_bundle_update_equals( 'directory adapter preserves bundle slug for updater', 'woo-brain', $array_bundle['bundle_slug'] ?? null );
+assert_bundle_update_equals( 'directory adapter preserves semantic bundle version', '2026.04.28', $array_bundle['bundle_version'] ?? null );
+assert_bundle_update_equals( 'pipeline carries portable slug into array importer', 'daily-ingest', $array_bundle['pipelines'][0]['portable_slug'] ?? null );
+assert_bundle_update_equals( 'flow carries portable slug into array importer', 'daily-ingest-flow', $array_bundle['flows'][0]['portable_slug'] ?? null );
 
 $bundler_reflection = new ReflectionClass( AgentBundler::class );
 $bundler            = $bundler_reflection->newInstanceWithoutConstructor();

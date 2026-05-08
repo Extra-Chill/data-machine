@@ -157,7 +157,7 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		// stays true regardless of how many user messages were sent.
 		$user_message = (string) ( $captured_request['prompt'] ?? '' );
 		if ( '' === $user_message || ! str_contains( $user_message, 'Article context:' ) ) {
-			foreach ( array_reverse( $captured_request['messages'] ) as $msg ) {
+			foreach ( array_reverse( $captured_request['messages'] ?? array() ) as $msg ) {
 				if ( ( $msg['role'] ?? '' ) === 'user' ) {
 					$user_message = $msg['content'] ?? '';
 					break;
