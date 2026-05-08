@@ -128,7 +128,7 @@ function datamachine_run_conversation(
 		if ( ! empty( $result['conversation_complete'] ) ) {
 			return false;
 		}
-		return ! empty( $result['tool_execution_results'] ) || ! empty( $result['completion_nudge'] );
+		return ! empty( $result['tool_execution_results'] ) || ! empty( $result['completion_nudge'] ) || ! empty( $result['duplicate_tool_call_rejected'] );
 	};
 
 	// Run through the upstream substrate loop.
@@ -208,7 +208,6 @@ function datamachine_run_conversation(
 		$result['completion_assertions_missing']   = $latest_nudge['completion_assertions_missing'] ?? array();
 		$result['completion_assertions_satisfied'] = $latest_nudge['completion_assertions_satisfied'] ?? array();
 	}
-
 	// Map upstream budget_exceeded status to DM's max_turns_reached flag
 	// for backward compatibility with ChatOrchestrator response shaping.
 	if ( 'budget_exceeded' === ( $result['status'] ?? '' ) && in_array( $result['budget'] ?? '', array( 'conversation_turns', 'turns' ), true ) ) {
@@ -358,6 +357,7 @@ function datamachine_build_turn_runner(
 		$tool_execution_results = array();
 		$conversation_complete  = false;
 		$completion_nudge       = '';
+		$duplicate_rejected     = false;
 		if ( ! empty( $tool_calls ) ) {
 			foreach ( $tool_calls as $tool_call ) {
 				$tool_name       = $tool_call['name'];
@@ -397,6 +397,7 @@ function datamachine_build_turn_runner(
 				$validation_result = ConversationManager::validateToolCall( $tool_name, $tool_parameters, $messages );
 				if ( $validation_result['is_duplicate'] ) {
 					$messages[] = ConversationManager::generateDuplicateToolCallMessage( $tool_name, $turn_count, $mode );
+					$duplicate_rejected = true;
 					do_action(
 						'datamachine_log',
 						'info',
@@ -546,6 +547,7 @@ function datamachine_build_turn_runner(
 			'tool_execution_results' => $tool_execution_results,
 			'conversation_complete'  => $conversation_complete,
 			'completion_nudge'       => $completion_nudge ?? '',
+			'duplicate_tool_call_rejected' => $duplicate_rejected,
 		);
 	};
 }

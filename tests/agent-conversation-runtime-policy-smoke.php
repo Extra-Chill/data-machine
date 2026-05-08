@@ -358,6 +358,88 @@ assert_runtime_policy( str_contains( wp_json_encode( $nudge_transcript->calls[0]
 assert_runtime_policy( 1 === ( $GLOBALS['datamachine_runtime_engine_merges'][4242][0]['completion_nudge_count'] ?? 0 ), 'job engine_data merge includes nudge count' );
 assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $GLOBALS['datamachine_runtime_engine_merges'][4242][0]['completion_assertions_missing']['tool_names'] ?? null ), 'job engine_data merge includes missing assertions' );
 
+$duplicate_dispatch_count = 0;
+$duplicate_transcript     = new RuntimePolicySmokeTranscriptPersister();
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$duplicate_dispatch_count ) {
+		++$duplicate_dispatch_count;
+
+		if ( 1 === $duplicate_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => 'I am done prematurely.',
+					'tool_calls' => array(),
+				),
+			);
+		}
+
+		if ( in_array( $duplicate_dispatch_count, array( 2, 3 ), true ) ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => '',
+					'tool_calls' => array(
+						array(
+							'name'       => 'runtime_policy_tool',
+							'parameters' => array( 'name' => 'Grace' ),
+						),
+					),
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => '',
+				'tool_calls' => array(
+					array(
+						'name'       => 'second_policy_tool',
+						'parameters' => array( 'name' => 'Hopper' ),
+					),
+				),
+			),
+		);
+	}
+);
+
+$duplicate_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'recover from duplicate tool call while completing assertions' ) ),
+	array(
+		'runtime_policy_tool' => array(
+			'name'        => 'runtime_policy_tool',
+			'description' => 'Runtime policy smoke tool',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+		'second_policy_tool'  => array(
+			'name'        => 'second_policy_tool',
+			'description' => 'Second runtime policy smoke tool',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	'pipeline',
+	array(
+		'transcript_persister'  => $duplicate_transcript,
+		'completion_assertions' => array(
+			'required_tool_names' => array( 'runtime_policy_tool', 'second_policy_tool' ),
+		),
+	),
+	6
+);
+
+assert_runtime_policy( $duplicate_dispatch_count >= 4, 'duplicate tool rejection keeps loop running for correction' );
+assert_runtime_policy( 2 === count( $duplicate_result['tool_execution_results'] ?? array() ), 'duplicate recovery result includes only executed tool calls' );
+assert_runtime_policy( 'second_policy_tool' === ( $duplicate_result['tool_execution_results'][1]['tool_name'] ?? '' ), 'duplicate recovery reaches next required tool' );
+assert_runtime_policy( str_contains( wp_json_encode( $duplicate_transcript->calls[0]['messages'] ?? array() ), 'DUPLICATE REJECTED' ), 'duplicate recovery transcript includes correction message' );
+
 $assertion_policy = new DataMachineHandlerCompletionPolicy(
 	array(),
 	new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
