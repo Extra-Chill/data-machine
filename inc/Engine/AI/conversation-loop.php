@@ -73,6 +73,7 @@ function datamachine_run_conversation(
 	$last_tool_calls       = array();
 	$final_content         = '';
 	$turns_run             = 0;
+	$completion_nudges     = array();
 	$total_usage           = array(
 		'prompt_tokens'     => 0,
 		'completion_tokens' => 0,
@@ -111,6 +112,7 @@ function datamachine_run_conversation(
 		$last_tool_calls,
 		$final_content,
 		$turns_run,
+		$completion_nudges,
 		$total_usage
 	);
 
@@ -198,6 +200,14 @@ function datamachine_run_conversation(
 	$result['turn_count']       = $turns_run;
 	$result['completed']        = 'budget_exceeded' !== ( $result['status'] ?? '' );
 	$result['last_tool_calls']  = $last_tool_calls;
+	if ( ! empty( $completion_nudges ) ) {
+		$latest_nudge                              = $completion_nudges[ count( $completion_nudges ) - 1 ];
+		$result['completion_nudge_count']          = count( $completion_nudges );
+		$result['completion_nudge']                = $latest_nudge['completion_nudge'] ?? '';
+		$result['completion_assertions_required']  = $latest_nudge['completion_assertions_required'] ?? array();
+		$result['completion_assertions_missing']   = $latest_nudge['completion_assertions_missing'] ?? array();
+		$result['completion_assertions_satisfied'] = $latest_nudge['completion_assertions_satisfied'] ?? array();
+	}
 
 	// Map upstream budget_exceeded status to DM's max_turns_reached flag
 	// for backward compatibility with ChatOrchestrator response shaping.
@@ -233,6 +243,7 @@ function datamachine_run_conversation(
  * @param array                                           &$last_tool_calls        Mutable last tool calls.
  * @param string                                          &$final_content          Mutable final assistant content.
  * @param int                                             &$turns_run              Mutable executed turn count.
+ * @param array                                           &$completion_nudges      Mutable nudge diagnostics.
  * @param array                                           &$total_usage           Mutable usage accumulator.
  * @return callable Turn runner closure.
  */
@@ -249,6 +260,7 @@ function datamachine_build_turn_runner(
 	array &$last_tool_calls,
 	string &$final_content,
 	int &$turns_run,
+	array &$completion_nudges,
 	array &$total_usage
 ): callable {
 	return static function ( array $messages, array $turn_context ) use (
@@ -264,6 +276,7 @@ function datamachine_build_turn_runner(
 		&$last_tool_calls,
 		&$final_content,
 		&$turns_run,
+		&$completion_nudges,
 		&$total_usage
 	): array {
 		// The upstream loop provides the turn number via turn_context.
@@ -344,7 +357,7 @@ function datamachine_build_turn_runner(
 		// Process tool calls.
 		$tool_execution_results = array();
 		$conversation_complete  = false;
-		$completion_nudge      = '';
+		$completion_nudge       = '';
 		if ( ! empty( $tool_calls ) ) {
 			foreach ( $tool_calls as $tool_call ) {
 				$tool_name       = $tool_call['name'];
@@ -435,7 +448,7 @@ function datamachine_build_turn_runner(
 					$tool_name,
 					is_array( $tool_def ) ? $tool_def : null,
 					$tool_result,
-					array_merge( $turn_context, array( 'mode' => $mode ) ),
+					array_merge( $turn_context, $loop_payload, array( 'mode' => $mode ) ),
 					$turn_count
 				);
 				$conversation_complete = $completion_decision->isComplete();
@@ -477,7 +490,16 @@ function datamachine_build_turn_runner(
 
 			if ( '' !== $completion_nudge ) {
 				$messages[] = ConversationManager::buildConversationMessage( 'user', $completion_nudge );
-				do_action( 'datamachine_ai_completion_nudge_added', $mode, $messages, $loop_payload, array( 'continuation_message' => $completion_nudge ) );
+				datamachine_record_completion_nudge(
+					$completion_nudges,
+					$event_sink,
+					$base_log_context,
+					$mode,
+					$messages,
+					$loop_payload,
+					array_merge( $completion_decision->context(), array( 'continuation_message' => $completion_nudge ) ),
+					$turn_count
+				);
 			}
 		} else {
 			$natural_completion_decision = $completion_policy instanceof NaturalCompletionPolicyInterface
@@ -505,7 +527,16 @@ function datamachine_build_turn_runner(
 				$completion_nudge = (string) ( $natural_completion_decision->context()['continuation_message'] ?? '' );
 				if ( '' !== $completion_nudge ) {
 					$messages[] = ConversationManager::buildConversationMessage( 'user', $completion_nudge );
-					do_action( 'datamachine_ai_completion_nudge_added', $mode, $messages, $loop_payload, $natural_completion_decision->context() );
+					datamachine_record_completion_nudge(
+						$completion_nudges,
+						$event_sink,
+						$base_log_context,
+						$mode,
+						$messages,
+						$loop_payload,
+						$natural_completion_decision->context(),
+						$turn_count
+					);
 				}
 			}
 		}
@@ -517,6 +548,83 @@ function datamachine_build_turn_runner(
 			'completion_nudge'       => $completion_nudge ?? '',
 		);
 	};
+}
+
+/**
+ * Record completion nudge diagnostics for events, transcripts, and job probes.
+ *
+ * @param array                  $completion_nudges Mutable nudge diagnostics.
+ * @param LoopEventSinkInterface $event_sink        Event sink.
+ * @param array                  $base_log_context  Base log context.
+ * @param string                 $mode              Runtime mode.
+ * @param array                  $messages          Current conversation messages.
+ * @param array                  $loop_payload      Loop payload.
+ * @param array                  $decision_context  Completion decision context.
+ * @param int                    $turn_count        Current turn count.
+ */
+function datamachine_record_completion_nudge(
+	array &$completion_nudges,
+	LoopEventSinkInterface $event_sink,
+	array $base_log_context,
+	string $mode,
+	array $messages,
+	array $loop_payload,
+	array $decision_context,
+	int $turn_count
+): void {
+	$diagnostic          = datamachine_completion_nudge_diagnostic( $decision_context, $turn_count, count( $completion_nudges ) + 1 );
+	$completion_nudges[] = $diagnostic;
+
+	$event_payload = array_merge(
+		$base_log_context,
+		$diagnostic,
+		array(
+			'mode'          => $mode,
+			'message_count' => count( $messages ),
+		)
+	);
+
+	datamachine_emit_loop_event( $event_sink, 'completion_nudge_added', $event_payload );
+	do_action( 'datamachine_ai_completion_nudge_added', $mode, $messages, $loop_payload, $event_payload );
+
+	$job_id = (int) ( $loop_payload['job_id'] ?? 0 );
+	if ( $job_id > 0 && function_exists( '\datamachine_merge_engine_data' ) ) {
+		\datamachine_merge_engine_data(
+			$job_id,
+			array(
+				'completion_nudge_count'          => $diagnostic['completion_nudge_count'],
+				'completion_nudge'                => $diagnostic['completion_nudge'],
+				'completion_assertions_required'  => $diagnostic['completion_assertions_required'],
+				'completion_assertions_missing'   => $diagnostic['completion_assertions_missing'],
+				'completion_assertions_satisfied' => $diagnostic['completion_assertions_satisfied'],
+				'completion_nudge_last_turn'      => $turn_count,
+			)
+		);
+	}
+}
+
+/**
+ * Build a bounded completion nudge diagnostic payload.
+ *
+ * @param array $decision_context Completion decision context.
+ * @param int   $turn_count       Current turn count.
+ * @param int   $nudge_count      Nudge count.
+ * @return array<string, mixed>
+ */
+function datamachine_completion_nudge_diagnostic( array $decision_context, int $turn_count, int $nudge_count ): array {
+	$completion_nudge = (string) ( $decision_context['continuation_message'] ?? '' );
+	if ( strlen( $completion_nudge ) > 2000 ) {
+		$completion_nudge = substr( $completion_nudge, 0, 1997 ) . '...';
+	}
+
+	return array(
+		'completion_nudge_count'          => $nudge_count,
+		'completion_nudge'                => $completion_nudge,
+		'completion_assertions_required'  => is_array( $decision_context['required'] ?? null ) ? $decision_context['required'] : array(),
+		'completion_assertions_missing'   => is_array( $decision_context['missing'] ?? null ) ? $decision_context['missing'] : array(),
+		'completion_assertions_satisfied' => is_array( $decision_context['satisfied'] ?? null ) ? $decision_context['satisfied'] : array(),
+		'completion_nudge_turn'           => $turn_count,
+	);
 }
 
 /**

@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 $GLOBALS['datamachine_runtime_policy_filters'] = array();
 $GLOBALS['datamachine_runtime_policy_logs']    = array();
+$GLOBALS['datamachine_runtime_engine_merges']  = array();
 
 if ( ! function_exists( 'add_filter' ) ) {
 	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
@@ -41,6 +42,13 @@ if ( ! function_exists( 'do_action' ) ) {
 	}
 }
 
+if ( ! function_exists( 'datamachine_merge_engine_data' ) ) {
+	function datamachine_merge_engine_data( int $job_id, array $data ): bool {
+		$GLOBALS['datamachine_runtime_engine_merges'][ $job_id ][] = $data;
+		return true;
+	}
+}
+
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $data, int $flags = 0 ) {
 		return json_encode( $data, $flags );
@@ -67,6 +75,7 @@ use AgentsAPI\AI\WP_Agent_Conversation_Completion_Policy;
 use AgentsAPI\AI\WP_Agent_Conversation_Request;
 use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use DataMachine\Engine\AI\DataMachineHandlerCompletionPolicy;
+use DataMachine\Engine\AI\LoopEventSinkInterface;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
@@ -96,6 +105,14 @@ class RuntimePolicySmokeTranscriptPersister implements WP_Agent_Transcript_Persi
 		$this->calls[] = compact( 'messages', 'provider', 'model', 'payload', 'result' );
 
 		return 'runtime-policy-transcript';
+	}
+}
+
+class RuntimePolicySmokeEventSink implements LoopEventSinkInterface {
+	public array $events = array();
+
+	public function emit( string $event, array $payload = array() ): void {
+		$this->events[] = compact( 'event', 'payload' );
 	}
 }
 
@@ -142,6 +159,27 @@ function runtime_policy_failure_count(): int {
 	global $failures;
 
 	return count( $failures );
+}
+
+function runtime_policy_action_count( string $hook ): int {
+	$count = 0;
+	foreach ( $GLOBALS['datamachine_runtime_policy_logs'] as $entry ) {
+		if ( $hook === ( $entry[0] ?? '' ) ) {
+			++$count;
+		}
+	}
+
+	return $count;
+}
+
+function runtime_policy_first_event_payload( RuntimePolicySmokeEventSink $sink, string $event ): array {
+	foreach ( $sink->events as $entry ) {
+		if ( $event === ( $entry['event'] ?? '' ) ) {
+			return is_array( $entry['payload'] ?? null ) ? $entry['payload'] : array();
+		}
+	}
+
+	return array();
 }
 
 // 1. Data Machine's handler policy is a runtime collaborator, not inline loop state.
@@ -197,6 +235,7 @@ assert_runtime_policy( 1 === $natural_dispatch_count, 'default no-tool response 
 assert_runtime_policy( ! empty( $natural_result['completed'] ), 'default natural completion result is completed' );
 
 $satisfied_dispatch_count = 0;
+$satisfied_nudge_actions  = runtime_policy_action_count( 'datamachine_ai_completion_nudge_added' );
 WpAiClientTestDouble::reset();
 WpAiClientTestDouble::set_response_callback(
 	function () use ( &$satisfied_dispatch_count ) {
@@ -231,9 +270,13 @@ $satisfied_result = datamachine_run_conversation(
 
 assert_runtime_policy( 1 === $satisfied_dispatch_count, 'satisfied natural assertion completes without nudge' );
 assert_runtime_policy( ! empty( $satisfied_result['completed'] ), 'satisfied natural assertion result is completed' );
+assert_runtime_policy( ! isset( $satisfied_result['completion_nudge_count'] ), 'satisfied natural assertion has no nudge diagnostics' );
+assert_runtime_policy( $satisfied_nudge_actions === runtime_policy_action_count( 'datamachine_ai_completion_nudge_added' ), 'satisfied natural assertion emits no nudge action' );
 
 $nudge_dispatch_count = 0;
 $nudge_second_request = null;
+$nudge_event_sink     = new RuntimePolicySmokeEventSink();
+$nudge_transcript     = new RuntimePolicySmokeTranscriptPersister();
 WpAiClientTestDouble::reset();
 WpAiClientTestDouble::set_response_callback(
 	function ( array $request_body ) use ( &$nudge_dispatch_count, &$nudge_second_request ) {
@@ -292,6 +335,9 @@ $nudge_result = datamachine_run_conversation(
 	'gpt-smoke',
 	'chat',
 	array(
+		'event_sink'            => $nudge_event_sink,
+		'transcript_persister'  => $nudge_transcript,
+		'job_id'                => 4242,
 		'completion_assertions' => array(
 			'required_tool_names' => array( 'runtime_policy_tool' ),
 		),
@@ -302,6 +348,15 @@ $nudge_result = datamachine_run_conversation(
 assert_runtime_policy( 3 === $nudge_dispatch_count, 'missing natural assertion nudges and keeps loop running' );
 assert_runtime_policy( str_contains( wp_json_encode( $nudge_second_request ), 'completion signals are still missing' ), 'nudge is appended before retry request' );
 assert_runtime_policy( 1 === count( $nudge_result['tool_execution_results'] ?? array() ), 'nudged loop captures required tool result' );
+assert_runtime_policy( 1 === ( $nudge_result['completion_nudge_count'] ?? 0 ), 'nudged loop returns nudge count diagnostic' );
+assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $nudge_result['completion_assertions_missing']['tool_names'] ?? null ), 'nudged loop returns missing assertion diagnostic' );
+assert_runtime_policy( str_contains( $nudge_result['completion_nudge'] ?? '', 'runtime_policy_tool' ), 'nudged loop returns latest nudge message' );
+assert_runtime_policy( 1 === count( array_filter( $nudge_event_sink->events, fn( $entry ) => 'completion_nudge_added' === ( $entry['event'] ?? '' ) ) ), 'nudged loop emits completion_nudge_added event' );
+$nudge_event_payload = runtime_policy_first_event_payload( $nudge_event_sink, 'completion_nudge_added' );
+assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $nudge_event_payload['completion_assertions_missing']['tool_names'] ?? null ), 'nudge event includes missing assertion context' );
+assert_runtime_policy( str_contains( wp_json_encode( $nudge_transcript->calls[0]['messages'] ?? array() ), 'completion signals are still missing' ), 'transcript messages include nudge message' );
+assert_runtime_policy( 1 === ( $GLOBALS['datamachine_runtime_engine_merges'][4242][0]['completion_nudge_count'] ?? 0 ), 'job engine_data merge includes nudge count' );
+assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $GLOBALS['datamachine_runtime_engine_merges'][4242][0]['completion_assertions_missing']['tool_names'] ?? null ), 'job engine_data merge includes missing assertions' );
 
 $assertion_policy = new DataMachineHandlerCompletionPolicy(
 	array(),
