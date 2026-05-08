@@ -3,7 +3,7 @@
  * PendingActionHelper — convenience wrapper for tool handlers that need to
  * stage an invocation for user approval.
  *
- * Tools that opt into ActionPolicy should never hand-roll the store/envelope
+ * Tools that opt into WP_Agent_Action_Policy should never hand-roll the store/envelope
  * shape. Call PendingActionHelper::stage() from the 'preview' branch of the
  * tool handler and return its result directly. The AI sees a standardized
  * envelope that tells it to show the preview to the user and wait for
@@ -29,8 +29,8 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
-use AgentsAPI\AI\AgentMessageEnvelope;
-use AgentsAPI\AI\Approvals\PendingAction;
+use AgentsAPI\AI\WP_Agent_Message;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -177,8 +177,8 @@ class PendingActionHelper {
 			'expires_at'  => null !== $expires_at ? gmdate( 'c', $expires_at ) : null,
 		);
 
-		if ( class_exists( PendingAction::class ) ) {
-			$pending_action = PendingAction::from_array( $pending_action )->to_array();
+		if ( class_exists( WP_Agent_Pending_Action::class ) ) {
+			$pending_action = WP_Agent_Pending_Action::from_array( $pending_action )->to_array();
 		}
 
 		$envelope_payload  = array_merge(
@@ -195,12 +195,12 @@ class PendingActionHelper {
 			),
 		);
 
-		$envelope = method_exists( AgentMessageEnvelope::class, 'approvalRequired' )
-			? AgentMessageEnvelope::approvalRequired( $payload['summary'], $envelope_payload, $envelope_metadata )
+		$envelope = method_exists( WP_Agent_Message::class, 'approvalRequired' )
+			? WP_Agent_Message::approvalRequired( $payload['summary'], $envelope_payload, $envelope_metadata )
 			: array(
-				'schema'   => AgentMessageEnvelope::SCHEMA,
-				'version'  => AgentMessageEnvelope::VERSION,
-				'type'     => AgentMessageEnvelope::TYPE_APPROVAL_REQUIRED,
+				'schema'   => WP_Agent_Message::SCHEMA,
+				'version'  => WP_Agent_Message::VERSION,
+				'type'     => WP_Agent_Message::TYPE_APPROVAL_REQUIRED,
 				'role'     => 'tool',
 				'content'  => $payload['summary'],
 				'payload'  => $envelope_payload,

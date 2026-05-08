@@ -1,13 +1,13 @@
 <?php
 /**
- * Tests for IterationBudget and IterationBudgetRegistry.
+ * Tests for WP_Agent_Iteration_Budget and IterationBudgetRegistry.
  *
  * @package DataMachine\Tests\Unit\AI
  */
 
 namespace DataMachine\Tests\Unit\AI;
 
-use AgentsAPI\AI\IterationBudget;
+use AgentsAPI\AI\WP_Agent_Iteration_Budget;
 use DataMachine\Engine\AI\IterationBudgetRegistry;
 use WP_UnitTestCase;
 
@@ -24,7 +24,7 @@ class IterationBudgetTest extends WP_UnitTestCase {
 	}
 
 	public function test_budget_starts_below_ceiling(): void {
-		$budget = new IterationBudget( 'x', 5 );
+		$budget = new WP_Agent_Iteration_Budget( 'x', 5 );
 		$this->assertSame( 0, $budget->current() );
 		$this->assertSame( 5, $budget->ceiling() );
 		$this->assertSame( 5, $budget->remaining() );
@@ -32,7 +32,7 @@ class IterationBudgetTest extends WP_UnitTestCase {
 	}
 
 	public function test_increment_advances_counter(): void {
-		$budget = new IterationBudget( 'x', 3 );
+		$budget = new WP_Agent_Iteration_Budget( 'x', 3 );
 		$budget->increment();
 		$this->assertSame( 1, $budget->current() );
 		$this->assertSame( 2, $budget->remaining() );
@@ -40,7 +40,7 @@ class IterationBudgetTest extends WP_UnitTestCase {
 	}
 
 	public function test_exceeded_at_ceiling(): void {
-		$budget = new IterationBudget( 'x', 2 );
+		$budget = new WP_Agent_Iteration_Budget( 'x', 2 );
 		$budget->increment();
 		$budget->increment();
 		$this->assertSame( 2, $budget->current() );
@@ -49,7 +49,7 @@ class IterationBudgetTest extends WP_UnitTestCase {
 	}
 
 	public function test_exceeded_above_ceiling(): void {
-		$budget = new IterationBudget( 'x', 2 );
+		$budget = new WP_Agent_Iteration_Budget( 'x', 2 );
 		$budget->increment();
 		$budget->increment();
 		$budget->increment();
@@ -59,17 +59,17 @@ class IterationBudgetTest extends WP_UnitTestCase {
 	}
 
 	public function test_ceiling_minimum_enforced(): void {
-		$budget = new IterationBudget( 'x', 0 );
+		$budget = new WP_Agent_Iteration_Budget( 'x', 0 );
 		$this->assertSame( 1, $budget->ceiling(), 'Ceiling floor of 1 enforced' );
 	}
 
 	public function test_negative_starting_current_clamped_to_zero(): void {
-		$budget = new IterationBudget( 'x', 5, -3 );
+		$budget = new WP_Agent_Iteration_Budget( 'x', 5, -3 );
 		$this->assertSame( 0, $budget->current() );
 	}
 
 	public function test_already_exceeded_start_preserved(): void {
-		$budget = new IterationBudget( 'x', 3, 7 );
+		$budget = new WP_Agent_Iteration_Budget( 'x', 3, 7 );
 		$this->assertSame( 7, $budget->current() );
 		$this->assertTrue( $budget->exceeded() );
 	}

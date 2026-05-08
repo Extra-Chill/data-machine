@@ -4,8 +4,9 @@
  * Plugin URI:      https://wordpress.org/plugins/data-machine/
  * Description:     AI-powered WordPress plugin for automated content workflows with visual pipeline builder and multi-provider AI integration.
  * Version:           0.106.0
- * Requires at least: 6.9
+ * Requires at least: 7.0
  * Requires PHP:     8.2
+ * Requires Plugins: agents-api
  * Author:          Chris Huber, extrachill
  * Author URI:      https://chubes.net
  * License:         GPL v2 or later
@@ -27,13 +28,6 @@ define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
 
 require_once __DIR__ . '/vendor/autoload.php';
-
-if ( ! defined( 'AGENTS_API_LOADED' ) ) {
-	$datamachine_agents_api_bootstrap = __DIR__ . '/vendor/automattic/agents-api/agents-api.php';
-	if ( file_exists( $datamachine_agents_api_bootstrap ) ) {
-		require_once $datamachine_agents_api_bootstrap;
-	}
-}
 
 // WP-CLI integration
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
@@ -836,8 +830,8 @@ require_once __DIR__ . '/inc/migrations/load.php';
 
 function datamachine_check_requirements() {
 	global $wp_version;
-	$current_wp_version = $wp_version ?? '0.0.0';
-	if ( version_compare( $current_wp_version, '6.9', '<' ) ) {
+	$current_wp_version = $wp_version ?? '';
+	if ( '' !== $current_wp_version && ! wp_installing() && version_compare( $current_wp_version, '7.0', '<' ) ) {
 		add_action(
 			'admin_notices',
 			function () use ( $current_wp_version ) {
@@ -845,7 +839,7 @@ function datamachine_check_requirements() {
 				printf(
 					esc_html( 'Data Machine requires WordPress %2$s or higher. You are running WordPress %1$s.' ),
 					esc_html( $current_wp_version ),
-					'6.9'
+					'7.0'
 				);
 				echo '</p></div>';
 			}

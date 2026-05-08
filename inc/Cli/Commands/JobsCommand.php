@@ -24,7 +24,7 @@ use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Abilities\Job\RunMetricsAbility;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Message;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\Tasks\TaskRegistry;
 
@@ -596,9 +596,9 @@ class JobsCommand extends BaseCommand {
 		WP_CLI::log( '' );
 
 		foreach ( $messages as $idx => $message ) {
-			$message = AgentMessageEnvelope::normalize( $message );
+			$message = WP_Agent_Message::normalize( $message );
 			$role    = $message['role'] ?? 'unknown';
-			$type    = $message['type'] ?? AgentMessageEnvelope::TYPE_TEXT;
+			$type    = $message['type'] ?? WP_Agent_Message::TYPE_TEXT;
 			$content = $message['content'] ?? '';
 			$header  = sprintf( '[%d] %s (%s)', $idx, $role, $type );
 

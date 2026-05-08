@@ -22,8 +22,8 @@
 
 namespace DataMachine\Core\Database\Chat;
 
-use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
-use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store;
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -76,7 +76,7 @@ class ConversationStoreFactory {
 		 *
 		 * The store MUST normalize messages on read to Data Machine message
 		 * shape. Implementations that only need transcript CRUD should target
-		 * {@see ConversationTranscriptStoreInterface}; this legacy Data Machine
+		 * {@see WP_Agent_Conversation_Store}; this legacy Data Machine
 		 * filter still expects the full aggregate so chat UI, REST, CLI, retention,
 		 * and reporting callers keep their existing behavior. A future Agents API
 		 * resolver can expose a narrower transcript-store filter without carrying
@@ -115,21 +115,21 @@ class ConversationStoreFactory {
 	 * runtime transcript persistence depends only on CRUD, not Data Machine's
 	 * chat session index, read-state, retention, or reporting product surface.
 	 *
-	 * @return ConversationTranscriptStoreInterface
+	 * @return WP_Agent_Conversation_Store
 	 */
-	public static function get_transcript_store(): ConversationTranscriptStoreInterface {
+	public static function get_transcript_store(): WP_Agent_Conversation_Store {
 		return self::get();
 	}
 
 	/**
 	 * Resolve Data Machine's default workspace scope for local chat/transcripts.
 	 *
-	 * @return AgentWorkspaceScope
+	 * @return WP_Agent_Workspace_Scope
 	 */
-	public static function default_workspace(): AgentWorkspaceScope {
+	public static function default_workspace(): WP_Agent_Workspace_Scope {
 		$blog_id = function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 1;
 
-		return AgentWorkspaceScope::from_parts( 'site', (string) max( 1, $blog_id ) );
+		return WP_Agent_Workspace_Scope::from_parts( 'site', (string) max( 1, $blog_id ) );
 	}
 
 	/**

@@ -14,7 +14,7 @@
  * Precedence: a valid DailyMemoryStorage returned by
  * `datamachine_daily_memory_storage` replaces the backend for these
  * abilities. If that filter is absent or returns an invalid value,
- * DailyMemory remains active and the active AgentMemoryStoreInterface
+ * DailyMemory remains active and the active WP_Agent_Memory_Store
  * selected by `agents_api_memory_store` handles persistence.
  *
  * @package DataMachine\Abilities

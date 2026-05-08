@@ -9,7 +9,7 @@
 
 namespace DataMachine\Engine\AI\Directives;
 
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Message;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -22,7 +22,7 @@ class DirectiveRenderer {
 			$type = $output['type'] ?? '';
 
 			if ( 'system_text' === $type ) {
-				$messages[] = AgentMessageEnvelope::text( 'system', $output['content'] );
+				$messages[] = WP_Agent_Message::text( 'system', $output['content'] );
 				continue;
 			}
 
@@ -30,12 +30,12 @@ class DirectiveRenderer {
 				$label = $output['label'];
 				$data  = $output['data'];
 
-				$messages[] = AgentMessageEnvelope::text( 'system', $label . ":\n\n" . wp_json_encode( $data, JSON_PRETTY_PRINT ) );
+				$messages[] = WP_Agent_Message::text( 'system', $label . ":\n\n" . wp_json_encode( $data, JSON_PRETTY_PRINT ) );
 				continue;
 			}
 
 			if ( 'system_file' === $type ) {
-				$messages[] = AgentMessageEnvelope::text(
+				$messages[] = WP_Agent_Message::text(
 					'system',
 					array(
 						array(

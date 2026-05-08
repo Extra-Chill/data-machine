@@ -121,7 +121,7 @@ require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
 require_once __DIR__ . '/../inc/Core/FilesRepository/GuidelineAgentMemoryStore.php';
 
-use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Scope;
 use DataMachine\Core\FilesRepository\GuidelineAgentMemoryStore;
 
 function datamachine_guideline_memory_assert( bool $condition, string $message ): void {
@@ -163,9 +163,9 @@ datamachine_guideline_memory_assert(
 
 echo "\nTest: deterministic scope key encoding\n";
 
-$scope = new AgentMemoryScope( 'agent', 'site', 'https://example.test', 7, 42, 'MEMORY.md' );
-$same  = new AgentMemoryScope( 'agent', 'site', 'https://example.test', 7, 42, 'MEMORY.md' );
-$daily = new AgentMemoryScope( 'agent', 'site', 'https://example.test', 7, 42, 'daily/2026/04/17.md' );
+$scope = new WP_Agent_Memory_Scope( 'agent', 'site', 'https://example.test', 7, 42, 'MEMORY.md' );
+$same  = new WP_Agent_Memory_Scope( 'agent', 'site', 'https://example.test', 7, 42, 'MEMORY.md' );
+$daily = new WP_Agent_Memory_Scope( 'agent', 'site', 'https://example.test', 7, 42, 'daily/2026/04/17.md' );
 
 $post_name = GuidelineAgentMemoryStore::post_name_for_scope( $scope );
 datamachine_guideline_memory_assert(
@@ -175,7 +175,7 @@ datamachine_guideline_memory_assert(
 
 datamachine_guideline_memory_assert(
 	'memory-' . sha1( $scope->key() ) === $post_name,
-	'post_name is memory- prefixed sha1 of AgentMemoryScope::key()'
+	'post_name is memory- prefixed sha1 of WP_Agent_Memory_Scope::key()'
 );
 
 datamachine_guideline_memory_assert(
@@ -248,7 +248,7 @@ datamachine_guideline_memory_assert(
 echo "\nTest: private memory requires explicit owner capability metadata\n";
 
 $store         = new GuidelineAgentMemoryStore();
-$private_scope = new AgentMemoryScope( 'user', 'site', '1', 7, 42, 'USER.md' );
+$private_scope = new WP_Agent_Memory_Scope( 'user', 'site', '1', 7, 42, 'USER.md' );
 $post_id       = 200;
 
 $GLOBALS['datamachine_guideline_posts'][ $post_id ] = new WP_Post(
@@ -294,7 +294,7 @@ datamachine_guideline_memory_assert(
 
 echo "\nTest: workspace-shared guidance uses workspace guideline capabilities\n";
 
-$shared_scope = new AgentMemoryScope( 'shared', 'site', '1', 7, 42, 'RULES.md' );
+$shared_scope = new WP_Agent_Memory_Scope( 'shared', 'site', '1', 7, 42, 'RULES.md' );
 $post_id      = 201;
 
 $GLOBALS['datamachine_guideline_posts'][ $post_id ] = new WP_Post(

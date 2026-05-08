@@ -27,7 +27,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Agents\AgentTokens;
 use DataMachine\Engine\AI\IterationBudgetRegistry;
-use AgentsAPI\AI\AgentExecutionPrincipal;
+use AgentsAPI\AI\WP_Agent_Execution_Principal;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -81,7 +81,7 @@ class AgentAuthMiddleware {
 		// Resolve token through the generic Agents API token contract.
 		$tokens_repo   = new AgentTokens();
 		$authenticator = new \WP_Agent_Token_Authenticator( $tokens_repo, self::TOKEN_PREFIX );
-		$principal     = $authenticator->authenticate_bearer_token( $raw_token, AgentExecutionPrincipal::REQUEST_CONTEXT_REST, array(), $request );
+		$principal     = $authenticator->authenticate_bearer_token( $raw_token, WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST, array(), $request );
 
 		if ( ! $principal ) {
 			do_action(

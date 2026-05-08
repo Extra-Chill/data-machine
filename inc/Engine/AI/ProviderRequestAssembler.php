@@ -10,7 +10,7 @@
 
 namespace DataMachine\Engine\AI;
 
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Message;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -51,7 +51,7 @@ class ProviderRequestAssembler {
 		}
 
 		$request             = $prompt_builder->buildDetailed( $mode, $provider, $payload );
-		$request['messages'] = AgentMessageEnvelope::normalize_many( $request['messages'] ?? array() );
+		$request['messages'] = WP_Agent_Message::normalize_many( $request['messages'] ?? array() );
 		$applied_directives  = $request['applied_directives'] ?? array();
 		$directive_metadata  = $request['directive_metadata'] ?? array();
 		$directive_breakdown = $request['directive_breakdown'] ?? array();
@@ -75,7 +75,7 @@ class ProviderRequestAssembler {
 	 */
 	public static function toProviderRequest( array $request ): array {
 		$provider_request             = $request;
-		$provider_request['messages'] = AgentMessageEnvelope::to_provider_messages( $request['messages'] ?? array() );
+		$provider_request['messages'] = WP_Agent_Message::to_provider_messages( $request['messages'] ?? array() );
 		return $provider_request;
 	}
 

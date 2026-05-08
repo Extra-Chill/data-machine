@@ -5,7 +5,7 @@
  * Determines HOW a tool invocation is allowed to execute. Sibling to
  * ToolPolicyResolver (which decides IF a tool is visible) and
  * MemoryPolicyResolver (which decides WHICH memory files inject). Where
- * ToolPolicy answers "can the agent see this tool?", ActionPolicy answers
+ * ToolPolicy answers "can the agent see this tool?", WP_Agent_Action_Policy answers
  * "having called it, does it execute directly, stage for user approval,
  * or get refused?"
  *
@@ -34,17 +34,9 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
-use AgentsAPI\AI\Tools\ActionPolicy;
+use AgentsAPI\AI\Tools\WP_Agent_Action_Policy;
 
 defined( 'ABSPATH' ) || exit;
-
-if ( ! class_exists( '\WP_Agent_Action_Policy_Resolver' ) ) {
-	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy-interface.php';
-	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
-	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy.php';
-	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-action-policy-provider-interface.php';
-	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-action-policy-resolver.php';
-}
 
 class ActionPolicyResolver {
 
@@ -62,9 +54,9 @@ class ActionPolicyResolver {
 	 * Keep the legacy Data Machine constant names as public aliases while the
 	 * generic vocabulary lives in Agents API.
 	 */
-	public const POLICY_DIRECT    = ActionPolicy::DIRECT;
-	public const POLICY_PREVIEW   = ActionPolicy::PREVIEW;
-	public const POLICY_FORBIDDEN = ActionPolicy::FORBIDDEN;
+	public const POLICY_DIRECT    = WP_Agent_Action_Policy::DIRECT;
+	public const POLICY_PREVIEW   = WP_Agent_Action_Policy::PREVIEW;
+	public const POLICY_FORBIDDEN = WP_Agent_Action_Policy::FORBIDDEN;
 
 	private \WP_Agent_Action_Policy_Resolver $resolver;
 
@@ -178,7 +170,7 @@ class ActionPolicyResolver {
 	private function applyDataMachineFilter( string $policy, string $tool_name, string $mode, array $context ): string {
 		$filtered = apply_filters( 'datamachine_tool_action_policy', $policy, $tool_name, $mode, $context );
 
-		return ActionPolicy::normalize( $filtered ) ?? $policy;
+		return WP_Agent_Action_Policy::normalize( $filtered ) ?? $policy;
 	}
 
 	/**

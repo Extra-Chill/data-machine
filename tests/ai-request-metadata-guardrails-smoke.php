@@ -103,8 +103,8 @@ use DataMachine\Core\Database\Chat\ConversationStoreInterface;
 use DataMachine\Engine\AI\DataMachinePipelineTranscriptPersister;
 use DataMachine\Engine\AI\Directives\DirectiveInterface;
 use DataMachine\Engine\AI\RequestBuilder;
-use AgentsAPI\AI\AgentConversationRequest;
-use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
+use AgentsAPI\AI\WP_Agent_Conversation_Request;
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 
 class RequestMetadataSmokeDirective implements DirectiveInterface {
 	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
@@ -121,21 +121,22 @@ class RequestMetadataSmokeStore implements ConversationStoreInterface {
 	public array $sessions = array();
 	public array $updated  = array();
 
-	public function create_session( AgentWorkspaceScope $workspace, int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
+	public function create_session( WP_Agent_Workspace_Scope $workspace, int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
 		$metadata['workspace'] = $workspace->to_array();
 		$this->sessions['smoke-session'] = compact( 'user_id', 'agent_id', 'metadata', 'context' );
 		return 'smoke-session';
 	}
 
 	public function get_session( string $session_id ): ?array { return null; }
-	public function update_session( string $session_id, array $messages, array $metadata = array(), string $provider = '', string $model = '' ): bool {
+	public function update_session( string $session_id, array $messages, array $metadata = array(), string $provider = '', string $model = '', ?string $provider_response_id = null ): bool {
+		unset( $provider_response_id );
 		$this->updated[ $session_id ] = compact( 'messages', 'metadata', 'provider', 'model' );
 		return true;
 	}
 	public function delete_session( string $session_id ): bool { return true; }
 	public function get_user_sessions( int $user_id, int $limit = 20, int $offset = 0, ?string $context = null, ?int $agent_id = null ): array { return array(); }
 	public function get_user_session_count( int $user_id, ?string $context = null, ?int $agent_id = null ): int { return 0; }
-	public function get_recent_pending_session( AgentWorkspaceScope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array { return null; }
+	public function get_recent_pending_session( WP_Agent_Workspace_Scope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array { return null; }
 	public function update_title( string $session_id, string $title ): bool { return true; }
 	public function count_unread( array $messages, ?string $last_read_at ): int { return 0; }
 	public function mark_session_read( string $session_id, int $user_id ) { return gmdate( 'Y-m-d H:i:s' ); }
@@ -286,7 +287,7 @@ $store    = new RequestMetadataSmokeStore();
 $property = new ReflectionProperty( ConversationStoreFactory::class, 'instance' );
 $property->setValue( null, $store );
 
-$transcript_request = new AgentConversationRequest(
+$transcript_request = new WP_Agent_Conversation_Request(
 	array( array( 'role' => 'user', 'content' => 'hello' ) ),
 	array(),
 	null,
@@ -294,7 +295,7 @@ $transcript_request = new AgentConversationRequest(
 	array( 'provider' => 'openai', 'model' => 'gpt-smoke' ),
 	10,
 	false,
-	AgentWorkspaceScope::from_parts( 'wordpress_site', 'default' )
+	WP_Agent_Workspace_Scope::from_parts( 'wordpress_site', 'default' )
 );
 
 $session_id = ( new DataMachinePipelineTranscriptPersister() )->persist(

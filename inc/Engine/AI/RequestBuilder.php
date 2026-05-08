@@ -120,6 +120,24 @@ class RequestBuilder {
 			return new \WP_Error( 'wp_ai_client_unavailable', $unavailable_reason );
 		}
 
+		$filtered_result = apply_filters( 'datamachine_wp_ai_client_text_result', null, $provider_request, $provider, $model, $request );
+		if ( null !== $filtered_result ) {
+			if ( $filtered_result instanceof \WP_Error || $filtered_result instanceof \WordPress\AiClient\Results\DTO\GenerativeAiResult ) {
+				return $filtered_result;
+			}
+
+			if ( is_array( $filtered_result ) ) {
+				$data = $filtered_result['data'] ?? $filtered_result;
+				if ( is_callable( array( '\WordPress\AiClient\Results\DTO\GenerativeAiResult', 'fromData' ) ) ) {
+					return \WordPress\AiClient\Results\DTO\GenerativeAiResult::fromData( $data );
+				}
+
+				if ( is_callable( array( '\WordPress\AiClient\Results\DTO\GenerativeAiResult', 'fromArray' ) ) ) {
+					return \WordPress\AiClient\Results\DTO\GenerativeAiResult::fromArray( self::wpAiClientResultArray( $data, $provider, $model ) );
+				}
+			}
+		}
+
 		$result                        = null;
 		$request_options               = null;
 		$transport_profile             = self::wpAiClientTransportProfile( $mode, $provider, $model, $payload );
@@ -573,6 +591,77 @@ class RequestBuilder {
 	}
 
 	/**
+	 * Normalize compact test-dispatch response data into wp-ai-client's DTO array shape.
+	 *
+	 * @param array  $data     Compact response data.
+	 * @param string $provider Provider identifier.
+	 * @param string $model    Model identifier.
+	 * @return array wp-ai-client GenerativeAiResult array shape.
+	 */
+	private static function wpAiClientResultArray( array $data, string $provider, string $model ): array {
+		$parts = array();
+		if ( '' !== (string) ( $data['content'] ?? '' ) ) {
+			$parts[] = array(
+				'channel' => 'content',
+				'type'    => 'text',
+				'text'    => (string) $data['content'],
+			);
+		}
+
+		foreach ( $data['tool_calls'] ?? array() as $tool_call ) {
+			$parts[] = array(
+				'channel'      => 'content',
+				'type'         => 'function_call',
+				'functionCall' => array_filter(
+					array(
+						'id'   => $tool_call['id'] ?? null,
+						'name' => $tool_call['name'] ?? null,
+						'args' => $tool_call['parameters'] ?? array(),
+					),
+					fn( $value ) => null !== $value
+				),
+			);
+		}
+
+		if ( empty( $parts ) ) {
+			$parts[] = array(
+				'channel' => 'content',
+				'type'    => 'text',
+				'text'    => '',
+			);
+		}
+
+		return array(
+			'id'               => 'datamachine-test-result',
+			'candidates'       => array(
+				array(
+					'message'      => array(
+						'role'  => 'model',
+						'parts' => $parts,
+					),
+					'finishReason' => ! empty( $data['tool_calls'] ) ? 'tool_calls' : 'stop',
+				),
+			),
+			'tokenUsage'       => array(
+				'promptTokens'     => (int) ( $data['usage']['prompt_tokens'] ?? 0 ),
+				'completionTokens' => (int) ( $data['usage']['completion_tokens'] ?? 0 ),
+				'totalTokens'      => (int) ( $data['usage']['total_tokens'] ?? 0 ),
+			),
+			'providerMetadata' => array(
+				'id'   => $provider,
+				'name' => $provider,
+				'type' => 'cloud',
+			),
+			'modelMetadata'    => array(
+				'id'                    => $model,
+				'name'                  => $model,
+				'supportedCapabilities' => array( 'text_generation' ),
+				'supportedOptions'      => array(),
+			),
+		);
+	}
+
+	/**
 	 * Explain why wp-ai-client cannot handle the requested provider.
 	 *
 	 * Agents API sits above wp-ai-client; this product execution path calls the
@@ -582,6 +671,14 @@ class RequestBuilder {
 	 * @return string|null Human-readable failure reason, or null when available.
 	 */
 	public static function wpAiClientUnavailableReason( string $provider ): ?string {
+		$availability = apply_filters( 'datamachine_wp_ai_client_availability', null, $provider );
+		if ( true === $availability ) {
+			return null;
+		}
+		if ( is_string( $availability ) && '' !== $availability ) {
+			return $availability;
+		}
+
 		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return 'wp-ai-client is unavailable: wp_ai_client_prompt() is not defined';
 		}

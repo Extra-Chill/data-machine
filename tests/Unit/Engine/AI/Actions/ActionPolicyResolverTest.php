@@ -16,13 +16,13 @@
 
 namespace DataMachine\Tests\Unit\Engine\AI\Actions;
 
-use AgentsAPI\AI\Tools\ActionPolicy;
+use AgentsAPI\AI\Tools\WP_Agent_Action_Policy;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
 use WP_UnitTestCase;
 
-if ( ! class_exists( ActionPolicy::class ) ) {
-	require_once dirname( __DIR__, 5 ) . '/vendor/automattic/agents-api/src/Tools/ActionPolicy.php';
+if ( ! class_exists( WP_Agent_Action_Policy::class ) ) {
+	require_once dirname( __DIR__, 5 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-action-policy.php';
 }
 
 class ActionPolicyResolverTest extends WP_UnitTestCase {
@@ -54,9 +54,9 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_legacy_policy_constants_alias_agents_api_vocabulary(): void {
-		$this->assertSame( ActionPolicy::DIRECT, ActionPolicyResolver::POLICY_DIRECT );
-		$this->assertSame( ActionPolicy::PREVIEW, ActionPolicyResolver::POLICY_PREVIEW );
-		$this->assertSame( ActionPolicy::FORBIDDEN, ActionPolicyResolver::POLICY_FORBIDDEN );
+		$this->assertSame( WP_Agent_Action_Policy::DIRECT, ActionPolicyResolver::POLICY_DIRECT );
+		$this->assertSame( WP_Agent_Action_Policy::PREVIEW, ActionPolicyResolver::POLICY_PREVIEW );
+		$this->assertSame( WP_Agent_Action_Policy::FORBIDDEN, ActionPolicyResolver::POLICY_FORBIDDEN );
 	}
 
 	public function test_tool_declared_default_overrides_global_default(): void {

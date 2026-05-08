@@ -7,7 +7,7 @@ Multi-turn conversation execution engine for AI agents. Handles automatic tool e
 
 ## Purpose
 
-Data Machine's `datamachine_run_conversation()` adapter provides centralized multi-turn conversation management while delegating generic turn sequencing to `AgentsAPI\AI\AgentConversationLoop`. It orchestrates Data Machine request assembly, product-specific tool execution, turn limits, transcript persistence, and completion detection for Pipeline and Chat agents.
+Data Machine's `datamachine_run_conversation()` adapter provides centralized multi-turn conversation management while delegating generic turn sequencing to `AgentsAPI\AI\WP_Agent_Conversation_Loop`. It orchestrates Data Machine request assembly, product-specific tool execution, turn limits, transcript persistence, and completion detection for Pipeline and Chat agents.
 
 ## Architecture
 
@@ -109,7 +109,7 @@ if ($turn_count >= $max_turns && !$conversation_complete) {
 
 ### Canonical entry point
 
-All callers should use `DataMachine\Engine\AI\datamachine_run_conversation()`. The function builds a Data Machine turn runner and passes it to `AgentsAPI\AI\AgentConversationLoop::run()` so generic lifecycle behavior stays in Agents API while product adapters own Data Machine request and tool semantics.
+All callers should use `DataMachine\Engine\AI\datamachine_run_conversation()`. The function builds a Data Machine turn runner and passes it to `AgentsAPI\AI\WP_Agent_Conversation_Loop::run()` so generic lifecycle behavior stays in Agents API while product adapters own Data Machine request and tool semantics.
 
 ```php
 use function DataMachine\Engine\AI\datamachine_run_conversation;

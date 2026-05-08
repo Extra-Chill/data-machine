@@ -6,7 +6,7 @@
  * Parses markdown sections and supports section-level operations
  * on any agent file (MEMORY.md, SOUL.md, USER.md, etc.).
  *
- * Persistence is delegated to an {@see AgentMemoryStoreInterface} resolved
+ * Persistence is delegated to an {@see WP_Agent_Memory_Store} resolved
  * via the `agents_api_memory_store` filter. The default store
  * ({@see DiskAgentMemoryStore}) preserves the byte-for-byte filesystem
  * behavior the codebase used before the store seam was introduced.
@@ -14,17 +14,17 @@
  * @package DataMachine\Core\FilesRepository
  * @since 0.30.0
  * @since 0.45.0 Generalized to support any agent file via $filename parameter.
- * @since next   Whole-file IO delegated to AgentMemoryStoreInterface.
+ * @since next   Whole-file IO delegated to WP_Agent_Memory_Store.
  */
 
 namespace DataMachine\Core\FilesRepository;
 
-use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
-use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
-use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
-use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
-use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
-use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_List_Entry;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Metadata;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Read_Result;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Scope;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
@@ -48,20 +48,20 @@ class AgentMemory {
 	private DirectoryManager $directory_manager;
 
 	/**
-	 * @var AgentMemoryScope
+	 * @var WP_Agent_Memory_Scope
 	 */
-	private AgentMemoryScope $scope;
+	private WP_Agent_Memory_Scope $scope;
 
 	/**
-	 * @var AgentMemoryStoreInterface
+	 * @var WP_Agent_Memory_Store
 	 */
-	private AgentMemoryStoreInterface $store;
+	private WP_Agent_Memory_Store $store;
 
 	/**
 	 * @since 0.37.0 Added $user_id parameter for multi-agent partitioning.
 	 * @since 0.41.0 Added $agent_id parameter for agent-first resolution.
 	 * @since 0.45.0 Added $filename parameter for any-file support.
-	 * @since next   Switched whole-file IO to AgentMemoryStoreInterface.
+	 * @since next   Switched whole-file IO to WP_Agent_Memory_Store.
 	 * @since next   Optional $layer override for explicit-layer addressing.
 	 *
 	 * @param int         $user_id  WordPress user ID. 0 = legacy shared directory.
@@ -76,7 +76,7 @@ class AgentMemory {
 		$safe_filename           = $this->sanitize_filename( $filename );
 		$workspace               = WordPressWorkspaceScope::current();
 
-		$this->scope = new AgentMemoryScope(
+		$this->scope = new WP_Agent_Memory_Scope(
 			$layer ?? self::resolve_layer_for( $safe_filename ),
 			$workspace->workspace_type,
 			$workspace->workspace_id,
@@ -105,9 +105,9 @@ class AgentMemory {
 	 * Get the resolved scope for this memory file.
 	 *
 	 * @since next
-	 * @return AgentMemoryScope
+	 * @return WP_Agent_Memory_Scope
 	 */
-	public function get_scope(): AgentMemoryScope {
+	public function get_scope(): WP_Agent_Memory_Scope {
 		return $this->scope;
 	}
 
@@ -164,7 +164,7 @@ class AgentMemory {
 	/**
 	 * Low-level read returning the raw store result.
 	 *
-	 * Exposes the underlying {@see AgentMemoryReadResult} (content, hash,
+	 * Exposes the underlying {@see WP_Agent_Memory_Read_Result} (content, hash,
 	 * bytes, updated_at, exists) for consumers that need richer metadata
 	 * than {@see self::get_all()}'s human-shaped response — e.g. directives
 	 * that want byte counts for size budgeting, the React UI's whole-file
@@ -172,9 +172,9 @@ class AgentMemory {
 	 * for compare-and-swap upstream.
 	 *
 	 * @since next
-	 * @return AgentMemoryReadResult
+	 * @return WP_Agent_Memory_Read_Result
 	 */
-	public function read(): AgentMemoryReadResult {
+	public function read(): WP_Agent_Memory_Read_Result {
 		return $this->store->read( $this->scope );
 	}
 
@@ -216,9 +216,9 @@ class AgentMemory {
 	/**
 	 * List all files in a single layer for the given identity.
 	 *
-	 * Static facade over {@see AgentMemoryStoreInterface::list_layer()}
+	 * Static facade over {@see WP_Agent_Memory_Store::list_layer()}
 	 * so directory enumeration goes through the same swap point as
-	 * single-file IO. Callers receive a list of {@see AgentMemoryListEntry}
+	 * single-file IO. Callers receive a list of {@see WP_Agent_Memory_List_Entry}
 	 * value objects.
 	 *
 	 * @since next
@@ -226,13 +226,13 @@ class AgentMemory {
 	 * @param string $layer    Layer identifier (shared|agent|user|network).
 	 * @param int    $user_id  WordPress user ID. 0 = default agent.
 	 * @param int    $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
-	 * @return AgentMemoryListEntry[]
+	 * @return WP_Agent_Memory_List_Entry[]
 	 */
 	public static function list_layer( string $layer, int $user_id = 0, int $agent_id = 0 ): array {
 		$dm                = new DirectoryManager();
 		$effective_user_id = $dm->get_effective_user_id( $user_id );
 		$workspace         = WordPressWorkspaceScope::current();
-		$scope_query       = new AgentMemoryScope( $layer, $workspace->workspace_type, $workspace->workspace_id, $effective_user_id, $agent_id, '' );
+		$scope_query       = new WP_Agent_Memory_Scope( $layer, $workspace->workspace_type, $workspace->workspace_id, $effective_user_id, $agent_id, '' );
 		$store             = AgentMemoryStoreFactory::for_scope( $scope_query );
 
 		return $store->list_layer( $scope_query );
@@ -241,7 +241,7 @@ class AgentMemory {
 	/**
 	 * List all files under a path prefix within a layer.
 	 *
-	 * Static facade over {@see AgentMemoryStoreInterface::list_subtree()}.
+	 * Static facade over {@see WP_Agent_Memory_Store::list_subtree()}.
 	 * Recursive — entries' filenames are full relative paths from the
 	 * layer root (e.g. `daily/2026/04/17.md`, `contexts/chat.md`).
 	 *
@@ -255,13 +255,13 @@ class AgentMemory {
 	 * @param int    $user_id  WordPress user ID. 0 = default agent.
 	 * @param int    $agent_id Agent ID for direct resolution. 0 = resolve from user_id.
 	 * @param string $prefix   Path prefix without trailing slash (e.g. 'daily', 'contexts').
-	 * @return AgentMemoryListEntry[]
+	 * @return WP_Agent_Memory_List_Entry[]
 	 */
 	public static function list_subtree( string $layer, int $user_id, int $agent_id, string $prefix ): array {
 		$dm                = new DirectoryManager();
 		$effective_user_id = $dm->get_effective_user_id( $user_id );
 		$workspace         = WordPressWorkspaceScope::current();
-		$scope_query       = new AgentMemoryScope( $layer, $workspace->workspace_type, $workspace->workspace_id, $effective_user_id, $agent_id, '' );
+		$scope_query       = new WP_Agent_Memory_Scope( $layer, $workspace->workspace_type, $workspace->workspace_id, $effective_user_id, $agent_id, '' );
 		$store             = AgentMemoryStoreFactory::for_scope( $scope_query );
 
 		return $store->list_subtree( $scope_query, $prefix );
@@ -333,10 +333,10 @@ class AgentMemory {
 	 *
 	 * @since next
 	 * @param string                   $content  New full file content.
-	 * @param AgentMemoryMetadata|null $metadata Optional Agents API provenance/trust metadata.
+	 * @param WP_Agent_Memory_Metadata|null $metadata Optional Agents API provenance/trust metadata.
 	 * @return array{success: bool, message: string, file_size?: int, warning?: string}
 	 */
-	public function replace_all( string $content, ?AgentMemoryMetadata $metadata = null ): array {
+	public function replace_all( string $content, ?WP_Agent_Memory_Metadata $metadata = null ): array {
 		$write = $this->store->write( $this->scope, $content, null, $metadata );
 
 		if ( ! $write->success ) {
@@ -624,9 +624,9 @@ class AgentMemory {
 	 * @since next
 	 *
 	 * @param string                 $content Persisted full-file content.
-	 * @param AgentMemoryWriteResult $write   Successful store write result.
+	 * @param WP_Agent_Memory_Write_Result $write   Successful store write result.
 	 */
-	private function emit_updated_event( string $content, AgentMemoryWriteResult $write ): void {
+	private function emit_updated_event( string $content, WP_Agent_Memory_Write_Result $write ): void {
 		do_action(
 			'datamachine_agent_memory_updated',
 			$this->scope,
@@ -647,16 +647,16 @@ class AgentMemory {
 	/**
 	 * Build JSON-friendly metadata for memory change events.
 	 *
-	 * The AgentMemoryScope object remains the first event argument for typed PHP
+	 * The WP_Agent_Memory_Scope object remains the first event argument for typed PHP
 	 * consumers; duplicated scalar identity fields let queue/log/projector code
 	 * persist the event without inspecting the value object.
 	 *
 	 * @since next
 	 *
-	 * @param AgentMemoryWriteResult $write Successful store write result.
+	 * @param WP_Agent_Memory_Write_Result $write Successful store write result.
 	 * @return array{layer: string, user_id: int, agent_id: int, filename: string, key: string, hash: string, bytes: int, metadata?: array, unsupported_metadata_fields?: string[]}
 	 */
-	private function event_metadata( AgentMemoryWriteResult $write ): array {
+	private function event_metadata( WP_Agent_Memory_Write_Result $write ): array {
 		$metadata = array(
 			'layer'    => $this->scope->layer,
 			'user_id'  => $this->scope->user_id,
