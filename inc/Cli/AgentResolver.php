@@ -46,9 +46,9 @@ class AgentResolver {
 		} catch ( \InvalidArgumentException $e ) {
 			// Suggest available agents.
 			$agents_repo = new Agents();
-			$all_agents = $agents_repo->get_all();
-			$slugs      = array_column( $all_agents, 'agent_slug' );
-			$hint       = ! empty( $slugs )
+			$all_agents  = $agents_repo->get_all();
+			$slugs       = array_column( $all_agents, 'agent_slug' );
+			$hint        = ! empty( $slugs )
 				? sprintf( ' Available: %s', implode( ', ', $slugs ) )
 				: '';
 			WP_CLI::error( $e->getMessage() . $hint );
