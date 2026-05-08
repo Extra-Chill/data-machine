@@ -210,208 +210,245 @@ class AIStep extends Step {
 				// drive the conversation. Fall through with $user_message=''.
 			}
 
-		// Vision image from engine data (single source of truth)
-		$file_path    = null;
-		$mime_type    = null;
-		$engine_image = $this->engine->get( 'image_file_path' );
-		if ( $engine_image && file_exists( $engine_image ) ) {
-			$file_path = $engine_image;
-			$file_info = wp_check_filetype( $engine_image );
-			$mime_type = is_string( $file_info['type'] ) ? $file_info['type'] : '';
-		}
+			// Vision image from engine data (single source of truth)
+			$file_path    = null;
+			$mime_type    = null;
+			$engine_image = $this->engine->get( 'image_file_path' );
+			if ( $engine_image && file_exists( $engine_image ) ) {
+				$file_path = $engine_image;
+				$file_info = wp_check_filetype( $engine_image );
+				$mime_type = is_string( $file_info['type'] ) ? $file_info['type'] : '';
+			}
 
-		$packet_projection_context = array(
-			'job_id'           => $this->job_id,
-			'pipeline_id'      => $job_snapshot['pipeline_id'] ?? null,
-			'flow_id'          => $job_snapshot['flow_id'] ?? null,
-			'flow_step_id'     => $this->flow_step_id,
-			'pipeline_step_id' => $pipeline_step_id,
-		);
-
-		$messages = array();
-
-		if ( ! empty( $this->dataPackets ) ) {
-			$data_packet_content = wp_json_encode( array( 'data_packets' => DataPacketPromptProjector::project( $this->dataPackets, $packet_projection_context ) ), JSON_UNESCAPED_UNICODE );
-			$messages[]          = ConversationManager::buildConversationMessage(
-				'user',
-				false === $data_packet_content ? '' : $data_packet_content
+			$packet_projection_context = array(
+				'job_id'           => $this->job_id,
+				'pipeline_id'      => $job_snapshot['pipeline_id'] ?? null,
+				'flow_id'          => $job_snapshot['flow_id'] ?? null,
+				'flow_step_id'     => $this->flow_step_id,
+				'pipeline_step_id' => $pipeline_step_id,
 			);
-		}
 
-		if ( $file_path && file_exists( $file_path ) ) {
-			$messages[] = ConversationManager::buildConversationMessage(
-				'user',
-				array(
+			$messages = array();
+
+			if ( ! empty( $this->dataPackets ) ) {
+				$data_packet_content = wp_json_encode( array( 'data_packets' => DataPacketPromptProjector::project( $this->dataPackets, $packet_projection_context ) ), JSON_UNESCAPED_UNICODE );
+				$messages[]          = ConversationManager::buildConversationMessage(
+					'user',
+					false === $data_packet_content ? '' : $data_packet_content
+				);
+			}
+
+			if ( $file_path && file_exists( $file_path ) ) {
+				$messages[] = ConversationManager::buildConversationMessage(
+					'user',
 					array(
-						'type'      => 'file',
-						'file_path' => $file_path,
-						'mime_type' => $mime_type,
+						array(
+							'type'      => 'file',
+							'file_path' => $file_path,
+							'mime_type' => $mime_type,
+						),
+					)
+				);
+			}
+
+			if ( ! empty( $user_message ) ) {
+				$messages[] = ConversationManager::buildConversationMessage( 'user', $user_message );
+			}
+
+			$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
+
+			$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
+
+			// Resolve transcript persistence policy once per AI step invocation.
+			// Resolution order: flow > pipeline > site option (default false).
+			// The boolean is threaded through $payload so the loop doesn't need
+			// to repeat the lookup every turn.
+			$transcript_consent_decision = PipelineTranscriptPolicy::decision( $this->engine );
+			$persist_transcript          = $transcript_consent_decision->is_allowed();
+
+			$payload = array(
+				'job_id'                      => $this->job_id,
+				'flow_step_id'                => $this->flow_step_id,
+				'step_id'                     => $pipeline_step_id,
+				'data'                        => $this->dataPackets,
+				'engine'                      => $this->engine,
+				'user_id'                     => $user_id,
+				'agent_id'                    => $agent_id,
+				'pipeline_id'                 => $job_snapshot['pipeline_id'] ?? null,
+				'flow_id'                     => $job_snapshot['flow_id'] ?? null,
+				'persist_transcript'          => $persist_transcript,
+				'transcript_consent_decision' => $transcript_consent_decision->to_array(),
+			);
+
+			$navigator             = new \DataMachine\Engine\StepNavigator();
+			$previous_flow_step_id = $navigator->get_previous_flow_step_id( $this->flow_step_id, $payload );
+
+			$previous_step_config = $previous_flow_step_id ? $this->engine->getFlowStepConfig( $previous_flow_step_id ) : null;
+
+			$next_flow_step_id = $navigator->get_next_flow_step_id( $this->flow_step_id, $payload );
+			$next_step_config  = $next_flow_step_id ? $this->engine->getFlowStepConfig( $next_flow_step_id ) : null;
+
+			// Collect required handler slugs from adjacent steps for completion tracking.
+			$required_handler_slugs = FlowStepConfig::getAdjacentRequiredHandlerSlugsForAi( $previous_step_config, $next_step_config );
+
+			$engine_data = $this->engine->all();
+
+			// Tool categories can be specified at the pipeline step level or pipeline level.
+			// This allows pipelines to declare which ability categories are relevant,
+			// reducing tool bloat by excluding irrelevant tools from the AI context.
+			$tool_categories = $pipeline_step_config['tool_categories']
+				?? $this->engine->get( 'pipeline_tool_categories' )
+				?? array();
+
+			$resolver        = new ToolPolicyResolver();
+			$available_tools = $resolver->resolve(
+				array_merge(
+					array(
+						'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
+						'agent_id'             => $agent_id,
+						'previous_step_config' => $previous_step_config,
+						'next_step_config'     => $next_step_config,
+						'pipeline_step_id'     => $pipeline_step_id,
+						'engine_data'          => $engine_data,
+						'categories'           => $tool_categories,
 					),
+					PipelineToolPolicyArgs::fromConfigs( $this->flow_step_config, $pipeline_step_config )
 				)
 			);
-		}
 
-		if ( ! empty( $user_message ) ) {
-			$messages[] = ConversationManager::buildConversationMessage( 'user', $user_message );
-		}
+			// Required adjacent handler tools are flow plumbing, not optional research
+			// tools. If a publish/upsert handler required by the flow shape cannot be
+			// exposed to the model, fail before the model call instead of silently
+			// narrowing completion tracking to the visible subset.
+			if ( ! empty( $required_handler_slugs ) ) {
+				$missing_handler_slugs = FlowStepConfig::getMissingRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools );
+				if ( ! empty( $missing_handler_slugs ) ) {
+					do_action(
+						'datamachine_fail_job',
+						$this->job_id,
+						'required_handler_tool_unavailable',
+						array(
+							'flow_step_id'                 => $this->flow_step_id,
+							'pipeline_step_id'             => $pipeline_step_id,
+							'required_handler_slugs'       => $required_handler_slugs,
+							'missing_required_handler_slugs' => $missing_handler_slugs,
+							'available_handler_tool_slugs' => FlowStepConfig::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools ),
+							'error_message'                => 'AI step requires adjacent handler tools that are not available to the model.',
+						)
+					);
 
-		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
+					return array();
+				}
 
-		$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
+				$ai_tool_handler_slugs = FlowStepConfig::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools );
 
-		// Resolve transcript persistence policy once per AI step invocation.
-		// Resolution order: flow > pipeline > site option (default false).
-		// The boolean is threaded through $payload so the loop doesn't need
-		// to repeat the lookup every turn.
-		$transcript_consent_decision = PipelineTranscriptPolicy::decision( $this->engine );
-		$persist_transcript          = $transcript_consent_decision->is_allowed();
+				if ( ! empty( $ai_tool_handler_slugs ) ) {
+					$payload['configured_handler_slugs'] = $ai_tool_handler_slugs;
+				}
+			}
 
-		$payload = array(
-			'job_id'                      => $this->job_id,
-			'flow_step_id'                => $this->flow_step_id,
-			'step_id'                     => $pipeline_step_id,
-			'data'                        => $this->dataPackets,
-			'engine'                      => $this->engine,
-			'user_id'                     => $user_id,
-			'agent_id'                    => $agent_id,
-			'pipeline_id'                 => $job_snapshot['pipeline_id'] ?? null,
-			'flow_id'                     => $job_snapshot['flow_id'] ?? null,
-			'persist_transcript'          => $persist_transcript,
-			'transcript_consent_decision' => $transcript_consent_decision->to_array(),
-		);
+			// Establish agent execution context before firing the conversation loop.
+			//
+			// Pipelines run inside the Action Scheduler queue where no WordPress user
+			// is set — get_current_user_id() returns 0 and any ability invoked as a
+			// tool call (wp_insert_post, wiki writes, taxonomy edits, etc.) either
+			// falls through to a "first administrator" fallback or relies on the
+			// blanket action_scheduler_run_queue bypass in PermissionHelper::can().
+			//
+			// When the job is owned by an agent, we resolve that agent's owner user
+			// and run the loop as that user, mirroring how AgentAuthMiddleware does
+			// this for REST bearer-token requests and ChatOrchestrator does it for
+			// in-browser chat. Tools fired inside the loop then execute with the
+			// correct identity, post_author resolves to the agent owner, and
+			// per-agent capability ceilings are enforced in pipelines the same way
+			// they are in REST.
+			$owner_id = 0;
+			if ( $agent_id > 0 ) {
+				$agents_repo  = new Agents();
+				$agent_record = $agents_repo->get_agent( $agent_id );
+				if ( $agent_record ) {
+					$owner_id = (int) ( $agent_record['owner_id'] ?? 0 );
+				}
+			}
+			if ( $owner_id <= 0 && $user_id > 0 ) {
+				// Legacy / agent-less flows: fall back to the flow's user_id.
+				$owner_id = $user_id;
+			}
 
-		$navigator             = new \DataMachine\Engine\StepNavigator();
-		$previous_flow_step_id = $navigator->get_previous_flow_step_id( $this->flow_step_id, $payload );
+			$previous_user_id = get_current_user_id();
+			$context_set      = false;
+			if ( $owner_id > 0 ) {
+				wp_set_current_user( $owner_id );
+				if ( $agent_id > 0 ) {
+					PermissionHelper::set_agent_context( $agent_id, $owner_id );
+					$context_set = true;
+				}
+			}
 
-		$previous_step_config = $previous_flow_step_id ? $this->engine->getFlowStepConfig( $previous_flow_step_id ) : null;
+			try {
+				// Execute conversation loop via agents-api substrate.
+				$loop_result = datamachine_run_conversation(
+					$messages,
+					$available_tools,
+					$provider_name,
+					$model_name,
+					ToolPolicyResolver::MODE_PIPELINE,
+					$payload,
+					$max_turns
+				);
+			} finally {
+				if ( $context_set ) {
+					PermissionHelper::clear_agent_context();
+				}
+				if ( $owner_id > 0 && $previous_user_id !== $owner_id ) {
+					wp_set_current_user( $previous_user_id );
+				}
+			}
 
-		$next_flow_step_id = $navigator->get_next_flow_step_id( $this->flow_step_id, $payload );
-		$next_step_config  = $next_flow_step_id ? $this->engine->getFlowStepConfig( $next_flow_step_id ) : null;
+			// Check for errors
+			if ( isset( $loop_result['error'] ) ) {
+				$request_metadata = is_array( $loop_result['request_metadata'] ?? null ) ? $loop_result['request_metadata'] : array();
+				// Record the transcript on the failure path too so operators
+				// can `wp datamachine jobs transcript <id>` and see exactly
+				// what the model received before the AI request died. This
+				// mirrors the same merge pattern used for the success path.
+				$transcript_session_id = $loop_result['transcript_session_id'] ?? '';
+				if ( '' !== $transcript_session_id && $this->job_id > 0 ) {
+					datamachine_merge_engine_data(
+						$this->job_id,
+						array( 'transcript_session_id' => $transcript_session_id )
+					);
+				}
 
-		// Collect required handler slugs from adjacent steps for completion tracking.
-		$required_handler_slugs = FlowStepConfig::getAdjacentRequiredHandlerSlugsForAi( $previous_step_config, $next_step_config );
-
-		$engine_data = $this->engine->all();
-
-		// Tool categories can be specified at the pipeline step level or pipeline level.
-		// This allows pipelines to declare which ability categories are relevant,
-		// reducing tool bloat by excluding irrelevant tools from the AI context.
-		$tool_categories = $pipeline_step_config['tool_categories']
-			?? $this->engine->get( 'pipeline_tool_categories' )
-			?? array();
-
-		$resolver        = new ToolPolicyResolver();
-		$available_tools = $resolver->resolve(
-			array_merge(
-				array(
-					'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
-					'agent_id'             => $agent_id,
-					'previous_step_config' => $previous_step_config,
-					'next_step_config'     => $next_step_config,
-					'pipeline_step_id'     => $pipeline_step_id,
-					'engine_data'          => $engine_data,
-					'categories'           => $tool_categories,
-				),
-				PipelineToolPolicyArgs::fromConfigs( $this->flow_step_config, $pipeline_step_config )
-			)
-		);
-
-		// Required adjacent handler tools are flow plumbing, not optional research
-		// tools. If a publish/upsert handler required by the flow shape cannot be
-		// exposed to the model, fail before the model call instead of silently
-		// narrowing completion tracking to the visible subset.
-		if ( ! empty( $required_handler_slugs ) ) {
-			$missing_handler_slugs = FlowStepConfig::getMissingRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools );
-			if ( ! empty( $missing_handler_slugs ) ) {
 				do_action(
 					'datamachine_fail_job',
 					$this->job_id,
-					'required_handler_tool_unavailable',
+					'ai_processing_failed',
 					array(
-						'flow_step_id'                   => $this->flow_step_id,
-						'pipeline_step_id'               => $pipeline_step_id,
-						'required_handler_slugs'         => $required_handler_slugs,
-						'missing_required_handler_slugs' => $missing_handler_slugs,
-						'available_handler_tool_slugs'   => FlowStepConfig::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools ),
-						'error_message'                  => 'AI step requires adjacent handler tools that are not available to the model.',
+						'flow_step_id'        => $this->flow_step_id,
+						'ai_error'            => $loop_result['error'],
+						'ai_provider'         => $provider_name,
+						'request_metadata'    => $request_metadata,
+						'transport_profile'   => is_array( $request_metadata['transport'] ?? null ) ? $request_metadata['transport'] : array(),
+						'retry_after'         => $loop_result['retry_after'] ?? null,
+						'retry_after_seconds' => $loop_result['retry_after_seconds'] ?? null,
+						'headers'             => is_array( $loop_result['headers'] ?? null ) ? $loop_result['headers'] : array(),
 					)
 				);
-
 				return array();
 			}
 
-			$ai_tool_handler_slugs = FlowStepConfig::getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, $available_tools );
-
-			if ( ! empty( $ai_tool_handler_slugs ) ) {
-				$payload['configured_handler_slugs'] = $ai_tool_handler_slugs;
+			// Store token usage in job engine_data via merge to avoid clobbering
+			// data written by handler tools during the conversation loop (e.g.
+			// event_id, event_url, post_id written via datamachine_merge_engine_data).
+			$usage = $loop_result['usage'] ?? array();
+			if ( ! empty( $usage ) && $this->job_id > 0 && ( $usage['total_tokens'] ?? 0 ) > 0 ) {
+				datamachine_merge_engine_data( $this->job_id, array( 'token_usage' => $usage ) );
 			}
-		}
 
-		// Establish agent execution context before firing the conversation loop.
-		//
-		// Pipelines run inside the Action Scheduler queue where no WordPress user
-		// is set — get_current_user_id() returns 0 and any ability invoked as a
-		// tool call (wp_insert_post, wiki writes, taxonomy edits, etc.) either
-		// falls through to a "first administrator" fallback or relies on the
-		// blanket action_scheduler_run_queue bypass in PermissionHelper::can().
-		//
-		// When the job is owned by an agent, we resolve that agent's owner user
-		// and run the loop as that user, mirroring how AgentAuthMiddleware does
-		// this for REST bearer-token requests and ChatOrchestrator does it for
-		// in-browser chat. Tools fired inside the loop then execute with the
-		// correct identity, post_author resolves to the agent owner, and
-		// per-agent capability ceilings are enforced in pipelines the same way
-		// they are in REST.
-		$owner_id = 0;
-		if ( $agent_id > 0 ) {
-			$agents_repo  = new Agents();
-			$agent_record = $agents_repo->get_agent( $agent_id );
-			if ( $agent_record ) {
-				$owner_id = (int) ( $agent_record['owner_id'] ?? 0 );
-			}
-		}
-		if ( $owner_id <= 0 && $user_id > 0 ) {
-			// Legacy / agent-less flows: fall back to the flow's user_id.
-			$owner_id = $user_id;
-		}
-
-		$previous_user_id = get_current_user_id();
-		$context_set      = false;
-		if ( $owner_id > 0 ) {
-			wp_set_current_user( $owner_id );
-			if ( $agent_id > 0 ) {
-				PermissionHelper::set_agent_context( $agent_id, $owner_id );
-				$context_set = true;
-			}
-		}
-
-		try {
-			// Execute conversation loop via agents-api substrate.
-			$loop_result = datamachine_run_conversation(
-				$messages,
-				$available_tools,
-				$provider_name,
-				$model_name,
-				ToolPolicyResolver::MODE_PIPELINE,
-				$payload,
-				$max_turns
-			);
-		} finally {
-			if ( $context_set ) {
-				PermissionHelper::clear_agent_context();
-			}
-			if ( $owner_id > 0 && $previous_user_id !== $owner_id ) {
-				wp_set_current_user( $previous_user_id );
-			}
-		}
-
-		// Check for errors
-		if ( isset( $loop_result['error'] ) ) {
-			$request_metadata = is_array( $loop_result['request_metadata'] ?? null ) ? $loop_result['request_metadata'] : array();
-			// Record the transcript on the failure path too so operators
-			// can `wp datamachine jobs transcript <id>` and see exactly
-			// what the model received before the AI request died. This
-			// mirrors the same merge pattern used for the success path.
+			// Store the transcript session ID when the AI loop persisted one.
+			// Same merge pattern as token_usage so handler-tool-written keys
+			// (event_id, post_id, etc.) are preserved.
 			$transcript_session_id = $loop_result['transcript_session_id'] ?? '';
 			if ( '' !== $transcript_session_id && $this->job_id > 0 ) {
 				datamachine_merge_engine_data(
@@ -420,45 +457,8 @@ class AIStep extends Step {
 				);
 			}
 
-			do_action(
-				'datamachine_fail_job',
-				$this->job_id,
-				'ai_processing_failed',
-				array(
-					'flow_step_id'        => $this->flow_step_id,
-					'ai_error'            => $loop_result['error'],
-					'ai_provider'         => $provider_name,
-					'request_metadata'    => $request_metadata,
-					'transport_profile'   => is_array( $request_metadata['transport'] ?? null ) ? $request_metadata['transport'] : array(),
-					'retry_after'         => $loop_result['retry_after'] ?? null,
-					'retry_after_seconds' => $loop_result['retry_after_seconds'] ?? null,
-					'headers'             => is_array( $loop_result['headers'] ?? null ) ? $loop_result['headers'] : array(),
-				)
-			);
-			return array();
-		}
-
-		// Store token usage in job engine_data via merge to avoid clobbering
-		// data written by handler tools during the conversation loop (e.g.
-		// event_id, event_url, post_id written via datamachine_merge_engine_data).
-		$usage = $loop_result['usage'] ?? array();
-		if ( ! empty( $usage ) && $this->job_id > 0 && ( $usage['total_tokens'] ?? 0 ) > 0 ) {
-			datamachine_merge_engine_data( $this->job_id, array( 'token_usage' => $usage ) );
-		}
-
-		// Store the transcript session ID when the AI loop persisted one.
-		// Same merge pattern as token_usage so handler-tool-written keys
-		// (event_id, post_id, etc.) are preserved.
-		$transcript_session_id = $loop_result['transcript_session_id'] ?? '';
-		if ( '' !== $transcript_session_id && $this->job_id > 0 ) {
-			datamachine_merge_engine_data(
-				$this->job_id,
-				array( 'transcript_session_id' => $transcript_session_id )
-			);
-		}
-
-		// Process loop results into data packets
-		return self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
+			// Process loop results into data packets
+			return self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
 		} finally {
 			if ( $ai_concurrency_lease instanceof PipelineAIConcurrencyLease ) {
 				$ai_concurrency_lease->release();
@@ -526,12 +526,12 @@ class AIStep extends Step {
 			'warning',
 			'Pipeline AI step deferred by concurrency limit',
 			array(
-				'job_id'                    => $this->job_id,
-				'flow_step_id'              => $this->flow_step_id,
-				'provider'                  => $provider_name,
-				'reason'                    => 'ai_concurrency_limit',
-				'limit'                     => (int) ( $lease_result['limit'] ?? 0 ),
-				'active'                    => (int) ( $lease_result['active'] ?? 0 ),
+				'job_id'                  => $this->job_id,
+				'flow_step_id'            => $this->flow_step_id,
+				'provider'                => $provider_name,
+				'reason'                  => 'ai_concurrency_limit',
+				'limit'                   => (int) ( $lease_result['limit'] ?? 0 ),
+				'active'                  => (int) ( $lease_result['active'] ?? 0 ),
 				'rescheduled_for_seconds' => $delay_seconds,
 				'action_id'               => $action_id,
 			)
