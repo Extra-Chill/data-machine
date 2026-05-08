@@ -57,6 +57,7 @@ function datamachine_run_conversation(
 	// Resolve DM runtime collaborators from the payload.
 	$event_sink           = datamachine_resolve_event_sink( $payload );
 	$completion_policy    = datamachine_resolve_completion_policy( $mode, $payload );
+	$tool_runtime_rules   = datamachine_resolve_tool_runtime_rules( $payload );
 	$transcript_persister = datamachine_resolve_transcript_persister( $payload );
 	$transcript_lock      = $payload['transcript_lock'] ?? $payload['transcript_lock_store'] ?? null;
 
@@ -108,6 +109,7 @@ function datamachine_run_conversation(
 		$event_sink,
 		$base_log_context,
 		$completion_policy,
+		$tool_runtime_rules,
 		$last_request_metadata,
 		$last_tool_calls,
 		$final_content,
@@ -128,7 +130,7 @@ function datamachine_run_conversation(
 		if ( ! empty( $result['conversation_complete'] ) ) {
 			return false;
 		}
-		return ! empty( $result['tool_execution_results'] ) || ! empty( $result['completion_nudge'] ) || ! empty( $result['duplicate_tool_call_rejected'] );
+		return ! empty( $result['tool_execution_results'] ) || ! empty( $result['completion_nudge'] ) || ! empty( $result['duplicate_tool_call_rejected'] ) || ! empty( $result['tool_runtime_rule_rejected'] );
 	};
 
 	// Run through the upstream substrate loop.
@@ -238,6 +240,7 @@ function datamachine_run_conversation(
  * @param LoopEventSinkInterface                          $event_sink             DM event sink.
  * @param array                                           $base_log_context       Base log context.
  * @param WP_Agent_Conversation_Completion_Policy       $completion_policy      Completion policy.
+ * @param DataMachineToolRuntimeRules                   $tool_runtime_rules     Tool runtime rules.
  * @param array                                           &$last_request_metadata Mutable request metadata.
  * @param array                                           &$last_tool_calls        Mutable last tool calls.
  * @param string                                          &$final_content          Mutable final assistant content.
@@ -255,6 +258,7 @@ function datamachine_build_turn_runner(
 	LoopEventSinkInterface $event_sink,
 	array $base_log_context,
 	WP_Agent_Conversation_Completion_Policy $completion_policy,
+	DataMachineToolRuntimeRules $tool_runtime_rules,
 	array &$last_request_metadata,
 	array &$last_tool_calls,
 	string &$final_content,
@@ -271,6 +275,7 @@ function datamachine_build_turn_runner(
 		$event_sink,
 		$base_log_context,
 		$completion_policy,
+		$tool_runtime_rules,
 		&$last_request_metadata,
 		&$last_tool_calls,
 		&$final_content,
@@ -358,6 +363,7 @@ function datamachine_build_turn_runner(
 		$conversation_complete  = false;
 		$completion_nudge       = '';
 		$duplicate_rejected     = false;
+		$runtime_rule_rejected  = false;
 		if ( ! empty( $tool_calls ) ) {
 			foreach ( $tool_calls as $tool_call ) {
 				$tool_name       = $tool_call['name'];
@@ -407,6 +413,30 @@ function datamachine_build_turn_runner(
 							array(
 								'turn_count' => $turn_count,
 								'tool_name'  => $tool_name,
+							)
+						)
+					);
+					continue;
+				}
+
+				$runtime_rule_result = $tool_runtime_rules->evaluate( $tool_name, $messages );
+				if ( ! $runtime_rule_result['allowed'] ) {
+					$tool_result = array(
+						'success' => false,
+						'error'   => $runtime_rule_result['error'],
+					);
+					$messages[] = ConversationManager::formatToolResultMessage( $tool_name, $tool_result, $tool_parameters, false, $turn_count );
+					$runtime_rule_rejected = true;
+					do_action(
+						'datamachine_log',
+						'info',
+						'datamachine_run_conversation: Tool runtime rule rejected call',
+						array_merge(
+							$base_log_context,
+							array(
+								'turn_count' => $turn_count,
+								'tool_name'  => $tool_name,
+								'policy'     => $runtime_rule_result['context'],
 							)
 						)
 					);
@@ -548,6 +578,7 @@ function datamachine_build_turn_runner(
 			'conversation_complete'  => $conversation_complete,
 			'completion_nudge'       => $completion_nudge ?? '',
 			'duplicate_tool_call_rejected' => $duplicate_rejected,
+			'tool_runtime_rule_rejected' => $runtime_rule_rejected,
 		);
 	};
 }
@@ -725,6 +756,17 @@ function datamachine_resolve_completion_policy( string $mode, array $payload ): 
 function datamachine_resolve_completion_assertions( array $payload ): DataMachineCompletionAssertions {
 	$config = $payload['completion_assertions'] ?? array();
 	return new DataMachineCompletionAssertions( is_array( $config ) ? $config : array() );
+}
+
+/**
+ * Resolve generic tool runtime rules from loop payload.
+ *
+ * @param array $payload Loop payload.
+ * @return DataMachineToolRuntimeRules
+ */
+function datamachine_resolve_tool_runtime_rules( array $payload ): DataMachineToolRuntimeRules {
+	$config = $payload['tool_runtime_rules'] ?? array();
+	return new DataMachineToolRuntimeRules( is_array( $config ) ? $config : array() );
 }
 
 /**

@@ -33,6 +33,7 @@ final class AgentBundleFlowFile {
 		'config_patch_queue',
 		'queue_mode',
 		'completion_assertions',
+		'tool_runtime_rules',
 		'enabled',
 	);
 
@@ -125,6 +126,13 @@ final class AgentBundleFlowFile {
 		if ( 'completion_assertions' === $field ) {
 			if ( ! is_array( $value ) ) {
 				throw new BundleValidationException( 'flow file completion_assertions must be an object.' );
+			}
+			return $value;
+		}
+
+		if ( 'tool_runtime_rules' === $field ) {
+			if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
+				throw new BundleValidationException( 'flow file tool_runtime_rules must be a list.' );
 			}
 			return $value;
 		}
