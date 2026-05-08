@@ -17,6 +17,7 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
@@ -815,18 +816,20 @@ class AgentBundler {
 				}
 
 				if ( $existing_flow ) {
-					$new_flow_id = (int) $existing_flow['flow_id'];
-					$flow_config = $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, $new_flow_id );
-					$flow_config = $reconcile_runtime
+					$new_flow_id          = (int) $existing_flow['flow_id'];
+					$scheduling_to_ensure = is_array( $existing_flow['scheduling_config'] ?? null ) ? $existing_flow['scheduling_config'] : array();
+					$flow_config          = $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, $new_flow_id );
+					$flow_config          = $reconcile_runtime
 					? AgentBundleRuntimeDrift::replace_runtime_queue_fields( $flow_config, $target_flow_config )
 					: $this->preserve_runtime_queue_fields( $flow_config, $existing_flow['flow_config'] ?? array() );
-					$update_data = array(
+					$update_data          = array(
 						'flow_name'     => $flow_data['flow_name'],
 						'flow_config'   => $flow_config,
 						'portable_slug' => $portable_slug,
 					);
 					if ( $reconcile_runtime ) {
 						$update_data['scheduling_config'] = $flow_data['scheduling_config'] ?? array();
+						$scheduling_to_ensure             = is_array( $flow_data['scheduling_config'] ?? null ) ? $flow_data['scheduling_config'] : array();
 					}
 					if ( ! $this->flows_repo->update_flow( $new_flow_id, $update_data ) ) {
 						throw new \RuntimeException( sprintf( 'Failed to update flow "%s".', $portable_slug ) );
@@ -858,7 +861,10 @@ class AgentBundler {
 					) ) {
 						throw new \RuntimeException( sprintf( 'Failed to update freshly-created flow "%s".', $portable_slug ) );
 					}
+					$scheduling_to_ensure = $scheduling;
 				}
+
+				$this->ensure_imported_flow_schedule( (int) $new_flow_id, $scheduling_to_ensure );
 
 				++$flow_count;
 				$artifact_records[ $artifact_key ] = $this->bundle_artifact_record(
@@ -1179,6 +1185,38 @@ class AgentBundler {
 		}
 
 		return $config;
+	}
+
+	private function ensure_imported_flow_schedule( int $flow_id, array $config ): void {
+		$config   = $this->bundle_create_scheduling_config( $config );
+		$interval = (string) ( $config['interval'] ?? 'manual' );
+
+		if ( 'manual' === $interval || false === ( $config['enabled'] ?? true ) ) {
+			return;
+		}
+
+		$result = FlowScheduling::handle_scheduling_update( $flow_id, $config );
+		if ( is_wp_error( $result ) ) {
+			throw new \RuntimeException(
+				sprintf(
+					'Failed to schedule imported flow %d: %s',
+					(int) $flow_id,
+					esc_html( $result->get_error_message() )
+				)
+			);
+		}
+
+		$flow             = $this->flows_repo->get_flow( $flow_id );
+		$scheduled_config = is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array();
+		foreach ( array( 'enabled', 'max_items' ) as $metadata_key ) {
+			if ( array_key_exists( $metadata_key, $config ) ) {
+				$scheduled_config[ $metadata_key ] = $config[ $metadata_key ];
+			}
+		}
+
+		if ( ! $this->flows_repo->update_flow( $flow_id, array( 'scheduling_config' => $scheduled_config ) ) ) {
+			throw new \RuntimeException( sprintf( 'Failed to preserve imported flow schedule metadata for flow %d.', (int) $flow_id ) );
+		}
 	}
 
 	private function bundle_scheduling_policy( array $config ): string {
