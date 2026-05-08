@@ -12,6 +12,7 @@
 namespace DataMachine\Core\Database\Chat;
 
 use DataMachine\Core\Admin\DateFormatter;
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\BaseRepository;
 use AgentsAPI\AI\WP_Agent_Message;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
@@ -270,7 +271,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 *
 	 * @param WP_Agent_Workspace_Scope $workspace Workspace owning the session.
 	 * @param int                 $user_id   WordPress user ID.
-	 * @param int                 $agent_id  Agent ID.
+	 * @param string              $agent_slug Registered agent slug.
 	 * @param array               $metadata  Optional session metadata.
 	 * @param string              $context   Execution context (chat, pipeline, system).
 	 * @return string Session ID (UUID)
@@ -278,7 +279,26 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	public function create_session( ...$args ): string {
 		global $wpdb;
 
-		list( $workspace, $user_id, $agent_id, $metadata, $context ) = self::normalize_create_session_args( $args );
+		list( $workspace, $user_id, $agent, $metadata, $context ) = self::normalize_create_session_args( $args );
+
+		try {
+			$identity   = self::resolve_agent_identity_for_session( $agent );
+			$agent_id   = $identity['agent_id'];
+			$agent_slug = $identity['agent_slug'];
+		} catch ( \InvalidArgumentException $e ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to resolve transcript session agent identity',
+				array(
+					'user_id' => $user_id,
+					'agent'   => is_scalar( $agent ) ? (string) $agent : gettype( $agent ),
+					'error'   => $e->getMessage(),
+					'mode'    => $context,
+				)
+			);
+			return '';
+		}
 
 		$session_id = wp_generate_uuid4();
 		$table_name = self::get_prefixed_table_name();
@@ -289,6 +309,9 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				'workspace_id'   => $workspace->workspace_id,
 			)
 		);
+		if ( '' !== $agent_slug ) {
+			$metadata['agent_slug'] = $agent_slug;
+		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$result = $wpdb->insert(
@@ -342,14 +365,14 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * Normalize create-session arguments across current and workspace-aware contracts.
 	 *
 	 * @param array $args Raw method arguments.
-	 * @return array{0:WP_Agent_Workspace_Scope,1:int,2:int,3:array,4:string}
+	 * @return array{0:WP_Agent_Workspace_Scope,1:int,2:int|string,3:array,4:string}
 	 */
 	private static function normalize_create_session_args( array $args ): array {
 		if ( isset( $args[0] ) && $args[0] instanceof WP_Agent_Workspace_Scope ) {
 			return array(
 				$args[0],
 				(int) ( $args[1] ?? 0 ),
-				(int) ( $args[2] ?? 0 ),
+				is_string( $args[2] ?? null ) ? (string) $args[2] : (int) ( $args[2] ?? 0 ),
 				is_array( $args[3] ?? null ) ? $args[3] : array(),
 				(string) ( $args[4] ?? 'chat' ),
 			);
@@ -358,9 +381,50 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		return array(
 			WordPressWorkspaceScope::current(),
 			(int) ( $args[0] ?? 0 ),
-			(int) ( $args[1] ?? 0 ),
+			is_string( $args[1] ?? null ) ? (string) $args[1] : (int) ( $args[1] ?? 0 ),
 			is_array( $args[2] ?? null ) ? $args[2] : array(),
 			(string) ( $args[3] ?? 'chat' ),
+		);
+	}
+
+	/**
+	 * Resolve the generic transcript agent slug to Data Machine's stored agent ID.
+	 *
+	 * Integer input is retained as a Data Machine-internal compatibility path for
+	 * callers that have not crossed the generic Agents API boundary.
+	 *
+	 * @param int|string $agent Agent slug, agent ID, or empty value.
+	 * @return array{agent_id:int,agent_slug:string}
+	 */
+	private static function resolve_agent_identity_for_session( int|string $agent ): array {
+		if ( is_int( $agent ) || is_numeric( $agent ) ) {
+			$agent_id = (int) $agent;
+			if ( $agent_id <= 0 ) {
+				return array(
+					'agent_id'   => 0,
+					'agent_slug' => '',
+				);
+			}
+
+			$identity = ( new AgentIdentityResolver() )->resolve_agent_identity( $agent_id );
+			return array(
+				'agent_id'   => $identity->agent_id,
+				'agent_slug' => $identity->agent_slug,
+			);
+		}
+
+		$agent_slug = AgentIdentityResolver::normalize_agent_slug( $agent );
+		if ( '' === $agent_slug ) {
+			return array(
+				'agent_id'   => 0,
+				'agent_slug' => '',
+			);
+		}
+
+		$identity = ( new AgentIdentityResolver() )->resolve_agent_identity( $agent_slug );
+		return array(
+			'agent_id'   => $identity->agent_id,
+			'agent_slug' => $identity->agent_slug,
 		);
 	}
 
@@ -415,10 +479,31 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return null;
 		}
 
-		$session['messages'] = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
-		$session['metadata'] = json_decode( $session['metadata'], true ) ?? array();
+		$session['messages']   = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
+		$session['metadata']   = json_decode( $session['metadata'], true ) ?? array();
+		$session['agent_slug'] = self::resolve_agent_slug_from_session_row( $session );
 
 		return $session;
+	}
+
+	/**
+	 * Resolve the generic transcript agent slug from a stored session row.
+	 *
+	 * @param array<string,mixed> $session Stored session row.
+	 * @return string|null Agent slug when resolvable.
+	 */
+	private static function resolve_agent_slug_from_session_row( array $session ): ?string {
+		$agent_id = isset( $session['agent_id'] ) ? (int) $session['agent_id'] : 0;
+		if ( $agent_id <= 0 ) {
+			return null;
+		}
+
+		try {
+			return ( new AgentIdentityResolver() )->resolve_agent_slug( $agent_id );
+		} catch ( \InvalidArgumentException $e ) {
+			unset( $e );
+			return null;
+		}
 	}
 
 	/**
@@ -935,8 +1020,9 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return null;
 		}
 
-		$session['messages'] = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
-		$session['metadata'] = json_decode( $session['metadata'], true ) ?? array();
+		$session['messages']   = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
+		$session['metadata']   = json_decode( $session['metadata'], true ) ?? array();
+		$session['agent_slug'] = self::resolve_agent_slug_from_session_row( $session );
 
 		return $session;
 	}

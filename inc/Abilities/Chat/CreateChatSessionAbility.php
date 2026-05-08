@@ -11,6 +11,7 @@
 
 namespace DataMachine\Abilities\Chat;
 
+use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 
 defined( 'ABSPATH' ) || exit;
@@ -39,24 +40,28 @@ class CreateChatSessionAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'user_id'  => array(
+							'user_id'    => array(
 								'type'        => 'integer',
 								'description' => __( 'User ID who owns the session.', 'data-machine' ),
 							),
-							'agent_id' => array(
+							'agent_id'   => array(
 								'type'        => 'integer',
-								'description' => __( 'First-class agent ID for this session.', 'data-machine' ),
+								'description' => __( 'Data Machine internal agent ID for this session.', 'data-machine' ),
 							),
-							'mode'     => array(
+							'agent_slug' => array(
+								'type'        => 'string',
+								'description' => __( 'Registered agent slug for this session.', 'data-machine' ),
+							),
+							'mode'       => array(
 								'type'        => 'string',
 								'default'     => 'chat',
 								'description' => __( 'Execution mode (chat, pipeline, system).', 'data-machine' ),
 							),
-							'source'   => array(
+							'source'     => array(
 								'type'        => 'string',
 								'description' => __( 'Session source identifier (e.g. ping, chat).', 'data-machine' ),
 							),
-							'metadata' => array(
+							'metadata'   => array(
 								'type'        => 'object',
 								'description' => __( 'Additional metadata for the session.', 'data-machine' ),
 							),
@@ -99,10 +104,13 @@ class CreateChatSessionAbility {
 			);
 		}
 
-		$user_id  = (int) $input['user_id'];
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$mode     = ! empty( $input['mode'] ) ? sanitize_text_field( $input['mode'] ) : 'chat';
-		$source   = ! empty( $input['source'] ) ? sanitize_text_field( $input['source'] ) : null;
+		$user_id    = (int) $input['user_id'];
+		$agent_id   = (int) ( $input['agent_id'] ?? 0 );
+		$agent_slug = ! empty( $input['agent_slug'] )
+			? sanitize_title( (string) $input['agent_slug'] )
+			: ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
+		$mode       = ! empty( $input['mode'] ) ? sanitize_text_field( $input['mode'] ) : 'chat';
+		$source     = ! empty( $input['source'] ) ? sanitize_text_field( $input['source'] ) : null;
 
 		if ( ! $this->can_access_user_sessions( $user_id ) ) {
 			return array(
@@ -125,7 +133,7 @@ class CreateChatSessionAbility {
 			$session_metadata = array_merge( $session_metadata, $input['metadata'] );
 		}
 
-		$session_id = $this->chat_db->create_session( WordPressWorkspaceScope::current(), $user_id, $agent_id, $session_metadata, $mode );
+		$session_id = $this->chat_db->create_session( WordPressWorkspaceScope::current(), $user_id, $agent_slug, $session_metadata, $mode );
 
 		if ( empty( $session_id ) ) {
 			return array(

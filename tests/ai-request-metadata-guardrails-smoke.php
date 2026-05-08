@@ -121,9 +121,15 @@ class RequestMetadataSmokeStore implements ConversationStoreInterface {
 	public array $sessions = array();
 	public array $updated  = array();
 
-	public function create_session( WP_Agent_Workspace_Scope $workspace, int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
+	public function create_session( ...$args ): string {
+		$workspace  = $args[0];
+		$user_id    = (int) ( $args[1] ?? 0 );
+		$agent      = $args[2] ?? '';
+		$agent_slug = is_string( $agent ) ? $agent : '';
+		$metadata   = is_array( $args[3] ?? null ) ? $args[3] : array();
+		$context    = (string) ( $args[4] ?? 'chat' );
 		$metadata['workspace'] = $workspace->to_array();
-		$this->sessions['smoke-session'] = compact( 'user_id', 'agent_id', 'metadata', 'context' );
+		$this->sessions['smoke-session'] = compact( 'user_id', 'agent_slug', 'metadata', 'context' );
 		return 'smoke-session';
 	}
 
@@ -134,6 +140,8 @@ class RequestMetadataSmokeStore implements ConversationStoreInterface {
 		return true;
 	}
 	public function delete_session( string $session_id ): bool { return true; }
+	public function acquire_session_lock( string $session_id, int $ttl_seconds = 300 ): ?string { return 'smoke-lock'; }
+	public function release_session_lock( string $session_id, string $lock_token ): bool { return true; }
 	public function get_user_sessions( int $user_id, int $limit = 20, int $offset = 0, ?string $context = null, ?int $agent_id = null ): array { return array(); }
 	public function get_user_session_count( int $user_id, ?string $context = null, ?int $agent_id = null ): int { return 0; }
 	public function get_recent_pending_session( WP_Agent_Workspace_Scope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array { return null; }

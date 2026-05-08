@@ -15,6 +15,7 @@
 namespace DataMachine\Tests\Unit\Core\Database\Chat;
 
 use DataMachine\Abilities\Chat\ListChatSessionsAbility;
+use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Chat\Chat;
 use DataMachine\Core\Database\Chat\ConversationReadStateInterface;
 use DataMachine\Core\Database\Chat\ConversationReportingInterface;
@@ -105,6 +106,44 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 				'gpt-test'
 			)
 		);
+	}
+
+	public function test_builtin_chat_store_accepts_agent_slug_and_stores_agent_id(): void {
+		$store      = ConversationStoreFactory::get();
+		$agent_id   = $this->create_agent( 'transcript-slug-agent' );
+		$session_id = $store->create_session( $this->workspace(), 12, 'transcript-slug-agent', array(), 'chat' );
+
+		$session = $store->get_session( $session_id );
+
+		$this->assertNotSame( '', $session_id );
+		$this->assertNotNull( $session );
+		$this->assertSame( $agent_id, (int) $session['agent_id'] );
+		$this->assertSame( 'transcript-slug-agent', $session['agent_slug'] );
+		$this->assertSame( 'transcript-slug-agent', $session['metadata']['agent_slug'] );
+	}
+
+	public function test_builtin_chat_store_keeps_internal_agent_id_compatibility(): void {
+		$store      = ConversationStoreFactory::get();
+		$agent_id   = $this->create_agent( 'transcript-id-agent' );
+		$session_id = $store->create_session( $this->workspace(), 12, $agent_id, array(), 'chat' );
+
+		$session = $store->get_session( $session_id );
+
+		$this->assertNotSame( '', $session_id );
+		$this->assertNotNull( $session );
+		$this->assertSame( $agent_id, (int) $session['agent_id'] );
+		$this->assertSame( 'transcript-id-agent', $session['agent_slug'] );
+	}
+
+	public function test_in_memory_store_accepts_agent_slug_and_exposes_it_on_get_session(): void {
+		$store      = new InMemoryConversationStore();
+		$session_id = $store->create_session( $this->workspace(), 5, 'memory-agent', array(), 'pipeline' );
+
+		$session = $store->get_session( $session_id );
+
+		$this->assertNotNull( $session );
+		$this->assertSame( 'memory-agent', $session['agent_slug'] );
+		$this->assertNull( $session['agent_id'] );
 	}
 
 	public function test_conversation_store_interface_is_composed_from_narrow_contracts(): void {
@@ -413,5 +452,10 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 
 	private function workspace(): WP_Agent_Workspace_Scope {
 		return WP_Agent_Workspace_Scope::from_parts( 'site', 'https://example.test' );
+	}
+
+	private function create_agent( string $slug ): int {
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		return ( new Agents() )->create_if_missing( $slug, $slug, $user_id );
 	}
 }
