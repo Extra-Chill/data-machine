@@ -71,6 +71,12 @@ function datamachine_run_datamachine_plugin() {
 		return;
 	}
 
+	static $runtime_loaded = false;
+	if ( $runtime_loaded ) {
+		return;
+	}
+	$runtime_loaded = true;
+
 	// Set Action Scheduler timeout to 10 minutes (600 seconds) for large tasks
 	add_filter(
 		'action_scheduler_timeout_period',
@@ -430,8 +436,12 @@ function datamachine_activate_defaults_for_site() {
 	add_option( 'datamachine_settings', $default_settings );
 }
 
-// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
-add_action( 'plugins_loaded', 'datamachine_run_datamachine_plugin', 20 );
+if ( did_action( 'plugins_loaded' ) ) {
+	datamachine_run_datamachine_plugin();
+} else {
+	// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
+	add_action( 'plugins_loaded', 'datamachine_run_datamachine_plugin', 20 );
+}
 
 
 
