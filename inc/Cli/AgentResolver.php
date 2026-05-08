@@ -15,6 +15,7 @@
 namespace DataMachine\Cli;
 
 use WP_CLI;
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 
@@ -38,30 +39,20 @@ class AgentResolver {
 			return null;
 		}
 
-		$agents_repo = new Agents();
+		$resolver = new AgentIdentityResolver();
 
-		// Numeric: treat as agent ID.
-		if ( is_numeric( $agent_value ) ) {
-			$agent = $agents_repo->get_agent( (int) $agent_value );
-			if ( ! $agent ) {
-				WP_CLI::error( sprintf( 'Agent ID %d not found.', (int) $agent_value ) );
-			}
-			return (int) $agent['agent_id'];
-		}
-
-		// String: treat as agent slug.
-		$agent = $agents_repo->get_by_slug( sanitize_title( $agent_value ) );
-		if ( ! $agent ) {
+		try {
+			return $resolver->resolve_agent_id( $agent_value );
+		} catch ( \InvalidArgumentException $e ) {
 			// Suggest available agents.
-			$all_agents = $agents_repo->get_all();
-			$slugs      = array_column( $all_agents, 'agent_slug' );
-			$hint       = ! empty( $slugs )
+			$agents_repo = new Agents();
+			$all_agents  = $agents_repo->get_all();
+			$slugs       = array_column( $all_agents, 'agent_slug' );
+			$hint        = ! empty( $slugs )
 				? sprintf( ' Available: %s', implode( ', ', $slugs ) )
 				: '';
-			WP_CLI::error( sprintf( 'Agent "%s" not found.%s', $agent_value, $hint ) );
+			WP_CLI::error( $e->getMessage() . $hint );
 		}
-
-		return (int) $agent['agent_id'];
 	}
 
 	/**
