@@ -975,7 +975,14 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		if ( $drain ) {
-			$stats = DrainCommand::drain();
+			$stats = DrainCommand::drain(
+				array(
+					'hooks' => array(
+						DrainCommand::HOOK_BATCH_CHUNK,
+						DrainCommand::HOOK_EXECUTE_STEP,
+					),
+				)
+			);
 			WP_CLI::log(
 				sprintf(
 					'Drained Data Machine actions: %d batch chunks, %d step executions, %d completions, %d failures, %d due pending remain.',
