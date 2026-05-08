@@ -125,18 +125,29 @@ class FlowStepConfigFactory {
 			}
 		}
 
-		$handler_slug   = $args['handler_slug'] ?? '';
-		$handler_config = $args['handler_config'] ?? array();
+		$handler_slug    = $args['handler_slug'] ?? '';
+		$handler_config  = $args['handler_config'] ?? array();
+		$handler_slugs   = is_array( $args['handler_slugs'] ?? null ) ? $args['handler_slugs'] : array();
+		$handler_configs = is_array( $args['handler_configs'] ?? null ) ? $args['handler_configs'] : array();
 
-		if ( is_string( $handler_slug ) && '' !== $handler_slug ) {
-			if ( FlowStepConfig::isMultiHandler( $step_config ) ) {
-				$step_config['handler_slugs']   = array( $handler_slug );
-				$step_config['handler_configs'] = array( $handler_slug => $handler_config );
-			} else {
-				$step_config['handler_slug']   = $handler_slug;
-				$step_config['handler_config'] = $handler_config;
+		if ( FlowStepConfig::usesHandler( $step_config ) ) {
+			if ( is_string( $handler_slug ) && '' !== $handler_slug ) {
+				$handler_slugs[] = $handler_slug;
+				if ( ! array_key_exists( $handler_slug, $handler_configs ) ) {
+					$handler_configs[ $handler_slug ] = $handler_config;
+				}
 			}
-		} elseif ( ! FlowStepConfig::usesHandler( $step_config ) && ! empty( $handler_config ) ) {
+
+			$step_config = FlowStepConfig::normalizeHandlerShape(
+				array_merge(
+					$step_config,
+					array(
+						'handler_slugs'   => $handler_slugs,
+						'handler_configs' => $handler_configs,
+					)
+				)
+			);
+		} elseif ( ! empty( $handler_config ) ) {
 			$step_config['handler_config'] = $handler_config;
 		}
 
@@ -219,7 +230,6 @@ class FlowStepConfigFactory {
 	 */
 	public static function withHandlerConfig( array $step_config, string $handler_slug = '', array $handler_config = array(), bool $merge = false ): array {
 		$uses_handler   = FlowStepConfig::usesHandler( $step_config );
-		$is_multi       = FlowStepConfig::isMultiHandler( $step_config );
 		$effective_slug = FlowStepConfig::getEffectiveSlug( $step_config, $handler_slug );
 
 		if ( ! $uses_handler ) {
@@ -237,29 +247,19 @@ class FlowStepConfigFactory {
 		$existing_config = $merge ? FlowStepConfig::getHandlerConfigForSlug( $step_config, $effective_slug ) : array();
 		$stored_config   = array_merge( $existing_config, $handler_config );
 
-		if ( $is_multi ) {
-			$slugs = '' !== $handler_slug ? array( $effective_slug ) : FlowStepConfig::getHandlerSlugs( $step_config );
-			if ( empty( $slugs ) ) {
-				$slugs = array( $effective_slug );
-			}
-
-			$configs                    = '' !== $handler_slug ? array() : FlowStepConfig::getHandlerConfigs( $step_config );
-			$configs[ $effective_slug ] = $stored_config;
-
-			return self::withHandlerFields(
-				$step_config,
-				array(
-					'handler_slugs'   => $slugs,
-					'handler_configs' => $configs,
-				)
-			);
+		$slugs = FlowStepConfig::getHandlerSlugs( $step_config );
+		if ( ! in_array( $effective_slug, $slugs, true ) ) {
+			$slugs[] = $effective_slug;
 		}
+
+		$configs                    = FlowStepConfig::getHandlerConfigs( $step_config );
+		$configs[ $effective_slug ] = $stored_config;
 
 		return self::withHandlerFields(
 			$step_config,
 			array(
-				'handler_slug'   => $effective_slug,
-				'handler_config' => $stored_config,
+				'handler_slugs'   => $slugs,
+				'handler_configs' => $configs,
 			)
 		);
 	}

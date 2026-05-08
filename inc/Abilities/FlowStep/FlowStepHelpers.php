@@ -307,7 +307,6 @@ trait FlowStepHelpers {
 		$step = &$flow_config[ $flow_step_id ];
 
 		$uses_handler     = FlowStepConfig::usesHandler( $step );
-		$is_multi_handler = FlowStepConfig::isMultiHandler( $step );
 		$effective_slug   = $uses_handler
 			? FlowStepConfig::getEffectiveSlug( $step, $handler_slug )
 			: ( $step['step_type'] ?? '' );
@@ -341,7 +340,7 @@ trait FlowStepHelpers {
 		if ( ! $uses_handler ) {
 			$step['handler_config'] = $stored_config;
 			unset( $step['handler_slug'], $step['handler_slugs'], $step['handler_configs'] );
-		} elseif ( $is_multi_handler ) {
+		} else {
 			$current_slugs = FlowStepConfig::getHandlerSlugs( $step );
 			if ( ! in_array( $effective_slug, $current_slugs, true ) ) {
 				$current_slugs = array( $effective_slug );
@@ -350,15 +349,11 @@ trait FlowStepHelpers {
 				array_unshift( $current_slugs, $effective_slug );
 			}
 
-			$handler_configs                    = is_array( $step['handler_configs'] ?? null ) ? $step['handler_configs'] : array();
+			$handler_configs                    = FlowStepConfig::getHandlerConfigs( $step );
 			$handler_configs[ $effective_slug ] = $stored_config;
 			$step['handler_slugs']              = $current_slugs;
 			$step['handler_configs']            = $handler_configs;
 			unset( $step['handler_slug'], $step['handler_config'] );
-		} else {
-			$step['handler_slug']   = $effective_slug;
-			$step['handler_config'] = $stored_config;
-			unset( $step['handler_slugs'], $step['handler_configs'] );
 		}
 
 		$step['enabled'] = true;

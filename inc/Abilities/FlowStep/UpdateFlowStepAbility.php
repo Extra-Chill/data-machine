@@ -46,7 +46,11 @@ class UpdateFlowStepAbility {
 							),
 							'handler_config'     => array(
 								'type'        => 'object',
-								'description' => __( 'Handler configuration settings to merge', 'data-machine' ),
+								'description' => __( 'Single handler configuration settings to merge. Prefer handler_configs for new callers.', 'data-machine' ),
+							),
+							'handler_configs'    => array(
+								'type'        => 'object',
+								'description' => __( 'Canonical handler configuration map keyed by handler slug.', 'data-machine' ),
 							),
 							'user_message'       => array(
 								'type'        => 'string',
@@ -96,10 +100,11 @@ class UpdateFlowStepAbility {
 	 * @return array Result with update status.
 	 */
 	public function execute( array $input ): array {
-		$flow_step_id   = $input['flow_step_id'] ?? null;
-		$handler_slug   = $input['handler_slug'] ?? null;
-		$handler_config = $input['handler_config'] ?? array();
-		$user_message   = $input['user_message'] ?? null;
+		$flow_step_id     = $input['flow_step_id'] ?? null;
+		$handler_slug     = $input['handler_slug'] ?? null;
+		$handler_configs  = is_array( $input['handler_configs'] ?? null ) ? $input['handler_configs'] : array();
+		$handler_config   = $input['handler_config'] ?? array();
+		$user_message     = $input['user_message'] ?? null;
 
 		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
 			return array(
@@ -108,7 +113,12 @@ class UpdateFlowStepAbility {
 			);
 		}
 
-		$has_handler_update = ! empty( $handler_slug ) || ! empty( $handler_config );
+		if ( empty( $handler_config ) && ! empty( $handler_configs ) ) {
+			$handler_slug   = is_string( $handler_slug ) && '' !== $handler_slug ? $handler_slug : array_key_first( $handler_configs );
+			$handler_config = is_string( $handler_slug ) && is_array( $handler_configs[ $handler_slug ] ?? null ) ? $handler_configs[ $handler_slug ] : array();
+		}
+
+		$has_handler_update = ! empty( $handler_slug ) || ! empty( $handler_config ) || ! empty( $handler_configs );
 		$has_message_update = null !== $user_message;
 		$has_add_handler    = ! empty( $input['add_handler'] );
 		$has_remove_handler = ! empty( $input['remove_handler'] );

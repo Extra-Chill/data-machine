@@ -79,7 +79,7 @@ $synced_step = array(
 );
 assert_absent( 'handler', $synced_step, 'synced step has no legacy handler field', $failures, $passes );
 
-echo "\n[2] configured single-handler step stores scalar canonical fields:\n";
+echo "\n[2] configured single-handler step stores plural canonical fields:\n";
 $single = FlowStepConfig::normalizeHandlerShape(
 	array_merge(
 		$synced_step,
@@ -90,11 +90,13 @@ $single = FlowStepConfig::normalizeHandlerShape(
 		)
 	)
 );
-assert_equals( 'rss', $single['handler_slug'] ?? null, 'single-handler slug is canonical scalar', $failures, $passes );
-assert_equals( array( 'url' => 'https://example.com/feed.xml' ), $single['handler_config'] ?? array(), 'single-handler config is canonical scalar', $failures, $passes );
+assert_equals( array( 'rss' ), $single['handler_slugs'] ?? array(), 'single-handler slug is canonical list', $failures, $passes );
+assert_equals( array( 'rss' => array( 'url' => 'https://example.com/feed.xml' ) ), $single['handler_configs'] ?? array(), 'single-handler config is canonical map', $failures, $passes );
+assert_equals( 'rss', FlowStepConfig::getHandlerSlug( $single ), 'single-handler primary slug accessor reads canonical list', $failures, $passes );
+assert_equals( array( 'url' => 'https://example.com/feed.xml' ), FlowStepConfig::getPrimaryHandlerConfig( $single ), 'single-handler primary config accessor reads canonical map', $failures, $passes );
 assert_absent( 'handler', $single, 'single-handler step drops legacy handler field', $failures, $passes );
-assert_absent( 'handler_slugs', $single, 'single-handler step has no plural slugs', $failures, $passes );
-assert_absent( 'handler_configs', $single, 'single-handler step has no plural configs', $failures, $passes );
+assert_absent( 'handler_slug', $single, 'single-handler step drops scalar slug', $failures, $passes );
+assert_absent( 'handler_config', $single, 'single-handler step drops scalar config', $failures, $passes );
 
 echo "\n[3] configured multi-handler step stores plural canonical fields:\n";
 $multi = FlowStepConfig::normalizeHandlerShape(
@@ -127,7 +129,7 @@ $restored = FlowStepConfig::normalizeHandlerShape(
 		'handler_configs'  => array( 'rss' => array( 'url' => 'https://example.com/feed.xml' ) ),
 	)
 );
-assert_equals( 'rss', $restored['handler_slug'] ?? null, 'restored single-handler slug comes from canonical import settings', $failures, $passes );
+assert_equals( array( 'rss' ), $restored['handler_slugs'] ?? array(), 'restored single-handler slug comes from canonical import settings', $failures, $passes );
 assert_absent( 'handler', $restored, 'restored step drops stale imported handler field', $failures, $passes );
 
 echo "\n[5] writer sources no longer seed or persist the legacy field:\n";

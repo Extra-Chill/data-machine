@@ -494,15 +494,10 @@ class ImportExport {
 		$settings        = array();
 		$primary_handler = FlowStepConfig::getPrimaryHandlerSlug( $flow_step ) ?? '';
 
-		if ( FlowStepConfig::isMultiHandler( $flow_step ) && ! empty( $primary_handler ) ) {
+		if ( FlowStepConfig::usesHandler( $flow_step ) && ! empty( $primary_handler ) ) {
 			$settings = array(
 				'handler_slugs'   => FlowStepConfig::getHandlerSlugs( $flow_step ),
 				'handler_configs' => FlowStepConfig::getHandlerConfigs( $flow_step ),
-			);
-		} elseif ( FlowStepConfig::usesHandler( $flow_step ) && ! empty( $primary_handler ) ) {
-			$settings = array(
-				'handler_slug'   => $primary_handler,
-				'handler_config' => FlowStepConfig::getPrimaryHandlerConfig( $flow_step ),
 			);
 		} elseif ( ! FlowStepConfig::usesHandler( $flow_step ) && ! empty( $flow_step['handler_config'] ) ) {
 			$settings = array(
