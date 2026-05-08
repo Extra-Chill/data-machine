@@ -210,48 +210,61 @@ class ImageGenerationAbilities {
 			$aspect_ratio = self::DEFAULT_ASPECT_RATIO;
 		}
 
-		try {
-			\DataMachine\Engine\AI\WpAiClientCache::install();
+		$image_file = apply_filters(
+			'datamachine_wp_ai_client_image_file',
+			null,
+			array(
+				'provider'     => $provider,
+				'model'        => $model,
+				'prompt'       => $prompt,
+				'aspect_ratio' => $aspect_ratio,
+			)
+		);
 
-			$registry = \WordPress\AiClient\AiClient::defaultRegistry();
-			/** @var callable $has_provider wp-ai-client exposes this through __call() in some versions. */
-			$has_provider = array( $registry, 'hasProvider' );
-			if ( ! call_user_func( $has_provider, $provider ) ) {
-				throw new \InvalidArgumentException( sprintf( 'Provider %s is not registered in wp-ai-client', esc_html( $provider ) ) );
+		if ( null === $image_file ) {
+			try {
+				\DataMachine\Engine\AI\WpAiClientCache::install();
+
+				$registry = \WordPress\AiClient\AiClient::defaultRegistry();
+				/** @var callable $has_provider wp-ai-client exposes this through __call() in some versions. */
+				$has_provider = array( $registry, 'hasProvider' );
+				if ( ! call_user_func( $has_provider, $provider ) ) {
+					throw new \InvalidArgumentException( sprintf( 'Provider %s is not registered in wp-ai-client', esc_html( $provider ) ) );
+				}
+
+				/** @var callable $provider_id_resolver wp-ai-client exposes this through __call() in some versions. */
+				$provider_id_resolver = array( $registry, 'getProviderId' );
+				$provider_id          = call_user_func( $provider_id_resolver, $provider );
+				$api_key              = \DataMachine\Engine\AI\WpAiClientProviderAdmin::resolveApiKey( $provider );
+				if ( '' !== $api_key ) {
+					$registry->setProviderRequestAuthentication(
+						$provider_id,
+						new \WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication( $api_key )
+					);
+				}
+
+				/** @var callable $model_resolver wp-ai-client exposes this through __call() in some versions. */
+				$model_resolver = array( $registry, 'getProviderModel' );
+				$image_builder  = \wp_ai_client_prompt( $prompt )
+					->using_provider( $provider_id )
+					->using_model( call_user_func( $model_resolver, $provider_id, $model, null ) );
+
+				/** @var callable $file_type_setter wp-ai-client prompt builders expose this through __call() in some versions. */
+				$file_type_setter = array( $image_builder, 'as_output_file_type' );
+				$image_builder    = call_user_func( $file_type_setter, \WordPress\AiClient\Files\Enums\FileTypeEnum::remote() );
+				$image_builder    = $image_builder->as_output_media_aspect_ratio( $aspect_ratio );
+
+				$supported = $image_builder->is_supported_for_image_generation();
+				if ( is_wp_error( $supported ) ) {
+					$image_file = $supported;
+				} elseif ( ! $supported ) {
+					$image_file = new \WP_Error( 'wp_ai_client_image_unsupported', sprintf( 'wp-ai-client model "%s" does not support image generation for provider "%s"', $model, $provider_id ) );
+				} else {
+					$image_file = $image_builder->generate_image();
+				}
+			} catch ( \Throwable $e ) {
+				$image_file = new \WP_Error( 'wp_ai_client_image_exception', 'wp-ai-client image generation threw: ' . $e->getMessage() );
 			}
-
-			/** @var callable $provider_id_resolver wp-ai-client exposes this through __call() in some versions. */
-			$provider_id_resolver = array( $registry, 'getProviderId' );
-			$provider_id          = call_user_func( $provider_id_resolver, $provider );
-			$api_key              = \DataMachine\Engine\AI\WpAiClientProviderAdmin::resolveApiKey( $provider );
-			if ( '' !== $api_key ) {
-				$registry->setProviderRequestAuthentication(
-					$provider_id,
-					new \WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication( $api_key )
-				);
-			}
-
-			/** @var callable $model_resolver wp-ai-client exposes this through __call() in some versions. */
-			$model_resolver = array( $registry, 'getProviderModel' );
-			$image_builder  = \wp_ai_client_prompt( $prompt )
-				->using_provider( $provider_id )
-				->using_model( call_user_func( $model_resolver, $provider_id, $model, null ) );
-
-			/** @var callable $file_type_setter wp-ai-client prompt builders expose this through __call() in some versions. */
-			$file_type_setter = array( $image_builder, 'as_output_file_type' );
-			$image_builder    = call_user_func( $file_type_setter, \WordPress\AiClient\Files\Enums\FileTypeEnum::remote() );
-			$image_builder    = $image_builder->as_output_media_aspect_ratio( $aspect_ratio );
-
-			$supported = $image_builder->is_supported_for_image_generation();
-			if ( is_wp_error( $supported ) ) {
-				$image_file = $supported;
-			} elseif ( ! $supported ) {
-				$image_file = new \WP_Error( 'wp_ai_client_image_unsupported', sprintf( 'wp-ai-client model "%s" does not support image generation for provider "%s"', $model, $provider_id ) );
-			} else {
-				$image_file = $image_builder->generate_image();
-			}
-		} catch ( \Throwable $e ) {
-			$image_file = new \WP_Error( 'wp_ai_client_image_exception', 'wp-ai-client image generation threw: ' . $e->getMessage() );
 		}
 
 		if ( $image_file instanceof \WP_Error || ! is_object( $image_file ) ) {
