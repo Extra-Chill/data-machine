@@ -402,7 +402,7 @@ function datamachine_build_turn_runner(
 				// Validate for duplicate tool calls.
 				$validation_result = ConversationManager::validateToolCall( $tool_name, $tool_parameters, $messages );
 				if ( $validation_result['is_duplicate'] ) {
-					$messages[] = ConversationManager::generateDuplicateToolCallMessage( $tool_name, $turn_count, $mode );
+					$messages[]          = ConversationManager::generateDuplicateToolCallMessage( $tool_name, $turn_count, $mode );
 					$duplicate_rejected = true;
 					do_action(
 						'datamachine_log',
@@ -421,7 +421,7 @@ function datamachine_build_turn_runner(
 
 				$runtime_rule_result = $tool_runtime_rules->evaluate( $tool_name, $messages );
 				if ( ! $runtime_rule_result['allowed'] ) {
-					$tool_result = array(
+					$tool_result           = array(
 						'success' => false,
 						'error'   => $runtime_rule_result['error'],
 					);

@@ -60,22 +60,34 @@ class DataMachineToolRuntimeRules {
 	 * @return array{allowed:bool,error:string,context:array<string,mixed>}
 	 */
 	private function evaluateRule( array $rule, string $tool_name, array $messages ): array {
-		$after_tool = (string) $rule['after_tool'];
+		$after_tool  = (string) $rule['after_tool'];
 		$after_index = $this->lastToolCallIndex( $messages, $after_tool );
 		if ( $after_index < 0 ) {
-			return array( 'allowed' => true, 'error' => '', 'context' => array() );
+			return array(
+				'allowed' => true,
+				'error'   => '',
+				'context' => array(),
+			);
 		}
 
 		$then_require_one_of = (array) $rule['then_require_one_of'];
 		if ( in_array( $tool_name, $then_require_one_of, true ) ) {
-			return array( 'allowed' => true, 'error' => '', 'context' => array() );
+			return array(
+				'allowed' => true,
+				'error'   => '',
+				'context' => array(),
+			);
 		}
 
 		$limited_tools = (array) $rule['limited_tools'];
 		$max_calls     = (int) $rule['max_calls'];
 		$limited_count = $this->countToolCallsAfter( $messages, $after_index, $limited_tools );
 		if ( $limited_count < $max_calls ) {
-			return array( 'allowed' => true, 'error' => '', 'context' => array() );
+			return array(
+				'allowed' => true,
+				'error'   => '',
+				'context' => array(),
+			);
 		}
 
 		$required = implode( ', ', $then_require_one_of );
@@ -152,8 +164,9 @@ class DataMachineToolRuntimeRules {
 	 * @param array<int,string>              $tool_names Limited tool names.
 	 */
 	private function countToolCallsAfter( array $messages, int $after_index, array $tool_names ): int {
-		$count = 0;
-		for ( $i = $after_index + 1; $i < count( $messages ); $i++ ) {
+		$count         = 0;
+		$message_count = count( $messages );
+		for ( $i = $after_index + 1; $i < $message_count; $i++ ) {
 			$call = $this->toolCallFromMessage( $messages[ $i ] );
 			if ( $call && in_array( $call['tool_name'], $tool_names, true ) ) {
 				++$count;
