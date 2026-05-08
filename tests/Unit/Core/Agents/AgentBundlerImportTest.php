@@ -139,6 +139,119 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'mcp' => 5 ), $flow['scheduling_config']['max_items'] ?? null, 'Importer preserves bundle max item caps.' );
 	}
 
+	public function test_reconcile_runtime_replaces_local_modified_flow_queue_and_schedule(): void {
+		$bundle = $this->fixture_bundle( 'runtime-reconcile-agent' );
+		$bundle['flows'][0]['flow_config']['1_step-uuid_1'] = array_merge(
+			$bundle['flows'][0]['flow_config']['1_step-uuid_1'],
+			array(
+				'step_type'          => 'fetch',
+				'handler_slug'       => 'mcp',
+				'handler_config'     => array(
+					'max_items' => 5,
+					'provider'  => 'mgs',
+				),
+				'handler_configs'    => array(
+					'mcp' => array(
+						'max_items' => 5,
+						'provider'  => 'mgs',
+					),
+				),
+				'config_patch_queue' => array(
+					array( 'patch' => array( 'query' => 'initial' ) ),
+				),
+				'queue_mode'         => 'loop',
+			)
+		);
+		$bundle['flows'][0]['scheduling_config'] = array(
+			'enabled'  => true,
+			'interval' => 'daily',
+			'max_items' => array(
+				'mcp' => 5,
+			),
+		);
+
+		$first = $this->bundler->import( $bundle, null, $this->owner_id );
+		$this->assertTrue( (bool) $first['success'], 'Initial install succeeds.' );
+
+		$agent    = $this->agents_repo->get_by_slug( 'runtime-reconcile-agent' );
+		$pipeline = $this->pipelines_repo->get_by_portable_slug( (int) $agent['agent_id'], 'static-site-pipeline' );
+		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
+		$config   = $flow['flow_config'];
+		$step_id  = array_key_first( $config );
+
+		$config[ $step_id ]['config_patch_queue'] = array(
+			array( 'patch' => array( 'query' => 'stale-a' ) ),
+			array( 'patch' => array( 'query' => 'stale-b' ) ),
+		);
+		$config[ $step_id ]['queue_mode']         = 'drain';
+		$config[ $step_id ]['handler_config']     = array(
+			'max_items' => 1,
+			'provider'  => 'mgs',
+		);
+		$config[ $step_id ]['handler_configs']    = array(
+			'mcp' => array(
+				'max_items' => 1,
+				'provider'  => 'mgs',
+			),
+		);
+
+		$this->flows_repo->update_flow(
+			(int) $flow['flow_id'],
+			array(
+				'flow_config'       => $config,
+				'scheduling_config' => array(
+					'enabled'  => false,
+					'interval' => 'manual',
+					'max_items' => array(
+						'mcp' => 1,
+					),
+				),
+			)
+		);
+
+		$upgrade = $bundle;
+		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['handler_config']['max_items'] = 50;
+		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['handler_configs']['mcp']['max_items'] = 50;
+		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['config_patch_queue'] = array(
+			array( 'patch' => array( 'query' => 'target-a' ) ),
+			array( 'patch' => array( 'query' => 'target-b' ) ),
+			array( 'patch' => array( 'query' => 'target-c' ) ),
+		);
+		$upgrade['flows'][0]['scheduling_config'] = array(
+			'enabled'  => true,
+			'interval' => 'every_5_minutes',
+			'max_items' => array(
+				'mcp' => 50,
+			),
+		);
+
+		$second = $this->bundler->import(
+			$upgrade,
+			null,
+			$this->owner_id,
+			false,
+			array(
+				'is_upgrade'        => true,
+				'reconcile_runtime' => true,
+			)
+		);
+
+		$this->assertTrue( (bool) $second['success'], 'Runtime reconcile import succeeds against locally modified flow.' );
+		$this->assertSame( array(), $second['summary']['conflicts'] ?? array(), 'Explicit runtime reconcile does not stage local-modified flow conflicts.' );
+
+		$updated_flow   = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
+		$updated_config = $updated_flow['flow_config'];
+		$updated_step   = $updated_config[ $step_id ];
+
+		$this->assertCount( 3, $updated_step['config_patch_queue'], 'Bundle seed queue replaces stale runtime queue.' );
+		$this->assertSame( 'target-a', $updated_step['config_patch_queue'][0]['patch']['query'] ?? null, 'Reconciled queue uses target patch content.' );
+		$this->assertSame( 'loop', $updated_step['queue_mode'] ?? null, 'Bundle seed queue mode replaces stale runtime mode.' );
+		$this->assertSame( 50, $updated_step['handler_configs']['mcp']['max_items'] ?? null, 'Bundle handler bounds replace stale runtime bounds.' );
+		$this->assertSame( 'every_5_minutes', $updated_flow['scheduling_config']['interval'] ?? null, 'Bundle schedule replaces stale runtime schedule.' );
+		$this->assertTrue( $updated_flow['scheduling_config']['enabled'] ?? false, 'Bundle schedule enabled flag replaces stale runtime flag.' );
+		$this->assertSame( array( 'mcp' => 50 ), $updated_flow['scheduling_config']['max_items'] ?? null, 'Bundle schedule max items replace stale runtime bounds.' );
+	}
+
 	/**
 	 * The silent-partial-success regression in #1801: a failure after the agent row was claimed used
 	 * to return `success: true` with a populated agent_id summary, while the row was rolled back at
