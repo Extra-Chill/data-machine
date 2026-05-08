@@ -306,8 +306,8 @@ trait FlowStepHelpers {
 
 		$step = &$flow_config[ $flow_step_id ];
 
-		$uses_handler     = FlowStepConfig::usesHandler( $step );
-		$effective_slug   = $uses_handler
+		$uses_handler   = FlowStepConfig::usesHandler( $step );
+		$effective_slug = $uses_handler
 			? FlowStepConfig::getEffectiveSlug( $step, $handler_slug )
 			: ( $step['step_type'] ?? '' );
 
@@ -338,8 +338,8 @@ trait FlowStepHelpers {
 		$stored_config = $this->handler_abilities->applyDefaults( $effective_slug, $merged_config );
 
 		if ( ! $uses_handler ) {
-			$step['handler_config'] = $stored_config;
-			unset( $step['handler_slug'], $step['handler_slugs'], $step['handler_configs'] );
+			$step['flow_step_settings'] = $stored_config;
+			unset( $step['handler_slug'], $step['handler_slugs'], $step['handler_config'], $step['handler_configs'] );
 		} else {
 			$current_slugs = FlowStepConfig::getHandlerSlugs( $step );
 			if ( ! in_array( $effective_slug, $current_slugs, true ) ) {

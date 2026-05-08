@@ -4,7 +4,7 @@
  *
  * The validator only enforces STRUCTURAL invariants — the workflow has
  * steps, each step has a registered type. Per-type config requirements
- * (handler_slug presence, handler_config shape, etc.) belong to each
+ * (handler_slug presence, flow_step_settings shape, etc.) belong to each
  * step type's own executeStep() at runtime, not here.
  *
  * Run with: php tests/system-task-workflow-validation-smoke.php
@@ -88,8 +88,8 @@ echo "\n[1] system_task workflow with no handler_slug — VALID (regression fix)
 $wf = array(
 	'steps' => array(
 		array(
-			'type'           => 'system_task',
-			'handler_config' => array(
+			'type'               => 'system_task',
+			'flow_step_settings' => array(
 				'task'   => 'daily_memory_generation',
 				'params' => array(),
 			),
@@ -145,7 +145,7 @@ $wf = array(
 	'steps' => array(
 		array( 'type' => 'fetch', 'handler_slug' => 'rss' ),
 		array( 'type' => 'ai' ),
-		array( 'type' => 'system_task', 'handler_config' => array( 'task' => 'cleanup' ) ),
+		array( 'type' => 'system_task', 'flow_step_settings' => array( 'task' => 'cleanup' ) ),
 	),
 );
 $r = validate_workflow_for_test( $wf );
@@ -183,8 +183,8 @@ echo "\n[13] real-world DailyMemoryTask workflow — VALID (the bug case)\n";
 $wf = array(
 	'steps' => array(
 		array(
-			'type'           => 'system_task',
-			'handler_config' => array(
+			'type'               => 'system_task',
+			'flow_step_settings' => array(
 				'task'   => 'daily_memory_generation',
 				'params' => array( 'date' => '2026-04-24' ),
 			),

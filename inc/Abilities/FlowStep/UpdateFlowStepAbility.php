@@ -52,6 +52,10 @@ class UpdateFlowStepAbility {
 								'type'        => 'object',
 								'description' => __( 'Canonical handler configuration map keyed by handler slug.', 'data-machine' ),
 							),
+							'flow_step_settings' => array(
+								'type'        => 'object',
+								'description' => __( 'Canonical settings object for handler-free flow steps.', 'data-machine' ),
+							),
 							'user_message'       => array(
 								'type'        => 'string',
 								'description' => __( 'User message for AI steps', 'data-machine' ),
@@ -100,11 +104,12 @@ class UpdateFlowStepAbility {
 	 * @return array Result with update status.
 	 */
 	public function execute( array $input ): array {
-		$flow_step_id     = $input['flow_step_id'] ?? null;
-		$handler_slug     = $input['handler_slug'] ?? null;
-		$handler_configs  = is_array( $input['handler_configs'] ?? null ) ? $input['handler_configs'] : array();
-		$handler_config   = $input['handler_config'] ?? array();
-		$user_message     = $input['user_message'] ?? null;
+		$flow_step_id       = $input['flow_step_id'] ?? null;
+		$handler_slug       = $input['handler_slug'] ?? null;
+		$handler_configs    = is_array( $input['handler_configs'] ?? null ) ? $input['handler_configs'] : array();
+		$flow_step_settings = is_array( $input['flow_step_settings'] ?? null ) ? $input['flow_step_settings'] : array();
+		$handler_config     = $input['handler_config'] ?? array();
+		$user_message       = $input['user_message'] ?? null;
 
 		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
 			return array(
@@ -117,8 +122,11 @@ class UpdateFlowStepAbility {
 			$handler_slug   = is_string( $handler_slug ) && '' !== $handler_slug ? $handler_slug : array_key_first( $handler_configs );
 			$handler_config = is_string( $handler_slug ) && is_array( $handler_configs[ $handler_slug ] ?? null ) ? $handler_configs[ $handler_slug ] : array();
 		}
+		if ( empty( $handler_config ) && ! empty( $flow_step_settings ) ) {
+			$handler_config = $flow_step_settings;
+		}
 
-		$has_handler_update = ! empty( $handler_slug ) || ! empty( $handler_config ) || ! empty( $handler_configs );
+		$has_handler_update = ! empty( $handler_slug ) || ! empty( $handler_config ) || ! empty( $handler_configs ) || ! empty( $flow_step_settings );
 		$has_message_update = null !== $user_message;
 		$has_add_handler    = ! empty( $input['add_handler'] );
 		$has_remove_handler = ! empty( $input['remove_handler'] );
@@ -132,10 +140,13 @@ class UpdateFlowStepAbility {
 
 		$validation = $this->validateFlowStepId( $flow_step_id );
 		if ( ! $validation['valid'] ) {
-			return $validation['error_response'];
+			return is_array( $validation['error_response'] ?? null ) ? $validation['error_response'] : array(
+				'success' => false,
+				'error'   => 'Invalid flow_step_id',
+			);
 		}
 
-		$existing_step = $validation['step_config'];
+		$existing_step = is_array( $validation['step_config'] ?? null ) ? $validation['step_config'] : array();
 
 		$updated_fields = array();
 
@@ -174,7 +185,7 @@ class UpdateFlowStepAbility {
 				$updated_fields[] = 'handler_slug';
 			}
 			if ( ! empty( $handler_config ) ) {
-				$updated_fields[] = 'handler_config';
+				$updated_fields[] = FlowStepConfig::usesHandler( $existing_step ) ? 'handler_config' : 'flow_step_settings';
 			}
 		}
 

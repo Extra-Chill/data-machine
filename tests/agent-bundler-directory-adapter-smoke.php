@@ -183,7 +183,7 @@ assert_adapter_equals(
 		'provider' => 'github',
 		'auth_ref' => 'github:default',
 	),
-	$flow['steps'][0]['handler_config']
+	$flow['steps'][0]['handler_configs']['mcp'] ?? null
 );
 assert_adapter_equals( 'flow document preserves step type', 'fetch', $flow['steps'][0]['step_type'] );
 assert_adapter_equals( 'flow document preserves config patch queue', array( 'after' => '2026-04-01' ), $flow['steps'][0]['config_patch_queue'][0]['patch'] ?? null );
@@ -222,7 +222,7 @@ assert_adapter_equals(
 		'auth_ref' => 'github:default',
 		'provider' => 'github',
 	),
-	$round_steps[0]['handler_config']
+	$round_steps[0]['handler_configs']['mcp'] ?? null
 );
 assert_adapter_equals( 'round-trip preserves step type', 'fetch', $round_steps[0]['step_type'] );
 assert_adapter_equals( 'round-trip preserves config patch queue', array( 'after' => '2026-04-01' ), $round_steps[0]['config_patch_queue'][0]['patch'] ?? null );

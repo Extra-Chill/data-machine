@@ -73,9 +73,13 @@ class ConfigureFlowStepsAbility {
 								'type'        => 'object',
 								'description' => __( 'Canonical handler configuration map keyed by handler slug.', 'data-machine' ),
 							),
+							'flow_step_settings'  => array(
+								'type'        => 'object',
+								'description' => __( 'Canonical settings object for handler-free flow steps.', 'data-machine' ),
+							),
 							'flow_configs'        => array(
 								'type'        => 'array',
-								'description' => __( 'Per-flow configurations: [{flow_id: int, handler_config: object}]', 'data-machine' ),
+								'description' => __( 'Per-flow configurations: [{flow_id: int, handler_config|flow_step_settings|handler_configs: object}]', 'data-machine' ),
 							),
 							'user_message'        => array(
 								'type'        => 'string',
@@ -151,6 +155,7 @@ class ConfigureFlowStepsAbility {
 		$target_handler_slug = $input['target_handler_slug'] ?? null;
 		$field_map           = $input['field_map'] ?? array();
 		$handler_configs     = is_array( $input['handler_configs'] ?? null ) ? $input['handler_configs'] : array();
+		$flow_step_settings  = is_array( $input['flow_step_settings'] ?? null ) ? $input['flow_step_settings'] : array();
 		$handler_config      = $input['handler_config'] ?? array();
 		$flow_configs        = $input['flow_configs'] ?? array();
 		$user_message        = $input['user_message'] ?? null;
@@ -174,6 +179,9 @@ class ConfigureFlowStepsAbility {
 		if ( empty( $handler_config ) && ! empty( $handler_configs ) ) {
 			$config_slug    = is_string( $target_handler_slug ) && '' !== $target_handler_slug ? $target_handler_slug : $handler_slug;
 			$handler_config = is_string( $config_slug ) && is_array( $handler_configs[ $config_slug ] ?? null ) ? $handler_configs[ $config_slug ] : array();
+		}
+		if ( empty( $handler_config ) && ! empty( $flow_step_settings ) ) {
+			$handler_config = $flow_step_settings;
 		}
 
 		$flows = $this->db_flows->get_flows_for_pipeline( $pipeline_id );
@@ -222,8 +230,10 @@ class ConfigureFlowStepsAbility {
 			if ( isset( $fc['flow_id'] ) ) {
 				$flow_handler_configs = is_array( $fc['handler_configs'] ?? null ) ? $fc['handler_configs'] : array();
 				if ( ! empty( $flow_handler_configs ) ) {
-					$config_slug = is_string( $target_handler_slug ) && '' !== $target_handler_slug ? $target_handler_slug : $handler_slug;
+					$config_slug                                = is_string( $target_handler_slug ) && '' !== $target_handler_slug ? $target_handler_slug : $handler_slug;
 					$flow_configs_by_id[ (int) $fc['flow_id'] ] = is_string( $config_slug ) && is_array( $flow_handler_configs[ $config_slug ] ?? null ) ? $flow_handler_configs[ $config_slug ] : array();
+				} elseif ( is_array( $fc['flow_step_settings'] ?? null ) ) {
+					$flow_configs_by_id[ (int) $fc['flow_id'] ] = $fc['flow_step_settings'];
 				} else {
 					$flow_configs_by_id[ (int) $fc['flow_id'] ] = $fc['handler_config'] ?? array();
 				}
@@ -542,12 +552,20 @@ class ConfigureFlowStepsAbility {
 
 				$target = FlowStepTargetResolver::resolve( $flow_config, (string) $step_key, $config );
 				if ( empty( $target['success'] ) ) {
-					$errors[] = array_merge( array( 'flow_id' => $flow_id ), $target['error'] );
+					$target_error = is_array( $target['error'] ?? null ) ? $target['error'] : array( 'error' => 'Unable to resolve flow step target' );
+					$errors[]     = array_merge( array( 'flow_id' => $flow_id ), $target_error );
 					continue;
 				}
 
-				$flow_step_id = $target['flow_step_id'];
-				$step_type    = $target['step_type'] ?? (string) $step_key;
+				$flow_step_id = (string) ( $target['flow_step_id'] ?? '' );
+				if ( '' === $flow_step_id ) {
+					$errors[] = array(
+						'flow_id' => $flow_id,
+						'error'   => 'Unable to resolve flow step target',
+					);
+					continue;
+				}
+				$step_type = $target['step_type'] ?? (string) $step_key;
 
 				$handler_slug   = $config['handler_slug'] ?? null;
 				$handler_config = $config['handler_config'] ?? array();
@@ -575,7 +593,7 @@ class ConfigureFlowStepsAbility {
 				}
 
 				if ( ! empty( $handler_slug ) || ! empty( $handler_config ) ) {
-					$success = $this->updateHandler( $flow_step_id, $effective_slug ?? '', $handler_config );
+					$success = $this->updateHandler( $flow_step_id, $effective_slug, $handler_config );
 					if ( ! $success ) {
 						$errors[] = array(
 							'flow_id'      => $flow_id,

@@ -29,6 +29,7 @@ use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
 use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Bundle\PortableSlug;
+use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -274,6 +275,7 @@ class AgentBundler {
 		 * @param int                                $agent_id Agent ID being exported.
 		 * @param array                              $agent    Agent row.
 		 */
+		/** @var mixed $extras */
 		$extras = apply_filters( 'datamachine_bundle_export_extras', array(), $agent_id, $agent );
 		if ( ! is_array( $extras ) ) {
 			return array();
@@ -358,12 +360,15 @@ class AgentBundler {
 				'step_position'   => (int) ( $step['execution_order'] ?? count( $steps ) ),
 				'handler_configs' => self::handler_configs_from_flow_step( $step, $handler_auth, $context ),
 			);
+			if ( ! FlowStepConfig::usesHandler( $step ) && ! empty( FlowStepConfig::getPrimaryHandlerConfig( $step ) ) ) {
+				$document_step['flow_step_settings'] = FlowStepConfig::getPrimaryHandlerConfig( $step );
+			}
 
 			if ( ! isset( $step['step_type'] ) && isset( $pipeline_step_types_by_id[ $pipeline_step_id ] ) ) {
 				$document_step['step_type'] = $pipeline_step_types_by_id[ $pipeline_step_id ];
 			}
 
-			foreach ( array( 'step_type', 'handler_slug', 'handler_slugs', 'handler_config', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'enabled' ) as $field ) {
+			foreach ( array( 'step_type', 'handler_slug', 'handler_slugs', 'flow_step_settings', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'enabled' ) as $field ) {
 				if ( array_key_exists( $field, $step ) ) {
 					$document_step[ $field ] = $step[ $field ];
 				}
@@ -1075,10 +1080,6 @@ class AgentBundler {
 	 * is the safety net that cleans up any rows we know we created.
 	 */
 	private function begin_transaction(): bool {
-		if ( ! isset( $this->agents_repo ) ) {
-			return false;
-		}
-
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$result = $wpdb->query( 'START TRANSACTION' );

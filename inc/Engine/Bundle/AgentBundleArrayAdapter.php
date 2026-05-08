@@ -7,6 +7,8 @@
 
 namespace DataMachine\Engine\Bundle;
 
+use DataMachine\Core\Steps\FlowStepConfig;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -295,11 +297,14 @@ final class AgentBundleArrayAdapter {
 				'step_position'   => (int) ( $step['execution_order'] ?? count( $steps ) ),
 				'handler_configs' => self::handler_configs_from_step( $step ),
 			);
+			if ( ! FlowStepConfig::usesHandler( $step ) && ! empty( FlowStepConfig::getPrimaryHandlerConfig( $step ) ) ) {
+				$document_step['flow_step_settings'] = FlowStepConfig::getPrimaryHandlerConfig( $step );
+			}
 			if ( ! isset( $step['step_type'] ) && isset( $pipeline_step_types_by_id[ $pipeline_step_id ] ) ) {
 				$document_step['step_type'] = $pipeline_step_types_by_id[ $pipeline_step_id ];
 			}
 
-			foreach ( array( 'step_type', 'handler_slug', 'handler_slugs', 'handler_config', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'enabled' ) as $field ) {
+			foreach ( array( 'step_type', 'handler_slug', 'handler_slugs', 'flow_step_settings', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'enabled' ) as $field ) {
 				if ( array_key_exists( $field, $step ) ) {
 					$document_step[ $field ] = $step[ $field ];
 				}
@@ -319,7 +324,7 @@ final class AgentBundleArrayAdapter {
 			'execution_order'  => (int) $step['step_position'],
 		);
 
-		foreach ( array( 'step_type', 'handler_slug', 'handler_slugs', 'handler_config', 'handler_configs', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'enabled' ) as $field ) {
+		foreach ( array( 'step_type', 'handler_slug', 'handler_slugs', 'handler_config', 'handler_configs', 'flow_step_settings', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'enabled' ) as $field ) {
 			if ( array_key_exists( $field, $step ) ) {
 				$config[ $field ] = $step[ $field ];
 			}

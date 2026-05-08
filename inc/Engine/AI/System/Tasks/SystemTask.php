@@ -67,8 +67,8 @@ abstract class SystemTask {
 		return array(
 			'steps' => array(
 				array(
-					'type'           => 'system_task',
-					'handler_config' => array(
+					'type'               => 'system_task',
+					'flow_step_settings' => array(
 						'task'   => $this->getTaskType(),
 						'params' => $params,
 					),
@@ -199,8 +199,8 @@ abstract class SystemTask {
 	 * @param string $message Error message.
 	 */
 	protected function failJob( int $jobId, string $message ): void {
-		$jobs_db     = new Jobs();
-		$engine_data = $jobs_db->retrieve_engine_data( $jobId );
+		$jobs_db              = new Jobs();
+		$engine_data          = $jobs_db->retrieve_engine_data( $jobId );
 		$engine_data['error'] = $message;
 		$jobs_db->store_engine_data( $jobId, $engine_data );
 		$jobs_db->complete_job( $jobId, 'failed: ' . $message );
@@ -443,7 +443,7 @@ abstract class SystemTask {
 	public function undo( int $jobId, array $engineData ): array {
 		// First try effects from the job itself (backward compat for
 		// jobs that completed before the migration).
-		$effects = $engineData['effects'] ?? array();
+		$effects = is_array( $engineData['effects'] ?? null ) ? $engineData['effects'] : array();
 
 		// If no self-effects, gather from child step jobs.
 		if ( empty( $effects ) ) {
@@ -452,7 +452,7 @@ abstract class SystemTask {
 
 			foreach ( $children as $child ) {
 				$child_data    = $child['engine_data'] ?? array();
-				$child_effects = $child_data['effects'] ?? array();
+				$child_effects = is_array( $child_data['effects'] ?? null ) ? $child_data['effects'] : array();
 				$effects       = array_merge( $effects, $child_effects );
 			}
 		}
@@ -529,7 +529,7 @@ abstract class SystemTask {
 	 * Undo a single effect by dispatching to the appropriate handler.
 	 *
 	 * @param array $effect Single effect entry.
-	 * @return array{status: string, type: string, reason?: string}
+	 * @return array<string, mixed>
 	 * @since 0.33.0
 	 */
 	protected function undoEffect( array $effect ): array {
@@ -566,23 +566,44 @@ abstract class SystemTask {
 		$revision_id = $effect['revision_id'] ?? 0;
 
 		if ( $post_id <= 0 ) {
-			return array( 'status' => 'failed', 'type' => 'post_content_modified', 'reason' => 'Missing post_id' );
+			return array(
+				'status' => 'failed',
+				'type'   => 'post_content_modified',
+				'reason' => 'Missing post_id',
+			);
 		}
 		if ( $revision_id <= 0 ) {
-			return array( 'status' => 'failed', 'type' => 'post_content_modified', 'reason' => 'No revision_id' );
+			return array(
+				'status' => 'failed',
+				'type'   => 'post_content_modified',
+				'reason' => 'No revision_id',
+			);
 		}
 
 		$revision = get_post( $revision_id );
-		if ( ! $revision || 'revision' !== $revision->post_type ) {
-			return array( 'status' => 'failed', 'type' => 'post_content_modified', 'reason' => "Revision #{$revision_id} not found" );
+		if ( ! $revision instanceof \WP_Post || 'revision' !== $revision->post_type ) {
+			return array(
+				'status' => 'failed',
+				'type'   => 'post_content_modified',
+				'reason' => "Revision #{$revision_id} not found",
+			);
 		}
 
 		$restored = wp_restore_post_revision( $revision_id );
 		if ( ! $restored ) {
-			return array( 'status' => 'failed', 'type' => 'post_content_modified', 'reason' => "Failed to restore revision #{$revision_id}" );
+			return array(
+				'status' => 'failed',
+				'type'   => 'post_content_modified',
+				'reason' => "Failed to restore revision #{$revision_id}",
+			);
 		}
 
-		return array( 'status' => 'reverted', 'type' => 'post_content_modified', 'post_id' => $post_id, 'revision_id' => $revision_id );
+		return array(
+			'status'      => 'reverted',
+			'type'        => 'post_content_modified',
+			'post_id'     => $post_id,
+			'revision_id' => $revision_id,
+		);
 	}
 
 	/**
@@ -596,7 +617,11 @@ abstract class SystemTask {
 		$meta_key = $effect['target']['meta_key'] ?? '';
 
 		if ( $post_id <= 0 || empty( $meta_key ) ) {
-			return array( 'status' => 'failed', 'type' => 'post_meta_set', 'reason' => 'Missing post_id or meta_key' );
+			return array(
+				'status' => 'failed',
+				'type'   => 'post_meta_set',
+				'reason' => 'Missing post_id or meta_key',
+			);
 		}
 
 		if ( array_key_exists( 'previous_value', $effect ) && null !== $effect['previous_value'] ) {
@@ -605,7 +630,12 @@ abstract class SystemTask {
 			delete_post_meta( $post_id, $meta_key );
 		}
 
-		return array( 'status' => 'reverted', 'type' => 'post_meta_set', 'post_id' => $post_id, 'meta_key' => $meta_key );
+		return array(
+			'status'   => 'reverted',
+			'type'     => 'post_meta_set',
+			'post_id'  => $post_id,
+			'meta_key' => $meta_key,
+		);
 	}
 
 	/**
@@ -619,7 +649,11 @@ abstract class SystemTask {
 		$field   = $effect['target']['field'] ?? '';
 
 		if ( $post_id <= 0 || empty( $field ) ) {
-			return array( 'status' => 'failed', 'type' => 'post_field_set', 'reason' => 'Missing post_id or field' );
+			return array(
+				'status' => 'failed',
+				'type'   => 'post_field_set',
+				'reason' => 'Missing post_id or field',
+			);
 		}
 
 		$update = array( 'ID' => $post_id );
@@ -632,10 +666,19 @@ abstract class SystemTask {
 
 		$result = wp_update_post( $update, true );
 		if ( is_wp_error( $result ) ) {
-			return array( 'status' => 'failed', 'type' => 'post_field_set', 'reason' => $result->get_error_message() );
+			return array(
+				'status' => 'failed',
+				'type'   => 'post_field_set',
+				'reason' => $result->get_error_message(),
+			);
 		}
 
-		return array( 'status' => 'reverted', 'type' => 'post_field_set', 'post_id' => $post_id, 'field' => $field );
+		return array(
+			'status'  => 'reverted',
+			'type'    => 'post_field_set',
+			'post_id' => $post_id,
+			'field'   => $field,
+		);
 	}
 
 	/**
@@ -648,15 +691,27 @@ abstract class SystemTask {
 		$attachment_id = $effect['target']['attachment_id'] ?? 0;
 
 		if ( $attachment_id <= 0 ) {
-			return array( 'status' => 'failed', 'type' => 'attachment_created', 'reason' => 'Missing attachment_id' );
+			return array(
+				'status' => 'failed',
+				'type'   => 'attachment_created',
+				'reason' => 'Missing attachment_id',
+			);
 		}
 
 		$deleted = wp_delete_attachment( $attachment_id, true );
 		if ( ! $deleted ) {
-			return array( 'status' => 'failed', 'type' => 'attachment_created', 'reason' => "Failed to delete attachment #{$attachment_id}" );
+			return array(
+				'status' => 'failed',
+				'type'   => 'attachment_created',
+				'reason' => "Failed to delete attachment #{$attachment_id}",
+			);
 		}
 
-		return array( 'status' => 'reverted', 'type' => 'attachment_created', 'attachment_id' => $attachment_id );
+		return array(
+			'status'        => 'reverted',
+			'type'          => 'attachment_created',
+			'attachment_id' => $attachment_id,
+		);
 	}
 
 	/**
@@ -669,7 +724,11 @@ abstract class SystemTask {
 		$post_id = $effect['target']['post_id'] ?? 0;
 
 		if ( $post_id <= 0 ) {
-			return array( 'status' => 'failed', 'type' => 'featured_image_set', 'reason' => 'Missing post_id' );
+			return array(
+				'status' => 'failed',
+				'type'   => 'featured_image_set',
+				'reason' => 'Missing post_id',
+			);
 		}
 
 		$previous = $effect['previous_value'] ?? 0;
@@ -679,6 +738,10 @@ abstract class SystemTask {
 			delete_post_thumbnail( $post_id );
 		}
 
-		return array( 'status' => 'reverted', 'type' => 'featured_image_set', 'post_id' => $post_id );
+		return array(
+			'status'  => 'reverted',
+			'type'    => 'featured_image_set',
+			'post_id' => $post_id,
+		);
 	}
 }

@@ -38,12 +38,13 @@ class FlowStepConfigFactory {
 				),
 				self::promptQueueFromWorkflowStep( $step ),
 				array(
-					'queue_mode'       => 'static',
-					'disabled_tools'   => $step['disabled_tools'] ?? array(),
-					'pipeline_id'      => 'direct',
-					'flow_id'          => 'direct',
-					'handler_slug'     => $step['handler_slug'] ?? '',
-					'handler_config'   => $step['handler_config'] ?? array(),
+					'queue_mode'         => 'static',
+					'disabled_tools'     => $step['disabled_tools'] ?? array(),
+					'pipeline_id'        => 'direct',
+					'flow_id'            => 'direct',
+					'handler_slug'       => $step['handler_slug'] ?? '',
+					'handler_config'     => $step['handler_config'] ?? array(),
+					'flow_step_settings' => $step['flow_step_settings'] ?? array(),
 				)
 			)
 		);
@@ -105,18 +106,18 @@ class FlowStepConfigFactory {
 	public static function build( array $args ): array {
 		$step_config = array();
 		$copy_fields = array(
-			'flow_step_id'       => true,
-			'pipeline_step_id'   => true,
-			'step_type'          => true,
-			'execution_order'    => true,
-			'enabled_tools'      => true,
-			'disabled_tools'     => true,
+			'flow_step_id'                        => true,
+			'pipeline_step_id'                    => true,
+			'step_type'                           => true,
+			'execution_order'                     => true,
+			'enabled_tools'                       => true,
+			'disabled_tools'                      => true,
 			QueueAbility::SLOT_PROMPT_QUEUE       => true,
 			QueueAbility::SLOT_CONFIG_PATCH_QUEUE => true,
-			'queue_mode'         => true,
-			'pipeline_id'        => true,
-			'flow_id'            => true,
-			'handler'            => true,
+			'queue_mode'                          => true,
+			'pipeline_id'                         => true,
+			'flow_id'                             => true,
+			'handler'                             => true,
 		);
 
 		foreach ( $args as $field => $value ) {
@@ -125,10 +126,11 @@ class FlowStepConfigFactory {
 			}
 		}
 
-		$handler_slug    = $args['handler_slug'] ?? '';
-		$handler_config  = $args['handler_config'] ?? array();
-		$handler_slugs   = is_array( $args['handler_slugs'] ?? null ) ? $args['handler_slugs'] : array();
-		$handler_configs = is_array( $args['handler_configs'] ?? null ) ? $args['handler_configs'] : array();
+		$handler_slug       = $args['handler_slug'] ?? '';
+		$handler_config     = $args['handler_config'] ?? array();
+		$flow_step_settings = is_array( $args['flow_step_settings'] ?? null ) ? $args['flow_step_settings'] : array();
+		$handler_slugs      = is_array( $args['handler_slugs'] ?? null ) ? $args['handler_slugs'] : array();
+		$handler_configs    = is_array( $args['handler_configs'] ?? null ) ? $args['handler_configs'] : array();
 
 		if ( FlowStepConfig::usesHandler( $step_config ) ) {
 			if ( is_string( $handler_slug ) && '' !== $handler_slug ) {
@@ -147,8 +149,11 @@ class FlowStepConfigFactory {
 					)
 				)
 			);
-		} elseif ( ! empty( $handler_config ) ) {
-			$step_config['handler_config'] = $handler_config;
+		} else {
+			$settings = ! empty( $flow_step_settings ) ? $flow_step_settings : ( is_array( $handler_config ) ? $handler_config : array() );
+			if ( ! empty( $settings ) ) {
+				$step_config['flow_step_settings'] = $settings;
+			}
 		}
 
 		return $step_config;
@@ -206,7 +211,7 @@ class FlowStepConfigFactory {
 	 */
 	public static function withHandlerFields( array $step_config, array $handler_fields ): array {
 		$overlay = array();
-		foreach ( array( 'handler_slug', 'handler_slugs', 'handler_config', 'handler_configs' ) as $field ) {
+		foreach ( array( 'handler_slug', 'handler_slugs', 'handler_config', 'handler_configs', 'flow_step_settings' ) as $field ) {
 			if ( array_key_exists( $field, $handler_fields ) ) {
 				$overlay[ $field ] = $handler_fields[ $field ];
 			}
@@ -236,7 +241,7 @@ class FlowStepConfigFactory {
 			$existing_config = $merge ? FlowStepConfig::getPrimaryHandlerConfig( $step_config ) : array();
 			return self::withHandlerFields(
 				$step_config,
-				array( 'handler_config' => array_merge( $existing_config, $handler_config ) )
+				array( 'flow_step_settings' => array_merge( $existing_config, $handler_config ) )
 			);
 		}
 
@@ -302,7 +307,7 @@ class FlowStepConfigFactory {
 				'added_at' => $added_at ?? gmdate( 'c' ),
 			),
 		);
-		$step_config['queue_mode']   = 'static';
+		$step_config['queue_mode']                      = 'static';
 
 		return $step_config;
 	}
