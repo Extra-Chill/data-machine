@@ -11,6 +11,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+if ( ! function_exists( 'sanitize_title' ) ) {
+	function sanitize_title( string $title ): string {
+		return strtolower( trim( preg_replace( '/[^a-z0-9]+/i', '-', $title ), '-' ) );
+	}
+}
+
 /**
  * Mirror of ExecuteWorkflowAbility::execute()'s create_args parent link.
  */
@@ -46,6 +52,9 @@ function build_execute_workflow_engine_data_for_contract_test( int $job_id, arra
 	);
 	if ( ! empty( $initial_data['agent_id'] ) && empty( $job_snapshot['agent_id'] ) ) {
 		$job_snapshot['agent_id'] = (int) $initial_data['agent_id'];
+	}
+	if ( ! empty( $initial_data['agent_slug'] ) && empty( $job_snapshot['agent_slug'] ) ) {
+		$job_snapshot['agent_slug'] = sanitize_title( (string) $initial_data['agent_slug'] );
 	}
 	$engine_data['job'] = $job_snapshot;
 
@@ -92,6 +101,7 @@ $initial_data = array(
 	'pipeline_config' => array( 'poisoned_pipeline' => array( 'system_prompt' => 'caller override' ) ),
 	'parent_job_id'   => 64,
 	'agent_id'        => 2,
+	'agent_slug'      => 'Wayward Son',
 	'user_id'         => 1,
 	'job'             => array(
 		'user_id' => 1,
@@ -112,9 +122,11 @@ dm_assert_same( 64, $create_args['parent_job_id'] ?? null, 'parent_job_id preser
 
 echo "\n[3] flat identity fields still route into the job snapshot\n";
 dm_assert_same( 2, $engine_data['agent_id'], 'flat agent_id remains in engine_data' );
+dm_assert_same( 'Wayward Son', $engine_data['agent_slug'], 'flat agent_slug remains in engine_data' );
 dm_assert_same( 1, $engine_data['user_id'], 'flat user_id remains in engine_data' );
 dm_assert_same( 100, $engine_data['job']['job_id'], 'authoritative job_id wins in job snapshot' );
 dm_assert_same( 2, $engine_data['job']['agent_id'], 'flat agent_id fills missing job.agent_id' );
+dm_assert_same( 'wayward-son', $engine_data['job']['agent_slug'], 'flat agent_slug fills missing job.agent_slug' );
 dm_assert_same( 1, $engine_data['job']['user_id'], 'job.user_id preserved from caller snapshot' );
 
 echo "\n[4] caller job snapshot identity is preserved when provided\n";

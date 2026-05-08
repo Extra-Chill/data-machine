@@ -22,6 +22,7 @@ namespace DataMachine\Engine\Tasks;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\ActionScheduler\BatchScheduler;
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\JobStatus;
 
@@ -115,8 +116,18 @@ class TaskScheduler {
 		// Resolve agent identity from the context. Callers without
 		// agent_id/user_id continue to work — the resulting job runs
 		// without an agent (matching pre-multi-agent behaviour).
-		$context_user_id  = (int) ( $context['user_id'] ?? 0 );
-		$context_agent_id = (int) ( $context['agent_id'] ?? 0 );
+		$context_user_id    = (int) ( $context['user_id'] ?? 0 );
+		$context_agent_id   = (int) ( $context['agent_id'] ?? 0 );
+		$context_agent_slug = '';
+		if ( ! empty( $context['agent_slug'] ) || $context_agent_id > 0 ) {
+			try {
+				$identity           = ( new AgentIdentityResolver() )->resolve_agent_identity( $context );
+				$context_agent_id   = $identity->agent_id;
+				$context_agent_slug = $identity->agent_slug;
+			} catch ( \InvalidArgumentException $e ) {
+				$context_agent_slug = ! empty( $context['agent_slug'] ) ? sanitize_title( (string) $context['agent_slug'] ) : '';
+			}
+		}
 
 		// Mirror RunFlowAbility's engine_data['job'] shape so downstream
 		// step types (AIStep, SystemTaskStep) can read agent identity
@@ -126,6 +137,9 @@ class TaskScheduler {
 		);
 		if ( $context_agent_id > 0 ) {
 			$job_snapshot['agent_id'] = $context_agent_id;
+		}
+		if ( '' !== $context_agent_slug ) {
+			$job_snapshot['agent_slug'] = $context_agent_slug;
 		}
 
 		$result = $ability->execute( array(
@@ -138,6 +152,7 @@ class TaskScheduler {
 				'parent_job_id' => $parentJobId,
 				'user_id'       => $context_user_id,
 				'agent_id'      => $context_agent_id,
+				'agent_slug'    => $context_agent_slug,
 				'job'           => $job_snapshot,
 			),
 		) );

@@ -21,6 +21,7 @@
 namespace DataMachine\Core\Steps\SystemTask;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Steps\Step;
@@ -194,7 +195,17 @@ class SystemTaskStep extends Step {
 		// and behaviour matches single-agent installs.
 		$parent_job_snapshot = $this->engine->getJobContext();
 		$parent_agent_id     = (int) ( $parent_job_snapshot['agent_id'] ?? 0 );
+		$parent_agent_slug   = '';
 		$parent_user_id      = (int) ( $parent_job_snapshot['user_id'] ?? 0 );
+		if ( ! empty( $parent_job_snapshot['agent_slug'] ) || $parent_agent_id > 0 ) {
+			try {
+				$identity            = ( new AgentIdentityResolver() )->resolve_agent_identity( $parent_job_snapshot );
+				$parent_agent_id     = $identity->agent_id;
+				$parent_agent_slug   = $identity->agent_slug;
+			} catch ( \InvalidArgumentException $e ) {
+				$parent_agent_slug = ! empty( $parent_job_snapshot['agent_slug'] ) ? sanitize_title( (string) $parent_job_snapshot['agent_slug'] ) : '';
+			}
+		}
 
 		// Store task params in child job engine_data.
 		$child_engine_data = array_merge( $task_params, array(
@@ -212,6 +223,9 @@ class SystemTaskStep extends Step {
 		if ( $parent_agent_id > 0 ) {
 			$child_engine_data['agent_id'] = $parent_agent_id;
 		}
+		if ( '' !== $parent_agent_slug ) {
+			$child_engine_data['agent_slug'] = $parent_agent_slug;
+		}
 		if ( $parent_user_id > 0 ) {
 			$child_engine_data['user_id'] = $parent_user_id;
 		}
@@ -222,6 +236,9 @@ class SystemTaskStep extends Step {
 		);
 		if ( $parent_agent_id > 0 ) {
 			$child_job_snapshot['agent_id'] = $parent_agent_id;
+		}
+		if ( '' !== $parent_agent_slug ) {
+			$child_job_snapshot['agent_slug'] = $parent_agent_slug;
 		}
 		$child_engine_data['job'] = $child_job_snapshot;
 

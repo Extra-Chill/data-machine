@@ -11,6 +11,7 @@
 
 namespace DataMachine\Abilities\Job;
 
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Steps\WorkflowConfigFactory;
 use DataMachine\Core\Steps\WorkflowSpecValidator;
 use DataMachine\Engine\ExecutionPlan;
@@ -158,8 +159,26 @@ class ExecuteWorkflowAbility {
 			$caller_snapshot,
 			array( 'job_id' => $job_id )
 		);
-		if ( ! empty( $initial_data['agent_id'] ) && empty( $job_snapshot['agent_id'] ) ) {
-			$job_snapshot['agent_id'] = (int) $initial_data['agent_id'];
+		$identity_context = array_filter(
+			array(
+				'agent_slug' => $job_snapshot['agent_slug'] ?? ( $initial_data['agent_slug'] ?? null ),
+				'agent_id'   => $job_snapshot['agent_id'] ?? ( $initial_data['agent_id'] ?? null ),
+			),
+			fn( $value ) => null !== $value && '' !== $value && 0 !== $value
+		);
+		if ( ! empty( $identity_context ) ) {
+			try {
+				$identity                   = ( new AgentIdentityResolver() )->resolve_agent_identity( $identity_context );
+				$job_snapshot['agent_id']   = $identity->agent_id;
+				$job_snapshot['agent_slug'] = $identity->agent_slug;
+			} catch ( \InvalidArgumentException $e ) {
+				if ( ! empty( $initial_data['agent_id'] ) && empty( $job_snapshot['agent_id'] ) ) {
+					$job_snapshot['agent_id'] = (int) $initial_data['agent_id'];
+				}
+				if ( ! empty( $initial_data['agent_slug'] ) && empty( $job_snapshot['agent_slug'] ) ) {
+					$job_snapshot['agent_slug'] = sanitize_title( (string) $initial_data['agent_slug'] );
+				}
+			}
 		}
 		$engine_data['job'] = $job_snapshot;
 
