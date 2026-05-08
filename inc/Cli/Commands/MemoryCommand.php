@@ -263,8 +263,8 @@ class MemoryCommand extends BaseCommand {
 			return;
 		}
 
-		$from_file     = $assoc_args['from-file'] ?? null;
-		$stdin_marker  = ( ! empty( $args ) && '-' === end( $args ) );
+		$from_file    = $assoc_args['from-file'] ?? null;
+		$stdin_marker = ( ! empty( $args ) && '-' === end( $args ) );
 		reset( $args );
 
 		if ( null !== $from_file && $stdin_marker ) {
@@ -297,7 +297,7 @@ class MemoryCommand extends BaseCommand {
 				return;
 			}
 
-			$content = file_get_contents( $from_file );
+			$content = file_get_contents( $from_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- CLI reads a local filesystem path supplied by --from-file.
 			if ( false === $content ) {
 				WP_CLI::error( sprintf( 'Failed to read --from-file path: %s', $from_file ) );
 				return;
@@ -985,13 +985,13 @@ class MemoryCommand extends BaseCommand {
 	 * @return array Input parameters with user_id and/or agent_id.
 	 */
 	private function resolveMemoryScoping( array $assoc_args ): array {
-		$agent_id = AgentResolver::resolve( $assoc_args );
+		$context = AgentResolver::resolveEffectiveContext( $assoc_args );
 
-		if ( null !== $agent_id ) {
-			return array( 'agent_id' => $agent_id );
+		if ( null !== $context['agent_id'] ) {
+			return array( 'agent_id' => (int) $context['agent_id'] );
 		}
 
-		return array( 'user_id' => UserResolver::resolve( $assoc_args ) );
+		return array( 'user_id' => (int) $context['user_id'] );
 	}
 
 	private function get_agent_dir( int $user_id = 0, ?int $agent_id = null ): string {
@@ -1253,11 +1253,13 @@ class MemoryCommand extends BaseCommand {
 				$effective_user_id = DirectoryManager::get_default_agent_user_id();
 			}
 		} else {
-			// Legacy user-based resolution (single-agent compat).
-			$user_id           = UserResolver::resolve( $assoc_args );
-			$effective_user_id = $directory_manager->get_effective_user_id( $user_id );
-			$agent_slug        = $directory_manager->get_agent_slug_for_user( $effective_user_id );
-			$agent_dir         = $directory_manager->get_agent_identity_directory_for_user( $effective_user_id );
+			$context           = AgentResolver::resolveEffectiveContext( $assoc_args );
+			$effective_user_id = (int) $context['user_id'];
+			$agent_slug        = (string) $context['agent_slug'];
+			if ( '' === $agent_slug ) {
+				$agent_slug = $directory_manager->get_agent_slug_for_user( $effective_user_id );
+			}
+			$agent_dir = $directory_manager->get_agent_identity_directory( $agent_slug );
 		}
 
 		$shared_dir  = $directory_manager->get_shared_directory();
