@@ -304,7 +304,7 @@ final class AgentBundleArrayAdapter {
 				$document_step['step_type'] = $pipeline_step_types_by_id[ $pipeline_step_id ];
 			}
 
-			foreach ( array( 'step_type', 'handler_slug', 'handler_slugs', 'flow_step_settings', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'enabled' ) as $field ) {
+			foreach ( array( 'step_type', 'handler_slug', 'handler_slugs', 'flow_step_settings', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'completion_assertions', 'enabled' ) as $field ) {
 				if ( array_key_exists( $field, $step ) ) {
 					$document_step[ $field ] = $step[ $field ];
 				}
@@ -324,7 +324,7 @@ final class AgentBundleArrayAdapter {
 			'execution_order'  => (int) $step['step_position'],
 		);
 
-		foreach ( array( 'step_type', 'handler_slug', 'handler_slugs', 'handler_config', 'handler_configs', 'flow_step_settings', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'enabled' ) as $field ) {
+		foreach ( array( 'step_type', 'handler_slug', 'handler_slugs', 'handler_config', 'handler_configs', 'flow_step_settings', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'completion_assertions', 'enabled' ) as $field ) {
 			if ( array_key_exists( $field, $step ) ) {
 				$config[ $field ] = $step[ $field ];
 			}
