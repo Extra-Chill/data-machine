@@ -151,7 +151,7 @@ class SystemAbilities {
 	 */
 	private function getRegisteredChecks(): array {
 		$checks = array(
-			'system' => array(
+			'system'    => array(
 				'label'    => __( 'System Diagnostics', 'data-machine' ),
 				'callback' => array( $this, 'runSystemDiagnostics' ),
 				'default'  => true,
@@ -265,8 +265,8 @@ class SystemAbilities {
 			'message'                 => $message,
 			'stale_threshold_seconds' => $stale_threshold,
 			'action_scheduler'        => array(
-				'available'         => function_exists( 'as_get_scheduled_actions' ),
-				'class_loaded'      => class_exists( '\\ActionScheduler' ),
+				'available'        => function_exists( 'as_get_scheduled_actions' ),
+				'class_loaded'     => class_exists( '\\ActionScheduler' ),
 				'is_initialized'   => class_exists( '\\ActionScheduler' ) && method_exists( '\\ActionScheduler', 'is_initialized' ) ? \ActionScheduler::is_initialized() : null,
 				'group'            => RecurringScheduler::GROUP,
 				'pending_count'    => $pending['count'],
@@ -276,14 +276,14 @@ class SystemAbilities {
 				'last_attempt_gmt' => $complete['last_attempt_gmt'],
 			),
 			'wp_cron'                 => array(
-				'action_scheduler_run_queue_next_gmt'        => is_int( $wp_cron_next ) ? gmdate( 'Y-m-d H:i:s', $wp_cron_next ) : null,
+				'action_scheduler_run_queue_next_gmt' => is_int( $wp_cron_next ) ? gmdate( 'Y-m-d H:i:s', $wp_cron_next ) : null,
 				'action_scheduler_run_queue_overdue_seconds' => $wp_cron_overdue,
 			),
 			'daily_memory'            => array(
 				'next_pending_gmt' => $daily_memory['pending']['oldest_gmt'],
 				'last_attempt_gmt' => $daily_memory['complete']['last_attempt_gmt'],
 			),
-			'recommendation'          => $status === 'stale'
+			'recommendation'          => 'stale' === $status
 				? __( 'For local or low-traffic installs, schedule an external wake-up such as wp cron event run --due-now or wp datamachine drain.', 'data-machine' )
 				: null,
 		);
@@ -370,7 +370,7 @@ class SystemAbilities {
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are derived from $wpdb->prefix.
 		$sql = "SELECT COUNT(*) AS count, MIN(a.scheduled_date_gmt) AS oldest_gmt, MAX(a.scheduled_date_gmt) AS newest_gmt, MAX(a.last_attempt_gmt) AS last_attempt_gmt FROM {$actions_table} a INNER JOIN {$groups_table} g ON g.group_id = a.group_id WHERE " . implode( ' AND ', $where );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- SQL uses prepared placeholders assembled from fixed fragments.
 		$row = $wpdb->get_row( $wpdb->prepare( $sql, $values ), ARRAY_A );
 		if ( ! is_array( $row ) ) {
 			return $default;
