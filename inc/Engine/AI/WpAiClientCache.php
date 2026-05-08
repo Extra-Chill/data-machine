@@ -69,12 +69,12 @@ abstract class WpAiClientTransientCacheBase {
 	 * @param mixed  $default Default value.
 	 * @return mixed
 	 */
-	public function get( $key, $default = null ) {
+	public function get( $key, $default_value = null ) {
 		$this->validateKey( $key );
 
 		$cached = get_transient( $this->transientKey( $key ) );
 		if ( ! is_array( $cached ) || ! array_key_exists( 'value', $cached ) ) {
-			return $default;
+			return $default_value;
 		}
 
 		return $cached['value'];
@@ -129,10 +129,10 @@ abstract class WpAiClientTransientCacheBase {
 	 * @param mixed    $default Default value.
 	 * @return iterable
 	 */
-	public function getMultiple( $keys, $default = null ) {
+	public function getMultiple( $keys, $default_value = null ) {
 		$values = array();
 		foreach ( $this->iterableKeys( $keys ) as $key ) {
-			$values[ $key ] = $this->get( $key, $default );
+			$values[ $key ] = $this->get( $key, $default_value );
 		}
 
 		return $values;

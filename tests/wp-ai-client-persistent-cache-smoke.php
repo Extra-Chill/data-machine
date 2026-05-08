@@ -7,11 +7,11 @@
 
 namespace Psr\SimpleCache {
 	interface CacheInterface {
-		public function get( $key, $default = null );
+		public function get( $key, $default_value = null );
 		public function set( $key, $value, $ttl = null );
 		public function delete( $key );
 		public function clear();
-		public function getMultiple( $keys, $default = null );
+		public function getMultiple( $keys, $default_value = null );
 		public function setMultiple( $values, $ttl = null );
 		public function deleteMultiple( $keys );
 		public function has( $key );
@@ -68,8 +68,8 @@ namespace {
 		return true;
 	}
 
-	function get_option( string $name, $default = false ) {
-		return $GLOBALS['datamachine_cache_smoke_options'][ $name ] ?? $default;
+	function get_option( string $name, $default_value = false ) {
+		return $GLOBALS['datamachine_cache_smoke_options'][ $name ] ?? $default_value;
 	}
 
 	function update_option( string $name, $value, bool $autoload = true ): bool {

@@ -151,13 +151,17 @@ class ImageGenerationPromptRefinementTest extends WP_UnitTestCase {
 		ImageGenerationAbilities::refine_prompt( 'Crane meaning', 'This article explores the spiritual symbolism of cranes in various cultures.' );
 
 		$this->assertNotNull( $captured_request );
-		// wp-ai-client receives the current user turn as `prompt`; older dispatch
-		// shapes may still carry it as the last user message.
-		$user_message = $captured_request['prompt'] ?? '';
-		foreach ( array_reverse( $captured_request['messages'] ) as $msg ) {
-			if ( ( $msg['role'] ?? '' ) === 'user' ) {
-				$user_message = $user_message ?: ( $msg['content'] ?? '' );
-				break;
+		// `RequestBuilder::wpAiClientPromptContext()` lifts the latest user
+		// message into wp-ai-client's `prompt` slot and routes earlier turns
+		// through `with_history()`. Search both surfaces so the assertion
+		// stays true regardless of how many user messages were sent.
+		$user_message = (string) ( $captured_request['prompt'] ?? '' );
+		if ( '' === $user_message || ! str_contains( $user_message, 'Article context:' ) ) {
+			foreach ( array_reverse( $captured_request['messages'] ) as $msg ) {
+				if ( ( $msg['role'] ?? '' ) === 'user' ) {
+					$user_message = $msg['content'] ?? '';
+					break;
+				}
 			}
 		}
 		$this->assertStringContainsString( 'Article context:', $user_message );

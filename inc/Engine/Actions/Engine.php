@@ -96,8 +96,9 @@ function datamachine_register_execution_engine() {
 			if ( $ability ) {
 				$ability->execute(
 					array(
-						'flow_id' => $flow_id,
-						'job_id'  => $job_id ? (int) $job_id : null,
+						'flow_id'        => $flow_id,
+						'job_id'         => $job_id ? (int) $job_id : null,
+						'respect_paused' => true,
 					)
 				);
 			}

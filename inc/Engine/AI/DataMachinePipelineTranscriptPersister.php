@@ -105,6 +105,11 @@ class DataMachinePipelineTranscriptPersister implements WP_Agent_Transcript_Pers
 			return '';
 		}
 
+		$job_id = (int) ( $runtime_context['job_id'] ?? 0 );
+		if ( $job_id > 0 ) {
+			datamachine_merge_engine_data( $job_id, array( 'transcript_session_id' => $session_id ) );
+		}
+
 		do_action(
 			'datamachine_log',
 			'debug',

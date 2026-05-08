@@ -5,6 +5,7 @@ namespace DataMachine\Core\Steps\AI;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\FlowStepConfig;
@@ -12,6 +13,9 @@ use DataMachine\Core\Steps\AI\ToolPolicy\PipelineToolPolicyArgs;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Engine\AI\ConversationManager;
+use DataMachine\Engine\AI\DataPacketPromptProjector;
+use DataMachine\Engine\AI\PipelineAIConcurrencyLease;
+use DataMachine\Engine\AI\PipelineAIConcurrencyLimiter;
 use DataMachine\Engine\AI\PipelineTranscriptPolicy;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
@@ -140,7 +144,39 @@ class AIStep extends Step {
 			return $this->dataPackets;
 		}
 
-		// AIStep reads a single prompt slot — `prompt_queue` — under one
+		$pipeline_step_id = $this->flow_step_config['pipeline_step_id'];
+
+		// Resolve user_id and agent_id from engine snapshot (set by RunFlowAbility).
+		$job_snapshot = $this->engine->get( 'job' );
+		$agent_id     = (int) ( $job_snapshot['agent_id'] ?? 0 );
+		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
+
+		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
+		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
+		$provider_name = $mode_model['provider'];
+		$model_name    = $mode_model['model'];
+
+		$lease_result = PipelineAIConcurrencyLimiter::acquire(
+			$provider_name,
+			array(
+				'job_id'           => $this->job_id,
+				'flow_step_id'     => $this->flow_step_id,
+				'pipeline_step_id' => $pipeline_step_id,
+				'pipeline_id'      => $job_snapshot['pipeline_id'] ?? null,
+				'flow_id'          => $job_snapshot['flow_id'] ?? null,
+				'mode'             => 'pipeline',
+			)
+		);
+
+		if ( empty( $lease_result['acquired'] ) ) {
+			$this->deferForAIConcurrency( $provider_name, $lease_result );
+			return array();
+		}
+
+		$ai_concurrency_lease = $lease_result['lease'] ?? null;
+
+		try {
+			// AIStep reads a single prompt slot — `prompt_queue` — under one
 		// of three access modes (#1291). Pre-collapse this branched on
 		// `queue_enabled` plus a `user_message` fallback; post-collapse
 		// the mode picks the access pattern and the queue head is the
@@ -188,10 +224,18 @@ class AIStep extends Step {
 			$mime_type = is_string( $file_info['type'] ) ? $file_info['type'] : '';
 		}
 
+		$packet_projection_context = array(
+			'job_id'           => $this->job_id,
+			'pipeline_id'      => $job_snapshot['pipeline_id'] ?? null,
+			'flow_id'          => $job_snapshot['flow_id'] ?? null,
+			'flow_step_id'     => $this->flow_step_id,
+			'pipeline_step_id' => $pipeline_step_id,
+		);
+
 		$messages = array();
 
 		if ( ! empty( $this->dataPackets ) ) {
-			$data_packet_content = wp_json_encode( array( 'data_packets' => self::sanitizeDataPacketsForAi( $this->dataPackets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
+			$data_packet_content = wp_json_encode( array( 'data_packets' => DataPacketPromptProjector::project( $this->dataPackets, $packet_projection_context ) ), JSON_UNESCAPED_UNICODE );
 			$messages[]          = ConversationManager::buildConversationMessage(
 				'user',
 				false === $data_packet_content ? '' : $data_packet_content
@@ -215,16 +259,9 @@ class AIStep extends Step {
 			$messages[] = ConversationManager::buildConversationMessage( 'user', $user_message );
 		}
 
-		$pipeline_step_id = $this->flow_step_config['pipeline_step_id'];
-
 		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
 
 		$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
-
-		// Resolve user_id and agent_id from engine snapshot (set by RunFlowAbility).
-		$job_snapshot = $this->engine->get( 'job' );
-		$agent_id     = (int) ( $job_snapshot['agent_id'] ?? 0 );
-		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
 
 		// Resolve transcript persistence policy once per AI step invocation.
 		// Resolution order: flow > pipeline > site option (default false).
@@ -314,11 +351,6 @@ class AIStep extends Step {
 			}
 		}
 
-		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
-		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
-		$provider_name = $mode_model['provider'];
-		$model_name    = $mode_model['model'];
-
 		// Establish agent execution context before firing the conversation loop.
 		//
 		// Pipelines run inside the Action Scheduler queue where no WordPress user
@@ -379,6 +411,7 @@ class AIStep extends Step {
 
 		// Check for errors
 		if ( isset( $loop_result['error'] ) ) {
+			$request_metadata = is_array( $loop_result['request_metadata'] ?? null ) ? $loop_result['request_metadata'] : array();
 			// Record the transcript on the failure path too so operators
 			// can `wp datamachine jobs transcript <id>` and see exactly
 			// what the model received before the AI request died. This
@@ -399,6 +432,8 @@ class AIStep extends Step {
 					'flow_step_id'        => $this->flow_step_id,
 					'ai_error'            => $loop_result['error'],
 					'ai_provider'         => $provider_name,
+					'request_metadata'    => $request_metadata,
+					'transport_profile'   => is_array( $request_metadata['transport'] ?? null ) ? $request_metadata['transport'] : array(),
 					'retry_after'         => $loop_result['retry_after'] ?? null,
 					'retry_after_seconds' => $loop_result['retry_after_seconds'] ?? null,
 					'headers'             => is_array( $loop_result['headers'] ?? null ) ? $loop_result['headers'] : array(),
@@ -428,61 +463,96 @@ class AIStep extends Step {
 
 		// Process loop results into data packets
 		return self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
+		} finally {
+			if ( $ai_concurrency_lease instanceof PipelineAIConcurrencyLease ) {
+				$ai_concurrency_lease->release();
+			}
+		}
 	}
 
 	/**
-	 * Remove local-only file paths before serializing data packets to AI.
+	 * Reschedule this AI step because provider/site concurrency is saturated.
 	 *
-	 * Fetch handlers may include file_info.file_path so downstream runtime steps
-	 * can attach images or access files. That internal path should not be exposed
-	 * in the AI-visible JSON payload because models can copy it into generated
-	 * content. The original packets remain unchanged for runtime use.
+	 * @param string $provider_name Provider slug.
+	 * @param array  $lease_result  Limiter result.
+	 */
+	private function deferForAIConcurrency( string $provider_name, array $lease_result ): void {
+		$delay_seconds = max( 1, (int) ( $lease_result['delay'] ?? 10 ) );
+		$timestamp     = time() + $delay_seconds;
+		$action_id     = false;
+
+		if ( function_exists( 'as_schedule_single_action' ) ) {
+			$action_id = as_schedule_single_action(
+				$timestamp,
+				'datamachine_execute_step',
+				array(
+					'job_id'       => $this->job_id,
+					'flow_step_id' => $this->flow_step_id,
+				),
+				'data-machine'
+			);
+		}
+
+		if ( false === $action_id ) {
+			do_action(
+				'datamachine_fail_job',
+				$this->job_id,
+				'ai_concurrency_defer_failed',
+				array(
+					'flow_step_id'  => $this->flow_step_id,
+					'ai_provider'   => $provider_name,
+					'error_message' => 'AI concurrency throttle could not reschedule the step.',
+				)
+			);
+			return;
+		}
+
+		( new Jobs() )->update_job_status( $this->job_id, 'pending' );
+
+		datamachine_merge_engine_data(
+			$this->job_id,
+			array(
+				'ai_concurrency_throttle' => array(
+					'next_retry_at'           => gmdate( 'c', $timestamp ),
+					'rescheduled_for_seconds' => $delay_seconds,
+					'reason'                  => 'ai_concurrency_limit',
+					'provider'                => $provider_name,
+					'flow_step_id'            => $this->flow_step_id,
+					'limit'                   => (int) ( $lease_result['limit'] ?? 0 ),
+					'active'                  => (int) ( $lease_result['active'] ?? 0 ),
+					'action_id'               => $action_id,
+				),
+			)
+		);
+
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Pipeline AI step deferred by concurrency limit',
+			array(
+				'job_id'                    => $this->job_id,
+				'flow_step_id'              => $this->flow_step_id,
+				'provider'                  => $provider_name,
+				'reason'                    => 'ai_concurrency_limit',
+				'limit'                     => (int) ( $lease_result['limit'] ?? 0 ),
+				'active'                    => (int) ( $lease_result['active'] ?? 0 ),
+				'rescheduled_for_seconds' => $delay_seconds,
+				'action_id'               => $action_id,
+			)
+		);
+	}
+
+	/**
+	 * Project data packets before serializing them to AI.
+	 *
+	 * Kept as a compatibility wrapper for older tests/call sites. Canonical
+	 * packets remain unchanged for runtime and storage use.
 	 *
 	 * @param array $data_packets Original data packets.
-	 * @return array Sanitized copy safe for AI serialization.
+	 * @return array Projected copy safe for AI serialization.
 	 */
 	public static function sanitizeDataPacketsForAi( array $data_packets ): array {
-		$sanitized_packets = array();
-
-		foreach ( $data_packets as $packet ) {
-			if ( ! is_array( $packet ) ) {
-				$sanitized_packets[] = $packet;
-				continue;
-			}
-
-			$sanitized_packet = $packet;
-
-			if ( isset( $sanitized_packet['data'] ) && is_array( $sanitized_packet['data'] ) ) {
-				$sanitized_packet['data'] = self::sanitizePacketDataForAi( $sanitized_packet['data'] );
-			}
-
-			$sanitized_packets[] = $sanitized_packet;
-		}
-
-		return $sanitized_packets;
-	}
-
-	/**
-	 * Remove internal file path fields from packet data.
-	 *
-	 * @param array $packet_data Packet data array.
-	 * @return array Sanitized packet data.
-	 */
-	private static function sanitizePacketDataForAi( array $packet_data ): array {
-		if ( ! isset( $packet_data['file_info'] ) || ! is_array( $packet_data['file_info'] ) ) {
-			return $packet_data;
-		}
-
-		$sanitized_file_info = $packet_data['file_info'];
-		unset( $sanitized_file_info['file_path'] );
-
-		if ( empty( $sanitized_file_info ) ) {
-			unset( $packet_data['file_info'] );
-			return $packet_data;
-		}
-
-		$packet_data['file_info'] = $sanitized_file_info;
-		return $packet_data;
+		return DataPacketPromptProjector::project( $data_packets );
 	}
 
 	/**

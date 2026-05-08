@@ -85,8 +85,8 @@ if ( ! function_exists( 'apply_filters' ) ) {
 }
 
 if ( ! function_exists( 'get_site_option' ) ) {
-	function get_site_option( string $option, $default = false ) {
-		return $GLOBALS['auth_ref_smoke_options'][ $option ] ?? $default;
+	function get_site_option( string $option, $default_value = false ) {
+		return $GLOBALS['auth_ref_smoke_options'][ $option ] ?? $default_value;
 	}
 }
 

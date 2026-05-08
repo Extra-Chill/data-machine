@@ -99,8 +99,26 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'default_provider', $settings );
 		$this->assertArrayHasKey( 'default_model', $settings );
 		$this->assertArrayHasKey( 'max_turns', $settings );
+		$this->assertArrayHasKey( 'wp_ai_client_connect_timeout', $settings );
+		$this->assertArrayHasKey( 'wp_ai_client_request_timeout', $settings );
 		$this->assertArrayHasKey( 'disabled_tools', $settings );
 		$this->assertArrayHasKey( 'ai_provider_keys', $settings );
+	}
+
+	public function test_update_settings_clamps_wp_ai_client_timeouts(): void {
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array(
+				'wp_ai_client_connect_timeout' => 999,
+				'wp_ai_client_request_timeout' => 9999,
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertArrayNotHasKey( 'unhandled_keys', $result );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertSame( 300.0, $updated_settings['wp_ai_client_connect_timeout'] );
+		$this->assertSame( 900.0, $updated_settings['wp_ai_client_request_timeout'] );
 	}
 
 	public function test_update_settings_updates_boolean_setting(): void {

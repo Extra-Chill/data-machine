@@ -10,9 +10,9 @@
 namespace DataMachine\Core {
     class PluginSettings {
 
-        public static function get( string $key, array $default = array() ): array {
+        public static function get( string $key, array $default_value = array() ): array {
             unset( $key );
-            return $default;
+            return $default_value;
         }
     }
 }

@@ -12,6 +12,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\Directives\DirectivePolicyResolver;
 
 defined( 'ABSPATH' ) || exit;
@@ -19,16 +20,6 @@ defined( 'ABSPATH' ) || exit;
 require_once __DIR__ . '/WpAiClientCache.php';
 
 class RequestBuilder {
-
-	/**
-	 * Default timeout for Data Machine wp-ai-client requests.
-	 *
-	 * WordPress AI Client defaults to 30 seconds, which is too short for
-	 * non-streaming LLM requests with large prompts. Studio's cURL low-speed
-	 * watchdog is longer than this; without raising the AI Client request
-	 * timeout, the request-level cap wins first.
-	 */
-	private const DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT = 300.0;
 
 	/**
 	 * Build standardized AI request for any execution mode.
@@ -62,10 +53,10 @@ class RequestBuilder {
 	) {
 		WpAiClientCache::install();
 
-		$assembled          = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
-		$request            = $assembled['request'];
-		$provider_request   = ProviderRequestAssembler::toProviderRequest( $request );
-		$prompt_context     = self::wpAiClientPromptContext( $request['messages'] ?? array() );
+		$assembled        = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
+		$request          = $assembled['request'];
+		$provider_request = ProviderRequestAssembler::toProviderRequest( $request );
+		$prompt_context   = self::wpAiClientPromptContext( $request['messages'] ?? array() );
 		if ( '' !== $prompt_context['prompt'] ) {
 			$provider_request['prompt'] = $prompt_context['prompt'];
 		}
@@ -129,12 +120,20 @@ class RequestBuilder {
 			return new \WP_Error( 'wp_ai_client_unavailable', $unavailable_reason );
 		}
 
-		$result          = null;
-		$request_timeout = self::wpAiClientRequestTimeout( $mode, $provider, $model, $payload );
-		$timeout_filter  = static function ( $default_timeout ) use ( $request_timeout ) {
+		$result                        = null;
+		$request_options               = null;
+		$transport_profile             = self::wpAiClientTransportProfile( $mode, $provider, $model, $payload );
+		$request_timeout               = (float) $transport_profile['request_timeout'];
+		$connect_timeout               = (float) $transport_profile['connect_timeout'];
+		$request_metadata['transport'] = $transport_profile;
+		$timeout_filter                = static function ( $default_timeout ) use ( $request_timeout ) {
 			return max( (float) $default_timeout, $request_timeout );
 		};
-		$curl_filter     = static function ( $handle ) use ( $request_timeout ) {
+		$curl_filter                   = static function ( $handle ) use ( $request_timeout, $connect_timeout ) {
+			if ( defined( 'CURLOPT_CONNECTTIMEOUT' ) ) {
+				curl_setopt( $handle, CURLOPT_CONNECTTIMEOUT, (int) ceil( $connect_timeout ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress exposes the cURL handle only through this hook.
+			}
+
 			if ( defined( 'CURLOPT_LOW_SPEED_TIME' ) ) {
 				curl_setopt( $handle, CURLOPT_LOW_SPEED_TIME, (int) ceil( $request_timeout ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress exposes the cURL handle only through this hook.
 			}
@@ -147,6 +146,8 @@ class RequestBuilder {
 		try {
 			add_filter( 'wp_ai_client_default_request_timeout', $timeout_filter, 10, 1 );
 			add_action( 'http_api_curl', $curl_filter, 10, 1 );
+			$transport_profile['curl_hook_installed'] = true;
+			$request_metadata['transport']            = $transport_profile;
 
 			$registry = \WordPress\AiClient\AiClient::defaultRegistry();
 			/** @var callable $has_provider wp-ai-client exposes this through __call() in some versions. */
@@ -169,16 +170,26 @@ class RequestBuilder {
 			/** @var callable $model_resolver wp-ai-client exposes this through __call() in some versions. */
 			$model_resolver = array( $registry, 'getProviderModel' );
 			$model_instance = call_user_func( $model_resolver, $provider_id, $model, null );
-			if (
-				is_object( $model_instance )
-				&& method_exists( $model_instance, 'setRequestOptions' )
-				&& class_exists( '\WordPress\AiClient\Providers\Http\DTO\RequestOptions' )
-			) {
+			if ( class_exists( '\WordPress\AiClient\Providers\Http\DTO\RequestOptions' ) ) {
 				$request_options = new \WordPress\AiClient\Providers\Http\DTO\RequestOptions();
 				$request_options->setTimeout( $request_timeout );
-				$request_options->setConnectTimeout( min( 30.0, $request_timeout ) );
-				$model_instance->setRequestOptions( $request_options );
+				$request_options->setConnectTimeout( $connect_timeout );
+				$transport_profile['request_options_used'] = true;
+				$request_metadata['transport']             = $transport_profile;
+				if ( is_object( $model_instance ) && method_exists( $model_instance, 'setRequestOptions' ) ) {
+					$model_instance->setRequestOptions( $request_options );
+				}
 			}
+
+			do_action(
+				'datamachine_log',
+				'debug',
+				'AI transport profile resolved',
+				array_filter(
+					$transport_profile,
+					fn( $v ) => null !== $v
+				)
+			);
 
 			// wp-ai-client refuses to construct a MessagePart from an empty
 			// string. Only pass the prompt text when it is non-empty; otherwise
@@ -187,6 +198,9 @@ class RequestBuilder {
 			$builder = '' !== $prompt_context['prompt']
 				? \wp_ai_client_prompt( $prompt_context['prompt'] )
 				: \wp_ai_client_prompt();
+			if ( null !== $request_options && is_callable( array( $builder, 'using_request_options' ) ) ) {
+				$builder = $builder->using_request_options( $request_options );
+			}
 			$builder = $builder->using_provider( $provider_id )
 				->using_model( $model_instance );
 
@@ -231,21 +245,23 @@ class RequestBuilder {
 			}
 		}
 
+		$dispatch_context = array_filter(
+			array_merge(
+				$transport_profile,
+				array(
+					'success'       => ! is_wp_error( $result ),
+					'error_code'    => is_wp_error( $result ) ? $result->get_error_code() : null,
+					'error_message' => is_wp_error( $result ) ? $result->get_error_message() : null,
+				)
+			),
+			fn( $v ) => null !== $v
+		);
+
 		do_action(
 			'datamachine_log',
-			'debug',
+			is_wp_error( $result ) ? 'error' : 'debug',
 			'AI request dispatched via wp-ai-client',
-			array_filter(
-				array(
-					'mode'         => $mode,
-					'job_id'       => $payload['job_id'] ?? null,
-					'flow_step_id' => $payload['flow_step_id'] ?? null,
-					'provider'     => $provider,
-					'model'        => $model,
-					'success'      => ! is_wp_error( $result ),
-				),
-				fn( $v ) => null !== $v
-			)
+			$dispatch_context
 		);
 
 		return $result;
@@ -384,9 +400,21 @@ class RequestBuilder {
 	 * @return float Timeout in seconds.
 	 */
 	private static function wpAiClientRequestTimeout( string $mode, string $provider, string $model, array $payload ): float {
-		$timeout = apply_filters(
+		$setting_default = PluginSettings::get(
+			'wp_ai_client_request_timeout',
+			PluginSettings::DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT
+		);
+		if ( ! is_numeric( $setting_default ) ) {
+			$setting_default = PluginSettings::DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT;
+		}
+
+		$default_timeout = max(
+			0.0,
+			min( PluginSettings::MAX_WP_AI_CLIENT_REQUEST_TIMEOUT, (float) $setting_default )
+		);
+		$timeout         = apply_filters(
 			'datamachine_wp_ai_client_request_timeout',
-			self::DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT,
+			$default_timeout,
 			$mode,
 			$provider,
 			$model,
@@ -394,10 +422,80 @@ class RequestBuilder {
 		);
 
 		if ( ! is_numeric( $timeout ) ) {
-			return self::DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT;
+			return $default_timeout;
 		}
 
 		return max( 0.0, (float) $timeout );
+	}
+
+	/**
+	 * Resolve the connection timeout Data Machine applies to wp-ai-client calls.
+	 *
+	 * @param string $mode            Execution mode.
+	 * @param string $provider        Provider identifier.
+	 * @param string $model           Model identifier.
+	 * @param array  $payload         Step payload.
+	 * @param float  $request_timeout Resolved full request timeout in seconds.
+	 * @return float Timeout in seconds.
+	 */
+	private static function wpAiClientConnectTimeout( string $mode, string $provider, string $model, array $payload, float $request_timeout ): float {
+		$setting_default = PluginSettings::get(
+			'wp_ai_client_connect_timeout',
+			PluginSettings::DEFAULT_WP_AI_CLIENT_CONNECT_TIMEOUT
+		);
+		if ( ! is_numeric( $setting_default ) ) {
+			$setting_default = PluginSettings::DEFAULT_WP_AI_CLIENT_CONNECT_TIMEOUT;
+		}
+
+		$default_timeout = min(
+			max(
+				0.0,
+				min( PluginSettings::MAX_WP_AI_CLIENT_CONNECT_TIMEOUT, (float) $setting_default )
+			),
+			$request_timeout
+		);
+		$timeout         = apply_filters(
+			'datamachine_wp_ai_client_connect_timeout',
+			$default_timeout,
+			$mode,
+			$provider,
+			$model,
+			$payload,
+			$request_timeout
+		);
+
+		if ( ! is_numeric( $timeout ) ) {
+			return $default_timeout;
+		}
+
+		return max( 0.0, (float) $timeout );
+	}
+
+	/**
+	 * Resolve the transport profile Data Machine applies to a wp-ai-client request.
+	 *
+	 * @param string $mode     Execution mode.
+	 * @param string $provider Provider identifier.
+	 * @param string $model    Model identifier.
+	 * @param array  $payload  Step payload.
+	 * @return array<string,mixed> Resolved transport profile for logging and inspection.
+	 */
+	public static function wpAiClientTransportProfile( string $mode, string $provider, string $model, array $payload ): array {
+		$request_timeout = self::wpAiClientRequestTimeout( $mode, $provider, $model, $payload );
+		$connect_timeout = self::wpAiClientConnectTimeout( $mode, $provider, $model, $payload, $request_timeout );
+
+		return array(
+			'mode'                            => $mode,
+			'provider'                        => $provider,
+			'model'                           => $model,
+			'job_id'                          => $payload['job_id'] ?? null,
+			'flow_step_id'                    => $payload['flow_step_id'] ?? null,
+			'request_timeout'                 => $request_timeout,
+			'connect_timeout'                 => $connect_timeout,
+			'request_options_class_available' => class_exists( '\\WordPress\\AiClient\\Providers\\Http\\DTO\\RequestOptions' ),
+			'request_options_used'            => false,
+			'curl_hook_installed'             => false,
+		);
 	}
 
 	/**

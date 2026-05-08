@@ -216,11 +216,11 @@ const ConfigForm = ( { provider, onSave, isSaving } ) => {
  * Callback URL display for OAuth providers.
  */
 const CallbackUrlDisplay = ( { url } ) => {
+	const [ copied, setCopied ] = useState( false );
+
 	if ( ! url ) {
 		return null;
 	}
-
-	const [ copied, setCopied ] = useState( false );
 
 	const handleCopy = () => {
 		navigator.clipboard.writeText( url ).then( () => {

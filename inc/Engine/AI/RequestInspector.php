@@ -13,7 +13,6 @@ use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\FilesRepository\FileRetrieval;
 use DataMachine\Core\PluginSettings;
-use DataMachine\Core\Steps\AI\AIStep;
 use DataMachine\Core\Steps\AI\ToolPolicy\PipelineToolPolicyArgs;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Abilities\Flow\QueueAbility;
@@ -89,9 +88,10 @@ class RequestInspector {
 			);
 		}
 
-		$data_packets = $this->retrieveDataPackets( $job_id, $engine );
-		$messages     = $this->buildInitialMessages( $data_packets, $engine, $flow_step_config );
-		$payload      = $this->buildPayload( $job_id, $flow_step_id, $pipeline_step_id, $data_packets, $engine, $job );
+		$data_packets              = $this->retrieveDataPackets( $job_id, $engine );
+		$packet_projection_context = $this->buildProjectionContext( $job_id, $flow_step_id, $pipeline_step_id, $engine, $job );
+		$messages                  = $this->buildInitialMessages( $data_packets, $engine, $flow_step_config, $packet_projection_context );
+		$payload                   = $this->buildPayload( $job_id, $flow_step_id, $pipeline_step_id, $data_packets, $engine, $job );
 
 		$previous_step_config = $this->getAdjacentStepConfig( $engine, $flow_step_id, $payload, 'previous' );
 		$next_step_config     = $this->getAdjacentStepConfig( $engine, $flow_step_id, $payload, 'next' );
@@ -142,12 +142,18 @@ class RequestInspector {
 		$provider   = (string) $mode_model['provider'];
 		$model      = (string) $mode_model['model'];
 
-		$assembled = RequestBuilder::assemble(
+		$assembled         = RequestBuilder::assemble(
 			$messages,
 			$provider,
 			$model,
 			$tools,
 			ToolPolicyResolver::MODE_PIPELINE,
+			$payload
+		);
+		$transport_profile = RequestBuilder::wpAiClientTransportProfile(
+			ToolPolicyResolver::MODE_PIPELINE,
+			$provider,
+			$model,
 			$payload
 		);
 
@@ -160,8 +166,9 @@ class RequestInspector {
 				'provider'     => $provider,
 				'model'        => $model,
 				'mode'         => ToolPolicyResolver::MODE_PIPELINE,
+				'transport'    => $transport_profile,
 			),
-			$this->measure( $assembled, $data_packets, $messages )
+			$this->measure( $assembled, $data_packets, $messages, $packet_projection_context )
 		);
 	}
 
@@ -187,11 +194,11 @@ class RequestInspector {
 		return ( new FileRetrieval() )->retrieve_data_by_job_id( $job_id, $context );
 	}
 
-	private function buildInitialMessages( array $data_packets, EngineData $engine, array $flow_step_config ): array {
+	private function buildInitialMessages( array $data_packets, EngineData $engine, array $flow_step_config, array $packet_projection_context ): array {
 		$messages = array();
 
 		if ( ! empty( $data_packets ) ) {
-			$data_packet_content = wp_json_encode( array( 'data_packets' => AIStep::sanitizeDataPacketsForAi( $data_packets ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
+			$data_packet_content = wp_json_encode( array( 'data_packets' => DataPacketPromptProjector::project( $data_packets, $packet_projection_context ) ), JSON_UNESCAPED_UNICODE );
 			$messages[]          = ConversationManager::buildConversationMessage(
 				'user',
 				false === $data_packet_content ? '' : $data_packet_content
@@ -231,6 +238,18 @@ class RequestInspector {
 		return trim( (string) ( $queue[0]['prompt'] ?? '' ) );
 	}
 
+	private function buildProjectionContext( int $job_id, string $flow_step_id, string $pipeline_step_id, EngineData $engine, array $job ): array {
+		$job_snapshot = $engine->getJobContext();
+
+		return array(
+			'job_id'           => $job_id,
+			'pipeline_id'      => $job_snapshot['pipeline_id'] ?? ( $job['pipeline_id'] ?? null ),
+			'flow_id'          => $job_snapshot['flow_id'] ?? ( $job['flow_id'] ?? null ),
+			'flow_step_id'     => $flow_step_id,
+			'pipeline_step_id' => $pipeline_step_id,
+		);
+	}
+
 	private function buildPayload(
 		int $job_id,
 		string $flow_step_id,
@@ -266,11 +285,13 @@ class RequestInspector {
 		return $adjacent_id ? $engine->getFlowStepConfig( $adjacent_id ) : null;
 	}
 
-	private function measure( array $assembled, array $data_packets, array $initial_messages ): array {
+	private function measure( array $assembled, array $data_packets, array $initial_messages, array $packet_projection_context ): array {
 		$request          = $assembled['request'];
 		$structured_tools = $assembled['structured_tools'];
 		$messages         = $request['messages'] ?? array();
 		$tools            = $request['tools'] ?? array();
+
+		$projected_packets = DataPacketPromptProjector::project( $data_packets, $packet_projection_context );
 
 		return array(
 			'message_count'                   => count( $messages ),
@@ -279,7 +300,9 @@ class RequestInspector {
 			'messages_json_bytes'             => self::jsonBytes( $messages ),
 			'tools_json_bytes'                => self::jsonBytes( $tools ),
 			'conversation_user_message_bytes' => self::sumUserMessageBytes( $initial_messages ),
-			'conversation_packet_json_bytes'  => self::jsonBytes( AIStep::sanitizeDataPacketsForAi( $data_packets ) ),
+			'canonical_packet_json_bytes'     => self::jsonBytes( $data_packets ),
+			'projected_packet_json_bytes'     => self::jsonBytes( $projected_packets ),
+			'conversation_packet_json_bytes'  => self::jsonBytes( $projected_packets ),
 			'directives'                      => $assembled['directive_breakdown'],
 			'tool_count'                      => count( $structured_tools ),
 			'largest_tools'                   => $this->largestTools( $structured_tools ),

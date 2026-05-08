@@ -8,6 +8,7 @@
 namespace DataMachine\Tests\Unit\Core\Steps\AI;
 
 use DataMachine\Core\Steps\AI\AIStep;
+use DataMachine\Engine\AI\DataPacketPromptProjector;
 use DataMachine\Engine\AI\Tools\ToolResultFinder;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
@@ -77,6 +78,126 @@ class AIStepTest extends TestCase {
 		);
 
 		$this->assertSame( $data_packets, AIStep::sanitizeDataPacketsForAi( $data_packets ) );
+	}
+
+	public function test_prompt_projection_generic_fallback_preserves_unknown_packet_shape(): void {
+		$canonical = array(
+			array(
+				'type'     => 'fetch',
+				'data'     => array(
+					'title'     => 'RSS item',
+					'body'      => 'Keep body',
+					'file_info' => array(
+						'file_path' => '/tmp/runtime-only.jpg',
+						'mime_type' => 'image/jpeg',
+					),
+				),
+				'metadata' => array(
+					'source_type' => 'rss',
+					'custom_key'   => 'custom value',
+				),
+			),
+		);
+
+		$projected = DataPacketPromptProjector::project( $canonical );
+
+		$this->assertSame( 'RSS item', $projected[0]['data']['title'] );
+		$this->assertSame( 'Keep body', $projected[0]['data']['body'] );
+		$this->assertSame( 'rss', $projected[0]['metadata']['source_type'] );
+		$this->assertSame( 'custom value', $projected[0]['metadata']['custom_key'] );
+		$this->assertArrayNotHasKey( 'file_path', $projected[0]['data']['file_info'] );
+		$this->assertSame( '/tmp/runtime-only.jpg', $canonical[0]['data']['file_info']['file_path'] );
+	}
+
+	public function test_prompt_projection_does_not_flatten_unknown_json_body_packets(): void {
+		$canonical = array(
+			array(
+				'type'     => 'fetch',
+				'data'     => array(
+					'title' => 'Unknown JSON packet',
+					'body'  => '{"title":"Nested title","custom":"important"}',
+				),
+				'metadata' => array( 'source_type' => 'custom_json_feed' ),
+			),
+		);
+
+		$this->assertSame( $canonical, DataPacketPromptProjector::project( $canonical ) );
+	}
+
+	public function test_prompt_projection_filter_can_replace_prompt_packet_without_mutating_canonical(): void {
+		$canonical = array(
+			array(
+				'type'     => 'fetch',
+				'data'     => array(
+					'title' => 'Verbose packet',
+					'body'  => 'Long source-specific body that an integration understands.',
+				),
+				'metadata' => array(
+					'source_type' => 'integration_owned_source',
+					'raw_payload'  => array( 'duplicated' => true ),
+				),
+			),
+		);
+
+		add_filter(
+			'datamachine_ai_project_data_packet',
+			static function ( array $projected, array $packet ): array {
+				if ( 'integration_owned_source' !== ( $packet['metadata']['source_type'] ?? '' ) ) {
+					return $projected;
+				}
+
+				return array(
+					'type'     => $packet['type'],
+					'data'     => array( 'title' => $packet['data']['title'] ),
+					'metadata' => array( 'source_type' => $packet['metadata']['source_type'] ),
+				);
+			},
+			10,
+			2
+		);
+
+		$canonical_before = $canonical;
+		$projected        = DataPacketPromptProjector::project( $canonical );
+
+		$this->assertSame( $canonical_before, $canonical );
+		$this->assertSame( 'Verbose packet', $projected[0]['data']['title'] );
+		$this->assertArrayNotHasKey( 'body', $projected[0]['data'] );
+		$this->assertArrayNotHasKey( 'raw_payload', $projected[0]['metadata'] );
+	}
+
+	public function test_prompt_projection_filter_receives_source_agnostic_context(): void {
+		$canonical = array(
+			array(
+				'type'     => 'fetch',
+				'data'     => array( 'title' => 'Context packet' ),
+				'metadata' => array( 'source_type' => 'context_source' ),
+			),
+		);
+		$context   = array(
+			'job_id'           => 1799,
+			'pipeline_id'      => 3,
+			'flow_id'          => 2,
+			'flow_step_id'     => 'flow_step_ai',
+			'pipeline_step_id' => 'pipeline_step_ai',
+		);
+		$received  = array();
+
+		add_filter(
+			'datamachine_ai_project_data_packet',
+			static function ( array $projected, array $packet, array $filter_context ) use ( &$received ): array {
+				if ( 'context_source' === ( $packet['metadata']['source_type'] ?? '' ) ) {
+					$received = $filter_context;
+				}
+
+				return $projected;
+			},
+			10,
+			3
+		);
+
+		DataPacketPromptProjector::project( $canonical, $context );
+
+		$this->assertSame( $context, $received );
 	}
 
 	/**

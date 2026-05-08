@@ -29,6 +29,7 @@ final class AgentBundleUpgradePendingAction {
 		$plan_array       = $plan->to_array();
 		$target_artifacts = isset( $args['target_artifacts'] ) && is_array( $args['target_artifacts'] ) ? $args['target_artifacts'] : array();
 		$approved         = isset( $args['approved_artifacts'] ) && is_array( $args['approved_artifacts'] ) ? array_values( array_map( 'strval', $args['approved_artifacts'] ) ) : array();
+		$rebased          = isset( $args['rebased_artifacts'] ) && is_array( $args['rebased_artifacts'] ) ? $args['rebased_artifacts'] : array();
 
 		return PendingActionHelper::stage(
 			array(
@@ -39,6 +40,7 @@ final class AgentBundleUpgradePendingAction {
 					'agent'              => isset( $args['agent'] ) && is_array( $args['agent'] ) ? $args['agent'] : array(),
 					'approved_artifacts' => $approved,
 					'target_artifacts'   => $target_artifacts,
+					'rebased_artifacts'  => $rebased,
 					'plan'               => $plan_array,
 				),
 				'preview_data' => array(
@@ -71,10 +73,33 @@ final class AgentBundleUpgradePendingAction {
 			: array();
 		$approved = array_fill_keys( $approved, true );
 		$targets  = isset( $apply_input['target_artifacts'] ) && is_array( $apply_input['target_artifacts'] ) ? $apply_input['target_artifacts'] : array();
+		$rebased  = isset( $apply_input['rebased_artifacts'] ) && is_array( $apply_input['rebased_artifacts'] ) ? $apply_input['rebased_artifacts'] : array();
 		$agent    = isset( $apply_input['agent'] ) && is_array( $apply_input['agent'] ) ? $apply_input['agent'] : array();
 		$applied  = array();
 		$skipped  = array();
 		$failed   = array();
+
+		// Index rebased artifacts by key for O(1) lookup. A rebased entry
+		// substitutes its merged payload for the wholesale target during apply.
+		$rebased_by_key = array();
+		foreach ( $rebased as $entry ) {
+			if ( ! is_array( $entry ) ) {
+				continue;
+			}
+			$key = (string) ( $entry['artifact_key'] ?? AgentBundleArtifactExtensions::artifact_key(
+				(string) ( $entry['artifact_type'] ?? '' ),
+				(string) ( $entry['artifact_id'] ?? '' )
+			) );
+			if ( '' === $key ) {
+				continue;
+			}
+			if ( ! empty( $entry['requires_approval'] ) ) {
+				// Rebased entries with unresolved ambiguous fields stay
+				// approval-required and never auto-apply.
+				continue;
+			}
+			$rebased_by_key[ $key ] = $entry;
+		}
 
 		foreach ( $targets as $artifact ) {
 			if ( ! is_array( $artifact ) ) {
@@ -89,15 +114,30 @@ final class AgentBundleUpgradePendingAction {
 				continue;
 			}
 
+			$apply_artifact = $artifact;
+			$rebase_meta    = null;
+			if ( isset( $rebased_by_key[ $key ] ) ) {
+				$rebase_entry              = $rebased_by_key[ $key ];
+				$apply_artifact['payload'] = $rebase_entry['merged'] ?? $artifact['payload'] ?? null;
+				if ( isset( $rebase_entry['merged_hash'] ) ) {
+					$apply_artifact['hash'] = (string) $rebase_entry['merged_hash'];
+				}
+				$rebase_meta = array(
+					'policy'      => (string) ( $rebase_entry['policy'] ?? '' ),
+					'merged_hash' => isset( $rebase_entry['merged_hash'] ) ? (string) $rebase_entry['merged_hash'] : null,
+					'decisions'   => is_array( $rebase_entry['decisions'] ?? null ) ? $rebase_entry['decisions'] : array(),
+				);
+			}
+
 			/**
 			 * Apply one approved bundle upgrade artifact.
 			 *
 			 * @param mixed $result Null until a consumer applies the artifact.
-			 * @param array $artifact Target artifact payload.
+			 * @param array $artifact Target artifact payload (may be rebased).
 			 * @param array $apply_input Full PendingAction input.
 			 */
-			$result = AgentBundleArtifactExtensions::apply_artifact( $artifact, $agent, $apply_input );
-			$result = apply_filters( 'datamachine_bundle_upgrade_apply_artifact', $result, $artifact, $apply_input );
+			$result = AgentBundleArtifactExtensions::apply_artifact( $apply_artifact, $agent, $apply_input );
+			$result = apply_filters( 'datamachine_bundle_upgrade_apply_artifact', $result, $apply_artifact, $apply_input );
 			if ( is_wp_error( $result ) ) {
 				$failed[] = array(
 					'artifact_key' => $key,
@@ -113,10 +153,14 @@ final class AgentBundleUpgradePendingAction {
 				continue;
 			}
 
-			$applied[] = array(
+			$applied_entry = array(
 				'artifact_key' => $key,
 				'result'       => $result,
 			);
+			if ( null !== $rebase_meta ) {
+				$applied_entry['rebase'] = $rebase_meta;
+			}
+			$applied[] = $applied_entry;
 		}
 
 		return array(

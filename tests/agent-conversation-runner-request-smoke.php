@@ -45,9 +45,9 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 }
 
 if ( ! function_exists( 'get_option' ) ) {
-	function get_option( string $name, $default = false ) {
+	function get_option( string $name, $default_value = false ) {
 		unset( $name );
-		return $default;
+		return $default_value;
 	}
 }
 

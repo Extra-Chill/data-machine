@@ -17,6 +17,8 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Agents\AgentAccess;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
+use DataMachine\Engine\Bundle\BundleSource;
+use DataMachine\Engine\Bundle\BundleSourceAuth;
 use DataMachine\Engine\Bundle\BundleValidationException;
 
 defined( 'ABSPATH' ) || exit;
@@ -237,7 +239,7 @@ class AgentAbilities {
 						'properties' => array(
 							'source'      => array(
 								'type'        => 'string',
-								'description' => 'Local bundle source path. Supports bundle directories, .json files, and .zip archives.',
+								'description' => 'Bundle source: local path (directory, .zip, .json) or remote URL (HTTPS to a .zip/.json or a GitHub blob/tree/archive URL).',
 							),
 							'slug'        => array(
 								'type'        => 'string',
@@ -245,7 +247,7 @@ class AgentAbilities {
 							),
 							'on_conflict' => array(
 								'type'        => 'string',
-								'enum'        => array( 'error', 'skip' ),
+								'enum'        => array( 'error', 'skip', 'upgrade' ),
 								'description' => 'How to handle an existing target agent slug.',
 							),
 							'owner_id'    => array(
@@ -255,6 +257,14 @@ class AgentAbilities {
 							'dry_run'     => array(
 								'type'        => 'boolean',
 								'description' => 'Validate and summarize without writing.',
+							),
+							'token'       => array(
+								'type'        => 'string',
+								'description' => 'Auth token for private archive downloads (e.g. GitHub PAT, GHE PAT). Used for this single resolve(); never persisted, never logged. Prefer token_env for repeated use.',
+							),
+							'token_env'   => array(
+								'type'        => 'string',
+								'description' => 'Environment variable (or PHP constant) name to read the auth token from. Used for this single resolve(); never persisted, never logged.',
 							),
 						),
 					),
@@ -672,23 +682,38 @@ class AgentAbilities {
 	 */
 	public static function importAgent( array $input ): array {
 		$source = trim( (string) ( $input['source'] ?? '' ) );
-		if ( '' === $source || ! file_exists( $source ) ) {
+		if ( '' === $source ) {
 			return array(
 				'success' => false,
-				'error'   => 'Bundle source not found.',
+				'error'   => 'Bundle source is required.',
 			);
 		}
 
-		$on_conflict = (string) ( $input['on_conflict'] ?? 'error' );
-		if ( ! in_array( $on_conflict, array( 'error', 'skip' ), true ) ) {
+		$context  = self::build_resolve_context( $input );
+		$resolved = BundleSource::resolve( $source, $context );
+		if ( is_wp_error( $resolved ) ) {
 			return array(
 				'success' => false,
-				'error'   => 'on_conflict must be one of: error, skip.',
+				'error'   => $resolved->get_error_message(),
+			);
+		}
+
+		// Snapshot the revision before any nested resolve() call could
+		// reset it.
+		$revision = BundleSource::is_remote( $source ) ? BundleSource::last_resolved_revision() : null;
+
+		$on_conflict = (string) ( $input['on_conflict'] ?? 'error' );
+		if ( ! in_array( $on_conflict, array( 'error', 'skip', 'upgrade' ), true ) ) {
+			BundleSource::cleanup( $resolved, $source );
+			return array(
+				'success' => false,
+				'error'   => 'on_conflict must be one of: error, skip, upgrade.',
 			);
 		}
 
 		$owner_id = self::resolve_import_owner_id( isset( $input['owner_id'] ) ? (int) $input['owner_id'] : 0 );
 		if ( $owner_id <= 0 ) {
+			BundleSource::cleanup( $resolved, $source );
 			return array(
 				'success' => false,
 				'error'   => 'Unable to resolve import owner. Pass owner_id, authenticate as a user, or set datamachine_default_owner_id.',
@@ -696,12 +721,28 @@ class AgentAbilities {
 		}
 
 		$bundler = new AgentBundler();
-		$bundle  = self::load_import_bundle( $bundler, $source );
+		$bundle  = self::load_import_bundle( $bundler, $resolved );
+
+		// from_zip() extracts to its own tempdir and from_json() reads
+		// the file into memory, so the resolver's temp file is safe to
+		// remove now (success or failure of parse).
+		BundleSource::cleanup( $resolved, $source );
+
 		if ( ! is_array( $bundle ) ) {
 			return array(
 				'success' => false,
 				'error'   => 'Failed to parse bundle. Use a bundle directory, .json file, or .zip archive.',
 			);
+		}
+
+		// Stamp the original remote source so installed bundle metadata
+		// records where this came from. source_revision is best-effort
+		// from the response ETag for GitHub archives (#1830).
+		if ( BundleSource::is_remote( $source ) && empty( $bundle['source_ref'] ) ) {
+			$bundle['source_ref'] = $source;
+		}
+		if ( null !== $revision && empty( $bundle['source_revision'] ) ) {
+			$bundle['source_revision'] = $revision;
 		}
 
 		$slug = sanitize_title( (string) ( $bundle['agent']['agent_slug'] ?? '' ) );
@@ -728,16 +769,25 @@ class AgentAbilities {
 			);
 		}
 
-		if ( $existing ) {
+		if ( $existing && 'upgrade' !== $on_conflict ) {
 			return array(
 				'success'    => false,
 				'agent_id'   => (int) $existing['agent_id'],
 				'agent_slug' => $slug,
-				'error'      => sprintf( 'Agent slug "%s" already exists. Use on_conflict=skip to no-op, or import with a new slug.', $slug ),
+				'error'      => sprintf( 'Agent slug "%s" already exists. Use on_conflict=skip to no-op, on_conflict=upgrade to reconcile bundle artifacts, or import with a new slug.', $slug ),
 			);
 		}
 
-		$result = $bundler->import( $bundle, null, $owner_id, ! empty( $input['dry_run'] ) );
+		$result = $bundler->import(
+			$bundle,
+			null,
+			$owner_id,
+			! empty( $input['dry_run'] ),
+			array(
+				'is_upgrade'        => 'upgrade' === $on_conflict,
+				'reconcile_runtime' => 'upgrade' === $on_conflict,
+			)
+		);
 		if ( empty( $result['success'] ) ) {
 			$result['auth_warnings'] = $auth_warnings;
 			return $result;
@@ -756,6 +806,23 @@ class AgentAbilities {
 		$result['auth_warnings'] = $auth_warnings;
 
 		return $result;
+	}
+
+	/**
+	 * Build the {@see BundleSource::resolve()} context array from the
+	 * import-agent ability inputs. Honors `token` (literal) and
+	 * `token_env` (env-var or PHP constant name) — both short-circuit
+	 * the env/constant/option/filter chain in
+	 * {@see \DataMachine\Engine\Bundle\BundleSourceAuth::token_for()}.
+	 *
+	 * @param array $input Ability input.
+	 * @return array
+	 */
+	private static function build_resolve_context( array $input ): array {
+		return BundleSourceAuth::build_resolve_context(
+			isset( $input['token'] ) ? (string) $input['token'] : null,
+			isset( $input['token_env'] ) ? (string) $input['token_env'] : null
+		);
 	}
 
 	private static function load_import_bundle( AgentBundler $bundler, string $source ): ?array {

@@ -711,7 +711,7 @@ class PipelinesCommand extends BaseCommand {
 
 			if ( null === $step_id ) {
 				$resolved = $this->resolveAiStep( $pipeline_id );
-				if ( $resolved['error'] ) {
+				if ( ! empty( $resolved['error'] ) ) {
 					WP_CLI::error( $resolved['error'] );
 					return;
 				}

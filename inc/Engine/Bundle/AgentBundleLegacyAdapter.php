@@ -52,7 +52,8 @@ final class AgentBundleLegacyAdapter {
 			self::pipeline_files_from_legacy( $bundle['pipelines'] ?? array(), $pipeline_slugs ),
 			self::flow_files_from_legacy( $bundle['flows'] ?? array(), $bundle['pipelines'] ?? array(), $pipeline_slugs, $flow_slugs ),
 			array(),
-			is_array( $bundle['extension_artifacts'] ?? null ) ? $bundle['extension_artifacts'] : array()
+			is_array( $bundle['extension_artifacts'] ?? null ) ? $bundle['extension_artifacts'] : array(),
+			is_array( $bundle['extras'] ?? null ) ? $bundle['extras'] : array()
 		);
 	}
 
@@ -146,6 +147,7 @@ final class AgentBundleLegacyAdapter {
 			'pipelines'             => $pipelines,
 			'flows'                 => $flows,
 			'extension_artifacts'   => $directory->extension_artifacts(),
+			'extras'                => $directory->extras(),
 			'abilities_manifest'    => array(),
 		);
 	}

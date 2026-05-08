@@ -2,6 +2,80 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.106.0] - 2026-05-07
+
+### Added
+- support auth headers for private GitHub/GHE archives (#1830)
+- policy-driven rebase for locally modified artifacts (#1832)
+- generic extras transport + post-install success hook (#1828)
+- accept remote URLs for agent install/import/upgrade (#1826)
+
+### Fixed
+- mirror rebased handler throttles
+- route GitHub archive URLs to api.github.com/zipball for PAT auth (#1840)
+- fix(pipeline-card): hoist hooks above early-return guard (rules-of-hooks)
+- fix(auth-providers): hoist useState above early-return guard in CallbackUrlDisplay
+- clear advanced AI concurrency leases
+- avoid poisoning source items on transport exhaustion
+- throttle concurrent pipeline AI steps
+- allow manual runs for paused flows
+- shorten AI transport retry delays
+- Fix wp-ai-client timeout semantics
+- split fetch item dispositions
+- guard scheduler checks before AS datastore init
+- restore queue backups only for drain mode
+- inspect wp-ai-client prompt slot in refinement context test
+
+## [0.105.0] - 2026-05-06
+
+### Added
+- add FreshCandidateCollector primitive for selection-time filtering
+- add synchronous job drain ability
+
+### Changed
+- collapse JobsOperations/JobsStatus passthrough into Jobs
+- Require explicit memory modes for prompt injection
+
+### Fixed
+- Fix silent agent install rollback and misleading upgrade rejection (#1801)
+
+## [0.104.1] - 2026-05-06
+
+### Changed
+- Project DataPackets before AI prompt serialization
+- Apply wp-ai-client connect timeout to curl
+- Allow tuning wp-ai-client connect timeout
+
+### Fixed
+- Fix pipeline transcript lookup
+
+## [0.104.0] - 2026-05-05
+
+### Added
+- CLI commands to reassign agent_id on pipelines and flows
+
+### Changed
+- Preserve job data when retry is pending
+- Revert #1790 and finish wp-ai-client prompt-dispatch fix
+- Soft-skip AI steps that produce no actionable output
+- Report bundle runtime queue drift
+- Consume Agents API overflow strategy
+- Consume Agents API loop events
+- Consume Agents API transcript lock contract
+- Consume Agents API caller context
+- Consume Agents API workspace scope
+- Consume Agents API memory context contracts
+- Consume durable Agents API approval contracts
+- Harden guideline-backed memory capability checks
+- Consume Agents API consent policy contracts
+- Consume Agents API tool policy contracts
+- Adopt agent authorization contracts
+- Consume updated Agents API substrate
+
+### Fixed
+- Fix flow user message step resolution
+- Fix wp-ai-client pipeline prompt dispatch
+
 ## [0.103.14] - 2026-05-03
 
 ### Changed

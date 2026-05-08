@@ -54,6 +54,7 @@ require_once __DIR__ . '/../inc/Engine/AI/MemoryFileRegistry.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DirectoryManager.php';
 require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
+require_once __DIR__ . '/../inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DiskAgentMemoryStore.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryStoreFactory.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemory.php';
@@ -77,6 +78,9 @@ class DailyMemorySeamFakeStore implements WP_Agent_Memory_Store {
 
 	/** @var string[] */
 	public array $operations = array();
+
+	/** @var array<string, WP_Agent_Memory_Scope> */
+	public array $file_scopes = array();
 
 	/** @var WP_Agent_Memory_Scope[] */
 	public array $scopes = array();
@@ -104,6 +108,7 @@ class DailyMemorySeamFakeStore implements WP_Agent_Memory_Store {
 		unset( $metadata );
 		$this->record( 'write', $scope );
 		$this->files[ $scope->key() ] = $content;
+		$this->file_scopes[ $scope->key() ] = $scope;
 
 		return WP_Agent_Memory_Write_Result::ok( sha1( $content ), strlen( $content ) );
 	}
@@ -116,6 +121,7 @@ class DailyMemorySeamFakeStore implements WP_Agent_Memory_Store {
 	public function delete( WP_Agent_Memory_Scope $scope ): WP_Agent_Memory_Write_Result {
 		$this->record( 'delete', $scope );
 		unset( $this->files[ $scope->key() ] );
+		unset( $this->file_scopes[ $scope->key() ] );
 
 		return WP_Agent_Memory_Write_Result::ok( '', 0 );
 	}
@@ -133,16 +139,18 @@ class DailyMemorySeamFakeStore implements WP_Agent_Memory_Store {
 
 		$entries = array();
 		foreach ( $this->files as $key => $content ) {
-			[ $layer, $workspace_type, $workspace_id, $user_id, $agent_id, $filename ] = explode( ':', $key, 6 );
-			unset( $workspace_type, $workspace_id );
-			if ( $layer !== $scope_query->layer || (int) $user_id !== $scope_query->user_id || (int) $agent_id !== $scope_query->agent_id ) {
+			$scope = $this->file_scopes[ $key ] ?? null;
+			if ( ! $scope instanceof WP_Agent_Memory_Scope ) {
 				continue;
 			}
-			if ( 0 !== strpos( $filename, $prefix . '/' ) ) {
+			if ( $scope->layer !== $scope_query->layer || $scope->user_id !== $scope_query->user_id || $scope->agent_id !== $scope_query->agent_id ) {
+				continue;
+			}
+			if ( 0 !== strpos( $scope->filename, $prefix . '/' ) ) {
 				continue;
 			}
 
-			$entries[] = new WP_Agent_Memory_List_Entry( $filename, $layer, strlen( $content ), 123 );
+			$entries[] = new WP_Agent_Memory_List_Entry( $scope->filename, $scope->layer, strlen( $content ), 123 );
 		}
 
 		return $entries;
@@ -170,6 +178,7 @@ $store = new DailyMemorySeamFakeStore();
 add_filter(
 	'agents_api_memory_store',
 	function ( $default, WP_Agent_Memory_Scope $scope ) use ( $store ) {
+		unset( $default, $scope );
 		return $store;
 	},
 	10,
