@@ -277,7 +277,6 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\LocalSearchAbilities();
 	new \DataMachine\Abilities\SourceAggregateAbility();
 	new \DataMachine\Abilities\SystemAbilities();
-	new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();
 	new \DataMachine\Abilities\Media\AltTextAbilities();
 	new \DataMachine\Abilities\Media\ImageGenerationAbilities();
 	new \DataMachine\Abilities\Media\MediaAbilities();
@@ -328,6 +327,10 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Publish\SendEmailAbility();
 	new \DataMachine\Abilities\Update\UpdateWordPressAbility();
 	new \DataMachine\Abilities\Handler\TestHandlerAbility();
+
+	// Register system tasks after every ability hook is attached. Task registry
+	// initialization can resolve abilities, which lazily fires wp_abilities_api_init.
+	new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();
 
 	// Deferred scaffold: during plugin activation the Abilities API is unavailable
 	// because init fires before the plugin file is included. A transient signals that
