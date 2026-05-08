@@ -746,7 +746,7 @@ class AgentBundler {
 				);
 			}
 
-			// 5. Import flows: create paused, preserve local schedules/queues on update.
+			// 5. Import flows: honor bundle schedules on create, preserve local schedules/queues on update.
 			$flow_count = 0;
 			foreach ( $bundle['flows'] ?? array() as $flow_data ) {
 				$old_pipeline_id = (int) ( $flow_data['original_pipeline_id'] ?? 0 );
@@ -762,13 +762,7 @@ class AgentBundler {
 				);
 				$artifact_key  = 'flow:' . $portable_slug;
 
-				// Force paused/manual scheduling on create.
-				$scheduling            = $flow_data['scheduling_config'] ?? array();
-				$scheduling['enabled'] = false;
-				if ( ! isset( $scheduling['interval'] ) || 'manual' !== $scheduling['interval'] ) {
-					$scheduling['_original_interval'] = $scheduling['interval'] ?? 'manual';
-					$scheduling['interval']           = 'manual';
-				}
+				$scheduling = $this->bundle_create_scheduling_config( is_array( $flow_data['scheduling_config'] ?? null ) ? $flow_data['scheduling_config'] : array() );
 
 				$flow_config         = is_array( $flow_data['flow_config'] ?? null ) ? $flow_data['flow_config'] : array();
 				$existing_flow       = $this->flows_repo->get_by_portable_slug( (int) $new_pipeline_id, $portable_slug );
@@ -1162,13 +1156,37 @@ class AgentBundler {
 	}
 
 	private function flow_artifact_payload( array $flow, string $portable_slug ): array {
+		$scheduling_policy = $this->bundle_scheduling_policy( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() );
+
 		return array(
 			'portable_slug'     => $portable_slug,
 			'flow_name'         => (string) ( $flow['flow_name'] ?? '' ),
 			'flow_config'       => $this->flow_config_without_runtime_queues( is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array() ),
-			'scheduling_policy' => 'create_paused_upgrade_preserve_existing',
+			'scheduling_policy' => $scheduling_policy,
 			'queue_policy'      => 'create_seed_upgrade_preserve_existing',
 		);
+	}
+
+	private function bundle_create_scheduling_config( array $config ): array {
+		$config   = $this->sanitize_scheduling_config( $config );
+		$interval = (string) ( $config['interval'] ?? 'manual' );
+
+		$config['interval'] = $interval;
+		if ( ! array_key_exists( 'enabled', $config ) ) {
+			$config['enabled'] = 'manual' !== $interval;
+		}
+
+		return $config;
+	}
+
+	private function bundle_scheduling_policy( array $config ): string {
+		$create_config = $this->bundle_create_scheduling_config( $config );
+
+		if ( 'manual' === (string) ( $create_config['interval'] ?? 'manual' ) || false === ( $create_config['enabled'] ?? true ) ) {
+			return 'create_paused_upgrade_preserve_existing';
+		}
+
+		return 'create_bundle_schedule_upgrade_preserve_existing';
 	}
 
 	private function artifact_has_local_modifications( ?array $record, mixed $current_payload ): bool {
