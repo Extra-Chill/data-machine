@@ -19,9 +19,9 @@ class DrainCommand extends BaseCommand {
 
 	private const GROUP = 'data-machine';
 
-	private const HOOK_BATCH_CHUNK = 'datamachine_pipeline_batch_chunk';
+	public const HOOK_BATCH_CHUNK = 'datamachine_pipeline_batch_chunk';
 
-	private const HOOK_EXECUTE_STEP = 'datamachine_execute_step';
+	public const HOOK_EXECUTE_STEP = 'datamachine_execute_step';
 
 	/**
 	 * Drain due Data Machine actions until empty or a budget is reached.
@@ -85,21 +85,26 @@ class DrainCommand extends BaseCommand {
 	/**
 	 * Drain due Data Machine actions and return a compact summary.
 	 *
-	 * @param array{limit?:int,batch_size?:int,time_limit?:int} $options Drain options.
+	 * Scheduler health checks count the full Data Machine Action Scheduler group,
+	 * so this drain runs concrete due action IDs from that same group instead of
+	 * a hand-maintained hook allow-list.
+	 *
+	 * @param array{limit?:int,batch_size?:int,time_limit?:int,hooks?:string[]} $options Drain options.
 	 * @return array<string,int|string> Drain stats.
 	 */
 	public static function drain( array $options = array() ): array {
 		$limit      = max( 0, (int) ( $options['limit'] ?? 0 ) );
 		$batch_size = max( 1, (int) ( $options['batch_size'] ?? 25 ) );
 		$time_limit = max( 0, (int) ( $options['time_limit'] ?? 0 ) );
+		$hooks      = self::normalizeHooks( $options['hooks'] ?? null );
 
 		$started_at    = time();
-		$before_counts = self::getStatusCounts();
+		$before_counts = self::getStatusCounts( $hooks );
 		$batches       = 0;
 		$warnings      = 0;
 
-		while ( self::getDuePendingCount() > 0 ) {
-			$stats = self::buildStats( $before_counts, self::getStatusCounts(), $batches, $warnings );
+		while ( self::getDuePendingCount( $hooks ) > 0 ) {
+			$stats = self::buildStats( $before_counts, self::getStatusCounts( $hooks ), $batches, $warnings, $hooks );
 			if ( $limit > 0 && (int) $stats['actions_processed'] >= $limit ) {
 				break;
 			}
@@ -116,13 +121,13 @@ class DrainCommand extends BaseCommand {
 				break;
 			}
 
-			$action_ids = self::getDuePendingActionIds( $current_batch_size );
+			$action_ids = self::getDuePendingActionIds( $current_batch_size, $hooks );
 			if ( empty( $action_ids ) ) {
 				break;
 			}
 
-			$due_before    = self::getDuePendingCount();
-			$status_before = self::getStatusCounts();
+			$due_before    = self::getDuePendingCount( $hooks );
+			$status_before = self::getStatusCounts( $hooks );
 			$result        = self::runActionSchedulerActions( $action_ids );
 			++$batches;
 
@@ -133,16 +138,16 @@ class DrainCommand extends BaseCommand {
 				break;
 			}
 
-			$status_after = self::getStatusCounts();
+			$status_after = self::getStatusCounts( $hooks );
 			$progress     = self::processedDelta( $status_before, $status_after );
-			if ( 0 === $progress && self::getDuePendingCount() >= $due_before ) {
+			if ( 0 === $progress && self::getDuePendingCount( $hooks ) >= $due_before ) {
 				++$warnings;
 				WP_CLI::warning( 'Drain stopped because Action Scheduler made no observable progress.' );
 				break;
 			}
 		}
 
-		return self::buildStats( $before_counts, self::getStatusCounts(), $batches, $warnings );
+		return self::buildStats( $before_counts, self::getStatusCounts( $hooks ), $batches, $warnings, $hooks );
 	}
 
 	/**
@@ -171,27 +176,32 @@ class DrainCommand extends BaseCommand {
 	 * @param int                             $warnings      Warning count.
 	 * @return array<string,int|string> Stats.
 	 */
-	private static function buildStats( array $before_counts, array $after_counts, int $batches, int $warnings ): array {
-		$batch_completed = self::delta( $before_counts, $after_counts, self::HOOK_BATCH_CHUNK, 'complete' );
-		$batch_failed    = self::delta( $before_counts, $after_counts, self::HOOK_BATCH_CHUNK, 'failed' );
-		$step_completed  = self::delta( $before_counts, $after_counts, self::HOOK_EXECUTE_STEP, 'complete' );
-		$step_failed     = self::delta( $before_counts, $after_counts, self::HOOK_EXECUTE_STEP, 'failed' );
+	private static function buildStats( array $before_counts, array $after_counts, int $batches, int $warnings, ?array $hooks = null ): array {
+		$batch_completed   = self::delta( $before_counts, $after_counts, self::HOOK_BATCH_CHUNK, 'complete' );
+		$batch_failed      = self::delta( $before_counts, $after_counts, self::HOOK_BATCH_CHUNK, 'failed' );
+		$step_completed    = self::delta( $before_counts, $after_counts, self::HOOK_EXECUTE_STEP, 'complete' );
+		$step_failed       = self::delta( $before_counts, $after_counts, self::HOOK_EXECUTE_STEP, 'failed' );
+		$total_completed   = self::statusDelta( $before_counts, $after_counts, 'complete' );
+		$total_failed      = self::statusDelta( $before_counts, $after_counts, 'failed' );
+		$total_processed   = $total_completed + $total_failed;
+		$tracked_processed = $batch_completed + $batch_failed + $step_completed + $step_failed;
 
 		return array(
 			'batches'                    => $batches,
 			'batch_chunks'               => $batch_completed + $batch_failed,
 			'step_executions'            => $step_completed + $step_failed,
-			'completions'                => $batch_completed + $step_completed,
-			'failures'                   => $batch_failed + $step_failed,
+			'completions'                => $total_completed,
+			'failures'                   => $total_failed,
 			'batch_chunk_completions'    => $batch_completed,
 			'batch_chunk_failures'       => $batch_failed,
 			'step_execution_completions' => $step_completed,
 			'step_execution_failures'    => $step_failed,
-			'actions_processed'          => $batch_completed + $batch_failed + $step_completed + $step_failed,
-			'remaining_pending'          => self::getDuePendingCount(),
-			'total_pending'              => self::getPendingCount(),
+			'actions_processed'          => $total_processed,
+			'other_actions'              => max( 0, $total_processed - $tracked_processed ),
+			'remaining_pending'          => self::getDuePendingCount( $hooks ),
+			'total_pending'              => self::getPendingCount( $hooks ),
 			'warnings'                   => $warnings,
-			'hooks'                      => implode( ',', self::hooks() ),
+			'hooks'                      => implode( ',', self::processedHooks( $before_counts, $after_counts ) ),
 		);
 	}
 
@@ -203,12 +213,94 @@ class DrainCommand extends BaseCommand {
 	 * @return int Processed action count.
 	 */
 	private static function processedDelta( array $before_counts, array $after_counts ): int {
+		return self::statusDelta( $before_counts, $after_counts, 'complete' ) + self::statusDelta( $before_counts, $after_counts, 'failed' );
+	}
+
+	/**
+	 * Count status deltas across all Data Machine hooks.
+	 *
+	 * @param array<string,array<string,int>> $before_counts Counts before.
+	 * @param array<string,array<string,int>> $after_counts  Counts after.
+	 * @param string                          $status        Action status.
+	 * @return int Non-negative delta.
+	 */
+	private static function statusDelta( array $before_counts, array $after_counts, string $status ): int {
 		$total = 0;
-		foreach ( self::hooks() as $hook ) {
-			$total += self::delta( $before_counts, $after_counts, $hook, 'complete' );
-			$total += self::delta( $before_counts, $after_counts, $hook, 'failed' );
+		foreach ( self::allHooks( $before_counts, $after_counts ) as $hook ) {
+			$total += self::delta( $before_counts, $after_counts, $hook, $status );
 		}
 		return $total;
+	}
+
+	/**
+	 * Get hooks with observed processed deltas.
+	 *
+	 * @param array<string,array<string,int>> $before_counts Counts before.
+	 * @param array<string,array<string,int>> $after_counts  Counts after.
+	 * @return string[] Hook names.
+	 */
+	private static function processedHooks( array $before_counts, array $after_counts ): array {
+		$hooks = array();
+		foreach ( self::allHooks( $before_counts, $after_counts ) as $hook ) {
+			if ( self::delta( $before_counts, $after_counts, $hook, 'complete' ) > 0 || self::delta( $before_counts, $after_counts, $hook, 'failed' ) > 0 ) {
+				$hooks[] = $hook;
+			}
+		}
+		return $hooks;
+	}
+
+	/**
+	 * Get hooks seen in either status snapshot.
+	 *
+	 * @param array<string,array<string,int>> $before_counts Counts before.
+	 * @param array<string,array<string,int>> $after_counts  Counts after.
+	 * @return string[] Hook names.
+	 */
+	private static function allHooks( array $before_counts, array $after_counts ): array {
+		return array_values( array_unique( array_merge( array_keys( $before_counts ), array_keys( $after_counts ) ) ) );
+	}
+
+	/**
+	 * Normalize hook-scope options.
+	 *
+	 * @param mixed $hooks Optional hook list.
+	 * @return string[]|null Hook list, or null for all Data Machine hooks.
+	 */
+	private static function normalizeHooks( mixed $hooks ): ?array {
+		if ( ! is_array( $hooks ) ) {
+			return null;
+		}
+
+		$hooks = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'strval', $hooks ),
+					static fn( string $hook ): bool => '' !== $hook
+				)
+			)
+		);
+
+		return empty( $hooks ) ? null : $hooks;
+	}
+
+	/**
+	 * Build optional hook WHERE SQL for prepared Action Scheduler queries.
+	 *
+	 * @param string[]|null $hooks Hook scope, or null for all hooks in the group.
+	 * @return array{sql:string,values:string[]} SQL fragment and placeholder values.
+	 */
+	private static function hookWhereSql( ?array $hooks ): array {
+		if ( empty( $hooks ) ) {
+			return array(
+				'sql'    => '',
+				'values' => array(),
+			);
+		}
+
+		return array(
+			'sql'    => 'a.hook IN (' . implode( ', ', array_fill( 0, count( $hooks ), '%s' ) ) . ') AND ',
+			'values' => $hooks,
+		);
 	}
 
 	/**
@@ -229,8 +321,8 @@ class DrainCommand extends BaseCommand {
 	 *
 	 * @return int Due pending count.
 	 */
-	private static function getDuePendingCount(): int {
-		return self::countActions( true );
+	private static function getDuePendingCount( ?array $hooks = null ): int {
+		return self::countActions( true, $hooks );
 	}
 
 	/**
@@ -238,8 +330,8 @@ class DrainCommand extends BaseCommand {
 	 *
 	 * @return int Pending count.
 	 */
-	private static function getPendingCount(): int {
-		return self::countActions( false );
+	private static function getPendingCount( ?array $hooks = null ): int {
+		return self::countActions( false, $hooks );
 	}
 
 	/**
@@ -248,11 +340,17 @@ class DrainCommand extends BaseCommand {
 	 * @param int $limit Maximum IDs to return.
 	 * @return int[] Action IDs.
 	 */
-	private static function getDuePendingActionIds( int $limit ): array {
+	private static function getDuePendingActionIds( int $limit, ?array $hooks = null ): array {
 		global $wpdb;
 
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
 		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
+		$hook_sql      = self::hookWhereSql( $hooks );
+		$values        = array_merge(
+			array( $actions_table, $groups_table ),
+			$hook_sql['values'],
+			array( self::GROUP, gmdate( 'Y-m-d H:i:s' ), $limit )
+		);
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$ids = $wpdb->get_col(
@@ -260,19 +358,12 @@ class DrainCommand extends BaseCommand {
 				'SELECT a.action_id
 				FROM %i a
 				INNER JOIN %i g ON g.group_id = a.group_id
-				WHERE a.hook IN (%s, %s)
-				AND a.status = \'pending\'
+				WHERE ' . $hook_sql['sql'] . 'a.status = \'pending\'
 				AND g.slug = %s
 				AND a.scheduled_date_gmt <= %s
 				ORDER BY a.scheduled_date_gmt ASC, a.action_id ASC
 				LIMIT %d',
-				$actions_table,
-				$groups_table,
-				self::HOOK_BATCH_CHUNK,
-				self::HOOK_EXECUTE_STEP,
-				self::GROUP,
-				gmdate( 'Y-m-d H:i:s' ),
-				$limit
+				$values
 			)
 		);
 
@@ -285,32 +376,39 @@ class DrainCommand extends BaseCommand {
 	 * @param bool $due_only Whether to count only due actions.
 	 * @return int Pending count.
 	 */
-	private static function countActions( bool $due_only ): int {
+	private static function countActions( bool $due_only, ?array $hooks = null ): int {
 		global $wpdb;
 
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
 		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
+		$hook_sql      = self::hookWhereSql( $hooks );
 
 		if ( $due_only ) {
+			$values = array_merge(
+				array( $actions_table, $groups_table ),
+				$hook_sql['values'],
+				array( self::GROUP, gmdate( 'Y-m-d H:i:s' ) )
+			);
+
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			return (int) $wpdb->get_var(
 				$wpdb->prepare(
 					'SELECT COUNT(*)
 					FROM %i a
 					INNER JOIN %i g ON g.group_id = a.group_id
-					WHERE a.hook IN (%s, %s)
-					AND a.status = \'pending\'
+					WHERE ' . $hook_sql['sql'] . 'a.status = \'pending\'
 					AND g.slug = %s
 					AND a.scheduled_date_gmt <= %s',
-					$actions_table,
-					$groups_table,
-					self::HOOK_BATCH_CHUNK,
-					self::HOOK_EXECUTE_STEP,
-					self::GROUP,
-					gmdate( 'Y-m-d H:i:s' )
+					$values
 				)
 			);
 		}
+
+		$values = array_merge(
+			array( $actions_table, $groups_table ),
+			$hook_sql['values'],
+			array( self::GROUP )
+		);
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		return (int) $wpdb->get_var(
@@ -318,14 +416,9 @@ class DrainCommand extends BaseCommand {
 				'SELECT COUNT(*)
 				FROM %i a
 				INNER JOIN %i g ON g.group_id = a.group_id
-				WHERE a.hook IN (%s, %s)
-				AND a.status = \'pending\'
+				WHERE ' . $hook_sql['sql'] . 'a.status = \'pending\'
 				AND g.slug = %s',
-				$actions_table,
-				$groups_table,
-				self::HOOK_BATCH_CHUNK,
-				self::HOOK_EXECUTE_STEP,
-				self::GROUP
+				$values
 			)
 		);
 	}
@@ -335,11 +428,17 @@ class DrainCommand extends BaseCommand {
 	 *
 	 * @return array<string,array<string,int>> Counts by hook and status.
 	 */
-	private static function getStatusCounts(): array {
+	private static function getStatusCounts( ?array $hooks = null ): array {
 		global $wpdb;
 
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
 		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
+		$hook_sql      = self::hookWhereSql( $hooks );
+		$values        = array_merge(
+			array( $actions_table, $groups_table ),
+			$hook_sql['values'],
+			array( self::GROUP )
+		);
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$rows = $wpdb->get_results(
@@ -347,43 +446,27 @@ class DrainCommand extends BaseCommand {
 				'SELECT a.hook, a.status, COUNT(*) AS count
 				FROM %i a
 				INNER JOIN %i g ON g.group_id = a.group_id
-				WHERE a.hook IN (%s, %s)
-				AND g.slug = %s
+				WHERE ' . $hook_sql['sql'] . 'g.slug = %s
 				GROUP BY a.hook, a.status',
-				$actions_table,
-				$groups_table,
-				self::HOOK_BATCH_CHUNK,
-				self::HOOK_EXECUTE_STEP,
-				self::GROUP
+				$values
 			)
 		);
 
 		$counts = array();
-		foreach ( self::hooks() as $hook ) {
-			$counts[ $hook ] = array(
-				'pending'  => 0,
-				'complete' => 0,
-				'failed'   => 0,
-			);
-		}
 
 		foreach ( $rows as $row ) {
 			$hook   = (string) $row->hook;
 			$status = (string) $row->status;
-			if ( isset( $counts[ $hook ] ) ) {
-				$counts[ $hook ][ $status ] = (int) $row->count;
+			if ( ! isset( $counts[ $hook ] ) ) {
+				$counts[ $hook ] = array(
+					'pending'  => 0,
+					'complete' => 0,
+					'failed'   => 0,
+				);
 			}
+			$counts[ $hook ][ $status ] = (int) $row->count;
 		}
 
 		return $counts;
-	}
-
-	/**
-	 * Get hooks drained by Data Machine.
-	 *
-	 * @return string[] Hook names.
-	 */
-	private static function hooks(): array {
-		return array( self::HOOK_BATCH_CHUNK, self::HOOK_EXECUTE_STEP );
 	}
 }
