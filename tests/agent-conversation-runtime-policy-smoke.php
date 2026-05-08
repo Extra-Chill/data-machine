@@ -396,6 +396,89 @@ $non_handler_assertion_decision = $non_handler_assertion_policy->recordToolResul
 assert_runtime_policy( ! $non_handler_assertion_decision->isComplete(), 'handler policy waits after non-handler tools when generic assertions are missing' );
 assert_runtime_policy( str_contains( $non_handler_assertion_decision->context()['continuation_message'] ?? '', 'create_github_pull_request' ), 'handler policy nudges after non-handler tools with missing assertions' );
 
+$setup_tool_dispatch_count = 0;
+$setup_tool_second_request = null;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function ( array $request_body ) use ( &$setup_tool_dispatch_count, &$setup_tool_second_request ) {
+		++$setup_tool_dispatch_count;
+		if ( 2 === $setup_tool_dispatch_count ) {
+			$setup_tool_second_request = $request_body;
+		}
+
+		if ( 1 === $setup_tool_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => '',
+					'tool_calls' => array(
+						array(
+							'name'       => 'workspace_worktree_add',
+							'parameters' => array( 'repo' => 'html-to-blocks-converter' ),
+						),
+					),
+				),
+			);
+		}
+
+		if ( 2 === $setup_tool_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => '',
+					'tool_calls' => array(
+						array(
+							'name'       => 'create_github_pull_request',
+							'parameters' => array( 'repo' => 'html-to-blocks-converter' ),
+						),
+					),
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => 'Done after required tool.',
+				'tool_calls' => array(),
+			),
+		);
+	}
+);
+
+$setup_tool_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'prepare workspace, then open PR' ) ),
+	array(
+		'workspace_worktree_add'      => array(
+			'name'        => 'workspace_worktree_add',
+			'description' => 'Prepare worktree',
+			'parameters'  => array( 'repo' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+		'create_github_pull_request' => array(
+			'name'        => 'create_github_pull_request',
+			'description' => 'Create PR',
+			'parameters'  => array( 'repo' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	'pipeline',
+	array(
+		'completion_assertions' => array(
+			'required_tool_names' => array( 'create_github_pull_request' ),
+		),
+	),
+	5
+);
+
+assert_runtime_policy( 3 === $setup_tool_dispatch_count, 'pipeline setup tool nudge keeps conversation running' );
+assert_runtime_policy( str_contains( wp_json_encode( $setup_tool_second_request ), 'create_github_pull_request' ), 'pipeline setup tool nudge names missing required tool' );
+assert_runtime_policy( array( 'workspace_worktree_add', 'create_github_pull_request' ) === array_column( $setup_tool_result['tool_execution_results'] ?? array(), 'tool_name' ), 'pipeline setup tool loop captures setup and required tools' );
+
 $dispatch_count     = 0;
 $provider_context   = null;
 $completion_policy  = new RuntimePolicySmokeCompletionPolicy();
