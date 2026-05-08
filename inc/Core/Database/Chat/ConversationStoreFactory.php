@@ -24,6 +24,7 @@ namespace DataMachine\Core\Database\Chat;
 
 use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
+use DataMachine\Core\Agents\AgentIdentityResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -130,6 +131,33 @@ class ConversationStoreFactory {
 		$blog_id = function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 1;
 
 		return WP_Agent_Workspace_Scope::from_parts( 'site', (string) max( 1, $blog_id ) );
+	}
+
+	/**
+	 * Resolve an internal Data Machine agent ID to the generic transcript slug.
+	 *
+	 * @param int $agent_id Internal Data Machine agent ID.
+	 * @return string Registered agent slug, or empty string for agent-less/unknown sessions.
+	 */
+	public static function resolve_agent_slug_for_transcript( int $agent_id ): string {
+		if ( $agent_id <= 0 ) {
+			return '';
+		}
+
+		try {
+			return ( new AgentIdentityResolver() )->resolve_agent_slug( $agent_id );
+		} catch ( \InvalidArgumentException $e ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Unable to resolve agent slug for transcript store call',
+				array(
+					'agent_id' => $agent_id,
+					'error'    => $e->getMessage(),
+				)
+			);
+			return '';
+		}
 	}
 
 	/**

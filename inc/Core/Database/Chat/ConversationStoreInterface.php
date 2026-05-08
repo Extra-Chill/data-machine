@@ -21,7 +21,7 @@
  * - normalizing messages on read to Data Machine's canonical AI message envelope
  *   (see docs/development/hooks/core-filters.md#message-shape-contract);
  * - preserving per-session identity via UUIDv4 session IDs;
- * - honoring the `(user_id, agent_id, context)` triple when listing.
+ * - honoring Data Machine's internal `(user_id, agent_id, context)` triple when listing.
  *
  * Session-scope policy (ownership checks, token resolution, agent adoption,
  * listing visibility, title generation, retention schedules) stays in the

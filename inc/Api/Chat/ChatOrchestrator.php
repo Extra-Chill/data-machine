@@ -589,10 +589,11 @@ class ChatOrchestrator {
 		$ability = wp_get_ability( 'datamachine/create-chat-session' );
 
 		if ( $ability ) {
-			$input = array(
-				'user_id'  => $user_id,
-				'agent_id' => $agent_id,
-				'mode'     => 'chat',
+			$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
+			$input      = array(
+				'user_id'    => $user_id,
+				'agent_slug' => $agent_slug,
+				'mode'       => 'chat',
 			);
 
 			if ( $source ) {
@@ -636,7 +637,8 @@ class ChatOrchestrator {
 			$metadata['source'] = $source;
 		}
 
-		$session_id = $chat_db->create_session( WordPressWorkspaceScope::current(), $user_id, $agent_id, $metadata, 'chat' );
+		$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
+		$session_id = $chat_db->create_session( WordPressWorkspaceScope::current(), $user_id, $agent_slug, $metadata, 'chat' );
 
 		if ( empty( $session_id ) ) {
 			return new WP_Error(

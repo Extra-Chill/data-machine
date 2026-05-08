@@ -42,8 +42,11 @@ class DataMachinePipelineTranscriptPersister implements WP_Agent_Transcript_Pers
 		$store     = ConversationStoreFactory::get_transcript_store();
 		$workspace = $request->workspace() ?? WordPressWorkspaceScope::current();
 
-		$user_id  = (int) ( $runtime_context['user_id'] ?? 0 );
-		$agent_id = (int) ( $runtime_context['agent_id'] ?? 0 );
+		$user_id    = (int) ( $runtime_context['user_id'] ?? 0 );
+		$agent_id   = (int) ( $runtime_context['agent_id'] ?? 0 );
+		$agent_slug = ! empty( $runtime_context['agent_slug'] )
+			? (string) $runtime_context['agent_slug']
+			: ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
 
 		$store_metadata = array(
 			'source'       => 'pipeline_transcript',
@@ -73,7 +76,7 @@ class DataMachinePipelineTranscriptPersister implements WP_Agent_Transcript_Pers
 			$store_metadata['request_metadata'] = $result['request_metadata'];
 		}
 
-		$session_id = $store->create_session( $workspace, $user_id, $agent_id, $store_metadata, 'pipeline' );
+		$session_id = $store->create_session( $workspace, $user_id, $agent_slug, $store_metadata, 'pipeline' );
 
 		if ( '' === $session_id ) {
 			do_action(

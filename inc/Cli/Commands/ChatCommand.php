@@ -287,7 +287,8 @@ class ChatCommand extends BaseCommand {
 		);
 
 		$chat_db    = ConversationStoreFactory::get();
-		$session_id = $chat_db->create_session( WordPressWorkspaceScope::current(), $user_id, $agent_id, $metadata, $context );
+		$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
+		$session_id = $chat_db->create_session( WordPressWorkspaceScope::current(), $user_id, $agent_slug, $metadata, $context );
 
 		if ( empty( $session_id ) ) {
 			WP_CLI::error( 'Failed to create chat session.' );

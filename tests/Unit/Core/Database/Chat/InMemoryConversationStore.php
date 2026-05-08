@@ -39,11 +39,16 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 	}
 
 	public function create_session( ...$args ): string {
-		list( $workspace, $user_id, $agent_id, $metadata, $context ) = $this->normalize_create_session_args( $args );
+		list( $workspace, $user_id, $agent, $metadata, $context ) = $this->normalize_create_session_args( $args );
+		$agent_id   = is_int( $agent ) ? $agent : 0;
+		$agent_slug = is_string( $agent ) ? sanitize_title( $agent ) : '';
 
 		$session_id = 'mem-' . bin2hex( random_bytes( 6 ) );
 		$now        = gmdate( 'Y-m-d H:i:s' );
 		$metadata   = array_merge( $metadata, $workspace->to_array() );
+		if ( '' !== $agent_slug ) {
+			$metadata['agent_slug'] = $agent_slug;
+		}
 
 		$this->sessions[ $session_id ] = array(
 			'session_id'     => $session_id,
@@ -51,6 +56,7 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 			'workspace_id'   => $workspace->workspace_id,
 			'user_id'        => $user_id,
 			'agent_id'       => $agent_id > 0 ? $agent_id : null,
+			'agent_slug'     => '' !== $agent_slug ? $agent_slug : null,
 			'title'          => null,
 			'messages'       => array(),
 			'metadata'       => $metadata,
@@ -68,14 +74,14 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 
 	/**
 	 * @param array $args Raw create-session arguments.
-	 * @return array{0:WP_Agent_Workspace_Scope,1:int,2:int,3:array,4:string}
+	 * @return array{0:WP_Agent_Workspace_Scope,1:int,2:int|string,3:array,4:string}
 	 */
 	private function normalize_create_session_args( array $args ): array {
 		if ( isset( $args[0] ) && $args[0] instanceof WP_Agent_Workspace_Scope ) {
 			return array(
 				$args[0],
 				(int) ( $args[1] ?? 0 ),
-				(int) ( $args[2] ?? 0 ),
+				is_string( $args[2] ?? null ) ? (string) $args[2] : (int) ( $args[2] ?? 0 ),
 				is_array( $args[3] ?? null ) ? $args[3] : array(),
 				(string) ( $args[4] ?? 'chat' ),
 			);
@@ -84,7 +90,7 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		return array(
 			WP_Agent_Workspace_Scope::from_parts( 'site', '1' ),
 			(int) ( $args[0] ?? 0 ),
-			(int) ( $args[1] ?? 0 ),
+			is_string( $args[1] ?? null ) ? (string) $args[1] : (int) ( $args[1] ?? 0 ),
 			is_array( $args[2] ?? null ) ? $args[2] : array(),
 			(string) ( $args[3] ?? 'chat' ),
 		);
@@ -115,7 +121,16 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 	}
 
 	public function get_session( string $session_id ): ?array {
-		return $this->sessions[ $session_id ] ?? null;
+		$session = $this->sessions[ $session_id ] ?? null;
+		if ( null === $session ) {
+			return null;
+		}
+
+		if ( ! array_key_exists( 'agent_slug', $session ) ) {
+			$session['agent_slug'] = null;
+		}
+
+		return $session;
 	}
 
 	public function update_session( string $session_id, array $messages, array $metadata = array(), string $provider = '', string $model = '', ?string $provider_response_id = null ): bool {
@@ -206,7 +221,7 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 				'message_count' => count( $messages ),
 				'unread_count'  => $this->count_unread( $messages, $session['last_read_at'] ),
 				'agent_id'      => $session['agent_id'],
-				'agent_slug'    => null,
+				'agent_slug'    => $session['agent_slug'] ?? null,
 				'agent_name'    => null,
 				'created_at'    => $session['created_at'],
 				'updated_at'    => $session['updated_at'],
