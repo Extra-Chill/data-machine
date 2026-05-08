@@ -193,14 +193,14 @@ datamachine_tests_require_agents_api();
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use DataMachine\Abilities\PermissionHelper;
-use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
-use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
-use AgentsAPI\Core\FilesRepository\AgentMemoryQuery;
-use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
-use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
-use AgentsAPI\Core\FilesRepository\AgentMemoryStoreCapabilities;
-use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
-use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_List_Entry;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Metadata;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Query;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Read_Result;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Scope;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store_Capabilities;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\AI\Memory\MemorySectionArtifact;
@@ -209,47 +209,47 @@ use DataMachine\Engine\AI\Memory\SelfMemoryWritePolicy;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 
-class MemoryPolicyFakeStore implements AgentMemoryStoreInterface {
+class MemoryPolicyFakeStore implements WP_Agent_Memory_Store {
 
 	/** @var array<string, string> */
 	public array $files = array();
 
-	public function capabilities(): AgentMemoryStoreCapabilities {
-		return AgentMemoryStoreCapabilities::none();
+	public function capabilities(): WP_Agent_Memory_Store_Capabilities {
+		return WP_Agent_Memory_Store_Capabilities::none();
 	}
 
-	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
+	public function read( WP_Agent_Memory_Scope $scope, array $metadata_fields = WP_Agent_Memory_Metadata::FIELDS ): WP_Agent_Memory_Read_Result {
 		unset( $metadata_fields );
 		if ( ! array_key_exists( $scope->key(), $this->files ) ) {
-			return AgentMemoryReadResult::not_found();
+			return WP_Agent_Memory_Read_Result::not_found();
 		}
 
 		$content = $this->files[ $scope->key() ];
-		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123 );
+		return new WP_Agent_Memory_Read_Result( true, $content, sha1( $content ), strlen( $content ), 123 );
 	}
 
-	public function write( AgentMemoryScope $scope, string $content, ?string $_if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
+	public function write( WP_Agent_Memory_Scope $scope, string $content, ?string $_if_match = null, ?WP_Agent_Memory_Metadata $metadata = null ): WP_Agent_Memory_Write_Result {
 		unset( $_if_match, $metadata );
 		$this->files[ $scope->key() ] = $content;
-		return AgentMemoryWriteResult::ok( sha1( $content ), strlen( $content ) );
+		return WP_Agent_Memory_Write_Result::ok( sha1( $content ), strlen( $content ) );
 	}
 
-	public function exists( AgentMemoryScope $scope ): bool {
+	public function exists( WP_Agent_Memory_Scope $scope ): bool {
 		return array_key_exists( $scope->key(), $this->files );
 	}
 
-	public function delete( AgentMemoryScope $scope ): AgentMemoryWriteResult {
+	public function delete( WP_Agent_Memory_Scope $scope ): WP_Agent_Memory_Write_Result {
 		unset( $this->files[ $scope->key() ] );
-		return AgentMemoryWriteResult::ok( '', 0 );
+		return WP_Agent_Memory_Write_Result::ok( '', 0 );
 	}
 
-	public function list_layer( AgentMemoryScope $_scope_query, ?AgentMemoryQuery $query = null ): array {
+	public function list_layer( WP_Agent_Memory_Scope $_scope_query, ?WP_Agent_Memory_Query $query = null ): array {
 		unset( $query );
 		unset( $_scope_query );
 		return array();
 	}
 
-	public function list_subtree( AgentMemoryScope $_scope_query, string $_prefix, ?AgentMemoryQuery $query = null ): array {
+	public function list_subtree( WP_Agent_Memory_Scope $_scope_query, string $_prefix, ?WP_Agent_Memory_Query $query = null ): array {
 		unset( $query );
 		unset( $_scope_query, $_prefix );
 		return array();
@@ -269,7 +269,7 @@ function memory_policy_assert( bool $condition, string $message ): void {
 $store = new MemoryPolicyFakeStore();
 add_filter(
 	'agents_api_memory_store',
-	static function ( $_default, AgentMemoryScope $_scope ) use ( $store ) {
+	static function ( $_default, WP_Agent_Memory_Scope $_scope ) use ( $store ) {
 		unset( $_default, $_scope );
 		return $store;
 	},

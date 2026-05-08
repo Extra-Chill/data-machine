@@ -58,8 +58,8 @@ function current_action(): string {
 	return '';
 }
 
-function get_option( string $key, $default = false ) {
-	return $default;
+function get_option( string $key, $default_value = false ) {
+	return $default_value;
 }
 
 class WP_Abilities_Registry {
@@ -74,7 +74,7 @@ class WP_Abilities_Registry {
 
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
-require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy-interface.php';
+require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy.php';
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';

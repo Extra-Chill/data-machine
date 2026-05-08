@@ -135,9 +135,30 @@ class FlowFormatter {
 			return null;
 		}
 
+		if ( ! self::is_action_scheduler_datastore_ready() ) {
+			return null;
+		}
+
 		$next_timestamp = as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
 
 		return $next_timestamp ? wp_date( 'Y-m-d H:i:s', $next_timestamp, new \DateTimeZone( 'UTC' ) ) : null;
+	}
+
+	/**
+	 * Check whether Action Scheduler's datastore is ready for procedural API reads.
+	 *
+	 * @return bool True when Action Scheduler can safely query scheduled actions.
+	 */
+	private static function is_action_scheduler_datastore_ready(): bool {
+		if ( function_exists( 'did_action' ) && 0 === did_action( 'action_scheduler_init' ) ) {
+			return false;
+		}
+
+		if ( ! class_exists( '\ActionScheduler' ) || ! method_exists( '\ActionScheduler', 'is_initialized' ) ) {
+			return true;
+		}
+
+		return \ActionScheduler::is_initialized();
 	}
 
 	/**

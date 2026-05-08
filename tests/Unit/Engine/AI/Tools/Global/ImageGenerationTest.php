@@ -27,6 +27,7 @@ class ImageGenerationTest extends WP_UnitTestCase {
 
 		$this->tool = new ImageGeneration();
 		WpAiClientTestDouble::reset();
+		WpAiClientTestDouble::set_response_callback( fn(): array => array( 'success' => true ) );
 	}
 
 	public function tear_down(): void {

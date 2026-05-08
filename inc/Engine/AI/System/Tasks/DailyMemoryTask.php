@@ -27,9 +27,9 @@ use DataMachine\Core\PluginSettings;
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Engine\AI\RequestBuilder;
-use AgentsAPI\AI\AgentConversationCompaction;
-use AgentsAPI\AI\AgentMarkdownSectionCompactionAdapter;
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Conversation_Compaction;
+use AgentsAPI\AI\WP_Agent_Markdown_Section_Compaction_Adapter;
+use AgentsAPI\AI\WP_Agent_Message;
 
 class DailyMemoryTask extends SystemTask {
 
@@ -486,10 +486,10 @@ class DailyMemoryTask extends SystemTask {
 	 * @return array{persistent: string, archived: string, persistent_blocks: int, archived_blocks: int}
 	 */
 	private static function planMemoryOverflowArchive( string $content, int $target_size, string $date ): array {
-		$items         = AgentMarkdownSectionCompactionAdapter::parse( $content );
+		$items         = WP_Agent_Markdown_Section_Compaction_Adapter::parse( $content );
 		$section_count = 0;
 		foreach ( $items as $item ) {
-			if ( AgentMarkdownSectionCompactionAdapter::TYPE_SECTION === ( $item['type'] ?? '' ) ) {
+			if ( WP_Agent_Markdown_Section_Compaction_Adapter::TYPE_SECTION === ( $item['type'] ?? '' ) ) {
 				++$section_count;
 			}
 		}
@@ -511,7 +511,7 @@ class DailyMemoryTask extends SystemTask {
 		// Daily Memory overflow needs tail-section archival, so project sections in
 		// reverse order and restore markdown order after Agents API chooses the cut.
 		foreach ( array_reverse( $items ) as $item ) {
-			$messages[] = AgentMessageEnvelope::text(
+			$messages[] = WP_Agent_Message::text(
 				'system',
 				(string) ( $item['content'] ?? '' ),
 				array(
@@ -520,7 +520,7 @@ class DailyMemoryTask extends SystemTask {
 			);
 		}
 
-		$result = AgentConversationCompaction::compact(
+		$result = WP_Agent_Conversation_Compaction::compact(
 			$messages,
 			array(
 				'overflow_archive_enabled'   => true,
@@ -536,7 +536,7 @@ class DailyMemoryTask extends SystemTask {
 		);
 
 		$status = (string) ( $result['metadata']['compaction']['status'] ?? '' );
-		if ( AgentConversationCompaction::STATUS_ARCHIVED !== $status || empty( $result['archive_items'] ) ) {
+		if ( WP_Agent_Conversation_Compaction::STATUS_ARCHIVED !== $status || empty( $result['archive_items'] ) ) {
 			return array(
 				'persistent'        => $content,
 				'archived'          => '',
@@ -549,8 +549,8 @@ class DailyMemoryTask extends SystemTask {
 		$persistent_items = self::markdownItemsFromCompactionMessages( $result['messages'] );
 
 		return array(
-			'persistent'        => rtrim( AgentMarkdownSectionCompactionAdapter::reconstruct( $persistent_items ) . $pointer ) . "\n",
-			'archived'          => AgentMarkdownSectionCompactionAdapter::reconstruct( $archived_items ),
+			'persistent'        => rtrim( WP_Agent_Markdown_Section_Compaction_Adapter::reconstruct( $persistent_items ) . $pointer ) . "\n",
+			'archived'          => WP_Agent_Markdown_Section_Compaction_Adapter::reconstruct( $archived_items ),
 			'persistent_blocks' => count( $persistent_items ),
 			'archived_blocks'   => count( $archived_items ),
 		);

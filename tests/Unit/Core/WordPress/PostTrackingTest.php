@@ -12,7 +12,6 @@ namespace DataMachine\Tests\Unit\Core\WordPress;
 
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
-use DataMachine\Core\Database\Jobs\JobsOperations;
 use DataMachine\Core\WordPress\PostTracking;
 use WP_UnitTestCase;
 
@@ -195,8 +194,7 @@ class PostTrackingTest extends WP_UnitTestCase {
 
 	private function create_job( int $flow_id, int $pipeline_id ): int {
 		$jobs_db = new Jobs();
-		$ops     = new JobsOperations( $jobs_db );
-		$job_id  = $ops->create_job(
+		$job_id  = $jobs_db->create_job(
 			array(
 				'flow_id'     => $flow_id,
 				'pipeline_id' => $pipeline_id,

@@ -120,54 +120,13 @@ class RetryJobAbility {
 
 		do_action( 'datamachine_job_complete', $job_id, 'failed' );
 
-		// Check for queued_prompt_backup and requeue if found. The
-		// `slot` field on the backup tells us which queue it came from
-		// (prompt_queue for AI, config_patch_queue for Fetch). Pre-#1292
-		// backups have no `slot` field; treat them as prompt_queue for
-		// backward compat — those jobs predate the split.
+		// Restore drain-mode queued_prompt_backup if the prior run removed an entry.
 		$prompt_requeued = false;
 		$job_flow_id     = (int) ( $job['flow_id'] ?? 0 );
 		$backup          = $engine_data['queued_prompt_backup'] ?? array();
 
-		if ( ! empty( $backup ) && isset( $backup['flow_step_id'] ) ) {
-			$slot = $backup['slot'] ?? \DataMachine\Abilities\Flow\QueueAbility::SLOT_PROMPT_QUEUE;
-
-			$flow = $this->db_flows->get_flow( $job_flow_id );
-
-			if ( $flow && isset( $flow['flow_config'] ) ) {
-				$flow_config = $flow['flow_config'];
-				$step_id     = $backup['flow_step_id'];
-
-				if ( isset( $flow_config[ $step_id ] ) ) {
-					$entry = null;
-
-					if ( \DataMachine\Abilities\Flow\QueueAbility::SLOT_CONFIG_PATCH_QUEUE === $slot && isset( $backup['patch'] ) && is_array( $backup['patch'] ) ) {
-						$entry = array(
-							'patch'    => $backup['patch'],
-							'added_at' => gmdate( 'c' ),
-						);
-					} elseif ( isset( $backup['prompt'] ) ) {
-						$entry = array(
-							'prompt'   => $backup['prompt'],
-							'added_at' => gmdate( 'c' ),
-						);
-						$slot  = \DataMachine\Abilities\Flow\QueueAbility::SLOT_PROMPT_QUEUE;
-					}
-
-					if ( null !== $entry ) {
-						if ( ! isset( $flow_config[ $step_id ][ $slot ] ) || ! is_array( $flow_config[ $step_id ][ $slot ] ) ) {
-							$flow_config[ $step_id ][ $slot ] = array();
-						}
-						$flow_config[ $step_id ][ $slot ][] = $entry;
-
-						$update_result = $this->db_flows->update_flow( $job_flow_id, array( 'flow_config' => $flow_config ) );
-
-						if ( $update_result ) {
-							$prompt_requeued = true;
-						}
-					}
-				}
-			}
+		if ( ! empty( $backup ) && $job_flow_id > 0 ) {
+			$prompt_requeued = $this->restoreQueuedPromptBackup( $job_flow_id, $backup );
 		}
 
 		do_action(

@@ -52,14 +52,17 @@ namespace DataMachine\Tests\Unit\Support {
 	class WpAiClientTestDouble {
 		/** @var callable|null */
 		private static $callback = null;
+		private static bool $filters_registered = false;
 
 		public static function reset(): void {
+			self::unregister_filters();
 			self::$callback = null;
 			$GLOBALS['datamachine_test_wp_ai_client_provider_ids'] = array( 'openai', 'fake_provider', 'gemini' );
 		}
 
 		public static function set_response_callback( callable $callback ): void {
 			self::$callback = $callback;
+			self::register_filters();
 		}
 
 		public static function dispatch( array $request, string $provider ): array {
@@ -77,6 +80,84 @@ namespace DataMachine\Tests\Unit\Support {
 					'tool_calls' => array(),
 				),
 			);
+		}
+
+		public static function availability_filter( $availability, string $provider ) {
+			if ( self::has_provider( $provider ) ) {
+				return true;
+			}
+
+			return $availability;
+		}
+
+		public static function text_result_filter( $result, array $request, string $provider, string $model = '' ) {
+			if ( ! self::has_provider( $provider ) ) {
+				return $result;
+			}
+
+			$response = self::dispatch( $request + array( 'provider' => $provider, 'model' => $model ), $provider );
+			if ( empty( $response['success'] ) ) {
+				return new \WP_Error( 'test_text_generation_failed', $response['error'] ?? 'Text generation failed' );
+			}
+
+			return $response;
+		}
+
+		public static function image_file_filter( $result, array $request ) {
+			$provider = (string) ( $request['provider'] ?? '' );
+			if ( ! self::has_provider( $provider ) ) {
+				return $result;
+			}
+
+			$response = self::dispatch( $request + array( 'capability' => 'image_generation' ), $provider );
+			if ( array_key_exists( 'supported', $response ) && ! $response['supported'] ) {
+				return new \WP_Error(
+					'wp_ai_client_image_unsupported',
+					sprintf(
+						'wp-ai-client model "%s" does not support image generation for provider "%s"',
+						(string) ( $request['model'] ?? '' ),
+						$provider
+					)
+				);
+			}
+
+			if ( empty( $response['success'] ) ) {
+				return new \WP_Error( 'test_image_generation_failed', $response['error'] ?? 'Image generation failed' );
+			}
+
+			$file = (string) ( $response['data']['image_url'] ?? $response['data']['image_data_uri'] ?? '' );
+			if ( '' === $file ) {
+				return new \WP_Error( 'test_image_generation_empty', 'No image returned' );
+			}
+
+			return new \WordPress\AiClient\Files\DTO\File( $file, $response['data']['mime_type'] ?? 'image/png' );
+		}
+
+		private static function register_filters(): void {
+			if ( self::$filters_registered || ! function_exists( 'add_filter' ) ) {
+				return;
+			}
+
+			add_filter( 'datamachine_wp_ai_client_availability', array( self::class, 'availability_filter' ), 10, 2 );
+			add_filter( 'datamachine_wp_ai_client_text_result', array( self::class, 'text_result_filter' ), 10, 4 );
+			add_filter( 'datamachine_wp_ai_client_image_file', array( self::class, 'image_file_filter' ), 10, 2 );
+			self::$filters_registered = true;
+		}
+
+		private static function unregister_filters(): void {
+			if ( ! self::$filters_registered || ! function_exists( 'remove_filter' ) ) {
+				return;
+			}
+
+			remove_filter( 'datamachine_wp_ai_client_availability', array( self::class, 'availability_filter' ), 10 );
+			remove_filter( 'datamachine_wp_ai_client_text_result', array( self::class, 'text_result_filter' ), 10 );
+			remove_filter( 'datamachine_wp_ai_client_image_file', array( self::class, 'image_file_filter' ), 10 );
+			self::$filters_registered = false;
+		}
+
+		private static function has_provider( string $provider ): bool {
+			$ids = $GLOBALS['datamachine_test_wp_ai_client_provider_ids'] ?? array();
+			return is_array( $ids ) && in_array( $provider, $ids, true );
 		}
 	}
 

@@ -519,11 +519,11 @@ add_filter('datamachine_tool_enabled', function($enabled, $tool_id, $agent_type)
 
 ### Parameter Building
 
-`ToolParameters` (`/inc/Engine/AI/Tools/ToolParameters.php`) provides unified parameter construction:
+`WP_Agent_Tool_Parameters` (`/inc/Engine/AI/Tools/ToolParameters.php`) provides unified parameter construction:
 
 **Standard Tools** (global tools):
 ```php
-$parameters = \DataMachine\Engine\AI\ToolParameters::buildParameters(
+$parameters = \DataMachine\Engine\AI\WP_Agent_Tool_Parameters::buildParameters(
     $data,
     $job_id,
     $flow_step_id
@@ -533,7 +533,7 @@ $parameters = \DataMachine\Engine\AI\ToolParameters::buildParameters(
 
 **Handler Tools** (publish/upsert handlers):
 ```php
-$parameters = \DataMachine\Engine\AI\ToolParameters::buildForHandlerTool(
+$parameters = \DataMachine\Engine\AI\WP_Agent_Tool_Parameters::buildForHandlerTool(
     $data,
     $tool_def,
     $job_id,
@@ -658,7 +658,7 @@ AI agents receive available tools based on:
 - Handler tool and global tool integration
 - Tool configuration validation
 
-**ToolParameters** (`/inc/Engine/AI/Tools/ToolParameters.php`):
+**WP_Agent_Tool_Parameters** (`/inc/Engine/AI/Tools/ToolParameters.php`):
 - Centralized parameter building for all AI tools
 - `buildParameters()` for standard AI tools with clean data extraction
 - `buildForHandlerTool()` for handler tools with engine parameters (source_url, image_url)

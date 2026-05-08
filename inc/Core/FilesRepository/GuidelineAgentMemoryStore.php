@@ -2,7 +2,7 @@
 /**
  * Guideline Agent Memory Store
  *
- * Optional {@see AgentMemoryStoreInterface} implementation that persists
+ * Optional {@see WP_Agent_Memory_Store} implementation that persists
  * agent memory records as `wp_guideline` posts tagged with
  * `wp_guideline_type=memory`.
  *
@@ -22,18 +22,18 @@
 
 namespace DataMachine\Core\FilesRepository;
 
-use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
-use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
-use AgentsAPI\Core\FilesRepository\AgentMemoryQuery;
-use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
-use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
-use AgentsAPI\Core\FilesRepository\AgentMemoryStoreCapabilities;
-use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
-use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_List_Entry;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Metadata;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Query;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Read_Result;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Scope;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store_Capabilities;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
 
 defined( 'ABSPATH' ) || exit;
 
-class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
+class GuidelineAgentMemoryStore implements WP_Agent_Memory_Store {
 
 	const POST_TYPE   = 'wp_guideline';
 	const TAXONOMY    = 'wp_guideline_type';
@@ -75,31 +75,31 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * sha1 is sufficient here: this is a stable key inside the `wp_guideline`
 	 * CPT, not a security primitive.
 	 *
-	 * @param AgentMemoryScope $scope Scope to encode.
+	 * @param WP_Agent_Memory_Scope $scope Scope to encode.
 	 * @return string
 	 */
-	public static function post_name_for_scope( AgentMemoryScope $scope ): string {
+	public static function post_name_for_scope( WP_Agent_Memory_Scope $scope ): string {
 		return 'memory-' . sha1( $scope->key() );
 	}
 
 	/**
 	 * @inheritDoc
 	 */
-	public function capabilities(): AgentMemoryStoreCapabilities {
-		return AgentMemoryStoreCapabilities::all();
+	public function capabilities(): WP_Agent_Memory_Store_Capabilities {
+		return WP_Agent_Memory_Store_Capabilities::all();
 	}
 
 	/**
 	 * @inheritDoc
 	 */
-	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
+	public function read( WP_Agent_Memory_Scope $scope, array $metadata_fields = WP_Agent_Memory_Metadata::FIELDS ): WP_Agent_Memory_Read_Result {
 		$post = $this->find_post( $scope );
 		if ( ! $post instanceof \WP_Post ) {
-			return AgentMemoryReadResult::not_found();
+			return WP_Agent_Memory_Read_Result::not_found();
 		}
 
 		if ( ! $this->can_read_post( $post ) ) {
-			return AgentMemoryReadResult::not_found();
+			return WP_Agent_Memory_Read_Result::not_found();
 		}
 
 		$content = (string) $post->post_content;
@@ -113,15 +113,15 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 
 		$updated = strtotime( (string) $post->post_modified_gmt );
 		$updated = false === $updated ? null : (int) $updated;
-		return new AgentMemoryReadResult( true, $content, $hash, $bytes, $updated, $this->metadata_for_post( $post, $metadata_fields ) );
+		return new WP_Agent_Memory_Read_Result( true, $content, $hash, $bytes, $updated, $this->metadata_for_post( $post, $metadata_fields ) );
 	}
 
 	/**
 	 * @inheritDoc
 	 */
-	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
+	public function write( WP_Agent_Memory_Scope $scope, string $content, ?string $if_match = null, ?WP_Agent_Memory_Metadata $metadata = null ): WP_Agent_Memory_Write_Result {
 		if ( ! self::is_available() ) {
-			return AgentMemoryWriteResult::failure( 'capability' );
+			return WP_Agent_Memory_Write_Result::failure( 'capability' );
 		}
 
 		$existing = $this->find_post( $scope );
@@ -133,22 +133,22 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 			}
 
 			if ( $stored !== $if_match ) {
-				return AgentMemoryWriteResult::failure( 'conflict' );
+				return WP_Agent_Memory_Write_Result::failure( 'conflict' );
 			}
 		}
 
 		if ( $existing instanceof \WP_Post && ! $this->can_write_post( $existing ) ) {
-			return AgentMemoryWriteResult::failure( 'capability' );
+			return WP_Agent_Memory_Write_Result::failure( 'capability' );
 		}
 
 		if ( ! $existing instanceof \WP_Post && ! $this->can_create_scope( $scope ) ) {
-			return AgentMemoryWriteResult::failure( 'capability' );
+			return WP_Agent_Memory_Write_Result::failure( 'capability' );
 		}
 
 		$hash               = sha1( $content );
 		$bytes              = strlen( $content );
 		$author             = $scope->user_id > 0 ? $scope->user_id : 0;
-		$metadata           = ( $metadata ?? new AgentMemoryMetadata() )->with_defaults();
+		$metadata           = ( $metadata ?? new WP_Agent_Memory_Metadata() )->with_defaults();
 		$guideline_metadata = $this->guideline_metadata_for_scope( $scope );
 
 		if ( $existing instanceof \WP_Post ) {
@@ -163,7 +163,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 			);
 
 			if ( is_wp_error( $updated ) ) {
-				return AgentMemoryWriteResult::failure( 'io' );
+				return WP_Agent_Memory_Write_Result::failure( 'io' );
 			}
 
 			update_post_meta( $existing->ID, self::META_HASH, $hash );
@@ -177,7 +177,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 
 			$this->emit_guideline_updated_event( $existing->ID );
 
-			return AgentMemoryWriteResult::ok( $hash, $bytes, $metadata );
+			return WP_Agent_Memory_Write_Result::ok( $hash, $bytes, $metadata );
 		}
 
 		$meta_input = array_merge(
@@ -211,13 +211,13 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		);
 
 		if ( is_wp_error( $post_id ) || 0 === $post_id ) {
-			return AgentMemoryWriteResult::failure( 'io' );
+			return WP_Agent_Memory_Write_Result::failure( 'io' );
 		}
 
 		wp_set_object_terms( $post_id, array( self::TERM_MEMORY ), self::TAXONOMY, false );
 		$this->emit_guideline_updated_event( (int) $post_id );
 
-		return AgentMemoryWriteResult::ok( $hash, $bytes, $metadata );
+		return WP_Agent_Memory_Write_Result::ok( $hash, $bytes, $metadata );
 	}
 
 	/**
@@ -234,7 +234,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * @inheritDoc
 	 */
-	public function exists( AgentMemoryScope $scope ): bool {
+	public function exists( WP_Agent_Memory_Scope $scope ): bool {
 		$post = $this->find_post( $scope );
 		return $post instanceof \WP_Post && $this->can_read_post( $post );
 	}
@@ -242,28 +242,28 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * @inheritDoc
 	 */
-	public function delete( AgentMemoryScope $scope ): AgentMemoryWriteResult {
+	public function delete( WP_Agent_Memory_Scope $scope ): WP_Agent_Memory_Write_Result {
 		$post = $this->find_post( $scope );
 		if ( ! $post instanceof \WP_Post ) {
-			return AgentMemoryWriteResult::ok( '', 0 );
+			return WP_Agent_Memory_Write_Result::ok( '', 0 );
 		}
 
 		if ( ! $this->can_write_post( $post ) ) {
-			return AgentMemoryWriteResult::failure( 'capability' );
+			return WP_Agent_Memory_Write_Result::failure( 'capability' );
 		}
 
 		$deleted = wp_delete_post( $post->ID, true );
 		if ( ! $deleted ) {
-			return AgentMemoryWriteResult::failure( 'io' );
+			return WP_Agent_Memory_Write_Result::failure( 'io' );
 		}
 
-		return AgentMemoryWriteResult::ok( '', 0 );
+		return WP_Agent_Memory_Write_Result::ok( '', 0 );
 	}
 
 	/**
 	 * @inheritDoc
 	 */
-	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
+	public function list_layer( WP_Agent_Memory_Scope $scope_query, ?WP_Agent_Memory_Query $query = null ): array {
 		$posts   = $this->query_scope_posts( $scope_query, null );
 		$entries = array();
 
@@ -277,7 +277,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 				continue;
 			}
 
-			$entry = $this->entry_for( $post, $filename, $scope_query->layer, $query?->metadata_fields ?? AgentMemoryMetadata::FIELDS );
+			$entry = $this->entry_for( $post, $filename, $scope_query->layer, $query?->metadata_fields ?? WP_Agent_Memory_Metadata::FIELDS );
 			if ( $this->entry_matches_query( $entry, $query ) ) {
 				$entries[] = $entry;
 			}
@@ -294,7 +294,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * @inheritDoc
 	 */
-	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
+	public function list_subtree( WP_Agent_Memory_Scope $scope_query, string $prefix, ?WP_Agent_Memory_Query $query = null ): array {
 		$prefix = trim( $prefix, '/' );
 		if ( '' === $prefix ) {
 			return array();
@@ -313,7 +313,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 				continue;
 			}
 
-			$entry = $this->entry_for( $post, $filename, $scope_query->layer, $query?->metadata_fields ?? AgentMemoryMetadata::FIELDS );
+			$entry = $this->entry_for( $post, $filename, $scope_query->layer, $query?->metadata_fields ?? WP_Agent_Memory_Metadata::FIELDS );
 			if ( $this->entry_matches_query( $entry, $query ) ) {
 				$entries[] = $entry;
 			}
@@ -330,10 +330,10 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * Locate the post matching a full memory scope.
 	 *
-	 * @param AgentMemoryScope $scope Scope to locate.
+	 * @param WP_Agent_Memory_Scope $scope Scope to locate.
 	 * @return \WP_Post|null
 	 */
-	private function find_post( AgentMemoryScope $scope ): ?\WP_Post {
+	private function find_post( WP_Agent_Memory_Scope $scope ): ?\WP_Post {
 		if ( ! self::is_available() ) {
 			return null;
 		}
@@ -357,11 +357,11 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * Query memory posts for a layer/user/agent triple, optionally scoped to a subtree.
 	 *
-	 * @param AgentMemoryScope $scope_query Scope query. Filename is ignored.
+	 * @param WP_Agent_Memory_Scope $scope_query Scope query. Filename is ignored.
 	 * @param string|null      $prefix      Optional subtree prefix.
 	 * @return \WP_Post[]
 	 */
-	private function query_scope_posts( AgentMemoryScope $scope_query, ?string $prefix ): array {
+	private function query_scope_posts( WP_Agent_Memory_Scope $scope_query, ?string $prefix ): array {
 		if ( ! self::is_available() ) {
 			return array();
 		}
@@ -437,28 +437,28 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	 * @param \WP_Post $post     Memory post.
 	 * @param string   $filename Scope filename.
 	 * @param string   $layer    Scope layer.
-	 * @return AgentMemoryListEntry
+	 * @return WP_Agent_Memory_List_Entry
 	 */
-	private function entry_for( \WP_Post $post, string $filename, string $layer, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryListEntry {
+	private function entry_for( \WP_Post $post, string $filename, string $layer, array $metadata_fields = WP_Agent_Memory_Metadata::FIELDS ): WP_Agent_Memory_List_Entry {
 		$bytes_meta = get_post_meta( $post->ID, self::META_BYTES, true );
 		$bytes      = is_numeric( $bytes_meta ) ? (int) $bytes_meta : strlen( (string) $post->post_content );
 
 		$updated = strtotime( (string) $post->post_modified_gmt );
 		$updated = false === $updated ? null : (int) $updated;
 
-		return new AgentMemoryListEntry( $filename, $layer, $bytes, $updated, $this->metadata_for_post( $post, $metadata_fields ) );
+		return new WP_Agent_Memory_List_Entry( $filename, $layer, $bytes, $updated, $this->metadata_for_post( $post, $metadata_fields ) );
 	}
 
-	private function metadata_for_post( \WP_Post $post, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryMetadata {
+	private function metadata_for_post( \WP_Post $post, array $metadata_fields = WP_Agent_Memory_Metadata::FIELDS ): WP_Agent_Memory_Metadata {
 		$raw = get_post_meta( $post->ID, self::META_METADATA, true );
 		if ( ! is_array( $raw ) ) {
 			$raw = array();
 		}
 
-		return AgentMemoryMetadata::from_array( $raw )->with_defaults()->only_fields( $metadata_fields );
+		return WP_Agent_Memory_Metadata::from_array( $raw )->with_defaults()->only_fields( $metadata_fields );
 	}
 
-	private function entry_matches_query( AgentMemoryListEntry $entry, ?AgentMemoryQuery $query ): bool {
+	private function entry_matches_query( WP_Agent_Memory_List_Entry $entry, ?WP_Agent_Memory_Query $query ): bool {
 		if ( null === $query || null === $entry->metadata ) {
 			return true;
 		}
@@ -480,10 +480,10 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	}
 
 	/**
-	 * @param AgentMemoryListEntry[] $entries Entries to sort.
-	 * @return AgentMemoryListEntry[]
+	 * @param WP_Agent_Memory_List_Entry[] $entries Entries to sort.
+	 * @return WP_Agent_Memory_List_Entry[]
 	 */
-	private function sort_entries( array $entries, ?AgentMemoryQuery $query ): array {
+	private function sort_entries( array $entries, ?WP_Agent_Memory_Query $query ): array {
 		if ( null === $query || null === $query->order_by ) {
 			return $entries;
 		}
@@ -492,7 +492,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		$order    = 'asc' === strtolower( $query->order ) ? 'asc' : 'desc';
 		usort(
 			$entries,
-			static function ( AgentMemoryListEntry $left, AgentMemoryListEntry $right ) use ( $order_by, $order ): int {
+			static function ( WP_Agent_Memory_List_Entry $left, WP_Agent_Memory_List_Entry $right ) use ( $order_by, $order ): int {
 				$left_value  = self::entry_sort_value( $left, $order_by );
 				$right_value = self::entry_sort_value( $right, $order_by );
 				$delta       = $left_value <=> $right_value;
@@ -503,7 +503,7 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 		return $entries;
 	}
 
-	private static function entry_sort_value( AgentMemoryListEntry $entry, string $field ) {
+	private static function entry_sort_value( WP_Agent_Memory_List_Entry $entry, string $field ) {
 		if ( 'updated_at' === $field ) {
 			return $entry->updated_at ?? 0;
 		}
@@ -523,10 +523,10 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * Build the shared wp_guideline metadata required by Agents API.
 	 *
-	 * @param AgentMemoryScope $scope Memory scope.
+	 * @param WP_Agent_Memory_Scope $scope Memory scope.
 	 * @return array<string, string|int>
 	 */
-	private function guideline_metadata_for_scope( AgentMemoryScope $scope ): array {
+	private function guideline_metadata_for_scope( WP_Agent_Memory_Scope $scope ): array {
 		return array(
 			self::GUIDELINE_META_SCOPE        => $this->guideline_scope_for_layer( $scope->layer ),
 			self::GUIDELINE_META_USER_ID      => $scope->user_id,
@@ -587,10 +587,10 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * Check whether the current context may create memory for a scope.
 	 *
-	 * @param AgentMemoryScope $scope Target scope.
+	 * @param WP_Agent_Memory_Scope $scope Target scope.
 	 * @return bool Whether create is allowed.
 	 */
-	private function can_create_scope( AgentMemoryScope $scope ): bool {
+	private function can_create_scope( WP_Agent_Memory_Scope $scope ): bool {
 		if ( $this->should_bypass_capability_checks() ) {
 			return true;
 		}
@@ -626,10 +626,10 @@ class GuidelineAgentMemoryStore implements AgentMemoryStoreInterface {
 	/**
 	 * Check if the current user owns a private memory scope.
 	 *
-	 * @param AgentMemoryScope $scope Memory scope.
+	 * @param WP_Agent_Memory_Scope $scope Memory scope.
 	 * @return bool Whether the current user owns the scope.
 	 */
-	private function current_user_owns_scope( AgentMemoryScope $scope ): bool {
+	private function current_user_owns_scope( WP_Agent_Memory_Scope $scope ): bool {
 		return function_exists( 'get_current_user_id' ) && $scope->user_id > 0 && get_current_user_id() === $scope->user_id;
 	}
 }

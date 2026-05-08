@@ -2,14 +2,14 @@
 
 Generic primitive for bounded iteration with a configurable ceiling. Counts a named dimension (conversation turns, A2A chain depth, retry attempts) and exposes a uniform API for checking exceedance, formatting warnings, and surfacing response flags.
 
-**Source**: `inc/Engine/AI/IterationBudget.php`, `inc/Engine/AI/IterationBudgetRegistry.php`
+**Source**: `inc/Engine/AI/WP_Agent_Iteration_Budget.php`, `inc/Engine/AI/IterationBudgetRegistry.php`
 **Since**: v0.71.0
 
 ## Why a primitive
 
 Before this primitive, every bounded loop in the codebase invented its own counter and its own "did we hit the limit" check — turn limits in the conversation loop, retry caps in async tasks, chain-depth limits in cross-site A2A. The result was inconsistent thresholds, copy-pasted clamping logic, and four different ways to surface "you ran out of budget" to the AI.
 
-`IterationBudget` is one value object covering all of them. Site config registers a named budget with a default, a site-setting override key, and clamp bounds; runtime code instantiates the budget for the current run and uses the same five methods on every consumer.
+`WP_Agent_Iteration_Budget` is one value object covering all of them. Site config registers a named budget with a default, a site-setting override key, and clamp bounds; runtime code instantiates the budget for the current run and uses the same five methods on every consumer.
 
 ## Two-stage lifecycle
 
@@ -56,7 +56,7 @@ while ( ! $budget->exceeded() ) {
 }
 ```
 
-`create()` reads the registered config, applies the ceiling-resolution chain, and returns a fresh `IterationBudget` value object.
+`create()` reads the registered config, applies the ceiling-resolution chain, and returns a fresh `WP_Agent_Iteration_Budget` value object.
 
 ## Ceiling resolution
 
@@ -70,7 +70,7 @@ Then clamped to `[config['min'], config['max']]`. The clamp is non-negotiable �
 
 ## API surface
 
-`IterationBudget` exposes:
+`WP_Agent_Iteration_Budget` exposes:
 
 | Method | Purpose |
 |--------|---------|
@@ -140,7 +140,7 @@ When exceeded, the request is refused with HTTP 429 and the error code `datamach
 
 Budgets don't share inheritance — they share *shape*. Different consumers count different things and integrate at different layers (an HTTP middleware, an AI loop, a retry helper). A trait or abstract class would force them to agree on lifecycle methods they don't actually share.
 
-`IterationBudget` is a single value-object class with a registry. Every consumer constructs its own, calls the same five methods, and emits the same response-flag convention. That is the contract. Inheritance would add nothing.
+`WP_Agent_Iteration_Budget` is a single value-object class with a registry. Every consumer constructs its own, calls the same five methods, and emits the same response-flag convention. That is the contract. Inheritance would add nothing.
 
 ## Related
 

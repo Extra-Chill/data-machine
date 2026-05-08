@@ -7,8 +7,8 @@
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
-use AgentsAPI\AI\AgentConversationResult;
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Conversation_Result;
+use AgentsAPI\AI\WP_Agent_Message;
 
 function datamachine_agent_conversation_result_assert( bool $condition, string $message ): void {
 	if ( ! $condition ) {
@@ -38,9 +38,9 @@ $valid_result = array(
 	'usage'                  => array( 'total_tokens' => 10 ),
 );
 
-$normalized = AgentConversationResult::normalize( $valid_result );
+$normalized = WP_Agent_Conversation_Result::normalize( $valid_result );
 datamachine_agent_conversation_result_assert(
-	AgentMessageEnvelope::TYPE_TEXT === $normalized['messages'][0]['type'],
+	WP_Agent_Message::TYPE_TEXT === $normalized['messages'][0]['type'],
 	'Valid built-in-shaped result should normalize messages to canonical envelopes.'
 );
 ++$assertions;
@@ -54,7 +54,7 @@ $generic_tool_result = $valid_result;
 unset( $generic_tool_result['tool_execution_results'][0]['is_handler_tool'] );
 $generic_tool_result['tool_execution_results'][0]['tool_name'] = 'search_knowledge_base';
 $generic_tool_result['tool_execution_results'][0]['result']    = array( 'success' => true, 'items' => array() );
-$normalized_generic_tool_result = AgentConversationResult::normalize( $generic_tool_result );
+$normalized_generic_tool_result = WP_Agent_Conversation_Result::normalize( $generic_tool_result );
 datamachine_agent_conversation_result_assert(
 	! array_key_exists( 'is_handler_tool', $normalized_generic_tool_result['tool_execution_results'][0] ),
 	'Generic tool execution result should not require Data Machine handler metadata.'
@@ -65,7 +65,7 @@ $malformed_handler_metadata = $valid_result;
 $malformed_handler_metadata['tool_execution_results'][0]['is_handler_tool'] = 'yes';
 
 try {
-	AgentConversationResult::normalize( $malformed_handler_metadata );
+	WP_Agent_Conversation_Result::normalize( $malformed_handler_metadata );
 	throw new RuntimeException( 'Malformed handler metadata should throw.' );
 } catch ( InvalidArgumentException $e ) {
 	datamachine_agent_conversation_result_assert(
@@ -77,7 +77,7 @@ try {
 
 $without_tool_results = $valid_result;
 unset( $without_tool_results['tool_execution_results'] );
-$normalized_without_tools = AgentConversationResult::normalize( $without_tool_results );
+$normalized_without_tools = WP_Agent_Conversation_Result::normalize( $without_tool_results );
 datamachine_agent_conversation_result_assert(
 	array_key_exists( 'tool_execution_results', $normalized_without_tools ),
 	'Missing tool_execution_results should normalize to an explicit empty list.'
@@ -93,7 +93,7 @@ $malformed_tool_result = $valid_result;
 unset( $malformed_tool_result['tool_execution_results'][0]['parameters'] );
 
 try {
-	AgentConversationResult::normalize( $malformed_tool_result );
+	WP_Agent_Conversation_Result::normalize( $malformed_tool_result );
 	throw new RuntimeException( 'Malformed tool result should throw.' );
 } catch ( InvalidArgumentException $e ) {
 	datamachine_agent_conversation_result_assert(
@@ -107,7 +107,7 @@ $missing_messages = $valid_result;
 unset( $missing_messages['messages'] );
 
 try {
-	AgentConversationResult::normalize( $missing_messages );
+	WP_Agent_Conversation_Result::normalize( $missing_messages );
 	throw new RuntimeException( 'Missing messages should throw.' );
 } catch ( InvalidArgumentException $e ) {
 	datamachine_agent_conversation_result_assert(
@@ -121,7 +121,7 @@ $malformed_message = $valid_result;
 $malformed_message['messages'][0] = 'not a message array';
 
 try {
-	AgentConversationResult::normalize( $malformed_message );
+	WP_Agent_Conversation_Result::normalize( $malformed_message );
 	throw new RuntimeException( 'Malformed message should throw.' );
 } catch ( InvalidArgumentException $e ) {
 	datamachine_agent_conversation_result_assert(
@@ -133,7 +133,7 @@ try {
 
 // Verify that malformed tool results produce a machine-readable validation error.
 try {
-	AgentConversationResult::normalize( $malformed_tool_result );
+	WP_Agent_Conversation_Result::normalize( $malformed_tool_result );
 	throw new RuntimeException( 'Malformed tool result should throw.' );
 } catch ( InvalidArgumentException $e ) {
 	datamachine_agent_conversation_result_assert(
@@ -144,7 +144,7 @@ try {
 }
 
 // Verify that valid results normalize without error.
-$runner_valid_result = AgentConversationResult::normalize( $valid_result );
+$runner_valid_result = WP_Agent_Conversation_Result::normalize( $valid_result );
 
 datamachine_agent_conversation_result_assert(
 	! isset( $runner_valid_result['error'] ),

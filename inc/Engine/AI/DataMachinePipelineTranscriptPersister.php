@@ -7,8 +7,8 @@
 
 namespace DataMachine\Engine\AI;
 
-use AgentsAPI\AI\AgentConversationRequest;
-use AgentsAPI\AI\AgentConversationTranscriptPersisterInterface;
+use AgentsAPI\AI\WP_Agent_Conversation_Request;
+use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 
@@ -17,12 +17,12 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Persists opted-in pipeline transcripts through Data Machine's transcript store.
  */
-class DataMachinePipelineTranscriptPersister implements AgentConversationTranscriptPersisterInterface {
+class DataMachinePipelineTranscriptPersister implements WP_Agent_Transcript_Persister {
 
 	/**
 	 * @inheritDoc
 	 */
-	public function persist( array $messages, AgentConversationRequest $request, array $result ): string {
+	public function persist( array $messages, WP_Agent_Conversation_Request $request, array $result ): string {
 		$runtime_context = $request->runtimeContext();
 		$metadata        = $request->metadata();
 		$provider        = (string) ( $metadata['provider'] ?? '' );
@@ -103,6 +103,11 @@ class DataMachinePipelineTranscriptPersister implements AgentConversationTranscr
 			// Best-effort cleanup so we don't leave an empty pipeline-mode row behind.
 			$store->delete_session( $session_id );
 			return '';
+		}
+
+		$job_id = (int) ( $runtime_context['job_id'] ?? 0 );
+		if ( $job_id > 0 ) {
+			datamachine_merge_engine_data( $job_id, array( 'transcript_session_id' => $session_id ) );
 		}
 
 		do_action(

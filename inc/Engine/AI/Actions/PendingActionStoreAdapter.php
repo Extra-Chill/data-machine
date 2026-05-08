@@ -7,9 +7,9 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
-use AgentsAPI\AI\Approvals\ApprovalDecision;
-use AgentsAPI\AI\Approvals\PendingAction;
-use AgentsAPI\AI\Approvals\PendingActionStoreInterface;
+use AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Store;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -17,15 +17,15 @@ defined( 'ABSPATH' ) || exit;
  * Implements the generic Agents API store contract without changing the
  * existing static Data Machine PendingActionStore facade.
  */
-final class PendingActionStoreAdapter implements PendingActionStoreInterface {
+final class PendingActionStoreAdapter implements WP_Agent_Pending_Action_Store {
 
 	/**
 	 * Persist a pending action payload.
 	 *
-	 * @param PendingAction $action Durable pending action record.
+	 * @param WP_Agent_Pending_Action $action Durable pending action record.
 	 * @return bool
 	 */
-	public function store( PendingAction $action ): bool {
+	public function store( WP_Agent_Pending_Action $action ): bool {
 		return PendingActionStore::store_action( $action );
 	}
 
@@ -34,9 +34,9 @@ final class PendingActionStoreAdapter implements PendingActionStoreInterface {
 	 *
 	 * @param string $action_id        Durable action identifier.
 	 * @param bool   $include_resolved Whether terminal audit rows may be returned.
-	 * @return PendingAction|null
+	 * @return WP_Agent_Pending_Action|null
 	 */
-	public function get( string $action_id, bool $include_resolved = false ): ?PendingAction {
+	public function get( string $action_id, bool $include_resolved = false ): ?WP_Agent_Pending_Action {
 		return PendingActionStore::get_action( $action_id, $include_resolved );
 	}
 
@@ -44,7 +44,7 @@ final class PendingActionStoreAdapter implements PendingActionStoreInterface {
 	 * List durable pending action records.
 	 *
 	 * @param array<string,mixed> $filters Query filters.
-	 * @return array<int,PendingAction>
+	 * @return array<int,WP_Agent_Pending_Action>
 	 */
 	public function list( array $filters = array() ): array {
 		return PendingActionStore::list_actions( $filters );
@@ -64,14 +64,14 @@ final class PendingActionStoreAdapter implements PendingActionStoreInterface {
 	 * Record a durable terminal resolution.
 	 *
 	 * @param string              $action_id Durable action identifier.
-	 * @param ApprovalDecision    $decision  Resolution decision.
+	 * @param WP_Agent_Approval_Decision    $decision  Resolution decision.
 	 * @param string              $resolver  Resolver audit identifier.
 	 * @param mixed|null          $result    Resolution result.
 	 * @param string|null         $error     Resolution error.
 	 * @param array<string,mixed> $metadata  Resolution metadata.
 	 * @return bool
 	 */
-	public function record_resolution( string $action_id, ApprovalDecision $decision, string $resolver, $result = null, ?string $error = null, array $metadata = array() ): bool {
+	public function record_resolution( string $action_id, WP_Agent_Approval_Decision $decision, string $resolver, $result = null, ?string $error = null, array $metadata = array() ): bool {
 		return PendingActionStore::record_action_resolution( $action_id, $decision, $resolver, $result, $error, $metadata );
 	}
 

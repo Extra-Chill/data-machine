@@ -20,13 +20,13 @@ require_once __DIR__ . '/agents-api-smoke-helpers.php';
 agents_api_smoke_require_module();
 
 $namespace_map = array(
-	'DataMachine\\Engine\\AI\\AgentMessageEnvelope'                         => 'AgentsAPI\\AI\\AgentMessageEnvelope',
-	'DataMachine\\Engine\\AI\\AgentConversationResult'                      => 'AgentsAPI\\AI\\AgentConversationResult',
-	'DataMachine\\Engine\\AI\\Tools\\RuntimeToolDeclaration'                => 'AgentsAPI\\AI\\Tools\\RuntimeToolDeclaration',
-	'DataMachine\\Core\\Database\\Chat\\ConversationTranscriptStoreInterface' => 'AgentsAPI\\Core\\Database\\Chat\\ConversationTranscriptStoreInterface',
-	'DataMachine\\Core\\Database\\Chat\\ConversationTranscriptLockInterface' => 'AgentsAPI\\Core\\Database\\Chat\\ConversationTranscriptLockInterface',
-	'DataMachine\\Core\\FilesRepository\\AgentMemoryStoreInterface'           => 'AgentsAPI\\Core\\FilesRepository\\AgentMemoryStoreInterface',
-	'DataMachine\\Core\\FilesRepository\\AgentMemoryScope'                    => 'AgentsAPI\\Core\\FilesRepository\\AgentMemoryScope',
+	'DataMachine\\Engine\\AI\\WP_Agent_Message'                         => 'AgentsAPI\\AI\\WP_Agent_Message',
+	'DataMachine\\Engine\\AI\\WP_Agent_Conversation_Result'                      => 'AgentsAPI\\AI\\WP_Agent_Conversation_Result',
+	'DataMachine\\Engine\\AI\\Tools\\WP_Agent_Tool_Declaration'                => 'AgentsAPI\\AI\\Tools\\WP_Agent_Tool_Declaration',
+	'DataMachine\\Core\\Database\\Chat\\WP_Agent_Conversation_Store' => 'AgentsAPI\\Core\\Database\\Chat\\WP_Agent_Conversation_Store',
+	'DataMachine\\Core\\Database\\Chat\\WP_Agent_Conversation_Lock' => 'AgentsAPI\\Core\\Database\\Chat\\WP_Agent_Conversation_Lock',
+	'DataMachine\\Core\\FilesRepository\\WP_Agent_Memory_Store'           => 'AgentsAPI\\Core\\FilesRepository\\WP_Agent_Memory_Store',
+	'DataMachine\\Core\\FilesRepository\\WP_Agent_Memory_Scope'                    => 'AgentsAPI\\Core\\FilesRepository\\WP_Agent_Memory_Scope',
 );
 
 echo "\n[1] Module bootstrap exposes registration facade without Data Machine product code:\n";

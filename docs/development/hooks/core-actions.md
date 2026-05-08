@@ -200,6 +200,45 @@ do_action('datamachine_import', 'pipelines', $csv_data);
 do_action('datamachine_export', 'pipelines', [$pipeline_id]);
 ```
 
+### `datamachine_bundle_install_succeeded`
+
+**Purpose**: Notify consumers that an agent bundle install/upgrade succeeded and the transaction has committed. The full extras payload is included so consumers do not need to re-read the bundle from disk.
+
+**Fires**:
+- After `commit_transaction()` succeeds, just before `AgentBundler::import()` returns success.
+- For both fresh installs and upgrades; the `is_upgrade` flag distinguishes.
+- **Never** on dry-run.
+- **Never** on failure.
+
+**Parameters**:
+- `$agent_id` (int) - Newly installed/upgraded agent ID.
+- `$slug` (string) - Agent slug.
+- `$bundle_metadata` (array) - `bundle_slug`, `bundle_version`, `source_ref`, `source_revision`.
+- `$extras` (array) - Validated extras payload, keyed by top-level directory name. Each value is a map of `<key>/path` => string contents.
+- `$context` (array) - `is_upgrade` (bool), `summary` (array).
+
+**Listener contract**:
+- Listeners are fire-and-forget; their failures do not roll back the install.
+- PHP exceptions thrown by listeners are caught, logged, and suppressed.
+- Data Machine does NOT auto-extract extras to disk. Consumers handle persistence.
+
+**Usage**:
+```php
+add_action(
+    'datamachine_bundle_install_succeeded',
+    function ( int $agent_id, string $slug, array $bundle_metadata, array $extras, array $context ): void {
+        if ( empty( $extras['wiki'] ) ) {
+            return;
+        }
+        my_plugin_import_wiki_files( $agent_id, $extras['wiki'], $context['is_upgrade'] );
+    },
+    10,
+    5
+);
+```
+
+See [Agent Bundles → Extras](../../core-system/agent-bundles.md#reserved-trees-and-extras) for the full contract and the paired `datamachine_bundle_export_extras` filter.
+
 ## Logging Action
 
 ### `datamachine_log`

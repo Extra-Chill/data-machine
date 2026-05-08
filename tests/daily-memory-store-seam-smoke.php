@@ -4,7 +4,7 @@
  *
  * Verifies that the default DailyMemory implementation addresses daily
  * entries as agent-layer files under daily/YYYY/MM/DD.md through the active
- * AgentMemoryStoreInterface. The older datamachine_daily_memory_storage seam
+ * WP_Agent_Memory_Store. The older datamachine_daily_memory_storage seam
  * is ability-level only and is intentionally not needed for this default path.
  */
 
@@ -54,101 +54,109 @@ require_once __DIR__ . '/../inc/Engine/AI/MemoryFileRegistry.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DirectoryManager.php';
 require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
+require_once __DIR__ . '/../inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DiskAgentMemoryStore.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryStoreFactory.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemory.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DailyMemoryStorage.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DailyMemory.php';
 
-use AgentsAPI\Core\FilesRepository\AgentMemoryListEntry;
-use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
-use AgentsAPI\Core\FilesRepository\AgentMemoryQuery;
-use AgentsAPI\Core\FilesRepository\AgentMemoryReadResult;
-use AgentsAPI\Core\FilesRepository\AgentMemoryScope;
-use AgentsAPI\Core\FilesRepository\AgentMemoryStoreCapabilities;
-use AgentsAPI\Core\FilesRepository\AgentMemoryStoreInterface;
-use AgentsAPI\Core\FilesRepository\AgentMemoryWriteResult;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_List_Entry;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Metadata;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Query;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Read_Result;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Scope;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store_Capabilities;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
-class DailyMemorySeamFakeStore implements AgentMemoryStoreInterface {
+class DailyMemorySeamFakeStore implements WP_Agent_Memory_Store {
 	/** @var array<string, string> */
 	public array $files = array();
 
 	/** @var string[] */
 	public array $operations = array();
 
-	/** @var AgentMemoryScope[] */
+	/** @var array<string, WP_Agent_Memory_Scope> */
+	public array $file_scopes = array();
+
+	/** @var WP_Agent_Memory_Scope[] */
 	public array $scopes = array();
 
 	/** @var string[] */
 	public array $list_prefixes = array();
 
-	public function capabilities(): AgentMemoryStoreCapabilities {
-		return AgentMemoryStoreCapabilities::none();
+	public function capabilities(): WP_Agent_Memory_Store_Capabilities {
+		return WP_Agent_Memory_Store_Capabilities::none();
 	}
 
-	public function read( AgentMemoryScope $scope, array $metadata_fields = AgentMemoryMetadata::FIELDS ): AgentMemoryReadResult {
+	public function read( WP_Agent_Memory_Scope $scope, array $metadata_fields = WP_Agent_Memory_Metadata::FIELDS ): WP_Agent_Memory_Read_Result {
 		unset( $metadata_fields );
 		$this->record( 'read', $scope );
 
 		if ( ! array_key_exists( $scope->key(), $this->files ) ) {
-			return AgentMemoryReadResult::not_found();
+			return WP_Agent_Memory_Read_Result::not_found();
 		}
 
 		$content = $this->files[ $scope->key() ];
-		return new AgentMemoryReadResult( true, $content, sha1( $content ), strlen( $content ), 123 );
+		return new WP_Agent_Memory_Read_Result( true, $content, sha1( $content ), strlen( $content ), 123 );
 	}
 
-	public function write( AgentMemoryScope $scope, string $content, ?string $if_match = null, ?AgentMemoryMetadata $metadata = null ): AgentMemoryWriteResult {
+	public function write( WP_Agent_Memory_Scope $scope, string $content, ?string $if_match = null, ?WP_Agent_Memory_Metadata $metadata = null ): WP_Agent_Memory_Write_Result {
 		unset( $metadata );
 		$this->record( 'write', $scope );
 		$this->files[ $scope->key() ] = $content;
+		$this->file_scopes[ $scope->key() ] = $scope;
 
-		return AgentMemoryWriteResult::ok( sha1( $content ), strlen( $content ) );
+		return WP_Agent_Memory_Write_Result::ok( sha1( $content ), strlen( $content ) );
 	}
 
-	public function exists( AgentMemoryScope $scope ): bool {
+	public function exists( WP_Agent_Memory_Scope $scope ): bool {
 		$this->record( 'exists', $scope );
 		return array_key_exists( $scope->key(), $this->files );
 	}
 
-	public function delete( AgentMemoryScope $scope ): AgentMemoryWriteResult {
+	public function delete( WP_Agent_Memory_Scope $scope ): WP_Agent_Memory_Write_Result {
 		$this->record( 'delete', $scope );
 		unset( $this->files[ $scope->key() ] );
+		unset( $this->file_scopes[ $scope->key() ] );
 
-		return AgentMemoryWriteResult::ok( '', 0 );
+		return WP_Agent_Memory_Write_Result::ok( '', 0 );
 	}
 
-	public function list_layer( AgentMemoryScope $scope_query, ?AgentMemoryQuery $query = null ): array {
+	public function list_layer( WP_Agent_Memory_Scope $scope_query, ?WP_Agent_Memory_Query $query = null ): array {
 		unset( $query );
 		$this->record( 'list_layer', $scope_query );
 		return array();
 	}
 
-	public function list_subtree( AgentMemoryScope $scope_query, string $prefix, ?AgentMemoryQuery $query = null ): array {
+	public function list_subtree( WP_Agent_Memory_Scope $scope_query, string $prefix, ?WP_Agent_Memory_Query $query = null ): array {
 		unset( $query );
 		$this->record( 'list_subtree', $scope_query );
 		$this->list_prefixes[] = $prefix;
 
 		$entries = array();
 		foreach ( $this->files as $key => $content ) {
-			[ $layer, $workspace_type, $workspace_id, $user_id, $agent_id, $filename ] = explode( ':', $key, 6 );
-			unset( $workspace_type, $workspace_id );
-			if ( $layer !== $scope_query->layer || (int) $user_id !== $scope_query->user_id || (int) $agent_id !== $scope_query->agent_id ) {
+			$scope = $this->file_scopes[ $key ] ?? null;
+			if ( ! $scope instanceof WP_Agent_Memory_Scope ) {
 				continue;
 			}
-			if ( 0 !== strpos( $filename, $prefix . '/' ) ) {
+			if ( $scope->layer !== $scope_query->layer || $scope->user_id !== $scope_query->user_id || $scope->agent_id !== $scope_query->agent_id ) {
+				continue;
+			}
+			if ( 0 !== strpos( $scope->filename, $prefix . '/' ) ) {
 				continue;
 			}
 
-			$entries[] = new AgentMemoryListEntry( $filename, $layer, strlen( $content ), 123 );
+			$entries[] = new WP_Agent_Memory_List_Entry( $scope->filename, $scope->layer, strlen( $content ), 123 );
 		}
 
 		return $entries;
 	}
 
-	private function record( string $operation, AgentMemoryScope $scope ): void {
+	private function record( string $operation, WP_Agent_Memory_Scope $scope ): void {
 		$this->operations[] = $operation;
 		$this->scopes[]     = $scope;
 	}
@@ -169,7 +177,8 @@ function datamachine_daily_memory_store_seam_assert( bool $condition, string $me
 $store = new DailyMemorySeamFakeStore();
 add_filter(
 	'agents_api_memory_store',
-	function ( $default, AgentMemoryScope $scope ) use ( $store ) {
+	function ( $default, WP_Agent_Memory_Scope $scope ) use ( $store ) {
+		unset( $default, $scope );
 		return $store;
 	},
 	10,
@@ -192,7 +201,7 @@ datamachine_daily_memory_store_seam_assert( true === $list['success'], 'list_all
 datamachine_daily_memory_store_seam_assert( array( '28', '29' ) === $list['months']['2026/04'], 'list_all groups daily store filenames by month' );
 
 $filenames = array_map(
-	static fn( AgentMemoryScope $scope ): string => $scope->filename,
+	static fn( WP_Agent_Memory_Scope $scope ): string => $scope->filename,
 	$store->scopes
 );
 

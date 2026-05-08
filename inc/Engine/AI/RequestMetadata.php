@@ -146,8 +146,8 @@ class RequestMetadata {
 		);
 	}
 
-	private static function threshold( string $filter, int $default ): int {
-		$value = (int) apply_filters( $filter, $default );
+	private static function threshold( string $filter, int $default_value ): int {
+		$value = (int) apply_filters( $filter, $default_value );
 		return max( 0, $value );
 	}
 

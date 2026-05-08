@@ -47,8 +47,8 @@ function current_action(): string {
 	return '';
 }
 
-function get_option( string $key, $default = false ) {
-	return $default;
+function get_option( string $key, $default_value = false ) {
+	return $default_value;
 }
 
 require_once __DIR__ . '/../inc/Core/DataPacket.php';
@@ -57,7 +57,7 @@ require_once __DIR__ . '/../inc/Core/Steps/Step.php';
 require_once __DIR__ . '/../inc/Core/Steps/StepTypeRegistrationTrait.php';
 require_once __DIR__ . '/../inc/Core/Steps/QueueableTrait.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
-require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy-interface.php';
+require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy.php';
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy.php';
 require_once __DIR__ . '/../inc/Engine/AI/ConversationManager.php';

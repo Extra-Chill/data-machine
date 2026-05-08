@@ -20,8 +20,8 @@ class JobCompleteHandler {
 	 * @param string $status Job completion status.
 	 */
 	public static function handle( $job_id, $status ) {
-		$jobs_ops = new \DataMachine\Core\Database\Jobs\JobsOperations();
-		$jobs_ops->update_flow_health_cache( $job_id, $status );
+		$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+		$jobs_db->update_flow_health_cache( $job_id, $status );
 
 		// Revert one-time flows to manual after execution.
 		// The Action Scheduler single action auto-completes, but the scheduling_config

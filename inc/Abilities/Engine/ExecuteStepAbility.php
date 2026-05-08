@@ -590,12 +590,23 @@ class ExecuteStepAbility {
 		}
 
 		// Non-fetch steps: empty data packet is an actual failure.
-		$already_failed_status = $this->getAlreadyFailedJobStatus( $job_id );
-		if ( null !== $already_failed_status ) {
+		// Some steps (notably AIStep) call datamachine_fail_job with a precise
+		// reason and then return no packets. The defensive check here covers
+		// two shapes:
+		//   - The step's failure was finalized → status starts with `failed`.
+		//   - The step's failure was caught by JobRetryPolicy, which parked the
+		//     job back to `pending` and scheduled a retry via Action Scheduler.
+		// In both cases the per-step failure has already been routed; firing
+		// `datamachine_fail_job` again here would double-record the failure
+		// and (when the second reason is non-retryable) trigger
+		// `cleanup_job_data_packets` even though a retry is still pending,
+		// orphaning the next attempt with no input data.
+		$prior_status = $this->getPriorTerminalStatus( $job_id );
+		if ( null !== $prior_status ) {
 			do_action(
 				'datamachine_log',
 				'debug',
-				'Step returned no data after job was already marked failed',
+				'Step returned no data after job was already marked failed or rescheduled for retry',
 				array(
 					'job_id'       => $job_id,
 					'pipeline_id'  => $pipeline_id,
@@ -603,7 +614,7 @@ class ExecuteStepAbility {
 					'flow_step_id' => $flow_step_id,
 					'step_class'   => $step_class,
 					'step_type'    => $step_type,
-					'job_status'   => $already_failed_status,
+					'job_status'   => $prior_status,
 				)
 			);
 
@@ -611,7 +622,7 @@ class ExecuteStepAbility {
 				'success'      => true,
 				'step_success' => false,
 				'outcome'      => 'failed',
-				'error'        => $already_failed_status,
+				'error'        => $prior_status,
 			);
 		}
 
@@ -647,16 +658,22 @@ class ExecuteStepAbility {
 	}
 
 	/**
-	 * Return the persisted failure status when the step itself already failed the job.
+	 * Return a status marker when the step's prior failure is already routed.
 	 *
-	 * Some steps, notably AIStep, call datamachine_fail_job with a precise failure
-	 * reason and then return no packets. Do not reclassify that empty packet list as
-	 * a generic execution failure.
+	 * Some steps, notably AIStep, call datamachine_fail_job with a precise
+	 * failure reason and then return no packets. Do not reclassify that empty
+	 * packet list as a generic execution failure.
+	 *
+	 * Returns the persisted status string when:
+	 *   - The job is already in a `failed` status (terminal failure routed).
+	 *   - The job is in `pending` status with a future-dated retry recorded in
+	 *     engine_data['retry']['next_retry_at'] — i.e. JobRetryPolicy already
+	 *     accepted ownership of this failure and parked the job for retry.
 	 *
 	 * @param int $job_id Job ID.
-	 * @return string|null Persisted failed status, or null when the job has not already failed.
+	 * @return string|null Status marker, or null when no prior route exists.
 	 */
-	private function getAlreadyFailedJobStatus( int $job_id ): ?string {
+	private function getPriorTerminalStatus( int $job_id ): ?string {
 		if ( ! isset( $this->db_jobs ) ) {
 			return null;
 		}
@@ -671,7 +688,58 @@ class ExecuteStepAbility {
 			return null;
 		}
 
-		return JobStatus::isStatusFailure( $status ) ? $status : null;
+		if ( JobStatus::isStatusFailure( $status ) ) {
+			return $status;
+		}
+
+		if ( JobStatus::PENDING === JobStatus::fromString( $status )->getBaseStatus() && ( $this->hasPendingRetry( $job_id ) || $this->hasPendingAIConcurrencyThrottle( $job_id ) ) ) {
+			return $status;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Check whether the job has a future-dated retry recorded in engine_data.
+	 *
+	 * `JobRetryPolicy::recordRetry` writes `engine_data['retry']['next_retry_at']`
+	 * as an ISO 8601 timestamp when scheduling a retry. Treat any non-empty value
+	 * here as authoritative — the scheduler may not have fired yet, but the policy
+	 * has already taken ownership of the failure path.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return bool
+	 */
+	private function hasPendingRetry( int $job_id ): bool {
+		if ( ! function_exists( 'datamachine_get_engine_data' ) ) {
+			return false;
+		}
+
+		$engine_data = datamachine_get_engine_data( $job_id );
+		$retry       = is_array( $engine_data['retry'] ?? null ) ? $engine_data['retry'] : array();
+
+		return ! empty( $retry['next_retry_at'] );
+	}
+
+	/**
+	 * Check whether the job has a future AI concurrency defer recorded.
+	 *
+	 * AIStep parks above-limit work back to pending and reschedules the same
+	 * step. Treat that as an already-routed outcome, not as an empty-packet
+	 * failure, so throttling remains distinct from provider/model errors.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return bool
+	 */
+	private function hasPendingAIConcurrencyThrottle( int $job_id ): bool {
+		if ( ! function_exists( 'datamachine_get_engine_data' ) ) {
+			return false;
+		}
+
+		$engine_data = datamachine_get_engine_data( $job_id );
+		$throttle    = is_array( $engine_data['ai_concurrency_throttle'] ?? null ) ? $engine_data['ai_concurrency_throttle'] : array();
+
+		return ! empty( $throttle['next_retry_at'] );
 	}
 
 	/**

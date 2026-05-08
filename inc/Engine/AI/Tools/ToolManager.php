@@ -640,9 +640,9 @@ class ToolManager {
 	 * @param callable $callable Callable to inspect.
 	 * @return bool True for ($tools, $handler_slug, ...) callbacks.
 	 */
-	private function uses_filter_convention( $callable ): bool {
+	private function uses_filter_convention( $callable_fn ): bool {
 		try {
-			$ref = $this->reflect_callable( $callable );
+			$ref = $this->reflect_callable( $callable_fn );
 			if ( null === $ref ) {
 				return false;
 			}
@@ -670,13 +670,13 @@ class ToolManager {
 	 * @return \ReflectionFunctionAbstract|null Reflection object, or null when unsupported.
 	 * @throws \ReflectionException When reflection fails.
 	 */
-	private function reflect_callable( $callable ): ?\ReflectionFunctionAbstract {
-		if ( is_array( $callable ) ) {
-			return new \ReflectionMethod( $callable[0], $callable[1] );
+	private function reflect_callable( $callable_fn ): ?\ReflectionFunctionAbstract {
+		if ( is_array( $callable_fn ) ) {
+			return new \ReflectionMethod( $callable_fn[0], $callable_fn[1] );
 		}
 
-		if ( $callable instanceof \Closure || is_string( $callable ) ) {
-			return new \ReflectionFunction( $callable );
+		if ( $callable_fn instanceof \Closure || is_string( $callable_fn ) ) {
+			return new \ReflectionFunction( $callable_fn );
 		}
 
 		return null;

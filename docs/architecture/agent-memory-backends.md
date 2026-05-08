@@ -6,7 +6,7 @@ This lets self-hosted installs keep the current disk-backed workflow while manag
 
 ## Logical Identity
 
-Every memory file is addressed by an `AgentMemoryScope` four-tuple:
+Every memory file is addressed by an `WP_Agent_Memory_Scope` four-tuple:
 
 ```text
 (layer, user_id, agent_id, filename)
@@ -43,7 +43,7 @@ AgentMemoryStoreFactory
         |
         +--> DiskAgentMemoryStore (default)
         |
-        +--> alternate AgentMemoryStoreInterface implementation
+        +--> alternate WP_Agent_Memory_Store implementation
 ```
 
 `MemoryFileRegistry` is the source of truth for which core memory files exist, where they live logically, and which modes receive them. Registration metadata includes the layer, priority, editability, `modes`, whether a file is composable, and optional `convention_path` disk projection metadata.
@@ -68,11 +68,11 @@ Data Machine resolves memory persistence through one current Agents API-shaped f
 apply_filters(
     'agents_api_memory_store',
     null,
-    AgentMemoryScope $scope
+    WP_Agent_Memory_Scope $scope
 );
 ```
 
-Return an `AgentMemoryStoreInterface` implementation to replace the disk default for the given scope. Return `null` to keep `DiskAgentMemoryStore`.
+Return an `WP_Agent_Memory_Store` implementation to replace the disk default for the given scope. Return `null` to keep `DiskAgentMemoryStore`.
 
 `agents_api_memory_store` replaces the earlier `datamachine_memory_store` name in-place. Data Machine intentionally does not call both filters; consumers should migrate to the Agents API-shaped hook rather than relying on a permanent alias.
 
@@ -92,7 +92,7 @@ DMC should be treated as a projection provider, not the memory model:
 
 | Concern | Owner |
 |---|---|
-| Logical memory identity and access | Data Machine (`AgentMemoryScope`, `AgentMemory`) |
+| Logical memory identity and access | Data Machine (`WP_Agent_Memory_Scope`, `AgentMemory`) |
 | Registered memory files and mode-aware injection | Data Machine (`MemoryFileRegistry`, directives) |
 | Disk file projection for local coding agents | DMC + `DiskAgentMemoryStore` environment capability |
 | Managed-host alternate backend | Consumer plugin via `agents_api_memory_store` |
@@ -118,7 +118,7 @@ The memory-store seam is not a replacement for AI Framework. Data Machine still 
 ## Extension Rules
 
 - Read and write memory through `AgentMemory`, not `AgentMemoryStoreFactory` directly.
-- Implement `AgentMemoryStoreInterface` when replacing persistence.
+- Implement `WP_Agent_Memory_Store` when replacing persistence.
 - Preserve the four-tuple identity model exactly, even if the physical backend has different keys.
 - Keep section parsing, scaffolding, editability gating, ability permissions, prompt-injection policy, and registry semantics above the store layer.
 - Gate guideline-backed stores on real substrate availability; do not assume `wp_guideline` exists.
@@ -129,4 +129,4 @@ The memory-store seam is not a replacement for AI Framework. Data Machine still 
 - [WordPress as Persistent Memory for AI Agents](../core-system/wordpress-as-agent-memory.md)
 - [Memory Policy](../core-system/memory-policy.md)
 - [Daily Memory System](../core-system/daily-memory-system.md)
-- [Core Filters: AgentMemoryStoreInterface](../development/hooks/core-filters.md#agentmemorystoreinterface-inccorefilesrepositoryagentmemorystoreinterfacephp)
+- [Core Filters: WP_Agent_Memory_Store](../development/hooks/core-filters.md#agentmemorystoreinterface-inccorefilesrepositoryagentmemorystoreinterfacephp)

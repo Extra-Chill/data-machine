@@ -126,10 +126,10 @@ require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionResolverAdapter.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/ResolvePendingActionAbility.php';
 
-use AgentsAPI\AI\Approvals\ApprovalDecision;
-use AgentsAPI\AI\Approvals\PendingAction;
-use AgentsAPI\AI\Approvals\PendingActionHandlerInterface;
-use AgentsAPI\AI\Approvals\PendingActionResolverInterface;
+use AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Handler;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Resolver;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 
@@ -150,14 +150,14 @@ function resolver_smoke_assert( bool $condition, string $message, array &$failur
 echo "pending-action-resolver-contract-smoke\n";
 
 $adapter = ResolvePendingActionAbility::adapter();
-resolver_smoke_assert( $adapter instanceof PendingActionResolverInterface, 'resolver adapter implements Agents API resolver contract', $failures, $passes );
+resolver_smoke_assert( $adapter instanceof WP_Agent_Pending_Action_Resolver, 'resolver adapter implements Agents API resolver contract', $failures, $passes );
 
 $handler_calls   = array();
 $permission_seen = array();
-$handler         = new class( $handler_calls ) implements PendingActionHandlerInterface {
+$handler         = new class( $handler_calls ) implements WP_Agent_Pending_Action_Handler {
 	public function __construct( private array &$handler_calls ) {}
 
-	public function can_resolve_pending_action( PendingAction $action, ApprovalDecision $decision, array $payload = array(), array $context = array() ): bool {
+	public function can_resolve_pending_action( WP_Agent_Pending_Action $action, WP_Agent_Approval_Decision $decision, array $payload = array(), array $context = array() ): bool {
 		$this->handler_calls[] = array(
 			'permission_action_id' => $action->get_action_id(),
 			'permission_decision'  => $decision->value(),
@@ -168,7 +168,7 @@ $handler         = new class( $handler_calls ) implements PendingActionHandlerIn
 		return true;
 	}
 
-	public function handle_pending_action( PendingAction $action, ApprovalDecision $decision, array $payload = array(), array $context = array() ): mixed {
+	public function handle_pending_action( WP_Agent_Pending_Action $action, WP_Agent_Approval_Decision $decision, array $payload = array(), array $context = array() ): mixed {
 		$this->handler_calls[] = array(
 			'action_id' => $action->get_action_id(),
 			'decision' => $decision->value(),
@@ -219,7 +219,7 @@ PendingActionStore::store(
 
 $accepted = $adapter->resolve_pending_action(
 	'act_contract_accept',
-	ApprovalDecision::accepted(),
+	WP_Agent_Approval_Decision::accepted(),
 	'user:123',
 	array( 'reason' => 'looks-good' ),
 	array( 'actor' => 'reviewer' )
@@ -227,9 +227,9 @@ $accepted = $adapter->resolve_pending_action(
 
 resolver_smoke_assert( true === ( $accepted['success'] ?? false ), 'accepted contract resolution succeeds', $failures, $passes );
 resolver_smoke_assert( 'accepted' === ( $accepted['decision'] ?? null ), 'accepted response keeps Data Machine decision string', $failures, $passes );
-resolver_smoke_assert( 'accepted' === ( $handler_calls[0]['permission_decision'] ?? null ), 'contract handler permission receives ApprovalDecision object value', $failures, $passes );
-resolver_smoke_assert( 'act_contract_accept' === ( $handler_calls[1]['action_id'] ?? null ), 'contract handler receives PendingAction value object', $failures, $passes );
-resolver_smoke_assert( 'accepted' === ( $handler_calls[1]['decision'] ?? null ), 'contract handler receives ApprovalDecision object value', $failures, $passes );
+resolver_smoke_assert( 'accepted' === ( $handler_calls[0]['permission_decision'] ?? null ), 'contract handler permission receives WP_Agent_Approval_Decision object value', $failures, $passes );
+resolver_smoke_assert( 'act_contract_accept' === ( $handler_calls[1]['action_id'] ?? null ), 'contract handler receives WP_Agent_Pending_Action value object', $failures, $passes );
+resolver_smoke_assert( 'accepted' === ( $handler_calls[1]['decision'] ?? null ), 'contract handler receives WP_Agent_Approval_Decision object value', $failures, $passes );
 resolver_smoke_assert( 'looks-good' === ( $handler_calls[1]['payload']['reason'] ?? null ), 'contract handler receives resolver payload', $failures, $passes );
 resolver_smoke_assert( 'reviewer' === ( $handler_calls[1]['context']['actor'] ?? null ), 'contract handler receives resolver context', $failures, $passes );
 resolver_smoke_assert( empty( $permission_seen ), 'legacy can_resolve is not duplicated for Agents API handler objects', $failures, $passes );
@@ -273,15 +273,15 @@ resolver_smoke_assert( 'rejected' === ( $rejected['decision'] ?? null ), 'reject
 resolver_smoke_assert( 0 === $legacy_apply_calls, 'rejected resolution does not invoke apply handler', $failures, $passes );
 
 $denied_apply_calls = 0;
-$denying_handler    = new class( $denied_apply_calls ) implements PendingActionHandlerInterface {
+$denying_handler    = new class( $denied_apply_calls ) implements WP_Agent_Pending_Action_Handler {
 	public function __construct( private int &$denied_apply_calls ) {}
 
-	public function can_resolve_pending_action( PendingAction $action, ApprovalDecision $decision, array $payload = array(), array $context = array() ): bool {
+	public function can_resolve_pending_action( WP_Agent_Pending_Action $action, WP_Agent_Approval_Decision $decision, array $payload = array(), array $context = array() ): bool {
 		unset( $action, $decision, $payload, $context );
 		return false;
 	}
 
-	public function handle_pending_action( PendingAction $action, ApprovalDecision $decision, array $payload = array(), array $context = array() ): mixed {
+	public function handle_pending_action( WP_Agent_Pending_Action $action, WP_Agent_Approval_Decision $decision, array $payload = array(), array $context = array() ): mixed {
 		unset( $action, $decision, $payload, $context );
 		++$this->denied_apply_calls;
 		return array( 'success' => true );

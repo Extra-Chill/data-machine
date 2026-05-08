@@ -31,8 +31,8 @@ function add_action( string $hook, callable $callback, int $priority = 10, int $
 require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
 
-use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
-use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store;
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 
 $failures = array();
 $passes   = 0;
@@ -48,14 +48,14 @@ $assert_true = static function ( bool $condition, string $label ) use ( &$failur
 	echo "FAIL: {$label}\n";
 };
 
-class AgentsApiFakeTranscriptStore implements ConversationTranscriptStoreInterface {
+class AgentsApiFakeTranscriptStore implements WP_Agent_Conversation_Store {
 
 	/**
 	 * @var array<string, array<string, mixed>>
 	 */
 	private array $sessions = array();
 
-	public function create_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope $workspace, int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
+	public function create_session( \AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope $workspace, int $user_id, int $agent_id = 0, array $metadata = array(), string $context = 'chat' ): string {
 		$session_id = 'session-' . ( count( $this->sessions ) + 1 );
 
 		$this->sessions[ $session_id ] = array(
@@ -84,7 +84,8 @@ class AgentsApiFakeTranscriptStore implements ConversationTranscriptStoreInterfa
 		return $this->sessions[ $session_id ] ?? null;
 	}
 
-	public function update_session( string $session_id, array $messages, array $metadata = array(), string $provider = '', string $model = '' ): bool {
+	public function update_session( string $session_id, array $messages, array $metadata = array(), string $provider = '', string $model = '', ?string $provider_response_id = null ): bool {
+		unset( $provider_response_id );
 		if ( ! isset( $this->sessions[ $session_id ] ) ) {
 			return false;
 		}
@@ -103,7 +104,7 @@ class AgentsApiFakeTranscriptStore implements ConversationTranscriptStoreInterfa
 		return true;
 	}
 
-	public function get_recent_pending_session( \AgentsAPI\Core\Workspace\AgentWorkspaceScope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array {
+	public function get_recent_pending_session( \AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array {
 		unset( $workspace, $seconds, $token_id );
 
 		foreach ( array_reverse( $this->sessions ) as $session ) {
@@ -128,14 +129,14 @@ class AgentsApiFakeTranscriptStore implements ConversationTranscriptStoreInterfa
 echo "agents-api-transcript-store-smoke\n";
 
 $assert_true( defined( 'AGENTS_API_LOADED' ), 'agents-api bootstrap loads without Data Machine product runtime' );
-$assert_true( interface_exists( ConversationTranscriptStoreInterface::class ), 'transcript contract is loaded by agents-api bootstrap' );
+$assert_true( interface_exists( WP_Agent_Conversation_Store::class ), 'transcript contract is loaded by agents-api bootstrap' );
 $assert_true( false === class_exists( 'DataMachine\\Core\\Database\\Chat\\Chat', false ), 'Data Machine chat table implementation is not loaded' );
 $assert_true( false === interface_exists( 'DataMachine\\Core\\Database\\Chat\\ConversationStoreInterface', false ), 'Data Machine aggregate chat contract is not loaded' );
 
 $store = new AgentsApiFakeTranscriptStore();
-$assert_true( in_array( ConversationTranscriptStoreInterface::class, class_implements( $store ), true ), 'fake store can implement transcript contract without chat product interfaces' );
+$assert_true( in_array( WP_Agent_Conversation_Store::class, class_implements( $store ), true ), 'fake store can implement transcript contract without chat product interfaces' );
 
-$workspace  = AgentWorkspaceScope::from_parts( 'site', 'https://example.test' );
+$workspace  = WP_Agent_Workspace_Scope::from_parts( 'site', 'https://example.test' );
 $session_id = $store->create_session( $workspace, 7, 3, array( 'source' => 'smoke' ), 'pipeline' );
 $assert_true( 'session-1' === $session_id, 'fake store creates transcript session IDs' );
 $assert_true( null !== $store->get_recent_pending_session( $workspace, 7, 600, 'pipeline' ), 'fake store can query pending transcript sessions' );

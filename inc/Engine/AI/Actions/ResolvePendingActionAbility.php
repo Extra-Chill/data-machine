@@ -2,7 +2,7 @@
 /**
  * ResolvePendingActionAbility — accept or reject a pending tool invocation.
  *
- * When a tool runs under ActionPolicy::POLICY_PREVIEW, it stages an invocation
+ * When a tool runs under WP_Agent_Action_Policy::POLICY_PREVIEW, it stages an invocation
  * via PendingActionHelper::stage() instead of executing directly. This ability
  * is the generic resolver that replays (accept) or discards (reject) the
  * stored payload, dispatching to the correct handler by `kind`.
@@ -38,10 +38,10 @@
 
 namespace DataMachine\Engine\AI\Actions;
 
-use AgentsAPI\AI\Approvals\ApprovalDecision;
-use AgentsAPI\AI\Approvals\PendingAction;
-use AgentsAPI\AI\Approvals\PendingActionHandlerInterface;
-use AgentsAPI\AI\Approvals\PendingActionStatus;
+use AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Handler;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Status;
 use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
@@ -67,7 +67,6 @@ class ResolvePendingActionAbility {
 	 */
 	public static function adapter(): PendingActionResolverAdapter {
 		if ( null === self::$adapter ) {
-			self::loadApprovalContracts();
 			self::$adapter = new PendingActionResolverAdapter();
 		}
 
@@ -93,7 +92,7 @@ class ResolvePendingActionAbility {
 				'datamachine/resolve-pending-action',
 				array(
 					'label'               => __( 'Resolve Pending Action', 'data-machine' ),
-					'description'         => __( 'Accept or reject a pending tool invocation staged by ActionPolicy.', 'data-machine' ),
+					'description'         => __( 'Accept or reject a pending tool invocation staged by WP_Agent_Action_Policy.', 'data-machine' ),
 					'category'            => 'datamachine-actions',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -244,7 +243,7 @@ class ResolvePendingActionAbility {
 		if ( ! is_array( $handler ) || empty( $handler['apply'] ) || ! self::isApplyHandler( $handler['apply'] ) ) {
 			// No handler registered — can't apply, but reject is still safe.
 			if ( $decision->is_rejected() ) {
-				PendingActionStore::record_resolution( $action_id, PendingActionStatus::REJECTED, null, null, $resolver, array( 'reason' => 'no_handler_rejected' ) );
+				PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::REJECTED, null, null, $resolver, array( 'reason' => 'no_handler_rejected' ) );
 				self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, null );
 				return array(
 					'success'   => true,
@@ -302,7 +301,7 @@ class ResolvePendingActionAbility {
 		}
 
 		if ( $decision->is_rejected() ) {
-			PendingActionStore::record_resolution( $action_id, PendingActionStatus::REJECTED, null, null, $resolver );
+			PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::REJECTED, null, null, $resolver );
 			self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, null );
 			return array(
 				'success'   => true,
@@ -316,7 +315,7 @@ class ResolvePendingActionAbility {
 		$result = self::applyHandler( $handler, $decision, $apply_input, $payload, $resolver_payload, $resolver_context, $pending_action );
 
 		if ( is_wp_error( $result ) ) {
-			PendingActionStore::record_resolution( $action_id, PendingActionStatus::ACCEPTED, null, $result->get_error_message(), $resolver );
+			PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::ACCEPTED, null, $result->get_error_message(), $resolver );
 			self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, $result );
 			return array(
 				'success'   => false,
@@ -328,7 +327,7 @@ class ResolvePendingActionAbility {
 		}
 
 		if ( is_array( $result ) && array_key_exists( 'success', $result ) && false === $result['success'] ) {
-			PendingActionStore::record_resolution( $action_id, PendingActionStatus::ACCEPTED, $result, $result['error'] ?? 'Apply handler reported failure.', $resolver );
+			PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::ACCEPTED, $result, $result['error'] ?? 'Apply handler reported failure.', $resolver );
 			self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, $result );
 			return array(
 				'success'   => false,
@@ -340,7 +339,7 @@ class ResolvePendingActionAbility {
 			);
 		}
 
-		PendingActionStore::record_resolution( $action_id, PendingActionStatus::ACCEPTED, $result, null, $resolver );
+		PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::ACCEPTED, $result, null, $resolver );
 		self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, $result );
 
 		return array(
@@ -385,18 +384,16 @@ class ResolvePendingActionAbility {
 	 * parallel Data Machine primitive.
 	 *
 	 * @param array            $handler          Handler configuration.
-	 * @param ApprovalDecision $decision         Accepted/rejected decision.
+	 * @param WP_Agent_Approval_Decision $decision         Accepted/rejected decision.
 	 * @param array            $apply_input      Stored apply input.
 	 * @param array            $payload          Stored pending action payload.
 	 * @param array            $resolver_payload Fresh resolver payload.
 	 * @param array            $resolver_context Optional resolver context.
 	 * @return mixed
 	 */
-	private static function applyHandler( array $handler, ApprovalDecision $decision, array $apply_input, array $payload, array $resolver_payload = array(), array $resolver_context = array(), ?PendingAction $pending_action = null ) {
-		self::loadApprovalContracts();
-
+	private static function applyHandler( array $handler, WP_Agent_Approval_Decision $decision, array $apply_input, array $payload, array $resolver_payload = array(), array $resolver_context = array(), ?WP_Agent_Pending_Action $pending_action = null ) {
 		$apply = $handler['apply'];
-		if ( $apply instanceof PendingActionHandlerInterface ) {
+		if ( $apply instanceof WP_Agent_Pending_Action_Handler ) {
 			if ( null === $pending_action ) {
 				return new \WP_Error( 'invalid_pending_action', 'Stored pending action could not be normalized.' );
 			}
@@ -418,9 +415,7 @@ class ResolvePendingActionAbility {
 			return true;
 		}
 
-		self::loadApprovalContracts();
-
-		return $apply instanceof PendingActionHandlerInterface;
+		return $apply instanceof WP_Agent_Pending_Action_Handler;
 	}
 
 	/**
@@ -428,11 +423,9 @@ class ResolvePendingActionAbility {
 	 *
 	 * @return bool|\WP_Error|null Null means no contract handler was provided.
 	 */
-	private static function canResolveWithHandlerContract( array $handler, ?PendingAction $pending_action, ApprovalDecision $decision, array $resolver_payload, array $resolver_context ) {
-		self::loadApprovalContracts();
-
+	private static function canResolveWithHandlerContract( array $handler, ?WP_Agent_Pending_Action $pending_action, WP_Agent_Approval_Decision $decision, array $resolver_payload, array $resolver_context ) {
 		$apply = $handler['apply'] ?? null;
-		if ( ! $apply instanceof PendingActionHandlerInterface ) {
+		if ( ! $apply instanceof WP_Agent_Pending_Action_Handler ) {
 			return null;
 		}
 
@@ -447,32 +440,13 @@ class ResolvePendingActionAbility {
 	 * Normalize an external decision value to the Agents API approval contract.
 	 *
 	 * @param string $value Request decision value.
-	 * @return ApprovalDecision|null
+	 * @return WP_Agent_Approval_Decision|null
 	 */
-	private static function approvalDecisionFromValue( string $value ): ?ApprovalDecision {
-		self::loadApprovalContracts();
-
+	private static function approvalDecisionFromValue( string $value ): ?WP_Agent_Approval_Decision {
 		try {
-			return ApprovalDecision::from_string( $value );
+			return WP_Agent_Approval_Decision::from_string( $value );
 		} catch ( \InvalidArgumentException $e ) {
 			return null;
-		}
-	}
-
-	/**
-	 * Load Composer-installed Agents API approval contracts when the plugin is not active.
-	 */
-	private static function loadApprovalContracts(): void {
-		if ( class_exists( ApprovalDecision::class ) && class_exists( PendingAction::class ) && class_exists( PendingActionStatus::class ) && interface_exists( PendingActionHandlerInterface::class ) ) {
-			return;
-		}
-
-		$approvals_path = dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Approvals/';
-		foreach ( array( 'ApprovalDecision.php', 'PendingActionStatus.php', 'PendingAction.php', 'PendingActionHandlerInterface.php', 'PendingActionResolverInterface.php' ) as $file ) {
-			$path = $approvals_path . $file;
-			if ( file_exists( $path ) ) {
-				require_once $path;
-			}
 		}
 	}
 

@@ -64,6 +64,13 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 				'modes' => array( 'chat' ),
 			)
 		);
+		MemoryFileRegistry::register(
+			'EXTERNAL_RUNTIME.md',
+			50,
+			array(
+				'layer' => MemoryFileRegistry::LAYER_SHARED,
+			)
+		);
 
 		$this->resolver = new MemoryPolicyResolver();
 	}
@@ -90,6 +97,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'MEMORY.md', $files );
 		$this->assertArrayHasKey( 'USER.md', $files );
 		$this->assertArrayHasKey( 'CHAT_ONLY.md', $files );
+		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $files );
 	}
 
 	public function test_registered_pipeline_context_excludes_chat_only(): void {
@@ -103,6 +111,25 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'MEMORY.md', $files );
 		$this->assertArrayHasKey( 'USER.md', $files );
 		$this->assertArrayNotHasKey( 'CHAT_ONLY.md', $files );
+		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $files );
+	}
+
+	public function test_registered_file_without_modes_is_not_injected_in_any_mode(): void {
+		$chat_files = $this->resolver->resolveRegistered(
+			array(
+				'mode' => MemoryPolicyResolver::MODE_CHAT,
+			)
+		);
+		$pipeline_files = $this->resolver->resolveRegistered(
+			array(
+				'mode' => MemoryPolicyResolver::MODE_PIPELINE,
+			)
+		);
+
+		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $chat_files );
+		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $pipeline_files );
+		$this->assertArrayHasKey( 'EXTERNAL_RUNTIME.md', MemoryFileRegistry::get_all() );
+		$this->assertSame( \WP_Agent_Context_Injection_Policy::NEVER, MemoryFileRegistry::get_all()['EXTERNAL_RUNTIME.md']['retrieval_policy'] );
 	}
 
 	public function test_registered_preserves_metadata(): void {

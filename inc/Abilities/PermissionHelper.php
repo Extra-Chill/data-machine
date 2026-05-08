@@ -8,7 +8,7 @@
 
 namespace DataMachine\Abilities;
 
-use AgentsAPI\AI\AgentExecutionPrincipal;
+use AgentsAPI\AI\WP_Agent_Execution_Principal;
 
 /**
  * Helper class for ability permission checks.
@@ -104,9 +104,9 @@ class PermissionHelper {
 	 * Agents API execution principal for the current request.
 	 *
 	 * @since 0.103.15
-	 * @var AgentExecutionPrincipal|null
+	 * @var WP_Agent_Execution_Principal|null
 	 */
-	private static ?AgentExecutionPrincipal $execution_principal = null;
+	private static ?WP_Agent_Execution_Principal $execution_principal = null;
 
 	/**
 	 * Cross-site caller context for the current request.
@@ -276,20 +276,20 @@ class PermissionHelper {
 			)
 		);
 		self::$execution_principal = null !== $token_id
-			? AgentExecutionPrincipal::agent_token(
+			? WP_Agent_Execution_Principal::agent_token(
 				$owner_id,
 				(string) $agent_id,
 				$token_id,
-				AgentExecutionPrincipal::REQUEST_CONTEXT_REST,
+				WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST,
 				array(),
 				null,
 				null,
 				self::$capability_ceiling
 			)
-			: AgentExecutionPrincipal::user_session(
+			: WP_Agent_Execution_Principal::user_session(
 				$owner_id,
 				(string) $agent_id,
-				AgentExecutionPrincipal::REQUEST_CONTEXT_REST,
+				WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST,
 				array(),
 				null,
 				null,
@@ -316,9 +316,9 @@ class PermissionHelper {
 	 *
 	 * @since 0.103.15
 	 *
-	 * @param AgentExecutionPrincipal $principal Execution principal.
+	 * @param WP_Agent_Execution_Principal $principal Execution principal.
 	 */
-	public static function set_execution_principal( AgentExecutionPrincipal $principal ): void {
+	public static function set_execution_principal( WP_Agent_Execution_Principal $principal ): void {
 		self::$execution_principal = $principal;
 		if ( property_exists( $principal, 'capability_ceiling' ) && $principal->capability_ceiling instanceof \WP_Agent_Capability_Ceiling ) {
 			self::$capability_ceiling = $principal->capability_ceiling;
@@ -330,9 +330,9 @@ class PermissionHelper {
 	 *
 	 * @since 0.103.15
 	 *
-	 * @return AgentExecutionPrincipal|null
+	 * @return WP_Agent_Execution_Principal|null
 	 */
-	public static function get_execution_principal(): ?AgentExecutionPrincipal {
+	public static function get_execution_principal(): ?WP_Agent_Execution_Principal {
 		return self::$execution_principal;
 	}
 
@@ -429,10 +429,10 @@ class PermissionHelper {
 			return false;
 		}
 
-		$principal = self::$execution_principal ?? AgentExecutionPrincipal::user_session(
+		$principal = self::$execution_principal ?? WP_Agent_Execution_Principal::user_session(
 			self::$agent_owner_id,
 			(string) self::$acting_agent_id,
-			AgentExecutionPrincipal::REQUEST_CONTEXT_REST,
+			WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST,
 			array(),
 			null,
 			null,

@@ -5,7 +5,7 @@
  * Registry for named bounded-iteration budgets. Each registration
  * declares the budget's ceiling resolution rules (default, site-setting
  * key, clamp bounds) so consumers can instantiate a fresh
- * {@see IterationBudget} at runtime without duplicating config-lookup
+ * {@see WP_Agent_Iteration_Budget} at runtime without duplicating config-lookup
  * boilerplate.
  *
  * Ceiling resolution order (per {@see create()}):
@@ -24,7 +24,7 @@
 
 namespace DataMachine\Engine\AI;
 
-use AgentsAPI\AI\IterationBudget;
+use AgentsAPI\AI\WP_Agent_Iteration_Budget;
 use DataMachine\Core\PluginSettings;
 
 defined( 'ABSPATH' ) || exit;
@@ -96,7 +96,7 @@ final class IterationBudgetRegistry {
 	 * Create a fresh budget for a named registration.
 	 *
 	 * Resolves the ceiling through the documented fallback chain and
-	 * returns a new {@see IterationBudget} seeded at $current.
+	 * returns a new {@see WP_Agent_Iteration_Budget} seeded at $current.
 	 *
 	 * Unregistered names return a permissive budget so callers using a
 	 * name-that-might-be-registered don't need conditional logic — the
@@ -108,13 +108,13 @@ final class IterationBudgetRegistry {
 	 * @param int|null $ceiling_override Optional caller-provided ceiling that
 	 *                                   bypasses the setting/default lookup but
 	 *                                   is still clamped to registered bounds.
-	 * @return IterationBudget
+	 * @return WP_Agent_Iteration_Budget
 	 */
 	public static function create(
 		string $name,
 		int $current = 0,
 		?int $ceiling_override = null
-	): IterationBudget {
+	): WP_Agent_Iteration_Budget {
 		$config = self::$registered[ $name ] ?? array(
 			'default' => 10,
 			'min'     => 1,
@@ -132,6 +132,6 @@ final class IterationBudgetRegistry {
 
 		$ceiling = max( (int) $config['min'], min( (int) $config['max'], $ceiling ) );
 
-		return new IterationBudget( $name, $ceiling, $current );
+		return new WP_Agent_Iteration_Budget( $name, $ceiling, $current );
 	}
 }

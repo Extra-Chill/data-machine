@@ -27,12 +27,6 @@ use DataMachine\Engine\AI\Tools\Policy\DataMachineToolAccessPolicy;
 
 defined( 'ABSPATH' ) || exit;
 
-if ( ! class_exists( '\WP_Agent_Tool_Policy' ) ) {
-	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy-interface.php';
-	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
-	require_once dirname( __DIR__, 4 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy.php';
-}
-
 class ToolPolicyResolver {
 
 	/**

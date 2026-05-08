@@ -34,6 +34,15 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 	}
 }
 
+$datamachine_test_engine_data = array();
+
+if ( ! function_exists( 'datamachine_get_engine_data' ) ) {
+	function datamachine_get_engine_data( int $job_id ): array {
+		global $datamachine_test_engine_data;
+		return $datamachine_test_engine_data[ $job_id ] ?? array();
+	}
+}
+
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
 require_once __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/EngineHelpers.php';
@@ -128,11 +137,14 @@ $invoke_empty_ai_route = function ( string $status ) use ( $build_ability ): arr
 
 echo "=== ai-error-status-propagation-smoke ===\n";
 
+$short_circuit_message = 'Step returned no data after job was already marked failed or rescheduled for retry';
+
 echo "\n[1] explicit AI failure is not reclassified as empty packets\n";
-$datamachine_action_log = datamachine_empty_action_log();
-$result                 = $invoke_empty_ai_route( 'failed - ai_processing_failed' );
-$failed_jobs            = $actions_by_hook( 'datamachine_fail_job' );
-$debug_logs             = $logs_with_message( 'Step returned no data after job was already marked failed' );
+$datamachine_action_log       = datamachine_empty_action_log();
+$datamachine_test_engine_data = array();
+$result                       = $invoke_empty_ai_route( 'failed - ai_processing_failed' );
+$failed_jobs                  = $actions_by_hook( 'datamachine_fail_job' );
+$debug_logs                   = $logs_with_message( $short_circuit_message );
 
 $assert( 'route still reports failed outcome', 'failed' === ( $result['outcome'] ?? '' ) );
 $assert( 'route preserves persisted AI failure status as error', 'failed - ai_processing_failed' === ( $result['error'] ?? '' ) );
@@ -140,15 +152,47 @@ $assert( 'generic fail-job action is not emitted again', empty( $failed_jobs ) )
 $assert( 'debug log records already-failed short circuit', 1 === count( $debug_logs ) );
 
 echo "\n[2] ordinary empty AI packet failures still use existing generic path\n";
-$datamachine_action_log = datamachine_empty_action_log();
-$result                 = $invoke_empty_ai_route( 'processing' );
-$failed_jobs            = $actions_by_hook( 'datamachine_fail_job' );
-$last_failure           = end( $failed_jobs );
-$failure_reason         = is_array( $last_failure ) ? ( $last_failure['args'][2]['reason'] ?? '' ) : '';
+$datamachine_action_log       = datamachine_empty_action_log();
+$datamachine_test_engine_data = array();
+$result                       = $invoke_empty_ai_route( 'processing' );
+$failed_jobs                  = $actions_by_hook( 'datamachine_fail_job' );
+$last_failure                 = end( $failed_jobs );
+$failure_reason               = is_array( $last_failure ) ? ( $last_failure['args'][2]['reason'] ?? '' ) : '';
 
 $assert( 'ordinary empty packet route still fails', 'failed' === ( $result['outcome'] ?? '' ) );
 $assert( 'ordinary empty packet still emits fail-job action', 1 === count( $failed_jobs ) );
 $assert( 'ordinary empty packet reason remains empty_data_packet_returned', 'empty_data_packet_returned' === $failure_reason );
+
+echo "\n[3] pending-status job with a scheduled retry short-circuits without re-firing fail-job\n";
+$datamachine_action_log       = datamachine_empty_action_log();
+$datamachine_test_engine_data = array(
+	123 => array(
+		'retry' => array(
+			'attempts'      => 1,
+			'next_retry_at' => gmdate( 'c', time() + 60 ),
+		),
+	),
+);
+$result      = $invoke_empty_ai_route( 'pending' );
+$failed_jobs = $actions_by_hook( 'datamachine_fail_job' );
+$debug_logs  = $logs_with_message( $short_circuit_message );
+
+$assert( 'pending+retry route reports failed outcome', 'failed' === ( $result['outcome'] ?? '' ) );
+$assert( 'pending+retry route surfaces pending status as error marker', 'pending' === ( $result['error'] ?? '' ) );
+$assert( 'pending+retry route does NOT emit a second fail-job action', empty( $failed_jobs ) );
+$assert( 'pending+retry route logs the short-circuit message', 1 === count( $debug_logs ) );
+
+echo "\n[4] pending-status job WITHOUT retry metadata still falls through to fail-job\n";
+$datamachine_action_log       = datamachine_empty_action_log();
+$datamachine_test_engine_data = array();
+$result                       = $invoke_empty_ai_route( 'pending' );
+$failed_jobs                  = $actions_by_hook( 'datamachine_fail_job' );
+$last_failure                 = end( $failed_jobs );
+$failure_reason               = is_array( $last_failure ) ? ( $last_failure['args'][2]['reason'] ?? '' ) : '';
+
+$assert( 'pending without retry still fails through generic path', 'failed' === ( $result['outcome'] ?? '' ) );
+$assert( 'pending without retry still emits fail-job action', 1 === count( $failed_jobs ) );
+$assert( 'pending without retry reason is empty_data_packet_returned', 'empty_data_packet_returned' === $failure_reason );
 
 if ( $failures > 0 ) {
 	echo "\n=== ai-error-status-propagation-smoke: {$failures} FAILURE(S) / {$total} assertions ===\n";

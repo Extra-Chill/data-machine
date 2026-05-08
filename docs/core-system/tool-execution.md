@@ -13,7 +13,7 @@ Universal tool discovery, enablement, and execution infrastructure shared by Pip
 The tool execution architecture consists of two core components:
 
 1. **ToolExecutor** - Tool discovery, validation, and execution
-2. **ToolParameters** - Centralized parameter building and merging
+2. **WP_Agent_Tool_Parameters** - Centralized parameter building and merging
 
 Together, these components ensure consistent tool behavior across all AI agents while supporting flexible, filter-based tool registration.
 
@@ -298,7 +298,7 @@ $result = ToolExecutor::executeTool(
 **Execution Process**:
 
 1. Validate tool exists in available tools
-2. Build complete parameters via `ToolParameters::buildParameters()`
+2. Build complete parameters via `WP_Agent_Tool_Parameters::buildParameters()`
 3. Instantiate tool class
 4. Call `handle_tool_call()` method with complete parameters
 5. Return standardized result array
@@ -361,7 +361,7 @@ try {
 }
 ```
 
-## ToolParameters
+## WP_Agent_Tool_Parameters
 
 **File**: `/inc/Engine/AI/Tools/ToolParameters.php`
 
@@ -381,7 +381,7 @@ public static function buildParameters(
 
 **Usage**:
 ```php
-$complete_parameters = ToolParameters::buildParameters(
+$complete_parameters = WP_Agent_Tool_Parameters::buildParameters(
     ['query' => 'WordPress SEO tips'],  // AI parameters
     ['session_id' => $session_id],      // Unified context
     $tool_definition                     // Tool definition array
@@ -461,7 +461,7 @@ public static function buildForHandlerTool(
 
 **Usage**:
 ```php
-$complete_parameters = ToolParameters::buildForHandlerTool(
+$complete_parameters = WP_Agent_Tool_Parameters::buildForHandlerTool(
     ['content' => 'Tweet text'],           // AI parameters
     $data,                                  // Data packets
     $tool_definition,                       // Tool definition

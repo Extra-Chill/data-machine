@@ -69,11 +69,11 @@ require_once __DIR__ . '/../inc/Engine/AI/SectionRegistry.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DiskAgentMemoryStore.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/GuidelineAgentMemoryStore.php';
 
-use AgentsAPI\AI\Context\ContextAuthorityTier;
-use AgentsAPI\AI\Context\ContextConflictKind;
-use AgentsAPI\AI\Context\DefaultContextConflictResolver;
-use AgentsAPI\AI\Context\RetrievedContextItem;
-use AgentsAPI\Core\FilesRepository\AgentMemoryMetadata;
+use AgentsAPI\AI\Context\WP_Agent_Context_Authority_Tier;
+use AgentsAPI\AI\Context\WP_Agent_Context_Conflict_Kind;
+use AgentsAPI\AI\Context\WP_Agent_Default_Context_Conflict_Resolver;
+use AgentsAPI\AI\Context\WP_Agent_Context_Item;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Metadata;
 use DataMachine\Core\FilesRepository\DiskAgentMemoryStore;
 use DataMachine\Core\FilesRepository\GuidelineAgentMemoryStore;
 use DataMachine\Engine\AI\MemoryFileRegistry;
@@ -107,7 +107,7 @@ $datamachine_file = MemoryFileRegistry::get( 'SITE.md' );
 $agents_source    = WP_Agent_Memory_Registry::get( 'datamachine/site.md' );
 datamachine_contract_adoption_assert( null !== $agents_source, 'Data Machine registration creates an Agents API memory source' );
 datamachine_contract_adoption_assert( 'SITE.md' === ( $agents_source['meta']['filename'] ?? null ), 'Agents API source retains Data Machine filename adapter metadata' );
-datamachine_contract_adoption_assert( ContextAuthorityTier::WORKSPACE_SHARED === $datamachine_file['authority_tier'], 'shared memory file receives workspace authority tier' );
+datamachine_contract_adoption_assert( WP_Agent_Context_Authority_Tier::WORKSPACE_SHARED === $datamachine_file['authority_tier'], 'shared memory file receives workspace authority tier' );
 datamachine_contract_adoption_assert( false === $datamachine_file['editable'], 'composable files remain non-editable through the adapter' );
 
 SectionRegistry::reset();
@@ -122,12 +122,12 @@ $unsupported = $disk_caps->unsupported_metadata_fields( array( 'source_type', 'a
 datamachine_contract_adoption_assert( array( 'source_type', 'authority_tier' ) === $unsupported, 'disk store declares unsupported metadata instead of dropping silently' );
 
 $guideline_caps = ( new GuidelineAgentMemoryStore() )->capabilities();
-datamachine_contract_adoption_assert( array() === $guideline_caps->unsupported_metadata_fields( AgentMemoryMetadata::FIELDS, 'persist' ), 'guideline store declares full metadata persistence support' );
+datamachine_contract_adoption_assert( array() === $guideline_caps->unsupported_metadata_fields( WP_Agent_Memory_Metadata::FIELDS, 'persist' ), 'guideline store declares full metadata persistence support' );
 
-$resolver = new DefaultContextConflictResolver();
+$resolver = new WP_Agent_Default_Context_Conflict_Resolver();
 $items    = array(
-	new RetrievedContextItem( 'agent memory says no', array( 'filename' => 'MEMORY.md' ), ContextAuthorityTier::AGENT_MEMORY, array(), ContextConflictKind::AUTHORITATIVE_FACT, 'policy:x' ),
-	new RetrievedContextItem( 'workspace says yes', array( 'filename' => 'SITE.md' ), ContextAuthorityTier::WORKSPACE_SHARED, array(), ContextConflictKind::AUTHORITATIVE_FACT, 'policy:x' ),
+	new WP_Agent_Context_Item( 'agent memory says no', array( 'filename' => 'MEMORY.md' ), WP_Agent_Context_Authority_Tier::AGENT_MEMORY, array(), WP_Agent_Context_Conflict_Kind::AUTHORITATIVE_FACT, 'policy:x' ),
+	new WP_Agent_Context_Item( 'workspace says yes', array( 'filename' => 'SITE.md' ), WP_Agent_Context_Authority_Tier::WORKSPACE_SHARED, array(), WP_Agent_Context_Conflict_Kind::AUTHORITATIVE_FACT, 'policy:x' ),
 );
 $resolution = $resolver->resolve( $items )['policy:x'] ?? null;
 datamachine_contract_adoption_assert( null !== $resolution && 'workspace says yes' === $resolution->winner->content, 'authority cascade rejects lower-scope memory for authoritative fact conflicts' );

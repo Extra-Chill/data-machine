@@ -11,7 +11,7 @@
 
 namespace DataMachine\Engine\AI\Tools;
 
-use AgentsAPI\AI\Tools\ActionPolicy;
+use AgentsAPI\AI\Tools\WP_Agent_Action_Policy;
 use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
 use DataMachine\Engine\AI\Actions\PendingActionHelper;
@@ -30,7 +30,7 @@ class ToolExecutor {
 	 * decide whether the invocation should execute directly, be staged for
 	 * user approval (preview), or be refused (forbidden). Tools opt into
 	 * preview/forbidden via metadata; unopted tools resolve to 'direct' and
-	 * behave identically to pre-ActionPolicy releases.
+	 * behave identically to pre-WP_Agent_Action_Policy releases.
 	 *
 	 * The `$mode` / `$agent_id` / `$client_context` parameters were added in
 	 * 0.72.0 so the resolver has enough context to apply per-agent and
@@ -81,7 +81,7 @@ class ToolExecutor {
 			)
 		);
 
-		if ( ActionPolicy::refusesExecution( $policy ) ) {
+		if ( WP_Agent_Action_Policy::refusesExecution( $policy ) ) {
 			return array(
 				'success'        => false,
 				'error'          => sprintf( 'Tool "%s" is not permitted in the current context (action_policy=forbidden).', $tool_name ),
@@ -90,7 +90,7 @@ class ToolExecutor {
 			);
 		}
 
-		if ( ActionPolicy::stagesApproval( $policy ) ) {
+		if ( WP_Agent_Action_Policy::stagesApproval( $policy ) ) {
 			// Tool must declare how to build an action kind and summary.
 			// If it hasn't opted into the preview pipeline properly, fall
 			// back to 'direct' and log a warning — preview is a contract,
@@ -99,7 +99,7 @@ class ToolExecutor {
 				do_action(
 					'datamachine_log',
 					'warning',
-					'ActionPolicy: tool resolved to preview but is missing action_kind metadata; falling back to direct.',
+					'WP_Agent_Action_Policy: tool resolved to preview but is missing action_kind metadata; falling back to direct.',
 					array(
 						'tool_name' => $tool_name,
 						'mode'      => $mode,

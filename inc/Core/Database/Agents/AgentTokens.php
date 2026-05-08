@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class AgentTokens extends BaseRepository implements \WP_Agent_Token_Store_Interface {
+class AgentTokens extends BaseRepository implements \WP_Agent_Token_Store {
 
 	/**
 	 * Table name (without prefix).

@@ -3,8 +3,8 @@
  * Smoke tests for the mode-aware duplicate-tool-call correction message.
  *
  * Regression coverage for #1441: when a pipeline AI step double-calls a tool,
- * the correction message must instruct the model to keep going (call the
- * publish handler) rather than the chat-shaped "task is done — end the
+ * the correction message must instruct the model to keep going to the next
+ * pipeline action rather than the chat-shaped "task is done — end the
  * conversation". The chat-mode behavior must remain identical to the
  * pre-fix-1441 message so existing chat callers are unaffected.
  *
@@ -15,7 +15,7 @@
 
 require_once __DIR__ . '/bootstrap-unit.php';
 
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Message;
 use DataMachine\Engine\AI\ConversationManager;
 
 function datamachine_dup_msg_assert( bool $condition, string $message ): void {
@@ -46,7 +46,7 @@ datamachine_dup_msg_assert(
 	'Default arg renders the duplicated tool name into the error.'
 );
 datamachine_dup_msg_assert(
-	AgentMessageEnvelope::TYPE_TOOL_RESULT === $default_envelope['type'],
+	WP_Agent_Message::TYPE_TOOL_RESULT === $default_envelope['type'],
 	'Duplicate-correction message is emitted as a tool_result envelope.'
 );
 datamachine_dup_msg_assert(
@@ -68,18 +68,22 @@ datamachine_dup_msg_assert(
 	'Explicit chat mode does NOT mention the publish handler.'
 );
 
-// --- Pipeline mode tells the AI to call the publish handler. -----------------
+// --- Pipeline mode tells the AI to continue the pipeline. --------------------
 
 $pipeline_envelope = ConversationManager::generateDuplicateToolCallMessage( 'foo', 0, 'pipeline' );
 $pipeline_error    = $extract_error( $pipeline_envelope );
 
 datamachine_dup_msg_assert(
-	str_contains( $pipeline_error, 'publish handler' ),
-	'Pipeline mode instructs the AI to call the publish handler.'
+	str_contains( $pipeline_error, 'next required pipeline action' ),
+	'Pipeline mode instructs the AI to move to the next required pipeline action.'
 );
 datamachine_dup_msg_assert(
 	! str_contains( $pipeline_error, 'end the conversation' ),
 	'Pipeline mode does NOT tell the AI to end the conversation.'
+);
+datamachine_dup_msg_assert(
+	! str_contains( $pipeline_error, 'publish handler' ),
+	'Pipeline mode does NOT assume a publish handler is configured.'
 );
 datamachine_dup_msg_assert(
 	str_contains( $pipeline_error, 'foo' ),

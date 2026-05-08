@@ -21,13 +21,17 @@
       "mysql_host": "localhost",
       "mysql_database": "wptests",
       "mysql_user": "root",
-      "mysql_password": ""
+      "mysql_password": "",
+      "settings": {
+        "playground_wordpress_version": "7.0",
+        "validation_dependencies": "agents-api"
+      }
     }
   },
   "id": "data-machine",
   "transforms": {
     "drop_wp_ability_dead_guards": {
-      "description": "Drop dead class_exists('WP_Ability') and class_exists('WP_Abilities_Registry') guards. Plugin header requires WP 6.9 where both classes ship in core, so every guard on these symbols is unreachable. Ref: https://github.com/Extra-Chill/data-machine/issues/XXXX",
+      "description": "Drop dead class_exists('WP_Ability') and class_exists('WP_Abilities_Registry') guards. Plugin header requires WP 7.0 where both classes ship in core, so every guard on these symbols is unreachable. Ref: https://github.com/Extra-Chill/data-machine/issues/XXXX",
       "rules": [
         {
           "id": "simple_guard",

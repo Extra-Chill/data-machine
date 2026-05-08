@@ -13,8 +13,8 @@
 namespace DataMachine\Tests\Unit\Core\Database\Chat;
 
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
-use AgentsAPI\AI\AgentMessageEnvelope;
-use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
+use AgentsAPI\AI\WP_Agent_Message;
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 
 class InMemoryConversationStore implements ConversationStoreInterface {
 
@@ -68,10 +68,10 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 
 	/**
 	 * @param array $args Raw create-session arguments.
-	 * @return array{0:AgentWorkspaceScope,1:int,2:int,3:array,4:string}
+	 * @return array{0:WP_Agent_Workspace_Scope,1:int,2:int,3:array,4:string}
 	 */
 	private function normalize_create_session_args( array $args ): array {
-		if ( isset( $args[0] ) && $args[0] instanceof AgentWorkspaceScope ) {
+		if ( isset( $args[0] ) && $args[0] instanceof WP_Agent_Workspace_Scope ) {
 			return array(
 				$args[0],
 				(int) ( $args[1] ?? 0 ),
@@ -82,7 +82,7 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		}
 
 		return array(
-			AgentWorkspaceScope::from_parts( 'site', '1' ),
+			WP_Agent_Workspace_Scope::from_parts( 'site', '1' ),
 			(int) ( $args[0] ?? 0 ),
 			(int) ( $args[1] ?? 0 ),
 			is_array( $args[2] ?? null ) ? $args[2] : array(),
@@ -92,10 +92,10 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 
 	/**
 	 * @param array $args Raw pending-session arguments.
-	 * @return array{0:AgentWorkspaceScope,1:int,2:int,3:string,4:int|null}
+	 * @return array{0:WP_Agent_Workspace_Scope,1:int,2:int,3:string,4:int|null}
 	 */
 	private function normalize_recent_pending_session_args( array $args ): array {
-		if ( isset( $args[0] ) && $args[0] instanceof AgentWorkspaceScope ) {
+		if ( isset( $args[0] ) && $args[0] instanceof WP_Agent_Workspace_Scope ) {
 			return array(
 				$args[0],
 				(int) ( $args[1] ?? 0 ),
@@ -106,7 +106,7 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		}
 
 		return array(
-			AgentWorkspaceScope::from_parts( 'site', '1' ),
+			WP_Agent_Workspace_Scope::from_parts( 'site', '1' ),
 			(int) ( $args[0] ?? 0 ),
 			(int) ( $args[1] ?? 600 ),
 			(string) ( $args[2] ?? 'chat' ),
@@ -118,7 +118,7 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		return $this->sessions[ $session_id ] ?? null;
 	}
 
-	public function update_session( string $session_id, array $messages, array $metadata = array(), string $provider = '', string $model = '' ): bool {
+	public function update_session( string $session_id, array $messages, array $metadata = array(), string $provider = '', string $model = '', ?string $provider_response_id = null ): bool {
 		if ( ! isset( $this->sessions[ $session_id ] ) ) {
 			return false;
 		}
@@ -132,6 +132,9 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		}
 		if ( '' !== $model ) {
 			$this->sessions[ $session_id ]['model'] = $model;
+		}
+		if ( null !== $provider_response_id ) {
+			$this->sessions[ $session_id ]['provider_response_id'] = $provider_response_id;
 		}
 
 		return true;
@@ -273,12 +276,12 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 	public function count_unread( array $messages, ?string $last_read_at ): int {
 		$count = 0;
 		foreach ( $messages as $msg ) {
-			$msg = AgentMessageEnvelope::normalize( $msg );
+			$msg = WP_Agent_Message::normalize( $msg );
 			if ( ( $msg['role'] ?? '' ) !== 'assistant' ) {
 				continue;
 			}
-			$type = $msg['type'] ?? AgentMessageEnvelope::TYPE_TEXT;
-			if ( AgentMessageEnvelope::TYPE_TOOL_CALL === $type || AgentMessageEnvelope::TYPE_TOOL_RESULT === $type ) {
+			$type = $msg['type'] ?? WP_Agent_Message::TYPE_TEXT;
+			if ( WP_Agent_Message::TYPE_TOOL_CALL === $type || WP_Agent_Message::TYPE_TOOL_RESULT === $type ) {
 				continue;
 			}
 			if ( null === $last_read_at ) {

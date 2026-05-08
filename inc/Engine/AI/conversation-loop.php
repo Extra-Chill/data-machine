@@ -3,7 +3,7 @@
  * Data Machine conversation loop — direct substrate consumer.
  *
  * Builds a DM-specific turn runner and passes it to the upstream
- * AgentConversationLoop::run() with DM completion policy, transcript
+ * WP_Agent_Conversation_Loop::run() with DM completion policy, transcript
  * persistence, and event emission wired as options.
  *
  * This file replaces the former 748-LOC AIConversationLoop class. Both
@@ -14,12 +14,12 @@
 
 namespace DataMachine\Engine\AI;
 
-use AgentsAPI\AI\AgentConversationCompletionPolicyInterface;
-use AgentsAPI\AI\AgentConversationLoop;
-use AgentsAPI\AI\AgentConversationResult;
-use AgentsAPI\AI\AgentConversationTranscriptPersisterInterface;
-use AgentsAPI\AI\AgentMessageEnvelope;
-use AgentsAPI\AI\NullAgentConversationTranscriptPersister;
+use AgentsAPI\AI\WP_Agent_Conversation_Completion_Policy;
+use AgentsAPI\AI\WP_Agent_Conversation_Loop;
+use AgentsAPI\AI\WP_Agent_Conversation_Result;
+use AgentsAPI\AI\WP_Agent_Transcript_Persister;
+use AgentsAPI\AI\WP_Agent_Message;
+use AgentsAPI\AI\WP_Agent_Null_Transcript_Persister;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
@@ -30,7 +30,7 @@ defined( 'ABSPATH' ) || exit;
  * Run a multi-turn AI conversation through the agents-api substrate.
  *
  * Builds a DM-specific turn runner (request building + wp-ai-client dispatch +
- * tool execution) and delegates orchestration to AgentConversationLoop::run().
+ * tool execution) and delegates orchestration to WP_Agent_Conversation_Loop::run().
  *
  * @param array  $messages    Initial conversation messages.
  * @param array  $tools       Available tools keyed by tool name.
@@ -52,7 +52,7 @@ function datamachine_run_conversation(
 	int $max_turns = PluginSettings::DEFAULT_MAX_TURNS,
 	bool $single_turn = false
 ): array {
-	$messages = AgentMessageEnvelope::normalize_many( $messages );
+	$messages = WP_Agent_Message::normalize_many( $messages );
 
 	// Resolve DM runtime collaborators from the payload.
 	$event_sink           = datamachine_resolve_event_sink( $payload );
@@ -131,14 +131,14 @@ function datamachine_run_conversation(
 
 	// Run through the upstream substrate loop.
 	try {
-		$result = AgentConversationLoop::run(
+		$result = WP_Agent_Conversation_Loop::run(
 			$messages,
 			$turn_runner,
 			array(
 				'max_turns'             => $max_turns,
 				'budgets'               => array( $turn_budget ),
 				'context'               => array_merge( $loop_payload, array( 'mode' => $mode ) ),
-				'request'               => new \AgentsAPI\AI\AgentConversationRequest(
+				'request'               => new \AgentsAPI\AI\WP_Agent_Conversation_Request(
 					$messages,
 					array(),
 					null,
@@ -178,7 +178,7 @@ function datamachine_run_conversation(
 
 	// Normalize the substrate result and augment with DM-specific fields.
 	try {
-		$result = AgentConversationResult::normalize( $result );
+		$result = WP_Agent_Conversation_Result::normalize( $result );
 	} catch ( \InvalidArgumentException $e ) {
 		return array(
 			'messages'               => $messages,
@@ -228,7 +228,7 @@ function datamachine_run_conversation(
  * @param array                                           $loop_payload           Cleaned payload.
  * @param LoopEventSinkInterface                          $event_sink             DM event sink.
  * @param array                                           $base_log_context       Base log context.
- * @param AgentConversationCompletionPolicyInterface       $completion_policy      Completion policy.
+ * @param WP_Agent_Conversation_Completion_Policy       $completion_policy      Completion policy.
  * @param array                                           &$last_request_metadata Mutable request metadata.
  * @param array                                           &$last_tool_calls        Mutable last tool calls.
  * @param string                                          &$final_content          Mutable final assistant content.
@@ -244,7 +244,7 @@ function datamachine_build_turn_runner(
 	array $loop_payload,
 	LoopEventSinkInterface $event_sink,
 	array $base_log_context,
-	AgentConversationCompletionPolicyInterface $completion_policy,
+	WP_Agent_Conversation_Completion_Policy $completion_policy,
 	array &$last_request_metadata,
 	array &$last_tool_calls,
 	string &$final_content,
@@ -548,11 +548,11 @@ function datamachine_resolve_event_sink( array $payload ): LoopEventSinkInterfac
  *
  * @param string $mode    Execution mode.
  * @param array  $payload Loop payload.
- * @return AgentConversationCompletionPolicyInterface
+ * @return WP_Agent_Conversation_Completion_Policy
  */
-function datamachine_resolve_completion_policy( string $mode, array $payload ): AgentConversationCompletionPolicyInterface {
+function datamachine_resolve_completion_policy( string $mode, array $payload ): WP_Agent_Conversation_Completion_Policy {
 	$policy = $payload['completion_policy'] ?? null;
-	if ( $policy instanceof AgentConversationCompletionPolicyInterface ) {
+	if ( $policy instanceof WP_Agent_Conversation_Completion_Policy ) {
 		return $policy;
 	}
 
@@ -570,11 +570,11 @@ function datamachine_resolve_completion_policy( string $mode, array $payload ): 
  * Resolve the runtime transcript persister from the payload.
  *
  * @param array $payload Loop payload.
- * @return AgentConversationTranscriptPersisterInterface
+ * @return WP_Agent_Transcript_Persister
  */
-function datamachine_resolve_transcript_persister( array $payload ): AgentConversationTranscriptPersisterInterface {
+function datamachine_resolve_transcript_persister( array $payload ): WP_Agent_Transcript_Persister {
 	$persister = $payload['transcript_persister'] ?? null;
-	if ( $persister instanceof AgentConversationTranscriptPersisterInterface ) {
+	if ( $persister instanceof WP_Agent_Transcript_Persister ) {
 		return $persister;
 	}
 
@@ -582,7 +582,7 @@ function datamachine_resolve_transcript_persister( array $payload ): AgentConver
 		return new DataMachinePipelineTranscriptPersister();
 	}
 
-	return new NullAgentConversationTranscriptPersister();
+	return new WP_Agent_Null_Transcript_Persister();
 }
 
 /**

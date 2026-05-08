@@ -22,9 +22,9 @@ use DataMachine\Core\Database\Chat\ConversationRetentionInterface;
 use DataMachine\Core\Database\Chat\ConversationSessionIndexInterface;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
-use AgentsAPI\Core\Database\Chat\ConversationTranscriptLockInterface;
-use AgentsAPI\Core\Database\Chat\ConversationTranscriptStoreInterface;
-use AgentsAPI\Core\Workspace\AgentWorkspaceScope;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Lock;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store;
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 use WP_UnitTestCase;
 
 class ConversationStoreFactoryTest extends WP_UnitTestCase {
@@ -48,8 +48,8 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$store = ConversationStoreFactory::get();
 
 		$this->assertInstanceOf( ConversationStoreInterface::class, $store );
-		$this->assertInstanceOf( ConversationTranscriptStoreInterface::class, $store );
-		$this->assertInstanceOf( ConversationTranscriptLockInterface::class, $store );
+		$this->assertInstanceOf( WP_Agent_Conversation_Store::class, $store );
+		$this->assertInstanceOf( WP_Agent_Conversation_Lock::class, $store );
 		$this->assertInstanceOf( ConversationSessionIndexInterface::class, $store );
 		$this->assertInstanceOf( ConversationReadStateInterface::class, $store );
 		$this->assertInstanceOf( ConversationRetentionInterface::class, $store );
@@ -60,7 +60,7 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 	public function test_transcript_resolution_returns_narrow_contract(): void {
 		$store = ConversationStoreFactory::get_transcript_store();
 
-		$this->assertInstanceOf( ConversationTranscriptStoreInterface::class, $store );
+		$this->assertInstanceOf( WP_Agent_Conversation_Store::class, $store );
 		$this->assertInstanceOf( ConversationStoreInterface::class, ConversationStoreFactory::get() );
 		$this->assertSame( ConversationStoreFactory::get(), $store );
 	}
@@ -110,8 +110,8 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 	public function test_conversation_store_interface_is_composed_from_narrow_contracts(): void {
 		$reflection = new \ReflectionClass( ConversationStoreInterface::class );
 		$expected   = array(
-			ConversationTranscriptLockInterface::class,
-			ConversationTranscriptStoreInterface::class,
+			WP_Agent_Conversation_Lock::class,
+			WP_Agent_Conversation_Store::class,
 			ConversationSessionIndexInterface::class,
 			ConversationReadStateInterface::class,
 			ConversationRetentionInterface::class,
@@ -138,8 +138,8 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$resolved = ConversationStoreFactory::get();
 
 		$this->assertSame( $memory_store, $resolved );
-		$this->assertInstanceOf( ConversationTranscriptStoreInterface::class, $resolved );
-		$this->assertInstanceOf( ConversationTranscriptLockInterface::class, $resolved );
+		$this->assertInstanceOf( WP_Agent_Conversation_Store::class, $resolved );
+		$this->assertInstanceOf( WP_Agent_Conversation_Lock::class, $resolved );
 		$this->assertInstanceOf( ConversationSessionIndexInterface::class, $resolved );
 		$this->assertInstanceOf( ConversationReadStateInterface::class, $resolved );
 		$this->assertInstanceOf( ConversationRetentionInterface::class, $resolved );
@@ -160,8 +160,8 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$resolved = ConversationStoreFactory::get_transcript_store();
 
 		$this->assertSame( $memory_store, $resolved );
-		$this->assertInstanceOf( ConversationTranscriptStoreInterface::class, $resolved );
-		$this->assertInstanceOf( ConversationTranscriptLockInterface::class, $resolved );
+		$this->assertInstanceOf( WP_Agent_Conversation_Store::class, $resolved );
+		$this->assertInstanceOf( WP_Agent_Conversation_Lock::class, $resolved );
 	}
 
 	public function test_misbehaving_filter_falls_back_to_default(): void {
@@ -299,10 +299,10 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 	/**
 	 * Persist a transcript through only the narrow runtime contract.
 	 *
-	 * @param ConversationTranscriptStoreInterface $store Transcript store.
+	 * @param WP_Agent_Conversation_Store $store Transcript store.
 	 * @return array<string, mixed>
 	 */
-	private function persist_fixture_transcript( ConversationTranscriptStoreInterface $store ): array {
+	private function persist_fixture_transcript( WP_Agent_Conversation_Store $store ): array {
 		$session_id = $store->create_session(
 			$this->workspace(),
 			5,
@@ -411,7 +411,7 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$this->assertSame( 'hello', $result['sessions'][0]['first_message'] );
 	}
 
-	private function workspace(): AgentWorkspaceScope {
-		return AgentWorkspaceScope::from_parts( 'site', 'https://example.test' );
+	private function workspace(): WP_Agent_Workspace_Scope {
+		return WP_Agent_Workspace_Scope::from_parts( 'site', 'https://example.test' );
 	}
 }

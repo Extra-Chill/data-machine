@@ -16,7 +16,7 @@ datamachine_tests_require_agents_api();
 
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/DataMachineAgentConsentPolicy.php';
 
-use AgentsAPI\AI\Consent\AgentConsentOperation;
+use AgentsAPI\AI\Consent\WP_Agent_Consent_Operation;
 use DataMachine\Engine\AI\DataMachineAgentConsentPolicy;
 
 $failures = array();
@@ -43,9 +43,9 @@ if ( ! function_exists( 'apply_filters' ) ) {
 
 $policy = DataMachineAgentConsentPolicy::get();
 
-$assert_true( $policy instanceof WP_Agent_Consent_Policy_Interface, 'Data Machine exposes the Agents API consent policy interface' );
-$assert_true( AgentConsentOperation::STORE_MEMORY === 'store_memory', 'Agents API memory operation vocabulary is installed' );
-$assert_true( AgentConsentOperation::STORE_TRANSCRIPT === 'store_transcript', 'Agents API transcript operation vocabulary is installed' );
+$assert_true( $policy instanceof WP_Agent_Consent_Policy, 'Data Machine exposes the Agents API consent policy interface' );
+$assert_true( WP_Agent_Consent_Operation::STORE_MEMORY === 'store_memory', 'Agents API memory operation vocabulary is installed' );
+$assert_true( WP_Agent_Consent_Operation::STORE_TRANSCRIPT === 'store_transcript', 'Agents API transcript operation vocabulary is installed' );
 
 $memory_decision = $policy->can_store_memory(
 	array(
@@ -57,7 +57,7 @@ $memory_decision = $policy->can_store_memory(
 	)
 );
 $assert_true( $memory_decision->is_allowed(), 'memory storage consent follows Data Machine memory permissions' );
-$assert_true( AgentConsentOperation::STORE_MEMORY === $memory_decision->operation(), 'memory decision uses Agents API store_memory operation' );
+$assert_true( WP_Agent_Consent_Operation::STORE_MEMORY === $memory_decision->operation(), 'memory decision uses Agents API store_memory operation' );
 
 $pipeline_default = $policy->can_store_transcript(
 	array(
@@ -68,7 +68,7 @@ $pipeline_default = $policy->can_store_transcript(
 	)
 );
 $assert_true( ! $pipeline_default->is_allowed(), 'non-interactive transcript storage remains denied by default' );
-$assert_true( AgentConsentOperation::STORE_TRANSCRIPT === $pipeline_default->operation(), 'pipeline decision uses Agents API store_transcript operation' );
+$assert_true( WP_Agent_Consent_Operation::STORE_TRANSCRIPT === $pipeline_default->operation(), 'pipeline decision uses Agents API store_transcript operation' );
 
 $pipeline_opt_in = $policy->can_store_transcript(
 	array(
@@ -95,11 +95,11 @@ $assert_true( $chat_decision->is_allowed(), 'interactive chat transcript storage
 
 $share_default = $policy->can_share_transcript( array( 'mode' => 'chat', 'interactive' => true ) );
 $assert_true( ! $share_default->is_allowed(), 'transcript sharing is independently denied without explicit consent' );
-$assert_true( AgentConsentOperation::SHARE_TRANSCRIPT === $share_default->operation(), 'sharing decision uses Agents API share_transcript operation' );
+$assert_true( WP_Agent_Consent_Operation::SHARE_TRANSCRIPT === $share_default->operation(), 'sharing decision uses Agents API share_transcript operation' );
 
 $escalation_default = $policy->can_escalate_to_human( array( 'mode' => 'chat', 'interactive' => true ) );
 $assert_true( ! $escalation_default->is_allowed(), 'human escalation is independently denied without explicit consent' );
-$assert_true( AgentConsentOperation::ESCALATE_TO_HUMAN === $escalation_default->operation(), 'escalation decision uses Agents API escalate_to_human operation' );
+$assert_true( WP_Agent_Consent_Operation::ESCALATE_TO_HUMAN === $escalation_default->operation(), 'escalation decision uses Agents API escalate_to_human operation' );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " Data Machine consent policy assertions failed.\n";

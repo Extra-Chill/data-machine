@@ -11,7 +11,7 @@
 
 namespace DataMachine\Engine\AI;
 
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Message;
 use DataMachine\Engine\AI\Directives\DirectiveInterface;
 use DataMachine\Engine\AI\Directives\DirectiveOutputValidator;
 use DataMachine\Engine\AI\Directives\DirectiveRenderer;
@@ -57,7 +57,7 @@ class PromptBuilder {
 	 * @return self
 	 */
 	public function setMessages( array $messages ): self {
-		$this->messages = AgentMessageEnvelope::normalize_many( $messages );
+		$this->messages = WP_Agent_Message::normalize_many( $messages );
 		return $this;
 	}
 
@@ -191,7 +191,7 @@ class PromptBuilder {
 		$directive_messages = DirectiveRenderer::renderMessages( $validated_outputs );
 
 		return array(
-			'messages'            => AgentMessageEnvelope::normalize_many( array_merge( $directive_messages, $conversation_messages ) ),
+			'messages'            => WP_Agent_Message::normalize_many( array_merge( $directive_messages, $conversation_messages ) ),
 			'tools'               => $this->tools,
 			'applied_directives'  => $applied_directives,
 			'directive_metadata'  => $directive_metadata,

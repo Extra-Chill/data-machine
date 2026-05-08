@@ -262,7 +262,29 @@ class RecurringScheduler {
 		if ( ! function_exists( 'as_next_scheduled_action' ) ) {
 			return false;
 		}
+
+		if ( ! self::isActionSchedulerDataStoreReady() ) {
+			return false;
+		}
+
 		return false !== as_next_scheduled_action( $hook, $args, $group );
+	}
+
+	/**
+	 * Check whether Action Scheduler's datastore is ready for procedural API reads.
+	 *
+	 * @return bool True when Action Scheduler can safely query scheduled actions.
+	 */
+	private static function isActionSchedulerDataStoreReady(): bool {
+		if ( function_exists( 'did_action' ) && 0 === did_action( 'action_scheduler_init' ) ) {
+			return false;
+		}
+
+		if ( ! class_exists( '\ActionScheduler' ) || ! method_exists( '\ActionScheduler', 'is_initialized' ) ) {
+			return true;
+		}
+
+		return \ActionScheduler::is_initialized();
 	}
 
 	/**
@@ -288,6 +310,10 @@ class RecurringScheduler {
 	 */
 	private static function getPendingAction( string $hook, array $args, string $group ): ?object {
 		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
+			return null;
+		}
+
+		if ( ! self::isActionSchedulerDataStoreReady() ) {
 			return null;
 		}
 

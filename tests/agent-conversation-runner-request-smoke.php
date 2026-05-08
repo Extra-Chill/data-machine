@@ -3,7 +3,7 @@
  * Smoke test for datamachine_run_conversation() substrate integration.
  *
  * Verifies that DM's conversation entry point correctly delegates to the
- * upstream AgentConversationLoop::run() and returns a normalized result.
+ * upstream WP_Agent_Conversation_Loop::run() and returns a normalized result.
  *
  * Run with: php tests/agent-conversation-runner-request-smoke.php
  *
@@ -45,9 +45,9 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 }
 
 if ( ! function_exists( 'get_option' ) ) {
-	function get_option( string $name, $default = false ) {
+	function get_option( string $name, $default_value = false ) {
 		unset( $name );
-		return $default;
+		return $default_value;
 	}
 }
 
@@ -56,7 +56,7 @@ require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
 
 use DataMachine\Engine\AI\LoopEventSinkInterface;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Message;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
 

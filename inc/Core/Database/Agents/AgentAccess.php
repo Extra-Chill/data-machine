@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class AgentAccess extends BaseRepository implements \WP_Agent_Access_Store_Interface {
+class AgentAccess extends BaseRepository implements \WP_Agent_Access_Store {
 
 	/**
 	 * Table name (without prefix).

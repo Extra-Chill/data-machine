@@ -57,5 +57,6 @@ jobs:
         with:
           commands: ${{ matrix.command }}
           expected-commands: audit,lint,test
+          args: ${{ matrix.command == 'test' && '--setting playground_wordpress_version=7.0' || '' }}
           app-token: ${{ steps.app-token.outputs.token || '' }}
           autofix: 'false'

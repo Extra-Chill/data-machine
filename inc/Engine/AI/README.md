@@ -17,7 +17,7 @@ Use this quick map before moving or renaming files:
 
 | Area | Boundary |
 |---|---|
-| `AgentMessageEnvelope`, `AgentConversation*`, `LoopEventSinkInterface`, `RuntimeToolDeclaration` | Generic runtime candidates. |
+| `WP_Agent_Message`, `AgentConversation*`, `LoopEventSinkInterface`, `WP_Agent_Tool_Declaration` | Generic runtime candidates. |
 | `BuiltInAgentConversationRunner`, `AIConversationLoop`, request builders, prompt/directive helpers | Implementation candidates, still carrying Data Machine compatibility seams. |
 | `System\*`, `System\Tasks\*`, `System\Tasks\Retention\*` | Data Machine product automation. Do not move into Agents API. |
 | `Actions\*` | Data Machine pending-action product surface. Do not move into Agents API. |

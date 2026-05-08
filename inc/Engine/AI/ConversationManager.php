@@ -11,7 +11,7 @@
 
 namespace DataMachine\Engine\AI;
 
-use AgentsAPI\AI\AgentMessageEnvelope;
+use AgentsAPI\AI\WP_Agent_Message;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -41,7 +41,7 @@ class ConversationManager {
 	 * @return array Message envelope.
 	 */
 	public static function buildConversationMessage( string $role, $content, array $metadata = array() ): array {
-		return AgentMessageEnvelope::text( $role, $content, array_merge( array( 'timestamp' => gmdate( 'c' ) ), $metadata ) );
+		return WP_Agent_Message::text( $role, $content, array_merge( array( 'timestamp' => gmdate( 'c' ) ), $metadata ) );
 	}
 
 	/**
@@ -127,7 +127,7 @@ class ConversationManager {
 			$message .= ' with parameters: ' . implode( ', ', $params_str );
 		}
 
-		return AgentMessageEnvelope::toolCall(
+		return WP_Agent_Message::toolCall(
 			$message,
 			$tool_name,
 			$tool_parameters,
@@ -180,7 +180,7 @@ class ConversationManager {
 			$payload['error'] = $tool_result['error'];
 		}
 
-		return AgentMessageEnvelope::toolResult( $content, $tool_name, $payload, array( 'timestamp' => gmdate( 'c' ) ) );
+		return WP_Agent_Message::toolResult( $content, $tool_name, $payload, array( 'timestamp' => gmdate( 'c' ) ) );
 	}
 
 	/**
@@ -300,13 +300,13 @@ class ConversationManager {
 
 		// Scan ALL previous tool_call messages, not just the most recent one.
 		for ( $i = count( $conversation_messages ) - 1; $i >= 0; $i-- ) {
-			$message = AgentMessageEnvelope::normalize( $conversation_messages[ $i ] );
+			$message = WP_Agent_Message::normalize( $conversation_messages[ $i ] );
 
 			if ( 'assistant' !== $message['role'] ) {
 				continue;
 			}
 
-			if ( AgentMessageEnvelope::TYPE_TOOL_CALL !== $message['type'] ) {
+			if ( WP_Agent_Message::TYPE_TOOL_CALL !== $message['type'] ) {
 				continue;
 			}
 
@@ -341,9 +341,9 @@ class ConversationManager {
 	 * @return array|null Tool call details or null if not a tool call message
 	 */
 	public static function extractToolCallFromMessage( array $message ): ?array {
-		$envelope = AgentMessageEnvelope::normalize( $message );
+		$envelope = WP_Agent_Message::normalize( $message );
 
-		if ( AgentMessageEnvelope::TYPE_TOOL_CALL === $envelope['type'] ) {
+		if ( WP_Agent_Message::TYPE_TOOL_CALL === $envelope['type'] ) {
 			$tool_name  = $envelope['payload']['tool_name'] ?? null;
 			$parameters = $envelope['payload']['parameters'] ?? null;
 
@@ -433,7 +433,7 @@ class ConversationManager {
 	private static function buildDuplicateToolCallError( string $tool_name, string $mode ): string {
 		switch ( $mode ) {
 			case 'pipeline':
-				return "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters earlier in this conversation. Do NOT call it again. Move on — call the publish handler tool now to complete this step.";
+				return "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters earlier in this conversation. Do NOT call it again. Move on to the next required pipeline action using the result you already have.";
 			case 'bridge':
 				return "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters. Do NOT call it again. Continue your response to the user using the result you already have.";
 			case 'chat':

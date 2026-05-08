@@ -40,8 +40,8 @@ $GLOBALS['__test_actions']      = array();
 $GLOBALS['__test_schema_calls'] = array();
 
 if ( ! function_exists( 'get_option' ) ) {
-	function get_option( $name, $default = false ) {
-		return $GLOBALS['__test_options'][ $name ] ?? $default;
+	function get_option( $name, $default_value = false ) {
+		return $GLOBALS['__test_options'][ $name ] ?? $default_value;
 	}
 }
 

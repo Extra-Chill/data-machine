@@ -25,7 +25,7 @@
 
 namespace DataMachine\Engine\AI;
 
-use AgentsAPI\AI\Consent\AgentConsentDecision;
+use AgentsAPI\AI\Consent\WP_Agent_Consent_Decision;
 use DataMachine\Core\EngineData;
 
 defined( 'ABSPATH' ) || exit;
@@ -59,9 +59,9 @@ class PipelineTranscriptPolicy {
 	 * Resolve the Agents API consent decision for pipeline transcript storage.
 	 *
 	 * @param EngineData $engine Engine data snapshot for the running job.
-	 * @return AgentConsentDecision Consent decision with audit metadata.
+	 * @return WP_Agent_Consent_Decision Consent decision with audit metadata.
 	 */
-	public static function decision( EngineData $engine ): AgentConsentDecision {
+	public static function decision( EngineData $engine ): WP_Agent_Consent_Decision {
 		$flow_config     = $engine->getFlowConfig();
 		$pipeline_config = $engine->getPipelineConfig();
 		$job_snapshot    = $engine->get( 'job' );

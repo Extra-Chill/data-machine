@@ -7,15 +7,15 @@
 
 namespace DataMachine\Engine\AI;
 
-use AgentsAPI\AI\AgentConversationCompletionDecision;
-use AgentsAPI\AI\AgentConversationCompletionPolicyInterface;
+use AgentsAPI\AI\WP_Agent_Conversation_Completion_Decision;
+use AgentsAPI\AI\WP_Agent_Conversation_Completion_Policy;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Preserves pipeline handler completion behavior outside the generic turn loop.
  */
-class DataMachineHandlerCompletionPolicy implements AgentConversationCompletionPolicyInterface {
+class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Completion_Policy {
 
 	/** @var array Required handler slugs configured by the adjacent pipeline step. */
 	private array $configured_handlers;
@@ -33,12 +33,12 @@ class DataMachineHandlerCompletionPolicy implements AgentConversationCompletionP
 	/**
 	 * @inheritDoc
 	 */
-	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $runtime_context, int $turn_count ): AgentConversationCompletionDecision {
+	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $runtime_context, int $turn_count ): WP_Agent_Conversation_Completion_Decision {
 		$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
 		$mode            = (string) ( $runtime_context['mode'] ?? '' );
 
 		if ( 'pipeline' !== $mode || ! $is_handler_tool || ! ( $tool_result['success'] ?? false ) ) {
-			return AgentConversationCompletionDecision::incomplete();
+			return WP_Agent_Conversation_Completion_Decision::incomplete();
 		}
 
 		$handler_slug = $tool_def['handler'] ?? null;
@@ -47,8 +47,8 @@ class DataMachineHandlerCompletionPolicy implements AgentConversationCompletionP
 		}
 
 		if ( empty( $this->configured_handlers ) ) {
-			return AgentConversationCompletionDecision::complete(
-				'AIConversationLoop: Handler tool executed (legacy mode), ending conversation',
+			return WP_Agent_Conversation_Completion_Decision::complete(
+				'AIConversationLoop: Handler tool executed without configured handler list, ending conversation',
 				array(
 					'tool_name'  => $tool_name,
 					'turn_count' => $turn_count,
@@ -58,7 +58,7 @@ class DataMachineHandlerCompletionPolicy implements AgentConversationCompletionP
 
 		$remaining = array_diff( $this->configured_handlers, array_unique( $this->executed_handler_slugs ) );
 		if ( empty( $remaining ) ) {
-			return AgentConversationCompletionDecision::complete(
+			return WP_Agent_Conversation_Completion_Decision::complete(
 				'AIConversationLoop: All configured handlers executed, ending conversation',
 				array(
 					'tool_name'           => $tool_name,
@@ -69,7 +69,7 @@ class DataMachineHandlerCompletionPolicy implements AgentConversationCompletionP
 			);
 		}
 
-		return AgentConversationCompletionDecision::incomplete(
+		return WP_Agent_Conversation_Completion_Decision::incomplete(
 			'AIConversationLoop: Handler executed, waiting for remaining handlers',
 			array(
 				'tool_name'          => $tool_name,

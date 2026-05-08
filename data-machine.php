@@ -3,9 +3,10 @@
  * Plugin Name:     Data Machine
  * Plugin URI:      https://wordpress.org/plugins/data-machine/
  * Description:     AI-powered WordPress plugin for automated content workflows with visual pipeline builder and multi-provider AI integration.
- * Version:           0.103.14
- * Requires at least: 6.9
+ * Version:           0.106.0
+ * Requires at least: 7.0
  * Requires PHP:     8.2
+ * Requires Plugins: agents-api
  * Author:          Chris Huber, extrachill
  * Author URI:      https://chubes.net
  * License:         GPL v2 or later
@@ -21,19 +22,12 @@ if ( ! datamachine_check_requirements() ) {
 	return;
 }
 
-define( 'DATAMACHINE_VERSION', '0.103.14' );
+define( 'DATAMACHINE_VERSION', '0.106.0' );
 
 define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
 
 require_once __DIR__ . '/vendor/autoload.php';
-
-if ( ! defined( 'AGENTS_API_LOADED' ) ) {
-	$datamachine_agents_api_bootstrap = __DIR__ . '/vendor/automattic/agents-api/agents-api.php';
-	if ( file_exists( $datamachine_agents_api_bootstrap ) ) {
-		require_once $datamachine_agents_api_bootstrap;
-	}
-}
 
 // WP-CLI integration
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
@@ -48,11 +42,34 @@ if ( ! class_exists( 'ActionScheduler' ) ) {
 	require_once __DIR__ . '/vendor/woocommerce/action-scheduler/action-scheduler.php';
 }
 
+if ( function_exists( 'wp_installing' ) && wp_installing() ) {
+	add_action( 'wp_loaded', 'datamachine_skip_action_scheduler_migration_during_install', 0 );
+}
+
+/**
+ * Prevent AS migration scheduling during wp-phpunit install bootstrap.
+ *
+ * @return void
+ */
+function datamachine_skip_action_scheduler_migration_during_install(): void {
+	if ( ! class_exists( '\Action_Scheduler\Migration\Controller' ) ) {
+		return;
+	}
+
+	remove_action( 'wp_loaded', array( \Action_Scheduler\Migration\Controller::instance(), 'schedule_migration' ) );
+}
+
 
 function datamachine_run_datamachine_plugin() {
 	if ( ! datamachine_should_load_full_runtime() ) {
 		return;
 	}
+
+	static $runtime_loaded = false;
+	if ( $runtime_loaded ) {
+		return;
+	}
+	$runtime_loaded = true;
 
 	// Set Action Scheduler timeout to 10 minutes (600 seconds) for large tasks
 	add_filter(
@@ -90,6 +107,8 @@ function datamachine_run_datamachine_plugin() {
 	// Load and instantiate all handlers - they self-register via constructors
 	datamachine_load_handlers();
 	\DataMachine\Engine\Bundle\AuthRefHandlerConfig::register();
+	\DataMachine\Engine\Bundle\BundleSourceAuth::register();
+	\DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::register();
 
 	// Initialize FetchHandler to register skip_item tool for all fetch-type handlers
 	\DataMachine\Core\Steps\Fetch\Handlers\FetchHandler::init();
@@ -256,7 +275,6 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\LocalSearchAbilities();
 	new \DataMachine\Abilities\SourceAggregateAbility();
 	new \DataMachine\Abilities\SystemAbilities();
-	new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();
 	new \DataMachine\Abilities\Media\AltTextAbilities();
 	new \DataMachine\Abilities\Media\ImageGenerationAbilities();
 	new \DataMachine\Abilities\Media\MediaAbilities();
@@ -307,6 +325,10 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Publish\SendEmailAbility();
 	new \DataMachine\Abilities\Update\UpdateWordPressAbility();
 	new \DataMachine\Abilities\Handler\TestHandlerAbility();
+
+	// Register system tasks after every ability hook is attached. Task registry
+	// initialization can resolve abilities, which lazily fires wp_abilities_api_init.
+	new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();
 
 	// Deferred scaffold: during plugin activation the Abilities API is unavailable
 	// because init fires before the plugin file is included. A transient signals that
@@ -406,8 +428,12 @@ function datamachine_activate_defaults_for_site() {
 	add_option( 'datamachine_settings', $default_settings );
 }
 
-// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
-add_action( 'plugins_loaded', 'datamachine_run_datamachine_plugin', 20 );
+if ( did_action( 'plugins_loaded' ) ) {
+	datamachine_run_datamachine_plugin();
+} else {
+	// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
+	add_action( 'plugins_loaded', 'datamachine_run_datamachine_plugin', 20 );
+}
 
 
 
@@ -802,8 +828,8 @@ require_once __DIR__ . '/inc/migrations/load.php';
 
 function datamachine_check_requirements() {
 	global $wp_version;
-	$current_wp_version = $wp_version ?? '0.0.0';
-	if ( version_compare( $current_wp_version, '6.9', '<' ) ) {
+	$current_wp_version = $wp_version ?? '';
+	if ( '' !== $current_wp_version && ! wp_installing() && version_compare( $current_wp_version, '7.0', '<' ) ) {
 		add_action(
 			'admin_notices',
 			function () use ( $current_wp_version ) {
@@ -811,7 +837,7 @@ function datamachine_check_requirements() {
 				printf(
 					esc_html( 'Data Machine requires WordPress %2$s or higher. You are running WordPress %1$s.' ),
 					esc_html( $current_wp_version ),
-					'6.9'
+					'7.0'
 				);
 				echo '</p></div>';
 			}
