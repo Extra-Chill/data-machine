@@ -50,7 +50,7 @@ final class AgentBundleFlowFile {
 		BundleSchema::assert_supported_version( $data, 'flow file' );
 		foreach ( array( 'slug', 'name', 'pipeline_slug', 'schedule', 'max_items', 'steps' ) as $field ) {
 			if ( ! array_key_exists( $field, $data ) ) {
-				throw new BundleValidationException( "flow file is missing required field {$field}." );
+				throw new BundleValidationException( sprintf( 'flow file is missing required field %s.', $field ) );
 			}
 		}
 
@@ -81,7 +81,7 @@ final class AgentBundleFlowFile {
 			}
 			foreach ( array( 'step_position', 'handler_configs' ) as $field ) {
 				if ( ! array_key_exists( $field, $step ) ) {
-					throw new BundleValidationException( "flow file step is missing required field {$field}." );
+					throw new BundleValidationException( sprintf( 'flow file step is missing required field %s.', $field ) );
 				}
 			}
 			if ( ! is_array( $step['handler_configs'] ) ) {
@@ -164,13 +164,13 @@ final class AgentBundleFlowFile {
 	 */
 	private static function normalize_string_list( string $field, $value ): array {
 		if ( ! is_array( $value ) || ! array_is_list( $value ) ) {
-			throw new BundleValidationException( "flow file {$field} must be a list of strings." );
+			throw new BundleValidationException( sprintf( 'flow file %s must be a list of strings.', $field ) );
 		}
 
 		$normalized = array();
 		foreach ( $value as $item ) {
 			if ( ! is_string( $item ) ) {
-				throw new BundleValidationException( "flow file {$field} must be a list of strings." );
+				throw new BundleValidationException( sprintf( 'flow file %s must be a list of strings.', $field ) );
 			}
 			$normalized[] = $item;
 		}

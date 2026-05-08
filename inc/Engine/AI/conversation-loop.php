@@ -425,7 +425,7 @@ function datamachine_build_turn_runner(
 						'success' => false,
 						'error'   => $runtime_rule_result['error'],
 					);
-					$messages[] = ConversationManager::formatToolResultMessage( $tool_name, $tool_result, $tool_parameters, false, $turn_count );
+					$messages[]             = ConversationManager::formatToolResultMessage( $tool_name, $tool_result, $tool_parameters, false, $turn_count );
 					$runtime_rule_rejected = true;
 					do_action(
 						'datamachine_log',
