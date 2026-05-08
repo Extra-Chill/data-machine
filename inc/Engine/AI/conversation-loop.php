@@ -573,12 +573,12 @@ function datamachine_build_turn_runner(
 		}
 
 		return array(
-			'messages'               => $messages,
-			'tool_execution_results' => $tool_execution_results,
-			'conversation_complete'  => $conversation_complete,
-			'completion_nudge'       => $completion_nudge ?? '',
+			'messages'                     => $messages,
+			'tool_execution_results'       => $tool_execution_results,
+			'conversation_complete'        => $conversation_complete,
+			'completion_nudge'             => $completion_nudge ?? '',
 			'duplicate_tool_call_rejected' => $duplicate_rejected,
-			'tool_runtime_rule_rejected' => $runtime_rule_rejected,
+			'tool_runtime_rule_rejected'   => $runtime_rule_rejected,
 		);
 	};
 }
