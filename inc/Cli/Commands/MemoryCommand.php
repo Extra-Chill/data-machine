@@ -263,8 +263,8 @@ class MemoryCommand extends BaseCommand {
 			return;
 		}
 
-		$from_file     = $assoc_args['from-file'] ?? null;
-		$stdin_marker  = ( ! empty( $args ) && '-' === end( $args ) );
+		$from_file    = $assoc_args['from-file'] ?? null;
+		$stdin_marker = ( ! empty( $args ) && '-' === end( $args ) );
 		reset( $args );
 
 		if ( null !== $from_file && $stdin_marker ) {
@@ -297,7 +297,7 @@ class MemoryCommand extends BaseCommand {
 				return;
 			}
 
-			$content = file_get_contents( $from_file );
+			$content = file_get_contents( $from_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- CLI reads a local filesystem path supplied by --from-file.
 			if ( false === $content ) {
 				WP_CLI::error( sprintf( 'Failed to read --from-file path: %s', $from_file ) );
 				return;
