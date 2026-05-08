@@ -303,6 +303,25 @@ assert_runtime_policy( 3 === $nudge_dispatch_count, 'missing natural assertion n
 assert_runtime_policy( str_contains( wp_json_encode( $nudge_second_request ), 'completion signals are still missing' ), 'nudge is appended before retry request' );
 assert_runtime_policy( 1 === count( $nudge_result['tool_execution_results'] ?? array() ), 'nudged loop captures required tool result' );
 
+$assertion_policy = new DataMachineHandlerCompletionPolicy(
+	array(),
+	new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
+		array(
+			'required_tool_names' => array( 'create_github_pull_request', 'comment_github_pull_request' ),
+		)
+	)
+);
+$assertion_decision = $assertion_policy->recordToolResult(
+	'workspace_read',
+	array( 'handler' => 'workspace_read' ),
+	array( 'success' => true ),
+	array( 'mode' => 'pipeline' ),
+	1
+);
+
+assert_runtime_policy( ! $assertion_decision->isComplete(), 'handler policy waits when generic assertions are missing' );
+assert_runtime_policy( str_contains( $assertion_decision->context()['continuation_message'] ?? '', 'completion signals are still missing' ), 'handler policy provides assertion continuation nudge' );
+
 $dispatch_count     = 0;
 $provider_context   = null;
 $completion_policy  = new RuntimePolicySmokeCompletionPolicy();

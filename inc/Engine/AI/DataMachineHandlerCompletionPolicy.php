@@ -54,6 +54,11 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 		}
 
 		if ( empty( $this->configured_handlers ) ) {
+			$missing_assertions = $this->incompleteAssertionsDecision( $runtime_context, $turn_count );
+			if ( null !== $missing_assertions ) {
+				return $missing_assertions;
+			}
+
 			return WP_Agent_Conversation_Completion_Decision::complete(
 				'AIConversationLoop: Handler tool executed without configured handler list, ending conversation',
 				array(
@@ -65,6 +70,11 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 
 		$remaining = array_diff( $this->configured_handlers, array_unique( $this->executed_handler_slugs ) );
 		if ( empty( $remaining ) ) {
+			$missing_assertions = $this->incompleteAssertionsDecision( $runtime_context, $turn_count );
+			if ( null !== $missing_assertions ) {
+				return $missing_assertions;
+			}
+
 			return WP_Agent_Conversation_Completion_Decision::complete(
 				'AIConversationLoop: All configured handlers executed, ending conversation',
 				array(
@@ -108,6 +118,36 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 				'satisfied'            => $evaluation['satisfied'],
 				'required'             => $this->assertions->required(),
 				'continuation_message' => DataMachineCompletionAssertions::buildNudge( $evaluation['missing'], $messages ),
+			)
+		);
+	}
+
+	/**
+	 * Keep handler-style tools from ending a run before generic completion
+	 * assertions are satisfied.
+	 *
+	 * @param array $runtime_context Caller-owned runtime context.
+	 * @param int   $turn_count      Current turn count.
+	 * @return WP_Agent_Conversation_Completion_Decision|null
+	 */
+	private function incompleteAssertionsDecision( array $runtime_context, int $turn_count ): ?WP_Agent_Conversation_Completion_Decision {
+		if ( ! $this->assertions->hasAssertions() ) {
+			return null;
+		}
+
+		$evaluation = $this->assertions->evaluate( $runtime_context );
+		if ( $evaluation['complete'] ) {
+			return null;
+		}
+
+		return WP_Agent_Conversation_Completion_Decision::incomplete(
+			'AIConversationLoop: Handler completion assertions missing, nudging continuation',
+			array(
+				'turn_count'           => $turn_count,
+				'missing'              => $evaluation['missing'],
+				'satisfied'            => $evaluation['satisfied'],
+				'required'             => $this->assertions->required(),
+				'continuation_message' => DataMachineCompletionAssertions::buildNudge( $evaluation['missing'], array() ),
 			)
 		);
 	}
