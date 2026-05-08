@@ -84,10 +84,11 @@ class SnapshotPolicyToolManager extends ToolManager {
 
 	public function get_all_tools(): array {
 		return array(
-			'alpha_tool'  => array( 'modes' => array( 'pipeline' ) ),
-			'beta_tool'   => array( 'modes' => array( 'pipeline' ) ),
-			'danger_tool' => array( 'modes' => array( 'pipeline' ) ),
-			'chat_only'   => array( 'modes' => array( 'chat' ) ),
+			'alpha_tool'         => array( 'modes' => array( 'pipeline' ) ),
+			'beta_tool'          => array( 'modes' => array( 'pipeline' ) ),
+			'danger_tool'        => array( 'modes' => array( 'pipeline' ) ),
+			'agent_daily_memory' => array( 'modes' => array( 'chat', 'pipeline_policy' ) ),
+			'chat_only'          => array( 'modes' => array( 'chat' ) ),
 		);
 	}
 
@@ -150,7 +151,20 @@ $tools   = resolve_policy_tools_for_test(
 	$manager
 );
 assert_policy_equals( array( 'alpha_tool' ), array_keys( $tools ), 'allowlist keeps only enabled tool', $failures, $passes );
-assert_policy_equals( array( null, null, null ), $manager->availability_contexts, 'pipeline availability does not pass context IDs', $failures, $passes );
+assert_policy_equals( array( null, null, null ), $manager->availability_contexts, 'pipeline availability does not pass context IDs for default pipeline tools', $failures, $passes );
+
+$manager = new SnapshotPolicyToolManager();
+$tools   = resolve_policy_tools_for_test(
+	array(
+		'step_type'        => 'ai',
+		'pipeline_step_id' => 'ephemeral_pipeline_0',
+		'enabled_tools'    => array( 'agent_daily_memory' ),
+	),
+	array(),
+	$manager
+);
+assert_policy_equals( array( 'agent_daily_memory' ), array_keys( $tools ), 'allowlist can intentionally grant policy-controlled daily memory tool', $failures, $passes );
+assert_policy_equals( array( null, null, null, null ), $manager->availability_contexts, 'policy-controlled daily memory still uses pipeline availability checks', $failures, $passes );
 
 echo "\n[2] ephemeral workflow disabled_tools deny from snapshot:\n";
 $ephemeral = WorkflowConfigFactory::buildEphemeralConfigs(
@@ -168,7 +182,7 @@ $flow_step_config     = $ephemeral['flow_config']['ephemeral_step_0'];
 $pipeline_step_config = $ephemeral['pipeline_config']['ephemeral_pipeline_0'];
 $manager              = new SnapshotPolicyToolManager();
 $tools                = resolve_policy_tools_for_test( $flow_step_config, $pipeline_step_config, $manager );
-assert_policy_equals( array( 'alpha_tool', 'beta_tool' ), array_keys( $tools ), 'ephemeral disabled_tools removes denied tool without DB row', $failures, $passes );
+assert_policy_equals( array( 'alpha_tool', 'beta_tool' ), array_keys( $tools ), 'ephemeral disabled_tools removes denied tool without DB row and does not auto-grant daily memory', $failures, $passes );
 assert_policy_equals( array( null, null, null ), $manager->availability_contexts, 'ephemeral policy never re-reads by synthetic pipeline step ID', $failures, $passes );
 
 echo "\n[3] persistent workflow disabled_tools still apply from snapshot:\n";
