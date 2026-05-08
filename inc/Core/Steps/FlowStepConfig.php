@@ -306,7 +306,7 @@ class FlowStepConfig {
 				return is_array( $config ) ? $config : array();
 			}
 
-			$config = $slug === ( $step_config['handler_slug'] ?? null ) ? ( $step_config['handler_config'] ?? array() ) : array();
+			$config = ( $step_config['handler_slug'] ?? null ) === $slug ? ( $step_config['handler_config'] ?? array() ) : array();
 			return is_array( $config ) ? $config : array();
 		}
 
@@ -352,7 +352,7 @@ class FlowStepConfig {
 	 * @return array Canonicalized step configuration.
 	 */
 	public static function normalizeHandlerShape( array $step_config ): array {
-		$uses_handler = self::usesHandler( $step_config );
+		$uses_handler    = self::usesHandler( $step_config );
 		$scalar_slug     = is_string( $step_config['handler_slug'] ?? null ) ? $step_config['handler_slug'] : '';
 		$scalar_config   = is_array( $step_config['handler_config'] ?? null ) ? $step_config['handler_config'] : array();
 		$step_settings   = is_array( $step_config['flow_step_settings'] ?? null ) ? $step_config['flow_step_settings'] : array();
@@ -450,26 +450,5 @@ class FlowStepConfig {
 			}
 		}
 		return $clean;
-	}
-
-	/**
-	 * Log a handler-shape contract violation.
-	 *
-	 * @param string $message Violation message.
-	 * @param array  $step_config Step configuration array.
-	 * @return void
-	 */
-	private static function warnContractViolation( string $message, array $step_config ): void {
-		if ( function_exists( 'do_action' ) ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'FlowStepConfig handler-shape contract violation',
-				array(
-					'message'   => $message,
-					'step_type' => $step_config['step_type'] ?? '',
-				)
-			);
-		}
 	}
 }

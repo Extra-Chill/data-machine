@@ -230,7 +230,7 @@ class ConfigureFlowStepsAbility {
 			if ( isset( $fc['flow_id'] ) ) {
 				$flow_handler_configs = is_array( $fc['handler_configs'] ?? null ) ? $fc['handler_configs'] : array();
 				if ( ! empty( $flow_handler_configs ) ) {
-					$config_slug = is_string( $target_handler_slug ) && '' !== $target_handler_slug ? $target_handler_slug : $handler_slug;
+					$config_slug                                = is_string( $target_handler_slug ) && '' !== $target_handler_slug ? $target_handler_slug : $handler_slug;
 					$flow_configs_by_id[ (int) $fc['flow_id'] ] = is_string( $config_slug ) && is_array( $flow_handler_configs[ $config_slug ] ?? null ) ? $flow_handler_configs[ $config_slug ] : array();
 				} elseif ( is_array( $fc['flow_step_settings'] ?? null ) ) {
 					$flow_configs_by_id[ (int) $fc['flow_id'] ] = $fc['flow_step_settings'];
@@ -552,12 +552,20 @@ class ConfigureFlowStepsAbility {
 
 				$target = FlowStepTargetResolver::resolve( $flow_config, (string) $step_key, $config );
 				if ( empty( $target['success'] ) ) {
-					$errors[] = array_merge( array( 'flow_id' => $flow_id ), $target['error'] );
+					$target_error = is_array( $target['error'] ?? null ) ? $target['error'] : array( 'error' => 'Unable to resolve flow step target' );
+					$errors[]     = array_merge( array( 'flow_id' => $flow_id ), $target_error );
 					continue;
 				}
 
-				$flow_step_id = $target['flow_step_id'];
-				$step_type    = $target['step_type'] ?? (string) $step_key;
+				$flow_step_id = (string) ( $target['flow_step_id'] ?? '' );
+				if ( '' === $flow_step_id ) {
+					$errors[] = array(
+						'flow_id' => $flow_id,
+						'error'   => 'Unable to resolve flow step target',
+					);
+					continue;
+				}
+				$step_type = $target['step_type'] ?? (string) $step_key;
 
 				$handler_slug   = $config['handler_slug'] ?? null;
 				$handler_config = $config['handler_config'] ?? array();
@@ -585,7 +593,7 @@ class ConfigureFlowStepsAbility {
 				}
 
 				if ( ! empty( $handler_slug ) || ! empty( $handler_config ) ) {
-					$success = $this->updateHandler( $flow_step_id, $effective_slug ?? '', $handler_config );
+					$success = $this->updateHandler( $flow_step_id, $effective_slug, $handler_config );
 					if ( ! $success ) {
 						$errors[] = array(
 							'flow_id'      => $flow_id,

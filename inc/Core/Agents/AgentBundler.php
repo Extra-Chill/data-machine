@@ -275,6 +275,7 @@ class AgentBundler {
 		 * @param int                                $agent_id Agent ID being exported.
 		 * @param array                              $agent    Agent row.
 		 */
+		/** @var mixed $extras */
 		$extras = apply_filters( 'datamachine_bundle_export_extras', array(), $agent_id, $agent );
 		if ( ! is_array( $extras ) ) {
 			return array();
@@ -1079,10 +1080,6 @@ class AgentBundler {
 	 * is the safety net that cleans up any rows we know we created.
 	 */
 	private function begin_transaction(): bool {
-		if ( ! isset( $this->agents_repo ) ) {
-			return false;
-		}
-
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$result = $wpdb->query( 'START TRANSACTION' );

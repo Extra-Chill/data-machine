@@ -38,12 +38,12 @@ class FlowStepConfigFactory {
 				),
 				self::promptQueueFromWorkflowStep( $step ),
 				array(
-					'queue_mode'       => 'static',
-					'disabled_tools'   => $step['disabled_tools'] ?? array(),
-					'pipeline_id'      => 'direct',
-					'flow_id'          => 'direct',
-					'handler_slug'     => $step['handler_slug'] ?? '',
-					'handler_config'   => $step['handler_config'] ?? array(),
+					'queue_mode'         => 'static',
+					'disabled_tools'     => $step['disabled_tools'] ?? array(),
+					'pipeline_id'        => 'direct',
+					'flow_id'            => 'direct',
+					'handler_slug'       => $step['handler_slug'] ?? '',
+					'handler_config'     => $step['handler_config'] ?? array(),
 					'flow_step_settings' => $step['flow_step_settings'] ?? array(),
 				)
 			)
@@ -106,18 +106,18 @@ class FlowStepConfigFactory {
 	public static function build( array $args ): array {
 		$step_config = array();
 		$copy_fields = array(
-			'flow_step_id'       => true,
-			'pipeline_step_id'   => true,
-			'step_type'          => true,
-			'execution_order'    => true,
-			'enabled_tools'      => true,
-			'disabled_tools'     => true,
+			'flow_step_id'                        => true,
+			'pipeline_step_id'                    => true,
+			'step_type'                           => true,
+			'execution_order'                     => true,
+			'enabled_tools'                       => true,
+			'disabled_tools'                      => true,
 			QueueAbility::SLOT_PROMPT_QUEUE       => true,
 			QueueAbility::SLOT_CONFIG_PATCH_QUEUE => true,
-			'queue_mode'         => true,
-			'pipeline_id'        => true,
-			'flow_id'            => true,
-			'handler'            => true,
+			'queue_mode'                          => true,
+			'pipeline_id'                         => true,
+			'flow_id'                             => true,
+			'handler'                             => true,
 		);
 
 		foreach ( $args as $field => $value ) {
@@ -307,7 +307,7 @@ class FlowStepConfigFactory {
 				'added_at' => $added_at ?? gmdate( 'c' ),
 			),
 		);
-		$step_config['queue_mode']   = 'static';
+		$step_config['queue_mode']                      = 'static';
 
 		return $step_config;
 	}

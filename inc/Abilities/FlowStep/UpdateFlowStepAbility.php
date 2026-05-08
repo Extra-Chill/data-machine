@@ -104,12 +104,12 @@ class UpdateFlowStepAbility {
 	 * @return array Result with update status.
 	 */
 	public function execute( array $input ): array {
-		$flow_step_id     = $input['flow_step_id'] ?? null;
-		$handler_slug     = $input['handler_slug'] ?? null;
-		$handler_configs  = is_array( $input['handler_configs'] ?? null ) ? $input['handler_configs'] : array();
+		$flow_step_id       = $input['flow_step_id'] ?? null;
+		$handler_slug       = $input['handler_slug'] ?? null;
+		$handler_configs    = is_array( $input['handler_configs'] ?? null ) ? $input['handler_configs'] : array();
 		$flow_step_settings = is_array( $input['flow_step_settings'] ?? null ) ? $input['flow_step_settings'] : array();
-		$handler_config   = $input['handler_config'] ?? array();
-		$user_message     = $input['user_message'] ?? null;
+		$handler_config     = $input['handler_config'] ?? array();
+		$user_message       = $input['user_message'] ?? null;
 
 		if ( empty( $flow_step_id ) || ! is_string( $flow_step_id ) ) {
 			return array(
@@ -140,10 +140,13 @@ class UpdateFlowStepAbility {
 
 		$validation = $this->validateFlowStepId( $flow_step_id );
 		if ( ! $validation['valid'] ) {
-			return $validation['error_response'];
+			return is_array( $validation['error_response'] ?? null ) ? $validation['error_response'] : array(
+				'success' => false,
+				'error'   => 'Invalid flow_step_id',
+			);
 		}
 
-		$existing_step = $validation['step_config'];
+		$existing_step = is_array( $validation['step_config'] ?? null ) ? $validation['step_config'] : array();
 
 		$updated_fields = array();
 

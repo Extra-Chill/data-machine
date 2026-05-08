@@ -27,6 +27,7 @@ use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\JobStatus;
+use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\Tasks\TaskRegistry;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -229,6 +230,19 @@ class SystemTaskStep extends Step {
 		// envelope below to call executeTask(). Passthrough methods are
 		// pure declarations with no side effects.
 		$task_for_passthrough = new $handler_class();
+		if ( ! $task_for_passthrough instanceof SystemTask ) {
+			do_action(
+				'datamachine_fail_job',
+				$this->job_id,
+				'system_task_invalid_handler',
+				array(
+					'flow_step_id'  => $this->flow_step_id,
+					'task_type'     => $task_type,
+					'error_message' => 'System task handler must extend SystemTask.',
+				)
+			);
+			return array();
+		}
 
 		// Inject the standard pipeline-execution context bundle when the
 		// task declares it needs it. Replaces the per-task `if` block
@@ -248,10 +262,10 @@ class SystemTaskStep extends Step {
 		// task can read them from $params at execution time. Tasks
 		// opt in by listing key names from
 		// SystemTask::getFlowStepConfigPassthrough().
-		$fsc                  = $this->flow_step_config ?? array();
+		$fsc                   = $this->flow_step_config ?? array();
 		$flow_step_config_keys = $task_for_passthrough->getFlowStepConfigPassthrough();
 		foreach ( $flow_step_config_keys as $key ) {
-			if ( ! is_string( $key ) || '' === $key ) {
+			if ( '' === $key ) {
 				continue;
 			}
 			if ( array_key_exists( $key, $fsc ) ) {

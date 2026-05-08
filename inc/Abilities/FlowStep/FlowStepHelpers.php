@@ -306,8 +306,8 @@ trait FlowStepHelpers {
 
 		$step = &$flow_config[ $flow_step_id ];
 
-		$uses_handler     = FlowStepConfig::usesHandler( $step );
-		$effective_slug   = $uses_handler
+		$uses_handler   = FlowStepConfig::usesHandler( $step );
+		$effective_slug = $uses_handler
 			? FlowStepConfig::getEffectiveSlug( $step, $handler_slug )
 			: ( $step['step_type'] ?? '' );
 
