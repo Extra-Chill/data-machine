@@ -590,7 +590,7 @@ class ChatOrchestrator {
 
 		if ( $ability ) {
 			$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
-			$input = array(
+			$input      = array(
 				'user_id'    => $user_id,
 				'agent_slug' => $agent_slug,
 				'mode'       => 'chat',
