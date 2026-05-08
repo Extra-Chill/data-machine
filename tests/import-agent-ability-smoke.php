@@ -107,8 +107,8 @@ namespace {
 				return is_array( $bundle ) ? $bundle : null;
 			}
 
-			public function import( array $bundle, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false ): array {
-				self::$last_import = compact( 'bundle', 'new_slug', 'owner_id', 'dry_run' );
+			public function import( array $bundle, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false, array $options = array() ): array {
+				self::$last_import = compact( 'bundle', 'new_slug', 'owner_id', 'dry_run', 'options' );
 
 				return array(
 					'success' => true,
@@ -145,6 +145,7 @@ namespace {
 }
 
 namespace DataMachine\Engine\Bundle {
+	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSourceAuth.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSource.php';
 }
 
@@ -249,11 +250,25 @@ namespace {
 	$result = AgentAbilities::importAgent(
 		array(
 			'source'      => $bundle_path,
-			'on_conflict' => 'replace',
+			'on_conflict' => 'overwrite',
 		)
 	);
-	$assert( 'unsupported replace policy is rejected', false === $result['success'] );
-	$assert( 'replace policy is no longer claimed', str_contains( $result['error'], 'error, skip' ) );
+	$assert( 'unsupported overwrite policy is rejected', false === $result['success'] );
+	$assert( 'overwrite policy is not claimed', str_contains( $result['error'], 'error, skip, upgrade' ) );
+
+	$result = AgentAbilities::importAgent(
+		array(
+			'source'      => $bundle_path,
+			'on_conflict' => 'upgrade',
+		)
+	);
+	$assert( 'conflict upgrade succeeds', true === $result['success'] );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
+	$assert( 'conflict upgrade reaches bundler import', ! empty( AgentBundler::$last_import ) );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
+	$assert( 'conflict upgrade passes upgrade option', true === AgentBundler::$last_import['options']['is_upgrade'] );
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
+	$assert( 'conflict upgrade reconciles runtime artifacts', true === AgentBundler::$last_import['options']['reconcile_runtime'] );
 
 	echo "\n[2] Accepted import path\n";
 	$reset();
