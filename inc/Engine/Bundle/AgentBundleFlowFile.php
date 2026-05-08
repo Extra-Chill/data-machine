@@ -32,6 +32,7 @@ final class AgentBundleFlowFile {
 		'prompt_queue',
 		'config_patch_queue',
 		'queue_mode',
+		'completion_assertions',
 		'enabled',
 	);
 
@@ -117,6 +118,13 @@ final class AgentBundleFlowFile {
 		if ( 'handler_config' === $field ) {
 			if ( ! is_array( $value ) ) {
 				throw new BundleValidationException( 'flow file handler_config must be an object.' );
+			}
+			return $value;
+		}
+
+		if ( 'completion_assertions' === $field ) {
+			if ( ! is_array( $value ) ) {
+				throw new BundleValidationException( 'flow file completion_assertions must be an object.' );
 			}
 			return $value;
 		}

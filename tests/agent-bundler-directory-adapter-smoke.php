@@ -143,6 +143,12 @@ $array_bundle = array(
 					'pipeline_id'      => 88,
 					'flow_id'          => 144,
 					'execution_order'  => 1,
+					'completion_assertions' => array(
+						'required_tool_names' => array(
+							'create_github_pull_request',
+							'comment_github_pull_request',
+						),
+					),
 					'enabled_tools'    => array( 'datamachine/get-github-pull-review-context' ),
 					'disabled_tools'   => array( 'datamachine/delete-flow' ),
 					'prompt_queue'     => array(
@@ -189,6 +195,7 @@ assert_adapter_equals( 'flow document preserves step type', 'fetch', $flow['step
 assert_adapter_equals( 'flow document preserves config patch queue', array( 'after' => '2026-04-01' ), $flow['steps'][0]['config_patch_queue'][0]['patch'] ?? null );
 assert_adapter_equals( 'flow document preserves AI enabled tools', array( 'datamachine/get-github-pull-review-context' ), $flow['steps'][1]['enabled_tools'] );
 assert_adapter_equals( 'flow document preserves AI disabled tools', array( 'datamachine/delete-flow' ), $flow['steps'][1]['disabled_tools'] );
+assert_adapter_equals( 'flow document preserves completion assertions', array( 'create_github_pull_request', 'comment_github_pull_request' ), $flow['steps'][1]['completion_assertions']['required_tool_names'] ?? null );
 assert_adapter_equals( 'flow document preserves prompt queue', 'Review PR #1', $flow['steps'][1]['prompt_queue'][0]['prompt'] );
 assert_adapter_equals( 'flow document preserves queue mode', 'loop', $flow['steps'][1]['queue_mode'] );
 assert_adapter_equals( 'flow document preserves scheduling interval', 'hourly', $flow['schedule'] );
@@ -229,6 +236,7 @@ assert_adapter_equals( 'round-trip preserves config patch queue', array( 'after'
 assert_adapter_equals( 'round-trip preserves enabled flag', true, $round_steps[0]['enabled'] );
 assert_adapter_equals( 'round-trip preserves enabled tools', array( 'datamachine/get-github-pull-review-context' ), $round_steps[1]['enabled_tools'] );
 assert_adapter_equals( 'round-trip preserves disabled tools', array( 'datamachine/delete-flow' ), $round_steps[1]['disabled_tools'] );
+assert_adapter_equals( 'round-trip preserves completion assertions', array( 'create_github_pull_request', 'comment_github_pull_request' ), $round_steps[1]['completion_assertions']['required_tool_names'] ?? null );
 assert_adapter_equals( 'round-trip preserves prompt queue', 'Review PR #1', $round_steps[1]['prompt_queue'][0]['prompt'] );
 assert_adapter_equals( 'round-trip preserves queue mode', 'loop', $round_steps[1]['queue_mode'] );
 assert_adapter_equals( 'round-trip preserves scheduling interval', 'hourly', $round_flow['scheduling_config']['interval'] );
