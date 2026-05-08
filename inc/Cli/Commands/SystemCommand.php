@@ -96,6 +96,44 @@ class SystemCommand extends BaseCommand {
 				$rest_ok = $check_result['rest_status']['namespace_registered'] ?? false;
 				WP_CLI::log( sprintf( '  REST API:       %s', $rest_ok ? 'registered' : 'NOT registered' ) );
 			}
+			if ( isset( $check_result['status'] ) ) {
+				WP_CLI::log( sprintf( '  Status:         %s', $check_result['status'] ) );
+			}
+			if ( isset( $check_result['message'] ) ) {
+				WP_CLI::log( sprintf( '  Message:        %s', $check_result['message'] ) );
+			}
+			if ( isset( $check_result['action_scheduler'] ) && is_array( $check_result['action_scheduler'] ) ) {
+				$action_scheduler = $check_result['action_scheduler'];
+				WP_CLI::log( sprintf( '  Pending:        %d', (int) ( $action_scheduler['pending_count'] ?? 0 ) ) );
+				WP_CLI::log( sprintf( '  Due now:        %d', (int) ( $action_scheduler['due_count'] ?? 0 ) ) );
+				if ( ! empty( $action_scheduler['oldest_due_gmt'] ) ) {
+					WP_CLI::log( sprintf( '  Oldest due:     %s GMT', $action_scheduler['oldest_due_gmt'] ) );
+				}
+				if ( ! empty( $action_scheduler['last_attempt_gmt'] ) ) {
+					WP_CLI::log( sprintf( '  Last attempt:   %s GMT', $action_scheduler['last_attempt_gmt'] ) );
+				}
+			}
+			if ( isset( $check_result['wp_cron'] ) && is_array( $check_result['wp_cron'] ) ) {
+				$wp_cron = $check_result['wp_cron'];
+				if ( ! empty( $wp_cron['action_scheduler_run_queue_next_gmt'] ) ) {
+					WP_CLI::log( sprintf( '  WP-Cron AS run: %s GMT', $wp_cron['action_scheduler_run_queue_next_gmt'] ) );
+				}
+				if ( null !== ( $wp_cron['action_scheduler_run_queue_overdue_seconds'] ?? null ) ) {
+					WP_CLI::log( sprintf( '  WP-Cron lag:    %d seconds', (int) $wp_cron['action_scheduler_run_queue_overdue_seconds'] ) );
+				}
+			}
+			if ( isset( $check_result['daily_memory'] ) && is_array( $check_result['daily_memory'] ) ) {
+				$daily_memory = $check_result['daily_memory'];
+				if ( ! empty( $daily_memory['next_pending_gmt'] ) ) {
+					WP_CLI::log( sprintf( '  Daily memory:   next %s GMT', $daily_memory['next_pending_gmt'] ) );
+				}
+				if ( ! empty( $daily_memory['last_attempt_gmt'] ) ) {
+					WP_CLI::log( sprintf( '  Daily memory:   last attempted %s GMT', $daily_memory['last_attempt_gmt'] ) );
+				}
+			}
+			if ( ! empty( $check_result['recommendation'] ) ) {
+				WP_CLI::log( sprintf( '  Recommendation: %s', $check_result['recommendation'] ) );
+			}
 
 			WP_CLI::log( '' );
 		}

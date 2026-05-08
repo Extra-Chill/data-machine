@@ -17,6 +17,7 @@ use DataMachine\Engine\AI\RequestBuilder;
 use AgentsAPI\AI\WP_Agent_Message;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Tasks\TaskScheduler;
 use DataMachine\Engine\Tasks\TaskRegistry;
 
@@ -155,6 +156,11 @@ class SystemAbilities {
 				'callback' => array( $this, 'runSystemDiagnostics' ),
 				'default'  => true,
 			),
+			'scheduler' => array(
+				'label'    => __( 'Scheduler Health', 'data-machine' ),
+				'callback' => array( $this, 'runSchedulerDiagnostics' ),
+				'default'  => true,
+			),
 		);
 
 		return apply_filters( 'datamachine_system_health_checks', $checks );
@@ -217,6 +223,179 @@ class SystemAbilities {
 			'abilities'   => $this->listRegisteredAbilities(),
 			'rest_status' => $this->checkRestApi(),
 		);
+	}
+
+	/**
+	 * Run scheduler diagnostics for Data Machine's Action Scheduler work.
+	 *
+	 * Data Machine owns schedule definitions and job execution, but local/dev
+	 * installs still need something outside WordPress to invoke WP-Cron or the
+	 * Action Scheduler runner. This check makes that wake-up gap visible without
+	 * trying to install host-level cron from inside the plugin.
+	 *
+	 * @param array $options Optional check options.
+	 * @return array Scheduler diagnostic results.
+	 */
+	private function runSchedulerDiagnostics( array $options = array() ): array {
+		$stale_threshold = max( 60, (int) ( $options['stale_threshold_seconds'] ?? 900 ) );
+		$now             = time();
+		$wp_cron_next    = wp_next_scheduled( 'action_scheduler_run_queue' );
+		$wp_cron_overdue = is_int( $wp_cron_next ) ? max( 0, $now - $wp_cron_next ) : null;
+		$pending         = $this->getActionSchedulerGroupStats( 'pending' );
+		$complete        = $this->getActionSchedulerGroupStats( 'complete' );
+		$due             = $this->getActionSchedulerGroupStats( 'pending', true );
+		$daily_memory    = $this->getActionSchedulerHookStats( 'datamachine_recurring_daily_memory_generation' );
+
+		$status = 'ok';
+		if ( ! function_exists( 'as_get_scheduled_actions' ) || ! class_exists( '\\ActionScheduler' ) ) {
+			$status = 'unavailable';
+		} elseif ( $due['count'] > 0 || ( null !== $wp_cron_overdue && $wp_cron_overdue > $stale_threshold ) ) {
+			$status = 'stale';
+		}
+
+		$message = match ( $status ) {
+			'ok'          => __( 'scheduler current', 'data-machine' ),
+			'stale'       => __( 'scheduler has overdue work; invoke WordPress cron or run wp datamachine drain', 'data-machine' ),
+			'unavailable' => __( 'Action Scheduler is unavailable', 'data-machine' ),
+			default       => __( 'scheduler status unknown', 'data-machine' ),
+		};
+
+		return array(
+			'status'                  => $status,
+			'message'                 => $message,
+			'stale_threshold_seconds' => $stale_threshold,
+			'action_scheduler'        => array(
+				'available'         => function_exists( 'as_get_scheduled_actions' ),
+				'class_loaded'      => class_exists( '\\ActionScheduler' ),
+				'is_initialized'   => class_exists( '\\ActionScheduler' ) && method_exists( '\\ActionScheduler', 'is_initialized' ) ? \ActionScheduler::is_initialized() : null,
+				'group'            => RecurringScheduler::GROUP,
+				'pending_count'    => $pending['count'],
+				'due_count'        => $due['count'],
+				'oldest_due_gmt'   => $due['oldest_gmt'],
+				'next_pending_gmt' => $pending['oldest_gmt'],
+				'last_attempt_gmt' => $complete['last_attempt_gmt'],
+			),
+			'wp_cron'                 => array(
+				'action_scheduler_run_queue_next_gmt'        => is_int( $wp_cron_next ) ? gmdate( 'Y-m-d H:i:s', $wp_cron_next ) : null,
+				'action_scheduler_run_queue_overdue_seconds' => $wp_cron_overdue,
+			),
+			'daily_memory'            => array(
+				'next_pending_gmt' => $daily_memory['pending']['oldest_gmt'],
+				'last_attempt_gmt' => $daily_memory['complete']['last_attempt_gmt'],
+			),
+			'recommendation'          => $status === 'stale'
+				? __( 'For local or low-traffic installs, schedule an external wake-up such as wp cron event run --due-now or wp datamachine drain.', 'data-machine' )
+				: null,
+		);
+	}
+
+	/**
+	 * Get Action Scheduler aggregate stats for Data Machine's group.
+	 *
+	 * @param string $status   Action Scheduler status.
+	 * @param bool   $due_only Whether to count only actions due now.
+	 * @return array{count:int,oldest_gmt:?string,newest_gmt:?string,last_attempt_gmt:?string}
+	 */
+	private function getActionSchedulerGroupStats( string $status, bool $due_only = false ): array {
+		return $this->queryActionSchedulerStats(
+			array(
+				'group'    => RecurringScheduler::GROUP,
+				'status'   => $status,
+				'due_only' => $due_only,
+			)
+		);
+	}
+
+	/**
+	 * Get pending and complete stats for an Action Scheduler hook.
+	 *
+	 * @param string $hook Action Scheduler hook.
+	 * @return array{pending:array,complete:array}
+	 */
+	private function getActionSchedulerHookStats( string $hook ): array {
+		return array(
+			'pending'  => $this->queryActionSchedulerStats(
+				array(
+					'group'  => RecurringScheduler::GROUP,
+					'hook'   => $hook,
+					'status' => 'pending',
+				)
+			),
+			'complete' => $this->queryActionSchedulerStats(
+				array(
+					'group'  => RecurringScheduler::GROUP,
+					'hook'   => $hook,
+					'status' => 'complete',
+				)
+			),
+		);
+	}
+
+	/**
+	 * Query Action Scheduler tables for aggregate stats.
+	 *
+	 * @param array $args Query args.
+	 * @return array{count:int,oldest_gmt:?string,newest_gmt:?string,last_attempt_gmt:?string}
+	 */
+	private function queryActionSchedulerStats( array $args ): array {
+		global $wpdb;
+
+		$default = array(
+			'count'            => 0,
+			'oldest_gmt'       => null,
+			'newest_gmt'       => null,
+			'last_attempt_gmt' => null,
+		);
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
+		$where         = array( 'a.status = %s' );
+		$values        = array( (string) ( $args['status'] ?? 'pending' ) );
+
+		if ( ! empty( $args['group'] ) ) {
+			$where[]  = 'g.slug = %s';
+			$values[] = (string) $args['group'];
+		}
+
+		if ( ! empty( $args['hook'] ) ) {
+			$where[]  = 'a.hook = %s';
+			$values[] = (string) $args['hook'];
+		}
+
+		if ( ! empty( $args['due_only'] ) ) {
+			$where[]  = 'a.scheduled_date_gmt <= %s';
+			$values[] = gmdate( 'Y-m-d H:i:s' );
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are derived from $wpdb->prefix.
+		$sql = "SELECT COUNT(*) AS count, MIN(a.scheduled_date_gmt) AS oldest_gmt, MAX(a.scheduled_date_gmt) AS newest_gmt, MAX(a.last_attempt_gmt) AS last_attempt_gmt FROM {$actions_table} a INNER JOIN {$groups_table} g ON g.group_id = a.group_id WHERE " . implode( ' AND ', $where );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, $values ), ARRAY_A );
+		if ( ! is_array( $row ) ) {
+			return $default;
+		}
+
+		return array(
+			'count'            => (int) ( $row['count'] ?? 0 ),
+			'oldest_gmt'       => $this->normalizeNullableDate( $row['oldest_gmt'] ?? null ),
+			'newest_gmt'       => $this->normalizeNullableDate( $row['newest_gmt'] ?? null ),
+			'last_attempt_gmt' => $this->normalizeNullableDate( $row['last_attempt_gmt'] ?? null ),
+		);
+	}
+
+	/**
+	 * Normalize empty Action Scheduler date values.
+	 *
+	 * @param mixed $value Date value from the DB.
+	 * @return string|null Normalized date, or null when unset.
+	 */
+	private function normalizeNullableDate( mixed $value ): ?string {
+		if ( ! is_string( $value ) || '' === $value || '0000-00-00 00:00:00' === $value ) {
+			return null;
+		}
+
+		return $value;
 	}
 
 	/**
