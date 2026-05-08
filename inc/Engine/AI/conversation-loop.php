@@ -344,6 +344,7 @@ function datamachine_build_turn_runner(
 		// Process tool calls.
 		$tool_execution_results = array();
 		$conversation_complete  = false;
+		$completion_nudge      = '';
 		if ( ! empty( $tool_calls ) ) {
 			foreach ( $tool_calls as $tool_call ) {
 				$tool_name       = $tool_call['name'];
@@ -464,10 +465,19 @@ function datamachine_build_turn_runner(
 					$turn_count
 				);
 
+				if ( ! $conversation_complete && '' === $completion_nudge ) {
+					$completion_nudge = (string) ( $completion_decision->context()['continuation_message'] ?? '' );
+				}
+
 				// Break out of tool processing when conversation is complete.
 				if ( $conversation_complete ) {
 					break;
 				}
+			}
+
+			if ( '' !== $completion_nudge ) {
+				$messages[] = ConversationManager::buildConversationMessage( 'user', $completion_nudge );
+				do_action( 'datamachine_ai_completion_nudge_added', $mode, $messages, $loop_payload, array( 'continuation_message' => $completion_nudge ) );
 			}
 		} else {
 			$natural_completion_decision = $completion_policy instanceof NaturalCompletionPolicyInterface
