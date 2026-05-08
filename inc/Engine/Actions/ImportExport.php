@@ -499,9 +499,9 @@ class ImportExport {
 				'handler_slugs'   => FlowStepConfig::getHandlerSlugs( $flow_step ),
 				'handler_configs' => FlowStepConfig::getHandlerConfigs( $flow_step ),
 			);
-		} elseif ( ! FlowStepConfig::usesHandler( $flow_step ) && ! empty( $flow_step['handler_config'] ) ) {
+		} elseif ( ! FlowStepConfig::usesHandler( $flow_step ) && ! empty( FlowStepConfig::getPrimaryHandlerConfig( $flow_step ) ) ) {
 			$settings = array(
-				'handler_config' => $flow_step['handler_config'],
+				'flow_step_settings' => FlowStepConfig::getPrimaryHandlerConfig( $flow_step ),
 			);
 		}
 

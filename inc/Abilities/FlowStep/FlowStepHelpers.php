@@ -338,8 +338,8 @@ trait FlowStepHelpers {
 		$stored_config = $this->handler_abilities->applyDefaults( $effective_slug, $merged_config );
 
 		if ( ! $uses_handler ) {
-			$step['handler_config'] = $stored_config;
-			unset( $step['handler_slug'], $step['handler_slugs'], $step['handler_configs'] );
+			$step['flow_step_settings'] = $stored_config;
+			unset( $step['handler_slug'], $step['handler_slugs'], $step['handler_config'], $step['handler_configs'] );
 		} else {
 			$current_slugs = FlowStepConfig::getHandlerSlugs( $step );
 			if ( ! in_array( $effective_slug, $current_slugs, true ) ) {

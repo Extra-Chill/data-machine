@@ -82,13 +82,13 @@ function assert_absent( string $key, array $array_value, string $name, array &$f
 echo "handler config shape smoke (#1293)\n";
 echo "-----------------------------------\n";
 
-echo "\n[1] system_task stores handler_config without synthetic slugs:\n";
+echo "\n[1] system_task stores flow_step_settings without synthetic slugs:\n";
 $built = build_configs_from_workflow_for_test(
 	array(
 		'steps' => array(
 			array(
 				'type'           => 'system_task',
-				'handler_config' => array(
+				'flow_step_settings' => array(
 					'task'   => 'daily_memory_generation',
 					'params' => array(),
 				),
@@ -101,7 +101,9 @@ assert_equals( array( 'task' => 'daily_memory_generation', 'params' => array() )
 assert_equals( 'system_task', FlowStepConfig::getEffectiveSlug( $step0 ), 'system_task settings slug is step_type', $failures, $passes );
 assert_absent( 'handler_slug', $step0, 'system_task has no handler_slug', $failures, $passes );
 assert_absent( 'handler_slugs', $step0, 'system_task has no handler_slugs', $failures, $passes );
+assert_absent( 'handler_config', $step0, 'system_task has no handler_config', $failures, $passes );
 assert_absent( 'handler_configs', $step0, 'system_task has no handler_configs', $failures, $passes );
+assert_equals( array( 'task' => 'daily_memory_generation', 'params' => array() ), $step0['flow_step_settings'] ?? array(), 'system_task stores flow_step_settings', $failures, $passes );
 
 echo "\n[2] fetch stores handler_slugs + handler_configs:\n";
 $built = build_configs_from_workflow_for_test(
@@ -175,7 +177,8 @@ $system_task = FlowStepConfig::normalizeHandlerShape(
 		'handler_config' => array( 'task' => 'agent_call' ),
 	)
 );
-assert_equals( array( 'task' => 'agent_call' ), $system_task['handler_config'] ?? array(), 'system_task config preserved', $failures, $passes );
+assert_equals( array( 'task' => 'agent_call' ), $system_task['flow_step_settings'] ?? array(), 'legacy system_task config normalizes to flow_step_settings', $failures, $passes );
+assert_absent( 'handler_config', $system_task, 'system_task scalar handler_config is removed', $failures, $passes );
 assert_absent( 'handler_slugs', $system_task, 'system_task slugs remain absent', $failures, $passes );
 
 $fetch = FlowStepConfig::normalizeHandlerShape(

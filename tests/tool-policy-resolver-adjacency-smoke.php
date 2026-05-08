@@ -170,7 +170,7 @@ $args         = array(
 	'previous_step_config' => array(
 		'flow_step_id'    => 'flow_sys_1',
 		'step_type'       => 'system_task',
-		'handler_config'  => array( 'task' => 'daily_memory_generation', 'params' => array() ),
+		'flow_step_settings' => array( 'task' => 'daily_memory_generation', 'params' => array() ),
 	),
 	'next_step_config'     => null,
 );
@@ -195,7 +195,7 @@ $args         = array(
 	'next_step_config'     => array(
 		'flow_step_id'    => 'flow_sys_2',
 		'step_type'       => 'system_task',
-		'handler_config'  => array( 'task' => 'agent_call', 'params' => array() ),
+		'flow_step_settings' => array( 'task' => 'agent_call', 'params' => array() ),
 	),
 );
 $tools = gather_pipeline_handler_tools_for_test( $args, $tool_manager );

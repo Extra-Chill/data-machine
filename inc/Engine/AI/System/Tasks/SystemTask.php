@@ -67,8 +67,8 @@ abstract class SystemTask {
 		return array(
 			'steps' => array(
 				array(
-					'type'           => 'system_task',
-					'handler_config' => array(
+					'type'               => 'system_task',
+					'flow_step_settings' => array(
 						'task'   => $this->getTaskType(),
 						'params' => $params,
 					),

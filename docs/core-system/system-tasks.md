@@ -233,7 +233,7 @@ A pipeline step type that bridges system tasks into the pipeline engine. This al
 
 ### How It Works
 
-1. Reads `handler_config.task` to determine the task type
+1. Reads `flow_step_settings.task` to determine the task type
 2. Creates a child DM job for independent tracking
 3. Injects pipeline context (e.g., `post_id` from a preceding Publish step) into task params
 4. Executes the task handler synchronously

@@ -118,8 +118,8 @@ $fetch_settings = call_import_export_private(
 	)
 );
 
-assert_csv_equals( 'webhook_payload', $fetch_settings['handler_slug'] ?? null, 'fetch handler_slug still exports', $failures, $passes );
-assert_csv_equals( array( 'payload_path' => 'pull_request' ), $fetch_settings['handler_config'] ?? null, 'fetch handler_config still exports', $failures, $passes );
+assert_csv_equals( array( 'webhook_payload' ), $fetch_settings['handler_slugs'] ?? null, 'fetch handler_slugs export', $failures, $passes );
+assert_csv_equals( array( 'payload_path' => 'pull_request' ), $fetch_settings['handler_configs']['webhook_payload'] ?? null, 'fetch handler_configs export', $failures, $passes );
 assert_csv_equals( array( 'after' => '2026-04-01' ), $fetch_settings['config_patch_queue'][0]['patch'] ?? null, 'fetch config_patch_queue exports canonical patch entry', $failures, $passes );
 assert_csv_equals( 'drain', $fetch_settings['queue_mode'] ?? null, 'fetch queue_mode exports as portable settings', $failures, $passes );
 

@@ -294,14 +294,16 @@ $prompt_queue = $flow_step_config['prompt_queue'];     // From flow (AI steps)
 $queue_mode = $flow_step_config['queue_mode'];         // drain | loop | static
 $handler_slugs = $flow_step_config['handler_slugs'];     // Handler-backed steps
 $handler_configs = $flow_step_config['handler_configs']; // Config map keyed by handler slug
+$flow_step_settings = $flow_step_config['flow_step_settings']; // Handler-free step settings
 ```
 
 Handler-backed flow steps use the plural shape consistently, even when the
 step type supports only one handler. Older singular input (`handler_slug` +
 `handler_config`) is accepted at import/API boundaries and normalized before
 storage. Handler-free step types that own settings, such as `system_task`, may
-still store those settings in `handler_config` because there is no handler slug
-to key a `handler_configs` map.
+store those settings in `flow_step_settings` because there is no handler slug
+to key a `handler_configs` map. Older handler-free `handler_config` rows are
+normalized to `flow_step_settings` when read or rewritten.
 
 ## Data Packet Integration
 

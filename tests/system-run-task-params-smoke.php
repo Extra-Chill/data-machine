@@ -161,8 +161,8 @@ function smoke_default_system_task_workflow( string $task_type, array $params ):
 	return array(
 		'steps' => array(
 			array(
-				'type'           => 'system_task',
-				'handler_config' => array(
+				'type'               => 'system_task',
+				'flow_step_settings' => array(
 					'task'   => $task_type,
 					'params' => $params,
 				),
@@ -226,7 +226,7 @@ $scheduled_params = array(
 $initial          = smoke_build_task_scheduler_initial_data( 'wiki_maintain', $scheduled_params );
 $assert( 'TaskScheduler initial_data stores task_params', $scheduled_params === $initial['task_params'] );
 $workflow = smoke_default_system_task_workflow( 'wiki_maintain', $initial['task_params'] );
-$assert( 'SystemTask workflow stores params in handler_config', $scheduled_params === $workflow['steps'][0]['handler_config']['params'] );
+$assert( 'SystemTask workflow stores params in flow_step_settings', $scheduled_params === $workflow['steps'][0]['flow_step_settings']['params'] );
 
 echo "\n[4] Source tripwires\n";
 $system_command = file_get_contents( __DIR__ . '/../inc/Cli/Commands/SystemCommand.php' );

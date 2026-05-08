@@ -93,8 +93,8 @@ class SystemTaskStep extends Step {
 	 * @return bool
 	 */
 	protected function validateStepConfiguration(): bool {
-		$handler_config = $this->getHandlerConfig();
-		$task_type      = $handler_config['task'] ?? '';
+		$step_settings = $this->getHandlerConfig();
+		$task_type     = $step_settings['task'] ?? '';
 
 		if ( empty( $task_type ) ) {
 			do_action(
@@ -103,7 +103,7 @@ class SystemTaskStep extends Step {
 				'system_task_missing_task_type',
 				array(
 					'flow_step_id'  => $this->flow_step_id,
-					'error_message' => 'System Task step requires a task type in handler_config.',
+					'error_message' => 'System Task step requires a task type in flow_step_settings.',
 				)
 			);
 			return false;
