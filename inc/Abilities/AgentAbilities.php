@@ -409,6 +409,8 @@ class AgentAbilities {
 			$register_callback();
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
+		} else {
+			$register_callback();
 		}
 	}
 
