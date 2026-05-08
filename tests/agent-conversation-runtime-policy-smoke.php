@@ -377,6 +377,25 @@ $assertion_decision = $assertion_policy->recordToolResult(
 assert_runtime_policy( ! $assertion_decision->isComplete(), 'handler policy waits when generic assertions are missing' );
 assert_runtime_policy( str_contains( $assertion_decision->context()['continuation_message'] ?? '', 'completion signals are still missing' ), 'handler policy provides assertion continuation nudge' );
 
+$non_handler_assertion_policy = new DataMachineHandlerCompletionPolicy(
+	array(),
+	new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
+		array(
+			'required_tool_names' => array( 'create_github_pull_request', 'comment_github_pull_request' ),
+		)
+	)
+);
+$non_handler_assertion_decision = $non_handler_assertion_policy->recordToolResult(
+	'workspace_worktree_add',
+	array( 'name' => 'workspace_worktree_add' ),
+	array( 'success' => true ),
+	array( 'mode' => 'pipeline' ),
+	1
+);
+
+assert_runtime_policy( ! $non_handler_assertion_decision->isComplete(), 'handler policy waits after non-handler tools when generic assertions are missing' );
+assert_runtime_policy( str_contains( $non_handler_assertion_decision->context()['continuation_message'] ?? '', 'create_github_pull_request' ), 'handler policy nudges after non-handler tools with missing assertions' );
+
 $dispatch_count     = 0;
 $provider_context   = null;
 $completion_policy  = new RuntimePolicySmokeCompletionPolicy();

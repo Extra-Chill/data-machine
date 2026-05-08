@@ -45,6 +45,11 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 		$mode            = (string) ( $runtime_context['mode'] ?? '' );
 
 		if ( 'pipeline' !== $mode || ! $is_handler_tool || ! ( $tool_result['success'] ?? false ) ) {
+			$missing_assertions = $this->incompleteAssertionsDecision( $runtime_context, $turn_count );
+			if ( null !== $missing_assertions ) {
+				return $missing_assertions;
+			}
+
 			return WP_Agent_Conversation_Completion_Decision::incomplete();
 		}
 
