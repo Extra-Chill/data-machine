@@ -272,6 +272,7 @@ class AIStep extends Step {
 				'step_id'                     => $pipeline_step_id,
 				'data'                        => $this->dataPackets,
 				'engine'                      => $this->engine,
+				'engine_data'                 => $this->engine->all(),
 				'user_id'                     => $user_id,
 				'agent_id'                    => $agent_id,
 				'pipeline_id'                 => $job_snapshot['pipeline_id'] ?? null,
@@ -292,6 +293,14 @@ class AIStep extends Step {
 			$required_handler_slugs = FlowStepConfig::getAdjacentRequiredHandlerSlugsForAi( $previous_step_config, $next_step_config );
 
 			$engine_data = $this->engine->all();
+
+			$completion_assertions = self::mergeCompletionAssertions(
+				is_array( $pipeline_step_config['completion_assertions'] ?? null ) ? $pipeline_step_config['completion_assertions'] : array(),
+				is_array( $this->flow_step_config['completion_assertions'] ?? null ) ? $this->flow_step_config['completion_assertions'] : array()
+			);
+			if ( ! empty( $completion_assertions ) ) {
+				$payload['completion_assertions'] = $completion_assertions;
+			}
 
 			// Tool categories can be specified at the pipeline step level or pipeline level.
 			// This allows pipelines to declare which ability categories are relevant,
@@ -549,6 +558,51 @@ class AIStep extends Step {
 	 */
 	public static function sanitizeDataPacketsForAi( array $data_packets ): array {
 		return DataPacketPromptProjector::project( $data_packets );
+	}
+
+	/**
+	 * Merge pipeline-level and flow-level generic completion assertions.
+	 *
+	 * @param array $pipeline_assertions Pipeline step assertions.
+	 * @param array $flow_assertions     Flow step assertions.
+	 * @return array<string, array<int, string>> Merged assertions.
+	 */
+	private static function mergeCompletionAssertions( array $pipeline_assertions, array $flow_assertions ): array {
+		$merged = array();
+		foreach ( array( 'required_engine_data_keys', 'required_tool_names', 'required_output_packet_types' ) as $key ) {
+			$values = array_merge(
+				self::normalizeCompletionAssertionList( $pipeline_assertions[ $key ] ?? array() ),
+				self::normalizeCompletionAssertionList( $flow_assertions[ $key ] ?? array() )
+			);
+			if ( ! empty( $values ) ) {
+				$merged[ $key ] = array_values( array_unique( $values ) );
+			}
+		}
+
+		return $merged;
+	}
+
+	/**
+	 * @param mixed $value Raw assertion list.
+	 * @return array<int, string>
+	 */
+	private static function normalizeCompletionAssertionList( $value ): array {
+		if ( is_string( $value ) && '' !== $value ) {
+			$value = array( $value );
+		}
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		$items = array();
+		foreach ( $value as $item ) {
+			$item = trim( (string) $item );
+			if ( '' !== $item ) {
+				$items[] = $item;
+			}
+		}
+
+		return $items;
 	}
 
 	/**
