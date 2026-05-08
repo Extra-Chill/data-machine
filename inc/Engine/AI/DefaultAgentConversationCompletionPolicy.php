@@ -15,14 +15,53 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Generic policy: tool calls alone do not complete the loop.
  */
-class DefaultAgentConversationCompletionPolicy implements WP_Agent_Conversation_Completion_Policy {
+class DefaultAgentConversationCompletionPolicy implements WP_Agent_Conversation_Completion_Policy, NaturalCompletionPolicyInterface {
+
+	/** @var DataMachineCompletionAssertions Generic completion assertions. */
+	private DataMachineCompletionAssertions $assertions;
+
+	/**
+	 * @param DataMachineCompletionAssertions|null $assertions Optional completion assertions.
+	 */
+	public function __construct( ?DataMachineCompletionAssertions $assertions = null ) {
+		$this->assertions = $assertions ?? new DataMachineCompletionAssertions();
+	}
 
 	/**
 	 * @inheritDoc
 	 */
 	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $runtime_context, int $turn_count ): WP_Agent_Conversation_Completion_Decision {
-		unset( $tool_name, $tool_def, $tool_result, $runtime_context, $turn_count );
+		unset( $runtime_context, $turn_count );
+
+		$this->assertions->recordToolResult( $tool_name, $tool_def, $tool_result );
 
 		return WP_Agent_Conversation_Completion_Decision::incomplete();
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function recordNaturalCompletion( array $messages, string $assistant_text, array $runtime_context, int $turn_count ): WP_Agent_Conversation_Completion_Decision {
+		$evaluation = $this->assertions->evaluate( $runtime_context, $assistant_text );
+		if ( $evaluation['complete'] ) {
+			return WP_Agent_Conversation_Completion_Decision::complete(
+				$this->assertions->hasAssertions() ? 'AIConversationLoop: Natural completion assertions satisfied' : '',
+				array(
+					'turn_count' => $turn_count,
+					'satisfied'  => $evaluation['satisfied'],
+				)
+			);
+		}
+
+		return WP_Agent_Conversation_Completion_Decision::incomplete(
+			'AIConversationLoop: Natural completion assertions missing, nudging continuation',
+			array(
+				'turn_count'           => $turn_count,
+				'missing'              => $evaluation['missing'],
+				'satisfied'            => $evaluation['satisfied'],
+				'required'             => $this->assertions->required(),
+				'continuation_message' => DataMachineCompletionAssertions::buildNudge( $evaluation['missing'], $messages ),
+			)
+		);
 	}
 }

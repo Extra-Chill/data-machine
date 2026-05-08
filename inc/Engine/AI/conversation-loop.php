@@ -126,7 +126,7 @@ function datamachine_run_conversation(
 		if ( ! empty( $result['conversation_complete'] ) ) {
 			return false;
 		}
-		return ! empty( $result['tool_execution_results'] );
+		return ! empty( $result['tool_execution_results'] ) || ! empty( $result['completion_nudge'] );
 	};
 
 	// Run through the upstream substrate loop.
@@ -470,13 +470,41 @@ function datamachine_build_turn_runner(
 				}
 			}
 		} else {
-			$conversation_complete = true;
+			$natural_completion_decision = $completion_policy instanceof NaturalCompletionPolicyInterface
+				? $completion_policy->recordNaturalCompletion(
+					$messages,
+					$ai_content,
+					array_merge( $turn_context, $loop_payload, array( 'mode' => $mode ) ),
+					$turn_count
+				)
+				: \AgentsAPI\AI\WP_Agent_Conversation_Completion_Decision::complete();
+
+			$conversation_complete = $natural_completion_decision->isComplete();
+			$completion_nudge      = '';
+
+			if ( '' !== $natural_completion_decision->message() ) {
+				do_action(
+					'datamachine_log',
+					'debug',
+					$natural_completion_decision->message(),
+					array_merge( $base_log_context, $natural_completion_decision->context() )
+				);
+			}
+
+			if ( ! $conversation_complete ) {
+				$completion_nudge = (string) ( $natural_completion_decision->context()['continuation_message'] ?? '' );
+				if ( '' !== $completion_nudge ) {
+					$messages[] = ConversationManager::buildConversationMessage( 'user', $completion_nudge );
+					do_action( 'datamachine_ai_completion_nudge_added', $mode, $messages, $loop_payload, $natural_completion_decision->context() );
+				}
+			}
 		}
 
 		return array(
 			'messages'               => $messages,
 			'tool_execution_results' => $tool_execution_results,
 			'conversation_complete'  => $conversation_complete,
+			'completion_nudge'       => $completion_nudge ?? '',
 		);
 	};
 }
@@ -556,14 +584,27 @@ function datamachine_resolve_completion_policy( string $mode, array $payload ): 
 		return $policy;
 	}
 
+	$assertions = datamachine_resolve_completion_assertions( $payload );
+
 	$configured_handlers = $payload['configured_handler_slugs'] ?? array();
 	$configured_handlers = is_array( $configured_handlers ) ? array_values( $configured_handlers ) : array();
 
 	if ( ! empty( $configured_handlers ) || 'pipeline' === $mode ) {
-		return new DataMachineHandlerCompletionPolicy( $configured_handlers );
+		return new DataMachineHandlerCompletionPolicy( $configured_handlers, $assertions );
 	}
 
-	return new DefaultAgentConversationCompletionPolicy();
+	return new DefaultAgentConversationCompletionPolicy( $assertions );
+}
+
+/**
+ * Resolve generic completion assertions from loop payload.
+ *
+ * @param array $payload Loop payload.
+ * @return DataMachineCompletionAssertions
+ */
+function datamachine_resolve_completion_assertions( array $payload ): DataMachineCompletionAssertions {
+	$config = $payload['completion_assertions'] ?? array();
+	return new DataMachineCompletionAssertions( is_array( $config ) ? $config : array() );
 }
 
 /**

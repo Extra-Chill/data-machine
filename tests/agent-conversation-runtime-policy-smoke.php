@@ -167,6 +167,142 @@ assert_runtime_policy( $second_decision->isComplete(), 'handler policy completes
 assert_runtime_policy( array( 'wordpress_publish', 'pinterest_publish' ) === array_values( $second_decision->context()['executed_handlers'] ?? array() ), 'handler policy reports executed handlers' );
 
 // 2. Injected completion/transcript collaborators steer the loop without leaking into provider payloads.
+$natural_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$natural_dispatch_count ) {
+		++$natural_dispatch_count;
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => 'Natural answer with no tool calls.',
+				'tool_calls' => array(),
+			),
+		);
+	}
+);
+
+$natural_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'answer naturally' ) ),
+	array(),
+	'openai',
+	'gpt-smoke',
+	'chat',
+	array(),
+	5
+);
+
+assert_runtime_policy( 1 === $natural_dispatch_count, 'default no-tool response completes naturally' );
+assert_runtime_policy( ! empty( $natural_result['completed'] ), 'default natural completion result is completed' );
+
+$satisfied_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$satisfied_dispatch_count ) {
+		++$satisfied_dispatch_count;
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => 'The required engine data is already present.',
+				'tool_calls' => array(),
+			),
+		);
+	}
+);
+
+$satisfied_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'finish once final_url exists' ) ),
+	array(),
+	'openai',
+	'gpt-smoke',
+	'chat',
+	array(
+		'completion_assertions' => array(
+			'required_engine_data_keys' => array( 'final_url' ),
+		),
+		'engine_data'           => array(
+			'final_url' => 'https://example.test/post',
+		),
+	),
+	5
+);
+
+assert_runtime_policy( 1 === $satisfied_dispatch_count, 'satisfied natural assertion completes without nudge' );
+assert_runtime_policy( ! empty( $satisfied_result['completed'] ), 'satisfied natural assertion result is completed' );
+
+$nudge_dispatch_count = 0;
+$nudge_second_request = null;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function ( array $request_body ) use ( &$nudge_dispatch_count, &$nudge_second_request ) {
+		++$nudge_dispatch_count;
+		if ( 2 === $nudge_dispatch_count ) {
+			$nudge_second_request = $request_body;
+		}
+
+		if ( 1 === $nudge_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => 'I am done prematurely.',
+					'tool_calls' => array(),
+				),
+			);
+		}
+
+		if ( 2 === $nudge_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => '',
+					'tool_calls' => array(
+						array(
+							'name'       => 'runtime_policy_tool',
+							'parameters' => array( 'name' => 'Grace' ),
+						),
+					),
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => 'Now complete after the required tool.',
+				'tool_calls' => array(),
+			),
+		);
+	}
+);
+
+$nudge_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'use the runtime policy tool before finishing' ) ),
+	array(
+		'runtime_policy_tool' => array(
+			'name'        => 'runtime_policy_tool',
+			'description' => 'Runtime policy smoke tool',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	'chat',
+	array(
+		'completion_assertions' => array(
+			'required_tool_names' => array( 'runtime_policy_tool' ),
+		),
+	),
+	5
+);
+
+assert_runtime_policy( 3 === $nudge_dispatch_count, 'missing natural assertion nudges and keeps loop running' );
+assert_runtime_policy( str_contains( wp_json_encode( $nudge_second_request ), 'completion signals are still missing' ), 'nudge is appended before retry request' );
+assert_runtime_policy( 1 === count( $nudge_result['tool_execution_results'] ?? array() ), 'nudged loop captures required tool result' );
+
 $dispatch_count     = 0;
 $provider_context   = null;
 $completion_policy  = new RuntimePolicySmokeCompletionPolicy();

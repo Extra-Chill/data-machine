@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Preserves pipeline handler completion behavior outside the generic turn loop.
  */
-class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Completion_Policy {
+class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Completion_Policy, NaturalCompletionPolicyInterface {
 
 	/** @var array Required handler slugs configured by the adjacent pipeline step. */
 	private array $configured_handlers;
@@ -23,17 +23,24 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 	/** @var array Handler slugs that have completed successfully. */
 	private array $executed_handler_slugs = array();
 
+	/** @var DataMachineCompletionAssertions Generic completion assertions. */
+	private DataMachineCompletionAssertions $assertions;
+
 	/**
-	 * @param array $configured_handlers Required handler slugs.
+	 * @param array                                $configured_handlers Required handler slugs.
+	 * @param DataMachineCompletionAssertions|null $assertions          Optional generic assertions.
 	 */
-	public function __construct( array $configured_handlers = array() ) {
+	public function __construct( array $configured_handlers = array(), ?DataMachineCompletionAssertions $assertions = null ) {
 		$this->configured_handlers = array_values( $configured_handlers );
+		$this->assertions          = $assertions ?? new DataMachineCompletionAssertions();
 	}
 
 	/**
 	 * @inheritDoc
 	 */
 	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $runtime_context, int $turn_count ): WP_Agent_Conversation_Completion_Decision {
+		$this->assertions->recordToolResult( $tool_name, $tool_def, $tool_result );
+
 		$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
 		$mode            = (string) ( $runtime_context['mode'] ?? '' );
 
@@ -74,6 +81,33 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 			array(
 				'tool_name'          => $tool_name,
 				'remaining_handlers' => array_values( $remaining ),
+			)
+		);
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function recordNaturalCompletion( array $messages, string $assistant_text, array $runtime_context, int $turn_count ): WP_Agent_Conversation_Completion_Decision {
+		$evaluation = $this->assertions->evaluate( $runtime_context, $assistant_text );
+		if ( $evaluation['complete'] ) {
+			return WP_Agent_Conversation_Completion_Decision::complete(
+				$this->assertions->hasAssertions() ? 'AIConversationLoop: Natural completion assertions satisfied' : '',
+				array(
+					'turn_count' => $turn_count,
+					'satisfied'  => $evaluation['satisfied'],
+				)
+			);
+		}
+
+		return WP_Agent_Conversation_Completion_Decision::incomplete(
+			'AIConversationLoop: Natural completion assertions missing, nudging continuation',
+			array(
+				'turn_count'           => $turn_count,
+				'missing'              => $evaluation['missing'],
+				'satisfied'            => $evaluation['satisfied'],
+				'required'             => $this->assertions->required(),
+				'continuation_message' => DataMachineCompletionAssertions::buildNudge( $evaluation['missing'], $messages ),
 			)
 		);
 	}
