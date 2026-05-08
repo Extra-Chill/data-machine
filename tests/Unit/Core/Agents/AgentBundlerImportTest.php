@@ -139,6 +139,43 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'mcp' => 5 ), $flow['scheduling_config']['max_items'] ?? null, 'Importer preserves bundle max item caps.' );
 	}
 
+	public function test_import_reenqueues_existing_scheduled_flow_when_action_is_missing(): void {
+		if ( ! function_exists( 'as_unschedule_all_actions' ) || ! function_exists( 'as_next_scheduled_action' ) ) {
+			$this->markTestSkipped( 'Action Scheduler functions are required for schedule re-enqueue assertions.' );
+		}
+
+		$bundle = $this->fixture_bundle( 'scheduled-action-repair-agent' );
+		$bundle['flows'][0]['scheduling_config'] = array(
+			'enabled'  => true,
+			'interval' => 'daily',
+			'max_items' => array(
+				'mcp' => 5,
+			),
+		);
+
+		$first = $this->bundler->import( $bundle, null, $this->owner_id );
+		$this->assertTrue( (bool) $first['success'], 'Initial scheduled import succeeds.' );
+
+		$agent    = $this->agents_repo->get_by_slug( 'scheduled-action-repair-agent' );
+		$pipeline = $this->pipelines_repo->get_by_portable_slug( (int) $agent['agent_id'], 'static-site-pipeline' );
+		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
+		$flow_id  = (int) $flow['flow_id'];
+
+		as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
+		$this->assertFalse( as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' ), 'Test setup removes the scheduled action while preserving flow row scheduling.' );
+
+		$second = $this->bundler->import(
+			$bundle,
+			null,
+			$this->owner_id,
+			false,
+			array( 'is_upgrade' => true )
+		);
+
+		$this->assertTrue( (bool) $second['success'], 'Upgrade import succeeds when only the scheduled action is missing.' );
+		$this->assertNotFalse( as_next_scheduled_action( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' ), 'Importer re-creates the missing scheduled action for an enabled non-manual flow.' );
+	}
+
 	public function test_reconcile_runtime_replaces_local_modified_flow_queue_and_schedule(): void {
 		$bundle = $this->fixture_bundle( 'runtime-reconcile-agent' );
 		$bundle['flows'][0]['flow_config']['1_step-uuid_1'] = array_merge(
