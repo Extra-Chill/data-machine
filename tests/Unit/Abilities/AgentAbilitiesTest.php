@@ -130,6 +130,21 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 'id-lookup-bot', $result['agent']['agent_slug'] );
 	}
 
+	public function test_getAgent_by_generic_agent_slug(): void {
+		$created = AgentAbilities::createAgent(
+			array(
+				'agent_slug' => 'generic-lookup-bot',
+				'owner_id'   => $this->admin_id,
+			)
+		);
+
+		$result = AgentAbilities::getAgent( array( 'agent' => 'generic-lookup-bot' ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $created['agent_id'], $result['agent']['agent_id'] );
+		$this->assertSame( 'generic-lookup-bot', $result['agent']['agent_slug'] );
+	}
+
 	public function test_getAgent_not_found(): void {
 		$result = AgentAbilities::getAgent( array( 'agent_slug' => 'nonexistent-bot' ) );
 
@@ -232,6 +247,26 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 'New Name', $result['agent']['agent_name'] );
 	}
 
+	public function test_updateAgent_accepts_agent_slug_alias(): void {
+		AgentAbilities::createAgent(
+			array(
+				'agent_slug' => 'slug-update-bot',
+				'agent_name' => 'Old Slug Name',
+				'owner_id'   => $this->admin_id,
+			)
+		);
+
+		$result = AgentAbilities::updateAgent(
+			array(
+				'agent'      => 'slug-update-bot',
+				'agent_name' => 'New Slug Name',
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'New Slug Name', $result['agent']['agent_name'] );
+	}
+
 	public function test_updateAgent_config(): void {
 		$created = AgentAbilities::createAgent(
 			array(
@@ -275,11 +310,30 @@ class AgentAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 'anthropic', $result['agent']['agent_config']['provider'] );
 	}
 
-	public function test_updateAgent_requires_agent_id(): void {
+	public function test_updateAgent_requires_agent_identity(): void {
 		$result = AgentAbilities::updateAgent( array( 'agent_name' => 'Orphan' ) );
 
 		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'agent_id', $result['error'] );
+		$this->assertStringContainsString( 'Agent identity', $result['error'] );
+	}
+
+	public function test_exportAgent_accepts_agent_slug_alias(): void {
+		AgentAbilities::createAgent(
+			array(
+				'agent_slug' => 'slug-export-bot',
+				'owner_id'   => $this->admin_id,
+			)
+		);
+
+		$result = AgentAbilities::exportAgent(
+			array(
+				'agent'       => 'slug-export-bot',
+				'destination' => sys_get_temp_dir() . '/datamachine-slug-export-bot-' . wp_generate_uuid4(),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'slug-export-bot', $result['agent_slug'] );
 	}
 
 	public function test_updateAgent_rejects_not_found(): void {

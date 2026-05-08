@@ -14,6 +14,7 @@ namespace DataMachine\Api;
 
 use DataMachine\Abilities\AgentAbilities;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\Agents\Agents as AgentsRepository;
 use DataMachine\Core\Database\Agents\AgentAccess;
 use WP_REST_Request;
@@ -93,20 +94,27 @@ class Agents {
 			)
 		);
 
-		// Single agent: get, update, delete.
+		$agent_resource_routes = array(
+			'/agents/(?P<agent>[A-Za-z0-9_-]+)',
+			'/agents/(?P<agent_id>\d+)',
+		);
+
+		// Single agent: get, update, delete. Slug routes are preferred; numeric ID
+		// routes remain for compatibility with existing integrations.
+		foreach ( $agent_resource_routes as $agent_resource_route ) {
 		register_rest_route(
 			'datamachine/v1',
-			'/agents/(?P<agent_id>\d+)',
+			$agent_resource_route,
 			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
 					'callback'            => array( self::class, 'handle_get' ),
 					'permission_callback' => $manage_permission,
 					'args'                => array(
-						'agent_id' => array(
-							'type'              => 'integer',
-							'required'          => true,
-							'sanitize_callback' => 'absint',
+						'agent' => array(
+							'type'              => 'string',
+							'required'          => false,
+							'sanitize_callback' => 'sanitize_text_field',
 						),
 					),
 				),
@@ -115,10 +123,10 @@ class Agents {
 					'callback'            => array( self::class, 'handle_update' ),
 					'permission_callback' => $manage_permission,
 					'args'                => array(
-						'agent_id'     => array(
-							'type'              => 'integer',
-							'required'          => true,
-							'sanitize_callback' => 'absint',
+						'agent'        => array(
+							'type'              => 'string',
+							'required'          => false,
+							'sanitize_callback' => 'sanitize_text_field',
 						),
 						'agent_name'   => array(
 							'type'              => 'string',
@@ -138,10 +146,10 @@ class Agents {
 					'callback'            => array( self::class, 'handle_delete' ),
 					'permission_callback' => $manage_permission,
 					'args'                => array(
-						'agent_id'     => array(
-							'type'              => 'integer',
-							'required'          => true,
-							'sanitize_callback' => 'absint',
+						'agent'        => array(
+							'type'              => 'string',
+							'required'          => false,
+							'sanitize_callback' => 'sanitize_text_field',
 						),
 						'delete_files' => array(
 							'type'        => 'boolean',
@@ -153,21 +161,28 @@ class Agents {
 				),
 			)
 		);
+		}
+
+		$agent_access_routes = array(
+			'/agents/(?P<agent>[A-Za-z0-9_-]+)/access',
+			'/agents/(?P<agent_id>\d+)/access',
+		);
 
 		// Agent access management.
+		foreach ( $agent_access_routes as $agent_access_route ) {
 		register_rest_route(
 			'datamachine/v1',
-			'/agents/(?P<agent_id>\d+)/access',
+			$agent_access_route,
 			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
 					'callback'            => array( self::class, 'handle_list_access' ),
 					'permission_callback' => $manage_permission,
 					'args'                => array(
-						'agent_id' => array(
-							'type'              => 'integer',
-							'required'          => true,
-							'sanitize_callback' => 'absint',
+						'agent' => array(
+							'type'              => 'string',
+							'required'          => false,
+							'sanitize_callback' => 'sanitize_text_field',
 						),
 					),
 				),
@@ -176,10 +191,10 @@ class Agents {
 					'callback'            => array( self::class, 'handle_grant_access' ),
 					'permission_callback' => $manage_permission,
 					'args'                => array(
-						'agent_id' => array(
-							'type'              => 'integer',
-							'required'          => true,
-							'sanitize_callback' => 'absint',
+						'agent'   => array(
+							'type'              => 'string',
+							'required'          => false,
+							'sanitize_callback' => 'sanitize_text_field',
 						),
 						'user_id'  => array(
 							'type'              => 'integer',
@@ -201,20 +216,27 @@ class Agents {
 				),
 			)
 		);
+		}
+
+		$agent_revoke_routes = array(
+			'/agents/(?P<agent>[A-Za-z0-9_-]+)/access/(?P<user_id>\d+)',
+			'/agents/(?P<agent_id>\d+)/access/(?P<user_id>\d+)',
+		);
 
 		// Revoke access (DELETE with user_id in URL).
+		foreach ( $agent_revoke_routes as $agent_revoke_route ) {
 		register_rest_route(
 			'datamachine/v1',
-			'/agents/(?P<agent_id>\d+)/access/(?P<user_id>\d+)',
+			$agent_revoke_route,
 			array(
 				'methods'             => WP_REST_Server::DELETABLE,
 				'callback'            => array( self::class, 'handle_revoke_access' ),
 				'permission_callback' => $manage_permission,
 				'args'                => array(
-					'agent_id' => array(
-						'type'              => 'integer',
-						'required'          => true,
-						'sanitize_callback' => 'absint',
+					'agent'   => array(
+						'type'              => 'string',
+						'required'          => false,
+						'sanitize_callback' => 'sanitize_text_field',
 					),
 					'user_id'  => array(
 						'type'              => 'integer',
@@ -224,21 +246,28 @@ class Agents {
 				),
 			)
 		);
+		}
+
+		$agent_token_routes = array(
+			'/agents/(?P<agent>[A-Za-z0-9_-]+)/tokens',
+			'/agents/(?P<agent_id>\d+)/tokens',
+		);
 
 		// Agent tokens: list and create.
+		foreach ( $agent_token_routes as $agent_token_route ) {
 		register_rest_route(
 			'datamachine/v1',
-			'/agents/(?P<agent_id>\d+)/tokens',
+			$agent_token_route,
 			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
 					'callback'            => array( self::class, 'handle_list_tokens' ),
 					'permission_callback' => $manage_permission,
 					'args'                => array(
-						'agent_id' => array(
-							'type'              => 'integer',
-							'required'          => true,
-							'sanitize_callback' => 'absint',
+						'agent' => array(
+							'type'              => 'string',
+							'required'          => false,
+							'sanitize_callback' => 'sanitize_text_field',
 						),
 					),
 				),
@@ -247,10 +276,10 @@ class Agents {
 					'callback'            => array( self::class, 'handle_create_token' ),
 					'permission_callback' => $manage_permission,
 					'args'                => array(
-						'agent_id'     => array(
-							'type'              => 'integer',
-							'required'          => true,
-							'sanitize_callback' => 'absint',
+						'agent'        => array(
+							'type'              => 'string',
+							'required'          => false,
+							'sanitize_callback' => 'sanitize_text_field',
 						),
 						'label'        => array(
 							'type'              => 'string',
@@ -273,20 +302,27 @@ class Agents {
 				),
 			)
 		);
+		}
+
+		$agent_revoke_token_routes = array(
+			'/agents/(?P<agent>[A-Za-z0-9_-]+)/tokens/(?P<token_id>\d+)',
+			'/agents/(?P<agent_id>\d+)/tokens/(?P<token_id>\d+)',
+		);
 
 		// Revoke a specific token.
+		foreach ( $agent_revoke_token_routes as $agent_revoke_token_route ) {
 		register_rest_route(
 			'datamachine/v1',
-			'/agents/(?P<agent_id>\d+)/tokens/(?P<token_id>\d+)',
+			$agent_revoke_token_route,
 			array(
 				'methods'             => WP_REST_Server::DELETABLE,
 				'callback'            => array( self::class, 'handle_revoke_token' ),
 				'permission_callback' => $manage_permission,
 				'args'                => array(
-					'agent_id' => array(
-						'type'              => 'integer',
-						'required'          => true,
-						'sanitize_callback' => 'absint',
+					'agent'   => array(
+						'type'              => 'string',
+						'required'          => false,
+						'sanitize_callback' => 'sanitize_text_field',
 					),
 					'token_id' => array(
 						'type'              => 'integer',
@@ -296,6 +332,7 @@ class Agents {
 				),
 			)
 		);
+		}
 	}
 
 	// ---------------------------------------------------------------
@@ -496,8 +533,13 @@ class Agents {
 	 * @return \WP_REST_Response|WP_Error
 	 */
 	public static function handle_get( WP_REST_Request $request ) {
+		$agent_id = self::resolve_request_agent_id( $request );
+		if ( is_wp_error( $agent_id ) ) {
+			return $agent_id;
+		}
+
 		$result = AgentAbilities::getAgent(
-			array( 'agent_id' => (int) $request->get_param( 'agent_id' ) )
+			array( 'agent_id' => $agent_id )
 		);
 
 		if ( empty( $result['success'] ) ) {
@@ -523,7 +565,12 @@ class Agents {
 	 * @return \WP_REST_Response|WP_Error
 	 */
 	public static function handle_update( WP_REST_Request $request ) {
-		$input = array( 'agent_id' => (int) $request->get_param( 'agent_id' ) );
+		$agent_id = self::resolve_request_agent_id( $request );
+		if ( is_wp_error( $agent_id ) ) {
+			return $agent_id;
+		}
+
+		$input = array( 'agent_id' => $agent_id );
 
 		// Only include fields that were actually sent.
 		$json_params = $request->get_json_params() ?? array();
@@ -565,9 +612,14 @@ class Agents {
 	 * @return \WP_REST_Response|WP_Error
 	 */
 	public static function handle_delete( WP_REST_Request $request ) {
+		$agent_id = self::resolve_request_agent_id( $request );
+		if ( is_wp_error( $agent_id ) ) {
+			return $agent_id;
+		}
+
 		$result = AgentAbilities::deleteAgent(
 			array(
-				'agent_id'     => (int) $request->get_param( 'agent_id' ),
+				'agent_id'     => $agent_id,
 				'delete_files' => (bool) $request->get_param( 'delete_files' ),
 			)
 		);
@@ -599,7 +651,10 @@ class Agents {
 	 * @return \WP_REST_Response|WP_Error
 	 */
 	public static function handle_list_access( WP_REST_Request $request ) {
-		$agent_id = (int) $request->get_param( 'agent_id' );
+		$agent_id = self::resolve_request_agent_id( $request );
+		if ( is_wp_error( $agent_id ) ) {
+			return $agent_id;
+		}
 
 		// Verify agent exists.
 		$agents_repo = new AgentsRepository();
@@ -644,7 +699,11 @@ class Agents {
 	 * @return \WP_REST_Response|WP_Error
 	 */
 	public static function handle_grant_access( WP_REST_Request $request ) {
-		$agent_id = (int) $request->get_param( 'agent_id' );
+		$agent_id = self::resolve_request_agent_id( $request );
+		if ( is_wp_error( $agent_id ) ) {
+			return $agent_id;
+		}
+
 		$user_id  = (int) $request->get_param( 'user_id' );
 		$role     = $request->get_param( 'role' );
 
@@ -706,7 +765,11 @@ class Agents {
 	 * @return \WP_REST_Response|WP_Error
 	 */
 	public static function handle_revoke_access( WP_REST_Request $request ) {
-		$agent_id = (int) $request->get_param( 'agent_id' );
+		$agent_id = self::resolve_request_agent_id( $request );
+		if ( is_wp_error( $agent_id ) ) {
+			return $agent_id;
+		}
+
 		$user_id  = (int) $request->get_param( 'user_id' );
 
 		// Verify agent exists.
@@ -764,9 +827,14 @@ class Agents {
 	 * @return \WP_REST_Response|WP_Error
 	 */
 	public static function handle_list_tokens( WP_REST_Request $request ) {
+		$agent_id = self::resolve_request_agent_id( $request );
+		if ( is_wp_error( $agent_id ) ) {
+			return $agent_id;
+		}
+
 		$abilities = new \DataMachine\Abilities\AgentTokenAbilities();
 		$result    = $abilities->executeListTokens(
-			array( 'agent_id' => (int) $request->get_param( 'agent_id' ) )
+			array( 'agent_id' => $agent_id )
 		);
 
 		if ( empty( $result['success'] ) ) {
@@ -783,10 +851,15 @@ class Agents {
 	 * @return \WP_REST_Response|WP_Error
 	 */
 	public static function handle_create_token( WP_REST_Request $request ) {
+		$agent_id = self::resolve_request_agent_id( $request );
+		if ( is_wp_error( $agent_id ) ) {
+			return $agent_id;
+		}
+
 		$abilities = new \DataMachine\Abilities\AgentTokenAbilities();
 		$result    = $abilities->executeCreateToken(
 			array(
-				'agent_id'     => (int) $request->get_param( 'agent_id' ),
+				'agent_id'     => $agent_id,
 				'label'        => $request->get_param( 'label' ) ?? '',
 				'capabilities' => $request->get_param( 'capabilities' ),
 				'expires_in'   => $request->get_param( 'expires_in' ),
@@ -808,10 +881,15 @@ class Agents {
 	 * @return \WP_REST_Response|WP_Error
 	 */
 	public static function handle_revoke_token( WP_REST_Request $request ) {
+		$agent_id = self::resolve_request_agent_id( $request );
+		if ( is_wp_error( $agent_id ) ) {
+			return $agent_id;
+		}
+
 		$abilities = new \DataMachine\Abilities\AgentTokenAbilities();
 		$result    = $abilities->executeRevokeToken(
 			array(
-				'agent_id' => (int) $request->get_param( 'agent_id' ),
+				'agent_id' => $agent_id,
 				'token_id' => (int) $request->get_param( 'token_id' ),
 			)
 		);
@@ -827,6 +905,29 @@ class Agents {
 	// ---------------------------------------------------------------
 	// Helpers
 	// ---------------------------------------------------------------
+
+	/**
+	 * Resolve a REST route agent parameter to the internal agent ID.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return int|WP_Error Agent ID or REST error.
+	 */
+	private static function resolve_request_agent_id( WP_REST_Request $request ): int|WP_Error {
+		$agent = $request->get_param( 'agent' );
+		if ( null === $agent || '' === $agent ) {
+			$agent = $request->get_param( 'agent_id' );
+		}
+
+		try {
+			return ( new AgentIdentityResolver() )->resolve_agent_id( (string) $agent );
+		} catch ( \InvalidArgumentException $e ) {
+			return new WP_Error(
+				'agent_not_found',
+				$e->getMessage(),
+				array( 'status' => 404 )
+			);
+		}
+	}
 
 	/**
 	 * Permission callback — any logged-in user can list their agents.
