@@ -796,6 +796,7 @@ class AgentBundler {
 
 				if (
 				$existing_flow
+				&& ! $reconcile_runtime
 				&& $this->artifact_has_local_modifications(
 					$artifact_records[ $artifact_key ] ?? null,
 					$this->flow_artifact_payload( $existing_flow, $portable_slug )
