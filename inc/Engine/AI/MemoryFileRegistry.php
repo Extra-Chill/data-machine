@@ -124,7 +124,7 @@ class MemoryFileRegistry {
 		if ( ! is_array( $modes ) ) {
 			$modes = self::MODES_NONE;
 		}
-		$modes = array_values( array_unique( array_map( 'sanitize_key', $modes ) ) );
+		$modes                    = array_values( array_unique( array_map( 'sanitize_key', $modes ) ) );
 		$default_retrieval_policy = empty( $modes )
 			? WP_Agent_Context_Injection_Policy::NEVER
 			: WP_Agent_Context_Injection_Policy::ALWAYS;

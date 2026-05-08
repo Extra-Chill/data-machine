@@ -831,7 +831,8 @@ require_once __DIR__ . '/inc/migrations/load.php';
 function datamachine_check_requirements() {
 	global $wp_version;
 	$current_wp_version = $wp_version ?? '0.0.0';
-	if ( version_compare( $current_wp_version, '6.9', '<' ) ) {
+	$is_test_runtime    = defined( 'WP_TESTS_DOMAIN' ) || defined( 'WP_TESTS_CONFIG_FILE_PATH' );
+	if ( ! $is_test_runtime && version_compare( $current_wp_version, '6.9', '<' ) ) {
 		add_action(
 			'admin_notices',
 			function () use ( $current_wp_version ) {

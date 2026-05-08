@@ -85,7 +85,7 @@ class AgentsChatHandler {
 			return $agent_id;
 		}
 
-		$agent_config = PluginSettings::resolveModelForAgentMode( $agent_id ?: null, 'chat' );
+		$agent_config = PluginSettings::resolveModelForAgentMode( 0 === $agent_id ? null : $agent_id, 'chat' );
 		$provider     = $agent_config['provider'] ?? '';
 		$model        = $agent_config['model'] ?? '';
 
@@ -148,7 +148,7 @@ class AgentsChatHandler {
 	 * @return array
 	 */
 	private function toCanonicalOutput( array $result ): array {
-		$metadata = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+		$metadata                = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
 		$metadata['datamachine'] = array_filter(
 			array(
 				'tool_calls'  => $result['tool_calls'] ?? null,

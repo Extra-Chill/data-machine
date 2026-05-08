@@ -37,12 +37,12 @@ class ChatAbilities {
 			return;
 		}
 
-		$this->list_sessions     = new ListChatSessionsAbility();
-		$this->get_session       = new GetChatSessionAbility();
-		$this->delete_session    = new DeleteChatSessionAbility();
-		$this->create_session    = new CreateChatSessionAbility();
-		$this->mark_session_read = new MarkSessionReadAbility();
-		$this->send_message      = new SendMessageAbility();
+		$this->list_sessions       = new ListChatSessionsAbility();
+		$this->get_session         = new GetChatSessionAbility();
+		$this->delete_session      = new DeleteChatSessionAbility();
+		$this->create_session      = new CreateChatSessionAbility();
+		$this->mark_session_read   = new MarkSessionReadAbility();
+		$this->send_message        = new SendMessageAbility();
 		$this->agents_chat_handler = new AgentsChatHandler();
 
 		self::$registered = true;
