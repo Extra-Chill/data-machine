@@ -67,8 +67,8 @@ class CycleCommand extends BaseCommand {
 			array_shift( $args );
 		}
 
-		$cycle  = sanitize_key( (string) ( $args[0] ?? 'default' ) );
-		$format = (string) ( $assoc_args['format'] ?? 'table' );
+		$cycle   = sanitize_key( (string) ( $args[0] ?? 'default' ) );
+		$format  = (string) ( $assoc_args['format'] ?? 'table' );
 		$dry_run = isset( $assoc_args['dry-run'] );
 		$drain   = ! $dry_run && \WP_CLI\Utils\get_flag_value( $assoc_args, 'drain', true );
 
@@ -79,7 +79,7 @@ class CycleCommand extends BaseCommand {
 
 		$rows = array();
 		foreach ( $selected as $item ) {
-			$flow = $item['flow'];
+			$flow   = $item['flow'];
 			$rows[] = array(
 				'flow_id'       => (int) ( $flow['flow_id'] ?? 0 ),
 				'flow_name'     => (string) ( $flow['flow_name'] ?? '' ),
