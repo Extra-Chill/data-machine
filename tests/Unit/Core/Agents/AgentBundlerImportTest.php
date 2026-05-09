@@ -32,10 +32,13 @@ use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\Database\Agents\Agents as AgentsRepository;
 use DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts;
 use DataMachine\Core\Database\Flows\Flows as FlowsRepository;
+use DataMachine\Core\Database\Jobs\Jobs as JobsRepository;
 use DataMachine\Core\Database\Pipelines\Pipelines as PipelinesRepository;
+use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
+use DataMachine\Engine\Bundle\BundleSchema;
 use WP_UnitTestCase;
 
 final class DailyMemoryImportFakeStore implements WP_Agent_Memory_Store {
@@ -120,6 +123,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		AgentsRepository::create_table();
 		PipelinesRepository::create_table();
 		FlowsRepository::create_table();
+		JobsRepository::create_table();
 		InstalledBundleArtifacts::create_table();
 
 		$this->bundler        = new AgentBundler();
@@ -138,6 +142,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$wpdb->query( "DELETE FROM {$wpdb->base_prefix}datamachine_agents" );
 		$wpdb->query( "DELETE FROM {$wpdb->prefix}datamachine_pipelines" );
 		$wpdb->query( "DELETE FROM {$wpdb->prefix}datamachine_flows" );
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}datamachine_jobs" );
 		$wpdb->query( "DELETE FROM {$wpdb->prefix}datamachine_bundle_artifacts" );
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 
@@ -220,6 +225,81 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( 'daily', $flow['scheduling_config']['interval'] ?? null, 'Importer preserves the bundle interval.' );
 		$this->assertTrue( $flow['scheduling_config']['enabled'] ?? false, 'Importer keeps scheduled bundle flows enabled.' );
 		$this->assertSame( array( 'mcp' => 5 ), $flow['scheduling_config']['max_items'] ?? null, 'Importer preserves bundle max item caps.' );
+	}
+
+	public function test_import_exposes_run_artifact_egress_policy_in_agent_and_flow_metadata(): void {
+		$bundle                  = $this->fixture_bundle( 'artifact-policy-agent' );
+		$bundle['run_artifacts'] = array(
+			'daily_memory'          => array(
+				'egress'               => array( 'bundle-file', 'pr-body', 'github-comment' ),
+				'bundle_relative_path' => 'memory/agent/daily/{yyyy}/{mm}/{dd}.md',
+			),
+			'completion_assertions' => array(
+				'egress' => array( 'pr-body' ),
+			),
+			'transcript_summary'    => array(
+				'egress' => array( 'artifact' ),
+			),
+			'unknown_future_source' => array(
+				'egress' => array( 'pr-body' ),
+			),
+		);
+
+		$result = $this->bundler->import( $bundle, null, $this->owner_id );
+
+		$this->assertTrue( (bool) $result['success'], 'Artifact policy bundle import succeeds.' );
+
+		$expected = array(
+			'completion_assertions' => array(
+				'egress' => array( 'pr-body' ),
+			),
+			'daily_memory'          => array(
+				'egress'               => array( 'bundle-file', 'pr-body' ),
+				'bundle_relative_path' => 'memory/agent/daily/{yyyy}/{mm}/{dd}.md',
+			),
+			'transcript_summary'    => array(
+				'egress' => array( 'artifact' ),
+			),
+		);
+
+		$agent    = $this->agents_repo->get_by_slug( 'artifact-policy-agent' );
+		$pipeline = $this->pipelines_repo->get_by_portable_slug( (int) $agent['agent_id'], 'static-site-pipeline' );
+		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
+
+		$this->assertSame( $expected, BundleSchema::normalize_run_artifact_egress_policy( $agent['agent_config']['datamachine_bundle']['run_artifacts'] ?? array() ), 'Agent bundle metadata exposes normalized run artifact policy.' );
+		$this->assertSame( $expected, BundleSchema::normalize_run_artifact_egress_policy( $flow['scheduling_config']['run_artifacts'] ?? array() ), 'Flow runtime metadata exposes normalized run artifact policy.' );
+		$this->assertSame( $expected, $result['summary']['run_artifacts'] ?? array(), 'Import summary exposes normalized run artifact policy.' );
+	}
+
+	public function test_run_flow_copies_run_artifact_egress_policy_to_job_engine_data(): void {
+		$bundle                  = $this->fixture_bundle( 'artifact-runtime-agent' );
+		$bundle['run_artifacts'] = array(
+			'daily_memory' => array(
+				'egress'               => array( 'bundle-file', 'pr-body' ),
+				'bundle_relative_path' => 'memory/agent/daily/{yyyy}/{mm}/{dd}.md',
+			),
+		);
+
+		$result = $this->bundler->import( $bundle, null, $this->owner_id );
+		$this->assertTrue( (bool) $result['success'], 'Artifact runtime policy bundle import succeeds.' );
+
+		$agent    = $this->agents_repo->get_by_slug( 'artifact-runtime-agent' );
+		$pipeline = $this->pipelines_repo->get_by_portable_slug( (int) $agent['agent_id'], 'static-site-pipeline' );
+		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
+
+		$run = ( new RunFlowAbility() )->execute( array( 'flow_id' => (int) $flow['flow_id'] ) );
+		$this->assertTrue( (bool) $run['success'], 'Flow run initializes job runtime metadata.' );
+
+		$engine_data = ( new JobsRepository() )->retrieve_engine_data( (int) $run['job_id'] );
+		$expected    = array(
+			'daily_memory' => array(
+				'egress'               => array( 'bundle-file', 'pr-body' ),
+				'bundle_relative_path' => 'memory/agent/daily/{yyyy}/{mm}/{dd}.md',
+			),
+		);
+
+		$this->assertSame( $expected, $engine_data['run_artifact_egress_policy'] ?? array(), 'Job engine_data exposes run artifact egress policy.' );
+		$this->assertSame( $expected, $engine_data['flow']['run_artifacts'] ?? array(), 'Flow runtime metadata exposes run artifact egress policy.' );
 	}
 
 	public function test_import_seeds_agent_daily_memory_into_runtime_store(): void {

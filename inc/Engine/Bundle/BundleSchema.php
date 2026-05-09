@@ -100,6 +100,18 @@ final class BundleSchema {
 
 	public const ARTIFACT_TYPES = self::CORE_ARTIFACT_TYPES;
 
+	public const RUN_ARTIFACT_EGRESS_TARGETS = array(
+		'artifact',
+		'bundle-file',
+		'pr-body',
+	);
+
+	public const RUN_ARTIFACT_SOURCES = array(
+		'completion_assertions',
+		'daily_memory',
+		'transcript_summary',
+	);
+
 	/**
 	 * Return all artifact types known to the bundle runtime.
 	 *
@@ -190,6 +202,82 @@ final class BundleSchema {
 		}
 
 		return $data;
+	}
+
+	/**
+	 * Normalize declarative run artifact egress policy.
+	 *
+	 * Data Machine only validates and exposes this policy. Consumers such as Data
+	 * Machine Code decide what `bundle-file` or `pr-body` mean in a given runtime.
+	 * Unknown sources or egress targets are dropped so older/future bundle authors
+	 * get deterministic behavior without triggering GitHub-specific code here.
+	 *
+	 * @param mixed $policy Raw policy value.
+	 * @return array<string,array<string,mixed>> Normalized source policy map.
+	 */
+	public static function normalize_run_artifact_egress_policy( mixed $policy ): array {
+		if ( ! is_array( $policy ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( self::RUN_ARTIFACT_SOURCES as $source ) {
+			if ( ! is_array( $policy[ $source ] ?? null ) ) {
+				continue;
+			}
+
+			$source_policy = $policy[ $source ];
+			$egress        = self::normalize_run_artifact_egress_targets( $source_policy['egress'] ?? array() );
+			if ( empty( $egress ) ) {
+				continue;
+			}
+
+			$entry = array( 'egress' => $egress );
+			if ( 'daily_memory' === $source && is_string( $source_policy['bundle_relative_path'] ?? null ) ) {
+				$path = self::normalize_bundle_relative_path( $source_policy['bundle_relative_path'] );
+				if ( '' !== $path ) {
+					$entry['bundle_relative_path'] = $path;
+				}
+			}
+
+			$normalized[ $source ] = $entry;
+		}
+
+		ksort( $normalized, SORT_STRING );
+		return $normalized;
+	}
+
+	/** @return string[] */
+	private static function normalize_run_artifact_egress_targets( mixed $targets ): array {
+		if ( ! is_array( $targets ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $targets as $target ) {
+			if ( ! is_string( $target ) ) {
+				continue;
+			}
+			$target = self::sanitize_key( $target );
+			if ( in_array( $target, self::RUN_ARTIFACT_EGRESS_TARGETS, true ) ) {
+				$normalized[] = $target;
+			}
+		}
+
+		$normalized = array_values( array_unique( $normalized ) );
+		sort( $normalized, SORT_STRING );
+		return $normalized;
+	}
+
+	private static function normalize_bundle_relative_path( string $path ): string {
+		$path = str_replace( '\\', '/', trim( $path ) );
+		$path = preg_replace( '#/+#', '/', $path );
+		$path = ltrim( is_string( $path ) ? $path : '', '/' );
+		if ( '' === $path || str_contains( $path, '../' ) || str_starts_with( $path, '..' ) ) {
+			return '';
+		}
+
+		return $path;
 	}
 
 	/**

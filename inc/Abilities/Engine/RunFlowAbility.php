@@ -187,8 +187,9 @@ class RunFlowAbility {
 		// Transition job from pending to processing.
 		$this->db_jobs->start_job( $job_id );
 
-		$flow_config       = $flow['flow_config'] ?? array();
-		$scheduling_config = $flow['scheduling_config'] ?? array();
+		$flow_config         = $flow['flow_config'] ?? array();
+		$scheduling_config   = $flow['scheduling_config'] ?? array();
+		$run_artifact_policy = \DataMachine\Engine\Bundle\BundleSchema::normalize_run_artifact_egress_policy( $scheduling_config['run_artifacts'] ?? array() );
 
 		// Load pipeline config.
 		$pipeline        = $this->db_pipelines->get_pipeline( $pipeline_id );
@@ -224,6 +225,10 @@ class RunFlowAbility {
 			'flow_config'     => $flow_config,
 			'pipeline_config' => $pipeline_config,
 		);
+		if ( ! empty( $run_artifact_policy ) ) {
+			$engine_snapshot['run_artifact_egress_policy'] = $run_artifact_policy;
+			$engine_snapshot['flow']['run_artifacts']      = $run_artifact_policy;
+		}
 
 		// Merge initial_data (e.g. webhook payloads, API context) into the
 		// engine snapshot. initial_data keys go underneath so engine
