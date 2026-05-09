@@ -369,7 +369,7 @@ assert_runtime_policy( 3 === $nudge_dispatch_count, 'missing natural assertion n
 assert_runtime_policy( str_contains( wp_json_encode( $nudge_second_request ), 'completion signals are still missing' ), 'nudge is appended before retry request' );
 assert_runtime_policy( 1 === count( $nudge_result['tool_execution_results'] ?? array() ), 'nudged loop captures required tool result' );
 assert_runtime_policy( 1 === ( $nudge_result['completion_nudge_count'] ?? 0 ), 'nudged loop returns nudge count diagnostic' );
-assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $nudge_result['completion_assertions_missing']['tool_names'] ?? null ), 'nudged loop returns missing assertion diagnostic' );
+assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $nudge_result['completion_assertions_satisfied']['tool_names'] ?? null ), 'nudged loop returns final satisfied assertion diagnostic' );
 assert_runtime_policy( str_contains( $nudge_result['completion_nudge'] ?? '', 'runtime_policy_tool' ), 'nudged loop returns latest nudge message' );
 assert_runtime_policy( 1 === count( array_filter( $nudge_event_sink->events, fn( $entry ) => 'completion_nudge_added' === ( $entry['event'] ?? '' ) ) ), 'nudged loop emits completion_nudge_added event' );
 $nudge_event_payload = runtime_policy_first_event_payload( $nudge_event_sink, 'completion_nudge_added' );
@@ -539,6 +539,85 @@ assert_runtime_policy( $runtime_rule_dispatch_count >= 4, 'runtime rule rejectio
 assert_runtime_policy( 2 === count( array_filter( $runtime_rule_tool_names, static fn( $tool_name ) => 'workspace_read' === $tool_name ) ), 'runtime rule result excludes rejected inspection call' );
 assert_runtime_policy( 'create_github_issue' === ( $runtime_rule_result['tool_execution_results'][3]['tool_name'] ?? '' ), 'runtime rule allows required fallback tool after rejection' );
 assert_runtime_policy( str_contains( wp_json_encode( $runtime_rule_transcript->calls[0]['messages'] ?? array() ), 'TOOL POLICY REJECTED' ), 'runtime rule transcript includes rejection message' );
+
+$pr_prerequisite_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$pr_prerequisite_dispatch_count ) {
+		++$pr_prerequisite_dispatch_count;
+		$tool_name = match ( $pr_prerequisite_dispatch_count ) {
+			1 => 'create_github_pull_request',
+			2 => 'agent_daily_memory',
+			3 => 'create_github_pull_request',
+			default => '',
+		};
+
+		if ( '' === $tool_name ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => 'Done after memory and PR.',
+					'tool_calls' => array(),
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => '',
+				'tool_calls' => array(
+					array(
+						'name'       => $tool_name,
+						'parameters' => array( 'name' => 'pr-prerequisite-smoke-' . $pr_prerequisite_dispatch_count ),
+					),
+				),
+			),
+		);
+	}
+);
+
+$pr_prerequisite_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'write memory before PR' ) ),
+	array(
+		'create_github_pull_request' => array(
+			'name'        => 'create_github_pull_request',
+			'description' => 'Open a PR',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+		'agent_daily_memory'         => array(
+			'name'        => 'agent_daily_memory',
+			'description' => 'Write daily memory',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	'pipeline',
+	array(
+		'completion_assertions' => array(
+			'required_tool_names' => array( 'create_github_pull_request', 'agent_daily_memory' ),
+		),
+		'tool_runtime_rules'    => array(
+			array(
+				'id'                 => 'daily-memory-before-pr-smoke',
+				'type'               => 'require_prior_tool',
+				'before_tool'        => 'create_github_pull_request',
+				'require_prior_tool' => array( 'agent_daily_memory' ),
+			),
+		),
+	),
+	6
+);
+
+$pr_prerequisite_tool_names = array_map( static fn( $entry ) => (string) ( $entry['tool_name'] ?? '' ), $pr_prerequisite_result['tool_execution_results'] ?? array() );
+assert_runtime_policy( 4 === $pr_prerequisite_dispatch_count, 'prior-tool runtime rule rejects premature PR and allows retry after memory' );
+assert_runtime_policy( array( 'agent_daily_memory', 'create_github_pull_request' ) === $pr_prerequisite_tool_names, 'prior-tool runtime rule excludes rejected PR from tool results' );
+assert_runtime_policy( str_contains( wp_json_encode( $pr_prerequisite_result['messages'] ?? array() ), 'Before using create_github_pull_request' ), 'prior-tool runtime rule explains required tool order' );
 
 $satisfied_runtime_rule_dispatch_count = 0;
 WpAiClientTestDouble::reset();
