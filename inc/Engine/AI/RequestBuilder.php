@@ -759,7 +759,7 @@ class RequestBuilder {
 	}
 
 	/**
-	 * Normalize Data Machine's tool parameter map into a JSON Schema object.
+	 * Return the canonical JSON Schema object for tool parameters.
 	 *
 	 * @param mixed $parameters Raw parameters definition.
 	 * @return array<string, mixed>|null
@@ -769,54 +769,6 @@ class RequestBuilder {
 			return null;
 		}
 
-		$schema = $parameters;
-		if ( ! isset( $schema['type'] ) && ! isset( $schema['properties'] ) && ! isset( $schema['$ref'] ) ) {
-			$schema = array(
-				'type'       => 'object',
-				'properties' => $schema,
-			);
-		}
-
-		return self::normalizeRequiredFlags( $schema );
-	}
-
-	/**
-	 * Convert property-level required flags to JSON Schema object-level required list.
-	 *
-	 * @param array<string, mixed> $schema JSON schema.
-	 * @return array<string, mixed>
-	 */
-	private static function normalizeRequiredFlags( array $schema ): array {
-		if ( isset( $schema['items'] ) && is_array( $schema['items'] ) ) {
-			$schema['items'] = self::normalizeRequiredFlags( $schema['items'] );
-		}
-
-		if ( empty( $schema['properties'] ) || ! is_array( $schema['properties'] ) ) {
-			return $schema;
-		}
-
-		$required = isset( $schema['required'] ) && is_array( $schema['required'] ) ? $schema['required'] : array();
-
-		foreach ( $schema['properties'] as $property_name => $property_schema ) {
-			if ( ! is_array( $property_schema ) ) {
-				continue;
-			}
-
-			if ( true === ( $property_schema['required'] ?? null ) ) {
-				$required[] = (string) $property_name;
-			}
-
-			unset( $property_schema['required'] );
-			$schema['properties'][ $property_name ] = self::normalizeRequiredFlags( $property_schema );
-		}
-
-		$required = array_values( array_unique( array_filter( $required, 'is_string' ) ) );
-		if ( ! empty( $required ) ) {
-			$schema['required'] = $required;
-		} else {
-			unset( $schema['required'] );
-		}
-
-		return $schema;
+		return $parameters;
 	}
 }

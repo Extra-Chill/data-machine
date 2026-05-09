@@ -276,11 +276,14 @@ class AmazonAffiliateLink extends BaseTool {
 			'description'     => 'Search Amazon products and return an affiliate link with the product title, URL, and thumbnail. Use when content mentions a specific product the reader might want to buy. Only use for genuinely relevant product references — not every noun.',
 			'requires_config' => true,
 			'parameters'      => array(
-				'query' => array(
+				'type'       => 'object',
+				'properties' => array(
+					'query' => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'Product search query (e.g., "Lodge cast iron Dutch oven", "KitchenAid stand mixer"). Be specific for best results.',
 				),
+				),
+				'required'   => array( 'query' ),
 			),
 		);
 	}

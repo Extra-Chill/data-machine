@@ -54,6 +54,44 @@ $tool_files = glob( $tools_dir . '/*.php' ) ?: array();
 $schemas_checked = 0;
 $array_params_checked = 0;
 
+$assert_schema_shape = function ( array $schema, string $path ) use ( &$assert, &$assert_schema_shape, &$array_params_checked ): void {
+	if ( array_key_exists( 'required', $schema ) ) {
+		$assert(
+			is_array( $schema['required'] ),
+			"{$path}: required is an object-level JSON Schema array"
+		);
+	}
+
+	if ( 'array' === ( $schema['type'] ?? null ) ) {
+		++$array_params_checked;
+		$assert(
+			isset( $schema['items'] ) && is_array( $schema['items'] ),
+			"{$path}: array schema declares 'items' (JSON Schema requirement; OpenAI strict mode rejects without)"
+		);
+
+		if ( isset( $schema['items'] ) && is_array( $schema['items'] ) ) {
+			$assert(
+				isset( $schema['items']['type'] ),
+				"{$path}.items: items declares a 'type'"
+			);
+			$assert_schema_shape( $schema['items'], "{$path}.items" );
+		}
+	}
+
+	foreach ( $schema['properties'] ?? array() as $property_name => $property_schema ) {
+		if ( ! is_array( $property_schema ) ) {
+			$assert( false, "{$path}.properties.{$property_name}: property schema is not an array" );
+			continue;
+		}
+
+		$assert(
+			! array_key_exists( 'required', $property_schema ) || is_array( $property_schema['required'] ),
+			"{$path}.properties.{$property_name}: does not use property-level required flags"
+		);
+		$assert_schema_shape( $property_schema, "{$path}.properties.{$property_name}" );
+	}
+};
+
 foreach ( $tool_files as $file ) {
 	require_once $file;
 
@@ -86,36 +124,9 @@ foreach ( $tool_files as $file ) {
 	}
 
 	++$schemas_checked;
-
-	foreach ( $definition['parameters'] as $param_name => $param_schema ) {
-		if ( ! is_array( $param_schema ) ) {
-			$assert(
-				false,
-				"{$class_short}.{$param_name}: parameter schema is not an array"
-			);
-			continue;
-		}
-
-		$type = $param_schema['type'] ?? null;
-
-		if ( 'array' !== $type ) {
-			continue;
-		}
-
-		++$array_params_checked;
-
-		$assert(
-			isset( $param_schema['items'] ) && is_array( $param_schema['items'] ),
-			"{$class_short}.{$param_name}: array-typed parameter declares 'items' (JSON Schema requirement; OpenAI strict mode rejects without)"
-		);
-
-		if ( isset( $param_schema['items'] ) && is_array( $param_schema['items'] ) ) {
-			$assert(
-				isset( $param_schema['items']['type'] ),
-				"{$class_short}.{$param_name}.items: items declares a 'type'"
-			);
-		}
-	}
+	$assert( 'object' === ( $definition['parameters']['type'] ?? null ), "{$class_short}: parameters is a canonical object schema" );
+	$assert( isset( $definition['parameters']['properties'] ) && is_array( $definition['parameters']['properties'] ), "{$class_short}: parameters declares properties" );
+	$assert_schema_shape( $definition['parameters'], $class_short . '.parameters' );
 }
 
 $assert(

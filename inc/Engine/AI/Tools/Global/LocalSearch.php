@@ -70,22 +70,23 @@ class LocalSearch extends BaseTool {
 			'description'     => 'Search this WordPress site for posts by title or content. Returns up to 10 results with titles, excerpts, permalinks, and metadata. Automatically tries multiple search strategies (standard search, title matching, split queries) if initial search returns no results. For best results, search for ONE item at a time. Use title_only=true for precise title matching.',
 			'requires_config' => false,
 			'parameters'      => array(
-				'query'      => array(
+				'type'       => 'object',
+				'properties' => array(
+					'query'      => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'Search terms to find relevant posts. For best results, use simple queries for one item at a time rather than multiple comma-separated items.',
 				),
-				'post_types' => array(
+					'post_types' => array(
 					'type'        => 'array',
-					'required'    => false,
 					'description' => 'Post types to search (default: ["post", "page"]). Use ["datamachine_events"] for events.',
 					'items'       => array( 'type' => 'string' ),
 				),
-				'title_only' => array(
+					'title_only' => array(
 					'type'        => 'boolean',
-					'required'    => false,
 					'description' => 'Search only post titles instead of full content (default: false). Use for precise title matching when you know the exact or partial title.',
 				),
+				),
+				'required'   => array( 'query' ),
 			),
 		);
 	}

@@ -130,26 +130,26 @@ $response = \DataMachine\Engine\AI\RequestBuilder::build(
 			'name'        => 'client/test_tool',
 			'description' => 'Test tool.',
 			'parameters'  => array(
-				'reason' => array(
-					'type'        => 'string',
-					'description' => 'Skip reason.',
-					'required'    => true,
-				),
-				'note'   => array(
-					'type'     => 'string',
-					'required' => false,
-				),
-				'policy' => array(
-					'type'       => 'object',
-					'required'   => false,
-					'properties' => array(
-						'allow' => array(
-							'type'     => 'array',
-							'items'    => array( 'type' => 'string' ),
-							'required' => false,
+				'type'       => 'object',
+				'properties' => array(
+					'reason' => array(
+						'type'        => 'string',
+						'description' => 'Skip reason.',
+					),
+					'note'   => array(
+						'type' => 'string',
+					),
+					'policy' => array(
+						'type'       => 'object',
+						'properties' => array(
+							'allow' => array(
+								'type'  => 'array',
+								'items' => array( 'type' => 'string' ),
+							),
 						),
 					),
 				),
+				'required'   => array( 'reason' ),
 			),
 		),
 	),
@@ -170,13 +170,9 @@ $assert( 7 === $response->getTokenUsage()->getTotalTokens(), 'token usage is rea
 $assert( 'Describe this file.' === ( $captured_request['prompt'] ?? null ), 'latest user message becomes the wp-ai-client prompt' );
 $assert( 'System directive.' === ( $captured_request['messages'][0]['content'] ?? null ), 'system instruction reaches wp-ai-client builder' );
 $assert( 'Run tool.' === ( $captured_request['messages'][1]['content'] ?? null ), 'earlier user message remains wp-ai-client history' );
-$assert( is_array( $schema ), 'legacy parameter map normalizes to a schema array' );
-$assert( 'object' === ( $schema['type'] ?? null ), 'legacy parameter map is wrapped as an object schema' );
-$assert( array( 'reason' ) === ( $schema['required'] ?? null ), 'property-level required=true is lifted to object-level required array' );
-$assert( ! isset( $schema['properties']['reason']['required'] ), 'required flag is removed from required property schema' );
-$assert( ! isset( $schema['properties']['note']['required'] ), 'required flag is removed from optional property schema' );
-$assert( ! isset( $schema['properties']['policy']['required'] ), 'required flag is removed from nested object property schema' );
-$assert( ! isset( $schema['properties']['policy']['properties']['allow']['required'] ), 'required flag is removed from nested object child property schema' );
+$assert( is_array( $schema ), 'canonical parameter schema reaches wp-ai-client as an array' );
+$assert( 'object' === ( $schema['type'] ?? null ), 'canonical parameter schema remains an object schema' );
+$assert( array( 'reason' ) === ( $schema['required'] ?? null ), 'canonical object-level required array is preserved' );
 $assert( 'string' === ( $schema['properties']['reason']['type'] ?? null ), 'property schema fields are preserved' );
 
 // --- Empty-prompt fallback ----------------------------------------------------

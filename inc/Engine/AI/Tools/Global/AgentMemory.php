@@ -211,36 +211,34 @@ class AgentMemory extends BaseTool {
 			'description'     => 'Manage persistent agent files with section-level operations. Works on any agent file: MEMORY.md (default), SOUL.md, USER.md, etc. Stored as markdown with ## section headers. Use "list_sections" to see what exists, "get" to read content, and "update" to write. Use "append" mode to add new information without losing existing content. Use "set" mode to replace a section entirely. For session activity and temporal events, use agent_daily_memory instead.',
 			'requires_config' => false,
 			'parameters'      => array(
-				'user_id' => array(
+				'type'       => 'object',
+				'properties' => array(
+					'user_id' => array(
 					'type'        => 'integer',
-					'required'    => false,
 					'description' => 'Optional WordPress user ID for layered memory context. Defaults to current user context.',
 				),
-				'action'  => array(
+					'action'  => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'Action to perform: "get" (read file/section), "update" (write to section), or "list_sections" (show all section headers).',
 				),
-				'file'    => array(
+					'file'    => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Target file. Defaults to MEMORY.md. Use SOUL.md, USER.md, SITE.md, etc. for other agent files.',
 				),
-				'section' => array(
+					'section' => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Section name without "##" prefix. Required for "update". Optional for "get" (omit to read full file).',
 				),
-				'content' => array(
+					'content' => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Content to write. Required for "update" action.',
 				),
-				'mode'    => array(
+					'mode'    => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Write mode for "update": "set" replaces section content (default), "append" adds to end of section.',
 				),
+				),
+				'required'   => array( 'action' ),
 			),
 		);
 	}

@@ -71,51 +71,46 @@ class GoogleSearchConsole extends BaseTool {
 			'description'     => 'Interact with Google Search Console. Fetch search analytics (query stats, page metrics, daily trends), inspect URLs for index status and mobile usability, and manage sitemaps (list, get details, submit).',
 			'requires_config' => true,
 			'parameters'      => array(
-				'action'       => array(
+				'type'       => 'object',
+				'properties' => array(
+					'action'       => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'Action to perform: query_stats (top search queries), page_stats (per-page metrics), query_page_stats (query+page combos), date_stats (daily trends), inspect_url (check index/crawl status for a URL), list_sitemaps (list all submitted sitemaps), get_sitemap (details for one sitemap), submit_sitemap (submit a sitemap to Google).',
 				),
-				'url'          => array(
+					'url'          => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Full URL to inspect. Required for inspect_url action.',
 				),
-				'sitemap_url'  => array(
+					'sitemap_url'  => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Sitemap URL. Required for get_sitemap and submit_sitemap actions.',
 				),
-				'site_url'     => array(
+					'site_url'     => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Site URL (sc-domain: or https://). Defaults to the configured site URL.',
 				),
-				'start_date'   => array(
+					'start_date'   => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Start date in YYYY-MM-DD format (defaults to 28 days ago).',
 				),
-				'end_date'     => array(
+					'end_date'     => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'End date in YYYY-MM-DD format (defaults to 3 days ago for final data).',
 				),
-				'limit'        => array(
+					'limit'        => array(
 					'type'        => 'integer',
-					'required'    => false,
 					'description' => 'Row limit (default: 25, max: 25000).',
 				),
-				'url_filter'   => array(
+					'url_filter'   => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Filter results to URLs containing this string.',
 				),
-				'query_filter' => array(
+					'query_filter' => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Filter results to queries containing this string.',
 				),
+				),
+				'required'   => array( 'action' ),
 			),
 		);
 	}
