@@ -117,7 +117,7 @@ final class AgentBundleArrayAdapter {
 				$flow_config[ $flow_step_id ] = self::flow_step_config_from_document_step( $step, $pipeline_id, $flow_id, $pipeline_step_id, $flow_step_id );
 			}
 
-			$flow_entry = array(
+			$flow_entry         = array(
 				'original_id'          => $flow_id,
 				'original_pipeline_id' => $pipeline_id,
 				'portable_slug'        => $slug,
@@ -137,7 +137,7 @@ final class AgentBundleArrayAdapter {
 			$flows[] = $flow_entry;
 		}
 
-		$bundle = array(
+		$bundle        = array(
 			'bundle_version'        => $manifest['bundle_version'],
 			'bundle_slug'           => $manifest['bundle_slug'],
 			'source_ref'            => $manifest['source_ref'] ?? '',

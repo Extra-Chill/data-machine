@@ -776,7 +776,6 @@ class AgentBundler {
 				);
 				$artifact_key  = 'flow:' . $portable_slug;
 
-
 				$flow_run_artifacts = \DataMachine\Engine\Bundle\BundleSchema::normalize_run_artifact_egress_policy( $flow_data['run_artifacts'] ?? $bundle_run_artifacts );
 				$scheduling         = $this->bundle_create_scheduling_config( is_array( $flow_data['scheduling_config'] ?? null ) ? $flow_data['scheduling_config'] : array() );
 				if ( ! empty( $flow_run_artifacts ) ) {
