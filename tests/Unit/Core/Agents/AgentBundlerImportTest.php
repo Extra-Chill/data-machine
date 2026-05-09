@@ -19,14 +19,91 @@
 
 namespace DataMachine\Tests\Unit\Core\Agents;
 
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_List_Entry;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Metadata;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Query;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Read_Result;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Scope;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store_Capabilities;
+use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Write_Result;
+use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\Database\Agents\Agents as AgentsRepository;
 use DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts;
 use DataMachine\Core\Database\Flows\Flows as FlowsRepository;
 use DataMachine\Core\Database\Pipelines\Pipelines as PipelinesRepository;
+use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use WP_UnitTestCase;
+
+final class DailyMemoryImportFakeStore implements WP_Agent_Memory_Store {
+
+	/** @var array<string,string> */
+	public array $files = array();
+
+	/** @var array<string,WP_Agent_Memory_Scope> */
+	private array $scopes = array();
+
+	public function capabilities(): WP_Agent_Memory_Store_Capabilities {
+		return WP_Agent_Memory_Store_Capabilities::none();
+	}
+
+	public function read( WP_Agent_Memory_Scope $scope, array $metadata_fields = WP_Agent_Memory_Metadata::FIELDS ): WP_Agent_Memory_Read_Result {
+		unset( $metadata_fields );
+		if ( ! array_key_exists( $scope->key(), $this->files ) ) {
+			return WP_Agent_Memory_Read_Result::not_found();
+		}
+
+		$content = $this->files[ $scope->key() ];
+		return new WP_Agent_Memory_Read_Result( true, $content, sha1( $content ), strlen( $content ), 123 );
+	}
+
+	public function write( WP_Agent_Memory_Scope $scope, string $content, ?string $if_match = null, ?WP_Agent_Memory_Metadata $metadata = null ): WP_Agent_Memory_Write_Result {
+		unset( $if_match, $metadata );
+		$this->files[ $scope->key() ]  = $content;
+		$this->scopes[ $scope->key() ] = $scope;
+
+		return WP_Agent_Memory_Write_Result::ok( sha1( $content ), strlen( $content ) );
+	}
+
+	public function exists( WP_Agent_Memory_Scope $scope ): bool {
+		return array_key_exists( $scope->key(), $this->files );
+	}
+
+	public function delete( WP_Agent_Memory_Scope $scope ): WP_Agent_Memory_Write_Result {
+		unset( $this->files[ $scope->key() ], $this->scopes[ $scope->key() ] );
+		return WP_Agent_Memory_Write_Result::ok( '', 0 );
+	}
+
+	public function list_layer( WP_Agent_Memory_Scope $scope_query, ?WP_Agent_Memory_Query $query = null ): array {
+		unset( $scope_query, $query );
+		return array();
+	}
+
+	public function list_subtree( WP_Agent_Memory_Scope $scope_query, string $prefix, ?WP_Agent_Memory_Query $query = null ): array {
+		unset( $query );
+		$entries = array();
+
+		foreach ( $this->files as $key => $content ) {
+			$scope = $this->scopes[ $key ] ?? null;
+			if ( ! $scope instanceof WP_Agent_Memory_Scope ) {
+				continue;
+			}
+			if ( $scope->layer !== $scope_query->layer || $scope->user_id !== $scope_query->user_id || $scope->agent_id !== $scope_query->agent_id ) {
+				continue;
+			}
+			if ( 0 !== strpos( $scope->filename, $prefix . '/' ) ) {
+				continue;
+			}
+
+			$entries[] = new WP_Agent_Memory_List_Entry( $scope->filename, $scope->layer, strlen( $content ), 123 );
+		}
+
+		return $entries;
+	}
+}
 
 class AgentBundlerImportTest extends WP_UnitTestCase {
 
@@ -35,6 +112,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 	private PipelinesRepository $pipelines_repo;
 	private FlowsRepository $flows_repo;
 	private int $owner_id;
+	private $memory_store_filter = null;
 
 	public function set_up(): void {
 		parent::set_up();
@@ -65,6 +143,11 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 
 		remove_all_actions( 'datamachine_bundle_import_pre_commit' );
 		remove_all_actions( 'datamachine_bundle_import_post_claim_started' );
+		if ( null !== $this->memory_store_filter ) {
+			remove_filter( 'agents_api_memory_store', $this->memory_store_filter, 10 );
+			$this->memory_store_filter = null;
+		}
+		PermissionHelper::clear_agent_context();
 
 		parent::tear_down();
 	}
@@ -137,6 +220,64 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( 'daily', $flow['scheduling_config']['interval'] ?? null, 'Importer preserves the bundle interval.' );
 		$this->assertTrue( $flow['scheduling_config']['enabled'] ?? false, 'Importer keeps scheduled bundle flows enabled.' );
 		$this->assertSame( array( 'mcp' => 5 ), $flow['scheduling_config']['max_items'] ?? null, 'Importer preserves bundle max item caps.' );
+	}
+
+	public function test_import_seeds_agent_daily_memory_into_runtime_store(): void {
+		$store                     = new DailyMemoryImportFakeStore();
+		$this->memory_store_filter = static fn( $default, WP_Agent_Memory_Scope $scope ) => $store;
+		add_filter( 'agents_api_memory_store', $this->memory_store_filter, 10, 2 );
+
+		$bundle = $this->fixture_bundle( 'daily-memory-agent' );
+		$bundle['files']['daily/2026/05/09.md'] = "# Daily Memory: 2026-05-09\n\nImported bundle memory with alpha-sentinel.\n";
+		$bundle_dir = sys_get_temp_dir() . '/datamachine-daily-memory-bundle-' . getmypid();
+		$this->remove_tree( $bundle_dir );
+		$this->assertTrue( $this->bundler->to_directory( $bundle, $bundle_dir ), 'Bundle directory write succeeds.' );
+		$this->assertFileExists( $bundle_dir . '/memory/agent/daily/2026/05/09.md', 'Daily memory is represented under memory/agent/daily in the bundle directory.' );
+		$bundle = $this->bundler->from_directory( $bundle_dir );
+		$this->assertIsArray( $bundle, 'Bundle directory reads back into importable bundle data.' );
+
+		$result = $this->bundler->import( $bundle, null, $this->owner_id );
+		$this->remove_tree( $bundle_dir );
+
+		$this->assertTrue( (bool) $result['success'], 'Bundle import succeeds.' );
+		$agent = $this->agents_repo->get_by_slug( 'daily-memory-agent' );
+		$this->assertNotEmpty( $agent, 'Imported agent exists.' );
+
+		PermissionHelper::set_agent_context( (int) $agent['agent_id'], $this->owner_id );
+		$tool = new AgentDailyMemory();
+
+		$read = $tool->handle_tool_call(
+			array(
+				'action' => 'read',
+				'date'   => '2026-05-09',
+			)
+		);
+		$this->assertTrue( (bool) ( $read['success'] ?? false ), 'Daily memory tool reads imported daily memory.' );
+		$this->assertStringContainsString( 'alpha-sentinel', $read['data']['content'] ?? '' );
+
+		$search = $tool->handle_tool_call(
+			array(
+				'action' => 'search',
+				'query'  => 'alpha-sentinel',
+			)
+		);
+		$this->assertTrue( (bool) ( $search['success'] ?? false ), 'Daily memory tool searches imported daily memory.' );
+		$this->assertSame( 1, $search['data']['match_count'] ?? 0 );
+	}
+
+	private function remove_tree( string $path ): void {
+		if ( ! is_dir( $path ) ) {
+			return;
+		}
+
+		$iterator = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator( $path, \FilesystemIterator::SKIP_DOTS ),
+			\RecursiveIteratorIterator::CHILD_FIRST
+		);
+		foreach ( $iterator as $file ) {
+			$file->isDir() ? rmdir( $file->getPathname() ) : unlink( $file->getPathname() );
+		}
+		rmdir( $path );
 	}
 
 	public function test_import_reenqueues_existing_scheduled_flow_when_action_is_missing(): void {

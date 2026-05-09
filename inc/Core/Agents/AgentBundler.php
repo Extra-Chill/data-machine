@@ -16,6 +16,7 @@ namespace DataMachine\Core\Agents;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\Database\Flows\Flows;
+use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
@@ -660,7 +661,7 @@ class AgentBundler {
 			}
 
 			// 2. Write agent identity files.
-			$this->write_agent_files( $slug, $bundle['files'] ?? array() );
+			$this->write_agent_files( $slug, $agent_id, $owner_id, $bundle['files'] ?? array() );
 
 			// 3. Write USER.md template if provided.
 			if ( ! empty( $bundle['user_template'] ) ) {
@@ -1492,14 +1493,22 @@ class AgentBundler {
 	/**
 	 * Write agent identity files to disk.
 	 *
-	 * @param string $slug  Agent slug.
-	 * @param array  $files filename => content map.
+	 * @param string $slug     Agent slug.
+	 * @param int    $agent_id Imported agent ID.
+	 * @param int    $owner_id Imported agent owner ID.
+	 * @param array  $files    filename => content map.
 	 */
-	private function write_agent_files( string $slug, array $files ): void {
+	private function write_agent_files( string $slug, int $agent_id, int $owner_id, array $files ): void {
 		$agent_dir = $this->directory_manager->get_agent_identity_directory( $slug );
 		$this->directory_manager->ensure_directory_exists( $agent_dir );
 
 		foreach ( $files as $relative_path => $content ) {
+			$relative_path = str_replace( '\\', '/', (string) $relative_path );
+			if ( preg_match( '#^daily/(\d{4})/(\d{2})/(\d{2})\.md$#', $relative_path, $matches ) ) {
+				( new DailyMemory( $owner_id, $agent_id ) )->write( $matches[1], $matches[2], $matches[3], (string) $content );
+				continue;
+			}
+
 			$full_path = $agent_dir . '/' . $relative_path;
 
 			// Ensure subdirectories exist (e.g., contexts/).
