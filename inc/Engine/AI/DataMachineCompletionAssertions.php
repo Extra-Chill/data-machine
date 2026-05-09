@@ -68,7 +68,7 @@ class DataMachineCompletionAssertions {
 		$tool_succeeded = true === ( $tool_result['success'] ?? false );
 
 		if ( '' !== $tool_name && $tool_succeeded ) {
-			$this->executed_tool_names[] = $tool_name;
+			$this->executed_tool_names[]                   = $tool_name;
 			$this->successful_tool_results[ $tool_name ][] = $tool_result;
 		}
 
@@ -144,7 +144,7 @@ class DataMachineCompletionAssertions {
 			$parts[] = $label . ': ' . implode( ', ', array_map( 'strval', $values ) );
 		}
 
-		$goal = self::extractGoal( $messages );
+		$goal  = self::extractGoal( $messages );
 		$nudge = 'Please continue. The work is close, but these completion signals are still missing: ' . implode( '; ', $parts ) . '.';
 		if ( '' !== $goal ) {
 			$nudge .= ' Original goal/context: ' . $goal;
