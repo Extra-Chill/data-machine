@@ -2,6 +2,17 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.31.5] - 2026-05-09
+
+### Changed
+- calendar block file layout cleanup (#239)
+- CalendarRequest value object dedups request shape (#236)
+- single helper for calendar REST URL/param construction (#237)
+- WeakMap instance guard + delegated pagination listener (#238)
+
+### Fixed
+- canonical JSON Schema for handler tool registrations
+
 ## [0.31.4] - 2026-05-09
 
 ### Changed
