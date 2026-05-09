@@ -485,6 +485,19 @@ class AIStep extends Step {
 				);
 			}
 
+			if ( $this->job_id > 0 ) {
+				$artifact_engine_data = datamachine_get_engine_data( $this->job_id );
+				$artifact_engine_data['tool_execution_summary'] = self::summarizeToolExecutions( $loop_result );
+
+				foreach ( array( 'completion_assertions_required', 'completion_assertions_missing', 'completion_assertions_satisfied' ) as $assertion_key ) {
+					if ( isset( $loop_result[ $assertion_key ] ) && array() !== $loop_result[ $assertion_key ] ) {
+						$artifact_engine_data[ $assertion_key ] = $loop_result[ $assertion_key ];
+					}
+				}
+
+				datamachine_set_engine_data( $this->job_id, $artifact_engine_data );
+			}
+
 			// Process loop results into data packets
 			return self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
 		} finally {
@@ -667,6 +680,50 @@ class AIStep extends Step {
 	 */
 	private static function mergeListConfigField( array $pipeline_values, array $flow_values ): array {
 		return array_values( array_merge( $pipeline_values, $flow_values ) );
+	}
+
+	/**
+	 * Build a bounded, non-secret summary of tool calls for job artifacts.
+	 *
+	 * @param array $loop_result Conversation loop result.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private static function summarizeToolExecutions( array $loop_result ): array {
+		$results   = is_array( $loop_result['tool_execution_results'] ?? null ) ? $loop_result['tool_execution_results'] : array();
+		$summaries = array();
+
+		foreach ( $results as $result ) {
+			if ( ! is_array( $result ) ) {
+				continue;
+			}
+
+			$tool_name   = sanitize_key( (string) ( $result['tool_name'] ?? '' ) );
+			$tool_result = is_array( $result['result'] ?? null ) ? $result['result'] : array();
+			$parameters  = is_array( $result['parameters'] ?? null ) ? $result['parameters'] : array();
+			if ( '' === $tool_name ) {
+				continue;
+			}
+
+			$summary = array(
+				'tool_name'  => $tool_name,
+				'success'    => true === ( $tool_result['success'] ?? false ),
+				'turn_count' => isset( $result['turn_count'] ) ? (int) $result['turn_count'] : null,
+				'summary'    => isset( $tool_result['message'] ) ? sanitize_text_field( (string) $tool_result['message'] ) : null,
+			);
+
+			if ( 'agent_daily_memory' === $tool_name ) {
+				$summary['action'] = isset( $parameters['action'] ) ? sanitize_key( (string) $parameters['action'] ) : null;
+				$summary['date']   = isset( $parameters['date'] ) ? sanitize_text_field( (string) $parameters['date'] ) : gmdate( 'Y-m-d' );
+				$summary['mode']   = isset( $parameters['mode'] ) ? sanitize_key( (string) $parameters['mode'] ) : null;
+			}
+
+			$summaries[] = array_filter(
+				$summary,
+				static fn( $value ) => null !== $value && '' !== $value
+			);
+		}
+
+		return $summaries;
 	}
 
 	/**
