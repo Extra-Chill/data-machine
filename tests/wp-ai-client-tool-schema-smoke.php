@@ -307,7 +307,9 @@ $captured_request = array();
 );
 
 $empty_schema = $captured_request['tools']['client/no_arg_tool']['parameters'] ?? null;
-$assert( array( 'type' => 'object', 'properties' => array() ) === $empty_schema, 'no-argument tools use canonical empty object schema' );
+$assert( is_array( $empty_schema ), 'no-argument tools use a parameter schema array' );
+$assert( 'object' === ( $empty_schema['type'] ?? null ), 'no-argument tools use object parameter schemas' );
+$assert( isset( $empty_schema['properties'] ) && $empty_schema['properties'] instanceof stdClass, 'no-argument tool properties encode as a JSON object' );
 
 echo "\n{$assertions} assertions, " . count( $failures ) . " failures\n";
 
