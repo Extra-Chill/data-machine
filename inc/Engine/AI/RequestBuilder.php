@@ -762,11 +762,14 @@ class RequestBuilder {
 	 * Return the canonical JSON Schema object for tool parameters.
 	 *
 	 * @param mixed $parameters Raw parameters definition.
-	 * @return array<string, mixed>|null
+	 * @return array<string, mixed>
 	 */
-	private static function normalizeToolSchema( $parameters ): ?array {
+	private static function normalizeToolSchema( $parameters ): array {
 		if ( ! is_array( $parameters ) || empty( $parameters ) ) {
-			return null;
+			return array(
+				'type'       => 'object',
+				'properties' => array(),
+			);
 		}
 
 		return $parameters;
