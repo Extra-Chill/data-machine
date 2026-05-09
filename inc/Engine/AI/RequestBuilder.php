@@ -787,6 +787,10 @@ class RequestBuilder {
 	 * @return array<string, mixed>
 	 */
 	private static function normalizeRequiredFlags( array $schema ): array {
+		if ( isset( $schema['items'] ) && is_array( $schema['items'] ) ) {
+			$schema['items'] = self::normalizeRequiredFlags( $schema['items'] );
+		}
+
 		if ( empty( $schema['properties'] ) || ! is_array( $schema['properties'] ) ) {
 			return $schema;
 		}
@@ -794,16 +798,16 @@ class RequestBuilder {
 		$required = isset( $schema['required'] ) && is_array( $schema['required'] ) ? $schema['required'] : array();
 
 		foreach ( $schema['properties'] as $property_name => $property_schema ) {
-			if ( ! is_array( $property_schema ) || ! array_key_exists( 'required', $property_schema ) ) {
+			if ( ! is_array( $property_schema ) ) {
 				continue;
 			}
 
-			if ( true === $property_schema['required'] ) {
+			if ( true === ( $property_schema['required'] ?? null ) ) {
 				$required[] = (string) $property_name;
 			}
 
 			unset( $property_schema['required'] );
-			$schema['properties'][ $property_name ] = $property_schema;
+			$schema['properties'][ $property_name ] = self::normalizeRequiredFlags( $property_schema );
 		}
 
 		$required = array_values( array_unique( array_filter( $required, 'is_string' ) ) );
