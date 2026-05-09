@@ -67,8 +67,8 @@ final class AgentBundleDirectory {
 		return new self(
 			$manifest,
 			self::read_memory_files( $directory . '/' . BundleSchema::MEMORY_DIR ),
-			self::read_documents( $directory . '/' . BundleSchema::PIPELINES_DIR, AgentBundlePipelineFile::class ),
-			self::read_documents( $directory . '/' . BundleSchema::FLOWS_DIR, AgentBundleFlowFile::class ),
+			self::read_documents( $directory . '/' . BundleSchema::PIPELINES_DIR, AgentBundlePipelineFile::class, $directory ),
+			self::read_documents( $directory . '/' . BundleSchema::FLOWS_DIR, AgentBundleFlowFile::class, $directory ),
 			self::read_artifact_directories( $directory ),
 			self::read_extension_artifacts( $directory . '/' . BundleSchema::EXTENSIONS_DIR ),
 			self::read_extras( $directory )
@@ -285,7 +285,7 @@ final class AgentBundleDirectory {
 	}
 
 	/** @return array */
-	private static function read_documents( string $directory, string $document_class ): array {
+	private static function read_documents( string $directory, string $document_class, string $bundle_root ): array {
 		if ( ! is_dir( $directory ) ) {
 			return array();
 		}
@@ -295,10 +295,62 @@ final class AgentBundleDirectory {
 		$paths     = is_array( $paths ) ? $paths : array();
 		sort( $paths, SORT_STRING );
 		foreach ( $paths as $path ) {
-			$documents[] = $document_class::from_array( BundleSchema::decode_json( self::read_file( $path ), basename( $path ) ) );
+			$document = BundleSchema::decode_json( self::read_file( $path ), basename( $path ) );
+			$document = self::resolve_prompt_file_fields( $document, $document_class, $bundle_root, basename( $path ) );
+			$documents[] = $document_class::from_array( $document );
 		}
 
 		return self::sort_documents_by_slug( $documents, $document_class );
+	}
+
+	private static function resolve_prompt_file_fields( array $document, string $document_class, string $bundle_root, string $label ): array {
+		if ( empty( $document['steps'] ) || ! is_array( $document['steps'] ) ) {
+			return $document;
+		}
+
+		foreach ( $document['steps'] as $step_index => $step ) {
+			if ( ! is_array( $step ) ) {
+				continue;
+			}
+
+			if ( AgentBundlePipelineFile::class === $document_class ) {
+				$step_config = is_array( $step['step_config'] ?? null ) ? $step['step_config'] : array();
+				if ( array_key_exists( 'system_prompt_file', $step_config ) ) {
+					$step_config['system_prompt'] = self::read_bundle_prompt_file( (string) $step_config['system_prompt_file'], $bundle_root, $label );
+					unset( $step_config['system_prompt_file'] );
+					$document['steps'][ $step_index ]['step_config'] = $step_config;
+				}
+				continue;
+			}
+
+			if ( AgentBundleFlowFile::class !== $document_class || empty( $step['prompt_queue'] ) || ! is_array( $step['prompt_queue'] ) ) {
+				continue;
+			}
+
+			foreach ( $step['prompt_queue'] as $queue_index => $entry ) {
+				if ( ! is_array( $entry ) || ! array_key_exists( 'prompt_file', $entry ) ) {
+					continue;
+				}
+				$entry['prompt'] = self::read_bundle_prompt_file( (string) $entry['prompt_file'], $bundle_root, $label );
+				unset( $entry['prompt_file'] );
+				$document['steps'][ $step_index ]['prompt_queue'][ $queue_index ] = $entry;
+			}
+		}
+
+		return $document;
+	}
+
+	private static function read_bundle_prompt_file( string $relative_path, string $bundle_root, string $label ): string {
+		$relative_path = self::normalize_relative_path( $relative_path, $label . ' prompt' );
+		$bundle_real   = realpath( $bundle_root );
+		$path          = $bundle_root . '/' . $relative_path;
+		$file_real     = realpath( $path );
+
+		if ( false === $bundle_real || false === $file_real || ! str_starts_with( $file_real, $bundle_real . DIRECTORY_SEPARATOR ) || ! is_file( $file_real ) ) {
+			throw new BundleValidationException( sprintf( '%s references missing prompt file: %s', esc_html( $label ), esc_html( $relative_path ) ) );
+		}
+
+		return self::read_file( $file_real );
 	}
 
 	/**

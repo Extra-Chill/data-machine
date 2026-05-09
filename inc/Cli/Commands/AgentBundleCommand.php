@@ -18,6 +18,7 @@ use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
+use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Bundle\BundleSource;
 use DataMachine\Engine\Bundle\BundleSourceAuth;
 use DataMachine\Engine\Bundle\PortableSlug;
@@ -611,12 +612,17 @@ class AgentBundleCommand extends BaseCommand {
 		$revision = BundleSource::is_remote( $source ) ? BundleSource::last_resolved_revision() : null;
 
 		$bundle = null;
-		if ( is_dir( $resolved ) ) {
-			$bundle = $this->bundler()->from_directory( $resolved );
-		} elseif ( preg_match( '/\.zip$/i', $resolved ) ) {
-			$bundle = $this->bundler()->from_zip( $resolved );
-		} elseif ( preg_match( '/\.json$/i', $resolved ) ) {
-			$bundle = $this->bundler()->from_json( (string) file_get_contents( $resolved ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		try {
+			if ( is_dir( $resolved ) ) {
+				$bundle = $this->bundler()->from_directory( $resolved );
+			} elseif ( preg_match( '/\.zip$/i', $resolved ) ) {
+				$bundle = $this->bundler()->from_zip( $resolved );
+			} elseif ( preg_match( '/\.json$/i', $resolved ) ) {
+				$bundle = $this->bundler()->from_json( (string) file_get_contents( $resolved ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			}
+		} catch ( BundleValidationException $e ) {
+			BundleSource::cleanup( $resolved, $source );
+			WP_CLI::error( $e->getMessage() );
 		}
 
 		// Resolver downloaded a temp file for remote sources; from_zip()

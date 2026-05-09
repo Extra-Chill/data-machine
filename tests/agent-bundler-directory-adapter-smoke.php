@@ -17,6 +17,12 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 	}
 }
 
+if ( ! function_exists( 'esc_html' ) ) {
+	function esc_html( $text ) {
+		return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
+	}
+}
+
 if ( ! function_exists( 'did_action' ) ) {
 	function did_action( $hook = '' ) {
 		return 0;
@@ -39,6 +45,7 @@ require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
+use DataMachine\Engine\Bundle\BundleValidationException;
 
 $failures = array();
 $passes   = 0;
@@ -251,7 +258,47 @@ assert_adapter_equals( 'round-trip preserves prompt queue', 'Review PR #1', $rou
 assert_adapter_equals( 'round-trip preserves queue mode', 'loop', $round_steps[1]['queue_mode'] );
 assert_adapter_equals( 'round-trip preserves scheduling interval', 'hourly', $round_flow['scheduling_config']['interval'] );
 
-echo "\n[3] AgentBundler directory methods route through the adapter\n";
+echo "\n[3] Directory read resolves prompt file references relative to bundle root\n";
+if ( ! is_dir( $tmp . '/prompts' ) ) {
+	mkdir( $tmp . '/prompts', 0775, true );
+}
+file_put_contents( $tmp . '/prompts/system.md', "Review from file.\n" );
+file_put_contents( $tmp . '/prompts/queue.md', "Review PR from file.\n" );
+
+$pipeline_path = $tmp . '/pipelines/pr-review-pipeline.json';
+$pipeline_json = json_decode( file_get_contents( $pipeline_path ), true );
+$pipeline_json['steps'][1]['step_config']['system_prompt_file'] = 'prompts/system.md';
+unset( $pipeline_json['steps'][1]['step_config']['system_prompt'] );
+file_put_contents( $pipeline_path, wp_json_encode( $pipeline_json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n" );
+
+$flow_path = $tmp . '/flows/pr-review-flow.json';
+$flow_json = json_decode( file_get_contents( $flow_path ), true );
+$flow_json['steps'][1]['prompt_queue'][0]['prompt_file'] = 'prompts/queue.md';
+unset( $flow_json['steps'][1]['prompt_queue'][0]['prompt'] );
+file_put_contents( $flow_path, wp_json_encode( $flow_json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n" );
+
+$file_backed_round_trip = AgentBundleArrayAdapter::to_array_bundle( AgentBundleDirectory::read( $tmp ) );
+$file_backed_pipeline_steps = array_values( $file_backed_round_trip['pipelines'][0]['pipeline_config'] );
+$file_backed_flow_steps = array_values( $file_backed_round_trip['flows'][0]['flow_config'] );
+
+assert_adapter_equals( 'system_prompt_file resolves into system_prompt', "Review from file.\n", $file_backed_pipeline_steps[1]['system_prompt'] ?? null );
+assert_adapter_equals( 'system_prompt_file does not leak into runtime config', false, array_key_exists( 'system_prompt_file', $file_backed_pipeline_steps[1] ) );
+assert_adapter_equals( 'prompt_file resolves into prompt queue entry', "Review PR from file.\n", $file_backed_flow_steps[1]['prompt_queue'][0]['prompt'] ?? null );
+assert_adapter_equals( 'prompt_file does not leak into runtime queue', false, array_key_exists( 'prompt_file', $file_backed_flow_steps[1]['prompt_queue'][0] ?? array() ) );
+
+$flow_json['steps'][1]['prompt_queue'][0]['prompt_file'] = 'prompts/missing.md';
+unset( $flow_json['steps'][1]['prompt_queue'][0]['prompt'] );
+file_put_contents( $flow_path, wp_json_encode( $flow_json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n" );
+
+$missing_prompt_failed_clearly = false;
+try {
+	AgentBundleDirectory::read( $tmp );
+} catch ( BundleValidationException $e ) {
+	$missing_prompt_failed_clearly = false !== strpos( $e->getMessage(), 'references missing prompt file: prompts/missing.md' );
+}
+assert_adapter( 'missing prompt_file fails clearly', $missing_prompt_failed_clearly );
+
+echo "\n[4] AgentBundler directory methods route through the adapter\n";
 $agent_bundler_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Agents/AgentBundler.php' ) ?: '';
 assert_adapter( 'export builds AgentBundleDirectory value objects first', false !== strpos( $agent_bundler_source, 'public function export_directory_object' ) );
 assert_adapter( 'export adapts value-object directory back to bundle array', false !== strpos( $agent_bundler_source, 'AgentBundleArrayAdapter::to_array_bundle( $directory )' ) );
