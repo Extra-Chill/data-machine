@@ -766,10 +766,14 @@ class RequestBuilder {
 	 */
 	private static function normalizeToolSchema( $parameters ): array {
 		if ( ! is_array( $parameters ) || empty( $parameters ) ) {
-			return array(
+			$parameters = array(
 				'type'       => 'object',
 				'properties' => array(),
 			);
+		}
+
+		if ( isset( $parameters['properties'] ) && is_array( $parameters['properties'] ) && empty( $parameters['properties'] ) ) {
+			$parameters['properties'] = (object) array();
 		}
 
 		return $parameters;
