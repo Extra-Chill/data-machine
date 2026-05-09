@@ -30,6 +30,7 @@ use AgentsAPI\AI\Context\WP_Agent_Default_Context_Conflict_Resolver;
 use AgentsAPI\AI\Context\WP_Agent_Context_Item;
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Engine\AI\ComposableFileGenerator;
 use DataMachine\Engine\AI\Memory\MemoryPolicyResolver;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
@@ -83,6 +84,10 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 			$memory = new AgentMemory( $user_id, $agent_id, $filename, $layer );
 			$read   = $memory->read();
 
+			if ( ! $read->exists && self::maybe_regenerate_composable_file( $filename, $meta, $user_id, $agent_id ) ) {
+				$read = $memory->read();
+			}
+
 			if ( ! $read->exists ) {
 				continue;
 			}
@@ -109,6 +114,35 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		}
 
 		return self::items_to_outputs( self::resolve_context_conflicts( $items, $payload ) );
+	}
+
+	/**
+	 * Regenerate a missing composable file just-in-time for prompt injection.
+	 *
+	 * Ephemeral runtimes can miss the normal invalidation hooks that write files
+	 * like SITE.md to disk. A first-read repair keeps composable context available
+	 * without regenerating existing files on every AI call.
+	 *
+	 * @param string $filename Memory filename.
+	 * @param array  $meta     Memory registry metadata.
+	 * @param int    $user_id  Effective user ID.
+	 * @param int    $agent_id Agent ID.
+	 * @return bool True when regeneration succeeded and callers should retry the read.
+	 */
+	private static function maybe_regenerate_composable_file( string $filename, array $meta, int $user_id, int $agent_id ): bool {
+		if ( empty( $meta['composable'] ) || ! class_exists( ComposableFileGenerator::class ) ) {
+			return false;
+		}
+
+		$result = ComposableFileGenerator::regenerate(
+			$filename,
+			array(
+				'user_id'  => $user_id,
+				'agent_id' => $agent_id,
+			)
+		);
+
+		return ! empty( $result['success'] );
 	}
 
 	/**
