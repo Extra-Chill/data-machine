@@ -32,6 +32,8 @@ import { initGeoSync, destroyGeoSync } from './modules/geo-sync';
 
 import type { FlatpickrInstance } from './types';
 
+const calendarInstances = new WeakMap< HTMLElement, true >();
+
 document.addEventListener( 'DOMContentLoaded', function () {
 	document
 		.querySelectorAll< HTMLElement >( '.data-machine-events-calendar' )
@@ -39,10 +41,10 @@ document.addEventListener( 'DOMContentLoaded', function () {
 } );
 
 function initCalendarInstance( calendar: HTMLElement ): void {
-	if ( calendar.dataset.dmInitialized === 'true' ) {
+	if ( calendarInstances.has( calendar ) ) {
 		return;
 	}
-	calendar.dataset.dmInitialized = 'true';
+	calendarInstances.set( calendar, true );
 
 	const filterState = getFilterState( calendar );
 
