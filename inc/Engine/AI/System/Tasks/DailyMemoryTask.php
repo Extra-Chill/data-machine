@@ -27,9 +27,7 @@ use DataMachine\Core\PluginSettings;
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Engine\AI\RequestBuilder;
-use AgentsAPI\AI\WP_Agent_Conversation_Compaction;
 use AgentsAPI\AI\WP_Agent_Markdown_Section_Compaction_Adapter;
-use AgentsAPI\AI\WP_Agent_Message;
 
 class DailyMemoryTask extends SystemTask {
 
@@ -486,57 +484,19 @@ class DailyMemoryTask extends SystemTask {
 	 * @return array{persistent: string, archived: string, persistent_blocks: int, archived_blocks: int}
 	 */
 	private static function planMemoryOverflowArchive( string $content, int $target_size, string $date ): array {
-		$items         = WP_Agent_Markdown_Section_Compaction_Adapter::parse( $content );
-		$section_count = 0;
-		foreach ( $items as $item ) {
-			if ( WP_Agent_Markdown_Section_Compaction_Adapter::TYPE_SECTION === ( $item['type'] ?? '' ) ) {
-				++$section_count;
-			}
-		}
-
-		if ( $section_count < 2 ) {
-			return array(
-				'persistent'        => $content,
-				'archived'          => '',
-				'persistent_blocks' => count( $items ),
-				'archived_blocks'   => 0,
-			);
-		}
-
-		$pointer         = self::buildOverflowArchivePointer( $date );
-		$retained_budget = max( 1, $target_size - strlen( $pointer ) );
-		$messages        = array();
-
-		// Agents API's overflow archive strategy archives the start of a stream.
-		// Daily Memory overflow needs tail-section archival, so project sections in
-		// reverse order and restore markdown order after Agents API chooses the cut.
-		foreach ( array_reverse( $items ) as $item ) {
-			$messages[] = WP_Agent_Message::text(
-				'system',
-				(string) ( $item['content'] ?? '' ),
-				array(
-					'datamachine_markdown_item' => $item,
-				)
-			);
-		}
-
-		$result = WP_Agent_Conversation_Compaction::compact(
-			$messages,
+		$items = WP_Agent_Markdown_Section_Compaction_Adapter::parse( $content );
+		$split = WP_Agent_Markdown_Section_Compaction_Adapter::split_for_overflow(
+			$items,
 			array(
-				'overflow_archive_enabled'   => true,
-				'overflow_threshold_bytes'   => 1,
-				'overflow_retained_messages' => max( 1, count( $messages ) - 1 ),
-				'overflow_retained_bytes'    => $retained_budget,
-				'overflow_stub_prefix'       => 'Daily Memory overflow archived without summarization.',
-				'preserve_tool_boundaries'   => false,
-			),
-			static function (): string {
-				throw new \RuntimeException( 'Daily Memory deterministic overflow must not invoke a summarizer.' );
-			}
+				'target_bytes'         => $target_size,
+				'pointer_destination'  => 'daily/' . str_replace( '-', '/', $date ) . '.md',
+				'pointer_heading'      => 'Archived Memory Overflow',
+				'pointer_content'      => self::buildOverflowArchivePointerContent( $date ),
+				'conservation_enabled' => true,
+			)
 		);
 
-		$status = (string) ( $result['metadata']['compaction']['status'] ?? '' );
-		if ( WP_Agent_Conversation_Compaction::STATUS_ARCHIVED !== $status || empty( $result['archive_items'] ) ) {
+		if ( WP_Agent_Markdown_Section_Compaction_Adapter::STATUS_ARCHIVED !== ( $split['status'] ?? '' ) || empty( $split['archive_items'] ) ) {
 			return array(
 				'persistent'        => $content,
 				'archived'          => '',
@@ -544,59 +504,26 @@ class DailyMemoryTask extends SystemTask {
 				'archived_blocks'   => 0,
 			);
 		}
-
-		$archived_items   = self::markdownItemsFromCompactionMessages( $result['archive_items'] );
-		$persistent_items = self::markdownItemsFromCompactionMessages( $result['messages'] );
-
 		return array(
-			'persistent'        => rtrim( WP_Agent_Markdown_Section_Compaction_Adapter::reconstruct( $persistent_items ) . $pointer ) . "\n",
-			'archived'          => WP_Agent_Markdown_Section_Compaction_Adapter::reconstruct( $archived_items ),
-			'persistent_blocks' => count( $persistent_items ),
-			'archived_blocks'   => count( $archived_items ),
+			'persistent'        => WP_Agent_Markdown_Section_Compaction_Adapter::reconstruct( $split['retained_items'] ),
+			'archived'          => WP_Agent_Markdown_Section_Compaction_Adapter::reconstruct( $split['archive_items'] ),
+			'persistent_blocks' => count( $split['retained_items'] ),
+			'archived_blocks'   => count( $split['archive_items'] ),
 		);
 	}
 
 	/**
-	 * Build the Data Machine-owned overflow archive pointer text.
+	 * Build the Data Machine-owned overflow archive pointer body.
 	 *
 	 * @param string $date Archive date.
-	 * @return string Pointer markdown.
+	 * @return string Pointer content.
 	 */
-	private static function buildOverflowArchivePointer( string $date ): string {
+	private static function buildOverflowArchivePointerContent( string $date ): string {
 		return sprintf(
-			"\n## Archived Memory Overflow\n\nOn %s, Daily Memory archived older MEMORY.md sections verbatim to `daily/%s`. Use daily memory search/read when those details are needed.\n",
+			"\nOn %s, Daily Memory archived older MEMORY.md sections verbatim to `daily/%s`. Use daily memory search/read when those details are needed.\n",
 			$date,
 			str_replace( '-', '/', $date ) . '.md'
 		);
-	}
-
-	/**
-	 * Extract original markdown items from Agents API compaction messages.
-	 *
-	 * @param array<int, array<string, mixed>> $messages Compaction messages.
-	 * @return array<int, array<string, mixed>> Markdown items in source document order.
-	 */
-	private static function markdownItemsFromCompactionMessages( array $messages ): array {
-		$items = array();
-		foreach ( $messages as $message ) {
-			$metadata = is_array( $message['metadata'] ?? null ) ? $message['metadata'] : array();
-			$item     = $metadata['datamachine_markdown_item'] ?? null;
-			if ( is_array( $item ) ) {
-				$items[] = $item;
-			}
-		}
-
-		usort(
-			$items,
-			static function ( array $left, array $right ): int {
-				$left_order  = (int) ( $left['metadata']['order'] ?? 0 );
-				$right_order = (int) ( $right['metadata']['order'] ?? 0 );
-
-				return $left_order <=> $right_order;
-			}
-		);
-
-		return $items;
 	}
 
 	/**

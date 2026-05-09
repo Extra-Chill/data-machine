@@ -35,6 +35,13 @@ class CallerContextDirectiveTest extends WP_UnitTestCase {
 		$this->assertSame( array(), $outputs );
 	}
 
+	public function test_chained_self_host_context_is_rejected_before_directive(): void {
+		$this->expectException( \InvalidArgumentException::class );
+		$this->expectExceptionMessage( 'chained context (chain_depth > 0) must specify a remote caller host' );
+
+		new \WP_Agent_Caller_Context( 'some-agent', 0, \WP_Agent_Caller_Context::SELF_HOST, 2, 'chain-id' );
+	}
+
 	public function test_emits_system_text_for_cross_site_call(): void {
 		PermissionHelper::set_caller_context( new \WP_Agent_Caller_Context(
 			'franklin-bot',
