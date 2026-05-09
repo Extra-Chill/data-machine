@@ -18,6 +18,7 @@ use DataMachine\Engine\AI\Directives\DirectivePolicyResolver;
 defined( 'ABSPATH' ) || exit;
 
 require_once __DIR__ . '/WpAiClientCache.php';
+require_once __DIR__ . '/DefaultOptionsHttpTransporter.php';
 
 class RequestBuilder {
 
@@ -144,10 +145,17 @@ class RequestBuilder {
 		$request_timeout               = (float) $transport_profile['request_timeout'];
 		$connect_timeout               = (float) $transport_profile['connect_timeout'];
 		$request_metadata['transport'] = $transport_profile;
-		$timeout_filter                = static function ( $default_timeout ) use ( $request_timeout ) {
+		if ( class_exists( '\WordPress\AiClient\Providers\Http\DTO\RequestOptions' ) ) {
+			$request_options = new \WordPress\AiClient\Providers\Http\DTO\RequestOptions();
+			$request_options->setTimeout( $request_timeout );
+			$request_options->setConnectTimeout( $connect_timeout );
+			$transport_profile['request_options_used'] = true;
+			$request_metadata['transport']             = $transport_profile;
+		}
+		$timeout_filter = static function ( $default_timeout ) use ( $request_timeout ) {
 			return max( (float) $default_timeout, $request_timeout );
 		};
-		$curl_filter                   = static function ( $handle ) use ( $request_timeout, $connect_timeout ) {
+		$curl_filter    = static function ( $handle ) use ( $request_timeout, $connect_timeout ) {
 			if ( defined( 'CURLOPT_CONNECTTIMEOUT' ) ) {
 				curl_setopt( $handle, CURLOPT_CONNECTTIMEOUT, (int) ceil( $connect_timeout ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress exposes the cURL handle only through this hook.
 			}
@@ -185,18 +193,13 @@ class RequestBuilder {
 				);
 			}
 
+			self::installDefaultRequestOptionsTransporter( $registry, $request_options );
+
 			/** @var callable $model_resolver wp-ai-client exposes this through __call() in some versions. */
 			$model_resolver = array( $registry, 'getProviderModel' );
 			$model_instance = call_user_func( $model_resolver, $provider_id, $model, null );
-			if ( class_exists( '\WordPress\AiClient\Providers\Http\DTO\RequestOptions' ) ) {
-				$request_options = new \WordPress\AiClient\Providers\Http\DTO\RequestOptions();
-				$request_options->setTimeout( $request_timeout );
-				$request_options->setConnectTimeout( $connect_timeout );
-				$transport_profile['request_options_used'] = true;
-				$request_metadata['transport']             = $transport_profile;
-				if ( is_object( $model_instance ) && method_exists( $model_instance, 'setRequestOptions' ) ) {
-					$model_instance->setRequestOptions( $request_options );
-				}
+			if ( null !== $request_options && is_object( $model_instance ) && method_exists( $model_instance, 'setRequestOptions' ) ) {
+				$model_instance->setRequestOptions( $request_options );
 			}
 
 			do_action(
@@ -514,6 +517,49 @@ class RequestBuilder {
 			'request_options_used'            => false,
 			'curl_hook_installed'             => false,
 		);
+	}
+
+	/**
+	 * Install a transporter that applies request options to provider metadata calls.
+	 *
+	 * wp-ai-client resolves API-backed models by listing provider models before a
+	 * model instance exists, so model-level RequestOptions are too late for that
+	 * discovery request. Wrap the registry transporter so model discovery and the
+	 * final generation request share Data Machine's timeout profile.
+	 *
+	 * @param object $registry        wp-ai-client provider registry.
+	 * @param mixed  $request_options wp-ai-client RequestOptions instance.
+	 * @return void
+	 */
+	private static function installDefaultRequestOptionsTransporter( object $registry, $request_options ): void {
+		if ( null === $request_options || ! method_exists( $registry, 'getHttpTransporter' ) || ! method_exists( $registry, 'setHttpTransporter' ) ) {
+			return;
+		}
+
+		if ( ! interface_exists( '\WordPress\AiClient\Providers\Http\Contracts\HttpTransporterInterface' ) || ! class_exists( '\DataMachine\Engine\AI\DefaultOptionsHttpTransporter' ) ) {
+			return;
+		}
+
+		try {
+			$current = $registry->getHttpTransporter();
+		} catch ( \Throwable $e ) {
+			if ( ! class_exists( '\WordPress\AiClient\Providers\Http\HttpTransporterFactory' ) ) {
+				return;
+			}
+
+			try {
+				$current = \WordPress\AiClient\Providers\Http\HttpTransporterFactory::createTransporter();
+			} catch ( \Throwable $inner ) {
+				return;
+			}
+		}
+
+		if ( $current instanceof DefaultOptionsHttpTransporter ) {
+			$current->setDefaultOptions( $request_options );
+			return;
+		}
+
+		$registry->setHttpTransporter( new DefaultOptionsHttpTransporter( $current, $request_options ) );
 	}
 
 	/**
