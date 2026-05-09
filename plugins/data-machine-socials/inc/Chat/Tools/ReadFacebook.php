@@ -26,26 +26,25 @@ class ReadFacebook extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Read Facebook Page posts. List recent posts, get details for a specific post, or get comments. Requires Facebook OAuth to be configured.',
 			'parameters'  => array(
-				'action'  => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Action: "list" (recent posts), "get" (single post), "comments" (post comments). Defaults to "list".',
-					'enum'        => array( 'list', 'get', 'comments' ),
-				),
-				'post_id' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Facebook post ID. Required for "get" and "comments" actions.',
-				),
-				'limit'   => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Number of items to return (max 100). Defaults to 25.',
-				),
-				'after'   => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Pagination cursor for next page.',
+				'type'       => 'object',
+				'properties' => array(
+					'action'  => array(
+						'type'        => 'string',
+						'description' => 'Action: "list" (recent posts), "get" (single post), "comments" (post comments). Defaults to "list".',
+						'enum'        => array( 'list', 'get', 'comments' ),
+					),
+					'post_id' => array(
+						'type'        => 'string',
+						'description' => 'Facebook post ID. Required for "get" and "comments" actions.',
+					),
+					'limit'   => array(
+						'type'        => 'integer',
+						'description' => 'Number of items to return (max 100). Defaults to 25.',
+					),
+					'after'   => array(
+						'type'        => 'string',
+						'description' => 'Pagination cursor for next page.',
+					),
 				),
 			),
 		);

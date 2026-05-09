@@ -29,16 +29,18 @@ class VoteReddit extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Upvote, downvote, or unvote a Reddit post or comment. Requires Reddit OAuth with vote scope.',
 			'parameters'  => array(
-				'thing_id'  => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Reddit fullname of the post (t3_xxx) or comment (t1_xxx) to vote on.',
+				'type'       => 'object',
+				'properties' => array(
+					'thing_id'  => array(
+						'type'        => 'string',
+						'description' => 'Reddit fullname of the post (t3_xxx) or comment (t1_xxx) to vote on.',
+					),
+					'direction' => array(
+						'type'        => 'integer',
+						'description' => 'Vote direction: 1 (upvote), 0 (unvote), -1 (downvote).',
+					),
 				),
-				'direction' => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'Vote direction: 1 (upvote), 0 (unvote), -1 (downvote).',
-				),
+				'required'   => array( 'thing_id', 'direction' ),
 			),
 		);
 	}

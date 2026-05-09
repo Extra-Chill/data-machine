@@ -26,11 +26,14 @@ class DeletePinterest extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Delete Pinterest pins. Requires Pinterest API token to be configured.',
 			'parameters'  => array(
-				'pin_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Pinterest pin ID to delete.',
+				'type'       => 'object',
+				'properties' => array(
+					'pin_id' => array(
+						'type'        => 'string',
+						'description' => 'Pinterest pin ID to delete.',
+					),
 				),
+				'required'   => array( 'pin_id' ),
 			),
 		);
 	}

@@ -29,36 +29,34 @@ class SubmitReddit extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Submit a new post to a Reddit subreddit. Supports self (text) posts and link posts. Requires Reddit OAuth with submit scope.',
 			'parameters'  => array(
-				'subreddit' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Subreddit name (without "r/").',
+				'type'       => 'object',
+				'properties' => array(
+					'subreddit' => array(
+						'type'        => 'string',
+						'description' => 'Subreddit name (without "r/").',
+					),
+					'title'     => array(
+						'type'        => 'string',
+						'description' => 'Post title (max 300 characters).',
+					),
+					'text'      => array(
+						'type'        => 'string',
+						'description' => 'Self-post body text (markdown). Omit for link posts.',
+					),
+					'url'       => array(
+						'type'        => 'string',
+						'description' => 'URL for link posts. Omit for text posts.',
+					),
+					'flair_id'  => array(
+						'type'        => 'string',
+						'description' => 'Flair template ID (if required by subreddit).',
+					),
+					'nsfw'      => array(
+						'type'        => 'boolean',
+						'description' => 'Mark as NSFW.',
+					),
 				),
-				'title'     => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Post title (max 300 characters).',
-				),
-				'text'      => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Self-post body text (markdown). Omit for link posts.',
-				),
-				'url'       => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'URL for link posts. Omit for text posts.',
-				),
-				'flair_id'  => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Flair template ID (if required by subreddit).',
-				),
-				'nsfw'      => array(
-					'type'        => 'boolean',
-					'required'    => false,
-					'description' => 'Mark as NSFW.',
-				),
+				'required'   => array( 'subreddit', 'title' ),
 			),
 		);
 	}

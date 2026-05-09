@@ -34,26 +34,26 @@ class PublishBluesky extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Publish a post to Bluesky. Supports text with optional image and source URL. Requires Bluesky authentication to be configured.',
 			'parameters'  => array(
-				'content'    => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Post content text. Max 300 characters.',
+				'type'       => 'object',
+				'properties' => array(
+					'content'    => array(
+						'type'        => 'string',
+						'description' => 'Post content text. Max 300 characters.',
+					),
+					'title'      => array(
+						'type'        => 'string',
+						'description' => 'Optional title for the post.',
+					),
+					'image_url'  => array(
+						'type'        => 'string',
+						'description' => 'Optional public URL of an image to attach.',
+					),
+					'source_url' => array(
+						'type'        => 'string',
+						'description' => 'Optional source URL to embed as a link card.',
+					),
 				),
-				'title'      => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional title for the post.',
-				),
-				'image_url'  => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional public URL of an image to attach.',
-				),
-				'source_url' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional source URL to embed as a link card.',
-				),
+				'required'   => array( 'content' ),
 			),
 		);
 	}

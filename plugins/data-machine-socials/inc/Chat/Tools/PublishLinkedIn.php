@@ -34,26 +34,26 @@ class PublishLinkedIn extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Publish a post to LinkedIn. Supports text (up to 3000 characters) with optional image and article sharing. Requires LinkedIn OAuth to be configured.',
 			'parameters'  => array(
-				'content'       => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Post text. Up to 3000 characters.',
+				'type'       => 'object',
+				'properties' => array(
+					'content'       => array(
+						'type'        => 'string',
+						'description' => 'Post text. Up to 3000 characters.',
+					),
+					'visibility'    => array(
+						'type'        => 'string',
+						'description' => 'Post visibility: PUBLIC (anyone) or CONNECTIONS (connections only). Defaults to PUBLIC.',
+					),
+					'article_url'   => array(
+						'type'        => 'string',
+						'description' => 'Optional article URL to share as an article-type post.',
+					),
+					'article_title' => array(
+						'type'        => 'string',
+						'description' => 'Optional article title (used with article_url).',
+					),
 				),
-				'visibility'    => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Post visibility: PUBLIC (anyone) or CONNECTIONS (connections only). Defaults to PUBLIC.',
-				),
-				'article_url'   => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional article URL to share as an article-type post.',
-				),
-				'article_title' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional article title (used with article_url).',
-				),
+				'required'   => array( 'content' ),
 			),
 		);
 	}

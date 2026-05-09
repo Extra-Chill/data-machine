@@ -26,11 +26,14 @@ class DeleteBluesky extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Delete Bluesky posts. Requires Bluesky app password to be configured.',
 			'parameters'  => array(
-				'post_uri' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Bluesky post URI to delete.',
+				'type'       => 'object',
+				'properties' => array(
+					'post_uri' => array(
+						'type'        => 'string',
+						'description' => 'Bluesky post URI to delete.',
+					),
 				),
+				'required'   => array( 'post_uri' ),
 			),
 		);
 	}

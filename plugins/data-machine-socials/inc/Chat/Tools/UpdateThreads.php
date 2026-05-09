@@ -26,17 +26,19 @@ class UpdateThreads extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Update Threads posts. Delete posts. Requires Threads OAuth to be configured.',
 			'parameters'  => array(
-				'action'    => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Action: "delete"',
-					'enum'        => array( 'delete' ),
+				'type'       => 'object',
+				'properties' => array(
+					'action'    => array(
+						'type'        => 'string',
+						'description' => 'Action: "delete"',
+						'enum'        => array( 'delete' ),
+					),
+					'thread_id' => array(
+						'type'        => 'string',
+						'description' => 'Threads thread ID to delete.',
+					),
 				),
-				'thread_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Threads thread ID to delete.',
-				),
+				'required'   => array( 'action', 'thread_id' ),
 			),
 		);
 	}

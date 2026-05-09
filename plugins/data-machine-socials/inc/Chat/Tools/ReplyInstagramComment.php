@@ -29,16 +29,18 @@ class ReplyInstagramComment extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Reply to an Instagram comment. Requires Instagram OAuth to be configured.',
 			'parameters'  => array(
-				'comment_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Instagram comment ID to reply to.',
+				'type'       => 'object',
+				'properties' => array(
+					'comment_id' => array(
+						'type'        => 'string',
+						'description' => 'Instagram comment ID to reply to.',
+					),
+					'message'    => array(
+						'type'        => 'string',
+						'description' => 'Reply text for the Instagram comment.',
+					),
 				),
-				'message'    => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Reply text for the Instagram comment.',
-				),
+				'required'   => array( 'comment_id', 'message' ),
 			),
 		);
 	}

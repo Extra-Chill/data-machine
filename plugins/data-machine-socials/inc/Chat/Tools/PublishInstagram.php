@@ -35,29 +35,29 @@ class PublishInstagram extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Publish a standard image or carousel post to Instagram. Requires at least one image URL and a caption. Supports up to 10 images for carousel. Requires Instagram OAuth to be configured.',
 			'parameters'  => array(
-				'caption'      => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Caption text for the post. Max 2200 characters.',
-				),
-				'image_urls'   => array(
-					'type'        => 'array',
-					'required'    => true,
-					'description' => 'Array of public image URLs to post. 1 image for single post, 2-10 for carousel.',
-					'items'       => array(
-						'type' => 'string',
+				'type'       => 'object',
+				'properties' => array(
+					'caption'      => array(
+						'type'        => 'string',
+						'description' => 'Caption text for the post. Max 2200 characters.',
+					),
+					'image_urls'   => array(
+						'type'        => 'array',
+						'description' => 'Array of public image URLs to post. 1 image for single post, 2-10 for carousel.',
+						'items'       => array(
+							'type' => 'string',
+						),
+					),
+					'aspect_ratio' => array(
+						'type'        => 'string',
+						'description' => 'Aspect ratio for images: 1:1, 4:5, 3:4, or 1.91:1. Defaults to 4:5.',
+					),
+					'source_url'   => array(
+						'type'        => 'string',
+						'description' => 'Optional source URL to include at the end of the caption.',
 					),
 				),
-				'aspect_ratio' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Aspect ratio for images: 1:1, 4:5, 3:4, or 1.91:1. Defaults to 4:5.',
-				),
-				'source_url'   => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional source URL to include at the end of the caption.',
-				),
+				'required'   => array( 'caption', 'image_urls' ),
 			),
 		);
 	}

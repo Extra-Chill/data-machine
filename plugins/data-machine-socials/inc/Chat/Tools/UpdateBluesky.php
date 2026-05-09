@@ -26,17 +26,19 @@ class UpdateBluesky extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Update Bluesky posts. Delete posts or like posts. Requires Bluesky app password to be configured.',
 			'parameters'  => array(
-				'action'   => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Action: "delete", "like", "unlike"',
-					'enum'        => array( 'delete', 'like', 'unlike' ),
+				'type'       => 'object',
+				'properties' => array(
+					'action'   => array(
+						'type'        => 'string',
+						'description' => 'Action: "delete", "like", "unlike"',
+						'enum'        => array( 'delete', 'like', 'unlike' ),
+					),
+					'post_uri' => array(
+						'type'        => 'string',
+						'description' => 'Bluesky post URI (at://...).',
+					),
 				),
-				'post_uri' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Bluesky post URI (at://...).',
-				),
+				'required'   => array( 'action', 'post_uri' ),
 			),
 		);
 	}

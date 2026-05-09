@@ -34,46 +34,41 @@ class FetchReddit extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Fetch posts from Reddit. Provide a subreddit to browse it, or a query to search across all of Reddit. Both can be combined to search within a subreddit. Returns eligible posts matching filters (upvotes, comments, timeframe, keywords). Requires Reddit OAuth to be configured.',
 			'parameters'  => array(
-				'subreddit'         => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Subreddit name to fetch from (without "r/", e.g. "jambands", "festivals"). Optional when query is provided.',
-				),
-				'query'             => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Search query. Without subreddit, searches all of Reddit. With subreddit, searches within it.',
-				),
-				'sort_by'           => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Sort order: hot, new, top, rising, controversial, relevance. Use "relevance" for search queries.',
-					'enum'        => array( 'hot', 'new', 'top', 'rising', 'controversial', 'relevance' ),
-				),
-				'timeframe_limit'   => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Timeframe filter: all_time, 24_hours, 72_hours, 7_days, 30_days, 90_days, 6_months, 1_year',
-				),
-				'min_upvotes'       => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Minimum upvotes (score) required. 0 to disable.',
-				),
-				'min_comment_count' => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Minimum comment count required. 0 to disable.',
-				),
-				'comment_count'     => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Number of top comments to include (0 = none).',
-				),
-				'search'            => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Comma-separated keywords to filter posts by title/content.',
+				'type'       => 'object',
+				'properties' => array(
+					'subreddit'         => array(
+						'type'        => 'string',
+						'description' => 'Subreddit name to fetch from (without "r/", e.g. "jambands", "festivals"). Optional when query is provided.',
+					),
+					'query'             => array(
+						'type'        => 'string',
+						'description' => 'Search query. Without subreddit, searches all of Reddit. With subreddit, searches within it.',
+					),
+					'sort_by'           => array(
+						'type'        => 'string',
+						'description' => 'Sort order: hot, new, top, rising, controversial, relevance. Use "relevance" for search queries.',
+						'enum'        => array( 'hot', 'new', 'top', 'rising', 'controversial', 'relevance' ),
+					),
+					'timeframe_limit'   => array(
+						'type'        => 'string',
+						'description' => 'Timeframe filter: all_time, 24_hours, 72_hours, 7_days, 30_days, 90_days, 6_months, 1_year',
+					),
+					'min_upvotes'       => array(
+						'type'        => 'integer',
+						'description' => 'Minimum upvotes (score) required. 0 to disable.',
+					),
+					'min_comment_count' => array(
+						'type'        => 'integer',
+						'description' => 'Minimum comment count required. 0 to disable.',
+					),
+					'comment_count'     => array(
+						'type'        => 'integer',
+						'description' => 'Number of top comments to include (0 = none).',
+					),
+					'search'            => array(
+						'type'        => 'string',
+						'description' => 'Comma-separated keywords to filter posts by title/content.',
+					),
 				),
 			),
 		);

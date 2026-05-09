@@ -29,16 +29,18 @@ class ReplyReddit extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Reply to a Reddit post or comment. Requires Reddit OAuth with submit scope. The thing_id is the Reddit fullname: t3_xxx for posts, t1_xxx for comments.',
 			'parameters'  => array(
-				'thing_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Reddit fullname: t3_xxx (post) or t1_xxx (comment) to reply to.',
+				'type'       => 'object',
+				'properties' => array(
+					'thing_id' => array(
+						'type'        => 'string',
+						'description' => 'Reddit fullname: t3_xxx (post) or t1_xxx (comment) to reply to.',
+					),
+					'text'     => array(
+						'type'        => 'string',
+						'description' => 'Reply text. Supports Reddit markdown formatting.',
+					),
 				),
-				'text'     => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Reply text. Supports Reddit markdown formatting.',
-				),
+				'required'   => array( 'thing_id', 'text' ),
 			),
 		);
 	}

@@ -34,26 +34,25 @@ class ReadInstagram extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Read Instagram media. List recent posts, get details for a specific post, or get comments on a post. Requires Instagram OAuth to be configured.',
 			'parameters'  => array(
-				'action'   => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Action to perform: "list" (recent posts), "get" (single post details), "comments" (post comments). Defaults to "list".',
-					'enum'        => array( 'list', 'get', 'comments' ),
-				),
-				'media_id' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Instagram media ID. Required for "get" and "comments" actions.',
-				),
-				'limit'    => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Number of items to return (max 100). Defaults to 25.',
-				),
-				'after'    => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Pagination cursor for fetching the next page of results.',
+				'type'       => 'object',
+				'properties' => array(
+					'action'   => array(
+						'type'        => 'string',
+						'description' => 'Action to perform: "list" (recent posts), "get" (single post details), "comments" (post comments). Defaults to "list".',
+						'enum'        => array( 'list', 'get', 'comments' ),
+					),
+					'media_id' => array(
+						'type'        => 'string',
+						'description' => 'Instagram media ID. Required for "get" and "comments" actions.',
+					),
+					'limit'    => array(
+						'type'        => 'integer',
+						'description' => 'Number of items to return (max 100). Defaults to 25.',
+					),
+					'after'    => array(
+						'type'        => 'string',
+						'description' => 'Pagination cursor for fetching the next page of results.',
+					),
 				),
 			),
 		);

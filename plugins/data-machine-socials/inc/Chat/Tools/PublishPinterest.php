@@ -34,31 +34,30 @@ class PublishPinterest extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Publish a pin to Pinterest. Requires a title, description, and image URL. Optionally specify a board and destination link. Requires Pinterest OAuth to be configured.',
 			'parameters'  => array(
-				'title'       => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Pin title. Max 100 characters.',
+				'type'       => 'object',
+				'properties' => array(
+					'title'       => array(
+						'type'        => 'string',
+						'description' => 'Pin title. Max 100 characters.',
+					),
+					'description' => array(
+						'type'        => 'string',
+						'description' => 'Pin description. Max 500 characters.',
+					),
+					'image_url'   => array(
+						'type'        => 'string',
+						'description' => 'Public URL of the image for the pin.',
+					),
+					'link'        => array(
+						'type'        => 'string',
+						'description' => 'Optional destination URL the pin will link to.',
+					),
+					'board_id'    => array(
+						'type'        => 'string',
+						'description' => 'Optional Pinterest board ID. Uses default board if not specified.',
+					),
 				),
-				'description' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Pin description. Max 500 characters.',
-				),
-				'image_url'   => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Public URL of the image for the pin.',
-				),
-				'link'        => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional destination URL the pin will link to.',
-				),
-				'board_id'    => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional Pinterest board ID. Uses default board if not specified.',
-				),
+				'required'   => array( 'title', 'description', 'image_url' ),
 			),
 		);
 	}

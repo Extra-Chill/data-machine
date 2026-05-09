@@ -26,17 +26,19 @@ class UpdatePinterest extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Update Pinterest pins. Delete pins. Requires Pinterest API token to be configured.',
 			'parameters'  => array(
-				'action' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Action: "delete"',
-					'enum'        => array( 'delete' ),
+				'type'       => 'object',
+				'properties' => array(
+					'action' => array(
+						'type'        => 'string',
+						'description' => 'Action: "delete"',
+						'enum'        => array( 'delete' ),
+					),
+					'pin_id' => array(
+						'type'        => 'string',
+						'description' => 'Pinterest pin ID to delete.',
+					),
 				),
-				'pin_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Pinterest pin ID to delete.',
-				),
+				'required'   => array( 'action', 'pin_id' ),
 			),
 		);
 	}

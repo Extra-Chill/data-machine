@@ -26,31 +26,29 @@ class ReadPinterest extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Read Pinterest pins and boards. List pins, get pin details, list boards, or list board pins. Requires Pinterest access token to be configured.',
 			'parameters'  => array(
-				'action'   => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Action: "pins" (user pins), "pin" (single pin), "boards" (list boards), "board_pins" (board pins). Defaults to "pins".',
-					'enum'        => array( 'pins', 'pin', 'boards', 'board_pins' ),
-				),
-				'pin_id'   => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Pinterest pin ID. Required for "pin" action.',
-				),
-				'board_id' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Pinterest board ID. Required for "board_pins" action.',
-				),
-				'limit'    => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Number of items to return (max 100). Defaults to 25.',
-				),
-				'bookmark' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Pagination bookmark for next page.',
+				'type'       => 'object',
+				'properties' => array(
+					'action'   => array(
+						'type'        => 'string',
+						'description' => 'Action: "pins" (user pins), "pin" (single pin), "boards" (list boards), "board_pins" (board pins). Defaults to "pins".',
+						'enum'        => array( 'pins', 'pin', 'boards', 'board_pins' ),
+					),
+					'pin_id'   => array(
+						'type'        => 'string',
+						'description' => 'Pinterest pin ID. Required for "pin" action.',
+					),
+					'board_id' => array(
+						'type'        => 'string',
+						'description' => 'Pinterest board ID. Required for "board_pins" action.',
+					),
+					'limit'    => array(
+						'type'        => 'integer',
+						'description' => 'Number of items to return (max 100). Defaults to 25.',
+					),
+					'bookmark' => array(
+						'type'        => 'string',
+						'description' => 'Pagination bookmark for next page.',
+					),
 				),
 			),
 		);

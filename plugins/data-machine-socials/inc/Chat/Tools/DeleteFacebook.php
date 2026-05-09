@@ -26,11 +26,14 @@ class DeleteFacebook extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Delete Facebook Page posts. Requires Facebook OAuth to be configured.',
 			'parameters'  => array(
-				'post_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Facebook post ID to delete.',
+				'type'       => 'object',
+				'properties' => array(
+					'post_id' => array(
+						'type'        => 'string',
+						'description' => 'Facebook post ID to delete.',
+					),
 				),
+				'required'   => array( 'post_id' ),
 			),
 		);
 	}

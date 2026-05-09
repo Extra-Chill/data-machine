@@ -34,31 +34,30 @@ class PublishFacebook extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Publish a post to a Facebook Page. Supports text with optional image and source URL. Requires Facebook OAuth to be configured.',
 			'parameters'  => array(
-				'content'       => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Post content text.',
+				'type'       => 'object',
+				'properties' => array(
+					'content'       => array(
+						'type'        => 'string',
+						'description' => 'Post content text.',
+					),
+					'title'         => array(
+						'type'        => 'string',
+						'description' => 'Optional title to prepend to the post content.',
+					),
+					'image_url'     => array(
+						'type'        => 'string',
+						'description' => 'Optional public URL of an image to attach to the post.',
+					),
+					'source_url'    => array(
+						'type'        => 'string',
+						'description' => 'Optional source URL to include in the post.',
+					),
+					'link_handling' => array(
+						'type'        => 'string',
+						'description' => 'How to handle the source URL: none, append (default), or comment (post as a follow-up comment).',
+					),
 				),
-				'title'         => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional title to prepend to the post content.',
-				),
-				'image_url'     => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional public URL of an image to attach to the post.',
-				),
-				'source_url'    => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional source URL to include in the post.',
-				),
-				'link_handling' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'How to handle the source URL: none, append (default), or comment (post as a follow-up comment).',
-				),
+				'required'   => array( 'content' ),
 			),
 		);
 	}

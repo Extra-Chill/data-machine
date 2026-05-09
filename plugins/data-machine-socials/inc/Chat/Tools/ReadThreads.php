@@ -26,26 +26,25 @@ class ReadThreads extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Read Threads posts. List recent threads, get details for a specific thread, or get replies. Requires Threads OAuth to be configured.',
 			'parameters'  => array(
-				'action'    => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Action: "list" (recent threads), "get" (single thread), "replies" (thread replies). Defaults to "list".',
-					'enum'        => array( 'list', 'get', 'replies' ),
-				),
-				'thread_id' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Threads media ID. Required for "get" and "replies" actions.',
-				),
-				'limit'     => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Number of items to return (max 100). Defaults to 25.',
-				),
-				'after'     => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Pagination cursor for next page.',
+				'type'       => 'object',
+				'properties' => array(
+					'action'    => array(
+						'type'        => 'string',
+						'description' => 'Action: "list" (recent threads), "get" (single thread), "replies" (thread replies). Defaults to "list".',
+						'enum'        => array( 'list', 'get', 'replies' ),
+					),
+					'thread_id' => array(
+						'type'        => 'string',
+						'description' => 'Threads media ID. Required for "get" and "replies" actions.',
+					),
+					'limit'     => array(
+						'type'        => 'integer',
+						'description' => 'Number of items to return (max 100). Defaults to 25.',
+					),
+					'after'     => array(
+						'type'        => 'string',
+						'description' => 'Pagination cursor for next page.',
+					),
 				),
 			),
 		);

@@ -26,11 +26,14 @@ class DeleteInstagram extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Delete Instagram media. Requires Instagram OAuth to be configured.',
 			'parameters'  => array(
-				'media_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Instagram media ID to delete.',
+				'type'       => 'object',
+				'properties' => array(
+					'media_id' => array(
+						'type'        => 'string',
+						'description' => 'Instagram media ID to delete.',
+					),
 				),
+				'required'   => array( 'media_id' ),
 			),
 		);
 	}

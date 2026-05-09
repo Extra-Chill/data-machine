@@ -26,26 +26,25 @@ class ReadTwitter extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Read tweets from Twitter/X. List recent tweets, get a specific tweet, or view mentions. Requires Twitter OAuth to be configured.',
 			'parameters'  => array(
-				'action'           => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Action: "list" (user timeline), "get" (single tweet), "mentions" (user mentions). Defaults to "list".',
-					'enum'        => array( 'list', 'get', 'mentions' ),
-				),
-				'tweet_id'         => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Tweet ID. Required for "get" action.',
-				),
-				'limit'            => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Number of tweets to return (min 5, max 100). Defaults to 25.',
-				),
-				'pagination_token' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Pagination token for next page.',
+				'type'       => 'object',
+				'properties' => array(
+					'action'           => array(
+						'type'        => 'string',
+						'description' => 'Action: "list" (user timeline), "get" (single tweet), "mentions" (user mentions). Defaults to "list".',
+						'enum'        => array( 'list', 'get', 'mentions' ),
+					),
+					'tweet_id'         => array(
+						'type'        => 'string',
+						'description' => 'Tweet ID. Required for "get" action.',
+					),
+					'limit'            => array(
+						'type'        => 'integer',
+						'description' => 'Number of tweets to return (min 5, max 100). Defaults to 25.',
+					),
+					'pagination_token' => array(
+						'type'        => 'string',
+						'description' => 'Pagination token for next page.',
+					),
 				),
 			),
 		);

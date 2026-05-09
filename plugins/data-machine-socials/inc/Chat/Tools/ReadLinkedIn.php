@@ -26,21 +26,21 @@ class ReadLinkedIn extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Read posts from LinkedIn. List recent posts or get a specific post by URN. Requires LinkedIn OAuth to be configured.',
 			'parameters'  => array(
-				'action'  => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Action: "list" (recent posts) or "get" (single post). Defaults to "list".',
-					'enum'        => array( 'list', 'get' ),
-				),
-				'post_id' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Post URN (e.g., urn:li:share:12345). Required for "get" action.',
-				),
-				'limit'   => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Number of posts to return (max 100). Defaults to 10.',
+				'type'       => 'object',
+				'properties' => array(
+					'action'  => array(
+						'type'        => 'string',
+						'description' => 'Action: "list" (recent posts) or "get" (single post). Defaults to "list".',
+						'enum'        => array( 'list', 'get' ),
+					),
+					'post_id' => array(
+						'type'        => 'string',
+						'description' => 'Post URN (e.g., urn:li:share:12345). Required for "get" action.',
+					),
+					'limit'   => array(
+						'type'        => 'integer',
+						'description' => 'Number of posts to return (max 100). Defaults to 10.',
+					),
 				),
 			),
 		);

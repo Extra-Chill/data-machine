@@ -35,15 +35,16 @@ class PublishStoryInstagram extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Publish an Instagram Story. Stories are ephemeral (24h lifespan) and support a single image or video. Requires Instagram OAuth to be configured.',
 			'parameters'  => array(
-				'image_url' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Public URL of an image for the Story. Provide either image_url or video_url.',
-				),
-				'video_url' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Public URL of a video for the Story. Provide either image_url or video_url.',
+				'type'       => 'object',
+				'properties' => array(
+					'image_url' => array(
+						'type'        => 'string',
+						'description' => 'Public URL of an image for the Story. Provide either image_url or video_url.',
+					),
+					'video_url' => array(
+						'type'        => 'string',
+						'description' => 'Public URL of a video for the Story. Provide either image_url or video_url.',
+					),
 				),
 			),
 		);

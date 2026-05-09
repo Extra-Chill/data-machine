@@ -26,26 +26,25 @@ class ReadBluesky extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Read Bluesky posts. List recent posts from your feed, get a post thread, or view your profile. Requires Bluesky app password to be configured.',
 			'parameters'  => array(
-				'action'   => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Action: "list" (author feed), "get" (post thread), "profile" (user profile). Defaults to "list".',
-					'enum'        => array( 'list', 'get', 'profile' ),
-				),
-				'post_uri' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'AT Protocol post URI (at://did:plc:.../app.bsky.feed.post/...). Required for "get" action.',
-				),
-				'limit'    => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Number of posts to return (max 100). Defaults to 25.',
-				),
-				'cursor'   => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Pagination cursor for next page.',
+				'type'       => 'object',
+				'properties' => array(
+					'action'   => array(
+						'type'        => 'string',
+						'description' => 'Action: "list" (author feed), "get" (post thread), "profile" (user profile). Defaults to "list".',
+						'enum'        => array( 'list', 'get', 'profile' ),
+					),
+					'post_uri' => array(
+						'type'        => 'string',
+						'description' => 'AT Protocol post URI (at://did:plc:.../app.bsky.feed.post/...). Required for "get" action.',
+					),
+					'limit'    => array(
+						'type'        => 'integer',
+						'description' => 'Number of posts to return (max 100). Defaults to 25.',
+					),
+					'cursor'   => array(
+						'type'        => 'string',
+						'description' => 'Pagination cursor for next page.',
+					),
 				),
 			),
 		);

@@ -34,22 +34,23 @@ class UpdateInstagram extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Update Instagram media. Edit caption, delete a post, or archive a post. Requires Instagram OAuth to be configured.',
 			'parameters'  => array(
-				'action'   => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Action to perform: "edit" (update caption), "delete" (remove post), "archive" (hide from profile)',
-					'enum'        => array( 'edit', 'delete', 'archive' ),
+				'type'       => 'object',
+				'properties' => array(
+					'action'   => array(
+						'type'        => 'string',
+						'description' => 'Action to perform: "edit" (update caption), "delete" (remove post), "archive" (hide from profile)',
+						'enum'        => array( 'edit', 'delete', 'archive' ),
+					),
+					'media_id' => array(
+						'type'        => 'string',
+						'description' => 'Instagram media ID to update.',
+					),
+					'caption'  => array(
+						'type'        => 'string',
+						'description' => 'New caption text (required for "edit" action). Max 2200 characters.',
+					),
 				),
-				'media_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Instagram media ID to update.',
-				),
-				'caption'  => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'New caption text (required for "edit" action). Max 2200 characters.',
-				),
+				'required'   => array( 'action', 'media_id' ),
 			),
 		);
 	}

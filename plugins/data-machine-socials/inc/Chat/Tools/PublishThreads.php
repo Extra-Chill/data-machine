@@ -34,21 +34,22 @@ class PublishThreads extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Publish a post to Threads. Supports text (max 500 characters) with optional image and source URL. Requires Threads OAuth to be configured.',
 			'parameters'  => array(
-				'content'    => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Post content text. Max 500 characters.',
+				'type'       => 'object',
+				'properties' => array(
+					'content'    => array(
+						'type'        => 'string',
+						'description' => 'Post content text. Max 500 characters.',
+					),
+					'image_url'  => array(
+						'type'        => 'string',
+						'description' => 'Optional public URL of an image to attach to the post.',
+					),
+					'source_url' => array(
+						'type'        => 'string',
+						'description' => 'Optional source URL to append to the post text.',
+					),
 				),
-				'image_url'  => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional public URL of an image to attach to the post.',
-				),
-				'source_url' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional source URL to append to the post text.',
-				),
+				'required'   => array( 'content' ),
 			),
 		);
 	}

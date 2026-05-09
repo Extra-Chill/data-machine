@@ -26,11 +26,14 @@ class DeleteLinkedIn extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Delete a post from LinkedIn. Requires LinkedIn OAuth to be configured.',
 			'parameters'  => array(
-				'post_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Post URN to delete (e.g., urn:li:share:12345).',
+				'type'       => 'object',
+				'properties' => array(
+					'post_id' => array(
+						'type'        => 'string',
+						'description' => 'Post URN to delete (e.g., urn:li:share:12345).',
+					),
 				),
+				'required'   => array( 'post_id' ),
 			),
 		);
 	}

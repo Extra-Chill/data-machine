@@ -26,11 +26,14 @@ class DeleteTwitter extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Delete tweets. Requires Twitter OAuth to be configured.',
 			'parameters'  => array(
-				'tweet_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Tweet ID to delete.',
+				'type'       => 'object',
+				'properties' => array(
+					'tweet_id' => array(
+						'type'        => 'string',
+						'description' => 'Tweet ID to delete.',
+					),
 				),
+				'required'   => array( 'tweet_id' ),
 			),
 		);
 	}

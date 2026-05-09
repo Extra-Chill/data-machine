@@ -26,16 +26,18 @@ class UpdateLinkedIn extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Update the commentary (text) of an existing LinkedIn post. Requires LinkedIn OAuth to be configured.',
 			'parameters'  => array(
-				'post_id'    => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Post URN to update (e.g., urn:li:share:12345).',
+				'type'       => 'object',
+				'properties' => array(
+					'post_id'    => array(
+						'type'        => 'string',
+						'description' => 'Post URN to update (e.g., urn:li:share:12345).',
+					),
+					'commentary' => array(
+						'type'        => 'string',
+						'description' => 'New commentary text for the post.',
+					),
 				),
-				'commentary' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'New commentary text for the post.',
-				),
+				'required'   => array( 'post_id', 'commentary' ),
 			),
 		);
 	}

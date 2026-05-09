@@ -26,17 +26,19 @@ class UpdateTwitter extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Update Twitter/X content. Delete tweets, retweet, unretweet, like, or unlike tweets. Requires Twitter OAuth to be configured.',
 			'parameters'  => array(
-				'action'   => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Action: "delete" (remove tweet), "retweet", "unretweet", "like", "unlike"',
-					'enum'        => array( 'delete', 'retweet', 'unretweet', 'like', 'unlike' ),
+				'type'       => 'object',
+				'properties' => array(
+					'action'   => array(
+						'type'        => 'string',
+						'description' => 'Action: "delete" (remove tweet), "retweet", "unretweet", "like", "unlike"',
+						'enum'        => array( 'delete', 'retweet', 'unretweet', 'like', 'unlike' ),
+					),
+					'tweet_id' => array(
+						'type'        => 'string',
+						'description' => 'Tweet ID to operate on.',
+					),
 				),
-				'tweet_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Tweet ID to operate on.',
-				),
+				'required'   => array( 'action', 'tweet_id' ),
 			),
 		);
 	}

@@ -26,11 +26,14 @@ class DeleteThreads extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Delete Threads posts. Requires Threads OAuth to be configured.',
 			'parameters'  => array(
-				'thread_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Threads thread ID to delete.',
+				'type'       => 'object',
+				'properties' => array(
+					'thread_id' => array(
+						'type'        => 'string',
+						'description' => 'Threads thread ID to delete.',
+					),
 				),
+				'required'   => array( 'thread_id' ),
 			),
 		);
 	}

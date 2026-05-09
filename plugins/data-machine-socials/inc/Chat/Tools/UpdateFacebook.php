@@ -26,22 +26,23 @@ class UpdateFacebook extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Update Facebook Page posts. Edit message, hide, unhide, or delete posts. Requires Facebook OAuth to be configured.',
 			'parameters'  => array(
-				'action'  => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Action: "edit" (update message), "hide", "unhide", "delete"',
-					'enum'        => array( 'edit', 'hide', 'unhide', 'delete' ),
+				'type'       => 'object',
+				'properties' => array(
+					'action'  => array(
+						'type'        => 'string',
+						'description' => 'Action: "edit" (update message), "hide", "unhide", "delete"',
+						'enum'        => array( 'edit', 'hide', 'unhide', 'delete' ),
+					),
+					'post_id' => array(
+						'type'        => 'string',
+						'description' => 'Facebook post ID to operate on.',
+					),
+					'message' => array(
+						'type'        => 'string',
+						'description' => 'New message text (required for edit action).',
+					),
 				),
-				'post_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Facebook post ID to operate on.',
-				),
-				'message' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'New message text (required for edit action).',
-				),
+				'required'   => array( 'action', 'post_id' ),
 			),
 		);
 	}
