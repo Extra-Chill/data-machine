@@ -93,17 +93,32 @@ class AgentIdentityResolverTest extends WP_UnitTestCase {
 		$this->resolver->resolve_agent_identity( 99999 );
 	}
 
-	public function test_rejects_mismatched_array_identity(): void {
-		$agent_id = $this->create_agent( 'matching-agent' );
+	public function test_array_context_prefers_agent_slug_over_mismatched_id(): void {
+		$stale_agent_id = $this->create_agent( 'stale-id-agent' );
+		$agent_id       = $this->create_agent( 'portable-slug-agent' );
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Agent identity mismatch' );
-
-		$this->resolver->resolve_agent_identity(
+		$identity = $this->resolver->resolve_agent_identity(
 			array(
-				'agent_id'   => $agent_id,
-				'agent_slug' => 'other-agent',
+				'agent_id'   => $stale_agent_id,
+				'agent_slug' => 'portable-slug-agent',
 			)
 		);
+
+		$this->assertSame( $agent_id, $identity->agent_id );
+		$this->assertSame( 'portable-slug-agent', $identity->agent_slug );
+	}
+
+	public function test_array_context_falls_back_to_agent_id_when_slug_is_unresolved(): void {
+		$agent_id = $this->create_agent( 'legacy-fallback-agent' );
+
+		$identity = $this->resolver->resolve_agent_identity(
+			array(
+				'agent_id'   => $agent_id,
+				'agent_slug' => 'missing-agent-slug',
+			)
+		);
+
+		$this->assertSame( $agent_id, $identity->agent_id );
+		$this->assertSame( 'legacy-fallback-agent', $identity->agent_slug );
 	}
 }

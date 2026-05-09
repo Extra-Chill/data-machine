@@ -579,6 +579,7 @@ class RequestBuilder {
 			array(
 				'job_id'       => $payload['job_id'] ?? null,
 				'flow_step_id' => $payload['flow_step_id'] ?? null,
+				'agent_slug'   => $payload['agent_slug'] ?? null,
 			),
 			fn( $value ) => null !== $value
 		);

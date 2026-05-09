@@ -3,6 +3,7 @@
 namespace DataMachine\Core\Steps\AI;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -81,7 +82,8 @@ class AIStep extends Step {
 
 		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
 		$job_snapshot         = $this->engine->get( 'job' );
-		$agent_id             = (int) ( $job_snapshot['agent_id'] ?? 0 );
+		$job_snapshot         = is_array( $job_snapshot ) ? $job_snapshot : array();
+		$agent_id             = $this->resolveAgentIdFromJobSnapshot( $job_snapshot );
 
 		// Model/provider resolved exclusively via mode system (agent → site → network).
 		// Pipeline-level model/provider fields are ignored — mode_models is the authority.
@@ -148,7 +150,9 @@ class AIStep extends Step {
 
 		// Resolve user_id and agent_id from engine snapshot (set by RunFlowAbility).
 		$job_snapshot = $this->engine->get( 'job' );
-		$agent_id     = (int) ( $job_snapshot['agent_id'] ?? 0 );
+		$job_snapshot = is_array( $job_snapshot ) ? $job_snapshot : array();
+		$agent_id     = $this->resolveAgentIdFromJobSnapshot( $job_snapshot );
+		$agent_slug   = $this->resolveAgentSlugFromJobSnapshot( $job_snapshot, $agent_id );
 		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
 
 		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
@@ -275,6 +279,7 @@ class AIStep extends Step {
 				'engine_data'                 => $this->engine->all(),
 				'user_id'                     => $user_id,
 				'agent_id'                    => $agent_id,
+				'agent_slug'                  => $agent_slug,
 				'pipeline_id'                 => $job_snapshot['pipeline_id'] ?? null,
 				'flow_id'                     => $job_snapshot['flow_id'] ?? null,
 				'persist_transcript'          => $persist_transcript,
@@ -323,6 +328,7 @@ class AIStep extends Step {
 					array(
 						'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
 						'agent_id'             => $agent_id,
+						'agent_slug'           => $agent_slug,
 						'previous_step_config' => $previous_step_config,
 						'next_step_config'     => $next_step_config,
 						'pipeline_step_id'     => $pipeline_step_id,
@@ -611,6 +617,40 @@ class AIStep extends Step {
 		}
 
 		return $items;
+	}
+
+	/**
+	 * Resolve agent ID from a portable job snapshot.
+	 */
+	private function resolveAgentIdFromJobSnapshot( array $job_snapshot ): int {
+		if ( empty( $job_snapshot['agent_slug'] ) && empty( $job_snapshot['agent_id'] ) ) {
+			return 0;
+		}
+
+		try {
+			return ( new AgentIdentityResolver() )->resolve_agent_identity( $job_snapshot )->agent_id;
+		} catch ( \InvalidArgumentException $e ) {
+			return (int) ( $job_snapshot['agent_id'] ?? 0 );
+		}
+	}
+
+	/**
+	 * Resolve agent slug from a portable job snapshot.
+	 */
+	private function resolveAgentSlugFromJobSnapshot( array $job_snapshot, int $agent_id ): string {
+		if ( ! empty( $job_snapshot['agent_slug'] ) ) {
+			return sanitize_title( (string) $job_snapshot['agent_slug'] );
+		}
+
+		if ( $agent_id <= 0 ) {
+			return '';
+		}
+
+		try {
+			return ( new AgentIdentityResolver() )->resolve_agent_slug( $agent_id );
+		} catch ( \InvalidArgumentException $e ) {
+			return '';
+		}
 	}
 
 	/**

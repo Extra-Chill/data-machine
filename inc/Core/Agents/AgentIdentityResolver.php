@@ -85,8 +85,8 @@ class AgentIdentityResolver {
 	/**
 	 * Resolve identity from a persisted or runtime context array.
 	 *
-	 * `agent_id` remains authoritative for old persisted contexts. When both
-	 * fields are present, the slug must match the row resolved by `agent_id`.
+	 * `agent_slug` is canonical for portable contexts. `agent_id` remains a
+	 * fallback for older persisted contexts that predate slug snapshots.
 	 *
 	 * @param array $context Context containing agent_id and/or agent_slug.
 	 * @return AgentIdentity Resolved identity.
@@ -95,25 +95,18 @@ class AgentIdentityResolver {
 		$agent_id   = isset( $context['agent_id'] ) && is_numeric( $context['agent_id'] ) ? (int) $context['agent_id'] : 0;
 		$agent_slug = isset( $context['agent_slug'] ) ? self::normalize_agent_slug( (string) $context['agent_slug'] ) : '';
 
-		if ( $agent_id > 0 ) {
-			$identity = $this->resolve_from_id( $agent_id );
-
-			if ( '' !== $agent_slug && $agent_slug !== $identity->agent_slug ) {
-				throw new \InvalidArgumentException(
-					sprintf(
-						'Agent identity mismatch: agent_id %d resolves to "%s", not "%s".',
-						absint( $identity->agent_id ),
-						esc_html( $identity->agent_slug ),
-						esc_html( $agent_slug )
-					)
-				);
+		if ( '' !== $agent_slug ) {
+			try {
+				return $this->resolve_from_slug( $agent_slug );
+			} catch ( \InvalidArgumentException $e ) {
+				if ( $agent_id <= 0 ) {
+					throw $e;
+				}
 			}
-
-			return $identity;
 		}
 
-		if ( '' !== $agent_slug ) {
-			return $this->resolve_from_slug( $agent_slug );
+		if ( $agent_id > 0 ) {
+			return $this->resolve_from_id( $agent_id );
 		}
 
 		throw new \InvalidArgumentException( 'Agent identity requires agent_id or agent_slug.' );

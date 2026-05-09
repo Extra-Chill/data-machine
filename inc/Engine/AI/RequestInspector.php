@@ -9,6 +9,7 @@
 
 namespace DataMachine\Engine\AI;
 
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\FilesRepository\FileRetrieval;
@@ -99,6 +100,7 @@ class RequestInspector {
 		$pipeline_step_config = $engine->getPipelineStepConfig( $pipeline_step_id );
 		$tool_categories      = $pipeline_step_config['tool_categories'] ?? $engine->get( 'pipeline_tool_categories' ) ?? array();
 		$agent_id             = (int) ( $payload['agent_id'] ?? 0 );
+		$agent_slug           = (string) ( $payload['agent_slug'] ?? '' );
 
 		$resolver = new ToolPolicyResolver();
 		$tools    = $resolver->resolve(
@@ -106,6 +108,7 @@ class RequestInspector {
 				array(
 					'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
 					'agent_id'             => $agent_id,
+					'agent_slug'           => $agent_slug,
 					'previous_step_config' => $previous_step_config,
 					'next_step_config'     => $next_step_config,
 					'pipeline_step_id'     => $pipeline_step_id,
@@ -258,9 +261,27 @@ class RequestInspector {
 		EngineData $engine,
 		array $job
 	): array {
-		$job_snapshot = $engine->getJobContext();
-		$user_id      = (int) ( $job_snapshot['user_id'] ?? ( $job['user_id'] ?? 0 ) );
-		$agent_id     = (int) ( $job_snapshot['agent_id'] ?? ( $job['agent_id'] ?? 0 ) );
+		$job_snapshot     = $engine->getJobContext();
+		$user_id          = (int) ( $job_snapshot['user_id'] ?? ( $job['user_id'] ?? 0 ) );
+		$identity_context = array_filter(
+			array(
+				'agent_slug' => $job_snapshot['agent_slug'] ?? null,
+				'agent_id'   => $job_snapshot['agent_id'] ?? ( $job['agent_id'] ?? null ),
+			),
+			fn( $value ) => null !== $value && '' !== $value && 0 !== $value
+		);
+		$agent_id         = (int) ( $job_snapshot['agent_id'] ?? ( $job['agent_id'] ?? 0 ) );
+		$agent_slug       = ! empty( $job_snapshot['agent_slug'] ) ? sanitize_title( (string) $job_snapshot['agent_slug'] ) : '';
+		if ( ! empty( $identity_context ) ) {
+			try {
+				$identity   = ( new AgentIdentityResolver() )->resolve_agent_identity( $identity_context );
+				$agent_id   = $identity->agent_id;
+				$agent_slug = $identity->agent_slug;
+			} catch ( \InvalidArgumentException $e ) {
+				// Keep the raw snapshot values for inspecting legacy/in-flight jobs.
+				unset( $e );
+			}
+		}
 
 		return array(
 			'job_id'             => $job_id,
@@ -270,6 +291,7 @@ class RequestInspector {
 			'engine'             => $engine,
 			'user_id'            => $user_id,
 			'agent_id'           => $agent_id,
+			'agent_slug'         => $agent_slug,
 			'pipeline_id'        => $job_snapshot['pipeline_id'] ?? ( $job['pipeline_id'] ?? null ),
 			'flow_id'            => $job_snapshot['flow_id'] ?? ( $job['flow_id'] ?? null ),
 			'persist_transcript' => false,

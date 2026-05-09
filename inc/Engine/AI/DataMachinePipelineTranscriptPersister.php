@@ -57,6 +57,7 @@ class DataMachinePipelineTranscriptPersister implements WP_Agent_Transcript_Pers
 			'pipeline_id'  => $runtime_context['pipeline_id'] ?? null,
 			'flow_id'      => $runtime_context['flow_id'] ?? null,
 			'agent_id'     => $agent_id > 0 ? $agent_id : null,
+			'agent_slug'   => '' !== $agent_slug ? $agent_slug : null,
 			'owner_id'     => $user_id > 0 ? $user_id : null,
 			'provider'     => $provider,
 			'model'        => $model,

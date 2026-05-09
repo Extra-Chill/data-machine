@@ -66,6 +66,7 @@ class ChatOrchestrator {
 		$max_turns            = $options['max_turns'] ?? PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 		$request_id           = $options['request_id'] ?? null;
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
+		$agent_slug           = (string) ( $options['agent_slug'] ?? '' );
 
 		$chat_db                     = ConversationStoreFactory::get();
 		$session_metadata            = array();
@@ -197,6 +198,7 @@ class ChatOrchestrator {
 				'mode'                 => ToolPolicyResolver::MODE_CHAT,
 				'user_id'              => $user_id,
 				'agent_id'             => $agent_id,
+				'agent_slug'           => $agent_slug,
 				'client_context'       => $options['client_context'] ?? array(),
 			)
 		);
@@ -371,6 +373,8 @@ class ChatOrchestrator {
 				'selected_pipeline_id' => $selected_pipeline_id,
 				'mode'                 => ToolPolicyResolver::MODE_CHAT,
 				'user_id'              => (int) ( $session['user_id'] ?? 0 ),
+				'agent_id'             => (int) ( $session['agent_id'] ?? 0 ),
+				'agent_slug'           => (string) ( $session['agent_slug'] ?? '' ),
 			)
 		);
 
@@ -696,6 +700,10 @@ class ChatOrchestrator {
 				$agent_id = datamachine_resolve_or_create_agent_id( $user_id );
 			}
 
+			if ( '' === $agent_slug && $agent_id > 0 ) {
+				$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
+			}
+
 			$resolver       = new ToolPolicyResolver();
 			$all_tools      = $resolver->resolve(
 				array(
@@ -710,6 +718,9 @@ class ChatOrchestrator {
 				'user_id'    => $user_id,
 				'agent_id'   => $agent_id,
 			);
+			if ( '' !== $agent_slug ) {
+				$loop_context['agent_slug'] = $agent_slug;
+			}
 			if ( $selected_pipeline_id ) {
 				$loop_context['selected_pipeline_id'] = $selected_pipeline_id;
 			}

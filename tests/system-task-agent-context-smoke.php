@@ -35,6 +35,12 @@ if ( ! function_exists( 'current_time' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sanitize_title' ) ) {
+	function sanitize_title( string $title ): string {
+		return strtolower( trim( preg_replace( '/[^a-z0-9]+/i', '-', $title ), '-' ) );
+	}
+}
+
 // ─── Harness functions mirroring production paths ───────────────────
 
 /**
@@ -46,14 +52,18 @@ function build_task_scheduler_initial_data(
 	array $context,
 	int $parent_job_id
 ): array {
-	$context_user_id  = (int) ( $context['user_id'] ?? 0 );
-	$context_agent_id = (int) ( $context['agent_id'] ?? 0 );
+	$context_user_id    = (int) ( $context['user_id'] ?? 0 );
+	$context_agent_id   = (int) ( $context['agent_id'] ?? 0 );
+	$context_agent_slug = ! empty( $context['agent_slug'] ) ? sanitize_title( (string) $context['agent_slug'] ) : '';
 
 	$job_snapshot = array(
 		'user_id' => $context_user_id,
 	);
 	if ( $context_agent_id > 0 ) {
 		$job_snapshot['agent_id'] = $context_agent_id;
+	}
+	if ( '' !== $context_agent_slug ) {
+		$job_snapshot['agent_slug'] = $context_agent_slug;
 	}
 
 	return array(
@@ -63,6 +73,7 @@ function build_task_scheduler_initial_data(
 		'parent_job_id' => $parent_job_id,
 		'user_id'       => $context_user_id,
 		'agent_id'      => $context_agent_id,
+		'agent_slug'    => $context_agent_slug,
 		'job'           => $job_snapshot,
 	);
 }
@@ -87,6 +98,9 @@ function build_engine_data_job_snapshot( int $job_id, array $initial_data ): arr
 	if ( ! empty( $initial_data['agent_id'] ) && empty( $job_snapshot['agent_id'] ) ) {
 		$job_snapshot['agent_id'] = (int) $initial_data['agent_id'];
 	}
+	if ( ! empty( $initial_data['agent_slug'] ) && empty( $job_snapshot['agent_slug'] ) ) {
+		$job_snapshot['agent_slug'] = sanitize_title( (string) $initial_data['agent_slug'] );
+	}
 	$engine_data['job'] = $job_snapshot;
 
 	return $engine_data;
@@ -104,6 +118,7 @@ function build_system_task_child_engine_data(
 ): array {
 	$parent_job_snapshot = $parent_engine_data['job'] ?? array();
 	$parent_agent_id     = (int) ( $parent_job_snapshot['agent_id'] ?? 0 );
+	$parent_agent_slug   = ! empty( $parent_job_snapshot['agent_slug'] ) ? sanitize_title( (string) $parent_job_snapshot['agent_slug'] ) : '';
 	$parent_user_id      = (int) ( $parent_job_snapshot['user_id'] ?? 0 );
 
 	$child_engine_data = array_merge( $task_params, array(
@@ -116,6 +131,9 @@ function build_system_task_child_engine_data(
 	if ( $parent_agent_id > 0 ) {
 		$child_engine_data['agent_id'] = $parent_agent_id;
 	}
+	if ( '' !== $parent_agent_slug ) {
+		$child_engine_data['agent_slug'] = $parent_agent_slug;
+	}
 	if ( $parent_user_id > 0 ) {
 		$child_engine_data['user_id'] = $parent_user_id;
 	}
@@ -126,6 +144,9 @@ function build_system_task_child_engine_data(
 	);
 	if ( $parent_agent_id > 0 ) {
 		$child_job_snapshot['agent_id'] = $parent_agent_id;
+	}
+	if ( '' !== $parent_agent_slug ) {
+		$child_job_snapshot['agent_slug'] = $parent_agent_slug;
 	}
 	$child_engine_data['job'] = $child_job_snapshot;
 
@@ -200,6 +221,16 @@ $assert( 'job snapshot present', is_array( $initial['job'] ) );
 $assert( 'job.agent_id present', 2 === $initial['job']['agent_id'] );
 $assert( 'job.user_id present', 1 === $initial['job']['user_id'] );
 
+echo "\n[1b] TaskScheduler initial_data dual-writes agent_slug when provided\n";
+$initial = build_task_scheduler_initial_data(
+	'daily_memory_generation',
+	array( 'date' => '2026-04-25' ),
+	array( 'agent_id' => 2, 'agent_slug' => 'Wayward Son', 'user_id' => 1 ),
+	0
+);
+$assert( 'flat agent_slug present', 'wayward-son' === $initial['agent_slug'] );
+$assert( 'job.agent_slug present', 'wayward-son' === $initial['job']['agent_slug'] );
+
 echo "\n[2] TaskScheduler initial_data without agent context (back-compat)\n";
 $initial = build_task_scheduler_initial_data( 'image_optimization', array(), array(), 0 );
 $assert( 'flat agent_id is 0', 0 === $initial['agent_id'] );
@@ -232,19 +263,22 @@ $assert( 'engine_data.job.user_id is 0', 0 === $engine['job']['user_id'] );
 echo "\n[5] SystemTaskStep child engine_data carries parent agent_id\n";
 $parent_engine = array(
 	'job' => array(
-		'job_id'   => 500,
-		'agent_id' => 2,
-		'user_id'  => 1,
+		'job_id'     => 500,
+		'agent_id'   => 2,
+		'agent_slug' => 'wayward-son',
+		'user_id'    => 1,
 	),
 );
 $child = build_system_task_child_engine_data( 500, $parent_engine, 501, 'alt_text_generation', array( 'attachment_id' => 42 ) );
 $assert( 'child task_type set', 'alt_text_generation' === $child['task_type'] );
 $assert( 'child has flat agent_id from parent', 2 === $child['agent_id'] );
+$assert( 'child has flat agent_slug from parent', 'wayward-son' === $child['agent_slug'] );
 $assert( 'child has flat user_id from parent', 1 === $child['user_id'] );
 $assert( 'child has job snapshot', is_array( $child['job'] ) );
 $assert( 'child.job.job_id is child id', 501 === $child['job']['job_id'] );
 $assert( 'child.job.parent_job_id linked', 500 === $child['job']['parent_job_id'] );
 $assert( 'child.job.agent_id from parent', 2 === $child['job']['agent_id'] );
+$assert( 'child.job.agent_slug from parent', 'wayward-son' === $child['job']['agent_slug'] );
 $assert( 'task params preserved', 42 === $child['attachment_id'] );
 
 echo "\n[6] SystemTaskStep child without agent context (legacy flow)\n";

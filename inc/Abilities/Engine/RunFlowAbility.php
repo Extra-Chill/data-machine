@@ -14,6 +14,7 @@
 
 namespace DataMachine\Abilities\Engine;
 
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Engine\ExecutionPlan;
 
 defined( 'ABSPATH' ) || exit;
@@ -131,6 +132,15 @@ class RunFlowAbility {
 
 		$pipeline_id = (int) $flow['pipeline_id'];
 
+		$agent_identity = null;
+		if ( ! empty( $flow['agent_id'] ) ) {
+			try {
+				$agent_identity = ( new AgentIdentityResolver() )->resolve_agent_identity( (int) $flow['agent_id'] );
+			} catch ( \InvalidArgumentException $e ) {
+				$agent_identity = null;
+			}
+		}
+
 		// Use provided job_id or create new one (for scheduled/recurring flows).
 		if ( ! $job_id ) {
 			$job_data = array(
@@ -142,8 +152,8 @@ class RunFlowAbility {
 			);
 
 			// Propagate agent_id from flow to job.
-			if ( ! empty( $flow['agent_id'] ) ) {
-				$job_data['agent_id'] = (int) $flow['agent_id'];
+			if ( null !== $agent_identity ) {
+				$job_data['agent_id'] = $agent_identity->agent_id;
 			}
 
 			$job_id = $this->db_jobs->create_job( $job_data );
@@ -195,8 +205,9 @@ class RunFlowAbility {
 			'created_at'  => current_time( 'mysql', true ),
 		);
 
-		if ( ! empty( $flow['agent_id'] ) ) {
-			$job_snapshot['agent_id'] = (int) $flow['agent_id'];
+		if ( null !== $agent_identity ) {
+			$job_snapshot['agent_id']   = $agent_identity->agent_id;
+			$job_snapshot['agent_slug'] = $agent_identity->agent_slug;
 		}
 
 		$engine_snapshot = array(

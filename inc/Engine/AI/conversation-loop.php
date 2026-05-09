@@ -87,6 +87,7 @@ function datamachine_run_conversation(
 			'mode'         => $mode,
 			'job_id'       => $loop_payload['job_id'] ?? null,
 			'flow_step_id' => $loop_payload['flow_step_id'] ?? null,
+			'agent_slug'   => $loop_payload['agent_slug'] ?? null,
 		),
 		fn( $v ) => null !== $v
 	);
