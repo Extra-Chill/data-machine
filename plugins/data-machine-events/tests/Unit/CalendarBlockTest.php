@@ -12,7 +12,7 @@ namespace DataMachineEvents\Tests\Unit;
 
 use WP_UnitTestCase;
 use DataMachineEvents\Blocks\Calendar\Calendar;
-use DataMachineEvents\Blocks\Calendar\Pagination;
+use DataMachineEvents\Blocks\Calendar\Pagination\Renderer as Pagination;
 
 class CalendarBlockTest extends WP_UnitTestCase {
 

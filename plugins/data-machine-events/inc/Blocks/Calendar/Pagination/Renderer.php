@@ -11,16 +11,16 @@
  * - data_machine_events_pagination_wrapper_classes: Modify CSS classes on <nav> wrapper
  * - data_machine_events_pagination_args: Customize paginate_links() arguments
  *
- * @package DataMachineEvents\Blocks\Calendar
+ * @package DataMachineEvents\Blocks\Calendar\Pagination
  */
 
-namespace DataMachineEvents\Blocks\Calendar;
+namespace DataMachineEvents\Blocks\Calendar\Pagination;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Pagination {
+class Renderer {
 
 	/**
 	 * Render pagination controls with extensibility filters

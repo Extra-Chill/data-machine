@@ -46,7 +46,7 @@ if ( $is_multi_day ) {
 
 	<div class="data-machine-event-link">
 
-		<?php echo \DataMachineEvents\Blocks\Calendar\Taxonomy_Badges::render_taxonomy_badges( $event_post->ID ); ?>
+		<?php echo \DataMachineEvents\Blocks\Calendar\Taxonomy\Badges::render_taxonomy_badges( $event_post->ID ); ?>
 
 		<h4 class="data-machine-event-title">
 			<a href="<?php echo esc_url( get_the_permalink() ); ?>">

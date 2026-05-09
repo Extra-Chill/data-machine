@@ -5,20 +5,19 @@
  * Automatically invalidates calendar transient caches when events or related
  * taxonomy terms are created, updated, or deleted.
  *
- * @package DataMachineEvents\Blocks\Calendar
+ * @package DataMachineEvents\Blocks\Calendar\Cache
  * @since 0.10.20
  */
 
-namespace DataMachineEvents\Blocks\Calendar;
+namespace DataMachineEvents\Blocks\Calendar\Cache;
 
 use DataMachineEvents\Core\Event_Post_Type;
-use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Cache_Invalidator {
+class CacheInvalidator {
 
 	private static bool $initialized = false;
 
@@ -96,4 +95,4 @@ class Cache_Invalidator {
 	}
 }
 
-Cache_Invalidator::init();
+CacheInvalidator::init();

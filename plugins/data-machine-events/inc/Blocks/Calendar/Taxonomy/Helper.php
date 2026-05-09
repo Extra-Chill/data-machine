@@ -2,10 +2,10 @@
 /**
  * Taxonomy data discovery, hierarchy building, and post count calculations for calendar filtering
  *
- * @package DataMachineEvents\Blocks\Calendar
+ * @package DataMachineEvents\Blocks\Calendar\Taxonomy
  */
 
-namespace DataMachineEvents\Blocks\Calendar;
+namespace DataMachineEvents\Blocks\Calendar\Taxonomy;
 
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventDatesTable;
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *             backward compatibility and will be removed in a future release.
  * @see \DataMachineEvents\Abilities\FilterAbilities
  */
-class Taxonomy_Helper {
+class Helper {
 
 	/**
 	 * Get all taxonomies with event counts using real-time cross-filtering.

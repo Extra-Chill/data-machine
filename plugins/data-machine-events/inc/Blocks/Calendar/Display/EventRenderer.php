@@ -15,7 +15,7 @@
 namespace DataMachineEvents\Blocks\Calendar\Display;
 
 use DataMachineEvents\Blocks\Calendar\Template_Loader;
-use DataMachineEvents\Blocks\Calendar\Taxonomy_Badges;
+use DataMachineEvents\Blocks\Calendar\Taxonomy\Badges as TaxonomyBadges;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -199,7 +199,7 @@ class EventRenderer {
 			'event_data'      => $event_data,
 			'display_vars'    => $display_vars,
 			'display_context' => $display_context,
-			'badges_html'     => Taxonomy_Badges::render_taxonomy_badges( $event_post->ID ),
+			'badges_html'     => TaxonomyBadges::render_taxonomy_badges( $event_post->ID ),
 			'button_classes'  => implode( ' ', apply_filters( 'data_machine_events_more_info_button_classes', array( 'data-machine-more-info-button' ) ) ),
 		);
 

@@ -16,7 +16,7 @@ use DataMachineEvents\Blocks\Calendar\Data\EventHydrator;
 use DataMachineEvents\Blocks\Calendar\Grouping\DateGrouper;
 use DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff;
 use DataMachineEvents\Blocks\Calendar\Display\EventRenderer;
-use DataMachineEvents\Blocks\Calendar\Pagination;
+use DataMachineEvents\Blocks\Calendar\Pagination\Renderer as PaginationRenderer;
 use DataMachineEvents\Blocks\Calendar\Pagination\PageBoundary;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 use DataMachineEvents\Blocks\Calendar\Template_Loader;
@@ -549,7 +549,7 @@ class CalendarAbilities {
 	): array {
 		$events_html = EventRenderer::render_date_groups( $paged_date_groups, $gaps_detected, $include_gaps, $deferred_dates, $events_per_date );
 
-		$pagination_html = Pagination::render_pagination( $current_page, $max_pages, $show_past );
+		$pagination_html = PaginationRenderer::render_pagination( $current_page, $max_pages, $show_past );
 
 		ob_start();
 		Template_Loader::include_template(

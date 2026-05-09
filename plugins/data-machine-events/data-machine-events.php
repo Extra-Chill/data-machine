@@ -588,7 +588,7 @@ class DATAMACHINE_Events {
 		register_block_type( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventsMap' );
 
 		// Initialize calendar cache invalidation hooks
-		\DataMachineEvents\Blocks\Calendar\Cache_Invalidator::init();
+		\DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator::init();
 	}
 
 	public function register_block_category( $block_categories, $editor_context ) {

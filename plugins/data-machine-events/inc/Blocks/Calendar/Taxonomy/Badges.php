@@ -11,10 +11,10 @@
  * @param array  $excluded Array of taxonomy slugs to exclude
  * @param string $context  Context identifier: 'badge', 'modal', or empty for all contexts
  *
- * @package DataMachineEvents\Blocks\Calendar
+ * @package DataMachineEvents\Blocks\Calendar\Taxonomy
  */
 
-namespace DataMachineEvents\Blocks\Calendar;
+namespace DataMachineEvents\Blocks\Calendar\Taxonomy;
 
 use DataMachineEvents\Core\Event_Post_Type;
 
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Taxonomy_Badges {
+class Badges {
 
 	/**
 	 * @param int $post_id Event post ID

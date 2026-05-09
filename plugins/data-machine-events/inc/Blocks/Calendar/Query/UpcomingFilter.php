@@ -4,7 +4,7 @@
  *
  * Single source of truth for the SQL conditions that determine whether
  * an event is upcoming or past. All consumers (DateFilter, EventDateQueryAbilities,
- * FilterAbilities, Taxonomy_Helper) delegate here.
+ * FilterAbilities, Taxonomy\Helper) delegate here.
  *
  * Definition:
  *   upcoming = start >= $datetime  OR  end >= $datetime
