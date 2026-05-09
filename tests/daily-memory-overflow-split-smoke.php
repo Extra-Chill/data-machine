@@ -38,8 +38,9 @@ require_once __DIR__ . '/../inc/Engine/AI/System/Tasks/DailyMemoryTask.php';
 $source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/System/Tasks/DailyMemoryTask.php' );
 dm_overflow_assert( str_contains( $source, 'maybeHandleDeterministicOverflow' ), 'production task has deterministic overflow hook', $failures, $passes );
 dm_overflow_assert( ! str_contains( $source, 'splitMemorySectionsForOverflow' ), 'local section-split helper is removed', $failures, $passes );
-dm_overflow_assert( str_contains( $source, 'WP_Agent_Conversation_Compaction::compact' ), 'overflow decision is delegated to Agents API compaction', $failures, $passes );
+dm_overflow_assert( str_contains( $source, 'WP_Agent_Markdown_Section_Compaction_Adapter::split_for_overflow' ), 'overflow decision is delegated to Agents API markdown compaction', $failures, $passes );
 dm_overflow_assert( str_contains( $source, 'WP_Agent_Markdown_Section_Compaction_Adapter::parse' ), 'markdown projection uses Agents API adapter', $failures, $passes );
+dm_overflow_assert( ! str_contains( $source, 'WP_Agent_Message::text' ), 'fake conversation-message projection is removed', $failures, $passes );
 dm_overflow_assert( str_contains( $source, 'datamachine_daily_memory_overflow_threshold' ), 'overflow threshold is filterable', $failures, $passes );
 dm_overflow_assert( str_contains( $source, 'datamachine_daily_memory_overflow_target_size' ), 'overflow target size is filterable', $failures, $passes );
 

@@ -820,16 +820,19 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "9d3d06a28402a66b9b74cf6b54ce90f59e4cab8a"
+                "reference": "ed6ffa82eb374dd431a54291eba6138b870d4cef"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/9d3d06a28402a66b9b74cf6b54ce90f59e4cab8a",
-                "reference": "9d3d06a28402a66b9b74cf6b54ce90f59e4cab8a",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/ed6ffa82eb374dd431a54291eba6138b870d4cef",
+                "reference": "ed6ffa82eb374dd431a54291eba6138b870d4cef",
                 "shasum": ""
             },
             "require": {
                 "php": ">=8.1"
+            },
+            "suggest": {
+                "woocommerce/action-scheduler": "Required to actually run cron-triggered workflows. The substrate detects Action Scheduler at runtime and no-ops cleanly when absent; install this package (or any plugin that ships it, like WooCommerce) to enable scheduled workflow runs."
             },
             "default-branch": true,
             "type": "wordpress-plugin",
@@ -854,6 +857,7 @@
                     "php tests/approval-action-value-shape-smoke.php",
                     "php tests/workspace-scope-smoke.php",
                     "php tests/compaction-item-smoke.php",
+                    "php tests/compaction-conservation-smoke.php",
                     "php tests/conversation-runner-contracts-smoke.php",
                     "php tests/conversation-transcript-lock-smoke.php",
                     "php tests/conversation-compaction-smoke.php",
@@ -866,8 +870,15 @@
                     "php tests/conversation-loop-events-smoke.php",
                     "php tests/iteration-budget-smoke.php",
                     "php tests/conversation-loop-budgets-smoke.php",
+                    "php tests/channels-smoke.php",
+                    "php tests/webhook-safety-smoke.php",
+                    "php tests/remote-bridge-smoke.php",
                     "php tests/context-authority-smoke.php",
                     "php tests/guidelines-substrate-smoke.php",
+                    "php tests/workflow-bindings-smoke.php",
+                    "php tests/workflow-spec-validator-smoke.php",
+                    "php tests/workflow-runner-smoke.php",
+                    "php tests/agents-workflow-ability-smoke.php",
                     "php tests/no-product-imports-smoke.php"
                 ]
             },
@@ -880,7 +891,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-05-08T14:27:01+00:00"
+            "time": "2026-05-09T17:26:05+00:00"
         },
         {
             "name": "dealerdirect/phpcodesniffer-composer-installer",
