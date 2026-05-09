@@ -129,20 +129,20 @@ function datamachine_run_conversation(
 		);
 
 		return array(
-			'messages'                         => $messages,
-			'final_content'                    => '',
-			'turn_count'                       => 0,
-			'completed'                        => false,
-			'last_tool_calls'                  => array(),
-			'tool_execution_results'           => array(),
-			'error'                            => $error_message,
-			'error_code'                       => 'completion_required_tool_unavailable',
-			'completion_assertions_required'    => $assertions->required(),
-			'unavailable_required_tool_names'   => $unavailable_required_tools,
-			'available_tool_names'              => array_keys( $tools ),
-			'usage'                            => array(),
-			'request_metadata'                 => array(),
-			'status'                           => 'error',
+			'messages'                        => $messages,
+			'final_content'                   => '',
+			'turn_count'                      => 0,
+			'completed'                       => false,
+			'last_tool_calls'                 => array(),
+			'tool_execution_results'          => array(),
+			'error'                           => $error_message,
+			'error_code'                      => 'completion_required_tool_unavailable',
+			'completion_assertions_required'  => $assertions->required(),
+			'unavailable_required_tool_names' => $unavailable_required_tools,
+			'available_tool_names'            => array_keys( $tools ),
+			'usage'                           => array(),
+			'request_metadata'                => array(),
+			'status'                          => 'error',
 		);
 	}
 

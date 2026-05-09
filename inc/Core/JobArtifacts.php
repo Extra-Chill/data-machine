@@ -42,15 +42,15 @@ class JobArtifacts {
 		$agent       = $this->resolve_agent( $job, $engine_data );
 		$tool_calls  = $this->successful_tool_summaries( $engine_data );
 		$payload     = array(
-			'job_id'                  => $job_id,
-			'status'                  => (string) ( $job['status'] ?? '' ),
-			'agent_id'                => $agent['agent_id'],
-			'agent_slug'              => $agent['agent_slug'],
-			'required_tool_names'     => $this->tool_names_from_assertions( $engine_data['completion_assertions_required'] ?? array() ),
-			'satisfied_tool_names'    => $this->tool_names_from_assertions( $engine_data['completion_assertions_satisfied'] ?? array() ),
-			'successful_tool_calls'   => $tool_calls,
-			'transcript'              => $this->transcript_metadata( $job_id, $engine_data ),
-			'daily_memory_artifacts'  => $this->daily_memory_artifacts( $job, $agent, $tool_calls ),
+			'job_id'                 => $job_id,
+			'status'                 => (string) ( $job['status'] ?? '' ),
+			'agent_id'               => $agent['agent_id'],
+			'agent_slug'             => $agent['agent_slug'],
+			'required_tool_names'    => $this->tool_names_from_assertions( $engine_data['completion_assertions_required'] ?? array() ),
+			'satisfied_tool_names'   => $this->tool_names_from_assertions( $engine_data['completion_assertions_satisfied'] ?? array() ),
+			'successful_tool_calls'  => $tool_calls,
+			'transcript'             => $this->transcript_metadata( $job_id, $engine_data ),
+			'daily_memory_artifacts' => $this->daily_memory_artifacts( $job, $agent, $tool_calls ),
 		);
 
 		return array(

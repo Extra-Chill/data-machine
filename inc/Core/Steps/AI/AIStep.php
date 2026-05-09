@@ -451,16 +451,16 @@ class AIStep extends Step {
 					$this->job_id,
 					$failure_reason,
 					array(
-						'flow_step_id'                      => $this->flow_step_id,
-						'ai_error'                          => $loop_result['error'],
-						'error_code'                        => $loop_result['error_code'] ?? null,
-						'unavailable_required_tool_names'   => is_array( $loop_result['unavailable_required_tool_names'] ?? null ) ? $loop_result['unavailable_required_tool_names'] : array(),
-						'ai_provider'                       => $provider_name,
-						'request_metadata'                  => $request_metadata,
-						'transport_profile'                 => is_array( $request_metadata['transport'] ?? null ) ? $request_metadata['transport'] : array(),
-						'retry_after'                       => $loop_result['retry_after'] ?? null,
-						'retry_after_seconds'               => $loop_result['retry_after_seconds'] ?? null,
-						'headers'                           => is_array( $loop_result['headers'] ?? null ) ? $loop_result['headers'] : array(),
+						'flow_step_id'                    => $this->flow_step_id,
+						'ai_error'                        => $loop_result['error'],
+						'error_code'                      => $loop_result['error_code'] ?? null,
+						'unavailable_required_tool_names' => is_array( $loop_result['unavailable_required_tool_names'] ?? null ) ? $loop_result['unavailable_required_tool_names'] : array(),
+						'ai_provider'                     => $provider_name,
+						'request_metadata'                => $request_metadata,
+						'transport_profile'               => is_array( $request_metadata['transport'] ?? null ) ? $request_metadata['transport'] : array(),
+						'retry_after'                     => $loop_result['retry_after'] ?? null,
+						'retry_after_seconds'             => $loop_result['retry_after_seconds'] ?? null,
+						'headers'                         => is_array( $loop_result['headers'] ?? null ) ? $loop_result['headers'] : array(),
 					)
 				);
 				return array();
@@ -486,7 +486,7 @@ class AIStep extends Step {
 			}
 
 			if ( $this->job_id > 0 ) {
-				$artifact_engine_data = datamachine_get_engine_data( $this->job_id );
+				$artifact_engine_data                           = datamachine_get_engine_data( $this->job_id );
 				$artifact_engine_data['tool_execution_summary'] = self::summarizeToolExecutions( $loop_result );
 
 				foreach ( array( 'completion_assertions_required', 'completion_assertions_missing', 'completion_assertions_satisfied' ) as $assertion_key ) {
