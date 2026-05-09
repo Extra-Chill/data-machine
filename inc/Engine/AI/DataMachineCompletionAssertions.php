@@ -157,6 +157,29 @@ class DataMachineCompletionAssertions {
 	}
 
 	/**
+	 * Return required tool names.
+	 *
+	 * @return array<int, string>
+	 */
+	public function requiredToolNames(): array {
+		return $this->required_tool_names;
+	}
+
+	/**
+	 * Return required tools that are not available to the model.
+	 *
+	 * @param array $tools Available tools keyed by tool name.
+	 * @return array<int, string>
+	 */
+	public function unavailableRequiredToolNames( array $tools ): array {
+		if ( empty( $this->required_tool_names ) ) {
+			return array();
+		}
+
+		return array_values( array_diff( $this->required_tool_names, array_keys( $tools ) ) );
+	}
+
+	/**
 	 * @param mixed $value Raw list.
 	 * @return array<int, string>
 	 */
