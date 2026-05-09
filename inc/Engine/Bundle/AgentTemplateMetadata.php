@@ -55,12 +55,16 @@ final class AgentTemplateMetadata {
 	}
 
 	public static function from_manifest( AgentBundleManifest $manifest, string $template_slug = '', string $template_version = '', array $installed_hashes = array() ): self {
-		$manifest_data = $manifest->to_array();
-		$agent_slug    = (string) ( $manifest_data['agent']['slug'] ?? 'template' );
+		$manifest_data     = $manifest->to_array();
+		$agent_slug        = (string) ( $manifest_data['agent']['slug'] ?? 'template' );
+		$template_slug     = trim( $template_slug );
+		$template_version  = trim( $template_version );
+		$effective_slug    = '' !== $template_slug ? $template_slug : $agent_slug;
+		$effective_version = '' !== $template_version ? $template_version : $manifest->bundle_version();
 
 		return new self(
-			'' !== trim( $template_slug ) ? $template_slug : $agent_slug,
-			'' !== trim( $template_version ) ? $template_version : $manifest->bundle_version(),
+			$effective_slug,
+			$effective_version,
 			$manifest->bundle_slug(),
 			$manifest->bundle_version(),
 			$manifest->source_ref(),

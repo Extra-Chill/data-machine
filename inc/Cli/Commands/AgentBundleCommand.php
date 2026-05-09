@@ -18,6 +18,7 @@ use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
+use DataMachine\Engine\Bundle\BundleStepIdRemapper;
 use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Bundle\BundleSource;
 use DataMachine\Engine\Bundle\BundleSourceAuth;
@@ -578,7 +579,7 @@ class AgentBundleCommand extends BaseCommand {
 			$target_flow = array_merge(
 				$flow,
 				array(
-					'flow_config' => $this->remap_flow_step_ids(
+					'flow_config' => BundleStepIdRemapper::remap_flow_step_ids(
 						is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array(),
 						$old_pipeline_id,
 						$new_pipeline_id,
@@ -601,11 +602,12 @@ class AgentBundleCommand extends BaseCommand {
 			WP_CLI::error( 'Bundle source is required.' );
 		}
 
-		$context  = $this->build_resolve_context( $assoc_args );
+		$context  = $this->build_cli_resolve_context( $assoc_args );
 		$resolved = BundleSource::resolve( $source, $context );
 		if ( is_wp_error( $resolved ) ) {
 			WP_CLI::error( $resolved->get_error_message() );
 		}
+		/** @var string $resolved */
 
 		// Snapshot the revision before any downstream resolve() call
 		// resets it (e.g. via re-entry through abilities).
@@ -656,7 +658,7 @@ class AgentBundleCommand extends BaseCommand {
 	 * @param array $assoc_args WP_CLI assoc args.
 	 * @return array
 	 */
-	private function build_resolve_context( array $assoc_args ): array {
+	private function build_cli_resolve_context( array $assoc_args ): array {
 		$token     = isset( $assoc_args['token'] ) ? (string) $assoc_args['token'] : null;
 		$token_env = isset( $assoc_args['token-env'] ) ? (string) $assoc_args['token-env'] : null;
 
@@ -724,7 +726,7 @@ class AgentBundleCommand extends BaseCommand {
 				$new_id = (int) ( $existing_pipelines_by_slug[ $slug ]['pipeline_id'] ?? 0 );
 
 				$pipeline_id_map[ $old_id ]  = $new_id;
-				$pipeline['pipeline_config'] = $this->remap_pipeline_step_ids(
+				$pipeline['pipeline_config'] = BundleStepIdRemapper::remap_pipeline_step_ids(
 					is_array( $pipeline['pipeline_config'] ?? null ) ? $pipeline['pipeline_config'] : array(),
 					$old_id,
 					$new_id
@@ -749,7 +751,7 @@ class AgentBundleCommand extends BaseCommand {
 			$existing_flow   = $new_pipeline_id > 0 ? $this->flows()->get_by_portable_slug( $new_pipeline_id, $slug ) : null;
 
 			if ( $existing_flow ) {
-				$flow['flow_config'] = $this->remap_flow_step_ids(
+				$flow['flow_config'] = BundleStepIdRemapper::remap_flow_step_ids(
 					is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array(),
 					$old_pipeline_id,
 					$new_pipeline_id,
@@ -868,53 +870,6 @@ class AgentBundleCommand extends BaseCommand {
 		unset( $step );
 
 		return $flow_config;
-	}
-
-	private function remap_pipeline_step_ids( array $pipeline_config, int $old_pipeline_id, int $new_pipeline_id ): array {
-		$remapped = array();
-
-		foreach ( $pipeline_config as $pipeline_step_id => $step_config ) {
-			$new_pipeline_step_id = $this->remap_step_id_prefix( (string) $pipeline_step_id, $old_pipeline_id, $new_pipeline_id );
-			if ( is_array( $step_config ) ) {
-				$step_config['pipeline_step_id'] = $new_pipeline_step_id;
-			}
-
-			$remapped[ $new_pipeline_step_id ] = $step_config;
-		}
-
-		return $remapped;
-	}
-
-	private function remap_flow_step_ids( array $flow_config, int $old_pipeline_id, int $new_pipeline_id, int $new_flow_id ): array {
-		$remapped = array();
-
-		foreach ( $flow_config as $flow_step_id => $step_config ) {
-			$pipeline_step_id = is_array( $step_config ) && is_string( $step_config['pipeline_step_id'] ?? null )
-				? $step_config['pipeline_step_id']
-				: preg_replace( '/_\d+$/', '', (string) $flow_step_id );
-			$pipeline_step_id = $this->remap_step_id_prefix( (string) $pipeline_step_id, $old_pipeline_id, $new_pipeline_id );
-			$new_flow_step_id = $pipeline_step_id . '_' . $new_flow_id;
-
-			if ( is_array( $step_config ) ) {
-				$step_config['pipeline_step_id'] = $pipeline_step_id;
-				$step_config['pipeline_id']      = $new_pipeline_id;
-				$step_config['flow_id']          = $new_flow_id;
-				$step_config['flow_step_id']     = $new_flow_step_id;
-			}
-
-			$remapped[ $new_flow_step_id ] = $step_config;
-		}
-
-		return $remapped;
-	}
-
-	private function remap_step_id_prefix( string $step_id, int $old_pipeline_id, int $new_pipeline_id ): string {
-		$prefix = $old_pipeline_id . '_';
-		if ( $old_pipeline_id === $new_pipeline_id || ! str_starts_with( $step_id, $prefix ) ) {
-			return $step_id;
-		}
-
-		return $new_pipeline_id . '_' . substr( $step_id, strlen( $prefix ) );
 	}
 
 	private function resolve_bundle_agent( array $bundle, string $slug = '' ): ?array {

@@ -29,7 +29,7 @@ final class AgentBundlePipelineFile {
 		BundleSchema::assert_supported_version( $data, 'pipeline file' );
 		foreach ( array( 'slug', 'name', 'steps' ) as $field ) {
 			if ( ! array_key_exists( $field, $data ) ) {
-				throw new BundleValidationException( "pipeline file is missing required field {$field}." );
+				throw new BundleValidationException( sprintf( 'pipeline file is missing required field %s.', esc_html( $field ) ) );
 			}
 		}
 
@@ -57,7 +57,7 @@ final class AgentBundlePipelineFile {
 			}
 			foreach ( array( 'step_position', 'step_type', 'step_config' ) as $field ) {
 				if ( ! array_key_exists( $field, $step ) ) {
-					throw new BundleValidationException( "pipeline file step is missing required field {$field}." );
+					throw new BundleValidationException( sprintf( 'pipeline file step is missing required field %s.', esc_html( $field ) ) );
 				}
 			}
 			if ( ! is_array( $step['step_config'] ) ) {
