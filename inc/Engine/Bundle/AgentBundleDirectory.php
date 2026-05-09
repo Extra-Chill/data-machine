@@ -295,8 +295,8 @@ final class AgentBundleDirectory {
 		$paths     = is_array( $paths ) ? $paths : array();
 		sort( $paths, SORT_STRING );
 		foreach ( $paths as $path ) {
-			$document = BundleSchema::decode_json( self::read_file( $path ), basename( $path ) );
-			$document = self::resolve_prompt_file_fields( $document, $document_class, $bundle_root, basename( $path ) );
+			$document    = BundleSchema::decode_json( self::read_file( $path ), basename( $path ) );
+			$document    = self::resolve_prompt_file_fields( $document, $document_class, $bundle_root, basename( $path ) );
 			$documents[] = $document_class::from_array( $document );
 		}
 
