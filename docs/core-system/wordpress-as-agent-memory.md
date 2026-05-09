@@ -86,7 +86,7 @@ Total injection capped at 100KB. Files sorted newest-first.
 
 **Storage:** Custom MySQL table `{prefix}_datamachine_chat_sessions`
 
-Full conversation history persisted in the database. Sessions survive page reloads and browser restarts. Agent-scoped via `agent_id` column. Configurable retention with automatic cleanup via Action Scheduler.
+Full conversation history persisted in the database. Sessions survive page reloads and browser restarts. Public/runtime context uses the agent slug; storage remains scoped by the internal `agent_id` column. Configurable retention with automatic cleanup via Action Scheduler.
 
 ### 4. Pipeline and Flow Memory — Workflow Context
 
@@ -116,7 +116,7 @@ The `datamachine_agent_access` table implements role-based access:
 
 ### Resource Scoping
 
-All major resources carry an `agent_id` column:
+All major resources are scoped to an agent. Public/runtime contexts use the agent slug, while database tables retain an internal `agent_id` column:
 - **Pipelines** — each pipeline belongs to an agent-scoped owner
 - **Flows** — each flow belongs to an agent-scoped owner
 - **Jobs** — each job runs under an agent-scoped owner
@@ -287,7 +287,7 @@ wp_execute_ability('datamachine/update-agent-memory', [
 wp_execute_ability('datamachine/search-agent-memory', [
     'query' => 'theme',
     'user_id' => 1,
-    'agent_id' => 1,
+    'agent' => 'chubes-bot',
 ])
 
 # List all sections
@@ -627,7 +627,7 @@ All agent file endpoints support a `user_id` parameter for multi-agent scoping. 
 |---------|-------------|
 | `datamachine/get-agent-memory` | Read full file or a specific section |
 | `datamachine/update-agent-memory` | Set or append to a section |
-| `datamachine/search-agent-memory` | Search across memory files (supports `user_id`, `agent_id`) |
+| `datamachine/search-agent-memory` | Search across memory files (supports `user_id`, `agent`, `agent_slug`; `agent_id` remains compatible) |
 | `datamachine/list-agent-memory-sections` | List all `##` section headers |
 
 ### Daily Memory Abilities
@@ -640,7 +640,7 @@ All agent file endpoints support a `user_id` parameter for multi-agent scoping. 
 | `datamachine/search-daily-memory` | Search daily files with date range and context |
 | `datamachine/daily-memory-delete` | Delete daily file by date |
 
-All daily memory abilities accept `user_id` and `agent_id` for multi-agent scoping.
+All daily memory abilities accept `user_id` and the preferred public agent selectors `agent` or `agent_slug` for multi-agent scoping. Numeric `agent_id` remains compatible for callers that already hold the internal row ID.
 
 ## WP-CLI Reference
 
