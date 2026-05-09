@@ -206,15 +206,19 @@ class AgentDailyMemory extends BaseTool {
 			);
 		}
 
-		$result = $ability->execute(
-			array(
-				'user_id'  => $scope['user_id'],
-				'agent_id' => $scope['agent_id'],
-				'query'    => $query,
-				'from'     => $parameters['from'] ?? null,
-				'to'       => $parameters['to'] ?? null,
-			)
+		$input = array(
+			'user_id'  => $scope['user_id'],
+			'agent_id' => $scope['agent_id'],
+			'query'    => $query,
 		);
+		if ( isset( $parameters['from'] ) ) {
+			$input['from'] = $parameters['from'];
+		}
+		if ( isset( $parameters['to'] ) ) {
+			$input['to'] = $parameters['to'];
+		}
+
+		$result = $ability->execute( $input );
 
 		if ( is_wp_error( $result ) ) {
 			return $this->buildErrorResponse( $result->get_error_message(), 'agent_daily_memory' );

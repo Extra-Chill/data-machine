@@ -88,12 +88,16 @@ class CallerContextTest extends WP_UnitTestCase {
 		$this->assertSame( 3, $ctx->chain_depth );
 	}
 
-	public function test_chained_context_requires_remote_host(): void {
+	public function test_is_cross_site_requires_remote_host(): void {
+		$local = \WP_Agent_Caller_Context::top_of_chain( 'cid' );
+		$this->assertFalse( $local->is_cross_site() );
+
 		$this->expectException( \InvalidArgumentException::class );
+		$this->expectExceptionMessage( 'caller_host chained context (chain_depth > 0) must specify a remote caller host' );
 		new \WP_Agent_Caller_Context( 'some-agent', 0, \WP_Agent_Caller_Context::SELF_HOST, 2, 'cid' );
 	}
 
-	public function test_is_cross_site_requires_remote_host(): void {
+	public function test_is_cross_site_accepts_remote_host(): void {
 		$remote = new \WP_Agent_Caller_Context( 'some-agent', 0, 'https://chubes.net', 1, 'cid' );
 		$this->assertTrue( $remote->is_cross_site() );
 	}
