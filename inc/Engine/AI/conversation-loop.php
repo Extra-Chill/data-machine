@@ -56,7 +56,8 @@ function datamachine_run_conversation(
 
 	// Resolve DM runtime collaborators from the payload.
 	$event_sink           = datamachine_resolve_event_sink( $payload );
-	$completion_policy    = datamachine_resolve_completion_policy( $mode, $payload );
+	$assertions           = datamachine_resolve_completion_assertions( $payload );
+	$completion_policy    = datamachine_resolve_completion_policy( $mode, $payload, $assertions );
 	$tool_runtime_rules   = datamachine_resolve_tool_runtime_rules( $payload );
 	$transcript_persister = datamachine_resolve_transcript_persister( $payload );
 	$transcript_lock      = $payload['transcript_lock'] ?? $payload['transcript_lock_store'] ?? null;
@@ -91,6 +92,59 @@ function datamachine_run_conversation(
 		),
 		fn( $v ) => null !== $v
 	);
+
+	$unavailable_required_tools = $assertions->unavailableRequiredToolNames( $tools );
+	if ( ! empty( $unavailable_required_tools ) ) {
+		$error_message = sprintf(
+			'Completion assertions require unavailable tool(s): %s. Update the AI step tool policy so every completion_assertions.required_tool_names entry is available to the model.',
+			implode( ', ', $unavailable_required_tools )
+		);
+
+		datamachine_emit_loop_event(
+			$event_sink,
+			'completion_assertions_unavailable',
+			array_merge(
+				$base_log_context,
+				array(
+					'required_tool_names'             => $assertions->requiredToolNames(),
+					'unavailable_required_tool_names' => $unavailable_required_tools,
+					'available_tool_names'            => array_keys( $tools ),
+					'error_message'                   => $error_message,
+				)
+			)
+		);
+
+		do_action(
+			'datamachine_log',
+			'error',
+			'datamachine_run_conversation: Required completion assertion tool unavailable',
+			array_merge(
+				$base_log_context,
+				array(
+					'required_tool_names'             => $assertions->requiredToolNames(),
+					'unavailable_required_tool_names' => $unavailable_required_tools,
+					'available_tool_names'            => array_keys( $tools ),
+				)
+			)
+		);
+
+		return array(
+			'messages'                         => $messages,
+			'final_content'                    => '',
+			'turn_count'                       => 0,
+			'completed'                        => false,
+			'last_tool_calls'                  => array(),
+			'tool_execution_results'           => array(),
+			'error'                            => $error_message,
+			'error_code'                       => 'completion_required_tool_unavailable',
+			'completion_assertions_required'    => $assertions->required(),
+			'unavailable_required_tool_names'   => $unavailable_required_tools,
+			'available_tool_names'              => array_keys( $tools ),
+			'usage'                            => array(),
+			'request_metadata'                 => array(),
+			'status'                           => 'error',
+		);
+	}
 
 	// Bridge DM's LoopEventSinkInterface to upstream's on_event callable.
 	$on_event = static function ( string $event, array $event_payload ) use ( $event_sink, $base_log_context ): void {
@@ -730,13 +784,13 @@ function datamachine_resolve_event_sink( array $payload ): LoopEventSinkInterfac
  * @param array  $payload Loop payload.
  * @return WP_Agent_Conversation_Completion_Policy
  */
-function datamachine_resolve_completion_policy( string $mode, array $payload ): WP_Agent_Conversation_Completion_Policy {
+function datamachine_resolve_completion_policy( string $mode, array $payload, ?DataMachineCompletionAssertions $assertions = null ): WP_Agent_Conversation_Completion_Policy {
 	$policy = $payload['completion_policy'] ?? null;
 	if ( $policy instanceof WP_Agent_Conversation_Completion_Policy ) {
 		return $policy;
 	}
 
-	$assertions = datamachine_resolve_completion_assertions( $payload );
+	$assertions = $assertions ?? datamachine_resolve_completion_assertions( $payload );
 
 	$configured_handlers = $payload['configured_handler_slugs'] ?? array();
 	$configured_handlers = is_array( $configured_handlers ) ? array_values( $configured_handlers ) : array();

@@ -129,6 +129,26 @@ class RuntimePolicySmokeTool {
 	}
 }
 
+class RuntimePolicySmokeMaybeFailTool {
+	public function execute( array $parameters, array $tool_def ): array {
+		unset( $tool_def );
+
+		if ( ! empty( $parameters['fail'] ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'requested failure',
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'message' => 'required tool succeeded',
+			),
+		);
+	}
+}
+
 $failures   = array();
 $assertions = 0;
 
@@ -668,6 +688,136 @@ $failed_required_tool_decision = $failed_required_tool_policy->recordNaturalComp
 
 assert_runtime_policy( ! $failed_required_tool_decision->isComplete(), 'failed required tool does not satisfy completion assertion' );
 assert_runtime_policy( array( 'workspace_edit', 'workspace_git_commit' ) === ( $failed_required_tool_decision->context()['missing']['tool_names'] ?? null ), 'failed required tool remains in missing assertion list' );
+
+$daily_memory_unavailable_dispatch_count = 0;
+$daily_memory_unavailable_sink           = new RuntimePolicySmokeEventSink();
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$daily_memory_unavailable_dispatch_count ) {
+		++$daily_memory_unavailable_dispatch_count;
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => 'This provider call should not happen.',
+				'tool_calls' => array(),
+			),
+		);
+	}
+);
+
+$daily_memory_unavailable_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'write daily memory before finishing' ) ),
+	array(
+		'create_github_pull_request' => array(
+			'name'        => 'create_github_pull_request',
+			'description' => 'Open a pull request',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	'pipeline',
+	array(
+		'event_sink'            => $daily_memory_unavailable_sink,
+		'completion_assertions' => array(
+			'required_tool_names' => array( 'create_github_pull_request', 'agent_daily_memory' ),
+		),
+	),
+	5
+);
+
+assert_runtime_policy( 0 === $daily_memory_unavailable_dispatch_count, 'unavailable required tool fails before provider dispatch' );
+assert_runtime_policy( 'completion_required_tool_unavailable' === ( $daily_memory_unavailable_result['error_code'] ?? '' ), 'unavailable required tool returns clear error code' );
+assert_runtime_policy( array( 'agent_daily_memory' ) === ( $daily_memory_unavailable_result['unavailable_required_tool_names'] ?? null ), 'unavailable required tool diagnostic names missing tool' );
+assert_runtime_policy( str_contains( $daily_memory_unavailable_result['error'] ?? '', 'agent_daily_memory' ), 'unavailable required tool error message names daily memory' );
+assert_runtime_policy( array( 'agent_daily_memory' ) === ( runtime_policy_first_event_payload( $daily_memory_unavailable_sink, 'completion_assertions_unavailable' )['unavailable_required_tool_names'] ?? null ), 'unavailable required tool emits preflight event' );
+
+$daily_memory_success_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$daily_memory_success_dispatch_count ) {
+		++$daily_memory_success_dispatch_count;
+
+		if ( 1 === $daily_memory_success_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => 'Done without memory.',
+					'tool_calls' => array(),
+				),
+			);
+		}
+
+		if ( 2 === $daily_memory_success_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => '',
+					'tool_calls' => array(
+						array(
+							'name'       => 'agent_daily_memory',
+							'parameters' => array( 'fail' => true ),
+						),
+					),
+				),
+			);
+		}
+
+		if ( 3 === $daily_memory_success_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => '',
+					'tool_calls' => array(
+						array(
+							'name'       => 'agent_daily_memory',
+							'parameters' => array(),
+						),
+					),
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => 'Complete after successful memory write.',
+				'tool_calls' => array(),
+			),
+		);
+	}
+);
+
+$daily_memory_success_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'finish only after daily memory succeeds' ) ),
+	array(
+		'agent_daily_memory' => array(
+			'name'        => 'agent_daily_memory',
+			'description' => 'Write daily memory',
+			'parameters'  => array( 'fail' => array( 'type' => 'boolean' ) ),
+			'class'       => RuntimePolicySmokeMaybeFailTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	'pipeline',
+	array(
+		'completion_assertions' => array(
+			'required_tool_names' => array( 'agent_daily_memory' ),
+		),
+	),
+	6
+);
+
+$daily_memory_tool_results = $daily_memory_success_result['tool_execution_results'] ?? array();
+assert_runtime_policy( 4 === $daily_memory_success_dispatch_count, 'required daily memory nudges until successful tool result and then natural completion' );
+assert_runtime_policy( false === ( $daily_memory_tool_results[0]['result']['success'] ?? null ), 'failed daily memory call is captured but not sufficient' );
+assert_runtime_policy( true === ( $daily_memory_tool_results[1]['result']['success'] ?? null ), 'successful daily memory call satisfies required tool assertion' );
+assert_runtime_policy( ! empty( $daily_memory_success_result['completed'] ), 'daily memory assertion result completes after successful tool call' );
 
 $dispatch_count     = 0;
 $provider_context   = null;
