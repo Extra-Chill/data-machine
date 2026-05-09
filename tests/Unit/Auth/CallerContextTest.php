@@ -89,11 +89,16 @@ class CallerContextTest extends WP_UnitTestCase {
 	}
 
 	public function test_is_cross_site_requires_remote_host(): void {
-		$local = new \WP_Agent_Caller_Context( 'some-agent', 0, \WP_Agent_Caller_Context::SELF_HOST, 2, 'cid' );
+		$local = \WP_Agent_Caller_Context::top_of_chain( 'cid' );
 		$this->assertFalse( $local->is_cross_site() );
 
 		$remote = new \WP_Agent_Caller_Context( 'some-agent', 0, 'https://chubes.net', 1, 'cid' );
 		$this->assertTrue( $remote->is_cross_site() );
+	}
+
+	public function test_chained_context_rejects_self_host(): void {
+		$this->expectException( \InvalidArgumentException::class );
+		new \WP_Agent_Caller_Context( 'some-agent', 0, \WP_Agent_Caller_Context::SELF_HOST, 2, 'cid' );
 	}
 
 	public function test_outbound_fresh_chain_shape(): void {
