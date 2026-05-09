@@ -475,11 +475,14 @@ abstract class FetchHandler {
 			'disposition'    => 'reject_source',
 			'description'    => 'Reject this fetched source item after reasoned content/source evaluation. Use when the source itself is irrelevant, too thin, duplicate, noisy, spammy, or otherwise fails the pipeline quality or relevance criteria. The source item will be marked as processed and will not normally be refetched.',
 			'parameters'     => array(
-				'reason' => array(
-					'type'        => 'string',
-					'description' => 'Concise categorical rejection reason, following the vocabulary defined in the pipeline system prompt or RULES.md.',
-					'required'    => true,
+				'type'       => 'object',
+				'properties' => array(
+					'reason' => array(
+						'type'        => 'string',
+						'description' => 'Concise categorical rejection reason, following the vocabulary defined in the pipeline system prompt or RULES.md.',
+					),
 				),
+				'required'   => array( 'reason' ),
 			),
 			'handler_config' => $handler_config,
 		);
@@ -501,11 +504,14 @@ abstract class FetchHandler {
 			'disposition'    => 'defer_item',
 			'description'    => 'Defer this fetched source item when the agent cannot safely complete processing now because of runtime failures, tool errors, missing context, uncertainty, or temporary limitations. The source claim will be released and the item will remain eligible to be fetched and retried later; it will not be marked processed.',
 			'parameters'     => array(
-				'reason' => array(
-					'type'        => 'string',
-					'description' => 'Concise reason explaining why processing cannot safely complete now and should be retried later.',
-					'required'    => true,
+				'type'       => 'object',
+				'properties' => array(
+					'reason' => array(
+						'type'        => 'string',
+						'description' => 'Concise reason explaining why processing cannot safely complete now and should be retried later.',
+					),
 				),
+				'required'   => array( 'reason' ),
 			),
 			'handler_config' => $handler_config,
 		);

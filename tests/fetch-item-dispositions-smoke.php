@@ -123,6 +123,9 @@ namespace {
 	assert_fetch_disposition_smoke( 'fetch surface exposes reject_source', str_contains( $fetch_handler, "'reject_source'" ) );
 	assert_fetch_disposition_smoke( 'fetch surface exposes defer_item', str_contains( $fetch_handler, "'defer_item'" ) );
 	assert_fetch_disposition_smoke( 'fetch surface avoids legacy skip tool registration', ! str_contains( $fetch_handler, "'skip_item'" ) );
+	assert_fetch_disposition_smoke( 'fetch disposition schemas use canonical root object schemas', 2 === substr_count( $fetch_handler, "'type'       => 'object'" ) );
+	assert_fetch_disposition_smoke( 'fetch disposition schemas use object-level required arrays', 2 === substr_count( $fetch_handler, "'required'   => array( 'reason' )" ) );
+	assert_fetch_disposition_smoke( 'fetch disposition schemas avoid property-level required flags', ! str_contains( $fetch_handler, "'required'    => true" ) );
 	assert_fetch_disposition_smoke( 'reject_source describes reasoned content/source rejection', str_contains( $fetch_handler, 'reasoned content/source evaluation' ) );
 	assert_fetch_disposition_smoke( 'defer_item describes safe completion and retry eligibility', str_contains( $fetch_handler, 'cannot safely complete processing now' ) && str_contains( $fetch_handler, 'remain eligible' ) );
 	assert_fetch_disposition_smoke( 'normal completion still marks processed', str_contains( $execute_step, '$this->markCompletedItemProcessed( $job_id );' ) && str_contains( $execute_step, 'JobStatus::COMPLETED' ) );
