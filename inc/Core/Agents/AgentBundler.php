@@ -205,7 +205,8 @@ class AgentBundler {
 								'flow_id'  => $flow_id,
 							)
 						)
-					)
+					),
+					\DataMachine\Engine\Bundle\BundleSchema::normalize_run_artifact_egress_policy( $scheduling['run_artifacts'] ?? array() )
 				);
 
 				if ( ! empty( $export_manifest['memory'] ) ) {
@@ -525,6 +526,7 @@ class AgentBundler {
 		$bundle_version         = trim( (string) $bundle['bundle_version'] );
 		$bundle_source_ref      = trim( (string) ( $bundle['source_ref'] ?? '' ) );
 		$bundle_source_revision = trim( (string) ( $bundle['source_revision'] ?? '' ) );
+		$bundle_run_artifacts   = \DataMachine\Engine\Bundle\BundleSchema::normalize_run_artifact_egress_policy( $bundle['run_artifacts'] ?? array() );
 		$bundle_metadata        = array(
 			'bundle_slug'     => $bundle_slug,
 			'bundle_version'  => $bundle_version,
@@ -587,6 +589,9 @@ class AgentBundler {
 			'upgrade'             => (bool) $existing,
 			'runtime_policy'      => $reconcile_runtime ? 'replace_bundle_seed' : 'preserve_existing',
 		);
+		if ( ! empty( $bundle_run_artifacts ) ) {
+			$summary['run_artifacts'] = $bundle_run_artifacts;
+		}
 
 		if ( $dry_run ) {
 			// Check ability mismatches.
@@ -635,6 +640,9 @@ class AgentBundler {
 			$bundle_metadata,
 			array( 'artifacts' => $existing_bundle_state['artifacts'] ?? array() )
 			);
+			if ( ! empty( $bundle_run_artifacts ) ) {
+				$config['datamachine_bundle']['run_artifacts'] = $bundle_run_artifacts;
+			}
 
 			if ( $existing ) {
 				$agent_id = (int) $existing['agent_id'];
@@ -769,7 +777,11 @@ class AgentBundler {
 				);
 				$artifact_key  = 'flow:' . $portable_slug;
 
-				$scheduling = $this->bundle_create_scheduling_config( is_array( $flow_data['scheduling_config'] ?? null ) ? $flow_data['scheduling_config'] : array() );
+				$flow_run_artifacts = \DataMachine\Engine\Bundle\BundleSchema::normalize_run_artifact_egress_policy( $flow_data['run_artifacts'] ?? $bundle_run_artifacts );
+				$scheduling         = $this->bundle_create_scheduling_config( is_array( $flow_data['scheduling_config'] ?? null ) ? $flow_data['scheduling_config'] : array() );
+				if ( ! empty( $flow_run_artifacts ) ) {
+					$scheduling['run_artifacts'] = $flow_run_artifacts;
+				}
 
 				$flow_config         = is_array( $flow_data['flow_config'] ?? null ) ? $flow_data['flow_config'] : array();
 				$existing_flow       = $this->flows_repo->get_by_portable_slug( (int) $new_pipeline_id, $portable_slug );
@@ -828,9 +840,15 @@ class AgentBundler {
 						'flow_config'   => $flow_config,
 						'portable_slug' => $portable_slug,
 					);
+					if ( ! empty( $flow_run_artifacts ) ) {
+						$update_scheduling                  = is_array( $existing_flow['scheduling_config'] ?? null ) ? $existing_flow['scheduling_config'] : array();
+						$update_scheduling['run_artifacts'] = $flow_run_artifacts;
+						$update_data['scheduling_config']   = $update_scheduling;
+						$scheduling_to_ensure               = $update_scheduling;
+					}
 					if ( $reconcile_runtime ) {
-						$update_data['scheduling_config'] = $flow_data['scheduling_config'] ?? array();
-						$scheduling_to_ensure             = is_array( $flow_data['scheduling_config'] ?? null ) ? $flow_data['scheduling_config'] : array();
+						$update_data['scheduling_config'] = $scheduling;
+						$scheduling_to_ensure             = $scheduling;
 					}
 					if ( ! $this->flows_repo->update_flow( $new_flow_id, $update_data ) ) {
 						throw new \RuntimeException( sprintf( 'Failed to update flow "%s".', $portable_slug ) );
@@ -1166,14 +1184,20 @@ class AgentBundler {
 
 	private function flow_artifact_payload( array $flow, string $portable_slug ): array {
 		$scheduling_policy = $this->bundle_scheduling_policy( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() );
+		$run_artifacts     = \DataMachine\Engine\Bundle\BundleSchema::normalize_run_artifact_egress_policy( $flow['run_artifacts'] ?? $flow['scheduling_config']['run_artifacts'] ?? array() );
 
-		return array(
+		$payload = array(
 			'portable_slug'     => $portable_slug,
 			'flow_name'         => (string) ( $flow['flow_name'] ?? '' ),
 			'flow_config'       => $this->flow_config_without_runtime_queues( is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array() ),
 			'scheduling_policy' => $scheduling_policy,
 			'queue_policy'      => 'create_seed_upgrade_preserve_existing',
 		);
+		if ( ! empty( $run_artifacts ) ) {
+			$payload['run_artifacts'] = $run_artifacts;
+		}
+
+		return $payload;
 	}
 
 	private function bundle_create_scheduling_config( array $config ): array {

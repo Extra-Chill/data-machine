@@ -22,8 +22,9 @@ final class AgentBundleManifest {
 	private string $source_revision;
 	private array $agent;
 	private array $included;
+	private array $run_artifacts;
 
-	public function __construct( string $exported_at, string $exported_by, string $bundle_slug, string $bundle_version, string $source_ref, string $source_revision, array $agent, array $included ) {
+	public function __construct( string $exported_at, string $exported_by, string $bundle_slug, string $bundle_version, string $source_ref, string $source_revision, array $agent, array $included, array $run_artifacts = array() ) {
 		$this->exported_at     = $exported_at;
 		$this->exported_by     = $exported_by;
 		$this->bundle_slug     = PortableSlug::normalize( $bundle_slug, 'bundle' );
@@ -32,6 +33,7 @@ final class AgentBundleManifest {
 		$this->source_revision = self::validate_optional_string( $source_revision, 'source_revision' );
 		$this->agent           = self::validate_agent( $agent );
 		$this->included        = self::validate_included( $included );
+		$this->run_artifacts   = BundleSchema::normalize_run_artifact_egress_policy( $run_artifacts );
 	}
 
 	/**
@@ -61,7 +63,8 @@ final class AgentBundleManifest {
 			(string) ( $data['source_ref'] ?? '' ),
 			(string) ( $data['source_revision'] ?? '' ),
 			$data['agent'],
-			$data['included']
+			$data['included'],
+			is_array( $data['run_artifacts'] ?? null ) ? $data['run_artifacts'] : array()
 		);
 	}
 
@@ -71,7 +74,7 @@ final class AgentBundleManifest {
 	 * @return array
 	 */
 	public function to_array(): array {
-		return array(
+		$data = array(
 			'schema_version'  => BundleSchema::VERSION,
 			'bundle_slug'     => $this->bundle_slug,
 			'bundle_version'  => $this->bundle_version,
@@ -82,6 +85,12 @@ final class AgentBundleManifest {
 			'agent'           => $this->agent,
 			'included'        => $this->included,
 		);
+
+		if ( ! empty( $this->run_artifacts ) ) {
+			$data['run_artifacts'] = $this->run_artifacts;
+		}
+
+		return $data;
 	}
 
 	public function agent_slug(): string {
@@ -111,6 +120,10 @@ final class AgentBundleManifest {
 			'source_ref'      => $this->source_ref,
 			'source_revision' => $this->source_revision,
 		);
+	}
+
+	public function run_artifacts(): array {
+		return $this->run_artifacts;
 	}
 
 	private static function validate_agent( array $agent ): array {

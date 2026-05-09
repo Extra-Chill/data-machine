@@ -21,6 +21,7 @@ final class AgentBundleFlowFile {
 	private string $schedule;
 	private array $max_items;
 	private array $steps;
+	private array $run_artifacts;
 
 	private const OPTIONAL_STEP_FIELDS = array(
 		'step_type',
@@ -37,13 +38,14 @@ final class AgentBundleFlowFile {
 		'enabled',
 	);
 
-	public function __construct( string $slug, string $name, string $pipeline_slug, string $schedule, array $max_items, array $steps ) {
+	public function __construct( string $slug, string $name, string $pipeline_slug, string $schedule, array $max_items, array $steps, array $run_artifacts = array() ) {
 		$this->slug          = PortableSlug::normalize( $slug, 'flow' );
 		$this->name          = $name;
 		$this->pipeline_slug = PortableSlug::normalize( $pipeline_slug, 'pipeline' );
 		$this->schedule      = $schedule;
 		$this->max_items     = $max_items;
 		$this->steps         = self::validate_steps( $steps );
+		$this->run_artifacts = BundleSchema::normalize_run_artifact_egress_policy( $run_artifacts );
 	}
 
 	public static function from_array( array $data ): self {
@@ -58,11 +60,19 @@ final class AgentBundleFlowFile {
 			throw new BundleValidationException( 'flow file max_items must be an object and steps must be a list.' );
 		}
 
-		return new self( (string) $data['slug'], (string) $data['name'], (string) $data['pipeline_slug'], (string) $data['schedule'], $data['max_items'], $data['steps'] );
+		return new self(
+			(string) $data['slug'],
+			(string) $data['name'],
+			(string) $data['pipeline_slug'],
+			(string) $data['schedule'],
+			$data['max_items'],
+			$data['steps'],
+			is_array( $data['run_artifacts'] ?? null ) ? $data['run_artifacts'] : array()
+		);
 	}
 
 	public function to_array(): array {
-		return array(
+		$data = array(
 			'schema_version' => BundleSchema::VERSION,
 			'slug'           => $this->slug,
 			'name'           => $this->name,
@@ -71,6 +81,16 @@ final class AgentBundleFlowFile {
 			'max_items'      => $this->max_items,
 			'steps'          => $this->steps,
 		);
+
+		if ( ! empty( $this->run_artifacts ) ) {
+			$data['run_artifacts'] = $this->run_artifacts;
+		}
+
+		return $data;
+	}
+
+	public function run_artifacts(): array {
+		return $this->run_artifacts;
 	}
 
 	private static function validate_steps( array $steps ): array {

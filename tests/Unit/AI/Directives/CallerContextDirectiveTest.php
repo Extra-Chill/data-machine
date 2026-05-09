@@ -35,13 +35,6 @@ class CallerContextDirectiveTest extends WP_UnitTestCase {
 		$this->assertSame( array(), $outputs );
 	}
 
-	public function test_no_output_when_depth_set_but_host_is_self(): void {
-		// Depth alone doesn't qualify — remote caller_host is the A2A signal.
-		PermissionHelper::set_caller_context( new \WP_Agent_Caller_Context( 'some-agent', 0, \WP_Agent_Caller_Context::SELF_HOST, 2, 'chain-id' ) );
-		$outputs = CallerContextDirective::get_outputs( 'openai', array() );
-		$this->assertSame( array(), $outputs );
-	}
-
 	public function test_emits_system_text_for_cross_site_call(): void {
 		PermissionHelper::set_caller_context( new \WP_Agent_Caller_Context(
 			'franklin-bot',

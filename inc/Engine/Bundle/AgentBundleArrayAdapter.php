@@ -45,7 +45,8 @@ final class AgentBundleArrayAdapter {
 				'pipelines'    => array_values( $pipeline_slugs ),
 				'flows'        => array_values( $flow_slugs ),
 				'handler_auth' => 'refs',
-			)
+			),
+			BundleSchema::normalize_run_artifact_egress_policy( $bundle['run_artifacts'] ?? array() )
 		);
 
 		return new AgentBundleDirectory(
@@ -116,7 +117,7 @@ final class AgentBundleArrayAdapter {
 				$flow_config[ $flow_step_id ] = self::flow_step_config_from_document_step( $step, $pipeline_id, $flow_id, $pipeline_step_id, $flow_step_id );
 			}
 
-			$flows[] = array(
+			$flow_entry         = array(
 				'original_id'          => $flow_id,
 				'original_pipeline_id' => $pipeline_id,
 				'portable_slug'        => $slug,
@@ -129,9 +130,14 @@ final class AgentBundleArrayAdapter {
 				),
 				'memory_file_contents' => self::strip_memory_prefix( $memory_files, 'flows/' . $slug . '/' ),
 			);
+			$flow_run_artifacts = BundleSchema::normalize_run_artifact_egress_policy( $flow['run_artifacts'] ?? array() );
+			if ( ! empty( $flow_run_artifacts ) ) {
+				$flow_entry['run_artifacts'] = $flow_run_artifacts;
+			}
+			$flows[] = $flow_entry;
 		}
 
-		return array(
+		$bundle        = array(
 			'bundle_version'        => $manifest['bundle_version'],
 			'bundle_slug'           => $manifest['bundle_slug'],
 			'source_ref'            => $manifest['source_ref'] ?? '',
@@ -152,6 +158,12 @@ final class AgentBundleArrayAdapter {
 			'extras'                => $directory->extras(),
 			'abilities_manifest'    => array(),
 		);
+		$run_artifacts = BundleSchema::normalize_run_artifact_egress_policy( $manifest['run_artifacts'] ?? array() );
+		if ( ! empty( $run_artifacts ) ) {
+			$bundle['run_artifacts'] = $run_artifacts;
+		}
+
+		return $bundle;
 	}
 
 	/** @param array<int,array<string,mixed>> $pipelines */
@@ -264,7 +276,8 @@ final class AgentBundleArrayAdapter {
 				$pipeline_slug,
 				(string) ( $scheduling['interval'] ?? 'manual' ),
 				is_array( $scheduling['max_items'] ?? null ) ? $scheduling['max_items'] : array(),
-				self::flow_steps_from_config( $flow['flow_config'] ?? array(), $pipeline_step_types_by_id )
+				self::flow_steps_from_config( $flow['flow_config'] ?? array(), $pipeline_step_types_by_id ),
+				BundleSchema::normalize_run_artifact_egress_policy( $flow['run_artifacts'] ?? $scheduling['run_artifacts'] ?? array() )
 			);
 		}
 		return $files;
