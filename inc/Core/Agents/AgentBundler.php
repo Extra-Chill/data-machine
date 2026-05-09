@@ -1207,7 +1207,7 @@ class AgentBundler {
 
 		$config['interval'] = $interval;
 		if ( ! array_key_exists( 'enabled', $config ) ) {
-			$config['enabled'] = 'manual' !== $interval;
+			$config['enabled'] = 'manual' !== $interval || 'every_cycle' === (string) ( $config['cycle_policy'] ?? '' );
 		}
 
 		return $config;

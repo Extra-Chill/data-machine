@@ -21,6 +21,8 @@ WP_CLI::add_command( 'datamachine settings', Commands\SettingsCommand::class );
 WP_CLI::add_command( 'datamachine flows', Commands\Flows\FlowsCommand::class );
 WP_CLI::add_command( 'datamachine alt-text', Commands\AltTextCommand::class );
 WP_CLI::add_command( 'datamachine jobs', Commands\JobsCommand::class );
+WP_CLI::add_command( 'datamachine cycle', Commands\CycleCommand::class );
+WP_CLI::add_command( 'datamachine cycles', Commands\CycleCommand::class );
 WP_CLI::add_command( 'datamachine drain', Commands\DrainCommand::class );
 WP_CLI::add_command( 'datamachine ai', Commands\AICommand::class );
 WP_CLI::add_command( 'datamachine pipelines', Commands\PipelinesCommand::class );
