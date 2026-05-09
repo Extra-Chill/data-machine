@@ -38,7 +38,7 @@ use DataMachine\Core\FilesRepository\DailyMemory;
 
 defined( 'ABSPATH' ) || exit;
 
-class AgentDailyMemoryDirective {
+class AgentDailyMemoryDirective implements DirectiveInterface {
 
 	/**
 	 * Default days to inject when the agent opts in without specifying.
