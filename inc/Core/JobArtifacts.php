@@ -107,6 +107,8 @@ class JobArtifacts {
 					'tool_name'  => sanitize_key( (string) ( $summary['tool_name'] ?? '' ) ),
 					'success'    => true,
 					'turn_count' => isset( $summary['turn_count'] ) ? (int) $summary['turn_count'] : null,
+					'user_id'    => isset( $summary['user_id'] ) ? (int) $summary['user_id'] : null,
+					'agent_id'   => isset( $summary['agent_id'] ) ? (int) $summary['agent_id'] : null,
 					'action'     => isset( $summary['action'] ) ? sanitize_key( (string) $summary['action'] ) : null,
 					'date'       => isset( $summary['date'] ) ? sanitize_text_field( (string) $summary['date'] ) : null,
 					'mode'       => isset( $summary['mode'] ) ? sanitize_key( (string) $summary['mode'] ) : null,
@@ -204,8 +206,8 @@ class JobArtifacts {
 	 * @return array<int, array<string, mixed>>
 	 */
 	private function daily_memory_artifacts( array $job, array $agent, array $tool_calls ): array {
-		$agent_id = (int) ( $agent['agent_id'] ?? 0 );
-		if ( $agent_id <= 0 ) {
+		$default_agent_id = (int) ( $agent['agent_id'] ?? 0 );
+		if ( $default_agent_id <= 0 ) {
 			return array();
 		}
 
@@ -215,20 +217,31 @@ class JobArtifacts {
 				continue;
 			}
 
+			$agent_id = (int) ( $tool_call['agent_id'] ?? $default_agent_id );
+			$user_id  = (int) ( $tool_call['user_id'] ?? ( $job['user_id'] ?? 0 ) );
+			if ( $agent_id <= 0 ) {
+				continue;
+			}
+
 			$date = (string) ( $tool_call['date'] ?? '' );
 			if ( '' === $date ) {
 				$date = gmdate( 'Y-m-d', strtotime( (string) ( $job['completed_at'] ?? $job['created_at'] ?? 'now' ) ) );
 			}
 
 			if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
-				$dates[ $date ] = true;
+				$dates[ $agent_id . ':' . $user_id . ':' . $date ] = array(
+					'agent_id' => $agent_id,
+					'user_id'  => $user_id,
+					'date'     => $date,
+				);
 			}
 		}
 
 		$artifacts = array();
-		foreach ( array_keys( $dates ) as $date ) {
+		foreach ( $dates as $memory_scope ) {
+			$date = (string) $memory_scope['date'];
 			list( $year, $month, $day ) = explode( '-', $date );
-			$daily_memory               = new DailyMemory( (int) ( $job['user_id'] ?? 0 ), $agent_id );
+			$daily_memory               = new DailyMemory( (int) $memory_scope['user_id'], (int) $memory_scope['agent_id'] );
 			$read                       = $daily_memory->read( $year, $month, $day );
 			if ( empty( $read['success'] ) ) {
 				continue;
@@ -236,7 +249,7 @@ class JobArtifacts {
 
 			$artifacts[] = array(
 				'type'                 => 'agent_daily_memory',
-				'agent_id'             => $agent_id,
+				'agent_id'             => (int) $memory_scope['agent_id'],
 				'agent_slug'           => $agent['agent_slug'],
 				'date'                 => $date,
 				'source'               => 'daily-memory',

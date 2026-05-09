@@ -65,6 +65,14 @@ $assert(
 );
 
 $assert(
+	false !== strpos( $loop, "\$summary['user_id']" )
+		&& false !== strpos( $loop, "\$summary['agent_id']" )
+		&& false !== strpos( $job_artifacts, "\$tool_call['user_id']" )
+		&& false !== strpos( $job_artifacts, "\$tool_call['agent_id']" ),
+	'daily memory artifact export preserves the exact write scope from tool summaries'
+);
+
+$assert(
 	false !== strpos( $job_artifacts, "'type'                 => 'agent_daily_memory'" )
 		&& false !== strpos( $job_artifacts, "memory/agent/daily/%s/%s/%s.md" )
 		&& false !== strpos( $job_artifacts, "'content'              =>" ),
