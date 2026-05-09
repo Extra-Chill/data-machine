@@ -306,7 +306,15 @@ class AgentDailyMemory extends BaseTool {
 			);
 		}
 
-		$raw_user_id       = (int) ( $parameters['user_id'] ?? 0 );
+		$raw_agent_id = (int) ( $parameters['agent_id'] ?? 0 );
+		$raw_user_id  = (int) ( $parameters['user_id'] ?? 0 );
+
+		if ( $raw_agent_id > 0 ) {
+			return array(
+				'user_id'  => $directory_manager->get_effective_user_id( $raw_user_id > 0 ? $raw_user_id : get_current_user_id() ),
+				'agent_id' => $raw_agent_id,
+			);
+		}
 
 		if ( $raw_user_id > 0 ) {
 			return array(
