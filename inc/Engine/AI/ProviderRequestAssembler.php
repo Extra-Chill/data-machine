@@ -113,14 +113,15 @@ class ProviderRequestAssembler {
 	private static function normalizeToolParameters( mixed $parameters ): array {
 		if ( ! is_array( $parameters ) || empty( $parameters ) ) {
 			return array(
-				'type'       => 'object',
-				'properties' => array(),
+				'type' => 'object',
 			);
 		}
 
 		if ( isset( $parameters['type'] ) || isset( $parameters['properties'] ) || isset( $parameters['required'] ) ) {
-			$parameters['type']       = $parameters['type'] ?? 'object';
-			$parameters['properties'] = is_array( $parameters['properties'] ?? null ) ? $parameters['properties'] : array();
+			$parameters['type'] = $parameters['type'] ?? 'object';
+			if ( isset( $parameters['properties'] ) && is_array( $parameters['properties'] ) && empty( $parameters['properties'] ) ) {
+				unset( $parameters['properties'] );
+			}
 			return $parameters;
 		}
 
@@ -142,9 +143,12 @@ class ProviderRequestAssembler {
 		}
 
 		$normalized = array(
-			'type'       => 'object',
-			'properties' => $properties,
+			'type' => 'object',
 		);
+
+		if ( ! empty( $properties ) ) {
+			$normalized['properties'] = $properties;
+		}
 
 		if ( ! empty( $required ) ) {
 			$normalized['required'] = $required;

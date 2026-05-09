@@ -773,7 +773,7 @@ class RequestBuilder {
 		}
 
 		if ( isset( $parameters['properties'] ) && is_array( $parameters['properties'] ) && empty( $parameters['properties'] ) ) {
-			$parameters['properties'] = (object) array();
+			unset( $parameters['properties'] );
 		}
 
 		return $parameters;
