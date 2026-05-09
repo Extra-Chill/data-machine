@@ -39,6 +39,7 @@ require_once $root . '/inc/Engine/AI/Directives/DirectivePolicyResolver.php';
 require_once $root . '/inc/Engine/AI/PromptBuilder.php';
 require_once $root . '/inc/Engine/AI/ProviderRequestAssembler.php';
 require_once $root . '/inc/Engine/AI/RequestMetadata.php';
+require_once $root . '/inc/Core/PluginSettings.php';
 require_once $root . '/inc/Engine/AI/WpAiClientProviderAdmin.php';
 require_once $root . '/inc/Engine/AI/RequestBuilder.php';
 
@@ -138,6 +139,17 @@ $response = \DataMachine\Engine\AI\RequestBuilder::build(
 					'type'     => 'string',
 					'required' => false,
 				),
+				'policy' => array(
+					'type'       => 'object',
+					'required'   => false,
+					'properties' => array(
+						'allow' => array(
+							'type'     => 'array',
+							'items'    => array( 'type' => 'string' ),
+							'required' => false,
+						),
+					),
+				),
 			),
 		),
 	),
@@ -163,6 +175,8 @@ $assert( 'object' === ( $schema['type'] ?? null ), 'legacy parameter map is wrap
 $assert( array( 'reason' ) === ( $schema['required'] ?? null ), 'property-level required=true is lifted to object-level required array' );
 $assert( ! isset( $schema['properties']['reason']['required'] ), 'required flag is removed from required property schema' );
 $assert( ! isset( $schema['properties']['note']['required'] ), 'required flag is removed from optional property schema' );
+$assert( ! isset( $schema['properties']['policy']['required'] ), 'required flag is removed from nested object property schema' );
+$assert( ! isset( $schema['properties']['policy']['properties']['allow']['required'] ), 'required flag is removed from nested object child property schema' );
 $assert( 'string' === ( $schema['properties']['reason']['type'] ?? null ), 'property schema fields are preserved' );
 
 // --- Empty-prompt fallback ----------------------------------------------------
