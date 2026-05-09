@@ -29,11 +29,14 @@ class TestEventScraper extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Test universal web scraper compatibility with a target URL. Returns structured JSON with event data, extraction method, and coverage warnings.',
 			'parameters'  => array(
-				'target_url' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Target URL to test scraper against',
+				'type'       => 'object',
+				'properties' => array(
+					'target_url' => array(
+						'type'        => 'string',
+						'description' => 'Target URL to test scraper against',
+					),
 				),
+				'required'   => array( 'target_url' ),
 			),
 		);
 	}

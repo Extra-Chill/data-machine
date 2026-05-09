@@ -29,71 +29,62 @@ class UpdateVenue extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Update a venue name and/or meta fields. Address changes trigger automatic geocoding.',
 			'parameters'  => array(
-				'venue'       => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Venue identifier (term ID, name, or slug)',
+				'type'       => 'object',
+				'properties' => array(
+					'venue'       => array(
+						'type'        => 'string',
+						'description' => 'Venue identifier (term ID, name, or slug)',
+					),
+					'name'        => array(
+						'type'        => 'string',
+						'description' => 'New venue name',
+					),
+					'description' => array(
+						'type'        => 'string',
+						'description' => 'Venue description',
+					),
+					'address'     => array(
+						'type'        => 'string',
+						'description' => 'Street address',
+					),
+					'city'        => array(
+						'type'        => 'string',
+						'description' => 'City',
+					),
+					'state'       => array(
+						'type'        => 'string',
+						'description' => 'State/region',
+					),
+					'zip'         => array(
+						'type'        => 'string',
+						'description' => 'Postal/ZIP code',
+					),
+					'country'     => array(
+						'type'        => 'string',
+						'description' => 'Country',
+					),
+					'phone'       => array(
+						'type'        => 'string',
+						'description' => 'Phone number',
+					),
+					'website'     => array(
+						'type'        => 'string',
+						'description' => 'Website URL',
+					),
+					'capacity'    => array(
+						'type'        => 'string',
+						'description' => 'Venue capacity',
+					),
+					'coordinates' => array(
+						'type'        => 'string',
+						'description' => 'GPS coordinates as "lat,lng"',
+					),
+					'timezone'    => array(
+						'type'        => 'string',
+						'description' => 'IANA timezone identifier (e.g., America/New_York)',
+					),
 				),
-				'name'        => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'New venue name',
-				),
-				'description' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Venue description',
-				),
-				'address'     => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Street address',
-				),
-				'city'        => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'City',
-				),
-				'state'       => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'State/region',
-				),
-				'zip'         => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Postal/ZIP code',
-				),
-				'country'     => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Country',
-				),
-				'phone'       => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Phone number',
-				),
-				'website'     => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Website URL',
-				),
-				'capacity'    => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Venue capacity',
-				),
-				'coordinates' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'GPS coordinates as "lat,lng"',
-				),
-				'timezone'    => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'IANA timezone identifier (e.g., America/New_York)',
-				),
+				'required'   => array( 'venue' ),
 			),
 		);
 	}

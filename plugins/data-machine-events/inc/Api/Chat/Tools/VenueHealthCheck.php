@@ -30,10 +30,12 @@ class VenueHealthCheck extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Check venues for data quality issues: missing address, coordinates, timezone, or website. Also detects suspicious websites where a ticket URL was mistakenly stored as venue website. Returns counts and lists of problematic venues.',
 			'parameters'  => array(
-				'limit' => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Max venues to return per issue category (default: 25)',
+				'type'       => 'object',
+				'properties' => array(
+					'limit' => array(
+						'type'        => 'integer',
+						'description' => 'Max venues to return per issue category (default: 25)',
+					),
 				),
 			),
 		);

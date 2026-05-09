@@ -29,31 +29,30 @@ class GetVenueEvents extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Get events attached to a specific venue. Useful for investigating venue terms before merging or cleanup.',
 			'parameters'  => array(
-				'venue'            => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Venue identifier (term ID, name, or slug)',
+				'type'       => 'object',
+				'properties' => array(
+					'venue'            => array(
+						'type'        => 'string',
+						'description' => 'Venue identifier (term ID, name, or slug)',
+					),
+					'limit'            => array(
+						'type'        => 'integer',
+						'description' => 'Maximum events to return (default: 25, max: 100)',
+					),
+					'status'           => array(
+						'type'        => 'string',
+						'description' => 'Post status filter: any, publish, future, draft (default: any)',
+					),
+					'published_before' => array(
+						'type'        => 'string',
+						'description' => 'Only return events published before this date (YYYY-MM-DD format)',
+					),
+					'published_after'  => array(
+						'type'        => 'string',
+						'description' => 'Only return events published after this date (YYYY-MM-DD format)',
+					),
 				),
-				'limit'            => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Maximum events to return (default: 25, max: 100)',
-				),
-				'status'           => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Post status filter: any, publish, future, draft (default: any)',
-				),
-				'published_before' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Only return events published before this date (YYYY-MM-DD format)',
-				),
-				'published_after'  => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Only return events published after this date (YYYY-MM-DD format)',
-				),
+				'required'   => array( 'venue' ),
 			),
 		);
 	}

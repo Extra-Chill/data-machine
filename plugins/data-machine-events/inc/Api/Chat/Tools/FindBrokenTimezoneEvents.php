@@ -29,21 +29,21 @@ class FindBrokenTimezoneEvents extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Find events where venue has no timezone or coordinates. Also separately notes events with no venue assigned. Returns actual timezone/coordinates values when present.',
 			'parameters'  => array(
-				'scope'      => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Which events to check: "upcoming" (default), "all", or "past"',
-					'enum'        => array( 'upcoming', 'all', 'past' ),
-				),
-				'days_ahead' => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Days to look ahead for upcoming scope (default: 90)',
-				),
-				'limit'      => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Max events to return (default: 50)',
+				'type'       => 'object',
+				'properties' => array(
+					'scope'      => array(
+						'type'        => 'string',
+						'description' => 'Which events to check: "upcoming" (default), "all", or "past"',
+						'enum'        => array( 'upcoming', 'all', 'past' ),
+					),
+					'days_ahead' => array(
+						'type'        => 'integer',
+						'description' => 'Days to look ahead for upcoming scope (default: 90)',
+					),
+					'limit'      => array(
+						'type'        => 'integer',
+						'description' => 'Max events to return (default: 50)',
+					),
 				),
 			),
 		);

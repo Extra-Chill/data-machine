@@ -29,25 +29,25 @@ class FixEventTimezone extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Fix event timezone by updating venue metadata. Supports batch updates. Event times remain as-is (8pm stays 8pm) regardless of timezone. Calls geocoding if venue lacks coordinates. Returns inline errors and continues processing.',
 			'parameters'  => array(
-				'event'       => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Single event post ID to fix',
-				),
-				'events'      => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Array of event updates. Each item must have "event" (post ID) and optionally "timezone" and "auto_derive".',
-				),
-				'timezone'    => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'IANA timezone identifier (e.g., "America/Chicago"). If omitted and auto_derive is false, no change is made.',
-				),
-				'auto_derive' => array(
-					'type'        => 'boolean',
-					'required'    => false,
-					'description' => 'If true, derive timezone from venue coordinates via GeoNames API (requires GeoNames username configured). Default: false.',
+				'type'       => 'object',
+				'properties' => array(
+					'event'       => array(
+						'type'        => 'integer',
+						'description' => 'Single event post ID to fix',
+					),
+					'events'      => array(
+						'type'        => 'array',
+						'description' => 'Array of event updates. Each item must have "event" (post ID) and optionally "timezone" and "auto_derive".',
+						'items'       => array( 'type' => 'object' ),
+					),
+					'timezone'    => array(
+						'type'        => 'string',
+						'description' => 'IANA timezone identifier (e.g., "America/Chicago"). If omitted and auto_derive is false, no change is made.',
+					),
+					'auto_derive' => array(
+						'type'        => 'boolean',
+						'description' => 'If true, derive timezone from venue coordinates via GeoNames API (requires GeoNames username configured). Default: false.',
+					),
 				),
 			),
 		);
