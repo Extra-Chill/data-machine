@@ -80,9 +80,8 @@ echo "Global tool pipeline-mode smoke (#1442)\n";
 echo "---------------------------------------\n";
 
 $chat_only = array(
-	'queue_validator'    => array( 'inc/Engine/AI/Tools/Global/QueueValidator.php', 'DataMachine\Engine\AI\Tools\Global\QueueValidator' ),
-	'agent_memory'       => array( 'inc/Engine/AI/Tools/Global/AgentMemory.php', 'DataMachine\Engine\AI\Tools\Global\AgentMemory' ),
-	'agent_daily_memory' => array( 'inc/Engine/AI/Tools/Global/AgentDailyMemory.php', 'DataMachine\Engine\AI\Tools\Global\AgentDailyMemory' ),
+	'queue_validator' => array( 'inc/Engine/AI/Tools/Global/QueueValidator.php', 'DataMachine\Engine\AI\Tools\Global\QueueValidator' ),
+	'agent_memory'    => array( 'inc/Engine/AI/Tools/Global/AgentMemory.php', 'DataMachine\Engine\AI\Tools\Global\AgentMemory' ),
 );
 
 foreach ( $chat_only as $tool => [ $path, $class_name ] ) {
@@ -104,6 +103,29 @@ foreach ( $chat_only as $tool => [ $path, $class_name ] ) {
 		$passes
 	);
 }
+
+load_global_tool_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentDailyMemory.php', 'DataMachine\Engine\AI\Tools\Global\AgentDailyMemory' );
+
+$chat_tools     = resolve_tools_for_pipeline_modes( 'chat' );
+$pipeline_tools = resolve_tools_for_pipeline_modes( 'pipeline' );
+assert_true_for_pipeline_modes(
+	isset( $chat_tools['agent_daily_memory'] ),
+	'agent_daily_memory resolves in chat mode',
+	$failures,
+	$passes
+);
+assert_true_for_pipeline_modes(
+	! isset( $pipeline_tools['agent_daily_memory'] ),
+	'agent_daily_memory does not resolve in default pipeline mode',
+	$failures,
+	$passes
+);
+assert_true_for_pipeline_modes(
+	file_contains_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentDailyMemory.php', "array( 'chat', 'pipeline_policy' )" ),
+	'agent_daily_memory declares policy-controlled pipeline availability',
+	$failures,
+	$passes
+);
 
 $pipeline_tools = array(
 	'web_fetch'             => array( 'inc/Engine/AI/Tools/Global/WebFetch.php', 'DataMachine\Engine\AI\Tools\Global\WebFetch' ),

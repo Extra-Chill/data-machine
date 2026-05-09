@@ -31,14 +31,18 @@ final class DataMachineToolRegistrySource {
 	 * @param string $mode Agent mode slug.
 	 * @return array Tools keyed by tool name.
 	 */
-	public function __invoke( string $mode ): array {
+	public function __invoke( string $mode, array $args = array() ): array {
 		$available_tools = array();
 		$all_tools       = $this->tool_manager->get_all_tools();
-		$mode_tools      = $this->filterByMode( $all_tools, $mode );
+		$mode_tools      = $this->filterByMode( $all_tools, $mode, $args );
 
 		foreach ( $mode_tools as $tool_name => $tool_config ) {
 			if ( ! is_array( $tool_config ) || empty( $tool_config ) ) {
 				continue;
+			}
+
+			if ( ToolPolicyResolver::MODE_PIPELINE === $mode && in_array( 'pipeline_policy', $tool_config['modes'] ?? array(), true ) ) {
+				$tool_config['modes'] = array_values( array_unique( array_merge( $tool_config['modes'], array( ToolPolicyResolver::MODE_PIPELINE ) ) ) );
 			}
 
 			if ( ToolPolicyResolver::MODE_PIPELINE === $mode ) {
@@ -76,13 +80,20 @@ final class DataMachineToolRegistrySource {
 	 * @param string $mode  Mode slug to filter by.
 	 * @return array Filtered tools.
 	 */
-	private function filterByMode( array $tools, string $mode ): array {
+	private function filterByMode( array $tools, string $mode, array $args = array() ): array {
 		return array_filter(
 			$tools,
-			static function ( $tool ) use ( $mode ) {
+			static function ( $tool, string $tool_name ) use ( $mode, $args ) {
 				$modes = $tool['modes'] ?? array();
+				if ( ToolPolicyResolver::MODE_PIPELINE === $mode
+					&& in_array( 'pipeline_policy', $modes, true )
+					&& in_array( $tool_name, $args['allow_only'] ?? array(), true ) ) {
+					return true;
+				}
+
 				return in_array( $mode, $modes, true );
-			}
+			},
+			ARRAY_FILTER_USE_BOTH
 		);
 	}
 }

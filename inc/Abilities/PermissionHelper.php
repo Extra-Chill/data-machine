@@ -524,12 +524,41 @@ class PermissionHelper {
 	 * @return int|null Agent ID to filter by, or null for all agents (admin default).
 	 */
 	public static function resolve_scoped_agent_id( \WP_REST_Request $request, string $action = 'manage_flows' ): ?int {
+		$requested_agent    = $request->get_param( 'agent' );
 		$requested_agent_id = $request->get_param( 'agent_id' );
+		$requested_slug     = $request->get_param( 'agent_slug' );
 		$is_admin           = self::can( $action );
 
-		// Explicit agent_id parameter — use it if caller has access.
-		if ( null !== $requested_agent_id && '' !== $requested_agent_id ) {
-			$agent_id = (int) $requested_agent_id;
+		// Explicit agent parameter — use it if caller has access. `agent` and
+		// `agent_slug` are slug-first aliases; `agent_id` remains compatible.
+		if (
+			( null !== $requested_agent && '' !== $requested_agent )
+			|| ( null !== $requested_slug && '' !== $requested_slug )
+			|| ( null !== $requested_agent_id && '' !== $requested_agent_id )
+		) {
+			$context = array();
+			if ( null !== $requested_agent && '' !== $requested_agent ) {
+				$context['agent'] = (string) $requested_agent;
+			}
+			if ( null !== $requested_slug && '' !== $requested_slug ) {
+				$context['agent_slug'] = (string) $requested_slug;
+			}
+			if ( null !== $requested_agent_id && '' !== $requested_agent_id ) {
+				$context['agent_id'] = (int) $requested_agent_id;
+			}
+
+			try {
+				if ( isset( $context['agent'] ) ) {
+					$identity = ( new \DataMachine\Core\Agents\AgentIdentityResolver() )->resolve_agent_identity( $context['agent'] );
+					unset( $context['agent'] );
+					$context['agent_id']   = $context['agent_id'] ?? $identity->agent_id;
+					$context['agent_slug'] = $context['agent_slug'] ?? $identity->agent_slug;
+				}
+
+				$agent_id = ( new \DataMachine\Core\Agents\AgentIdentityResolver() )->resolve_agent_identity( $context )->agent_id;
+			} catch ( \InvalidArgumentException $e ) {
+				return null;
+			}
 
 			// Admins can access any agent.
 			if ( $is_admin ) {

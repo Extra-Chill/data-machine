@@ -307,6 +307,14 @@ class AIStep extends Step {
 				$payload['completion_assertions'] = $completion_assertions;
 			}
 
+			$tool_runtime_rules = self::mergeListConfigField(
+				is_array( $pipeline_step_config['tool_runtime_rules'] ?? null ) ? $pipeline_step_config['tool_runtime_rules'] : array(),
+				is_array( $this->flow_step_config['tool_runtime_rules'] ?? null ) ? $this->flow_step_config['tool_runtime_rules'] : array()
+			);
+			if ( ! empty( $tool_runtime_rules ) ) {
+				$payload['tool_runtime_rules'] = $tool_runtime_rules;
+			}
+
 			// Tool categories can be specified at the pipeline step level or pipeline level.
 			// This allows pipelines to declare which ability categories are relevant,
 			// reducing tool bloat by excluding irrelevant tools from the AI context.
@@ -643,6 +651,17 @@ class AIStep extends Step {
 		} catch ( \InvalidArgumentException $e ) {
 			return '';
 		}
+	}
+
+	/**
+	 * Merge pipeline-level and flow-level list config fields.
+	 *
+	 * @param array $pipeline_values Pipeline step values.
+	 * @param array $flow_values     Flow step values.
+	 * @return array<int,mixed> Merged list values.
+	 */
+	private static function mergeListConfigField( array $pipeline_values, array $flow_values ): array {
+		return array_values( array_merge( $pipeline_values, $flow_values ) );
 	}
 
 	/**
