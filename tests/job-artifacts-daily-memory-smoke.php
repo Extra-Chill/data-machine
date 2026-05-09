@@ -65,6 +65,12 @@ $assert(
 );
 
 $assert(
+	false !== strpos( $loop, 'datamachine_persist_inflight_tool_summary' )
+		&& false !== strpos( $loop, "'tool_execution_summary' => datamachine_summarize_tool_execution_results( \$tool_execution_results, true )" ),
+	'conversation loop persists in-flight tool summaries before later artifact-aware tools run'
+);
+
+$assert(
 	false !== strpos( $loop, "\$summary['user_id']" )
 		&& false !== strpos( $loop, "\$summary['agent_id']" )
 		&& false !== strpos( $job_artifacts, "\$tool_call['user_id']" )

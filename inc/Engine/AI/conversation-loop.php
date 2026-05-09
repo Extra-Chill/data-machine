@@ -563,6 +563,7 @@ function datamachine_build_turn_runner(
 					'is_handler_tool' => $is_handler_tool,
 					'turn_count'      => $turn_count,
 				);
+				datamachine_persist_inflight_tool_summary( $loop_payload, $tool_execution_results );
 
 				// Add tool result message.
 				$messages[] = ConversationManager::formatToolResultMessage(
@@ -698,6 +699,30 @@ function datamachine_record_completion_nudge(
 			)
 		);
 	}
+}
+
+/**
+ * Persist a bounded tool summary during the loop for tools that open artifacts.
+ *
+ * Some artifact-aware tools are implemented outside the Data Machine tool
+ * wrapper and fall back to job engine data. Keep that snapshot current before
+ * the loop returns so a later PR tool can see prior daily-memory writes.
+ *
+ * @param array $loop_payload           Loop payload.
+ * @param array $tool_execution_results Tool execution results accumulated by the loop.
+ */
+function datamachine_persist_inflight_tool_summary( array $loop_payload, array $tool_execution_results ): void {
+	$job_id = (int) ( $loop_payload['job_id'] ?? 0 );
+	if ( $job_id <= 0 || ! function_exists( '\datamachine_merge_engine_data' ) ) {
+		return;
+	}
+
+	\datamachine_merge_engine_data(
+		$job_id,
+		array(
+			'tool_execution_summary' => datamachine_summarize_tool_execution_results( $tool_execution_results, true ),
+		)
+	);
 }
 
 /**
