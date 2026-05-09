@@ -689,6 +689,125 @@ $failed_required_tool_decision = $failed_required_tool_policy->recordNaturalComp
 assert_runtime_policy( ! $failed_required_tool_decision->isComplete(), 'failed required tool does not satisfy completion assertion' );
 assert_runtime_policy( array( 'workspace_edit', 'workspace_git_commit' ) === ( $failed_required_tool_decision->context()['missing']['tool_names'] ?? null ), 'failed required tool remains in missing assertion list' );
 
+$outcome_assertions_config = array(
+	'complete_when_any' => array(
+		array(
+			'tools' => array(
+				array(
+					'name'            => 'create_github_pull_request',
+					'success'         => true,
+					'required_output' => 'html_url',
+				),
+				array(
+					'name'    => 'comment_github_pull_request',
+					'success' => true,
+				),
+			),
+		),
+		array(
+			'tools' => array(
+				array(
+					'name'            => 'create_github_issue',
+					'success'         => true,
+					'required_output' => 'html_url',
+				),
+				array(
+					'name'    => 'comment_github_pull_request',
+					'success' => true,
+				),
+			),
+		),
+	),
+);
+
+$pr_outcome_policy = new DataMachineHandlerCompletionPolicy(
+	array(),
+	new \DataMachine\Engine\AI\DataMachineCompletionAssertions( $outcome_assertions_config )
+);
+$pr_outcome_policy->recordToolResult(
+	'create_github_pull_request',
+	array( 'name' => 'create_github_pull_request' ),
+	array(
+		'success' => true,
+		'data'    => array( 'html_url' => 'https://github.com/Extra-Chill/data-machine/pull/1' ),
+	),
+	array( 'mode' => 'pipeline' ),
+	1
+);
+$pr_outcome_policy->recordToolResult(
+	'comment_github_pull_request',
+	array( 'name' => 'comment_github_pull_request' ),
+	array( 'success' => true ),
+	array( 'mode' => 'pipeline' ),
+	2
+);
+$pr_outcome_decision = $pr_outcome_policy->recordNaturalCompletion(
+	array( array( 'role' => 'user', 'content' => 'open a PR or fallback issue, then comment on source PR' ) ),
+	'Complete via PR path.',
+	array( 'mode' => 'pipeline' ),
+	3
+);
+assert_runtime_policy( $pr_outcome_decision->isComplete(), 'complete_when_any PR path satisfies completion assertion' );
+
+$issue_outcome_policy = new DataMachineHandlerCompletionPolicy(
+	array(),
+	new \DataMachine\Engine\AI\DataMachineCompletionAssertions( $outcome_assertions_config )
+);
+$issue_outcome_policy->recordToolResult(
+	'create_github_issue',
+	array( 'name' => 'create_github_issue' ),
+	array(
+		'success'  => true,
+		'html_url' => 'https://github.com/Extra-Chill/data-machine/issues/1',
+	),
+	array( 'mode' => 'pipeline' ),
+	1
+);
+$issue_outcome_policy->recordToolResult(
+	'comment_github_pull_request',
+	array( 'name' => 'comment_github_pull_request' ),
+	array( 'success' => true ),
+	array( 'mode' => 'pipeline' ),
+	2
+);
+$issue_outcome_decision = $issue_outcome_policy->recordNaturalCompletion(
+	array( array( 'role' => 'user', 'content' => 'open a PR or fallback issue, then comment on source PR' ) ),
+	'Complete via issue fallback path.',
+	array( 'mode' => 'pipeline' ),
+	3
+);
+assert_runtime_policy( $issue_outcome_decision->isComplete(), 'complete_when_any issue fallback path satisfies completion assertion' );
+
+$failed_outcome_policy = new DataMachineHandlerCompletionPolicy(
+	array(),
+	new \DataMachine\Engine\AI\DataMachineCompletionAssertions( $outcome_assertions_config )
+);
+$failed_outcome_policy->recordToolResult(
+	'create_github_issue',
+	array( 'name' => 'create_github_issue' ),
+	array(
+		'success' => false,
+		'data'    => array( 'html_url' => 'https://github.com/Extra-Chill/data-machine/issues/1' ),
+	),
+	array( 'mode' => 'pipeline' ),
+	1
+);
+$failed_outcome_policy->recordToolResult(
+	'comment_github_pull_request',
+	array( 'name' => 'comment_github_pull_request' ),
+	array( 'success' => true ),
+	array( 'mode' => 'pipeline' ),
+	2
+);
+$failed_outcome_decision = $failed_outcome_policy->recordNaturalCompletion(
+	array( array( 'role' => 'user', 'content' => 'open a PR or fallback issue, then comment on source PR' ) ),
+	'Cannot complete because the issue call failed.',
+	array( 'mode' => 'pipeline' ),
+	3
+);
+assert_runtime_policy( ! $failed_outcome_decision->isComplete(), 'failed complete_when_any tool result does not satisfy completion assertion' );
+assert_runtime_policy( isset( $failed_outcome_decision->context()['missing']['complete_when_any'] ), 'failed complete_when_any path reports missing outcome assertion' );
+
 $daily_memory_unavailable_dispatch_count = 0;
 $daily_memory_unavailable_sink           = new RuntimePolicySmokeEventSink();
 WpAiClientTestDouble::reset();

@@ -598,6 +598,14 @@ class AIStep extends Step {
 			}
 		}
 
+		$complete_when_any = array_merge(
+			is_array( $pipeline_assertions['complete_when_any'] ?? null ) ? $pipeline_assertions['complete_when_any'] : array(),
+			is_array( $flow_assertions['complete_when_any'] ?? null ) ? $flow_assertions['complete_when_any'] : array()
+		);
+		if ( ! empty( $complete_when_any ) ) {
+			$merged['complete_when_any'] = array_values( $complete_when_any );
+		}
+
 		return $merged;
 	}
 

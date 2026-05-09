@@ -23,8 +23,14 @@ class DataMachineCompletionAssertions {
 	/** @var array<int, string> */
 	private array $required_output_packet_types;
 
+	/** @var array<int, array{tools: array<int, array{name: string, required_output: array<int, string>}>}> */
+	private array $complete_when_any;
+
 	/** @var array<int, string> */
 	private array $executed_tool_names = array();
+
+	/** @var array<string, array<int, array>> */
+	private array $successful_tool_results = array();
 
 	/** @var array<int, string> */
 	private array $available_output_packet_types = array();
@@ -36,6 +42,7 @@ class DataMachineCompletionAssertions {
 		$this->required_engine_data_keys    = $this->sanitizeList( $config['required_engine_data_keys'] ?? array() );
 		$this->required_tool_names          = $this->sanitizeList( $config['required_tool_names'] ?? array() );
 		$this->required_output_packet_types = $this->sanitizeList( $config['required_output_packet_types'] ?? array() );
+		$this->complete_when_any            = $this->sanitizeOutcomeAssertions( $config['complete_when_any'] ?? array() );
 	}
 
 	/**
@@ -46,7 +53,8 @@ class DataMachineCompletionAssertions {
 	public function hasAssertions(): bool {
 		return ! empty( $this->required_engine_data_keys )
 			|| ! empty( $this->required_tool_names )
-			|| ! empty( $this->required_output_packet_types );
+			|| ! empty( $this->required_output_packet_types )
+			|| ! empty( $this->complete_when_any );
 	}
 
 	/**
@@ -61,6 +69,7 @@ class DataMachineCompletionAssertions {
 
 		if ( '' !== $tool_name && $tool_succeeded ) {
 			$this->executed_tool_names[] = $tool_name;
+			$this->successful_tool_results[ $tool_name ][] = $tool_result;
 		}
 
 		$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
@@ -93,10 +102,13 @@ class DataMachineCompletionAssertions {
 			$output_packet_types[] = 'ai_response';
 		}
 
+		$outcome_evaluation = $this->evaluateOutcomeAssertions();
+
 		$satisfied = array(
 			'engine_data_keys'    => $this->satisfiedEngineDataKeys( $runtime_context ),
 			'tool_names'          => array_values( array_intersect( $this->required_tool_names, array_unique( $this->executed_tool_names ) ) ),
 			'output_packet_types' => array_values( array_intersect( $this->required_output_packet_types, $output_packet_types ) ),
+			'complete_when_any'   => $outcome_evaluation['satisfied'],
 		);
 
 		$missing = array_filter(
@@ -104,6 +116,7 @@ class DataMachineCompletionAssertions {
 				'engine_data_keys'    => array_values( array_diff( $this->required_engine_data_keys, $satisfied['engine_data_keys'] ) ),
 				'tool_names'          => array_values( array_diff( $this->required_tool_names, $satisfied['tool_names'] ) ),
 				'output_packet_types' => array_values( array_diff( $this->required_output_packet_types, $satisfied['output_packet_types'] ) ),
+				'complete_when_any'   => $outcome_evaluation['missing'],
 			)
 		);
 
@@ -152,6 +165,7 @@ class DataMachineCompletionAssertions {
 				'engine_data_keys'    => $this->required_engine_data_keys,
 				'tool_names'          => $this->required_tool_names,
 				'output_packet_types' => $this->required_output_packet_types,
+				'complete_when_any'   => $this->complete_when_any,
 			)
 		);
 	}
@@ -172,11 +186,122 @@ class DataMachineCompletionAssertions {
 	 * @return array<int, string>
 	 */
 	public function unavailableRequiredToolNames( array $tools ): array {
-		if ( empty( $this->required_tool_names ) ) {
+		$required_tool_names = $this->required_tool_names;
+		if ( ! empty( $this->complete_when_any ) && ! $this->hasAvailableOutcomePath( $tools ) ) {
+			$required_tool_names = array_merge( $required_tool_names, $this->outcomeToolNames() );
+		}
+
+		if ( empty( $required_tool_names ) ) {
 			return array();
 		}
 
-		return array_values( array_diff( $this->required_tool_names, array_keys( $tools ) ) );
+		return array_values( array_diff( array_values( array_unique( $required_tool_names ) ), array_keys( $tools ) ) );
+	}
+
+	/**
+	 * @return array{satisfied: array<int, string>, missing: array<int, string>}
+	 */
+	private function evaluateOutcomeAssertions(): array {
+		if ( empty( $this->complete_when_any ) ) {
+			return array(
+				'satisfied' => array(),
+				'missing'   => array(),
+			);
+		}
+
+		$missing = array();
+		foreach ( $this->complete_when_any as $index => $outcome ) {
+			$outcome_missing = $this->missingOutcomeRequirements( $outcome );
+			if ( empty( $outcome_missing ) ) {
+				return array(
+					'satisfied' => array( 'outcome_' . ( $index + 1 ) ),
+					'missing'   => array(),
+				);
+			}
+
+			$missing[] = 'outcome_' . ( $index + 1 ) . ': ' . implode( ', ', $outcome_missing );
+		}
+
+		return array(
+			'satisfied' => array(),
+			'missing'   => $missing,
+		);
+	}
+
+	/**
+	 * @param array{tools: array<int, array{name: string, required_output: array<int, string>}>} $outcome Outcome assertion.
+	 * @return array<int, string>
+	 */
+	private function missingOutcomeRequirements( array $outcome ): array {
+		$missing = array();
+		foreach ( $outcome['tools'] as $tool ) {
+			$name = $tool['name'];
+			if ( empty( $this->successful_tool_results[ $name ] ) ) {
+				$missing[] = $name;
+				continue;
+			}
+
+			foreach ( $tool['required_output'] as $field ) {
+				if ( ! $this->toolHasOutputField( $name, $field ) ) {
+					$missing[] = $name . '.' . $field;
+				}
+			}
+		}
+
+		return array_values( array_unique( $missing ) );
+	}
+
+	private function toolHasOutputField( string $tool_name, string $field ): bool {
+		foreach ( $this->successful_tool_results[ $tool_name ] ?? array() as $result ) {
+			if ( $this->hasNonEmptyPath( $result, $field ) ) {
+				return true;
+			}
+
+			if ( is_array( $result['data'] ?? null ) && $this->hasNonEmptyPath( $result['data'], $field ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private function hasNonEmptyPath( array $data, string $path ): bool {
+		$segments = explode( '.', $path );
+		$value    = $data;
+		foreach ( $segments as $segment ) {
+			if ( ! is_array( $value ) || ! array_key_exists( $segment, $value ) ) {
+				return false;
+			}
+
+			$value = $value[ $segment ];
+		}
+
+		return null !== $value && '' !== $value && array() !== $value;
+	}
+
+	private function hasAvailableOutcomePath( array $tools ): bool {
+		foreach ( $this->complete_when_any as $outcome ) {
+			$names = array_map( static fn( array $tool ): string => $tool['name'], $outcome['tools'] );
+			if ( empty( array_diff( $names, array_keys( $tools ) ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	private function outcomeToolNames(): array {
+		$names = array();
+		foreach ( $this->complete_when_any as $outcome ) {
+			foreach ( $outcome['tools'] as $tool ) {
+				$names[] = $tool['name'];
+			}
+		}
+
+		return array_values( array_unique( $names ) );
 	}
 
 	/**
@@ -200,6 +325,46 @@ class DataMachineCompletionAssertions {
 		}
 
 		return array_values( array_unique( $items ) );
+	}
+
+	/**
+	 * @param mixed $value Raw outcome assertions.
+	 * @return array<int, array{tools: array<int, array{name: string, required_output: array<int, string>}>}>
+	 */
+	private function sanitizeOutcomeAssertions( $value ): array {
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		$outcomes = array();
+		foreach ( $value as $outcome ) {
+			if ( ! is_array( $outcome ) || ! is_array( $outcome['tools'] ?? null ) ) {
+				continue;
+			}
+
+			$tools = array();
+			foreach ( $outcome['tools'] as $tool ) {
+				if ( ! is_array( $tool ) ) {
+					continue;
+				}
+
+				$name = trim( (string) ( $tool['name'] ?? '' ) );
+				if ( '' === $name ) {
+					continue;
+				}
+
+				$tools[] = array(
+					'name'            => $name,
+					'required_output' => $this->sanitizeList( $tool['required_output'] ?? array() ),
+				);
+			}
+
+			if ( ! empty( $tools ) ) {
+				$outcomes[] = array( 'tools' => $tools );
+			}
+		}
+
+		return $outcomes;
 	}
 
 	/**
