@@ -697,7 +697,7 @@ class AIStep extends Step {
 	 * @return array<int, array<string, mixed>>
 	 */
 	private static function summarizeToolExecutions( array $loop_result ): array {
-		$results   = is_array( $loop_result['tool_execution_results'] ?? null ) ? $loop_result['tool_execution_results'] : array();
+		$results = is_array( $loop_result['tool_execution_results'] ?? null ) ? $loop_result['tool_execution_results'] : array();
 		return function_exists( 'DataMachine\Engine\AI\datamachine_summarize_tool_execution_results' )
 			? \DataMachine\Engine\AI\datamachine_summarize_tool_execution_results( $results )
 			: array();
