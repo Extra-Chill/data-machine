@@ -309,7 +309,9 @@ $captured_request = array();
 $empty_schema = $captured_request['tools']['client/no_arg_tool']['parameters'] ?? null;
 $assert( is_array( $empty_schema ), 'no-argument tools use a parameter schema array' );
 $assert( 'object' === ( $empty_schema['type'] ?? null ), 'no-argument tools use object parameter schemas' );
-$assert( isset( $empty_schema['properties']['_unused'] ), 'no-argument tool properties include an ignored provider-compatible placeholder' );
+$assert( isset( $empty_schema['properties'] ), 'no-argument tool schemas keep explicit properties for strict providers' );
+$assert( $empty_schema['properties'] instanceof stdClass, 'no-argument tool properties encode as a JSON object' );
+$assert( ! str_contains( json_encode( $empty_schema ), '[]' ), 'no-argument tool schema avoids PHP empty-array JSON encoding' );
 
 echo "\n{$assertions} assertions, " . count( $failures ) . " failures\n";
 
