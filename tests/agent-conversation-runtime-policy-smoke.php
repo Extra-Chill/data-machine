@@ -440,6 +440,86 @@ assert_runtime_policy( 2 === count( $duplicate_result['tool_execution_results'] 
 assert_runtime_policy( 'second_policy_tool' === ( $duplicate_result['tool_execution_results'][1]['tool_name'] ?? '' ), 'duplicate recovery reaches next required tool' );
 assert_runtime_policy( str_contains( wp_json_encode( $duplicate_transcript->calls[0]['messages'] ?? array() ), 'DUPLICATE REJECTED' ), 'duplicate recovery transcript includes correction message' );
 
+$runtime_rule_dispatch_count = 0;
+$runtime_rule_transcript     = new RuntimePolicySmokeTranscriptPersister();
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$runtime_rule_dispatch_count ) {
+		++$runtime_rule_dispatch_count;
+
+		$tool_name = match ( $runtime_rule_dispatch_count ) {
+			1 => 'workspace_worktree_add',
+			2, 3, 4 => 'workspace_read',
+			default => 'create_github_issue',
+		};
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => '',
+				'tool_calls' => array(
+					array(
+						'name'       => $tool_name,
+						'parameters' => array( 'name' => 'rule-smoke-' . $runtime_rule_dispatch_count ),
+					),
+				),
+			),
+		);
+	}
+);
+
+$runtime_rule_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'enforce inspection budget before fallback issue' ) ),
+	array(
+		'workspace_worktree_add' => array(
+			'name'        => 'workspace_worktree_add',
+			'description' => 'Prepare a workspace',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+		'workspace_read'         => array(
+			'name'        => 'workspace_read',
+			'description' => 'Inspect a workspace file',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+		'create_github_issue'    => array(
+			'name'        => 'create_github_issue',
+			'description' => 'Open a fallback issue',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	'pipeline',
+	array(
+		'transcript_persister'  => $runtime_rule_transcript,
+		'completion_assertions' => array(
+			'required_tool_names' => array( 'create_github_issue' ),
+		),
+		'tool_runtime_rules'    => array(
+			array(
+				'id'                  => 'inspection-budget-smoke',
+				'after_tool'          => 'workspace_worktree_add',
+				'limited_tools'       => array( 'workspace_read' ),
+				'max_calls'           => 2,
+				'then_require_one_of' => array( 'create_github_issue' ),
+			),
+		),
+	),
+	6
+);
+
+$runtime_rule_tool_names = array_map( static fn( $entry ) => (string) ( $entry['tool_name'] ?? '' ), $runtime_rule_result['tool_execution_results'] ?? array() );
+assert_runtime_policy( $runtime_rule_dispatch_count >= 4, 'runtime rule rejection keeps loop running for correction' );
+assert_runtime_policy( 2 === count( array_filter( $runtime_rule_tool_names, static fn( $tool_name ) => 'workspace_read' === $tool_name ) ), 'runtime rule result excludes rejected inspection call' );
+assert_runtime_policy( 'create_github_issue' === ( $runtime_rule_result['tool_execution_results'][3]['tool_name'] ?? '' ), 'runtime rule allows required fallback tool after rejection' );
+assert_runtime_policy( str_contains( wp_json_encode( $runtime_rule_transcript->calls[0]['messages'] ?? array() ), 'TOOL POLICY REJECTED' ), 'runtime rule transcript includes rejection message' );
+
 $assertion_policy = new DataMachineHandlerCompletionPolicy(
 	array(),
 	new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
