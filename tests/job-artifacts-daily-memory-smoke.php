@@ -73,6 +73,13 @@ $assert(
 );
 
 $assert(
+	false !== strpos( $loop, 'datamachine_summarize_tool_execution_results( $tool_execution_results, true )' )
+		&& false !== strpos( $loop, "\$summary['content']" )
+		&& false !== strpos( $job_artifacts, 'daily_memory_fallback_content' ),
+	'in-flight daily memory artifacts can fall back to the successful write content'
+);
+
+$assert(
 	false !== strpos( $job_artifacts, "'type'                 => 'agent_daily_memory'" )
 		&& false !== strpos( $job_artifacts, "memory/agent/daily/%s/%s/%s.md" )
 		&& false !== strpos( $job_artifacts, "'content'              =>" ),

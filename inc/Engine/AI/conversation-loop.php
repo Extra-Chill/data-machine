@@ -871,7 +871,7 @@ function datamachine_payload_with_inflight_run_artifacts( array $payload, array 
 
 	$artifact_result = ( new JobArtifacts() )->get(
 		$job_id,
-		datamachine_summarize_tool_execution_results( $tool_execution_results )
+		datamachine_summarize_tool_execution_results( $tool_execution_results, true )
 	);
 	if ( empty( $artifact_result['success'] ) || ! is_array( $artifact_result['artifacts'] ?? null ) ) {
 		return $payload;
@@ -885,9 +885,10 @@ function datamachine_payload_with_inflight_run_artifacts( array $payload, array 
  * Build a bounded, non-secret summary of in-flight tool calls.
  *
  * @param array $tool_execution_results Tool execution results accumulated by the loop.
+ * @param bool  $include_content        Whether to keep daily memory write content for in-flight artifact export.
  * @return array<int, array<string, mixed>>
  */
-function datamachine_summarize_tool_execution_results( array $tool_execution_results ): array {
+function datamachine_summarize_tool_execution_results( array $tool_execution_results, bool $include_content = false ): array {
 	$summaries = array();
 
 	foreach ( $tool_execution_results as $result ) {
@@ -912,9 +913,12 @@ function datamachine_summarize_tool_execution_results( array $tool_execution_res
 		if ( 'agent_daily_memory' === $tool_name ) {
 			$summary['user_id']  = isset( $parameters['user_id'] ) ? (int) $parameters['user_id'] : null;
 			$summary['agent_id'] = isset( $parameters['agent_id'] ) ? (int) $parameters['agent_id'] : null;
-			$summary['action'] = isset( $parameters['action'] ) ? sanitize_key( (string) $parameters['action'] ) : null;
-			$summary['date']   = isset( $parameters['date'] ) ? sanitize_text_field( (string) $parameters['date'] ) : gmdate( 'Y-m-d' );
-			$summary['mode']   = isset( $parameters['mode'] ) ? sanitize_key( (string) $parameters['mode'] ) : null;
+			$summary['action']   = isset( $parameters['action'] ) ? sanitize_key( (string) $parameters['action'] ) : null;
+			$summary['date']     = isset( $parameters['date'] ) ? sanitize_text_field( (string) $parameters['date'] ) : gmdate( 'Y-m-d' );
+			$summary['mode']     = isset( $parameters['mode'] ) ? sanitize_key( (string) $parameters['mode'] ) : null;
+			if ( $include_content && 'write' === $summary['action'] && isset( $parameters['content'] ) ) {
+				$summary['content'] = (string) $parameters['content'];
+			}
 		}
 
 		$summaries[] = array_filter(

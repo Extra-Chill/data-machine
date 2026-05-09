@@ -112,6 +112,7 @@ class JobArtifacts {
 					'action'     => isset( $summary['action'] ) ? sanitize_key( (string) $summary['action'] ) : null,
 					'date'       => isset( $summary['date'] ) ? sanitize_text_field( (string) $summary['date'] ) : null,
 					'mode'       => isset( $summary['mode'] ) ? sanitize_key( (string) $summary['mode'] ) : null,
+					'content'    => isset( $summary['content'] ) ? (string) $summary['content'] : null,
 					'summary'    => isset( $summary['summary'] ) ? sanitize_text_field( (string) $summary['summary'] ) : null,
 				),
 				static fn( $value ) => null !== $value && '' !== $value
@@ -233,17 +234,19 @@ class JobArtifacts {
 					'agent_id' => $agent_id,
 					'user_id'  => $user_id,
 					'date'     => $date,
+					'content'  => isset( $tool_call['content'] ) ? (string) $tool_call['content'] : '',
 				);
 			}
 		}
 
 		$artifacts = array();
 		foreach ( $dates as $memory_scope ) {
-			$date = (string) $memory_scope['date'];
+			$date                       = (string) $memory_scope['date'];
 			list( $year, $month, $day ) = explode( '-', $date );
 			$daily_memory               = new DailyMemory( (int) $memory_scope['user_id'], (int) $memory_scope['agent_id'] );
 			$read                       = $daily_memory->read( $year, $month, $day );
-			if ( empty( $read['success'] ) ) {
+			$content                    = empty( $read['success'] ) ? $this->daily_memory_fallback_content( $date, (string) ( $memory_scope['content'] ?? '' ) ) : (string) ( $read['content'] ?? '' );
+			if ( '' === $content ) {
 				continue;
 			}
 
@@ -254,10 +257,23 @@ class JobArtifacts {
 				'date'                 => $date,
 				'source'               => 'daily-memory',
 				'bundle_relative_path' => sprintf( 'memory/agent/daily/%s/%s/%s.md', $year, $month, $day ),
-				'content'              => (string) ( $read['content'] ?? '' ),
+				'content'              => $content,
 			);
 		}
 
 		return $artifacts;
+	}
+
+	private function daily_memory_fallback_content( string $date, string $content ): string {
+		$content = trim( $content );
+		if ( '' === $content ) {
+			return '';
+		}
+
+		if ( str_starts_with( $content, '# Daily Memory:' ) ) {
+			return $content . "\n";
+		}
+
+		return sprintf( "# Daily Memory: %s\n\n%s\n", $date, $content );
 	}
 }
