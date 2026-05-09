@@ -94,49 +94,45 @@ class InternalLinkAudit extends BaseTool {
 			'description'     => 'Audit links on this WordPress site. Four actions: "audit" scans post content to build a link graph (cached 24hr), "orphans" lists posts with zero inbound links, "backlinks" gets all posts linking to a given post_id, "broken" performs HTTP HEAD checks for broken URLs (expensive, supports internal/external/all scope). Always run "audit" first, then use other actions for specific checks.',
 			'requires_config' => false,
 			'parameters'      => array(
-				'action'    => array(
+				'type'       => 'object',
+				'properties' => array(
+					'action'    => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'Action to perform: "audit" (scan + cache link graph), "orphans" (list orphaned posts), "backlinks" (get posts linking to a given post_id), or "broken" (HTTP check for broken links).',
 					'enum'        => array( 'audit', 'orphans', 'backlinks', 'broken' ),
 				),
-				'post_id'   => array(
+					'post_id'   => array(
 					'type'        => 'integer',
-					'required'    => false,
 					'description' => 'Post ID to get backlinks for (backlinks action only).',
 				),
-				'post_type' => array(
+					'post_type' => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Post type to audit (default: "post").',
 				),
-				'category'  => array(
+					'category'  => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Category slug to limit audit scope (audit action only).',
 				),
-				'force'     => array(
+					'force'     => array(
 					'type'        => 'boolean',
-					'required'    => false,
 					'description' => 'Force rebuild even if cached graph exists (audit action only).',
 				),
-				'scope'     => array(
+					'scope'     => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Link scope for broken action: "internal" (default), "external", or "all".',
 					'enum'        => array( 'internal', 'external', 'all' ),
 				),
-				'limit'     => array(
+					'limit'     => array(
 					'type'        => 'integer',
-					'required'    => false,
 					'description' => 'Maximum results to return. For orphans: max posts (default 50). For broken: max URLs to check (default 200).',
 				),
-				'types'     => array(
+					'types'     => array(
 					'type'        => 'array',
-					'required'    => false,
 					'description' => 'Optional edge types to include (e.g. ["html_anchor"], ["wikilink"]). Omit for all registered types.',
 					'items'       => array( 'type' => 'string' ),
 				),
+				),
+				'required'   => array( 'action' ),
 			),
 		);
 	}

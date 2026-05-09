@@ -104,11 +104,14 @@ class WebFetch extends BaseTool {
 			'description'     => 'Fetch and extract readable content from any HTTP/HTTPS web page URL (50K character limit). Use when you have a specific URL to retrieve full article content. Automatically converts HTML to readable text. Best for single-page content analysis after discovery via Google Search.',
 			'requires_config' => false,
 			'parameters'      => array(
-				'url' => array(
+				'type'       => 'object',
+				'properties' => array(
+					'url' => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'Full HTTP/HTTPS URL to fetch content from. Must be a valid web address.',
 				),
+				),
+				'required'   => array( 'url' ),
 			),
 		);
 	}

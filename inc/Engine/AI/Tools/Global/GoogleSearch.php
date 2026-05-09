@@ -143,16 +143,18 @@ class GoogleSearch extends BaseTool {
 			'description'     => 'Search the web using Google Custom Search and return 1-10 structured JSON results with titles, links, and snippets. Best for discovering external information when you don\'t have specific URLs. Use for current events, factual verification, or broad topic research. Returns complete web search data in JSON format with title, link, snippet for each result.',
 			'requires_config' => true,
 			'parameters'      => array(
-				'query'         => array(
+				'type'       => 'object',
+				'properties' => array(
+					'query'         => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'Search query for external web information. Returns JSON with "results" array containing web search results.',
 				),
-				'site_restrict' => array(
+					'site_restrict' => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Restrict search to specific domain (e.g., "wikipedia.org" for Wikipedia only)',
 				),
+				),
+				'required'   => array( 'query' ),
 			),
 		);
 	}

@@ -71,21 +71,22 @@ class BingWebmaster extends BaseTool {
 			'description'     => 'Fetch search analytics data from Bing Webmaster Tools. Returns query performance stats, traffic rankings, page-level stats, or crawl information for the configured site. Use to analyze search visibility, top queries, and crawl health on Bing.',
 			'requires_config' => true,
 			'parameters'      => array(
-				'action'   => array(
+				'type'       => 'object',
+				'properties' => array(
+					'action'   => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'Analytics action to perform: query_stats (search query performance), traffic_stats (rank and traffic data), page_stats (per-page metrics), crawl_stats (crawl information).',
 				),
-				'site_url' => array(
+					'site_url' => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Site URL to query. Defaults to the configured site URL.',
 				),
-				'limit'    => array(
+					'limit'    => array(
 					'type'        => 'integer',
-					'required'    => false,
 					'description' => 'Maximum number of results to return (default: 20).',
 				),
+				),
+				'required'   => array( 'action' ),
 			),
 		);
 	}

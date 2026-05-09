@@ -345,31 +345,30 @@ class QueueValidator extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Check if a topic already exists as a published post or in a Data Machine queue before generating content. Returns "clear" if no duplicates found, or "duplicate" with match details (title, similarity score, source). Always use this before adding topics to the queue or starting content generation to avoid duplicate work.',
 			'parameters'  => array(
-				'topic'                => array(
+				'type'       => 'object',
+				'properties' => array(
+					'topic'                => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'Topic or title to validate against existing content and queue items.',
 				),
-				'post_type'            => array(
+					'post_type'            => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'WordPress post type to check against (default: "post"). Use "recipe" for recipe validation, or any registered custom post type.',
 				),
-				'flow_id'              => array(
+					'flow_id'              => array(
 					'type'        => 'integer',
-					'required'    => false,
 					'description' => 'Data Machine flow ID to check queue against. Required together with flow_step_id to enable queue checking.',
 				),
-				'flow_step_id'         => array(
+					'flow_step_id'         => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Flow step ID to check queue against. Required together with flow_id to enable queue checking.',
 				),
-				'similarity_threshold' => array(
+					'similarity_threshold' => array(
 					'type'        => 'number',
-					'required'    => false,
 					'description' => 'Jaccard similarity threshold between 0.0 and 1.0 (default: 0.65). Lower values catch more potential duplicates.',
 				),
+				),
+				'required'   => array( 'topic' ),
 			),
 		);
 	}

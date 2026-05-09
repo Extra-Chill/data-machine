@@ -72,56 +72,50 @@ class GoogleAnalytics extends BaseTool {
 			'description'     => 'Fetch visitor analytics from Google Analytics (GA4). Get page performance metrics, traffic sources, daily trends, real-time active users, top events, user demographics, landing pages, engagement metrics, and new-vs-returning user breakdown. Supports sorting, hostname filtering for multisite, and period-over-period comparison.',
 			'requires_config' => true,
 			'parameters'      => array(
-				'action'      => array(
+				'type'       => 'object',
+				'properties' => array(
+					'action'      => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'Action to perform: page_stats (per-page views, sessions, bounce rate), traffic_sources (where visitors come from), date_stats (daily trends over time), realtime (active users right now), top_events (most triggered events), user_demographics (visitor country and device breakdown), landing_pages (entry pages with session metrics), engagement (engagement rate, session quality, pages/session), new_vs_returning (new vs returning user comparison).',
 				),
-				'property_id' => array(
+					'property_id' => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'GA4 property ID (numeric). Defaults to the configured property ID.',
 				),
-				'start_date'  => array(
+					'start_date'  => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Start date in YYYY-MM-DD format (defaults to 28 days ago). Not used for realtime action.',
 				),
-				'end_date'    => array(
+					'end_date'    => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'End date in YYYY-MM-DD format (defaults to yesterday). Not used for realtime action.',
 				),
-				'limit'       => array(
+					'limit'       => array(
 					'type'        => 'integer',
-					'required'    => false,
 					'description' => 'Row limit (default: 25, max: 10000).',
 				),
-				'page_filter' => array(
+					'page_filter' => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Filter results to pages with paths containing this string.',
 				),
-				'hostname'    => array(
+					'hostname'    => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Filter to pages on this hostname (for multisite GA4 properties).',
 				),
-				'sort_by'     => array(
+					'sort_by'     => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Sort results by this metric or dimension field name (e.g. bounceRate, sessions, engagementRate).',
 				),
-				'order'       => array(
+					'order'       => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Sort direction: asc or desc (default: desc).',
 				),
-				'compare'     => array(
+					'compare'     => array(
 					'type'        => 'boolean',
-					'required'    => false,
 					'description' => 'Compare against the previous period of equal length. Adds delta percentage columns.',
 				),
+				),
+				'required'   => array( 'action' ),
 			),
 		);
 	}

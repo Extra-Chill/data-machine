@@ -72,21 +72,22 @@ class PageSpeed extends BaseTool {
 			'description'     => 'Run Google PageSpeed Insights (Lighthouse) audits on any URL. Get performance scores, Core Web Vitals (LCP, CLS, INP, FCP, TTFB), accessibility and SEO scores, and actionable optimization opportunities with estimated savings. Use to audit page speed, monitor site health, and identify performance improvements.',
 			'requires_config' => false,
 			'parameters'      => array(
-				'action'   => array(
+				'type'       => 'object',
+				'properties' => array(
+					'action'   => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'Action to perform: analyze (full Lighthouse audit with all category scores and key metrics), performance (focused Core Web Vitals and performance metrics), opportunities (optimization suggestions sorted by estimated savings).',
 				),
-				'url'      => array(
+					'url'      => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'URL to analyze. Defaults to the WordPress site home URL.',
 				),
-				'strategy' => array(
+					'strategy' => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Device strategy: mobile (default) or desktop.',
 				),
+				),
+				'required'   => array( 'action' ),
 			),
 		);
 	}

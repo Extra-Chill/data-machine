@@ -41,12 +41,11 @@ class BingWebmasterTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'description', $def );
 		$this->assertArrayHasKey( 'parameters', $def );
 		$this->assertTrue( $def['requires_config'] );
-		$this->assertArrayHasKey( 'action', $def['parameters'] );
-		$this->assertTrue( $def['parameters']['action']['required'] );
-		$this->assertArrayHasKey( 'site_url', $def['parameters'] );
-		$this->assertFalse( $def['parameters']['site_url']['required'] );
-		$this->assertArrayHasKey( 'limit', $def['parameters'] );
-		$this->assertFalse( $def['parameters']['limit']['required'] );
+		$this->assertSame( 'object', $def['parameters']['type'] );
+		$this->assertSame( array( 'action' ), $def['parameters']['required'] );
+		$this->assertArrayHasKey( 'action', $def['parameters']['properties'] );
+		$this->assertArrayHasKey( 'site_url', $def['parameters']['properties'] );
+		$this->assertArrayHasKey( 'limit', $def['parameters']['properties'] );
 	}
 
 	/**

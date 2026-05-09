@@ -177,8 +177,9 @@ class QueueValidatorTest extends WP_UnitTestCase {
 		$this->assertSame( 'handle_tool_call', $def['method'] );
 		$this->assertArrayHasKey( 'description', $def );
 		$this->assertArrayHasKey( 'parameters', $def );
-		$this->assertArrayHasKey( 'topic', $def['parameters'] );
-		$this->assertTrue( $def['parameters']['topic']['required'] );
+		$this->assertSame( 'object', $def['parameters']['type'] );
+		$this->assertSame( array( 'topic' ), $def['parameters']['required'] );
+		$this->assertArrayHasKey( 'topic', $def['parameters']['properties'] );
 		$this->assertArrayNotHasKey( 'requires_config', $def );
 	}
 }

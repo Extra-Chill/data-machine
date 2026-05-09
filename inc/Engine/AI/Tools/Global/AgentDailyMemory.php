@@ -250,46 +250,42 @@ class AgentDailyMemory extends BaseTool {
 			'description'     => 'Manage daily memory journal entries (daily/YYYY/MM/DD.md). Use for session activity, temporal events, and work logs. Use "write" to record today\'s session notes (defaults to append mode). Use "read" to review a specific day. Use "search" to find past entries by keyword. Use "list" to see which days have entries. Daily memory captures WHAT HAPPENED — persistent knowledge belongs in agent_memory (MEMORY.md) instead.',
 			'requires_config' => false,
 			'parameters'      => array(
-				'user_id' => array(
+				'type'       => 'object',
+				'properties' => array(
+					'user_id' => array(
 					'type'        => 'integer',
-					'required'    => false,
 					'description' => 'Optional WordPress user ID for layered memory context. Defaults to current user context.',
 				),
-				'action'  => array(
+					'action'  => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'Action to perform: "read" (get daily file), "write" (add to daily file), "list" (show all daily files), or "search" (find entries by keyword).',
 				),
-				'date'    => array(
+					'date'    => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Date in YYYY-MM-DD format. Defaults to today. Used by "read" and "write".',
 				),
-				'content' => array(
+					'content' => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Content to write. Required for "write" action. Use markdown format with ### headings for session sections.',
 				),
-				'mode'    => array(
+					'mode'    => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Write mode: "append" adds to end of file (default), "write" replaces the entire file. Prefer "append" to preserve earlier entries from the same day.',
 				),
-				'query'   => array(
+					'query'   => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Search term for "search" action. Case-insensitive substring match across all daily files.',
 				),
-				'from'    => array(
+					'from'    => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'Start date (YYYY-MM-DD) for "search" action. Omit for no lower bound.',
 				),
-				'to'      => array(
+					'to'      => array(
 					'type'        => 'string',
-					'required'    => false,
 					'description' => 'End date (YYYY-MM-DD) for "search" action. Omit for no upper bound.',
 				),
+				),
+				'required'   => array( 'action' ),
 			),
 		);
 	}

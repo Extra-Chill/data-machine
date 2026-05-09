@@ -106,16 +106,18 @@ class WordPressPostReader extends BaseTool {
 			'description'     => 'Read full content and metadata from a specific WordPress post by permalink URL. Use after Local Search when you need complete post content instead of excerpts. Accepts standard WordPress permalinks (e.g., /post-slug/) or shortlinks (?p=123). Does NOT accept REST API URLs (/wp-json/...). Essential for content analysis before WordPress Update operations.',
 			'requires_config' => false,
 			'parameters'      => array(
-				'source_url'   => array(
+				'type'       => 'object',
+				'properties' => array(
+					'source_url'   => array(
 					'type'        => 'string',
-					'required'    => true,
 					'description' => 'WordPress permalink URL (e.g., https://site.com/post-slug/ or https://site.com/?p=123). Do not use REST API URLs.',
 				),
-				'include_meta' => array(
+					'include_meta' => array(
 					'type'        => 'boolean',
-					'required'    => false,
 					'description' => 'Include custom fields in response (default: false)',
 				),
+				),
+				'required'   => array( 'source_url' ),
 			),
 		);
 	}
