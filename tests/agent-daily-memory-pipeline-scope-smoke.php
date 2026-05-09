@@ -155,8 +155,6 @@ namespace {
 			'user_id'  => 77,
 			'agent_id' => 42,
 			'query'    => 'entry',
-			'from'     => null,
-			'to'       => null,
 		),
 		$agent_daily_memory_ability_inputs['datamachine/search-daily-memory'] ?? null,
 		'search uses executing agent scope',
