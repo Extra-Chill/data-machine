@@ -223,6 +223,45 @@ $assert( $response_no_user instanceof \WordPress\AiClient\Results\DTO\Generative
 $assert( '' === ( $captured_request['prompt'] ?? null ), 'no user message → wp-ai-client receives empty prompt (built without a MessagePart)' );
 $assert( 'System directive only.' === ( $captured_request['messages'][0]['content'] ?? null ), 'system instruction still reaches the builder when prompt is empty' );
 
+// --- No-argument tool schema --------------------------------------------------
+//
+// OpenAI still expects a function parameters schema for tools with no inputs.
+// The canonical empty schema is an object with no properties, not null.
+$captured_request = array();
+\DataMachine\Tests\Unit\Support\WpAiClientTestDouble::reset();
+\DataMachine\Tests\Unit\Support\WpAiClientTestDouble::set_response_callback(
+	function ( array $request ) use ( &$captured_request ): array {
+		$captured_request = $request;
+		return array(
+			'success' => true,
+			'data'    => array( 'content' => 'ok' ),
+		);
+	},
+);
+
+\DataMachine\Engine\AI\RequestBuilder::build(
+	array(
+		array(
+			'role'    => 'user',
+			'content' => 'Run no-arg tool.',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array(
+		'client/no_arg_tool' => array(
+			'name'        => 'client/no_arg_tool',
+			'description' => 'No argument test tool.',
+			'parameters'  => array(),
+		),
+	),
+	'pipeline',
+	array( 'job_id' => 1686 )
+);
+
+$empty_schema = $captured_request['tools']['client/no_arg_tool']['parameters'] ?? null;
+$assert( array( 'type' => 'object', 'properties' => array() ) === $empty_schema, 'no-argument tools use canonical empty object schema' );
+
 echo "\n{$assertions} assertions, " . count( $failures ) . " failures\n";
 
 if ( ! empty( $failures ) ) {
