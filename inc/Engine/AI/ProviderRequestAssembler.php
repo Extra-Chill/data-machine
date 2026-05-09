@@ -113,14 +113,15 @@ class ProviderRequestAssembler {
 	private static function normalizeToolParameters( mixed $parameters ): array {
 		if ( ! is_array( $parameters ) || empty( $parameters ) ) {
 			return array(
-				'type' => 'object',
+				'type'       => 'object',
+				'properties' => self::noArgumentToolProperties(),
 			);
 		}
 
 		if ( isset( $parameters['type'] ) || isset( $parameters['properties'] ) || isset( $parameters['required'] ) ) {
 			$parameters['type'] = $parameters['type'] ?? 'object';
 			if ( isset( $parameters['properties'] ) && is_array( $parameters['properties'] ) && empty( $parameters['properties'] ) ) {
-				unset( $parameters['properties'] );
+				$parameters['properties'] = self::noArgumentToolProperties();
 			}
 			return $parameters;
 		}
@@ -155,5 +156,17 @@ class ProviderRequestAssembler {
 		}
 
 		return $normalized;
+	}
+
+	/**
+	 * @return array<string, array<string, string>>
+	 */
+	private static function noArgumentToolProperties(): array {
+		return array(
+			'_unused' => array(
+				'type'        => 'boolean',
+				'description' => 'Ignored placeholder for providers that require at least one object property.',
+			),
+		);
 	}
 }
