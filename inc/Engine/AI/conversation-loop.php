@@ -20,6 +20,7 @@ use AgentsAPI\AI\WP_Agent_Conversation_Result;
 use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use AgentsAPI\AI\WP_Agent_Message;
 use AgentsAPI\AI\WP_Agent_Null_Transcript_Persister;
+use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
@@ -508,14 +509,16 @@ function datamachine_build_turn_runner(
 				$messages[] = ConversationManager::formatToolCallMessage( $tool_name, $tool_parameters, $turn_count );
 
 				// Execute through DM's ToolExecutor (action policy, post tracking).
+				$tool_payload = datamachine_payload_with_inflight_run_artifacts( $loop_payload, $tool_execution_results );
+
 				$tool_result = ToolExecutor::executeTool(
 					$tool_name,
 					$tool_parameters,
 					$tools,
-					$loop_payload,
+					$tool_payload,
 					$mode,
-					(int) ( $loop_payload['agent_id'] ?? 0 ),
-					is_array( $loop_payload['client_context'] ?? null ) ? $loop_payload['client_context'] : array()
+					(int) ( $tool_payload['agent_id'] ?? 0 ),
+					is_array( $tool_payload['client_context'] ?? null ) ? $tool_payload['client_context'] : array()
 				);
 
 				do_action(
@@ -847,6 +850,78 @@ function datamachine_resolve_transcript_persister( array $payload ): WP_Agent_Tr
 	}
 
 	return new WP_Agent_Null_Transcript_Persister();
+}
+
+/**
+ * Add an in-flight run artifact payload for tools that finalize a run.
+ *
+ * The AI step persists tool summaries after the conversation loop returns. A
+ * PR-creation tool runs inside that same loop, so artifact-aware tools need a
+ * snapshot of successful tool calls that already happened in the current loop.
+ *
+ * @param array $payload                Clean loop payload.
+ * @param array $tool_execution_results Tool execution results accumulated so far.
+ * @return array Payload with run_artifacts when they can be built.
+ */
+function datamachine_payload_with_inflight_run_artifacts( array $payload, array $tool_execution_results ): array {
+	$job_id = (int) ( $payload['job_id'] ?? 0 );
+	if ( $job_id <= 0 || empty( $tool_execution_results ) ) {
+		return $payload;
+	}
+
+	$artifact_result = ( new JobArtifacts() )->get(
+		$job_id,
+		datamachine_summarize_tool_execution_results( $tool_execution_results )
+	);
+	if ( empty( $artifact_result['success'] ) || ! is_array( $artifact_result['artifacts'] ?? null ) ) {
+		return $payload;
+	}
+
+	$payload['run_artifacts'] = $artifact_result['artifacts'];
+	return $payload;
+}
+
+/**
+ * Build a bounded, non-secret summary of in-flight tool calls.
+ *
+ * @param array $tool_execution_results Tool execution results accumulated by the loop.
+ * @return array<int, array<string, mixed>>
+ */
+function datamachine_summarize_tool_execution_results( array $tool_execution_results ): array {
+	$summaries = array();
+
+	foreach ( $tool_execution_results as $result ) {
+		if ( ! is_array( $result ) ) {
+			continue;
+		}
+
+		$tool_name   = sanitize_key( (string) ( $result['tool_name'] ?? '' ) );
+		$tool_result = is_array( $result['result'] ?? null ) ? $result['result'] : array();
+		$parameters  = is_array( $result['parameters'] ?? null ) ? $result['parameters'] : array();
+		if ( '' === $tool_name ) {
+			continue;
+		}
+
+		$summary = array(
+			'tool_name'  => $tool_name,
+			'success'    => true === ( $tool_result['success'] ?? false ),
+			'turn_count' => isset( $result['turn_count'] ) ? (int) $result['turn_count'] : null,
+			'summary'    => isset( $tool_result['message'] ) ? sanitize_text_field( (string) $tool_result['message'] ) : null,
+		);
+
+		if ( 'agent_daily_memory' === $tool_name ) {
+			$summary['action'] = isset( $parameters['action'] ) ? sanitize_key( (string) $parameters['action'] ) : null;
+			$summary['date']   = isset( $parameters['date'] ) ? sanitize_text_field( (string) $parameters['date'] ) : gmdate( 'Y-m-d' );
+			$summary['mode']   = isset( $parameters['mode'] ) ? sanitize_key( (string) $parameters['mode'] ) : null;
+		}
+
+		$summaries[] = array_filter(
+			$summary,
+			static fn( $value ) => null !== $value && '' !== $value
+		);
+	}
+
+	return $summaries;
 }
 
 /**

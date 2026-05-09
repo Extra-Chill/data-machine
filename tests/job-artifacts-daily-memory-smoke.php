@@ -53,6 +53,18 @@ $assert(
 );
 
 $assert(
+	false !== strpos( $job_artifacts, 'additional_tool_summaries' )
+		&& false !== strpos( $job_artifacts, 'successful_tool_summaries_from_list' ),
+	'job artifact builder accepts in-flight tool summaries before engine_data persistence'
+);
+
+$assert(
+	false !== strpos( $loop, 'datamachine_payload_with_inflight_run_artifacts' )
+		&& false !== strpos( $loop, 'datamachine_summarize_tool_execution_results' ),
+	'conversation loop passes in-flight run artifacts to artifact-aware tools'
+);
+
+$assert(
 	false !== strpos( $job_artifacts, "'type'                 => 'agent_daily_memory'" )
 		&& false !== strpos( $job_artifacts, "memory/agent/daily/%s/%s/%s.md" )
 		&& false !== strpos( $job_artifacts, "'content'              =>" ),

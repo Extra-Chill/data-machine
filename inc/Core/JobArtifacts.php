@@ -19,10 +19,11 @@ class JobArtifacts {
 	/**
 	 * Build a deterministic artifact payload for a job.
 	 *
-	 * @param int $job_id Job ID.
+	 * @param int   $job_id                    Job ID.
+	 * @param array $additional_tool_summaries Tool summaries accumulated before engine_data persistence.
 	 * @return array{success: bool, artifacts?: array, error?: string}
 	 */
-	public function get( int $job_id ): array {
+	public function get( int $job_id, array $additional_tool_summaries = array() ): array {
 		if ( $job_id <= 0 ) {
 			return array(
 				'success' => false,
@@ -40,7 +41,10 @@ class JobArtifacts {
 
 		$engine_data = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
 		$agent       = $this->resolve_agent( $job, $engine_data );
-		$tool_calls  = $this->successful_tool_summaries( $engine_data );
+		$tool_calls  = array_merge(
+			$this->successful_tool_summaries( $engine_data ),
+			$this->successful_tool_summaries_from_list( $additional_tool_summaries )
+		);
 		$payload     = array(
 			'job_id'                 => $job_id,
 			'status'                 => (string) ( $job['status'] ?? '' ),
@@ -84,6 +88,13 @@ class JobArtifacts {
 	 */
 	private function successful_tool_summaries( array $engine_data ): array {
 		$summaries = is_array( $engine_data['tool_execution_summary'] ?? null ) ? $engine_data['tool_execution_summary'] : array();
+		return $this->successful_tool_summaries_from_list( $summaries );
+	}
+
+	/**
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function successful_tool_summaries_from_list( array $summaries ): array {
 		$successes = array();
 
 		foreach ( $summaries as $summary ) {
