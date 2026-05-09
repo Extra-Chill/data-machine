@@ -773,12 +773,7 @@ class RequestBuilder {
 		}
 
 		if ( isset( $parameters['properties'] ) && is_array( $parameters['properties'] ) && empty( $parameters['properties'] ) ) {
-			$parameters['properties'] = array(
-				'_unused' => array(
-					'type'        => 'boolean',
-					'description' => 'Ignored placeholder for providers that require at least one object property.',
-				),
-			);
+			$parameters['properties'] = (object) array();
 		}
 
 		return $parameters;
