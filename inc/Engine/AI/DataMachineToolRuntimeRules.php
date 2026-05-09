@@ -78,6 +78,13 @@ class DataMachineToolRuntimeRules {
 				'context' => array(),
 			);
 		}
+		if ( $this->hasToolCallAfter( $messages, $after_index, $then_require_one_of ) ) {
+			return array(
+				'allowed' => true,
+				'error'   => '',
+				'context' => array(),
+			);
+		}
 
 		$limited_tools = (array) $rule['limited_tools'];
 		$max_calls     = (int) $rule['max_calls'];
@@ -174,6 +181,22 @@ class DataMachineToolRuntimeRules {
 		}
 
 		return $count;
+	}
+
+	/**
+	 * @param array<int,array<string,mixed>> $messages Conversation messages.
+	 * @param array<int,string>              $tool_names Tool names.
+	 */
+	private function hasToolCallAfter( array $messages, int $after_index, array $tool_names ): bool {
+		$message_count = count( $messages );
+		for ( $i = $after_index + 1; $i < $message_count; $i++ ) {
+			$call = $this->toolCallFromMessage( $messages[ $i ] );
+			if ( $call && in_array( $call['tool_name'], $tool_names, true ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

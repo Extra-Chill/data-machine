@@ -520,6 +520,89 @@ assert_runtime_policy( 2 === count( array_filter( $runtime_rule_tool_names, stat
 assert_runtime_policy( 'create_github_issue' === ( $runtime_rule_result['tool_execution_results'][3]['tool_name'] ?? '' ), 'runtime rule allows required fallback tool after rejection' );
 assert_runtime_policy( str_contains( wp_json_encode( $runtime_rule_transcript->calls[0]['messages'] ?? array() ), 'TOOL POLICY REJECTED' ), 'runtime rule transcript includes rejection message' );
 
+$satisfied_runtime_rule_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$satisfied_runtime_rule_dispatch_count ) {
+		++$satisfied_runtime_rule_dispatch_count;
+		$tool_name = match ( $satisfied_runtime_rule_dispatch_count ) {
+			1 => 'workspace_worktree_add',
+			2, 3, 4 => 'workspace_read',
+			5 => 'workspace_edit',
+			default => 'workspace_git_status',
+		};
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => '',
+				'tool_calls' => array(
+					array(
+						'name'       => $tool_name,
+						'parameters' => array( 'name' => 'satisfied-rule-smoke-' . $satisfied_runtime_rule_dispatch_count ),
+					),
+				),
+			),
+		);
+	}
+);
+
+$satisfied_runtime_rule_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'allow status after required edit' ) ),
+	array(
+		'workspace_worktree_add' => array(
+			'name'        => 'workspace_worktree_add',
+			'description' => 'Prepare a workspace',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+		'workspace_read'         => array(
+			'name'        => 'workspace_read',
+			'description' => 'Inspect a workspace file',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+		'workspace_edit'         => array(
+			'name'        => 'workspace_edit',
+			'description' => 'Edit a workspace file',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+		'workspace_git_status'   => array(
+			'name'        => 'workspace_git_status',
+			'description' => 'Inspect workspace status after editing',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	'pipeline',
+	array(
+		'completion_assertions' => array(
+			'required_tool_names' => array( 'workspace_git_status' ),
+		),
+		'tool_runtime_rules'    => array(
+			array(
+				'id'                  => 'inspection-budget-satisfied-smoke',
+				'after_tool'          => 'workspace_worktree_add',
+				'limited_tools'       => array( 'workspace_read' ),
+				'max_calls'           => 2,
+				'then_require_one_of' => array( 'workspace_edit' ),
+			),
+		),
+	),
+	8
+);
+
+$satisfied_runtime_rule_tool_names = array_map( static fn( $entry ) => (string) ( $entry['tool_name'] ?? '' ), $satisfied_runtime_rule_result['tool_execution_results'] ?? array() );
+assert_runtime_policy( in_array( 'workspace_edit', $satisfied_runtime_rule_tool_names, true ), 'runtime rule allows required edit after inspection rejection' );
+assert_runtime_policy( in_array( 'workspace_git_status', $satisfied_runtime_rule_tool_names, true ), 'runtime rule stops restricting tools after required edit' );
+
 $assertion_policy = new DataMachineHandlerCompletionPolicy(
 	array(),
 	new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
