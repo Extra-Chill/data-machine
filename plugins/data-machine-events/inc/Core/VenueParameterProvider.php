@@ -21,57 +21,46 @@ class VenueParameterProvider {
 	private const TOOL_PARAMETERS = array(
 		'venue'            => array(
 			'type'        => 'string',
-			'required'    => false,
 			'description' => 'Venue name where the event takes place',
 		),
 		'venueAddress'     => array(
 			'type'        => 'string',
-			'required'    => false,
 			'description' => 'Street address of the venue',
 		),
 		'venueCity'        => array(
 			'type'        => 'string',
-			'required'    => false,
 			'description' => 'City where the venue is located',
 		),
 		'venueState'       => array(
 			'type'        => 'string',
-			'required'    => false,
 			'description' => 'State/province where the venue is located',
 		),
 		'venueZip'         => array(
 			'type'        => 'string',
-			'required'    => false,
 			'description' => 'Postal/zip code of the venue',
 		),
 		'venueCountry'     => array(
 			'type'        => 'string',
-			'required'    => false,
 			'description' => 'Country where the venue is located',
 		),
 		'venuePhone'       => array(
 			'type'        => 'string',
-			'required'    => false,
 			'description' => 'Phone number of the venue',
 		),
 		'venueWebsite'     => array(
 			'type'        => 'string',
-			'required'    => false,
 			'description' => 'Website URL of the venue',
 		),
 		'venueCoordinates' => array(
 			'type'        => 'string',
-			'required'    => false,
 			'description' => 'GPS coordinates (latitude,longitude format)',
 		),
 		'venueCapacity'    => array(
 			'type'        => 'string',
-			'required'    => false,
 			'description' => 'Maximum venue capacity',
 		),
 		'venueTimezone'    => array(
 			'type'        => 'string',
-			'required'    => false,
 			'description' => 'IANA timezone identifier (e.g., America/Chicago, America/Los_Angeles)',
 		),
 	);
@@ -91,12 +80,16 @@ class VenueParameterProvider {
 	);
 
 	/**
-	 * Get all possible venue tool parameters.
+	 * Get all possible venue tool parameters as a canonical fragment.
 	 *
-	 * @return array Complete parameter definitions
+	 * No venue parameter is required at the schema level — venue presence
+	 * is enforced upstream via engine data / handler config, not via the
+	 * tool schema.
+	 *
+	 * @return array Canonical fragment with `properties`.
 	 */
 	protected static function getAllParameters(): array {
-		return self::TOOL_PARAMETERS;
+		return array( 'properties' => self::TOOL_PARAMETERS );
 	}
 
 	/**
@@ -116,13 +109,13 @@ class VenueParameterProvider {
 	 *
 	 * @param array $handler_config Handler configuration
 	 * @param array $engine_data Engine data snapshot
-	 * @return array Tool parameter definitions (empty if venue data exists)
+	 * @return array Canonical fragment, or empty array when venue is pre-configured.
 	 */
 	public static function getToolParameters( array $handler_config, array $engine_data = array() ): array {
 		if ( self::hasVenueData( $handler_config, $engine_data ) ) {
 			return array();
 		}
-		return static::filterByEngineData( self::TOOL_PARAMETERS, $engine_data );
+		return static::filterByEngineData( array( 'properties' => self::TOOL_PARAMETERS ), $engine_data );
 	}
 
 	/**

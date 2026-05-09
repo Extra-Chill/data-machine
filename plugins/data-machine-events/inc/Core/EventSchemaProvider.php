@@ -218,7 +218,7 @@ class EventSchemaProvider {
 	/**
 	 * Get all possible tool parameters (trait implementation).
 	 *
-	 * @return array Complete parameter definitions
+	 * @return array Canonical fragment with `properties` and optional `required`.
 	 */
 	protected static function getAllParameters(): array {
 		return self::fieldsToToolParameters( self::getAllFields() );
@@ -239,18 +239,18 @@ class EventSchemaProvider {
 	 * Get core event tool parameters, filtered by engine data.
 	 *
 	 * @param array $engine_data Engine data snapshot
-	 * @return array Filtered core parameter definitions
+	 * @return array Canonical fragment with `properties` and optional `required`.
 	 */
 	public static function getCoreToolParameters( array $engine_data = array() ): array {
-		$params = self::fieldsToToolParameters( self::CORE_FIELDS );
-		return static::filterByEngineData( $params, $engine_data );
+		$fragment = self::fieldsToToolParameters( self::CORE_FIELDS );
+		return static::filterByEngineData( $fragment, $engine_data );
 	}
 
 	/**
 	 * Get schema enrichment tool parameters, filtered by engine data.
 	 *
 	 * @param array $engine_data Engine data snapshot
-	 * @return array Filtered schema parameter definitions
+	 * @return array Canonical fragment with `properties` and optional `required`.
 	 */
 	public static function getSchemaToolParameters( array $engine_data = array() ): array {
 		$schema_fields = array_merge(
@@ -260,19 +260,19 @@ class EventSchemaProvider {
 			self::STATUS_FIELDS,
 			self::TYPE_FIELDS
 		);
-		$params        = self::fieldsToToolParameters( $schema_fields );
-		return static::filterByEngineData( $params, $engine_data );
+		$fragment      = self::fieldsToToolParameters( $schema_fields );
+		return static::filterByEngineData( $fragment, $engine_data );
 	}
 
 	/**
 	 * Get all tool parameters, filtered by engine data.
 	 *
 	 * @param array $engine_data Engine data snapshot
-	 * @return array Filtered parameter definitions
+	 * @return array Canonical fragment with `properties` and optional `required`.
 	 */
 	public static function getAllToolParameters( array $engine_data = array() ): array {
-		$params = self::fieldsToToolParameters( self::getAllFields() );
-		return static::filterByEngineData( $params, $engine_data );
+		$fragment = self::fieldsToToolParameters( self::getAllFields() );
+		return static::filterByEngineData( $fragment, $engine_data );
 	}
 
 	public static function getFieldKeys( string $category = 'all' ): array {
@@ -318,18 +318,29 @@ class EventSchemaProvider {
 		return $event_data;
 	}
 
+	/**
+	 * Convert a field definition map into a canonical JSON Schema fragment.
+	 *
+	 * Returns `{ properties: {...}, required: [...] }`. The `required` key is
+	 * omitted when no field declares `required => true` so we do not emit
+	 * an empty `required: []` (which OpenAI's strict tool-schema validator
+	 * rejects in some configurations).
+	 *
+	 * @param array $fields Field declarations keyed by parameter name.
+	 * @return array Canonical fragment with `properties` and optional `required`.
+	 */
 	private static function fieldsToToolParameters( array $fields ): array {
-		$params = array();
+		$properties = array();
+		$required   = array();
 
 		foreach ( $fields as $key => $field ) {
-			$param = array(
+			$property = array(
 				'type'        => $field['type'],
-				'required'    => $field['required'] ?? false,
 				'description' => $field['description'],
 			);
 
 			if ( ! empty( $field['enum'] ) ) {
-				$param['enum'] = $field['enum'];
+				$property['enum'] = $field['enum'];
 			}
 
 			// JSON Schema requires `items` on every array type, and OpenAI's
@@ -338,13 +349,22 @@ class EventSchemaProvider {
 			// array when the declaration is incomplete to avoid emitting an
 			// invalid schema that would fail at runtime.
 			if ( 'array' === ( $field['type'] ?? '' ) ) {
-				$param['items'] = $field['items'] ?? array( 'type' => 'string' );
+				$property['items'] = $field['items'] ?? array( 'type' => 'string' );
 			}
 
-			$params[ $key ] = $param;
+			$properties[ $key ] = $property;
+
+			if ( ! empty( $field['required'] ) ) {
+				$required[] = $key;
+			}
 		}
 
-		return $params;
+		$fragment = array( 'properties' => $properties );
+		if ( ! empty( $required ) ) {
+			$fragment['required'] = $required;
+		}
+
+		return $fragment;
 	}
 
 	public static function generateSchemaOrg( array $event_data, array $venue_data, array $organizer_data = array(), int $post_id = 0 ): array {

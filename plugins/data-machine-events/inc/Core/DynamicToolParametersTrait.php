@@ -38,9 +38,14 @@ trait DynamicToolParametersTrait {
 	 * Excludes parameters that already have values in engine data,
 	 * preventing the AI from seeing or providing redundant values.
 	 *
+	 * Returns a canonical JSON Schema fragment shaped as
+	 * `{ properties: {...}, required?: [...] }`. Composers merge multiple
+	 * fragments at the registration site to build a full
+	 * `{ type: 'object', properties, required }` schema.
+	 *
 	 * @param array $handler_config Handler configuration
 	 * @param array $engine_data Engine data snapshot
-	 * @return array Filtered parameter definitions
+	 * @return array Canonical fragment with `properties` and optional `required`.
 	 */
 	public static function getToolParameters( array $handler_config, array $engine_data = array() ): array {
 		return static::filterByEngineData( static::getAllParameters(), $engine_data );
@@ -49,25 +54,51 @@ trait DynamicToolParametersTrait {
 	/**
 	 * Filter parameters based on engine data presence.
 	 *
-	 * @param array $parameters All available parameters
+	 * Operates on canonical fragments. Properties whose key matches an
+	 * engine-aware key with a non-empty engine_data value are removed
+	 * from `properties` and the corresponding entry is removed from
+	 * `required`.
+	 *
+	 * @param array $fragment Canonical fragment with `properties` and optional `required`.
 	 * @param array $engine_data Engine data snapshot
-	 * @return array Filtered parameters
+	 * @return array Filtered canonical fragment
 	 */
-	protected static function filterByEngineData( array $parameters, array $engine_data ): array {
+	protected static function filterByEngineData( array $fragment, array $engine_data ): array {
 		if ( empty( $engine_data ) ) {
-			return $parameters;
+			return $fragment;
+		}
+
+		$properties = $fragment['properties'] ?? array();
+		$required   = $fragment['required'] ?? array();
+
+		if ( ! is_array( $properties ) ) {
+			return $fragment;
 		}
 
 		$engine_aware = static::getEngineAwareKeys();
 		$filtered     = array();
 
-		foreach ( $parameters as $key => $definition ) {
+		foreach ( $properties as $key => $definition ) {
 			if ( in_array( $key, $engine_aware, true ) && ! empty( $engine_data[ $key ] ) ) {
 				continue;
 			}
 			$filtered[ $key ] = $definition;
 		}
 
-		return $filtered;
+		$result = array( 'properties' => $filtered );
+
+		if ( is_array( $required ) && ! empty( $required ) ) {
+			$still_required = array_values(
+				array_filter(
+					$required,
+					static fn( $name ) => is_string( $name ) && array_key_exists( $name, $filtered )
+				)
+			);
+			if ( ! empty( $still_required ) ) {
+				$result['required'] = $still_required;
+			}
+		}
+
+		return $result;
 	}
 }

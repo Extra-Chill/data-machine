@@ -66,43 +66,108 @@ class EventUpsertFilters {
 	/**
 	 * Generate dynamic event tool based on taxonomy, venue settings, and engine data.
 	 *
-	 * All parameter methods filter by engine data - if a value exists in engine data,
-	 * the parameter is excluded from the tool definition so the AI doesn't see it.
+	 * Composes a canonical JSON Schema (`{ type: object, properties, required }`)
+	 * for the `upsert_event` tool from four fragment sources. Each fragment
+	 * provider returns either:
+	 *   - canonical fragment: `{ properties: {...}, required?: [...] }`
+	 *     (EventSchemaProvider, VenueParameterProvider), or
+	 *   - flat property bag: `{ name => def, ... }` with no top-level
+	 *     `properties`/`required` keys (TaxonomyHandler in data-machine core).
+	 *
+	 * The flat shape is treated as a degenerate fragment with no required
+	 * fields. This keeps EventUpsertFilters tolerant of TaxonomyHandler's
+	 * existing return shape until data-machine core converts it to the
+	 * canonical fragment shape.
+	 *
+	 * All parameter methods filter by engine data - if a value exists in
+	 * engine data, the parameter is excluded from the tool definition so
+	 * the AI doesn't see it.
 	 *
 	 * @param array $handler_config Handler configuration
 	 * @param array $engine_data Engine data snapshot
-	 * @return array Tool definition
+	 * @return array Tool definition with canonical JSON Schema parameters.
 	 */
 	private static function getDynamicEventTool( array $handler_config, array $engine_data = array() ): array {
 		$ue_config = $handler_config['upsert_event'] ?? $handler_config;
 
-		$tool = array(
-			'class'       => EventUpsert::class,
-			'method'      => 'handle_tool_call',
-			'handler'     => 'upsert_event',
-			'description' => 'Create or update WordPress event post. Automatically finds existing events by title, venue, and date. Updates if data changed, skips if unchanged, creates if new.',
-			'parameters'  => array(),
+		$fragments = array(
+			// Core event parameters (title, dates, description) - filtered by engine data.
+			EventSchemaProvider::getCoreToolParameters( $engine_data ),
+			// Schema enrichment parameters (performer, organizer, status, etc.) - filtered by engine data.
+			EventSchemaProvider::getSchemaToolParameters( $engine_data ),
+			// Taxonomy parameters - config-driven (ai_decides vs skip vs preselected).
+			// Owned by data-machine core; currently returns a flat property bag.
+			TaxonomyHandler::getTaxonomyToolParameters( $ue_config, Event_Post_Type::POST_TYPE ),
+			// Venue parameters - filtered by engine data.
+			VenueParameterProvider::getToolParameters( $ue_config, $engine_data ),
 		);
 
-		// Core event parameters (title, dates, description) - filtered by engine data
-		$core_params        = EventSchemaProvider::getCoreToolParameters( $engine_data );
-		$tool['parameters'] = array_merge( $tool['parameters'], $core_params );
+		$parameters = self::composeCanonicalParameters( $fragments );
 
-		// Schema enrichment parameters (performer, organizer, status, etc.) - filtered by engine data
-		$schema_params      = EventSchemaProvider::getSchemaToolParameters( $engine_data );
-		$tool['parameters'] = array_merge( $tool['parameters'], $schema_params );
+		return array(
+			'class'          => EventUpsert::class,
+			'method'         => 'handle_tool_call',
+			'handler'        => 'upsert_event',
+			'description'    => 'Create or update WordPress event post. Automatically finds existing events by title, venue, and date. Updates if data changed, skips if unchanged, creates if new.',
+			'parameters'     => $parameters,
+			'handler_config' => $ue_config,
+		);
+	}
 
-		// Taxonomy parameters - config-driven (ai_decides vs skip vs preselected)
-		$taxonomy_params    = TaxonomyHandler::getTaxonomyToolParameters( $ue_config, Event_Post_Type::POST_TYPE );
-		$tool['parameters'] = array_merge( $tool['parameters'], $taxonomy_params );
+	/**
+	 * Compose canonical JSON Schema parameters from a list of fragments.
+	 *
+	 * Each fragment is either:
+	 *   - canonical: `{ properties: {...}, required?: [...] }`, or
+	 *   - flat property bag: `{ name => def, ... }` (treated as
+	 *     `{ properties: <bag> }` with no required fields).
+	 *
+	 * Empty fragments are skipped.
+	 *
+	 * @param array $fragments List of provider fragments.
+	 * @return array Canonical JSON Schema: `{ type: object, properties, required? }`.
+	 */
+	private static function composeCanonicalParameters( array $fragments ): array {
+		$properties = array();
+		$required   = array();
 
-		// Venue parameters - filtered by engine data
-		$venue_params       = VenueParameterProvider::getToolParameters( $ue_config, $engine_data );
-		$tool['parameters'] = array_merge( $tool['parameters'], $venue_params );
+		foreach ( $fragments as $fragment ) {
+			if ( ! is_array( $fragment ) || empty( $fragment ) ) {
+				continue;
+			}
 
-		$tool['handler_config'] = $ue_config;
+			if ( isset( $fragment['properties'] ) && is_array( $fragment['properties'] ) ) {
+				$properties = array_merge( $properties, $fragment['properties'] );
+				if ( isset( $fragment['required'] ) && is_array( $fragment['required'] ) ) {
+					$required = array_merge( $required, $fragment['required'] );
+				}
+				continue;
+			}
 
-		return $tool;
+			// Legacy flat property bag (e.g. data-machine core's TaxonomyHandler).
+			// Treat the entire fragment as the properties map; no required fields.
+			$properties = array_merge( $properties, $fragment );
+		}
+
+		$required = array_values(
+			array_unique(
+				array_filter(
+					$required,
+					static fn( $name ) => is_string( $name ) && array_key_exists( $name, $properties )
+				)
+			)
+		);
+
+		$parameters = array(
+			'type'       => 'object',
+			'properties' => $properties,
+		);
+
+		if ( ! empty( $required ) ) {
+			$parameters['required'] = $required;
+		}
+
+		return $parameters;
 	}
 }
 
