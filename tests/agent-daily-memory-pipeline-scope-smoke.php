@@ -163,6 +163,21 @@ namespace {
 	);
 
 	PermissionHelper::clear_agent_context();
+	$tool->handle_tool_call( array( 'action' => 'write', 'content' => 'pipeline entry', 'user_id' => 77, 'agent_id' => 42 ) );
+	assert_daily_memory_scope(
+		array(
+			'user_id'  => 77,
+			'agent_id' => 42,
+			'content'  => 'pipeline entry',
+			'date'     => gmdate( 'Y-m-d' ),
+			'mode'     => 'append',
+		),
+		$agent_daily_memory_ability_inputs['datamachine/daily-memory-write'] ?? null,
+		'pipeline payload agent_id preserves agent memory scope without permission context',
+		$failures,
+		$passes
+	);
+
 	$tool->handle_tool_call( array( 'action' => 'read', 'date' => '2026-05-09', 'user_id' => 123 ) );
 	assert_daily_memory_scope(
 		array(
