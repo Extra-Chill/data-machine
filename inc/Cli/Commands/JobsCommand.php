@@ -22,6 +22,7 @@ use DataMachine\Abilities\Job\JobsSummaryAbility;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Abilities\Job\RunMetricsAbility;
+use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use AgentsAPI\AI\WP_Agent_Message;
@@ -524,6 +525,53 @@ class JobsCommand extends BaseCommand {
 		}
 
 		$this->renderTranscriptText( $job_id, (string) $transcript_session_id, $session, $messages, $metadata );
+	}
+
+	/**
+	 * Export structured artifacts for a job.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <job_id>
+	 * : The job ID whose artifacts should be exported.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: json
+	 * options:
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine jobs artifacts 844 --format=json
+	 *
+	 * @subcommand artifacts
+	 */
+	public function artifacts( array $args, array $assoc_args ): void {
+		if ( empty( $args[0] ) || ! is_numeric( $args[0] ) || (int) $args[0] <= 0 ) {
+			WP_CLI::error( 'Job ID is required and must be a positive integer.' );
+			return;
+		}
+
+		$result = ( new JobArtifacts() )->get( (int) $args[0] );
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to build job artifacts.' );
+			return;
+		}
+
+		$payload = $result['artifacts'] ?? array();
+		$format  = $assoc_args['format'] ?? 'json';
+
+		if ( 'yaml' === $format ) {
+			/** @phpstan-ignore-next-line Spyc is provided by WP-CLI at runtime. */
+			WP_CLI::log( (string) call_user_func( array( 'Spyc', 'YAMLDump' ), $payload, false, false, true ) );
+			return;
+		}
+
+		WP_CLI::log( wp_json_encode( $payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
 	}
 
 	/**

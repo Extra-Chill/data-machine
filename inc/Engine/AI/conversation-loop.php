@@ -129,20 +129,20 @@ function datamachine_run_conversation(
 		);
 
 		return array(
-			'messages'                         => $messages,
-			'final_content'                    => '',
-			'turn_count'                       => 0,
-			'completed'                        => false,
-			'last_tool_calls'                  => array(),
-			'tool_execution_results'           => array(),
-			'error'                            => $error_message,
-			'error_code'                       => 'completion_required_tool_unavailable',
-			'completion_assertions_required'    => $assertions->required(),
-			'unavailable_required_tool_names'   => $unavailable_required_tools,
-			'available_tool_names'              => array_keys( $tools ),
-			'usage'                            => array(),
-			'request_metadata'                 => array(),
-			'status'                           => 'error',
+			'messages'                        => $messages,
+			'final_content'                   => '',
+			'turn_count'                      => 0,
+			'completed'                       => false,
+			'last_tool_calls'                 => array(),
+			'tool_execution_results'          => array(),
+			'error'                           => $error_message,
+			'error_code'                      => 'completion_required_tool_unavailable',
+			'completion_assertions_required'  => $assertions->required(),
+			'unavailable_required_tool_names' => $unavailable_required_tools,
+			'available_tool_names'            => array_keys( $tools ),
+			'usage'                           => array(),
+			'request_metadata'                => array(),
+			'status'                          => 'error',
 		);
 	}
 
@@ -264,6 +264,12 @@ function datamachine_run_conversation(
 		$result['completion_assertions_required']  = $latest_nudge['completion_assertions_required'] ?? array();
 		$result['completion_assertions_missing']   = $latest_nudge['completion_assertions_missing'] ?? array();
 		$result['completion_assertions_satisfied'] = $latest_nudge['completion_assertions_satisfied'] ?? array();
+	}
+	if ( $assertions->hasAssertions() ) {
+		$evaluation                                = $assertions->evaluate( $loop_payload, $final_content );
+		$result['completion_assertions_required']  = $assertions->required();
+		$result['completion_assertions_missing']   = $evaluation['missing'];
+		$result['completion_assertions_satisfied'] = $evaluation['satisfied'];
 	}
 	// Map upstream budget_exceeded status to DM's max_turns_reached flag
 	// for backward compatibility with ChatOrchestrator response shaping.
