@@ -22,6 +22,7 @@ use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
+use DataMachine\Engine\Bundle\BundleStepIdRemapper;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
 use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
@@ -693,7 +694,7 @@ class AgentBundler {
 				$existing_pipeline = $this->pipelines_repo->get_by_portable_slug( $agent_id, $portable_slug );
 				$target_pipeline   = $pipeline_data;
 				if ( $existing_pipeline ) {
-					$target_pipeline['pipeline_config'] = $this->remap_pipeline_step_ids( $pipeline_config, $old_id, (int) $existing_pipeline['pipeline_id'] );
+					$target_pipeline['pipeline_config'] = BundleStepIdRemapper::remap_pipeline_step_ids( $pipeline_config, $old_id, (int) $existing_pipeline['pipeline_id'] );
 				}
 				$payload = $this->pipeline_artifact_payload( $target_pipeline, $portable_slug );
 
@@ -733,7 +734,7 @@ class AgentBundler {
 					$created_pipeline_ids[] = (int) $new_pipeline_id;
 				}
 
-				$pipeline_config = $this->remap_pipeline_step_ids( $pipeline_config, $old_id, (int) $new_pipeline_id );
+				$pipeline_config = BundleStepIdRemapper::remap_pipeline_step_ids( $pipeline_config, $old_id, (int) $new_pipeline_id );
 				if ( ! $this->pipelines_repo->update_pipeline(
 				(int) $new_pipeline_id,
 				array(
@@ -786,7 +787,7 @@ class AgentBundler {
 				$flow_config         = is_array( $flow_data['flow_config'] ?? null ) ? $flow_data['flow_config'] : array();
 				$existing_flow       = $this->flows_repo->get_by_portable_slug( (int) $new_pipeline_id, $portable_slug );
 				$target_flow_config  = $existing_flow
-				? $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, (int) $existing_flow['flow_id'] )
+				? BundleStepIdRemapper::remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, (int) $existing_flow['flow_id'] )
 				: $flow_config;
 				$flow_payload_source = array_merge(
 				$flow_data,
@@ -831,7 +832,7 @@ class AgentBundler {
 				if ( $existing_flow ) {
 					$new_flow_id          = (int) $existing_flow['flow_id'];
 					$scheduling_to_ensure = is_array( $existing_flow['scheduling_config'] ?? null ) ? $existing_flow['scheduling_config'] : array();
-					$flow_config          = $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, $new_flow_id );
+					$flow_config          = BundleStepIdRemapper::remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, $new_flow_id );
 					$flow_config          = $reconcile_runtime
 					? AgentBundleRuntimeDrift::replace_runtime_queue_fields( $flow_config, $target_flow_config )
 					: $this->preserve_runtime_queue_fields( $flow_config, $existing_flow['flow_config'] ?? array() );
@@ -869,7 +870,7 @@ class AgentBundler {
 					}
 					$created_flow_ids[] = (int) $new_flow_id;
 
-					$flow_config = $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, (int) $new_flow_id );
+					$flow_config = BundleStepIdRemapper::remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, (int) $new_flow_id );
 					if ( ! $this->flows_repo->update_flow(
 					(int) $new_flow_id,
 					array(
@@ -1344,7 +1345,7 @@ class AgentBundler {
 
 			$old_pipeline_id = (int) $step_config['pipeline_id'];
 			if ( $old_pipeline_id > 0 && $flow_id > 0 ) {
-				$flow['flow_config'] = $this->remap_flow_step_ids( $flow_config, $old_pipeline_id, $new_pipeline_id, $flow_id );
+				$flow['flow_config'] = BundleStepIdRemapper::remap_flow_step_ids( $flow_config, $old_pipeline_id, $new_pipeline_id, $flow_id );
 			}
 
 			break;
@@ -1627,82 +1628,6 @@ class AgentBundler {
 			}
 			file_put_contents( $full_path, $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 		}
-	}
-
-	/**
-	 * Remap pipeline step IDs inside a pipeline config.
-	 *
-	 * @param array $pipeline_config Pipeline config.
-	 * @param int   $old_pipeline_id Original pipeline ID.
-	 * @param int   $new_pipeline_id New pipeline ID.
-	 * @return array Updated pipeline config.
-	 */
-	private function remap_pipeline_step_ids( array $pipeline_config, int $old_pipeline_id, int $new_pipeline_id ): array {
-		$remapped = array();
-
-		foreach ( $pipeline_config as $pipeline_step_id => $step_config ) {
-			$new_pipeline_step_id = $this->remap_step_id_prefix( (string) $pipeline_step_id, $old_pipeline_id, $new_pipeline_id );
-			if ( is_array( $step_config ) ) {
-				$step_config['pipeline_step_id'] = $new_pipeline_step_id;
-			}
-
-			$remapped[ $new_pipeline_step_id ] = $step_config;
-		}
-
-		return $remapped;
-	}
-
-	/**
-	 * Remap pipeline step IDs inside a flow config.
-	 *
-	 * Pipeline step IDs have the format {pipeline_id}_{uuid}. Flow step IDs add
-	 * the installed flow ID as the final suffix. Bundle-local IDs must be
-	 * rewritten after install or runtime lookups resolve the wrong pipeline.
-	 *
-	 * @param array $flow_config     Flow config.
-	 * @param int   $old_pipeline_id Original pipeline ID.
-	 * @param int   $new_pipeline_id New pipeline ID.
-	 * @param int   $new_flow_id     New flow ID.
-	 * @return array Updated flow config.
-	 */
-	private function remap_flow_step_ids( array $flow_config, int $old_pipeline_id, int $new_pipeline_id, int $new_flow_id ): array {
-		$remapped = array();
-
-		foreach ( $flow_config as $flow_step_id => $step_config ) {
-			$pipeline_step_id = is_array( $step_config ) && is_string( $step_config['pipeline_step_id'] ?? null )
-				? $step_config['pipeline_step_id']
-				: preg_replace( '/_\d+$/', '', (string) $flow_step_id );
-			$pipeline_step_id = $this->remap_step_id_prefix( (string) $pipeline_step_id, $old_pipeline_id, $new_pipeline_id );
-			$new_flow_step_id = $pipeline_step_id . '_' . $new_flow_id;
-
-			if ( is_array( $step_config ) ) {
-				$step_config['pipeline_step_id'] = $pipeline_step_id;
-				$step_config['pipeline_id']      = $new_pipeline_id;
-				$step_config['flow_id']          = $new_flow_id;
-				$step_config['flow_step_id']     = $new_flow_step_id;
-			}
-
-			$remapped[ $new_flow_step_id ] = $step_config;
-		}
-
-		return $remapped;
-	}
-
-	/**
-	 * Remap the pipeline ID prefix of a step ID.
-	 *
-	 * @param string $step_id         Step ID.
-	 * @param int    $old_pipeline_id Original pipeline ID.
-	 * @param int    $new_pipeline_id New pipeline ID.
-	 * @return string Remapped step ID.
-	 */
-	private function remap_step_id_prefix( string $step_id, int $old_pipeline_id, int $new_pipeline_id ): string {
-		$prefix = $old_pipeline_id . '_';
-		if ( $old_pipeline_id === $new_pipeline_id || ! str_starts_with( $step_id, $prefix ) ) {
-			return $step_id;
-		}
-
-		return $new_pipeline_id . '_' . substr( $step_id, strlen( $prefix ) );
 	}
 
 	/**

@@ -140,7 +140,10 @@ class SendEmailAbility {
 
 		// 1. Parse and validate recipients.
 		$to = array_map( 'trim', explode( ',', $config['to'] ) );
-		$to = array_filter( $to, 'is_email' );
+		$to = array_filter(
+			$to,
+			static fn( string $email ): bool => false !== is_email( $email )
+		);
 
 		if ( empty( $to ) ) {
 			$logs[] = array(
@@ -166,8 +169,8 @@ class SendEmailAbility {
 		$headers[] = "Content-Type: {$content_type}; charset=UTF-8";
 
 		// From.
-		$from_name  = $config['from_name'] ?: get_bloginfo( 'name' );
-		$from_email = $config['from_email'] ?: get_option( 'admin_email' );
+		$from_name  = ! empty( $config['from_name'] ) ? $config['from_name'] : get_bloginfo( 'name' );
+		$from_email = ! empty( $config['from_email'] ) ? $config['from_email'] : get_option( 'admin_email' );
 		if ( $from_name && $from_email ) {
 			$headers[] = sprintf( 'From: %s <%s>', $from_name, $from_email );
 		}
@@ -258,7 +261,7 @@ class SendEmailAbility {
 		global $phpmailer;
 		$error_msg = 'wp_mail() returned false';
 		if ( isset( $phpmailer ) && $phpmailer instanceof \PHPMailer\PHPMailer\PHPMailer ) {
-			$error_msg = $phpmailer->ErrorInfo ?: $error_msg;
+			$error_msg = ! empty( $phpmailer->ErrorInfo ) ? $phpmailer->ErrorInfo : $error_msg;
 		}
 
 		$logs[] = array(
@@ -313,6 +316,6 @@ class SendEmailAbility {
 			'{admin_email}' => get_option( 'admin_email' ),
 		);
 
-		return str_replace( array_keys( $replacements ), array_values( $replacements ), $text );
+		return str_replace( array_keys( $replacements ), array_map( 'strval', array_values( $replacements ) ), $text );
 	}
 }

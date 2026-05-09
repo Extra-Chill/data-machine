@@ -59,6 +59,7 @@ use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
+use DataMachine\Engine\Bundle\BundleStepIdRemapper;
 
 $failures = array();
 $passes   = 0;
@@ -207,39 +208,31 @@ $runtime_stripped_payload = call_bundle_private(
 );
 assert_bundle_update( 'flow artifact hashing ignores queue consume revision', ! isset( $runtime_stripped_payload['flow_config']['2_bundle_step_0_4']['_queue_consume_revision'] ) );
 
-$remapped_pipeline = call_bundle_private(
-	$bundler,
-	'remap_pipeline_step_ids',
+$remapped_pipeline = BundleStepIdRemapper::remap_pipeline_step_ids(
 	array(
-		array(
-			'2_bundle_step_0' => array(
-				'pipeline_step_id' => '2_bundle_step_0',
-				'step_type'        => 'fetch',
-			),
+		'2_bundle_step_0' => array(
+			'pipeline_step_id' => '2_bundle_step_0',
+			'step_type'        => 'fetch',
 		),
-		2,
-		3,
-	)
+	),
+	2,
+	3
 );
 assert_bundle_update( 'pipeline step key remaps to installed pipeline ID', isset( $remapped_pipeline['3_bundle_step_0'] ) );
 assert_bundle_update_equals( 'pipeline step metadata remaps to installed pipeline ID', '3_bundle_step_0', $remapped_pipeline['3_bundle_step_0']['pipeline_step_id'] ?? null );
 
-$remapped_flow = call_bundle_private(
-	$bundler,
-	'remap_flow_step_ids',
+$remapped_flow = BundleStepIdRemapper::remap_flow_step_ids(
 	array(
-		array(
-			'2_bundle_step_0_4' => array(
-				'flow_step_id'     => '2_bundle_step_0_4',
-				'pipeline_step_id' => '2_bundle_step_0',
-				'pipeline_id'      => 2,
-				'flow_id'          => 4,
-			),
+		'2_bundle_step_0_4' => array(
+			'flow_step_id'     => '2_bundle_step_0_4',
+			'pipeline_step_id' => '2_bundle_step_0',
+			'pipeline_id'      => 2,
+			'flow_id'          => 4,
 		),
-		2,
-		3,
-		9,
-	)
+	),
+	2,
+	3,
+	9
 );
 assert_bundle_update( 'flow step key remaps to installed pipeline and flow IDs', isset( $remapped_flow['3_bundle_step_0_9'] ) );
 assert_bundle_update_equals( 'flow step metadata pipeline_step_id remaps', '3_bundle_step_0', $remapped_flow['3_bundle_step_0_9']['pipeline_step_id'] ?? null );
