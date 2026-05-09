@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.31.4] - 2026-05-09
+
+### Changed
+- use fresh candidate collector for event prefilters
+
+### Fixed
+- single-owner module lifecycle on calendar content swaps (#233)
+- convert chat tools to canonical JSON Schema for DM 0.106.1
+
 ## [0.31.3] - 2026-05-04
 
 ### Fixed
