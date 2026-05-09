@@ -79,7 +79,13 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 
 	filterState.updateFilterCountBadge();
 
-	// Listen for external content updates (e.g., discovery page scope switching).
+	// Single owner for dynamic-module lifecycle when `.data-machine-events-content`
+	// is replaced. Fired by api-client.fetchCalendarEvents after every innerHTML
+	// swap (geo-sync re-fetch, pagination, scope switching, etc.). Modules that
+	// touch the content region must NOT drive their own destroy/init cycle —
+	// they register here, and only here. This is the architectural fix for the
+	// race where geo-sync forgot to re-init day-loader after a content swap,
+	// leaving deferred date shells permanently un-hydrated on location archives.
 	calendar.addEventListener(
 		'data-machine-calendar-content-updated',
 		function () {

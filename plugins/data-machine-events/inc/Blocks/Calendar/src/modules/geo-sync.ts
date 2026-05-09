@@ -15,8 +15,6 @@
 
 import { fetchCalendarEvents } from './api-client';
 import { getFilterState } from './filter-state';
-import { initLazyRender, destroyLazyRender } from './lazy-render';
-import { initCarousel, destroyCarousel } from './carousel';
 
 import type { GeoContext } from '../types';
 
@@ -200,17 +198,14 @@ async function fetchAndUpdate(
 		label: '',
 	} );
 
-	// Clean up existing dynamic UI before re-fetch.
-	destroyLazyRender( calendar );
-	destroyCarousel( calendar );
-
+	// Module lifecycle (lazy-render, day-loader, carousel) is driven by
+	// frontend.ts in response to the `data-machine-calendar-content-updated`
+	// event that fetchCalendarEvents fires after swapping innerHTML. This
+	// module does not destroy or re-init dynamic UI directly — single owner.
 	await fetchCalendarEvents( calendar, params, archiveContext );
 
-	// Re-initialize dynamic UI on new DOM.
-	initLazyRender( calendar );
-	initCarousel( calendar );
-
-	// Re-bind pagination links for REST fetching.
+	// Re-bind pagination links for REST fetching (geo-sync owns this since
+	// it injects geo params into pagination requests).
 	rebindPagination( calendar, geo );
 }
 
@@ -290,16 +285,14 @@ function rebindPagination(
 		const filterState = getFilterState( calendar );
 		filterState.updateUrl( linkParams );
 
-		destroyLazyRender( calendar );
-		destroyCarousel( calendar );
-
+		// Module lifecycle handled by frontend.ts via the
+		// `data-machine-calendar-content-updated` event. We only re-bind
+		// pagination here because geo-sync owns the geo-param injection.
 		fetchCalendarEvents(
 			calendar,
 			linkParams,
 			filterState.getArchiveContext()
 		).then( () => {
-			initLazyRender( calendar );
-			initCarousel( calendar );
 			rebindPagination( calendar, geo );
 		} );
 	} );

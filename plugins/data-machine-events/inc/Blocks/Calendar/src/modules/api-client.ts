@@ -52,6 +52,18 @@ export async function fetchCalendarEvents(
 			updatePagination( calendar, data.pagination );
 			updateCounter( calendar, content, data.counter );
 			updateNavigation( calendar, content, data.navigation );
+
+			// Notify lifecycle owners (frontend.ts) that the content region was
+			// replaced, so they can re-init dynamic modules (lazy-render,
+			// day-loader, carousel) on the new DOM. This is the single point
+			// of truth for content-swap notifications — every module that
+			// touches `.data-machine-events-content` should rely on this event,
+			// not drive its own destroy/init cycle.
+			calendar.dispatchEvent(
+				new CustomEvent( 'data-machine-calendar-content-updated', {
+					bubbles: false,
+				} )
+			);
 		}
 
 		return data;
