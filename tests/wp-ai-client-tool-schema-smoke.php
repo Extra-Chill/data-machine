@@ -175,6 +175,53 @@ $assert( 'object' === ( $schema['type'] ?? null ), 'canonical parameter schema r
 $assert( array( 'reason' ) === ( $schema['required'] ?? null ), 'canonical object-level required array is preserved' );
 $assert( 'string' === ( $schema['properties']['reason']['type'] ?? null ), 'property schema fields are preserved' );
 
+// --- Legacy flat parameter map normalization ---------------------------------
+//
+// Older internal tools may still declare parameters as a flat property map. The
+// provider-facing schema must still be canonical JSON Schema.
+$captured_request = array();
+\DataMachine\Tests\Unit\Support\WpAiClientTestDouble::reset();
+\DataMachine\Tests\Unit\Support\WpAiClientTestDouble::set_response_callback(
+	function ( array $request ) use ( &$captured_request ): array {
+		$captured_request = $request;
+		return array(
+			'success' => true,
+			'data'    => array( 'content' => 'ok' ),
+		);
+	},
+);
+
+\DataMachine\Engine\AI\RequestBuilder::build(
+	array(
+		array(
+			'role'    => 'user',
+			'content' => 'Run legacy tool.',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array(
+		'client/legacy_schema_tool' => array(
+			'name'        => 'client/legacy_schema_tool',
+			'description' => 'Legacy schema test tool.',
+			'parameters'  => array(
+				'reason' => array(
+					'type'        => 'string',
+					'description' => 'Reason text.',
+					'required'    => true,
+				),
+			),
+		),
+	),
+	'pipeline',
+	array( 'job_id' => 1686 )
+);
+
+$legacy_schema = $captured_request['tools']['client/legacy_schema_tool']['parameters'] ?? null;
+$assert( 'object' === ( $legacy_schema['type'] ?? null ), 'legacy flat parameter map becomes a root object schema' );
+$assert( array( 'reason' ) === ( $legacy_schema['required'] ?? null ), 'legacy property-level required flag becomes object-level required array' );
+$assert( ! isset( $legacy_schema['properties']['reason']['required'] ), 'legacy property-level required flag is removed from property schema' );
+
 // --- Empty-prompt fallback ----------------------------------------------------
 //
 // Regression coverage for https://github.com/Extra-Chill/data-machine/issues/1789.
