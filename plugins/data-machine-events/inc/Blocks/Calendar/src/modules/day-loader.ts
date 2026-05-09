@@ -14,6 +14,7 @@
  */
 
 import type { ArchiveContext } from '../types';
+import { buildCalendarRequest } from './api-client';
 import { initLazyRender } from './lazy-render';
 import { initCarousel } from './carousel';
 
@@ -148,42 +149,26 @@ async function fetchDayHtml(
 	archiveContext: Partial< ArchiveContext >,
 	geoContext: GeoContextData
 ): Promise< string | null > {
-	const params = new URLSearchParams();
-	params.set( 'date_start', date );
-	params.set( 'date_end', date );
-
-	// Preserve current page filters from URL.
-	const urlParams = new URLSearchParams( window.location.search );
-	const passthrough = [ 'event_search', 'scope', 'past' ];
-	passthrough.forEach( function ( key ) {
-		const val = urlParams.get( key );
-		if ( val ) {
-			params.set( key, val );
-		}
+	// Build via the shared helper so passthrough (event_search, scope,
+	// past, paged, tax_filter[*]) and archive/geo context stay consistent
+	// across all calendar REST callers. Per-day overrides win — date_start
+	// and date_end pin the request to this single day.
+	const params = buildCalendarRequest( {
+		archiveContext,
+		geoContext: {
+			lat: geoContext.lat,
+			lng: geoContext.lng,
+			// `radius` is typed as `number` on GeoContext but flows here as a
+			// wire string sourced from `data-geo-radius`. Cast at the helper
+			// boundary; the helper stringifies before writing the param.
+			radius: geoContext.radius as unknown as number,
+			radius_unit: geoContext.radius_unit as 'mi' | 'km',
+		},
+		overrides: {
+			date_start: date,
+			date_end: date,
+		},
 	} );
-
-	// Preserve taxonomy filters.
-	urlParams.forEach( function ( value, key ) {
-		if ( key.startsWith( 'tax_filter' ) ) {
-			params.append( key, value );
-		}
-	} );
-
-	if ( archiveContext.taxonomy && archiveContext.term_id ) {
-		params.set( 'archive_taxonomy', archiveContext.taxonomy );
-		params.set( 'archive_term_id', String( archiveContext.term_id ) );
-	}
-
-	if ( geoContext.lat && geoContext.lng ) {
-		params.set( 'lat', geoContext.lat );
-		params.set( 'lng', geoContext.lng );
-		if ( geoContext.radius ) {
-			params.set( 'radius', geoContext.radius );
-		}
-		if ( geoContext.radius_unit ) {
-			params.set( 'radius_unit', geoContext.radius_unit );
-		}
-	}
 
 	const response = await fetch(
 		`/wp-json/datamachine/v1/events/calendar?${ params.toString() }`,

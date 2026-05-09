@@ -4,12 +4,124 @@
 
 import type {
 	ArchiveContext,
+	CalendarRequest,
 	CalendarResponse,
 	DateContext,
 	FilterResponse,
 	GeoContext,
 	TaxFilters,
 } from '../types';
+
+/* ------------------------------------------------------------------ */
+/*  Calendar REST request builder — single source of truth             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Canonical passthrough list of calendar URL params.
+ *
+ * Every calendar URL param the REST endpoint understands lives here.
+ * `buildCalendarRequest()` reads these from `window.location.search`
+ * so re-fetches (geo-sync map pan, day-loader prefetch, pagination
+ * rebind) preserve every relevant URL param by default.
+ *
+ * Adding a new calendar URL param means adding it both here and to
+ * the `CalendarRequest` interface in `../types.ts`.
+ *
+ * `tax_filter[*]` is dynamic and walked separately — not in this list.
+ */
+const CALENDAR_PASSTHROUGH_KEYS: ( keyof CalendarRequest )[] = [
+	'event_search',
+	'scope',
+	'past',
+	'paged',
+	'date_start',
+	'date_end',
+];
+
+/**
+ * Build a URLSearchParams for the calendar REST endpoint.
+ *
+ * Single helper used by every JS module that hits
+ * `/wp-json/datamachine/v1/events/calendar`. Replaces the three
+ * separate URL builders that previously drifted (api-client,
+ * day-loader, geo-sync) — each had its own `passthrough` list and
+ * they silently disagreed (notably `scope` survived day-loader
+ * fetches but got dropped by geo-sync re-fetches).
+ *
+ * Order of operations:
+ *   1. Passthrough every canonical calendar param from
+ *      `window.location.search` (one source of truth).
+ *   2. Passthrough every `tax_filter[*]` entry from the URL.
+ *   3. Apply `archiveContext` (sets `archive_taxonomy` /
+ *      `archive_term_id` if both present).
+ *   4. Apply `geoContext` (sets `lat`/`lng`/`radius`/`radius_unit`
+ *      if `lat` and `lng` are present).
+ *   5. Apply `overrides` last — explicit per-caller params win
+ *      (e.g. day-loader sets `date_start`/`date_end` for a single
+ *      day, geo-sync injects fresh `lat`/`lng` from the bounds-
+ *      changed event).
+ *
+ * Callers that need to drop a param after building (e.g. geo-sync
+ * resets `paged` on geo change) can `params.delete( 'paged' )` on
+ * the returned object — the helper intentionally does not encode
+ * deletion semantics so the override semantics stay simple.
+ */
+export function buildCalendarRequest( opts: {
+	archiveContext?: Partial< ArchiveContext >;
+	geoContext?: Partial< GeoContext >;
+	overrides?: Partial< CalendarRequest >;
+} = {} ): URLSearchParams {
+	const params = new URLSearchParams();
+	const urlParams = new URLSearchParams( window.location.search );
+
+	// 1. Canonical passthrough.
+	CALENDAR_PASSTHROUGH_KEYS.forEach( ( key ) => {
+		const val = urlParams.get( key );
+		if ( val ) {
+			params.set( key, val );
+		}
+	} );
+
+	// 2. Tax filters (dynamic key family).
+	for ( const [ key, value ] of urlParams.entries() ) {
+		if ( key.startsWith( 'tax_filter[' ) ) {
+			params.append( key, value );
+		}
+	}
+
+	// 3. Archive context.
+	const archiveContext = opts.archiveContext ?? {};
+	if ( archiveContext.taxonomy && archiveContext.term_id ) {
+		params.set( 'archive_taxonomy', archiveContext.taxonomy );
+		params.set( 'archive_term_id', String( archiveContext.term_id ) );
+	}
+
+	// 4. Geo context.
+	const geoContext = opts.geoContext ?? {};
+	if ( geoContext.lat && geoContext.lng ) {
+		params.set( 'lat', geoContext.lat );
+		params.set( 'lng', geoContext.lng );
+		if ( geoContext.radius !== undefined && geoContext.radius !== null ) {
+			params.set( 'radius', String( geoContext.radius ) );
+		}
+		if ( geoContext.radius_unit ) {
+			params.set( 'radius_unit', geoContext.radius_unit );
+		}
+	}
+
+	// 5. Per-caller overrides win.
+	const overrides = opts.overrides ?? {};
+	( Object.keys( overrides ) as ( keyof CalendarRequest )[] ).forEach(
+		( key ) => {
+			const val = overrides[ key ];
+			if ( val !== undefined && val !== null && val !== '' ) {
+				params.set( key, String( val ) );
+			}
+		}
+	);
+
+	return params;
+}
 
 export async function fetchCalendarEvents(
 	calendar: HTMLElement,

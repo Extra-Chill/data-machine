@@ -13,7 +13,7 @@
  * @since 0.14.0
  */
 
-import { fetchCalendarEvents } from './api-client';
+import { buildCalendarRequest, fetchCalendarEvents } from './api-client';
 import { getFilterState } from './filter-state';
 
 import type { GeoContext } from '../types';
@@ -161,39 +161,15 @@ async function fetchAndUpdate(
 	const filterState = getFilterState( calendar );
 	const archiveContext = filterState.getArchiveContext();
 
-	const params = new URLSearchParams();
-
-	// Geo params.
-	if ( geo.lat && geo.lng ) {
-		params.set( 'lat', geo.lat );
-		params.set( 'lng', geo.lng );
-		params.set( 'radius', String( geo.radius ) );
-		params.set( 'radius_unit', geo.radius_unit );
-	}
-
-	// Preserve existing filters from URL.
-	const urlParams = new URLSearchParams( window.location.search );
-
-	const passthroughKeys = [
-		'event_search',
-		'date_start',
-		'date_end',
-		'past',
-		'paged',
-	];
-	passthroughKeys.forEach( ( key ) => {
-		const val = urlParams.get( key );
-		if ( val ) {
-			params.set( key, val );
-		}
+	// Build via the shared helper so passthrough stays consistent with
+	// day-loader and api-client (notably `scope` now survives geo
+	// re-fetches — see #237). Geo lives in `geoContext` so the helper
+	// applies it consistently. `paged` is intentionally cleared after
+	// the helper runs because a viewport change resets pagination.
+	const params = buildCalendarRequest( {
+		archiveContext,
+		geoContext: geo,
 	} );
-
-	// Taxonomy filters.
-	for ( const [ key, value ] of urlParams.entries() ) {
-		if ( key.startsWith( 'tax_filter[' ) ) {
-			params.append( key, value );
-		}
-	}
 
 	// Reset to page 1 on geo change.
 	params.delete( 'paged' );

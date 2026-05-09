@@ -67,6 +67,40 @@ export interface TaxonomyData {
 }
 
 /* ------------------------------------------------------------------ */
+/*  REST API request shape                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The complete set of calendar URL params understood by the
+ * `/wp-json/datamachine/v1/events/calendar` endpoint, expressed as
+ * URL-wire strings (everything that ends up in URLSearchParams is a
+ * string at the network boundary).
+ *
+ * This is the single source of truth used by `buildCalendarRequest()`
+ * to drive passthrough from `window.location.search` and to type the
+ * `overrides` map. Adding a new calendar URL param means adding it
+ * here once.
+ *
+ * `tax_filter[*]` is intentionally not modeled here — it's a dynamic
+ * key family, not a fixed param, and `buildCalendarRequest()` walks
+ * `urlParams.entries()` to passthrough every `tax_filter[...]` key.
+ */
+export interface CalendarRequest {
+	event_search: string;
+	scope: string;
+	past: string;
+	paged: string;
+	date_start: string;
+	date_end: string;
+	archive_taxonomy: string;
+	archive_term_id: string;
+	lat: string;
+	lng: string;
+	radius: string;
+	radius_unit: string;
+}
+
+/* ------------------------------------------------------------------ */
 /*  REST API responses                                                 */
 /* ------------------------------------------------------------------ */
 
