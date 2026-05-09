@@ -60,6 +60,10 @@ class DataMachineToolRuntimeRules {
 	 * @return array{allowed:bool,error:string,context:array<string,mixed>}
 	 */
 	private function evaluateRule( array $rule, string $tool_name, array $messages ): array {
+		if ( 'require_prior_tool' === ( $rule['type'] ?? '' ) ) {
+			return $this->evaluateRequirePriorToolRule( $rule, $tool_name, $messages );
+		}
+
 		$after_tool  = (string) $rule['after_tool'];
 		$after_index = $this->lastToolCallIndex( $messages, $after_tool );
 		if ( $after_index < 0 ) {
@@ -122,12 +126,73 @@ class DataMachineToolRuntimeRules {
 	}
 
 	/**
+	 * @param array<string,mixed> $rule Runtime rule.
+	 * @return array{allowed:bool,error:string,context:array<string,mixed>}
+	 */
+	private function evaluateRequirePriorToolRule( array $rule, string $tool_name, array $messages ): array {
+		$before_tool = (string) $rule['before_tool'];
+		if ( $tool_name !== $before_tool ) {
+			return array(
+				'allowed' => true,
+				'error'   => '',
+				'context' => array(),
+			);
+		}
+
+		$required_tools = (array) $rule['require_prior_tool'];
+		foreach ( $required_tools as $required_tool ) {
+			if ( $this->lastToolCallIndex( $messages, (string) $required_tool ) >= 0 ) {
+				return array(
+					'allowed' => true,
+					'error'   => '',
+					'context' => array(),
+				);
+			}
+		}
+
+		$required = implode( ', ', $required_tools );
+		$error    = sprintf(
+			'TOOL POLICY REJECTED: Before using %1$s, first use one of: %2$s.',
+			$before_tool,
+			$required
+		);
+
+		return array(
+			'allowed' => false,
+			'error'   => $error,
+			'context' => array(
+				'rule_id'            => (string) $rule['id'],
+				'before_tool'        => $before_tool,
+				'require_prior_tool' => $required_tools,
+				'rejected_tool'      => $tool_name,
+			),
+		);
+	}
+
+	/**
 	 * @return array<int,array<string,mixed>>
 	 */
 	private function normalizeRules( array $rules ): array {
 		$normalized = array();
 		foreach ( $rules as $index => $rule ) {
 			if ( ! is_array( $rule ) ) {
+				continue;
+			}
+
+			$type = $this->sanitizeRuleType( $rule['type'] ?? '' );
+			if ( 'require_prior_tool' === $type ) {
+				$before_tool        = $this->sanitizeToolName( $rule['before_tool'] ?? '' );
+				$require_prior_tool = $this->sanitizeToolList( $rule['require_prior_tool'] ?? $rule['require_prior_tools'] ?? array() );
+				if ( '' === $before_tool || empty( $require_prior_tool ) ) {
+					continue;
+				}
+
+				$normalized[] = array(
+					'id'                 => $this->sanitizeRuleId( $rule['id'] ?? 'tool-runtime-rule-' . $index ),
+					'type'               => 'require_prior_tool',
+					'before_tool'        => $before_tool,
+					'require_prior_tool' => $require_prior_tool,
+				);
 				continue;
 			}
 
@@ -220,6 +285,11 @@ class DataMachineToolRuntimeRules {
 	private function sanitizeRuleId( $value ): string {
 		$id = preg_replace( '/[^a-zA-Z0-9_\-]/', '-', (string) $value ) ?? '';
 		return '' !== $id ? $id : 'tool-runtime-rule';
+	}
+
+	private function sanitizeRuleType( $value ): string {
+		$value = sanitize_key( (string) $value );
+		return in_array( $value, array( 'require_prior_tool' ), true ) ? $value : '';
 	}
 
 	private function sanitizeToolName( $value ): string {
