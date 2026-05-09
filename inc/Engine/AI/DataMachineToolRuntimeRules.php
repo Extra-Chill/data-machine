@@ -139,9 +139,10 @@ class DataMachineToolRuntimeRules {
 			);
 		}
 
-		$required_tools = (array) $rule['require_prior_tool'];
+		$required_tools      = (array) $rule['require_prior_tool'];
+		$required_parameters = is_array( $rule['require_prior_tool_parameters'] ?? null ) ? $rule['require_prior_tool_parameters'] : array();
 		foreach ( $required_tools as $required_tool ) {
-			if ( $this->lastToolCallIndex( $messages, (string) $required_tool ) >= 0 ) {
+			if ( $this->lastToolCallIndex( $messages, (string) $required_tool, is_array( $required_parameters[ $required_tool ] ?? null ) ? $required_parameters[ $required_tool ] : array() ) >= 0 ) {
 				return array(
 					'allowed' => true,
 					'error'   => '',
@@ -161,10 +162,11 @@ class DataMachineToolRuntimeRules {
 			'allowed' => false,
 			'error'   => $error,
 			'context' => array(
-				'rule_id'            => (string) $rule['id'],
-				'before_tool'        => $before_tool,
-				'require_prior_tool' => $required_tools,
-				'rejected_tool'      => $tool_name,
+				'rule_id'                       => (string) $rule['id'],
+				'before_tool'                   => $before_tool,
+				'require_prior_tool'            => $required_tools,
+				'require_prior_tool_parameters' => $required_parameters,
+				'rejected_tool'                 => $tool_name,
 			),
 		);
 	}
@@ -181,17 +183,19 @@ class DataMachineToolRuntimeRules {
 
 			$type = $this->sanitizeRuleType( $rule['type'] ?? '' );
 			if ( 'require_prior_tool' === $type ) {
-				$before_tool        = $this->sanitizeToolName( $rule['before_tool'] ?? '' );
-				$require_prior_tool = $this->sanitizeToolList( $rule['require_prior_tool'] ?? $rule['require_prior_tools'] ?? array() );
+				$before_tool                   = $this->sanitizeToolName( $rule['before_tool'] ?? '' );
+				$require_prior_tool            = $this->sanitizeToolList( $rule['require_prior_tool'] ?? $rule['require_prior_tools'] ?? array() );
+				$require_prior_tool_parameters = $this->sanitizeToolParameterConditions( $rule['require_prior_tool_parameters'] ?? array(), $require_prior_tool );
 				if ( '' === $before_tool || empty( $require_prior_tool ) ) {
 					continue;
 				}
 
 				$normalized[] = array(
-					'id'                 => $this->sanitizeRuleId( $rule['id'] ?? 'tool-runtime-rule-' . $index ),
-					'type'               => 'require_prior_tool',
-					'before_tool'        => $before_tool,
-					'require_prior_tool' => $require_prior_tool,
+					'id'                            => $this->sanitizeRuleId( $rule['id'] ?? 'tool-runtime-rule-' . $index ),
+					'type'                          => 'require_prior_tool',
+					'before_tool'                   => $before_tool,
+					'require_prior_tool'            => $require_prior_tool,
+					'require_prior_tool_parameters' => $require_prior_tool_parameters,
 				);
 				continue;
 			}
@@ -220,10 +224,10 @@ class DataMachineToolRuntimeRules {
 	/**
 	 * @param array<int,array<string,mixed>> $messages Conversation messages.
 	 */
-	private function lastToolCallIndex( array $messages, string $tool_name ): int {
+	private function lastToolCallIndex( array $messages, string $tool_name, array $parameter_conditions = array() ): int {
 		for ( $i = count( $messages ) - 1; $i >= 0; $i-- ) {
 			$call = $this->toolCallFromMessage( $messages[ $i ] );
-			if ( $call && $call['tool_name'] === $tool_name ) {
+			if ( $call && $call['tool_name'] === $tool_name && $this->toolCallMatchesParameters( $call, $parameter_conditions ) ) {
 				return $i;
 			}
 		}
@@ -266,7 +270,7 @@ class DataMachineToolRuntimeRules {
 
 	/**
 	 * @param array<string,mixed> $message Conversation message.
-	 * @return array{tool_name:string}|null
+	 * @return array{tool_name:string,parameters:array<string,mixed>}|null
 	 */
 	private function toolCallFromMessage( array $message ): ?array {
 		$envelope = WP_Agent_Message::normalize( $message );
@@ -279,7 +283,31 @@ class DataMachineToolRuntimeRules {
 			return null;
 		}
 
-		return array( 'tool_name' => $tool_name );
+		$parameters = $envelope['payload']['parameters'] ?? array();
+
+		return array(
+			'tool_name'  => $tool_name,
+			'parameters' => is_array( $parameters ) ? $parameters : array(),
+		);
+	}
+
+	/**
+	 * @param array{tool_name:string,parameters:array<string,mixed>} $call Tool call.
+	 * @param array<string,mixed>                                    $conditions Parameter conditions.
+	 */
+	private function toolCallMatchesParameters( array $call, array $conditions ): bool {
+		if ( empty( $conditions ) ) {
+			return true;
+		}
+
+		$parameters = is_array( $call['parameters'] ?? null ) ? $call['parameters'] : array();
+		foreach ( $conditions as $key => $expected ) {
+			if ( ! array_key_exists( $key, $parameters ) || $parameters[ $key ] !== $expected ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	private function sanitizeRuleId( $value ): string {
@@ -290,6 +318,37 @@ class DataMachineToolRuntimeRules {
 	private function sanitizeRuleType( $value ): string {
 		$value = sanitize_key( (string) $value );
 		return in_array( $value, array( 'require_prior_tool' ), true ) ? $value : '';
+	}
+
+	/**
+	 * @param mixed             $value Raw parameter condition map.
+	 * @param array<int,string> $tool_names Tools allowed by the prerequisite rule.
+	 * @return array<string,array<string,mixed>>
+	 */
+	private function sanitizeToolParameterConditions( $value, array $tool_names ): array {
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		$allowed_tools = array_flip( $tool_names );
+		$conditions    = array();
+		foreach ( $value as $tool_name => $tool_conditions ) {
+			$tool_name = $this->sanitizeToolName( $tool_name );
+			if ( '' === $tool_name || ! isset( $allowed_tools[ $tool_name ] ) || ! is_array( $tool_conditions ) ) {
+				continue;
+			}
+
+			foreach ( $tool_conditions as $parameter => $expected ) {
+				$parameter = sanitize_key( (string) $parameter );
+				if ( '' === $parameter || is_array( $expected ) || is_object( $expected ) ) {
+					continue;
+				}
+
+				$conditions[ $tool_name ][ $parameter ] = $expected;
+			}
+		}
+
+		return $conditions;
 	}
 
 	private function sanitizeToolName( $value ): string {

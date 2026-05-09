@@ -549,6 +549,8 @@ WpAiClientTestDouble::set_response_callback(
 			1 => 'create_github_pull_request',
 			2 => 'agent_daily_memory',
 			3 => 'create_github_pull_request',
+			4 => 'agent_daily_memory',
+			5 => 'create_github_pull_request',
 			default => '',
 		};
 
@@ -562,6 +564,11 @@ WpAiClientTestDouble::set_response_callback(
 			);
 		}
 
+		$parameters = array( 'name' => 'pr-prerequisite-smoke-' . $pr_prerequisite_dispatch_count );
+		if ( 'agent_daily_memory' === $tool_name ) {
+			$parameters['action'] = 2 === $pr_prerequisite_dispatch_count ? 'read' : 'write';
+		}
+
 		return array(
 			'success' => true,
 			'data'    => array(
@@ -569,7 +576,7 @@ WpAiClientTestDouble::set_response_callback(
 				'tool_calls' => array(
 					array(
 						'name'       => $tool_name,
-						'parameters' => array( 'name' => 'pr-prerequisite-smoke-' . $pr_prerequisite_dispatch_count ),
+						'parameters' => $parameters,
 					),
 				),
 			),
@@ -590,7 +597,10 @@ $pr_prerequisite_result = datamachine_run_conversation(
 		'agent_daily_memory'         => array(
 			'name'        => 'agent_daily_memory',
 			'description' => 'Write daily memory',
-			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'parameters'  => array(
+				'name'   => array( 'type' => 'string' ),
+				'action' => array( 'type' => 'string' ),
+			),
 			'class'       => RuntimePolicySmokeTool::class,
 			'method'      => 'execute',
 		),
@@ -608,15 +618,18 @@ $pr_prerequisite_result = datamachine_run_conversation(
 				'type'               => 'require_prior_tool',
 				'before_tool'        => 'create_github_pull_request',
 				'require_prior_tool' => array( 'agent_daily_memory' ),
+				'require_prior_tool_parameters' => array(
+					'agent_daily_memory' => array( 'action' => 'write' ),
+				),
 			),
 		),
 	),
-	6
+	8
 );
 
 $pr_prerequisite_tool_names = array_map( static fn( $entry ) => (string) ( $entry['tool_name'] ?? '' ), $pr_prerequisite_result['tool_execution_results'] ?? array() );
-assert_runtime_policy( 4 === $pr_prerequisite_dispatch_count, 'prior-tool runtime rule rejects premature PR and allows retry after memory' );
-assert_runtime_policy( array( 'agent_daily_memory', 'create_github_pull_request' ) === $pr_prerequisite_tool_names, 'prior-tool runtime rule excludes rejected PR from tool results' );
+assert_runtime_policy( 6 === $pr_prerequisite_dispatch_count, 'prior-tool runtime rule rejects premature PR until parameter-matched memory' );
+assert_runtime_policy( array( 'agent_daily_memory', 'agent_daily_memory', 'create_github_pull_request' ) === $pr_prerequisite_tool_names, 'prior-tool runtime rule excludes rejected PR attempts from tool results' );
 assert_runtime_policy( str_contains( wp_json_encode( $pr_prerequisite_result['messages'] ?? array() ), 'Before using create_github_pull_request' ), 'prior-tool runtime rule explains required tool order' );
 
 $satisfied_runtime_rule_dispatch_count = 0;
