@@ -57,12 +57,14 @@ class DataMachineCompletionAssertions {
 	 * @param array      $tool_result Tool result.
 	 */
 	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result ): void {
-		if ( '' !== $tool_name ) {
+		$tool_succeeded = true === ( $tool_result['success'] ?? false );
+
+		if ( '' !== $tool_name && $tool_succeeded ) {
 			$this->executed_tool_names[] = $tool_name;
 		}
 
 		$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
-		if ( $is_handler_tool && ( $tool_result['success'] ?? false ) ) {
+		if ( $is_handler_tool && $tool_succeeded ) {
 			$this->available_output_packet_types[] = 'ai_handler_complete';
 			return;
 		}

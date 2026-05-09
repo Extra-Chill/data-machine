@@ -641,6 +641,34 @@ $non_handler_assertion_decision = $non_handler_assertion_policy->recordToolResul
 assert_runtime_policy( ! $non_handler_assertion_decision->isComplete(), 'handler policy waits after non-handler tools when generic assertions are missing' );
 assert_runtime_policy( str_contains( $non_handler_assertion_decision->context()['continuation_message'] ?? '', 'create_github_pull_request' ), 'handler policy nudges after non-handler tools with missing assertions' );
 
+$failed_required_tool_policy = new DataMachineHandlerCompletionPolicy(
+	array(),
+	new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
+		array(
+			'required_tool_names' => array( 'workspace_edit', 'workspace_git_commit' ),
+		)
+	)
+);
+$failed_required_tool_policy->recordToolResult(
+	'workspace_edit',
+	array( 'name' => 'workspace_edit' ),
+	array(
+		'success' => false,
+		'error'   => 'old_string not found in file content.',
+	),
+	array( 'mode' => 'pipeline' ),
+	1
+);
+$failed_required_tool_decision = $failed_required_tool_policy->recordNaturalCompletion(
+	array( array( 'role' => 'user', 'content' => 'edit then commit' ) ),
+	'I cannot proceed.',
+	array( 'mode' => 'pipeline' ),
+	2
+);
+
+assert_runtime_policy( ! $failed_required_tool_decision->isComplete(), 'failed required tool does not satisfy completion assertion' );
+assert_runtime_policy( array( 'workspace_edit', 'workspace_git_commit' ) === ( $failed_required_tool_decision->context()['missing']['tool_names'] ?? null ), 'failed required tool remains in missing assertion list' );
+
 $dispatch_count     = 0;
 $provider_context   = null;
 $completion_policy  = new RuntimePolicySmokeCompletionPolicy();
