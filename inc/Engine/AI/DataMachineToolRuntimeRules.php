@@ -139,7 +139,7 @@ class DataMachineToolRuntimeRules {
 			);
 		}
 
-		$required_tools = (array) $rule['require_prior_tool'];
+		$required_tools      = (array) $rule['require_prior_tool'];
 		$required_parameters = is_array( $rule['require_prior_tool_parameters'] ?? null ) ? $rule['require_prior_tool_parameters'] : array();
 		foreach ( $required_tools as $required_tool ) {
 			if ( $this->lastToolCallIndex( $messages, (string) $required_tool, is_array( $required_parameters[ $required_tool ] ?? null ) ? $required_parameters[ $required_tool ] : array() ) >= 0 ) {
@@ -191,11 +191,11 @@ class DataMachineToolRuntimeRules {
 				}
 
 				$normalized[] = array(
-					'id'                              => $this->sanitizeRuleId( $rule['id'] ?? 'tool-runtime-rule-' . $index ),
-					'type'                            => 'require_prior_tool',
-					'before_tool'                     => $before_tool,
-					'require_prior_tool'              => $require_prior_tool,
-					'require_prior_tool_parameters'   => $require_prior_tool_parameters,
+					'id'                            => $this->sanitizeRuleId( $rule['id'] ?? 'tool-runtime-rule-' . $index ),
+					'type'                          => 'require_prior_tool',
+					'before_tool'                   => $before_tool,
+					'require_prior_tool'            => $require_prior_tool,
+					'require_prior_tool_parameters' => $require_prior_tool_parameters,
 				);
 				continue;
 			}
