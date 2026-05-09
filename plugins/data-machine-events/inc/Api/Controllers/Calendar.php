@@ -12,6 +12,7 @@ defined( 'ABSPATH' ) || exit;
 
 use WP_REST_Request;
 use DataMachineEvents\Abilities\CalendarAbilities;
+use DataMachineEvents\Blocks\Calendar\Query\CalendarRequest;
 
 /**
  * Calendar API controller
@@ -25,27 +26,9 @@ class Calendar {
 	 * @return \WP_REST_Response
 	 */
 	public function calendar( WP_REST_Request $request ) {
-		$abilities = new CalendarAbilities();
-		$result    = $abilities->executeGetCalendarPage(
-			array(
-				'paged'            => $request->get_param( 'paged' ) ?? 1,
-				'past'             => '1' === $request->get_param( 'past' ),
-				'event_search'     => $request->get_param( 'event_search' ) ?? '',
-				'date_start'       => $request->get_param( 'date_start' ) ?? '',
-				'date_end'         => $request->get_param( 'date_end' ) ?? '',
-				'scope'            => $request->get_param( 'scope' ) ?? '',
-				'tax_filter'       => $request->get_param( 'tax_filter' ) ?? array(),
-				'archive_taxonomy' => $request->get_param( 'archive_taxonomy' ) ?? '',
-				'archive_term_id'  => $request->get_param( 'archive_term_id' ) ?? 0,
-				'geo_lat'          => $request->get_param( 'lat' ) ?? '',
-				'geo_lng'          => $request->get_param( 'lng' ) ?? '',
-				'geo_radius'       => $request->get_param( 'radius' ) ?? 25,
-				'geo_radius_unit'  => $request->get_param( 'radius_unit' ) ?? 'mi',
-				'include_html'     => true,
-				'include_gaps'     => true,
-				'progressive'      => true,
-			)
-		);
+		$calendar_request = CalendarRequest::fromRestRequest( $request );
+		$abilities        = new CalendarAbilities();
+		$result           = $abilities->executeGetCalendarPage( $calendar_request->toAbilitiesArgs() );
 
 		return rest_ensure_response(
 			array(

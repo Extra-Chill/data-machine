@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use DataMachineEvents\Abilities\CalendarAbilities;
 use DataMachineEvents\Abilities\FilterAbilities;
-use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
+use DataMachineEvents\Blocks\Calendar\Query\CalendarRequest;
 
 if ( wp_is_json_request() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
 	return '';
@@ -25,88 +25,57 @@ if ( wp_is_json_request() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
 
 $show_search = $attributes['showSearch'] ?? true;
 
-$current_page = 1;
-if ( isset( $_GET['paged'] ) && absint( $_GET['paged'] ) > 0 ) {
-	$current_page = absint( $_GET['paged'] );
-} elseif ( get_query_var( 'paged' ) ) {
-	$current_page = max( 1, (int) get_query_var( 'paged' ) );
-}
-
-$show_past = isset( $_GET['past'] ) && '1' === $_GET['past'];
-
-$search_query    = isset( $_GET['event_search'] ) ? sanitize_text_field( wp_unslash( $_GET['event_search'] ) ) : '';
-$date_start      = isset( $_GET['date_start'] ) ? sanitize_text_field( wp_unslash( $_GET['date_start'] ) ) : '';
-$date_end        = isset( $_GET['date_end'] ) ? sanitize_text_field( wp_unslash( $_GET['date_end'] ) ) : '';
-$geo_lat         = isset( $_GET['lat'] ) ? sanitize_text_field( wp_unslash( $_GET['lat'] ) ) : '';
-$geo_lng         = isset( $_GET['lng'] ) ? sanitize_text_field( wp_unslash( $_GET['lng'] ) ) : '';
-$geo_radius      = isset( $_GET['radius'] ) ? absint( $_GET['radius'] ) : 25;
-$geo_radius_unit = isset( $_GET['radius_unit'] ) ? sanitize_key( wp_unslash( $_GET['radius_unit'] ) ) : 'mi';
-$tax_filters_raw = isset( $_GET['tax_filter'] ) ? wp_unslash( $_GET['tax_filter'] ) : array();
-$tax_filters     = array();
-
-if ( is_array( $tax_filters_raw ) ) {
-	foreach ( $tax_filters_raw as $taxonomy_slug => $term_ids ) {
-		$taxonomy_slug = sanitize_key( $taxonomy_slug );
-		$term_ids      = (array) $term_ids;
-		$clean_ids     = array();
-		foreach ( $term_ids as $term_id ) {
-			$term_id = absint( $term_id );
-			if ( $term_id > 0 ) {
-				$clean_ids[] = $term_id;
-			}
-		}
-		if ( ! empty( $clean_ids ) ) {
-			$tax_filters[ $taxonomy_slug ] = $clean_ids;
-		}
+// Resolve archive term context first so the value object can pick it up.
+$archive_term = null;
+if ( is_tax() ) {
+	$queried = get_queried_object();
+	if ( $queried instanceof WP_Term ) {
+		$archive_term = $queried;
 	}
 }
 
-// Resolve scope: URL ?scope= param takes priority, then block attribute, then empty (default).
-$scope = '';
-if ( isset( $_GET['scope'] ) ) {
-	$scope = sanitize_key( wp_unslash( $_GET['scope'] ) );
-} elseif ( ! empty( $attributes['defaultDateRange'] ) && 'current' !== $attributes['defaultDateRange'] ) {
-	$scope = $attributes['defaultDateRange'];
+// CalendarRequest::fromQueryArgs() owns sanitization + unslashing.
+// We only need to layer on two non-`$_GET` fallbacks before handing the
+// array off:
+//   1. `paged` falls back to the WP query var when `?paged=` is absent.
+//   2. `scope` falls back to the block's `defaultDateRange` attribute.
+// Passing the raw `$_GET` shape (still slashed) is intentional — the
+// value object will `wp_unslash()` each value as it sanitizes.
+// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+$query_args = $_GET;
+if ( ! isset( $query_args['paged'] ) || absint( $query_args['paged'] ) < 1 ) {
+	$query_var_paged = (int) get_query_var( 'paged' );
+	if ( $query_var_paged > 0 ) {
+		$query_args['paged'] = $query_var_paged;
+	}
 }
+if ( ! isset( $query_args['scope'] ) && ! empty( $attributes['defaultDateRange'] ) && 'current' !== $attributes['defaultDateRange'] ) {
+	$query_args['scope'] = (string) $attributes['defaultDateRange'];
+}
+
+$request = CalendarRequest::fromQueryArgs( $query_args, $archive_term );
+
+// Local aliases used by template includes / data attrs further down.
+$current_page    = $request->paged();
+$show_past       = $request->past();
+$search_query    = $request->eventSearch();
+$date_start      = $request->dateStart();
+$date_end        = $request->dateEnd();
+$scope           = $request->scope();
+$tax_filters     = $request->taxFilter();
+$geo_lat         = $request->geoLat();
+$geo_lng         = $request->geoLng();
+$geo_radius      = $request->geoRadius();
+$geo_radius_unit = $request->geoRadiusUnit();
 
 $archive_context = array(
-	'taxonomy'  => '',
-	'term_id'   => 0,
-	'term_name' => '',
+	'taxonomy'  => $request->archiveTaxonomy(),
+	'term_id'   => $request->archiveTermId(),
+	'term_name' => $archive_term instanceof WP_Term ? $archive_term->name : '',
 );
-
-if ( is_tax() ) {
-	$term = get_queried_object();
-	if ( $term && isset( $term->taxonomy ) && isset( $term->term_id ) ) {
-		$archive_context = array(
-			'taxonomy'  => $term->taxonomy,
-			'term_id'   => $term->term_id,
-			'term_name' => $term->name,
-		);
-	}
-}
 
 $abilities = new CalendarAbilities();
-$result    = $abilities->executeGetCalendarPage(
-	array(
-		'paged'            => $current_page,
-		'past'             => $show_past,
-		'event_search'     => $search_query,
-		'date_start'       => $date_start,
-		'date_end'         => $date_end,
-		'scope'            => $scope,
-		'tax_filter'       => $tax_filters,
-		'archive_taxonomy' => $archive_context['taxonomy'],
-		'archive_term_id'  => $archive_context['term_id'],
-		'geo_lat'          => $geo_lat,
-		'geo_lng'          => $geo_lng,
-		'geo_radius'       => $geo_radius,
-		'geo_radius_unit'  => $geo_radius_unit,
-		'include_html'     => true,
-		'include_gaps'     => true,
-		'progressive'      => true,
-	)
-);
+$result    = $abilities->executeGetCalendarPage( $request->toAbilitiesArgs() );
 
 $current_page        = $result['current_page'];
 $max_pages           = $result['max_pages'];
