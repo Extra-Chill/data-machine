@@ -2,6 +2,83 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.107.0] - 2026-05-09
+
+### Added
+- require prior tools before finalizers
+- declare run artifact egress policy
+- expose job artifacts for daily memory
+- resolve bundle prompt files
+- support outcome completion assertions
+- add AI tool runtime rules
+- add agent identity resolver
+- report scheduler health
+
+### Changed
+- Require canonical AI tool schemas
+- Expose in-flight run artifacts to tools
+- align caller context invariant
+- update caller context self-host invariant
+- align caller context validation
+- align caller context host assertions
+- Add completion nudge observability
+- Add natural completion assertions
+- Normalize handler-free flow step settings
+- Normalize handler-backed step config shape
+- Use effective agent resolution for memory CLI
+- Ensure DM tables exist on deploy-in-place and test boot
+- Drop pending-action legacy top-level fields
+- Rename misleading 'legacy' identifiers in active runtime code
+- Drop bounded pre-1.0 runtime shims
+- Drop pre-1.0 data-shape migrations
+
+### Fixed
+- clear focused release blockers
+- inject agent daily memory directive
+- persist inflight tool summaries
+- preserve empty tool schema properties
+- keep inflight daily memory artifacts
+- preserve daily memory artifact scope
+- keep no-argument tool schemas provider-compatible
+- preserve agent scope for daily memory tools
+- omit empty tool schema properties
+- encode empty tool properties as objects
+- normalize provider tool parameter schemas
+- canonicalize fetch disposition tool schemas
+- send empty schema for no-arg tools
+- match prerequisite tool parameters
+- normalize nested tool schema required flags
+- use Agents API markdown overflow planner
+- align completion assertion formatting
+- align bundle prompt file assignments
+- import bundled daily memory
+- preflight required completion assertion tools
+- require successful completion assertion tools
+- satisfy runtime rule after action
+- align runtime rule assignments
+- satisfy runtime rule lint
+- align runtime rule diagnostics
+- gate daily memory tool for pipelines
+- align agent slug context formatting
+- align agent route formatting
+- carry agent slugs through runtime contexts
+- prefer agent slugs for public inputs
+- align chat session assignments
+- adapt transcripts to agent slugs
+- align agent resolver assignments
+- continue after duplicate tool corrections
+- nudge after setup tools miss assertions
+- Fix completion nudge lint alignment
+- preserve bundle completion assertions
+- reenqueue imported scheduled flows
+- continue after handler setup tools
+- reconcile locally modified bundle flows
+- drain all due Data Machine actions
+- Fix flow step settings lint
+- honor bundle flow schedules
+- Fix AIStep lint alignment
+- Fix CI after migration cleanup
+
 ## [0.106.1] - 2026-05-08
 
 ### Changed
