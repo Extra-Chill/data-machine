@@ -155,11 +155,11 @@ $completed  = $result['completed'];
 ### Chat Agent Example
 
 ```php
-// Chat payload includes session_id, user_id, agent_id
+// Chat payload includes session_id, user_id, and public agent slug.
 $payload = [
-    'session_id' => $session_id,
-    'user_id'    => $user_id,
-    'agent_id'   => $agent_id,
+    'session_id'  => $session_id,
+    'user_id'     => $user_id,
+    'agent_slug'  => $agent_slug,
 ];
 
 $result = AIConversationLoop::run(

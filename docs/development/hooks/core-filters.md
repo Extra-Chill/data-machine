@@ -1609,7 +1609,7 @@ seam was introduced.
 apply_filters(
     'agents_api_memory_store',
     null,                       // Return WP_Agent_Memory_Store to short-circuit
-    WP_Agent_Memory_Scope $scope     // Identifies (layer, user_id, agent_id, filename)
+    WP_Agent_Memory_Scope $scope     // Identifies (layer, user_id, agent_slug, filename)
 );
 ```
 

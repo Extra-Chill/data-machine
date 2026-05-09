@@ -36,13 +36,13 @@ agents/chubes-bot/daily/
 **Source:** `inc/Core/FilesRepository/DailyMemory.php`
 **Since:** v0.32.0
 
-The `DailyMemory` class handles all file operations. It accepts `user_id` and `agent_id` constructor parameters for multi-agent scoping — the directory is resolved through `DirectoryManager`.
+The `DailyMemory` class handles all file operations. Public callers should select an agent with the `--agent` CLI flag or `agent`/`agent_slug` ability input; internally, `DailyMemory` accepts resolved `user_id` and `agent_id` constructor parameters for storage scoping, and the directory is resolved through `DirectoryManager`.
 
 ```php
 // Default (current agent context)
 $daily = new DailyMemory();
 
-// Scoped to a specific agent
+// Internally scoped to a resolved agent row
 $daily = new DailyMemory(user_id: 0, agent_id: 42);
 ```
 
@@ -196,7 +196,7 @@ Five abilities registered under the `datamachine` category:
 | `datamachine/search-daily-memory` | Search across daily files with optional date range. |
 | `datamachine/daily-memory-delete` | Delete a daily file by date. |
 
-All abilities accept `user_id` and `agent_id` parameters for multi-agent scoping. Write and delete operations respect the `daily_memory_enabled` setting — they return an error if daily memory is disabled.
+All abilities accept `user_id` plus the preferred public agent selectors `agent` or `agent_slug` for multi-agent scoping. Numeric `agent_id` remains a compatibility input after resolution to the internal agent row. Write and delete operations respect the `daily_memory_enabled` setting — they return an error if daily memory is disabled.
 
 ```php
 // Read today's daily memory
