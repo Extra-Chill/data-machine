@@ -820,12 +820,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "ec834af9394af25ba11a4d4f09b65f1474d3eec3"
+                "reference": "c365119d177e9d3fc568f8032695e87007ceab4c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/ec834af9394af25ba11a4d4f09b65f1474d3eec3",
-                "reference": "ec834af9394af25ba11a4d4f09b65f1474d3eec3",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/c365119d177e9d3fc568f8032695e87007ceab4c",
+                "reference": "c365119d177e9d3fc568f8032695e87007ceab4c",
                 "shasum": ""
             },
             "require": {
@@ -893,7 +893,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-05-10T14:56:05+00:00"
+            "time": "2026-05-10T20:26:56+00:00"
         },
         {
             "name": "dealerdirect/phpcodesniffer-composer-installer",
@@ -1587,6 +1587,6 @@
     "platform": {
         "php": ">=8.2"
     },
-    "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "platform-dev": [],
+    "plugin-api-version": "2.6.0"
 }

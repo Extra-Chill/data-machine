@@ -71,17 +71,12 @@ function datamachine_run_conversation(
 	$turn_budget = IterationBudgetRegistry::create( 'conversation_turns', 0, $max_turns );
 	$max_turns   = $turn_budget->ceiling();
 
-	// Mutable state accumulated across turns by the turn runner.
-	$last_request_metadata = array();
-	$last_tool_calls       = array();
-	$final_content         = '';
-	$turns_run             = 0;
-	$completion_nudges     = array();
-	$total_usage           = array(
-		'prompt_tokens'     => 0,
-		'completion_tokens' => 0,
-		'total_tokens'      => 0,
-	);
+	// DM-flavored mutable state accumulated by the turn runner. The substrate
+	// surfaces turn_count, final_content, usage, and request_metadata on the
+	// final result directly (see agents-api#136), so we only carry by-reference
+	// the things substrate doesn't track for us.
+	$last_tool_calls   = array();
+	$completion_nudges = array();
 
 	// Base log context for consistent logging.
 	$base_log_context = array_filter(
@@ -166,12 +161,8 @@ function datamachine_run_conversation(
 		$base_log_context,
 		$completion_policy,
 		$tool_runtime_rules,
-		$last_request_metadata,
 		$last_tool_calls,
-		$final_content,
-		$turns_run,
-		$completion_nudges,
-		$total_usage
+		$completion_nudges
 	);
 
 	// Build should_continue callback. Budget enforcement is handled by
@@ -222,16 +213,19 @@ function datamachine_run_conversation(
 		);
 	} catch ( \RuntimeException $e ) {
 		// The turn runner throws RuntimeException for wp-ai-client failures.
+		// We can't read the substrate's accumulated turn_count/usage/etc here
+		// because the loop didn't return — surface what we know with empty
+		// defaults for the substrate-tracked fields.
 		return array(
 			'messages'               => $messages,
 			'final_content'          => '',
-			'turn_count'             => $turns_run,
+			'turn_count'             => 0,
 			'completed'              => false,
 			'last_tool_calls'        => $last_tool_calls,
 			'tool_execution_results' => array(),
 			'error'                  => $e->getMessage(),
-			'usage'                  => $total_usage,
-			'request_metadata'       => $last_request_metadata,
+			'usage'                  => array(),
+			'request_metadata'       => array(),
 			'status'                 => 'error',
 		);
 	}
@@ -252,12 +246,11 @@ function datamachine_run_conversation(
 		);
 	}
 
-	$result['usage']            = $total_usage;
-	$result['request_metadata'] = $last_request_metadata;
-	$result['final_content']    = $final_content;
-	$result['turn_count']       = $turns_run;
-	$result['completed']        = 'budget_exceeded' !== ( $result['status'] ?? '' );
-	$result['last_tool_calls']  = $last_tool_calls;
+	// Substrate now surfaces turn_count, final_content, usage, and
+	// request_metadata directly on the result (agents-api#136). Augment with
+	// DM-only fields that the substrate doesn't know about.
+	$result['completed']       = 'budget_exceeded' !== ( $result['status'] ?? '' );
+	$result['last_tool_calls'] = $last_tool_calls;
 	if ( ! empty( $completion_nudges ) ) {
 		$latest_nudge                              = $completion_nudges[ count( $completion_nudges ) - 1 ];
 		$result['completion_nudge_count']          = count( $completion_nudges );
@@ -267,7 +260,7 @@ function datamachine_run_conversation(
 		$result['completion_assertions_satisfied'] = $latest_nudge['completion_assertions_satisfied'] ?? array();
 	}
 	if ( $assertions->hasAssertions() ) {
-		$evaluation                                = $assertions->evaluate( $loop_payload, $final_content );
+		$evaluation                                = $assertions->evaluate( $loop_payload, $result['final_content'] ?? '' );
 		$result['completion_assertions_required']  = $assertions->required();
 		$result['completion_assertions_missing']   = $evaluation['missing'];
 		$result['completion_assertions_satisfied'] = $evaluation['satisfied'];
@@ -294,21 +287,22 @@ function datamachine_run_conversation(
  * The upstream loop handles multi-turn sequencing, completion policy, and
  * transcript persistence.
  *
- * @param array                                           $tools                  Available tools.
- * @param string                                          $provider               AI provider.
- * @param string                                          $model                  AI model.
- * @param string                                          $mode                   Execution mode.
- * @param array                                           $loop_payload           Cleaned payload.
- * @param LoopEventSinkInterface                          $event_sink             DM event sink.
- * @param array                                           $base_log_context       Base log context.
- * @param WP_Agent_Conversation_Completion_Policy       $completion_policy      Completion policy.
- * @param DataMachineToolRuntimeRules                   $tool_runtime_rules     Tool runtime rules.
- * @param array                                           &$last_request_metadata Mutable request metadata.
- * @param array                                           &$last_tool_calls        Mutable last tool calls.
- * @param string                                          &$final_content          Mutable final assistant content.
- * @param int                                             &$turns_run              Mutable executed turn count.
- * @param array                                           &$completion_nudges      Mutable nudge diagnostics.
- * @param array                                           &$total_usage           Mutable usage accumulator.
+ * Per-turn `usage` and `request_metadata` are returned in the turn runner's
+ * result array; the substrate accumulates and exposes them on the final
+ * loop result (see agents-api#136), so callers don't need by-reference
+ * accumulators for those fields.
+ *
+ * @param array                                     $tools              Available tools.
+ * @param string                                    $provider           AI provider.
+ * @param string                                    $model              AI model.
+ * @param string                                    $mode               Execution mode.
+ * @param array                                     $loop_payload       Cleaned payload.
+ * @param LoopEventSinkInterface                    $event_sink         DM event sink.
+ * @param array                                     $base_log_context   Base log context.
+ * @param WP_Agent_Conversation_Completion_Policy   $completion_policy  Completion policy.
+ * @param DataMachineToolRuntimeRules               $tool_runtime_rules Tool runtime rules.
+ * @param array                                     &$last_tool_calls    Mutable last tool calls (DM-flavored shape).
+ * @param array                                     &$completion_nudges  Mutable nudge diagnostics (DM-only).
  * @return callable Turn runner closure.
  */
 function datamachine_build_turn_runner(
@@ -321,12 +315,8 @@ function datamachine_build_turn_runner(
 	array $base_log_context,
 	WP_Agent_Conversation_Completion_Policy $completion_policy,
 	DataMachineToolRuntimeRules $tool_runtime_rules,
-	array &$last_request_metadata,
 	array &$last_tool_calls,
-	string &$final_content,
-	int &$turns_run,
-	array &$completion_nudges,
-	array &$total_usage
+	array &$completion_nudges
 ): callable {
 	return static function ( array $messages, array $turn_context ) use (
 		$tools,
@@ -338,26 +328,25 @@ function datamachine_build_turn_runner(
 		$base_log_context,
 		$completion_policy,
 		$tool_runtime_rules,
-		&$last_request_metadata,
 		&$last_tool_calls,
-		&$final_content,
-		&$turns_run,
-		&$completion_nudges,
-		&$total_usage
+		&$completion_nudges
 	): array {
 		// The upstream loop provides the turn number via turn_context.
 		$turn_count = (int) ( $turn_context['turn'] ?? 1 );
-		$turns_run  = max( $turns_run, $turn_count );
 
 		// Build and dispatch AI request using centralized RequestBuilder.
-		$ai_response = RequestBuilder::build(
+		// Per-turn request metadata is captured locally and returned in the
+		// turn result so the substrate can surface the latest one on the
+		// final loop result.
+		$request_metadata = array();
+		$ai_response      = RequestBuilder::build(
 			$messages,
 			$provider,
 			$model,
 			$tools,
 			$mode,
 			$loop_payload,
-			$last_request_metadata
+			$request_metadata
 		);
 
 		datamachine_emit_loop_event(
@@ -370,7 +359,7 @@ function datamachine_build_turn_runner(
 					'provider'         => $provider,
 					'model'            => $model,
 					'success'          => ! is_wp_error( $ai_response ),
-					'request_metadata' => $last_request_metadata,
+					'request_metadata' => $request_metadata,
 				)
 			)
 		);
@@ -400,15 +389,15 @@ function datamachine_build_turn_runner(
 		$tool_calls      = datamachine_extract_tool_calls( $ai_result );
 		$ai_content      = RequestBuilder::resultText( $ai_result );
 		$last_tool_calls = $tool_calls;
-		if ( '' !== $ai_content ) {
-			$final_content = $ai_content;
-		}
 
-		// Accumulate token usage.
-		$token_usage                       = $ai_result->getTokenUsage();
-		$total_usage['prompt_tokens']     += $token_usage->getPromptTokens();
-		$total_usage['completion_tokens'] += $token_usage->getCompletionTokens();
-		$total_usage['total_tokens']      += $token_usage->getTotalTokens();
+		// Per-turn token usage. Substrate accumulates this across turns and
+		// exposes the running total on the final loop result.
+		$token_usage = $ai_result->getTokenUsage();
+		$turn_usage  = array(
+			'prompt_tokens'     => $token_usage->getPromptTokens(),
+			'completion_tokens' => $token_usage->getCompletionTokens(),
+			'total_tokens'      => $token_usage->getTotalTokens(),
+		);
 
 		// Add AI message to conversation if it has content.
 		if ( ! empty( $ai_content ) ) {
@@ -647,7 +636,8 @@ function datamachine_build_turn_runner(
 		return array(
 			'messages'                     => $messages,
 			'tool_execution_results'       => $tool_execution_results,
-			'request_metadata'             => $last_request_metadata,
+			'request_metadata'             => $request_metadata,
+			'usage'                        => $turn_usage,
 			'conversation_complete'        => $conversation_complete,
 			'completion_nudge'             => $completion_nudge ?? '',
 			'duplicate_tool_call_rejected' => $duplicate_rejected,
