@@ -237,7 +237,7 @@ class DataMachineCompletionAssertions {
 	private function missingOutcomeRequirements( array $outcome ): array {
 		$missing = array();
 		foreach ( $outcome['tools'] as $tool ) {
-			$name = $tool['name'];
+			$name             = $tool['name'];
 			$matching_results = $this->matchingToolResults( $tool );
 			if ( empty( $matching_results ) ) {
 				$missing[] = $name;
