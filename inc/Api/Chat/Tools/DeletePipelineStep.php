@@ -33,16 +33,18 @@ class DeletePipelineStep extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Remove a step from a pipeline. This removes the step from all flows on the pipeline.',
 			'parameters'  => array(
-				'pipeline_id'      => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'ID of the pipeline containing the step',
+				'type'       => 'object',
+				'properties' => array(
+					'pipeline_id'      => array(
+						'type'        => 'integer',
+						'description' => 'ID of the pipeline containing the step',
+					),
+					'pipeline_step_id' => array(
+						'type'        => 'string',
+						'description' => 'ID of the pipeline step to remove',
+					),
 				),
-				'pipeline_step_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'ID of the pipeline step to remove',
-				),
+				'required'   => array( 'pipeline_id', 'pipeline_step_id' ),
 			),
 		);
 	}

@@ -60,16 +60,19 @@ EXAMPLE:
 			'method'      => 'handle_tool_call',
 			'description' => $description,
 			'parameters'  => array(
-				'steps'   => array(
-					'type'        => 'array',
-					'required'    => true,
-					'description' => 'Step objects: {type, handler_slug, handler_config}. AI steps: {type: "ai", user_message}.',
+				'type'       => 'object',
+				'properties' => array(
+					'steps'   => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'object' ),
+						'description' => 'Step objects: {type, handler_slug, handler_config}. AI steps: {type: "ai", user_message}.',
+					),
+					'dry_run' => array(
+						'type'        => 'boolean',
+						'description' => 'Preview execution without creating posts. Returns what would be published instead of actually publishing.',
+					),
 				),
-				'dry_run' => array(
-					'type'        => 'boolean',
-					'required'    => false,
-					'description' => 'Preview execution without creating posts. Returns what would be published instead of actually publishing.',
-				),
+				'required'   => array( 'steps' ),
 			),
 		);
 	}

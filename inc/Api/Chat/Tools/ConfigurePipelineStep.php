@@ -35,26 +35,28 @@ class ConfigurePipelineStep extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Configure pipeline-level AI step settings: system prompt and tool policy. Model/provider are managed via the mode_models site setting, not per-pipeline. For flow-level settings (handler, handler_config, user_message), use configure_flow_steps instead.',
 			'parameters'  => array(
-				'pipeline_step_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Pipeline step ID to configure (e.g., "123_uuid4")',
+				'type'       => 'object',
+				'properties' => array(
+					'pipeline_step_id' => array(
+						'type'        => 'string',
+						'description' => 'Pipeline step ID to configure (e.g., "123_uuid4")',
+					),
+					'system_prompt'    => array(
+						'type'        => 'string',
+						'description' => 'System prompt for the AI step - defines the AI persona and instructions',
+					),
+					'disabled_tools'   => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Array of tool slugs to disable for this AI step',
+					),
+					'tool_categories'  => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Array of ability categories allowed for this AI step',
+					),
 				),
-				'system_prompt'    => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'System prompt for the AI step - defines the AI persona and instructions',
-				),
-				'disabled_tools'   => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Array of tool slugs to disable for this AI step',
-				),
-				'tool_categories'  => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Array of ability categories allowed for this AI step',
-				),
+				'required'   => array( 'pipeline_step_id' ),
 			),
 		);
 	}

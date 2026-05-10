@@ -35,21 +35,22 @@ class RunFlow extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Execute an existing flow immediately or schedule it for later. For IMMEDIATE execution: provide only flow_id (do NOT include timestamp). For SCHEDULED execution: provide flow_id AND a future Unix timestamp. Flows run asynchronously in the background. Use api_query with GET /datamachine/v1/jobs/{job_id} to check execution status.',
 			'parameters'  => array(
-				'flow_id'   => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'Flow ID to execute',
+				'type'       => 'object',
+				'properties' => array(
+					'flow_id'   => array(
+						'type'        => 'integer',
+						'description' => 'Flow ID to execute',
+					),
+					'count'     => array(
+						'type'        => 'integer',
+						'description' => 'Number of times to run the flow (1-10, default 1). Each run spawns an independent job. Use this to process multiple items from a source.',
+					),
+					'timestamp' => array(
+						'type'        => 'integer',
+						'description' => 'ONLY for scheduled execution: a future Unix timestamp. OMIT this parameter entirely for immediate execution. Cannot be combined with count > 1.',
+					),
 				),
-				'count'     => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Number of times to run the flow (1-10, default 1). Each run spawns an independent job. Use this to process multiple items from a source.',
-				),
-				'timestamp' => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'ONLY for scheduled execution: a future Unix timestamp. OMIT this parameter entirely for immediate execution. Cannot be combined with count > 1.',
-				),
+				'required'   => array( 'flow_id' ),
 			),
 		);
 	}

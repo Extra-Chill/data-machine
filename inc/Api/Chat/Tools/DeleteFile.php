@@ -33,16 +33,18 @@ class DeleteFile extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Delete an uploaded file. Requires flow_step_id to identify the file scope.',
 			'parameters'  => array(
-				'filename'     => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Name of the file to delete',
+				'type'       => 'object',
+				'properties' => array(
+					'filename'     => array(
+						'type'        => 'string',
+						'description' => 'Name of the file to delete',
+					),
+					'flow_step_id' => array(
+						'type'        => 'string',
+						'description' => 'Flow step ID for flow-level files (e.g., "1-2" for pipeline 1, flow 2)',
+					),
 				),
-				'flow_step_id' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Flow step ID for flow-level files (e.g., "1-2" for pipeline 1, flow 2)',
-				),
+				'required'   => array( 'filename' ),
 			),
 		);
 	}

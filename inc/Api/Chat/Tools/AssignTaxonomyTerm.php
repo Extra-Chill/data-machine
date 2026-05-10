@@ -30,26 +30,27 @@ class AssignTaxonomyTerm extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Assign a taxonomy term to one or more posts. Can append to existing terms or replace them.',
 			'parameters'  => array(
-				'term'     => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Term to assign - ID, name, or slug',
+				'type'       => 'object',
+				'properties' => array(
+					'term'     => array(
+						'type'        => 'string',
+						'description' => 'Term to assign - ID, name, or slug',
+					),
+					'taxonomy' => array(
+						'type'        => 'string',
+						'description' => 'Taxonomy slug (venue, artist, category, post_tag, etc.)',
+					),
+					'post_ids' => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'integer' ),
+						'description' => 'Array of post IDs to assign the term to',
+					),
+					'append'   => array(
+						'type'        => 'boolean',
+						'description' => 'true = add to existing terms, false = replace existing terms (default: true)',
+					),
 				),
-				'taxonomy' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Taxonomy slug (venue, artist, category, post_tag, etc.)',
-				),
-				'post_ids' => array(
-					'type'        => 'array',
-					'required'    => true,
-					'description' => 'Array of post IDs to assign the term to',
-				),
-				'append'   => array(
-					'type'        => 'boolean',
-					'required'    => false,
-					'description' => 'true = add to existing terms, false = replace existing terms (default: true)',
-				),
+				'required'   => array( 'term', 'taxonomy', 'post_ids' ),
 			),
 		);
 	}

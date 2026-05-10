@@ -29,41 +29,38 @@ class UpdateTaxonomyTerm extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Update an existing taxonomy term. Can modify core fields (name, slug, description, parent) and custom term meta (venue_address, venue_capacity, etc.). Use search_taxonomy_terms first to find the term to update.',
 			'parameters'  => array(
-				'term'        => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Term identifier - can be term ID, name, or slug',
+				'type'       => 'object',
+				'properties' => array(
+					'term'        => array(
+						'type'        => 'string',
+						'description' => 'Term identifier - can be term ID, name, or slug',
+					),
+					'taxonomy'    => array(
+						'type'        => 'string',
+						'description' => 'Taxonomy slug (venue, artist, category, post_tag, or custom taxonomy)',
+					),
+					'name'        => array(
+						'type'        => 'string',
+						'description' => 'New term name',
+					),
+					'slug'        => array(
+						'type'        => 'string',
+						'description' => 'New term slug (URL-friendly identifier)',
+					),
+					'description' => array(
+						'type'        => 'string',
+						'description' => 'New term description',
+					),
+					'parent'      => array(
+						'type'        => 'string',
+						'description' => 'New parent term (ID, name, or slug) - hierarchical taxonomies only',
+					),
+					'meta'        => array(
+						'type'        => 'object',
+						'description' => 'Key-value pairs of term meta to update (e.g., venue_address, venue_capacity). Keys starting with "_" are protected and cannot be modified.',
+					),
 				),
-				'taxonomy'    => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Taxonomy slug (venue, artist, category, post_tag, or custom taxonomy)',
-				),
-				'name'        => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'New term name',
-				),
-				'slug'        => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'New term slug (URL-friendly identifier)',
-				),
-				'description' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'New term description',
-				),
-				'parent'      => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'New parent term (ID, name, or slug) - hierarchical taxonomies only',
-				),
-				'meta'        => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Key-value pairs of term meta to update (e.g., venue_address, venue_capacity). Keys starting with "_" are protected and cannot be modified.',
-				),
+				'required'   => array( 'term', 'taxonomy' ),
 			),
 		);
 	}

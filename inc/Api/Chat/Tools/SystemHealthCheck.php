@@ -34,15 +34,17 @@ class SystemHealthCheck extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Run unified health diagnostics for Data Machine and extensions. Returns status of various system components.',
 			'parameters'  => array(
-				'types'   => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Check types to run. Use "all" for all default checks, or specific type IDs. Omit for all checks.',
-				),
-				'options' => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Type-specific options (scope, limit, url, etc.)',
+				'type'       => 'object',
+				'properties' => array(
+					'types'   => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Check types to run. Use "all" for all default checks, or specific type IDs. Omit for all checks.',
+					),
+					'options' => array(
+						'type'        => 'object',
+						'description' => 'Type-specific options (scope, limit, url, etc.)',
+					),
 				),
 			),
 		);

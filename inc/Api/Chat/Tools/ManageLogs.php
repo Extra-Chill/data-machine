@@ -34,21 +34,22 @@ class ManageLogs extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => $this->buildDescription(),
 			'parameters'  => array(
-				'action'   => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Action to perform: "clear" or "get_metadata"',
+				'type'       => 'object',
+				'properties' => array(
+					'action'   => array(
+						'type'        => 'string',
+						'description' => 'Action to perform: "clear" or "get_metadata"',
+					),
+					'agent_id' => array(
+						'type'        => 'integer',
+						'description' => 'Agent ID to target. Omit to target all logs.',
+					),
+					'context'  => array(
+						'type'        => 'string',
+						'description' => 'Deprecated label only. Use agent_id instead.',
+					),
 				),
-				'agent_id' => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Agent ID to target. Omit to target all logs.',
-				),
-				'context'  => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Deprecated label only. Use agent_id instead.',
-				),
+				'required'   => array( 'action' ),
 			),
 		);
 	}
