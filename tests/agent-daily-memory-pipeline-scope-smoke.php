@@ -107,6 +107,22 @@ namespace {
 	echo "agent-daily-memory-pipeline-scope-smoke (#1877)\n";
 
 	$tool = new AgentDailyMemory();
+	$definition = $tool->getToolDefinition();
+	assert_daily_memory_scope(
+		array( 'read', 'write', 'list', 'search' ),
+		$definition['parameters']['properties']['action']['enum'] ?? null,
+		'action schema exposes valid enum values',
+		$failures,
+		$passes
+	);
+	assert_daily_memory_scope(
+		array( 'append', 'write' ),
+		$definition['parameters']['properties']['mode']['enum'] ?? null,
+		'mode schema exposes valid enum values',
+		$failures,
+		$passes
+	);
+
 	PermissionHelper::set_agent_context( 42, 77 );
 
 	$tool->handle_tool_call( array( 'action' => 'write', 'content' => 'entry', 'user_id' => 999 ) );
@@ -120,6 +136,30 @@ namespace {
 		),
 		$agent_daily_memory_ability_inputs['datamachine/daily-memory-write'] ?? null,
 		'write ignores model user_id and uses executing agent scope',
+		$failures,
+		$passes
+	);
+
+	$last_write_input = $agent_daily_memory_ability_inputs['datamachine/daily-memory-write'] ?? null;
+	$invalid_result   = $tool->handle_tool_call( array( 'action' => 'write', 'content' => 'bad mode', 'mode' => 'append()} bad tool args' ) );
+	assert_daily_memory_scope(
+		false,
+		$invalid_result['success'] ?? null,
+		'invalid write mode is rejected by the tool',
+		$failures,
+		$passes
+	);
+	assert_daily_memory_scope(
+		'Invalid mode "append()} bad tool args". Use "append" or "write".',
+		$invalid_result['error'] ?? null,
+		'invalid write mode returns a corrective error',
+		$failures,
+		$passes
+	);
+	assert_daily_memory_scope(
+		$last_write_input,
+		$agent_daily_memory_ability_inputs['datamachine/daily-memory-write'] ?? null,
+		'invalid write mode does not call the write ability',
 		$failures,
 		$passes
 	);

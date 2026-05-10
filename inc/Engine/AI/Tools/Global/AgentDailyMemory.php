@@ -108,6 +108,14 @@ class AgentDailyMemory extends BaseTool {
 		}
 
 		$ability = wp_get_ability( 'datamachine/daily-memory-write' );
+		$mode    = $parameters['mode'] ?? 'append';
+
+		if ( ! in_array( $mode, array( 'append', 'write' ), true ) ) {
+			return $this->buildErrorResponse(
+				'Invalid mode "' . $mode . '". Use "append" or "write".',
+				'agent_daily_memory'
+			);
+		}
 
 		if ( ! $ability ) {
 			return $this->buildErrorResponse(
@@ -122,7 +130,7 @@ class AgentDailyMemory extends BaseTool {
 				'agent_id' => $scope['agent_id'],
 				'content'  => $content,
 				'date'     => $parameters['date'] ?? gmdate( 'Y-m-d' ),
-				'mode'     => $parameters['mode'] ?? 'append',
+				'mode'     => $mode,
 			)
 		);
 
@@ -258,6 +266,7 @@ class AgentDailyMemory extends BaseTool {
 				),
 					'action'  => array(
 					'type'        => 'string',
+					'enum'        => array( 'read', 'write', 'list', 'search' ),
 					'description' => 'Action to perform: "read" (get daily file), "write" (add to daily file), "list" (show all daily files), or "search" (find entries by keyword).',
 				),
 					'date'    => array(
@@ -270,6 +279,7 @@ class AgentDailyMemory extends BaseTool {
 				),
 					'mode'    => array(
 					'type'        => 'string',
+					'enum'        => array( 'append', 'write' ),
 					'description' => 'Write mode: "append" adds to end of file (default), "write" replaces the entire file. Prefer "append" to preserve earlier entries from the same day.',
 				),
 					'query'   => array(
