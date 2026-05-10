@@ -39,7 +39,12 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 	 * @inheritDoc
 	 */
 	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $runtime_context, int $turn_count ): WP_Agent_Conversation_Completion_Decision {
-		$this->assertions->recordToolResult( $tool_name, $tool_def, $tool_result );
+		$this->assertions->recordToolResult(
+			$tool_name,
+			$tool_def,
+			$tool_result,
+			is_array( $runtime_context['tool_parameters'] ?? null ) ? $runtime_context['tool_parameters'] : array()
+		);
 
 		$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
 		$mode            = (string) ( $runtime_context['mode'] ?? '' );

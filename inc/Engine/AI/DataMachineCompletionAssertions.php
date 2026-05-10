@@ -23,7 +23,7 @@ class DataMachineCompletionAssertions {
 	/** @var array<int, string> */
 	private array $required_output_packet_types;
 
-	/** @var array<int, array{tools: array<int, array{name: string, required_output: array<int, string>}>}> */
+	/** @var array<int, array{name: string, tools: array<int, array{name: string, required_output: array<int, string>, required_parameters: array<string, mixed>, min_successful_calls: int}>}> */
 	private array $complete_when_any;
 
 	/** @var array<int, string> */
@@ -60,14 +60,16 @@ class DataMachineCompletionAssertions {
 	/**
 	 * Record a tool result as a possible completion signal.
 	 *
-	 * @param string     $tool_name   Tool name.
-	 * @param array|null $tool_def    Tool definition.
-	 * @param array      $tool_result Tool result.
+	 * @param string     $tool_name       Tool name.
+	 * @param array|null $tool_def        Tool definition.
+	 * @param array      $tool_result     Tool result.
+	 * @param array      $tool_parameters Tool parameters.
 	 */
-	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result ): void {
+	public function recordToolResult( string $tool_name, ?array $tool_def, array $tool_result, array $tool_parameters = array() ): void {
 		$tool_succeeded = true === ( $tool_result['success'] ?? false );
 
 		if ( '' !== $tool_name && $tool_succeeded ) {
+			$tool_result['_parameters']                    = $tool_parameters;
 			$this->executed_tool_names[]                   = $tool_name;
 			$this->successful_tool_results[ $tool_name ][] = $tool_result;
 		}
@@ -214,12 +216,12 @@ class DataMachineCompletionAssertions {
 			$outcome_missing = $this->missingOutcomeRequirements( $outcome );
 			if ( empty( $outcome_missing ) ) {
 				return array(
-					'satisfied' => array( 'outcome_' . ( $index + 1 ) ),
+					'satisfied' => array( $outcome['name'] ),
 					'missing'   => array(),
 				);
 			}
 
-			$missing[] = 'outcome_' . ( $index + 1 ) . ': ' . implode( ', ', $outcome_missing );
+			$missing[] = $outcome['name'] . ': ' . implode( ', ', $outcome_missing );
 		}
 
 		return array(
@@ -229,20 +231,25 @@ class DataMachineCompletionAssertions {
 	}
 
 	/**
-	 * @param array{tools: array<int, array{name: string, required_output: array<int, string>}>} $outcome Outcome assertion.
+	 * @param array{name: string, tools: array<int, array{name: string, required_output: array<int, string>, required_parameters: array<string, mixed>, min_successful_calls: int}>} $outcome Outcome assertion.
 	 * @return array<int, string>
 	 */
 	private function missingOutcomeRequirements( array $outcome ): array {
 		$missing = array();
 		foreach ( $outcome['tools'] as $tool ) {
-			$name = $tool['name'];
-			if ( empty( $this->successful_tool_results[ $name ] ) ) {
+			$name             = $tool['name'];
+			$matching_results = $this->matchingToolResults( $tool );
+			if ( empty( $matching_results ) ) {
 				$missing[] = $name;
+				continue;
+			}
+			if ( count( $matching_results ) < $tool['min_successful_calls'] ) {
+				$missing[] = $name . ' x' . $tool['min_successful_calls'];
 				continue;
 			}
 
 			foreach ( $tool['required_output'] as $field ) {
-				if ( ! $this->toolHasOutputField( $name, $field ) ) {
+				if ( ! $this->resultsHaveOutputField( $matching_results, $field ) ) {
 					$missing[] = $name . '.' . $field;
 				}
 			}
@@ -251,8 +258,50 @@ class DataMachineCompletionAssertions {
 		return array_values( array_unique( $missing ) );
 	}
 
-	private function toolHasOutputField( string $tool_name, string $field ): bool {
-		foreach ( $this->successful_tool_results[ $tool_name ] ?? array() as $result ) {
+	/**
+	 * @param array{name: string, required_parameters: array<string, mixed>} $tool Tool assertion.
+	 * @return array<int, array>
+	 */
+	private function matchingToolResults( array $tool ): array {
+		$results = $this->successful_tool_results[ $tool['name'] ] ?? array();
+		if ( empty( $tool['required_parameters'] ) ) {
+			return $results;
+		}
+
+		return array_values(
+			array_filter(
+				$results,
+				fn( array $result ): bool => $this->parametersMatch( is_array( $result['_parameters'] ?? null ) ? $result['_parameters'] : array(), $tool['required_parameters'] )
+			)
+		);
+	}
+
+	private function parametersMatch( array $parameters, array $required_parameters ): bool {
+		foreach ( $required_parameters as $path => $expected ) {
+			if ( ! $this->hasPathValue( $parameters, (string) $path, $expected ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	private function hasPathValue( array $data, string $path, mixed $expected ): bool {
+		$segments = explode( '.', $path );
+		$value    = $data;
+		foreach ( $segments as $segment ) {
+			if ( ! is_array( $value ) || ! array_key_exists( $segment, $value ) ) {
+				return false;
+			}
+
+			$value = $value[ $segment ];
+		}
+
+		return $value === $expected;
+	}
+
+	private function resultsHaveOutputField( array $results, string $field ): bool {
+		foreach ( $results as $result ) {
 			if ( $this->hasNonEmptyPath( $result, $field ) ) {
 				return true;
 			}
@@ -329,7 +378,7 @@ class DataMachineCompletionAssertions {
 
 	/**
 	 * @param mixed $value Raw outcome assertions.
-	 * @return array<int, array{tools: array<int, array{name: string, required_output: array<int, string>}>}>
+	 * @return array<int, array{name: string, tools: array<int, array{name: string, required_output: array<int, string>, required_parameters: array<string, mixed>, min_successful_calls: int}>}>
 	 */
 	private function sanitizeOutcomeAssertions( $value ): array {
 		if ( ! is_array( $value ) ) {
@@ -337,7 +386,7 @@ class DataMachineCompletionAssertions {
 		}
 
 		$outcomes = array();
-		foreach ( $value as $outcome ) {
+		foreach ( $value as $index => $outcome ) {
 			if ( ! is_array( $outcome ) || ! is_array( $outcome['tools'] ?? null ) ) {
 				continue;
 			}
@@ -354,17 +403,48 @@ class DataMachineCompletionAssertions {
 				}
 
 				$tools[] = array(
-					'name'            => $name,
-					'required_output' => $this->sanitizeList( $tool['required_output'] ?? array() ),
+					'name'                 => $name,
+					'required_output'      => $this->sanitizeList( $tool['required_output'] ?? array() ),
+					'required_parameters'  => $this->sanitizeRequiredParameters( $tool['required_parameters'] ?? array() ),
+					'min_successful_calls' => max( 1, (int) ( $tool['min_successful_calls'] ?? 1 ) ),
 				);
 			}
 
 			if ( ! empty( $tools ) ) {
-				$outcomes[] = array( 'tools' => $tools );
+				$outcomes[] = array(
+					'name'  => $this->sanitizeOutcomeName( $outcome['name'] ?? 'outcome_' . ( (int) $index + 1 ) ),
+					'tools' => $tools,
+				);
 			}
 		}
 
 		return $outcomes;
+	}
+
+	private function sanitizeOutcomeName( mixed $value ): string {
+		$name = strtolower( trim( (string) $value ) );
+		$name = preg_replace( '/[^a-z0-9_\-]+/', '_', $name );
+		$name = trim( is_string( $name ) ? $name : '', '_' );
+		return '' !== $name ? $name : 'outcome';
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	private function sanitizeRequiredParameters( mixed $value ): array {
+		if ( ! is_array( $value ) || array_is_list( $value ) ) {
+			return array();
+		}
+
+		$parameters = array();
+		foreach ( $value as $path => $expected ) {
+			$path = trim( (string) $path );
+			if ( '' !== $path ) {
+				$parameters[ $path ] = $expected;
+			}
+		}
+
+		return $parameters;
 	}
 
 	/**

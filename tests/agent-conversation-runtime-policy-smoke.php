@@ -784,6 +784,7 @@ assert_runtime_policy( array( 'workspace_edit', 'workspace_git_commit' ) === ( $
 $outcome_assertions_config = array(
 	'complete_when_any' => array(
 		array(
+			'name'  => 'pull_request_path',
 			'tools' => array(
 				array(
 					'name'            => 'create_github_pull_request',
@@ -797,6 +798,7 @@ $outcome_assertions_config = array(
 			),
 		),
 		array(
+			'name'  => 'issue_fallback_path',
 			'tools' => array(
 				array(
 					'name'            => 'create_github_issue',
@@ -840,6 +842,7 @@ $pr_outcome_decision = $pr_outcome_policy->recordNaturalCompletion(
 	3
 );
 assert_runtime_policy( $pr_outcome_decision->isComplete(), 'complete_when_any PR path satisfies completion assertion' );
+assert_runtime_policy( array( 'pull_request_path' ) === ( $pr_outcome_decision->context()['satisfied']['complete_when_any'] ?? null ), 'named complete_when_any PR path is reported as satisfied' );
 
 $issue_outcome_policy = new DataMachineHandlerCompletionPolicy(
 	array(),
@@ -869,6 +872,7 @@ $issue_outcome_decision = $issue_outcome_policy->recordNaturalCompletion(
 	3
 );
 assert_runtime_policy( $issue_outcome_decision->isComplete(), 'complete_when_any issue fallback path satisfies completion assertion' );
+assert_runtime_policy( array( 'issue_fallback_path' ) === ( $issue_outcome_decision->context()['satisfied']['complete_when_any'] ?? null ), 'named complete_when_any issue path is reported as satisfied' );
 
 $failed_outcome_policy = new DataMachineHandlerCompletionPolicy(
 	array(),
@@ -899,6 +903,96 @@ $failed_outcome_decision = $failed_outcome_policy->recordNaturalCompletion(
 );
 assert_runtime_policy( ! $failed_outcome_decision->isComplete(), 'failed complete_when_any tool result does not satisfy completion assertion' );
 assert_runtime_policy( isset( $failed_outcome_decision->context()['missing']['complete_when_any'] ), 'failed complete_when_any path reports missing outcome assertion' );
+
+$parameter_outcome_policy = new DataMachineHandlerCompletionPolicy(
+	array(),
+	new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
+		array(
+			'complete_when_any' => array(
+				array(
+					'name'  => 'mailbox_return',
+					'tools' => array(
+						array(
+							'name'                => 'manage_github_issue',
+							'required_parameters' => array( 'action' => 'comment' ),
+							'required_output'     => array( 'comment.html_url' ),
+						),
+					),
+				),
+			),
+		)
+	)
+);
+$parameter_outcome_policy->recordToolResult(
+	'manage_github_issue',
+	array( 'name' => 'manage_github_issue' ),
+	array(
+		'success' => true,
+		'data'    => array( 'comment' => array( 'html_url' => 'https://github.com/Extra-Chill/data-machine/issues/1#issuecomment-1' ) ),
+	),
+	array( 'mode' => 'pipeline', 'tool_parameters' => array( 'action' => 'close' ) ),
+	1
+);
+$parameter_outcome_missing_decision = $parameter_outcome_policy->recordNaturalCompletion(
+	array( array( 'role' => 'user', 'content' => 'return to mailbox' ) ),
+	'Close is not a mailbox reply.',
+	array( 'mode' => 'pipeline' ),
+	2
+);
+assert_runtime_policy( ! $parameter_outcome_missing_decision->isComplete(), 'complete_when_any required_parameters reject wrong tool arguments' );
+$parameter_outcome_policy->recordToolResult(
+	'manage_github_issue',
+	array( 'name' => 'manage_github_issue' ),
+	array(
+		'success' => true,
+		'data'    => array( 'comment' => array( 'html_url' => 'https://github.com/Extra-Chill/data-machine/issues/1#issuecomment-2' ) ),
+	),
+	array( 'mode' => 'pipeline', 'tool_parameters' => array( 'action' => 'comment' ) ),
+	3
+);
+$parameter_outcome_decision = $parameter_outcome_policy->recordNaturalCompletion(
+	array( array( 'role' => 'user', 'content' => 'return to mailbox' ) ),
+	'Commented on the mailbox issue.',
+	array( 'mode' => 'pipeline' ),
+	4
+);
+assert_runtime_policy( $parameter_outcome_decision->isComplete(), 'complete_when_any required_parameters accept matching tool arguments' );
+assert_runtime_policy( array( 'mailbox_return' ) === ( $parameter_outcome_decision->context()['satisfied']['complete_when_any'] ?? null ), 'parameter-matched outcome name is reported as satisfied' );
+
+$multi_call_outcome_policy = new DataMachineHandlerCompletionPolicy(
+	array(),
+	new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
+		array(
+			'complete_when_any' => array(
+				array(
+					'name'  => 'multi_file_change',
+					'tools' => array(
+						array(
+							'name'                 => 'create_or_update_github_file',
+							'min_successful_calls' => 2,
+						),
+					),
+				),
+			),
+		)
+	)
+);
+$multi_call_outcome_policy->recordToolResult( 'create_or_update_github_file', array( 'name' => 'create_or_update_github_file' ), array( 'success' => true ), array( 'mode' => 'pipeline' ), 1 );
+$multi_call_missing_decision = $multi_call_outcome_policy->recordNaturalCompletion(
+	array( array( 'role' => 'user', 'content' => 'make a multi-file change' ) ),
+	'One file changed.',
+	array( 'mode' => 'pipeline' ),
+	2
+);
+assert_runtime_policy( ! $multi_call_missing_decision->isComplete(), 'complete_when_any min_successful_calls requires enough matching successful calls' );
+$multi_call_outcome_policy->recordToolResult( 'create_or_update_github_file', array( 'name' => 'create_or_update_github_file' ), array( 'success' => true ), array( 'mode' => 'pipeline' ), 3 );
+$multi_call_decision = $multi_call_outcome_policy->recordNaturalCompletion(
+	array( array( 'role' => 'user', 'content' => 'make a multi-file change' ) ),
+	'Two files changed.',
+	array( 'mode' => 'pipeline' ),
+	4
+);
+assert_runtime_policy( $multi_call_decision->isComplete(), 'complete_when_any min_successful_calls accepts enough matching successful calls' );
 
 $daily_memory_unavailable_dispatch_count = 0;
 $daily_memory_unavailable_sink           = new RuntimePolicySmokeEventSink();
