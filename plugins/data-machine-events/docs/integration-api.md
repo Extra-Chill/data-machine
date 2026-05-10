@@ -169,6 +169,24 @@ Pass-through parameters mirror the underlying ability:
 
 Returns `[ 'posts' => WP_Post[], 'total' => int, … ]`.
 
+### `data_machine_events_get_venue_data( int $term_id ): ?array`
+
+Return the structured venue data array stored against a `venue` term —
+address fields, lat/lng, website, etc. Returns `null` when the term does
+not exist or has no venue data. Use this instead of calling
+`Venue_Taxonomy::get_venue_data()` directly.
+
+### `data_machine_events_get_venue_address( int $term_id, ?array $venue_data = null ): string`
+
+Return the formatted single-line address for a venue term. Pass
+`$venue_data` if you already have it to avoid an extra meta read. Use this
+instead of `Venue_Taxonomy::get_formatted_address()`.
+
+### `data_machine_events_get_promoter_data( int $term_id ): ?array`
+
+Return the structured promoter data array stored against a `promoter` term.
+Use this instead of `Promoter_Taxonomy::get_promoter_data()`.
+
 ### `data_machine_events_get_event_datetime( int $post_id ): string`
 
 Return the start datetime string for an event, or empty string when no row

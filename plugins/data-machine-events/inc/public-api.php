@@ -190,6 +190,74 @@ if ( ! function_exists( 'data_machine_events_query_events' ) ) {
 	}
 }
 
+if ( ! function_exists( 'data_machine_events_get_venue_data' ) ) {
+	/**
+	 * Get raw venue term metadata.
+	 *
+	 * Returns the structured venue data array stored against a venue term —
+	 * address, lat/lng, city, region, country, website, etc. Returns null when
+	 * the term does not exist or has no associated venue data.
+	 *
+	 * @since 0.32.1
+	 *
+	 * @param int $term_id Venue term ID.
+	 * @return array|null Venue data array or null.
+	 */
+	function data_machine_events_get_venue_data( int $term_id ): ?array {
+		if ( ! class_exists( '\DataMachineEvents\Core\Venue_Taxonomy' ) ) {
+			return null;
+		}
+
+		$data = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data( $term_id );
+		return is_array( $data ) ? $data : null;
+	}
+}
+
+if ( ! function_exists( 'data_machine_events_get_venue_address' ) ) {
+	/**
+	 * Get the formatted single-line address string for a venue term.
+	 *
+	 * Combines street, city, region, postal code, and country into a
+	 * comma-delimited human-readable address.
+	 *
+	 * @since 0.32.1
+	 *
+	 * @param int        $term_id    Venue term ID.
+	 * @param array|null $venue_data Optional pre-fetched venue data array
+	 *                               to avoid an extra term meta lookup.
+	 * @return string Formatted address or empty string.
+	 */
+	function data_machine_events_get_venue_address( int $term_id, ?array $venue_data = null ): string {
+		if ( ! class_exists( '\DataMachineEvents\Core\Venue_Taxonomy' ) ) {
+			return '';
+		}
+
+		return (string) \DataMachineEvents\Core\Venue_Taxonomy::get_formatted_address( $term_id, $venue_data );
+	}
+}
+
+if ( ! function_exists( 'data_machine_events_get_promoter_data' ) ) {
+	/**
+	 * Get raw promoter term metadata.
+	 *
+	 * Returns the structured promoter data array stored against a promoter term.
+	 * Returns null when the term does not exist or has no associated data.
+	 *
+	 * @since 0.32.1
+	 *
+	 * @param int $term_id Promoter term ID.
+	 * @return array|null Promoter data array or null.
+	 */
+	function data_machine_events_get_promoter_data( int $term_id ): ?array {
+		if ( ! class_exists( '\DataMachineEvents\Core\Promoter_Taxonomy' ) ) {
+			return null;
+		}
+
+		$data = \DataMachineEvents\Core\Promoter_Taxonomy::get_promoter_data( $term_id );
+		return is_array( $data ) ? $data : null;
+	}
+}
+
 if ( ! function_exists( 'data_machine_events_get_event_datetime' ) ) {
 	/**
 	 * Get the start datetime for an event, formatted as a string.
