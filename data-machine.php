@@ -469,32 +469,6 @@ function datamachine_load_handlers() {
 	new \DataMachine\Core\Steps\Upsert\Handlers\WordPress\WordPress();
 }
 
-/**
- * Scan directory for PHP files and instantiate classes.
- * Classes are expected to self-register in their constructors.
- */
-function datamachine_scan_and_instantiate( $directory ) {
-	$files = glob( $directory . '/*.php' );
-	if ( false === $files ) {
-		return;
-	}
-
-	foreach ( $files as $file ) {
-		// Skip if it's a *Filters.php file (will be deleted)
-		if ( strpos( basename( $file ), 'Filters.php' ) !== false ) {
-			continue;
-		}
-
-		// Skip if it's a *Settings.php file
-		if ( strpos( basename( $file ), 'Settings.php' ) !== false ) {
-			continue;
-		}
-
-		// Include the file - classes will auto-instantiate
-		include_once $file;
-	}
-}
-
 function datamachine_allow_json_upload( $mimes ) {
 	$mimes['json'] = 'application/json';
 	return $mimes;
@@ -502,23 +476,6 @@ function datamachine_allow_json_upload( $mimes ) {
 add_filter( 'upload_mimes', 'datamachine_allow_json_upload' );
 
 add_action( 'update_option_datamachine_settings', array( \DataMachine\Core\PluginSettings::class, 'clearCache' ) );
-
-// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
-add_action(
-	'plugins_loaded',
-	function () {
-		if ( ! \DataMachine\Core\Database\Chat\Chat::table_exists() ) {
-			return;
-		}
-		\DataMachine\Core\Database\Chat\Chat::ensure_mode_column();
-		\DataMachine\Core\Database\Chat\Chat::ensure_workspace_columns();
-		\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();
-		\DataMachine\Core\Database\Chat\Chat::ensure_last_read_at_column();
-		\DataMachine\Core\Database\Chat\Chat::ensure_transcript_lock_columns();
-		\DataMachine\Engine\AI\Actions\PendingActionStore::ensure_workspace_columns();
-	},
-	6
-);
 
 register_activation_hook( __FILE__, 'datamachine_activate_plugin' );
 register_deactivation_hook( __FILE__, 'datamachine_deactivate_plugin' );
