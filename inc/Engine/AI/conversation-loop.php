@@ -954,6 +954,18 @@ function datamachine_summarize_tool_execution_results( array $tool_execution_res
 			}
 		}
 
+		if ( 'agent_memory' === $tool_name ) {
+			$summary['user_id']  = isset( $parameters['user_id'] ) ? (int) $parameters['user_id'] : null;
+			$summary['agent_id'] = isset( $parameters['agent_id'] ) ? (int) $parameters['agent_id'] : null;
+			$summary['action']   = isset( $parameters['action'] ) ? sanitize_key( (string) $parameters['action'] ) : null;
+			$summary['file']     = isset( $parameters['file'] ) ? sanitize_file_name( (string) $parameters['file'] ) : 'MEMORY.md';
+			$summary['section']  = isset( $parameters['section'] ) ? sanitize_text_field( (string) $parameters['section'] ) : null;
+			$summary['mode']     = isset( $parameters['mode'] ) ? sanitize_key( (string) $parameters['mode'] ) : null;
+			if ( $include_content && 'update' === $summary['action'] && isset( $parameters['content'] ) ) {
+				$summary['content'] = (string) $parameters['content'];
+			}
+		}
+
 		$summaries[] = array_filter(
 			$summary,
 			static fn( $value ) => null !== $value && '' !== $value

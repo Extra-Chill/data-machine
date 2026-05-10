@@ -10,7 +10,9 @@ namespace DataMachine\Core;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\FilesRepository\AgentMemory as AgentMemoryFile;
 use DataMachine\Core\FilesRepository\DailyMemory;
+use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -54,6 +56,7 @@ class JobArtifacts {
 			'satisfied_tool_names'   => $this->tool_names_from_assertions( $engine_data['completion_assertions_satisfied'] ?? array() ),
 			'successful_tool_calls'  => $tool_calls,
 			'transcript'             => $this->transcript_metadata( $job_id, $engine_data ),
+			'agent_memory_artifacts' => $this->agent_memory_artifacts( $job, $agent, $tool_calls ),
 			'daily_memory_artifacts' => $this->daily_memory_artifacts( $job, $agent, $tool_calls ),
 		);
 
@@ -112,6 +115,8 @@ class JobArtifacts {
 					'action'     => isset( $summary['action'] ) ? sanitize_key( (string) $summary['action'] ) : null,
 					'date'       => isset( $summary['date'] ) ? sanitize_text_field( (string) $summary['date'] ) : null,
 					'mode'       => isset( $summary['mode'] ) ? sanitize_key( (string) $summary['mode'] ) : null,
+					'file'       => isset( $summary['file'] ) ? sanitize_file_name( (string) $summary['file'] ) : null,
+					'section'    => isset( $summary['section'] ) ? sanitize_text_field( (string) $summary['section'] ) : null,
 					'content'    => isset( $summary['content'] ) ? (string) $summary['content'] : null,
 					'summary'    => isset( $summary['summary'] ) ? sanitize_text_field( (string) $summary['summary'] ) : null,
 				),
@@ -201,6 +206,96 @@ class JobArtifacts {
 		);
 
 		return is_string( $row ) ? $row : '';
+	}
+
+	/**
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function agent_memory_artifacts( array $job, array $agent, array $tool_calls ): array {
+		$default_agent_id = (int) ( $agent['agent_id'] ?? 0 );
+		$files            = array();
+
+		foreach ( $tool_calls as $tool_call ) {
+			if ( 'agent_memory' !== ( $tool_call['tool_name'] ?? '' ) || 'update' !== ( $tool_call['action'] ?? '' ) ) {
+				continue;
+			}
+
+			$filename = sanitize_file_name( (string) ( $tool_call['file'] ?? 'MEMORY.md' ) );
+			if ( '' === $filename ) {
+				continue;
+			}
+
+			$agent_id = (int) ( $tool_call['agent_id'] ?? $default_agent_id );
+			$user_id  = (int) ( $tool_call['user_id'] ?? ( $job['user_id'] ?? 0 ) );
+			$layer    = AgentMemoryFile::resolve_layer_for( $filename );
+			$key      = $layer . ':' . $agent_id . ':' . $user_id . ':' . $filename;
+
+			$files[ $key ] = array(
+				'agent_id' => $agent_id,
+				'user_id'  => $user_id,
+				'file'     => $filename,
+				'layer'    => $layer,
+				'section'  => isset( $tool_call['section'] ) ? (string) $tool_call['section'] : '',
+				'mode'     => isset( $tool_call['mode'] ) ? (string) $tool_call['mode'] : '',
+				'content'  => isset( $tool_call['content'] ) ? (string) $tool_call['content'] : '',
+			);
+		}
+
+		$artifacts = array();
+		foreach ( $files as $memory_scope ) {
+			$filename = (string) $memory_scope['file'];
+			$memory   = new AgentMemoryFile( (int) $memory_scope['user_id'], (int) $memory_scope['agent_id'], $filename );
+			$read     = $memory->get_all();
+			$content  = empty( $read['success'] ) ? $this->agent_memory_fallback_content( $memory_scope ) : (string) ( $read['content'] ?? '' );
+			if ( '' === $content ) {
+				continue;
+			}
+
+			$bundle_relative_path = $this->agent_memory_bundle_relative_path( (string) $memory_scope['layer'], $filename );
+			if ( '' === $bundle_relative_path ) {
+				continue;
+			}
+
+			$artifacts[] = array(
+				'type'                 => 'agent_memory',
+				'agent_id'             => (int) $memory_scope['agent_id'],
+				'agent_slug'           => $agent['agent_slug'],
+				'file'                 => $filename,
+				'layer'                => (string) $memory_scope['layer'],
+				'section'              => (string) $memory_scope['section'],
+				'source'               => 'agent-memory',
+				'bundle_relative_path' => $bundle_relative_path,
+				'content'              => $content,
+			);
+		}
+
+		return $artifacts;
+	}
+
+	private function agent_memory_bundle_relative_path( string $layer, string $filename ): string {
+		if ( MemoryFileRegistry::LAYER_AGENT === $layer ) {
+			return 'memory/agent/' . $filename;
+		}
+
+		if ( MemoryFileRegistry::LAYER_USER === $layer && 'USER.md' === $filename ) {
+			return 'memory/USER.md';
+		}
+
+		return '';
+	}
+
+	private function agent_memory_fallback_content( array $memory_scope ): string {
+		$content = trim( (string) ( $memory_scope['content'] ?? '' ) );
+		$section = trim( (string) ( $memory_scope['section'] ?? '' ) );
+		if ( '' === $content ) {
+			return '';
+		}
+
+		if ( '' === $section ) {
+			return $content . "\n";
+		}
+
+		return sprintf( "## %s\n%s\n", $section, $content );
 	}
 
 	/**

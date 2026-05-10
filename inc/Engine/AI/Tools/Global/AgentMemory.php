@@ -17,11 +17,12 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
 use DataMachine\Core\FilesRepository\DirectoryManager;
+use DataMachine\Abilities\PermissionHelper;
 
 class AgentMemory extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'agent_memory', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'abilities' => array( 'datamachine/get-agent-memory', 'datamachine/update-agent-memory', 'datamachine/list-agent-memory-sections' ) ) );
+		$this->registerTool( 'agent_memory', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline_policy' ), array( 'abilities' => array( 'datamachine/get-agent-memory', 'datamachine/update-agent-memory', 'datamachine/list-agent-memory-sections' ) ) );
 	}
 
 	/**
@@ -53,7 +54,7 @@ class AgentMemory extends BaseTool {
 	 */
 	private function handleGet( array $parameters ): array {
 		$ability = wp_get_ability( 'datamachine/get-agent-memory' );
-		$user_id = $this->resolve_user_id( $parameters );
+		$scope   = $this->resolve_scope( $parameters );
 
 		if ( ! $ability ) {
 			return $this->buildErrorResponse(
@@ -63,8 +64,9 @@ class AgentMemory extends BaseTool {
 		}
 
 		$input = array(
-			'user_id' => $user_id,
-			'section' => $parameters['section'] ?? '',
+			'user_id'  => $scope['user_id'],
+			'agent_id' => $scope['agent_id'],
+			'section'  => $parameters['section'] ?? '',
 		);
 
 		if ( ! empty( $parameters['file'] ) ) {
@@ -101,7 +103,7 @@ class AgentMemory extends BaseTool {
 		$section = $parameters['section'] ?? '';
 		$content = $parameters['content'] ?? '';
 		$mode    = $parameters['mode'] ?? 'set';
-		$user_id = $this->resolve_user_id( $parameters );
+		$scope   = $this->resolve_scope( $parameters );
 
 		if ( '' === $section ) {
 			return $this->buildErrorResponse(
@@ -127,10 +129,11 @@ class AgentMemory extends BaseTool {
 		}
 
 		$input = array(
-			'user_id' => $user_id,
-			'section' => $section,
-			'content' => $content,
-			'mode'    => $mode,
+			'user_id'  => $scope['user_id'],
+			'agent_id' => $scope['agent_id'],
+			'section'  => $section,
+			'content'  => $content,
+			'mode'     => $mode,
 		);
 
 		if ( ! empty( $parameters['file'] ) ) {
@@ -164,7 +167,7 @@ class AgentMemory extends BaseTool {
 	 */
 	private function handleListSections( array $parameters = array() ): array {
 		$ability = wp_get_ability( 'datamachine/list-agent-memory-sections' );
-		$user_id = $this->resolve_user_id( $parameters );
+		$scope   = $this->resolve_scope( $parameters );
 
 		if ( ! $ability ) {
 			return $this->buildErrorResponse(
@@ -173,7 +176,10 @@ class AgentMemory extends BaseTool {
 			);
 		}
 
-		$input = array( 'user_id' => $user_id );
+		$input = array(
+			'user_id'  => $scope['user_id'],
+			'agent_id' => $scope['agent_id'],
+		);
 
 		if ( ! empty( $parameters['file'] ) ) {
 			$input['file'] = $parameters['file'];
@@ -214,29 +220,34 @@ class AgentMemory extends BaseTool {
 				'type'       => 'object',
 				'properties' => array(
 					'user_id' => array(
-					'type'        => 'integer',
-					'description' => 'Optional WordPress user ID for layered memory context. Defaults to current user context.',
-				),
+						'type'        => 'integer',
+						'description' => 'Optional WordPress user ID for layered memory context. Defaults to current user context.',
+					),
+					'agent_id' => array(
+						'type'        => 'integer',
+						'description' => 'Optional agent ID for agent-scoped memory. In agent context, the executing agent scope is used.',
+					),
 					'action'  => array(
-					'type'        => 'string',
-					'description' => 'Action to perform: "get" (read file/section), "update" (write to section), or "list_sections" (show all section headers).',
-				),
+						'type'        => 'string',
+						'description' => 'Action to perform: "get" (read file/section), "update" (write to section), or "list_sections" (show all section headers).',
+					),
 					'file'    => array(
-					'type'        => 'string',
-					'description' => 'Target file. Defaults to MEMORY.md. Use SOUL.md, USER.md, SITE.md, etc. for other agent files.',
-				),
+						'type'        => 'string',
+						'description' => 'Target file. Defaults to MEMORY.md. Use SOUL.md, USER.md, SITE.md, etc. for other agent files.',
+					),
 					'section' => array(
-					'type'        => 'string',
-					'description' => 'Section name without "##" prefix. Required for "update". Optional for "get" (omit to read full file).',
-				),
+						'type'        => 'string',
+						'description' => 'Section name without "##" prefix. Required for "update". Optional for "get" (omit to read full file).',
+					),
 					'content' => array(
-					'type'        => 'string',
-					'description' => 'Content to write. Required for "update" action.',
-				),
+						'type'        => 'string',
+						'description' => 'Content to write. Required for "update" action.',
+					),
 					'mode'    => array(
-					'type'        => 'string',
-					'description' => 'Write mode for "update": "set" replaces section content (default), "append" adds to end of section.',
-				),
+						'type'        => 'string',
+						'description' => 'Write mode for "update": "set" replaces section content (default), "append" adds to end of section.',
+						'enum'        => array( 'set', 'append' ),
+					),
 				),
 				'required'   => array( 'action' ),
 			),
@@ -244,25 +255,35 @@ class AgentMemory extends BaseTool {
 	}
 
 	/**
-	 * Resolve scoped user ID from tool parameters.
+	 * Resolve scoped user and agent IDs from tool parameters.
 	 *
 	 * @param array $parameters Tool parameters.
-	 * @return int
+	 * @return array{user_id:int, agent_id:int}
 	 */
-	private function resolve_user_id( array $parameters ): int {
+	private function resolve_scope( array $parameters ): array {
 		$directory_manager = new DirectoryManager();
-		$raw_user_id       = (int) ( $parameters['user_id'] ?? 0 );
+
+		if ( PermissionHelper::in_agent_context() ) {
+			return array(
+				'user_id'  => PermissionHelper::acting_user_id(),
+				'agent_id' => PermissionHelper::get_acting_agent_id() ?? 0,
+			);
+		}
+
+		$raw_user_id = (int) ( $parameters['user_id'] ?? 0 );
+		$agent_id    = (int) ( $parameters['agent_id'] ?? 0 );
 
 		if ( $raw_user_id > 0 ) {
-			return $directory_manager->get_effective_user_id( $raw_user_id );
+			$user_id = $directory_manager->get_effective_user_id( $raw_user_id );
+		} else {
+			$current_user_id = get_current_user_id();
+			$user_id         = $current_user_id > 0 ? $directory_manager->get_effective_user_id( $current_user_id ) : $directory_manager->get_effective_user_id( 0 );
 		}
 
-		$current_user_id = get_current_user_id();
-		if ( $current_user_id > 0 ) {
-			return $directory_manager->get_effective_user_id( $current_user_id );
-		}
-
-		return $directory_manager->get_effective_user_id( 0 );
+		return array(
+			'user_id'  => $user_id,
+			'agent_id' => $agent_id,
+		);
 	}
 
 	/**
