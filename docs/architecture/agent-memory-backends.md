@@ -6,17 +6,17 @@ This lets self-hosted installs keep the current disk-backed workflow while manag
 
 ## Logical Identity
 
-Every memory file is addressed by a logical memory scope:
+Every memory file is addressed by a logical memory scope. The agent portion may be resolved from either `agent_id` or `agent_slug`, matching WordPress's numeric ID plus slug pattern:
 
 ```text
-(layer, user_id, agent_slug, filename)
+(layer, user_id, agent identity, filename)
 ```
 
 | Field | Purpose |
 |---|---|
 | `layer` | Memory layer: `shared`, `agent`, `user`, or `network`. |
 | `user_id` | Effective WordPress user ID. `0` means no user-specific layer. |
-| `agent_slug` | Public agent identity. Empty means callers may resolve from the user context. Backends may translate this to an internal numeric `agent_id` for storage. |
+| `agent_id` / `agent_slug` | Agent identity. `agent_id` is the stable storage ID; `agent_slug` is the portable, human-readable selector. Empty means callers may resolve from the user context. |
 | `filename` | File name or relative path within the layer, such as `MEMORY.md`, `contexts/editor.md`, or `daily/2026/04/17.md`. |
 
 Backends translate that tuple to their own physical key: a filesystem path, a database row, a post, or another host-owned identifier. Callers should use `AgentMemory` and should not branch on the concrete backend.
@@ -97,7 +97,7 @@ DMC should be treated as a projection provider, not the memory model:
 | Disk file projection for local coding agents | DMC + `DiskAgentMemoryStore` environment capability |
 | Managed-host alternate backend | Consumer plugin via `agents_api_memory_store` |
 
-`MEMORY.md` is not deprecated. On disk-capable installs it remains the agent's persistent knowledge file. On hosts without disk, the same logical `MEMORY.md` may be represented by another backend while still appearing to Data Machine as `(agent, user_id, agent_slug, MEMORY.md)`.
+`MEMORY.md` is not deprecated. On disk-capable installs it remains the agent's persistent knowledge file. On hosts without disk, the same logical `MEMORY.md` may be represented by another backend while still appearing to Data Machine as `(agent, user_id, agent identity, MEMORY.md)`.
 
 ## Daily Memory
 

@@ -12,7 +12,7 @@ The tables below document the core ability groups most commonly used by REST, CL
 
 ## Multi-Agent Scoping
 
-Public ability inputs should identify agents by `agent` or `agent_slug` when selecting an agent explicitly. Numeric `agent_id` remains supported as an internal storage key and compatibility parameter. The `PermissionHelper` class resolves public selectors to scoped agent and user IDs, enforces ownership checks via `owns_resource()` and `owns_agent_resource()`, and controls access grants via `can_access_agent()`.
+Data Machine follows a WordPress-shaped identifier model: `agent_id` is the stable numeric row ID, and `agent_slug` is the human-readable, portable identifier. Programmatic ability inputs should use explicit fields (`agent_id` when selecting by row ID, `agent_slug` when selecting by slug). The generic `agent` selector is reserved for CLI and resolver-style boundaries that intentionally accept either ID or slug. The `PermissionHelper` class resolves selectors to scoped agent and user IDs, enforces ownership checks via `owns_resource()` and `owns_agent_resource()`, and controls access grants via `can_access_agent()`.
 
 ## Registered Abilities
 
@@ -399,8 +399,8 @@ All abilities support both WordPress admin and WP-CLI contexts via the shared `P
 // Standard permission check
 PermissionHelper::can_manage(); // WP-CLI always returns true; web requires manage_options
 
-// Multi-agent scoped permission check. Public requests may provide `agent` or
-// `agent_slug`; PermissionHelper resolves those to the internal numeric ID.
+// Multi-agent scoped permission check. Requests may provide explicit
+// `agent_id` or `agent_slug`; resolver boundaries may also accept `agent`.
 PermissionHelper::can_access_agent($agent_id);
 PermissionHelper::owns_resource($resource_user_id);
 PermissionHelper::resolve_scoped_agent_id($params);

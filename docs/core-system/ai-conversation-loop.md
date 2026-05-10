@@ -155,10 +155,11 @@ $completed  = $result['completed'];
 ### Chat Agent Example
 
 ```php
-// Chat payload includes session_id, user_id, and public agent slug.
+// Chat payload includes session_id, user_id, and resolved agent identity.
 $payload = [
     'session_id'  => $session_id,
     'user_id'     => $user_id,
+    'agent_id'    => $agent_id,
     'agent_slug'  => $agent_slug,
 ];
 

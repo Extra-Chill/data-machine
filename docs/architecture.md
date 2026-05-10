@@ -64,7 +64,7 @@ Data Machine supports **multiple agents on a single WordPress installation** (@s
 **Key components:**
 - **Agent Registry** (`datamachine_agents`): Each agent has a unique slug, owner, and configuration
 - **Access Control** (`datamachine_agent_access`): Role-based sharing (viewer < operator < admin)
-- **Resource Scoping**: Runtime contexts use agent slugs; storage tables retain internal `agent_id` columns
+- **Resource Scoping**: Agents have both `agent_id` and `agent_slug`; storage tables use IDs while portable runtime/export contexts may carry slugs
 - **Filesystem Isolation**: Each agent gets `agents/{slug}/` for identity files and daily memory
 - **Permission Helper**: `PermissionHelper` resolves agent context and enforces access checks
 
