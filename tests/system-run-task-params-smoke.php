@@ -150,6 +150,8 @@ function smoke_build_task_scheduler_initial_data( string $task_type, array $para
 		'task_type'     => $task_type,
 		'task_params'   => $params,
 		'task_context'  => array(),
+		'job_source'    => 'system',
+		'job_label'     => ucfirst( str_replace( '_', ' ', $task_type ) ),
 		'parent_job_id' => 0,
 		'user_id'       => 0,
 		'agent_id'      => 0,
@@ -225,6 +227,8 @@ $scheduled_params = array(
 );
 $initial          = smoke_build_task_scheduler_initial_data( 'wiki_maintain', $scheduled_params );
 $assert( 'TaskScheduler initial_data stores task_params', $scheduled_params === $initial['task_params'] );
+$assert( 'TaskScheduler marks run-now jobs as system jobs', 'system' === $initial['job_source'] );
+$assert( 'TaskScheduler labels system task jobs from task type', 'Wiki maintain' === $initial['job_label'] );
 $workflow = smoke_default_system_task_workflow( 'wiki_maintain', $initial['task_params'] );
 $assert( 'SystemTask workflow stores params in flow_step_settings', $scheduled_params === $workflow['steps'][0]['flow_step_settings']['params'] );
 
@@ -232,6 +236,8 @@ echo "\n[4] Source tripwires\n";
 $system_command = file_get_contents( __DIR__ . '/../inc/Cli/Commands/SystemCommand.php' );
 $abilities      = file_get_contents( __DIR__ . '/../inc/Abilities/SystemAbilities.php' );
 $registry       = file_get_contents( __DIR__ . '/../inc/Engine/Tasks/TaskRegistry.php' );
+$scheduler        = file_get_contents( __DIR__ . '/../inc/Engine/Tasks/TaskScheduler.php' );
+$workflow_ability = file_get_contents( __DIR__ . '/../inc/Abilities/Job/ExecuteWorkflowAbility.php' );
 $assert( 'CLI avoids invalid --param key=value synopsis placeholder', ! str_contains( $system_command, '[--param=<key=value>]' ) );
 $assert( 'CLI documents valid --param synopsis placeholder', str_contains( $system_command, '[--param=<param>]' ) );
 $assert( 'CLI documents --param key=value semantics', str_contains( $system_command, 'Structured task param as key=value. Repeatable.' ) );
@@ -240,6 +246,8 @@ $assert( 'run-task ability schema accepts task_params', str_contains( $abilities
 $assert( 'run-task ability schedules merged task params', str_contains( $abilities, 'array_merge( $task_params' ) );
 $assert( 'TaskRegistry exposes mutates metadata', str_contains( $registry, "'mutates'" ) );
 $assert( 'TaskRegistry exposes requires_scope metadata', str_contains( $registry, "'requires_scope'" ) );
+$assert( 'TaskScheduler passes system job source to execute-workflow', str_contains( $scheduler, "'job_source'    => 'system'" ) );
+$assert( 'execute-workflow honors caller job source', str_contains( $workflow_ability, "'source'      => $" . 'job_source' ) );
 
 echo "\nAssertions: {$total}, Failures: {$failures}\n";
 if ( $failures > 0 ) {

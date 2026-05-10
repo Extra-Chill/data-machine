@@ -142,6 +142,13 @@ class TaskScheduler {
 			$job_snapshot['agent_slug'] = $context_agent_slug;
 		}
 
+		$task_meta = method_exists( $handler_class, 'getTaskMeta' )
+			? $handler_class::getTaskMeta()
+			: array();
+		$job_label = ! empty( $task_meta['label'] )
+			? $task_meta['label']
+			: ucfirst( str_replace( '_', ' ', $taskType ) );
+
 		$result = $ability->execute( array(
 			'workflow'     => $workflow,
 			'timestamp'    => $params['scheduled_at'] ?? null,
@@ -149,6 +156,8 @@ class TaskScheduler {
 				'task_type'     => $taskType,
 				'task_params'   => $params,
 				'task_context'  => $context,
+				'job_source'    => 'system',
+				'job_label'     => $job_label,
 				'parent_job_id' => $parentJobId,
 				'user_id'       => $context_user_id,
 				'agent_id'      => $context_agent_id,
