@@ -47,6 +47,11 @@ class Reddit extends FetchHandler {
 			array(
 				'charLimit' => 40000,
 				'scopes'    => 'identity read',
+				'preview'   => array(
+					'aspectRatio'     => 'native',
+					'captionPosition' => 'above',
+					'previewSurface'  => 'card',
+				),
 			)
 		);
 	}

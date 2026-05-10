@@ -959,6 +959,11 @@ class RestApi {
 	 *         "authenticated": true,
 	 *         "username": "extrachill",
 	 *         "capabilities": [{ "slug": "publish", "label": "Publish" }, ...],
+	 *         "preview": {
+	 *           "aspectRatio":     "1:1" | "4:5" | "16:9" | "native",
+	 *           "captionPosition": "above" | "below" | "overlay",
+	 *           "previewSurface":  "card" | "feed" | "square"
+	 *         },
 	 *         ...meta fields like charLimit, maxImages, supportsCarousel
 	 *       },
 	 *       ...
@@ -972,6 +977,10 @@ class RestApi {
 	 *     it from object keys.
 	 *   - `capabilities` is canonicalised to `[{slug, label}]`. The legacy
 	 *     bare-string form is no longer accepted.
+	 *   - `preview` is always present. Handlers that don't declare it get a
+	 *     generic feed-shaped default (`aspectRatio=native`, `captionPosition=above`,
+	 *     `previewSurface=feed`). Clients should rely on this field — never
+	 *     branch on `slug` to pick preview chrome.
 	 *   - Sort: authenticated first, then alphabetical by label. This is the
 	 *     canonical display order; clients should render in array order.
 	 *   - The `{ platforms: [...] }` envelope leaves room to add metadata
@@ -1025,6 +1034,7 @@ class RestApi {
 			);
 
 			$entry['capabilities'] = self::normalize_capabilities( $entry['capabilities'] ?? null );
+			$entry['preview']      = self::normalize_preview( $entry['preview'] ?? null );
 
 			$platforms[] = $entry;
 		}
@@ -1137,6 +1147,49 @@ class RestApi {
 		}
 
 		return $normalised ?: $default;
+	}
+
+	/**
+	 * Normalise the `preview` shape declared by handlers.
+	 *
+	 * Each handler MAY declare a `preview` array describing how clients should
+	 * render a post preview for the platform. The shape is:
+	 *
+	 *   array(
+	 *       'aspectRatio'     => '1:1' | '4:5' | '16:9' | 'native',
+	 *       'captionPosition' => 'above' | 'below' | 'overlay',
+	 *       'previewSurface'  => 'card' | 'feed' | 'square',
+	 *   )
+	 *
+	 * Handlers that don't declare it (or declare an incomplete shape) get a
+	 * generic feed-shaped default applied server-side. This keeps clients
+	 * 100% data-driven — no per-platform branching for preview rendering.
+	 *
+	 * @param mixed $raw Raw value from the handler's `meta['preview']`.
+	 * @return array{aspectRatio: string, captionPosition: string, previewSurface: string}
+	 */
+	private static function normalize_preview( $raw ): array {
+		$default = array(
+			'aspectRatio'     => 'native',
+			'captionPosition' => 'above',
+			'previewSurface'  => 'feed',
+		);
+
+		if ( ! is_array( $raw ) ) {
+			return $default;
+		}
+
+		return array(
+			'aspectRatio'     => isset( $raw['aspectRatio'] ) && is_string( $raw['aspectRatio'] ) && '' !== $raw['aspectRatio']
+				? (string) $raw['aspectRatio']
+				: $default['aspectRatio'],
+			'captionPosition' => isset( $raw['captionPosition'] ) && is_string( $raw['captionPosition'] ) && '' !== $raw['captionPosition']
+				? (string) $raw['captionPosition']
+				: $default['captionPosition'],
+			'previewSurface'  => isset( $raw['previewSurface'] ) && is_string( $raw['previewSurface'] ) && '' !== $raw['previewSurface']
+				? (string) $raw['previewSurface']
+				: $default['previewSurface'],
+		);
 	}
 
 	/**

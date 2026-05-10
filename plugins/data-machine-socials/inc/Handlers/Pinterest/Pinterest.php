@@ -101,6 +101,11 @@ class Pinterest extends PublishHandler {
 			'capabilities'       => array(
 				array( 'slug' => 'publish', 'label' => 'Publish' ),
 			),
+			'preview'            => array(
+				'aspectRatio'     => '4:5',
+				'captionPosition' => 'below',
+				'previewSurface'  => 'square',
+			),
 			)
 		);
 	}

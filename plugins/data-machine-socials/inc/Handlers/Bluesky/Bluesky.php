@@ -65,6 +65,11 @@ class Bluesky extends PublishHandler {
 			'capabilities'       => array(
 				array( 'slug' => 'publish', 'label' => 'Publish' ),
 			),
+			'preview'            => array(
+				'aspectRatio'     => '16:9',
+				'captionPosition' => 'above',
+				'previewSurface'  => 'feed',
+			),
 			)
 		);
 	}

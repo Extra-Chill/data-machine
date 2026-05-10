@@ -74,6 +74,11 @@ class Threads extends PublishHandler {
 			'capabilities'       => array(
 				array( 'slug' => 'publish', 'label' => 'Publish' ),
 			),
+			'preview'            => array(
+				'aspectRatio'     => 'native',
+				'captionPosition' => 'below',
+				'previewSurface'  => 'feed',
+			),
 			)
 		);
 	}

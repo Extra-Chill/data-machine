@@ -75,6 +75,11 @@ class Facebook extends PublishHandler {
 				array( 'slug' => 'publish', 'label' => 'Publish' ),
 				array( 'slug' => 'comments', 'label' => 'Comments' ),
 			),
+			'preview'            => array(
+				'aspectRatio'     => 'native',
+				'captionPosition' => 'above',
+				'previewSurface'  => 'card',
+			),
 			)
 		);
 	}

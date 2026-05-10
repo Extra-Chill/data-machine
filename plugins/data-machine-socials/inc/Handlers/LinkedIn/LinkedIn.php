@@ -77,6 +77,11 @@ class LinkedIn extends PublishHandler {
 			'capabilities'       => array(
 				array( 'slug' => 'publish', 'label' => 'Publish' ),
 			),
+			'preview'            => array(
+				'aspectRatio'     => 'native',
+				'captionPosition' => 'above',
+				'previewSurface'  => 'card',
+			),
 			)
 		);
 	}

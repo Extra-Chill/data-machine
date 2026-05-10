@@ -94,6 +94,11 @@ class Instagram extends PublishHandler {
 				array( 'slug' => 'comments', 'label' => 'Comments' ),
 				array( 'slug' => 'giveaway', 'label' => 'Giveaway' ),
 			),
+			'preview'             => array(
+				'aspectRatio'     => '1:1',
+				'captionPosition' => 'below',
+				'previewSurface'  => 'square',
+			),
 			)
 		);
 	}
