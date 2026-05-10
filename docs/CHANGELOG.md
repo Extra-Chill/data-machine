@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.108.2] - 2026-05-10
+
+### Changed
+- unify duplicated WP_TESTS_* detection in should_load_full_runtime
+
 ## [0.108.1] - 2026-05-10
 
 ### Changed
