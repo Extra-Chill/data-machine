@@ -80,6 +80,47 @@ if (empty($tool_calls)) {
 }
 ```
 
+Pipeline steps can also declare `completion_assertions` to keep the loop running until required runtime signals are present. Simple assertions require all named tools to have succeeded:
+
+```json
+{
+  "completion_assertions": {
+    "required_tool_names": ["create_or_update_github_file", "create_github_pull_request"]
+  }
+}
+```
+
+For agents with multiple valid completion shapes, use `complete_when_any`. Each outcome is generic and tool-driven: the run completes when any named outcome has all of its required successful tool calls, optional output fields, optional parameter matches, and optional minimum call counts.
+
+```json
+{
+  "completion_assertions": {
+    "required_tool_names": ["agent_daily_memory"],
+    "complete_when_any": [
+      {
+        "name": "content_proposal",
+        "tools": [
+          { "name": "create_or_update_github_file", "min_successful_calls": 2 },
+          { "name": "create_github_pull_request", "required_output": ["html_url"] }
+        ]
+      },
+      {
+        "name": "issue_reply",
+        "tools": [
+          {
+            "name": "manage_github_issue",
+            "required_parameters": { "action": "comment" },
+            "required_output": ["comment.html_url"]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Outcome names appear in completion diagnostics and nudges, so operators can tell which path was satisfied or what remains missing without decoding `outcome_1` style placeholders.
+
 ### State Management
 
 The loop maintains conversation state across turns, tracking:

@@ -543,7 +543,14 @@ function datamachine_build_turn_runner(
 					$tool_name,
 					is_array( $tool_def ) ? $tool_def : null,
 					$tool_result,
-					array_merge( $turn_context, $loop_payload, array( 'mode' => $mode ) ),
+					array_merge(
+						$turn_context,
+						$loop_payload,
+						array(
+							'mode'            => $mode,
+							'tool_parameters' => $tool_parameters,
+						)
+					),
 					$turn_count
 				);
 				$conversation_complete = $completion_decision->isComplete();
