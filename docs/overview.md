@@ -47,7 +47,7 @@ Data Machine supports **multiple agents on a single WordPress installation** (@s
 
 - **Agent Registry**: Agents are stored in `datamachine_agents` with unique slugs, owner relationships, and configuration.
 - **Access Control**: The `datamachine_agent_access` table implements role-based access (viewer, operator, admin) for sharing agents across WordPress users.
-- **Resource Scoping**: Public/runtime contexts use agent slugs, while major storage tables keep internal `agent_id` columns. Queries filter by resolved agent context automatically.
+- **Resource Scoping**: Agents have both `agent_id` and `agent_slug`, similar to WordPress posts having IDs and slugs. Storage tables keep `agent_id`; portable runtime/export contexts may also carry `agent_slug`. Queries filter by resolved agent context automatically.
 - **Filesystem Isolation**: Each agent gets its own directory under `agents/{slug}/` for identity files (SOUL.md, MEMORY.md) and daily memory.
 - **Three-Layer Directory System**: Memory files are organized into shared (site-wide), agent (identity), and user (personal) layers below Data Machine's files root in WordPress uploads.
 
