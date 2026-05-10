@@ -120,11 +120,20 @@ class ExecuteWorkflowAbility {
 		// fan-out children, scheduleBatch passing through caller
 		// linkage) can stamp the indexed parent_job_id column — the
 		// path Jobs::get_children walks for status / undo.
+		$requested_job_source = $initial_data['job_source'] ?? null;
+		$requested_job_label  = $initial_data['job_label'] ?? null;
+		$job_source           = is_string( $requested_job_source ) && '' !== $requested_job_source
+			? $requested_job_source
+			: 'chat';
+		$job_label            = is_string( $requested_job_label ) && '' !== $requested_job_label
+			? $requested_job_label
+			: 'Chat Workflow';
+
 		$create_args = array(
 			'pipeline_id' => 'direct',
 			'flow_id'     => 'direct',
-			'source'      => 'chat',
-			'label'       => 'Chat Workflow',
+			'source'      => $job_source,
+			'label'       => $job_label,
 		);
 
 		$initial_parent_job_id = (int) ( $initial_data['parent_job_id'] ?? 0 );
