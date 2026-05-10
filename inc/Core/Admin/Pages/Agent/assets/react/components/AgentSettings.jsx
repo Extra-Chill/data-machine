@@ -1,12 +1,19 @@
 /**
- * AgentSettings Component
+ * Runtime configuration component.
  *
- * Agent configuration settings: provider/model, site context, turns, webhook.
- * Transplanted from the former Settings → Agent tab.
+ * Global AI runtime settings: provider/model, per-mode overrides, site
+ * context, turns, and webhook access.
  */
 
+/**
+ * WordPress dependencies
+ */
 import { useState, useEffect, useCallback } from '@wordpress/element';
-import { Button } from '@wordpress/components';
+import { Button, Notice } from '@wordpress/components';
+
+/**
+ * External dependencies
+ */
 import { useSettings, useUpdateSettings } from '@shared/queries/settings';
 import { client } from '@shared/utils/api';
 import { useFormState } from '@shared/hooks/useFormState';
@@ -33,6 +40,8 @@ const AgentSettings = () => {
 	const [ pingSecretVisible, setPingSecretVisible ] = useState( false );
 	const [ pingCopied, setPingCopied ] = useState( false );
 	const [ pingGenerating, setPingGenerating ] = useState( false );
+	const [ pingError, setPingError ] = useState( '' );
+	const [ confirmRegenerateOpen, setConfirmRegenerateOpen ] = useState( false );
 
 	const form = useFormState( {
 		initialData: EMPTY_FORM,
@@ -49,17 +58,8 @@ const AgentSettings = () => {
 		}
 	}, [ data ] );
 
-	const handleGeneratePingSecret = useCallback( async () => {
-		const confirmed = pingSecret
-			? window.confirm(
-					'Regenerating will invalidate the current token. Any services using it will lose access. Continue?'
-			  )
-			: true;
-
-		if ( ! confirmed ) {
-			return;
-		}
-
+	const generatePingSecret = useCallback( async () => {
+		setPingError( '' );
 		setPingGenerating( true );
 		try {
 			const response = await client.post(
@@ -70,11 +70,21 @@ const AgentSettings = () => {
 				setPingSecretVisible( true );
 			}
 		} catch ( err ) {
-			console.error( 'Failed to generate ping secret:', err );
+			setPingError( err.message || 'Failed to generate secret.' );
 		} finally {
 			setPingGenerating( false );
+			setConfirmRegenerateOpen( false );
 		}
-	}, [ pingSecret ] );
+	}, [] );
+
+	const handleGeneratePingSecret = useCallback( () => {
+		if ( pingSecret ) {
+			setConfirmRegenerateOpen( true );
+			return;
+		}
+
+		generatePingSecret();
+	}, [ generatePingSecret, pingSecret ] );
 
 	const handleCopyPingSecret = useCallback( () => {
 		navigator.clipboard.writeText( pingSecret ).then( () => {
@@ -114,7 +124,7 @@ const AgentSettings = () => {
 		return (
 			<div className="datamachine-agent-settings-loading">
 				<span className="spinner is-active"></span>
-				<span>Loading agent settings...</span>
+				<span>Loading configuration...</span>
 			</div>
 		);
 	}
@@ -130,6 +140,15 @@ const AgentSettings = () => {
 	return (
 		<div className="datamachine-agent-settings">
 			<h2 className="datamachine-agent-settings-title">Configuration</h2>
+			{ pingError && (
+				<Notice
+					status="error"
+					isDismissible
+					onRemove={ () => setPingError( '' ) }
+				>
+					{ pingError }
+				</Notice>
+			) }
 			<table className="form-table">
 				<tbody>
 					<tr>
@@ -168,10 +187,10 @@ const AgentSettings = () => {
 										marginBottom: '16px',
 									} }
 								>
-									The same agent runs in different modes
-									with different toolkits. Override the default
-									model for specific modes — leave empty to
-									use the default above.
+									Modes can use different toolkits and runtime
+									behavior. Override the default model for
+									specific modes, or leave empty to use the
+									default above.
 								</p>
 								{ ( providersData?.modes || [] ).map(
 									( modeItem ) => {
@@ -261,7 +280,7 @@ const AgentSettings = () => {
 					) }
 
 					<tr>
-						<th scope="row">Provide site context to agents</th>
+						<th scope="row">Provide site context to AI modes</th>
 						<td>
 							<fieldset>
 								<label htmlFor="site_context_enabled">
@@ -284,7 +303,7 @@ const AgentSettings = () => {
 								<p className="description">
 									Automatically provides site information
 									(post types, taxonomies, user stats) to AI
-									agents for better context awareness.
+									requests for better context awareness.
 								</p>
 							</fieldset>
 						</td>
@@ -322,19 +341,19 @@ const AgentSettings = () => {
 							/>
 							<p className="description">
 								Maximum number of conversation turns allowed for
-								AI agents (1-50). Applies to both pipeline and
-								chat conversations.
+								AI runtime loops (1-50). Applies to both pipeline
+								and chat conversations.
 							</p>
 						</td>
 					</tr>
 
 					<tr>
-						<th scope="row">Chat Agent Webhook</th>
+						<th scope="row">Chat Webhook</th>
 						<td>
 							<div className="datamachine-ping-secret-section">
 								<p className="description" style={ { marginTop: 0 } }>
 									Allow external services to send messages to
-									your chat agent via webhook. Use this
+									the chat runtime via webhook. Use this
 									endpoint URL and secret token in Agent Ping
 									step configurations.
 								</p>
@@ -431,6 +450,30 @@ const AgentSettings = () => {
 				saveStatus={ save.saveStatus }
 				onSave={ save.handleSave }
 			/>
+
+			{ confirmRegenerateOpen && (
+				<Notice status="warning" isDismissible={ false }>
+					<p>
+						Regenerating will invalidate the current token. Any services
+						using it will lose access. Continue?
+					</p>
+					<Button
+						variant="primary"
+						onClick={ generatePingSecret }
+						isBusy={ pingGenerating }
+						disabled={ pingGenerating }
+					>
+						Regenerate Secret
+					</Button>{ ' ' }
+					<Button
+						variant="secondary"
+						onClick={ () => setConfirmRegenerateOpen( false ) }
+						disabled={ pingGenerating }
+					>
+						Cancel
+					</Button>
+				</Notice>
+			) }
 		</div>
 	);
 };
