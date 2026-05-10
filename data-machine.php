@@ -18,10 +18,6 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-if ( ! datamachine_check_requirements() ) {
-	return;
-}
-
 define( 'DATAMACHINE_VERSION', '0.107.0' );
 
 define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
@@ -824,38 +820,3 @@ add_action( 'wp_initialize_site', 'datamachine_on_new_site', 200 );
 
 // Migrations, scaffolding, and activation helpers.
 require_once __DIR__ . '/inc/migrations/load.php';
-
-
-function datamachine_check_requirements() {
-	global $wp_version;
-	$current_wp_version = $wp_version ?? '';
-	if ( '' !== $current_wp_version && ! wp_installing() && version_compare( $current_wp_version, '7.0', '<' ) ) {
-		add_action(
-			'admin_notices',
-			function () use ( $current_wp_version ) {
-				echo '<div class="notice notice-error"><p>';
-				printf(
-					esc_html( 'Data Machine requires WordPress %2$s or higher. You are running WordPress %1$s.' ),
-					esc_html( $current_wp_version ),
-					'7.0'
-				);
-				echo '</p></div>';
-			}
-		);
-		return false;
-	}
-
-	if ( ! file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
-		add_action(
-			'admin_notices',
-			function () {
-				echo '<div class="notice notice-error"><p>';
-				echo esc_html( 'Data Machine: Composer dependencies are missing. Please run "composer install" or contact Chubes to report a bug.' );
-				echo '</p></div>';
-			}
-		);
-		return false;
-	}
-
-	return true;
-}
