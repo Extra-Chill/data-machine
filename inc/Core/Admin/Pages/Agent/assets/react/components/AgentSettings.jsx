@@ -1,8 +1,8 @@
 /**
- * AgentSettings Component
+ * Runtime configuration component.
  *
- * Agent configuration settings: provider/model, site context, turns, webhook.
- * Transplanted from the former Settings → Agent tab.
+ * Global AI runtime settings: provider/model, per-mode overrides, site
+ * context, turns, and webhook access.
  */
 
 import { useState, useEffect, useCallback } from '@wordpress/element';
@@ -114,7 +114,7 @@ const AgentSettings = () => {
 		return (
 			<div className="datamachine-agent-settings-loading">
 				<span className="spinner is-active"></span>
-				<span>Loading agent settings...</span>
+				<span>Loading configuration...</span>
 			</div>
 		);
 	}
@@ -168,10 +168,10 @@ const AgentSettings = () => {
 										marginBottom: '16px',
 									} }
 								>
-									The same agent runs in different modes
-									with different toolkits. Override the default
-									model for specific modes — leave empty to
-									use the default above.
+									Modes can use different toolkits and runtime
+									behavior. Override the default model for
+									specific modes, or leave empty to use the
+									default above.
 								</p>
 								{ ( providersData?.modes || [] ).map(
 									( modeItem ) => {
@@ -261,7 +261,7 @@ const AgentSettings = () => {
 					) }
 
 					<tr>
-						<th scope="row">Provide site context to agents</th>
+						<th scope="row">Provide site context to AI modes</th>
 						<td>
 							<fieldset>
 								<label htmlFor="site_context_enabled">
@@ -284,7 +284,7 @@ const AgentSettings = () => {
 								<p className="description">
 									Automatically provides site information
 									(post types, taxonomies, user stats) to AI
-									agents for better context awareness.
+									requests for better context awareness.
 								</p>
 							</fieldset>
 						</td>
@@ -322,19 +322,19 @@ const AgentSettings = () => {
 							/>
 							<p className="description">
 								Maximum number of conversation turns allowed for
-								AI agents (1-50). Applies to both pipeline and
-								chat conversations.
+								AI runtime loops (1-50). Applies to both pipeline
+								and chat conversations.
 							</p>
 						</td>
 					</tr>
 
 					<tr>
-						<th scope="row">Chat Agent Webhook</th>
+						<th scope="row">Chat Webhook</th>
 						<td>
 							<div className="datamachine-ping-secret-section">
 								<p className="description" style={ { marginTop: 0 } }>
 									Allow external services to send messages to
-									your chat agent via webhook. Use this
+									the chat runtime via webhook. Use this
 									endpoint URL and secret token in Agent Ping
 									step configurations.
 								</p>
