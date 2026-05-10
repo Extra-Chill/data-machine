@@ -15,6 +15,18 @@ import { applyFilters } from '@wordpress/hooks';
  */
 import UrlListField from './UrlListField';
 
+const formatJsonValue = ( value ) => {
+	if ( value === undefined || value === null || value === '' ) {
+		return '';
+	}
+
+	if ( typeof value === 'string' ) {
+		return value;
+	}
+
+	return JSON.stringify( value, null, 2 );
+};
+
 /**
  * Shared renderer for handler schema-driven fields.
  *
@@ -96,6 +108,20 @@ export default function HandlerSettingField( {
 						rows={ fieldConfig.rows || 4 }
 						help={ help }
 						placeholder={ fieldConfig.placeholder }
+					/>
+				</div>
+			);
+
+		case 'json':
+			return (
+				<div className={ wrapperClassName }>
+					<TextareaControl
+						label={ label }
+						value={ formatJsonValue( resolvedValue ) }
+						onChange={ handleChange }
+						rows={ fieldConfig.rows || 6 }
+						help={ help }
+						placeholder={ fieldConfig.placeholder || '{}' }
 					/>
 				</div>
 			);
