@@ -3,6 +3,18 @@
  */
 import { resolveFieldValue } from '../utils/handlerSettings';
 
+const formatDisplayValue = ( value ) => {
+	if ( value === undefined || value === null ) {
+		return '';
+	}
+
+	if ( typeof value === 'object' ) {
+		return JSON.stringify( value );
+	}
+
+	return value;
+};
+
 export default class HandlerModel {
 	constructor( slug, descriptor = {}, details = {} ) {
 		this.slug = slug;
@@ -38,7 +50,9 @@ export default class HandlerModel {
 			settingsDisplay.forEach( ( setting ) => {
 				display[ setting.key ] = {
 					label: setting.label,
-					value: setting.display_value || setting.value,
+					value: formatDisplayValue(
+						setting.display_value || setting.value
+					),
 				};
 			} );
 
@@ -51,7 +65,9 @@ export default class HandlerModel {
 		Object.entries( schema ).forEach( ( [ key, config ] ) => {
 			display[ key ] = {
 				label: config.label || key,
-				value: resolveFieldValue( key, config, handlerConfig ),
+				value: formatDisplayValue(
+					resolveFieldValue( key, config, handlerConfig )
+				),
 			};
 		} );
 
@@ -97,6 +113,26 @@ export default class HandlerModel {
 			switch ( fieldConfig.type ) {
 				case 'checkbox':
 					sanitized[ key ] = !! value;
+					break;
+
+				case 'json':
+					if ( value === '' || value === undefined || value === null ) {
+						sanitized[ key ] = {};
+						break;
+					}
+
+					if ( typeof value === 'string' ) {
+						try {
+							sanitized[ key ] = JSON.parse( value );
+						} catch ( error ) {
+							throw new Error(
+								`Invalid JSON for ${ fieldConfig.label || key }.`
+							);
+						}
+						break;
+					}
+
+					sanitized[ key ] = value;
 					break;
 
 				case 'select':

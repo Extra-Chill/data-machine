@@ -16,6 +16,18 @@ import { __ } from '@wordpress/i18n';
 import { useHandlers } from '../../queries/handlers';
 import { useStepTypes } from '../../queries/config';
 
+const formatDisplayValue = ( value ) => {
+	if ( value === undefined || value === null ) {
+		return '';
+	}
+
+	if ( typeof value === 'object' ) {
+		return JSON.stringify( value );
+	}
+
+	return value;
+};
+
 export default function FlowStepHandler( {
 	handlerSlug,
 	handlerSlugs,
@@ -73,7 +85,7 @@ export default function FlowStepHandler( {
 			? settings.reduce( ( acc, s ) => {
 					acc[ s.key ] = {
 						label: s.label,
-						value: s.display_value ?? s.value,
+						value: formatDisplayValue( s.display_value ?? s.value ),
 					};
 					return acc;
 			  }, {} )
@@ -90,7 +102,9 @@ export default function FlowStepHandler( {
 			return settingsDisplay.reduce( ( acc, setting ) => {
 				acc[ setting.key ] = {
 					label: setting.label,
-					value: setting.display_value ?? setting.value,
+					value: formatDisplayValue(
+						setting.display_value ?? setting.value
+					),
 				};
 				return acc;
 			}, {} );
