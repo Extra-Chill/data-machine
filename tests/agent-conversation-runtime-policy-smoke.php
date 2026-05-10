@@ -1082,6 +1082,8 @@ $result = datamachine_run_conversation(
 assert_runtime_policy( 1 === $dispatch_count, 'custom completion policy stopped the loop after one provider request' );
 assert_runtime_policy( 1 === count( $result['tool_execution_results'] ?? array() ), 'custom completion policy returned one tool result' );
 assert_runtime_policy( 1588 === ( $transcript_policy->calls[0]['payload']['job_id'] ?? null ), 'custom transcript persister receives runtime context' );
+assert_runtime_policy( isset( $result['request_metadata']['request_json_bytes'] ), 'conversation result carries request metadata' );
+assert_runtime_policy( isset( $transcript_policy->calls[0]['result']['request_metadata']['request_json_bytes'] ), 'custom transcript persister receives request metadata' );
 assert_runtime_policy( 1 === count( $completion_policy->calls ), 'custom completion policy received one tool result' );
 assert_runtime_policy( 'runtime_policy_tool' === ( $completion_policy->calls[0]['tool_name'] ?? null ), 'custom completion policy receives tool name' );
 assert_runtime_policy( 1 === count( $transcript_policy->calls ), 'custom transcript persister was called once on success' );

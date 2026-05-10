@@ -640,6 +640,7 @@ function datamachine_build_turn_runner(
 		return array(
 			'messages'                     => $messages,
 			'tool_execution_results'       => $tool_execution_results,
+			'request_metadata'             => $last_request_metadata,
 			'conversation_complete'        => $conversation_complete,
 			'completion_nudge'             => $completion_nudge ?? '',
 			'duplicate_tool_call_rejected' => $duplicate_rejected,
