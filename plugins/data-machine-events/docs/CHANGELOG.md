@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.32.2] - 2026-05-10
+
+### Changed
+- skip geo-radius haversine when archive_taxonomy=venue (#247)
+- cache calendar REST responses, aggressive TTL for past=1 (#246)
+
 ## [0.32.1] - 2026-05-10
 
 ### Fixed
