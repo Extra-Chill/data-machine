@@ -51,6 +51,10 @@ if ( ! function_exists( 'data_machine_events_sanitize_query_params' ) ) {
 	}
 }
 
+// Public integration API — stable function surface for downstream plugins/themes.
+// See docs/integration-api.md.
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/public-api.php';
+
 // Load event dates sync (monitors Event Details block saves → datamachine_event_dates table).
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-dates-sync.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/EventDatesTable.php';
@@ -224,10 +228,32 @@ class DATAMACHINE_Events {
 
 		add_action( 'init', array( $this, 'init_data_machine_integration' ), 25 );
 
+		// Fire the public integration loaded action. Consumers gate filter
+		// registration / rendering on `did_action('data_machine_events_loaded')`
+		// instead of class_exists() against internal classes.
+		// See inc/public-api.php and docs/integration-api.md.
+		add_action( 'init', array( $this, 'fire_loaded_action' ), 30 );
+
 		// Initialize admin bar for all logged-in users
 		if ( class_exists( 'DataMachineEvents\\Admin\\Admin_Bar' ) ) {
 			new \DataMachineEvents\Admin\Admin_Bar();
 		}
+	}
+
+	/**
+	 * Fire the public `data_machine_events_loaded` action.
+	 *
+	 * Hooked at init priority 30 so it runs after post types (priority 0),
+	 * blocks (priority 15), taxonomies (priority 20), and the Data Machine
+	 * integration (priority 25). Consumers should hook their own filter
+	 * registrations on this action — or gate them on
+	 * `did_action('data_machine_events_loaded')` — rather than checking for
+	 * the existence of internal classes.
+	 *
+	 * @since 0.32.0
+	 */
+	public function fire_loaded_action(): void {
+		do_action( 'data_machine_events_loaded' );
 	}
 
 	private function init_hooks() {
