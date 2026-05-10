@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.108.1] - 2026-05-10
+
+### Changed
+- drop dead scan_and_instantiate + per-request migration callback
+
 ## [0.108.0] - 2026-05-10
 
 ### Added
