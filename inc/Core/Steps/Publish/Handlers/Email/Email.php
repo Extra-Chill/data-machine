@@ -44,27 +44,27 @@ class Email extends PublishHandler {
 						'handler'        => 'email_publish',
 						'description'    => 'Send an email. Compose the subject and body (HTML). Optionally override recipients and attach files by providing server file paths.',
 						'parameters'     => array(
-							'to'          => array(
-								'type'        => 'string',
-								'required'    => false,
-								'description' => 'Comma-separated recipient emails. Leave empty to use the default recipients from handler settings.',
+							'type'       => 'object',
+							'properties' => array(
+								'to'          => array(
+									'type'        => 'string',
+									'description' => 'Comma-separated recipient emails. Leave empty to use the default recipients from handler settings.',
+								),
+								'subject'     => array(
+									'type'        => 'string',
+									'description' => 'Email subject. Supports {month}, {year}, {site_name} placeholders.',
+								),
+								'body'        => array(
+									'type'        => 'string',
+									'description' => 'Email body content in HTML format.',
+								),
+								'attachments' => array(
+									'type'        => 'array',
+									'items'       => array( 'type' => 'string' ),
+									'description' => 'Array of server file paths to attach to the email.',
+								),
 							),
-							'subject'     => array(
-								'type'        => 'string',
-								'required'    => true,
-								'description' => 'Email subject. Supports {month}, {year}, {site_name} placeholders.',
-							),
-							'body'        => array(
-								'type'        => 'string',
-								'required'    => true,
-								'description' => 'Email body content in HTML format.',
-							),
-							'attachments' => array(
-								'type'        => 'array',
-								'items'       => array( 'type' => 'string' ),
-								'required'    => false,
-								'description' => 'Array of server file paths to attach to the email.',
-							),
+							'required'   => array( 'subject', 'body' ),
 						),
 						'handler_config' => $handler_config,
 					);

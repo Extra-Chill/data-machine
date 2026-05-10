@@ -43,39 +43,45 @@ class WordPress extends PublishHandler {
 			WordPressSettings::class,
 			function ( $tools, $handler_slug, $handler_config ) {
 				if ( 'wordpress_publish' === $handler_slug ) {
-					// Base parameters (always present)
-					$base_parameters = array(
+					// Base parameters (canonical JSON Schema fragment: bare properties + top-level required[]).
+					$base_properties = array(
 						'title'          => array(
 							'type'        => 'string',
-							'required'    => true,
 							'description' => 'The title of the WordPress post or page',
 						),
 						'content'        => array(
 							'type'        => 'string',
-							'required'    => true,
 							'description' => 'The main content of the post in the requested content_format. Markdown is preferred for AI-authored prose unless the workflow asks for HTML or blocks. Do not include source URL attribution or images - these are handled automatically by the system.',
 						),
 						'content_format' => array(
 							'type'        => 'string',
-							'required'    => false,
 							'enum'        => array( 'html', 'markdown', 'blocks' ),
 							'default'     => 'html',
 							'description' => 'Format of the supplied content before Data Machine converts it to the post type storage format.',
 						),
 					);
+					$base_required   = array( 'title', 'content' );
 
-					// Dynamic taxonomy parameters based on "AI Decides" selections
+					// Dynamic taxonomy parameters based on "AI Decides" selections.
+					// TaxonomyHandler::getTaxonomyToolParameters() already returns canonical-shape
+					// bare properties (no per-property required flags, items present on arrays),
+					// so it is safe to merge into properties as-is.
 					$taxonomy_parameters = TaxonomyHandler::getTaxonomyToolParameters( $handler_config );
 
-					// Merge base + dynamic parameters
-					$all_parameters = array_merge( $base_parameters, $taxonomy_parameters );
+					$tool_parameters = array(
+						'type'       => 'object',
+						'properties' => array_merge( $base_properties, $taxonomy_parameters ),
+					);
+					if ( ! empty( $base_required ) ) {
+						$tool_parameters['required'] = $base_required;
+					}
 
 					$tools['wordpress_publish'] = array(
 						'class'          => self::class,
 						'method'         => 'handle_tool_call',
 						'handler'        => 'wordpress_publish',
 						'description'    => 'Create WordPress posts and pages with automatic taxonomy assignment, featured image processing, and source URL attribution.',
-						'parameters'     => $all_parameters,
+						'parameters'     => $tool_parameters,
 						'handler_config' => $handler_config,
 					);
 				}
