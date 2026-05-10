@@ -361,18 +361,20 @@ function datamachine_run_datamachine_plugin() {
  * @return bool True when full runtime registration should run.
  */
 function datamachine_should_load_full_runtime(): bool {
-	if ( defined( 'WP_TESTS_DOMAIN' ) || defined( 'WP_TESTS_CONFIG_FILE_PATH' ) ) {
+	// WordPress PHPUnit loads plugins through a frontend-shaped request. Keep
+	// the full runtime available so ability/tool registration tests exercise
+	// the same surfaces as CLI, REST, admin, cron, and Ajax entry points.
+	// Any of these constants is sufficient to identify a WP test environment.
+	if (
+		defined( 'WP_TESTS_DOMAIN' )
+		|| defined( 'WP_TESTS_CONFIG_FILE_PATH' )
+		|| defined( 'WP_TESTS_EMAIL' )
+		|| defined( 'WP_TESTS_TITLE' )
+	) {
 		return true;
 	}
 
 	if ( defined( 'WP_CLI' ) && WP_CLI ) {
-		return true;
-	}
-
-	// WordPress PHPUnit loads plugins through a frontend-shaped request. Keep the
-	// full runtime available so ability/tool registration tests exercise the same
-	// surfaces as CLI, REST, admin, cron, and Ajax entry points.
-	if ( defined( 'WP_TESTS_DOMAIN' ) || defined( 'WP_TESTS_EMAIL' ) || defined( 'WP_TESTS_TITLE' ) ) {
 		return true;
 	}
 
