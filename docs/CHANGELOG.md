@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.109.0] - 2026-05-10
+
+### Added
+- enhance completion outcome assertions
+
+### Changed
+- consume substrate-tracked loop result fields, drop by-reference accumulators
+
+### Fixed
+- export durable agent memory artifacts
+- harden daily memory tool schema
+- persist AI request metadata in transcripts
+
 ## [0.108.2] - 2026-05-10
 
 ### Changed
