@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.108.0] - 2026-05-10
+
+### Added
+- add cycle flow runner
+
+### Fixed
+- delete redundant datamachine_check_requirements() (#1919)
+- fix(chat-tools): canonical JSON Schema across inc/Api/Chat/Tools/
+- fix(publish-handlers): canonical JSON Schema for wordpress_publish and email_publish tools
+- align cycle command assignments
+- regenerate composable memory on first read
+- apply ai request timeouts during model discovery
+
 ## [0.107.0] - 2026-05-09
 
 ### Added
