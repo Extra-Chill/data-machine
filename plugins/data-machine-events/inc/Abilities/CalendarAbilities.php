@@ -356,8 +356,18 @@ class CalendarAbilities {
 			}
 		}
 
-		// Geo.
-		if ( ! empty( $query_params['geo_lat'] ) && ! empty( $query_params['geo_lng'] ) ) {
+		// Geo. Skip when the request is already scoped to a single venue archive
+		// — the proximity radius cannot further filter what's already a one-venue
+		// result, and the haversine sweep over every venue's coordinates is
+		// expensive (especially under bot crawl pressure). This short-circuit
+		// intentionally only applies to `venue` archives because a venue is the
+		// only single-point archive; artist/festival/location archives can span
+		// multiple coordinates so geo+radius remain meaningful for them.
+		$skip_geo = ! empty( $query_params['archive_taxonomy'] )
+			&& 'venue' === $query_params['archive_taxonomy']
+			&& ! empty( $query_params['archive_term_id'] );
+
+		if ( ! $skip_geo && ! empty( $query_params['geo_lat'] ) && ! empty( $query_params['geo_lng'] ) ) {
 			$ability_input['geo'] = array(
 				'lat'    => (float) $query_params['geo_lat'],
 				'lng'    => (float) $query_params['geo_lng'],

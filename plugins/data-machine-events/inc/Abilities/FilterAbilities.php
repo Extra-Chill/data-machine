@@ -198,7 +198,14 @@ class FilterAbilities {
 			'radius_unit' => $geo_unit,
 		);
 
-		if ( ! empty( $geo_lat ) && ! empty( $geo_lng ) ) {
+		// Skip the haversine sweep when the request is already scoped to a
+		// single venue archive — a venue is one point, the radius cannot
+		// further filter what's already a one-venue result. Only `venue`
+		// short-circuits because artist/festival/location archives can span
+		// multiple coordinates and still benefit from proximity filtering.
+		$skip_geo = 'venue' === $archive_taxonomy && $archive_term_id;
+
+		if ( ! $skip_geo && ! empty( $geo_lat ) && ! empty( $geo_lng ) ) {
 			$geo_lat    = (float) $geo_lat;
 			$geo_lng    = (float) $geo_lng;
 			$geo_radius = (float) $geo_radius;

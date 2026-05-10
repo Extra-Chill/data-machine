@@ -144,7 +144,23 @@ class EventQueryBuilder {
 		}
 
 		// Geo-filter: find venues within radius and inject as tax_query constraint.
-		if ( ! empty( $params['geo_lat'] ) && ! empty( $params['geo_lng'] ) ) {
+		//
+		// Skip the haversine query entirely when the request is already scoped
+		// to a single venue archive (archive_taxonomy=venue + archive_term_id).
+		// A specific venue is a single point — the proximity radius cannot
+		// further filter what's already a one-venue result, so the entire
+		// haversine sweep over `_venue_coordinates` term meta is dead work.
+		//
+		// This short-circuit intentionally does NOT apply to other archive
+		// taxonomies. An artist can play multiple venues, a festival has
+		// multiple stages/locations, and a `location` term is a region (not
+		// a single coordinate), so geo + radius are still meaningful filters
+		// for those archive contexts. Only `venue` is literally a point.
+		$skip_geo = ! empty( $params['archive_taxonomy'] )
+			&& 'venue' === $params['archive_taxonomy']
+			&& ! empty( $params['archive_term_id'] );
+
+		if ( ! $skip_geo && ! empty( $params['geo_lat'] ) && ! empty( $params['geo_lng'] ) ) {
 			$geo_lat    = (float) $params['geo_lat'];
 			$geo_lng    = (float) $params['geo_lng'];
 			$geo_radius = (float) ( $params['geo_radius'] ?? 25 );
