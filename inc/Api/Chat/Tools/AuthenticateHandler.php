@@ -38,22 +38,23 @@ class AuthenticateHandler extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => $this->buildDescription(),
 			'parameters'  => array(
-				'action'       => array(
-					'type'        => 'string',
-					'required'    => true,
-					'enum'        => array( 'list', 'status', 'configure', 'get_oauth_url', 'disconnect' ),
-					'description' => 'Action to perform: list (all statuses), status (specific handler), configure (save credentials), get_oauth_url (for OAuth), disconnect (clear auth)',
+				'type'       => 'object',
+				'properties' => array(
+					'action'       => array(
+						'type'        => 'string',
+						'enum'        => array( 'list', 'status', 'configure', 'get_oauth_url', 'disconnect' ),
+						'description' => 'Action to perform: list (all statuses), status (specific handler), configure (save credentials), get_oauth_url (for OAuth), disconnect (clear auth)',
+					),
+					'handler_slug' => array(
+						'type'        => 'string',
+						'description' => 'Handler identifier (required for all actions except list)',
+					),
+					'credentials'  => array(
+						'type'        => 'object',
+						'description' => 'Credentials object for configure action. For OAuth: {client_id, client_secret}. For simple auth: handler-specific fields.',
+					),
 				),
-				'handler_slug' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Handler identifier (required for all actions except list)',
-				),
-				'credentials'  => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Credentials object for configure action. For OAuth: {client_id, client_secret}. For simple auth: handler-specific fields.',
-				),
+				'required'   => array( 'action' ),
 			),
 		);
 	}

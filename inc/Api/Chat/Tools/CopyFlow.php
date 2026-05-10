@@ -36,31 +36,30 @@ class CopyFlow extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Copy a flow to the same or different pipeline. Cross-pipeline requires compatible step structures. Copies handlers, messages, and schedule.',
 			'parameters'  => array(
-				'source_flow_id'        => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'Flow ID to copy',
+				'type'       => 'object',
+				'properties' => array(
+					'source_flow_id'        => array(
+						'type'        => 'integer',
+						'description' => 'Flow ID to copy',
+					),
+					'target_pipeline_id'    => array(
+						'type'        => 'integer',
+						'description' => 'Destination pipeline ID',
+					),
+					'flow_name'             => array(
+						'type'        => 'string',
+						'description' => 'New flow name',
+					),
+					'scheduling_config'     => array(
+						'type'        => 'object',
+						'description' => 'Override schedule (defaults to source). Format: {interval: value}. Valid intervals:' . "\n" . SchedulingDocumentation::getIntervalsJson(),
+					),
+					'step_config_overrides' => array(
+						'type'        => 'object',
+						'description' => 'Override steps by step_type or execution_order: {handler_slug?, handler_config?, user_message?}',
+					),
 				),
-				'target_pipeline_id'    => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'Destination pipeline ID',
-				),
-				'flow_name'             => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'New flow name',
-				),
-				'scheduling_config'     => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Override schedule (defaults to source). Format: {interval: value}. Valid intervals:' . "\n" . SchedulingDocumentation::getIntervalsJson(),
-				),
-				'step_config_overrides' => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Override steps by step_type or execution_order: {handler_slug?, handler_config?, user_message?}',
-				),
+				'required'   => array( 'source_flow_id', 'target_pipeline_id', 'flow_name' ),
 			),
 		);
 	}

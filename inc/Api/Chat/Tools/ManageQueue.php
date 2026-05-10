@@ -35,47 +35,43 @@ class ManageQueue extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => $this->buildDescription(),
 			'parameters'  => array(
-				'action'       => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Action to perform: "add", "list", "clear", "remove", "update", "move", or "mode"',
+				'type'       => 'object',
+				'properties' => array(
+					'action'       => array(
+						'type'        => 'string',
+						'description' => 'Action to perform: "add", "list", "clear", "remove", "update", "move", or "mode"',
+					),
+					'flow_id'      => array(
+						'type'        => 'integer',
+						'description' => 'Flow ID',
+					),
+					'flow_step_id' => array(
+						'type'        => 'string',
+						'description' => 'Flow step ID',
+					),
+					'prompt'       => array(
+						'type'        => 'string',
+						'description' => 'Prompt text (for add and update actions)',
+					),
+					'index'        => array(
+						'type'        => 'integer',
+						'description' => 'Queue index, 0-based (for remove and update actions)',
+					),
+					'from_index'   => array(
+						'type'        => 'integer',
+						'description' => 'Source index for move action (0-based)',
+					),
+					'to_index'     => array(
+						'type'        => 'integer',
+						'description' => 'Destination index for move action (0-based)',
+					),
+					'mode'         => array(
+						'type'        => 'string',
+						'enum'        => array( 'drain', 'loop', 'static' ),
+						'description' => 'Queue access mode for the "mode" action: drain (pop+discard), loop (pop+append-to-tail), static (peek-only).',
+					),
 				),
-				'flow_id'      => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'Flow ID',
-				),
-				'flow_step_id' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Flow step ID',
-				),
-				'prompt'       => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Prompt text (for add and update actions)',
-				),
-				'index'        => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Queue index, 0-based (for remove and update actions)',
-				),
-				'from_index'   => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Source index for move action (0-based)',
-				),
-				'to_index'     => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Destination index for move action (0-based)',
-				),
-				'mode'         => array(
-					'type'        => 'string',
-					'required'    => false,
-					'enum'        => array( 'drain', 'loop', 'static' ),
-					'description' => 'Queue access mode for the "mode" action: drain (pop+discard), loop (pop+append-to-tail), static (peek-only).',
-				),
+				'required'   => array( 'action', 'flow_id', 'flow_step_id' ),
 			),
 		);
 	}

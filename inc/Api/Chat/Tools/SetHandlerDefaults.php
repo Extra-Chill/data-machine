@@ -29,16 +29,18 @@ class SetHandlerDefaults extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Set site-wide handler defaults. Use to establish standard configuration values that apply to all new flows. For example, setting post_author and include_images defaults for upsert_event.',
 			'parameters'  => array(
-				'handler_slug' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Handler slug to set defaults for (e.g., upsert_event, eventbrite)',
+				'type'       => 'object',
+				'properties' => array(
+					'handler_slug' => array(
+						'type'        => 'string',
+						'description' => 'Handler slug to set defaults for (e.g., upsert_event, eventbrite)',
+					),
+					'defaults'     => array(
+						'type'        => 'object',
+						'description' => 'Default configuration values to set. Keys should match handler config fields.',
+					),
 				),
-				'defaults'     => array(
-					'type'        => 'object',
-					'required'    => true,
-					'description' => 'Default configuration values to set. Keys should match handler config fields.',
-				),
+				'required'   => array( 'handler_slug', 'defaults' ),
 			),
 		);
 	}

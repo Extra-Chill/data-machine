@@ -43,16 +43,18 @@ class AddPipelineStep extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Add a step to a pipeline. Automatically syncs to all flows on that pipeline.',
 			'parameters'  => array(
-				'pipeline_id' => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'Pipeline ID to add the step to',
+				'type'       => 'object',
+				'properties' => array(
+					'pipeline_id' => array(
+						'type'        => 'integer',
+						'description' => 'Pipeline ID to add the step to',
+					),
+					'step_type'   => array(
+						'type'        => 'string',
+						'description' => "Type of step: {$types_list}",
+					),
 				),
-				'step_type'   => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => "Type of step: {$types_list}",
-				),
+				'required'   => array( 'pipeline_id', 'step_type' ),
 			),
 		);
 	}

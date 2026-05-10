@@ -33,16 +33,19 @@ class ReorderPipelineSteps extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Reorder steps within a pipeline.',
 			'parameters'  => array(
-				'pipeline_id' => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'ID of the pipeline',
+				'type'       => 'object',
+				'properties' => array(
+					'pipeline_id' => array(
+						'type'        => 'integer',
+						'description' => 'ID of the pipeline',
+					),
+					'step_order'  => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'object' ),
+						'description' => 'Array of step order objects: [{pipeline_step_id: "...", execution_order: 0}, ...]',
+					),
 				),
-				'step_order'  => array(
-					'type'        => 'array',
-					'required'    => true,
-					'description' => 'Array of step order objects: [{pipeline_step_id: "...", execution_order: 0}, ...]',
-				),
+				'required'   => array( 'pipeline_id', 'step_order' ),
 			),
 		);
 	}

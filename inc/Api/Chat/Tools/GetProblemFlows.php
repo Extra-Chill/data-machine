@@ -40,10 +40,12 @@ class GetProblemFlows extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => "Identify flows with issues: consecutive failures (broken) or consecutive no-items runs (source exhausted). Default threshold: {$default_threshold}.",
 			'parameters'  => array(
-				'threshold' => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => "Minimum consecutive count to report (default: {$default_threshold} from settings)",
+				'type'       => 'object',
+				'properties' => array(
+					'threshold' => array(
+						'type'        => 'integer',
+						'description' => "Minimum consecutive count to report (default: {$default_threshold} from settings)",
+					),
 				),
 			),
 		);

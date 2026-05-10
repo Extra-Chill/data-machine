@@ -26,25 +26,24 @@ class ListFlows extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'List flows with optional filtering by pipeline ID or handler slug. Supports pagination.',
 			'parameters'  => array(
-				'pipeline_id'  => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Filter flows by pipeline ID',
-				),
-				'handler_slug' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Filter flows using this handler slug (any step that uses this handler)',
-				),
-				'per_page'     => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Number of flows per page (default: 20, max: 100)',
-				),
-				'offset'       => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Offset for pagination (default: 0)',
+				'type'       => 'object',
+				'properties' => array(
+					'pipeline_id'  => array(
+						'type'        => 'integer',
+						'description' => 'Filter flows by pipeline ID',
+					),
+					'handler_slug' => array(
+						'type'        => 'string',
+						'description' => 'Filter flows using this handler slug (any step that uses this handler)',
+					),
+					'per_page'     => array(
+						'type'        => 'integer',
+						'description' => 'Number of flows per page (default: 20, max: 100)',
+					),
+					'offset'       => array(
+						'type'        => 'integer',
+						'description' => 'Offset for pagination (default: 0)',
+					),
 				),
 			),
 		);

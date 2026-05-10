@@ -28,10 +28,12 @@ class GetHandlerDefaults extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Get site-wide handler defaults. Use before configuring flows to learn the established configuration standards for this site. Returns defaults for a specific handler or all handlers.',
 			'parameters'  => array(
-				'handler_slug' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Handler slug to get defaults for (e.g., upsert_event, eventbrite). If omitted, returns defaults for all handlers.',
+				'type'       => 'object',
+				'properties' => array(
+					'handler_slug' => array(
+						'type'        => 'string',
+						'description' => 'Handler slug to get defaults for (e.g., upsert_event, eventbrite). If omitted, returns defaults for all handlers.',
+					),
 				),
 			),
 		);

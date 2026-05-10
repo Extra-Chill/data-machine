@@ -43,40 +43,38 @@ class CreatePipeline extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Create a pipeline with optional steps. Automatically creates a flow - do NOT call create_flow afterward. Supports bulk mode via pipelines array.',
 			'parameters'  => array(
-				'pipeline_name'     => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Pipeline name (single mode - required unless using bulk mode)',
-				),
-				'steps'             => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => "Steps in execution order: {step_type: \"{$types_list}\", handler_slug, handler_config}. AI steps: add provider, model, system_prompt.",
-				),
-				'flow_name'         => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Flow name (defaults to pipeline_name)',
-				),
-				'scheduling_config' => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Schedule: {interval: value}. Valid intervals:' . "\n" . SchedulingDocumentation::getIntervalsJson(),
-				),
-				'pipelines'         => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Bulk mode: create multiple pipelines. Each item: {name, steps?, flow_name?, scheduling_config?}. Uses template for shared config.',
-				),
-				'template'          => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Shared config for bulk mode: {steps, scheduling_config}. Individual pipeline configs override template.',
-				),
-				'validate_only'     => array(
-					'type'        => 'boolean',
-					'required'    => false,
-					'description' => 'Dry-run mode: validate configuration without creating. Returns what would be created.',
+				'type'       => 'object',
+				'properties' => array(
+					'pipeline_name'     => array(
+						'type'        => 'string',
+						'description' => 'Pipeline name (single mode - required unless using bulk mode)',
+					),
+					'steps'             => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'object' ),
+						'description' => "Steps in execution order: {step_type: \"{$types_list}\", handler_slug, handler_config}. AI steps: add provider, model, system_prompt.",
+					),
+					'flow_name'         => array(
+						'type'        => 'string',
+						'description' => 'Flow name (defaults to pipeline_name)',
+					),
+					'scheduling_config' => array(
+						'type'        => 'object',
+						'description' => 'Schedule: {interval: value}. Valid intervals:' . "\n" . SchedulingDocumentation::getIntervalsJson(),
+					),
+					'pipelines'         => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'object' ),
+						'description' => 'Bulk mode: create multiple pipelines. Each item: {name, steps?, flow_name?, scheduling_config?}. Uses template for shared config.',
+					),
+					'template'          => array(
+						'type'        => 'object',
+						'description' => 'Shared config for bulk mode: {steps, scheduling_config}. Individual pipeline configs override template.',
+					),
+					'validate_only'     => array(
+						'type'        => 'boolean',
+						'description' => 'Dry-run mode: validate configuration without creating. Returns what would be created.',
+					),
 				),
 			),
 		);

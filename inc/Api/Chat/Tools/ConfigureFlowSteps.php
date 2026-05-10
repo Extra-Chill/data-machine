@@ -56,75 +56,67 @@ class ConfigureFlowSteps extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => $description,
 			'parameters'  => array(
-				'flow_step_id'        => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Single flow step ID (format: {pipeline_step_id}_{flow_id})',
-				),
-				'flow_step_ids'       => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Array of flow step IDs for batch updates on specific steps',
-				),
-				'pipeline_id'         => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Pipeline scope. REQUIRES either handler_slug (filter) or all_flows=true',
-				),
-				'all_flows'           => array(
-					'type'        => 'boolean',
-					'required'    => false,
-					'description' => 'When true with pipeline_id, applies to ALL flows in pipeline. Explicit opt-in required for bulk operations.',
-				),
-				'step_type'           => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Filter by step type (fetch, publish, upsert, ai)',
-				),
-				'handler_slug'        => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Handler slug to set (single mode) OR filter by existing handler (bulk mode). Works with or without pipeline_id scope.',
-				),
-				'target_handler_slug' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Handler to switch TO. When provided, handler_slug filters existing handlers (bulk) and target_handler_slug sets the new handler.',
-				),
-				'field_map'           => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Field mappings when switching handlers, e.g. {"endpoint_url": "source_url"}. Fields with matching names auto-map by default.',
-				),
-				'handler_config'      => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Handler-specific configuration to merge into existing config',
-				),
-				'flow_configs'        => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Per-flow configurations for bulk mode. Array of {flow_id: int, handler_config: object}. Merged with shared handler_config (per-flow takes precedence).',
-				),
-				'user_message'        => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'User message/prompt for AI steps',
-				),
-				'updates'             => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Cross-pipeline mode: configure multiple flows with different settings. Each item: {flow_id, step_configs (keyed by step_type: {handler_slug?, handler_config?, user_message?})}',
-				),
-				'shared_config'       => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Shared step config for cross-pipeline mode (keyed by step_type). Per-flow step_configs override these.',
-				),
-				'validate_only'       => array(
-					'type'        => 'boolean',
-					'required'    => false,
-					'description' => 'Dry-run mode: validate configuration without executing. Returns what would be updated.',
+				'type'       => 'object',
+				'properties' => array(
+					'flow_step_id'        => array(
+						'type'        => 'string',
+						'description' => 'Single flow step ID (format: {pipeline_step_id}_{flow_id})',
+					),
+					'flow_step_ids'       => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Array of flow step IDs for batch updates on specific steps',
+					),
+					'pipeline_id'         => array(
+						'type'        => 'integer',
+						'description' => 'Pipeline scope. REQUIRES either handler_slug (filter) or all_flows=true',
+					),
+					'all_flows'           => array(
+						'type'        => 'boolean',
+						'description' => 'When true with pipeline_id, applies to ALL flows in pipeline. Explicit opt-in required for bulk operations.',
+					),
+					'step_type'           => array(
+						'type'        => 'string',
+						'description' => 'Filter by step type (fetch, publish, upsert, ai)',
+					),
+					'handler_slug'        => array(
+						'type'        => 'string',
+						'description' => 'Handler slug to set (single mode) OR filter by existing handler (bulk mode). Works with or without pipeline_id scope.',
+					),
+					'target_handler_slug' => array(
+						'type'        => 'string',
+						'description' => 'Handler to switch TO. When provided, handler_slug filters existing handlers (bulk) and target_handler_slug sets the new handler.',
+					),
+					'field_map'           => array(
+						'type'        => 'object',
+						'description' => 'Field mappings when switching handlers, e.g. {"endpoint_url": "source_url"}. Fields with matching names auto-map by default.',
+					),
+					'handler_config'      => array(
+						'type'        => 'object',
+						'description' => 'Handler-specific configuration to merge into existing config',
+					),
+					'flow_configs'        => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'object' ),
+						'description' => 'Per-flow configurations for bulk mode. Array of {flow_id: int, handler_config: object}. Merged with shared handler_config (per-flow takes precedence).',
+					),
+					'user_message'        => array(
+						'type'        => 'string',
+						'description' => 'User message/prompt for AI steps',
+					),
+					'updates'             => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'object' ),
+						'description' => 'Cross-pipeline mode: configure multiple flows with different settings. Each item: {flow_id, step_configs (keyed by step_type: {handler_slug?, handler_config?, user_message?})}',
+					),
+					'shared_config'       => array(
+						'type'        => 'object',
+						'description' => 'Shared step config for cross-pipeline mode (keyed by step_type). Per-flow step_configs override these.',
+					),
+					'validate_only'       => array(
+						'type'        => 'boolean',
+						'description' => 'Dry-run mode: validate configuration without executing. Returns what would be updated.',
+					),
 				),
 			),
 		);

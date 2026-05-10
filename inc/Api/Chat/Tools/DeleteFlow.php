@@ -32,11 +32,14 @@ class DeleteFlow extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Delete a flow.',
 			'parameters'  => array(
-				'flow_id' => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'ID of the flow to delete',
+				'type'       => 'object',
+				'properties' => array(
+					'flow_id' => array(
+						'type'        => 'integer',
+						'description' => 'ID of the flow to delete',
+					),
 				),
+				'required'   => array( 'flow_id' ),
 			),
 		);
 	}

@@ -33,11 +33,14 @@ class DeletePipeline extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Delete a pipeline and all its associated flows.',
 			'parameters'  => array(
-				'pipeline_id' => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'ID of the pipeline to delete',
+				'type'       => 'object',
+				'properties' => array(
+					'pipeline_id' => array(
+						'type'        => 'integer',
+						'description' => 'ID of the pipeline to delete',
+					),
 				),
+				'required'   => array( 'pipeline_id' ),
 			),
 		);
 	}

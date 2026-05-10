@@ -34,40 +34,36 @@ class ReadLogs extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => $this->buildDescription(),
 			'parameters'  => array(
-				'agent_id'    => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Agent ID to read logs for. Omit for all agents.',
-				),
-				'context'     => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Deprecated label only. Use agent_id instead.',
-				),
-				'mode'        => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Content mode: "recent" (default) or "full"',
-				),
-				'limit'       => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Max entries for recent mode (default: 200, max: 10000)',
-				),
-				'job_id'      => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Filter logs by job ID',
-				),
-				'pipeline_id' => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Filter logs by pipeline ID',
-				),
-				'flow_id'     => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Filter logs by flow ID',
+				'type'       => 'object',
+				'properties' => array(
+					'agent_id'    => array(
+						'type'        => 'integer',
+						'description' => 'Agent ID to read logs for. Omit for all agents.',
+					),
+					'context'     => array(
+						'type'        => 'string',
+						'description' => 'Deprecated label only. Use agent_id instead.',
+					),
+					'mode'        => array(
+						'type'        => 'string',
+						'description' => 'Content mode: "recent" (default) or "full"',
+					),
+					'limit'       => array(
+						'type'        => 'integer',
+						'description' => 'Max entries for recent mode (default: 200, max: 10000)',
+					),
+					'job_id'      => array(
+						'type'        => 'integer',
+						'description' => 'Filter logs by job ID',
+					),
+					'pipeline_id' => array(
+						'type'        => 'integer',
+						'description' => 'Filter logs by pipeline ID',
+					),
+					'flow_id'     => array(
+						'type'        => 'integer',
+						'description' => 'Filter logs by flow ID',
+					),
 				),
 			),
 		);

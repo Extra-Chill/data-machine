@@ -29,21 +29,22 @@ class SearchTaxonomyTerms extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Search existing taxonomy terms. Use to discover what terms exist before creating new ones or when configuring handler term assignments.',
 			'parameters'  => array(
-				'taxonomy' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Taxonomy slug (category, post_tag, venue, artist, or other custom taxonomy)',
+				'type'       => 'object',
+				'properties' => array(
+					'taxonomy' => array(
+						'type'        => 'string',
+						'description' => 'Taxonomy slug (category, post_tag, venue, artist, or other custom taxonomy)',
+					),
+					'search'   => array(
+						'type'        => 'string',
+						'description' => 'Search string to filter terms by name (partial match)',
+					),
+					'limit'    => array(
+						'type'        => 'integer',
+						'description' => 'Maximum number of terms to return (default 20, max 100)',
+					),
 				),
-				'search'   => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Search string to filter terms by name (partial match)',
-				),
-				'limit'    => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Maximum number of terms to return (default 20, max 100)',
-				),
+				'required'   => array( 'taxonomy' ),
 			),
 		);
 	}

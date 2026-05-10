@@ -29,26 +29,26 @@ class MergeTaxonomyTerms extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Merge two taxonomy terms into one. Reassigns all posts from source term to target term, optionally merges meta data, then deletes the source term. Useful for consolidating duplicates.',
 			'parameters'  => array(
-				'source_term' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Term to merge FROM (will be deleted) - ID, name, or slug',
+				'type'       => 'object',
+				'properties' => array(
+					'source_term' => array(
+						'type'        => 'string',
+						'description' => 'Term to merge FROM (will be deleted) - ID, name, or slug',
+					),
+					'target_term' => array(
+						'type'        => 'string',
+						'description' => 'Term to merge INTO (will be kept) - ID, name, or slug',
+					),
+					'taxonomy'    => array(
+						'type'        => 'string',
+						'description' => 'Taxonomy slug (venue, artist, category, post_tag, etc.)',
+					),
+					'merge_meta'  => array(
+						'type'        => 'boolean',
+						'description' => 'Fill empty target meta from source (default: true)',
+					),
 				),
-				'target_term' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Term to merge INTO (will be kept) - ID, name, or slug',
-				),
-				'taxonomy'    => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Taxonomy slug (venue, artist, category, post_tag, etc.)',
-				),
-				'merge_meta'  => array(
-					'type'        => 'boolean',
-					'required'    => false,
-					'description' => 'Fill empty target meta from source (default: true)',
-				),
+				'required'   => array( 'source_term', 'target_term', 'taxonomy' ),
 			),
 		);
 	}

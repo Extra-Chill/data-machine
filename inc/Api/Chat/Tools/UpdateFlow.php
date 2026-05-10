@@ -33,21 +33,22 @@ class UpdateFlow extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Update flow title and/or scheduling.',
 			'parameters'  => array(
-				'flow_id'           => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'Flow ID',
+				'type'       => 'object',
+				'properties' => array(
+					'flow_id'           => array(
+						'type'        => 'integer',
+						'description' => 'Flow ID',
+					),
+					'flow_name'         => array(
+						'type'        => 'string',
+						'description' => 'New flow title',
+					),
+					'scheduling_config' => array(
+						'type'        => 'object',
+						'description' => 'Schedule: {interval: value}. Valid intervals:' . "\n" . SchedulingDocumentation::getIntervalsJson(),
+					),
 				),
-				'flow_name'         => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'New flow title',
-				),
-				'scheduling_config' => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Schedule: {interval: value}. Valid intervals:' . "\n" . SchedulingDocumentation::getIntervalsJson(),
-				),
+				'required'   => array( 'flow_id' ),
 			),
 		);
 	}

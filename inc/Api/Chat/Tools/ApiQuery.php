@@ -39,15 +39,17 @@ class ApiQuery extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => $this->buildApiDocumentation(),
 			'parameters'  => array(
-				'endpoint' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Single mode: REST API endpoint path (e.g., /datamachine/v1/handlers)',
-				),
-				'requests' => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Batch mode: Array of {endpoint, key?}. Results keyed by endpoint or custom key.',
+				'type'       => 'object',
+				'properties' => array(
+					'endpoint' => array(
+						'type'        => 'string',
+						'description' => 'Single mode: REST API endpoint path (e.g., /datamachine/v1/handlers)',
+					),
+					'requests' => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'object' ),
+						'description' => 'Batch mode: Array of {endpoint, key?}. Results keyed by endpoint or custom key.',
+					),
 				),
 			),
 		);

@@ -36,40 +36,37 @@ class CreateFlow extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Create a new flow for a pipeline with optional step configurations. Query existing flows first to learn established patterns. Supports bulk mode via flows array.',
 			'parameters'  => array(
-				'pipeline_id'        => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Pipeline ID (single mode - required unless using bulk mode)',
-				),
-				'flow_name'          => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Flow name (defaults to "Flow")',
-				),
-				'scheduling_config'  => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Schedule: {interval: value}. Valid intervals:' . "\n" . SchedulingDocumentation::getIntervalsJson(),
-				),
-				'step_configs'       => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Step configurations keyed by step_type: {handler_slug?, handler_config?, user_message?}',
-				),
-				'flows'              => array(
-					'type'        => 'array',
-					'required'    => false,
-					'description' => 'Bulk mode: create multiple flows. Each item: {pipeline_id, flow_name, step_configs?, scheduling_config?}. Uses shared_step_config as base.',
-				),
-				'shared_step_config' => array(
-					'type'        => 'object',
-					'required'    => false,
-					'description' => 'Shared step config for bulk mode (keyed by step_type). Per-flow step_configs override these.',
-				),
-				'validate_only'      => array(
-					'type'        => 'boolean',
-					'required'    => false,
-					'description' => 'Dry-run mode: validate configuration without creating. Returns what would be created.',
+				'type'       => 'object',
+				'properties' => array(
+					'pipeline_id'        => array(
+						'type'        => 'integer',
+						'description' => 'Pipeline ID (single mode - required unless using bulk mode)',
+					),
+					'flow_name'          => array(
+						'type'        => 'string',
+						'description' => 'Flow name (defaults to "Flow")',
+					),
+					'scheduling_config'  => array(
+						'type'        => 'object',
+						'description' => 'Schedule: {interval: value}. Valid intervals:' . "\n" . SchedulingDocumentation::getIntervalsJson(),
+					),
+					'step_configs'       => array(
+						'type'        => 'object',
+						'description' => 'Step configurations keyed by step_type: {handler_slug?, handler_config?, user_message?}',
+					),
+					'flows'              => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'object' ),
+						'description' => 'Bulk mode: create multiple flows. Each item: {pipeline_id, flow_name, step_configs?, scheduling_config?}. Uses shared_step_config as base.',
+					),
+					'shared_step_config' => array(
+						'type'        => 'object',
+						'description' => 'Shared step config for bulk mode (keyed by step_type). Per-flow step_configs override these.',
+					),
+					'validate_only'      => array(
+						'type'        => 'boolean',
+						'description' => 'Dry-run mode: validate configuration without creating. Returns what would be created.',
+					),
 				),
 			),
 		);

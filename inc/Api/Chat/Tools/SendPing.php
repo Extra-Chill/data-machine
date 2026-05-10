@@ -34,26 +34,26 @@ class SendPing extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Send a ping to one or more webhook URLs. Useful for triggering external agents or notifying services.',
 			'parameters'  => array(
-				'webhook_url' => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'URL(s) to POST data to. Accepts a single URL or newline-separated string of URLs.',
+				'type'       => 'object',
+				'properties' => array(
+					'webhook_url' => array(
+						'type'        => 'string',
+						'description' => 'URL(s) to POST data to. Accepts a single URL or newline-separated string of URLs.',
+					),
+					'prompt'      => array(
+						'type'        => 'string',
+						'description' => 'Optional instructions for the receiving agent',
+					),
+					'flow_id'     => array(
+						'type'        => 'integer',
+						'description' => 'Flow ID for context',
+					),
+					'pipeline_id' => array(
+						'type'        => 'integer',
+						'description' => 'Pipeline ID for context',
+					),
 				),
-				'prompt'      => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Optional instructions for the receiving agent',
-				),
-				'flow_id'     => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Flow ID for context',
-				),
-				'pipeline_id' => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Pipeline ID for context',
-				),
+				'required'   => array( 'webhook_url' ),
 			),
 		);
 	}

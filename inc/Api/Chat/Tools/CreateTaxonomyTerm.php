@@ -30,26 +30,26 @@ class CreateTaxonomyTerm extends BaseTool {
 			'method'      => 'handle_tool_call',
 			'description' => 'Create a taxonomy term if it does not exist. Use when configuring flows that need categories, tags, or custom taxonomy terms that are not yet on the site.',
 			'parameters'  => array(
-				'taxonomy'    => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Taxonomy slug (category, post_tag, or custom taxonomy slug)',
+				'type'       => 'object',
+				'properties' => array(
+					'taxonomy'    => array(
+						'type'        => 'string',
+						'description' => 'Taxonomy slug (category, post_tag, or custom taxonomy slug)',
+					),
+					'name'        => array(
+						'type'        => 'string',
+						'description' => 'Term name to create',
+					),
+					'parent'      => array(
+						'type'        => 'string',
+						'description' => 'Parent term name, slug, or ID (hierarchical taxonomies only)',
+					),
+					'description' => array(
+						'type'        => 'string',
+						'description' => 'Term description',
+					),
 				),
-				'name'        => array(
-					'type'        => 'string',
-					'required'    => true,
-					'description' => 'Term name to create',
-				),
-				'parent'      => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Parent term name, slug, or ID (hierarchical taxonomies only)',
-				),
-				'description' => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Term description',
-				),
+				'required'   => array( 'taxonomy', 'name' ),
 			),
 		);
 	}
