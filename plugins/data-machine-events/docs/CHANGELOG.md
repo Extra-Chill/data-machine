@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.32.1] - 2026-05-10
+
+### Fixed
+- add venue/promoter accessor functions to public API
+
 ## [0.32.0] - 2026-05-10
 
 ### Added
