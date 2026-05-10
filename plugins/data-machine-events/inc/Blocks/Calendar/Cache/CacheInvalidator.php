@@ -92,6 +92,21 @@ class CacheInvalidator {
 			wp_cache_delete( $key, 'transient' );
 			wp_cache_delete( $key, 'site-transient' );
 		}
+
+		// Flush the dedicated full-response cache group. This is safe to
+		// flush wholesale because the group is private to the calendar —
+		// nothing else writes to `data-machine-calendar`.
+		if ( function_exists( 'wp_cache_flush_group' ) ) {
+			wp_cache_flush_group( CalendarCache::GROUP );
+		} else {
+			// On WP < 6.1 / object-cache drop-ins lacking flush_group support,
+			// the transient layer above still serves as the source of truth.
+			// The wp_cache entries will age out within TTL_FULL_PAST (24h).
+			// Acceptable downside for a fallback path that won't hit on
+			// extrachill.com (Redis Object Cache supports flush_group).
+			$noop = true;
+			unset( $noop );
+		}
 	}
 }
 
