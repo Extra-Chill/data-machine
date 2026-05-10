@@ -88,6 +88,7 @@ class SnapshotPolicyToolManager extends ToolManager {
 			'beta_tool'          => array( 'modes' => array( 'pipeline' ) ),
 			'danger_tool'        => array( 'modes' => array( 'pipeline' ) ),
 			'agent_daily_memory' => array( 'modes' => array( 'chat', 'pipeline_policy' ) ),
+			'agent_memory'       => array( 'modes' => array( 'chat', 'pipeline_policy' ) ),
 			'chat_only'          => array( 'modes' => array( 'chat' ) ),
 		);
 	}
@@ -158,13 +159,13 @@ $tools   = resolve_policy_tools_for_test(
 	array(
 		'step_type'        => 'ai',
 		'pipeline_step_id' => 'ephemeral_pipeline_0',
-		'enabled_tools'    => array( 'agent_daily_memory' ),
+		'enabled_tools'    => array( 'agent_daily_memory', 'agent_memory' ),
 	),
 	array(),
 	$manager
 );
-assert_policy_equals( array( 'agent_daily_memory' ), array_keys( $tools ), 'allowlist can intentionally grant policy-controlled daily memory tool', $failures, $passes );
-assert_policy_equals( array( null, null, null, null ), $manager->availability_contexts, 'policy-controlled daily memory still uses pipeline availability checks', $failures, $passes );
+assert_policy_equals( array( 'agent_daily_memory', 'agent_memory' ), array_keys( $tools ), 'allowlist can intentionally grant policy-controlled memory tools', $failures, $passes );
+assert_policy_equals( array( null, null, null, null, null ), $manager->availability_contexts, 'policy-controlled memory tools still use pipeline availability checks', $failures, $passes );
 
 echo "\n[2] ephemeral workflow disabled_tools deny from snapshot:\n";
 $ephemeral = WorkflowConfigFactory::buildEphemeralConfigs(

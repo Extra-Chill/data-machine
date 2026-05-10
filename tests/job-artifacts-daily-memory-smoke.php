@@ -86,6 +86,35 @@ $assert(
 );
 
 $assert(
+	false !== strpos( $loop, "'agent_memory' === \$tool_name" )
+		&& false !== strpos( $loop, "\$summary['file']" )
+		&& false !== strpos( $loop, "\$summary['section']" )
+		&& false !== strpos( $loop, "'update' === \$summary['action']" ),
+	'agent memory update summaries preserve file, section, action, and content for artifact export'
+);
+
+$assert(
+	false !== strpos( $job_artifacts, "'agent_memory_artifacts'" )
+		&& false !== strpos( $job_artifacts, 'private function agent_memory_artifacts' )
+		&& false !== strpos( $job_artifacts, "'type'                 => 'agent_memory'" ),
+	'artifact payload includes durable agent memory artifacts'
+);
+
+$assert(
+	false !== strpos( $job_artifacts, "memory/agent/' . \$filename" )
+		&& false !== strpos( $job_artifacts, "'memory/USER.md'" )
+		&& false !== strpos( $job_artifacts, 'AgentMemoryFile::resolve_layer_for' ),
+	'agent memory artifacts map memory layers to canonical bundle-relative paths'
+);
+
+$assert(
+	false !== strpos( $job_artifacts, 'new AgentMemoryFile' )
+		&& false !== strpos( $job_artifacts, 'get_all()' )
+		&& false !== strpos( $job_artifacts, 'agent_memory_fallback_content' ),
+	'agent memory artifacts export the full updated file content with a write-content fallback'
+);
+
+$assert(
 	false !== strpos( $job_artifacts, "'type'                 => 'agent_daily_memory'" )
 		&& false !== strpos( $job_artifacts, "memory/agent/daily/%s/%s/%s.md" )
 		&& false !== strpos( $job_artifacts, "'content'              =>" ),
