@@ -164,6 +164,6 @@ class IterationBudgetTest extends WP_UnitTestCase {
 		$config = IterationBudgetRegistry::get_config( 'conversation_turns' );
 		$this->assertSame( 'max_turns', $config['setting'] );
 		$this->assertSame( 1, $config['min'] );
-		$this->assertSame( 50, $config['max'] );
+		$this->assertSame( 200, $config['max'] );
 	}
 }

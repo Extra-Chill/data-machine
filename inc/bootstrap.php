@@ -88,7 +88,7 @@ add_action( 'plugins_loaded', array( WpAiClientCache::class, 'install' ), 20 );
 IterationBudgetRegistry::register( 'conversation_turns', array(
 	'default' => PluginSettings::DEFAULT_MAX_TURNS,
 	'min'     => 1,
-	'max'     => 50,
+	'max'     => 200,
 	'setting' => 'max_turns',
 ) );
 
