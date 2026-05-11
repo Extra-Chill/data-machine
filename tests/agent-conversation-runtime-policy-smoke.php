@@ -518,6 +518,135 @@ assert_runtime_policy( 2 === count( $duplicate_result['tool_execution_results'] 
 assert_runtime_policy( 'second_policy_tool' === ( $duplicate_result['tool_execution_results'][1]['tool_name'] ?? '' ), 'duplicate recovery reaches next required tool' );
 assert_runtime_policy( str_contains( wp_json_encode( $duplicate_transcript->calls[0]['messages'] ?? array() ), 'DUPLICATE REJECTED' ), 'duplicate recovery transcript includes correction message' );
 
+$repeatable_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$repeatable_dispatch_count ) {
+		++$repeatable_dispatch_count;
+
+		if ( in_array( $repeatable_dispatch_count, array( 1, 2 ), true ) ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => '',
+					'tool_calls' => array(
+						array(
+							'name'       => 'repeatable_inspection_tool',
+							'parameters' => array( 'name' => 'demo@branch' ),
+						),
+					),
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => 'Done after repeatable inspection.',
+				'tool_calls' => array(),
+			),
+		);
+	}
+);
+
+$repeatable_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'inspect status twice' ) ),
+	array(
+		'repeatable_inspection_tool' => array(
+			'name'        => 'repeatable_inspection_tool',
+			'description' => 'Repeatable status smoke tool',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+			'runtime'     => array(
+				'duplicate_policy' => 'repeatable',
+			),
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	'pipeline',
+	array(),
+	4
+);
+
+assert_runtime_policy( 2 === count( $repeatable_result['tool_execution_results'] ?? array() ), 'repeatable inspection tool can be called twice with identical parameters' );
+assert_runtime_policy( empty( $repeatable_result['duplicate_tool_call_rejected'] ), 'repeatable inspection tool bypasses duplicate rejection' );
+
+$inspection_nudge_dispatch_count = 0;
+$inspection_nudge_transcript     = new RuntimePolicySmokeTranscriptPersister();
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$inspection_nudge_dispatch_count ) {
+		++$inspection_nudge_dispatch_count;
+
+		if ( 1 === $inspection_nudge_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => '',
+					'tool_calls' => array(
+						array(
+							'name'       => 'inspection_tool',
+							'parameters' => array( 'repo' => 'demo@branch', 'path' => 'README.md' ),
+						),
+					),
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => '',
+				'tool_calls' => array(
+					array(
+						'name'       => 'memory_write_tool',
+						'parameters' => array( 'action' => 'write' ),
+					),
+				),
+			),
+		);
+	}
+);
+
+$inspection_nudge_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'read before writing memory' ) ),
+	array(
+		'inspection_tool'    => array(
+			'name'        => 'inspection_tool',
+			'description' => 'Inspection smoke tool',
+			'parameters'  => array( 'repo' => array( 'type' => 'string' ), 'path' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+		'memory_write_tool'  => array(
+			'name'        => 'memory_write_tool',
+			'description' => 'Memory smoke tool',
+			'parameters'  => array( 'action' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+			'runtime'     => array(
+				'completion_signal' => 'progress',
+			),
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	'pipeline',
+	array(
+		'transcript_persister'  => $inspection_nudge_transcript,
+		'completion_assertions' => array(
+			'required_tool_names' => array( 'memory_write_tool' ),
+		),
+	),
+	4
+);
+
+assert_runtime_policy( $inspection_nudge_dispatch_count >= 2, 'inspection-only turn continues without immediate completion nudge' );
+assert_runtime_policy( 2 === count( $inspection_nudge_result['tool_execution_results'] ?? array() ), 'inspection-only nudge suppression still reaches required tool' );
+assert_runtime_policy( ! str_contains( wp_json_encode( $inspection_nudge_transcript->calls[0]['messages'] ?? array() ), 'completion signals are still missing' ), 'inspection-only transcript avoids assertion nudge spam' );
+
 $runtime_rule_dispatch_count = 0;
 $runtime_rule_transcript     = new RuntimePolicySmokeTranscriptPersister();
 WpAiClientTestDouble::reset();

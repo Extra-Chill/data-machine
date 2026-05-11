@@ -264,6 +264,10 @@ function datamachine_run_conversation(
 		$result['completion_assertions_required']  = $assertions->required();
 		$result['completion_assertions_missing']   = $evaluation['missing'];
 		$result['completion_assertions_satisfied'] = $evaluation['satisfied'];
+		$result['completion_assertions_complete']  = ! empty( $evaluation['complete'] );
+		if ( ! empty( $evaluation['complete'] ) && 'budget_exceeded' !== ( $result['status'] ?? '' ) ) {
+			$result['completed'] = true;
+		}
 	}
 	// Map upstream budget_exceeded status to DM's max_turns_reached flag
 	// for backward compatibility with ChatOrchestrator response shaping.
@@ -450,8 +454,10 @@ function datamachine_build_turn_runner(
 					)
 				);
 
+				$tool_def = $tools[ $tool_name ] ?? null;
+
 				// Validate for duplicate tool calls.
-				$validation_result = ConversationManager::validateToolCall( $tool_name, $tool_parameters, $messages );
+				$validation_result = ConversationManager::validateToolCall( $tool_name, $tool_parameters, $messages, is_array( $tool_def ) ? $tool_def : null );
 				if ( $validation_result['is_duplicate'] ) {
 					$messages[]         = ConversationManager::generateDuplicateToolCallMessage( $tool_name, $turn_count, $mode );
 					$duplicate_rejected = true;
@@ -524,7 +530,6 @@ function datamachine_build_turn_runner(
 					)
 				);
 
-				$tool_def        = $tools[ $tool_name ] ?? null;
 				$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
 
 				// Evaluate the DM completion policy.
@@ -557,6 +562,7 @@ function datamachine_build_turn_runner(
 					'result'          => $tool_result,
 					'parameters'      => $tool_parameters,
 					'is_handler_tool' => $is_handler_tool,
+					'runtime'         => datamachine_tool_runtime_metadata( is_array( $tool_def ) ? $tool_def : null, $tool_result ),
 					'turn_count'      => $turn_count,
 				);
 				datamachine_persist_inflight_tool_summary( $loop_payload, $tool_execution_results );
@@ -580,7 +586,7 @@ function datamachine_build_turn_runner(
 				}
 			}
 
-			if ( '' !== $completion_nudge ) {
+			if ( '' !== $completion_nudge && datamachine_should_append_tool_completion_nudge( $tool_execution_results, $completion_decision->context() ) ) {
 				$messages[] = ConversationManager::buildConversationMessage( 'user', $completion_nudge );
 				datamachine_record_completion_nudge(
 					$completion_nudges,
@@ -644,6 +650,66 @@ function datamachine_build_turn_runner(
 			'tool_runtime_rule_rejected'   => $runtime_rule_rejected,
 		);
 	};
+}
+
+/**
+ * Decide whether an assertion nudge is useful immediately after tool calls.
+ *
+ * Inspection-heavy agents can spend many turns reading files and runtime state.
+ * Repeating the same missing-assertion nudge after every read wastes context and
+ * pressures the model into completion mechanics too early. Keep immediate
+ * nudges for turns that changed state, attempted completion, or made direct
+ * assertion progress; natural completions still receive nudges elsewhere.
+ *
+ * @param array<int,array<string,mixed>> $tool_execution_results Tool results from the current turn.
+ * @param array<string,mixed>            $decision_context       Completion decision context.
+ */
+function datamachine_should_append_tool_completion_nudge( array $tool_execution_results, array $decision_context ): bool {
+	$progress_tools = array_merge(
+		array_values( (array) ( $decision_context['satisfied']['tool_names'] ?? array() ) ),
+		datamachine_completion_outcome_tool_names( (array) ( $decision_context['completion_assertions_required']['complete_when_any'] ?? array() ) )
+	);
+
+	foreach ( $tool_execution_results as $entry ) {
+		$tool_name = (string) ( $entry['tool_name'] ?? '' );
+		$runtime   = is_array( $entry['runtime'] ?? null ) ? $entry['runtime'] : array();
+		if ( in_array( $tool_name, $progress_tools, true ) || 'progress' === ( $runtime['completion_signal'] ?? '' ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Return Data Machine runtime metadata from a tool definition/result pair.
+ *
+ * Tool providers can declare top-level `runtime` metadata without requiring
+ * Data Machine core to know extension-specific tool names.
+ *
+ * @param array<string,mixed>|null $tool_definition Tool definition.
+ * @param array<string,mixed>      $tool_result     Tool execution result.
+ * @return array<string,mixed>
+ */
+function datamachine_tool_runtime_metadata( ?array $tool_definition, array $tool_result = array() ): array {
+	$definition_runtime = is_array( $tool_definition['runtime'] ?? null ) ? $tool_definition['runtime'] : array();
+	$result_runtime     = is_array( $tool_result['runtime'] ?? null ) ? $tool_result['runtime'] : array();
+
+	return array_merge( $definition_runtime, $result_runtime );
+}
+
+/** @return array<int,string> */
+function datamachine_completion_outcome_tool_names( array $outcomes ): array {
+	$tools = array();
+	foreach ( $outcomes as $outcome ) {
+		foreach ( (array) ( is_array( $outcome ) ? ( $outcome['tools'] ?? array() ) : array() ) as $tool ) {
+			if ( is_array( $tool ) && isset( $tool['name'] ) && is_string( $tool['name'] ) ) {
+				$tools[] = $tool['name'];
+			}
+		}
+	}
+
+	return array_values( array_unique( $tools ) );
 }
 
 /**

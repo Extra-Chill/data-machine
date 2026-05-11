@@ -87,6 +87,9 @@ class AgentDailyMemory extends BaseTool {
 		return array(
 			'success'   => true,
 			'data'      => $result,
+			'runtime'   => array(
+				'completion_signal' => 'progress',
+			),
 			'tool_name' => 'agent_daily_memory',
 		);
 	}
