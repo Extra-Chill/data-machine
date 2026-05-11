@@ -137,6 +137,13 @@ class WorkflowConfigFactory {
 		if ( 'ai' === $step_type ) {
 			$pipeline_step['system_prompt']  = $step['system_prompt'] ?? '';
 			$pipeline_step['disabled_tools'] = is_array( $step['disabled_tools'] ?? null ) ? array_values( $step['disabled_tools'] ) : array();
+			foreach ( array( 'completion_assertions', 'tool_runtime_rules', 'tool_categories' ) as $field ) {
+				if ( is_array( $step[ $field ] ?? null ) ) {
+					$pipeline_step[ $field ] = 'completion_assertions' === $field
+						? $step[ $field ]
+						: array_values( $step[ $field ] );
+				}
+			}
 		}
 
 		return $pipeline_step;
