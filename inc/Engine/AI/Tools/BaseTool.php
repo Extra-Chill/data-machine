@@ -35,6 +35,12 @@ abstract class BaseTool {
 	 * check the ability's permission_callback before offering the tool to AI agents.
 	 * Tools without an ability declaration default to admin-only access.
 	 *
+	 * Tools may also expose top-level `runtime` metadata in their definition to
+	 * describe loop behavior without hardcoding tool names in core. Supported keys
+	 * include `duplicate_policy => repeatable` for safe repeated calls and
+	 * `completion_signal => progress` for results that should trigger immediate
+	 * completion-assertion nudges when assertions are still missing.
+	 *
 	 * When the definition is a callable (for lazy evaluation), the modes
 	 * are stored alongside so they're available before the callable is resolved.
 	 * The ToolManager merges modes into the resolved definition.

@@ -454,8 +454,10 @@ function datamachine_build_turn_runner(
 					)
 				);
 
+				$tool_def = $tools[ $tool_name ] ?? null;
+
 				// Validate for duplicate tool calls.
-				$validation_result = ConversationManager::validateToolCall( $tool_name, $tool_parameters, $messages );
+				$validation_result = ConversationManager::validateToolCall( $tool_name, $tool_parameters, $messages, is_array( $tool_def ) ? $tool_def : null );
 				if ( $validation_result['is_duplicate'] ) {
 					$messages[]         = ConversationManager::generateDuplicateToolCallMessage( $tool_name, $turn_count, $mode );
 					$duplicate_rejected = true;
@@ -528,7 +530,6 @@ function datamachine_build_turn_runner(
 					)
 				);
 
-				$tool_def        = $tools[ $tool_name ] ?? null;
 				$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
 
 				// Evaluate the DM completion policy.
@@ -561,6 +562,7 @@ function datamachine_build_turn_runner(
 					'result'          => $tool_result,
 					'parameters'      => $tool_parameters,
 					'is_handler_tool' => $is_handler_tool,
+					'runtime'         => datamachine_tool_runtime_metadata( is_array( $tool_def ) ? $tool_def : null, $tool_result ),
 					'turn_count'      => $turn_count,
 				);
 				datamachine_persist_inflight_tool_summary( $loop_payload, $tool_execution_results );
@@ -670,12 +672,30 @@ function datamachine_should_append_tool_completion_nudge( array $tool_execution_
 
 	foreach ( $tool_execution_results as $entry ) {
 		$tool_name = (string) ( $entry['tool_name'] ?? '' );
-		if ( in_array( $tool_name, $progress_tools, true ) || datamachine_tool_name_is_mutating( $tool_name ) ) {
+		$runtime   = is_array( $entry['runtime'] ?? null ) ? $entry['runtime'] : array();
+		if ( in_array( $tool_name, $progress_tools, true ) || 'progress' === ( $runtime['completion_signal'] ?? '' ) ) {
 			return true;
 		}
 	}
 
 	return false;
+}
+
+/**
+ * Return Data Machine runtime metadata from a tool definition/result pair.
+ *
+ * Tool providers can declare top-level `runtime` metadata without requiring
+ * Data Machine core to know extension-specific tool names.
+ *
+ * @param array<string,mixed>|null $tool_definition Tool definition.
+ * @param array<string,mixed>      $tool_result     Tool execution result.
+ * @return array<string,mixed>
+ */
+function datamachine_tool_runtime_metadata( ?array $tool_definition, array $tool_result = array() ): array {
+	$definition_runtime = is_array( $tool_definition['runtime'] ?? null ) ? $tool_definition['runtime'] : array();
+	$result_runtime     = is_array( $tool_result['runtime'] ?? null ) ? $tool_result['runtime'] : array();
+
+	return array_merge( $definition_runtime, $result_runtime );
 }
 
 /** @return array<int,string> */
@@ -690,29 +710,6 @@ function datamachine_completion_outcome_tool_names( array $outcomes ): array {
 	}
 
 	return array_values( array_unique( $tools ) );
-}
-
-function datamachine_tool_name_is_mutating( string $tool_name ): bool {
-	return in_array(
-		$tool_name,
-		array(
-			'workspace_write',
-			'workspace_edit',
-			'workspace_apply_patch',
-			'workspace_delete',
-			'workspace_git_add',
-			'workspace_git_commit',
-			'workspace_git_push',
-			'workspace_git_pull',
-			'workspace_worktree_add',
-			'create_github_pull_request',
-			'comment_github_pull_request',
-			'create_github_issue',
-			'manage_github_issue',
-			'agent_daily_memory',
-		),
-		true
-	);
 }
 
 /**

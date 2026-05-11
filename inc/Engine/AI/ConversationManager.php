@@ -285,12 +285,13 @@ class ConversationManager {
 	 * the immediately previous call and would miss this. This broader check prevents
 	 * wasted AI credits on duplicate tool executions.
 	 *
-	 * @param string $tool_name Tool name to validate
-	 * @param array  $tool_parameters Tool parameters to validate
-	 * @param array  $conversation_messages Conversation history
+	 * @param string     $tool_name Tool name to validate
+	 * @param array      $tool_parameters Tool parameters to validate
+	 * @param array      $conversation_messages Conversation history
+	 * @param array|null $tool_definition Tool definition, when available.
 	 * @return array Validation result with is_duplicate and message
 	 */
-	public static function validateToolCall( string $tool_name, array $tool_parameters, array $conversation_messages ): array {
+	public static function validateToolCall( string $tool_name, array $tool_parameters, array $conversation_messages, ?array $tool_definition = null ): array {
 		if ( empty( $conversation_messages ) ) {
 			return array(
 				'is_duplicate' => false,
@@ -298,7 +299,7 @@ class ConversationManager {
 			);
 		}
 
-		if ( self::isRepeatableInspectionTool( $tool_name ) ) {
+		if ( self::toolAllowsRepeatCalls( $tool_definition ) ) {
 			return array(
 				'is_duplicate' => false,
 				'message'      => '',
@@ -339,29 +340,10 @@ class ConversationManager {
 		);
 	}
 
-	private static function isRepeatableInspectionTool( string $tool_name ): bool {
-		return in_array(
-			$tool_name,
-			array(
-				'workspace_show',
-				'workspace_ls',
-				'workspace_read',
-				'workspace_grep',
-				'workspace_git_status',
-				'workspace_git_log',
-				'workspace_git_diff',
-				'list_github_issues',
-				'get_github_issue',
-				'list_github_pulls',
-				'get_github_pull',
-				'get_github_pull_files',
-				'get_github_pull_review_context',
-				'wordpress_runtime_inventory',
-				'wordpress_runtime_ls',
-				'wordpress_runtime_read',
-			),
-			true
-		);
+	private static function toolAllowsRepeatCalls( ?array $tool_definition ): bool {
+		$runtime = is_array( $tool_definition['runtime'] ?? null ) ? $tool_definition['runtime'] : array();
+
+		return 'repeatable' === ( $runtime['duplicate_policy'] ?? '' );
 	}
 
 	/**

@@ -531,7 +531,7 @@ WpAiClientTestDouble::set_response_callback(
 					'content'    => '',
 					'tool_calls' => array(
 						array(
-							'name'       => 'workspace_git_status',
+							'name'       => 'repeatable_inspection_tool',
 							'parameters' => array( 'name' => 'demo@branch' ),
 						),
 					),
@@ -552,12 +552,15 @@ WpAiClientTestDouble::set_response_callback(
 $repeatable_result = datamachine_run_conversation(
 	array( array( 'role' => 'user', 'content' => 'inspect status twice' ) ),
 	array(
-		'workspace_git_status' => array(
-			'name'        => 'workspace_git_status',
+		'repeatable_inspection_tool' => array(
+			'name'        => 'repeatable_inspection_tool',
 			'description' => 'Repeatable status smoke tool',
 			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
 			'class'       => RuntimePolicySmokeTool::class,
 			'method'      => 'execute',
+			'runtime'     => array(
+				'duplicate_policy' => 'repeatable',
+			),
 		),
 	),
 	'openai',
@@ -584,7 +587,7 @@ WpAiClientTestDouble::set_response_callback(
 					'content'    => '',
 					'tool_calls' => array(
 						array(
-							'name'       => 'workspace_read',
+							'name'       => 'inspection_tool',
 							'parameters' => array( 'repo' => 'demo@branch', 'path' => 'README.md' ),
 						),
 					),
@@ -598,7 +601,7 @@ WpAiClientTestDouble::set_response_callback(
 				'content'    => '',
 				'tool_calls' => array(
 					array(
-						'name'       => 'agent_daily_memory',
+						'name'       => 'memory_write_tool',
 						'parameters' => array( 'action' => 'write' ),
 					),
 				),
@@ -610,19 +613,22 @@ WpAiClientTestDouble::set_response_callback(
 $inspection_nudge_result = datamachine_run_conversation(
 	array( array( 'role' => 'user', 'content' => 'read before writing memory' ) ),
 	array(
-		'workspace_read'     => array(
-			'name'        => 'workspace_read',
+		'inspection_tool'    => array(
+			'name'        => 'inspection_tool',
 			'description' => 'Inspection smoke tool',
 			'parameters'  => array( 'repo' => array( 'type' => 'string' ), 'path' => array( 'type' => 'string' ) ),
 			'class'       => RuntimePolicySmokeTool::class,
 			'method'      => 'execute',
 		),
-		'agent_daily_memory' => array(
-			'name'        => 'agent_daily_memory',
+		'memory_write_tool'  => array(
+			'name'        => 'memory_write_tool',
 			'description' => 'Memory smoke tool',
 			'parameters'  => array( 'action' => array( 'type' => 'string' ) ),
 			'class'       => RuntimePolicySmokeTool::class,
 			'method'      => 'execute',
+			'runtime'     => array(
+				'completion_signal' => 'progress',
+			),
 		),
 	),
 	'openai',
@@ -631,7 +637,7 @@ $inspection_nudge_result = datamachine_run_conversation(
 	array(
 		'transcript_persister'  => $inspection_nudge_transcript,
 		'completion_assertions' => array(
-			'required_tool_names' => array( 'agent_daily_memory' ),
+			'required_tool_names' => array( 'memory_write_tool' ),
 		),
 	),
 	4
