@@ -2,6 +2,31 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.110.0] - 2026-05-11
+
+### Added
+- add Data Machine worker loop
+
+### Changed
+- centralize policy-gated pipeline tools
+
+### Fixed
+- align worker loop stats output
+- preload pipeline flow page size
+- satisfy changed pipeline lint
+- align pipeline REST parameters
+- reuse pipelines cache for selector defaults
+- avoid embedded flows during pipeline hydration
+- preserve minimum tool count assertions
+- default flow steps to handler-backed rendering
+- align completion assertion assignments
+- require minimum successful tool counts
+- avoid invalid AI handler detail request
+- satisfy configuration tab lint
+- clarify configuration mode copy
+- attribute system task jobs
+- render JSON handler settings
+
 ## [0.109.0] - 2026-05-10
 
 ### Added
