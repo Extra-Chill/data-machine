@@ -59,9 +59,14 @@ export const usePipelines = () =>
  *
  * @param {Object} [options]
  * @param {string} [options.search]  Filter by pipeline_name substring.
- * @param {number} [options.perPage] Items per page (default 50).
+ * @param {number}  [options.perPage] Items per page (default 50).
+ * @param {boolean} [options.enabled] Whether the search query should run.
  */
-export const usePipelineSearch = ( { search = '', perPage = 50 } = {} ) => {
+export const usePipelineSearch = ( {
+	search = '',
+	perPage = 50,
+	enabled = true,
+} = {} ) => {
 	const normalizedSearch = search ? search.trim() : '';
 
 	return useQuery( {
@@ -81,6 +86,7 @@ export const usePipelineSearch = ( { search = '', perPage = 50 } = {} ) => {
 				total: response.total ?? response.data.total ?? 0,
 			};
 		},
+		enabled,
 		keepPreviousData: true,
 		staleTime: 5_000,
 	} );
