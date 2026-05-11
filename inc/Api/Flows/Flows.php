@@ -109,6 +109,14 @@ class Flows {
 						'description'       => __( 'Filter by user ID (admin only, non-admins always see own data)', 'data-machine' ),
 						'sanitize_callback' => 'absint',
 					),
+					'output_mode' => array(
+						'required'          => false,
+						'type'              => 'string',
+						'default'           => 'full',
+						'enum'              => array( 'full', 'list', 'summary', 'ids' ),
+						'description'       => __( 'Output mode for flow list responses.', 'data-machine' ),
+						'sanitize_callback' => 'sanitize_key',
+					),
 				),
 			)
 		);
@@ -496,6 +504,7 @@ class Flows {
 		$pipeline_id     = $request->get_param( 'pipeline_id' );
 		$per_page        = $request->get_param( 'per_page' ) ?? 20;
 		$offset          = $request->get_param( 'offset' ) ?? 0;
+		$output_mode     = $request->get_param( 'output_mode' ) ?? 'full';
 		$scoped_user_id  = PermissionHelper::resolve_scoped_user_id( $request );
 		$scoped_agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
 
@@ -508,6 +517,7 @@ class Flows {
 			'pipeline_id' => $pipeline_id,
 			'per_page'    => $per_page,
 			'offset'      => $offset,
+			'output_mode' => $output_mode,
 		);
 		if ( null !== $scoped_agent_id ) {
 			$input['agent_id'] = $scoped_agent_id;

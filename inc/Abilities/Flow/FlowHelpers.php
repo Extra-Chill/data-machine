@@ -206,8 +206,8 @@ trait FlowHelpers {
 	}
 
 	/**
-	 * Format flow for list views — includes flow_config and scheduling
-	 * but skips the expensive handler settings enrichment in FlowFormatter.
+	 * Format flow for list views with status fields but without the expensive
+	 * handler settings enrichment in FlowFormatter.
 	 *
 	 * @param array       $flow Flow data.
 	 * @param array|null  $latest_jobs Pre-fetched latest jobs keyed by flow_id.

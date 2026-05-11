@@ -466,6 +466,43 @@ class Flows extends BaseRepository {
 	}
 
 	/**
+	 * Get paginated flows for a pipeline without loading flow_config longtext.
+	 *
+	 * @since 0.66.1
+	 *
+	 * @param int $pipeline_id Pipeline ID.
+	 * @param int $per_page    Number of flows per page.
+	 * @param int $offset      Offset for pagination.
+	 * @return array Flows array without decoded flow_config.
+	 */
+	public function get_flows_for_pipeline_summary( int $pipeline_id, int $per_page = 20, int $offset = 0 ): array {
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+		$flows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				'SELECT flow_id, flow_name, pipeline_id, scheduling_config, user_id, agent_id FROM %i WHERE pipeline_id = %d ORDER BY flow_id ASC LIMIT %d OFFSET %d',
+				$this->table_name,
+				$pipeline_id,
+				$per_page,
+				$offset
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		if ( null === $flows ) {
+			return array();
+		}
+
+		foreach ( $flows as &$flow ) {
+			$flow['scheduling_config'] = json_decode( $flow['scheduling_config'], true ) ?? array();
+			$flow['flow_config']       = array(); // Not loaded — placeholder for consistent interface.
+		}
+
+		return $flows;
+	}
+
+	/**
 	 * Count total flows for a pipeline
 	 *
 	 * @param int $pipeline_id Pipeline ID

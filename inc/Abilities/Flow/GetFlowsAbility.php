@@ -164,11 +164,14 @@ class GetFlowsAbility {
 			$flows = array();
 			$total = 0;
 
-			// Use lightweight summary query for modes that don't need flow_config.
-			$use_summary_query = in_array( $output_mode, array( 'summary', 'ids' ), true );
+			// Use lightweight summary queries for modes that don't need flow_config.
+			// Handler filtering still needs flow_config to inspect step handlers.
+			$use_summary_query = in_array( $output_mode, array( 'list', 'summary', 'ids' ), true ) && ! $handler_slug;
 
 			if ( $pipeline_id ) {
-				$flows = $this->db_flows->get_flows_for_pipeline_paginated( $pipeline_id, $effective_per_page, $offset );
+				$flows = $use_summary_query
+					? $this->db_flows->get_flows_for_pipeline_summary( $pipeline_id, $effective_per_page, $offset )
+					: $this->db_flows->get_flows_for_pipeline_paginated( $pipeline_id, $effective_per_page, $offset );
 				$total = $this->db_flows->count_flows_for_pipeline( $pipeline_id );
 			} elseif ( $use_summary_query ) {
 				$flows = $this->db_flows->get_all_flows_summary( $effective_per_page, $offset, $user_id, $agent_id );
