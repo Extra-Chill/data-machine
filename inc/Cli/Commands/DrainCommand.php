@@ -151,6 +151,22 @@ class DrainCommand extends BaseCommand {
 	}
 
 	/**
+	 * Return a read-only Data Machine Action Scheduler status snapshot.
+	 *
+	 * @param array{hooks?:string[]} $options Status options.
+	 * @return array<string,int|string> Status stats.
+	 */
+	public static function status( array $options = array() ): array {
+		$hooks = self::normalizeHooks( $options['hooks'] ?? null );
+
+		return array(
+			'due_pending'   => self::getDuePendingCount( $hooks ),
+			'total_pending' => self::getPendingCount( $hooks ),
+			'hooks'         => implode( ',', array_keys( self::getStatusCounts( $hooks ) ) ),
+		);
+	}
+
+	/**
 	 * Run specific due Action Scheduler actions.
 	 *
 	 * @param int[] $action_ids Action IDs.

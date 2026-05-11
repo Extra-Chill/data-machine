@@ -38,8 +38,12 @@ assert_worker_contains( '@subcommand status', $worker_src, 'worker exposes statu
 assert_worker_contains( 'RecoverStuckJobsAbility', $worker_src, 'worker composes stuck job recovery ability' );
 assert_worker_contains( 'DrainCommand::drain(', $worker_src, 'worker composes the existing drain loop' );
 assert_worker_contains( 'PendingActionStore::summary', $worker_src, 'worker reads pending-action gate through the store' );
+assert_worker_contains( 'JobsSummaryAbility', $worker_src, 'worker reads job status through the existing summary ability' );
 assert_worker_contains( 'stop_on_pending_actions', $worker_src, 'worker can stop at approval gates' );
+assert_worker_contains( 'max_passes', $worker_src, 'worker supports bounded pass counts' );
+assert_worker_contains( 'stop_before_timeout', $worker_src, 'worker exits before external supervisor timeouts' );
 assert_worker_contains( 'drain_time_limit', $worker_src, 'worker bounds each drain pass' );
+assert_worker_contains( 'DrainCommand::status()', $worker_src, 'worker reads Action Scheduler state through drain status' );
 assert_worker_not_contains( 'action-scheduler action run ', $worker_src, 'worker does not shell directly to Action Scheduler' );
 assert_worker_not_contains( 'actionscheduler_actions', $worker_src, 'worker does not query Action Scheduler tables directly' );
 assert_worker_not_contains( 'datamachine_jobs', $worker_src, 'worker does not query jobs tables directly' );
