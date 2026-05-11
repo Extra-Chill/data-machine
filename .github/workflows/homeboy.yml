@@ -19,44 +19,9 @@ permissions:
 
 jobs:
   homeboy:
-    name: Homeboy (${{ matrix.command }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        command: [audit, lint, test]
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: ''
-          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
-          MYSQL_DATABASE: homeboy_wptests
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Generate app token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        continue-on-error: true
-        with:
-          app-id: ${{ secrets.HOMEBOY_APP_ID }}
-          private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
-
-      - name: Run Homeboy ${{ matrix.command }}
-        uses: Extra-Chill/homeboy-action@v2
-        with:
-          commands: ${{ matrix.command }}
-          expected-commands: audit,lint,test
-          args: ${{ matrix.command == 'test' && '--setting playground_wordpress_version=7.0' || '' }}
-          app-token: ${{ steps.app-token.outputs.token || '' }}
-          autofix: 'false'
+    uses: Extra-Chill/homeboy-action/.github/workflows/ci.yml@v2
+    with:
+      commands: audit,lint,test
+      expected-commands: audit,lint,test
+      autofix: 'false'
+    secrets: inherit
