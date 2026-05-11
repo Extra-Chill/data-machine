@@ -611,6 +611,14 @@ class AIStep extends Step {
 			}
 		}
 
+		$minimum_successful_tool_counts = array_merge(
+			self::normalizeCompletionAssertionCountMap( $pipeline_assertions['minimum_successful_tool_counts'] ?? array() ),
+			self::normalizeCompletionAssertionCountMap( $flow_assertions['minimum_successful_tool_counts'] ?? array() )
+		);
+		if ( ! empty( $minimum_successful_tool_counts ) ) {
+			$merged['minimum_successful_tool_counts'] = $minimum_successful_tool_counts;
+		}
+
 		$complete_when_any = array_merge(
 			is_array( $pipeline_assertions['complete_when_any'] ?? null ) ? $pipeline_assertions['complete_when_any'] : array(),
 			is_array( $flow_assertions['complete_when_any'] ?? null ) ? $flow_assertions['complete_when_any'] : array()
@@ -643,6 +651,27 @@ class AIStep extends Step {
 		}
 
 		return $items;
+	}
+
+	/**
+	 * @param mixed $value Raw assertion count map.
+	 * @return array<string, int>
+	 */
+	private static function normalizeCompletionAssertionCountMap( $value ): array {
+		if ( ! is_array( $value ) || array_is_list( $value ) ) {
+			return array();
+		}
+
+		$counts = array();
+		foreach ( $value as $tool_name => $minimum_count ) {
+			$tool_name     = trim( (string) $tool_name );
+			$minimum_count = (int) $minimum_count;
+			if ( '' !== $tool_name && $minimum_count > 0 ) {
+				$counts[ $tool_name ] = $minimum_count;
+			}
+		}
+
+		return $counts;
 	}
 
 	/**

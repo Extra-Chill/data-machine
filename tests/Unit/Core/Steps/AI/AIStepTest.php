@@ -80,6 +80,41 @@ class AIStepTest extends TestCase {
 		$this->assertSame( $data_packets, AIStep::sanitizeDataPacketsForAi( $data_packets ) );
 	}
 
+	public function test_merge_completion_assertions_preserves_minimum_successful_tool_counts(): void {
+		$method = new ReflectionMethod( AIStep::class, 'mergeCompletionAssertions' );
+		$method->setAccessible( true );
+
+		$merged = $method->invoke(
+			null,
+			array(
+				'required_tool_names'             => array( 'create_github_pull_request' ),
+				'minimum_successful_tool_counts' => array(
+					'create_or_update_github_file' => 3,
+					'ignored_zero_count'           => 0,
+				),
+			),
+			array(
+				'required_tool_names'             => array( 'comment_github_pull_request' ),
+				'minimum_successful_tool_counts' => array(
+					'create_or_update_github_file' => 6,
+					'custom_tool'                  => '2',
+				),
+			)
+		);
+
+		$this->assertSame(
+			array( 'create_github_pull_request', 'comment_github_pull_request' ),
+			$merged['required_tool_names']
+		);
+		$this->assertSame(
+			array(
+				'create_or_update_github_file' => 6,
+				'custom_tool'                  => 2,
+			),
+			$merged['minimum_successful_tool_counts']
+		);
+	}
+
 	public function test_prompt_projection_generic_fallback_preserves_unknown_packet_shape(): void {
 		$canonical = array(
 			array(
