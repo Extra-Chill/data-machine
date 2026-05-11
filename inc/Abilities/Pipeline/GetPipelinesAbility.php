@@ -125,9 +125,9 @@ class GetPipelinesAbility {
 				$output_mode = 'full';
 			}
 
-			// Direct pipeline lookup by ID - bypasses pagination.
-			// Single-pipeline fetches always embed flows for backward compatibility
-			// (this is what callers like the REST /pipelines/{id} endpoint rely on).
+			// Direct pipeline lookup by ID bypasses pagination. It embeds flows by
+			// default for existing callers, while list-style hydration can explicitly
+			// opt out with include_flows=false.
 			if ( null !== $pipeline_id ) {
 				if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
 					return array(
@@ -152,7 +152,7 @@ class GetPipelinesAbility {
 				$formatted_pipeline = $this->formatPipelineByMode(
 					$pipeline,
 					$output_mode,
-					true
+					$include_flows
 				);
 
 				return array(

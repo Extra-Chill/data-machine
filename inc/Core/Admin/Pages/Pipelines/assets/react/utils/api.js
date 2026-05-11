@@ -47,7 +47,10 @@ export const fetchPipelines = async (
 	{ perPage = 100, offset = 0, includeFlows = false, search = null } = {}
 ) => {
 	if ( pipelineId ) {
-		return await client.get( '/pipelines', { pipeline_id: pipelineId } );
+		return await client.get( '/pipelines', {
+			pipeline_id: pipelineId,
+			include_flows: includeFlows,
+		} );
 	}
 
 	const params = {

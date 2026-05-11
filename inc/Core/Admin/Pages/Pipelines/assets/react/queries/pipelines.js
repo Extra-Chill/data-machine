@@ -113,7 +113,9 @@ export const usePipeline = ( pipelineId ) => {
 				}
 			}
 
-			const response = await fetchPipelines( pipelineId );
+			const response = await fetchPipelines( pipelineId, {
+				includeFlows: false,
+			} );
 			if ( ! response.success ) {
 				return null;
 			}

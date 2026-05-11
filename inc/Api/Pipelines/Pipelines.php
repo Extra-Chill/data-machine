@@ -331,6 +331,9 @@ class Pipelines {
 				'pipeline_id' => (int) $pipeline_id,
 				'output_mode' => 'full',
 			);
+			if ( null !== $include_flows_param ) {
+				$input['include_flows'] = (bool) $include_flows_param;
+			}
 			if ( null !== $scoped_agent_id ) {
 				$input['agent_id'] = $scoped_agent_id;
 			} elseif ( null !== $scoped_user_id ) {
