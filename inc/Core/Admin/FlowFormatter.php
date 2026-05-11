@@ -74,8 +74,8 @@ class FlowFormatter {
 					if ( ! in_array( $effective_slug, $handler_slugs, true ) ) {
 						$handler_slugs[] = $effective_slug;
 					}
-					$step_data['handler_slugs']                          = $handler_slugs;
-					$step_data['handler_configs'][ $effective_slug ]     = $with_defaults;
+					$step_data['handler_slugs']                      = $handler_slugs;
+					$step_data['handler_configs'][ $effective_slug ] = $with_defaults;
 					unset( $step_data['handler_slug'], $step_data['handler_config'] );
 				} else {
 					$step_data['handler_config'] = $with_defaults;
