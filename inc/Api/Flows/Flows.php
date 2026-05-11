@@ -117,14 +117,6 @@ class Flows {
 						'description'       => __( 'Filter by user ID (admin only, non-admins always see own data)', 'data-machine' ),
 						'sanitize_callback' => 'absint',
 					),
-					'output_mode' => array(
-						'required'          => false,
-						'type'              => 'string',
-						'default'           => 'full',
-						'enum'              => array( 'full', 'list', 'summary', 'ids' ),
-						'description'       => __( 'Output mode for flow list responses.', 'data-machine' ),
-						'sanitize_callback' => 'sanitize_key',
-					),
 				),
 			)
 		);
