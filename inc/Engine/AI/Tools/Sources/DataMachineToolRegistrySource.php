@@ -41,7 +41,7 @@ final class DataMachineToolRegistrySource {
 				continue;
 			}
 
-			if ( ToolPolicyResolver::MODE_PIPELINE === $mode && in_array( 'pipeline_policy', $tool_config['modes'] ?? array(), true ) ) {
+			if ( ToolPolicyResolver::MODE_PIPELINE === $mode && ToolPolicyResolver::isPipelinePolicyToolAllowed( $tool_config, $tool_name, $args ) ) {
 				$tool_config['modes'] = array_values( array_unique( array_merge( $tool_config['modes'], array( ToolPolicyResolver::MODE_PIPELINE ) ) ) );
 			}
 
@@ -86,8 +86,7 @@ final class DataMachineToolRegistrySource {
 			static function ( $tool, string $tool_name ) use ( $mode, $args ) {
 				$modes = $tool['modes'] ?? array();
 				if ( ToolPolicyResolver::MODE_PIPELINE === $mode
-					&& in_array( 'pipeline_policy', $modes, true )
-					&& in_array( $tool_name, $args['allow_only'] ?? array(), true ) ) {
+					&& ToolPolicyResolver::isPipelinePolicyToolAllowed( $tool, $tool_name, $args ) ) {
 					return true;
 				}
 

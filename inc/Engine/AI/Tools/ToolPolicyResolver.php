@@ -36,6 +36,12 @@ class ToolPolicyResolver {
 	public const MODE_CHAT     = 'chat';
 	public const MODE_SYSTEM   = 'system';
 
+	/**
+	 * Opt-in pipeline mode for tools that should never be exposed to pipeline
+	 * agents by default, but may be explicitly enabled by a flow/tool policy.
+	 */
+	public const MODE_PIPELINE_POLICY = 'pipeline_policy';
+
 	private ToolManager $tool_manager;
 	private ToolSourceRegistry $tool_source_registry;
 	private DataMachineAgentToolPolicyProvider $agent_policy_provider;
@@ -207,5 +213,23 @@ class ToolPolicyResolver {
 			self::MODE_CHAT     => 'Chat interaction with full management tools',
 			self::MODE_SYSTEM   => 'System task execution with minimal toolset',
 		);
+	}
+
+	/**
+	 * Whether a tool is available to a pipeline only by explicit policy opt-in.
+	 *
+	 * Policy-gated pipeline tools stay out of the default pipeline tool pool, but
+	 * can be granted by a flow's `enabled_tools` allowlist or equivalent tool
+	 * policy. This is intended for powerful-but-automatable tools such as durable
+	 * agent memory writes.
+	 *
+	 * @param array  $tool_config Tool definition.
+	 * @param string $tool_name   Tool identifier.
+	 * @param array  $args        Resolver args, including optional allow_only.
+	 * @return bool True when the tool should be included for this pipeline pass.
+	 */
+	public static function isPipelinePolicyToolAllowed( array $tool_config, string $tool_name, array $args ): bool {
+		return in_array( self::MODE_PIPELINE_POLICY, $tool_config['modes'] ?? array(), true )
+			&& in_array( $tool_name, $args['allow_only'] ?? array(), true );
 	}
 }

@@ -40,6 +40,7 @@ function apply_filters( string $tag, $value ) {
 }
 
 require_once __DIR__ . '/../inc/Engine/AI/Tools/BaseTool.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 
 $failures = array();
 $passes   = 0;
@@ -121,7 +122,7 @@ assert_true_for_pipeline_modes(
 	$passes
 );
 assert_true_for_pipeline_modes(
-	file_contains_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentDailyMemory.php', "array( 'chat', 'pipeline_policy' )" ),
+	file_contains_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentDailyMemory.php', 'ToolPolicyResolver::MODE_PIPELINE_POLICY' ),
 	'agent_daily_memory declares policy-controlled pipeline availability',
 	$failures,
 	$passes
@@ -139,7 +140,7 @@ assert_true_for_pipeline_modes(
 	$passes
 );
 assert_true_for_pipeline_modes(
-	file_contains_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentMemory.php', "array( 'chat', 'pipeline_policy' )" ),
+	file_contains_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentMemory.php', 'ToolPolicyResolver::MODE_PIPELINE_POLICY' ),
 	'agent_memory declares policy-controlled pipeline availability',
 	$failures,
 	$passes

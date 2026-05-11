@@ -16,13 +16,14 @@
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Abilities\PermissionHelper;
 
 class AgentMemory extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'agent_memory', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline_policy' ), array( 'abilities' => array( 'datamachine/get-agent-memory', 'datamachine/update-agent-memory', 'datamachine/list-agent-memory-sections' ) ) );
+		$this->registerTool( 'agent_memory', array( $this, 'getToolDefinition' ), array( 'chat', ToolPolicyResolver::MODE_PIPELINE_POLICY ), array( 'abilities' => array( 'datamachine/get-agent-memory', 'datamachine/update-agent-memory', 'datamachine/list-agent-memory-sections' ) ) );
 	}
 
 	/**
