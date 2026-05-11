@@ -162,6 +162,15 @@ $configs         = WorkflowConfigFactory::buildEphemeralConfigs(
 				'label'          => 'Summarize',
 				'system_prompt'  => 'Be concise.',
 				'disabled_tools' => array( 'danger_tool' ),
+				'completion_assertions' => array(
+					'required_tool_names' => array( 'publish_result' ),
+				),
+				'tool_runtime_rules' => array(
+					array(
+						'id'        => 'after-worktree',
+						'max_calls' => 4,
+					),
+				),
 			),
 			array(
 				'type'           => 'system_task',
@@ -180,6 +189,8 @@ assert_workflow_spec_equals( array( 0, 1, 2 ), array_column( $pipeline_steps, 'e
 assert_workflow_spec_equals( 'Fetch Source', $pipeline_steps[0]['label'] ?? null, 'ephemeral pipeline_config preserves fetch label', $failures, $passes );
 assert_workflow_spec_equals( 'Be concise.', $pipeline_steps[1]['system_prompt'] ?? null, 'ephemeral pipeline_config preserves AI system prompt', $failures, $passes );
 assert_workflow_spec_equals( array( 'danger_tool' ), $pipeline_steps[1]['disabled_tools'] ?? null, 'ephemeral pipeline_config preserves AI disabled tools', $failures, $passes );
+assert_workflow_spec_equals( array( 'required_tool_names' => array( 'publish_result' ) ), $pipeline_steps[1]['completion_assertions'] ?? null, 'ephemeral pipeline_config preserves AI completion assertions', $failures, $passes );
+assert_workflow_spec_equals( array( array( 'id' => 'after-worktree', 'max_calls' => 4 ) ), $pipeline_steps[1]['tool_runtime_rules'] ?? null, 'ephemeral pipeline_config preserves AI tool runtime rules', $failures, $passes );
 assert_workflow_spec_equals( 'Cleanup', $pipeline_steps[2]['label'] ?? null, 'ephemeral pipeline_config preserves system_task label', $failures, $passes );
 assert_workflow_spec_equals( false, array_key_exists( 'system_prompt', $pipeline_steps[2] ), 'non-AI ephemeral pipeline rows do not gain AI metadata', $failures, $passes );
 
