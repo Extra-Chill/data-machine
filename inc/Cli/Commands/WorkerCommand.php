@@ -7,6 +7,7 @@
 
 namespace DataMachine\Cli\Commands;
 
+use DataMachine\Abilities\Job\JobsSummaryAbility;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
@@ -70,6 +71,18 @@ class WorkerCommand extends BaseCommand {
 	 * [--stop-on-pending-actions]
 	 * : Stop when pending approval actions exist.
 	 *
+	 * [--max-passes=<number>]
+	 * : Maximum worker passes to run. 0 means no pass-count limit.
+	 * ---
+	 * default: 0
+	 * ---
+	 *
+	 * [--stop-before-timeout=<seconds>]
+	 * : Stop this many seconds before the wall-clock limit so the worker exits cleanly before an external supervisor timeout.
+	 * ---
+	 * default: 30
+	 * ---
+	 *
 	 * [--once]
 	 * : Run one recovery/drain pass and exit.
 	 *
@@ -85,6 +98,7 @@ class WorkerCommand extends BaseCommand {
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine worker run --time-limit=3600 --sleep=30
+	 *     wp datamachine worker run --time-limit=900 --max-passes=10 --stop-before-timeout=60
 	 *     wp datamachine worker run --once --stop-on-pending-actions
 	 *
 	 * @subcommand run
@@ -104,6 +118,8 @@ class WorkerCommand extends BaseCommand {
 			'stuck_timeout'           => isset( $assoc_args['stuck-timeout'] ) ? max( 1, (int) $assoc_args['stuck-timeout'] ) : 2,
 			'recover_stuck'           => ! isset( $assoc_args['no-recover-stuck'] ),
 			'stop_on_pending_actions' => isset( $assoc_args['stop-on-pending-actions'] ),
+			'max_passes'              => isset( $assoc_args['max-passes'] ) ? max( 0, (int) $assoc_args['max-passes'] ) : 0,
+			'stop_before_timeout'     => isset( $assoc_args['stop-before-timeout'] ) ? max( 0, (int) $assoc_args['stop-before-timeout'] ) : 30,
 			'once'                    => isset( $assoc_args['once'] ),
 		);
 
@@ -165,6 +181,8 @@ class WorkerCommand extends BaseCommand {
 		$stuck_timeout           = max( 1, (int) ( $options['stuck_timeout'] ?? 2 ) );
 		$recover_stuck           = (bool) ( $options['recover_stuck'] ?? true );
 		$stop_on_pending_actions = (bool) ( $options['stop_on_pending_actions'] ?? false );
+		$max_passes              = max( 0, (int) ( $options['max_passes'] ?? 0 ) );
+		$stop_before_timeout     = max( 0, (int) ( $options['stop_before_timeout'] ?? 30 ) );
 		$once                    = (bool) ( $options['once'] ?? false );
 
 		$passes      = 0;
@@ -177,7 +195,16 @@ class WorkerCommand extends BaseCommand {
 		$stop_reason = 'time_limit';
 
 		while ( true ) {
-			if ( $time_limit > 0 && ( time() - $started_at ) >= $time_limit ) {
+			$elapsed = time() - $started_at;
+			if ( $time_limit > 0 && $elapsed >= $time_limit ) {
+				break;
+			}
+			if ( $time_limit > 0 && ( $time_limit - $elapsed ) <= $stop_before_timeout ) {
+				$stop_reason = 'timeout_margin';
+				break;
+			}
+			if ( $max_passes > 0 && $passes >= $max_passes ) {
+				$stop_reason = 'max_passes';
 				break;
 			}
 
@@ -206,7 +233,7 @@ class WorkerCommand extends BaseCommand {
 				}
 			}
 
-			$remaining_time = $time_limit > 0 ? max( 1, $time_limit - ( time() - $started_at ) ) : $drain_time_limit;
+			$remaining_time = $time_limit > 0 ? max( 1, $time_limit - $stop_before_timeout - ( time() - $started_at ) ) : $drain_time_limit;
 			$drain          = DrainCommand::drain(
 				array(
 					'limit'      => $drain_limit,
@@ -230,7 +257,7 @@ class WorkerCommand extends BaseCommand {
 					break;
 				}
 
-				sleep( min( $sleep, $time_limit > 0 ? max( 0, $time_limit - ( time() - $started_at ) ) : $sleep ) );
+				sleep( min( $sleep, $time_limit > 0 ? max( 0, $time_limit - $stop_before_timeout - ( time() - $started_at ) ) : $sleep ) );
 			}
 		}
 
@@ -244,6 +271,11 @@ class WorkerCommand extends BaseCommand {
 			'action_completions'       => $completions,
 			'action_failures'          => $failures,
 			'pending_actions'          => (int) $status['pending_actions'],
+			'due_actions'              => (int) $status['due_actions'],
+			'total_pending_actions'    => (int) $status['total_pending_actions'],
+			'processing_jobs'          => (int) $status['processing_jobs'],
+			'pending_jobs'             => (int) $status['pending_jobs'],
+			'stuck_jobs'               => (int) $status['stuck_jobs'],
 			'warnings'                 => $warnings,
 			'duration_seconds'         => time() - $started_at,
 			'stop_reason'              => $stop_reason,
@@ -257,10 +289,25 @@ class WorkerCommand extends BaseCommand {
 	 */
 	private static function statusSnapshot(): array {
 		$pending_summary = PendingActionStore::summary( array( 'status' => 'pending' ) );
+		$drain_status    = DrainCommand::status();
+		$jobs_summary    = ( new JobsSummaryAbility() )->execute( array() );
+		$jobs            = ! empty( $jobs_summary['success'] ) && is_array( $jobs_summary['summary'] ?? null ) ? $jobs_summary['summary'] : array();
+		$stuck           = ( new RecoverStuckJobsAbility() )->execute(
+			array(
+				'dry_run' => true,
+			)
+		);
 
 		return array(
-			'pending_actions' => (int) ( $pending_summary['total'] ?? 0 ),
-			'pending_kinds'   => implode( ',', array_keys( (array) ( $pending_summary['by_kind'] ?? array() ) ) ),
+			'pending_actions'       => (int) ( $pending_summary['total'] ?? 0 ),
+			'pending_kinds'         => implode( ',', array_keys( (array) ( $pending_summary['by_kind'] ?? array() ) ) ),
+			'due_actions'           => (int) ( $drain_status['due_pending'] ?? 0 ),
+			'total_pending_actions' => (int) ( $drain_status['total_pending'] ?? 0 ),
+			'action_hooks'          => (string) ( $drain_status['hooks'] ?? '' ),
+			'processing_jobs'       => (int) ( $jobs['processing'] ?? 0 ),
+			'pending_jobs'          => (int) ( $jobs['pending'] ?? 0 ),
+			'failed_jobs'           => (int) ( $jobs['failed'] ?? 0 ),
+			'stuck_jobs'            => (int) ( $stuck['recovered'] ?? 0 ) + (int) ( $stuck['timed_out'] ?? 0 ) + (int) ( $stuck['stale_actions'] ?? 0 ),
 		);
 	}
 
