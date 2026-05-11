@@ -2,7 +2,7 @@
  * Pipelines App Root Component
  *
  * Container component that manages the entire pipeline interface state and data.
- * @pattern Container - Fetches all pipeline-related data and manages global state
+ * Pattern: Container - Fetches all pipeline-related data and manages global state
  */
 
 /**
@@ -83,8 +83,42 @@ export default function PipelinesApp() {
 		page: flowsPage,
 		perPage: flowsPerPage,
 	} );
-	const flows = useMemo( () => flowsData?.flows ?? [], [ flowsData ] );
-	const flowsTotal = flowsData?.total ?? 0;
+	const [ previousFlowsData, setPreviousFlowsData ] = useState( {
+		pipelineId: null,
+		data: null,
+	} );
+
+	useEffect( () => {
+		setPreviousFlowsData( {
+			pipelineId: selectedPipelineId,
+			data: null,
+		} );
+	}, [ selectedPipelineId ] );
+
+	useEffect( () => {
+		if ( flowsData ) {
+			setPreviousFlowsData( {
+				pipelineId: selectedPipelineId,
+				data: flowsData,
+			} );
+		}
+	}, [ flowsData, selectedPipelineId ] );
+
+	const previousFlowsForSelectedPipeline = isSameId(
+		previousFlowsData.pipelineId,
+		selectedPipelineId
+	)
+		? previousFlowsData.data
+		: null;
+	const displayFlowsData =
+		flowsData || ( flowsLoading ? previousFlowsForSelectedPipeline : null );
+	const flows = useMemo( () => {
+		return {
+			items: displayFlowsData?.flows ?? [],
+			isLoading: flowsLoading,
+		};
+	}, [ displayFlowsData, flowsLoading ] );
+	const flowsTotal = displayFlowsData?.total ?? 0;
 
 	const createPipelineMutation = useCreatePipeline( {
 		onSuccess: ( pipelineId ) => {
@@ -187,7 +221,7 @@ export default function PipelinesApp() {
 	 */
 	const renderMainContent = () => {
 		// Loading state
-		if ( pipelinesLoading || selectedPipelineLoading || flowsLoading ) {
+		if ( pipelinesLoading || selectedPipelineLoading ) {
 			return (
 				<div className="datamachine-pipelines-loading">
 					<Spinner />

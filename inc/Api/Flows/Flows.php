@@ -103,6 +103,14 @@ class Flows {
 						'sanitize_callback' => 'absint',
 						'description'       => __( 'Offset for pagination', 'data-machine' ),
 					),
+					'output_mode' => array(
+						'required'          => false,
+						'type'              => 'string',
+						'enum'              => array( 'full', 'list', 'summary', 'ids' ),
+						'default'           => 'full',
+						'sanitize_callback' => 'sanitize_key',
+						'description'       => __( 'Output mode for returned flows: full, list, summary, or ids.', 'data-machine' ),
+					),
 					'user_id'     => array(
 						'required'          => false,
 						'type'              => 'integer',

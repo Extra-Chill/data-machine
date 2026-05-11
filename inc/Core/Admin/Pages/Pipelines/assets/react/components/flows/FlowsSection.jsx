@@ -7,6 +7,7 @@
  */
 import { useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
+import { Spinner } from '@wordpress/components';
 /**
  * Internal dependencies
  */
@@ -29,6 +30,9 @@ export default function FlowsSection( {
 } ) {
 	// Use mutations
 	const createFlowMutation = useCreateFlow();
+	const flowItems = Array.isArray( flows ) ? flows : flows?.items ?? [];
+	const isLoading = ! Array.isArray( flows ) && flows?.isLoading === true;
+	const hasFlows = flowItems.length > 0;
 
 	/**
 	 * Handle flow creation
@@ -71,7 +75,21 @@ export default function FlowsSection( {
 	/**
 	 * Empty state
 	 */
-	if ( ! flows || flows.length === 0 ) {
+	if ( isLoading && ! hasFlows ) {
+		return (
+			<div className="datamachine-flows-section datamachine-flows-section--loading">
+				<h3 className="datamachine-flows-section__title">
+					{ __( 'Flows', 'data-machine' ) }
+				</h3>
+				<div className="datamachine-pipelines-loading">
+					<Spinner />
+					<p>{ __( 'Loading flows…', 'data-machine' ) }</p>
+				</div>
+			</div>
+		);
+	}
+
+	if ( ! hasFlows ) {
 		return (
 			<div className="datamachine-flows-section datamachine-flows-section--empty">
 				<h3 className="datamachine-flows-section__title">
@@ -103,10 +121,16 @@ export default function FlowsSection( {
 						({ total })
 					</span>
 				</h3>
+				{ isLoading && (
+					<div className="datamachine-flows-section__loading">
+						<Spinner />
+						<span>{ __( 'Loading flows…', 'data-machine' ) }</span>
+					</div>
+				) }
 			</div>
 
 			<div className="datamachine-flows-list">
-				{ flows.map( ( flow ) => (
+				{ flowItems.map( ( flow ) => (
 					<FlowCard
 						key={ flow.flow_id }
 						flow={ flow }

@@ -37,14 +37,30 @@ class SettingsDisplayService {
 	 * @return array Formatted settings display array
 	 */
 	public function getDisplaySettings( string $flow_step_id, string $step_type ): array {
-		if ( ! $this->shouldShowSettingsDisplay( $step_type ) ) {
-			return array();
-		}
-
 		// Get flow step configuration
 		$db_flows         = new \DataMachine\Core\Database\Flows\Flows();
 		$flow_step_config = $db_flows->get_flow_step_config( $flow_step_id );
 		if ( empty( $flow_step_config ) ) {
+			return array();
+		}
+
+		return $this->getDisplaySettingsForStepConfig( $flow_step_config, $step_type );
+	}
+
+	/**
+	 * Get formatted settings display from an already-loaded flow step config.
+	 *
+	 * Use this in batch/full-flow formatting paths that already have the step
+	 * configuration in memory to avoid re-reading it by flow step ID.
+	 *
+	 * @param array  $flow_step_config Flow step configuration array.
+	 * @param string $step_type Step type override (optional; falls back to config).
+	 * @return array Formatted settings display array.
+	 */
+	public function getDisplaySettingsForStepConfig( array $flow_step_config, string $step_type = '' ): array {
+		$step_type = '' !== $step_type ? $step_type : ( $flow_step_config['step_type'] ?? '' );
+
+		if ( ! $this->shouldShowSettingsDisplay( $step_type ) ) {
 			return array();
 		}
 
@@ -65,13 +81,26 @@ class SettingsDisplayService {
 	 * @return array<string, array> Map of handler_slug => settings display array.
 	 */
 	public function getDisplaySettingsForHandlers( string $flow_step_id, string $step_type ): array {
-		if ( ! $this->shouldShowSettingsDisplay( $step_type ) ) {
-			return array();
-		}
-
 		$db_flows         = new \DataMachine\Core\Database\Flows\Flows();
 		$flow_step_config = $db_flows->get_flow_step_config( $flow_step_id );
 		if ( empty( $flow_step_config ) ) {
+			return array();
+		}
+
+		return $this->getDisplaySettingsForHandlersConfig( $flow_step_config, $step_type );
+	}
+
+	/**
+	 * Get formatted settings display for all handlers from loaded step config.
+	 *
+	 * @param array  $flow_step_config Flow step configuration array.
+	 * @param string $step_type        Step type override (optional; falls back to config).
+	 * @return array<string, array> Map of handler_slug => settings display array.
+	 */
+	public function getDisplaySettingsForHandlersConfig( array $flow_step_config, string $step_type = '' ): array {
+		$step_type = '' !== $step_type ? $step_type : ( $flow_step_config['step_type'] ?? '' );
+
+		if ( ! $this->shouldShowSettingsDisplay( $step_type ) ) {
 			return array();
 		}
 

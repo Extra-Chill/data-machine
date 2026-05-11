@@ -381,9 +381,22 @@ class SystemTaskStep extends Step {
 			$error_msg = $child_data['error'] ?? 'Task reported failure';
 		}
 
+		if ( ! empty( $child_data['job_status'] ) && is_string( $child_data['job_status'] ) ) {
+			$this->engine->set( 'job_status', $child_data['job_status'] );
+		}
+
 		$skipped = ! empty( $child_data['skipped'] );
 		if ( $skipped ) {
 			$success = true;
+		}
+
+		$result = ! empty( $child_data['replace_data_packets'] ) ? array() : $this->dataPackets;
+		foreach ( $this->normalizeOutputDataPackets( $child_data['output_data_packets'] ?? array(), $task_type, (int) $child_job_id ) as $packet ) {
+			$result = $packet->addTo( $result );
+		}
+
+		if ( ! empty( $child_data['suppress_result_packet'] ) ) {
+			return $result;
 		}
 
 		$body = $success
@@ -409,6 +422,50 @@ class SystemTaskStep extends Step {
 			'system_task_result'
 		);
 
-		return $result_packet->addTo( $this->dataPackets );
+		return $result_packet->addTo( $result );
+	}
+
+	/**
+	 * Normalize task-emitted packet arrays into DataPacket objects.
+	 *
+	 * System tasks can set output_data_packets in child job engine_data to
+	 * hand precise packets to downstream workflow steps. This keeps the
+	 * pipeline handoff contract on DataPackets instead of task-specific fields.
+	 *
+	 * @param mixed  $packets      Raw output packet declarations.
+	 * @param string $task_type    Task type for default metadata.
+	 * @param int    $child_job_id Child job ID for default metadata.
+	 * @return array<int, DataPacket>
+	 */
+	private function normalizeOutputDataPackets( $packets, string $task_type, int $child_job_id ): array {
+		if ( ! is_array( $packets ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $packets as $packet ) {
+			if ( ! is_array( $packet ) ) {
+				continue;
+			}
+
+			$data     = is_array( $packet['data'] ?? null ) ? $packet['data'] : $packet;
+			$type     = isset( $packet['type'] ) && is_string( $packet['type'] ) && '' !== $packet['type']
+				? $packet['type']
+				: 'system_task_output';
+			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+			$metadata = array_merge(
+				array(
+					'source_type'  => 'system_task',
+					'task_type'    => $task_type,
+					'child_job_id' => $child_job_id,
+					'success'      => true,
+				),
+				$metadata
+			);
+
+			$normalized[] = new DataPacket( $data, $metadata, $type );
+		}
+
+		return $normalized;
 	}
 }

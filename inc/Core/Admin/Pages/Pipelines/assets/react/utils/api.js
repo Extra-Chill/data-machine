@@ -187,21 +187,23 @@ export const updateSystemPrompt = async (
 /**
  * Fetch flows for a pipeline with pagination
  *
- * @param {number} pipelineId      - Pipeline ID
- * @param {Object} options         - Pagination options
- * @param {number} options.page    - Current page (1-indexed)
- * @param {number} options.perPage - Items per page
+ * @param {number} pipelineId         - Pipeline ID
+ * @param {Object} options            - Pagination options
+ * @param {number} options.page       - Current page (1-indexed)
+ * @param {number} options.perPage    - Items per page
+ * @param {string} options.outputMode - Flow output mode (default list)
  * @return {Promise<Object>} Paginated flows response
  */
 export const fetchFlows = async (
 	pipelineId,
-	{ page = 1, perPage = 20 } = {}
+	{ page = 1, perPage = 20, outputMode = 'list' } = {}
 ) => {
 	const offset = ( page - 1 ) * perPage;
 	return await client.get( '/flows', {
 		pipeline_id: pipelineId,
 		per_page: perPage,
 		offset,
+		output_mode: outputMode,
 	} );
 };
 

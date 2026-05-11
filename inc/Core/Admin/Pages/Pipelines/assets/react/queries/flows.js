@@ -126,11 +126,12 @@ const patchFlowStepInCache = (
 // Queries
 export const useFlows = ( pipelineId, { page = 1, perPage = 20 } = {} ) => {
 	const cachedPipelineId = normalizeId( pipelineId );
+	const outputMode = 'list';
 
 	return useQuery( {
-		queryKey: [ 'flows', cachedPipelineId, { page, perPage } ],
+		queryKey: [ 'flows', cachedPipelineId, { page, perPage, outputMode } ],
 		queryFn: async () => {
-			const response = await fetchFlows( pipelineId, { page, perPage } );
+			const response = await fetchFlows( pipelineId, { page, perPage, outputMode } );
 			if ( ! response.success ) {
 				return { flows: [], total: 0, perPage, offset: 0 };
 			}

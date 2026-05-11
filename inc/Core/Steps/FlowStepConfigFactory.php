@@ -112,6 +112,8 @@ class FlowStepConfigFactory {
 			'execution_order'                     => true,
 			'enabled_tools'                       => true,
 			'disabled_tools'                      => true,
+			'completion_assertions'               => true,
+			'tool_runtime_rules'                  => true,
 			QueueAbility::SLOT_PROMPT_QUEUE       => true,
 			QueueAbility::SLOT_CONFIG_PATCH_QUEUE => true,
 			'queue_mode'                          => true,

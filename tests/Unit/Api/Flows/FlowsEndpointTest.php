@@ -88,6 +88,21 @@ class FlowsEndpointTest extends WP_UnitTestCase {
 		$this->assertEquals(0, $data['offset']);
 	}
 
+	public function test_get_flows_accepts_output_mode(): void {
+		$request = new WP_REST_Request('GET', '/datamachine/v1/flows');
+		$request->set_param('pipeline_id', $this->test_pipeline_id);
+		$request->set_param('output_mode', 'ids');
+
+		$response = Flows::handle_get_flows($request);
+
+		$this->assertSame(200, $response->get_status());
+		$data = $response->get_data();
+		$this->assertTrue($data['success']);
+		$this->assertArrayHasKey('flows', $data['data']);
+		$this->assertContains($this->test_flow_id, $data['data']['flows']);
+		$this->assertContainsOnly('int', $data['data']['flows']);
+	}
+
 	public function test_response_structure(): void {
 		$request = new WP_REST_Request('GET', '/datamachine/v1/flows');
 
