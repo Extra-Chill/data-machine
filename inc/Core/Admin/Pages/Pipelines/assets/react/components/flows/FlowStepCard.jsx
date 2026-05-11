@@ -50,7 +50,7 @@ export default function FlowStepCard( {
 	const stepTypeInfo = stepTypes[ pipelineStep.step_type ] || {};
 
 	const isAiStep = pipelineStep.step_type === 'ai';
-	const usesHandler = stepTypeInfo.uses_handler === true;
+	const usesHandler = stepTypeInfo.uses_handler !== false;
 	const isMultiHandlerStep = stepTypeInfo.multi_handler === true;
 	const handlerSlugs = isMultiHandlerStep
 		? flowStepConfig?.handler_slugs || []
