@@ -24,6 +24,7 @@ WP_CLI::add_command( 'datamachine jobs', Commands\JobsCommand::class );
 WP_CLI::add_command( 'datamachine cycle', Commands\CycleCommand::class );
 WP_CLI::add_command( 'datamachine cycles', Commands\CycleCommand::class );
 WP_CLI::add_command( 'datamachine drain', Commands\DrainCommand::class );
+WP_CLI::add_command( 'datamachine worker', Commands\WorkerCommand::class );
 WP_CLI::add_command( 'datamachine ai', Commands\AICommand::class );
 WP_CLI::add_command( 'datamachine pipelines', Commands\PipelinesCommand::class );
 WP_CLI::add_command( 'datamachine posts', Commands\PostsCommand::class );
