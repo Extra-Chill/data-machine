@@ -42,11 +42,11 @@ class DataMachineCompletionAssertions {
 	 * @param array $config Assertion config.
 	 */
 	public function __construct( array $config = array() ) {
-		$this->required_engine_data_keys       = $this->sanitizeList( $config['required_engine_data_keys'] ?? array() );
-		$this->required_tool_names             = $this->sanitizeList( $config['required_tool_names'] ?? array() );
+		$this->required_engine_data_keys      = $this->sanitizeList( $config['required_engine_data_keys'] ?? array() );
+		$this->required_tool_names            = $this->sanitizeList( $config['required_tool_names'] ?? array() );
 		$this->minimum_successful_tool_counts = $this->sanitizeToolCountMap( $config['minimum_successful_tool_counts'] ?? array() );
-		$this->required_output_packet_types    = $this->sanitizeList( $config['required_output_packet_types'] ?? array() );
-		$this->complete_when_any               = $this->sanitizeOutcomeAssertions( $config['complete_when_any'] ?? array() );
+		$this->required_output_packet_types   = $this->sanitizeList( $config['required_output_packet_types'] ?? array() );
+		$this->complete_when_any              = $this->sanitizeOutcomeAssertions( $config['complete_when_any'] ?? array() );
 	}
 
 	/**
