@@ -57,11 +57,16 @@ export const usePipelines = () =>
  * Server-side search for pipelines — debounce the `search` argument in the
  * caller. Designed for the PipelineSelector and similar typeahead UIs.
  *
- * @param {Object} [options]
- * @param {string} [options.search]  Filter by pipeline_name substring.
- * @param {number} [options.perPage] Items per page (default 50).
+ * @param {Object}  [options]         Search options.
+ * @param {string}  [options.search]  Filter by pipeline_name substring.
+ * @param {number}  [options.perPage] Items per page (default 50).
+ * @param {boolean} [options.enabled] Whether the search query should run.
  */
-export const usePipelineSearch = ( { search = '', perPage = 50 } = {} ) => {
+export const usePipelineSearch = ( {
+	search = '',
+	perPage = 50,
+	enabled = true,
+} = {} ) => {
 	const normalizedSearch = search ? search.trim() : '';
 
 	return useQuery( {
@@ -81,6 +86,7 @@ export const usePipelineSearch = ( { search = '', perPage = 50 } = {} ) => {
 				total: response.total ?? response.data.total ?? 0,
 			};
 		},
+		enabled,
 		keepPreviousData: true,
 		staleTime: 5_000,
 	} );
@@ -113,7 +119,9 @@ export const usePipeline = ( pipelineId ) => {
 				}
 			}
 
-			const response = await fetchPipelines( pipelineId );
+			const response = await fetchPipelines( pipelineId, {
+				includeFlows: false,
+			} );
 			if ( ! response.success ) {
 				return null;
 			}

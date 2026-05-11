@@ -46,13 +46,13 @@ class Pipelines {
 					'callback'            => array( self::class, 'handle_get_pipelines' ),
 					'permission_callback' => array( self::class, 'check_permission' ),
 					'args'                => array(
-						'pipeline_id' => array(
+						'pipeline_id'   => array(
 							'required'          => false,
 							'type'              => 'integer',
 							'description'       => __( 'Pipeline ID to retrieve (omit for all pipelines)', 'data-machine' ),
 							'sanitize_callback' => 'absint',
 						),
-						'fields'      => array(
+						'fields'        => array(
 							'required'          => false,
 							'type'              => 'string',
 							'description'       => __( 'Comma-separated list of fields to return', 'data-machine' ),
@@ -60,7 +60,7 @@ class Pipelines {
 								return sanitize_text_field( $param );
 							},
 						),
-						'format'      => array(
+						'format'        => array(
 							'required'          => false,
 							'type'              => 'string',
 							'default'           => 'json',
@@ -68,25 +68,25 @@ class Pipelines {
 							'description'       => __( 'Response format (json or csv)', 'data-machine' ),
 							'sanitize_callback' => 'sanitize_text_field',
 						),
-						'ids'         => array(
+						'ids'           => array(
 							'required'          => false,
 							'type'              => 'string',
 							'description'       => __( 'Comma-separated pipeline IDs for export', 'data-machine' ),
 							'sanitize_callback' => 'sanitize_text_field',
 						),
-						'user_id'     => array(
+						'user_id'       => array(
 							'required'          => false,
 							'type'              => 'integer',
 							'description'       => __( 'Filter by user ID (admin only, non-admins always see own data)', 'data-machine' ),
 							'sanitize_callback' => 'absint',
 						),
-						'search'      => array(
+						'search'        => array(
 							'required'          => false,
 							'type'              => 'string',
 							'description'       => __( 'Filter pipelines by name (substring match)', 'data-machine' ),
 							'sanitize_callback' => 'sanitize_text_field',
 						),
-						'per_page'    => array(
+						'per_page'      => array(
 							'required'          => false,
 							'type'              => 'integer',
 							'default'           => 20,
@@ -95,7 +95,7 @@ class Pipelines {
 							'description'       => __( 'Number of pipelines per page', 'data-machine' ),
 							'sanitize_callback' => 'absint',
 						),
-						'offset'      => array(
+						'offset'        => array(
 							'required'          => false,
 							'type'              => 'integer',
 							'default'           => 0,
@@ -278,16 +278,16 @@ class Pipelines {
 	 * Handle pipeline retrieval request
 	 */
 	public static function handle_get_pipelines( $request ) {
-		$pipeline_id     = $request->get_param( 'pipeline_id' );
-		$fields          = $request->get_param( 'fields' );
-		$format          = $request->get_param( 'format' ) ?? 'json';
-		$ids             = $request->get_param( 'ids' );
-		$search          = $request->get_param( 'search' );
-		$per_page_param  = $request->get_param( 'per_page' );
-		$offset_param    = $request->get_param( 'offset' );
+		$pipeline_id         = $request->get_param( 'pipeline_id' );
+		$fields              = $request->get_param( 'fields' );
+		$format              = $request->get_param( 'format' ) ?? 'json';
+		$ids                 = $request->get_param( 'ids' );
+		$search              = $request->get_param( 'search' );
+		$per_page_param      = $request->get_param( 'per_page' );
+		$offset_param        = $request->get_param( 'offset' );
 		$include_flows_param = $request->get_param( 'include_flows' );
-		$scoped_user_id  = PermissionHelper::resolve_scoped_user_id( $request );
-		$scoped_agent_id = PermissionHelper::resolve_scoped_agent_id( $request );
+		$scoped_user_id      = PermissionHelper::resolve_scoped_user_id( $request );
+		$scoped_agent_id     = PermissionHelper::resolve_scoped_agent_id( $request );
 
 		// Handle CSV export
 		if ( 'csv' === $format ) {
@@ -331,6 +331,9 @@ class Pipelines {
 				'pipeline_id' => (int) $pipeline_id,
 				'output_mode' => 'full',
 			);
+			if ( null !== $include_flows_param ) {
+				$input['include_flows'] = (bool) $include_flows_param;
+			}
 			if ( null !== $scoped_agent_id ) {
 				$input['agent_id'] = $scoped_agent_id;
 			} elseif ( null !== $scoped_user_id ) {

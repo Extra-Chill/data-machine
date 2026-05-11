@@ -15,15 +15,20 @@
  */
 import { ComboboxControl } from '@wordpress/components';
 import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
-import { usePipelineSearch, usePipeline } from '../../queries/pipelines';
+import {
+	usePipelines,
+	usePipelineSearch,
+	usePipeline,
+} from '../../queries/pipelines';
 import { useUIStore } from '../../stores/uiStore';
 import { isSameId } from '../../utils/ids';
 
 const SEARCH_DEBOUNCE_MS = 200;
+const EMPTY_PIPELINES = [];
 
 /**
  * Pipeline combobox selector with server-side search.
@@ -53,13 +58,20 @@ export default function PipelineSelector() {
 		};
 	}, [ inputValue ] );
 
-	const {
-		data: searchData,
-		isLoading: searchLoading,
-	} = usePipelineSearch( { search: debouncedSearch } );
+	const normalizedSearch = debouncedSearch.trim();
+	const { data: pipelines = [], isLoading: pipelinesLoading } = usePipelines();
+	const { data: searchData, isLoading: searchLoading } = usePipelineSearch( {
+		search: normalizedSearch,
+		enabled: normalizedSearch !== '',
+	} );
 
-	const results = searchData?.pipelines ?? [];
-	const total = searchData?.total ?? 0;
+	const searchResults = searchData?.pipelines ?? EMPTY_PIPELINES;
+	const results = useMemo(
+		() => ( normalizedSearch ? searchResults : pipelines ),
+		[ normalizedSearch, searchResults, pipelines ]
+	);
+	const total = normalizedSearch ? searchData?.total ?? 0 : results.length;
+	const isLoading = normalizedSearch ? searchLoading : pipelinesLoading;
 
 	// Keep the selected pipeline visible in the list even when the search
 	// filters it out. Falls back to a single-pipeline fetch if the selection
@@ -120,7 +132,7 @@ export default function PipelineSelector() {
 	 * keep the selector visible while a search is in-flight so the UI does not
 	 * flicker between states.
 	 */
-	if ( ! selectedPipelineId && options.length === 0 && ! searchLoading ) {
+	if ( ! selectedPipelineId && options.length === 0 && ! isLoading ) {
 		return null;
 	}
 
@@ -137,7 +149,9 @@ export default function PipelineSelector() {
 
 	// When results are capped, surface a hint so users know to refine search.
 	const showOverflowHint =
-		total > results.length && options.length >= results.length;
+		normalizedSearch &&
+		total > results.length &&
+		options.length >= results.length;
 
 	return (
 		<div className="datamachine-pipeline-selector-wrapper datamachine-spacing--margin-bottom-20">
@@ -153,12 +167,15 @@ export default function PipelineSelector() {
 			/>
 			{ showOverflowHint && (
 				<p className="datamachine-pipeline-selector__hint datamachine-color--text-muted">
-					{ __(
-						'Showing first %1$d of %2$d pipelines. Keep typing to narrow the list.',
-						'data-machine'
-					)
-						.replace( '%1$d', results.length )
-						.replace( '%2$d', total ) }
+					{ sprintf(
+						/* translators: 1: displayed pipeline count, 2: total matching pipeline count. */
+						__(
+							'Showing first %1$d of %2$d pipelines. Keep typing to narrow the list.',
+							'data-machine'
+						),
+						results.length,
+						total
+					) }
 				</p>
 			) }
 		</div>

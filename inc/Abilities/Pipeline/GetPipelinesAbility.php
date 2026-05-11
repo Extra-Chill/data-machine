@@ -35,37 +35,37 @@ class GetPipelinesAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'pipeline_id' => array(
+							'pipeline_id'   => array(
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Get a specific pipeline by ID (ignores pagination when provided)', 'data-machine' ),
 							),
-							'user_id'     => array(
+							'user_id'       => array(
 								'type'        => 'integer',
 								'description' => __( 'Filter pipelines by WordPress user ID. Defaults to 0 (shared/legacy).', 'data-machine' ),
 								'default'     => 0,
 							),
-							'agent_id'    => array(
+							'agent_id'      => array(
 								'type'        => array( 'integer', 'null' ),
 								'description' => __( 'Filter pipelines by agent ID. Takes priority over user_id when provided.', 'data-machine' ),
 							),
-							'per_page'    => array(
+							'per_page'      => array(
 								'type'        => 'integer',
 								'default'     => self::DEFAULT_PER_PAGE,
 								'minimum'     => 1,
 								'maximum'     => 100,
 								'description' => __( 'Number of pipelines per page', 'data-machine' ),
 							),
-							'offset'      => array(
+							'offset'        => array(
 								'type'        => 'integer',
 								'default'     => 0,
 								'minimum'     => 0,
 								'description' => __( 'Offset for pagination', 'data-machine' ),
 							),
-							'search'      => array(
+							'search'        => array(
 								'type'        => array( 'string', 'null' ),
 								'description' => __( 'Search pipelines by name (SQL LIKE match)', 'data-machine' ),
 							),
-							'output_mode' => array(
+							'output_mode'   => array(
 								'type'        => 'string',
 								'enum'        => array( 'full', 'summary', 'ids' ),
 								'default'     => 'full',
@@ -125,9 +125,9 @@ class GetPipelinesAbility {
 				$output_mode = 'full';
 			}
 
-			// Direct pipeline lookup by ID - bypasses pagination.
-			// Single-pipeline fetches always embed flows for backward compatibility
-			// (this is what callers like the REST /pipelines/{id} endpoint rely on).
+			// Direct pipeline lookup by ID bypasses pagination. It embeds flows by
+			// default for existing callers, while list-style hydration can explicitly
+			// opt out with include_flows=false.
 			if ( null !== $pipeline_id ) {
 				if ( ! is_numeric( $pipeline_id ) || (int) $pipeline_id <= 0 ) {
 					return array(
@@ -152,7 +152,7 @@ class GetPipelinesAbility {
 				$formatted_pipeline = $this->formatPipelineByMode(
 					$pipeline,
 					$output_mode,
-					true
+					$include_flows
 				);
 
 				return array(
