@@ -16,13 +16,14 @@ namespace DataMachine\Engine\AI\Tools\Global;
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
+use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Abilities\PermissionHelper;
 
 class AgentDailyMemory extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'agent_daily_memory', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline_policy' ), array( 'abilities' => array( 'datamachine/daily-memory-read', 'datamachine/daily-memory-write', 'datamachine/daily-memory-list', 'datamachine/search-daily-memory' ) ) );
+		$this->registerTool( 'agent_daily_memory', array( $this, 'getToolDefinition' ), array( 'chat', ToolPolicyResolver::MODE_PIPELINE_POLICY ), array( 'abilities' => array( 'datamachine/daily-memory-read', 'datamachine/daily-memory-write', 'datamachine/daily-memory-list', 'datamachine/search-daily-memory' ) ) );
 	}
 
 	/**

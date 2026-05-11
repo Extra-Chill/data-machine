@@ -27,7 +27,8 @@ abstract class BaseTool {
 	 *
 	 * All tools register via the single `datamachine_tools` filter. Each tool
 	 * must declare its modes — the agent modes where it's available (e.g.
-	 * 'chat', 'pipeline').
+	 * 'chat', 'pipeline'). Tools that should be available to pipeline runs only
+	 * when explicitly allowlisted may declare 'pipeline_policy'.
 	 *
 	 * Tools should also declare which ability they wrap via the `ability` key
 	 * (or `abilities` for composed tools). The ToolPolicyResolver uses this to

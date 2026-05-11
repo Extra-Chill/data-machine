@@ -87,8 +87,8 @@ class SnapshotPolicyToolManager extends ToolManager {
 			'alpha_tool'         => array( 'modes' => array( 'pipeline' ) ),
 			'beta_tool'          => array( 'modes' => array( 'pipeline' ) ),
 			'danger_tool'        => array( 'modes' => array( 'pipeline' ) ),
-			'agent_daily_memory' => array( 'modes' => array( 'chat', 'pipeline_policy' ) ),
-			'agent_memory'       => array( 'modes' => array( 'chat', 'pipeline_policy' ) ),
+			'agent_daily_memory' => array( 'modes' => array( 'chat', ToolPolicyResolver::MODE_PIPELINE_POLICY ) ),
+			'agent_memory'       => array( 'modes' => array( 'chat', ToolPolicyResolver::MODE_PIPELINE_POLICY ) ),
 			'chat_only'          => array( 'modes' => array( 'chat' ) ),
 		);
 	}
