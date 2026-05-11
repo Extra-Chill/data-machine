@@ -237,16 +237,16 @@ class WorkerCommand extends BaseCommand {
 		$status = self::statusSnapshot();
 
 		return array(
-			'passes'                  => $passes,
-			'job_recoveries'          => $recoveries,
-			'job_timeouts'            => $timed_out,
+			'passes'                   => $passes,
+			'job_recoveries'           => $recoveries,
+			'job_timeouts'             => $timed_out,
 			'stale_actions_reconciled' => $reconciled,
-			'action_completions'      => $completions,
-			'action_failures'         => $failures,
-			'pending_actions'         => (int) $status['pending_actions'],
-			'warnings'                => $warnings,
-			'duration_seconds'        => time() - $started_at,
-			'stop_reason'             => $stop_reason,
+			'action_completions'       => $completions,
+			'action_failures'          => $failures,
+			'pending_actions'          => (int) $status['pending_actions'],
+			'warnings'                 => $warnings,
+			'duration_seconds'         => time() - $started_at,
+			'stop_reason'              => $stop_reason,
 		);
 	}
 
