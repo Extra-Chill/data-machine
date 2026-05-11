@@ -438,7 +438,7 @@ trait FlowHelpers {
 			$override = $this->resolveOverride( $overrides, $step_type, $order );
 			if ( $override ) {
 				if ( ! empty( $override['handler_slug'] ) ) {
-					$handler_config = $override['handler_config'] ?? array();
+					$handler_config  = $override['handler_config'] ?? array();
 					$new_step_config = FlowStepConfigFactory::withHandlerConfig( $new_step_config, $override['handler_slug'], $handler_config );
 				} elseif ( ! empty( $override['handler_config'] ) ) {
 					$new_step_config = FlowStepConfigFactory::withHandlerConfig( $new_step_config, '', $override['handler_config'], true );
