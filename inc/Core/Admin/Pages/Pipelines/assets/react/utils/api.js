@@ -6,7 +6,7 @@
  */
 
 /**
- * Internal dependencies
+ * External dependencies
  */
 import { client } from '@shared/utils/api';
 import { useAgentStore } from '@shared/stores/agentStore';
@@ -158,13 +158,10 @@ export const reorderPipelineSteps = async ( pipelineId, steps ) => {
 /**
  * Update AI step configuration
  *
- * @param {string}        stepId        - Pipeline step ID
- * @param {string}        prompt        - System prompt content
- * @param {string}        provider      - AI provider
- * @param {string}        model         - AI model
- * @param {Array<string>} disabledTools - Tools to disable for this step (exclusion list)
- * @param {string}        stepType      - Step type (currently only 'ai' supported)
- * @param {number}        pipelineId    - Pipeline ID for context
+ * @param {string} stepId     - Pipeline step ID
+ * @param {string} prompt     - System prompt content
+ * @param {string} stepType   - Step type (currently only 'ai' supported)
+ * @param {number} pipelineId - Pipeline ID for context
  * @return {Promise<Object>} Updated step data
  */
 export const updateSystemPrompt = async (
@@ -282,8 +279,8 @@ export const runFlow = async ( flowId ) => {
  * @param {Object} settings           - Handler settings
  * @param {number} pipelineId         - Pipeline ID
  * @param {string} stepType           - Step type
- * @param          flowConfig
- * @param          pipelineStepConfig
+ * @param {Object} flowConfig         - Flow configuration
+ * @param {Object} pipelineStepConfig - Pipeline step configuration
  * @return {Promise<Object>} Updated flow step data
  */
 export const updateFlowHandler = async (
@@ -489,8 +486,8 @@ export const fetchFlowMemoryFiles = async ( flowId ) => {
 /**
  * Update memory files for a flow
  *
- * @param {number}        flowId       - Flow ID
- * @param {Array<string>} memoryFiles  - Array of filenames
+ * @param {number}        flowId      - Flow ID
+ * @param {Array<string>} memoryFiles - Array of filenames
  * @return {Promise<Object>} Update confirmation
  */
 export const updateFlowMemoryFiles = async ( flowId, memoryFiles ) => {

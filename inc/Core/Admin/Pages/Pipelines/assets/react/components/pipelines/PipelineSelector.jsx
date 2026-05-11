@@ -15,7 +15,7 @@
  */
 import { ComboboxControl } from '@wordpress/components';
 import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
@@ -28,6 +28,7 @@ import { useUIStore } from '../../stores/uiStore';
 import { isSameId } from '../../utils/ids';
 
 const SEARCH_DEBOUNCE_MS = 200;
+const EMPTY_PIPELINES = [];
 
 /**
  * Pipeline combobox selector with server-side search.
@@ -64,7 +65,11 @@ export default function PipelineSelector() {
 		enabled: normalizedSearch !== '',
 	} );
 
-	const results = normalizedSearch ? searchData?.pipelines ?? [] : pipelines;
+	const searchResults = searchData?.pipelines ?? EMPTY_PIPELINES;
+	const results = useMemo(
+		() => ( normalizedSearch ? searchResults : pipelines ),
+		[ normalizedSearch, searchResults, pipelines ]
+	);
 	const total = normalizedSearch ? searchData?.total ?? 0 : results.length;
 	const isLoading = normalizedSearch ? searchLoading : pipelinesLoading;
 
@@ -162,12 +167,15 @@ export default function PipelineSelector() {
 			/>
 			{ showOverflowHint && (
 				<p className="datamachine-pipeline-selector__hint datamachine-color--text-muted">
-					{ __(
-						'Showing first %1$d of %2$d pipelines. Keep typing to narrow the list.',
-						'data-machine'
-					)
-						.replace( '%1$d', results.length )
-						.replace( '%2$d', total ) }
+					{ sprintf(
+						/* translators: 1: displayed pipeline count, 2: total matching pipeline count. */
+						__(
+							'Showing first %1$d of %2$d pipelines. Keep typing to narrow the list.',
+							'data-machine'
+						),
+						results.length,
+						total
+					) }
 				</p>
 			) }
 		</div>

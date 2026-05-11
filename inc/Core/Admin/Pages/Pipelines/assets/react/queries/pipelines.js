@@ -57,8 +57,8 @@ export const usePipelines = () =>
  * Server-side search for pipelines — debounce the `search` argument in the
  * caller. Designed for the PipelineSelector and similar typeahead UIs.
  *
- * @param {Object} [options]
- * @param {string} [options.search]  Filter by pipeline_name substring.
+ * @param {Object}  [options]         Search options.
+ * @param {string}  [options.search]  Filter by pipeline_name substring.
  * @param {number}  [options.perPage] Items per page (default 50).
  * @param {boolean} [options.enabled] Whether the search query should run.
  */
