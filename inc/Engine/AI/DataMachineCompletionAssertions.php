@@ -20,6 +20,9 @@ class DataMachineCompletionAssertions {
 	/** @var array<int, string> */
 	private array $required_tool_names;
 
+	/** @var array<string, int> */
+	private array $minimum_successful_tool_counts;
+
 	/** @var array<int, string> */
 	private array $required_output_packet_types;
 
@@ -39,10 +42,11 @@ class DataMachineCompletionAssertions {
 	 * @param array $config Assertion config.
 	 */
 	public function __construct( array $config = array() ) {
-		$this->required_engine_data_keys    = $this->sanitizeList( $config['required_engine_data_keys'] ?? array() );
-		$this->required_tool_names          = $this->sanitizeList( $config['required_tool_names'] ?? array() );
-		$this->required_output_packet_types = $this->sanitizeList( $config['required_output_packet_types'] ?? array() );
-		$this->complete_when_any            = $this->sanitizeOutcomeAssertions( $config['complete_when_any'] ?? array() );
+		$this->required_engine_data_keys       = $this->sanitizeList( $config['required_engine_data_keys'] ?? array() );
+		$this->required_tool_names             = $this->sanitizeList( $config['required_tool_names'] ?? array() );
+		$this->minimum_successful_tool_counts = $this->sanitizeToolCountMap( $config['minimum_successful_tool_counts'] ?? array() );
+		$this->required_output_packet_types    = $this->sanitizeList( $config['required_output_packet_types'] ?? array() );
+		$this->complete_when_any               = $this->sanitizeOutcomeAssertions( $config['complete_when_any'] ?? array() );
 	}
 
 	/**
@@ -53,6 +57,7 @@ class DataMachineCompletionAssertions {
 	public function hasAssertions(): bool {
 		return ! empty( $this->required_engine_data_keys )
 			|| ! empty( $this->required_tool_names )
+			|| ! empty( $this->minimum_successful_tool_counts )
 			|| ! empty( $this->required_output_packet_types )
 			|| ! empty( $this->complete_when_any );
 	}
@@ -109,6 +114,7 @@ class DataMachineCompletionAssertions {
 		$satisfied = array(
 			'engine_data_keys'    => $this->satisfiedEngineDataKeys( $runtime_context ),
 			'tool_names'          => array_values( array_intersect( $this->required_tool_names, array_unique( $this->executed_tool_names ) ) ),
+			'tool_counts'         => $this->satisfiedToolCounts(),
 			'output_packet_types' => array_values( array_intersect( $this->required_output_packet_types, $output_packet_types ) ),
 			'complete_when_any'   => $outcome_evaluation['satisfied'],
 		);
@@ -117,6 +123,7 @@ class DataMachineCompletionAssertions {
 			array(
 				'engine_data_keys'    => array_values( array_diff( $this->required_engine_data_keys, $satisfied['engine_data_keys'] ) ),
 				'tool_names'          => array_values( array_diff( $this->required_tool_names, $satisfied['tool_names'] ) ),
+				'tool_counts'         => $this->missingToolCounts(),
 				'output_packet_types' => array_values( array_diff( $this->required_output_packet_types, $satisfied['output_packet_types'] ) ),
 				'complete_when_any'   => $outcome_evaluation['missing'],
 			)
@@ -166,6 +173,7 @@ class DataMachineCompletionAssertions {
 			array(
 				'engine_data_keys'    => $this->required_engine_data_keys,
 				'tool_names'          => $this->required_tool_names,
+				'tool_counts'         => $this->requiredToolCounts(),
 				'output_packet_types' => $this->required_output_packet_types,
 				'complete_when_any'   => $this->complete_when_any,
 			)
@@ -342,6 +350,48 @@ class DataMachineCompletionAssertions {
 	/**
 	 * @return array<int, string>
 	 */
+	private function requiredToolCounts(): array {
+		$counts = array();
+		foreach ( $this->minimum_successful_tool_counts as $tool_name => $minimum_count ) {
+			$counts[] = $tool_name . '>=' . $minimum_count;
+		}
+
+		return $counts;
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	private function satisfiedToolCounts(): array {
+		$satisfied = array();
+		foreach ( $this->minimum_successful_tool_counts as $tool_name => $minimum_count ) {
+			$actual_count = count( $this->successful_tool_results[ $tool_name ] ?? array() );
+			if ( $actual_count >= $minimum_count ) {
+				$satisfied[] = $tool_name . '>=' . $minimum_count;
+			}
+		}
+
+		return $satisfied;
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	private function missingToolCounts(): array {
+		$missing = array();
+		foreach ( $this->minimum_successful_tool_counts as $tool_name => $minimum_count ) {
+			$actual_count = count( $this->successful_tool_results[ $tool_name ] ?? array() );
+			if ( $actual_count < $minimum_count ) {
+				$missing[] = $tool_name . ': ' . $actual_count . '/' . $minimum_count;
+			}
+		}
+
+		return $missing;
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
 	private function outcomeToolNames(): array {
 		$names = array();
 		foreach ( $this->complete_when_any as $outcome ) {
@@ -374,6 +424,27 @@ class DataMachineCompletionAssertions {
 		}
 
 		return array_values( array_unique( $items ) );
+	}
+
+	/**
+	 * @param mixed $value Raw tool count map.
+	 * @return array<string, int>
+	 */
+	private function sanitizeToolCountMap( $value ): array {
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		$counts = array();
+		foreach ( $value as $tool_name => $minimum_count ) {
+			$tool_name     = trim( (string) $tool_name );
+			$minimum_count = (int) $minimum_count;
+			if ( '' !== $tool_name && $minimum_count > 0 ) {
+				$counts[ $tool_name ] = $minimum_count;
+			}
+		}
+
+		return $counts;
 	}
 
 	/**

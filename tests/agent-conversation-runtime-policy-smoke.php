@@ -378,6 +378,64 @@ assert_runtime_policy( str_contains( wp_json_encode( $nudge_transcript->calls[0]
 assert_runtime_policy( 1 === ( $GLOBALS['datamachine_runtime_engine_merges'][4242][0]['completion_nudge_count'] ?? 0 ), 'job engine_data merge includes nudge count' );
 assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $GLOBALS['datamachine_runtime_engine_merges'][4242][0]['completion_assertions_missing']['tool_names'] ?? null ), 'job engine_data merge includes missing assertions' );
 
+$minimum_count_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$minimum_count_dispatch_count ) {
+		++$minimum_count_dispatch_count;
+
+		if ( 1 === $minimum_count_dispatch_count || 3 === $minimum_count_dispatch_count || 5 === $minimum_count_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => 5 === $minimum_count_dispatch_count ? 'Now complete after enough tool calls.' : 'I am done too early.',
+					'tool_calls' => array(),
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => '',
+				'tool_calls' => array(
+					array(
+						'name'       => 'runtime_policy_tool',
+						'parameters' => array( 'name' => 'Counted call ' . $minimum_count_dispatch_count ),
+					),
+				),
+			),
+		);
+	}
+);
+
+$minimum_count_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'use the runtime policy tool twice before finishing' ) ),
+	array(
+		'runtime_policy_tool' => array(
+			'name'        => 'runtime_policy_tool',
+			'description' => 'Runtime policy smoke tool',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	'chat',
+	array(
+		'completion_assertions' => array(
+			'minimum_successful_tool_counts' => array( 'runtime_policy_tool' => 2 ),
+		),
+	),
+	6
+);
+
+assert_runtime_policy( 5 === $minimum_count_dispatch_count, 'minimum successful tool count nudges until enough calls run' );
+assert_runtime_policy( 2 === count( $minimum_count_result['tool_execution_results'] ?? array() ), 'minimum successful tool count captures both tool results' );
+assert_runtime_policy( array( 'runtime_policy_tool>=2' ) === ( $minimum_count_result['completion_assertions_satisfied']['tool_counts'] ?? null ), 'minimum successful tool count reports satisfied count assertion' );
+assert_runtime_policy( str_contains( $minimum_count_result['completion_nudge'] ?? '', 'runtime_policy_tool: 1/2' ), 'minimum successful tool count nudge reports current count' );
+
 $duplicate_dispatch_count = 0;
 $duplicate_transcript     = new RuntimePolicySmokeTranscriptPersister();
 WpAiClientTestDouble::reset();
