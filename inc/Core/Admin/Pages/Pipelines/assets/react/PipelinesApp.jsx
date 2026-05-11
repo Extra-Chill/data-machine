@@ -30,7 +30,6 @@ import { useFlows } from './queries/flows';
 /**
  * External dependencies
  */
-import { useSettings } from '@shared/queries/settings';
 import { useUIStore } from './stores/uiStore';
 import PipelineCard from './components/pipelines/PipelineCard';
 import PipelineSelector from './components/pipelines/PipelineSelector';
@@ -74,8 +73,7 @@ export default function PipelinesApp() {
 		isLoading: pipelinesLoading,
 		error: pipelinesError,
 	} = usePipelines();
-	const { data: settingsData } = useSettings();
-	const flowsPerPage = settingsData?.settings?.flows_per_page ?? 20;
+	const flowsPerPage = window.dataMachineConfig?.flowsPerPage ?? 20;
 
 	const {
 		data: flowsData,

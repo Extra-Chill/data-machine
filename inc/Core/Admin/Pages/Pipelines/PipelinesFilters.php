@@ -75,6 +75,7 @@ function datamachine_register_pipelines_admin_page_filters() {
 									'restNamespace' => 'datamachine/v1',
 									'restNonce'     => wp_create_nonce( 'wp_rest' ),
 									'maxUploadSize' => wp_max_upload_size(),
+									'flowsPerPage'  => max( 5, min( 100, absint( get_option( 'datamachine_settings', array() )['flows_per_page'] ?? 20 ) ) ),
 									// stepTypes: Loaded via REST API in PipelineContext
 									// handlers: Loaded via REST API in PipelineContext
 									// handlerSettings: Lazy-loaded via REST API in HandlerSettingsModal
