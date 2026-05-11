@@ -53,16 +53,14 @@ class FlowFormatter {
 				continue;
 			}
 
-			$step_data['settings_display'] = apply_filters(
-				'datamachine_get_handler_settings_display',
-				array(),
-				$flow_step_id,
+			$step_data['settings_display'] = $settings_display_service->getDisplaySettingsForStepConfig(
+				$step_data,
 				$step_type
 			);
 
 			// Multi-handler: per-handler settings displays keyed by slug.
-			$step_data['handler_settings_displays'] = $settings_display_service->getDisplaySettingsForHandlers(
-				$flow_step_id,
+			$step_data['handler_settings_displays'] = $settings_display_service->getDisplaySettingsForHandlersConfig(
+				$step_data,
 				$step_type
 			);
 
