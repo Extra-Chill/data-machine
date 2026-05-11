@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.110.1] - 2026-05-11
+
+### Fixed
+- scope drain query phpcs suppressions
+- document dynamic drain status queries
+- bound Data Machine worker passes
+
 ## [0.110.0] - 2026-05-11
 
 ### Added
