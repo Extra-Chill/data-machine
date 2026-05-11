@@ -368,7 +368,7 @@ class DrainCommand extends BaseCommand {
 			array( self::GROUP, gmdate( 'Y-m-d H:i:s' ), $limit )
 		);
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic hook scope is constructed from normalized placeholders and values.
 		$ids = $wpdb->get_col(
 			$wpdb->prepare(
 				'SELECT a.action_id
@@ -406,7 +406,7 @@ class DrainCommand extends BaseCommand {
 				array( self::GROUP, gmdate( 'Y-m-d H:i:s' ) )
 			);
 
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic hook scope is constructed from normalized placeholders and values.
 			return (int) $wpdb->get_var(
 				$wpdb->prepare(
 					'SELECT COUNT(*)
@@ -426,7 +426,7 @@ class DrainCommand extends BaseCommand {
 			array( self::GROUP )
 		);
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic hook scope is constructed from normalized placeholders and values.
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
 				'SELECT COUNT(*)
@@ -456,7 +456,7 @@ class DrainCommand extends BaseCommand {
 			array( self::GROUP )
 		);
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic hook scope is constructed from normalized placeholders and values.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT a.hook, a.status, COUNT(*) AS count
