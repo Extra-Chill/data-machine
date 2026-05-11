@@ -298,6 +298,13 @@ class ConversationManager {
 			);
 		}
 
+		if ( self::isRepeatableInspectionTool( $tool_name ) ) {
+			return array(
+				'is_duplicate' => false,
+				'message'      => '',
+			);
+		}
+
 		// Scan ALL previous tool_call messages, not just the most recent one.
 		for ( $i = count( $conversation_messages ) - 1; $i >= 0; $i-- ) {
 			$message = WP_Agent_Message::normalize( $conversation_messages[ $i ] );
@@ -329,6 +336,31 @@ class ConversationManager {
 		return array(
 			'is_duplicate' => false,
 			'message'      => '',
+		);
+	}
+
+	private static function isRepeatableInspectionTool( string $tool_name ): bool {
+		return in_array(
+			$tool_name,
+			array(
+				'workspace_show',
+				'workspace_ls',
+				'workspace_read',
+				'workspace_grep',
+				'workspace_git_status',
+				'workspace_git_log',
+				'workspace_git_diff',
+				'list_github_issues',
+				'get_github_issue',
+				'list_github_pulls',
+				'get_github_pull',
+				'get_github_pull_files',
+				'get_github_pull_review_context',
+				'wordpress_runtime_inventory',
+				'wordpress_runtime_ls',
+				'wordpress_runtime_read',
+			),
+			true
 		);
 	}
 

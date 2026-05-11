@@ -264,6 +264,10 @@ function datamachine_run_conversation(
 		$result['completion_assertions_required']  = $assertions->required();
 		$result['completion_assertions_missing']   = $evaluation['missing'];
 		$result['completion_assertions_satisfied'] = $evaluation['satisfied'];
+		$result['completion_assertions_complete']  = ! empty( $evaluation['complete'] );
+		if ( ! empty( $evaluation['complete'] ) && 'budget_exceeded' !== ( $result['status'] ?? '' ) ) {
+			$result['completed'] = true;
+		}
 	}
 	// Map upstream budget_exceeded status to DM's max_turns_reached flag
 	// for backward compatibility with ChatOrchestrator response shaping.
@@ -580,7 +584,7 @@ function datamachine_build_turn_runner(
 				}
 			}
 
-			if ( '' !== $completion_nudge ) {
+			if ( '' !== $completion_nudge && datamachine_should_append_tool_completion_nudge( $tool_execution_results, $completion_decision->context() ) ) {
 				$messages[] = ConversationManager::buildConversationMessage( 'user', $completion_nudge );
 				datamachine_record_completion_nudge(
 					$completion_nudges,
@@ -644,6 +648,71 @@ function datamachine_build_turn_runner(
 			'tool_runtime_rule_rejected'   => $runtime_rule_rejected,
 		);
 	};
+}
+
+/**
+ * Decide whether an assertion nudge is useful immediately after tool calls.
+ *
+ * Inspection-heavy agents can spend many turns reading files and runtime state.
+ * Repeating the same missing-assertion nudge after every read wastes context and
+ * pressures the model into completion mechanics too early. Keep immediate
+ * nudges for turns that changed state, attempted completion, or made direct
+ * assertion progress; natural completions still receive nudges elsewhere.
+ *
+ * @param array<int,array<string,mixed>> $tool_execution_results Tool results from the current turn.
+ * @param array<string,mixed>            $decision_context       Completion decision context.
+ */
+function datamachine_should_append_tool_completion_nudge( array $tool_execution_results, array $decision_context ): bool {
+	$progress_tools = array_merge(
+		array_values( (array) ( $decision_context['satisfied']['tool_names'] ?? array() ) ),
+		datamachine_completion_outcome_tool_names( (array) ( $decision_context['completion_assertions_required']['complete_when_any'] ?? array() ) )
+	);
+
+	foreach ( $tool_execution_results as $entry ) {
+		$tool_name = (string) ( $entry['tool_name'] ?? '' );
+		if ( in_array( $tool_name, $progress_tools, true ) || datamachine_tool_name_is_mutating( $tool_name ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/** @return array<int,string> */
+function datamachine_completion_outcome_tool_names( array $outcomes ): array {
+	$tools = array();
+	foreach ( $outcomes as $outcome ) {
+		foreach ( (array) ( is_array( $outcome ) ? ( $outcome['tools'] ?? array() ) : array() ) as $tool ) {
+			if ( is_array( $tool ) && isset( $tool['name'] ) && is_string( $tool['name'] ) ) {
+				$tools[] = $tool['name'];
+			}
+		}
+	}
+
+	return array_values( array_unique( $tools ) );
+}
+
+function datamachine_tool_name_is_mutating( string $tool_name ): bool {
+	return in_array(
+		$tool_name,
+		array(
+			'workspace_write',
+			'workspace_edit',
+			'workspace_apply_patch',
+			'workspace_delete',
+			'workspace_git_add',
+			'workspace_git_commit',
+			'workspace_git_push',
+			'workspace_git_pull',
+			'workspace_worktree_add',
+			'create_github_pull_request',
+			'comment_github_pull_request',
+			'create_github_issue',
+			'manage_github_issue',
+			'agent_daily_memory',
+		),
+		true
+	);
 }
 
 /**
