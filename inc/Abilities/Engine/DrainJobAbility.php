@@ -234,16 +234,18 @@ class DrainJobAbility {
 				"SELECT a.action_id, a.args
 				 FROM {$actions_table} a
 				 INNER JOIN {$groups_table} g ON g.group_id = a.group_id
-				 WHERE a.hook = %s
+				 WHERE a.hook IN (%s, %s)
 				 AND a.status = 'pending'
 				 AND g.slug = %s
 				 AND a.scheduled_date_gmt <= %s
-				 AND a.args LIKE %s
+				 AND (a.args LIKE %s OR a.args LIKE %s)
 				 ORDER BY a.scheduled_date_gmt ASC, a.action_id ASC",
 				self::HOOK_EXECUTE_STEP,
+				PipelineBatchScheduler::BATCH_HOOK,
 				self::GROUP,
 				gmdate( 'Y-m-d H:i:s' ),
-				'%"job_id"%'
+				'%"job_id"%',
+				'%"parent_job_id"%'
 			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -273,9 +275,17 @@ class DrainJobAbility {
 			return (int) $args['job_id'];
 		}
 
+		if ( isset( $args['parent_job_id'] ) ) {
+			return (int) $args['parent_job_id'];
+		}
+
 		foreach ( $args as $value ) {
 			if ( is_array( $value ) && isset( $value['job_id'] ) ) {
 				return (int) $value['job_id'];
+			}
+
+			if ( is_array( $value ) && isset( $value['parent_job_id'] ) ) {
+				return (int) $value['parent_job_id'];
 			}
 		}
 
