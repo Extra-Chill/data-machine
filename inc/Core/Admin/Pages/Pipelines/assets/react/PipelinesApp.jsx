@@ -8,7 +8,14 @@
 /**
  * WordPress dependencies
  */
-import { useEffect, useCallback, useState, useMemo } from '@wordpress/element';
+import {
+	useEffect,
+	useCallback,
+	useState,
+	useMemo,
+	lazy,
+	Suspense,
+} from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Spinner, Notice, Button } from '@wordpress/components';
 /**
@@ -27,12 +34,13 @@ import { useSettings } from '@shared/queries/settings';
 import { useUIStore } from './stores/uiStore';
 import PipelineCard from './components/pipelines/PipelineCard';
 import PipelineSelector from './components/pipelines/PipelineSelector';
-import ModalManager from './components/shared/ModalManager';
 import ChatToggle from './components/chat/ChatToggle';
-import ChatSidebar from './components/chat/ChatSidebar';
 import AgentSwitcher from '@shared/components/AgentSwitcher';
 import { MODAL_TYPES } from './utils/constants';
 import { isSameId } from './utils/ids';
+
+const ModalManager = lazy( () => import( './components/shared/ModalManager' ) );
+const ChatSidebar = lazy( () => import( './components/chat/ChatSidebar' ) );
 
 /**
  * Root application component
@@ -46,6 +54,7 @@ export default function PipelinesApp() {
 		setSelectedPipelineId,
 		openModal,
 		isChatOpen,
+		activeModal,
 	} = useUIStore();
 
 	// Check if Zustand has finished hydrating from localStorage
@@ -252,7 +261,11 @@ export default function PipelinesApp() {
 					onFlowsPageChange={ setFlowsPage }
 				/>
 
-				<ModalManager />
+				{ activeModal && (
+					<Suspense fallback={ null }>
+						<ModalManager />
+					</Suspense>
+				) }
 			</>
 		);
 	};
@@ -290,7 +303,11 @@ export default function PipelinesApp() {
 				{ renderMainContent() }
 			</div>
 
-			{ isChatOpen && <ChatSidebar /> }
+			{ isChatOpen && (
+				<Suspense fallback={ null }>
+					<ChatSidebar />
+				</Suspense>
+			) }
 		</div>
 	);
 }

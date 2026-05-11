@@ -67,7 +67,7 @@ function datamachine_register_pipelines_admin_page_filters() {
 						// React bundle (only script needed)
 						'datamachine-pipelines-react' => array(
 							'file'      => 'inc/Core/Admin/assets/build/pipelines-react.js',
-							'deps'      => array( 'wp-element', 'wp-components', 'wp-i18n', 'wp-api-fetch', 'wp-data', 'wp-dom-ready', 'wp-notices', 'wp-hooks' ),
+							'deps'      => array( 'wp-element', 'wp-components', 'wp-i18n', 'wp-api-fetch', 'wp-dom-ready', 'wp-hooks' ),
 							'in_footer' => true,
 							'localize'  => array(
 								'object' => 'dataMachineConfig',
