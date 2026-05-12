@@ -372,7 +372,20 @@ class Pipelines {
 			}
 
 			$pipeline_data = $result['pipelines'][0];
-			$flows         = $pipeline_data['flows'] ?? array();
+			if ( 'ids' === ( $result['output_mode'] ?? $output_mode ) ) {
+				return rest_ensure_response(
+					array(
+						'success'     => true,
+						'output_mode' => 'ids',
+						'data'        => array(
+							'pipeline' => $pipeline_data,
+							'flows'    => array(),
+						),
+					)
+				);
+			}
+
+			$flows = $pipeline_data['flows'] ?? array();
 			unset( $pipeline_data['flows'] );
 			$pipeline = $pipeline_data;
 
@@ -425,7 +438,7 @@ class Pipelines {
 
 			$pipelines = $result['pipelines'];
 
-			if ( ! empty( $requested_fields ) ) {
+			if ( ! empty( $requested_fields ) && 'ids' !== ( $result['output_mode'] ?? $output_mode ) ) {
 				$pipelines = array_map(
 					function ( $pipeline ) use ( $requested_fields ) {
 						return array_intersect_key( $pipeline, array_flip( $requested_fields ) );

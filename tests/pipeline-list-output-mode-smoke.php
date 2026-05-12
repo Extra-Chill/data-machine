@@ -45,6 +45,16 @@ $assert(
 );
 
 $assert(
+	'REST single pipeline ids mode returns before array shape handling',
+	false !== strpos( $rest_api, "if ( 'ids' === ( \$result['output_mode'] ?? \$output_mode ) )" )
+);
+
+$assert(
+	'REST collection ids mode skips fields filtering',
+	false !== strpos( $rest_api, "! empty( \$requested_fields ) && 'ids' !== ( \$result['output_mode'] ?? \$output_mode )" )
+);
+
+$assert(
 	'pipelines admin client requests list output mode',
 	false !== strpos( $pipelines_client, "outputMode = 'list'" ) && false !== strpos( $pipelines_client, 'output_mode: outputMode' )
 );
