@@ -1,21 +1,27 @@
 # WordPress Update Handler
 
-Updates existing WordPress posts and pages in the local installation using native WordPress functions with selective field updates and taxonomy management.
+Updates existing WordPress posts and pages in the local installation using the `datamachine/update-wordpress` ability with selective field updates and taxonomy management.
 
 ## Architecture
 
-**Base Class**: Extends PublishHandler (@since v0.2.1)
+**Base Class**: Extends [`UpsertHandler`](../../../inc/Core/Steps/Upsert/Handlers/UpsertHandler.php)
 
 **Inherited Functionality**:
 - Engine data retrieval for source_url matching
 - Standardized response formatting
-- Centralized logging and error handling
+- Centralized error handling
+- Final `handle_tool_call()` entry point
+- Runtime `auth_ref` resolution via `AuthRefHandlerConfig::resolve_runtime_config()`
 
-**Requirements**: Requires `source_url` from engine data (provided by fetch handlers or AI tools)
+**Registration**: The handler registers as slug `wordpress_update` with handler type `upsert` via [`HandlerRegistrationTrait`](../../../inc/Core/Steps/HandlerRegistrationTrait.php).
+
+**Requirements**: Requires `job_id` and `source_url`. The `job_id` is added by tool execution; `source_url` is normally available from the prior fetch step's engine data and should be provided to the tool call for post identification.
 
 ## Local WordPress Integration
 
-**wp_update_post**: Uses WordPress's native `wp_update_post()` function for content modification.
+**Ability Delegation**: The handler delegates modification work to the `datamachine/update-wordpress` ability.
+
+**wp_update_post**: The ability uses WordPress's native `wp_update_post()` function for content modification.
 
 **URL-based Identification**: Extracts post ID from source URLs using `url_to_postid()` function.
 
@@ -24,7 +30,8 @@ Updates existing WordPress posts and pages in the local installation using nativ
 ## Required Parameters
 
 **Tool Call Parameters**:
-- `source_url`: WordPress post/page URL (required for post identification, provided by centralized engine data via datamachine_engine_data filter)
+- `job_id`: Required by `UpsertHandler::handle_tool_call()` and injected by the tool executor during pipeline runs
+- `source_url`: WordPress post/page URL, required for post identification
 
 **Optional Update Parameters**:
 - `title`: New post title (updates `post_title`)
@@ -40,6 +47,7 @@ Updates existing WordPress posts and pages in the local installation using nativ
 // Note: source_url is automatically provided via centralized datamachine_engine_data filter
 // from the fetch handler that originally retrieved the content
 $parameters = [
+    'job_id' => 456,
     'source_url' => 'https://site.com/existing-post/',  // From engine data
     'content' => 'Updated post content with <strong>HTML formatting</strong>.'
 ];
@@ -179,6 +187,10 @@ $parameters = [
 
 **Source URL Requirement**: Requires source URL from centralized engine data via datamachine_engine_data filter for post identification, making it suitable for content update workflows.
 
+**Base-Class Entry Point**: Upsert tools should route through `UpsertHandler::handle_tool_call()`. The base class validates `job_id`, creates an `EngineData` wrapper, resolves runtime `auth_ref` config, and then calls `executeUpsert()`.
+
+**Centralized Post Tracking**: Post origin tracking is applied centrally in `ToolExecutor::executeTool()` after successful tool calls. Upsert handlers should return an extractable post ID in their result and should not write origin tracking metadata themselves.
+
 **ToolResultFinder Integration** (@since v0.2.0): UpsertStep uses the `ToolResultFinder` utility class for locating handler tool execution results in data packets.
 
 **Tool Result Search Pattern**:
@@ -210,7 +222,7 @@ return [];
 - Centralizes search logic eliminating code duplication
 
 **Benefits**:
-- Universal search utility shared across all update handlers
+- Universal search utility shared across all upsert handlers
 - Consistent tool result detection across step types
 - Simplified upsert handler implementation
 - Centralized maintenance for search improvements
@@ -220,3 +232,10 @@ return [];
 **Selective Modification**: Allows targeted updates without affecting other post aspects.
 
 **Logging**: Detailed debug logging for URL resolution, update operations, taxonomy assignments, and error conditions.
+
+## Core vs Extension Boundaries
+
+- Core owns [`UpsertHandler`](../../../inc/Core/Steps/Upsert/Handlers/UpsertHandler.php), `UpsertStep`, handler-tool execution, runtime `auth_ref` resolution, and centralized post-origin tracking.
+- The WordPress upsert handler owns only the WordPress-specific tool definition and `executeUpsert()` implementation.
+- The handler delegates mutation logic to the `datamachine/update-wordpress` ability instead of duplicating post update behavior in the handler layer.
+- Extension upsert handlers should register with handler type `upsert`, expose tools through deferred `_handler_callable` entries, route execution through the base `handle_tool_call()`, and return standard success/error tool results.

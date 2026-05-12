@@ -1,6 +1,6 @@
 # Fetch Handlers Overview
 
-Fetch handlers retrieve content from various sources and convert it into standardized DataPackets for pipeline processing.
+Fetch handlers retrieve content from various sources and convert it into standardized `DataPacket` objects for pipeline processing.
 
 ## Available Handlers
 
@@ -48,14 +48,15 @@ Fetch handlers retrieve content from various sources and convert it into standar
 
 **Base Class Architecture** (@since v0.2.1):
 
-All fetch handlers extend `FetchHandler` base class (`/inc/Core/Steps/Fetch/Handlers/FetchHandler.php`) which provides:
-- Deduplication checking via `isItemProcessed()` and `markItemProcessed()`
+All fetch handlers extend [`FetchHandler`](../../../inc/Core/Steps/Fetch/Handlers/FetchHandler.php), which provides:
+- Output normalization into `DataPacket` objects
+- Deduplication and in-flight claim checks through `ExecutionContext`
+- `max_items` capping after dedupe and before claims
 - Engine data storage via `storeEngineData()`
-- Remote file downloading via `downloadRemoteFile()`
+- Remote file downloading via `ExecutionContext::downloadFile()`
 - Timeframe filtering via `applyTimeframeFilter()`
 - Keyword search filtering via `applyKeywordSearch()`
 - Standardized logging via `log()`
-- Response formatting via `successResponse()` and `emptyResponse()`
 
 ### `get_fetch_data()` Method
 
@@ -65,35 +66,71 @@ All fetch handlers implement the same public interface:
 public function get_fetch_data(int|string $pipeline_id, array $handler_config, ?string $job_id = null): array
 ```
 
-Internally, the base class creates an `ExecutionContext` and calls:
+[`FetchStep`](../../../inc/Core/Steps/Fetch/FetchStep.php) resolves portable `auth_ref` handler config before invoking the handler. Internally, the final base-class entry point creates an [`ExecutionContext`](../../../inc/Core/ExecutionContext.php) and calls:
 ```php
 abstract protected function executeFetch(array $config, ExecutionContext $context): array
 ```
 
 **Parameters**:
-- `$pipeline_id` - Pipeline ID or `'direct'` for direct execution mode
-- `$handler_config` - Handler-specific configuration (must include `flow_id`, `flow_step_id`, `pipeline_id`)
-- `$job_id` - Job identifier for deduplication tracking and engine data storage
+- `$pipeline_id` - Pipeline ID, or `'direct'` for direct execution mode
+- `$handler_config` - Flat handler configuration. Flow execution adds `flow_id`, `flow_step_id`, and `pipeline_id`; direct mode may use the `'direct'` sentinel values.
+- `$job_id` - Job identifier for engine data storage and in-flight claims
 
 **ExecutionContext provides**:
 - `$context->getPipelineId()` - Returns `int|string` (numeric ID or `'direct'`)
 - `$context->getFlowId()` - Returns `int|string` (numeric ID or `'direct'`)
 - `$context->getJobId()` - Returns `?string`
 - `$context->isItemProcessed($id)` - Check deduplication (always false in direct mode)
-- `$context->markItemProcessed($id)` - Mark item processed (no-op in direct mode)
+- `$context->isItemClaimed($id)` - Check whether another in-flight run already claimed the item (always false in direct/standalone modes)
+- `$context->claimItemForProcessing($id)` - Atomically claim an item for this job (successful no-op in direct/standalone modes)
+- `$context->markItemProcessed($id)` - Mark item processed (no-op in direct/standalone modes)
 - `$context->log($level, $message, $extra)` - Contextual logging
 - `$context->storeEngineData($data)` - Store data for downstream steps
 - `$context->getFileContext()` - Get file storage context array
 - `$context->isDirect()` - Check if running in direct execution mode
 
-**Return**: Array of DataPacket objects
+**Return**: Array of `DataPacket` objects. Child handlers return plain arrays; `FetchHandler::get_fetch_data()` normalizes those arrays into packets.
+
+### Handler Output Shapes
+
+Child handlers should return one of these plain-array shapes from `executeFetch()`:
+
+```php
+// Preferred: explicit list, supports zero, one, or many items.
+return [
+    'items' => [
+        [
+            'title' => 'Content Title',
+            'content' => 'Content body...',
+            'file_info' => null,
+            'metadata' => [
+                'item_identifier' => 'stable-source-id',
+                'original_id' => 'source-id',
+            ],
+        ],
+    ],
+];
+
+// Also accepted: one item as the whole result.
+return [
+    'title' => 'Content Title',
+    'content' => 'Content body...',
+    'metadata' => [ 'item_identifier' => 'stable-source-id' ],
+];
+
+// Empty result.
+return [ 'items' => [] ];
+```
+
+Do not return legacy `processed_items` arrays. They are not the fetch base-class contract.
 
 ### Clean DataPacket Format (AI-visible)
 
 ```php
 [
     'data' => [
-        'content_string' => "Source: Site Name\n\nTitle: Content Title\n\nContent body...",
+        'title' => 'Content Title',
+        'body' => "Source: Site Name\n\nTitle: Content Title\n\nContent body...",
         'file_info' => null // or file information array
     ],
     'metadata' => [
@@ -146,11 +183,19 @@ if (!$context->isItemProcessed($item_identifier)) {
 }
 ```
 
-Fetch handlers identify candidate items; completed items are marked processed after the full pipeline finishes successfully so downstream failures do not permanently drop content.
+Fetch handlers identify candidate items. The base class filters already-processed items and active claims, applies `max_items`, then claims only the selected items for the current job. Completed items are marked processed after the full pipeline finishes successfully so downstream failures do not permanently drop content.
 
 **Scope**: Per-flow-step deduplication (same item can be processed by different flows)
 **Persistence**: Stored in `wp_datamachine_processed_items` table
 **Cleanup**: Automatic cleanup with job completion
+
+### `max_items` and Claims
+
+- `max_items` is a flat handler config value. If omitted, `FetchHandler::getDefaultMaxItems()` defaults to `1`.
+- `max_items = 0` means unlimited.
+- Claims are created after dedupe and after `max_items`, so items that do not fit in the current batch remain eligible for future runs.
+- Final processed marking is deferred to successful pipeline completion, not fetch completion.
+- Direct and standalone execution modes skip persisted dedupe and claims; the methods return safe no-op defaults.
 
 ### Source Type Identifiers
 
@@ -170,12 +215,15 @@ Extension plugins can register additional fetch handlers and source type identif
 ```php
 $handler_config = [
     'flow_step_id' => $flow_step_id, // Added by engine
-    'handler_specific_key' => [
-        'setting1' => 'value1',
-        'setting2' => 'value2'
-    ]
+    'pipeline_id' => $pipeline_id,   // Added by engine
+    'flow_id' => $flow_id,           // Added by engine
+    'setting1' => 'value1',          // Handler-specific settings are flat
+    'setting2' => 'value2',
+    'max_items' => 5,
 ];
 ```
+
+The base class passes this flat array to `executeFetch()` as `$config`. Do not wrap handler settings under the handler slug unless the handler explicitly documents that nested shape.
 
 ### Common Settings
 
@@ -204,7 +252,7 @@ if (empty($required_setting)) {
         'handler' => 'handler_name',
         'setting' => 'required_setting'
     ]);
-    return ['processed_items' => []];
+    return ['items' => []];
 }
 ```
 
@@ -224,13 +272,14 @@ if (empty($required_setting)) {
 
 ## Performance Considerations
 
-### Single Item Execution Model
+### Bounded Batch Execution Model
 
-All fetch handlers follow the system-wide **Single Item Execution Model**:
-- Finds first eligible unprocessed item.
-- Marks as processed immediately to prevent concurrency issues.
-- Returns exactly one DataPacket (or an empty array if no new content exists).
-- Ensures job-level isolation and reliability.
+Fetch handlers follow a bounded batch model:
+- Child handlers may return zero, one, or many candidate items.
+- The base class filters processed and claimed items.
+- The base class applies `max_items` before claiming work.
+- The base class returns one `DataPacket` per selected item.
+- Final processed marking happens only after the downstream pipeline completes successfully.
 
 ### Memory Optimization
 
@@ -255,6 +304,13 @@ Fetch handlers provide essential metadata that AI steps use for content processi
 **Content Structure**: All handlers structure content in consistent format that AI steps process through the modular AI directive system.
 
 **Metadata Preservation**: Handler metadata (original titles, dates) flows through pipeline to AI tools via WP_Agent_Tool_Parameters while URLs are accessed via engine data filter.
+
+## Core vs Extension Boundaries
+
+- Core owns the handler base classes, `ExecutionContext`, processed-item ledger, claims, engine data storage, `auth_ref` resolution, and handler-tool resolution.
+- Extensions own source/platform-specific API calls, settings classes, auth providers, and handler registration.
+- Extensions should register handlers and tools through `HandlerRegistrationTrait` where possible instead of reimplementing core filters.
+- Extensions should return plain handler output arrays and let core normalize packets, apply dedupe, create claims, resolve `auth_ref`, and track posts.
 
 ### Tool-First Architecture Support
 
@@ -285,7 +341,7 @@ $result = $wordpress_handler->get_fetch_data(
     ['wordpress_posts' => ['post_type' => 'post']],
     $job_id
 );
-// Returns: ['processed_items' => [...]]
+// Returns: DataPacket[]
 // Engine data stored separately in database via centralized datamachine_engine_data filter
 ```
 
@@ -305,7 +361,7 @@ foreach ($potential_items as $item) {
         ];
     }
 }
-return ['processed_items' => []]; // No unprocessed items
+return ['items' => []]; // No unprocessed items
 ```
 
 ## Extension Development
@@ -324,31 +380,24 @@ class CustomFetchHandler extends FetchHandler {
         // Fetch data from source
         $items = $this->fetch_from_source($source_config);
 
-        // Process first unprocessed item
+        // Return candidate items. The base class applies dedupe, max_items, and claims.
+        $candidates = [];
         foreach ($items as $item) {
-            if ($context->isItemProcessed((string) $item['id'])) {
-                continue;
-            }
-
             // Store engine data via centralized filter (array storage)
             $context->storeEngineData([
                 'source_url' => $item['url'],
                 'image_url' => $item['image'] ?? ''
             ]);
 
-            return [
-                'items' => [
-                    [
-                        'title' => $item['title'],
-                        'content' => $item['content'],
-                        'metadata' => [
-                            'item_identifier' => (string) $item['id'],
-                        ],
-                    ],
+            $candidates[] = [
+                'title' => $item['title'],
+                'content' => $item['content'],
+                'metadata' => [
+                    'item_identifier' => (string) $item['id'],
                 ],
             ];
         }
 
-        return ['items' => []];
+        return ['items' => $candidates];
     }
 }
