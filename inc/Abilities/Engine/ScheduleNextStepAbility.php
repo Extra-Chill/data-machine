@@ -116,7 +116,7 @@ class ScheduleNextStepAbility {
 			// Direct workflows do not have a numeric flow file context, so keep
 			// step input packets on engine data for execute-step to reload.
 			if ( 'direct' === $raw_flow_id ) {
-				$direct_step_data_packets                    = is_array( $engine_snapshot['direct_step_data_packets'] ?? null ) ? $engine_snapshot['direct_step_data_packets'] : array();
+				$direct_step_data_packets                  = is_array( $engine_snapshot['direct_step_data_packets'] ?? null ) ? $engine_snapshot['direct_step_data_packets'] : array();
 				$direct_step_data_packets[ $flow_step_id ] = $dataPackets;
 				datamachine_merge_engine_data(
 					$job_id,
