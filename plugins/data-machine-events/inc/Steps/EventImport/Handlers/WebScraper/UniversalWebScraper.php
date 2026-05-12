@@ -133,6 +133,16 @@ class UniversalWebScraper extends EventImportHandler {
 		);
 	}
 
+	protected function getSourceInventoryCapabilities(): array {
+		return array(
+			'stable_ids'            => true,
+			'supports_query_shards' => true,
+			'supports_pagination'   => true,
+			'pagination'            => 'url',
+			'max_pages'             => self::MAX_PAGES,
+		);
+	}
+
 	/**
 	 * Get registered extractors in priority order.
 	 *
@@ -308,17 +318,17 @@ class UniversalWebScraper extends EventImportHandler {
 				// pagination instead of returning immediately. This allows
 				// multi-page APIs (e.g. Tribe Events with 9 pages) to be
 				// fully scraped in a single fetch cycle.
-				$page_items = isset( $structured_result['items'] ) ? $structured_result['items'] : array( $structured_result );
+				$page_items        = isset( $structured_result['items'] ) ? $structured_result['items'] : array( $structured_result );
 				$accumulated_items = array_merge( $accumulated_items, $page_items );
 
 				$context->log(
 					'info',
 					'Universal Web Scraper: Accumulated structured items from page',
 					array(
-						'page'             => $current_page,
-						'page_items'       => count( $page_items ),
-						'total_items'      => count( $accumulated_items ),
-						'source_url'       => $current_url,
+						'page'        => $current_page,
+						'page_items'  => count( $page_items ),
+						'total_items' => count( $accumulated_items ),
+						'source_url'  => $current_url,
 					)
 				);
 
@@ -556,9 +566,9 @@ class UniversalWebScraper extends EventImportHandler {
 					'source_type'      => 'universal_web_scraper',
 					'pipeline_id'      => $context->getPipelineId(),
 					'flow_id'          => $context->getFlowId(),
-					'original_title'   => 'HTML Section from ' . parse_url( $current_url, PHP_URL_HOST ),
+					'original_title'   => 'HTML Section from ' . wp_parse_url( $current_url, PHP_URL_HOST ),
 					'event_identifier' => $event_section['identifier'],
-					'item_identifier'        => $event_section['identifier'],
+					'item_identifier'  => $event_section['identifier'],
 					'import_timestamp' => time(),
 				),
 			);
@@ -771,7 +781,7 @@ class UniversalWebScraper extends EventImportHandler {
 	 * Attempt to discover WordPress API endpoint if initial fetch fails.
 	 */
 	private function attemptWordPressApiDiscovery( string $url, ExecutionContext $context ): ?string {
-		$parsed = parse_url( $url );
+		$parsed = wp_parse_url( $url );
 		if ( empty( $parsed['host'] ) ) {
 			return null;
 		}

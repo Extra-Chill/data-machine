@@ -48,6 +48,57 @@ abstract class EventImportHandler extends FetchHandler {
 
 	public function __construct( string $handler_type ) {
 		parent::__construct( $handler_type );
+		add_filter( 'datamachine_source_inventory_capabilities', array( $this, 'filterSourceInventoryCapabilities' ), 10, 2 );
+	}
+
+	/**
+	 * Add handler-owned source inventory facts to matching source descriptors.
+	 *
+	 * @param array<string,mixed> $capabilities Existing capabilities.
+	 * @param array<string,mixed> $source       Source descriptor.
+	 * @return array<string,mixed>
+	 */
+	public function filterSourceInventoryCapabilities( array $capabilities, array $source ): array {
+		if ( ! $this->sourceMatchesHandler( $source ) ) {
+			return $capabilities;
+		}
+
+		return array_merge( $this->getSourceInventoryCapabilities(), $capabilities );
+	}
+
+	/**
+	 * Handler-owned source inventory facts.
+	 *
+	 * Concrete handlers override this when their source has known inventory,
+	 * count, cursor, or bounded-discovery behavior.
+	 *
+	 * @return array<string,mixed>
+	 */
+	protected function getSourceInventoryCapabilities(): array {
+		return array();
+	}
+
+	/**
+	 * Whether a generic source descriptor refers to this handler.
+	 *
+	 * @param array<string,mixed> $source Source descriptor.
+	 */
+	private function sourceMatchesHandler( array $source ): bool {
+		foreach ( array( 'handler', 'handler_type', 'provider', 'source_type', 'kind' ) as $key ) {
+			if ( $this->handler_type === $this->normalizeSourceKey( (string) ( $source[ $key ] ?? '' ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private function normalizeSourceKey( string $value ): string {
+		$value = strtolower( trim( $value ) );
+		$value = preg_replace( '/[^a-z0-9_\-]+/', '_', $value );
+		$value = str_replace( '-', '_', (string) $value );
+
+		return trim( $value, '_' );
 	}
 
 	/**
