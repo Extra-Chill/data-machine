@@ -15,7 +15,7 @@ Complete user documentation for Data Machine, the AI-first WordPress plugin that
 ### Architecture Deep Dives
 - **Agent Memory Backends**: Store selection model for disk-backed memory, optional guideline-backed stores, and the DMC file-projection boundary ([architecture/agent-memory-backends.md](architecture/agent-memory-backends.md)).
 - **Pipeline Execution Axes**: Queue, fan-out, and per-step iteration semantics ([architecture/pipeline-execution-axes.md](architecture/pipeline-execution-axes.md)).
-- **Policy Resolvers**: Why `ToolPolicyResolver`, `MemoryPolicyResolver`, `ActionPolicyResolver`, and `PipelineTranscriptPolicy` stay as four single-purpose classes ([architecture/policy-resolvers.md](architecture/policy-resolvers.md)).
+- **Policy Resolvers**: Why tool, memory, directive, action, and transcript policies stay as single-purpose classes ([architecture/policy-resolvers.md](architecture/policy-resolvers.md)).
 - **Iteration Budget**: Shared bounded-iteration primitive backing `conversation_turns` and `chain_depth` budgets ([architecture/iteration-budget.md](architecture/iteration-budget.md)).
 
 ### Engine & Services
@@ -25,8 +25,8 @@ Complete user documentation for Data Machine, the AI-first WordPress plugin that
 - **Universal Engine**: Shared AI infrastructure for pipeline and chat agents.
 - **AI Conversation Loop**: Turn-based conversation execution with directive orchestration.
 - **AI Directives System**: Hierarchical directive injection for contextual AI behavior.
-- **Tool Execution**: Centralized discovery, validation, and execution of AI tools.
-- **Tool Manager**: Runtime tool enablement, provider checks, and contextual metadata.
+- **Tool Execution**: Resolved tool dispatch, action policy, ability-only execution, and approval staging.
+- **Tool Manager**: Data Machine tool registry, source-level availability checks, and handler tool expansion.
 - **Request Builder**: Directive-aware construction of provider requests.
 - **Conversation Manager**: Message normalization, logging, and tool call tracking.
 - **Prompt Builder**: Priority-based directive registration via filters.
@@ -43,10 +43,10 @@ Complete user documentation for Data Machine, the AI-first WordPress plugin that
 - **Upsert Handlers**: Identity-aware create-or-update operations — find existing content by identity strategy, update if changed, create if new.
 
 ### AI Tools
-- **Tools Overview**: Global and context-aware tools available to AI agents.
+- **Tools Overview**: Static, ability-backed, and adjacent handler tools available to AI agents.
 - **Execute Workflow**: Modular execution of multi-step workflows from the chat toolset.
-- **Global Tools**: Google Search, Local Search, Web Fetch, WordPress Post Reader, and others used across agents.
-- **Chat Tools**: AddPipelineStep, ApiQuery, ConfigureFlowSteps, ConfigurePipelineStep, CreateFlow, CreatePipeline, RunFlow, UpdateFlow, and other workflow management tools.
+- **Static Registry Tools**: Research, memory, workflow-management, and site-operation tools registered through `datamachine_tools`.
+- **Pipeline Handler Tools**: Runtime tools generated from adjacent fetch, publish, and upsert handlers.
 
 ### API Reference
 - **API Overview**: Catalog of REST endpoints for API consumers ([api/index.md](api/index.md)).

@@ -81,7 +81,7 @@ Tools are registered via a single unified filter. Per-mode tool partitioning is 
 
 ### datamachine_tools
 
-Single registry for all AI tools. Used by `ToolManager::getRawToolsForMode()` to assemble the available tool set for a given execution mode.
+Single Data Machine registry for AI tools. `ToolManager` reads this registry, `ToolSourceRegistry` composes source pools, and `ToolPolicyResolver::resolve()` assembles the final request-visible tool set for a mode.
 
 **Hook usage**:
 
@@ -107,7 +107,8 @@ $tools = apply_filters( 'datamachine_tools', array() );
     ],
     'modes'            => ['chat'],             // which modes can see this tool
     'requires_config'  => true,                 // checked via datamachine_tool_configured
-    'category'         => 'search',             // optional grouping
+    'ability'          => 'my-plugin/search',   // optional Ability link for permissions/categories
+    'access_level'     => 'admin',              // fallback when no ability is linked
 ]
 ```
 
@@ -133,9 +134,9 @@ add_filter( 'datamachine_tools', function ( $tools ) {
 } );
 ```
 
-Use `pipeline` mode only when a static/global tool is useful inside an automated pipeline AI step. Chat affordances and tools that duplicate engine-level validation should stay `chat`-only; pipeline AI steps already receive step-scoped handler tools plus pipeline/flow memory directives.
+Use `pipeline` mode only when a static registry tool is useful inside an automated pipeline AI step. Use `pipeline_policy` for powerful tools that should stay hidden from pipeline by default but can be explicitly granted through `enabled_tools`. Chat affordances and tools that duplicate engine-level validation should stay `chat`-only; pipeline AI steps already receive adjacent handler tools plus pipeline/flow memory directives.
 
-> The legacy `datamachine_global_tools` and `datamachine_chat_tools` filters were consolidated into `datamachine_tools` in v0.68.0 (PR #1130). The old per-mode filters no longer exist.
+> Earlier per-mode tool filters were consolidated into `datamachine_tools` in v0.68.0 (PR #1130). Register current tools through the unified registry and declare `modes` on the tool definition.
 
 ### datamachine_tool_configured
 
@@ -166,7 +167,7 @@ add_filter( 'datamachine_tool_configured', function ( $configured, $tool_id ) {
 }, 10, 2 );
 ```
 
-> Tool *availability* (whether the AI sees the tool in this request) is now resolved by `ToolManager::is_tool_available()`, not by a public filter. The `datamachine_tool_enabled` filter from earlier versions has been removed in favour of `ToolManager`'s direct logic, which combines configuration state, mode membership, and per-step `enabled_tools` settings.
+> Tool *visibility* (whether the AI sees the tool in this request) is resolved by `ToolPolicyResolver::resolve()`. `ToolManager::is_tool_available()` is a source-level check for global enablement and configuration. The earlier public enablement filter is not part of the current runtime path.
 
 ## Handler Registration
 
@@ -203,6 +204,6 @@ Handlers (fetch / publish / upsert) are registered via the `HandlerRegistrationT
 ## Related Documentation
 
 - [AI Directives System](../../core-system/ai-directives.md) — Built-in directive list, priorities, modes
-- [Tool Manager](../../core-system/tool-manager.md) — Tool availability resolution
-- [Tool Execution](../../core-system/tool-execution.md) — Tool dispatch and result handling
+- [Tool Manager](../../core-system/tool-manager.md) — Data Machine registry, source-level availability, and handler tool expansion
+- [Tool Execution](../../core-system/tool-execution.md) — Tool dispatch, action policy, and approval staging
 - [Core Filters](core-filters.md) — Handler registration filters and OAuth service discovery

@@ -248,9 +248,7 @@ See Handler Registration Trait for complete documentation.
 
 ### `datamachine_tools`
 
-**Purpose**: Unified registry for every AI tool — static global tools AND per-handler
-runtime-generated tools. Consumed by `ToolPolicyResolver` when gathering the
-available tool set for a pipeline or chat context.
+**Purpose**: Unified Data Machine registry for AI tools — static registry tools and per-handler runtime-generated tools. Adapted by `DataMachineToolRegistrySource` and consumed through `ToolPolicyResolver::resolve()`.
 
 **Parameters**:
 
@@ -258,7 +256,7 @@ available tool set for a pipeline or chat context.
 
 **Return**: Modified tools array
 
-#### Static tool entry (global tools)
+#### Static tool entry
 
 ```php
 add_filter('datamachine_tools', function($tools) {
@@ -1428,9 +1426,7 @@ Builds parameters for handler-specific tools with engine data merging (source_ur
 
 #### `ToolPolicyResolver::resolve()`
 
-Tool discovery moved from `ToolExecutor::getAvailableTools()` (removed in 0.79)
-to `ToolPolicyResolver::resolve()`. Single entry point for chat and pipeline
-modes.
+Tool discovery uses `ToolPolicyResolver::resolve()`. This is the single entry point for chat, pipeline, system, and custom modes.
 
 ```php
 $resolver = new \DataMachine\Engine\AI\Tools\ToolPolicyResolver();
@@ -1446,10 +1442,11 @@ $tools = $resolver->resolve( array(
 
 **Discovery Process**:
 
-1. Handler Tools - Retrieved via `datamachine_tools` filter (runtime-resolved `_handler_callable` entries)
-2. Global Tools - Retrieved via `datamachine_global_tools` filter
-3. Chat Tools - Retrieved via `datamachine_chat_tools` filter (chat only)
-4. Enablement Check - Each tool filtered through `datamachine_tool_enabled`
+1. Source composition - `ToolSourceRegistry` gathers `adjacent_handlers` and/or `static_registry` for the mode.
+2. Static registry - `DataMachineToolRegistrySource` adapts `datamachine_tools`, filters by `modes`, and checks source-level availability/configuration.
+3. Adjacent handlers - `AdjacentHandlerToolSource` resolves `_handler_callable` entries from previous/next pipeline steps.
+4. Policy resolution - Agents API tool policy applies deny, allow-only, category, mode, mandatory-tool, and chat access rules.
+5. Final filter - `datamachine_resolved_tools` can adjust the resolved set.
 
 ### AIConversationLoop (`/inc/Engine/AI/AIConversationLoop.php`)
 

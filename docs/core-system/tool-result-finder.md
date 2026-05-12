@@ -329,7 +329,7 @@ $result = ToolResultFinder::findHandlerResult($data, 'twitter', $type = 'tool_re
 ## Related Components
 
 - Universal Engine Architecture - Overall engine structure
-- Tool Execution Architecture - Tool execution and result creation
+- [Tool Execution Architecture](tool-execution.md) - Tool execution and result creation
 - WordPress Update Handler - Primary ToolResultFinder user
 - Data Flow Architecture - Data packet structure and flow
 
