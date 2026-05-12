@@ -16,6 +16,22 @@ Data Machine builds on [Agents API](https://github.com/Automattic/agents-api) fo
 
 ## Architecture
 
+Data Machine is the WordPress automation product layer on top of generic agent primitives:
+
+```text
+WordPress site
+  -> Data Machine product runtime
+       pipelines, flows, jobs, handlers, system tasks, policy-gated tools,
+       pending actions, memory files, bundles, REST, WP-CLI, admin UI
+  -> Agents API substrate
+       agent contracts, durable conversation loop, transcripts, memory-store
+       interfaces, approval vocabulary, locks, event sinks
+  -> wp-ai-client / provider adapters
+       one-shot model calls and durable agent turns
+```
+
+Use **Agents API** for durable, generic agent runtime behavior. Use **Data Machine** for WordPress automation behavior: pipeline orchestration, publishing, content operations, queues, files, policies, approvals, bundles, and operator surfaces. Extension plugins add handlers, abilities, tools, and bundle extras without reaching into core internals.
+
 ### Pipelines
 
 ```
@@ -26,7 +42,20 @@ Data Machine builds on [Agents API](https://github.com/Automattic/agents-api) fo
 └─────────────┘     └─────────────┘     └─────────────┘
 ```
 
-**Pipelines** define the workflow template. **Flows** schedule when they run. **Jobs** track each execution with full undo support.
+**Pipelines** define the workflow template. **Flows** configure and schedule a pipeline. **Jobs** track each execution, artifacts, retries, status, and undo support. The engine processes work as a bounded cycle: fetch or receive input, process one item through the configured steps, persist job/log/artifact state, then either complete, fail, reschedule, or let the next drain/worker pass continue the queue.
+
+### Worker, Drain, and Cycle
+
+Long-running automation uses small repeatable units instead of one unbounded request:
+
+| Concept | Purpose |
+|---------|---------|
+| **Cycle** | One bounded scheduler/engine pass. It claims due work, advances jobs, and exits. |
+| **Drain** | CLI/operator command that repeatedly runs due work until the queue is empty or a budget is reached. |
+| **Worker** | Runtime wrapper for ongoing background processing. It runs cycles under configured limits. |
+| **Retention** | Cleanup tasks for old logs, jobs, processed items, files, Action Scheduler rows, stale claims, and chat sessions. |
+
+Useful entry points: `wp datamachine cycle`, `wp datamachine drain`, `wp datamachine worker`, `wp datamachine jobs summary`, and `wp datamachine retention`.
 
 ### Agent Modes
 
@@ -36,7 +65,7 @@ One agent, three operational modes — same identity and memory, different guida
 |---------|---------|-------|
 | **Pipeline** | Automated workflow execution | Handler-specific tools scoped to the current step |
 | **Chat** | Conversational interface in wp-admin | 30+ management tools (flows, pipelines, jobs, logs, memory, content) |
-| **System** | Background infrastructure tasks | Alt text, daily memory, image generation, internal linking, meta descriptions (GitHub issues in data-machine-code extension) |
+| **System** | Background infrastructure tasks | Alt text, daily memory, image generation, internal linking, meta descriptions, retention (GitHub issues in data-machine-code extension) |
 
 Built-in mode guidance is injected by `AgentModeDirective` at runtime and extensions can register more modes through `AgentModeRegistry`. Configure AI provider and model per mode in Settings. Each mode falls back to the global default if no override is set.
 
@@ -49,13 +78,19 @@ shared/
   SITE.md                  — Site-wide context
 agents/{slug}/
   SOUL.md                  — Identity, voice, rules
-  MEMORY.md                — Accumulated knowledge
+  MEMORY.md                — Durable knowledge every session should know
   daily/YYYY/MM/DD.md      — Automatic daily journals
 users/{id}/
   USER.md                  — Information about the human
 ```
 
-Discovery: `wp datamachine memory paths --allow-root`
+Daily memory files are append-only history and are also system-task artifacts: `DailyMemoryTask` can synthesize recent activity, archive older details under `daily/YYYY/MM/DD.md`, and keep `MEMORY.md` focused on persistent knowledge. Discovery: `wp datamachine memory paths --allow-root`.
+
+### Policy-Gated Tools and Pending Actions
+
+Tool access is resolved at runtime by policy classes instead of hardcoded allow-lists. Data Machine combines tool sources, mode policy, handler adjacency, memory policy, and action policy to decide what an agent can see and what requires approval.
+
+When an operation needs human approval, it becomes a **pending action** backed by Agents API approval vocabulary and Data Machine storage/resolution adapters. Pending actions can be inspected and resolved through REST, abilities, chat tools, and CLI (`wp datamachine pending-actions`).
 
 ### Abilities API
 
@@ -71,7 +106,11 @@ Typed, permissioned functions registered via WordPress's Abilities API. Extensio
 | `datamachine/run-flow` | Execute a flow programmatically |
 | ... | Additional core abilities across pipelines, flows, jobs, memory, media, SEO, email, and infrastructure |
 
-Social publishing, workspace, and GitHub abilities live in extension plugins such as data-machine-socials and data-machine-code.
+Social publishing, workspace, GitHub, and business integration abilities live in extension plugins such as data-machine-socials, data-machine-code, and data-machine-business.
+
+### Agent Bundles
+
+Agent bundles are portable packages for an agent recipe: manifest metadata, memory, pipelines, flows, prompts, rubrics, tool policies, auth references, seed queues, and extension-owned extras. Core owns the transport and reserved tree schema; extensions own their extras through bundle export/import hooks. See [`docs/core-system/agent-bundles.md`](docs/core-system/agent-bundles.md).
 
 ### Content Formats
 
@@ -107,6 +146,8 @@ Pipelines are built from **step types**. Some use pluggable **handlers** — int
 | **Agent Ping** | Outbound webhook to trigger external agents |
 | **Webhook Gate** | Pause pipeline until an external webhook callback fires |
 | **System Task** | Background tasks (alt text, image generation, daily memory, etc.) |
+
+Agent Ping is outbound-only. It hands context to another agent or system and supports confirmation/callback REST routes; inbound starts use flow webhooks or chat/API surfaces.
 
 ## Media Primitives
 
@@ -161,51 +202,62 @@ Agent executes → Agent queues next task → Loop continues
 ## WP-CLI
 
 ```bash
-wp datamachine agents           # Agent identities, access, tokens, bundles
-wp datamachine memory           # Layered memory files and path discovery
-wp datamachine pipelines        # Pipeline CRUD
-wp datamachine flows            # Flow CRUD and queue management
-wp datamachine jobs             # Job management, monitoring, undo
-wp datamachine worker           # Headless worker loop
-wp datamachine drain            # Drain due Data Machine actions
-wp datamachine cycle            # Run due flows for an external cycle
-wp datamachine pending-actions  # Inspect approval queues
-wp datamachine settings         # Plugin settings
-wp datamachine posts            # Query Data Machine-created posts
-wp datamachine logs             # Log operations
-wp datamachine handlers         # List registered handlers
-wp datamachine step-types       # List registered step types
-wp datamachine processed-items  # Deduplication tracking
-wp datamachine chat             # Chat agent interface
-wp datamachine alt-text         # AI alt text generation
-wp datamachine links            # Internal linking
-wp datamachine blocks           # Gutenberg block operations
-wp datamachine image            # Image generation
-wp datamachine meta-description # SEO meta descriptions
-wp datamachine auth             # OAuth provider management
-wp datamachine email            # Email send/fetch/reply operations
-wp datamachine external         # Remote Data Machine site connections
-wp datamachine indexnow         # IndexNow indexing integration
-wp datamachine taxonomy         # Taxonomy operations
-wp datamachine batch            # Batch operations
-wp datamachine system           # System task management
-wp datamachine retention        # Retention policies and cleanup scheduling
-wp datamachine test             # Fetch handler dry-runs
-wp datamachine analytics        # Analytics and tracking
+wp datamachine agent|agents      # Agent CRUD, access, tokens, bundles, installed state
+wp datamachine ai                # AI/provider diagnostics
+wp datamachine analytics         # Analytics reporting
+wp datamachine alt-text          # AI alt text generation
+wp datamachine auth              # OAuth/provider auth management
+wp datamachine batch             # Batch operations
+wp datamachine block|blocks      # Gutenberg block operations
+wp datamachine chat              # Chat agent interface
+wp datamachine cycle|cycles      # Run one bounded scheduler/engine cycle
+wp datamachine drain             # Drain due work until empty or budgeted
+wp datamachine email             # Site email read/send/reply operations
+wp datamachine external          # Remote agent/site calls and auth helpers
+wp datamachine fetch test        # Fetch-handler test harness
+wp datamachine flow|flows        # Flow CRUD, queue, webhook, scheduling, run
+wp datamachine handler|handlers  # List registered handlers
+wp datamachine image             # Image generation
+wp datamachine indexnow          # IndexNow submission helpers
+wp datamachine job|jobs          # Job management, monitoring, undo, summary
+wp datamachine link|links        # Internal linking
+wp datamachine log|logs          # Log operations
+wp datamachine memory            # Agent memory and daily memory read/write/search
+wp datamachine meta-description  # SEO meta descriptions
+wp datamachine pending-actions   # Inspect/resolve approval-gated actions
+wp datamachine pipeline|pipelines # Pipeline CRUD and memory-file links
+wp datamachine post|posts        # Query/update Data Machine-created posts
+wp datamachine processed-items   # Dedupe/processed item management
+wp datamachine retention         # Retention cleanup tasks
+wp datamachine setting|settings  # Plugin settings
+wp datamachine step-type|step-types # List registered step types
+wp datamachine system            # System health, tasks, prompts, runs
+wp datamachine taxonomy          # Taxonomy operations
+wp datamachine test              # Diagnostic command surface
+wp datamachine worker            # Long-running worker wrapper
 ```
+
+`wp datamachine workspace` and `wp datamachine github` live in the `data-machine-code` extension. Use `wp help datamachine` and `wp help datamachine <command>` as the authoritative runtime command list.
 
 ## REST API
 
 Full REST API under `datamachine/v1`:
 
-- `POST /execute` — Execute a flow
+- `POST /execute` — Execute a flow or ephemeral workflow
 - `POST /trigger/{flow_id}` — Webhook trigger with Bearer token auth
-- `POST /chat` — Chat agent interface
-- `GET|POST /pipelines` — Pipeline CRUD
-- `GET|POST /flows` — Flow CRUD with queue management
-- `GET|POST /jobs` — Job management
-- `POST /jobs/{id}/undo` — Job undo
-- `GET /agent/paths` — Agent file path discovery
+- `GET|POST /pipelines`, `GET|PATCH|DELETE /pipelines/{id}` — Pipeline CRUD, steps, flows, memory files
+- `GET|POST /flows`, `GET|PATCH|DELETE /flows/{id}` — Flow CRUD, pause/resume, duplicate, queue, config, webhooks
+- `GET|POST|DELETE /jobs`, `GET /jobs/{id}` — Job management, cleanup, monitoring, undo-capable artifacts
+- `GET|POST|DELETE /logs` — Log search, metadata, and cleanup
+- `GET|POST /chat`, `POST /chat/continue`, `GET|DELETE /chat/{session_id}` — Chat and sessions
+- `GET|POST|DELETE /files`, `/files/agent`, `/files/agent/daily/...` — Flow files, memory files, daily memory artifacts
+- `GET|POST|PATCH|DELETE /agents...` — Agent CRUD, current agent, access, tokens
+- `POST /agent-ping/confirm`, `POST /agent-ping/callback/{callback_id}` — Agent Ping confirmation/callbacks
+- `GET /handlers`, `/step-types`, `/providers`, `/tools`, `/settings`, `/system/*` — Discovery and settings
+- `GET|POST /auth/*`, `/email/*`, `/processed-items`, `/users/*`, `/analytics/*`, `/links/*` — Supporting product surfaces
+- `GET /actions/pending`, `GET /actions/pending/{id}`, `POST /actions/resolve` — Approval-gated pending actions
+
+Detailed endpoint docs live under [`docs/api/`](docs/api/). Routes under `wp-json/datamachine/v1` are the Data Machine product API, not the generic Agents API substrate.
 
 ## Extensions
 
@@ -291,6 +343,10 @@ homeboy lint data-machine    # PHPCS with WordPress standards
 ## Documentation
 
 - [docs/](docs/) — User documentation
+- [docs/core-system/wp-cli.md](docs/core-system/wp-cli.md) — WP-CLI reference
+- [docs/api/index.md](docs/api/index.md) — REST API overview
+- [docs/core-system/agent-bundles.md](docs/core-system/agent-bundles.md) — Portable agent recipes
+- [docs/core-system/daily-memory-system.md](docs/core-system/daily-memory-system.md) — Daily memory artifacts and system task
 - [docs/architecture/pipeline-execution-axes.md](docs/architecture/pipeline-execution-axes.md) — Four orthogonal axes of work expansion in a pipeline
 - Data Machine skill and agent instruction files are generated into consumer environments rather than stored in this plugin tree
 - [docs/CHANGELOG.md](docs/CHANGELOG.md) — Version history
