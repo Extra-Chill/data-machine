@@ -1,6 +1,6 @@
 # Authentication
 
-Data Machine REST API supports two authentication methods for secure access.
+Data Machine REST API requests use normal WordPress REST authentication. The separate [Auth Endpoints](auth.md) page documents handler/provider credentials such as OAuth tokens.
 
 ## Authentication Methods
 
@@ -68,12 +68,14 @@ fetch('/wp-json/datamachine/v1/pipelines', {
 
 ## Permission Model
 
-### manage_options Capability
+### Data Machine Permissions
 
-Most endpoints require `manage_options` capability (Administrator/Editor roles):
-- Execute, Pipelines, Flows, Jobs, Files
-- Settings, Logs, Processed Items
-- Handlers, Providers, Tools, Auth
+Endpoints check Data Machine permissions through `PermissionHelper`, not a single hardcoded WordPress capability:
+
+- `manage_flows`: pipelines, flows, jobs, execution-related administration.
+- `manage_settings`: settings and handler auth management.
+- `chat`: chat message/session routes.
+- Public read routes exist for discovery-style surfaces such as providers, tools, and step types.
 
 ### Authenticated Users
 
@@ -112,7 +114,7 @@ curl -u username:app_password \
 ```
 
 **Solutions**:
-- Verify user has `manage_options` capability
+- Verify the user or scoped agent has the endpoint's Data Machine permission
 - Check application password is correct
 - Ensure WordPress user is active
 - Confirm HTTPS is being used
@@ -126,6 +128,6 @@ curl -u username:app_password \
 
 ---
 
-**Security Model**: `manage_options` capability required for admin endpoints
+**Security Model**: Endpoint-specific Data Machine permissions via `PermissionHelper`
 **Supported Methods**: Application Password, Cookie Authentication
 **WordPress Version**: 5.6+ (Application Passwords)
