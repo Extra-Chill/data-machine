@@ -46,8 +46,8 @@ Complete user documentation for Data Machine, the AI-first WordPress plugin that
 - **Chat Tools**: AddPipelineStep, ApiQuery, ConfigureFlowSteps, ConfigurePipelineStep, CreateFlow, CreatePipeline, RunFlow, UpdateFlow, and other workflow management tools.
 
 ### API Reference
-- **API Overview**: Catalog of REST endpoints for API consumers.
-- **Endpoints**: Auth, Execute, Files, Flows, Jobs, Logs, and other REST resources.
+- **API Overview**: Catalog of REST endpoints for API consumers ([api/index.md](api/index.md)).
+- **Endpoints**: Agents, Agent Ping, Auth, Email, Execute, Files, Flows, Internal Links, Jobs, Logs, and other REST resources.
 
 ### Development
 - **Hooks**: Core actions, filters, and engine hooks for extension development.

@@ -25,11 +25,15 @@ Complete REST API reference for Data Machine
 
 ### Content & Data
 - [Files](endpoints/files.md)
+- [Internal Links](endpoints/internal-links.md)
 - [Processed Items](endpoints/processed-items.md)
 
 ### AI & Chat
+- [Agents](endpoints/agents.md)
+- [Agent Ping](endpoints/agent-ping.md)
 - [Chat](endpoints/chat.md)
 - [Chat Sessions](endpoints/chat-sessions.md)
+- [Email](endpoints/email.md)
 - [Handlers](endpoints/handlers.md)
 - [Providers](endpoints/providers.md)
 - [Tools](endpoints/tools.md)
