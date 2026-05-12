@@ -173,6 +173,8 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/StepTypeAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/LocalSearchAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/SourceAggregateAbility.php';
+	require_once __DIR__ . '/inc/Core/SourceAggregation/SourceInventoryProfiler.php';
+	require_once __DIR__ . '/inc/Abilities/SourceInventoryAbility.php';
 	require_once __DIR__ . '/inc/Abilities/SystemAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/AltTextAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/ImageGenerationAbilities.php';
@@ -270,6 +272,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\StepTypeAbilities();
 	new \DataMachine\Abilities\LocalSearchAbilities();
 	new \DataMachine\Abilities\SourceAggregateAbility();
+	new \DataMachine\Abilities\SourceInventoryAbility();
 	new \DataMachine\Abilities\SystemAbilities();
 	new \DataMachine\Abilities\Media\AltTextAbilities();
 	new \DataMachine\Abilities\Media\ImageGenerationAbilities();
