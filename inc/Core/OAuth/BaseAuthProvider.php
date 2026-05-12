@@ -24,11 +24,18 @@
 
 namespace DataMachine\Core\OAuth;
 
+use DataMachine\Abilities\PermissionHelper;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 abstract class BaseAuthProvider {
+
+	public const AUTH_SCOPE_SITE      = 'site';
+	public const AUTH_SCOPE_USER      = 'user';
+	public const AUTH_SCOPE_AGENT     = 'agent';
+	public const AUTH_SCOPE_PRINCIPAL = 'principal';
 
 	/**
 	 * Encryption envelope prefix.
@@ -208,14 +215,26 @@ abstract class BaseAuthProvider {
 	/**
 	 * Get OAuth account data directly from options.
 	 *
-	 * Automatically decrypts any encrypted fields. Plaintext legacy values
-	 * pass through unchanged.
+	 * Automatically decrypts any encrypted fields. Principal-scoped credentials
+	 * are preferred when a user or agent context is available; legacy site-level
+	 * credentials remain readable as a fallback for existing installs.
 	 *
+	 * @param array $context Optional principal context, e.g. user_id or agent_id.
 	 * @return array Account data or empty array
 	 */
-	public function get_account(): array {
+	public function get_account( array $context = array() ): array {
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
-		$account       = $all_auth_data[ $this->provider_slug ]['account'] ?? array();
+		$provider_data = $all_auth_data[ $this->provider_slug ] ?? array();
+		$scope         = $this->get_principal_scope( $context, 'account' );
+
+		if ( null !== $scope ) {
+			$scoped_account = $provider_data['principals'][ $scope ]['account'] ?? array();
+			if ( ! empty( $scoped_account ) && is_array( $scoped_account ) ) {
+				return $this->decrypt_fields( $scoped_account );
+			}
+		}
+
+		$account = $provider_data['account'] ?? array();
 		return $this->decrypt_fields( $account );
 	}
 
@@ -227,26 +246,49 @@ abstract class BaseAuthProvider {
 	 *
 	 * @return array Configuration data or empty array
 	 */
-	public function get_config(): array {
+	public function get_config( array $context = array() ): array {
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
-		$config        = $all_auth_data[ $this->provider_slug ]['config'] ?? array();
+		$provider_data = $all_auth_data[ $this->provider_slug ] ?? array();
+		$scope         = $this->get_principal_scope( $context, 'config' );
+
+		if ( null !== $scope ) {
+			$scoped_config = $provider_data['principals'][ $scope ]['config'] ?? array();
+			if ( ! empty( $scoped_config ) && is_array( $scoped_config ) ) {
+				return $this->decrypt_fields( $scoped_config );
+			}
+		}
+
+		$config = $provider_data['config'] ?? array();
 		return $this->decrypt_fields( $config );
 	}
 
 	/**
 	 * Store OAuth account data directly in options.
 	 *
-	 * Sensitive fields are automatically encrypted before storage.
+	 * Sensitive fields are automatically encrypted before storage. Writes with a
+	 * resolvable user or agent context are stored under that principal; writes
+	 * without context preserve legacy site-level storage.
 	 *
 	 * @param array $data Account data to store
+	 * @param array $context Optional principal context, e.g. user_id or agent_id.
 	 * @return bool True on success
 	 */
-	public function save_account( array $data ): bool {
+	public function save_account( array $data, array $context = array() ): bool {
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
 		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) ) {
 			$all_auth_data[ $this->provider_slug ] = array();
 		}
-		$all_auth_data[ $this->provider_slug ]['account'] = $this->encrypt_fields( $data );
+
+		$scope = $this->get_principal_scope( $context, 'account' );
+		if ( null !== $scope ) {
+			if ( ! isset( $all_auth_data[ $this->provider_slug ]['principals'] ) || ! is_array( $all_auth_data[ $this->provider_slug ]['principals'] ) ) {
+				$all_auth_data[ $this->provider_slug ]['principals'] = array();
+			}
+			$all_auth_data[ $this->provider_slug ]['principals'][ $scope ]['account'] = $this->encrypt_fields( $data );
+		} else {
+			$all_auth_data[ $this->provider_slug ]['account'] = $this->encrypt_fields( $data );
+		}
+
 		return update_site_option( 'datamachine_auth_data', $all_auth_data );
 	}
 
@@ -256,24 +298,46 @@ abstract class BaseAuthProvider {
 	 * Sensitive fields are automatically encrypted before storage.
 	 *
 	 * @param array $data Configuration data to store
+	 * @param array $context Optional principal context. Config writes only scope when context is explicit.
 	 * @return bool True on success
 	 */
-	public function save_config( array $data ): bool {
+	public function save_config( array $data, array $context = array() ): bool {
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
 		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) ) {
 			$all_auth_data[ $this->provider_slug ] = array();
 		}
-		$all_auth_data[ $this->provider_slug ]['config'] = $this->encrypt_fields( $data );
+
+		$scope = $this->get_principal_scope( $context, 'config' );
+		if ( null !== $scope ) {
+			if ( ! isset( $all_auth_data[ $this->provider_slug ]['principals'] ) || ! is_array( $all_auth_data[ $this->provider_slug ]['principals'] ) ) {
+				$all_auth_data[ $this->provider_slug ]['principals'] = array();
+			}
+			$all_auth_data[ $this->provider_slug ]['principals'][ $scope ]['config'] = $this->encrypt_fields( $data );
+		} else {
+			$all_auth_data[ $this->provider_slug ]['config'] = $this->encrypt_fields( $data );
+		}
+
 		return update_site_option( 'datamachine_auth_data', $all_auth_data );
 	}
 
 	/**
 	 * Clear OAuth account data from options.
 	 *
+	 * @param array $context Optional principal context, e.g. user_id or agent_id.
 	 * @return bool True on success
 	 */
-	public function clear_account(): bool {
+	public function clear_account( array $context = array() ): bool {
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		$scope         = $this->get_principal_scope( $context, 'account' );
+
+		if ( null !== $scope ) {
+			if ( isset( $all_auth_data[ $this->provider_slug ]['principals'][ $scope ] ) ) {
+				unset( $all_auth_data[ $this->provider_slug ]['principals'][ $scope ] );
+				return update_site_option( 'datamachine_auth_data', $all_auth_data );
+			}
+			return true;
+		}
+
 		if ( isset( $all_auth_data[ $this->provider_slug ]['account'] ) ) {
 			unset( $all_auth_data[ $this->provider_slug ]['account'] );
 			return update_site_option( 'datamachine_auth_data', $all_auth_data );
@@ -303,6 +367,90 @@ abstract class BaseAuthProvider {
 	 */
 	public function get_account_details(): ?array {
 		return $this->get_account();
+	}
+
+	/**
+	 * Resolve the current credential scope.
+	 *
+	 * Agent context wins over user context so delegated agent execution cannot
+	 * accidentally read a broader owner credential when an agent credential exists.
+	 * Returning null intentionally preserves site-level behavior.
+	 *
+	 * @param array $context Optional explicit principal context.
+	 * @param string $credential_type Credential type: account or config.
+	 * @return string|null Scope key such as agent:12 or user:34, or null.
+	 */
+	protected function get_principal_scope( array $context = array(), string $credential_type = 'account' ): ?string {
+		$policy = $this->get_auth_scope_policy( $credential_type, $context );
+		if ( self::AUTH_SCOPE_SITE === $policy ) {
+			return null;
+		}
+
+		$agent_id = isset( $context['agent_id'] ) ? absint( $context['agent_id'] ) : 0;
+		if ( $agent_id > 0 && in_array( $policy, array( self::AUTH_SCOPE_AGENT, self::AUTH_SCOPE_PRINCIPAL ), true ) ) {
+			return 'agent:' . $agent_id;
+		}
+
+		$user_id = isset( $context['user_id'] ) ? absint( $context['user_id'] ) : 0;
+		if ( $user_id > 0 && in_array( $policy, array( self::AUTH_SCOPE_USER, self::AUTH_SCOPE_PRINCIPAL ), true ) ) {
+			return 'user:' . $user_id;
+		}
+
+		if ( class_exists( PermissionHelper::class ) ) {
+			$agent_id = absint( PermissionHelper::get_acting_agent_id() );
+			if ( $agent_id > 0 && in_array( $policy, array( self::AUTH_SCOPE_AGENT, self::AUTH_SCOPE_PRINCIPAL ), true ) ) {
+				return 'agent:' . $agent_id;
+			}
+
+			$user_id = absint( PermissionHelper::acting_user_id() );
+			if ( $user_id > 0 && in_array( $policy, array( self::AUTH_SCOPE_USER, self::AUTH_SCOPE_PRINCIPAL ), true ) ) {
+				return 'user:' . $user_id;
+			}
+		}
+
+		if ( function_exists( 'get_current_user_id' ) ) {
+			$user_id = absint( get_current_user_id() );
+			if ( $user_id > 0 && in_array( $policy, array( self::AUTH_SCOPE_USER, self::AUTH_SCOPE_PRINCIPAL ), true ) ) {
+				return 'user:' . $user_id;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Return the credential scope policy for this provider.
+	 *
+	 * The default preserves existing site-wide behavior for all providers. Providers
+	 * that represent a human browser/session identity can opt into user, agent, or
+	 * principal scoping by overriding this method or using the filter.
+	 *
+	 * @param string $credential_type Credential type: account or config.
+	 * @param array  $context Optional explicit principal context.
+	 * @return string One of site, user, agent, principal.
+	 */
+	protected function get_auth_scope_policy( string $credential_type = 'account', array $context = array() ): string {
+		$policy = self::AUTH_SCOPE_SITE;
+
+		if ( function_exists( 'apply_filters' ) ) {
+			$policy = (string) apply_filters(
+				'datamachine_auth_scope_policy',
+				$policy,
+				$this->provider_slug,
+				$credential_type,
+				$context,
+				$this
+			);
+		}
+
+		$allowed = array(
+			self::AUTH_SCOPE_SITE,
+			self::AUTH_SCOPE_USER,
+			self::AUTH_SCOPE_AGENT,
+			self::AUTH_SCOPE_PRINCIPAL,
+		);
+
+		return in_array( $policy, $allowed, true ) ? $policy : self::AUTH_SCOPE_SITE;
 	}
 
 	// -------------------------------------------------------------------------

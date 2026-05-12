@@ -505,9 +505,9 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	 * @since 0.31.1
 	 * @return bool True on success
 	 */
-	public function clear_account(): bool {
+	public function clear_account( array $context = array() ): bool {
 		$this->clear_proactive_refresh();
-		return parent::clear_account();
+		return parent::clear_account( $context );
 	}
 
 	// -------------------------------------------------------------------------
@@ -590,14 +590,15 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	 * @return array Query parameters for the authorization URL.
 	 */
 	protected function build_auth_url_params( array $state_payload = array() ): array {
+		$state = $this->oauth2->create_state( $this->provider_slug, $state_payload );
 		$params = array(
 			'response_type' => $this->get_oauth_response_type(),
 			'redirect_uri'  => $this->get_callback_url(),
-			'state'         => $this->oauth2->create_state( $this->provider_slug, $state_payload ),
+			'state'         => $state,
 		);
 
 		if ( $this->uses_pkce() ) {
-			$pkce                            = $this->oauth2->create_pkce( $this->provider_slug );
+			$pkce                            = $this->oauth2->create_pkce( $this->provider_slug, $state );
 			$params['code_challenge']        = $pkce['challenge'];
 			$params['code_challenge_method'] = $pkce['method'];
 		}
