@@ -4,7 +4,7 @@ Standardized handler registration trait introduced in v0.2.2 that eliminates ~70
 
 ## Overview
 
-HandlerRegistrationTrait (`/inc/Core/Steps/HandlerRegistrationTrait.php`) provides a single `registerHandler()` method that automatically registers handlers with all required WordPress filters.
+[`HandlerRegistrationTrait`](../../inc/Core/Steps/HandlerRegistrationTrait.php) provides a single `registerHandler()` method that automatically registers handlers with the core WordPress filters Data Machine uses for handler discovery, settings, auth providers, and deferred handler tools.
 
 ## Architecture
 
@@ -29,14 +29,15 @@ protected static function registerHandler(
     ?string $auth_class = null,
     ?string $settings_class = null,
     ?callable $tools_callback = null,
-    ?string $authProviderKey = null
+    ?string $authProviderKey = null,
+    array $meta = []
 ): void
 ```
 
 ### Parameters
 
 - **$handler_slug**: Unique identifier for the handler (e.g., 'twitter', 'rss')
-- **$handler_type**: Handler type ('fetch', 'publish', 'update')
+- **$handler_type**: Handler type (`'fetch'`, `'publish'`, or `'upsert'`)
 - **$handler_class**: Fully qualified class name for the handler
 - **$label**: Display name for admin interface (translatable)
 - **$description**: Handler description for admin interface (translatable)
@@ -45,6 +46,7 @@ protected static function registerHandler(
 - **$settings_class**: Fully qualified settings class name
 - **$tools_callback**: Callback for AI tool registration
 - **$authProviderKey**: Optional auth provider key override for shared authentication. When set, the handler metadata includes `auth_provider_key`, and the auth provider is registered under this key.
+- **$meta**: Optional arbitrary metadata passed through to handler discovery APIs, for example character limits or media limits.
 
 ## Filters Registered
 
@@ -55,16 +57,22 @@ The trait automatically registers handlers with the following WordPress filters:
 Handler metadata registration (always registered).
 
 ```php
-add_filter('datamachine_handlers', function($handlers) {
+add_filter('datamachine_handlers', function($handlers, $step_type = null) {
+    if (null !== $step_type && $step_type !== $handler_type) {
+        return $handlers;
+    }
+
     $handlers[$handler_slug] = [
         'type' => $handler_type,
         'class' => $handler_class,
         'label' => $label,
         'description' => $description,
-        'requires_auth' => $requires_auth
+        'requires_auth' => $requires_auth,
+        'auth_provider_key' => $requires_auth ? $provider_key : null,
+        'meta' => $meta,
     ];
     return $handlers;
-});
+}, 10, 2);
 ```
 
 ### 2. datamachine_auth_providers
@@ -78,22 +86,26 @@ Auth providers are keyed by **provider key**, not necessarily the handler slug.
 
 ```php
 // Only registered if requires_auth is true
-add_filter('datamachine_auth_providers', function($providers) use ($provider_key) {
-    $providers[$provider_key] = new $auth_class();
+add_filter('datamachine_auth_providers', function($providers, $step_type = null) use ($provider_key) {
+    if (null === $step_type || $step_type === $handler_type) {
+        $providers[$provider_key] = $providers[$provider_key] ?? new $auth_class();
+    }
     return $providers;
-});
+}, 10, 2);
 ```
+
+Portable bundles may export credential-bearing handler config as `auth_ref`. Publish and upsert base classes resolve that reference at runtime with `AuthRefHandlerConfig::resolve_runtime_config()` before calling the handler-specific execution method. The registration trait only registers the provider and advertises `auth_provider_key`; it does not resolve credentials itself.
 
 ### 3. datamachine_handler_settings
 
 Settings class registration (always registered if settings_class provided).
 
 ```php
-add_filter('datamachine_handler_settings', function($settings, $handler_slug_param) {
-    if ($handler_slug_param === $handler_slug) {
-        return $settings_class;
+add_filter('datamachine_handler_settings', function($all_settings, $handler_slug_param = null) {
+    if (null === $handler_slug_param || $handler_slug_param === $handler_slug) {
+        $all_settings[$handler_slug] = new $settings_class();
     }
-    return $settings;
+    return $all_settings;
 }, 10, 2);
 ```
 
@@ -118,8 +130,13 @@ add_filter('datamachine_tools', function($tools) use ($slug, $tools_callback) {
 });
 ```
 
-The callback receives `(string $handler_slug, array $handler_config, array $engine_data)`
-and returns `['tool_name' => $tool_definition]` (empty array to opt out).
+The preferred direct-style callback receives `(string $handler_slug, array $handler_config, array $engine_data)` and returns `['tool_name' => $tool_definition]` (empty array to opt out).
+
+Existing filter-style callbacks are also supported. `ToolManager::resolveHandlerTools()` invokes callbacks with `($tools, $handler_slug, $handler_config, $engine_data)` when reflection detects four or more parameters, or a first parameter named `$tools` or `$all_tools`.
+
+Handler tool matching is exact by default: a registry entry with `'handler' => 'wordpress_publish'` is resolved only for adjacent steps whose handler slug is exactly `wordpress_publish`. Cross-cutting tools can use `'handler_types' => ['fetch', 'event_import']`; those are matched against `datamachine_handlers` metadata.
+
+`_handler_callable` entries are deferred registry entries. They are not directly executable tools and should not include normal tool parameters at the wrapper level. The callback returns the executable tool definitions.
 
 ## Usage Example
 
@@ -197,7 +214,7 @@ class WordPressUpdateFilters {
     public static function register(): void {
         self::registerHandler(
             'wordpress_update',
-            'update',
+            'upsert',
             WordPressUpdate::class,
             __('WordPress Update', 'datamachine'),
             __('Update existing WordPress content', 'datamachine'),
@@ -256,8 +273,8 @@ Custom handlers should adopt this pattern by:
 
 3. **Move tool registration to callback parameter**:
    ```php
-   // Receives (handler_slug, handler_config, engine_data) and returns
-   // [tool_name => definition]. The trait handles routing to the adjacent
+    // Receives (handler_slug, handler_config, engine_data) and returns
+    // [tool_name => definition]. The trait handles exact-slug routing to the adjacent
    // step's handler — no manual slug check needed.
    function($handler_slug, $handler_config, $engine_data) {
        return [
@@ -375,12 +392,21 @@ self::registerHandler(
 - IDE autocomplete support for all parameters
 - PHP type hints prevent registration errors
 
+## Core vs Extension Boundaries
+
+- Core owns `HandlerRegistrationTrait`, `datamachine_handlers`, `datamachine_handler_settings`, `datamachine_auth_providers`, and deferred `_handler_callable` resolution.
+- Extensions own concrete handler classes, settings classes, auth provider classes, and executable tool definitions.
+- Extensions should register exact handler slugs. Core does not perform fuzzy slug matching.
+- Extensions should use `handler_types` only for cross-cutting tools that intentionally apply to every handler of a registered type.
+- Extensions can export portable auth config as `auth_ref`; core resolves it at runtime before fetch, publish, and upsert handler execution.
+
 ## See Also
 
-- Core Filters - Complete filter reference
-- Fetch Handler - Fetch handler base class
-- Publish Handler - Publish handler base class
-- Settings Handler - Settings base classes
+- [Core Filters](../development/hooks/core-filters.md) - Complete filter reference
+- [`FetchHandler`](../../inc/Core/Steps/Fetch/Handlers/FetchHandler.php) - Fetch handler base class
+- [`PublishHandler`](../../inc/Core/Steps/Publish/Handlers/PublishHandler.php) - Publish handler base class
+- [`UpsertHandler`](../../inc/Core/Steps/Upsert/Handlers/UpsertHandler.php) - Upsert handler base class
+- [`SettingsHandler`](../../inc/Core/Steps/Settings/SettingsHandler.php) - Settings base class
 
 ## Related Documentation
 

@@ -1,6 +1,6 @@
 # Publish Handlers Overview
 
-Publish handlers distribute processed content to external platforms using AI tool calling architecture. All handlers implement the `handle_tool_call()` method for agentic execution.
+Publish handlers distribute processed content to external platforms using the AI tool-calling architecture. Custom handlers extend the publish base class and implement `executePublish()`; the base class owns the final `handle_tool_call()` entry point.
 
 ## Available Handlers
 
@@ -54,14 +54,16 @@ if ($link_handling === 'append' && !empty($source_url) && filter_var($source_url
 
 **Base Class Architecture** (@since v0.2.1):
 
-All publish handlers extend `PublishHandler` base class (`/inc/Core/Steps/Publish/Handlers/PublishHandler.php`) which provides:
+All publish handlers extend [`PublishHandler`](../../../inc/Core/Steps/Publish/Handlers/PublishHandler.php), which provides:
 - Engine data retrieval via `getEngineData()`, `getSourceUrl()`, `getImageFilePath()`
 - Image validation via `validateImage()`
+- `auth_ref` runtime resolution via `AuthRefHandlerConfig::resolve_runtime_config()`
+- Dry-run preview handling
 - Response formatting via `successResponse()` and `errorResponse()`
 - Centralized logging via `log()`
 - Standardized error handling
 
-The base class provides `handle_tool_call()` as the final public entry point, calling abstract `executePublish()` method in child classes.
+The base class provides `handle_tool_call()` as the final public entry point and calls the abstract `executePublish()` method in child classes. Do not override `handle_tool_call()` in extension handlers unless the base class is not being used.
 
 ### `handle_tool_call()` Interface
 
@@ -78,7 +80,16 @@ abstract protected function executePublish(array $parameters, array $handler_con
 
 **Parameters Structure**:
 - `$parameters` - AI-provided parameters (content, etc.)
-- `$tool_def` - Tool definition with handler configuration
+- `$tool_def` - Tool definition with handler configuration and handler slug
+
+Before `executePublish()` runs, the base class:
+
+- Requires `job_id`.
+- Loads job engine data and injects an `EngineData` object as `$parameters['engine']`.
+- Resolves portable `auth_ref` handler config into runtime credentials when present.
+- Returns a dry-run preview when engine data contains `dry_run_mode`.
+
+Post-origin tracking is centralized in [`ToolExecutor`](../../../inc/Engine/AI/Tools/ToolExecutor.php). Handler base classes and extensions should return an extractable post ID in the tool result; they should not call post-tracking helpers directly.
 
 **Return Structure**:
 ```php
@@ -96,9 +107,7 @@ abstract protected function executePublish(array $parameters, array $handler_con
 
 ### AI Tool Registration
 
-Each handler registers its tool through the unified `datamachine_tools` registry.
-The preferred path is `HandlerRegistrationTrait::registerHandler()` which wires
-the callback for you; the equivalent manual registration shape is:
+Each handler registers its tool through the unified `datamachine_tools` registry. The preferred path is [`HandlerRegistrationTrait::registerHandler()`](../../../inc/Core/Steps/HandlerRegistrationTrait.php), which wires the callback for you. The equivalent manual registration shape is:
 
 ```php
 add_filter('datamachine_tools', function($tools) {
@@ -129,6 +138,15 @@ add_filter('datamachine_tools', function($tools) {
 });
 ```
 
+Handler tool entries are deferred registry entries, not directly executable tools. `ToolManager::resolveHandlerTools()` resolves entries whose `handler` exactly matches the adjacent step handler slug. Cross-cutting tools may use `handler_types`, for example `['fetch', 'event_import']`, which matches against `datamachine_handlers` metadata.
+
+Callback conventions supported by `ToolManager`:
+
+- **Direct-style** callbacks receive `($handler_slug, $handler_config, $engine_data)` and return `['tool_name' => $tool_definition]`.
+- **Filter-style** callbacks receive `($tools, $handler_slug, $handler_config, $engine_data)` and return the updated tool map.
+
+The resolver detects filter-style callbacks by reflection: callbacks with four or more parameters, or a first parameter named `$tools` or `$all_tools`, are invoked with the filter-style shape. New code should prefer direct-style callbacks unless it is migrating an existing filter-style tool builder.
+
 ## Common Features
 
 ### Handler Configuration
@@ -136,19 +154,18 @@ add_filter('datamachine_tools', function($tools) {
 **Configuration Structure**:
 ```php
 $handler_config = [
-    'handler_name' => [
-        'setting1' => 'value1',
-        'enable_feature' => true,
-        'platform_specific_option' => 'option_value'
-    ]
+    'setting1' => 'value1',
+    'enable_feature' => true,
+    'platform_specific_option' => 'option_value',
 ];
 ```
 
 **Tool Definition Integration**:
 ```php
 $handler_config = $tool_def['handler_config'] ?? [];
-$platform_config = $handler_config['platform_name'] ?? $handler_config;
 ```
+
+Handler config is flat at runtime. `AuthRefHandlerConfig::resolve_runtime_config()` may merge local credentials into that flat config before `executePublish()` receives it.
 
 ### Content Processing
 
@@ -303,8 +320,14 @@ $pipeline_steps = [
 ### Custom Publish Handler
 
 ```php
-class CustomPublishHandler {
-    public function handle_tool_call(array $parameters, array $tool_def = []): array {
+use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
+
+class CustomPublishHandler extends PublishHandler {
+    public function __construct() {
+        parent::__construct('custom_platform');
+    }
+
+    protected function executePublish(array $parameters, array $handler_config): array {
         // Validate parameters
         if (empty($parameters['content'])) {
             return [
@@ -314,13 +337,13 @@ class CustomPublishHandler {
             ];
         }
 
-        // Get configuration
-        $handler_config = $tool_def['handler_config'] ?? [];
-        $custom_config = $handler_config['custom_platform'] ?? [];
+        $custom_config = $handler_config;
+        $engine = $parameters['engine'];
+        $source_url = $engine->getSourceUrl();
 
         // Publish to platform
         try {
-            $result = $this->publish_to_platform($parameters['content'], $custom_config);
+            $result = $this->publish_to_platform($parameters['content'], $custom_config, $source_url);
 
             return [
                 'success' => true,
@@ -372,3 +395,10 @@ add_filter('datamachine_tools', function($tools) {
     return $tools;
 });
 ```
+
+## Core vs Extension Boundaries
+
+- Core owns `PublishHandler::handle_tool_call()`, engine data loading, dry-run previews, `auth_ref` resolution, tool execution, and centralized post-origin tracking.
+- Extensions own platform-specific API clients, settings classes, auth providers, and `executePublish()` implementation details.
+- Extensions should return standard tool results and allow `ToolExecutor` to apply post tracking when a post ID is present.
+- Extensions should register handler tools as deferred `_handler_callable` entries and let `ToolManager` resolve exact-slug or `handler_types` matches at pipeline runtime.
