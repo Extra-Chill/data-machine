@@ -477,8 +477,11 @@ Agents with shell access can use the `memory` command for structured access:
 wp datamachine memory paths --allow-root
 
 # Read memory file
-wp datamachine memory files read SOUL.md --allow-root
-wp datamachine memory files read MEMORY.md --allow-root
+wp datamachine memory read SOUL.md --allow-root
+wp datamachine memory read MEMORY.md --allow-root
+
+# Read a section. Pass section names without the leading ##.
+wp datamachine memory read SOUL.md "Identity" --allow-root
 
 # List agent directory contents
 wp datamachine memory files list --allow-root
@@ -664,7 +667,7 @@ wp datamachine memory paths --relative --allow-root
 
 ```bash
 wp datamachine agents list --allow-root
-wp datamachine agents create --slug=bot --name="My Bot" --allow-root
+wp datamachine agents create bot --name="My Bot" --owner=1 --allow-root
 wp datamachine agents rename old-slug new-slug --allow-root
 ```
 
@@ -673,9 +676,10 @@ wp datamachine agents rename old-slug new-slug --allow-root
 ```bash
 wp datamachine memory paths --allow-root
 wp datamachine memory files list --allow-root
-wp datamachine memory files read <file> --allow-root
-wp datamachine memory files write <file> --content="..." --allow-root
-wp datamachine memory files edit <file> --old="..." --new="..." --allow-root
+wp datamachine memory read <file> --allow-root
+wp datamachine memory read <file> "Section" --allow-root
+wp datamachine memory write <file> "Section" "Content" --allow-root
+wp datamachine memory write "Section" --from-file=/tmp/content.md --mode=append --allow-root
 ```
 
 > **Note:** For workspace/git operations, install the `data-machine-code` extension and use `wp datamachine-code workspace`.

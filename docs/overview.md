@@ -65,7 +65,7 @@ Markdown files organized in three layers:
 |-------|-----------|----------|
 | **Shared** | shared layer | SITE.md, RULES.md (site-wide context) |
 | **Agent** | agent slug layer | SOUL.md, MEMORY.md (agent identity and knowledge) |
-| **User** | user ID layer | USER.md, MEMORY.md (human preferences) |
+| **User** | user ID layer | USER.md (human preferences) |
 
 ### Daily Memory System
 
