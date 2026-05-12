@@ -68,9 +68,14 @@ use DataMachine\Engine\AI\MemoryFileRegistry;
 use DataMachine\Engine\AI\AgentModeRegistry;
 use DataMachine\Engine\AI\IterationBudgetRegistry;
 use DataMachine\Engine\AI\WpAiClientCache;
+use DataMachine\Core\Auth\AgentAccessStoreAdapter;
 use DataMachine\Core\PluginSettings;
 
 add_action( 'plugins_loaded', array( WpAiClientCache::class, 'install' ), 20 );
+
+if ( interface_exists( 'WP_Agent_Access_Store' ) ) {
+	AgentAccessStoreAdapter::register();
+}
 
 /*
 |--------------------------------------------------------------------------
