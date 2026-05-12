@@ -92,6 +92,7 @@ export const clearProcessedItems = ( clearType, targetId ) =>
  */
 export const fetchPipelines = () =>
 	client.get( '/pipelines', {
+		output_mode: 'list',
 		include_flows: false,
 		per_page: 100,
 	} );

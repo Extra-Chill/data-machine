@@ -48,7 +48,7 @@ trait PipelineHelpers {
 	 * avoid N+1 per-pipeline lookups when formatting the admin list.
 	 *
 	 * @param array  $pipelines     Pipelines to format.
-	 * @param string $output_mode   Output mode (full, summary, ids).
+	 * @param string $output_mode   Output mode (full, list, summary, ids).
 	 * @param bool   $include_flows When true, embed the full flows array on each pipeline
 	 *                              (only honored in 'full' mode). Defaults to true for
 	 *                              backward compatibility.
@@ -131,6 +131,17 @@ trait PipelineHelpers {
 				'pipeline_name' => $pipeline['pipeline_name'] ?? '',
 				'flow_count'    => $count,
 			);
+		}
+
+		if ( 'list' === $output_mode ) {
+			$pipeline = $this->addDisplayFields( $pipeline );
+			unset( $pipeline['flows'] );
+
+			$pipeline['flow_count'] = array_key_exists( $pipeline_id, $flow_counts )
+				? (int) $flow_counts[ $pipeline_id ]
+				: $this->db_flows->count_flows_for_pipeline( $pipeline_id );
+
+			return $pipeline;
 		}
 
 		$pipeline = $this->addDisplayFields( $pipeline );

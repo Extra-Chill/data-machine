@@ -67,9 +67,9 @@ class GetPipelinesAbility {
 							),
 							'output_mode'   => array(
 								'type'        => 'string',
-								'enum'        => array( 'full', 'summary', 'ids' ),
+								'enum'        => array( 'full', 'list', 'summary', 'ids' ),
 								'default'     => 'full',
-								'description' => __( 'Output mode: full=all data with flows, summary=key fields only, ids=just pipeline_ids', 'data-machine' ),
+								'description' => __( 'Output mode: full=all data with flows, list=pipeline shell with flow_count and no embedded flows, summary=key fields only, ids=just pipeline_ids', 'data-machine' ),
 							),
 							'include_flows' => array(
 								'type'        => 'boolean',
@@ -121,8 +121,12 @@ class GetPipelinesAbility {
 			$search        = isset( $input['search'] ) && '' !== $input['search'] ? sanitize_text_field( $input['search'] ) : null;
 			$include_flows = array_key_exists( 'include_flows', $input ) ? (bool) $input['include_flows'] : true;
 
-			if ( ! in_array( $output_mode, array( 'full', 'summary', 'ids' ), true ) ) {
+			if ( ! in_array( $output_mode, array( 'full', 'list', 'summary', 'ids' ), true ) ) {
 				$output_mode = 'full';
+			}
+
+			if ( 'list' === $output_mode ) {
+				$include_flows = false;
 			}
 
 			// Direct pipeline lookup by ID bypasses pagination. It embeds flows by

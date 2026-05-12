@@ -39,7 +39,8 @@ List pipelines or export CSV.
 - `search` (string, optional): substring match on pipeline name.
 - `per_page` (integer, optional, default `20`, max `100`): page size.
 - `offset` (integer, optional, default `0`): pagination offset.
-- `include_flows` (boolean, optional): include full flows. Defaults to `false` for list mode and `true` for single-pipeline lookups.
+- `output_mode` (string, optional, default `list`): `full`, `list`, `summary`, or `ids`. `list` returns the pipeline shell plus `flow_count` without embedding flows.
+- `include_flows` (boolean, optional): include full flows when `output_mode=full`. Defaults to `false` for collection reads.
 
 **List success shape**:
 
@@ -49,6 +50,7 @@ List pipelines or export CSV.
   "per_page": 20,
   "offset": 0,
   "total": 0,
+  "output_mode": "list",
   "data": {
     "pipelines": [],
     "total": 0
