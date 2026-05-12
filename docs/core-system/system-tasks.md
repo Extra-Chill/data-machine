@@ -260,7 +260,7 @@ Defines the admin UI fields. The task dropdown is populated from `TaskRegistry::
 **Source:** `inc/Engine/AI/System/Tasks/DailyMemoryTask.php`
 **Undo:** No
 
-AI-generated daily summary of agent activity plus automatic MEMORY.md cleanup. Two-phase execution: Phase 1 synthesizes the day's jobs and chat sessions into a daily entry; Phase 2 uses AI to split MEMORY.md into persistent knowledge and session-specific content, archiving the latter to the daily file.
+Automated `MEMORY.md` maintenance. The task gathers same-day job/chat context into `activity_section`, performs deterministic overflow archiving for very large files, and otherwise uses the single `daily_memory` prompt to split persistent knowledge from session-specific content. Safety and conservation checks prevent lossy rewrites.
 
 See [Daily Memory System](daily-memory-system.md) for complete documentation.
 
@@ -269,7 +269,7 @@ See [Daily Memory System](daily-memory-system.md) for complete documentation.
 | Setting | `daily_memory_enabled` |
 | Trigger | Daily at midnight UTC (cron) |
 | Manual run | Yes |
-| Prompts | `daily_summary`, `memory_cleanup` |
+| Prompts | `daily_memory` |
 
 ### InternalLinkingTask
 

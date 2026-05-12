@@ -111,6 +111,24 @@ For example, the daily file for April 17, 2026 is the logical filename `daily/20
 
 Path helper methods such as `DailyMemory::get_base_path()` and `get_file_path()` are disk conveniences only. Non-disk stores may persist daily memory in posts, rows, or another physical shape.
 
+Daily memory availability is policy-gated at two layers:
+
+- `AgentDailyMemoryDirective` only injects recent files when `agent_config.daily_memory.enabled` is true for the resolved agent.
+- `AgentDailyMemory` tool access is still subject to tool policy and the underlying daily-memory abilities; write/delete operations also honor `daily_memory_enabled`.
+
+Run artifact collection can project daily memory writes into bundle-relative paths. When a successful `agent_daily_memory` write happens during a job, `JobArtifacts` reads the resulting day file and emits an `agent_daily_memory` artifact with `bundle_relative_path` shaped as `memory/agent/daily/YYYY/MM/DD.md`. If the file cannot be read yet, the artifact falls back to the write content with a `# Daily Memory: YYYY-MM-DD` heading.
+
+## Bundle Artifact Projection
+
+Memory backends store logical files; bundles and job artifacts provide portable projections of those files:
+
+- Agent memory writes become `agent_memory` run artifacts with paths such as `memory/agent/MEMORY.md` or `memory/USER.md`.
+- Daily memory writes become `agent_daily_memory` run artifacts under `memory/agent/daily/YYYY/MM/DD.md`.
+- Bundle-owned memory sections are tracked as section artifacts by `MemorySectionArtifact`, including owner, section type, source path, install hash, current hash, and local status.
+- Safe self-memory writes use section artifact ownership to decide whether to write directly or stage a PendingAction.
+
+The backend contract does not need to know about these bundle paths. The projection layer reads through `AgentMemory` and `DailyMemory`, then maps logical records to portable package paths for egress or upgrade review.
+
 ## Relationship To AI Framework
 
 The memory-store seam is not a replacement for AI Framework. Data Machine still owns its portable agent memory model and prompt assembly, while consumers can route storage to the backend that fits the host. AI Framework integration can coexist with this model; it does not require Data Machine to abandon `AgentMemory`, `MEMORY.md`, or the registry-driven directive stack.
@@ -129,4 +147,5 @@ The memory-store seam is not a replacement for AI Framework. Data Machine still 
 - [WordPress as Persistent Memory for AI Agents](../core-system/wordpress-as-agent-memory.md)
 - [Memory Policy](../core-system/memory-policy.md)
 - [Daily Memory System](../core-system/daily-memory-system.md)
+- [Agent Bundles](../core-system/agent-bundles.md)
 - [Core Filters: WP_Agent_Memory_Store](../development/hooks/core-filters.md#agentmemorystoreinterface-inccorefilesrepositoryagentmemorystoreinterfacephp)

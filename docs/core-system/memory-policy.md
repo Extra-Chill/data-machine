@@ -15,6 +15,8 @@ Two shapes of agent:
 
 MemoryPolicy lets the stateless shape declare its posture in config, travel with the agent through bundle export/import, and apply uniformly across every memory injection surface.
 
+Daily memory has a separate opt-in switch at `agent_config.daily_memory`. MemoryPolicy controls registered and scoped memory files such as `MEMORY.md`, `SOUL.md`, `USER.md`, and configured context files; `AgentDailyMemoryDirective` separately decides whether recent daily archive files are injected at priority 35. Both settings travel in `agent_config` so bundles can preserve a stateful agent's memory posture without making daily memory a global default.
+
 ## How it fits
 
 Data Machine already has a layered memory injection system. MemoryPolicy does not replace it — it is a subtractive filter that applies across all three existing layers.
@@ -162,6 +164,21 @@ Parallel structure, parallel mental model:
 
 Same precedence model, same extension points, same per-agent config home. An agent's portable definition bundles both policies together with its pipelines, flows, and identity files.
 
+## Safe self-memory writes
+
+The `datamachine/agent-memory-self-write` ability is narrower than general file editing. It exists so an acting agent can record operational lessons without silently rewriting durable knowledge or another agent's memory.
+
+Policy gates in `SelfMemoryWritePolicy` are applied before `AgentMemory` writes:
+
+- An active acting-agent context is required.
+- The target defaults to the current agent; cross-agent writes require `datamachine_self_memory_allow_cross_agent_write` delegation.
+- Durable fact section types (`fact`, `domain_fact`, `wiki_fact`, `knowledge`) are rejected. Those belong in wiki or graph tools.
+- Allowed operational section types default to `operating_note`, `source_quirk`, `run_lesson`, and `task_note`, filterable through `datamachine_self_memory_allowed_section_types`.
+- Bundle-owned memory sections are staged as PendingActions instead of overwritten directly.
+- Sensitive section types or explicit `requires_approval` requests are also staged as PendingActions.
+
+Section ownership is represented by `MemorySectionArtifact` with owners `bundle`, `user`, `runtime`, and `compaction`. Bundle-owned sections carry `bundle_slug`, `bundle_version`, `installed_hash`, `current_hash`, and `local_status`, so clean bundle sections can auto-update while modified sections are preserved for review.
+
 ## See also
 
 - [WordPress as Agent Memory](./wordpress-as-agent-memory.md) — the full memory architecture
@@ -169,3 +186,5 @@ Same precedence model, same extension points, same per-agent config home. An age
 - [Tool Manager](./tool-manager.md) — tool resolution and ToolPolicy reference
 - [Multi-Agent Architecture](./multi-agent-architecture.md) — `agent_config` and per-agent settings
 - [Import/Export](./import-export.md) — `AgentBundler` and bundle round-trips
+- [Agent Bundles](./agent-bundles.md) — bundle artifact tracking, memory section artifacts, and upgrade conflict handling
+- [Daily Memory System](./daily-memory-system.md) — daily archive storage, directive opt-in, and the `agent_daily_memory` tool

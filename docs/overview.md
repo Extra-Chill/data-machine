@@ -71,10 +71,10 @@ Markdown files organized in three layers:
 
 Temporal knowledge is preserved in date-organized daily memory files. The **DailyMemoryTask** system task automatically:
 
-1. Synthesizes daily activity into summary files
-2. Prunes MEMORY.md when it exceeds 8KB, archiving session-specific content to daily files
+1. Maintains `MEMORY.md` with the single `daily_memory` prompt when activity or size requires compaction
+2. Archives session-specific content to daily files, including deterministic overflow artifacts for very large memory files
 
-Pipelines can selectively inject daily memory via the **DailyMemorySelectorDirective** with modes: recent days, specific dates, date range, or by month.
+Agents can opt into recent daily memory injection via **AgentDailyMemoryDirective** (`agent_config.daily_memory`). Precise historical lookups use the `agent_daily_memory` tool.
 
 ### Memory Path Discovery
 
