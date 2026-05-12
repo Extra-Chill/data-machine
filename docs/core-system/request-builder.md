@@ -3,482 +3,259 @@
 **File**: `/inc/Engine/AI/RequestBuilder.php`
 **Since**: 0.2.0
 
-Centralized AI request construction ensuring consistent request structure across Pipeline AI and Chat API agents. Single source of truth for building standardized AI requests to prevent architectural drift between agent types.
+`RequestBuilder` is Data Machine's request assembly and provider dispatch adapter. It prepares Data Machine messages, tools, directives, request metadata, and transport options, then calls WordPress core's `wp-ai-client` directly.
 
-## Purpose
+## Boundary
 
-The `RequestBuilder` class consolidates all AI request building logic into a single, unified interface. This prevents behavioral differences between Pipeline and Chat agents by ensuring both use identical request construction, tool formatting, and directive application patterns.
+Data Machine has two separate runtime layers:
 
-**Critical Rule**: Data Machine runtime code should not bypass its own request assembly. Use `RequestBuilder::build()` for Data Machine chat and pipeline AI steps so directive application, metadata, request guardrails, and wp-ai-client dispatch stay consistent. This rule is not an Agents API boundary: plugins that only need one-shot AI operations may call `wp-ai-client` directly without routing through Data Machine or Agents API.
+- **Agents API** owns durable multi-turn runtime semantics: conversation loops, transcripts, locks, event sinks, budgets, sessions, memory contracts, and normalized result/message envelopes.
+- **wp-ai-client** owns provider/model prompt execution.
+- **RequestBuilder** is the Data Machine adapter from product payloads to `wp-ai-client` provider requests.
 
-## Architecture
+Pipeline AI steps and Data Machine chat turns use `RequestBuilder::build()` so directives, metadata, request inspection, tool declarations, and timeout behavior stay consistent. Plugins that only need one-shot provider calls may call `wp-ai-client` directly; they do not need to route through Data Machine or Agents API.
+
+## Flow
 
 ```
-Request Building Flow:
-┌─────────────────────────────────────────────────────┐
-│              RequestBuilder::build()                │
-│                                                      │
-│  1. Initialize Request                              │
-│     • Set model and messages                        │
-│                                                      │
-│  2. Restructure Tools                               │
-│     • Normalize tool definitions                    │
-│     • Ensure provider compatibility                 │
-│                                                      │
-│  3. Apply Directives via PromptBuilder              │
-│     • datamachine_directives filter collects configs │
-│     • Priority-based sorting and agent targeting    │
-│     • Unified directive management                   │
-│                                                      │
-│  4. Send to wp-ai-client                            │
-│     • RequestBuilder capability gate                │
-│     • Returns standardized AI response              │
-└─────────────────────────────────────────────────────┘
+RequestBuilder::build()
+  |
+  |-- WpAiClientCache::install()
+  |-- assemble()
+  |     |-- withDirectiveContext()
+  |     |-- apply_filters( 'datamachine_directives', [] )
+  |     |-- DirectivePolicyResolver::resolve()
+  |     `-- ProviderRequestAssembler::assemble()
+  |-- ProviderRequestAssembler::toProviderRequest()
+  |-- wpAiClientPromptContext()
+  |-- RequestMetadata::build()
+  |-- RequestMetadata::warn_if_oversized()
+  |-- wpAiClientUnavailableReason()
+  |-- apply_filters( 'datamachine_wp_ai_client_text_result', null, ... )
+  |-- wpAiClientTransportProfile()
+  |-- AiClient::defaultRegistry()
+  |-- wp_ai_client_prompt()
+  `-- generate_text_result()
 ```
 
 ## Usage
 
-### Basic Usage
-
 ```php
 use DataMachine\Engine\AI\RequestBuilder;
 
+$request_metadata = array();
+
 $ai_response = RequestBuilder::build(
-    $messages,      // Messages array with role/content
-    $provider,      // AI provider name (openai, anthropic, etc.)
-    $model,         // Model identifier
-    $tools,         // Raw tools array from filters
-    $agent_type,    // 'chat' or 'pipeline'
-    $context        // Agent-specific context (session_id, step_id, payload, etc)
-);
-```
-
-### Pipeline Agent Example
-
-```php
-use DataMachine\Engine\AI\RequestBuilder;
-
-// Build context for pipeline agent
-$context = [
-    'step_id' => $flow_step_id,
-    'payload' => [
-        'job_id' => $job_id,
-        'flow_step_id' => $flow_step_id,
-        'data' => $data,
-        'flow_step_config' => $flow_step_config,
-        'engine_data' => $engine_data
-    ]
-];
-
-// Build AI request
-$ai_response = RequestBuilder::build(
-    $messages,
-    'openai',
-    'gpt-4',
-    $tools,
-    'pipeline',
-    $context
+    $messages,          // Canonical Agents API message envelopes.
+    $provider,          // wp-ai-client provider identifier.
+    $model,             // wp-ai-client model identifier.
+    $tools,             // Data Machine tool definitions keyed by name.
+    $mode,              // 'chat', 'pipeline', 'system', or extension mode.
+    $payload,           // Runtime payload: session, job, flow step, agent, etc.
+    $request_metadata   // Output parameter populated before dispatch.
 );
 
-// Check response
-if ($ai_response['success']) {
-    $tool_calls = $ai_response['data']['tool_calls'] ?? [];
-    $content = $ai_response['data']['content'] ?? '';
+if ( $ai_response instanceof \WP_Error ) {
+    $message = $ai_response->get_error_message();
 } else {
-    $error = $ai_response['error'] ?? 'Unknown error';
+    $content    = RequestBuilder::resultText( $ai_response );
+    $tool_calls = datamachine_extract_tool_calls( $ai_response );
 }
 ```
 
-### Chat Agent Example
+## Return Types
+
+`RequestBuilder::build()` returns native provider-layer objects, not the older `['success' => true, 'data' => ...]` array shape.
+
+Success:
 
 ```php
-use DataMachine\Engine\AI\RequestBuilder;
+\WordPress\AiClient\Results\DTO\GenerativeAiResult
+```
 
-// Build context for chat agent
-$context = [
-    'session_id' => $session_id
-];
+Failure:
 
-// Build AI request
-$ai_response = RequestBuilder::build(
-    $messages,
-    'anthropic',
-    'claude-3-5-sonnet-20241022',
-    $tools,
-    'chat',
-    $context
+```php
+\WP_Error
+```
+
+The Data Machine conversation turn runner converts `WP_Error` into a structured conversation error. Tests may still provide compact arrays through `datamachine_wp_ai_client_text_result`; RequestBuilder converts those arrays into `GenerativeAiResult` DTOs when the current wp-ai-client API supports it.
+
+## Request Metadata
+
+The optional seventh parameter is an output parameter populated before dispatch:
+
+```php
+$request_metadata = RequestMetadata::build(
+    $provider_request,
+    $structured_tools,
+    $directive_metadata,
+    $provider,
+    $model,
+    $mode
 );
-
-// Check response
-if ($ai_response['success']) {
-    $content = $ai_response['data']['content'] ?? '';
-    $tool_calls = $ai_response['data']['tool_calls'] ?? [];
-}
 ```
 
-## Directive Application System
+Metadata is used by logs, tests, loop events, transcripts, and final conversation results. It captures fields such as provider, model, mode, request JSON sizes, message/tool sizes, applied directive metadata, and the resolved transport profile.
 
-The RequestBuilder integrates with PromptBuilder for unified directive management with priority-based ordering and agent-specific targeting.
+The conversation loop emits this metadata in the `request_built` event and returns the latest metadata on the normalized result under `request_metadata`.
 
-### Directive System (@since v0.2.5)
+## Directive Context
 
-```
-1. PromptBuilder Initialization
-    ↓ RequestBuilder creates PromptBuilder instance
+`RequestBuilder::assemble()` maps Data Machine runtime payloads into neutral directive context before prompt assembly:
 
-2. Directive Collection
-    ↓ datamachine_directives filter returns directive configurations
-
-3. Priority-Based Sorting
-    ↓ Directives sorted by priority (ascending: low to high)
-
-4. Agent-Specific Application
-    ↓ Each directive applied based on agent type targeting
-```
-
-### Directive Registration
-
-Directives are registered via the `datamachine_directives` filter with configuration arrays:
-
-```php
-add_filter('datamachine_directives', function($directives) {
-    $directives[] = [
-        'class' => MyDirective::class,
-        'priority' => 20,  // Lower numbers applied first
-        'modes' => ['all']  // 'all', 'pipeline', 'chat', 'system', or extension mode
-    ];
-    return $directives;
-});
-```
-
-**Priority Order** (lower = applied first):
-- **20**: Registered memory files
-- **22**: Runtime agent-mode guidance
-- **25-35**: Caller, daily memory, and client-reported context
-- **40-50**: Pipeline, flow, chat inventory, and workflow-specific directives
-
-### Current Directive Implementations
-
-- `CoreMemoryFilesDirective` - Registered memory files from shared, agent, and user layers (priority 20)
-- `AgentModeDirective` - Runtime mode guidance for chat, pipeline, system, and extension modes (priority 22)
-- `CallerContextDirective` - Authenticated cross-site caller identity (priority 25)
-- `AgentDailyMemoryDirective` and `ClientContextDirective` - Optional daily memory and client context (priority 35)
-- `PipelineMemoryFilesDirective`, `FlowMemoryFilesDirective`, and `PipelineSystemPromptDirective` - Pipeline-specific context (priorities 40, 45, 50)
-- `ChatPipelinesDirective` - Pipeline and flow inventory for chat (priority 45)
-
-## Tool Restructuring
-
-The RequestBuilder normalizes tool definitions to ensure consistent structure across all providers:
-
-```php
-private static function restructure_tools(array $raw_tools): array
-{
-    $structured = [];
-
-    foreach ($raw_tools as $tool_name => $tool_config) {
-        $structured[$tool_name] = [
-            'name' => $tool_name,
-            'description' => $tool_config['description'] ?? '',
-            'parameters' => $tool_config['parameters'] ?? [],
-            'handler' => $tool_config['handler'] ?? null,
-            'handler_config' => $tool_config['handler_config'] ?? []
-        ];
-    }
-
-    return $structured;
-}
-```
-
-**Purpose**: Ensures all tools have explicit `name`, `description`, `parameters`, `handler`, and `handler_config` fields, preventing tool format mismatches with AI providers.
-
-**Example**:
-
-**Input** (raw tool from filter):
-```php
-$tools['twitter_publish'] = [
-    'class' => 'DataMachine\\Core\\Steps\\Publish\\Handlers\\Twitter\\Twitter',
-    'method' => 'handle_tool_call',
-    'handler' => 'twitter',
-    'description' => 'Post content to Twitter',
-    'parameters' => [...]
-];
-```
-
-**Output** (structured tool):
-```php
-$structured_tools['twitter_publish'] = [
-    'name' => 'twitter_publish',
-    'description' => 'Post content to Twitter',
-    'parameters' => [...],
-    'handler' => 'twitter',
-    'handler_config' => []
-];
-```
-
-## Integration with wp-ai-client
-
-The RequestBuilder gates runtime availability through `WpAiClientCapability`, then sends the finalized request through `WpAiClientAdapter`. The gate requires:
-
-- `wp_ai_client_prompt()` being defined.
-- `wp_supports_ai()` being defined and returning true.
-- The requested provider, or its known alias, being registered in the wp-ai-client default provider registry.
-
-If the gate fails, RequestBuilder returns a structured request error with `request_metadata`. It does not fall back to `chubes_ai_request` / `ai-http-client`.
-
-**Response Structure**:
 ```php
 [
-    'success' => true,
-    'data' => [
-        'content' => 'AI text response',
-        'tool_calls' => [
-            [
-                'name' => 'tool_name',
-                'parameters' => [...]
-            ]
-        ]
+    'directive_context' => [
+        'job_id'       => $payload['job_id'] ?? null,
+        'flow_step_id' => $payload['flow_step_id'] ?? null,
+        'agent_slug'   => $payload['agent_slug'] ?? null,
     ],
-    'provider' => 'openai',
-    'model' => 'gpt-4',
-    'error' => 'Error message if success=false'
 ]
 ```
 
-## Context Parameter
+Directive ordering and suppression are resolved by `DirectivePolicyResolver` from the `datamachine_directives` filter.
 
-The `$context` array provides information to directives, logging, transcripts, and request metadata:
+Current directive priorities:
 
-### Pipeline Context
+- **20**: Registered memory files.
+- **22**: Runtime agent-mode guidance.
+- **25**: Authenticated caller context.
+- **35**: Daily memory and client-reported context.
+- **40-50**: Pipeline, flow, chat inventory, and workflow-specific directives.
 
-```php
-$context = [
-    'step_id' => $flow_step_id,        // Used for logging and directive identification
-    'payload' => [                      // Complete step execution context
-        'job_id' => $job_id,
-        'flow_step_id' => $flow_step_id,
-        'data' => $data,
-        'flow_step_config' => $flow_step_config,
-        'engine_data' => $engine_data
-    ]
-];
-```
+## Tool Declarations
 
-**Available to Directives**:
-- `$context['step_id']` - Flow step identifier
-- `$context['payload']['job_id']` - Job execution ID
-- `$context['payload']['data']` - Data packets from previous steps
-- `$context['payload']['flow_step_config']` - Step configuration
-- `$context['payload']['engine_data']` - Engine parameters (source_url, image_url)
+Provider tool declarations are assembled from Data Machine tool definitions. Each tool is normalized into a name, description, JSON Schema parameters object, handler metadata, and runtime metadata before conversion to wp-ai-client `FunctionDeclaration` DTOs.
 
-### Chat Context
-
-```php
-$context = [
-    'session_id' => $session_id  // Chat session identifier
-];
-```
-
-**Available to Directives**:
-- `$context['session_id']` - Chat session ID for persistence
-
-## Response Format
-
-The RequestBuilder returns a standardized response structure:
-
-### Success Response
+Empty tool schemas are normalized to an object schema with an empty `properties` object so providers receive a valid JSON Schema object:
 
 ```php
 [
-    'success' => true,
-    'data' => [
-        'content' => 'AI generated text response',
-        'tool_calls' => [
-            [
-                'name' => 'tool_name',
-                'parameters' => [
-                    'param1' => 'value1',
-                    'param2' => 'value2'
-                ]
-            ]
-        ]
-    ],
-    'provider' => 'openai',
-    'model' => 'gpt-4'
+    'type'       => 'object',
+    'properties' => (object) array(),
 ]
 ```
 
-### Error Response
+Tool execution does not happen in RequestBuilder. The Data Machine conversation turn runner executes tool calls later through `ToolExecutor::executeTool()`.
+
+## wp-ai-client Runtime Gates
+
+`RequestBuilder::wpAiClientUnavailableReason()` returns `null` when dispatch is available or a human-readable reason when blocked.
+
+The gate checks:
+
+- `datamachine_wp_ai_client_availability` filter override.
+- `wp_ai_client_prompt()` exists.
+- `wp_supports_ai()` exists.
+- `wp_supports_ai()` returns true.
+- `WordPress\AiClient\AiClient` is loaded.
+- The requested provider is present in the default wp-ai-client provider registry.
+
+If any check fails, `build()` logs `AI request blocked: wp-ai-client unavailable` and returns:
+
+```php
+new \WP_Error( 'wp_ai_client_unavailable', $unavailable_reason );
+```
+
+Data Machine no longer falls back to `chubes_ai_request` or `ai-http-client` for runtime provider calls.
+
+## Provider Dispatch
+
+After the gates pass, RequestBuilder:
+
+1. Resolves the wp-ai-client default registry.
+2. Resolves the provider ID from the configured provider alias.
+3. Applies a provider API key from `WpAiClientProviderAdmin::resolveApiKey()` when present.
+4. Installs a default-options HTTP transporter so provider model discovery and final generation share timeout settings.
+5. Resolves the model instance.
+6. Creates a prompt builder with `wp_ai_client_prompt( $prompt )` or `wp_ai_client_prompt()` when the prompt is empty.
+7. Applies provider, model, model config, system instruction, history, and function declarations.
+8. Calls `generate_text_result()`.
+
+Exceptions are caught and returned as:
+
+```php
+new \WP_Error( 'wp_ai_client_text_exception', 'wp-ai-client request failed: ' . $e->getMessage() );
+```
+
+## Prompt And History Mapping
+
+wp-ai-client expects a current prompt plus optional history. RequestBuilder maps Data Machine messages this way:
+
+- System messages become `using_system_instruction()` text.
+- The latest user message becomes the current `wp_ai_client_prompt()` prompt.
+- Earlier user and assistant/model messages become `with_history()` DTOs.
+- Text arrays are flattened into newline-separated text when possible.
+- Unsupported or empty content is skipped.
+
+This keeps provider dispatch working even when a Data Machine conversation contains many previous tool and assistant messages.
+
+## Transport Behavior
+
+RequestBuilder applies Data Machine timeout settings to wp-ai-client calls.
+
+Request timeout:
+
+- Setting: `wp_ai_client_request_timeout`.
+- Default: `PluginSettings::DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT`.
+- Max clamp: `PluginSettings::MAX_WP_AI_CLIENT_REQUEST_TIMEOUT`.
+- Filter: `datamachine_wp_ai_client_request_timeout`.
+
+Connect timeout:
+
+- Setting: `wp_ai_client_connect_timeout`.
+- Default: `PluginSettings::DEFAULT_WP_AI_CLIENT_CONNECT_TIMEOUT`.
+- Max clamp: `PluginSettings::MAX_WP_AI_CLIENT_CONNECT_TIMEOUT`.
+- Filter: `datamachine_wp_ai_client_connect_timeout`.
+- Never exceeds the request timeout.
+
+The resolved profile is added to `request_metadata['transport']`:
 
 ```php
 [
-    'success' => false,
-    'error' => 'Descriptive error message',
-    'provider' => 'anthropic',
-    'model' => 'claude-3-5-sonnet-20241022'
+    'mode'                            => $mode,
+    'provider'                        => $provider,
+    'model'                           => $model,
+    'job_id'                          => $payload['job_id'] ?? null,
+    'flow_step_id'                    => $payload['flow_step_id'] ?? null,
+    'request_timeout'                 => $request_timeout,
+    'connect_timeout'                 => $connect_timeout,
+    'request_options_class_available' => class_exists( RequestOptions::class ),
+    'request_options_used'            => false,
+    'curl_hook_installed'             => false,
 ]
 ```
 
-## Error Handling
+When wp-ai-client exposes `RequestOptions`, Data Machine passes timeout and connect-timeout options to the prompt builder and wraps the registry HTTP transporter with `DefaultOptionsHttpTransporter` so provider metadata/model discovery requests use the same options.
 
-### Provider Errors
+For older or lower-level transport paths, RequestBuilder also installs temporary `wp_ai_client_default_request_timeout` and `http_api_curl` hooks. The cURL hook sets connect timeout plus low-speed timeout/limit for long provider calls. Both hooks are removed in `finally` after dispatch.
 
-AI provider errors (API failures, rate limits, invalid credentials) are returned in the error response:
+## Test Hooks
 
-```php
-$ai_response = RequestBuilder::build(...);
+Stable test and integration hooks:
 
-if (!$ai_response['success']) {
-    $error = $ai_response['error'] ?? 'Unknown error';
-    $provider = $ai_response['provider'] ?? 'Unknown';
+- `datamachine_wp_ai_client_text_result` may short-circuit dispatch. Return `WP_Error`, `GenerativeAiResult`, or compact array data.
+- `datamachine_wp_ai_client_availability` may return `true` to force availability or a string to force an unavailable reason.
+- `datamachine_wp_ai_client_request_timeout` customizes request timeout.
+- `datamachine_wp_ai_client_connect_timeout` customizes connect timeout.
+- `datamachine_directives` registers directive classes for prompt assembly.
 
-    do_action('datamachine_log', 'error', 'RequestBuilder: AI request failed', [
-        'provider' => $provider,
-        'error' => $error
-    ]);
-}
-```
+Representative tests:
 
-### Configuration Errors
-
-Missing or invalid runtime configuration (wp-ai-client unavailable, model not set, provider not configured) is returned in the standard response shape:
-
-```php
-[
-    'success' => false,
-    'error' => 'wp-ai-client provider "openai" is not registered'
-]
-```
-
-## Logging
-
-The RequestBuilder logs request building details:
-
-```php
-do_action('datamachine_log', 'debug', 'RequestBuilder: Built AI request', [
-    'agent_type' => $agent_type,
-    'provider' => $provider,
-    'model' => $model,
-    'message_count' => count($request['messages']),
-    'tool_count' => count($structured_tools)
-]);
-```
-
-**Log Entry**:
-```
-RequestBuilder: Built AI request
-- agent_type: pipeline
-- provider: openai
-- model: gpt-4
-- message_count: 5
-- tool_count: 3
-```
+- `tests/agent-conversation-runner-request-smoke.php` verifies RequestBuilder dispatch through `datamachine_run_conversation()`.
+- `tests/agent-conversation-runtime-policy-smoke.php` uses the provider test double to exercise completion and continuation behavior.
+- Unit support under `tests/Unit/Support/WpAiClientTestDoubles.php` supplies compact wp-ai-client response data for deterministic tests.
 
 ## Best Practices
 
-### Always Use RequestBuilder
+- Use `RequestBuilder::build()` for Data Machine chat, pipeline, and system runtime turns.
+- Treat `GenerativeAiResult` and `WP_Error` as the public return contract.
+- Use the `$request_metadata` output parameter when a caller needs request diagnostics.
+- Keep tool execution outside RequestBuilder.
+- Keep durable multi-turn runtime behavior in `datamachine_run_conversation()` and Agents API, not in RequestBuilder.
+- Prefer wp-ai-client provider plugins over any legacy `chubes_ai_*` path.
 
-**Correct**:
-```php
-use DataMachine\Engine\AI\RequestBuilder;
+## Historical Context
 
-$ai_response = RequestBuilder::build(
-    $messages,
-    $provider,
-    $model,
-    $tools,
-    $agent_type,
-    $context
-);
-```
-
-**Incorrect** (bypasses directive system and tool restructuring):
-```php
-// NEVER DO THIS
-$ai_response = wp_ai_client_prompt()->generate_text_result();
-```
-
-### Provide Complete Context
-
-**Pipeline Agent**:
-```php
-$context = [
-    'step_id' => $flow_step_id,
-    'payload' => [
-        'job_id' => $job_id,
-        'flow_step_id' => $flow_step_id,
-        'data' => $data,
-        'flow_step_config' => $flow_step_config,
-        'engine_data' => $engine_data
-    ]
-];
-```
-
-**Chat Agent**:
-```php
-$context = [
-    'session_id' => $session_id
-];
-```
-
-### Handle Errors Gracefully
-
-```php
-$ai_response = RequestBuilder::build(...);
-
-if (!$ai_response['success']) {
-    do_action('datamachine_log', 'error', 'AI request failed', [
-        'error' => $ai_response['error'],
-        'provider' => $ai_response['provider']
-    ]);
-
-    // Return error to caller or retry
-    return [
-        'success' => false,
-        'error' => $ai_response['error']
-    ];
-}
-
-// Process successful response
-$content = $ai_response['data']['content'] ?? '';
-$tool_calls = $ai_response['data']['tool_calls'] ?? [];
-```
-
-### Directive Registration
-
-Register directives using the unified `datamachine_directives` filter with appropriate priorities:
-
-```php
-// Register a global directive (applies to all modes)
-add_filter('datamachine_directives', function($directives) {
-    $directives[] = [
-        'class' => MyGlobalDirective::class,
-        'priority' => 25,
-        'modes' => ['all']
-    ];
-    return $directives;
-});
-
-// Register a pipeline-specific directive
-add_filter('datamachine_directives', function($directives) {
-    $directives[] = [
-        'class' => MyPipelineDirective::class,
-        'priority' => 40,
-        'modes' => ['pipeline']
-    ];
-    return $directives;
-});
-```
-
-**Priority Guidelines**:
-- **20**: Registered memory files
-- **22**: Runtime agent-mode guidance
-- **25-35**: Caller, daily memory, and client-reported context
-- **40-50**: Pipeline, flow, chat inventory, and workflow-specific directives
-
-## Related Components
-
-- Universal Engine Architecture - Overall engine structure
-- AI Conversation Loop - Uses RequestBuilder for AI requests
-- PromptBuilder Pattern - Unified directive management
-- [Tool Execution Architecture](tool-execution.md) - Tool discovery, execution, action policy, and approval staging
-- Universal Engine Filters - Complete filter reference
+Older docs may show `RequestBuilder::build()` returning a `success/data/error` array. That was the pre-wp-ai-client adapter shape. Current code returns `GenerativeAiResult` or `WP_Error`.

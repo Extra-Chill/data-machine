@@ -3,84 +3,110 @@
 **File**: `/inc/Engine/AI/conversation-loop.php`
 **Since**: 0.2.0
 
-Multi-turn conversation execution engine for AI agents. Handles automatic tool execution, result feedback, and conversation completion detection for both Pipeline AI and Chat API agents.
+Data Machine runs multi-turn agent work through the Agents API conversation substrate. The canonical Data Machine entry point is `DataMachine\Engine\AI\datamachine_run_conversation()`; the former `AIConversationLoop` class has been removed.
 
-## Purpose
-
-Data Machine's `datamachine_run_conversation()` adapter provides centralized multi-turn conversation management while delegating generic turn sequencing to `AgentsAPI\AI\WP_Agent_Conversation_Loop`. It orchestrates Data Machine request assembly, product-specific tool execution, turn limits, transcript persistence, and completion detection for Pipeline and Chat agents.
-
-## Architecture
+## Current Ownership
 
 ```
-Conversation Flow:
-┌─────────────────────────────────────────────────────┐
-│                 AIConversationLoop                  │
-│                                                      │
-│  ┌────────────────────────────────────────────┐    │
-│  │ Turn 1: AI Request → Tool Calls → Execute │    │
-│  └────────────────────────────────────────────┘    │
-│                        │                            │
-│  ┌────────────────────────────────────────────┐    │
-│  │ Turn 2: AI Request → Tool Calls → Execute │    │
-│  └────────────────────────────────────────────┘    │
-│                        │                            │
-│                       ...                           │
-│                        │                            │
-│  ┌────────────────────────────────────────────┐    │
-│  │ Turn N: AI Request → No Tool Calls = Done  │    │
-│  └────────────────────────────────────────────┘    │
-│                                                      │
-│  Components Used:                                   │
-│  • RequestBuilder - Build AI requests               │
-│  • ToolExecutor - Execute tool calls                │
-│  • ConversationManager - Format messages            │
-└─────────────────────────────────────────────────────┘
+Data Machine caller
+  |
+  v
+datamachine_run_conversation()
+  |  owns Data Machine runtime policy and builds the turn runner
+  v
+AgentsAPI\AI\WP_Agent_Conversation_Loop::run()
+  |  owns generic turn sequencing, budgets, transcripts, locks, events
+  v
+Data Machine turn runner closure
+  |  owns request assembly, wp-ai-client dispatch, tool execution
+  v
+RequestBuilder::build() -> wp_ai_client_prompt()
 ```
 
-## Key Features
+`WP_Agent_Conversation_Loop` is the generic runtime loop. It should not know about Data Machine jobs, flow steps, handlers, tool policies, or completion assertions. Data Machine adapts those product concepts into the generic loop with options and a turn runner.
 
-### Automatic Tool Execution
-
-The conversation loop automatically detects tool calls in AI responses and executes them via `ToolExecutor`, adding both tool call and tool result messages to the conversation history.
+## Canonical Entry Point
 
 ```php
-foreach ($tool_calls as $tool_call) {
-    $tool_name = $tool_call['name'];
-    $tool_parameters = $tool_call['parameters'];
+use function DataMachine\Engine\AI\datamachine_run_conversation;
 
-    // Execute tool
-    $tool_result = ToolExecutor::executeTool(
-        $tool_name,
-        $tool_parameters,
-        $tools,
-        $data,
-        $flow_step_id,
-        $context
-    );
-
-    // Add tool result to conversation
-    $tool_result_message = ConversationManager::formatToolResultMessage(
-        $tool_name,
-        $tool_result,
-        $tool_parameters,
-        $is_handler_tool,
-        $turn_count
-    );
-    $messages[] = $tool_result_message;
-}
+$result = datamachine_run_conversation(
+    $messages,        // Initial messages; normalized to Agents API envelopes.
+    $tools,           // Data Machine tool definitions keyed by tool name.
+    $provider,        // wp-ai-client provider identifier.
+    $model,           // wp-ai-client model identifier.
+    $mode,            // 'pipeline', 'chat', 'system', or extension mode.
+    $payload,         // Data Machine runtime payload.
+    $max_turns,       // Turn ceiling; resolved through IterationBudgetRegistry.
+    $single_turn      // Stop after exactly one provider turn.
+);
 ```
 
-### Completion Detection
+Current callers, including `AIStep` and `ChatOrchestrator`, call this function directly. New code should not introduce `AIConversationLoop::run()` examples; references to that class are historical only.
 
-Conversations complete naturally when the AI returns a response with no tool calls. This signals the AI has finished its workflow objectives.
+## What Data Machine Owns
 
-```php
-if (empty($tool_calls)) {
-    $conversation_complete = true;
-}
-```
+`datamachine_run_conversation()` owns the Data Machine adapter layer around the generic loop:
 
-Pipeline steps can also declare `completion_assertions` to keep the loop running until required runtime signals are present. Simple assertions require all named tools to have succeeded:
+- Message normalization through `AgentsAPI\AI\WP_Agent_Message::normalize_many()`.
+- Runtime object resolution from `$payload`, including event sinks, transcript persisters, transcript locks, completion assertions, and tool runtime rules.
+- Runtime object stripping before passing payload data into tools and requests.
+- Turn budget construction through `IterationBudgetRegistry::create( 'conversation_turns', 0, $max_turns )`.
+- Base log context for `mode`, `job_id`, `flow_step_id`, and `agent_slug`.
+- Completion assertion preflight for required tools that are unavailable to the model.
+- Data Machine turn runner creation through `datamachine_build_turn_runner()`.
+- Mapping the Agents API `budget_exceeded` status back to Data Machine's `max_turns_reached` compatibility flag.
+- Augmenting the normalized Agents API result with Data Machine-only fields such as `last_tool_calls`, completion nudge diagnostics, and completion assertion diagnostics.
+
+## What Agents API Owns
+
+`AgentsAPI\AI\WP_Agent_Conversation_Loop::run()` owns generic runtime mechanics:
+
+- Turn sequencing and turn count.
+- Budget enforcement through the `budgets` option.
+- Final result normalization fields such as `messages`, `final_content`, `turn_count`, `status`, `usage`, and `request_metadata`.
+- Transcript persistence via `transcript_persister`.
+- Transcript locking via `transcript_lock`, `transcript_session_id`, and `transcript_lock_ttl`.
+- Runtime events through the `on_event` callback.
+- Generic continuation decisions through the `should_continue` callback.
+
+Data Machine passes a `WP_Agent_Conversation_Request` into the loop options. Its metadata includes the selected provider, model, and `WordPressWorkspaceScope::metadata()` so hosts can inspect the WordPress runtime associated with the run.
+
+## Turn Runner Responsibilities
+
+The Data Machine turn runner handles one provider turn:
+
+1. Build and dispatch a provider request with `RequestBuilder::build()`.
+2. Emit a `request_built` event with turn count, provider, model, success status, and request metadata.
+3. Convert `WP_Error` request failures into a structured runtime error by throwing `RuntimeException`; `datamachine_run_conversation()` catches it and returns an error result.
+4. Extract tool calls from the `GenerativeAiResult`.
+5. Extract text content with `RequestBuilder::resultText()`.
+6. Accumulate token usage for the substrate to total across turns.
+7. Append assistant text messages with `ConversationManager::buildConversationMessage()`.
+8. Validate duplicate tool calls with `ConversationManager::validateToolCall()`.
+9. Enforce Data Machine tool runtime rules before execution.
+10. Execute tools through `ToolExecutor::executeTool()` with mode, agent, and client context.
+11. Record Data Machine completion policy progress after each tool result.
+12. Append tool call and tool result envelope messages through `ConversationManager`.
+13. Add completion nudges when assertions are still missing and another turn is useful.
+
+The turn runner returns per-turn `messages`, `tool_execution_results`, `request_metadata`, `usage`, `conversation_complete`, and continuation hints. The Agents API loop merges those into the final result.
+
+## Continuation Rules
+
+Data Machine's `should_continue` callback is intentionally small because Agents API owns the loop mechanics:
+
+- Stop immediately when `$single_turn` is true.
+- Stop when the turn runner marks `conversation_complete`.
+- Continue when the turn executed tools, appended a completion nudge, rejected a duplicate call, or rejected a tool runtime rule.
+
+Natural completion is still a Data Machine policy decision. If there are no tool calls, the turn runner asks the resolved completion policy whether natural completion is acceptable. Completion assertions can therefore keep the loop running even after a text-only model response.
+
+## Completion Assertions
+
+Pipeline and chat payloads may include `completion_assertions`. Data Machine resolves them before entering the substrate loop.
+
+Simple required-tool assertions require named tools to run successfully:
 
 ```json
 {
@@ -90,12 +116,11 @@ Pipeline steps can also declare `completion_assertions` to keep the loop running
 }
 ```
 
-For agents with multiple valid completion shapes, use `complete_when_any`. Each outcome is generic and tool-driven: the run completes when any named outcome has all of its required successful tool calls, optional output fields, optional parameter matches, and optional minimum call counts.
+Assertions can also require engine data keys, minimum successful tool counts, output fields, parameter matches, or any one of several named outcomes:
 
 ```json
 {
   "completion_assertions": {
-    "required_tool_names": ["agent_daily_memory"],
     "complete_when_any": [
       {
         "name": "content_proposal",
@@ -119,407 +144,74 @@ For agents with multiple valid completion shapes, use `complete_when_any`. Each 
 }
 ```
 
-Outcome names appear in completion diagnostics and nudges, so operators can tell which path was satisfied or what remains missing without decoding `outcome_1` style placeholders.
-
-### State Management
-
-The loop maintains conversation state across turns, tracking:
-
-- Total message count
-- Current turn number
-- Final AI content response
-- Last tool calls (for debugging)
-- Completion status
-
-### Turn Limiting
-
-Configurable maximum turns (default: 8) prevent infinite loops. If max turns are reached, the loop terminates and logs a warning.
+If a required tool is not available in the current tool set, `datamachine_run_conversation()` returns an error before any provider call:
 
 ```php
-if ($turn_count >= $max_turns && !$conversation_complete) {
-    do_action('datamachine_log', 'warning', 'AIConversationLoop: Max turns reached', [
-        'agent_type' => $agent_type,
-        'max_turns' => $max_turns,
-        'final_turn_count' => $turn_count,
-        'still_had_tool_calls' => !empty($last_tool_calls)
-    ]);
-}
+[
+    'completed'                       => false,
+    'error_code'                      => 'completion_required_tool_unavailable',
+    'completion_assertions_required'  => $assertions->required(),
+    'unavailable_required_tool_names' => $unavailable_required_tools,
+    'available_tool_names'            => array_keys( $tools ),
+    'status'                          => 'error',
+]
 ```
 
-## Usage
+When assertions are missing after a natural completion or partial progress, Data Machine appends a nudge as a user message and keeps the loop running when useful. Final results may include:
 
-### Canonical entry point
+- `completion_nudge_count`
+- `completion_nudge`
+- `completion_assertions_required`
+- `completion_assertions_missing`
+- `completion_assertions_satisfied`
+- `completion_assertions_complete`
 
-All callers should use `DataMachine\Engine\AI\datamachine_run_conversation()`. The function builds a Data Machine turn runner and passes it to `AgentsAPI\AI\WP_Agent_Conversation_Loop::run()` so generic lifecycle behavior stays in Agents API while product adapters own Data Machine request and tool semantics.
+Job engine data and loop events receive the same diagnostics for evidence and artifact reporting.
+
+## Result Shape
+
+The returned array is normalized by `AgentsAPI\AI\WP_Agent_Conversation_Result::normalize()` and then augmented by Data Machine.
+
+Common fields:
 
 ```php
-use function DataMachine\Engine\AI\datamachine_run_conversation;
-
-$result = datamachine_run_conversation(
-    $messages,        // Initial conversation messages
-    $tools,           // Available tools for AI
-    $provider,        // AI provider (openai, anthropic, etc.)
-    $model,           // AI model identifier
-    $context,         // 'pipeline' or 'chat'
-    $payload,         // Agent-specific payload data
-    $max_turns,       // Maximum conversation turns (default: 25)
-    $single_turn      // Execute exactly one turn (default: false)
-);
+[
+    'messages'               => [], // canonical Agents API envelopes
+    'final_content'          => '',
+    'turn_count'             => 1,
+    'completed'              => true,
+    'status'                 => 'completed',
+    'last_tool_calls'        => [],
+    'tool_execution_results' => [],
+    'usage'                  => [],
+    'request_metadata'       => [],
+]
 ```
 
-### Pipeline Agent Example
+Error results use the same array style and include `error`; budget exhaustion also includes `max_turns_reached` and a warning.
 
-```php
-// Pipeline payload includes job_id, flow_step_id, data, flow_step_config
-$payload = [
-    'job_id'           => $job_id,
-    'flow_step_id'     => $flow_step_id,
-    'data'             => $data,
-    'flow_step_config' => $flow_step_config,
-];
+## Runtime Gates And Transport
 
-$result = AIConversationLoop::run(
-    $messages,
-    $tools,
-    $provider,
-    $model,
-    'pipeline',
-    $payload,
-    $max_turns
-);
+Provider availability is checked in `RequestBuilder::build()`, not in the conversation loop. The turn runner treats a `WP_Error` from RequestBuilder as a failed turn and returns a structured error result.
 
-$final_data = $result['messages'];
-$turn_count = $result['turn_count'];
-$completed  = $result['completed'];
-```
+Transport and provider behavior are documented in [RequestBuilder Pattern](./request-builder.md). The conversation loop stores the per-turn `request_metadata` returned by RequestBuilder so callers and tests can inspect directives, request sizes, provider/model, and transport profile.
 
-### Chat Agent Example
+## Test Hooks
 
-```php
-// Chat payload includes session_id, user_id, and resolved agent identity.
-$payload = [
-    'session_id'  => $session_id,
-    'user_id'     => $user_id,
-    'agent_id'    => $agent_id,
-    'agent_slug'  => $agent_slug,
-];
+Runtime tests can control or observe execution through stable hooks and payload collaborators:
 
-$result = AIConversationLoop::run(
-    $messages,
-    $tools,
-    $provider,
-    $model,
-    'chat',
-    $payload,
-    $max_turns,
-    $single_turn
-);
+- `datamachine_wp_ai_client_text_result` short-circuits provider dispatch and may return `WP_Error`, `GenerativeAiResult`, or compact array data for test doubles.
+- `datamachine_wp_ai_client_availability` overrides wp-ai-client availability checks.
+- `datamachine_wp_ai_client_request_timeout` and `datamachine_wp_ai_client_connect_timeout` control timeout profiles.
+- `event_sink` in the payload receives loop events through `LoopEventSinkInterface`.
+- `transcript_persister`, `transcript_lock`, `transcript_session_id`, and `transcript_lock_ttl` exercise transcript persistence and locking.
 
-$final_messages = $result['messages'];
-$final_content  = $result['final_content'];
-$turn_count     = $result['turn_count'];
-```
+Representative smoke tests:
 
-## Runtime Adapters
+- `tests/agent-conversation-runner-request-smoke.php` verifies that `datamachine_run_conversation()` delegates through the Agents API substrate and returns normalized content, usage, tool results, and events.
+- `tests/agent-conversation-runtime-policy-smoke.php` covers completion assertions, natural completion, nudges, duplicate-tool recovery, runtime rules, and completion diagnostics.
+- `tests/ai-message-envelope-smoke.php` verifies message envelope normalization and result normalization.
 
-Data Machine's built-in loop is the default, but the entire conversation
-runtime is swappable via a single filter. This lets a consumer plug Data
-Machine's pipelines, flows, tools, and memory into a different agent runtime
-(for example, a host platform that already provides its own agent loop,
-conversation storage, and channels) without Data Machine knowing anything
-about that runtime.
+## Historical Context
 
-### The filter
-
-```php
-apply_filters(
-    'agents_api_conversation_runner',
-    null,           // Return non-null to short-circuit the built-in loop
-    $messages,
-    $tools,
-    $provider,
-    $model,
-    $context,
-    $payload,
-    $max_turns,
-    $single_turn
-);
-```
-
-Return an array matching `AIConversationLoop::execute()`'s documented return
-shape to replace the built-in loop. Return `null` (the default) to let Data
-Machine run the conversation itself.
-
-### Adapter contract
-
-An adapter is responsible for:
-
-1. Executing tool calls and appending tool-result messages to `$messages`.
-2. Managing turn count and termination against `$max_turns`.
-3. Returning the exact shape `execute()` returns — `messages`, `final_content`,
-   `turn_count`, `completed`, `last_tool_calls`, `tool_execution_results`,
-   `has_pending_tools`, `usage`, plus optional `error`, `warning`, and
-   `max_turns_reached` keys.
-
-Data Machine makes no assumptions about how the adapter produces that result.
-A consumer can delegate to any external runtime — its own `Agent` subclass, a
-remote RPC service, a different language — as long as the return shape is
-honored. Returned messages may use the legacy `role/content/metadata` shape or
-the versioned [Agent Message Envelope](./ai-message-envelope.md); Data Machine
-normalizes every returned message to the canonical envelope before callers store
-or render the result. Provider-specific `role/content/metadata` arrays are now a
-projection at the provider boundary, not the runtime/storage contract.
-
-### Minimal adapter example
-
-```php
-add_filter(
-    'agents_api_conversation_runner',
-    function ( $result, $messages, $tools, $provider, $model, $context, $payload, $max_turns, $single_turn ) {
-        // Only take over for a specific context.
-        if ( 'chat' !== $context ) {
-            return $result;
-        }
-
-        // Delegate to an external runtime that returns the expected shape.
-        return my_external_runtime_run( [
-            'messages'    => $messages,
-            'tools'       => $tools,
-            'provider'    => $provider,
-            'model'       => $model,
-            'payload'     => $payload,
-            'max_turns'   => $max_turns,
-            'single_turn' => $single_turn,
-        ] );
-    },
-    10,
-    9
-);
-```
-
-### Mirrors the provider-runtime pattern
-
-Runtime adapters use the same separation of concerns as provider runtimes, one
-layer up: providers swap how the LLM is called; runtime adapters swap how the
-conversation is run.
-
-### Relationship to wp-ai-client migration (#1027)
-
-Runtime adapters and the upcoming wp-ai-client migration operate at different
-layers and are independent:
-
-- `agents_api_conversation_runner` replaces the **conversation loop** — turn
-  management, tool execution, completion detection.
-- The wp-ai-client migration (see Extra-Chill/data-machine#1027) replaces the
-  **LLM request layer** that the built-in loop calls internally — a single
-  HTTP call to an LLM provider.
-
-Data Machine's built-in `execute()` calls `wp_ai_client_prompt()` through the
-wp-ai-client adapter. The `run()` entry point and the
-`agents_api_conversation_runner` filter contract are unchanged, and adapters
-that replace the entire loop are unaffected — they bring their own LLM client
-as part of their runtime.
-
-## Configuration
-
-### Max Turns
-
-The `$max_turns` parameter controls the maximum number of conversation turns before forced termination:
-
-```php
-$result = $loop->execute($messages, $tools, $provider, $model, $agent_type, $context, 10); // 10 turns max
-```
-
-**Default**: 8 turns
-**Recommended**: 8-12 turns for most workflows
-
-### Turn tracking
-
-Each turn represents one AI request-response cycle. Tool execution within a turn does not increment the turn count. The loop automatically tags messages with `Turn {N}` prefixes via `ConversationManager` to maintain chronological context for the AI.
-
-## Tool Execution Integration
-
-The conversation loop integrates with `ToolExecutor` for unified tool execution:
-
-```php
-$tool_result = ToolExecutor::executeTool(
-    $tool_name,           // Tool name from AI
-    $tool_parameters,     // Parameters from AI
-    $tools,               // Available tools array
-    [],                   // Data packets (empty for chat, populated for pipeline)
-    null,                 // flow_step_id (null for chat, string for pipeline)
-    $context              // Unified parameters (session_id or job_id + engine_data)
-);
-```
-
-### Duplicate Tool Call Prevention
-
-The loop validates tool calls against conversation history to prevent duplicate executions:
-
-```php
-$validation_result = ConversationManager::validateToolCall(
-    $tool_name,
-    $tool_parameters,
-    $messages
-);
-
-if ($validation_result['is_duplicate']) {
-    // $mode is the loop's current execution mode ('chat', 'pipeline', 'bridge', ...).
-    // The correction message is shaped per-mode so pipeline AI steps are told to
-    // call the publish handler instead of ending the conversation. See #1441.
-    $correction_message = ConversationManager::generateDuplicateToolCallMessage(
-        $tool_name,
-        $turn_count,
-        $mode
-    );
-    $messages[] = $correction_message;
-    continue; // Skip execution
-}
-```
-
-## Error Handling
-
-### AI Request Failures
-
-If `RequestBuilder::build()` returns an error, the loop terminates immediately and returns error information:
-
-```php
-if (!$ai_response['success']) {
-    return [
-        'messages' => $messages,
-        'final_content' => '',
-        'turn_count' => $turn_count,
-        'completed' => false,
-        'last_tool_calls' => [],
-        'error' => $ai_response['error'] ?? 'AI request failed'
-    ];
-}
-```
-
-### Tool Execution Failures
-
-Tool execution failures are captured and added to conversation history as tool result messages. The conversation continues, allowing the AI to adapt or retry.
-
-```php
-$tool_result = ToolExecutor::executeTool(...);
-
-// Tool result includes success flag and error message if failed
-$tool_result_message = ConversationManager::formatToolResultMessage(
-    $tool_name,
-    $tool_result,  // Contains 'success' => false and 'error' message
-    $tool_parameters,
-    $is_handler_tool,
-    $turn_count
-);
-$messages[] = $tool_result_message;
-```
-
-### Max Turns Reached
-
-If max turns are reached before conversation completion, the loop logs a warning and returns the final state:
-
-```php
-do_action('datamachine_log', 'warning', 'AIConversationLoop: Max turns reached', [
-    'agent_type' => $agent_type,
-    'max_turns' => $max_turns,
-    'final_turn_count' => $turn_count,
-    'still_had_tool_calls' => !empty($last_tool_calls)
-]);
-```
-
-## Observability
-
-Generic loop lifecycle events come from the Agents API substrate. Cross-cutting observers should subscribe to the canonical `agents_api_loop_event` action instead of Data Machine-local loop conventions:
-
-```php
-add_action(
-    'agents_api_loop_event',
-    static function ( string $event, array $payload ): void {
-        // Generic events include turn_started, completed, failed,
-        // budget_exceeded, and transcript_lock_contention.
-    },
-    10,
-    2
-);
-```
-
-Per-run callers that need direct handling can still pass an `event_sink` in the payload. Data Machine bridges that sink to Agents API's `on_event` option so the caller receives the same generic lifecycle vocabulary for that run.
-
-Data Machine-specific observability remains product-specific. Request metadata such as `request_built`, AI request failures, duplicate tool-call prevention, and Data Machine tool execution details continue to use Data Machine's event sink or `datamachine_log` rather than being forced into the generic Agents API lifecycle surface.
-
-Agents API swallows observer exceptions for both `on_event` and `agents_api_loop_event`, and Data Machine's local event sink wrapper also logs sink failures without changing successful loop results.
-
-## Best Practices
-
-### Initial Message Structure
-
-Always provide initial messages with proper role/content structure:
-
-```php
-$initial_messages = [
-    [
-        'role' => 'user',
-        'content' => 'Process this content and publish to social media.'
-    ]
-];
-```
-
-### Context Parameters
-
-Provide complete context for agent-specific operations:
-
-```php
-// Pipeline context
-$context = [
-    'step_id' => $flow_step_id,
-    'payload' => [
-        'job_id' => $job_id,
-        'flow_step_id' => $flow_step_id,
-        'data' => $data,
-        'flow_step_config' => $flow_step_config,
-        'engine_data' => $engine_data
-    ]
-];
-
-// Chat context
-$context = [
-    'session_id' => $session_id
-];
-```
-
-### Result Handling
-
-Always check completion status and handle partial results:
-
-```php
-$result = $loop->execute(...);
-
-if ($result['completed']) {
-    // Conversation finished naturally
-    $final_messages = $result['messages'];
-} else {
-    // Max turns reached or error occurred
-    if (isset($result['error'])) {
-        // Handle error
-    } else {
-        // Max turns reached
-        $partial_messages = $result['messages'];
-    }
-}
-```
-
-### Turn Limits
-
-Set appropriate max turns based on workflow complexity:
-
-- **Simple workflows**: 4-6 turns
-- **Standard workflows**: 8 turns (default)
-- **Complex workflows**: 10-12 turns
-- **Avoid**: Setting max turns > 15 (indicates architectural issue)
-
-## Related Components
-
-- Universal Engine Architecture - Overall engine structure
-- [Tool Execution Architecture](tool-execution.md) - ToolExecutor details
-- RequestBuilder Pattern - AI request construction
-- [ConversationManager](universal-engine.md#conversationmanager) - Message formatting utilities
+Older docs and changelog entries may mention `AIConversationLoop::run()` or `AIConversationLoop::execute()`. Those references describe the pre-substrate compatibility class. Current runtime docs and examples should use `datamachine_run_conversation()` and `AgentsAPI\AI\WP_Agent_Conversation_Loop::run()`.

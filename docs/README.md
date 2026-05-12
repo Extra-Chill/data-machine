@@ -81,10 +81,11 @@ Core should expose behavior through abilities, hooks, REST, CLI, handlers, and b
 - **Chat Tools**: AddPipelineStep, ApiQuery, ConfigureFlowSteps, ConfigurePipelineStep, CreateFlow, CreatePipeline, RunFlow, UpdateFlow, and other workflow management tools.
 
 ### API Reference
-- **API Overview**: REST endpoint categories for Data Machine product consumers ([api/index.md](api/index.md)).
-- **Workflow Endpoints**: Execute, flows, queues, webhooks, jobs, logs, processed items.
-- **Agent Endpoints**: Chat, chat sessions, agents, access, tokens, memory files, daily memory, Agent Ping callbacks, pending-action resolution.
-- **Discovery/Settings Endpoints**: Handlers, step types, providers, tools, settings, system tasks, auth, users.
+- **API Overview**: Canonical REST route inventory sourced from `inc/Api` registrations ([api/index.md](api/index.md)).
+- **Endpoints**: Agents, Agent Ping, Analytics, Auth, Chat, Email, Execute, Files, Flows, Internal Links, Jobs, Logs, Pipelines, Settings, System, and other REST resources.
+- **Workflow Endpoints**: Execute, flows, queues, webhooks, jobs, logs, and processed items.
+- **Agent Endpoints**: Chat, chat sessions, agents, access, tokens, memory files, daily memory, Agent Ping callbacks, and pending-action resolution.
+- **Discovery/Settings Endpoints**: Handlers, step types, providers, tools, settings, system tasks, auth, and users.
 
 ### Development
 - **Hooks**: Core actions, filters, and engine hooks for extension development.
@@ -122,6 +123,10 @@ docs/
 ├── api/                               # REST API for consumers
 │   ├── index.md                       # Complete API overview and common patterns
 │   └── endpoints/                     # Individual REST endpoint documentation
+│       ├── agents.md                  # Agent CRUD, access grants, and tokens
+│       ├── agent-ping.md              # Bearer-token ping callback routes
+│       ├── email.md                   # Email send/fetch/mailbox routes
+│       ├── internal-links.md          # Link audit and diagnostics routes
 │       └── errors.md                  # Error handling reference
 ├── development/                       # Developer-focused documentation
 │   ├── agents-api-pre-extraction-audit.md # Agents API/Data Machine boundary record

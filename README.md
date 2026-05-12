@@ -12,7 +12,7 @@ Data Machine turns a WordPress site into an agent runtime — persistent identit
 - **Multi-agent** — Multiple agents with scoped pipelines, flows, jobs, and filesystem directories
 - **Self-scheduling** — Agents schedule their own recurring tasks using flows, prompt queues, and Agent Pings
 
-Data Machine builds on [Agents API](https://github.com/Automattic/agents-api) for generic agent runtime contracts and durable agent primitives. Data Machine owns the WordPress automation product layer: pipelines, flows, jobs, handlers, tools, abilities, memory files, system tasks, and admin/CLI surfaces.
+Data Machine builds on [Agents API](https://github.com/Automattic/agents-api) for generic agent runtime contracts and durable agent primitives. Data Machine owns the WordPress automation product layer: pipelines, flows, jobs, handlers, tools, abilities, memory files, system tasks, request assembly, and admin/CLI surfaces.
 
 ## Architecture
 
@@ -287,13 +287,21 @@ Detailed endpoint docs live under [`docs/api/`](docs/api/). Routes under `wp-jso
 
 ## AI Providers
 
-OpenAI, Anthropic, Google, Grok, OpenRouter — configure a global default per-site, with per-mode overrides for pipeline, chat, and system.
+OpenAI, Anthropic, Google, Grok, OpenRouter — configure a global default per-site, with per-mode overrides for pipeline, chat, and system. Runtime provider dispatch goes through WordPress core's `wp-ai-client` via Data Machine's `RequestBuilder`; there is no runtime fallback to `chubes_ai_request` or `ai-http-client`.
 
-## Runtime Adapters
+## Runtime Architecture
 
-Data Machine's runtime seams use Agents API vocabulary, but Data Machine remains the product owner. `datamachine_run_conversation()` builds a Data Machine turn runner for request assembly, wp-ai-client dispatch, tool execution, completion policy, transcripts, locks, and event emission, then delegates turn orchestration to `AgentsAPI\AI\WP_Agent_Conversation_Loop::run()`.
+Data Machine's runtime seam uses Agents API vocabulary but keeps Data Machine product policy in Data Machine:
 
-See [`docs/core-system/ai-conversation-loop.md`](docs/core-system/ai-conversation-loop.md) for the current substrate boundary and return-shape reference.
+- `datamachine_run_conversation()` is the Data Machine entry point for chat and pipeline AI turns.
+- `AgentsAPI\AI\WP_Agent_Conversation_Loop::run()` owns generic turn sequencing, budgets, transcript persistence, locks, event callbacks, and normalized result fields.
+- Data Machine's turn runner owns request assembly, wp-ai-client dispatch, Data Machine tool execution, duplicate-call protection, tool runtime rules, completion assertions, job artifacts, and product logging.
+- `RequestBuilder::build()` returns `WordPress\AiClient\Results\DTO\GenerativeAiResult` or `WP_Error`; the old `success/data/error` array shape is historical.
+- Message storage and runtime results use Agents API message envelopes; provider-specific message shapes are projections at the wp-ai-client boundary.
+
+Runtime tests and host integrations can use stable hooks such as `datamachine_wp_ai_client_text_result`, `datamachine_wp_ai_client_availability`, `datamachine_wp_ai_client_request_timeout`, and `datamachine_wp_ai_client_connect_timeout` to replace provider dispatch or inspect transport behavior without replacing the Agents API substrate.
+
+See [`docs/core-system/ai-conversation-loop.md`](docs/core-system/ai-conversation-loop.md), [`docs/core-system/request-builder.md`](docs/core-system/request-builder.md), and [`docs/core-system/ai-message-envelope.md`](docs/core-system/ai-message-envelope.md) for the full runtime contract.
 
 ## Memory Storage Adapters
 

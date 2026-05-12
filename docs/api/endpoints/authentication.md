@@ -1,12 +1,12 @@
 # Authentication
 
-Data Machine REST API requests use normal WordPress REST authentication. The separate [Auth Endpoints](auth.md) page documents handler/provider credentials such as OAuth tokens.
+Data Machine REST API requests use normal WordPress REST authentication. Endpoint-specific callback routes add bearer or HMAC verification where a logged-in WordPress user does not fit the integration. The separate [Auth Endpoints](auth.md) page documents handler/provider credentials such as OAuth tokens.
 
 ## Authentication Methods
 
 This page describes authentication options, but it does not replace WordPress’s own authentication documentation.
 
-### 1. Application Password (Recommended)
+### 1. Application Password
 
 **Best For**: External integrations, non-browser applications, API clients
 
@@ -66,21 +66,42 @@ fetch('/wp-json/datamachine/v1/pipelines', {
 })
 ```
 
+### 3. Bearer or HMAC Callback Authentication
+
+Some routes are intentionally public at the WordPress REST layer and authenticate inside the callback:
+
+- `/trigger/{flow_id}` validates per-flow bearer tokens or HMAC signatures before executing the flow.
+- `/agent-ping/*` validates `Authorization: Bearer <token>` against the configured callback token.
+- Agent bearer tokens populate `PermissionHelper` agent context for routes such as `/agents/me`.
+
 ## Permission Model
 
 ### Data Machine Permissions
 
-Endpoints check Data Machine permissions through `PermissionHelper`, not a single hardcoded WordPress capability:
+Endpoints check Data Machine permissions through `PermissionHelper`, not a single hardcoded WordPress capability. `manage_options` is an administrator fallback, not the canonical permission name for most endpoints.
 
-- `manage_flows`: pipelines, flows, jobs, execution-related administration.
-- `manage_settings`: settings and handler auth management.
-- `chat`: chat message/session routes.
-- Public read routes exist for discovery-style surfaces such as providers, tools, and step types.
+| Scoped action | Concrete WordPress capability | Common use |
+|---------------|------------------------------|------------|
+| `manage_agents` | `datamachine_manage_agents` | Agent CRUD, access grants, tokens, cross-user agent files. |
+| `manage_flows` | `datamachine_manage_flows` | Flow, pipeline, jobs, analytics, internal link tools, and workflow operations. |
+| `manage_settings` | `datamachine_manage_settings` | Settings and system operations. |
+| `chat` | `datamachine_chat` | Chat access where enforced by the chat layer. |
+| `use_tools` | `datamachine_use_tools` | Tool execution where enforced by the tool layer. |
+| `view_logs` | `datamachine_view_logs` | Log access where enforced by the logs layer. |
+| `create_own_agent` | `datamachine_create_own_agent` | Self-service agent creation. |
 
-### Authenticated Users
+Public read routes exist for discovery-style surfaces such as providers, tools, and step types.
 
-Some endpoints require authentication only (any logged-in user):
-- `/users/me` - Current user preferences
+`PermissionHelper::can_manage()` passes when the caller has `manage_flows`, `manage_settings`, or `manage_agents`.
+
+### Authenticated Users and Scoped Resources
+
+Some routes accept any logged-in user and then scope data by the current user or agent context:
+
+- `/agents` lists agents visible to the current user.
+- `/agents/me` returns the active agent or user's default agent.
+- `/files/agent/*` allows a user to access their own files; `manage_agents` is required to access another user's files.
+- `/users/me` returns current-user preferences.
 
 ## Security Best Practices
 
@@ -114,20 +135,21 @@ curl -u username:app_password \
 ```
 
 **Solutions**:
-- Verify the user or scoped agent has the endpoint's Data Machine permission
+- Verify the user or scoped agent has the endpoint's Data Machine permission.
 - Check application password is correct
 - Ensure WordPress user is active
 - Confirm HTTPS is being used
 
 ## Related Documentation
 
-- Execute Endpoint - Workflow execution
-- Auth Endpoints - OAuth account management
-- Errors - Authentication error codes
-- API Overview - Complete API documentation
+- [Execute Endpoint](execute.md) - Workflow execution
+- [Auth Endpoints](auth.md) - OAuth account management
+- [Webhook Triggers](webhook-triggers.md) - Bearer/HMAC callback auth
+- [Errors](errors.md) - Authentication error codes
+- [API Overview](../index.md) - Complete API documentation
 
 ---
 
-**Security Model**: Endpoint-specific Data Machine permissions via `PermissionHelper`
-**Supported Methods**: Application Password, Cookie Authentication
+**Security Model**: Scoped Data Machine capabilities via `PermissionHelper`
+**Supported Methods**: Application Password, Cookie Authentication, Bearer/HMAC callback auth
 **WordPress Version**: 5.6+ (Application Passwords)
