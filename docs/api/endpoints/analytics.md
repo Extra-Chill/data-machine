@@ -17,7 +17,7 @@ Unified REST API for all analytics integrations. Each endpoint delegates to its 
 
 ## Authentication
 
-All endpoints require `manage_options` capability. Returns HTTP 403 if the current user lacks permission.
+All endpoints require `PermissionHelper::can( 'manage_flows' )`. Administrators also pass through the `manage_options` fallback in `PermissionHelper`.
 
 ## Request Format
 
@@ -150,7 +150,7 @@ const ABILITY_MAP = [
 ### Execution Flow
 
 1. `register_routes()` registers all four POST routes
-2. `check_permission()` validates `manage_options` capability
+2. `check_permission()` validates the scoped `manage_flows` permission
 3. `handle_request()` extracts tool name from route, looks up ability slug
 4. Ability is retrieved via `wp_get_ability()` and executed with the JSON body
 5. Error responses use HTTP 422 for configuration errors, 400 for input errors

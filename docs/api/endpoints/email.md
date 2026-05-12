@@ -12,6 +12,8 @@ Email endpoints expose Data Machine email abilities over REST for sending mail, 
 
 All email routes require Data Machine manage permission via `PermissionHelper::can_manage()`.
 
+`PermissionHelper::can_manage()` passes when the caller has `manage_flows`, `manage_settings`, or `manage_agents`. Administrators also pass through the `manage_options` fallback built into `PermissionHelper`.
+
 External REST clients should use WordPress application passwords or cookie auth. Inbox operations also require a configured `email_imap` auth provider; missing IMAP credentials return `not_configured` with HTTP 400.
 
 ## Route Table
