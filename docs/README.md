@@ -19,6 +19,9 @@ Complete user documentation for Data Machine, the AI-first WordPress plugin that
 - **Iteration Budget**: Shared bounded-iteration primitive backing `conversation_turns` and `chain_depth` budgets ([architecture/iteration-budget.md](architecture/iteration-budget.md)).
 
 ### Engine & Services
+- **Daily Memory System**: DailyMemoryTask lifecycle, deterministic overflow, opt-in daily injection, and daily memory artifacts ([core-system/daily-memory-system.md](core-system/daily-memory-system.md)).
+- **Memory Policy**: Per-agent memory injection policy and safe self-memory write gates ([core-system/memory-policy.md](core-system/memory-policy.md)).
+- **Agent Bundles**: Portable agent package schema, artifact tracking, extras, extension artifacts, run artifacts, and authenticated sources ([core-system/agent-bundles.md](core-system/agent-bundles.md)).
 - **Universal Engine**: Shared AI infrastructure for pipeline and chat agents.
 - **AI Conversation Loop**: Turn-based conversation execution with directive orchestration.
 - **AI Directives System**: Hierarchical directive injection for contextual AI behavior.

@@ -78,58 +78,82 @@ $daily = new DailyMemory(user_id: 0, agent_id: 42);
 **Source:** `inc/Engine/AI/System/Tasks/DailyMemoryTask.php`
 **Since:** v0.32.0
 
-An AI-powered system task that runs daily via Action Scheduler. It has two phases:
+An AI-powered system task that runs daily via Action Scheduler. The task lifecycle is deterministic around one optional AI compaction call:
 
-### Phase 1: Activity Synthesis
+1. Exit cleanly when `daily_memory_enabled` is false.
+2. Resolve the target date, user, agent, and system-mode model.
+3. Read the agent's `MEMORY.md`; empty or missing memory is a skipped job.
+4. Run deterministic overflow handling when `MEMORY.md` is extremely large.
+5. Gather same-day Data Machine activity for the prompt's `activity_section`.
+6. Skip when `MEMORY.md` is within budget and there is no activity context.
+7. Run the single `daily_memory` prompt, parse `===PERSISTENT===` and `===ARCHIVED===`, apply safety gates, rewrite `MEMORY.md`, and append archived content to the daily file.
 
-Gathers the day's activity from Data Machine (completed jobs and chat sessions) and uses AI to synthesize a concise daily memory entry.
+### Activity Context
+
+The task gathers same-day Data Machine activity and injects it into the single maintenance prompt as `{{activity_section}}`. Activity context is supporting material for compaction; it is not a separate summary prompt.
 
 **Data sources:**
 - `datamachine_jobs` — pipeline and system jobs created on the target date (job_id, pipeline_id, flow_id, source, label, status)
 - `datamachine_chat_sessions` — chat sessions created on the target date (session_id, title, context)
 
 **Process:**
-1. Query jobs and chat sessions for the target date
-2. Format as structured context with `## Jobs completed on YYYY-MM-DD` and `## Chat sessions on YYYY-MM-DD` sections
-3. Send to AI with the `daily_summary` prompt template
-4. Append the AI-generated summary to the day's daily memory file
+1. Query jobs and chat sessions for the target date.
+2. Format as structured context with `## Jobs completed on YYYY-MM-DD` and `## Chat sessions on YYYY-MM-DD` sections.
+3. Wrap that context in `## Today's Activity` and pass it as `{{activity_section}}`.
 
-If no DM activity occurred (empty context), Phase 1 is skipped. Phase 2 still runs because most agent work happens via external tools (e.g. Kimaki sessions) that don't create DM jobs.
+If no Data Machine activity occurred and `MEMORY.md` is already within `AgentMemory::MAX_FILE_SIZE`, the task completes as a skipped no-op. External tools such as Kimaki can still write temporal details directly with `agent_daily_memory`.
 
-### Phase 2: MEMORY.md Cleanup
+### MEMORY.md Compaction
 
 Reads the full MEMORY.md file and uses AI to split it into persistent knowledge (stays) and session-specific content (archived to the daily file). This keeps MEMORY.md lean for the context window budget.
 
 **Process:**
 1. Read MEMORY.md via `AgentMemory` service
-2. **Skip if within budget** — if file size ≤ `AgentMemory::MAX_FILE_SIZE` (8192 bytes / 8 KB), no cleanup needed
-3. Send to AI with the `memory_cleanup` prompt template
-4. Parse AI response into `===PERSISTENT===` and `===ARCHIVED===` sections
-5. **Safety check** — verify the new content isn't suspiciously small:
+2. **Deterministic overflow first** — if the file is over `datamachine_daily_memory_overflow_threshold` (default: 4x `AgentMemory::MAX_FILE_SIZE`), archive whole tail sections verbatim and write an archive pointer without invoking AI
+3. **Skip if within budget and no activity** — if file size ≤ `AgentMemory::MAX_FILE_SIZE` (8192 bytes / 8 KB) and `activity_section` is empty, no cleanup needed
+4. Send to AI with the `daily_memory` prompt template
+5. Parse AI response into `===PERSISTENT===` and `===ARCHIVED===` sections
+6. **Safety check** — verify the new content isn't suspiciously small:
    - If file is >2x over budget: allow reduction down to half the target size (4 KB minimum)
    - If file is near budget: don't allow reduction below 10% of original size
-6. Write cleaned content back to MEMORY.md
-7. Append archived content to the daily file under `### Archived from MEMORY.md`
+7. **Conservation check** — verify persistent + archived output accounts for at least 85% of the original by byte size, unless `datamachine_daily_memory_conservation_threshold` changes the threshold
+8. Write cleaned content back to MEMORY.md
+9. Append archived content to the daily file under `### Archived from MEMORY.md`
 
-**Failure handling:** Cleanup failures are logged but never fail the overall job. The daily summary (Phase 1) is already written. Key safety rules:
+### Deterministic Overflow
+
+Very large `MEMORY.md` files can exceed provider request limits. Before the AI call, `maybeHandleDeterministicOverflow()` checks `datamachine_daily_memory_overflow_threshold` (default: `AgentMemory::MAX_FILE_SIZE * 4`). When the file is above that threshold, the task uses `WP_Agent_Markdown_Section_Compaction_Adapter` to split the markdown by sections:
+
+- Retained sections stay in `MEMORY.md` up to `datamachine_daily_memory_overflow_target_size` (default: `AgentMemory::MAX_FILE_SIZE`).
+- Archived sections are appended verbatim to `daily/YYYY/MM/DD.md` under `### Archived from oversized MEMORY.md`.
+- A persistent `Archived Memory Overflow` pointer remains in `MEMORY.md`, pointing to the daily artifact path.
+- Conservation is enabled in the section adapter so overflow handling preserves content instead of summarizing it.
+
+When deterministic overflow handles the file, the job completes with `overflow_split: true` and does not run the AI prompt.
+
+**Failure handling:** compaction failures leave `MEMORY.md` unchanged and fail the job so operators can inspect the reason. Key safety rules:
 - Never wipe MEMORY.md if the AI response can't be parsed
 - Never write if the persistent section is empty
 - Never write if the new content is suspiciously small (safety threshold check)
+- Never write if the conservation check indicates the model discarded too much content
 
 ### Editable Prompts
 
-DailyMemoryTask defines two customizable prompts via `getPromptDefinitions()`:
+DailyMemoryTask defines one customizable prompt via `getPromptDefinitions()`:
 
-**`daily_summary`** — Synthesizes the day's DM activity into a concise entry.
-- Variable: `{{context}}` — gathered activity from jobs and chat sessions
+**`daily_memory`** — Maintains `MEMORY.md`, splitting persistent vs. session-specific content while considering same-day activity.
 
-**`memory_cleanup`** — Splits MEMORY.md into persistent vs. session-specific content.
-- Variables: `{{memory_content}}` (current MEMORY.md), `{{date}}` (target date), `{{max_size}}` (recommended limit, e.g. "8 KB")
+Variables:
+
+- `{{memory_content}}` — current full `MEMORY.md` content.
+- `{{date}}` — target archive date in `YYYY-MM-DD` format.
+- `{{max_size}}` — recommended persistent memory limit, e.g. `8 KB`.
+- `{{activity_section}}` — optional `## Today's Activity` section generated from jobs and chat sessions.
 
 Prompts can be overridden via the System Tasks admin tab or programmatically:
 
 ```php
-SystemTask::setPromptOverride('daily_memory_generation', 'memory_cleanup', 'Your custom prompt...');
+SystemTask::setPromptOverride('daily_memory_generation', 'daily_memory', 'Your custom prompt...');
 ```
 
 ### Scheduling
@@ -155,7 +179,7 @@ Upgrading sites have any pending action under the pre-refactor hook
 ```php
 [
     'label'           => 'Daily Memory',
-    'description'     => 'AI-generated daily summary of activity and automatic MEMORY.md cleanup',
+    'description'     => 'Automated MEMORY.md maintenance -- archives session-specific content to daily files, compresses and cleans persistent knowledge.',
     'setting_key'     => 'daily_memory_enabled',
     'default_enabled' => false,
     'supports_run'    => true,
@@ -277,7 +301,7 @@ The directive only injects *recent* days on a rolling window. Anything beyond `r
 **Tool ID:** `agent_daily_memory`
 **Contexts:** `chat`, `pipeline`, `standalone`
 
-An AI chat tool that lets agents manage their own daily memory during conversations. Always available (no external configuration required).
+An AI chat tool that lets agents manage their own daily memory during conversations. It is registered for chat and pipeline-policy contexts, then gated by normal tool policy and by the underlying daily-memory abilities. Read/list/search availability follows the ability permission path; writes also respect `daily_memory_enabled` through `DailyMemoryAbilities`.
 
 ### Tool Schema
 
@@ -291,6 +315,8 @@ An AI chat tool that lets agents manage their own daily memory during conversati
 | `query` | string | no | Search term (required for `search`) |
 | `from` | string | no | Start date for search range |
 | `to` | string | no | End date for search range |
+
+The tool resolves the acting scope from the tool call plus the active agent context. It passes explicit `user_id` and `agent_id` to abilities so writes land in the selected agent's daily-memory tree rather than a global file.
 
 ### Delegation
 
@@ -306,6 +332,17 @@ The tool delegates to WordPress Abilities:
 ### Usage Guidance (from tool description)
 
 > Use for session activity, temporal events, and work logs. Daily memory captures WHAT HAPPENED — persistent knowledge belongs in agent_memory (MEMORY.md) instead.
+
+## Daily Memory Artifacts
+
+Daily memory writes can become job artifacts for package consumers. During the AI conversation loop, successful tool calls are summarized and passed into `JobArtifacts`. For each successful `agent_daily_memory` write, `JobArtifacts`:
+
+1. Resolves the target agent, user, and date.
+2. Reads the written `daily/YYYY/MM/DD.md` file through `DailyMemory`.
+3. Falls back to the tool-call content with a `# Daily Memory: YYYY-MM-DD` heading when the file cannot be read.
+4. Emits an artifact with `type: agent_daily_memory`, `source: daily-memory`, `bundle_relative_path: memory/agent/daily/YYYY/MM/DD.md`, and the file content.
+
+Bundles can declare `run_artifacts.daily_memory` egress policy to let downstream runtimes preserve these artifacts in bundle files, job artifacts, or PR bodies. Data Machine validates the policy and builds deterministic artifact payloads; consumers decide where those payloads leave the system.
 
 ## REST API
 

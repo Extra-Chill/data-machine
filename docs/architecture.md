@@ -110,11 +110,12 @@ See [WordPress as Agent Memory](core-system/wordpress-as-agent-memory.md) for fu
 Temporal knowledge management via date-organized files:
 
 - **DailyMemory**: File operations at `agents/{slug}/daily/YYYY/MM/DD.md`
-- **DailyMemoryTask**: System task with two phases:
-  - Phase 1: Synthesizes daily activity (jobs, chat) into daily file
-  - Phase 2: Prunes MEMORY.md when > 8KB, archiving session content to daily file
-- **DailyMemorySelectorDirective** (Priority 46): Injects daily memory into pipeline AI requests with configurable selection modes (recent days, specific dates, date range, months). Capped at 100KB total.
+- **DailyMemoryTask**: System task that maintains `MEMORY.md` with deterministic overflow handling, same-day `activity_section` context, the single `daily_memory` prompt, and conservation checks.
+- **AgentDailyMemoryDirective** (Priority 35): Opt-in recent daily memory injection for chat and pipeline requests via `agent_config.daily_memory`.
+- **AgentDailyMemory tool**: Policy-gated on-demand reads, writes, lists, and searches for exact dates, ranges, and historical lookups.
 - **DailyMemoryAbilities**: CRUD + search via Abilities API with multi-agent scoping
+
+See [Daily Memory System](core-system/daily-memory-system.md) for the current task lifecycle and artifact behavior.
 
 ### System Tasks Framework
 

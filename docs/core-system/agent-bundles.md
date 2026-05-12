@@ -13,12 +13,13 @@ Agent bundles are portable, versioned packages for an agent's runtime behavior. 
 ├── prompts/<prompt-slug>.md
 ├── rubrics/<rubric-slug>.md
 ├── tool-policies/<policy-slug>.json
+├── auth-refs/<auth-ref-slug>.json
 ├── seed-queues/<queue-slug>.json
 ├── extensions/
 └── <extras-key>/                     # Plugin-owned opaque extras (e.g. wiki/, datasets/)
 ```
 
-Only `manifest.json`, `pipelines/`, `flows/`, and `memory/` have import/export adapters today. The remaining directories are reserved schema surface for prompts, rubrics, tool policies, auth references, seed queue artifacts, and plugin-owned extension artifacts.
+`manifest.json`, `memory/`, `pipelines/`, `flows/`, `prompts/`, `rubrics/`, `tool-policies/`, `auth-refs/`, `seed-queues/`, and `extensions/` are first-class bundle schema. Unknown top-level directories are transported as plugin-owned extras.
 
 ### Reserved Trees And Extras
 
@@ -93,6 +94,8 @@ See `Automattic/intelligence#467` for the reference consumer that claims the `wi
 - `full`: reserved for encrypted credential exports.
 - `omit`: omit handler auth material.
 
+`run_artifacts` is an optional manifest-level default egress policy. Individual flow files can also declare `run_artifacts`; flow-level policy wins for that flow. See [Run Artifact Egress](#run-artifact-egress).
+
 ## Artifact Tracking
 
 Bundle installs track artifacts independently of their runtime table. The foundation record shape is:
@@ -134,6 +137,13 @@ Memory artifacts can be tracked at section granularity. Section records extend t
 
 Self-memory writes are policy-constrained: the default target is the current acting agent, allowed section types are operational (`operating_note`, `source_quirk`, `run_lesson`, `task_note`), durable facts are rejected, and bundle-owned sections are staged through PendingActions instead of overwritten directly.
 
+Bundle section artifacts are the bridge between seed memory and safe runtime learning:
+
+- `MemorySectionArtifact::from_bundle_section()` records bundle-owned sections with install-time hashes.
+- `can_auto_update_from_bundle()` is true only while a bundle-owned section is still clean.
+- `should_stage_bundle_update()` is true when the section was locally modified after install.
+- Runtime self-memory writes that target a bundle-owned section stage a PendingAction instead of replacing the section.
+
 ## Pipeline And Flow Updates
 
 Bundle-installed pipelines and flows use stable `portable_slug` values as their runtime identity:
@@ -144,6 +154,15 @@ Bundle-installed pipelines and flows use stable `portable_slug` values as their 
 - Local edits are detected by comparing the current artifact hash with the install-time hash recorded in the owning agent's `datamachine_bundle.artifacts` config.
 - Installed artifact tracking is persisted in the site-scoped `datamachine_bundle_artifacts` table, keyed by `(agent_id, bundle_slug, artifact_type, artifact_id)`, so bundle state is independent of runtime tables.
 - Modified artifacts are reported as conflicts and are not overwritten by the import path.
+
+Upgrade planning groups artifacts into deterministic buckets:
+
+- `auto_apply`: new artifacts with no local value, or artifacts whose current hash still matches the installed hash.
+- `needs_approval`: untracked local artifacts or locally modified artifacts.
+- `warnings`: missing local artifacts and installed artifacts absent from the target bundle.
+- `no_op`: current artifact already matches the target.
+
+`install` creates new package-backed agents. `upgrade` applies clean updates and stages review-required changes through `AgentBundleUpgradePendingAction` with kind `bundle_upgrade`. `diff` runs the same planner without mutation. Applying a bundle PendingAction only applies explicitly approved artifact keys; unapproved entries are skipped, and consumers write storage through the registered artifact handlers or the `datamachine_bundle_upgrade_apply_artifact` filter.
 
 Schedule and queue policy is intentionally conservative:
 
@@ -158,6 +177,50 @@ Portable flow-step policy fields are explicit in `flows/<flow-slug>.json`:
 - `prompt_queue`: AI seed queue entries shaped as `{ "prompt": "...", "added_at": "..." }`.
 - `config_patch_queue`: fetch seed queue entries shaped as `{ "patch": { ... }, "added_at": "..." }`.
 - `queue_mode`: one of `drain`, `loop`, or `static`; shared by both queue slots on that flow step.
+
+## Run Artifact Egress
+
+`run_artifacts` declares which runtime artifacts a bundle consumer may surface after a job. Data Machine validates and stores the policy; downstream runtimes such as Data Machine Code decide how to materialize egress targets like PR bodies or bundle files.
+
+Supported sources:
+
+- `completion_assertions`
+- `daily_memory`
+- `transcript_summary`
+
+Supported egress targets:
+
+- `artifact` — retain in the job artifact payload.
+- `bundle-file` — allow a consumer to write the artifact into a bundle-relative file.
+- `pr-body` — allow a consumer to summarize the artifact in a PR body or review surface.
+
+Example:
+
+```json
+{
+  "run_artifacts": {
+    "daily_memory": {
+      "egress": ["artifact", "bundle-file", "pr-body"],
+      "bundle_relative_path": "memory/agent/daily/{yyyy}/{mm}/{dd}.md"
+    }
+  }
+}
+```
+
+Normalization drops unknown sources, unknown egress targets, duplicate targets, and unsafe bundle-relative paths. Data Machine does not execute GitHub-specific behavior from this policy; it only preserves a deterministic egress contract for consumers.
+
+During AI conversation loops, successful tool calls can add in-flight run artifacts before job persistence. `JobArtifacts` maps `agent_memory` and `agent_daily_memory` writes to canonical bundle-relative paths so DMC or other package consumers can export the evidence without scraping transcripts.
+
+## Extras Vs Extension Artifacts
+
+Bundles have two plugin-extension surfaces with different contracts:
+
+| Surface | Location | Shape | Data Machine behavior | Use when |
+|---|---|---|---|---|
+| Extras | Any unreserved top-level directory, exposed under `bundle["extras"]` | Opaque file map keyed by top-level directory | Transport only; consumer persists via `datamachine_bundle_install_succeeded` | A plugin owns a directory tree such as `wiki/` or `datasets/` |
+| Extension artifacts | `extensions/**/*.json`, exposed as `extension_artifacts` | Typed artifact envelopes with `artifact_type`, `artifact_id`, `source_path`, payload/hash fields | Normalized, included in package projection, upgrade planning, and artifact handlers | A plugin wants artifact diffing, upgrade conflict detection, and PendingAction apply semantics |
+
+Use extras for bulk opaque content where Data Machine should not inspect individual files. Use extension artifacts when each item needs stable identity, hashes, status, and upgrade behavior.
 
 ## CLI
 
@@ -185,6 +248,8 @@ Public archives install with no configuration. Private GitHub repositories, GitH
 5. **Generic per-request filter** — `datamachine_bundle_source_download_args` for arbitrary header injection (any host, any auth scheme).
 
 Data Machine **never persists tokens itself.** Storage and rotation live in the host plugin or operator's environment. Errors that surface from a failed download include the URL but never the `Authorization` header — see `BundleSourceAuth::redact_args_for_log()` if you log the args downstream.
+
+CLI token flags are resolved into the bundle-source context for that one import/diff/upgrade request only. `--token-env=<varname>` reads the token from the named environment variable and avoids placing the token in shell history. The internal download args carry private `datamachine_bundle_source` metadata until auth injection finishes; that metadata is stripped before the HTTP request is made.
 
 ### Example 1 — github.com private archive via env var
 
@@ -241,8 +306,9 @@ Or hook the lower-cost `datamachine_bundle_source_token_for_url` fallback when y
 
 For GitHub archive responses, `BundleSource::fetch_to_tempfile()` reads the response `ETag` header and parses the git SHA out of the `W/"<sha>:<format>"` (or bare `"<sha>"`) shape GitHub serves. When present and parseable the SHA is exposed via `BundleSource::last_resolved_revision()` and stamped onto the bundle as `source_revision`. Best-effort only — installs do not fail when the ETag is absent or unparseable.
 
-## Follow-Ups
+## See Also
 
-- Wire importer/exporter paths for prompts, rubrics, tool policies, auth refs, and seed queues.
-- Use artifact statuses during bundle upgrade planning: auto-update `clean`, stage PendingActions for `modified`, surface `missing` and `orphaned` explicitly.
-- Add registered bundle sources once bundles move beyond local paths.
+- [Memory Policy](./memory-policy.md) — policy gates for memory injection and self-memory writes.
+- [Daily Memory System](./daily-memory-system.md) — daily-memory storage, compaction, and artifacts.
+- [Pending Actions](./pending-actions.md) — approval envelopes used for bundle upgrades and protected memory writes.
+- [Agent Memory Backends](../architecture/agent-memory-backends.md) — logical memory identity and backend projection.

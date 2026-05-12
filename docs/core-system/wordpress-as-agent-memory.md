@@ -62,25 +62,29 @@ The **CoreMemoryFilesDirective** loads all files from the **MemoryFileRegistry**
 
 **Location:** `agents/{agent_slug}/daily/YYYY/MM/DD.md`
 
-Daily memory files capture session-specific knowledge organized by date. Two-phase system:
+Daily memory files capture session-specific knowledge organized by date. Current lifecycle:
 
-1. **Daily Summary** (Phase 1): At the end of each day, Data Machine gathers completed jobs and chat sessions, synthesizes them via AI, and appends the result to the daily file.
-2. **MEMORY.md Cleanup** (Phase 2): If MEMORY.md exceeds the size threshold (`MAX_FILE_SIZE = 8KB`), AI splits content into persistent facts and session-specific details. Persistent content stays in MEMORY.md; archived content moves to the daily file.
+1. **Activity context**: Data Machine gathers same-day jobs and chat sessions into the `{{activity_section}}` variable.
+2. **Deterministic overflow**: Very large `MEMORY.md` files are split by section and archived verbatim before any AI call.
+3. **AI compaction**: The single `daily_memory` prompt splits `MEMORY.md` into `===PERSISTENT===` and `===ARCHIVED===` sections when size or activity requires maintenance.
+4. **Conservation checks**: Safety gates prevent empty, suspiciously small, or lossy rewrites.
 
 This keeps MEMORY.md lean while preserving the full temporal record in daily files.
 
-**DailyMemoryTask** runs as a system task (`daily_memory_generation`) on a daily cron schedule. Both phases use editable AI prompts via the `getPromptDefinitions()` system.
+**DailyMemoryTask** runs as a system task (`daily_memory_generation`) on a daily cron schedule. The `daily_memory` prompt is editable via the `getPromptDefinitions()` system.
 
-**Pipeline integration:** The **DailyMemorySelectorDirective** (Priority 46) injects daily memory into pipeline AI requests. Four selection modes:
+**Runtime integration:** The **AgentDailyMemoryDirective** (Priority 35) injects recent daily files into chat and pipeline AI requests only when the resolved agent opts in with `agent_config.daily_memory`:
 
-| Mode | Description |
-|------|-------------|
-| `recent_days` | Last N days (max 90) |
-| `specific_dates` | Explicit date list |
-| `date_range` | From/to date filtering |
-| `months` | All dates in selected months |
+```json
+{
+  "daily_memory": {
+    "enabled": true,
+    "recent_days": 3
+  }
+}
+```
 
-Total injection capped at 100KB. Files sorted newest-first.
+Historical date, range, and month queries are served on demand by the `agent_daily_memory` tool instead of pre-injecting large selector windows.
 
 ### 3. Chat Sessions — Conversation Memory
 
@@ -377,17 +381,17 @@ Each pipeline can select additional agent files beyond the core set. Configure v
 
 Each flow can independently select additional memory files, allowing flow-level customization beyond pipeline defaults.
 
-### Daily Memory Files (Priority 46)
+### Daily Memory Files (Priority 35)
 
-Flows can configure daily memory injection through the `daily_memory` flow config setting. See the [Daily Memory section](#2-daily-memory--temporal-knowledge) for selection modes.
+Agents can opt into recent daily memory injection through `agent_config.daily_memory`. `AgentDailyMemoryDirective` runs after core memory files and before pipeline/flow memory files, and it only injects the newest available daily files within the 8 KB memory budget.
 
 ```
-"Daily Music News"    -> [content-strategy.md] + recent 7 days daily memory
-"Social Media Posts"  -> []
-"Album Reviews"       -> [content-strategy.md, content-briefing.md] + specific dates
+"Personal Assistant"  -> recent 3 days daily memory
+"Social Media Posts"  -> no daily memory
+"Album Reviews"       -> no daily memory; uses agent_daily_memory for exact historical lookups
 ```
 
-Different workflows access different slices of knowledge. This is deliberate — selective memory injection over RAG means you know exactly what context the agent has, with no embedding cost and no hallucination from irrelevant similarity matches.
+Different agents access different slices of temporal knowledge. This is deliberate — opt-in recent daily memory keeps stateful assistants continuous without leaking yesterday's work into stateless pipeline workers.
 
 ## External Agent Integration
 
