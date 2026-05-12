@@ -18,6 +18,7 @@ import { client } from '@shared/utils/api';
  * @param {number} params.page  Current page (1-based)
  * @param {number} params.perPage Items per page
  * @param {string} params.status Optional status filter
+ * @param {boolean} params.hideChildren Hide child jobs in the main list
  * @return {Promise<Object>} Jobs list response
  */
 export const fetchJobs = ( {
