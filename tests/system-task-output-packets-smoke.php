@@ -14,6 +14,7 @@ $sources = array(
 	'task'     => file_get_contents( $root . '/inc/Engine/AI/System/Tasks/EmitDataPacketsTask.php' ) ?: '',
 	'provider' => file_get_contents( $root . '/inc/Engine/AI/System/SystemAgentServiceProvider.php' ) ?: '',
 	'engine'   => file_get_contents( $root . '/inc/Abilities/Engine/ExecuteStepAbility.php' ) ?: '',
+	'jobs'     => file_get_contents( $root . '/inc/Core/Database/Jobs/Jobs.php' ) ?: '',
 );
 
 $failures = array();
@@ -54,6 +55,9 @@ assert_system_task_output_contains( $sources['provider'], "\$tasks['emit_data_pa
 echo "\n[4] engine status override can stop after zero emitted packets\n";
 assert_system_task_output_contains( $sources['engine'], 'if ( $status_override )', 'ExecuteStepAbility honors status override before normal continuation', $failures, $passes );
 assert_system_task_output_contains( $sources['engine'], 'JobStatus::COMPLETED_NO_ITEMS', 'ExecuteStepAbility recognizes completed_no_items statuses', $failures, $passes );
+
+echo "\n[5] engine data writes refresh the shared cache\n";
+assert_system_task_output_contains( $sources['jobs'], "wp_cache_set( \$job_id, \$data, 'datamachine_engine_data'", 'Jobs::store_engine_data refreshes EngineData cache after direct writes', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " system task output packet assertions failed.\n";

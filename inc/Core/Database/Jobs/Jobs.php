@@ -739,6 +739,8 @@ class Jobs extends BaseRepository {
 			return false;
 		}
 
+		wp_cache_set( $job_id, $data, 'datamachine_engine_data' );
+
 		do_action(
 			'datamachine_log',
 			'debug',
