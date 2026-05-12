@@ -1591,7 +1591,7 @@ arrays are projection shapes at provider boundaries, not the store contract.
 - `count_unread` — pure derivation from a messages array
 - `cleanup_expired_sessions / cleanup_old_sessions / cleanup_orphaned_sessions` — scheduled cleanup
 - `list_sessions_for_day` — day-scoped summary rows for the Daily Memory Task
-- `get_storage_metrics` — row count + on-disk size for the `wp datamachine retention status` CLI; return `null` to opt out
+- `get_storage_metrics` — row count + on-disk size for the `wp datamachine retention show` CLI; return `null` to opt out
 
 ### WP_Agent_Memory_Store (`/agents-api/inc/Core/FilesRepository/WP_Agent_Memory_Store.php`)
 

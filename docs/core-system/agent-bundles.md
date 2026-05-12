@@ -227,10 +227,13 @@ Use extras for bulk opaque content where Data Machine should not inspect individ
 Agent package operations live under `wp datamachine agent`:
 
 - `install <path|url>` imports a local bundle path (`.zip`, `.json`, or directory) or a remote URL.
+- `import <path|url>` imports a portable agent export and creates a new agent.
+- `export <agent>` writes an agent identity, memory, pipelines, and flows to a portable bundle.
 - `installed` reports installed package-backed agents without clobbering `agent list`.
 - `status <slug>` reports installed version and tracked artifact state by agent slug or bundle slug.
 - `diff <path|url>` builds a read-only upgrade plan.
 - `upgrade <path|url>` applies clean updates and stages locally modified artifacts as PendingActions.
+- `rebase <path|url>` previews 3-way merges for locally modified bundle artifacts.
 - `apply <pending_action_id>` accepts a staged bundle PendingAction.
 
 Every read/preview command supports `--format=json` for automation.

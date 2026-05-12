@@ -161,16 +161,21 @@ Agent executes → Agent queues next task → Loop continues
 ## WP-CLI
 
 ```bash
-wp datamachine agents           # Agent management and path discovery
+wp datamachine agents           # Agent identities, access, tokens, bundles
+wp datamachine memory           # Layered memory files and path discovery
 wp datamachine pipelines        # Pipeline CRUD
 wp datamachine flows            # Flow CRUD and queue management
 wp datamachine jobs             # Job management, monitoring, undo
+wp datamachine worker           # Headless worker loop
+wp datamachine drain            # Drain due Data Machine actions
+wp datamachine cycle            # Run due flows for an external cycle
+wp datamachine pending-actions  # Inspect approval queues
 wp datamachine settings         # Plugin settings
 wp datamachine posts            # Query Data Machine-created posts
 wp datamachine logs             # Log operations
-wp datamachine memory           # Agent memory read/write
 wp datamachine handlers         # List registered handlers
 wp datamachine step-types       # List registered step types
+wp datamachine processed-items  # Deduplication tracking
 wp datamachine chat             # Chat agent interface
 wp datamachine alt-text         # AI alt text generation
 wp datamachine links            # Internal linking
@@ -178,9 +183,14 @@ wp datamachine blocks           # Gutenberg block operations
 wp datamachine image            # Image generation
 wp datamachine meta-description # SEO meta descriptions
 wp datamachine auth             # OAuth provider management
+wp datamachine email            # Email send/fetch/reply operations
+wp datamachine external         # Remote Data Machine site connections
+wp datamachine indexnow         # IndexNow indexing integration
 wp datamachine taxonomy         # Taxonomy operations
 wp datamachine batch            # Batch operations
 wp datamachine system           # System task management
+wp datamachine retention        # Retention policies and cleanup scheduling
+wp datamachine test             # Fetch handler dry-runs
 wp datamachine analytics        # Analytics and tracking
 ```
 
