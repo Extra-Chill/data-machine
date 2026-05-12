@@ -122,7 +122,7 @@ class AIStepTest extends TestCase {
 
 		$this->assertSame(
 			'rl_task',
-			$method->invoke( null, array( 'agent_mode' => 'pipeline' ), array( 'agent_mode' => 'RL Task' ) )
+			$method->invoke( null, array( 'agent_mode' => 'pipeline' ), array( 'agent_mode' => 'rl_task' ) )
 		);
 		$this->assertSame(
 			'eval',
