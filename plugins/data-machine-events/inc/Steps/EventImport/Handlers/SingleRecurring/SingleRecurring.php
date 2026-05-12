@@ -50,6 +50,15 @@ class SingleRecurring extends EventImportHandler {
 		);
 	}
 
+	protected function getSourceInventoryCapabilities(): array {
+		return array(
+			'can_enumerate'    => true,
+			'stable_ids'       => true,
+			'has_total_count'  => true,
+			'inventory_source' => 'handler_config',
+		);
+	}
+
 	protected function executeFetch( array $config, ExecutionContext $context ): array {
 		$context->log( 'info', 'SingleRecurring: Starting event handler' );
 
@@ -129,7 +138,7 @@ class SingleRecurring extends EventImportHandler {
 				'flow_id'          => $context->getFlowId(),
 				'original_title'   => $event_title,
 				'event_identifier' => $event_identifier,
-				'item_identifier'        => $event_identifier,
+				'item_identifier'  => $event_identifier,
 				'import_timestamp' => time(),
 				'_engine_data'     => $engine_data,
 			),

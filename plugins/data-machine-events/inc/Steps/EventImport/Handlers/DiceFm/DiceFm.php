@@ -45,6 +45,14 @@ class DiceFm extends EventImportHandler {
 		);
 	}
 
+	protected function getSourceInventoryCapabilities(): array {
+		return array(
+			'stable_ids'            => true,
+			'supports_query_shards' => true,
+			'bounded_by'            => array( 'city', 'country' ),
+		);
+	}
+
 	/**
 	 * Execute Dice FM event import with flat parameter structure
 	 */
@@ -159,7 +167,7 @@ class DiceFm extends EventImportHandler {
 					'flow_id'          => $context->getFlowId(),
 					'original_title'   => $standardized_event['title'],
 					'event_identifier' => $event_identifier,
-					'item_identifier'        => $event_identifier,
+					'item_identifier'  => $event_identifier,
 					'import_timestamp' => time(),
 					'_engine_data'     => $engine_data,
 				),

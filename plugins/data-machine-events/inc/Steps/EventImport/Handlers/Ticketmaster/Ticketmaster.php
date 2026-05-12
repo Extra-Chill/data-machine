@@ -51,6 +51,17 @@ class Ticketmaster extends EventImportHandler {
 		);
 	}
 
+	protected function getSourceInventoryCapabilities(): array {
+		return array(
+			'stable_ids'            => true,
+			'has_total_count'       => true,
+			'supports_time_windows' => true,
+			'supports_query_shards' => true,
+			'pagination'            => 'page',
+			'max_pages'             => self::MAX_PAGE + 1,
+		);
+	}
+
 	/**
 	 * Execute fetch logic
 	 */
@@ -166,7 +177,7 @@ class Ticketmaster extends EventImportHandler {
 						'flow_id'          => $context->getFlowId(),
 						'original_title'   => $standardized_event['title'],
 						'event_identifier' => $event_identifier,
-						'item_identifier'        => $event_identifier,
+						'item_identifier'  => $event_identifier,
 						'import_timestamp' => time(),
 						'_engine_data'     => $engine_data,
 					),
@@ -217,7 +228,7 @@ class Ticketmaster extends EventImportHandler {
 		$classification_slug = strtolower( $handler_config['classification_type'] );
 
 		if ( ! isset( $classifications[ $classification_slug ] ) ) {
-			throw new \Exception( 'Invalid Ticketmaster classification_type: ' . $classification_slug );
+			throw new \Exception( 'Invalid Ticketmaster classification_type: ' . esc_html( $classification_slug ) );
 		}
 
 		$params['segmentName'] = $classifications[ $classification_slug ];
@@ -282,7 +293,7 @@ class Ticketmaster extends EventImportHandler {
 			return self::get_fallback_classifications();
 		}
 
-		$api_url = 'https://app.ticketmaster.com/discovery/v2/classifications.json?apikey=' . urlencode( $api_key );
+		$api_url = 'https://app.ticketmaster.com/discovery/v2/classifications.json?apikey=' . rawurlencode( $api_key );
 		$result  = \DataMachine\Core\HttpClient::get(
 			$api_url,
 			array(
