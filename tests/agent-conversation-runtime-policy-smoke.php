@@ -366,15 +366,16 @@ $nudge_result = datamachine_run_conversation(
 );
 
 assert_runtime_policy( 3 === $nudge_dispatch_count, 'missing natural assertion nudges and keeps loop running' );
-assert_runtime_policy( str_contains( wp_json_encode( $nudge_second_request ), 'completion signals are still missing' ), 'nudge is appended before retry request' );
+assert_runtime_policy( str_contains( wp_json_encode( $nudge_second_request ), 'The task is not complete yet' ), 'natural nudge is appended before retry request' );
+assert_runtime_policy( ! str_contains( wp_json_encode( $nudge_second_request ), 'completion signals are still missing' ), 'model-facing nudge omits assertion diagnostics phrasing' );
 assert_runtime_policy( 1 === count( $nudge_result['tool_execution_results'] ?? array() ), 'nudged loop captures required tool result' );
 assert_runtime_policy( 1 === ( $nudge_result['completion_nudge_count'] ?? 0 ), 'nudged loop returns nudge count diagnostic' );
 assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $nudge_result['completion_assertions_satisfied']['tool_names'] ?? null ), 'nudged loop returns final satisfied assertion diagnostic' );
-assert_runtime_policy( str_contains( $nudge_result['completion_nudge'] ?? '', 'runtime_policy_tool' ), 'nudged loop returns latest nudge message' );
+assert_runtime_policy( str_contains( $nudge_result['completion_nudge'] ?? '', 'The task is not complete yet' ), 'nudged loop returns latest natural nudge message' );
 assert_runtime_policy( 1 === count( array_filter( $nudge_event_sink->events, fn( $entry ) => 'completion_nudge_added' === ( $entry['event'] ?? '' ) ) ), 'nudged loop emits completion_nudge_added event' );
 $nudge_event_payload = runtime_policy_first_event_payload( $nudge_event_sink, 'completion_nudge_added' );
 assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $nudge_event_payload['completion_assertions_missing']['tool_names'] ?? null ), 'nudge event includes missing assertion context' );
-assert_runtime_policy( str_contains( wp_json_encode( $nudge_transcript->calls[0]['messages'] ?? array() ), 'completion signals are still missing' ), 'transcript messages include nudge message' );
+assert_runtime_policy( str_contains( wp_json_encode( $nudge_transcript->calls[0]['messages'] ?? array() ), 'The task is not complete yet' ), 'transcript messages include natural nudge message' );
 assert_runtime_policy( 1 === ( $GLOBALS['datamachine_runtime_engine_merges'][4242][0]['completion_nudge_count'] ?? 0 ), 'job engine_data merge includes nudge count' );
 assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $GLOBALS['datamachine_runtime_engine_merges'][4242][0]['completion_assertions_missing']['tool_names'] ?? null ), 'job engine_data merge includes missing assertions' );
 
@@ -434,7 +435,8 @@ $minimum_count_result = datamachine_run_conversation(
 assert_runtime_policy( 5 === $minimum_count_dispatch_count, 'minimum successful tool count nudges until enough calls run' );
 assert_runtime_policy( 2 === count( $minimum_count_result['tool_execution_results'] ?? array() ), 'minimum successful tool count captures both tool results' );
 assert_runtime_policy( array( 'runtime_policy_tool>=2' ) === ( $minimum_count_result['completion_assertions_satisfied']['tool_counts'] ?? null ), 'minimum successful tool count reports satisfied count assertion' );
-assert_runtime_policy( str_contains( $minimum_count_result['completion_nudge'] ?? '', 'runtime_policy_tool: 1/2' ), 'minimum successful tool count nudge reports current count' );
+assert_runtime_policy( str_contains( $minimum_count_result['completion_nudge'] ?? '', 'The task is not complete yet' ), 'minimum successful tool count returns natural nudge' );
+assert_runtime_policy( ! str_contains( $minimum_count_result['completion_nudge'] ?? '', 'runtime_policy_tool' ), 'minimum successful tool count nudge omits assertion tool name' );
 
 $duplicate_dispatch_count = 0;
 $duplicate_transcript     = new RuntimePolicySmokeTranscriptPersister();
@@ -919,7 +921,7 @@ $assertion_decision = $assertion_policy->recordToolResult(
 );
 
 assert_runtime_policy( ! $assertion_decision->isComplete(), 'handler policy waits when generic assertions are missing' );
-assert_runtime_policy( str_contains( $assertion_decision->context()['continuation_message'] ?? '', 'completion signals are still missing' ), 'handler policy provides assertion continuation nudge' );
+assert_runtime_policy( str_contains( $assertion_decision->context()['continuation_message'] ?? '', 'The task is not complete yet' ), 'handler policy provides natural assertion continuation nudge' );
 
 $non_handler_assertion_policy = new DataMachineHandlerCompletionPolicy(
 	array(),
@@ -938,7 +940,8 @@ $non_handler_assertion_decision = $non_handler_assertion_policy->recordToolResul
 );
 
 assert_runtime_policy( ! $non_handler_assertion_decision->isComplete(), 'handler policy waits after non-handler tools when generic assertions are missing' );
-assert_runtime_policy( str_contains( $non_handler_assertion_decision->context()['continuation_message'] ?? '', 'create_github_pull_request' ), 'handler policy nudges after non-handler tools with missing assertions' );
+assert_runtime_policy( str_contains( $non_handler_assertion_decision->context()['continuation_message'] ?? '', 'The task is not complete yet' ), 'handler policy nudges naturally after non-handler tools with missing assertions' );
+assert_runtime_policy( ! str_contains( $non_handler_assertion_decision->context()['continuation_message'] ?? '', 'create_github_pull_request' ), 'handler policy natural nudge omits missing assertion tool names' );
 
 $failed_required_tool_policy = new DataMachineHandlerCompletionPolicy(
 	array(),

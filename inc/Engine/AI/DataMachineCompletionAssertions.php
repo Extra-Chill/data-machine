@@ -144,21 +144,13 @@ class DataMachineCompletionAssertions {
 	 * @return string Nudge message.
 	 */
 	public static function buildNudge( array $missing, array $messages ): string {
-		$parts = array();
-		foreach ( $missing as $type => $values ) {
-			if ( ! is_array( $values ) || empty( $values ) ) {
-				continue;
-			}
-			$label   = str_replace( '_', ' ', (string) $type );
-			$parts[] = $label . ': ' . implode( ', ', array_map( 'strval', $values ) );
-		}
+		unset( $missing ); // Raw assertion diagnostics stay in metadata, not model-facing text.
 
 		$goal  = self::extractGoal( $messages );
-		$nudge = 'Please continue. The work is close, but these completion signals are still missing: ' . implode( '; ', $parts ) . '.';
+		$nudge = 'Please continue. The task is not complete yet. Use the available tools to inspect or update the project as needed, then finish once the requested outcome is in place.';
 		if ( '' !== $goal ) {
-			$nudge .= ' Original goal/context: ' . $goal;
+			$nudge .= ' Original request: ' . $goal;
 		}
-		$nudge .= ' Use the available tools as needed, then only finish once those signals are present.';
 
 		return $nudge;
 	}
