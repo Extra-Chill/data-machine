@@ -42,15 +42,15 @@ Updates, deletes, queue changes, handler changes, and file operations do not add
 
 | Operation | Client function | Endpoint |
 | --- | --- | --- |
-| List pipelines | `fetchPipelines(null, { perPage, offset, includeFlows, search })` | `GET /pipelines` |
-| Fetch one pipeline | `fetchPipelines(pipelineId, { includeFlows })` | `GET /pipelines?pipeline_id=...` |
+| List pipelines | `fetchPipelines(null, { perPage, offset, outputMode, includeFlows, search })` | `GET /pipelines` |
+| Fetch one pipeline | `fetchPipelines(pipelineId, { outputMode, includeFlows })` | `GET /pipelines?pipeline_id=...` |
 | Create pipeline | `createPipeline(name)` | `POST /pipelines` |
 | Rename pipeline | `updatePipelineTitle(pipelineId, name)` | `PATCH /pipelines/{pipeline_id}` |
 | Delete pipeline | `deletePipeline(pipelineId)` | `DELETE /pipelines/{pipeline_id}` |
 | Export pipelines | `exportPipelines(pipelineIds)` | `GET /pipelines?format=csv&ids=...` |
 | Import pipelines | `importPipelines(csvContent)` | `POST /pipelines` with `batch_import`, `format=csv`, `data` |
 
-List mode defaults to lightweight responses with `include_flows=false`; selected pipeline flows are loaded separately.
+List mode requests `output_mode=list` with `include_flows=false`; selected pipeline flows are loaded separately.
 
 ## Pipeline Step Operations
 

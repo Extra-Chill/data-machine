@@ -68,6 +68,13 @@ class Pipelines {
 							'description'       => __( 'Response format (json or csv)', 'data-machine' ),
 							'sanitize_callback' => 'sanitize_text_field',
 						),
+						'output_mode'   => array(
+							'required'          => false,
+							'type'              => 'string',
+							'enum'              => array( 'full', 'list', 'summary', 'ids' ),
+							'description'       => __( 'Output mode for returned pipelines: full, list, summary, or ids.', 'data-machine' ),
+							'sanitize_callback' => 'sanitize_key',
+						),
 						'ids'           => array(
 							'required'          => false,
 							'type'              => 'string',
@@ -106,7 +113,6 @@ class Pipelines {
 						'include_flows' => array(
 							'required'          => false,
 							'type'              => 'boolean',
-							'default'           => true,
 							'description'       => __( 'Include full flows array per pipeline. Set false for list views — response returns flow_count only.', 'data-machine' ),
 							'sanitize_callback' => 'rest_sanitize_boolean',
 						),
@@ -173,11 +179,26 @@ class Pipelines {
 					'callback'            => array( self::class, 'handle_get_pipelines' ),
 					'permission_callback' => array( self::class, 'check_permission' ),
 					'args'                => array(
-						'pipeline_id' => array(
+						'pipeline_id'   => array(
 							'required'          => true,
 							'type'              => 'integer',
 							'sanitize_callback' => 'absint',
 							'description'       => __( 'Pipeline ID to retrieve', 'data-machine' ),
+						),
+						'output_mode'   => array(
+							'required'          => false,
+							'type'              => 'string',
+							'default'           => 'full',
+							'enum'              => array( 'full', 'list', 'summary', 'ids' ),
+							'description'       => __( 'Output mode for returned pipeline: full, list, summary, or ids.', 'data-machine' ),
+							'sanitize_callback' => 'sanitize_key',
+						),
+						'include_flows' => array(
+							'required'          => false,
+							'type'              => 'boolean',
+							'default'           => true,
+							'description'       => __( 'Include full flows array when output_mode=full.', 'data-machine' ),
+							'sanitize_callback' => 'rest_sanitize_boolean',
 						),
 					),
 				),
@@ -286,6 +307,7 @@ class Pipelines {
 		$per_page_param      = $request->get_param( 'per_page' );
 		$offset_param        = $request->get_param( 'offset' );
 		$include_flows_param = $request->get_param( 'include_flows' );
+		$output_mode         = $request->get_param( 'output_mode' ) ?? null;
 		$scoped_user_id      = PermissionHelper::resolve_scoped_user_id( $request );
 		$scoped_agent_id     = PermissionHelper::resolve_scoped_agent_id( $request );
 
@@ -329,7 +351,7 @@ class Pipelines {
 		if ( $pipeline_id ) {
 			$input = array(
 				'pipeline_id' => (int) $pipeline_id,
-				'output_mode' => 'full',
+				'output_mode' => $output_mode ? $output_mode : 'full',
 			);
 			if ( null !== $include_flows_param ) {
 				$input['include_flows'] = (bool) $include_flows_param;
@@ -370,9 +392,9 @@ class Pipelines {
 		} else {
 			$per_page = ( null !== $per_page_param ) ? max( 1, (int) $per_page_param ) : 20;
 			$offset   = ( null !== $offset_param ) ? max( 0, (int) $offset_param ) : 0;
-			// Default include_flows to false for list mode — callers explicitly
-			// opt-in when they need full flows embedded. This avoids the N+1
-			// flow query and the large payload on admin list loads.
+			// Default to explicit list mode for collection reads. Callers that need
+			// embedded flows must request output_mode=full and include_flows=true.
+			$output_mode   = $output_mode ? $output_mode : 'list';
 			$include_flows = ( null !== $include_flows_param )
 				? (bool) $include_flows_param
 				: false;
@@ -380,7 +402,7 @@ class Pipelines {
 			$input = array(
 				'per_page'      => $per_page,
 				'offset'        => $offset,
-				'output_mode'   => 'full',
+				'output_mode'   => $output_mode,
 				'include_flows' => $include_flows,
 			);
 			if ( null !== $scoped_agent_id ) {
@@ -414,11 +436,12 @@ class Pipelines {
 
 			return rest_ensure_response(
 				array(
-					'success'  => true,
-					'per_page' => $result['per_page'] ?? $per_page,
-					'offset'   => $result['offset'] ?? $offset,
-					'total'    => $result['total'],
-					'data'     => array(
+					'success'     => true,
+					'per_page'    => $result['per_page'] ?? $per_page,
+					'offset'      => $result['offset'] ?? $offset,
+					'total'       => $result['total'],
+					'output_mode' => $result['output_mode'] ?? $output_mode,
+					'data'        => array(
 						'pipelines' => $pipelines,
 						'total'     => $result['total'],
 					),

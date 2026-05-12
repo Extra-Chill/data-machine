@@ -29,7 +29,7 @@ const getAgentPayload = () => {
 /**
  * Fetch pipelines list or a specific pipeline.
  *
- * In list mode, defaults to lightweight responses (include_flows=false) so the
+ * In list mode, requests explicit lightweight responses so the
  * admin UI can render hundreds of pipelines without the server embedding every
  * flow. Each pipeline still exposes flow_count for display purposes, and the
  * selected pipeline's flows are fetched separately via /flows.
@@ -39,16 +39,24 @@ const getAgentPayload = () => {
  * @param {number}      [options.perPage]      - Items per page (default 100)
  * @param {number}      [options.offset]       - Pagination offset (default 0)
  * @param {boolean}     [options.includeFlows] - Embed flows per pipeline (default false)
+ * @param {string}      [options.outputMode]   - Pipeline output mode (default list)
  * @param {string|null} [options.search]       - Filter by pipeline name (substring)
  * @return {Promise<Object>} Pipeline data
  */
 export const fetchPipelines = async (
 	pipelineId = null,
-	{ perPage = 100, offset = 0, includeFlows = false, search = null } = {}
+	{
+		perPage = 100,
+		offset = 0,
+		includeFlows = false,
+		outputMode = 'list',
+		search = null,
+	} = {}
 ) => {
 	if ( pipelineId ) {
 		return await client.get( '/pipelines', {
 			pipeline_id: pipelineId,
+			output_mode: outputMode,
 			include_flows: includeFlows,
 		} );
 	}
@@ -56,6 +64,7 @@ export const fetchPipelines = async (
 	const params = {
 		per_page: perPage,
 		offset,
+		output_mode: outputMode,
 		include_flows: includeFlows,
 	};
 
