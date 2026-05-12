@@ -153,7 +153,7 @@ class PipelineStepAbilities {
 			'datamachine/update-pipeline-step',
 			array(
 				'label'               => __( 'Update Pipeline Step', 'data-machine' ),
-				'description'         => __( 'Update pipeline step configuration (system prompt and AI tool policy). Model/provider are configured via mode_models setting.', 'data-machine' ),
+				'description'         => __( 'Update pipeline step configuration (system prompt, AI execution mode, and AI tool policy). Model/provider are configured via mode_models setting.', 'data-machine' ),
 				'category'            => 'datamachine-pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -166,6 +166,10 @@ class PipelineStepAbilities {
 						'system_prompt'    => array(
 							'type'        => 'string',
 							'description' => __( 'System prompt for AI step', 'data-machine' ),
+						),
+						'agent_mode'       => array(
+							'type'        => 'string',
+							'description' => __( 'Agent execution mode for this AI step. Defaults to pipeline.', 'data-machine' ),
 						),
 						'disabled_tools'   => array(
 							'type'        => 'array',
@@ -531,6 +535,7 @@ class PipelineStepAbilities {
 		}
 
 		$system_prompt = $input['system_prompt'] ?? null;
+		$agent_mode    = $input['agent_mode'] ?? null;
 		$policy_fields = array( 'disabled_tools', 'tool_categories' );
 
 		// provider/model are no longer configurable at the pipeline step level.
@@ -544,10 +549,10 @@ class PipelineStepAbilities {
 			}
 		}
 
-		if ( null === $system_prompt && ! $has_policy_field ) {
+		if ( null === $system_prompt && null === $agent_mode && ! $has_policy_field ) {
 			return array(
 				'success' => false,
-				'error'   => 'At least one of system_prompt, disabled_tools, or tool_categories is required',
+				'error'   => 'At least one of system_prompt, agent_mode, disabled_tools, or tool_categories is required',
 			);
 		}
 
@@ -579,6 +584,11 @@ class PipelineStepAbilities {
 		if ( null !== $system_prompt ) {
 			$step_config_data['system_prompt'] = wp_unslash( $system_prompt );
 			$updated_fields[]                  = 'system_prompt';
+		}
+
+		if ( null !== $agent_mode ) {
+			$step_config_data['agent_mode'] = sanitize_key( (string) $agent_mode );
+			$updated_fields[]               = 'agent_mode';
 		}
 
 		foreach ( $policy_fields as $field ) {

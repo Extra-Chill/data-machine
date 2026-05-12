@@ -160,6 +160,7 @@ $configs         = WorkflowConfigFactory::buildEphemeralConfigs(
 			array(
 				'type'           => 'ai',
 				'label'          => 'Summarize',
+				'agent_mode'     => 'rl_task',
 				'system_prompt'  => 'Be concise.',
 				'disabled_tools' => array( 'danger_tool' ),
 				'completion_assertions' => array(
@@ -187,6 +188,7 @@ assert_workflow_spec_equals( array( 'ephemeral_pipeline_0', 'ephemeral_pipeline_
 assert_workflow_spec_equals( array( 'fetch', 'ai', 'system_task' ), array_column( $pipeline_steps, 'step_type' ), 'ephemeral pipeline_config preserves step types', $failures, $passes );
 assert_workflow_spec_equals( array( 0, 1, 2 ), array_column( $pipeline_steps, 'execution_order' ), 'ephemeral pipeline_config preserves execution order', $failures, $passes );
 assert_workflow_spec_equals( 'Fetch Source', $pipeline_steps[0]['label'] ?? null, 'ephemeral pipeline_config preserves fetch label', $failures, $passes );
+assert_workflow_spec_equals( 'rl_task', $pipeline_steps[1]['agent_mode'] ?? null, 'ephemeral pipeline_config preserves AI agent mode', $failures, $passes );
 assert_workflow_spec_equals( 'Be concise.', $pipeline_steps[1]['system_prompt'] ?? null, 'ephemeral pipeline_config preserves AI system prompt', $failures, $passes );
 assert_workflow_spec_equals( array( 'danger_tool' ), $pipeline_steps[1]['disabled_tools'] ?? null, 'ephemeral pipeline_config preserves AI disabled tools', $failures, $passes );
 assert_workflow_spec_equals( array( 'required_tool_names' => array( 'publish_result' ) ), $pipeline_steps[1]['completion_assertions'] ?? null, 'ephemeral pipeline_config preserves AI completion assertions', $failures, $passes );

@@ -87,8 +87,9 @@ class AIStep extends Step {
 
 		// Model/provider resolved exclusively via mode system (agent → site → network).
 		// Pipeline-level model/provider fields are ignored — mode_models is the authority.
-		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
-		$provider_name = $mode_model['provider'];
+		$execution_mode = self::resolveExecutionMode( $pipeline_step_config, $this->flow_step_config );
+		$mode_model     = PluginSettings::resolveModelForAgentMode( $agent_id, $execution_mode );
+		$provider_name  = $mode_model['provider'];
 		if ( empty( $provider_name ) ) {
 			do_action(
 				'datamachine_fail_job',
@@ -97,8 +98,9 @@ class AIStep extends Step {
 				array(
 					'flow_step_id'     => $this->flow_step_id,
 					'pipeline_step_id' => $pipeline_step_id,
-					'error_message'    => 'AI step requires provider configuration. Set a default provider in Data Machine settings or configure mode_models.',
-					'solution'         => 'Set default_provider in Data Machine settings or configure mode_models for the pipeline mode',
+					'agent_mode'       => $execution_mode,
+					'error_message'    => sprintf( 'AI step requires provider configuration for agent mode "%s". Set a default provider in Data Machine settings or configure mode_models.', $execution_mode ),
+					'solution'         => sprintf( 'Set default_provider in Data Machine settings or configure mode_models for the %s mode', $execution_mode ),
 				)
 			);
 			return false;
@@ -155,8 +157,11 @@ class AIStep extends Step {
 		$agent_slug   = $this->resolveAgentSlugFromJobSnapshot( $job_snapshot, $agent_id );
 		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
 
+		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
+		$execution_mode       = self::resolveExecutionMode( $pipeline_step_config, $this->flow_step_config );
+
 		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
-		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, 'pipeline' );
+		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, $execution_mode );
 		$provider_name = $mode_model['provider'];
 		$model_name    = $mode_model['model'];
 
@@ -168,7 +173,7 @@ class AIStep extends Step {
 				'pipeline_step_id' => $pipeline_step_id,
 				'pipeline_id'      => $job_snapshot['pipeline_id'] ?? null,
 				'flow_id'          => $job_snapshot['flow_id'] ?? null,
-				'mode'             => 'pipeline',
+				'mode'             => $execution_mode,
 			)
 		);
 
@@ -259,8 +264,6 @@ class AIStep extends Step {
 				$messages[] = ConversationManager::buildConversationMessage( 'user', $user_message );
 			}
 
-			$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
-
 			$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 
 			// Resolve transcript persistence policy once per AI step invocation.
@@ -280,6 +283,7 @@ class AIStep extends Step {
 				'user_id'                     => $user_id,
 				'agent_id'                    => $agent_id,
 				'agent_slug'                  => $agent_slug,
+				'agent_mode'                  => $execution_mode,
 				'pipeline_id'                 => $job_snapshot['pipeline_id'] ?? null,
 				'flow_id'                     => $job_snapshot['flow_id'] ?? null,
 				'persist_transcript'          => $persist_transcript,
@@ -326,7 +330,7 @@ class AIStep extends Step {
 			$available_tools = $resolver->resolve(
 				array_merge(
 					array(
-						'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
+						'mode'                 => $execution_mode,
 						'agent_id'             => $agent_id,
 						'agent_slug'           => $agent_slug,
 						'previous_step_config' => $previous_step_config,
@@ -415,7 +419,7 @@ class AIStep extends Step {
 					$available_tools,
 					$provider_name,
 					$model_name,
-					ToolPolicyResolver::MODE_PIPELINE,
+					$execution_mode,
 					$payload,
 					$max_turns
 				);
@@ -672,6 +676,27 @@ class AIStep extends Step {
 		}
 
 		return $counts;
+	}
+
+	/**
+	 * Resolve the agent execution mode for this AI step.
+	 *
+	 * @param array $pipeline_step_config Pipeline step config.
+	 * @param array $flow_step_config Flow step config.
+	 * @return string Agent mode slug.
+	 */
+	private static function resolveExecutionMode( array $pipeline_step_config, array $flow_step_config ): string {
+		$raw_mode = ToolPolicyResolver::MODE_PIPELINE;
+		foreach ( array( $flow_step_config['agent_mode'] ?? null, $pipeline_step_config['agent_mode'] ?? null ) as $candidate ) {
+			if ( is_scalar( $candidate ) && '' !== trim( (string) $candidate ) ) {
+				$raw_mode = $candidate;
+				break;
+			}
+		}
+
+		$mode = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $raw_mode ) : strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $raw_mode ) ?? '' );
+
+		return '' !== $mode ? $mode : ToolPolicyResolver::MODE_PIPELINE;
 	}
 
 	/**

@@ -10,6 +10,7 @@ namespace DataMachine\Tests\Unit\Core\Steps\AI;
 use DataMachine\Core\Steps\AI\AIStep;
 use DataMachine\Engine\AI\DataPacketPromptProjector;
 use DataMachine\Engine\AI\Tools\ToolResultFinder;
+use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 
@@ -112,6 +113,24 @@ class AIStepTest extends TestCase {
 				'custom_tool'                  => 2,
 			),
 			$merged['minimum_successful_tool_counts']
+		);
+	}
+
+	public function test_resolve_execution_mode_uses_flow_override_then_pipeline_config(): void {
+		$method = new ReflectionMethod( AIStep::class, 'resolveExecutionMode' );
+		$method->setAccessible( true );
+
+		$this->assertSame(
+			'rl_task',
+			$method->invoke( null, array( 'agent_mode' => 'pipeline' ), array( 'agent_mode' => 'rl_task' ) )
+		);
+		$this->assertSame(
+			'eval',
+			$method->invoke( null, array( 'agent_mode' => 'Eval' ), array( 'agent_mode' => '' ) )
+		);
+		$this->assertSame(
+			ToolPolicyResolver::MODE_PIPELINE,
+			$method->invoke( null, array(), array() )
 		);
 	}
 
