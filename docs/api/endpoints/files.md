@@ -21,7 +21,7 @@ Requires authenticated user. Agent file endpoints use scoped permissions — use
 
 Upload a file for flow processing (`flow_step_id`).
 
-**Permission**: `manage_options` capability required
+**Permission**: Logged-in user plus `PermissionHelper::can_manage()`.
 
 **Parameters**:
 - `flow_step_id` (string, optional): Flow step ID for flow-level files
@@ -91,7 +91,7 @@ List files in a flow scope (`flow_step_id`).
 
 Download a file by filename.
 
-**Permission**: `manage_options` capability required
+**Permission**: Logged-in user plus `PermissionHelper::can_manage()`.
 
 **Parameters**:
 - `filename` (string, required): File to retrieve
@@ -105,7 +105,7 @@ Download a file by filename.
 
 Delete a file by filename.
 
-**Permission**: `manage_options` capability required
+**Permission**: Logged-in user plus `PermissionHelper::can_manage()`.
 
 **Parameters**:
 - `filename` (string, required): File to delete

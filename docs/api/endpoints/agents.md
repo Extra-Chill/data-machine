@@ -18,6 +18,8 @@ There are three auth modes:
 
 Token values are sensitive. `POST /agents/{agent}/tokens` returns `raw_token` once; list endpoints return token metadata only.
 
+Agent bearer-token requests populate `PermissionHelper` agent context. Token capabilities can be restricted by a capability ceiling, so a token can be narrower than the owning agent's full Data Machine capability set.
+
 ## Route Table
 
 | Method | Route | Auth model | Purpose |
