@@ -480,5 +480,5 @@ add_filter('datamachine_directives', function($directives) {
 - Universal Engine Architecture - Overall engine structure
 - AI Conversation Loop - Uses RequestBuilder for AI requests
 - PromptBuilder Pattern - Unified directive management
-- Tool Execution Architecture - Tool discovery and execution
+- [Tool Execution Architecture](tool-execution.md) - Tool discovery, execution, action policy, and approval staging
 - Universal Engine Filters - Complete filter reference

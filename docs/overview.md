@@ -142,10 +142,10 @@ wp datamachine jobs undo <job_id> --dry-run --allow-root
 
 ## AI Integration
 
-- **Tool-first architecture** enables AI agents (pipeline and chat) to call tools that interact with handlers, external APIs, or workflow metadata.
+- **Tool-first architecture** enables AI agents (pipeline, chat, and system) to call tools resolved through `ToolPolicyResolver`, `ToolSourceRegistry`, and the Data Machine `datamachine_tools` registry.
 - **PromptBuilder + RequestBuilder** apply layered directives via the `datamachine_directives` filter so every request includes identity, context, and site-specific instructions.
-- **Global tools** (Google Search, Local Search, Web Fetch, WordPress Post Reader) are registered under `/inc/Engine/AI/Tools/` and available to all agents.
-- **Chat-specific tools** (AddPipelineStep, ApiQuery, AuthenticateHandler, ConfigureFlowSteps, ConfigurePipelineStep, CopyFlow, CreateFlow, CreatePipeline, CreateTaxonomyTerm, ExecuteWorkflowTool, GetHandlerDefaults, ManageLogs, ReadLogs, RunFlow, SearchTaxonomyTerms, SetHandlerDefaults, UpdateFlow) orchestrate pipeline and flow management within conversations.
+- **Static registry tools** include research, site operations, memory, and workflow-management tools whose `modes` decide whether they appear in chat, pipeline, or system requests.
+- **Adjacent handler tools** are generated from previous/next pipeline steps so AI steps can publish, upsert, or skip items using the neighboring handler configuration.
 - **WP_Agent_Tool_Parameters + ToolResultFinder** gather parameter metadata for tools and interpret results inside data packets to keep conversations consistent.
 
 ## Authentication & Security
@@ -180,6 +180,6 @@ wp datamachine jobs undo <job_id> --dry-run --allow-root
 - **Multi-platform publishing** via core fetch/publish/upsert handlers for files, RSS, email, and WordPress, plus extension-provided handlers for social, business, and event destinations.
 - **Daily memory system** for automatic temporal knowledge management with AI-driven pruning.
 - **System tasks** for background AI operations (image generation, alt text, internal linking, meta descriptions) with undo support.
-- **Extension points** through filters such as `datamachine_handlers`, `datamachine_tools`, `datamachine_step_types`, `datamachine_auth_providers`, and `datamachine_engine_data`.
+- **Extension points** through filters such as `datamachine_handlers`, `datamachine_tools`, `agents_api_tool_sources`, `datamachine_step_types`, `datamachine_auth_providers`, and `datamachine_engine_data`.
 - **Directive orchestration** ensures every AI request is context-aware, tool-enabled, and consistent with site policies.
 - **Chartable logging, deduplication, and error handling** keep operators informed about job outcomes and prevent duplicate processing.

@@ -140,7 +140,7 @@ $ui_data = $tool_manager->getToolsForUI();
 - **Maintainability**: Single location for tool management logic
 - **Extensibility**: Filter-based architecture for custom tools
 
-See Tool Manager for complete documentation.
+See [Tool Manager](tool-manager.md) for the current registry/source/policy split.
 
 ### BaseTool (@since v0.14.10)
 
