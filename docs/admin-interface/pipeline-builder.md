@@ -1,224 +1,220 @@
 # Pipeline Builder Interface
 
-React-based interface for creating and managing Pipelines and Flows, backed by the `/wp-json/datamachine/v1/` REST API.
+The Pipelines admin page is a React builder for Data Machine pipelines, flows, flow-step handlers, prompt queues, memory/context files, and the integrated chat sidebar. The current client source lives under `inc/Core/Admin/Pages/Pipelines/assets/react/` and all server operations are routed through `utils/api.js` unless noted.
 
-## Architecture
+## Source Map
 
-**TanStack Query** manages server state (pipelines, flows, handler metadata, chat sessions/messages) with caching + invalidation.
+| Area | Primary files |
+| --- | --- |
+| REST wrapper | `utils/api.js` |
+| Pipeline data | `queries/pipelines.js`, `components/pipelines/` |
+| Flow data | `queries/flows.js`, `components/flows/` |
+| Queue data | `queries/queue.js`, `components/modals/FlowQueueModal.jsx` |
+| Handler data | `queries/handlers.js`, `components/modals/HandlerSettingsModal.jsx`, `components/flows/FlowStepHandler.jsx` |
+| Config data | `queries/config.js`, `components/modals/StepSelectionModal.jsx`, `components/modals/HandlerSelectionModal.jsx` |
+| UI state | `stores/uiStore.js`, `components/shared/ModalSwitch.jsx`, `components/shared/ModalManager.jsx` |
+| Chat sidebar | `components/chat/`, `queries/chat.js` |
 
-**Zustand UI store** (`inc/Core/Admin/Pages/Pipelines/assets/react/stores/uiStore.js`) manages client UI state and persists a small subset to `localStorage`:
+## State Model
+
+**TanStack Query** owns server state and cache invalidation for pipelines, flows, handlers, queues, config, memory files, and chat data.
+
+**Zustand** owns local UI state in `stores/uiStore.js`. The persisted keys are intentionally small:
+
 - `selectedPipelineId`
 - `isChatOpen`
 - `chatSessionId`
 
-## Pipeline Management
+Modal state (`activeModal`, `modalData`) stays in the store but is not persisted.
 
-- **Pipeline selection** is stored as `selectedPipelineId` in the Zustand UI store.
-- **Pipeline CRUD** uses REST endpoints via `inc/Core/Admin/Pages/Pipelines/assets/react/utils/api.js` (wrapper around `@wordpress/api-fetch` + nonce).
+## Selected Agent Payload
 
-## Flow Management
+Pipeline and flow creation include the selected admin agent when one is active. `utils/api.js` reads `selectedAgentId` from `@shared/stores/agentStore` and adds `{ agent_id: selectedAgentId }` through `getAgentPayload()`.
 
-Flows are created under a pipeline and displayed with pagination.
+Current client mutations that include the selected agent payload:
 
-## Step Configuration
+- `createPipeline(name)` sends `POST /pipelines` with `pipeline_name` and optional `agent_id`.
+- `createFlow(pipelineId, flowName)` sends `POST /flows` with `pipeline_id`, `flow_name`, and optional `agent_id`.
 
-Step and handler configuration is driven by React modals and handler schemas from the REST API.
+Updates, deletes, queue changes, handler changes, and file operations do not add the selected agent payload in the client wrapper.
 
-- **Handler selection** uses `HandlerSelectionModal.jsx`.
-- **Handler settings** uses `HandlerSettingsModal.jsx` (not a PHP template). The modal renders fields from the handler schema and submits updates via the flow update mutation.
-- **OAuth connection** is surfaced through an OAuth modal (`OAuthAuthenticationModal.jsx`) and popup handler components in `inc/Core/Admin/Pages/Pipelines/assets/react/components/modals/oauth/`.
+## Pipeline Operations
 
-## Integrated Chat Sidebar
+| Operation | Client function | Endpoint |
+| --- | --- | --- |
+| List pipelines | `fetchPipelines(null, { perPage, offset, includeFlows, search })` | `GET /pipelines` |
+| Fetch one pipeline | `fetchPipelines(pipelineId, { includeFlows })` | `GET /pipelines?pipeline_id=...` |
+| Create pipeline | `createPipeline(name)` | `POST /pipelines` |
+| Rename pipeline | `updatePipelineTitle(pipelineId, name)` | `PATCH /pipelines/{pipeline_id}` |
+| Delete pipeline | `deletePipeline(pipelineId)` | `DELETE /pipelines/{pipeline_id}` |
+| Export pipelines | `exportPipelines(pipelineIds)` | `GET /pipelines?format=csv&ids=...` |
+| Import pipelines | `importPipelines(csvContent)` | `POST /pipelines` with `batch_import`, `format=csv`, `data` |
 
-The Pipelines page includes a collapsible chat sidebar whose open/closed state, selected pipeline context, and active chat session are tracked in the Zustand UI store.
+List mode defaults to lightweight responses with `include_flows=false`; selected pipeline flows are loaded separately.
 
-## REST API integration
+## Pipeline Step Operations
 
-All Pipelines page operations are REST-driven through the Pipelines page API wrapper (`inc/Core/Admin/Pages/Pipelines/assets/react/utils/api.js`), including:
-- Pipelines: `GET /pipelines`, `POST /pipelines`, `PATCH /pipelines/{pipeline_id}`, `DELETE /pipelines/{pipeline_id}`
-- Pipeline steps: `POST /pipelines/{pipeline_id}/steps`, `DELETE /pipelines/{pipeline_id}/steps/{step_id}`, `PUT /pipelines/{pipeline_id}/steps/reorder`
-- Flows: `GET /flows?pipeline_id=...`, `POST /flows`, `GET /flows/{flow_id}`
+| Operation | Client function | Endpoint |
+| --- | --- | --- |
+| Add step | `addPipelineStep(pipelineId, stepType, executionOrder)` | `POST /pipelines/{pipeline_id}/steps` |
+| Delete step | `deletePipelineStep(pipelineId, stepId)` | `DELETE /pipelines/{pipeline_id}/steps/{step_id}` |
+| Reorder steps | `reorderPipelineSteps(pipelineId, steps)` | `PUT /pipelines/{pipeline_id}/steps/reorder` |
+| Update AI step system prompt | `updateSystemPrompt(stepId, prompt, stepType, pipelineId)` | `PUT /pipelines/steps/{step_id}/config` |
 
-(Endpoint surface evolves; treat this list as a starting point and confirm against `inc/Core/Admin/Pages/Pipelines/assets/react/utils/api.js` and the PHP REST controllers.)
+`updateSystemPrompt()` only sends `step_type`, `pipeline_id`, and `system_prompt`; provider, model, and tool policy are resolved by the current mode system rather than the pipeline builder client.
 
-**Performance note**: client caching and background refetching are provided by TanStack Query; UI-only state persistence is via Zustand `persist` to `localStorage`.
+## Flow Operations
 
-### Key React files
+| Operation | Client function | Endpoint |
+| --- | --- | --- |
+| List flows for pipeline | `fetchFlows(pipelineId, { page, perPage, outputMode })` | `GET /flows` |
+| Fetch one flow | `fetchFlow(flowId)` | `GET /flows/{flow_id}` |
+| Create flow | `createFlow(pipelineId, flowName)` | `POST /flows` |
+| Rename flow | `updateFlowTitle(flowId, name)` | `PATCH /flows/{flow_id}` |
+| Delete flow | `deleteFlow(flowId)` | `DELETE /flows/{flow_id}` |
+| Duplicate flow | `duplicateFlow(flowId)` | `POST /flows/{flow_id}/duplicate` |
+| Run flow now | `runFlow(flowId)` | `POST /execute` with `flow_id` |
+| Update schedule | `updateFlowSchedule(flowId, schedulingConfig)` | `PATCH /flows/{flow_id}` |
 
-- `inc/Core/Admin/Pages/Pipelines/assets/react/PipelinesApp.jsx`
-- `inc/Core/Admin/Pages/Pipelines/assets/react/components/shared/ModalManager.jsx`
-- `inc/Core/Admin/Pages/Pipelines/assets/react/components/modals/HandlerSettingsModal.jsx`
-- `inc/Core/Admin/Pages/Pipelines/assets/react/components/modals/OAuthAuthenticationModal.jsx`
-- `inc/Core/Admin/Pages/Pipelines/assets/react/components/chat/`
-- `FlowCard` - Flow instance display with scheduling and status
-- `PipelineStepCard` - Individual pipeline step cards with handler info
-- `FlowStepCard` - Configured flow step display with settings
-- `EmptyStepCard` - Add new step interface
-- `EmptyFlowCard` - Create new flow interface
+Flow duplication invalidates the selected pipeline's flow query. It copies via the REST `duplicate` endpoint; the client does not build the duplicate payload itself.
 
-**Modal Components:**
+## Pagination
 
-- `ConfigureStepModal` - AI configuration, system prompts, and tool selection
-- `HandlerSettingsModal` - Handler-specific configuration with dynamic field rendering
-- `OAuthAuthenticationModal` - OAuth provider authentication with popup handling
-- `StepSelectionModal` - Step type selection interface
-- `HandlerSelectionModal` - Handler selection with capability display
-- `FlowScheduleModal` - Flow scheduling configuration
-- `ImportExportModal` - Pipeline import/export operations with CSV handling
+Pipeline lists use offset pagination through `fetchPipelines()` with `per_page` and `offset`.
 
-**Shared Components:**
+Flow lists use 1-indexed page state in React and convert it to REST offset in `fetchFlows()`:
 
-- `LoadingSpinner` - Loading state visualization
-- `StepTypeIcon` - Step type icons with consistent styling
-- `DataFlowArrow` - Visual data flow indicators between steps
-- `PipelineSelector` - Pipeline selection dropdown with preferences
-- `ModalManager` - Centralized modal rendering logic (@since v0.2.3)
-- `ModalSwitch` - Centralized modal routing component (@since v0.2.5)
-
-**Specialized Sub-Components:**
-
-- OAuth components: `ConnectionStatus`, `AccountDetails`, `APIConfigForm`, `OAuthPopupHandler`
-- Files handler components: `FilesHandlerSettings`, `FileUploadInterface`, `FileStatusTable`, `AutoCleanupOption`
-- Configure step components: `AIToolsSelector`, `ToolCheckbox`, `ConfigurationWarning`
-- Import/export components: `ImportTab`, `ExportTab`, `CSVDropzone`, `PipelineCheckboxTable`
-- File management components: `FileUploadDropzone`, `FileStatusTable`, `AutoCleanupOption`
-
-### State Management
-
-**Server state (TanStack Query)**
-
-Pipelines/Flows/Handlers/Chat are fetched and cached via query hooks under `inc/Core/Admin/Pages/Pipelines/assets/react/queries/`.
-
-**Client UI state (Zustand)**
-
-The UI store in `inc/Core/Admin/Pages/Pipelines/assets/react/stores/uiStore.js` is intentionally small and persists only:
-- `selectedPipelineId`
-- `isChatOpen`
-- `chatSessionId`
-
-Modal state is also held in the UI store (`activeModal`, `modalData`) but is not persisted.
-
-### REST API Integration
-
-The Pipelines UI calls REST endpoints through `inc/Core/Admin/Pages/Pipelines/assets/react/utils/api.js` (a wrapper around `@wordpress/api-fetch` that reads the nonce/namespace from `window.dataMachineConfig`).
-
-For the authoritative list of endpoints used by the UI, refer to `inc/Core/Admin/Pages/Pipelines/assets/react/utils/api.js` and the PHP REST controllers under `inc/Api/`.
-
-### Benefits of React Architecture
-
-**User Experience:**
-- Zero page reloads for all operations
-- Instant visual feedback
-- Optimistic UI updates
-- Real-time status updates
-- Modern, responsive interface
-
-**Developer Experience:**
-- Component reusability
-- Clear separation of concerns
-- Testable code structure
-- Maintainable state management
-- Type-safe operations (via PropTypes)
-
-**Performance:**
-- Client-side caching
-- Efficient re-renders via React optimization
-- Lazy loading of modal content
-- Reduced server load (REST API vs repeated page loads)
-
-**Extensibility:**
-- Easy to add new features
-- Filter-based handler discovery
-- Dynamic field rendering
-- Plugin-friendly architecture
-
-### Migration Impact
-
-**Eliminated Code:**
-
-
-**Simplified Maintenance:**
-- Single responsibility components
-- Declarative UI rendering
-- Centralized state management
-- Consistent error handling patterns
-
-## Advanced Architecture Patterns
-
-### Handler API Helpers
-
-Handler-related server state is fetched through TanStack Query hooks under `inc/Core/Admin/Pages/Pipelines/assets/react/queries/` and shared utility helpers under `inc/Core/Admin/Pages/Pipelines/assets/react/utils/`:
-
-- `inc/Core/Admin/Pages/Pipelines/assets/react/queries/handlers.js` - handler metadata queries
-- `inc/Core/Admin/Pages/Pipelines/assets/react/utils/handlerSettings.js` - field normalization and settings helpers
-
-### Service Layer Architecture
-
-**Handler queries** (`inc/Core/Admin/Pages/Pipelines/assets/react/queries/handlers.js`):
-- Query abstraction for handler-related API operations
-- Separates API communication from component logic
-- Provides reusable handler operation methods
-- Centralizes error handling for handler operations
-
-**Benefits**:
-- Clear separation between API calls, query state, and UI components
-- Consistent cache invalidation through TanStack Query
-- Reusable field-normalization helpers independent of modal rendering
-
-### Modal Management System
-
-**ModalSwitch** (`inc/Core/Admin/Pages/Pipelines/assets/react/components/shared/ModalSwitch.jsx`):
-- Centralized modal rendering component
-- Routes modal types to appropriate modal components
-- Replaces scattered conditional modal logic
-- Single source of truth for modal rendering
-
-**Pattern**:
-```javascript
-// Before: Multiple conditional modal renders scattered in components
-{showHandlerModal && <HandlerSettingsModal />}
-{showConfigModal && <ConfigureStepModal />}
-{showOAuthModal && <OAuthAuthenticationModal />}
-
-// After: Single centralized modal switch
-<ModalSwitch activeModal={activeModal} />
+```js
+offset = ( page - 1 ) * perPage;
 ```
 
-**Benefits**:
-- Reduced code duplication
-- Easier to add new modal types
-- Centralized modal state management
-- Consistent modal behavior
+`FlowsSection.jsx` renders `@shared/components/Pagination` with `page`, `perPage`, `total`, and `onPageChange`. The default flow page size is 20.
 
-### Component Directory Structure
+## Flow Step Configuration
 
+Flow steps render through `FlowStepCard.jsx`. Step type metadata comes from `GET /step-types` via `useStepTypes()`.
+
+The card distinguishes these cases:
+
+- AI steps show a queueable user-message field.
+- Handler-backed steps show handler badges and configure controls.
+- Non-handler step types render inline fields through `InlineStepConfig` and the handler details API fallback.
+
+`updateFlowStepConfig(flowStepId, config)` sends partial config patches to `PATCH /flows/steps/{flow_step_id}/config`.
+
+## Queue CRUD And Modes
+
+Prompt queues are flow-step scoped. `FlowQueueModal.jsx` and `queries/queue.js` expose these operations:
+
+| Operation | Client function | Endpoint |
+| --- | --- | --- |
+| Read queue | `fetchFlowQueue(flowId, flowStepId)` | `GET /flows/{flow_id}/queue?flow_step_id=...` |
+| Add prompt(s) | `addToFlowQueue(flowId, flowStepId, prompts)` | `POST /flows/{flow_id}/queue` |
+| Clear queue | `clearFlowQueue(flowId, flowStepId)` | `DELETE /flows/{flow_id}/queue?flow_step_id=...` |
+| Remove item | `removeFromFlowQueue(flowId, flowStepId, index)` | `DELETE /flows/{flow_id}/queue/{index}?flow_step_id=...` |
+| Update item | `updateFlowQueueItem(flowId, flowStepId, index, prompt)` | `PUT /flows/{flow_id}/queue/{index}` |
+| Update mode | `updateFlowQueueMode(flowId, flowStepId, mode)` | `PUT /flows/{flow_id}/queue/mode` |
+
+Queue modes are:
+
+- `static`: peek the head prompt on each run without mutating the queue.
+- `drain`: pop the head prompt on each run and discard it.
+- `loop`: pop the head prompt on each run and append it to the tail.
+
+The queue modal supports adding text, removing individual items, clearing all items after confirmation, and changing mode. It documents FIFO behavior in the UI.
+
+## Handler Details And Editing
+
+Handler discovery and details use:
+
+- `getHandlers(stepType)` -> `GET /handlers`, optionally filtered by `step_type`.
+- `fetchHandlerDetails(handlerSlug)` -> `GET /handlers/{handler_slug}`.
+
+`HandlerSettingsModal.jsx` receives full handler metadata and the selected handler details as props. It renders schema fields through `HandlerSettingField`, normalizes/sanitizes values through `useHandlerModel()`, and saves through `useUpdateFlowHandler()`.
+
+The save path calls `updateFlowHandler(flowStepId, handlerSlug, settings, pipelineId, stepType, flowConfig, pipelineStepConfig)` and sends:
+
+```json
+{
+  "handler_slug": "example_handler",
+  "pipeline_id": 123,
+  "step_type": "fetch",
+  "flow_config": {},
+  "pipeline_step": {},
+  "settings": {}
+}
 ```
-assets/react/
-├── components/           # UI components and modals
-├── queries/              # TanStack Query hooks
-├── stores/               # Zustand UI state
-└── utils/                # API and field helpers
-```
 
-### Pattern Benefits
+The endpoint is `PUT /flows/steps/{flow_step_id}/handler`.
 
-**Query/UI Separation**:
-- Server state isolated in query hooks
-- UI state isolated in the Zustand store
-- Field normalization isolated in utility helpers
+Handler settings can be enriched by plugins through these client-side filters:
 
-**Centralized Modal Management**:
-- Single modal rendering location
-- Reduced conditional logic in components
-- Easier modal state debugging
+- `datamachine.handlerSettings.init`
+- `datamachine.handlerSettings.fieldChange`
 
-**Custom Hooks**:
-- Reusable state management logic
-- Consistent data fetching patterns
-- Simplified component logic
+OAuth-capable handlers surface connection state in the settings modal and open `OAuthAuthenticationModal.jsx` for connection flows.
 
-**Implemented Features:**
-React architecture provides modern features including:
-- Drag-and-drop step reordering (implemented)
-- Advanced validation UI (easy to implement)
-- Keyboard shortcuts (event-based)
+## Multi-Handler Editing
+
+Multi-handler steps are driven by step type metadata where `multi_handler === true`.
+
+`FlowStepCard.jsx` derives:
+
+- `handler_slugs` for the ordered handler list.
+- `handler_configs` for per-handler config.
+- `handler_settings_displays` for per-handler display rows.
+
+`FlowStepHandler.jsx` renders one badge/configure button per handler when multiple handlers are present and shows a `+` badge when another handler can be added.
+
+`HandlerSettingsModal.jsx` supports per-handler editing by receiving `handlerSlugs` and `onRemoveHandler`. The destructive remove button is only shown when more than one handler is attached.
+
+Add/remove multi-handler operations use the WordPress Abilities API directly instead of the page REST client:
+
+| Operation | Client function | Ability endpoint | Payload |
+| --- | --- | --- | --- |
+| Add handler | `addFlowHandler(flowStepId, handlerSlug, settings)` | `POST /wp-abilities/v1/execute/datamachine/update-flow-step` | `flow_step_id`, `add_handler`, `add_handler_config` |
+| Remove handler | `removeFlowHandler(flowStepId, handlerSlug)` | `POST /wp-abilities/v1/execute/datamachine/update-flow-step` | `flow_step_id`, `remove_handler` |
+
+## Memory, Context, And Agent Files
+
+The builder exposes three file surfaces:
+
+| Surface | Client functions | Endpoints |
+| --- | --- | --- |
+| Pipeline context files | `fetchContextFiles`, `uploadContextFile`, `deleteContextFile` | `GET /files`, `POST /files`, `DELETE /files/{filename}` |
+| Pipeline memory files | `fetchPipelineMemoryFiles`, `updatePipelineMemoryFiles` | `GET/PUT /pipelines/{pipeline_id}/memory-files` |
+| Flow memory files | `fetchFlowMemoryFiles`, `updateFlowMemoryFiles` | `GET/PUT /flows/{flow_id}/memory-files` |
+| Available agent files | `fetchAgentFiles` | `GET /files/agent` |
+
+Context files are uploaded against a pipeline. Memory files are selected by filename at either pipeline or flow scope. Agent files are read as an inventory for the selector UI.
+
+## Handler And Tool Inventory Endpoints
+
+The builder also reads current configuration inventories:
+
+- `getStepTypes()` -> `GET /step-types`.
+- `getTools(context)` -> `GET /tools`, optionally filtered by `context` (`pipeline`, `chat`, or `system`).
+- `getHandlers(stepType)` -> `GET /handlers`, optionally filtered by step type.
+- `getSchedulingIntervals()` -> `GET /settings/scheduling-intervals`.
+
+## Current Modal Components
+
+The modal system is centralized through `ModalSwitch.jsx` and `ModalManager.jsx`. Current modal components include:
+
+- `ContextFilesModal.jsx`
+- `FlowMemoryFilesModal.jsx`
+- `FlowQueueModal.jsx`
+- `FlowScheduleModal.jsx`
+- `HandlerSelectionModal.jsx`
+- `HandlerSettingsModal.jsx`
+- `ImportExportModal.jsx`
+- `MemoryFilesModal.jsx`
+- `OAuthAuthenticationModal.jsx`
+- `StepSelectionModal.jsx`
+
+## Operational Notes
+
+- The builder is REST-first and avoids full page reloads.
+- Query hooks update or invalidate the smallest practical cache slice after mutations.
+- Flow rows are paginated independently of pipeline rows to keep large admin installs usable.
+- Handler UI is schema-driven; handler-specific rendering should be added through field metadata, handler models, or the handler settings filters before adding new bespoke modal branches.
