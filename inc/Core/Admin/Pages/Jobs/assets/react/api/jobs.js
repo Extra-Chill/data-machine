@@ -89,7 +89,11 @@ export const clearProcessedItems = ( clearType, targetId ) =>
  *
  * @return {Promise<Object>} Pipelines list response
  */
-export const fetchPipelines = () => client.get( '/pipelines' );
+export const fetchPipelines = () =>
+	client.get( '/pipelines', {
+		include_flows: false,
+		per_page: 100,
+	} );
 
 /**
  * Fetch flows for a specific pipeline
@@ -98,4 +102,8 @@ export const fetchPipelines = () => client.get( '/pipelines' );
  * @return {Promise<Object>} Flows list response
  */
 export const fetchFlowsForPipeline = ( pipelineId ) =>
-	client.get( `/pipelines/${ pipelineId }/flows` );
+	client.get( '/flows', {
+		pipeline_id: pipelineId,
+		output_mode: 'list',
+		per_page: 100,
+	} );
