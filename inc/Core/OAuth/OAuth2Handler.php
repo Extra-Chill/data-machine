@@ -84,7 +84,7 @@ class OAuth2Handler {
 			'created_at' => time(),
 		);
 
-		set_transient( "datamachine_{$provider_key}_oauth_state", $record, 15 * MINUTE_IN_SECONDS );
+		set_transient( $this->state_transient_key( $provider_key, $nonce ), $record, 15 * MINUTE_IN_SECONDS );
 
 		do_action(
 			'datamachine_log',
@@ -124,7 +124,12 @@ class OAuth2Handler {
 			return false;
 		}
 
-		$record = get_transient( "datamachine_{$provider_key}_oauth_state" );
+		$record = get_transient( $this->state_transient_key( $provider_key, $state ) );
+
+		if ( false === $record ) {
+			// Backward compatibility for states created before nonce-keyed storage.
+			$record = get_transient( "datamachine_{$provider_key}_oauth_state" );
+		}
 
 		if ( false === $record ) {
 			$this->log_state_verification( $provider_key, false );
@@ -141,6 +146,7 @@ class OAuth2Handler {
 			return false;
 		}
 
+		delete_transient( $this->state_transient_key( $provider_key, $state ) );
 		delete_transient( "datamachine_{$provider_key}_oauth_state" );
 		$this->log_state_verification( $provider_key, true );
 
@@ -178,6 +184,17 @@ class OAuth2Handler {
 		);
 	}
 
+	/**
+	 * Build a nonce-keyed OAuth state transient key.
+	 *
+	 * @param string $provider_key Provider identifier.
+	 * @param string $state OAuth state nonce.
+	 * @return string Transient key.
+	 */
+	private function state_transient_key( string $provider_key, string $state ): string {
+		return "datamachine_{$provider_key}_oauth_state_" . substr( hash( 'sha256', $state ), 0, 24 );
+	}
+
 	// -------------------------------------------------------------------------
 	// PKCE (Proof Key for Code Exchange)
 	// -------------------------------------------------------------------------
@@ -194,7 +211,7 @@ class OAuth2Handler {
 	 * @param string $provider_key Provider identifier.
 	 * @return array{verifier: string, challenge: string, method: string} PKCE parameters.
 	 */
-	public function create_pkce( string $provider_key ): array {
+	public function create_pkce( string $provider_key, string $state = '' ): array {
 		// Generate a random 32-byte verifier (43-128 chars when base64url-encoded per RFC 7636).
 		$verifier = $this->base64url_encode( random_bytes( 32 ) );
 
@@ -202,7 +219,7 @@ class OAuth2Handler {
 		$challenge = $this->base64url_encode( hash( 'sha256', $verifier, true ) );
 
 		// Store verifier for token exchange (15 minutes, same as state).
-		set_transient( "datamachine_{$provider_key}_pkce_verifier", $verifier, 15 * MINUTE_IN_SECONDS );
+		set_transient( $this->pkce_transient_key( $provider_key, $state ), $verifier, 15 * MINUTE_IN_SECONDS );
 
 		do_action(
 			'datamachine_log',
@@ -230,15 +247,36 @@ class OAuth2Handler {
 	 * @param string $provider_key Provider identifier.
 	 * @return string|null Code verifier, or null if not found/expired.
 	 */
-	public function get_pkce_verifier( string $provider_key ): ?string {
-		$verifier = get_transient( "datamachine_{$provider_key}_pkce_verifier" );
+	public function get_pkce_verifier( string $provider_key, string $state = '' ): ?string {
+		$verifier = get_transient( $this->pkce_transient_key( $provider_key, $state ) );
+
+		if ( false === $verifier && '' !== $state ) {
+			// Backward compatibility for verifiers created before nonce-keyed storage.
+			$verifier = get_transient( "datamachine_{$provider_key}_pkce_verifier" );
+		}
 
 		if ( false === $verifier ) {
 			return null;
 		}
 
+		delete_transient( $this->pkce_transient_key( $provider_key, $state ) );
 		delete_transient( "datamachine_{$provider_key}_pkce_verifier" );
 		return $verifier;
+	}
+
+	/**
+	 * Build a nonce-keyed PKCE transient key.
+	 *
+	 * @param string $provider_key Provider identifier.
+	 * @param string $state OAuth state nonce.
+	 * @return string Transient key.
+	 */
+	private function pkce_transient_key( string $provider_key, string $state = '' ): string {
+		if ( '' === $state ) {
+			return "datamachine_{$provider_key}_pkce_verifier";
+		}
+
+		return "datamachine_{$provider_key}_pkce_verifier_" . substr( hash( 'sha256', $state ), 0, 24 );
 	}
 
 	/**
@@ -361,7 +399,7 @@ class OAuth2Handler {
 		}
 
 		// Include PKCE code_verifier in token exchange if one was stored.
-		$verifier = $this->get_pkce_verifier( $provider_key );
+		$verifier = $this->get_pkce_verifier( $provider_key, $state );
 		if ( null !== $verifier ) {
 			$token_params['code_verifier'] = $verifier;
 

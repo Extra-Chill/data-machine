@@ -576,6 +576,7 @@ class AuthAbilities {
 	public function executeSaveAuthConfig( array $input ): array {
 		$handler_slug = sanitize_text_field( $input['handler_slug'] ?? '' );
 		$config_input = $input['config'] ?? array();
+		$principal_context = $this->getPrincipalContext( $input );
 
 		if ( empty( $handler_slug ) ) {
 			return array(
@@ -665,9 +666,9 @@ class AuthAbilities {
 				);
 			}
 		} elseif ( method_exists( $auth_instance, 'save_config' ) ) {
-			$saved = $auth_instance->save_config( $config_data );
+			$saved = $auth_instance->save_config( $config_data, $principal_context );
 		} elseif ( method_exists( $auth_instance, 'save_account' ) ) {
-			$saved = $auth_instance->save_account( $config_data );
+			$saved = $auth_instance->save_account( $config_data, $principal_context );
 		} else {
 			return array(
 				'success' => false,
@@ -703,6 +704,7 @@ class AuthAbilities {
 	public function executeSetAuthToken( array $input ): array {
 		$handler_slug = sanitize_text_field( $input['handler_slug'] ?? '' );
 		$account_data = $input['account_data'] ?? array();
+		$principal_context = $this->getPrincipalContext( $input );
 
 		if ( empty( $handler_slug ) ) {
 			return array(
@@ -753,7 +755,7 @@ class AuthAbilities {
 			}
 		}
 
-		$saved = $auth_instance->save_account( $sanitized );
+		$saved = $auth_instance->save_account( $sanitized, $principal_context );
 
 		if ( $saved ) {
 			// Schedule proactive refresh if the provider supports it.
@@ -861,5 +863,39 @@ class AuthAbilities {
 			'message'    => sprintf( __( '%s token refreshed successfully', 'data-machine' ), ucfirst( $handler_slug ) ),
 			'expires_at' => $expires_at,
 		);
+	}
+
+	/**
+	 * Extract explicit principal context from ability input.
+	 *
+	 * @param array $input Ability input.
+	 * @return array{user_id?:int,agent_id?:int}
+	 */
+	private function getPrincipalContext( array $input ): array {
+		$context = array();
+		if ( ! empty( $input['agent_id'] ) ) {
+			$context['agent_id'] = absint( $input['agent_id'] );
+		}
+		if ( ! empty( $input['user_id'] ) ) {
+			$context['user_id'] = absint( $input['user_id'] );
+		}
+		if ( empty( $context['agent_id'] ) ) {
+			$agent_id = absint( PermissionHelper::get_acting_agent_id() );
+			if ( $agent_id > 0 ) {
+				$context['agent_id'] = $agent_id;
+			}
+		}
+
+		if ( empty( $context['user_id'] ) ) {
+			$user_id = absint( PermissionHelper::acting_user_id() );
+			if ( $user_id <= 0 && function_exists( 'get_current_user_id' ) ) {
+				$user_id = absint( get_current_user_id() );
+			}
+			if ( $user_id > 0 ) {
+				$context['user_id'] = $user_id;
+			}
+		}
+
+		return array_filter( $context );
 	}
 }
