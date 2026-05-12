@@ -144,4 +144,12 @@ dm_assert_same( 9, $engine_data_with_snapshot['job']['agent_id'], 'caller job.ag
 dm_assert_same( 8, $engine_data_with_snapshot['job']['user_id'], 'caller job.user_id remains authoritative over flat user_id' );
 dm_assert_same( 101, $engine_data_with_snapshot['job']['job_id'], 'engine job_id remains authoritative over caller job.job_id' );
 
+echo "\n[5] direct workflow packet handoff is engine-backed\n";
+$schedule_next_step_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Engine/ScheduleNextStepAbility.php' ) ?: '';
+$execute_step_source       = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/Engine/ExecuteStepAbility.php' ) ?: '';
+dm_assert_same( true, str_contains( $schedule_next_step_source, "'direct' === \$raw_flow_id" ), 'direct schedule path is detected before file storage' );
+dm_assert_same( true, str_contains( $schedule_next_step_source, 'direct_step_data_packets' ), 'direct schedule path stores data packets on engine data' );
+dm_assert_same( true, str_contains( $execute_step_source, "empty( \$dataPackets ) && 'direct' === \$flow_id" ), 'direct execute path falls back when file storage has no packets' );
+dm_assert_same( true, str_contains( $execute_step_source, 'direct_step_data_packets' ), 'direct execute path reloads engine-backed packets' );
+
 echo "\n=== execute-workflow-initial-data-contract-smoke: ALL PASS ===\n";
