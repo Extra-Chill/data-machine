@@ -137,6 +137,9 @@ class WorkflowConfigFactory {
 		if ( 'ai' === $step_type ) {
 			$pipeline_step['system_prompt']  = $step['system_prompt'] ?? '';
 			$pipeline_step['disabled_tools'] = is_array( $step['disabled_tools'] ?? null ) ? array_values( $step['disabled_tools'] ) : array();
+			if ( isset( $step['agent_mode'] ) && is_scalar( $step['agent_mode'] ) ) {
+				$pipeline_step['agent_mode'] = self::sanitizeAgentMode( (string) $step['agent_mode'] );
+			}
 			foreach ( array( 'completion_assertions', 'tool_runtime_rules', 'tool_categories' ) as $field ) {
 				if ( is_array( $step[ $field ] ?? null ) ) {
 					$pipeline_step[ $field ] = 'completion_assertions' === $field
@@ -147,5 +150,15 @@ class WorkflowConfigFactory {
 		}
 
 		return $pipeline_step;
+	}
+
+	/**
+	 * Sanitize an agent mode slug without requiring full WordPress bootstrap.
+	 *
+	 * @param string $mode Raw mode.
+	 * @return string Sanitized mode.
+	 */
+	private static function sanitizeAgentMode( string $mode ): string {
+		return function_exists( 'sanitize_key' ) ? sanitize_key( $mode ) : strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', $mode ) ?? '' );
 	}
 }

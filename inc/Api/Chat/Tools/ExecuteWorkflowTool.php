@@ -44,7 +44,7 @@ class ExecuteWorkflowTool extends BaseTool {
 
 		$description = 'Execute an ephemeral workflow (not saved to database).
 
-STEP FORMAT: {type: "' . $types_list . '", handler_slug, handler_config, user_message?, system_prompt?}
+STEP FORMAT: {type: "' . $types_list . '", handler_slug, handler_config, user_message?, system_prompt?, agent_mode?}
 
 Use api_query GET /datamachine/v1/handlers/{slug} for handler_config fields.
 

@@ -346,6 +346,9 @@ class CreatePipeline extends BaseTool {
 			if ( isset( $step['system_prompt'] ) ) {
 				$normalized_step['system_prompt'] = $step['system_prompt'];
 			}
+			if ( isset( $step['agent_mode'] ) && is_scalar( $step['agent_mode'] ) ) {
+				$normalized_step['agent_mode'] = sanitize_key( (string) $step['agent_mode'] );
+			}
 
 			$normalized[] = $normalized_step;
 		}
