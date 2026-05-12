@@ -136,6 +136,12 @@ class ExecuteStepAbility {
 			$context     = datamachine_get_file_context( $flow_id );
 			$retrieval   = new FileRetrieval();
 			$dataPackets = $retrieval->retrieve_data_by_job_id( $job_id, $context );
+			if ( empty( $dataPackets ) && 'direct' === $flow_id ) {
+				$direct_step_data_packets = is_array( $engine_snapshot['direct_step_data_packets'][ $flow_step_id ] ?? null ) ? $engine_snapshot['direct_step_data_packets'][ $flow_step_id ] : array();
+				if ( ! empty( $direct_step_data_packets ) ) {
+					$dataPackets = $direct_step_data_packets;
+				}
+			}
 
 			if ( ! isset( $flow_step_config['step_type'] ) || empty( $flow_step_config['step_type'] ) ) {
 				do_action(

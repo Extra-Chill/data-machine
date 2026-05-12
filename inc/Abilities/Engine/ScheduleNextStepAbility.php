@@ -113,8 +113,16 @@ class ScheduleNextStepAbility {
 
 			$raw_flow_id = $flow_step_config['flow_id'] ?? ( $engine->getJobContext()['flow_id'] ?? null );
 
-			// Standalone jobs (null flow_id) skip file-based data storage.
-			if ( null !== $raw_flow_id && 'direct' !== $raw_flow_id ) {
+			// Direct workflows do not have a numeric flow file context, so keep
+			// step input packets on engine data for execute-step to reload.
+			if ( 'direct' === $raw_flow_id ) {
+				$direct_step_data_packets                    = is_array( $engine_snapshot['direct_step_data_packets'] ?? null ) ? $engine_snapshot['direct_step_data_packets'] : array();
+				$direct_step_data_packets[ $flow_step_id ] = $dataPackets;
+				datamachine_merge_engine_data(
+					$job_id,
+					array( 'direct_step_data_packets' => $direct_step_data_packets )
+				);
+			} elseif ( null !== $raw_flow_id ) {
 				$flow_id = (int) $raw_flow_id;
 
 				if ( $flow_id <= 0 ) {
