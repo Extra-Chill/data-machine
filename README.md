@@ -12,7 +12,7 @@ Data Machine turns a WordPress site into an agent runtime — persistent identit
 - **Multi-agent** — Multiple agents with scoped pipelines, flows, jobs, and filesystem directories
 - **Self-scheduling** — Agents schedule their own recurring tasks using flows, prompt queues, and Agent Pings
 
-Data Machine builds on [Agents API](https://github.com/Automattic/agents-api) for generic agent runtime contracts and durable agent primitives. Data Machine owns the WordPress automation product layer: pipelines, flows, jobs, handlers, tools, abilities, memory files, system tasks, and admin/CLI surfaces.
+Data Machine builds on [Agents API](https://github.com/Automattic/agents-api) for generic agent runtime contracts and durable agent primitives. Data Machine owns the WordPress automation product layer: pipelines, flows, jobs, handlers, tools, abilities, memory files, system tasks, request assembly, and admin/CLI surfaces.
 
 ## Architecture
 
@@ -235,28 +235,21 @@ Full REST API under `datamachine/v1`:
 
 ## AI Providers
 
-OpenAI, Anthropic, Google, Grok, OpenRouter — configure a global default per-site, with per-mode overrides for pipeline, chat, and system.
+OpenAI, Anthropic, Google, Grok, OpenRouter — configure a global default per-site, with per-mode overrides for pipeline, chat, and system. Runtime provider dispatch goes through WordPress core's `wp-ai-client` via Data Machine's `RequestBuilder`; there is no runtime fallback to `chubes_ai_request` or `ai-http-client`.
 
-## Runtime Adapters
+## Runtime Architecture
 
-Data Machine's runtime seams use Agents API vocabulary. The conversation loop is swappable through `agents_api_conversation_runner`, letting another durable agent runtime take over while Data Machine still provides pipelines, flows, jobs, tool resolution, abilities, and memory integration.
+Data Machine's runtime seam uses Agents API vocabulary but keeps Data Machine product policy in Data Machine:
 
-```php
-add_filter(
-    'agents_api_conversation_runner',
-    function ( $result, $messages, $tools, $provider, $model, $context, $payload, $max_turns, $single_turn ) {
-        // Return an array matching AIConversationLoop::execute()'s shape to
-        // replace the built-in loop, or null to let Data Machine run it.
-        return my_runtime_run( ... );
-    },
-    10,
-    9
-);
-```
+- `datamachine_run_conversation()` is the Data Machine entry point for chat and pipeline AI turns.
+- `AgentsAPI\AI\WP_Agent_Conversation_Loop::run()` owns generic turn sequencing, budgets, transcript persistence, locks, event callbacks, and normalized result fields.
+- Data Machine's turn runner owns request assembly, wp-ai-client dispatch, Data Machine tool execution, duplicate-call protection, tool runtime rules, completion assertions, job artifacts, and product logging.
+- `RequestBuilder::build()` returns `WordPress\AiClient\Results\DTO\GenerativeAiResult` or `WP_Error`; the old `success/data/error` array shape is historical.
+- Message storage and runtime results use Agents API message envelopes; provider-specific message shapes are projections at the wp-ai-client boundary.
 
-This mirrors the provider pattern used by the bundled AI HTTP Client: providers swap how the LLM is called; runtime adapters swap how the conversation is run. Data Machine makes no assumptions about the host runtime — the filter is the entire contract.
+Runtime tests and host integrations can use stable hooks such as `datamachine_wp_ai_client_text_result`, `datamachine_wp_ai_client_availability`, `datamachine_wp_ai_client_request_timeout`, and `datamachine_wp_ai_client_connect_timeout` to replace provider dispatch or inspect transport behavior without replacing the Agents API substrate.
 
-See [`docs/core-system/ai-conversation-loop.md`](docs/core-system/ai-conversation-loop.md#runtime-adapters) for the full adapter contract and return-shape reference.
+See [`docs/core-system/ai-conversation-loop.md`](docs/core-system/ai-conversation-loop.md), [`docs/core-system/request-builder.md`](docs/core-system/request-builder.md), and [`docs/core-system/ai-message-envelope.md`](docs/core-system/ai-message-envelope.md) for the full runtime contract.
 
 ## Memory Storage Adapters
 
