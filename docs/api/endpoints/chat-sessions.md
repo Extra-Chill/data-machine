@@ -2,74 +2,54 @@
 
 **Implementation**: `inc/Api/Chat/Chat.php`
 
-## Overview
-
-Data Machine persists chat conversations as sessions. Sessions are user-scoped and stored in `wp_datamachine_chat_sessions`.
+Data Machine stores chat conversations as user-scoped sessions in `wp_datamachine_chat_sessions`.
 
 ## Authentication
 
-Requires WordPress authentication with `manage_options` capability.
+Requires the Data Machine `chat` permission (`PermissionHelper::can( 'chat' )`).
 
-## Endpoints
+## Response Envelope
+
+Session routes return:
+
+```json
+{
+  "success": true,
+  "data": {}
+}
+```
+
+The `data` shape is the corresponding Chat Session ability result.
+
+## Routes
 
 ### GET `/wp-json/datamachine/v1/chat/sessions`
 
-List chat sessions for the current user.
+List sessions for the current user and scoped agent.
 
-**Query Parameters**:
-- `limit` (integer, optional, default: `20`): Maximum sessions to return (capped at 100)
-- `offset` (integer, optional, default: `0`): Pagination offset
-- `agent_type` (string, optional, default: `chat`): Deprecated. Use `agent_id` to filter by specific agent.
+**Query parameters**:
 
-**Success Response**:
+- `limit` (integer, optional, default `20`): maximum sessions to return.
+- `offset` (integer, optional, default `0`): pagination offset.
+- `mode` (string, optional): `chat`, `pipeline`, or `system`.
+- `agent_id` (integer, optional): filter sessions by agent.
 
-```json
-{
-  "success": true,
-  "data": {
-    "sessions": [],
-    "total": 0,
-    "limit": 20,
-    "offset": 0,
-    "agent_type": "chat"
-  }
-}
-```
+`agent_type` is not a REST parameter for this route.
 
 ### GET `/wp-json/datamachine/v1/chat/{session_id}`
 
-Retrieve a single session by ID.
-
-**Success Response**:
-
-```json
-{
-  "success": true,
-  "data": {
-    "session_id": "<uuid>",
-    "conversation": [],
-    "metadata": {}
-  }
-}
-```
+Retrieve one session by UUID-like session ID (`[a-f0-9-]+`).
 
 ### DELETE `/wp-json/datamachine/v1/chat/{session_id}`
 
-Delete a session by ID.
+Delete one session by UUID-like session ID.
 
-**Success Response**:
+### POST `/wp-json/datamachine/v1/chat/sessions/{session_id}/read`
 
-```json
-{
-  "success": true,
-  "data": {
-    "session_id": "<uuid>",
-    "deleted": true
-  }
-}
-```
+Mark a session read for the current user.
 
-**Errors**:
-- `session_not_found` (404): Session does not exist
-- `session_access_denied` (403): Session exists but belongs to a different user
-- `session_delete_failed` (500): Database deletion failed
+## Errors
+
+- `session_not_found` (404): session does not exist.
+- `session_access_denied` (403): session belongs to another user.
+- `ability_not_found` (500): session ability is not registered.

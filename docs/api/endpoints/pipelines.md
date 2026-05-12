@@ -1,385 +1,194 @@
 # Pipelines Endpoints
 
-**Implementation**: `/inc/Api/Pipelines/` directory structure
-- `Pipelines.php` - Main pipeline CRUD operations
-- `PipelineSteps.php` - Step management (`/pipelines/{id}/steps`)
-- `PipelineFlows.php` - Pipeline-flow relationships (`/pipelines/{id}/flows`)
+**Implementation**: `inc/Api/Pipelines/`
 
 **Base URL**: `/wp-json/datamachine/v1/pipelines`
 
-## Overview
-
-Pipeline endpoints provide complete pipeline template management including creation, retrieval, modification, deletion, step management, and CSV import/export functionality. Directory-based structure (@since v0.2.0) organizes related operations with nested endpoints for steps and flows.
+Pipelines are reusable workflow templates. Flows are executable instances of pipelines.
 
 ## Authentication
 
-Requires `manage_options` capability. See Authentication Guide.
+Requires the Data Machine `manage_flows` permission (`PermissionHelper::can( 'manage_flows' )`). Requests may be user-scoped or agent-scoped through `PermissionHelper`.
 
-## Endpoints
+## Response Envelope
 
-### GET /pipelines
-
-Retrieve all pipelines or a specific pipeline with optional field filtering.
-
-**Permission**: `manage_options` capability required
-
-**Parameters**:
-- `pipeline_id` (integer, optional): Specific pipeline ID to retrieve
-- `fields` (string, optional): Comma-separated list of fields to return
-
-**Example Requests**:
-
-```bash
-# Get all pipelines
-curl https://example.com/wp-json/datamachine/v1/pipelines \
-  -u username:application_password
-
-# Get specific pipeline
-curl https://example.com/wp-json/datamachine/v1/pipelines?pipeline_id=5 \
-  -u username:application_password
-
-# Get specific fields only
-curl https://example.com/wp-json/datamachine/v1/pipelines?fields=pipeline_id,pipeline_name \
-  -u username:application_password
-```
-
-**Success Response (All Pipelines)**:
+Current JSON routes generally return:
 
 ```json
 {
   "success": true,
-  "pipelines": [
-    {
-      "pipeline_id": 5,
-      "pipeline_name": "Content Pipeline",
-      "pipeline_config": "{}",
-      "created_at": "2024-01-01 12:00:00",
-      "updated_at": "2024-01-02 14:30:00"
-    }
-  ],
-  "total": 1
+  "data": {}
 }
 ```
 
-**Success Response (Single Pipeline)**:
+List routes may also include top-level pagination fields. CSV export returns raw `text/csv`, not a JSON envelope.
+
+## Pipeline Routes
+
+### GET `/wp-json/datamachine/v1/pipelines`
+
+List pipelines or export CSV.
+
+**Query parameters**:
+
+- `pipeline_id` (integer, optional): retrieve one pipeline through the list route.
+- `fields` (string, optional): comma-separated fields to keep.
+- `format` (string, optional, default `json`): `json` or `csv`.
+- `ids` (string, optional): comma-separated pipeline IDs for CSV export.
+- `user_id` (integer, optional): filter by user when allowed by scope.
+- `search` (string, optional): substring match on pipeline name.
+- `per_page` (integer, optional, default `20`, max `100`): page size.
+- `offset` (integer, optional, default `0`): pagination offset.
+- `include_flows` (boolean, optional): include full flows. Defaults to `false` for list mode and `true` for single-pipeline lookups.
+
+**List success shape**:
 
 ```json
 {
   "success": true,
-  "pipeline": {
-    "pipeline_id": 5,
-    "pipeline_name": "Content Pipeline",
-    "pipeline_config": "{}",
-    "created_at": "2024-01-01 12:00:00",
-    "updated_at": "2024-01-02 14:30:00"
-  },
-  "flows": [...]
+  "per_page": 20,
+  "offset": 0,
+  "total": 0,
+  "data": {
+    "pipelines": [],
+    "total": 0
+  }
 }
 ```
 
-### POST /pipelines
+### GET `/wp-json/datamachine/v1/pipelines/{pipeline_id}`
 
-Create a new pipeline with optional step configuration.
+Get one pipeline.
 
-**Permission**: `manage_options` capability required
-
-**Parameters**:
-- `pipeline_name` (string, optional): Pipeline name (default: "Pipeline")
-- `steps` (array, optional): Complete pipeline steps configuration for complete mode
-- `flow_config` (array, optional): Flow configuration
-
-**Creation Modes**:
-- **Simple Mode**: Only `pipeline_name` provided - creates empty pipeline
-- **Complete Mode**: `steps` array provided - creates pipeline with configured steps
-
-**Example Requests**:
-
-```bash
-# Simple mode - empty pipeline
-curl -X POST https://example.com/wp-json/datamachine/v1/pipelines \
-  -H "Content-Type: application/json" \
-  -u username:application_password \
-  -d '{"pipeline_name": "My Pipeline"}'
-
-# Complete mode - with steps
-curl -X POST https://example.com/wp-json/datamachine/v1/pipelines \
-  -H "Content-Type: application/json" \
-  -u username:application_password \
-  -d '{
-    "pipeline_name": "Complete Pipeline",
-    "steps": [
-      {"step_type": "fetch"},
-      {"step_type": "ai"},
-      {"step_type": "publish"}
-    ]
-  }'
-```
-
-**Success Response**:
+**Success shape**:
 
 ```json
 {
   "success": true,
-  "pipeline_id": 6,
-  "pipeline_name": "My Pipeline",
-  "pipeline_data": {...},
-  "existing_flows": [],
-  "creation_mode": "simple"
+  "data": {
+    "pipeline": {},
+    "flows": []
+  }
 }
 ```
 
-### DELETE /pipelines/{pipeline_id}
+### POST `/wp-json/datamachine/v1/pipelines`
 
-Delete a pipeline and all associated flows and jobs.
+Create a pipeline. Despite the REST schema default, `pipeline_name` is required by the controller.
 
-**Permission**: `manage_options` capability required
+**Body parameters**:
 
-**Parameters**:
-- `pipeline_id` (integer, required): Pipeline ID to delete (in URL path)
+- `pipeline_name` (string, required): pipeline name.
+- `steps` (array, optional): pipeline step configuration.
+- `flow_config` (array, optional): initial flow configuration.
 
-**Example Request**:
-
-```bash
-curl -X DELETE https://example.com/wp-json/datamachine/v1/pipelines/6 \
-  -u username:application_password
-```
-
-**Success Response (200 OK)**:
+**Success shape**:
 
 ```json
 {
   "success": true,
-  "pipeline_id": 6,
-  "message": "Pipeline deleted successfully.",
-  "deleted_flows": 2,
-  "deleted_jobs": 15
+  "data": {}
 }
 ```
 
-### POST /pipelines/{pipeline_id}/steps
+### PATCH `/wp-json/datamachine/v1/pipelines/{pipeline_id}`
 
-Add a step to an existing pipeline.
+Rename a pipeline.
 
-**Permission**: `manage_options` capability required
+**Body parameters**:
 
-**Parameters**:
-- `pipeline_id` (integer, required): Pipeline ID (in URL path)
-- `step_type` (string, required): Step type (`fetch`, `ai`, `publish`, `upsert`)
+- `pipeline_name` (string, required): new title.
 
-**Example Request**:
+### DELETE `/wp-json/datamachine/v1/pipelines/{pipeline_id}`
 
-```bash
-curl -X POST https://example.com/wp-json/datamachine/v1/pipelines/6/steps \
-  -H "Content-Type: application/json" \
-  -u username:application_password \
-  -d '{"step_type": "fetch"}'
-```
-
-**Success Response (200 OK)**:
-
-```json
-{
-  "success": true,
-  "message": "Step \"Fetch\" added successfully",
-  "step_type": "fetch",
-  "step_config": {...},
-  "pipeline_id": 6,
-  "pipeline_step_id": "abc123-def456-789",
-  "step_data": {...},
-  "created_type": "step"
-}
-```
-
-### DELETE /pipelines/{pipeline_id}/steps/{step_id}
-
-Delete a step from a pipeline.
-
-**Permission**: `manage_options` capability required
-
-**Parameters**:
-- `pipeline_id` (integer, required): Pipeline ID (in URL path)
-- `step_id` (string, required): Pipeline step ID (in URL path)
-
-**Example Request**:
-
-```bash
-curl -X DELETE https://example.com/wp-json/datamachine/v1/pipelines/6/steps/abc123-def456-789 \
-  -u username:application_password
-```
-
-**Success Response (200 OK)**:
-
-```json
-{
-  "success": true,
-  "pipeline_step_id": "abc123-def456-789",
-  "pipeline_id": 6,
-  "message": "Step deleted successfully."
-}
-```
+Delete a pipeline and related records.
 
 ## CSV Export
 
-### GET /pipelines?format=csv
+### GET `/wp-json/datamachine/v1/pipelines?format=csv`
 
-Export pipelines to CSV format for backup, migration, or version control.
+Export pipelines as CSV. Use `ids=1,2` or `pipeline_id=1` to limit the export. The response is raw CSV with `Content-Type: text/csv; charset=utf-8`.
 
-**Permission**: `manage_options` capability required
+CSV import is not wired through `inc/Api/Pipelines/Pipelines.php`. The REST schema still registers `batch_import`, `format`, and `data` args on `POST /pipelines`, but the controller currently ignores them and requires `pipeline_name` for normal creation.
 
-**Parameters**:
-- `format` (string, required): Must be `csv` for export
-- `ids` (string, optional): Comma-separated pipeline IDs to export
-- `pipeline_id` (integer, optional): Single pipeline ID to export
+## Pipeline Step Routes
 
-**Export Behavior**:
-- If `ids` provided → Export specified pipelines
-- If `pipeline_id` provided → Export single pipeline
-- If neither provided → Export all pipelines
+### POST `/wp-json/datamachine/v1/pipelines/{pipeline_id}/steps`
 
-**CSV Structure**:
+Add a step.
 
-The exported CSV includes 9 columns: `pipeline_id`, `pipeline_name`, `step_position`, `step_type`, `step_config`, `flow_id`, `flow_name`, `handler`, `settings`
+**Body parameters**:
 
-**Example Requests**:
+- `step_type` (string, required): registered step type.
 
-```bash
-# Export all pipelines
-curl https://example.com/wp-json/datamachine/v1/pipelines?format=csv \
-  -u username:application_password \
-  -o pipelines-export.csv
+### DELETE `/wp-json/datamachine/v1/pipelines/{pipeline_id}/steps/{step_id}`
 
-# Export specific pipelines
-curl "https://example.com/wp-json/datamachine/v1/pipelines?format=csv&ids=5,6,7" \
-  -u username:application_password \
-  -o pipelines-export.csv
+Delete a pipeline step.
 
-# Export single pipeline
-curl https://example.com/wp-json/datamachine/v1/pipelines?format=csv&pipeline_id=5 \
-  -u username:application_password \
-  -o pipeline-5.csv
-```
+### PUT `/wp-json/datamachine/v1/pipelines/{pipeline_id}/steps/reorder`
 
-**Success Response (200 OK)**:
+Reorder steps.
 
-```csv
-pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,handler,settings
-5,Content Pipeline,0,fetch,"{""pipeline_step_id"":""abc-123""}",,,""
-5,Content Pipeline,1,ai,"{""pipeline_step_id"":""def-456""}",,,""
-5,Content Pipeline,0,fetch,"{""pipeline_step_id"":""abc-123""}",42,My Flow,rss,"{""feed_url"":""https://example.com/feed""}"
-```
+**Body parameters**:
 
-**Response Headers**:
+- `step_order` (array, required): objects with `pipeline_step_id` and numeric `execution_order`.
 
-```
-Content-Type: text/csv; charset=utf-8
-Content-Disposition: attachment; filename="pipelines-export-2024-01-02-14-30-00.csv"
-```
+### PATCH `/wp-json/datamachine/v1/pipelines/steps/{pipeline_step_id}/system-prompt`
 
-**Use Cases**:
-- Backup pipeline configurations
-- Share workflows between Data Machine installations
-- Version control pipeline templates
-- Migrate pipelines from development to production
+Update the AI system prompt for a pipeline step.
 
-## CSV Import
+**Body parameters**:
 
-### POST /pipelines (CSV Import Mode)
+- `system_prompt` (string, required): system prompt text.
 
-Import pipelines from CSV format.
+### PUT `/wp-json/datamachine/v1/pipelines/steps/{pipeline_step_id}/config`
 
-**Permission**: `manage_options` capability required
+Upsert AI step configuration. `step_type` and `pipeline_id` are required for `PUT` unless they can be inferred from the step ID.
 
-**Parameters**:
-- `batch_import` (boolean, required): Must be `true` to enable import mode
-- `format` (string, required): Must be `csv` for CSV import
-- `data` (string, required): CSV content to import
+**Body parameters**:
 
-**Import Behavior**:
-- Creates pipelines if they don't exist (matched by name)
-- Adds steps with configuration from CSV
-- Reuses existing pipelines with matching names
-- Returns array of imported pipeline IDs
+- `step_type` (string, required for PUT): currently only `ai` supports this config route.
+- `pipeline_id` (integer, required for PUT): pipeline context.
+- `disabled_tools` (array, optional): disabled tool IDs.
+- `tool_categories` (array, optional): allowed ability categories.
+- `system_prompt` (string, optional): AI system prompt.
 
-**Example Request**:
+### PATCH `/wp-json/datamachine/v1/pipelines/steps/{pipeline_step_id}/config`
 
-```bash
-curl -X POST https://example.com/wp-json/datamachine/v1/pipelines \
-  -H "Content-Type: application/json" \
-  -u username:application_password \
-  -d '{
-    "batch_import": true,
-    "format": "csv",
-    "data": "pipeline_id,pipeline_name,step_position,step_type,step_config,flow_id,flow_name,handler,settings\n5,Content Pipeline,0,fetch,\"{}\",,,\"\"\n5,Content Pipeline,1,ai,\"{}\",,,\"\""
-  }'
-```
+Patch AI step configuration. Only supplied fields are changed.
 
-**Success Response (200 OK)**:
+Accepted fields are `disabled_tools`, `tool_categories`, and `system_prompt`. `provider`, `model`, and `ai_api_key` are not accepted; model/provider resolution comes from the mode settings system.
+
+## Pipeline Flow Routes
+
+### GET `/wp-json/datamachine/v1/pipelines/{pipeline_id}/flows`
+
+List flows attached to a pipeline.
+
+**Success shape**:
 
 ```json
 {
   "success": true,
-  "imported_pipeline_ids": [5, 6, 7],
-  "count": 3,
-  "message": "Successfully imported 3 pipeline(s)"
+  "data": {
+    "pipeline_id": 5,
+    "flows": [],
+    "flow_count": 0,
+    "first_flow_id": null
+  }
 }
 ```
 
-**Error Response (500 Internal Server Error)**:
+## Pipeline Memory Routes
 
-```json
-{
-  "code": "import_failed",
-  "message": "Failed to import pipelines from CSV.",
-  "data": {"status": 500}
-}
-```
+### GET `/wp-json/datamachine/v1/pipelines/{pipeline_id}/memory-files`
 
-**CSV Format Requirements**:
-- Header row required with 9 columns
-- Pipeline rows: Include pipeline structure (empty flow columns)
-- Flow rows: Include flow configuration (populated flow columns)
-- JSON-encoded fields must be properly escaped
-- Steps sorted by execution_order for consistency
+Return configured memory filenames for a pipeline.
 
-**Integration Example (Python)**:
+### POST/PUT/PATCH `/wp-json/datamachine/v1/pipelines/{pipeline_id}/memory-files`
 
-```python
-import requests
-from requests.auth import HTTPBasicAuth
+Replace configured memory filenames.
 
-# Read CSV file
-with open('pipelines-export.csv', 'r') as f:
-    csv_content = f.read()
+**Body parameters**:
 
-# Import to Data Machine
-url = "https://example.com/wp-json/datamachine/v1/pipelines"
-auth = HTTPBasicAuth("username", "application_password")
-payload = {
-    "batch_import": True,
-    "format": "csv",
-    "data": csv_content
-}
-
-response = requests.post(url, json=payload, auth=auth)
-
-if response.status_code == 200:
-    result = response.json()
-    print(f"Imported {result['count']} pipeline(s)")
-    print(f"Pipeline IDs: {result['imported_pipeline_ids']}")
-else:
-    print(f"Import failed: {response.json()['message']}")
-```
-
-## Related Documentation
-
-- Flows Endpoints - Flow instance management
-- Execute Endpoint - Pipeline execution
-- StepTypes Endpoint - Available step types
-- Authentication - Auth methods
-
----
-
-**Base URL**: `/wp-json/datamachine/v1/pipelines`
-**Permission**: `manage_options` capability required
-**Implementation**: `/inc/Api/Pipelines/` directory (Pipelines.php, PipelineSteps.php, PipelineFlows.php)
-**Version**: Directory structure introduced in v0.2.1
+- `memory_files` (array of strings, required): agent memory filenames.
