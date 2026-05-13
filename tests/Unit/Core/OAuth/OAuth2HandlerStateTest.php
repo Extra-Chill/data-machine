@@ -50,9 +50,9 @@ class OAuth2HandlerStateTest extends WP_UnitTestCase {
 	}
 
 	public function test_create_state_stores_structured_record_in_transient(): void {
-		$this->handler->create_state( 'test_provider', array( 'key' => 'value' ) );
+		$state = $this->handler->create_state( 'test_provider', array( 'key' => 'value' ) );
 
-		$record = get_transient( 'datamachine_test_provider_oauth_state' );
+		$record = get_transient( $this->state_transient_key( 'test_provider', $state ) );
 
 		$this->assertIsArray( $record );
 		$this->assertArrayHasKey( 'nonce', $record );
@@ -62,9 +62,9 @@ class OAuth2HandlerStateTest extends WP_UnitTestCase {
 	}
 
 	public function test_create_state_without_payload_stores_empty_array(): void {
-		$this->handler->create_state( 'test_provider' );
+		$state = $this->handler->create_state( 'test_provider' );
 
-		$record = get_transient( 'datamachine_test_provider_oauth_state' );
+		$record = get_transient( $this->state_transient_key( 'test_provider', $state ) );
 
 		$this->assertIsArray( $record );
 		$this->assertSame( array(), $record['payload'] );
@@ -209,7 +209,7 @@ class OAuth2HandlerStateTest extends WP_UnitTestCase {
 		$state = $this->handler->create_state( 'test_expired' );
 
 		// Simulate expiration by deleting the transient.
-		delete_transient( 'datamachine_test_expired_oauth_state' );
+		delete_transient( $this->state_transient_key( 'test_expired', $state ) );
 
 		$result = $this->handler->verify_state( 'test_expired', $state );
 
@@ -257,5 +257,9 @@ class OAuth2HandlerStateTest extends WP_UnitTestCase {
 
 	public function test_max_payload_size_constant_is_4096(): void {
 		$this->assertSame( 4096, OAuth2Handler::MAX_PAYLOAD_SIZE );
+	}
+
+	private function state_transient_key( string $provider_key, string $state ): string {
+		return "datamachine_{$provider_key}_oauth_state_" . substr( hash( 'sha256', $state ), 0, 24 );
 	}
 }
