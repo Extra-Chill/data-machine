@@ -36,18 +36,44 @@ class DateTimeParserTest extends WP_UnitTestCase {
 		$this->assertEquals( '13:00', $la['time'] );
 	}
 
-	public function test_parse_utc_returns_empty_for_invalid_timezone() {
+	public function test_parse_utc_falls_back_to_site_timezone_for_invalid_timezone() {
+		// Defense-in-depth fix from #254: invalid timezone must NOT silently destroy
+		// the date — it must fall back to the site timezone so a missing venue
+		// timezone cannot cascade into off-by-one duplicates.
 		$result = DateTimeParser::parseUtc( '2026-01-15T18:00:00Z', 'Invalid/Timezone' );
 
-		$this->assertEquals( '', $result['date'] );
-		$this->assertEquals( '', $result['time'] );
-		$this->assertEquals( '', $result['timezone'] );
+		$this->assertNotEmpty( $result['date'], 'parseUtc must not return an empty date when timezone is invalid' );
+		$this->assertNotEmpty( $result['time'] );
+		$this->assertNotEmpty( $result['timezone'], 'parseUtc must report the fallback timezone it used' );
+		$this->assertTrue( DateTimeParser::isValidTimezone( $result['timezone'] ) );
+	}
+
+	public function test_parse_utc_falls_back_to_site_timezone_for_empty_timezone() {
+		// Royal American repro: Squarespace shows at 9pm Eastern land on the next
+		// calendar day in UTC. With an empty timezone, the old code returned empty
+		// and the caller picked a fragile fallback path. With the fix, parseUtc
+		// falls back to the WP site timezone and still produces a stable date.
+		$result = DateTimeParser::parseUtc( '2026-05-16T01:00:00Z', '' );
+
+		$this->assertNotEmpty( $result['date'], 'parseUtc must not silently drop the date when timezone is empty' );
+		$this->assertNotEmpty( $result['timezone'] );
+		$this->assertTrue( DateTimeParser::isValidTimezone( $result['timezone'] ) );
 	}
 
 	public function test_parse_utc_returns_empty_for_empty_datetime() {
 		$result = DateTimeParser::parseUtc( '', 'America/Chicago' );
 
 		$this->assertEquals( '', $result['date'] );
+	}
+
+	public function test_parse_utc_valid_timezone_path_unchanged() {
+		// Regression guard: explicit valid timezone must continue to produce the
+		// exact same output it did before the fallback was introduced.
+		$result = DateTimeParser::parseUtc( '2026-05-16T01:00:00Z', 'America/New_York' );
+
+		$this->assertEquals( '2026-05-15', $result['date'] );
+		$this->assertEquals( '21:00', $result['time'] );
+		$this->assertEquals( 'America/New_York', $result['timezone'] );
 	}
 
 	public function test_parse_local_preserves_datetime() {

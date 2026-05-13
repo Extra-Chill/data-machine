@@ -381,7 +381,12 @@ class PageVenueExtractor {
 	 */
 	public static function extractTimezone( string $html ): string {
 		// Squarespace context
-		if ( preg_match( '/Static\.SQUARESPACE_CONTEXT\s*=\s*\{[^}]*"timeZone"\s*:\s*"([^"]+)"/s', $html, $matches ) ) {
+		// Non-greedy .*? crosses nested {...} objects in SQUARESPACE_CONTEXT to reach
+		// the first "timeZone" key (always inside the top-level `website` object). The
+		// previous [^}]* form could not cross any `}` boundary, so it never matched
+		// real Squarespace pages whose context JSON contains nested objects before
+		// `website.timeZone` (e.g. betaFeatureFlags, rollups). See #254.
+		if ( preg_match( '/Static\.SQUARESPACE_CONTEXT\s*=\s*\{.*?"timeZone"\s*:\s*"([^"]+)"/s', $html, $matches ) ) {
 			return $matches[1];
 		}
 

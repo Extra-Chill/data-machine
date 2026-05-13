@@ -27,6 +27,11 @@ class DateTimeParser {
 	 * Use when API returns UTC times with a separate timezone field.
 	 * Example: Dice.fm returns "2026-01-04T02:30:00Z" with timezone "America/Chicago"
 	 *
+	 * When `$timezone` is empty or invalid, falls back to the site timezone
+	 * (`wp_timezone()`) and emits a `datamachine_log` warning. This prevents
+	 * upstream regex / extractor bugs from silently destroying the date and
+	 * cascading into off-by-one duplicates on the calendar. See #254.
+	 *
 	 * @param string $datetime UTC datetime string (e.g., "2026-01-04T02:30:00Z")
 	 * @param string $timezone Target IANA timezone (e.g., "America/Chicago")
 	 * @return array{date: string, time: string, timezone: string}
@@ -39,7 +44,18 @@ class DateTimeParser {
 		}
 
 		if ( ! self::isValidTimezone( $timezone ) ) {
-			return $result;
+			$fallback = self::siteTimezoneName();
+			do_action(
+				'datamachine_log',
+				'warning',
+				'DateTimeParser::parseUtc received empty/invalid timezone; falling back to site timezone',
+				array(
+					'datetime'         => $datetime,
+					'invalid_timezone' => $timezone,
+					'fallback'         => $fallback,
+				)
+			);
+			$timezone = $fallback;
 		}
 
 		try {
@@ -54,6 +70,32 @@ class DateTimeParser {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Resolve a usable site timezone name for fallbacks.
+	 *
+	 * Prefers `wp_timezone()` when WordPress is loaded, otherwise falls back to
+	 * UTC so the parser still produces a stable result in non-WP contexts.
+	 *
+	 * @return string IANA timezone identifier
+	 */
+	private static function siteTimezoneName(): string {
+		if ( function_exists( 'wp_timezone' ) ) {
+			try {
+				$tz = wp_timezone();
+				if ( $tz instanceof DateTimeZone ) {
+					$name = $tz->getName();
+					if ( ! empty( $name ) ) {
+						return $name;
+					}
+				}
+			} catch ( Exception $e ) {
+				// Fall through to UTC.
+			}
+		}
+
+		return 'UTC';
 	}
 
 	/**
