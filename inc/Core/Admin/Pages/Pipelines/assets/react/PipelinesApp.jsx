@@ -41,6 +41,14 @@ import { isSameId } from './utils/ids';
 const ModalManager = lazy( () => import( './components/shared/ModalManager' ) );
 const ChatSidebar = lazy( () => import( './components/chat/ChatSidebar' ) );
 
+const getErrorMessage = ( error ) => {
+	if ( ! error ) {
+		return null;
+	}
+
+	return error.message || String( error );
+};
+
 /**
  * Root application component
  *
@@ -220,6 +228,10 @@ export default function PipelinesApp() {
 	 * Determine main content based on state
 	 */
 	const renderMainContent = () => {
+		const errorMessage = getErrorMessage(
+			pipelinesError || selectedPipelineError || flowsError
+		);
+
 		// Loading state
 		if ( pipelinesLoading || selectedPipelineLoading ) {
 			return (
@@ -231,14 +243,10 @@ export default function PipelinesApp() {
 		}
 
 		// Error state
-		if ( pipelinesError || selectedPipelineError || flowsError ) {
+		if ( errorMessage ) {
 			return (
 				<Notice status="error" isDismissible={ false }>
-					<p>
-						{ pipelinesError ||
-							selectedPipelineError ||
-							flowsError }
-					</p>
+					<p>{ errorMessage }</p>
 				</Notice>
 			);
 		}

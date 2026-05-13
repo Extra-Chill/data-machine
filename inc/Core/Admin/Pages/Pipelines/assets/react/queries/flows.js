@@ -28,19 +28,23 @@ import {
 } from '../utils/api';
 import { isSameId, normalizeId } from '../utils/ids';
 
+const getFetchError = ( response, fallback ) =>
+	new Error( response?.message || fallback );
+
 const setFlowInCache = ( queryClient, flow ) => {
 	if ( ! flow?.flow_id ) {
 		return;
 	}
 
 	const cachedFlowId = normalizeId( flow.flow_id );
-	const cachedPipelineId = normalizeId( flow.pipeline_id );
 
 	if ( ! cachedFlowId ) {
 		return;
 	}
 
 	queryClient.setQueryData( [ 'flows', 'single', cachedFlowId ], flow );
+
+	const cachedPipelineId = normalizeId( flow.pipeline_id );
 
 	if ( cachedPipelineId ) {
 		queryClient.setQueriesData(
@@ -65,7 +69,6 @@ const setFlowInCache = ( queryClient, flow ) => {
 
 const patchFlowInCache = ( queryClient, { pipelineId, flowId, patchFlow } ) => {
 	const cachedFlowId = normalizeId( flowId );
-	const cachedPipelineId = normalizeId( pipelineId );
 
 	if ( ! cachedFlowId || typeof patchFlow !== 'function' ) {
 		return;
@@ -75,6 +78,8 @@ const patchFlowInCache = ( queryClient, { pipelineId, flowId, patchFlow } ) => {
 		[ 'flows', 'single', cachedFlowId ],
 		( oldFlow ) => ( oldFlow ? patchFlow( oldFlow ) : oldFlow )
 	);
+
+	const cachedPipelineId = normalizeId( pipelineId );
 
 	if ( cachedPipelineId ) {
 		queryClient.setQueriesData(
@@ -133,7 +138,7 @@ export const useFlows = ( pipelineId, { page = 1, perPage = 20 } = {} ) => {
 		queryFn: async () => {
 			const response = await fetchFlows( pipelineId, { page, perPage, outputMode } );
 			if ( ! response.success ) {
-				return { flows: [], total: 0, perPage, offset: 0 };
+				throw getFetchError( response, 'Failed to fetch flows' );
 			}
 			return {
 				flows: response.data.flows || [],

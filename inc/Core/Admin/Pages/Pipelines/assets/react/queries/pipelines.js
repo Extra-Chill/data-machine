@@ -26,6 +26,9 @@ import {
 } from '../utils/api';
 import { isSameId } from '../utils/ids';
 
+const getFetchError = ( response, fallback ) =>
+	new Error( response?.message || fallback );
+
 // Queries
 
 /**
@@ -47,7 +50,7 @@ export const usePipelines = () =>
 		queryFn: async () => {
 			const response = await fetchPipelines();
 			if ( ! response.success ) {
-				return [];
+				throw getFetchError( response, 'Failed to fetch pipelines' );
 			}
 			return response.data.pipelines ?? [];
 		},
@@ -79,7 +82,7 @@ export const usePipelineSearch = ( {
 				search: normalizedSearch || null,
 			} );
 			if ( ! response.success ) {
-				return { pipelines: [], total: 0 };
+				throw getFetchError( response, 'Failed to search pipelines' );
 			}
 			return {
 				pipelines: response.data.pipelines ?? [],
@@ -123,7 +126,7 @@ export const usePipeline = ( pipelineId ) => {
 				includeFlows: false,
 			} );
 			if ( ! response.success ) {
-				return null;
+				throw getFetchError( response, 'Failed to fetch pipeline' );
 			}
 			const pipelineRecord = response.data?.pipeline ?? null;
 			const flows = response.data?.flows ?? [];
