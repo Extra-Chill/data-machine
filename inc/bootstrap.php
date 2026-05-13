@@ -68,6 +68,9 @@ use DataMachine\Engine\AI\MemoryFileRegistry;
 use DataMachine\Engine\AI\AgentModeRegistry;
 use DataMachine\Engine\AI\IterationBudgetRegistry;
 use DataMachine\Engine\AI\WpAiClientCache;
+use DataMachine\Engine\AI\Actions\PendingActionStore;
+use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
+use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
 use DataMachine\Core\PluginSettings;
 
@@ -76,6 +79,27 @@ add_action( 'plugins_loaded', array( WpAiClientCache::class, 'install' ), 20 );
 if ( interface_exists( 'WP_Agent_Access_Store' ) ) {
 	AgentAccessStoreAdapter::register();
 }
+
+add_filter(
+	'wp_agent_conversation_store',
+	static function () {
+		return ConversationStoreFactory::get_transcript_store();
+	}
+);
+
+add_filter(
+	'wp_agent_pending_action_store',
+	static function () {
+		return PendingActionStore::adapter();
+	}
+);
+
+add_filter(
+	'wp_agent_pending_action_resolver',
+	static function () {
+		return ResolvePendingActionAbility::adapter();
+	}
+);
 
 /*
 |--------------------------------------------------------------------------
