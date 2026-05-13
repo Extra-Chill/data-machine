@@ -134,6 +134,7 @@ class RequestMetadataSmokeStore implements ConversationStoreInterface {
 	}
 
 	public function get_session( string $session_id ): ?array { return null; }
+	public function list_sessions( WP_Agent_Workspace_Scope $workspace, int $user_id, array $args = array() ): array { return array(); }
 	public function update_session( string $session_id, array $messages, array $metadata = array(), string $provider = '', string $model = '', ?string $provider_response_id = null ): bool {
 		unset( $provider_response_id );
 		$this->updated[ $session_id ] = compact( 'messages', 'metadata', 'provider', 'model' );

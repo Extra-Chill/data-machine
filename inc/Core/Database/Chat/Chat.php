@@ -487,6 +487,75 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	}
 
 	/**
+	 * List transcript sessions for a workspace/user pair.
+	 *
+	 * @param WP_Agent_Workspace_Scope $workspace Workspace owning the sessions.
+	 * @param int                      $user_id   WordPress user ID owning the sessions.
+	 * @param array                    $args      Optional filters/pagination.
+	 * @return array<int,array<string,mixed>> Session rows.
+	 */
+	public function list_sessions( WP_Agent_Workspace_Scope $workspace, int $user_id, array $args = array() ): array {
+		global $wpdb;
+
+		$table_name       = self::get_prefixed_table_name();
+		$include_messages = (bool) ( $args['include_messages'] ?? true );
+		$limit            = max( 1, min( 100, (int) ( $args['limit'] ?? 20 ) ) );
+		$offset           = max( 0, (int) ( $args['offset'] ?? 0 ) );
+		$where            = array(
+			'workspace_type = %s',
+			'workspace_id = %s',
+			'user_id = %d',
+		);
+		$query_args       = array(
+			$table_name,
+			$workspace->workspace_type,
+			$workspace->workspace_id,
+			$user_id,
+		);
+
+		if ( is_string( $args['context'] ?? null ) && '' !== $args['context'] ) {
+			$where[]      = 'mode = %s';
+			$query_args[] = $args['context'];
+		}
+
+		if ( is_string( $args['agent_slug'] ?? null ) && '' !== $args['agent_slug'] ) {
+			try {
+				$identity = self::resolve_agent_identity_for_session( $args['agent_slug'] );
+			} catch ( \InvalidArgumentException $e ) {
+				unset( $e );
+				return array();
+			}
+
+			$where[]      = 'agent_id = %d';
+			$query_args[] = $identity['agent_id'];
+		}
+
+		$select = $include_messages ? '*' : 'session_id, workspace_type, workspace_id, user_id, agent_id, title, metadata, provider, model, provider_response_id, mode, created_at, updated_at, last_read_at, expires_at';
+		$sql    = 'SELECT ' . $select . ' FROM %i WHERE ' . implode( ' AND ', $where ) . ' ORDER BY updated_at DESC LIMIT %d OFFSET %d';
+
+		$query_args[] = $limit;
+		$query_args[] = $offset;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$sessions = $wpdb->get_results( $wpdb->prepare( $sql, ...$query_args ), ARRAY_A );
+
+		if ( ! $sessions ) {
+			return array();
+		}
+
+		foreach ( $sessions as &$session ) {
+			if ( $include_messages ) {
+				$session['messages'] = self::normalize_messages( json_decode( $session['messages'] ?? '[]', true ) ?? array() );
+			}
+			$session['metadata']   = json_decode( $session['metadata'] ?? '[]', true ) ?? array();
+			$session['agent_slug'] = self::resolve_agent_slug_from_session_row( $session );
+		}
+		unset( $session );
+
+		return $sessions;
+	}
+
+	/**
 	 * Resolve the generic transcript agent slug from a stored session row.
 	 *
 	 * @param array<string,mixed> $session Stored session row.
