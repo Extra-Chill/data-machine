@@ -298,6 +298,37 @@ class Venue_Taxonomy {
 	}
 
 	/**
+	 * Public accessor for address-based venue lookup.
+	 *
+	 * Used by EventDuplicateStrategy to resolve an incoming venue to a
+	 * canonical taxonomy term when the venue string differs from the
+	 * stored term name but the address matches. This mirrors the
+	 * address-first cascade used by find_or_create_venue().
+	 *
+	 * Returns the resolved \WP_Term (rather than just the term ID) so
+	 * callers can use it the same way as find_venue_by_normalized_name_public().
+	 *
+	 * @param string $address Street address.
+	 * @param string $city    City name.
+	 * @return \WP_Term|null Matching term or null.
+	 */
+	public static function find_venue_by_address_public( string $address, string $city ): ?\WP_Term {
+		$term_id = self::find_venue_by_address( $address, $city );
+
+		if ( ! $term_id ) {
+			return null;
+		}
+
+		$term = get_term( $term_id, 'venue' );
+
+		if ( ! $term || is_wp_error( $term ) ) {
+			return null;
+		}
+
+		return $term;
+	}
+
+	/**
 	 * Smartly merge new venue data into existing venue
 	 * Only updates fields that are currently empty in the database
 	 *

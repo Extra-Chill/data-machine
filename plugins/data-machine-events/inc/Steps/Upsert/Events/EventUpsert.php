@@ -151,9 +151,16 @@ class EventUpsert extends UpsertHandler {
 		EngineData $engine
 	): array {
 		// 1. Find existing event via domain-specific duplicate detection.
+		// Pass venue address + city so dedup can resolve the incoming venue
+		// via the same address-first cascade the upsert path uses
+		// (Venue_Taxonomy::find_or_create_venue). Without this, dupes slip
+		// through whenever the incoming venue string differs from the
+		// canonical taxonomy term name. See issue #252.
 		// findExistingEventViaAbility() returns ?int — null means no existing post.
 		// Normalize to int (0 = no match) so downstream type contracts hold.
-		$existing_post_id = (int) $this->findExistingEventViaAbility( $title, $venue, $startDate, $ticketUrl );
+		$venueAddress     = (string) ( $engine->get( 'venueAddress' ) ?? $parameters['venueAddress'] ?? '' );
+		$venueCity        = (string) ( $engine->get( 'venueCity' ) ?? $parameters['venueCity'] ?? '' );
+		$existing_post_id = (int) $this->findExistingEventViaAbility( $title, $venue, $startDate, $ticketUrl, $venueAddress, $venueCity );
 
 		// 2. Build event data.
 		$event_data = $this->buildEventData( $parameters, $handler_config, $engine, $existing_post_id );
@@ -278,13 +285,19 @@ class EventUpsert extends UpsertHandler {
 	 * Falls back to the legacy findExistingEvent() if the ability or
 	 * identity index table is not available.
 	 *
+	 * The `address` and `city` context fields let EventDuplicateStrategy
+	 * resolve the incoming venue via the same address-first cascade the
+	 * upsert path uses (Venue_Taxonomy::find_or_create_venue). See #252.
+	 *
 	 * @param string $title     Event title.
 	 * @param string $venue     Venue name.
 	 * @param string $startDate Start date.
 	 * @param string $ticketUrl Ticket URL.
+	 * @param string $address   Venue street address (for address-aware venue resolution).
+	 * @param string $city      Venue city (required alongside address).
 	 * @return int|null Post ID if found, null otherwise.
 	 */
-	private function findExistingEventViaAbility( string $title, string $venue, string $startDate, string $ticketUrl ): ?int {
+	private function findExistingEventViaAbility( string $title, string $venue, string $startDate, string $ticketUrl, string $address = '', string $city = '' ): ?int {
 		// Check if the identity index table class exists (requires DM core >= 0.50.0).
 		if ( ! class_exists( 'DataMachine\\Core\\Database\\PostIdentityIndex\\PostIdentityIndex' ) ) {
 			return $this->findExistingEvent( $title, $venue, $startDate, $ticketUrl );
@@ -305,6 +318,8 @@ class EventUpsert extends UpsertHandler {
 					'venue'     => $venue,
 					'startDate' => $startDate,
 					'ticketUrl' => $ticketUrl,
+					'address'   => $address,
+					'city'      => $city,
 				),
 			)
 		);

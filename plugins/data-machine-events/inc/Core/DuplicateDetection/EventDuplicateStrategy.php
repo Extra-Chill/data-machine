@@ -63,7 +63,7 @@ class EventDuplicateStrategy {
 	 * @param array $input {
 	 *     @type string $title      Event title.
 	 *     @type string $post_type  Post type (data_machine_events).
-	 *     @type array  $context    { venue, startDate, ticketUrl }
+	 *     @type array  $context    { venue, startDate, ticketUrl, address, city }
 	 * }
 	 * @return array|null Duplicate result or null if clear.
 	 */
@@ -73,6 +73,8 @@ class EventDuplicateStrategy {
 		$venue     = $context['venue'] ?? '';
 		$startDate = $context['startDate'] ?? '';
 		$ticketUrl = $context['ticketUrl'] ?? '';
+		$address   = $context['address'] ?? '';
+		$city      = $context['city'] ?? '';
 
 		if ( empty( $title ) || empty( $startDate ) ) {
 			return null;
@@ -80,6 +82,12 @@ class EventDuplicateStrategy {
 
 		$date_only           = self::extractDateOnly( $startDate );
 		$identity_confidence = EventIdentifierGenerator::getIdentityConfidence( $title, $startDate, $venue );
+
+		// Resolve the incoming venue once via the same cascade used by
+		// Venue_Taxonomy::find_or_create_venue (address-first, then name).
+		// Reused across strategies so dedup matches the canonicalization
+		// that the upsert path will perform.
+		$venue_term = self::resolveVenueTerm( $venue, $address, $city );
 
 		// Strategy 1: Ticket URL + date (most reliable).
 		if ( ! empty( $ticketUrl ) ) {
@@ -90,22 +98,22 @@ class EventDuplicateStrategy {
 		}
 
 		// Strategy 2: Venue + date + fuzzy title.
-		if ( ! empty( $venue ) ) {
-			$match = self::findByVenueDateAndFuzzyTitle( $title, $venue, $date_only, $startDate );
+		if ( ! empty( $venue ) || $venue_term ) {
+			$match = self::findByVenueDateAndFuzzyTitle( $title, $venue, $date_only, $startDate, $venue_term );
 			if ( $match ) {
 				return $match;
 			}
 		}
 
 		// Strategy 3: Exact title + date (with venue confirmation).
-		$match = self::findByExactTitle( $title, $venue, $date_only, $identity_confidence );
+		$match = self::findByExactTitle( $title, $venue, $date_only, $identity_confidence, $venue_term, $startDate );
 		if ( $match ) {
 			return $match;
 		}
 
 		// Strategy 4: Date + fuzzy title fallback (venue-agnostic).
 		if ( 'low' !== $identity_confidence ) {
-			$match = self::findByDateAndFuzzyTitle( $title, $date_only, $startDate, $venue );
+			$match = self::findByDateAndFuzzyTitle( $title, $date_only, $startDate, $venue, $venue_term );
 			if ( $match ) {
 				return $match;
 			}
@@ -175,20 +183,24 @@ class EventDuplicateStrategy {
 	 * Queries the identity index for events at the same venue on the same date,
 	 * then compares titles using the SimilarityEngine and checks time windows.
 	 *
-	 * @param string $title     Event title.
-	 * @param string $venue     Venue name.
-	 * @param string $date_only Date in YYYY-MM-DD.
-	 * @param string $startDate Full datetime for time window comparison.
+	 * @param string        $title      Event title.
+	 * @param string        $venue      Venue name.
+	 * @param string        $date_only  Date in YYYY-MM-DD.
+	 * @param string        $startDate  Full datetime for time window comparison.
+	 * @param \WP_Term|null $venue_term Optional pre-resolved venue term (address-aware).
+	 *                                  When null, falls back to a name-only cascade.
 	 * @return array|null Duplicate result or null.
 	 */
-	private static function findByVenueDateAndFuzzyTitle( string $title, string $venue, string $date_only, string $startDate ): ?array {
+	private static function findByVenueDateAndFuzzyTitle( string $title, string $venue, string $date_only, string $startDate, ?\WP_Term $venue_term = null ): ?array {
 		if ( EventIdentifierGenerator::isLowConfidenceTitle( $title ) ) {
 			return null;
 		}
 
-		// Resolve venue to term ID with cascading lookup:
-		// exact name → slug → normalized name (strips punctuation, dashes, case).
-		$venue_term = self::resolveVenueTerm( $venue );
+		// Use the pre-resolved venue term when available (address-aware).
+		// Otherwise fall back to a name-only cascade: exact → slug → normalized.
+		if ( ! $venue_term ) {
+			$venue_term = self::resolveVenueTerm( $venue );
+		}
 		if ( ! $venue_term ) {
 			return null;
 		}
@@ -229,13 +241,33 @@ class EventDuplicateStrategy {
 	 *
 	 * Uses the title_hash index for fast exact-title lookup.
 	 *
-	 * @param string $title               Event title.
-	 * @param string $venue               Venue name.
-	 * @param string $date_only           Date in YYYY-MM-DD.
-	 * @param string $identity_confidence Identity confidence level.
+	 * @param string        $title               Event title.
+	 * @param string        $venue               Venue name.
+	 * @param string        $date_only           Date in YYYY-MM-DD.
+	 * @param string        $identity_confidence Identity confidence level.
+	 * @param \WP_Term|null $venue_term          Optional pre-resolved venue term
+	 *                                           (address-aware). When provided, the
+	 *                                           candidate's venue term_ids are
+	 *                                           compared directly — bypassing the
+	 *                                           name-string compare so dedup still
+	 *                                           fires when the incoming venue
+	 *                                           string differs from the canonical
+	 *                                           term name.
+	 * @param string        $startDate           Full datetime (YYYY-MM-DDTHH:MM or
+	 *                                           similar) used to enforce a 2-hour
+	 *                                           window when the term_id bypass
+	 *                                           fires. Without this guard, two
+	 *                                           genuinely distinct shows that
+	 *                                           share a title hash and venue term
+	 *                                           on the same date but at very
+	 *                                           different times (e.g. an early
+	 *                                           and a late show at a multi-room
+	 *                                           venue) could be falsely merged.
+	 *                                           When empty, the time window is
+	 *                                           skipped (matches legacy behavior).
 	 * @return array|null Duplicate result or null.
 	 */
-	private static function findByExactTitle( string $title, string $venue, string $date_only, string $identity_confidence ): ?array {
+	private static function findByExactTitle( string $title, string $venue, string $date_only, string $identity_confidence, ?\WP_Term $venue_term = null, string $startDate = '' ): ?array {
 		if ( empty( $date_only ) ) {
 			return null;
 		}
@@ -254,11 +286,47 @@ class EventDuplicateStrategy {
 		}
 
 		// Venue confirmation logic (same as old EventUpsert::findEventByExactTitle).
-		if ( empty( $venue ) ) {
+		if ( empty( $venue ) && ! $venue_term ) {
 			if ( 'low' === $identity_confidence ) {
 				return null;
 			}
 			return self::duplicateResult( $post_id, 'exact_title_no_venue' );
+		}
+
+		// Term-id-aware short-circuit: when the incoming venue resolved to a
+		// term (via address or name), match directly on the candidate's
+		// venue term_ids. This catches dupes where the incoming venue string
+		// differs from the stored term name (e.g. "Monks Jazz" → term "Monks"),
+		// which the name-string compare below would miss.
+		//
+		// Time-window guard: Strategies 2 and 4 enforce a 2-hour window when
+		// matching by title fuzziness; Strategy 3 historically did not,
+		// because exact-title-hash + venue-name compare is highly specific.
+		// The term_id bypass widens that specificity in one direction (the
+		// incoming venue can now differ from the candidate's stored venue
+		// name), so we add the same 2-hour guard here to avoid falsely
+		// merging early/late shows at multi-room venues that share a title
+		// hash on the same date. When the guard fails, fall through to the
+		// existing venue-name compare path (legacy behavior).
+		if ( $venue_term ) {
+			$candidate_term_ids = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'ids' ) );
+			if ( ! is_wp_error( $candidate_term_ids ) && ! empty( $candidate_term_ids )
+				&& in_array( (int) $venue_term->term_id, array_map( 'intval', $candidate_term_ids ), true ) ) {
+
+				$within_window = true;
+				if ( '' !== $startDate ) {
+					$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+					$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
+					$within_window     = self::isWithinTimeWindow( $startDate, $existing_datetime );
+				}
+
+				if ( $within_window ) {
+					return self::duplicateResult( $post_id, 'exact_title_venue_term_id_match' );
+				}
+				// Outside time window: skip the bypass and fall through to
+				// the existing venue-name compare. If that also fails to
+				// confirm, we return null (treat as distinct event).
+			}
 		}
 
 		$venue_terms = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
@@ -269,9 +337,11 @@ class EventDuplicateStrategy {
 			return self::duplicateResult( $post_id, 'exact_title_no_existing_venue' );
 		}
 
-		foreach ( $venue_terms as $existing_venue ) {
-			if ( $venue === $existing_venue || EventIdentifierGenerator::venuesMatch( $venue, $existing_venue ) ) {
-				return self::duplicateResult( $post_id, 'exact_title_venue_confirmed' );
+		if ( '' !== $venue ) {
+			foreach ( $venue_terms as $existing_venue ) {
+				if ( $venue === $existing_venue || EventIdentifierGenerator::venuesMatch( $venue, $existing_venue ) ) {
+					return self::duplicateResult( $post_id, 'exact_title_venue_confirmed' );
+				}
 			}
 		}
 
@@ -288,13 +358,20 @@ class EventDuplicateStrategy {
 	 * Queries all events on the date and compares titles.
 	 * When both sides have venue data, venue match is required.
 	 *
-	 * @param string $title     Event title.
-	 * @param string $date_only Date in YYYY-MM-DD.
-	 * @param string $startDate Full datetime for time window.
-	 * @param string $venue     Incoming venue for confirmation.
+	 * @param string        $title      Event title.
+	 * @param string        $date_only  Date in YYYY-MM-DD.
+	 * @param string        $startDate  Full datetime for time window.
+	 * @param string        $venue      Incoming venue for confirmation.
+	 * @param \WP_Term|null $venue_term Optional pre-resolved venue term
+	 *                                  (address-aware). When provided, the
+	 *                                  candidate's venue term_ids are compared
+	 *                                  first — bypassing the name-string
+	 *                                  compare so dupes where the incoming
+	 *                                  venue string differs from the canonical
+	 *                                  term name still match.
 	 * @return array|null Duplicate result or null.
 	 */
-	private static function findByDateAndFuzzyTitle( string $title, string $date_only, string $startDate, string $venue = '' ): ?array {
+	private static function findByDateAndFuzzyTitle( string $title, string $date_only, string $startDate, string $venue = '', ?\WP_Term $venue_term = null ): ?array {
 		if ( EventIdentifierGenerator::isLowConfidenceTitle( $title ) ) {
 			return null;
 		}
@@ -321,11 +398,30 @@ class EventDuplicateStrategy {
 
 			// When both sides have venue data, require venue match to avoid
 			// false positives on generic titles at different venues.
-			if ( ! empty( $venue ) ) {
-				$candidate_venues = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
-				$candidate_venue  = ( ! is_wp_error( $candidate_venues ) && ! empty( $candidate_venues ) ) ? $candidate_venues[0] : '';
+			if ( ! empty( $venue ) || $venue_term ) {
+				// Term-id-aware short-circuit: when the incoming venue resolved
+				// to a term, accept the match if the candidate is tagged with
+				// that same term — regardless of how the venue is spelled in
+				// either post's content.
+				if ( $venue_term ) {
+					$candidate_term_ids = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'ids' ) );
+					if ( ! is_wp_error( $candidate_term_ids ) && ! empty( $candidate_term_ids )
+						&& in_array( (int) $venue_term->term_id, array_map( 'intval', $candidate_term_ids ), true ) ) {
+						return self::duplicateResult( $post_id, 'date_fuzzy_title_venue_term_id_match' );
+					}
+				}
 
-				if ( ! empty( $candidate_venue ) && ! EventIdentifierGenerator::venuesMatch( $venue, $candidate_venue ) ) {
+				if ( '' !== $venue ) {
+					$candidate_venues = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
+					$candidate_venue  = ( ! is_wp_error( $candidate_venues ) && ! empty( $candidate_venues ) ) ? $candidate_venues[0] : '';
+
+					if ( ! empty( $candidate_venue ) && ! EventIdentifierGenerator::venuesMatch( $venue, $candidate_venue ) ) {
+						continue;
+					}
+				} elseif ( $venue_term ) {
+					// Incoming side has a resolved term but the candidate
+					// doesn't share it; skip to avoid cross-venue false
+					// positives on generic titles.
 					continue;
 				}
 			}
@@ -407,29 +503,52 @@ class EventDuplicateStrategy {
 	/**
 	 * Resolve a venue name to a WP_Term with cascading lookup.
 	 *
-	 * Tries in order:
-	 * 1. Exact name match
-	 * 2. Slug-based match (catches minor name variations)
-	 * 3. Normalized name match (strips punctuation, dashes, apostrophes, case)
+	 * Mirrors the address-first cascade used by
+	 * Venue_Taxonomy::find_or_create_venue() so that dedup resolves the
+	 * same canonical term the upsert path will land on:
 	 *
-	 * @param string $venue Venue name from import source.
+	 * 1. Address + city match (most authoritative — survives venue rename/alias)
+	 * 2. Exact name match
+	 * 3. Slug-based match (catches minor name variations)
+	 * 4. Normalized name match (strips punctuation, dashes, apostrophes, case)
+	 *
+	 * Without step 1, dedup misses cases where the incoming venue string
+	 * differs from the canonical term name but matches by address — e.g.
+	 * "Monks Jazz" vs term "Monks", "Humphreys Backstage Live" vs term
+	 * "Humphreys Concerts By the Bay". See issue #252.
+	 *
+	 * @param string $venue   Venue name from import source.
+	 * @param string $address Optional street address (enables address-first lookup).
+	 * @param string $city    Optional city name (required alongside address).
 	 * @return \WP_Term|null Resolved venue term or null.
 	 */
-	private static function resolveVenueTerm( string $venue ): ?\WP_Term {
-		// 1. Exact name match.
+	private static function resolveVenueTerm( string $venue, string $address = '', string $city = '' ): ?\WP_Term {
+		// 1. Address + city match (mirrors find_or_create_venue).
+		if ( '' !== $address && '' !== $city ) {
+			$venue_term = \DataMachineEvents\Core\Venue_Taxonomy::find_venue_by_address_public( $address, $city );
+			if ( $venue_term ) {
+				return $venue_term;
+			}
+		}
+
+		if ( '' === $venue ) {
+			return null;
+		}
+
+		// 2. Exact name match.
 		$venue_term = get_term_by( 'name', $venue, 'venue' );
 		if ( $venue_term ) {
 			return $venue_term;
 		}
 
-		// 2. Slug-based lookup.
+		// 3. Slug-based lookup.
 		$venue_slug = sanitize_title( $venue );
 		$venue_term = get_term_by( 'slug', $venue_slug, 'venue' );
 		if ( $venue_term ) {
 			return $venue_term;
 		}
 
-		// 3. Normalized name match via Venue_Taxonomy.
+		// 4. Normalized name match via Venue_Taxonomy.
 		$venue_term = \DataMachineEvents\Core\Venue_Taxonomy::find_venue_by_normalized_name_public( $venue );
 		if ( $venue_term ) {
 			return $venue_term;
