@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class AgentAccess extends BaseRepository implements \WP_Agent_Access_Store {
+class AgentAccess extends BaseRepository {
 
 	/**
 	 * Table name (without prefix).
@@ -296,7 +296,7 @@ class AgentAccess extends BaseRepository implements \WP_Agent_Access_Store {
 	 * @return string[] Roles that meet or exceed the minimum.
 	 */
 	private function roles_at_or_above( string $role ): array {
-		$hierarchy = array( 'viewer', 'operator', 'admin' );
+		$hierarchy = \WP_Agent_Access_Grant::roles();
 		$index     = array_search( $role, $hierarchy, true );
 
 		if ( false === $index ) {
@@ -304,25 +304,5 @@ class AgentAccess extends BaseRepository implements \WP_Agent_Access_Store {
 		}
 
 		return array_slice( $hierarchy, $index );
-	}
-
-	/**
-	 * Check if a role meets the minimum requirement.
-	 *
-	 * @param string $actual_role   The role the user has.
-	 * @param string $minimum_role  The minimum required role.
-	 * @return bool
-	 */
-	private function role_meets_minimum( string $actual_role, string $minimum_role ): bool {
-		$hierarchy = array(
-			'viewer'   => 0,
-			'operator' => 1,
-			'admin'    => 2,
-		);
-
-		$actual_level  = $hierarchy[ $actual_role ] ?? -1;
-		$minimum_level = $hierarchy[ $minimum_role ] ?? 0;
-
-		return $actual_level >= $minimum_level;
 	}
 }
