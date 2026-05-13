@@ -110,9 +110,27 @@ class Handlers {
 
 		// Enrich handler data with auth_type, auth_fields, and authentication status
 		foreach ( $handlers as $slug => &$handler ) {
+			if ( ! is_array( $handler ) ) {
+				unset( $handlers[ $slug ] );
+				continue;
+			}
+
+			$handler = array_merge(
+				array(
+					'type'              => '',
+					'class'             => '',
+					'label'             => $slug,
+					'description'       => '',
+					'requires_auth'     => false,
+					'auth_provider_key' => null,
+					'meta'              => array(),
+				),
+				$handler
+			);
+
 			$auth_key      = $handler['auth_provider_key'] ?? $slug;
 			$auth_instance = $auth_abilities->getProvider( $auth_key );
-			if ( $handler['requires_auth'] && $auth_instance ) {
+			if ( ! empty( $handler['requires_auth'] ) && $auth_instance ) {
 				$auth_type            = self::detect_auth_type( $auth_instance );
 				$handler['auth_type'] = $auth_type;
 
@@ -138,6 +156,7 @@ class Handlers {
 				}
 			}
 		}
+		unset( $handler );
 
 		return rest_ensure_response(
 			array(
