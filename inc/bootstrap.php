@@ -136,67 +136,75 @@ add_action(
 	0
 );
 
-// Shared layer — site-wide context, visible to all agents.
-// Composable: content assembled from sections registered against SectionRegistry
-// (see inc/migrations/site-md.php). `editable` is forced to false by composable=true.
-MemoryFileRegistry::register( 'SITE.md', 10, array(
-	'layer'       => MemoryFileRegistry::LAYER_SHARED,
-	'protected'   => true,
-	'composable'  => true,
-	'modes'       => array( MemoryFileRegistry::MODE_ALL ),
-	'label'       => 'Site Context',
-	'description' => 'Auto-generated site context. Composable — extend via SectionRegistry.',
-) );
-MemoryFileRegistry::register( 'RULES.md', 15, array(
-	'layer'       => MemoryFileRegistry::LAYER_SHARED,
-	'protected'   => true,
-	'editable'    => 'manage_options',
-	'modes'       => array( MemoryFileRegistry::MODE_ALL ),
-	'label'       => 'Site Rules',
-	'description' => 'Behavioral constraints that apply to every agent. Admin-editable.',
-) );
+function datamachine_register_default_memory_files(): void {
+	// Shared layer — site-wide context, visible to all agents.
+	// Composable: content assembled from sections registered against SectionRegistry
+	// (see inc/migrations/site-md.php). `editable` is forced to false by composable=true.
+	MemoryFileRegistry::register( 'SITE.md', 10, array(
+		'layer'       => MemoryFileRegistry::LAYER_SHARED,
+		'protected'   => true,
+		'composable'  => true,
+		'modes'       => array( MemoryFileRegistry::MODE_ALL ),
+		'label'       => 'Site Context',
+		'description' => 'Auto-generated site context. Composable — extend via SectionRegistry.',
+	) );
+	MemoryFileRegistry::register( 'RULES.md', 15, array(
+		'layer'       => MemoryFileRegistry::LAYER_SHARED,
+		'protected'   => true,
+		'editable'    => 'manage_options',
+		'modes'       => array( MemoryFileRegistry::MODE_ALL ),
+		'label'       => 'Site Rules',
+		'description' => 'Behavioral constraints that apply to every agent. Admin-editable.',
+	) );
 
-// Agent layer — identity and knowledge, scoped to a single agent.
-// Injected in interactive modes only (chat, pipeline). Excluded from
-// system mode so autonomous maintenance tasks (e.g. daily memory
-// compaction) are not primed with the agent's identity while operating
-// on these files.
-MemoryFileRegistry::register( 'SOUL.md', 20, array(
-	'layer'       => MemoryFileRegistry::LAYER_AGENT,
-	'protected'   => true,
-	'modes'       => array( 'chat', 'pipeline' ),
-	'label'       => 'Agent Identity',
-	'description' => 'Agent identity, voice, rules. Injected in interactive modes only.',
-) );
-MemoryFileRegistry::register( 'MEMORY.md', 30, array(
-	'layer'       => MemoryFileRegistry::LAYER_AGENT,
-	'protected'   => true,
-	'modes'       => array( 'chat', 'pipeline' ),
-	'label'       => 'Agent Memory',
-	'description' => 'Accumulated knowledge. Injected in interactive modes only.',
-) );
+	// Agent layer — identity and knowledge, scoped to a single agent.
+	// Injected in interactive modes only (chat, pipeline). Excluded from
+	// system mode so autonomous maintenance tasks (e.g. daily memory
+	// compaction) are not primed with the agent's identity while operating
+	// on these files.
+	MemoryFileRegistry::register( 'SOUL.md', 20, array(
+		'layer'       => MemoryFileRegistry::LAYER_AGENT,
+		'protected'   => true,
+		'modes'       => array( 'chat', 'pipeline' ),
+		'label'       => 'Agent Identity',
+		'description' => 'Agent identity, voice, rules. Injected in interactive modes only.',
+	) );
+	MemoryFileRegistry::register( 'MEMORY.md', 30, array(
+		'layer'       => MemoryFileRegistry::LAYER_AGENT,
+		'protected'   => true,
+		'modes'       => array( 'chat', 'pipeline' ),
+		'label'       => 'Agent Memory',
+		'description' => 'Accumulated knowledge. Injected in interactive modes only.',
+	) );
 
-// User layer — human preferences, network-scoped on multisite.
-// Only injected in interactive modes where a human is present.
-// Pipelines can still opt in via pipeline memory file selection.
-MemoryFileRegistry::register( 'USER.md', 25, array(
-	'layer'       => MemoryFileRegistry::LAYER_USER,
-	'protected'   => true,
-	'modes'       => array( 'chat', 'editor' ),
-	'label'       => 'User Profile',
-	'description' => 'Information about the human the agent works with. Injected in chat and editor modes only.',
-) );
+	// User layer — human preferences, network-scoped on multisite.
+	// Only injected in interactive modes where a human is present.
+	// Pipelines can still opt in via pipeline memory file selection.
+	MemoryFileRegistry::register( 'USER.md', 25, array(
+		'layer'       => MemoryFileRegistry::LAYER_USER,
+		'protected'   => true,
+		'modes'       => array( 'chat', 'editor' ),
+		'label'       => 'User Profile',
+		'description' => 'Information about the human the agent works with. Injected in chat and editor modes only.',
+	) );
 
-// Network layer — multisite topology, only meaningful on multisite installs.
-// Composable: content assembled from sections registered against SectionRegistry.
-MemoryFileRegistry::register( 'NETWORK.md', 5, array(
-	'layer'       => MemoryFileRegistry::LAYER_NETWORK,
-	'protected'   => true,
-	'composable'  => true,
-	'modes'       => array( MemoryFileRegistry::MODE_ALL ),
-	'label'       => 'Network Context',
-	'description' => 'Auto-generated multisite network topology. Composable — extend via SectionRegistry.',
-) );
+	// Network layer — multisite topology, only meaningful on multisite installs.
+	// Composable: content assembled from sections registered against SectionRegistry.
+	MemoryFileRegistry::register( 'NETWORK.md', 5, array(
+		'layer'       => MemoryFileRegistry::LAYER_NETWORK,
+		'protected'   => true,
+		'composable'  => true,
+		'modes'       => array( MemoryFileRegistry::MODE_ALL ),
+		'label'       => 'Network Context',
+		'description' => 'Auto-generated multisite network topology. Composable — extend via SectionRegistry.',
+	) );
+}
+
+if ( did_action( 'plugins_loaded' ) ) {
+	datamachine_register_default_memory_files();
+} else {
+	add_action( 'plugins_loaded', 'datamachine_register_default_memory_files', 0 );
+}
 
 // Composable file auto-regeneration — rebuilds AGENTS.md, SITE.md, NETWORK.md, and any other
 // composable files on plugin (de)activation plus any hooks plugins register via

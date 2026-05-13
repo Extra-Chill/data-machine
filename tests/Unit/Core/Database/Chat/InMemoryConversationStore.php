@@ -133,6 +133,35 @@ class InMemoryConversationStore implements ConversationStoreInterface {
 		return $session;
 	}
 
+	public function list_sessions( WP_Agent_Workspace_Scope $workspace, int $user_id, array $args = array() ): array {
+		$include_messages = (bool) ( $args['include_messages'] ?? true );
+		$limit            = max( 1, min( 100, (int) ( $args['limit'] ?? 20 ) ) );
+		$offset           = max( 0, (int) ( $args['offset'] ?? 0 ) );
+		$rows             = array();
+
+		foreach ( $this->sessions as $session ) {
+			if ( $session['workspace_type'] !== $workspace->workspace_type || $session['workspace_id'] !== $workspace->workspace_id || (int) $session['user_id'] !== $user_id ) {
+				continue;
+			}
+			if ( is_string( $args['context'] ?? null ) && '' !== $args['context'] && $session['context'] !== $args['context'] ) {
+				continue;
+			}
+			if ( is_string( $args['agent_slug'] ?? null ) && '' !== $args['agent_slug'] && ( $session['agent_slug'] ?? '' ) !== sanitize_title( $args['agent_slug'] ) ) {
+				continue;
+			}
+
+			$row = $session;
+			if ( ! $include_messages ) {
+				unset( $row['messages'] );
+			}
+			$rows[] = $row;
+		}
+
+		usort( $rows, static fn( $a, $b ) => strcmp( $b['updated_at'], $a['updated_at'] ) );
+
+		return array_slice( $rows, $offset, $limit );
+	}
+
 	public function update_session( string $session_id, array $messages, array $metadata = array(), string $provider = '', string $model = '', ?string $provider_response_id = null ): bool {
 		if ( ! isset( $this->sessions[ $session_id ] ) ) {
 			return false;
