@@ -26,7 +26,7 @@ defined( 'ABSPATH' ) || exit;
 
 class AgentAbilities {
 
-	private static bool $registered = false;
+	private static bool $registered       = false;
 	private const ACTIVE_AGENT_META_KEY = 'datamachine_active_agent_slug';
 
 	public function __construct() {
@@ -164,9 +164,9 @@ class AgentAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
+							'success'           => array( 'type' => 'boolean' ),
 							'active_agent_slug' => array( 'type' => array( 'string', 'null' ) ),
-							'agents'  => array(
+							'agents'            => array(
 								'type'  => 'array',
 								'items' => array(
 									'type'       => 'object',
@@ -724,7 +724,7 @@ class AgentAbilities {
 			);
 		}
 
-		$active = self::resolve_active_agent_for_user( $target_user_id, $candidates, 'all' !== $scope );
+		$active            = self::resolve_active_agent_for_user( $target_user_id, $candidates, 'all' !== $scope );
 		$active_agent_slug = $active['agent'] ? (string) $active['agent']['agent_slug'] : null;
 
 		// ---- Role enrichment (optional) ----------------------------------
