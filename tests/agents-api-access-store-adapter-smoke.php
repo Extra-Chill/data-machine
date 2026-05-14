@@ -12,10 +12,12 @@ agents_api_smoke_require_module();
 
 require_once dirname( __DIR__ ) . '/inc/Core/Database/BaseRepository.php';
 require_once dirname( __DIR__ ) . '/inc/Core/Database/Agents/AgentAccess.php';
+require_once dirname( __DIR__ ) . '/inc/Core/Database/Agents/Agents.php';
 require_once dirname( __DIR__ ) . '/inc/Core/Auth/AgentAccessStoreAdapter.php';
 
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
 use DataMachine\Core\Database\Agents\AgentAccess;
+use DataMachine\Core\Database\Agents\Agents;
 
 $GLOBALS['wpdb'] = (object) array(
 	'base_prefix' => 'wp_',
@@ -81,6 +83,43 @@ class DataMachineAccessStoreAdapterFakeRepository extends AgentAccess {
 	}
 }
 
+class DataMachineAccessStoreAdapterFakeAgentsRepository extends Agents {
+	/** @var array<int,array<string,mixed>> */
+	private array $rows;
+
+	/**
+	 * @param array<int,array<string,mixed>> $rows Agent rows keyed by ID.
+	 */
+	public function __construct( array $rows ) {
+		$this->rows = $rows;
+	}
+
+	public function get_agent( int $agent_id ): ?array {
+		return $this->rows[ $agent_id ] ?? null;
+	}
+
+	public function get_by_slug( string $agent_slug ): ?array {
+		foreach ( $this->rows as $row ) {
+			if ( $row['agent_slug'] === $agent_slug ) {
+				return $row;
+			}
+		}
+
+		return null;
+	}
+
+	public function get_agents_by_ids( array $agent_ids ): array {
+		$rows = array();
+		foreach ( $agent_ids as $agent_id ) {
+			if ( isset( $this->rows[ (int) $agent_id ] ) ) {
+				$rows[] = $this->rows[ (int) $agent_id ];
+			}
+		}
+
+		return $rows;
+	}
+}
+
 class DataMachineAccessStoreAdapterExistingStore implements \WP_Agent_Access_Store {
 	public function grant_access( \WP_Agent_Access_Grant $grant ): \WP_Agent_Access_Grant { return $grant; }
 	public function revoke_access( string $agent_id, int $user_id, ?string $workspace_id = null ): bool { unset( $agent_id, $user_id, $workspace_id ); return true; }
@@ -92,7 +131,15 @@ class DataMachineAccessStoreAdapterExistingStore implements \WP_Agent_Access_Sto
 echo "agents-api-access-store-adapter-smoke\n";
 
 $repository = new DataMachineAccessStoreAdapterFakeRepository();
-$adapter    = new AgentAccessStoreAdapter( $repository );
+$agents     = new DataMachineAccessStoreAdapterFakeAgentsRepository(
+	array(
+		42 => array(
+			'agent_id'   => 42,
+			'agent_slug' => 'wiki-brain',
+		),
+	)
+);
+$adapter    = new AgentAccessStoreAdapter( $repository, $agents );
 
 agents_api_smoke_assert_equals( true, $adapter instanceof \WP_Agent_Access_Store, 'adapter implements Agents API store contract', $failures, $passes );
 
@@ -101,12 +148,15 @@ agents_api_smoke_assert_equals( $existing, AgentAccessStoreAdapter::filter_acces
 agents_api_smoke_assert_equals( true, AgentAccessStoreAdapter::filter_access_store( null ) instanceof AgentAccessStoreAdapter, 'filter supplies Data Machine adapter when empty', $failures, $passes );
 agents_api_smoke_assert_equals( AgentAccessStoreAdapter::filter_access_store( null ), AgentAccessStoreAdapter::filter_access_store( null ), 'filter reuses default adapter instance', $failures, $passes );
 
-$grant = new \WP_Agent_Access_Grant( '42', 7, \WP_Agent_Access_Grant::ROLE_OPERATOR );
-agents_api_smoke_assert_equals( $grant, $adapter->grant_access( $grant ), 'grant delegates to repository', $failures, $passes );
-agents_api_smoke_assert_equals( $grant, $adapter->get_access( '42', 7 ), 'get_access delegates to repository', $failures, $passes );
-agents_api_smoke_assert_equals( array( '42' ), $adapter->get_agent_ids_for_user( 7, \WP_Agent_Access_Grant::ROLE_VIEWER ), 'agent ID list is contract string shape', $failures, $passes );
-agents_api_smoke_assert_equals( array( $grant ), $adapter->get_users_for_agent( '42' ), 'get_users_for_agent delegates to repository', $failures, $passes );
-agents_api_smoke_assert_equals( true, $adapter->revoke_access( '42', 7 ), 'revoke delegates to repository', $failures, $passes );
-agents_api_smoke_assert_equals( null, $adapter->get_access( '42', 7 ), 'revoke removes repository grant', $failures, $passes );
+$grant          = new \WP_Agent_Access_Grant( 'wiki-brain', 7, \WP_Agent_Access_Grant::ROLE_OPERATOR );
+$stored_grant   = new \WP_Agent_Access_Grant( '42', 7, \WP_Agent_Access_Grant::ROLE_OPERATOR );
+$returned_grant = $adapter->grant_access( $grant );
+agents_api_smoke_assert_equals( $grant->to_array(), $returned_grant->to_array(), 'grant maps slug to storage ID and returns slug contract', $failures, $passes );
+agents_api_smoke_assert_equals( $stored_grant->to_array(), $repository->get_access( '42', 7 )->to_array(), 'grant delegates numeric ID to repository', $failures, $passes );
+agents_api_smoke_assert_equals( $grant->to_array(), $adapter->get_access( 'wiki-brain', 7 )->to_array(), 'get_access maps slug to storage ID and returns slug contract', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'wiki-brain' ), $adapter->get_agent_ids_for_user( 7, \WP_Agent_Access_Grant::ROLE_VIEWER ), 'agent ID list is Agents API slug shape', $failures, $passes );
+agents_api_smoke_assert_equals( array( $grant->to_array() ), array_map( static fn( \WP_Agent_Access_Grant $value ): array => $value->to_array(), $adapter->get_users_for_agent( 'wiki-brain' ) ), 'get_users_for_agent returns slug contract', $failures, $passes );
+agents_api_smoke_assert_equals( true, $adapter->revoke_access( 'wiki-brain', 7 ), 'revoke maps slug to storage ID', $failures, $passes );
+agents_api_smoke_assert_equals( null, $adapter->get_access( 'wiki-brain', 7 ), 'revoke removes repository grant', $failures, $passes );
 
 agents_api_smoke_finish( 'access-store adapter smoke', $failures, $passes );

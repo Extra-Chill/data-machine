@@ -8,6 +8,7 @@
 
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\Agents\AgentRegistry;
+use DataMachine\Engine\Agents\PersistedAgentProjector;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -143,3 +144,13 @@ function datamachine_register_default_admin_agent(): void {
 	);
 }
 add_action( 'wp_agents_api_init', 'datamachine_register_default_admin_agent', 10 );
+
+/**
+ * Project durable Data Machine agents into the Agents API runtime registry.
+ *
+ * @since 0.110.3
+ */
+function datamachine_register_persisted_agents(): void {
+	PersistedAgentProjector::register_persisted_agents();
+}
+add_action( 'wp_agents_api_init', 'datamachine_register_persisted_agents', 20 );
