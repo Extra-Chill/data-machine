@@ -131,7 +131,7 @@ const patchFlowStepInCache = (
 // Queries
 export const useFlows = ( pipelineId, { page = 1, perPage = 20 } = {} ) => {
 	const cachedPipelineId = normalizeId( pipelineId );
-	const outputMode = 'list';
+	const outputMode = 'full';
 
 	return useQuery( {
 		queryKey: [ 'flows', cachedPipelineId, { page, perPage, outputMode } ],
