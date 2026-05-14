@@ -38,8 +38,76 @@ if ( ! function_exists( 'wp_parse_url' ) ) {
 	}
 }
 
+if ( ! function_exists( '__' ) ) {
+	function __( string $text, string $domain = '' ): string {
+		unset( $domain );
+		return $text;
+	}
+}
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
+		if ( 'datamachine_auth_providers' === $hook ) {
+			return $GLOBALS['datamachine_http_client_auth_providers'] ?? $value;
+		}
+
+		if ( 'datamachine_auth_encrypted_fields' === $hook && 'http_basic' === ( $args[0] ?? '' ) ) {
+			$value[] = 'password';
+		}
+
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'get_site_option' ) ) {
+	function get_site_option( string $name, mixed $default = false ): mixed {
+		return $GLOBALS['datamachine_http_client_options'][ $name ] ?? $default;
+	}
+}
+
+if ( ! function_exists( 'update_site_option' ) ) {
+	function update_site_option( string $name, mixed $value ): bool {
+		$GLOBALS['datamachine_http_client_options'][ $name ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_salt' ) ) {
+	function wp_salt( string $scheme = 'auth' ): string {
+		return 'http-client-smoke-salt-' . $scheme;
+	}
+}
+
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( mixed $thing ): bool {
+		return $thing instanceof WP_Error;
+	}
+}
+
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		public function __construct(
+			private string $code = '',
+			private string $message = ''
+		) {}
+
+		public function get_error_code(): string {
+			return $this->code;
+		}
+
+		public function get_error_message(): string {
+			return $this->message;
+		}
+	}
+}
+
+require_once __DIR__ . '/../inc/Engine/Bundle/BundleValidationException.php';
+require_once __DIR__ . '/../inc/Engine/Bundle/AuthRef.php';
+require_once __DIR__ . '/../inc/Core/OAuth/BaseAuthProvider.php';
+require_once __DIR__ . '/../inc/Core/OAuth/HttpBasicAuthProvider.php';
 require_once __DIR__ . '/../inc/Core/HttpClient.php';
 
+use DataMachine\Core\OAuth\HttpBasicAuthProvider;
 use DataMachine\Core\HttpClient;
 
 $failed = 0;
@@ -115,7 +183,39 @@ http_client_smoke_assert(
 	'Custom manual' === ( $manual_args['headers']['authorization'] ?? null )
 );
 
-echo "\n[2] Redaction\n";
+echo "\n[2] Auth ref options\n";
+
+$provider = new HttpBasicAuthProvider();
+$provider->save_config(
+	array(
+		'account'   => 'logstash',
+		'username'  => 'chubes4',
+		'password'  => 'secret-password',
+		'proxy_url' => 'socks5://127.0.0.1:8080',
+	)
+);
+$GLOBALS['datamachine_http_client_auth_providers'] = array(
+	HttpBasicAuthProvider::PROVIDER_SLUG => $provider,
+);
+
+$resolved_options = http_client_private(
+	'resolveAuthRefOptions',
+	array(
+		'auth_ref' => 'http_basic:logstash',
+	),
+	'Logstash test'
+);
+
+http_client_smoke_assert( 'auth_ref resolves auth options', is_array( $resolved_options ) && 'basic' === ( $resolved_options['auth']['type'] ?? null ) );
+http_client_smoke_assert( 'auth_ref resolves proxy URL', is_array( $resolved_options ) && 'socks5://127.0.0.1:8080' === ( $resolved_options['proxy_url'] ?? null ) );
+
+$auth_ref_args = http_client_private( 'buildRequestArgs', 'GET', is_array( $resolved_options ) ? $resolved_options : array() );
+http_client_smoke_assert(
+	'auth_ref resolved Basic header is applied',
+	'Basic ' . base64_encode( 'chubes4:secret-password' ) === ( $auth_ref_args['headers']['Authorization'] ?? null )
+);
+
+echo "\n[3] Redaction\n";
 
 $redacted = http_client_private(
 	'redactRequestArgsForLog',
@@ -134,7 +234,7 @@ http_client_smoke_assert( 'Proxy-Authorization is redacted', '[redacted]' === ( 
 http_client_smoke_assert( 'Cookie is redacted', '[redacted]' === ( $redacted['headers']['Cookie'] ?? null ) );
 http_client_smoke_assert( 'Non-sensitive header remains visible', 'visible' === ( $redacted['headers']['X-Test'] ?? null ) );
 
-echo "\n[3] Proxy scheme mapping\n";
+echo "\n[4] Proxy scheme mapping\n";
 
 http_client_smoke_assert(
 	'socks5 proxy scheme is recognized when cURL exposes the constant',

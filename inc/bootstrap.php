@@ -72,9 +72,31 @@ use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
+use DataMachine\Core\OAuth\HttpBasicAuthProvider;
 use DataMachine\Core\PluginSettings;
 
 add_action( 'plugins_loaded', array( WpAiClientCache::class, 'install' ), 20 );
+
+add_filter(
+	'datamachine_auth_providers',
+	static function ( array $providers ): array {
+		$providers[ HttpBasicAuthProvider::PROVIDER_SLUG ] ??= new HttpBasicAuthProvider();
+		return $providers;
+	}
+);
+
+add_filter(
+	'datamachine_auth_encrypted_fields',
+	static function ( array $fields, string $provider_slug ): array {
+		if ( HttpBasicAuthProvider::PROVIDER_SLUG === $provider_slug ) {
+			$fields[] = 'password';
+		}
+
+		return $fields;
+	},
+	10,
+	2
+);
 
 if ( interface_exists( 'WP_Agent_Access_Store' ) ) {
 	AgentAccessStoreAdapter::register();
