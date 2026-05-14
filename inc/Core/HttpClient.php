@@ -42,6 +42,7 @@ class HttpClient {
 	 *                        - timeout: int - Request timeout (default 120)
 	 *                        - proxy_url: string - Optional per-request proxy URL (http, https, socks4, socks5, socks5h)
 	 *                        - auth: array - Optional standard auth config: {type: basic, username, password} or {type: bearer, token}
+	 *                        - auth_ref: string - Optional provider:account credential reference resolved through registered auth providers
 	 *                        - browser_mode: bool - Use browser-like headers (default false)
 	 *                        - context: string - Context for logging (default 'HTTP Request')
 	 * @return array Response array.
@@ -64,6 +65,14 @@ class HttpClient {
 			return array(
 				'success' => false,
 				'error'   => 'Invalid HTTP method',
+			);
+		}
+
+		$options = self::resolveAuthRefOptions( $options, $context );
+		if ( is_wp_error( $options ) ) {
+			return array(
+				'success' => false,
+				'error'   => $options->get_error_message(),
 			);
 		}
 
@@ -235,6 +244,59 @@ class HttpClient {
 		}
 
 		return $headers;
+	}
+
+	/**
+	 * Resolve a portable auth_ref into concrete request options for this install.
+	 */
+	private static function resolveAuthRefOptions( array $options, string $context ): array|\WP_Error {
+		$ref_string = $options['auth_ref'] ?? null;
+		if ( ! is_string( $ref_string ) || '' === trim( $ref_string ) ) {
+			return $options;
+		}
+
+		try {
+			$ref = \DataMachine\Engine\Bundle\AuthRef::from_string( $ref_string );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error( 'http_auth_ref_invalid', $e->getMessage() );
+		}
+
+		$providers = apply_filters( 'datamachine_auth_providers', array() );
+		$provider  = is_array( $providers ) ? ( $providers[ $ref->provider() ] ?? null ) : null;
+		if ( ! $provider instanceof \DataMachine\Core\OAuth\BaseAuthProvider ) {
+			return new \WP_Error(
+				'http_auth_ref_unresolved',
+				sprintf(
+					/* translators: 1: auth ref, 2: provider slug. */
+					__( 'Auth ref "%1$s" cannot be resolved because provider "%2$s" is not registered on this install.', 'data-machine' ),
+					$ref->ref(),
+					$ref->provider()
+				)
+			);
+		}
+
+		$resolved = $provider->resolve_auth_ref(
+			$ref->account(),
+			'http',
+			array(
+				'context' => $context,
+				'runtime' => true,
+			)
+		);
+		if ( is_wp_error( $resolved ) ) {
+			$error_code = $resolved->get_error_code();
+			return new \WP_Error(
+				'' !== $error_code ? $error_code : 'http_auth_ref_unresolved',
+				sprintf(
+					/* translators: %s: auth ref. */
+					__( 'Auth ref "%s" could not be resolved on this install.', 'data-machine' ),
+					$ref->ref()
+				)
+			);
+		}
+
+		unset( $options['auth_ref'] );
+		return array_replace( $resolved, $options );
 	}
 
 	/**
