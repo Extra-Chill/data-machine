@@ -26,7 +26,7 @@ defined( 'ABSPATH' ) || exit;
 
 class AgentAbilities {
 
-	private static bool $registered       = false;
+	private static bool $registered     = false;
 	private const ACTIVE_AGENT_META_KEY = 'datamachine_active_agent_slug';
 
 	public function __construct() {
