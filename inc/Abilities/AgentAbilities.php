@@ -26,7 +26,8 @@ defined( 'ABSPATH' ) || exit;
 
 class AgentAbilities {
 
-	private static bool $registered = false;
+	private static bool $registered     = false;
+	private const ACTIVE_AGENT_META_KEY = 'datamachine_active_agent_slug';
 
 	public function __construct() {
 		if ( self::$registered ) {
@@ -163,8 +164,9 @@ class AgentAbilities {
 					'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'agents'  => array(
+							'success'           => array( 'type' => 'boolean' ),
+							'active_agent_slug' => array( 'type' => array( 'string', 'null' ) ),
+							'agents'            => array(
 								'type'  => 'array',
 								'items' => array(
 									'type'       => 'object',
@@ -176,6 +178,7 @@ class AgentAbilities {
 										'site_scope'  => array( 'type' => array( 'integer', 'null' ) ),
 										'description' => array( 'type' => 'string' ),
 										'is_owner'    => array( 'type' => 'boolean' ),
+										'is_active'   => array( 'type' => 'boolean' ),
 										'user_role'   => array( 'type' => array( 'string', 'null' ) ),
 									),
 								),
@@ -183,6 +186,74 @@ class AgentAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'listAgents' ),
+					'permission_callback' => fn() => PermissionHelper::can( 'chat' ) || PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/get-active-agent',
+				array(
+					'label'               => 'Get Active Agent',
+					'description'         => 'Return the current user\'s persisted active Data Machine agent preference, falling back to an unambiguous accessible agent.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'user_id' => array(
+								'type'        => 'integer',
+								'description' => 'Resolve active agent for this user. Non-admins are forced to themselves.',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'      => array( 'type' => 'boolean' ),
+							'agent'        => array( 'type' => array( 'object', 'null' ) ),
+							'agent_slug'   => array( 'type' => array( 'string', 'null' ) ),
+							'source'       => array( 'type' => 'string' ),
+							'needs_choice' => array( 'type' => 'boolean' ),
+							'error'        => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'getActiveAgent' ),
+					'permission_callback' => fn() => PermissionHelper::can( 'chat' ) || PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/set-active-agent',
+				array(
+					'label'               => 'Set Active Agent',
+					'description'         => 'Persist the active Data Machine agent preference for a user after validating access.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'agent' ),
+						'properties' => array(
+							'agent'   => array(
+								'type'        => 'string',
+								'description' => 'Agent slug or ID to make active.',
+							),
+							'user_id' => array(
+								'type'        => 'integer',
+								'description' => 'Set active agent for this user. Non-admins are forced to themselves.',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success'    => array( 'type' => 'boolean' ),
+							'agent'      => array( 'type' => 'object' ),
+							'agent_slug' => array( 'type' => 'string' ),
+							'user_id'    => array( 'type' => 'integer' ),
+							'error'      => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'setActiveAgent' ),
 					'permission_callback' => fn() => PermissionHelper::can( 'chat' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
@@ -606,8 +677,9 @@ class AgentAbilities {
 		} else {
 			if ( $target_user_id <= 0 ) {
 				return array(
-					'success' => true,
-					'agents'  => array(),
+					'success'           => true,
+					'active_agent_slug' => null,
+					'agents'            => array(),
 				);
 			}
 
@@ -652,6 +724,9 @@ class AgentAbilities {
 			);
 		}
 
+		$active            = self::resolve_active_agent_for_user( $target_user_id, $candidates, 'all' !== $scope );
+		$active_agent_slug = $active['agent'] ? (string) $active['agent']['agent_slug'] : null;
+
 		// ---- Role enrichment (optional) ----------------------------------
 		// Computed against $target_user_id so `include_role=true` reflects
 		// the resolved user's role even when an admin queries on their behalf.
@@ -671,6 +746,7 @@ class AgentAbilities {
 				'site_scope'  => isset( $row['site_scope'] ) ? (int) $row['site_scope'] : null,
 				'description' => $description,
 				'is_owner'    => $target_user_id > 0 && $owner_id === $target_user_id,
+				'is_active'   => null !== $active_agent_slug && (string) $row['agent_slug'] === $active_agent_slug,
 			);
 
 			if ( $include_role ) {
@@ -688,8 +764,223 @@ class AgentAbilities {
 		}
 
 		return array(
-			'success' => true,
-			'agents'  => $agents,
+			'success'           => true,
+			'active_agent_slug' => $active_agent_slug,
+			'agents'            => $agents,
+		);
+	}
+
+	/**
+	 * Return a user's active agent preference with safe fallback metadata.
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function getActiveAgent( array $input ): array {
+		$target_user_id = self::resolve_active_agent_user_id( isset( $input['user_id'] ) ? (int) $input['user_id'] : 0 );
+		if ( is_wp_error( $target_user_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => $target_user_id->get_error_message(),
+			);
+		}
+
+		$active = self::resolve_active_agent_for_user( $target_user_id );
+
+		return array(
+			'success'      => true,
+			'agent'        => $active['agent'] ? self::format_active_agent_row( $active['agent'], $target_user_id ) : null,
+			'agent_slug'   => $active['agent'] ? (string) $active['agent']['agent_slug'] : null,
+			'source'       => $active['source'],
+			'needs_choice' => (bool) $active['needs_choice'],
+		);
+	}
+
+	/**
+	 * Persist a user's active agent preference after validating access.
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function setActiveAgent( array $input ): array {
+		$target_user_id = self::resolve_active_agent_user_id( isset( $input['user_id'] ) ? (int) $input['user_id'] : 0 );
+		if ( is_wp_error( $target_user_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => $target_user_id->get_error_message(),
+			);
+		}
+
+		$agent_id = self::resolve_agent_input_id( array( 'agent' => (string) ( $input['agent'] ?? '' ) ) );
+		if ( is_wp_error( $agent_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => $agent_id->get_error_message(),
+			);
+		}
+
+		$agents_repo = new Agents();
+		$agent       = $agents_repo->get_agent( $agent_id );
+		if ( ! $agent ) {
+			return array(
+				'success' => false,
+				'error'   => 'Agent not found.',
+			);
+		}
+
+		if ( ! self::user_can_access_agent_row( $target_user_id, $agent ) ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'User %d cannot access agent "%s".', $target_user_id, (string) $agent['agent_slug'] ),
+			);
+		}
+
+		update_user_meta( $target_user_id, self::ACTIVE_AGENT_META_KEY, (string) $agent['agent_slug'] );
+
+		return array(
+			'success'    => true,
+			'agent'      => self::format_active_agent_row( $agent, $target_user_id ),
+			'agent_slug' => (string) $agent['agent_slug'],
+			'user_id'    => $target_user_id,
+		);
+	}
+
+	/**
+	 * Resolve which user an active-agent ability may act on.
+	 *
+	 * @param int $requested_user_id Requested user ID, or zero for caller.
+	 * @return int|\WP_Error
+	 */
+	private static function resolve_active_agent_user_id( int $requested_user_id ): int|\WP_Error {
+		$caller_id = PermissionHelper::acting_user_id();
+		$is_admin  = PermissionHelper::can_manage();
+
+		if ( $requested_user_id > 0 && $requested_user_id !== $caller_id && ! $is_admin ) {
+			return new \WP_Error( 'forbidden_user', 'Changing another user\'s active agent requires admin privileges.' );
+		}
+
+		$target_user_id = $requested_user_id > 0 ? $requested_user_id : $caller_id;
+		if ( $target_user_id <= 0 ) {
+			return new \WP_Error( 'missing_user', 'Could not determine acting user.' );
+		}
+
+		return $target_user_id;
+	}
+
+	/**
+	 * Resolve active agent row from persisted preference or safe fallback.
+	 *
+	 * @param int        $user_id               User ID.
+	 * @param array|null $candidates            Optional accessible agent rows.
+	 * @param bool       $allow_single_fallback Whether a single candidate should become active by default.
+	 * @return array{agent: array|null, source: string, needs_choice: bool}
+	 */
+	private static function resolve_active_agent_for_user( int $user_id, ?array $candidates = null, bool $allow_single_fallback = true ): array {
+		$candidates = null === $candidates ? self::get_accessible_agent_rows_for_user( $user_id ) : array_values( $candidates );
+		$stored     = self::get_active_agent_slug_for_user( $user_id );
+
+		if ( '' !== $stored ) {
+			foreach ( $candidates as $row ) {
+				if ( (string) ( $row['agent_slug'] ?? '' ) === $stored && self::user_can_access_agent_row( $user_id, $row ) ) {
+					return array(
+						'agent'        => $row,
+						'source'       => 'preference',
+						'needs_choice' => false,
+					);
+				}
+			}
+		}
+
+		if ( $allow_single_fallback && 1 === count( $candidates ) ) {
+			return array(
+				'agent'        => $candidates[0],
+				'source'       => 'single_accessible_agent',
+				'needs_choice' => false,
+			);
+		}
+
+		return array(
+			'agent'        => null,
+			'source'       => '' !== $stored ? 'invalid_preference' : 'none',
+			'needs_choice' => count( $candidates ) > 1,
+		);
+	}
+
+	/**
+	 * Read persisted active agent slug for a user.
+	 *
+	 * @param int $user_id User ID.
+	 * @return string
+	 */
+	private static function get_active_agent_slug_for_user( int $user_id ): string {
+		$stored = get_user_meta( $user_id, self::ACTIVE_AGENT_META_KEY, true );
+		return is_string( $stored ) ? sanitize_title( $stored ) : '';
+	}
+
+	/**
+	 * Build accessible agent rows for a user from ownership plus grants.
+	 *
+	 * @param int $user_id User ID.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function get_accessible_agent_rows_for_user( int $user_id ): array {
+		if ( $user_id <= 0 ) {
+			return array();
+		}
+
+		$agents_repo  = new Agents();
+		$access_repo  = new AgentAccess();
+		$owned        = $agents_repo->get_all_by_owner_id( $user_id );
+		$owned_ids    = array_map( static fn( $agent ) => (int) $agent['agent_id'], $owned );
+		$granted_ids  = array_map( 'intval', $access_repo->get_agent_ids_for_user( $user_id ) );
+		$extra_ids    = array_values( array_diff( $granted_ids, $owned_ids ) );
+		$granted_rows = ! empty( $extra_ids ) ? $agents_repo->get_agents_by_ids( $extra_ids ) : array();
+
+		return array_values( array_filter( array_merge( $owned, $granted_rows ), static fn( $row ) => is_array( $row ) ) );
+	}
+
+	/**
+	 * Check whether a user can access an agent row without changing acting context.
+	 *
+	 * @param int   $user_id User ID.
+	 * @param array $agent   Agent row.
+	 * @return bool
+	 */
+	private static function user_can_access_agent_row( int $user_id, array $agent ): bool {
+		$agent_id = (int) ( $agent['agent_id'] ?? 0 );
+		if ( $user_id <= 0 || $agent_id <= 0 ) {
+			return false;
+		}
+
+		if ( (int) ( $agent['owner_id'] ?? 0 ) === $user_id ) {
+			return true;
+		}
+
+		$grant      = ( new AgentAccess() )->get_access( (string) $agent_id, $user_id );
+		$can_access = $grant instanceof \WP_Agent_Access_Grant && $grant->role_meets( 'viewer' );
+
+		return (bool) apply_filters( 'datamachine_can_access_agent', $can_access, $agent_id, $user_id, 'viewer' );
+	}
+
+	/**
+	 * Format active agent payload for ability responses.
+	 *
+	 * @param array $agent   Agent row.
+	 * @param int   $user_id User ID.
+	 * @return array<string,mixed>
+	 */
+	private static function format_active_agent_row( array $agent, int $user_id ): array {
+		$config = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
+
+		return array(
+			'agent_id'    => (int) $agent['agent_id'],
+			'agent_slug'  => (string) $agent['agent_slug'],
+			'agent_name'  => (string) $agent['agent_name'],
+			'owner_id'    => (int) $agent['owner_id'],
+			'site_scope'  => isset( $agent['site_scope'] ) ? (int) $agent['site_scope'] : null,
+			'description' => isset( $config['description'] ) ? (string) $config['description'] : '',
+			'is_owner'    => (int) $agent['owner_id'] === $user_id,
+			'is_active'   => true,
 		);
 	}
 
