@@ -40,13 +40,16 @@ class HttpClient {
 	 *                        - headers: array - Additional headers to merge
 	 *                        - body: string|array - Request body (for POST/PUT/PATCH)
 	 *                        - timeout: int - Request timeout (default 120)
+	 *                        - proxy_url: string - Optional per-request proxy URL (http, https, socks4, socks5, socks5h)
+	 *                        - auth: array - Optional standard auth config: {type: basic, username, password} or {type: bearer, token}
 	 *                        - browser_mode: bool - Use browser-like headers (default false)
 	 *                        - context: string - Context for logging (default 'HTTP Request')
-	 * @return array{success: bool, data?: string, status_code?: int, headers?: array, response?: array, error?: string}
+	 * @return array Response array.
 	 */
 	public static function request( string $method, string $url, array $options = array() ): array {
-		$method  = strtoupper( $method );
-		$context = $options['context'] ?? 'HTTP Request';
+		$method       = strtoupper( $method );
+		$context      = $options['context'] ?? 'HTTP Request';
+		$proxy_filter = null;
 
 		if ( ! in_array( $method, self::VALID_METHODS, true ) ) {
 			do_action(
@@ -66,17 +69,28 @@ class HttpClient {
 
 		$args = self::buildRequestArgs( $method, $options );
 
-		$response = ( 'GET' === $method )
-			? wp_remote_get( $url, $args )
-			: wp_remote_request( $url, $args );
-
-		if ( is_wp_error( $response ) ) {
-			return self::handleWpError( $response, $method, $url, $context );
+		if ( isset( $options['proxy_url'] ) && is_string( $options['proxy_url'] ) && '' !== $options['proxy_url'] ) {
+			$proxy_filter = self::createProxyCurlFilter( $options['proxy_url'] );
+			add_action( 'http_api_curl', $proxy_filter, 10, 1 );
 		}
 
-		$status_code   = wp_remote_retrieve_response_code( $response );
+		try {
+			$response = ( 'GET' === $method )
+				? wp_remote_get( $url, $args )
+				: wp_remote_request( $url, $args );
+		} finally {
+			if ( null !== $proxy_filter ) {
+				remove_action( 'http_api_curl', $proxy_filter, 10 );
+			}
+		}
+
+		if ( is_wp_error( $response ) ) {
+			return self::handleWpError( $response, $method, $url, $context, $args );
+		}
+
+		$status_code   = (int) wp_remote_retrieve_response_code( $response );
 		$body          = wp_remote_retrieve_body( $response );
-		$success_codes = self::SUCCESS_CODES[ $method ] ?? array( 200 );
+		$success_codes = self::SUCCESS_CODES[ $method ];
 
 		if ( ! in_array( $status_code, $success_codes, true ) ) {
 			return self::handleHttpError( $status_code, $body, $method, $url, $context );
@@ -178,6 +192,7 @@ class HttpClient {
 			);
 
 		$headers = array_merge( $default_headers, $options['headers'] ?? array() );
+		$headers = self::applyAuthentication( $headers, $options['auth'] ?? null );
 
 		$args = array(
 			'timeout' => $timeout,
@@ -196,9 +211,80 @@ class HttpClient {
 	}
 
 	/**
+	 * Apply standard request authentication when the caller has not provided an Authorization header.
+	 */
+	private static function applyAuthentication( array $headers, mixed $auth ): array {
+		if ( ! is_array( $auth ) || self::hasHeader( $headers, 'Authorization' ) ) {
+			return $headers;
+		}
+
+		$type = strtolower( (string) ( $auth['type'] ?? '' ) );
+		if ( 'basic' === $type ) {
+			$username = (string) ( $auth['username'] ?? '' );
+			$password = (string) ( $auth['password'] ?? '' );
+			if ( '' !== $username || '' !== $password ) {
+				$headers['Authorization'] = 'Basic ' . base64_encode( $username . ':' . $password ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Basic auth requires RFC 7617 base64 encoding.
+			}
+		}
+
+		if ( 'bearer' === $type ) {
+			$token = (string) ( $auth['token'] ?? '' );
+			if ( '' !== $token ) {
+				$headers['Authorization'] = 'Bearer ' . $token;
+			}
+		}
+
+		return $headers;
+	}
+
+	/**
+	 * Determine whether a header exists case-insensitively.
+	 */
+	private static function hasHeader( array $headers, string $needle ): bool {
+		foreach ( array_keys( $headers ) as $name ) {
+			if ( strtolower( (string) $name ) === strtolower( $needle ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Create a request-scoped cURL proxy configurator for WordPress HTTP requests.
+	 */
+	private static function createProxyCurlFilter( string $proxy_url ): callable {
+		return static function ( $handle ) use ( $proxy_url ): void {
+			if ( function_exists( 'curl_setopt' ) && defined( 'CURLOPT_PROXY' ) ) {
+				curl_setopt( $handle, CURLOPT_PROXY, $proxy_url ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress exposes the cURL handle only through this hook.
+			}
+
+			$scheme = strtolower( (string) wp_parse_url( $proxy_url, PHP_URL_SCHEME ) );
+			$type   = self::curlProxyTypeForScheme( $scheme );
+			if ( function_exists( 'curl_setopt' ) && null !== $type && defined( 'CURLOPT_PROXYTYPE' ) ) {
+				curl_setopt( $handle, CURLOPT_PROXYTYPE, $type ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress exposes the cURL handle only through this hook.
+			}
+		};
+	}
+
+	/**
+	 * Map common proxy URL schemes to cURL proxy type constants.
+	 */
+	private static function curlProxyTypeForScheme( string $scheme ): ?int {
+		return match ( $scheme ) {
+			'socks4' => defined( 'CURLPROXY_SOCKS4' ) ? CURLPROXY_SOCKS4 : null,
+			'socks5' => defined( 'CURLPROXY_SOCKS5' ) ? CURLPROXY_SOCKS5 : null,
+			'socks5h' => defined( 'CURLPROXY_SOCKS5_HOSTNAME' ) ? CURLPROXY_SOCKS5_HOSTNAME : ( defined( 'CURLPROXY_SOCKS5' ) ? CURLPROXY_SOCKS5 : null ),
+			'http' => defined( 'CURLPROXY_HTTP' ) ? CURLPROXY_HTTP : null,
+			'https' => defined( 'CURLPROXY_HTTPS' ) ? CURLPROXY_HTTPS : ( defined( 'CURLPROXY_HTTP' ) ? CURLPROXY_HTTP : null ),
+			default => null,
+		};
+	}
+
+	/**
 	 * Handle WP_Error response
 	 */
-	private static function handleWpError( \WP_Error $response, string $method, string $url, string $context ): array {
+	private static function handleWpError( \WP_Error $response, string $method, string $url, string $context, array $args = array() ): array {
 		$error_message = sprintf(
 			'Failed to connect to %1$s: %2$s',
 			$context,
@@ -215,6 +301,7 @@ class HttpClient {
 				'method'     => $method,
 				'error'      => $response->get_error_message(),
 				'error_code' => $response->get_error_code(),
+				'args'       => self::redactRequestArgsForLog( $args ),
 			)
 		);
 
@@ -222,6 +309,21 @@ class HttpClient {
 			'success' => false,
 			'error'   => $error_message,
 		);
+	}
+
+	/**
+	 * Redact sensitive HTTP request data before log emission.
+	 */
+	private static function redactRequestArgsForLog( array $args ): array {
+		if ( ! empty( $args['headers'] ) && is_array( $args['headers'] ) ) {
+			foreach ( $args['headers'] as $name => $value ) {
+				if ( in_array( strtolower( (string) $name ), array( 'authorization', 'proxy-authorization', 'cookie', 'set-cookie' ), true ) ) {
+					$args['headers'][ $name ] = '[redacted]';
+				}
+			}
+		}
+
+		return $args;
 	}
 
 	/**
