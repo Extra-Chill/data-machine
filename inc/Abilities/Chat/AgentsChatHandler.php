@@ -88,8 +88,8 @@ class AgentsChatHandler {
 		$client_context = is_array( $input['client_context'] ?? null ) ? $input['client_context'] : array();
 		$mode           = $this->resolveMode( $input, $client_context );
 		$agent_config   = PluginSettings::resolveModelForAgentMode( 0 === $agent_id ? null : $agent_id, $mode );
-		$provider     = $agent_config['provider'] ?? '';
-		$model        = $agent_config['model'] ?? '';
+		$provider       = $agent_config['provider'] ?? '';
+		$model          = $agent_config['model'] ?? '';
 
 		if ( '' === $provider ) {
 			return new WP_Error( 'provider_required', __( 'AI provider is required. Set a default in Data Machine settings.', 'data-machine' ), array( 'status' => 400 ) );
