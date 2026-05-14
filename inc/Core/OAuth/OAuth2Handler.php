@@ -399,6 +399,8 @@ class OAuth2Handler {
 		}
 
 		// Include PKCE code_verifier in token exchange if one was stored.
+		$token_params['code'] = $code;
+
 		$verifier = $this->get_pkce_verifier( $provider_key, $state );
 		if ( null !== $verifier ) {
 			$token_params['code_verifier'] = $verifier;
