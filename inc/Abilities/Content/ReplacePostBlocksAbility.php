@@ -131,6 +131,14 @@ class ReplacePostBlocksAbility {
 				),
 				'replacements' => array(
 					'type'        => 'array',
+					'items'       => array(
+						'type'       => 'object',
+						'required'   => array( 'block_index', 'new_content' ),
+						'properties' => array(
+							'block_index' => array( 'type' => 'integer' ),
+							'new_content' => array( 'type' => 'string' ),
+						),
+					),
 					'required'    => true,
 					'description' => 'Array of { block_index, new_content } operations',
 				),
