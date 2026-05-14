@@ -724,7 +724,7 @@ class AgentAbilities {
 			);
 		}
 
-		$active = self::resolve_active_agent_for_user( $target_user_id, $candidates );
+		$active = self::resolve_active_agent_for_user( $target_user_id, $candidates, 'all' !== $scope );
 		$active_agent_slug = $active['agent'] ? (string) $active['agent']['agent_slug'] : null;
 
 		// ---- Role enrichment (optional) ----------------------------------
@@ -870,11 +870,12 @@ class AgentAbilities {
 	/**
 	 * Resolve active agent row from persisted preference or safe fallback.
 	 *
-	 * @param int        $user_id    User ID.
-	 * @param array|null $candidates Optional accessible agent rows.
+	 * @param int        $user_id               User ID.
+	 * @param array|null $candidates            Optional accessible agent rows.
+	 * @param bool       $allow_single_fallback Whether a single candidate should become active by default.
 	 * @return array{agent: array|null, source: string, needs_choice: bool}
 	 */
-	private static function resolve_active_agent_for_user( int $user_id, ?array $candidates = null ): array {
+	private static function resolve_active_agent_for_user( int $user_id, ?array $candidates = null, bool $allow_single_fallback = true ): array {
 		$candidates = null === $candidates ? self::get_accessible_agent_rows_for_user( $user_id ) : array_values( $candidates );
 		$stored     = self::get_active_agent_slug_for_user( $user_id );
 
@@ -890,7 +891,7 @@ class AgentAbilities {
 			}
 		}
 
-		if ( 1 === count( $candidates ) ) {
+		if ( $allow_single_fallback && 1 === count( $candidates ) ) {
 			return array(
 				'agent'        => $candidates[0],
 				'source'       => 'single_accessible_agent',

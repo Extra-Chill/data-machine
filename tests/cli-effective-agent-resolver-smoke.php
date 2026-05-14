@@ -124,6 +124,22 @@ namespace {
 	agents_api_smoke_assert_equals( 2, $context['agent_id'], 'active preference resolves before ambiguous owner fallback', $failures, $passes );
 	agents_api_smoke_assert_equals( 'intelligence-chubes4', $context['agent_slug'], 'active preference carries slug', $failures, $passes );
 
+	add_filter(
+		'agents_api_execution_principal',
+		static function ( $principal, $request_context ) {
+			unset( $principal, $request_context );
+			return AgentsAPI\AI\WP_Agent_Execution_Principal::user_session(
+				1,
+				'admin',
+				AgentsAPI\AI\WP_Agent_Execution_Principal::REQUEST_CONTEXT_CLI
+			);
+		},
+		10,
+		2
+	);
+	$context = DataMachine\Cli\AgentResolver::resolveEffectiveContext( array( 'user' => 1 ) );
+	agents_api_smoke_assert_equals( 1, $context['agent_id'], 'execution principal overrides active preference', $failures, $passes );
+
 	$context = DataMachine\Cli\AgentResolver::resolveEffectiveContext( array( 'agent' => 'admin', 'user' => 1 ) );
 	agents_api_smoke_assert_equals( 1, $context['agent_id'], 'explicit --agent overrides active preference', $failures, $passes );
 

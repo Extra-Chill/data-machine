@@ -113,9 +113,12 @@ class AgentResolver {
 		$user_id           = UserResolver::resolve( $assoc_args );
 		$effective_user_id = $directory_manager->get_effective_user_id( $user_id );
 
-		$agent_slug = self::resolveActiveAgentSlugForUser( $effective_user_id );
+		$agent_slug = self::resolvePrincipalAgentSlug();
 		if ( '' === $agent_slug ) {
-			$agent_slug = self::resolveEffectiveAgentSlugForUser( $effective_user_id );
+			$agent_slug = self::resolveActiveAgentSlugForUser( $effective_user_id );
+		}
+		if ( '' === $agent_slug ) {
+			$agent_slug = self::resolveOwnerFallbackAgentSlugForUser( $effective_user_id );
 		}
 		if ( '' === $agent_slug ) {
 			return array(
@@ -201,19 +204,14 @@ class AgentResolver {
 	}
 
 	/**
-	 * Resolve an effective agent slug for an owner using Agents API semantics.
+	 * Resolve an agent slug from the current Agents API execution principal.
 	 *
-	 * @param int $owner_user_id Owner WordPress user ID.
-	 * @return string Effective agent slug, or empty string when none exists.
+	 * @return string Effective agent slug, or empty string when no principal exists.
 	 */
-	private static function resolveEffectiveAgentSlugForUser( int $owner_user_id ): string {
+	private static function resolvePrincipalAgentSlug(): string {
 		if ( ! class_exists( '\\AgentsAPI\\AI\\WP_Agent_Effective_Agent_Resolver' ) ) {
-			WP_CLI::error( 'Agents API effective agent resolver is unavailable. Update the agents-api dependency or pass --agent explicitly.' );
+			return '';
 		}
-
-		$agents_repo = new Agents();
-		$owned       = $agents_repo->get_all_by_owner_id( $owner_user_id );
-		$slugs       = array_values( array_filter( array_map( static fn( $agent ) => (string) ( $agent['agent_slug'] ?? '' ), $owned ) ) );
 
 		$principal_context = array();
 		if ( class_exists( '\\AgentsAPI\\AI\\WP_Agent_Execution_Principal' ) ) {
@@ -223,10 +221,37 @@ class AgentResolver {
 		try {
 			return \AgentsAPI\AI\WP_Agent_Effective_Agent_Resolver::resolve(
 				array(
-					'owner_user_id'     => $owner_user_id,
-					'owner_agent_slugs' => $slugs,
 					'resolve_principal' => true,
 					'principal_context' => $principal_context,
+				)
+			);
+		} catch ( \InvalidArgumentException $e ) {
+			WP_CLI::error( $e->getMessage() );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Resolve an effective agent slug for an owner using the ambiguous-safe owner fallback.
+	 *
+	 * @param int $owner_user_id Owner WordPress user ID.
+	 * @return string Effective agent slug, or empty string when none exists.
+	 */
+	private static function resolveOwnerFallbackAgentSlugForUser( int $owner_user_id ): string {
+		if ( ! class_exists( '\\AgentsAPI\\AI\\WP_Agent_Effective_Agent_Resolver' ) ) {
+			WP_CLI::error( 'Agents API effective agent resolver is unavailable. Update the agents-api dependency or pass --agent explicitly.' );
+		}
+
+		$agents_repo = new Agents();
+		$owned       = $agents_repo->get_all_by_owner_id( $owner_user_id );
+		$slugs       = array_values( array_filter( array_map( static fn( $agent ) => (string) ( $agent['agent_slug'] ?? '' ), $owned ) ) );
+
+		try {
+			return \AgentsAPI\AI\WP_Agent_Effective_Agent_Resolver::resolve(
+				array(
+					'owner_user_id'     => $owner_user_id,
+					'owner_agent_slugs' => $slugs,
 				)
 			);
 		} catch ( \InvalidArgumentException $e ) {
