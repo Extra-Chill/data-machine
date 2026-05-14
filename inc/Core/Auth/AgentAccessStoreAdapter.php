@@ -102,7 +102,7 @@ class AgentAccessStoreAdapter implements \WP_Agent_Access_Store {
 			return array();
 		}
 
-		$rows = $this->agents_repository->get_agents_by_ids( array_map( 'intval', $agent_ids ) );
+		$rows        = $this->agents_repository->get_agents_by_ids( array_map( 'intval', $agent_ids ) );
 		$slugs_by_id = array();
 		foreach ( $rows as $row ) {
 			$agent_id = (int) ( $row['agent_id'] ?? 0 );
