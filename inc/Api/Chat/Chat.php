@@ -86,6 +86,12 @@ class Chat {
 						'description'       => __( 'Model identifier (optional, uses default if not provided)', 'data-machine' ),
 						'sanitize_callback' => 'sanitize_text_field',
 					),
+					'mode'                 => array(
+						'type'              => 'string',
+						'required'          => false,
+						'description'       => __( 'Execution mode for tool/context resolution. Defaults to chat.', 'data-machine' ),
+						'sanitize_callback' => 'sanitize_key',
+					),
 					'selected_pipeline_id' => array(
 						'type'              => 'integer',
 						'required'          => false,
@@ -472,6 +478,7 @@ class Chat {
 			'agent_id'       => (int) $request->get_param( 'agent_id' ),
 			'provider'       => (string) ( $request->get_param( 'provider' ) ?? '' ),
 			'model'          => (string) ( $request->get_param( 'model' ) ?? '' ),
+			'mode'           => (string) ( $request->get_param( 'mode' ) ?? '' ),
 			'attachments'    => $attachments,
 			'client_context' => $client_context,
 		);

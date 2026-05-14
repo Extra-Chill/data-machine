@@ -85,7 +85,9 @@ class AgentsChatHandler {
 			return $agent_id;
 		}
 
-		$agent_config = PluginSettings::resolveModelForAgentMode( 0 === $agent_id ? null : $agent_id, 'chat' );
+		$client_context = is_array( $input['client_context'] ?? null ) ? $input['client_context'] : array();
+		$mode           = $this->resolveMode( $input, $client_context );
+		$agent_config   = PluginSettings::resolveModelForAgentMode( 0 === $agent_id ? null : $agent_id, $mode );
 		$provider     = $agent_config['provider'] ?? '';
 		$model        = $agent_config['model'] ?? '';
 
@@ -104,9 +106,10 @@ class AgentsChatHandler {
 			$user_id,
 			array(
 				'session_id'     => $input['session_id'] ?? null,
+				'mode'           => $mode,
 				'agent_id'       => $agent_id,
 				'attachments'    => $input['attachments'] ?? array(),
-				'client_context' => $input['client_context'] ?? array(),
+				'client_context' => $client_context,
 			)
 		);
 
@@ -139,6 +142,20 @@ class AgentsChatHandler {
 		}
 
 		return (int) ( $row['agent_id'] ?? 0 );
+	}
+
+	/**
+	 * Resolve the Data Machine execution mode from canonical Agents API input.
+	 *
+	 * @param array $input Canonical agents/chat input.
+	 * @param array $client_context Transport-level client context.
+	 * @return string Sanitized mode slug.
+	 */
+	private function resolveMode( array $input, array $client_context ): string {
+		$mode = $input['mode'] ?? $client_context['agent_mode'] ?? $client_context['mode'] ?? 'chat';
+		$mode = sanitize_key( (string) $mode );
+
+		return '' !== $mode ? $mode : 'chat';
 	}
 
 	/**

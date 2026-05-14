@@ -66,6 +66,10 @@ class SendMessageAbility {
 								'type'        => 'string',
 								'description' => __( 'AI model identifier. Resolved from agent/defaults if omitted.', 'data-machine' ),
 							),
+							'mode'                 => array(
+								'type'        => 'string',
+								'description' => __( 'Execution mode for tool/context resolution. Defaults to chat.', 'data-machine' ),
+							),
 							'selected_pipeline_id' => array(
 								'type'        => 'integer',
 								'description' => __( 'Currently selected pipeline ID for context.', 'data-machine' ),
@@ -163,13 +167,14 @@ class SendMessageAbility {
 		}
 
 		$agent_id = (int) ( $input['agent_id'] ?? 0 );
+		$mode     = ! empty( $input['mode'] ) ? sanitize_key( (string) $input['mode'] ) : 'chat';
 
 		// Resolve provider/model from input or agent context.
 		$provider = $input['provider'] ?? '';
 		$model    = $input['model'] ?? '';
 
 		if ( empty( $provider ) || empty( $model ) ) {
-			$agent_config = PluginSettings::resolveModelForAgentMode( $agent_id > 0 ? $agent_id : null, 'chat' );
+			$agent_config = PluginSettings::resolveModelForAgentMode( $agent_id > 0 ? $agent_id : null, $mode );
 			if ( empty( $provider ) ) {
 				$provider = $agent_config['provider'];
 			}
@@ -204,6 +209,7 @@ class SendMessageAbility {
 				'selected_pipeline_id' => (int) ( $input['selected_pipeline_id'] ?? 0 ),
 				'max_turns'            => $input['max_turns'] ?? null,
 				'request_id'           => $input['request_id'] ?? null,
+				'mode'                 => $mode,
 				'agent_id'             => $agent_id,
 				'attachments'          => $input['attachments'] ?? array(),
 				'client_context'       => $input['client_context'] ?? array(),
