@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.33.0] - 2026-05-14
+
+### Added
+- expose event source inventory capabilities
+
+### Fixed
+- Squarespace timezone regex cannot match nested context JSON
+- address-aware venue resolution in event dedup strategy
+
 ## [0.32.2] - 2026-05-10
 
 ### Changed
