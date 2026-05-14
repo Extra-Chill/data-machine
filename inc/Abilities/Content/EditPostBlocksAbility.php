@@ -136,6 +136,15 @@ class EditPostBlocksAbility {
 				),
 				'edits'   => array(
 					'type'        => 'array',
+					'items'       => array(
+						'type'       => 'object',
+						'required'   => array( 'block_index', 'find', 'replace' ),
+						'properties' => array(
+							'block_index' => array( 'type' => 'integer' ),
+							'find'        => array( 'type' => 'string' ),
+							'replace'     => array( 'type' => 'string' ),
+						),
+					),
 					'required'    => true,
 					'description' => 'Array of { block_index, find, replace } operations',
 				),

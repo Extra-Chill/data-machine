@@ -67,13 +67,14 @@ class ChatOrchestrator {
 		$request_id           = $options['request_id'] ?? null;
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 		$agent_slug           = (string) ( $options['agent_slug'] ?? '' );
+		$mode                 = ! empty( $options['mode'] ) ? sanitize_key( (string) $options['mode'] ) : ToolPolicyResolver::MODE_CHAT;
 
 		$chat_db                     = ConversationStoreFactory::get();
 		$session_metadata            = array();
 		$acting_token_id             = \DataMachine\Abilities\PermissionHelper::get_acting_token_id();
 		$transcript_consent_decision = DataMachineAgentConsentPolicy::get()->can_store_transcript(
 			array(
-				'mode'        => 'chat',
+				'mode'        => $mode,
 				'interactive' => true,
 				'user_id'     => $user_id,
 				'agent_id'    => $agent_id,
@@ -102,9 +103,12 @@ class ChatOrchestrator {
 
 			$messages         = $session['messages'];
 			$session_metadata = $session['metadata'] ?? array();
+			if ( empty( $options['mode'] ) && ! empty( $session['mode'] ) ) {
+				$mode = sanitize_key( (string) $session['mode'] );
+			}
 		} else {
 			// Check for recent pending session to prevent duplicates from timeout retries.
-			$pending_session = $chat_db->get_recent_pending_session( WordPressWorkspaceScope::current(), $user_id, 600, 'chat', $acting_token_id );
+			$pending_session = $chat_db->get_recent_pending_session( WordPressWorkspaceScope::current(), $user_id, 600, $mode, $acting_token_id );
 
 			if ( $pending_session ) {
 				$session_id       = $pending_session['session_id'];
@@ -119,11 +123,11 @@ class ChatOrchestrator {
 						'session_id'          => $session_id,
 						'user_id'             => $user_id,
 						'original_created_at' => $pending_session['created_at'],
-						'mode'                => 'chat',
+						'mode'                => $mode,
 					)
 				);
 			} else {
-				$create_result = self::createSession( $user_id, '', $agent_id );
+				$create_result = self::createSession( $user_id, '', $agent_id, $mode );
 
 				if ( is_wp_error( $create_result ) ) {
 					return $create_result;
@@ -195,7 +199,7 @@ class ChatOrchestrator {
 				'single_turn'          => true,
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id ? $selected_pipeline_id : null,
-				'mode'                 => ToolPolicyResolver::MODE_CHAT,
+				'mode'                 => $mode,
 				'user_id'              => $user_id,
 				'agent_id'             => $agent_id,
 				'agent_slug'           => $agent_slug,
@@ -371,7 +375,7 @@ class ChatOrchestrator {
 				'single_turn'          => true,
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id,
-				'mode'                 => ToolPolicyResolver::MODE_CHAT,
+				'mode'                 => (string) ( $session['mode'] ?? ToolPolicyResolver::MODE_CHAT ),
 				'user_id'              => (int) ( $session['user_id'] ?? 0 ),
 				'agent_id'             => (int) ( $session['agent_id'] ?? 0 ),
 				'agent_slug'           => (string) ( $session['agent_slug'] ?? '' ),
@@ -583,7 +587,9 @@ class ChatOrchestrator {
 	 * @param string $source  Optional source identifier.
 	 * @return string|WP_Error Session ID on success, WP_Error on failure.
 	 */
-	private static function createSession( int $user_id, string $source = '', int $agent_id = 0 ): string|WP_Error {
+	private static function createSession( int $user_id, string $source = '', int $agent_id = 0, string $mode = ToolPolicyResolver::MODE_CHAT ): string|WP_Error {
+		$mode = '' !== $mode ? sanitize_key( $mode ) : ToolPolicyResolver::MODE_CHAT;
+
 		if ( $agent_id <= 0 ) {
 			$agent_id = function_exists( 'datamachine_resolve_or_create_agent_id' )
 				? datamachine_resolve_or_create_agent_id( $user_id )
@@ -597,7 +603,7 @@ class ChatOrchestrator {
 			$input      = array(
 				'user_id'    => $user_id,
 				'agent_slug' => $agent_slug,
-				'mode'       => 'chat',
+				'mode'       => $mode,
 			);
 
 			if ( $source ) {
@@ -642,7 +648,7 @@ class ChatOrchestrator {
 		}
 
 		$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
-		$session_id = $chat_db->create_session( WordPressWorkspaceScope::current(), $user_id, $agent_slug, $metadata, 'chat' );
+		$session_id = $chat_db->create_session( WordPressWorkspaceScope::current(), $user_id, $agent_slug, $metadata, $mode );
 
 		if ( empty( $session_id ) ) {
 			return new WP_Error(
@@ -688,8 +694,9 @@ class ChatOrchestrator {
 		$single_turn          = $options['single_turn'] ?? false;
 		$max_turns            = $options['max_turns'] ?? PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 		$selected_pipeline_id = $options['selected_pipeline_id'] ?? null;
-		$mode                 = $options['mode'] ?? ToolPolicyResolver::MODE_CHAT;
+		$mode                 = ! empty( $options['mode'] ) ? sanitize_key( (string) $options['mode'] ) : ToolPolicyResolver::MODE_CHAT;
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
+		$agent_slug           = (string) ( $options['agent_slug'] ?? '' );
 
 		$chat_db = ConversationStoreFactory::get();
 
@@ -707,8 +714,11 @@ class ChatOrchestrator {
 			$resolver       = new ToolPolicyResolver();
 			$all_tools      = $resolver->resolve(
 				array(
-					'mode'     => ToolPolicyResolver::MODE_CHAT,
-					'agent_id' => $agent_id,
+					'mode'        => $mode,
+					'agent_id'    => $agent_id,
+					'agent_slug'  => $agent_slug,
+					'user_id'     => $user_id,
+					'interactive' => true,
 				)
 			);
 			$client_context = $options['client_context'] ?? array();

@@ -124,6 +124,7 @@ class GetPostBlocksAbility {
 				),
 				'block_types' => array(
 					'type'        => 'array',
+					'items'       => array( 'type' => 'string' ),
 					'required'    => false,
 					'description' => 'Filter to specific block types (e.g. ["core/paragraph"])',
 				),

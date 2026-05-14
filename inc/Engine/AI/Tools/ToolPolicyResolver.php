@@ -98,7 +98,9 @@ class ToolPolicyResolver {
 		$mode     = $args['mode'] ?? self::MODE_PIPELINE;
 		$agent_id = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
 
-		if ( self::MODE_CHAT === $mode && ! $this->tool_access_policy->passesChatGate( $args ) ) {
+		$is_interactive = self::MODE_CHAT === $mode || ! empty( $args['interactive'] );
+
+		if ( $is_interactive && ! $this->tool_access_policy->passesChatGate( $args ) ) {
 			return array();
 		}
 
@@ -121,8 +123,8 @@ class ToolPolicyResolver {
 			unset( $policy_context['agent_id'], $policy_context['agent_slug'] );
 		}
 
-		// Only chat is request-user scoped. Pipeline/system run as product automation.
-		if ( self::MODE_CHAT === $mode ) {
+		// Interactive modes are request-user scoped. Pipeline/system run as product automation.
+		if ( $is_interactive ) {
 			$policy_context['tool_access_checker'] = array( $this->tool_access_policy, 'canAccessTool' );
 		}
 
