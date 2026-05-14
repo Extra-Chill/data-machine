@@ -23,6 +23,8 @@ defined( 'ABSPATH' ) || exit;
 
 class AgentResolver {
 
+	private const ACTIVE_AGENT_META_KEY = 'datamachine_active_agent_slug';
+
 	/**
 	 * Resolve --agent flag to an agent_id.
 	 *
@@ -111,7 +113,10 @@ class AgentResolver {
 		$user_id           = UserResolver::resolve( $assoc_args );
 		$effective_user_id = $directory_manager->get_effective_user_id( $user_id );
 
-		$agent_slug = self::resolveEffectiveAgentSlugForUser( $effective_user_id );
+		$agent_slug = self::resolveActiveAgentSlugForUser( $effective_user_id );
+		if ( '' === $agent_slug ) {
+			$agent_slug = self::resolveEffectiveAgentSlugForUser( $effective_user_id );
+		}
 		if ( '' === $agent_slug ) {
 			return array(
 				'agent_id'   => null,
@@ -158,6 +163,41 @@ class AgentResolver {
 
 		// No scoping — return empty (show all).
 		return array();
+	}
+
+	/**
+	 * Resolve the user's persisted active agent slug when it is still valid.
+	 *
+	 * @param int $user_id WordPress user ID.
+	 * @return string Active agent slug, or empty string when unset/invalid.
+	 */
+	private static function resolveActiveAgentSlugForUser( int $user_id ): string {
+		if ( $user_id <= 0 || ! function_exists( 'get_user_meta' ) ) {
+			return '';
+		}
+
+		$stored = get_user_meta( $user_id, self::ACTIVE_AGENT_META_KEY, true );
+		$slug   = is_string( $stored ) ? sanitize_title( $stored ) : '';
+		if ( '' === $slug ) {
+			return '';
+		}
+
+		$agents_repo = new Agents();
+		$agent       = $agents_repo->get_by_slug( $slug );
+		if ( ! $agent ) {
+			return '';
+		}
+
+		if ( (int) $agent['owner_id'] === $user_id ) {
+			return $slug;
+		}
+
+		if ( ! class_exists( '\DataMachine\Core\Database\Agents\AgentAccess' ) ) {
+			return '';
+		}
+
+		$grant = ( new \DataMachine\Core\Database\Agents\AgentAccess() )->get_access( (string) (int) $agent['agent_id'], $user_id );
+		return $grant instanceof \WP_Agent_Access_Grant && $grant->role_meets( 'viewer' ) ? $slug : '';
 	}
 
 	/**
