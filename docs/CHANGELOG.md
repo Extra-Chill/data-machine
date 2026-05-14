@@ -2,6 +2,56 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.111.0] - 2026-05-14
+
+### Added
+- add HTTP Basic auth refs
+- add active agent preference
+- add generic HTTP proxy auth options
+- register agents api host stores
+- expose Data Machine agent access store
+- allow AI steps to choose agent mode
+- add source inventory profiling ability
+- emit system task data packets
+
+### Changed
+- Expose persisted agents to Agents API
+- align OAuth state coverage with nonce-keyed transients
+- use reusable Homeboy workflow
+
+### Fixed
+- load full flow configs in pipelines admin
+- match active agent property alignment
+- align active agent lint formatting
+- preserve principal active agent precedence
+- include OAuth2 code in token exchange
+- harden handlers API response
+- surface pipeline fetch errors
+- implement transcript session listing contract
+- defer memory file registration until plugins load
+- scope auth credentials by policy
+- guard pipeline ids response mode
+- make pipeline list responses explicit
+- keep completion nudges natural
+- align direct packet assignment
+- preserve direct workflow step packets
+- refresh engine data cache on job writes
+- document jobs hide children option
+- use lightweight jobs dropdown endpoints
+- satisfy ai step mode checks
+- remove duplicate flow output mode arg
+- satisfy flow helper lint
+- align flow formatter assignments
+- use lightweight pipeline flow lists
+- support flow output mode in REST
+- render pipeline shell while flows load
+- format flow settings display from loaded config
+- satisfy drain query lint
+- drain pipeline batch actions
+- use tool runtime metadata in agent loop
+- reduce agent loop tool friction
+- raise conversation turn ceiling
+
 ## [0.110.1] - 2026-05-11
 
 ### Fixed
