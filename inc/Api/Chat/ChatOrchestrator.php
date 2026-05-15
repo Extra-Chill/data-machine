@@ -196,7 +196,7 @@ class ChatOrchestrator {
 			$provider,
 			$model,
 			array(
-				'single_turn'          => true,
+				'single_turn'          => false,
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id ? $selected_pipeline_id : null,
 				'mode'                 => $mode,
@@ -372,7 +372,7 @@ class ChatOrchestrator {
 			$provider,
 			$model,
 			array(
-				'single_turn'          => true,
+				'single_turn'          => false,
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id,
 				'mode'                 => (string) ( $session['mode'] ?? ToolPolicyResolver::MODE_CHAT ),

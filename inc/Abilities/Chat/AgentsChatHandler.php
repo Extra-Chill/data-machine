@@ -204,6 +204,10 @@ class AgentsChatHandler {
 				continue;
 			}
 
+			if ( in_array( (string) ( $message['type'] ?? '' ), array( 'tool_call', 'tool_result' ), true ) ) {
+				continue;
+			}
+
 			if ( ! is_string( $message['content'] ) ) {
 				continue;
 			}
