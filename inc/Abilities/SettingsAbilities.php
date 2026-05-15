@@ -359,28 +359,28 @@ class SettingsAbilities {
 		return array(
 			'success'          => true,
 			'settings'         => array(
-				'cleanup_job_data_on_failure'    => $settings['cleanup_job_data_on_failure'] ?? true,
-				'file_retention_days'            => $settings['file_retention_days'] ?? 7,
-				'chat_retention_days'            => $settings['chat_retention_days'] ?? 90,
-				'chat_ai_titles_enabled'         => $settings['chat_ai_titles_enabled'] ?? true,
-				'alt_text_auto_generate_enabled' => $settings['alt_text_auto_generate_enabled'] ?? true,
-				'problem_flow_threshold'         => $settings['problem_flow_threshold'] ?? 3,
-				'flows_per_page'                 => $settings['flows_per_page'] ?? 20,
-				'jobs_per_page'                  => $settings['jobs_per_page'] ?? 50,
-				'site_context_enabled'           => $settings['site_context_enabled'] ?? false,
-				'daily_memory_enabled'           => $settings['daily_memory_enabled'] ?? false,
-				'default_provider'               => $settings['default_provider'] ?? '',
-				'default_model'                  => $settings['default_model'] ?? '',
-				'mode_models'                    => $settings['mode_models'] ?? array(),
-				'max_turns'                      => $settings['max_turns'] ?? $defaults['max_turns'],
-				'wp_ai_client_connect_timeout'   => $settings['wp_ai_client_connect_timeout'] ?? $defaults['wp_ai_client_connect_timeout'],
-				'wp_ai_client_request_timeout'   => $settings['wp_ai_client_request_timeout'] ?? $defaults['wp_ai_client_request_timeout'],
-				'pipeline_ai_concurrency_limit'  => $settings['pipeline_ai_concurrency_limit'] ?? $defaults['pipeline_ai_concurrency_limit'],
+				'cleanup_job_data_on_failure'             => $settings['cleanup_job_data_on_failure'] ?? true,
+				'file_retention_days'                     => $settings['file_retention_days'] ?? 7,
+				'chat_retention_days'                     => $settings['chat_retention_days'] ?? 90,
+				'chat_ai_titles_enabled'                  => $settings['chat_ai_titles_enabled'] ?? true,
+				'alt_text_auto_generate_enabled'          => $settings['alt_text_auto_generate_enabled'] ?? true,
+				'problem_flow_threshold'                  => $settings['problem_flow_threshold'] ?? 3,
+				'flows_per_page'                          => $settings['flows_per_page'] ?? 20,
+				'jobs_per_page'                           => $settings['jobs_per_page'] ?? 50,
+				'site_context_enabled'                    => $settings['site_context_enabled'] ?? false,
+				'daily_memory_enabled'                    => $settings['daily_memory_enabled'] ?? false,
+				'default_provider'                        => $settings['default_provider'] ?? '',
+				'default_model'                           => $settings['default_model'] ?? '',
+				'mode_models'                             => $settings['mode_models'] ?? array(),
+				'max_turns'                               => $settings['max_turns'] ?? $defaults['max_turns'],
+				'wp_ai_client_connect_timeout'            => $settings['wp_ai_client_connect_timeout'] ?? $defaults['wp_ai_client_connect_timeout'],
+				'wp_ai_client_request_timeout'            => $settings['wp_ai_client_request_timeout'] ?? $defaults['wp_ai_client_request_timeout'],
+				'pipeline_ai_concurrency_limit'           => $settings['pipeline_ai_concurrency_limit'] ?? $defaults['pipeline_ai_concurrency_limit'],
 				'pipeline_ai_provider_concurrency_limits' => $settings['pipeline_ai_provider_concurrency_limits'] ?? $defaults['pipeline_ai_provider_concurrency_limits'],
-				'pipeline_ai_throttle_delay'     => $settings['pipeline_ai_throttle_delay'] ?? $defaults['pipeline_ai_throttle_delay'],
-				'disabled_tools'                 => $settings['disabled_tools'] ?? array(),
-				'ai_provider_keys'               => $masked_keys,
-				'queue_tuning'                   => wp_parse_args( $settings['queue_tuning'] ?? array(), $defaults['queue_tuning'] ),
+				'pipeline_ai_throttle_delay'              => $settings['pipeline_ai_throttle_delay'] ?? $defaults['pipeline_ai_throttle_delay'],
+				'disabled_tools'                          => $settings['disabled_tools'] ?? array(),
+				'ai_provider_keys'                        => $masked_keys,
+				'queue_tuning'                            => wp_parse_args( $settings['queue_tuning'] ?? array(), $defaults['queue_tuning'] ),
 			),
 			'defaults'         => $defaults,
 			'network_settings' => array(
@@ -499,7 +499,7 @@ class SettingsAbilities {
 		}
 
 		if ( isset( $input['pipeline_ai_concurrency_limit'] ) ) {
-			$limit                                         = absint( $input['pipeline_ai_concurrency_limit'] );
+			$limit = absint( $input['pipeline_ai_concurrency_limit'] );
 			$all_settings['pipeline_ai_concurrency_limit'] = max( 1, min( PluginSettings::MAX_PIPELINE_AI_CONCURRENCY_LIMIT, $limit ) );
 			$handled_keys[]                                = 'pipeline_ai_concurrency_limit';
 		}
@@ -521,7 +521,7 @@ class SettingsAbilities {
 			}
 
 			$all_settings['pipeline_ai_provider_concurrency_limits'] = $provider_limits;
-			$handled_keys[]                                          = 'pipeline_ai_provider_concurrency_limits';
+			$handled_keys[] = 'pipeline_ai_provider_concurrency_limits';
 		}
 
 		if ( isset( $input['pipeline_ai_throttle_delay'] ) ) {
