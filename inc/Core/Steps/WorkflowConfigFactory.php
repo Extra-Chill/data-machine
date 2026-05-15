@@ -137,7 +137,7 @@ class WorkflowConfigFactory {
 		if ( 'ai' === $step_type ) {
 			$pipeline_step['system_prompt']  = $step['system_prompt'] ?? '';
 			$pipeline_step['disabled_tools'] = is_array( $step['disabled_tools'] ?? null ) ? array_values( $step['disabled_tools'] ) : array();
-			$agent_modes = self::sanitizeAgentModes( $step['agent_modes'] ?? array() );
+			$agent_modes                     = self::sanitizeAgentModes( $step['agent_modes'] ?? array() );
 			if ( ! empty( $agent_modes ) ) {
 				$pipeline_step['agent_modes'] = $agent_modes;
 			}

@@ -89,7 +89,7 @@ class AIStep extends Step {
 		// Pipeline-level model/provider fields are ignored — mode_models is the authority.
 		$execution_modes = self::resolveExecutionModes( $pipeline_step_config, $this->flow_step_config );
 		$mode_model      = self::resolveModelForExecutionModes( $agent_id, $execution_modes );
-		$provider_name  = $mode_model['provider'];
+		$provider_name   = $mode_model['provider'];
 		if ( empty( $provider_name ) ) {
 			do_action(
 				'datamachine_fail_job',
@@ -711,7 +711,10 @@ class AIStep extends Step {
 	 * @return array{provider:string,model:string}
 	 */
 	private static function resolveModelForExecutionModes( int $agent_id, array $modes ): array {
-		$fallback = array( 'provider' => '', 'model' => '' );
+		$fallback = array(
+			'provider' => '',
+			'model'    => '',
+		);
 		foreach ( $modes as $mode ) {
 			$model = PluginSettings::resolveModelForAgentMode( $agent_id, $mode );
 			if ( ! empty( $model['provider'] ) ) {

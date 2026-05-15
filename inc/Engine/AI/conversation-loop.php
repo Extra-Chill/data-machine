@@ -209,12 +209,18 @@ function datamachine_run_conversation(
 			array(
 				'max_turns'             => $max_turns,
 				'budgets'               => array( $turn_budget ),
-				'context'               => array_merge( $loop_payload, array( 'mode' => $mode, 'modes' => $modes ) ),
+				'context'               => array_merge( $loop_payload, array(
+					'mode'  => $mode,
+					'modes' => $modes,
+				) ),
 				'request'               => new \AgentsAPI\AI\WP_Agent_Conversation_Request(
 					$messages,
 					array(),
 					null,
-					array_merge( $loop_payload, array( 'mode' => $mode, 'modes' => $modes ) ),
+					array_merge( $loop_payload, array(
+						'mode'  => $mode,
+						'modes' => $modes,
+					) ),
 					array(
 						'provider'  => $provider,
 						'model'     => $model,

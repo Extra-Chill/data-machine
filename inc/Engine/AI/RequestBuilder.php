@@ -109,7 +109,7 @@ class RequestBuilder {
 				'AI request blocked: wp-ai-client unavailable',
 				array_filter(
 					array(
-					'mode'         => $mode_label,
+						'mode'         => $mode_label,
 						'job_id'       => $payload['job_id'] ?? null,
 						'flow_step_id' => $payload['flow_step_id'] ?? null,
 						'provider'     => $provider,

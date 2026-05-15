@@ -213,7 +213,10 @@ class AgentsChatHandler {
 	 * @return array{provider:string,model:string}
 	 */
 	private function resolveModelForModes( ?int $agent_id, array $modes ): array {
-		$fallback = array( 'provider' => '', 'model' => '' );
+		$fallback = array(
+			'provider' => '',
+			'model'    => '',
+		);
 		foreach ( $modes as $mode ) {
 			$config = PluginSettings::resolveModelForAgentMode( $agent_id, $mode );
 			if ( '' !== $config['provider'] && '' !== $config['model'] ) {

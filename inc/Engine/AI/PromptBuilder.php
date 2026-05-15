@@ -138,9 +138,9 @@ class PromptBuilder {
 			: array();
 
 		foreach ( $this->directives as $directiveConfig ) {
-			$directive = $directiveConfig['directive'];
+			$directive       = $directiveConfig['directive'];
 			$directive_modes = $directiveConfig['modes'];
-			$priority  = (int) ( $directiveConfig['priority'] ?? 10 );
+			$priority        = (int) ( $directiveConfig['priority'] ?? 10 );
 
 			if ( ! in_array( 'all', $directive_modes, true ) && empty( array_intersect( $payload['agent_modes'], $directive_modes ) ) ) {
 				continue;

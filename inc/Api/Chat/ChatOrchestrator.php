@@ -725,10 +725,10 @@ class ChatOrchestrator {
 			$client_context = $options['client_context'] ?? array();
 
 			$loop_context = array(
-				'session_id'   => $session_id,
-				'user_id'      => $user_id,
-				'agent_id'     => $agent_id,
-				'agent_modes'  => $modes,
+				'session_id'  => $session_id,
+				'user_id'     => $user_id,
+				'agent_id'    => $agent_id,
+				'agent_modes' => $modes,
 			);
 			if ( '' !== $agent_slug ) {
 				$loop_context['agent_slug'] = $agent_slug;
