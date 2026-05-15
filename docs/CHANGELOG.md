@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.113.1] - 2026-05-15
+
+### Fixed
+- pipeline-policy tools follow pipeline mode inheritance
+
 ## [0.113.0] - 2026-05-15
 
 ### Added
