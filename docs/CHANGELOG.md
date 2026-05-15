@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.113.0] - 2026-05-15
+
+### Added
+- support custom mode tool inheritance via filter
+- expose AI runtime provenance
+
+### Changed
+- align provenance formatting
+
+### Fixed
+- preserve scheduled jobs during stuck recovery
+- ignore future source publication dates
+- preserve original source attribution on posts
+- complete agent chat after tool calls
+
 ## [0.112.0] - 2026-05-15
 
 ### Added
