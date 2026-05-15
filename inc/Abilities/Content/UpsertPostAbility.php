@@ -29,6 +29,7 @@ use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\SourceDate;
 use DataMachine\Core\WordPress\ResolvePostByPath;
 use DataMachine\Core\WordPress\PostTracking;
+use DataMachine\Core\WordPress\WordPressPublishHelper;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -125,6 +126,12 @@ class UpsertPostAbility {
 								'type'        => 'string',
 								'description' => 'Original source publication date in GMT.',
 							),
+
+							'add_source_attribution' => array(
+								'type'        => 'boolean',
+								'description' => 'When true, append a clickable source link to the stored content when source_url is available.',
+							),
+
 							'post_status'       => array(
 								'type'        => 'string',
 								'description' => 'Post status for create path. Defaults to publish.',
@@ -258,6 +265,11 @@ class UpsertPostAbility {
 					'type'        => 'string',
 					'description' => 'Original source publication date in GMT.',
 				),
+
+				'add_source_attribution' => array(
+					'type'        => 'boolean',
+					'description' => 'When true, append a clickable source link to the stored content when source_url is available.',
+				),
 			),
 			'required'    => array( 'post_type', 'title', 'content' ),
 		);
@@ -300,18 +312,47 @@ class UpsertPostAbility {
 		$raw_source        = $input['raw_source'] ?? '';
 		$source_url        = esc_url_raw( (string) ( $input['source_url'] ?? '' ) );
 		$original_date_gmt = SourceDate::normalizeGmt( $input['original_date_gmt'] ?? '' );
-		$post_status       = sanitize_key( $input['post_status'] ?? 'publish' );
-		$post_author       = absint( $input['post_author'] ?? 0 );
-		$post_excerpt      = $input['post_excerpt'] ?? '';
-		$taxonomies        = $input['taxonomies'] ?? array();
-		$meta_input        = $input['meta_input'] ?? array();
-		$create_stubs      = ! empty( $input['create_stubs'] );
+
+		$add_source_attribution = ! empty( $input['add_source_attribution'] );
+
+		$post_status  = sanitize_key( $input['post_status'] ?? 'publish' );
+		$post_author  = absint( $input['post_author'] ?? 0 );
+		$post_excerpt = $input['post_excerpt'] ?? '';
+		$taxonomies   = $input['taxonomies'] ?? array();
+		$meta_input   = $input['meta_input'] ?? array();
+		$create_stubs = ! empty( $input['create_stubs'] );
 
 		if ( '' === $post_type || '' === $title ) {
 			return array(
 				'success' => false,
 				'error'   => 'post_type and title are required.',
 			);
+		}
+
+		if ( $add_source_attribution && '' !== $source_url ) {
+			$content = WordPressPublishHelper::applySourceAttribution(
+				(string) $content,
+				$source_url,
+				array(
+					'link_handling'  => 'append',
+					'content_format' => $content_format,
+				)
+			);
+
+			if ( '' !== $raw_source ) {
+				$raw_source = WordPressPublishHelper::applySourceAttribution(
+					(string) $raw_source,
+					$source_url,
+					array(
+						'link_handling'  => 'append',
+						'content_format' => $content_format,
+					)
+				);
+			}
+
+			if ( '' !== $content_hash ) {
+				$content_hash = hash( 'sha256', (string) $content );
+			}
 		}
 
 		$stored_content = ContentFormat::sourceToStored( (string) $content, $content_format, $post_type );

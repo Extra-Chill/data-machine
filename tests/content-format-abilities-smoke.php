@@ -110,6 +110,10 @@ namespace {
 		return trim( (string) $url );
 	}
 
+	function esc_url( $url ): string {
+		return trim( (string) $url );
+	}
+
 	function absint( $value ): int {
 		return max( 0, (int) $value );
 	}
@@ -345,6 +349,7 @@ namespace {
 	include_once dirname( __DIR__ ) . '/inc/Core/Content/ContentFormat.php';
 	include_once dirname( __DIR__ ) . '/inc/Core/SourceDate.php';
 	include_once dirname( __DIR__ ) . '/inc/Core/WordPress/PostTracking.php';
+	include_once dirname( __DIR__ ) . '/inc/Core/WordPress/WordPressPublishHelper.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/BlockSanitizer.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/GetPostBlocksAbility.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/EditPostBlocksAbility.php';
@@ -402,6 +407,41 @@ namespace {
 	assert_content_ability( 'upsert-source-url-meta-stored', 'https://example.com/source-post/' === get_post_meta( $source_id, '_datamachine_source_url', true ) );
 	assert_content_ability( 'upsert-original-date-meta-stored', '2020-09-24 06:12:53' === get_post_meta( $source_id, '_datamachine_original_date_gmt', true ) );
 	assert_content_ability( 'upsert-original-date-applies-post-date-gmt', '2020-09-24 06:12:53' === ( $source_post->post_date_gmt ?? '' ) );
+
+	$attributed_upsert = DataMachine\Abilities\Content\UpsertPostAbility::execute(
+		array(
+			'post_type'              => 'wiki',
+			'title'                  => 'Attributed Markdown',
+			'content'                => "# Attributed\n\nRaw markdown.",
+			'content_format'         => 'markdown',
+			'raw_source'             => "# Attributed\n\nRaw markdown.",
+			'content_hash'           => hash( 'sha256', "# Attributed\n\nRaw markdown." ),
+			'source_url'             => 'https://example.com/attributed-source/',
+			'add_source_attribution' => true,
+		)
+	);
+	$attributed_id   = (int) ( $attributed_upsert['post_id'] ?? 0 );
+	$attributed_post = get_post( $attributed_id );
+	$attributed_body = (string) ( $attributed_post->post_content ?? '' );
+	assert_content_ability( 'upsert-source-attribution-succeeds', true === $attributed_upsert['success'] );
+	assert_content_ability( 'upsert-source-attribution-adds-markdown-link', str_contains( $attributed_body, '**Source:** [https://example.com/attributed-source/](https://example.com/attributed-source/)' ) );
+	assert_content_ability( 'upsert-source-attribution-updates-raw-source', str_contains( (string) get_post_meta( $attributed_id, '_datamachine_raw_source', true ), 'https://example.com/attributed-source/' ) );
+	assert_content_ability( 'upsert-source-attribution-hashes-attributed-content', hash( 'sha256', $attributed_body ) === get_post_meta( $attributed_id, '_datamachine_content_hash', true ) );
+
+	$attributed_repeat = DataMachine\Abilities\Content\UpsertPostAbility::execute(
+		array(
+			'post_type'              => 'wiki',
+			'post_id'                => $attributed_id,
+			'title'                  => 'Attributed Markdown',
+			'content'                => "# Attributed\n\nRaw markdown.",
+			'content_format'         => 'markdown',
+			'content_hash'           => hash( 'sha256', "# Attributed\n\nRaw markdown." ),
+			'source_url'             => 'https://example.com/attributed-source/',
+			'add_source_attribution' => true,
+		)
+	);
+	assert_content_ability( 'upsert-source-attribution-repeat-no-change', 'no_change' === ( $attributed_repeat['action'] ?? '' ) );
+	assert_content_ability( 'upsert-source-attribution-repeat-no-duplicate', 1 === substr_count( (string) get_post( $attributed_id )->post_content, '**Source:**' ) );
 
 	$future_source_upsert = DataMachine\Abilities\Content\UpsertPostAbility::execute(
 		array(
