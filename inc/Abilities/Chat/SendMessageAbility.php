@@ -183,6 +183,14 @@ class SendMessageAbility {
 			}
 		}
 
+		if ( empty( $model ) && 'chat' !== $mode ) {
+			$chat_config = PluginSettings::resolveModelForAgentMode( $agent_id > 0 ? $agent_id : null, 'chat' );
+			if ( empty( $provider ) ) {
+				$provider = $chat_config['provider'];
+			}
+			$model = $chat_config['model'];
+		}
+
 		if ( empty( $provider ) ) {
 			return new \WP_Error(
 				'provider_required',
