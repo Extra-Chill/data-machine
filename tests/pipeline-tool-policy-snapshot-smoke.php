@@ -87,8 +87,8 @@ class SnapshotPolicyToolManager extends ToolManager {
 			'alpha_tool'         => array( 'modes' => array( 'pipeline' ) ),
 			'beta_tool'          => array( 'modes' => array( 'pipeline' ) ),
 			'danger_tool'        => array( 'modes' => array( 'pipeline' ) ),
-			'agent_daily_memory' => array( 'modes' => array( 'chat', ToolPolicyResolver::MODE_PIPELINE_POLICY ) ),
-			'agent_memory'       => array( 'modes' => array( 'chat', ToolPolicyResolver::MODE_PIPELINE_POLICY ) ),
+			'agent_daily_memory' => array( 'modes' => array( 'chat', ToolPolicyResolver::MODE_PIPELINE ), 'requires_opt_in' => true ),
+			'agent_memory'       => array( 'modes' => array( 'chat', ToolPolicyResolver::MODE_PIPELINE ), 'requires_opt_in' => true ),
 			'chat_only'          => array( 'modes' => array( 'chat' ) ),
 		);
 	}
@@ -96,6 +96,10 @@ class SnapshotPolicyToolManager extends ToolManager {
 	public function is_tool_available( string $tool_id, ?string $context_id = null ): bool {
 		$this->availability_contexts[] = $context_id;
 		return null === $context_id;
+	}
+
+	public function is_globally_enabled( string $tool_id ): bool {
+		return true;
 	}
 
 	public function resolveHandlerTools( string $handler_slug, array $handler_config, array $engine_data, string $cache_scope = '' ): array {
@@ -152,7 +156,7 @@ $tools   = resolve_policy_tools_for_test(
 	$manager
 );
 assert_policy_equals( array( 'alpha_tool' ), array_keys( $tools ), 'allowlist keeps only enabled tool', $failures, $passes );
-assert_policy_equals( array( null, null, null ), $manager->availability_contexts, 'pipeline availability does not pass context IDs for default pipeline tools', $failures, $passes );
+assert_policy_equals( array(), $manager->availability_contexts, 'default pipeline tools avoid per-step availability context lookups', $failures, $passes );
 
 $manager = new SnapshotPolicyToolManager();
 $tools   = resolve_policy_tools_for_test(
@@ -165,7 +169,7 @@ $tools   = resolve_policy_tools_for_test(
 	$manager
 );
 assert_policy_equals( array( 'agent_daily_memory', 'agent_memory' ), array_keys( $tools ), 'allowlist can intentionally grant policy-controlled memory tools', $failures, $passes );
-assert_policy_equals( array( null, null, null, null, null ), $manager->availability_contexts, 'policy-controlled memory tools still use pipeline availability checks', $failures, $passes );
+assert_policy_equals( array(), $manager->availability_contexts, 'opt-in memory tools avoid per-step availability context lookups', $failures, $passes );
 
 echo "\n[2] ephemeral workflow disabled_tools deny from snapshot:\n";
 $ephemeral = WorkflowConfigFactory::buildEphemeralConfigs(
@@ -184,7 +188,7 @@ $pipeline_step_config = $ephemeral['pipeline_config']['ephemeral_pipeline_0'];
 $manager              = new SnapshotPolicyToolManager();
 $tools                = resolve_policy_tools_for_test( $flow_step_config, $pipeline_step_config, $manager );
 assert_policy_equals( array( 'alpha_tool', 'beta_tool' ), array_keys( $tools ), 'ephemeral disabled_tools removes denied tool without DB row and does not auto-grant daily memory', $failures, $passes );
-assert_policy_equals( array( null, null, null ), $manager->availability_contexts, 'ephemeral policy never re-reads by synthetic pipeline step ID', $failures, $passes );
+assert_policy_equals( array(), $manager->availability_contexts, 'ephemeral policy never re-reads by synthetic pipeline step ID', $failures, $passes );
 
 echo "\n[3] persistent workflow disabled_tools still apply from snapshot:\n";
 $workflow = array(
@@ -203,7 +207,7 @@ $flow_step_id         = array_key_first( $flow_config );
 $manager              = new SnapshotPolicyToolManager();
 $tools                = resolve_policy_tools_for_test( $flow_config[ $flow_step_id ], $pipeline_config[ $pipeline_step_id ], $manager );
 assert_policy_equals( array( 'alpha_tool', 'danger_tool' ), array_keys( $tools ), 'persistent disabled_tools removes denied tool', $failures, $passes );
-assert_policy_equals( array( null, null, null ), $manager->availability_contexts, 'persistent policy does not re-read persisted step config', $failures, $passes );
+assert_policy_equals( array(), $manager->availability_contexts, 'persistent policy does not re-read persisted step config', $failures, $passes );
 
 echo "\n[4] RequestInspector and AIStep share policy input helper:\n";
 $ai_step_source   = file_get_contents( __DIR__ . '/../inc/Core/Steps/AI/AIStep.php' ) ?: '';

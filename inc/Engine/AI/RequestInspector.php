@@ -106,7 +106,7 @@ class RequestInspector {
 		$tools    = $resolver->resolve(
 			array_merge(
 				array(
-					'mode'                 => ToolPolicyResolver::MODE_PIPELINE,
+					'modes'                => array( ToolPolicyResolver::MODE_PIPELINE ),
 					'agent_id'             => $agent_id,
 					'agent_slug'           => $agent_slug,
 					'previous_step_config' => $previous_step_config,
@@ -150,7 +150,7 @@ class RequestInspector {
 			$provider,
 			$model,
 			$tools,
-			ToolPolicyResolver::MODE_PIPELINE,
+			array( ToolPolicyResolver::MODE_PIPELINE ),
 			$payload
 		);
 		$transport_profile = RequestBuilder::wpAiClientTransportProfile(

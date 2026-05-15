@@ -66,14 +66,18 @@ function load_global_tool_for_pipeline_modes( string $relative_path, string $cla
 	new $class_name();
 }
 
-function resolve_tools_for_pipeline_modes( string $mode ): array {
+function resolve_tools_for_pipeline_modes( string $mode, array $allow_only = array() ): array {
 	$tools = apply_filters( 'datamachine_tools', array() );
 
 	return array_filter(
 		$tools,
-		function ( $tool ) use ( $mode ) {
-			return is_array( $tool ) && in_array( $mode, $tool['modes'] ?? array(), true );
+		function ( $tool, string $tool_name ) use ( $mode, $allow_only ) {
+			return is_array( $tool )
+				&& in_array( $mode, $tool['modes'] ?? array(), true )
+				&& ( empty( $tool['requires_opt_in'] ) || in_array( $tool_name, $allow_only, true ) );
 		}
+		,
+		ARRAY_FILTER_USE_BOTH
 	);
 }
 
@@ -107,7 +111,7 @@ foreach ( $chat_only as $tool => [ $path, $class_name ] ) {
 load_global_tool_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentDailyMemory.php', 'DataMachine\Engine\AI\Tools\Global\AgentDailyMemory' );
 load_global_tool_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentMemory.php', 'DataMachine\Engine\AI\Tools\Global\AgentMemory' );
 
-$chat_tools     = resolve_tools_for_pipeline_modes( 'chat' );
+$chat_tools     = resolve_tools_for_pipeline_modes( 'chat', array( 'agent_daily_memory', 'agent_memory' ) );
 $pipeline_tools = resolve_tools_for_pipeline_modes( 'pipeline' );
 assert_true_for_pipeline_modes(
 	isset( $chat_tools['agent_daily_memory'] ),
@@ -122,8 +126,8 @@ assert_true_for_pipeline_modes(
 	$passes
 );
 assert_true_for_pipeline_modes(
-	file_contains_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentDailyMemory.php', 'ToolPolicyResolver::MODE_PIPELINE_POLICY' ),
-	'agent_daily_memory declares policy-controlled pipeline availability',
+	file_contains_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentDailyMemory.php', "'requires_opt_in' => true" ),
+	'agent_daily_memory declares opt-in availability',
 	$failures,
 	$passes
 );
@@ -140,8 +144,8 @@ assert_true_for_pipeline_modes(
 	$passes
 );
 assert_true_for_pipeline_modes(
-	file_contains_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentMemory.php', 'ToolPolicyResolver::MODE_PIPELINE_POLICY' ),
-	'agent_memory declares policy-controlled pipeline availability',
+	file_contains_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentMemory.php', "'requires_opt_in' => true" ),
+	'agent_memory declares opt-in availability',
 	$failures,
 	$passes
 );

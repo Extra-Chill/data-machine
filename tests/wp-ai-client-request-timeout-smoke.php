@@ -253,7 +253,7 @@ $result           = RequestBuilder::build(
 	'openai',
 	'gpt-smoke',
 	array(),
-	'pipeline',
+	array( 'pipeline' ),
 	array( 'job_id' => 1695, 'flow_step_id' => 'ai-step-1' ),
 	$request_metadata
 );

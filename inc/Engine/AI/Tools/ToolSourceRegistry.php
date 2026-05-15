@@ -26,18 +26,18 @@ class ToolSourceRegistry {
 	}
 
 	/**
-	 * Gather tools from the sources configured for a mode.
+	 * Gather tools from the sources configured for active modes.
 	 *
-	 * @param string $mode Agent mode slug.
+	 * @param array $modes Agent mode slugs.
 	 * @param array  $args Full resolution arguments.
 	 * @return array Tools keyed by tool name.
 	 */
-	public function gather( string $mode, array $args ): array {
+	public function gather( array $modes, array $args ): array {
 		$tools   = array();
-		$sources = $this->getRegisteredSources( $mode, $args );
+		$sources = $this->getRegisteredSources( $modes, $args );
 
-		foreach ( $this->getSourcesForMode( $mode, $args ) as $source_slug ) {
-			$source_tools = $this->gatherFromSource( $source_slug, $mode, $args, $sources );
+		foreach ( $this->getSourcesForModes( $modes, $args ) as $source_slug ) {
+			$source_tools = $this->gatherFromSource( $source_slug, $modes, $args, $sources );
 
 			foreach ( $source_tools as $tool_name => $tool_config ) {
 				if ( isset( $tools[ $tool_name ] ) ) {
@@ -54,11 +54,11 @@ class ToolSourceRegistry {
 	/**
 	 * Return registered tool sources.
 	 *
-	 * @param string $mode Agent mode slug.
+	 * @param array $modes Agent mode slugs.
 	 * @param array  $args Full resolution arguments.
 	 * @return array<string, callable> Source callbacks keyed by source slug.
 	 */
-	private function getRegisteredSources( string $mode, array $args ): array {
+	private function getRegisteredSources( array $modes, array $args ): array {
 		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
 		$sources = apply_filters(
 			'agents_api_tool_sources',
@@ -66,7 +66,7 @@ class ToolSourceRegistry {
 				self::SOURCE_STATIC_REGISTRY   => new DataMachineToolRegistrySource( $this->tool_manager ),
 				self::SOURCE_ADJACENT_HANDLERS => new AdjacentHandlerToolSource(),
 			),
-			$mode,
+			$modes,
 			$args,
 			$this->tool_manager
 		);
@@ -75,19 +75,19 @@ class ToolSourceRegistry {
 	}
 
 	/**
-	 * Return source slugs for a mode.
+	 * Return source slugs for active modes.
 	 *
-	 * @param string $mode Agent mode slug.
+	 * @param array $modes Agent mode slugs.
 	 * @param array  $args Full resolution arguments.
 	 * @return array<int, string> Source slugs in precedence order.
 	 */
-	private function getSourcesForMode( string $mode, array $args ): array {
-		$sources = ToolPolicyResolver::MODE_PIPELINE === $mode
+	private function getSourcesForModes( array $modes, array $args ): array {
+		$sources = in_array( ToolPolicyResolver::MODE_PIPELINE, $modes, true )
 			? array( self::SOURCE_ADJACENT_HANDLERS, self::SOURCE_STATIC_REGISTRY )
 			: array( self::SOURCE_STATIC_REGISTRY );
 
 		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
-		$sources = apply_filters( 'agents_api_tool_sources_for_mode', $sources, $mode, $args );
+		$sources = apply_filters( 'agents_api_tool_sources_for_mode', $sources, $modes, $args );
 
 		if ( ! is_array( $sources ) ) {
 			return array();
@@ -105,18 +105,18 @@ class ToolSourceRegistry {
 	 * Gather tools from one source.
 	 *
 	 * @param string $source_slug Source slug.
-	 * @param string $mode        Agent mode slug.
+	 * @param array  $modes       Agent mode slugs.
 	 * @param array  $args        Full resolution arguments.
 	 * @param array  $sources     Registered source callbacks keyed by source slug.
 	 * @return array Tools keyed by tool name.
 	 */
-	private function gatherFromSource( string $source_slug, string $mode, array $args, array $sources ): array {
+	private function gatherFromSource( string $source_slug, array $modes, array $args, array $sources ): array {
 		$source = $sources[ $source_slug ] ?? null;
 		if ( ! is_callable( $source ) ) {
 			return array();
 		}
 
-		$tools = call_user_func( $source, $mode, $args, $this->tool_manager );
+		$tools = call_user_func( $source, $modes, $args, $this->tool_manager );
 
 		return is_array( $tools ) ? $tools : array();
 	}

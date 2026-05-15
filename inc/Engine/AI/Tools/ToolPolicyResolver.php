@@ -36,12 +36,6 @@ class ToolPolicyResolver {
 	public const MODE_CHAT     = 'chat';
 	public const MODE_SYSTEM   = 'system';
 
-	/**
-	 * Opt-in pipeline mode for tools that should never be exposed to pipeline
-	 * agents by default, but may be explicitly enabled by a flow/tool policy.
-	 */
-	public const MODE_PIPELINE_POLICY = 'pipeline_policy';
-
 	private ToolManager $tool_manager;
 	private ToolSourceRegistry $tool_source_registry;
 	private DataMachineAgentToolPolicyProvider $agent_policy_provider;
@@ -73,14 +67,14 @@ class ToolPolicyResolver {
 	}
 
 	/**
-	 * Resolve available tools for a given agent mode.
+	 * Resolve available tools for given agent modes.
 	 *
 	 * This is the single entry point. All tool assembly should go through here.
 	 *
 	 * @param array $args {
 	 *     Resolution arguments describing the request.
 	 *
-	 *     @type string      $mode                  Required. One of the MODE_* constants (or a custom mode slug).
+	 *     @type string[]    $modes                 Active agent mode slugs.
 	 *     @type int|null    $agent_id              Agent ID for per-agent tool policy filtering.
 	 *     @type array|null  $previous_step_config  Pipeline only: previous step config.
 	 *     @type array|null  $next_step_config      Pipeline only: next step config.
@@ -95,23 +89,25 @@ class ToolPolicyResolver {
 	 * @return array Resolved tools array keyed by tool name.
 	 */
 	public function resolve( array $args ): array {
-		$mode     = $args['mode'] ?? self::MODE_PIPELINE;
+		$modes    = self::normalizeModes( $args['modes'] ?? ( array_key_exists( 'mode', $args ) ? array( $args['mode'] ) : array( self::MODE_PIPELINE ) ) );
 		$agent_id = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
 
-		$is_interactive = self::MODE_CHAT === $mode || ! empty( $args['interactive'] );
+		$is_interactive = in_array( self::MODE_CHAT, $modes, true ) || ! empty( $args['interactive'] );
 
 		if ( $is_interactive && ! $this->tool_access_policy->passesChatGate( $args ) ) {
 			return array();
 		}
 
 		// 1. Gather tools from Data Machine-owned sources.
-		$tools = $this->gatherByMode( $mode, $args );
+		$args['modes'] = $modes;
+		$tools         = $this->gatherByModes( $modes, $args );
 
 		// 2. Delegate generic mode/allow/deny/category policy resolution to Agents API.
 		$policy_context = array_merge(
 			$args,
 			array(
-				'mode'              => $mode,
+				'mode'              => '',
+				'modes'             => $modes,
 				'datamachine_tools' => $tools,
 			)
 		);
@@ -132,7 +128,8 @@ class ToolPolicyResolver {
 
 		// 7. Allow external filtering of resolved tools.
 		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
-		$tools = apply_filters( 'datamachine_resolved_tools', $tools, $mode, $args );
+		$filter_mode = 1 === count( $modes ) ? $modes[0] : $modes;
+		$tools       = apply_filters( 'datamachine_resolved_tools', $tools, $filter_mode, $args );
 
 		return $tools;
 	}
@@ -140,12 +137,12 @@ class ToolPolicyResolver {
 	/**
 	 * Gather tools by mode preset.
 	 *
-	 * @param string $mode Agent mode slug.
+	 * @param array $modes Agent mode slugs.
 	 * @param array  $args Full resolution arguments.
 	 * @return array Tools array.
 	 */
-	private function gatherByMode( string $mode, array $args ): array {
-		return $this->tool_source_registry->gather( $mode, $args );
+	private function gatherByModes( array $modes, array $args ): array {
+		return $this->tool_source_registry->gather( $modes, $args );
 	}
 
 	/**
@@ -218,20 +215,44 @@ class ToolPolicyResolver {
 	}
 
 	/**
-	 * Whether a tool is available to a pipeline only by explicit policy opt-in.
+	 * Normalize active mode input to sanitized slugs.
 	 *
-	 * Policy-gated pipeline tools stay out of the default pipeline tool pool, but
-	 * can be granted by a flow's `enabled_tools` allowlist or equivalent tool
-	 * policy. This is intended for powerful-but-automatable tools such as durable
-	 * agent memory writes.
+	 * @param mixed $modes Raw mode input.
+	 * @return array<int,string>
+	 */
+	public static function normalizeModes( mixed $modes ): array {
+		if ( is_string( $modes ) ) {
+			$modes = array( $modes );
+		}
+		if ( ! is_array( $modes ) ) {
+			$modes = array();
+		}
+
+		$normalized = array();
+		foreach ( $modes as $mode ) {
+			if ( ! is_scalar( $mode ) ) {
+				continue;
+			}
+			$mode = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $mode ) : strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $mode ) ?? '' );
+			if ( '' !== $mode ) {
+				$normalized[] = $mode;
+			}
+		}
+
+		$normalized = array_values( array_unique( $normalized ) );
+		return ! empty( $normalized ) ? $normalized : array( self::MODE_PIPELINE );
+	}
+
+	/**
+	 * Whether an explicitly opt-in tool is available to this run.
 	 *
 	 * @param array  $tool_config Tool definition.
 	 * @param string $tool_name   Tool identifier.
 	 * @param array  $args        Resolver args, including optional allow_only.
-	 * @return bool True when the tool should be included for this pipeline pass.
+	 * @return bool True when the tool should be included.
 	 */
-	public static function isPipelinePolicyToolAllowed( array $tool_config, string $tool_name, array $args ): bool {
-		return in_array( self::MODE_PIPELINE_POLICY, $tool_config['modes'] ?? array(), true )
-			&& in_array( $tool_name, $args['allow_only'] ?? array(), true );
+	public static function isOptInToolAllowed( array $tool_config, string $tool_name, array $args ): bool {
+		return empty( $tool_config['requires_opt_in'] )
+			|| in_array( $tool_name, $args['allow_only'] ?? array(), true );
 	}
 }

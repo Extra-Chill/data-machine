@@ -20,13 +20,13 @@ final class AdjacentHandlerToolSource {
 	/**
 	 * Gather handler tools from adjacent pipeline steps.
 	 *
-	 * @param string      $mode         Agent mode slug.
+	 * @param array       $modes        Agent mode slugs.
 	 * @param array       $args         Full resolution arguments.
 	 * @param ToolManager $tool_manager Tool registry/handler resolver.
 	 * @return array Tools keyed by tool name.
 	 */
-	public function __invoke( string $mode, array $args, ToolManager $tool_manager ): array {
-		if ( ToolPolicyResolver::MODE_PIPELINE !== $mode ) {
+	public function __invoke( array $modes, array $args, ToolManager $tool_manager ): array {
+		if ( ! in_array( ToolPolicyResolver::MODE_PIPELINE, $modes, true ) ) {
 			return array();
 		}
 

@@ -33,7 +33,7 @@ class ConfigurePipelineStep extends BaseTool {
 		return array(
 			'class'       => self::class,
 			'method'      => 'handle_tool_call',
-			'description' => 'Configure pipeline-level AI step settings: system prompt, execution mode, and tool policy. Model/provider are managed via the mode_models site setting, not per-pipeline. For flow-level settings (handler, handler_config, user_message), use configure_flow_steps instead.',
+			'description' => 'Configure pipeline-level AI step settings: system prompt, execution modes, and tool policy. Model/provider are managed via the mode_models site setting, not per-pipeline. For flow-level settings (handler, handler_config, user_message), use configure_flow_steps instead.',
 			'parameters'  => array(
 				'type'       => 'object',
 				'properties' => array(
@@ -45,9 +45,10 @@ class ConfigurePipelineStep extends BaseTool {
 						'type'        => 'string',
 						'description' => 'System prompt for the AI step - defines the AI persona and instructions',
 					),
-					'agent_mode'       => array(
-						'type'        => 'string',
-						'description' => 'Agent execution mode for this AI step. Defaults to pipeline.',
+					'agent_modes'      => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => 'Agent execution modes for this AI step. Defaults to pipeline.',
 					),
 					'disabled_tools'   => array(
 						'type'        => 'array',

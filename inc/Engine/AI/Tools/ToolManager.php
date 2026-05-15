@@ -127,9 +127,12 @@ class ToolManager {
 
 		// Handle unified registry wrapper: ['_callable' becomes callable, 'modes' becomes [...]]
 		$modes = array();
+		$meta  = array();
 		if ( is_array( $definition ) && isset( $definition['_callable'] ) ) {
 			$modes      = $definition['modes'] ?? array();
+			$meta       = $definition;
 			$definition = $definition['_callable'];
+			unset( $meta['_callable'] );
 		}
 
 		// Resolve callable or use array directly
@@ -145,6 +148,11 @@ class ToolManager {
 		// Merge modes into resolved definition (registry modes take precedence)
 		if ( ! empty( $modes ) ) {
 			$resolved['modes'] = $modes;
+		}
+		foreach ( array( 'ability', 'abilities', 'access_level', 'requires_opt_in' ) as $key ) {
+			if ( isset( $meta[ $key ] ) ) {
+				$resolved[ $key ] = $meta[ $key ];
+			}
 		}
 
 		// Cache the resolved definition
@@ -611,7 +619,7 @@ class ToolManager {
 		// If mode specified, use ToolPolicyResolver to filter appropriately.
 		if ( null !== $mode ) {
 			$resolver = new ToolPolicyResolver( $this );
-			$tools    = $resolver->resolve( array( 'mode' => $mode ) );
+			$tools    = $resolver->resolve( array( 'modes' => array( $mode ) ) );
 		} else {
 			$tools = $this->get_all_tools();
 		}

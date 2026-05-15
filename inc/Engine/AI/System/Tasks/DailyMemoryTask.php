@@ -161,7 +161,7 @@ class DailyMemoryTask extends SystemTask {
 			$provider,
 			$model,
 			array(),
-			'system',
+			array( 'system' ),
 			$ai_payload
 		);
 

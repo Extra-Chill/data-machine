@@ -27,8 +27,8 @@ abstract class BaseTool {
 	 *
 	 * All tools register via the single `datamachine_tools` filter. Each tool
 	 * must declare its modes — the agent modes where it's available (e.g.
-	 * 'chat', 'pipeline'). Tools that should be available to pipeline runs only
-	 * when explicitly allowlisted may declare 'pipeline_policy'.
+	 * 'chat', 'pipeline'). Tools that should be available only when explicitly
+	 * allowlisted may declare `requires_opt_in` in metadata.
 	 *
 	 * Tools should also declare which ability they wrap via the `ability` key
 	 * (or `abilities` for composed tools). The ToolPolicyResolver uses this to
@@ -60,6 +60,7 @@ abstract class BaseTool {
 	 *     @type string[] $abilities    Multiple ability slugs for composed tools. ALL must pass permission check.
 	 *     @type string   $access_level Fallback for tools without a linked ability.
 	 *                                  One of: 'public', 'authenticated', 'author', 'editor', 'admin'. Default: 'admin'.
+	 *     @type bool     $requires_opt_in Only expose the tool when `allow_only` includes the tool name.
 	 * }
 	 */
 	protected function registerTool( string $toolName, array|callable $toolDefinition, array $modes = array(), array $meta = array() ): void {
@@ -69,13 +70,15 @@ abstract class BaseTool {
 				if ( is_callable( $toolDefinition ) ) {
 					// Wrap callable with modes for pre-resolution filtering.
 					$tools[ $toolName ] = array(
-						'_callable' => $toolDefinition,
-						'modes'     => $modes,
+						'_callable'       => $toolDefinition,
+						'modes'           => $modes,
+						'requires_opt_in' => ! empty( $meta['requires_opt_in'] ),
 					);
 				} else {
 					// Array definition — merge modes directly.
-					$toolDefinition['modes'] = $modes;
-					$tools[ $toolName ]      = $toolDefinition;
+					$toolDefinition['modes']           = $modes;
+					$toolDefinition['requires_opt_in'] = ! empty( $meta['requires_opt_in'] );
+					$tools[ $toolName ]                = $toolDefinition;
 				}
 
 				// Merge permission metadata into the tool entry.
@@ -87,6 +90,9 @@ abstract class BaseTool {
 				}
 				if ( ! empty( $meta['access_level'] ) ) {
 					$tools[ $toolName ]['access_level'] = $meta['access_level'];
+				}
+				if ( ! empty( $meta['requires_opt_in'] ) ) {
+					$tools[ $toolName ]['requires_opt_in'] = true;
 				}
 
 				return $tools;

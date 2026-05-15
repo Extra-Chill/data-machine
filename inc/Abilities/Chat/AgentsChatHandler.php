@@ -11,6 +11,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Api\Chat\ChatOrchestrator;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use WP_Error;
 
 defined( 'ABSPATH' ) || exit;
@@ -89,12 +90,13 @@ class AgentsChatHandler {
 		}
 
 		$client_context = is_array( $input['client_context'] ?? null ) ? $input['client_context'] : array();
-		$mode           = $this->resolveMode( $input, $client_context );
-		$agent_config   = PluginSettings::resolveModelForAgentMode( 0 === $agent_id ? null : $agent_id, $mode );
+		$modes          = $this->resolveModes( $input, $client_context );
+		$mode           = implode( ',', $modes );
+		$agent_config   = $this->resolveModelForModes( 0 === $agent_id ? null : $agent_id, $modes );
 		$provider       = $agent_config['provider'];
 		$model          = $agent_config['model'];
 
-		if ( '' === $model && 'chat' !== $mode ) {
+		if ( '' === $model && ! in_array( 'chat', $modes, true ) ) {
 			$chat_config = PluginSettings::resolveModelForAgentMode( 0 === $agent_id ? null : $agent_id, 'chat' );
 			$provider    = '' === $provider ? $chat_config['provider'] : $provider;
 			$model       = $chat_config['model'];
@@ -115,7 +117,7 @@ class AgentsChatHandler {
 			$user_id,
 			array(
 				'session_id'     => $input['session_id'] ?? null,
-				'mode'           => $mode,
+				'modes'          => $modes,
 				'agent_id'       => $agent_id,
 				'attachments'    => $input['attachments'] ?? array(),
 				'client_context' => $client_context,
@@ -188,17 +190,41 @@ class AgentsChatHandler {
 	}
 
 	/**
-	 * Resolve the Data Machine execution mode from canonical Agents API input.
+	 * Resolve the Data Machine execution modes from canonical Agents API input.
 	 *
 	 * @param array $input Canonical agents/chat input.
 	 * @param array $client_context Transport-level client context.
-	 * @return string Sanitized mode slug.
+	 * @return array<int,string> Sanitized mode slugs.
 	 */
-	private function resolveMode( array $input, array $client_context ): string {
-		$mode = $input['mode'] ?? $client_context['agent_mode'] ?? $client_context['mode'] ?? 'chat';
-		$mode = sanitize_key( (string) $mode );
+	private function resolveModes( array $input, array $client_context ): array {
+		$modes = $input['modes'] ?? $client_context['agent_modes'] ?? null;
+		if ( ! is_array( $modes ) || empty( $modes ) ) {
+			$modes = array( $input['mode'] ?? $client_context['mode'] ?? 'chat' );
+		}
 
-		return '' !== $mode ? $mode : 'chat';
+		return ToolPolicyResolver::normalizeModes( $modes );
+	}
+
+	/**
+	 * Resolve a model for the first configured active mode.
+	 *
+	 * @param int|null $agent_id Agent ID.
+	 * @param array    $modes    Active modes.
+	 * @return array{provider:string,model:string}
+	 */
+	private function resolveModelForModes( ?int $agent_id, array $modes ): array {
+		$fallback = array( 'provider' => '', 'model' => '' );
+		foreach ( $modes as $mode ) {
+			$config = PluginSettings::resolveModelForAgentMode( $agent_id, $mode );
+			if ( '' !== $config['provider'] && '' !== $config['model'] ) {
+				return $config;
+			}
+			if ( '' === $fallback['provider'] && '' === $fallback['model'] ) {
+				$fallback = $config;
+			}
+		}
+
+		return $fallback;
 	}
 
 	/**

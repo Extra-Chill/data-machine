@@ -218,7 +218,7 @@ $result = datamachine_run_conversation(
 	loop_event_sink_tools(),
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array(
 		'event_sink'   => $collector,
 		'job_id'       => 1479,
@@ -297,7 +297,7 @@ $action_result = datamachine_run_conversation(
 	loop_event_sink_tools(),
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array( 'job_id' => 1774 ),
 	3
 );
@@ -323,7 +323,7 @@ $failure_result = datamachine_run_conversation(
 	array(),
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array( 'event_sink' => $failure_sink ),
 	1
 );
@@ -361,7 +361,7 @@ $throwing_result = datamachine_run_conversation(
 	array(),
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array( 'event_sink' => new LoopEventSinkSmokeThrowingSink() ),
 	1
 );

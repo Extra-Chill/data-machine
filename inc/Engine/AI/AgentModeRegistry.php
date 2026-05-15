@@ -3,8 +3,8 @@
  * Agent Mode Registry
  *
  * Central registry for AI execution modes (chat, pipeline, system, editor, etc.).
- * Each mode has an ID, label, description, and priority for sort order.
- * Core modes register through the same API that extensions use.
+ * Each mode has an ID, label, description, and priority for sort order. Runtime
+ * requests can activate multiple registered modes additively.
  *
  * Extension point: the `datamachine_agent_modes` action fires once per request
  * when the registry is first consumed, allowing extensions to register

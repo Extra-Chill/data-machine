@@ -95,7 +95,7 @@ class AltTextTask extends SystemTask {
 			$provider,
 			$model,
 			array(),
-			'system',
+			array( 'system' ),
 			$ai_payload
 		);
 

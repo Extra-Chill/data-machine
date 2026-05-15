@@ -37,7 +37,7 @@ defined( 'ABSPATH' ) || exit;
  * @param array  $tools       Available tools keyed by tool name.
  * @param string $provider    AI provider identifier.
  * @param string $model       AI model identifier.
- * @param string $mode        Execution mode ('pipeline', 'chat', ...).
+	 * @param array  $modes       Execution modes ('pipeline', 'chat', ...).
  * @param array  $payload     Step payload / loop context.
  * @param int    $max_turns   Maximum conversation turns.
  * @param bool   $single_turn Execute exactly one turn and return.
@@ -48,17 +48,19 @@ function datamachine_run_conversation(
 	array $tools,
 	string $provider,
 	string $model,
-	string $mode,
+	array $modes,
 	array $payload = array(),
 	int $max_turns = PluginSettings::DEFAULT_MAX_TURNS,
 	bool $single_turn = false
 ): array {
 	$messages = WP_Agent_Message::normalize_many( $messages );
+	$modes    = Tools\ToolPolicyResolver::normalizeModes( $modes );
+	$mode     = implode( ',', $modes );
 
 	// Resolve DM runtime collaborators from the payload.
 	$event_sink           = datamachine_resolve_event_sink( $payload );
 	$assertions           = datamachine_resolve_completion_assertions( $payload );
-	$completion_policy    = datamachine_resolve_completion_policy( $mode, $payload, $assertions );
+	$completion_policy    = datamachine_resolve_completion_policy( $modes, $payload, $assertions );
 	$tool_runtime_rules   = datamachine_resolve_tool_runtime_rules( $payload );
 	$transcript_persister = datamachine_resolve_transcript_persister( $payload );
 	$transcript_lock      = $payload['transcript_lock'] ?? $payload['transcript_lock_store'] ?? null;
@@ -83,6 +85,7 @@ function datamachine_run_conversation(
 	$base_log_context = array_filter(
 		array(
 			'mode'         => $mode,
+			'modes'        => $modes,
 			'job_id'       => $loop_payload['job_id'] ?? null,
 			'flow_step_id' => $loop_payload['flow_step_id'] ?? null,
 			'agent_slug'   => $loop_payload['agent_slug'] ?? null,
@@ -153,7 +156,7 @@ function datamachine_run_conversation(
 				$loop_payload,
 				$provider,
 				$model,
-				$mode
+				$modes
 			),
 		);
 	}
@@ -172,6 +175,7 @@ function datamachine_run_conversation(
 		$provider,
 		$model,
 		$mode,
+		$modes,
 		$loop_payload,
 		$event_sink,
 		$base_log_context,
@@ -205,12 +209,12 @@ function datamachine_run_conversation(
 			array(
 				'max_turns'             => $max_turns,
 				'budgets'               => array( $turn_budget ),
-				'context'               => array_merge( $loop_payload, array( 'mode' => $mode ) ),
+				'context'               => array_merge( $loop_payload, array( 'mode' => $mode, 'modes' => $modes ) ),
 				'request'               => new \AgentsAPI\AI\WP_Agent_Conversation_Request(
 					$messages,
 					array(),
 					null,
-					array_merge( $loop_payload, array( 'mode' => $mode ) ),
+					array_merge( $loop_payload, array( 'mode' => $mode, 'modes' => $modes ) ),
 					array(
 						'provider'  => $provider,
 						'model'     => $model,
@@ -245,7 +249,7 @@ function datamachine_run_conversation(
 			'request_metadata'       => $last_request_metadata,
 			'status'                 => 'error',
 		);
-		$error_result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $error_result, $loop_payload, $provider, $model, $mode );
+		$error_result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $error_result, $loop_payload, $provider, $model, $modes );
 		return $error_result;
 	}
 
@@ -263,7 +267,7 @@ function datamachine_run_conversation(
 			'usage'                  => array(),
 			'error'                  => $e->getMessage(),
 		);
-		$error_result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $error_result, $loop_payload, $provider, $model, $mode );
+		$error_result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $error_result, $loop_payload, $provider, $model, $modes );
 		return $error_result;
 	}
 
@@ -301,7 +305,7 @@ function datamachine_run_conversation(
 		);
 	}
 
-	$result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $result, $loop_payload, $provider, $model, $mode );
+	$result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $result, $loop_payload, $provider, $model, $modes );
 
 	return $result;
 }
@@ -322,7 +326,8 @@ function datamachine_run_conversation(
  * @param array                                     $tools              Available tools.
  * @param string                                    $provider           AI provider.
  * @param string                                    $model              AI model.
- * @param string                                    $mode               Execution mode.
+	 * @param string                                    $mode               Comma-separated execution mode label.
+	 * @param array                                     $modes              Execution mode slugs.
  * @param array                                     $loop_payload       Cleaned payload.
  * @param LoopEventSinkInterface                    $event_sink         DM event sink.
  * @param array                                     $base_log_context   Base log context.
@@ -337,6 +342,7 @@ function datamachine_build_turn_runner(
 	string $provider,
 	string $model,
 	string $mode,
+	array $modes,
 	array $loop_payload,
 	LoopEventSinkInterface $event_sink,
 	array $base_log_context,
@@ -351,6 +357,7 @@ function datamachine_build_turn_runner(
 		$provider,
 		$model,
 		$mode,
+		$modes,
 		$loop_payload,
 		$event_sink,
 		$base_log_context,
@@ -373,7 +380,7 @@ function datamachine_build_turn_runner(
 			$provider,
 			$model,
 			$tools,
-			$mode,
+			$modes,
 			$loop_payload,
 			$request_metadata
 		);
@@ -931,11 +938,11 @@ function datamachine_resolve_event_sink( array $payload ): LoopEventSinkInterfac
 /**
  * Resolve the runtime completion policy from mode and payload.
  *
- * @param string $mode    Execution mode.
+	 * @param array  $modes   Execution modes.
  * @param array  $payload Loop payload.
  * @return WP_Agent_Conversation_Completion_Policy
  */
-function datamachine_resolve_completion_policy( string $mode, array $payload, ?DataMachineCompletionAssertions $assertions = null ): WP_Agent_Conversation_Completion_Policy {
+function datamachine_resolve_completion_policy( array $modes, array $payload, ?DataMachineCompletionAssertions $assertions = null ): WP_Agent_Conversation_Completion_Policy {
 	$policy = $payload['completion_policy'] ?? null;
 	if ( $policy instanceof WP_Agent_Conversation_Completion_Policy ) {
 		return $policy;
@@ -946,7 +953,7 @@ function datamachine_resolve_completion_policy( string $mode, array $payload, ?D
 	$configured_handlers = $payload['configured_handler_slugs'] ?? array();
 	$configured_handlers = is_array( $configured_handlers ) ? array_values( $configured_handlers ) : array();
 
-	if ( ! empty( $configured_handlers ) || 'pipeline' === $mode ) {
+	if ( ! empty( $configured_handlers ) || in_array( 'pipeline', $modes, true ) ) {
 		return new DataMachineHandlerCompletionPolicy( $configured_handlers, $assertions );
 	}
 

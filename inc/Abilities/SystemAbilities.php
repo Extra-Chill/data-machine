@@ -865,7 +865,7 @@ class SystemAbilities {
 				$provider,
 				$model,
 				array(), // No tools for title generation
-				'system', // Agent type
+				array( 'system' ), // Agent modes
 				array() // No payload needed
 			);
 

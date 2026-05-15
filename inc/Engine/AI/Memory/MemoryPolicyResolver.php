@@ -51,7 +51,7 @@ class MemoryPolicyResolver {
 	 * @param array $args {
 	 *     Resolution arguments describing the request.
 	 *
-	 *     @type string   $mode       Required. Agent mode slug (e.g. 'chat', 'pipeline').
+	 *     @type string[] $modes      Required. Agent mode slugs (e.g. 'chat', 'pipeline').
 	 *     @type int|null $agent_id   Optional agent ID for per-agent policy filtering.
 	 *     @type array    $deny       Filenames to explicitly deny (highest precedence).
 	 *     @type array    $allow_only Mode-level allowlist narrowing.
@@ -59,12 +59,12 @@ class MemoryPolicyResolver {
 	 * @return array<string, array> Filename => metadata map, sorted by priority ascending.
 	 */
 	public function resolveRegistered( array $args ): array {
-		$mode     = $args['mode'] ?? '';
+		$modes    = self::normalizeModes( $args['modes'] ?? ( array_key_exists( 'mode', $args ) ? array( $args['mode'] ) : array() ) );
 		$agent_id = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
 
 		// 1. Start with registry output filtered by mode (already priority-sorted).
-		$files = ! empty( $mode )
-			? MemoryFileRegistry::get_for_mode( $mode )
+		$files = ! empty( $modes )
+			? MemoryFileRegistry::get_for_modes( $modes )
 			: MemoryFileRegistry::get_all();
 
 		// 2. Apply per-agent policy.
@@ -86,7 +86,8 @@ class MemoryPolicyResolver {
 		}
 
 		// 5. Allow external filtering of the resolved registered set.
-		$files = apply_filters( 'datamachine_resolved_memory_files', $files, $mode, $args );
+		$filter_mode = 1 === count( $modes ) ? $modes[0] : $modes;
+		$files       = apply_filters( 'datamachine_resolved_memory_files', $files, $filter_mode, $args );
 
 		return $files;
 	}
@@ -310,5 +311,28 @@ class MemoryPolicyResolver {
 			self::MODE_CHAT     => 'Admin chat session',
 			self::MODE_SYSTEM   => 'System task execution',
 		);
+	}
+
+	/** @return array<int,string> */
+	private static function normalizeModes( mixed $modes ): array {
+		if ( is_string( $modes ) ) {
+			$modes = array( $modes );
+		}
+		if ( ! is_array( $modes ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $modes as $mode ) {
+			if ( ! is_scalar( $mode ) ) {
+				continue;
+			}
+			$mode = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $mode ) : strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $mode ) ?? '' );
+			if ( '' !== $mode ) {
+				$normalized[] = $mode;
+			}
+		}
+
+		return array_values( array_unique( $normalized ) );
 	}
 }

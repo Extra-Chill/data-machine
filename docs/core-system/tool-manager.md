@@ -135,9 +135,8 @@ Tool definitions declare the request modes that may see them:
 | `pipeline` | `ToolPolicyResolver::MODE_PIPELINE` | Automated AI pipeline steps. Includes adjacent handler tools plus static registry tools explicitly marked for pipeline. |
 | `chat` | `ToolPolicyResolver::MODE_CHAT` | User-present chat sessions. Runs the chat access gate and ability permission checks. |
 | `system` | `ToolPolicyResolver::MODE_SYSTEM` | Background/system jobs with a small explicit tool set. |
-| `pipeline_policy` | `ToolPolicyResolver::MODE_PIPELINE_POLICY` | Opt-in marker for tools hidden from pipeline by default but grantable through pipeline tool policy. |
 
-`pipeline_policy` does not expose a tool by itself. A pipeline request must also include the tool in `allow_only`, usually from `enabled_tools` in the flow-step snapshot.
+Runtime requests may activate multiple modes at once, for example `['pipeline', 'world']`. A tool is eligible when its declared `modes` intersects with any active mode. Powerful tools can add `requires_opt_in => true`; those tools must also appear in `allow_only`, usually from `enabled_tools` in the flow-step snapshot.
 
 ## Availability Checks
 
@@ -172,7 +171,7 @@ Pipeline AI steps build resolver policy args from the workflow snapshot through 
 
 | Config key | Resolver arg | Effect |
 |---|---|---|
-| `enabled_tools` on the flow step | `allow_only` | Narrows optional/static tools to the listed names and grants matching `pipeline_policy` tools. |
+| `enabled_tools` on the flow step | `allow_only` | Narrows optional/static tools to the listed names and grants matching `requires_opt_in` tools. |
 | `disabled_tools` on the pipeline step | `deny` | Removes listed tools. |
 | `disabled_tools` on the flow step | `deny` | Removes listed tools. |
 

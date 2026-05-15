@@ -126,7 +126,7 @@ $result = datamachine_run_conversation(
 	$tools,
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array(
 		'job_id'       => 1569,
 		'flow_step_id' => 'flow-step-smoke',
@@ -166,7 +166,7 @@ $error_result = datamachine_run_conversation(
 	$tools,
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array(),
 	1
 );

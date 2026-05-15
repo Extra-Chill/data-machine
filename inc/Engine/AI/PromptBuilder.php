@@ -92,13 +92,13 @@ class PromptBuilder {
 	/**
 	 * Build the final AI request with directives applied
 	 *
-	 * @param string $mode     Agent mode ('pipeline', 'chat', etc.)
+	 * @param array  $modes    Agent modes ('pipeline', 'chat', etc.)
 	 * @param string $provider AI provider name
 	 * @param array  $payload  Request payload
 	 * @return array Request array with messages, tools, and directive metadata
 	 */
-	public function build( string $mode, string $provider, array $payload = array() ): array {
-		$detailed = $this->buildDetailed( $mode, $provider, $payload );
+	public function build( array $modes, string $provider, array $payload = array() ): array {
+		$detailed = $this->buildDetailed( $modes, $provider, $payload );
 
 		return array(
 			'messages'           => $detailed['messages'],
@@ -111,12 +111,13 @@ class PromptBuilder {
 	/**
 	 * Build the final AI request and include directive-level inspection metadata.
 	 *
-	 * @param string $mode     Agent mode ('pipeline', 'chat', etc.).
+	 * @param array  $modes    Agent modes ('pipeline', 'chat', etc.).
 	 * @param string $provider AI provider name.
 	 * @param array  $payload  Request payload.
 	 * @return array Request array with messages, tools, applied_directives, directive_metadata, and directive_breakdown.
 	 */
-	public function buildDetailed( string $mode, string $provider, array $payload = array() ): array {
+	public function buildDetailed( array $modes, string $provider, array $payload = array() ): array {
+		$modes = self::normalizeModes( $modes );
 		usort(
 			$this->directives,
 			function ( $a, $b ) {
@@ -124,10 +125,8 @@ class PromptBuilder {
 			}
 		);
 
-		// Ensure directives can access the current agent mode.
-		if ( ! isset( $payload['agent_mode'] ) ) {
-			$payload['agent_mode'] = $mode;
-		}
+		// Ensure directives can access the current agent modes.
+		$payload['agent_modes'] = self::normalizeModes( $payload['agent_modes'] ?? $modes );
 
 		$conversation_messages = $this->messages;
 		$directive_outputs     = array();
@@ -140,10 +139,10 @@ class PromptBuilder {
 
 		foreach ( $this->directives as $directiveConfig ) {
 			$directive = $directiveConfig['directive'];
-			$modes     = $directiveConfig['modes'];
+			$directive_modes = $directiveConfig['modes'];
 			$priority  = (int) ( $directiveConfig['priority'] ?? 10 );
 
-			if ( ! in_array( 'all', $modes, true ) && ! in_array( $mode, $modes, true ) ) {
+			if ( ! in_array( 'all', $directive_modes, true ) && empty( array_intersect( $payload['agent_modes'], $directive_modes ) ) ) {
 				continue;
 			}
 
@@ -301,5 +300,28 @@ class PromptBuilder {
 			}
 		}
 		return $total;
+	}
+
+	/** @return array<int,string> */
+	private static function normalizeModes( mixed $modes ): array {
+		if ( is_string( $modes ) ) {
+			$modes = array( $modes );
+		}
+		if ( ! is_array( $modes ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $modes as $mode ) {
+			if ( ! is_scalar( $mode ) ) {
+				continue;
+			}
+			$mode = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $mode ) : strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $mode ) ?? '' );
+			if ( '' !== $mode ) {
+				$normalized[] = $mode;
+			}
+		}
+
+		return array_values( array_unique( $normalized ) );
 	}
 }

@@ -246,7 +246,7 @@ $natural_result = datamachine_run_conversation(
 	array(),
 	'openai',
 	'gpt-smoke',
-	'chat',
+	array( 'chat' ),
 	array(),
 	5
 );
@@ -276,7 +276,7 @@ $satisfied_result = datamachine_run_conversation(
 	array(),
 	'openai',
 	'gpt-smoke',
-	'chat',
+	array( 'chat' ),
 	array(
 		'completion_assertions' => array(
 			'required_engine_data_keys' => array( 'final_url' ),
@@ -353,7 +353,7 @@ $nudge_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	'chat',
+	array( 'chat' ),
 	array(
 		'event_sink'            => $nudge_event_sink,
 		'transcript_persister'  => $nudge_transcript,
@@ -423,7 +423,7 @@ $minimum_count_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	'chat',
+	array( 'chat' ),
 	array(
 		'completion_assertions' => array(
 			'minimum_successful_tool_counts' => array( 'runtime_policy_tool' => 2 ),
@@ -505,7 +505,7 @@ $duplicate_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array(
 		'transcript_persister'  => $duplicate_transcript,
 		'completion_assertions' => array(
@@ -567,7 +567,7 @@ $repeatable_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array(),
 	4
 );
@@ -635,7 +635,7 @@ $inspection_nudge_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array(
 		'transcript_persister'  => $inspection_nudge_transcript,
 		'completion_assertions' => array(
@@ -704,7 +704,7 @@ $runtime_rule_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array(
 		'transcript_persister'  => $runtime_rule_transcript,
 		'completion_assertions' => array(
@@ -796,7 +796,7 @@ $pr_prerequisite_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array(
 		'completion_assertions' => array(
 			'required_tool_names' => array( 'create_github_pull_request', 'agent_daily_memory' ),
@@ -882,7 +882,7 @@ $satisfied_runtime_rule_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array(
 		'completion_assertions' => array(
 			'required_tool_names' => array( 'workspace_git_status' ),
@@ -1214,7 +1214,7 @@ $daily_memory_unavailable_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array(
 		'event_sink'            => $daily_memory_unavailable_sink,
 		'completion_assertions' => array(
@@ -1299,7 +1299,7 @@ $daily_memory_success_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	'pipeline',
+	array( 'pipeline' ),
 	array(
 		'completion_assertions' => array(
 			'required_tool_names' => array( 'agent_daily_memory' ),
@@ -1354,7 +1354,7 @@ $result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	'chat',
+	array( 'chat' ),
 	array(
 		'completion_policy'    => $completion_policy,
 		'transcript_persister' => $transcript_policy,

@@ -67,7 +67,8 @@ class ChatOrchestrator {
 		$request_id           = $options['request_id'] ?? null;
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 		$agent_slug           = (string) ( $options['agent_slug'] ?? '' );
-		$mode                 = ! empty( $options['mode'] ) ? sanitize_key( (string) $options['mode'] ) : ToolPolicyResolver::MODE_CHAT;
+		$modes                = ToolPolicyResolver::normalizeModes( ! empty( $options['modes'] ) ? $options['modes'] : array( $options['mode'] ?? ToolPolicyResolver::MODE_CHAT ) );
+		$mode                 = implode( ',', $modes );
 
 		$chat_db                     = ConversationStoreFactory::get();
 		$session_metadata            = array();
@@ -515,7 +516,7 @@ class ChatOrchestrator {
 			$provider,
 			$model,
 			array(
-				'mode'    => ToolPolicyResolver::MODE_CHAT,
+				'modes'   => array( ToolPolicyResolver::MODE_CHAT ),
 				'user_id' => $user_id,
 			)
 		);
@@ -714,7 +715,7 @@ class ChatOrchestrator {
 			$resolver       = new ToolPolicyResolver();
 			$all_tools      = $resolver->resolve(
 				array(
-					'mode'        => $mode,
+					'modes'       => $modes,
 					'agent_id'    => $agent_id,
 					'agent_slug'  => $agent_slug,
 					'user_id'     => $user_id,
@@ -724,9 +725,10 @@ class ChatOrchestrator {
 			$client_context = $options['client_context'] ?? array();
 
 			$loop_context = array(
-				'session_id' => $session_id,
-				'user_id'    => $user_id,
-				'agent_id'   => $agent_id,
+				'session_id'   => $session_id,
+				'user_id'      => $user_id,
+				'agent_id'     => $agent_id,
+				'agent_modes'  => $modes,
 			);
 			if ( '' !== $agent_slug ) {
 				$loop_context['agent_slug'] = $agent_slug;
@@ -743,7 +745,7 @@ class ChatOrchestrator {
 				$all_tools,
 				$provider,
 				$model,
-				$mode,
+				$modes,
 				$loop_context,
 				$max_turns,
 				$single_turn

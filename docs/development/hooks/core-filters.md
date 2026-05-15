@@ -376,7 +376,7 @@ $ai_response = RequestBuilder::build(
     $provider,      // AI provider name
     $model,         // Model identifier
     $tools,         // Raw tools array from filters
-    $agent_mode,    // 'chat', 'pipeline', 'system', or extension mode
+    $agent_modes,   // ['chat'], ['pipeline', 'world'], etc.
     $context        // Agent-specific context
 );
 ```
