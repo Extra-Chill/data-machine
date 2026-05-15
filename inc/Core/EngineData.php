@@ -166,6 +166,15 @@ class EngineData {
 	}
 
 	/**
+	 * Get the original source publication date in GMT.
+	 *
+	 * @return string|null MySQL GMT datetime or null.
+	 */
+	public function getOriginalDateGmt(): ?string {
+		return SourceDate::normalizeGmt( $this->get( 'original_date_gmt' ) );
+	}
+
+	/**
 	 * Get the Image File Path (from Files Repository).
 	 *
 	 * @return string|null Absolute file path or null.

@@ -26,16 +26,19 @@ namespace DataMachine\Abilities\Content;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Content\ContentFormat;
+use DataMachine\Core\SourceDate;
 use DataMachine\Core\WordPress\ResolvePostByPath;
+use DataMachine\Core\WordPress\PostTracking;
 
 defined( 'ABSPATH' ) || exit;
 
 class UpsertPostAbility {
 
-	public const ABILITY_NAME      = 'datamachine/upsert-post';
-	public const META_CONTENT_HASH = '_datamachine_content_hash';
-	public const META_RAW_SOURCE   = '_datamachine_raw_source';
-	public const META_STUB_MARKER  = '_datamachine_auto_stub';
+	public const ABILITY_NAME           = 'datamachine/upsert-post';
+	public const META_CONTENT_HASH      = '_datamachine_content_hash';
+	public const META_RAW_SOURCE        = '_datamachine_raw_source';
+	public const META_STUB_MARKER       = '_datamachine_auto_stub';
+	public const META_ORIGINAL_DATE_GMT = '_datamachine_original_date_gmt';
 
 	private static bool $registered = false;
 
@@ -64,40 +67,40 @@ class UpsertPostAbility {
 						'type'       => 'object',
 						'required'   => array( 'post_type', 'title', 'content' ),
 						'properties' => array(
-							'post_type'      => array(
+							'post_type'         => array(
 								'type'        => 'string',
 								'description' => 'Post type slug (e.g. post, page, wiki, ec_doc).',
 							),
-							'title'          => array(
+							'title'             => array(
 								'type'        => 'string',
 								'description' => 'Post title.',
 							),
-							'content'        => array(
+							'content'           => array(
 								'type'        => 'string',
 								'description' => 'Post content. Replaces existing content when updating. Raw ability callers that omit content_format are treated as providing block markup for backwards compatibility.',
 							),
-							'content_format' => array(
+							'content_format'    => array(
 								'type'        => 'string',
 								'enum'        => array( 'blocks', 'html', 'markdown' ),
 								'description' => 'Authoring/source format of content, not the stored post_content format. Raw ability/API calls default to blocks for compatibility. Pass markdown or html when supplying those source formats; the post type stored format is decided by datamachine_post_content_format.',
 							),
-							'post_id'        => array(
+							'post_id'           => array(
 								'type'        => 'integer',
 								'description' => 'Explicit post ID. Most deterministic identity. Overrides other identity fields.',
 							),
-							'slug'           => array(
+							'slug'              => array(
 								'type'        => 'string',
 								'description' => 'Post slug (post_name). Used with parent_id for scoped lookup.',
 							),
-							'parent_id'      => array(
+							'parent_id'         => array(
 								'type'        => 'integer',
 								'description' => 'Parent post ID for scoped slug lookup.',
 							),
-							'parent_path'    => array(
+							'parent_path'       => array(
 								'type'        => 'string',
 								'description' => 'Slash-delimited parent slug path (e.g. "artist/link-pages"). Resolved via ResolvePostByPath. Overrides parent_id.',
 							),
-							'identity_meta'  => array(
+							'identity_meta'     => array(
 								'type'        => 'object',
 								'description' => 'Custom meta-based identity. {key: "_source_file", value: "artist/getting-started.md"}',
 								'properties'  => array(
@@ -106,35 +109,43 @@ class UpsertPostAbility {
 								),
 								'required'    => array( 'key', 'value' ),
 							),
-							'content_hash'   => array(
+							'content_hash'      => array(
 								'type'        => 'string',
 								'description' => 'Hash of normalized content for no_change detection. If omitted, no idempotency check is performed (always writes).',
 							),
-							'raw_source'     => array(
+							'raw_source'        => array(
 								'type'        => 'string',
 								'description' => 'Optional raw source (e.g. markdown) stored in _datamachine_raw_source meta for round-trip sync.',
 							),
-							'post_status'    => array(
+							'source_url'        => array(
+								'type'        => 'string',
+								'description' => 'Original source URL for attribution and dedupe.',
+							),
+							'original_date_gmt' => array(
+								'type'        => 'string',
+								'description' => 'Original source publication date in GMT.',
+							),
+							'post_status'       => array(
 								'type'        => 'string',
 								'description' => 'Post status for create path. Defaults to publish.',
 							),
-							'post_author'    => array(
+							'post_author'       => array(
 								'type'        => 'integer',
 								'description' => 'Post author user ID. Only applied on create; ignored on update.',
 							),
-							'post_excerpt'   => array(
+							'post_excerpt'      => array(
 								'type'        => 'string',
 								'description' => 'Post excerpt.',
 							),
-							'taxonomies'     => array(
+							'taxonomies'        => array(
 								'type'        => 'object',
 								'description' => 'Taxonomy terms to assign. {taxonomy: [term1, term2]}',
 							),
-							'meta_input'     => array(
+							'meta_input'        => array(
 								'type'        => 'object',
 								'description' => 'Additional post meta to set.',
 							),
-							'create_stubs'   => array(
+							'create_stubs'      => array(
 								'type'        => 'boolean',
 								'description' => 'When parent_path is provided, auto-create missing intermediate nodes as stubs.',
 							),
@@ -202,42 +213,50 @@ class UpsertPostAbility {
 			'method'      => 'handleChatToolCall',
 			'description' => 'Idempotently create or update a WordPress post. For normal authored prose, write content as markdown and omit content_format; Data Machine converts that authoring format to the post type stored format. Only set content_format when you are intentionally providing html or serialized block markup.',
 			'parameters'  => array(
-				'post_type'      => array(
+				'post_type'         => array(
 					'type'        => 'string',
 					'description' => 'Post type slug.',
 				),
-				'title'          => array(
+				'title'             => array(
 					'type'        => 'string',
 					'description' => 'Post title.',
 				),
-				'content'        => array(
+				'content'           => array(
 					'type'        => 'string',
 					'description' => 'Post content to author. Use markdown for normal prose unless content_format explicitly says otherwise.',
 				),
-				'content_format' => array(
+				'content_format'    => array(
 					'type'        => 'string',
 					'enum'        => array( 'markdown', 'html', 'blocks' ),
 					'description' => 'Optional authoring/source format for content. Omit for normal prose; AI tool calls default to markdown. Set to html or blocks only when content is already in that format. This is distinct from the stored format chosen by the post type.',
 				),
-				'slug'           => array(
+				'slug'              => array(
 					'type'        => 'string',
 					'description' => 'Post slug for lookup.',
 				),
-				'parent_id'      => array(
+				'parent_id'         => array(
 					'type'        => 'integer',
 					'description' => 'Parent post ID.',
 				),
-				'parent_path'    => array(
+				'parent_path'       => array(
 					'type'        => 'string',
 					'description' => 'Slash-delimited parent path (e.g. "artist/link-pages").',
 				),
-				'post_author'    => array(
+				'post_author'       => array(
 					'type'        => 'integer',
 					'description' => 'Post author user ID (create only).',
 				),
-				'content_hash'   => array(
+				'content_hash'      => array(
 					'type'        => 'string',
 					'description' => 'Hash for idempotency check.',
+				),
+				'source_url'        => array(
+					'type'        => 'string',
+					'description' => 'Original source URL for attribution and dedupe.',
+				),
+				'original_date_gmt' => array(
+					'type'        => 'string',
+					'description' => 'Original source publication date in GMT.',
 				),
 			),
 			'required'    => array( 'post_type', 'title', 'content' ),
@@ -268,23 +287,25 @@ class UpsertPostAbility {
 	 * @return array Result with action: created|updated|no_change.
 	 */
 	public static function execute( array $input ): array {
-		$post_type      = sanitize_key( $input['post_type'] ?? '' );
-		$title          = trim( $input['title'] ?? '' );
-		$content        = $input['content'] ?? '';
-		$content_format = sanitize_key( $input['content_format'] ?? 'blocks' );
-		$post_id        = absint( $input['post_id'] ?? 0 );
-		$slug           = sanitize_title( $input['slug'] ?? '' );
-		$parent_id      = absint( $input['parent_id'] ?? 0 );
-		$parent_path    = trim( $input['parent_path'] ?? '' );
-		$identity_meta  = $input['identity_meta'] ?? array();
-		$content_hash   = $input['content_hash'] ?? '';
-		$raw_source     = $input['raw_source'] ?? '';
-		$post_status    = sanitize_key( $input['post_status'] ?? 'publish' );
-		$post_author    = absint( $input['post_author'] ?? 0 );
-		$post_excerpt   = $input['post_excerpt'] ?? '';
-		$taxonomies     = $input['taxonomies'] ?? array();
-		$meta_input     = $input['meta_input'] ?? array();
-		$create_stubs   = ! empty( $input['create_stubs'] );
+		$post_type         = sanitize_key( $input['post_type'] ?? '' );
+		$title             = trim( $input['title'] ?? '' );
+		$content           = $input['content'] ?? '';
+		$content_format    = sanitize_key( $input['content_format'] ?? 'blocks' );
+		$post_id           = absint( $input['post_id'] ?? 0 );
+		$slug              = sanitize_title( $input['slug'] ?? '' );
+		$parent_id         = absint( $input['parent_id'] ?? 0 );
+		$parent_path       = trim( $input['parent_path'] ?? '' );
+		$identity_meta     = $input['identity_meta'] ?? array();
+		$content_hash      = $input['content_hash'] ?? '';
+		$raw_source        = $input['raw_source'] ?? '';
+		$source_url        = esc_url_raw( (string) ( $input['source_url'] ?? '' ) );
+		$original_date_gmt = SourceDate::normalizeGmt( $input['original_date_gmt'] ?? '' );
+		$post_status       = sanitize_key( $input['post_status'] ?? 'publish' );
+		$post_author       = absint( $input['post_author'] ?? 0 );
+		$post_excerpt      = $input['post_excerpt'] ?? '';
+		$taxonomies        = $input['taxonomies'] ?? array();
+		$meta_input        = $input['meta_input'] ?? array();
+		$create_stubs      = ! empty( $input['create_stubs'] );
 
 		if ( '' === $post_type || '' === $title ) {
 			return array(
@@ -345,6 +366,7 @@ class UpsertPostAbility {
 		if ( $existing_id > 0 && '' !== $content_hash ) {
 			$stored_hash = get_post_meta( $existing_id, self::META_CONTENT_HASH, true );
 			if ( $stored_hash === $content_hash ) {
+				self::applySourceMetadata( $existing_id, $source_url, $original_date_gmt );
 				$post = get_post( $existing_id );
 				return array(
 					'success'  => true,
@@ -377,6 +399,11 @@ class UpsertPostAbility {
 			$post_data['post_parent'] = $parent_id;
 		}
 
+		if ( null !== $original_date_gmt ) {
+			$post_data['post_date_gmt'] = $original_date_gmt;
+			$post_data['post_date']     = get_date_from_gmt( $original_date_gmt );
+		}
+
 		if ( $existing_id > 0 ) {
 			$post_data['ID'] = $existing_id;
 			$action          = 'updated';
@@ -396,6 +423,14 @@ class UpsertPostAbility {
 
 		if ( '' !== $raw_source ) {
 			$all_meta[ self::META_RAW_SOURCE ] = $raw_source;
+		}
+
+		if ( '' !== $source_url ) {
+			$all_meta[ PostTracking::SOURCE_URL_META_KEY ] = $source_url;
+		}
+
+		if ( null !== $original_date_gmt ) {
+			$all_meta[ self::META_ORIGINAL_DATE_GMT ] = $original_date_gmt;
 		}
 
 		if ( ! empty( $all_meta ) ) {
@@ -456,6 +491,31 @@ class UpsertPostAbility {
 			'post_url' => get_permalink( (int) $id ),
 			'path'     => ResolvePostByPath::build_path( $post ),
 		);
+	}
+
+	/**
+	 * Apply source metadata to an existing post when content is unchanged.
+	 *
+	 * @param int         $post_id           Post ID.
+	 * @param string      $source_url        Source URL.
+	 * @param string|null $original_date_gmt Original source date.
+	 */
+	private static function applySourceMetadata( int $post_id, string $source_url, ?string $original_date_gmt ): void {
+		$update = array( 'ID' => $post_id );
+
+		if ( '' !== $source_url ) {
+			update_post_meta( $post_id, PostTracking::SOURCE_URL_META_KEY, $source_url );
+		}
+
+		if ( null !== $original_date_gmt ) {
+			update_post_meta( $post_id, self::META_ORIGINAL_DATE_GMT, $original_date_gmt );
+			$update['post_date_gmt'] = $original_date_gmt;
+			$update['post_date']     = get_date_from_gmt( $original_date_gmt );
+		}
+
+		if ( count( $update ) > 1 ) {
+			wp_update_post( $update );
+		}
 	}
 
 	/**

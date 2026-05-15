@@ -209,6 +209,7 @@ namespace {
     );
 
     require_once dirname( __DIR__ ) . '/inc/Core/Content/ContentFormat.php';
+    require_once dirname( __DIR__ ) . '/inc/Core/SourceDate.php';
     require_once dirname( __DIR__ ) . '/inc/Core/WordPress/PostTracking.php';
     require_once dirname( __DIR__ ) . '/inc/Core/WordPress/WordPressSettingsResolver.php';
     require_once dirname( __DIR__ ) . '/inc/Core/WordPress/WordPressPublishHelper.php';
