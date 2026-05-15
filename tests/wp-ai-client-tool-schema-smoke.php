@@ -153,7 +153,7 @@ $response = \DataMachine\Engine\AI\RequestBuilder::build(
 			),
 		),
 	),
-	'pipeline',
+	array( 'pipeline' ),
 	array( 'job_id' => 1684 )
 );
 
@@ -213,7 +213,7 @@ $captured_request = array();
 			),
 		),
 	),
-	'pipeline',
+	array( 'pipeline' ),
 	array( 'job_id' => 1686 )
 );
 
@@ -262,7 +262,7 @@ $response_no_user = \DataMachine\Engine\AI\RequestBuilder::build(
 	'openai',
 	'gpt-smoke',
 	array(),
-	'pipeline',
+	array( 'pipeline' ),
 	array( 'job_id' => 1685 )
 );
 
@@ -302,7 +302,7 @@ $captured_request = array();
 			'parameters'  => array(),
 		),
 	),
-	'pipeline',
+	array( 'pipeline' ),
 	array( 'job_id' => 1686 )
 );
 

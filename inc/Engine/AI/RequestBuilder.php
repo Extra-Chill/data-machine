@@ -38,7 +38,7 @@ class RequestBuilder {
 	 * @param string $provider    AI provider name (openai, anthropic, google, grok, openrouter)
 	 * @param string $model       Model identifier
 	 * @param array  $tools       Raw tools array from filters
-	 * @param string $mode     Execution mode: 'chat' or 'pipeline'
+	 * @param array  $modes       Execution modes.
 	 * @param array  $payload     Step payload (session_id, job_id, flow_step_id, data, etc)
 	 * @param array|null $request_metadata Optional output parameter for request metadata.
 	 * @return \WordPress\AiClient\Results\DTO\GenerativeAiResult|\WP_Error AI response from wp-ai-client.
@@ -48,13 +48,15 @@ class RequestBuilder {
 		string $provider,
 		string $model,
 		array $tools,
-		string $mode,
+		array $modes,
 		array $payload = array(),
 		?array &$request_metadata = null
 	) {
 		WpAiClientCache::install();
 
-		$assembled        = self::assemble( $messages, $provider, $model, $tools, $mode, $payload );
+		$modes            = self::normalizeModes( $modes );
+		$mode_label       = implode( ',', $modes );
+		$assembled        = self::assemble( $messages, $provider, $model, $tools, $modes, $payload );
 		$request          = $assembled['request'];
 		$provider_request = ProviderRequestAssembler::toProviderRequest( $request );
 		$prompt_context   = self::wpAiClientPromptContext( $request['messages'] ?? array() );
@@ -71,7 +73,7 @@ class RequestBuilder {
 			$directive_metadata,
 			$provider,
 			$model,
-			$mode
+			$mode_label
 		);
 		RequestMetadata::warn_if_oversized( $request_metadata, $payload );
 
@@ -81,7 +83,7 @@ class RequestBuilder {
 			'AI request built',
 			array_filter(
 				array(
-					'mode'                  => $mode,
+					'mode'                  => $mode_label,
 					'job_id'                => $payload['job_id'] ?? null,
 					'flow_step_id'          => $payload['flow_step_id'] ?? null,
 					'provider'              => $provider,
@@ -107,7 +109,7 @@ class RequestBuilder {
 				'AI request blocked: wp-ai-client unavailable',
 				array_filter(
 					array(
-						'mode'         => $mode,
+						'mode'         => $mode_label,
 						'job_id'       => $payload['job_id'] ?? null,
 						'flow_step_id' => $payload['flow_step_id'] ?? null,
 						'provider'     => $provider,
@@ -141,7 +143,7 @@ class RequestBuilder {
 
 		$result                        = null;
 		$request_options               = null;
-		$transport_profile             = self::wpAiClientTransportProfile( $mode, $provider, $model, $payload );
+		$transport_profile             = self::wpAiClientTransportProfile( $mode_label, $provider, $model, $payload );
 		$request_timeout               = (float) $transport_profile['request_timeout'];
 		$connect_timeout               = (float) $transport_profile['connect_timeout'];
 		$request_metadata['transport'] = $transport_profile;
@@ -414,7 +416,7 @@ class RequestBuilder {
 	/**
 	 * Resolve the request timeout Data Machine applies to wp-ai-client calls.
 	 *
-	 * @param string $mode     Execution mode.
+	 * @param array  $modes    Execution modes.
 	 * @param string $provider Provider identifier.
 	 * @param string $model    Model identifier.
 	 * @param array  $payload  Step payload.
@@ -578,22 +580,23 @@ class RequestBuilder {
 		string $provider,
 		string $model,
 		array $tools,
-		string $mode,
+		array $modes,
 		array $payload = array()
 	): array {
-		$payload          = self::withDirectiveContext( $payload );
+		$modes            = self::normalizeModes( $modes );
+		$payload          = self::withDirectiveContext( array_merge( $payload, array( 'agent_modes' => $modes ) ) );
 		$directives       = apply_filters( 'datamachine_directives', array() );
 		$directive_policy = ( new DirectivePolicyResolver() )->resolve(
 			$directives,
 			array(
-				'mode'     => $mode,
+				'modes'    => $modes,
 				'agent_id' => $payload['agent_id'] ?? 0,
 			)
 		);
 		$directives       = $directive_policy['directives'];
 		$suppressed       = $directive_policy['suppressed'];
 
-		$assembled = ( new ProviderRequestAssembler() )->assemble( $messages, $provider, $model, $tools, $mode, $payload, $directives );
+		$assembled = ( new ProviderRequestAssembler() )->assemble( $messages, $provider, $model, $tools, $modes, $payload, $directives );
 
 		return array(
 			'request'               => $assembled['request'],
@@ -706,6 +709,29 @@ class RequestBuilder {
 				'supportedOptions'      => array(),
 			),
 		);
+	}
+
+	/** @return array<int,string> */
+	private static function normalizeModes( mixed $modes ): array {
+		if ( is_string( $modes ) ) {
+			$modes = array( $modes );
+		}
+		if ( ! is_array( $modes ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $modes as $mode ) {
+			if ( ! is_scalar( $mode ) ) {
+				continue;
+			}
+			$mode = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $mode ) : strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $mode ) ?? '' );
+			if ( '' !== $mode ) {
+				$normalized[] = $mode;
+			}
+		}
+
+		return array_values( array_unique( $normalized ) );
 	}
 
 	/**

@@ -95,7 +95,7 @@ Injects execution-mode guidance (chat, pipeline, system) as a runtime directive 
 
 **Extension hook**: `datamachine_agent_mode_{slug}` — extensions can append or modify mode-specific guidance for a given mode (e.g. the editor plugin appends diff workflow instructions when the `editor` mode is active).
 
-**Payload key**: Reads `agent_mode` from the request payload.
+**Payload key**: Reads `agent_modes` from the request payload and composes guidance once for each active mode.
 
 ### CallerContextDirective (Priority 25)
 

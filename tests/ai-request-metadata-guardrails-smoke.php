@@ -266,7 +266,7 @@ function build_smoke_request() {
 				'parameters'  => array( 'type' => 'object', 'properties' => array( 'title' => array( 'type' => 'string' ) ) ),
 			),
 		),
-		'pipeline',
+		array( 'pipeline' ),
 		array( 'job_id' => 279, 'flow_step_id' => 12, 'persist_transcript' => true ),
 		$request_metadata
 	);

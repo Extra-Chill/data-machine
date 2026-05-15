@@ -59,15 +59,16 @@ Resolution concepts:
 
 Adjacent handler tools are different from optional/static tools. They come from the previous and next pipeline steps and represent the workflow's required flow plumbing. They are gathered by `AdjacentHandlerToolSource` before generic policy filtering and are protected by Data Machine's mandatory-tool policy where appropriate. A required adjacent publish/upsert handler with no callable AI tool fails before the model call; request inspection reports the same missing-handler state.
 
-### Pipeline Policy-Gated Tools
+### Opt-In Tools
 
-Some tools are safe for chat but too powerful for default pipeline exposure. They declare `pipeline_policy` mode instead of `pipeline` mode.
+Some tools are too powerful for default exposure but are still valid in their real modes. They declare those real modes plus `requires_opt_in`.
 
 ```php
-'modes' => array( 'chat', ToolPolicyResolver::MODE_PIPELINE_POLICY )
+'modes' => array( 'chat', ToolPolicyResolver::MODE_PIPELINE ),
+'requires_opt_in' => true,
 ```
 
-`DataMachineToolRegistrySource` includes such a tool in a pipeline request only when `ToolPolicyResolver::isPipelinePolicyToolAllowed()` sees the tool name in `allow_only`. In practice, that means the flow-step snapshot's `enabled_tools` list opted in.
+`DataMachineToolRegistrySource` includes such a tool only when `ToolPolicyResolver::isOptInToolAllowed()` sees the tool name in `allow_only`. In practice, that means the flow-step snapshot's `enabled_tools` list opted in.
 
 ### Pipeline Disabled Tools
 

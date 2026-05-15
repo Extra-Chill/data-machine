@@ -87,9 +87,9 @@ class AIStep extends Step {
 
 		// Model/provider resolved exclusively via mode system (agent → site → network).
 		// Pipeline-level model/provider fields are ignored — mode_models is the authority.
-		$execution_mode = self::resolveExecutionMode( $pipeline_step_config, $this->flow_step_config );
-		$mode_model     = PluginSettings::resolveModelForAgentMode( $agent_id, $execution_mode );
-		$provider_name  = $mode_model['provider'];
+		$execution_modes = self::resolveExecutionModes( $pipeline_step_config, $this->flow_step_config );
+		$mode_model      = self::resolveModelForExecutionModes( $agent_id, $execution_modes );
+		$provider_name   = $mode_model['provider'];
 		if ( empty( $provider_name ) ) {
 			do_action(
 				'datamachine_fail_job',
@@ -98,9 +98,9 @@ class AIStep extends Step {
 				array(
 					'flow_step_id'     => $this->flow_step_id,
 					'pipeline_step_id' => $pipeline_step_id,
-					'agent_mode'       => $execution_mode,
-					'error_message'    => sprintf( 'AI step requires provider configuration for agent mode "%s". Set a default provider in Data Machine settings or configure mode_models.', $execution_mode ),
-					'solution'         => sprintf( 'Set default_provider in Data Machine settings or configure mode_models for the %s mode', $execution_mode ),
+					'agent_modes'      => $execution_modes,
+					'error_message'    => sprintf( 'AI step requires provider configuration for agent modes "%s". Set a default provider in Data Machine settings or configure mode_models.', implode( ',', $execution_modes ) ),
+					'solution'         => sprintf( 'Set default_provider in Data Machine settings or configure mode_models for one of these modes: %s', implode( ', ', $execution_modes ) ),
 				)
 			);
 			return false;
@@ -158,12 +158,13 @@ class AIStep extends Step {
 		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
 
 		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
-		$execution_mode       = self::resolveExecutionMode( $pipeline_step_config, $this->flow_step_config );
+		$execution_modes      = self::resolveExecutionModes( $pipeline_step_config, $this->flow_step_config );
 
 		// Model/provider resolved exclusively via mode system — pipeline config is ignored.
-		$mode_model    = PluginSettings::resolveModelForAgentMode( $agent_id, $execution_mode );
+		$mode_model    = self::resolveModelForExecutionModes( $agent_id, $execution_modes );
 		$provider_name = $mode_model['provider'];
 		$model_name    = $mode_model['model'];
+		$mode_label    = implode( ',', $execution_modes );
 
 		$lease_result = PipelineAIConcurrencyLimiter::acquire(
 			$provider_name,
@@ -173,7 +174,7 @@ class AIStep extends Step {
 				'pipeline_step_id' => $pipeline_step_id,
 				'pipeline_id'      => $job_snapshot['pipeline_id'] ?? null,
 				'flow_id'          => $job_snapshot['flow_id'] ?? null,
-				'mode'             => $execution_mode,
+				'mode'             => $mode_label,
 			)
 		);
 
@@ -283,7 +284,7 @@ class AIStep extends Step {
 				'user_id'                     => $user_id,
 				'agent_id'                    => $agent_id,
 				'agent_slug'                  => $agent_slug,
-				'agent_mode'                  => $execution_mode,
+				'agent_modes'                 => $execution_modes,
 				'pipeline_id'                 => $job_snapshot['pipeline_id'] ?? null,
 				'flow_id'                     => $job_snapshot['flow_id'] ?? null,
 				'persist_transcript'          => $persist_transcript,
@@ -330,7 +331,7 @@ class AIStep extends Step {
 			$available_tools = $resolver->resolve(
 				array_merge(
 					array(
-						'mode'                 => $execution_mode,
+						'modes'                => $execution_modes,
 						'agent_id'             => $agent_id,
 						'agent_slug'           => $agent_slug,
 						'previous_step_config' => $previous_step_config,
@@ -419,7 +420,7 @@ class AIStep extends Step {
 					$available_tools,
 					$provider_name,
 					$model_name,
-					$execution_mode,
+					$execution_modes,
 					$payload,
 					$max_turns
 				);
@@ -686,24 +687,45 @@ class AIStep extends Step {
 	}
 
 	/**
-	 * Resolve the agent execution mode for this AI step.
+	 * Resolve the agent execution modes for this AI step.
 	 *
 	 * @param array $pipeline_step_config Pipeline step config.
 	 * @param array $flow_step_config Flow step config.
-	 * @return string Agent mode slug.
+	 * @return array<int,string> Agent mode slugs.
 	 */
-	private static function resolveExecutionMode( array $pipeline_step_config, array $flow_step_config ): string {
-		$raw_mode = ToolPolicyResolver::MODE_PIPELINE;
-		foreach ( array( $flow_step_config['agent_mode'] ?? null, $pipeline_step_config['agent_mode'] ?? null ) as $candidate ) {
-			if ( is_scalar( $candidate ) && '' !== trim( (string) $candidate ) ) {
-				$raw_mode = $candidate;
-				break;
+	private static function resolveExecutionModes( array $pipeline_step_config, array $flow_step_config ): array {
+		foreach ( array( $flow_step_config['agent_modes'] ?? null, $pipeline_step_config['agent_modes'] ?? null ) as $candidate ) {
+			if ( is_array( $candidate ) && ! empty( $candidate ) ) {
+				return ToolPolicyResolver::normalizeModes( $candidate );
 			}
 		}
 
-		$mode = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $raw_mode ) : strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $raw_mode ) ?? '' );
+		return array( ToolPolicyResolver::MODE_PIPELINE );
+	}
 
-		return '' !== $mode ? $mode : ToolPolicyResolver::MODE_PIPELINE;
+	/**
+	 * Resolve the first configured model for an active mode set.
+	 *
+	 * @param int   $agent_id Agent ID.
+	 * @param array $modes    Active mode slugs.
+	 * @return array{provider:string,model:string}
+	 */
+	private static function resolveModelForExecutionModes( int $agent_id, array $modes ): array {
+		$fallback = array(
+			'provider' => '',
+			'model'    => '',
+		);
+		foreach ( $modes as $mode ) {
+			$model = PluginSettings::resolveModelForAgentMode( $agent_id, $mode );
+			if ( ! empty( $model['provider'] ) ) {
+				return $model;
+			}
+			if ( '' === $fallback['provider'] && '' === $fallback['model'] ) {
+				$fallback = $model;
+			}
+		}
+
+		return $fallback;
 	}
 
 	/**

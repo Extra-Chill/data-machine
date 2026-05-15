@@ -123,9 +123,8 @@ MD;
 	/**
 	 * Get directive outputs for the current agent mode.
 	 *
-	 * Reads the mode slug from $payload['agent_mode'], applies the built-in
-	 * default, then filters through datamachine_agent_mode_{slug} for
-	 * extension composition.
+	 * Reads mode slugs from $payload['agent_modes'], applies built-in defaults,
+	 * then filters through datamachine_agent_mode_{slug} for extension composition.
 	 *
 	 * @param string      $provider_name AI provider name.
 	 * @param array       $tools         Available tools.
@@ -134,36 +133,44 @@ MD;
 	 * @return array Directive outputs.
 	 */
 	public static function get_outputs( string $provider_name, array $tools, ?string $step_id = null, array $payload = array() ): array {
-		$mode = $payload['agent_mode'] ?? '';
+		$modes = self::normalizeModes( $payload['agent_modes'] ?? array() );
 
-		if ( empty( $mode ) ) {
+		if ( empty( $modes ) ) {
 			return array();
 		}
 
-		$default = self::get_default_for_mode( $mode );
+		$contents = array();
+		foreach ( $modes as $mode ) {
+			$default = self::get_default_for_mode( $mode );
 
-		/**
-		 * Filter agent-mode guidance for a given mode slug.
-		 *
-		 * Lets extensions append or modify mode-specific guidance
-		 * (e.g. the editor plugin appends diff workflow instructions
-		 * when the 'editor' mode is active).
-		 *
-		 * Fires as datamachine_agent_mode_{mode}, e.g.
-		 * datamachine_agent_mode_chat.
-		 *
-		 * @since 0.68.0
-		 *
-		 * @param string $content Current guidance text.
-		 * @param array  $payload Full request payload (agent_id, user_id, etc.).
-		 */
-		$content = apply_filters(
-			"datamachine_agent_mode_{$mode}",
-			$default,
-			$payload
-		);
+			/**
+			 * Filter agent-mode guidance for a given mode slug.
+			 *
+			 * Lets extensions append or modify mode-specific guidance
+			 * (e.g. the editor plugin appends diff workflow instructions
+			 * when the 'editor' mode is active).
+			 *
+			 * Fires as datamachine_agent_mode_{mode}, e.g.
+			 * datamachine_agent_mode_chat.
+			 *
+			 * @since 0.68.0
+			 *
+			 * @param string $content Current guidance text.
+			 * @param array  $payload Full request payload (agent_id, user_id, etc.).
+			 */
+			$content = apply_filters(
+				"datamachine_agent_mode_{$mode}",
+				$default,
+				$payload
+			);
 
-		$content = trim( (string) $content );
+			$content = trim( (string) $content );
+			if ( '' !== $content ) {
+				$contents[] = $content;
+			}
+		}
+
+		$content = trim( implode( "\n\n", $contents ) );
 
 		if ( '' === $content ) {
 			return array();
@@ -192,6 +199,29 @@ MD;
 			'system'   => self::SYSTEM_MODE,
 			default     => '',
 		};
+	}
+
+	/** @return array<int,string> */
+	private static function normalizeModes( mixed $modes ): array {
+		if ( is_string( $modes ) ) {
+			$modes = array( $modes );
+		}
+		if ( ! is_array( $modes ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $modes as $mode ) {
+			if ( ! is_scalar( $mode ) ) {
+				continue;
+			}
+			$mode = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $mode ) : strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $mode ) ?? '' );
+			if ( '' !== $mode ) {
+				$normalized[] = $mode;
+			}
+		}
+
+		return array_values( array_unique( $normalized ) );
 	}
 }
 

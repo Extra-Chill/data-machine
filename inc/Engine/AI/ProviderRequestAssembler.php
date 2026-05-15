@@ -23,7 +23,7 @@ class ProviderRequestAssembler {
 	 * @param string $provider   AI provider name.
 	 * @param string $model      Model identifier.
 	 * @param array  $tools      Raw tools array from filters or runtime declarations.
-	 * @param string $mode       Execution mode.
+	 * @param array  $modes      Execution modes.
 	 * @param array  $payload    Request payload.
 	 * @param array  $directives Directive configs already selected by the caller.
 	 * @return array Assembled request and inspection metadata.
@@ -33,7 +33,7 @@ class ProviderRequestAssembler {
 		string $provider,
 		string $model,
 		array $tools,
-		string $mode,
+		array $modes,
 		array $payload = array(),
 		array $directives = array()
 	): array {
@@ -50,7 +50,7 @@ class ProviderRequestAssembler {
 			);
 		}
 
-		$request             = $prompt_builder->buildDetailed( $mode, $provider, $payload );
+		$request             = $prompt_builder->buildDetailed( $modes, $provider, $payload );
 		$request['messages'] = WP_Agent_Message::normalize_many( $request['messages'] ?? array() );
 		$applied_directives  = $request['applied_directives'] ?? array();
 		$directive_metadata  = $request['directive_metadata'] ?? array();

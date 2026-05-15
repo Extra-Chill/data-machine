@@ -23,7 +23,7 @@ use DataMachine\Abilities\PermissionHelper;
 class AgentDailyMemory extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'agent_daily_memory', array( $this, 'getToolDefinition' ), array( 'chat', ToolPolicyResolver::MODE_PIPELINE_POLICY ), array( 'abilities' => array( 'datamachine/daily-memory-read', 'datamachine/daily-memory-write', 'datamachine/daily-memory-list', 'datamachine/search-daily-memory' ) ) );
+		$this->registerTool( 'agent_daily_memory', array( $this, 'getToolDefinition' ), array( 'chat', ToolPolicyResolver::MODE_PIPELINE ), array( 'abilities' => array( 'datamachine/daily-memory-read', 'datamachine/daily-memory-write', 'datamachine/daily-memory-list', 'datamachine/search-daily-memory' ), 'requires_opt_in' => true ) );
 	}
 
 	/**

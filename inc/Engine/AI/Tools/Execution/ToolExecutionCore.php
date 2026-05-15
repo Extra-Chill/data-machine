@@ -164,6 +164,15 @@ class ToolExecutionCore {
 		}
 
 		$registry = \WP_Abilities_Registry::get_instance();
+		if ( method_exists( $registry, 'is_registered' ) && ! $registry->is_registered( $ability_slug ) ) {
+			return array(
+				'success'   => false,
+				'error'     => sprintf( "Tool '%s' references missing ability '%s'.", $tool_name, $ability_slug ),
+				'tool_name' => $tool_name,
+				'ability'   => $ability_slug,
+			);
+		}
+
 		$ability  = $registry->get_registered( $ability_slug );
 
 		if ( ! $ability ) {

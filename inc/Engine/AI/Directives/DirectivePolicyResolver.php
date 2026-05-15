@@ -21,15 +21,15 @@ class DirectivePolicyResolver {
 	 * Resolve directives after applying optional per-agent policy.
 	 *
 	 * @param array $directives Registered directive configs.
-	 * @param array $args       Resolution args: mode, agent_id.
+	 * @param array $args       Resolution args: modes, agent_id.
 	 * @return array{directives: array, suppressed: array}
 	 */
 	public function resolve( array $directives, array $args ): array {
-		$mode     = isset( $args['mode'] ) ? (string) $args['mode'] : '';
+		$modes    = self::normalizeModes( $args['modes'] ?? ( array_key_exists( 'mode', $args ) ? array( $args['mode'] ) : array() ) );
 		$agent_id = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
 		$policy   = $agent_id > 0 ? $this->getAgentDirectivePolicy( $agent_id ) : null;
 
-		$result = $this->applyPolicy( $directives, $policy, $mode );
+		$result = $this->applyPolicy( $directives, $policy, $modes );
 
 		/**
 		 * Filter the directive stack after per-agent policy is applied.
@@ -86,11 +86,12 @@ class DirectivePolicyResolver {
 	 *
 	 * @param array      $directives Registered directive configs.
 	 * @param array|null $policy     Normalized policy.
-	 * @param string     $mode       Current agent mode.
+	 * @param array      $modes      Current agent modes.
 	 * @return array{directives: array, suppressed: array}
 	 */
-	public function applyPolicy( array $directives, ?array $policy, string $mode = '' ): array {
-		if ( null === $policy || ! $this->policyAppliesToMode( $policy, $mode ) ) {
+	public function applyPolicy( array $directives, ?array $policy, array $modes = array() ): array {
+		$modes = self::normalizeModes( $modes );
+		if ( null === $policy || ! $this->policyAppliesToModes( $policy, $modes ) ) {
 			return array(
 				'directives' => $directives,
 				'suppressed' => array(),
@@ -178,9 +179,32 @@ class DirectivePolicyResolver {
 	 * @param string $mode   Current mode.
 	 * @return bool
 	 */
-	private function policyAppliesToMode( array $policy, string $mode ): bool {
+	private function policyAppliesToModes( array $policy, array $active_modes ): bool {
 		$modes = $policy['modes'] ?? array();
-		return empty( $modes ) || in_array( $mode, $modes, true );
+		return empty( $modes ) || ! empty( array_intersect( $active_modes, $modes ) );
+	}
+
+	/** @return array<int,string> */
+	private static function normalizeModes( mixed $modes ): array {
+		if ( is_string( $modes ) ) {
+			$modes = array( $modes );
+		}
+		if ( ! is_array( $modes ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $modes as $mode ) {
+			if ( ! is_scalar( $mode ) ) {
+				continue;
+			}
+			$mode = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $mode ) : strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $mode ) ?? '' );
+			if ( '' !== $mode ) {
+				$normalized[] = $mode;
+			}
+		}
+
+		return array_values( array_unique( $normalized ) );
 	}
 
 	/**

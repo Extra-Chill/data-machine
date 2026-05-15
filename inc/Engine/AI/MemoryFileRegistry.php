@@ -438,7 +438,7 @@ class MemoryFileRegistry {
 	}
 
 	/**
-	 * Get always-injected files applicable to a specific agent mode.
+	 * Get always-injected files applicable to active agent modes.
 	 *
 	 * Returns files that either list the mode in their `modes` array
 	 * or are registered with `['all']`, excluding files
@@ -447,13 +447,13 @@ class MemoryFileRegistry {
 	 * @since 0.60.0
 	 * @since 0.68.0 Internal key renamed from contexts to modes.
 	 *
-	 * @param string $mode Agent mode slug (e.g. 'chat', 'pipeline', 'system', 'editor').
+	 * @param array $modes Agent mode slugs (e.g. 'chat', 'pipeline', 'system', 'editor').
 	 * @return array<string, array> Filtered and sorted file metadata.
 	 */
-	public static function get_for_mode( string $mode ): array {
-		$mode = sanitize_key( $mode );
+	public static function get_for_modes( array $modes ): array {
+		$modes = array_values( array_unique( array_filter( array_map( 'sanitize_key', $modes ) ) ) );
 
-		if ( empty( $mode ) ) {
+		if ( empty( $modes ) ) {
 			return self::get_resolved();
 		}
 
@@ -461,7 +461,7 @@ class MemoryFileRegistry {
 
 		return array_filter(
 			self::get_resolved(),
-			function ( $meta ) use ( $mode, $agents_api_loaded ) {
+			function ( $meta ) use ( $modes, $agents_api_loaded ) {
 				$default_policy   = $agents_api_loaded ? WP_Agent_Context_Injection_Policy::ALWAYS : 'always';
 				$retrieval_policy = $meta['retrieval_policy'] ?? $default_policy;
 				$is_always        = $agents_api_loaded
@@ -471,39 +471,39 @@ class MemoryFileRegistry {
 					return false;
 				}
 
-				$modes = $meta['modes'] ?? self::MODES_NONE;
-				if ( empty( $modes ) ) {
+				$file_modes = $meta['modes'] ?? self::MODES_NONE;
+				if ( empty( $file_modes ) ) {
 					return false;
 				}
 
-				return in_array( self::MODE_ALL, $modes, true )
-					|| in_array( $mode, $modes, true );
+				return in_array( self::MODE_ALL, $file_modes, true )
+					|| ! empty( array_intersect( $modes, $file_modes ) );
 			}
 		);
 	}
 
 	/**
-	 * Check if a file applies to a specific agent mode.
+	 * Check if a file applies to active agent modes.
 	 *
 	 * @since 0.60.0
 	 * @since 0.68.0 Internal key renamed from contexts to modes.
 	 *
 	 * @param string $filename Filename to check.
-	 * @param string $mode     Agent mode slug.
+	 * @param array  $modes    Agent mode slugs.
 	 * @return bool True if the file should be injected in this mode.
 	 */
-	public static function applies_to_mode( string $filename, string $mode ): bool {
+	public static function applies_to_modes( string $filename, array $modes ): bool {
 		$resolved = self::get_resolved();
 		$filename = sanitize_file_name( $filename );
-		$mode     = sanitize_key( $mode );
+		$modes    = array_values( array_unique( array_filter( array_map( 'sanitize_key', $modes ) ) ) );
 
 		if ( ! isset( $resolved[ $filename ] ) ) {
 			return true; // Unregistered files are included everywhere.
 		}
 
-		$modes = $resolved[ $filename ]['modes'] ?? array( self::MODE_ALL );
-		return in_array( self::MODE_ALL, $modes, true )
-			|| in_array( $mode, $modes, true );
+		$file_modes = $resolved[ $filename ]['modes'] ?? array( self::MODE_ALL );
+		return in_array( self::MODE_ALL, $file_modes, true )
+			|| ! empty( array_intersect( $modes, $file_modes ) );
 	}
 
 	/**

@@ -153,7 +153,7 @@ class PipelineStepAbilities {
 			'datamachine/update-pipeline-step',
 			array(
 				'label'               => __( 'Update Pipeline Step', 'data-machine' ),
-				'description'         => __( 'Update pipeline step configuration (system prompt, AI execution mode, and AI tool policy). Model/provider are configured via mode_models setting.', 'data-machine' ),
+				'description'         => __( 'Update pipeline step configuration (system prompt, AI execution modes, and AI tool policy). Model/provider are configured via mode_models setting.', 'data-machine' ),
 				'category'            => 'datamachine-pipeline',
 				'input_schema'        => array(
 					'type'       => 'object',
@@ -167,9 +167,10 @@ class PipelineStepAbilities {
 							'type'        => 'string',
 							'description' => __( 'System prompt for AI step', 'data-machine' ),
 						),
-						'agent_mode'       => array(
-							'type'        => 'string',
-							'description' => __( 'Agent execution mode for this AI step. Defaults to pipeline.', 'data-machine' ),
+						'agent_modes'      => array(
+							'type'        => 'array',
+							'description' => __( 'Agent execution modes for this AI step. Defaults to pipeline.', 'data-machine' ),
+							'items'       => array( 'type' => 'string' ),
 						),
 						'disabled_tools'   => array(
 							'type'        => 'array',
@@ -535,7 +536,7 @@ class PipelineStepAbilities {
 		}
 
 		$system_prompt = $input['system_prompt'] ?? null;
-		$agent_mode    = $input['agent_mode'] ?? null;
+		$agent_modes   = $input['agent_modes'] ?? null;
 		$policy_fields = array( 'disabled_tools', 'tool_categories' );
 
 		// provider/model are no longer configurable at the pipeline step level.
@@ -549,10 +550,10 @@ class PipelineStepAbilities {
 			}
 		}
 
-		if ( null === $system_prompt && null === $agent_mode && ! $has_policy_field ) {
+		if ( null === $system_prompt && null === $agent_modes && ! $has_policy_field ) {
 			return array(
 				'success' => false,
-				'error'   => 'At least one of system_prompt, agent_mode, disabled_tools, or tool_categories is required',
+				'error'   => 'At least one of system_prompt, agent_modes, disabled_tools, or tool_categories is required',
 			);
 		}
 
@@ -586,9 +587,16 @@ class PipelineStepAbilities {
 			$updated_fields[]                  = 'system_prompt';
 		}
 
-		if ( null !== $agent_mode ) {
-			$step_config_data['agent_mode'] = sanitize_key( (string) $agent_mode );
-			$updated_fields[]               = 'agent_mode';
+		if ( null !== $agent_modes ) {
+			$sanitized_modes = self::sanitizeStringListField( $agent_modes, 'agent_modes' );
+			if ( is_wp_error( $sanitized_modes ) ) {
+				return array(
+					'success' => false,
+					'error'   => $sanitized_modes->get_error_message(),
+				);
+			}
+			$step_config_data['agent_modes'] = $sanitized_modes;
+			$updated_fields[]                = 'agent_modes';
 		}
 
 		foreach ( $policy_fields as $field ) {

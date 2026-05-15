@@ -146,7 +146,7 @@ $response = RequestBuilder::build(
 	'openai',
 	'gpt-smoke',
 	array(),
-	'pipeline',
+	array( 'pipeline' ),
 	array( 'job_id' => 1633 )
 );
 

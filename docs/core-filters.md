@@ -180,6 +180,6 @@ Central registry for execution modes. Extensions register modes; the settings UI
 **Since:** 0.68.0  
 **Priority:** 22
 
-Injects execution-mode guidance as a runtime directive. Reads `$payload['agent_mode']` and emits one `system_text` output with composed content.
+Injects execution-mode guidance as a runtime directive. Reads `$payload['agent_modes']` and emits one `system_text` output with composed content for every active mode.
 
-Built-in defaults for `chat`, `pipeline`, and `system` are shipped as class constants. Custom modes (e.g. `editor`, `bridge`) provide their content exclusively via the `datamachine_agent_mode_{slug}` filter.
+Built-in defaults for `chat`, `pipeline`, and `system` are shipped as class constants. Custom modes (e.g. `editor`, `bridge`) provide their content via the `datamachine_agent_mode_{slug}` filter and can be additive with other active modes.

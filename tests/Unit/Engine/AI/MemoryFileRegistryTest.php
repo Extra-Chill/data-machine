@@ -112,10 +112,10 @@ class MemoryFileRegistryTest extends TestCase {
 	}
 
 	/**
-	 * get_for_mode() only returns files whose modes match the requested mode
+	 * get_for_modes() only returns files whose modes match the requested modes
 	 * AND whose retrieval_policy is `always`.
 	 */
-	public function test_get_for_mode_filters_by_mode_and_policy(): void {
+	public function test_get_for_modes_filters_by_mode_and_policy(): void {
 		MemoryFileRegistry::register( 'CHAT_ONLY.md', 10, array(
 			'layer' => MemoryFileRegistry::LAYER_AGENT,
 			'modes' => array( 'chat' ),
@@ -132,7 +132,7 @@ class MemoryFileRegistryTest extends TestCase {
 			'layer' => MemoryFileRegistry::LAYER_AGENT,
 		) );
 
-		$chat_files = MemoryFileRegistry::get_for_mode( 'chat' );
+		$chat_files = MemoryFileRegistry::get_for_modes( array( 'chat' ) );
 		$this->assertArrayHasKey( 'CHAT_ONLY.md', $chat_files );
 		$this->assertArrayHasKey( 'ALL_MODES.md', $chat_files );
 		$this->assertArrayNotHasKey( 'PIPELINE_ONLY.md', $chat_files );

@@ -39,7 +39,7 @@ class FlowStepConfigFactory {
 				self::promptQueueFromWorkflowStep( $step ),
 				array(
 					'queue_mode'         => 'static',
-					'agent_mode'         => isset( $step['agent_mode'] ) && is_scalar( $step['agent_mode'] ) ? self::sanitizeAgentMode( (string) $step['agent_mode'] ) : '',
+					'agent_modes'        => self::sanitizeAgentModes( $step['agent_modes'] ?? array() ),
 					'disabled_tools'     => $step['disabled_tools'] ?? array(),
 					'pipeline_id'        => 'direct',
 					'flow_id'            => 'direct',
@@ -91,7 +91,7 @@ class FlowStepConfigFactory {
 					'pipeline_id'      => $pipeline_id,
 					'flow_id'          => $flow_id,
 					'execution_order'  => $step['execution_order'] ?? 0,
-					'agent_mode'       => isset( $pipeline_step_config['agent_mode'] ) && is_scalar( $pipeline_step_config['agent_mode'] ) ? self::sanitizeAgentMode( (string) $pipeline_step_config['agent_mode'] ) : '',
+					'agent_modes'      => self::sanitizeAgentModes( $pipeline_step_config['agent_modes'] ?? array() ),
 					'disabled_tools'   => $pipeline_step_config['disabled_tools'] ?? array(),
 				),
 				self::queueDefaultsForStepType( $step_type )
@@ -113,7 +113,7 @@ class FlowStepConfigFactory {
 			'step_type'                           => true,
 			'execution_order'                     => true,
 			'enabled_tools'                       => true,
-			'agent_mode'                          => true,
+			'agent_modes'                         => true,
 			'disabled_tools'                      => true,
 			'completion_assertions'               => true,
 			'tool_runtime_rules'                  => true,
@@ -318,12 +318,27 @@ class FlowStepConfigFactory {
 	}
 
 	/**
-	 * Sanitize an agent mode slug without requiring full WordPress bootstrap.
+	 * Sanitize agent mode slugs without requiring full WordPress bootstrap.
 	 *
-	 * @param string $mode Raw mode.
-	 * @return string Sanitized mode.
+	 * @param mixed $modes Raw modes.
+	 * @return array<int,string> Sanitized modes.
 	 */
-	private static function sanitizeAgentMode( string $mode ): string {
-		return function_exists( 'sanitize_key' ) ? sanitize_key( $mode ) : strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', $mode ) ?? '' );
+	private static function sanitizeAgentModes( mixed $modes ): array {
+		if ( ! is_array( $modes ) ) {
+			return array();
+		}
+
+		$sanitized = array();
+		foreach ( $modes as $mode ) {
+			if ( ! is_scalar( $mode ) ) {
+				continue;
+			}
+			$mode = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $mode ) : strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $mode ) ?? '' );
+			if ( '' !== $mode ) {
+				$sanitized[] = $mode;
+			}
+		}
+
+		return array_values( array_unique( $sanitized ) );
 	}
 }

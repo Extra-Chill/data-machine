@@ -104,7 +104,7 @@ $promptBuilder->setMessages($messages)
               ->setTools($structured_tools);
 
 // Apply directives via PromptBuilder
-$request = $promptBuilder->build($agent_mode, $provider, $context);
+$request = $promptBuilder->build($agent_modes, $provider, $context);
 ```
 
 ## Migration from Legacy System

@@ -81,7 +81,7 @@ namespace {
 	$result = $resolver->resolve(
 		$directives,
 		array(
-			'mode'     => 'pipeline',
+			'modes'    => array( 'pipeline' ),
 			'agent_id' => 0,
 		)
 	);
@@ -100,7 +100,7 @@ namespace {
 	$result = $resolver->resolve(
 		$directives,
 		array(
-			'mode'     => 'pipeline',
+			'modes'    => array( 'pipeline' ),
 			'agent_id' => 1,
 		)
 	);
@@ -119,7 +119,7 @@ namespace {
 	$result = $resolver->resolve(
 		$directives,
 		array(
-			'mode'     => 'pipeline',
+			'modes'    => array( 'pipeline' ),
 			'agent_id' => 2,
 		)
 	);
@@ -138,7 +138,7 @@ namespace {
 	$result = $resolver->resolve(
 		$directives,
 		array(
-			'mode'     => 'pipeline',
+			'modes'    => array( 'pipeline' ),
 			'agent_id' => 3,
 		)
 	);
@@ -158,7 +158,7 @@ namespace {
 	$result = $resolver->resolve(
 		$directives,
 		array(
-			'mode'     => 'chat',
+			'modes'    => array( 'chat' ),
 			'agent_id' => 4,
 		)
 	);
@@ -167,7 +167,7 @@ namespace {
 	$result = $resolver->resolve(
 		$directives,
 		array(
-			'mode'     => 'pipeline',
+			'modes'    => array( 'pipeline' ),
 			'agent_id' => 4,
 		)
 	);

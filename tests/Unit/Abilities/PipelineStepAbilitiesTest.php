@@ -528,7 +528,7 @@ class PipelineStepAbilitiesTest extends WP_UnitTestCase {
 		);
 
 		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'system_prompt, agent_mode, disabled_tools, or tool_categories', $result['error'] );
+		$this->assertStringContainsString( 'system_prompt, agent_modes, disabled_tools, or tool_categories', $result['error'] );
 	}
 
 	public function test_update_pipeline_step_no_fields(): void {

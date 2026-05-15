@@ -24,28 +24,28 @@ $assert = static function ( string $message, bool $condition ) use ( &$failures,
 };
 
 $assert(
-	'AI step resolves execution mode from step configuration',
-	false !== strpos( $source, 'resolveExecutionMode( $pipeline_step_config, $this->flow_step_config )' )
+	'AI step resolves execution modes from step configuration',
+	false !== strpos( $source, 'resolveExecutionModes( $pipeline_step_config, $this->flow_step_config )' )
 );
 
 $assert(
-	'model resolution uses resolved execution mode',
-	false !== strpos( $source, 'PluginSettings::resolveModelForAgentMode( $agent_id, $execution_mode )' )
+	'model resolution uses resolved execution modes',
+	false !== strpos( $source, 'resolveModelForExecutionModes( $agent_id, $execution_modes )' )
 );
 
 $assert(
-	'tool policy receives resolved execution mode',
-	false !== strpos( $source, "'mode'                 => $" . 'execution_mode' )
+	'tool policy receives resolved execution modes',
+	false !== strpos( $source, "'modes'                => $" . 'execution_modes' )
 );
 
 $assert(
-	'conversation loop receives resolved execution mode',
-	false !== strpos( $source, "\n\t\t\t\t\t$" . 'execution_mode,' )
+	'conversation loop receives resolved execution modes',
+	false !== strpos( $source, "\n\t\t\t\t\t$" . 'execution_modes,' )
 );
 
 $assert(
-	'payload carries agent_mode for directives and runtime context',
-	false !== strpos( $source, "'agent_mode'                  => $" . 'execution_mode' )
+	'payload carries agent_modes for directives and runtime context',
+	false !== strpos( $source, "'agent_modes'                 => $" . 'execution_modes' )
 );
 
 $assert(

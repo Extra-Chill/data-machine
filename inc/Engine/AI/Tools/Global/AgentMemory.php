@@ -23,7 +23,7 @@ use DataMachine\Abilities\PermissionHelper;
 class AgentMemory extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'agent_memory', array( $this, 'getToolDefinition' ), array( 'chat', ToolPolicyResolver::MODE_PIPELINE_POLICY ), array( 'abilities' => array( 'datamachine/get-agent-memory', 'datamachine/update-agent-memory', 'datamachine/list-agent-memory-sections' ) ) );
+		$this->registerTool( 'agent_memory', array( $this, 'getToolDefinition' ), array( 'chat', ToolPolicyResolver::MODE_PIPELINE ), array( 'abilities' => array( 'datamachine/get-agent-memory', 'datamachine/update-agent-memory', 'datamachine/list-agent-memory-sections' ), 'requires_opt_in' => true ) );
 	}
 
 	/**

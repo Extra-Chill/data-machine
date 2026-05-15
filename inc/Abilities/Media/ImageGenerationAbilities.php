@@ -382,7 +382,7 @@ class ImageGenerationAbilities {
 			$provider,
 			$model,
 			array(), // No tools needed for prompt refinement.
-			'system',
+			array( 'system' ),
 			array( 'purpose' => 'image_prompt_refinement' )
 		);
 

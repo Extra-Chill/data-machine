@@ -58,7 +58,7 @@ $content = apply_filters( "datamachine_agent_mode_{$mode}", $default_content, $p
 **Parameters**:
 
 - `$default_content` (string) — Built-in guidance for that mode (or empty for unregistered modes).
-- `$payload` (array) — Full request payload (`agent_id`, `user_id`, `agent_mode`, etc.).
+- `$payload` (array) — Full request payload (`agent_id`, `user_id`, `agent_modes`, etc.).
 
 **Return**: Modified guidance text. Returning an empty string suppresses the directive.
 
@@ -81,7 +81,7 @@ Tools are registered via a single unified filter. Per-mode tool partitioning is 
 
 ### datamachine_tools
 
-Single Data Machine registry for AI tools. `ToolManager` reads this registry, `ToolSourceRegistry` composes source pools, and `ToolPolicyResolver::resolve()` assembles the final request-visible tool set for a mode.
+Single Data Machine registry for AI tools. `ToolManager` reads this registry, `ToolSourceRegistry` composes source pools, and `ToolPolicyResolver::resolve()` assembles the final request-visible tool set for active modes.
 
 **Hook usage**:
 
@@ -134,7 +134,7 @@ add_filter( 'datamachine_tools', function ( $tools ) {
 } );
 ```
 
-Use `pipeline` mode only when a static registry tool is useful inside an automated pipeline AI step. Use `pipeline_policy` for powerful tools that should stay hidden from pipeline by default but can be explicitly granted through `enabled_tools`. Chat affordances and tools that duplicate engine-level validation should stay `chat`-only; pipeline AI steps already receive adjacent handler tools plus pipeline/flow memory directives.
+Use `pipeline` mode only when a static registry tool is useful inside an automated pipeline AI step. Add `requires_opt_in => true` for powerful tools that should stay hidden by default but can be explicitly granted through `enabled_tools`. Chat affordances and tools that duplicate engine-level validation should stay `chat`-only; pipeline AI steps already receive adjacent handler tools plus pipeline/flow memory directives.
 
 > Earlier per-mode tool filters were consolidated into `datamachine_tools` in v0.68.0 (PR #1130). Register current tools through the unified registry and declare `modes` on the tool definition.
 

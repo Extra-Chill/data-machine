@@ -116,20 +116,20 @@ class AIStepTest extends TestCase {
 		);
 	}
 
-	public function test_resolve_execution_mode_uses_flow_override_then_pipeline_config(): void {
-		$method = new ReflectionMethod( AIStep::class, 'resolveExecutionMode' );
+	public function test_resolve_execution_modes_uses_flow_override_then_pipeline_config(): void {
+		$method = new ReflectionMethod( AIStep::class, 'resolveExecutionModes' );
 		$method->setAccessible( true );
 
 		$this->assertSame(
-			'rl_task',
-			$method->invoke( null, array( 'agent_mode' => 'pipeline' ), array( 'agent_mode' => 'rl_task' ) )
+			array( 'rl_task' ),
+			$method->invoke( null, array( 'agent_modes' => array( 'pipeline' ) ), array( 'agent_modes' => array( 'rl_task' ) ) )
 		);
 		$this->assertSame(
-			'eval',
-			$method->invoke( null, array( 'agent_mode' => 'Eval' ), array( 'agent_mode' => '' ) )
+			array( 'eval' ),
+			$method->invoke( null, array( 'agent_modes' => array( 'Eval' ) ), array( 'agent_modes' => array() ) )
 		);
 		$this->assertSame(
-			ToolPolicyResolver::MODE_PIPELINE,
+			array( ToolPolicyResolver::MODE_PIPELINE ),
 			$method->invoke( null, array(), array() )
 		);
 	}

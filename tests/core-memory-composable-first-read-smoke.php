@@ -155,7 +155,7 @@ namespace {
 		array(),
 		null,
 		array(
-			'agent_mode' => 'pipeline',
+			'agent_modes' => array( 'pipeline' ),
 			'user_id'    => 123,
 			'agent_id'   => 456,
 		)

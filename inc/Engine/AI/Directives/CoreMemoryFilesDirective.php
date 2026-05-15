@@ -68,13 +68,13 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 
 		$items = array();
 
-		// Load registered files applicable to the current agent mode,
+		// Load registered files applicable to the current agent modes,
 		// filtered through the per-agent MemoryPolicy.
-		$mode       = $payload['agent_mode'] ?? '';
+		$modes      = self::normalizeModes( $payload['agent_modes'] ?? array() );
 		$resolver   = new MemoryPolicyResolver();
 		$mode_files = $resolver->resolveRegistered(
 			array(
-				'mode'     => $mode,
+				'modes'    => $modes,
 				'agent_id' => $agent_id,
 			)
 		);
@@ -259,6 +259,29 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		}
 
 		return trim( $content );
+	}
+
+	/** @return array<int,string> */
+	private static function normalizeModes( mixed $modes ): array {
+		if ( is_string( $modes ) ) {
+			$modes = array( $modes );
+		}
+		if ( ! is_array( $modes ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $modes as $mode ) {
+			if ( ! is_scalar( $mode ) ) {
+				continue;
+			}
+			$mode = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $mode ) : strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $mode ) ?? '' );
+			if ( '' !== $mode ) {
+				$normalized[] = $mode;
+			}
+		}
+
+		return array_values( array_unique( $normalized ) );
 	}
 }
 

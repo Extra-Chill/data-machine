@@ -18,10 +18,10 @@ class RuntimeProvenance {
 	 * @param array  $payload Data Machine loop payload.
 	 * @param string $provider Provider identifier.
 	 * @param string $model Model identifier.
-	 * @param string $mode Execution mode.
+	 * @param array  $modes Execution modes.
 	 * @return array<string,mixed>
 	 */
-	public static function fromConversationResult( array $result, array $payload, string $provider, string $model, string $mode ): array {
+	public static function fromConversationResult( array $result, array $payload, string $provider, string $model, array $modes ): array {
 		$request_metadata = is_array( $result['request_metadata'] ?? null ) ? $result['request_metadata'] : array();
 		$usage            = is_array( $result['usage'] ?? null ) ? $result['usage'] : array();
 		$error_message    = isset( $result['error'] ) ? (string) $result['error'] : '';
@@ -44,7 +44,8 @@ class RuntimeProvenance {
 				),
 				static fn( $value ) => array() !== $value && null !== $value && '' !== $value
 			),
-			'mode'            => $mode,
+			'mode'            => implode( ',', $modes ),
+			'modes'           => $modes,
 			'identifiers'     => self::identifiers( $payload ),
 			'input'           => array_filter(
 				array(
@@ -101,7 +102,7 @@ class RuntimeProvenance {
 
 	/** @return array<string,mixed> */
 	private static function identifiers( array $payload ): array {
-		$keys        = array( 'agent_id', 'agent_slug', 'agent_mode', 'pipeline_id', 'flow_id', 'flow_step_id', 'step_id', 'job_id', 'session_id', 'transcript_session_id' );
+		$keys        = array( 'agent_id', 'agent_slug', 'agent_modes', 'pipeline_id', 'flow_id', 'flow_step_id', 'step_id', 'job_id', 'session_id', 'transcript_session_id' );
 		$identifiers = array();
 		foreach ( $keys as $key ) {
 			if ( isset( $payload[ $key ] ) && '' !== $payload[ $key ] ) {
@@ -127,7 +128,8 @@ class RuntimeProvenance {
 	/** @return array<string,mixed> */
 	private static function tool_policy_inputs( array $payload ): array {
 		$inputs = array(
-			'mode'                     => $payload['agent_mode'] ?? null,
+			'mode'                     => isset( $payload['agent_modes'] ) && is_array( $payload['agent_modes'] ) ? implode( ',', $payload['agent_modes'] ) : null,
+			'modes'                    => is_array( $payload['agent_modes'] ?? null ) ? array_values( $payload['agent_modes'] ) : null,
 			'agent_id'                 => $payload['agent_id'] ?? null,
 			'agent_slug'               => $payload['agent_slug'] ?? null,
 			'pipeline_step_id'         => $payload['step_id'] ?? null,

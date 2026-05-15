@@ -121,7 +121,7 @@ $generic_assembled = ( new \DataMachine\Engine\AI\ProviderRequestAssembler() )->
 	'openai',
 	'gpt-test',
 	$tools,
-	'pipeline',
+	array( 'pipeline' ),
 	array(
 		'job_id'       => 1423,
 		'flow_step_id' => 'ai_step_1',
@@ -160,7 +160,7 @@ $assembled = \DataMachine\Engine\AI\RequestBuilder::assemble(
 	'openai',
 	'gpt-test',
 	$tools,
-	'pipeline',
+	array( 'pipeline' ),
 	array(
 		'job_id'       => 1423,
 		'flow_step_id' => 'ai_step_1',

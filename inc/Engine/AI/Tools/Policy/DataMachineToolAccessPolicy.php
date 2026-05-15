@@ -65,6 +65,10 @@ final class DataMachineToolAccessPolicy {
 		if ( ! empty( $ability_slugs ) ) {
 			$registry = \WP_Abilities_Registry::get_instance();
 			foreach ( $ability_slugs as $slug ) {
+				if ( method_exists( $registry, 'is_registered' ) && ! $registry->is_registered( $slug ) ) {
+					return false;
+				}
+
 				$ability = $registry->get_registered( $slug );
 				if ( ! $ability || ! $ability->check_permissions() ) {
 					return false;
