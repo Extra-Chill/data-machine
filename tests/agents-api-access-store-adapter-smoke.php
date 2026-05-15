@@ -228,11 +228,11 @@ agents_api_smoke_assert_equals( true, $adapter->revoke_access( 'wiki-brain', 7 )
 agents_api_smoke_assert_equals( null, $adapter->get_access( 'wiki-brain', 7 ), 'revoke removes repository grant', $failures, $passes );
 
 $principal_grant = array(
+	'grant_id'           => null,
 	'agent_id'           => 'wiki-brain',
 	'user_id'            => 0,
 	'role'               => \WP_Agent_Access_Grant::ROLE_OPERATOR,
 	'workspace_id'       => null,
-	'grant_id'           => null,
 	'granted_by_user_id' => null,
 	'granted_at'         => null,
 	'metadata'           => array( 'source' => 'fake' ),

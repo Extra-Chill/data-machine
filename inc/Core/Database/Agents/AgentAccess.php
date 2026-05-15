@@ -115,9 +115,9 @@ class AgentAccess extends BaseRepository {
 				$this->principal_table_name(),
 				array( 'role' => $role ),
 				array(
-					'agent_id'        => $agent_id,
-					'principal_type'  => $principal_type,
-					'principal_id'    => $principal_id,
+					'agent_id'       => $agent_id,
+					'principal_type' => $principal_type,
+					'principal_id'   => $principal_id,
 				),
 				array( '%s' ),
 				array( '%d', '%s', '%s' )
@@ -134,11 +134,11 @@ class AgentAccess extends BaseRepository {
 		$result = $this->wpdb->insert(
 			$this->principal_table_name(),
 			array(
-				'agent_id'        => $agent_id,
-				'principal_type'  => $principal_type,
-				'principal_id'    => $principal_id,
-				'role'            => $role,
-				'granted_at'      => current_time( 'mysql', true ),
+				'agent_id'       => $agent_id,
+				'principal_type' => $principal_type,
+				'principal_id'   => $principal_id,
+				'role'           => $role,
+				'granted_at'     => current_time( 'mysql', true ),
 			),
 			array( '%d', '%s', '%s', '%s', '%s' )
 		);
@@ -163,9 +163,9 @@ class AgentAccess extends BaseRepository {
 		$result = $this->wpdb->delete(
 			$this->principal_table_name(),
 			array(
-				'agent_id'        => (int) $agent_id,
-				'principal_type'  => $this->normalize_principal_type( $principal_type ),
-				'principal_id'    => $this->normalize_principal_id( $principal_id ),
+				'agent_id'       => (int) $agent_id,
+				'principal_type' => $this->normalize_principal_type( $principal_type ),
+				'principal_id'   => $this->normalize_principal_id( $principal_id ),
 			),
 			array( '%d', '%s', '%s' )
 		);

@@ -534,7 +534,7 @@ class AgentsCommand extends AgentBundleCommand {
 				}
 
 				list( $principal_type, $principal_id ) = $this->resolveAudiencePrincipal( (string) $audience );
-				$role                                = (string) ( $assoc_args['role'] ?? 'operator' );
+				$role                                  = (string) ( $assoc_args['role'] ?? 'operator' );
 
 				try {
 					$access_repo->grant_principal_access( (string) $agent_id, $principal_type, $principal_id, $role );
@@ -604,7 +604,7 @@ class AgentsCommand extends AgentBundleCommand {
 				}
 
 				list( $principal_type, $principal_id ) = $this->resolveAudiencePrincipal( (string) $audience );
-				$ok                                  = $access_repo->revoke_principal_access( (string) $agent_id, $principal_type, $principal_id );
+				$ok                                    = $access_repo->revoke_principal_access( (string) $agent_id, $principal_type, $principal_id );
 
 				if ( $ok ) {
 					WP_CLI::success( sprintf( 'Revoked access for %s:%s on agent "%s".', $principal_type, $principal_id, $slug ) );

@@ -361,8 +361,8 @@ class AgentAccessStoreAdapter implements \WP_Agent_Access_Store, \WP_Agent_Princ
 	private function normalize_principal( $principal ): ?array {
 		if ( is_string( $principal ) && false !== strpos( $principal, ':' ) ) {
 			list( $type, $id ) = explode( ':', $principal, 2 );
-			$type             = sanitize_key( $type );
-			$id               = sanitize_title( $id );
+			$type              = sanitize_key( $type );
+			$id                = sanitize_title( $id );
 			return '' !== $type && '' !== $id ? array(
 				'principal_type' => $type,
 				'principal_id'   => $id,

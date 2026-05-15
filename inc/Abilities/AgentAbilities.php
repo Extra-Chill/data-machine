@@ -1503,8 +1503,8 @@ class AgentAbilities {
 		}
 
 		// Enrich with access grants.
-		$access_repo = new \DataMachine\Core\Database\Agents\AgentAccess();
-		$access      = array_map(
+		$access_repo      = new \DataMachine\Core\Database\Agents\AgentAccess();
+		$access           = array_map(
 			static fn( \WP_Agent_Access_Grant $grant ): array => $grant->to_array(),
 			$access_repo->get_users_for_agent( (string) (int) $agent['agent_id'] )
 		);
@@ -1517,17 +1517,17 @@ class AgentAbilities {
 		return array(
 			'success' => true,
 			'agent'   => array(
-				'agent_id'     => (int) $agent['agent_id'],
-				'agent_slug'   => (string) $agent['agent_slug'],
-				'agent_name'   => (string) $agent['agent_name'],
-				'owner_id'     => (int) $agent['owner_id'],
-				'agent_config' => is_array( $agent['agent_config'] ?? null )
+				'agent_id'         => (int) $agent['agent_id'],
+				'agent_slug'       => (string) $agent['agent_slug'],
+				'agent_name'       => (string) $agent['agent_name'],
+				'owner_id'         => (int) $agent['owner_id'],
+				'agent_config'     => is_array( $agent['agent_config'] ?? null )
 					? $agent['agent_config']
 					: ( json_decode( $agent['agent_config'] ?? '{}', true ) ? json_decode( $agent['agent_config'] ?? '{}', true ) : array() ),
-				'created_at'   => $agent['created_at'] ?? '',
-				'updated_at'   => $agent['updated_at'] ?? '',
-				'agent_dir'    => $agent_dir,
-				'has_files'    => is_dir( $agent_dir ),
+				'created_at'       => $agent['created_at'] ?? '',
+				'updated_at'       => $agent['updated_at'] ?? '',
+				'agent_dir'        => $agent_dir,
+				'has_files'        => is_dir( $agent_dir ),
 				'access'           => $access,
 				'principal_access' => $principal_access,
 			),

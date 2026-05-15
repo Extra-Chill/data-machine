@@ -820,12 +820,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "c365119d177e9d3fc568f8032695e87007ceab4c"
+                "reference": "f761ddc24a72f7c541884e54f8664968a0bd8799"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/c365119d177e9d3fc568f8032695e87007ceab4c",
-                "reference": "c365119d177e9d3fc568f8032695e87007ceab4c",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/f761ddc24a72f7c541884e54f8664968a0bd8799",
+                "reference": "f761ddc24a72f7c541884e54f8664968a0bd8799",
                 "shasum": ""
             },
             "require": {
@@ -845,6 +845,8 @@
                     "php tests/effective-agent-resolver-smoke.php",
                     "php tests/caller-context-smoke.php",
                     "php tests/authorization-smoke.php",
+                    "php tests/agents-access-ability-smoke.php",
+                    "php tests/agents-conversation-session-abilities-smoke.php",
                     "php tests/action-policy-values-smoke.php",
                     "php tests/consent-policy-smoke.php",
                     "php tests/tool-policy-contracts-smoke.php",
@@ -852,6 +854,7 @@
                     "php tests/tool-runtime-smoke.php",
                     "php tests/pending-action-store-contract-smoke.php",
                     "php tests/approval-resolver-contract-smoke.php",
+                    "php tests/pending-action-abilities-smoke.php",
                     "php tests/identity-smoke.php",
                     "php tests/memory-metadata-contract-smoke.php",
                     "php tests/approval-action-value-shape-smoke.php",
@@ -871,6 +874,8 @@
                     "php tests/iteration-budget-smoke.php",
                     "php tests/conversation-loop-budgets-smoke.php",
                     "php tests/channels-smoke.php",
+                    "php tests/frontend-chat-rest-smoke.php",
+                    "php tests/agents-dispatch-message-ability-smoke.php",
                     "php tests/webhook-safety-smoke.php",
                     "php tests/remote-bridge-smoke.php",
                     "php tests/context-authority-smoke.php",
@@ -878,6 +883,7 @@
                     "php tests/workflow-bindings-smoke.php",
                     "php tests/workflow-spec-validator-smoke.php",
                     "php tests/workflow-runner-smoke.php",
+                    "php tests/workflow-lifecycle-smoke.php",
                     "php tests/agents-workflow-ability-smoke.php",
                     "php tests/routine-smoke.php",
                     "php tests/subagents-smoke.php",
@@ -893,7 +899,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-05-10T20:26:56+00:00"
+            "time": "2026-05-15T22:40:54+00:00"
         },
         {
             "name": "dealerdirect/phpcodesniffer-composer-installer",
@@ -1587,6 +1593,6 @@
     "platform": {
         "php": ">=8.2"
     },
-    "platform-dev": [],
-    "plugin-api-version": "2.6.0"
+    "platform-dev": {},
+    "plugin-api-version": "2.9.0"
 }
