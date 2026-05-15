@@ -142,13 +142,13 @@ function datamachine_run_conversation(
 			'status'                          => 'error',
 			'runtime_provenance'              => RuntimeProvenance::fromConversationResult(
 				array(
-					'messages'          => $messages,
-					'completed'         => false,
-					'error'             => $error_message,
-					'error_code'        => 'completion_required_tool_unavailable',
-					'usage'             => array(),
-					'request_metadata'  => array(),
-					'status'            => 'error',
+					'messages'         => $messages,
+					'completed'        => false,
+					'error'            => $error_message,
+					'error_code'       => 'completion_required_tool_unavailable',
+					'usage'            => array(),
+					'request_metadata' => array(),
+					'status'           => 'error',
 				),
 				$loop_payload,
 				$provider,
@@ -233,7 +233,7 @@ function datamachine_run_conversation(
 		// We can't read the substrate's accumulated turn_count/usage/etc here
 		// because the loop didn't return — surface what we know with empty
 		// defaults for the substrate-tracked fields.
-		$error_result = array(
+		$error_result                       = array(
 			'messages'               => $messages,
 			'final_content'          => '',
 			'turn_count'             => 0,
@@ -253,7 +253,7 @@ function datamachine_run_conversation(
 	try {
 		$result = WP_Agent_Conversation_Result::normalize( $result );
 	} catch ( \InvalidArgumentException $e ) {
-		$error_result = array(
+		$error_result                       = array(
 			'messages'               => $messages,
 			'final_content'          => '',
 			'turn_count'             => 0,
@@ -367,8 +367,8 @@ function datamachine_build_turn_runner(
 		// Per-turn request metadata is captured locally and returned in the
 		// turn result so the substrate can surface the latest one on the
 		// final loop result.
-		$request_metadata = array();
-		$ai_response      = RequestBuilder::build(
+		$request_metadata      = array();
+		$ai_response           = RequestBuilder::build(
 			$messages,
 			$provider,
 			$model,
@@ -422,8 +422,8 @@ function datamachine_build_turn_runner(
 
 		// Per-turn token usage. Substrate accumulates this across turns and
 		// exposes the running total on the final loop result.
-		$token_usage = $ai_result->getTokenUsage();
-		$turn_usage  = array(
+		$token_usage   = $ai_result->getTokenUsage();
+		$turn_usage    = array(
 			'prompt_tokens'     => $token_usage->getPromptTokens(),
 			'completion_tokens' => $token_usage->getCompletionTokens(),
 			'total_tokens'      => $token_usage->getTotalTokens(),

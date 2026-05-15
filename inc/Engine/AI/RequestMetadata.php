@@ -121,7 +121,7 @@ class RequestMetadata {
 					'model'                => $metadata['model'] ?? null,
 					'mode'                 => $metadata['mode'] ?? null,
 					'request_json_bytes'   => $metadata['request_json_bytes'] ?? null,
-					'messages_json_bytes' => $metadata['messages_json_bytes'] ?? null,
+					'messages_json_bytes'  => $metadata['messages_json_bytes'] ?? null,
 					'tools_json_bytes'     => $metadata['tools_json_bytes'] ?? null,
 					'message_count'        => $metadata['message_count'] ?? null,
 					'tool_count'           => $metadata['tools']['count'] ?? null,

@@ -27,8 +27,8 @@ class RuntimeProvenance {
 		$error_message    = isset( $result['error'] ) ? (string) $result['error'] : '';
 
 		$provenance = array(
-			'schema_version' => 1,
-			'provider'       => array_filter(
+			'schema_version'  => 1,
+			'provider'        => array_filter(
 				array(
 					'id'        => (string) ( $request_metadata['provider'] ?? $provider ),
 					'source'    => 'wp-ai-client',
@@ -36,7 +36,7 @@ class RuntimeProvenance {
 				),
 				static fn( $value ) => null !== $value && '' !== $value
 			),
-			'model'          => array_filter(
+			'model'           => array_filter(
 				array(
 					'id'            => (string) ( $request_metadata['model'] ?? $model ),
 					'config'        => is_array( $request_metadata['model_config'] ?? null ) ? $request_metadata['model_config'] : array(),
@@ -44,9 +44,9 @@ class RuntimeProvenance {
 				),
 				static fn( $value ) => array() !== $value && null !== $value && '' !== $value
 			),
-			'mode'           => $mode,
-			'identifiers'    => self::identifiers( $payload ),
-			'input'          => array_filter(
+			'mode'            => $mode,
+			'identifiers'     => self::identifiers( $payload ),
+			'input'           => array_filter(
 				array(
 					'prompt_sha256' => $request_metadata['prompt_sha256'] ?? null,
 					'input_sha256'  => $request_metadata['input_sha256'] ?? null,
@@ -54,7 +54,7 @@ class RuntimeProvenance {
 				),
 				static fn( $value ) => null !== $value && '' !== $value
 			),
-			'tools'          => array_filter(
+			'tools'           => array_filter(
 				array(
 					'policy_sha256' => $request_metadata['tool_policy_sha256'] ?? null,
 					'count'         => $request_metadata['tools']['count'] ?? null,
@@ -63,14 +63,14 @@ class RuntimeProvenance {
 				),
 				static fn( $value ) => array() !== $value && null !== $value && '' !== $value
 			),
-			'usage'          => $usage,
-			'attempts'       => array(
+			'usage'           => $usage,
+			'attempts'        => array(
 				'retry_count'    => 0,
 				'fallback_count' => 0,
 				'retries'        => array(),
 				'fallbacks'      => array(),
 			),
-			'status'         => array_filter(
+			'status'          => array_filter(
 				array(
 					'status'        => (string) ( $result['status'] ?? ( isset( $result['error'] ) ? 'error' : 'completed' ) ),
 					'completed'     => (bool) ( $result['completed'] ?? false ),
@@ -89,7 +89,7 @@ class RuntimeProvenance {
 					static fn( $value ) => null !== $value && '' !== $value
 				),
 			) : array(),
-			'request'        => self::request_shape( $request_metadata ),
+			'request'         => self::request_shape( $request_metadata ),
 		);
 
 		if ( isset( $result['tool_audit_events'] ) && is_array( $result['tool_audit_events'] ) ) {
@@ -127,12 +127,12 @@ class RuntimeProvenance {
 	/** @return array<string,mixed> */
 	private static function tool_policy_inputs( array $payload ): array {
 		$inputs = array(
-			'mode'                    => $payload['agent_mode'] ?? null,
-			'agent_id'                => $payload['agent_id'] ?? null,
-			'agent_slug'              => $payload['agent_slug'] ?? null,
-			'pipeline_step_id'        => $payload['step_id'] ?? null,
+			'mode'                     => $payload['agent_mode'] ?? null,
+			'agent_id'                 => $payload['agent_id'] ?? null,
+			'agent_slug'               => $payload['agent_slug'] ?? null,
+			'pipeline_step_id'         => $payload['step_id'] ?? null,
 			'configured_handler_slugs' => is_array( $payload['configured_handler_slugs'] ?? null ) ? array_values( $payload['configured_handler_slugs'] ) : null,
-			'tool_runtime_rules'      => is_array( $payload['tool_runtime_rules'] ?? null ) ? $payload['tool_runtime_rules'] : null,
+			'tool_runtime_rules'       => is_array( $payload['tool_runtime_rules'] ?? null ) ? $payload['tool_runtime_rules'] : null,
 		);
 
 		return array_filter(
