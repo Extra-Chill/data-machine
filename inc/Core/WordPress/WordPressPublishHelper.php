@@ -42,13 +42,14 @@ class WordPressPublishHelper {
 
 		// 3. Validate Image Type
 		$file_type = wp_check_filetype( $image_path );
-		if ( ! str_starts_with( $file_type['type'] ?? '', 'image/' ) ) {
+		$mime_type = is_string( $file_type['type'] ) ? $file_type['type'] : '';
+		if ( ! str_starts_with( $mime_type, 'image/' ) ) {
 			self::log(
 				'warning',
 				'WordPressPublishHelper: File is not a valid image',
 				array(
 					'path' => $image_path,
-					'type' => $file_type['type'],
+					'type' => $mime_type,
 				)
 			);
 			return null;
@@ -121,6 +122,10 @@ class WordPressPublishHelper {
 		}
 
 		$sanitized_url = esc_url( $source_url );
+		if ( str_contains( $content, $source_url ) || str_contains( $content, $sanitized_url ) ) {
+			return $content;
+		}
+
 		$content_format = isset( $config['content_format'] )
 			? sanitize_key( $config['content_format'] )
 			: ( self::contentHasBlocks( $content ) ? 'blocks' : 'html' );
