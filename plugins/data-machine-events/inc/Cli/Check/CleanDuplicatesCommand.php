@@ -13,6 +13,7 @@
 namespace DataMachineEvents\Cli\Check;
 
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\DuplicateDetection\EventMergeHelper;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 
@@ -149,19 +150,19 @@ class CleanDuplicatesCommand {
 		$merged  = 0;
 
 		foreach ( $to_trash as $action ) {
-			// Merge ticket URL if needed.
-			if ( 'yes' === $action['merge_ticket'] ) {
-				$trash_ticket = get_post_meta( $action['trash_id'], EVENT_TICKET_URL_META_KEY, true );
-				update_post_meta( $action['keep_id'], EVENT_TICKET_URL_META_KEY, $trash_ticket );
-				++$merged;
-			}
+			$merge_result = EventMergeHelper::merge(
+				$action['keep_id'],
+				$action['trash_id'],
+				array( 'merge_ticket_url' => 'yes' === $action['merge_ticket'] )
+			);
 
-			// Trash the duplicate.
-			$result = wp_trash_post( $action['trash_id'] );
-			if ( $result ) {
+			if ( $merge_result['success'] ) {
 				++$trashed;
+				if ( $merge_result['ticket_url_merged'] ) {
+					++$merged;
+				}
 			} else {
-				\WP_CLI::warning( sprintf( 'Failed to trash post %d.', $action['trash_id'] ) );
+				\WP_CLI::warning( $merge_result['error'] ?: sprintf( 'Failed to merge post %d into %d.', $action['trash_id'], $action['keep_id'] ) );
 			}
 		}
 

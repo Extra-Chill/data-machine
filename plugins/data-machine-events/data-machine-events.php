@@ -118,6 +118,7 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	\WP_CLI::add_command( 'data-machine-events check duration', \DataMachineEvents\Cli\Check\CheckDurationCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check duplicates', \DataMachineEvents\Cli\Check\CheckDuplicatesCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check clean-duplicates', \DataMachineEvents\Cli\Check\CleanDuplicatesCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check merged-bills', \DataMachineEvents\Cli\Check\CheckMergedBillsCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check quality', \DataMachineEvents\Cli\Check\CheckQualityCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check all', \DataMachineEvents\Cli\Check\CheckAllCommand::class );
 }
@@ -436,6 +437,36 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventDateQueryAbilities.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventDateQueryAbilities.php';
 			new \DataMachineEvents\Abilities\EventDateQueryAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MergedBillDetectAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MergedBillDetectAbilities.php';
+			new \DataMachineEvents\Abilities\MergedBillDetectAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MergeEventPostsAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MergeEventPostsAbilities.php';
+			new \DataMachineEvents\Abilities\MergeEventPostsAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MergedBillDecideAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MergedBillDecideAbilities.php';
+			new \DataMachineEvents\Abilities\MergedBillDecideAbilities();
+		}
+
+		// Chat tools for the merged-bill agent decision step (issue #256).
+		if ( class_exists( 'DataMachineEvents\\Api\\Chat\\Tools\\MergedBillInspect' ) ) {
+			new \DataMachineEvents\Api\Chat\Tools\MergedBillInspect();
+		}
+		if ( class_exists( 'DataMachineEvents\\Api\\Chat\\Tools\\MergedBillDecide' ) ) {
+			new \DataMachineEvents\Api\Chat\Tools\MergedBillDecide();
+		}
+
+		// Recurring resolver hook — drains the merged-bill candidate queue
+		// by invoking the chat agent. Registered at init so the hook fires
+		// once Action Scheduler is ready.
+		if ( class_exists( 'DataMachineEvents\\Steps\\MergedBills\\MergedBillResolverFlow' ) ) {
+			\DataMachineEvents\Steps\MergedBills\MergedBillResolverFlow::register();
 		}
 
 		$this->registerSystemHealthChecks();
