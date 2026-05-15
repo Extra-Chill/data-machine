@@ -15,6 +15,7 @@ React admin page for configuring Data Machine’s global settings, agent default
 The settings UI is a simple tabbed container (`SettingsApp.jsx`) that persists the active tab in `localStorage` (`datamachine_settings_active_tab`).
 
 - **General**: Non-AI operational settings (cleanup, retention, pagination).
+- **General / Pipeline AI Concurrency**: Pipeline AI provider backpressure (`pipeline_ai_concurrency_limit`, optional provider limits, and retry delay) separate from Action Scheduler queue throughput.
 - **Agent**: Global agent runtime defaults (global system prompt, site context toggle, max turns, enabled global tools).
 - **API Keys**: Provider API keys (masked on read; only updated when the user enters a new value).
 - **Handler Defaults**: Site-wide handler default settings that seed new flow step configs.

@@ -90,6 +90,10 @@ curl -X POST https://example.com/wp-json/datamachine/v1/settings/tools/google_se
 ### Global Settings
 
 - `problem_flow_threshold` (integer): Number of consecutive failures or "no items" results before a flow is flagged as a problem flow. Default: `3`.
+- `pipeline_ai_concurrency_limit` (integer): Site-wide maximum concurrent pipeline AI provider calls. Default: `3`.
+- `pipeline_ai_provider_concurrency_limits` (object): Optional per-provider caps keyed by provider slug, for example `{ "openai": 10 }`. Provider caps apply in addition to the site-wide cap.
+- `pipeline_ai_throttle_delay` (integer): Seconds before a pipeline AI job retries when the AI concurrency lane is saturated. Default: `10`.
+- `queue_tuning` (object): Local queue producer/consumer tuning for Action Scheduler and batch fan-out. These settings control job scheduling/draining, not provider-call concurrency.
 
 **Example Request**:
 
@@ -98,7 +102,10 @@ curl -X POST https://example.com/wp-json/datamachine/v1/settings \
   -H "Content-Type: application/json" \
   -u username:application_password \
   -d '{
-    "problem_flow_threshold": 5
+    "problem_flow_threshold": 5,
+    "pipeline_ai_concurrency_limit": 10,
+    "pipeline_ai_provider_concurrency_limits": { "openai": 10 },
+    "pipeline_ai_throttle_delay": 5
   }'
 ```
 

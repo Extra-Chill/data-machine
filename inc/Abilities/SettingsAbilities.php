@@ -118,6 +118,18 @@ class SettingsAbilities {
 							'type'        => 'number',
 							'description' => 'Full request timeout in seconds for wp-ai-client provider requests.',
 						),
+						'pipeline_ai_concurrency_limit'  => array(
+							'type'        => 'integer',
+							'description' => 'Site-wide maximum number of concurrent pipeline AI provider calls.',
+						),
+						'pipeline_ai_provider_concurrency_limits' => array(
+							'type'        => 'object',
+							'description' => 'Optional per-provider pipeline AI concurrency limits keyed by provider slug. Values above 0 add a provider-specific cap in addition to the site-wide cap.',
+						),
+						'pipeline_ai_throttle_delay'     => array(
+							'type'        => 'integer',
+							'description' => 'Seconds before a pipeline AI job retries after the AI concurrency limit is saturated.',
+						),
 						'disabled_tools'                 => array( 'type' => 'object' ),
 						'ai_provider_keys'               => array( 'type' => 'object' ),
 						'queue_tuning'                   => array(
@@ -363,6 +375,9 @@ class SettingsAbilities {
 				'max_turns'                      => $settings['max_turns'] ?? $defaults['max_turns'],
 				'wp_ai_client_connect_timeout'   => $settings['wp_ai_client_connect_timeout'] ?? $defaults['wp_ai_client_connect_timeout'],
 				'wp_ai_client_request_timeout'   => $settings['wp_ai_client_request_timeout'] ?? $defaults['wp_ai_client_request_timeout'],
+				'pipeline_ai_concurrency_limit'  => $settings['pipeline_ai_concurrency_limit'] ?? $defaults['pipeline_ai_concurrency_limit'],
+				'pipeline_ai_provider_concurrency_limits' => $settings['pipeline_ai_provider_concurrency_limits'] ?? $defaults['pipeline_ai_provider_concurrency_limits'],
+				'pipeline_ai_throttle_delay'     => $settings['pipeline_ai_throttle_delay'] ?? $defaults['pipeline_ai_throttle_delay'],
 				'disabled_tools'                 => $settings['disabled_tools'] ?? array(),
 				'ai_provider_keys'               => $masked_keys,
 				'queue_tuning'                   => wp_parse_args( $settings['queue_tuning'] ?? array(), $defaults['queue_tuning'] ),
@@ -481,6 +496,38 @@ class SettingsAbilities {
 				min( PluginSettings::MAX_WP_AI_CLIENT_REQUEST_TIMEOUT, (float) $input['wp_ai_client_request_timeout'] )
 			);
 			$handled_keys[]                               = 'wp_ai_client_request_timeout';
+		}
+
+		if ( isset( $input['pipeline_ai_concurrency_limit'] ) ) {
+			$limit                                         = absint( $input['pipeline_ai_concurrency_limit'] );
+			$all_settings['pipeline_ai_concurrency_limit'] = max( 1, min( PluginSettings::MAX_PIPELINE_AI_CONCURRENCY_LIMIT, $limit ) );
+			$handled_keys[]                                = 'pipeline_ai_concurrency_limit';
+		}
+
+		if ( isset( $input['pipeline_ai_provider_concurrency_limits'] ) && is_array( $input['pipeline_ai_provider_concurrency_limits'] ) ) {
+			$provider_limits = array();
+			foreach ( $input['pipeline_ai_provider_concurrency_limits'] as $provider => $limit ) {
+				$provider = sanitize_key( (string) $provider );
+				if ( '' === $provider ) {
+					continue;
+				}
+
+				$limit = absint( $limit );
+				if ( $limit <= 0 ) {
+					continue;
+				}
+
+				$provider_limits[ $provider ] = min( PluginSettings::MAX_PIPELINE_AI_CONCURRENCY_LIMIT, $limit );
+			}
+
+			$all_settings['pipeline_ai_provider_concurrency_limits'] = $provider_limits;
+			$handled_keys[]                                          = 'pipeline_ai_provider_concurrency_limits';
+		}
+
+		if ( isset( $input['pipeline_ai_throttle_delay'] ) ) {
+			$delay                                      = absint( $input['pipeline_ai_throttle_delay'] );
+			$all_settings['pipeline_ai_throttle_delay'] = max( 1, min( PluginSettings::MAX_PIPELINE_AI_THROTTLE_DELAY, $delay ) );
+			$handled_keys[]                             = 'pipeline_ai_throttle_delay';
 		}
 
 		if ( isset( $input['disabled_tools'] ) ) {
