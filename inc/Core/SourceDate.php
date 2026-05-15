@@ -26,6 +26,10 @@ class SourceDate {
 		}
 
 		$timestamp = strtotime( (string) $date );
-		return false !== $timestamp ? gmdate( 'Y-m-d H:i:s', $timestamp ) : null;
+		if ( false === $timestamp || $timestamp > time() ) {
+			return null;
+		}
+
+		return gmdate( 'Y-m-d H:i:s', $timestamp );
 	}
 }

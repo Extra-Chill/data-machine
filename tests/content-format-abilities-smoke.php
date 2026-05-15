@@ -403,6 +403,23 @@ namespace {
 	assert_content_ability( 'upsert-original-date-meta-stored', '2020-09-24 06:12:53' === get_post_meta( $source_id, '_datamachine_original_date_gmt', true ) );
 	assert_content_ability( 'upsert-original-date-applies-post-date-gmt', '2020-09-24 06:12:53' === ( $source_post->post_date_gmt ?? '' ) );
 
+	$future_source_upsert = DataMachine\Abilities\Content\UpsertPostAbility::execute(
+		array(
+			'post_type'         => 'wiki',
+			'title'             => 'Future Source Date Ignored',
+			'content'           => "# Future\n\nRaw markdown.",
+			'content_format'    => 'markdown',
+			'source_url'        => 'https://example.com/future-source-post/',
+			'original_date_gmt' => '2999-01-01T00:00:00+00:00',
+		)
+	);
+	$future_source_id     = (int) ( $future_source_upsert['post_id'] ?? 0 );
+	$future_source_post   = get_post( $future_source_id );
+	assert_content_ability( 'upsert-future-source-date-succeeds', true === $future_source_upsert['success'] );
+	assert_content_ability( 'upsert-future-source-url-still-stored', 'https://example.com/future-source-post/' === get_post_meta( $future_source_id, '_datamachine_source_url', true ) );
+	assert_content_ability( 'upsert-future-original-date-ignored', '' === get_post_meta( $future_source_id, '_datamachine_original_date_gmt', true ) );
+	assert_content_ability( 'upsert-future-original-date-does-not-set-post-date-gmt', empty( $future_source_post->post_date_gmt ) );
+
 	$chat_upsert   = DataMachine\Abilities\Content\UpsertPostAbility::handleChatToolCall(
 		array(
 			'post_type' => 'post',
