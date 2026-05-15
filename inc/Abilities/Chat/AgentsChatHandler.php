@@ -54,9 +54,16 @@ class AgentsChatHandler {
 	 * @return bool
 	 */
 	public function checkPermission( bool $allowed, array $input ): bool {
-		unset( $input );
+		if ( $allowed || PermissionHelper::can( 'chat' ) ) {
+			return true;
+		}
 
-		return $allowed || PermissionHelper::can( 'chat' );
+		$agent = sanitize_title( (string) ( $input['agent'] ?? '' ) );
+		if ( '' === $agent || ! class_exists( '\WP_Agent_Access' ) || ! class_exists( '\WP_Agent_Access_Grant' ) ) {
+			return false;
+		}
+
+		return \WP_Agent_Access::can_current_principal_access_agent( $agent, \WP_Agent_Access_Grant::ROLE_VIEWER );
 	}
 
 	/**
@@ -71,18 +78,14 @@ class AgentsChatHandler {
 			return new WP_Error( 'empty_message', __( 'Message cannot be empty.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
-		$user_id = PermissionHelper::acting_user_id();
-		if ( $user_id <= 0 ) {
-			$user_id = get_current_user_id();
-		}
-
-		if ( $user_id <= 0 ) {
-			return new WP_Error( 'no_user', __( 'No user context available.', 'data-machine' ), array( 'status' => 400 ) );
-		}
-
 		$agent_id = $this->resolveAgentId( (string) ( $input['agent'] ?? '' ) );
 		if ( $agent_id instanceof WP_Error ) {
 			return $agent_id;
+		}
+
+		$user_id = $this->resolveRuntimeUserId( $agent_id, (string) ( $input['agent'] ?? '' ) );
+		if ( $user_id <= 0 ) {
+			return new WP_Error( 'no_user', __( 'No user context available.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
 		$client_context = is_array( $input['client_context'] ?? null ) ? $input['client_context'] : array();
@@ -148,6 +151,40 @@ class AgentsChatHandler {
 		}
 
 		return (int) ( $row['agent_id'] ?? 0 );
+	}
+
+	/**
+	 * Resolve the WordPress user context used by Data Machine's chat runtime.
+	 *
+	 * Anonymous audience chats execute under the selected agent owner after the
+	 * Agents API access check succeeds, keeping model credentials and tool policy
+	 * scoped to the site-owned brain agent instead of an anonymous WP user.
+	 *
+	 * @param int    $agent_id Internal Data Machine agent ID.
+	 * @param string $agent    Requested Agents API agent slug/id.
+	 * @return int Runtime WordPress user ID, or 0 when no safe context exists.
+	 */
+	private function resolveRuntimeUserId( int $agent_id, string $agent ): int {
+		$user_id = PermissionHelper::acting_user_id();
+		if ( $user_id <= 0 ) {
+			$user_id = get_current_user_id();
+		}
+
+		if ( $user_id > 0 ) {
+			return $user_id;
+		}
+
+		$agent_slug = sanitize_title( $agent );
+		if ( '' === $agent_slug || ! class_exists( '\WP_Agent_Access' ) || ! class_exists( '\WP_Agent_Access_Grant' ) ) {
+			return 0;
+		}
+
+		if ( ! \WP_Agent_Access::can_current_principal_access_agent( $agent_slug, \WP_Agent_Access_Grant::ROLE_VIEWER ) ) {
+			return 0;
+		}
+
+		$row = ( new Agents() )->get_agent( $agent_id );
+		return $row ? (int) ( $row['owner_id'] ?? 0 ) : 0;
 	}
 
 	/**

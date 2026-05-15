@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Exposes Data Machine's existing agent access table through Agents API.
  */
-class AgentAccessStoreAdapter implements \WP_Agent_Access_Store {
+class AgentAccessStoreAdapter implements \WP_Agent_Access_Store, \WP_Agent_Principal_Access_Store {
 
 	/**
 	 * Existing Data Machine access repository.
@@ -124,6 +124,104 @@ class AgentAccessStoreAdapter implements \WP_Agent_Access_Store {
 	}
 
 	/**
+	 * Create or update a non-user principal/audience grant.
+	 *
+	 * This method is intentionally additive because older Agents API versions only
+	 * declare user-grant methods on WP_Agent_Access_Store.
+	 *
+	 * @param string $agent_id       Registered agent slug/id.
+	 * @param string $principal_type Principal type, for example audience.
+	 * @param string $principal_id   Principal identifier, for example public.
+	 * @param string $role           Access role.
+	 * @return array<string,mixed>
+	 */
+	public function grant_access_for_principal( string $agent_id, string $principal_type, string $principal_id, string $role = \WP_Agent_Access_Grant::ROLE_VIEWER ): array {
+		$resolved = $this->access_repository->grant_principal_access( $this->storage_agent_id( $agent_id ), $principal_type, $principal_id, $role );
+		return $this->principal_grant_for_contract( $resolved, $agent_id )->to_array();
+	}
+
+	/**
+	 * Alias for upstream contracts that choose principal-first naming.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function grant_principal_access( string $agent_id, string $principal_type, string $principal_id, string $role = \WP_Agent_Access_Grant::ROLE_VIEWER ): array {
+		return $this->grant_access_for_principal( $agent_id, $principal_type, $principal_id, $role );
+	}
+
+	/**
+	 * Revoke a non-user principal/audience grant.
+	 */
+	public function revoke_access_for_principal( string $agent_id, string $principal_type, string $principal_id, ?string $workspace_id = null ): bool {
+		unset( $workspace_id );
+		return $this->access_repository->revoke_principal_access( $this->storage_agent_id( $agent_id ), $principal_type, $principal_id );
+	}
+
+	/**
+	 * Fetch a grant for a resolved non-user principal/audience.
+	 *
+	 * @return \WP_Agent_Access_Grant|null
+	 */
+	public function get_access_for_principal( string $agent_id, \AgentsAPI\AI\WP_Agent_Execution_Principal $principal, ?string $workspace_id = null ): ?\WP_Agent_Access_Grant {
+		$normalized = $this->normalize_principal( $principal );
+		if ( null === $normalized ) {
+			return null;
+		}
+
+		$grant = $this->access_repository->get_principal_access( $this->storage_agent_id( $agent_id ), $normalized['principal_type'], $normalized['principal_id'], $workspace_id );
+		return $grant ? $this->principal_grant_for_contract( $grant, $agent_id ) : null;
+	}
+
+	/**
+	 * List agent IDs accessible to a resolved non-user principal/audience.
+	 *
+	 * @return string[]
+	 */
+	public function get_agent_ids_for_principal( \AgentsAPI\AI\WP_Agent_Execution_Principal $principal, ?string $minimum_role = null, ?string $workspace_id = null ): array {
+		$normalized = $this->normalize_principal( $principal );
+		if ( null === $normalized ) {
+			return array();
+		}
+
+		$agent_ids = $this->access_repository->get_agent_ids_for_principal( $normalized['principal_type'], $normalized['principal_id'], $minimum_role, $workspace_id );
+		if ( empty( $agent_ids ) ) {
+			return array();
+		}
+
+		$rows        = $this->agents_repository->get_agents_by_ids( array_map( 'intval', $agent_ids ) );
+		$slugs_by_id = array();
+		foreach ( $rows as $row ) {
+			$agent_id = (int) ( $row['agent_id'] ?? 0 );
+			$slug     = sanitize_title( (string) ( $row['agent_slug'] ?? '' ) );
+			if ( $agent_id > 0 && '' !== $slug ) {
+				$slugs_by_id[ $agent_id ] = $slug;
+			}
+		}
+
+		$slugs = array();
+		foreach ( $agent_ids as $agent_id ) {
+			$agent_id = (int) $agent_id;
+			if ( isset( $slugs_by_id[ $agent_id ] ) ) {
+				$slugs[] = $slugs_by_id[ $agent_id ];
+			}
+		}
+
+		return $slugs;
+	}
+
+	/**
+	 * List non-user principal/audience grants for an agent.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function get_principals_for_agent( string $agent_id, ?string $workspace_id = null ): array {
+		return array_map(
+			fn( array $grant ): array => $this->principal_grant_for_contract( $grant, $agent_id )->to_array(),
+			$this->access_repository->get_principals_for_agent( $this->storage_agent_id( $agent_id ), $workspace_id )
+		);
+	}
+
+	/**
 	 * List users with access to an agent.
 	 *
 	 * @return \WP_Agent_Access_Grant[]
@@ -168,7 +266,8 @@ class AgentAccessStoreAdapter implements \WP_Agent_Access_Store {
 			$grant->grant_id,
 			$grant->granted_by_user_id,
 			$grant->granted_at,
-			$grant->metadata
+			$grant->metadata,
+			$grant->audience_id
 		);
 	}
 
@@ -196,7 +295,8 @@ class AgentAccessStoreAdapter implements \WP_Agent_Access_Store {
 			$grant->grant_id,
 			$grant->granted_by_user_id,
 			$grant->granted_at,
-			$grant->metadata
+			$grant->metadata,
+			$grant->audience_id
 		);
 	}
 
@@ -214,5 +314,86 @@ class AgentAccessStoreAdapter implements \WP_Agent_Access_Store {
 		}
 
 		return $agent_id;
+	}
+
+	/**
+	 * Convert a Data Machine numeric principal grant into the Agents API slug shape.
+	 *
+	 * @param array<string,mixed> $grant              Principal grant row.
+	 * @param string             $requested_agent_id Agent ID requested by caller.
+	 * @return \WP_Agent_Access_Grant
+	 */
+	private function principal_grant_for_contract( array $grant, string $requested_agent_id = '' ): \WP_Agent_Access_Grant {
+		$agent_slug = $this->contract_agent_id( (string) ( $grant['agent_id'] ?? '' ) );
+		if ( ! is_numeric( $requested_agent_id ) ) {
+			$requested_slug = sanitize_title( $requested_agent_id );
+			if ( '' !== $requested_slug ) {
+				$agent_slug = $requested_slug;
+			}
+		}
+
+		$audience_id = (string) ( $grant['audience_id'] ?? '' );
+		if ( '' === $audience_id ) {
+			$principal_type = (string) ( $grant['principal_type'] ?? 'audience' );
+			$principal_id   = (string) ( $grant['principal_id'] ?? '' );
+			$audience_id    = '' !== $principal_type && '' !== $principal_id ? $principal_type . ':' . $principal_id : '';
+		}
+
+		return new \WP_Agent_Access_Grant(
+			$agent_slug,
+			0,
+			(string) ( $grant['role'] ?? \WP_Agent_Access_Grant::ROLE_VIEWER ),
+			array_key_exists( 'workspace_id', $grant ) && null !== $grant['workspace_id'] ? (string) $grant['workspace_id'] : null,
+			isset( $grant['grant_id'] ) ? (int) $grant['grant_id'] : null,
+			null,
+			array_key_exists( 'granted_at', $grant ) && null !== $grant['granted_at'] ? (string) $grant['granted_at'] : null,
+			isset( $grant['metadata'] ) && is_array( $grant['metadata'] ) ? $grant['metadata'] : array(),
+			$audience_id
+		);
+	}
+
+	/**
+	 * Normalize an Agents API principal object/array or an audience:<slug> string.
+	 *
+	 * @param mixed $principal Principal shape from Agents API.
+	 * @return array{principal_type:string,principal_id:string}|null
+	 */
+	private function normalize_principal( $principal ): ?array {
+		if ( is_string( $principal ) && false !== strpos( $principal, ':' ) ) {
+			list( $type, $id ) = explode( ':', $principal, 2 );
+			$type             = sanitize_key( $type );
+			$id               = sanitize_title( $id );
+			return '' !== $type && '' !== $id ? array(
+				'principal_type' => $type,
+				'principal_id'   => $id,
+			) : null;
+		}
+
+		if ( is_array( $principal ) ) {
+			$type = (string) ( $principal['principal_type'] ?? $principal['type'] ?? '' );
+			$id   = (string) ( $principal['principal_id'] ?? $principal['id'] ?? '' );
+		} elseif ( is_object( $principal ) ) {
+			$audience_id = (string) ( $principal->audience_id ?? '' );
+			if ( '' !== $audience_id && false !== strpos( $audience_id, ':' ) ) {
+				list( $type, $id ) = explode( ':', $audience_id, 2 );
+			} else {
+				$type = (string) ( $principal->principal_type ?? $principal->type ?? '' );
+				$id   = (string) ( $principal->principal_id ?? $principal->id ?? '' );
+			}
+		} else {
+			return null;
+		}
+
+		$type = sanitize_key( $type );
+		$id   = sanitize_title( $id );
+
+		if ( '' === $type || '' === $id || 'user' === $type ) {
+			return null;
+		}
+
+		return array(
+			'principal_type' => $type,
+			'principal_id'   => $id,
+		);
 	}
 }

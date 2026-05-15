@@ -493,6 +493,49 @@ class AgentAbilities {
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
+
+			wp_register_ability(
+				'datamachine/grant-agent-audience-access',
+				array(
+					'label'               => 'Grant Agent Audience Access',
+					'description'         => 'Grant a selected agent to an explicit non-user audience principal such as audience:public.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'agent', 'principal_id' ),
+						'properties' => array(
+							'agent'          => array(
+								'type'        => 'string',
+								'description' => 'Agent slug or ID to grant.',
+							),
+							'principal_type' => array(
+								'type'        => 'string',
+								'description' => 'Principal type. Defaults to audience.',
+							),
+							'principal_id'   => array(
+								'type'        => 'string',
+								'description' => 'Principal identifier, such as public or automattician.',
+							),
+							'role'           => array(
+								'type'        => 'string',
+								'enum'        => array( 'admin', 'operator', 'viewer' ),
+								'description' => 'Access role. Defaults to operator.',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'grant'   => array( 'type' => 'object' ),
+							'error'   => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( self::class, 'grantAgentAudienceAccess' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
@@ -1465,6 +1508,7 @@ class AgentAbilities {
 			static fn( \WP_Agent_Access_Grant $grant ): array => $grant->to_array(),
 			$access_repo->get_users_for_agent( (string) (int) $agent['agent_id'] )
 		);
+		$principal_access = $access_repo->get_principals_for_agent( (string) (int) $agent['agent_id'] );
 
 		// Check for agent directory.
 		$directory_manager = new DirectoryManager();
@@ -1484,8 +1528,50 @@ class AgentAbilities {
 				'updated_at'   => $agent['updated_at'] ?? '',
 				'agent_dir'    => $agent_dir,
 				'has_files'    => is_dir( $agent_dir ),
-				'access'       => $access,
+				'access'           => $access,
+				'principal_access' => $principal_access,
 			),
+		);
+	}
+
+	/**
+	 * Grant an agent to an explicit audience/non-user principal.
+	 *
+	 * @param array $input Ability input.
+	 * @return array Result.
+	 */
+	public static function grantAgentAudienceAccess( array $input ): array {
+		$agent_id = self::resolve_agent_input_id( $input );
+		if ( is_wp_error( $agent_id ) ) {
+			return array(
+				'success' => false,
+				'error'   => $agent_id->get_error_message(),
+			);
+		}
+
+		$principal_type = sanitize_key( (string) ( $input['principal_type'] ?? 'audience' ) );
+		$principal_id   = sanitize_title( (string) ( $input['principal_id'] ?? '' ) );
+		$role           = (string) ( $input['role'] ?? \WP_Agent_Access_Grant::ROLE_OPERATOR );
+
+		if ( '' === $principal_type || '' === $principal_id || 'user' === $principal_type ) {
+			return array(
+				'success' => false,
+				'error'   => 'A non-user principal_type and principal_id are required.',
+			);
+		}
+
+		try {
+			$grant = ( new AgentAccess() )->grant_principal_access( (string) $agent_id, $principal_type, $principal_id, $role );
+		} catch ( \Throwable $e ) {
+			return array(
+				'success' => false,
+				'error'   => $e->getMessage(),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'grant'   => $grant,
 		);
 	}
 
