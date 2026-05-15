@@ -102,6 +102,7 @@ class SourcePolicyToolManager extends ToolManager {
 			'custom_static_tool'   => array( 'modes' => array( 'custom_mode' ), 'origin' => 'static' ),
 			'handler_wrapper'      => array( 'modes' => array( 'pipeline' ), '_handler_callable' => 'noop' ),
 			'disabled_static_tool' => array( 'modes' => array( 'chat' ), 'origin' => 'static', 'access_level' => 'public' ),
+			'durable_memory_tool'  => array( 'modes' => array( 'chat', 'pipeline_policy' ), 'origin' => 'static', 'access_level' => 'public' ),
 		);
 	}
 
@@ -197,7 +198,7 @@ assert_source_equals( array( 'ticketmaster_fetch:previous:fetch_step', 'publish_
 
 echo "\n[2] non-pipeline modes use static registry only:\n";
 $manager = new SourcePolicyToolManager();
-assert_source_equals( array( 'chat_static_tool' ), array_keys( resolve_source_tools( ToolPolicyResolver::MODE_CHAT, $manager ) ), 'chat mode gets static chat tools only', $failures, $passes );
+assert_source_equals( array( 'chat_static_tool', 'durable_memory_tool' ), array_keys( resolve_source_tools( ToolPolicyResolver::MODE_CHAT, $manager ) ), 'chat mode gets static chat tools only', $failures, $passes );
 assert_source_equals( array(), $manager->handler_calls, 'chat mode does not query adjacent handlers', $failures, $passes );
 assert_source_equals( array( 'system_static_tool' ), array_keys( resolve_source_tools( ToolPolicyResolver::MODE_SYSTEM, new SourcePolicyToolManager() ) ), 'system mode gets static system tools only', $failures, $passes );
 assert_source_equals( array( 'custom_static_tool' ), array_keys( resolve_source_tools( 'custom_mode', new SourcePolicyToolManager() ) ), 'custom mode gets static custom-mode tools only', $failures, $passes );
@@ -231,7 +232,7 @@ add_filter(
 	3
 );
 $tools = resolve_source_tools( ToolPolicyResolver::MODE_CHAT, new SourcePolicyToolManager() );
-assert_source_equals( array( 'chat_static_tool', 'extra_tool' ), array_keys( $tools ), 'filter appends extra source after static source', $failures, $passes );
+assert_source_equals( array( 'chat_static_tool', 'durable_memory_tool', 'extra_tool' ), array_keys( $tools ), 'filter appends extra source after static source', $failures, $passes );
 remove_all_filters_for_source_smoke();
 add_filter(
 	'datamachine_tool_sources',
@@ -255,7 +256,7 @@ add_filter(
 	10,
 	1
 );
-assert_source_equals( array( 'chat_static_tool' ), array_keys( resolve_source_tools( ToolPolicyResolver::MODE_CHAT, new SourcePolicyToolManager() ) ), 'legacy Data Machine tool-source filters are no longer mirrored', $failures, $passes );
+assert_source_equals( array( 'chat_static_tool', 'durable_memory_tool' ), array_keys( resolve_source_tools( ToolPolicyResolver::MODE_CHAT, new SourcePolicyToolManager() ) ), 'legacy Data Machine tool-source filters are no longer mirrored', $failures, $passes );
 
 echo "\n[4] custom mode can inherit another mode's tool surface via filter:\n";
 remove_all_filters_for_source_smoke();
@@ -296,7 +297,50 @@ $null_filter = resolve_source_tools( 'custom_mode', new SourcePolicyToolManager(
 assert_source_equals( array( 'custom_static_tool' ), array_keys( $null_filter ), 'empty filter return falls back to current mode', $failures, $passes );
 remove_all_filters_for_source_smoke();
 
-echo "\n[5] Data Machine source adapters own product vocabulary:\n";
+echo "\n[5] pipeline_policy tools follow pipeline inheritance:\n";
+remove_all_filters_for_source_smoke();
+$pipeline_policy_baseline = resolve_source_tools(
+	ToolPolicyResolver::MODE_PIPELINE,
+	new SourcePolicyToolManager(),
+	array( 'allow_only' => array( 'durable_memory_tool' ) )
+);
+assert_source_equals( true, isset( $pipeline_policy_baseline['durable_memory_tool'] ), 'pipeline mode picks up policy-gated tool when allowlisted', $failures, $passes );
+$pipeline_policy_no_allowlist = resolve_source_tools(
+	ToolPolicyResolver::MODE_PIPELINE,
+	new SourcePolicyToolManager()
+);
+assert_source_equals( false, isset( $pipeline_policy_no_allowlist['durable_memory_tool'] ), 'pipeline mode skips policy-gated tool without allowlist', $failures, $passes );
+add_filter(
+	'datamachine_tool_mode_matchable_modes',
+	static function ( array $matchable, string $mode ): array {
+		if ( 'custom_mode' === $mode ) {
+			$matchable[] = ToolPolicyResolver::MODE_PIPELINE;
+		}
+		return $matchable;
+	},
+	10,
+	2
+);
+$inherited_policy = resolve_source_tools(
+	'custom_mode',
+	new SourcePolicyToolManager(),
+	array( 'allow_only' => array( 'durable_memory_tool' ) )
+);
+assert_source_equals( true, isset( $inherited_policy['durable_memory_tool'] ), 'custom mode that inherits pipeline picks up policy-gated tool when allowlisted', $failures, $passes );
+$inherited_policy_no_allowlist = resolve_source_tools(
+	'custom_mode',
+	new SourcePolicyToolManager()
+);
+assert_source_equals( false, isset( $inherited_policy_no_allowlist['durable_memory_tool'] ), 'custom mode that inherits pipeline still skips policy-gated tool without allowlist', $failures, $passes );
+remove_all_filters_for_source_smoke();
+$chat_no_inheritance = resolve_source_tools(
+	ToolPolicyResolver::MODE_CHAT,
+	new SourcePolicyToolManager(),
+	array( 'allow_only' => array( 'durable_memory_tool' ) )
+);
+assert_source_equals( true, isset( $chat_no_inheritance['durable_memory_tool'] ), 'chat mode keeps direct access to its own pipeline_policy tool entry', $failures, $passes );
+
+echo "\n[6] Data Machine source adapters own product vocabulary:\n";
 $registry_source          = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php' );
 $adjacent_source          = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php' );
 $datamachine_tool_source  = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php' );
