@@ -75,8 +75,9 @@ function datamachine_run_conversation(
 	// surfaces turn_count, final_content, usage, and request_metadata on the
 	// final result directly (see agents-api#136), so we only carry by-reference
 	// the things substrate doesn't track for us.
-	$last_tool_calls   = array();
-	$completion_nudges = array();
+	$last_tool_calls       = array();
+	$completion_nudges     = array();
+	$last_request_metadata = array();
 
 	// Base log context for consistent logging.
 	$base_log_context = array_filter(
@@ -139,6 +140,21 @@ function datamachine_run_conversation(
 			'usage'                           => array(),
 			'request_metadata'                => array(),
 			'status'                          => 'error',
+			'runtime_provenance'              => RuntimeProvenance::fromConversationResult(
+				array(
+					'messages'         => $messages,
+					'completed'        => false,
+					'error'            => $error_message,
+					'error_code'       => 'completion_required_tool_unavailable',
+					'usage'            => array(),
+					'request_metadata' => array(),
+					'status'           => 'error',
+				),
+				$loop_payload,
+				$provider,
+				$model,
+				$mode
+			),
 		);
 	}
 
@@ -162,7 +178,8 @@ function datamachine_run_conversation(
 		$completion_policy,
 		$tool_runtime_rules,
 		$last_tool_calls,
-		$completion_nudges
+		$completion_nudges,
+		$last_request_metadata
 	);
 
 	// Build should_continue callback. Budget enforcement is handled by
@@ -216,7 +233,7 @@ function datamachine_run_conversation(
 		// We can't read the substrate's accumulated turn_count/usage/etc here
 		// because the loop didn't return — surface what we know with empty
 		// defaults for the substrate-tracked fields.
-		return array(
+		$error_result                       = array(
 			'messages'               => $messages,
 			'final_content'          => '',
 			'turn_count'             => 0,
@@ -225,16 +242,18 @@ function datamachine_run_conversation(
 			'tool_execution_results' => array(),
 			'error'                  => $e->getMessage(),
 			'usage'                  => array(),
-			'request_metadata'       => array(),
+			'request_metadata'       => $last_request_metadata,
 			'status'                 => 'error',
 		);
+		$error_result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $error_result, $loop_payload, $provider, $model, $mode );
+		return $error_result;
 	}
 
 	// Normalize the substrate result and augment with DM-specific fields.
 	try {
 		$result = WP_Agent_Conversation_Result::normalize( $result );
 	} catch ( \InvalidArgumentException $e ) {
-		return array(
+		$error_result                       = array(
 			'messages'               => $messages,
 			'final_content'          => '',
 			'turn_count'             => 0,
@@ -244,6 +263,8 @@ function datamachine_run_conversation(
 			'usage'                  => array(),
 			'error'                  => $e->getMessage(),
 		);
+		$error_result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $error_result, $loop_payload, $provider, $model, $mode );
+		return $error_result;
 	}
 
 	// Substrate now surfaces turn_count, final_content, usage, and
@@ -279,6 +300,8 @@ function datamachine_run_conversation(
 			$turn_budget->ceiling()
 		);
 	}
+
+	$result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $result, $loop_payload, $provider, $model, $mode );
 
 	return $result;
 }
@@ -320,7 +343,8 @@ function datamachine_build_turn_runner(
 	WP_Agent_Conversation_Completion_Policy $completion_policy,
 	DataMachineToolRuntimeRules $tool_runtime_rules,
 	array &$last_tool_calls,
-	array &$completion_nudges
+	array &$completion_nudges,
+	array &$last_request_metadata
 ): callable {
 	return static function ( array $messages, array $turn_context ) use (
 		$tools,
@@ -333,7 +357,8 @@ function datamachine_build_turn_runner(
 		$completion_policy,
 		$tool_runtime_rules,
 		&$last_tool_calls,
-		&$completion_nudges
+		&$completion_nudges,
+		&$last_request_metadata
 	): array {
 		// The upstream loop provides the turn number via turn_context.
 		$turn_count = (int) ( $turn_context['turn'] ?? 1 );
@@ -342,8 +367,8 @@ function datamachine_build_turn_runner(
 		// Per-turn request metadata is captured locally and returned in the
 		// turn result so the substrate can surface the latest one on the
 		// final loop result.
-		$request_metadata = array();
-		$ai_response      = RequestBuilder::build(
+		$request_metadata      = array();
+		$ai_response           = RequestBuilder::build(
 			$messages,
 			$provider,
 			$model,
@@ -352,6 +377,7 @@ function datamachine_build_turn_runner(
 			$loop_payload,
 			$request_metadata
 		);
+		$last_request_metadata = $request_metadata;
 
 		datamachine_emit_loop_event(
 			$event_sink,
@@ -396,12 +422,17 @@ function datamachine_build_turn_runner(
 
 		// Per-turn token usage. Substrate accumulates this across turns and
 		// exposes the running total on the final loop result.
-		$token_usage = $ai_result->getTokenUsage();
-		$turn_usage  = array(
+		$token_usage   = $ai_result->getTokenUsage();
+		$turn_usage    = array(
 			'prompt_tokens'     => $token_usage->getPromptTokens(),
 			'completion_tokens' => $token_usage->getCompletionTokens(),
 			'total_tokens'      => $token_usage->getTotalTokens(),
 		);
+		$finish_reason = datamachine_ai_result_finish_reason( $ai_result );
+		if ( null !== $finish_reason ) {
+			$request_metadata['response']['finish_reason'] = $finish_reason;
+			$last_request_metadata                         = $request_metadata;
+		}
 
 		// Add AI message to conversation if it has content.
 		if ( ! empty( $ai_content ) ) {
@@ -644,12 +675,34 @@ function datamachine_build_turn_runner(
 			'tool_execution_results'       => $tool_execution_results,
 			'request_metadata'             => $request_metadata,
 			'usage'                        => $turn_usage,
+			'finish_reason'                => $finish_reason,
 			'conversation_complete'        => $conversation_complete,
 			'completion_nudge'             => $completion_nudge ?? '',
 			'duplicate_tool_call_rejected' => $duplicate_rejected,
 			'tool_runtime_rule_rejected'   => $runtime_rule_rejected,
 		);
 	};
+}
+
+/**
+ * Best-effort finish reason extraction from wp-ai-client result DTOs.
+ *
+ * @param \WordPress\AiClient\Results\DTO\GenerativeAiResult $result AI result.
+ * @return string|null
+ */
+function datamachine_ai_result_finish_reason( $result ): ?string {
+	try {
+		$candidates = $result->getCandidates();
+		$candidate  = $candidates[0] ?? null;
+		if ( is_object( $candidate ) && method_exists( $candidate, 'getFinishReason' ) ) {
+			$reason = $candidate->getFinishReason();
+			return is_scalar( $reason ) ? (string) $reason : null;
+		}
+	} catch ( \Throwable $e ) {
+		return null;
+	}
+
+	return null;
 }
 
 /**

@@ -475,7 +475,11 @@ class AIStep extends Step {
 			// event_id, event_url, post_id written via datamachine_merge_engine_data).
 			$usage = $loop_result['usage'] ?? array();
 			if ( ! empty( $usage ) && $this->job_id > 0 && ( $usage['total_tokens'] ?? 0 ) > 0 ) {
-				datamachine_merge_engine_data( $this->job_id, array( 'token_usage' => $usage ) );
+				$usage_engine_data = array( 'token_usage' => $usage );
+				if ( isset( $loop_result['runtime_provenance'] ) && is_array( $loop_result['runtime_provenance'] ) ) {
+					$usage_engine_data['runtime_provenance'] = $loop_result['runtime_provenance'];
+				}
+				datamachine_merge_engine_data( $this->job_id, $usage_engine_data );
 			}
 
 			// Store the transcript session ID when the AI loop persisted one.
@@ -492,6 +496,9 @@ class AIStep extends Step {
 			if ( $this->job_id > 0 ) {
 				$artifact_engine_data                           = datamachine_get_engine_data( $this->job_id );
 				$artifact_engine_data['tool_execution_summary'] = self::summarizeToolExecutions( $loop_result );
+				if ( isset( $loop_result['runtime_provenance'] ) && is_array( $loop_result['runtime_provenance'] ) ) {
+					$artifact_engine_data['runtime_provenance'] = $loop_result['runtime_provenance'];
+				}
 
 				foreach ( array( 'completion_assertions_required', 'completion_assertions_missing', 'completion_assertions_satisfied' ) as $assertion_key ) {
 					if ( isset( $loop_result[ $assertion_key ] ) && array() !== $loop_result[ $assertion_key ] ) {

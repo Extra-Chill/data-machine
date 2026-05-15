@@ -143,6 +143,15 @@ assert_runner_request( is_array( $result['tool_execution_results'] ?? null ), 'r
 assert_runner_request( 5 === ( $result['usage']['total_tokens'] ?? null ), 'result preserves accumulated usage totals' );
 assert_runner_request( is_array( $dispatched_request ), 'substrate dispatched a provider request' );
 assert_runner_request( ! empty( $sink->events ), 'DM event sink received events through the substrate bridge' );
+assert_runner_request( isset( $result['runtime_provenance'] ) && is_array( $result['runtime_provenance'] ), 'result includes runtime provenance' );
+assert_runner_request( 1 === ( $result['runtime_provenance']['schema_version'] ?? null ), 'runtime provenance exposes a stable schema version' );
+assert_runner_request( 'openai' === ( $result['runtime_provenance']['provider']['id'] ?? null ), 'runtime provenance records provider id' );
+assert_runner_request( 'gpt-smoke' === ( $result['runtime_provenance']['model']['id'] ?? null ), 'runtime provenance records model id' );
+assert_runner_request( 5 === ( $result['runtime_provenance']['usage']['total_tokens'] ?? null ), 'runtime provenance records token usage' );
+assert_runner_request( 'flow-step-smoke' === ( $result['runtime_provenance']['identifiers']['flow_step_id'] ?? null ), 'runtime provenance records flow step id' );
+assert_runner_request( 1569 === ( $result['runtime_provenance']['identifiers']['job_id'] ?? null ), 'runtime provenance records job id' );
+assert_runner_request( isset( $result['runtime_provenance']['input']['prompt_sha256'] ) && 64 === strlen( $result['runtime_provenance']['input']['prompt_sha256'] ), 'runtime provenance records prompt hash' );
+assert_runner_request( isset( $result['runtime_provenance']['tools']['policy_sha256'] ) && 64 === strlen( $result['runtime_provenance']['tools']['policy_sha256'] ), 'runtime provenance records tool policy hash' );
 
 // 2. Error path returns a structured error result without throwing.
 WpAiClientTestDouble::reset();
@@ -165,6 +174,8 @@ $error_result = datamachine_run_conversation(
 assert_runner_request( isset( $error_result['error'] ), 'error path returns a structured error field' );
 assert_runner_request( str_contains( (string) ( $error_result['error'] ?? '' ), 'provider offline' ), 'error path preserves the provider error message' );
 assert_runner_request( false === ( $error_result['completed'] ?? true ), 'error path marks conversation not completed' );
+assert_runner_request( 'provider_error' === ( $error_result['runtime_provenance']['status']['finish_reason'] ?? null ), 'error provenance records provider error finish reason' );
+assert_runner_request( str_contains( (string) ( $error_result['runtime_provenance']['provider_errors'][0]['message'] ?? '' ), 'provider offline' ), 'error provenance records provider error message' );
 
 if ( runner_request_failure_count() > 0 ) {
 	exit( 1 );
