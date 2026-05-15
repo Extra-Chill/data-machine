@@ -2,6 +2,23 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.112.0] - 2026-05-15
+
+### Added
+- support custom chat execution modes
+
+### Changed
+- align settings ability arrays
+- align chat handler assignments
+
+### Fixed
+- target active WP Cloud plugin path
+- guard MemoryFileRegistry against missing agents-api at bootstrap
+- raise queue tuning operator ceilings
+- expose pipeline AI concurrency settings
+- inherit chat model for custom chat modes
+- add items schemas for block chat tools
+
 ## [0.111.0] - 2026-05-14
 
 ### Added
