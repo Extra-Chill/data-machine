@@ -185,7 +185,7 @@ Note: `chunk_size` is the **producer-side** knob (how DM creates child jobs). Th
 | Visible to | Site operator (Settings → General → Queue Performance) | Site operator (Settings → General → Pipeline AI Concurrency) |
 | Purpose | Keep local queue work moving | Protect provider/API budgets and avoid transport saturation |
 
-Both layers matter. Raising Action Scheduler concurrency without raising `pipeline_ai_concurrency_limit` can still serialize AI-heavy pipelines at the provider-call lane. Raising AI concurrency without enough queue throughput leaves provider capacity idle. The default pipeline AI concurrency is deliberately moderate for self-hosted installs; high-volume sites should tune it alongside queue throughput and provider-specific limits such as `pipeline_ai_provider_concurrency_limits.openai`.
+Both layers matter. Raising Action Scheduler concurrency without raising `pipeline_ai_concurrency_limit` can still serialize AI-heavy pipelines at the provider-call lane. Raising AI concurrency without enough queue throughput leaves provider capacity idle. Defaults are deliberately moderate for self-hosted installs, while the settings allow higher operator ceilings for managed workers and large queues. High-volume sites should tune queue throughput alongside provider-specific limits such as `pipeline_ai_provider_concurrency_limits.openai`.
 
 ### Queueable fetch vs. queueable AI — same primitive, two consumption shapes
 

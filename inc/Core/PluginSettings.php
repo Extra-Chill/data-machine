@@ -25,6 +25,11 @@ class PluginSettings {
 	public const DEFAULT_PIPELINE_AI_THROTTLE_DELAY    = 10;
 	public const MAX_PIPELINE_AI_CONCURRENCY_LIMIT     = 50;
 	public const MAX_PIPELINE_AI_THROTTLE_DELAY        = 300;
+	public const MAX_QUEUE_CONCURRENT_BATCHES          = 50;
+	public const MAX_QUEUE_BATCH_SIZE                  = 500;
+	public const MAX_QUEUE_TIME_LIMIT                  = 300;
+	public const MAX_QUEUE_CHUNK_SIZE                  = 500;
+	public const MAX_QUEUE_CHUNK_DELAY                 = 300;
 	public const DEFAULT_WP_AI_CLIENT_CONNECT_TIMEOUT  = 15.0;
 	public const DEFAULT_WP_AI_CLIENT_REQUEST_TIMEOUT  = 300.0;
 	public const MAX_WP_AI_CLIENT_CONNECT_TIMEOUT      = 300.0;

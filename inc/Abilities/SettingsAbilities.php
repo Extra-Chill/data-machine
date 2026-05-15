@@ -551,27 +551,27 @@ class SettingsAbilities {
 
 			if ( isset( $input['queue_tuning']['concurrent_batches'] ) ) {
 				$batches                      = absint( $input['queue_tuning']['concurrent_batches'] );
-				$tuning['concurrent_batches'] = max( 1, min( 10, $batches ) ); // 1-10 range
+				$tuning['concurrent_batches'] = max( 1, min( PluginSettings::MAX_QUEUE_CONCURRENT_BATCHES, $batches ) );
 			}
 
 			if ( isset( $input['queue_tuning']['batch_size'] ) ) {
 				$size                 = absint( $input['queue_tuning']['batch_size'] );
-				$tuning['batch_size'] = max( 10, min( 200, $size ) ); // 10-200 range
+				$tuning['batch_size'] = max( 10, min( PluginSettings::MAX_QUEUE_BATCH_SIZE, $size ) );
 			}
 
 			if ( isset( $input['queue_tuning']['time_limit'] ) ) {
 				$limit                = absint( $input['queue_tuning']['time_limit'] );
-				$tuning['time_limit'] = max( 15, min( 300, $limit ) ); // 15-300 seconds range
+				$tuning['time_limit'] = max( 15, min( PluginSettings::MAX_QUEUE_TIME_LIMIT, $limit ) );
 			}
 
 			if ( isset( $input['queue_tuning']['chunk_size'] ) ) {
 				$chunk                = absint( $input['queue_tuning']['chunk_size'] );
-				$tuning['chunk_size'] = max( 1, min( 100, $chunk ) ); // 1-100 range
+				$tuning['chunk_size'] = max( 1, min( PluginSettings::MAX_QUEUE_CHUNK_SIZE, $chunk ) );
 			}
 
 			if ( isset( $input['queue_tuning']['chunk_delay'] ) ) {
 				$delay                 = absint( $input['queue_tuning']['chunk_delay'] );
-				$tuning['chunk_delay'] = max( 0, min( 300, $delay ) ); // 0-300 seconds range
+				$tuning['chunk_delay'] = max( 0, min( PluginSettings::MAX_QUEUE_CHUNK_DELAY, $delay ) );
 			}
 
 			$all_settings['queue_tuning'] = $tuning;

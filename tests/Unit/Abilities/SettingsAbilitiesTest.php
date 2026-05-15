@@ -156,6 +156,62 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 300, $updated_settings['pipeline_ai_throttle_delay'] );
 	}
 
+	public function test_update_settings_accepts_high_throughput_queue_tuning(): void {
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array(
+				'queue_tuning' => array(
+					'concurrent_batches' => 50,
+					'batch_size'         => 500,
+					'time_limit'         => 300,
+					'chunk_size'         => 500,
+					'chunk_delay'        => 0,
+				),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertSame(
+			array(
+				'concurrent_batches' => 50,
+				'batch_size'         => 500,
+				'time_limit'         => 300,
+				'chunk_size'         => 500,
+				'chunk_delay'        => 0,
+			),
+			$updated_settings['queue_tuning']
+		);
+	}
+
+	public function test_update_settings_clamps_queue_tuning_to_operator_ceiling(): void {
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array(
+				'queue_tuning' => array(
+					'concurrent_batches' => 999,
+					'batch_size'         => 999,
+					'time_limit'         => 999,
+					'chunk_size'         => 999,
+					'chunk_delay'        => 999,
+				),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertSame(
+			array(
+				'concurrent_batches' => 50,
+				'batch_size'         => 500,
+				'time_limit'         => 300,
+				'chunk_size'         => 500,
+				'chunk_delay'        => 300,
+			),
+			$updated_settings['queue_tuning']
+		);
+	}
+
 	public function test_update_settings_clamps_wp_ai_client_timeouts(): void {
 		$result = $this->settings_abilities->executeUpdateSettings(
 			array(

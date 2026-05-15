@@ -53,10 +53,10 @@ const clamp = ( raw, min, max, defaultValue ) =>
 	Math.max( min, Math.min( max, parseInt( raw, 10 ) || defaultValue ) );
 
 const QUEUE_LIMITS = {
-	concurrent_batches: { min: 1, max: 10, default: 3 },
-	batch_size: { min: 10, max: 200, default: 25 },
+	concurrent_batches: { min: 1, max: 50, default: 3 },
+	batch_size: { min: 10, max: 500, default: 25 },
 	time_limit: { min: 15, max: 300, default: 60 },
-	chunk_size: { min: 1, max: 100, default: 10 },
+	chunk_size: { min: 1, max: 500, default: 10 },
 	chunk_delay: { min: 0, max: 300, default: 30 },
 };
 
@@ -565,13 +565,13 @@ const GeneralTab = () => {
 										)
 									}
 									min="1"
-									max="10"
+									max="50"
 									className="small-text"
 								/>
 								<p className="description">
 									Number of action batches that can run
 									simultaneously. Higher = faster processing,
-									but more server load. (1-10, default: { queueDefaults.concurrent_batches })
+									but more server load. (1-50, default: { queueDefaults.concurrent_batches })
 								</p>
 							</fieldset>
 						</td>
@@ -594,13 +594,13 @@ const GeneralTab = () => {
 										)
 									}
 									min="10"
-									max="200"
+									max="500"
 									className="small-text"
 								/>
 								<p className="description">
 									Number of actions claimed per batch. For
 									AI-heavy workloads, smaller batches with
-									more concurrency often works better. (10-200,
+									more concurrency often works better. (10-500,
 									default: { queueDefaults.batch_size })
 								</p>
 							</fieldset>
@@ -653,14 +653,14 @@ const GeneralTab = () => {
 										)
 									}
 									min="1"
-									max="100"
+									max="500"
 									className="small-text"
 								/>
 								<p className="description">
 									Number of child jobs Data Machine creates
 									per scheduling cycle when fanning out a
 									batch. Lower = gentler on the queue;
-									higher = faster fan-out. (1-100,
+									higher = faster fan-out. (1-500,
 									default: { queueDefaults.chunk_size })
 								</p>
 							</fieldset>

@@ -93,7 +93,12 @@ curl -X POST https://example.com/wp-json/datamachine/v1/settings/tools/google_se
 - `pipeline_ai_concurrency_limit` (integer): Site-wide maximum concurrent pipeline AI provider calls. Default: `3`.
 - `pipeline_ai_provider_concurrency_limits` (object): Optional per-provider caps keyed by provider slug, for example `{ "openai": 10 }`. Provider caps apply in addition to the site-wide cap.
 - `pipeline_ai_throttle_delay` (integer): Seconds before a pipeline AI job retries when the AI concurrency lane is saturated. Default: `10`.
-- `queue_tuning` (object): Local queue producer/consumer tuning for Action Scheduler and batch fan-out. These settings control job scheduling/draining, not provider-call concurrency.
+- `queue_tuning` (object): Local queue producer/consumer tuning for Action Scheduler and batch fan-out. Defaults are conservative for self-hosted installs; operator ceilings support managed/high-throughput runtimes. These settings control job scheduling/draining, not provider-call concurrency.
+  - `concurrent_batches` (integer): Parallel Action Scheduler batches. Default: `3`, maximum: `50`.
+  - `batch_size` (integer): Actions claimed per scheduler batch. Default: `25`, maximum: `500`.
+  - `time_limit` (integer): Seconds per scheduler batch. Default: `60`, maximum: `300`.
+  - `chunk_size` (integer): Child jobs created per fan-out scheduling cycle. Default: `10`, maximum: `500`.
+  - `chunk_delay` (integer): Seconds between fan-out chunks. Default: `30`, maximum: `300`.
 
 **Example Request**:
 
@@ -103,6 +108,13 @@ curl -X POST https://example.com/wp-json/datamachine/v1/settings \
   -u username:application_password \
   -d '{
     "problem_flow_threshold": 5,
+    "queue_tuning": {
+      "concurrent_batches": 20,
+      "batch_size": 300,
+      "time_limit": 300,
+      "chunk_size": 300,
+      "chunk_delay": 0
+    },
     "pipeline_ai_concurrency_limit": 10,
     "pipeline_ai_provider_concurrency_limits": { "openai": 10 },
     "pipeline_ai_throttle_delay": 5
