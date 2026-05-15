@@ -93,8 +93,13 @@ function size_format( $bytes ): string {
 	return $bytes . ' B';
 }
 
+function datamachine_merge_engine_data( int $job_id, array $data ): void {
+	$GLOBALS['datamachine_test_engine_data'][ $job_id ] = array_merge( $GLOBALS['datamachine_test_engine_data'][ $job_id ] ?? array(), $data );
+}
+
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 require_once __DIR__ . '/agents-api-loader.php';
+require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
 datamachine_tests_require_agents_api();
 
 use DataMachine\Cli\Commands\JobsCommand;
@@ -214,6 +219,7 @@ function reset_smoke_state(): void {
 	$GLOBALS['datamachine_test_filters'] = array();
 	$GLOBALS['datamachine_test_logs']    = array();
 	$GLOBALS['datamachine_test_request_metadata'] = array();
+	$GLOBALS['datamachine_test_wp_ai_client_provider_ids'] = array();
 	WP_CLI::$logs                        = array();
 }
 
@@ -300,7 +306,7 @@ $transcript_request = new WP_Agent_Conversation_Request(
 	array( array( 'role' => 'user', 'content' => 'hello' ) ),
 	array(),
 	null,
-	array( 'persist_transcript' => true, 'job_id' => 279, 'flow_step_id' => 12, 'user_id' => 1, 'agent_id' => 2 ),
+	array( 'persist_transcript' => true, 'job_id' => 279, 'flow_step_id' => 12, 'user_id' => 1, 'agent_id' => 2, 'agent_slug' => 'smoke-agent' ),
 	array( 'provider' => 'openai', 'model' => 'gpt-smoke' ),
 	10,
 	false,

@@ -33,11 +33,17 @@ class RequestMetadata {
 		$messages_json = wp_json_encode( $request['messages'] ?? array(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 		$tools_json    = wp_json_encode( $structured_tools, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 		$request_json  = wp_json_encode( $request, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		$model_config  = self::model_config( $request );
 
 		return array(
 			'provider'            => $provider,
 			'model'               => $model,
 			'mode'                => $mode,
+			'prompt_sha256'       => hash( 'sha256', (string) $messages_json ),
+			'input_sha256'        => hash( 'sha256', (string) $request_json ),
+			'tool_policy_sha256'  => hash( 'sha256', (string) $tools_json ),
+			'model_config'        => $model_config,
+			'model_config_source' => ! empty( $model_config ) ? 'provider_request' : 'default',
 			'message_count'       => count( $request['messages'] ?? array() ),
 			'request_json_bytes'  => strlen( (string) $request_json ),
 			'messages_json_bytes' => strlen( (string) $messages_json ),
@@ -205,5 +211,23 @@ class RequestMetadata {
 
 		usort( $files, fn( $a, $b ) => ( $b['bytes'] ?? 0 ) <=> ( $a['bytes'] ?? 0 ) );
 		return $files;
+	}
+
+	/**
+	 * Extract the effective model config Data Machine supplied to wp-ai-client.
+	 *
+	 * @param array $request Provider request array.
+	 * @return array<string,mixed>
+	 */
+	private static function model_config( array $request ): array {
+		$config = array();
+		if ( isset( $request['temperature'] ) && is_numeric( $request['temperature'] ) ) {
+			$config['temperature'] = (float) $request['temperature'];
+		}
+		if ( isset( $request['max_tokens'] ) && is_numeric( $request['max_tokens'] ) ) {
+			$config['max_tokens'] = (int) $request['max_tokens'];
+		}
+
+		return $config;
 	}
 }
