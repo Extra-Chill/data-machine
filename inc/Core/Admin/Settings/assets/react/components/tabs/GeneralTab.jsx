@@ -26,6 +26,9 @@ const EMPTY_FORM = {
 	chat_ai_titles_enabled: true,
 	wp_ai_client_connect_timeout: 15,
 	wp_ai_client_request_timeout: 300,
+	pipeline_ai_concurrency_limit: 3,
+	pipeline_ai_provider_concurrency_limits: {},
+	pipeline_ai_throttle_delay: 10,
 	flows_per_page: 20,
 	jobs_per_page: 50,
 	queue_tuning: {
@@ -50,11 +53,16 @@ const clamp = ( raw, min, max, defaultValue ) =>
 	Math.max( min, Math.min( max, parseInt( raw, 10 ) || defaultValue ) );
 
 const QUEUE_LIMITS = {
-	concurrent_batches: { min: 1, max: 10, default: 3 },
-	batch_size: { min: 10, max: 200, default: 25 },
+	concurrent_batches: { min: 1, max: 50, default: 3 },
+	batch_size: { min: 10, max: 500, default: 25 },
 	time_limit: { min: 15, max: 300, default: 60 },
-	chunk_size: { min: 1, max: 100, default: 10 },
+	chunk_size: { min: 1, max: 500, default: 10 },
 	chunk_delay: { min: 0, max: 300, default: 30 },
+};
+
+const AI_CONCURRENCY_LIMITS = {
+	pipeline_ai_concurrency_limit: { min: 1, max: 50, default: 3 },
+	pipeline_ai_throttle_delay: { min: 1, max: 300, default: 10 },
 };
 
 const GeneralTab = () => {
@@ -70,6 +78,12 @@ const GeneralTab = () => {
 	const transportDefaults = {
 		connectTimeout: data?.defaults?.wp_ai_client_connect_timeout ?? 15,
 		requestTimeout: data?.defaults?.wp_ai_client_request_timeout ?? 300,
+	};
+	const aiConcurrencyDefaults = {
+		limit: data?.defaults?.pipeline_ai_concurrency_limit ?? 3,
+		providerLimits:
+			data?.defaults?.pipeline_ai_provider_concurrency_limits ?? {},
+		throttleDelay: data?.defaults?.pipeline_ai_throttle_delay ?? 10,
 	};
 
 	const form = useFormState( {
@@ -97,6 +111,12 @@ const GeneralTab = () => {
 					data.settings.wp_ai_client_connect_timeout ?? transportDefaults.connectTimeout,
 				wp_ai_client_request_timeout:
 					data.settings.wp_ai_client_request_timeout ?? transportDefaults.requestTimeout,
+				pipeline_ai_concurrency_limit:
+					data.settings.pipeline_ai_concurrency_limit ?? aiConcurrencyDefaults.limit,
+				pipeline_ai_provider_concurrency_limits:
+					data.settings.pipeline_ai_provider_concurrency_limits ?? aiConcurrencyDefaults.providerLimits,
+				pipeline_ai_throttle_delay:
+					data.settings.pipeline_ai_throttle_delay ?? aiConcurrencyDefaults.throttleDelay,
 				flows_per_page:
 					data.settings.flows_per_page ?? EMPTY_FORM.flows_per_page,
 				jobs_per_page:
@@ -128,6 +148,33 @@ const GeneralTab = () => {
 				[ key ]: value,
 			},
 		} );
+		save.markChanged();
+	};
+
+	const updateAIConcurrency = ( key, rawValue ) => {
+		const { min, max, default: defaultVal } = AI_CONCURRENCY_LIMITS[ key ];
+		const fallback =
+			key === 'pipeline_ai_concurrency_limit'
+				? aiConcurrencyDefaults.limit
+				: aiConcurrencyDefaults.throttleDelay;
+		const value = clamp( rawValue, min, max, fallback ?? defaultVal );
+		form.updateField( key, value );
+		save.markChanged();
+	};
+
+	const updateProviderLimit = ( provider, rawValue ) => {
+		const value = clamp( rawValue, 0, 50, 0 );
+		const providerLimits = {
+			...( form.data.pipeline_ai_provider_concurrency_limits ?? {} ),
+		};
+
+		if ( value > 0 ) {
+			providerLimits[ provider ] = value;
+		} else {
+			delete providerLimits[ provider ];
+		}
+
+		form.updateField( 'pipeline_ai_provider_concurrency_limits', providerLimits );
 		save.markChanged();
 	};
 
@@ -399,6 +446,97 @@ const GeneralTab = () => {
 				</tbody>
 			</table>
 
+			<h3>Pipeline AI Concurrency</h3>
+			<p className="description datamachine-section-description">
+				Limit concurrent provider calls from pipeline AI steps. These
+				limits are separate from Action Scheduler queue throughput: queue
+				settings decide how many actions run, while these settings decide
+				how many pipeline AI calls may be in flight at once.
+			</p>
+			<table className="form-table">
+				<tbody>
+					<tr>
+						<th scope="row">Site-wide AI calls</th>
+						<td>
+							<fieldset>
+								<input
+									type="number"
+									id="pipeline_ai_concurrency_limit"
+									value={ form.data.pipeline_ai_concurrency_limit }
+									onChange={ ( e ) =>
+										updateAIConcurrency(
+											'pipeline_ai_concurrency_limit',
+											e.target.value
+										)
+									}
+									min="1"
+									max="50"
+									className="small-text"
+								/>
+								<p className="description">
+									Maximum concurrent pipeline AI provider calls across
+									the site. (1-50, default:{ ' ' }
+									{ aiConcurrencyDefaults.limit })
+								</p>
+							</fieldset>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row">OpenAI AI calls</th>
+						<td>
+							<fieldset>
+								<input
+									type="number"
+									id="pipeline_ai_provider_openai_limit"
+									value={
+										form.data.pipeline_ai_provider_concurrency_limits
+											?.openai ?? 0
+									}
+									onChange={ ( e ) =>
+										updateProviderLimit( 'openai', e.target.value )
+									}
+									min="0"
+									max="50"
+									className="small-text"
+								/>
+								<p className="description">
+									Optional OpenAI-specific cap. Use 0 to rely only on
+									the site-wide AI call limit.
+								</p>
+							</fieldset>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row">AI throttle retry delay</th>
+						<td>
+							<fieldset>
+								<input
+									type="number"
+									id="pipeline_ai_throttle_delay"
+									value={ form.data.pipeline_ai_throttle_delay }
+									onChange={ ( e ) =>
+										updateAIConcurrency(
+											'pipeline_ai_throttle_delay',
+											e.target.value
+										)
+									}
+									min="1"
+									max="300"
+									className="small-text"
+								/>
+								<p className="description">
+									Seconds before a pipeline AI job retries when the
+									AI concurrency lane is full. (1-300, default:{ ' ' }
+									{ aiConcurrencyDefaults.throttleDelay })
+								</p>
+							</fieldset>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+
 			<h3>Queue Performance</h3>
 			<p className="description datamachine-section-description">
 				Tune how Data Machine feeds the queue (chunking) and how
@@ -427,13 +565,13 @@ const GeneralTab = () => {
 										)
 									}
 									min="1"
-									max="10"
+									max="50"
 									className="small-text"
 								/>
 								<p className="description">
 									Number of action batches that can run
 									simultaneously. Higher = faster processing,
-									but more server load. (1-10, default: { queueDefaults.concurrent_batches })
+									but more server load. (1-50, default: { queueDefaults.concurrent_batches })
 								</p>
 							</fieldset>
 						</td>
@@ -456,13 +594,13 @@ const GeneralTab = () => {
 										)
 									}
 									min="10"
-									max="200"
+									max="500"
 									className="small-text"
 								/>
 								<p className="description">
 									Number of actions claimed per batch. For
 									AI-heavy workloads, smaller batches with
-									more concurrency often works better. (10-200,
+									more concurrency often works better. (10-500,
 									default: { queueDefaults.batch_size })
 								</p>
 							</fieldset>
@@ -515,14 +653,14 @@ const GeneralTab = () => {
 										)
 									}
 									min="1"
-									max="100"
+									max="500"
 									className="small-text"
 								/>
 								<p className="description">
 									Number of child jobs Data Machine creates
 									per scheduling cycle when fanning out a
 									batch. Lower = gentler on the queue;
-									higher = faster fan-out. (1-100,
+									higher = faster fan-out. (1-500,
 									default: { queueDefaults.chunk_size })
 								</p>
 							</fieldset>

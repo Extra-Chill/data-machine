@@ -101,8 +101,115 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'max_turns', $settings );
 		$this->assertArrayHasKey( 'wp_ai_client_connect_timeout', $settings );
 		$this->assertArrayHasKey( 'wp_ai_client_request_timeout', $settings );
+		$this->assertArrayHasKey( 'pipeline_ai_concurrency_limit', $settings );
+		$this->assertArrayHasKey( 'pipeline_ai_provider_concurrency_limits', $settings );
+		$this->assertArrayHasKey( 'pipeline_ai_throttle_delay', $settings );
 		$this->assertArrayHasKey( 'disabled_tools', $settings );
 		$this->assertArrayHasKey( 'ai_provider_keys', $settings );
+	}
+
+	public function test_get_settings_exposes_pipeline_ai_concurrency_defaults(): void {
+		$result = $this->settings_abilities->executeGetSettings( array() );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 3, $result['settings']['pipeline_ai_concurrency_limit'] );
+		$this->assertSame( array(), $result['settings']['pipeline_ai_provider_concurrency_limits'] );
+		$this->assertSame( 10, $result['settings']['pipeline_ai_throttle_delay'] );
+	}
+
+	public function test_update_settings_updates_pipeline_ai_concurrency_settings(): void {
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array(
+				'pipeline_ai_concurrency_limit'           => 12,
+				'pipeline_ai_provider_concurrency_limits' => array(
+					'openai' => 10,
+					''       => 20,
+					'bad'    => 0,
+				),
+				'pipeline_ai_throttle_delay'              => 5,
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertArrayNotHasKey( 'unhandled_keys', $result );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertSame( 12, $updated_settings['pipeline_ai_concurrency_limit'] );
+		$this->assertSame( array( 'openai' => 10 ), $updated_settings['pipeline_ai_provider_concurrency_limits'] );
+		$this->assertSame( 5, $updated_settings['pipeline_ai_throttle_delay'] );
+	}
+
+	public function test_update_settings_clamps_pipeline_ai_concurrency_settings(): void {
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array(
+				'pipeline_ai_concurrency_limit'           => 999,
+				'pipeline_ai_provider_concurrency_limits' => array( 'openai' => 999 ),
+				'pipeline_ai_throttle_delay'              => 999,
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertSame( 50, $updated_settings['pipeline_ai_concurrency_limit'] );
+		$this->assertSame( array( 'openai' => 50 ), $updated_settings['pipeline_ai_provider_concurrency_limits'] );
+		$this->assertSame( 300, $updated_settings['pipeline_ai_throttle_delay'] );
+	}
+
+	public function test_update_settings_accepts_high_throughput_queue_tuning(): void {
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array(
+				'queue_tuning' => array(
+					'concurrent_batches' => 50,
+					'batch_size'         => 500,
+					'time_limit'         => 300,
+					'chunk_size'         => 500,
+					'chunk_delay'        => 0,
+				),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertSame(
+			array(
+				'concurrent_batches' => 50,
+				'batch_size'         => 500,
+				'time_limit'         => 300,
+				'chunk_size'         => 500,
+				'chunk_delay'        => 0,
+			),
+			$updated_settings['queue_tuning']
+		);
+	}
+
+	public function test_update_settings_clamps_queue_tuning_to_operator_ceiling(): void {
+		$result = $this->settings_abilities->executeUpdateSettings(
+			array(
+				'queue_tuning' => array(
+					'concurrent_batches' => 999,
+					'batch_size'         => 999,
+					'time_limit'         => 999,
+					'chunk_size'         => 999,
+					'chunk_delay'        => 999,
+				),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+
+		$updated_settings = get_option( 'datamachine_settings', array() );
+		$this->assertSame(
+			array(
+				'concurrent_batches' => 50,
+				'batch_size'         => 500,
+				'time_limit'         => 300,
+				'chunk_size'         => 500,
+				'chunk_delay'        => 300,
+			),
+			$updated_settings['queue_tuning']
+		);
 	}
 
 	public function test_update_settings_clamps_wp_ai_client_timeouts(): void {

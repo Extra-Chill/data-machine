@@ -174,6 +174,19 @@ A flow with `max_items = 50` and 50 packets produces 50 child jobs. They are *al
 
 Note: `chunk_size` is the **producer-side** knob (how DM creates child jobs). The complementary **consumer-side** knobs (`concurrent_batches`, `batch_size`, `time_limit`) live in the same `queue_tuning` settings group and control how Action Scheduler drains the resulting queue. Tune them together — bumping consumer-side concurrency without bumping producer-side chunking leaves the queue runner idle waiting for work.
 
+### Queue throughput vs. AI provider concurrency — different layers
+
+`queue_tuning` controls how fast WordPress and Action Scheduler move jobs through the local queue. Pipeline AI steps also pass through a provider backpressure lane before making external model calls:
+
+| | `queue_tuning.concurrent_batches` / `batch_size` | `pipeline_ai_concurrency_limit` |
+|---|---|---|
+| Where | Action Scheduler queue runner and Data Machine worker drain | `PipelineAIConcurrencyLimiter` before each pipeline AI request |
+| Cap on | Local scheduled actions claimed and executed | Concurrent pipeline AI provider calls |
+| Visible to | Site operator (Settings → General → Queue Performance) | Site operator (Settings → General → Pipeline AI Concurrency) |
+| Purpose | Keep local queue work moving | Protect provider/API budgets and avoid transport saturation |
+
+Both layers matter. Raising Action Scheduler concurrency without raising `pipeline_ai_concurrency_limit` can still serialize AI-heavy pipelines at the provider-call lane. Raising AI concurrency without enough queue throughput leaves provider capacity idle. Defaults are deliberately moderate for self-hosted installs, while the settings allow higher operator ceilings for managed workers and large queues. High-volume sites should tune queue throughput alongside provider-specific limits such as `pipeline_ai_provider_concurrency_limits.openai`.
+
 ### Queueable fetch vs. queueable AI — same primitive, two consumption shapes
 
 Both share `QueueableTrait` and the same queue-mode mechanics. They differ in which storage slot they consume and how that slot's payload is interpreted.
