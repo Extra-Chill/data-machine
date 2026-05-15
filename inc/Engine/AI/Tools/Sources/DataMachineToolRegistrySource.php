@@ -41,15 +41,27 @@ final class DataMachineToolRegistrySource {
 				continue;
 			}
 
+			// Handler-wrapper tools belong to the adjacent-handler source.
+			// Skip them here regardless of mode so they cannot leak into
+			// the static-registry surface — including via mode inheritance.
+			if ( isset( $tool_config['_handler_callable'] ) ) {
+				continue;
+			}
+
 			if ( ToolPolicyResolver::MODE_PIPELINE === $mode && ToolPolicyResolver::isPipelinePolicyToolAllowed( $tool_config, $tool_name, $args ) ) {
 				$tool_config['modes'] = array_values( array_unique( array_merge( $tool_config['modes'], array( ToolPolicyResolver::MODE_PIPELINE ) ) ) );
 			}
 
-			if ( ToolPolicyResolver::MODE_PIPELINE === $mode ) {
-				if ( isset( $tool_config['_handler_callable'] ) ) {
-					continue;
-				}
+			// Tools admitted via mode inheritance get the current mode
+			// stamped onto their `modes` array. Downstream policy filters
+			// (notably Agents API's `filter_by_mode`) re-check tool modes
+			// against the runtime mode; without the rewrite, inherited
+			// tools would be filtered back out one layer up.
+			$tool_config['modes'] = array_values(
+				array_unique( array_merge( $tool_config['modes'] ?? array(), array( $mode ) ) )
+			);
 
+			if ( ToolPolicyResolver::MODE_PIPELINE === $mode ) {
 				if ( $this->tool_manager->is_tool_available( $tool_name, null ) ) {
 					$available_tools[ $tool_name ] = $tool_config;
 				}
@@ -76,21 +88,59 @@ final class DataMachineToolRegistrySource {
 	/**
 	 * Filter resolved tools by agent mode.
 	 *
+	 * Tools declare which modes they belong to via the `modes` key on
+	 * registration (e.g. `['chat', 'pipeline']`). By default a tool is
+	 * available to a request only when the request's mode appears in
+	 * that list verbatim.
+	 *
+	 * Extension plugins that register custom modes via `AgentModeRegistry`
+	 * can opt their mode into another mode's tool surface by hooking the
+	 * `datamachine_tool_mode_matchable_modes` filter. Returning
+	 * `['world', 'pipeline']` for the `world` mode, for example, makes
+	 * every tool registered for `pipeline` available to `world` runs as
+	 * well — without re-registering each tool. The default value is
+	 * `[$mode]` so existing behavior is unchanged for any mode that does
+	 * not opt in.
+	 *
 	 * @param array  $tools Resolved tools array.
 	 * @param string $mode  Mode slug to filter by.
+	 * @param array  $args  Resolution context passed through from the source.
 	 * @return array Filtered tools.
 	 */
 	private function filterByMode( array $tools, string $mode, array $args = array() ): array {
+		/**
+		 * Filter the modes a tool's `modes` array is matched against.
+		 *
+		 * Custom modes registered via `AgentModeRegistry` can declare
+		 * inheritance from a built-in mode by appending its slug to the
+		 * matchable list. Tools whose `modes` array intersects with the
+		 * matchable list become available to the current mode.
+		 *
+		 * Defaults to `[$mode]`, which preserves the historical exact-
+		 * match behavior. The filter is the seam custom modes use to
+		 * inherit tool surfaces without DM having to know about them.
+		 *
+		 * @since 0.113.0
+		 *
+		 * @param string[] $matchable Mode slugs to match tool `modes` against.
+		 * @param string   $mode      Current execution mode.
+		 * @param array    $args      Tool resolution context.
+		 */
+		$matchable = apply_filters( 'datamachine_tool_mode_matchable_modes', array( $mode ), $mode, $args );
+		if ( ! is_array( $matchable ) || empty( $matchable ) ) {
+			$matchable = array( $mode );
+		}
+
 		return array_filter(
 			$tools,
-			static function ( $tool, string $tool_name ) use ( $mode, $args ) {
+			static function ( $tool, string $tool_name ) use ( $mode, $matchable, $args ) {
 				$modes = $tool['modes'] ?? array();
 				if ( ToolPolicyResolver::MODE_PIPELINE === $mode
 					&& ToolPolicyResolver::isPipelinePolicyToolAllowed( $tool, $tool_name, $args ) ) {
 					return true;
 				}
 
-				return in_array( $mode, $modes, true );
+				return ! empty( array_intersect( $matchable, $modes ) );
 			},
 			ARRAY_FILTER_USE_BOTH
 		);

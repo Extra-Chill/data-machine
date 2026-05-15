@@ -257,7 +257,46 @@ add_filter(
 );
 assert_source_equals( array( 'chat_static_tool' ), array_keys( resolve_source_tools( ToolPolicyResolver::MODE_CHAT, new SourcePolicyToolManager() ) ), 'legacy Data Machine tool-source filters are no longer mirrored', $failures, $passes );
 
-echo "\n[4] Data Machine source adapters own product vocabulary:\n";
+echo "\n[4] custom mode can inherit another mode's tool surface via filter:\n";
+remove_all_filters_for_source_smoke();
+assert_source_equals(
+	array( 'custom_static_tool' ),
+	array_keys( resolve_source_tools( 'custom_mode', new SourcePolicyToolManager() ) ),
+	'custom mode without filter still gets only custom-mode tools',
+	$failures,
+	$passes
+);
+add_filter(
+	'datamachine_tool_mode_matchable_modes',
+	static function ( array $matchable, string $mode ): array {
+		if ( 'custom_mode' === $mode ) {
+			$matchable[] = ToolPolicyResolver::MODE_PIPELINE;
+		}
+		return $matchable;
+	},
+	10,
+	2
+);
+$inherited = resolve_source_tools( 'custom_mode', new SourcePolicyToolManager() );
+assert_source_equals( true, isset( $inherited['custom_static_tool'] ), 'inheritance keeps custom mode\'s own tools', $failures, $passes );
+assert_source_equals( true, isset( $inherited['static_pipeline_tool'] ), 'inheritance from pipeline exposes pipeline-only tools to the custom mode', $failures, $passes );
+assert_source_equals( true, isset( $inherited['collision_tool'] ), 'pipeline tools registered for the inherited mode become available', $failures, $passes );
+assert_source_equals( false, isset( $inherited['chat_static_tool'] ), 'inheritance does not leak unrelated mode tools', $failures, $passes );
+assert_source_equals( false, isset( $inherited['handler_wrapper'] ), 'inherited custom mode still skips handler wrappers (non-pipeline source)', $failures, $passes );
+remove_all_filters_for_source_smoke();
+add_filter(
+	'datamachine_tool_mode_matchable_modes',
+	static function (): array {
+		return array();
+	},
+	10,
+	2
+);
+$null_filter = resolve_source_tools( 'custom_mode', new SourcePolicyToolManager() );
+assert_source_equals( array( 'custom_static_tool' ), array_keys( $null_filter ), 'empty filter return falls back to current mode', $failures, $passes );
+remove_all_filters_for_source_smoke();
+
+echo "\n[5] Data Machine source adapters own product vocabulary:\n";
 $registry_source          = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php' );
 $adjacent_source          = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php' );
 $datamachine_tool_source  = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php' );
