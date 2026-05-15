@@ -434,13 +434,13 @@ class AgentsCommand extends AgentBundleCommand {
 	 * ## OPTIONS
 	 *
 	 * <action>
-	 * : Action: grant, revoke, or list.
+	 * : Action: grant, grant-audience, revoke, revoke-audience, or list.
 	 *
 	 * <slug>
 	 * : Agent slug.
 	 *
-	 * [<user>]
-	 * : User ID, login, or email (required for grant/revoke).
+	 * [<principal>]
+	 * : User ID/login/email for user grants, or audience slug / audience:<slug> for audience grants.
 	 *
 	 * [--role=<role>]
 	 * : Access role (grant only).
@@ -466,7 +466,9 @@ class AgentsCommand extends AgentBundleCommand {
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine agents access grant chubes-bot 2 --role=admin
+	 *     wp datamachine agents access grant-audience chubes-bot audience:automattician --role=operator
 	 *     wp datamachine agents access revoke chubes-bot 2
+	 *     wp datamachine agents access revoke-audience chubes-bot audience:automattician
 	 *     wp datamachine agents access list chubes-bot
 	 *
 	 * @subcommand access
@@ -494,9 +496,10 @@ class AgentsCommand extends AgentBundleCommand {
 
 		switch ( $action ) {
 			case 'list':
-				$grants = $access_repo->get_users_for_agent( (string) $agent_id );
+				$grants           = $access_repo->get_users_for_agent( (string) $agent_id );
+				$principal_grants = $access_repo->get_principals_for_agent( (string) $agent_id );
 
-				if ( empty( $grants ) ) {
+				if ( empty( $grants ) && empty( $principal_grants ) ) {
 					WP_CLI::warning( sprintf( 'No access grants for agent "%s".', $slug ) );
 					return;
 				}
@@ -505,13 +508,46 @@ class AgentsCommand extends AgentBundleCommand {
 				foreach ( $grants as $grant ) {
 					$user    = get_user_by( 'id', $grant->user_id );
 					$items[] = array(
-						'user_id' => $grant->user_id,
-						'login'   => $user ? $user->user_login : '(deleted)',
-						'role'    => $grant->role,
+						'principal' => 'user:' . $grant->user_id,
+						'label'     => $user ? $user->user_login : '(deleted)',
+						'role'      => $grant->role,
+					);
+				}
+				foreach ( $principal_grants as $grant ) {
+					$principal_type = (string) ( $grant['principal_type'] ?? '' );
+					$principal_id   = (string) ( $grant['principal_id'] ?? '' );
+					$items[]        = array(
+						'principal' => $principal_type . ':' . $principal_id,
+						'label'     => $principal_id,
+						'role'      => (string) ( $grant['role'] ?? '' ),
 					);
 				}
 
-				$this->format_items( $items, array( 'user_id', 'login', 'role' ), $assoc_args, 'user_id' );
+				$this->format_items( $items, array( 'principal', 'label', 'role' ), $assoc_args, 'principal' );
+				break;
+
+			case 'grant-audience':
+				$audience = $args[2] ?? null;
+				if ( null === $audience ) {
+					WP_CLI::error( 'Audience is required. Usage: wp datamachine agents access grant-audience <slug> <audience|audience:slug> [--role=<role>]' );
+					return;
+				}
+
+				list( $principal_type, $principal_id ) = $this->resolveAudiencePrincipal( (string) $audience );
+				$role                                  = (string) ( $assoc_args['role'] ?? 'operator' );
+
+				try {
+					$access_repo->grant_principal_access( (string) $agent_id, $principal_type, $principal_id, $role );
+					$ok = true;
+				} catch ( \Throwable $e ) {
+					$ok = false;
+				}
+
+				if ( $ok ) {
+					WP_CLI::success( sprintf( 'Granted %s access to %s:%s for agent "%s".', $role, $principal_type, $principal_id, $slug ) );
+				} else {
+					WP_CLI::error( 'Failed to grant audience access.' );
+				}
 				break;
 
 			case 'grant':
@@ -560,9 +596,50 @@ class AgentsCommand extends AgentBundleCommand {
 				}
 				break;
 
+			case 'revoke-audience':
+				$audience = $args[2] ?? null;
+				if ( null === $audience ) {
+					WP_CLI::error( 'Audience is required for revoke-audience.' );
+					return;
+				}
+
+				list( $principal_type, $principal_id ) = $this->resolveAudiencePrincipal( (string) $audience );
+				$ok                                    = $access_repo->revoke_principal_access( (string) $agent_id, $principal_type, $principal_id );
+
+				if ( $ok ) {
+					WP_CLI::success( sprintf( 'Revoked access for %s:%s on agent "%s".', $principal_type, $principal_id, $slug ) );
+				} else {
+					WP_CLI::warning( 'No audience access grant found to revoke.' );
+				}
+				break;
+
 			default:
-				WP_CLI::error( "Unknown action: {$action}. Use: grant, revoke, list" );
+				WP_CLI::error( "Unknown action: {$action}. Use: grant, grant-audience, revoke, revoke-audience, list" );
 		}
+	}
+
+	/**
+	 * Resolve audience CLI syntax to an explicit principal tuple.
+	 *
+	 * @return array{0:string,1:string}
+	 */
+	private function resolveAudiencePrincipal( string $audience ): array {
+		$audience = trim( $audience );
+		$type     = 'audience';
+		$id       = $audience;
+
+		if ( false !== strpos( $audience, ':' ) ) {
+			list( $type, $id ) = explode( ':', $audience, 2 );
+		}
+
+		$type = sanitize_key( $type );
+		$id   = sanitize_title( $id );
+
+		if ( '' === $type || '' === $id || 'user' === $type ) {
+			WP_CLI::error( 'Audience principal must be a non-user value such as audience:automattician.' );
+		}
+
+		return array( $type, $id );
 	}
 
 	/**

@@ -249,7 +249,9 @@ wp datamachine agents delete my-agent --delete-files --yes
 
 # Manage access grants
 wp datamachine agents access grant my-agent 2 --role=operator
+wp datamachine agents access grant-audience my-agent audience:public --role=operator
 wp datamachine agents access revoke my-agent 2
+wp datamachine agents access revoke-audience my-agent audience:public
 wp datamachine agents access list my-agent
 
 # Manage runtime bearer tokens. Raw token values are shown only at creation time.

@@ -19,6 +19,13 @@ use DataMachine\Core\Auth\AgentAccessStoreAdapter;
 use DataMachine\Core\Database\Agents\AgentAccess;
 use DataMachine\Core\Database\Agents\Agents;
 
+if ( ! function_exists( 'sanitize_key' ) ) {
+	function sanitize_key( $key ) {
+		$key = strtolower( (string) $key );
+		return preg_replace( '/[^a-z0-9_\-]/', '', $key );
+	}
+}
+
 $GLOBALS['wpdb'] = (object) array(
 	'base_prefix' => 'wp_',
 	'prefix'      => 'wp_',
@@ -78,8 +85,68 @@ class DataMachineAccessStoreAdapterFakeRepository extends AgentAccess {
 		);
 	}
 
+	public function grant_principal_access( string $agent_id, string $principal_type, string $principal_id, string $role ): array {
+		$grant                                      = array(
+			'agent_id'       => $agent_id,
+			'principal_type' => $principal_type,
+			'principal_id'   => $principal_id,
+			'role'           => $role,
+			'workspace_id'   => null,
+			'metadata'       => array( 'source' => 'fake' ),
+		);
+		$this->grants[ $this->principal_key( $agent_id, $principal_type, $principal_id ) ] = $grant;
+		return $grant;
+	}
+
+	public function revoke_principal_access( string $agent_id, string $principal_type, string $principal_id ): bool {
+		$key = $this->principal_key( $agent_id, $principal_type, $principal_id );
+		if ( ! isset( $this->grants[ $key ] ) ) {
+			return false;
+		}
+
+		unset( $this->grants[ $key ] );
+		return true;
+	}
+
+	public function get_principal_access( string $agent_id, string $principal_type, string $principal_id, ?string $workspace_id = null ): ?array {
+		unset( $workspace_id );
+		return $this->grants[ $this->principal_key( $agent_id, $principal_type, $principal_id ) ] ?? null;
+	}
+
+	public function get_agent_ids_for_principal( string $principal_type, string $principal_id, ?string $minimum_role = null, ?string $workspace_id = null ): array {
+		unset( $workspace_id );
+		$agent_ids = array();
+
+		foreach ( $this->grants as $grant ) {
+			if ( ! is_array( $grant ) ) {
+				continue;
+			}
+
+			$role_matches = null === $minimum_role || ( new \WP_Agent_Access_Grant( (string) $grant['agent_id'], 1, (string) $grant['role'] ) )->role_meets( $minimum_role );
+			if ( $grant['principal_type'] === $principal_type && $grant['principal_id'] === $principal_id && $role_matches ) {
+				$agent_ids[] = (int) $grant['agent_id'];
+			}
+		}
+
+		return $agent_ids;
+	}
+
+	public function get_principals_for_agent( string $agent_id, ?string $workspace_id = null ): array {
+		unset( $workspace_id );
+		return array_values(
+			array_filter(
+				$this->grants,
+				static fn( $grant ): bool => is_array( $grant ) && $grant['agent_id'] === $agent_id
+			)
+		);
+	}
+
 	private function key( string $agent_id, int $user_id ): string {
 		return $agent_id . ':' . $user_id;
+	}
+
+	private function principal_key( string $agent_id, string $principal_type, string $principal_id ): string {
+		return $agent_id . ':' . $principal_type . ':' . $principal_id;
 	}
 }
 
@@ -142,6 +209,7 @@ $agents     = new DataMachineAccessStoreAdapterFakeAgentsRepository(
 $adapter    = new AgentAccessStoreAdapter( $repository, $agents );
 
 agents_api_smoke_assert_equals( true, $adapter instanceof \WP_Agent_Access_Store, 'adapter implements Agents API store contract', $failures, $passes );
+agents_api_smoke_assert_equals( true, $adapter instanceof \WP_Agent_Principal_Access_Store, 'adapter implements Agents API principal store contract', $failures, $passes );
 
 $existing = new DataMachineAccessStoreAdapterExistingStore();
 agents_api_smoke_assert_equals( $existing, AgentAccessStoreAdapter::filter_access_store( $existing ), 'filter preserves existing host store', $failures, $passes );
@@ -158,5 +226,24 @@ agents_api_smoke_assert_equals( array( 'wiki-brain' ), $adapter->get_agent_ids_f
 agents_api_smoke_assert_equals( array( $grant->to_array() ), array_map( static fn( \WP_Agent_Access_Grant $value ): array => $value->to_array(), $adapter->get_users_for_agent( 'wiki-brain' ) ), 'get_users_for_agent returns slug contract', $failures, $passes );
 agents_api_smoke_assert_equals( true, $adapter->revoke_access( 'wiki-brain', 7 ), 'revoke maps slug to storage ID', $failures, $passes );
 agents_api_smoke_assert_equals( null, $adapter->get_access( 'wiki-brain', 7 ), 'revoke removes repository grant', $failures, $passes );
+
+$principal_grant = array(
+	'grant_id'           => null,
+	'agent_id'           => 'wiki-brain',
+	'user_id'            => 0,
+	'role'               => \WP_Agent_Access_Grant::ROLE_OPERATOR,
+	'workspace_id'       => null,
+	'granted_by_user_id' => null,
+	'granted_at'         => null,
+	'metadata'           => array( 'source' => 'fake' ),
+	'audience_id'        => 'audience:operators',
+);
+$principal = \AgentsAPI\AI\WP_Agent_Execution_Principal::audience( 'audience:operators', 'frontend-chat' );
+$adapter->grant_access_for_principal( 'wiki-brain', 'audience', 'operators', \WP_Agent_Access_Grant::ROLE_OPERATOR );
+agents_api_smoke_assert_equals( $principal_grant, $adapter->get_access_for_principal( 'wiki-brain', $principal )->to_array(), 'principal grant resolves audience principal', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'wiki-brain' ), $adapter->get_agent_ids_for_principal( $principal, \WP_Agent_Access_Grant::ROLE_VIEWER ), 'principal agent ID list is Agents API slug shape', $failures, $passes );
+agents_api_smoke_assert_equals( array( $principal_grant ), $adapter->get_principals_for_agent( 'wiki-brain' ), 'principal grants list returns slug contract', $failures, $passes );
+agents_api_smoke_assert_equals( true, $adapter->revoke_access_for_principal( 'wiki-brain', 'audience', 'operators' ), 'principal revoke maps slug to storage ID', $failures, $passes );
+agents_api_smoke_assert_equals( null, $adapter->get_access_for_principal( 'wiki-brain', $principal ), 'principal revoke removes grant', $failures, $passes );
 
 agents_api_smoke_finish( 'access-store adapter smoke', $failures, $passes );
