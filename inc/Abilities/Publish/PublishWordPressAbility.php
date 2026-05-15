@@ -12,6 +12,7 @@ namespace DataMachine\Abilities\Publish;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Content\ContentFormat;
+use DataMachine\Core\SourceDate;
 use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Core\WordPress\WordPressPublishHelper;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
@@ -86,6 +87,11 @@ class PublishWordPressAbility {
 								'default'     => '',
 								'description' => __( 'Source URL for attribution', 'data-machine' ),
 							),
+							'original_date_gmt'      => array(
+								'type'        => 'string',
+								'default'     => '',
+								'description' => __( 'Original source publication date in GMT', 'data-machine' ),
+							),
 							'add_source_attribution' => array(
 								'type'        => 'boolean',
 								'default'     => true,
@@ -159,6 +165,7 @@ class PublishWordPressAbility {
 		$taxonomies             = $config['taxonomies'];
 		$featured_image_path    = $config['featured_image_path'];
 		$source_url             = $config['source_url'];
+		$original_date_gmt      = $this->normalizeOriginalDateGmt( $config['original_date_gmt'] );
 		$add_source_attribution = $config['add_source_attribution'];
 		$job_id                 = $config['job_id'];
 
@@ -253,6 +260,11 @@ class PublishWordPressAbility {
 				array( 'post_author' => $post_author )
 			),
 		);
+
+		if ( null !== $original_date_gmt ) {
+			$post_data['post_date_gmt'] = $original_date_gmt;
+			$post_data['post_date']     = get_date_from_gmt( $original_date_gmt );
+		}
 
 		// Support hierarchical post types (pages, custom hierarchical CPTs).
 		$post_parent = (int) ( $config['post_parent'] ?? 0 );
@@ -375,6 +387,10 @@ class PublishWordPressAbility {
 			update_post_meta( $post_id, PostTracking::SOURCE_URL_META_KEY, esc_url_raw( $source_url ) );
 		}
 
+		if ( null !== $original_date_gmt ) {
+			update_post_meta( $post_id, '_datamachine_original_date_gmt', $original_date_gmt );
+		}
+
 		$logs[] = array(
 			'level'   => 'debug',
 			'message' => 'WordPress: Post published successfully',
@@ -408,6 +424,7 @@ class PublishWordPressAbility {
 			'taxonomies'             => array(),
 			'featured_image_path'    => '',
 			'source_url'             => '',
+			'original_date_gmt'      => '',
 			'content_format'         => 'html',
 			'add_source_attribution' => true,
 			'post_parent'            => 0,
@@ -415,6 +432,16 @@ class PublishWordPressAbility {
 		);
 
 		return array_merge( $defaults, $input );
+	}
+
+	/**
+	 * Normalize an arbitrary source date into a MySQL GMT datetime.
+	 *
+	 * @param mixed $date Source date value.
+	 * @return string|null MySQL GMT datetime or null when invalid.
+	 */
+	private function normalizeOriginalDateGmt( $date ): ?string {
+		return SourceDate::normalizeGmt( $date );
 	}
 
 	/**

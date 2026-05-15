@@ -73,6 +73,7 @@ namespace {
 	);
 	$GLOBALS['__content_ability_next_id']     = 20;
 	$GLOBALS['__content_ability_conversions'] = array();
+	$GLOBALS['__content_ability_meta']        = array();
 
 	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
 		$GLOBALS['__content_ability_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
@@ -103,6 +104,10 @@ namespace {
 
 	function sanitize_text_field( $value ): string {
 		return trim( (string) $value );
+	}
+
+	function esc_url_raw( $url ): string {
+		return trim( (string) $url );
 	}
 
 	function absint( $value ): int {
@@ -139,8 +144,16 @@ namespace {
 	}
 
 	function get_post_meta( int $post_id, string $key, bool $single = false ) {
-		unset( $post_id, $key, $single );
-		return '';
+		$value = $GLOBALS['__content_ability_meta'][ $post_id ][ $key ] ?? '';
+		return $single ? $value : array( $value );
+	}
+
+	function update_post_meta( int $post_id, string $key, $value ): void {
+		$GLOBALS['__content_ability_meta'][ $post_id ][ $key ] = $value;
+	}
+
+	function get_date_from_gmt( string $date ): string {
+		return $date;
 	}
 
 	function taxonomy_exists( string $taxonomy ): bool {
@@ -175,6 +188,9 @@ namespace {
 			if ( 'meta_input' !== $key ) {
 				$existing->{$key} = $value;
 			}
+		}
+		foreach ( $post_data['meta_input'] ?? array() as $key => $value ) {
+			$GLOBALS['__content_ability_meta'][ $id ][ $key ] = $value;
 		}
 		$existing->ID                              = $id;
 		$GLOBALS['__content_ability_posts'][ $id ] = $existing;
@@ -327,6 +343,8 @@ namespace {
 	);
 
 	include_once dirname( __DIR__ ) . '/inc/Core/Content/ContentFormat.php';
+	include_once dirname( __DIR__ ) . '/inc/Core/SourceDate.php';
+	include_once dirname( __DIR__ ) . '/inc/Core/WordPress/PostTracking.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/BlockSanitizer.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/GetPostBlocksAbility.php';
 	include_once dirname( __DIR__ ) . '/inc/Abilities/Content/EditPostBlocksAbility.php';
@@ -367,6 +385,40 @@ namespace {
 	$new_post = get_post( (int) $new_id );
 	assert_content_ability( 'upsert-markdown-source-succeeds', true === $upsert['success'] );
 	assert_content_ability( 'upsert-markdown-source-stays-markdown', "# Stored\n\nRaw markdown." === ( $new_post->post_content ?? '' ) );
+
+	$source_upsert = DataMachine\Abilities\Content\UpsertPostAbility::execute(
+		array(
+			'post_type'         => 'wiki',
+			'title'             => 'Source Dated Markdown',
+			'content'           => "# Source\n\nRaw markdown.",
+			'content_format'    => 'markdown',
+			'source_url'        => 'https://example.com/source-post/',
+			'original_date_gmt' => '2020-09-24T06:12:53+00:00',
+		)
+	);
+	$source_id     = (int) ( $source_upsert['post_id'] ?? 0 );
+	$source_post   = get_post( $source_id );
+	assert_content_ability( 'upsert-source-date-succeeds', true === $source_upsert['success'] );
+	assert_content_ability( 'upsert-source-url-meta-stored', 'https://example.com/source-post/' === get_post_meta( $source_id, '_datamachine_source_url', true ) );
+	assert_content_ability( 'upsert-original-date-meta-stored', '2020-09-24 06:12:53' === get_post_meta( $source_id, '_datamachine_original_date_gmt', true ) );
+	assert_content_ability( 'upsert-original-date-applies-post-date-gmt', '2020-09-24 06:12:53' === ( $source_post->post_date_gmt ?? '' ) );
+
+	$future_source_upsert = DataMachine\Abilities\Content\UpsertPostAbility::execute(
+		array(
+			'post_type'         => 'wiki',
+			'title'             => 'Future Source Date Ignored',
+			'content'           => "# Future\n\nRaw markdown.",
+			'content_format'    => 'markdown',
+			'source_url'        => 'https://example.com/future-source-post/',
+			'original_date_gmt' => '2999-01-01T00:00:00+00:00',
+		)
+	);
+	$future_source_id     = (int) ( $future_source_upsert['post_id'] ?? 0 );
+	$future_source_post   = get_post( $future_source_id );
+	assert_content_ability( 'upsert-future-source-date-succeeds', true === $future_source_upsert['success'] );
+	assert_content_ability( 'upsert-future-source-url-still-stored', 'https://example.com/future-source-post/' === get_post_meta( $future_source_id, '_datamachine_source_url', true ) );
+	assert_content_ability( 'upsert-future-original-date-ignored', '' === get_post_meta( $future_source_id, '_datamachine_original_date_gmt', true ) );
+	assert_content_ability( 'upsert-future-original-date-does-not-set-post-date-gmt', empty( $future_source_post->post_date_gmt ) );
 
 	$chat_upsert   = DataMachine\Abilities\Content\UpsertPostAbility::handleChatToolCall(
 		array(

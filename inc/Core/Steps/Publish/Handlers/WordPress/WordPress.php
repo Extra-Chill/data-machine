@@ -200,6 +200,7 @@ class WordPress extends PublishHandler {
 			'featured_image_path'    => $media['image_file_path'],
 			'featured_image_url'     => $media['image_url'],
 			'source_url'             => $engine->getSourceUrl(),
+			'original_date_gmt'      => $engine->getOriginalDateGmt(),
 			'add_source_attribution' => 'append' === ( $handler_config['link_handling'] ?? 'append' ),
 			'job_id'                 => $parameters['job_id'] ?? null,
 		);
