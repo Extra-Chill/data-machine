@@ -210,6 +210,17 @@ class RecoverStuckJobsAbility {
 			$job_id      = (int) $job->job_id;
 			$job_flow_id = (int) $job->flow_id;
 
+			if ( $this->hasActiveStepAction( $job_id ) ) {
+				++$skipped;
+				$jobs[] = array(
+					'job_id'  => $job_id,
+					'flow_id' => $job_flow_id,
+					'status'  => 'skipped',
+					'reason'  => 'Pending or in-progress Action Scheduler step action exists',
+				);
+				continue;
+			}
+
 			if ( $dry_run ) {
 				++$timed_out;
 				$jobs[] = array(
@@ -422,6 +433,52 @@ class RecoverStuckJobsAbility {
 		}
 
 		return $terminal_actions;
+	}
+
+	/**
+	 * Check whether Action Scheduler still owns executable work for a job.
+	 *
+	 * Pipeline jobs can stay in the `processing` state across multiple scheduled
+	 * steps. If a later `datamachine_execute_step` action is still pending or
+	 * in-progress, timeout recovery must not mark the job failed just because the
+	 * original job row is old.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return bool True when a pending/in-progress step action exists.
+	 */
+	private function hasActiveStepAction( int $job_id ): bool {
+		global $wpdb;
+
+		if ( $job_id <= 0 ) {
+			return false;
+		}
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$like_job_id   = '%"job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
+		$actions = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT action_id, args
+				 FROM {$actions_table}
+				 WHERE hook = %s
+				 AND status IN ( %s, %s )
+				 AND args LIKE %s",
+				'datamachine_execute_step',
+				'pending',
+				'in-progress',
+				$like_job_id
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		foreach ( $actions as $action ) {
+			if ( $job_id === $this->extractActionJobId( (string) ( $action->args ?? '' ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
