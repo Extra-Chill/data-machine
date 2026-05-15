@@ -128,6 +128,10 @@ class CreateChatSessionAbility {
 			$session_metadata['source'] = $source;
 		}
 
+		if ( isset( $input['transcript_owner'] ) && is_array( $input['transcript_owner'] ) ) {
+			$session_metadata['transcript_owner'] = $input['transcript_owner'];
+		}
+
 		// Merge any additional metadata from input.
 		if ( ! empty( $input['metadata'] ) && is_array( $input['metadata'] ) ) {
 			$session_metadata = array_merge( $session_metadata, $input['metadata'] );

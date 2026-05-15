@@ -12,6 +12,7 @@
 namespace DataMachine\Core\Database\Chat;
 
 use DataMachine\Core\Admin\DateFormatter;
+use DataMachine\Abilities\Chat\ChatTranscriptOwner;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\BaseRepository;
 use AgentsAPI\AI\WP_Agent_Message;
@@ -55,6 +56,9 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			workspace_type VARCHAR(50) NOT NULL,
 			workspace_id VARCHAR(191) NOT NULL,
 			user_id BIGINT(20) UNSIGNED NOT NULL,
+			owner_type VARCHAR(40) NOT NULL DEFAULT 'user',
+			owner_key_hash VARCHAR(64) NOT NULL,
+			owner_label VARCHAR(191) NULL,
 			agent_id BIGINT(20) UNSIGNED NULL,
 			title VARCHAR(100) NULL,
 			messages LONGTEXT NOT NULL,
@@ -72,6 +76,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			PRIMARY KEY  (session_id),
 			KEY workspace (workspace_type, workspace_id),
 			KEY user_id (user_id),
+			KEY owner (owner_type, owner_key_hash),
 			KEY agent_id (agent_id),
 			KEY mode (mode),
 			KEY user_mode (user_id, mode),
@@ -83,6 +88,63 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+	}
+
+	/**
+	 * Ensure transcript owner columns exist and migrate legacy rows to user ownership.
+	 *
+	 * @return void
+	 */
+	public static function ensure_owner_columns(): void {
+		global $wpdb;
+
+		$table_name = self::get_prefixed_table_name();
+
+		if ( ! self::column_exists( $table_name, 'owner_type', $wpdb ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN owner_type VARCHAR(40) NOT NULL DEFAULT %s', $table_name, 'user' ) );
+		}
+
+		if ( ! self::column_exists( $table_name, 'owner_key_hash', $wpdb ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN owner_key_hash VARCHAR(64) NULL', $table_name ) );
+		}
+
+		if ( ! self::column_exists( $table_name, 'owner_label', $wpdb ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i ADD COLUMN owner_label VARCHAR(191) NULL', $table_name ) );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query(
+			$wpdb->prepare(
+				'UPDATE %i SET owner_type = %s WHERE owner_type IS NULL OR owner_type = %s',
+				$table_name,
+				'user',
+				''
+			)
+		);
+
+		// Backfill user-owned hashes row-by-row because the value is intentionally
+		// derived through PHP's hash() to stay engine-independent.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT session_id, user_id FROM %i WHERE owner_key_hash IS NULL OR owner_key_hash = %s', $table_name, '' ), ARRAY_A );
+		foreach ( $rows as $row ) {
+			$user_id = absint( $row['user_id'] ?? 0 );
+			$owner   = ChatTranscriptOwner::user_owner( $user_id );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$wpdb->update(
+				$table_name,
+				array(
+					'owner_type'     => $owner['owner_type'],
+					'owner_key_hash' => $owner['owner_key_hash'],
+					'owner_label'    => $owner['owner_label'],
+				),
+				array( 'session_id' => (string) $row['session_id'] ),
+				array( '%s', '%s', '%s' ),
+				array( '%s' )
+			);
+		}
 	}
 
 	/**
@@ -280,6 +342,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		global $wpdb;
 
 		list( $workspace, $user_id, $agent, $metadata, $context ) = self::normalize_create_session_args( $args );
+		$owner = self::normalize_owner_from_metadata( $metadata, $user_id );
 
 		try {
 			$identity   = self::resolve_agent_identity_for_session( $agent );
@@ -321,6 +384,9 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				'workspace_type' => $workspace->workspace_type,
 				'workspace_id'   => $workspace->workspace_id,
 				'user_id'        => $user_id,
+				'owner_type'     => $owner['owner_type'],
+				'owner_key_hash' => $owner['owner_key_hash'],
+				'owner_label'    => $owner['owner_label'],
 				'agent_id'       => $agent_id > 0 ? $agent_id : null,
 				'messages'       => wp_json_encode( array() ),
 				'metadata'       => wp_json_encode( $metadata ),
@@ -329,7 +395,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				'mode'           => $context,
 				'expires_at'     => null,
 			),
-			array( '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
+			array( '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( false === $result ) {
@@ -388,6 +454,80 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	}
 
 	/**
+	 * Normalize transcript owner metadata for storage.
+	 *
+	 * @param array $metadata Session metadata.
+	 * @param int   $user_id  Compatibility user ID.
+	 * @return array{owner_type:string,owner_key_hash:string,owner_label:string}
+	 */
+	private static function normalize_owner_from_metadata( array &$metadata, int $user_id ): array {
+		$owner = is_array( $metadata['transcript_owner'] ?? null ) ? $metadata['transcript_owner'] : ChatTranscriptOwner::user_owner( $user_id );
+
+		if ( empty( $owner['owner_key_hash'] ) && ! empty( $owner['owner_key'] ) ) {
+			$owner['owner_key_hash'] = ChatTranscriptOwner::hash_owner_key( (string) $owner['owner_key'] );
+		}
+
+		$normalized = array(
+			'owner_type'     => sanitize_key( (string) ( $owner['owner_type'] ?? 'user' ) ),
+			'owner_key_hash' => preg_replace( '/[^a-f0-9]/', '', strtolower( (string) ( $owner['owner_key_hash'] ?? '' ) ) ),
+			'owner_label'    => mb_substr( sanitize_text_field( (string) ( $owner['owner_label'] ?? '' ) ), 0, 191 ),
+		);
+
+		if ( '' === $normalized['owner_type'] || '' === $normalized['owner_key_hash'] ) {
+			$fallback   = ChatTranscriptOwner::user_owner( $user_id );
+			$normalized = array(
+				'owner_type'     => $fallback['owner_type'],
+				'owner_key_hash' => $fallback['owner_key_hash'],
+				'owner_label'    => $fallback['owner_label'],
+			);
+		}
+
+		$metadata['transcript_owner'] = $normalized;
+
+		return $normalized;
+	}
+
+	/**
+	 * Add owner constraints to a WHERE fragment.
+	 *
+	 * @param array      $where      WHERE fragments.
+	 * @param array      $query_args Query args.
+	 * @param array|null $owner      Optional owner array.
+	 * @return void
+	 */
+	private static function append_owner_where( array &$where, array &$query_args, ?array $owner ): void {
+		if ( empty( $owner['owner_type'] ) || empty( $owner['owner_key_hash'] ) ) {
+			return;
+		}
+
+		$where[]      = 'owner_type = %s';
+		$query_args[] = sanitize_key( (string) $owner['owner_type'] );
+		$where[]      = 'owner_key_hash = %s';
+		$query_args[] = (string) $owner['owner_key_hash'];
+	}
+
+	/**
+	 * Check whether a loaded session row belongs to an owner.
+	 *
+	 * @param array $session Session row.
+	 * @param array $owner   Owner array.
+	 * @return bool
+	 */
+	public function session_matches_owner( array $session, array $owner ): bool {
+		$session_owner_type = (string) ( $session['owner_type'] ?? '' );
+		$session_owner_hash = (string) ( $session['owner_key_hash'] ?? '' );
+
+		if ( '' === $session_owner_type || '' === $session_owner_hash ) {
+			$legacy = ChatTranscriptOwner::user_owner( absint( $session['user_id'] ?? 0 ) );
+			$session_owner_type = $legacy['owner_type'];
+			$session_owner_hash = $legacy['owner_key_hash'];
+		}
+
+		return $session_owner_type === (string) ( $owner['owner_type'] ?? '' )
+			&& $session_owner_hash === (string) ( $owner['owner_key_hash'] ?? '' );
+	}
+
+	/**
 	 * Resolve the generic transcript agent slug to Data Machine's stored agent ID.
 	 *
 	 * Integer input is retained as a Data Machine-internal compatibility path for
@@ -432,7 +572,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * Normalize pending-session arguments across current and workspace-aware contracts.
 	 *
 	 * @param array $args Raw method arguments.
-	 * @return array{0:WP_Agent_Workspace_Scope,1:int,2:int,3:string,4:int|null}
+	 * @return array{0:WP_Agent_Workspace_Scope,1:int,2:int,3:string,4:int|null,5:array|null}
 	 */
 	private static function normalize_recent_pending_session_args( array $args ): array {
 		if ( isset( $args[0] ) && $args[0] instanceof WP_Agent_Workspace_Scope ) {
@@ -442,6 +582,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 				(int) ( $args[2] ?? 600 ),
 				(string) ( $args[3] ?? 'chat' ),
 				isset( $args[4] ) ? (int) $args[4] : null,
+				is_array( $args[5] ?? null ) ? $args[5] : null,
 			);
 		}
 
@@ -451,6 +592,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			(int) ( $args[1] ?? 600 ),
 			(string) ( $args[2] ?? 'chat' ),
 			isset( $args[3] ) ? (int) $args[3] : null,
+			is_array( $args[4] ?? null ) ? $args[4] : null,
 		);
 	}
 
@@ -518,6 +660,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			$query_args[] = $args['context'];
 		}
 
+		self::append_owner_where( $where, $query_args, is_array( $args['transcript_owner'] ?? null ) ? $args['transcript_owner'] : null );
+
 		if ( is_string( $args['agent_slug'] ?? null ) && '' !== $args['agent_slug'] ) {
 			try {
 				$identity = self::resolve_agent_identity_for_session( $args['agent_slug'] );
@@ -530,7 +674,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			$query_args[] = $identity['agent_id'];
 		}
 
-		$select = $include_messages ? '*' : 'session_id, workspace_type, workspace_id, user_id, agent_id, title, metadata, provider, model, provider_response_id, mode, created_at, updated_at, last_read_at, expires_at';
+		$select = $include_messages ? '*' : 'session_id, workspace_type, workspace_id, user_id, owner_type, owner_key_hash, owner_label, agent_id, title, metadata, provider, model, provider_response_id, mode, created_at, updated_at, last_read_at, expires_at';
 		$sql    = 'SELECT ' . $select . ' FROM %i WHERE ' . implode( ' AND ', $where ) . ' ORDER BY updated_at DESC LIMIT %d OFFSET %d';
 
 		$query_args[] = $limit;
@@ -840,65 +984,34 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		int $limit = 20,
 		int $offset = 0,
 		?string $mode = null,
-		?int $agent_id = null
+		?int $agent_id = null,
+		?array $transcript_owner = null
 	): array {
 		global $wpdb;
 
 		$table_name = self::get_prefixed_table_name();
+		$where      = array( 'user_id = %d' );
+		$params     = array( $table_name, $user_id );
 
-		if ( null !== $agent_id && null !== $mode && '' !== $mode ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$sessions = $wpdb->get_results(
-				$wpdb->prepare(
-					'SELECT * FROM %i WHERE user_id = %d AND mode = %s AND agent_id = %d ORDER BY updated_at DESC LIMIT %d OFFSET %d',
-					$table_name,
-					$user_id,
-					$mode,
-					$agent_id,
-					$limit,
-					$offset
-				),
-				ARRAY_A
-			);
-		} elseif ( null !== $agent_id ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$sessions = $wpdb->get_results(
-				$wpdb->prepare(
-					'SELECT * FROM %i WHERE user_id = %d AND agent_id = %d ORDER BY updated_at DESC LIMIT %d OFFSET %d',
-					$table_name,
-					$user_id,
-					$agent_id,
-					$limit,
-					$offset
-				),
-				ARRAY_A
-			);
-		} elseif ( null !== $mode && '' !== $mode ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$sessions = $wpdb->get_results(
-				$wpdb->prepare(
-					'SELECT * FROM %i WHERE user_id = %d AND mode = %s ORDER BY updated_at DESC LIMIT %d OFFSET %d',
-					$table_name,
-					$user_id,
-					$mode,
-					$limit,
-					$offset
-				),
-				ARRAY_A
-			);
-		} else {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$sessions = $wpdb->get_results(
-				$wpdb->prepare(
-					'SELECT * FROM %i WHERE user_id = %d ORDER BY updated_at DESC LIMIT %d OFFSET %d',
-					$table_name,
-					$user_id,
-					$limit,
-					$offset
-				),
-				ARRAY_A
-			);
+		if ( null !== $mode && '' !== $mode ) {
+			$where[]  = 'mode = %s';
+			$params[] = $mode;
 		}
+
+		if ( null !== $agent_id ) {
+			$where[]  = 'agent_id = %d';
+			$params[] = $agent_id;
+		}
+
+		self::append_owner_where( $where, $params, $transcript_owner );
+
+		$params[] = $limit;
+		$params[] = $offset;
+
+		$sql = 'SELECT * FROM %i WHERE ' . implode( ' AND ', $where ) . ' ORDER BY updated_at DESC LIMIT %d OFFSET %d';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$sessions = $wpdb->get_results( $wpdb->prepare( $sql, ...$params ), ARRAY_A );
 
 		if ( ! $sessions ) {
 			return array();
@@ -966,53 +1079,31 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	public function get_user_session_count(
 		int $user_id,
 		?string $mode = null,
-		?int $agent_id = null
+		?int $agent_id = null,
+		?array $transcript_owner = null
 	): int {
 		global $wpdb;
 
 		$table_name = self::get_prefixed_table_name();
+		$where      = array( 'user_id = %d' );
+		$params     = array( $table_name, $user_id );
 
-		if ( null !== $agent_id && null !== $mode && '' !== $mode ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$count = $wpdb->get_var(
-				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i WHERE user_id = %d AND mode = %s AND agent_id = %d',
-					$table_name,
-					$user_id,
-					$mode,
-					$agent_id
-				)
-			);
-		} elseif ( null !== $agent_id ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$count = $wpdb->get_var(
-				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i WHERE user_id = %d AND agent_id = %d',
-					$table_name,
-					$user_id,
-					$agent_id
-				)
-			);
-		} elseif ( null !== $mode && '' !== $mode ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$count = $wpdb->get_var(
-				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i WHERE user_id = %d AND mode = %s',
-					$table_name,
-					$user_id,
-					$mode
-				)
-			);
-		} else {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$count = $wpdb->get_var(
-				$wpdb->prepare(
-					'SELECT COUNT(*) FROM %i WHERE user_id = %d',
-					$table_name,
-					$user_id
-				)
-			);
+		if ( null !== $mode && '' !== $mode ) {
+			$where[]  = 'mode = %s';
+			$params[] = $mode;
 		}
+
+		if ( null !== $agent_id ) {
+			$where[]  = 'agent_id = %d';
+			$params[] = $agent_id;
+		}
+
+		self::append_owner_where( $where, $params, $transcript_owner );
+
+		$sql = 'SELECT COUNT(*) FROM %i WHERE ' . implode( ' AND ', $where );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$count = $wpdb->get_var( $wpdb->prepare( $sql, ...$params ) );
 
 		return (int) $count;
 	}
@@ -1041,7 +1132,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	public function get_recent_pending_session( ...$args ): ?array {
 		global $wpdb;
 
-		list( $workspace, $user_id, $seconds, $context, $token_id ) = self::normalize_recent_pending_session_args( $args );
+		list( $workspace, $user_id, $seconds, $context, $token_id, $transcript_owner ) = self::normalize_recent_pending_session_args( $args );
 
 		$table_name  = self::get_prefixed_table_name();
 		$cutoff_time = gmdate( 'Y-m-d H:i:s', time() - $seconds );
@@ -1073,6 +1164,12 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		if ( null !== $token_id ) {
 			$query   .= ' AND metadata LIKE %s';
 			$params[] = '%"token_id":' . (int) $token_id . '%';
+		}
+
+		if ( is_array( $transcript_owner ) && ! empty( $transcript_owner['owner_type'] ) && ! empty( $transcript_owner['owner_key_hash'] ) ) {
+			$query   .= ' AND owner_type = %s AND owner_key_hash = %s';
+			$params[] = sanitize_key( (string) $transcript_owner['owner_type'] );
+			$params[] = (string) $transcript_owner['owner_key_hash'];
 		}
 
 		$query .= ' ORDER BY created_at DESC LIMIT 1';
@@ -1220,22 +1317,31 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	 * @param int    $user_id    User ID for ownership verification.
 	 * @return string|false The new last_read_at value on success, false on failure.
 	 */
-	public function mark_session_read( string $session_id, int $user_id ) {
+	public function mark_session_read( string $session_id, int $user_id, ?array $transcript_owner = null ) {
 		global $wpdb;
 
 		$table_name   = self::get_prefixed_table_name();
 		$last_read_at = (string) current_time( 'mysql', true );
+		$where        = array(
+			'session_id' => $session_id,
+			'user_id'    => $user_id,
+		);
+		$where_format = array( '%s', '%d' );
+
+		if ( is_array( $transcript_owner ) && ! empty( $transcript_owner['owner_type'] ) && ! empty( $transcript_owner['owner_key_hash'] ) ) {
+			$where['owner_type']     = sanitize_key( (string) $transcript_owner['owner_type'] );
+			$where['owner_key_hash'] = (string) $transcript_owner['owner_key_hash'];
+			$where_format[]          = '%s';
+			$where_format[]          = '%s';
+		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $wpdb->update(
 			$table_name,
 			array( 'last_read_at' => $last_read_at ),
-			array(
-				'session_id' => $session_id,
-				'user_id'    => $user_id,
-			),
+			$where,
 			array( '%s' ),
-			array( '%s', '%d' )
+			$where_format
 		);
 
 		if ( false === $result ) {

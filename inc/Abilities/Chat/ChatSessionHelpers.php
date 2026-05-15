@@ -51,20 +51,35 @@ trait ChatSessionHelpers {
 	}
 
 	/**
+	 * Resolve the transcript owner used by session abilities.
+	 *
+	 * @param array $input           Ability input.
+	 * @param int   $fallback_user_id User ID compatibility fallback.
+	 * @return array|\WP_Error
+	 */
+	protected function resolve_transcript_owner( array $input, int $fallback_user_id ) {
+		return ChatTranscriptOwner::resolve_for_request( $input, $fallback_user_id );
+	}
+
+	/**
 	 * Verify that a session exists and belongs to the given user.
 	 *
 	 * @param string $session_id Session ID to verify.
 	 * @param int    $user_id    User ID to check ownership against.
 	 * @return array|array{error: string} Session data on success, or array with 'error' key on failure.
 	 */
-	protected function verifySessionOwnership( string $session_id, int $user_id ): array {
+	protected function verifySessionOwnership( string $session_id, int $user_id, ?array $transcript_owner = null ): array {
 		$session = $this->chat_db->get_session( $session_id );
 
 		if ( ! $session ) {
 			return array( 'error' => 'session_not_found' );
 		}
 
-		if ( (int) $session['user_id'] !== $user_id ) {
+		$owns_session = null !== $transcript_owner && method_exists( $this->chat_db, 'session_matches_owner' )
+			? $this->chat_db->session_matches_owner( $session, $transcript_owner )
+			: ( (int) $session['user_id'] === $user_id );
+
+		if ( ! $owns_session ) {
 			return array( 'error' => 'session_access_denied' );
 		}
 
