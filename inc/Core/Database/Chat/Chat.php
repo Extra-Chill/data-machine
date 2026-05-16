@@ -595,7 +595,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agen
 	 * Normalize pending-session arguments across current and workspace-aware contracts.
 	 *
 	 * @param array $args Raw method arguments.
-	 * @return array{0:WP_Agent_Workspace_Scope,1:int,2:int,3:string,4:int|null,5:array|null}
+	 * @return array{0:WP_Agent_Workspace_Scope,1:int,2:int,3:string,4:int|null,5:array|null,6:bool}
 	 */
 	private static function normalize_recent_pending_session_args( array $args ): array {
 		if ( isset( $args[0] ) && $args[0] instanceof WP_Agent_Workspace_Scope ) {
@@ -606,6 +606,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agen
 				(string) ( $args[3] ?? 'chat' ),
 				isset( $args[4] ) ? (int) $args[4] : null,
 				is_array( $args[5] ?? null ) ? $args[5] : null,
+				! empty( $args[6] ),
 			);
 		}
 
@@ -616,6 +617,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agen
 			(string) ( $args[2] ?? 'chat' ),
 			isset( $args[3] ) ? (int) $args[3] : null,
 			is_array( $args[4] ?? null ) ? $args[4] : null,
+			! empty( $args[5] ),
 		);
 	}
 
@@ -666,17 +668,21 @@ class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agen
 		$include_messages = (bool) ( $args['include_messages'] ?? true );
 		$limit            = max( 1, min( 100, (int) ( $args['limit'] ?? 20 ) ) );
 		$offset           = max( 0, (int) ( $args['offset'] ?? 0 ) );
+		$owner_only       = ! empty( $args['owner_only'] ) && is_array( $args['transcript_owner'] ?? null );
 		$where            = array(
 			'workspace_type = %s',
 			'workspace_id = %s',
-			'user_id = %d',
 		);
 		$query_args       = array(
 			$table_name,
 			$workspace->workspace_type,
 			$workspace->workspace_id,
-			$user_id,
 		);
+
+		if ( ! $owner_only ) {
+			$where[]      = 'user_id = %d';
+			$query_args[] = $user_id;
+		}
 
 		if ( is_string( $args['context'] ?? null ) && '' !== $args['context'] ) {
 			$where[]      = 'mode = %s';
@@ -737,6 +743,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agen
 		}
 
 		$args['transcript_owner'] = $transcript_owner;
+		$args['owner_only']       = true;
 		return $this->list_sessions( $workspace, (int) $transcript_owner['user_id'], $args );
 	}
 
@@ -1173,7 +1180,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agen
 	public function get_recent_pending_session( ...$args ): ?array {
 		global $wpdb;
 
-		list( $workspace, $user_id, $seconds, $context, $token_id, $transcript_owner ) = self::normalize_recent_pending_session_args( $args );
+		list( $workspace, $user_id, $seconds, $context, $token_id, $transcript_owner, $owner_only ) = self::normalize_recent_pending_session_args( $args );
 
 		$table_name  = self::get_prefixed_table_name();
 		$cutoff_time = gmdate( 'Y-m-d H:i:s', time() - $seconds );
@@ -1181,7 +1188,6 @@ class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agen
 		$query  = "SELECT * FROM %i
 				WHERE workspace_type = %s
 				AND workspace_id = %s
-				AND user_id = %d
 				AND mode = %s
 				AND created_at >= %s
 				AND (
@@ -1192,11 +1198,15 @@ class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agen
 			$table_name,
 			$workspace->workspace_type,
 			$workspace->workspace_id,
-			$user_id,
 			$context,
 			$cutoff_time,
 			'%"status":"processing"%',
 		);
+
+		if ( ! $owner_only ) {
+			$query   .= ' AND user_id = %d';
+			$params[] = $user_id;
+		}
 
 		$query   .= ' AND metadata LIKE %s AND metadata LIKE %s';
 		$params[] = '%"workspace_type":"' . $wpdb->esc_like( $workspace->workspace_type ) . '"%';
@@ -1250,7 +1260,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agen
 			return null;
 		}
 
-		return $this->get_recent_pending_session( $workspace, (int) $transcript_owner['user_id'], $seconds, $context, $token_id, $transcript_owner );
+		return $this->get_recent_pending_session( $workspace, (int) $transcript_owner['user_id'], $seconds, $context, $token_id, $transcript_owner, true );
 	}
 
 	/**
