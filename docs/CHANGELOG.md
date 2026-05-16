@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.116.1] - 2026-05-16
+
+### Fixed
+- preserve bundle flow step settings
+
 ## [0.116.0] - 2026-05-15
 
 ### Added
