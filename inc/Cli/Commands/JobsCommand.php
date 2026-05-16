@@ -391,9 +391,9 @@ class JobsCommand extends BaseCommand {
 		$limit   = isset( $assoc_args['limit'] ) ? max( 1, min( 5000, (int) $assoc_args['limit'] ) ) : 500;
 		$format  = $assoc_args['format'] ?? 'table';
 
-		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
-		$jobs_db    = new Jobs();
-		$failed_like = $wpdb->esc_like( 'failed' ) . '%';
+		$jobs_table         = $wpdb->prefix . 'datamachine_jobs';
+		$jobs_db            = new Jobs();
+		$failed_like        = $wpdb->esc_like( 'failed' ) . '%';
 		$agent_skipped_like = $wpdb->esc_like( 'agent_skipped' ) . '%';
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
@@ -518,8 +518,8 @@ class JobsCommand extends BaseCommand {
 	private function reconcile_parent_batch_statuses( bool $dry_run, int $limit ): array {
 		global $wpdb;
 
-		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
-		$jobs_db    = new Jobs();
+		$jobs_table  = $wpdb->prefix . 'datamachine_jobs';
+		$jobs_db     = new Jobs();
 		$failed_like = $wpdb->esc_like( 'failed' ) . '%';
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
@@ -614,10 +614,10 @@ class JobsCommand extends BaseCommand {
 	private function get_child_terminal_counts( int $parent_job_id ): array {
 		global $wpdb;
 
-		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
-		$agent_skipped_like = $wpdb->esc_like( 'agent_skipped' ) . '%';
+		$jobs_table              = $wpdb->prefix . 'datamachine_jobs';
+		$agent_skipped_like      = $wpdb->esc_like( 'agent_skipped' ) . '%';
 		$completed_no_items_like = $wpdb->esc_like( 'completed_no_items' ) . '%';
-		$failed_like = $wpdb->esc_like( 'failed' ) . '%';
+		$failed_like             = $wpdb->esc_like( 'failed' ) . '%';
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
