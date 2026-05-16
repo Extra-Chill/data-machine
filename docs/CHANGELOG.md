@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.116.3] - 2026-05-16
+
+### Fixed
+- preserve local agent config on bundle upgrades
+- retain AI tool results across conversation turns
+- complete assertion-only non-handler AI runs
+- read direct workflow static prompts
+- align principal sessions with WordPress workspace
+- emit packets for assertion-only AI completions
+- list principal-owned chat sessions by owner
+- support principal-owned conversation store
+
 ## [0.116.2] - 2026-05-16
 
 ### Changed
