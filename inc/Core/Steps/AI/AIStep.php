@@ -921,6 +921,24 @@ class AIStep extends Step {
 			$outputPackets = $packet->addTo( $outputPackets );
 		}
 
+		if ( count( $outputPackets ) === 0 && true === ( $loop_result['completion_assertions_complete'] ?? false ) ) {
+			$packet        = new DataPacket(
+				array(
+					'title' => 'AI Completion Assertions Satisfied',
+					'body'  => 'The AI step satisfied its configured completion assertions.',
+				),
+				array(
+					'source_type'                     => 'ai_completion_assertions',
+					'flow_step_id'                    => $flow_step_id,
+					'conversation_turn'               => $turn_count,
+					'completion_assertions_satisfied' => is_array( $loop_result['completion_assertions_satisfied'] ?? null ) ? $loop_result['completion_assertions_satisfied'] : array(),
+					'completion_assertions_missing'   => is_array( $loop_result['completion_assertions_missing'] ?? null ) ? $loop_result['completion_assertions_missing'] : array(),
+				),
+				'ai_completion_assertions'
+			);
+			$outputPackets = $packet->addTo( $outputPackets );
+		}
+
 		return $outputPackets;
 	}
 }
