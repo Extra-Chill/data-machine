@@ -2,6 +2,21 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.114.0] - 2026-05-15
+
+### Added
+- support multi-mode AI runs
+
+### Changed
+- phpcbf-formatted multi-mode changes
+- Add audience grants for agent access
+
+### Fixed
+- clarify stuck job recovery output
+- Fix audience grant dependency and lint
+- clean up upsert attribution lint
+- append source attribution on upsert
+
 ## [0.113.1] - 2026-05-15
 
 ### Fixed
