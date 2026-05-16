@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.117.0] - 2026-05-16
+
+### Added
+- add external login primitives
+
+### Fixed
+- align rebased approval payload
+- approve safe rebased bundle artifacts
+
 ## [0.116.3] - 2026-05-16
 
 ### Fixed
