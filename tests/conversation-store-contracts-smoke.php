@@ -39,6 +39,7 @@ use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
 use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Lock;
 use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Principal_Conversation_Store;
 use DataMachine\Tests\Unit\Core\Database\Chat\InMemoryConversationStore;
 
 $failures    = array();
@@ -83,6 +84,7 @@ $assert_true(
 		'delete_session',
 		'get_recent_pending_session',
 		'get_session',
+		'list_sessions',
 		'update_session',
 		'update_title',
 	) === $transcript_methods,
@@ -110,6 +112,7 @@ foreach ( $narrow_contracts as $contract ) {
 }
 
 $assert_true( ( new ReflectionClass( Chat::class ) )->implementsInterface( ConversationStoreInterface::class ), 'Chat remains a ConversationStoreInterface aggregate' );
+$assert_true( ( new ReflectionClass( Chat::class ) )->implementsInterface( WP_Agent_Principal_Conversation_Store::class ), 'Chat supports principal-owned transcript sessions' );
 $assert_true( ( new ReflectionClass( InMemoryConversationStore::class ) )->implementsInterface( ConversationStoreInterface::class ), 'test adapter remains a ConversationStoreInterface aggregate' );
 
 $factory_get = new ReflectionMethod( ConversationStoreFactory::class, 'get' );

@@ -15,9 +15,12 @@ use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Abilities\Chat\ChatTranscriptOwner;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\BaseRepository;
+use AgentsAPI\AI\WP_Agent_Execution_Principal;
 use AgentsAPI\AI\WP_Agent_Message;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Principal_Conversation_Store;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
+use WP_Error;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -31,7 +34,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * filter. Resolve via {@see ConversationStoreFactory::get()} rather than
  * instantiating this class directly.
  */
-class Chat extends BaseRepository implements ConversationStoreInterface {
+class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agent_Principal_Conversation_Store {
 
 	/**
 	 * Table name (without prefix)
@@ -428,6 +431,26 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	}
 
 	/**
+	 * Create a new chat session for a canonical Agents API principal owner.
+	 *
+	 * @param WP_Agent_Workspace_Scope      $workspace  Workspace owning the session.
+	 * @param array{type:string,key:string} $owner      Canonical principal owner.
+	 * @param string                        $agent_slug Registered agent slug.
+	 * @param array                         $metadata   Optional session metadata.
+	 * @param string                        $context    Execution context.
+	 * @return string Session ID (UUID), or empty string on failure.
+	 */
+	public function create_session_for_owner( WP_Agent_Workspace_Scope $workspace, array $owner, string $agent_slug = '', array $metadata = array(), string $context = 'chat' ): string {
+		$transcript_owner = self::principal_owner_to_transcript_owner( $owner );
+		if ( null === $transcript_owner ) {
+			return '';
+		}
+
+		$metadata['transcript_owner'] = $transcript_owner;
+		return $this->create_session( $workspace, (int) $transcript_owner['user_id'], $agent_slug, $metadata, $context );
+	}
+
+	/**
 	 * Normalize create-session arguments across current and workspace-aware contracts.
 	 *
 	 * @param array $args Raw method arguments.
@@ -697,6 +720,24 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		unset( $session );
 
 		return $sessions;
+	}
+
+	/**
+	 * List chat sessions for a canonical Agents API principal owner.
+	 *
+	 * @param WP_Agent_Workspace_Scope      $workspace Workspace owning the sessions.
+	 * @param array{type:string,key:string} $owner     Canonical principal owner.
+	 * @param array                         $args      Optional filters/pagination.
+	 * @return array<int,array<string,mixed>> Session rows.
+	 */
+	public function list_sessions_for_owner( WP_Agent_Workspace_Scope $workspace, array $owner, array $args = array() ): array {
+		$transcript_owner = self::principal_owner_to_transcript_owner( $owner );
+		if ( null === $transcript_owner ) {
+			return array();
+		}
+
+		$args['transcript_owner'] = $transcript_owner;
+		return $this->list_sessions( $workspace, (int) $transcript_owner['user_id'], $args );
 	}
 
 	/**
@@ -1191,6 +1232,45 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$session['agent_slug'] = self::resolve_agent_slug_from_session_row( $session );
 
 		return $session;
+	}
+
+	/**
+	 * Find a recent pending session for a canonical Agents API principal owner.
+	 *
+	 * @param WP_Agent_Workspace_Scope      $workspace Workspace owning the session.
+	 * @param array{type:string,key:string} $owner     Canonical principal owner.
+	 * @param int                           $seconds   Lookback window in seconds.
+	 * @param string                        $context   Context filter.
+	 * @param int|null                      $token_id  Optional token ID for token-scoped deduplication.
+	 * @return array|null Session data or null if none found.
+	 */
+	public function get_recent_pending_session_for_owner( WP_Agent_Workspace_Scope $workspace, array $owner, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array {
+		$transcript_owner = self::principal_owner_to_transcript_owner( $owner );
+		if ( null === $transcript_owner ) {
+			return null;
+		}
+
+		return $this->get_recent_pending_session( $workspace, (int) $transcript_owner['user_id'], $seconds, $context, $token_id, $transcript_owner );
+	}
+
+	/**
+	 * Convert an Agents API principal owner into Data Machine's stored owner shape.
+	 *
+	 * @param array{type:string,key:string} $owner Canonical principal owner.
+	 * @return array{owner_type:string,owner_key:string,owner_key_hash:string,owner_label:string,user_id:int}|null
+	 */
+	private static function principal_owner_to_transcript_owner( array $owner ): ?array {
+		$transcript_owner = ChatTranscriptOwner::resolve_for_request(
+			array(
+				'transcript_owner' => array(
+					'type' => (string) ( $owner['type'] ?? '' ),
+					'key'  => (string) ( $owner['key'] ?? '' ),
+				),
+			),
+			WP_Agent_Execution_Principal::OWNER_TYPE_USER === (string) ( $owner['type'] ?? '' ) ? absint( $owner['key'] ?? 0 ) : 0
+		);
+
+		return $transcript_owner instanceof WP_Error ? null : $transcript_owner;
 	}
 
 	/**
