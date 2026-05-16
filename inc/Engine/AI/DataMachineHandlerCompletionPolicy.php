@@ -50,6 +50,11 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 		$mode            = (string) ( $runtime_context['mode'] ?? '' );
 
 		if ( 'pipeline' !== $mode || ! $is_handler_tool || ! ( $tool_result['success'] ?? false ) ) {
+			$completed_assertions = $this->completedAssertionsDecision( $runtime_context, $turn_count, $tool_name );
+			if ( null !== $completed_assertions ) {
+				return $completed_assertions;
+			}
+
 			$missing_assertions = $this->incompleteAssertionsDecision( $runtime_context, $turn_count );
 			if ( null !== $missing_assertions ) {
 				return $missing_assertions;
@@ -158,6 +163,34 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 				'satisfied'            => $evaluation['satisfied'],
 				'required'             => $this->assertions->required(),
 				'continuation_message' => DataMachineCompletionAssertions::buildNudge( $evaluation['missing'], array() ),
+			)
+		);
+	}
+
+	/**
+	 * Complete assertion-only pipeline runs as soon as a non-handler tool satisfies them.
+	 *
+	 * @param array  $runtime_context Caller-owned runtime context.
+	 * @param int    $turn_count      Current turn count.
+	 * @param string $tool_name       Tool that just ran.
+	 * @return WP_Agent_Conversation_Completion_Decision|null
+	 */
+	private function completedAssertionsDecision( array $runtime_context, int $turn_count, string $tool_name ): ?WP_Agent_Conversation_Completion_Decision {
+		if ( ! $this->assertions->hasAssertions() ) {
+			return null;
+		}
+
+		$evaluation = $this->assertions->evaluate( $runtime_context );
+		if ( ! $evaluation['complete'] || empty( $evaluation['satisfied']['complete_when_any'] ) ) {
+			return null;
+		}
+
+		return WP_Agent_Conversation_Completion_Decision::complete(
+			'AIConversationLoop: Completion assertions satisfied by non-handler tool, ending conversation',
+			array(
+				'tool_name'  => $tool_name,
+				'turn_count' => $turn_count,
+				'satisfied'  => $evaluation['satisfied'],
 			)
 		);
 	}
