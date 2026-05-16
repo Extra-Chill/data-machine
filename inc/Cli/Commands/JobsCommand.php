@@ -303,11 +303,11 @@ class JobsCommand extends BaseCommand {
 		$items   = array();
 		$summary = array(
 			'total'              => 0,
-			'active_processing'  => 0,
-			'queued_next_step'   => 0,
-			'scheduler_starved'  => 0,
+			'active_processing' => 0,
+			'queued_next_step'  => 0,
+			'scheduler_starved' => 0,
 			'stale_in_progress' => 0,
-			'no_scheduler_path'  => 0,
+			'no_scheduler_path' => 0,
 		);
 
 		foreach ( $jobs as $job ) {
