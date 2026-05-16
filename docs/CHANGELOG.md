@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.118.0] - 2026-05-16
+
+### Added
+- feat(system-task): DispatchMessageTask wrapping agents/dispatch-message
+- add WordPress Playground marketing blueprint
+
+### Fixed
+- remote_path relative to project base_path
+
 ## [0.117.0] - 2026-05-16
 
 ### Added
