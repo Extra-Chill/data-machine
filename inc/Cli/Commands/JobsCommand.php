@@ -393,22 +393,26 @@ class JobsCommand extends BaseCommand {
 
 		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
 		$jobs_db    = new Jobs();
+		$failed_like = $wpdb->esc_like( 'failed' ) . '%';
+		$agent_skipped_like = $wpdb->esc_like( 'agent_skipped' ) . '%';
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT job_id, flow_id, parent_job_id, status, label, engine_data
 				FROM {$jobs_table}
-				WHERE status LIKE 'failed%%'
+				WHERE status LIKE %s
 				AND (
 					engine_data LIKE %s
 					OR engine_data LIKE %s
-					OR JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.job_status')) LIKE 'agent_skipped%%'
+					OR JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.job_status')) LIKE %s
 				)
 				ORDER BY completed_at DESC
 				LIMIT %d",
+				$failed_like,
 				'%Updated wiki article:%',
 				'%Source rejected:%',
+				$agent_skipped_like,
 				$limit
 			),
 			ARRAY_A
@@ -516,17 +520,19 @@ class JobsCommand extends BaseCommand {
 
 		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
 		$jobs_db    = new Jobs();
+		$failed_like = $wpdb->esc_like( 'failed' ) . '%';
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
 		$parents = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT job_id, flow_id, status, label, engine_data
 				FROM {$jobs_table}
-				WHERE status LIKE 'failed%%'
+				WHERE status LIKE %s
 				AND parent_job_id IS NULL
 				AND JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.run_metrics.context.batch_completion_strategy')) = 'children_complete'
 				ORDER BY completed_at DESC
 				LIMIT %d",
+				$failed_like,
 				$limit
 			),
 			ARRAY_A
@@ -609,17 +615,23 @@ class JobsCommand extends BaseCommand {
 		global $wpdb;
 
 		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
+		$agent_skipped_like = $wpdb->esc_like( 'agent_skipped' ) . '%';
+		$completed_no_items_like = $wpdb->esc_like( 'completed_no_items' ) . '%';
+		$failed_like = $wpdb->esc_like( 'failed' ) . '%';
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT
 					COUNT(*) AS total,
 					SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
-					SUM(CASE WHEN status LIKE 'agent_skipped%%' OR status LIKE 'completed_no_items%%' THEN 1 ELSE 0 END) AS skipped,
-					SUM(CASE WHEN status LIKE 'failed%%' THEN 1 ELSE 0 END) AS failed,
+					SUM(CASE WHEN status LIKE %s OR status LIKE %s THEN 1 ELSE 0 END) AS skipped,
+					SUM(CASE WHEN status LIKE %s THEN 1 ELSE 0 END) AS failed,
 					SUM(CASE WHEN status IN ('pending', 'processing') THEN 1 ELSE 0 END) AS active
 				FROM {$jobs_table}
 				WHERE parent_job_id = %d",
+				$agent_skipped_like,
+				$completed_no_items_like,
+				$failed_like,
 				$parent_job_id
 			),
 			ARRAY_A
