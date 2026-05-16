@@ -41,6 +41,13 @@ class JobsCommand extends BaseCommand {
 	private array $default_fields = array( 'id', 'source', 'flow', 'status', 'created', 'completed' );
 
 	/**
+	 * Default fields for job liveness diagnostics.
+	 *
+	 * @var array
+	 */
+	private array $liveness_fields = array( 'id', 'flow_id', 'classification', 'age_hours', 'pending_actions', 'in_progress_actions', 'oldest_pending', 'latest_attempt' );
+
+	/**
 	 * Recover stuck jobs that have job_status in engine_data but status is 'processing'.
 	 *
 	 * Jobs can become stuck when the engine stores a status override (e.g., from skip_item)
@@ -217,6 +224,325 @@ class JobsCommand extends BaseCommand {
 			'total'         => $recovered + $timed_out + $stale_actions + $skipped,
 			'requeued'      => (int) ( $result['requeued'] ?? 0 ),
 		);
+	}
+
+	/**
+	 * Diagnose liveness for processing jobs.
+	 *
+	 * Processing is a broad lifecycle state. This command reports whether each
+	 * processing job is actively executing, waiting on a scheduler action, or
+	 * scheduler-starved by overdue pending Action Scheduler work.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--flow=<flow_id>]
+	 * : Only diagnose jobs for a specific flow ID.
+	 *
+	 * [--limit=<limit>]
+	 * : Number of processing jobs to inspect, oldest first.
+	 * ---
+	 * default: 50
+	 * ---
+	 *
+	 * [--overdue-minutes=<minutes>]
+	 * : Minutes after scheduled time before a pending/in-progress step is classified as overdue.
+	 * ---
+	 * default: 120
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 *   - csv
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Diagnose oldest processing jobs
+	 *     wp datamachine jobs liveness
+	 *
+	 *     # Diagnose scheduler-starved jobs as JSON
+	 *     wp datamachine jobs liveness --overdue-minutes=120 --format=json
+	 *
+	 * @subcommand liveness
+	 */
+	public function liveness( array $args, array $assoc_args ): void {
+		global $wpdb;
+
+		$flow_id         = isset( $assoc_args['flow'] ) ? (int) $assoc_args['flow'] : null;
+		$limit           = isset( $assoc_args['limit'] ) ? max( 1, min( 500, (int) $assoc_args['limit'] ) ) : 50;
+		$overdue_minutes = isset( $assoc_args['overdue-minutes'] ) ? max( 1, (int) $assoc_args['overdue-minutes'] ) : 120;
+		$format          = $assoc_args['format'] ?? 'table';
+
+		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
+		$where      = "WHERE status = 'processing'";
+		$values     = array();
+
+		if ( $flow_id ) {
+			$where   .= ' AND flow_id = %d';
+			$values[] = $flow_id;
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table and WHERE are composed from trusted fragments above.
+		$sql = "SELECT job_id, flow_id, pipeline_id, agent_id, status, created_at, completed_at, engine_data
+			FROM {$jobs_table}
+			{$where}
+			ORDER BY created_at ASC
+			LIMIT %d";
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$values[] = $limit;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Dynamic SQL is prepared with accumulated placeholders.
+		$jobs = $wpdb->get_results( $wpdb->prepare( $sql, $values ), ARRAY_A );
+
+		$items   = array();
+		$summary = array(
+			'total'              => 0,
+			'active_processing'  => 0,
+			'queued_next_step'   => 0,
+			'scheduler_starved'  => 0,
+			'stale_in_progress' => 0,
+			'no_scheduler_path'  => 0,
+		);
+
+		foreach ( $jobs as $job ) {
+			$diagnostic = $this->diagnose_job_liveness( $job, $overdue_minutes );
+			++$summary['total'];
+			if ( isset( $summary[ $diagnostic['classification'] ] ) ) {
+				++$summary[ $diagnostic['classification'] ];
+			}
+			$items[] = $diagnostic;
+		}
+
+		if ( 'json' === $format || 'yaml' === $format ) {
+			WP_CLI::print_value(
+				array(
+					'success'         => true,
+					'overdue_minutes' => $overdue_minutes,
+					'summary'         => $summary,
+					'jobs'            => $items,
+				),
+				array( 'format' => $format )
+			);
+			return;
+		}
+
+		if ( empty( $items ) ) {
+			WP_CLI::success( 'No processing jobs found.' );
+			return;
+		}
+
+		$this->format_items( $items, $this->liveness_fields, $assoc_args, 'id' );
+
+		if ( 'table' === $format ) {
+			WP_CLI::log(
+				sprintf(
+					'Inspected %d processing jobs: %d active, %d queued, %d scheduler-starved, %d stale in-progress, %d without scheduler path.',
+					$summary['total'],
+					$summary['active_processing'],
+					$summary['queued_next_step'],
+					$summary['scheduler_starved'],
+					$summary['stale_in_progress'],
+					$summary['no_scheduler_path']
+				)
+			);
+		}
+	}
+
+	/**
+	 * Diagnose one processing job's scheduler liveness.
+	 *
+	 * @param array<string,mixed> $job Job row.
+	 * @param int                 $overdue_minutes Overdue threshold in minutes.
+	 * @return array<string,mixed>
+	 */
+	private function diagnose_job_liveness( array $job, int $overdue_minutes ): array {
+		$job_id  = (int) ( $job['job_id'] ?? 0 );
+		$actions = $this->get_job_step_actions( $job_id );
+
+		$pending     = array_values( array_filter( $actions, fn( $action ) => 'pending' === ( $action['status'] ?? '' ) ) );
+		$in_progress = array_values( array_filter( $actions, fn( $action ) => 'in-progress' === ( $action['status'] ?? '' ) ) );
+		$complete    = array_values( array_filter( $actions, fn( $action ) => 'complete' === ( $action['status'] ?? '' ) ) );
+		$failed      = array_values( array_filter( $actions, fn( $action ) => 'failed' === ( $action['status'] ?? '' ) ) );
+
+		$oldest_pending      = $this->oldest_action_datetime( $pending, 'scheduled_date_gmt' );
+		$oldest_in_progress  = $this->oldest_action_datetime( $in_progress, 'scheduled_date_gmt' );
+		$latest_attempt      = $this->latest_action_datetime( $actions, 'last_attempt_gmt' );
+		$oldest_pending_age  = $this->minutes_since( $oldest_pending );
+		$oldest_progress_age = $this->minutes_since( $oldest_in_progress );
+
+		if ( ! empty( $in_progress ) && $oldest_progress_age > $overdue_minutes ) {
+			$classification = 'stale_in_progress';
+		} elseif ( ! empty( $in_progress ) ) {
+			$classification = 'active_processing';
+		} elseif ( ! empty( $pending ) && $oldest_pending_age > $overdue_minutes ) {
+			$classification = 'scheduler_starved';
+		} elseif ( ! empty( $pending ) ) {
+			$classification = 'queued_next_step';
+		} else {
+			$classification = 'no_scheduler_path';
+		}
+
+		$engine_data = json_decode( (string) ( $job['engine_data'] ?? '' ), true );
+		if ( ! is_array( $engine_data ) ) {
+			$engine_data = array();
+		}
+		$last_activity = $engine_data['run_metrics']['last_activity_at'] ?? null;
+
+		return array(
+			'id'                  => $job_id,
+			'flow_id'             => (string) ( $job['flow_id'] ?? '' ),
+			'pipeline_id'         => (string) ( $job['pipeline_id'] ?? '' ),
+			'agent_id'            => isset( $job['agent_id'] ) ? (int) $job['agent_id'] : null,
+			'classification'      => $classification,
+			'created_at'          => (string) ( $job['created_at'] ?? '' ),
+			'age_hours'           => round( $this->minutes_since( (string) ( $job['created_at'] ?? '' ) ) / 60, 1 ),
+			'last_activity_at'    => is_string( $last_activity ) ? $last_activity : '',
+			'pending_actions'     => count( $pending ),
+			'in_progress_actions' => count( $in_progress ),
+			'complete_actions'    => count( $complete ),
+			'failed_actions'      => count( $failed ),
+			'oldest_pending'      => $oldest_pending,
+			'oldest_in_progress'  => $oldest_in_progress,
+			'latest_attempt'      => $latest_attempt,
+		);
+	}
+
+	/**
+	 * Get Action Scheduler execute-step actions for a job.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function get_job_step_actions( int $job_id ): array {
+		global $wpdb;
+
+		if ( $job_id <= 0 ) {
+			return array();
+		}
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$like_job_id   = '%"job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT action_id, hook, status, scheduled_date_gmt, last_attempt_gmt, attempts, args
+				 FROM {$actions_table}
+				 WHERE hook = %s
+				 AND args LIKE %s
+				 ORDER BY action_id ASC",
+				'datamachine_execute_step',
+				$like_job_id
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		return array_values(
+			array_filter(
+				$rows,
+				function ( array $row ) use ( $job_id ): bool {
+					return $job_id === $this->extract_action_job_id( (string) ( $row['args'] ?? '' ) );
+				}
+			)
+		);
+	}
+
+	/**
+	 * Extract job ID from an Action Scheduler args payload.
+	 *
+	 * @param string $args Action args.
+	 * @return int Job ID.
+	 */
+	private function extract_action_job_id( string $args ): int {
+		$decoded = json_decode( $args, true );
+		if ( is_array( $decoded ) ) {
+			if ( isset( $decoded['job_id'] ) && is_numeric( $decoded['job_id'] ) ) {
+				return (int) $decoded['job_id'];
+			}
+
+			foreach ( $decoded as $value ) {
+				if ( is_array( $value ) && isset( $value['job_id'] ) && is_numeric( $value['job_id'] ) ) {
+					return (int) $value['job_id'];
+				}
+			}
+		}
+
+		$unserialized = maybe_unserialize( $args );
+		if ( is_array( $unserialized ) ) {
+			if ( isset( $unserialized['job_id'] ) && is_numeric( $unserialized['job_id'] ) ) {
+				return (int) $unserialized['job_id'];
+			}
+
+			foreach ( $unserialized as $value ) {
+				if ( is_array( $value ) && isset( $value['job_id'] ) && is_numeric( $value['job_id'] ) ) {
+					return (int) $value['job_id'];
+				}
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Get the oldest non-empty action datetime for a field.
+	 *
+	 * @param array<int,array<string,mixed>> $actions Action rows.
+	 * @param string                         $field Field name.
+	 * @return string Datetime or empty string.
+	 */
+	private function oldest_action_datetime( array $actions, string $field ): string {
+		$values = array_filter( array_map( fn( $action ) => (string) ( $action[ $field ] ?? '' ), $actions ), array( $this, 'is_real_datetime' ) );
+		sort( $values );
+		return $values[0] ?? '';
+	}
+
+	/**
+	 * Get the latest non-empty action datetime for a field.
+	 *
+	 * @param array<int,array<string,mixed>> $actions Action rows.
+	 * @param string                         $field Field name.
+	 * @return string Datetime or empty string.
+	 */
+	private function latest_action_datetime( array $actions, string $field ): string {
+		$values = array_filter( array_map( fn( $action ) => (string) ( $action[ $field ] ?? '' ), $actions ), array( $this, 'is_real_datetime' ) );
+		rsort( $values );
+		return $values[0] ?? '';
+	}
+
+	/**
+	 * Whether a datetime string represents a real Action Scheduler timestamp.
+	 *
+	 * @param string $datetime Datetime string.
+	 * @return bool
+	 */
+	private function is_real_datetime( string $datetime ): bool {
+		return '' !== $datetime && '0000-00-00 00:00:00' !== $datetime;
+	}
+
+	/**
+	 * Minutes since a GMT datetime.
+	 *
+	 * @param string $datetime GMT datetime.
+	 * @return int Minutes elapsed, or 0 for empty/invalid dates.
+	 */
+	private function minutes_since( string $datetime ): int {
+		if ( ! $this->is_real_datetime( $datetime ) ) {
+			return 0;
+		}
+
+		$timestamp = strtotime( $datetime . ' UTC' );
+		if ( false === $timestamp ) {
+			return 0;
+		}
+
+		return max( 0, (int) floor( ( time() - $timestamp ) / 60 ) );
 	}
 
 	/**
