@@ -64,6 +64,16 @@ class JobsCommand extends BaseCommand {
 	 * default: 2
 	 * ---
 	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Preview stuck jobs recovery
@@ -78,12 +88,16 @@ class JobsCommand extends BaseCommand {
 	 *     # Recover stuck jobs with custom timeout
 	 *     wp datamachine jobs recover-stuck --timeout=4
 	 *
+	 *     # Preview stuck jobs recovery as JSON
+	 *     wp datamachine jobs recover-stuck --dry-run --format=json
+	 *
 	 * @subcommand recover-stuck
 	 */
 	public function recover_stuck( array $args, array $assoc_args ): void {
 		$dry_run = isset( $assoc_args['dry-run'] );
 		$flow_id = isset( $assoc_args['flow'] ) ? (int) $assoc_args['flow'] : null;
 		$timeout = isset( $assoc_args['timeout'] ) ? max( 1, (int) $assoc_args['timeout'] ) : 2;
+		$format  = $assoc_args['format'] ?? 'table';
 
 		$result = ( new RecoverStuckJobsAbility() )->execute(
 			array(
@@ -100,12 +114,36 @@ class JobsCommand extends BaseCommand {
 
 		$jobs = $result['jobs'] ?? array();
 
+		$summary = $this->summarize_recover_stuck_result( $result );
+
+		if ( 'table' !== $format ) {
+			WP_CLI::print_value(
+				array(
+					'success' => true,
+					'dry_run' => $dry_run,
+					'summary' => $summary,
+					'jobs'    => $jobs,
+					'message' => $result['message'] ?? '',
+				),
+				array(
+					'format' => $format,
+				)
+			);
+			return;
+		}
+
 		if ( empty( $jobs ) ) {
 			WP_CLI::success( 'No stuck jobs found.' );
 			return;
 		}
 
-		WP_CLI::log( sprintf( 'Found %d stuck jobs or stale actions.', count( $jobs ) ) );
+		WP_CLI::log(
+			sprintf(
+				'Found %d recoverable jobs/actions and %d guarded jobs.',
+				$summary['actionable'],
+				$summary['skipped']
+			)
+		);
 
 		if ( $dry_run ) {
 			WP_CLI::log( 'Dry run - no changes will be made.' );
@@ -156,6 +194,29 @@ class JobsCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( $result['message'] );
+	}
+
+	/**
+	 * Summarize recover-stuck ability output for operator-facing CLI reporting.
+	 *
+	 * @param array $result Recovery ability result.
+	 * @return array<string,int>
+	 */
+	private function summarize_recover_stuck_result( array $result ): array {
+		$recovered     = (int) ( $result['recovered'] ?? 0 );
+		$timed_out     = (int) ( $result['timed_out'] ?? 0 );
+		$stale_actions = (int) ( $result['stale_actions'] ?? 0 );
+		$skipped       = (int) ( $result['skipped'] ?? 0 );
+
+		return array(
+			'recovered'     => $recovered,
+			'timed_out'     => $timed_out,
+			'stale_actions' => $stale_actions,
+			'skipped'       => $skipped,
+			'actionable'    => $recovered + $timed_out + $stale_actions,
+			'total'         => $recovered + $timed_out + $stale_actions + $skipped,
+			'requeued'      => (int) ( $result['requeued'] ?? 0 ),
+		);
 	}
 
 	/**
