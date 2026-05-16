@@ -1149,6 +1149,58 @@ $parameter_outcome_decision = $parameter_outcome_policy->recordNaturalCompletion
 assert_runtime_policy( $parameter_outcome_decision->isComplete(), 'complete_when_any required_parameters accept matching tool arguments' );
 assert_runtime_policy( array( 'mailbox_return' ) === ( $parameter_outcome_decision->context()['satisfied']['complete_when_any'] ?? null ), 'parameter-matched outcome name is reported as satisfied' );
 
+$design_outcome_policy = new DataMachineHandlerCompletionPolicy(
+	array(),
+	new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
+		array(
+			'complete_when_any' => array(
+				array(
+					'name'  => 'design_comment_and_labels',
+					'tools' => array(
+						array(
+							'name'                => 'manage_github_issue',
+							'required_parameters' => array( 'action' => 'comment' ),
+							'required_output'     => array( 'comment.html_url' ),
+						),
+						array(
+							'name' => 'remove_label_from_issue',
+						),
+						array(
+							'name' => 'add_label_to_issue',
+						),
+					),
+				),
+			),
+		)
+	)
+);
+$design_outcome_policy->recordToolResult(
+	'manage_github_issue',
+	array( 'name' => 'manage_github_issue' ),
+	array(
+		'success' => true,
+		'data'    => array( 'comment' => array( 'html_url' => 'https://github.com/Extra-Chill/data-machine/issues/1#issuecomment-3' ) ),
+	),
+	array( 'mode' => 'pipeline', 'tool_parameters' => array( 'action' => 'comment' ) ),
+	1
+);
+$design_outcome_policy->recordToolResult(
+	'remove_label_from_issue',
+	array( 'name' => 'remove_label_from_issue' ),
+	array( 'success' => true ),
+	array( 'mode' => 'pipeline' ),
+	2
+);
+$design_outcome_decision = $design_outcome_policy->recordToolResult(
+	'add_label_to_issue',
+	array( 'name' => 'add_label_to_issue' ),
+	array( 'success' => true ),
+	array( 'mode' => 'pipeline' ),
+	3
+);
+assert_runtime_policy( $design_outcome_decision->isComplete(), 'non-handler complete_when_any outcome completes immediately when satisfied' );
+assert_runtime_policy( array( 'design_comment_and_labels' ) === ( $design_outcome_decision->context()['satisfied']['complete_when_any'] ?? null ), 'non-handler completion reports satisfied outcome name' );
+
 $multi_call_outcome_policy = new DataMachineHandlerCompletionPolicy(
 	array(),
 	new \DataMachine\Engine\AI\DataMachineCompletionAssertions(
