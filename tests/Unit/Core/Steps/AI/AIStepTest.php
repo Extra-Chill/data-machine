@@ -443,4 +443,37 @@ class AIStepTest extends TestCase {
 		$this->assertCount( 1, $result );
 		$this->assertSame( 'ai_response', $result[0]['type'] );
 	}
+
+	public function test_process_loop_results_emits_completion_assertion_packet_when_final_turn_is_empty(): void {
+		$method = new ReflectionMethod( AIStep::class, 'processLoopResults' );
+		$method->setAccessible( true );
+
+		$loop_result = array(
+			'messages'                         => array(),
+			'tool_execution_results'           => array(),
+			'completion_assertions_complete'    => true,
+			'completion_assertions_satisfied'   => array(
+				'complete_when_any' => array( 'design_comment_and_labels' ),
+			),
+			'completion_assertions_missing'     => array(),
+		);
+
+		$result = $method->invoke(
+			null,
+			$loop_result,
+			array(
+				array(
+					'type'     => 'fetch',
+					'metadata' => array( 'source_type' => 'github_issue' ),
+				),
+			),
+			array( 'flow_step_id' => 'design_ai_step' ),
+			array()
+		);
+
+		$this->assertCount( 1, $result );
+		$this->assertSame( 'ai_completion_assertions', $result[0]['type'] );
+		$this->assertSame( 'ai_completion_assertions', $result[0]['metadata']['source_type'] );
+		$this->assertSame( array( 'design_comment_and_labels' ), $result[0]['metadata']['completion_assertions_satisfied']['complete_when_any'] );
+	}
 }
