@@ -510,6 +510,20 @@ class AIStep extends Step {
 				datamachine_set_engine_data( $this->job_id, $artifact_engine_data );
 			}
 
+			$missing_assertion_failure = self::missingCompletionAssertionsFailure( $loop_result );
+			if ( null !== $missing_assertion_failure ) {
+				do_action(
+					'datamachine_fail_job',
+					$this->job_id,
+					'completion_assertions_missing',
+					array_merge(
+						array( 'flow_step_id' => $this->flow_step_id ),
+						$missing_assertion_failure
+					)
+				);
+				return array();
+			}
+
 			// Process loop results into data packets
 			return self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
 		} finally {
@@ -940,5 +954,26 @@ class AIStep extends Step {
 		}
 
 		return $outputPackets;
+	}
+
+	/**
+	 * Build a structured failure payload when an AI loop exhausts without
+	 * satisfying configured completion assertions.
+	 *
+	 * @param array $loop_result Conversation loop result.
+	 * @return array<string,mixed>|null Failure payload, or null when assertions are complete/not configured.
+	 */
+	private static function missingCompletionAssertionsFailure( array $loop_result ): ?array {
+		$missing = is_array( $loop_result['completion_assertions_missing'] ?? null ) ? $loop_result['completion_assertions_missing'] : array();
+		if ( empty( $missing ) || true === ( $loop_result['completion_assertions_complete'] ?? false ) ) {
+			return null;
+		}
+
+		return array(
+			'reason'                         => 'completion_assertions_missing',
+			'completion_assertions_missing'  => $missing,
+			'completion_assertions_satisfied' => is_array( $loop_result['completion_assertions_satisfied'] ?? null ) ? $loop_result['completion_assertions_satisfied'] : array(),
+			'completion_assertions_required'  => is_array( $loop_result['completion_assertions_required'] ?? null ) ? $loop_result['completion_assertions_required'] : array(),
+		);
 	}
 }
