@@ -355,6 +355,299 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
+	 * Reconcile jobs whose persisted status disagrees with successful engine artifacts.
+	 *
+	 * Repairs historical rows where an earlier failed tool call left the job status as
+	 * failed even though a later handler tool succeeded, or where an explicit source
+	 * rejection was recorded as an intentional skip.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--dry-run]
+	 * : Show what would be updated without making changes.
+	 *
+	 * [--limit=<limit>]
+	 * : Maximum failed rows to inspect.
+	 * ---
+	 * default: 500
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * @subcommand reconcile-status
+	 */
+	public function reconcile_status( array $args, array $assoc_args ): void {
+		global $wpdb;
+
+		$dry_run = isset( $assoc_args['dry-run'] );
+		$limit   = isset( $assoc_args['limit'] ) ? max( 1, min( 5000, (int) $assoc_args['limit'] ) ) : 500;
+		$format  = $assoc_args['format'] ?? 'table';
+
+		$jobs_table         = $wpdb->prefix . 'datamachine_jobs';
+		$jobs_db            = new Jobs();
+		$failed_like        = $wpdb->esc_like( 'failed' ) . '%';
+		$agent_skipped_like = $wpdb->esc_like( 'agent_skipped' ) . '%';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT job_id, flow_id, parent_job_id, status, label, engine_data
+				FROM {$jobs_table}
+				WHERE status LIKE %s
+				AND (
+					engine_data LIKE %s
+					OR engine_data LIKE %s
+					OR JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.job_status')) LIKE %s
+				)
+				ORDER BY completed_at DESC
+				LIMIT %d",
+				$failed_like,
+				'%Updated wiki article:%',
+				'%Source rejected:%',
+				$agent_skipped_like,
+				$limit
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		$items   = array();
+		$updated = 0;
+
+		foreach ( $rows as $row ) {
+			$target_status = $this->resolve_reconciled_job_status( $row );
+			if ( '' === $target_status ) {
+				continue;
+			}
+
+			$item = array(
+				'id'            => (int) $row['job_id'],
+				'flow_id'       => (int) $row['flow_id'],
+				'from_status'   => (string) $row['status'],
+				'target_status' => $target_status,
+				'reason'        => str_starts_with( $target_status, 'agent_skipped' ) ? 'source_rejected' : 'successful_handler_artifact',
+				'label'         => (string) ( $row['label'] ?? '' ),
+			);
+
+			if ( ! $dry_run && $jobs_db->complete_job( (int) $row['job_id'], $target_status ) ) {
+				++$updated;
+				$item['status'] = 'reconciled';
+			} else {
+				$item['status'] = $dry_run ? 'would_reconcile' : 'failed_to_reconcile';
+			}
+
+			$items[] = $item;
+		}
+
+		$parent_items = $this->reconcile_parent_batch_statuses( $dry_run, $limit );
+		foreach ( $parent_items as $parent_item ) {
+			if ( 'reconciled' === ( $parent_item['status'] ?? '' ) ) {
+				++$updated;
+			}
+			$items[] = $parent_item;
+		}
+
+		$summary = array(
+			'inspected' => count( $rows ),
+			'matched'   => count( $items ),
+			'updated'   => $updated,
+		);
+
+		if ( 'table' !== $format ) {
+			WP_CLI::print_value(
+				array(
+					'success' => true,
+					'dry_run' => $dry_run,
+					'summary' => $summary,
+					'jobs'    => $items,
+				),
+				array( 'format' => $format )
+			);
+			return;
+		}
+
+		if ( empty( $items ) ) {
+			WP_CLI::success( 'No misclassified failed jobs found.' );
+			return;
+		}
+
+		$this->format_items( $items, array( 'id', 'flow_id', 'status', 'from_status', 'target_status', 'reason' ), $assoc_args, 'id' );
+		WP_CLI::success( $dry_run ? sprintf( 'Dry run: %d job(s) would be reconciled.', count( $items ) ) : sprintf( 'Reconciled %d job(s).', $updated ) );
+	}
+
+	/**
+	 * Resolve the corrected terminal status for a failed job row.
+	 *
+	 * @param array<string,mixed> $row Job row.
+	 * @return string Corrected status, or empty string when the row is not safe to repair.
+	 */
+	private function resolve_reconciled_job_status( array $row ): string {
+		$engine_data = $this->decode_job_engine_data( $row['engine_data'] ?? null );
+
+		$job_status = isset( $engine_data['job_status'] ) ? (string) $engine_data['job_status'] : '';
+		if ( str_starts_with( $job_status, 'agent_skipped' ) ) {
+			return $job_status;
+		}
+
+		if ( false !== strpos( (string) ( $row['engine_data'] ?? '' ), 'Source rejected:' ) ) {
+			return 'agent_skipped - source-rejected';
+		}
+
+		if ( false !== strpos( (string) ( $row['engine_data'] ?? '' ), 'Updated wiki article:' ) ) {
+			return 'completed';
+		}
+
+		return '';
+	}
+
+	/**
+	 * Repair failed batch parent rows once their children now contain successes.
+	 *
+	 * @param bool $dry_run Whether to preview changes only.
+	 * @param int  $limit   Maximum parent rows to inspect.
+	 * @return array<int,array<string,mixed>> Reconciliation rows.
+	 */
+	private function reconcile_parent_batch_statuses( bool $dry_run, int $limit ): array {
+		global $wpdb;
+
+		$jobs_table  = $wpdb->prefix . 'datamachine_jobs';
+		$jobs_db     = new Jobs();
+		$failed_like = $wpdb->esc_like( 'failed' ) . '%';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
+		$parents = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT job_id, flow_id, status, label, engine_data
+				FROM {$jobs_table}
+				WHERE status LIKE %s
+				AND parent_job_id IS NULL
+				AND JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.run_metrics.context.batch_completion_strategy')) = 'children_complete'
+				ORDER BY completed_at DESC
+				LIMIT %d",
+				$failed_like,
+				$limit
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		$items = array();
+
+		foreach ( $parents as $parent ) {
+			$counts = $this->get_child_terminal_counts( (int) $parent['job_id'] );
+			if ( $counts['active'] > 0 || 0 === $counts['total'] ) {
+				continue;
+			}
+
+			$target_status = '';
+			if ( $counts['completed'] > 0 ) {
+				$target_status = 'completed';
+			} elseif ( $counts['failed'] <= 0 && $counts['skipped'] > 0 ) {
+				$target_status = 'completed_no_items';
+			}
+
+			if ( '' === $target_status ) {
+				continue;
+			}
+
+			$engine_data                  = $this->decode_job_engine_data( $parent['engine_data'] ?? null );
+			$engine_data['batch_results'] = array(
+				'completed' => $counts['completed'],
+				'failed'    => $counts['failed'],
+				'skipped'   => $counts['skipped'],
+				'total'     => $counts['total'],
+			);
+
+			if ( ! $dry_run ) {
+				datamachine_set_engine_data( (int) $parent['job_id'], $engine_data );
+			}
+
+			$updated = ! $dry_run && $jobs_db->complete_job( (int) $parent['job_id'], $target_status );
+
+			$items[] = array(
+				'id'            => (int) $parent['job_id'],
+				'flow_id'       => (int) $parent['flow_id'],
+				'from_status'   => (string) $parent['status'],
+				'target_status' => $target_status,
+				'reason'        => 'batch_children_reconciled',
+				'label'         => (string) ( $parent['label'] ?? '' ),
+				'status'        => $dry_run ? 'would_reconcile' : ( $updated ? 'reconciled' : 'failed_to_reconcile' ),
+			);
+		}
+
+		return $items;
+	}
+
+	/**
+	 * Decode a job engine_data value.
+	 *
+	 * @param mixed $engine_data Raw engine data.
+	 * @return array<string,mixed>
+	 */
+	private function decode_job_engine_data( $engine_data ): array {
+		if ( is_array( $engine_data ) ) {
+			return $engine_data;
+		}
+
+		if ( ! is_string( $engine_data ) || '' === $engine_data ) {
+			return array();
+		}
+
+		$decoded = json_decode( $engine_data, true );
+		return is_array( $decoded ) ? $decoded : array();
+	}
+
+	/**
+	 * Count child terminal statuses for a parent job.
+	 *
+	 * @param int $parent_job_id Parent job ID.
+	 * @return array<string,int>
+	 */
+	private function get_child_terminal_counts( int $parent_job_id ): array {
+		global $wpdb;
+
+		$jobs_table              = $wpdb->prefix . 'datamachine_jobs';
+		$agent_skipped_like      = $wpdb->esc_like( 'agent_skipped' ) . '%';
+		$completed_no_items_like = $wpdb->esc_like( 'completed_no_items' ) . '%';
+		$failed_like             = $wpdb->esc_like( 'failed' ) . '%';
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT
+					COUNT(*) AS total,
+					SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+					SUM(CASE WHEN status LIKE %s OR status LIKE %s THEN 1 ELSE 0 END) AS skipped,
+					SUM(CASE WHEN status LIKE %s THEN 1 ELSE 0 END) AS failed,
+					SUM(CASE WHEN status IN ('pending', 'processing') THEN 1 ELSE 0 END) AS active
+				FROM {$jobs_table}
+				WHERE parent_job_id = %d",
+				$agent_skipped_like,
+				$completed_no_items_like,
+				$failed_like,
+				$parent_job_id
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		return array(
+			'total'     => (int) ( $row['total'] ?? 0 ),
+			'completed' => (int) ( $row['completed'] ?? 0 ),
+			'skipped'   => (int) ( $row['skipped'] ?? 0 ),
+			'failed'    => (int) ( $row['failed'] ?? 0 ),
+			'active'    => (int) ( $row['active'] ?? 0 ),
+		);
+	}
+
+	/**
 	 * Diagnose one processing job's scheduler liveness.
 	 *
 	 * @param array<string,mixed> $job Job row.

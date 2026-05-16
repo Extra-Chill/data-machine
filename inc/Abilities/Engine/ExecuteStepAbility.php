@@ -306,6 +306,8 @@ class ExecuteStepAbility {
 		$step_success = ! empty( $dataPackets );
 
 		if ( $step_success ) {
+			$successful_handlers = $this->collectSuccessfulHandlerTools( $dataPackets );
+
 			foreach ( $dataPackets as $packet ) {
 				$metadata = $packet['metadata'] ?? array();
 				if ( isset( $metadata['success'] ) && false === $metadata['success'] ) {
@@ -323,10 +325,60 @@ class ExecuteStepAbility {
 					);
 					break;
 				}
+
+				if ( isset( $metadata['tool_success'] ) && false === $metadata['tool_success'] ) {
+					$handler_tool = isset( $metadata['handler_tool'] ) ? (string) $metadata['handler_tool'] : '';
+					if ( '' !== $handler_tool && isset( $successful_handlers[ $handler_tool ] ) ) {
+						continue;
+					}
+
+					$step_success = false;
+					do_action(
+						'datamachine_log',
+						'warning',
+						'Step returned failed tool result',
+						array(
+							'job_id'        => $job_id,
+							'flow_step_id'  => $flow_step_id,
+							'packet_type'   => $packet['type'] ?? 'unknown',
+							'handler_tool'  => $handler_tool,
+							'error_message' => $packet['data']['body'] ?? 'No error message',
+						)
+					);
+					break;
+				}
 			}
 		}
 
 		return $step_success;
+	}
+
+	/**
+	 * Collect handler tools that have at least one successful result packet.
+	 *
+	 * AI tools may fail once and then succeed on a later turn. A later successful
+	 * required handler result should allow downstream upsert/publish steps to run.
+	 *
+	 * @param array $dataPackets Returned data packets.
+	 * @return array<string,bool>
+	 */
+	private function collectSuccessfulHandlerTools( array $dataPackets ): array {
+		$handlers = array();
+
+		foreach ( $dataPackets as $packet ) {
+			$metadata     = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+			$handler_tool = isset( $metadata['handler_tool'] ) ? (string) $metadata['handler_tool'] : '';
+
+			if ( '' === $handler_tool ) {
+				continue;
+			}
+
+			if ( 'ai_handler_complete' === ( $packet['type'] ?? '' ) || true === ( $metadata['tool_success'] ?? false ) ) {
+				$handlers[ $handler_tool ] = true;
+			}
+		}
+
+		return $handlers;
 	}
 
 	/**
