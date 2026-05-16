@@ -712,7 +712,8 @@ class ChatOrchestrator {
 		$single_turn          = $options['single_turn'] ?? false;
 		$max_turns            = $options['max_turns'] ?? PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 		$selected_pipeline_id = $options['selected_pipeline_id'] ?? null;
-		$mode                 = ! empty( $options['mode'] ) ? sanitize_key( (string) $options['mode'] ) : ToolPolicyResolver::MODE_CHAT;
+		$modes                = ToolPolicyResolver::normalizeModes( ! empty( $options['modes'] ) ? $options['modes'] : array( $options['mode'] ?? ToolPolicyResolver::MODE_CHAT ) );
+		$mode                 = implode( ',', $modes );
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 		$agent_slug           = (string) ( $options['agent_slug'] ?? '' );
 
