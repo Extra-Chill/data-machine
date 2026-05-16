@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.35.1] - 2026-05-16
+
+### Fixed
+- fix(test-event-scraper): restore correct extraction count in qualify path
+
 ## [0.35.0] - 2026-05-16
 
 ### Added
