@@ -114,6 +114,12 @@ $array_bundle = array(
 					'system_prompt'    => 'Review carefully.',
 					'disabled_tools'   => array( 'datamachine/delete-flow' ),
 				),
+				'88_graph' => array(
+					'pipeline_step_id' => '88_graph',
+					'step_type'        => 'system_task',
+					'execution_order'  => 2,
+					'label'            => 'Extract graph',
+				),
 			),
 			'memory_file_contents' => array( 'pipeline.md' => "# Pipeline\n" ),
 		),
@@ -174,6 +180,22 @@ $array_bundle = array(
 					),
 					'queue_mode'       => 'loop',
 				),
+				'88_graph_144' => array(
+					'flow_step_id'       => '88_graph_144',
+					'pipeline_step_id'   => '88_graph',
+					'pipeline_id'        => 88,
+					'flow_id'            => 144,
+					'execution_order'    => 2,
+					'step_type'          => 'system_task',
+					'flow_step_settings' => array(
+						'task'   => 'wiki_graph_extract',
+						'params' => array(
+							'root'    => 'wordpress-com',
+							'limit'   => 5,
+							'dry_run' => true,
+						),
+					),
+				),
 			),
 			'scheduling_config'    => array(
 				'enabled'   => true,
@@ -214,6 +236,7 @@ assert_adapter_equals( 'flow document preserves completion assertions', array( '
 assert_adapter_equals( 'flow document preserves tool runtime rules', 4, $flow['steps'][1]['tool_runtime_rules'][0]['max_calls'] ?? null );
 assert_adapter_equals( 'flow document preserves prompt queue', 'Review PR #1', $flow['steps'][1]['prompt_queue'][0]['prompt'] );
 assert_adapter_equals( 'flow document preserves queue mode', 'loop', $flow['steps'][1]['queue_mode'] );
+assert_adapter_equals( 'flow document preserves system task settings', 'wiki_graph_extract', $flow['steps'][2]['flow_step_settings']['task'] ?? null );
 assert_adapter_equals( 'flow document preserves scheduling interval', 'hourly', $flow['schedule'] );
 assert_adapter_equals( 'memory path moves agent files under memory/agent', "# Soul\n", $directory->memory_files()['agent/SOUL.md'] ?? null );
 
@@ -256,6 +279,8 @@ assert_adapter_equals( 'round-trip preserves completion assertions', array( 'cre
 assert_adapter_equals( 'round-trip preserves tool runtime rules', array( 'workspace_edit', 'create_github_issue' ), $round_steps[1]['tool_runtime_rules'][0]['then_require_one_of'] ?? null );
 assert_adapter_equals( 'round-trip preserves prompt queue', 'Review PR #1', $round_steps[1]['prompt_queue'][0]['prompt'] );
 assert_adapter_equals( 'round-trip preserves queue mode', 'loop', $round_steps[1]['queue_mode'] );
+assert_adapter_equals( 'round-trip preserves system task settings', 'wiki_graph_extract', $round_steps[2]['flow_step_settings']['task'] ?? null );
+assert_adapter_equals( 'round-trip preserves system task params', 'wordpress-com', $round_steps[2]['flow_step_settings']['params']['root'] ?? null );
 assert_adapter_equals( 'round-trip preserves scheduling interval', 'hourly', $round_flow['scheduling_config']['interval'] );
 
 echo "\n[3] Directory read resolves prompt file references relative to bundle root\n";

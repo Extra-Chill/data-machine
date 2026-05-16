@@ -28,6 +28,7 @@ final class AgentBundleFlowFile {
 		'handler_slug',
 		'handler_slugs',
 		'handler_config',
+		'flow_step_settings',
 		'enabled_tools',
 		'disabled_tools',
 		'prompt_queue',
@@ -136,9 +137,9 @@ final class AgentBundleFlowFile {
 			return (bool) $value;
 		}
 
-		if ( 'handler_config' === $field ) {
+		if ( in_array( $field, array( 'handler_config', 'flow_step_settings' ), true ) ) {
 			if ( ! is_array( $value ) ) {
-				throw new BundleValidationException( 'flow file handler_config must be an object.' );
+				throw new BundleValidationException( sprintf( 'flow file %s must be an object.', esc_html( $field ) ) );
 			}
 			return $value;
 		}
