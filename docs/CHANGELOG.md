@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.116.2] - 2026-05-16
+
+### Changed
+- move release-asset build to release.published trigger
+
+### Fixed
+- reconcile completed processing artifacts
+- normalize chat turn modes
+
 ## [0.116.1] - 2026-05-16
 
 ### Fixed
