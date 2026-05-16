@@ -441,13 +441,15 @@ class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agen
 	 * @return string Session ID (UUID), or empty string on failure.
 	 */
 	public function create_session_for_owner( WP_Agent_Workspace_Scope $workspace, array $owner, string $agent_slug = '', array $metadata = array(), string $context = 'chat' ): string {
+		unset( $workspace );
+
 		$transcript_owner = self::principal_owner_to_transcript_owner( $owner );
 		if ( null === $transcript_owner ) {
 			return '';
 		}
 
 		$metadata['transcript_owner'] = $transcript_owner;
-		return $this->create_session( $workspace, (int) $transcript_owner['user_id'], $agent_slug, $metadata, $context );
+		return $this->create_session( WordPressWorkspaceScope::current(), (int) $transcript_owner['user_id'], $agent_slug, $metadata, $context );
 	}
 
 	/**
@@ -737,6 +739,8 @@ class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agen
 	 * @return array<int,array<string,mixed>> Session rows.
 	 */
 	public function list_sessions_for_owner( WP_Agent_Workspace_Scope $workspace, array $owner, array $args = array() ): array {
+		unset( $workspace );
+
 		$transcript_owner = self::principal_owner_to_transcript_owner( $owner );
 		if ( null === $transcript_owner ) {
 			return array();
@@ -744,7 +748,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agen
 
 		$args['transcript_owner'] = $transcript_owner;
 		$args['owner_only']       = true;
-		return $this->list_sessions( $workspace, (int) $transcript_owner['user_id'], $args );
+		return $this->list_sessions( WordPressWorkspaceScope::current(), (int) $transcript_owner['user_id'], $args );
 	}
 
 	/**
