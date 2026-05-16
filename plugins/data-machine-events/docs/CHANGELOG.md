@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.34.0] - 2026-05-16
+
+### Added
+- detect + agent-resolve merged-bill duplicate events
+
 ## [0.33.0] - 2026-05-14
 
 ### Added
