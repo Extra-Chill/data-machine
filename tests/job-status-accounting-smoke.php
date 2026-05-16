@@ -101,6 +101,9 @@ $jobs_command = file_get_contents( __DIR__ . '/../inc/Cli/Commands/JobsCommand.p
 $assert( 'CLI exposes reconcile-status subcommand', str_contains( $jobs_command, '@subcommand reconcile-status' ) );
 $assert( 'CLI detects successful wiki update artifacts', str_contains( $jobs_command, 'Updated wiki article:' ) );
 $assert( 'CLI detects source rejection artifacts', str_contains( $jobs_command, 'Source rejected:' ) );
+$assert( 'CLI inspects processing rows with terminal artifacts', str_contains( $jobs_command, "status = 'processing'" ) );
+$assert( 'CLI requires successful runtime provenance', str_contains( $jobs_command, 'engine_data_has_successful_runtime' ) );
+$assert( 'CLI requires successful handler tool summary', str_contains( $jobs_command, 'engine_data_has_successful_handler_tool' ) );
 $assert( 'CLI supports dry-run output', str_contains( $jobs_command, "'dry_run' => $" ) || str_contains( $jobs_command, "'dry_run' => \$dry_run" ) );
 
 if ( $failures > 0 ) {

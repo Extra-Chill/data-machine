@@ -357,9 +357,9 @@ class JobsCommand extends BaseCommand {
 	/**
 	 * Reconcile jobs whose persisted status disagrees with successful engine artifacts.
 	 *
-	 * Repairs historical rows where an earlier failed tool call left the job status as
-	 * failed even though a later handler tool succeeded, or where an explicit source
-	 * rejection was recorded as an intentional skip.
+	 * Repairs historical rows where a completed engine artifact disagrees with the
+	 * persisted job status, including failed rows and processing rows whose actions
+	 * already completed successfully.
 	 *
 	 * ## OPTIONS
 	 *
@@ -367,7 +367,7 @@ class JobsCommand extends BaseCommand {
 	 * : Show what would be updated without making changes.
 	 *
 	 * [--limit=<limit>]
-	 * : Maximum failed rows to inspect.
+	 * : Maximum rows to inspect.
 	 * ---
 	 * default: 500
 	 * ---
@@ -401,13 +401,15 @@ class JobsCommand extends BaseCommand {
 			$wpdb->prepare(
 				"SELECT job_id, flow_id, parent_job_id, status, label, engine_data
 				FROM {$jobs_table}
-				WHERE status LIKE %s
+				WHERE (status LIKE %s OR status = 'processing')
 				AND (
 					engine_data LIKE %s
 					OR engine_data LIKE %s
 					OR JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.job_status')) LIKE %s
+					OR JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.runtime_provenance.status.status')) = 'completed'
+					OR JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.runtime_provenance.status.completed')) = 'true'
 				)
-				ORDER BY completed_at DESC
+				ORDER BY COALESCE(completed_at, created_at) DESC
 				LIMIT %d",
 				$failed_like,
 				'%Updated wiki article:%',
@@ -475,7 +477,7 @@ class JobsCommand extends BaseCommand {
 		}
 
 		if ( empty( $items ) ) {
-			WP_CLI::success( 'No misclassified failed jobs found.' );
+			WP_CLI::success( 'No misclassified jobs found.' );
 			return;
 		}
 
@@ -484,7 +486,7 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Resolve the corrected terminal status for a failed job row.
+	 * Resolve the corrected terminal status for a job row.
 	 *
 	 * @param array<string,mixed> $row Job row.
 	 * @return string Corrected status, or empty string when the row is not safe to repair.
@@ -505,11 +507,56 @@ class JobsCommand extends BaseCommand {
 			return 'completed';
 		}
 
+		if ( $this->engine_data_has_successful_runtime( $engine_data ) && $this->engine_data_has_successful_handler_tool( $engine_data ) ) {
+			return 'completed';
+		}
+
 		return '';
 	}
 
 	/**
-	 * Repair failed batch parent rows once their children now contain successes.
+	 * Determine whether runtime provenance marks the engine attempt complete.
+	 *
+	 * @param array<string,mixed> $engine_data Decoded engine data.
+	 * @return bool Whether runtime provenance is terminal-successful.
+	 */
+	private function engine_data_has_successful_runtime( array $engine_data ): bool {
+		$status = $engine_data['runtime_provenance']['status'] ?? array();
+		if ( ! is_array( $status ) ) {
+			return false;
+		}
+
+		return true === ( $status['completed'] ?? false ) || 'completed' === (string) ( $status['status'] ?? '' );
+	}
+
+	/**
+	 * Determine whether engine data includes a successful handler tool call.
+	 *
+	 * @param array<string,mixed> $engine_data Decoded engine data.
+	 * @return bool Whether a handler tool completed successfully.
+	 */
+	private function engine_data_has_successful_handler_tool( array $engine_data ): bool {
+		$summary = $engine_data['tool_execution_summary'] ?? array();
+		if ( ! is_array( $summary ) ) {
+			return false;
+		}
+
+		foreach ( $summary as $tool ) {
+			if ( ! is_array( $tool ) ) {
+				continue;
+			}
+
+			$tool_name = (string) ( $tool['tool_name'] ?? '' );
+			if ( true === ( $tool['success'] ?? false ) && in_array( $tool_name, array( 'wiki_upsert', 'create_post', 'update_post' ), true ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Repair batch parent rows once their children now contain terminal statuses.
 	 *
 	 * @param bool $dry_run Whether to preview changes only.
 	 * @param int  $limit   Maximum parent rows to inspect.
@@ -527,7 +574,7 @@ class JobsCommand extends BaseCommand {
 			$wpdb->prepare(
 				"SELECT job_id, flow_id, status, label, engine_data
 				FROM {$jobs_table}
-				WHERE status LIKE %s
+				WHERE (status LIKE %s OR status = 'processing')
 				AND parent_job_id IS NULL
 				AND JSON_UNQUOTE(JSON_EXTRACT(engine_data, '$.run_metrics.context.batch_completion_strategy')) = 'children_complete'
 				ORDER BY completed_at DESC
