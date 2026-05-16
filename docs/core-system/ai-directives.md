@@ -272,6 +272,14 @@ add_filter('datamachine_directives', function($directives) {
 });
 ```
 
+**`datamachine_directives_enabled`** — Disable the entire directive stack before any directive class renders:
+
+```php
+add_filter( 'datamachine_directives_enabled', '__return_false' );
+```
+
+Use this for eval or training runners that need a provider request with no hidden Data Machine context. Returning `false` removes every registered directive after discovery and before per-agent policy resolution or directive rendering.
+
 **`datamachine_agent_mode_{slug}`** — Append or modify mode-specific guidance:
 
 ```php

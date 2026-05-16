@@ -191,7 +191,39 @@ assert_test( 'request JSON byte count stable', 496 === $request_json_bytes, 'got
 assert_test( 'messages JSON byte count stable', 277 === $messages_json_bytes, 'got ' . $messages_json_bytes );
 assert_test( 'tools JSON byte count stable', 178 === $tools_json_bytes, 'got ' . $tools_json_bytes );
 
-echo "\nCase 4: CLI command surface is registered and documented\n";
+echo "\nCase 4: directives can be disabled before any directive class renders\n";
+
+add_filter(
+	'datamachine_directives_enabled',
+	static function ( bool $enabled, array $directives, array $args ): bool {
+		assert_test( 'directive enabled filter receives default true', true === $enabled );
+		assert_test( 'directive enabled filter sees registered directives', ! empty( $directives ) );
+		assert_test( 'directive enabled filter sees active mode', array( 'pipeline' ) === ( $args['modes'] ?? array() ) );
+		return false;
+	},
+	10,
+	3
+);
+
+$without_directives = \DataMachine\Engine\AI\RequestBuilder::assemble(
+	$messages,
+	'openai',
+	'gpt-test',
+	$tools,
+	array( 'pipeline' ),
+	array(
+		'job_id'       => 1423,
+		'flow_step_id' => 'ai_step_1',
+		'step_id'      => 'pipeline_ai_1',
+	)
+);
+
+assert_test( 'directive kill switch keeps original user message first', 'user' === ( $without_directives['request']['messages'][0]['role'] ?? '' ) );
+assert_test( 'directive kill switch removes rendered directive breakdown', array() === ( $without_directives['directive_breakdown'] ?? array() ) );
+assert_test( 'directive kill switch removes applied directives', array() === ( $without_directives['applied_directives'] ?? array() ) );
+assert_test( 'directive kill switch reports suppressed directive', array( 'Test_Request_Inspector_Directive' ) === ( $without_directives['suppressed_directives'] ?? array() ) );
+
+echo "\nCase 5: CLI command surface is registered and documented\n";
 
 $bootstrap = (string) file_get_contents( __DIR__ . '/../inc/Cli/Bootstrap.php' );
 $command   = (string) file_get_contents( __DIR__ . '/../inc/Cli/Commands/AICommand.php' );
@@ -214,7 +246,7 @@ assert_test( 'inspect request ability loaded by plugin bootstrap', false !== str
 assert_test( 'inspect request ability instantiated by plugin bootstrap', false !== strpos( $plugin, 'new \\DataMachine\\Abilities\\AI\\InspectRequestAbility()' ) );
 assert_test( 'ability registers datamachine/inspect-ai-request', false !== strpos( $ability, 'datamachine/inspect-ai-request' ) );
 
-echo "\nCase 4: prompt validation context is adapter-provided\n";
+echo "\nCase 6: prompt validation context is adapter-provided\n";
 
 $prompt_builder_source  = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/PromptBuilder.php' );
 $request_builder_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/RequestBuilder.php' );
