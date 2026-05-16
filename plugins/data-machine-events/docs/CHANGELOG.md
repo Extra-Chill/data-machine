@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.35.0] - 2026-05-16
+
+### Added
+- Bandzoogle handler for indie venues using Bandzoogle CMS
+
+### Fixed
+- JsonLdExtractor handles all schema.org Event shapes
+
 ## [0.34.0] - 2026-05-16
 
 ### Added
