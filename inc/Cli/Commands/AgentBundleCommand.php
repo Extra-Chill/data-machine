@@ -301,14 +301,14 @@ class AgentBundleCommand extends BaseCommand {
 			$pending                    = AgentBundleUpgradePendingAction::stage(
 				$plan,
 				array(
-					'bundle'            => $this->bundle_summary( $bundle, $slug ),
-					'agent'             => $agent ? $agent : array(),
-					'target_artifacts'  => $this->bundle_artifacts( $bundle ),
+					'bundle'             => $this->bundle_summary( $bundle, $slug ),
+					'agent'              => $agent ? $agent : array(),
+					'target_artifacts'   => $this->bundle_artifacts( $bundle ),
 					'approved_artifacts' => $approved_artifacts,
-					'rebased_artifacts' => $rebased_artifacts,
-					'summary'           => 'Review locally modified bundle artifacts before applying.',
-					'agent_id'          => $agent ? (int) $agent['agent_id'] : 0,
-					'user_id'           => get_current_user_id(),
+					'rebased_artifacts'  => $rebased_artifacts,
+					'summary'            => 'Review locally modified bundle artifacts before applying.',
+					'agent_id'           => $agent ? (int) $agent['agent_id'] : 0,
+					'user_id'            => get_current_user_id(),
 				)
 			);
 			$response['pending_action'] = $pending;
