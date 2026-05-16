@@ -124,6 +124,14 @@ namespace {
 	agents_api_smoke_assert_equals( 2, $context['agent_id'], 'active preference resolves before ambiguous owner fallback', $failures, $passes );
 	agents_api_smoke_assert_equals( 'intelligence-chubes4', $context['agent_slug'], 'active preference carries slug', $failures, $passes );
 
+	$GLOBALS['__datamachine_test_user_meta'][1]['datamachine_active_agent_slug'] = '';
+	putenv( 'DATAMACHINE_AGENT_SLUG=intelligence-chubes4' );
+	$context = DataMachine\Cli\AgentResolver::resolveEffectiveContext( array( 'user' => 1 ) );
+	agents_api_smoke_assert_equals( 2, $context['agent_id'], 'environment agent slug resolves before ambiguous owner fallback', $failures, $passes );
+	agents_api_smoke_assert_equals( 'intelligence-chubes4', $context['agent_slug'], 'environment agent slug carries slug', $failures, $passes );
+	putenv( 'DATAMACHINE_AGENT_SLUG' );
+	$GLOBALS['__datamachine_test_user_meta'][1]['datamachine_active_agent_slug'] = 'intelligence-chubes4';
+
 	add_filter(
 		'agents_api_execution_principal',
 		static function ( $principal, $request_context ) {
