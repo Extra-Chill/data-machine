@@ -149,6 +149,9 @@ function datamachine_run_datamachine_plugin() {
 	// Agent auth callback handler (receives tokens from external DM instances).
 	new \DataMachine\Core\Auth\AgentAuthCallback();
 
+	// External human-login callback routing (separate from credential auth).
+	\DataMachine\Core\Auth\ExternalLoginRouter::register();
+
 	// Register ability categories first — must happen before any ability registration.
 	require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';
 	\DataMachine\Abilities\AbilityCategories::ensure_registered();
