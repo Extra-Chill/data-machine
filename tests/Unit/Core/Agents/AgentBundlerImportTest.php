@@ -595,6 +595,83 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		);
 	}
 
+	public function test_upgrade_preserves_locally_modified_agent_config_and_reports_conflict(): void {
+		$bundle = $this->fixture_bundle( 'context-agent' );
+		$bundle['agent']['agent_config'] = array(
+			'intelligence' => array(
+				'context_servers' => array(
+					'wporg' => array(
+						'transport' => 'stdio',
+						'command'   => 'node',
+					),
+				),
+			),
+		);
+
+		$first = $this->bundler->import( $bundle, null, $this->owner_id );
+		$this->assertTrue( (bool) $first['success'], 'Initial install succeeds.' );
+
+		$agent = $this->agents_repo->get_by_slug( 'context-agent' );
+		$this->agents_repo->update_agent(
+			(int) $agent['agent_id'],
+			array(
+				'agent_config' => array_merge(
+					$agent['agent_config'],
+					array(
+						'intelligence' => array(
+							'context_servers' => array(
+								'wporg' => array(
+									'transport' => 'streamable-http',
+									'url'       => 'https://example.test/mcp',
+									'headers'   => array( 'Authorization' => 'Bearer local-token' ),
+								),
+							),
+						),
+					)
+				),
+			)
+		);
+
+		$updated_bundle = $bundle;
+		$updated_bundle['agent']['agent_config']['intelligence']['context_servers']['wporg']['args'] = array( 'mcp-context-wporg/dist/index.js' );
+
+		$second = $this->bundler->import(
+			$updated_bundle,
+			null,
+			$this->owner_id,
+			false,
+			array( 'is_upgrade' => true )
+		);
+
+		$this->assertTrue( (bool) $second['success'], 'Upgrade succeeds so clean artifacts can apply.' );
+		$this->assertSame(
+			array(
+				'artifact_type' => 'agent_config',
+				'artifact_id'   => 'config',
+				'reason'        => 'local_modified',
+			),
+			$second['summary']['conflicts'][0] ?? null,
+			'Locally modified agent config is reported as a conflict.'
+		);
+
+		$after = $this->agents_repo->get_by_slug( 'context-agent' );
+		$this->assertSame(
+			'streamable-http',
+			$after['agent_config']['intelligence']['context_servers']['wporg']['transport'] ?? null,
+			'Upgrade preserves the live context server transport.'
+		);
+		$this->assertSame(
+			'Bearer local-token',
+			$after['agent_config']['intelligence']['context_servers']['wporg']['headers']['Authorization'] ?? null,
+			'Upgrade preserves the live context server authorization header.'
+		);
+		$this->assertArrayNotHasKey(
+			'args',
+			$after['agent_config']['intelligence']['context_servers']['wporg'],
+			'Bundle context server args do not overwrite local runtime config without approval.'
+		);
+	}
+
 	/**
 	 * Defensive registry cleanup: even though the importer does not currently write to
 	 * `datamachine_bundle_artifacts`, extensions can. If an agent is deleted, any tracked rows for
