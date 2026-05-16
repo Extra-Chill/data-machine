@@ -19,6 +19,7 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Engine\AI\System\Tasks\AgentCallTask;
 use DataMachine\Engine\AI\System\Tasks\AltTextTask;
 use DataMachine\Engine\AI\System\Tasks\DailyMemoryTask;
+use DataMachine\Engine\AI\System\Tasks\DispatchMessageTask;
 use DataMachine\Engine\AI\System\Tasks\EmitDataPacketsTask;
 use DataMachine\Engine\AI\System\Tasks\ImageGenerationTask;
 use DataMachine\Engine\AI\System\Tasks\ImageOptimizationTask;
@@ -74,6 +75,7 @@ class SystemAgentServiceProvider {
 	 */
 	public function getBuiltInTasks( array $tasks ): array {
 		$tasks['agent_call']                             = AgentCallTask::class;
+		$tasks['dispatch_message']                       = DispatchMessageTask::class;
 		$tasks['emit_data_packets']                      = EmitDataPacketsTask::class;
 		$tasks['image_generation']                       = ImageGenerationTask::class;
 		$tasks['image_optimization']                     = ImageOptimizationTask::class;
