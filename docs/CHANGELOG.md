@@ -2,6 +2,24 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.116.0] - 2026-05-15
+
+### Added
+- allow disabling AI directives
+
+### Changed
+- fix directive policy alignment
+- publish release asset zip
+- Add transcript owner isolation
+
+### Fixed
+- align job reconciliation assignments
+- Fix chat handler alignment
+- prepare status reconciliation wildcards
+- reconcile successful job status artifacts
+- Fix transcript owner lint
+- resolve CLI memory agent context
+
 ## [0.115.0] - 2026-05-15
 
 ### Added
