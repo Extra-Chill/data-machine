@@ -77,9 +77,10 @@ function datamachine_run_conversation(
 	// surfaces turn_count, final_content, usage, and request_metadata on the
 	// final result directly (see agents-api#136), so we only carry by-reference
 	// the things substrate doesn't track for us.
-	$last_tool_calls       = array();
-	$completion_nudges     = array();
-	$last_request_metadata = array();
+	$last_tool_calls        = array();
+	$tool_execution_results = array();
+	$completion_nudges      = array();
+	$last_request_metadata  = array();
 
 	// Base log context for consistent logging.
 	$base_log_context = array_filter(
@@ -182,6 +183,7 @@ function datamachine_run_conversation(
 		$completion_policy,
 		$tool_runtime_rules,
 		$last_tool_calls,
+		$tool_execution_results,
 		$completion_nudges,
 		$last_request_metadata
 	);
@@ -262,6 +264,9 @@ function datamachine_run_conversation(
 	// Normalize the substrate result and augment with DM-specific fields.
 	try {
 		$result = WP_Agent_Conversation_Result::normalize( $result );
+		if ( ! empty( $tool_execution_results ) ) {
+			$result['tool_execution_results'] = $tool_execution_results;
+		}
 	} catch ( \InvalidArgumentException $e ) {
 		$error_result                       = array(
 			'messages'               => $messages,
@@ -340,6 +345,7 @@ function datamachine_run_conversation(
  * @param WP_Agent_Conversation_Completion_Policy   $completion_policy  Completion policy.
  * @param DataMachineToolRuntimeRules               $tool_runtime_rules Tool runtime rules.
  * @param array                                     &$last_tool_calls    Mutable last tool calls (DM-flavored shape).
+ * @param array                                     &$all_tool_results   Mutable all executed tool results (DM-flavored shape).
  * @param array                                     &$completion_nudges  Mutable nudge diagnostics (DM-only).
  * @return callable Turn runner closure.
  */
@@ -355,6 +361,7 @@ function datamachine_build_turn_runner(
 	WP_Agent_Conversation_Completion_Policy $completion_policy,
 	DataMachineToolRuntimeRules $tool_runtime_rules,
 	array &$last_tool_calls,
+	array &$all_tool_results,
 	array &$completion_nudges,
 	array &$last_request_metadata
 ): callable {
@@ -370,6 +377,7 @@ function datamachine_build_turn_runner(
 		$completion_policy,
 		$tool_runtime_rules,
 		&$last_tool_calls,
+		&$all_tool_results,
 		&$completion_nudges,
 		&$last_request_metadata
 	): array {
@@ -609,6 +617,7 @@ function datamachine_build_turn_runner(
 					'runtime'         => datamachine_tool_runtime_metadata( is_array( $tool_def ) ? $tool_def : null, $tool_result ),
 					'turn_count'      => $turn_count,
 				);
+				$all_tool_results[]       = $tool_execution_results[ count( $tool_execution_results ) - 1 ];
 				datamachine_persist_inflight_tool_summary( $loop_payload, $tool_execution_results );
 
 				// Add tool result message.
