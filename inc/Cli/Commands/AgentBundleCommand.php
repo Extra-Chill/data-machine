@@ -297,12 +297,14 @@ class AgentBundleCommand extends BaseCommand {
 			$rebased_artifacts          = $rebase_local
 				? $this->rebase_locally_modified( $plan, $bundle, $slug, $policy_name )
 				: array();
+			$approved_artifacts         = $this->approved_rebased_artifact_keys( $rebased_artifacts );
 			$pending                    = AgentBundleUpgradePendingAction::stage(
 				$plan,
 				array(
 					'bundle'            => $this->bundle_summary( $bundle, $slug ),
 					'agent'             => $agent ? $agent : array(),
 					'target_artifacts'  => $this->bundle_artifacts( $bundle ),
+					'approved_artifacts' => $approved_artifacts,
 					'rebased_artifacts' => $rebased_artifacts,
 					'summary'           => 'Review locally modified bundle artifacts before applying.',
 					'agent_id'          => $agent ? (int) $agent['agent_id'] : 0,
@@ -500,6 +502,36 @@ class AgentBundleCommand extends BaseCommand {
 		}
 
 		return $results;
+	}
+
+	/**
+	 * Collect rebased artifact keys that can be applied after approval.
+	 *
+	 * @param array<int,array<string,mixed>> $rebased_artifacts Rebase preview entries.
+	 * @return array<int,string>
+	 */
+	private function approved_rebased_artifact_keys( array $rebased_artifacts ): array {
+		$approved = array();
+
+		foreach ( $rebased_artifacts as $artifact ) {
+			if ( ! is_array( $artifact ) || ! empty( $artifact['requires_approval'] ) ) {
+				continue;
+			}
+
+			$key = (string) ( $artifact['artifact_key'] ?? '' );
+			if ( '' === $key ) {
+				$key = AgentBundleArtifactExtensions::artifact_key(
+					(string) ( $artifact['artifact_type'] ?? '' ),
+					(string) ( $artifact['artifact_id'] ?? '' )
+				);
+			}
+
+			if ( '' !== $key ) {
+				$approved[] = $key;
+			}
+		}
+
+		return array_values( array_unique( $approved ) );
 	}
 
 	private function run_install( array $args, array $assoc_args ): void {
