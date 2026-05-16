@@ -92,6 +92,11 @@ class UniversalWebScraperTestCommand {
 		} else {
 			$event_data = $result['event_data'] ?? array();
 			\WP_CLI::log( 'Payload type: event' );
+			if ( isset( $event_data['event_count'] ) && (int) $event_data['event_count'] > 1 ) {
+				\WP_CLI::log( 'Events extracted: ' . (int) $event_data['event_count'] . ' (showing first below)' );
+			} elseif ( isset( $event_data['event_count'] ) ) {
+				\WP_CLI::log( 'Events extracted: ' . (int) $event_data['event_count'] );
+			}
 			\WP_CLI::log( 'Title: ' . ( $event_data['title'] ?? '' ) );
 			\WP_CLI::log( 'Start Date: ' . ( $event_data['startDate'] ?? '' ) );
 			\WP_CLI::log( 'Start Time: ' . ( $event_data['startTime'] ?? '' ) );

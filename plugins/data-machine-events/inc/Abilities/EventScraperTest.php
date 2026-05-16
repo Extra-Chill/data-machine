@@ -5,6 +5,27 @@
  * Tests universal web scraper compatibility with a target URL.
  * Provides structured JSON output via WordPress Abilities API and Chat Tools.
  *
+ * Qualify-path divergence (issue #265, fixed in #266):
+ * -----------------------------------------------------
+ * UniversalWebScraper::executeFetch() returns `{ items: [...] }` when an
+ * extractor yields multiple events on a calendar page. FetchHandler::get_fetch_data()
+ * normalizes that into one DataPacket per event — so for a Bandzoogle calendar with
+ * 19 events, `$handler->get_fetch_data()` returns an array of 19 DataPackets.
+ *
+ * Prior to the #265 fix, this ability read only `$results[0]` — the first packet —
+ * and returned its single event as `event_data`. The qualify path
+ * (extrachill-events/QualifyFingerprinter::count_events()) then saw a single-event
+ * payload and recorded `extractor_attempts[i].events: 1` regardless of how many
+ * events the extractor actually found. That undercount caused every Bandzoogle /
+ * multi-event JSON-LD venue to be flagged `extraction_gap` on its first qualify run.
+ *
+ * Fix shape (Shape A from the issue): walk all packets, build an `event_data.events[]`
+ * summary array (compatible with `QualifyFingerprinter::count_events()`'s existing
+ * `items[]` check), and surface `event_count` in both `event_data` and
+ * `extraction_info`. The first event's full record stays at `event_data` top-level
+ * for backwards compatibility with the chat tool and the CLI command, which only
+ * read a single event's fields.
+ *
  * @package DataMachineEvents\Abilities
  */
 
@@ -124,9 +145,20 @@ class EventScraperTest {
 			return new \WP_Error( 'scraper_failed', 'Scraper returned no results. ' . implode( '; ', $warning_messages ), array( 'status' => 500 ) );
 		}
 
-		$packet       = $results[0];
-		$packet_array = $packet->addTo( array() );
-		$packet_entry = $packet_array[0] ?? array();
+		// Walk every packet returned by get_fetch_data(). One packet per extracted
+		// event — multi-event calendars (Bandzoogle, JSON-LD lists, Tribe REST,
+		// etc.) produce N packets and we must surface the full count to the
+		// qualify path (#265).
+		$packet_entries = array();
+		foreach ( $results as $packet_obj ) {
+			$packet_array = $packet_obj->addTo( array() );
+			$packet_entry = $packet_array[0] ?? array();
+			if ( ! empty( $packet_entry ) ) {
+				$packet_entries[] = $packet_entry;
+			}
+		}
+
+		$packet_entry = $packet_entries[0] ?? array();
 		$packet_data  = $packet_entry['data'] ?? array();
 		$packet_meta  = $packet_entry['metadata'] ?? array();
 
@@ -138,10 +170,16 @@ class EventScraperTest {
 		$payload = json_decode( (string) $body, true );
 		$event   = is_array( $payload ) ? ( $payload['event'] ?? null ) : null;
 
+		// Build a summary list of every event across all packets. Compatible
+		// with QualifyFingerprinter::count_events() which already handles
+		// $event_data['items'] / $event_data['events'] as the multi-event signal.
+		$all_events = $this->summarizeEventsFromPackets( $packet_entries );
+
 		$extraction_info = array(
 			'packet_title'      => $packet_data['title'] ?? '',
 			'source_type'       => $packet_meta['source_type'] ?? '',
 			'extraction_method' => $packet_meta['extraction_method'] ?? '',
+			'event_count'       => count( $packet_entries ),
 		);
 
 		if ( is_array( $payload ) && isset( $payload['raw_html'] ) && is_string( $payload['raw_html'] ) ) {
@@ -237,6 +275,16 @@ class EventScraperTest {
 		$event_data['venueState']   = $venue_state;
 		$event_data['venueZip']     = $venue_zip;
 
+		// Surface the full event list and total count so qualify-path consumers
+		// (extrachill-events QualifyFingerprinter::count_events) see the true
+		// extraction count instead of just the first event (#265).
+		//
+		// `items` is the field QualifyFingerprinter::count_events() already
+		// inspects (`isset($event_data['items'])`) — populating it lets the fix
+		// land without requiring a matching change in extrachill-events.
+		$event_data['items']       = $all_events;
+		$event_data['event_count'] = count( $all_events );
+
 		$extraction_info['payload_type'] = 'event';
 
 		$time_data_warning = false;
@@ -296,5 +344,52 @@ class EventScraperTest {
 
 	private function buildErrorResponse( string $message ): \WP_Error {
 		return new \WP_Error( 'test_error', $message, array( 'status' => 400 ) );
+	}
+
+	/**
+	 * Build a lightweight summary list of every event represented in the
+	 * DataPacket array returned by UniversalWebScraper::get_fetch_data().
+	 *
+	 * Each input packet entry is the array shape produced by DataPacket::addTo()
+	 * (i.e. has `data.body` as a JSON-encoded `{ event: {...}, ... }` blob, as
+	 * built by StructuredDataProcessor::process()).
+	 *
+	 * Packets whose body is non-event (raw_html / vision_flyer) are skipped —
+	 * those payload types are inherently single-event and already counted via
+	 * the existing `event_data.title` / `event_data.raw_html` heuristics in
+	 * QualifyFingerprinter::count_events().
+	 *
+	 * @param array $packet_entries Packet entries from DataPacket::addTo().
+	 * @return array<int, array{title:string,startDate:string,startTime:string,ticketUrl:string}>
+	 */
+	private function summarizeEventsFromPackets( array $packet_entries ): array {
+		$summary = array();
+
+		foreach ( $packet_entries as $entry ) {
+			$data = $entry['data'] ?? array();
+			$body = $data['body'] ?? '';
+			if ( '' === $body ) {
+				continue;
+			}
+
+			$decoded = json_decode( (string) $body, true );
+			if ( ! is_array( $decoded ) ) {
+				continue;
+			}
+
+			$event = $decoded['event'] ?? null;
+			if ( ! is_array( $event ) ) {
+				continue;
+			}
+
+			$summary[] = array(
+				'title'     => (string) ( $event['title'] ?? '' ),
+				'startDate' => (string) ( $event['startDate'] ?? '' ),
+				'startTime' => (string) ( $event['startTime'] ?? '' ),
+				'ticketUrl' => (string) ( $event['ticketUrl'] ?? '' ),
+			);
+		}
+
+		return $summary;
 	}
 }
