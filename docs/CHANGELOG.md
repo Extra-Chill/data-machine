@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.115.0] - 2026-05-15
+
+### Added
+- diagnose processing job liveness
+
+### Fixed
+- align liveness total summary formatting
+- align liveness summary formatting
+
 ## [0.114.0] - 2026-05-15
 
 ### Added
