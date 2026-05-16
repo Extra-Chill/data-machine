@@ -47,7 +47,7 @@ class DirectivePolicyResolver {
 			);
 		}
 
-		$policy   = $agent_id > 0 ? $this->getAgentDirectivePolicy( $agent_id ) : null;
+		$policy = $agent_id > 0 ? $this->getAgentDirectivePolicy( $agent_id ) : null;
 
 		$result = $this->applyPolicy( $directives, $policy, $modes );
 
