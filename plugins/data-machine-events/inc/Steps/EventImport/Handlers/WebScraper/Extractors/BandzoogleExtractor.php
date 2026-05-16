@@ -1,17 +1,49 @@
 <?php
 /**
-/**
- * Bandzoogle extractor.
+ * Bandzoogle CMS extractor.
  *
- * Extracts event data from Bandzoogle calendar sites by crawling month pages
- * and fetching individual event detail popups. Maintains legacy regex stability.
+ * Bandzoogle is a self-serve website builder popular with small indie venues
+ * and DIY rooms. Calendars live at venue-specific paths (e.g. /calendar,
+ * /gigs, /shows) and the markup is platform-specific.
+ *
+ * The current Bandzoogle "anthem" generation of themes renders an event
+ * list using:
+ *
+ *   <div class="event-detail" data-event-id="..." data-occurrence-id="...">
+ *     <div class="event-image"><a><img src="..." /></a></div>
+ *     <div class="event-description">
+ *       <h2 class="event-info event-title"><a href="...">Title</a></h2>
+ *       <p class="event-info event-datetime">
+ *         <time class="from">
+ *           <span class="date">Wednesday, May 13</span> @ <span class="time">6:00PM</span>
+ *         </time>
+ *       </p>
+ *       <p class="event-info event-location"><a href="...maps...">Sub-venue</a></p>
+ *       <div class="event-info event-notes"><p>...</p></div>
+ *       <div class="event-info buying-options">...share/ticket buttons...</div>
+ *     </div>
+ *   </div>
+ *
+ * The calendar's month/year context lives separately in
+ * `<span class="month-name">May 2026</span>` near the top of the calendar
+ * feature. The individual `event-datetime` markup intentionally omits the
+ * year, so we resolve the year from that header (with a sane fallback).
+ *
+ * Detection: Bandzoogle ships everything from `bndzgl.com` (app assets) and
+ * `zoogletools.com` (image CDN), plus a `data-event-id` attribute on each
+ * event card. Any one of those is enough to call it Bandzoogle.
+ *
+ * Note: the original issue (#261) described an older Bandzoogle theme using
+ * `.gig-info`, `.gig-artist`, etc. We keep detection broad enough to catch
+ * that legacy markup too, but the parser targets the current `event-detail`
+ * shape observed on real production sites (Elephant Room, Austin TX).
  *
  * @package DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors
  */
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
 
-use DataMachine\Core\HttpClient;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\PageVenueExtractor;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -19,68 +51,59 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class BandzoogleExtractor extends BaseExtractor {
 
-	const MAX_PAGES = 12; // Limit pagination to 1 year forward
-
+	/**
+	 * Detect Bandzoogle.
+	 *
+	 * Any of these is a strong positive signal:
+	 *   - asset host `bndzgl.com`
+	 *   - image CDN `zoogletools.com`
+	 *   - `bandzoogle.com` reference (footer credit / "powered by")
+	 *   - `data-event-id=` paired with `event-detail` class
+	 *   - legacy `.gig-info` / `.gigs` / `.bandzoogle-` class names
+	 */
 	public function canExtract( string $html ): bool {
-		// Bandzoogle sites often have these characteristic identifiers
-		return ( strpos( $html, 'class="month-name"' ) !== false && strpos( $html, '/go/calendar/' ) !== false )
-			|| ( strpos( $html, 'class="event-title"' ) !== false && strpos( $html, 'class="event-notes"' ) !== false )
-			|| strpos( $html, 'bandzoogle.com' ) !== false;
+		if ( '' === $html ) {
+			return false;
+		}
+
+		$markers = array(
+			'bndzgl.com',
+			'zoogletools.com',
+			'bandzoogle.com',
+			'class="bandzoogle-',
+			'class="gig-info"',
+			'class="gigs"',
+		);
+
+		foreach ( $markers as $marker ) {
+			if ( false !== strpos( $html, $marker ) ) {
+				return true;
+			}
+		}
+
+		// data-event-id + event-detail is unique to Bandzoogle calendars.
+		if ( false !== strpos( $html, 'data-event-id=' ) && false !== strpos( $html, 'event-detail' ) ) {
+			return true;
+		}
+
+		return false;
 	}
 
 	public function extract( string $html, string $source_url ): array {
-		$all_events  = array();
-		$current_url = $source_url;
-		$visited     = array();
-		$page_count  = 1;
+		$page_venue = PageVenueExtractor::extract( $html, $source_url );
 
-		// Start with the initial HTML provided
-		$current_html = $html;
+		// Resolve year from the calendar header (`May 2026`). Falls back to
+		// the current year, then to inferring from month/day.
+		$calendar_year = $this->extractCalendarYear( $html );
 
-		while ( $page_count <= self::MAX_PAGES ) {
-			$url_hash = md5( $current_url );
-			if ( isset( $visited[ $url_hash ] ) ) {
-				break;
-			}
-			$visited[ $url_hash ] = true;
+		$events = $this->extractEventDetailBlocks( $html, $source_url, $page_venue, $calendar_year );
 
-			// 1. Get month context (Year/Month) for date resolution
-			$context = $this->parseMonthContext( $current_html );
-			if ( empty( $context ) ) {
-				$context = $this->parseMonthContextFromUrl( $current_url );
-			}
-
-			// 2. Extract individual occurrence URLs (popups)
-			$occurrence_urls = $this->extractOccurrenceUrls( $current_html, $current_url );
-
-			foreach ( $occurrence_urls as $occurrence_url ) {
-				$detail_html = $this->fetchHtml( $occurrence_url );
-				if ( empty( $detail_html ) ) {
-					continue;
-				}
-
-				$event = $this->parseOccurrenceHtml( $detail_html, $occurrence_url, $context );
-				if ( ! empty( $event['title'] ) && ! empty( $event['startDate'] ) ) {
-					$all_events[] = $event;
-				}
-			}
-
-			// 3. Find next month URL
-			$next_url = $this->findNextMonthUrl( $current_html, $current_url );
-			if ( empty( $next_url ) ) {
-				break;
-			}
-
-			$current_url  = $next_url;
-			$current_html = $this->fetchHtml( $current_url );
-			if ( empty( $current_html ) ) {
-				break;
-			}
-
-			++$page_count;
+		if ( empty( $events ) ) {
+			// Legacy `.gig-info` markup fallback.
+			$events = $this->extractGigInfoBlocks( $html, $source_url, $page_venue );
 		}
 
-		return $all_events;
+		return $events;
 	}
 
 	public function getMethod(): string {
@@ -88,195 +111,416 @@ class BandzoogleExtractor extends BaseExtractor {
 	}
 
 	/**
-	 * Parse month/year from the calendar header.
+	 * Parse the calendar header for a 4-digit year.
+	 *
+	 * Bandzoogle renders the current month as:
+	 *   <span class="month-name">May 2026</span>
+	 *
+	 * Some themes use slightly different wrappers, so we accept any
+	 * `month-name` span. If absent, returns 0 (caller falls back to
+	 * BaseExtractor::inferDateFromMonthDay).
+	 *
+	 * @return int Year (e.g. 2026) or 0 when unknown.
 	 */
-	private function parseMonthContext( string $html ): ?array {
-		if ( ! preg_match( '#<span[^>]*class=["\']month-name["\'][^>]*>\s*([^<]+)\s*</span>#i', $html, $m ) ) {
-			return null;
+	private function extractCalendarYear( string $html ): int {
+		if ( preg_match( '/<span[^>]*class="[^"]*month-name[^"]*"[^>]*>\s*([A-Za-z]+)\s+(\d{4})\s*<\/span>/i', $html, $m ) ) {
+			return (int) $m[2];
 		}
 
-		$label = trim( html_entity_decode( $m[1], ENT_QUOTES | ENT_HTML5 ) );
-		if ( ! preg_match( '/^([A-Za-z]+)\s+(\d{4})$/', $label, $mm ) ) {
-			return null;
+		// Fallback: pagination links carry `?month=N&year=YYYY`. The "next" link
+		// always points one month ahead of the current view; subtracting 1 from
+		// that month would require date math, so we just use the year as-is
+		// because the year flips so rarely that this is good enough.
+		if ( preg_match( '/[?&]year=(\d{4})/', $html, $m ) ) {
+			return (int) $m[1];
 		}
 
-		$month_num = (int) date( 'n', strtotime( $mm[1] . ' 1' ) );
-		$year      = (int) $mm[2];
-
-		return ( $month_num > 0 && $year > 0 ) ? array(
-			'year'  => $year,
-			'month' => $month_num,
-		) : null;
+		return 0;
 	}
 
 	/**
-	 * Parse month/year from the URL if not found in HTML.
+	 * Extract events from the modern `event-detail` list view.
+	 *
+	 * @param string $html       Full page HTML.
+	 * @param string $source_url Source URL for resolving relative links.
+	 * @param array  $page_venue Venue data extracted from page context.
+	 * @param int    $calendar_year Year resolved from calendar header, or 0.
+	 * @return array Normalized event records.
 	 */
-	private function parseMonthContextFromUrl( string $url ): ?array {
-		$path = (string) parse_url( $url, PHP_URL_PATH );
-		if ( preg_match( '#/go/calendar/\d+/(\d{4})/(\d{1,2})#', $path, $m ) ) {
-			return array(
-				'year'  => (int) $m[1],
-				'month' => (int) $m[2],
-			);
+	private function extractEventDetailBlocks( string $html, string $source_url, array $page_venue, int $calendar_year ): array {
+		// Capture each <div class="event-detail" data-event-id="...">...</div> block.
+		// We anchor on the opening tag and consume until the matching closing div by
+		// using a depth-aware split: the next `event-detail` opener (or EOF) bounds it.
+		if ( ! preg_match_all(
+			'/<div\s+class="event-detail"[^>]*data-event-id="(\d+)"[^>]*data-occurrence-id="(\d+)"[^>]*>(.*?)(?=<div\s+class="event-detail"\b|<div class="event-clear">|<\/article>\s*<\/div>\s*<\/section>|<\/section>\s*<\/div>\s*<footer)/si',
+			$html,
+			$matches,
+			PREG_SET_ORDER
+		) ) {
+			return array();
 		}
-		return null;
-	}
 
-	/**
-	 * Extract event detail URLs from the calendar grid.
-	 */
-	private function extractOccurrenceUrls( string $html, string $current_url ): array {
-		preg_match_all( '#href=["\'](/go/events/\d+\?[^"\']*occurrence_id=\d+[^"\']*)["\']#i', $html, $matches );
+		$events = array();
 
-		$urls   = array();
-		$parsed = parse_url( $current_url );
-		$host   = $parsed['host'] ?? '';
-		$scheme = $parsed['scheme'] ?? 'https';
+		foreach ( $matches as $match ) {
+			$event_id      = $match[1];
+			$occurrence_id = $match[2];
+			$inner         = $match[3];
 
-		foreach ( ( $matches[1] ?? array() ) as $rel ) {
-			$rel = html_entity_decode( $rel, ENT_QUOTES | ENT_HTML5 );
-			if ( ! str_contains( $rel, 'popup=1' ) ) {
-				$rel .= ( str_contains( $rel, '?' ) ? '&' : '?' ) . 'popup=1';
+			$event = $this->parseEventDetailBlock( $inner, $source_url, $page_venue, $calendar_year, $event_id, $occurrence_id );
+			if ( ! empty( $event['title'] ) && ! empty( $event['startDate'] ) ) {
+				$events[] = $event;
 			}
-			$urls[] = $scheme . '://' . $host . $rel;
 		}
 
-		return array_values( array_unique( $urls ) );
+		return $events;
 	}
 
 	/**
-	 * Find the link to the next month's calendar.
+	 * Parse a single `.event-detail` block.
 	 */
-	private function findNextMonthUrl( string $html, string $current_url ): string {
-		if ( ! preg_match( '#<a[^>]*class=["\'][^"\']*\bnext\b[^"\']*["\'][^>]*href=["\']([^"\']+)["\']#i', $html, $m ) ) {
-			return '';
+	private function parseEventDetailBlock( string $html, string $source_url, array $page_venue, int $calendar_year, string $event_id, string $occurrence_id ): array {
+		$event = array(
+			'title'         => '',
+			'description'   => '',
+			'startDate'     => '',
+			'startTime'     => '',
+			'endDate'       => '',
+			'endTime'       => '',
+			'venue'         => $page_venue['venue'] ?? '',
+			'venueAddress'  => $page_venue['venueAddress'] ?? '',
+			'venueCity'     => $page_venue['venueCity'] ?? '',
+			'venueState'    => $page_venue['venueState'] ?? '',
+			'venueZip'      => $page_venue['venueZip'] ?? '',
+			'venueCountry'  => $page_venue['venueCountry'] ?? 'US',
+			'venueTimezone' => $page_venue['venueTimezone'] ?? '',
+			'ticketUrl'     => '',
+			'imageUrl'      => '',
+			'source_url'    => '',
+			'price'         => '',
+		);
+
+		// Title + event detail page URL.
+		if ( preg_match( '/<h2[^>]*class="[^"]*event-title[^"]*"[^>]*>\s*<a\s+href="([^"]+)"[^>]*>(.*?)<\/a>\s*<\/h2>/is', $html, $m ) ) {
+			$event['source_url'] = esc_url_raw( html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' ) );
+			$event['title']      = $this->sanitizeText( html_entity_decode( wp_strip_all_tags( $m[2] ), ENT_QUOTES, 'UTF-8' ) );
 		}
 
-		$href = html_entity_decode( $m[1], ENT_QUOTES | ENT_HTML5 );
-		if ( empty( $href ) ) {
-			return '';
+		// Datetime: parse "Wednesday, May 13" + "6:00PM" inside event-datetime.
+		if ( preg_match( '/<p[^>]*class="[^"]*event-datetime[^"]*"[^>]*>(.*?)<\/p>/is', $html, $dt_match ) ) {
+			$this->parseDatetimeFragment( $event, $dt_match[1], $calendar_year );
 		}
 
-		if ( strpos( $href, '//' ) === 0 ) {
-			return 'https:' . $href;
-		}
-		if ( preg_match( '#^https?://#i', $href ) ) {
-			return $href;
-		}
-
-		$parsed = parse_url( $current_url );
-		$host   = $parsed['host'] ?? '';
-		$scheme = $parsed['scheme'] ?? 'https';
-
-		if ( empty( $host ) ) {
-			return '';
-		}
-		if ( '/' !== $href[0] ) {
-			$href = '/' . $href;
+		// Sub-venue / room (e.g. "🐘6pm" at Elephant Room). Only override the
+		// venue NAME — keep page-level address. Many Bandzoogle venues do not
+		// expose per-event addresses.
+		if ( preg_match( '/<p[^>]*class="[^"]*event-location[^"]*"[^>]*>(.*?)<\/p>/is', $html, $loc_match ) ) {
+			$loc_text = trim( html_entity_decode( wp_strip_all_tags( $loc_match[1] ), ENT_QUOTES, 'UTF-8' ) );
+			if ( '' !== $loc_text && empty( $event['venue'] ) ) {
+				$event['venue'] = $this->sanitizeText( $loc_text );
+			}
 		}
 
-		return $scheme . '://' . $host . $href;
+		// Description from event-notes block.
+		if ( preg_match( '/<div[^>]*class="[^"]*event-notes[^"]*"[^>]*>(.*?)<\/div>/is', $html, $notes_match ) ) {
+			$event['description'] = $this->cleanHtml( $notes_match[1] );
+		}
+
+		// Image — prefer the social-sized event-image, fall back to any <img>.
+		if ( preg_match( '/<div[^>]*class="[^"]*event-image[^"]*"[^>]*>.*?<img[^>]+src="([^"]+)"/is', $html, $img_match ) ) {
+			$event['imageUrl'] = esc_url_raw( $this->resolveUrl( html_entity_decode( $img_match[1], ENT_QUOTES, 'UTF-8' ), $source_url ) );
+		}
+
+		// Ticket URL — Bandzoogle's buying-options block contains an external
+		// purchase link when the venue sells tickets through the site. Look
+		// for any non-share, non-map external link inside it.
+		$event['ticketUrl'] = $this->findTicketUrl( $html, $source_url );
+
+		// As a last resort, point ticketUrl at the event detail page so
+		// downstream pipelines always have something to link to.
+		if ( '' === $event['ticketUrl'] && '' !== $event['source_url'] ) {
+			$event['ticketUrl'] = $event['source_url'];
+		}
+
+		return $event;
 	}
 
 	/**
-	 * Parse the individual event popup HTML.
+	 * Pull date + time out of the `.event-datetime` paragraph.
+	 *
+	 * Bandzoogle prints two variants side-by-side (long + short). We parse
+	 * the first one we find. Format examples:
+	 *   "Wednesday, May 13 @ 6:00PM"
+	 *   "Wed, May 13 @ 6:00PM"
 	 */
-	private function parseOccurrenceHtml( string $html, string $occurrence_url, ?array $context ): array {
-		$title       = '';
-		$source_url  = $occurrence_url;
-		$description = '';
-		$image_url   = '';
-		$date_text   = '';
-		$time_text   = '';
+	private function parseDatetimeFragment( array &$event, string $fragment, int $calendar_year ): void {
+		// Pull all `<time>` elements; the first `class="from"` is start, second is end (if present).
+		if ( preg_match_all( '/<time[^>]*class="([^"]*)"[^>]*>(.*?)<\/time>/is', $fragment, $time_matches, PREG_SET_ORDER ) ) {
+			$start_set = false;
+			foreach ( $time_matches as $tm ) {
+				$class = $tm[1];
+				$inner = $tm[2];
 
-		// Title and Source URL
-		if ( preg_match( '#<h2[^>]*class=["\'][^"\']*\bevent-title\b[^"\']*["\'][^>]*>\s*<a[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>#is', $html, $m ) ) {
-			$source_url = html_entity_decode( $m[1], ENT_QUOTES | ENT_HTML5 );
-			$title      = trim( wp_strip_all_tags( html_entity_decode( $m[2], ENT_QUOTES | ENT_HTML5 ) ) );
-		} elseif ( preg_match( '#<h2[^>]*class=["\'][^"\']*\bevent-title\b[^"\']*["\'][^>]*>(.*?)</h2>#is', $html, $m ) ) {
-			$title = trim( wp_strip_all_tags( html_entity_decode( $m[1], ENT_QUOTES | ENT_HTML5 ) ) );
+				$is_start = ! $start_set && ( false !== strpos( $class, 'from' ) || ! $start_set );
+				$is_end   = $start_set && false !== strpos( $class, 'to' );
+
+				$parsed = $this->parseTimeBlock( $inner, $calendar_year );
+
+				if ( $is_start && ! empty( $parsed['date'] ) ) {
+					$event['startDate'] = $parsed['date'];
+					$event['startTime'] = $parsed['time'];
+					$start_set          = true;
+				} elseif ( $is_end && ! empty( $parsed['date'] ) ) {
+					$event['endDate'] = $parsed['date'];
+					$event['endTime'] = $parsed['time'];
+				}
+			}
 		}
 
-		// Date and Time
-		if ( preg_match( '#<time[^>]*class=["\']from["\'][^>]*>.*?<span[^>]*class=["\'][^"\']*\bdate\b[^"\']*["\'][^>]*>(.*?)</span>\s*@\s*<span[^>]*class=["\'][^"\']*\btime\b[^"\']*["\'][^>]*>(.*?)</span>#is', $html, $m ) ) {
-			$date_text = trim( wp_strip_all_tags( html_entity_decode( $m[1], ENT_QUOTES | ENT_HTML5 ) ) );
-			$time_text = trim( wp_strip_all_tags( html_entity_decode( $m[2], ENT_QUOTES | ENT_HTML5 ) ) );
+		// Some Bandzoogle themes omit the inner spans and inline the text.
+		// Fall back to scraping the raw fragment if we still have nothing.
+		if ( '' === $event['startDate'] ) {
+			$parsed = $this->parseTimeBlock( $fragment, $calendar_year );
+			if ( ! empty( $parsed['date'] ) ) {
+				$event['startDate'] = $parsed['date'];
+				$event['startTime'] = $parsed['time'];
+			}
+		}
+	}
+
+	/**
+	 * Parse a single time block's inner HTML (e.g. the contents of a `<time>` tag)
+	 * to a date + time tuple.
+	 *
+	 * @return array{date: string, time: string}
+	 */
+	private function parseTimeBlock( string $html, int $calendar_year ): array {
+		$out = array(
+			'date' => '',
+			'time' => '',
+		);
+
+		// Date span: "Wednesday, May 13" or "Wed, May 13".
+		$date_text = '';
+		if ( preg_match( '/<span[^>]*class="date"[^>]*>(.*?)<\/span>/is', $html, $m ) ) {
+			$date_text = trim( wp_strip_all_tags( $m[1] ) );
 		} else {
-			if ( preg_match( '#<span[^>]*class=["\'][^"\']*\bdate\b[^"\']*["\'][^>]*>(.*?)</span>#is', $html, $m ) ) {
-				$date_text = trim( wp_strip_all_tags( html_entity_decode( $m[1], ENT_QUOTES | ENT_HTML5 ) ) );
-			}
-			if ( preg_match( '#<span[^>]*class=["\'][^"\']*\btime\b[^"\']*["\'][^>]*>(.*?)</span>#is', $html, $m ) ) {
-				$time_text = trim( wp_strip_all_tags( html_entity_decode( $m[1], ENT_QUOTES | ENT_HTML5 ) ) );
+			$date_text = trim( wp_strip_all_tags( $html ) );
+		}
+
+		// Time span: "6:00PM".
+		$time_text = '';
+		if ( preg_match( '/<span[^>]*class="time"[^>]*>(.*?)<\/span>/is', $html, $m ) ) {
+			$time_text = trim( wp_strip_all_tags( $m[1] ) );
+		}
+
+		// Extract month + day from date_text. Day-of-week prefix is optional.
+		$months = '(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t)?(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)';
+		if ( preg_match( '/(' . $months . ')\s+(\d{1,2})/i', $date_text, $dm ) ) {
+			$month_name = $dm[1];
+			$day        = (int) $dm[2];
+
+			if ( $calendar_year > 0 ) {
+				try {
+					$dt           = new \DateTime( sprintf( '%s %d %d', $month_name, $day, $calendar_year ) );
+					$out['date']  = $dt->format( 'Y-m-d' );
+				} catch ( \Exception $e ) {
+					$out['date'] = '';
+				}
+			} else {
+				$out['date'] = $this->inferDateFromMonthDay( $month_name, (string) $day );
 			}
 		}
 
-		// Description
-		if ( preg_match( '#<div[^>]*class=["\'][^"\']*\bevent-notes\b[^"\']*["\'][^>]*>(.*?)</div>#is', $html, $m ) ) {
-			$description = wp_kses_post( $m[1] );
+		if ( '' !== $time_text ) {
+			$out['time'] = $this->parseTimeString( $time_text );
 		}
 
-		// Image
-		if ( preg_match( '#<div[^>]*class=["\'][^"\']*\bevent-image\b[^"\']*["\'][^>]*>.*?<img[^>]*src=["\']([^"\']+)["\']#is', $html, $m ) ) {
-			$image_url = html_entity_decode( $m[1], ENT_QUOTES | ENT_HTML5 );
-			if ( strpos( $image_url, '//' ) === 0 ) {
-				$image_url = 'https:' . $image_url;
-			}
-		}
-
-		$start_date = $this->resolveDate( $date_text, $context );
-		$start_time = $this->parseTimeString( $time_text );
-
-		return array(
-			'title'       => sanitize_text_field( $title ),
-			'description' => $description,
-			'startDate'   => $start_date,
-			'endDate'     => $start_date,
-			'startTime'   => $start_time,
-			'ticketUrl'   => esc_url_raw( $source_url ),
-			'imageUrl'    => esc_url_raw( $image_url ),
-			'eventType'   => 'Event',
-		);
+		return $out;
 	}
 
-	private function resolveDate( string $date_text, ?array $context ): string {
-		if ( empty( $date_text ) || empty( $context ) ) {
+	/**
+	 * Find a ticket purchase URL inside an event-detail block.
+	 *
+	 * Bandzoogle's buying-options div wraps a share dialog (junk) and an
+	 * optional external ticket link. We accept any external URL whose host
+	 * differs from the source URL's host and doesn't smell like a share /
+	 * social link. As a fallback, well-known ticket vendor domains win
+	 * regardless of position.
+	 */
+	private function findTicketUrl( string $html, string $source_url ): string {
+		$ticket_domains = array(
+			'eventbrite',
+			'tixr',
+			'etix',
+			'dice.fm',
+			'ticketmaster',
+			'seetickets',
+			'ticketweb',
+			'aftontickets',
+			'prekindle',
+			'showclix',
+			'opentable',
+			'resy',
+			'tock',
+			'venuepilot',
+			'freshtix',
+			'showare',
+			'wl.seetickets',
+		);
+
+		if ( ! preg_match_all( '/<a[^>]+href="([^"]+)"[^>]*>/i', $html, $links ) ) {
 			return '';
 		}
 
-		if ( ! preg_match( '/([A-Za-z]+)\s+(\d{1,2})$/', $date_text, $m ) ) {
-			return '';
+		$source_host = wp_parse_url( $source_url, PHP_URL_HOST );
+
+		// Pass 1: known ticket vendor domains.
+		foreach ( $links[1] as $href ) {
+			$href_decoded = html_entity_decode( $href, ENT_QUOTES, 'UTF-8' );
+			foreach ( $ticket_domains as $domain ) {
+				if ( false !== stripos( $href_decoded, $domain ) ) {
+					return esc_url_raw( $href_decoded );
+				}
+			}
 		}
 
-		$month_name = $m[1];
-		$day        = (int) $m[2];
-		$month      = (int) date( 'n', strtotime( $month_name . ' 1' ) );
-		if ( $month <= 0 || $day <= 0 ) {
-			return '';
+		// Pass 2: any external link that isn't share/social/maps/javascript.
+		$blocklist = array( 'facebook.com', 'twitter.com', 'instagram.com', 'threads.net', 'google.com/maps', 'mailto:', 'javascript:', '#', 'pinterest', 'bandzoogle.com', 'bndzgl.com', 'zoogletools.com' );
+
+		foreach ( $links[1] as $href ) {
+			$href_decoded = html_entity_decode( $href, ENT_QUOTES, 'UTF-8' );
+
+			foreach ( $blocklist as $bad ) {
+				if ( false !== stripos( $href_decoded, $bad ) ) {
+					continue 2;
+				}
+			}
+
+			if ( ! preg_match( '#^https?://#i', $href_decoded ) ) {
+				continue;
+			}
+
+			$link_host = wp_parse_url( $href_decoded, PHP_URL_HOST );
+			if ( $link_host && $source_host && $link_host !== $source_host ) {
+				return esc_url_raw( $href_decoded );
+			}
 		}
 
-		$year          = (int) $context['year'];
-		$context_month = (int) $context['month'];
-
-		// Handle year rollover (e.g. looking at January from December view or vice-versa)
-		if ( 12 === $month && 1 === $context_month ) {
-			$year -= 1;
-		} elseif ( 1 === $month && 12 === $context_month ) {
-			$year += 1;
-		}
-
-		return sprintf( '%04d-%02d-%02d', $year, $month, $day );
+		return '';
 	}
 
-	private function fetchHtml( string $url ): string {
-		$result = HttpClient::get(
-			$url,
-			array(
-				'timeout'      => 30,
-				'browser_mode' => true,
-				'context'      => 'Bandzoogle Extractor',
-			)
+	/**
+	 * Legacy `.gig-info` parser.
+	 *
+	 * Older Bandzoogle themes (and the markup originally described in #261)
+	 * use `<div class="gig-info">` blocks. We don't currently have a
+	 * production sample for this shape, but the parser is straightforward
+	 * and cheap to ship for forward compatibility.
+	 *
+	 * @return array
+	 */
+	private function extractGigInfoBlocks( string $html, string $source_url, array $page_venue ): array {
+		if ( false === strpos( $html, 'gig-info' ) ) {
+			return array();
+		}
+
+		if ( ! preg_match_all(
+			'/<div[^>]*class="[^"]*gig-info[^"]*"[^>]*>(.*?)(?=<div[^>]*class="[^"]*gig-info[^"]*"|<\/section>|<\/div>\s*<\/div>\s*<\/div>)/si',
+			$html,
+			$matches
+		) ) {
+			return array();
+		}
+
+		$events = array();
+		foreach ( $matches[1] as $inner ) {
+			$event = $this->parseGigInfoBlock( $inner, $source_url, $page_venue );
+			if ( ! empty( $event['title'] ) && ! empty( $event['startDate'] ) ) {
+				$events[] = $event;
+			}
+		}
+
+		return $events;
+	}
+
+	/**
+	 * Parse a single `.gig-info` legacy block.
+	 */
+	private function parseGigInfoBlock( string $html, string $source_url, array $page_venue ): array {
+		$event = array(
+			'title'         => '',
+			'description'   => '',
+			'startDate'     => '',
+			'startTime'     => '',
+			'endDate'       => '',
+			'endTime'       => '',
+			'venue'         => $page_venue['venue'] ?? '',
+			'venueAddress'  => $page_venue['venueAddress'] ?? '',
+			'venueCity'     => $page_venue['venueCity'] ?? '',
+			'venueState'    => $page_venue['venueState'] ?? '',
+			'venueZip'      => $page_venue['venueZip'] ?? '',
+			'venueCountry'  => $page_venue['venueCountry'] ?? 'US',
+			'venueTimezone' => $page_venue['venueTimezone'] ?? '',
+			'ticketUrl'     => '',
+			'imageUrl'      => '',
+			'source_url'    => '',
+			'price'         => '',
 		);
-		return ( $result['success'] && 200 === $result['status_code'] ) ? $result['data'] : '';
+
+		// time[datetime] -> ISO 8601.
+		if ( preg_match( '/<time[^>]+datetime="([^"]+)"/i', $html, $m ) ) {
+			$parsed             = $this->parseIsoDatetime( $m[1] );
+			$event['startDate'] = $parsed['date'];
+			$event['startTime'] = $parsed['time'];
+			if ( ! empty( $parsed['timezone'] ) ) {
+				$event['venueTimezone'] = $parsed['timezone'];
+			}
+		} elseif ( preg_match( '/<time[^>]*>(.*?)<\/time>/is', $html, $m ) ) {
+			// Fall back to time element text.
+			$text   = trim( wp_strip_all_tags( $m[1] ) );
+			$parsed = $this->parseDatetime( $text, $page_venue['venueTimezone'] ?? '' );
+			if ( ! empty( $parsed['date'] ) ) {
+				$event['startDate'] = $parsed['date'];
+				$event['startTime'] = $parsed['time'];
+			}
+		}
+
+		// Title: .gig-artist or .gig-title.
+		foreach ( array( 'gig-artist', 'gig-title' ) as $title_class ) {
+			if ( preg_match( '/<[a-z0-9]+[^>]*class="[^"]*' . preg_quote( $title_class, '/' ) . '[^"]*"[^>]*>(.*?)<\/[a-z0-9]+>/is', $html, $m ) ) {
+				$event['title'] = $this->sanitizeText( html_entity_decode( wp_strip_all_tags( $m[1] ), ENT_QUOTES, 'UTF-8' ) );
+				if ( ! empty( $event['title'] ) ) {
+					break;
+				}
+			}
+		}
+
+		// Venue override.
+		if ( preg_match( '/<[a-z0-9]+[^>]*class="[^"]*gig-venue[^"]*"[^>]*>(.*?)<\/[a-z0-9]+>/is', $html, $m ) ) {
+			$venue_text = $this->sanitizeText( html_entity_decode( wp_strip_all_tags( $m[1] ), ENT_QUOTES, 'UTF-8' ) );
+			if ( '' !== $venue_text ) {
+				$event['venue'] = $venue_text;
+			}
+		}
+
+		// Ticket URL: .gig-tickets a[href].
+		if ( preg_match( '/<[a-z0-9]+[^>]*class="[^"]*gig-tickets[^"]*"[^>]*>.*?<a[^>]+href="([^"]+)"/is', $html, $m ) ) {
+			$event['ticketUrl'] = esc_url_raw( $this->resolveUrl( html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' ), $source_url ) );
+		}
+
+		// Image: poster img or first img inside the gig block.
+		if ( preg_match( '/<[a-z0-9]+[^>]*class="[^"]*gig-poster[^"]*"[^>]*>.*?<img[^>]+src="([^"]+)"/is', $html, $m ) ) {
+			$event['imageUrl'] = esc_url_raw( $this->resolveUrl( html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' ), $source_url ) );
+		} elseif ( preg_match( '/<img[^>]+src="([^"]+)"/i', $html, $m ) ) {
+			$event['imageUrl'] = esc_url_raw( $this->resolveUrl( html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' ), $source_url ) );
+		}
+
+		// Description.
+		if ( preg_match( '/<[a-z0-9]+[^>]*class="[^"]*gig-description[^"]*"[^>]*>(.*?)<\/[a-z0-9]+>/is', $html, $m ) ) {
+			$event['description'] = $this->cleanHtml( $m[1] );
+		}
+
+		return $event;
 	}
 }
