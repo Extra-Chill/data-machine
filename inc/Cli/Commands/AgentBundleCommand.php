@@ -709,6 +709,14 @@ class AgentBundleCommand extends BaseCommand {
 		$agent_id                   = is_array( $agent ) ? (int) ( $agent['agent_id'] ?? 0 ) : 0;
 		$pipeline_id_map            = array();
 		$existing_pipelines_by_slug = array();
+		$incoming_config            = is_array( $bundle['agent']['agent_config'] ?? null ) ? $bundle['agent']['agent_config'] : array();
+
+		$artifacts[] = array(
+			'artifact_type' => 'agent_config',
+			'artifact_id'   => 'config',
+			'source_path'   => 'manifest.json#/agent/agent_config',
+			'payload'       => self::tracked_agent_config_payload( $incoming_config ),
+		);
 
 		if ( $agent_id > 0 ) {
 			foreach ( $this->pipelines()->get_all_pipelines( null, $agent_id ) as $pipeline ) {
@@ -780,6 +788,13 @@ class AgentBundleCommand extends BaseCommand {
 		$artifacts = array();
 		$pipelines = $this->pipelines()->get_all_pipelines( null, $agent_id );
 		$flows     = $this->flows()->get_all_flows( null, $agent_id );
+
+		$artifacts[] = array(
+			'artifact_type' => 'agent_config',
+			'artifact_id'   => 'config',
+			'source_path'   => 'manifest.json#/agent/agent_config',
+			'payload'       => self::tracked_agent_config_payload( is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array() ),
+		);
 
 		$pipeline_by_slug = array();
 		foreach ( $pipelines as $pipeline ) {
@@ -870,6 +885,22 @@ class AgentBundleCommand extends BaseCommand {
 		unset( $step );
 
 		return $flow_config;
+	}
+
+	/**
+	 * Return the bundle-owned agent config payload tracked by package upgrades.
+	 *
+	 * The installer maintains `datamachine_bundle` bookkeeping under agent_config;
+	 * that metadata is not authored by bundles and must not participate in local
+	 * config drift checks.
+	 *
+	 * @param array<string,mixed> $config Agent config.
+	 * @return array<string,mixed>
+	 */
+	private static function tracked_agent_config_payload( array $config ): array {
+		unset( $config['datamachine_bundle'] );
+		ksort( $config, SORT_STRING );
+		return $config;
 	}
 
 	private function resolve_bundle_agent( array $bundle, string $slug = '' ): ?array {

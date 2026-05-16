@@ -131,6 +131,82 @@ if ( ! class_exists( 'WP_Error' ) ) {
 		}
 	}
 }
+if ( ! class_exists( 'AgentsAPI\\Core\\Workspace\\WP_Agent_Workspace_Scope' ) ) {
+	eval( '
+	namespace AgentsAPI\\Core\\Workspace;
+	class WP_Agent_Workspace_Scope {
+		private string $type;
+		private string $id;
+		private function __construct( string $type, string $id ) { $this->type = $type; $this->id = $id; }
+		public static function from_parts( string $type, string $id ): self { return new self( $type, $id ); }
+		public static function from_array( array $data ): self { return new self( (string) ( $data["type"] ?? "site" ), (string) ( $data["id"] ?? "test" ) ); }
+		public function to_array(): array { return array( "type" => $this->type, "id" => $this->id ); }
+	}
+	' );
+}
+if ( ! class_exists( 'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action_Status' ) ) {
+	eval( '
+	namespace AgentsAPI\\AI\\Approvals;
+	final class WP_Agent_Pending_Action_Status {
+		public const PENDING = "pending";
+		public const ACCEPTED = "accepted";
+		public const REJECTED = "rejected";
+		public const EXPIRED = "expired";
+		public const DELETED = "deleted";
+		public static function normalize( string $status ): string { return $status; }
+	}
+	' );
+}
+if ( ! class_exists( 'AgentsAPI\\AI\\WP_Agent_Message' ) ) {
+	eval( '
+	namespace AgentsAPI\\AI;
+	final class WP_Agent_Message {
+		public const SCHEMA = "wp-agent-message";
+		public const VERSION = "1.0.0";
+		public const TYPE_APPROVAL_REQUIRED = "approval_required";
+		public static function approvalRequired( string $summary, array $payload, array $metadata ): array {
+			$pending = $payload["pending_action"] ?? array();
+			return array(
+				"schema" => self::SCHEMA,
+				"version" => self::VERSION,
+				"type" => self::TYPE_APPROVAL_REQUIRED,
+				"role" => "tool",
+				"content" => $summary,
+				"payload" => $payload,
+				"metadata" => $metadata,
+				"kind" => $pending["kind"] ?? "",
+				"preview" => $pending["preview"] ?? array(),
+			);
+		}
+	}
+	' );
+}
+if ( ! class_exists( 'AgentsAPI\\AI\\Approvals\\WP_Agent_Approval_Decision' ) ) {
+	eval( '
+	namespace AgentsAPI\\AI\\Approvals;
+	final class WP_Agent_Approval_Decision {
+		private string $value;
+		private function __construct( string $value ) { $this->value = $value; }
+		public static function from_string( string $value ): self {
+			if ( ! in_array( $value, array( "accepted", "rejected" ), true ) ) { throw new \\InvalidArgumentException( "invalid decision" ); }
+			return new self( $value );
+		}
+		public function value(): string { return $this->value; }
+		public function is_rejected(): bool { return "rejected" === $this->value; }
+	}
+	' );
+}
+if ( ! class_exists( 'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action' ) ) {
+	eval( '
+	namespace AgentsAPI\\AI\\Approvals;
+	final class WP_Agent_Pending_Action {
+		private array $data;
+		private function __construct( array $data ) { $this->data = $data; }
+		public static function from_array( array $data ): self { return new self( $data ); }
+		public function to_array(): array { return $this->data; }
+	}
+	' );
+}
 
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleUpgradeActionHandlers.php';
@@ -226,6 +302,58 @@ $approval = $plan_array['needs_approval'][0] ?? array();
 assert_upgrade_plan( 'approval entry includes before payload', isset( $approval['diff']['before']['note'] ) );
 assert_upgrade_plan_equals( 'secret-like target keys are redacted', '[redacted]', $approval['diff']['after']['api_token'] ?? null );
 assert_upgrade_plan( 'raw secret value is absent from preview', false === strpos( (string) json_encode( $plan_array ), 'secret-token-value' ) );
+
+echo "\n[2b] Agent config drift is surfaced like artifact conflicts\n";
+$old_agent_config = upgrade_artifact(
+	'agent_config',
+	'config',
+	array(
+		'intelligence' => array(
+			'context_servers' => array(
+				'wporg' => array( 'transport' => 'stdio' ),
+			),
+		),
+	),
+	'manifest.json#/agent/agent_config'
+);
+$local_agent_config = upgrade_artifact(
+	'agent_config',
+	'config',
+	array(
+		'intelligence' => array(
+			'context_servers' => array(
+				'wporg' => array(
+					'transport' => 'streamable-http',
+					'headers'   => array( 'Authorization' => 'Bearer local-token' ),
+				),
+			),
+		),
+	),
+	'manifest.json#/agent/agent_config'
+);
+$target_agent_config = upgrade_artifact(
+	'agent_config',
+	'config',
+	array(
+		'intelligence' => array(
+			'context_servers' => array(
+				'wporg' => array( 'transport' => 'stdio', 'command' => 'node' ),
+			),
+		),
+	),
+	'manifest.json#/agent/agent_config'
+);
+$config_plan       = AgentBundleUpgradePlanner::plan(
+	array( installed_row( $old_agent_config ) ),
+	array( $local_agent_config ),
+	array( $target_agent_config ),
+	array( 'bundle_slug' => 'wordpress-core-wiki' )
+)->to_array();
+$config_conflict   = $config_plan['needs_approval'][0] ?? array();
+assert_upgrade_plan_equals( 'locally changed context server needs approval', 'agent_config:config', $config_conflict['artifact_key'] ?? null );
+assert_upgrade_plan_equals( 'agent config reason is local modified', 'local_modified', $config_conflict['reason'] ?? null );
+assert_upgrade_plan_equals( 'authorization header is redacted', '[redacted]', $config_conflict['diff']['before']['intelligence']['context_servers']['wporg']['headers']['Authorization'] ?? null );
+assert_upgrade_plan( 'raw local bearer is absent from config preview', false === strpos( (string) json_encode( $config_plan ), 'local-token' ) );
 
 echo "\n[3] PendingAction stages bundle-upgrade previews\n";
 $staged = AgentBundleUpgradePendingAction::stage(

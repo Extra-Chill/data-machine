@@ -626,20 +626,42 @@ class AgentBundler {
 			// 1. Create or update the agent record.
 			$incoming_config = $agent_data['agent_config'] ?? array();
 
-			$incoming_config = is_array( $incoming_config ) ? $incoming_config : array();
+			$incoming_config                = is_array( $incoming_config ) ? $incoming_config : array();
+			$existing_bundle_state          = is_array( $existing['agent_config']['datamachine_bundle'] ?? null )
+				? $existing['agent_config']['datamachine_bundle']
+				: array();
+			$artifact_records               = is_array( $existing_bundle_state['artifacts'] ?? null ) ? $existing_bundle_state['artifacts'] : array();
+			$config_conflicts               = array();
+			$agent_config_key               = self::artifact_key( 'agent_config', 'config' );
+			$incoming_config_payload        = self::tracked_agent_config_payload( $incoming_config );
+			$current_config_payload         = self::tracked_agent_config_payload( is_array( $existing['agent_config'] ?? null ) ? $existing['agent_config'] : array() );
+			$agent_config_record            = $artifact_records[ $agent_config_key ] ?? null;
+			$agent_config_has_local_changes = $existing && (
+				$this->artifact_has_local_modifications( is_array( $agent_config_record ) ? $agent_config_record : null, $current_config_payload )
+				|| ( ! is_array( $agent_config_record ) && ! empty( $current_config_payload ) )
+			);
+			$agent_config_target_differs    = ! hash_equals(
+				AgentBundleArtifactHasher::hash( $incoming_config_payload ),
+				AgentBundleArtifactHasher::hash( $current_config_payload )
+			);
+
+			if ( $agent_config_has_local_changes && $agent_config_target_differs ) {
+				$config_conflicts[] = array(
+					'artifact_type' => 'agent_config',
+					'artifact_id'   => 'config',
+					'reason'        => 'local_modified',
+				);
+				$incoming_config    = array();
+			}
 
 			$config = is_array( $existing['agent_config'] ?? null )
-			? array_merge( $existing['agent_config'], $incoming_config )
-			: $incoming_config;
-
-			$existing_bundle_state = is_array( $existing['agent_config']['datamachine_bundle'] ?? null )
-			? $existing['agent_config']['datamachine_bundle']
-			: array();
+				? array_merge( $existing['agent_config'], $incoming_config )
+				: $incoming_config;
 
 			$config['datamachine_bundle'] = array_merge(
-			$existing_bundle_state,
-			$bundle_metadata,
-			array( 'artifacts' => $existing_bundle_state['artifacts'] ?? array() )
+				$existing_bundle_state,
+				$bundle_metadata,
+				array( 'artifacts' => $existing_bundle_state['artifacts'] ?? array() )
 			);
 			if ( ! empty( $bundle_run_artifacts ) ) {
 				$config['datamachine_bundle']['run_artifacts'] = $bundle_run_artifacts;
@@ -648,20 +670,20 @@ class AgentBundler {
 			if ( $existing ) {
 				$agent_id = (int) $existing['agent_id'];
 				if ( ! $this->agents_repo->update_agent(
-				$agent_id,
-				array(
-					'agent_name'   => $agent_data['agent_name'] ?? $slug,
-					'agent_config' => $config,
-				)
+					$agent_id,
+					array(
+						'agent_name'   => $agent_data['agent_name'] ?? $slug,
+						'agent_config' => $config,
+					)
 				) ) {
 					throw new \RuntimeException( 'Failed to update existing agent record.' );
 				}
 			} else {
 				$agent_id = $this->agents_repo->create_if_missing(
-				$slug,
-				$agent_data['agent_name'] ?? $slug,
-				$owner_id,
-				$config
+					$slug,
+					$agent_data['agent_name'] ?? $slug,
+					$owner_id,
+					$config
 				);
 				if ( ! $agent_id ) {
 					throw new \RuntimeException( 'Failed to create agent record.' );
@@ -678,8 +700,17 @@ class AgentBundler {
 			}
 
 			$artifact_records = $config['datamachine_bundle']['artifacts'];
-			$conflicts        = array();
+			$conflicts        = $config_conflicts;
 			$runtime_drift    = array();
+			if ( empty( $config_conflicts ) ) {
+				$artifact_records[ $agent_config_key ] = $this->bundle_artifact_record(
+					$bundle_metadata,
+					'agent_config',
+					'config',
+					'manifest.json#/agent/agent_config',
+					$incoming_config_payload
+				);
+			}
 
 			// 4. Import pipelines — build old→new ID map.
 			$pipeline_id_map = array(); // old_id => new_id.
@@ -1302,6 +1333,22 @@ class AgentBundler {
 
 	private static function artifact_key( string $type, string $id ): string {
 		return AgentBundleArtifactExtensions::artifact_key( $type, $id );
+	}
+
+	/**
+	 * Return the bundle-owned agent config payload tracked by package upgrades.
+	 *
+	 * Data Machine writes installation bookkeeping under `datamachine_bundle` at
+	 * runtime. That metadata is not authored by bundles, so excluding it keeps
+	 * agent config conflict detection focused on operator/bundle-owned settings.
+	 *
+	 * @param array<string,mixed> $config Agent config.
+	 * @return array<string,mixed>
+	 */
+	private static function tracked_agent_config_payload( array $config ): array {
+		unset( $config['datamachine_bundle'] );
+		ksort( $config, SORT_STRING );
+		return $config;
 	}
 
 	private function preserve_runtime_queue_fields( array $incoming_flow_config, array $existing_flow_config ): array {
