@@ -121,7 +121,7 @@ class AgentsChatHandler {
 				'agent_id'          => $agent_id,
 				'attachments'       => $input['attachments'] ?? array(),
 				'client_context'    => $client_context,
-				'transcript_owner' => is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : null,
+				'transcript_owner'  => is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : null,
 			)
 		);
 

@@ -518,13 +518,13 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$session_owner_hash = (string) ( $session['owner_key_hash'] ?? '' );
 
 		if ( '' === $session_owner_type || '' === $session_owner_hash ) {
-			$legacy = ChatTranscriptOwner::user_owner( absint( $session['user_id'] ?? 0 ) );
+			$legacy             = ChatTranscriptOwner::user_owner( absint( $session['user_id'] ?? 0 ) );
 			$session_owner_type = $legacy['owner_type'];
 			$session_owner_hash = $legacy['owner_key_hash'];
 		}
 
-		return $session_owner_type === (string) ( $owner['owner_type'] ?? '' )
-			&& $session_owner_hash === (string) ( $owner['owner_key_hash'] ?? '' );
+		return (string) ( $owner['owner_type'] ?? '' ) === $session_owner_type
+			&& (string) ( $owner['owner_key_hash'] ?? '' ) === $session_owner_hash;
 	}
 
 	/**
