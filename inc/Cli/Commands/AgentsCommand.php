@@ -25,6 +25,95 @@ defined( 'ABSPATH' ) || exit;
 class AgentsCommand extends AgentBundleCommand {
 
 	/**
+	 * Get or set the active agent for CLI/default user context.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <action>
+	 * : Action to perform.
+	 * ---
+	 * options:
+	 *   - get
+	 *   - set
+	 * ---
+	 *
+	 * [<agent>]
+	 * : Agent slug or ID. Required for `set`.
+	 *
+	 * [--user_id=<id>]
+	 * : User ID whose active agent should be read or changed.
+	 *
+	 * [--format=<format>]
+	 * : Output format for `get`.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine agent active get
+	 *     wp datamachine agent active set intelligence-chubes4
+	 *     wp datamachine agent active set wordpress-com-wiki --user_id=1
+	 *
+	 * @subcommand active
+	 */
+	public function active( array $args, array $assoc_args ): void {
+		$action = isset( $args[0] ) ? (string) $args[0] : '';
+		if ( ! in_array( $action, array( 'get', 'set' ), true ) ) {
+			WP_CLI::error( 'Usage: wp datamachine agent active <get|set> [agent] [--user_id=<id>]' );
+			return;
+		}
+
+		$input        = array();
+		$user_id_flag = \WP_CLI\Utils\get_flag_value( $assoc_args, 'user_id', null );
+		if ( null !== $user_id_flag ) {
+			$input['user_id'] = (int) $user_id_flag;
+		}
+
+		if ( 'get' === $action ) {
+			$result = AgentAbilities::getActiveAgent( $input );
+			if ( empty( $result['success'] ) ) {
+				WP_CLI::error( $result['error'] ?? 'Failed to get active agent.' );
+				return;
+			}
+
+			$item = array(
+				'agent_slug'   => $result['agent_slug'] ?? '',
+				'source'       => $result['source'] ?? '',
+				'needs_choice' => ! empty( $result['needs_choice'] ) ? 'Yes' : 'No',
+			);
+
+			if ( ! empty( $result['agent'] ) && is_array( $result['agent'] ) ) {
+				$item['agent_id']   = (int) ( $result['agent']['agent_id'] ?? 0 );
+				$item['agent_name'] = (string) ( $result['agent']['agent_name'] ?? '' );
+			}
+
+			$this->format_items( array( $item ), array_keys( $item ), $assoc_args );
+			return;
+		}
+
+		$agent = isset( $args[1] ) ? (string) $args[1] : '';
+		if ( '' === $agent ) {
+			WP_CLI::error( 'Agent is required. Usage: wp datamachine agent active set <agent>' );
+			return;
+		}
+
+		$input['agent'] = $agent;
+		$result         = AgentAbilities::setActiveAgent( $input );
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Failed to set active agent.' );
+			return;
+		}
+
+		WP_CLI::success( sprintf( 'Active agent set to %s for user %d.', (string) $result['agent_slug'], (int) $result['user_id'] ) );
+	}
+
+	/**
 	 * List registered agent identities.
 	 *
 	 * ## OPTIONS

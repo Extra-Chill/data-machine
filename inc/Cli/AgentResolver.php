@@ -115,6 +115,9 @@ class AgentResolver {
 
 		$agent_slug = self::resolvePrincipalAgentSlug();
 		if ( '' === $agent_slug ) {
+			$agent_slug = self::resolveEnvironmentAgentSlug();
+		}
+		if ( '' === $agent_slug ) {
 			$agent_slug = self::resolveActiveAgentSlugForUser( $effective_user_id );
 		}
 		if ( '' === $agent_slug ) {
@@ -230,6 +233,26 @@ class AgentResolver {
 		}
 
 		return '';
+	}
+
+	/**
+	 * Resolve an agent slug from the current CLI process environment.
+	 *
+	 * This gives coding-agent shells and scheduled CLI jobs a stable explicit
+	 * context path without mutating the user's active-agent preference.
+	 *
+	 * @return string Effective agent slug, or empty string when unset/invalid.
+	 */
+	private static function resolveEnvironmentAgentSlug(): string {
+		$env_slug = getenv( 'DATAMACHINE_AGENT_SLUG' );
+		$slug     = is_string( $env_slug ) ? sanitize_title( $env_slug ) : '';
+		if ( '' === $slug ) {
+			return '';
+		}
+
+		$agents_repo = new Agents();
+		$agent       = $agents_repo->get_by_slug( $slug );
+		return $agent ? $slug : '';
 	}
 
 	/**
