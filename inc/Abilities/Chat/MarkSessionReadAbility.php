@@ -104,7 +104,15 @@ class MarkSessionReadAbility {
 			);
 		}
 
-		$session = $this->verifySessionOwnership( $session_id, $user_id );
+		$owner = $this->resolve_transcript_owner( $input, $user_id );
+		if ( is_wp_error( $owner ) ) {
+			return array(
+				'success' => false,
+				'error'   => $owner->get_error_code(),
+			);
+		}
+
+		$session = $this->verifySessionOwnership( $session_id, $user_id, $owner );
 
 		if ( isset( $session['error'] ) ) {
 			return array(
@@ -113,7 +121,7 @@ class MarkSessionReadAbility {
 			);
 		}
 
-		$last_read_at = $this->chat_db->mark_session_read( $session_id, $user_id );
+		$last_read_at = $this->chat_db->mark_session_read( $session_id, $user_id, $owner );
 
 		if ( false === $last_read_at ) {
 			return array(

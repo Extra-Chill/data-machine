@@ -90,6 +90,22 @@ class AgentsApiFakeTranscriptStore implements WP_Agent_Conversation_Store {
 		return $this->sessions[ $session_id ] ?? null;
 	}
 
+	public function list_sessions( WP_Agent_Workspace_Scope $workspace, int $user_id, array $args = array() ): array {
+		$context = (string) ( $args['context'] ?? '' );
+
+		return array_values(
+			array_filter(
+				$this->sessions,
+				static function ( array $session ) use ( $workspace, $user_id, $context ): bool {
+					return $workspace->workspace_type === $session['workspace_type']
+						&& $workspace->workspace_id === $session['workspace_id']
+						&& $user_id === $session['user_id']
+						&& ( '' === $context || $context === $session['context'] );
+				}
+			)
+		);
+	}
+
 	public function update_session( string $session_id, array $messages, array $metadata = array(), string $provider = '', string $model = '', ?string $provider_response_id = null ): bool {
 		unset( $provider_response_id );
 		if ( ! isset( $this->sessions[ $session_id ] ) ) {

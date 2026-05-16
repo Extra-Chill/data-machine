@@ -16,6 +16,7 @@
 
 namespace DataMachine\Api\Chat;
 
+use DataMachine\Abilities\Chat\ChatTranscriptOwner;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
@@ -69,6 +70,10 @@ class ChatOrchestrator {
 		$agent_slug           = (string) ( $options['agent_slug'] ?? '' );
 		$modes                = ToolPolicyResolver::normalizeModes( ! empty( $options['modes'] ) ? $options['modes'] : array( $options['mode'] ?? ToolPolicyResolver::MODE_CHAT ) );
 		$mode                 = implode( ',', $modes );
+		$transcript_owner     = ChatTranscriptOwner::resolve_for_request( $options, $user_id );
+		if ( is_wp_error( $transcript_owner ) ) {
+			return $transcript_owner;
+		}
 
 		$chat_db                     = ConversationStoreFactory::get();
 		$session_metadata            = array();
@@ -94,7 +99,11 @@ class ChatOrchestrator {
 				);
 			}
 
-			if ( (int) $session['user_id'] !== $user_id ) {
+			$owns_session = method_exists( $chat_db, 'session_matches_owner' )
+				? $chat_db->session_matches_owner( $session, $transcript_owner )
+				: ( (int) $session['user_id'] === $user_id );
+
+			if ( ! $owns_session ) {
 				return new WP_Error(
 					'session_access_denied',
 					__( 'Access denied to this session', 'data-machine' ),
@@ -109,7 +118,7 @@ class ChatOrchestrator {
 			}
 		} else {
 			// Check for recent pending session to prevent duplicates from timeout retries.
-			$pending_session = $chat_db->get_recent_pending_session( WordPressWorkspaceScope::current(), $user_id, 600, $mode, $acting_token_id );
+			$pending_session = $chat_db->get_recent_pending_session( WordPressWorkspaceScope::current(), $user_id, 600, $mode, $acting_token_id, $transcript_owner );
 
 			if ( $pending_session ) {
 				$session_id       = $pending_session['session_id'];
@@ -128,7 +137,7 @@ class ChatOrchestrator {
 					)
 				);
 			} else {
-				$create_result = self::createSession( $user_id, '', $agent_id, $mode );
+				$create_result = self::createSession( $user_id, '', $agent_id, $mode, $transcript_owner );
 
 				if ( is_wp_error( $create_result ) ) {
 					return $create_result;
@@ -588,7 +597,7 @@ class ChatOrchestrator {
 	 * @param string $source  Optional source identifier.
 	 * @return string|WP_Error Session ID on success, WP_Error on failure.
 	 */
-	private static function createSession( int $user_id, string $source = '', int $agent_id = 0, string $mode = ToolPolicyResolver::MODE_CHAT ): string|WP_Error {
+	private static function createSession( int $user_id, string $source = '', int $agent_id = 0, string $mode = ToolPolicyResolver::MODE_CHAT, ?array $transcript_owner = null ): string|WP_Error {
 		$mode = '' !== $mode ? sanitize_key( $mode ) : ToolPolicyResolver::MODE_CHAT;
 
 		if ( $agent_id <= 0 ) {
@@ -606,6 +615,10 @@ class ChatOrchestrator {
 				'agent_slug' => $agent_slug,
 				'mode'       => $mode,
 			);
+
+			if ( null !== $transcript_owner ) {
+				$input['transcript_owner'] = $transcript_owner;
+			}
 
 			if ( $source ) {
 				$input['source'] = $source;
@@ -638,6 +651,10 @@ class ChatOrchestrator {
 			'started_at'    => current_time( 'mysql', true ),
 			'message_count' => 0,
 		);
+
+		if ( null !== $transcript_owner ) {
+			$metadata['transcript_owner'] = $transcript_owner;
+		}
 
 		$acting_token_id = \DataMachine\Abilities\PermissionHelper::get_acting_token_id();
 		if ( $acting_token_id ) {

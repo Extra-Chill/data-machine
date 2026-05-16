@@ -101,6 +101,13 @@ class GetChatSessionAbility {
 
 		$session_id = sanitize_text_field( $input['session_id'] );
 		$user_id    = (int) $input['user_id'];
+		$owner      = $this->resolve_transcript_owner( $input, $user_id );
+		if ( is_wp_error( $owner ) ) {
+			return array(
+				'success' => false,
+				'error'   => $owner->get_error_code(),
+			);
+		}
 
 		if ( ! $this->can_access_user_sessions( $user_id ) ) {
 			return array(
@@ -109,7 +116,7 @@ class GetChatSessionAbility {
 			);
 		}
 
-		$session = $this->verifySessionOwnership( $session_id, $user_id );
+		$session = $this->verifySessionOwnership( $session_id, $user_id, $owner );
 
 		if ( isset( $session['error'] ) ) {
 			return array(

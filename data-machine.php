@@ -691,6 +691,7 @@ function datamachine_ensure_all_tables() {
 	\DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::create_table();
 
 	\DataMachine\Core\Database\Chat\Chat::create_table();
+	\DataMachine\Core\Database\Chat\Chat::ensure_owner_columns();
 	\DataMachine\Core\Database\Chat\Chat::ensure_mode_column();
 	\DataMachine\Core\Database\Chat\Chat::ensure_workspace_columns();
 	\DataMachine\Core\Database\Chat\Chat::ensure_agent_id_column();

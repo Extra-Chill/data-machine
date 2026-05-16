@@ -116,11 +116,12 @@ class AgentsChatHandler {
 			sanitize_text_field( $model ),
 			$user_id,
 			array(
-				'session_id'     => $input['session_id'] ?? null,
-				'modes'          => $modes,
-				'agent_id'       => $agent_id,
-				'attachments'    => $input['attachments'] ?? array(),
-				'client_context' => $client_context,
+				'session_id'       => $input['session_id'] ?? null,
+				'modes'            => $modes,
+				'agent_id'         => $agent_id,
+				'attachments'      => $input['attachments'] ?? array(),
+				'client_context'   => $client_context,
+				'transcript_owner' => is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : null,
 			)
 		);
 

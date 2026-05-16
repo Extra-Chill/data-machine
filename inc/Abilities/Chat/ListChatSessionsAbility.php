@@ -112,6 +112,13 @@ class ListChatSessionsAbility {
 		}
 
 		$user_id = (int) $input['user_id'];
+		$owner   = $this->resolve_transcript_owner( $input, $user_id );
+		if ( is_wp_error( $owner ) ) {
+			return array(
+				'success' => false,
+				'error'   => $owner->get_error_code(),
+			);
+		}
 
 		if ( ! $this->can_access_user_sessions( $user_id ) ) {
 			return array(
@@ -125,8 +132,8 @@ class ListChatSessionsAbility {
 		$mode     = ! empty( $input['mode'] ) ? sanitize_text_field( $input['mode'] ) : null;
 		$agent_id = isset( $input['agent_id'] ) && is_numeric( $input['agent_id'] ) ? (int) $input['agent_id'] : null;
 
-		$sessions = $this->chat_db->get_user_sessions( $user_id, $limit, $offset, $mode, $agent_id );
-		$total    = $this->chat_db->get_user_session_count( $user_id, $mode, $agent_id );
+		$sessions = $this->chat_db->get_user_sessions( $user_id, $limit, $offset, $mode, $agent_id, $owner );
+		$total    = $this->chat_db->get_user_session_count( $user_id, $mode, $agent_id, $owner );
 
 		return array(
 			'success'  => true,
