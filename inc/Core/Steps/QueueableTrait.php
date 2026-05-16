@@ -188,8 +188,23 @@ trait QueueableTrait {
 		$job_context = $this->engine->getJobContext();
 		$flow_id     = $job_context['flow_id'] ?? null;
 
-		if ( ! $flow_id ) {
-			return null;
+		if ( ! $flow_id || ! is_numeric( $flow_id ) ) {
+			if ( 'static' !== $queue_mode ) {
+				return null;
+			}
+
+			$prompt_queue = is_array( $this->flow_step_config[ QueueAbility::SLOT_PROMPT_QUEUE ] ?? null )
+				? $this->flow_step_config[ QueueAbility::SLOT_PROMPT_QUEUE ]
+				: array();
+			$entry        = $prompt_queue[0] ?? null;
+			if ( ! is_array( $entry ) || empty( $entry['prompt'] ) ) {
+				return null;
+			}
+
+			return array(
+				'prompt'   => (string) $entry['prompt'],
+				'added_at' => isset( $entry['added_at'] ) ? (string) $entry['added_at'] : null,
+			);
 		}
 
 		$entry = QueueAbility::consumeFromQueueSlot(
