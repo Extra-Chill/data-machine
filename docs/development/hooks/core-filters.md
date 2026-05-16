@@ -1131,6 +1131,28 @@ add_filter('datamachine_directives', function($directives) {
 - **25-35**: Caller, daily memory, and client-reported context
 - **40-50**: Pipeline, flow, chat inventory, and workflow-specific directives
 
+### `datamachine_directives_enabled`
+
+**Since**: v0.112.1
+
+**Purpose**: Disable all Data Machine directives before directive classes render into a provider request.
+
+**Parameters**:
+
+- `$enabled` (bool) - Whether directive rendering is enabled. Defaults to `true`.
+- `$directives` (array) - Registered directive configurations.
+- `$args` (array) - Resolution args such as `modes` and `agent_id`.
+
+**Return**: Boolean enabled state.
+
+**Usage Example**:
+
+```php
+add_filter( 'datamachine_directives_enabled', '__return_false' );
+```
+
+Use this for eval or training runs that need to guarantee Data Machine contributes no hidden system-message context. Returning `false` suppresses every registered directive before per-agent policy resolution and before any directive class `get_outputs()` method is called.
+
 ### `datamachine_global_directives` (LEGACY — use `datamachine_directives`)
 
 **Deprecated**: v0.2.5

@@ -27,6 +27,26 @@ class DirectivePolicyResolver {
 	public function resolve( array $directives, array $args ): array {
 		$modes    = self::normalizeModes( $args['modes'] ?? ( array_key_exists( 'mode', $args ) ? array( $args['mode'] ) : array() ) );
 		$agent_id = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
+
+		/**
+		 * Filter whether Data Machine directives should be applied to the request.
+		 *
+		 * Returning false removes every registered directive before directive classes
+		 * are invoked, which lets eval/training runners guarantee that Data Machine
+		 * context does not leak into the model input.
+		 *
+		 * @param bool  $enabled    Whether directives are enabled.
+		 * @param array $directives  Registered directive configs.
+		 * @param array $args        Resolution args.
+		 */
+		$enabled = apply_filters( 'datamachine_directives_enabled', true, $directives, $args );
+		if ( false === $enabled ) {
+			return array(
+				'directives' => array(),
+				'suppressed' => $this->getDirectiveNames( $directives ),
+			);
+		}
+
 		$policy   = $agent_id > 0 ? $this->getAgentDirectivePolicy( $agent_id ) : null;
 
 		$result = $this->applyPolicy( $directives, $policy, $modes );
@@ -253,6 +273,26 @@ class DirectivePolicyResolver {
 		$short      = false === $pos ? $class_name : substr( $class_name, $pos + 1 );
 
 		return array_values( array_unique( array( $class_name, $short ) ) );
+	}
+
+	/**
+	 * Get stable short names for registered directives.
+	 *
+	 * @param array $directives Registered directive configs.
+	 * @return string[] Directive short names.
+	 */
+	private function getDirectiveNames( array $directives ): array {
+		$names = array();
+		foreach ( $directives as $directive ) {
+			$class = $directive['class'] ?? null;
+			if ( ! is_string( $class ) || '' === $class ) {
+				continue;
+			}
+			$identifiers = $this->getClassIdentifiers( $class );
+			$names[]     = $identifiers[ count( $identifiers ) - 1 ];
+		}
+
+		return array_values( array_unique( $names ) );
 	}
 
 	/**
