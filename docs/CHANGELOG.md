@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.119.2] - 2026-05-17
+
+### Fixed
+- avoid hard principal transcript dependency
+
 ## [0.119.1] - 2026-05-17
 
 ### Changed
