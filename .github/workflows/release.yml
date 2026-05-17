@@ -1,0 +1,146 @@
+# Continuous release pipeline for Data Machine.
+#
+# Triggers on push to main (immediate release) and manual dispatch.
+# Checks for releasable conventional commits since the last tag. If found:
+#   1. Version bump + changelog generation
+#   2. Tag + push + GitHub Release creation
+#   3. WordPress release.package builds the vendor-bundled ZIP
+#   4. WordPress release.publish uploads the ZIP to the Release and
+#      mirrors the tree to the release-latest branch (Playground CORS path)
+#
+# No human input needed — version is computed from commit types:
+#   fix: → patch, feat: → minor, BREAKING CHANGE → major
+#   chore:/ci:/docs:/test: → no release
+
+name: Release
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Preview the release without making changes'
+        type: boolean
+        default: false
+
+jobs:
+  # ── Step 1: Check for releasable commits ──
+  check:
+    name: Check for releasable commits
+    runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.check.outputs.should-release }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Restore failure cache
+        id: failure-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/homeboy-release-last-failed
+          key: release-last-failed-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            release-last-failed-${{ github.ref_name }}-
+
+      - name: Dry-run release check
+        id: release-check
+        uses: Extra-Chill/homeboy-action@v2
+        with:
+          commands: release
+          release-dry-run: 'true'
+
+      - name: Decide whether to release
+        id: check
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          FAILURE_MARKER="${RUNNER_TEMP}/homeboy-release-last-failed"
+          if [ -f "${FAILURE_MARKER}" ]; then
+            LAST_FAILED="$(tr -d '[:space:]' < "${FAILURE_MARKER}")"
+            if [ "${HEAD_SHA}" = "${LAST_FAILED}" ]; then
+              echo "::notice::HEAD ${HEAD_SHA:0:8} matches last failed release attempt — skipping until new commits"
+              echo "should-release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          RELEASE_VERSION="${{ steps.release-check.outputs.release-version }}"
+          BUMP_TYPE="${{ steps.release-check.outputs.release-bump-type }}"
+
+          if [ -z "${RELEASE_VERSION}" ]; then
+            echo "should-release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No releasable commits at HEAD ${HEAD_SHA:0:8}"
+          else
+            echo "should-release=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Release dry-run predicts v${RELEASE_VERSION} (${BUMP_TYPE})"
+          fi
+
+  # ── Step 2: Release ──
+  release:
+    name: Release
+    needs: check
+    if: needs.check.outputs.should-release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        continue-on-error: true
+        with:
+          app-id: ${{ secrets.HOMEBOY_APP_ID }}
+          private-key: ${{ secrets.HOMEBOY_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+
+      - uses: Extra-Chill/homeboy-action@v2
+        id: release
+        with:
+          commands: release
+          release-dry-run: ${{ inputs.dry-run || 'false' }}
+          app-token: ${{ steps.app-token.outputs.token || '' }}
+
+  # ── Record failed SHA to prevent retry loops ──
+  record-failure:
+    name: Record failure
+    needs:
+      - check
+      - release
+    if: ${{ always() && needs.check.outputs.should-release == 'true' && needs.release.result == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Save failed SHA
+        run: git rev-parse HEAD > "${RUNNER_TEMP}/homeboy-release-last-failed"
+
+      - name: Cache failed SHA
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/homeboy-release-last-failed
+          key: release-last-failed-${{ github.ref_name }}-${{ github.sha }}
+
+  # ── Clear failure cache on success ──
+  clear-failure:
+    name: Clear failure cache
+    needs: release
+    if: ${{ needs.release.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clear failure cache
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh cache list --json id,key --jq '.[] | select(.key | startswith("release-last-failed-${{ github.ref_name }}-")) | .id' | while read -r id; do
+            gh cache delete "$id" 2>/dev/null || true
+          done
