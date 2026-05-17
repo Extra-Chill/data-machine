@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.119.1] - 2026-05-17
+
+### Changed
+- Guard principal access store adapter registration
+
 ## [0.119.0] - 2026-05-17
 
 ### Added
