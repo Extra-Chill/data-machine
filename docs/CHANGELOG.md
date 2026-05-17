@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.119.0] - 2026-05-17
+
+### Added
+- switch release pipeline to homeboy-native release workflow
+
+### Fixed
+- preserve multimodal content blocks through wp-ai-client conversion
+
 ## [0.118.1] - 2026-05-17
 
 ### Fixed
