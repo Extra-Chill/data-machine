@@ -93,6 +93,9 @@ abstract class SettingsHandler {
 			case 'textarea':
 				return self::sanitizeTextarea( $raw_settings, $key, $default );
 
+			case 'json':
+				return self::sanitizeJson( $raw_settings, $key, $default );
+
 			case 'text':
 			default:
 				return self::sanitizeText( $raw_settings, $key, $default );
@@ -166,6 +169,49 @@ abstract class SettingsHandler {
 	protected static function sanitizeTextarea( array $raw_settings, string $key, $default_value ): string {
 		$value = $raw_settings[ $key ] ?? $default_value;
 		return sanitize_textarea_field( wp_unslash( $value ) );
+	}
+
+	/**
+	 * Sanitize JSON field.
+	 *
+	 * JSON fields accept either a JSON-encoded string (which gets decoded to
+	 * an associative array) or an already-decoded array. The previous default
+	 * sanitization path coerced array values to empty strings via
+	 * sanitize_text_field(), which corrupted nested handler configuration
+	 * (see #2059). Invalid input falls back to the schema default or an empty
+	 * array, never to a scalar string that would later trip array_merge().
+	 *
+	 * @param array  $raw_settings Raw settings array.
+	 * @param string $key          Field key.
+	 * @param mixed  $default      Default value (typically a JSON string like '{}').
+	 * @return array Sanitized JSON value as an associative array.
+	 */
+	protected static function sanitizeJson( array $raw_settings, string $key, $default_value ): array {
+		$value = $raw_settings[ $key ] ?? $default_value;
+
+		if ( is_array( $value ) ) {
+			return $value;
+		}
+
+		if ( is_string( $value ) && '' !== $value ) {
+			$decoded = json_decode( wp_unslash( $value ), true );
+			if ( is_array( $decoded ) ) {
+				return $decoded;
+			}
+		}
+
+		if ( is_string( $default_value ) && '' !== $default_value ) {
+			$decoded_default = json_decode( $default_value, true );
+			if ( is_array( $decoded_default ) ) {
+				return $decoded_default;
+			}
+		}
+
+		if ( is_array( $default_value ) ) {
+			return $default_value;
+		}
+
+		return array();
 	}
 
 	/**
