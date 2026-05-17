@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.119.3] - 2026-05-17
+
+### Fixed
+- preserve nested params in handler/settings JSON fields
+
 ## [0.119.2] - 2026-05-17
 
 ### Fixed
