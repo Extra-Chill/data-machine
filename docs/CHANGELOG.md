@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.118.1] - 2026-05-17
+
+### Fixed
+- satisfy bundle artifact lint
+- align completion assertion payload
+- apply core bundle artifacts
+- surface missing AI completion assertions
+
 ## [0.118.0] - 2026-05-16
 
 ### Added
