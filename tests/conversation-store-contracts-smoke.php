@@ -40,6 +40,7 @@ use DataMachine\Core\Database\Chat\ConversationStoreInterface;
 use DataMachine\Core\Database\Chat\PrincipalChat;
 use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Lock;
 use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Principal_Conversation_Session_Reader;
 use AgentsAPI\Core\Database\Chat\WP_Agent_Principal_Conversation_Store;
 use DataMachine\Tests\Unit\Core\Database\Chat\InMemoryConversationStore;
 
@@ -115,6 +116,7 @@ foreach ( $narrow_contracts as $contract ) {
 $assert_true( ( new ReflectionClass( Chat::class ) )->implementsInterface( ConversationStoreInterface::class ), 'Chat remains a ConversationStoreInterface aggregate' );
 $assert_true( ! ( new ReflectionClass( Chat::class ) )->implementsInterface( WP_Agent_Principal_Conversation_Store::class ), 'Base Chat store does not hard-require optional principal session contract' );
 $assert_true( ( new ReflectionClass( PrincipalChat::class ) )->implementsInterface( WP_Agent_Principal_Conversation_Store::class ), 'PrincipalChat supports principal-owned transcript sessions when contract is available' );
+$assert_true( ( new ReflectionClass( PrincipalChat::class ) )->implementsInterface( WP_Agent_Principal_Conversation_Session_Reader::class ), 'PrincipalChat supports owner-aware single-session reads when contract is available' );
 $assert_true( ( new ReflectionClass( InMemoryConversationStore::class ) )->implementsInterface( ConversationStoreInterface::class ), 'test adapter remains a ConversationStoreInterface aggregate' );
 
 $factory_get = new ReflectionMethod( ConversationStoreFactory::class, 'get' );
