@@ -106,8 +106,10 @@ function datamachine_run_datamachine_plugin() {
 	\DataMachine\Engine\Bundle\BundleSourceAuth::register();
 	\DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::register();
 
-	// Initialize FetchHandler to register skip_item tool for all fetch-type handlers
-	\DataMachine\Core\Steps\Fetch\Handlers\FetchHandler::init();
+	// Initialize FetchHandler to register skip_item tool for all fetch-type handlers.
+	if ( method_exists( \DataMachine\Core\Steps\Fetch\Handlers\FetchHandler::class, 'init' ) ) {
+		\DataMachine\Core\Steps\Fetch\Handlers\FetchHandler::init();
+	}
 
 	// Register all tools - must happen AFTER step types and handlers are registered.
 	\DataMachine\Engine\AI\Tools\ToolServiceProvider::register();

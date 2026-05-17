@@ -98,7 +98,7 @@ add_filter(
 	2
 );
 
-if ( interface_exists( 'WP_Agent_Access_Store' ) ) {
+if ( interface_exists( 'WP_Agent_Access_Store' ) && interface_exists( 'WP_Agent_Principal_Access_Store' ) ) {
 	AgentAccessStoreAdapter::register();
 }
 
