@@ -124,7 +124,7 @@ final class AgentBundleCoreArtifactApply {
 		$repo = new Flows();
 		$row  = null;
 		foreach ( $repo->get_all_flows( null, $agent_id ) as $flow ) {
-			if ( $slug === (string) ( $flow['portable_slug'] ?? '' ) ) {
+			if ( (string) ( $flow['portable_slug'] ?? '' ) === $slug ) {
 				$row = $flow;
 				break;
 			}
