@@ -970,8 +970,8 @@ class AIStep extends Step {
 		}
 
 		return array(
-			'reason'                         => 'completion_assertions_missing',
-			'completion_assertions_missing'  => $missing,
+			'reason'                          => 'completion_assertions_missing',
+			'completion_assertions_missing'   => $missing,
 			'completion_assertions_satisfied' => is_array( $loop_result['completion_assertions_satisfied'] ?? null ) ? $loop_result['completion_assertions_satisfied'] : array(),
 			'completion_assertions_required'  => is_array( $loop_result['completion_assertions_required'] ?? null ) ? $loop_result['completion_assertions_required'] : array(),
 		);
