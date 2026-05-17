@@ -53,10 +53,13 @@ namespace DataMachine\Tests\Unit\Support {
 		/** @var callable|null */
 		private static $callback = null;
 		private static bool $filters_registered = false;
+		/** @var array<int,array<string,mixed>> Captured dispatched requests for inspection in tests. */
+		private static array $dispatched_requests = array();
 
 		public static function reset(): void {
 			self::unregister_filters();
-			self::$callback = null;
+			self::$callback            = null;
+			self::$dispatched_requests = array();
 			$GLOBALS['datamachine_test_wp_ai_client_provider_ids'] = array( 'openai', 'fake_provider', 'gemini' );
 		}
 
@@ -65,7 +68,23 @@ namespace DataMachine\Tests\Unit\Support {
 			self::register_filters();
 		}
 
+		/**
+		 * @return array<int,array<string,mixed>>
+		 */
+		public static function get_dispatched_requests(): array {
+			return self::$dispatched_requests;
+		}
+
+		public static function last_dispatched_request(): ?array {
+			if ( empty( self::$dispatched_requests ) ) {
+				return null;
+			}
+			return self::$dispatched_requests[ array_key_last( self::$dispatched_requests ) ];
+		}
+
 		public static function dispatch( array $request, string $provider ): array {
+			self::$dispatched_requests[] = $request;
+
 			if ( is_callable( self::$callback ) ) {
 				$response = call_user_func( self::$callback, $request, $provider );
 				if ( is_array( $response ) ) {
@@ -169,9 +188,29 @@ namespace DataMachine\Tests\Unit\Support {
 		private array $history = array();
 		private array $function_declarations = array();
 		private string $aspect_ratio = '';
+		/** @var array<int,object> */
+		private array $prompt_parts = array();
 
 		public function __construct( string $prompt = '' ) {
 			$this->prompt = $prompt;
+		}
+
+		public function with_message_parts( ...$parts ): self {
+			foreach ( $parts as $part ) {
+				$this->prompt_parts[] = $part;
+				if ( is_object( $part ) && method_exists( $part, 'getText' ) ) {
+					$text = (string) $part->getText();
+					if ( '' !== $text && '' === $this->prompt ) {
+						$this->prompt = $text;
+					}
+				}
+			}
+			return $this;
+		}
+
+		public function using_request_options( $options ): self {
+			unset( $options );
+			return $this;
 		}
 
 		public function using_provider( string $provider ): self {
@@ -280,10 +319,25 @@ namespace DataMachine\Tests\Unit\Support {
 				);
 			}
 
+			$prompt_files = array();
+			foreach ( $this->prompt_parts as $part ) {
+				if ( ! is_object( $part ) ) {
+					continue;
+				}
+				if ( method_exists( $part, 'getFile' ) ) {
+					$file = $part->getFile();
+					if ( null !== $file ) {
+						$prompt_files[] = $file;
+					}
+				}
+			}
+
 			return array(
 				'provider'     => $this->provider,
 				'model'        => $this->model,
 				'prompt'       => $this->prompt,
+				'prompt_parts' => $this->prompt_parts,
+				'prompt_files' => $prompt_files,
 				'aspect_ratio' => $this->aspect_ratio,
 				'messages'     => $messages,
 				'tools'        => $tools,
@@ -342,21 +396,42 @@ namespace WordPress\AiClient\Files\Enums {
 namespace WordPress\AiClient\Files\DTO {
 	if ( ! class_exists( File::class ) ) {
 		class File {
-			private ?string $url = null;
-			private ?string $data_uri = null;
+			private ?string $url        = null;
+			private ?string $data_uri   = null;
+			private ?string $local_path = null;
+			private ?string $mime_type  = null;
+			private string $raw_source  = '';
 
 			public function __construct( string $file, ?string $mime_type = null ) {
-				unset( $mime_type );
+				$this->raw_source = $file;
+				$this->mime_type  = $mime_type;
 
 				if ( str_starts_with( $file, 'data:' ) ) {
 					$this->data_uri = $file;
+				} elseif ( preg_match( '#^https?://#i', $file ) ) {
+					$this->url = $file;
+				} elseif ( file_exists( $file ) ) {
+					$this->local_path = $file;
 				} else {
+					// Unknown but non-empty source; preserve as URL for backwards compat.
 					$this->url = $file;
 				}
 			}
 
 			public function getUrl(): ?string {
 				return $this->url;
+			}
+
+			public function getLocalPath(): ?string {
+				return $this->local_path;
+			}
+
+			public function getMimeType(): ?string {
+				return $this->mime_type;
+			}
+
+			public function getRawSource(): string {
+				return $this->raw_source;
 			}
 
 			public function getDataUri(): ?string {
@@ -474,16 +549,38 @@ namespace WordPress\AiClient\Messages\DTO {
 
 	if ( ! class_exists( MessagePart::class ) ) {
 		class MessagePart {
-			private ?string $text;
-			private ?\WordPress\AiClient\Tools\DTO\FunctionCall $function_call;
+			private ?string $text                                                          = null;
+			private ?\WordPress\AiClient\Files\DTO\File $file                              = null;
+			private ?\WordPress\AiClient\Tools\DTO\FunctionCall $function_call             = null;
 
-			public function __construct( ?string $text = null, ?\WordPress\AiClient\Tools\DTO\FunctionCall $function_call = null ) {
-				$this->text          = $text;
-				$this->function_call = $function_call;
+			/**
+			 * Accepts a string (text part), a File (file part), or a FunctionCall.
+			 * Matches the production MessagePart constructor surface used by Data
+			 * Machine for multimodal vision input.
+			 *
+			 * @param string|\WordPress\AiClient\Files\DTO\File|\WordPress\AiClient\Tools\DTO\FunctionCall|null $content Part content.
+			 * @param \WordPress\AiClient\Tools\DTO\FunctionCall|null                                          $function_call Back-compat positional function call.
+			 */
+			public function __construct( $content = null, ?\WordPress\AiClient\Tools\DTO\FunctionCall $function_call = null ) {
+				if ( $content instanceof \WordPress\AiClient\Files\DTO\File ) {
+					$this->file = $content;
+				} elseif ( $content instanceof \WordPress\AiClient\Tools\DTO\FunctionCall ) {
+					$this->function_call = $content;
+				} elseif ( is_string( $content ) ) {
+					$this->text = $content;
+				}
+
+				if ( null !== $function_call ) {
+					$this->function_call = $function_call;
+				}
 			}
 
 			public function getText(): ?string {
 				return $this->text;
+			}
+
+			public function getFile(): ?\WordPress\AiClient\Files\DTO\File {
+				return $this->file;
 			}
 
 			public function getChannel(): MessagePartChannelDouble {

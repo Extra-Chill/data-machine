@@ -214,13 +214,16 @@ class RequestBuilder {
 				)
 			);
 
-			// wp-ai-client refuses to construct a MessagePart from an empty
-			// string. Only pass the prompt text when it is non-empty; otherwise
-			// fall back to instantiating the builder without a prompt and let
-			// history + system instruction carry the conversation.
-			$builder = '' !== $prompt_context['prompt']
-				? \wp_ai_client_prompt( $prompt_context['prompt'] )
-				: \wp_ai_client_prompt();
+			// The current user message can be multimodal (text + file parts) for
+			// vision-capable tasks like alt text generation. Build it from the
+			// MessagePart[] returned by wpAiClientPromptContext() and attach via
+			// with_message_parts(); fall back to an empty builder when there are
+			// no parts and let history + system instruction carry the conversation.
+			$prompt_parts = $prompt_context['prompt_parts'];
+			$builder      = \wp_ai_client_prompt();
+			if ( ! empty( $prompt_parts ) ) {
+				$builder = $builder->with_message_parts( ...$prompt_parts );
+			}
 			if ( null !== $request_options && is_callable( array( $builder, 'using_request_options' ) ) ) {
 				$builder = $builder->using_request_options( $request_options );
 			}
@@ -293,17 +296,22 @@ class RequestBuilder {
 	/**
 	 * Convert Data Machine's canonical provider-message array into a wp-ai-client message DTO.
 	 *
+	 * Walks all content blocks (text, file, image_url) and builds a full
+	 * MessagePart[] so multimodal context — including file/image attachments
+	 * for vision-capable models — survives the conversion. Prior to 0.118.x
+	 * this collapsed everything to a single text part, silently dropping
+	 * file blocks and causing vision tasks (alt text generation, chat media)
+	 * to hallucinate from filename context. See #2053.
+	 *
 	 * @param array $message Provider-message array.
 	 * @return \WordPress\AiClient\Messages\DTO\Message|null Message DTO, or null when the shape is unsupported.
 	 */
 	private static function wpAiClientHistoryMessage( array $message ): ?\WordPress\AiClient\Messages\DTO\Message {
-		$role = (string) ( $message['role'] ?? '' );
-		$text = self::wpAiClientMessageText( $message['content'] ?? '' );
-		if ( null === $text ) {
+		$role  = (string) ( $message['role'] ?? '' );
+		$parts = self::wpAiClientMessageParts( $message['content'] ?? '' );
+		if ( empty( $parts ) ) {
 			return null;
 		}
-
-		$parts = array( new \WordPress\AiClient\Messages\DTO\MessagePart( $text ) );
 
 		if ( 'assistant' === $role || 'model' === $role ) {
 			return new \WordPress\AiClient\Messages\DTO\ModelMessage( $parts );
@@ -319,17 +327,23 @@ class RequestBuilder {
 	/**
 	 * Split Data Machine messages into wp-ai-client's current prompt + history.
 	 *
-	 * wp-ai-client requires a current prompt passed to wp_ai_client_prompt().
-	 * Supplying only with_history() makes provider dispatch fail with an empty
-	 * prompt even when Data Machine has valid user messages. The latest user
-	 * message is the current prompt; earlier conversational turns remain history.
+	 * wp-ai-client expects the current user turn passed to wp_ai_client_prompt()
+	 * (or attached via with_message_parts()) and earlier turns supplied via
+	 * with_history(). The latest user message becomes the current prompt; earlier
+	 * conversational turns remain history.
+	 *
+	 * The current prompt is returned as a MessagePart[] so multimodal content
+	 * (text + file) survives intact for vision tasks. A `prompt` string is also
+	 * surfaced for legacy callers and request metadata, but the canonical input
+	 * is `prompt_parts`.
 	 *
 	 * @param array $messages Canonical message envelopes.
-	 * @return array{prompt:string,system_parts:array<int,string>,history:array<int,\WordPress\AiClient\Messages\DTO\Message>}
+	 * @return array{prompt:string,prompt_parts:array<int,\WordPress\AiClient\Messages\DTO\MessagePart>,system_parts:array<int,string>,history:array<int,\WordPress\AiClient\Messages\DTO\Message>}
 	 */
 	private static function wpAiClientPromptContext( array $messages ): array {
 		$prompt_index = null;
 		$prompt       = '';
+		$prompt_parts = array();
 		$system_parts = array();
 
 		foreach ( $messages as $index => $message ) {
@@ -352,10 +366,11 @@ class RequestBuilder {
 				continue;
 			}
 
-			$text = self::wpAiClientMessageText( $content );
-			if ( null !== $text ) {
+			$candidate_parts = self::wpAiClientMessageParts( $content );
+			if ( ! empty( $candidate_parts ) ) {
 				$prompt_index = $index;
-				$prompt       = $text;
+				$prompt_parts = $candidate_parts;
+				$prompt       = (string) self::wpAiClientMessageText( $content );
 			}
 		}
 
@@ -373,13 +388,167 @@ class RequestBuilder {
 
 		return array(
 			'prompt'       => $prompt,
+			'prompt_parts' => $prompt_parts,
 			'system_parts' => $system_parts,
 			'history'      => $history,
 		);
 	}
 
 	/**
+	 * Convert canonical content blocks into wp-ai-client MessagePart objects.
+	 *
+	 * Supports:
+	 * - plain strings → text MessagePart
+	 * - ['type' => 'text', 'text' => ...] / ['content' => ...] → text MessagePart
+	 * - ['type' => 'file', 'file_path' => ..., 'mime_type' => ...] → file MessagePart (local path, base64-encoded by File DTO)
+	 * - ['type' => 'image_url', 'image_url' => ['url' => ...]] → file MessagePart (remote URL)
+	 *
+	 * File blocks that point at non-existent paths or throw during File DTO
+	 * construction are skipped with a logged warning rather than aborting the
+	 * whole request — keeps text-only fallback behavior identical to the
+	 * legacy path while letting valid file parts flow through to the model.
+	 *
+	 * @param mixed $content Message content (string or array of blocks).
+	 * @return array<int,\WordPress\AiClient\Messages\DTO\MessagePart>
+	 */
+	private static function wpAiClientMessageParts( $content ): array {
+		if ( is_string( $content ) ) {
+			return '' !== $content
+				? array( new \WordPress\AiClient\Messages\DTO\MessagePart( $content ) )
+				: array();
+		}
+
+		if ( ! is_array( $content ) ) {
+			return array();
+		}
+
+		$parts = array();
+		foreach ( $content as $part ) {
+			if ( is_string( $part ) && '' !== $part ) {
+				$parts[] = new \WordPress\AiClient\Messages\DTO\MessagePart( $part );
+				continue;
+			}
+
+			if ( ! is_array( $part ) ) {
+				continue;
+			}
+
+			$type = isset( $part['type'] ) ? (string) $part['type'] : '';
+
+			if ( 'file' === $type ) {
+				$file_part = self::buildFileMessagePart( $part );
+				if ( null !== $file_part ) {
+					$parts[] = $file_part;
+				}
+				continue;
+			}
+
+			if ( 'image_url' === $type ) {
+				$file_part = self::buildImageUrlMessagePart( $part );
+				if ( null !== $file_part ) {
+					$parts[] = $file_part;
+				}
+				continue;
+			}
+
+			// Default to text extraction for unknown / text-typed parts.
+			$text = $part['text'] ?? $part['content'] ?? null;
+			if ( is_string( $text ) && '' !== $text ) {
+				$parts[] = new \WordPress\AiClient\Messages\DTO\MessagePart( $text );
+			}
+		}
+
+		return $parts;
+	}
+
+	/**
+	 * Build a file MessagePart from a canonical ['type' => 'file', ...] block.
+	 *
+	 * @param array $part Canonical content block.
+	 * @return \WordPress\AiClient\Messages\DTO\MessagePart|null
+	 */
+	private static function buildFileMessagePart( array $part ): ?\WordPress\AiClient\Messages\DTO\MessagePart {
+		$file_path = isset( $part['file_path'] ) ? (string) $part['file_path'] : '';
+		$mime_type = isset( $part['mime_type'] ) ? (string) $part['mime_type'] : '';
+
+		if ( '' === $file_path || ! file_exists( $file_path ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'AI request: dropped file message part with missing or invalid path',
+				array(
+					'file_path' => $file_path,
+					'mime_type' => $mime_type,
+				)
+			);
+			return null;
+		}
+
+		try {
+			$file = new \WordPress\AiClient\Files\DTO\File( $file_path, '' !== $mime_type ? $mime_type : null );
+			return new \WordPress\AiClient\Messages\DTO\MessagePart( $file );
+		} catch ( \Throwable $e ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'AI request: failed to build file message part',
+				array(
+					'file_path' => $file_path,
+					'mime_type' => $mime_type,
+					'error'     => $e->getMessage(),
+				)
+			);
+			return null;
+		}
+	}
+
+	/**
+	 * Build a file MessagePart from a canonical ['type' => 'image_url', ...] block.
+	 *
+	 * @param array $part Canonical content block.
+	 * @return \WordPress\AiClient\Messages\DTO\MessagePart|null
+	 */
+	private static function buildImageUrlMessagePart( array $part ): ?\WordPress\AiClient\Messages\DTO\MessagePart {
+		$url       = '';
+		$mime_type = '';
+
+		if ( isset( $part['image_url'] ) && is_array( $part['image_url'] ) ) {
+			$url       = isset( $part['image_url']['url'] ) ? (string) $part['image_url']['url'] : '';
+			$mime_type = isset( $part['image_url']['mime_type'] ) ? (string) $part['image_url']['mime_type'] : '';
+		} elseif ( isset( $part['url'] ) ) {
+			$url       = (string) $part['url'];
+			$mime_type = isset( $part['mime_type'] ) ? (string) $part['mime_type'] : '';
+		}
+
+		if ( '' === $url ) {
+			return null;
+		}
+
+		try {
+			$file = new \WordPress\AiClient\Files\DTO\File( $url, '' !== $mime_type ? $mime_type : null );
+			return new \WordPress\AiClient\Messages\DTO\MessagePart( $file );
+		} catch ( \Throwable $e ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'AI request: failed to build image_url message part',
+				array(
+					'url'       => $url,
+					'mime_type' => $mime_type,
+					'error'     => $e->getMessage(),
+				)
+			);
+			return null;
+		}
+	}
+
+	/**
 	 * Extract text content from canonical message content shapes.
+	 *
+	 * Retained for callers that still need a flattened text view of a message
+	 * (logging, the legacy `prompt` string in wpAiClientPromptContext, request
+	 * metadata previews). The authoritative multimodal path is
+	 * wpAiClientMessageParts().
 	 *
 	 * @param mixed $content Message content.
 	 * @return string|null Text content, or null when no text is available.
