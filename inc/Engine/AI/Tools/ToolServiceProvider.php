@@ -32,6 +32,7 @@ use DataMachine\Engine\AI\Tools\Global\WordPressPostReader;
 
 // Chat-only tools.
 use DataMachine\Api\Chat\Tools\AddPipelineStep;
+use DataMachine\Api\Chat\Tools\AgentChat;
 use DataMachine\Api\Chat\Tools\ApiQuery;
 use DataMachine\Api\Chat\Tools\AssignTaxonomyTerm;
 use DataMachine\Api\Chat\Tools\AuthenticateHandler;
@@ -98,6 +99,7 @@ class ToolServiceProvider {
 		new WordPressPostReader();
 
 		// Chat-only tools.
+		new AgentChat();
 		new ApiQuery();
 		new CreatePipeline();
 		new AddPipelineStep();
