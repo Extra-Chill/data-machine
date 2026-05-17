@@ -91,6 +91,7 @@ echo "AI completion assertion packet smoke\n";
 echo "-------------------------------------\n\n";
 
 $method = new ReflectionMethod( AIStep::class, 'processLoopResults' );
+$missing_method = new ReflectionMethod( AIStep::class, 'missingCompletionAssertionsFailure' );
 
 $result = $method->invoke(
 	null,
@@ -117,6 +118,31 @@ assert_completion_packet( 1 === count( $result ), 'AI step emits one summary pac
 assert_completion_packet( 'ai_completion_assertions' === ( $result[0]['type'] ?? '' ), 'packet uses completion assertion type', $failures, $passes );
 assert_completion_packet( 'design_ai_step' === ( $result[0]['metadata']['flow_step_id'] ?? '' ), 'packet preserves flow step id', $failures, $passes );
 assert_completion_packet( array( 'design_comment_and_labels' ) === ( $result[0]['metadata']['completion_assertions_satisfied']['complete_when_any'] ?? array() ), 'packet carries satisfied outcome', $failures, $passes );
+
+$missing_failure = $missing_method->invoke(
+	null,
+	array(
+		'completion_assertions_complete'  => false,
+		'completion_assertions_missing'   => array( 'tool_names' => array( 'comment_github_pull_request' ) ),
+		'completion_assertions_satisfied' => array( 'complete_when_any' => array( 'pull_request_path' ) ),
+		'completion_assertions_required'  => array( 'tool_names' => array( 'comment_github_pull_request' ) ),
+	)
+);
+
+assert_completion_packet( is_array( $missing_failure ), 'missing assertions build structured failure payload', $failures, $passes );
+assert_completion_packet( 'completion_assertions_missing' === ( $missing_failure['reason'] ?? '' ), 'missing assertion failure uses explicit reason', $failures, $passes );
+assert_completion_packet( array( 'comment_github_pull_request' ) === ( $missing_failure['completion_assertions_missing']['tool_names'] ?? array() ), 'missing assertion failure preserves missing tool names', $failures, $passes );
+
+$complete_failure = $missing_method->invoke(
+	null,
+	array(
+		'completion_assertions_complete'  => true,
+		'completion_assertions_missing'   => array(),
+		'completion_assertions_satisfied' => array( 'complete_when_any' => array( 'pull_request_path' ) ),
+	)
+);
+
+assert_completion_packet( null === $complete_failure, 'satisfied assertions do not build failure payload', $failures, $passes );
 
 echo "\n-------------------------------------\n";
 echo sprintf( "%d / %d passed\n", $passes, $passes + count( $failures ) );
