@@ -51,7 +51,7 @@ class ConversationStoreFactory {
 			return self::$instance;
 		}
 
-		$default = new Chat();
+		$default = self::default_store();
 
 		/**
 		 * Filter: swap the Data Machine chat conversation persistence backend.
@@ -106,6 +106,23 @@ class ConversationStoreFactory {
 
 		self::$instance = $default;
 		return self::$instance;
+	}
+
+	/**
+	 * Create the default MySQL-backed store.
+	 *
+	 * The principal-owner transcript interface is an optional Agents API contract.
+	 * Use the principal-aware subclass only when that interface is loaded, so
+	 * activation remains safe with older dependency checkouts.
+	 *
+	 * @return ConversationStoreInterface
+	 */
+	private static function default_store(): ConversationStoreInterface {
+		if ( interface_exists( 'AgentsAPI\\Core\\Database\\Chat\\WP_Agent_Principal_Conversation_Store' ) ) {
+			return new PrincipalChat();
+		}
+
+		return new Chat();
 	}
 
 	/**

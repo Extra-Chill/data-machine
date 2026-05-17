@@ -17,7 +17,6 @@ use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\Database\BaseRepository;
 use AgentsAPI\AI\WP_Agent_Execution_Principal;
 use AgentsAPI\AI\WP_Agent_Message;
-use AgentsAPI\Core\Database\Chat\WP_Agent_Principal_Conversation_Store;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use WP_Error;
@@ -34,7 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * filter. Resolve via {@see ConversationStoreFactory::get()} rather than
  * instantiating this class directly.
  */
-class Chat extends BaseRepository implements ConversationStoreInterface, WP_Agent_Principal_Conversation_Store {
+class Chat extends BaseRepository implements ConversationStoreInterface {
 
 	/**
 	 * Table name (without prefix)
