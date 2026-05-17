@@ -1092,8 +1092,8 @@ class AgentsCommand extends AgentBundleCommand {
 				$decoded = json_decode( $raw_value, true );
 				$value   = ( null !== $decoded || 'null' === $raw_value ) ? $decoded : $raw_value;
 
-				$config[ $key ] = $value;
-				$display        = is_array( $value ) ? wp_json_encode( $value, JSON_UNESCAPED_SLASHES ) : (string) $value;
+				$this->setConfigValue( $config, $key, $value );
+				$display = is_array( $value ) ? wp_json_encode( $value, JSON_UNESCAPED_SLASHES ) : (string) $value;
 				WP_CLI::log( sprintf( '  %s → %s', $key, $display ) );
 			}
 		}
@@ -1103,8 +1103,7 @@ class AgentsCommand extends AgentBundleCommand {
 			$unsets = is_array( $assoc_args['unset'] ) ? $assoc_args['unset'] : array( $assoc_args['unset'] );
 
 			foreach ( $unsets as $key ) {
-				if ( array_key_exists( $key, $config ) ) {
-					unset( $config[ $key ] );
+				if ( $this->unsetConfigValue( $config, (string) $key ) ) {
 					WP_CLI::log( sprintf( '  Removed: %s', $key ) );
 				} else {
 					WP_CLI::warning( sprintf( '  Key not found: %s', $key ) );
@@ -1116,6 +1115,78 @@ class AgentsCommand extends AgentBundleCommand {
 		$agents_repo->update_agent( $agent_id, array( 'agent_config' => $config ) );
 
 		WP_CLI::success( sprintf( 'Config updated for agent "%s".', $agent['agent_slug'] ) );
+	}
+
+	/**
+	 * Set a config value, supporting dot notation for nested paths.
+	 *
+	 * @param array  $config Config array, passed by reference.
+	 * @param string $path   Dot-notated config path.
+	 * @param mixed  $value  Value to set.
+	 */
+	private function setConfigValue( array &$config, string $path, $value ): void {
+		$segments = $this->getConfigPathSegments( $path );
+		if ( empty( $segments ) ) {
+			return;
+		}
+
+		$target =& $config;
+		$last   = array_pop( $segments );
+		foreach ( $segments as $segment ) {
+			if ( ! isset( $target[ $segment ] ) || ! is_array( $target[ $segment ] ) ) {
+				$target[ $segment ] = array();
+			}
+			$target =& $target[ $segment ];
+		}
+
+		$target[ $last ] = $value;
+	}
+
+	/**
+	 * Remove a config value, supporting dot notation for nested paths.
+	 *
+	 * @param array  $config Config array, passed by reference.
+	 * @param string $path   Dot-notated config path.
+	 * @return bool Whether a value was removed.
+	 */
+	private function unsetConfigValue( array &$config, string $path ): bool {
+		$segments = $this->getConfigPathSegments( $path );
+		if ( empty( $segments ) ) {
+			return false;
+		}
+
+		$target =& $config;
+		$last   = array_pop( $segments );
+		foreach ( $segments as $segment ) {
+			if ( ! isset( $target[ $segment ] ) || ! is_array( $target[ $segment ] ) ) {
+				return false;
+			}
+			$target =& $target[ $segment ];
+		}
+
+		if ( ! array_key_exists( $last, $target ) ) {
+			return false;
+		}
+
+		unset( $target[ $last ] );
+		return true;
+	}
+
+	/**
+	 * Split a dot-notated config path into usable segments.
+	 *
+	 * @param string $path Config path.
+	 * @return string[]
+	 */
+	private function getConfigPathSegments( string $path ): array {
+		$segments = array_filter(
+			array_map( 'trim', explode( '.', $path ) ),
+			static function ( string $segment ): bool {
+				return '' !== $segment;
+			}
+		);
+
+		return array_values( $segments );
 	}
 
 	/**
