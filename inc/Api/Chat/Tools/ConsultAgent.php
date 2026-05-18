@@ -70,8 +70,6 @@ class ConsultAgent extends BaseTool {
 	 * @return array Tool execution result.
 	 */
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
-		unset( $tool_def );
-
 		$target_agent = sanitize_title( (string) ( $parameters['agent'] ?? '' ) );
 		$question     = trim( (string) ( $parameters['question'] ?? $parameters['message'] ?? '' ) );
 
