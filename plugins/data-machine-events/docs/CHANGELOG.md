@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.37.3] - 2026-05-18
+
+### Fixed
+- fix(venue-merge): require name similarity on address-based clusters
+
 ## [0.37.2] - 2026-05-18
 
 ### Fixed
