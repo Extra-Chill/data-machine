@@ -38,11 +38,14 @@ class SendEmailAbility {
 				'datamachine/send-email',
 				array(
 					'label'               => __( 'Send Email', 'data-machine' ),
-					'description'         => __( 'Send an email with optional attachments via wp_mail()', 'data-machine' ),
+					'description'         => __( 'Send an email with optional attachments via wp_mail(). Body can be supplied directly or rendered from a registered template via the datamachine_email_templates filter.', 'data-machine' ),
 					'category'            => 'datamachine-publishing',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'to', 'subject', 'body' ),
+						// Either `body` or `template` must be provided. Both branches
+						// are validated in execute(); the schema marks only `to` and
+						// `subject` as universally required.
+						'required'   => array( 'to', 'subject' ),
 						'properties' => array(
 							'to'           => array(
 								'type'        => 'string',
@@ -60,11 +63,22 @@ class SendEmailAbility {
 							),
 							'subject'      => array(
 								'type'        => 'string',
-								'description' => __( 'Email subject line. Supports {month}, {year}, {site_name}, {date} placeholders.', 'data-machine' ),
+								'description' => __( 'Email subject line. Supports {month}, {year}, {site_name}, {date}, {admin_email} placeholders (replaced after template render).', 'data-machine' ),
 							),
 							'body'         => array(
 								'type'        => 'string',
-								'description' => __( 'Email body content (HTML or plain text)', 'data-machine' ),
+								'default'     => '',
+								'description' => __( 'Email body content (HTML or plain text). Used verbatim when `template` is omitted. Supports {month}, {year}, {site_name}, {date}, {admin_email} placeholders (replaced after template render).', 'data-machine' ),
+							),
+							'template'     => array(
+								'type'        => 'string',
+								'default'     => '',
+								'description' => __( 'Optional template id. Resolved via the datamachine_email_templates filter; the resolved callable receives the `context` array and returns the body. Placeholder replacement runs AFTER template render so templates may emit {site_name}, {date}, etc.', 'data-machine' ),
+							),
+							'context'      => array(
+								'type'        => 'object',
+								'default'     => array(),
+								'description' => __( 'Opaque context object passed to the template renderer. Ignored when `template` is omitted.', 'data-machine' ),
 							),
 							'content_type' => array(
 								'type'        => 'string',
@@ -154,6 +168,66 @@ class SendEmailAbility {
 			return array(
 				'success' => false,
 				'error'   => 'No valid recipient email addresses',
+				'logs'    => $logs,
+			);
+		}
+
+		// 1b. Resolve template (if provided) → body. Runs BEFORE placeholder
+		// replacement so templates may themselves emit {site_name}, {date}, etc.
+		if ( '' !== $config['template'] ) {
+			$templates = apply_filters( 'datamachine_email_templates', array() );
+			if ( ! is_array( $templates ) || ! isset( $templates[ $config['template'] ] ) || ! is_callable( $templates[ $config['template'] ] ) ) {
+				$error  = sprintf( 'Unknown email template: %s', $config['template'] );
+				$logs[] = array(
+					'level'   => 'error',
+					'message' => 'Email: ' . $error,
+					'data'    => array(
+						'template'           => $config['template'],
+						'registered_templates' => is_array( $templates ) ? array_keys( $templates ) : array(),
+					),
+				);
+				return array(
+					'success' => false,
+					'error'   => $error,
+					'logs'    => $logs,
+				);
+			}
+
+			$rendered = call_user_func( $templates[ $config['template'] ], (array) $config['context'] );
+			if ( ! is_string( $rendered ) ) {
+				$error  = sprintf( 'Email template renderer did not return a string: %s', $config['template'] );
+				$logs[] = array(
+					'level'   => 'error',
+					'message' => 'Email: ' . $error,
+					'data'    => array(
+						'template'    => $config['template'],
+						'return_type' => gettype( $rendered ),
+					),
+				);
+				return array(
+					'success' => false,
+					'error'   => $error,
+					'logs'    => $logs,
+				);
+			}
+
+			$config['body'] = $rendered;
+			$logs[]         = array(
+				'level'   => 'debug',
+				'message' => 'Email: Template rendered',
+				'data'    => array(
+					'template'    => $config['template'],
+					'body_length' => strlen( $rendered ),
+				),
+			);
+		} elseif ( '' === (string) $config['body'] ) {
+			$logs[] = array(
+				'level'   => 'error',
+				'message' => 'Email: No body provided and no template specified',
+			);
+			return array(
+				'success' => false,
+				'error'   => 'Either `body` or `template` must be provided.',
 				'logs'    => $logs,
 			);
 		}
@@ -289,6 +363,8 @@ class SendEmailAbility {
 			'bcc'          => '',
 			'subject'      => '',
 			'body'         => '',
+			'template'     => '',
+			'context'      => array(),
 			'content_type' => 'text/html',
 			'from_name'    => '',
 			'from_email'   => '',
@@ -296,7 +372,14 @@ class SendEmailAbility {
 			'attachments'  => array(),
 		);
 
-		return array_merge( $defaults, $input );
+		$merged = array_merge( $defaults, $input );
+
+		// Normalize types defensively — REST/JSON callers may pass nulls.
+		$merged['template'] = is_string( $merged['template'] ) ? trim( $merged['template'] ) : '';
+		$merged['context']  = is_array( $merged['context'] ) ? $merged['context'] : array();
+		$merged['body']     = is_string( $merged['body'] ) ? $merged['body'] : '';
+
+		return $merged;
 	}
 
 	/**
