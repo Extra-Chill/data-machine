@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.122.0] - 2026-05-18
+
+### Added
+- add consult agent tool
+- add agent chat tool
+
+### Fixed
+- keep consult agent tool definition
+
 ## [0.121.1] - 2026-05-18
 
 ### Changed
