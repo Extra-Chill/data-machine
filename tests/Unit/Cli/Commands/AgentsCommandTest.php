@@ -62,4 +62,89 @@ class AgentsCommandTest extends TestCase {
 		$this->assertNotNull( $returnType );
 		$this->assertSame( 'void', $returnType->getName() );
 	}
+
+	/**
+	 * Test config path setter supports dot notation.
+	 */
+	public function test_set_config_value_supports_dot_notation(): void {
+		$command = new AgentsCommand();
+		$method  = new ReflectionMethod( AgentsCommand::class, 'setConfigValue' );
+		$method->setAccessible( true );
+
+		$config = array(
+			'intelligence' => array(
+				'context_servers' => 'legacy',
+			),
+		);
+
+		$method->invokeArgs( $command, array( &$config, 'intelligence.context_servers.a8c.url', 'https://example.com/mcp' ) );
+
+		$this->assertSame(
+			array(
+				'intelligence' => array(
+					'context_servers' => array(
+						'a8c' => array(
+							'url' => 'https://example.com/mcp',
+						),
+					),
+				),
+			),
+			$config
+		);
+	}
+
+	/**
+	 * Test config path unsetter supports dot notation.
+	 */
+	public function test_unset_config_value_supports_dot_notation(): void {
+		$command = new AgentsCommand();
+		$method  = new ReflectionMethod( AgentsCommand::class, 'unsetConfigValue' );
+		$method->setAccessible( true );
+
+		$config = array(
+			'intelligence' => array(
+				'context_servers' => array(
+					'a8c' => array(
+						'url'     => 'https://example.com/mcp',
+						'timeout' => 30,
+					),
+				),
+			),
+		);
+
+		$removed = $method->invokeArgs( $command, array( &$config, 'intelligence.context_servers.a8c.url' ) );
+
+		$this->assertTrue( $removed );
+		$this->assertSame(
+			array(
+				'intelligence' => array(
+					'context_servers' => array(
+						'a8c' => array(
+							'timeout' => 30,
+						),
+					),
+				),
+			),
+			$config
+		);
+	}
+
+	/**
+	 * Test config path unsetter reports missing nested paths.
+	 */
+	public function test_unset_config_value_returns_false_for_missing_path(): void {
+		$command = new AgentsCommand();
+		$method  = new ReflectionMethod( AgentsCommand::class, 'unsetConfigValue' );
+		$method->setAccessible( true );
+
+		$config = array(
+			'intelligence' => array(
+				'context_servers' => array(),
+			),
+		);
+
+		$removed = $method->invokeArgs( $command, array( &$config, 'intelligence.context_servers.a8c.url' ) );
+
+		$this->assertFalse( $removed );
+	}
 }
