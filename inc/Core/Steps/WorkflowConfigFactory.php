@@ -150,6 +150,10 @@ class WorkflowConfigFactory {
 			}
 		}
 
+		if ( 'system_task' === $step_type && is_array( $step['flow_step_settings'] ?? null ) ) {
+			$pipeline_step['flow_step_settings'] = $step['flow_step_settings'];
+		}
+
 		return $pipeline_step;
 	}
 
