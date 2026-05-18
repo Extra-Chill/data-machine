@@ -4,11 +4,18 @@
  *
  * Abilities API primitive for sending emails via wp_mail().
  * Centralizes email composition, header building, attachment validation,
- * and placeholder replacement.
+ * placeholder replacement, optional template rendering via the
+ * `datamachine_email_templates` filter, and optional per-site SMTP routing
+ * via `switch_to_blog()`.
  *
  * This is the bottom layer — pure business logic, no handler config,
  * no engine data, no pipeline context. Any caller (REST, CLI, chat tool,
  * pipeline handler) can invoke this directly.
+ *
+ * Placeholder ordering: template render runs FIRST, then placeholder
+ * replacement runs on the rendered body. Templates may therefore emit
+ * `{site_name}`, `{date}`, etc. and have them resolved by the standard
+ * replacement pass.
  *
  * @package DataMachine\Abilities\Publish
  */
@@ -38,11 +45,14 @@ class SendEmailAbility {
 				'datamachine/send-email',
 				array(
 					'label'               => __( 'Send Email', 'data-machine' ),
-					'description'         => __( 'Send an email with optional attachments via wp_mail()', 'data-machine' ),
+					'description'         => __( 'Send an email with optional attachments via wp_mail(). Body may be supplied directly or rendered from a template registered via the datamachine_email_templates filter. Optionally routes the wp_mail() call through a specific site via switch_to_blog() on multisite.', 'data-machine' ),
 					'category'            => 'datamachine-publishing',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'to', 'subject', 'body' ),
+						// `body` is no longer hard-required: callers may supply `template` instead.
+						// Validation is enforced in execute() so existing callers passing `body`
+						// continue to work unchanged.
+						'required'   => array( 'to', 'subject' ),
 						'properties' => array(
 							'to'           => array(
 								'type'        => 'string',
@@ -60,11 +70,27 @@ class SendEmailAbility {
 							),
 							'subject'      => array(
 								'type'        => 'string',
-								'description' => __( 'Email subject line. Supports {month}, {year}, {site_name}, {date} placeholders.', 'data-machine' ),
+								'description' => __( 'Email subject line. Supports {month}, {year}, {site_name}, {date}, {admin_email} placeholders. Placeholders are resolved after template render.', 'data-machine' ),
 							),
 							'body'         => array(
 								'type'        => 'string',
-								'description' => __( 'Email body content (HTML or plain text)', 'data-machine' ),
+								'default'     => '',
+								'description' => __( 'Email body content (HTML or plain text). Ignored when `template` is supplied. Supports {month}, {year}, {site_name}, {date}, {admin_email} placeholders.', 'data-machine' ),
+							),
+							'template'     => array(
+								'type'        => 'string',
+								'default'     => '',
+								'description' => __( 'Optional template id resolved via the datamachine_email_templates filter. When set, the registered callable receives `context` and its return value is used as the body before placeholder replacement. When empty, `body` is used verbatim.', 'data-machine' ),
+							),
+							'context'      => array(
+								'type'        => 'object',
+								'default'     => array(),
+								'description' => __( 'Opaque context array passed to the template callable. Each template owns its own context contract.', 'data-machine' ),
+							),
+							'mail_site_id' => array(
+								'type'        => 'integer',
+								'default'     => 0,
+								'description' => __( 'Optional multisite blog id. When > 0 and multisite is active, the wp_mail() call is wrapped in switch_to_blog()/restore_current_blog() so site-scoped SMTP config applies. Validation, header building, and template rendering run in the original site context.', 'data-machine' ),
 							),
 							'content_type' => array(
 								'type'        => 'string',
@@ -200,11 +226,92 @@ class SendEmailAbility {
 			}
 		}
 
-		// 3. Process subject placeholders.
-		$subject = $this->replacePlaceholders( $config['subject'] );
+		// 3. Resolve body — template (if any) renders before placeholder replacement.
+		$template_id = is_string( $config['template'] ) ? trim( $config['template'] ) : '';
+		$body_source = $config['body'];
 
-		// 4. Process body placeholders.
-		$body = $this->replacePlaceholders( $config['body'] );
+		if ( '' !== $template_id ) {
+			// Apply the filter lazily inside execute() so consumers can hook at any
+			// priority before the first call. Shape: [ id => callable( array $context ): string ].
+			$templates = apply_filters( 'datamachine_email_templates', array() );
+
+			if ( ! is_array( $templates ) || ! isset( $templates[ $template_id ] ) || ! is_callable( $templates[ $template_id ] ) ) {
+				$error  = sprintf( 'Unknown email template: %s', $template_id );
+				$logs[] = array(
+					'level'   => 'error',
+					'message' => 'Email: ' . $error,
+					'data'    => array(
+						'template'            => $template_id,
+						'registered_templates' => is_array( $templates ) ? array_keys( $templates ) : array(),
+					),
+				);
+				return array(
+					'success' => false,
+					'error'   => $error,
+					'logs'    => $logs,
+				);
+			}
+
+			$context = is_array( $config['context'] ) ? $config['context'] : array();
+
+			try {
+				$rendered = call_user_func( $templates[ $template_id ], $context );
+			} catch ( \Throwable $e ) {
+				$logs[] = array(
+					'level'   => 'error',
+					'message' => 'Email: Template render threw - ' . $e->getMessage(),
+					'data'    => array( 'template' => $template_id ),
+				);
+				return array(
+					'success' => false,
+					'error'   => 'Template render failed: ' . $e->getMessage(),
+					'logs'    => $logs,
+				);
+			}
+
+			if ( ! is_string( $rendered ) ) {
+				$logs[] = array(
+					'level'   => 'error',
+					'message' => 'Email: Template did not return a string',
+					'data'    => array(
+						'template'      => $template_id,
+						'returned_type' => gettype( $rendered ),
+					),
+				);
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Template "%s" did not return a string', $template_id ),
+					'logs'    => $logs,
+				);
+			}
+
+			$body_source = $rendered;
+
+			$logs[] = array(
+				'level'   => 'debug',
+				'message' => 'Email: Template rendered',
+				'data'    => array(
+					'template'    => $template_id,
+					'body_length' => strlen( $body_source ),
+				),
+			);
+		} elseif ( '' === trim( (string) $body_source ) ) {
+			// No template and no body — nothing to send.
+			$logs[] = array(
+				'level'   => 'error',
+				'message' => 'Email: Neither `body` nor `template` provided',
+			);
+			return array(
+				'success' => false,
+				'error'   => 'Either `body` or `template` is required',
+				'logs'    => $logs,
+			);
+		}
+
+		// 4. Process subject + body placeholders. Runs AFTER template render so
+		//    templates can emit placeholders too.
+		$subject = $this->replacePlaceholders( $config['subject'] );
+		$body    = $this->replacePlaceholders( $body_source );
 
 		// 5. Validate attachments exist.
 		$attachments = array();
@@ -227,6 +334,41 @@ class SendEmailAbility {
 			}
 		}
 
+		// 6. Resolve optional per-site SMTP routing.
+		$mail_site_id = (int) $config['mail_site_id'];
+		$should_switch = false;
+
+		if ( $mail_site_id > 0 ) {
+			if ( ! is_multisite() ) {
+				$logs[] = array(
+					'level'   => 'error',
+					'message' => 'Email: mail_site_id provided but multisite is not active',
+					'data'    => array( 'mail_site_id' => $mail_site_id ),
+				);
+				return array(
+					'success' => false,
+					'error'   => 'mail_site_id requires a multisite install',
+					'logs'    => $logs,
+				);
+			}
+
+			$blog_details = get_blog_details( $mail_site_id );
+			if ( ! $blog_details ) {
+				$logs[] = array(
+					'level'   => 'error',
+					'message' => 'Email: mail_site_id refers to an unknown blog',
+					'data'    => array( 'mail_site_id' => $mail_site_id ),
+				);
+				return array(
+					'success' => false,
+					'error'   => sprintf( 'Unknown mail_site_id: %d', $mail_site_id ),
+					'logs'    => $logs,
+				);
+			}
+
+			$should_switch = true;
+		}
+
 		$logs[] = array(
 			'level'   => 'debug',
 			'message' => 'Email: Sending',
@@ -236,11 +378,30 @@ class SendEmailAbility {
 				'content_type'     => $content_type,
 				'attachment_count' => count( $attachments ),
 				'body_length'      => strlen( $body ),
+				'template'         => $template_id,
+				'mail_site_id'     => $should_switch ? $mail_site_id : 0,
 			),
 		);
 
-		// 6. Send via wp_mail().
-		$sent = wp_mail( $to, $subject, $body, $headers, $attachments );
+		// 7. Send via wp_mail(). Wrap ONLY this call in switch_to_blog when routing.
+		if ( $should_switch ) {
+			switch_to_blog( $mail_site_id );
+		}
+
+		$sent      = wp_mail( $to, $subject, $body, $headers, $attachments );
+		$error_msg = '';
+
+		if ( ! $sent ) {
+			global $phpmailer;
+			$error_msg = 'wp_mail() returned false';
+			if ( isset( $phpmailer ) && $phpmailer instanceof \PHPMailer\PHPMailer\PHPMailer ) {
+				$error_msg = ! empty( $phpmailer->ErrorInfo ) ? $phpmailer->ErrorInfo : $error_msg;
+			}
+		}
+
+		if ( $should_switch ) {
+			restore_current_blog();
+		}
 
 		if ( $sent ) {
 			$logs[] = array(
@@ -255,13 +416,6 @@ class SendEmailAbility {
 				'subject'    => $subject,
 				'logs'       => $logs,
 			);
-		}
-
-		// wp_mail failed — attempt to extract error info.
-		global $phpmailer;
-		$error_msg = 'wp_mail() returned false';
-		if ( isset( $phpmailer ) && $phpmailer instanceof \PHPMailer\PHPMailer\PHPMailer ) {
-			$error_msg = ! empty( $phpmailer->ErrorInfo ) ? $phpmailer->ErrorInfo : $error_msg;
 		}
 
 		$logs[] = array(
@@ -289,6 +443,9 @@ class SendEmailAbility {
 			'bcc'          => '',
 			'subject'      => '',
 			'body'         => '',
+			'template'     => '',
+			'context'      => array(),
+			'mail_site_id' => 0,
 			'content_type' => 'text/html',
 			'from_name'    => '',
 			'from_email'   => '',
