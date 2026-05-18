@@ -338,10 +338,10 @@ class FetchGoogleDriveAbility {
 		$name    = $file['name'] ?? '';
 
 		// Native Google types use files.export; everything else uses files.get?alt=media.
-		$export_mime = $this->export_mime_for_native( $mime );
+		$export_candidates = $this->export_candidates_for_native( $mime );
 
-		if ( null !== $export_mime ) {
-			if ( '' === $export_mime ) {
+		if ( null !== $export_candidates ) {
+			if ( empty( $export_candidates ) ) {
 				// Native but not exportable (Forms, Sites, etc.).
 				return array(
 					'skipped' => true,
@@ -349,24 +349,39 @@ class FetchGoogleDriveAbility {
 				);
 			}
 
-			$url      = self::API_BASE . '/files/' . rawurlencode( $file_id ) . '/export';
-			$response = $this->drive_get_raw( $url, array( 'mimeType' => $export_mime ), $access_token, $logs );
+			$last_error = null;
+			foreach ( $export_candidates as $candidate_mime ) {
+				$url      = self::API_BASE . '/files/' . rawurlencode( $file_id ) . '/export';
+				$response = $this->drive_get_raw( $url, array( 'mimeType' => $candidate_mime ), $access_token, $logs );
 
-			if ( is_wp_error( $response ) ) {
-				$logs[] = array(
-					'level'   => 'warning',
-					'message' => 'GoogleDrive: Export failed for native file.',
-					'data'    => array( 'file_id' => $file_id, 'error' => $response->get_error_message() ),
-				);
-				return array(
-					'skipped' => true,
-					'reason'  => $response->get_error_message(),
+				if ( ! is_wp_error( $response ) ) {
+					return array(
+						'text'        => $response,
+						'export_mime' => $candidate_mime,
+					);
+				}
+
+				$last_error = $response;
+				$logs[]     = array(
+					'level'   => 'debug',
+					'message' => 'GoogleDrive: Export candidate not accepted, trying next.',
+					'data'    => array(
+						'file_id'        => $file_id,
+						'candidate_mime' => $candidate_mime,
+						'error'          => $response->get_error_message(),
+					),
 				);
 			}
 
+			$reason = $last_error instanceof \WP_Error ? $last_error->get_error_message() : 'Export failed.';
+			$logs[] = array(
+				'level'   => 'warning',
+				'message' => 'GoogleDrive: All export candidates failed for native file.',
+				'data'    => array( 'file_id' => $file_id, 'error' => $reason ),
+			);
 			return array(
-				'text'        => $response,
-				'export_mime' => $export_mime,
+				'skipped' => true,
+				'reason'  => $reason,
 			);
 		}
 
@@ -399,36 +414,48 @@ class FetchGoogleDriveAbility {
 	}
 
 	/**
-	 * Map a native Google MIME type to its export target MIME.
+	 * Map a native Google MIME type to its preferred export target MIMEs.
+	 *
+	 * Returns an ORDERED list of MIME candidates to try via files.export.
+	 * The first candidate that the Drive API accepts wins. This lets us
+	 * prefer the LLM-friendlier text/markdown for Google Docs while
+	 * falling back to text/plain if Drive rejects it (older accounts or
+	 * documents with features the markdown exporter doesn't handle).
 	 *
 	 * Returns:
-	 * - null if the file is NOT a native Google type (use files.get?alt=media)
-	 * - '' if it IS a native type but not exportable as text
-	 * - the export MIME string otherwise
+	 * - null if the file is NOT a native Google type (caller falls back
+	 *   to files.get?alt=media for binary download).
+	 * - [] (empty array) if it IS a native type but not exportable as
+	 *   text (Forms, Sites, etc.).
+	 * - non-empty list of MIME candidates otherwise.
 	 *
 	 * @param string $mime Source MIME.
-	 * @return string|null
+	 * @return string[]|null
 	 */
-	private function export_mime_for_native( string $mime ): ?string {
+	private function export_candidates_for_native( string $mime ): ?array {
 		switch ( $mime ) {
 			case 'application/vnd.google-apps.document':
-				return 'text/plain';
+				// Markdown is the LLM-preferred format. Drive started
+				// supporting it as a Docs export target in 2024 but older
+				// project credentials still 4xx on it — fall back to
+				// text/plain so the export still succeeds.
+				return array( 'text/markdown', 'text/plain' );
 			case 'application/vnd.google-apps.spreadsheet':
-				return 'text/csv';
+				return array( 'text/csv' );
 			case 'application/vnd.google-apps.presentation':
-				return 'text/plain';
+				return array( 'text/plain' );
 			case 'application/vnd.google-apps.form':
 			case 'application/vnd.google-apps.site':
 			case 'application/vnd.google-apps.drawing':
 			case 'application/vnd.google-apps.map':
 			case 'application/vnd.google-apps.shortcut':
 			case 'application/vnd.google-apps.folder':
-				return '';
+				return array();
 		}
 
 		if ( 0 === strpos( $mime, 'application/vnd.google-apps.' ) ) {
 			// Unknown native type — refuse rather than guess.
-			return '';
+			return array();
 		}
 
 		return null;

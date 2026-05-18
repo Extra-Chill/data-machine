@@ -148,21 +148,41 @@ class GoogleDriveFetch extends FetchHandler {
 				continue;
 			}
 
+			$metadata = array(
+				'source_type'   => 'google_drive_fetch',
+				'folder_id'     => $folder_id,
+				'file_id'       => $file_id,
+				'name'          => $file['name'] ?? '',
+				'mime_type'     => $file['mime_type'] ?? '',
+				'modified_time' => $file['modified_time'] ?? '',
+				'web_view_link' => $file['web_view_link'] ?? '',
+				'size'          => $file['size'] ?? null,
+				'md5_checksum'  => $file['md5_checksum'] ?? '',
+				'owners'        => $file['owners'] ?? array(),
+				'payload'       => $payload,
+			);
+
+			// Surface binary download details at the top of metadata so a
+			// downstream publish handler (e.g. a future "Drive -> WordPress
+			// media library" bridge) can call media_sideload_image() or
+			// wp_insert_attachment() against the local file without having
+			// to know about the payload sub-structure.
+			if ( isset( $payload['local_path'] ) ) {
+				$metadata['file_path']     = $payload['local_path'];
+				$metadata['file_filename'] = $payload['filename'] ?? basename( $payload['local_path'] );
+				$metadata['file_size']     = $payload['size'] ?? null;
+			}
+
+			// Surface exported text format so downstream steps can render
+			// markdown as markdown vs. treat plaintext as plaintext.
+			if ( isset( $payload['export_mime'] ) ) {
+				$metadata['export_mime'] = $payload['export_mime'];
+			}
+
 			return array(
 				'title'    => $file['name'] ?? ( 'Drive file ' . $file_id ),
 				'content'  => $content,
-				'metadata' => array(
-					'source_type'   => 'google_drive_fetch',
-					'folder_id'     => $folder_id,
-					'file_id'       => $file_id,
-					'mime_type'     => $file['mime_type'] ?? '',
-					'modified_time' => $file['modified_time'] ?? '',
-					'web_view_link' => $file['web_view_link'] ?? '',
-					'size'          => $file['size'] ?? null,
-					'md5_checksum'  => $file['md5_checksum'] ?? '',
-					'owners'        => $file['owners'] ?? array(),
-					'payload'       => $payload,
-				),
+				'metadata' => $metadata,
 			);
 		}
 
