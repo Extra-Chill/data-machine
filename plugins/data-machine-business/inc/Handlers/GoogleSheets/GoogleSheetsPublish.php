@@ -34,10 +34,10 @@ class GoogleSheetsPublish extends PublishHandler {
 			__( 'Google Sheets Publish', 'data-machine-business' ),
 			__( 'Append data rows to Google Sheets spreadsheets', 'data-machine-business' ),
 			true,
-			\DataMachineBusiness\OAuth\Providers\GoogleSheetsAuth::class,
+			\DataMachineBusiness\OAuth\Providers\GoogleAuth::class,
 			GoogleSheetsSettings::class,
 			null,
-			'googlesheets'
+			'google'
 		);
 	}
 

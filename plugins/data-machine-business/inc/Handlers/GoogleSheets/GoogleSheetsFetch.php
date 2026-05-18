@@ -36,10 +36,10 @@ class GoogleSheetsFetch extends FetchHandler {
 			__( 'Google Sheets', 'data-machine-business' ),
 			__( 'Fetch data from Google Sheets spreadsheets', 'data-machine-business' ),
 			true,
-			\DataMachineBusiness\OAuth\Providers\GoogleSheetsAuth::class,
+			\DataMachineBusiness\OAuth\Providers\GoogleAuth::class,
 			GoogleSheetsFetchSettings::class,
 			null,
-			'googlesheets'
+			'google'
 		);
 	}
 

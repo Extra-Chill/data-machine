@@ -214,10 +214,10 @@ class PublishGoogleSheetsAbility {
 	/**
 	 * Get the Google Sheets auth provider instance.
 	 *
-	 * @return \DataMachineBusiness\OAuth\Providers\GoogleSheetsAuth|null
+	 * @return \DataMachineBusiness\OAuth\Providers\GoogleAuth|null
 	 */
-	private static function get_auth_provider(): ?\DataMachineBusiness\OAuth\Providers\GoogleSheetsAuth {
+	private static function get_auth_provider(): ?\DataMachineBusiness\OAuth\Providers\GoogleAuth {
 		$providers = apply_filters( 'datamachine_auth_providers', array() );
-		return $providers['googlesheets'] ?? null;
+		return $providers['google'] ?? null;
 	}
 }
