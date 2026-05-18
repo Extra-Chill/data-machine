@@ -37,6 +37,7 @@ use DataMachine\Api\Chat\Tools\AssignTaxonomyTerm;
 use DataMachine\Api\Chat\Tools\AuthenticateHandler;
 use DataMachine\Api\Chat\Tools\ConfigureFlowSteps;
 use DataMachine\Api\Chat\Tools\ConfigurePipelineStep;
+use DataMachine\Api\Chat\Tools\ConsultAgent;
 use DataMachine\Api\Chat\Tools\CopyFlow;
 use DataMachine\Api\Chat\Tools\CreateFlow;
 use DataMachine\Api\Chat\Tools\CreatePipeline;
@@ -98,6 +99,7 @@ class ToolServiceProvider {
 		new WordPressPostReader();
 
 		// Chat-only tools.
+		new ConsultAgent();
 		new ApiQuery();
 		new CreatePipeline();
 		new AddPipelineStep();
