@@ -240,7 +240,7 @@ class ToolManager {
 		array $engine_data,
 		string $cache_scope = ''
 	): array {
-		$cache_key = $cache_scope . '|handler_tools|' . $handler_slug;
+		$cache_key = self::buildHandlerToolsCacheKey( $cache_scope, $handler_slug, $handler_config, $engine_data );
 
 		if ( '' !== $cache_scope && isset( self::$resolved_cache[ $cache_key ] ) ) {
 			return self::$resolved_cache[ $cache_key ];
@@ -348,6 +348,38 @@ class ToolManager {
 		}
 
 		return $resolved;
+	}
+
+	/**
+	 * Build a cache key for adjacent handler tool resolution.
+	 *
+	 * Direct workflows reuse synthetic flow_step_ids like `ephemeral_step_2`
+	 * across jobs. Handler tools carry the adjacent step's handler_config, so
+	 * the cache key must include the config and job identity to avoid reusing a
+	 * previous job's pinned write target.
+	 *
+	 * @param string $cache_scope    Scope key (usually flow_step_id).
+	 * @param string $handler_slug   Adjacent step handler slug.
+	 * @param array  $handler_config Handler configuration from flow step.
+	 * @param array  $engine_data    Engine data snapshot.
+	 * @return string Cache key.
+	 */
+	private static function buildHandlerToolsCacheKey( string $cache_scope, string $handler_slug, array $handler_config, array $engine_data ): string {
+		$job_snapshot = is_array( $engine_data['job'] ?? null ) ? $engine_data['job'] : array();
+		$job_id       = (int) ( $engine_data['job_id'] ?? $job_snapshot['job_id'] ?? 0 );
+		$config_json  = wp_json_encode( $handler_config );
+		$config_hash  = md5( false === $config_json ? '' : $config_json );
+
+		return implode(
+			'|',
+			array(
+				$cache_scope,
+				'handler_tools',
+				$handler_slug,
+				'job:' . $job_id,
+				'config:' . $config_hash,
+			)
+		);
 	}
 
 	/**
