@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.36.0] - 2026-05-18
+
+### Added
+- collapse low-density day groups to a single-row card layout
+
 ## [0.35.3] - 2026-05-18
 
 ### Changed
