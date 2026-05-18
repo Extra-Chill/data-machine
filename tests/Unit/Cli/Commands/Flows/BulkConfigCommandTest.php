@@ -66,10 +66,12 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 					'pipeline_id'     => $this->pipeline_id,
 					'flow_id'         => $this->flow_id_1,
 					'execution_order' => 0,
-					'handler_slug'    => 'rss',
-					'handler_config'  => array(
-						'feed_url'  => 'https://example.com/feed',
-						'max_items' => 5,
+					'handler_slugs'   => array( 'rss' ),
+					'handler_configs' => array(
+						'rss' => array(
+							'feed_url'  => 'https://example.com/feed',
+							'max_items' => 5,
+						),
 					),
 				),
 			),
@@ -92,10 +94,12 @@ class BulkConfigCommandTest extends WP_UnitTestCase {
 					'pipeline_id'     => $this->pipeline_id,
 					'flow_id'         => $this->flow_id_2,
 					'execution_order' => 0,
-					'handler_slug'    => 'rss',
-					'handler_config'  => array(
-						'feed_url'  => 'https://example.com/other-feed',
-						'max_items' => 3,
+					'handler_slugs'   => array( 'rss' ),
+					'handler_configs' => array(
+						'rss' => array(
+							'feed_url'  => 'https://example.com/other-feed',
+							'max_items' => 3,
+						),
 					),
 				),
 			),

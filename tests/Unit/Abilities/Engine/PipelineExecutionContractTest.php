@@ -361,8 +361,8 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
                     'execution_order'  => 0,
                     'pipeline_id'      => $pipeline_id,
                     'flow_id'          => $flow_id,
-                    'handler_slug'     => 'fake_fetch',
-                    'handler_config'   => array('source' => 'contract-test'),
+                    'handler_slugs'    => array('fake_fetch'),
+                    'handler_configs'  => array('fake_fetch' => array('source' => 'contract-test')),
                     'queue_mode'       => 'static',
                 )
             ),
@@ -391,8 +391,8 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
                     'execution_order'  => 2,
                     'pipeline_id'      => $pipeline_id,
                     'flow_id'          => $flow_id,
-                    'handler_slug'     => 'fake_publish',
-                    'handler_config'   => array('destination' => 'contract-test'),
+                    'handler_slugs'    => array('fake_publish'),
+                    'handler_configs'  => array('fake_publish' => array('destination' => 'contract-test')),
                 )
             ),
         );
