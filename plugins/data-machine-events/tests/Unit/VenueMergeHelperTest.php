@@ -285,4 +285,314 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 			'Winner address must not be overwritten by loser address.'
 		);
 	}
+
+	// ---------------------------------------------------------------------
+	// names_are_similar() — three-rule guard for address-cluster path
+	// (issue #281)
+	// ---------------------------------------------------------------------
+
+	public function test_names_are_similar_exact_normalized_match(): void {
+		// Different casing only → Rule 1 (exact match after normalization).
+		$this->assertTrue(
+			VenueMergeHelper::names_are_similar( 'Hi-Fi Indianapolis', 'HI-FI Indianapolis' )
+		);
+	}
+
+	public function test_names_are_similar_substring_containment(): void {
+		// "the abbey" is substring of "the abbeyorlando" after normalization
+		// strips the dash. Shorter is well above the 4-char floor → Rule 2.
+		$this->assertTrue(
+			VenueMergeHelper::names_are_similar( 'The Abbey', 'The Abbey-Orlando' )
+		);
+	}
+
+	public function test_names_are_similar_token_overlap_above_threshold(): void {
+		// Token reordering keeps Rule 3 honest: same bag of tokens but
+		// not a substring of each other. 3/3 = 1.0, well over 0.70.
+		$this->assertTrue(
+			VenueMergeHelper::names_are_similar( 'Bowery Ballroom NYC', 'NYC Bowery Ballroom' )
+		);
+	}
+
+	public function test_names_are_similar_token_overlap_below_threshold(): void {
+		// {v, theater, planet, hollywood} vs {saxe, theater, planet, hollywood}
+		// intersection 3, union 5 → 0.60 → below the 0.70 cutoff.
+		$this->assertFalse(
+			VenueMergeHelper::names_are_similar(
+				'V Theater at Planet Hollywood',
+				'Saxe Theater at Planet Hollywood'
+			)
+		);
+	}
+
+	public function test_names_are_similar_completely_different(): void {
+		// Zero token overlap → 0/4 = 0.0 → false.
+		$this->assertFalse(
+			VenueMergeHelper::names_are_similar( 'Dolby Theatre', 'Lucky Strike Hollywood' )
+		);
+	}
+
+	public function test_names_are_similar_taco_vs_art_space(): void {
+		// "panchos tacos and tequila" vs "athica" → no token overlap → false.
+		$this->assertFalse(
+			VenueMergeHelper::names_are_similar( "Pancho's Tacos & Tequila", 'ATHICA' )
+		);
+	}
+
+	public function test_names_are_similar_short_substring_at_threshold(): void {
+		// Edge case: "joes" normalizes to exactly 4 chars, which meets the
+		// >=4 floor of Rule 2, and IS substring of "joes bar and grill"
+		// after normalization. This case PASSES — documenting the floor.
+		//
+		// Real-world impact is bounded: this only fires inside an
+		// address-bucket where both terms ALREADY share a normalized
+		// address+city, so spurious "Joe's" → "Joe's Bar and Grill" cross-
+		// city collisions are not possible.
+		$this->assertTrue(
+			VenueMergeHelper::names_are_similar( 'Joes', "Joe's Bar and Grill" )
+		);
+	}
+
+	public function test_names_are_similar_empty_or_whitespace(): void {
+		$this->assertFalse( VenueMergeHelper::names_are_similar( '', 'Anything' ) );
+		$this->assertFalse( VenueMergeHelper::names_are_similar( 'Anything', '' ) );
+		$this->assertFalse( VenueMergeHelper::names_are_similar( '   ', 'Anything' ) );
+		// Single-character "Z" normalizes to "z" (1 char) — fails Rule 1
+		// (not equal), Rule 2 (below 4-char floor), Rule 3 (no overlap).
+		$this->assertFalse( VenueMergeHelper::names_are_similar( 'Z', 'Anything' ) );
+	}
+
+	/**
+	 * Regression fixture: every production false-positive pair from the
+	 * issue #281 dry-run must be rejected by names_are_similar(). These
+	 * are the actual term-pair names from extrachill.com (Nov 2025), and
+	 * each one would have produced a destructive cross-venue merge if
+	 * we'd run --apply against the unguarded clustering logic.
+	 */
+	public function test_production_false_positive_pairs_rejected(): void {
+		$pairs = array(
+			array( 'Dolby Theatre', 'Lucky Strike Hollywood' ),
+			array( 'Come and Take It Live', "Emo's Austin" ),
+			array( "Pancho's Tacos & Tequila", 'ATHICA' ),
+			array( 'North Charleston Coliseum', 'North Charleston Performing Arts Center' ),
+			array( 'V Theater at Planet Hollywood', 'Saxe Theater at Planet Hollywood' ),
+			array( 'The Arrow Room', 'Haven City Market' ),
+		);
+
+		foreach ( $pairs as $pair ) {
+			$this->assertFalse(
+				VenueMergeHelper::names_are_similar( $pair[0], $pair[1] ),
+				sprintf(
+					'Pair MUST be rejected as dissimilar: "%s" vs "%s"',
+					$pair[0],
+					$pair[1]
+				)
+			);
+		}
+	}
+
+	/**
+	 * Regression fixture: legitimate venue-pair variants that the issue
+	 * #281 fix MUST keep clustering together. If any of these flip to
+	 * false the address-cluster path stops doing useful work and the
+	 * migration becomes a no-op.
+	 */
+	public function test_production_true_positive_pairs_accepted(): void {
+		$pairs = array(
+			// Rule 1 (exact normalized) — case-only variant.
+			array( 'Hi-Fi Indianapolis', 'HI-FI Indianapolis' ),
+			// Rule 2 (substring) — annex/suffix variant.
+			array( 'The Abbey', 'The Abbey-Orlando' ),
+			// Rule 1 — ampersand collapses to "and" via the existing
+			// normalize_venue_name_for_matching() pipeline so both sides
+			// reduce to the identical normalized string.
+			array( 'Hook & Ladder Theater', 'Hook and Ladder Theater' ),
+			// Rule 1 — leading "The" is stripped and periods removed by
+			// normalize_venue_name_for_matching(), so both sides reduce
+			// to "st augustine amphitheatre".
+			array( 'St Augustine Amphitheatre', 'The St. Augustine Amphitheatre' ),
+		);
+
+		foreach ( $pairs as $pair ) {
+			$this->assertTrue(
+				VenueMergeHelper::names_are_similar( $pair[0], $pair[1] ),
+				sprintf(
+					'Pair MUST be accepted as similar: "%s" vs "%s"',
+					$pair[0],
+					$pair[1]
+				)
+			);
+		}
+	}
+
+	// ---------------------------------------------------------------------
+	// Address-cluster integration: split_by_name_similarity() must keep
+	// legitimate pairs and drop multi-tenant false positives.
+	// ---------------------------------------------------------------------
+
+	public function test_address_cluster_excludes_dissimilar_names(): void {
+		// Two terms at the same address+city with completely different
+		// names. The address-cluster path must NOT emit a multi-term
+		// cluster for this address.
+		$this->make_venue(
+			'Dolby Theatre',
+			array(
+				'_venue_address' => '6801 Hollywood Blvd',
+				'_venue_city'    => 'Hollywood',
+			)
+		);
+		$this->make_venue(
+			'Lucky Strike Hollywood',
+			array(
+				'_venue_address' => '6801 Hollywood Blvd',
+				'_venue_city'    => 'Hollywood',
+			)
+		);
+
+		$cmd = new CheckMergeDuplicateVenuesCommand();
+		$reflection = new \ReflectionClass( $cmd );
+		$method     = $reflection->getMethod( 'find_clusters' );
+		$method->setAccessible( true );
+		$clusters = $method->invoke( $cmd );
+
+		foreach ( $clusters as $cluster ) {
+			$this->assertStringStartsNotWith(
+				'addr:',
+				$cluster['key'],
+				sprintf(
+					'Multi-tenant address must not produce an addr-cluster (got key %s with %d terms)',
+					$cluster['key'],
+					count( $cluster['term_ids'] )
+				)
+			);
+		}
+	}
+
+	public function test_address_cluster_includes_similar_names(): void {
+		// Two terms at the same address+city with case-only name variants.
+		// Both pass Rule 1 → address-cluster must contain them.
+		$winner = $this->make_venue(
+			'Hi-Fi Indianapolis',
+			array(
+				'_venue_address' => '1043 Virginia Ave',
+				'_venue_city'    => 'Indianapolis',
+			)
+		);
+		$loser = $this->make_venue(
+			'HI-FI Indianapolis Suite 4',
+			array(
+				'_venue_address' => '1043 Virginia Ave',
+				'_venue_city'    => 'Indianapolis',
+			)
+		);
+
+		$cmd        = new CheckMergeDuplicateVenuesCommand();
+		$reflection = new \ReflectionClass( $cmd );
+		$method     = $reflection->getMethod( 'find_clusters' );
+		$method->setAccessible( true );
+		$clusters = $method->invoke( $cmd );
+
+		// Either bucket may catch the pair (name-cluster wins first), but
+		// SOME cluster must contain both ids.
+		$found = false;
+		foreach ( $clusters as $cluster ) {
+			if (
+				in_array( $winner, $cluster['term_ids'], true )
+				&& in_array( $loser, $cluster['term_ids'], true )
+			) {
+				$found = true;
+				break;
+			}
+		}
+
+		$this->assertTrue(
+			$found,
+			'Similar-named terms at the same address must be clustered together.'
+		);
+	}
+
+	public function test_address_cluster_splits_multi_tenant_with_mixed_pair(): void {
+		// Three terms at the same address: two are name-similar to each
+		// other, the third is unrelated. The similar pair must cluster;
+		// the odd one out must be excluded.
+		$similar_a = $this->make_venue(
+			'Hi-Fi Indianapolis',
+			array(
+				'_venue_address' => '1043 Virginia Ave',
+				'_venue_city'    => 'Indianapolis',
+			)
+		);
+		$similar_b = $this->make_venue(
+			'HI-FI Indianapolis',
+			array(
+				'_venue_address' => '1043 Virginia Ave',
+				'_venue_city'    => 'Indianapolis',
+			)
+		);
+		$intruder = $this->make_venue(
+			'Completely Unrelated Bowling Alley',
+			array(
+				'_venue_address' => '1043 Virginia Ave',
+				'_venue_city'    => 'Indianapolis',
+			)
+		);
+
+		$cmd        = new CheckMergeDuplicateVenuesCommand();
+		$reflection = new \ReflectionClass( $cmd );
+		$method     = $reflection->getMethod( 'find_clusters' );
+		$method->setAccessible( true );
+		$clusters = $method->invoke( $cmd );
+
+		$cluster_with_similar = null;
+		foreach ( $clusters as $cluster ) {
+			if (
+				in_array( $similar_a, $cluster['term_ids'], true )
+				&& in_array( $similar_b, $cluster['term_ids'], true )
+			) {
+				$cluster_with_similar = $cluster;
+				break;
+			}
+		}
+
+		$this->assertNotNull(
+			$cluster_with_similar,
+			'Similar pair must be clustered.'
+		);
+		$this->assertNotContains(
+			$intruder,
+			$cluster_with_similar['term_ids'],
+			'Dissimilar third term must not join the cluster.'
+		);
+	}
+
+	public function test_name_cluster_unchanged(): void {
+		// Regression guard: name-only clusters (no shared address) still
+		// match by normalized-name equality, which IS Rule 1 of
+		// names_are_similar. The fix must not affect this path.
+		$winner = $this->make_venue( 'Hook and Ladder Theater' );
+		$loser  = $this->make_venue( 'Hook & Ladder Theater' );
+
+		$cmd        = new CheckMergeDuplicateVenuesCommand();
+		$reflection = new \ReflectionClass( $cmd );
+		$method     = $reflection->getMethod( 'find_clusters' );
+		$method->setAccessible( true );
+		$clusters = $method->invoke( $cmd );
+
+		$found = false;
+		foreach ( $clusters as $cluster ) {
+			if (
+				str_starts_with( $cluster['key'], 'name:' )
+				&& in_array( $winner, $cluster['term_ids'], true )
+				&& in_array( $loser, $cluster['term_ids'], true )
+			) {
+				$found = true;
+				break;
+			}
+		}
+
+		$this->assertTrue(
+			$found,
+			'Name-cluster for ampersand variant must survive the address-cluster guard.'
+		);
+	}
 }

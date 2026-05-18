@@ -38,6 +38,98 @@ class VenueMergeHelper {
 	public const NO_MERGE_META_KEY = '_venue_no_merge';
 
 	/**
+	 * Jaccard token-overlap threshold for Rule 3 of names_are_similar().
+	 * Stricter is safer for a destructive merge operation — do not lower
+	 * without revisiting the production false-positive set in issue #281.
+	 */
+	public const NAME_SIMILARITY_TOKEN_OVERLAP_THRESHOLD = 0.70;
+
+	/**
+	 * Decide whether two venue names are similar enough that two terms
+	 * sharing an address+city should be treated as the same venue.
+	 *
+	 * Used by the address-cluster path in CheckMergeDuplicateVenuesCommand
+	 * to suppress false positives at multi-tenant addresses (issue #281).
+	 * Multi-tenant buildings — Dolby Theatre vs Lucky Strike Hollywood,
+	 * Pancho's Tacos vs ATHICA, V Theater vs Saxe Theater at Planet
+	 * Hollywood — legitimately share a street address but are distinct
+	 * operators that must not be merged.
+	 *
+	 * Three rules — any single rule passing accepts the pair as "similar":
+	 *
+	 *   Rule 1: Exact equality after normalize_venue_name_for_matching().
+	 *           Handles "Hi-Fi Indianapolis" vs "HI-FI Indianapolis".
+	 *
+	 *   Rule 2: Substring containment after normalization, where the
+	 *           shorter normalized name is at least 4 characters.
+	 *           Handles "The Abbey" vs "The Abbey-Orlando".
+	 *
+	 *   Rule 3: Jaccard token overlap >= 70% after stop-word removal
+	 *           ("the", "a", "an", "and", "of", "at"). Handles
+	 *           "St Augustine Amphitheatre" vs "The St. Augustine
+	 *           Amphitheatre" (4/5 = 0.80). Correctly REJECTS
+	 *           "V Theater at Planet Hollywood" vs "Saxe Theater at
+	 *           Planet Hollywood" (3/5 = 0.60).
+	 *
+	 * If all three rules fail, the names are dissimilar and the pair
+	 * must NOT be clustered as duplicates even if they share an address.
+	 *
+	 * Empty / whitespace-only / sub-threshold inputs return false — when
+	 * in doubt the safer answer for a destructive merge is "not similar".
+	 *
+	 * @param string $a First venue name.
+	 * @param string $b Second venue name.
+	 * @return bool True if any of the three rules accepts the pair.
+	 */
+	public static function names_are_similar( string $a, string $b ): bool {
+		$norm_a = Venue_Taxonomy::normalize_venue_name_for_matching( $a );
+		$norm_b = Venue_Taxonomy::normalize_venue_name_for_matching( $b );
+
+		if ( '' === $norm_a || '' === $norm_b ) {
+			return false;
+		}
+
+		// Rule 1: exact match after normalization.
+		if ( $norm_a === $norm_b ) {
+			return true;
+		}
+
+		// Rule 2: substring containment with a 4-char floor on the shorter
+		// name. The floor stops tiny tokens like "joe" matching every
+		// "Joe's <something>" but allows "joes" (4 chars) through.
+		$shorter = strlen( $norm_a ) <= strlen( $norm_b ) ? $norm_a : $norm_b;
+		$longer  = strlen( $norm_a ) <= strlen( $norm_b ) ? $norm_b : $norm_a;
+		if ( strlen( $shorter ) >= 4 && str_contains( $longer, $shorter ) ) {
+			return true;
+		}
+
+		// Rule 3: Jaccard token overlap on stop-word-stripped tokens.
+		$stops = array( 'the', 'a', 'an', 'and', 'of', 'at' );
+
+		$tok_a = preg_split( '/\s+/', $norm_a, -1, PREG_SPLIT_NO_EMPTY );
+		$tok_b = preg_split( '/\s+/', $norm_b, -1, PREG_SPLIT_NO_EMPTY );
+		if ( ! is_array( $tok_a ) || ! is_array( $tok_b ) ) {
+			return false;
+		}
+
+		$tok_a = array_values( array_diff( $tok_a, $stops ) );
+		$tok_b = array_values( array_diff( $tok_b, $stops ) );
+
+		if ( empty( $tok_a ) || empty( $tok_b ) ) {
+			return false;
+		}
+
+		$intersection = count( array_intersect( $tok_a, $tok_b ) );
+		$union        = count( array_unique( array_merge( $tok_a, $tok_b ) ) );
+
+		if ( 0 === $union ) {
+			return false;
+		}
+
+		return ( $intersection / $union ) >= self::NAME_SIMILARITY_TOKEN_OVERLAP_THRESHOLD;
+	}
+
+	/**
 	 * Merge a loser venue term into a winner venue term.
 	 *
 	 * @param int $winner_id Term ID to keep (lower IDs win in callers).

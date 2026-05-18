@@ -190,44 +190,113 @@ class CheckMergeDuplicateVenuesCommand {
 		// Emit name-clusters first, then address-clusters. Each term is
 		// emitted in at most one cluster — once seen via name, the
 		// address loop ignores it.
+		//
+		// Name-clusters are accepted as-is: same normalized name = same
+		// venue (this IS Rule 1 of names_are_similar).
+		//
+		// Address-clusters are subdivided by name similarity to suppress
+		// false positives at multi-tenant addresses (issue #281). Two
+		// terms sharing an address+city are only kept together if their
+		// names pass VenueMergeHelper::names_are_similar().
 		foreach ( array( 'name' => $by_name, 'addr' => $by_address ) as $kind => $groups ) {
 			foreach ( $groups as $key => $group_terms ) {
 				if ( count( $group_terms ) < 2 ) {
 					continue;
 				}
 
-				$ids = array();
-				foreach ( $group_terms as $t ) {
-					$ids[] = (int) $t->term_id;
-				}
-
 				// Drop terms we've already clustered via the name pass.
-				$ids = array_values( array_diff( $ids, $seen_term_ids ) );
-
-				if ( count( $ids ) < 2 ) {
-					continue;
-				}
-
-				$cluster_terms = array_values(
+				$group_terms = array_values(
 					array_filter(
 						$group_terms,
-						static fn( $t ) => in_array( (int) $t->term_id, $ids, true )
+						static fn( $t ) => ! in_array( (int) $t->term_id, $seen_term_ids, true )
 					)
 				);
 
-				$clusters[] = array(
-					'key'      => $kind . ':' . $key,
-					'term_ids' => $ids,
-					'terms'    => $cluster_terms,
-				);
+				if ( count( $group_terms ) < 2 ) {
+					continue;
+				}
 
-				foreach ( $ids as $tid ) {
-					$seen_term_ids[] = $tid;
+				$subgroups = ( 'addr' === $kind )
+					? $this->split_by_name_similarity( $group_terms )
+					: array( $group_terms );
+
+				foreach ( $subgroups as $subgroup_index => $subgroup_terms ) {
+					if ( count( $subgroup_terms ) < 2 ) {
+						continue;
+					}
+
+					$ids = array();
+					foreach ( $subgroup_terms as $t ) {
+						$ids[] = (int) $t->term_id;
+					}
+
+					// When an address bucket is split, give each surviving
+					// sub-cluster a disambiguating suffix so the operator
+					// can tell them apart in the dry-run report.
+					$cluster_key = $kind . ':' . $key;
+					if ( 'addr' === $kind && count( $subgroups ) > 1 ) {
+						$cluster_key .= '#' . ( $subgroup_index + 1 );
+					}
+
+					$clusters[] = array(
+						'key'      => $cluster_key,
+						'term_ids' => $ids,
+						'terms'    => array_values( $subgroup_terms ),
+					);
+
+					foreach ( $ids as $tid ) {
+						$seen_term_ids[] = $tid;
+					}
 				}
 			}
 		}
 
 		return $clusters;
+	}
+
+	/**
+	 * Subdivide an address-bucket of venue terms into sub-clusters where
+	 * every term is name-similar to every other term in the sub-cluster
+	 * (complete-linkage clustering on VenueMergeHelper::names_are_similar).
+	 *
+	 * Complete-linkage (require similarity to ALL existing members, not
+	 * just one) is the safer choice for a destructive merge: it prevents
+	 * transitive chaining where A~B and B~C but A and C are not similar.
+	 *
+	 * Singleton sub-clusters are returned and filtered by the caller.
+	 *
+	 * @param array<int,\WP_Term> $terms Terms sharing an address+city.
+	 * @return array<int,array<int,\WP_Term>> List of sub-clusters.
+	 */
+	private function split_by_name_similarity( array $terms ): array {
+		$subgroups = array();
+
+		foreach ( $terms as $term ) {
+			$placed = false;
+
+			foreach ( $subgroups as $sub_idx => $sub_terms ) {
+				$similar_to_all = true;
+
+				foreach ( $sub_terms as $existing ) {
+					if ( ! VenueMergeHelper::names_are_similar( (string) $term->name, (string) $existing->name ) ) {
+						$similar_to_all = false;
+						break;
+					}
+				}
+
+				if ( $similar_to_all ) {
+					$subgroups[ $sub_idx ][] = $term;
+					$placed                  = true;
+					break;
+				}
+			}
+
+			if ( ! $placed ) {
+				$subgroups[] = array( $term );
+			}
+		}
+
+		return $subgroups;
 	}
 
 	/**
