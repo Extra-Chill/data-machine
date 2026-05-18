@@ -61,6 +61,7 @@ function datamachine_business_load_handlers() {
 	new \DataMachineBusiness\Abilities\GoogleDrive\FetchGoogleDriveAbility();
 	new \DataMachineBusiness\Abilities\GoogleDrive\ListGoogleDriveFilesAbility();
 	new \DataMachineBusiness\Abilities\GoogleDrive\ReadGoogleDriveDocAbility();
+	new \DataMachineBusiness\Abilities\GoogleDrive\DownloadGoogleDriveAbility();
 	new \DataMachineBusiness\Handlers\GoogleDrive\GoogleDriveFetch();
 
 	// Slack
