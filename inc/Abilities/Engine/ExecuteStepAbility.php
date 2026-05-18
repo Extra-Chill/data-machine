@@ -100,6 +100,23 @@ class ExecuteStepAbility {
 	public function execute( array $input ): array {
 		$job_id       = (int) ( $input['job_id'] ?? 0 );
 		$flow_step_id = (string) ( $input['flow_step_id'] ?? '' );
+		$job          = $this->db_jobs->get_job( $job_id );
+
+		if ( ! $job ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Job %d not found.', $job_id ),
+			);
+		}
+
+		$current_status = (string) ( $job['status'] ?? '' );
+		if ( JobStatus::isStatusFinal( $current_status ) ) {
+			return array(
+				'success'        => false,
+				'error'          => sprintf( 'Job %d has terminal status "%s"; step execution skipped.', $job_id, $current_status ),
+				'terminal_state' => $current_status,
+			);
+		}
 
 		// Transition job to 'processing' now that Action Scheduler is actually
 		// executing it. For parent jobs this is a no-op (already processing via

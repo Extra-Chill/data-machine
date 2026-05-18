@@ -10,6 +10,8 @@
 
 namespace DataMachine\Abilities\Job;
 
+use DataMachine\Core\JobStatus;
+
 defined( 'ABSPATH' ) || exit;
 
 class FailJobAbility {
@@ -31,7 +33,7 @@ class FailJobAbility {
 				'datamachine/fail-job',
 				array(
 					'label'               => __( 'Fail Job', 'data-machine' ),
-					'description'         => __( 'Manually fail a processing job with an optional reason.', 'data-machine' ),
+					'description'         => __( 'Manually fail a pending or processing job with an optional reason.', 'data-machine' ),
 					'category'            => 'datamachine-jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -76,7 +78,7 @@ class FailJobAbility {
 	/**
 	 * Execute fail-job ability.
 	 *
-	 * Marks a processing job as failed with the given reason.
+	 * Marks a pending or processing job as failed with the given reason.
 	 *
 	 * @param array $input Input parameters with job_id and optional reason.
 	 * @return array Result with job_id, previous_status, and new_status.
@@ -114,15 +116,15 @@ class FailJobAbility {
 			);
 		}
 
-		// Only allow failing processing jobs.
-		if ( 'processing' !== $previous_status ) {
+		// Pending jobs are queued but not yet running; cancellation is safest before they start.
+		if ( ! in_array( $previous_status, array( JobStatus::PENDING, JobStatus::PROCESSING ), true ) ) {
 			return array(
 				'success' => false,
-				'error'   => sprintf( 'Job %d has status "%s" — only processing jobs can be failed.', $job_id, $previous_status ),
+				'error'   => sprintf( 'Job %d has status "%s" — only pending or processing jobs can be failed.', $job_id, $previous_status ),
 			);
 		}
 
-		$new_status = "failed - {$reason}";
+		$new_status = JobStatus::failed( $reason )->toString();
 		$this->db_jobs->complete_job( $job_id, $new_status );
 
 		do_action( 'datamachine_job_complete', $job_id, 'failed' );
