@@ -928,6 +928,87 @@
     opacity: 1;
 }
 
+/*
+ * Low-density layout for day groups with 1–2 events
+ * --------------------------------------------------
+ * The default carousel uses fixed-size cards optimized for horizontal scrolling
+ * through multiple acts per night. On day groups with only 1–2 events (typical
+ * for venue and artist archives), the fixed card height leaves significant
+ * vertical dead space inside each card because the card uses
+ * flex justify-content: space-between to push the title to the top and the
+ * time/button to the bottom of a fixed-height box.
+ *
+ * These rules opt the card out of the carousel sizing model when there are
+ * 1–2 events, collapsing each card into a single horizontal row with
+ * intrinsic height. Zero markup changes — uses the data-event-count attribute
+ * already present on .data-machine-date-group (see date-group.php).
+ *
+ * High-density days (3+ events) keep the carousel layout unchanged.
+ */
+.data-machine-events-calendar .data-machine-date-group[data-event-count="1"] .data-machine-events-wrapper,
+.data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .data-machine-events-wrapper {
+    /* Allow cards to flow naturally; no horizontal scroll for so few items. */
+    flex-wrap: wrap;
+    overflow-x: visible;
+}
+
+.data-machine-events-calendar .data-machine-date-group[data-event-count="1"] .data-machine-event-item,
+.data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .data-machine-event-item {
+    /* Drop the fixed grid sizing — let the card size to its content. */
+    width: 100%;
+    height: auto;
+    flex: 1 1 100%;
+    padding: 0.85rem 1rem;
+}
+
+.data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .data-machine-event-item {
+    /* Two-event days: two columns side by side on wide screens. */
+    flex-basis: calc(50% - var(--data-machine-grid-gap, 1rem) / 2);
+    min-width: 280px;
+}
+
+.data-machine-events-calendar .data-machine-date-group[data-event-count="1"] .data-machine-event-link,
+.data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .data-machine-event-link {
+    /* Collapse the title-above-meta column layout into a single row strip. */
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    height: auto;
+}
+
+.data-machine-events-calendar .data-machine-date-group[data-event-count="1"] .data-machine-event-title,
+.data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .data-machine-event-title {
+    /* Title sits inline with meta instead of stacking above it. */
+    margin: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.data-machine-events-calendar .data-machine-date-group[data-event-count="1"] .data-machine-event-meta,
+.data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .data-machine-event-meta {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+/* Hide the carousel overflow "More" indicator on low-density days — irrelevant
+ * when there's nothing to scroll. */
+.data-machine-events-calendar .data-machine-date-group[data-event-count="1"]::after,
+.data-machine-events-calendar .data-machine-date-group[data-event-count="2"]::after {
+    display: none;
+}
+
+/* On narrow screens, collapse two-event days to a single column so each card
+ * keeps the same single-row layout without cramping. */
+@media (max-width: 600px) {
+    .data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .data-machine-event-item {
+        flex-basis: 100%;
+    }
+}
+
 /* Day-specific backgrounds */
 .data-machine-events-calendar .data-machine-day-sunday .data-machine-event-item { background: var(--data-machine-day-sunday-rgba); }
 .data-machine-events-calendar .data-machine-day-monday .data-machine-event-item { background: var(--data-machine-day-monday-rgba); }
