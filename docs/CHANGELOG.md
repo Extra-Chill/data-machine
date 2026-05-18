@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.121.0] - 2026-05-18
+
+### Added
+- add datamachine_engine_snapshot filter at job init
+
 ## [0.120.0] - 2026-05-18
 
 ### Added
