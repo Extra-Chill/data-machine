@@ -623,7 +623,7 @@ class AIStep extends Step {
 	 *
 	 * @param array $pipeline_assertions Pipeline step assertions.
 	 * @param array $flow_assertions     Flow step assertions.
-	 * @return array<string, array<int, string>> Merged assertions.
+	 * @return array<string, mixed> Merged assertions.
 	 */
 	private static function mergeCompletionAssertions( array $pipeline_assertions, array $flow_assertions ): array {
 		$merged = array();
@@ -725,21 +725,7 @@ class AIStep extends Step {
 	 * @return array{provider:string,model:string}
 	 */
 	private static function resolveModelForExecutionModes( int $agent_id, array $modes ): array {
-		$fallback = array(
-			'provider' => '',
-			'model'    => '',
-		);
-		foreach ( $modes as $mode ) {
-			$model = PluginSettings::resolveModelForAgentMode( $agent_id, $mode );
-			if ( ! empty( $model['provider'] ) ) {
-				return $model;
-			}
-			if ( '' === $fallback['provider'] && '' === $fallback['model'] ) {
-				$fallback = $model;
-			}
-		}
-
-		return $fallback;
+		return PluginSettings::resolveModelForAgentModes( $agent_id, $modes, ToolPolicyResolver::MODE_PIPELINE );
 	}
 
 	/**
