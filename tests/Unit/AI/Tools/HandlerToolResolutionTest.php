@@ -298,6 +298,47 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 		$this->assertSame( 2, $invocations, 'Different scope must re-invoke callback.' );
 	}
 
+	public function test_resolution_cache_varies_by_handler_config_and_job(): void {
+		$invocations = 0;
+		add_filter(
+			'datamachine_tools',
+			function ( array $tools ) use ( &$invocations ): array {
+				$tools['__handler_tools_pinned'] = array(
+					'_handler_callable' => function ( string $slug, array $config ) use ( &$invocations ) {
+						unset( $slug );
+						$invocations++;
+						return array(
+							'pinned' => array(
+								'description'    => 'Pinned handler',
+								'handler_config' => $config,
+							),
+						);
+					},
+					'handler'           => 'pinned',
+					'modes'             => array( 'pipeline' ),
+				);
+				return $tools;
+			}
+		);
+
+		$first = $this->tool_manager->resolveHandlerTools(
+			'pinned',
+			array( 'fixed_slug' => '13751' ),
+			array( 'job' => array( 'job_id' => 55300 ) ),
+			'ephemeral_step_2'
+		);
+		$second = $this->tool_manager->resolveHandlerTools(
+			'pinned',
+			array( 'fixed_slug' => '13378' ),
+			array( 'job' => array( 'job_id' => 55301 ) ),
+			'ephemeral_step_2'
+		);
+
+		$this->assertSame( 2, $invocations, 'Same ephemeral step must not reuse handler tools across different jobs/configs.' );
+		$this->assertSame( '13751', $first['pinned']['handler_config']['fixed_slug'] ?? null );
+		$this->assertSame( '13378', $second['pinned']['handler_config']['fixed_slug'] ?? null );
+	}
+
 	public function test_no_caching_when_scope_is_empty(): void {
 		$invocations = 0;
 		add_filter(
