@@ -92,15 +92,9 @@ class AgentsChatHandler {
 		$client_context = is_array( $input['client_context'] ?? null ) ? $input['client_context'] : array();
 		$modes          = $this->resolveModes( $input, $client_context );
 		$mode           = implode( ',', $modes );
-		$agent_config   = $this->resolveModelForModes( 0 === $agent_id ? null : $agent_id, $modes );
+		$agent_config   = PluginSettings::resolveModelForAgentModes( 0 === $agent_id ? null : $agent_id, $modes, 'chat' );
 		$provider       = $agent_config['provider'];
 		$model          = $agent_config['model'];
-
-		if ( '' === $model && ! in_array( 'chat', $modes, true ) ) {
-			$chat_config = PluginSettings::resolveModelForAgentMode( 0 === $agent_id ? null : $agent_id, 'chat' );
-			$provider    = '' === $provider ? $chat_config['provider'] : $provider;
-			$model       = $chat_config['model'];
-		}
 
 		if ( '' === $provider ) {
 			return new WP_Error( 'provider_required', __( 'AI provider is required. Set a default in Data Machine settings.', 'data-machine' ), array( 'status' => 400 ) );
@@ -204,31 +198,6 @@ class AgentsChatHandler {
 		}
 
 		return ToolPolicyResolver::normalizeModes( $modes );
-	}
-
-	/**
-	 * Resolve a model for the first configured active mode.
-	 *
-	 * @param int|null $agent_id Agent ID.
-	 * @param array    $modes    Active modes.
-	 * @return array{provider:string,model:string}
-	 */
-	private function resolveModelForModes( ?int $agent_id, array $modes ): array {
-		$fallback = array(
-			'provider' => '',
-			'model'    => '',
-		);
-		foreach ( $modes as $mode ) {
-			$config = PluginSettings::resolveModelForAgentMode( $agent_id, $mode );
-			if ( '' !== $config['provider'] && '' !== $config['model'] ) {
-				return $config;
-			}
-			if ( '' === $fallback['provider'] && '' === $fallback['model'] ) {
-				$fallback = $config;
-			}
-		}
-
-		return $fallback;
 	}
 
 	/**

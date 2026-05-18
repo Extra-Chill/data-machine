@@ -174,21 +174,13 @@ class SendMessageAbility {
 		$model    = $input['model'] ?? '';
 
 		if ( empty( $provider ) || empty( $model ) ) {
-			$agent_config = PluginSettings::resolveModelForAgentMode( $agent_id > 0 ? $agent_id : null, $mode );
+			$agent_config = PluginSettings::resolveModelForAgentModes( $agent_id > 0 ? $agent_id : null, array( $mode ), 'chat' );
 			if ( empty( $provider ) ) {
 				$provider = $agent_config['provider'];
 			}
 			if ( empty( $model ) ) {
 				$model = $agent_config['model'];
 			}
-		}
-
-		if ( empty( $model ) && 'chat' !== $mode ) {
-			$chat_config = PluginSettings::resolveModelForAgentMode( $agent_id > 0 ? $agent_id : null, 'chat' );
-			if ( empty( $provider ) ) {
-				$provider = $chat_config['provider'];
-			}
-			$model = $chat_config['model'];
 		}
 
 		if ( empty( $provider ) ) {

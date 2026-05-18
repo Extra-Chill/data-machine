@@ -97,7 +97,7 @@ class PluginSettings {
 	 * Get a specific per-site setting value (no cascade).
 	 *
 	 * @param string $key     Setting key
-	 * @param mixed  $default Default value if key not found
+	 * @param mixed  $default_value Default value if key not found
 	 * @return mixed
 	 */
 	public static function get( string $key, mixed $default_value = null ): mixed {
@@ -118,7 +118,7 @@ class PluginSettings {
 	 * @since 0.32.0
 	 *
 	 * @param string $key     Setting key.
-	 * @param mixed  $default Default value if neither site nor network has it.
+	 * @param mixed  $default_value Default value if neither site nor network has it.
 	 * @return mixed
 	 */
 	public static function resolve( string $key, mixed $default_value = null ): mixed {
@@ -242,6 +242,53 @@ class PluginSettings {
 		self::$agent_model_cache[ $cache_key ] = self::getModelForMode( $mode );
 
 		return self::$agent_model_cache[ $cache_key ];
+	}
+
+	/**
+	 * Resolve provider/model for the first complete mode in an ordered mode set.
+	 *
+	 * Behavioral modes can intentionally omit model configuration and compose with
+	 * an execution surface mode such as chat or pipeline. Treat provider/model as
+	 * an atomic pair so a provider from one mode is never combined with a model
+	 * from another mode.
+	 *
+	 * @param int|null       $agent_id      Agent ID or null/0 for no agent-specific override.
+	 * @param array<int,string> $modes      Ordered mode slugs.
+	 * @param string|null    $fallback_mode Optional execution-surface fallback mode.
+	 * @return array{ provider: string, model: string }
+	 */
+	public static function resolveModelForAgentModes( ?int $agent_id, array $modes, ?string $fallback_mode = null ): array {
+		$fallback = array(
+			'provider' => '',
+			'model'    => '',
+		);
+
+		foreach ( $modes as $mode ) {
+			$mode   = sanitize_key( (string) $mode );
+			$config = self::resolveModelForAgentMode( $agent_id, $mode );
+
+			if ( '' !== $config['provider'] && '' !== $config['model'] ) {
+				return $config;
+			}
+
+			if ( '' === $fallback['provider'] && '' === $fallback['model'] ) {
+				$fallback = $config;
+			}
+		}
+
+		$fallback_mode = null === $fallback_mode ? '' : sanitize_key( $fallback_mode );
+		if ( '' !== $fallback_mode && ! in_array( $fallback_mode, array_map( 'sanitize_key', $modes ), true ) ) {
+			$config = self::resolveModelForAgentMode( $agent_id, $fallback_mode );
+			if ( '' !== $config['provider'] && '' !== $config['model'] ) {
+				return $config;
+			}
+
+			if ( '' === $fallback['provider'] && '' === $fallback['model'] ) {
+				$fallback = $config;
+			}
+		}
+
+		return $fallback;
 	}
 
 	/**
