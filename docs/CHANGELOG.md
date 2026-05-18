@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.119.5] - 2026-05-18
+
+### Changed
+- clarify system task contracts
+
+### Fixed
+- require canonical system task setting
+- drop legacy recurring task hook execution
+
 ## [0.119.4] - 2026-05-18
 
 ### Fixed
