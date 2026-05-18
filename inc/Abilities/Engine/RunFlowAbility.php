@@ -244,6 +244,30 @@ class RunFlowAbility {
 			$engine_snapshot = array_merge( $existing_data, $engine_snapshot );
 		}
 
+		/**
+		 * Filter the engine snapshot before it is persisted for a new job.
+		 *
+		 * Lets extensions enrich the engine_data snapshot with context that
+		 * lives outside DM core. For example, Data Machine Code projects the
+		 * active workspace identity (repo, handle, branch, path) into
+		 * `active_workspace` so directives, abilities, and tool calls can
+		 * read which repo the current job is operating against.
+		 *
+		 * Filters MUST return an array. Returning a non-array silently
+		 * preserves the prior snapshot.
+		 *
+		 * @since 0.10.3
+		 *
+		 * @param array $engine_snapshot The snapshot about to be persisted.
+		 * @param int   $job_id          Job being initialized.
+		 * @param array $flow            Flow row from the database.
+		 * @param array $pipeline        Pipeline row from the database.
+		 */
+		$filtered_snapshot = apply_filters( 'datamachine_engine_snapshot', $engine_snapshot, $job_id, $flow, $pipeline );
+		if ( is_array( $filtered_snapshot ) ) {
+			$engine_snapshot = $filtered_snapshot;
+		}
+
 		datamachine_set_engine_data( $job_id, $engine_snapshot );
 
 		try {
