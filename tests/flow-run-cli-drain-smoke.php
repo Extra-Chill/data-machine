@@ -42,10 +42,10 @@ assert_drain_contains( "datamachine_execute_step'", $drain_src, 'drain includes 
 assert_drain_contains( 'hookWhereSql( $hooks )', $drain_src, 'drain supports an optional hook scope' );
 assert_drain_contains( "a.status = \\'pending\\'", $drain_src, 'drain queries pending actions in the Data Machine group' );
 assert_drain_contains( 'getDuePendingActionIds', $drain_src, 'drain queries concrete due Data Machine action IDs' );
-assert_drain_contains( 'action-scheduler action run ', $drain_src, 'drain runs concrete action IDs instead of generic queue runner' );
-assert_drain_contains( "'exit_error' => false", $drain_src, 'drain failure is surfaced as warning instead of fataling after job start' );
-assert_drain_contains( "'launch'     => true", $drain_src, 'drain isolates nested Action Scheduler CLI fatals from the parent drain command' );
-assert_drain_contains( "'return'     => 'all'", $drain_src, 'drain captures Action Scheduler command result' );
+assert_drain_contains( "\\ActionScheduler::runner()", $drain_src, 'drain runs concrete action IDs through Action Scheduler runner' );
+assert_drain_contains( "'Data Machine CLI drain'", $drain_src, 'drain records a Data Machine-specific execution context' );
+assert_drain_contains( 'catch ( \\Throwable $throwable )', $drain_src, 'drain catches per-action runner failures instead of fataling after job start' );
+assert_drain_contains( "'return_code' => empty( \$warnings ) ? 0 : 1", $drain_src, 'drain surfaces runner failures through a result object' );
 assert_drain_contains( "'remaining_pending'", $drain_src, 'drain reports remaining pending actions' );
 assert_drain_contains( "'batch_chunks'", $drain_src, 'drain reports batch chunk counts' );
 assert_drain_contains( "'step_executions'", $drain_src, 'drain reports step execution counts' );

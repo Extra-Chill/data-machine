@@ -170,16 +170,29 @@ class DrainCommand extends BaseCommand {
 	 * Run specific due Action Scheduler actions.
 	 *
 	 * @param int[] $action_ids Action IDs.
-	 * @return object WP_CLI::runcommand result object.
+	 * @return object Result object with return_code and stderr fields.
 	 */
 	private static function runActionSchedulerActions( array $action_ids ): object {
-		return WP_CLI::runcommand(
-			'action-scheduler action run ' . implode( ' ', array_map( 'intval', $action_ids ) ),
-			array(
-				'exit_error' => false,
-				'launch'     => true,
-				'return'     => 'all',
-			)
+		$runner   = \ActionScheduler::runner();
+		$warnings = array();
+
+		foreach ( $action_ids as $action_id ) {
+			$action_id = absint( $action_id );
+			if ( $action_id <= 0 ) {
+				continue;
+			}
+
+			try {
+				$runner->process_action( $action_id, 'Data Machine CLI drain' );
+			} catch ( \Throwable $throwable ) {
+				$warnings[] = sprintf( 'Action %d failed during drain: %s', $action_id, $throwable->getMessage() );
+			}
+		}
+
+		return (object) array(
+			'return_code' => empty( $warnings ) ? 0 : 1,
+			'stdout'      => '',
+			'stderr'      => implode( "\n", $warnings ),
 		);
 	}
 
