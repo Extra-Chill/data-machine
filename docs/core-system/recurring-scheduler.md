@@ -132,8 +132,7 @@ definition.
 
 Hooks are schedule-scoped because a single task handler can have multiple
 schedule bindings. Legacy task-scoped hooks (`datamachine_recurring_<task_type>`)
-are still recognized during migration, then unscheduled once the canonical
-schedule-scoped hook is reconciled.
+are unscheduled once the canonical schedule-scoped hook is reconciled.
 
 ## Upgrade migration
 

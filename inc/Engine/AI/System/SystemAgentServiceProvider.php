@@ -316,9 +316,6 @@ class SystemAgentServiceProvider {
 			};
 
 			add_action( $hook, $dispatch_schedule );
-			if ( $legacy_hook !== $hook ) {
-				add_action( $legacy_hook, $dispatch_schedule );
-			}
 		}
 	}
 

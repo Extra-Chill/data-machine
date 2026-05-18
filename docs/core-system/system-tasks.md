@@ -239,7 +239,7 @@ Scheduler:
   pending → schedule via `RecurringScheduler::ensureSchedule()`.
 - If the setting resolves to false → unschedule.
 
-Recurring hooks are schedule-scoped because one task can have multiple schedules with different params or cadences. Task-scoped legacy hooks (`datamachine_recurring_<task_type>`) are registered only as a migration bridge and are unscheduled when the schedule-scoped hook is reconciled.
+Recurring hooks are schedule-scoped because one task can have multiple schedules with different params or cadences. Task-scoped legacy hooks (`datamachine_recurring_<task_type>`) are unscheduled when the schedule-scoped hook is reconciled.
 
 ## SystemTaskStep
 
