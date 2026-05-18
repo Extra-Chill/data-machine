@@ -416,10 +416,10 @@ class FetchEmailAbility {
 		$body = $this->fetchBody( $connection, $uid );
 
 		// Check for attachments.
-		$structure         = imap_fetchstructure( $connection, $uid, FT_UID );
-		$attachment_count  = 0;
-		$downloaded_files  = array();
-		$skipped_count     = 0;
+		$structure        = imap_fetchstructure( $connection, $uid, FT_UID );
+		$attachment_count = 0;
+		$downloaded_files = array();
+		$skipped_count    = 0;
 
 		if ( $structure ) {
 			$attachments      = $this->findAttachments( $structure );
