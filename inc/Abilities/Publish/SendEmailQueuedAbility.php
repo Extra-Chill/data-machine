@@ -259,10 +259,10 @@ class SendEmailQueuedAbility {
 		$as_args = array( $input );
 
 		if ( null === $timestamp ) {
-			$action_id = as_enqueue_async_action( self::WORKER_HOOK, $as_args, self::GROUP );
+			$action_id     = as_enqueue_async_action( self::WORKER_HOOK, $as_args, self::GROUP );
 			$scheduled_for = time();
 		} else {
-			$action_id = as_schedule_single_action( $timestamp, self::WORKER_HOOK, $as_args, self::GROUP );
+			$action_id     = as_schedule_single_action( $timestamp, self::WORKER_HOOK, $as_args, self::GROUP );
 			$scheduled_for = $timestamp;
 		}
 
@@ -376,7 +376,10 @@ class SendEmailQueuedAbility {
 				'datamachine_log',
 				'error',
 				'Email worker: Action Scheduler unavailable for retry',
-				array( 'attempt' => $attempt, 'error' => $error_msg )
+				array(
+					'attempt' => $attempt,
+					'error'   => $error_msg,
+				)
 			);
 			return;
 		}

@@ -117,14 +117,14 @@ function get_bloginfo( string $key ) {
 	return 'Test Site';
 }
 
-function get_option( string $key, $default = null ) {
+function get_option( string $key, $default_value = null ) {
 	if ( 'admin_email' === $key ) {
 		return 'admin@example.com';
 	}
 	if ( 'date_format' === $key ) {
 		return 'Y-m-d';
 	}
-	return $default;
+	return $default_value;
 }
 
 function wp_date( string $format, ?int $timestamp = null ): string {

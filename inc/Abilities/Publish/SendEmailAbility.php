@@ -241,7 +241,7 @@ class SendEmailAbility {
 					'level'   => 'error',
 					'message' => 'Email: ' . $error,
 					'data'    => array(
-						'template'            => $template_id,
+						'template'             => $template_id,
 						'registered_templates' => is_array( $templates ) ? array_keys( $templates ) : array(),
 					),
 				);
@@ -335,7 +335,7 @@ class SendEmailAbility {
 		}
 
 		// 6. Resolve optional per-site SMTP routing.
-		$mail_site_id = (int) $config['mail_site_id'];
+		$mail_site_id  = (int) $config['mail_site_id'];
 		$should_switch = false;
 
 		if ( $mail_site_id > 0 ) {
