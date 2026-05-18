@@ -403,12 +403,15 @@ class UpsertPostAbility {
 			);
 		}
 
-		// Idempotency check.
+		// Idempotency check. Parent/slug changes still need a write even when
+		// the content hash is unchanged.
 		if ( $existing_id > 0 && '' !== $content_hash ) {
 			$stored_hash = get_post_meta( $existing_id, self::META_CONTENT_HASH, true );
-			if ( $stored_hash === $content_hash ) {
+			$post        = get_post( $existing_id );
+			$same_parent = ! $post instanceof \WP_Post || $parent_id <= 0 || (int) $post->post_parent === $parent_id;
+			$same_slug   = ! $post instanceof \WP_Post || '' === $slug || (string) $post->post_name === $slug;
+			if ( $stored_hash === $content_hash && $same_parent && $same_slug ) {
 				self::applySourceMetadata( $existing_id, $source_url, $original_date_gmt );
-				$post       = get_post( $existing_id );
 				$post_title = $post instanceof \WP_Post ? $post->post_title : $title;
 				return array(
 					'success'  => true,

@@ -51,7 +51,7 @@ class ResolvePostByPath {
 		}
 
 		if ( str_contains( $identifier, '/' ) ) {
-			$parts     = array_values( array_filter( explode( '/', $identifier ) ) );
+			$parts          = array_values( array_filter( explode( '/', $identifier ) ) );
 			$current_parent = $parent_id;
 
 			foreach ( $parts as $slug_part ) {
@@ -174,6 +174,77 @@ class ResolvePostByPath {
 		string $stub_meta_key,
 		array $stub_defaults = array()
 	) {
+		$found = self::find_stub( $slug, $post_type, $parent_id );
+
+		if ( ! empty( $found ) ) {
+			return (int) $found;
+		}
+
+		$lock_key = self::stub_lock_key( $slug, $post_type, $parent_id );
+		$locked   = self::acquire_stub_lock( $lock_key );
+
+		if ( ! $locked ) {
+			$found = self::find_stub( $slug, $post_type, $parent_id );
+			if ( ! empty( $found ) ) {
+				return (int) $found;
+			}
+
+			return new \WP_Error(
+				'stub_lock_timeout',
+				sprintf( 'Timed out waiting to create %s stub: %s', $post_type, $slug )
+			);
+		}
+
+		try {
+			$found = self::find_stub( $slug, $post_type, $parent_id );
+			if ( ! empty( $found ) ) {
+				return (int) $found;
+			}
+
+			$title = ucwords( str_replace( array( '-', '_' ), ' ', $slug ) );
+
+			$defaults = array(
+				'post_type'      => $post_type,
+				'post_title'     => $title,
+				'post_name'      => $slug,
+				'post_parent'    => $parent_id,
+				'post_status'    => 'publish',
+				'post_content'   => '',
+				'comment_status' => 'closed',
+				'ping_status'    => 'closed',
+			);
+
+			$post_data = wp_parse_args( $stub_defaults, $defaults );
+
+			$new_id = wp_insert_post( $post_data, true );
+
+			if ( is_wp_error( $new_id ) ) {
+				return $new_id;
+			}
+
+			$created = get_post( (int) $new_id );
+			if ( $created && $created->post_name !== $slug ) {
+				$found = self::find_stub( $slug, $post_type, $parent_id );
+				if ( ! empty( $found ) ) {
+					wp_delete_post( (int) $new_id, true );
+					return (int) $found;
+				}
+			}
+
+			if ( '' !== $stub_meta_key ) {
+				update_post_meta( (int) $new_id, $stub_meta_key, '1' );
+			}
+
+			return (int) $new_id;
+		} finally {
+			delete_option( $lock_key );
+		}
+	}
+
+	/**
+	 * Find an existing slug under the requested parent.
+	 */
+	private static function find_stub( string $slug, string $post_type, int $parent_id ): int {
 		$found = get_posts(
 			array(
 				'post_type'      => $post_type,
@@ -186,36 +257,35 @@ class ResolvePostByPath {
 			)
 		);
 
-		if ( ! empty( $found ) ) {
-			return (int) $found[0];
+		return empty( $found ) ? 0 : (int) $found[0];
+	}
+
+	/**
+	 * Return the option key used as an atomic DB-backed stub creation lock.
+	 */
+	private static function stub_lock_key( string $slug, string $post_type, int $parent_id ): string {
+		return '_datamachine_stub_lock_' . md5( $post_type . '|' . $parent_id . '|' . $slug );
+	}
+
+	/**
+	 * Acquire a short-lived creation lock using add_option's unique key insert.
+	 */
+	private static function acquire_stub_lock( string $lock_key ): bool {
+		for ( $attempt = 0; $attempt < 40; $attempt++ ) {
+			if ( add_option( $lock_key, (string) time(), '', false ) ) {
+				return true;
+			}
+
+			$locked_at = (int) get_option( $lock_key, 0 );
+			if ( $locked_at > 0 && time() - $locked_at > 30 ) {
+				delete_option( $lock_key );
+				continue;
+			}
+
+			usleep( 50000 );
 		}
 
-		$title = ucwords( str_replace( array( '-', '_' ), ' ', $slug ) );
-
-		$defaults = array(
-			'post_type'      => $post_type,
-			'post_title'     => $title,
-			'post_name'      => $slug,
-			'post_parent'    => $parent_id,
-			'post_status'    => 'publish',
-			'post_content'   => '',
-			'comment_status' => 'closed',
-			'ping_status'    => 'closed',
-		);
-
-		$post_data = wp_parse_args( $stub_defaults, $defaults );
-
-		$new_id = wp_insert_post( $post_data, true );
-
-		if ( is_wp_error( $new_id ) ) {
-			return $new_id;
-		}
-
-		if ( '' !== $stub_meta_key ) {
-			update_post_meta( (int) $new_id, $stub_meta_key, '1' );
-		}
-
-		return (int) $new_id;
+		return false;
 	}
 
 	/**
