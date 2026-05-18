@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.37.1] - 2026-05-18
+
+### Fixed
+- zero badge bottom-margin in low-density day groups for inline alignment
+
 ## [0.37.0] - 2026-05-18
 
 ### Added
