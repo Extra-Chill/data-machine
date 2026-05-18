@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.122.5] - 2026-05-18
+
+### Fixed
+- download all attachments instead of only the first
+
 ## [0.122.4] - 2026-05-18
 
 ### Fixed
