@@ -31,7 +31,8 @@
  * 21. Eventbrite (organizer pages, individual event pages)
  * 22. Schema.org JSON-LD
  * 23. WordPress (Tribe Events, WP REST)
- * 24. Prekindle ticketing
+ * 24. WordPress Generic (non-Tribe WP: REST CPT discovery + theme listing fallback)
+ * 25. Prekindle ticketing
  * 25. Wix Events JSON (wix-warmup-data)
  * 26. MusicItem CSS pattern (music__item/music__artist)
  * 27. RHP Events WordPress plugin HTML
@@ -68,6 +69,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\Prekindle
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GoDaddyExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\BandzoogleExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WordPressExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\WordPressGenericExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\TimelyExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ElfsightEventsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GigwellExtractor;
@@ -176,6 +178,7 @@ class UniversalWebScraper extends EventImportHandler {
 			new JsonLdExtractor(),
 			new GenericHtmlEventsExtractor(),
 			new WordPressExtractor(),
+			new WordPressGenericExtractor(),
 			new PrekindleExtractor(),
 			new WixEventsExtractor(),
 			new WeeblyExtractor(),
