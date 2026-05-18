@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.35.3] - 2026-05-18
+
+### Changed
+- migrate submission notification to datamachine/send-email (closes #267)
+
 ## [0.35.2] - 2026-05-18
 
 ### Fixed
