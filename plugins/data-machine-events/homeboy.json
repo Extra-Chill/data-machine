@@ -21,6 +21,18 @@
     {
       "file": "readme.txt",
       "pattern": "(?m)^Stable tag:\\s*([0-9.]+)"
+    },
+    {
+      "file": "inc/Blocks/Calendar/block.json",
+      "pattern": "\"version\":\\s*\"([0-9.]+)\""
+    },
+    {
+      "file": "inc/Blocks/EventDetails/block.json",
+      "pattern": "\"version\":\\s*\"([0-9.]+)\""
+    },
+    {
+      "file": "inc/Blocks/EventsMap/block.json",
+      "pattern": "\"version\":\\s*\"([0-9.]+)\""
     }
   ]
 }
