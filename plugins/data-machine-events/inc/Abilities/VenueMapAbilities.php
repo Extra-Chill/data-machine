@@ -238,6 +238,22 @@ class VenueMapAbilities {
 			unset( $venue );
 		}
 
+		// Replace placeholder event_count with upcoming-only counts.
+		// The query paths above seed event_count=0; the real number comes from
+		// a single batched query keyed by the term IDs actually being returned.
+		// This is what the popup label promises ("X upcoming events") rather
+		// than $term->count, which is the lifetime total of all published
+		// events ever assigned to the venue (past + future).
+		if ( ! empty( $venues ) ) {
+			$venue_ids       = array_map( 'intval', array_column( $venues, 'term_id' ) );
+			$upcoming_counts = $this->getUpcomingCountsForVenues( $venue_ids );
+
+			foreach ( $venues as &$venue ) {
+				$venue['event_count'] = (int) ( $upcoming_counts[ $venue['term_id'] ] ?? 0 );
+			}
+			unset( $venue );
+		}
+
 		// Sort by distance if geo filtering, otherwise by event count.
 		if ( $has_geo && ! empty( $distance_map ) ) {
 			usort( $venues, function ( $a, $b ) {
@@ -349,7 +365,7 @@ class VenueMapAbilities {
 				'lon'         => $venue_lon,
 				'address'     => $address,
 				'url'         => is_string( $url ) ? $url : '',
-				'event_count' => $term->count,
+				'event_count' => 0,
 			);
 		}
 
@@ -410,11 +426,73 @@ class VenueMapAbilities {
 				'lon'         => $venue_lon,
 				'address'     => $address,
 				'url'         => is_string( $url ) ? $url : '',
-				'event_count' => $venue->count,
+				'event_count' => 0,
 			);
 		}
 
 		return $venues;
+	}
+
+	/**
+	 * Get upcoming-event counts for a set of venue term IDs.
+	 *
+	 * Single batched query keyed by the IDs being rendered, returning a
+	 * `term_id => count` map. "Upcoming" means events with a
+	 * `start_datetime >= today` row in the event_dates table — matching
+	 * the semantics of the venue popup label ("X upcoming events") and
+	 * the location-archive venue badge graph (Extra-Chill/extrachill-events#88).
+	 *
+	 * Venues with zero upcoming events are intentionally absent from the
+	 * returned map; callers should default to 0 on missing keys. This avoids
+	 * a separate "empty" branch and keeps the query trivially indexable.
+	 *
+	 * @param int[] $venue_ids Term IDs from the venue taxonomy.
+	 * @return array<int,int> Map of term_id => upcoming event count.
+	 */
+	private function getUpcomingCountsForVenues( array $venue_ids ): array {
+		if ( empty( $venue_ids ) ) {
+			return array();
+		}
+
+		global $wpdb;
+
+		$post_type = Event_Post_Type::POST_TYPE;
+		$today     = gmdate( 'Y-m-d 00:00:00' );
+
+		$placeholders = implode( ',', array_fill( 0, count( $venue_ids ), '%d' ) );
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$query = $wpdb->prepare(
+			"SELECT tt.term_id, COUNT(DISTINCT p.ID) AS upcoming_count
+			FROM {$wpdb->term_relationships} tr
+			INNER JOIN {$wpdb->term_taxonomy} tt
+				ON tr.term_taxonomy_id = tt.term_taxonomy_id
+			INNER JOIN {$wpdb->posts} p
+				ON tr.object_id = p.ID
+			INNER JOIN {$wpdb->prefix}datamachine_event_dates ed
+				ON p.ID = ed.post_id
+			WHERE tt.taxonomy = 'venue'
+			AND tt.term_id IN ($placeholders)
+			AND p.post_type = %s
+			AND p.post_status = 'publish'
+			AND ed.start_datetime >= %s
+			GROUP BY tt.term_id",
+			array_merge( $venue_ids, array( $post_type, $today ) )
+		);
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results( $query );
+
+		if ( empty( $rows ) ) {
+			return array();
+		}
+
+		$counts = array();
+		foreach ( $rows as $row ) {
+			$counts[ (int) $row->term_id ] = (int) $row->upcoming_count;
+		}
+
+		return $counts;
 	}
 
 	/**
