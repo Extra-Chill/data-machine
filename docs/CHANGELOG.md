@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.122.8] - 2026-05-18
+
+### Fixed
+- preserve workflow handler config fields
+- align memory artifact assignments
+- preserve resolved agent memory artifact scope
+
 ## [0.122.7] - 2026-05-18
 
 ### Fixed
