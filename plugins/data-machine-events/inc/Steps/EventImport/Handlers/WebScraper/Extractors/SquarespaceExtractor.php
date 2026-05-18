@@ -23,9 +23,29 @@ class SquarespaceExtractor extends BaseExtractor {
 	public function extract( string $html, string $source_url ): array {
 		$data = $this->fetchJsonData( $html, $source_url );
 
-		if ( empty( $data ) ) {
-			return array();
+		// Improvement 3 (#272): single-event-detail pages. When the JSON payload
+		// has no upcoming/past/items arrays but contains a top-level `item`
+		// (singular) describing a single event, treat it as a one-event page.
+		// We check this BEFORE the empty-data short-circuit so single-event
+		// pages still extract even when nothing else fires.
+		$single = $this->extractSingleItem( $data );
+		if ( ! empty( $single ) ) {
+			$page_venue = \DataMachineEvents\Steps\EventImport\Handlers\WebScraper\PageVenueExtractor::extract( $html, $source_url );
+			$event      = $this->normalizeItem( $single, $page_venue );
+			if ( ! empty( $event['title'] ) ) {
+				return array( $event );
+			}
 		}
+
+		// Defensive default so empty/missing $data still lets the HTML-based
+		// strategies (4, 7, 8, 9) run. Previously this method bailed early on
+		// empty $data, which prevented the new collection-deref strategies
+		// from firing on pages where ?format=json returns nothing useful.
+		if ( ! is_array( $data ) ) {
+			$data = array();
+		}
+
+		$raw_items = array();
 
 		// 1. Check for top-level 'upcoming' array (common in Squarespace event collections)
 		if ( isset( $data['upcoming'] ) && is_array( $data['upcoming'] ) && ! empty( $data['upcoming'] ) ) {
@@ -64,6 +84,21 @@ class SquarespaceExtractor extends BaseExtractor {
 		if ( empty( $raw_items ) ) {
 			// 7. Parse User Items List blocks (custom event listings without Events collection)
 			$raw_items = $this->parseUserItemsList( $html );
+		}
+
+		if ( empty( $raw_items ) ) {
+			// 8. Improvement 1 (#272): Summary Block collection-ID dereferencing.
+			// Find any Summary Block on the page with a collectionId and fetch
+			// that collection's JSON for its upcoming/items array.
+			$raw_items = $this->parseSummaryBlockCollections( $html, $source_url );
+		}
+
+		if ( empty( $raw_items ) ) {
+			// 9. Improvement 2 (#272): User Items List with data-collection-id.
+			// Detect <div class="user-items-list" data-collection-id="..."> and
+			// fetch the linked collection. Falls back to embedded
+			// `data-current-context` userItems when no separate collection.
+			$raw_items = $this->parseUserItemsListCollection( $html, $source_url );
 		}
 
 		if ( empty( $raw_items ) ) {
@@ -199,6 +234,335 @@ class SquarespaceExtractor extends BaseExtractor {
 		}
 
 		return $items;
+	}
+
+	/**
+	 * Parse Summary Block collection references and dereference their JSON.
+	 *
+	 * Improvement 1 (issue #272): when the host page contains one or more
+	 * Summary Blocks (`<div class="sqs-block-summary-v2" data-block-json="...">`)
+	 * pointing at an external collection via `collectionId`, this method
+	 * resolves each collection's JSON via the Squarespace JSON API and
+	 * returns the first non-empty events array.
+	 *
+	 * Strategy per block:
+	 *   1. If the block declares an explicit `collectionUrlId` use
+	 *      `/<urlId>?format=json` directly.
+	 *   2. Otherwise probe the `?collectionId=` query against the source
+	 *      origin which Squarespace honors site-wide.
+	 *
+	 * Returns an array of raw items (compatible with normalizeItem()) or an
+	 * empty array on failure. Never throws.
+	 *
+	 * @since 0.15.x
+	 * @param string $html       Host page HTML.
+	 * @param string $source_url Source URL (used to derive collection origin).
+	 * @return array
+	 */
+	private function parseSummaryBlockCollections( string $html, string $source_url ): array {
+		if ( ! preg_match_all( '/data-block-json="([^"]+)"/i', $html, $matches ) ) {
+			return array();
+		}
+
+		$parsed   = wp_parse_url( $source_url );
+		$base_url = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? '' );
+		$seen_ids = array();
+
+		foreach ( $matches[1] as $raw_attr ) {
+			$decoded = html_entity_decode( $raw_attr, ENT_QUOTES, 'UTF-8' );
+			$block   = json_decode( $decoded, true );
+
+			if ( ! is_array( $block ) || empty( $block['collectionId'] ) ) {
+				continue;
+			}
+
+			// Skip non-events Summary Blocks (galleries, products, blog posts).
+			// We can't always tell from the block alone — the collection probe
+			// itself will return nothing actionable in those cases, but we still
+			// want to skip obvious gallery blocks to avoid wasted requests.
+			if ( ! empty( $block['design'] ) && in_array( $block['design'], array( 'grid', 'list', 'carousel', 'wall' ), true )
+				&& empty( $block['showPastOrUpcomingEvents'] )
+				&& empty( $block['eventTime'] ) ) {
+				// Probably a Summary widget — still worth probing IF the
+				// referenced collection is an Events collection (type=10).
+				// Skip only obvious gallery blocks that declare a transient
+				// gallery id matching the collectionId (image galleries).
+				if ( ! empty( $block['transientGalleryId'] ) && $block['transientGalleryId'] === $block['collectionId'] ) {
+					continue;
+				}
+			}
+
+			$collection_id = (string) $block['collectionId'];
+
+			if ( isset( $seen_ids[ $collection_id ] ) ) {
+				continue;
+			}
+			$seen_ids[ $collection_id ] = true;
+
+			$items = $this->fetchCollectionItemsById( $collection_id, $base_url, $block );
+			if ( ! empty( $items ) ) {
+				return $items;
+			}
+		}
+
+		return array();
+	}
+
+	/**
+	 * Parse User Items List blocks that reference a collection by ID, or
+	 * fall back to inline `data-current-context` userItems embedded on the page.
+	 *
+	 * Improvement 2 (issue #272). Two shapes are handled here:
+	 *
+	 *   a) <div class="user-items-list" data-collection-id="ABC">  — fetch
+	 *      the collection JSON like Summary Blocks (improvement 1).
+	 *   b) Inline shape used by some 7.1 themes (e.g. Saint Vitus):
+	 *      <div class="user-items-list-item-container"
+	 *           data-current-context="{&quot;userItems&quot;:[...]}">
+	 *      The items live entirely in the page HTML inside a giant
+	 *      HTML-encoded JSON attribute.
+	 *
+	 * @since 0.15.x
+	 * @param string $html       Host page HTML.
+	 * @param string $source_url Source URL (used to derive collection origin).
+	 * @return array
+	 */
+	private function parseUserItemsListCollection( string $html, string $source_url ): array {
+		if ( strpos( $html, 'user-items-list' ) === false ) {
+			return array();
+		}
+
+		$parsed   = wp_parse_url( $source_url );
+		$base_url = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? '' );
+
+		// Shape (a): collection-backed user-items-list.
+		if ( preg_match_all( '/<(?:div|section)[^>]+class="[^"]*user-items-list[^"]*"[^>]*data-collection-id="([^"]+)"/i', $html, $matches ) ) {
+			$seen = array();
+			foreach ( $matches[1] as $cid ) {
+				$cid = trim( $cid );
+				if ( '' === $cid || isset( $seen[ $cid ] ) ) {
+					continue;
+				}
+				$seen[ $cid ] = true;
+				$items        = $this->fetchCollectionItemsById( $cid, $base_url );
+				if ( ! empty( $items ) ) {
+					return $items;
+				}
+			}
+		}
+
+		// Same attribute order can also appear with data-collection-id first.
+		if ( preg_match_all( '/<(?:div|section)[^>]+data-collection-id="([^"]+)"[^>]*class="[^"]*user-items-list[^"]*"/i', $html, $matches ) ) {
+			$seen = array();
+			foreach ( $matches[1] as $cid ) {
+				$cid = trim( $cid );
+				if ( '' === $cid || isset( $seen[ $cid ] ) ) {
+					continue;
+				}
+				$seen[ $cid ] = true;
+				$items        = $this->fetchCollectionItemsById( $cid, $base_url );
+				if ( ! empty( $items ) ) {
+					return $items;
+				}
+			}
+		}
+
+		// Shape (b): inline data-current-context with userItems.
+		return $this->parseInlineUserItemsContext( $html );
+	}
+
+	/**
+	 * Parse `data-current-context` attributes embedded on user-items-list
+	 * containers to extract their inline `userItems` array.
+	 *
+	 * Some Squarespace 7.1 themes ship the full userItems payload inside an
+	 * HTML-encoded JSON attribute on
+	 * `.user-items-list-item-container[data-current-context]` rather than
+	 * fetching from a separate collection. This parser pulls all such
+	 * payloads, aggregates them, and returns them as raw items.
+	 *
+	 * @since 0.15.x
+	 * @param string $html Host page HTML.
+	 * @return array
+	 */
+	private function parseInlineUserItemsContext( string $html ): array {
+		if ( ! preg_match_all( '/data-current-context="([^"]+)"/i', $html, $matches ) ) {
+			return array();
+		}
+
+		$items = array();
+		foreach ( $matches[1] as $raw_attr ) {
+			$decoded = html_entity_decode( $raw_attr, ENT_QUOTES, 'UTF-8' );
+			$ctx     = json_decode( $decoded, true );
+			if ( ! is_array( $ctx ) ) {
+				continue;
+			}
+
+			if ( ! empty( $ctx['userItems'] ) && is_array( $ctx['userItems'] ) ) {
+				foreach ( $ctx['userItems'] as $item ) {
+					if ( is_array( $item ) && ! empty( $item['title'] ) ) {
+						$items[] = $item;
+					}
+				}
+			}
+		}
+
+		return $items;
+	}
+
+	/**
+	 * Fetch a Squarespace collection's events array by collection ID.
+	 *
+	 * Tries (in order):
+	 *   1. The block's own `collectionUrlId` if present (`/<urlId>?format=json`).
+	 *   2. `?collectionId=` query against the source origin — Squarespace
+	 *      resolves this to the collection root regardless of path.
+	 *
+	 * @since 0.15.x
+	 * @param string $collection_id Squarespace collection ID.
+	 * @param string $base_url      Source origin (scheme + host, no trailing slash).
+	 * @param array  $block         Optional originating block payload (for urlId hints).
+	 * @return array Raw event items, or empty array on failure.
+	 */
+	private function fetchCollectionItemsById( string $collection_id, string $base_url, array $block = array() ): array {
+		$candidates = array();
+
+		if ( ! empty( $block['collectionUrlId'] ) ) {
+			$candidates[] = $base_url . '/' . ltrim( (string) $block['collectionUrlId'], '/' ) . '?format=json';
+		}
+
+		// Squarespace honors `?collectionId=ID` at any path on the same site.
+		// `/?format=json&collectionId=...` resolves to the collection root JSON.
+		$candidates[] = $base_url . '/?format=json&collectionId=' . rawurlencode( $collection_id );
+
+		foreach ( $candidates as $url ) {
+			$response = \DataMachine\Core\HttpClient::get(
+				$url,
+				array(
+					'timeout' => 15,
+					'context' => 'Squarespace Extractor Collection Deref',
+				)
+			);
+
+			if ( empty( $response['success'] ) || empty( $response['data'] ) ) {
+				continue;
+			}
+
+			$data = json_decode( $response['data'], true );
+			if ( ! is_array( $data ) || JSON_ERROR_NONE !== json_last_error() ) {
+				continue;
+			}
+
+			$items = $this->extractEventsFromCollection( $data );
+			if ( ! empty( $items ) ) {
+				return $items;
+			}
+		}
+
+		return array();
+	}
+
+	/**
+	 * Pull the events array out of a fetched collection JSON payload.
+	 *
+	 * Squarespace events collections expose events via `upcoming`/`past`
+	 * top-level arrays; some templates use `items[]` populated with
+	 * `recordType:12` (event records). This method centralizes the lookup
+	 * for both shapes.
+	 *
+	 * @since 0.15.x
+	 * @param array $data Decoded collection JSON.
+	 * @return array
+	 */
+	private function extractEventsFromCollection( array $data ): array {
+		if ( ! empty( $data['upcoming'] ) && is_array( $data['upcoming'] ) ) {
+			return $data['upcoming'];
+		}
+
+		if ( ! empty( $data['past'] ) && is_array( $data['past'] ) ) {
+			return $data['past'];
+		}
+
+		if ( ! empty( $data['items'] ) && is_array( $data['items'] ) ) {
+			$events = array();
+			foreach ( $data['items'] as $item ) {
+				if ( ! is_array( $item ) ) {
+					continue;
+				}
+				// recordType 12 = Squarespace event record. When recordType is
+				// absent (older payloads) but the item carries event-ish
+				// fields, accept it too.
+				$is_event = ( isset( $item['recordType'] ) && 12 === (int) $item['recordType'] )
+					|| ! empty( $item['startDate'] )
+					|| ! empty( $item['endDate'] )
+					|| ! empty( $item['eventDates'] );
+				if ( $is_event ) {
+					$events[] = $item;
+				}
+			}
+			if ( ! empty( $events ) ) {
+				return $events;
+			}
+		}
+
+		return array();
+	}
+
+	/**
+	 * Detect a single-event-detail payload and return its sole item.
+	 *
+	 * Improvement 3 (issue #272). When a Squarespace JSON payload has no
+	 * `upcoming` / `past` / `items` arrays but carries a top-level `item`
+	 * describing one event (recordType 12 or with event-shaped fields),
+	 * treat the page as a single-event detail page and surface that one
+	 * item to the caller.
+	 *
+	 * This dovetails with extrachill-events#78's `event_page_shape=detail`
+	 * detection — when a single-event-detail URL extracts exactly 1 event,
+	 * qualify v2 returns `qualified_structured`.
+	 *
+	 * @since 0.15.x
+	 * @param array $data Decoded Squarespace JSON payload.
+	 * @return array Single raw item array, or empty array if not a detail page.
+	 */
+	private function extractSingleItem( array $data ): array {
+		if ( empty( $data ) ) {
+			return array();
+		}
+
+		// Bail when the payload is clearly a listing — don't shadow the
+		// listing strategies. We only fire for true single-event payloads.
+		if ( ! empty( $data['upcoming'] ) || ! empty( $data['past'] ) ) {
+			return array();
+		}
+
+		if ( ! empty( $data['items'] ) && is_array( $data['items'] ) && count( $data['items'] ) > 1 ) {
+			return array();
+		}
+
+		if ( empty( $data['item'] ) || ! is_array( $data['item'] ) ) {
+			return array();
+		}
+
+		$item = $data['item'];
+
+		// Accept any of: recordType=12, an @type containing "Event",
+		// startDate/endDate/eventDates fields.
+		$type     = $item['@type'] ?? $item['type'] ?? '';
+		$is_event = false;
+		if ( isset( $item['recordType'] ) && 12 === (int) $item['recordType'] ) {
+			$is_event = true;
+		} elseif ( is_string( $type ) && false !== stripos( $type, 'event' ) ) {
+			$is_event = true;
+		} elseif ( ! empty( $item['startDate'] ) || ! empty( $item['endDate'] ) || ! empty( $item['eventDates'] ) ) {
+			$is_event = true;
+		}
+
+		if ( ! $is_event ) {
+			return array();
+		}
+
+		return $item;
 	}
 
 	/**
