@@ -90,6 +90,7 @@ class AgentMemory extends BaseTool {
 		return array(
 			'success'   => true,
 			'data'      => $result,
+			'scope'     => $scope,
 			'tool_name' => 'agent_memory',
 		);
 	}
@@ -157,6 +158,7 @@ class AgentMemory extends BaseTool {
 		return array(
 			'success'   => true,
 			'data'      => $result,
+			'scope'     => $scope,
 			'tool_name' => 'agent_memory',
 		);
 	}
@@ -202,6 +204,7 @@ class AgentMemory extends BaseTool {
 		return array(
 			'success'   => true,
 			'data'      => $result,
+			'scope'     => $scope,
 			'tool_name' => 'agent_memory',
 		);
 	}

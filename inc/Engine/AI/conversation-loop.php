@@ -1086,8 +1086,9 @@ function datamachine_summarize_tool_execution_results( array $tool_execution_res
 		}
 
 		if ( 'agent_memory' === $tool_name ) {
-			$summary['user_id']  = isset( $parameters['user_id'] ) ? (int) $parameters['user_id'] : null;
-			$summary['agent_id'] = isset( $parameters['agent_id'] ) ? (int) $parameters['agent_id'] : null;
+			$scope               = is_array( $tool_result['scope'] ?? null ) ? $tool_result['scope'] : array();
+			$summary['user_id']  = isset( $scope['user_id'] ) ? (int) $scope['user_id'] : ( isset( $parameters['user_id'] ) ? (int) $parameters['user_id'] : null );
+			$summary['agent_id'] = isset( $scope['agent_id'] ) ? (int) $scope['agent_id'] : ( isset( $parameters['agent_id'] ) ? (int) $parameters['agent_id'] : null );
 			$summary['action']   = isset( $parameters['action'] ) ? sanitize_key( (string) $parameters['action'] ) : null;
 			$summary['file']     = isset( $parameters['file'] ) ? sanitize_file_name( (string) $parameters['file'] ) : 'MEMORY.md';
 			$summary['section']  = isset( $parameters['section'] ) ? sanitize_text_field( (string) $parameters['section'] ) : null;
