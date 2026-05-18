@@ -155,6 +155,25 @@ assert_workflow_equals( array( 'datamachine/delete-flow' ), $flow_steps[1]['disa
 assert_workflow_equals( array( array( 'prompt' => 'Prompt A', 'added_at' => '2026-04-27T00:00:00Z' ) ), $flow_steps[2]['prompt_queue'] ?? null, 'flow preserves explicit prompt queue', $failures, $passes );
 assert_workflow_equals( 'loop', $flow_steps[2]['queue_mode'] ?? null, 'flow preserves explicit AI queue mode', $failures, $passes );
 
+$legacy_handler_workflow = array(
+	'steps' => array(
+		array(
+			'type'           => 'fetch',
+			'handler_slug'   => 'mcp',
+			'handler_config' => array( 'query' => 'https://example.com/source' ),
+		),
+		array(
+			'type'           => 'upsert',
+			'handler_slug'   => 'wiki_upsert',
+			'handler_config' => array( 'fixed_slug' => '13751' ),
+		),
+	),
+);
+$legacy_handler_config = WorkflowConfigFactory::buildEphemeralConfigs( $legacy_handler_workflow )['flow_config'];
+assert_workflow_equals( array( 'mcp' ), $legacy_handler_config['ephemeral_step_0']['handler_slugs'] ?? null, 'workflow handler_slug maps to handler_slugs', $failures, $passes );
+assert_workflow_equals( array( 'mcp' => array( 'query' => 'https://example.com/source' ) ), $legacy_handler_config['ephemeral_step_0']['handler_configs'] ?? null, 'workflow handler_config maps to handler_configs', $failures, $passes );
+assert_workflow_equals( array( 'wiki_upsert' => array( 'fixed_slug' => '13751' ) ), $legacy_handler_config['ephemeral_step_1']['handler_configs'] ?? null, 'workflow upsert handler_config is preserved', $failures, $passes );
+
 $execute_workflow_source = file_get_contents( __DIR__ . '/../inc/Abilities/Job/ExecuteWorkflowAbility.php' ) ?: '';
 $create_pipeline_source  = file_get_contents( __DIR__ . '/../inc/Abilities/Pipeline/CreatePipelineAbility.php' ) ?: '';
 
