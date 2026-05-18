@@ -26,14 +26,14 @@ class SystemTaskSettings extends SettingsHandler {
 	 */
 	public static function get_fields(): array {
 		return array(
-			'task'   => array(
+			'task_type' => array(
 				'type'        => 'select',
 				'label'       => __( 'Task Type', 'data-machine' ),
 				'description' => __( 'The system task to execute. Available tasks are registered by Data Machine and plugins.', 'data-machine' ),
 				'required'    => true,
 				'options'     => self::getTaskOptions(),
 			),
-			'params' => array(
+			'params'    => array(
 				'type'        => 'json',
 				'label'       => __( 'Task Parameters', 'data-machine' ),
 				'description' => __( 'JSON object of task-specific parameters. Pipeline context (post_id) is injected automatically.', 'data-machine' ),

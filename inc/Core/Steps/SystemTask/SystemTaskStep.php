@@ -6,9 +6,9 @@
  * mechanical/deterministic tasks (internal linking, alt text generation)
  * to run as pipeline steps without a full agent turn.
  *
- * Configuration is at the flow step level via handler_config:
- *   task   - Task type identifier (e.g., 'internal_linking')
- *   params - Task-specific parameters merged with pipeline context
+ * Configuration is at the flow step level via flow_step_settings:
+ *   task_type - Task type identifier (e.g., 'internal_linking')
+ *   params    - Task-specific parameters merged with pipeline context
  *
  * Pipeline context (post_id from Publish step) is injected automatically
  * into the task params.
@@ -96,7 +96,7 @@ class SystemTaskStep extends Step {
 	 */
 	protected function validateStepConfiguration(): bool {
 		$step_settings = $this->getHandlerConfig();
-		$task_type     = $step_settings['task'] ?? '';
+		$task_type     = self::getConfiguredTaskType( $step_settings );
 
 		if ( empty( $task_type ) ) {
 			do_action(
@@ -141,7 +141,7 @@ class SystemTaskStep extends Step {
 	 */
 	protected function executeStep(): array {
 		$handler_config = $this->getHandlerConfig();
-		$task_type      = $handler_config['task'];
+		$task_type      = self::getConfiguredTaskType( $handler_config );
 		$task_params    = $handler_config['params'] ?? array();
 
 		// Inject pipeline context into task params.
@@ -467,5 +467,19 @@ class SystemTaskStep extends Step {
 		}
 
 		return $normalized;
+	}
+
+	/**
+	 * Resolve the configured task type for this step.
+	 *
+	 * `task_type` is the canonical field used by public task APIs and workflow
+	 * step configuration.
+	 *
+	 * @param array $settings Flow step settings.
+	 * @return string Configured task type, or empty string.
+	 */
+	private static function getConfiguredTaskType( array $settings ): string {
+		$task_type = $settings['task_type'] ?? '';
+		return is_string( $task_type ) ? $task_type : '';
 	}
 }

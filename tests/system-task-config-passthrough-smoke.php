@@ -89,21 +89,21 @@ $built = build_configs_from_workflow_for_test(
 			array(
 				'type'           => 'system_task',
 				'flow_step_settings' => array(
-					'task'   => 'daily_memory_generation',
-					'params' => array(),
+					'task_type' => 'daily_memory_generation',
+					'params'    => array(),
 				),
 			),
 		),
 	)
 );
 $step0 = $built['flow_config']['ephemeral_step_0'];
-assert_equals( array( 'task' => 'daily_memory_generation', 'params' => array() ), FlowStepConfig::getPrimaryHandlerConfig( $step0 ), 'system_task config reachable', $failures, $passes );
+assert_equals( array( 'task_type' => 'daily_memory_generation', 'params' => array() ), FlowStepConfig::getPrimaryHandlerConfig( $step0 ), 'system_task config reachable', $failures, $passes );
 assert_equals( 'system_task', FlowStepConfig::getEffectiveSlug( $step0 ), 'system_task settings slug is step_type', $failures, $passes );
 assert_absent( 'handler_slug', $step0, 'system_task has no handler_slug', $failures, $passes );
 assert_absent( 'handler_slugs', $step0, 'system_task has no handler_slugs', $failures, $passes );
 assert_absent( 'handler_config', $step0, 'system_task has no handler_config', $failures, $passes );
 assert_absent( 'handler_configs', $step0, 'system_task has no handler_configs', $failures, $passes );
-assert_equals( array( 'task' => 'daily_memory_generation', 'params' => array() ), $step0['flow_step_settings'] ?? array(), 'system_task stores flow_step_settings', $failures, $passes );
+assert_equals( array( 'task_type' => 'daily_memory_generation', 'params' => array() ), $step0['flow_step_settings'] ?? array(), 'system_task stores flow_step_settings', $failures, $passes );
 
 echo "\n[2] fetch stores handler_slugs + handler_configs:\n";
 $built = build_configs_from_workflow_for_test(
@@ -174,10 +174,10 @@ echo "\n[6] normalize canonical rows without cross-shape inference:\n";
 $system_task = FlowStepConfig::normalizeHandlerShape(
 	array(
 		'step_type'      => 'system_task',
-		'handler_config' => array( 'task' => 'agent_call' ),
+		'handler_config' => array( 'task_type' => 'agent_call' ),
 	)
 );
-assert_equals( array( 'task' => 'agent_call' ), $system_task['flow_step_settings'] ?? array(), 'legacy system_task config normalizes to flow_step_settings', $failures, $passes );
+assert_equals( array( 'task_type' => 'agent_call' ), $system_task['flow_step_settings'] ?? array(), 'system_task config normalizes to flow_step_settings', $failures, $passes );
 assert_absent( 'handler_config', $system_task, 'system_task scalar handler_config is removed', $failures, $passes );
 assert_absent( 'handler_slugs', $system_task, 'system_task slugs remain absent', $failures, $passes );
 

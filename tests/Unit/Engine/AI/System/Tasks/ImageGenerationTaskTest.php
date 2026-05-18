@@ -58,7 +58,7 @@ class ImageGenerationTaskTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'steps', $workflow );
 		$this->assertCount( 1, $workflow['steps'] );
 		$this->assertSame( 'system_task', $workflow['steps'][0]['type'] );
-		$this->assertSame( 'image_generation', $workflow['steps'][0]['flow_step_settings']['task'] );
+		$this->assertSame( 'image_generation', $workflow['steps'][0]['flow_step_settings']['task_type'] );
 	}
 
 	public function test_execute_task_fails_when_image_file_missing(): void {

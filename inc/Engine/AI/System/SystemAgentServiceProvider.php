@@ -233,7 +233,7 @@ class SystemAgentServiceProvider {
 	 *   - datamachine_task_process_batch  → process batch chunks
 	 *   - datamachine_task_retry          → retry polling tasks (e.g. image generation)
 	 *   - datamachine_system_agent_set_featured_image → deferred featured image
-	 *   - datamachine_recurring_<task>    → per-schedule ticks via TaskScheduler
+	 *   - datamachine_recurring_<schedule> → per-schedule ticks via TaskScheduler
 	 *
 	 * @since 0.72.0
 	 */
@@ -258,64 +258,64 @@ class SystemAgentServiceProvider {
 		// primary agent.
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
 			$hook        = RecurringScheduleRegistry::hookFor( $schedule );
+			$legacy_hook = RecurringScheduleRegistry::legacyHookFor( $schedule );
 			$task_type   = $schedule['task_type'];
 			$schedule_id = $schedule['schedule_id'];
 			if ( '' === $hook ) {
 				continue;
 			}
 
-			add_action(
-				$hook,
-				static function () use ( $schedule_id, $task_type ): void {
-					$def = RecurringScheduleRegistry::get( $schedule_id );
-					if ( null === $def ) {
-						return;
-					}
-
-					$params = $def['task_params'] ?? array();
-					if ( ! empty( $def['task_params_callback'] ) && is_callable( $def['task_params_callback'] ) ) {
-						$params = (array) call_user_func( $def['task_params_callback'] );
-					}
-
-					if ( ! empty( $def['per_agent'] ) ) {
-						$agents_repo = new Agents();
-						$agents      = $agents_repo->get_all();
-
-						if ( empty( $agents ) ) {
-							// No agents on this install — fall back to a
-							// single site-scoped run so the task still
-							// fires (mirrors pre-multi-agent behaviour).
-							TaskScheduler::schedule( $task_type, $params );
-							return;
-						}
-
-						foreach ( $agents as $agent ) {
-							$agent_id = (int) ( $agent['agent_id'] ?? 0 );
-							$owner_id = (int) ( $agent['owner_id'] ?? 0 );
-
-							if ( $agent_id <= 0 ) {
-								continue;
-							}
-
-							$agent_params             = $params;
-							$agent_params['agent_id'] = $agent_id;
-							$agent_params['user_id']  = $owner_id;
-
-							TaskScheduler::schedule(
-								$task_type,
-								$agent_params,
-								array(
-									'agent_id' => $agent_id,
-									'user_id'  => $owner_id,
-								)
-							);
-						}
-						return;
-					}
-
-					TaskScheduler::schedule( $task_type, $params );
+			$dispatch_schedule = static function () use ( $schedule_id, $task_type ): void {
+				$def = RecurringScheduleRegistry::get( $schedule_id );
+				if ( null === $def ) {
+					return;
 				}
-			);
+
+				$params = $def['task_params'] ?? array();
+				if ( ! empty( $def['task_params_callback'] ) && is_callable( $def['task_params_callback'] ) ) {
+					$params = (array) call_user_func( $def['task_params_callback'] );
+				}
+
+				if ( ! empty( $def['per_agent'] ) ) {
+					$agents_repo = new Agents();
+					$agents      = $agents_repo->get_all();
+
+					if ( empty( $agents ) ) {
+						// No agents on this install — fall back to a
+						// single site-scoped run so the task still
+						// fires (mirrors pre-multi-agent behaviour).
+						TaskScheduler::schedule( $task_type, $params );
+						return;
+					}
+
+					foreach ( $agents as $agent ) {
+						$agent_id = (int) ( $agent['agent_id'] ?? 0 );
+						$owner_id = (int) ( $agent['owner_id'] ?? 0 );
+
+						if ( $agent_id <= 0 ) {
+							continue;
+						}
+
+						$agent_params             = $params;
+						$agent_params['agent_id'] = $agent_id;
+						$agent_params['user_id']  = $owner_id;
+
+						TaskScheduler::schedule(
+							$task_type,
+							$agent_params,
+							array(
+								'agent_id' => $agent_id,
+								'user_id'  => $owner_id,
+							)
+						);
+					}
+					return;
+				}
+
+				TaskScheduler::schedule( $task_type, $params );
+			};
+
+			add_action( $hook, $dispatch_schedule );
 		}
 	}
 
@@ -330,8 +330,9 @@ class SystemAgentServiceProvider {
 		}
 
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
-			$hook    = RecurringScheduleRegistry::hookFor( $schedule );
-			$enabled = RecurringScheduleRegistry::isEnabled( $schedule );
+			$hook        = RecurringScheduleRegistry::hookFor( $schedule );
+			$legacy_hook = RecurringScheduleRegistry::legacyHookFor( $schedule );
+			$enabled     = RecurringScheduleRegistry::isEnabled( $schedule );
 
 			$options = array();
 			if ( ! empty( $schedule['cron_expression'] ) ) {
@@ -351,6 +352,10 @@ class SystemAgentServiceProvider {
 				$options,
 				$enabled
 			);
+
+			if ( $legacy_hook !== $hook ) {
+				RecurringScheduler::unschedule( $legacy_hook, array() );
+			}
 
 			if ( $result instanceof \WP_Error ) {
 				do_action(

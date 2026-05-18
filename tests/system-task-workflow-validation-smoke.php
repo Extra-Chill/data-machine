@@ -90,8 +90,8 @@ $wf = array(
 		array(
 			'type'               => 'system_task',
 			'flow_step_settings' => array(
-				'task'   => 'daily_memory_generation',
-				'params' => array(),
+				'task_type' => 'daily_memory_generation',
+				'params'     => array(),
 			),
 		),
 	),
@@ -145,7 +145,7 @@ $wf = array(
 	'steps' => array(
 		array( 'type' => 'fetch', 'handler_slug' => 'rss' ),
 		array( 'type' => 'ai' ),
-		array( 'type' => 'system_task', 'flow_step_settings' => array( 'task' => 'cleanup' ) ),
+		array( 'type' => 'system_task', 'flow_step_settings' => array( 'task_type' => 'cleanup' ) ),
 	),
 );
 $r = validate_workflow_for_test( $wf );
@@ -185,8 +185,8 @@ $wf = array(
 		array(
 			'type'               => 'system_task',
 			'flow_step_settings' => array(
-				'task'   => 'daily_memory_generation',
-				'params' => array( 'date' => '2026-04-24' ),
+				'task_type' => 'daily_memory_generation',
+				'params'     => array( 'date' => '2026-04-24' ),
 			),
 		),
 	),

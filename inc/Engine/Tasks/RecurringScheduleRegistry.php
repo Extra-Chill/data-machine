@@ -127,14 +127,38 @@ class RecurringScheduleRegistry {
 	/**
 	 * The Action Scheduler hook that fires for this schedule.
 	 *
-	 * All scheduled hooks share a single naming convention so external
-	 * code can reliably target them.
+	 * Hooks are schedule-scoped, not task-scoped. A task can have multiple
+	 * recurring schedules with different params/cadences, so the hook must
+	 * identify the schedule binding that fired.
 	 *
 	 * @param array $schedule Normalized schedule definition.
 	 * @return string
 	 */
 	public static function hookFor( array $schedule ): string {
-		return 'datamachine_recurring_' . $schedule['task_type'];
+		$schedule_id = $schedule['schedule_id'] ?? '';
+		return 'datamachine_recurring_' . self::sanitizeHookSuffix( (string) $schedule_id );
+	}
+
+	/**
+	 * Legacy task-scoped Action Scheduler hook used before schedule ids were canonical.
+	 *
+	 * @param array $schedule Normalized schedule definition.
+	 * @return string Legacy hook name.
+	 */
+	public static function legacyHookFor( array $schedule ): string {
+		return 'datamachine_recurring_' . self::sanitizeHookSuffix( (string) $schedule['task_type'] );
+	}
+
+	/**
+	 * Normalize a schedule/task id for an Action Scheduler hook suffix.
+	 *
+	 * @param string $value Raw schedule or task identifier.
+	 * @return string Hook-safe suffix.
+	 */
+	private static function sanitizeHookSuffix( string $value ): string {
+		$value = strtolower( $value );
+		$value = preg_replace( '/[^a-z0-9_\-]/', '_', $value );
+		return trim( (string) $value, '_' );
 	}
 
 	/**

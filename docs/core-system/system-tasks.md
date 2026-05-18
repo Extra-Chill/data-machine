@@ -1,6 +1,6 @@
 # System Tasks
 
-System tasks are background operations that run outside the normal pipeline execution cycle. They handle AI-powered content operations (alt text, meta descriptions, internal linking), media processing (image generation, optimization), and agent housekeeping (daily memory synthesis, agent ping). All system tasks share a common base class with standardized job management, effect tracking, and undo support.
+System tasks are reusable task handlers that can run on demand, from recurring schedules, or inline as workflow/pipeline steps. They handle AI-powered content operations (alt text, meta descriptions, internal linking), media processing (image generation, optimization), and agent housekeeping (daily memory synthesis). All system tasks share a common base class with standardized job management, effect tracking, and undo support.
 
 ## Overview
 
@@ -9,9 +9,9 @@ The system tasks framework consists of:
 1. **SystemTask base class** — abstract base with job completion, failure handling, rescheduling, and undo
 2. **SystemAgentServiceProvider** — registers task handlers and Action Scheduler hooks
 3. **TaskRegistry** — central registry of available task types
-4. **TaskScheduler** — schedules and dispatches tasks via Action Scheduler
+4. **TaskScheduler** — enqueues a task run through `datamachine/execute-workflow`
 5. **SystemTaskStep** — pipeline step type that bridges system tasks into pipeline workflows
-6. **Seven built-in tasks** — each implementing a specific AI or system operation
+6. **RecurringScheduleRegistry** — optional schedule bindings that say when a task should run
 
 > Note: `GitHubIssueTask` was extracted to the `data-machine-code` extension plugin (see PR #926). It is no longer part of core data-machine.
 
@@ -24,10 +24,29 @@ All system tasks extend this abstract class:
 
 ```php
 abstract class SystemTask {
-    abstract public function execute(int $jobId, array $params): void;
+    public function getWorkflow(array $params): array;
+    abstract public function executeTask(int $jobId, array $params): void;
     abstract public function getTaskType(): string;
 }
 ```
+
+`getWorkflow()` is the scheduling contract. The default implementation returns a single `system_task` workflow step using the canonical `flow_step_settings.task_type` key:
+
+```php
+[
+    'steps' => [
+        [
+            'type' => 'system_task',
+            'flow_step_settings' => [
+                'task_type' => $this->getTaskType(),
+                'params'    => $params,
+            ],
+        ],
+    ],
+]
+```
+
+`executeTask()` is the imperative body called by `SystemTaskStep`. System task step settings use `task_type`; configs that still use the older `task` key must be upgraded before they run.
 
 ### Job Lifecycle Methods
 
@@ -185,26 +204,28 @@ Registers all task infrastructure on instantiation:
 
 ### Task Registration
 
-Hooks the `datamachine_tasks` filter to register the seven built-in task types:
+Hooks the `datamachine_tasks` filter to register built-in task types:
 
 | Task Key | Class |
 |----------|-------|
-| `agent_ping` | `AgentPingTask` |
+| `agent_call` | `AgentCallTask` |
+| `dispatch_message` | `DispatchMessageTask` |
+| `emit_data_packets` | `EmitDataPacketsTask` |
 | `image_generation` | `ImageGenerationTask` |
 | `image_optimization` | `ImageOptimizationTask` |
 | `alt_text_generation` | `AltTextTask` |
 | `internal_linking` | `InternalLinkingTask` |
 | `daily_memory_generation` | `DailyMemoryTask` |
 | `meta_description_generation` | `MetaDescriptionTask` |
+| `retention_*` | Retention cleanup task classes |
 
 ### Action Scheduler Hooks
 
 | Hook | Handler | Description |
 |------|---------|-------------|
-| `datamachine_task_handle` | `handleScheduledTask` | Dispatches a scheduled task job |
 | `datamachine_task_process_batch` | `handleBatchChunk` | Processes a batch chunk |
 | `datamachine_system_agent_set_featured_image` | `handleDeferredFeaturedImage` | Retries featured image assignment (up to 12 × 15s = 3 minutes) |
-| `datamachine_recurring_<task_type>` | closure → `TaskScheduler::schedule()` | One hook per registered recurring schedule. Fires on the cadence defined by the schedule and enqueues an ephemeral DM job for the bound task. |
+| `datamachine_recurring_<schedule_id>` | closure → `TaskScheduler::schedule()` | One hook per registered recurring schedule. Fires on the cadence defined by the schedule and enqueues a DM workflow job for the bound task. |
 
 ### Recurring Task Schedule Management
 
@@ -218,9 +239,7 @@ Scheduler:
   pending → schedule via `RecurringScheduler::ensureSchedule()`.
 - If the setting resolves to false → unschedule.
 
-On upgrade, any pending AS action queued under the pre-refactor hook
-`datamachine_system_agent_daily_memory` is unscheduled during the first
-reconciliation so no zombie recurring action remains in the queue.
+Recurring hooks are schedule-scoped because one task can have multiple schedules with different params or cadences. Task-scoped legacy hooks (`datamachine_recurring_<task_type>`) are unscheduled when the schedule-scoped hook is reconciled.
 
 ## SystemTaskStep
 
@@ -233,7 +252,7 @@ A pipeline step type that bridges system tasks into the pipeline engine. This al
 
 ### How It Works
 
-1. Reads `flow_step_settings.task` to determine the task type
+1. Reads `flow_step_settings.task_type` to determine the task type
 2. Creates a child DM job for independent tracking
 3. Injects pipeline context (e.g., `post_id` from a preceding Publish step) into task params
 4. Executes the task handler synchronously
@@ -243,8 +262,10 @@ A pipeline step type that bridges system tasks into the pipeline engine. This al
 
 Configured via the pipeline step UI with two fields:
 
-- **Task** (select dropdown) — chooses from registered task types via `TaskRegistry`
+- **Task Type** (select dropdown, stored as `task_type`) — chooses from registered task types via `TaskRegistry`
 - **Params** (JSON editor) — task-specific parameters, defaults to `{}`
+
+Bundle, workflow, and agent-generated configs must use `task_type`.
 
 ### Settings
 
@@ -363,14 +384,13 @@ Compresses oversized images and generates WebP variants using WordPress's native
 | Manual run | No |
 | Prompts | None (not an AI task) |
 
-### AgentPingTask
+### AgentCallTask
 
-**Type:** `agent_ping`
-**Source:** `inc/Engine/AI/System/Tasks/AgentPingTask.php`
-**Since:** v0.60.0
+**Type:** `agent_call`
+**Source:** `inc/Engine/AI/System/Tasks/AgentCallTask.php`
 **Undo:** No
 
-Sends pipeline context to external webhook endpoints (Discord, Slack, custom HTTP collectors). Delegates HTTP transport to `SendPingAbility` (`inc/Abilities/AgentPing/SendPingAbility.php`). When dispatched as a pipeline step via `SystemTaskStep`, supports queue popping so a single ping configuration can be reused across queued runs.
+Dispatches a structured agent invocation through a target transport. Webhook fire-and-forget delivery preserves the historical agent ping behavior under the generic `agent_call` contract. When dispatched as a pipeline step via `SystemTaskStep`, it can forward pipeline context and use queue modes so one configuration can be reused across queued runs.
 
 | Property | Value |
 |----------|-------|
@@ -390,7 +410,7 @@ add_filter('datamachine_tasks', function(array $tasks): array {
 });
 ```
 
-The class must extend `SystemTask` and implement `execute()` and `getTaskType()`. Override `getTaskMeta()` for admin UI display, `supportsUndo()` for reversibility, and `getPromptDefinitions()` for editable prompts.
+The class must extend `SystemTask` and implement `executeTask()` and `getTaskType()`. Override `getWorkflow()` only when the task needs a richer multi-step workflow. Override `getTaskMeta()` for admin UI display, `supportsUndo()` for reversibility, and `getPromptDefinitions()` for editable prompts.
 
 ## Architecture Diagram
 
@@ -399,22 +419,24 @@ The class must extend `SystemTask` and implement `execute()` and `getTaskType()`
                      |                          |                         |
                      v                          v                         v
               TaskScheduler              SystemTaskStep              TaskScheduler
-                     |                          |                         |
-                     v                          v                         v
-              TaskRegistry -----> resolve task class <----- TaskRegistry
-                                        |
-                                        v
-                                   SystemTask
-                                   .execute()
-                                        |
-                    +-------------------+-------------------+
-                    |                   |                   |
-                    v                   v                   v
-             completeJob()        failJob()          reschedule()
-                    |                   |                   |
-                    v                   v                   v
-              Jobs table          Jobs table        Action Scheduler
-            (engine_data)       (failed status)     (retry in N sec)
+                      |                          |                         |
+                      v                          v                         v
+              getWorkflow() ----> system_task step <----- TaskRegistry
+                      |                          |
+                      v                          v
+              execute-workflow             executeTask()
+                                                 |
+                                                 v
+                                           SystemTask body
+                                                 |
+                    +----------------------------+-------------------+
+                    |                            |                   |
+                    v                            v                   v
+             completeJob()                 failJob()          reschedule()
+                    |                            |                   |
+                    v                            v                   v
+              Jobs table                   Jobs table        Action Scheduler
+            (engine_data)                (failed status)     (retry in N sec)
 ```
 
 ## Source Files
@@ -429,6 +451,6 @@ The class must extend `SystemTask` and implement `execute()` and `getTaskType()`
 | `inc/Engine/AI/System/Tasks/AltTextTask.php` | AI-powered image alt text generation |
 | `inc/Engine/AI/System/Tasks/ImageGenerationTask.php` | Async image generation via Replicate API |
 | `inc/Engine/AI/System/Tasks/ImageOptimizationTask.php` | Image compression and WebP generation |
-| `inc/Engine/AI/System/Tasks/AgentPingTask.php` | Send pipeline context to external webhook endpoints |
+| `inc/Engine/AI/System/Tasks/AgentCallTask.php` | Send structured agent invocation payloads |
 | `inc/Core/Steps/SystemTask/SystemTaskStep.php` | Pipeline step type bridging system tasks |
 | `inc/Core/Steps/SystemTask/SystemTaskSettings.php` | Admin UI settings for the SystemTask step |
