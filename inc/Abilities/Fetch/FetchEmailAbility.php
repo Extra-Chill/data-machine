@@ -416,42 +416,73 @@ class FetchEmailAbility {
 		$body = $this->fetchBody( $connection, $uid );
 
 		// Check for attachments.
-		$structure        = imap_fetchstructure( $connection, $uid, FT_UID );
-		$attachment_count = 0;
-		$file_info        = null;
+		$structure         = imap_fetchstructure( $connection, $uid, FT_UID );
+		$attachment_count  = 0;
+		$downloaded_files  = array();
+		$skipped_count     = 0;
 
 		if ( $structure ) {
 			$attachments      = $this->findAttachments( $structure );
 			$attachment_count = count( $attachments );
 
 			if ( $config['download_attachments'] && ! empty( $attachments ) ) {
-				$file_info = $this->downloadAttachment( $connection, $uid, $attachments[0] );
+				foreach ( $attachments as $attachment ) {
+					$file_info = $this->downloadAttachment( $connection, $uid, $attachment );
+					if ( null === $file_info ) {
+						++$skipped_count;
+						do_action(
+							'datamachine_log',
+							'warning',
+							'Email attachment download failed',
+							array(
+								'uid'         => $uid,
+								'filename'    => $attachment['filename'] ?? '(unknown)',
+								'part_number' => $attachment['part_number'] ?? '',
+							)
+						);
+						continue;
+					}
+					$downloaded_files[] = $file_info;
+				}
 			}
+		}
+
+		$metadata = array(
+			'uid'               => $uid,
+			'message_id'        => $message_id,
+			'item_identifier'   => $message_id,
+			'from'              => $from_email,
+			'from_name'         => $from_name,
+			'to'                => $to_address,
+			'date'              => $date,
+			'original_date_gmt' => $date,
+			'seen'              => $seen,
+			'flagged'           => $flagged,
+			'has_attachments'   => $attachment_count > 0,
+			'attachment_count'  => $attachment_count,
+			'in_reply_to'       => $in_reply,
+			'references'        => $references,
+		);
+
+		// Expose every downloaded attachment under metadata.files so callers
+		// that need access to attachments beyond the first can read them.
+		// file_info stays as the first attachment for backward compatibility
+		// with the FetchHandler pipeline contract (one file_info per item).
+		if ( ! empty( $downloaded_files ) ) {
+			$metadata['files'] = $downloaded_files;
+		}
+		if ( $skipped_count > 0 ) {
+			$metadata['attachments_skipped'] = $skipped_count;
 		}
 
 		$item = array(
 			'title'    => $subject,
 			'content'  => $body,
-			'metadata' => array(
-				'uid'               => $uid,
-				'message_id'        => $message_id,
-				'item_identifier'   => $message_id,
-				'from'              => $from_email,
-				'from_name'         => $from_name,
-				'to'                => $to_address,
-				'date'              => $date,
-				'original_date_gmt' => $date,
-				'seen'              => $seen,
-				'flagged'           => $flagged,
-				'has_attachments'   => $attachment_count > 0,
-				'attachment_count'  => $attachment_count,
-				'in_reply_to'       => $in_reply,
-				'references'        => $references,
-			),
+			'metadata' => $metadata,
 		);
 
-		if ( $file_info ) {
-			$item['file_info'] = $file_info;
+		if ( ! empty( $downloaded_files ) ) {
+			$item['file_info'] = $downloaded_files[0];
 		}
 
 		return $item;
@@ -626,6 +657,7 @@ class FetchEmailAbility {
 
 		return array(
 			'file_path' => $file_path,
+			'filename'  => basename( $file_path ),
 			'mime_type' => $attachment_info['mime_type'],
 			'file_size' => $written,
 		);
