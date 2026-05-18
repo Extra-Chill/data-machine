@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.122.3] - 2026-05-18
+
+### Changed
+- update flow config unit fixtures
+- require canonical flow step config
+
 ## [0.122.2] - 2026-05-18
 
 ### Fixed
