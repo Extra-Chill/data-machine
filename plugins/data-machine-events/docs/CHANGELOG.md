@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.37.0] - 2026-05-18
+
+### Added
+- SquarespaceExtractor handles Summary/User-Items-List collection-ID deref + single-event-detail pages
+- WordPressGenericExtractor for WP sites without The Events Calendar (Tribe) plugin
+
+### Fixed
+- sync block.json versions on release so style/script changes bust caches
+
 ## [0.36.0] - 2026-05-18
 
 ### Added
