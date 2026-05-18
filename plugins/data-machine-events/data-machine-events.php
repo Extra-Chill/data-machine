@@ -119,6 +119,7 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	\WP_CLI::add_command( 'data-machine-events check duplicates', \DataMachineEvents\Cli\Check\CheckDuplicatesCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check clean-duplicates', \DataMachineEvents\Cli\Check\CleanDuplicatesCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check merged-bills', \DataMachineEvents\Cli\Check\CheckMergedBillsCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check merge-duplicate-venues', \DataMachineEvents\Cli\Check\CheckMergeDuplicateVenuesCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check quality', \DataMachineEvents\Cli\Check\CheckQualityCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check all', \DataMachineEvents\Cli\Check\CheckAllCommand::class );
 }

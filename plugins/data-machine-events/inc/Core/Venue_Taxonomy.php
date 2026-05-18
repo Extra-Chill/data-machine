@@ -272,10 +272,19 @@ class Venue_Taxonomy {
 		// Lowercase.
 		$text = strtolower( $text );
 
+		// Normalize ampersand variants to "and" so "Hook & Ladder" and
+		// "Hook and Ladder" collapse to the same key. Spaced ampersand
+		// becomes " and " (one token); tight ampersand (e.g. "rock&roll")
+		// becomes "and" without surrounding spaces — the subsequent
+		// alphanumeric strip + whitespace collapse normalizes both shapes.
+		$text = preg_replace( '/\s*&\s*/', ' and ', $text );
+
 		// Remove articles at the start.
 		$text = preg_replace( '/^(the|a|an)\s+/i', '', $text );
 
 		// Remove all non-alphanumeric characters (keeps spaces).
+		// This also strips apostrophes, so "Amos' Southend" → "amos southend"
+		// matches "Amos Southend".
 		$text = preg_replace( '/[^a-z0-9\s]/', '', $text );
 
 		// Collapse whitespace and trim.
@@ -712,11 +721,29 @@ class Venue_Taxonomy {
 	/**
 	 * Normalize address string for consistent comparison
 	 *
+	 * Strips suite/unit/apartment suffixes BEFORE running the
+	 * street-suffix replacements so "3010 Minnehaha Ave STE 420"
+	 * and "3010 Minnehaha Ave" collapse to the same key.
+	 *
 	 * @param string $address Raw address string
 	 * @return string Normalized address for matching
 	 */
-	private static function normalize_address_for_matching( string $address ): string {
+	public static function normalize_address_for_matching( string $address ): string {
 		$address = strtolower( trim( $address ) );
+
+		// Strip suite/unit/apartment/room suffixes that produce false
+		// non-matches for the same physical street address. Runs first
+		// so the downstream replacements operate on the cleaned street.
+		// Two passes:
+		//   1. Word-prefixed suffix tokens (ste, suite, unit, apt, …) — \b works.
+		//   2. Bare `#NNN` style — handled separately because `#` is not a
+		//      word character and \b would not anchor it.
+		$address = preg_replace(
+			'/\b(ste|suite|unit|apt|apartment|room|rm)\s*[a-z0-9\-]+\b/i',
+			'',
+			$address
+		);
+		$address = preg_replace( '/#\s*[a-z0-9\-]+/i', '', $address );
 
 		$replacements = array(
 			'/\bstreet\b/'    => 'st',
@@ -739,7 +766,12 @@ class Venue_Taxonomy {
 			$address = preg_replace( $pattern, $replacement, $address );
 		}
 
-		return preg_replace( '/\s+/', ' ', trim( $address ) );
+		// Collapse whitespace and strip stray trailing separators
+		// (suite-suffix removal can leave a dangling comma).
+		$address = preg_replace( '/\s+/', ' ', trim( $address ) );
+		$address = trim( $address, ' ,-' );
+
+		return $address;
 	}
 
 	/**
