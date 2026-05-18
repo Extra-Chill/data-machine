@@ -216,6 +216,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Fetch/QueryWordPressPostsAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Publish/PublishWordPressAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Publish/SendEmailAbility.php';
+	require_once __DIR__ . '/inc/Abilities/Publish/SendEmailQueuedAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Update/UpdateWordPressAbility.php';
 	require_once __DIR__ . '/inc/Abilities/Handler/TestHandlerAbility.php';
 	// Register ability hooks immediately during plugins_loaded.
@@ -327,6 +328,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Fetch\QueryWordPressPostsAbility();
 	new \DataMachine\Abilities\Publish\PublishWordPressAbility();
 	new \DataMachine\Abilities\Publish\SendEmailAbility();
+	new \DataMachine\Abilities\Publish\SendEmailQueuedAbility();
 	new \DataMachine\Abilities\Update\UpdateWordPressAbility();
 	new \DataMachine\Abilities\Handler\TestHandlerAbility();
 
