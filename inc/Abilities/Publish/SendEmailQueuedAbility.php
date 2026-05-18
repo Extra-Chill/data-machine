@@ -217,8 +217,8 @@ class SendEmailQueuedAbility {
 
 		// Worker payload carries an internal _attempt counter. Not exposed in
 		// the public input_schema; defaults to 1 on first enqueue.
-		$payload              = $input;
-		$payload['_attempt']  = 1;
+		$payload             = $input;
+		$payload['_attempt'] = 1;
 
 		$timestamp = $this->normalizeSendAt( $send_at_raw );
 
@@ -377,9 +377,9 @@ class SendEmailQueuedAbility {
 		}
 
 		// Exponential backoff: 60s, 300s, 1500s, ... (60 * 5^(attempt-1)).
-		$delay              = 60 * (int) pow( 5, $attempt - 1 );
-		$retry_at           = time() + $delay;
-		$send['_attempt']   = $attempt + 1;
+		$delay            = 60 * (int) pow( 5, $attempt - 1 );
+		$retry_at         = time() + $delay;
+		$send['_attempt'] = $attempt + 1;
 
 		if ( ! function_exists( 'as_schedule_single_action' ) ) {
 			do_action(

@@ -182,7 +182,7 @@ class SendEmailAbility {
 					'level'   => 'error',
 					'message' => 'Email: ' . $error,
 					'data'    => array(
-						'template'           => $config['template'],
+						'template'             => $config['template'],
 						'registered_templates' => is_array( $templates ) ? array_keys( $templates ) : array(),
 					),
 				);

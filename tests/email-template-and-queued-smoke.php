@@ -140,14 +140,14 @@ if ( ! function_exists( 'get_bloginfo' ) ) {
 }
 
 if ( ! function_exists( 'get_option' ) ) {
-	function get_option( string $key, $default = false ) {
+	function get_option( string $key, $default_value = false ) {
 		if ( 'date_format' === $key ) {
 			return 'Y-m-d';
 		}
 		if ( 'admin_email' === $key ) {
 			return 'admin@example.com';
 		}
-		return $default;
+		return $default_value;
 	}
 }
 
