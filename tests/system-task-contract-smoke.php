@@ -36,10 +36,9 @@ echo "=== system-task-contract-smoke ===\n";
 echo "\n[1] task_type is the canonical workflow/settings key\n";
 datamachine_contract_assert_contains( $system_task, "'task_type' => \$this->getTaskType()", 'SystemTask::getWorkflow writes task_type', $failures, $passes );
 datamachine_contract_assert_contains( $settings, "'task_type' => array", 'SystemTaskSettings exposes task_type field', $failures, $passes );
-datamachine_contract_assert_contains( $settings, "\$raw_settings['task_type'] = \$raw_settings['task'];", 'SystemTaskSettings maps legacy task to task_type on sanitize', $failures, $passes );
 
-echo "\n[2] legacy task key remains readable\n";
-datamachine_contract_assert_contains( $step, "\$settings['task_type'] ?? ( \$settings['task'] ?? '' )", 'SystemTaskStep reads task_type with task fallback', $failures, $passes );
+echo "\n[2] system task step reads only task_type\n";
+datamachine_contract_assert_contains( $step, "\$settings['task_type'] ?? ''", 'SystemTaskStep reads task_type directly', $failures, $passes );
 
 if ( ! empty( $failures ) ) {
 	echo "\nFAILED: " . count( $failures ) . " system task contract assertion(s) failed.\n";

@@ -43,23 +43,6 @@ class SystemTaskSettings extends SettingsHandler {
 	}
 
 	/**
-	 * Sanitize System Task step settings.
-	 *
-	 * Accepts the legacy `task` key so existing saved steps can still be opened
-	 * and resaved through the settings UI without losing their task selection.
-	 *
-	 * @param array $raw_settings Raw settings input from user.
-	 * @return array Sanitized settings.
-	 */
-	public static function sanitize( array $raw_settings ): array {
-		if ( empty( $raw_settings['task_type'] ) && ! empty( $raw_settings['task'] ) ) {
-			$raw_settings['task_type'] = $raw_settings['task'];
-		}
-
-		return parent::sanitize( $raw_settings );
-	}
-
-	/**
 	 * Get available task types as select options.
 	 *
 	 * Reads from the System Agent's registered task handlers.

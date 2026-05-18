@@ -174,10 +174,10 @@ echo "\n[6] normalize canonical rows without cross-shape inference:\n";
 $system_task = FlowStepConfig::normalizeHandlerShape(
 	array(
 		'step_type'      => 'system_task',
-		'handler_config' => array( 'task' => 'agent_call' ),
+		'handler_config' => array( 'task_type' => 'agent_call' ),
 	)
 );
-assert_equals( array( 'task' => 'agent_call' ), $system_task['flow_step_settings'] ?? array(), 'legacy system_task config normalizes to flow_step_settings', $failures, $passes );
+assert_equals( array( 'task_type' => 'agent_call' ), $system_task['flow_step_settings'] ?? array(), 'system_task config normalizes to flow_step_settings', $failures, $passes );
 assert_absent( 'handler_config', $system_task, 'system_task scalar handler_config is removed', $failures, $passes );
 assert_absent( 'handler_slugs', $system_task, 'system_task slugs remain absent', $failures, $passes );
 

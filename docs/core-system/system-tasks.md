@@ -46,7 +46,7 @@ abstract class SystemTask {
 ]
 ```
 
-`executeTask()` is the imperative body called by `SystemTaskStep`. Legacy persisted step settings that use `task` instead of `task_type` are still readable, but new code should write `task_type`.
+`executeTask()` is the imperative body called by `SystemTaskStep`. System task step settings use `task_type`; configs that still use the older `task` key must be upgraded before they run.
 
 ### Job Lifecycle Methods
 
@@ -265,7 +265,7 @@ Configured via the pipeline step UI with two fields:
 - **Task Type** (select dropdown, stored as `task_type`) — chooses from registered task types via `TaskRegistry`
 - **Params** (JSON editor) — task-specific parameters, defaults to `{}`
 
-Legacy persisted configs may still contain `task`; the runtime reads both keys. New bundle, workflow, and agent-generated configs should use `task_type`.
+Bundle, workflow, and agent-generated configs must use `task_type`.
 
 ### Settings
 

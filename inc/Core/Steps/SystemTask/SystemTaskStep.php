@@ -10,8 +10,6 @@
  *   task_type - Task type identifier (e.g., 'internal_linking')
  *   params    - Task-specific parameters merged with pipeline context
  *
- * Legacy persisted steps may still use `task`; runtime reads both keys.
- *
  * Pipeline context (post_id from Publish step) is injected automatically
  * into the task params.
  *
@@ -474,14 +472,14 @@ class SystemTaskStep extends Step {
 	/**
 	 * Resolve the configured task type for this step.
 	 *
-	 * `task_type` is the canonical field used by public task APIs. The older
-	 * `task` field remains readable so persisted flows continue to execute.
+	 * `task_type` is the canonical field used by public task APIs and workflow
+	 * step configuration.
 	 *
 	 * @param array $settings Flow step settings.
 	 * @return string Configured task type, or empty string.
 	 */
 	private static function getConfiguredTaskType( array $settings ): string {
-		$task_type = $settings['task_type'] ?? ( $settings['task'] ?? '' );
+		$task_type = $settings['task_type'] ?? '';
 		return is_string( $task_type ) ? $task_type : '';
 	}
 }
