@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.122.7] - 2026-05-18
+
+### Fixed
+- scope handler tool cache by job config
+
 ## [0.122.6] - 2026-05-18
 
 ### Fixed
