@@ -994,6 +994,21 @@
     gap: 0.75rem;
 }
 
+/* Badges sit inline with everything else in the row strip, so drop the
+ * stacked-layout bottom margin from .data-machine-taxonomy-badges /
+ * .taxonomy-badges (both selectors exist — host theme can supply either).
+ * Without this, the badge block keeps margin-bottom from its default
+ * stacked-card styling and visually pushes the title baseline out of
+ * alignment with the time and More Info button. */
+.data-machine-events-calendar .data-machine-date-group[data-event-count="1"] .data-machine-taxonomy-badges,
+.data-machine-events-calendar .data-machine-date-group[data-event-count="1"] .taxonomy-badges,
+.data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .data-machine-taxonomy-badges,
+.data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .taxonomy-badges {
+    margin-bottom: 0;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
 /* Hide the carousel overflow "More" indicator on low-density days — irrelevant
  * when there's nothing to scroll. */
 .data-machine-events-calendar .data-machine-date-group[data-event-count="1"]::after,
