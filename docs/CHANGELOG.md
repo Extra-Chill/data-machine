@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.122.1] - 2026-05-18
+
+### Fixed
+- require canonical system task type field
+
 ## [0.122.0] - 2026-05-18
 
 ### Added
