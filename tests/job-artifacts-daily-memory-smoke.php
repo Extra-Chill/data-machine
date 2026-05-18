@@ -87,10 +87,11 @@ $assert(
 
 $assert(
 	false !== strpos( $loop, "'agent_memory' === \$tool_name" )
+		&& false !== strpos( $loop, "\$tool_result['scope']" )
 		&& false !== strpos( $loop, "\$summary['file']" )
 		&& false !== strpos( $loop, "\$summary['section']" )
 		&& false !== strpos( $loop, "'update' === \$summary['action']" ),
-	'agent memory update summaries preserve file, section, action, and content for artifact export'
+	'agent memory update summaries preserve resolved scope, file, section, action, and content for artifact export'
 );
 
 $assert(
@@ -110,8 +111,9 @@ $assert(
 $assert(
 	false !== strpos( $job_artifacts, 'new AgentMemoryFile' )
 		&& false !== strpos( $job_artifacts, 'get_all()' )
+		&& false !== strpos( $job_artifacts, '$agent_id <= 0 && $default_agent_id > 0' )
 		&& false !== strpos( $job_artifacts, 'agent_memory_fallback_content' ),
-	'agent memory artifacts export the full updated file content with a write-content fallback'
+	'agent memory artifacts export the full updated file content using the resolved job agent when needed'
 );
 
 $assert(

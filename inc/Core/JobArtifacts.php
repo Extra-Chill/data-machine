@@ -225,10 +225,13 @@ class JobArtifacts {
 				continue;
 			}
 
-			$agent_id = (int) ( $tool_call['agent_id'] ?? $default_agent_id );
-			$user_id  = (int) ( $tool_call['user_id'] ?? ( $job['user_id'] ?? 0 ) );
-			$layer    = AgentMemoryFile::resolve_layer_for( $filename );
-			$key      = $layer . ':' . $agent_id . ':' . $user_id . ':' . $filename;
+			$agent_id = (int) ( $tool_call['agent_id'] ?? 0 );
+			if ( $agent_id <= 0 && $default_agent_id > 0 ) {
+				$agent_id = $default_agent_id;
+			}
+			$user_id = (int) ( $tool_call['user_id'] ?? ( $job['user_id'] ?? 0 ) );
+			$layer   = AgentMemoryFile::resolve_layer_for( $filename );
+			$key     = $layer . ':' . $agent_id . ':' . $user_id . ':' . $filename;
 
 			$files[ $key ] = array(
 				'agent_id' => $agent_id,
