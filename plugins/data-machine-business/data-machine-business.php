@@ -60,6 +60,7 @@ function datamachine_business_load_handlers() {
 	// Google Drive (shares the unified GoogleAuth credential — see scope union below)
 	new \DataMachineBusiness\Abilities\GoogleDrive\FetchGoogleDriveAbility();
 	new \DataMachineBusiness\Abilities\GoogleDrive\ListGoogleDriveFilesAbility();
+	new \DataMachineBusiness\Abilities\GoogleDrive\ReadGoogleDriveDocAbility();
 	new \DataMachineBusiness\Handlers\GoogleDrive\GoogleDriveFetch();
 
 	// Slack
