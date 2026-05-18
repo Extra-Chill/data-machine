@@ -1,0 +1,79 @@
+name: Release asset
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to (re)build and upload an asset for.'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-release-asset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction
+      - run: npm ci
+      - run: npm run build
+
+      - name: Build plugin ZIP
+        run: |
+          mkdir -p dist/data-machine
+          rsync -a ./ dist/data-machine/ \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.claude' \
+            --exclude='.datamachine' \
+            --exclude='AGENTS.md' \
+            --exclude='dist' \
+            --exclude='docs' \
+            --exclude='node_modules' \
+            --exclude='tests' \
+            --exclude='.buildignore' \
+            --exclude='*.zip' \
+            --exclude='*.tar.gz' \
+            --exclude='*.log' \
+            --exclude='*.tmp' \
+            --exclude='*.temp' \
+            --exclude='*.cache' \
+            --exclude='*.bak' \
+            --exclude='*.backup' \
+            --exclude='package-lock.json' \
+            --exclude='package.json' \
+            --exclude='webpack.config.js' \
+            --exclude='jsconfig.json' \
+            --exclude='phpstan-baseline.neon' \
+            --exclude='phpunit.xml*'
+          cd dist
+          zip -r data-machine.zip data-machine
+
+      - run: gh release upload "${{ steps.tag.outputs.tag }}" dist/data-machine.zip --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
