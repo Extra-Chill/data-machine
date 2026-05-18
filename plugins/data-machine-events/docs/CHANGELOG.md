@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.37.2] - 2026-05-18
+
+### Fixed
+- fix(venue-dedup): normalize ampersand/HTML-entity/apostrophe in names + strip suite suffixes from addresses + migration CLI
+
 ## [0.37.1] - 2026-05-18
 
 ### Fixed
