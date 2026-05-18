@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.35.2] - 2026-05-18
+
+### Fixed
+- show upcoming event count in map venue popups instead of lifetime total
+
 ## [0.35.1] - 2026-05-16
 
 ### Fixed
