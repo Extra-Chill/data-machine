@@ -471,8 +471,9 @@ add_filter('datamachine_tasks', function($tasks) {
 
 **Task class requirements**:
 - Must extend `DataMachine\Engine\AI\System\Tasks\SystemTask`
-- Must implement `execute(int $jobId, array $params): void`
+- Must implement `executeTask(int $jobId, array $params): void`
 - Must implement `getTaskType(): string`
+- May override `getWorkflow()` when the task needs a multi-step workflow
 - May override `getTaskMeta()` for UI metadata
 - May override `getPromptDefinitions()` for editable prompts
 - May override `supportsUndo()` for undo support

@@ -26,20 +26,37 @@ class SystemTaskSettings extends SettingsHandler {
 	 */
 	public static function get_fields(): array {
 		return array(
-			'task'   => array(
+			'task_type' => array(
 				'type'        => 'select',
 				'label'       => __( 'Task Type', 'data-machine' ),
 				'description' => __( 'The system task to execute. Available tasks are registered by Data Machine and plugins.', 'data-machine' ),
 				'required'    => true,
 				'options'     => self::getTaskOptions(),
 			),
-			'params' => array(
+			'params'    => array(
 				'type'        => 'json',
 				'label'       => __( 'Task Parameters', 'data-machine' ),
 				'description' => __( 'JSON object of task-specific parameters. Pipeline context (post_id) is injected automatically.', 'data-machine' ),
 				'default'     => '{}',
 			),
 		);
+	}
+
+	/**
+	 * Sanitize System Task step settings.
+	 *
+	 * Accepts the legacy `task` key so existing saved steps can still be opened
+	 * and resaved through the settings UI without losing their task selection.
+	 *
+	 * @param array $raw_settings Raw settings input from user.
+	 * @return array Sanitized settings.
+	 */
+	public static function sanitize( array $raw_settings ): array {
+		if ( empty( $raw_settings['task_type'] ) && ! empty( $raw_settings['task'] ) ) {
+			$raw_settings['task_type'] = $raw_settings['task'];
+		}
+
+		return parent::sanitize( $raw_settings );
 	}
 
 	/**

@@ -140,7 +140,7 @@ $valid_workflow = array(
 	'steps' => array(
 		array( 'type' => 'fetch' ),
 		array( 'type' => 'ai' ),
-		array( 'type' => 'system_task', 'flow_step_settings' => array( 'task' => 'daily_memory_generation' ) ),
+		array( 'type' => 'system_task', 'flow_step_settings' => array( 'task_type' => 'daily_memory_generation' ) ),
 	),
 );
 
@@ -176,7 +176,7 @@ $configs         = WorkflowConfigFactory::buildEphemeralConfigs(
 			array(
 				'type'           => 'system_task',
 				'label'          => 'Cleanup',
-				'flow_step_settings' => array( 'task' => 'retention_logs' ),
+				'flow_step_settings' => array( 'task_type' => 'retention_logs' ),
 			),
 		),
 	)
