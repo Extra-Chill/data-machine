@@ -85,8 +85,8 @@ $workflow = array(
 		array(
 			'type'               => 'fetch',
 			'label'              => 'Webhook Payload',
-			'handler_slug'       => 'webhook_payload',
-			'handler_config'     => array( 'payload_path' => 'pull_request' ),
+			'handler_slugs'      => array( 'webhook_payload' ),
+			'handler_configs'    => array( 'webhook_payload' => array( 'payload_path' => 'pull_request' ) ),
 			'config_patch_queue' => array( array( 'patch' => array( 'after' => '2026-04-01' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
 			'queue_mode'         => 'drain',
 		),
@@ -144,8 +144,8 @@ assert_workflow_equals( array( 'fetch', 'ai', 'ai' ), array_column( $flow_steps,
 assert_workflow_equals( '88_uuid-1_144', $flow_steps[0]['flow_step_id'] ?? null, 'flow step id maps pipeline step id to flow id', $failures, $passes );
 assert_workflow_equals( 88, $flow_steps[0]['pipeline_id'] ?? null, 'flow stores target pipeline id', $failures, $passes );
 assert_workflow_equals( 144, $flow_steps[0]['flow_id'] ?? null, 'flow stores target flow id', $failures, $passes );
-assert_workflow_equals( 'webhook_payload', $flow_steps[0]['handler_slug'] ?? null, 'flow preserves fetch handler slug', $failures, $passes );
-assert_workflow_equals( array( 'payload_path' => 'pull_request' ), $flow_steps[0]['handler_config'] ?? null, 'flow preserves fetch handler config', $failures, $passes );
+assert_workflow_equals( array( 'webhook_payload' ), $flow_steps[0]['handler_slugs'] ?? null, 'flow preserves fetch handler slugs', $failures, $passes );
+assert_workflow_equals( array( 'webhook_payload' => array( 'payload_path' => 'pull_request' ) ), $flow_steps[0]['handler_configs'] ?? null, 'flow preserves fetch handler configs', $failures, $passes );
 assert_workflow_equals( array( 'after' => '2026-04-01' ), $flow_steps[0]['config_patch_queue'][0]['patch'] ?? null, 'flow preserves fetch config patch queue', $failures, $passes );
 assert_workflow_equals( 'drain', $flow_steps[0]['queue_mode'] ?? null, 'flow preserves explicit fetch queue mode', $failures, $passes );
 assert_workflow_equals( array( 'datamachine/get-github-pull-review-context', 'datamachine/upsert-github-pull-review-comment' ), $flow_steps[1]['enabled_tools'] ?? null, 'flow preserves AI enabled tools', $failures, $passes );

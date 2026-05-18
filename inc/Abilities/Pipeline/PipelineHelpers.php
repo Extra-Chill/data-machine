@@ -237,17 +237,19 @@ trait PipelineHelpers {
 		$handler_abilities = new HandlerAbilities();
 
 		foreach ( $steps as $index => $step ) {
-			$handler_slug = $step['handler_slug'] ?? null;
-			if ( empty( $handler_slug ) ) {
+			$handler_slugs = FlowStepConfig::getConfiguredHandlerSlugs( $step );
+			if ( empty( $handler_slugs ) ) {
 				continue;
 			}
 
-			if ( ! $handler_abilities->handlerExists( $handler_slug ) ) {
-				return array(
-					'success'     => false,
-					'error'       => "Step at index {$index} has invalid handler_slug '{$handler_slug}'",
-					'remediation' => 'Use list_handlers tool to find valid handler slugs',
-				);
+			foreach ( $handler_slugs as $handler_slug ) {
+				if ( ! $handler_abilities->handlerExists( $handler_slug ) ) {
+					return array(
+						'success'     => false,
+						'error'       => "Step at index {$index} has invalid handler slug '{$handler_slug}'",
+						'remediation' => 'Use list_handlers tool to find valid handler slugs',
+					);
+				}
 			}
 		}
 

@@ -136,10 +136,12 @@ $array_bundle = array(
 					'pipeline_id'        => 88,
 					'flow_id'            => 144,
 					'execution_order'    => 0,
-					'handler_slug'       => 'mcp',
-					'handler_config'     => array(
-						'provider' => 'github',
-						'auth_ref' => 'github:default',
+					'handler_slugs'      => array( 'mcp' ),
+					'handler_configs'    => array(
+						'mcp' => array(
+							'provider' => 'github',
+							'auth_ref' => 'github:default',
+						),
 					),
 					'config_patch_queue' => array(
 						array(

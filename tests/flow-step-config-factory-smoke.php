@@ -70,8 +70,6 @@ function assert_factory_equals( $expected, $actual, string $name, array &$failur
 function legacy_workflow_step_config_for_test( array $step, int $index ): array {
 	$step_id          = "ephemeral_step_{$index}";
 	$pipeline_step_id = "ephemeral_pipeline_{$index}";
-	$handler_slug     = $step['handler_slug'] ?? '';
-	$handler_config   = $step['handler_config'] ?? array();
 	$step_type        = $step['type'];
 	$prompt_queue     = array();
 
@@ -97,21 +95,21 @@ function legacy_workflow_step_config_for_test( array $step, int $index ): array 
 			: array(),
 		'prompt_queue'     => $prompt_queue,
 		'queue_mode'       => 'static',
+		'agent_modes'      => array(),
 		'disabled_tools'   => $step['disabled_tools'] ?? array(),
 		'pipeline_id'      => 'direct',
 		'flow_id'          => 'direct',
 	);
 
-	if ( ! empty( $handler_slug ) ) {
-		if ( FlowStepConfig::isMultiHandler( $flow_step_config ) ) {
-			$flow_step_config['handler_slugs']   = array( $handler_slug );
-			$flow_step_config['handler_configs'] = array( $handler_slug => $handler_config );
-		} else {
-			$flow_step_config['handler_slug']   = $handler_slug;
-			$flow_step_config['handler_config'] = $handler_config;
+	if ( FlowStepConfig::usesHandler( $flow_step_config ) ) {
+		if ( ! empty( $step['handler_slugs'] ) ) {
+			$flow_step_config['handler_slugs'] = $step['handler_slugs'];
 		}
-	} elseif ( ! FlowStepConfig::usesHandler( $flow_step_config ) && ! empty( $handler_config ) ) {
-		$flow_step_config['handler_config'] = $handler_config;
+		if ( ! empty( $step['handler_configs'] ) ) {
+			$flow_step_config['handler_configs'] = $step['handler_configs'];
+		}
+	} elseif ( ! empty( $step['flow_step_settings'] ) ) {
+		$flow_step_config['flow_step_settings'] = $step['flow_step_settings'];
 	}
 
 	return $flow_step_config;
@@ -137,6 +135,7 @@ function legacy_synced_step_config_for_test( array $step, int $flow_id, int $pip
 		'pipeline_id'      => $pipeline_id,
 		'flow_id'          => $flow_id,
 		'execution_order'  => $step['execution_order'] ?? 0,
+		'agent_modes'      => array(),
 		'disabled_tools'   => $disabled_tools,
 		'queue_mode'       => 'static',
 	);
@@ -166,20 +165,20 @@ echo "FlowStepConfigFactory smoke (#1345)\n";
 echo "-----------------------------------\n";
 
 $workflow_cases = array(
-	'fetch keeps scalar handler shape'        => array(
-		'type'           => 'fetch',
-		'handler_slug'   => 'mcp',
-		'handler_config' => array( 'server' => 'a8c' ),
-		'disabled_tools' => array( 'local_search' ),
+	'fetch keeps canonical handler shape'     => array(
+		'type'            => 'fetch',
+		'handler_slugs'   => array( 'mcp' ),
+		'handler_configs' => array( 'mcp' => array( 'server' => 'a8c' ) ),
+		'disabled_tools'  => array( 'local_search' ),
 	),
 	'publish keeps multi-handler shape'       => array(
-		'type'           => 'publish',
-		'handler_slug'   => 'wordpress_publish',
-		'handler_config' => array( 'post_type' => 'post' ),
+		'type'            => 'publish',
+		'handler_slugs'   => array( 'wordpress_publish' ),
+		'handler_configs' => array( 'wordpress_publish' => array( 'post_type' => 'post' ) ),
 	),
 	'system_task keeps handler-free settings' => array(
-		'type'           => 'system_task',
-		'handler_config' => array( 'task' => 'daily_memory_generation' ),
+		'type'               => 'system_task',
+		'flow_step_settings' => array( 'task_type' => 'daily_memory_generation' ),
 	),
 	'ai converts user message to prompt queue' => array(
 		'type'          => 'ai',

@@ -88,8 +88,8 @@ $workflow = array(
 		array(
 			'type'               => 'fetch',
 			'label'              => 'Fetch Context',
-			'handler_slug'       => 'mcp',
-			'handler_config'     => array( 'provider' => 'github', 'query' => 'repo:Extra-Chill/data-machine' ),
+			'handler_slugs'      => array( 'mcp' ),
+			'handler_configs'    => array( 'mcp' => array( 'provider' => 'github', 'query' => 'repo:Extra-Chill/data-machine' ) ),
 			'config_patch_queue' => array( array( 'patch' => array( 'query' => 'workflow spec' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
 			'queue_mode'         => 'drain',
 		),
@@ -127,8 +127,8 @@ $flow_steps      = array_values( $flow_config );
 
 assert_bulk_workflow_equals( 2, count( $pipeline_config ), 'bulk workflow creates persistent pipeline rows', $failures, $passes );
 assert_bulk_workflow_equals( 2, count( $flow_config ), 'bulk workflow creates persistent flow rows through shared factory', $failures, $passes );
-assert_bulk_workflow_equals( 'mcp', $flow_steps[0]['handler_slug'] ?? null, 'bulk workflow preserves handler slug', $failures, $passes );
-assert_bulk_workflow_equals( array( 'provider' => 'github', 'query' => 'repo:Extra-Chill/data-machine' ), $flow_steps[0]['handler_config'] ?? null, 'bulk workflow preserves handler config', $failures, $passes );
+assert_bulk_workflow_equals( array( 'mcp' ), $flow_steps[0]['handler_slugs'] ?? null, 'bulk workflow preserves handler slugs', $failures, $passes );
+assert_bulk_workflow_equals( array( 'mcp' => array( 'provider' => 'github', 'query' => 'repo:Extra-Chill/data-machine' ) ), $flow_steps[0]['handler_configs'] ?? null, 'bulk workflow preserves handler configs', $failures, $passes );
 assert_bulk_workflow_equals( array( 'query' => 'workflow spec' ), $flow_steps[0]['config_patch_queue'][0]['patch'] ?? null, 'bulk workflow preserves config patch queue', $failures, $passes );
 assert_bulk_workflow_equals( 'drain', $flow_steps[0]['queue_mode'] ?? null, 'bulk workflow preserves queue mode', $failures, $passes );
 assert_bulk_workflow_equals( array( 'datamachine/read-github-file' ), $flow_steps[1]['enabled_tools'] ?? null, 'bulk workflow preserves enabled tools', $failures, $passes );
@@ -138,10 +138,10 @@ assert_bulk_workflow_equals( 'Use the latest queue item.', $flow_steps[1]['promp
 $template_workflow = array(
 	'steps' => array(
 		array(
-			'type'          => 'publish',
-			'label'         => 'Template Publish',
-			'handler_slug'  => 'wordpress',
-			'handler_config' => array( 'post_type' => 'wiki' ),
+			'type'            => 'publish',
+			'label'           => 'Template Publish',
+			'handler_slugs'   => array( 'wordpress' ),
+			'handler_configs' => array( 'wordpress' => array( 'post_type' => 'wiki' ) ),
 		),
 	),
 );

@@ -110,9 +110,9 @@ $built = build_configs_from_workflow_for_test(
 	array(
 		'steps' => array(
 			array(
-				'type'           => 'fetch',
-				'handler_slug'   => 'mcp',
-				'handler_config' => array( 'server' => 'a8c' ),
+				'type'            => 'fetch',
+				'handler_slugs'   => array( 'mcp' ),
+				'handler_configs' => array( 'mcp' => array( 'server' => 'a8c' ) ),
 			),
 		),
 	)
@@ -131,9 +131,9 @@ $built = build_configs_from_workflow_for_test(
 	array(
 		'steps' => array(
 			array(
-				'type'           => 'publish',
-				'handler_slug'   => 'wordpress_publish',
-				'handler_config' => array( 'post_type' => 'post' ),
+				'type'            => 'publish',
+				'handler_slugs'   => array( 'wordpress_publish' ),
+				'handler_configs' => array( 'wordpress_publish' => array( 'post_type' => 'post' ) ),
 			),
 		),
 	)
@@ -173,23 +173,23 @@ assert_equals( 'be helpful', $built['pipeline_config']['ephemeral_pipeline_0']['
 echo "\n[6] normalize canonical rows without cross-shape inference:\n";
 $system_task = FlowStepConfig::normalizeHandlerShape(
 	array(
-		'step_type'      => 'system_task',
-		'handler_config' => array( 'task_type' => 'agent_call' ),
+		'step_type'          => 'system_task',
+		'flow_step_settings' => array( 'task_type' => 'agent_call' ),
 	)
 );
-assert_equals( array( 'task_type' => 'agent_call' ), $system_task['flow_step_settings'] ?? array(), 'system_task config normalizes to flow_step_settings', $failures, $passes );
+assert_equals( array( 'task_type' => 'agent_call' ), $system_task['flow_step_settings'] ?? array(), 'system_task settings are preserved', $failures, $passes );
 assert_absent( 'handler_config', $system_task, 'system_task scalar handler_config is removed', $failures, $passes );
 assert_absent( 'handler_slugs', $system_task, 'system_task slugs remain absent', $failures, $passes );
 
 $fetch = FlowStepConfig::normalizeHandlerShape(
 	array(
-		'step_type'      => 'fetch',
-		'handler_slug'   => 'rss',
-		'handler_config' => array( 'url' => 'https://example.com/feed.xml' ),
+		'step_type'       => 'fetch',
+		'handler_slugs'   => array( 'rss' ),
+		'handler_configs' => array( 'rss' => array( 'url' => 'https://example.com/feed.xml' ) ),
 	)
 );
-assert_equals( array( 'rss' ), $fetch['handler_slugs'] ?? array(), 'fetch singular slug normalizes to plural list', $failures, $passes );
-assert_equals( array( 'rss' => array( 'url' => 'https://example.com/feed.xml' ) ), $fetch['handler_configs'] ?? array(), 'fetch singular config normalizes to plural map', $failures, $passes );
+assert_equals( array( 'rss' ), $fetch['handler_slugs'] ?? array(), 'fetch slugs preserved', $failures, $passes );
+assert_equals( array( 'rss' => array( 'url' => 'https://example.com/feed.xml' ) ), $fetch['handler_configs'] ?? array(), 'fetch configs preserved', $failures, $passes );
 assert_absent( 'handler_slug', $fetch, 'fetch scalar slug is removed', $failures, $passes );
 assert_absent( 'handler_config', $fetch, 'fetch scalar config is removed', $failures, $passes );
 

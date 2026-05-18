@@ -177,10 +177,10 @@ $tools   = resolve_source_tools(
 	$manager,
 	array(
 		'previous_step_config' => array(
-			'flow_step_id'   => 'fetch_step',
-			'step_type'      => 'fetch',
-			'handler_slug'   => 'ticketmaster_fetch',
-			'handler_config' => array( 'marker' => 'previous' ),
+			'flow_step_id'    => 'fetch_step',
+			'step_type'       => 'fetch',
+			'handler_slugs'   => array( 'ticketmaster_fetch' ),
+			'handler_configs' => array( 'ticketmaster_fetch' => array( 'marker' => 'previous' ) ),
 		),
 		'next_step_config'     => array(
 			'flow_step_id'     => 'publish_step',

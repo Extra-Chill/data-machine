@@ -127,9 +127,6 @@ class ImportExport {
 			}
 
 			$settings = $row['settings'];
-			if ( '' !== $row['handler'] && empty( $settings['handler_slug'] ) && empty( $settings['handler_slugs'] ) ) {
-				$settings['handler_slug'] = $row['handler'];
-			}
 
 			try {
 				$this->restore_flow_step_config(

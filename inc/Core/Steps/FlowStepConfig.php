@@ -2,7 +2,8 @@
 /**
  * Flow Step Config Utilities
  *
- * Static helpers for reading handler slugs and configs from step configuration arrays.
+ * Static helpers for reading canonical handler slugs and configs from step
+ * configuration arrays.
  *
  * @package DataMachine\Core\Steps
  * @since 0.39.0
@@ -150,8 +151,7 @@ class FlowStepConfig {
 			return $slugs;
 		}
 
-		$slug = $step_config['handler_slug'] ?? null;
-		return is_string( $slug ) && '' !== $slug ? array( $slug ) : array();
+		return array();
 	}
 
 	/**
@@ -287,7 +287,7 @@ class FlowStepConfig {
 			return self::getHandlerConfigForSlug( $step_config, $slug );
 		}
 
-		$config = $step_config['flow_step_settings'] ?? ( $step_config['handler_config'] ?? array() );
+		$config = $step_config['flow_step_settings'] ?? array();
 		return is_array( $config ) ? $config : array();
 	}
 
@@ -306,8 +306,7 @@ class FlowStepConfig {
 				return is_array( $config ) ? $config : array();
 			}
 
-			$config = ( $step_config['handler_slug'] ?? null ) === $slug ? ( $step_config['handler_config'] ?? array() ) : array();
-			return is_array( $config ) ? $config : array();
+			return array();
 		}
 
 		$effective_slug = self::getEffectiveSlug( $step_config );
@@ -353,8 +352,6 @@ class FlowStepConfig {
 	 */
 	public static function normalizeHandlerShape( array $step_config ): array {
 		$uses_handler    = self::usesHandler( $step_config );
-		$scalar_slug     = is_string( $step_config['handler_slug'] ?? null ) ? $step_config['handler_slug'] : '';
-		$scalar_config   = is_array( $step_config['handler_config'] ?? null ) ? $step_config['handler_config'] : array();
 		$step_settings   = is_array( $step_config['flow_step_settings'] ?? null ) ? $step_config['flow_step_settings'] : array();
 		$handler_slugs   = self::sanitizeSlugList( is_array( $step_config['handler_slugs'] ?? null ) ? $step_config['handler_slugs'] : array() );
 		$handler_configs = is_array( $step_config['handler_configs'] ?? null ) ? $step_config['handler_configs'] : array();
@@ -362,18 +359,10 @@ class FlowStepConfig {
 		unset( $step_config['handler'], $step_config['handler_slug'], $step_config['handler_slugs'], $step_config['handler_config'], $step_config['handler_configs'], $step_config['flow_step_settings'] );
 
 		if ( ! $uses_handler ) {
-			$settings = ! empty( $step_settings ) ? $step_settings : $scalar_config;
-			if ( ! empty( $settings ) ) {
-				$step_config['flow_step_settings'] = $settings;
+			if ( ! empty( $step_settings ) ) {
+				$step_config['flow_step_settings'] = $step_settings;
 			}
 			return $step_config;
-		}
-
-		if ( empty( $handler_slugs ) && '' !== $scalar_slug ) {
-			$handler_slugs = array( $scalar_slug );
-		}
-		if ( '' !== $scalar_slug && ! array_key_exists( $scalar_slug, $handler_configs ) ) {
-			$handler_configs[ $scalar_slug ] = $scalar_config;
 		}
 
 		if ( ! empty( $handler_slugs ) ) {
