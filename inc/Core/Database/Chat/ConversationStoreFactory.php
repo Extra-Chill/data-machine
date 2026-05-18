@@ -118,7 +118,7 @@ class ConversationStoreFactory {
 	 * @return ConversationStoreInterface
 	 */
 	private static function default_store(): ConversationStoreInterface {
-		if ( interface_exists( 'AgentsAPI\\Core\\Database\\Chat\\WP_Agent_Principal_Conversation_Store' ) ) {
+		if ( interface_exists( 'AgentsAPI\\Core\\Database\\Chat\\WP_Agent_Principal_Conversation_Session_Reader' ) ) {
 			return new PrincipalChat();
 		}
 

@@ -820,12 +820,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "f60d01133e0cbbf01c2dc01ec444534948ac7b5f"
+                "reference": "da4477579eb03963af202a39cfd6102bebdbd802"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/f60d01133e0cbbf01c2dc01ec444534948ac7b5f",
-                "reference": "f60d01133e0cbbf01c2dc01ec444534948ac7b5f",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/da4477579eb03963af202a39cfd6102bebdbd802",
+                "reference": "da4477579eb03963af202a39cfd6102bebdbd802",
                 "shasum": ""
             },
             "require": {
@@ -864,6 +864,7 @@
                     "php tests/conversation-runner-contracts-smoke.php",
                     "php tests/conversation-transcript-lock-smoke.php",
                     "php tests/conversation-compaction-smoke.php",
+                    "php tests/tool-pair-validator-smoke.php",
                     "php tests/markdown-section-compaction-smoke.php",
                     "php tests/context-registry-smoke.php",
                     "php tests/conversation-loop-smoke.php",
@@ -899,7 +900,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-05-16T13:34:28+00:00"
+            "time": "2026-05-17T21:38:05+00:00"
         },
         {
             "name": "dealerdirect/phpcodesniffer-composer-installer",

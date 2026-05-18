@@ -751,6 +751,30 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 	}
 
 	/**
+	 * Read one transcript session for a canonical Agents API principal owner.
+	 *
+	 * @param WP_Agent_Workspace_Scope      $workspace  Workspace owning the session.
+	 * @param array{type:string,key:string} $owner      Canonical principal owner.
+	 * @param string                        $session_id Session ID.
+	 * @return array<string,mixed>|null Session row, or null when missing/not owned.
+	 */
+	public function get_session_for_owner( WP_Agent_Workspace_Scope $workspace, array $owner, string $session_id ): ?array {
+		unset( $workspace );
+
+		$transcript_owner = self::principal_owner_to_transcript_owner( $owner );
+		if ( null === $transcript_owner ) {
+			return null;
+		}
+
+		$session = $this->get_session( $session_id );
+		if ( ! is_array( $session ) || ! self::session_matches_owner( $session, $transcript_owner ) ) {
+			return null;
+		}
+
+		return $session;
+	}
+
+	/**
 	 * Resolve the generic transcript agent slug from a stored session row.
 	 *
 	 * @param array<string,mixed> $session Stored session row.
