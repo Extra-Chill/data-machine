@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.120.0] - 2026-05-18
+
+### Added
+- send-email template registry + queued variant (closes #2064)
+
 ## [0.119.5] - 2026-05-18
 
 ### Changed
