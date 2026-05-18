@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.121.1] - 2026-05-18
+
+### Changed
+- make alt text fixture setup filesystem-independent
+
+### Fixed
+- preserve workflow system task settings
+
 ## [0.121.0] - 2026-05-18
 
 ### Added
