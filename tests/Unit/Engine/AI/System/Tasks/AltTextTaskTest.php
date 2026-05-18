@@ -21,7 +21,6 @@ class AltTextTaskTest extends WP_UnitTestCase {
 	private string $test_image_path;
 
 	public function set_up(): void {
-		global $wp_filesystem;
 		parent::set_up();
 		$this->task = new AltTextTask();
 
@@ -33,7 +32,7 @@ class AltTextTaskTest extends WP_UnitTestCase {
 		
 		// Create a minimal JPEG file
 		$jpeg_data = base64_decode( '/9j/4AAQSkZJRgABAQEAAAAAAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/3/AD' );
-		$wp_filesystem->put_contents( $this->test_image_path, $jpeg_data );
+		file_put_contents( $this->test_image_path, $jpeg_data );
 
 		// Create attachment
 		$this->attachment_id = self::factory()->attachment->create_object( [

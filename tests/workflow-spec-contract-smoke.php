@@ -194,7 +194,16 @@ assert_workflow_spec_equals( array( 'danger_tool' ), $pipeline_steps[1]['disable
 assert_workflow_spec_equals( array( 'required_tool_names' => array( 'publish_result' ) ), $pipeline_steps[1]['completion_assertions'] ?? null, 'ephemeral pipeline_config preserves AI completion assertions', $failures, $passes );
 assert_workflow_spec_equals( array( array( 'id' => 'after-worktree', 'max_calls' => 4 ) ), $pipeline_steps[1]['tool_runtime_rules'] ?? null, 'ephemeral pipeline_config preserves AI tool runtime rules', $failures, $passes );
 assert_workflow_spec_equals( 'Cleanup', $pipeline_steps[2]['label'] ?? null, 'ephemeral pipeline_config preserves system_task label', $failures, $passes );
+assert_workflow_spec_equals( array( 'task_type' => 'retention_logs' ), $pipeline_steps[2]['flow_step_settings'] ?? null, 'ephemeral pipeline_config preserves system_task settings', $failures, $passes );
 assert_workflow_spec_equals( false, array_key_exists( 'system_prompt', $pipeline_steps[2] ), 'non-AI ephemeral pipeline rows do not gain AI metadata', $failures, $passes );
+
+$legacy_task_workflow = array(
+	'steps' => array(
+		array( 'type' => 'system_task', 'flow_step_settings' => array( 'task' => 'retention_logs' ) ),
+	),
+);
+$legacy_configs       = WorkflowConfigFactory::buildEphemeralConfigs( $legacy_task_workflow );
+assert_workflow_spec_equals( array( 'task' => 'retention_logs' ), array_values( $legacy_configs['pipeline_config'] )[0]['flow_step_settings'] ?? null, 'ephemeral pipeline_config preserves legacy task settings', $failures, $passes );
 
 $execute_source  = file_get_contents( __DIR__ . '/../inc/Abilities/Job/ExecuteWorkflowAbility.php' ) ?: '';
 $pipeline_source = file_get_contents( __DIR__ . '/../inc/Abilities/Pipeline/PipelineHelpers.php' ) ?: '';
