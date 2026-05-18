@@ -479,7 +479,7 @@ class SystemTaskStep extends Step {
 	 * @return string Configured task type, or empty string.
 	 */
 	private static function getConfiguredTaskType( array $settings ): string {
-		$task_type = $settings['task_type'] ?? ( $settings['task'] ?? '' );
+		$task_type = $settings['task_type'] ?? '';
 		return is_string( $task_type ) ? $task_type : '';
 	}
 }
