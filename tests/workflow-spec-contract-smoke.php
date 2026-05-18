@@ -152,10 +152,10 @@ $configs         = WorkflowConfigFactory::buildEphemeralConfigs(
 	array(
 		'steps' => array(
 			array(
-				'type'           => 'fetch',
-				'label'          => 'Fetch Source',
-				'handler_slug'   => 'mcp',
-				'handler_config' => array( 'server' => 'a8c' ),
+				'type'            => 'fetch',
+				'label'           => 'Fetch Source',
+				'handler_slugs'   => array( 'mcp' ),
+				'handler_configs' => array( 'mcp' => array( 'server' => 'a8c' ) ),
 			),
 			array(
 				'type'           => 'ai',

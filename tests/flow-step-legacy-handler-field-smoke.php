@@ -84,9 +84,9 @@ $single = FlowStepConfig::normalizeHandlerShape(
 	array_merge(
 		$synced_step,
 		array(
-			'handler'        => 'rss',
-			'handler_slug'   => 'rss',
-			'handler_config' => array( 'url' => 'https://example.com/feed.xml' ),
+			'handler'         => 'rss',
+			'handler_slugs'   => array( 'rss' ),
+			'handler_configs' => array( 'rss' => array( 'url' => 'https://example.com/feed.xml' ) ),
 		)
 	)
 );
@@ -107,8 +107,8 @@ $multi = FlowStepConfig::normalizeHandlerShape(
 		'pipeline_id'      => 1,
 		'flow_id'          => 10,
 		'handler'          => 'wordpress_publish',
-		'handler_slug'     => 'wordpress_publish',
-		'handler_config'   => array( 'post_type' => 'post' ),
+		'handler_slugs'    => array( 'wordpress_publish' ),
+		'handler_configs'  => array( 'wordpress_publish' => array( 'post_type' => 'post' ) ),
 	)
 );
 assert_equals( array( 'wordpress_publish' ), $multi['handler_slugs'] ?? array(), 'multi-handler slug is canonical list', $failures, $passes );

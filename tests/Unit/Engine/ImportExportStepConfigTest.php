@@ -173,10 +173,12 @@ class ImportExportStepConfigTest extends WP_UnitTestCase {
 		$source_flow      = $this->db_flows->get_flow( (int) $source_flow_id );
 		$flow_config      = $source_flow['flow_config'] ?? array();
 		$source_flow_step = apply_filters( 'datamachine_generate_flow_step_id', '', $source_step_id, (int) $source_flow_id );
-		$flow_config[ $source_flow_step ]['handler_slug']    = 'rss';
-		$flow_config[ $source_flow_step ]['handler_config']  = array(
-			'feed_url'  => 'https://example.com/feed',
-			'max_items' => 25,
+		$flow_config[ $source_flow_step ]['handler_slugs']   = array( 'rss' );
+		$flow_config[ $source_flow_step ]['handler_configs'] = array(
+			'rss' => array(
+				'feed_url'  => 'https://example.com/feed',
+				'max_items' => 25,
+			),
 		);
 		$flow_config[ $source_flow_step ]['enabled'] = true;
 		$this->db_flows->update_flow( (int) $source_flow_id, array( 'flow_config' => $flow_config ) );

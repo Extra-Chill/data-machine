@@ -25,9 +25,7 @@ final class AgentBundleFlowFile {
 
 	private const OPTIONAL_STEP_FIELDS = array(
 		'step_type',
-		'handler_slug',
 		'handler_slugs',
-		'handler_config',
 		'flow_step_settings',
 		'enabled_tools',
 		'disabled_tools',
@@ -129,7 +127,7 @@ final class AgentBundleFlowFile {
 	}
 
 	private static function normalize_optional_step_field( string $field, $value ) {
-		if ( in_array( $field, array( 'step_type', 'handler_slug' ), true ) ) {
+		if ( 'step_type' === $field ) {
 			return (string) $value;
 		}
 
@@ -137,7 +135,7 @@ final class AgentBundleFlowFile {
 			return (bool) $value;
 		}
 
-		if ( in_array( $field, array( 'handler_config', 'flow_step_settings' ), true ) ) {
+		if ( 'flow_step_settings' === $field ) {
 			if ( ! is_array( $value ) ) {
 				throw new BundleValidationException( sprintf( 'flow file %s must be an object.', esc_html( $field ) ) );
 			}

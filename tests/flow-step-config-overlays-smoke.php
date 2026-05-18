@@ -111,10 +111,14 @@ $overridden = FlowStepConfigFactory::withHandlerConfig(
 	'wordpress_xmlrpc',
 	array( 'post_type' => 'page' )
 );
-assert_overlay_same( 'copy override replaces multi-handler list', array( 'wordpress_xmlrpc' ), $overridden['handler_slugs'] );
+assert_overlay_same( 'copy override appends multi-handler list', array( 'wordpress', 'pinterest', 'wordpress_xmlrpc' ), $overridden['handler_slugs'] );
 assert_overlay_same(
-	'copy override stores config under replacement handler',
-	array( 'wordpress_xmlrpc' => array( 'post_type' => 'page' ) ),
+	'copy override stores config under added handler',
+	array(
+		'wordpress'        => array( 'post_type' => 'post' ),
+		'pinterest'        => array( 'board' => 'events' ),
+		'wordpress_xmlrpc' => array( 'post_type' => 'page' ),
+	),
 	$overridden['handler_configs']
 );
 
@@ -137,20 +141,20 @@ $import_base = FlowStepConfigFactory::build(
 $import_restored = FlowStepConfigFactory::withHandlerFields(
 	$import_base,
 	array(
-		'handler_slug'   => 'mcp',
-		'handler_config' => array( 'server' => 'a8c', 'provider' => 'slack' ),
+		'handler_slugs'   => array( 'mcp' ),
+		'handler_configs' => array( 'mcp' => array( 'server' => 'a8c', 'provider' => 'slack' ) ),
 	)
 );
 
 assert_overlay_same(
-	'import restore path preserves field order and scalar handler shape',
+	'import restore path preserves field order and canonical handler shape',
 	array(
 		'flow_step_id'     => 'fetch_step_42',
 		'pipeline_step_id' => 'fetch_step',
 		'flow_id'          => 42,
 		'step_type'        => 'fetch',
-		'handler_slug'     => 'mcp',
-		'handler_config'   => array( 'server' => 'a8c', 'provider' => 'slack' ),
+		'handler_slugs'    => array( 'mcp' ),
+		'handler_configs'  => array( 'mcp' => array( 'server' => 'a8c', 'provider' => 'slack' ) ),
 	),
 	$import_restored
 );
@@ -164,12 +168,12 @@ $import_handler_free = FlowStepConfigFactory::withHandlerFields(
 			'step_type'        => 'system_task',
 		)
 	),
-	array( 'handler_config' => array( 'task' => 'daily_memory_generation' ) )
+	array( 'flow_step_settings' => array( 'task_type' => 'daily_memory_generation' ) )
 );
 assert_overlay_same(
 	'import restore path preserves handler-free settings config',
-	array( 'task' => 'daily_memory_generation' ),
-	$import_handler_free['handler_config']
+	array( 'task_type' => 'daily_memory_generation' ),
+	$import_handler_free['flow_step_settings']
 );
 
 $flow_helpers_source = file_get_contents( __DIR__ . '/../inc/Abilities/Flow/FlowHelpers.php' );

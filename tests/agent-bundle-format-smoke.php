@@ -185,13 +185,13 @@ $flow = AgentBundleFlowFile::from_array(
 			),
 			array(
 				'step_position'   => 1,
-				'handler_slug'    => 'wordpress_publish',
+				'handler_slugs'   => array( 'wordpress_publish' ),
 				'handler_configs' => array( 'wordpress_publish' => array( 'post_type' => 'wiki' ) ),
 				'disabled_tools'  => array( 'datamachine/delete-flow' ),
 			),
 			array(
 				'step_position'   => 0,
-				'handler_slug'    => 'mcp',
+				'handler_slugs'   => array( 'mcp' ),
 				'handler_configs' => array( 'mcp' => array( 'auth_ref' => 'wpcom:default', 'provider' => 'mgs' ) ),
 				'config_patch_queue' => array(
 					array(
@@ -206,7 +206,7 @@ $flow = AgentBundleFlowFile::from_array(
 );
 $flow_array = $flow->to_array();
 assert_bundle_equals( 'flow references pipeline by slug, not source ID', 'wc-daily-ingest', $flow_array['pipeline_slug'] );
-assert_bundle_equals( 'flow step 0 first after normalization', 'mcp', $flow_array['steps'][0]['handler_slug'] );
+assert_bundle_equals( 'flow step 0 first after normalization', array( 'mcp' ), $flow_array['steps'][0]['handler_slugs'] );
 assert_bundle_equals( 'flow step preserves fetch config patch queue', array( 'after' => '2026-04-01' ), $flow_array['steps'][0]['config_patch_queue'][0]['patch'] );
 assert_bundle_equals( 'flow step preserves AI enabled tools', array( 'datamachine/get-github-pull-review-context' ), $flow_array['steps'][2]['enabled_tools'] );
 assert_bundle_equals( 'flow step preserves AI prompt queue', 'Review this PR.', $flow_array['steps'][2]['prompt_queue'][0]['prompt'] );
