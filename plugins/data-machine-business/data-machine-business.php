@@ -18,18 +18,6 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-// Check if Data Machine core is active
-if ( ! class_exists( 'DataMachine\Core\Steps\Publish\Handlers\PublishHandler' ) ) {
-	add_action( 'admin_notices', function() {
-		?>
-		<div class="notice notice-error">
-			<p><?php esc_html_e( 'Data Machine Business requires Data Machine core plugin to be installed and activated.', 'data-machine-business' ); ?></p>
-		</div>
-		<?php
-	} );
-	return;
-}
-
 define( 'DATAMACHINE_BUSINESS_VERSION', '0.2.0' );
 define( 'DATAMACHINE_BUSINESS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_BUSINESS_URL', plugin_dir_url( __FILE__ ) );
@@ -39,8 +27,27 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 /**
  * Load and instantiate business handlers and abilities.
+ *
+ * The Data Machine core dependency is checked inside this function (at
+ * plugins_loaded time) rather than at file-include time because PHP
+ * autoloading of classes from sibling network-active plugins is not
+ * reliably available when our plugin file is being included, even if
+ * the dependency plugin is loaded first alphabetically. Checking at
+ * plugins_loaded ensures every plugin's autoloader is registered before
+ * we test for the dependency.
  */
 function datamachine_business_load_handlers() {
+	if ( ! class_exists( 'DataMachine\\Core\\Steps\\Publish\\Handlers\\PublishHandler' ) ) {
+		add_action( 'admin_notices', function () {
+			?>
+			<div class="notice notice-error">
+				<p><?php esc_html_e( 'Data Machine Business requires Data Machine core plugin to be installed and activated.', 'data-machine-business' ); ?></p>
+			</div>
+			<?php
+		} );
+		return;
+	}
+
 	// Load Abilities (they self-register)
 	// Google Sheets
 	new \DataMachineBusiness\Abilities\GoogleSheets\FetchGoogleSheetsAbility();
