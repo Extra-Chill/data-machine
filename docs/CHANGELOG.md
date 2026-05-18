@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.119.4] - 2026-05-18
+
+### Fixed
+- support principal-owned session reads
+- support nested agent config paths
+
 ## [0.119.3] - 2026-05-17
 
 ### Fixed
