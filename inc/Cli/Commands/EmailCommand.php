@@ -101,6 +101,123 @@ class EmailCommand extends BaseCommand {
 	}
 
 	/**
+	 * Queue an email for delivery via Action Scheduler.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --to=<emails>
+	 * : Comma-separated recipient email addresses.
+	 *
+	 * --subject=<subject>
+	 * : Email subject. Supports {month}, {year}, {site_name}, {date} placeholders.
+	 *
+	 * [--body=<body>]
+	 * : Email body content (HTML or plain text). Required unless --template is provided.
+	 *
+	 * [--template=<id>]
+	 * : Optional template id resolved via the datamachine_email_templates filter.
+	 *
+	 * [--context=<json>]
+	 * : JSON-encoded context object passed to the template renderer.
+	 *
+	 * [--cc=<emails>]
+	 * : Comma-separated CC addresses.
+	 *
+	 * [--bcc=<emails>]
+	 * : Comma-separated BCC addresses.
+	 *
+	 * [--from-name=<name>]
+	 * : Sender name. Defaults to site name.
+	 *
+	 * [--from-email=<email>]
+	 * : Sender email. Defaults to admin email.
+	 *
+	 * [--reply-to=<email>]
+	 * : Reply-to address.
+	 *
+	 * [--content-type=<type>]
+	 * : Content type: text/html or text/plain.
+	 * ---
+	 * default: text/html
+	 * ---
+	 *
+	 * [--attachments=<paths>]
+	 * : Comma-separated file paths to attach.
+	 *
+	 * [--send-at=<when>]
+	 * : ISO 8601 timestamp or unix timestamp (prefix with @). Omit for "send now (async)".
+	 *
+	 * [--priority=<int>]
+	 * : Action Scheduler priority hint.
+	 * ---
+	 * default: 10
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine email send-queued --to=user@example.com --subject="Hi" --body="<p>Hello</p>"
+	 *     wp datamachine email send-queued --to=user@example.com --subject="Hi" --template=weekly-digest --context='{"week":42}'
+	 *     wp datamachine email send-queued --to=user@example.com --subject="Later" --body="Hi" --send-at="2030-01-01T09:00:00Z"
+	 *
+	 * @subcommand send-queued
+	 */
+	public function send_queued( array $args, array $assoc_args ): void {
+		$ability = wp_get_ability( 'datamachine/send-email-queued' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'Send email queued ability not available.' );
+		}
+
+		$context = array();
+		if ( ! empty( $assoc_args['context'] ) ) {
+			$decoded = json_decode( $assoc_args['context'], true );
+			if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) ) {
+				WP_CLI::error( 'Invalid --context JSON: ' . json_last_error_msg() );
+			}
+			$context = $decoded;
+		}
+
+		$input = array(
+			'to'           => $assoc_args['to'],
+			'subject'      => $assoc_args['subject'],
+			'body'         => $assoc_args['body'] ?? '',
+			'template'     => $assoc_args['template'] ?? '',
+			'context'      => $context,
+			'cc'           => $assoc_args['cc'] ?? '',
+			'bcc'          => $assoc_args['bcc'] ?? '',
+			'from_name'    => $assoc_args['from-name'] ?? '',
+			'from_email'   => $assoc_args['from-email'] ?? '',
+			'reply_to'     => $assoc_args['reply-to'] ?? '',
+			'content_type' => $assoc_args['content-type'] ?? 'text/html',
+			'attachments'  => array(),
+			'priority'     => isset( $assoc_args['priority'] ) ? (int) $assoc_args['priority'] : 10,
+		);
+
+		if ( ! empty( $assoc_args['attachments'] ) ) {
+			$input['attachments'] = array_map( 'trim', explode( ',', $assoc_args['attachments'] ) );
+		}
+
+		if ( isset( $assoc_args['send-at'] ) && '' !== $assoc_args['send-at'] ) {
+			$input['send_at'] = $assoc_args['send-at'];
+		}
+
+		$result = $ability->execute( $input );
+
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
+		if ( ! ( $result['success'] ?? false ) ) {
+			WP_CLI::error( $result['error'] ?? 'Email enqueue failed.' );
+		}
+
+		$action_id     = (int) ( $result['action_id'] ?? 0 );
+		$scheduled_for = (int) ( $result['scheduled_for'] ?? 0 );
+		$when          = $scheduled_for ? gmdate( 'c', $scheduled_for ) : 'now';
+
+		WP_CLI::success( sprintf( 'Email queued. Action id: %d. Scheduled for: %s', $action_id, $when ) );
+	}
+
+	/**
 	 * Fetch emails from IMAP inbox.
 	 *
 	 * ## OPTIONS
