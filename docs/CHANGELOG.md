@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.124.8] - 2026-05-19
+
+### Fixed
+- surface agentless flow ownership drift
+
 ## [0.124.7] - 2026-05-19
 
 ### Fixed
