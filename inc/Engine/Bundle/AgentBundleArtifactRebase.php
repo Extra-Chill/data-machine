@@ -177,14 +177,13 @@ final class AgentBundleArtifactRebase {
 	 *   - flow_config.*.config_patch_queue
 	 *   - flow_config.*.queue_mode
 	 *   - flow_config.*._queue_consume_revision
-	 *   - flow_config.*.handler_config.max_items (and handler_configs.*.max_items)
+	 *   - flow_config.*.handler_configs.*.max_items
 	 *     when local diverged from base only on the throttle.
 	 *   - scheduling_config (whole subtree, including max_items)
 	 *
 	 * Takes remote source-shape changes when remote diverged from base on
 	 * provider-routing fields:
-	 *   - flow_config.*.handler
-	 *   - flow_config.*.handler_config.* and handler_configs.*.* except local-preserved keys
+	 *   - flow_config.*.handler_configs.*.* except local-preserved keys
 	 *     (server, provider, tool, params, query, owner, repo, channel, perPage, source-shape)
 	 *
 	 * Non-flow artifacts are forwarded to conservative policy.
@@ -266,24 +265,7 @@ final class AgentBundleArtifactRebase {
 				}
 			}
 
-			// Merge handler_config keys (single-handler shape).
-			$base_hc   = is_array( $base_step['handler_config'] ?? null ) ? $base_step['handler_config'] : array();
-			$local_hc  = is_array( $local_step['handler_config'] ?? null ) ? $local_step['handler_config'] : array();
-			$remote_hc = is_array( $remote_step['handler_config'] ?? null ) ? $remote_step['handler_config'] : array();
-
-			if ( ! empty( $local_hc ) || ! empty( $remote_hc ) ) {
-				$merged_hc                     = self::merge_handler_config(
-					$base_hc,
-					$local_hc,
-					$remote_hc,
-					"flow_config.{$step_id}.handler_config",
-					$decisions,
-					$ambiguous
-				);
-				$merged_step['handler_config'] = $merged_hc;
-			}
-
-			// Merge handler_configs (multi-handler shape: keyed by handler slug).
+			// Merge handler_configs (keyed by handler slug).
 			$base_hcs   = is_array( $base_step['handler_configs'] ?? null ) ? $base_step['handler_configs'] : array();
 			$local_hcs  = is_array( $local_step['handler_configs'] ?? null ) ? $local_step['handler_configs'] : array();
 			$remote_hcs = is_array( $remote_step['handler_configs'] ?? null ) ? $remote_step['handler_configs'] : array();
@@ -304,18 +286,26 @@ final class AgentBundleArtifactRebase {
 						$ambiguous
 					);
 				}
+
+				if ( 1 === count( $local_hcs ) && 1 === count( $remote_hcs ) ) {
+					$local_slug     = (string) array_key_first( $local_hcs );
+					$remote_slug    = (string) array_key_first( $remote_hcs );
+					$local_config   = is_array( $local_hcs[ $local_slug ] ?? null ) ? $local_hcs[ $local_slug ] : array();
+					$base_config    = is_array( $base_hcs[ $local_slug ] ?? null ) ? $base_hcs[ $local_slug ] : array();
+					$local_throttle = self::local_preserved_max_items( $base_config, $local_config );
+
+					if ( null !== $local_throttle && is_array( $merged_hcs[ $remote_slug ] ?? null ) ) {
+						$merged_hcs[ $remote_slug ]['max_items'] = $local_throttle;
+
+						$decisions[ "flow_config.{$step_id}.handler_configs.{$remote_slug}.max_items" ] = array(
+							'source' => 'local',
+							'reason' => 'burn_in_preserve_throttle_across_handler_slug_change',
+						);
+					}
+				}
+
 				$merged_step['handler_configs'] = $merged_hcs;
 			}
-
-			self::mirror_preserved_handler_throttle(
-				$base_hc,
-				$local_hc,
-				$base_hcs,
-				$local_hcs,
-				$step_id,
-				$merged_step,
-				$decisions
-			);
 
 			$merged_steps[ $step_id ] = $merged_step;
 		}
@@ -404,68 +394,6 @@ final class AgentBundleArtifactRebase {
 			'decisions' => $decisions,
 			'ambiguous' => $ambiguous,
 		);
-	}
-
-	/**
-	 * Keep local burn-in max_items consistent across legacy and canonical shapes.
-	 *
-	 * Flow payloads may carry both `handler_config` and `handler_configs` while
-	 * installs migrate between old and new representations. The two shapes are
-	 * equivalent runtime inputs, so a locally lowered throttle must not be
-	 * preserved in only one of them.
-	 *
-	 * @param array<string,mixed>                $base_hc Single-handler base config.
-	 * @param array<string,mixed>                $local_hc Single-handler local config.
-	 * @param array<string,mixed>                $base_hcs Multi-handler base config.
-	 * @param array<string,mixed>                $local_hcs Multi-handler local config.
-	 * @param string|int                         $step_id Flow step ID.
-	 * @param array<string,mixed>                $merged_step In/out merged step.
-	 * @param array<string,array<string,string>> $decisions In/out decisions map.
-	 */
-	private static function mirror_preserved_handler_throttle(
-		array $base_hc,
-		array $local_hc,
-		array $base_hcs,
-		array $local_hcs,
-		string|int $step_id,
-		array &$merged_step,
-		array &$decisions
-	): void {
-		$single_throttle = self::local_preserved_max_items( $base_hc, $local_hc );
-		if ( null !== $single_throttle && is_array( $merged_step['handler_configs'] ?? null ) ) {
-			foreach ( $merged_step['handler_configs'] as $slug => &$handler_config ) {
-				if ( ! is_array( $handler_config ) ) {
-					continue;
-				}
-				$handler_config['max_items'] = $single_throttle;
-				$decisions[ "flow_config.{$step_id}.handler_configs.{$slug}.max_items" ] = array(
-					'source' => 'local',
-					'reason' => 'burn_in_preserve_throttle_shape_mirror',
-				);
-			}
-			unset( $handler_config );
-		}
-
-		if ( ! is_array( $merged_step['handler_config'] ?? null ) ) {
-			return;
-		}
-
-		foreach ( $local_hcs as $slug => $local_config ) {
-			if ( ! is_array( $local_config ) ) {
-				continue;
-			}
-			$base_config = is_array( $base_hcs[ $slug ] ?? null ) ? $base_hcs[ $slug ] : array();
-			$max_items   = self::local_preserved_max_items( $base_config, $local_config );
-			if ( null === $max_items ) {
-				continue;
-			}
-			$merged_step['handler_config']['max_items']                     = $max_items;
-			$decisions[ "flow_config.{$step_id}.handler_config.max_items" ] = array(
-				'source' => 'local',
-				'reason' => 'burn_in_preserve_throttle_shape_mirror',
-			);
-			return;
-		}
 	}
 
 	/**

@@ -59,6 +59,15 @@ function validate_workflow_for_test( array $workflow ): array {
 	$valid_types         = array_keys( $step_type_abilities->getAllStepTypes() );
 
 	foreach ( $workflow['steps'] as $index => $step ) {
+		foreach ( array( 'handler', 'handler_slug', 'handler_config' ) as $legacy_field ) {
+			if ( array_key_exists( $legacy_field, $step ) ) {
+				return array(
+					'valid' => false,
+					'error' => "Step {$index} uses unsupported legacy field {$legacy_field}; use handler_slugs and handler_configs",
+				);
+			}
+		}
+
 		if ( ! isset( $step['type'] ) ) {
 			return array( 'valid' => false, 'error' => "Step {$index} missing type" );
 		}
@@ -122,10 +131,11 @@ $r  = validate_workflow_for_test( $wf );
 dm_assert( true === $r['valid'], 'fetch without handler_slug accepted at workflow level' );
 
 // -----------------------------------------------------------------
-echo "\n[5] fetch step WITH handler_slug — VALID\n";
+echo "\n[5] fetch step WITH legacy handler_slug — INVALID\n";
 $wf = array( 'steps' => array( array( 'type' => 'fetch', 'handler_slug' => 'rss' ) ) );
 $r  = validate_workflow_for_test( $wf );
-dm_assert( true === $r['valid'], 'fetch with handler_slug=rss accepted' );
+dm_assert( false === $r['valid'], 'fetch with legacy handler_slug rejected' );
+dm_assert( str_contains( $r['error'] ?? '', 'unsupported legacy field handler_slug' ), 'legacy handler_slug error is explicit' );
 
 // -----------------------------------------------------------------
 echo "\n[6] publish step without handler_slug — VALID at workflow level\n";
@@ -143,7 +153,11 @@ dm_assert( true === $r['valid'], 'upsert without handler_slug accepted at workfl
 echo "\n[8] mixed workflow: fetch + ai + system_task — VALID\n";
 $wf = array(
 	'steps' => array(
-		array( 'type' => 'fetch', 'handler_slug' => 'rss' ),
+		array(
+			'type'            => 'fetch',
+			'handler_slugs'   => array( 'rss' ),
+			'handler_configs' => array( 'rss' => array( 'feed_url' => 'https://example.com/feed.xml' ) ),
+		),
 		array( 'type' => 'ai' ),
 		array( 'type' => 'system_task', 'flow_step_settings' => array( 'task_type' => 'cleanup' ) ),
 	),

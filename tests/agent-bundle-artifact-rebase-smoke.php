@@ -151,13 +151,15 @@ echo "\n[3] burn-in-safe preserves throttles, takes remote provider/owner/repo\n
 $base_flow = array(
 	'flow_config' => array(
 		'10_fetch_1' => array(
-			'handler'        => 'github',
-			'handler_config' => array(
-				'server'    => 'github',
-				'owner'     => 'old-owner',
-				'repo'      => 'old-repo',
-				'perPage'   => 25,
-				'max_items' => 25,
+			'handler_slugs'   => array( 'github' ),
+			'handler_configs' => array(
+				'github' => array(
+					'server'    => 'github',
+					'owner'     => 'old-owner',
+					'repo'      => 'old-repo',
+					'perPage'   => 25,
+					'max_items' => 25,
+				),
 			),
 			'queue_mode'         => 'idle',
 			'config_patch_queue' => array(),
@@ -173,13 +175,15 @@ $base_flow = array(
 $local_flow = array(
 	'flow_config' => array(
 		'10_fetch_1' => array(
-			'handler'        => 'github',
-			'handler_config' => array(
-				'server'    => 'github',
-				'owner'     => 'old-owner',
-				'repo'      => 'old-repo',
-				'perPage'   => 25,
-				'max_items' => 1, // local burn-in throttle
+			'handler_slugs'   => array( 'github' ),
+			'handler_configs' => array(
+				'github' => array(
+					'server'    => 'github',
+					'owner'     => 'old-owner',
+					'repo'      => 'old-repo',
+					'perPage'   => 25,
+					'max_items' => 1, // local burn-in throttle
+				),
 			),
 			'queue_mode'         => 'drain', // runtime queue change
 			'config_patch_queue' => array( array( 'patch' => array( 'state' => 'live' ) ) ),
@@ -195,13 +199,15 @@ $local_flow = array(
 $remote_flow = array(
 	'flow_config' => array(
 		'10_fetch_1' => array(
-			'handler'        => 'github-a8c', // upstream provider switch
-			'handler_config' => array(
-				'server'    => 'github-a8c',
-				'owner'     => 'Automattic',
-				'repo'      => 'wpcom',
-				'perPage'   => 1,
-				'max_items' => 25, // bundle-default upper bound
+			'handler_slugs'   => array( 'github-a8c' ), // upstream provider switch
+			'handler_configs' => array(
+				'github-a8c' => array(
+					'server'    => 'github-a8c',
+					'owner'     => 'Automattic',
+					'repo'      => 'wpcom',
+					'perPage'   => 1,
+					'max_items' => 25, // bundle-default upper bound
+				),
 			),
 			'queue_mode'         => 'idle',
 			'config_patch_queue' => array(),
@@ -226,13 +232,14 @@ $result = AgentBundleArtifactRebase::rebase(
 );
 
 $step = $result['merged']['flow_config']['10_fetch_1'] ?? array();
+$github_config = $step['handler_configs']['github-a8c'] ?? array();
 
-rebase_assert_equals( 'remote source-shape: handler', 'github-a8c', $step['handler'] ?? null );
-rebase_assert_equals( 'remote source-shape: server', 'github-a8c', $step['handler_config']['server'] ?? null );
-rebase_assert_equals( 'remote source-shape: owner', 'Automattic', $step['handler_config']['owner'] ?? null );
-rebase_assert_equals( 'remote source-shape: repo', 'wpcom', $step['handler_config']['repo'] ?? null );
-rebase_assert_equals( 'remote source-shape: perPage', 1, $step['handler_config']['perPage'] ?? null );
-rebase_assert_equals( 'local throttle preserved: max_items', 1, $step['handler_config']['max_items'] ?? null );
+rebase_assert_equals( 'remote source-shape: handler slugs', array( 'github-a8c' ), $step['handler_slugs'] ?? null );
+rebase_assert_equals( 'remote source-shape: server', 'github-a8c', $github_config['server'] ?? null );
+rebase_assert_equals( 'remote source-shape: owner', 'Automattic', $github_config['owner'] ?? null );
+rebase_assert_equals( 'remote source-shape: repo', 'wpcom', $github_config['repo'] ?? null );
+rebase_assert_equals( 'remote source-shape: perPage', 1, $github_config['perPage'] ?? null );
+rebase_assert_equals( 'local throttle preserved: max_items', 1, $github_config['max_items'] ?? null );
 rebase_assert_equals( 'local runtime queue preserved: queue_mode', 'drain', $step['queue_mode'] ?? null );
 rebase_assert_equals( 'local runtime queue preserved: config_patch_queue length', 1, count( $step['config_patch_queue'] ?? array() ) );
 rebase_assert_equals(
@@ -248,12 +255,12 @@ rebase_assert( 'rebase does not require approval in canonical case', false === $
 rebase_assert_equals(
 	'decision recorded for max_items local preservation',
 	'local',
-	$result['decisions']['flow_config.10_fetch_1.handler_config.max_items']['source'] ?? null
+	$result['decisions']['flow_config.10_fetch_1.handler_configs.github-a8c.max_items']['source'] ?? null
 );
 rebase_assert_equals(
 	'decision recorded for owner remote source-shape',
 	'remote',
-	$result['decisions']['flow_config.10_fetch_1.handler_config.owner']['source'] ?? null
+	$result['decisions']['flow_config.10_fetch_1.handler_configs.github-a8c.owner']['source'] ?? null
 );
 
 // ---------------------------------------------------------------------------
@@ -267,9 +274,11 @@ $ambiguous_result = AgentBundleArtifactRebase::rebase(
 		'base'          => array(
 			'flow_config' => array(
 				'1_step_1' => array(
-					'handler_config' => array(
-						'tool'      => 'old-tool',
-						'max_items' => 10,
+					'handler_configs' => array(
+						'mcp' => array(
+							'tool'      => 'old-tool',
+							'max_items' => 10,
+						),
 					),
 				),
 			),
@@ -277,9 +286,11 @@ $ambiguous_result = AgentBundleArtifactRebase::rebase(
 		'local' => array(
 			'flow_config' => array(
 				'1_step_1' => array(
-					'handler_config' => array(
-						'tool'      => 'local-tool', // local changed source-shape
-						'max_items' => 1,            // local lowered throttle
+					'handler_configs' => array(
+						'mcp' => array(
+							'tool'      => 'local-tool', // local changed source-shape
+							'max_items' => 1,            // local lowered throttle
+						),
 					),
 				),
 			),
@@ -287,9 +298,11 @@ $ambiguous_result = AgentBundleArtifactRebase::rebase(
 		'remote' => array(
 			'flow_config' => array(
 				'1_step_1' => array(
-					'handler_config' => array(
-						'tool'      => 'remote-tool', // remote also changed source-shape
-						'max_items' => 25,            // remote raised throttle
+					'handler_configs' => array(
+						'mcp' => array(
+							'tool'      => 'remote-tool', // remote also changed source-shape
+							'max_items' => 25,            // remote raised throttle
+						),
 					),
 				),
 			),
@@ -301,13 +314,13 @@ $ambiguous_result = AgentBundleArtifactRebase::rebase(
 rebase_assert( 'ambiguous overlap requires approval', true === $ambiguous_result['requires_approval'] );
 rebase_assert(
 	'tool flagged ambiguous when both diverged from base',
-	in_array( 'flow_config.1_step_1.handler_config.tool', $ambiguous_result['ambiguous'], true )
+	in_array( 'flow_config.1_step_1.handler_configs.mcp.tool', $ambiguous_result['ambiguous'], true )
 );
 rebase_assert(
 	'max_items flagged ambiguous when both throttles diverged',
-	in_array( 'flow_config.1_step_1.handler_config.max_items', $ambiguous_result['ambiguous'], true )
+	in_array( 'flow_config.1_step_1.handler_configs.mcp.max_items', $ambiguous_result['ambiguous'], true )
 );
-$step_ambiguous = $ambiguous_result['merged']['flow_config']['1_step_1']['handler_config'] ?? array();
+$step_ambiguous = $ambiguous_result['merged']['flow_config']['1_step_1']['handler_configs']['mcp'] ?? array();
 rebase_assert_equals( 'ambiguous merge defaults to local tool (safer)', 'local-tool', $step_ambiguous['tool'] ?? null );
 rebase_assert_equals( 'ambiguous merge defaults to local throttle', 1, $step_ambiguous['max_items'] ?? null );
 
@@ -360,62 +373,9 @@ rebase_assert_equals( 'multi: rss feed from remote (local unchanged)', 'https://
 rebase_assert( 'multi: no ambiguous fields', empty( $multi_result['ambiguous'] ) );
 
 // ---------------------------------------------------------------------------
-// [6] Equivalent legacy/canonical handler config shapes keep throttle in sync.
+// [6] Hashes are recomputed for the merged payload.
 // ---------------------------------------------------------------------------
-echo "\n[6] handler_config max_items mirrors into handler_configs\n";
-$shape_result = AgentBundleArtifactRebase::rebase(
-	array(
-		'artifact_type' => 'flow',
-		'artifact_id'   => 'shape-transition',
-		'base'          => array(
-			'flow_config' => array(
-				'1_step_1' => array(
-					'handler_config' => array(
-						'owner'     => 'old',
-						'max_items' => 25,
-					),
-				),
-			),
-		),
-		'local' => array(
-			'flow_config' => array(
-				'1_step_1' => array(
-					'handler_config' => array(
-						'owner'     => 'old',
-						'max_items' => 1,
-					),
-				),
-			),
-		),
-		'remote' => array(
-			'flow_config' => array(
-				'1_step_1' => array(
-					'handler_config'  => array(
-						'owner'     => 'Automattic',
-						'max_items' => 25,
-					),
-					'handler_configs' => array(
-						'github-a8c' => array(
-							'owner'     => 'Automattic',
-							'max_items' => 25,
-						),
-					),
-				),
-			),
-		),
-	),
-	AgentBundleArtifactRebase::POLICY_BURN_IN_SAFE
-);
-
-$shape_step = $shape_result['merged']['flow_config']['1_step_1'] ?? array();
-rebase_assert_equals( 'shape: single handler throttle from local', 1, $shape_step['handler_config']['max_items'] ?? null );
-rebase_assert_equals( 'shape: multi handler throttle mirrors local', 1, $shape_step['handler_configs']['github-a8c']['max_items'] ?? null );
-rebase_assert_equals( 'shape: multi handler source-shape remains remote', 'Automattic', $shape_step['handler_configs']['github-a8c']['owner'] ?? null );
-
-// ---------------------------------------------------------------------------
-// [7] Hashes are recomputed for the merged payload.
-// ---------------------------------------------------------------------------
-echo "\n[7] Rebase output carries reproducible hashes\n";
+echo "\n[6] Rebase output carries reproducible hashes\n";
 $hashed_result = AgentBundleArtifactRebase::rebase(
 	array(
 		'artifact_type' => 'flow',

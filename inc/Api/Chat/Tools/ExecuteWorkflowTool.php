@@ -44,15 +44,15 @@ class ExecuteWorkflowTool extends BaseTool {
 
 		$description = 'Execute an ephemeral workflow (not saved to database).
 
-STEP FORMAT: {type: "' . $types_list . '", handler_slug, handler_config, user_message?, system_prompt?, agent_modes?}
+STEP FORMAT: {type: "' . $types_list . '", handler_slugs?, handler_configs?, flow_step_settings?, user_message?, system_prompt?, agent_modes?}
 
-Use api_query GET /datamachine/v1/handlers/{slug} for handler_config fields.
+Use api_query GET /datamachine/v1/handlers/{slug} for handler_configs fields.
 
 EXAMPLE:
 [
-  {"type": "fetch", "handler_slug": "rss", "handler_config": {"feed_url": "..."}},
+  {"type": "fetch", "handler_slugs": ["rss"], "handler_configs": {"rss": {"feed_url": "..."}}},
   {"type": "ai", "user_message": "Summarize for social media"},
-  {"type": "publish", "handler_slug": "wordpress_publish", "handler_config": {"post_type": "post"}}
+  {"type": "publish", "handler_slugs": ["wordpress_publish"], "handler_configs": {"wordpress_publish": {"post_type": "post"}}}
 ]';
 
 		return array(
@@ -65,7 +65,7 @@ EXAMPLE:
 					'steps'   => array(
 						'type'        => 'array',
 						'items'       => array( 'type' => 'object' ),
-						'description' => 'Step objects: {type, handler_slug, handler_config}. AI steps: {type: "ai", user_message}.',
+						'description' => 'Step objects: {type, handler_slugs, handler_configs}. AI steps: {type: "ai", user_message}.',
 					),
 					'dry_run' => array(
 						'type'        => 'boolean',

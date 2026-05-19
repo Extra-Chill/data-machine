@@ -372,7 +372,7 @@ class AgentBundler {
 				$document_step['step_type'] = $pipeline_step_types_by_id[ $pipeline_step_id ];
 			}
 
-			foreach ( array( 'step_type', 'handler_slug', 'handler_slugs', 'flow_step_settings', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'completion_assertions', 'tool_runtime_rules', 'enabled' ) as $field ) {
+			foreach ( array( 'step_type', 'handler_slugs', 'flow_step_settings', 'enabled_tools', 'disabled_tools', 'prompt_queue', 'config_patch_queue', 'queue_mode', 'completion_assertions', 'tool_runtime_rules', 'enabled' ) as $field ) {
 				if ( array_key_exists( $field, $step ) ) {
 					$document_step[ $field ] = $step[ $field ];
 				}
@@ -394,13 +394,11 @@ class AgentBundler {
 			return array();
 		}
 
-		if ( is_array( $step['handler_configs'] ?? null ) ) {
-			$configs = $step['handler_configs'];
-		} elseif ( is_string( $step['handler_slug'] ?? null ) && is_array( $step['handler_config'] ?? null ) ) {
-			$configs = array( $step['handler_slug'] => $step['handler_config'] );
-		} else {
+		if ( ! is_array( $step['handler_configs'] ?? null ) ) {
 			return array();
 		}
+
+		$configs = $step['handler_configs'];
 
 		if ( 'refs' !== $handler_auth ) {
 			return $configs;

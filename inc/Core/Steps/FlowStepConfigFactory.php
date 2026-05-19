@@ -43,8 +43,6 @@ class FlowStepConfigFactory {
 					'disabled_tools'     => $step['disabled_tools'] ?? array(),
 					'pipeline_id'        => 'direct',
 					'flow_id'            => 'direct',
-					'handler_slug'       => $step['handler_slug'] ?? '',
-					'handler_config'     => $step['handler_config'] ?? array(),
 					'handler_slugs'      => $step['handler_slugs'] ?? array(),
 					'handler_configs'    => $step['handler_configs'] ?? array(),
 					'flow_step_settings' => $step['flow_step_settings'] ?? array(),
@@ -124,7 +122,6 @@ class FlowStepConfigFactory {
 			'queue_mode'                          => true,
 			'pipeline_id'                         => true,
 			'flow_id'                             => true,
-			'handler'                             => true,
 		);
 
 		foreach ( $args as $field => $value ) {
@@ -133,18 +130,9 @@ class FlowStepConfigFactory {
 			}
 		}
 
-		$handler_slug       = is_string( $args['handler_slug'] ?? null ) ? (string) $args['handler_slug'] : '';
-		$handler_config     = is_array( $args['handler_config'] ?? null ) ? $args['handler_config'] : array();
 		$flow_step_settings = is_array( $args['flow_step_settings'] ?? null ) ? $args['flow_step_settings'] : array();
 		$handler_slugs      = is_array( $args['handler_slugs'] ?? null ) ? $args['handler_slugs'] : array();
 		$handler_configs    = is_array( $args['handler_configs'] ?? null ) ? $args['handler_configs'] : array();
-
-		if ( '' !== $handler_slug ) {
-			$handler_slugs[] = $handler_slug;
-			if ( ! array_key_exists( $handler_slug, $handler_configs ) ) {
-				$handler_configs[ $handler_slug ] = $handler_config;
-			}
-		}
 
 		if ( FlowStepConfig::usesHandler( $step_config ) ) {
 			$step_config = FlowStepConfig::normalizeHandlerShape(
