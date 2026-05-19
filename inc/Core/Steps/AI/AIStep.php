@@ -405,6 +405,7 @@ class AIStep extends Step {
 			}
 			if ( $owner_id <= 0 && $user_id > 0 ) {
 				// Legacy / agent-less flows: fall back to the flow's user_id.
+				$this->logAgentlessFallback( $job_snapshot, $user_id, $pipeline_step_id );
 				$owner_id = $user_id;
 			}
 
@@ -746,6 +747,29 @@ class AIStep extends Step {
 		} catch ( \InvalidArgumentException $e ) {
 			return (int) ( $job_snapshot['agent_id'] ?? 0 );
 		}
+	}
+
+	/**
+	 * Log when execution falls back to a user without an agent context.
+	 *
+	 * @param array  $job_snapshot     Portable job snapshot from engine data.
+	 * @param int    $fallback_user_id User ID used for the legacy fallback.
+	 * @param string $pipeline_step_id Pipeline step currently executing.
+	 */
+	private function logAgentlessFallback( array $job_snapshot, int $fallback_user_id, string $pipeline_step_id ): void {
+		do_action(
+			'datamachine_log',
+			'warning',
+			'AIStep: Agent-less job snapshot fell back to flow user_id; execution is outside the agent ownership envelope.',
+			array(
+				'job_id'           => $this->job_id,
+				'flow_id'          => (int) ( $job_snapshot['flow_id'] ?? 0 ),
+				'pipeline_id'      => (int) ( $job_snapshot['pipeline_id'] ?? 0 ),
+				'flow_step_id'     => $this->flow_step_id,
+				'pipeline_step_id' => $pipeline_step_id,
+				'fallback_user_id' => $fallback_user_id,
+			)
+		);
 	}
 
 	/**

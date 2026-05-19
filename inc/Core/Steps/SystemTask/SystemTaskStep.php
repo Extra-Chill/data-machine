@@ -322,6 +322,7 @@ class SystemTaskStep extends Step {
 		}
 		if ( $owner_id <= 0 && $parent_user_id > 0 ) {
 			// Legacy / agent-less flows: fall back to the flow's user_id.
+			$this->logAgentlessFallback( $parent_job_snapshot, $parent_user_id, (int) $child_job_id );
 			$owner_id = $parent_user_id;
 		}
 
@@ -481,5 +482,28 @@ class SystemTaskStep extends Step {
 	private static function getConfiguredTaskType( array $settings ): string {
 		$task_type = $settings['task_type'] ?? '';
 		return is_string( $task_type ) ? $task_type : '';
+	}
+
+	/**
+	 * Log when a system task runs via the legacy user fallback without agent context.
+	 *
+	 * @param array $parent_job_snapshot Parent job snapshot from engine data.
+	 * @param int   $fallback_user_id    User ID used for the fallback.
+	 * @param int   $child_job_id        Child job created for the system task.
+	 */
+	private function logAgentlessFallback( array $parent_job_snapshot, int $fallback_user_id, int $child_job_id ): void {
+		do_action(
+			'datamachine_log',
+			'warning',
+			'SystemTaskStep: Agent-less parent job snapshot fell back to flow user_id; execution is outside the agent ownership envelope.',
+			array(
+				'parent_job_id'    => $this->job_id,
+				'child_job_id'     => $child_job_id,
+				'flow_id'          => (int) ( $parent_job_snapshot['flow_id'] ?? 0 ),
+				'pipeline_id'      => (int) ( $parent_job_snapshot['pipeline_id'] ?? 0 ),
+				'flow_step_id'     => $this->flow_step_id,
+				'fallback_user_id' => $fallback_user_id,
+			)
+		);
 	}
 }

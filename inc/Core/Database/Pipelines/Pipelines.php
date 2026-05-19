@@ -886,4 +886,30 @@ class Pipelines extends BaseRepository {
 
 		return (int) $count;
 	}
+
+	/**
+	 * List pipelines with no agent owner.
+	 *
+	 * @param int $limit  Maximum rows to return.
+	 * @param int $offset SQL offset.
+	 * @return array<int, array<string, mixed>> Orphaned pipeline rows.
+	 */
+	public function get_orphaned_pipelines( int $limit = 20, int $offset = 0 ): array {
+		$limit  = max( 1, min( 100, $limit ) );
+		$offset = max( 0, $offset );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared -- Table name uses %i and limit/offset are prepared integers.
+		$results = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				'SELECT pipeline_id, pipeline_name, user_id, portable_slug, created_at, updated_at FROM %i WHERE agent_id IS NULL ORDER BY updated_at DESC LIMIT %d OFFSET %d',
+				$this->table_name,
+				$limit,
+				$offset
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+
+		return is_array( $results ) ? $results : array();
+	}
 }

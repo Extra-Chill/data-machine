@@ -65,6 +65,13 @@ smoke_assert(
 	$passes
 );
 
+smoke_assert(
+	str_contains( $pipelines_src, 'public function get_orphaned_pipelines( int $limit = 20, int $offset = 0 ): array' ),
+	'Pipelines::get_orphaned_pipelines() read-only listing method exists',
+	$failures,
+	$passes
+);
+
 // reassign_agent_id handles NULL source
 smoke_assert(
 	str_contains( $pipelines_src, 'WHERE agent_id IS NULL' ),
@@ -104,6 +111,13 @@ smoke_assert(
 	$passes
 );
 
+smoke_assert(
+	str_contains( $flows_src, 'public function get_orphaned_flows( int $limit = 20, int $offset = 0 ): array' ),
+	'Flows::get_orphaned_flows() read-only listing method exists',
+	$failures,
+	$passes
+);
+
 // reassign_agent_id_for_pipeline method exists
 smoke_assert(
 	str_contains( $flows_src, 'public function reassign_agent_id_for_pipeline( int $pipeline_id, ?int $from_agent_id, int $to_agent_id ): int' ),
@@ -131,6 +145,15 @@ smoke_assert(
 smoke_assert(
 	str_contains( $pipelines_cmd_src, 'private function reassignPipelines(' ),
 	'PipelinesCommand::reassignPipelines() method exists',
+	$failures,
+	$passes
+);
+
+smoke_assert(
+	str_contains( $pipelines_cmd_src, "'orphans' === \$args[0]" )
+	&& str_contains( $pipelines_cmd_src, 'private function listOrphanedPipelines(' )
+	&& str_contains( $pipelines_cmd_src, 'get_orphaned_pipelines' ),
+	'PipelinesCommand exposes read-only orphans subcommand',
 	$failures,
 	$passes
 );
@@ -195,6 +218,15 @@ smoke_assert(
 smoke_assert(
 	str_contains( $flows_cmd_src, 'private function reassignFlows(' ),
 	'FlowsCommand::reassignFlows() method exists',
+	$failures,
+	$passes
+);
+
+smoke_assert(
+	str_contains( $flows_cmd_src, "'orphans' === \$args[0]" )
+	&& str_contains( $flows_cmd_src, 'private function listOrphanedFlows(' )
+	&& str_contains( $flows_cmd_src, 'get_orphaned_flows' ),
+	'FlowsCommand exposes read-only orphans subcommand',
 	$failures,
 	$passes
 );
@@ -264,6 +296,45 @@ smoke_assert(
 smoke_assert(
 	! str_contains( $post_tracking_src, 'is not mutated by update_flow' ),
 	'PostTracking no longer claims agent_id is immutable',
+	$failures,
+	$passes
+);
+
+// ── 8. Agent-less fallback observability ───────────────────────────────
+
+echo "\n--- Agent-less fallback observability ---\n";
+
+$ai_step_file = __DIR__ . '/../inc/Core/Steps/AI/AIStep.php';
+$ai_step_src  = file_get_contents( $ai_step_file );
+
+smoke_assert(
+	str_contains( $ai_step_src, 'function logAgentlessFallback' )
+	&& str_contains( $ai_step_src, 'Agent-less job snapshot fell back to flow user_id' ),
+	'AIStep logs legacy agent-less fallback',
+	$failures,
+	$passes
+);
+
+$system_task_step_file = __DIR__ . '/../inc/Core/Steps/SystemTask/SystemTaskStep.php';
+$system_task_step_src  = file_get_contents( $system_task_step_file );
+
+smoke_assert(
+	str_contains( $system_task_step_src, 'function logAgentlessFallback' )
+	&& str_contains( $system_task_step_src, 'Agent-less parent job snapshot fell back to flow user_id' ),
+	'SystemTaskStep logs legacy agent-less fallback',
+	$failures,
+	$passes
+);
+
+$system_abilities_file = __DIR__ . '/../inc/Abilities/SystemAbilities.php';
+$system_abilities_src  = file_get_contents( $system_abilities_file );
+
+smoke_assert(
+	str_contains( $system_abilities_src, "'ownership' => array(" )
+	&& str_contains( $system_abilities_src, 'runOwnershipDiagnostics' )
+	&& str_contains( $system_abilities_src, 'unowned_pipelines' )
+	&& str_contains( $system_abilities_src, 'unowned_flows' ),
+	'System health includes agent ownership diagnostics',
 	$failures,
 	$passes
 );

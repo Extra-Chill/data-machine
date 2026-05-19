@@ -16,6 +16,8 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Engine\AI\RequestBuilder;
 use AgentsAPI\AI\WP_Agent_Message;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
+use DataMachine\Core\Database\Flows\Flows;
+use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\Tasks\RecurringScheduler;
 use DataMachine\Engine\Tasks\TaskScheduler;
@@ -161,6 +163,11 @@ class SystemAbilities {
 				'callback' => array( $this, 'runSchedulerDiagnostics' ),
 				'default'  => true,
 			),
+			'ownership' => array(
+				'label'    => __( 'Agent Ownership', 'data-machine' ),
+				'callback' => array( $this, 'runOwnershipDiagnostics' ),
+				'default'  => true,
+			),
 		);
 
 		return apply_filters( 'datamachine_system_health_checks', $checks );
@@ -285,6 +292,32 @@ class SystemAbilities {
 			),
 			'recommendation'          => 'stale' === $status
 				? __( 'For local or low-traffic installs, schedule an external wake-up such as wp cron event run --due-now or wp datamachine drain.', 'data-machine' )
+				: null,
+		);
+	}
+
+	/**
+	 * Report rows that still execute through legacy agent-less ownership paths.
+	 *
+	 * @param array $options Optional check options.
+	 * @return array Ownership diagnostic results.
+	 */
+	private function runOwnershipDiagnostics( array $options = array() ): array {
+		unset( $options );
+
+		$pipeline_count = ( new Pipelines() )->count_by_agent_id( null );
+		$flow_count     = ( new Flows() )->count_by_agent_id( null );
+		$status         = ( $pipeline_count > 0 || $flow_count > 0 ) ? 'warning' : 'ok';
+
+		return array(
+			'status'            => $status,
+			'message'           => 'ok' === $status
+				? __( 'all pipelines and flows have agent ownership', 'data-machine' )
+				: __( 'unowned pipelines or flows can run outside the agent ownership envelope', 'data-machine' ),
+			'unowned_pipelines' => $pipeline_count,
+			'unowned_flows'     => $flow_count,
+			'recommendation'    => 'warning' === $status
+				? __( 'Inspect with wp datamachine pipelines orphans and wp datamachine flows orphans, then reassign with --where-null.', 'data-machine' )
 				: null,
 		);
 	}
