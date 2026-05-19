@@ -288,13 +288,15 @@ final class AgentBundleArtifactRebase {
 				}
 
 				if ( 1 === count( $local_hcs ) && 1 === count( $remote_hcs ) ) {
-					$local_slug    = (string) array_key_first( $local_hcs );
-					$remote_slug   = (string) array_key_first( $remote_hcs );
-					$local_config  = is_array( $local_hcs[ $local_slug ] ?? null ) ? $local_hcs[ $local_slug ] : array();
-					$base_config   = is_array( $base_hcs[ $local_slug ] ?? null ) ? $base_hcs[ $local_slug ] : array();
+					$local_slug     = (string) array_key_first( $local_hcs );
+					$remote_slug    = (string) array_key_first( $remote_hcs );
+					$local_config   = is_array( $local_hcs[ $local_slug ] ?? null ) ? $local_hcs[ $local_slug ] : array();
+					$base_config    = is_array( $base_hcs[ $local_slug ] ?? null ) ? $base_hcs[ $local_slug ] : array();
 					$local_throttle = self::local_preserved_max_items( $base_config, $local_config );
+
 					if ( null !== $local_throttle && is_array( $merged_hcs[ $remote_slug ] ?? null ) ) {
 						$merged_hcs[ $remote_slug ]['max_items'] = $local_throttle;
+
 						$decisions[ "flow_config.{$step_id}.handler_configs.{$remote_slug}.max_items" ] = array(
 							'source' => 'local',
 							'reason' => 'burn_in_preserve_throttle_across_handler_slug_change',
