@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.124.1] - 2026-05-19
+
+### Fixed
+- parse repeated system run params from argv
+
 ## [0.124.0] - 2026-05-19
 
 ### Added
