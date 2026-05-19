@@ -97,6 +97,53 @@ rebase_assert( 'pipeline rebase requires approval under burn-in-safe', true === 
 rebase_assert_equals( 'pipeline merged stays local under burn-in-safe', array( 'steps' => array( 'fetch', 'ai' ), 'note' => 'local' ), $pipeline_result['merged'] );
 
 // ---------------------------------------------------------------------------
+// [2b] agent_config burn-in-safe preserves runtime-local config but takes clean bundle changes.
+// ---------------------------------------------------------------------------
+echo "\n[2b] burn-in-safe rebases agent_config path-wise\n";
+$base_agent_config = array(
+	'intelligence'            => array(
+		'context_servers' => array(
+			'a8c' => array(
+				'transport' => 'streamable-http',
+				'url'       => 'https://public-api.wordpress.com/wpcom/v2/context-a8c-mcp/v1',
+			),
+		),
+	),
+	'intelligence_wiki_brain' => array(
+		'graph_config' => array(
+			'entity_types' => array(
+				'strategic-signal' => array(
+					'label'       => 'Strategic signal',
+					'description' => 'Source-backed signal.',
+				),
+			),
+		),
+	),
+);
+$local_agent_config = $base_agent_config;
+$local_agent_config['intelligence']['context_servers']['a8c']['url']                      = 'https://local-tunnel.example.test/mcp';
+$local_agent_config['intelligence']['context_servers']['a8c']['headers']['Authorization'] = 'Bearer local-token';
+$remote_agent_config = $base_agent_config;
+$remote_agent_config['intelligence_wiki_brain']['graph_config']['entity_types']['strategic-signal']['aliases'] = array( 'strategy-signal' );
+
+$agent_config_result = AgentBundleArtifactRebase::rebase(
+	array(
+		'artifact_type' => 'agent_config',
+		'artifact_id'   => 'config',
+		'base'          => $base_agent_config,
+		'local'         => $local_agent_config,
+		'remote'        => $remote_agent_config,
+	),
+	AgentBundleArtifactRebase::POLICY_BURN_IN_SAFE
+);
+rebase_assert( 'agent_config rebase is unambiguous for runtime-local plus bundle-owned paths', false === $agent_config_result['requires_approval'] );
+rebase_assert_equals( 'agent_config preserves local context server URL', 'https://local-tunnel.example.test/mcp', $agent_config_result['merged']['intelligence']['context_servers']['a8c']['url'] ?? null );
+rebase_assert_equals( 'agent_config preserves local auth header', 'Bearer local-token', $agent_config_result['merged']['intelligence']['context_servers']['a8c']['headers']['Authorization'] ?? null );
+rebase_assert_equals( 'agent_config takes remote graph alias', array( 'strategy-signal' ), $agent_config_result['merged']['intelligence_wiki_brain']['graph_config']['entity_types']['strategic-signal']['aliases'] ?? null );
+rebase_assert_equals( 'agent_config records runtime-local decision', 'burn_in_preserve_runtime_agent_config', $agent_config_result['decisions']['intelligence.context_servers']['reason'] ?? null );
+rebase_assert_equals( 'agent_config records bundle-owned remote decision', 'local_unchanged_from_base', $agent_config_result['decisions']['intelligence_wiki_brain.graph_config.entity_types.strategic-signal.aliases']['reason'] ?? null );
+
+// ---------------------------------------------------------------------------
 // [3] burn-in-safe takes remote source-shape, keeps local throttles.
 // Mirrors the wordpress-com-wiki Flow 41 case from the issue.
 // ---------------------------------------------------------------------------

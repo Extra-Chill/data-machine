@@ -194,6 +194,10 @@ final class AgentBundleArtifactRebase {
 	 */
 	public static function policy_burn_in_safe( array $input ): array {
 		$type = (string) $input['artifact_type'];
+		if ( 'agent_config' === $type ) {
+			return self::policy_agent_config_burn_in_safe( $input );
+		}
+
 		if ( 'flow' !== $type ) {
 			return self::policy_conservative( $input );
 		}
@@ -377,6 +381,32 @@ final class AgentBundleArtifactRebase {
 	}
 
 	/**
+	 * Burn-in-safe policy for agent_config artifacts.
+	 *
+	 * Agent config mixes bundle-owned brain config with runtime-local connection
+	 * details. Preserve local runtime connection/auth subtrees, while allowing
+	 * clean remote changes elsewhere (for example graph ontology aliases) to merge.
+	 *
+	 * @param array<string,mixed> $input Rebase input.
+	 * @return array<string,mixed>
+	 */
+	private static function policy_agent_config_burn_in_safe( array $input ): array {
+		$base   = is_array( $input['base'] ?? null ) ? $input['base'] : array();
+		$local  = is_array( $input['local'] ?? null ) ? $input['local'] : array();
+		$remote = is_array( $input['remote'] ?? null ) ? $input['remote'] : array();
+
+		$decisions = array();
+		$ambiguous = array();
+		$merged    = self::merge_agent_config_value( $base, $local, $remote, '', $decisions, $ambiguous );
+
+		return array(
+			'merged'    => is_array( $merged ) ? $merged : array(),
+			'decisions' => $decisions,
+			'ambiguous' => $ambiguous,
+		);
+	}
+
+	/**
 	 * Keep local burn-in max_items consistent across legacy and canonical shapes.
 	 *
 	 * Flow payloads may carry both `handler_config` and `handler_configs` while
@@ -455,6 +485,111 @@ final class AgentBundleArtifactRebase {
 		}
 
 		return $local['max_items'];
+	}
+
+	/**
+	 * Merge one agent_config value using path-aware ownership rules.
+	 *
+	 * @param mixed                               $base Base value.
+	 * @param mixed                               $local Local value.
+	 * @param mixed                               $remote Remote value.
+	 * @param string                              $path Dot path.
+	 * @param array<string,array<string,string>>  $decisions In/out decisions map.
+	 * @param array<int,string>                   $ambiguous In/out ambiguous list.
+	 */
+	private static function merge_agent_config_value( mixed $base, mixed $local, mixed $remote, string $path, array &$decisions, array &$ambiguous ): mixed {
+		$local_exists  = null !== $local;
+		$remote_exists = null !== $remote;
+		$base_exists   = null !== $base;
+
+		if ( $local === $remote ) {
+			return $local;
+		}
+
+		if ( self::is_runtime_local_agent_config_path( $path ) ) {
+			$decisions[ $path ] = array(
+				'source' => 'local',
+				'reason' => 'burn_in_preserve_runtime_agent_config',
+			);
+			return $local_exists ? $local : $base;
+		}
+
+		if ( is_array( $local ) && is_array( $remote ) && ( is_array( $base ) || ! $base_exists ) ) {
+			$base_array = is_array( $base ) ? $base : array();
+			$merged     = array();
+			$keys       = array_unique( array_merge( array_keys( $base_array ), array_keys( $local ), array_keys( $remote ) ) );
+			foreach ( $keys as $key ) {
+				$key_path          = '' === $path ? (string) $key : $path . '.' . (string) $key;
+				$key_base_exists   = array_key_exists( $key, $base_array );
+				$key_local_exists  = array_key_exists( $key, $local );
+				$key_remote_exists = array_key_exists( $key, $remote );
+				$value             = self::merge_agent_config_value(
+					$key_base_exists ? $base_array[ $key ] : null,
+					$key_local_exists ? $local[ $key ] : null,
+					$key_remote_exists ? $remote[ $key ] : null,
+					$key_path,
+					$decisions,
+					$ambiguous
+				);
+				if ( $key_local_exists || $key_remote_exists || null !== $value ) {
+					$merged[ $key ] = $value;
+				}
+			}
+			return $merged;
+		}
+
+		$local_changed  = $local_exists && ( ! $base_exists || $local !== $base );
+		$remote_changed = $remote_exists && ( ! $base_exists || $remote !== $base );
+
+		if ( $local_changed && $remote_changed ) {
+			$decisions[ $path ] = array(
+				'source' => 'ambiguous',
+				'reason' => 'both_diverged_from_base',
+			);
+			$ambiguous[]        = $path;
+			return $local;
+		}
+
+		if ( $local_changed ) {
+			$decisions[ $path ] = array(
+				'source' => 'local',
+				'reason' => 'remote_unchanged_from_base',
+			);
+			return $local;
+		}
+
+		if ( $remote_changed ) {
+			$decisions[ $path ] = array(
+				'source' => 'remote',
+				'reason' => 'local_unchanged_from_base',
+			);
+			return $remote;
+		}
+
+		return $remote_exists ? $remote : $local;
+	}
+
+	/**
+	 * Whether an agent_config path is runtime-local and should preserve local state.
+	 *
+	 * @param string $path Dot path.
+	 */
+	private static function is_runtime_local_agent_config_path( string $path ): bool {
+		$prefixes = array(
+			'intelligence.context_servers',
+			'intelligence.auth_refs',
+			'allowed_redirect_uris',
+			'model',
+			'provider',
+		);
+
+		foreach ( $prefixes as $prefix ) {
+			if ( $path === $prefix || str_starts_with( $path, $prefix . '.' ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
