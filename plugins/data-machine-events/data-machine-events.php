@@ -120,6 +120,8 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	\WP_CLI::add_command( 'data-machine-events check clean-duplicates', \DataMachineEvents\Cli\Check\CleanDuplicatesCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check merged-bills', \DataMachineEvents\Cli\Check\CheckMergedBillsCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check merge-duplicate-venues', \DataMachineEvents\Cli\Check\CheckMergeDuplicateVenuesCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check missing-venue-addresses', \DataMachineEvents\Cli\Check\CheckMissingVenueAddressesCommand::class );
+	\WP_CLI::add_command( 'data-machine-events check orphan-venues', \DataMachineEvents\Cli\Check\CheckOrphanVenuesCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check quality', \DataMachineEvents\Cli\Check\CheckQualityCommand::class );
 	\WP_CLI::add_command( 'data-machine-events check all', \DataMachineEvents\Cli\Check\CheckAllCommand::class );
 }
@@ -408,6 +410,11 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/GeocodingAbilities.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/GeocodingAbilities.php';
 			new \DataMachineEvents\Abilities\GeocodingAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueStatsAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/VenueStatsAbilities.php';
+			new \DataMachineEvents\Abilities\VenueStatsAbilities();
 		}
 
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/FilterAbilities.php' ) ) {
