@@ -235,4 +235,136 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 
 		remove_all_filters( 'datamachine_oauth_callback_url' );
 	}
+
+	// -------------------------------------------------------------------------
+	// Per-user account API
+	// -------------------------------------------------------------------------
+
+	public function test_get_account_for_user_returns_null_when_no_account(): void {
+		$this->assertNull( $this->provider->get_account_for_user( 42 ) );
+	}
+
+	public function test_save_account_for_user_round_trip(): void {
+		$account = array(
+			'access_token' => 'tok_user_42',
+			'username'     => 'alice',
+			'scope'        => 'read write',
+		);
+
+		$saved = $this->provider->save_account_for_user( 42, $account );
+		$this->assertTrue( $saved );
+
+		$loaded = $this->provider->get_account_for_user( 42 );
+		$this->assertIsArray( $loaded );
+		$this->assertSame( 'tok_user_42', $loaded['access_token'] );
+		$this->assertSame( 'alice', $loaded['username'] );
+		$this->assertSame( 'read write', $loaded['scope'] );
+	}
+
+	public function test_delete_account_for_user_removes_account(): void {
+		$this->provider->save_account_for_user( 42, array( 'access_token' => 'tok_user_42' ) );
+		$this->assertNotNull( $this->provider->get_account_for_user( 42 ) );
+
+		$this->assertTrue( $this->provider->delete_account_for_user( 42 ) );
+		$this->assertNull( $this->provider->get_account_for_user( 42 ) );
+	}
+
+	public function test_delete_account_for_user_is_idempotent(): void {
+		$this->assertTrue( $this->provider->delete_account_for_user( 12345 ) );
+	}
+
+	public function test_per_user_accounts_are_isolated_between_users(): void {
+		$this->provider->save_account_for_user( 101, array( 'access_token' => 'tok_alice' ) );
+		$this->provider->save_account_for_user( 202, array( 'access_token' => 'tok_bob' ) );
+
+		$alice = $this->provider->get_account_for_user( 101 );
+		$bob   = $this->provider->get_account_for_user( 202 );
+
+		$this->assertSame( 'tok_alice', $alice['access_token'] );
+		$this->assertSame( 'tok_bob', $bob['access_token'] );
+	}
+
+	public function test_per_user_account_does_not_fall_back_to_site_account(): void {
+		// Site-wide account stored.
+		$this->provider->save_account( array( 'access_token' => 'site_token' ) );
+
+		// Per-user read for a user without per-user storage MUST be null.
+		$this->assertNull( $this->provider->get_account_for_user( 42 ) );
+
+		// Site account is still readable via the site-scoped API.
+		$this->assertSame( 'site_token', $this->provider->get_account()['access_token'] );
+	}
+
+	public function test_per_user_save_does_not_affect_site_account(): void {
+		$this->provider->save_account( array( 'access_token' => 'site_token' ) );
+		$this->provider->save_account_for_user( 42, array( 'access_token' => 'tok_user_42' ) );
+
+		$this->assertSame( 'site_token', $this->provider->get_account()['access_token'] );
+		$this->assertSame( 'tok_user_42', $this->provider->get_account_for_user( 42 )['access_token'] );
+	}
+
+	public function test_invalid_user_ids_are_rejected(): void {
+		$this->assertFalse( $this->provider->save_account_for_user( 0, array( 'access_token' => 'x' ) ) );
+		$this->assertNull( $this->provider->get_account_for_user( 0 ) );
+		$this->assertFalse( $this->provider->delete_account_for_user( 0 ) );
+	}
+
+	public function test_resolve_filter_short_circuits_default_lookup(): void {
+		$received = null;
+
+		add_filter(
+			'datamachine_resolve_oauth_account_for_user',
+			function ( $account, $provider, $user_id ) use ( &$received ) {
+				$received = array( $account, $provider, $user_id );
+				if ( 'test_provider' === $provider && 707 === $user_id ) {
+					return array(
+						'access_token' => 'platform_supplied',
+						'scope'        => 'platform:read',
+					);
+				}
+				return $account;
+			},
+			10,
+			3
+		);
+
+		$result = $this->provider->get_account_for_user( 707 );
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'platform_supplied', $result['access_token'] );
+		$this->assertSame( array( null, 'test_provider', 707 ), $received );
+
+		remove_all_filters( 'datamachine_resolve_oauth_account_for_user' );
+	}
+
+	public function test_resolve_filter_returning_null_falls_through_to_default(): void {
+		add_filter(
+			'datamachine_resolve_oauth_account_for_user',
+			function ( $account ) {
+				return $account; // null in, null out.
+			}
+		);
+
+		$this->provider->save_account_for_user( 808, array( 'access_token' => 'tok_default' ) );
+
+		$this->assertSame( 'tok_default', $this->provider->get_account_for_user( 808 )['access_token'] );
+
+		remove_all_filters( 'datamachine_resolve_oauth_account_for_user' );
+	}
+
+	public function test_resolve_filter_returning_empty_array_falls_through(): void {
+		// Empty array should not short-circuit (it's indistinguishable from "no account").
+		add_filter(
+			'datamachine_resolve_oauth_account_for_user',
+			function () {
+				return array();
+			}
+		);
+
+		$this->provider->save_account_for_user( 909, array( 'access_token' => 'tok_default' ) );
+
+		$this->assertSame( 'tok_default', $this->provider->get_account_for_user( 909 )['access_token'] );
+
+		remove_all_filters( 'datamachine_resolve_oauth_account_for_user' );
+	}
 }

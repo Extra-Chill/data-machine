@@ -197,6 +197,109 @@ class AuthCommand extends BaseCommand {
 	}
 
 	/**
+	 * Revoke authentication for a handler at site or per-user scope.
+	 *
+	 * Without --user, behaves like `disconnect` — clears the shared
+	 * site-wide account slot. With --user=<id>, clears only that user's
+	 * per-user credential slot via the BaseAuthProvider per-user API.
+	 *
+	 * Providers that expose an upstream revoke endpoint are called first,
+	 * before local deletion, so upstream credentials are invalidated even
+	 * if local storage is later restored from a backup. An upstream
+	 * failure logs a warning but does not prevent local deletion.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <handler_slug>
+	 * : Handler to revoke (e.g., a registered handler slug).
+	 *
+	 * [--user=<id>]
+	 * : Target user ID. When provided, revokes only that user's per-user
+	 *   credentials. When omitted, revokes the site-wide account.
+	 *
+	 * [--yes]
+	 * : Skip confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     # Revoke the site-wide account.
+	 *     wp datamachine auth revoke <handler>
+	 *
+	 *     # Revoke a specific user's per-user credentials.
+	 *     wp datamachine auth revoke <handler> --user=42
+	 *
+	 * @subcommand revoke
+	 */
+	public function revoke( array $args, array $assoc_args ): void {
+		if ( empty( $args[0] ) ) {
+			WP_CLI::error( 'Handler slug is required.' );
+			return;
+		}
+
+		$handler_slug = sanitize_text_field( $args[0] );
+
+		if ( ! $this->abilities->providerExists( $handler_slug ) ) {
+			WP_CLI::error( sprintf( 'Auth provider "%s" not found.', $handler_slug ) );
+			return;
+		}
+
+		$user_id = isset( $assoc_args['user'] ) ? absint( $assoc_args['user'] ) : 0;
+
+		// Per-user revoke path.
+		if ( $user_id > 0 ) {
+			if ( ! isset( $assoc_args['yes'] ) ) {
+				WP_CLI::confirm(
+					sprintf(
+						'Revoke %s credentials for user %d? This will delete that user\'s per-user account slot.',
+						ucfirst( $handler_slug ),
+						$user_id
+					)
+				);
+			}
+
+			$result = $this->abilities->executeRevokeAuthForUser(
+				array(
+					'handler_slug' => $handler_slug,
+					'user_id'      => $user_id,
+				)
+			);
+
+			if ( ! empty( $result['success'] ) ) {
+				$msg = $result['message'] ?? sprintf( '%s credentials revoked for user %d.', ucfirst( $handler_slug ), $user_id );
+				if ( array_key_exists( 'upstream_revoked', $result ) ) {
+					$msg .= $result['upstream_revoked']
+						? ' (upstream revoke succeeded)'
+						: ' (upstream revoke skipped or failed; local delete completed)';
+				}
+				WP_CLI::success( $msg );
+				return;
+			}
+
+			WP_CLI::error( $result['error'] ?? 'Failed to revoke per-user credentials.' );
+			return;
+		}
+
+		// Site-wide revoke path (delegates to the existing disconnect ability).
+		$auth_status = $this->abilities->getAuthStatus( $handler_slug );
+		if ( ! $auth_status['authenticated'] ) {
+			WP_CLI::warning( sprintf( '%s is not currently authenticated at site scope.', ucfirst( $handler_slug ) ) );
+			return;
+		}
+
+		if ( ! isset( $assoc_args['yes'] ) ) {
+			WP_CLI::confirm( sprintf( 'Revoke site-wide %s credentials? This will clear stored account data.', ucfirst( $handler_slug ) ) );
+		}
+
+		$result = $this->abilities->executeDisconnectAuth( array( 'handler_slug' => $handler_slug ) );
+
+		if ( ! empty( $result['success'] ) ) {
+			WP_CLI::success( $result['message'] ?? sprintf( '%s site-wide credentials revoked.', ucfirst( $handler_slug ) ) );
+		} else {
+			WP_CLI::error( $result['error'] ?? 'Failed to revoke.' );
+		}
+	}
+
+	/**
 	 * View or save API configuration for a handler.
 	 *
 	 * Without --<field>=<value> flags, shows the current config and required fields.
