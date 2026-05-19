@@ -212,7 +212,7 @@ class SystemCommand extends BaseCommand {
 	 * <task_type>
 	 * : The task type to run (e.g. alt_text_generation, daily_memory_generation).
 	 *
-	 * [--param=<param>]...
+	 * [--param=<param>]
 	 * : Structured task param as key=value. Repeatable.
 	 *
 	 * [--params=<json>]
@@ -293,10 +293,7 @@ class SystemCommand extends BaseCommand {
 			$params = $decoded;
 		}
 
-		$param_args = $assoc_args['param'] ?? array();
-		if ( is_string( $param_args ) ) {
-			$param_args = array( $param_args );
-		}
+		$param_args = self::collectRunTaskParamArgs( $assoc_args );
 		if ( ! is_array( $param_args ) ) {
 			return array( 'error' => '--param must be key=value.' );
 		}
@@ -324,6 +321,46 @@ class SystemCommand extends BaseCommand {
 		}
 
 		return $params;
+	}
+
+	/**
+	 * Collect repeatable `--param` values from WP-CLI args.
+	 *
+	 * WP-CLI keeps only the last value for repeated named args unless the
+	 * command uses a generic `--<field>=<value>` synopsis. Preserve the public
+	 * `--param=key=value` contract by reading the raw argv when repeats exist.
+	 *
+	 * @param array      $assoc_args WP-CLI associative args.
+	 * @param array|null $argv Raw argv override for tests.
+	 * @return array|string
+	 */
+	private static function collectRunTaskParamArgs( array $assoc_args, ?array $argv = null ): array|string {
+		$argv       = $argv ?? ( $_SERVER['argv'] ?? array() );
+		$raw_params = array();
+
+		$argv_values = array_values( $argv );
+		foreach ( $argv_values as $index => $arg ) {
+			if ( ! is_string( $arg ) ) {
+				continue;
+			}
+			if ( str_starts_with( $arg, '--param=' ) ) {
+				$raw_params[] = substr( $arg, strlen( '--param=' ) );
+				continue;
+			}
+			if ( '--param' === $arg && isset( $argv_values[ $index + 1 ] ) ) {
+				$raw_params[] = (string) $argv_values[ $index + 1 ];
+			}
+		}
+
+		if ( count( $raw_params ) > 1 || ( ! isset( $assoc_args['param'] ) && ! empty( $raw_params ) ) ) {
+			return $raw_params;
+		}
+
+		$param_args = $assoc_args['param'] ?? array();
+		if ( is_string( $param_args ) ) {
+			$param_args = array( $param_args );
+		}
+		return $param_args;
 	}
 
 	/**
