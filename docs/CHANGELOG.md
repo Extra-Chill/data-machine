@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.124.4] - 2026-05-19
+
+### Changed
+- decouple memory injection from mode slugs
+- use interactive scope for agent memory
+
+### Fixed
+- preserve local memory context metadata
+- include chat memory for custom interactive modes
+
 ## [0.124.3] - 2026-05-19
 
 ### Fixed
