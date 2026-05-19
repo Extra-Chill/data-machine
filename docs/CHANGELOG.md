@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.124.5] - 2026-05-19
+
+### Fixed
+- register network memory only on multisite
+
 ## [0.124.4] - 2026-05-19
 
 ### Changed
