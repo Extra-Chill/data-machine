@@ -224,6 +224,11 @@ agents_api_smoke_assert_equals( $stored_grant->to_array(), $repository->get_acce
 agents_api_smoke_assert_equals( $grant->to_array(), $adapter->get_access( 'wiki-brain', 7 )->to_array(), 'get_access maps slug to storage ID and returns slug contract', $failures, $passes );
 agents_api_smoke_assert_equals( array( 'wiki-brain' ), $adapter->get_agent_ids_for_user( 7, \WP_Agent_Access_Grant::ROLE_VIEWER ), 'agent ID list is Agents API slug shape', $failures, $passes );
 agents_api_smoke_assert_equals( array( $grant->to_array() ), array_map( static fn( \WP_Agent_Access_Grant $value ): array => $value->to_array(), $adapter->get_users_for_agent( 'wiki-brain' ) ), 'get_users_for_agent returns slug contract', $failures, $passes );
+
+$user_principal = \AgentsAPI\AI\WP_Agent_Execution_Principal::user_session( 7, '__wordpress_user__' );
+agents_api_smoke_assert_equals( $grant->to_array(), $adapter->get_access_for_principal( 'wiki-brain', $user_principal )->to_array(), 'principal grant falls back to user access for WordPress user sessions', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'wiki-brain' ), $adapter->get_agent_ids_for_principal( $user_principal, \WP_Agent_Access_Grant::ROLE_VIEWER ), 'principal agent IDs fall back to user access for WordPress user sessions', $failures, $passes );
+
 agents_api_smoke_assert_equals( true, $adapter->revoke_access( 'wiki-brain', 7 ), 'revoke maps slug to storage ID', $failures, $passes );
 agents_api_smoke_assert_equals( null, $adapter->get_access( 'wiki-brain', 7 ), 'revoke removes repository grant', $failures, $passes );
 
