@@ -365,9 +365,11 @@ class DrainCommand extends BaseCommand {
 		if ( ! empty( $job_ids ) ) {
 			$clauses = array();
 			foreach ( $job_ids as $job_id ) {
-				$clauses[] = '(a.args LIKE %s OR a.args LIKE %s)';
+				$clauses[] = '(a.args LIKE %s OR a.args LIKE %s OR a.args LIKE %s OR a.args LIKE %s)';
 				$values[]  = '%"job_id":' . $job_id . ',%';
 				$values[]  = '%"job_id":' . $job_id . '}%';
+				$values[]  = '%"parent_job_id":' . $job_id . ',%';
+				$values[]  = '%"parent_job_id":' . $job_id . '}%';
 			}
 			$sql .= '(' . implode( ' OR ', $clauses ) . ') AND ';
 		}

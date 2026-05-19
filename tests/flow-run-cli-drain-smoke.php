@@ -43,6 +43,7 @@ assert_drain_contains( '[--job-id=<ids>]', $drain_src, 'drain documents optional
 assert_drain_contains( 'normalizeJobIds', $drain_src, 'drain normalizes optional job-id scope' );
 assert_drain_contains( 'hookWhereSql( $hooks, $job_ids )', $drain_src, 'drain supports optional hook and job-id scopes' );
 assert_drain_contains( 'a.args LIKE %s', $drain_src, 'drain can filter pending actions by serialized job_id args' );
+assert_drain_contains( '"parent_job_id":', $drain_src, 'drain can filter batch actions by serialized parent_job_id args' );
 assert_drain_contains( "a.status = \\'pending\\'", $drain_src, 'drain queries pending actions in the Data Machine group' );
 assert_drain_contains( 'getDuePendingActionIds', $drain_src, 'drain queries concrete due Data Machine action IDs' );
 assert_drain_contains( "\\ActionScheduler::runner()", $drain_src, 'drain runs concrete action IDs through Action Scheduler runner' );
