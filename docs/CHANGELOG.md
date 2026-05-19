@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.123.2] - 2026-05-19
+
+### Fixed
+- fail empty bundle upgrade applies
+
 ## [0.123.1] - 2026-05-19
 
 ### Fixed
