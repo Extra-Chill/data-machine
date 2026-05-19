@@ -2,6 +2,19 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.123.0] - 2026-05-19
+
+### Added
+- scope drain by job id
+
+### Fixed
+- honor user principals in agent access store
+- run drain actions without nested cli
+- preserve workflow handler config fields
+- isolate action scheduler drain failures
+- align memory artifact assignments
+- preserve resolved agent memory artifact scope
+
 ## [0.122.7] - 2026-05-18
 
 ### Fixed
