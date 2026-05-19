@@ -70,7 +70,7 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 
 		// Load registered files applicable to the current agent modes,
 		// filtered through the per-agent MemoryPolicy.
-		$modes      = self::memory_modes( self::normalizeModes( $payload['agent_modes'] ?? array() ), $payload );
+		$modes      = self::normalizeModes( $payload['agent_modes'] ?? array() );
 		$resolver   = new MemoryPolicyResolver();
 		$mode_files = $resolver->resolveRegistered(
 			array(
@@ -282,29 +282,6 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		}
 
 		return array_values( array_unique( $normalized ) );
-	}
-
-	/**
-	 * Expand execution modes into memory scopes for core memory file selection.
-	 *
-	 * Agent identity memory applies to interactive conversations, including
-	 * pipeline turns and session-backed custom modes. System mode remains
-	 * explicit so background maintenance does not inherit agent identity.
-	 *
-	 * @param array<int,string> $modes   Normalized active modes.
-	 * @param array             $payload Runtime payload.
-	 * @return array<int,string>
-	 */
-	private static function memory_modes( array $modes, array $payload ): array {
-		if ( in_array( 'system', $modes, true ) || in_array( 'interactive', $modes, true ) ) {
-			return $modes;
-		}
-
-		if ( array_intersect( $modes, array( 'chat', 'pipeline' ) ) || ! empty( $payload['session_id'] ) ) {
-			$modes[] = 'interactive';
-		}
-
-		return array_values( array_unique( $modes ) );
 	}
 }
 

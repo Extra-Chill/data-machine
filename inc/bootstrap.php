@@ -167,12 +167,14 @@ add_action(
 	'init',
 	function () {
 		AgentModeRegistry::register( 'chat', 10, array(
-			'label'       => __( 'Chat Agent', 'data-machine' ),
-			'description' => __( 'Interactive chat conversations. Benefits from capable models for complex reasoning.', 'data-machine' ),
+			'label'           => __( 'Chat Agent', 'data-machine' ),
+			'description'     => __( 'Interactive chat conversations. Benefits from capable models for complex reasoning.', 'data-machine' ),
+			'memory_contexts' => array( 'agent_identity', 'agent_memory', 'user_profile' ),
 		) );
 		AgentModeRegistry::register( 'pipeline', 20, array(
-			'label'       => __( 'Pipeline Agent', 'data-machine' ),
-			'description' => __( 'Structured workflow execution. Operates within defined steps — efficient models work well.', 'data-machine' ),
+			'label'           => __( 'Pipeline Agent', 'data-machine' ),
+			'description'     => __( 'Structured workflow execution. Operates within defined steps — efficient models work well.', 'data-machine' ),
+			'memory_contexts' => array( 'agent_identity', 'agent_memory' ),
 		) );
 		AgentModeRegistry::register( 'system', 30, array(
 			'label'       => __( 'System Agent', 'data-machine' ),
@@ -204,34 +206,35 @@ function datamachine_register_default_memory_files(): void {
 	) );
 
 	// Agent layer — identity and knowledge, scoped to a single agent.
-	// Injected in interactive modes only. Excluded from
+	// Injected only when an execution mode activates the matching semantic
+	// memory context. Excluded from
 	// system mode so autonomous maintenance tasks (e.g. daily memory
 	// compaction) are not primed with the agent's identity while operating
 	// on these files.
 	MemoryFileRegistry::register( 'SOUL.md', 20, array(
-		'layer'       => MemoryFileRegistry::LAYER_AGENT,
-		'protected'   => true,
-		'modes'       => array( 'chat', 'pipeline', 'interactive' ),
-		'label'       => 'Agent Identity',
-		'description' => 'Agent identity, voice, rules. Injected in interactive modes only.',
+		'layer'              => MemoryFileRegistry::LAYER_AGENT,
+		'protected'          => true,
+		'injection_contexts' => array( 'agent_identity' ),
+		'label'              => 'Agent Identity',
+		'description'        => 'Agent identity, voice, rules. Injected when the mode activates agent identity memory.',
 	) );
 	MemoryFileRegistry::register( 'MEMORY.md', 30, array(
-		'layer'       => MemoryFileRegistry::LAYER_AGENT,
-		'protected'   => true,
-		'modes'       => array( 'chat', 'pipeline', 'interactive' ),
-		'label'       => 'Agent Memory',
-		'description' => 'Accumulated knowledge. Injected in interactive modes only.',
+		'layer'              => MemoryFileRegistry::LAYER_AGENT,
+		'protected'          => true,
+		'injection_contexts' => array( 'agent_memory' ),
+		'label'              => 'Agent Memory',
+		'description'        => 'Accumulated knowledge. Injected when the mode activates agent memory.',
 	) );
 
 	// User layer — human preferences, network-scoped on multisite.
 	// Only injected in interactive modes where a human is present.
 	// Pipelines can still opt in via pipeline memory file selection.
 	MemoryFileRegistry::register( 'USER.md', 25, array(
-		'layer'       => MemoryFileRegistry::LAYER_USER,
-		'protected'   => true,
-		'modes'       => array( 'chat', 'editor' ),
-		'label'       => 'User Profile',
-		'description' => 'Information about the human the agent works with. Injected in chat and editor modes only.',
+		'layer'              => MemoryFileRegistry::LAYER_USER,
+		'protected'          => true,
+		'injection_contexts' => array( 'user_profile' ),
+		'label'              => 'User Profile',
+		'description'        => 'Information about the human the agent works with. Injected when the mode activates user profile memory.',
 	) );
 
 	// Network layer — multisite topology, only meaningful on multisite installs.

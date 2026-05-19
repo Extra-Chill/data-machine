@@ -43,6 +43,13 @@ class MemoryFileRegistry {
 	const MODE_ALL = 'all';
 
 	/**
+	 * Semantic prompt-injection contexts independent of execution mode slugs.
+	 */
+	const INJECTION_AGENT_IDENTITY = 'agent_identity';
+	const INJECTION_AGENT_MEMORY   = 'agent_memory';
+	const INJECTION_USER_PROFILE   = 'user_profile';
+
+	/**
 	 * Default mode list for registered files.
 	 *
 	 * Files without explicit modes are registered and manageable, but are not
@@ -89,6 +96,8 @@ class MemoryFileRegistry {
 	 *                                        Array of mode slugs (e.g. 'chat', 'editor', 'pipeline',
 	 *                                        'system') or array( 'all' ) to make available everywhere.
 	 *                                        Default empty array: registered but never injected.
+	 *     @type string[]    $injection_contexts Semantic prompt-injection contexts where this file applies
+	 *                                        independent of execution mode (e.g. 'agent_identity').
 	 *     @type string      $retrieval_policy Context injection policy. Only `always` files are injected
 	 *                                        by CoreMemoryFilesDirective. Defaults to `never` when modes are
 	 *                                        omitted, otherwise `always`.
@@ -125,25 +134,27 @@ class MemoryFileRegistry {
 			$modes = self::MODES_NONE;
 		}
 		$modes                    = array_values( array_unique( array_map( 'sanitize_key', $modes ) ) );
-		$default_retrieval_policy = self::default_retrieval_policy( empty( $modes ) );
+		$injection_contexts       = self::normalize_injection_contexts( $args['injection_contexts'] ?? array() );
+		$default_retrieval_policy = self::default_retrieval_policy( empty( $modes ) && empty( $injection_contexts ) );
 
 		// Convention path: relative path from ABSPATH for an additional copy.
 		$convention_path = isset( $args['convention_path'] ) ? ltrim( $args['convention_path'], '/' ) : '';
 
 		$metadata = array(
-			'filename'         => $filename,
-			'priority'         => $priority,
-			'layer'            => $layer,
-			'protected'        => (bool) ( $args['protected'] ?? false ),
-			'editable'         => $editable,
-			'composable'       => $composable,
-			'convention_path'  => $convention_path,
-			'modes'            => $modes,
-			'label'            => $args['label'] ?? self::filename_to_label( $filename ),
-			'description'      => $args['description'] ?? '',
-			'retrieval_policy' => self::normalize_retrieval_policy( $args['retrieval_policy'] ?? $default_retrieval_policy ),
-			'authority_tier'   => $args['authority_tier'] ?? self::default_authority_tier( $layer, $filename ),
-			'provenance'       => is_array( $args['provenance'] ?? null ) ? $args['provenance'] : self::default_provenance( $filename ),
+			'filename'           => $filename,
+			'priority'           => $priority,
+			'layer'              => $layer,
+			'protected'          => (bool) ( $args['protected'] ?? false ),
+			'editable'           => $editable,
+			'composable'         => $composable,
+			'convention_path'    => $convention_path,
+			'modes'              => $modes,
+			'injection_contexts' => $injection_contexts,
+			'label'              => $args['label'] ?? self::filename_to_label( $filename ),
+			'description'        => $args['description'] ?? '',
+			'retrieval_policy'   => self::normalize_retrieval_policy( $args['retrieval_policy'] ?? $default_retrieval_policy ),
+			'authority_tier'     => $args['authority_tier'] ?? self::default_authority_tier( $layer, $filename ),
+			'provenance'         => is_array( $args['provenance'] ?? null ) ? $args['provenance'] : self::default_provenance( $filename ),
 		);
 
 		self::$files[ $filename ] = $metadata;
@@ -158,21 +169,23 @@ class MemoryFileRegistry {
 		WP_Agent_Memory_Registry::register(
 			self::source_id_for_filename( $filename ),
 			array(
-				'layer'            => $layer,
-				'priority'         => $priority,
-				'protected'        => $metadata['protected'],
-				'editable'         => $editable,
-				'modes'            => $modes,
-				'retrieval_policy' => $metadata['retrieval_policy'],
-				'composable'       => $composable,
-				'context_slug'     => self::context_slug_for_filename( $filename ),
-				'convention_path'  => $convention_path,
-				'label'            => $metadata['label'],
-				'description'      => $metadata['description'],
-				'meta'             => array(
-					'filename'       => $filename,
-					'authority_tier' => $metadata['authority_tier'],
-					'provenance'     => $metadata['provenance'],
+				'layer'              => $layer,
+				'priority'           => $priority,
+				'protected'          => $metadata['protected'],
+				'editable'           => $editable,
+				'modes'              => $modes,
+				'injection_contexts' => $injection_contexts,
+				'retrieval_policy'   => $metadata['retrieval_policy'],
+				'composable'         => $composable,
+				'context_slug'       => self::context_slug_for_filename( $filename ),
+				'convention_path'    => $convention_path,
+				'label'              => $metadata['label'],
+				'description'        => $metadata['description'],
+				'meta'               => array(
+					'filename'           => $filename,
+					'authority_tier'     => $metadata['authority_tier'],
+					'provenance'         => $metadata['provenance'],
+					'injection_contexts' => $injection_contexts,
 				),
 			)
 		);
@@ -211,6 +224,36 @@ class MemoryFileRegistry {
 			return in_array( $policy, $valid, true ) ? $policy : 'always';
 		}
 		return WP_Agent_Context_Injection_Policy::normalize( $policy );
+	}
+
+	/**
+	 * Normalize semantic memory context slugs.
+	 *
+	 * @param mixed $contexts Raw context value.
+	 * @return array<int,string>
+	 */
+	public static function normalize_injection_contexts( mixed $contexts ): array {
+		if ( is_string( $contexts ) ) {
+			$contexts = array( $contexts );
+		}
+
+		if ( ! is_array( $contexts ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $contexts as $context ) {
+			if ( ! is_scalar( $context ) ) {
+				continue;
+			}
+
+			$context = sanitize_key( (string) $context );
+			if ( '' !== $context ) {
+				$normalized[] = $context;
+			}
+		}
+
+		return array_values( array_unique( $normalized ) );
 	}
 
 	/**
@@ -450,10 +493,11 @@ class MemoryFileRegistry {
 	 * @param array $modes Agent mode slugs (e.g. 'chat', 'pipeline', 'system', 'editor').
 	 * @return array<string, array> Filtered and sorted file metadata.
 	 */
-	public static function get_for_modes( array $modes ): array {
-		$modes = array_values( array_unique( array_filter( array_map( 'sanitize_key', $modes ) ) ) );
+	public static function get_for_modes( array $modes, array $injection_contexts = array() ): array {
+		$modes              = array_values( array_unique( array_filter( array_map( 'sanitize_key', $modes ) ) ) );
+		$injection_contexts = self::normalize_injection_contexts( $injection_contexts );
 
-		if ( empty( $modes ) ) {
+		if ( empty( $modes ) && empty( $injection_contexts ) ) {
 			return self::get_resolved();
 		}
 
@@ -461,7 +505,7 @@ class MemoryFileRegistry {
 
 		return array_filter(
 			self::get_resolved(),
-			function ( $meta ) use ( $modes, $agents_api_loaded ) {
+			function ( $meta ) use ( $modes, $injection_contexts, $agents_api_loaded ) {
 				$default_policy   = $agents_api_loaded ? WP_Agent_Context_Injection_Policy::ALWAYS : 'always';
 				$retrieval_policy = $meta['retrieval_policy'] ?? $default_policy;
 				$is_always        = $agents_api_loaded
@@ -471,13 +515,15 @@ class MemoryFileRegistry {
 					return false;
 				}
 
-				$file_modes = $meta['modes'] ?? self::MODES_NONE;
-				if ( empty( $file_modes ) ) {
+				$file_modes    = $meta['modes'] ?? self::MODES_NONE;
+				$file_contexts = self::normalize_injection_contexts( $meta['injection_contexts'] ?? array() );
+				if ( empty( $file_modes ) && empty( $file_contexts ) ) {
 					return false;
 				}
 
 				return in_array( self::MODE_ALL, $file_modes, true )
-					|| ! empty( array_intersect( $modes, $file_modes ) );
+					|| ! empty( array_intersect( $modes, $file_modes ) )
+					|| ! empty( array_intersect( $injection_contexts, $file_contexts ) );
 			}
 		);
 	}
@@ -492,18 +538,21 @@ class MemoryFileRegistry {
 	 * @param array  $modes    Agent mode slugs.
 	 * @return bool True if the file should be injected in this mode.
 	 */
-	public static function applies_to_modes( string $filename, array $modes ): bool {
-		$resolved = self::get_resolved();
-		$filename = sanitize_file_name( $filename );
-		$modes    = array_values( array_unique( array_filter( array_map( 'sanitize_key', $modes ) ) ) );
+	public static function applies_to_modes( string $filename, array $modes, array $injection_contexts = array() ): bool {
+		$resolved           = self::get_resolved();
+		$filename           = sanitize_file_name( $filename );
+		$modes              = array_values( array_unique( array_filter( array_map( 'sanitize_key', $modes ) ) ) );
+		$injection_contexts = self::normalize_injection_contexts( $injection_contexts );
 
 		if ( ! isset( $resolved[ $filename ] ) ) {
 			return true; // Unregistered files are included everywhere.
 		}
 
-		$file_modes = $resolved[ $filename ]['modes'] ?? array( self::MODE_ALL );
+		$file_modes    = $resolved[ $filename ]['modes'] ?? array( self::MODE_ALL );
+		$file_contexts = self::normalize_injection_contexts( $resolved[ $filename ]['injection_contexts'] ?? array() );
 		return in_array( self::MODE_ALL, $file_modes, true )
-			|| ! empty( array_intersect( $modes, $file_modes ) );
+			|| ! empty( array_intersect( $modes, $file_modes ) )
+			|| ! empty( array_intersect( $injection_contexts, $file_contexts ) );
 	}
 
 	/**
@@ -616,19 +665,20 @@ class MemoryFileRegistry {
 			}
 
 			$files[ $filename ] = array(
-				'filename'         => $filename,
-				'priority'         => (int) ( $source['priority'] ?? 50 ),
-				'layer'            => self::normalize_layer( $source['layer'] ?? self::LAYER_AGENT ),
-				'protected'        => (bool) ( $source['protected'] ?? false ),
-				'editable'         => $source['editable'] ?? true,
-				'composable'       => (bool) ( $source['composable'] ?? false ),
-				'convention_path'  => is_string( $source['convention_path'] ?? null ) ? $source['convention_path'] : '',
-				'modes'            => is_array( $source['modes'] ?? null ) ? $source['modes'] : self::MODES_NONE,
-				'label'            => is_string( $source['label'] ?? null ) ? $source['label'] : self::filename_to_label( $filename ),
-				'description'      => is_string( $source['description'] ?? null ) ? $source['description'] : '',
-				'retrieval_policy' => is_string( $source['retrieval_policy'] ?? null ) ? $source['retrieval_policy'] : WP_Agent_Context_Injection_Policy::ALWAYS,
-				'authority_tier'   => is_string( $source['meta']['authority_tier'] ?? null ) ? $source['meta']['authority_tier'] : self::default_authority_tier( self::normalize_layer( $source['layer'] ?? self::LAYER_AGENT ), $filename ),
-				'provenance'       => is_array( $source['meta']['provenance'] ?? null ) ? $source['meta']['provenance'] : self::default_provenance( $filename ),
+				'filename'           => $filename,
+				'priority'           => (int) ( $source['priority'] ?? 50 ),
+				'layer'              => self::normalize_layer( $source['layer'] ?? self::LAYER_AGENT ),
+				'protected'          => (bool) ( $source['protected'] ?? false ),
+				'editable'           => $source['editable'] ?? true,
+				'composable'         => (bool) ( $source['composable'] ?? false ),
+				'convention_path'    => is_string( $source['convention_path'] ?? null ) ? $source['convention_path'] : '',
+				'modes'              => is_array( $source['modes'] ?? null ) ? $source['modes'] : self::MODES_NONE,
+				'injection_contexts' => self::normalize_injection_contexts( $source['injection_contexts'] ?? ( $source['meta']['injection_contexts'] ?? array() ) ),
+				'label'              => is_string( $source['label'] ?? null ) ? $source['label'] : self::filename_to_label( $filename ),
+				'description'        => is_string( $source['description'] ?? null ) ? $source['description'] : '',
+				'retrieval_policy'   => is_string( $source['retrieval_policy'] ?? null ) ? $source['retrieval_policy'] : WP_Agent_Context_Injection_Policy::ALWAYS,
+				'authority_tier'     => is_string( $source['meta']['authority_tier'] ?? null ) ? $source['meta']['authority_tier'] : self::default_authority_tier( self::normalize_layer( $source['layer'] ?? self::LAYER_AGENT ), $filename ),
+				'provenance'         => is_array( $source['meta']['provenance'] ?? null ) ? $source['meta']['provenance'] : self::default_provenance( $filename ),
 			);
 		}
 
@@ -707,32 +757,19 @@ class MemoryFileRegistry {
 	 * @return string Authority tier slug.
 	 */
 	private static function default_authority_tier( string $layer, string $filename ): string {
-		if ( ! self::agents_api_loaded() ) {
-			if ( self::LAYER_SHARED === $layer || self::LAYER_NETWORK === $layer ) {
-				return 'workspace_shared';
-			}
-			if ( self::LAYER_USER === $layer ) {
-				return 'user_global';
-			}
-			if ( 'SOUL.md' === $filename ) {
-				return 'agent_identity';
-			}
-			return 'agent_memory';
-		}
-
 		if ( self::LAYER_SHARED === $layer || self::LAYER_NETWORK === $layer ) {
-			return \AgentsAPI\AI\Context\WP_Agent_Context_Authority_Tier::WORKSPACE_SHARED;
+			return 'workspace_shared';
 		}
 
 		if ( self::LAYER_USER === $layer ) {
-			return \AgentsAPI\AI\Context\WP_Agent_Context_Authority_Tier::USER_GLOBAL;
+			return 'user_global';
 		}
 
 		if ( 'SOUL.md' === $filename ) {
-			return \AgentsAPI\AI\Context\WP_Agent_Context_Authority_Tier::AGENT_IDENTITY;
+			return 'agent_identity';
 		}
 
-		return \AgentsAPI\AI\Context\WP_Agent_Context_Authority_Tier::AGENT_MEMORY;
+		return 'agent_memory';
 	}
 
 	private static function default_provenance( string $filename ): array {

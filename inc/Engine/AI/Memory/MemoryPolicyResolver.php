@@ -26,6 +26,7 @@
 namespace DataMachine\Engine\AI\Memory;
 
 use DataMachine\Core\Database\Agents\Agents;
+use DataMachine\Engine\AI\AgentModeRegistry;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 
 defined( 'ABSPATH' ) || exit;
@@ -59,12 +60,13 @@ class MemoryPolicyResolver {
 	 * @return array<string, array> Filename => metadata map, sorted by priority ascending.
 	 */
 	public function resolveRegistered( array $args ): array {
-		$modes    = self::normalizeModes( $args['modes'] ?? ( array_key_exists( 'mode', $args ) ? array( $args['mode'] ) : array() ) );
-		$agent_id = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
+		$modes              = self::normalizeModes( $args['modes'] ?? ( array_key_exists( 'mode', $args ) ? array( $args['mode'] ) : array() ) );
+		$injection_contexts = self::resolveInjectionContexts( $modes, $args );
+		$agent_id           = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
 
 		// 1. Start with registry output filtered by mode (already priority-sorted).
-		$files = ! empty( $modes )
-			? MemoryFileRegistry::get_for_modes( $modes )
+		$files = ! empty( $modes ) || ! empty( $injection_contexts )
+			? MemoryFileRegistry::get_for_modes( $modes, $injection_contexts )
 			: MemoryFileRegistry::get_all();
 
 		// 2. Apply per-agent policy.
@@ -90,6 +92,25 @@ class MemoryPolicyResolver {
 		$files       = apply_filters( 'datamachine_resolved_memory_files', $files, $filter_mode, $args );
 
 		return $files;
+	}
+
+	/**
+	 * Resolve semantic memory contexts from explicit args and registered modes.
+	 *
+	 * @param array<int,string> $modes Normalized execution modes.
+	 * @param array             $args  Resolution arguments.
+	 * @return array<int,string>
+	 */
+	private static function resolveInjectionContexts( array $modes, array $args ): array {
+		$contexts = MemoryFileRegistry::normalize_injection_contexts(
+			$args['injection_contexts'] ?? ( $args['memory_contexts'] ?? array() )
+		);
+
+		if ( ! empty( $modes ) ) {
+			$contexts = array_merge( $contexts, AgentModeRegistry::get_memory_contexts_for_modes( $modes ) );
+		}
+
+		return array_values( array_unique( $contexts ) );
 	}
 
 	/**
