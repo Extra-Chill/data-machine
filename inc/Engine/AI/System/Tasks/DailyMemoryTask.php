@@ -148,7 +148,10 @@ class DailyMemoryTask extends SystemTask {
 			\DataMachine\Engine\AI\ConversationManager::buildConversationMessage( 'user', $prompt ),
 		);
 
-		$ai_payload = array();
+		$ai_payload = array(
+			// System task — no human caller. See MetaDescriptionTask for rationale.
+			'calling_user_id' => 0,
+		);
 		if ( $agent_id > 0 ) {
 			$ai_payload['agent_id'] = $agent_id;
 		}

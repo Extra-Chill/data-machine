@@ -1137,6 +1137,52 @@ function datamachine_payload_without_runtime_objects( array $payload ): array {
 }
 
 /**
+ * Read the calling-user identity from an AI invocation payload.
+ *
+ * `calling_user_id` is the human user on whose behalf the agent is acting
+ * during this invocation. It is intentionally distinct from `agent_id`
+ * (the acting agent identity, which is the same across invocations for a
+ * given agent) and from the pipeline `user_id` (which is the flow/job
+ * owner — typically an admin who scheduled the work, not someone who is
+ * "calling" the agent right now).
+ *
+ * Producer semantics:
+ *   - Chat sessions set this to the chat caller's user ID.
+ *   - Pipeline executions set this to 0 (no human caller — the agent runs
+ *     against a scheduled job).
+ *   - System tasks (title gen, summaries, alt text) set this to 0.
+ *   - REST-initiated invocations set this to the authenticated bearer
+ *     token's owner when present, else `get_current_user_id()`, else 0.
+ *
+ * Consumer pattern (tools/directives that resolve per-user OAuth):
+ *
+ *   ```php
+ *   $calling_user_id = datamachine_get_calling_user_id( $payload );
+ *   if ( $calling_user_id > 0 ) {
+ *       $account = $provider->get_account_for_user( $calling_user_id );
+ *   } else {
+ *       // No human caller — fall back to site-wide or skip the call.
+ *   }
+ *   ```
+ *
+ * Returns 0 when the key is absent, non-numeric, or non-positive so
+ * callers can safely guard `> 0` without re-validating.
+ *
+ * @since 0.123.0
+ *
+ * @param array $payload AI invocation payload.
+ * @return int Non-negative user ID. 0 means "no human caller".
+ */
+function datamachine_get_calling_user_id( array $payload ): int {
+	$raw = $payload['calling_user_id'] ?? 0;
+	if ( ! is_numeric( $raw ) ) {
+		return 0;
+	}
+	$user_id = (int) $raw;
+	return $user_id > 0 ? $user_id : 0;
+}
+
+/**
  * Emit a loop event without letting observer failures change loop results.
  *
  * @param LoopEventSinkInterface $sink    Event sink.

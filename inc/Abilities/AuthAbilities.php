@@ -178,6 +178,7 @@ class AuthAbilities {
 		$register_callback = function () {
 			$this->registerGetAuthStatus();
 			$this->registerDisconnectAuth();
+			$this->registerRevokeAuthForUser();
 			$this->registerSaveAuthConfig();
 			$this->registerSetAuthToken();
 			$this->registerRefreshAuth();
@@ -254,6 +255,46 @@ class AuthAbilities {
 					),
 				),
 				'execute_callback'    => array( $this, 'executeDisconnectAuth' ),
+				'permission_callback' => array( $this, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	private function registerRevokeAuthForUser(): void {
+		wp_register_ability(
+			'datamachine/revoke-auth-for-user',
+			array(
+				'label'               => __( 'Revoke Auth For User', 'data-machine' ),
+				'description'         => __( 'Revoke a specific user\'s OAuth credentials for a handler. Used by platform UIs to power per-user disconnect buttons.', 'data-machine' ),
+				'category'            => 'datamachine-auth',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'handler_slug', 'user_id' ),
+					'properties' => array(
+						'handler_slug' => array(
+							'type'        => 'string',
+							'description' => __( 'Handler identifier (e.g., registered handler slug).', 'data-machine' ),
+						),
+						'user_id'      => array(
+							'type'        => 'integer',
+							'description' => __( 'Target user ID whose per-user credentials should be revoked.', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'          => array( 'type' => 'boolean' ),
+						'message'          => array( 'type' => 'string' ),
+						'error'            => array( 'type' => 'string' ),
+						'upstream_revoked' => array(
+							'type'        => 'boolean',
+							'description' => __( 'Whether the provider\'s upstream revoke endpoint was called successfully. Local storage is still cleared on upstream failure.', 'data-machine' ),
+						),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeRevokeAuthForUser' ),
 				'permission_callback' => array( $this, 'checkPermission' ),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
@@ -573,9 +614,130 @@ class AuthAbilities {
 		);
 	}
 
-	public function executeSaveAuthConfig( array $input ): array {
+	/**
+	 * Revoke a specific user's OAuth credentials for a handler.
+	 *
+	 * Deletes the per-user account slot via BaseAuthProvider::delete_account_for_user.
+	 * If the provider exposes an upstream revoke method (`revoke_token_for_user`
+	 * or generic `revoke_token`), it is called BEFORE local deletion so the
+	 * upstream credential is invalidated even if we lose our copy later. An
+	 * upstream failure logs a warning but does NOT prevent local deletion —
+	 * better to lose local access than leak credentials.
+	 *
+	 * @since 0.123.0
+	 *
+	 * @param array $input { handler_slug, user_id }.
+	 * @return array Standard ability response.
+	 */
+	public function executeRevokeAuthForUser( array $input ): array {
 		$handler_slug = sanitize_text_field( $input['handler_slug'] ?? '' );
-		$config_input = $input['config'] ?? array();
+		$user_id      = absint( $input['user_id'] ?? 0 );
+
+		if ( '' === $handler_slug ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Handler slug is required', 'data-machine' ),
+			);
+		}
+
+		if ( $user_id <= 0 ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'A positive user_id is required', 'data-machine' ),
+			);
+		}
+
+		$auth_instance = $this->getProviderForHandler( $handler_slug );
+		if ( ! $auth_instance ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'Authentication provider not found', 'data-machine' ),
+			);
+		}
+
+		if ( ! method_exists( $auth_instance, 'delete_account_for_user' ) ) {
+			return array(
+				'success' => false,
+				'error'   => __( 'This handler does not support per-user revocation', 'data-machine' ),
+			);
+		}
+
+		$revoked_by_user_id = absint( PermissionHelper::acting_user_id() );
+		if ( $revoked_by_user_id <= 0 && function_exists( 'get_current_user_id' ) ) {
+			$revoked_by_user_id = absint( get_current_user_id() );
+		}
+
+		// Best-effort upstream revoke before local delete. If the provider doesn't
+		// implement a revoke endpoint, that's fine — local-only revocation still
+		// achieves the immediate goal of cutting off this install's access.
+		$upstream_revoked = null;
+		if ( method_exists( $auth_instance, 'revoke_token_for_user' ) ) {
+			try {
+				$upstream_revoked = (bool) $auth_instance->revoke_token_for_user( $user_id );
+			} catch ( \Throwable $e ) {
+				$upstream_revoked = false;
+				do_action(
+					'datamachine_log',
+					'warning',
+					'OAuth: Upstream per-user revoke threw',
+					array(
+						'provider' => $handler_slug,
+						'user_id'  => $user_id,
+						'error'    => $e->getMessage(),
+					)
+				);
+			}
+			if ( ! $upstream_revoked ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'OAuth: Upstream per-user revoke failed; continuing with local delete',
+					array(
+						'provider' => $handler_slug,
+						'user_id'  => $user_id,
+					)
+				);
+			}
+		}
+
+		$deleted = $auth_instance->delete_account_for_user( $user_id );
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'OAuth: Per-user credentials revoked',
+			array(
+				'provider'         => $handler_slug,
+				'user_id'          => $user_id,
+				'revoked_by'       => $revoked_by_user_id,
+				'upstream_revoked' => $upstream_revoked,
+				'local_deleted'    => $deleted,
+			)
+		);
+
+		if ( ! $deleted ) {
+			return array(
+				'success'          => false,
+				'error'            => __( 'Failed to delete per-user credentials', 'data-machine' ),
+				'upstream_revoked' => (bool) $upstream_revoked,
+			);
+		}
+
+		return array(
+			'success'          => true,
+			'message'          => sprintf(
+				/* translators: 1: Service name, 2: user ID */
+				__( '%1$s credentials revoked for user %2$d', 'data-machine' ),
+				ucfirst( $handler_slug ),
+				$user_id
+			),
+			'upstream_revoked' => (bool) $upstream_revoked,
+		);
+	}
+
+	public function executeSaveAuthConfig( array $input ): array {
+		$handler_slug      = sanitize_text_field( $input['handler_slug'] ?? '' );
+		$config_input      = $input['config'] ?? array();
 		$principal_context = $this->getPrincipalContext( $input );
 
 		if ( empty( $handler_slug ) ) {
@@ -702,8 +864,8 @@ class AuthAbilities {
 	 * @return array Result.
 	 */
 	public function executeSetAuthToken( array $input ): array {
-		$handler_slug = sanitize_text_field( $input['handler_slug'] ?? '' );
-		$account_data = $input['account_data'] ?? array();
+		$handler_slug      = sanitize_text_field( $input['handler_slug'] ?? '' );
+		$account_data      = $input['account_data'] ?? array();
 		$principal_context = $this->getPrincipalContext( $input );
 
 		if ( empty( $handler_slug ) ) {

@@ -61,6 +61,173 @@ All providers store data in WordPress options using a consistent structure:
 ]
 ```
 
+### Per-user account API (@since v0.123.0)
+
+Three concrete methods on `BaseAuthProvider` let callers operate on a specific
+human user's credentials, independent of the site-wide account slot:
+
+```php
+public function get_account_for_user( int $user_id ): ?array;
+public function save_account_for_user( int $user_id, array $account ): bool;
+public function delete_account_for_user( int $user_id ): bool;
+```
+
+These share the same on-disk shape as the principal-scoped API
+(`principals[user:<id>][account]`), so an account written via either surface
+is readable through the other. They differ from the scope-aware
+`get_account( array $context )` in two ways:
+
+1. **No scope policy consultation.** A caller invoking
+   `get_account_for_user( 101 )` has made a deliberate choice — the return
+   value reflects that user's slot or null.
+2. **No site fallback.** A missing per-user account always returns `null`,
+   never the shared site account. This prevents cross-user leakage in
+   callers that did not explicitly opt in to a site fallback.
+
+Resolution order inside `get_account_for_user()`:
+
+1. **`datamachine_resolve_oauth_account_for_user` filter** — platform
+   plugins return a non-null array to plug in their own per-user storage
+   (custom table, external KMS, encrypted blob). Returning null lets the
+   default path run. Filter results are NOT re-decrypted: platform plugins
+   are responsible for returning already-plaintext account data.
+2. **Default storage** at `principals[user:<id>][account]` (encrypted at
+   rest, decrypted on read).
+3. **`null`** if neither yields an account.
+
+Every successful resolve emits a `debug`-level entry via the
+`datamachine_log` action with `{ provider, user_id, source }`. Failed
+lookups do not log (they would dwarf real signal during normal "no account
+yet" probes). The token itself is never logged at any level.
+
+#### When to use per-user vs. site-wide credentials
+
+```
+Decision flow:
+
+  Does the agent need credentials tied to a specific human user?
+   │
+   ├── Yes ──→ Use per-user API (get_account_for_user)
+   │           Caller resolves calling_user_id from $payload first.
+   │
+   └── No  ──→ Use site-wide API (get_account, no context)
+               Bot accounts, shared posting accounts, scheduled flows.
+```
+
+Use **per-user** for any workflow where the credential authorizes access to
+a specific human's data: "read my files on the upstream service", "post to
+my own account", "summarize my mailbox". The agent must know who is asking
+— see the `calling_user_id` section below.
+
+Use **site-wide** for shared automation: the platform's own bot account, a
+single shared posting account, anything where "whose account is this?" is
+not a meaningful question.
+
+#### Vendor-plugin pattern
+
+A vendor plugin (`data-machine-business`, `data-machine-socials`, etc.)
+registers an ability that reads its own credentials. Inside the ability's
+execute callback:
+
+```php
+use function DataMachine\Engine\AI\datamachine_get_calling_user_id;
+
+public function execute_my_handler( array $input, array $context = array() ) {
+    $calling_user_id = datamachine_get_calling_user_id( $context['payload'] ?? array() );
+    $provider        = my_get_auth_provider();  // returns a BaseAuthProvider subclass
+
+    if ( $calling_user_id > 0 ) {
+        $account = $provider->get_account_for_user( $calling_user_id );
+        if ( null === $account ) {
+            return new \WP_Error(
+                'no_per_user_credentials',
+                __( 'Connect your account before using this tool.', 'my-plugin' )
+            );
+        }
+    } else {
+        // No human caller — fall back to site-wide or refuse, depending on
+        // the handler's policy. Shared bot accounts use this branch.
+        $account = $provider->get_account();
+        if ( empty( $account['access_token'] ) ) {
+            return new \WP_Error( 'no_credentials', __( 'Not connected.', 'my-plugin' ) );
+        }
+    }
+
+    // ... use $account['access_token'] to call upstream.
+}
+```
+
+#### Revocation
+
+```bash
+# Site-wide revoke.
+wp datamachine auth revoke <handler>
+
+# Per-user revoke.
+wp datamachine auth revoke <handler> --user=42
+```
+
+Or via the abilities surface:
+
+```php
+$result = wp_get_ability( 'datamachine/revoke-auth-for-user' )->execute(
+    array(
+        'handler_slug' => 'my_handler',
+        'user_id'      => 42,
+    )
+);
+```
+
+If the provider exposes a `revoke_token_for_user( int $user_id )` method,
+the abilities executor calls it BEFORE local deletion so the upstream
+credential is invalidated even if local storage is later restored from
+backup. An upstream failure logs a warning but does not block local
+deletion — losing local access is preferable to leaking credentials.
+
+#### Calling-user identity in AI invocations
+
+`calling_user_id` is a new field on every AI invocation payload, alongside
+the existing `agent_id`. It identifies the human user on whose behalf the
+agent is acting during *this specific* invocation:
+
+| Flow                     | `calling_user_id` value                        |
+|--------------------------|------------------------------------------------|
+| Chat session             | the chat caller's user ID                      |
+| Pipeline execution       | `0` (no human caller; scheduled work)          |
+| System task              | `0` (alt-text, meta, internal-linking, etc.)   |
+| REST chat with bearer    | the bearer-owner user ID                       |
+| processPing health check | `0` (admin user_id borrowed for storage only)  |
+
+Tools and directives read it with the consumer helper:
+
+```php
+use function DataMachine\Engine\AI\datamachine_get_calling_user_id;
+
+$calling_user_id = datamachine_get_calling_user_id( $payload );
+// Returns 0 when absent, non-numeric, or non-positive.
+```
+
+`calling_user_id` is intentionally distinct from `agent_id` (the acting
+agent identity, same across invocations for one agent) and from pipeline
+`user_id` (the flow/job owner — typically an admin who scheduled the work,
+not someone "calling" the agent right now).
+
+#### Migration
+
+Existing installs need no action. The legacy site-wide flow
+(`get_account()` / `save_account()` without a context arg) continues to
+work unchanged. Tokens stored before the encryption-at-rest feature landed
+in v0.88.0 are lazy-migrated on next save. Per-user storage activates only
+when callers opt in via `get_account_for_user( $user_id )` or by setting
+`calling_user_id > 0` in the payload.
+
+For production, define `DATAMACHINE_OAUTH_ENCRYPTION_KEY` is **not**
+required: keys are derived from `wp_salt( 'auth' )`, which already pulls
+from `AUTH_KEY` / `SECURE_AUTH_KEY` / `LOGGED_IN_KEY` in `wp-config.php`.
+Operators who want explicit key isolation can rotate `AUTH_KEY` to force
+re-encryption on next save (but be aware that doing so invalidates any
+encrypted values not re-saved).
+
 ### BaseOAuth1Provider
 
 **Location**: `/inc/Core/OAuth/BaseOAuth1Provider.php`

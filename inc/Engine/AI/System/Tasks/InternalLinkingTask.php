@@ -125,7 +125,12 @@ class InternalLinkingTask extends SystemTask {
 			}
 
 			$prompt     = $this->buildBlockPrompt( $candidate['inner_html'], $related_post );
-			$ai_payload = array( 'post_id' => $post_id );
+			$ai_payload = array(
+				'post_id'         => $post_id,
+				// System task — no human caller. See MetaDescriptionTask for the
+				// rationale on why per-user OAuth resolution must see 0 here.
+				'calling_user_id' => 0,
+			);
 			if ( ! empty( $params['agent_id'] ) ) {
 				$ai_payload['agent_id'] = (int) $params['agent_id'];
 			}
