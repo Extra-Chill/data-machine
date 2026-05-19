@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.123.3] - 2026-05-19
+
+### Fixed
+- include batch parent jobs in scoped drain
+- preserve repeatable system run params
+
 ## [0.123.2] - 2026-05-19
 
 ### Fixed
