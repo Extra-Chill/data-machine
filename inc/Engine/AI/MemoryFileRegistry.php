@@ -638,7 +638,7 @@ class MemoryFileRegistry {
 		// When the Agents API substrate is missing, the local self::$files map
 		// is the single source of truth. See agents_api_loaded() docblock.
 		$files = self::agents_api_loaded()
-			? self::from_agents_api_sources( WP_Agent_Memory_Registry::get_all() )
+			? array_replace( self::from_agents_api_sources( WP_Agent_Memory_Registry::get_all() ), self::$files )
 			: self::$files;
 		uasort(
 			$files,
