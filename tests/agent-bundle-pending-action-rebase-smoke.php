@@ -226,6 +226,18 @@ pa_rebase_assert(
 	'remote' === ( $captured_payloads['flow:tricky']['flow_config']['1_a_1']['handler_config']['tool'] ?? null )
 );
 
+$captured_payloads = array();
+$empty_apply       = AgentBundleUpgradePendingAction::apply(
+	array(
+		'agent'              => array( 'agent_id' => 7 ),
+		'approved_artifacts' => array(),
+		'target_artifacts'   => $apply_input['target_artifacts'],
+	)
+);
+pa_rebase_assert( 'empty approval apply fails clearly', false === ( $empty_apply['success'] ?? true ) );
+pa_rebase_assert_equals( 'empty approval apply writes nothing', array(), $captured_payloads );
+pa_rebase_assert_equals( 'empty approval apply reports no-op failure', 'No bundle artifacts were approved for apply; nothing changed.', $empty_apply['failed'][0]['error'] ?? null );
+
 echo "\nTotal assertions: {$total}\n";
 if ( 0 !== $failures ) {
 	echo "Failures: {$failures}\n";

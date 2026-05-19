@@ -163,6 +163,13 @@ final class AgentBundleUpgradePendingAction {
 			$applied[] = $applied_entry;
 		}
 
+		if ( empty( $applied ) && empty( $failed ) && ! empty( $targets ) ) {
+			$failed[] = array(
+				'artifact_key' => '',
+				'error'        => 'No bundle artifacts were approved for apply; nothing changed.',
+			);
+		}
+
 		return array(
 			'success' => empty( $failed ),
 			'applied' => $applied,
