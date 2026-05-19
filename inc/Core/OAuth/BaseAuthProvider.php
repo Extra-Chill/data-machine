@@ -368,6 +368,14 @@ abstract class BaseAuthProvider {
 	 * fallback to site-wide storage so callers cannot accidentally cross
 	 * user boundaries.
 	 *
+	 * Resolution order:
+	 *   1. `datamachine_resolve_oauth_account_for_user` filter — platform
+	 *      plugins return a non-null array to short-circuit with their own
+	 *      per-user storage layer (custom table, encrypted blob, etc.).
+	 *   2. Default user-meta-equivalent storage at
+	 *      `principals[user:<id>][account]`.
+	 *   3. Return null if neither yielded an account.
+	 *
 	 * @since 0.123.0
 	 *
 	 * @param int $user_id Target user ID. Must be a positive integer.
@@ -377,6 +385,37 @@ abstract class BaseAuthProvider {
 		$user_id = absint( $user_id );
 		if ( $user_id <= 0 ) {
 			return null;
+		}
+
+		/**
+		 * Filter the resolution of an OAuth account for a given user.
+		 *
+		 * Platform plugins can return a non-null array to plug in their own
+		 * per-user credential storage (custom table, external KMS, encrypted
+		 * blob, etc.) without touching core. Returning null lets the default
+		 * storage path run.
+		 *
+		 * The filter fires BEFORE the default lookup. The filter result is
+		 * NOT passed through decrypt_fields() — platform plugins are
+		 * responsible for returning already-decrypted account data in the
+		 * canonical shape (access_token, refresh_token, scope, expires_at,
+		 * etc. as plaintext).
+		 *
+		 * @since 0.123.0
+		 *
+		 * @param array|null $account     Resolved account, or null to fall through.
+		 * @param string     $provider    Provider slug (e.g. registered handler slug).
+		 * @param int        $user_id     Target user ID.
+		 */
+		$resolved = apply_filters(
+			'datamachine_resolve_oauth_account_for_user',
+			null,
+			$this->provider_slug,
+			$user_id
+		);
+
+		if ( is_array( $resolved ) && ! empty( $resolved ) ) {
+			return $resolved;
 		}
 
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );

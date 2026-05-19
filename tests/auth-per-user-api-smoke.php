@@ -172,7 +172,42 @@ smoke_assert(
 	isset( $raw['shared']['principals']['user:303']['account'] )
 );
 
-echo "\n[7] sensitive fields are encrypted at rest\n";
+echo "\n[7] platform override filter short-circuits default lookup\n";
+$filter_provider = new Per_User_Smoke_Provider( 'filtered' );
+
+$captured_args = null;
+add_filter(
+	'datamachine_resolve_oauth_account_for_user',
+	function ( $account, $provider, $user_id ) use ( &$captured_args ) {
+		$captured_args = array( $account, $provider, $user_id );
+		if ( 'filtered' === $provider && 707 === $user_id ) {
+			return array(
+				'access_token' => 'platform-supplied-token',
+				'scope'        => 'platform:read',
+			);
+		}
+		return $account;
+	},
+	10,
+	3
+);
+
+$override = $filter_provider->get_account_for_user( 707 );
+smoke_assert( 'filter return value short-circuits default lookup', is_array( $override ) && 'platform-supplied-token' === $override['access_token'] );
+smoke_assert(
+	'filter receives (null, provider, user_id) arguments',
+	is_array( $captured_args ) && null === $captured_args[0] && 'filtered' === $captured_args[1] && 707 === $captured_args[2]
+);
+
+// Filter returning null lets the default fall through.
+$filter_provider->save_account_for_user( 808, array( 'access_token' => 'default-token' ) );
+$default = $filter_provider->get_account_for_user( 808 );
+smoke_assert(
+	'filter returning null lets default lookup proceed',
+	is_array( $default ) && 'default-token' === $default['access_token']
+);
+
+echo "\n[8] sensitive fields are encrypted at rest\n";
 $raw          = get_site_option( 'datamachine_auth_data', array() );
 $stored_token = $raw['sample']['principals']['user:202']['account']['access_token'] ?? '';
 smoke_assert(
