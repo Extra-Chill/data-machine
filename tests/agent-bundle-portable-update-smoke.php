@@ -134,8 +134,6 @@ $directory = new AgentBundleDirectory(
 			array(
 				array(
 					'step_position'       => 0,
-					'handler_slug'        => 'mcp',
-					'handler_config'      => array( 'provider' => 'mgs' ),
 					'handler_configs'     => array( 'mcp' => array( 'provider' => 'mgs' ) ),
 					'config_patch_queue'  => array( array( 'patch' => array( 'query' => 'WooCommerce' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
 					'queue_mode'          => 'loop',
@@ -174,8 +172,7 @@ assert_bundle_update_equals( 'artifact classifier labels changed payload modifie
 
 $incoming_flow_config = array(
 	'flow-step-1' => array(
-		'handler_slug'       => 'mcp',
-		'handler_config'     => array( 'provider' => 'mgs', 'query' => 'New seed' ),
+		'handler_configs'    => array( 'mcp' => array( 'provider' => 'mgs', 'query' => 'New seed' ) ),
 		'config_patch_queue' => array( array( 'patch' => array( 'query' => 'New seed' ), 'added_at' => '2026-04-27T00:00:00Z' ) ),
 		'queue_mode'         => 'drain',
 	),
