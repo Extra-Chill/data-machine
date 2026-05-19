@@ -81,6 +81,8 @@ function datamachine_run_conversation(
 	$tool_execution_results = array();
 	$completion_nudges      = array();
 	$last_request_metadata  = array();
+	$latest_messages        = $messages;
+	$latest_turn_count      = 0;
 
 	// Base log context for consistent logging.
 	$base_log_context = array_filter(
@@ -185,7 +187,9 @@ function datamachine_run_conversation(
 		$last_tool_calls,
 		$tool_execution_results,
 		$completion_nudges,
-		$last_request_metadata
+		$last_request_metadata,
+		$latest_messages,
+		$latest_turn_count
 	);
 
 	// Build should_continue callback. Budget enforcement is handled by
@@ -203,6 +207,24 @@ function datamachine_run_conversation(
 		return ! empty( $result['tool_execution_results'] ) || ! empty( $result['completion_nudge'] ) || ! empty( $result['duplicate_tool_call_rejected'] ) || ! empty( $result['tool_runtime_rule_rejected'] );
 	};
 
+	$conversation_request = new \AgentsAPI\AI\WP_Agent_Conversation_Request(
+		$messages,
+		array(),
+		null,
+		array_merge( $loop_payload, array(
+			'mode'  => $mode,
+			'modes' => $modes,
+		) ),
+		array(
+			'provider'  => $provider,
+			'model'     => $model,
+			'wordpress' => WordPressWorkspaceScope::metadata(),
+		),
+		$max_turns,
+		$single_turn,
+		WordPressWorkspaceScope::current()
+	);
+
 	// Run through the upstream substrate loop.
 	try {
 		$result = WP_Agent_Conversation_Loop::run(
@@ -215,23 +237,7 @@ function datamachine_run_conversation(
 					'mode'  => $mode,
 					'modes' => $modes,
 				) ),
-				'request'               => new \AgentsAPI\AI\WP_Agent_Conversation_Request(
-					$messages,
-					array(),
-					null,
-					array_merge( $loop_payload, array(
-						'mode'  => $mode,
-						'modes' => $modes,
-					) ),
-					array(
-						'provider'  => $provider,
-						'model'     => $model,
-						'wordpress' => WordPressWorkspaceScope::metadata(),
-					),
-					$max_turns,
-					$single_turn,
-					WordPressWorkspaceScope::current()
-				),
+				'request'               => $conversation_request,
 				'should_continue'       => $should_continue,
 				'transcript_persister'  => $transcript_persister,
 				'transcript_lock'       => $transcript_lock,
@@ -241,22 +247,26 @@ function datamachine_run_conversation(
 			)
 		);
 	} catch ( \RuntimeException $e ) {
-		// The turn runner throws RuntimeException for wp-ai-client failures.
-		// We can't read the substrate's accumulated turn_count/usage/etc here
-		// because the loop didn't return — surface what we know with empty
-		// defaults for the substrate-tracked fields.
+		// The turn runner throws RuntimeException for wp-ai-client failures before
+		// the substrate can return its accumulated result. Preserve the latest
+		// known state from completed turns so failed job artifacts still explain
+		// where the conversation stopped.
 		$error_result                       = array(
-			'messages'               => $messages,
+			'messages'               => $latest_messages,
 			'final_content'          => '',
-			'turn_count'             => 0,
+			'turn_count'             => $latest_turn_count,
 			'completed'              => false,
 			'last_tool_calls'        => $last_tool_calls,
-			'tool_execution_results' => array(),
+			'tool_execution_results' => $tool_execution_results,
 			'error'                  => $e->getMessage(),
 			'usage'                  => array(),
 			'request_metadata'       => $last_request_metadata,
 			'status'                 => 'error',
 		);
+		$transcript_session_id = $transcript_persister->persist( $latest_messages, $conversation_request, $error_result );
+		if ( '' !== $transcript_session_id ) {
+			$error_result['transcript_session_id'] = $transcript_session_id;
+		}
 		$error_result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $error_result, $loop_payload, $provider, $model, $modes );
 		return $error_result;
 	}
@@ -363,7 +373,9 @@ function datamachine_build_turn_runner(
 	array &$last_tool_calls,
 	array &$all_tool_results,
 	array &$completion_nudges,
-	array &$last_request_metadata
+	array &$last_request_metadata,
+	array &$latest_messages,
+	int &$latest_turn_count
 ): callable {
 	return static function ( array $messages, array $turn_context ) use (
 		$tools,
@@ -379,10 +391,14 @@ function datamachine_build_turn_runner(
 		&$last_tool_calls,
 		&$all_tool_results,
 		&$completion_nudges,
-		&$last_request_metadata
+		&$last_request_metadata,
+		&$latest_messages,
+		&$latest_turn_count
 	): array {
 		// The upstream loop provides the turn number via turn_context.
 		$turn_count = (int) ( $turn_context['turn'] ?? 1 );
+		$latest_turn_count = $turn_count;
+		$latest_messages   = $messages;
 
 		// Build and dispatch AI request using centralized RequestBuilder.
 		// Per-turn request metadata is captured locally and returned in the
@@ -691,6 +707,8 @@ function datamachine_build_turn_runner(
 				}
 			}
 		}
+
+		$latest_messages = $messages;
 
 		return array(
 			'messages'                     => $messages,

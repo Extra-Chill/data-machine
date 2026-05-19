@@ -57,6 +57,8 @@ require_once __DIR__ . '/Unit/Support/WpAiClientTestDoubles.php';
 use DataMachine\Engine\AI\LoopEventSinkInterface;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 use AgentsAPI\AI\WP_Agent_Message;
+use AgentsAPI\AI\WP_Agent_Conversation_Request;
+use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
 
@@ -68,6 +70,29 @@ class RunnerRequestSmokeSink implements LoopEventSinkInterface {
 			'event'   => $event,
 			'payload' => $payload,
 		);
+	}
+}
+
+class RunnerRequestSmokeTool {
+	public function execute( array $params ): array {
+		return array(
+			'success' => true,
+			'name'    => (string) ( $params['name'] ?? '' ),
+		);
+	}
+}
+
+class RunnerRequestSmokeTranscriptPersister implements WP_Agent_Transcript_Persister {
+	public array $calls = array();
+
+	public function persist( array $messages, WP_Agent_Conversation_Request $request, array $result ): string {
+		$this->calls[] = array(
+			'messages' => $messages,
+			'result'   => $result,
+			'context'  => $request->runtimeContext(),
+		);
+
+		return 'runner-request-smoke-failure-session';
 	}
 }
 
@@ -176,6 +201,70 @@ assert_runner_request( str_contains( (string) ( $error_result['error'] ?? '' ), 
 assert_runner_request( false === ( $error_result['completed'] ?? true ), 'error path marks conversation not completed' );
 assert_runner_request( 'provider_error' === ( $error_result['runtime_provenance']['status']['finish_reason'] ?? null ), 'error provenance records provider error finish reason' );
 assert_runner_request( str_contains( (string) ( $error_result['runtime_provenance']['provider_errors'][0]['message'] ?? '' ), 'provider offline' ), 'error provenance records provider error message' );
+
+// 3. Mid-conversation provider failures preserve the completed-turn context.
+$mid_failure_dispatch_count = 0;
+$mid_failure_transcript     = new RunnerRequestSmokeTranscriptPersister();
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$mid_failure_dispatch_count ) {
+		++$mid_failure_dispatch_count;
+
+		if ( 1 === $mid_failure_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => '',
+					'tool_calls' => array(
+						array(
+							'name'       => 'runner_request_smoke_tool',
+							'parameters' => array( 'name' => 'Ada' ),
+						),
+					),
+					'usage'      => array(
+						'prompt_tokens'     => 4,
+						'completion_tokens' => 5,
+						'total_tokens'      => 9,
+					),
+				),
+			);
+		}
+
+		throw new RuntimeException( 'provider offline after tool' );
+	}
+);
+
+$mid_failure_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'use a tool then continue' ) ),
+	array(
+		'runner_request_smoke_tool' => array(
+			'name'        => 'runner_request_smoke_tool',
+			'description' => 'Runner request smoke tool',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RunnerRequestSmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array( 'pipeline' ),
+	array(
+		'transcript_persister' => $mid_failure_transcript,
+	),
+	3
+);
+
+assert_runner_request( 2 === $mid_failure_dispatch_count, 'mid-conversation failure reaches the second provider request' );
+assert_runner_request( str_contains( (string) ( $mid_failure_result['error'] ?? '' ), 'provider offline after tool' ), 'mid-conversation failure preserves provider error' );
+assert_runner_request( 2 === ( $mid_failure_result['turn_count'] ?? null ), 'mid-conversation failure preserves latest turn count' );
+assert_runner_request( 1 === count( $mid_failure_result['tool_execution_results'] ?? array() ), 'mid-conversation failure preserves completed tool results' );
+assert_runner_request( str_contains( wp_json_encode( $mid_failure_result['messages'] ?? array() ), 'runner_request_smoke_tool' ), 'mid-conversation failure preserves accumulated messages' );
+assert_runner_request( 'provider_error' === ( $mid_failure_result['runtime_provenance']['status']['finish_reason'] ?? null ), 'mid-conversation failure provenance records provider error' );
+assert_runner_request( 'runner-request-smoke-failure-session' === ( $mid_failure_result['transcript_session_id'] ?? null ), 'mid-conversation failure returns refreshed transcript session id' );
+$last_failure_transcript_call = end( $mid_failure_transcript->calls );
+assert_runner_request( ! empty( $mid_failure_transcript->calls ), 'mid-conversation failure persists refreshed failure transcript' );
+assert_runner_request( str_contains( (string) ( $last_failure_transcript_call['result']['error'] ?? '' ), 'provider offline after tool' ), 'failure transcript result includes provider error' );
+assert_runner_request( 2 === ( $last_failure_transcript_call['result']['turn_count'] ?? null ), 'failure transcript result includes latest turn count' );
 
 if ( runner_request_failure_count() > 0 ) {
 	exit( 1 );
