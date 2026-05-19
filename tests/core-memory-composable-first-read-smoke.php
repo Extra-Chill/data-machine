@@ -76,6 +76,7 @@ namespace DataMachine\Abilities\File {
 namespace DataMachine\Engine\AI\Memory {
 	class MemoryPolicyResolver {
 		public function resolveRegistered( array $context ): array {
+			$GLOBALS['__core_memory_composable_resolver_contexts'][] = $context;
 			return $GLOBALS['__core_memory_composable_registry'];
 		}
 	}
@@ -140,9 +141,10 @@ namespace {
 		++$failures;
 	}
 
-	$GLOBALS['__core_memory_composable_files']       = array();
-	$GLOBALS['__core_memory_composable_regenerated'] = array();
-	$GLOBALS['__core_memory_composable_registry']    = array(
+	$GLOBALS['__core_memory_composable_files']             = array();
+	$GLOBALS['__core_memory_composable_regenerated']       = array();
+	$GLOBALS['__core_memory_composable_resolver_contexts'] = array();
+	$GLOBALS['__core_memory_composable_registry']          = array(
 		'SITE.md' => array(
 			'layer'      => 'shared',
 			'priority'   => 10,
@@ -168,6 +170,37 @@ namespace {
 		array( 'user_id' => 123, 'agent_id' => 456 ) === $GLOBALS['__core_memory_composable_regenerated'][0]['context'],
 		'regeneration receives prompt scope'
 	);
+
+	\DataMachine\Engine\AI\Directives\CoreMemoryFilesDirective::get_outputs(
+		'openai',
+		array(),
+		null,
+		array(
+			'agent_modes' => array( 'intelligence' ),
+			'session_id'  => 'session-1',
+			'user_id'     => 123,
+			'agent_id'    => 456,
+		)
+	);
+
+	$custom_context = end( $GLOBALS['__core_memory_composable_resolver_contexts'] );
+	core_memory_composable_assert( in_array( 'intelligence', $custom_context['modes'] ?? array(), true ), 'custom mode is preserved for memory resolution' );
+	core_memory_composable_assert( ! in_array( 'chat', $custom_context['modes'] ?? array(), true ), 'custom mode does not masquerade as chat' );
+
+	\DataMachine\Engine\AI\Directives\CoreMemoryFilesDirective::get_outputs(
+		'openai',
+		array(),
+		null,
+		array(
+			'agent_modes' => array( 'system' ),
+			'session_id'  => 'session-2',
+			'user_id'     => 123,
+			'agent_id'    => 456,
+		)
+	);
+
+	$system_context = end( $GLOBALS['__core_memory_composable_resolver_contexts'] );
+	core_memory_composable_assert( ! in_array( 'chat', $system_context['modes'] ?? array(), true ), 'system mode does not inherit chat memory files' );
 
 	echo "\n{$assertions} assertions, {$failures} failures\n";
 	if ( $failures > 0 ) {

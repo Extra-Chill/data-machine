@@ -8,6 +8,7 @@
 namespace DataMachine\Tests\Unit\AI\Memory;
 
 use DataMachine\Core\Database\Agents\Agents;
+use DataMachine\Engine\AI\AgentModeRegistry;
 use DataMachine\Engine\AI\Memory\MemoryPolicyResolver;
 use DataMachine\Engine\AI\MemoryFileRegistry;
 use WP_UnitTestCase;
@@ -28,6 +29,28 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 		// Reset the memory file registry before each test so we control
 		// exactly which files are registered.
 		MemoryFileRegistry::reset();
+		AgentModeRegistry::reset();
+		AgentModeRegistry::register(
+			MemoryPolicyResolver::MODE_CHAT,
+			10,
+			array(
+				'memory_contexts' => array( 'agent_identity', 'agent_memory', 'user_profile' ),
+			)
+		);
+		AgentModeRegistry::register(
+			MemoryPolicyResolver::MODE_PIPELINE,
+			20,
+			array(
+				'memory_contexts' => array( 'agent_identity', 'agent_memory' ),
+			)
+		);
+		AgentModeRegistry::register(
+			'intelligence',
+			30,
+			array(
+				'memory_contexts' => array( 'agent_identity', 'agent_memory' ),
+			)
+		);
 
 		// Seed a small, known set of registered files so assertions are
 		// stable across test runs. The real core registrations happen in
@@ -36,24 +59,24 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 			'SOUL.md',
 			10,
 			array(
-				'layer' => MemoryFileRegistry::LAYER_AGENT,
-				'modes' => array( 'all' ),
+				'layer'              => MemoryFileRegistry::LAYER_AGENT,
+				'injection_contexts' => array( 'agent_identity' ),
 			)
 		);
 		MemoryFileRegistry::register(
 			'MEMORY.md',
 			20,
 			array(
-				'layer' => MemoryFileRegistry::LAYER_AGENT,
-				'modes' => array( 'all' ),
+				'layer'              => MemoryFileRegistry::LAYER_AGENT,
+				'injection_contexts' => array( 'agent_memory' ),
 			)
 		);
 		MemoryFileRegistry::register(
 			'USER.md',
 			30,
 			array(
-				'layer' => MemoryFileRegistry::LAYER_USER,
-				'modes' => array( 'chat', 'pipeline' ),
+				'layer'              => MemoryFileRegistry::LAYER_USER,
+				'injection_contexts' => array( 'user_profile' ),
 			)
 		);
 		MemoryFileRegistry::register(
@@ -77,6 +100,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 
 	public function tear_down(): void {
 		MemoryFileRegistry::reset();
+		AgentModeRegistry::reset();
 		remove_all_filters( 'datamachine_resolved_memory_files' );
 		remove_all_filters( 'datamachine_resolved_scoped_memory_files' );
 		parent::tear_down();
@@ -109,9 +133,36 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayHasKey( 'MEMORY.md', $files );
-		$this->assertArrayHasKey( 'USER.md', $files );
+		$this->assertArrayNotHasKey( 'USER.md', $files );
 		$this->assertArrayNotHasKey( 'CHAT_ONLY.md', $files );
 		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $files );
+	}
+
+	public function test_registered_custom_mode_uses_declared_memory_contexts(): void {
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode' => 'intelligence',
+			)
+		);
+
+		$this->assertArrayHasKey( 'SOUL.md', $files );
+		$this->assertArrayHasKey( 'MEMORY.md', $files );
+		$this->assertArrayNotHasKey( 'USER.md', $files );
+		$this->assertArrayNotHasKey( 'CHAT_ONLY.md', $files );
+	}
+
+	public function test_registered_custom_mode_without_memory_contexts_does_not_guess(): void {
+		AgentModeRegistry::register( 'retrieval_only', 40, array() );
+
+		$files = $this->resolver->resolveRegistered(
+			array(
+				'mode' => 'retrieval_only',
+			)
+		);
+
+		$this->assertArrayNotHasKey( 'SOUL.md', $files );
+		$this->assertArrayNotHasKey( 'MEMORY.md', $files );
+		$this->assertArrayNotHasKey( 'USER.md', $files );
 	}
 
 	public function test_registered_file_without_modes_is_not_injected_in_any_mode(): void {

@@ -3,8 +3,9 @@
  * Agent Mode Registry
  *
  * Central registry for AI execution modes (chat, pipeline, system, editor, etc.).
- * Each mode has an ID, label, description, and priority for sort order. Runtime
- * requests can activate multiple registered modes additively.
+	 * Each mode has an ID, label, description, priority for sort order, and
+	 * optional memory contexts activated by that mode. Runtime requests can
+	 * activate multiple registered modes additively.
  *
  * Extension point: the `datamachine_agent_modes` action fires once per request
  * when the registry is first consumed, allowing extensions to register
@@ -44,8 +45,9 @@ class AgentModeRegistry {
 	 * @param array  $args     {
 	 *     Registration arguments.
 	 *
-	 *     @type string $label       Human-readable display label.
-	 *     @type string $description Description of the mode's purpose.
+	 *     @type string   $label           Human-readable display label.
+	 *     @type string   $description     Description of the mode's purpose.
+	 *     @type string[] $memory_contexts Semantic memory contexts activated by the mode.
 	 * }
 	 * @return void
 	 */
@@ -57,10 +59,11 @@ class AgentModeRegistry {
 		}
 
 		self::$modes[ $id ] = array(
-			'id'          => $id,
-			'priority'    => $priority,
-			'label'       => $args['label'] ?? self::id_to_label( $id ),
-			'description' => $args['description'] ?? '',
+			'id'              => $id,
+			'priority'        => $priority,
+			'label'           => $args['label'] ?? self::id_to_label( $id ),
+			'description'     => $args['description'] ?? '',
+			'memory_contexts' => self::normalize_memory_contexts( $args['memory_contexts'] ?? array() ),
 		);
 	}
 
@@ -122,6 +125,30 @@ class AgentModeRegistry {
 	 */
 	public static function get_ids(): array {
 		return array_keys( self::get_resolved() );
+	}
+
+	/**
+	 * Get semantic memory contexts activated by execution modes.
+	 *
+	 * @since 0.124.3
+	 *
+	 * @param array<int,string> $modes Execution mode slugs.
+	 * @return array<int,string> Memory context slugs.
+	 */
+	public static function get_memory_contexts_for_modes( array $modes ): array {
+		$resolved = self::get_resolved();
+		$contexts = array();
+
+		foreach ( $modes as $mode ) {
+			$mode = sanitize_key( (string) $mode );
+			if ( '' === $mode || empty( $resolved[ $mode ]['memory_contexts'] ) ) {
+				continue;
+			}
+
+			$contexts = array_merge( $contexts, $resolved[ $mode ]['memory_contexts'] );
+		}
+
+		return array_values( array_unique( $contexts ) );
 	}
 
 	/**
@@ -206,5 +233,35 @@ class AgentModeRegistry {
 	 */
 	private static function id_to_label( string $id ): string {
 		return ucwords( str_replace( array( '-', '_' ), ' ', $id ) );
+	}
+
+	/**
+	 * Normalize memory context slugs.
+	 *
+	 * @param mixed $contexts Raw memory context list.
+	 * @return array<int,string>
+	 */
+	private static function normalize_memory_contexts( mixed $contexts ): array {
+		if ( is_string( $contexts ) ) {
+			$contexts = array( $contexts );
+		}
+
+		if ( ! is_array( $contexts ) ) {
+			return array();
+		}
+
+		$normalized = array();
+		foreach ( $contexts as $context ) {
+			if ( ! is_scalar( $context ) ) {
+				continue;
+			}
+
+			$context = sanitize_key( (string) $context );
+			if ( '' !== $context ) {
+				$normalized[] = $context;
+			}
+		}
+
+		return array_values( array_unique( $normalized ) );
 	}
 }

@@ -140,4 +140,23 @@ class MemoryFileRegistryTest extends TestCase {
 		// never appear in mode-filtered injection lists.
 		$this->assertArrayNotHasKey( 'NO_MODES.md', $chat_files );
 	}
+
+	/**
+	 * Semantic injection contexts are independent of execution mode slugs.
+	 */
+	public function test_get_for_modes_filters_by_injection_contexts(): void {
+		MemoryFileRegistry::register( 'SOUL.md', 10, array(
+			'layer'              => MemoryFileRegistry::LAYER_AGENT,
+			'injection_contexts' => array( MemoryFileRegistry::INJECTION_AGENT_IDENTITY ),
+		) );
+		MemoryFileRegistry::register( 'CHAT_ONLY.md', 20, array(
+			'layer' => MemoryFileRegistry::LAYER_AGENT,
+			'modes' => array( 'chat' ),
+		) );
+
+		$files = MemoryFileRegistry::get_for_modes( array( 'intelligence' ), array( MemoryFileRegistry::INJECTION_AGENT_IDENTITY ) );
+
+		$this->assertArrayHasKey( 'SOUL.md', $files );
+		$this->assertArrayNotHasKey( 'CHAT_ONLY.md', $files );
+	}
 }
