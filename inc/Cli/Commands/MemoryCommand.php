@@ -363,6 +363,53 @@ class MemoryCommand extends BaseCommand {
 	}
 
 	/**
+	 * Delete a section from an agent file.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <file_or_section>
+	 * : Filename (e.g. SOUL.md) or section name (without ##).
+	 *   Arguments ending in .md are treated as filenames.
+	 *
+	 * [<section>]
+	 * : Section name when the first argument is a filename.
+	 *
+	 * [--agent=<slug>]
+	 * : Agent slug or numeric ID.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine memory delete "Old Notes"
+	 *     wp datamachine memory delete SOUL.md "Old Voice" --agent=studio
+	 *
+	 * @subcommand delete
+	 */
+	public function delete( array $args, array $assoc_args ): void {
+		$parsed = $this->parseFileAndSection( $args );
+		if ( null === $parsed['section'] ) {
+			WP_CLI::error( 'Usage: wp datamachine memory delete [<file.md>] <section>' );
+			return;
+		}
+
+		$input = array_merge(
+			$this->resolveMemoryScoping( $assoc_args ),
+			array( 'section' => $parsed['section'] )
+		);
+
+		if ( null !== $parsed['file'] ) {
+			$input['file'] = $parsed['file'];
+		}
+
+		$result = AgentMemoryAbilities::deleteMemorySection( $input );
+		if ( ! $result['success'] ) {
+			WP_CLI::error( $result['message'] ?? 'Failed to delete section.' );
+			return;
+		}
+
+		WP_CLI::success( $result['message'] );
+	}
+
+	/**
 	 * Read content from stdin (php://stdin) and return as string.
 	 *
 	 * Returns an empty string if stdin yields nothing.

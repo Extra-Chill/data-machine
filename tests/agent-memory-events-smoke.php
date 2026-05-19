@@ -70,6 +70,19 @@ if ( ! function_exists( 'size_format' ) ) {
 	}
 }
 
+if ( ! function_exists( 'untrailingslashit' ) ) {
+	function untrailingslashit( string $value ): string {
+		return rtrim( $value, '/' );
+	}
+}
+
+if ( ! function_exists( 'home_url' ) ) {
+	function home_url( string $_path = '/' ): string {
+		unset( $_path );
+		return '1';
+	}
+}
+
 if ( ! function_exists( 'post_type_exists' ) ) {
 	function post_type_exists( string $post_type ): bool {
 		return in_array( $post_type, $GLOBALS['datamachine_agent_memory_events_post_types'], true );
@@ -200,6 +213,7 @@ require_once __DIR__ . '/../inc/Engine/AI/MemoryFileRegistry.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DirectoryManager.php';
 require_once __DIR__ . '/agents-api-loader.php';
 datamachine_tests_require_agents_api();
+require_once __DIR__ . '/../inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DiskAgentMemoryStore.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemoryStoreFactory.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/AgentMemory.php';
