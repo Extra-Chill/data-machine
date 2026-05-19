@@ -207,7 +207,57 @@ smoke_assert(
 	is_array( $default ) && 'default-token' === $default['access_token']
 );
 
-echo "\n[8] sensitive fields are encrypted at rest\n";
+echo "\n[8] audit log fires on successful per-user reads only\n";
+$GLOBALS['datamachine_auth_per_user_logs'] = array();
+$logged_provider                           = new Per_User_Smoke_Provider( 'logged' );
+$logged_provider->save_account_for_user( 909, array( 'access_token' => 'tok-logged' ) );
+$GLOBALS['datamachine_auth_per_user_logs'] = array(); // reset after the save's encrypt path.
+
+$logged_provider->get_account_for_user( 909 );
+$resolved_logs = array_filter(
+	$GLOBALS['datamachine_auth_per_user_logs'],
+	function ( $entry ) {
+		return 'datamachine_log' === $entry[0]
+			&& isset( $entry[1][1] )
+			&& 'OAuth: Per-user account resolved' === $entry[1][1];
+	}
+);
+smoke_assert( 'successful read emits one audit log entry', 1 === count( $resolved_logs ) );
+
+$entry = array_values( $resolved_logs )[0] ?? null;
+smoke_assert( 'audit log level is debug', is_array( $entry ) && 'debug' === $entry[1][0] );
+$context = is_array( $entry ) ? ( $entry[1][2] ?? array() ) : array();
+smoke_assert( 'audit log context carries provider', is_array( $context ) && 'logged' === ( $context['provider'] ?? null ) );
+smoke_assert( 'audit log context carries user_id', is_array( $context ) && 909 === ( $context['user_id'] ?? null ) );
+smoke_assert( 'audit log context carries source', is_array( $context ) && 'default' === ( $context['source'] ?? null ) );
+
+// Failed read (no account) should NOT log.
+$GLOBALS['datamachine_auth_per_user_logs'] = array();
+$logged_provider->get_account_for_user( 12345 ); // not stored.
+$fail_logs = array_filter(
+	$GLOBALS['datamachine_auth_per_user_logs'],
+	function ( $entry ) {
+		return 'datamachine_log' === $entry[0]
+			&& isset( $entry[1][1] )
+			&& 'OAuth: Per-user account resolved' === $entry[1][1];
+	}
+);
+smoke_assert( 'failed read emits no audit log entry', 0 === count( $fail_logs ) );
+
+// Token MUST NOT appear in any log entry, ever.
+$GLOBALS['datamachine_auth_per_user_logs'] = array();
+$logged_provider->get_account_for_user( 909 ); // successful read again.
+$logged_provider->get_account_for_user( 99999 ); // failed read.
+$all_log_text = '';
+foreach ( $GLOBALS['datamachine_auth_per_user_logs'] as $entry ) {
+	$all_log_text .= json_encode( $entry );
+}
+smoke_assert(
+	'no token value appears in any audit log',
+	false === strpos( $all_log_text, 'tok-logged' )
+);
+
+echo "\n[9] sensitive fields are encrypted at rest\n";
 $raw          = get_site_option( 'datamachine_auth_data', array() );
 $stored_token = $raw['sample']['principals']['user:202']['account']['access_token'] ?? '';
 smoke_assert(

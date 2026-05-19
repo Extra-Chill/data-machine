@@ -415,6 +415,7 @@ abstract class BaseAuthProvider {
 		);
 
 		if ( is_array( $resolved ) && ! empty( $resolved ) ) {
+			$this->log_per_user_account_read( $user_id, 'filter' );
 			return $resolved;
 		}
 
@@ -427,7 +428,37 @@ abstract class BaseAuthProvider {
 			return null;
 		}
 
+		$this->log_per_user_account_read( $user_id, 'default' );
 		return $this->decrypt_fields( $account );
+	}
+
+	/**
+	 * Emit an audit log entry for a successful per-user account resolution.
+	 *
+	 * Only successful resolves are logged — failed lookups would dwarf real
+	 * signal during normal "no account exists yet" probes. The token itself
+	 * is NEVER logged, at any level.
+	 *
+	 * @since 0.123.0
+	 *
+	 * @param int    $user_id Resolved user ID.
+	 * @param string $source  Resolution source — 'filter' or 'default'.
+	 */
+	private function log_per_user_account_read( int $user_id, string $source ): void {
+		if ( ! function_exists( 'do_action' ) ) {
+			return;
+		}
+
+		do_action(
+			'datamachine_log',
+			'debug',
+			'OAuth: Per-user account resolved',
+			array(
+				'provider' => $this->provider_slug,
+				'user_id'  => $user_id,
+				'source'   => $source,
+			)
+		);
 	}
 
 	/**
