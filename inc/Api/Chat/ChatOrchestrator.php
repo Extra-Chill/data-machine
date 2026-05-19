@@ -525,8 +525,11 @@ class ChatOrchestrator {
 			$provider,
 			$model,
 			array(
-				'modes'   => array( ToolPolicyResolver::MODE_CHAT ),
-				'user_id' => $user_id,
+				'modes'           => array( ToolPolicyResolver::MODE_CHAT ),
+				'user_id'         => $user_id,
+				// Ping is a system-level health check; there is no human caller
+				// even though the session is recorded under the admin user_id.
+				'calling_user_id' => 0,
 			)
 		);
 
@@ -742,11 +745,25 @@ class ChatOrchestrator {
 			);
 			$client_context = $options['client_context'] ?? array();
 
+			// `calling_user_id` is the human user on whose behalf this AI invocation
+			// is running. In a chat session that's the chat caller. Tools that resolve
+			// per-user OAuth credentials read this field — distinct from `agent_id`
+			// (the acting agent identity) and from pipeline `user_id` (job owner).
+			//
+			// Callers can override via `$options['calling_user_id']` to express
+			// "this is a system-level invocation borrowing an admin session_id for
+			// storage but has no real human caller" (e.g. processPing). When the
+			// override is absent, the chat user is the calling user.
+			$calling_user_id = isset( $options['calling_user_id'] )
+				? max( 0, (int) $options['calling_user_id'] )
+				: $user_id;
+
 			$loop_context = array(
-				'session_id'  => $session_id,
-				'user_id'     => $user_id,
-				'agent_id'    => $agent_id,
-				'agent_modes' => $modes,
+				'session_id'      => $session_id,
+				'user_id'         => $user_id,
+				'calling_user_id' => $calling_user_id,
+				'agent_id'        => $agent_id,
+				'agent_modes'     => $modes,
 			);
 			if ( '' !== $agent_slug ) {
 				$loop_context['agent_slug'] = $agent_slug;

@@ -282,6 +282,11 @@ class AIStep extends Step {
 				'engine'                      => $this->engine,
 				'engine_data'                 => $this->engine->all(),
 				'user_id'                     => $user_id,
+				// Pipeline executions have no human caller — the agent is acting on a
+				// scheduled job, not on behalf of a person. Per-user OAuth resolution
+				// reads this field; setting it to 0 prevents accidentally picking up
+				// per-user credentials of the flow owner.
+				'calling_user_id'             => 0,
 				'agent_id'                    => $agent_id,
 				'agent_slug'                  => $agent_slug,
 				'agent_modes'                 => $execution_modes,

@@ -82,7 +82,11 @@ class AltTextTask extends SystemTask {
 			ConversationManager::buildConversationMessage( 'user', $prompt ),
 		);
 
-		$ai_payload = array( 'attachment_id' => $attachment_id );
+		$ai_payload = array(
+			'attachment_id'   => $attachment_id,
+			// System task — no human caller. See MetaDescriptionTask for rationale.
+			'calling_user_id' => 0,
+		);
 		if ( ! empty( $params['agent_id'] ) ) {
 			$ai_payload['agent_id'] = (int) $params['agent_id'];
 		}

@@ -78,7 +78,13 @@ class MetaDescriptionTask extends SystemTask {
 			ConversationManager::buildConversationMessage( 'user', $prompt ),
 		);
 
-		$ai_payload = array( 'post_id' => $post_id );
+		$ai_payload = array(
+			'post_id'         => $post_id,
+			// System tasks run without a human caller — calling_user_id is 0 so
+			// tools that resolve per-user OAuth credentials know not to look up
+			// any specific user's storage slot.
+			'calling_user_id' => 0,
+		);
 		if ( ! empty( $params['agent_id'] ) ) {
 			$ai_payload['agent_id'] = (int) $params['agent_id'];
 		}
