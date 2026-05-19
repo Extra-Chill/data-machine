@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.123.1] - 2026-05-19
+
+### Fixed
+- align AI failure diagnostics
+- preserve AI failure diagnostics
+
 ## [0.123.0] - 2026-05-19
 
 ### Added
