@@ -235,6 +235,12 @@ class PipelinesCommand extends BaseCommand {
 			return;
 		}
 
+		// Handle 'orphans' subcommand.
+		if ( ! empty( $args ) && 'orphans' === $args[0] ) {
+			$this->listOrphanedPipelines( $assoc_args );
+			return;
+		}
+
 		// Handle 'memory-files' subcommand.
 		if ( ! empty( $args ) && 'memory-files' === $args[0] ) {
 			if ( ! isset( $args[1] ) ) {
@@ -1086,5 +1092,50 @@ class PipelinesCommand extends BaseCommand {
 			$source_label,
 			$to_agent_id
 		) );
+	}
+
+	/**
+	 * List pipelines with NULL agent_id without mutating data.
+	 *
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function listOrphanedPipelines( array $assoc_args ): void {
+		$limit  = max( 1, min( 100, (int) ( $assoc_args['limit'] ?? 20 ) ) );
+		$offset = max( 0, (int) ( $assoc_args['offset'] ?? 0 ) );
+		$format = $assoc_args['format'] ?? 'table';
+
+		$pipelines_repo = new \DataMachine\Core\Database\Pipelines\Pipelines();
+		$rows           = $pipelines_repo->get_orphaned_pipelines( $limit, $offset );
+		$total          = $pipelines_repo->count_by_agent_id( null );
+
+		$items = array_map(
+			static function ( array $pipeline ): array {
+				return array(
+					'id'            => (int) ( $pipeline['pipeline_id'] ?? 0 ),
+					'name'          => (string) ( $pipeline['pipeline_name'] ?? '' ),
+					'user_id'       => (int) ( $pipeline['user_id'] ?? 0 ),
+					'portable_slug' => (string) ( $pipeline['portable_slug'] ?? '' ),
+					'updated'       => (string) ( $pipeline['updated_at'] ?? '' ),
+				);
+			},
+			$rows
+		);
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( array(
+				'total'     => $total,
+				'pipelines' => $items,
+			), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( empty( $items ) ) {
+			WP_CLI::success( 'No orphaned pipelines found.' );
+			return;
+		}
+
+		WP_CLI::warning( sprintf( 'Found %d orphaned pipeline(s) with agent_id=NULL.', $total ) );
+		\WP_CLI\Utils\format_items( 'table', $items, array( 'id', 'name', 'user_id', 'portable_slug', 'updated' ) );
+		WP_CLI::log( 'Repair with: wp datamachine pipelines reassign --where-null --to-agent=<agent> --dry-run' );
 	}
 }

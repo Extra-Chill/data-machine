@@ -313,6 +313,12 @@ class FlowsCommand extends BaseCommand {
 			return;
 		}
 
+		// Handle 'orphans' subcommand.
+		if ( ! empty( $args ) && 'orphans' === $args[0] ) {
+			$this->listOrphanedFlows( $assoc_args );
+			return;
+		}
+
 		// Handle 'migrate-legacy-handler-shape' subcommand.
 		if ( ! empty( $args ) && 'migrate-legacy-handler-shape' === $args[0] ) {
 			$this->migrateLegacyHandlerShape( $assoc_args );
@@ -2042,6 +2048,52 @@ class FlowsCommand extends BaseCommand {
 			$source_label,
 			$to_agent_id
 		) );
+	}
+
+	/**
+	 * List flows with NULL agent_id without mutating data.
+	 *
+	 * @param array $assoc_args Associative arguments.
+	 */
+	private function listOrphanedFlows( array $assoc_args ): void {
+		$limit  = max( 1, min( 100, (int) ( $assoc_args['limit'] ?? 20 ) ) );
+		$offset = max( 0, (int) ( $assoc_args['offset'] ?? 0 ) );
+		$format = $assoc_args['format'] ?? 'table';
+
+		$flows_repo = new \DataMachine\Core\Database\Flows\Flows();
+		$rows       = $flows_repo->get_orphaned_flows( $limit, $offset );
+		$total      = $flows_repo->count_by_agent_id( null );
+
+		$items = array_map(
+			static function ( array $flow ): array {
+				return array(
+					'id'            => (int) ( $flow['flow_id'] ?? 0 ),
+					'name'          => (string) ( $flow['flow_name'] ?? '' ),
+					'pipeline_id'   => (int) ( $flow['pipeline_id'] ?? 0 ),
+					'user_id'       => (int) ( $flow['user_id'] ?? 0 ),
+					'portable_slug' => (string) ( $flow['portable_slug'] ?? '' ),
+					'created'       => (string) ( $flow['created_at'] ?? '' ),
+				);
+			},
+			$rows
+		);
+
+		if ( 'json' === $format ) {
+			WP_CLI::line( wp_json_encode( array(
+				'total' => $total,
+				'flows' => $items,
+			), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		if ( empty( $items ) ) {
+			WP_CLI::success( 'No orphaned flows found.' );
+			return;
+		}
+
+		WP_CLI::warning( sprintf( 'Found %d orphaned flow(s) with agent_id=NULL.', $total ) );
+		\WP_CLI\Utils\format_items( 'table', $items, array( 'id', 'name', 'pipeline_id', 'user_id', 'portable_slug', 'created' ) );
+		WP_CLI::log( 'Repair with: wp datamachine flows reassign --where-null --to-agent=<agent> --dry-run' );
 	}
 
 	/**

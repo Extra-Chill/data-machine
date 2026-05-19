@@ -131,6 +131,10 @@ class SystemCommand extends BaseCommand {
 					WP_CLI::log( sprintf( '  Daily memory:   last attempted %s GMT', $daily_memory['last_attempt_gmt'] ) );
 				}
 			}
+			if ( isset( $check_result['unowned_pipelines'] ) || isset( $check_result['unowned_flows'] ) ) {
+				WP_CLI::log( sprintf( '  Unowned pipelines: %d', (int) ( $check_result['unowned_pipelines'] ?? 0 ) ) );
+				WP_CLI::log( sprintf( '  Unowned flows:     %d', (int) ( $check_result['unowned_flows'] ?? 0 ) ) );
+			}
 			if ( ! empty( $check_result['recommendation'] ) ) {
 				WP_CLI::log( sprintf( '  Recommendation: %s', $check_result['recommendation'] ) );
 			}
