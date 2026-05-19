@@ -345,6 +345,116 @@ abstract class BaseAuthProvider {
 		return true;
 	}
 
+	// -------------------------------------------------------------------------
+	// Per-user account API
+	//
+	// These methods provide a deliberate, no-fallback per-user storage surface
+	// for callers that operate on a specific human user's credentials. They
+	// share the same underlying storage layout as the principal-scoped API
+	// (`principals[user:<id>][account]`) so an account written via either
+	// surface is readable through the other.
+	//
+	// Unlike `get_account( array $context )`, these methods never consult the
+	// provider's scope policy and never fall back to site-wide storage when
+	// no per-user account exists. A missing per-user account always returns
+	// `null`.
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Get the OAuth account for a specific user.
+	 *
+	 * Sensitive fields are decrypted on read. Returns `null` when no per-user
+	 * account exists for this provider+user — there is intentionally no
+	 * fallback to site-wide storage so callers cannot accidentally cross
+	 * user boundaries.
+	 *
+	 * @since 0.123.0
+	 *
+	 * @param int $user_id Target user ID. Must be a positive integer.
+	 * @return array|null Decrypted account data, or null if no account exists.
+	 */
+	public function get_account_for_user( int $user_id ): ?array {
+		$user_id = absint( $user_id );
+		if ( $user_id <= 0 ) {
+			return null;
+		}
+
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		$provider_data = $all_auth_data[ $this->provider_slug ] ?? array();
+		$scope_key     = 'user:' . $user_id;
+		$account       = $provider_data['principals'][ $scope_key ]['account'] ?? null;
+
+		if ( ! is_array( $account ) || empty( $account ) ) {
+			return null;
+		}
+
+		return $this->decrypt_fields( $account );
+	}
+
+	/**
+	 * Save the OAuth account for a specific user.
+	 *
+	 * Sensitive fields are encrypted before storage. Stores under the same
+	 * `principals[user:<id>][account]` slot used by the scope-aware
+	 * `save_account()` path so the two surfaces stay in sync.
+	 *
+	 * @since 0.123.0
+	 *
+	 * @param int   $user_id Target user ID. Must be a positive integer.
+	 * @param array $account Account data to store. Must include `access_token`
+	 *                       for the credential to be useful.
+	 * @return bool True on successful write, false on invalid input or storage failure.
+	 */
+	public function save_account_for_user( int $user_id, array $account ): bool {
+		$user_id = absint( $user_id );
+		if ( $user_id <= 0 ) {
+			return false;
+		}
+
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) || ! is_array( $all_auth_data[ $this->provider_slug ] ) ) {
+			$all_auth_data[ $this->provider_slug ] = array();
+		}
+		if ( ! isset( $all_auth_data[ $this->provider_slug ]['principals'] ) || ! is_array( $all_auth_data[ $this->provider_slug ]['principals'] ) ) {
+			$all_auth_data[ $this->provider_slug ]['principals'] = array();
+		}
+
+		$scope_key = 'user:' . $user_id;
+		$all_auth_data[ $this->provider_slug ]['principals'][ $scope_key ]['account'] = $this->encrypt_fields( $account );
+
+		return update_site_option( 'datamachine_auth_data', $all_auth_data );
+	}
+
+	/**
+	 * Delete the OAuth account for a specific user.
+	 *
+	 * Returns true when the per-user slot existed and was removed, or when
+	 * there was nothing to remove (idempotent). Returns false only on
+	 * invalid input or a storage failure.
+	 *
+	 * @since 0.123.0
+	 *
+	 * @param int $user_id Target user ID. Must be a positive integer.
+	 * @return bool True on success (including no-op deletes), false on invalid input or storage failure.
+	 */
+	public function delete_account_for_user( int $user_id ): bool {
+		$user_id = absint( $user_id );
+		if ( $user_id <= 0 ) {
+			return false;
+		}
+
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		$scope_key     = 'user:' . $user_id;
+
+		if ( ! isset( $all_auth_data[ $this->provider_slug ]['principals'][ $scope_key ] ) ) {
+			return true; // Idempotent: nothing to delete.
+		}
+
+		unset( $all_auth_data[ $this->provider_slug ]['principals'][ $scope_key ] );
+
+		return update_site_option( 'datamachine_auth_data', $all_auth_data );
+	}
+
 	/**
 	 * Get the authenticated username for this provider.
 	 *
