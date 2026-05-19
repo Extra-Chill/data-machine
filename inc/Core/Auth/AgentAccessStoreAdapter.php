@@ -165,7 +165,7 @@ class AgentAccessStoreAdapter implements \WP_Agent_Access_Store, \WP_Agent_Princ
 	public function get_access_for_principal( string $agent_id, \AgentsAPI\AI\WP_Agent_Execution_Principal $principal, ?string $workspace_id = null ): ?\WP_Agent_Access_Grant {
 		$normalized = $this->normalize_principal( $principal );
 		if ( null === $normalized ) {
-			return null;
+			return $principal->acting_user_id > 0 ? $this->get_access( $agent_id, $principal->acting_user_id, $workspace_id ) : null;
 		}
 
 		$grant = $this->access_repository->get_principal_access( $this->storage_agent_id( $agent_id ), $normalized['principal_type'], $normalized['principal_id'], $workspace_id );
@@ -180,7 +180,7 @@ class AgentAccessStoreAdapter implements \WP_Agent_Access_Store, \WP_Agent_Princ
 	public function get_agent_ids_for_principal( \AgentsAPI\AI\WP_Agent_Execution_Principal $principal, ?string $minimum_role = null, ?string $workspace_id = null ): array {
 		$normalized = $this->normalize_principal( $principal );
 		if ( null === $normalized ) {
-			return array();
+			return $principal->acting_user_id > 0 ? $this->get_agent_ids_for_user( $principal->acting_user_id, $minimum_role, $workspace_id ) : array();
 		}
 
 		$agent_ids = $this->access_repository->get_agent_ids_for_principal( $normalized['principal_type'], $normalized['principal_id'], $minimum_role, $workspace_id );
