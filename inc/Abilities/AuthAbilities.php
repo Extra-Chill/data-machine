@@ -736,8 +736,8 @@ class AuthAbilities {
 	}
 
 	public function executeSaveAuthConfig( array $input ): array {
-		$handler_slug = sanitize_text_field( $input['handler_slug'] ?? '' );
-		$config_input = $input['config'] ?? array();
+		$handler_slug      = sanitize_text_field( $input['handler_slug'] ?? '' );
+		$config_input      = $input['config'] ?? array();
 		$principal_context = $this->getPrincipalContext( $input );
 
 		if ( empty( $handler_slug ) ) {
@@ -864,8 +864,8 @@ class AuthAbilities {
 	 * @return array Result.
 	 */
 	public function executeSetAuthToken( array $input ): array {
-		$handler_slug = sanitize_text_field( $input['handler_slug'] ?? '' );
-		$account_data = $input['account_data'] ?? array();
+		$handler_slug      = sanitize_text_field( $input['handler_slug'] ?? '' );
+		$account_data      = $input['account_data'] ?? array();
 		$principal_context = $this->getPrincipalContext( $input );
 
 		if ( empty( $handler_slug ) ) {
