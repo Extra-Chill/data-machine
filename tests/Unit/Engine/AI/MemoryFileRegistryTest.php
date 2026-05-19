@@ -159,4 +159,22 @@ class MemoryFileRegistryTest extends TestCase {
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayNotHasKey( 'CHAT_ONLY.md', $files );
 	}
+
+	/**
+	 * NETWORK.md is a multisite topology file, so core should not register it on single-site installs.
+	 */
+	public function test_default_memory_files_do_not_register_network_on_single_site(): void {
+		$this->assertFalse( is_multisite() );
+		$this->assertTrue( function_exists( 'datamachine_register_default_memory_files' ) );
+
+		datamachine_register_default_memory_files();
+
+		$files = MemoryFileRegistry::get_all();
+		$this->assertArrayHasKey( 'SITE.md', $files );
+		$this->assertArrayHasKey( 'RULES.md', $files );
+		$this->assertArrayHasKey( 'SOUL.md', $files );
+		$this->assertArrayHasKey( 'MEMORY.md', $files );
+		$this->assertArrayHasKey( 'USER.md', $files );
+		$this->assertArrayNotHasKey( 'NETWORK.md', $files );
+	}
 }

@@ -237,16 +237,18 @@ function datamachine_register_default_memory_files(): void {
 		'description'        => 'Information about the human the agent works with. Injected when the mode activates user profile memory.',
 	) );
 
-	// Network layer — multisite topology, only meaningful on multisite installs.
-	// Composable: content assembled from sections registered against SectionRegistry.
-	MemoryFileRegistry::register( 'NETWORK.md', 5, array(
-		'layer'       => MemoryFileRegistry::LAYER_NETWORK,
-		'protected'   => true,
-		'composable'  => true,
-		'modes'       => array( MemoryFileRegistry::MODE_ALL ),
-		'label'       => 'Network Context',
-		'description' => 'Auto-generated multisite network topology. Composable — extend via SectionRegistry.',
-	) );
+	// Network layer — multisite topology.
+	if ( is_multisite() ) {
+		// Composable: content assembled from sections registered against SectionRegistry.
+		MemoryFileRegistry::register( 'NETWORK.md', 5, array(
+			'layer'       => MemoryFileRegistry::LAYER_NETWORK,
+			'protected'   => true,
+			'composable'  => true,
+			'modes'       => array( MemoryFileRegistry::MODE_ALL ),
+			'label'       => 'Network Context',
+			'description' => 'Auto-generated multisite network topology. Composable — extend via SectionRegistry.',
+		) );
+	}
 }
 
 if ( did_action( 'plugins_loaded' ) ) {
