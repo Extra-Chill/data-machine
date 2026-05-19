@@ -37,7 +37,35 @@ function smoke_coerce_run_task_param_value( string $value ): mixed {
 	return $value;
 }
 
-function smoke_parse_run_task_params( array $assoc_args ): array {
+function smoke_collect_run_task_param_args( array $assoc_args, array $argv = array() ): array|string {
+	$raw_params  = array();
+	$argv_values = array_values( $argv );
+
+	foreach ( $argv_values as $index => $arg ) {
+		if ( ! is_string( $arg ) ) {
+			continue;
+		}
+		if ( str_starts_with( $arg, '--param=' ) ) {
+			$raw_params[] = substr( $arg, strlen( '--param=' ) );
+			continue;
+		}
+		if ( '--param' === $arg && isset( $argv_values[ $index + 1 ] ) ) {
+			$raw_params[] = (string) $argv_values[ $index + 1 ];
+		}
+	}
+
+	if ( count( $raw_params ) > 1 || ( ! isset( $assoc_args['param'] ) && ! empty( $raw_params ) ) ) {
+		return $raw_params;
+	}
+
+	$param_args = $assoc_args['param'] ?? array();
+	if ( is_string( $param_args ) ) {
+		$param_args = array( $param_args );
+	}
+	return $param_args;
+}
+
+function smoke_parse_run_task_params( array $assoc_args, array $argv = array() ): array {
 	$params = array();
 
 	if ( isset( $assoc_args['params'] ) ) {
@@ -48,10 +76,7 @@ function smoke_parse_run_task_params( array $assoc_args ): array {
 		$params = $decoded;
 	}
 
-	$param_args = $assoc_args['param'] ?? array();
-	if ( is_string( $param_args ) ) {
-		$param_args = array( $param_args );
-	}
+	$param_args = smoke_collect_run_task_param_args( $assoc_args, $argv );
 	if ( ! is_array( $param_args ) ) {
 		return array( 'error' => '--param must be key=value.' );
 	}
@@ -187,6 +212,27 @@ $assert( '--dry-run sets dry_run', true === $params['dry_run'] );
 
 $params = smoke_parse_run_task_params(
 	array(
+		'param' => 'pending_decision_limit=20',
+	),
+	array(
+		'wp',
+		'datamachine',
+		'system',
+		'run',
+		'wiki_maintain',
+		'--param=root_path=matt',
+		'--param=dry_run=1',
+		'--param=stage_pending_actions=1',
+		'--param=pending_decision_limit=20',
+	)
+);
+$assert( 'raw argv preserves repeated root_path param', 'matt' === $params['root_path'] );
+$assert( 'raw argv preserves repeated dry_run param', 1 === $params['dry_run'] );
+$assert( 'raw argv preserves repeated stage_pending_actions param', 1 === $params['stage_pending_actions'] );
+$assert( 'raw argv preserves repeated pending_decision_limit param', 20 === $params['pending_decision_limit'] );
+
+$params = smoke_parse_run_task_params(
+	array(
 		'params' => '{"root_path":"woocommerce","limit":10}',
 		'apply'  => true,
 	)
@@ -239,7 +285,8 @@ $registry       = file_get_contents( __DIR__ . '/../inc/Engine/Tasks/TaskRegistr
 $scheduler        = file_get_contents( __DIR__ . '/../inc/Engine/Tasks/TaskScheduler.php' );
 $workflow_ability = file_get_contents( __DIR__ . '/../inc/Abilities/Job/ExecuteWorkflowAbility.php' );
 $assert( 'CLI avoids invalid --param key=value synopsis placeholder', ! str_contains( $system_command, '[--param=<key=value>]' ) );
-$assert( 'CLI documents repeatable --param synopsis placeholder', str_contains( $system_command, '[--param=<param>]...' ) );
+$assert( 'CLI avoids WP-CLI-invalid repeatable --param synopsis placeholder', ! str_contains( $system_command, '[--param=<param>]...' ) );
+$assert( 'CLI documents valid --param synopsis placeholder', str_contains( $system_command, '[--param=<param>]' ) );
 $assert( 'CLI documents --param key=value semantics', str_contains( $system_command, 'Structured task param as key=value. Repeatable.' ) );
 $assert( 'CLI forwards task_params to runTask', str_contains( $system_command, "'task_params' => $" . 'params' ) );
 $assert( 'run-task ability schema accepts task_params', str_contains( $abilities, "'task_params' => array" ) );
