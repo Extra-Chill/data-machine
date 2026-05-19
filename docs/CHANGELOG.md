@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.124.7] - 2026-05-19
+
+### Fixed
+- preserve nested memory section headings
+
 ## [0.124.6] - 2026-05-19
 
 ### Fixed
