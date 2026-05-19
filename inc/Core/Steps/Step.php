@@ -115,7 +115,7 @@ abstract class Step {
 
 	/**
 	 * Validate step-specific configuration requirements.
-	 * Default implementation checks for handler_slug. Override for custom validation.
+	 * Default implementation checks for a configured handler slug. Override for custom validation.
 	 *
 	 * @return bool True if configuration is valid, false otherwise
 	 */
@@ -215,8 +215,8 @@ abstract class Step {
 	/**
 	 * Get the primary handler slug from flow step configuration.
 	 *
-	 * Reads the canonical scalar `handler_slug` field. Multi-handler steps
-	 * should call getHandlerSlugs(); handler-free steps return null.
+	 * Reads the first canonical `handler_slugs` entry. Multi-handler steps should
+	 * call getHandlerSlugs(); handler-free steps return null.
 	 *
 	 * @return string|null Handler slug or null if not set
 	 */
@@ -227,9 +227,8 @@ abstract class Step {
 	/**
 	 * Get the primary handler configuration from flow step configuration.
 	 *
-	 * Reads the canonical config slot: `handler_config` for handler-free and
-	 * single-handler steps, or `handler_configs[primary_slug]` for true
-	 * multi-handler steps.
+	 * Reads the canonical config slot: `flow_step_settings` for handler-free
+	 * steps, or `handler_configs[primary_slug]` for handler-backed steps.
 	 *
 	 * @return array Handler configuration array
 	 */

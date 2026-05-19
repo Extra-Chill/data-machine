@@ -308,6 +308,31 @@ try {
 }
 assert_bundle( 'malformed config_patch_queue fails clearly', $threw );
 
+$threw = false;
+try {
+	AgentBundleFlowFile::from_array(
+		array(
+			'schema_version' => 1,
+			'slug'           => 'Legacy Handler Slug',
+			'name'           => 'Legacy Handler Slug',
+			'pipeline_slug'  => 'WC Daily Ingest',
+			'schedule'       => 'daily',
+			'max_items'      => array(),
+			'steps'          => array(
+				array(
+					'step_position'   => 0,
+					'handler_slug'     => 'mcp',
+					'handler_config'   => array( 'provider' => 'mgs' ),
+					'handler_configs'  => array( 'mcp' => array( 'provider' => 'mgs' ) ),
+				),
+			),
+		)
+	);
+} catch ( BundleValidationException $e ) {
+	$threw = str_contains( $e->getMessage(), 'unsupported legacy field handler_slug' );
+}
+assert_bundle( 'legacy handler_slug in flow file fails clearly', $threw );
+
 echo "\n[4] Directory write/read round-trips without DB access\n";
 $bundle = new AgentBundleDirectory(
 	$manifest,

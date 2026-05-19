@@ -98,6 +98,11 @@ final class AgentBundleFlowFile {
 			if ( ! is_array( $step ) ) {
 				throw new BundleValidationException( 'flow file steps must contain objects.' );
 			}
+			foreach ( array( 'handler', 'handler_slug', 'handler_config' ) as $legacy_field ) {
+				if ( array_key_exists( $legacy_field, $step ) ) {
+					throw new BundleValidationException( sprintf( 'flow file step uses unsupported legacy field %s; use handler_slugs and handler_configs.', esc_html( $legacy_field ) ) );
+				}
+			}
 			foreach ( array( 'step_position', 'handler_configs' ) as $field ) {
 				if ( ! array_key_exists( $field, $step ) ) {
 					throw new BundleValidationException( sprintf( 'flow file step is missing required field %s.', esc_html( $field ) ) );

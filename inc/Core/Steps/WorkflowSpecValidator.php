@@ -58,6 +58,15 @@ class WorkflowSpecValidator {
 				);
 			}
 
+			foreach ( array( 'handler', 'handler_slug', 'handler_config' ) as $legacy_field ) {
+				if ( array_key_exists( $legacy_field, $step ) ) {
+					return array(
+						'valid' => false,
+						'error' => "Step {$index} uses unsupported legacy field {$legacy_field}; use handler_slugs and handler_configs",
+					);
+				}
+			}
+
 			$step_type = $step['type'] ?? null;
 			if ( ! is_string( $step_type ) || '' === trim( $step_type ) ) {
 				return array(
