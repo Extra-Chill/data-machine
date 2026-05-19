@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.124.6] - 2026-05-19
+
+### Fixed
+- align legacy migrator formatting
+- add operator-invoked legacy handler shape migrator
+
 ## [0.124.5] - 2026-05-19
 
 ### Fixed
