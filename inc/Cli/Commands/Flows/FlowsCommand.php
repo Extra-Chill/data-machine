@@ -2071,10 +2071,10 @@ class FlowsCommand extends BaseCommand {
 	 * @param array $assoc_args Associative arguments.
 	 */
 	private function migrateLegacyHandlerShape( array $assoc_args ): void {
-		$dry_run    = isset( $assoc_args['dry-run'] );
-		$skip       = isset( $assoc_args['yes'] );
-		$all_sites  = isset( $assoc_args['all-sites'] );
-		$verbose    = isset( $assoc_args['verbose'] );
+		$dry_run   = isset( $assoc_args['dry-run'] );
+		$skip      = isset( $assoc_args['yes'] );
+		$all_sites = isset( $assoc_args['all-sites'] );
+		$verbose   = isset( $assoc_args['verbose'] );
 
 		if ( $all_sites && ! is_multisite() ) {
 			WP_CLI::warning( '--all-sites has no effect on a single-site install; continuing on current site.' );
@@ -2087,13 +2087,13 @@ class FlowsCommand extends BaseCommand {
 		}
 
 		$totals = array(
-			'sites_scanned'           => 0,
-			'flows_scanned'           => 0,
-			'flows_with_legacy'       => 0,
-			'flows_rewritten'         => 0,
-			'steps_migrated'          => 0,
-			'orphan_legacy_dropped'   => 0,
-			'errors'                  => 0,
+			'sites_scanned'         => 0,
+			'flows_scanned'         => 0,
+			'flows_with_legacy'     => 0,
+			'flows_rewritten'       => 0,
+			'steps_migrated'        => 0,
+			'orphan_legacy_dropped' => 0,
+			'errors'                => 0,
 		);
 
 		if ( $all_sites ) {

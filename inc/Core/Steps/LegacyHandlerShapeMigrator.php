@@ -60,13 +60,13 @@ class LegacyHandlerShapeMigrator {
 	 */
 	public static function migrate_flow_config( array $flow_config ): array {
 		$report = array(
-			'changed'                       => false,
-			'steps_migrated'                => 0,
-			'steps_already_canonical'       => 0,
-			'steps_skipped_non_step'        => 0,
-			'dropped_orphan_legacy_config'  => 0,
-			'migrated_step_ids'             => array(),
-			'config'                        => $flow_config,
+			'changed'                      => false,
+			'steps_migrated'               => 0,
+			'steps_already_canonical'      => 0,
+			'steps_skipped_non_step'       => 0,
+			'dropped_orphan_legacy_config' => 0,
+			'migrated_step_ids'            => array(),
+			'config'                       => $flow_config,
 		);
 
 		foreach ( $flow_config as $step_id => $step ) {
@@ -86,7 +86,7 @@ class LegacyHandlerShapeMigrator {
 			}
 
 			$report['config'][ $step_id ] = self::migrate_step( $step, $report );
-			$report['changed']             = true;
+			$report['changed']            = true;
 			++$report['steps_migrated'];
 			$report['migrated_step_ids'][] = (string) $step_id;
 		}
