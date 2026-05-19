@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.124.9] - 2026-05-19
+
+### Fixed
+- deduplicate bundle config payload helpers
+
 ## [0.124.8] - 2026-05-19
 
 ### Fixed
