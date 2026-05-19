@@ -67,6 +67,7 @@ $schema_chain = array(
 	'datamachine_migrate_bundle_artifacts_table',
 	'datamachine_migrate_processed_item_claims',
 	'datamachine_migrate_pending_actions_table',
+	'datamachine_migrate_stored_flow_legacy_handler_fields',
 );
 
 foreach ( $schema_chain as $fn ) {

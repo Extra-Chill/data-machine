@@ -35,6 +35,7 @@ if ( ! function_exists( 'do_action' ) ) {
 }
 
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
+require_once __DIR__ . '/../inc/migrations/flows.php';
 
 use DataMachine\Core\Steps\FlowStepConfig;
 
@@ -145,6 +146,30 @@ foreach ( $source_checks as $relative_path => $needles ) {
 		assert_not_contains( $needle, $source, "{$relative_path} does not contain {$needle}", $failures, $passes );
 	}
 }
+
+echo "\n[6] stored flow migration preserves legacy-only fetch handler config:\n";
+$stored_flow_config = array(
+	'fetch_10'       => array(
+		'flow_step_id'   => 'fetch_10',
+		'step_type'      => 'fetch',
+		'handler_slug'   => 'rss',
+		'handler_config' => array( 'url' => 'https://example.com/feed.xml' ),
+	),
+	'system_task_10' => array(
+		'flow_step_id'   => 'system_task_10',
+		'step_type'      => 'system_task',
+		'handler_config' => array( 'task' => 'ping' ),
+	),
+);
+$migrated_flow_config = datamachine_normalize_stored_flow_legacy_handler_fields( $stored_flow_config );
+$migrated_fetch       = $migrated_flow_config['fetch_10'];
+$migrated_task        = $migrated_flow_config['system_task_10'];
+assert_equals( array( 'rss' ), $migrated_fetch['handler_slugs'] ?? array(), 'legacy-only fetch slug migrates to canonical list', $failures, $passes );
+assert_equals( array( 'rss' => array( 'url' => 'https://example.com/feed.xml' ) ), $migrated_fetch['handler_configs'] ?? array(), 'legacy-only fetch config migrates to canonical map', $failures, $passes );
+assert_absent( 'handler_slug', $migrated_fetch, 'migrated fetch drops scalar slug', $failures, $passes );
+assert_absent( 'handler_config', $migrated_fetch, 'migrated fetch drops scalar config', $failures, $passes );
+assert_absent( 'handler_config', $migrated_task, 'handler-free stored step drops redundant scalar config', $failures, $passes );
+assert_absent( 'handler_slugs', $migrated_task, 'handler-free stored step has no canonical handler slugs', $failures, $passes );
 
 echo "\n-------------------------------------------\n";
 $total = $passes + count( $failures );
