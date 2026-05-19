@@ -21,6 +21,7 @@ use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
+use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\BundleStepIdRemapper;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
@@ -631,8 +632,8 @@ class AgentBundler {
 			$artifact_records               = is_array( $existing_bundle_state['artifacts'] ?? null ) ? $existing_bundle_state['artifacts'] : array();
 			$config_conflicts               = array();
 			$agent_config_key               = self::artifact_key( 'agent_config', 'config' );
-			$incoming_config_payload        = self::tracked_agent_config_payload( $incoming_config );
-			$current_config_payload         = self::tracked_agent_config_payload( is_array( $existing['agent_config'] ?? null ) ? $existing['agent_config'] : array() );
+			$incoming_config_payload        = AgentBundleAgentConfig::tracked_payload( $incoming_config );
+			$current_config_payload         = AgentBundleAgentConfig::tracked_payload( is_array( $existing['agent_config'] ?? null ) ? $existing['agent_config'] : array() );
 			$agent_config_record            = $artifact_records[ $agent_config_key ] ?? null;
 			$agent_config_has_local_changes = $existing && (
 				$this->artifact_has_local_modifications( is_array( $agent_config_record ) ? $agent_config_record : null, $current_config_payload )
@@ -1331,22 +1332,6 @@ class AgentBundler {
 
 	private static function artifact_key( string $type, string $id ): string {
 		return AgentBundleArtifactExtensions::artifact_key( $type, $id );
-	}
-
-	/**
-	 * Return the bundle-owned agent config payload tracked by package upgrades.
-	 *
-	 * Data Machine writes installation bookkeeping under `datamachine_bundle` at
-	 * runtime. That metadata is not authored by bundles, so excluding it keeps
-	 * agent config conflict detection focused on operator/bundle-owned settings.
-	 *
-	 * @param array<string,mixed> $config Agent config.
-	 * @return array<string,mixed>
-	 */
-	private static function tracked_agent_config_payload( array $config ): array {
-		unset( $config['datamachine_bundle'] );
-		ksort( $config, SORT_STRING );
-		return $config;
 	}
 
 	private function preserve_runtime_queue_fields( array $incoming_flow_config, array $existing_flow_config ): array {

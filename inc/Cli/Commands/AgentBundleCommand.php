@@ -14,6 +14,7 @@ use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
+use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
 use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
@@ -747,7 +748,7 @@ class AgentBundleCommand extends BaseCommand {
 			'artifact_type' => 'agent_config',
 			'artifact_id'   => 'config',
 			'source_path'   => 'manifest.json#/agent/agent_config',
-			'payload'       => self::tracked_agent_config_payload( $incoming_config ),
+			'payload'       => AgentBundleAgentConfig::tracked_payload( $incoming_config ),
 		);
 
 		if ( $agent_id > 0 ) {
@@ -825,7 +826,7 @@ class AgentBundleCommand extends BaseCommand {
 			'artifact_type' => 'agent_config',
 			'artifact_id'   => 'config',
 			'source_path'   => 'manifest.json#/agent/agent_config',
-			'payload'       => self::tracked_agent_config_payload( is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array() ),
+			'payload'       => AgentBundleAgentConfig::tracked_payload( is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array() ),
 		);
 
 		$pipeline_by_slug = array();
@@ -917,22 +918,6 @@ class AgentBundleCommand extends BaseCommand {
 		unset( $step );
 
 		return $flow_config;
-	}
-
-	/**
-	 * Return the bundle-owned agent config payload tracked by package upgrades.
-	 *
-	 * The installer maintains `datamachine_bundle` bookkeeping under agent_config;
-	 * that metadata is not authored by bundles and must not participate in local
-	 * config drift checks.
-	 *
-	 * @param array<string,mixed> $config Agent config.
-	 * @return array<string,mixed>
-	 */
-	private static function tracked_agent_config_payload( array $config ): array {
-		unset( $config['datamachine_bundle'] );
-		ksort( $config, SORT_STRING );
-		return $config;
 	}
 
 	private function resolve_bundle_agent( array $bundle, string $slug = '' ): ?array {
