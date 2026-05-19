@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.38.0] - 2026-05-19
+
+### Added
+- audit + repair venue terms with missing addresses or orphan status
+
 ## [0.37.3] - 2026-05-18
 
 ### Fixed
