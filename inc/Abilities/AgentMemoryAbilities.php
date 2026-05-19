@@ -390,6 +390,42 @@ class AgentMemoryAbilities {
 	}
 
 	/**
+	 * Delete an agent file section.
+	 *
+	 * @param array $input Input parameters.
+	 * @return array Result.
+	 */
+	public static function deleteMemorySection( array $input ): array {
+		$consent_decision = DataMachineAgentConsentPolicy::get()->can_store_memory(
+			array(
+				'mode'               => 'ability',
+				'interactive'        => true,
+				'permission_granted' => PermissionHelper::can_manage(),
+				'agent_id'           => (int) ( $input['agent_id'] ?? 0 ),
+				'user_id'            => (int) ( $input['user_id'] ?? 0 ),
+			)
+		);
+		if ( ! $consent_decision->is_allowed() ) {
+			return array(
+				'success'          => false,
+				'message'          => 'Memory delete consent denied.',
+				'consent_decision' => $consent_decision->to_array(),
+			);
+		}
+
+		$filename = $input['file'] ?? 'MEMORY.md';
+		if ( 'MEMORY.md' !== $filename && ! \DataMachine\Engine\AI\MemoryFileRegistry::is_editable( $filename ) ) {
+			return array(
+				'success' => false,
+				'message' => sprintf( 'File %s is read-only and cannot be edited via section delete.', $filename ),
+			);
+		}
+
+		$memory = self::resolveMemory( $input );
+		return $memory->delete_section( (string) $input['section'] );
+	}
+
+	/**
 	 * Policy-constrained write to the current agent's own operational memory.
 	 *
 	 * @param array $input Input parameters.

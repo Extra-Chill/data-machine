@@ -32,6 +32,9 @@ defined( 'ABSPATH' ) || exit;
 
 class AgentMemory {
 
+	private const SECTION_BODY_START = '<!-- datamachine-section-body -->';
+	private const SECTION_BODY_END   = '<!-- /datamachine-section-body -->';
+
 	/**
 	 * Recommended maximum file size for agent memory files (8KB ≈ 2K tokens).
 	 *
@@ -377,11 +380,12 @@ class AgentMemory {
 		$current      = $this->store->read( $this->scope );
 		$file_content = $current->exists ? $current->content : '';
 		$section_pos  = $this->find_section_position( $file_content, $section_name );
+		$body         = $this->format_section_body( $content );
 
 		if ( null === $section_pos ) {
-			$file_content .= "\n## {$section_name}\n{$content}\n";
+			$file_content .= "\n## {$section_name}\n{$body}\n";
 		} else {
-			$file_content = $this->replace_section_content( $file_content, $section_pos, $content );
+			$file_content = $this->replace_section_content( $file_content, $section_pos, $body );
 		}
 
 		$write = $this->store->write( $this->scope, $file_content, $current->exists ? $current->hash : null );
@@ -426,11 +430,11 @@ class AgentMemory {
 		$section_pos  = $this->find_section_position( $file_content, $section_name );
 
 		if ( null === $section_pos ) {
-			$file_content .= "\n## {$section_name}\n{$content}\n";
+			$file_content .= "\n## {$section_name}\n" . $this->format_section_body( $content ) . "\n";
 		} else {
 			$existing     = $this->parse_section( $file_content, $section_name ) ?? '';
 			$merged       = rtrim( $existing ) . "\n" . $content . "\n";
-			$file_content = $this->replace_section_content( $file_content, $section_pos, $merged );
+			$file_content = $this->replace_section_content( $file_content, $section_pos, $this->format_section_body( $merged ) );
 		}
 
 		$write = $this->store->write( $this->scope, $file_content, $current->exists ? $current->hash : null );
@@ -456,6 +460,51 @@ class AgentMemory {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Delete a specific section and its body.
+	 *
+	 * @param string $section_name Section header text (without ##).
+	 * @return array{success: bool, message: string, file_size?: int}
+	 */
+	public function delete_section( string $section_name ): array {
+		$current = $this->store->read( $this->scope );
+
+		if ( ! $current->exists ) {
+			return array(
+				'success' => false,
+				'message' => sprintf( 'File %s does not exist.', $this->scope->filename ),
+			);
+		}
+
+		$section_pos = $this->find_section_position( $current->content, $section_name );
+		if ( null === $section_pos ) {
+			return array(
+				'success' => false,
+				'message' => sprintf( 'Section "%s" not found.', $section_name ),
+			);
+		}
+
+		$file_content = substr( $current->content, 0, $section_pos['start'] ) . substr( $current->content, $section_pos['end'] );
+		$file_content = preg_replace( "/\n{3,}/", "\n\n", $file_content ) ?? $file_content;
+		$file_content = rtrim( $file_content ) . "\n";
+
+		$write = $this->store->write( $this->scope, $file_content, $current->hash );
+		if ( ! $write->success ) {
+			return array(
+				'success' => false,
+				'message' => sprintf( 'Failed to delete section "%s" (%s).', $section_name, $write->error ?? 'unknown' ),
+			);
+		}
+
+		$this->emit_updated_event( $file_content, $write );
+
+		return array(
+			'success'   => true,
+			'message'   => sprintf( 'Section "%s" deleted.', $section_name ),
+			'file_size' => $write->bytes,
+		);
 	}
 
 	/**
@@ -506,9 +555,21 @@ class AgentMemory {
 		$current_section = null;
 		$query_lower     = mb_strtolower( $query );
 		$line_count      = count( $lines );
+		$in_marked_body  = false;
 
 		foreach ( $lines as $index => $line ) {
-			if ( preg_match( '/^## (.+)$/', $line, $header_match ) ) {
+			$trimmed = trim( $line );
+			if ( self::SECTION_BODY_START === $trimmed ) {
+				$in_marked_body = true;
+				continue;
+			}
+
+			if ( self::SECTION_BODY_END === $trimmed ) {
+				$in_marked_body = false;
+				continue;
+			}
+
+			if ( ! $in_marked_body && preg_match( '/^## (.+)$/', $line, $header_match ) ) {
 				$current_section = trim( $header_match[1] );
 			}
 
@@ -550,10 +611,26 @@ class AgentMemory {
 	 * @return string[] List of section names.
 	 */
 	private function parse_section_headers( string $content ): array {
-		$sections = array();
-		if ( preg_match_all( '/^## (.+)$/m', $content, $matches ) ) {
-			$sections = array_map( 'trim', $matches[1] );
+		$sections       = array();
+		$in_marked_body = false;
+
+		foreach ( explode( "\n", $content ) as $line ) {
+			$trimmed = trim( $line );
+			if ( self::SECTION_BODY_START === $trimmed ) {
+				$in_marked_body = true;
+				continue;
+			}
+
+			if ( self::SECTION_BODY_END === $trimmed ) {
+				$in_marked_body = false;
+				continue;
+			}
+
+			if ( ! $in_marked_body && preg_match( '/^## (.+)$/', $line, $match ) ) {
+				$sections[] = trim( $match[1] );
+			}
 		}
+
 		return $sections;
 	}
 
@@ -565,14 +642,13 @@ class AgentMemory {
 	 * @return string|null Section body or null if not found.
 	 */
 	private function parse_section( string $content, string $section_name ): ?string {
-		$escaped = preg_quote( $section_name, '/' );
-		$pattern = '/^## ' . $escaped . '\s*\n(.*?)(?=\n## |\z)/ms';
-
-		if ( preg_match( $pattern, $content, $match ) ) {
-			return trim( $match[1] );
+		$section_pos = $this->find_section_position( $content, $section_name );
+		if ( null === $section_pos ) {
+			return null;
 		}
 
-		return null;
+		$body = substr( $content, $section_pos['header_end'], $section_pos['end'] - $section_pos['header_end'] );
+		return trim( $this->unwrap_section_body( $body ) );
 	}
 
 	/**
@@ -584,14 +660,27 @@ class AgentMemory {
 	 */
 	private function find_section_position( string $content, string $section_name ): ?array {
 		$escaped = preg_quote( $section_name, '/' );
-		$pattern = '/^(## ' . $escaped . '\s*\n)(.*?)(?=\n## |\z)/ms';
+		$pattern = '/(^|\n)(## ' . $escaped . '[ \t]*\n)/';
 
 		if ( preg_match( $pattern, $content, $match, PREG_OFFSET_CAPTURE ) ) {
-			$full_start  = $match[0][1];
-			$header      = $match[1][0];
+			$prefix      = $match[1][0];
+			$full_start  = $match[0][1] + strlen( $prefix );
+			$header      = $match[2][0];
 			$header_end  = $full_start + strlen( $header );
-			$body        = $match[2][0];
-			$section_end = $header_end + strlen( $body );
+			$body        = substr( $content, $header_end );
+			$section_end = strlen( $content );
+
+			if ( str_starts_with( $body, self::SECTION_BODY_START . "\n" ) ) {
+				$end_marker_pos = strpos( $body, "\n" . self::SECTION_BODY_END );
+				if ( false !== $end_marker_pos ) {
+					$section_end = $header_end + $end_marker_pos + 1 + strlen( self::SECTION_BODY_END );
+					if ( "\n" === substr( $content, $section_end, 1 ) ) {
+						++$section_end;
+					}
+				}
+			} elseif ( preg_match( '/\n## /', $body, $next_match, PREG_OFFSET_CAPTURE ) ) {
+				$section_end = $header_end + $next_match[0][1];
+			}
 
 			return array(
 				'start'      => $full_start,
@@ -616,6 +705,36 @@ class AgentMemory {
 		$after  = substr( $file_content, $position['end'] );
 
 		return $before . $new_content . "\n" . $after;
+	}
+
+	/**
+	 * Marker-wrap section bodies that contain top-level markdown headings.
+	 *
+	 * Plain markdown cannot otherwise distinguish a body `##` heading from the
+	 * next agent-memory section. The markers are stripped from section reads and
+	 * ignored by section listing.
+	 */
+	private function format_section_body( string $content ): string {
+		$content = rtrim( $content );
+		if ( ! preg_match( '/^## .+$/m', $content ) ) {
+			return $content;
+		}
+
+		return self::SECTION_BODY_START . "\n" . $content . "\n" . self::SECTION_BODY_END;
+	}
+
+	/**
+	 * Remove section body boundary markers from a parsed body.
+	 */
+	private function unwrap_section_body( string $body ): string {
+		$body = trim( $body );
+		if ( ! str_starts_with( $body, self::SECTION_BODY_START ) ) {
+			return $body;
+		}
+
+		$body = preg_replace( '/^' . preg_quote( self::SECTION_BODY_START, '/' ) . '\s*\n?/', '', $body ) ?? $body;
+		$body = preg_replace( '/\n?' . preg_quote( self::SECTION_BODY_END, '/' ) . '$/', '', $body ) ?? $body;
+		return $body;
 	}
 
 	/**
