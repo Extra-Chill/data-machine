@@ -285,23 +285,23 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 	}
 
 	/**
-	 * Expand custom interactive chat modes for core memory file selection.
+	 * Expand execution modes into memory scopes for core memory file selection.
 	 *
-	 * Custom modes such as a domain-specific frontend chat mode should still
-	 * receive agent identity and memory files registered for `chat`. System mode
-	 * remains explicit so background maintenance does not inherit agent identity.
+	 * Agent identity memory applies to interactive conversations, including
+	 * pipeline turns and session-backed custom modes. System mode remains
+	 * explicit so background maintenance does not inherit agent identity.
 	 *
 	 * @param array<int,string> $modes   Normalized active modes.
 	 * @param array             $payload Runtime payload.
 	 * @return array<int,string>
 	 */
 	private static function memory_modes( array $modes, array $payload ): array {
-		if ( in_array( 'system', $modes, true ) || in_array( 'chat', $modes, true ) ) {
+		if ( in_array( 'system', $modes, true ) || in_array( 'interactive', $modes, true ) ) {
 			return $modes;
 		}
 
-		if ( ! empty( $payload['session_id'] ) ) {
-			$modes[] = 'chat';
+		if ( array_intersect( $modes, array( 'chat', 'pipeline' ) ) || ! empty( $payload['session_id'] ) ) {
+			$modes[] = 'interactive';
 		}
 
 		return array_values( array_unique( $modes ) );

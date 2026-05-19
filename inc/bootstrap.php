@@ -204,21 +204,21 @@ function datamachine_register_default_memory_files(): void {
 	) );
 
 	// Agent layer — identity and knowledge, scoped to a single agent.
-	// Injected in interactive modes only (chat, pipeline). Excluded from
+	// Injected in interactive modes only. Excluded from
 	// system mode so autonomous maintenance tasks (e.g. daily memory
 	// compaction) are not primed with the agent's identity while operating
 	// on these files.
 	MemoryFileRegistry::register( 'SOUL.md', 20, array(
 		'layer'       => MemoryFileRegistry::LAYER_AGENT,
 		'protected'   => true,
-		'modes'       => array( 'chat', 'pipeline' ),
+		'modes'       => array( 'chat', 'pipeline', 'interactive' ),
 		'label'       => 'Agent Identity',
 		'description' => 'Agent identity, voice, rules. Injected in interactive modes only.',
 	) );
 	MemoryFileRegistry::register( 'MEMORY.md', 30, array(
 		'layer'       => MemoryFileRegistry::LAYER_AGENT,
 		'protected'   => true,
-		'modes'       => array( 'chat', 'pipeline' ),
+		'modes'       => array( 'chat', 'pipeline', 'interactive' ),
 		'label'       => 'Agent Memory',
 		'description' => 'Accumulated knowledge. Injected in interactive modes only.',
 	) );

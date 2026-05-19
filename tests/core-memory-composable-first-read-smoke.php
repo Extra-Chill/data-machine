@@ -185,7 +185,23 @@ namespace {
 
 	$custom_context = end( $GLOBALS['__core_memory_composable_resolver_contexts'] );
 	core_memory_composable_assert( in_array( 'intelligence', $custom_context['modes'] ?? array(), true ), 'custom mode is preserved for memory resolution' );
-	core_memory_composable_assert( in_array( 'chat', $custom_context['modes'] ?? array(), true ), 'session-backed custom mode also resolves chat memory files' );
+	core_memory_composable_assert( ! in_array( 'chat', $custom_context['modes'] ?? array(), true ), 'custom mode does not masquerade as chat' );
+	core_memory_composable_assert( in_array( 'interactive', $custom_context['modes'] ?? array(), true ), 'session-backed custom mode resolves interactive memory files' );
+
+	\DataMachine\Engine\AI\Directives\CoreMemoryFilesDirective::get_outputs(
+		'openai',
+		array(),
+		null,
+		array(
+			'agent_modes' => array( 'pipeline' ),
+			'user_id'     => 123,
+			'agent_id'    => 456,
+		)
+	);
+
+	$pipeline_context = end( $GLOBALS['__core_memory_composable_resolver_contexts'] );
+	core_memory_composable_assert( in_array( 'pipeline', $pipeline_context['modes'] ?? array(), true ), 'pipeline mode is preserved for memory resolution' );
+	core_memory_composable_assert( in_array( 'interactive', $pipeline_context['modes'] ?? array(), true ), 'pipeline mode resolves interactive memory files' );
 
 	\DataMachine\Engine\AI\Directives\CoreMemoryFilesDirective::get_outputs(
 		'openai',
@@ -200,7 +216,7 @@ namespace {
 	);
 
 	$system_context = end( $GLOBALS['__core_memory_composable_resolver_contexts'] );
-	core_memory_composable_assert( ! in_array( 'chat', $system_context['modes'] ?? array(), true ), 'system mode does not inherit chat memory files' );
+	core_memory_composable_assert( ! in_array( 'interactive', $system_context['modes'] ?? array(), true ), 'system mode does not inherit interactive memory files' );
 
 	echo "\n{$assertions} assertions, {$failures} failures\n";
 	if ( $failures > 0 ) {
