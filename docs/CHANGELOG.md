@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.124.0] - 2026-05-19
+
+### Added
+- propagate calling_user_id through AI invocation payload
+- wp datamachine auth revoke command with per-user support
+- audit log on successful per-user account reads
+- add datamachine_resolve_oauth_account_for_user filter
+- add per-user account API to BaseAuthProvider
+
+### Fixed
+- align auth ability assignments
+
 ## [0.123.3] - 2026-05-19
 
 ### Fixed
