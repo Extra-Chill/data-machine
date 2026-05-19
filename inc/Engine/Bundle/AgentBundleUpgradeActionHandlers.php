@@ -64,13 +64,17 @@ final class AgentBundleCoreArtifactApply {
 		$agent_id = (int) ( $agent['agent_id'] ?? 0 );
 		$payload  = is_array( $artifact['payload'] ?? null ) ? $artifact['payload'] : array();
 
-		if ( $agent_id <= 0 || empty( $payload ) || ! in_array( $type, array( 'pipeline', 'flow' ), true ) ) {
+		if ( $agent_id <= 0 || empty( $payload ) || ! in_array( $type, array( 'agent_config', 'pipeline', 'flow' ), true ) ) {
 			return null;
 		}
 
-		$applied = 'pipeline' === $type
-			? self::apply_pipeline( $artifact, $agent_id, $payload )
-			: self::apply_flow( $artifact, $agent_id, $payload );
+		if ( 'agent_config' === $type ) {
+			$applied = self::apply_agent_config( $artifact, $agent_id, $payload );
+		} else {
+			$applied = 'pipeline' === $type
+				? self::apply_pipeline( $artifact, $agent_id, $payload )
+				: self::apply_flow( $artifact, $agent_id, $payload );
+		}
 		if ( is_wp_error( $applied ) ) {
 			return $applied;
 		}
@@ -81,6 +85,32 @@ final class AgentBundleCoreArtifactApply {
 		}
 
 		return array_merge( $applied, array( 'registry' => 'updated' ) );
+	}
+
+	/**
+	 * @param array<string,mixed> $artifact Artifact envelope.
+	 * @param array<string,mixed> $payload Artifact payload.
+	 */
+	private static function apply_agent_config( array $artifact, int $agent_id, array $payload ): array|\WP_Error {
+		$agents = new Agents();
+		$agent  = $agents->get_agent( $agent_id );
+		if ( ! $agent ) {
+			return new \WP_Error( 'datamachine_bundle_agent_missing', sprintf( 'Agent ID %d was not found.', $agent_id ) );
+		}
+		$current_config = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
+		if ( ! empty( $current_config['datamachine_bundle'] ) && ! isset( $payload['datamachine_bundle'] ) ) {
+			$payload['datamachine_bundle'] = $current_config['datamachine_bundle'];
+		}
+
+		if ( ! $agents->update_agent( $agent_id, array( 'agent_config' => $payload ) ) ) {
+			return new \WP_Error( 'datamachine_bundle_agent_config_update_failed', 'Failed to update agent_config bundle artifact.' );
+		}
+
+		return array(
+			'artifact_type' => 'agent_config',
+			'artifact_id'   => (string) ( $artifact['artifact_id'] ?? 'config' ),
+			'agent_id'      => $agent_id,
+		);
 	}
 
 	/**
