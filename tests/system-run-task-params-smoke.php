@@ -239,7 +239,7 @@ $registry       = file_get_contents( __DIR__ . '/../inc/Engine/Tasks/TaskRegistr
 $scheduler        = file_get_contents( __DIR__ . '/../inc/Engine/Tasks/TaskScheduler.php' );
 $workflow_ability = file_get_contents( __DIR__ . '/../inc/Abilities/Job/ExecuteWorkflowAbility.php' );
 $assert( 'CLI avoids invalid --param key=value synopsis placeholder', ! str_contains( $system_command, '[--param=<key=value>]' ) );
-$assert( 'CLI documents valid --param synopsis placeholder', str_contains( $system_command, '[--param=<param>]' ) );
+$assert( 'CLI documents repeatable --param synopsis placeholder', str_contains( $system_command, '[--param=<param>]...' ) );
 $assert( 'CLI documents --param key=value semantics', str_contains( $system_command, 'Structured task param as key=value. Repeatable.' ) );
 $assert( 'CLI forwards task_params to runTask', str_contains( $system_command, "'task_params' => $" . 'params' ) );
 $assert( 'run-task ability schema accepts task_params', str_contains( $abilities, "'task_params' => array" ) );
