@@ -251,7 +251,7 @@ function datamachine_run_conversation(
 		// the substrate can return its accumulated result. Preserve the latest
 		// known state from completed turns so failed job artifacts still explain
 		// where the conversation stopped.
-		$error_result                       = array(
+		$error_result          = array(
 			'messages'               => $latest_messages,
 			'final_content'          => '',
 			'turn_count'             => $latest_turn_count,
@@ -396,7 +396,7 @@ function datamachine_build_turn_runner(
 		&$latest_turn_count
 	): array {
 		// The upstream loop provides the turn number via turn_context.
-		$turn_count = (int) ( $turn_context['turn'] ?? 1 );
+		$turn_count        = (int) ( $turn_context['turn'] ?? 1 );
 		$latest_turn_count = $turn_count;
 		$latest_messages   = $messages;
 
