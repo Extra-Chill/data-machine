@@ -238,14 +238,19 @@ resolver_smoke_assert( 'reviewer' === ( $handler_calls[1]['context']['actor'] ??
 resolver_smoke_assert( empty( $permission_seen ), 'legacy can_resolve is not duplicated for Agents API handler objects', $failures, $passes );
 
 $legacy_apply_calls = 0;
+$legacy_permission_seen = array();
 add_filter(
 	'datamachine_pending_action_handlers',
-	static function ( array $handlers ) use ( &$legacy_apply_calls ) {
+	static function ( array $handlers ) use ( &$legacy_apply_calls, &$legacy_permission_seen ) {
 		$handlers['legacy_kind'] = array(
-			'apply' => static function ( array $apply_input, array $payload ) use ( &$legacy_apply_calls ) {
+			'apply'       => static function ( array $apply_input, array $payload ) use ( &$legacy_apply_calls ) {
 				unset( $apply_input, $payload );
 				++$legacy_apply_calls;
 				return array( 'success' => true );
+			},
+			'can_resolve' => static function ( array $payload, string $decision, int $user_id, array $context ) use ( &$legacy_permission_seen ) {
+				$legacy_permission_seen[] = compact( 'payload', 'decision', 'user_id', 'context' );
+				return true;
 			},
 		);
 
@@ -268,11 +273,15 @@ $rejected = ResolvePendingActionAbility::execute(
 	array(
 		'action_id' => 'act_legacy_reject',
 		'decision'  => 'rejected',
+		'resolver'  => 'system:test-resolver',
+		'context'   => array( 'reason' => 'safe-test' ),
 	)
 );
 
 resolver_smoke_assert( true === ( $rejected['success'] ?? false ), 'rejected legacy resolution succeeds', $failures, $passes );
 resolver_smoke_assert( 'rejected' === ( $rejected['decision'] ?? null ), 'rejected response keeps Data Machine decision string', $failures, $passes );
+resolver_smoke_assert( 'safe-test' === ( $legacy_permission_seen[0]['context']['reason'] ?? null ), 'legacy can_resolve receives resolver context', $failures, $passes );
+resolver_smoke_assert( 'system:test-resolver' === ( $legacy_permission_seen[0]['context']['resolver'] ?? null ), 'legacy can_resolve receives resolver identity', $failures, $passes );
 resolver_smoke_assert( 0 === $legacy_apply_calls, 'rejected resolution does not invoke apply handler', $failures, $passes );
 
 $denied_apply_calls = 0;
