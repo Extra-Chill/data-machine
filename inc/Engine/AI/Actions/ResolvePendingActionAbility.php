@@ -24,7 +24,7 @@
  *                 array on 'accepted'. Return value is included in the
  *                 response. Return a WP_Error or an array with `success=>false`
  *                 to surface failure.
- *   - can_resolve (callable, optional): invoked with ($payload, $decision, $user_id)
+ *   - can_resolve (callable, optional): invoked with ($payload, $decision, $user_id, $context)
  *                 before apply. Must return true. Return a WP_Error (or false)
  *                 to deny. Defaults to "anyone with access to the ability".
  *
@@ -226,6 +226,7 @@ class ResolvePendingActionAbility {
 		$resolver_payload = isset( $input['payload'] ) && is_array( $input['payload'] ) ? $input['payload'] : array();
 		$resolver_context = isset( $input['context'] ) && is_array( $input['context'] ) ? $input['context'] : array();
 		$resolver         = isset( $input['resolver'] ) ? sanitize_text_field( $input['resolver'] ) : self::resolverFromCurrentUser();
+		$resolver_context = array_merge( $resolver_context, array( 'resolver' => $resolver ) );
 		$pending_action   = PendingActionStore::get_action( $action_id );
 
 		if ( '' === $kind ) {
@@ -280,7 +281,7 @@ class ResolvePendingActionAbility {
 		}
 
 		if ( null === $contract_allowed && ! empty( $handler['can_resolve'] ) && is_callable( $handler['can_resolve'] ) ) {
-			$allowed = call_user_func( $handler['can_resolve'], $payload, $decision_value, $user_id );
+			$allowed = call_user_func( $handler['can_resolve'], $payload, $decision_value, $user_id, $resolver_context );
 			if ( is_wp_error( $allowed ) ) {
 				return array(
 					'success'   => false,
@@ -359,7 +360,7 @@ class ResolvePendingActionAbility {
 		 *
 		 *   array(
 		 *       'apply'       => callable ( array $apply_input, array $payload ): mixed,
-		 *       'can_resolve' => callable ( array $payload, string $decision, int $user_id ): bool|WP_Error,
+		 *       'can_resolve' => callable ( array $payload, string $decision, int $user_id, array $context ): bool|WP_Error,
 		 *   )
 		 *
 		 * @since 0.72.0
