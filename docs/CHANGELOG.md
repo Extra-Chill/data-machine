@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.126.0] - 2026-05-20
+
+### Added
+- dispatch pending action lifecycle observers
+
 ## [0.125.0] - 2026-05-20
 
 ### Added
