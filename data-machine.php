@@ -313,7 +313,9 @@ function datamachine_run_datamachine_plugin() {
 	// ActionPolicy + unified pending-action resolver. Content abilities register
 	// themselves on `datamachine_pending_action_handlers` via
 	// inc/Abilities/Content/ContentActionHandlers.php (required above).
-	\DataMachine\Engine\AI\Actions\PendingActionObservers::register( new \DataMachine\Engine\AI\Actions\WordPressActionDispatchObserver() );
+	if ( interface_exists( '\AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Observer' ) ) {
+		\DataMachine\Engine\AI\Actions\PendingActionObservers::register( new \DataMachine\Engine\AI\Actions\WordPressActionDispatchObserver() );
+	}
 	new \DataMachine\Engine\AI\Actions\PendingActionInspectionAbility();
 	new \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility();
 	new \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility();
