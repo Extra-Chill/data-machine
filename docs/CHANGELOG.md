@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.125.0] - 2026-05-20
+
+### Added
+- expose composable section provenance
+
 ## [0.124.9] - 2026-05-19
 
 ### Fixed
