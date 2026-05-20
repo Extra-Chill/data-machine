@@ -300,6 +300,95 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 	}
 
 	// -------------------------------------------------------------------------
+	// Policy-resolved account context API
+	// -------------------------------------------------------------------------
+
+	public function test_get_account_for_context_returns_null_when_no_account(): void {
+		$this->assertNull( $this->provider->get_account_for_context() );
+	}
+
+	public function test_get_account_for_context_reads_site_account_by_default(): void {
+		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
+
+		$this->assertSame( 'tok_site', $this->provider->get_account_for_context()['access_token'] );
+	}
+
+	public function test_get_account_for_context_preserves_site_policy_for_user_context(): void {
+		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
+		$this->provider->save_account_for_user( 42, array( 'access_token' => 'tok_user_42' ) );
+
+		$this->assertSame( 'tok_site', $this->provider->get_account_for_context( array( 'user_id' => 42 ) )['access_token'] );
+	}
+
+	public function test_get_account_for_context_resolves_user_policy(): void {
+		add_filter(
+			'datamachine_auth_scope_policy',
+			function () {
+				return BaseAuthProvider::AUTH_SCOPE_USER;
+			}
+		);
+
+		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
+		$this->provider->save_account_for_user( 42, array( 'access_token' => 'tok_user_42' ) );
+
+		$this->assertSame( 'tok_user_42', $this->provider->get_account_for_context( array( 'user_id' => 42 ) )['access_token'] );
+
+		remove_all_filters( 'datamachine_auth_scope_policy' );
+	}
+
+	public function test_get_account_for_context_resolves_agent_before_user_for_principal_policy(): void {
+		add_filter(
+			'datamachine_auth_scope_policy',
+			function () {
+				return BaseAuthProvider::AUTH_SCOPE_PRINCIPAL;
+			}
+		);
+
+		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
+		$this->provider->save_account_for_user( 42, array( 'access_token' => 'tok_user_42' ) );
+		$this->provider->save_account_for_agent( 303, array( 'access_token' => 'tok_agent_303' ) );
+
+		$account = $this->provider->get_account_for_context(
+			array(
+				'user_id'  => 42,
+				'agent_id' => 303,
+			)
+		);
+
+		$this->assertSame( 'tok_agent_303', $account['access_token'] );
+
+		remove_all_filters( 'datamachine_auth_scope_policy' );
+	}
+
+	public function test_get_account_for_context_falls_back_to_site_account_when_scoped_account_missing(): void {
+		add_filter(
+			'datamachine_auth_scope_policy',
+			function () {
+				return BaseAuthProvider::AUTH_SCOPE_USER;
+			}
+		);
+
+		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
+
+		$this->assertSame( 'tok_site', $this->provider->get_account_for_context( array( 'user_id' => 42 ) )['access_token'] );
+
+		remove_all_filters( 'datamachine_auth_scope_policy' );
+	}
+
+	public function test_get_account_for_context_returns_null_when_policy_scoped_and_no_fallback_exists(): void {
+		add_filter(
+			'datamachine_auth_scope_policy',
+			function () {
+				return BaseAuthProvider::AUTH_SCOPE_USER;
+			}
+		);
+
+		$this->assertNull( $this->provider->get_account_for_context( array( 'user_id' => 42 ) ) );
+
+		remove_all_filters( 'datamachine_auth_scope_policy' );
+	}
+
+	// -------------------------------------------------------------------------
 	// Per-user account API
 	// -------------------------------------------------------------------------
 

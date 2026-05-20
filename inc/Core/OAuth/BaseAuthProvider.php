@@ -314,6 +314,38 @@ abstract class BaseAuthProvider {
 	}
 
 	/**
+	 * Get the OAuth account that applies to an execution context.
+	 *
+	 * This is the explicit policy-resolved account lookup. It preserves the
+	 * existing `get_account( array $context )` scope resolution and site fallback
+	 * semantics while returning `null` when no account is available.
+	 *
+	 * @since 0.130.0
+	 *
+	 * @param array $context Optional principal context, e.g. user_id or agent_id.
+	 * @return array|null Decrypted account data, or null if no account resolves.
+	 */
+	public function get_account_for_context( array $context = array() ): ?array {
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		$provider_data = $all_auth_data[ $this->provider_slug ] ?? array();
+		$scope         = $this->get_principal_scope( $context, 'account' );
+
+		if ( null !== $scope ) {
+			$scoped_account = $provider_data['principals'][ $scope ]['account'] ?? array();
+			if ( ! empty( $scoped_account ) && is_array( $scoped_account ) ) {
+				return $this->decrypt_fields( $scoped_account );
+			}
+		}
+
+		$account = $provider_data['account'] ?? array();
+		if ( ! is_array( $account ) || empty( $account ) ) {
+			return null;
+		}
+
+		return $this->decrypt_fields( $account );
+	}
+
+	/**
 	 * Get OAuth configuration keys directly from options.
 	 *
 	 * Automatically decrypts any encrypted fields. Plaintext legacy values
