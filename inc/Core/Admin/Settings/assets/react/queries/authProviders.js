@@ -19,8 +19,10 @@ export const AUTH_PROVIDERS_KEY = [ 'authProviders' ];
 
 /**
  * Fetch all registered auth providers with status
+ *
+ * @param {Object} options TanStack Query options.
  */
-export const useAuthProviders = () => {
+export const useAuthProviders = ( options = {} ) => {
 	return useQuery( {
 		queryKey: AUTH_PROVIDERS_KEY,
 		queryFn: async () => {
@@ -33,6 +35,7 @@ export const useAuthProviders = () => {
 			return response.data;
 		},
 		staleTime: 30 * 1000,
+		...options,
 	} );
 };
 

@@ -19,6 +19,7 @@ import GeneralTab from './components/tabs/GeneralTab';
 import ApiKeysTab from './components/tabs/ApiKeysTab';
 import HandlerDefaultsTab from './components/tabs/HandlerDefaultsTab';
 import AuthProvidersTab from './components/tabs/AuthProvidersTab';
+import { useAuthProviders } from './queries/authProviders';
 
 const STORAGE_KEY = 'datamachine_settings_active_tab';
 
@@ -39,20 +40,23 @@ const getInitialTab = () => {
 /**
  * Get OAuth callback feedback from URL query params.
  *
- * @returns {Object|null} Feedback object or null if no OAuth params present.
+ * @return {Object|null} Feedback object or null if no OAuth params present.
  */
 const getOAuthFeedbackFromUrl = () => {
 	const urlParams = new URLSearchParams( window.location.search );
 	const authSuccess = urlParams.get( 'auth_success' );
 	const authError = urlParams.get( 'auth_error' );
-	const provider = urlParams.get( 'provider' );
 
 	if ( ! authSuccess && ! authError ) {
 		return null;
 	}
 
+	const provider = urlParams.get( 'provider' );
+
 	if ( authSuccess ) {
 		return {
+			code: 'success',
+			provider,
 			type: 'success',
 			message: provider
 				? /* translators: %s: provider name (e.g., Pinterest) */
@@ -73,6 +77,8 @@ const getOAuthFeedbackFromUrl = () => {
 	};
 
 	return {
+		code: authError,
+		provider,
 		type: 'error',
 		message: errorMessages[ authError ] ||
 			/* translators: %s: error code */
@@ -93,13 +99,19 @@ const cleanOAuthParamsFromUrl = () => {
 
 const SettingsApp = () => {
 	const [ activeTab, setActiveTab ] = useState( getInitialTab() );
+	const [ oauthFeedback, setOauthFeedback ] = useState( null );
 	const [ oauthNotice, setOauthNotice ] = useState( null );
+	const shouldReconcileStateError =
+		oauthFeedback?.code === 'invalid_state' && !! oauthFeedback.provider;
+	const { data: authProviders, error: authProvidersError } = useAuthProviders( {
+		enabled: shouldReconcileStateError,
+	} );
 
 	// Handle OAuth callback feedback on mount.
 	useEffect( () => {
 		const feedback = getOAuthFeedbackFromUrl();
 		if ( feedback ) {
-			setOauthNotice( feedback );
+			setOauthFeedback( feedback );
 			// Auto-switch to Auth Providers tab.
 			setActiveTab( 'auth-providers' );
 			localStorage.setItem( STORAGE_KEY, 'auth-providers' );
@@ -107,6 +119,44 @@ const SettingsApp = () => {
 			cleanOAuthParamsFromUrl();
 		}
 	}, [] );
+
+	useEffect( () => {
+		if ( ! oauthFeedback ) {
+			return;
+		}
+
+		if ( oauthFeedback.code !== 'invalid_state' || ! oauthFeedback.provider ) {
+			setOauthNotice( oauthFeedback );
+			return;
+		}
+
+		if ( ! authProviders && ! authProvidersError ) {
+			return;
+		}
+
+		const connectedProvider = authProviders?.find(
+			( provider ) =>
+				provider.provider_key === oauthFeedback.provider &&
+				provider.is_authenticated
+		);
+		const connectedProviderName =
+			connectedProvider?.label || oauthFeedback.provider;
+		const connectedMessage = sprintf(
+			/* translators: %s: provider name (e.g., Pinterest) */
+			__( 'Successfully connected to %s.', 'data-machine' ),
+			connectedProviderName
+		);
+
+		setOauthNotice(
+			connectedProvider
+				? {
+						...oauthFeedback,
+						type: 'success',
+						message: connectedMessage,
+				  }
+				: oauthFeedback
+		);
+	}, [ oauthFeedback, authProviders, authProvidersError ] );
 
 	const handleSelect = useCallback( ( tabName ) => {
 		setActiveTab( tabName );
