@@ -14,7 +14,7 @@ The Settings page is a React admin interface built with `@wordpress/element` and
 
 ## Overview
 
-Settings endpoints manage tool configuration for Data Machine.
+Settings endpoints manage Data Machine core and extension tool configuration.
 
 ## Authentication
 
@@ -29,25 +29,25 @@ Save configuration for a specific tool.
 **Permission**: `manage_settings`
 
 **Parameters**:
-- `tool_id` (string, required): Tool identifier (in URL path) - e.g., `google_search`
+- `tool_id` (string, required): Tool identifier (in URL path) - e.g., `image_generation`
 - `config_data` (object, required): Tool configuration fields as key-value pairs
 
 **Tool Configuration Storage**:
 - Delegates to `datamachine_save_tool_config` action for tool-specific handlers
 - Each tool implements its own configuration storage mechanism
-- Example: Google Search stores in `datamachine_search_config` site option
+- Extension tools may implement their own site options and adoption paths.
 
 **Example Request**:
 
 ```bash
-# Save Google Search configuration
-curl -X POST https://example.com/wp-json/datamachine/v1/settings/tools/google_search \
+# Save Image Generation configuration
+curl -X POST https://example.com/wp-json/datamachine/v1/settings/tools/image_generation \
   -H "Content-Type: application/json" \
   -u username:application_password \
   -d '{
     "config_data": {
-      "api_key": "AIzaSyC1234567890abcdef",
-      "search_engine_id": "012345678901234567890:abcdefg"
+      "provider": "openai",
+      "api_key": "sk-example"
     }
   }'
 ```
@@ -122,8 +122,7 @@ curl -X POST https://example.com/wp-json/datamachine/v1/settings \
 ```
 
 **Supported Tools**:
-- `google_search` - Google Search API configuration (api_key, search_engine_id)
-- Additional tools can register handlers via `datamachine_save_tool_config` action
+- Core tools and extension tools can register handlers via `datamachine_save_tool_config`.
 
 ## Handler Defaults
 
@@ -205,28 +204,6 @@ curl -X PUT https://example.com/wp-json/datamachine/v1/settings/handler-defaults
 
 ## Tool Configuration
 
-### Google Search
-
-Configure Google Custom Search API for web search functionality.
-
-**Required Fields**:
-- `api_key` (string): Google API key with Custom Search API enabled
-- `search_engine_id` (string): Custom Search Engine ID
-
-**Example Configuration**:
-
-```bash
-curl -X POST https://example.com/wp-json/datamachine/v1/settings/tools/google_search \
-  -H "Content-Type: application/json" \
-  -u username:application_password \
-  -d '{
-    "config_data": {
-      "api_key": "AIzaSyC1234567890abcdef",
-      "search_engine_id": "012345678901234567890:abcdefg"
-    }
-  }'
-```
-
 ### Custom Tools
 
 Tools can register configuration handlers via the `datamachine_save_tool_config` action:
@@ -247,13 +224,12 @@ add_action('datamachine_save_tool_config', function($tool_id, $config_data) {
 import requests
 from requests.auth import HTTPBasicAuth
 
-url = "https://example.com/wp-json/datamachine/v1/settings/tools/google_search"
+url = "https://example.com/wp-json/datamachine/v1/settings/tools/my_custom_tool"
 auth = HTTPBasicAuth("username", "application_password")
 
 config = {
     "config_data": {
-        "api_key": "AIzaSyC1234567890abcdef",
-        "search_engine_id": "012345678901234567890:abcdefg"
+        "api_key": "example-api-key"
     }
 }
 
@@ -290,9 +266,8 @@ async function configureTool(toolId, configData) {
 }
 
 // Usage
-const configured = await configureTool('google_search', {
-  api_key: 'AIzaSyC1234567890abcdef',
-  search_engine_id: '012345678901234567890:abcdefg'
+const configured = await configureTool('my_custom_tool', {
+  api_key: 'example-api-key'
 });
 console.log(`Tool configured: ${configured}`);
 ```

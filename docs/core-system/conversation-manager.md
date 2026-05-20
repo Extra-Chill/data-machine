@@ -59,7 +59,7 @@ public static function formatToolCallMessage(
 ```
 
 **Parameters**:
-- `$tool_name` (string) - Tool identifier (e.g., `google_search`, `wordpress_publish`)
+- `$tool_name` (string) - Tool identifier (e.g., `local_search`, `wordpress_publish`)
 - `$tool_parameters` (array) - Tool call parameters
 - `$turn_count` (int) - Current conversation turn (0 = no turn display)
 
@@ -75,11 +75,11 @@ AI ACTION (Turn {$turn_count}): Executing {Tool Display Name} with parameters: k
 **Example**:
 ```php
 $message = ConversationManager::formatToolCallMessage(
-    'google_search',
+    'local_search',
     ['query' => 'WordPress best practices', 'num_results' => 5],
     1
 );
-// Returns: ['role' => 'assistant', 'content' => 'AI ACTION (Turn 1): Executing Google Search with parameters: query: WordPress best practices, num_results: 5']
+// Returns: ['role' => 'assistant', 'content' => 'AI ACTION (Turn 1): Executing Local Search with parameters: query: WordPress best practices, num_results: 5']
 ```
 
 **Integration**: Used by AIConversationLoop during multi-turn conversation execution
@@ -145,7 +145,7 @@ $search_result = [
 ];
 
 $message2 = ConversationManager::formatToolResultMessage(
-    'google_search',
+    'local_search',
     $search_result,
     ['query' => 'test'],
     false, // not a handler tool
@@ -236,10 +236,10 @@ TOOL FAILED: {Tool Display Name} execution failed - {error_message}. Please revi
 **Example**:
 ```php
 $message = ConversationManager::generateFailureMessage(
-    'google_search',
-    'API quota exceeded'
+    'local_search',
+    'Search index unavailable'
 );
-// Returns: "TOOL FAILED: Google Search execution failed - API quota exceeded. Please review the error and adjust your approach if needed."
+// Returns: "TOOL FAILED: Local Search execution failed - Search index unavailable. Please review the error and adjust your approach if needed."
 ```
 
 ---
@@ -276,19 +276,19 @@ public static function validateToolCall(
 ```php
 $conversation = [
     ['role' => 'user', 'content' => 'Search for WordPress'],
-    ['role' => 'assistant', 'content' => 'AI ACTION (Turn 1): Executing Google Search with parameters: query: WordPress, num_results: 5'],
+    ['role' => 'assistant', 'content' => 'AI ACTION (Turn 1): Executing Local Search with parameters: query: WordPress, num_results: 5'],
     ['role' => 'user', 'content' => 'TOOL RESPONSE (Turn 1): ...']
 ];
 
 $validation = ConversationManager::validateToolCall(
-    'google_search',
+    'local_search',
     ['query' => 'WordPress', 'num_results' => 5],
     $conversation
 );
-// Returns: ['is_duplicate' => true, 'message' => 'You just called the google_search tool with the exact same parameters...']
+// Returns: ['is_duplicate' => true, 'message' => 'You just called the local_search tool with the exact same parameters...']
 
 $validation2 = ConversationManager::validateToolCall(
-    'google_search',
+    'local_search',
     ['query' => 'WordPress plugins', 'num_results' => 5],
     $conversation
 );
@@ -325,12 +325,12 @@ public static function extractToolCallFromMessage(array $message): ?array
 ```php
 $message = [
     'role' => 'assistant',
-    'content' => 'AI ACTION (Turn 1): Executing Google Search with parameters: query: WordPress, num_results: 5'
+    'content' => 'AI ACTION (Turn 1): Executing Local Search with parameters: query: WordPress, num_results: 5'
 ];
 
 $extracted = ConversationManager::extractToolCallFromMessage($message);
 // Returns: [
-//     'tool_name' => 'google_search',
+//     'tool_name' => 'local_search',
 //     'parameters' => ['query' => 'WordPress', 'num_results' => 5]
 // ]
 ```
@@ -370,7 +370,7 @@ public static function generateDuplicateToolCallMessage(
 **Example**:
 ```php
 // Chat: AI is told the task is done.
-$msg = ConversationManager::generateDuplicateToolCallMessage('google_search');
+$msg = ConversationManager::generateDuplicateToolCallMessage('local_search');
 
 // Pipeline: AI is told to move on to the publish handler.
 $msg = ConversationManager::generateDuplicateToolCallMessage(
@@ -513,7 +513,7 @@ $conversation = [...]; // Full conversation history
 
 // Validate before execution
 $validation = ConversationManager::validateToolCall(
-    'google_search',
+    'local_search',
     ['query' => 'test'],
     $conversation
 );

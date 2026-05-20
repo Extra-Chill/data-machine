@@ -19,7 +19,6 @@ use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\AI\Tools\Global\AgentMemory;
 use DataMachine\Engine\AI\Tools\Global\BingWebmaster;
 use DataMachine\Engine\AI\Tools\Global\GoogleAnalytics;
-use DataMachine\Engine\AI\Tools\Global\GoogleSearch;
 use DataMachine\Engine\AI\Tools\Global\GoogleSearchConsole;
 use DataMachine\Engine\AI\Tools\Global\PageSpeed;
 use DataMachine\Engine\AI\Tools\Global\ImageGeneration;
@@ -86,7 +85,6 @@ class ToolServiceProvider {
 		new AgentMemory();
 		new BingWebmaster();
 		new GoogleAnalytics();
-		new GoogleSearch();
 		new GoogleSearchConsole();
 		new PageSpeed();
 		new ImageGeneration();

@@ -145,7 +145,7 @@ Runtime requests may activate multiple modes at once, for example `['pipeline', 
 ```php
 $manager = new ToolManager();
 
-if ( $manager->is_tool_available( 'google_search' ) ) {
+if ( $manager->is_tool_available( 'local_search' ) ) {
     // The static registry source may include it, subject to mode and policy.
 }
 ```

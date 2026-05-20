@@ -96,10 +96,10 @@ $tool_manager = new ToolManager();
 $global_tools = $tool_manager->get_all_tools();
 
 // Check tool availability (includes enablement and configuration)
-$is_available = $tool_manager->is_tool_available('google_search', $step_context_id);
+$is_available = $tool_manager->is_tool_available('local_search', $step_context_id);
 
 // Configuration checking
-$is_configured = $tool_manager->is_tool_configured('google_search');
+$is_configured = $tool_manager->is_tool_configured('local_search');
 
 // WordPress-native tools (no config needed)
 $opt_out_tools = $tool_manager->get_opt_out_defaults();
@@ -161,18 +161,18 @@ Unified abstract base class for all AI tools (global and chat) that provides sta
 ```php
 use DataMachine\Engine\AI\Tools\BaseTool;
 
-class GoogleSearch extends BaseTool {
+class ExternalLookup extends BaseTool {
 
     public function __construct() {
-        $this->registerGlobalTool('google_search', [$this, 'getToolDefinition']);
-        $this->registerConfigurationHandlers('google_search');
+        $this->registerTool('external_lookup', [$this, 'getToolDefinition'], ['chat', 'pipeline'], ['access_level' => 'admin']);
+        $this->registerConfigurationHandlers('external_lookup');
     }
 
     public function getToolDefinition(): array {
         return [
             'class' => self::class,
             'method' => 'handle_tool_call',
-            'description' => 'Search the web using Google Custom Search API',
+            'description' => 'Look up data from an external service',
             'parameters' => [
                 'query' => ['type' => 'string', 'description' => 'Search query'],
             ]
@@ -184,7 +184,6 @@ class GoogleSearch extends BaseTool {
 #### Tools Using BaseTool
 
 **Global Tools:**
-- **GoogleSearch** - Web search with Custom Search API
 - **LocalSearch** - WordPress internal search
 - **WebFetch** - Web page content retrieval
 - **WordPressPostReader** - Single post analysis
