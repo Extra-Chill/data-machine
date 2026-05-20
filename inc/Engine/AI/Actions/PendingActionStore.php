@@ -206,7 +206,12 @@ class PendingActionStore {
 			$payload['action_id']  = $action_id;
 			$payload['status']     = WP_Agent_Pending_Action_Status::PENDING;
 
-			return set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) );
+			$stored = set_transient( self::TRANSIENT_PREFIX . $action_id, $payload, self::resolve_ttl( $payload ) );
+			if ( $stored ) {
+				self::dispatch_stored_payload( $payload );
+			}
+
+			return $stored;
 		}
 
 		$now        = time();
@@ -248,6 +253,9 @@ class PendingActionStore {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$stored = $wpdb->replace( self::get_table_name(), $row, $formats );
+		if ( false !== $stored ) {
+			self::dispatch_stored_payload( $payload );
+		}
 
 		return false !== $stored;
 	}
@@ -321,13 +329,23 @@ class PendingActionStore {
 		global $wpdb;
 
 		if ( ! self::has_database() ) {
-			return delete_transient( self::TRANSIENT_PREFIX . $action_id );
+			$payload = get_transient( self::TRANSIENT_PREFIX . $action_id );
+			$action  = is_array( $payload ) ? self::action_from_payload( $payload ) : null;
+			$deleted = delete_transient( self::TRANSIENT_PREFIX . $action_id );
+			if ( $deleted && null !== $action ) {
+				self::dispatch_resolution( $action, $decision, $resolver ?? self::current_resolver() );
+			}
+
+			return $deleted;
 		}
 
 		$status = self::normalize_status( $decision );
 		if ( '' === $status ) {
 			return false;
 		}
+
+		$row    = self::get_row( $action_id );
+		$action = is_array( $row ) ? self::action_from_payload( self::row_to_payload( $row ) ) : null;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$updated = $wpdb->update(
@@ -345,6 +363,11 @@ class PendingActionStore {
 			array( '%s', '%s', '%d', '%s', '%s', '%s', '%s' ),
 			array( '%s' )
 		);
+
+		if ( false !== $updated && null !== $action ) {
+			$resolved_action = self::get_action( $action_id, true ) ?? $action;
+			self::dispatch_resolution( $resolved_action, $status, $resolver ?? self::current_resolver() );
+		}
 
 		return false !== $updated;
 	}
@@ -464,20 +487,25 @@ class PendingActionStore {
 
 		$boundary = null !== $before ? gmdate( 'Y-m-d H:i:s', self::normalize_timestamp( $before ) ) : current_time( 'mysql', true );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$updated = $wpdb->query(
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
+		$action_ids = $wpdb->get_col(
 			$wpdb->prepare(
-				'UPDATE %i SET status = %s, resolved_at = %s, resolution_error = %s WHERE status = %s AND expires_at IS NOT NULL AND expires_at <= %s',
+				'SELECT action_id FROM %i WHERE status = %s AND expires_at IS NOT NULL AND expires_at <= %s',
 				self::get_table_name(),
-				WP_Agent_Pending_Action_Status::EXPIRED,
-				$boundary,
-				'Pending action expired.',
 				WP_Agent_Pending_Action_Status::PENDING,
 				$boundary
 			)
 		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
 
-		return false === $updated ? 0 : (int) $updated;
+		$expired = 0;
+		foreach ( (array) $action_ids as $action_id ) {
+			if ( self::record_resolution( (string) $action_id, WP_Agent_Pending_Action_Status::EXPIRED, null, 'Pending action expired.', 'system:expiration' ) ) {
+				++$expired;
+			}
+		}
+
+		return $expired;
 	}
 
 	/**
@@ -658,6 +686,48 @@ class PendingActionStore {
 			'resolution_metadata' => isset( $payload['resolution_metadata'] ) && is_array( $payload['resolution_metadata'] ) ? $payload['resolution_metadata'] : array(),
 			'metadata'            => $metadata,
 		);
+	}
+
+	/**
+	 * Dispatch a stored lifecycle event from a Data Machine payload.
+	 */
+	private static function dispatch_stored_payload( array $payload ): void {
+		$action = self::action_from_payload( $payload );
+		if ( null !== $action ) {
+			PendingActionObservers::dispatch_stored( $action );
+		}
+	}
+
+	/**
+	 * Dispatch terminal lifecycle events that have observer contracts.
+	 */
+	private static function dispatch_resolution( WP_Agent_Pending_Action $action, string $status, string $resolver ): void {
+		if ( WP_Agent_Pending_Action_Status::EXPIRED === $status ) {
+			PendingActionObservers::dispatch_expired( $action );
+			return;
+		}
+
+		if ( ! in_array( $status, array( WP_Agent_Approval_Decision::ACCEPTED, WP_Agent_Approval_Decision::REJECTED ), true ) ) {
+			return;
+		}
+
+		try {
+			PendingActionObservers::dispatch_resolved( $action, WP_Agent_Approval_Decision::from_string( $status ), $resolver );
+		} catch ( \InvalidArgumentException $error ) {
+			unset( $error );
+		}
+	}
+
+	/**
+	 * Convert a payload to an observer-safe Agents API value object.
+	 */
+	private static function action_from_payload( array $payload ): ?WP_Agent_Pending_Action {
+		try {
+			return WP_Agent_Pending_Action::from_array( self::payload_to_action_array( $payload ) );
+		} catch ( \InvalidArgumentException $error ) {
+			unset( $error );
+			return null;
+		}
 	}
 
 	/**

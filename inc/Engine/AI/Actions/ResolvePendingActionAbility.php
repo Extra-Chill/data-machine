@@ -244,7 +244,6 @@ class ResolvePendingActionAbility {
 			// No handler registered — can't apply, but reject is still safe.
 			if ( $decision->is_rejected() ) {
 				PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::REJECTED, null, null, $resolver, array( 'reason' => 'no_handler_rejected' ) );
-				self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, null );
 				return array(
 					'success'   => true,
 					'decision'  => 'rejected',
@@ -302,7 +301,6 @@ class ResolvePendingActionAbility {
 
 		if ( $decision->is_rejected() ) {
 			PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::REJECTED, null, null, $resolver );
-			self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, null );
 			return array(
 				'success'   => true,
 				'decision'  => 'rejected',
@@ -316,7 +314,6 @@ class ResolvePendingActionAbility {
 
 		if ( is_wp_error( $result ) ) {
 			PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::ACCEPTED, null, $result->get_error_message(), $resolver );
-			self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, $result );
 			return array(
 				'success'   => false,
 				'decision'  => 'accepted',
@@ -328,7 +325,6 @@ class ResolvePendingActionAbility {
 
 		if ( is_array( $result ) && array_key_exists( 'success', $result ) && false === $result['success'] ) {
 			PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::ACCEPTED, $result, $result['error'] ?? 'Apply handler reported failure.', $resolver );
-			self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, $result );
 			return array(
 				'success'   => false,
 				'decision'  => 'accepted',
@@ -340,7 +336,6 @@ class ResolvePendingActionAbility {
 		}
 
 		PendingActionStore::record_resolution( $action_id, WP_Agent_Pending_Action_Status::ACCEPTED, $result, null, $resolver );
-		self::fireResolvedAction( $decision_value, $action_id, $kind, $payload, $result );
 
 		return array(
 			'success'   => true,
@@ -456,30 +451,5 @@ class ResolvePendingActionAbility {
 	private static function resolverFromCurrentUser(): string {
 		$user_id = get_current_user_id();
 		return $user_id > 0 ? 'user:' . $user_id : 'system:anonymous';
-	}
-
-	/**
-	 * Fire the post-resolution action.
-	 *
-	 * @param string     $decision  accepted|rejected.
-	 * @param string     $action_id Action ID.
-	 * @param string     $kind      Kind.
-	 * @param array      $payload   Stored payload.
-	 * @param mixed|null $result    Apply result (for accepted) or null.
-	 * @return void
-	 */
-	private static function fireResolvedAction( string $decision, string $action_id, string $kind, array $payload, $result ): void {
-		/**
-		 * Fires after a pending action has been resolved.
-		 *
-		 * @since 0.72.0
-		 *
-		 * @param string     $decision  accepted|rejected.
-		 * @param string     $action_id Action ID.
-		 * @param string     $kind      Kind.
-		 * @param array      $payload   Stored payload (pre-deletion).
-		 * @param mixed|null $result    Apply result (for accepted) or null.
-		 */
-		do_action( 'datamachine_pending_action_resolved', $decision, $action_id, $kind, $payload, $result );
 	}
 }
