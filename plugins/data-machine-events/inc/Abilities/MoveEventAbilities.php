@@ -104,12 +104,7 @@ class MoveEventAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
-					// TODO(#288): swap to the team-member permission helper introduced
-					// by the permission_callback audit. For now use manage_options to
-					// match the rest of the EC-events surface.
-					'permission_callback' => function () {
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => AbilityPermissions::canWrite(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
