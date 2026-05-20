@@ -232,6 +232,12 @@ Operators who want explicit key isolation can rotate `AUTH_KEY` to force
 re-encryption on next save (but be aware that doing so invalidates any
 encrypted values not re-saved).
 
+The account API is moving toward explicit named scope methods so vendor
+plugins can choose site, user, agent, or policy-resolved credentials without
+relying on context-array fallback semantics. See
+[OAuth Account Scope API](../architecture/oauth-account-scope-api.md) for the
+proposed migration path.
+
 ### BaseOAuth1Provider
 
 **Location**: `/inc/Core/OAuth/BaseOAuth1Provider.php`
