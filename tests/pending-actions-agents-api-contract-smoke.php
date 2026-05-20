@@ -39,6 +39,7 @@ function datamachine_pending_actions_source( string $path ): string {
 $store_source       = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/PendingActionStore.php' );
 $observers_source   = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/PendingActionObservers.php' );
 $wp_observer_source = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/WordPressActionDispatchObserver.php' );
+$signer_source      = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/SignPendingActionResolutionAbility.php' );
 $adapter_source     = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/PendingActionStoreAdapter.php' );
 $resolver_adapter   = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/PendingActionResolverAdapter.php' );
 $resolver_source    = datamachine_pending_actions_source( 'inc/Engine/AI/Actions/ResolvePendingActionAbility.php' );
@@ -125,6 +126,9 @@ datamachine_pending_actions_assert( str_contains( $resolver_source, 'can_resolve
 datamachine_pending_actions_assert( str_contains( $plugin_source, 'new \\DataMachine\\Engine\\AI\\Actions\\ResolvePendingActionAbility();' ), 'existing resolve ability remains registered', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $plugin_source, 'new \\DataMachine\\Engine\\AI\\Actions\\ResolvePendingAction();' ), 'existing chat resolver tool remains registered', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $plugin_source, 'PendingActionObservers::register' ) && str_contains( $plugin_source, 'WordPressActionDispatchObserver' ), 'default WordPress pending-action observer is registered during bootstrap', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $plugin_source, 'new \\DataMachine\\Engine\\AI\\Actions\\SignPendingActionResolutionAbility();' ), 'signed pending-action resolution ability is registered', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $signer_source, 'datamachine/sign-pending-action-resolution' ) && str_contains( $signer_source, '/actions/resolve-by-token' ), 'signed pending-action resolution exposes ability and public token route', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $signer_source, 'hash_hmac' ) && str_contains( $signer_source, 'datamachine_pending_action_resolution_secret' ), 'signed pending-action resolution uses a stored HMAC secret', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $runtime_source, 'datamachine_migrate_pending_actions_table' ), 'upgrade path creates pending-action table on deployed installs', $failures, $passes );
 
 echo "\n[5] Store contract adapter preserves transient fallback behavior:\n";

@@ -315,6 +315,7 @@ function datamachine_run_datamachine_plugin() {
 	// inc/Abilities/Content/ContentActionHandlers.php (required above).
 	\DataMachine\Engine\AI\Actions\PendingActionObservers::register( new \DataMachine\Engine\AI\Actions\WordPressActionDispatchObserver() );
 	new \DataMachine\Engine\AI\Actions\PendingActionInspectionAbility();
+	new \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility();
 	new \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility();
 	new \DataMachine\Engine\AI\Actions\ResolvePendingAction();
 
