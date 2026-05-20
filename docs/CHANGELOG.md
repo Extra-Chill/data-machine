@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.127.11] - 2026-05-20
+
+### Fixed
+- summarize all matching pending actions
+
 ## [0.127.10] - 2026-05-20
 
 ### Changed
