@@ -63,9 +63,7 @@ class MergeEventPostsAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'execute' ),
-					'permission_callback' => function () {
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => AbilityPermissions::canWrite(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

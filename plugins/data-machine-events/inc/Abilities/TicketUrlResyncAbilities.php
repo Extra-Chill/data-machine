@@ -88,9 +88,7 @@ class TicketUrlResyncAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeResync' ),
-					'permission_callback' => function () {
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => AbilityPermissions::canWrite(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

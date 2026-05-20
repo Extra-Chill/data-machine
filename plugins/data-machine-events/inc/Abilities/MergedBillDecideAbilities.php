@@ -61,9 +61,7 @@ class MergedBillDecideAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeInspect' ),
-					'permission_callback' => function () {
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => AbilityPermissions::canWrite(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -98,9 +96,7 @@ class MergedBillDecideAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeDecide' ),
-					'permission_callback' => function () {
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => AbilityPermissions::canWrite(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

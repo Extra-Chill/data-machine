@@ -70,9 +70,7 @@ class MetaSyncAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeFindMissingMetaSync' ),
-					'permission_callback' => function () {
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => AbilityPermissions::canWrite(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -131,9 +129,7 @@ class MetaSyncAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeResyncEventMeta' ),
-					'permission_callback' => function () {
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => AbilityPermissions::canWrite(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

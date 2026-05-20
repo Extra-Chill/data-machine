@@ -95,9 +95,7 @@ class EncodingFixAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeEncodingFix' ),
-					'permission_callback' => function () {
-						return current_user_can( 'manage_options' );
-					},
+					'permission_callback' => AbilityPermissions::canWrite(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

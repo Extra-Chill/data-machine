@@ -325,6 +325,10 @@ class DATAMACHINE_Events {
 		require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/AbilityCategories.php';
 		\DataMachineEvents\Abilities\AbilityCategories::ensure_registered();
 
+		// Shared permission callbacks. Must load before any ability that
+		// references AbilityPermissions::canWrite()/canRead().
+		require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/AbilityPermissions.php';
+
 		// Load chat tools - self-register via ToolRegistrationTrait
 		new \DataMachineEvents\Api\Chat\Tools\VenueHealthCheck();
 		new \DataMachineEvents\Api\Chat\Tools\UpdateVenue();

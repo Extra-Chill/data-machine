@@ -94,9 +94,7 @@ class GeocodingAbilities {
 					),
 				),
 				'execute_callback'    => array( $this, 'executeGeocodeAddress' ),
-				'permission_callback' => function () {
-					return current_user_can( 'manage_options' ) || ( defined( 'WP_CLI' ) && WP_CLI );
-				},
+				'permission_callback' => AbilityPermissions::canWrite(),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
 		);
@@ -306,9 +304,7 @@ class GeocodingAbilities {
 					),
 				),
 				'execute_callback'    => array( $this, 'executeGeocodeVenues' ),
-				'permission_callback' => function () {
-					return current_user_can( 'manage_options' ) || ( defined( 'WP_CLI' ) && WP_CLI );
-				},
+				'permission_callback' => AbilityPermissions::canWrite(),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
 		);
@@ -483,9 +479,7 @@ class GeocodingAbilities {
 					),
 				),
 				'execute_callback'    => array( $this, 'executeAuditVenues' ),
-				'permission_callback' => function () {
-					return current_user_can( 'manage_options' ) || ( defined( 'WP_CLI' ) && WP_CLI );
-				},
+				'permission_callback' => AbilityPermissions::canWrite(),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
 		);
