@@ -61,6 +61,9 @@ function datamachine_business_load_handlers() {
 	new \DataMachineBusiness\Abilities\GoogleDrive\FetchGoogleDriveAbility();
 	new \DataMachineBusiness\Handlers\GoogleDrive\GoogleDriveFetch();
 
+	// Google Custom Search API tool.
+	new \DataMachineBusiness\Tools\GoogleSearch();
+
 	// Slack
 	new \DataMachineBusiness\Abilities\Slack\PostMessageSlackAbility();
 	new \DataMachineBusiness\Abilities\Slack\FetchMessagesSlackAbility();
