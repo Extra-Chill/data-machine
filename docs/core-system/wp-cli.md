@@ -506,7 +506,10 @@ wp datamachine auth status wordpress-api
 # Connect (OAuth shows URL; direct accepts credentials)
 wp datamachine auth connect google --client_id=xxx --client_secret=xxx
 
-# Disconnect
+# Revoke site-wide credentials
+wp datamachine auth revoke google --yes
+
+# Deprecated alias for site-wide revoke
 wp datamachine auth disconnect google --yes
 
 # View or save API config

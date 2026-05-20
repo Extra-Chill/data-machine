@@ -3,7 +3,7 @@
  * WP-CLI Auth Command
  *
  * CLI surface for authentication management operations.
- * Wraps the AuthAbilities layer for status, connect, disconnect, and config.
+ * Wraps the AuthAbilities layer for status, connect, revoke, and config.
  *
  * @package DataMachine\Cli\Commands
  * @since 0.36.0
@@ -141,6 +141,9 @@ class AuthCommand extends BaseCommand {
 	/**
 	 * Disconnect authentication for a handler.
 	 *
+	 * Deprecated alias for `revoke` at site scope. Kept so existing scripts do
+	 * not break during the CLI verb transition.
+	 *
 	 * Clears stored account data (tokens, credentials). Does not remove
 	 * API configuration (client ID, client secret).
 	 *
@@ -154,7 +157,7 @@ class AuthCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     # Disconnect Twitter
+	 *     # Deprecated: use `wp datamachine auth revoke twitter` instead.
 	 *     wp datamachine auth disconnect twitter
 	 *
 	 *     # Disconnect without confirmation
@@ -163,37 +166,9 @@ class AuthCommand extends BaseCommand {
 	 * @subcommand disconnect
 	 */
 	public function disconnect( array $args, array $assoc_args ): void {
-		if ( empty( $args[0] ) ) {
-			WP_CLI::error( 'Handler slug is required.' );
-			return;
-		}
-
-		$handler_slug = sanitize_text_field( $args[0] );
-
-		if ( ! $this->abilities->providerExists( $handler_slug ) ) {
-			WP_CLI::error( sprintf( 'Auth provider "%s" not found.', $handler_slug ) );
-			return;
-		}
-
-		// Check current status.
-		$auth_status = $this->abilities->getAuthStatus( $handler_slug );
-
-		if ( ! $auth_status['authenticated'] ) {
-			WP_CLI::warning( sprintf( '%s is not currently authenticated.', ucfirst( $handler_slug ) ) );
-			return;
-		}
-
-		if ( ! isset( $assoc_args['yes'] ) ) {
-			WP_CLI::confirm( sprintf( 'Disconnect %s? This will clear stored account data.', ucfirst( $handler_slug ) ) );
-		}
-
-		$result = $this->abilities->executeDisconnectAuth( array( 'handler_slug' => $handler_slug ) );
-
-		if ( ! empty( $result['success'] ) ) {
-			WP_CLI::success( $result['message'] ?? sprintf( '%s disconnected.', ucfirst( $handler_slug ) ) );
-		} else {
-			WP_CLI::error( $result['error'] ?? 'Failed to disconnect.' );
-		}
+		WP_CLI::warning( '`disconnect` is deprecated; use `revoke` instead.' );
+		unset( $assoc_args['user'] );
+		$this->revoke( $args, $assoc_args );
 	}
 
 	/**
