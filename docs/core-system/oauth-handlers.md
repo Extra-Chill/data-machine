@@ -35,6 +35,12 @@ public function get_callback_url(): string;
 public function get_site_account(): ?array;
 public function save_site_account(array $account): bool;
 public function delete_site_account(): bool;
+public function get_account_for_user(int $user_id): ?array;
+public function save_account_for_user(int $user_id, array $account): bool;
+public function delete_account_for_user(int $user_id): bool;
+public function get_account_for_agent(int $agent_id): ?array;
+public function save_account_for_agent(int $agent_id, array $account): bool;
+public function delete_account_for_agent(int $agent_id): bool;
 public function get_account(): array;
 public function get_config(): array;
 public function save_account(array $data): bool;
@@ -119,6 +125,23 @@ Every successful resolve emits a `debug`-level entry via the
 `datamachine_log` action with `{ provider, user_id, source }`. Failed
 lookups do not log (they would dwarf real signal during normal "no account
 yet" probes). The token itself is never logged at any level.
+
+### Per-agent account API (@since v0.129.0)
+
+Three concrete methods on `BaseAuthProvider` let callers operate on credentials
+delegated to a specific agent, independent of the site-wide and per-user account
+slots:
+
+```php
+public function get_account_for_agent( int $agent_id ): ?array;
+public function save_account_for_agent( int $agent_id, array $account ): bool;
+public function delete_account_for_agent( int $agent_id ): bool;
+```
+
+These share the same on-disk shape as the principal-scoped API
+(`principals[agent:<id>][account]`), so an account written via either surface is
+readable through the other. Like the per-user API, these methods never consult
+auth scope policy and never fall back to site-wide storage.
 
 #### When to use per-user vs. site-wide credentials
 

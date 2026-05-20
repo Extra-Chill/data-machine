@@ -188,7 +188,8 @@ scope is genuinely delegated to provider policy.
 1. Add this RFC and link it from OAuth handler docs.
 2. Add site-wide named methods and tests in `BaseAuthProvider`. Shipped in
    v0.128.0.
-3. Add agent named methods and tests in `BaseAuthProvider`.
+3. Add agent named methods and tests in `BaseAuthProvider`. Shipped in
+   v0.129.0.
 4. Add `get_account_for_context()` and reduce context-array `get_account()` to
    a deprecated shim for non-empty contexts.
 5. Update internal site-wide callsites to `get_site_account()` /
