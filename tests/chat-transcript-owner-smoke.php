@@ -93,6 +93,20 @@ $assert_true( 'browser' === $browser_owner['owner_type'], 'browser owner keeps b
 $assert_true( 42 === $browser_owner['user_id'], 'browser owner preserves runtime user for reporting' );
 $assert_true( hash( 'sha256', 'browser:browser-session-abc' ) === $browser_owner['owner_key_hash'], 'browser owner hashes scoped key' );
 
+$canonical_owner = ChatTranscriptOwner::resolve_for_request(
+	array(
+		'session_owner' => array(
+			'type'  => 'browser',
+			'key'   => 'browser-session-def',
+			'label' => 'Canonical browser',
+		),
+	),
+	42
+);
+$assert_true( ! is_wp_error( $canonical_owner ), 'canonical session_owner resolves' );
+$assert_true( 'browser' === $canonical_owner['owner_type'], 'canonical session_owner keeps browser type' );
+$assert_true( hash( 'sha256', 'browser:browser-session-def' ) === $canonical_owner['owner_key_hash'], 'canonical session_owner hashes scoped key' );
+
 $public_owner = ChatTranscriptOwner::resolve_for_request(
 	array(
 		'transcript_owner' => array(
