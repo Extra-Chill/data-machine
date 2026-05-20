@@ -1,0 +1,39 @@
+<?php
+/**
+ * Pure-PHP smoke test for empty drain queue run-flow short-circuiting.
+ *
+ * Run with: php tests/run-flow-empty-drain-queue-smoke.php
+ *
+ * @package DataMachine\Tests
+ */
+
+$run_flow_file = __DIR__ . '/../inc/Abilities/Engine/RunFlowAbility.php';
+$run_flow_src  = file_get_contents( $run_flow_file ) ?: '';
+
+$assertions = 0;
+
+function assert_run_flow_empty_drain_true( bool $condition, string $message ): void {
+	global $assertions;
+	++$assertions;
+
+	if ( ! $condition ) {
+		fwrite( STDERR, "FAIL: {$message}\n" );
+		exit( 1 );
+	}
+}
+
+function assert_run_flow_empty_drain_contains( string $needle, string $haystack, string $message ): void {
+	assert_run_flow_empty_drain_true( false !== strpos( $haystack, $needle ), $message );
+}
+
+assert_run_flow_empty_drain_contains( 'use DataMachine\\Abilities\\Flow\\QueueAbility;', $run_flow_src, 'run-flow ability imports queue slot constants' );
+assert_run_flow_empty_drain_contains( '$empty_drain_skip = $this->getEmptyDrainQueueSkip( $flow_config );', $run_flow_src, 'run-flow checks empty drain queues' );
+assert_run_flow_empty_drain_contains( "'reason'     => 'empty_drain_queue'", $run_flow_src, 'empty drain skip returns explicit reason' );
+assert_run_flow_empty_drain_contains( '\'drain\' !== (string) ( $first_step[\'queue_mode\'] ?? \'static\' )', $run_flow_src, 'skip is scoped to drain mode' );
+assert_run_flow_empty_drain_contains( 'QueueAbility::SLOT_CONFIG_PATCH_QUEUE', $run_flow_src, 'skip checks the config patch queue slot' );
+
+$skip_pos       = strpos( $run_flow_src, '$empty_drain_skip = $this->getEmptyDrainQueueSkip( $flow_config );' );
+$create_job_pos = strpos( $run_flow_src, '$job_id = $this->db_jobs->create_job( $job_data );' );
+assert_run_flow_empty_drain_true( false !== $skip_pos && false !== $create_job_pos && $skip_pos < $create_job_pos, 'empty drain queue is skipped before job creation' );
+
+echo "OK ({$assertions} assertions)\n";
