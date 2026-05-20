@@ -10,27 +10,22 @@
 
 namespace DataMachine\Abilities\Taxonomy;
 
-use DataMachine\Abilities\PermissionHelper;
-
 use DataMachine\Core\WordPress\TaxonomyHandler;
 
 defined( 'ABSPATH' ) || exit;
 
-class CreateTaxonomyTermAbility {
+class CreateTaxonomyTermAbility extends AbstractTaxonomyAbility {
 
-	public function __construct() {
-		$this->registerAbility();
+	protected function getAbilityName(): string {
+		return 'datamachine/create-taxonomy-term';
 	}
 
-	private function registerAbility(): void {
-		$register_callback = function () {
-			wp_register_ability(
-				'datamachine/create-taxonomy-term',
-				array(
-					'label'               => __( 'Create Taxonomy Term', 'data-machine' ),
-					'description'         => __( 'Create a new taxonomy term. The term will be created if it does not already exist.', 'data-machine' ),
-					'category'            => 'datamachine-taxonomy',
-					'input_schema'        => array(
+	protected function getAbilityArgs(): array {
+		return array(
+			'label'               => __( 'Create Taxonomy Term', 'data-machine' ),
+			'description'         => __( 'Create a new taxonomy term. The term will be created if it does not already exist.', 'data-machine' ),
+			'category'            => 'datamachine-taxonomy',
+			'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
 							'taxonomy'    => array(
@@ -58,7 +53,7 @@ class CreateTaxonomyTermAbility {
 						),
 						'required'   => array( 'taxonomy', 'name' ),
 					),
-					'output_schema'       => array(
+			'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
 							'success'   => array( 'type' => 'boolean' ),
@@ -71,18 +66,10 @@ class CreateTaxonomyTermAbility {
 							'error'     => array( 'type' => 'string' ),
 						),
 					),
-					'execute_callback'    => array( $this, 'execute' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
-				)
-			);
-		};
-
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
+			'execute_callback'    => array( $this, 'execute' ),
+			'permission_callback' => array( $this, 'checkPermission' ),
+			'meta'                => array( 'show_in_rest' => true ),
+		);
 	}
 
 	/**
@@ -209,12 +196,4 @@ class CreateTaxonomyTermAbility {
 		);
 	}
 
-	/**
-	 * Check permission for this ability.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
-	}
 }

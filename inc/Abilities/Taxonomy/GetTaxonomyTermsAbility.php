@@ -10,27 +10,22 @@
 
 namespace DataMachine\Abilities\Taxonomy;
 
-use DataMachine\Abilities\PermissionHelper;
-
 use DataMachine\Core\WordPress\TaxonomyHandler;
 
 defined( 'ABSPATH' ) || exit;
 
-class GetTaxonomyTermsAbility {
+class GetTaxonomyTermsAbility extends AbstractTaxonomyAbility {
 
-	public function __construct() {
-		$this->registerAbility();
+	protected function getAbilityName(): string {
+		return 'datamachine/get-taxonomy-terms';
 	}
 
-	private function registerAbility(): void {
-		$register_callback = function () {
-			wp_register_ability(
-				'datamachine/get-taxonomy-terms',
-				array(
-					'label'               => __( 'Get Taxonomy Terms', 'data-machine' ),
-					'description'         => __( 'Retrieve taxonomy terms with optional filtering by taxonomy, search, and pagination.', 'data-machine' ),
-					'category'            => 'datamachine-taxonomy',
-					'input_schema'        => array(
+	protected function getAbilityArgs(): array {
+		return array(
+			'label'               => __( 'Get Taxonomy Terms', 'data-machine' ),
+			'description'         => __( 'Retrieve taxonomy terms with optional filtering by taxonomy, search, and pagination.', 'data-machine' ),
+			'category'            => 'datamachine-taxonomy',
+			'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
 							'taxonomy'   => array(
@@ -69,7 +64,7 @@ class GetTaxonomyTermsAbility {
 							),
 						),
 					),
-					'output_schema'       => array(
+			'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
 							'success' => array( 'type' => 'boolean' ),
@@ -91,18 +86,10 @@ class GetTaxonomyTermsAbility {
 							'error'   => array( 'type' => 'string' ),
 						),
 					),
-					'execute_callback'    => array( $this, 'execute' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
-				)
-			);
-		};
-
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
+			'execute_callback'    => array( $this, 'execute' ),
+			'permission_callback' => array( $this, 'checkPermission' ),
+			'meta'                => array( 'show_in_rest' => true ),
+		);
 	}
 
 	/**
@@ -190,12 +177,4 @@ class GetTaxonomyTermsAbility {
 		);
 	}
 
-	/**
-	 * Check permission for this ability.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
-	}
 }
