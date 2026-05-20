@@ -40,17 +40,18 @@ const getInitialTab = () => {
 /**
  * Get OAuth callback feedback from URL query params.
  *
- * @returns {Object|null} Feedback object or null if no OAuth params present.
+ * @return {Object|null} Feedback object or null if no OAuth params present.
  */
 const getOAuthFeedbackFromUrl = () => {
 	const urlParams = new URLSearchParams( window.location.search );
 	const authSuccess = urlParams.get( 'auth_success' );
 	const authError = urlParams.get( 'auth_error' );
-	const provider = urlParams.get( 'provider' );
 
 	if ( ! authSuccess && ! authError ) {
 		return null;
 	}
+
+	const provider = urlParams.get( 'provider' );
 
 	if ( authSuccess ) {
 		return {
@@ -138,18 +139,20 @@ const SettingsApp = () => {
 				provider.provider_key === oauthFeedback.provider &&
 				provider.is_authenticated
 		);
+		const connectedProviderName =
+			connectedProvider?.label || oauthFeedback.provider;
+		const connectedMessage = sprintf(
+			/* translators: %s: provider name (e.g., Pinterest) */
+			__( 'Successfully connected to %s.', 'data-machine' ),
+			connectedProviderName
+		);
 
 		setOauthNotice(
 			connectedProvider
 				? {
 						...oauthFeedback,
 						type: 'success',
-						message:
-							/* translators: %s: provider name (e.g., Pinterest) */
-							sprintf(
-								__( 'Successfully connected to %s.', 'data-machine' ),
-								connectedProvider.label || oauthFeedback.provider
-							),
+						message: connectedMessage,
 				  }
 				: oauthFeedback
 		);
