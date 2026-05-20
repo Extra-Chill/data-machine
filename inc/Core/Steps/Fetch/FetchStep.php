@@ -130,6 +130,16 @@ class FetchStep extends Step {
 		$handler_settings['flow_step_id'] = $this->flow_step_config['flow_step_id'];
 		$handler_settings['pipeline_id']  = $this->flow_step_config['pipeline_id'];
 		$handler_settings['flow_id']      = $this->flow_step_config['flow_id'];
+		$job_context                      = $this->engine->getJobContext();
+		$owner_user_id                    = (int) ( $job_context['user_id'] ?? 0 );
+		$agent_id                         = (int) ( $job_context['agent_id'] ?? 0 );
+
+		if ( $owner_user_id > 0 ) {
+			$handler_settings['user_id'] = $owner_user_id;
+		}
+		if ( $agent_id > 0 ) {
+			$handler_settings['agent_id'] = $agent_id;
+		}
 
 		$resolved_handler_settings = AuthRefHandlerConfig::resolve_runtime_config(
 			$handler_settings,
@@ -139,6 +149,8 @@ class FetchStep extends Step {
 				'pipeline_id'  => $this->flow_step_config['pipeline_id'],
 				'flow_id'      => $this->flow_step_config['flow_id'],
 				'job_id'       => $this->job_id,
+				'user_id'      => $owner_user_id,
+				'agent_id'     => $agent_id,
 			)
 		);
 
@@ -149,7 +161,7 @@ class FetchStep extends Step {
 
 		$handler_settings = $resolved_handler_settings;
 
-		$packets = $this->execute_handler( $handler, $handler_settings, (string) $this->job_id );
+		$packets = $this->execute_handler_as_owner( $handler, $handler_settings, (string) $this->job_id, $owner_user_id );
 
 		if ( empty( $packets ) ) {
 			$this->log( 'error', 'Fetch handler returned no content' );
@@ -216,6 +228,39 @@ class FetchStep extends Step {
 				)
 			);
 			return array();
+		}
+	}
+
+	/**
+	 * Execute the fetch handler as the flow owner when one is known.
+	 *
+	 * Scheduled fetches often run without a logged-in WordPress user. Principal-
+	 * scoped auth providers still need the flow owner as current user so handler
+	 * code can resolve user-scoped OAuth credentials without falling back to an
+	 * anonymous/site context.
+	 *
+	 * @param string $handler_name Handler slug.
+	 * @param array  $handler_settings Handler settings.
+	 * @param string $job_id Job ID.
+	 * @param int    $owner_user_id Flow owner user ID.
+	 * @return DataPacket[] Array of DataPackets, or empty array on failure.
+	 */
+	private function execute_handler_as_owner( string $handler_name, array $handler_settings, string $job_id, int $owner_user_id ): array {
+		if ( $owner_user_id <= 0 || ! function_exists( 'wp_set_current_user' ) || ! function_exists( 'get_current_user_id' ) ) {
+			return $this->execute_handler( $handler_name, $handler_settings, $job_id );
+		}
+
+		$previous_user_id = (int) get_current_user_id();
+		if ( $previous_user_id !== $owner_user_id ) {
+			wp_set_current_user( $owner_user_id );
+		}
+
+		try {
+			return $this->execute_handler( $handler_name, $handler_settings, $job_id );
+		} finally {
+			if ( $previous_user_id !== $owner_user_id ) {
+				wp_set_current_user( $previous_user_id );
+			}
 		}
 	}
 
