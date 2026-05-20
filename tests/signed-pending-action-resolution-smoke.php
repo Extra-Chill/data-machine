@@ -15,6 +15,8 @@ $GLOBALS['__signed_filters']    = array();
 $GLOBALS['__signed_transients'] = array();
 $GLOBALS['__signed_options']    = array();
 
+require_once __DIR__ . '/fixtures/rest-url-stub.php';
+
 function datamachine_signed_assert( bool $condition, string $message, array &$failures, int &$passes ): void {
 	if ( $condition ) {
 		++$passes;
@@ -67,11 +69,6 @@ if ( ! function_exists( 'update_option' ) ) {
 		unset( $autoload );
 		$GLOBALS['__signed_options'][ $option ] = $value;
 		return true;
-	}
-}
-if ( ! function_exists( 'rest_url' ) ) {
-	function rest_url( string $path = '' ): string {
-		return 'https://example.test/wp-json/' . ltrim( $path, '/' );
 	}
 }
 if ( ! function_exists( 'add_query_arg' ) ) {
