@@ -11,6 +11,7 @@ This plugin extends Data Machine with business-focused integrations including:
 - **Slack**: Post messages and fetch conversations from channels
 - **Discord**: Post messages and fetch messages from server channels
 - **Amazon Affiliate Link**: Search Amazon products and return affiliate links using the Amazon Creators API
+- **Bing Webmaster Tools**: Fetch Bing search, traffic, page, and crawl analytics
 
 ## Requirements
 
@@ -182,6 +183,19 @@ Existing credentials saved by older Data Machine core versions are adopted autom
 2. Create Amazon Creators API credentials.
 3. In Data Machine tool settings, configure Credential ID, Credential Secret, Partner Tag, and Marketplace.
 4. Use `amazon_affiliate_link` only for genuinely relevant product references.
+
+## Bing Webmaster Tools
+
+Bing Webmaster Tools is owned by Data Machine Business. When this plugin is active, it registers the same user-facing capability that previously lived in Data Machine core:
+
+- Ability: `datamachine/bing-webmaster`
+- AI tool: `bing_webmaster`
+- REST route: `POST /wp-json/datamachine/v1/analytics/bing`
+- WP-CLI: `wp datamachine analytics bing <action>`
+
+Existing sites keep their saved configuration because the business plugin adopts the original `datamachine_bing_webmaster_config` site option.
+
+See [Bing Webmaster Tools](docs/bing-webmaster.md) for setup and usage details.
 
 ## License
 
