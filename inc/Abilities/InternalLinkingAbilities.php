@@ -1264,7 +1264,7 @@ class InternalLinkingAbilities {
 		if ( ! $gsc_ability ) {
 			return array(
 				'success' => false,
-				'error'   => 'Google Search Console ability not available. Ensure Data Machine analytics is configured.',
+				'error'   => 'Google Search Console ability not available. Ensure Data Machine Business is active and Search Console is configured.',
 			);
 		}
 
