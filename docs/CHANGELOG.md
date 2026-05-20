@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.130.2] - 2026-05-20
+
+### Changed
+- deprecate oauth account context writes
+
 ## [0.130.1] - 2026-05-20
 
 ### Changed
