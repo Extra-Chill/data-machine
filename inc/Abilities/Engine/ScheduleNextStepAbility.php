@@ -98,13 +98,6 @@ class ScheduleNextStepAbility {
 		$flow_step_id = $input['flow_step_id'] ?? '';
 		$dataPackets  = $input['data_packets'] ?? array();
 
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Action Scheduler not available.',
-			);
-		}
-
 		// Store data by job_id (if present).
 		if ( ! empty( $dataPackets ) ) {
 			$engine_snapshot  = datamachine_get_engine_data( $job_id );

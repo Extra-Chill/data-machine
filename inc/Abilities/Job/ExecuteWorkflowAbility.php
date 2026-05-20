@@ -267,13 +267,6 @@ class ExecuteWorkflowAbility {
 		// Delayed execution
 		$timestamp = (int) $timestamp;
 
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Action Scheduler not available for delayed execution',
-			);
-		}
-
 		$action_id = as_schedule_single_action(
 			$timestamp,
 			'datamachine_schedule_next_step',

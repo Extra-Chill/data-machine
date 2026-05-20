@@ -240,14 +240,12 @@ abstract class SystemTask {
 		$engine_data['attempts'] = $attempts;
 		$jobs_db->store_engine_data( $jobId, $engine_data );
 
-		if ( function_exists( 'as_schedule_single_action' ) ) {
-			as_schedule_single_action(
-				time() + $delaySeconds,
-				'datamachine_task_retry',
-				array( $jobId ),
-				'data-machine'
-			);
-		}
+		as_schedule_single_action(
+			time() + $delaySeconds,
+			'datamachine_task_retry',
+			array( $jobId ),
+			'data-machine'
+		);
 	}
 
 	// ─── Prompt system ────────────────────────────────────────────────

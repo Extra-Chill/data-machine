@@ -94,9 +94,7 @@ class ScheduleFlowAbility {
 		$interval_or_timestamp = $input['interval_or_timestamp'] ?? null;
 
 		// Always unschedule existing to prevent duplicates.
-		if ( function_exists( 'as_unschedule_all_actions' ) ) {
-			as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
-		}
+		as_unschedule_all_actions( 'datamachine_run_flow_now', array( $flow_id ), 'data-machine' );
 
 		if ( 'manual' === $interval_or_timestamp ) {
 			return $this->clearSchedule( $flow_id );
@@ -148,13 +146,6 @@ class ScheduleFlowAbility {
 	 * @return array Result.
 	 */
 	private function scheduleOneTime( int $flow_id, int $timestamp ): array {
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Action Scheduler not available.',
-			);
-		}
-
 		$action_id = as_schedule_single_action(
 			$timestamp,
 			'datamachine_run_flow_now',

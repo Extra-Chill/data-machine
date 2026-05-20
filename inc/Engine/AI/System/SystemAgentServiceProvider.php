@@ -494,18 +494,16 @@ class SystemAgentServiceProvider {
 				return;
 			}
 
-			if ( function_exists( 'as_schedule_single_action' ) ) {
-				as_schedule_single_action(
-					time() + 15,
-					'datamachine_system_agent_set_featured_image',
-					array(
-						'attachment_id'   => $attachmentId,
-						'pipeline_job_id' => $pipelineJobId,
-						'attempt'         => $attempt + 1,
-					),
-					'data-machine'
-				);
-			}
+			as_schedule_single_action(
+				time() + 15,
+				'datamachine_system_agent_set_featured_image',
+				array(
+					'attachment_id'   => $attachmentId,
+					'pipeline_job_id' => $pipelineJobId,
+					'attempt'         => $attempt + 1,
+				),
+				'data-machine'
+			);
 			return;
 		}
 

@@ -206,10 +206,6 @@ class ImageGenerationTask extends SystemTask {
 	}
 
 	private function scheduleFeaturedImageRetry( int $attachmentId, int $pipelineJobId ): void {
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return;
-		}
-
 		as_schedule_single_action(
 			time() + 15,
 			'datamachine_system_agent_set_featured_image',
