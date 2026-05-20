@@ -22,8 +22,26 @@ define( 'DATAMACHINE_BUSINESS_VERSION', '0.2.0' );
 define( 'DATAMACHINE_BUSINESS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_BUSINESS_URL', plugin_dir_url( __FILE__ ) );
 
-// PSR-4 Autoloading
-require_once __DIR__ . '/vendor/autoload.php';
+// PSR-4 Autoloading.
+$datamachine_business_autoloader = __DIR__ . '/vendor/autoload.php';
+if ( file_exists( $datamachine_business_autoloader ) ) {
+	require_once $datamachine_business_autoloader;
+} else {
+	spl_autoload_register(
+		function ( string $class_name ): void {
+			$prefix = 'DataMachineBusiness\\';
+			if ( 0 !== strpos( $class_name, $prefix ) ) {
+				return;
+			}
+
+			$relative_class = substr( $class_name, strlen( $prefix ) );
+			$file           = DATAMACHINE_BUSINESS_PATH . 'inc/' . str_replace( '\\', '/', $relative_class ) . '.php';
+			if ( is_readable( $file ) ) {
+				require_once $file;
+			}
+		}
+	);
+}
 
 /**
  * Load and instantiate business handlers and abilities.
@@ -76,6 +94,9 @@ function datamachine_business_load_handlers() {
 	// Discord Handlers
 	new \DataMachineBusiness\Handlers\Discord\DiscordPublish();
 	new \DataMachineBusiness\Handlers\Discord\DiscordFetch();
+
+	// Business AI tools
+	new \DataMachineBusiness\Tools\AmazonAffiliateLink();
 }
 
 // Hook into plugins_loaded to ensure Data Machine core is loaded first
