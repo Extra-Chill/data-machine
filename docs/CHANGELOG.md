@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.130.0] - 2026-05-20
+
+### Added
+- add oauth account context resolver
+
 ## [0.129.0] - 2026-05-20
 
 ### Added
