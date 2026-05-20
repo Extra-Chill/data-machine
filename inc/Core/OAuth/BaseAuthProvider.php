@@ -600,6 +600,109 @@ abstract class BaseAuthProvider {
 		return update_site_option( 'datamachine_auth_data', $all_auth_data );
 	}
 
+	// -------------------------------------------------------------------------
+	// Per-agent account API
+	//
+	// These methods provide a deliberate, no-fallback per-agent storage surface
+	// for callers that operate on credentials delegated to a specific agent.
+	// They share the same underlying storage layout as the principal-scoped API
+	// (`principals[agent:<id>][account]`) so an account written via either
+	// surface is readable through the other.
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Get the OAuth account for a specific agent.
+	 *
+	 * Sensitive fields are decrypted on read. Returns `null` when no per-agent
+	 * account exists for this provider+agent — there is intentionally no fallback
+	 * to site-wide storage.
+	 *
+	 * @since 0.129.0
+	 *
+	 * @param int $agent_id Target agent ID. Must be a positive integer.
+	 * @return array|null Decrypted account data, or null if no account exists.
+	 */
+	public function get_account_for_agent( int $agent_id ): ?array {
+		$agent_id = absint( $agent_id );
+		if ( $agent_id <= 0 ) {
+			return null;
+		}
+
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		$provider_data = $all_auth_data[ $this->provider_slug ] ?? array();
+		$scope_key     = 'agent:' . $agent_id;
+		$account       = $provider_data['principals'][ $scope_key ]['account'] ?? null;
+
+		if ( ! is_array( $account ) || empty( $account ) ) {
+			return null;
+		}
+
+		return $this->decrypt_fields( $account );
+	}
+
+	/**
+	 * Save the OAuth account for a specific agent.
+	 *
+	 * Sensitive fields are encrypted before storage. Stores under the same
+	 * `principals[agent:<id>][account]` slot used by the scope-aware
+	 * `save_account()` path so the two surfaces stay in sync.
+	 *
+	 * @since 0.129.0
+	 *
+	 * @param int   $agent_id Target agent ID. Must be a positive integer.
+	 * @param array $account Account data to store.
+	 * @return bool True on successful write, false on invalid input or storage failure.
+	 */
+	public function save_account_for_agent( int $agent_id, array $account ): bool {
+		$agent_id = absint( $agent_id );
+		if ( $agent_id <= 0 ) {
+			return false;
+		}
+
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) || ! is_array( $all_auth_data[ $this->provider_slug ] ) ) {
+			$all_auth_data[ $this->provider_slug ] = array();
+		}
+		if ( ! isset( $all_auth_data[ $this->provider_slug ]['principals'] ) || ! is_array( $all_auth_data[ $this->provider_slug ]['principals'] ) ) {
+			$all_auth_data[ $this->provider_slug ]['principals'] = array();
+		}
+
+		$scope_key = 'agent:' . $agent_id;
+		$all_auth_data[ $this->provider_slug ]['principals'][ $scope_key ]['account'] = $this->encrypt_fields( $account );
+
+		return update_site_option( 'datamachine_auth_data', $all_auth_data );
+	}
+
+	/**
+	 * Delete the OAuth account for a specific agent.
+	 *
+	 * Returns true when the per-agent slot existed and was removed, or when there
+	 * was nothing to remove (idempotent). Returns false only on invalid input or a
+	 * storage failure.
+	 *
+	 * @since 0.129.0
+	 *
+	 * @param int $agent_id Target agent ID. Must be a positive integer.
+	 * @return bool True on success (including no-op deletes), false on invalid input or storage failure.
+	 */
+	public function delete_account_for_agent( int $agent_id ): bool {
+		$agent_id = absint( $agent_id );
+		if ( $agent_id <= 0 ) {
+			return false;
+		}
+
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		$scope_key     = 'agent:' . $agent_id;
+
+		if ( ! isset( $all_auth_data[ $this->provider_slug ]['principals'][ $scope_key ] ) ) {
+			return true; // Idempotent: nothing to delete.
+		}
+
+		unset( $all_auth_data[ $this->provider_slug ]['principals'][ $scope_key ] );
+
+		return update_site_option( 'datamachine_auth_data', $all_auth_data );
+	}
+
 	/**
 	 * Get the authenticated username for this provider.
 	 *

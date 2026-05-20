@@ -430,4 +430,97 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 
 		remove_all_filters( 'datamachine_resolve_oauth_account_for_user' );
 	}
+
+	// -------------------------------------------------------------------------
+	// Per-agent account API
+	// -------------------------------------------------------------------------
+
+	public function test_get_account_for_agent_returns_null_when_no_account(): void {
+		$this->assertNull( $this->provider->get_account_for_agent( 303 ) );
+	}
+
+	public function test_save_account_for_agent_round_trip(): void {
+		$account = array(
+			'access_token' => 'tok_agent_303',
+			'username'     => 'agent-account',
+			'scope'        => 'read write',
+		);
+
+		$saved = $this->provider->save_account_for_agent( 303, $account );
+		$this->assertTrue( $saved );
+
+		$loaded = $this->provider->get_account_for_agent( 303 );
+		$this->assertIsArray( $loaded );
+		$this->assertSame( 'tok_agent_303', $loaded['access_token'] );
+		$this->assertSame( 'agent-account', $loaded['username'] );
+		$this->assertSame( 'read write', $loaded['scope'] );
+	}
+
+	public function test_delete_account_for_agent_removes_account(): void {
+		$this->provider->save_account_for_agent( 303, array( 'access_token' => 'tok_agent_303' ) );
+		$this->assertNotNull( $this->provider->get_account_for_agent( 303 ) );
+
+		$this->assertTrue( $this->provider->delete_account_for_agent( 303 ) );
+		$this->assertNull( $this->provider->get_account_for_agent( 303 ) );
+	}
+
+	public function test_delete_account_for_agent_is_idempotent(): void {
+		$this->assertTrue( $this->provider->delete_account_for_agent( 12345 ) );
+	}
+
+	public function test_per_agent_accounts_are_isolated_between_agents(): void {
+		$this->provider->save_account_for_agent( 303, array( 'access_token' => 'tok_agent_a' ) );
+		$this->provider->save_account_for_agent( 404, array( 'access_token' => 'tok_agent_b' ) );
+
+		$agent_a = $this->provider->get_account_for_agent( 303 );
+		$agent_b = $this->provider->get_account_for_agent( 404 );
+
+		$this->assertSame( 'tok_agent_a', $agent_a['access_token'] );
+		$this->assertSame( 'tok_agent_b', $agent_b['access_token'] );
+	}
+
+	public function test_per_agent_account_does_not_fall_back_to_site_account(): void {
+		$this->provider->save_site_account( array( 'access_token' => 'site_token' ) );
+
+		$this->assertNull( $this->provider->get_account_for_agent( 303 ) );
+		$this->assertSame( 'site_token', $this->provider->get_site_account()['access_token'] );
+	}
+
+	public function test_per_agent_save_does_not_affect_site_or_user_account(): void {
+		$this->provider->save_site_account( array( 'access_token' => 'site_token' ) );
+		$this->provider->save_account_for_user( 42, array( 'access_token' => 'tok_user_42' ) );
+		$this->provider->save_account_for_agent( 303, array( 'access_token' => 'tok_agent_303' ) );
+
+		$this->assertSame( 'site_token', $this->provider->get_site_account()['access_token'] );
+		$this->assertSame( 'tok_user_42', $this->provider->get_account_for_user( 42 )['access_token'] );
+		$this->assertSame( 'tok_agent_303', $this->provider->get_account_for_agent( 303 )['access_token'] );
+	}
+
+	public function test_invalid_agent_ids_are_rejected(): void {
+		$this->assertFalse( $this->provider->save_account_for_agent( 0, array( 'access_token' => 'x' ) ) );
+		$this->assertNull( $this->provider->get_account_for_agent( 0 ) );
+		$this->assertFalse( $this->provider->delete_account_for_agent( 0 ) );
+	}
+
+	public function test_per_agent_account_shares_principal_scoped_agent_slot(): void {
+		add_filter(
+			'datamachine_auth_scope_policy',
+			function () {
+				return BaseAuthProvider::AUTH_SCOPE_AGENT;
+			}
+		);
+
+		$this->provider->save_account_for_agent( 303, array( 'access_token' => 'tok_agent_303' ) );
+
+		$this->assertSame(
+			'tok_agent_303',
+			$this->provider->get_account( array( 'agent_id' => 303 ) )['access_token']
+		);
+
+		$this->provider->save_account( array( 'access_token' => 'tok_agent_scoped' ), array( 'agent_id' => 404 ) );
+
+		$this->assertSame( 'tok_agent_scoped', $this->provider->get_account_for_agent( 404 )['access_token'] );
+
+		remove_all_filters( 'datamachine_auth_scope_policy' );
+	}
 }
