@@ -642,6 +642,30 @@ class ExecuteStepAbility {
 		// This applies regardless of whether the flow has historical processed items —
 		// a new flow checking a source with no events is not broken, it just has nothing yet.
 		$is_fetch_step = in_array( $step_type, array( 'fetch', 'event_import' ), true );
+		$prior_status  = $this->getPriorTerminalStatus( $job_id );
+		if ( null !== $prior_status ) {
+			do_action(
+				'datamachine_log',
+				'debug',
+				'Step returned no data after job was already marked failed or rescheduled for retry',
+				array(
+					'job_id'       => $job_id,
+					'pipeline_id'  => $pipeline_id,
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+					'step_class'   => $step_class,
+					'step_type'    => $step_type,
+					'job_status'   => $prior_status,
+				)
+			);
+
+			return array(
+				'success'      => true,
+				'step_success' => false,
+				'outcome'      => 'failed',
+				'error'        => $prior_status,
+			);
+		}
 
 		if ( $is_fetch_step ) {
 			$this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED_NO_ITEMS );
@@ -676,31 +700,6 @@ class ExecuteStepAbility {
 		// and (when the second reason is non-retryable) trigger
 		// `cleanup_job_data_packets` even though a retry is still pending,
 		// orphaning the next attempt with no input data.
-		$prior_status = $this->getPriorTerminalStatus( $job_id );
-		if ( null !== $prior_status ) {
-			do_action(
-				'datamachine_log',
-				'debug',
-				'Step returned no data after job was already marked failed or rescheduled for retry',
-				array(
-					'job_id'       => $job_id,
-					'pipeline_id'  => $pipeline_id,
-					'flow_id'      => $flow_id,
-					'flow_step_id' => $flow_step_id,
-					'step_class'   => $step_class,
-					'step_type'    => $step_type,
-					'job_status'   => $prior_status,
-				)
-			);
-
-			return array(
-				'success'      => true,
-				'step_success' => false,
-				'outcome'      => 'failed',
-				'error'        => $prior_status,
-			);
-		}
-
 		do_action(
 			'datamachine_log',
 			'error',

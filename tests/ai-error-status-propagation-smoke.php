@@ -54,6 +54,7 @@ use DataMachine\Core\Database\Jobs\Jobs;
 
 class DataMachine_Test_Jobs_For_AI_Status extends Jobs {
 	private string $status;
+	public ?string $completed_status = null;
 
 	public function __construct( string $status ) {
 		$this->status = $status;
@@ -64,6 +65,12 @@ class DataMachine_Test_Jobs_For_AI_Status extends Jobs {
 			'job_id' => $job_id,
 			'status' => $this->status,
 		);
+	}
+
+	public function complete_job( int $job_id, string $status ): bool {
+		unset( $job_id );
+		$this->completed_status = $status;
+		return true;
 	}
 }
 
@@ -136,6 +143,52 @@ $invoke_empty_ai_route = function ( string $status ) use ( $build_ability ): arr
 	);
 };
 
+$invoke_empty_fetch_route = function ( string $status ) use ( $build_ability ): array {
+	list( $ability, $route ) = $build_ability( $status );
+
+	return $route->invoke(
+		$ability,
+		123,
+		'fetch_step',
+		9,
+		array(
+			'pipeline_id' => 3,
+			'step_type'   => 'fetch',
+		),
+		'fetch',
+		'DataMachine\Core\Steps\Fetch\FetchStep',
+		array(),
+		array( 'data' => array() ),
+		false,
+		null
+	);
+};
+
+$fetch_completed_status = function ( string $status ) use ( $build_ability ): ?string {
+	list( $ability, $route_method ) = $build_ability( $status );
+	$reflection = new ReflectionClass( $ability );
+	$db_jobs    = $reflection->getProperty( 'db_jobs' )->getValue( $ability );
+
+	$route_method->invoke(
+		$ability,
+		123,
+		'fetch_step',
+		9,
+		array(
+			'pipeline_id' => 3,
+			'step_type'   => 'fetch',
+		),
+		'fetch',
+		'DataMachine\Core\Steps\Fetch\FetchStep',
+		array(),
+		array( 'data' => array() ),
+		false,
+		null
+	);
+
+	return $db_jobs->completed_status;
+};
+
 echo "=== ai-error-status-propagation-smoke ===\n";
 
 $short_circuit_message = 'Step returned no data after job was already marked failed or rescheduled for retry';
@@ -194,6 +247,20 @@ $failure_reason               = is_array( $last_failure ) ? ( $last_failure['arg
 $assert( 'pending without retry still fails through generic path', 'failed' === ( $result['outcome'] ?? '' ) );
 $assert( 'pending without retry still emits fail-job action', 1 === count( $failed_jobs ) );
 $assert( 'pending without retry reason is empty_data_packet_returned', 'empty_data_packet_returned' === $failure_reason );
+
+echo "\n[5] explicit fetch failure is not reclassified as completed_no_items\n";
+$datamachine_action_log       = datamachine_empty_action_log();
+$datamachine_test_engine_data = array();
+$result                       = $invoke_empty_fetch_route( 'failed - mcp_provider_access_forbidden' );
+$failed_jobs                  = $actions_by_hook( 'datamachine_fail_job' );
+$debug_logs                   = $logs_with_message( $short_circuit_message );
+$completed_status             = $fetch_completed_status( 'failed - mcp_provider_access_forbidden' );
+
+$assert( 'fetch route preserves prior provider failure', 'failed' === ( $result['outcome'] ?? '' ) );
+$assert( 'fetch route surfaces provider failure status', 'failed - mcp_provider_access_forbidden' === ( $result['error'] ?? '' ) );
+$assert( 'fetch route does not emit a second fail-job action', empty( $failed_jobs ) );
+$assert( 'fetch route does not complete failed job as no-items', null === $completed_status );
+$assert( 'fetch route logs the short-circuit message', 1 <= count( $debug_logs ) );
 
 if ( $failures > 0 ) {
 	echo "\n=== ai-error-status-propagation-smoke: {$failures} FAILURE(S) / {$total} assertions ===\n";
