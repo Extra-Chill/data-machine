@@ -58,6 +58,10 @@ class SendMessageAbility {
 								'type'        => 'string',
 								'description' => __( 'Existing session ID to continue. Omit to create a new session.', 'data-machine' ),
 							),
+							'session_owner'        => array(
+								'type'        => 'object',
+								'description' => __( 'Canonical opaque owner for persisted conversation sessions.', 'data-machine' ),
+							),
 							'provider'             => array(
 								'type'        => 'string',
 								'description' => __( 'AI provider identifier. Resolved from agent/defaults if omitted.', 'data-machine' ),
@@ -213,6 +217,7 @@ class SendMessageAbility {
 				'agent_id'             => $agent_id,
 				'attachments'          => $input['attachments'] ?? array(),
 				'client_context'       => $input['client_context'] ?? array(),
+				'session_owner'        => is_array( $input['session_owner'] ?? null ) ? $input['session_owner'] : null,
 			)
 		);
 	}

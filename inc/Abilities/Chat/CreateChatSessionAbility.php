@@ -128,7 +128,9 @@ class CreateChatSessionAbility {
 			$session_metadata['source'] = $source;
 		}
 
-		if ( isset( $input['transcript_owner'] ) && is_array( $input['transcript_owner'] ) ) {
+		if ( isset( $input['session_owner'] ) && is_array( $input['session_owner'] ) ) {
+			$session_metadata['transcript_owner'] = $input['session_owner'];
+		} elseif ( isset( $input['transcript_owner'] ) && is_array( $input['transcript_owner'] ) ) {
 			$session_metadata['transcript_owner'] = $input['transcript_owner'];
 		}
 
