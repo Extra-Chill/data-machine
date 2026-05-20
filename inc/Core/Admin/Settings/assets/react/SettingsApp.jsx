@@ -19,6 +19,7 @@ import GeneralTab from './components/tabs/GeneralTab';
 import ApiKeysTab from './components/tabs/ApiKeysTab';
 import HandlerDefaultsTab from './components/tabs/HandlerDefaultsTab';
 import AuthProvidersTab from './components/tabs/AuthProvidersTab';
+import { useAuthProviders } from './queries/authProviders';
 
 const STORAGE_KEY = 'datamachine_settings_active_tab';
 
@@ -53,6 +54,8 @@ const getOAuthFeedbackFromUrl = () => {
 
 	if ( authSuccess ) {
 		return {
+			code: 'success',
+			provider,
 			type: 'success',
 			message: provider
 				? /* translators: %s: provider name (e.g., Pinterest) */
@@ -73,6 +76,8 @@ const getOAuthFeedbackFromUrl = () => {
 	};
 
 	return {
+		code: authError,
+		provider,
 		type: 'error',
 		message: errorMessages[ authError ] ||
 			/* translators: %s: error code */
@@ -93,13 +98,19 @@ const cleanOAuthParamsFromUrl = () => {
 
 const SettingsApp = () => {
 	const [ activeTab, setActiveTab ] = useState( getInitialTab() );
+	const [ oauthFeedback, setOauthFeedback ] = useState( null );
 	const [ oauthNotice, setOauthNotice ] = useState( null );
+	const shouldReconcileStateError =
+		oauthFeedback?.code === 'invalid_state' && !! oauthFeedback.provider;
+	const { data: authProviders, error: authProvidersError } = useAuthProviders( {
+		enabled: shouldReconcileStateError,
+	} );
 
 	// Handle OAuth callback feedback on mount.
 	useEffect( () => {
 		const feedback = getOAuthFeedbackFromUrl();
 		if ( feedback ) {
-			setOauthNotice( feedback );
+			setOauthFeedback( feedback );
 			// Auto-switch to Auth Providers tab.
 			setActiveTab( 'auth-providers' );
 			localStorage.setItem( STORAGE_KEY, 'auth-providers' );
@@ -107,6 +118,42 @@ const SettingsApp = () => {
 			cleanOAuthParamsFromUrl();
 		}
 	}, [] );
+
+	useEffect( () => {
+		if ( ! oauthFeedback ) {
+			return;
+		}
+
+		if ( oauthFeedback.code !== 'invalid_state' || ! oauthFeedback.provider ) {
+			setOauthNotice( oauthFeedback );
+			return;
+		}
+
+		if ( ! authProviders && ! authProvidersError ) {
+			return;
+		}
+
+		const connectedProvider = authProviders?.find(
+			( provider ) =>
+				provider.provider_key === oauthFeedback.provider &&
+				provider.is_authenticated
+		);
+
+		setOauthNotice(
+			connectedProvider
+				? {
+						...oauthFeedback,
+						type: 'success',
+						message:
+							/* translators: %s: provider name (e.g., Pinterest) */
+							sprintf(
+								__( 'Successfully connected to %s.', 'data-machine' ),
+								connectedProvider.label || oauthFeedback.provider
+							),
+				  }
+				: oauthFeedback
+		);
+	}, [ oauthFeedback, authProviders, authProvidersError ] );
 
 	const handleSelect = useCallback( ( tabName ) => {
 		setActiveTab( tabName );
