@@ -17,7 +17,6 @@ defined( 'ABSPATH' ) || exit;
 // Global tools. Each class declares the modes where its tool is visible.
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\AI\Tools\Global\AgentMemory;
-use DataMachine\Engine\AI\Tools\Global\GoogleAnalytics;
 use DataMachine\Engine\AI\Tools\Global\GoogleSearchConsole;
 use DataMachine\Engine\AI\Tools\Global\PageSpeed;
 use DataMachine\Engine\AI\Tools\Global\ImageGeneration;
@@ -82,7 +81,6 @@ class ToolServiceProvider {
 		// Global tools. Each class declares its own mode visibility.
 		new AgentDailyMemory();
 		new AgentMemory();
-		new GoogleAnalytics();
 		new GoogleSearchConsole();
 		new PageSpeed();
 		new ImageGeneration();

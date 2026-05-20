@@ -2,15 +2,14 @@
 /**
  * Analytics REST API Endpoints
  *
- * Provides REST API access to core analytics integrations:
- * Google Search Console, Google Analytics (GA4), PageSpeed Insights.
+ * Provides REST API access to core and extension-backed analytics integrations.
  *
  * Each endpoint delegates to its respective ability via wp_get_ability().
  * All endpoints require manage_options capability.
  *
  * Endpoints:
  * - POST /datamachine/v1/analytics/gsc        — Google Search Console queries
- * - POST /datamachine/v1/analytics/ga         — Google Analytics (GA4) queries
+ * - POST /datamachine/v1/analytics/ga         — Google Analytics (GA4) queries when Data Machine Business is active
  * - POST /datamachine/v1/analytics/pagespeed  — PageSpeed Insights audits
  *
  * @package DataMachine\Api

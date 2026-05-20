@@ -473,7 +473,7 @@ wp datamachine analytics gsc page_stats --url-filter="/blog/"
 wp datamachine analytics gsc inspect_url --inspect-url="https://example.com/post"
 wp datamachine analytics gsc list_sitemaps
 
-# Google Analytics (GA4)
+# Google Analytics (GA4, requires Data Machine Business)
 wp datamachine analytics ga page_stats --start-date=2026-01-01
 wp datamachine analytics ga traffic_sources --limit=20
 wp datamachine analytics ga realtime
