@@ -41,6 +41,7 @@ public function delete_account_for_user(int $user_id): bool;
 public function get_account_for_agent(int $agent_id): ?array;
 public function save_account_for_agent(int $agent_id, array $account): bool;
 public function delete_account_for_agent(int $agent_id): bool;
+public function get_account_for_context(array $context = array()): ?array;
 public function get_account(): array;
 public function get_config(): array;
 public function save_account(array $data): bool;
@@ -142,6 +143,23 @@ These share the same on-disk shape as the principal-scoped API
 (`principals[agent:<id>][account]`), so an account written via either surface is
 readable through the other. Like the per-user API, these methods never consult
 auth scope policy and never fall back to site-wide storage.
+
+### Policy-resolved account context API (@since v0.130.0)
+
+`get_account_for_context()` is the explicit account lookup for callers that want
+provider policy to decide which credential scope applies to an execution
+context:
+
+```php
+public function get_account_for_context( array $context = array() ): ?array;
+```
+
+The method consults `datamachine_auth_scope_policy` and the same context inputs
+as legacy `get_account( array $context )`: explicit `agent_id`, explicit
+`user_id`, acting agent/user IDs from `PermissionHelper`, and the current WP
+user. It preserves the current site fallback behavior during the migration
+window, but returns `null` when neither a scoped account nor a site-wide account
+exists.
 
 #### When to use per-user vs. site-wide credentials
 

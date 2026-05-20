@@ -190,14 +190,15 @@ scope is genuinely delegated to provider policy.
    v0.128.0.
 3. Add agent named methods and tests in `BaseAuthProvider`. Shipped in
    v0.129.0.
-4. Add `get_account_for_context()` and reduce context-array `get_account()` to
-   a deprecated shim for non-empty contexts.
-5. Update internal site-wide callsites to `get_site_account()` /
+4. Add `get_account_for_context()`. Shipped in v0.130.0.
+5. Reduce context-array `get_account()` to a deprecated shim for non-empty
+   contexts.
+6. Update internal site-wide callsites to `get_site_account()` /
    `save_site_account()` / `delete_site_account()`.
-6. Update internal scoped callsites to `get_account_for_user()` or
+7. Update internal scoped callsites to `get_account_for_user()` or
    `get_account_for_agent()` when the scope is explicit.
-7. Publish vendor migration notes and coordinate downstream plugin updates.
-8. After at least one release cycle, decide whether context-free `get_account()`
+8. Publish vendor migration notes and coordinate downstream plugin updates.
+9. After at least one release cycle, decide whether context-free `get_account()`
    should also become a deprecated alias for `get_site_account()`.
 
 ## Open Questions
