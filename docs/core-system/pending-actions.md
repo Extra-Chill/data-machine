@@ -37,12 +37,44 @@ The resolved hook keeps its legacy signature for compatibility. Object-oriented 
 - Ability: `datamachine/list-pending-actions`
 - Ability: `datamachine/get-pending-action`
 - Ability: `datamachine/summarize-pending-actions`
+- Ability: `datamachine/sign-pending-action-resolution`
 - Resolver ability: `datamachine/resolve-pending-action`
 - Chat tool: `resolve_pending_action`
 - REST: `GET /datamachine/v1/actions`
 - REST: `GET /datamachine/v1/actions/{action_id}`
 - REST: `GET /datamachine/v1/actions/summary`
+- REST: `GET /datamachine/v1/actions/resolve-by-token?t={token}`
 - REST resolver: `POST /datamachine/v1/actions/resolve`
 - CLI: `wp datamachine pending-actions list|get|summary`
 
 `PendingActionStore::get()` remains the live-pending lookup used by legacy callers. Resolved rows are retained for audit and are available through inspect/list/get surfaces.
+
+## Signed Resolution URLs
+
+`datamachine/sign-pending-action-resolution` creates short-lived approve and reject URLs for a pending action. The URLs are stateless: the `t` query parameter contains a JSON payload signed with an HMAC secret stored in the `datamachine_pending_action_resolution_secret` option.
+
+Input:
+
+```php
+array(
+	'action_id' => 'act_...',
+	'lifetime'  => 604800, // Optional, seconds; capped at 30 days.
+	'resolver'  => 'email_approval', // Optional audit identifier.
+)
+```
+
+Output:
+
+```php
+array(
+	'success'     => true,
+	'action_id'   => 'act_...',
+	'approve_url' => 'https://example.test/wp-json/datamachine/v1/actions/resolve-by-token?t=...',
+	'reject_url'  => 'https://example.test/wp-json/datamachine/v1/actions/resolve-by-token?t=...',
+	'expires_at'  => '2026-05-17T12:00:00+00:00',
+)
+```
+
+The public token route validates the signature and expiry before delegating to the same resolver path as `datamachine/resolve-pending-action`. Already-resolved accepted/rejected rows return their existing decision instead of being overwritten. Expired, deleted, missing, or otherwise non-resolvable rows return `410`.
+
+Use `SignPendingActionResolutionAbility::rotate_secret()` to invalidate existing signed URLs during a security incident.
