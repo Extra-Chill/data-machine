@@ -448,22 +448,76 @@ class PendingActionStore {
 	 * @return array<string,mixed>
 	 */
 	public static function summary( array $filters = array() ): array {
-		$rows = self::list( array_merge( $filters, array( 'limit' => $filters['limit'] ?? 200 ) ) );
+		if ( ! self::has_database() ) {
+			return array(
+				'total'       => 0,
+				'by_status'   => array(),
+				'by_kind'     => array(),
+				'by_agent_id' => array(),
+				'by_context'  => array(),
+			);
+		}
+
+		self::expire_due_actions();
+
+		global $wpdb;
+
+		$where = array( '1=1' );
+		$args  = array();
+
+		self::add_filter_clause( $where, $args, $filters, 'status', 'status', '%s' );
+		self::add_filter_clause( $where, $args, $filters, 'workspace_type', 'workspace_type', '%s' );
+		self::add_filter_clause( $where, $args, $filters, 'workspace_id', 'workspace_id', '%s' );
+		self::add_filter_clause( $where, $args, $filters, 'kind', 'kind', '%s' );
+		self::add_filter_clause( $where, $args, $filters, 'agent_id', 'agent_id', '%d' );
+		self::add_filter_clause( $where, $args, $filters, 'agent', 'agent', '%s' );
+		self::add_filter_clause( $where, $args, $filters, 'created_by', 'created_by', '%d' );
+		self::add_filter_clause( $where, $args, $filters, 'creator', 'creator', '%s' );
+		self::add_filter_clause( $where, $args, $filters, 'resolver', 'resolver', '%s' );
+
+		if ( ! empty( $filters['context'] ) && is_array( $filters['context'] ) ) {
+			foreach ( $filters['context'] as $key => $value ) {
+				$where[] = 'context LIKE %s';
+				$args[]  = '%' . $wpdb->esc_like( '"' . (string) $key . '"' ) . '%' . $wpdb->esc_like( (string) $value ) . '%';
+			}
+		}
+
+		if ( ! empty( $filters['created_after'] ) ) {
+			$where[] = 'created_at >= %s';
+			$args[]  = gmdate( 'Y-m-d H:i:s', self::normalize_timestamp( $filters['created_after'] ) );
+		}
+
+		if ( ! empty( $filters['created_before'] ) ) {
+			$where[] = 'created_at <= %s';
+			$args[]  = gmdate( 'Y-m-d H:i:s', self::normalize_timestamp( $filters['created_before'] ) );
+		}
+
+		$sql = sprintf(
+			'SELECT status, kind, agent_id, context FROM %%i WHERE %s',
+			implode( ' AND ', $where )
+		);
+
+		$prepare_args = array_merge( array( self::get_table_name() ), $args );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare_args ), ARRAY_A );
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
 
 		$summary = array(
-			'total'       => count( $rows ),
+			'total'       => count( (array) $rows ),
 			'by_status'   => array(),
 			'by_kind'     => array(),
 			'by_agent_id' => array(),
 			'by_context'  => array(),
 		);
 
-		foreach ( $rows as $row ) {
+		foreach ( (array) $rows as $row ) {
 			self::increment_summary_bucket( $summary['by_status'], (string) ( $row['status'] ?? '' ) );
 			self::increment_summary_bucket( $summary['by_kind'], (string) ( $row['kind'] ?? '' ) );
 			self::increment_summary_bucket( $summary['by_agent_id'], (string) ( $row['agent_id'] ?? '0' ) );
 
-			$context = isset( $row['context'] ) && is_array( $row['context'] ) ? $row['context'] : array();
+			$context = self::decode_json( $row['context'] ?? null );
+			$context = is_array( $context ) ? $context : array();
 			foreach ( $context as $key => $value ) {
 				$bucket = (string) $key . ':' . ( is_scalar( $value ) ? (string) $value : wp_json_encode( $value ) );
 				self::increment_summary_bucket( $summary['by_context'], $bucket );
