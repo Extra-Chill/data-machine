@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.127.2] - 2026-05-20
+
+### Fixed
+- pass resolver context to pending actions
+
 ## [0.127.1] - 2026-05-20
 
 ### Fixed
