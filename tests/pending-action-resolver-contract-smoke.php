@@ -122,6 +122,9 @@ if ( ! class_exists( 'WP_Error' ) ) {
 }
 
 require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/agents-api.php';
+require_once dirname( __DIR__ ) . '/inc/Core/Workspace/WordPressWorkspaceScope.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionObservers.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/WordPressActionDispatchObserver.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionResolverAdapter.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/ResolvePendingActionAbility.php';

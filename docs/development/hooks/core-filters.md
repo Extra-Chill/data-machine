@@ -545,10 +545,20 @@ the final content in the post type's canonical format.
 user resolution. Use this to notify users, log audit trails, or mirror the
 payload into a visible queue.
 
+### `datamachine_pending_action_stored`
+
+**Purpose**: Fires after `PendingActionStore` successfully persists a pending
+action. Receives `WP_Agent_Pending_Action $action`.
+
 ### `datamachine_pending_action_resolved`
 
-**Purpose**: Fires after a staged action is accepted or rejected. Receives
-`$decision, $action_id, $kind, $payload, $result`.
+**Purpose**: Fires after a staged action is accepted or rejected. This hook keeps
+the legacy signature: `$decision, $action_id, $kind, $payload, $result`.
+
+### `datamachine_pending_action_expired`
+
+**Purpose**: Fires after `PendingActionStore` marks a pending action expired.
+Receives `WP_Agent_Pending_Action $action`.
 
 ### `datamachine_tool_action_policy`
 
