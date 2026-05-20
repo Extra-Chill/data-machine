@@ -255,6 +255,13 @@ assert_test( 'PromptBuilder no longer reads job_id directly', false === strpos( 
 assert_test( 'PromptBuilder no longer reads flow_step_id directly', false === strpos( $prompt_builder_source, "\$payload['flow_step_id']" ) );
 assert_test( 'RequestBuilder maps legacy identifiers into directive_context', false !== strpos( $request_builder_source, "'directive_context'" ) );
 
+echo "\nCase 7: direct workflow packets are inspectable\n";
+
+$request_inspector_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/RequestInspector.php' );
+assert_test( 'RequestInspector passes flow step id into packet retrieval', false !== strpos( $request_inspector_source, '$this->retrieveDataPackets( $job_id, $engine, $flow_step_id )' ) );
+assert_test( 'RequestInspector recognizes direct workflows', false !== strpos( $request_inspector_source, "'direct' === \$flow_id" ) );
+assert_test( 'RequestInspector reads direct step packet slots', false !== strpos( $request_inspector_source, "\$direct_step_data_packets[ \$flow_step_id ]" ) );
+
 echo "\n$total assertions, $failed failures\n";
 $failed_count = (int) ( $GLOBALS['failed'] ?? $failed );
 if ( $failed_count > 0 ) {

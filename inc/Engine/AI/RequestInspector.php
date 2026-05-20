@@ -89,7 +89,7 @@ class RequestInspector {
 			);
 		}
 
-		$data_packets              = $this->retrieveDataPackets( $job_id, $engine );
+		$data_packets              = $this->retrieveDataPackets( $job_id, $engine, $flow_step_id );
 		$packet_projection_context = $this->buildProjectionContext( $job_id, $flow_step_id, $pipeline_step_id, $engine, $job );
 		$messages                  = $this->buildInitialMessages( $data_packets, $engine, $flow_step_config, $packet_projection_context );
 		$payload                   = $this->buildPayload( $job_id, $flow_step_id, $pipeline_step_id, $data_packets, $engine, $job );
@@ -186,10 +186,15 @@ class RequestInspector {
 		return 1 === count( $ai_steps ) ? $ai_steps[0] : '';
 	}
 
-	private function retrieveDataPackets( int $job_id, EngineData $engine ): array {
+	private function retrieveDataPackets( int $job_id, EngineData $engine, string $flow_step_id ): array {
 		$job_context = $engine->getJobContext();
 		$flow_id     = $job_context['flow_id'] ?? null;
-		if ( null === $flow_id || 'direct' === $flow_id || (int) $flow_id <= 0 ) {
+		if ( 'direct' === $flow_id ) {
+			$direct_step_data_packets = $engine->get( 'direct_step_data_packets', array() );
+			return is_array( $direct_step_data_packets[ $flow_step_id ] ?? null ) ? $direct_step_data_packets[ $flow_step_id ] : array();
+		}
+
+		if ( null === $flow_id || (int) $flow_id <= 0 ) {
 			return array();
 		}
 
