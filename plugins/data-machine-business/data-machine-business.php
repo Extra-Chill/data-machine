@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Data Machine Business
  * Plugin URI: https://github.com/Extra-Chill/data-machine-business
- * Description: Business and enterprise integrations for Data Machine. Adds support for Google Sheets, Slack, Discord, and other business tools.
+ * Description: Business and enterprise integrations for Data Machine. Adds support for Google Sheets, Slack, Discord, PageSpeed Insights, and other business tools.
  * Version: 0.2.0
  * Requires at least: 6.9
  * Requires PHP: 8.2
@@ -22,8 +22,24 @@ define( 'DATAMACHINE_BUSINESS_VERSION', '0.2.0' );
 define( 'DATAMACHINE_BUSINESS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_BUSINESS_URL', plugin_dir_url( __FILE__ ) );
 
-// PSR-4 Autoloading
-require_once __DIR__ . '/vendor/autoload.php';
+// PSR-4 Autoloading. Composer is preferred for packaged builds, while source
+// checkouts and test runners can load the plugin without a generated vendor dir.
+if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
+	require_once __DIR__ . '/vendor/autoload.php';
+} else {
+	spl_autoload_register( function ( string $class ): void {
+		$prefix = 'DataMachineBusiness\\';
+		if ( 0 !== strpos( $class, $prefix ) ) {
+			return;
+		}
+
+		$relative_class = substr( $class, strlen( $prefix ) );
+		$file           = __DIR__ . '/inc/' . str_replace( '\\', '/', $relative_class ) . '.php';
+		if ( file_exists( $file ) ) {
+			require_once $file;
+		}
+	} );
+}
 
 /**
  * Load and instantiate business handlers and abilities.
@@ -60,6 +76,15 @@ function datamachine_business_load_handlers() {
 	// Google Drive (shares the unified GoogleAuth credential — see scope union below)
 	new \DataMachineBusiness\Abilities\GoogleDrive\FetchGoogleDriveAbility();
 	new \DataMachineBusiness\Handlers\GoogleDrive\GoogleDriveFetch();
+
+	// PageSpeed Insights
+	new \DataMachineBusiness\Abilities\PageSpeed\PageSpeedAbility();
+	new \DataMachineBusiness\Tools\PageSpeedTool();
+	\DataMachineBusiness\Api\PageSpeedAnalytics::register();
+
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		\WP_CLI::add_command( 'datamachine analytics pagespeed', \DataMachineBusiness\Cli\PageSpeedCommand::class );
+	}
 
 	// Slack
 	new \DataMachineBusiness\Abilities\Slack\PostMessageSlackAbility();
