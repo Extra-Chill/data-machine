@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.127.5] - 2026-05-20
+
+### Fixed
+- run fetch handlers as flow owner
+- satisfy oauth settings lint
+- reconcile stale oauth state errors
+
 ## [0.127.4] - 2026-05-20
 
 ### Fixed
