@@ -190,7 +190,7 @@ wp datamachine analytics ga user_demographics --allow-root
 POST /wp-json/datamachine/v1/analytics/ga
 ```
 
-**Authentication**: Requires `manage_options` capability.
+**Authentication**: Requires the relevant Data Machine management capability plus configured Google Analytics access.
 
 **Request Body**:
 ```json

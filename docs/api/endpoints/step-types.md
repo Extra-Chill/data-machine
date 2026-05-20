@@ -10,7 +10,7 @@ The StepTypes endpoint provides information about available step types for pipel
 
 ## Authentication
 
-Requires `manage_options` capability. See Authentication Guide.
+Public metadata endpoints. The routes use `__return_true` because step-type labels, handler requirements, and UI metadata are not sensitive.
 
 ## Endpoints
 
@@ -18,7 +18,7 @@ Requires `manage_options` capability. See Authentication Guide.
 
 Retrieve available step types for pipeline configuration.
 
-**Permission**: `manage_options` capability required
+**Permission**: Public metadata endpoint
 
 **Purpose**: Discover available step types for pipeline builder UI
 

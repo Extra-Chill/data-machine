@@ -188,7 +188,7 @@ wp datamachine analytics pagespeed analyze --format=json --allow-root
 POST /wp-json/datamachine/v1/analytics/pagespeed
 ```
 
-**Authentication**: Requires `manage_options` capability.
+**Authentication**: Requires the relevant Data Machine management capability for tool configuration and execution context.
 
 **Request Body**:
 ```json

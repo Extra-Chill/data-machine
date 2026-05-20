@@ -32,7 +32,7 @@ Core should expose behavior through abilities, hooks, REST, CLI, handlers, and b
 - **Engine Execution**: Bounded execution cycle, Single Item Execution Model, job status logic, and retry behavior ([core-system/engine-execution.md](core-system/engine-execution.md)).
 - **Pipeline Execution Axes**: Queue, fan-out, per-step iteration, and scheduled runs as separate dimensions ([architecture/pipeline-execution-axes.md](architecture/pipeline-execution-axes.md)).
 - **Troubleshooting Problem Flows**: Automated monitoring of consecutive failures/no-items and how to resolve them ([core-system/troubleshooting-problem-flows.md](core-system/troubleshooting-problem-flows.md)).
-- **Abilities API**: WordPress capability discovery and execution for Data Machine operations ([core-system/abilities-api.md](core-system/abilities-api.md)).
+- **Abilities API**: Current `datamachine/*` domain inventory, permission model, and registration contract ([core-system/abilities-api.md](core-system/abilities-api.md)).
 - **WP-CLI**: Current command surface including cycle, drain, worker, pending actions, retention, bundles, and aliases ([core-system/wp-cli.md](core-system/wp-cli.md)).
 
 ### Architecture Deep Dives
@@ -47,22 +47,20 @@ Core should expose behavior through abilities, hooks, REST, CLI, handlers, and b
 - **Daily Memory System**: DailyMemoryTask lifecycle, deterministic overflow, opt-in daily injection, and daily memory artifacts ([core-system/daily-memory-system.md](core-system/daily-memory-system.md)).
 - **Memory Policy**: Per-agent memory injection policy and safe self-memory write gates ([core-system/memory-policy.md](core-system/memory-policy.md)).
 - **Agent Bundles**: Portable agent package schema, artifact tracking, extras, extension artifacts, run artifacts, and authenticated sources ([core-system/agent-bundles.md](core-system/agent-bundles.md)).
-- **Universal Engine**: Shared AI infrastructure for pipeline and chat agents.
+- **Universal Engine**: Shared AI infrastructure for pipeline, chat, and system agents ([core-system/universal-engine.md](core-system/universal-engine.md)).
 - **AI Conversation Loop**: Data Machine turn runner over `AgentsAPI\AI\WP_Agent_Conversation_Loop` ([core-system/ai-conversation-loop.md](core-system/ai-conversation-loop.md)).
-- **AI Directives System**: Hierarchical directive injection for contextual AI behavior.
-- **Tool Execution**: Resolved tool dispatch, action policy, ability-only execution, and approval staging.
-- **Tool Manager**: Data Machine tool registry, source-level availability checks, policy resolution, and handler tool expansion.
-- **Request Builder**: Directive-aware construction of provider requests.
-- **Conversation Manager**: Message normalization, logging, and tool call tracking.
-- **Prompt Builder**: Priority-based directive registration via filters.
-- **Parameter Systems**: Unified parameter handling across tools and handlers.
-- **Tool Result Finder**: Utility for interpreting tool responses inside data packets.
-- **OAuth Handlers**: Base classes for OAuth1/OAuth2 providers and app-password flows.
-- **Handler Registration Trait**: Centralized registration pattern for fetch, publish, and upsert handlers.
-- **HTTP Client**: Standardized outbound request flow for handlers with structured logging and browser-mode header support.
-- **Import/Export System**: Pipeline configuration backup, migration, and sharing functionality.
-- **Agent Bundles**: Portable agent recipes with memory, pipelines, flows, reserved schema trees, and extension-owned extras ([core-system/agent-bundles.md](core-system/agent-bundles.md)).
-- **Daily Memory System**: Append-only daily artifacts, daily-memory directive, chat tool, REST/CLI, and summarization task ([core-system/daily-memory-system.md](core-system/daily-memory-system.md)).
+- **AI Directives System**: Hierarchical directive injection for contextual AI behavior ([core-system/ai-directives.md](core-system/ai-directives.md)).
+- **Tool Execution**: Resolved tool dispatch, action policy, ability execution, and approval staging ([core-system/tool-execution.md](core-system/tool-execution.md)).
+- **Tool Manager**: Data Machine tool registry, source-level availability checks, policy resolution, and handler tool expansion ([core-system/tool-manager.md](core-system/tool-manager.md)).
+- **Request Builder**: Directive-aware construction of wp-ai-client provider requests ([core-system/request-builder.md](core-system/request-builder.md)).
+- **Conversation Manager**: Message normalization, logging, and tool call tracking ([core-system/conversation-manager.md](core-system/conversation-manager.md)).
+- **Prompt Builder**: Priority-based directive registration via filters ([core-system/prompt-builder.md](core-system/prompt-builder.md)).
+- **Parameter Systems**: Unified parameter handling across tools and handlers ([api/endpoints/parameter-systems.md](api/endpoints/parameter-systems.md)).
+- **Tool Result Finder**: Utility for interpreting tool responses inside data packets ([core-system/tool-result-finder.md](core-system/tool-result-finder.md)).
+- **OAuth Handlers**: Base classes for OAuth1/OAuth2 providers and app-password flows ([core-system/oauth-handlers.md](core-system/oauth-handlers.md)).
+- **Handler Registration Trait**: Centralized registration pattern for fetch, publish, and upsert handlers ([core-system/handler-registration-trait.md](core-system/handler-registration-trait.md)).
+- **HTTP Client**: Standardized outbound request flow for handlers with structured logging and browser-mode header support ([core-system/http-client.md](core-system/http-client.md)).
+- **Import/Export System**: Pipeline configuration backup, migration, and sharing functionality ([core-system/import-export.md](core-system/import-export.md)).
 - **Ephemeral Workflows**: Execute workflow definitions without first saving a persistent pipeline ([core-system/ephemeral-workflows.md](core-system/ephemeral-workflows.md)).
 - **Memory Policy**: Read/write/editability policy for self-memory and file sections ([core-system/memory-policy.md](core-system/memory-policy.md)).
 
@@ -105,7 +103,7 @@ docs/
 ├── architecture/                      # Architecture deep dives (axes, policies, primitives)
 ├── CHANGELOG.md                       # Semantic changelog for releases
 ├── core-system/                       # Engine, services, and core infrastructure pieces
-│   ├── abilities-api.md               # WordPress 6.9 Abilities API for flow queries, logging, and post filtering
+│   ├── abilities-api.md               # Current datamachine/* ability domains, permissions, and registration contract
 │   ├── ai-directives.md               # AI directive system and priority hierarchy
 │   ├── ai-conversation-loop.md        # Data Machine turn runner over Agents API conversation loop
 │   ├── agent-bundles.md               # Portable agent bundle schema and extras contract

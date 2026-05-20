@@ -127,7 +127,7 @@ wp datamachine analytics bing page_stats --allow-root
 POST /wp-json/datamachine/v1/analytics/bing
 ```
 
-**Authentication**: Requires `manage_options` capability.
+**Authentication**: Requires the relevant Data Machine management capability plus configured Bing Webmaster access.
 
 **Request Body**:
 ```json

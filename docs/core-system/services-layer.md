@@ -1,12 +1,12 @@
-# Services Layer Architecture
+# Abilities-First Service Layer
 
-**Abilities-First Architecture** (@since v0.11.7)
+Data Machine's public service layer is the WordPress Abilities API. REST controllers, WP-CLI commands, chat tools, system tasks, and extension integrations call `datamachine/*` abilities instead of reaching into manager classes or controller internals.
 
-The Services Layer has been fully migrated to the WordPress 6.9 Abilities API. The legacy Services directory has been deleted. All business logic now resides in ability classes under `inc/Abilities/`.
+The legacy Services directory has been removed. Current business operations live in focused ability classes under `inc/Abilities/`, with lower-level repositories and core classes kept as implementation details behind those abilities.
 
 ## Migration Status
 
-The migration from OOP service managers to WordPress Abilities API is **complete**:
+The migration from OOP service managers to WordPress Abilities API is complete:
 
 | Former Service | Replacement | Location |
 |----------------|-------------|----------|
@@ -19,27 +19,27 @@ The migration from OOP service managers to WordPress Abilities API is **complete
 | `HandlerService` | `HandlerAbilities` | `inc/Abilities/HandlerAbilities.php` |
 | `StepTypeService` | `StepTypeAbilities` | `inc/Abilities/StepTypeAbilities.php` |
 | `LogsManager` | `LogAbilities` | `inc/Abilities/LogAbilities.php` |
-| `CacheManager` | Ability-level `clearCache()` methods (legacy name) | Per-ability class |
+| `CacheManager` | Ability-level/cache-owner invalidation methods | Per-ability class or owning core class |
 | `AuthProviderService` | `AuthAbilities` | `inc/Abilities/AuthAbilities.php` |
 
 ## Abilities Overview
 
-Ability classes under `inc/Abilities/` register the operations Data Machine exposes to REST, WP-CLI, and chat tools. The current registry includes 193 `wp_register_ability()` callsites across domains including:
+Ability classes under `inc/Abilities/` register the operations Data Machine exposes to REST, WP-CLI, chat tools, background jobs, and external integrations. The current registry includes 205 `datamachine/*` abilities across domains including:
 
 - Pipeline and pipeline-step CRUD, duplication, import, and export
 - Flow CRUD, scheduling, duplication, pause/resume, webhook triggers, and per-step configuration
 - Prompt queues, fetch config-patch queues, and queue mode management
 - Job execution, retry/fail/delete/recovery, flow health, and summaries
-- Agent identity, access, tokens, remote calls, memory, and ping notifications
-- File, scaffold, chat, email, media, SEO, taxonomy, settings, auth, logs, and analytics operations
+- Agent identity, access grants, tokens, active-agent selection, remote calls, memory, and self-memory writes
+- File, scaffold, chat, email, media, SEO, taxonomy CRUD/resolution/merge, settings, auth, logs, source inventory, and analytics operations
 
 ## Architecture Principles
 
-- **Standardized Capability Discovery**: All operations exposed via `wp_register_ability()`
+- **Standardized Capability Discovery**: Public operations are exposed via `wp_register_ability()`
 - **Single Responsibility**: Each ability class handles one domain
 - **Centralized Business Logic**: Consistent validation and error handling
-- **Permission Integration**: All abilities check `manage_options` or WP_CLI context
-- **Cache Management**: Each ability class provides its own `clearCache()` method
+- **Permission Integration**: Abilities use `PermissionHelper` for Data Machine capabilities, agent token ceilings, pre-authenticated contexts, Action Scheduler, and WP-CLI
+- **Cache Management**: Cache invalidation stays with the ability or core class that owns the cached domain
 
 ## Cache Management
 

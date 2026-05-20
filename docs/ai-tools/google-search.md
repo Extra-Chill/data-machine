@@ -192,7 +192,7 @@ $result = $google_search_tool->handle_tool_call([
 
 ### WordPress Integration
 
-**Permissions**: Requires `manage_options` capability for configuration
+**Permissions**: Requires the relevant Data Machine management capability for configuration
 **Storage**: Configuration stored in WordPress options table
 **Logging**: All operations logged via `datamachine_log` action
 **REST API**: Configuration handled through Data Machine REST API endpoints

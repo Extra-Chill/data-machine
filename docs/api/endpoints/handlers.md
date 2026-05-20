@@ -10,7 +10,7 @@ The Handlers endpoint provides information about registered fetch, publish, and 
 
 ## Authentication
 
-Requires `manage_options` capability. See Authentication Guide.
+Public metadata endpoints. The routes use `__return_true` because handler labels, schema metadata, and auth requirements are used for UI discovery and do not expose stored credentials.
 
 ## Endpoints
 
@@ -18,7 +18,7 @@ Requires `manage_options` capability. See Authentication Guide.
 
 Retrieve list of available handlers with metadata.
 
-**Permission**: `manage_options` capability required
+**Permission**: Public metadata endpoint
 
 **Purpose**: Discover available handlers for pipeline configuration
 

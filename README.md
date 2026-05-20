@@ -258,7 +258,7 @@ Full REST API under `datamachine/v1`:
 - `GET|POST|PATCH|DELETE /agents...` — Agent CRUD, current agent, access, tokens
 - `POST /agent-ping/confirm`, `POST /agent-ping/callback/{callback_id}` — Agent Ping confirmation/callbacks
 - `GET /handlers`, `/step-types`, `/providers`, `/tools`, `/settings`, `/system/*` — Discovery and settings
-- `GET|POST /auth/*`, `/email/*`, `/processed-items`, `/users/*`, `/analytics/*`, `/links/*` — Supporting product surfaces
+- `GET|POST /auth/*`, `/email/*`, `/users/*`, `/analytics/*`, `/links/*`; `DELETE /processed-items` — Supporting product surfaces
 - `GET /actions/pending`, `GET /actions/pending/{id}`, `POST /actions/resolve` — Approval-gated pending actions
 
 Detailed endpoint docs live under [`docs/api/`](docs/api/). Routes under `wp-json/datamachine/v1` are the Data Machine product API, not the generic Agents API substrate.
@@ -291,7 +291,7 @@ Detailed endpoint docs live under [`docs/api/`](docs/api/). Routes under `wp-jso
 
 ## AI Providers
 
-OpenAI, Anthropic, Google, Grok, OpenRouter — configure a global default per-site, with per-mode overrides for pipeline, chat, and system. Runtime provider dispatch goes through WordPress core's `wp-ai-client` via Data Machine's `RequestBuilder`; there is no runtime fallback to `chubes_ai_request` or `ai-http-client`.
+Configure any provider registered with `wp-ai-client`, then choose a global default per site with optional per-mode overrides for pipeline, chat, and system. Data Machine reads provider/model metadata from the wp-ai-client provider registry and Connectors-shaped settings via `WpAiClientProviderAdmin`; runtime dispatch goes through `RequestBuilder` and has no fallback to `chubes_ai_request` or `ai-http-client`.
 
 ## Runtime Architecture
 
