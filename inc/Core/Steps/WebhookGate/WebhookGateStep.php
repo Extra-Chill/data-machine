@@ -220,7 +220,7 @@ class WebhookGateStep extends Step {
 		set_transient( 'datamachine_webhook_gate_' . $token, $this->job_id, $expiry );
 
 		// Schedule timeout action if configured.
-		if ( $timeout_hours > 0 && function_exists( 'as_schedule_single_action' ) ) {
+		if ( $timeout_hours > 0 ) {
 			as_schedule_single_action(
 				time() + ( $timeout_hours * HOUR_IN_SECONDS ),
 				'datamachine_webhook_gate_timeout',

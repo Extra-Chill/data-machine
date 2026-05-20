@@ -135,7 +135,7 @@ class FlowFormatter {
 	 * @return string|null MySQL datetime string or null
 	 */
 	private static function get_next_run_time( ?int $flow_id ): ?string {
-		if ( ! $flow_id || ! function_exists( 'as_next_scheduled_action' ) ) {
+		if ( ! $flow_id ) {
 			return null;
 		}
 

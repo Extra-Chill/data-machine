@@ -78,16 +78,6 @@ class JobRetryPolicy {
 			);
 		}
 
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			return array(
-				'retried'      => false,
-				'exhausted'    => false,
-				'attempt'      => $attempt,
-				'max_attempts' => $max_attempts,
-				'reason'       => 'action_scheduler_unavailable',
-			);
-		}
-
 		$delay_seconds = self::resolveDelay( $attempt, $policy, $context_data );
 		$timestamp     = time() + $delay_seconds;
 		$flow_step_id  = (string) ( $context_data['flow_step_id'] ?? '' );

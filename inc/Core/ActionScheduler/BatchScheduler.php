@@ -185,14 +185,12 @@ class BatchScheduler {
 			)
 		);
 
-		if ( function_exists( 'as_schedule_single_action' ) ) {
-			as_schedule_single_action(
-				time(),
-				$hook,
-				array( 'parent_job_id' => $parent_job_id ),
-				'data-machine'
-			);
-		}
+		as_schedule_single_action(
+			time(),
+			$hook,
+			array( 'parent_job_id' => $parent_job_id ),
+			'data-machine'
+		);
 
 		return array(
 			'parent_job_id' => $parent_job_id,
@@ -291,14 +289,12 @@ class BatchScheduler {
 			$parent_engine['batch_state']['offset'] = $new_offset;
 			datamachine_set_engine_data( $parent_job_id, $parent_engine );
 
-			if ( function_exists( 'as_schedule_single_action' ) ) {
-				as_schedule_single_action(
-					time() + $delay,
-					$hook,
-					array( 'parent_job_id' => $parent_job_id ),
-					'data-machine'
-				);
-			}
+			as_schedule_single_action(
+				time() + $delay,
+				$hook,
+				array( 'parent_job_id' => $parent_job_id ),
+				'data-machine'
+			);
 		} else {
 			// Last chunk — drop batch_state to free row space. Top-level
 			// batch_total / batch_scheduled / batch_offset stay so the

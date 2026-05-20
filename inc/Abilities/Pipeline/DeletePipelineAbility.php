@@ -104,9 +104,7 @@ class DeletePipelineAbility {
 				continue;
 			}
 
-			if ( function_exists( 'as_unschedule_all_actions' ) ) {
-				as_unschedule_all_actions( 'datamachine_run_flow_now', array( (int) $flow_id ), 'data-machine' );
-			}
+			as_unschedule_all_actions( 'datamachine_run_flow_now', array( (int) $flow_id ), 'data-machine' );
 
 			$this->db_flows->delete_flow( (int) $flow_id );
 		}

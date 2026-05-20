@@ -130,9 +130,7 @@ class PauseFlowAbility {
 			$this->db_flows->update_flow_scheduling( $fid, $scheduling );
 
 			// Unschedule Action Scheduler hooks so paused flows don't fire.
-			if ( function_exists( 'as_unschedule_all_actions' ) ) {
-				as_unschedule_all_actions( 'datamachine_run_flow_now', array( $fid ), 'data-machine' );
-			}
+			as_unschedule_all_actions( 'datamachine_run_flow_now', array( $fid ), 'data-machine' );
 
 			++$paused;
 			$details[] = array(

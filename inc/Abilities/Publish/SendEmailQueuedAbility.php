@@ -212,14 +212,6 @@ class SendEmailQueuedAbility {
 	public function execute( array $input ): array {
 		$logs = array();
 
-		if ( ! function_exists( 'as_schedule_single_action' ) || ! function_exists( 'as_enqueue_async_action' ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Action Scheduler not available.',
-				'logs'    => $logs,
-			);
-		}
-
 		// Validate the bare minimum here. The underlying ability re-validates
 		// the full payload when the worker runs.
 		$to = isset( $input['to'] ) ? (string) $input['to'] : '';
@@ -370,19 +362,6 @@ class SendEmailQueuedAbility {
 		// Re-enqueue with backoff. Bump the attempt counter on the payload.
 		$payload['_attempt'] = $attempt + 1;
 		$retry_at            = time() + self::RETRY_BACKOFF_SECONDS;
-
-		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'Email worker: Action Scheduler unavailable for retry',
-				array(
-					'attempt' => $attempt,
-					'error'   => $error_msg,
-				)
-			);
-			return;
-		}
 
 		$retry_action_id = as_schedule_single_action( $retry_at, self::WORKER_HOOK, array( $payload ), self::GROUP );
 
