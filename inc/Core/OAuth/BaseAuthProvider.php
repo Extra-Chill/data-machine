@@ -212,6 +212,81 @@ abstract class BaseAuthProvider {
 		return apply_filters( 'datamachine_oauth_callback_url', $url, $this->provider_slug );
 	}
 
+	// -------------------------------------------------------------------------
+	// Site-wide account API
+	//
+	// These methods provide explicit top-level account storage access for shared
+	// bot credentials, scheduled flows, and other cases where the credential is
+	// intentionally not owned by a specific user or agent.
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Get the site-wide OAuth account for this provider.
+	 *
+	 * Unlike `get_account( array $context )`, this method never consults auth
+	 * scope policy and never resolves to a user or agent principal. It only reads
+	 * the provider's top-level account slot.
+	 *
+	 * @since 0.128.0
+	 *
+	 * @return array|null Decrypted site-wide account data, or null if no account exists.
+	 */
+	public function get_site_account(): ?array {
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		$provider_data = $all_auth_data[ $this->provider_slug ] ?? array();
+		$account       = $provider_data['account'] ?? null;
+
+		if ( ! is_array( $account ) || empty( $account ) ) {
+			return null;
+		}
+
+		return $this->decrypt_fields( $account );
+	}
+
+	/**
+	 * Save the site-wide OAuth account for this provider.
+	 *
+	 * Sensitive fields are encrypted before storage. The account is stored in the
+	 * top-level provider account slot and does not affect principal-scoped user or
+	 * agent accounts.
+	 *
+	 * @since 0.128.0
+	 *
+	 * @param array $account Account data to store.
+	 * @return bool True on successful write, false on storage failure.
+	 */
+	public function save_site_account( array $account ): bool {
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) || ! is_array( $all_auth_data[ $this->provider_slug ] ) ) {
+			$all_auth_data[ $this->provider_slug ] = array();
+		}
+
+		$all_auth_data[ $this->provider_slug ]['account'] = $this->encrypt_fields( $account );
+
+		return update_site_option( 'datamachine_auth_data', $all_auth_data );
+	}
+
+	/**
+	 * Delete the site-wide OAuth account for this provider.
+	 *
+	 * Principal-scoped user and agent accounts are preserved. The delete is
+	 * idempotent: removing a missing site account is successful.
+	 *
+	 * @since 0.128.0
+	 *
+	 * @return bool True on success, false on storage failure.
+	 */
+	public function delete_site_account(): bool {
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+
+		if ( isset( $all_auth_data[ $this->provider_slug ]['account'] ) ) {
+			unset( $all_auth_data[ $this->provider_slug ]['account'] );
+			return update_site_option( 'datamachine_auth_data', $all_auth_data );
+		}
+
+		return true;
+	}
+
 	/**
 	 * Get OAuth account data directly from options.
 	 *

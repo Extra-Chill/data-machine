@@ -32,6 +32,9 @@ abstract public function is_authenticated(): bool;
 public function __construct(string $provider_slug);
 public function is_configured(): bool;
 public function get_callback_url(): string;
+public function get_site_account(): ?array;
+public function save_site_account(array $account): bool;
+public function delete_site_account(): bool;
 public function get_account(): array;
 public function get_config(): array;
 public function save_account(array $data): bool;
@@ -60,6 +63,23 @@ All providers store data in WordPress options using a consistent structure:
     ]
 ]
 ```
+
+### Site-wide account API (@since v0.128.0)
+
+Three concrete methods on `BaseAuthProvider` let callers operate on the shared
+site-wide account slot without consulting auth scope policy:
+
+```php
+public function get_site_account(): ?array;
+public function save_site_account( array $account ): bool;
+public function delete_site_account(): bool;
+```
+
+Use these methods for shared bot accounts, scheduled flows, and other cases
+where the credential is intentionally not owned by a specific user or agent.
+`get_site_account()` returns `null` when no site-wide account exists. The
+legacy `get_account()` method continues to return an empty array for missing
+accounts and remains unchanged during the migration window.
 
 ### Per-user account API (@since v0.123.0)
 

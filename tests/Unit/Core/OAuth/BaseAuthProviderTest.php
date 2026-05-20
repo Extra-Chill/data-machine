@@ -237,6 +237,69 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 	}
 
 	// -------------------------------------------------------------------------
+	// Site-wide account API
+	// -------------------------------------------------------------------------
+
+	public function test_get_site_account_returns_null_when_no_account(): void {
+		$this->assertNull( $this->provider->get_site_account() );
+	}
+
+	public function test_save_site_account_round_trip(): void {
+		$account = array(
+			'access_token' => 'tok_site',
+			'username'     => 'bot-account',
+			'scope'        => 'read write',
+		);
+
+		$this->assertTrue( $this->provider->save_site_account( $account ) );
+		$this->assertSame( $account, $this->provider->get_site_account() );
+	}
+
+	public function test_site_account_shares_legacy_site_slot(): void {
+		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
+
+		$this->assertSame( 'tok_site', $this->provider->get_account()['access_token'] );
+
+		$this->provider->save_account( array( 'access_token' => 'tok_legacy' ) );
+
+		$this->assertSame( 'tok_legacy', $this->provider->get_site_account()['access_token'] );
+	}
+
+	public function test_delete_site_account_removes_only_site_account(): void {
+		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
+		$this->provider->save_account_for_user( 42, array( 'access_token' => 'tok_user' ) );
+
+		$this->assertTrue( $this->provider->delete_site_account() );
+
+		$this->assertNull( $this->provider->get_site_account() );
+		$this->assertSame( 'tok_user', $this->provider->get_account_for_user( 42 )['access_token'] );
+	}
+
+	public function test_delete_site_account_is_idempotent(): void {
+		$this->assertTrue( $this->provider->delete_site_account() );
+	}
+
+	public function test_site_account_methods_do_not_consult_scope_policy(): void {
+		add_filter(
+			'datamachine_auth_scope_policy',
+			function () {
+				return BaseAuthProvider::AUTH_SCOPE_USER;
+			}
+		);
+
+		wp_set_current_user( self::factory()->user->create() );
+
+		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
+		$this->provider->save_account_for_user( get_current_user_id(), array( 'access_token' => 'tok_user' ) );
+
+		$this->assertSame( 'tok_site', $this->provider->get_site_account()['access_token'] );
+		$this->assertSame( 'tok_user', $this->provider->get_account()['access_token'] );
+
+		remove_all_filters( 'datamachine_auth_scope_policy' );
+		wp_set_current_user( 0 );
+	}
+
+	// -------------------------------------------------------------------------
 	// Per-user account API
 	// -------------------------------------------------------------------------
 
