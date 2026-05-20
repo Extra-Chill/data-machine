@@ -23,6 +23,7 @@ use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Abilities\Job\RunMetricsAbility;
 use DataMachine\Core\JobArtifacts;
+use DataMachine\Core\RunMetrics;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use AgentsAPI\AI\WP_Agent_Message;
@@ -899,6 +900,12 @@ class JobsCommand extends BaseCommand {
 	 * [--source=<source>]
 	 * : Filter by source (pipeline, system).
 	 *
+	 * [--pipeline=<pipeline_id>]
+	 * : Filter by pipeline ID.
+	 *
+	 * [--handler=<handler_slug>]
+	 * : Filter by handler slug recorded in generic job outcome metadata.
+	 *
 	 * [--since=<datetime>]
 	 * : Show jobs created after this time. Accepts ISO datetime or relative strings (e.g., "1 hour ago", "today", "yesterday").
 	 *
@@ -958,6 +965,7 @@ class JobsCommand extends BaseCommand {
 	public function list_jobs( array $args, array $assoc_args ): void {
 		$status  = $assoc_args['status'] ?? null;
 		$flow_id = isset( $assoc_args['flow'] ) ? (int) $assoc_args['flow'] : null;
+		$pipeline_id = isset( $assoc_args['pipeline'] ) ? (int) $assoc_args['pipeline'] : null;
 		$limit   = (int) ( $assoc_args['limit'] ?? 20 );
 		$format  = $assoc_args['format'] ?? 'table';
 
@@ -986,6 +994,18 @@ class JobsCommand extends BaseCommand {
 
 		if ( $flow_id ) {
 			$input['flow_id'] = $flow_id;
+		}
+
+		if ( $pipeline_id ) {
+			$input['pipeline_id'] = $pipeline_id;
+		}
+
+		if ( ! empty( $assoc_args['source'] ) ) {
+			$input['source'] = (string) $assoc_args['source'];
+		}
+
+		if ( ! empty( $assoc_args['handler'] ) ) {
+			$input['handler'] = (string) $assoc_args['handler'];
 		}
 
 		$since = $assoc_args['since'] ?? null;
@@ -1031,7 +1051,7 @@ class JobsCommand extends BaseCommand {
 
 		// Transform jobs to flat row format.
 		$items = array_map(
-			function ( $j ) {
+			function ( $j ) use ( $format ) {
 				$source         = $j['source'] ?? 'pipeline';
 				$status_display = strlen( $j['status'] ?? '' ) > 40 ? substr( $j['status'], 0, 40 ) . '...' : ( $j['status'] ?? '' );
 
@@ -1041,7 +1061,7 @@ class JobsCommand extends BaseCommand {
 					$flow_display = $j['flow_name'] ?? ( isset( $j['flow_id'] ) ? "Flow {$j['flow_id']}" : '' );
 				}
 
-				return array(
+				$item = array(
 					'id'        => $j['job_id'] ?? '',
 					'source'    => $source,
 					'flow'      => $flow_display,
@@ -1049,9 +1069,26 @@ class JobsCommand extends BaseCommand {
 					'created'   => $j['created_at'] ?? '',
 					'completed' => $j['completed_at'] ?? '-',
 				);
+
+				if ( 'json' === $format ) {
+					$metrics              = RunMetrics::fromJob( $j );
+					$item['pipeline_id']  = $j['pipeline_id'] ?? null;
+					$item['flow_id']      = $j['flow_id'] ?? null;
+					$item['handler_slug'] = $metrics['outcome']['handler_slug'] ?? null;
+					$item['outcome']      = $metrics['outcome'];
+					$item['step_results'] = $metrics['step_results'];
+					$item['counts']       = $metrics['counts'];
+				}
+
+				return $item;
 			},
 			$jobs
 		);
+
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $items, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
 
 		$this->format_items( $items, $this->default_fields, $assoc_args, 'id' );
 

@@ -21,12 +21,56 @@ class RunMetrics {
 		'processed',
 		'skipped',
 		'failed',
+		'fetch_packets',
+		'no_content',
+		'source_rejected',
 		'retried',
 		'scheduled',
 		'staged_actions',
 		'accepted_actions',
 		'rejected_actions',
 	);
+
+	private const STEP_RESULTS_KEY = 'step_results';
+
+	public static function recordStepResult( int $job_id, string $flow_step_id, array $result ): bool {
+		if ( $job_id <= 0 || '' === $flow_step_id ) {
+			return false;
+		}
+
+		$engine       = EngineData::retrieve( $job_id );
+		$step_results = is_array( $engine[ self::STEP_RESULTS_KEY ] ?? null ) ? $engine[ self::STEP_RESULTS_KEY ] : array();
+		$existing     = is_array( $step_results[ $flow_step_id ] ?? null ) ? $step_results[ $flow_step_id ] : array();
+		$clean_result = self::sanitizeResult( $result );
+
+		$step_results[ $flow_step_id ] = array_replace_recursive(
+			$existing,
+			array_merge(
+				array(
+					'flow_step_id' => $flow_step_id,
+					'recorded_at'  => self::now(),
+				),
+				$clean_result
+			)
+		);
+
+		$engine[ self::STEP_RESULTS_KEY ] = $step_results;
+
+		$metrics = self::normalize( $engine[ self::KEY ] ?? array() );
+		if ( isset( $clean_result['packet_count'] ) && 'fetch' === ( $clean_result['step_type'] ?? '' ) ) {
+			$metrics['counts']['fetch_packets'] = max( (int) $metrics['counts']['fetch_packets'], (int) $clean_result['packet_count'] );
+		}
+		if ( in_array( $clean_result['result'] ?? '', array( 'no_content', 'completed_no_items' ), true ) ) {
+			$metrics['counts']['no_content'] = max( 1, (int) $metrics['counts']['no_content'] );
+		}
+		if ( 'source_rejected' === ( $clean_result['result'] ?? '' ) || ! empty( $clean_result['source_rejection_reason'] ) ) {
+			$metrics['counts']['source_rejected'] = max( 1, (int) $metrics['counts']['source_rejected'] );
+		}
+		$metrics['last_activity_at'] = self::now();
+		$engine[ self::KEY ]        = $metrics;
+
+		return EngineData::persist( $job_id, $engine );
+	}
 
 	public static function start( int $job_id, array $context = array() ): bool {
 		if ( $job_id <= 0 ) {
@@ -134,6 +178,8 @@ class RunMetrics {
 				'completed_at'     => $ended_at,
 			),
 			'duration_seconds' => self::durationSeconds( $started_at, $duration_end ),
+			'outcome'          => self::outcomeDetails( $job, $engine, $counts ),
+			'step_results'     => self::stepResults( $engine ),
 			'context'          => $metrics['context'],
 			'token_usage'      => self::tokenUsage( $engine ),
 			'cost'             => self::cost( $engine ),
@@ -214,7 +260,95 @@ class RunMetrics {
 			$counts['failed'] = max( 1, (int) ( $counts['failed'] ?? 0 ) );
 		}
 
+		foreach ( self::stepResults( $engine ) as $step_result ) {
+			if ( 'fetch' === ( $step_result['step_type'] ?? '' ) && isset( $step_result['packet_count'] ) ) {
+				$counts['fetch_packets'] = max( (int) ( $counts['fetch_packets'] ?? 0 ), (int) $step_result['packet_count'] );
+			}
+			if ( in_array( $step_result['result'] ?? '', array( 'no_content', 'completed_no_items' ), true ) ) {
+				$counts['no_content'] = max( 1, (int) ( $counts['no_content'] ?? 0 ) );
+			}
+			if ( 'source_rejected' === ( $step_result['result'] ?? '' ) || ! empty( $step_result['source_rejection_reason'] ) ) {
+				$counts['source_rejected'] = max( 1, (int) ( $counts['source_rejected'] ?? 0 ) );
+			}
+		}
+
 		return $counts;
+	}
+
+	private static function outcomeDetails( array $job, array $engine, array $counts ): array {
+		$status             = (string) ( $job['status'] ?? '' );
+		$job_status         = JobStatus::fromString( $status );
+		$source_rejection   = is_array( $engine['source_rejection'] ?? null ) ? $engine['source_rejection'] : array();
+		$is_source_rejected = ! empty( $counts['source_rejected'] ) || ! empty( $source_rejection ) || 'source-rejected' === $job_status->getReason();
+
+		return array_filter(
+			array(
+				'status'                  => $status,
+				'base_status'             => $job_status->getBaseStatus(),
+				'status_reason'           => $job_status->getReason(),
+				'fetch_packet_count'      => (int) ( $counts['fetch_packets'] ?? 0 ),
+				'no_content'              => ! empty( $counts['no_content'] ) || JobStatus::COMPLETED_NO_ITEMS === $job_status->getBaseStatus(),
+				'source_rejected'         => $is_source_rejected,
+				'source_rejection_reason' => $source_rejection['reason'] ?? ( $is_source_rejected ? $job_status->getReason() : null ),
+				'handler_slug'            => self::firstStepField( $engine, 'handler_slug' ),
+				'provider_id'             => self::firstStepField( $engine, 'provider_id' ),
+				'tool_ids'                => self::mergedStepListField( $engine, 'tool_ids' ),
+			),
+			static fn( $value ) => null !== $value
+		);
+	}
+
+	private static function stepResults( array $engine ): array {
+		$step_results = is_array( $engine[ self::STEP_RESULTS_KEY ] ?? null ) ? $engine[ self::STEP_RESULTS_KEY ] : array();
+		return array_values( array_filter( $step_results, 'is_array' ) );
+	}
+
+	private static function firstStepField( array $engine, string $field ) {
+		foreach ( self::stepResults( $engine ) as $result ) {
+			if ( isset( $result[ $field ] ) && '' !== $result[ $field ] ) {
+				return $result[ $field ];
+			}
+		}
+		return null;
+	}
+
+	private static function mergedStepListField( array $engine, string $field ): array {
+		$values = array();
+		foreach ( self::stepResults( $engine ) as $result ) {
+			$list = is_array( $result[ $field ] ?? null ) ? $result[ $field ] : array();
+			foreach ( $list as $value ) {
+				if ( is_scalar( $value ) && '' !== (string) $value ) {
+					$values[] = (string) $value;
+				}
+			}
+		}
+		return array_values( array_unique( $values ) );
+	}
+
+	private static function sanitizeResult( array $result ): array {
+		$clean = array();
+		foreach ( $result as $key => $value ) {
+			$key = function_exists( 'sanitize_key' ) ? sanitize_key( (string) $key ) : preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) );
+			if ( '' === $key ) {
+				continue;
+			}
+			if ( is_scalar( $value ) || null === $value ) {
+				$clean[ $key ] = $value;
+			} elseif ( is_array( $value ) ) {
+				$clean[ $key ] = self::sanitizeList( $value );
+			}
+		}
+		return $clean;
+	}
+
+	private static function sanitizeList( array $values ): array {
+		$clean = array();
+		foreach ( $values as $key => $value ) {
+			if ( is_scalar( $value ) || null === $value ) {
+				$clean[ is_int( $key ) ? $key : (string) $key ] = $value;
+			}
+		}
+		return $clean;
 	}
 
 	private static function childTotals( int $job_id ): array {

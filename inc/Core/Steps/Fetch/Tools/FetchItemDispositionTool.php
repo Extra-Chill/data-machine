@@ -17,6 +17,7 @@
 namespace DataMachine\Core\Steps\Fetch\Tools;
 
 use DataMachine\Core\JobStatus;
+use DataMachine\Core\RunMetrics;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -125,7 +126,33 @@ class FetchItemDispositionTool {
 
 		// Set job status override for engine to use at completion
 		$status = JobStatus::agentSkipped( 'source-rejected' );
-		datamachine_merge_engine_data( $job_id, array( 'job_status' => $status->toString() ) );
+		datamachine_merge_engine_data(
+			$job_id,
+			array(
+				'job_status'       => $status->toString(),
+				'source_rejection' => array(
+					'reason'          => $reason,
+					'flow_step_id'    => $flow_step_id,
+					'item_identifier' => $item_identifier,
+					'source_type'     => $source_type,
+				),
+			)
+		);
+
+		if ( $flow_step_id ) {
+			RunMetrics::recordStepResult(
+				$job_id,
+				(string) $flow_step_id,
+				array(
+					'step_type'               => 'fetch',
+					'result'                  => 'source_rejected',
+					'packet_count'            => 0,
+					'source_rejection_reason' => $reason,
+					'source_type'             => $source_type,
+					'item_identifier'         => $item_identifier,
+				)
+			);
+		}
 
 		do_action(
 			'datamachine_log',

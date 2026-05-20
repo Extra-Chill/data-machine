@@ -268,7 +268,10 @@ class JobStatus {
 	 * Parse base status from a potentially compound status string.
 	 */
 	private static function parseBaseStatus( string $status ): string {
-		foreach ( self::FINAL_STATUSES as $base ) {
+		$base_statuses = self::FINAL_STATUSES;
+		usort( $base_statuses, static fn( string $a, string $b ): int => strlen( $b ) <=> strlen( $a ) );
+
+		foreach ( $base_statuses as $base ) {
 			if ( str_starts_with( $status, $base ) ) {
 				return $base;
 			}

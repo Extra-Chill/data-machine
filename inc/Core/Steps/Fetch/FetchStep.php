@@ -3,6 +3,7 @@
 namespace DataMachine\Core\Steps\Fetch;
 
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\RunMetrics;
 use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
@@ -108,6 +109,18 @@ class FetchStep extends Step {
 				);
 
 				$this->engine->set( 'job_status', \DataMachine\Core\JobStatus::COMPLETED_NO_ITEMS );
+				RunMetrics::recordStepResult(
+					$this->job_id,
+					$this->flow_step_id,
+					array(
+						'step_type'    => 'fetch',
+						'result'       => 'completed_no_items',
+						'handler_slug' => (string) $handler,
+						'packet_count' => 0,
+						'reason'       => 'empty_queue',
+						'queue_mode'   => $queue_mode,
+					)
+				);
 
 				return $this->dataPackets;
 			}
@@ -156,6 +169,18 @@ class FetchStep extends Step {
 
 		if ( is_wp_error( $resolved_handler_settings ) ) {
 			$this->log( 'error', 'Fetch auth_ref resolution failed: ' . $resolved_handler_settings->get_error_message() );
+			RunMetrics::recordStepResult(
+				$this->job_id,
+				$this->flow_step_id,
+				array(
+					'step_type'    => 'fetch',
+					'result'       => 'failed',
+					'handler_slug' => (string) $handler,
+					'packet_count' => 0,
+					'reason'       => 'auth_ref_resolution_failed',
+					'error'        => $resolved_handler_settings->get_error_message(),
+				)
+			);
 			return $this->dataPackets;
 		}
 
@@ -165,8 +190,35 @@ class FetchStep extends Step {
 
 		if ( empty( $packets ) ) {
 			$this->log( 'error', 'Fetch handler returned no content' );
+			RunMetrics::recordStepResult(
+				$this->job_id,
+				$this->flow_step_id,
+				array_merge(
+					$this->extractHandlerOutcomeIds( $handler_settings ),
+					array(
+						'step_type'    => 'fetch',
+						'result'       => 'no_content',
+						'handler_slug' => (string) $handler,
+						'packet_count' => 0,
+					)
+				)
+			);
 			return $this->dataPackets;
 		}
+
+		RunMetrics::recordStepResult(
+			$this->job_id,
+			$this->flow_step_id,
+			array_merge(
+				$this->extractHandlerOutcomeIds( $handler_settings ),
+				array(
+					'step_type'    => 'fetch',
+					'result'       => 'completed',
+					'handler_slug' => (string) $handler,
+					'packet_count' => count( $packets ),
+				)
+			)
+		);
 
 		$this->log(
 			'info',
@@ -280,5 +332,33 @@ class FetchStep extends Step {
 
 		$class_name = $handler_info['class'];
 		return class_exists( $class_name ) ? new $class_name() : null;
+	}
+
+	/**
+	 * Extract generic provider/tool identifiers from handler settings.
+	 *
+	 * @param array $handler_settings Handler settings after runtime auth resolution.
+	 * @return array<string,mixed>
+	 */
+	private function extractHandlerOutcomeIds( array $handler_settings ): array {
+		$out = array();
+		foreach ( array( 'provider_id', 'provider_slug', 'provider', 'auth_provider', 'server_key', 'context_server_key' ) as $key ) {
+			if ( ! empty( $handler_settings[ $key ] ) && is_scalar( $handler_settings[ $key ] ) ) {
+				$out['provider_id'] = (string) $handler_settings[ $key ];
+				break;
+			}
+		}
+
+		$tool_ids = array();
+		foreach ( array( 'tool_id', 'tool_slug', 'tool_name', 'handler_tool', 'mcp_tool' ) as $key ) {
+			if ( ! empty( $handler_settings[ $key ] ) && is_scalar( $handler_settings[ $key ] ) ) {
+				$tool_ids[] = (string) $handler_settings[ $key ];
+			}
+		}
+		if ( ! empty( $tool_ids ) ) {
+			$out['tool_ids'] = array_values( array_unique( $tool_ids ) );
+		}
+
+		return $out;
 	}
 }

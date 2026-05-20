@@ -206,6 +206,16 @@ class Jobs extends BaseRepository {
 			$where_values[]  = sanitize_text_field( $args['source'] );
 		}
 
+		if ( ! empty( $args['handler'] ) ) {
+			$handler = sanitize_key( (string) $args['handler'] );
+			if ( '' !== $handler ) {
+				$where_clauses[] = '(engine_data LIKE %s OR engine_data LIKE %s OR engine_data LIKE %s)';
+				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler_slug":"' . $handler . '"' ) . '%';
+				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler":"' . $handler . '"' ) . '%';
+				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler_slugs":["' . $handler . '"' ) . '%';
+			}
+		}
+
 		if ( isset( $args['user_id'] ) ) {
 			$where_clauses[] = 'user_id = %d';
 			$where_values[]  = absint( $args['user_id'] );
@@ -315,6 +325,16 @@ class Jobs extends BaseRepository {
 			$where_values[]  = sanitize_text_field( $args['source'] );
 		}
 
+		if ( ! empty( $args['handler'] ) ) {
+			$handler = sanitize_key( (string) $args['handler'] );
+			if ( '' !== $handler ) {
+				$where_clauses[] = '(j.engine_data LIKE %s OR j.engine_data LIKE %s OR j.engine_data LIKE %s)';
+				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler_slug":"' . $handler . '"' ) . '%';
+				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler":"' . $handler . '"' ) . '%';
+				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler_slugs":["' . $handler . '"' ) . '%';
+			}
+		}
+
 		if ( isset( $args['user_id'] ) ) {
 			$where_clauses[] = 'j.user_id = %d';
 			$where_values[]  = absint( $args['user_id'] );
@@ -368,6 +388,17 @@ class Jobs extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above
 		$results = $this->wpdb->get_results( $query, ARRAY_A );
+		if ( $results ) {
+			foreach ( $results as &$result ) {
+				if ( isset( $result['engine_data'] ) && is_string( $result['engine_data'] ) && '' !== $result['engine_data'] ) {
+					$decoded = json_decode( $result['engine_data'], true );
+					$result['engine_data'] = JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ? $decoded : array();
+				} else {
+					$result['engine_data'] = array();
+				}
+			}
+			unset( $result );
+		}
 
 		return $results ? $results : array();
 	}

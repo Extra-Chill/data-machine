@@ -8,6 +8,7 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Core\RunMetrics;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\AI\ToolPolicy\PipelineToolPolicyArgs;
@@ -132,6 +133,17 @@ class AIStep extends Step {
 			$reason = $pre_check['reason'] ?? 'pre-AI check determined processing is unnecessary';
 
 			$this->engine->set( 'job_status', $status );
+			RunMetrics::recordStepResult(
+				$this->job_id,
+				$this->flow_step_id,
+				array(
+					'step_type'    => 'ai',
+					'result'       => 'skipped',
+					'packet_count' => 0,
+					'reason'       => $reason,
+					'status'       => $status,
+				)
+			);
 
 			do_action(
 				'datamachine_log',
@@ -211,6 +223,17 @@ class AIStep extends Step {
 					);
 
 					$this->engine->set( 'job_status', \DataMachine\Core\JobStatus::COMPLETED_NO_ITEMS );
+					RunMetrics::recordStepResult(
+						$this->job_id,
+						$this->flow_step_id,
+						array(
+							'step_type'    => 'ai',
+							'result'       => 'completed_no_items',
+							'packet_count' => 0,
+							'reason'       => 'empty_queue',
+							'queue_mode'   => $queue_mode,
+						)
+					);
 
 					return $this->dataPackets;
 				}
@@ -457,6 +480,21 @@ class AIStep extends Step {
 					);
 				}
 
+				RunMetrics::recordStepResult(
+					$this->job_id,
+					$this->flow_step_id,
+					array(
+						'step_type'    => 'ai',
+						'result'       => 'failed',
+						'provider_id'  => $provider_name,
+						'model_id'     => $model_name,
+						'tool_ids'     => array_keys( $available_tools ),
+						'packet_count' => 0,
+						'reason'       => $failure_reason,
+						'error_code'   => $loop_result['error_code'] ?? null,
+					)
+				);
+
 				do_action(
 					'datamachine_fail_job',
 					$this->job_id,
@@ -531,7 +569,22 @@ class AIStep extends Step {
 			}
 
 			// Process loop results into data packets
-			return self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
+			$processed_packets = self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
+			RunMetrics::recordStepResult(
+				$this->job_id,
+				$this->flow_step_id,
+				array(
+					'step_type'     => 'ai',
+					'result'        => empty( $processed_packets ) ? 'no_content' : 'completed',
+					'provider_id'   => $provider_name,
+					'model_id'      => $model_name,
+					'tool_ids'      => array_keys( $available_tools ),
+					'handler_slugs' => $required_handler_slugs,
+					'packet_count'  => count( $processed_packets ),
+				)
+			);
+
+			return $processed_packets;
 		} finally {
 			if ( $ai_concurrency_lease instanceof PipelineAIConcurrencyLease ) {
 				$ai_concurrency_lease->release();
