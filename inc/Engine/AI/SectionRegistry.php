@@ -50,6 +50,10 @@ class SectionRegistry {
 	 *
 	 *     @type string $label       Human-readable label.
 	 *     @type string $description Description of what this section provides.
+	 *     @type string $source_plugin Plugin slug/path that owns the registration.
+	 *     @type string $source_file   File that registered the section.
+	 *     @type string $source_callback Callback that renders the section.
+	 *     @type string $registered_at WordPress hook active during registration.
 	 * }
 	 * @return void
 	 */
@@ -70,12 +74,18 @@ class SectionRegistry {
 			return call_user_func( $callback, $context );
 		};
 
+		$provenance = array_merge( self::registration_provenance( $callback ), array_intersect_key( $args, array_flip( array( 'source_plugin', 'source_file', 'source_callback', 'registered_at' ) ) ) );
+
 		self::$sections[ $filename ][ $slug ] = array(
-			'slug'        => $slug,
-			'priority'    => $priority,
-			'callback'    => $section_callback,
-			'label'       => $args['label'] ?? self::slug_to_label( $slug ),
-			'description' => $args['description'] ?? '',
+			'slug'            => $slug,
+			'priority'        => $priority,
+			'callback'        => $section_callback,
+			'label'           => $args['label'] ?? self::slug_to_label( $slug ),
+			'description'     => $args['description'] ?? '',
+			'source_plugin'   => $provenance['source_plugin'],
+			'source_file'     => $provenance['source_file'],
+			'source_callback' => $provenance['source_callback'],
+			'registered_at'   => $provenance['registered_at'],
 		);
 
 		WP_Agent_Context_Section_Registry::register(
@@ -89,7 +99,11 @@ class SectionRegistry {
 				'retrieval_policy' => $args['retrieval_policy'] ?? null,
 				'modes'            => $args['modes'] ?? array( MemoryFileRegistry::MODE_ALL ),
 				'meta'             => array(
-					'filename' => $filename,
+					'filename'        => $filename,
+					'source_plugin'   => self::$sections[ $filename ][ $slug ]['source_plugin'],
+					'source_file'     => self::$sections[ $filename ][ $slug ]['source_file'],
+					'source_callback' => self::$sections[ $filename ][ $slug ]['source_callback'],
+					'registered_at'   => self::$sections[ $filename ][ $slug ]['registered_at'],
 				),
 			)
 		);
@@ -249,5 +263,106 @@ class SectionRegistry {
 	 */
 	private static function slug_to_label( string $slug ): string {
 		return ucwords( str_replace( array( '-', '_' ), ' ', $slug ) );
+	}
+
+	/**
+	 * Infer registration provenance from the caller frame and callback.
+	 *
+	 * @param callable $callback Section render callback.
+	 * @return array<string, string>
+	 */
+	private static function registration_provenance( callable $callback ): array {
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace -- Intentional provenance capture for registered composable sections.
+		$trace         = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS );
+		$source_file   = '';
+		$registered_at = function_exists( 'current_filter' ) ? (string) current_filter() : '';
+
+		foreach ( $trace as $frame ) {
+			$file = (string) ( $frame['file'] ?? '' );
+			if ( '' === $file || __FILE__ === $file ) {
+				continue;
+			}
+
+			$source_file = $file;
+			break;
+		}
+
+		return array(
+			'source_plugin'   => self::source_plugin_from_file( $source_file ),
+			'source_file'     => self::normalize_source_file( $source_file ),
+			'source_callback' => self::describe_callback( $callback ),
+			'registered_at'   => '' !== $registered_at ? $registered_at : '-',
+		);
+	}
+
+	/**
+	 * Normalize a source file for operator-facing output.
+	 *
+	 * @param string $file Absolute file path.
+	 * @return string Relative plugin/site path when possible.
+	 */
+	private static function normalize_source_file( string $file ): string {
+		if ( '' === $file ) {
+			return '-';
+		}
+
+		if ( function_exists( 'plugin_basename' ) ) {
+			$plugin_basename = plugin_basename( $file );
+			if ( is_string( $plugin_basename ) && '' !== $plugin_basename && $plugin_basename !== $file ) {
+				return $plugin_basename;
+			}
+		}
+
+		if ( defined( 'ABSPATH' ) ) {
+			$root = rtrim( (string) ABSPATH, '/\\' ) . DIRECTORY_SEPARATOR;
+			if ( 0 === strpos( $file, $root ) ) {
+				return ltrim( substr( $file, strlen( $root ) ), '/\\' );
+			}
+		}
+
+		return basename( $file );
+	}
+
+	/**
+	 * Derive a plugin owner from a source file.
+	 *
+	 * @param string $file Absolute file path.
+	 * @return string Plugin slug/path, or '-' when unavailable.
+	 */
+	private static function source_plugin_from_file( string $file ): string {
+		$source_file = self::normalize_source_file( $file );
+		if ( '-' === $source_file ) {
+			return '-';
+		}
+
+		$parts = explode( '/', str_replace( '\\', '/', $source_file ) );
+		return $parts[0] ?? '-';
+	}
+
+	/**
+	 * Describe a PHP callback for CLI provenance output.
+	 *
+	 * @param callable $callback Callback to describe.
+	 * @return string Human-readable callback name.
+	 */
+	private static function describe_callback( callable $callback ): string {
+		if ( is_string( $callback ) ) {
+			return $callback;
+		}
+
+		if ( $callback instanceof \Closure ) {
+			return 'Closure';
+		}
+
+		if ( is_array( $callback ) && 2 === count( $callback ) ) {
+			$target = is_object( $callback[0] ) ? get_class( $callback[0] ) : (string) $callback[0];
+			return $target . '::' . (string) $callback[1];
+		}
+
+		if ( is_object( $callback ) ) {
+			return get_class( $callback ) . '::__invoke';
+		}
+
+		return '-';
 	}
 }
