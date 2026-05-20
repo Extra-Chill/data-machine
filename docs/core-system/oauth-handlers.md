@@ -166,6 +166,10 @@ v0.131.0. The legacy method still returns an array for backward compatibility,
 but callers should use `get_account_for_context()` when they want
 policy-resolved lookup.
 
+Passing a non-empty context array to `save_account()` or `clear_account()` is
+deprecated as of v0.132.0. Callers should use the explicit site, user, or agent
+methods when they know the target scope.
+
 #### When to use per-user vs. site-wide credentials
 
 ```

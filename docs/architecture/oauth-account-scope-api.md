@@ -194,7 +194,7 @@ scope is genuinely delegated to provider policy.
 5. Reduce context-array `get_account()` to a deprecated shim for non-empty
    contexts. Shipped in v0.131.0.
 6. Reduce context-array `save_account()` and `clear_account()` to deprecated
-   shims for non-empty contexts.
+   shims for non-empty contexts. Shipped in v0.132.0.
 7. Update internal site-wide callsites to `get_site_account()` /
    `save_site_account()` / `delete_site_account()`.
 8. Update internal scoped callsites to `get_account_for_user()` or

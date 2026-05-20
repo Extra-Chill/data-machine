@@ -477,6 +477,144 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 		remove_all_filters( 'datamachine_auth_scope_policy' );
 	}
 
+	public function test_save_account_without_context_does_not_emit_deprecation(): void {
+		$deprecated_calls = array();
+
+		add_action(
+			'deprecated_function_run',
+			function ( $function_name, $replacement, $version ) use ( &$deprecated_calls ) {
+				$deprecated_calls[] = array( $function_name, $replacement, $version );
+			},
+			10,
+			3
+		);
+
+		$this->provider->save_account( array( 'access_token' => 'tok_site' ) );
+
+		$this->assertSame( array(), $deprecated_calls );
+
+		remove_all_filters( 'deprecated_function_run' );
+	}
+
+	public function test_save_account_with_context_emits_deprecation_and_preserves_policy_write(): void {
+		$deprecated_calls = array();
+		$this->setExpectedDeprecated( 'DataMachine\Core\OAuth\BaseAuthProvider::save_account with a context argument' );
+
+		add_filter(
+			'deprecated_function_trigger_error',
+			function () {
+				return false;
+			}
+		);
+		add_filter(
+			'datamachine_auth_scope_policy',
+			function () {
+				return BaseAuthProvider::AUTH_SCOPE_PRINCIPAL;
+			}
+		);
+		add_action(
+			'deprecated_function_run',
+			function ( $function_name, $replacement, $version ) use ( &$deprecated_calls ) {
+				$deprecated_calls[] = array( $function_name, $replacement, $version );
+			},
+			10,
+			3
+		);
+
+		$result = $this->provider->save_account(
+			array( 'access_token' => 'tok_agent_scoped' ),
+			array(
+				'user_id'  => 42,
+				'agent_id' => 303,
+			)
+		);
+
+		$this->assertTrue( $result );
+		$this->assertSame( 'tok_agent_scoped', $this->provider->get_account_for_agent( 303 )['access_token'] );
+		$this->assertSame(
+			array(
+				array(
+					'DataMachine\Core\OAuth\BaseAuthProvider::save_account with a context argument',
+					'BaseAuthProvider::save_site_account(), BaseAuthProvider::save_account_for_user(), or BaseAuthProvider::save_account_for_agent()',
+					'0.132.0',
+				),
+			),
+			$deprecated_calls
+		);
+
+		remove_all_filters( 'deprecated_function_trigger_error' );
+		remove_all_filters( 'datamachine_auth_scope_policy' );
+		remove_all_filters( 'deprecated_function_run' );
+	}
+
+	public function test_clear_account_without_context_does_not_emit_deprecation(): void {
+		$deprecated_calls = array();
+
+		add_action(
+			'deprecated_function_run',
+			function ( $function_name, $replacement, $version ) use ( &$deprecated_calls ) {
+				$deprecated_calls[] = array( $function_name, $replacement, $version );
+			},
+			10,
+			3
+		);
+
+		$this->provider->clear_account();
+
+		$this->assertSame( array(), $deprecated_calls );
+
+		remove_all_filters( 'deprecated_function_run' );
+	}
+
+	public function test_clear_account_with_context_emits_deprecation_and_preserves_policy_delete(): void {
+		$deprecated_calls = array();
+		$this->setExpectedDeprecated( 'DataMachine\Core\OAuth\BaseAuthProvider::clear_account with a context argument' );
+
+		add_filter(
+			'deprecated_function_trigger_error',
+			function () {
+				return false;
+			}
+		);
+		add_filter(
+			'datamachine_auth_scope_policy',
+			function () {
+				return BaseAuthProvider::AUTH_SCOPE_PRINCIPAL;
+			}
+		);
+		add_action(
+			'deprecated_function_run',
+			function ( $function_name, $replacement, $version ) use ( &$deprecated_calls ) {
+				$deprecated_calls[] = array( $function_name, $replacement, $version );
+			},
+			10,
+			3
+		);
+
+		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
+		$this->provider->save_account_for_agent( 303, array( 'access_token' => 'tok_agent_303' ) );
+
+		$result = $this->provider->clear_account( array( 'agent_id' => 303 ) );
+
+		$this->assertTrue( $result );
+		$this->assertNull( $this->provider->get_account_for_agent( 303 ) );
+		$this->assertSame( 'tok_site', $this->provider->get_site_account()['access_token'] );
+		$this->assertSame(
+			array(
+				array(
+					'DataMachine\Core\OAuth\BaseAuthProvider::clear_account with a context argument',
+					'BaseAuthProvider::delete_site_account(), BaseAuthProvider::delete_account_for_user(), or BaseAuthProvider::delete_account_for_agent()',
+					'0.132.0',
+				),
+			),
+			$deprecated_calls
+		);
+
+		remove_all_filters( 'deprecated_function_trigger_error' );
+		remove_all_filters( 'datamachine_auth_scope_policy' );
+		remove_all_filters( 'deprecated_function_run' );
+	}
+
 	// -------------------------------------------------------------------------
 	// Per-user account API
 	// -------------------------------------------------------------------------
@@ -695,7 +833,7 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 			$this->provider->get_account_for_context( array( 'agent_id' => 303 ) )['access_token']
 		);
 
-		$this->provider->save_account( array( 'access_token' => 'tok_agent_scoped' ), array( 'agent_id' => 404 ) );
+		$this->provider->save_account_for_agent( 404, array( 'access_token' => 'tok_agent_scoped' ) );
 
 		$this->assertSame( 'tok_agent_scoped', $this->provider->get_account_for_agent( 404 )['access_token'] );
 
