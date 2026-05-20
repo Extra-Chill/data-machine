@@ -9,6 +9,7 @@ This plugin extends Data Machine with business-focused integrations including:
 - **Google Search**: Search the web through Google Custom Search API as an AI tool
 - **Google Sheets**: Fetch data from spreadsheets and append data for reporting
 - **Google Analytics (GA4)**: Fetch visitor analytics, realtime, engagement, and comparison metrics
+- **Google Search Console**: Read search analytics, inspect URLs, and manage sitemaps
 - **Slack**: Post messages and fetch conversations from channels
 - **Discord**: Post messages and fetch messages from server channels
 - **Amazon Affiliate Link**: Search Amazon products and return affiliate links using the Amazon Creators API
@@ -70,6 +71,25 @@ Supported actions include `page_stats`, `traffic_sources`, `date_stats`, `realti
 5. Add your site's URL as authorized redirect URI
 6. Copy Client ID and Client Secret to Data Machine settings
 7. Authenticate the handler
+
+## Google Search Console Setup
+
+Google Search Console uses a Google service account, not the shared Google OAuth user credential.
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create or select a project with the Search Console APIs enabled
+3. Create a service account and JSON key
+4. Add the service account email as a user on the Search Console property
+5. Configure the `google_search_console` tool in Data Machine settings with the JSON key and property URL
+
+Existing Data Machine core installations keep using the same `datamachine_gsc_config` option, so activating Data Machine Business adopts previously saved Search Console configuration automatically.
+
+### Google Search Console Usage
+
+- AI tool: `google_search_console`
+- Ability: `datamachine/google-search-console`
+- REST: `POST /wp-json/datamachine/v1/analytics/gsc`
+- WP-CLI: `wp datamachine analytics gsc query_stats`
 
 ## Usage
 

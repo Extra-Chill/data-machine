@@ -75,6 +75,7 @@ function datamachine_business_load_handlers() {
 	// Google Sheets
 	new \DataMachineBusiness\Abilities\GoogleSheets\FetchGoogleSheetsAbility();
 	new \DataMachineBusiness\Abilities\GoogleSheets\PublishGoogleSheetsAbility();
+	new \DataMachineBusiness\Abilities\Analytics\GoogleSearchConsoleAbilities();
 
 	// Google Sheets Handlers
 	new \DataMachineBusiness\Handlers\GoogleSheets\GoogleSheetsFetch();
@@ -86,6 +87,15 @@ function datamachine_business_load_handlers() {
 
 	// Google Custom Search API tool.
 	new \DataMachineBusiness\Tools\GoogleSearch();
+
+	// Google Search Console global tool. Uses the legacy core option key so
+	// existing service-account configuration is adopted without migration.
+	new \DataMachineBusiness\Tools\GoogleSearchConsole();
+	\DataMachineBusiness\Api\GoogleSearchConsoleAnalytics::register();
+
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		\WP_CLI::add_command( 'datamachine analytics gsc', \DataMachineBusiness\Cli\GoogleSearchConsoleCommand::class );
+	}
 
 	// Slack
 	new \DataMachineBusiness\Abilities\Slack\PostMessageSlackAbility();
