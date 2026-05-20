@@ -119,6 +119,8 @@ foreach ( array( '/actions', '/actions/(?P<action_id>', '/actions/summary' ) as 
 }
 datamachine_pending_actions_assert( str_contains( $cli_bootstrap, 'datamachine pending-actions' ), 'pending-actions CLI command is registered', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $cli_command_source, 'public function list' ) && str_contains( $cli_command_source, 'public function get' ) && str_contains( $cli_command_source, 'public function summary' ), 'CLI exposes list/get/summary subcommands', $failures, $passes );
+datamachine_pending_actions_assert( ! str_contains( $store_source, 'public static function summary( array $filters = array() ): array {' . PHP_EOL . "\t\t" . '$rows = self::list' ), 'summary aggregation does not use the paginated list surface', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $store_source, 'SELECT status, kind, agent_id, context FROM %%i WHERE %s' ), 'summary aggregation queries all matching rows for accurate filtered totals', $failures, $passes );
 
 echo "\n[4] Existing resolver and Agents API handler contracts remain the canonical resolution path:\n";
 datamachine_pending_actions_assert( str_contains( $resolver_source, 'datamachine_pending_action_handlers' ), 'legacy pending action handler filter remains in resolver', $failures, $passes );
