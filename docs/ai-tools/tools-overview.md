@@ -24,7 +24,6 @@ Mutation risk means what the tool can change when called successfully:
 | `image_generation` | chat, pipeline | Low mutation | Create image-generation jobs and sideload generated media. | [Image Generation](image-generation.md) |
 | `internal_link_audit` | chat, pipeline | Low mutation | Audit internal links, backlinks, orphans, and broken URLs. | [Internal Link Audit](internal-link-audit.md) |
 | `local_search` | chat, pipeline | Read-only | Search local WordPress posts/pages. | [Local Search](local-search.md) |
-| `pagespeed` | chat, pipeline | Read-only | Run PageSpeed Insights/Lighthouse audits. | [PageSpeed Insights](pagespeed-insights.md) |
 | `web_fetch` | chat, pipeline | Read-only | Fetch readable content from a URL. | [Web Fetch](web-fetch.md) |
 | `wordpress_post_reader` | chat, pipeline | Read-only | Read a WordPress post by permalink URL. | [WordPress Post Reader](wordpress-post-reader.md) |
 

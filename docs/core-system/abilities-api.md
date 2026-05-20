@@ -285,7 +285,6 @@ writing.
 | `datamachine/bing-webmaster` | Fetch search analytics from Bing Webmaster Tools API | `inc/Abilities/Analytics/BingWebmasterAbilities.php` |
 | `datamachine/google-search-console` | Fetch search analytics from Google Search Console API | `inc/Abilities/Analytics/GoogleSearchConsoleAbilities.php` |
 | `datamachine/google-analytics` | Fetch visitor analytics from Google Analytics (GA4) Data API | `inc/Abilities/Analytics/GoogleAnalyticsAbilities.php` |
-| `datamachine/pagespeed` | Run Lighthouse audits via PageSpeed Insights API | `inc/Abilities/Analytics/PageSpeedAbilities.php` |
 
 ### Taxonomy (5 abilities)
 

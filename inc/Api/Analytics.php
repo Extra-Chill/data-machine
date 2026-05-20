@@ -2,8 +2,8 @@
 /**
  * Analytics REST API Endpoints
  *
- * Provides REST API access to all analytics integrations:
- * Google Search Console, Bing Webmaster, Google Analytics (GA4), PageSpeed Insights.
+ * Provides REST API access to core analytics integrations:
+ * Google Search Console, Bing Webmaster, Google Analytics (GA4).
  *
  * Each endpoint delegates to its respective ability via wp_get_ability().
  * All endpoints require manage_options capability.
@@ -12,7 +12,6 @@
  * - POST /datamachine/v1/analytics/gsc        — Google Search Console queries
  * - POST /datamachine/v1/analytics/bing       — Bing Webmaster Tools queries
  * - POST /datamachine/v1/analytics/ga         — Google Analytics (GA4) queries
- * - POST /datamachine/v1/analytics/pagespeed  — PageSpeed Insights audits
  *
  * @package DataMachine\Api
  * @since 0.31.0
@@ -35,10 +34,9 @@ class Analytics {
 	 * @var array
 	 */
 	const ABILITY_MAP = array(
-		'gsc'       => 'datamachine/google-search-console',
-		'bing'      => 'datamachine/bing-webmaster',
-		'ga'        => 'datamachine/google-analytics',
-		'pagespeed' => 'datamachine-pagespeed',
+		'gsc'  => 'datamachine/google-search-console',
+		'bing' => 'datamachine/bing-webmaster',
+		'ga'   => 'datamachine/google-analytics',
 	);
 
 	/**

@@ -68,7 +68,7 @@ class AbilityCategories {
 			),
 			self::ANALYTICS  => array(
 				'label'       => __( 'Analytics', 'data-machine' ),
-				'description' => __( 'Google Analytics, Search Console, Bing Webmaster, and PageSpeed.', 'data-machine' ),
+				'description' => __( 'Google Analytics, Search Console, and Bing Webmaster.', 'data-machine' ),
 			),
 			self::SEO        => array(
 				'label'       => __( 'SEO', 'data-machine' ),

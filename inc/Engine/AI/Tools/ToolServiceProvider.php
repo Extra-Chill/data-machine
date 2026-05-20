@@ -22,7 +22,6 @@ use DataMachine\Engine\AI\Tools\Global\BingWebmaster;
 use DataMachine\Engine\AI\Tools\Global\GoogleAnalytics;
 use DataMachine\Engine\AI\Tools\Global\GoogleSearch;
 use DataMachine\Engine\AI\Tools\Global\GoogleSearchConsole;
-use DataMachine\Engine\AI\Tools\Global\PageSpeed;
 use DataMachine\Engine\AI\Tools\Global\ImageGeneration;
 use DataMachine\Engine\AI\Tools\Global\InternalLinkAudit;
 use DataMachine\Engine\AI\Tools\Global\LocalSearch;
@@ -90,7 +89,6 @@ class ToolServiceProvider {
 		new GoogleAnalytics();
 		new GoogleSearch();
 		new GoogleSearchConsole();
-		new PageSpeed();
 		new ImageGeneration();
 		new InternalLinkAudit();
 		new LocalSearch();

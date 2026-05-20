@@ -190,7 +190,6 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/Analytics/BingWebmasterAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Analytics/GoogleAnalyticsAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Analytics/GoogleSearchConsoleAbilities.php';
-	require_once __DIR__ . '/inc/Abilities/Analytics/PageSpeedAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentCallAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentRemoteCallAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentAbilities.php';
@@ -289,7 +288,6 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Analytics\BingWebmasterAbilities();
 	new \DataMachine\Abilities\Analytics\GoogleAnalyticsAbilities();
 	new \DataMachine\Abilities\Analytics\GoogleSearchConsoleAbilities();
-	new \DataMachine\Abilities\Analytics\PageSpeedAbilities();
 	new \DataMachine\Abilities\AgentCallAbilities();
 	new \DataMachine\Abilities\AgentRemoteCallAbilities();
 	new \DataMachine\Abilities\Taxonomy\ResolveTermAbility();

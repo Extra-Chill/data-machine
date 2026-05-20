@@ -13,7 +13,6 @@ Unified REST API for all analytics integrations. Each endpoint delegates to its 
 | `POST` | `/datamachine/v1/analytics/gsc` | Google Search Console |
 | `POST` | `/datamachine/v1/analytics/bing` | Bing Webmaster Tools |
 | `POST` | `/datamachine/v1/analytics/ga` | Google Analytics (GA4) |
-| `POST` | `/datamachine/v1/analytics/pagespeed` | PageSpeed Insights |
 
 ## Authentication
 
@@ -59,14 +58,6 @@ All endpoints accept JSON POST body with `action` as the only required field. Ad
 | `end_date` | string | No | `YYYY-MM-DD` (default: yesterday) |
 | `limit` | integer | No | Row limit (default: 25, max: 10000) |
 | `page_filter` | string | No | Filter to pages containing this path string |
-
-### PageSpeed Insights Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `action` | string | Yes | `analyze`, `performance`, `opportunities` |
-| `url` | string | No | URL to analyze (default: site home URL) |
-| `strategy` | string | No | `mobile` (default) or `desktop` |
 
 ## Response Format
 
@@ -140,16 +131,15 @@ The `Analytics` class registers a single route pattern for each tool. The handle
 
 ```php
 const ABILITY_MAP = [
-    'gsc'       => 'datamachine/google-search-console',
-    'bing'      => 'datamachine/bing-webmaster',
-    'ga'        => 'datamachine/google-analytics',
-    'pagespeed' => 'datamachine/pagespeed',
+	'gsc'  => 'datamachine/google-search-console',
+	'bing' => 'datamachine/bing-webmaster',
+	'ga'   => 'datamachine/google-analytics',
 ];
 ```
 
 ### Execution Flow
 
-1. `register_routes()` registers all four POST routes
+1. `register_routes()` registers the core analytics POST routes
 2. `check_permission()` validates the scoped `manage_flows` permission
 3. `handle_request()` extracts tool name from route, looks up ability slug
 4. Ability is retrieved via `wp_get_ability()` and executed with the JSON body
@@ -169,16 +159,6 @@ curl -X POST https://chubes.net/wp-json/datamachine/v1/analytics/ga \
   -H "X-WP-Nonce: {nonce}" \
   --cookie "{auth_cookie}" \
   -d '{"action": "page_stats", "limit": 10}'
-```
-
-### cURL — PageSpeed Audit
-
-```bash
-curl -X POST https://chubes.net/wp-json/datamachine/v1/analytics/pagespeed \
-  -H "Content-Type: application/json" \
-  -H "X-WP-Nonce: {nonce}" \
-  --cookie "{auth_cookie}" \
-  -d '{"action": "analyze", "url": "https://chubes.net/", "strategy": "desktop"}'
 ```
 
 ### cURL — GSC Query Stats

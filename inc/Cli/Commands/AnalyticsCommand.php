@@ -2,8 +2,8 @@
 /**
  * WP-CLI Analytics Command
  *
- * Provides CLI access to all analytics integrations:
- * Google Search Console, Bing Webmaster, Google Analytics (GA4), PageSpeed Insights.
+ * Provides CLI access to core analytics integrations:
+ * Google Search Console, Bing Webmaster, Google Analytics (GA4).
  *
  * Each subcommand delegates to its respective ability via wp_get_ability().
  *
@@ -249,59 +249,6 @@ class AnalyticsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Run PageSpeed Insights (Lighthouse) audits.
-	 *
-	 * ## OPTIONS
-	 *
-	 * <action>
-	 * : Action to perform: analyze (full audit), performance (Core Web Vitals), opportunities (optimization suggestions).
-	 *
-	 * [--page-url=<url>]
-	 * : URL to analyze. Defaults to the site home URL (named --page-url to avoid WP-CLI's global --url).
-	 *
-	 * [--strategy=<strategy>]
-	 * : Device strategy: mobile or desktop (default: mobile).
-	 *
-	 * [--format=<format>]
-	 * : Output format.
-	 * ---
-	 * default: table
-	 * options:
-	 *   - table
-	 *   - json
-	 *   - csv
-	 * ---
-	 *
-	 * ## EXAMPLES
-	 *
-	 *     # Full Lighthouse audit (mobile)
-	 *     wp datamachine analytics pagespeed analyze
-	 *
-	 *     # Desktop performance check
-	 *     wp datamachine analytics pagespeed performance --strategy=desktop
-	 *
-	 *     # Optimization opportunities for a specific page
-	 *     wp datamachine analytics pagespeed opportunities --page-url=https://chubes.net/blog/
-	 *
-	 *     # Full audit as JSON
-	 *     wp datamachine analytics pagespeed analyze --format=json
-	 *
-	 * @subcommand pagespeed
-	 */
-	public function pagespeed( array $args, array $assoc_args ): void {
-		$input = array(
-			'action' => $args[0] ?? '',
-		);
-
-		$this->map_optional( $input, $assoc_args, array(
-			'page-url' => 'url',
-			'strategy' => 'strategy',
-		) );
-
-		$this->execute_ability( 'datamachine-pagespeed', $input, $assoc_args );
-	}
-
-	/**
 	 * Map CLI flags to ability input keys.
 	 *
 	 * @param array $input     Ability input (modified by reference).
@@ -355,7 +302,7 @@ class AnalyticsCommand extends BaseCommand {
 		$results = $result['results'] ?? array();
 
 		if ( empty( $results ) ) {
-			// Show top-level data for actions that don't return a results array (e.g., pagespeed analyze).
+			// Show top-level data for actions that don't return a results array.
 			$display = array_filter(
 				$result,
 				function ( $value, $key ) {
@@ -437,7 +384,7 @@ class AnalyticsCommand extends BaseCommand {
 	/**
 	 * Flatten a nested result into a single-level array for display.
 	 *
-	 * Used for pagespeed scores/metrics where the result has nested objects.
+	 * Used for scores/metrics where the result has nested objects.
 	 *
 	 * @param array $result Full result array.
 	 * @return array Flattened key-value pairs.
