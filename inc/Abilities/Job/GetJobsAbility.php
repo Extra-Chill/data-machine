@@ -63,6 +63,10 @@ class GetJobsAbility {
 								'type'        => array( 'string', 'null' ),
 								'description' => __( 'Filter jobs by source (pipeline, chat, system, api, direct)', 'data-machine' ),
 							),
+							'handler'     => array(
+								'type'        => array( 'string', 'null' ),
+								'description' => __( 'Filter jobs by generic handler slug recorded in job outcome metadata.', 'data-machine' ),
+							),
 							'per_page'    => array(
 								'type'        => 'integer',
 								'default'     => self::DEFAULT_PER_PAGE,
@@ -133,6 +137,7 @@ class GetJobsAbility {
 		$agent_id    = $input['agent_id'] ?? null;
 		$status      = $input['status'] ?? null;
 		$source      = $input['source'] ?? null;
+		$handler     = $input['handler'] ?? null;
 		$since       = $input['since'] ?? null;
 		$per_page    = (int) ( $input['per_page'] ?? self::DEFAULT_PER_PAGE );
 		$offset      = (int) ( $input['offset'] ?? 0 );
@@ -201,6 +206,11 @@ class GetJobsAbility {
 		if ( null !== $source && '' !== $source ) {
 			$args['source']            = sanitize_text_field( $source );
 			$filters_applied['source'] = $args['source'];
+		}
+
+		if ( null !== $handler && '' !== $handler ) {
+			$args['handler']            = sanitize_key( (string) $handler );
+			$filters_applied['handler'] = $args['handler'];
 		}
 
 		if ( null !== $agent_id ) {

@@ -20,6 +20,7 @@ use DataMachine\Core\EngineData;
 use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileRetrieval;
 use DataMachine\Core\JobStatus;
+use DataMachine\Core\RunMetrics;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Engine\StepNavigator;
@@ -221,7 +222,7 @@ class ExecuteStepAbility {
 				)
 			);
 
-			return $this->routeAfterExecution(
+			$result = $this->routeAfterExecution(
 				$job_id,
 				$flow_step_id,
 				$flow_id,
@@ -233,7 +234,35 @@ class ExecuteStepAbility {
 				$step_success,
 				$status_override
 			);
+
+			$recorded_status = $status_override ? $status_override : ( $result['outcome'] ?? null );
+
+			RunMetrics::recordStepResult(
+				$job_id,
+				$flow_step_id,
+				array(
+					'step_type'    => $step_type,
+					'result'       => $result['outcome'] ?? ( $step_success ? 'completed' : 'failed' ),
+					'step_success' => $step_success,
+					'packet_count' => count( $dataPackets ),
+					'status'       => $recorded_status,
+					'error'        => $result['error'] ?? null,
+				)
+			);
+
+			return $result;
 		} catch ( \Throwable $e ) {
+			RunMetrics::recordStepResult(
+				$job_id,
+				$flow_step_id,
+				array(
+					'result'       => 'failed',
+					'step_success' => false,
+					'packet_count' => 0,
+					'reason'       => 'throwable_exception_in_step_execution',
+					'error'        => $e->getMessage(),
+				)
+			);
 			do_action(
 				'datamachine_fail_job',
 				$job_id,
