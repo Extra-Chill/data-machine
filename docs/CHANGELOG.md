@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.127.4] - 2026-05-20
+
+### Fixed
+- preserve fetch step failures
+
 ## [0.127.3] - 2026-05-20
 
 ### Fixed
