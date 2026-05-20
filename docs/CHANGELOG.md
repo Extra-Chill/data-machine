@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.127.9] - 2026-05-20
+
+### Changed
+- share rest url smoke stub
+
 ## [0.127.8] - 2026-05-20
 
 ### Changed
