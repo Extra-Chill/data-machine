@@ -115,6 +115,11 @@ SectionRegistry::register( 'SITE.md', 'one', 20, static fn(): string => "## One\
 SectionRegistry::register( 'SITE.md', 'zero', 10, static fn(): string => "## Zero\nBefore" );
 $content = SectionRegistry::generate( 'SITE.md' );
 datamachine_contract_adoption_assert( "## Zero\nBefore\n\n## One\nFirst" === $content, 'Data Machine section composition stays priority-stable through Agents API' );
+$sections = SectionRegistry::get_sections( 'SITE.md' );
+datamachine_contract_adoption_assert( 'tests' === $sections['one']['source_plugin'], 'section registry records source plugin provenance' );
+datamachine_contract_adoption_assert( 'tests/agents-api-memory-contract-adoption-smoke.php' === $sections['one']['source_file'], 'section registry records source file provenance' );
+datamachine_contract_adoption_assert( 'Closure' === $sections['one']['source_callback'], 'section registry records callback provenance' );
+datamachine_contract_adoption_assert( '-' === $sections['one']['registered_at'], 'section registry records registration hook provenance fallback' );
 
 $disk_store = ( new ReflectionClass( DiskAgentMemoryStore::class ) )->newInstanceWithoutConstructor();
 $disk_caps  = $disk_store->capabilities();

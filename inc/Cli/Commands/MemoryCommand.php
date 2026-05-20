@@ -1164,11 +1164,15 @@ class MemoryCommand extends BaseCommand {
 
 			foreach ( $sections as $slug => $section ) {
 				$items[] = array(
-					'file'        => $filename,
-					'slug'        => $slug,
-					'priority'    => $section['priority'],
-					'label'       => $section['label'],
-					'description' => $section['description'],
+					'file'            => $filename,
+					'slug'            => $slug,
+					'priority'        => $section['priority'],
+					'label'           => $section['label'],
+					'description'     => $section['description'],
+					'source_plugin'   => $section['source_plugin'] ?? '-',
+					'source_file'     => $section['source_file'] ?? '-',
+					'source_callback' => $section['source_callback'] ?? '-',
+					'registered_at'   => $section['registered_at'] ?? '-',
 				);
 			}
 		} else {
@@ -1184,21 +1188,29 @@ class MemoryCommand extends BaseCommand {
 				$sections = SectionRegistry::get_sections( $fname );
 				foreach ( $sections as $slug => $section ) {
 					$items[] = array(
-						'file'        => $fname,
-						'slug'        => $slug,
-						'priority'    => $section['priority'],
-						'label'       => $section['label'],
-						'description' => $section['description'],
+						'file'            => $fname,
+						'slug'            => $slug,
+						'priority'        => $section['priority'],
+						'label'           => $section['label'],
+						'description'     => $section['description'],
+						'source_plugin'   => $section['source_plugin'] ?? '-',
+						'source_file'     => $section['source_file'] ?? '-',
+						'source_callback' => $section['source_callback'] ?? '-',
+						'registered_at'   => $section['registered_at'] ?? '-',
 					);
 				}
 
 				if ( empty( $sections ) ) {
 					$items[] = array(
-						'file'        => $fname,
-						'slug'        => '(none)',
-						'priority'    => '-',
-						'label'       => '-',
-						'description' => 'No sections registered.',
+						'file'            => $fname,
+						'slug'            => '(none)',
+						'priority'        => '-',
+						'label'           => '-',
+						'description'     => 'No sections registered.',
+						'source_plugin'   => '-',
+						'source_file'     => '-',
+						'source_callback' => '-',
+						'registered_at'   => '-',
 					);
 				}
 			}
@@ -1209,7 +1221,7 @@ class MemoryCommand extends BaseCommand {
 			return;
 		}
 
-		$this->format_items( $items, array( 'file', 'slug', 'priority', 'label' ), $assoc_args );
+		$this->format_items( $items, array( 'file', 'slug', 'priority', 'label', 'source_plugin', 'source_file', 'source_callback', 'registered_at' ), $assoc_args );
 	}
 
 	/**
