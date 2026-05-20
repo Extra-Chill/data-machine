@@ -391,7 +391,7 @@ class Jobs extends BaseRepository {
 		if ( $results ) {
 			foreach ( $results as &$result ) {
 				if ( isset( $result['engine_data'] ) && is_string( $result['engine_data'] ) && '' !== $result['engine_data'] ) {
-					$decoded = json_decode( $result['engine_data'], true );
+					$decoded               = json_decode( $result['engine_data'], true );
 					$result['engine_data'] = JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ? $decoded : array();
 				} else {
 					$result['engine_data'] = array();

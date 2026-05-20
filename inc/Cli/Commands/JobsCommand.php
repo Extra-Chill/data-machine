@@ -963,11 +963,11 @@ class JobsCommand extends BaseCommand {
 	 * @subcommand list
 	 */
 	public function list_jobs( array $args, array $assoc_args ): void {
-		$status  = $assoc_args['status'] ?? null;
-		$flow_id = isset( $assoc_args['flow'] ) ? (int) $assoc_args['flow'] : null;
+		$status      = $assoc_args['status'] ?? null;
+		$flow_id     = isset( $assoc_args['flow'] ) ? (int) $assoc_args['flow'] : null;
 		$pipeline_id = isset( $assoc_args['pipeline'] ) ? (int) $assoc_args['pipeline'] : null;
-		$limit   = (int) ( $assoc_args['limit'] ?? 20 );
-		$format  = $assoc_args['format'] ?? 'table';
+		$limit       = (int) ( $assoc_args['limit'] ?? 20 );
+		$format      = $assoc_args['format'] ?? 'table';
 
 		if ( $limit < 1 ) {
 			$limit = 20;

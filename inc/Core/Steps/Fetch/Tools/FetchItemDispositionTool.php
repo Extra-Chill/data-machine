@@ -139,7 +139,7 @@ class FetchItemDispositionTool {
 			)
 		);
 
-		if ( $flow_step_id ) {
+		if ( $flow_step_id && class_exists( RunMetrics::class ) ) {
 			RunMetrics::recordStepResult(
 				$job_id,
 				(string) $flow_step_id,

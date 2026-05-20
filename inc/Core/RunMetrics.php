@@ -67,7 +67,7 @@ class RunMetrics {
 			$metrics['counts']['source_rejected'] = max( 1, (int) $metrics['counts']['source_rejected'] );
 		}
 		$metrics['last_activity_at'] = self::now();
-		$engine[ self::KEY ]        = $metrics;
+		$engine[ self::KEY ]         = $metrics;
 
 		return EngineData::persist( $job_id, $engine );
 	}

@@ -235,6 +235,8 @@ class ExecuteStepAbility {
 				$status_override
 			);
 
+			$recorded_status = $status_override ? $status_override : ( $result['outcome'] ?? null );
+
 			RunMetrics::recordStepResult(
 				$job_id,
 				$flow_step_id,
@@ -243,7 +245,7 @@ class ExecuteStepAbility {
 					'result'       => $result['outcome'] ?? ( $step_success ? 'completed' : 'failed' ),
 					'step_success' => $step_success,
 					'packet_count' => count( $dataPackets ),
-					'status'       => $status_override ?: ( $result['outcome'] ?? null ),
+					'status'       => $recorded_status,
 					'error'        => $result['error'] ?? null,
 				)
 			);
