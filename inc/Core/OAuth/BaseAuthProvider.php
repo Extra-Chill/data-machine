@@ -298,6 +298,18 @@ abstract class BaseAuthProvider {
 	 * @return array Account data or empty array
 	 */
 	public function get_account( array $context = array() ): array {
+		if ( ! empty( $context ) ) {
+			if ( function_exists( '_deprecated_function' ) ) {
+				_deprecated_function(
+					__METHOD__ . ' with a context argument',
+					'0.131.0',
+					'BaseAuthProvider::get_account_for_context()'
+				);
+			}
+
+			return $this->get_account_for_context( $context ) ?? array();
+		}
+
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
 		$provider_data = $all_auth_data[ $this->provider_slug ] ?? array();
 		$scope         = $this->get_principal_scope( $context, 'account' );

@@ -192,13 +192,15 @@ scope is genuinely delegated to provider policy.
    v0.129.0.
 4. Add `get_account_for_context()`. Shipped in v0.130.0.
 5. Reduce context-array `get_account()` to a deprecated shim for non-empty
-   contexts.
-6. Update internal site-wide callsites to `get_site_account()` /
+   contexts. Shipped in v0.131.0.
+6. Reduce context-array `save_account()` and `clear_account()` to deprecated
+   shims for non-empty contexts.
+7. Update internal site-wide callsites to `get_site_account()` /
    `save_site_account()` / `delete_site_account()`.
-7. Update internal scoped callsites to `get_account_for_user()` or
+8. Update internal scoped callsites to `get_account_for_user()` or
    `get_account_for_agent()` when the scope is explicit.
-8. Publish vendor migration notes and coordinate downstream plugin updates.
-9. After at least one release cycle, decide whether context-free `get_account()`
+9. Publish vendor migration notes and coordinate downstream plugin updates.
+10. After at least one release cycle, decide whether context-free `get_account()`
    should also become a deprecated alias for `get_site_account()`.
 
 ## Open Questions
