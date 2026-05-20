@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.128.0] - 2026-05-20
+
+### Added
+- add explicit oauth site account api
+
 ## [0.127.11] - 2026-05-20
 
 ### Fixed
