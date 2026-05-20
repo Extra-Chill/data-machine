@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.127.7] - 2026-05-20
+
+### Fixed
+- align taxonomy CLI ability contract
+
 ## [0.127.6] - 2026-05-20
 
 ### Fixed
