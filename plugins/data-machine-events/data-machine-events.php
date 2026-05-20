@@ -336,6 +336,7 @@ class DATAMACHINE_Events {
 		new \DataMachineEvents\Api\Chat\Tools\EventQualityAudit();
 		new \DataMachineEvents\Api\Chat\Tools\UpdateEvent();
 		new \DataMachineEvents\Api\Chat\Tools\MoveEvent();
+		new \DataMachineEvents\Api\Chat\Tools\DeleteEvent();
 		new \DataMachineEvents\Api\Chat\Tools\GetVenueEvents();
 		new \DataMachineEvents\Api\Chat\Tools\FindBrokenTimezoneEvents();
 		new \DataMachineEvents\Api\Chat\Tools\FixEventTimezone();
@@ -370,6 +371,11 @@ class DATAMACHINE_Events {
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MoveEventAbilities.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/MoveEventAbilities.php';
 			new \DataMachineEvents\Abilities\MoveEventAbilities();
+		}
+
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DeleteEventAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/DeleteEventAbilities.php';
+			new \DataMachineEvents\Abilities\DeleteEventAbilities();
 		}
 
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/BatchTimeFixAbilities.php' ) ) {
