@@ -10,27 +10,22 @@
 
 namespace DataMachine\Abilities\Taxonomy;
 
-use DataMachine\Abilities\PermissionHelper;
-
 use DataMachine\Core\WordPress\TaxonomyHandler;
 
 defined( 'ABSPATH' ) || exit;
 
-class DeleteTaxonomyTermAbility {
+class DeleteTaxonomyTermAbility extends AbstractTaxonomyAbility {
 
-	public function __construct() {
-		$this->registerAbility();
+	protected function getAbilityName(): string {
+		return 'datamachine/delete-taxonomy-term';
 	}
 
-	private function registerAbility(): void {
-		$register_callback = function () {
-			wp_register_ability(
-				'datamachine/delete-taxonomy-term',
-				array(
-					'label'               => __( 'Delete Taxonomy Term', 'data-machine' ),
-					'description'         => __( 'Delete an existing taxonomy term. Optionally reassign posts to another term.', 'data-machine' ),
-					'category'            => 'datamachine-taxonomy',
-					'input_schema'        => array(
+	protected function getAbilityArgs(): array {
+		return array(
+			'label'               => __( 'Delete Taxonomy Term', 'data-machine' ),
+			'description'         => __( 'Delete an existing taxonomy term. Optionally reassign posts to another term.', 'data-machine' ),
+			'category'            => 'datamachine-taxonomy',
+			'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
 							'term'     => array(
@@ -50,7 +45,7 @@ class DeleteTaxonomyTermAbility {
 						),
 						'required'   => array( 'term', 'taxonomy' ),
 					),
-					'output_schema'       => array(
+			'output_schema'       => array(
 						'type'       => 'object',
 						'properties' => array(
 							'success'    => array( 'type' => 'boolean' ),
@@ -62,18 +57,10 @@ class DeleteTaxonomyTermAbility {
 							'error'      => array( 'type' => 'string' ),
 						),
 					),
-					'execute_callback'    => array( $this, 'execute' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
-				)
-			);
-		};
-
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
+			'execute_callback'    => array( $this, 'execute' ),
+			'permission_callback' => array( $this, 'checkPermission' ),
+			'meta'                => array( 'show_in_rest' => true ),
+		);
 	}
 
 	/**
@@ -190,12 +177,4 @@ class DeleteTaxonomyTermAbility {
 		);
 	}
 
-	/**
-	 * Check permission for this ability.
-	 *
-	 * @return bool True if user has permission.
-	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
-	}
 }

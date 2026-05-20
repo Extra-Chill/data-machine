@@ -227,7 +227,7 @@ class TaxonomyCommand extends BaseCommand {
 			return;
 		}
 
-		WP_CLI::success( sprintf( 'Created term "%s" (ID: %d).', $result['name'] ?? $name, $result['term_id'] ?? 0 ) );
+		WP_CLI::success( sprintf( 'Created term "%s" (ID: %d).', $result['term_name'] ?? $name, $result['term_id'] ?? 0 ) );
 
 		if ( 'json' === $format ) {
 			WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
@@ -241,6 +241,9 @@ class TaxonomyCommand extends BaseCommand {
 	 *
 	 * <term_id>
 	 * : Term ID to update.
+	 *
+	 * --taxonomy=<taxonomy>
+	 * : Taxonomy slug.
 	 *
 	 * [--name=<name>]
 	 * : New term name.
@@ -256,20 +259,29 @@ class TaxonomyCommand extends BaseCommand {
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine taxonomy update 5 --name="Renamed Category"
-	 *     wp datamachine taxonomy update 5 --slug=renamed-cat
+	 *     wp datamachine taxonomy update 5 --taxonomy=category --name="Renamed Category"
+	 *     wp datamachine taxonomy update 5 --taxonomy=category --slug=renamed-cat
 	 *
 	 * @subcommand update
 	 */
 	public function update( array $args, array $assoc_args ): void {
-		$term_id = (int) ( $args[0] ?? 0 );
+		$term_id  = (int) ( $args[0] ?? 0 );
+		$taxonomy = $assoc_args['taxonomy'] ?? '';
 
 		if ( $term_id <= 0 ) {
 			WP_CLI::error( 'Valid term ID is required.' );
 			return;
 		}
 
-		$input = array( 'term_id' => $term_id );
+		if ( empty( $taxonomy ) ) {
+			WP_CLI::error( 'Taxonomy is required (--taxonomy=<slug>).' );
+			return;
+		}
+
+		$input = array(
+			'term'     => (string) $term_id,
+			'taxonomy' => $taxonomy,
+		);
 
 		if ( isset( $assoc_args['name'] ) ) {
 			$input['name'] = $assoc_args['name'];
@@ -302,18 +314,22 @@ class TaxonomyCommand extends BaseCommand {
 	 * <term_id>
 	 * : Term ID to delete.
 	 *
+	 * --taxonomy=<taxonomy>
+	 * : Taxonomy slug.
+	 *
 	 * [--yes]
 	 * : Skip confirmation prompt.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp datamachine taxonomy delete 5
-	 *     wp datamachine taxonomy delete 5 --yes
+	 *     wp datamachine taxonomy delete 5 --taxonomy=category
+	 *     wp datamachine taxonomy delete 5 --taxonomy=category --yes
 	 *
 	 * @subcommand delete
 	 */
 	public function delete( array $args, array $assoc_args ): void {
 		$term_id      = (int) ( $args[0] ?? 0 );
+		$taxonomy     = $assoc_args['taxonomy'] ?? '';
 		$skip_confirm = isset( $assoc_args['yes'] );
 
 		if ( $term_id <= 0 ) {
@@ -321,11 +337,21 @@ class TaxonomyCommand extends BaseCommand {
 			return;
 		}
 
+		if ( empty( $taxonomy ) ) {
+			WP_CLI::error( 'Taxonomy is required (--taxonomy=<slug>).' );
+			return;
+		}
+
 		if ( ! $skip_confirm ) {
 			WP_CLI::confirm( sprintf( 'Delete term %d?', $term_id ) );
 		}
 
-		$result = ( new DeleteTaxonomyTermAbility() )->execute( array( 'term_id' => $term_id ) );
+		$result = ( new DeleteTaxonomyTermAbility() )->execute(
+			array(
+				'term'     => (string) $term_id,
+				'taxonomy' => $taxonomy,
+			)
+		);
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to delete term.' );
