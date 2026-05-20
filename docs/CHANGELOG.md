@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.127.10] - 2026-05-20
+
+### Changed
+- deprecate auth disconnect cli verb
+
 ## [0.127.9] - 2026-05-20
 
 ### Changed
