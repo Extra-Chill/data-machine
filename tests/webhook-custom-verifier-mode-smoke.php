@@ -40,6 +40,7 @@ namespace {
 		define( 'ABSPATH', __DIR__ . '/' );
 	}
 
+	require_once __DIR__ . '/fixtures/rest-url-stub.php';
 	require_once __DIR__ . '/smoke-wp-stubs.php';
 
 	$GLOBALS['__webhook_custom_mode_filters'] = array();
@@ -67,12 +68,6 @@ namespace {
 
 	if ( ! function_exists( 'do_action' ) ) {
 		function do_action( string $hook_name, ...$args ): void {}
-	}
-
-	if ( ! function_exists( 'rest_url' ) ) {
-		function rest_url( string $path = '' ): string {
-			return 'https://example.test/wp-json/' . ltrim( $path, '/' );
-		}
 	}
 
 	class TestRegisteredWebhookVerifier {
