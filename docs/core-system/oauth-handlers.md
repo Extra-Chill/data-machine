@@ -167,6 +167,10 @@ wp datamachine auth revoke <handler>
 wp datamachine auth revoke <handler> --user=42
 ```
 
+`wp datamachine auth disconnect <handler>` is kept as a deprecated site-wide
+alias for `revoke` so existing scripts continue to run during the CLI verb
+transition. New callsites should use `revoke`.
+
 Or via the abilities surface:
 
 ```php
