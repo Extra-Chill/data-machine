@@ -8,6 +8,7 @@ This plugin extends Data Machine with business-focused integrations including:
 
 - **Google Search**: Search the web through Google Custom Search API as an AI tool
 - **Google Sheets**: Fetch data from spreadsheets and append data for reporting
+- **Google Analytics (GA4)**: Fetch visitor analytics, realtime, engagement, and comparison metrics
 - **Slack**: Post messages and fetch conversations from channels
 - **Discord**: Post messages and fetch messages from server channels
 - **Amazon Affiliate Link**: Search Amazon products and return affiliate links using the Amazon Creators API
@@ -40,6 +41,25 @@ Data Machine Business registers the `google_search` AI tool for chat and pipelin
 ### Google Search Usage
 
 The tool accepts a required `query` parameter and an optional `site_restrict` domain. It returns up to 10 structured results with title, link, snippet, and display link fields.
+
+## Google Analytics (GA4) Setup
+
+Data Machine Business registers the `datamachine/google-analytics` ability and `google_analytics` chat/pipeline tool. Data Machine core keeps the compatible REST and WP-CLI dispatchers (`/analytics/ga` and `wp datamachine analytics ga`), which work when this plugin is active.
+
+Existing Data Machine GA4 settings are adopted automatically because this plugin uses the same option key, `datamachine_ga_config`, and token transient, `datamachine_ga_access_token`.
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable the Google Analytics Data API
+3. Create a service account and download its JSON key
+4. Grant the service account access to the GA4 property
+5. Configure the Service Account JSON and GA4 Property ID in Data Machine tool settings
+
+### GA4 Ability And Tool
+
+- `datamachine/google-analytics` — Fetches GA4 reports and realtime analytics
+- `google_analytics` — Chat and pipeline tool wrapper for AI agents
+
+Supported actions include `page_stats`, `traffic_sources`, `date_stats`, `realtime`, `top_events`, `user_demographics`, `landing_pages`, `engagement`, and `new_vs_returning`.
 
 ## Google Sheets Setup
 

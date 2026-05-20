@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Data Machine Business
  * Plugin URI: https://github.com/Extra-Chill/data-machine-business
- * Description: Business and enterprise integrations for Data Machine. Adds support for Google Sheets, Slack, Discord, and other business tools.
+ * Description: Business and enterprise integrations for Data Machine. Adds support for Google Analytics, Google Sheets, Slack, Discord, and other business tools.
  * Version: 0.2.0
  * Requires at least: 6.9
  * Requires PHP: 8.2
@@ -67,6 +67,11 @@ function datamachine_business_load_handlers() {
 	}
 
 	// Load Abilities (they self-register)
+	new \DataMachineBusiness\Abilities\Analytics\GoogleAnalyticsAbilities();
+
+	// Global AI tools.
+	new \DataMachineBusiness\Engine\AI\Tools\Global\GoogleAnalytics();
+
 	// Google Sheets
 	new \DataMachineBusiness\Abilities\GoogleSheets\FetchGoogleSheetsAbility();
 	new \DataMachineBusiness\Abilities\GoogleSheets\PublishGoogleSheetsAbility();
