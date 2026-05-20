@@ -393,6 +393,14 @@ abstract class BaseAuthProvider {
 	 * @return bool True on success
 	 */
 	public function save_account( array $data, array $context = array() ): bool {
+		if ( ! empty( $context ) && function_exists( '_deprecated_function' ) ) {
+			_deprecated_function(
+				__METHOD__ . ' with a context argument',
+				'0.132.0',
+				'BaseAuthProvider::save_site_account(), BaseAuthProvider::save_account_for_user(), or BaseAuthProvider::save_account_for_agent()'
+			);
+		}
+
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
 		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) ) {
 			$all_auth_data[ $this->provider_slug ] = array();
@@ -446,6 +454,14 @@ abstract class BaseAuthProvider {
 	 * @return bool True on success
 	 */
 	public function clear_account( array $context = array() ): bool {
+		if ( ! empty( $context ) && function_exists( '_deprecated_function' ) ) {
+			_deprecated_function(
+				__METHOD__ . ' with a context argument',
+				'0.132.0',
+				'BaseAuthProvider::delete_site_account(), BaseAuthProvider::delete_account_for_user(), or BaseAuthProvider::delete_account_for_agent()'
+			);
+		}
+
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
 		$scope         = $this->get_principal_scope( $context, 'account' );
 
