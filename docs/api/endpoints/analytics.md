@@ -4,14 +4,13 @@
 
 **@since**: 0.31.0
 
-Unified REST API for all analytics integrations. Each endpoint delegates to its respective WordPress ability via `wp_get_ability()`.
+Unified REST API for core analytics integrations. Each endpoint delegates to its respective WordPress ability via `wp_get_ability()`. Extensions can add analytics routes with the `datamachine_analytics_ability_map` filter.
 
 ## Endpoints
 
 | Method | Route | Tool |
 |--------|-------|------|
 | `POST` | `/datamachine/v1/analytics/gsc` | Google Search Console |
-| `POST` | `/datamachine/v1/analytics/bing` | Bing Webmaster Tools |
 | `POST` | `/datamachine/v1/analytics/ga` | Google Analytics (GA4) |
 | `POST` | `/datamachine/v1/analytics/pagespeed` | PageSpeed Insights |
 
@@ -41,13 +40,6 @@ All endpoints accept JSON POST body with `action` as the only required field. Ad
 | `query_filter` | string | No | Filter to queries containing this string |
 | `url` | string | No | URL for `inspect_url` action |
 | `sitemap_url` | string | No | URL for `get_sitemap`/`submit_sitemap` |
-
-### Bing Webmaster Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `action` | string | Yes | `query_stats`, `traffic_stats`, `page_stats`, `crawl_stats` |
-| `limit` | integer | No | Row limit (default: 20) |
 
 ### Google Analytics (GA4) Parameters
 
@@ -136,12 +128,11 @@ Response structure varies by tool and action. See individual tool documentation 
 
 ### Routing
 
-The `Analytics` class registers a single route pattern for each tool. The handler extracts the tool name from the request route path and maps it to an ability slug via `ABILITY_MAP`:
+The `Analytics` class registers a single route pattern for each tool. The handler extracts the tool name from the request route path and maps it to an ability slug via `ABILITY_MAP`, after applying `datamachine_analytics_ability_map`:
 
 ```php
 const ABILITY_MAP = [
     'gsc'       => 'datamachine/google-search-console',
-    'bing'      => 'datamachine/bing-webmaster',
     'ga'        => 'datamachine/google-analytics',
     'pagespeed' => 'datamachine/pagespeed',
 ];
@@ -149,7 +140,7 @@ const ABILITY_MAP = [
 
 ### Execution Flow
 
-1. `register_routes()` registers all four POST routes
+1. `register_routes()` registers the core POST routes plus filtered extension routes
 2. `check_permission()` validates the scoped `manage_flows` permission
 3. `handle_request()` extracts tool name from route, looks up ability slug
 4. Ability is retrieved via `wp_get_ability()` and executed with the JSON body

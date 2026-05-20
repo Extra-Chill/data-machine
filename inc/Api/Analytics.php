@@ -2,15 +2,14 @@
 /**
  * Analytics REST API Endpoints
  *
- * Provides REST API access to all analytics integrations:
- * Google Search Console, Bing Webmaster, Google Analytics (GA4), PageSpeed Insights.
+ * Provides REST API access to core analytics integrations:
+ * Google Search Console, Google Analytics (GA4), PageSpeed Insights.
  *
  * Each endpoint delegates to its respective ability via wp_get_ability().
  * All endpoints require manage_options capability.
  *
  * Endpoints:
  * - POST /datamachine/v1/analytics/gsc        — Google Search Console queries
- * - POST /datamachine/v1/analytics/bing       — Bing Webmaster Tools queries
  * - POST /datamachine/v1/analytics/ga         — Google Analytics (GA4) queries
  * - POST /datamachine/v1/analytics/pagespeed  — PageSpeed Insights audits
  *
@@ -36,10 +35,29 @@ class Analytics {
 	 */
 	const ABILITY_MAP = array(
 		'gsc'       => 'datamachine/google-search-console',
-		'bing'      => 'datamachine/bing-webmaster',
 		'ga'        => 'datamachine/google-analytics',
 		'pagespeed' => 'datamachine-pagespeed',
 	);
+
+	/**
+	 * Return analytics route-to-ability mappings.
+	 *
+	 * Extensions can add analytics routes without Data Machine core hardcoding
+	 * named external integrations.
+	 *
+	 * @return array<string,string>
+	 */
+	private static function get_ability_map(): array {
+		/**
+		 * Filter analytics REST route ability mappings.
+		 *
+		 * Keys are route suffixes for /datamachine/v1/analytics/{key}; values are
+		 * registered ability slugs.
+		 *
+		 * @param array<string,string> $ability_map Route-to-ability map.
+		 */
+		return apply_filters( 'datamachine_analytics_ability_map', self::ABILITY_MAP );
+	}
 
 	/**
 	 * Register the API endpoints.
@@ -52,7 +70,7 @@ class Analytics {
 	 * Register REST API routes for all analytics tools.
 	 */
 	public static function register_routes() {
-		foreach ( array_keys( self::ABILITY_MAP ) as $route ) {
+		foreach ( array_keys( self::get_ability_map() ) as $route ) {
 			register_rest_route(
 				'datamachine/v1',
 				'/analytics/' . $route,
@@ -103,7 +121,9 @@ class Analytics {
 		$parts = explode( '/', trim( $route, '/' ) );
 		$tool  = end( $parts );
 
-		if ( ! isset( self::ABILITY_MAP[ $tool ] ) ) {
+		$ability_map = self::get_ability_map();
+
+		if ( ! isset( $ability_map[ $tool ] ) ) {
 			return new \WP_Error(
 				'invalid_tool',
 				__( 'Invalid analytics tool.', 'data-machine' ),
@@ -111,7 +131,7 @@ class Analytics {
 			);
 		}
 
-		$ability_slug = self::ABILITY_MAP[ $tool ];
+		$ability_slug = $ability_map[ $tool ];
 		$ability      = wp_get_ability( $ability_slug );
 
 		if ( ! $ability ) {

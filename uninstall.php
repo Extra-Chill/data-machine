@@ -111,7 +111,6 @@ function datamachine_uninstall_site() {
 function datamachine_uninstall_network_options() {
 	$datamachine_network_options = array(
 		'datamachine_image_generation_config',
-		'datamachine_bing_webmaster_config',
 		'datamachine_gsc_config',
 		'datamachine_search_config',
 		'datamachine_amazon_config',

@@ -2,8 +2,8 @@
 /**
  * WP-CLI Analytics Command
  *
- * Provides CLI access to all analytics integrations:
- * Google Search Console, Bing Webmaster, Google Analytics (GA4), PageSpeed Insights.
+ * Provides CLI access to core analytics integrations:
+ * Google Search Console, Google Analytics (GA4), PageSpeed Insights.
  *
  * Each subcommand delegates to its respective ability via wp_get_ability().
  *
@@ -91,59 +91,6 @@ class AnalyticsCommand extends BaseCommand {
 		) );
 
 		$this->execute_ability( 'datamachine/google-search-console', $input, $assoc_args );
-	}
-
-	/**
-	 * Query Bing Webmaster Tools analytics.
-	 *
-	 * ## OPTIONS
-	 *
-	 * <action>
-	 * : Action to perform: query_stats, traffic_stats, page_stats, crawl_stats.
-	 *
-	 * [--limit=<number>]
-	 * : Maximum number of results (default: 20).
-	 *
-	 * [--days=<number>]
-	 * : Only show data from the last N days (client-side filter).
-	 *
-	 * [--format=<format>]
-	 * : Output format.
-	 * ---
-	 * default: table
-	 * options:
-	 *   - table
-	 *   - json
-	 *   - csv
-	 * ---
-	 *
-	 * ## EXAMPLES
-	 *
-	 *     # Query performance stats
-	 *     wp datamachine analytics bing query_stats
-	 *
-	 *     # Traffic stats as JSON
-	 *     wp datamachine analytics bing traffic_stats --format=json
-	 *
-	 *     # Crawl stats with limit
-	 *     wp datamachine analytics bing crawl_stats --limit=50
-	 *
-	 *     # Only last 30 days of data
-	 *     wp datamachine analytics bing traffic_stats --days=30
-	 *
-	 * @subcommand bing
-	 */
-	public function bing( array $args, array $assoc_args ): void {
-		$input = array(
-			'action' => $args[0] ?? '',
-		);
-
-		$this->map_optional( $input, $assoc_args, array(
-			'limit' => 'limit',
-			'days'  => 'days',
-		) );
-
-		$this->execute_ability( 'datamachine/bing-webmaster', $input, $assoc_args );
 	}
 
 	/**
