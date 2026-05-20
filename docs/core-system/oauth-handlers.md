@@ -85,8 +85,8 @@ public function delete_site_account(): bool;
 Use these methods for shared bot accounts, scheduled flows, and other cases
 where the credential is intentionally not owned by a specific user or agent.
 `get_site_account()` returns `null` when no site-wide account exists. The
-legacy `get_account()` method continues to return an empty array for missing
-accounts and remains unchanged during the migration window.
+legacy context-free `get_account()` method continues to return an empty array
+for missing accounts during the migration window.
 
 ### Per-user account API (@since v0.123.0)
 
@@ -160,6 +160,11 @@ as legacy `get_account( array $context )`: explicit `agent_id`, explicit
 user. It preserves the current site fallback behavior during the migration
 window, but returns `null` when neither a scoped account nor a site-wide account
 exists.
+
+Passing a non-empty context array to `get_account()` is deprecated as of
+v0.131.0. The legacy method still returns an array for backward compatibility,
+but callers should use `get_account_for_context()` when they want
+policy-resolved lookup.
 
 #### When to use per-user vs. site-wide credentials
 

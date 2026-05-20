@@ -388,6 +388,95 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 		remove_all_filters( 'datamachine_auth_scope_policy' );
 	}
 
+	public function test_get_account_without_context_does_not_emit_deprecation(): void {
+		$deprecated_calls = array();
+
+		add_action(
+			'deprecated_function_run',
+			function ( $function_name, $replacement, $version ) use ( &$deprecated_calls ) {
+				$deprecated_calls[] = array( $function_name, $replacement, $version );
+			},
+			10,
+			3
+		);
+
+		$this->provider->get_account();
+
+		$this->assertSame( array(), $deprecated_calls );
+
+		remove_all_filters( 'deprecated_function_run' );
+	}
+
+	public function test_get_account_with_context_emits_deprecation_and_preserves_return_shape(): void {
+		$deprecated_calls = array();
+		$this->setExpectedDeprecated( 'DataMachine\Core\OAuth\BaseAuthProvider::get_account with a context argument' );
+
+		add_filter(
+			'deprecated_function_trigger_error',
+			function () {
+				return false;
+			}
+		);
+		add_action(
+			'deprecated_function_run',
+			function ( $function_name, $replacement, $version ) use ( &$deprecated_calls ) {
+				$deprecated_calls[] = array( $function_name, $replacement, $version );
+			},
+			10,
+			3
+		);
+
+		$result = $this->provider->get_account( array( 'user_id' => 42 ) );
+
+		$this->assertSame( array(), $result );
+		$this->assertSame(
+			array(
+				array(
+					'DataMachine\Core\OAuth\BaseAuthProvider::get_account with a context argument',
+					'BaseAuthProvider::get_account_for_context()',
+					'0.131.0',
+				),
+			),
+			$deprecated_calls
+		);
+
+		remove_all_filters( 'deprecated_function_trigger_error' );
+		remove_all_filters( 'deprecated_function_run' );
+	}
+
+	public function test_deprecated_get_account_context_uses_context_resolver_behavior(): void {
+		$this->setExpectedDeprecated( 'DataMachine\Core\OAuth\BaseAuthProvider::get_account with a context argument' );
+
+		add_filter(
+			'deprecated_function_trigger_error',
+			function () {
+				return false;
+			}
+		);
+		add_filter(
+			'datamachine_auth_scope_policy',
+			function () {
+				return BaseAuthProvider::AUTH_SCOPE_PRINCIPAL;
+			}
+		);
+
+		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
+		$this->provider->save_account_for_user( 42, array( 'access_token' => 'tok_user_42' ) );
+		$this->provider->save_account_for_agent( 303, array( 'access_token' => 'tok_agent_303' ) );
+
+		$result = $this->provider->get_account(
+			array(
+				'user_id'  => 42,
+				'agent_id' => 303,
+			)
+		);
+
+		$this->assertSame( 'tok_agent_303', $result['access_token'] );
+
+		remove_all_filters( 'deprecated_function_trigger_error' );
+		remove_all_filters( 'datamachine_auth_scope_policy' );
+	}
+
 	// -------------------------------------------------------------------------
 	// Per-user account API
 	// -------------------------------------------------------------------------
@@ -603,7 +692,7 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 
 		$this->assertSame(
 			'tok_agent_303',
-			$this->provider->get_account( array( 'agent_id' => 303 ) )['access_token']
+			$this->provider->get_account_for_context( array( 'agent_id' => 303 ) )['access_token']
 		);
 
 		$this->provider->save_account( array( 'access_token' => 'tok_agent_scoped' ), array( 'agent_id' => 404 ) );
