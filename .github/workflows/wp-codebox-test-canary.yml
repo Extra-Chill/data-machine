@@ -1,0 +1,53 @@
+name: WP Codebox test canary
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wp-codebox-test:
+    name: Data Machine PHPUnit via WP Codebox
+    runs-on: ubuntu-latest
+    env:
+      HOMEBOY_WORDPRESS_TEST_RUNTIME: wp-codebox
+      HOMEBOY_WORDPRESS_DEPENDENCY_PATHS: ${{ github.workspace }}/.ci/agents-api
+      HOMEBOY_WP_CODEBOX_BIN: ${{ github.workspace }}/.ci/wp-codebox/packages/cli/dist/index.js
+    steps:
+      - name: Checkout Data Machine
+        uses: actions/checkout@v6
+
+      - name: Checkout Agents API dependency
+        uses: actions/checkout@v6
+        with:
+          repository: Automattic/agents-api
+          path: .ci/agents-api
+
+      - name: Checkout WP Codebox
+        uses: actions/checkout@v6
+        with:
+          repository: chubes4/wp-codebox
+          path: .ci/wp-codebox
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: .ci/wp-codebox/package-lock.json
+
+      - name: Build WP Codebox CLI
+        working-directory: .ci/wp-codebox
+        run: |
+          npm ci
+          npm run build
+
+      - name: Run Homeboy test canary
+        uses: Extra-Chill/homeboy-action@v2
+        with:
+          commands: test
+          expected-commands: test
+          autofix: 'false'
