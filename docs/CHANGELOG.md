@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.127.1] - 2026-05-20
+
+### Fixed
+- skip empty drain queue runs
+
 ## [0.127.0] - 2026-05-20
 
 ### Added
