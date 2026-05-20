@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.128.1] - 2026-05-20
+
+### Fixed
+- inspect direct workflow AI packets
+- satisfy outcome metrics CI checks
+- expose generic job outcome metrics
+
 ## [0.128.0] - 2026-05-20
 
 ### Added
