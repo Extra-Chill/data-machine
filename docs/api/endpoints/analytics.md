@@ -4,14 +4,14 @@
 
 **@since**: 0.31.0
 
-Unified REST API for core analytics integrations. Each endpoint delegates to its respective WordPress ability via `wp_get_ability()`. Extensions can add analytics routes with the `datamachine_analytics_ability_map` filter.
+Unified REST API for core and extension-backed analytics integrations. Each endpoint delegates to its respective WordPress ability via `wp_get_ability()`. Extensions can add analytics routes with the `datamachine_analytics_ability_map` filter.
 
 ## Endpoints
 
 | Method | Route | Tool |
 |--------|-------|------|
 | `POST` | `/datamachine/v1/analytics/gsc` | Google Search Console |
-| `POST` | `/datamachine/v1/analytics/ga` | Google Analytics (GA4) |
+| `POST` | `/datamachine/v1/analytics/ga` | Google Analytics (GA4), registered by Data Machine Business |
 
 ## Authentication
 
@@ -41,6 +41,8 @@ All endpoints accept JSON POST body with `action` as the only required field. Ad
 | `sitemap_url` | string | No | URL for `get_sitemap`/`submit_sitemap` |
 
 ### Google Analytics (GA4) Parameters
+
+The `/analytics/ga` route remains in Data Machine core for compatibility, but the `datamachine/google-analytics` ability is registered by the Data Machine Business extension. Activate Data Machine Business before using this route.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -92,7 +94,7 @@ Response structure varies by tool and action. See individual tool documentation 
 ```json
 {
     "code": "ability_not_found",
-    "message": "Analytics ability \"datamachine/google-analytics\" not registered. Ensure WordPress 6.9+ and the ability class is loaded.",
+    "message": "Analytics ability \"datamachine/google-analytics\" not registered. Ensure WordPress 6.9+ and Data Machine Business is active.",
     "data": { "status": 500 }
 }
 ```
@@ -138,7 +140,7 @@ const ABILITY_MAP = [
 
 ### Ability Delegation
 
-The REST layer is intentionally thin — it performs no data transformation. All business logic (authentication, API calls, result formatting) lives in the ability layer.
+The REST layer is intentionally thin — it performs no data transformation. All business logic (authentication, API calls, result formatting) lives in the ability layer. Extension-backed routes, including Google Analytics, work when the extension registers the mapped ability slug.
 
 ## Examples
 

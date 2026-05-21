@@ -25,7 +25,7 @@ The current core registry has 203 `datamachine/*` abilities across these domains
 | Agent calls | 2 | `inc/Abilities/AgentCall/`, `inc/Abilities/AgentRemoteCall/` | `datamachine/agent-call`, `datamachine/agent-remote-call` |
 | Agent memory | 5 | `inc/Abilities/AgentMemoryAbilities.php` | read/update/search sections, self-memory writes |
 | Agent tokens | 3 | `inc/Abilities/AgentTokenAbilities.php` | create/list/revoke agent bearer tokens |
-| Analytics | 2 | `inc/Abilities/Analytics/` | Google Analytics, Google Search Console |
+| Analytics | 1 | `inc/Abilities/Analytics/` | Google Search Console |
 | Auth | 7 | `inc/Abilities/AuthAbilities.php` | provider listing, status, connect/disconnect, token set/refresh/revoke |
 | Chat | 6 | `inc/Abilities/Chat/` | sessions, read state, message sending |
 | Content/block editing | 5 | `inc/Abilities/Content/` | upsert posts, get/edit/replace blocks, insert content |
