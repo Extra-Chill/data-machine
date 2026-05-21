@@ -6,7 +6,7 @@ WordPress 6.9 Abilities API provides standardized capability discovery and execu
 
 The Abilities API in `inc/Abilities/` provides a unified interface for Data Machine operations. Each ability implements `execute_callback` with `permission_callback` for consistent access control across REST API, CLI commands, and Chat tools.
 
-**Total registered abilities**: 202
+**Total registered abilities**: 201
 
 This page documents the shape of the current ability surface and the source files that own each domain. For an exact live inventory, run `wp abilities list --category=datamachine-*` in a loaded WordPress install or inspect `wp_register_ability()` callsites under `inc/Abilities/`.
 
@@ -16,7 +16,7 @@ Data Machine follows a WordPress-shaped identifier model: `agent_id` is the stab
 
 ## Registered Ability Domains
 
-The current core registry has 202 `datamachine/*` abilities across these domains:
+The current core registry has 201 `datamachine/*` abilities across these domains:
 
 | Domain | Count | Source anchor | Examples |
 |--------|-------|---------------|----------|
@@ -25,7 +25,6 @@ The current core registry has 202 `datamachine/*` abilities across these domains
 | Agent calls | 2 | `inc/Abilities/AgentCall/`, `inc/Abilities/AgentRemoteCall/` | `datamachine/agent-call`, `datamachine/agent-remote-call` |
 | Agent memory | 5 | `inc/Abilities/AgentMemoryAbilities.php` | read/update/search sections, self-memory writes |
 | Agent tokens | 3 | `inc/Abilities/AgentTokenAbilities.php` | create/list/revoke agent bearer tokens |
-| Analytics | 1 | `inc/Abilities/Analytics/` | PageSpeed |
 | Auth | 7 | `inc/Abilities/AuthAbilities.php` | provider listing, status, connect/disconnect, token set/refresh/revoke |
 | Chat | 6 | `inc/Abilities/Chat/` | sessions, read state, message sending |
 | Content/block editing | 5 | `inc/Abilities/Content/` | upsert posts, get/edit/replace blocks, insert content |

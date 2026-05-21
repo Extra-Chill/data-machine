@@ -187,7 +187,6 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/SEO/MetaDescriptionAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/SEO/IndexNowAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php';
-	require_once __DIR__ . '/inc/Abilities/Analytics/PageSpeedAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentCallAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentRemoteCallAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentAbilities.php';
@@ -283,7 +282,6 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\SEO\MetaDescriptionAbilities();
 	new \DataMachine\Abilities\SEO\IndexNowAbilities();
 	new \DataMachine\Abilities\Media\ImageTemplateAbilities();
-	new \DataMachine\Abilities\Analytics\PageSpeedAbilities();
 	new \DataMachine\Abilities\AgentCallAbilities();
 	new \DataMachine\Abilities\AgentRemoteCallAbilities();
 	new \DataMachine\Abilities\Taxonomy\ResolveTermAbility();

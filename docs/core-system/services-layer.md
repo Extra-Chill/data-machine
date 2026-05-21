@@ -24,7 +24,7 @@ The migration from OOP service managers to WordPress Abilities API is complete:
 
 ## Abilities Overview
 
-Ability classes under `inc/Abilities/` register the operations Data Machine exposes to REST, WP-CLI, chat tools, background jobs, and external integrations. The current registry includes 205 `datamachine/*` abilities across domains including:
+Ability classes under `inc/Abilities/` register the operations Data Machine exposes to REST, WP-CLI, chat tools, background jobs, and external integrations. The current registry includes 204 `datamachine/*` abilities across domains including:
 
 - Pipeline and pipeline-step CRUD, duplication, import, and export
 - Flow CRUD, scheduling, duplication, pause/resume, webhook triggers, and per-step configuration

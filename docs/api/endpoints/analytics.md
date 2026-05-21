@@ -11,7 +11,6 @@ Unified REST API for core and extension-backed analytics integrations. Each endp
 | Method | Route | Tool |
 |--------|-------|------|
 | `POST` | `/datamachine/v1/analytics/ga` | Google Analytics (GA4), registered by Data Machine Business |
-| `POST` | `/datamachine/v1/analytics/pagespeed` | PageSpeed Insights |
 
 ## Authentication
 
@@ -39,14 +38,6 @@ The `/analytics/ga` route remains in Data Machine core for compatibility, but th
 | `end_date` | string | No | `YYYY-MM-DD` (default: yesterday) |
 | `limit` | integer | No | Row limit (default: 25, max: 10000) |
 | `page_filter` | string | No | Filter to pages containing this path string |
-
-### PageSpeed Insights Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `action` | string | Yes | `analyze`, `performance`, `opportunities` |
-| `url` | string | No | URL to analyze (default: site home URL) |
-| `strategy` | string | No | `mobile` (default) or `desktop` |
 
 ## Response Format
 
@@ -121,13 +112,12 @@ The `Analytics` class registers a single route pattern for each tool. The handle
 ```php
 const ABILITY_MAP = [
     'ga'        => 'datamachine/google-analytics',
-    'pagespeed' => 'datamachine/pagespeed',
 ];
 ```
 
 ### Execution Flow
 
-1. `register_routes()` registers one POST route per core analytics ability
+1. `register_routes()` registers one POST route per filtered analytics ability mapping
 2. `check_permission()` validates the scoped `manage_flows` permission
 3. `handle_request()` extracts tool name from route, looks up ability slug
 4. Ability is retrieved via `wp_get_ability()` and executed with the JSON body
@@ -147,14 +137,4 @@ curl -X POST https://chubes.net/wp-json/datamachine/v1/analytics/ga \
   -H "X-WP-Nonce: {nonce}" \
   --cookie "{auth_cookie}" \
   -d '{"action": "page_stats", "limit": 10}'
-```
-
-### cURL — PageSpeed Audit
-
-```bash
-curl -X POST https://chubes.net/wp-json/datamachine/v1/analytics/pagespeed \
-  -H "Content-Type: application/json" \
-  -H "X-WP-Nonce: {nonce}" \
-  --cookie "{auth_cookie}" \
-  -d '{"action": "analyze", "url": "https://chubes.net/", "strategy": "desktop"}'
 ```

@@ -2,13 +2,12 @@
 /**
  * Analytics REST API Endpoints
  *
- * Provides REST API access to core and extension-backed analytics integrations.
+ * Provides REST API access to extension-backed analytics integrations.
  *
  * Each endpoint delegates to its respective ability via wp_get_ability().
  * All endpoints require manage_options capability.
  *
- * Endpoints:
- * - POST /datamachine/v1/analytics/pagespeed  — PageSpeed Insights audits
+ * Extensions can add routes via datamachine_analytics_ability_map.
  *
  * @package DataMachine\Api
  * @since 0.31.0
@@ -30,9 +29,7 @@ class Analytics {
 	 *
 	 * @var array
 	 */
-	const ABILITY_MAP = array(
-		'pagespeed' => 'datamachine-pagespeed',
-	);
+	const ABILITY_MAP = array();
 
 	/**
 	 * Return analytics route-to-ability mappings.

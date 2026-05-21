@@ -480,10 +480,6 @@ wp datamachine analytics ga top_events
 wp datamachine analytics ga user_demographics
 wp datamachine analytics ga engagement --compare
 
-# PageSpeed Insights
-wp datamachine analytics pagespeed analyze --page-url="https://example.com" --strategy=mobile
-wp datamachine analytics pagespeed performance --page-url="https://example.com"
-wp datamachine analytics pagespeed opportunities --page-url="https://example.com"
 ```
 
 ### datamachine auth
