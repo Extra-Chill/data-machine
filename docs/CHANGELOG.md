@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.131.5] - 2026-05-21
+
+### Fixed
+- align fetch ability schemas
+
 ## [0.131.4] - 2026-05-21
 
 ### Fixed
