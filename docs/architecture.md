@@ -286,7 +286,7 @@ Data Machine v0.2.0 introduced a universal Engine layer (`/inc/Engine/AI/`) that
 
 **Tool Categories**:
 - Handler-specific tools for publish/update operations
-- Global tools for search and analysis (GoogleSearch, LocalSearch, WebFetch, WordPressPostReader)
+- Global tools for search and analysis (LocalSearch, WebFetch, WordPressPostReader)
 - Coding workspace tools live in the `data-machine-code` extension plugin
 - Agent memory tools (AgentMemory, AgentDailyMemory) for runtime memory access
 - Chat-only tools for workflow building (@since v0.4.3):
