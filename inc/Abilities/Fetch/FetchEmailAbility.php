@@ -563,7 +563,9 @@ class FetchEmailAbility {
 	private function decodeBody( string $body, int $encoding ): string {
 		switch ( $encoding ) {
 			case 3: // BASE64.
-				return base64_decode( $body, true ) ?: $body;
+				// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decodes MIME transfer encoding, not executable payloads.
+				$decoded_body = base64_decode( $body, true );
+				return false !== $decoded_body ? $decoded_body : $body;
 			case 4: // QUOTED-PRINTABLE.
 				return quoted_printable_decode( $body );
 			case 1: // 8BIT.

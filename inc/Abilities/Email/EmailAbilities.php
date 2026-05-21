@@ -520,7 +520,7 @@ class EmailAbilities {
 		global $phpmailer;
 		$error = 'wp_mail() returned false';
 		if ( isset( $phpmailer ) && $phpmailer instanceof \PHPMailer\PHPMailer\PHPMailer ) {
-			$error = $phpmailer->ErrorInfo ?: $error;
+			$error = $phpmailer->ErrorInfo ? $phpmailer->ErrorInfo : $error;
 		}
 
 		return array(
@@ -619,7 +619,7 @@ class EmailAbilities {
 
 		return array(
 			'success' => true,
-			'message' => sprintf( 'Flag %s %s on UID %d', $flag, $action === 'clear' ? 'cleared' : 'set', $uid ),
+			'message' => sprintf( 'Flag %s %s on UID %d', $flag, 'clear' === $action ? 'cleared' : 'set', $uid ),
 		);
 	}
 
@@ -627,6 +627,8 @@ class EmailAbilities {
 	 * Test the IMAP connection with stored credentials.
 	 */
 	public function executeTestConnection( array $input ): array {
+		unset( $input );
+
 		if ( ! function_exists( 'imap_open' ) ) {
 			return array(
 				'success' => false,

@@ -221,18 +221,56 @@ class AgentCallAbility {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			do_action( 'datamachine_log', 'error', 'Agent call webhook request failed', array( 'url' => $this->sanitizeUrlForLog( $url ), 'error' => $response->get_error_message() ) );
-			return array( 'success' => false, 'url' => $this->sanitizeUrlForLog( $url ), 'error' => $response->get_error_message() );
+			do_action(
+				'datamachine_log',
+				'error',
+				'Agent call webhook request failed',
+				array(
+					'url'   => $this->sanitizeUrlForLog( $url ),
+					'error' => $response->get_error_message(),
+				)
+			);
+			return array(
+				'success' => false,
+				'url'     => $this->sanitizeUrlForLog( $url ),
+				'error'   => $response->get_error_message(),
+			);
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
 		if ( $status_code >= 200 && $status_code < 300 ) {
-			do_action( 'datamachine_log', 'info', 'Agent call webhook sent successfully', array( 'url' => $this->sanitizeUrlForLog( $url ), 'status_code' => $status_code ) );
-			return array( 'success' => true, 'url' => $this->sanitizeUrlForLog( $url ), 'status_code' => $status_code );
+			do_action(
+				'datamachine_log',
+				'info',
+				'Agent call webhook sent successfully',
+				array(
+					'url'         => $this->sanitizeUrlForLog( $url ),
+					'status_code' => $status_code,
+				)
+			);
+			return array(
+				'success'     => true,
+				'url'         => $this->sanitizeUrlForLog( $url ),
+				'status_code' => $status_code,
+			);
 		}
 
-		do_action( 'datamachine_log', 'warning', 'Agent call webhook received non-success response', array( 'url' => $this->sanitizeUrlForLog( $url ), 'status_code' => $status_code, 'response_body' => wp_remote_retrieve_body( $response ) ) );
-		return array( 'success' => false, 'url' => $this->sanitizeUrlForLog( $url ), 'status_code' => $status_code, 'error' => 'Webhook returned non-success status code: ' . $status_code );
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Agent call webhook received non-success response',
+			array(
+				'url'           => $this->sanitizeUrlForLog( $url ),
+				'status_code'   => $status_code,
+				'response_body' => wp_remote_retrieve_body( $response ),
+			)
+		);
+		return array(
+			'success'     => false,
+			'url'         => $this->sanitizeUrlForLog( $url ),
+			'status_code' => $status_code,
+			'error'       => 'Webhook returned non-success status code: ' . $status_code,
+		);
 	}
 
 	/**
