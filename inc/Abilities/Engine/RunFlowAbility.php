@@ -138,6 +138,8 @@ class RunFlowAbility {
 
 		$empty_drain_skip = $this->getEmptyDrainQueueSkip( $flow_config );
 		if ( null !== $empty_drain_skip ) {
+			$this->recordSuppressedRun( $flow_id, $scheduling_config, $empty_drain_skip );
+
 			do_action(
 				'datamachine_log',
 				'info',
@@ -146,6 +148,7 @@ class RunFlowAbility {
 					'flow_id'      => $flow_id,
 					'pipeline_id'  => $pipeline_id,
 					'flow_step_id' => $empty_drain_skip['flow_step_id'],
+					'reason'       => 'empty_drain_queue',
 				)
 			);
 
@@ -157,6 +160,10 @@ class RunFlowAbility {
 				'skipped'    => true,
 				'reason'     => 'empty_drain_queue',
 			);
+		}
+
+		if ( isset( $scheduling_config['datamachine_last_suppressed_run'] ) ) {
+			$this->clearSuppressedRun( $flow_id, $scheduling_config );
 		}
 
 		$agent_identity = null;
@@ -357,7 +364,7 @@ class RunFlowAbility {
 	 * Return first-step drain queue details when a scheduled flow has no work.
 	 *
 	 * @param array $flow_config Normalized flow config.
-	 * @return array{flow_step_id:string}|null
+	 * @return array{flow_step_id:string,queue_mode:string,reason:string}|null
 	 */
 	private function getEmptyDrainQueueSkip( array $flow_config ): ?array {
 		try {
@@ -384,6 +391,81 @@ class RunFlowAbility {
 			return null;
 		}
 
-		return array( 'flow_step_id' => (string) $first_flow_step_id );
+		return array(
+			'flow_step_id' => (string) $first_flow_step_id,
+			'queue_mode'   => 'drain',
+			'reason'       => 'empty_drain_queue',
+		);
+	}
+
+	/**
+	 * Persist a virtual run marker for scheduled empty drain ticks.
+	 *
+	 * The cycle scheduler uses latest job timestamps to decide when a flow is
+	 * due. Empty drain skips intentionally do not create jobs, so this marker
+	 * lets the scheduler back off until the next normal window while keeping the
+	 * operator-visible reason separate from provider exhaustion.
+	 *
+	 * @param int   $flow_id           Flow ID.
+	 * @param array $scheduling_config Current scheduling config.
+	 * @param array $skip              Skip details from getEmptyDrainQueueSkip().
+	 */
+	private function recordSuppressedRun( int $flow_id, array $scheduling_config, array $skip ): void {
+		$suppressed_at = current_time( 'mysql', true );
+
+		$scheduling_config['datamachine_last_suppressed_run'] = array(
+			'reason'        => (string) ( $skip['reason'] ?? 'empty_drain_queue' ),
+			'flow_step_id'  => (string) ( $skip['flow_step_id'] ?? '' ),
+			'queue_mode'    => (string) ( $skip['queue_mode'] ?? 'drain' ),
+			'suppressed_at' => $suppressed_at,
+			'backoff_until' => $this->getSuppressedRunBackoffUntil( $scheduling_config, $suppressed_at ),
+		);
+
+		$this->db_flows->update_flow_scheduling( $flow_id, $scheduling_config );
+	}
+
+	/**
+	 * Clear stale suppression metadata once the flow can start normally.
+	 *
+	 * @param int   $flow_id           Flow ID.
+	 * @param array $scheduling_config Current scheduling config.
+	 */
+	private function clearSuppressedRun( int $flow_id, array $scheduling_config ): void {
+		unset( $scheduling_config['datamachine_last_suppressed_run'] );
+		$this->db_flows->update_flow_scheduling( $flow_id, $scheduling_config );
+	}
+
+	/**
+	 * Resolve the human-readable backoff boundary for suppression metadata.
+	 *
+	 * @param array  $scheduling_config Current scheduling config.
+	 * @param string $suppressed_at     UTC MySQL datetime.
+	 * @return string|null UTC MySQL datetime when known.
+	 */
+	private function getSuppressedRunBackoffUntil( array $scheduling_config, string $suppressed_at ): ?string {
+		$interval = (string) ( $scheduling_config['interval'] ?? '' );
+		if ( '' === $interval || 'manual' === $interval ) {
+			return null;
+		}
+
+		try {
+			$suppressed_time = new \DateTime( $suppressed_at, new \DateTimeZone( 'UTC' ) );
+
+			if ( 'cron' === $interval && ! empty( $scheduling_config['cron_expression'] ) && class_exists( 'CronExpression' ) ) {
+				$cron = \CronExpression::factory( (string) $scheduling_config['cron_expression'] );
+				return $cron->getNextRunDate( $suppressed_time )->format( 'Y-m-d H:i:s' );
+			}
+
+			$intervals     = apply_filters( 'datamachine_scheduler_intervals', array() );
+			$interval_data = $intervals[ $interval ] ?? null;
+			if ( is_array( $interval_data ) && isset( $interval_data['seconds'] ) ) {
+				$suppressed_time->modify( '+' . max( 0, (int) $interval_data['seconds'] ) . ' seconds' );
+				return $suppressed_time->format( 'Y-m-d H:i:s' );
+			}
+		} catch ( \Exception $e ) {
+			return null;
+		}
+
+		return null;
 	}
 }
