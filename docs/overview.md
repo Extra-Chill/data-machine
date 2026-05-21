@@ -93,9 +93,11 @@ The ability classes under `inc/Abilities/` provide direct method calls for core 
 - Flow, pipeline, and flow-step operations live in focused classes under `inc/Abilities/Flow/`, `inc/Abilities/Pipeline/`, and `inc/Abilities/FlowStep/`; `PipelineStepAbilities` handles pipeline-step ordering and synchronization.
 - Job abilities monitor execution outcomes, retries, manual failure, recovery, summaries, and deletion.
 - `ProcessedItemsAbilities` deduplicates content across executions by tracking previously processed identifiers.
-- `AgentAbilities` manages agent CRUD, renaming (with filesystem migration), and deletion.
-- `AgentMemoryAbilities` provides section-based read, write, append, and search operations on memory files.
+- `AgentAbilities` manages agent CRUD, active-agent selection, bundle import/export, audience access grants, renaming, and deletion.
+- `AgentTokenAbilities` manages per-agent bearer tokens for external clients.
+- `AgentMemoryAbilities` provides section-based read, write, append, search, and self-memory operations on memory files.
 - `DailyMemoryAbilities` manages daily memory files — read, write, list, search, and delete by date.
+- `EmailAbilities`, `SourceInventoryAbility`, and `SourceAggregateAbility` expose email operations plus source-level inventory and aggregate reporting.
 - `LogAbilities` and the `LogRepository` aggregate log entries in the `wp_datamachine_logs` table for filtering in the admin UI.
 - Cache invalidation is handled by ability-level `clearCache()` methods to ensure dynamic handler and step type registrations are immediately reflected across the system.
 
@@ -152,7 +154,7 @@ wp datamachine jobs undo <job_id> --dry-run --allow-root
 
 - **Authentication providers** extend BaseAuthProvider, BaseOAuth1Provider, or BaseOAuth2Provider under `/inc/Core/OAuth/`; concrete providers live next to their handlers in core or extension plugins.
 - **OAuth handlers** (`OAuth1Handler`, `OAuth2Handler`) standardize callback handling, nonce validation, and credential storage.
-- **Capability checks** (`manage_options`) and WordPress nonces guard REST endpoints; inputs run through `sanitize_*` helpers before hitting services.
+- **Capability checks** use Data Machine capabilities through `PermissionHelper`, with support for WP-CLI, Action Scheduler, pre-authenticated contexts, and agent bearer-token ceilings. WordPress nonces guard browser REST requests; inputs run through `sanitize_*` helpers before hitting abilities.
 - **Multi-agent permissions**: `PermissionHelper` handles agent-level access checks via `resolve_scoped_agent_id()`, `can_access_agent()`, and `owns_agent_resource()`.
 - **HttpClient** centralizes outbound HTTP requests with consistent headers, browser-mode simulation, timeout control, and logging via `datamachine_log`.
 

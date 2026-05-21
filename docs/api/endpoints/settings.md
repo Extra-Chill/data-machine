@@ -18,7 +18,7 @@ Settings endpoints manage tool configuration for Data Machine.
 
 ## Authentication
 
-Requires `manage_options` capability. See Authentication Guide.
+Settings endpoints require `PermissionHelper::can( 'manage_settings' )`. Administrators pass through the mapped Data Machine capability fallback.
 
 ## Endpoints
 
@@ -26,7 +26,7 @@ Requires `manage_options` capability. See Authentication Guide.
 
 Save configuration for a specific tool.
 
-**Permission**: `manage_options` capability required
+**Permission**: `manage_settings`
 
 **Parameters**:
 - `tool_id` (string, required): Tool identifier (in URL path) - e.g., `google_search`

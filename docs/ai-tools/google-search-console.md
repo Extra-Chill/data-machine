@@ -209,7 +209,7 @@ wp datamachine analytics gsc submit_sitemap --sitemap-url=https://chubes.net/sit
 POST /wp-json/datamachine/v1/analytics/gsc
 ```
 
-**Authentication**: Requires `manage_options` capability.
+**Authentication**: Requires the relevant Data Machine management capability plus configured Google Search Console access.
 
 **Request Body**:
 ```json

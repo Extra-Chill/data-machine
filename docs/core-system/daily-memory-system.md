@@ -357,7 +357,7 @@ Daily memory endpoints are registered alongside other agent file endpoints:
 | `PUT` | `/datamachine/v1/files/agent/daily/{year}/{month}/{day}` | Write/replace a daily file |
 | `DELETE` | `/datamachine/v1/files/agent/daily/{year}/{month}/{day}` | Delete a daily file |
 
-All endpoints require `manage_options` capability. The `PUT` endpoint accepts content as a JSON body parameter or raw body and always uses `mode: 'write'` (replace). An optional `user_id` query parameter enables multi-agent scoping.
+Daily memory endpoints require a logged-in user. Users can access their own files; accessing another user's files requires `PermissionHelper::can( 'manage_agents' )`. The `PUT` endpoint accepts content as a JSON body parameter or raw body and always uses `mode: 'write'` (replace). An optional `user_id` query parameter enables multi-agent scoping.
 
 **Note:** There is no REST search endpoint for daily memory. Search is only available via the AI tool and CLI.
 
