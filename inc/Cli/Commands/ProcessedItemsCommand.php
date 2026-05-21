@@ -94,7 +94,7 @@ class ProcessedItemsCommand extends BaseCommand {
 
 		$where_sql = ! empty( $where_clauses ) ? 'WHERE ' . implode( ' AND ', $where_clauses ) : '';
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- WHERE clause is built from fixed fragments above.
 		$results = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT
@@ -111,6 +111,7 @@ class ProcessedItemsCommand extends BaseCommand {
 			),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( empty( $results ) ) {
 			WP_CLI::log( 'No processed items found.' );
@@ -372,10 +373,11 @@ class ProcessedItemsCommand extends BaseCommand {
 		$where_sql = ! empty( $where_parts ) ? 'WHERE ' . implode( ' AND ', $where_parts ) : '';
 
 		// Count first.
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- WHERE clause is built from fixed fragments above.
 		$count = (int) $wpdb->get_var(
 			$wpdb->prepare( "SELECT COUNT(*) FROM %i {$where_sql}", ...$values )
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( 0 === $count ) {
 			WP_CLI::log( 'No processed items match the criteria.' );
@@ -417,10 +419,11 @@ class ProcessedItemsCommand extends BaseCommand {
 		}
 
 		// Delete.
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- WHERE clause is built from fixed fragments above.
 		$deleted = $wpdb->query(
 			$wpdb->prepare( "DELETE FROM %i {$where_sql}", ...$values )
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( false === $deleted ) {
 			WP_CLI::error( 'Database error during deletion: ' . $wpdb->last_error );
@@ -486,13 +489,14 @@ class ProcessedItemsCommand extends BaseCommand {
 		}
 
 		// Count orphans.
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Optional flow clause is built from a fixed fragment above.
 		$count = (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM %i pi LEFT JOIN %i j ON pi.job_id = j.job_id WHERE j.job_id IS NULL{$where_extra}",
 				...$values
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 
 		if ( 0 === $count ) {
 			WP_CLI::success( 'No orphaned processed items found.' );
@@ -513,13 +517,14 @@ class ProcessedItemsCommand extends BaseCommand {
 		}
 
 		// Delete orphans.
-		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Optional flow clause is built from a fixed fragment above.
 		$deleted = $wpdb->query(
 			$wpdb->prepare(
 				"DELETE pi FROM %i pi LEFT JOIN %i j ON pi.job_id = j.job_id WHERE j.job_id IS NULL{$where_extra}",
 				...$values
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 
 		if ( false === $deleted ) {
 			WP_CLI::error( 'Database error during deletion: ' . $wpdb->last_error );
