@@ -40,7 +40,7 @@ if ( ! class_exists( 'DataMachine\\Abilities\\ProcessedItemsAbilities' ) ) {
 }
 
 if ( ! class_exists( 'DataMachine\\Core\\Database\\ProcessedItems\\ProcessedItems' ) ) {
-	eval( 'namespace DataMachine\\Core\\Database\\ProcessedItems; class ProcessedItems { public function get_table_name(): string { return "wp_datamachine_processed_items"; } }' );
+	eval( 'namespace DataMachine\\Core\\Database\\ProcessedItems; class ProcessedItems { public const STATUS_PROCESSED = "processed"; public function get_table_name(): string { return "wp_datamachine_processed_items"; } }' );
 }
 
 require_once __DIR__ . '/../inc/Cli/Commands/ProcessedItemsCommand.php';
