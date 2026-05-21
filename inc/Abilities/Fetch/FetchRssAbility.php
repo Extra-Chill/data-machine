@@ -41,16 +41,16 @@ class FetchRssAbility {
 						'type'       => 'object',
 						'required'   => array( 'feed_url' ),
 						'properties' => array(
-							'feed_url'        => array(
+							'feed_url'         => array(
 								'type'        => 'string',
 								'description' => __( 'URL of the RSS/Atom feed', 'data-machine' ),
 							),
-							'timeframe_limit' => array(
+							'timeframe_limit'  => array(
 								'type'        => 'string',
 								'default'     => 'all_time',
 								'description' => __( 'Timeframe filter (all_time, 24_hours, 7_days, 30_days, 90_days, 6_months, 1_year)', 'data-machine' ),
 							),
-							'search'          => array(
+							'search'           => array(
 								'type'        => 'string',
 								'default'     => '',
 								'description' => __( 'Search term to filter items', 'data-machine' ),
@@ -60,12 +60,12 @@ class FetchRssAbility {
 								'default'     => '',
 								'description' => __( 'Comma-separated keywords; items whose title or description contains any of these are skipped', 'data-machine' ),
 							),
-							'processed_items' => array(
+							'processed_items'  => array(
 								'type'        => 'array',
 								'default'     => array(),
 								'description' => __( 'Array of already processed item GUIDs to skip', 'data-machine' ),
 							),
-							'download_images' => array(
+							'download_images'  => array(
 								'type'        => 'boolean',
 								'default'     => true,
 								'description' => __( 'Whether to download enclosure images', 'data-machine' ),
