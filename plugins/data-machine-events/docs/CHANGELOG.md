@@ -2,6 +2,18 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.39.0] - 2026-05-21
+
+### Added
+- feat(chat-tools): add delete_event tool for trashing wrong-venue duplicates
+- feat(chat-tools): add move_event primitive with venue-change audit trail
+
+### Changed
+- adopt AbilityPermissions::canWrite() helper in move-event ability
+
+### Fixed
+- allow team-member contributors to use event/venue write abilities
+
 ## [0.38.0] - 2026-05-19
 
 ### Added
