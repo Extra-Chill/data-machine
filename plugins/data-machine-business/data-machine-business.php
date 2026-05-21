@@ -99,6 +99,10 @@ function datamachine_business_load_handlers() {
 	new \DataMachineBusiness\Abilities\Discord\PostMessageDiscordAbility();
 	new \DataMachineBusiness\Abilities\Discord\FetchMessagesDiscordAbility();
 
+	// Bing Webmaster Tools.
+	new \DataMachineBusiness\Abilities\Analytics\BingWebmasterAbilities();
+	new \DataMachineBusiness\Tools\BingWebmaster();
+
 	// Discord Handlers
 	new \DataMachineBusiness\Handlers\Discord\DiscordPublish();
 	new \DataMachineBusiness\Handlers\Discord\DiscordFetch();
@@ -109,6 +113,25 @@ function datamachine_business_load_handlers() {
 
 // Hook into plugins_loaded to ensure Data Machine core is loaded first
 add_action( 'plugins_loaded', 'datamachine_business_load_handlers', 20 );
+
+/**
+ * Register business-owned analytics routes with Data Machine core.
+ */
+add_filter( 'datamachine_analytics_ability_map', function ( array $ability_map ): array {
+	$ability_map['bing'] = 'datamachine/bing-webmaster';
+	return $ability_map;
+} );
+
+/**
+ * Register business-owned WP-CLI commands.
+ */
+add_action( 'plugins_loaded', function (): void {
+	if ( ! defined( 'WP_CLI' ) || ! WP_CLI || ! class_exists( 'DataMachine\\Cli\\BaseCommand' ) ) {
+		return;
+	}
+
+	\WP_CLI::add_command( 'datamachine analytics bing', \DataMachineBusiness\Cli\Commands\BingWebmasterCommand::class );
+}, 21 );
 
 /**
  * Contribute Google Drive scopes to the unified Google OAuth credential.
