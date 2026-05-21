@@ -9,9 +9,11 @@ This plugin extends Data Machine with business-focused integrations including:
 - **Google Search**: Search the web through Google Custom Search API as an AI tool
 - **Google Sheets**: Fetch data from spreadsheets and append data for reporting
 - **PageSpeed Insights**: Run Lighthouse audits for performance, SEO, accessibility, and optimization opportunities
+- **Google Analytics (GA4)**: Fetch visitor analytics, realtime, engagement, and comparison metrics
 - **Slack**: Post messages and fetch conversations from channels
 - **Discord**: Post messages and fetch messages from server channels
 - **Amazon Affiliate Link**: Search Amazon products and return affiliate links using the Amazon Creators API
+- **Bing Webmaster Tools**: Fetch Bing search, traffic, page, and crawl analytics
 
 ## Requirements
 
@@ -41,6 +43,25 @@ Data Machine Business registers the `google_search` AI tool for chat and pipelin
 ### Google Search Usage
 
 The tool accepts a required `query` parameter and an optional `site_restrict` domain. It returns up to 10 structured results with title, link, snippet, and display link fields.
+
+## Google Analytics (GA4) Setup
+
+Data Machine Business registers the `datamachine/google-analytics` ability and `google_analytics` chat/pipeline tool. Data Machine core keeps the compatible REST and WP-CLI dispatchers (`/analytics/ga` and `wp datamachine analytics ga`), which work when this plugin is active.
+
+Existing Data Machine GA4 settings are adopted automatically because this plugin uses the same option key, `datamachine_ga_config`, and token transient, `datamachine_ga_access_token`.
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable the Google Analytics Data API
+3. Create a service account and download its JSON key
+4. Grant the service account access to the GA4 property
+5. Configure the Service Account JSON and GA4 Property ID in Data Machine tool settings
+
+### GA4 Ability And Tool
+
+- `datamachine/google-analytics` — Fetches GA4 reports and realtime analytics
+- `google_analytics` — Chat and pipeline tool wrapper for AI agents
+
+Supported actions include `page_stats`, `traffic_sources`, `date_stats`, `realtime`, `top_events`, `user_demographics`, `landing_pages`, `engagement`, and `new_vs_returning`.
 
 ## Google Sheets Setup
 
@@ -222,6 +243,19 @@ Existing credentials saved by older Data Machine core versions are adopted autom
 2. Create Amazon Creators API credentials.
 3. In Data Machine tool settings, configure Credential ID, Credential Secret, Partner Tag, and Marketplace.
 4. Use `amazon_affiliate_link` only for genuinely relevant product references.
+
+## Bing Webmaster Tools
+
+Bing Webmaster Tools is owned by Data Machine Business. When this plugin is active, it registers the same user-facing capability that previously lived in Data Machine core:
+
+- Ability: `datamachine/bing-webmaster`
+- AI tool: `bing_webmaster`
+- REST route: `POST /wp-json/datamachine/v1/analytics/bing`
+- WP-CLI: `wp datamachine analytics bing <action>`
+
+Existing sites keep their saved configuration because the business plugin adopts the original `datamachine_bing_webmaster_config` site option.
+
+See [Bing Webmaster Tools](docs/bing-webmaster.md) for setup and usage details.
 
 ## License
 
