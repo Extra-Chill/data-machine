@@ -26,37 +26,37 @@ class DeleteTaxonomyTermAbility extends AbstractTaxonomyAbility {
 			'description'         => __( 'Delete an existing taxonomy term. Optionally reassign posts to another term.', 'data-machine' ),
 			'category'            => 'datamachine-taxonomy',
 			'input_schema'        => array(
-						'type'       => 'object',
-						'properties' => array(
-							'term'     => array(
-								'type'        => 'string',
-								'required'    => true,
-								'description' => __( 'Term identifier (ID, name, or slug)', 'data-machine' ),
-							),
-							'taxonomy' => array(
-								'type'        => 'string',
-								'required'    => true,
-								'description' => __( 'Taxonomy slug (category, post_tag, custom taxonomy)', 'data-machine' ),
-							),
-							'reassign' => array(
-								'type'        => 'integer',
-								'description' => __( 'Term ID to reassign posts to (optional)', 'data-machine' ),
-							),
-						),
-						'required'   => array( 'term', 'taxonomy' ),
+				'type'       => 'object',
+				'properties' => array(
+					'term'     => array(
+						'type'        => 'string',
+						'required'    => true,
+						'description' => __( 'Term identifier (ID, name, or slug)', 'data-machine' ),
 					),
+					'taxonomy' => array(
+						'type'        => 'string',
+						'required'    => true,
+						'description' => __( 'Taxonomy slug (category, post_tag, custom taxonomy)', 'data-machine' ),
+					),
+					'reassign' => array(
+						'type'        => 'integer',
+						'description' => __( 'Term ID to reassign posts to (optional)', 'data-machine' ),
+					),
+				),
+				'required'   => array( 'term', 'taxonomy' ),
+			),
 			'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'    => array( 'type' => 'boolean' ),
-							'term_id'    => array( 'type' => 'integer' ),
-							'term_name'  => array( 'type' => 'string' ),
-							'taxonomy'   => array( 'type' => 'string' ),
-							'deleted'    => array( 'type' => 'boolean' ),
-							'reassigned' => array( 'type' => 'integer' ),
-							'error'      => array( 'type' => 'string' ),
-						),
-					),
+				'type'       => 'object',
+				'properties' => array(
+					'success'    => array( 'type' => 'boolean' ),
+					'term_id'    => array( 'type' => 'integer' ),
+					'term_name'  => array( 'type' => 'string' ),
+					'taxonomy'   => array( 'type' => 'string' ),
+					'deleted'    => array( 'type' => 'boolean' ),
+					'reassigned' => array( 'type' => 'integer' ),
+					'error'      => array( 'type' => 'string' ),
+				),
+			),
 			'execute_callback'    => array( $this, 'execute' ),
 			'permission_callback' => array( $this, 'checkPermission' ),
 			'meta'                => array( 'show_in_rest' => true ),
@@ -176,5 +176,4 @@ class DeleteTaxonomyTermAbility extends AbstractTaxonomyAbility {
 			'reassigned' => null !== $reassign ? absint( $reassign ) : null,
 		);
 	}
-
 }

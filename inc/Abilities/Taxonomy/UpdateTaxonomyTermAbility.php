@@ -26,50 +26,50 @@ class UpdateTaxonomyTermAbility extends AbstractTaxonomyAbility {
 			'description'         => __( 'Update an existing taxonomy term. Supports updating name, slug, description, and parent.', 'data-machine' ),
 			'category'            => 'datamachine-taxonomy',
 			'input_schema'        => array(
-						'type'       => 'object',
-						'properties' => array(
-							'term'        => array(
-								'type'        => 'string',
-								'required'    => true,
-								'description' => __( 'Term identifier (ID, name, or slug)', 'data-machine' ),
-							),
-							'taxonomy'    => array(
-								'type'        => 'string',
-								'required'    => true,
-								'description' => __( 'Taxonomy slug (category, post_tag, custom taxonomy)', 'data-machine' ),
-							),
-							'name'        => array(
-								'type'        => 'string',
-								'description' => __( 'New term name', 'data-machine' ),
-							),
-							'slug'        => array(
-								'type'        => 'string',
-								'description' => __( 'New term slug', 'data-machine' ),
-							),
-							'description' => array(
-								'type'        => 'string',
-								'description' => __( 'New term description', 'data-machine' ),
-							),
-							'parent'      => array(
-								'type'        => 'integer',
-								'description' => __( 'New parent term ID for hierarchical taxonomies', 'data-machine' ),
-							),
-						),
-						'required'   => array( 'term', 'taxonomy' ),
+				'type'       => 'object',
+				'properties' => array(
+					'term'        => array(
+						'type'        => 'string',
+						'required'    => true,
+						'description' => __( 'Term identifier (ID, name, or slug)', 'data-machine' ),
 					),
+					'taxonomy'    => array(
+						'type'        => 'string',
+						'required'    => true,
+						'description' => __( 'Taxonomy slug (category, post_tag, custom taxonomy)', 'data-machine' ),
+					),
+					'name'        => array(
+						'type'        => 'string',
+						'description' => __( 'New term name', 'data-machine' ),
+					),
+					'slug'        => array(
+						'type'        => 'string',
+						'description' => __( 'New term slug', 'data-machine' ),
+					),
+					'description' => array(
+						'type'        => 'string',
+						'description' => __( 'New term description', 'data-machine' ),
+					),
+					'parent'      => array(
+						'type'        => 'integer',
+						'description' => __( 'New parent term ID for hierarchical taxonomies', 'data-machine' ),
+					),
+				),
+				'required'   => array( 'term', 'taxonomy' ),
+			),
 			'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'   => array( 'type' => 'boolean' ),
-							'term_id'   => array( 'type' => 'integer' ),
-							'term_name' => array( 'type' => 'string' ),
-							'term_slug' => array( 'type' => 'string' ),
-							'taxonomy'  => array( 'type' => 'string' ),
-							'updated'   => array( 'type' => 'boolean' ),
-							'changes'   => array( 'type' => 'object' ),
-							'error'     => array( 'type' => 'string' ),
-						),
-					),
+				'type'       => 'object',
+				'properties' => array(
+					'success'   => array( 'type' => 'boolean' ),
+					'term_id'   => array( 'type' => 'integer' ),
+					'term_name' => array( 'type' => 'string' ),
+					'term_slug' => array( 'type' => 'string' ),
+					'taxonomy'  => array( 'type' => 'string' ),
+					'updated'   => array( 'type' => 'boolean' ),
+					'changes'   => array( 'type' => 'object' ),
+					'error'     => array( 'type' => 'string' ),
+				),
+			),
 			'execute_callback'    => array( $this, 'execute' ),
 			'permission_callback' => array( $this, 'checkPermission' ),
 			'meta'                => array( 'show_in_rest' => true ),
@@ -245,5 +245,4 @@ class UpdateTaxonomyTermAbility extends AbstractTaxonomyAbility {
 			'changes'   => $changes,
 		);
 	}
-
 }
