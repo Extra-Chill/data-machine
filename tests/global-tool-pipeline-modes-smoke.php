@@ -160,7 +160,6 @@ $pipeline_tools = array(
 	'bing_webmaster'        => array( 'inc/Engine/AI/Tools/Global/BingWebmaster.php', 'DataMachine\Engine\AI\Tools\Global\BingWebmaster' ),
 	'local_search'          => array( 'inc/Engine/AI/Tools/Global/LocalSearch.php', 'DataMachine\Engine\AI\Tools\Global\LocalSearch' ),
 	'internal_link_audit'   => array( 'inc/Engine/AI/Tools/Global/InternalLinkAudit.php', 'DataMachine\Engine\AI\Tools\Global\InternalLinkAudit' ),
-	'amazon_affiliate_link' => array( 'inc/Engine/AI/Tools/Global/AmazonAffiliateLink.php', 'DataMachine\Engine\AI\Tools\Global\AmazonAffiliateLink' ),
 );
 
 foreach ( $pipeline_tools as $tool => [ $path, $class_name ] ) {

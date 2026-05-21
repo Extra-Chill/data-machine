@@ -436,7 +436,7 @@ See [HTTP Client](core-system/http-client.md) for implementation details and usa
 **Complete REST API Integration**:
 All admin pages now use REST API architecture with zero jQuery/AJAX dependencies.
 
-**Security Model**: All admin operations require `manage_options` capability with WordPress nonce validation.
+**Security Model**: Admin operations use scoped Data Machine capabilities through `PermissionHelper` plus WordPress nonce validation for browser requests. Administrators continue to pass through the `manage_options` capability mapping.
 
 ### Extension Framework
 Complete extension system for custom handlers and tools:
@@ -482,7 +482,7 @@ Complete extension system for custom handlers and tools:
 - Job failure handling with retry support (max 24 attempts)
 
 ### Security
-- Admin-only access (`manage_options` capability)
+- Scoped Data Machine capabilities for admin and agent operations
 - Multi-agent access control (viewer, operator, admin roles)
 - CSRF protection via WordPress nonces
 - Input sanitization and validation

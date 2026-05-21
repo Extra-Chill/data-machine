@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.131.0] - 2026-05-21
+
+### Added
+- add filter hooks so taxonomy-owning plugins can enrich AI tool descriptions and refuse AI-supplied values
+
 ## [0.130.2] - 2026-05-20
 
 ### Changed

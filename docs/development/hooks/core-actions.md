@@ -345,10 +345,10 @@ do_action('datamachine_log', 'info', 'Flow execution started successfully', [
 
 ### Capability Requirements
 
-All actions require `manage_options` capability:
+Callbacks that expose admin-only behavior should use the scoped Data Machine capability for the operation:
 
 ```php
-if (!current_user_can('manage_options')) {
+if ( ! \DataMachine\Abilities\PermissionHelper::can( 'manage_flows' ) ) {
     wp_die(__('You do not have sufficient permissions to access this page.'));
 }
 ```

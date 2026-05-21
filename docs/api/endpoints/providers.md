@@ -10,7 +10,7 @@ The Providers endpoint retrieves information about available AI providers and th
 
 ## Authentication
 
-Requires `manage_options` capability. See Authentication Guide.
+Public metadata endpoint. The route uses `__return_true` because provider labels and model metadata are needed by setup/admin clients and do not expose raw API keys.
 
 ## Endpoints
 
@@ -18,7 +18,7 @@ Requires `manage_options` capability. See Authentication Guide.
 
 Retrieve available AI providers with configuration status.
 
-**Permission**: `manage_options` capability required
+**Permission**: Public metadata endpoint
 
 **Purpose**: Discover available AI providers and check their configuration status
 
