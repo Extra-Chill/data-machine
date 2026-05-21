@@ -84,6 +84,21 @@ namespace {
 	);
 
 	$tool = new DataMachine\Core\Steps\Fetch\Tools\FetchItemDispositionTool();
+	$data_packets = array(
+		array(
+			'type'     => 'fetch',
+			'data'     => array(
+				'title' => 'Fixture source title',
+				'body'  => str_repeat( 'Source body with access_token=secret-value. ', 40 ),
+			),
+			'metadata' => array(
+				'item_identifier' => 'source-123',
+				'source_type'     => 'rss',
+				'source_url'      => 'https://example.test/post?access_token=secret-value',
+				'provider_id'     => 'fixture-provider',
+			),
+		),
+	);
 
 	echo "Case 1: reject_source marks processed\n";
 	$reject = $tool->handle_tool_call(
@@ -91,6 +106,7 @@ namespace {
 			'job_id'       => 1814,
 			'flow_step_id' => 'ai-step_7',
 			'engine'       => $engine,
+			'data'         => $data_packets,
 			'reason'       => 'duplicate-source',
 		),
 		array( 'disposition' => 'reject_source' )
@@ -99,6 +115,11 @@ namespace {
 	assert_fetch_disposition_smoke( 'reject_source reports explicit tool name', 'reject_source' === ( $reject['tool_name'] ?? '' ) );
 	assert_fetch_disposition_smoke( 'reject_source marks fetch step processed', array( 'fetch-step_7', 'rss', 'source-123', 1814 ) === ( $GLOBALS['fetch_disposition_smoke_processed'][0] ?? null ) );
 	assert_fetch_disposition_smoke( 'reject_source sets source-rejected status', 'agent_skipped - source-rejected' === ( $GLOBALS['fetch_disposition_smoke_engine'][1814]['job_status'] ?? '' ) );
+	$reject_diagnostic = $GLOBALS['fetch_disposition_smoke_engine'][1814]['disposition_diagnostic'] ?? array();
+	assert_fetch_disposition_smoke( 'reject_source persists disposition diagnostic', 'reject_source' === ( $reject_diagnostic['disposition'] ?? '' ) && 'duplicate-source' === ( $reject_diagnostic['reason'] ?? '' ) );
+	assert_fetch_disposition_smoke( 'reject_source diagnostic includes source identity', 'source-123' === ( $reject_diagnostic['item_identifier'] ?? '' ) && 'fixture-provider' === ( $reject_diagnostic['provider'] ?? '' ) && 'fetch-step_7' === ( $reject_diagnostic['flow_step_id'] ?? '' ) );
+	assert_fetch_disposition_smoke( 'reject_source diagnostic includes packet count and bounded excerpt', 1 === ( $reject_diagnostic['packet_count'] ?? 0 ) && 1200 === ( $reject_diagnostic['excerpt_limit'] ?? 0 ) && 1200 >= strlen( $reject_diagnostic['excerpt'] ?? '' ) );
+	assert_fetch_disposition_smoke( 'reject_source diagnostic redacts obvious secrets', ! str_contains( $reject_diagnostic['excerpt'] ?? '', 'secret-value' ) && ! str_contains( $reject_diagnostic['source_url'] ?? '', 'secret-value' ) );
 
 	echo "Case 2: defer_item releases claim without marking processed\n";
 	$GLOBALS['fetch_disposition_smoke_processed'] = array();
@@ -107,6 +128,7 @@ namespace {
 			'job_id'       => 1815,
 			'flow_step_id' => 'ai-step_7',
 			'engine'       => $engine,
+			'data'         => $data_packets,
 			'reason'       => 'tool-error',
 		),
 		array( 'disposition' => 'defer_item' )
@@ -116,6 +138,8 @@ namespace {
 	assert_fetch_disposition_smoke( 'defer_item releases fetch step claim', array( 'fetch-step_7', 'rss', 'source-123' ) === ( $GLOBALS['fetch_disposition_smoke_released'][0] ?? null ) );
 	assert_fetch_disposition_smoke( 'defer_item does not mark processed', array() === $GLOBALS['fetch_disposition_smoke_processed'] );
 	assert_fetch_disposition_smoke( 'tool-error deferral remains retry eligible', 'failed - item-deferred' === ( $GLOBALS['fetch_disposition_smoke_engine'][1815]['job_status'] ?? '' ) );
+	$defer_diagnostic = $GLOBALS['fetch_disposition_smoke_engine'][1815]['disposition_diagnostic'] ?? array();
+	assert_fetch_disposition_smoke( 'defer_item persists disposition diagnostic', 'defer_item' === ( $defer_diagnostic['disposition'] ?? '' ) && 'tool-error' === ( $defer_diagnostic['reason'] ?? '' ) );
 
 	echo "Case 3: production tool surface exposes positive affordances\n";
 	$fetch_handler = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/FetchHandler.php' );

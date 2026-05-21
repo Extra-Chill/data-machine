@@ -129,6 +129,14 @@ $assert(
 	'artifact payload includes transcript session metadata without raw messages'
 );
 
+$assert(
+	false !== strpos( $job_artifacts, "'disposition_diagnostic'" )
+		&& false !== strpos( $job_artifacts, 'private function disposition_diagnostic' )
+		&& false !== strpos( $job_artifacts, "'packet_count'" )
+		&& false !== strpos( $job_artifacts, "'excerpt_limit'" ),
+	'job artifacts expose bounded source disposition diagnostics for skipped/deferred jobs'
+);
+
 echo "\n";
 if ( empty( $failures ) ) {
 	echo "OK: job artifacts daily memory smoke assertions passed.\n";
