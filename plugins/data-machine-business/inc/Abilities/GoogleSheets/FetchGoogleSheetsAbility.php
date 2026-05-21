@@ -39,7 +39,7 @@ class FetchGoogleSheetsAbility {
 				array(
 					'label'               => __( 'Fetch Google Sheets', 'data-machine-business' ),
 					'description'         => __( 'Fetch data from Google Sheets spreadsheets', 'data-machine-business' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'spreadsheet_id' ),

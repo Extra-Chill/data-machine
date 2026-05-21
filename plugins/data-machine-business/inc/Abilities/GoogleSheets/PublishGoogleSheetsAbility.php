@@ -39,7 +39,7 @@ class PublishGoogleSheetsAbility {
 				array(
 					'label'               => __( 'Publish to Google Sheets', 'data-machine-business' ),
 					'description'         => __( 'Append data rows to Google Sheets spreadsheets', 'data-machine-business' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-publishing',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'spreadsheet_id', 'data' ),

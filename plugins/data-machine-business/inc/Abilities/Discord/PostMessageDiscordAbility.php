@@ -35,7 +35,7 @@ class PostMessageDiscordAbility {
 				array(
 					'label'            => __( 'Post Message to Discord', 'data-machine-business' ),
 					'description'      => __( 'Post a message to a Discord channel', 'data-machine-business' ),
-					'category'         => 'datamachine',
+					'category'         => 'datamachine-publishing',
 					'input_schema'     => array(
 						'type'       => 'object',
 						'required'   => array( 'channel_id', 'content' ),

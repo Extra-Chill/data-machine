@@ -35,7 +35,7 @@ class FetchMessagesDiscordAbility {
 				array(
 					'label'            => __( 'Fetch Discord Messages', 'data-machine-business' ),
 					'description'      => __( 'Fetch recent messages from a Discord channel', 'data-machine-business' ),
-					'category'         => 'datamachine',
+					'category'         => 'datamachine-fetch',
 					'input_schema'     => array(
 						'type'       => 'object',
 						'required'   => array( 'channel_id' ),
