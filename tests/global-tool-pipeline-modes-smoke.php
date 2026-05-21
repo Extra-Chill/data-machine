@@ -161,7 +161,6 @@ $pipeline_tools = array(
 	'pagespeed'             => array( 'inc/Engine/AI/Tools/Global/PageSpeed.php', 'DataMachine\Engine\AI\Tools\Global\PageSpeed' ),
 	'local_search'          => array( 'inc/Engine/AI/Tools/Global/LocalSearch.php', 'DataMachine\Engine\AI\Tools\Global\LocalSearch' ),
 	'internal_link_audit'   => array( 'inc/Engine/AI/Tools/Global/InternalLinkAudit.php', 'DataMachine\Engine\AI\Tools\Global\InternalLinkAudit' ),
-	'amazon_affiliate_link' => array( 'inc/Engine/AI/Tools/Global/AmazonAffiliateLink.php', 'DataMachine\Engine\AI\Tools\Global\AmazonAffiliateLink' ),
 );
 
 foreach ( $pipeline_tools as $tool => [ $path, $class_name ] ) {
