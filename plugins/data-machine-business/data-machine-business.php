@@ -22,23 +22,25 @@ define( 'DATAMACHINE_BUSINESS_VERSION', '0.2.0' );
 define( 'DATAMACHINE_BUSINESS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_BUSINESS_URL', plugin_dir_url( __FILE__ ) );
 
-// PSR-4 Autoloading. Composer is preferred for packaged builds, while source
-// checkouts and test runners can load the plugin without a generated vendor dir.
-if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
-	require_once __DIR__ . '/vendor/autoload.php';
+// PSR-4 Autoloading.
+$datamachine_business_autoloader = __DIR__ . '/vendor/autoload.php';
+if ( file_exists( $datamachine_business_autoloader ) ) {
+	require_once $datamachine_business_autoloader;
 } else {
-	spl_autoload_register( function ( string $class ): void {
-		$prefix = 'DataMachineBusiness\\';
-		if ( 0 !== strpos( $class, $prefix ) ) {
-			return;
-		}
+	spl_autoload_register(
+		function ( string $class_name ): void {
+			$prefix = 'DataMachineBusiness\\';
+			if ( 0 !== strpos( $class_name, $prefix ) ) {
+				return;
+			}
 
-		$relative_class = substr( $class, strlen( $prefix ) );
-		$file           = __DIR__ . '/inc/' . str_replace( '\\', '/', $relative_class ) . '.php';
-		if ( file_exists( $file ) ) {
-			require_once $file;
+			$relative_class = substr( $class_name, strlen( $prefix ) );
+			$file           = DATAMACHINE_BUSINESS_PATH . 'inc/' . str_replace( '\\', '/', $relative_class ) . '.php';
+			if ( is_readable( $file ) ) {
+				require_once $file;
+			}
 		}
-	} );
+	);
 }
 
 /**
@@ -86,6 +88,9 @@ function datamachine_business_load_handlers() {
 		\WP_CLI::add_command( 'datamachine analytics pagespeed', \DataMachineBusiness\Cli\PageSpeedCommand::class );
 	}
 
+	// Google Custom Search API tool.
+	new \DataMachineBusiness\Tools\GoogleSearch();
+
 	// Slack
 	new \DataMachineBusiness\Abilities\Slack\PostMessageSlackAbility();
 	new \DataMachineBusiness\Abilities\Slack\FetchMessagesSlackAbility();
@@ -101,6 +106,9 @@ function datamachine_business_load_handlers() {
 	// Discord Handlers
 	new \DataMachineBusiness\Handlers\Discord\DiscordPublish();
 	new \DataMachineBusiness\Handlers\Discord\DiscordFetch();
+
+	// Business AI tools
+	new \DataMachineBusiness\Tools\AmazonAffiliateLink();
 }
 
 // Hook into plugins_loaded to ensure Data Machine core is loaded first

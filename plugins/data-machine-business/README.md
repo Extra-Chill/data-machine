@@ -6,10 +6,12 @@ Business and enterprise integrations for Data Machine.
 
 This plugin extends Data Machine with business-focused integrations including:
 
+- **Google Search**: Search the web through Google Custom Search API as an AI tool
 - **Google Sheets**: Fetch data from spreadsheets and append data for reporting
 - **PageSpeed Insights**: Run Lighthouse audits for performance, SEO, accessibility, and optimization opportunities
 - **Slack**: Post messages and fetch conversations from channels
 - **Discord**: Post messages and fetch messages from server channels
+- **Amazon Affiliate Link**: Search Amazon products and return affiliate links using the Amazon Creators API
 
 ## Requirements
 
@@ -23,6 +25,22 @@ This plugin extends Data Machine with business-focused integrations including:
 2. Upload and activate this plugin
 3. Configure Google Sheets authentication in Data Machine settings
 4. Create flows using the Google Sheets handlers
+
+## Google Search Tool
+
+Data Machine Business registers the `google_search` AI tool for chat and pipeline contexts. It uses the Google Custom Search API endpoint and the same `datamachine_search_config` site option previously used by Data Machine core, so existing saved API keys and Custom Search Engine IDs continue to work after this plugin is activated.
+
+### Google Search Setup
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable the Custom Search API for your project
+3. Create or select an API key with access to the Custom Search API
+4. Create a Programmable Search Engine and copy its Search Engine ID
+5. Save the API key and Search Engine ID in Data Machine tool settings for `google_search`
+
+### Google Search Usage
+
+The tool accepts a required `query` parameter and an optional `site_restrict` domain. It returns up to 10 structured results with title, link, snippet, and display link fields.
 
 ## Google Sheets Setup
 
@@ -191,6 +209,19 @@ Fetches messages from a configured Discord channel with:
 ### Abilities (REST API / Chat Tools)
 - `datamachine/post-message-discord` — Post a message to any channel
 - `datamachine/fetch-messages-discord` — Fetch messages from any channel
+
+## Amazon Affiliate Link Tool
+
+The `amazon_affiliate_link` AI tool searches Amazon products and returns an affiliate URL, product title, thumbnail, and ASIN. It is available in Data Machine chat and pipeline contexts when Data Machine Business is active.
+
+Existing credentials saved by older Data Machine core versions are adopted automatically because the extension uses the same `datamachine_amazon_config` site option.
+
+### Amazon Setup
+
+1. Join or open Amazon Associates.
+2. Create Amazon Creators API credentials.
+3. In Data Machine tool settings, configure Credential ID, Credential Secret, Partner Tag, and Marketplace.
+4. Use `amazon_affiliate_link` only for genuinely relevant product references.
 
 ## License
 
