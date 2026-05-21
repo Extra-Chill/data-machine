@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.131.1] - 2026-05-21
+
+### Changed
+- remove Amazon affiliate tool from core
+
 ## [0.131.0] - 2026-05-21
 
 ### Added
