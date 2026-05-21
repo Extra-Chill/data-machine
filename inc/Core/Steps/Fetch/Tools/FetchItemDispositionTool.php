@@ -25,6 +25,7 @@ class FetchItemDispositionTool {
 
 	private const DISPOSITION_REJECT_SOURCE = 'reject_source';
 	private const DISPOSITION_DEFER_ITEM    = 'defer_item';
+	private const MAX_DIAGNOSTIC_CHARS      = 1200;
 
 	/**
 	 * Handle the reject_source/defer_item tool call.
@@ -86,6 +87,7 @@ class FetchItemDispositionTool {
 		$item_identifier = $engine->get( 'item_identifier' );
 		$source_type     = $engine->get( 'source_type' );
 		$flow_step_id    = $this->resolveFetchFlowStepId( $engine ) ?? ( $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' ) );
+		$diagnostic      = $this->buildDispositionDiagnostic( self::DISPOSITION_REJECT_SOURCE, $tool_name, $reason, $flow_step_id, $item_identifier, $source_type, $parameters );
 
 		// Mark item as processed so it won't be refetched
 		if ( $flow_step_id && $item_identifier && $source_type ) {
@@ -129,12 +131,14 @@ class FetchItemDispositionTool {
 		datamachine_merge_engine_data(
 			$job_id,
 			array(
-				'job_status'       => $status->toString(),
-				'source_rejection' => array(
+				'job_status'             => $status->toString(),
+				'disposition_diagnostic' => $diagnostic,
+				'source_rejection'       => array(
 					'reason'          => $reason,
 					'flow_step_id'    => $flow_step_id,
 					'item_identifier' => $item_identifier,
 					'source_type'     => $source_type,
+					'diagnostic'      => $diagnostic,
 				),
 			)
 		);
@@ -219,13 +223,27 @@ class FetchItemDispositionTool {
 		$source_type     = $engine->get( 'source_type' );
 		$flow_step_id    = $this->resolveFetchFlowStepId( $engine ) ?? ( $parameters['flow_step_id'] ?? $engine->get( 'flow_step_id' ) );
 		$released        = null;
+		$diagnostic      = $this->buildDispositionDiagnostic( self::DISPOSITION_DEFER_ITEM, $tool_name, $reason, $flow_step_id, $item_identifier, $source_type, $parameters );
 
 		if ( $flow_step_id && $item_identifier && $source_type ) {
 			$released = ( new \DataMachine\Core\Database\ProcessedItems\ProcessedItems() )->release_claim( $flow_step_id, (string) $source_type, (string) $item_identifier );
 		}
 
 		$status = JobStatus::failed( 'item-deferred' );
-		datamachine_merge_engine_data( $job_id, array( 'job_status' => $status->toString() ) );
+		datamachine_merge_engine_data(
+			$job_id,
+			array(
+				'job_status'             => $status->toString(),
+				'disposition_diagnostic' => $diagnostic,
+				'item_deferral'          => array(
+					'reason'          => $reason,
+					'flow_step_id'    => $flow_step_id,
+					'item_identifier' => $item_identifier,
+					'source_type'     => $source_type,
+					'diagnostic'      => $diagnostic,
+				),
+			)
+		);
 
 		do_action(
 			'datamachine_log',
@@ -289,5 +307,167 @@ class FetchItemDispositionTool {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Build bounded, generic evidence for skipped/deferred source decisions.
+	 *
+	 * @param string     $disposition     Disposition slug.
+	 * @param string     $tool_name       Tool name.
+	 * @param string     $reason          Operator-visible disposition reason.
+	 * @param mixed      $flow_step_id    Flow step ID.
+	 * @param mixed      $item_identifier Source item identifier.
+	 * @param mixed      $source_type     Source type.
+	 * @param array      $parameters      Tool parameters including current data packets.
+	 * @return array<string,mixed>
+	 */
+	private function buildDispositionDiagnostic( string $disposition, string $tool_name, string $reason, mixed $flow_step_id, mixed $item_identifier, mixed $source_type, array $parameters ): array {
+		$packets       = is_array( $parameters['data'] ?? null ) ? $parameters['data'] : array();
+		$packet        = $this->selectDiagnosticPacket( $packets, $item_identifier );
+		$packet_data   = is_array( $packet['data'] ?? null ) ? $packet['data'] : array();
+		$metadata      = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+		$excerpt       = $this->packetExcerpt( $packet_data );
+		$bounded       = $this->boundAndRedact( $excerpt );
+		$diagnostic    = array(
+			'type'            => 'pipeline_disposition_diagnostic',
+			'disposition'     => $disposition,
+			'reason'          => $this->cleanScalar( $reason ),
+			'tool_name'       => $this->cleanScalar( $tool_name ),
+			'item_identifier' => $this->cleanScalar( $item_identifier ),
+			'source_url'      => $this->sourceUrlFromMetadata( $metadata ),
+			'provider'        => $this->providerFromMetadata( $metadata ),
+			'source_type'     => $this->cleanScalar( $source_type ?: ( $metadata['source_type'] ?? '' ) ),
+			'flow_step_id'    => $this->cleanScalar( $flow_step_id ),
+			'packet_count'    => count( $packets ),
+			'excerpt'         => $bounded['text'],
+			'excerpt_chars'   => strlen( $bounded['text'] ),
+			'excerpt_limit'   => self::MAX_DIAGNOSTIC_CHARS,
+			'truncated'       => $bounded['truncated'],
+		);
+
+		if ( '' === $diagnostic['excerpt'] ) {
+			$diagnostic['diagnostic'] = $this->packetShapeDiagnostic( $packet );
+			unset( $diagnostic['excerpt'], $diagnostic['excerpt_chars'], $diagnostic['truncated'] );
+		}
+
+		return array_filter(
+			$diagnostic,
+			static fn( $value ) => null !== $value && '' !== $value && array() !== $value
+		);
+	}
+
+	/**
+	 * @param array<int,array<string,mixed>> $packets Data packets.
+	 * @param mixed                          $item_identifier Current item identifier.
+	 * @return array<string,mixed>
+	 */
+	private function selectDiagnosticPacket( array $packets, mixed $item_identifier ): array {
+		$item_identifier = (string) $item_identifier;
+		foreach ( $packets as $packet ) {
+			if ( ! is_array( $packet ) ) {
+				continue;
+			}
+
+			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+			if ( '' !== $item_identifier && $item_identifier === (string) ( $metadata['item_identifier'] ?? '' ) ) {
+				return $packet;
+			}
+		}
+
+		$first = reset( $packets );
+		return is_array( $first ) ? $first : array();
+	}
+
+	/**
+	 * @param array<string,mixed> $data Packet data.
+	 */
+	private function packetExcerpt( array $data ): string {
+		$parts = array();
+		foreach ( array( 'title', 'body', 'content', 'text', 'description', 'summary' ) as $key ) {
+			if ( ! isset( $data[ $key ] ) || is_array( $data[ $key ] ) || is_object( $data[ $key ] ) ) {
+				continue;
+			}
+
+			$value = trim( (string) $data[ $key ] );
+			if ( '' !== $value ) {
+				$parts[] = $value;
+			}
+		}
+
+		return trim( implode( "\n\n", $parts ) );
+	}
+
+	/**
+	 * @return array{text:string,truncated:bool}
+	 */
+	private function boundAndRedact( string $text ): array {
+		$text = function_exists( 'wp_strip_all_tags' ) ? wp_strip_all_tags( $text ) : strip_tags( $text );
+		$text = trim( preg_replace( '/\s+/u', ' ', $text ) ?? '' );
+		$text = preg_replace( '/\b(Bearer|Basic)\s+[A-Za-z0-9._~+\/-]+=*/i', '$1 [redacted]', $text ) ?? $text;
+		$text = preg_replace( '/\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|secret)\b\s*[:=]\s*[^\s,;]+/i', '$1=[redacted]', $text ) ?? $text;
+		$text = preg_replace( '/([?&](?:token|access_token|key|api_key|secret|password)=)[^&\s]+/i', '$1[redacted]', $text ) ?? $text;
+
+		$truncated = strlen( $text ) > self::MAX_DIAGNOSTIC_CHARS;
+		if ( $truncated ) {
+			$text = substr( $text, 0, self::MAX_DIAGNOSTIC_CHARS );
+		}
+
+		return array(
+			'text'      => $text,
+			'truncated' => $truncated,
+		);
+	}
+
+	/**
+	 * @param array<string,mixed> $metadata Packet metadata.
+	 */
+	private function sourceUrlFromMetadata( array $metadata ): string {
+		foreach ( array( 'source_url', 'url', 'permalink', 'link', 'guid' ) as $key ) {
+			if ( ! empty( $metadata[ $key ] ) && is_scalar( $metadata[ $key ] ) ) {
+				return $this->redactScalar( (string) $metadata[ $key ] );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * @param array<string,mixed> $metadata Packet metadata.
+	 */
+	private function providerFromMetadata( array $metadata ): string {
+		foreach ( array( 'provider_id', 'provider_slug', 'provider', 'auth_provider', 'server_key', 'context_server_key', 'handler' ) as $key ) {
+			if ( ! empty( $metadata[ $key ] ) && is_scalar( $metadata[ $key ] ) ) {
+				return $this->cleanScalar( (string) $metadata[ $key ] );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * @param array<string,mixed> $packet Packet data.
+	 */
+	private function packetShapeDiagnostic( array $packet ): string {
+		$data     = is_array( $packet['data'] ?? null ) ? $packet['data'] : array();
+		$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+
+		return sprintf(
+			'No textual packet excerpt available; packet keys: %s; metadata keys: %s',
+			implode( ',', array_slice( array_map( 'strval', array_keys( $data ) ), 0, 12 ) ),
+			implode( ',', array_slice( array_map( 'strval', array_keys( $metadata ) ), 0, 12 ) )
+		);
+	}
+
+	private function cleanScalar( mixed $value ): string {
+		if ( ! is_scalar( $value ) ) {
+			return '';
+		}
+
+		return trim( preg_replace( '/\s+/u', ' ', (string) $value ) ?? '' );
+	}
+
+	private function redactScalar( string $value ): string {
+		$bounded = $this->boundAndRedact( $value );
+		return $bounded['text'];
 	}
 }

@@ -52,6 +52,7 @@ class JobArtifacts {
 			'status'                 => (string) ( $job['status'] ?? '' ),
 			'agent_id'               => $agent['agent_id'],
 			'agent_slug'             => $agent['agent_slug'],
+			'disposition_diagnostic' => $this->disposition_diagnostic( $engine_data ),
 			'required_tool_names'    => $this->tool_names_from_assertions( $engine_data['completion_assertions_required'] ?? array() ),
 			'satisfied_tool_names'   => $this->tool_names_from_assertions( $engine_data['completion_assertions_satisfied'] ?? array() ),
 			'successful_tool_calls'  => $tool_calls,
@@ -150,6 +151,56 @@ class JobArtifacts {
 				)
 			)
 		);
+	}
+
+	/**
+	 * Return bounded source/disposition evidence persisted by pipeline tools.
+	 *
+	 * @param array<string,mixed> $engine_data Job engine data.
+	 * @return array<string,mixed>|null
+	 */
+	private function disposition_diagnostic( array $engine_data ): ?array {
+		$diagnostic = $engine_data['disposition_diagnostic'] ?? null;
+		if ( ! is_array( $diagnostic ) ) {
+			$source_rejection = $engine_data['source_rejection'] ?? array();
+			$item_deferral    = $engine_data['item_deferral'] ?? array();
+			if ( is_array( $source_rejection ) && is_array( $source_rejection['diagnostic'] ?? null ) ) {
+				$diagnostic = $source_rejection['diagnostic'];
+			} elseif ( is_array( $item_deferral ) && is_array( $item_deferral['diagnostic'] ?? null ) ) {
+				$diagnostic = $item_deferral['diagnostic'];
+			}
+		}
+
+		if ( ! is_array( $diagnostic ) ) {
+			return null;
+		}
+
+		$fields = array(
+			'type',
+			'disposition',
+			'reason',
+			'tool_name',
+			'item_identifier',
+			'source_url',
+			'provider',
+			'source_type',
+			'flow_step_id',
+			'packet_count',
+			'excerpt',
+			'excerpt_chars',
+			'excerpt_limit',
+			'truncated',
+			'diagnostic',
+		);
+
+		$out = array();
+		foreach ( $fields as $field ) {
+			if ( array_key_exists( $field, $diagnostic ) ) {
+				$out[ $field ] = $diagnostic[ $field ];
+			}
+		}
+
+		return empty( $out ) ? null : $out;
 	}
 
 	/**
