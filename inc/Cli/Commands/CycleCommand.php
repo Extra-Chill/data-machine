@@ -105,6 +105,12 @@ class CycleCommand extends BaseCommand {
 					continue;
 				}
 
+				if ( ! empty( $result['skipped'] ) ) {
+					$row['status'] = 'suppressed';
+					$row['reason'] = (string) ( $result['reason'] ?? $row['reason'] );
+					continue;
+				}
+
 				$row['status'] = 'started';
 				$row['job_id'] = isset( $result['job_id'] ) ? (int) $result['job_id'] : null;
 			}

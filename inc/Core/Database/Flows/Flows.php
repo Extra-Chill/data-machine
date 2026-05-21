@@ -2,7 +2,9 @@
 
 namespace DataMachine\Core\Database\Flows;
 
+use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Core\Database\BaseRepository;
+use DataMachine\Engine\ExecutionPlan;
 
 /**
  * Flows Database Class
@@ -1022,9 +1024,15 @@ class Flows extends BaseRepository {
 
 		foreach ( $flows as $flow ) {
 			$scheduling_config = json_decode( $flow['scheduling_config'], true );
+			$scheduling_config = is_array( $scheduling_config ) ? $scheduling_config : array();
 			$flow_id           = (int) $flow['flow_id'];
 			$latest_job        = $latest_jobs[ $flow_id ] ?? null;
 			$last_run_at       = $latest_job['created_at'] ?? null;
+			$suppressed_run    = self::get_last_suppressed_run( $scheduling_config );
+
+			if ( null !== $suppressed_run && ! self::first_drain_queue_has_work( $flow['flow_config'] ?? '' ) ) {
+				$last_run_at = self::latest_mysql_datetime( $last_run_at, $suppressed_run['suppressed_at'] );
+			}
 
 			if ( $this->is_flow_ready_for_execution( $scheduling_config, $current_time, $last_run_at ) ) {
 				$flow['flow_config']       = json_decode( $flow['flow_config'], true ) ?? array();
@@ -1095,6 +1103,85 @@ class Flows extends BaseRepository {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Read a valid suppressed-run marker from scheduling config.
+	 *
+	 * @param array $scheduling_config Scheduling configuration.
+	 * @return array{suppressed_at:string,reason:string,flow_step_id:string,queue_mode:string,backoff_until:?string}|null
+	 */
+	private static function get_last_suppressed_run( array $scheduling_config ): ?array {
+		$marker = $scheduling_config['datamachine_last_suppressed_run'] ?? null;
+		if ( ! is_array( $marker ) ) {
+			return null;
+		}
+
+		$suppressed_at = (string) ( $marker['suppressed_at'] ?? '' );
+		if ( '' === $suppressed_at ) {
+			return null;
+		}
+
+		return array(
+			'suppressed_at' => $suppressed_at,
+			'reason'        => (string) ( $marker['reason'] ?? 'empty_drain_queue' ),
+			'flow_step_id'  => (string) ( $marker['flow_step_id'] ?? '' ),
+			'queue_mode'    => (string) ( $marker['queue_mode'] ?? '' ),
+			'backoff_until' => isset( $marker['backoff_until'] ) ? (string) $marker['backoff_until'] : null,
+		);
+	}
+
+	/**
+	 * Determine whether the first drain-mode fetch step has queued work now.
+	 *
+	 * @param mixed $flow_config_json Raw flow config JSON or decoded array.
+	 * @return bool True when new queued work should bypass suppression.
+	 */
+	private static function first_drain_queue_has_work( mixed $flow_config_json ): bool {
+		$flow_config = is_array( $flow_config_json ) ? $flow_config_json : json_decode( (string) $flow_config_json, true );
+		if ( ! is_array( $flow_config ) ) {
+			return false;
+		}
+
+		try {
+			$first_flow_step_id = ExecutionPlan::from_flow_config( $flow_config )->first_step_id();
+		} catch ( \InvalidArgumentException $e ) {
+			return false;
+		}
+
+		if ( ! $first_flow_step_id || ! isset( $flow_config[ $first_flow_step_id ] ) || ! is_array( $flow_config[ $first_flow_step_id ] ) ) {
+			return false;
+		}
+
+		$first_step = $flow_config[ $first_flow_step_id ];
+		if ( 'fetch' !== (string) ( $first_step['step_type'] ?? '' ) ) {
+			return false;
+		}
+
+		if ( 'drain' !== (string) ( $first_step['queue_mode'] ?? 'static' ) ) {
+			return false;
+		}
+
+		$queue = $first_step[ QueueAbility::SLOT_CONFIG_PATCH_QUEUE ] ?? array();
+		return is_array( $queue ) && ! empty( $queue );
+	}
+
+	/**
+	 * Return the later of two UTC MySQL datetime strings.
+	 *
+	 * @param string|null $left  First datetime.
+	 * @param string|null $right Second datetime.
+	 * @return string|null Latest datetime or null.
+	 */
+	private static function latest_mysql_datetime( ?string $left, ?string $right ): ?string {
+		if ( null === $left || '' === $left ) {
+			return $right;
+		}
+		if ( null === $right || '' === $right ) {
+			return $left;
+		}
+
+		return strtotime( $right ) > strtotime( $left ) ? $right : $left;
 	}
 
 	/**

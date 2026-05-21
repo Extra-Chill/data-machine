@@ -31,6 +31,9 @@ assert_run_flow_empty_drain_contains( '$empty_drain_skip = $this->getEmptyDrainQ
 assert_run_flow_empty_drain_contains( "'reason'     => 'empty_drain_queue'", $run_flow_src, 'empty drain skip returns explicit reason' );
 assert_run_flow_empty_drain_contains( '\'drain\' !== (string) ( $first_step[\'queue_mode\'] ?? \'static\' )', $run_flow_src, 'skip is scoped to drain mode' );
 assert_run_flow_empty_drain_contains( 'QueueAbility::SLOT_CONFIG_PATCH_QUEUE', $run_flow_src, 'skip checks the config patch queue slot' );
+assert_run_flow_empty_drain_contains( '$this->recordSuppressedRun( $flow_id, $scheduling_config, $empty_drain_skip );', $run_flow_src, 'empty drain skip records scheduler suppression metadata' );
+assert_run_flow_empty_drain_contains( "'datamachine_last_suppressed_run'", $run_flow_src, 'suppression marker uses explicit Data Machine scheduling key' );
+assert_run_flow_empty_drain_contains( "'backoff_until'", $run_flow_src, 'suppression marker records backoff boundary for status' );
 
 $skip_pos       = strpos( $run_flow_src, '$empty_drain_skip = $this->getEmptyDrainQueueSkip( $flow_config );' );
 $create_job_pos = strpos( $run_flow_src, '$job_id = $this->db_jobs->create_job( $job_data );' );
