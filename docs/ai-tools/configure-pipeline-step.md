@@ -37,7 +37,7 @@ The `configure_pipeline_step` tool manages pipeline-level AI configuration that 
 ```json
 {
   "pipeline_step_id": "123_abc123",
-  "enabled_tools": ["google_search", "web_fetch", "wordpress_post_reader"]
+  "enabled_tools": ["local_search", "web_fetch", "wordpress_post_reader"]
 }
 ```
 
@@ -48,7 +48,7 @@ The `configure_pipeline_step` tool manages pipeline-level AI configuration that 
   "system_prompt": "You are a social media expert creating engaging posts.",
   "provider": "openai",
   "model": "gpt-4o",
-  "enabled_tools": ["local_search", "google_search"]
+  "enabled_tools": ["local_search", "web_fetch"]
 }
 ```
 
@@ -81,7 +81,6 @@ Pipeline-level settings apply to all flows using this pipeline:
 ## Available Tools
 
 Common tools that can be enabled:
-- `google_search` - Web search via Google Custom Search API
 - `local_search` - WordPress internal content search
 - `web_fetch` - Web page content retrieval (50K limit)
 - `wordpress_post_reader` - Single WordPress post content retrieval

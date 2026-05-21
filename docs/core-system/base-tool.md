@@ -72,18 +72,18 @@ namespace MyExtension\Tools;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
 
-class GoogleSearch extends BaseTool {
+class ExternalLookup extends BaseTool {
 
     public function __construct() {
-        $this->registerTool('google_search', [$this, 'getToolDefinition'], ['chat', 'pipeline'], ['access_level' => 'admin']);
-        $this->registerConfigurationHandlers('google_search');
+        $this->registerTool('external_lookup', [$this, 'getToolDefinition'], ['chat', 'pipeline'], ['access_level' => 'admin']);
+        $this->registerConfigurationHandlers('external_lookup');
     }
 
     public function getToolDefinition(): array {
         return [
             'class' => self::class,
             'method' => 'handle_tool_call',
-            'description' => 'Search the web using Google Custom Search API',
+            'description' => 'Look up data from an external service',
             'parameters' => [
                 'query' => ['type' => 'string', 'description' => 'Search query'],
             ]

@@ -154,10 +154,8 @@ $pipeline_tools = array(
 	'web_fetch'             => array( 'inc/Engine/AI/Tools/Global/WebFetch.php', 'DataMachine\Engine\AI\Tools\Global\WebFetch' ),
 	'wordpress_post_reader' => array( 'inc/Engine/AI/Tools/Global/WordPressPostReader.php', 'DataMachine\Engine\AI\Tools\Global\WordPressPostReader' ),
 	'image_generation'      => array( 'inc/Engine/AI/Tools/Global/ImageGeneration.php', 'DataMachine\Engine\AI\Tools\Global\ImageGeneration' ),
-	'google_search'         => array( 'inc/Engine/AI/Tools/Global/GoogleSearch.php', 'DataMachine\Engine\AI\Tools\Global\GoogleSearch' ),
 	'google_analytics'      => array( 'inc/Engine/AI/Tools/Global/GoogleAnalytics.php', 'DataMachine\Engine\AI\Tools\Global\GoogleAnalytics' ),
 	'google_search_console' => array( 'inc/Engine/AI/Tools/Global/GoogleSearchConsole.php', 'DataMachine\Engine\AI\Tools\Global\GoogleSearchConsole' ),
-	'bing_webmaster'        => array( 'inc/Engine/AI/Tools/Global/BingWebmaster.php', 'DataMachine\Engine\AI\Tools\Global\BingWebmaster' ),
 	'local_search'          => array( 'inc/Engine/AI/Tools/Global/LocalSearch.php', 'DataMachine\Engine\AI\Tools\Global\LocalSearch' ),
 	'internal_link_audit'   => array( 'inc/Engine/AI/Tools/Global/InternalLinkAudit.php', 'DataMachine\Engine\AI\Tools\Global\InternalLinkAudit' ),
 );

@@ -37,11 +37,11 @@ curl https://example.com/wp-json/datamachine/v1/tools \
 {
   "success": true,
   "data": {
-    "google_search": {
-      "label": "Google Search",
+    "local_search": {
+      "label": "Local Search",
       "configured": true,
       "chat_enabled": false,
-      "description": "Search the web using Google Custom Search API"
+      "description": "Search WordPress content locally"
     }
   }
 }
@@ -66,26 +66,6 @@ Notes:
 ### Global Tools
 
 Available to all AI agents via `datamachine_global_tools` filter.
-
-#### google_search
-
-**Tool ID**: `google_search`
-
-**Configuration Required**: Yes (API key + Search Engine ID)
-
-**Chat Enabled**: No (available to pipeline AI steps only)
-
-**Purpose**: Search the web using Google Custom Search API
-
-**Parameters**:
-- `query` (string): Search query
-- `num_results` (integer): Number of results (1-10)
-- `site` (string, optional): Restrict search to specific site
-
-**Use Cases**:
-- Research web content
-- Find related information
-- Verify facts
 
 #### local_search
 
@@ -215,30 +195,14 @@ Available only to chat AI agents via `datamachine_chat_tools` filter. Since v0.4
 
 ## Tool Configuration
 
-### Google Search Configuration
-
-Google Search requires API credentials:
-
-```bash
-curl -X POST https://example.com/wp-json/datamachine/v1/settings/tools/google_search \
-  -H "Content-Type: application/json" \
-  -u username:application_password \
-  -d '{
-    "config_data": {
-      "api_key": "AIzaSyC1234567890abcdef",
-      "search_engine_id": "012345678901234567890:abcdefg"
-    }
-  }'
-```
-
 ### Configuration Status
 
 Tools show `"configured": false` if required configuration is missing:
 
 ```json
 {
-  "google_search": {
-    "label": "Google Search",
+  "image_generation": {
+    "label": "Image Generation",
     "configured": false,
     "chat_enabled": false
   }
@@ -420,9 +384,9 @@ if (chatTools.includes('create_pipeline')) {
 Verify tool configuration before use:
 
 ```javascript
-async function canUseGoogleSearch() {
+async function canUseLocalSearch() {
   const tools = await getConfiguredTools();
-  return tools['google_search']?.configured || false;
+  return tools['local_search']?.configured || false;
 }
 ```
 

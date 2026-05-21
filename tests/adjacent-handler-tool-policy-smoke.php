@@ -119,7 +119,7 @@ namespace {
 	$inspector_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/RequestInspector.php' );
 	assert_same_policy( true, false !== strpos( $ai_step_source, 'getMissingRequiredHandlerSlugsForAi' ), 'AIStep checks missing required handler tools before model call', $failures, $passes );
 	assert_same_policy( true, false !== strpos( $inspector_source, 'getMissingRequiredHandlerSlugsForAi' ), 'RequestInspector checks the same missing handler state', $failures, $passes );
-	assert_same_policy( false, false !== strpos( $ai_step_source, 'array_keys( $available_tools )' ), 'AIStep no longer silently narrows by visible tool names', $failures, $passes );
+	assert_same_policy( false, false !== strpos( $ai_step_source, 'getAvailableRequiredHandlerSlugsForAi( $required_handler_slugs, array_keys( $available_tools )' ), 'AIStep no longer silently narrows by visible tool names', $failures, $passes );
 
 	echo "\n[5] Data Machine policy adapters own mandatory handler-tool vocabulary:\n";
 	$resolver_source  = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php' );

@@ -75,7 +75,7 @@ Core should expose behavior through abilities, hooks, REST, CLI, handlers, and b
 - **Static Registry Tools**: Research, memory, workflow-management, and site-operation tools registered through `datamachine_tools`.
 - **Pipeline Handler Tools**: Runtime tools generated from adjacent fetch, publish, and upsert handlers.
 - **Policy-Gated Tools**: Tools are composed from sources and filtered by mode, memory, action, and handler policies before exposure.
-- **Global Tools**: Google Search, Local Search, Web Fetch, WordPress Post Reader, daily memory, image generation, search-console/analytics, and others used across agents.
+- **Global Tools**: Local Search, Web Fetch, WordPress Post Reader, daily memory, image generation, search-console/analytics, and others used across agents.
 - **Chat Tools**: AddPipelineStep, ApiQuery, ConfigureFlowSteps, ConfigurePipelineStep, CreateFlow, CreatePipeline, RunFlow, UpdateFlow, and other workflow management tools.
 
 ### API Reference

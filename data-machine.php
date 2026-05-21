@@ -3,7 +3,7 @@
  * Plugin Name:     Data Machine
  * Plugin URI:      https://wordpress.org/plugins/data-machine/
  * Description:     AI-powered WordPress plugin for automated content workflows with visual pipeline builder and multi-provider AI integration.
- * Version:           0.131.0
+ * Version:           0.131.1
  * Requires at least: 7.0
  * Requires PHP:     8.2
  * Requires Plugins: agents-api
@@ -18,7 +18,7 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-define( 'DATAMACHINE_VERSION', '0.131.0' );
+define( 'DATAMACHINE_VERSION', '0.131.1' );
 
 define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
@@ -187,7 +187,6 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/SEO/MetaDescriptionAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/SEO/IndexNowAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php';
-	require_once __DIR__ . '/inc/Abilities/Analytics/BingWebmasterAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Analytics/GoogleAnalyticsAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Analytics/GoogleSearchConsoleAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/AgentCallAbilities.php';
@@ -285,7 +284,6 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\SEO\MetaDescriptionAbilities();
 	new \DataMachine\Abilities\SEO\IndexNowAbilities();
 	new \DataMachine\Abilities\Media\ImageTemplateAbilities();
-	new \DataMachine\Abilities\Analytics\BingWebmasterAbilities();
 	new \DataMachine\Abilities\Analytics\GoogleAnalyticsAbilities();
 	new \DataMachine\Abilities\Analytics\GoogleSearchConsoleAbilities();
 	new \DataMachine\Abilities\AgentCallAbilities();

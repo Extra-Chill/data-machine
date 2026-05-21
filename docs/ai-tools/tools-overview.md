@@ -16,9 +16,7 @@ Mutation risk means what the tool can change when called successfully:
 
 | Tool | Modes | Mutation risk | Purpose | Docs |
 | --- | --- | --- | --- | --- |
-| `bing_webmaster` | chat, pipeline | Read-only | Read Bing Webmaster search and crawl analytics. | [Bing Webmaster](bing-webmaster.md) |
 | `google_analytics` | chat, pipeline | Read-only | Read GA4 analytics, realtime, engagement, and comparison metrics. | [Google Analytics](google-analytics.md) |
-| `google_search` | chat, pipeline | Read-only | Search Google Custom Search results. | [Google Search](google-search.md) |
 | `google_search_console` | chat, pipeline | Low mutation | Read GSC data and submit sitemaps. | [Google Search Console](google-search-console.md) |
 | `image_generation` | chat, pipeline | Low mutation | Create image-generation jobs and sideload generated media. | [Image Generation](image-generation.md) |
 | `internal_link_audit` | chat, pipeline | Low mutation | Audit internal links, backlinks, orphans, and broken URLs. | [Internal Link Audit](internal-link-audit.md) |
