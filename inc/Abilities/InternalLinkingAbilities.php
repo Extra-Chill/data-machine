@@ -780,8 +780,8 @@ class InternalLinkingAbilities {
 		if ( ! $force && ! $is_scoped ) {
 			$cached = get_transient( self::GRAPH_TRANSIENT_KEY );
 			if ( false !== $cached && is_array( $cached ) && ( $cached['post_type'] ?? '' ) === $post_type ) {
-				$graph            = self::applyTypesFilterToGraph( $cached, $types );
-				$graph['cached']  = true;
+				$graph           = self::applyTypesFilterToGraph( $cached, $types );
+				$graph['cached'] = true;
 				return $graph;
 			}
 		}
@@ -954,10 +954,11 @@ class InternalLinkingAbilities {
 		// Build the response array with titles and permalinks.
 		$backlinks = array();
 		foreach ( $sources as $source_id => $link_count ) {
+			$permalink   = get_permalink( $source_id );
 			$backlinks[] = array(
 				'source_id'  => $source_id,
 				'title'      => $id_to_title[ $source_id ] ?? '',
-				'permalink'  => get_permalink( $source_id ) ?: '',
+				'permalink'  => false !== $permalink ? $permalink : '',
 				'link_count' => $link_count,
 			);
 		}
@@ -1742,7 +1743,7 @@ class InternalLinkingAbilities {
 				if ( self::EDGE_TYPE_HTML_ANCHOR === $edge_type ) {
 					$resolve_context['url_to_id'] = $url_to_id;
 				}
-				$resolve_context['edge']    = $edge;
+				$resolve_context['edge']     = $edge;
 				$resolve_context['post_ids'] = $post_ids;
 
 				$target_id = self::dispatchResolver( $target_hint, $edge_type, $resolve_context );
