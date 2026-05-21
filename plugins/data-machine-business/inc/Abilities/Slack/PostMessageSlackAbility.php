@@ -35,7 +35,7 @@ class PostMessageSlackAbility {
 				array(
 					'label'            => __( 'Post Message to Slack', 'data-machine-business' ),
 					'description'      => __( 'Post a message to a Slack channel or DM', 'data-machine-business' ),
-					'category'         => 'datamachine',
+					'category'         => 'datamachine-publishing',
 					'input_schema'     => array(
 						'type'       => 'object',
 						'required'   => array( 'channel', 'text' ),

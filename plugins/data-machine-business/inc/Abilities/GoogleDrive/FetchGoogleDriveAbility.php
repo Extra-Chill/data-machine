@@ -61,7 +61,7 @@ class FetchGoogleDriveAbility {
 				array(
 					'label'               => __( 'Fetch Google Drive Folder', 'data-machine-business' ),
 					'description'         => __( 'List files in a Google Drive folder and download or export their contents.', 'data-machine-business' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'folder_id' ),
