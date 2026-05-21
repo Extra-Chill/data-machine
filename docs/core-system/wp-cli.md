@@ -467,11 +467,10 @@ wp datamachine image optimize --size_threshold=500000 --quality=82 --limit=50 --
 Analytics integrations. **Since**: 0.31.0
 
 ```bash
-# Google Search Console
-wp datamachine analytics gsc query_stats --start-date=2026-01-01 --end-date=2026-03-01
-wp datamachine analytics gsc page_stats --url-filter="/blog/"
-wp datamachine analytics gsc inspect_url --inspect-url="https://example.com/post"
-wp datamachine analytics gsc list_sitemaps
+# Bing Webmaster Tools
+wp datamachine analytics bing query_stats --days=30
+wp datamachine analytics bing traffic_stats
+wp datamachine analytics bing crawl_stats
 
 # Google Analytics (GA4, requires Data Machine Business)
 wp datamachine analytics ga page_stats --start-date=2026-01-01

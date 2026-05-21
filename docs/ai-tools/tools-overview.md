@@ -16,7 +16,6 @@ Mutation risk means what the tool can change when called successfully:
 
 | Tool | Modes | Mutation risk | Purpose | Docs |
 | --- | --- | --- | --- | --- |
-| `google_search_console` | chat, pipeline | Low mutation | Read GSC data and submit sitemaps. | [Google Search Console](google-search-console.md) |
 | `image_generation` | chat, pipeline | Low mutation | Create image-generation jobs and sideload generated media. | [Image Generation](image-generation.md) |
 | `internal_link_audit` | chat, pipeline | Low mutation | Audit internal links, backlinks, orphans, and broken URLs. | [Internal Link Audit](internal-link-audit.md) |
 | `local_search` | chat, pipeline | Read-only | Search local WordPress posts/pages. | [Local Search](local-search.md) |
