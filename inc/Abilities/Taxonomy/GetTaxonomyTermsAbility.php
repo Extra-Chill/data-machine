@@ -26,66 +26,66 @@ class GetTaxonomyTermsAbility extends AbstractTaxonomyAbility {
 			'description'         => __( 'Retrieve taxonomy terms with optional filtering by taxonomy, search, and pagination.', 'data-machine' ),
 			'category'            => 'datamachine-taxonomy',
 			'input_schema'        => array(
-						'type'       => 'object',
-						'properties' => array(
-							'taxonomy'   => array(
-								'type'        => 'string',
-								'description' => __( 'Taxonomy slug (category, post_tag, custom taxonomy)', 'data-machine' ),
-							),
-							'search'     => array(
-								'type'        => 'string',
-								'description' => __( 'Search term to filter terms by name', 'data-machine' ),
-							),
-							'parent'     => array(
-								'type'        => 'integer',
-								'description' => __( 'Parent term ID to get child terms', 'data-machine' ),
-							),
-							'hide_empty' => array(
-								'type'        => 'boolean',
-								'description' => __( 'Hide terms with no posts (default: false)', 'data-machine' ),
-							),
-							'number'     => array(
-								'type'        => 'integer',
-								'description' => __( 'Maximum number of terms to return', 'data-machine' ),
-							),
-							'offset'     => array(
-								'type'        => 'integer',
-								'description' => __( 'Number of terms to skip', 'data-machine' ),
-							),
-							'orderby'    => array(
-								'type'        => 'string',
-								'enum'        => array( 'name', 'slug', 'term_id', 'count' ),
-								'description' => __( 'Sort field (default: name)', 'data-machine' ),
-							),
-							'order'      => array(
-								'type'        => 'string',
-								'enum'        => array( 'ASC', 'DESC' ),
-								'description' => __( 'Sort order (default: ASC)', 'data-machine' ),
-							),
-						),
+				'type'       => 'object',
+				'properties' => array(
+					'taxonomy'   => array(
+						'type'        => 'string',
+						'description' => __( 'Taxonomy slug (category, post_tag, custom taxonomy)', 'data-machine' ),
 					),
+					'search'     => array(
+						'type'        => 'string',
+						'description' => __( 'Search term to filter terms by name', 'data-machine' ),
+					),
+					'parent'     => array(
+						'type'        => 'integer',
+						'description' => __( 'Parent term ID to get child terms', 'data-machine' ),
+					),
+					'hide_empty' => array(
+						'type'        => 'boolean',
+						'description' => __( 'Hide terms with no posts (default: false)', 'data-machine' ),
+					),
+					'number'     => array(
+						'type'        => 'integer',
+						'description' => __( 'Maximum number of terms to return', 'data-machine' ),
+					),
+					'offset'     => array(
+						'type'        => 'integer',
+						'description' => __( 'Number of terms to skip', 'data-machine' ),
+					),
+					'orderby'    => array(
+						'type'        => 'string',
+						'enum'        => array( 'name', 'slug', 'term_id', 'count' ),
+						'description' => __( 'Sort field (default: name)', 'data-machine' ),
+					),
+					'order'      => array(
+						'type'        => 'string',
+						'enum'        => array( 'ASC', 'DESC' ),
+						'description' => __( 'Sort order (default: ASC)', 'data-machine' ),
+					),
+				),
+			),
 			'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'terms'   => array(
-								'type'  => 'array',
-								'items' => array(
-									'type'       => 'object',
-									'properties' => array(
-										'term_id'    => array( 'type' => 'integer' ),
-										'name'       => array( 'type' => 'string' ),
-										'slug'       => array( 'type' => 'string' ),
-										'count'      => array( 'type' => 'integer' ),
-										'parent'     => array( 'type' => 'integer' ),
-										'term_group' => array( 'type' => 'integer' ),
-									),
-								),
+				'type'       => 'object',
+				'properties' => array(
+					'success' => array( 'type' => 'boolean' ),
+					'terms'   => array(
+						'type'  => 'array',
+						'items' => array(
+							'type'       => 'object',
+							'properties' => array(
+								'term_id'    => array( 'type' => 'integer' ),
+								'name'       => array( 'type' => 'string' ),
+								'slug'       => array( 'type' => 'string' ),
+								'count'      => array( 'type' => 'integer' ),
+								'parent'     => array( 'type' => 'integer' ),
+								'term_group' => array( 'type' => 'integer' ),
 							),
-							'total'   => array( 'type' => 'integer' ),
-							'error'   => array( 'type' => 'string' ),
 						),
 					),
+					'total'   => array( 'type' => 'integer' ),
+					'error'   => array( 'type' => 'string' ),
+				),
+			),
 			'execute_callback'    => array( $this, 'execute' ),
 			'permission_callback' => array( $this, 'checkPermission' ),
 			'meta'                => array( 'show_in_rest' => true ),
@@ -176,5 +176,4 @@ class GetTaxonomyTermsAbility extends AbstractTaxonomyAbility {
 			'total'   => count( $formatted_terms ),
 		);
 	}
-
 }

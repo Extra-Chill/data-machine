@@ -285,32 +285,26 @@ class LogRepository extends BaseRepository {
 	 * }
 	 */
 	public function get_metadata( ?int $agent_id = null ): array {
-		$where  = '1=1';
-		$params = array();
-
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		if ( null !== $agent_id ) {
-			$where    = 'agent_id = %d';
-			$params[] = $agent_id;
-		}
-
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		if ( ! empty( $params ) ) {
-			// phpcs:disable WordPress.DB.PreparedSQLPlaceholders -- Dynamic query construction with safe values.
 			$row = $this->wpdb->get_row(
 				$this->wpdb->prepare(
-					"SELECT COUNT(*) AS total_entries, MIN(created_at) AS oldest, MAX(created_at) AS newest FROM {$this->table_name} WHERE {$where}",
-					...$params
+					'SELECT COUNT(*) AS total_entries, MIN(created_at) AS oldest, MAX(created_at) AS newest FROM %i WHERE agent_id = %d',
+					$this->table_name,
+					$agent_id
 				),
 				ARRAY_A
 			);
-			// phpcs:enable WordPress.DB.PreparedSQLPlaceholders
 		} else {
 			$row = $this->wpdb->get_row(
-				"SELECT COUNT(*) AS total_entries, MIN(created_at) AS oldest, MAX(created_at) AS newest FROM {$this->table_name} WHERE {$where}",
+				$this->wpdb->prepare(
+					'SELECT COUNT(*) AS total_entries, MIN(created_at) AS oldest, MAX(created_at) AS newest FROM %i',
+					$this->table_name
+				),
 				ARRAY_A
 			);
 		}
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL
 
 		return array(
 			'total_entries' => (int) ( $row['total_entries'] ?? 0 ),
@@ -326,32 +320,26 @@ class LogRepository extends BaseRepository {
 	 * @return array<string, int> Level => count mapping.
 	 */
 	public function get_level_counts( ?int $agent_id = null ): array {
-		$where  = '1=1';
-		$params = array();
-
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
 		if ( null !== $agent_id ) {
-			$where    = 'agent_id = %d';
-			$params[] = $agent_id;
-		}
-
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		if ( ! empty( $params ) ) {
-			// phpcs:disable WordPress.DB.PreparedSQLPlaceholders -- Dynamic query construction with safe values.
 			$rows = $this->wpdb->get_results(
 				$this->wpdb->prepare(
-					"SELECT level, COUNT(*) AS cnt FROM {$this->table_name} WHERE {$where} GROUP BY level",
-					...$params
+					'SELECT level, COUNT(*) AS cnt FROM %i WHERE agent_id = %d GROUP BY level',
+					$this->table_name,
+					$agent_id
 				),
 				ARRAY_A
 			);
-			// phpcs:enable WordPress.DB.PreparedSQLPlaceholders
 		} else {
 			$rows = $this->wpdb->get_results(
-				"SELECT level, COUNT(*) AS cnt FROM {$this->table_name} WHERE {$where} GROUP BY level",
+				$this->wpdb->prepare(
+					'SELECT level, COUNT(*) AS cnt FROM %i GROUP BY level',
+					$this->table_name
+				),
 				ARRAY_A
 			);
 		}
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL
 
 		$counts = array();
 		if ( $rows ) {

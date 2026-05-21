@@ -26,46 +26,46 @@ class CreateTaxonomyTermAbility extends AbstractTaxonomyAbility {
 			'description'         => __( 'Create a new taxonomy term. The term will be created if it does not already exist.', 'data-machine' ),
 			'category'            => 'datamachine-taxonomy',
 			'input_schema'        => array(
-						'type'       => 'object',
-						'properties' => array(
-							'taxonomy'    => array(
-								'type'        => 'string',
-								'required'    => true,
-								'description' => __( 'Taxonomy slug (category, post_tag, custom taxonomy)', 'data-machine' ),
-							),
-							'name'        => array(
-								'type'        => 'string',
-								'required'    => true,
-								'description' => __( 'Term name', 'data-machine' ),
-							),
-							'slug'        => array(
-								'type'        => 'string',
-								'description' => __( 'Term slug (auto-generated if not provided)', 'data-machine' ),
-							),
-							'description' => array(
-								'type'        => 'string',
-								'description' => __( 'Term description', 'data-machine' ),
-							),
-							'parent'      => array(
-								'type'        => 'integer',
-								'description' => __( 'Parent term ID for hierarchical taxonomies', 'data-machine' ),
-							),
-						),
-						'required'   => array( 'taxonomy', 'name' ),
+				'type'       => 'object',
+				'properties' => array(
+					'taxonomy'    => array(
+						'type'        => 'string',
+						'required'    => true,
+						'description' => __( 'Taxonomy slug (category, post_tag, custom taxonomy)', 'data-machine' ),
 					),
+					'name'        => array(
+						'type'        => 'string',
+						'required'    => true,
+						'description' => __( 'Term name', 'data-machine' ),
+					),
+					'slug'        => array(
+						'type'        => 'string',
+						'description' => __( 'Term slug (auto-generated if not provided)', 'data-machine' ),
+					),
+					'description' => array(
+						'type'        => 'string',
+						'description' => __( 'Term description', 'data-machine' ),
+					),
+					'parent'      => array(
+						'type'        => 'integer',
+						'description' => __( 'Parent term ID for hierarchical taxonomies', 'data-machine' ),
+					),
+				),
+				'required'   => array( 'taxonomy', 'name' ),
+			),
 			'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'   => array( 'type' => 'boolean' ),
-							'term_id'   => array( 'type' => 'integer' ),
-							'term_name' => array( 'type' => 'string' ),
-							'term_slug' => array( 'type' => 'string' ),
-							'taxonomy'  => array( 'type' => 'string' ),
-							'created'   => array( 'type' => 'boolean' ),
-							'existed'   => array( 'type' => 'boolean' ),
-							'error'     => array( 'type' => 'string' ),
-						),
-					),
+				'type'       => 'object',
+				'properties' => array(
+					'success'   => array( 'type' => 'boolean' ),
+					'term_id'   => array( 'type' => 'integer' ),
+					'term_name' => array( 'type' => 'string' ),
+					'term_slug' => array( 'type' => 'string' ),
+					'taxonomy'  => array( 'type' => 'string' ),
+					'created'   => array( 'type' => 'boolean' ),
+					'existed'   => array( 'type' => 'boolean' ),
+					'error'     => array( 'type' => 'string' ),
+				),
+			),
 			'execute_callback'    => array( $this, 'execute' ),
 			'permission_callback' => array( $this, 'checkPermission' ),
 			'meta'                => array( 'show_in_rest' => true ),
@@ -195,5 +195,4 @@ class CreateTaxonomyTermAbility extends AbstractTaxonomyAbility {
 			'existed'   => false,
 		);
 	}
-
 }
