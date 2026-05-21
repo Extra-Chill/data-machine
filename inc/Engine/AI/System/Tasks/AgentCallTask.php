@@ -178,12 +178,12 @@ class AgentCallTask extends SystemTask {
 		$context = array_merge(
 			$context,
 			array(
-				'data_packets'  => $params['data_packets'] ?? array(),
-				'engine_data'   => $params['engine_data'] ?? array(),
-				'flow_id'       => $params['flow_id'] ?? null,
-				'pipeline_id'   => $params['pipeline_id'] ?? null,
-				'job_id'        => $params['job_id'] ?? $jobId,
-				'from_queue'    => $from_queue,
+				'data_packets' => $params['data_packets'] ?? array(),
+				'engine_data'  => $params['engine_data'] ?? array(),
+				'flow_id'      => $params['flow_id'] ?? null,
+				'pipeline_id'  => $params['pipeline_id'] ?? null,
+				'job_id'       => $params['job_id'] ?? $jobId,
+				'from_queue'   => $from_queue,
 			)
 		);
 		$input['context'] = $context;

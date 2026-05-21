@@ -452,7 +452,8 @@ function datamachine_scaffold_rules_content( string $content, string $filename, 
 		return $content;
 	}
 
-	$site_name = get_bloginfo( 'name' ) ?: 'this site';
+	$site_name = get_bloginfo( 'name' );
+	$site_name = $site_name ? $site_name : 'this site';
 
 	return <<<MD
 # Site Rules

@@ -63,7 +63,7 @@ class ImageOptimizationTask extends SystemTask {
 
 		$file_path = get_attached_file( $attachment_id );
 		if ( empty( $file_path ) || ! file_exists( $file_path ) ) {
-			$this->failJob( $jobId, 'Attachment file not found: ' . ( $file_path ?: 'empty path' ) );
+			$this->failJob( $jobId, 'Attachment file not found: ' . ( $file_path ? $file_path : 'empty path' ) );
 			return;
 		}
 
@@ -138,18 +138,27 @@ class ImageOptimizationTask extends SystemTask {
 		$editor = wp_get_image_editor( $file_path );
 
 		if ( is_wp_error( $editor ) ) {
-			return array( 'success' => false, 'error' => 'Image editor not available: ' . $editor->get_error_message() );
+			return array(
+				'success' => false,
+				'error'   => 'Image editor not available: ' . $editor->get_error_message(),
+			);
 		}
 
 		$editor->set_quality( $quality );
 		$saved = $editor->save( $file_path, $mime_type );
 
 		if ( is_wp_error( $saved ) ) {
-			return array( 'success' => false, 'error' => 'Compression failed: ' . $saved->get_error_message() );
+			return array(
+				'success' => false,
+				'error'   => 'Compression failed: ' . $saved->get_error_message(),
+			);
 		}
 
 		clearstatcache( true, $file_path );
-		return array( 'success' => true, 'new_size' => filesize( $file_path ) );
+		return array(
+			'success'  => true,
+			'new_size' => filesize( $file_path ),
+		);
 	}
 
 	/**
@@ -162,21 +171,35 @@ class ImageOptimizationTask extends SystemTask {
 		$webp_path = preg_replace( '/\.(jpe?g|png)$/i', '.webp', $file_path );
 
 		if ( file_exists( $webp_path ) ) {
-			return array( 'success' => true, 'webp_path' => $webp_path, 'webp_size' => filesize( $webp_path ) );
+			return array(
+				'success'   => true,
+				'webp_path' => $webp_path,
+				'webp_size' => filesize( $webp_path ),
+			);
 		}
 
 		$editor = wp_get_image_editor( $file_path );
 		if ( is_wp_error( $editor ) ) {
-			return array( 'success' => false, 'error' => 'Image editor not available: ' . $editor->get_error_message() );
+			return array(
+				'success' => false,
+				'error'   => 'Image editor not available: ' . $editor->get_error_message(),
+			);
 		}
 
 		$editor->set_quality( $quality );
 		$saved = $editor->save( $webp_path, 'image/webp' );
 
 		if ( is_wp_error( $saved ) ) {
-			return array( 'success' => false, 'error' => 'WebP generation failed: ' . $saved->get_error_message() );
+			return array(
+				'success' => false,
+				'error'   => 'WebP generation failed: ' . $saved->get_error_message(),
+			);
 		}
 
-		return array( 'success' => true, 'webp_path' => $saved['path'], 'webp_size' => filesize( $saved['path'] ) );
+		return array(
+			'success'   => true,
+			'webp_path' => $saved['path'],
+			'webp_size' => filesize( $saved['path'] ),
+		);
 	}
 }
