@@ -627,6 +627,8 @@ class EmailAbilities {
 	 * Test the IMAP connection with stored credentials.
 	 */
 	public function executeTestConnection( array $input ): array {
+		unset( $input );
+
 		if ( ! function_exists( 'imap_open' ) ) {
 			return array(
 				'success' => false,

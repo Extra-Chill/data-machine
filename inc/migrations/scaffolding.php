@@ -426,6 +426,8 @@ function datamachine_scaffold_soul_content( string $content, string $filename, a
  * @return string
  */
 function datamachine_scaffold_memory_content( string $content, string $filename, array $context ): string {
+	unset( $context );
+
 	if ( 'MEMORY.md' !== $filename || '' !== $content ) {
 		return $content;
 	}
@@ -448,6 +450,8 @@ function datamachine_scaffold_memory_content( string $content, string $filename,
  * @return string
  */
 function datamachine_scaffold_rules_content( string $content, string $filename, array $context ): string {
+	unset( $context );
+
 	if ( 'RULES.md' !== $filename || '' !== $content ) {
 		return $content;
 	}

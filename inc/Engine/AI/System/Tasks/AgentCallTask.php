@@ -174,8 +174,8 @@ class AgentCallTask extends SystemTask {
 			}
 		}
 
-		$context = is_array( $input['context'] ?? null ) ? $input['context'] : array();
-		$context = array_merge(
+		$context          = is_array( $input['context'] ?? null ) ? $input['context'] : array();
+		$context          = array_merge(
 			$context,
 			array(
 				'data_packets' => $params['data_packets'] ?? array(),
