@@ -108,6 +108,31 @@ class TaxonomyHandler {
 	 * Iterates through public taxonomies (or specific post type taxonomies) and
 	 * generates tool parameters for any taxonomy configured as "AI Decides".
 	 *
+	 * The auto-generated description uses only the taxonomy label, which is
+	 * intentionally generic — DM core has no business knowing what any
+	 * particular taxonomy means. Plugins that own a taxonomy should hook the
+	 * {@see 'datamachine_taxonomy_tool_parameter'} filter to enrich the
+	 * description with domain context, add an `enum` constraint, mark the
+	 * field required, etc.
+	 *
+	 * Example: a plugin that owns a "region" taxonomy might want the AI to
+	 * only pick from a fixed list of cities and never invent new ones:
+	 *
+	 *     add_filter(
+	 *         'datamachine_taxonomy_tool_parameter',
+	 *         function ( $param_def, $taxonomy, $handler_config, $post_type ) {
+	 *             if ( 'region' !== $taxonomy->name ) {
+	 *                 return $param_def;
+	 *             }
+	 *             $terms = get_terms( array( 'taxonomy' => 'region', 'hide_empty' => false ) );
+	 *             $param_def['enum']        = wp_list_pluck( $terms, 'name' );
+	 *             $param_def['description'] = 'Pick the discovery region this post belongs to. Must be one of the existing terms — do not invent new regions.';
+	 *             return $param_def;
+	 *         },
+	 *         10,
+	 *         4
+	 *     );
+	 *
 	 * @param array       $handler_config Handler configuration with taxonomy selections
 	 * @param string|null $post_type Optional post type to filter taxonomies
 	 * @return array Parameter definitions for AI-decided taxonomies
@@ -138,7 +163,7 @@ class TaxonomyHandler {
 
 			$is_hierarchical = $taxonomy->hierarchical;
 
-			$parameters[ $param_name ] = array(
+			$param_def = array(
 				'type'        => $is_hierarchical ? 'string' : 'array',
 				'description' => sprintf(
 					'Assign %s for this post. %s',
@@ -151,10 +176,46 @@ class TaxonomyHandler {
 
 			// For non-hierarchical (tags), we need to specify items type
 			if ( ! $is_hierarchical ) {
-				$parameters[ $param_name ]['items'] = array(
+				$param_def['items'] = array(
 					'type' => 'string',
 				);
 			}
+
+			/**
+			 * Filters the AI tool parameter definition for a taxonomy.
+			 *
+			 * Allows the plugin that owns a taxonomy to enrich the description
+			 * with semantic context the AI can use to pick correct term values,
+			 * add an `enum` constraint, mark the field `required`, change the
+			 * `type`, etc. Default behavior (when no filter is hooked) is
+			 * identical to pre-filter output.
+			 *
+			 * Taxonomy ownership lives in the plugin that registered the
+			 * taxonomy, not in Data Machine core. This filter is the recommended
+			 * extension point for any taxonomy whose business rules live in
+			 * another plugin.
+			 *
+			 * @since 0.131.0
+			 *
+			 * @param array       $param_def      JSON Schema fragment for this parameter.
+			 *                                    Includes `type`, `description`, and
+			 *                                    (for non-hierarchical taxonomies) `items`.
+			 * @param \WP_Taxonomy $taxonomy       The taxonomy object being exposed to the AI.
+			 * @param array       $handler_config The handler config (so the filter can
+			 *                                    inspect whether this is AI-decided vs
+			 *                                    pre-selected, and behave accordingly).
+			 * @param string|null $post_type      Post type being targeted, or null if all
+			 *                                    public taxonomies are in scope.
+			 */
+			$param_def = apply_filters(
+				'datamachine_taxonomy_tool_parameter',
+				$param_def,
+				$taxonomy,
+				$handler_config,
+				$post_type
+			);
+
+			$parameters[ $param_name ] = $param_def;
 		}
 
 		return $parameters;
@@ -300,7 +361,34 @@ class TaxonomyHandler {
 
 	/**
 	 * Assign taxonomy terms with dynamic term creation using wp_insert_term().
-	 * Creates non-existing terms automatically before assignment.
+	 *
+	 * Creates non-existing terms automatically before assignment. Fires the
+	 * {@see 'datamachine_taxonomy_assign_value'} filter before processing so
+	 * the plugin that owns the taxonomy can sanitize, coerce, or refuse the
+	 * AI-supplied value at runtime — preventing junk terms from being created
+	 * when the AI invents values outside the taxonomy's intended domain.
+	 *
+	 * Example: a plugin that owns a "region" taxonomy can refuse any value
+	 * the AI invented and force the value to be derived from another field:
+	 *
+	 *     add_filter(
+	 *         'datamachine_taxonomy_assign_value',
+	 *         function ( $taxonomy_value, $taxonomy_name, $post_id ) {
+	 *             if ( 'region' !== $taxonomy_name ) {
+	 *                 return $taxonomy_value;
+	 *             }
+	 *             // Region is derived from another field, not AI-decided.
+	 *             // Returning empty skips assignment for this taxonomy.
+	 *             return '';
+	 *         },
+	 *         10,
+	 *         3
+	 *     );
+	 *
+	 * When the filter returns an empty string, null, or empty array, the
+	 * assignment is skipped silently (no terms created, no error raised).
+	 * Default behavior (when no filter is hooked) is identical to the
+	 * pre-filter behavior.
 	 *
 	 * @param int    $post_id WordPress post ID
 	 * @param string $taxonomy_name Taxonomy name
@@ -310,6 +398,36 @@ class TaxonomyHandler {
 	public function assignTaxonomy( int $post_id, string $taxonomy_name, $taxonomy_value ): array {
 		if ( ! $this->validateTaxonomyExists( $taxonomy_name ) ) {
 			return $this->createErrorResult( "Taxonomy '{$taxonomy_name}' does not exist" );
+		}
+
+		/**
+		 * Filters the AI-supplied taxonomy value before term resolution.
+		 *
+		 * Lets the plugin that owns a taxonomy mutate, sanitize, or refuse the
+		 * value the AI picked, before {@see processTerms()} creates new terms.
+		 * Returning an empty value (`''`, `null`, or `array()`) skips
+		 * assignment for this taxonomy without raising an error — useful when
+		 * a taxonomy is derived from another data source and the AI must
+		 * never pick it.
+		 *
+		 * @since 0.131.0
+		 *
+		 * @param mixed  $taxonomy_value The AI-supplied value. Either a string
+		 *                               (hierarchical taxonomy) or an array
+		 *                               of strings (flat taxonomy).
+		 * @param string $taxonomy_name  The taxonomy slug being assigned.
+		 * @param int    $post_id        The post ID receiving the assignment.
+		 */
+		$taxonomy_value = apply_filters(
+			'datamachine_taxonomy_assign_value',
+			$taxonomy_value,
+			$taxonomy_name,
+			$post_id
+		);
+
+		// Empty filter return: skip assignment silently.
+		if ( null === $taxonomy_value || '' === $taxonomy_value || ( is_array( $taxonomy_value ) && empty( $taxonomy_value ) ) ) {
+			return $this->createSuccessResult( $taxonomy_name, array(), array() );
 		}
 
 		$terms    = is_array( $taxonomy_value ) ? $taxonomy_value : array( $taxonomy_value );
