@@ -2,8 +2,7 @@
 /**
  * WP-CLI Analytics Command
  *
- * Provides CLI access to core analytics integrations:
- * Google Search Console, Google Analytics (GA4), PageSpeed Insights.
+ * Provides CLI access to core and extension-backed analytics integrations.
  *
  * Each subcommand delegates to its respective ability via wp_get_ability().
  *
@@ -94,7 +93,7 @@ class AnalyticsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Query Google Analytics (GA4) data.
+	 * Query Google Analytics (GA4) data. Requires Data Machine Business.
 	 *
 	 * ## OPTIONS
 	 *
