@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.131.3] - 2026-05-21
+
+### Fixed
+- clean lint blocker formatting
+
 ## [0.131.2] - 2026-05-21
 
 ### Changed
