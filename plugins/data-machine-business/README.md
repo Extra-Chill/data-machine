@@ -8,6 +8,7 @@ This plugin extends Data Machine with business-focused integrations including:
 
 - **Google Search**: Search the web through Google Custom Search API as an AI tool
 - **Google Sheets**: Fetch data from spreadsheets and append data for reporting
+- **PageSpeed Insights**: Run Lighthouse audits for performance, SEO, accessibility, and optimization opportunities
 - **Google Analytics (GA4)**: Fetch visitor analytics, realtime, engagement, and comparison metrics
 - **Google Search Console**: Read search analytics, inspect URLs, and manage sitemaps
 - **Slack**: Post messages and fetch conversations from channels
@@ -72,6 +73,45 @@ Supported actions include `page_stats`, `traffic_sources`, `date_stats`, `realti
 5. Add your site's URL as authorized redirect URI
 6. Copy Client ID and Client Secret to Data Machine settings
 7. Authenticate the handler
+
+## PageSpeed Insights
+
+PageSpeed Insights runs Google Lighthouse audits against any URL. It works without an API key, but Google may rate-limit anonymous requests. Add an optional Google API key in the Data Machine tool settings under **PageSpeed** for higher limits.
+
+Data Machine Business registers the same PageSpeed surfaces that previously lived in Data Machine core:
+
+- AI tool: `pagespeed`
+- Ability: `datamachine/pagespeed`
+- REST endpoint: `POST /wp-json/datamachine/v1/analytics/pagespeed`
+- WP-CLI command: `wp datamachine analytics pagespeed <action>`
+
+Existing PageSpeed API-key config is adopted automatically because the integration continues to use the `datamachine_pagespeed_config` site option.
+
+### PageSpeed Actions
+
+| Action | Description |
+|--------|-------------|
+| `analyze` | Full Lighthouse audit with category scores and key metrics |
+| `performance` | Focused performance score and Core Web Vitals metrics |
+| `opportunities` | Optimization opportunities sorted by estimated savings |
+
+### PageSpeed CLI Examples
+
+```bash
+wp datamachine analytics pagespeed analyze --page-url="https://example.com" --strategy=mobile
+wp datamachine analytics pagespeed performance --page-url="https://example.com" --strategy=desktop
+wp datamachine analytics pagespeed opportunities --page-url="https://example.com" --format=json
+```
+
+### PageSpeed REST Example
+
+```bash
+curl -X POST https://example.com/wp-json/datamachine/v1/analytics/pagespeed \
+  -H "Content-Type: application/json" \
+  -H "X-WP-Nonce: {nonce}" \
+  --cookie "{auth_cookie}" \
+  -d '{"action":"analyze","url":"https://example.com/","strategy":"desktop"}'
+```
 
 ## Google Search Console Setup
 
