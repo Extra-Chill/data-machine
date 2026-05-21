@@ -16,7 +16,6 @@ Mutation risk means what the tool can change when called successfully:
 
 | Tool | Modes | Mutation risk | Purpose | Docs |
 | --- | --- | --- | --- | --- |
-| `amazon_affiliate_link` | chat, pipeline | Read-only | Search Amazon products and return affiliate links. | [Amazon Affiliate Link](amazon-affiliate-link.md) |
 | `google_analytics` | chat, pipeline | Read-only | Read GA4 analytics, realtime, engagement, and comparison metrics. | [Google Analytics](google-analytics.md) |
 | `google_search` | chat, pipeline | Read-only | Search Google Custom Search results. | [Google Search](google-search.md) |
 | `google_search_console` | chat, pipeline | Low mutation | Read GSC data and submit sitemaps. | [Google Search Console](google-search-console.md) |
