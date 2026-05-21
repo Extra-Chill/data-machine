@@ -30,7 +30,7 @@ class BrandTokens {
 	 * @var array
 	 */
 	private const DEFAULTS = array(
-		'colors' => array(
+		'colors'     => array(
 			'background'      => '#ffffff',
 			'background_dark' => '#0f0f0f',
 			'surface'         => '#f1f5f9',
@@ -44,7 +44,7 @@ class BrandTokens {
 			'header_bg'       => '#000000',
 			'border'          => '#dddddd',
 		),
-		'fonts'  => array(
+		'fonts'      => array(
 			// Absolute paths to .ttf files. GD cannot use .woff2 — themes
 			// must ship TTF/OTF for any font they want in rendered images.
 			'heading' => null,

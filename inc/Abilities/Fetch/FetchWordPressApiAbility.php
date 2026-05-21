@@ -42,16 +42,16 @@ class FetchWordPressApiAbility {
 						'type'       => 'object',
 						'required'   => array( 'endpoint_url' ),
 						'properties' => array(
-							'endpoint_url'    => array(
+							'endpoint_url'     => array(
 								'type'        => 'string',
 								'description' => __( 'Complete REST API endpoint URL (e.g., https://example.com/wp-json/wp/v2/posts)', 'data-machine' ),
 							),
-							'timeframe_limit' => array(
+							'timeframe_limit'  => array(
 								'type'        => 'string',
 								'default'     => 'all_time',
 								'description' => __( 'Timeframe filter (all_time, 24_hours, 7_days, 30_days, 90_days, 6_months, 1_year)', 'data-machine' ),
 							),
-							'search'          => array(
+							'search'           => array(
 								'type'        => 'string',
 								'default'     => '',
 								'description' => __( 'Search term to filter items', 'data-machine' ),
@@ -61,12 +61,12 @@ class FetchWordPressApiAbility {
 								'default'     => '',
 								'description' => __( 'Comma-separated keywords; items whose title, content, or excerpt contains any of these are skipped', 'data-machine' ),
 							),
-							'processed_items' => array(
+							'processed_items'  => array(
 								'type'        => 'array',
 								'default'     => array(),
 								'description' => __( 'Array of already processed item IDs to skip', 'data-machine' ),
 							),
-							'download_images' => array(
+							'download_images'  => array(
 								'type'        => 'boolean',
 								'default'     => true,
 								'description' => __( 'Whether to download featured images', 'data-machine' ),
