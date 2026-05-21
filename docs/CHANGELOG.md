@@ -2,6 +2,23 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.131.2] - 2026-05-21
+
+### Changed
+- remove search console from core
+- remove GA4 tooling from core
+- narrow adjacent handler smoke assertion
+- remove Bing Webmaster from core
+- remove Google Search tool from core
+- remove pagespeed from core
+
+### Fixed
+- add source-rejected processed item replay tooling
+- back off empty drain queue ticks
+- persist source disposition diagnostics
+- clean internal linking lint
+- remove stale Amazon core registration
+
 ## [0.131.1] - 2026-05-21
 
 ### Changed
