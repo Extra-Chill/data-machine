@@ -2,18 +2,28 @@
   "auto_cleanup": false,
   "changelog_target": "docs/CHANGELOG.md",
   "extensions": {
-    "wordpress": {}
+    "wordpress": {
+      "php": "8.2",
+      "release_latest_branch": "release-latest",
+      "settings": {
+        "validation_dependencies": "data-machine"
+      }
+    }
   },
   "id": "data-machine-business",
   "remote_path": "wp-content/plugins/data-machine-business",
   "version_targets": [
     {
       "file": "data-machine-business.php",
-      "pattern": "Version:\\s*([0-9.]+)"
+      "pattern": "(?m)^\\s*\\*?\\s*Version:\\s*([0-9.]+)"
     },
     {
       "file": "data-machine-business.php",
       "pattern": "DATAMACHINE_BUSINESS_VERSION',\\s*'([0-9.]+)'"
+    },
+    {
+      "file": "composer.json",
+      "pattern": "\"version\":\\s*\"([0-9.]+)\""
     }
   ]
 }
