@@ -24,6 +24,8 @@ defined( 'ABSPATH' ) || exit;
  */
 class ProcessedItemsCommand extends BaseCommand {
 
+	private const DEFAULT_SOURCE_REJECTED_JOB_STATUS = 'agent_skipped - source-rejected';
+
 	/**
 	 * Audit processed items vs actual published posts per flow.
 	 *
@@ -525,6 +527,290 @@ class ProcessedItemsCommand extends BaseCommand {
 		}
 
 		WP_CLI::success( sprintf( 'Deleted %s orphaned processed items for %s.', number_format( $deleted ), $scope ) );
+	}
+
+	/**
+	 * List processed items whose owning job ended with a source-rejected skip.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--pipeline=<pipeline_id>]
+	 * : Filter by owning job pipeline ID.
+	 *
+	 * [--flow=<flow_id>]
+	 * : Filter by owning job flow ID.
+	 *
+	 * [--source-type=<source_type>]
+	 * : Filter by processed item source type.
+	 *
+	 * [--after=<date>]
+	 * : Only include items processed on or after this date (YYYY-MM-DD or datetime).
+	 *
+	 * [--before=<date>]
+	 * : Only include items processed on or before this date (YYYY-MM-DD or datetime).
+	 *
+	 * [--job-status=<status>]
+	 * : Owning job status to match. Defaults to agent_skipped - source-rejected.
+	 * ---
+	 * default: agent_skipped - source-rejected
+	 * ---
+	 *
+	 * [--limit=<count>]
+	 * : Maximum rows to display. Default: 50.
+	 * ---
+	 * default: 50
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format. Default: table.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - csv
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine processed-items source-rejected --pipeline=12
+	 *     wp datamachine processed-items source-rejected --source-type=slack --after=2026-05-01 --format=json
+	 *
+	 * @subcommand source-rejected
+	 */
+	public function source_rejected( array $args, array $assoc_args ): void {
+		global $wpdb;
+
+		$limit  = max( 1, (int) ( $assoc_args['limit'] ?? 50 ) );
+		$format = $assoc_args['format'] ?? 'table';
+
+		$db              = new ProcessedItems();
+		$processed_table = $db->get_table_name();
+		$jobs_table      = $wpdb->prefix . 'datamachine_jobs';
+		$query_parts     = $this->build_source_rejected_query_parts( $assoc_args, $processed_table, $jobs_table );
+
+		$count_sql = "SELECT COUNT(*) FROM %i pi INNER JOIN %i j ON pi.job_id = j.job_id {$query_parts['where_sql']}";
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$count = (int) $wpdb->get_var( $wpdb->prepare( $count_sql, ...$query_parts['values'] ) );
+
+		if ( 0 === $count ) {
+			WP_CLI::log( 'No source-rejected processed items match the criteria.' );
+			return;
+		}
+
+		$rows_sql = "SELECT
+				pi.id,
+				pi.flow_step_id,
+				pi.source_type,
+				pi.item_identifier,
+				pi.job_id,
+				j.pipeline_id,
+				j.flow_id,
+				j.status AS job_status,
+				pi.processed_timestamp,
+				j.completed_at
+			FROM %i pi
+			INNER JOIN %i j ON pi.job_id = j.job_id
+			{$query_parts['where_sql']}
+			ORDER BY pi.processed_timestamp DESC, pi.id DESC
+			LIMIT %d";
+
+		$row_values = array_merge( $query_parts['values'], array( $limit ) );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results( $wpdb->prepare( $rows_sql, ...$row_values ), ARRAY_A );
+
+		WP_CLI::log( sprintf( 'Matched %s source-rejected processed item(s). Showing %d example(s).', number_format( $count ), count( $rows ) ) );
+
+		$formatted = array_map(
+			static function ( array $row ): array {
+				return array(
+					'id'                  => (int) $row['id'],
+					'job_id'              => (int) $row['job_id'],
+					'pipeline_id'         => $row['pipeline_id'],
+					'flow_id'             => $row['flow_id'],
+					'flow_step_id'        => $row['flow_step_id'],
+					'source_type'         => $row['source_type'],
+					'item_identifier'     => $row['item_identifier'],
+					'job_status'          => $row['job_status'],
+					'processed_timestamp' => $row['processed_timestamp'],
+					'completed_at'        => $row['completed_at'],
+				);
+			},
+			(array) $rows
+		);
+
+		WP_CLI\Utils\format_items( $format, $formatted, array_keys( $formatted[0] ) );
+	}
+
+	/**
+	 * Clear processed rows whose owning job ended with a source-rejected skip.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--pipeline=<pipeline_id>]
+	 * : Filter by owning job pipeline ID.
+	 *
+	 * [--flow=<flow_id>]
+	 * : Filter by owning job flow ID.
+	 *
+	 * [--source-type=<source_type>]
+	 * : Filter by processed item source type.
+	 *
+	 * [--after=<date>]
+	 * : Only clear items processed on or after this date (YYYY-MM-DD or datetime).
+	 *
+	 * [--before=<date>]
+	 * : Only clear items processed on or before this date (YYYY-MM-DD or datetime).
+	 *
+	 * [--job-status=<status>]
+	 * : Owning job status to match. Defaults to agent_skipped - source-rejected.
+	 * ---
+	 * default: agent_skipped - source-rejected
+	 * ---
+	 *
+	 * [--dry-run]
+	 * : Show matching counts and example identifiers without deleting.
+	 *
+	 * [--yes]
+	 * : Skip confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine processed-items clear-source-rejected --pipeline=12 --dry-run
+	 *     wp datamachine processed-items clear-source-rejected --source-type=slack --after=2026-05-01 --yes
+	 *
+	 * @subcommand clear-source-rejected
+	 */
+	public function clear_source_rejected( array $args, array $assoc_args ): void {
+		global $wpdb;
+
+		$dry_run      = isset( $assoc_args['dry-run'] );
+		$skip_confirm = isset( $assoc_args['yes'] );
+		$examples     = 10;
+
+		$db              = new ProcessedItems();
+		$processed_table = $db->get_table_name();
+		$jobs_table      = $wpdb->prefix . 'datamachine_jobs';
+		$query_parts     = $this->build_source_rejected_query_parts( $assoc_args, $processed_table, $jobs_table );
+
+		$ids_sql = "SELECT pi.id, pi.job_id, pi.source_type, pi.item_identifier, pi.processed_timestamp
+			FROM %i pi
+			INNER JOIN %i j ON pi.job_id = j.job_id
+			{$query_parts['where_sql']}
+			ORDER BY pi.processed_timestamp DESC, pi.id DESC";
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$matches = $wpdb->get_results( $wpdb->prepare( $ids_sql, ...$query_parts['values'] ), ARRAY_A );
+
+		if ( empty( $matches ) ) {
+			WP_CLI::log( 'No source-rejected processed items match the criteria.' );
+			return;
+		}
+
+		$count        = count( $matches );
+		$description  = $this->describe_source_rejected_filters( $assoc_args );
+		$example_rows = array_slice( $matches, 0, $examples );
+
+		WP_CLI::log( sprintf( 'Matched %s source-rejected processed item(s) for %s.', number_format( $count ), $description ) );
+		WP_CLI::log( 'Examples:' );
+		WP_CLI\Utils\format_items( 'table', $example_rows, array( 'id', 'job_id', 'source_type', 'item_identifier', 'processed_timestamp' ) );
+
+		if ( $dry_run ) {
+			WP_CLI::log( sprintf( 'DRY RUN: Would delete %s processed item(s).', number_format( $count ) ) );
+			return;
+		}
+
+		if ( ! $skip_confirm ) {
+			WP_CLI::confirm( sprintf( 'Delete %s processed item(s) for %s? This allows matching source items to be fetched again.', number_format( $count ), $description ) );
+		}
+
+		$deleted = 0;
+		$ids     = array_map( 'intval', array_column( $matches, 'id' ) );
+		foreach ( array_chunk( $ids, 500 ) as $chunk ) {
+			$placeholders = implode( ',', array_fill( 0, count( $chunk ), '%d' ) );
+			$sql          = sprintf( 'DELETE FROM %%i WHERE id IN (%s)', $placeholders );
+			/** @var literal-string $sql */
+			$values = array_merge( array( $processed_table ), $chunk );
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result = $wpdb->query( $wpdb->prepare( $sql, ...$values ) );
+			if ( false === $result ) {
+				WP_CLI::error( 'Database error during deletion: ' . $wpdb->last_error );
+				return;
+			}
+			$deleted += (int) $result;
+		}
+
+		WP_CLI::success( sprintf( 'Deleted %s source-rejected processed item(s) for %s.', number_format( $deleted ), $description ) );
+	}
+
+	/**
+	 * Build source-rejected processed-item query filters.
+	 *
+	 * @param array  $assoc_args CLI associative args.
+	 * @param string $processed_table Processed items table name.
+	 * @param string $jobs_table Jobs table name.
+	 * @return array{where_sql:string,values:array<int,mixed>}
+	 */
+	private function build_source_rejected_query_parts( array $assoc_args, string $processed_table, string $jobs_table ): array {
+		$job_status  = (string) ( $assoc_args['job-status'] ?? self::DEFAULT_SOURCE_REJECTED_JOB_STATUS );
+		$pipeline_id = $assoc_args['pipeline'] ?? null;
+		$flow_id     = $assoc_args['flow'] ?? null;
+		$source_type = $assoc_args['source-type'] ?? null;
+		$after       = $assoc_args['after'] ?? null;
+		$before      = $assoc_args['before'] ?? null;
+
+		$where_parts = array( 'pi.status = %s', 'j.status = %s' );
+		$values      = array( $processed_table, $jobs_table, ProcessedItems::STATUS_PROCESSED, $job_status );
+
+		if ( null !== $pipeline_id && '' !== (string) $pipeline_id ) {
+			$where_parts[] = 'j.pipeline_id = %s';
+			$values[]      = (string) $pipeline_id;
+		}
+
+		if ( null !== $flow_id && '' !== (string) $flow_id ) {
+			$where_parts[] = 'j.flow_id = %s';
+			$values[]      = (string) $flow_id;
+		}
+
+		if ( null !== $source_type && '' !== (string) $source_type ) {
+			$where_parts[] = 'pi.source_type = %s';
+			$values[]      = (string) $source_type;
+		}
+
+		if ( null !== $after && '' !== (string) $after ) {
+			$where_parts[] = 'pi.processed_timestamp >= %s';
+			$values[]      = (string) $after;
+		}
+
+		if ( null !== $before && '' !== (string) $before ) {
+			$where_parts[] = 'pi.processed_timestamp <= %s';
+			$values[]      = (string) $before;
+		}
+
+		return array(
+			'where_sql' => 'WHERE ' . implode( ' AND ', $where_parts ),
+			'values'    => $values,
+		);
+	}
+
+	/**
+	 * Describe source-rejected filters for operator-facing output.
+	 *
+	 * @param array $assoc_args CLI associative args.
+	 * @return string Human-readable filter description.
+	 */
+	private function describe_source_rejected_filters( array $assoc_args ): string {
+		$parts = array(
+			'job-status=' . ( (string) ( $assoc_args['job-status'] ?? self::DEFAULT_SOURCE_REJECTED_JOB_STATUS ) ),
+		);
+
+		foreach ( array( 'pipeline', 'flow', 'source-type', 'after', 'before' ) as $key ) {
+			if ( isset( $assoc_args[ $key ] ) && '' !== (string) $assoc_args[ $key ] ) {
+				$parts[] = $key . '=' . (string) $assoc_args[ $key ];
+			}
+		}
+
+		return implode( ', ', $parts );
 	}
 
 	/**

@@ -662,6 +662,11 @@ wp datamachine processed-items clear --all --yes
 wp datamachine processed-items cleanup-orphans --dry-run
 wp datamachine processed-items cleanup-orphans --flow=10 --yes
 
+# Audit and replay rows marked processed by agent source rejection
+wp datamachine processed-items source-rejected --pipeline=5 --source-type=rss
+wp datamachine processed-items clear-source-rejected --pipeline=5 --after=2026-05-01 --dry-run
+wp datamachine processed-items clear-source-rejected --pipeline=5 --after=2026-05-01 --yes
+
 # Check if an item was processed
 wp datamachine processed-items check --flow-step=fetch_1_10 --source=rss --item="https://example.com/feed/1"
 
@@ -684,7 +689,7 @@ wp datamachine processed-items find-never-processed \
   --candidate-ids=1,2,3,4
 ```
 
-**Options**: `audit` supports `--handler`, `--pipeline`, `--min-waste`, `--format`; `clear` supports `--pipeline`, `--flow`, `--handler`, `--after`, `--before`, `--all`, `--dry-run`, `--yes`; revisit helpers support `--flow-step-id`, `--source-type`, `--candidate-ids`, `--limit`, `--format`.
+**Options**: `audit` supports `--handler`, `--pipeline`, `--min-waste`, `--format`; `clear` supports `--pipeline`, `--flow`, `--handler`, `--after`, `--before`, `--all`, `--dry-run`, `--yes`; `source-rejected` and `clear-source-rejected` support `--pipeline`, `--flow`, `--source-type`, `--after`, `--before`, `--job-status`, `--dry-run`, `--yes`, `--limit`, `--format` as applicable; revisit helpers support `--flow-step-id`, `--source-type`, `--candidate-ids`, `--limit`, `--format`.
 
 ### datamachine links
 
