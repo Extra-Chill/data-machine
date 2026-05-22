@@ -75,6 +75,41 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 		$this->assertSame( $account_data, $this->provider->get_account() );
 	}
 
+	public function test_save_account_replaces_existing_account_data(): void {
+		$this->provider->save_account(
+			array(
+				'access_token'  => 'tok_original',
+				'refresh_token' => 'refresh_original',
+				'scope'         => 'read write',
+			)
+		);
+
+		$this->assertTrue( $this->provider->save_account( array( 'access_token' => 'tok_reauth' ) ) );
+
+		$this->assertSame( array( 'access_token' => 'tok_reauth' ), $this->provider->get_account() );
+	}
+
+	public function test_update_account_merges_existing_account_data(): void {
+		$this->provider->save_account(
+			array(
+				'access_token'  => 'tok_original',
+				'refresh_token' => 'refresh_original',
+				'scope'         => 'read write',
+			)
+		);
+
+		$this->assertTrue( $this->provider->update_account( array( 'access_token' => 'tok_refreshed' ) ) );
+
+		$this->assertSame(
+			array(
+				'access_token'  => 'tok_refreshed',
+				'refresh_token' => 'refresh_original',
+				'scope'         => 'read write',
+			),
+			$this->provider->get_account()
+		);
+	}
+
 	public function test_save_config_stores_data(): void {
 		$config_data = array(
 			'api_key'    => 'key_abc',
@@ -253,6 +288,27 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 
 		$this->assertTrue( $this->provider->save_site_account( $account ) );
 		$this->assertSame( $account, $this->provider->get_site_account() );
+	}
+
+	public function test_update_site_account_merges_existing_account_data(): void {
+		$this->provider->save_site_account(
+			array(
+				'access_token'  => 'tok_site',
+				'refresh_token' => 'refresh_site',
+				'scope'         => 'read write',
+			)
+		);
+
+		$this->assertTrue( $this->provider->update_site_account( array( 'access_token' => 'tok_site_refreshed' ) ) );
+
+		$this->assertSame(
+			array(
+				'access_token'  => 'tok_site_refreshed',
+				'refresh_token' => 'refresh_site',
+				'scope'         => 'read write',
+			),
+			$this->provider->get_site_account()
+		);
 	}
 
 	public function test_site_account_shares_legacy_site_slot(): void {
@@ -547,6 +603,74 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 		remove_all_filters( 'deprecated_function_run' );
 	}
 
+	public function test_update_account_with_context_merges_policy_scoped_slot(): void {
+		add_filter(
+			'datamachine_auth_scope_policy',
+			function () {
+				return BaseAuthProvider::AUTH_SCOPE_PRINCIPAL;
+			}
+		);
+
+		$this->provider->save_account_for_agent(
+			303,
+			array(
+				'access_token'  => 'tok_agent_original',
+				'refresh_token' => 'refresh_agent',
+				'scope'         => 'read write',
+			)
+		);
+
+		$this->assertTrue(
+			$this->provider->update_account(
+				array( 'access_token' => 'tok_agent_refreshed' ),
+				array(
+					'user_id'  => 42,
+					'agent_id' => 303,
+				)
+			)
+		);
+
+		$this->assertSame(
+			array(
+				'access_token'  => 'tok_agent_refreshed',
+				'refresh_token' => 'refresh_agent',
+				'scope'         => 'read write',
+			),
+			$this->provider->get_account_for_agent( 303 )
+		);
+
+		remove_all_filters( 'datamachine_auth_scope_policy' );
+	}
+
+	public function test_update_account_with_scoped_context_does_not_merge_site_fallback(): void {
+		add_filter(
+			'datamachine_auth_scope_policy',
+			function () {
+				return BaseAuthProvider::AUTH_SCOPE_USER;
+			}
+		);
+
+		$this->provider->save_site_account(
+			array(
+				'access_token'  => 'tok_site',
+				'refresh_token' => 'refresh_site',
+				'scope'         => 'site_scope',
+			)
+		);
+
+		$this->assertTrue(
+			$this->provider->update_account(
+				array( 'access_token' => 'tok_user_new' ),
+				array( 'user_id' => 42 )
+			)
+		);
+
+		$this->assertSame( array( 'access_token' => 'tok_user_new' ), $this->provider->get_account_for_user( 42 ) );
+		$this->assertSame( 'refresh_site', $this->provider->get_site_account()['refresh_token'] );
+
+		remove_all_filters( 'datamachine_auth_scope_policy' );
+	}
+
 	public function test_clear_account_without_context_does_not_emit_deprecation(): void {
 		$deprecated_calls = array();
 
@@ -640,6 +764,53 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 		$this->assertSame( 'read write', $loaded['scope'] );
 	}
 
+	public function test_update_account_for_user_merges_existing_account_data(): void {
+		$this->provider->save_account_for_user(
+			42,
+			array(
+				'access_token'  => 'tok_user_original',
+				'refresh_token' => 'refresh_user',
+				'scope'         => 'read write',
+			)
+		);
+
+		$this->assertTrue( $this->provider->update_account_for_user( 42, array( 'access_token' => 'tok_user_refreshed' ) ) );
+
+		$this->assertSame(
+			array(
+				'access_token'  => 'tok_user_refreshed',
+				'refresh_token' => 'refresh_user',
+				'scope'         => 'read write',
+			),
+			$this->provider->get_account_for_user( 42 )
+		);
+	}
+
+	public function test_update_account_for_user_does_not_copy_filter_resolved_account_into_default_storage(): void {
+		add_filter(
+			'datamachine_resolve_oauth_account_for_user',
+			function ( $account, $provider, $user_id ) {
+				if ( 'test_provider' === $provider && 707 === $user_id ) {
+					return array(
+						'access_token'  => 'platform_supplied',
+						'refresh_token' => 'platform_refresh',
+						'scope'         => 'platform:read',
+					);
+				}
+
+				return $account;
+			},
+			10,
+			3
+		);
+
+		$this->assertTrue( $this->provider->update_account_for_user( 707, array( 'access_token' => 'default_storage_token' ) ) );
+
+		remove_all_filters( 'datamachine_resolve_oauth_account_for_user' );
+
+		$this->assertSame( array( 'access_token' => 'default_storage_token' ), $this->provider->get_account_for_user( 707 ) );
+	}
+
 	public function test_delete_account_for_user_removes_account(): void {
 		$this->provider->save_account_for_user( 42, array( 'access_token' => 'tok_user_42' ) );
 		$this->assertNotNull( $this->provider->get_account_for_user( 42 ) );
@@ -684,6 +855,7 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 
 	public function test_invalid_user_ids_are_rejected(): void {
 		$this->assertFalse( $this->provider->save_account_for_user( 0, array( 'access_token' => 'x' ) ) );
+		$this->assertFalse( $this->provider->update_account_for_user( 0, array( 'access_token' => 'x' ) ) );
 		$this->assertNull( $this->provider->get_account_for_user( 0 ) );
 		$this->assertFalse( $this->provider->delete_account_for_user( 0 ) );
 	}
@@ -772,6 +944,28 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 		$this->assertSame( 'read write', $loaded['scope'] );
 	}
 
+	public function test_update_account_for_agent_merges_existing_account_data(): void {
+		$this->provider->save_account_for_agent(
+			303,
+			array(
+				'access_token'  => 'tok_agent_original',
+				'refresh_token' => 'refresh_agent',
+				'scope'         => 'read write',
+			)
+		);
+
+		$this->assertTrue( $this->provider->update_account_for_agent( 303, array( 'access_token' => 'tok_agent_refreshed' ) ) );
+
+		$this->assertSame(
+			array(
+				'access_token'  => 'tok_agent_refreshed',
+				'refresh_token' => 'refresh_agent',
+				'scope'         => 'read write',
+			),
+			$this->provider->get_account_for_agent( 303 )
+		);
+	}
+
 	public function test_delete_account_for_agent_removes_account(): void {
 		$this->provider->save_account_for_agent( 303, array( 'access_token' => 'tok_agent_303' ) );
 		$this->assertNotNull( $this->provider->get_account_for_agent( 303 ) );
@@ -814,6 +1008,7 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 
 	public function test_invalid_agent_ids_are_rejected(): void {
 		$this->assertFalse( $this->provider->save_account_for_agent( 0, array( 'access_token' => 'x' ) ) );
+		$this->assertFalse( $this->provider->update_account_for_agent( 0, array( 'access_token' => 'x' ) ) );
 		$this->assertNull( $this->provider->get_account_for_agent( 0 ) );
 		$this->assertFalse( $this->provider->delete_account_for_agent( 0 ) );
 	}
