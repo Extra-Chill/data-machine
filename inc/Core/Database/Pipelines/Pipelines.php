@@ -215,6 +215,67 @@ class Pipelines extends BaseRepository {
 	}
 
 	/**
+	 * Get pipeline rows for list views without loading pipeline_config longtext.
+	 *
+	 * @param int|null    $user_id  Optional user ID to filter by.
+	 * @param int|null    $agent_id Optional agent ID to filter by.
+	 * @param string|null $search   Optional search term to filter by pipeline name (LIKE).
+	 * @param int|null    $per_page Optional SQL LIMIT. Null returns all rows.
+	 * @param int         $offset   SQL OFFSET (only honored when $per_page is set).
+	 * @return array Array of pipeline records without decoded pipeline_config.
+	 */
+	public function get_all_pipelines_summary(
+		?int $user_id = null,
+		?int $agent_id = null,
+		?string $search = null,
+		?int $per_page = null,
+		int $offset = 0
+	): array {
+		$where_clauses = array();
+		$where_values  = array();
+
+		if ( null !== $agent_id ) {
+			$where_clauses[] = 'agent_id = %d';
+			$where_values[]  = $agent_id;
+		} elseif ( null !== $user_id ) {
+			$where_clauses[] = 'user_id = %d';
+			$where_values[]  = $user_id;
+		}
+
+		if ( null !== $search && '' !== $search ) {
+			$where_clauses[] = 'pipeline_name LIKE %s';
+			$where_values[]  = '%' . $this->wpdb->esc_like( $search ) . '%';
+		}
+
+		$where = '';
+		if ( ! empty( $where_clauses ) ) {
+			$where = ' WHERE ' . implode( ' AND ', $where_clauses );
+		}
+
+		$limit_clause = '';
+		$limit_values = array();
+		if ( null !== $per_page && $per_page > 0 ) {
+			$limit_clause   = ' LIMIT %d OFFSET %d';
+			$limit_values[] = (int) $per_page;
+			$limit_values[] = max( 0, (int) $offset );
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+		$results = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT pipeline_id, pipeline_name, user_id, agent_id, portable_slug, created_at, updated_at
+				FROM %i{$where}
+				ORDER BY updated_at DESC{$limit_clause}",
+				array_merge( array( $this->table_name ), $where_values, $limit_values )
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.PreparedSQL.NotPrepared
+
+		return $results ? $results : array();
+	}
+
+	/**
 	 * Get lightweight pipelines list for UI dropdowns.
 	 *
 	 * @param int|null $user_id  Optional user ID to filter by.

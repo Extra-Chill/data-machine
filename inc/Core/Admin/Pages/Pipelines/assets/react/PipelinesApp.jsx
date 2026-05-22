@@ -144,12 +144,10 @@ export default function PipelinesApp() {
 		data: fetchedSelectedPipeline,
 		isLoading: fetchedSelectedLoading,
 		error: fetchedSelectedError,
-	} = usePipeline(
-		selectedPipelineId && ! selectedFromList ? selectedPipelineId : null
-	);
-	const selectedPipeline = selectedFromList || fetchedSelectedPipeline;
+	} = usePipeline( selectedPipelineId || null );
+	const selectedPipeline = fetchedSelectedPipeline || selectedFromList;
 	const selectedPipelineLoading =
-		selectedPipelineId && ! selectedFromList && fetchedSelectedLoading;
+		selectedPipelineId && fetchedSelectedLoading;
 	const selectedPipelineError = fetchedSelectedError;
 
 	const [ isCreatingPipeline, setIsCreatingPipeline ] = useState( false );

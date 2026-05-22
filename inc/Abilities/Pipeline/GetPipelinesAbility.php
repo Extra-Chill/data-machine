@@ -169,15 +169,11 @@ class GetPipelinesAbility {
 				);
 			}
 
-			// List mode: paginate at the SQL layer instead of loading all rows
-			// into memory and slicing. Count runs as a separate COUNT(*) query.
-			$pipelines = $this->db_pipelines->get_all_pipelines(
-				$user_id,
-				$agent_id,
-				$search,
-				$per_page,
-				$offset
-			);
+			// List-like modes do not render pipeline steps, so avoid selecting and
+			// decoding large pipeline_config blobs for every pipeline on the page.
+			$pipelines = in_array( $output_mode, array( 'list', 'summary', 'ids' ), true )
+				? $this->db_pipelines->get_all_pipelines_summary( $user_id, $agent_id, $search, $per_page, $offset )
+				: $this->db_pipelines->get_all_pipelines( $user_id, $agent_id, $search, $per_page, $offset );
 			$total     = $this->db_pipelines->get_pipelines_count( $user_id, $agent_id, $search );
 
 			$formatted_pipelines = $this->formatPipelinesByMode(
