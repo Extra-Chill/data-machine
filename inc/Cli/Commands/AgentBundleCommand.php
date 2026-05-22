@@ -16,6 +16,7 @@ use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
 use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
+use DataMachine\Engine\Bundle\AgentBundleMaterializedArtifacts;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
@@ -812,6 +813,10 @@ class AgentBundleCommand extends BaseCommand {
 			$artifacts[] = $artifact;
 		}
 
+		foreach ( AgentBundleMaterializedArtifacts::from_array_bundle( $bundle ) as $artifact ) {
+			$artifacts[] = $artifact;
+		}
+
 		return $artifacts;
 	}
 
@@ -863,6 +868,17 @@ class AgentBundleCommand extends BaseCommand {
 					'source_path'   => (string) ( $record['source_path'] ?? '' ),
 					'payload'       => $this->flow_payload( $flow_by_slug[ $id ], $id ),
 				);
+			}
+			if ( in_array( $type, array( 'prompt', 'rubric' ), true ) ) {
+				$payload = AgentBundleMaterializedArtifacts::current_payload_from_record( is_array( $record ) ? $record : null );
+				if ( null !== $payload ) {
+					$artifacts[] = array(
+						'artifact_type' => $type,
+						'artifact_id'   => $id,
+						'source_path'   => (string) ( $record['source_path'] ?? '' ),
+						'payload'       => $payload,
+					);
+				}
 			}
 		}
 

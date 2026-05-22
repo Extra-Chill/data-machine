@@ -154,6 +154,8 @@ final class AgentBundleArrayAdapter {
 			'user_template'         => $memory_files['USER.md'] ?? '',
 			'pipelines'             => $pipelines,
 			'flows'                 => $flows,
+			'prompt_artifacts'      => $directory->prompts(),
+			'rubric_artifacts'      => $directory->rubrics(),
 			'extension_artifacts'   => $directory->extension_artifacts(),
 			'extras'                => $directory->extras(),
 			'abilities_manifest'    => array(),

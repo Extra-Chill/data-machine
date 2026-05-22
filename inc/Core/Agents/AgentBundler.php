@@ -28,6 +28,7 @@ use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
 use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
+use DataMachine\Engine\Bundle\AgentBundleMaterializedArtifacts;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
@@ -584,6 +585,8 @@ class AgentBundler {
 			'files'               => count( $bundle['files'] ?? array() ),
 			'pipelines'           => count( $bundle['pipelines'] ?? array() ),
 			'flows'               => count( $bundle['flows'] ?? array() ),
+			'prompt_artifacts'    => count( $bundle['prompt_artifacts'] ?? array() ),
+			'rubric_artifacts'    => count( $bundle['rubric_artifacts'] ?? array() ),
 			'extension_artifacts' => count( $bundle['extension_artifacts'] ?? array() ),
 			'has_user_template'   => ! empty( $bundle['user_template'] ),
 			'upgrade'             => (bool) $existing,
@@ -933,7 +936,38 @@ class AgentBundler {
 				);
 			}
 
-			// 6. Apply plugin-owned artifacts through their owning plugin.
+			// 6. Track bundle-owned prompt/rubric artifacts.
+			foreach ( AgentBundleMaterializedArtifacts::from_array_bundle( $bundle ) as $artifact ) {
+				$artifact_key = self::artifact_key( (string) $artifact['artifact_type'], (string) $artifact['artifact_id'] );
+				$record       = is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null;
+				$local_payload = AgentBundleMaterializedArtifacts::current_payload_from_record( $record );
+
+				if (
+					$record
+					&& $this->artifact_has_local_modifications( $record, $local_payload )
+					&& ! hash_equals(
+						AgentBundleArtifactHasher::hash( $artifact['payload'] ?? null ),
+						AgentBundleArtifactHasher::hash( $local_payload )
+					)
+				) {
+					$conflicts[] = array(
+						'artifact_type' => $artifact['artifact_type'],
+						'artifact_id'   => $artifact['artifact_id'],
+						'reason'        => 'local_modified',
+					);
+					continue;
+				}
+
+				$artifact_records[ $artifact_key ] = $this->bundle_artifact_record(
+					$bundle_metadata,
+					(string) $artifact['artifact_type'],
+					(string) $artifact['artifact_id'],
+					(string) $artifact['source_path'],
+					$artifact['payload'] ?? null
+				);
+			}
+
+			// 7. Apply plugin-owned artifacts through their owning plugin.
 			$agent_context               = array_merge(
 			$agent_data,
 			array(
@@ -1202,6 +1236,9 @@ class AgentBundler {
 		if ( ! empty( $bundle['extension_artifacts'] ) ) {
 			return true;
 		}
+		if ( ! empty( $bundle['prompt_artifacts'] ) || ! empty( $bundle['rubric_artifacts'] ) ) {
+			return true;
+		}
 		return false;
 	}
 
@@ -1314,6 +1351,7 @@ class AgentBundler {
 			'installed_hash'    => $hash,
 			'current_hash'      => $hash,
 			'installed_payload' => $payload,
+			'current_payload'   => $payload,
 			'status'            => AgentBundleArtifactStatus::CLEAN,
 			'installed_at'      => $now,
 			'updated_at'        => $now,

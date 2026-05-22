@@ -131,6 +131,7 @@ if ( ! class_exists( 'WP_Error' ) ) {
 		}
 	}
 }
+require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 if ( ! class_exists( 'AgentsAPI\\Core\\Workspace\\WP_Agent_Workspace_Scope' ) ) {
 	eval( '
 	namespace AgentsAPI\\Core\\Workspace;
@@ -207,8 +208,6 @@ if ( ! class_exists( 'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action' ) ) {
 	}
 	' );
 }
-
-require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleUpgradeActionHandlers.php';
 
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
@@ -355,6 +354,21 @@ assert_upgrade_plan_equals( 'agent config reason is local modified', 'local_modi
 assert_upgrade_plan_equals( 'authorization header is redacted', '[redacted]', $config_conflict['diff']['before']['intelligence']['context_servers']['wporg']['headers']['Authorization'] ?? null );
 assert_upgrade_plan( 'raw local bearer is absent from config preview', false === strpos( (string) json_encode( $config_plan ), 'local-token' ) );
 
+echo "\n[2c] Prompt/rubric artifact edits get readable approval diffs\n";
+$old_prompt      = upgrade_artifact( 'prompt', 'extract-facts', "Extract facts.\n", 'prompts/extract-facts.md' );
+$local_prompt    = upgrade_artifact( 'prompt', 'extract-facts', "Extract facts and cite local sources.\n", 'prompts/extract-facts.md' );
+$target_prompt   = upgrade_artifact( 'prompt', 'extract-facts', "Extract facts and cite bundle sources.\n", 'prompts/extract-facts.md' );
+$prompt_plan     = AgentBundleUpgradePlanner::plan(
+	array( installed_row( $old_prompt ) ),
+	array( $local_prompt ),
+	array( $target_prompt ),
+	array( 'bundle_slug' => 'prompt-bundle' )
+)->to_array();
+$prompt_conflict = $prompt_plan['needs_approval'][0] ?? array();
+assert_upgrade_plan_equals( 'locally changed prompt needs approval', 'prompt:extract-facts', $prompt_conflict['artifact_key'] ?? null );
+assert_upgrade_plan_equals( 'prompt approval includes readable local text', "Extract facts and cite local sources.\n", $prompt_conflict['diff']['before'] ?? null );
+assert_upgrade_plan_equals( 'prompt approval includes readable target text', "Extract facts and cite bundle sources.\n", $prompt_conflict['diff']['after'] ?? null );
+
 echo "\n[3] PendingAction stages bundle-upgrade previews\n";
 $staged = AgentBundleUpgradePendingAction::stage(
 	$plan,
@@ -366,8 +380,8 @@ $staged = AgentBundleUpgradePendingAction::stage(
 	)
 );
 assert_upgrade_plan( 'pending action staged', true === ( $staged['staged'] ?? false ) );
-assert_upgrade_plan_equals( 'pending action kind is bundle_upgrade', 'bundle_upgrade', $staged['kind'] ?? null );
-assert_upgrade_plan_equals( 'preview carries approval count', 1, $staged['preview']['counts']['needs_approval'] ?? null );
+assert_upgrade_plan_equals( 'pending action kind is bundle_upgrade', 'bundle_upgrade', $staged['payload']['pending_action']['kind'] ?? null );
+assert_upgrade_plan_equals( 'preview carries approval count', 1, $staged['payload']['pending_action']['preview']['counts']['needs_approval'] ?? null );
 
 echo "\n[4] Resolve applies approved artifacts only\n";
 $applied_keys = array();
