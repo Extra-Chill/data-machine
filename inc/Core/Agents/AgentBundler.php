@@ -30,6 +30,7 @@ use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
+use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
 use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Bundle\PortableSlug;
@@ -533,6 +534,9 @@ class AgentBundler {
 			'source_ref'      => $bundle_source_ref,
 			'source_revision' => $bundle_source_revision,
 		);
+		$template_metadata      = AgentTemplateMetadata::from_bundle_array( $bundle )->to_array();
+		unset( $template_metadata['installed_hashes'] );
+		$bundle_metadata        = array_merge( $template_metadata, $bundle_metadata );
 		$is_portable_bundle     = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
 		$reconcile_runtime      = ! empty( $options['reconcile_runtime'] );
 		$is_upgrade             = ! empty( $options['is_upgrade'] );

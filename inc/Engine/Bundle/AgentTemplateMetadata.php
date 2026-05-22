@@ -73,6 +73,25 @@ final class AgentTemplateMetadata {
 		);
 	}
 
+	public static function from_bundle_array( array $bundle, array $installed_hashes = array() ): self {
+		$bundle_slug     = (string) ( $bundle['bundle_slug'] ?? ( $bundle['agent']['agent_slug'] ?? 'bundle' ) );
+		$bundle_version  = (string) ( $bundle['bundle_version'] ?? '1' );
+		$template        = is_array( $bundle['template'] ?? null ) ? $bundle['template'] : array();
+		$template_meta   = is_array( $bundle['template_metadata'] ?? null ) ? $bundle['template_metadata'] : array();
+		$template_slug   = (string) ( $bundle['template_slug'] ?? $template['slug'] ?? $template_meta['template_slug'] ?? $bundle_slug );
+		$template_version = (string) ( $bundle['template_version'] ?? $template['version'] ?? $template_meta['template_version'] ?? $bundle_version );
+
+		return new self(
+			$template_slug,
+			$template_version,
+			$bundle_slug,
+			$bundle_version,
+			(string) ( $bundle['source_ref'] ?? $template_meta['source_ref'] ?? '' ),
+			(string) ( $bundle['source_revision'] ?? $template_meta['source_revision'] ?? '' ),
+			$installed_hashes
+		);
+	}
+
 	public function to_array(): array {
 		return array(
 			'template_slug'    => $this->template_slug,
