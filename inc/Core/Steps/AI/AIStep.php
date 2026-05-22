@@ -584,7 +584,7 @@ class AIStep extends Step {
 
 			// Process loop results into data packets
 			$processed_packets = self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
-			$diagnostic_reason = empty( $processed_packets ) ? self::emptyOutputDiagnosticReason( $loop_result, $required_handler_slugs ) : '';
+			$diagnostic_reason = self::outputDiagnosticReason( $loop_result, $required_handler_slugs, $processed_packets );
 			RunMetrics::recordStepResult(
 				$this->job_id,
 				$this->flow_step_id,
@@ -1041,7 +1041,43 @@ class AIStep extends Step {
 	}
 
 	/**
-	 * Explain why an AI step emitted no packets without changing terminal status semantics.
+	 * Explain why AI step output cannot satisfy downstream packet requirements.
+	 *
+	 * @param array             $loop_result             Conversation loop result.
+	 * @param array<int,string> $required_handler_slugs  Handler slugs required by downstream steps.
+	 * @param array             $processed_packets       Data packets emitted by the AI step.
+	 * @return string
+	 */
+	private static function outputDiagnosticReason( array $loop_result, array $required_handler_slugs, array $processed_packets ): string {
+		if ( ! empty( $required_handler_slugs ) && ! self::hasHandlerCompletePacket( $processed_packets ) ) {
+			return self::emptyOutputDiagnosticReason( $loop_result, $required_handler_slugs );
+		}
+
+		if ( empty( $processed_packets ) ) {
+			return self::emptyOutputDiagnosticReason( $loop_result, $required_handler_slugs );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Check whether processed output includes a handler completion packet.
+	 *
+	 * @param array $processed_packets Data packets emitted by the AI step.
+	 * @return bool
+	 */
+	private static function hasHandlerCompletePacket( array $processed_packets ): bool {
+		foreach ( $processed_packets as $packet ) {
+			if ( 'ai_handler_complete' === ( $packet['type'] ?? '' ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Explain why an AI step output cannot satisfy downstream handler requirements.
 	 *
 	 * @param array             $loop_result             Conversation loop result.
 	 * @param array<int,string> $required_handler_slugs  Handler slugs required by downstream steps.
