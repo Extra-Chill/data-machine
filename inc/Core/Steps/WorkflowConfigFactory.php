@@ -137,6 +137,12 @@ class WorkflowConfigFactory {
 		if ( 'ai' === $step_type ) {
 			$pipeline_step['system_prompt']  = $step['system_prompt'] ?? '';
 			$pipeline_step['disabled_tools'] = is_array( $step['disabled_tools'] ?? null ) ? array_values( $step['disabled_tools'] ) : array();
+			if ( is_array( $step['system_prompt_queue'] ?? null ) ) {
+				$pipeline_step['system_prompt_queue'] = array_values( $step['system_prompt_queue'] );
+			}
+			if ( isset( $step['system_prompt_queue_mode'] ) && in_array( $step['system_prompt_queue_mode'], array( 'drain', 'loop', 'static' ), true ) ) {
+				$pipeline_step['system_prompt_queue_mode'] = $step['system_prompt_queue_mode'];
+			}
 			$agent_modes                     = self::sanitizeAgentModes( $step['agent_modes'] ?? array() );
 			if ( ! empty( $agent_modes ) ) {
 				$pipeline_step['agent_modes'] = $agent_modes;

@@ -42,6 +42,7 @@ namespace DataMachine\Engine\AI\System\Tasks;
 
 defined( 'ABSPATH' ) || exit;
 
+use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\System\SystemTaskPromptRegistry;
@@ -173,6 +174,95 @@ abstract class SystemTask {
 	 */
 	public function getFlowStepConfigPassthrough(): array {
 		return array();
+	}
+
+	/**
+	 * Resolve a queueable system-task prompt field from flow-step context.
+	 *
+	 * System tasks run from `system_task` flow steps, so queueable prompt fields
+	 * share the existing flow-step scoped `prompt_queue` + `queue_mode` storage.
+	 * The concrete task decides where the returned prompt lands in its task params.
+	 *
+	 * @param int    $jobId          Job ID for retry backup engine data.
+	 * @param array  $params         Task params / engine data.
+	 * @param string $fallbackPrompt Configured prompt to use when no queue item applies.
+	 * @return array{prompt: string, from_queue: bool, skipped: bool, reason: string|null}
+	 */
+	protected function resolveQueueablePromptField( int $jobId, array $params, string $fallbackPrompt = '' ): array {
+		$flow_id      = (int) ( $params['flow_id'] ?? 0 );
+		$flow_step_id = $params['flow_step_id'] ?? '';
+		$queue_mode   = $params['queue_mode'] ?? 'static';
+		if ( ! in_array( $queue_mode, array( 'drain', 'loop', 'static' ), true ) ) {
+			$queue_mode = 'static';
+		}
+
+		if ( 'static' === $queue_mode || $flow_id <= 0 || empty( $flow_step_id ) ) {
+			return array(
+				'prompt'     => $fallbackPrompt,
+				'from_queue' => false,
+				'skipped'    => false,
+				'reason'     => null,
+			);
+		}
+
+		$queued_item = QueueAbility::consumeFromQueueSlot(
+			$flow_id,
+			(string) $flow_step_id,
+			QueueAbility::SLOT_PROMPT_QUEUE,
+			$queue_mode
+		);
+
+		if ( $queued_item && ! empty( $queued_item['prompt'] ) ) {
+			\datamachine_merge_engine_data(
+				$jobId,
+				array(
+					'queued_prompt_backup' => array(
+						'slot'         => QueueAbility::SLOT_PROMPT_QUEUE,
+						'mode'         => $queue_mode,
+						'prompt'       => $queued_item['prompt'],
+						'flow_id'      => $flow_id,
+						'flow_step_id' => (string) $flow_step_id,
+						'added_at'     => $queued_item['added_at'] ?? null,
+					),
+				)
+			);
+
+			do_action(
+				'datamachine_log',
+				'info',
+				'System task using prompt from queue',
+				array(
+					'job_id'       => $jobId,
+					'task_type'    => $this->getTaskType(),
+					'flow_id'      => $flow_id,
+					'flow_step_id' => (string) $flow_step_id,
+					'queue_mode'   => $queue_mode,
+				)
+			);
+
+			return array(
+				'prompt'     => (string) $queued_item['prompt'],
+				'from_queue' => true,
+				'skipped'    => false,
+				'reason'     => null,
+			);
+		}
+
+		if ( '' === $fallbackPrompt ) {
+			return array(
+				'prompt'     => '',
+				'from_queue' => false,
+				'skipped'    => true,
+				'reason'     => sprintf( 'Queue mode "%s" but queue empty, no configured prompt fallback', $queue_mode ),
+			);
+		}
+
+		return array(
+			'prompt'     => $fallbackPrompt,
+			'from_queue' => false,
+			'skipped'    => false,
+			'reason'     => null,
+		);
 	}
 
 	// ─── Job lifecycle helpers ────────────────────────────────────────
