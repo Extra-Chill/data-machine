@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.132.2] - 2026-05-22
+
+### Fixed
+- add oauth account update helpers
+
 ## [0.132.1] - 2026-05-22
 
 ### Fixed
