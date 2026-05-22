@@ -1777,6 +1777,7 @@ class JobsCommand extends BaseCommand {
 		$counts     = $metrics['counts'] ?? array();
 		$children   = $metrics['child_jobs'] ?? array();
 		$timestamps = $metrics['timestamps'] ?? array();
+		$classes    = is_array( $metrics['outcome_classes'] ?? null ) ? $metrics['outcome_classes'] : array();
 
 		WP_CLI::log( sprintf( 'Job ID: %d', $metrics['job_id'] ?? 0 ) );
 		WP_CLI::log( sprintf( 'Status: %s', $metrics['status'] ?? '' ) );
@@ -1794,6 +1795,10 @@ class JobsCommand extends BaseCommand {
 		foreach ( $counts as $key => $value ) {
 			WP_CLI::log( sprintf( '  %s: %d', $key, (int) $value ) );
 		}
+		WP_CLI::log( '' );
+
+		WP_CLI::log( 'Outcome Classes:' );
+		WP_CLI::log( empty( $classes ) ? '  -' : '  ' . implode( ', ', array_map( 'strval', $classes ) ) );
 		WP_CLI::log( '' );
 
 		WP_CLI::log( 'Child Jobs:' );

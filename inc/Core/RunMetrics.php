@@ -23,7 +23,14 @@ class RunMetrics {
 		'failed',
 		'fetch_packets',
 		'no_content',
+		'true_empty_query',
+		'provider_error',
+		'hydration_failed',
+		'hydration_partial',
+		'ai_empty_packet',
+		'missing_handler_packet',
 		'source_rejected',
+		'item_deferred',
 		'retried',
 		'scheduled',
 		'staged_actions',
@@ -65,6 +72,12 @@ class RunMetrics {
 		}
 		if ( 'source_rejected' === ( $clean_result['result'] ?? '' ) || ! empty( $clean_result['source_rejection_reason'] ) ) {
 			$metrics['counts']['source_rejected'] = max( 1, (int) $metrics['counts']['source_rejected'] );
+		}
+		foreach ( self::classesFromStepResult( $clean_result, (string) ( $clean_result['status'] ?? '' ) ) as $class ) {
+			if ( ! isset( $metrics['counts'][ $class ] ) ) {
+				$metrics['counts'][ $class ] = 0;
+			}
+			$metrics['counts'][ $class ] = max( 1, (int) $metrics['counts'][ $class ] );
 		}
 		$metrics['last_activity_at'] = self::now();
 		$engine[ self::KEY ]         = $metrics;
@@ -161,6 +174,8 @@ class RunMetrics {
 			$counts[ $key ] = max( (int) ( $counts[ $key ] ?? 0 ), (int) $value );
 		}
 
+		$outcome_classes = self::outcomeClasses( $job, $engine, $counts );
+
 		return array(
 			'job_id'           => (int) ( $job['job_id'] ?? 0 ),
 			'source'           => $job['source'] ?? null,
@@ -170,6 +185,7 @@ class RunMetrics {
 			'parent_job_id'    => isset( $job['parent_job_id'] ) ? (int) $job['parent_job_id'] : 0,
 			'status'           => $status,
 			'counts'           => $counts,
+			'outcome_classes'  => $outcome_classes,
 			'child_jobs'       => self::childTotals( (int) ( $job['job_id'] ?? 0 ) ),
 			'timestamps'       => array(
 				'created_at'       => $job['created_at'] ?? null,
@@ -178,7 +194,7 @@ class RunMetrics {
 				'completed_at'     => $ended_at,
 			),
 			'duration_seconds' => self::durationSeconds( $started_at, $duration_end ),
-			'outcome'          => self::outcomeDetails( $job, $engine, $counts ),
+			'outcome'          => self::outcomeDetails( $job, $engine, $counts, $outcome_classes ),
 			'step_results'     => self::stepResults( $engine ),
 			'context'          => $metrics['context'],
 			'token_usage'      => self::tokenUsage( $engine ),
@@ -270,22 +286,36 @@ class RunMetrics {
 			if ( 'source_rejected' === ( $step_result['result'] ?? '' ) || ! empty( $step_result['source_rejection_reason'] ) ) {
 				$counts['source_rejected'] = max( 1, (int) ( $counts['source_rejected'] ?? 0 ) );
 			}
+			foreach ( self::classesFromStepResult( $step_result, $status ) as $class ) {
+				$counts[ $class ] = max( 1, (int) ( $counts[ $class ] ?? 0 ) );
+			}
+		}
+
+		foreach ( self::classesFromStatus( $status ) as $class ) {
+			$counts[ $class ] = max( 1, (int) ( $counts[ $class ] ?? 0 ) );
 		}
 
 		return $counts;
 	}
 
-	private static function outcomeDetails( array $job, array $engine, array $counts ): array {
+	private static function outcomeDetails( array $job, array $engine, array $counts, array $outcome_classes ): array {
 		$status             = (string) ( $job['status'] ?? '' );
 		$job_status         = JobStatus::fromString( $status );
 		$source_rejection   = is_array( $engine['source_rejection'] ?? null ) ? $engine['source_rejection'] : array();
 		$is_source_rejected = ! empty( $counts['source_rejected'] ) || ! empty( $source_rejection ) || 'source-rejected' === $job_status->getReason();
+		$class_counts       = array();
+		foreach ( $outcome_classes as $class ) {
+			$class_counts[ $class ] = (int) ( $counts[ $class ] ?? 0 );
+		}
 
 		return array_filter(
 			array(
 				'status'                  => $status,
 				'base_status'             => $job_status->getBaseStatus(),
 				'status_reason'           => $job_status->getReason(),
+				'primary_class'           => $outcome_classes[0] ?? null,
+				'classes'                 => $outcome_classes,
+				'class_counts'            => $class_counts,
 				'fetch_packet_count'      => (int) ( $counts['fetch_packets'] ?? 0 ),
 				'no_content'              => ! empty( $counts['no_content'] ) || JobStatus::COMPLETED_NO_ITEMS === $job_status->getBaseStatus(),
 				'source_rejected'         => $is_source_rejected,
@@ -296,6 +326,98 @@ class RunMetrics {
 			),
 			static fn( $value ) => null !== $value
 		);
+	}
+
+	private static function outcomeClasses( array $job, array $engine, array $counts ): array {
+		$status  = (string) ( $job['status'] ?? '' );
+		$classes = self::classesFromStatus( $status );
+
+		foreach ( self::stepResults( $engine ) as $step_result ) {
+			$classes = array_merge( $classes, self::classesFromStepResult( $step_result, $status ) );
+		}
+
+		foreach ( array( 'true_empty_query', 'provider_error', 'hydration_failed', 'hydration_partial', 'ai_empty_packet', 'missing_handler_packet', 'source_rejected', 'item_deferred' ) as $class ) {
+			if ( ! empty( $counts[ $class ] ) ) {
+				$classes[] = $class;
+			}
+		}
+
+		return array_values( array_unique( array_filter( $classes ) ) );
+	}
+
+	private static function classesFromStepResult( array $step_result, string $status = '' ): array {
+		$result = (string) ( $step_result['result'] ?? '' );
+		$reason = self::outcomeReasonFrom( $step_result, $status );
+		$classes = self::classesFromReason( $reason );
+
+		if ( in_array( $result, array( 'no_content', 'completed_no_items' ), true ) ) {
+			$classes[] = 'true_empty_query';
+		}
+		if ( 'source_rejected' === $result || ! empty( $step_result['source_rejection_reason'] ) ) {
+			$classes[] = 'source_rejected';
+		}
+		if ( 'fetch' === ( $step_result['step_type'] ?? '' ) && 'failed' === $result ) {
+			$classes[] = 'provider_error';
+		}
+
+		return array_values( array_unique( array_filter( $classes ) ) );
+	}
+
+	private static function classesFromStatus( string $status ): array {
+		$job_status = JobStatus::fromString( $status );
+		$classes    = self::classesFromReason( (string) $job_status->getReason() );
+
+		if ( JobStatus::COMPLETED_NO_ITEMS === $job_status->getBaseStatus() ) {
+			$classes[] = 'true_empty_query';
+		}
+
+		return array_values( array_unique( array_filter( $classes ) ) );
+	}
+
+	private static function classesFromReason( string $reason ): array {
+		$reason = strtolower( str_replace( '-', '_', trim( $reason ) ) );
+		if ( '' === $reason ) {
+			return array();
+		}
+
+		$classes = array();
+		if ( in_array( $reason, array( 'mcp_fetch_failed', 'auth_ref_resolution_failed', 'ai_provider_missing' ), true ) || str_contains( $reason, 'provider' ) ) {
+			$classes[] = 'provider_error';
+		}
+		if ( 'missing_source_content' === $reason || str_contains( $reason, 'hydration_failed' ) ) {
+			$classes[] = 'hydration_failed';
+		}
+		if ( str_contains( $reason, 'hydration_partial' ) ) {
+			$classes[] = 'hydration_partial';
+		}
+		if ( 'empty_data_packet_returned' === $reason ) {
+			$classes[] = 'ai_empty_packet';
+		}
+		if ( 'handler_requiring_step_missing_handler_packets' === $reason ) {
+			$classes[] = 'missing_handler_packet';
+		}
+		if ( 'source_rejected' === $reason ) {
+			$classes[] = 'source_rejected';
+		}
+		if ( 'item_deferred' === $reason ) {
+			$classes[] = 'item_deferred';
+		}
+
+		return $classes;
+	}
+
+	private static function outcomeReasonFrom( array $step_result, string $status ): string {
+		foreach ( array( 'reason', 'error', 'status' ) as $key ) {
+			$value = $step_result[ $key ] ?? null;
+			if ( is_scalar( $value ) && '' !== (string) $value ) {
+				if ( 'status' === $key ) {
+					return (string) JobStatus::fromString( (string) $value )->getReason();
+				}
+				return (string) $value;
+			}
+		}
+
+		return (string) JobStatus::fromString( $status )->getReason();
 	}
 
 	private static function stepResults( array $engine ): array {
