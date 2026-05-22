@@ -224,6 +224,16 @@ assert_runtime_policy( array( 'pinterest_publish' ) === ( $first_decision->conte
 assert_runtime_policy( $second_decision->isComplete(), 'handler policy completes after all configured handlers fire' );
 assert_runtime_policy( array( 'wordpress_publish', 'pinterest_publish' ) === array_values( $second_decision->context()['executed_handlers'] ?? array() ), 'handler policy reports executed handlers' );
 
+$natural_before_handler_policy   = new DataMachineHandlerCompletionPolicy( array( 'wiki_upsert' ) );
+$natural_before_handler_decision = $natural_before_handler_policy->recordNaturalCompletion(
+	array( array( 'role' => 'user', 'content' => 'write the wiki article' ) ),
+	'I summarized the source.',
+	array( 'mode' => 'pipeline' ),
+	1
+);
+assert_runtime_policy( ! $natural_before_handler_decision->isComplete(), 'handler policy rejects natural completion before configured handlers fire' );
+assert_runtime_policy( array( 'wiki_upsert' ) === ( $natural_before_handler_decision->context()['remaining_handlers'] ?? null ), 'handler policy reports remaining handlers on natural completion' );
+
 // 2. Injected completion/transcript collaborators steer the loop without leaking into provider payloads.
 $natural_dispatch_count = 0;
 WpAiClientTestDouble::reset();
