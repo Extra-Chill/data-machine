@@ -305,7 +305,7 @@ class PipelineBatchScheduler {
 		$item_engine_data = $single_packet['metadata']['_engine_data'] ?? array();
 		if ( ! empty( $item_engine_data ) && is_array( $item_engine_data ) ) {
 			$item_engine_data = $this->removeReservedEngineDataKeys( $item_engine_data, $parent_job_id );
-			$child_engine = array_merge( $child_engine, $item_engine_data );
+			$child_engine     = array_merge( $child_engine, $item_engine_data );
 		}
 
 		// Seed dedup context (item_identifier + source_type) from DataPacket metadata.

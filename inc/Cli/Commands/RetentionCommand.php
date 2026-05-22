@@ -311,7 +311,7 @@ class RetentionCommand extends BaseCommand {
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$results = $wpdb->get_results(
-				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholder list is generated from table count and values are still prepared.
 				$wpdb->prepare(
 					"SELECT table_name, table_rows,
 						ROUND((data_length + index_length) / 1024 / 1024, 1) AS size_mb
@@ -320,6 +320,7 @@ class RetentionCommand extends BaseCommand {
 					AND table_name IN ({$placeholders})",
 					...$unique_tables
 				)
+				// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
 			);
 
 			if ( $results ) {
@@ -349,5 +350,4 @@ class RetentionCommand extends BaseCommand {
 
 		return $sizes;
 	}
-
 }

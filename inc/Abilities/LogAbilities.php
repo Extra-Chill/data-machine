@@ -499,6 +499,7 @@ class LogAbilities {
 	 * @return array Lines from the file.
 	 */
 	private static function tailDebugLog( string $file, int $lines ): array {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Efficient reverse tailing needs a seekable stream.
 		$handle = fopen( $file, 'r' );
 		if ( ! $handle ) {
 			return array();
@@ -511,8 +512,9 @@ class LogAbilities {
 		// Read backwards to find line breaks.
 		$found_lines = array();
 		$line_buffer = '';
+		$line_count  = count( $found_lines );
 
-		while ( $pos > 0 && count( $found_lines ) < $lines ) {
+		while ( $pos > 0 && $line_count < $lines ) {
 			--$pos;
 			fseek( $handle, $pos, SEEK_SET );
 			$char = fgetc( $handle );
@@ -520,6 +522,7 @@ class LogAbilities {
 			if ( "\n" === $char ) {
 				if ( '' !== trim( $line_buffer ) ) {
 					array_unshift( $found_lines, strrev( $line_buffer ) );
+					$line_count = count( $found_lines );
 				}
 				$line_buffer = '';
 			} else {
@@ -528,10 +531,11 @@ class LogAbilities {
 		}
 
 		// Don't forget the last line if we hit the beginning.
-		if ( '' !== trim( $line_buffer ) && count( $found_lines ) < $lines ) {
+		if ( '' !== trim( $line_buffer ) && $line_count < $lines ) {
 			array_unshift( $found_lines, strrev( $line_buffer ) );
 		}
 
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Handle opened above for seekable reverse tailing.
 		fclose( $handle );
 
 		return $found_lines;

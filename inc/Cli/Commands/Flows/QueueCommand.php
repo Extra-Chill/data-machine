@@ -392,8 +392,8 @@ class QueueCommand extends BaseCommand {
 			$flow_step_id = $resolved['step_id'];
 		}
 
-		$step_type   = $this->getStepType( $flow_id, $flow_step_id );
-		$ability_id  = ( 'fetch' === $step_type )
+		$step_type  = $this->getStepType( $flow_id, $flow_step_id );
+		$ability_id = ( 'fetch' === $step_type )
 			? 'datamachine/config-patch-clear'
 			: 'datamachine/queue-clear';
 

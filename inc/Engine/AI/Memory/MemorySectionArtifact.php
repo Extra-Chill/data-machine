@@ -147,6 +147,7 @@ final class MemorySectionArtifact {
 	private static function owner( string $owner ): string {
 		$owner = sanitize_key( self::non_empty_string( $owner, 'owner' ) );
 		if ( ! in_array( $owner, self::OWNERS, true ) ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 			throw new BundleValidationException( sprintf( 'memory section owner must be one of: %s.', implode( ', ', self::OWNERS ) ) );
 		}
 
@@ -168,7 +169,7 @@ final class MemorySectionArtifact {
 	}
 
 	private static function source_path( string $path ): string {
-		$path = str_replace( "\\", '/', trim( $path ) );
+		$path = str_replace( '\\', '/', trim( $path ) );
 		$path = ltrim( $path, '/' );
 		if ( str_contains( $path, '..' ) ) {
 			throw new BundleValidationException( 'memory section source_path must be bundle-local.' );

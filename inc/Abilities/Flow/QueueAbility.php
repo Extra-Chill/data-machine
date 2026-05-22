@@ -1611,7 +1611,7 @@ class QueueAbility {
 				$queue[] = $entry;
 			}
 
-			$flow_config[ $flow_step_id ][ $slot ] = $queue;
+			$flow_config[ $flow_step_id ][ $slot ]                   = $queue;
 			$flow_config[ $flow_step_id ]['_queue_consume_revision'] =
 				(int) ( $flow_config[ $flow_step_id ]['_queue_consume_revision'] ?? 0 ) + 1;
 

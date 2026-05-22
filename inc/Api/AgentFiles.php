@@ -118,8 +118,6 @@ class AgentFiles {
 			)
 		);
 
-
-
 		// Daily memory file routes.
 		$daily_date_args = array(
 			'user_id' => $user_id_arg,

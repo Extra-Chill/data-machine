@@ -95,8 +95,8 @@ class HandlersCommand extends BaseCommand {
 		$items = array();
 		foreach ( $result['handlers'] as $slug => $handler ) {
 			$items[] = array(
-				'slug'      => $slug,
-				'label'     => $handler['label'] ?? '',
+				'slug'           => $slug,
+				'label'          => $handler['label'] ?? '',
 				'step_type'      => $handler['step_type'] ?? '',
 				'settings_class' => $handler['settings_class'] ?? '',
 			);

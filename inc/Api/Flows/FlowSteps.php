@@ -181,7 +181,7 @@ class FlowSteps {
 		$handler_config = $request->get_param( 'handler_config' ) ?? array();
 		$user_message   = $request->get_param( 'user_message' );
 
-		$input     = array( 'flow_step_id' => $flow_step_id );
+		$input = array( 'flow_step_id' => $flow_step_id );
 
 		if ( null !== $handler_slug ) {
 			$input['handler_slug'] = $handler_slug;

@@ -422,7 +422,8 @@ class ExternalCommand extends BaseCommand {
 			}
 
 			if ( '' !== $opener && function_exists( 'shell_exec' ) ) {
-				@shell_exec( sprintf( '%s %s > /dev/null 2>&1 &', $opener, escapeshellarg( $url ) ) );
+				// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_shell_exec -- CLI-only helper to open an authorization URL.
+				shell_exec( sprintf( '%s %s > /dev/null 2>&1 &', $opener, escapeshellarg( $url ) ) );
 				WP_CLI::log( '(Attempted to open URL in your default browser.)' );
 			}
 		}
@@ -525,7 +526,7 @@ class ExternalCommand extends BaseCommand {
 			if ( '' === $line || false === strpos( $line, ':' ) ) {
 				continue;
 			}
-			list( $name, $value ) = explode( ':', $line, 2 );
+			list( $name, $value )     = explode( ':', $line, 2 );
 			$headers[ trim( $name ) ] = trim( $value );
 		}
 		if ( ! empty( $headers ) ) {

@@ -131,9 +131,9 @@ class FailJobHandler {
 		$db_processed_items->delete_processed_items( array( 'job_id' => $job_id ) );
 		self::releaseInFlightSourceClaims( $db_processed_items, $job_id, $engine_data );
 
-		$cleanup_files          = \DataMachine\Core\PluginSettings::get( 'cleanup_job_data_on_failure', true );
-		$files_cleaned          = false;
-		$retry_pending          = self::hasPendingRetry( $engine_data );
+		$cleanup_files = \DataMachine\Core\PluginSettings::get( 'cleanup_job_data_on_failure', true );
+		$files_cleaned = false;
+		$retry_pending = self::hasPendingRetry( $engine_data );
 
 		// Skip cleanup whenever a retry is already scheduled for this job.
 		// JobRetryPolicy::recordRetry writes the next_retry_at timestamp before

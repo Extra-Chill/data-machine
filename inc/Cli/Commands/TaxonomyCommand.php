@@ -101,7 +101,7 @@ class TaxonomyCommand extends BaseCommand {
 			return;
 		}
 
-		$input   = array(
+		$input = array(
 			'taxonomy'   => $taxonomy,
 			'hide_empty' => false,
 			'number'     => (int) ( $assoc_args['number'] ?? 50 ),

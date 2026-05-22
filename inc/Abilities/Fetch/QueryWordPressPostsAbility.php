@@ -225,7 +225,7 @@ class QueryWordPressPostsAbility {
 			// Build search text once for both include and exclude filters.
 			// $search is server-side handled by WP_Query when single-term;
 			// only the comma-separated case falls through to client-side filtering.
-			$search_text = '';
+			$search_text       = '';
 			$needs_search_text = ( $use_client_side_search && ! empty( $search ) ) || '' !== trim( $exclude_keywords );
 			if ( $needs_search_text ) {
 				$search_text = $post->post_title . ' ' . wp_strip_all_tags( $post->post_content . ' ' . $post->post_excerpt );
