@@ -15,10 +15,9 @@
  * The check is filterable via
  * `datamachine_daily_memory_conservation_threshold` (default 0.85).
  *
- * The guard logic is small and pure (size arithmetic), so this smoke
- * mirrors the conservation block inline rather than booting the full
- * task. A regression in the real file shows up when the harness'
- * inline reimplementation diverges from the production one.
+ * The guard now delegates to Agents API conservation metadata while keeping
+ * Data Machine-owned raw MEMORY.md byte accounting. This smoke exercises the
+ * production planning helper instead of mirroring the arithmetic inline.
  *
  * @package DataMachine\Tests
  */
@@ -33,9 +32,18 @@ if ( ! function_exists( 'size_format' ) ) {
 	}
 }
 
+if ( ! function_exists( 'add_filter' ) ) {
+	$GLOBALS['datamachine_daily_memory_conservation_smoke_filters'] = array();
+
+	function add_filter( $hook, $callback ): void {
+		$GLOBALS['datamachine_daily_memory_conservation_smoke_filters'][ $hook ] = $callback;
+	}
+}
+
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( $hook, $value ) {
-		return $value;
+		$callback = $GLOBALS['datamachine_daily_memory_conservation_smoke_filters'][ $hook ] ?? null;
+		return is_callable( $callback ) ? $callback( $value ) : $value;
 	}
 }
 
@@ -45,11 +53,16 @@ if ( ! function_exists( 'do_action' ) ) {
 	}
 }
 
+require_once __DIR__ . '/agents-api-loader.php';
+datamachine_tests_require_agents_api();
+require_once __DIR__ . '/../inc/Engine/AI/System/Tasks/SystemTask.php';
+require_once __DIR__ . '/../inc/Engine/AI/System/Tasks/DailyMemoryTask.php';
+
 /**
- * Inline reimplementation of the conservation check body.
+ * Evaluate the production daily-memory compaction plan for synthetic sizes.
  *
- * Returns ['committed' => bool, 'reason' => string] so test
- * assertions can verify both happy-path and reject-path behaviour.
+ * Returns ['committed' => bool, 'reason' => string] so test assertions can
+ * verify both happy-path and reject-path behaviour.
  */
 function evaluate_conservation(
 	int $original_size,
@@ -57,34 +70,41 @@ function evaluate_conservation(
 	int $archived_size,
 	float $threshold = 0.85
 ): array {
-	if ( $threshold <= 0 ) {
-		return array(
-			'committed' => true,
-			'reason'    => 'threshold disabled',
-		);
-	}
+	add_filter(
+		'datamachine_daily_memory_conservation_threshold',
+		static function () use ( $threshold ): float {
+			return $threshold;
+		}
+	);
 
-	$combined     = $persistent_size + $archived_size;
-	$min_combined = (int) ( $original_size * $threshold );
+	$task   = new DataMachine\Engine\AI\System\Tasks\DailyMemoryTask();
+	$method = new ReflectionMethod( $task, 'planMemoryCompaction' );
+	$plan   = $method->invoke(
+		$task,
+		str_repeat( 'o', $original_size ),
+		"===PERSISTENT===\n" . str_repeat( 'p', $persistent_size ) . "\n===ARCHIVED===\n" . str_repeat( 'a', $archived_size ),
+		'2026-05-01',
+		123,
+		'openai',
+		'gpt-test'
+	);
 
-	if ( $combined < $min_combined ) {
+	if ( empty( $plan['success'] ) ) {
 		return array(
 			'committed' => false,
-			'reason'    => sprintf(
-				'conservation check failed: %d + %d = %d < %d',
-				$persistent_size,
-				$archived_size,
-				$combined,
-				$min_combined
-			),
+			'reason'    => $plan['message'] ?? 'failed',
+			'plan'      => $plan,
 		);
 	}
 
 	return array(
 		'committed' => true,
 		'reason'    => 'conservation ok',
+		'plan'      => $plan,
 	);
 }
+
+$source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/System/Tasks/DailyMemoryTask.php' );
 
 $failures = array();
 $passes   = 0;
@@ -106,6 +126,9 @@ function assert_committed( bool $expected, array $result, string $name, array &$
 echo "daily memory conservation smoke\n";
 echo "-------------------------------\n";
 
+assert_committed( true, array( 'committed' => str_contains( $source, 'WP_Agent_Compaction_Conservation::metadata' ), 'reason' => 'source check' ), 'production task uses Agents API conservation metadata', $failures, $passes );
+assert_committed( true, array( 'committed' => str_contains( $source, 'WP_Agent_Compaction_Conservation::failed_closed' ), 'reason' => 'source check' ), 'production task uses Agents API fail-closed decision', $failures, $passes );
+
 // Test 1: real-world reproducer from intelligence-chubes4 2026-04-25.
 // 55KB original, 20KB persistent, 335B archived. Should reject.
 echo "\n[1] reproducer from live failure (55KB → 20KB + 335B):\n";
@@ -117,6 +140,8 @@ assert_committed( false, $result, 'live failure case is rejected', $failures, $p
 echo "\n[2] healthy compaction (58KB → 20KB persistent + 35KB archived):\n";
 $result = evaluate_conservation( 58 * 1024, 20 * 1024, 35 * 1024 );
 assert_committed( true, $result, 'healthy compaction commits', $failures, $passes );
+assert_committed( true, array( 'committed' => 'compacted' === ( $result['plan']['metadata']['status'] ?? '' ), 'reason' => 'metadata status' ), 'healthy compaction reports Agents API compaction metadata', $failures, $passes );
+assert_committed( true, array( 'committed' => 'compaction_completed' === ( $result['plan']['events'][0]['type'] ?? '' ), 'reason' => 'event type' ), 'healthy compaction emits lifecycle event', $failures, $passes );
 
 // Test 3: edge case — exactly at 85% threshold.
 echo "\n[3] exactly at 85% threshold:\n";
