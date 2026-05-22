@@ -131,6 +131,7 @@ if ( ! class_exists( 'WP_Error' ) ) {
 		}
 	}
 }
+require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 if ( ! class_exists( 'AgentsAPI\\Core\\Workspace\\WP_Agent_Workspace_Scope' ) ) {
 	eval( '
 	namespace AgentsAPI\\Core\\Workspace;
@@ -207,8 +208,6 @@ if ( ! class_exists( 'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action' ) ) {
 	}
 	' );
 }
-
-require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleUpgradeActionHandlers.php';
 
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
@@ -355,6 +354,64 @@ assert_upgrade_plan_equals( 'agent config reason is local modified', 'local_modi
 assert_upgrade_plan_equals( 'authorization header is redacted', '[redacted]', $config_conflict['diff']['before']['intelligence']['context_servers']['wporg']['headers']['Authorization'] ?? null );
 assert_upgrade_plan( 'raw local bearer is absent from config preview', false === strpos( (string) json_encode( $config_plan ), 'local-token' ) );
 
+echo "\n[2c] Flow runtime overlays are planned separately from source shape\n";
+$installed_runtime_flow = upgrade_artifact(
+	'flow',
+	'queued-fetch',
+	array(
+		'portable_slug'     => 'queued-fetch',
+		'flow_name'         => 'Queued Fetch',
+		'flow_config'       => array(
+			'1_fetch_1' => array(
+				'handler_configs' => array( 'mcp' => array( 'provider' => 'mgs' ) ),
+			),
+		),
+		'scheduling_policy' => 'create_paused_upgrade_preserve_existing',
+		'queue_policy'      => 'create_seed_upgrade_preserve_existing',
+		'runtime_overlays'  => array(
+			'scheduling_config' => array(
+				'enabled'   => false,
+				'interval'  => 'manual',
+				'max_items' => array( 'mcp' => 5 ),
+			),
+			'steps'             => array(
+				'1_fetch_1' => array(
+					'config_patch_queue'     => array( array( 'patch' => array( 'query' => 'seed' ) ) ),
+					'queue_mode'             => 'loop',
+					'_queue_consume_revision' => 'seed-rev',
+					'handler_configs'        => array( 'mcp' => array( 'max_items' => 5 ) ),
+				),
+			),
+		),
+	),
+	'flows/queued-fetch.json'
+);
+$current_runtime_flow   = $installed_runtime_flow;
+$target_runtime_flow    = $installed_runtime_flow;
+$target_runtime_flow['payload']['runtime_overlays']['scheduling_config'] = array(
+	'enabled'   => true,
+	'interval'  => 'hourly',
+	'max_items' => array( 'mcp' => 50 ),
+);
+$target_runtime_flow['payload']['runtime_overlays']['steps']['1_fetch_1']['config_patch_queue'] = array(
+	array( 'patch' => array( 'query' => 'target-a' ) ),
+	array( 'patch' => array( 'query' => 'target-b' ) ),
+);
+$target_runtime_flow['payload']['runtime_overlays']['steps']['1_fetch_1']['queue_mode'] = 'drain';
+$target_runtime_flow['payload']['runtime_overlays']['steps']['1_fetch_1']['handler_configs']['mcp']['max_items'] = 50;
+$runtime_plan = AgentBundleUpgradePlanner::plan(
+	array( installed_row( $installed_runtime_flow ) ),
+	array( $current_runtime_flow ),
+	array( $target_runtime_flow ),
+	array( 'bundle_slug' => 'runtime-overlay-brain' )
+)->to_array();
+$runtime_update = $runtime_plan['auto_apply'][0] ?? array();
+assert_upgrade_plan_equals( 'bundle seed overlay change auto-applies when source shape is clean', 'flow:queued-fetch', $runtime_update['artifact_key'] ?? null );
+assert_upgrade_plan_equals( 'runtime overlay seed change is not hidden', 2, count( $runtime_update['diff']['after']['runtime_overlays']['steps']['1_fetch_1']['config_patch_queue'] ?? array() ) );
+assert_upgrade_plan_equals( 'manual paused seed is visible in before diff', false, $runtime_update['diff']['before']['runtime_overlays']['scheduling_config']['enabled'] ?? null );
+assert_upgrade_plan_equals( 'scheduled seed is visible in after diff', 'hourly', $runtime_update['diff']['after']['runtime_overlays']['scheduling_config']['interval'] ?? null );
+assert_upgrade_plan_equals( 'burn-in max_items seed drift remains visible', 50, $runtime_update['diff']['after']['runtime_overlays']['steps']['1_fetch_1']['handler_configs']['mcp']['max_items'] ?? null );
+
 echo "\n[3] PendingAction stages bundle-upgrade previews\n";
 $staged = AgentBundleUpgradePendingAction::stage(
 	$plan,
@@ -366,8 +423,9 @@ $staged = AgentBundleUpgradePendingAction::stage(
 	)
 );
 assert_upgrade_plan( 'pending action staged', true === ( $staged['staged'] ?? false ) );
-assert_upgrade_plan_equals( 'pending action kind is bundle_upgrade', 'bundle_upgrade', $staged['kind'] ?? null );
-assert_upgrade_plan_equals( 'preview carries approval count', 1, $staged['preview']['counts']['needs_approval'] ?? null );
+$staged_pending = $staged['payload']['pending_action'] ?? $staged;
+assert_upgrade_plan_equals( 'pending action kind is bundle_upgrade', 'bundle_upgrade', $staged_pending['kind'] ?? null );
+assert_upgrade_plan_equals( 'preview carries approval count', 1, $staged_pending['preview']['counts']['needs_approval'] ?? null );
 
 echo "\n[4] Resolve applies approved artifacts only\n";
 $applied_keys = array();

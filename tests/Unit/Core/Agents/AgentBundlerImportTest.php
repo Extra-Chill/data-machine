@@ -510,6 +510,91 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'mcp' => 50 ), $updated_flow['scheduling_config']['max_items'] ?? null, 'Bundle schedule max items replace stale runtime bounds.' );
 	}
 
+	public function test_upgrade_preserves_runtime_overlays_without_hiding_bundle_seed_drift(): void {
+		$bundle = $this->fixture_bundle( 'runtime-overlay-agent' );
+		$bundle['flows'][0]['flow_config']['1_step-uuid_1'] = array_merge(
+			$bundle['flows'][0]['flow_config']['1_step-uuid_1'],
+			array(
+				'step_type'          => 'fetch',
+				'handler_configs'    => array(
+					'mcp' => array(
+						'provider'  => 'mgs',
+						'max_items' => 5,
+					),
+				),
+				'config_patch_queue' => array( array( 'patch' => array( 'query' => 'seed' ) ) ),
+				'queue_mode'         => 'loop',
+			)
+		);
+		$bundle['flows'][0]['scheduling_config'] = array(
+			'enabled'   => false,
+			'interval'  => 'manual',
+			'max_items' => array( 'mcp' => 5 ),
+		);
+
+		$first = $this->bundler->import( $bundle, null, $this->owner_id );
+		$this->assertTrue( (bool) $first['success'], 'Initial install succeeds.' );
+
+		$agent    = $this->agents_repo->get_by_slug( 'runtime-overlay-agent' );
+		$pipeline = $this->pipelines_repo->get_by_portable_slug( (int) $agent['agent_id'], 'static-site-pipeline' );
+		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
+		$config   = $flow['flow_config'];
+		$step_id  = array_key_first( $config );
+
+		$config[ $step_id ]['config_patch_queue'] = array(
+			array( 'patch' => array( 'query' => 'live-a' ) ),
+			array( 'patch' => array( 'query' => 'live-b' ) ),
+		);
+		$config[ $step_id ]['queue_mode'] = 'drain';
+		$config[ $step_id ]['_queue_consume_revision'] = 'live-rev';
+		$config[ $step_id ]['handler_configs']['mcp']['max_items'] = 1;
+		$this->flows_repo->update_flow(
+			(int) $flow['flow_id'],
+			array(
+				'flow_config'       => $config,
+				'scheduling_config' => array(
+					'enabled'   => true,
+					'interval'  => 'hourly',
+					'max_items' => array( 'mcp' => 1 ),
+				),
+			)
+		);
+
+		$upgrade = $bundle;
+		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['config_patch_queue'] = array(
+			array( 'patch' => array( 'query' => 'target-a' ) ),
+			array( 'patch' => array( 'query' => 'target-b' ) ),
+		);
+		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['queue_mode'] = 'loop';
+		$upgrade['flows'][0]['flow_config']['1_step-uuid_1']['handler_configs']['mcp']['max_items'] = 50;
+		$upgrade['flows'][0]['scheduling_config'] = array(
+			'enabled'   => false,
+			'interval'  => 'manual',
+			'max_items' => array( 'mcp' => 50 ),
+		);
+
+		$second = $this->bundler->import(
+			$upgrade,
+			null,
+			$this->owner_id,
+			false,
+			array( 'is_upgrade' => true )
+		);
+
+		$this->assertTrue( (bool) $second['success'], 'Upgrade succeeds when only runtime overlays changed locally.' );
+		$this->assertSame( array(), $second['summary']['conflicts'] ?? array(), 'Runtime overlay drift is not reported as package source drift.' );
+
+		$updated_flow = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
+		$updated_step = $updated_flow['flow_config'][ $step_id ];
+		$this->assertCount( 2, $updated_step['config_patch_queue'], 'Local queue entries are preserved.' );
+		$this->assertSame( 'live-a', $updated_step['config_patch_queue'][0]['patch']['query'] ?? null, 'Local queue content is preserved.' );
+		$this->assertSame( 'drain', $updated_step['queue_mode'] ?? null, 'Local queue mode is preserved.' );
+		$this->assertSame( 'live-rev', $updated_step['_queue_consume_revision'] ?? null, 'Local consume revision is preserved.' );
+		$this->assertSame( 1, $updated_step['handler_configs']['mcp']['max_items'] ?? null, 'Local burn-in max_items is preserved.' );
+		$this->assertSame( 'hourly', $updated_flow['scheduling_config']['interval'] ?? null, 'Local schedule interval is preserved.' );
+		$this->assertSame( array( 'mcp' => 1 ), $updated_flow['scheduling_config']['max_items'] ?? null, 'Local schedule max_items are preserved.' );
+	}
+
 	/**
 	 * The silent-partial-success regression in #1801: a failure after the agent row was claimed used
 	 * to return `success: true` with a populated agent_id summary, while the row was rolled back at
