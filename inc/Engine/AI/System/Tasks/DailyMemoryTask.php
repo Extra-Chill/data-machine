@@ -27,6 +27,7 @@ use DataMachine\Core\PluginSettings;
 use DataMachine\Core\FilesRepository\AgentMemory;
 use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Engine\AI\RequestBuilder;
+use AgentsAPI\AI\WP_Agent_Compaction_Conservation;
 use AgentsAPI\AI\WP_Agent_Markdown_Section_Compaction_Adapter;
 
 class DailyMemoryTask extends SystemTask {
@@ -187,8 +188,17 @@ class DailyMemoryTask extends SystemTask {
 			return;
 		}
 
-		// Parse the AI output into persistent and archived sections.
-		$parsed = $this->parseCleanupResponse( $ai_output );
+		// Parse and validate the AI output through the Agents API memory
+		// compaction contract. Data Machine still owns the prompt, model call,
+		// and file writes; Agents API owns the generic markdown item projection,
+		// conservation metadata, and fail-closed compaction decision.
+		$plan = $this->planMemoryCompaction( $memory_content, $ai_output, $date, $jobId, $provider, $model );
+		if ( empty( $plan['success'] ) ) {
+			$this->failJob( $jobId, $plan['message'] ?? 'Daily memory compaction failed.' );
+			return;
+		}
+
+		$parsed = $plan['parsed'];
 
 		if ( empty( $parsed['persistent'] ) ) {
 			do_action(
@@ -238,78 +248,6 @@ class DailyMemoryTask extends SystemTask {
 			);
 			$this->failJob( $jobId, 'Output too small -- safety check prevented write.' );
 			return;
-		}
-
-		// Conservation check: persistent + archived must approximately
-		// account for the original. The prompt explicitly says "NEVER
-		// discard information -- everything goes to either PERSISTENT or
-		// ARCHIVED", but a model that ignores that instruction can emit
-		// a short ARCHIVED section and silently lose content. Without
-		// this gate, the truncated MEMORY.md gets committed and the
-		// missing content is gone (the daily file ends up with the AI's
-		// _description_ of what it archived, not the content itself).
-		//
-		// Threshold defaults to 0.85 (combined size must be at least 85%
-		// of original) and is filterable for consumers that legitimately
-		// expect heavier compression. A value of 0 disables the check
-		// entirely (not recommended).
-		$combined_size = $new_size + $archived_size;
-
-		/**
-		 * Filter the conservation threshold for daily memory compaction.
-		 *
-		 * The persistent section plus the archived section must together
-		 * account for at least this fraction of the original MEMORY.md
-		 * size. Below the threshold the task fails rather than commit a
-		 * lossy split. Set to 0 to disable the check.
-		 *
-		 * @since 0.80.3
-		 *
-		 * @param float $threshold      Default 0.85.
-		 * @param array $context        date, original_size, new_size, archived_size, job_id.
-		 */
-		$conservation_threshold = (float) apply_filters(
-			'datamachine_daily_memory_conservation_threshold',
-			0.85,
-			array(
-				'date'          => $date,
-				'original_size' => $original_size,
-				'new_size'      => $new_size,
-				'archived_size' => $archived_size,
-				'job_id'        => $jobId,
-			)
-		);
-
-		if ( $conservation_threshold > 0 ) {
-			$min_combined = (int) ( $original_size * $conservation_threshold );
-			if ( $combined_size < $min_combined ) {
-				$discarded = $original_size - $combined_size;
-				do_action(
-					'datamachine_log',
-					'warning',
-					sprintf(
-						'Daily memory aborted -- conservation check failed: persistent (%s) + archived (%s) = %s, expected at least %s of %s original (~%s discarded). AI ignored the "NEVER discard information" rule.',
-						size_format( $new_size ),
-						size_format( $archived_size ),
-						size_format( $combined_size ),
-						size_format( $min_combined ),
-						size_format( $original_size ),
-						size_format( $discarded )
-					),
-					array(
-						'date'           => $date,
-						'original_size'  => $original_size,
-						'new_size'       => $new_size,
-						'archived_size'  => $archived_size,
-						'combined_size'  => $combined_size,
-						'min_combined'   => $min_combined,
-						'discarded_size' => $discarded,
-						'threshold'      => $conservation_threshold,
-					)
-				);
-				$this->failJob( $jobId, 'Conservation check failed -- AI emitted a lossy split. MEMORY.md unchanged.' );
-				return;
-			}
 		}
 
 		$write_result = $memory->replace_all( $new_content );
@@ -370,11 +308,166 @@ class DailyMemoryTask extends SystemTask {
 		$this->completeJob(
 			$jobId,
 			array(
+				'date'              => $date,
+				'original_size'     => $original_size,
+				'new_size'          => $new_size,
+				'archived_size'     => $archived_size,
+				'compaction'        => $plan['metadata'],
+				'compaction_events' => $plan['events'],
+			)
+		);
+	}
+
+	/**
+	 * Plan AI-produced MEMORY.md compaction through Agents API primitives.
+	 *
+	 * Data Machine supplies the model output and owns persistence. Agents API
+	 * supplies the markdown item projection and conservation contract so the
+	 * fail-closed decision is shared with the broader agent runtime substrate.
+	 *
+	 * @param string $original_content Current MEMORY.md content.
+	 * @param string $ai_output        Raw AI output.
+	 * @param string $date             Archive date.
+	 * @param int    $jobId            Job ID.
+	 * @param string $provider         Summary provider.
+	 * @param string $model            Summary model.
+	 * @return array{success: bool, parsed: array{persistent: string|null, archived: string|null}, metadata: array<string, mixed>, events: array<int, array<string, mixed>>, message?: string}
+	 */
+	private function planMemoryCompaction( string $original_content, string $ai_output, string $date, int $jobId, string $provider, string $model ): array {
+		$parsed = $this->parseCleanupResponse( $ai_output );
+		if ( empty( $parsed['persistent'] ) ) {
+			return array(
+				'success'  => true,
+				'parsed'   => $parsed,
+				'metadata' => array(),
+				'events'   => array(),
+			);
+		}
+
+		$persistent_text = $parsed['persistent'];
+		$archived_text   = $parsed['archived'] ?? '';
+
+		$original_items  = WP_Agent_Markdown_Section_Compaction_Adapter::parse( $original_content );
+		$compacted_items = WP_Agent_Markdown_Section_Compaction_Adapter::parse( $persistent_text );
+		$archived_items  = '' === trim( $archived_text ) ? array() : WP_Agent_Markdown_Section_Compaction_Adapter::parse( $archived_text );
+		$original_size   = strlen( $original_content );
+		$new_size        = strlen( $persistent_text );
+		$archived_size   = strlen( $archived_text );
+		$combined_size   = $new_size + $archived_size;
+
+		/**
+		 * Filter the conservation threshold for daily memory compaction.
+		 *
+		 * The persistent section plus the archived section must together
+		 * account for at least this fraction of the original MEMORY.md
+		 * size. Below the threshold the task fails rather than commit a
+		 * lossy split. Set to 0 to disable the check.
+		 *
+		 * @since 0.80.3
+		 *
+		 * @param float $threshold Default 0.85.
+		 * @param array $context   date, original_size, new_size, archived_size, job_id.
+		 */
+		$conservation_threshold = (float) apply_filters(
+			'datamachine_daily_memory_conservation_threshold',
+			0.85,
+			array(
 				'date'          => $date,
 				'original_size' => $original_size,
 				'new_size'      => $new_size,
 				'archived_size' => $archived_size,
+				'job_id'        => $jobId,
 			)
+		);
+
+		$policy = array(
+			'conservation_enabled'         => $conservation_threshold > 0,
+			'minimum_conserved_byte_ratio' => $conservation_threshold,
+			'fail_on_conservation_failure' => true,
+			'summary_provider'             => $provider,
+			'summary_model'                => $model,
+		);
+
+		$metadata = WP_Agent_Compaction_Conservation::metadata(
+			$policy,
+			$original_items,
+			$compacted_items,
+			array(),
+			$archived_items,
+			array(
+				'status'        => 'compacted',
+				'strategy'      => 'ai_markdown_memory_compaction',
+				'date'          => $date,
+				'job_id'        => $jobId,
+				'combined_size' => $combined_size,
+			),
+			array(
+				'item_count' => count( $original_items ),
+				'byte_count' => $original_size,
+			),
+			array(
+				'item_count' => count( $compacted_items ),
+				'byte_count' => $new_size,
+			),
+			null,
+			array(
+				'item_count' => count( $archived_items ),
+				'byte_count' => $archived_size,
+			)
+		);
+
+		if ( WP_Agent_Compaction_Conservation::failed_closed( $metadata ) ) {
+			$discarded = max( 0, $original_size - $combined_size );
+			do_action(
+				'datamachine_log',
+				'warning',
+				sprintf(
+					'Daily memory aborted -- conservation check failed: persistent (%s) + archived (%s) = %s, expected at least %s of %s original (~%s discarded). AI ignored the "NEVER discard information" rule.',
+					size_format( $new_size ),
+					size_format( $archived_size ),
+					size_format( $combined_size ),
+					size_format( (int) ( $metadata['conservation']['required_byte_count'] ?? 0 ) ),
+					size_format( $original_size ),
+					size_format( $discarded )
+				),
+				array(
+					'date'           => $date,
+					'original_size'  => $original_size,
+					'new_size'       => $new_size,
+					'archived_size'  => $archived_size,
+					'combined_size'  => $combined_size,
+					'min_combined'   => (int) ( $metadata['conservation']['required_byte_count'] ?? 0 ),
+					'discarded_size' => $discarded,
+					'threshold'      => $conservation_threshold,
+					'compaction'     => $metadata,
+				)
+			);
+
+			$metadata['status'] = 'failed';
+			return array(
+				'success'  => false,
+				'parsed'   => $parsed,
+				'metadata' => $metadata,
+				'events'   => array(
+					array(
+						'type'     => 'compaction_failed',
+						'metadata' => $metadata,
+					),
+				),
+				'message'  => 'Conservation check failed -- AI emitted a lossy split. MEMORY.md unchanged.',
+			);
+		}
+
+		return array(
+			'success'  => true,
+			'parsed'   => $parsed,
+			'metadata' => $metadata,
+			'events'   => array(
+				array(
+					'type'     => 'compaction_completed',
+					'metadata' => $metadata,
+				),
+			),
 		);
 	}
 

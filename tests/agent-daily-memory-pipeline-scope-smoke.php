@@ -83,6 +83,7 @@ namespace {
 	}
 
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/BaseTool.php';
+	require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/Global/AgentDailyMemory.php';
 
 	use DataMachine\Abilities\PermissionHelper;
