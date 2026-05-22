@@ -75,12 +75,14 @@ class WP_Abilities_Registry {
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy.php';
+require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-declaration.php';
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineToolAccessPolicy.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/RuntimeToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
@@ -302,7 +304,110 @@ $chat_no_inheritance = resolve_source_tools(
 );
 assert_source_equals( false, isset( $chat_no_inheritance['durable_memory_tool'] ), 'chat mode also respects requires_opt_in', $failures, $passes );
 
-echo "\n[6] Data Machine source adapters own product vocabulary:\n";
+echo "\n[6] runtime tools are normalized and opt-in:\n";
+$runtime_tools = resolve_source_tools(
+	ToolPolicyResolver::MODE_CHAT,
+	new SourcePolicyToolManager(),
+	array(
+		'client_context' => array(
+			'runtime_tools' => array(
+				'client/select_block' => array(
+					'description' => 'Select a block in the active editor.',
+					'parameters'  => array(
+						'type'       => 'object',
+						'properties' => array(
+							'client_id' => array( 'type' => 'string' ),
+						),
+					),
+					'executor'    => 'client',
+					'scope'       => 'run',
+				),
+			),
+		),
+	)
+);
+assert_source_equals( false, isset( $runtime_tools['client/select_block'] ), 'runtime tool is denied by default because it requires allow_only opt-in', $failures, $passes );
+
+$runtime_policy_tools = resolve_source_tools(
+	ToolPolicyResolver::MODE_CHAT,
+	new SourcePolicyToolManager(),
+	array(
+		'tool_policy'    => array(
+			'mode'  => 'allow',
+			'tools' => array( 'client/select_block' ),
+		),
+		'client_context' => array(
+			'runtime_tools' => array(
+				'client/select_block' => array(
+					'description' => 'Select a block in the active editor.',
+					'parameters'  => array(
+						'type'       => 'object',
+						'properties' => array(
+							'client_id' => array( 'type' => 'string' ),
+						),
+					),
+					'executor'    => 'client',
+					'scope'       => 'run',
+				),
+			),
+		),
+	)
+);
+assert_source_equals( true, isset( $runtime_policy_tools['client/select_block'] ), 'allow-mode tool policy opts in a client runtime tool', $failures, $passes );
+
+$runtime_tools = resolve_source_tools(
+	ToolPolicyResolver::MODE_CHAT,
+	new SourcePolicyToolManager(),
+	array(
+		'allow_only'      => array( 'client/select_block' ),
+		'client_context'  => array(
+			'runtime_tools' => array(
+				'client/select_block' => array(
+					'description' => 'Select a block in the active editor.',
+					'parameters'  => array(
+						'type'       => 'object',
+						'properties' => array(
+							'client_id' => array( 'type' => 'string' ),
+						),
+					),
+					'executor'    => 'client',
+					'scope'       => 'run',
+				),
+				'client/bad_tool'     => array(
+					'description' => 'Invalid missing executor.',
+					'scope'       => 'run',
+				),
+			),
+		),
+	)
+);
+assert_source_equals( true, isset( $runtime_tools['client/select_block'] ), 'allow_only opts in a client runtime tool through existing policy filtering', $failures, $passes );
+assert_source_equals( false, isset( $runtime_tools['client/bad_tool'] ), 'invalid runtime declarations are skipped', $failures, $passes );
+assert_source_equals( 'client', $runtime_tools['client/select_block']['executor'] ?? '', 'runtime tool keeps client executor marker', $failures, $passes );
+assert_source_equals( true, $runtime_tools['client/select_block']['external_executor'] ?? false, 'runtime tool is marked external executor', $failures, $passes );
+assert_source_equals( 'run', $runtime_tools['client/select_block']['scope'] ?? '', 'runtime tool keeps run scope', $failures, $passes );
+assert_source_equals(
+	array(
+		'type'       => 'object',
+		'properties' => array(
+			'client_id' => array( 'type' => 'string' ),
+		),
+	),
+	$runtime_tools['client/select_block']['parameters'] ?? null,
+	'runtime tool preserves normalized JSON schema parameters',
+	$failures,
+	$passes
+);
+
+$executor_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutor.php' );
+$client_guard    = strpos( $executor_source, "'client' === (string) ( $" . "tool_def['executor'] ?? '' )" );
+$policy_resolver = strpos( $executor_source, 'new ActionPolicyResolver()' );
+$direct_execute  = strpos( $executor_source, 'executePreparedTool' );
+assert_source_equals( true, false !== $client_guard, 'ToolExecutor has an explicit client-executor guard', $failures, $passes );
+assert_source_equals( true, false !== $client_guard && false !== $policy_resolver && $client_guard < $policy_resolver, 'client-executor guard runs before action-policy/direct execution setup', $failures, $passes );
+assert_source_equals( true, false !== $client_guard && false !== $direct_execute && $client_guard < $direct_execute, 'client-executor guard runs before direct PHP tool execution', $failures, $passes );
+
+echo "\n[7] Data Machine source adapters own product vocabulary:\n";
 $registry_source          = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php' );
 $adjacent_source          = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php' );
 $datamachine_tool_source  = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistrySource.php' );

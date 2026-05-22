@@ -102,6 +102,9 @@ class ToolPolicyResolver {
 		$args['modes'] = $modes;
 		$tools         = $this->gatherByModes( $modes, $args );
 
+		$agent_policy = $agent_id > 0 ? $this->getAgentToolPolicy( $agent_id ) : null;
+		$tools        = $this->filterRuntimeToolsByPolicyOptIn( $tools, $args, $agent_policy );
+
 		// 2. Delegate generic mode/allow/deny/category policy resolution to Agents API.
 		$policy_context = array_merge(
 			$args,
@@ -112,7 +115,6 @@ class ToolPolicyResolver {
 			)
 		);
 
-		$agent_policy = $agent_id > 0 ? $this->getAgentToolPolicy( $agent_id ) : null;
 		if ( null !== $agent_policy ) {
 			$policy_context['agent_config'] = array( 'tool_policy' => $agent_policy );
 		} else {
@@ -143,6 +145,47 @@ class ToolPolicyResolver {
 	 */
 	private function gatherByModes( array $modes, array $args ): array {
 		return $this->tool_source_registry->gather( $modes, $args );
+	}
+
+	/**
+	 * Keep client-declared runtime tools only when explicitly opted in.
+	 *
+	 * Runtime declarations are caller supplied and client-executed. They must be
+	 * named by an existing allow path before the generic policy pass can expose
+	 * them to a provider request.
+	 *
+	 * @param array      $tools        Resolved tools keyed by name.
+	 * @param array      $args         Resolver args.
+	 * @param array|null $agent_policy Optional persisted agent policy.
+	 * @return array Filtered tools.
+	 */
+	private function filterRuntimeToolsByPolicyOptIn( array $tools, array $args, ?array $agent_policy ): array {
+		$runtime_tool_names = array();
+		foreach ( $tools as $name => $tool ) {
+			if ( is_array( $tool ) && ! empty( $tool['runtime_tool'] ) ) {
+				$runtime_tool_names[] = (string) $name;
+			}
+		}
+
+		if ( empty( $runtime_tool_names ) ) {
+			return $tools;
+		}
+
+		$allowed = $this->policy_filter->string_list( $args['allow_only'] ?? array() );
+		foreach ( array( $agent_policy, $args['tool_policy'] ?? null ) as $policy ) {
+			if ( is_array( $policy ) && \WP_Agent_Tool_Policy::MODE_ALLOW === ( $policy['mode'] ?? \WP_Agent_Tool_Policy::MODE_DENY ) ) {
+				$allowed = array_merge( $allowed, $this->policy_filter->string_list( $policy['tools'] ?? array() ) );
+			}
+		}
+
+		$allowed = array_flip( array_values( array_unique( $allowed ) ) );
+		foreach ( $runtime_tool_names as $name ) {
+			if ( ! isset( $allowed[ $name ] ) ) {
+				unset( $tools[ $name ] );
+			}
+		}
+
+		return $tools;
 	}
 
 	/**

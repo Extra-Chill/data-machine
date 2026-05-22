@@ -11,6 +11,7 @@ namespace DataMachine\Engine\AI\Tools;
 
 use DataMachine\Engine\AI\Tools\Sources\AdjacentHandlerToolSource;
 use DataMachine\Engine\AI\Tools\Sources\DataMachineToolRegistrySource;
+use DataMachine\Engine\AI\Tools\Sources\RuntimeToolSource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -18,6 +19,7 @@ class ToolSourceRegistry {
 
 	public const SOURCE_STATIC_REGISTRY   = 'static_registry';
 	public const SOURCE_ADJACENT_HANDLERS = 'adjacent_handlers';
+	public const SOURCE_RUNTIME_TOOLS     = 'runtime_tools';
 
 	private ToolManager $tool_manager;
 
@@ -63,6 +65,7 @@ class ToolSourceRegistry {
 		$sources = apply_filters(
 			'agents_api_tool_sources',
 			array(
+				self::SOURCE_RUNTIME_TOOLS     => new RuntimeToolSource(),
 				self::SOURCE_STATIC_REGISTRY   => new DataMachineToolRegistrySource( $this->tool_manager ),
 				self::SOURCE_ADJACENT_HANDLERS => new AdjacentHandlerToolSource(),
 			),
@@ -83,8 +86,8 @@ class ToolSourceRegistry {
 	 */
 	private function getSourcesForModes( array $modes, array $args ): array {
 		$sources = in_array( ToolPolicyResolver::MODE_PIPELINE, $modes, true )
-			? array( self::SOURCE_ADJACENT_HANDLERS, self::SOURCE_STATIC_REGISTRY )
-			: array( self::SOURCE_STATIC_REGISTRY );
+			? array( self::SOURCE_RUNTIME_TOOLS, self::SOURCE_ADJACENT_HANDLERS, self::SOURCE_STATIC_REGISTRY )
+			: array( self::SOURCE_RUNTIME_TOOLS, self::SOURCE_STATIC_REGISTRY );
 
 		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
 		$sources = apply_filters( 'agents_api_tool_sources_for_mode', $sources, $modes, $args );
