@@ -267,6 +267,23 @@ abstract class BaseAuthProvider {
 	}
 
 	/**
+	 * Merge partial account data into the site-wide OAuth account.
+	 *
+	 * Use this for incremental token/profile refreshes where omitted fields should
+	 * be preserved. Use `save_site_account()` for initial authorization or
+	 * re-consent flows that intentionally replace the complete account payload.
+	 *
+	 * @since 0.132.0
+	 *
+	 * @param array $patch Partial account data to merge into the existing account.
+	 * @return bool True on successful write, false on storage failure.
+	 */
+	public function update_site_account( array $patch ): bool {
+		$existing = $this->get_stored_account_for_scope( null );
+		return $this->store_account_for_scope( array_merge( $existing, $patch ), null );
+	}
+
+	/**
 	 * Delete the site-wide OAuth account for this provider.
 	 *
 	 * Principal-scoped user and agent accounts are preserved. The delete is
@@ -401,22 +418,32 @@ abstract class BaseAuthProvider {
 			);
 		}
 
-		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
-		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) ) {
-			$all_auth_data[ $this->provider_slug ] = array();
-		}
+		return $this->store_account_for_scope( $data, $this->get_principal_scope( $context, 'account' ) );
+	}
 
-		$scope = $this->get_principal_scope( $context, 'account' );
-		if ( null !== $scope ) {
-			if ( ! isset( $all_auth_data[ $this->provider_slug ]['principals'] ) || ! is_array( $all_auth_data[ $this->provider_slug ]['principals'] ) ) {
-				$all_auth_data[ $this->provider_slug ]['principals'] = array();
-			}
-			$all_auth_data[ $this->provider_slug ]['principals'][ $scope ]['account'] = $this->encrypt_fields( $data );
-		} else {
-			$all_auth_data[ $this->provider_slug ]['account'] = $this->encrypt_fields( $data );
-		}
+	/**
+	 * Merge partial account data into the policy-resolved OAuth account slot.
+	 *
+	 * This method preserves omitted fields. It writes to the same site/user/agent
+	 * slot that `save_account()` would target for the supplied context, but reads
+	 * only that exact slot before merging so a missing scoped account does not pull
+	 * values from the legacy site fallback.
+	 *
+	 * Use `save_account()` for full replacement, especially initial authorization
+	 * or re-consent flows. Use this method for token refreshes and other partial
+	 * account updates.
+	 *
+	 * @since 0.132.0
+	 *
+	 * @param array $patch Partial account data to merge.
+	 * @param array $context Optional principal context, e.g. user_id or agent_id.
+	 * @return bool True on successful write, false on storage failure.
+	 */
+	public function update_account( array $patch, array $context = array() ): bool {
+		$scope    = $this->get_principal_scope( $context, 'account' );
+		$existing = $this->get_stored_account_for_scope( $scope );
 
-		return update_site_option( 'datamachine_auth_data', $all_auth_data );
+		return $this->store_account_for_scope( array_merge( $existing, $patch ), $scope );
 	}
 
 	/**
@@ -478,6 +505,55 @@ abstract class BaseAuthProvider {
 			return update_site_option( 'datamachine_auth_data', $all_auth_data );
 		}
 		return true;
+	}
+
+	/**
+	 * Read the exact stored account slot for merge updates.
+	 *
+	 * Unlike `get_account_for_context()`, this does not fall back from a scoped
+	 * principal slot to the legacy site account. Partial updates must not copy site
+	 * credentials into a user or agent slot just because the scoped slot is empty.
+	 *
+	 * @since 0.132.0
+	 *
+	 * @param string|null $scope Principal scope key (`user:<id>` or `agent:<id>`), or null for site account.
+	 * @return array<string,mixed> Decrypted account data, or an empty array when none exists.
+	 */
+	private function get_stored_account_for_scope( ?string $scope ): array {
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		$provider_data = $all_auth_data[ $this->provider_slug ] ?? array();
+		$account       = null === $scope
+			? ( $provider_data['account'] ?? array() )
+			: ( $provider_data['principals'][ $scope ]['account'] ?? array() );
+
+		return is_array( $account ) ? $this->decrypt_fields( $account ) : array();
+	}
+
+	/**
+	 * Store account data in the exact site or principal scope slot.
+	 *
+	 * @since 0.132.0
+	 *
+	 * @param array<string,mixed> $account Account data to store.
+	 * @param string|null         $scope   Principal scope key, or null for the site account.
+	 * @return bool True on successful write, false on storage failure.
+	 */
+	private function store_account_for_scope( array $account, ?string $scope ): bool {
+		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
+		if ( ! isset( $all_auth_data[ $this->provider_slug ] ) || ! is_array( $all_auth_data[ $this->provider_slug ] ) ) {
+			$all_auth_data[ $this->provider_slug ] = array();
+		}
+
+		if ( null !== $scope ) {
+			if ( ! isset( $all_auth_data[ $this->provider_slug ]['principals'] ) || ! is_array( $all_auth_data[ $this->provider_slug ]['principals'] ) ) {
+				$all_auth_data[ $this->provider_slug ]['principals'] = array();
+			}
+			$all_auth_data[ $this->provider_slug ]['principals'][ $scope ]['account'] = $this->encrypt_fields( $account );
+		} else {
+			$all_auth_data[ $this->provider_slug ]['account'] = $this->encrypt_fields( $account );
+		}
+
+		return update_site_option( 'datamachine_auth_data', $all_auth_data );
 	}
 
 	// -------------------------------------------------------------------------
@@ -631,6 +707,26 @@ abstract class BaseAuthProvider {
 	}
 
 	/**
+	 * Merge partial account data into a specific user's OAuth account.
+	 *
+	 * @since 0.132.0
+	 *
+	 * @param int   $user_id Target user ID. Must be a positive integer.
+	 * @param array $patch   Partial account data to merge.
+	 * @return bool True on successful write, false on invalid input or storage failure.
+	 */
+	public function update_account_for_user( int $user_id, array $patch ): bool {
+		$user_id = absint( $user_id );
+		if ( $user_id <= 0 ) {
+			return false;
+		}
+
+		$scope_key = 'user:' . $user_id;
+		$existing  = $this->get_stored_account_for_scope( $scope_key );
+		return $this->store_account_for_scope( array_merge( $existing, $patch ), $scope_key );
+	}
+
+	/**
 	 * Delete the OAuth account for a specific user.
 	 *
 	 * Returns true when the per-user slot existed and was removed, or when
@@ -731,6 +827,26 @@ abstract class BaseAuthProvider {
 		$all_auth_data[ $this->provider_slug ]['principals'][ $scope_key ]['account'] = $this->encrypt_fields( $account );
 
 		return update_site_option( 'datamachine_auth_data', $all_auth_data );
+	}
+
+	/**
+	 * Merge partial account data into a specific agent's OAuth account.
+	 *
+	 * @since 0.132.0
+	 *
+	 * @param int   $agent_id Target agent ID. Must be a positive integer.
+	 * @param array $patch    Partial account data to merge.
+	 * @return bool True on successful write, false on invalid input or storage failure.
+	 */
+	public function update_account_for_agent( int $agent_id, array $patch ): bool {
+		$agent_id = absint( $agent_id );
+		if ( $agent_id <= 0 ) {
+			return false;
+		}
+
+		$scope_key = 'agent:' . $agent_id;
+		$existing  = $this->get_stored_account_for_scope( $scope_key );
+		return $this->store_account_for_scope( array_merge( $existing, $patch ), $scope_key );
 	}
 
 	/**
