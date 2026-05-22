@@ -51,6 +51,10 @@ function get_option( string $key, $default_value = false ) {
 	return $default_value;
 }
 
+function wp_json_encode( $value, int $flags = 0, int $depth = 512 ) {
+	return json_encode( $value, $flags, $depth );
+}
+
 require_once __DIR__ . '/../inc/Core/DataPacket.php';
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
 require_once __DIR__ . '/../inc/Core/Steps/Step.php';
@@ -146,6 +150,8 @@ assert_handoff_equals( array( 'fixed_parent_path' => 'woocommerce' ), $available
 assert_handoff_equals( array( 'fixed_parent_path' => 'woocommerce' ), $available_tools['wiki_upsert']['config_seen'] ?? null, 'handler callback still receives the same config', $failures, $passes );
 
 $method = new ReflectionMethod( AIStep::class, 'processLoopResults' );
+$output_diagnostic_method = new ReflectionMethod( AIStep::class, 'outputDiagnosticReason' );
+$diagnostic_method = new ReflectionMethod( AIStep::class, 'emptyOutputDiagnosticReason' );
 
 $packets = $method->invoke(
 	null,
@@ -183,6 +189,69 @@ assert_handoff_equals( 'wiki_upsert', $packets[0]['metadata']['handler_tool'] ??
 
 $found = ToolResultFinder::findHandlerResult( $packets, 'wiki_upsert', 'upsert_step', false );
 assert_handoff_equals( $packets[0], $found, 'ToolResultFinder finds packet by required handler slug', $failures, $passes );
+
+$diagnostic = $output_diagnostic_method->invoke(
+	null,
+	array(
+		'messages'               => array(
+			array( 'role' => 'assistant', 'content' => 'I summarized the source but did not write the article.' ),
+		),
+		'tool_execution_results' => array(),
+	),
+	array( 'wiki_upsert' ),
+	array(
+		array(
+			'type' => 'ai_response',
+			'data' => array( 'content' => 'I summarized the source but did not write the article.' ),
+		),
+	)
+);
+assert_handoff_equals( 'ai_required_handler_not_called', $diagnostic, 'AI non-handler output records missing handler diagnostic', $failures, $passes );
+
+$diagnostic = $output_diagnostic_method->invoke(
+	null,
+	array( 'tool_execution_results' => array() ),
+	array( 'wiki_upsert' ),
+	$packets
+);
+assert_handoff_equals( '', $diagnostic, 'AI handler-complete output records no diagnostic', $failures, $passes );
+
+$diagnostic = $diagnostic_method->invoke(
+	null,
+	array(
+		'messages'               => array(
+			array( 'role' => 'assistant', 'content' => 'I could not find enough useful material.' ),
+		),
+		'tool_execution_results' => array(),
+	),
+	array( 'wiki_upsert' )
+);
+assert_handoff_equals( 'ai_required_handler_not_called', $diagnostic, 'AI empty output records missing handler diagnostic', $failures, $passes );
+
+$diagnostic = $diagnostic_method->invoke(
+	null,
+	array(
+		'tool_execution_results' => array(
+			array(
+				'tool_name'       => 'wiki_upsert',
+				'result'          => array( 'success' => false, 'message' => 'quality gate rejected' ),
+				'is_handler_tool' => true,
+			),
+		),
+	),
+	array( 'wiki_upsert' )
+);
+assert_handoff_equals( 'ai_handler_tool_failed', $diagnostic, 'AI empty output records failed handler diagnostic', $failures, $passes );
+
+$diagnostic = $diagnostic_method->invoke(
+	null,
+	array(
+		'messages'               => array(),
+		'tool_execution_results' => array(),
+	),
+	array()
+);
+assert_handoff_equals( 'ai_empty_response', $diagnostic, 'AI empty output records empty response diagnostic', $failures, $passes );
 
 echo "\n------------------------------------------\n";
 echo "{$passes} / " . ( $passes + count( $failures ) ) . " passed\n";
