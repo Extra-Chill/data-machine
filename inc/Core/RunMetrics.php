@@ -28,6 +28,10 @@ class RunMetrics {
 		'hydration_failed',
 		'hydration_partial',
 		'ai_empty_packet',
+		'ai_required_handler_not_called',
+		'ai_handler_tool_failed',
+		'ai_empty_response',
+		'ai_completion_assertions_missing',
 		'missing_handler_packet',
 		'source_rejected',
 		'item_deferred',
@@ -323,6 +327,7 @@ class RunMetrics {
 				'handler_slug'            => self::firstStepField( $engine, 'handler_slug' ),
 				'provider_id'             => self::firstStepField( $engine, 'provider_id' ),
 				'tool_ids'                => self::mergedStepListField( $engine, 'tool_ids' ),
+				'ai_diagnostic_reason'    => self::firstStepField( $engine, 'diagnostic_reason' ),
 			),
 			static fn( $value ) => null !== $value
 		);
@@ -336,7 +341,7 @@ class RunMetrics {
 			$classes = array_merge( $classes, self::classesFromStepResult( $step_result, $status ) );
 		}
 
-		foreach ( array( 'true_empty_query', 'provider_error', 'hydration_failed', 'hydration_partial', 'ai_empty_packet', 'missing_handler_packet', 'source_rejected', 'item_deferred' ) as $class ) {
+		foreach ( array( 'true_empty_query', 'provider_error', 'hydration_failed', 'hydration_partial', 'ai_empty_packet', 'ai_required_handler_not_called', 'ai_handler_tool_failed', 'ai_empty_response', 'ai_completion_assertions_missing', 'missing_handler_packet', 'source_rejected', 'item_deferred' ) as $class ) {
 			if ( ! empty( $counts[ $class ] ) ) {
 				$classes[] = $class;
 			}
@@ -349,6 +354,9 @@ class RunMetrics {
 		$result  = (string) ( $step_result['result'] ?? '' );
 		$reason  = self::outcomeReasonFrom( $step_result, $status );
 		$classes = self::classesFromReason( $reason );
+		if ( isset( $step_result['diagnostic_reason'] ) && is_scalar( $step_result['diagnostic_reason'] ) ) {
+			$classes = array_merge( $classes, self::classesFromReason( (string) $step_result['diagnostic_reason'] ) );
+		}
 
 		if ( in_array( $result, array( 'no_content', 'completed_no_items' ), true ) ) {
 			$classes[] = 'true_empty_query';
@@ -392,6 +400,18 @@ class RunMetrics {
 		}
 		if ( 'empty_data_packet_returned' === $reason ) {
 			$classes[] = 'ai_empty_packet';
+		}
+		if ( in_array( $reason, array( 'ai_required_handler_not_called', 'required_handler_tool_not_called' ), true ) ) {
+			$classes[] = 'ai_required_handler_not_called';
+		}
+		if ( 'ai_handler_tool_failed' === $reason ) {
+			$classes[] = 'ai_handler_tool_failed';
+		}
+		if ( 'ai_empty_response' === $reason ) {
+			$classes[] = 'ai_empty_response';
+		}
+		if ( in_array( $reason, array( 'ai_completion_assertions_missing', 'completion_assertions_missing' ), true ) ) {
+			$classes[] = 'ai_completion_assertions_missing';
 		}
 		if ( 'handler_requiring_step_missing_handler_packets' === $reason ) {
 			$classes[] = 'missing_handler_packet';

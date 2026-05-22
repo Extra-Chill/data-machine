@@ -131,17 +131,38 @@ $metrics = RunMetrics::fromJob(
 		array(
 			'step_results' => array(
 				'ai_1' => array(
-					'flow_step_id' => 'ai_1',
-					'step_type'    => 'ai',
-					'result'       => 'failed',
-					'reason'       => 'empty_data_packet_returned',
-					'packet_count' => 0,
+					'flow_step_id'      => 'ai_1',
+					'step_type'         => 'ai',
+					'result'            => 'failed',
+					'reason'            => 'empty_data_packet_returned',
+					'diagnostic_reason' => 'ai_required_handler_not_called',
+					'packet_count'      => 0,
 				),
 			),
 		)
 	)
 );
-$assert( 'AI empty packet class is exposed from step result', array( 'ai_empty_packet' ) === $metrics['outcome_classes'] );
+$assert( 'AI empty packet class is exposed from step result', in_array( 'ai_empty_packet', $metrics['outcome_classes'], true ) );
+$assert( 'AI handler-not-called diagnostic class is exposed from step result', in_array( 'ai_required_handler_not_called', $metrics['outcome_classes'], true ) );
+$assert( 'AI diagnostic reason is exposed in outcome details', 'ai_required_handler_not_called' === ( $metrics['outcome']['ai_diagnostic_reason'] ?? '' ) );
+
+$metrics = RunMetrics::fromJob(
+	$job(
+		'failed - completion_assertions_missing',
+		array(
+			'step_results' => array(
+				'ai_1' => array(
+					'flow_step_id'      => 'ai_1',
+					'step_type'         => 'ai',
+					'result'            => 'failed',
+					'diagnostic_reason' => 'ai_completion_assertions_missing',
+					'packet_count'      => 0,
+				),
+			),
+		)
+	)
+);
+$assert( 'AI assertion diagnostic class is exposed', in_array( 'ai_completion_assertions_missing', $metrics['outcome_classes'], true ) );
 
 $metrics = RunMetrics::fromJob(
 	$job(

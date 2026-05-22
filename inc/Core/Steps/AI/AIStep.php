@@ -556,6 +556,20 @@ class AIStep extends Step {
 
 			$missing_assertion_failure = self::missingCompletionAssertionsFailure( $loop_result );
 			if ( null !== $missing_assertion_failure ) {
+				RunMetrics::recordStepResult(
+					$this->job_id,
+					$this->flow_step_id,
+					array(
+						'step_type'         => 'ai',
+						'result'            => 'failed',
+						'provider_id'       => $provider_name,
+						'model_id'          => $model_name,
+						'tool_ids'          => array_keys( $available_tools ),
+						'handler_slugs'     => $required_handler_slugs,
+						'packet_count'      => 0,
+						'diagnostic_reason' => 'ai_completion_assertions_missing',
+					)
+				);
 				do_action(
 					'datamachine_fail_job',
 					$this->job_id,
@@ -570,17 +584,19 @@ class AIStep extends Step {
 
 			// Process loop results into data packets
 			$processed_packets = self::processLoopResults( $loop_result, $this->dataPackets, $payload, $available_tools );
+			$diagnostic_reason = empty( $processed_packets ) ? self::emptyOutputDiagnosticReason( $loop_result, $required_handler_slugs ) : '';
 			RunMetrics::recordStepResult(
 				$this->job_id,
 				$this->flow_step_id,
 				array(
-					'step_type'     => 'ai',
-					'result'        => empty( $processed_packets ) ? 'no_content' : 'completed',
-					'provider_id'   => $provider_name,
-					'model_id'      => $model_name,
-					'tool_ids'      => array_keys( $available_tools ),
-					'handler_slugs' => $required_handler_slugs,
-					'packet_count'  => count( $processed_packets ),
+					'step_type'         => 'ai',
+					'result'            => empty( $processed_packets ) ? 'no_content' : 'completed',
+					'provider_id'       => $provider_name,
+					'model_id'          => $model_name,
+					'tool_ids'          => array_keys( $available_tools ),
+					'handler_slugs'     => $required_handler_slugs,
+					'packet_count'      => count( $processed_packets ),
+					'diagnostic_reason' => $diagnostic_reason,
 				)
 			);
 
@@ -1022,6 +1038,58 @@ class AIStep extends Step {
 		}
 
 		return $outputPackets;
+	}
+
+	/**
+	 * Explain why an AI step emitted no packets without changing terminal status semantics.
+	 *
+	 * @param array             $loop_result             Conversation loop result.
+	 * @param array<int,string> $required_handler_slugs  Handler slugs required by downstream steps.
+	 * @return string
+	 */
+	private static function emptyOutputDiagnosticReason( array $loop_result, array $required_handler_slugs ): string {
+		$tool_results      = is_array( $loop_result['tool_execution_results'] ?? null ) ? $loop_result['tool_execution_results'] : array();
+		$messages          = is_array( $loop_result['messages'] ?? null ) ? $loop_result['messages'] : array();
+		$handler_attempted = false;
+		$handler_succeeded = false;
+		$assistant_content = '';
+
+		foreach ( $tool_results as $tool_result_data ) {
+			if ( empty( $tool_result_data['is_handler_tool'] ) ) {
+				continue;
+			}
+
+			$handler_attempted = true;
+			$tool_result       = is_array( $tool_result_data['result'] ?? null ) ? $tool_result_data['result'] : array();
+			if ( ! empty( $tool_result['success'] ) ) {
+				$handler_succeeded = true;
+			}
+		}
+
+		foreach ( $messages as $message ) {
+			if ( 'assistant' !== ( $message['role'] ?? '' ) ) {
+				continue;
+			}
+
+			$content = trim( (string) ( $message['content'] ?? '' ) );
+			if ( '' !== $content ) {
+				$assistant_content = $content;
+			}
+		}
+
+		if ( ! empty( $required_handler_slugs ) && ! $handler_attempted ) {
+			return 'ai_required_handler_not_called';
+		}
+
+		if ( $handler_attempted && ! $handler_succeeded ) {
+			return 'ai_handler_tool_failed';
+		}
+
+		if ( empty( $tool_results ) && '' === $assistant_content ) {
+			return 'ai_empty_response';
+		}
+
+		return 'ai_empty_packet';
 	}
 
 	/**
