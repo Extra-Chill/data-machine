@@ -104,8 +104,8 @@ class VideoMetadata {
 		$output     = array();
 		$return_var = -1;
 
-		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-		@exec( 'which ffprobe 2>/dev/null', $output, $return_var );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec -- ffprobe availability requires probing the system binary.
+		exec( 'which ffprobe 2>/dev/null', $output, $return_var );
 
 		self::$ffprobe_available = ( 0 === $return_var && ! empty( $output ) );
 
@@ -130,8 +130,8 @@ class VideoMetadata {
 		$output     = array();
 		$return_var = -1;
 
-		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
-		@exec( $command, $output, $return_var );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec -- Video metadata extraction delegates to ffprobe.
+		exec( $command, $output, $return_var );
 
 		if ( 0 !== $return_var || empty( $output ) ) {
 			return null;
@@ -207,7 +207,6 @@ class VideoMetadata {
 			$finfo = finfo_open( FILEINFO_MIME_TYPE );
 			if ( $finfo ) {
 				$mime = finfo_file( $finfo, $file_path );
-				finfo_close( $finfo );
 				if ( $mime && strpos( $mime, '/' ) !== false ) {
 					return $mime;
 				}

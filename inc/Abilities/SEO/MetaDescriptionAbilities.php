@@ -346,6 +346,7 @@ class MetaDescriptionAbilities {
 			$args = array_merge( $post_types, array( $limit ) );
 		}
 
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query shape is selected from fixed strings above; values are prepared.
 		$results = $wpdb->get_col( $wpdb->prepare( $sql, $args ) );
 
 		return array_map( 'absint', $results ? $results : array() );
