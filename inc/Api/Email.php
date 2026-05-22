@@ -399,6 +399,7 @@ class Email {
 		);
 	}
 
+	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- REST permission callbacks receive the request by contract.
 	public static function check_permission( \WP_REST_Request $request ): bool {
 		return PermissionHelper::can_manage();
 	}
@@ -633,6 +634,7 @@ class Email {
 		return self::to_response( $result );
 	}
 
+	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- REST callback signature receives the request by contract.
 	public static function handle_test_connection( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
 		$ability = wp_get_ability( 'datamachine/email-test-connection' );
 		if ( ! $ability ) {

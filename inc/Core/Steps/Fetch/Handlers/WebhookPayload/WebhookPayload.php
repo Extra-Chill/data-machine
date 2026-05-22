@@ -145,6 +145,7 @@ class WebhookPayload extends FetchHandler {
 	private static function getRequiredPath( array $payload, string $path ) {
 		$value = self::getPath( $payload, $path );
 		if ( null === $value ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 			throw new \UnexpectedValueException( sprintf( 'Missing webhook payload path "%s".', $path ) );
 		}
 

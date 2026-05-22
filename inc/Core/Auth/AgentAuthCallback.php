@@ -168,6 +168,7 @@ class AgentAuthCallback {
 	 * @param \WP_REST_Request $request Request object.
 	 * @return \WP_REST_Response
 	 */
+	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- REST callback signature receives the request by contract.
 	public function list_external_tokens( \WP_REST_Request $request ): \WP_REST_Response {
 		$tokens = get_option( self::OPTION_KEY, array() );
 		$result = array();
@@ -327,8 +328,8 @@ class AgentAuthCallback {
 			width: 48px;
 			height: 48px;
 			border-radius: 50%;
-			background: ' . $bg_color . ';
-			color: ' . $color . ';
+			background: ' . esc_attr( $bg_color ) . ';
+			color: ' . esc_attr( $color ) . ';
 			font-size: 1.5rem;
 			line-height: 48px;
 			margin: 0 auto 1rem;
@@ -358,9 +359,9 @@ class AgentAuthCallback {
 </head>
 <body>
 	<div class="result-container">
-		<div class="result-icon">' . $icon . '</div>
+		<div class="result-icon">' . esc_html( $icon ) . '</div>
 		<h1>' . esc_html( $title ) . '</h1>
-		<p class="message">' . $message . '</p>
+		<p class="message">' . wp_kses_post( $message ) . '</p>
 		<p class="close-hint">You can close this window.</p>
 	</div>
 </body>

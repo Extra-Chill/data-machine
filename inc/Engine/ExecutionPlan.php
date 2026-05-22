@@ -42,11 +42,13 @@ class ExecutionPlan {
 
 		foreach ( $flow_config as $step_id => $step_config ) {
 			if ( ! is_array( $step_config ) || ! array_key_exists( 'execution_order', $step_config ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 				throw new \InvalidArgumentException( sprintf( 'Flow step "%s" is missing execution_order.', (string) $step_id ) );
 			}
 
 			$order = self::normalize_order( $step_config['execution_order'], (string) $step_id );
 			if ( array_key_exists( $order, $steps_by_order ) ) {
+				// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 				throw new \InvalidArgumentException(
 					sprintf(
 						'Duplicate execution_order %d for flow steps "%s" and "%s".',
@@ -55,6 +57,7 @@ class ExecutionPlan {
 						(string) $step_id
 					)
 				);
+				// phpcs:enable WordPress.Security.EscapeOutput.ExceptionNotEscaped
 			}
 
 			$steps_by_order[ $order ] = (string) $step_id;
@@ -115,6 +118,7 @@ class ExecutionPlan {
 			return (int) $raw_order;
 		}
 
+		// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is not rendered directly.
 		throw new \InvalidArgumentException( sprintf( 'Flow step "%s" has invalid execution_order.', $step_id ) );
 	}
 }
