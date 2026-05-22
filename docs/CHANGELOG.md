@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.131.9] - 2026-05-22
+
+### Changed
+- Expose pipeline outcome classes
+
 ## [0.131.8] - 2026-05-22
 
 ### Fixed
