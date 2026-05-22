@@ -359,5 +359,4 @@ class OAuth1Handler {
 		$transient_key = self::TEMP_TOKEN_SECRET_PREFIX . $provider_key . '_' . $oauth_token;
 		delete_transient( $transient_key );
 	}
-
 }

@@ -40,8 +40,8 @@ final class MemorySectionPendingAction {
 		$mode     = self::mode( (string) ( $args['mode'] ?? 'append' ) );
 		$reason   = (string) ( $args['reason'] ?? '' );
 
-		$memory  = new AgentMemory( $user_id, $agent_id, $file );
-		$current = $memory->get_section( $section );
+		$memory          = new AgentMemory( $user_id, $agent_id, $file );
+		$current         = $memory->get_section( $section );
 		$current_content = ! empty( $current['success'] ) ? (string) $current['content'] : '';
 		$proposed        = 'append' === $mode && '' !== $current_content
 			? rtrim( $current_content ) . "\n" . $content

@@ -590,7 +590,7 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	 * @return array Query parameters for the authorization URL.
 	 */
 	protected function build_auth_url_params( array $state_payload = array() ): array {
-		$state = $this->oauth2->create_state( $this->provider_slug, $state_payload );
+		$state  = $this->oauth2->create_state( $this->provider_slug, $state_payload );
 		$params = array(
 			'response_type' => $this->get_oauth_response_type(),
 			'redirect_uri'  => $this->get_callback_url(),
@@ -655,5 +655,4 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 			$this->get_callback_url()
 		);
 	}
-
 }

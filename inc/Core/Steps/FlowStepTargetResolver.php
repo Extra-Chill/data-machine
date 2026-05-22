@@ -88,8 +88,8 @@ class FlowStepTargetResolver {
 		return array(
 			'success' => false,
 			'error'   => array(
-				$field   => $value,
-				'error'  => "No step found for {$field} '{$value}'",
+				$field  => $value,
+				'error' => "No step found for {$field} '{$value}'",
 			),
 		);
 	}

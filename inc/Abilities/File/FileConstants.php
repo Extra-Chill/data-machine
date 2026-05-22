@@ -93,5 +93,4 @@ class FileConstants {
 	public static function get_edit_capability( string $filename ) {
 		return MemoryFileRegistry::get_edit_capability( $filename );
 	}
-
 }
