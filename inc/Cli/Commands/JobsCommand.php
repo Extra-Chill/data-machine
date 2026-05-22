@@ -21,6 +21,7 @@ use DataMachine\Abilities\Job\GetJobsAbility;
 use DataMachine\Abilities\Job\JobsSummaryAbility;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
+use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 use DataMachine\Abilities\Job\RunMetricsAbility;
 use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\RunMetrics;
@@ -306,6 +307,7 @@ class JobsCommand extends BaseCommand {
 			'total'             => 0,
 			'active_processing' => 0,
 			'queued_next_step'  => 0,
+			'waiting_children'  => 0,
 			'scheduler_starved' => 0,
 			'stale_in_progress' => 0,
 			'no_scheduler_path' => 0,
@@ -343,10 +345,11 @@ class JobsCommand extends BaseCommand {
 		if ( 'table' === $format ) {
 			WP_CLI::log(
 				sprintf(
-					'Inspected %d processing jobs: %d active, %d queued, %d scheduler-starved, %d stale in-progress, %d without scheduler path.',
+					'Inspected %d processing jobs: %d active, %d queued, %d waiting on children, %d scheduler-starved, %d stale in-progress, %d without scheduler path.',
 					$summary['total'],
 					$summary['active_processing'],
 					$summary['queued_next_step'],
+					$summary['waiting_children'],
 					$summary['scheduler_starved'],
 					$summary['stale_in_progress'],
 					$summary['no_scheduler_path']
@@ -704,7 +707,7 @@ class JobsCommand extends BaseCommand {
 	 */
 	private function diagnose_job_liveness( array $job, int $overdue_minutes ): array {
 		$job_id  = (int) ( $job['job_id'] ?? 0 );
-		$actions = $this->get_job_step_actions( $job_id );
+		$actions = $this->get_job_scheduler_actions( $job_id );
 
 		$pending     = array_values( array_filter( $actions, fn( $action ) => 'pending' === ( $action['status'] ?? '' ) ) );
 		$in_progress = array_values( array_filter( $actions, fn( $action ) => 'in-progress' === ( $action['status'] ?? '' ) ) );
@@ -717,6 +720,16 @@ class JobsCommand extends BaseCommand {
 		$oldest_pending_age  = $this->minutes_since( $oldest_pending );
 		$oldest_progress_age = $this->minutes_since( $oldest_in_progress );
 
+		$engine_data = json_decode( (string) ( $job['engine_data'] ?? '' ), true );
+		if ( ! is_array( $engine_data ) ) {
+			$engine_data = array();
+		}
+
+		$child_counts    = ! empty( $engine_data['batch'] ) ? $this->get_child_status_counts( $job_id ) : array();
+		$active_children = (int) ( $child_counts['active'] ?? 0 );
+		$total_children  = (int) ( $child_counts['total'] ?? 0 );
+		$batch_total     = (int) ( $engine_data['batch_total'] ?? 0 );
+
 		if ( ! empty( $in_progress ) && $oldest_progress_age > $overdue_minutes ) {
 			$classification = 'stale_in_progress';
 		} elseif ( ! empty( $in_progress ) ) {
@@ -725,14 +738,12 @@ class JobsCommand extends BaseCommand {
 			$classification = 'scheduler_starved';
 		} elseif ( ! empty( $pending ) ) {
 			$classification = 'queued_next_step';
+		} elseif ( $active_children > 0 || ( $batch_total > 0 && $total_children < $batch_total ) ) {
+			$classification = 'waiting_children';
 		} else {
 			$classification = 'no_scheduler_path';
 		}
 
-		$engine_data = json_decode( (string) ( $job['engine_data'] ?? '' ), true );
-		if ( ! is_array( $engine_data ) ) {
-			$engine_data = array();
-		}
 		$last_activity = $engine_data['run_metrics']['last_activity_at'] ?? null;
 
 		return array(
@@ -748,6 +759,9 @@ class JobsCommand extends BaseCommand {
 			'in_progress_actions' => count( $in_progress ),
 			'complete_actions'    => count( $complete ),
 			'failed_actions'      => count( $failed ),
+			'child_jobs'          => $total_children,
+			'active_children'     => $active_children,
+			'batch_total'         => $batch_total,
 			'oldest_pending'      => $oldest_pending,
 			'oldest_in_progress'  => $oldest_in_progress,
 			'latest_attempt'      => $latest_attempt,
@@ -755,31 +769,34 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Get Action Scheduler execute-step actions for a job.
+	 * Get Action Scheduler actions that can advance a job.
 	 *
 	 * @param int $job_id Job ID.
 	 * @return array<int,array<string,mixed>>
 	 */
-	private function get_job_step_actions( int $job_id ): array {
+	private function get_job_scheduler_actions( int $job_id ): array {
 		global $wpdb;
 
 		if ( $job_id <= 0 ) {
 			return array();
 		}
 
-		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
-		$like_job_id   = '%"job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
+		$actions_table      = $wpdb->prefix . 'actionscheduler_actions';
+		$like_job_id        = '%"job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
+		$like_parent_job_id = '%"parent_job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT action_id, hook, status, scheduled_date_gmt, last_attempt_gmt, attempts, args
 				 FROM {$actions_table}
-				 WHERE hook = %s
-				 AND args LIKE %s
+				 WHERE hook IN (%s, %s)
+				 AND (args LIKE %s OR args LIKE %s)
 				 ORDER BY action_id ASC",
 				'datamachine_execute_step',
-				$like_job_id
+				PipelineBatchScheduler::BATCH_HOOK,
+				$like_job_id,
+				$like_parent_job_id
 			),
 			ARRAY_A
 		);
@@ -796,6 +813,41 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
+	 * Count child jobs for a batch parent.
+	 *
+	 * @param int $parent_job_id Parent job ID.
+	 * @return array<string,int>
+	 */
+	private function get_child_status_counts( int $parent_job_id ): array {
+		global $wpdb;
+
+		if ( $parent_job_id <= 0 ) {
+			return array();
+		}
+
+		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT
+					COUNT(*) as total,
+					SUM(CASE WHEN status = 'processing' OR status = 'pending' THEN 1 ELSE 0 END) as active
+				 FROM {$jobs_table}
+				 WHERE parent_job_id = %d",
+				$parent_job_id
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		return array(
+			'total'  => (int) ( $row['total'] ?? 0 ),
+			'active' => (int) ( $row['active'] ?? 0 ),
+		);
+	}
+
+	/**
 	 * Extract job ID from an Action Scheduler args payload.
 	 *
 	 * @param string $args Action args.
@@ -808,9 +860,17 @@ class JobsCommand extends BaseCommand {
 				return (int) $decoded['job_id'];
 			}
 
+			if ( isset( $decoded['parent_job_id'] ) && is_numeric( $decoded['parent_job_id'] ) ) {
+				return (int) $decoded['parent_job_id'];
+			}
+
 			foreach ( $decoded as $value ) {
 				if ( is_array( $value ) && isset( $value['job_id'] ) && is_numeric( $value['job_id'] ) ) {
 					return (int) $value['job_id'];
+				}
+
+				if ( is_array( $value ) && isset( $value['parent_job_id'] ) && is_numeric( $value['parent_job_id'] ) ) {
+					return (int) $value['parent_job_id'];
 				}
 			}
 		}
@@ -821,9 +881,17 @@ class JobsCommand extends BaseCommand {
 				return (int) $unserialized['job_id'];
 			}
 
+			if ( isset( $unserialized['parent_job_id'] ) && is_numeric( $unserialized['parent_job_id'] ) ) {
+				return (int) $unserialized['parent_job_id'];
+			}
+
 			foreach ( $unserialized as $value ) {
 				if ( is_array( $value ) && isset( $value['job_id'] ) && is_numeric( $value['job_id'] ) ) {
 					return (int) $value['job_id'];
+				}
+
+				if ( is_array( $value ) && isset( $value['parent_job_id'] ) && is_numeric( $value['parent_job_id'] ) ) {
+					return (int) $value['parent_job_id'];
 				}
 			}
 		}
