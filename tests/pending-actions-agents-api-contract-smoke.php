@@ -114,6 +114,9 @@ echo "\n[3] List/get/summary surfaces are registered for agents and operators:\n
 foreach ( array( 'datamachine/list-pending-actions', 'datamachine/get-pending-action', 'datamachine/summarize-pending-actions' ) as $ability ) {
 	datamachine_pending_actions_assert( str_contains( $inspection_source, $ability ), $ability . ' ability is registered', $failures, $passes );
 }
+foreach ( array( 'agents_list_pending_actions', 'agents_get_pending_action', 'agents_summary_pending_actions' ) as $canonical_callback ) {
+	datamachine_pending_actions_assert( str_contains( $inspection_source, $canonical_callback ), 'Data Machine pending-action alias delegates to Agents API ' . $canonical_callback, $failures, $passes );
+}
 foreach ( array( '/actions', '/actions/(?P<action_id>', '/actions/summary' ) as $route ) {
 	datamachine_pending_actions_assert( str_contains( $inspection_source, $route ), $route . ' REST route is registered', $failures, $passes );
 }
