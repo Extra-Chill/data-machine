@@ -262,16 +262,34 @@ class GoogleAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	/**
 	 * Update credentials with new tokens.
 	 *
+	 * Merges the refreshed token fields into the existing stored account so
+	 * non-refresh fields (notably `scope` and `last_verified_at`, set at initial
+	 * consent) survive a refresh_token grant. Google's refresh-token grant
+	 * response does NOT echo `scope` back — only the initial authorization-code
+	 * exchange does — so rebuilding the account dict from scratch silently
+	 * dropped scope and any other previously-stored fields, making downstream
+	 * `has_scope()` checks return false and surfacing a misleading
+	 * "re-authenticate" error until the next refresh wiped scope again.
+	 *
+	 * See data-machine#2167. This is the per-provider (Option A) fix; the
+	 * storage-layer merge-semantics fix that would protect every OAuth
+	 * provider from the same footgun is tracked separately.
+	 *
 	 * @param string $access_token New access token
 	 * @param string $refresh_token Refresh token
 	 * @param int $expires_in Token expiry time in seconds
 	 */
 	private function update_credentials( string $access_token, string $refresh_token, int $expires_in ) {
-		$account_data = array(
-			'access_token' => $access_token,
-			'refresh_token' => $refresh_token,
-			'expires_at' => time() + $expires_in,
-			'last_refreshed_at' => time(),
+		$existing = $this->get_account();
+
+		$account_data = array_merge(
+			is_array( $existing ) ? $existing : array(),
+			array(
+				'access_token'      => $access_token,
+				'refresh_token'     => $refresh_token,
+				'expires_at'        => time() + $expires_in,
+				'last_refreshed_at' => time(),
+			)
 		);
 
 		$this->save_account( $account_data );
