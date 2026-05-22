@@ -183,7 +183,12 @@ class Flows extends BaseRepository {
 			}
 		}
 
-		$flow_config       = wp_json_encode( $flow_data['flow_config'] );
+		$flow_config = $this->prepare_flow_config_for_save( $flow_data['flow_config'], 0, $flow_data );
+		if ( false === $flow_config ) {
+			return false;
+		}
+
+		$flow_config       = wp_json_encode( $flow_config );
 		$scheduling_config = wp_json_encode( $flow_data['scheduling_config'] );
 
 		$user_id  = isset( $flow_data['user_id'] ) ? absint( $flow_data['user_id'] ) : 0;
@@ -791,7 +796,12 @@ class Flows extends BaseRepository {
 		}
 
 		if ( isset( $flow_data['flow_config'] ) ) {
-			$update_data['flow_config'] = wp_json_encode( $flow_data['flow_config'] );
+			$flow_config = $this->prepare_flow_config_for_save( $flow_data['flow_config'], $flow_id, $flow_data );
+			if ( false === $flow_config ) {
+				return false;
+			}
+
+			$update_data['flow_config'] = wp_json_encode( $flow_config );
 			$update_formats[]           = '%s';
 		}
 
@@ -854,6 +864,32 @@ class Flows extends BaseRepository {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Apply the flow-config write-boundary filter before persisting JSON.
+	 *
+	 * @param array<string,mixed> $flow_config Flow config payload.
+	 * @param int                 $flow_id     Flow ID, or 0 while creating a new flow.
+	 * @param array<string,mixed> $flow_data   Full create/update payload.
+	 * @return array<string,mixed>|false Filtered flow config, or false when rejected.
+	 */
+	private function prepare_flow_config_for_save( array $flow_config, int $flow_id, array $flow_data ) {
+		$filtered_config = apply_filters( 'datamachine_flow_config_pre_save', $flow_config, $flow_id, $flow_data );
+		if ( is_wp_error( $filtered_config ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'flow_config rejected by datamachine_flow_config_pre_save filter',
+				array(
+					'flow_id' => $flow_id,
+					'reason'  => $filtered_config->get_error_message(),
+				)
+			);
+			return false;
+		}
+
+		return is_array( $filtered_config ) ? $filtered_config : $flow_config;
 	}
 
 	/**
