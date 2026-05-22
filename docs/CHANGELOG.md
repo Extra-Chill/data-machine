@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.131.10] - 2026-05-22
+
+### Fixed
+- avoid runtime-branded agent descriptions
+
 ## [0.131.9] - 2026-05-22
 
 ### Changed
