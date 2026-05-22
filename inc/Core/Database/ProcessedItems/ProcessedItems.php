@@ -1,5 +1,4 @@
 <?php
-// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns custom operational tables and these paths require fresh runtime state or one-time schema mutation.
 /**
  * ProcessedItems database service - prevents duplicate processing at flow step level.
  *
@@ -116,7 +115,7 @@ class ProcessedItems extends BaseRepository {
 				self::STATUS_PROCESSED
 			)
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 
 		if ( null === $value || '' === $value ) {
 			return null;
