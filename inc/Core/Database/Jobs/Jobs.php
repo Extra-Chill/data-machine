@@ -278,6 +278,7 @@ class Jobs extends BaseRepository {
 		$order    = strtoupper( $args['order'] ?? 'DESC' );
 		$per_page = (int) ( $args['per_page'] ?? 20 );
 		$offset   = (int) ( $args['offset'] ?? 0 );
+		$fields   = $args['fields'] ?? null;
 
 		$pipelines_table = $this->wpdb->prefix . 'datamachine_pipelines';
 		$flows_table     = $this->wpdb->prefix . 'datamachine_flows';
@@ -364,22 +365,68 @@ class Jobs extends BaseRepository {
 			$where_sql = 'WHERE ' . implode( ' AND ', $where_clauses );
 		}
 
+		$select_fields       = 'j.*, p.pipeline_name, f.flow_name';
+		$include_child_count = true;
+		$decode_engine_data  = true;
+
+		if ( is_array( $fields ) && ! empty( $fields ) ) {
+			$allowed_fields = array(
+				'job_id'        => 'j.job_id',
+				'user_id'       => 'j.user_id',
+				'pipeline_id'   => 'j.pipeline_id',
+				'flow_id'       => 'j.flow_id',
+				'source'        => 'j.source',
+				'label'         => 'j.label',
+				'parent_job_id' => 'j.parent_job_id',
+				'status'        => 'j.status',
+				'engine_data'   => 'j.engine_data',
+				'created_at'    => 'j.created_at',
+				'completed_at'  => 'j.completed_at',
+				'pipeline_name' => 'p.pipeline_name',
+				'flow_name'     => 'f.flow_name',
+			);
+
+			$requested_fields = array_values( array_unique( array_filter( array_map( 'strval', $fields ) ) ) );
+			if ( ! in_array( 'job_id', $requested_fields, true ) ) {
+				$requested_fields[] = 'job_id';
+			}
+
+			$select_parts = array();
+			foreach ( $requested_fields as $field ) {
+				if ( isset( $allowed_fields[ $field ] ) ) {
+					$select_parts[] = $allowed_fields[ $field ] . ' AS ' . $field;
+				}
+			}
+
+			if ( ! empty( $select_parts ) ) {
+				$select_fields       = implode( ', ', $select_parts );
+				$include_child_count = in_array( 'child_count', $requested_fields, true );
+				$decode_engine_data  = in_array( 'engine_data', $requested_fields, true );
+			}
+		}
+
+		$child_count_select = $include_child_count
+			? ', (SELECT COUNT(*) FROM %i c WHERE c.parent_job_id = j.job_id) AS child_count'
+			: '';
+		$query_tables       = $include_child_count
+			? array( $this->table_name, $this->table_name, $pipelines_table, $flows_table )
+			: array( $this->table_name, $pipelines_table, $flows_table );
+
 		// Note: orderby is validated above, so safe to interpolate.
 		// For direct execution jobs, LEFT JOINs will return NULL for pipeline_name/flow_name.
 		// JOIN uses j.pipeline_id (varchar) directly against CAST of p.pipeline_id (int) to varchar
 		// for index-friendly matching on the jobs table side.
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		$query = $this->wpdb->prepare(
-			"SELECT j.*, p.pipeline_name, f.flow_name,
-                 (SELECT COUNT(*) FROM %i c WHERE c.parent_job_id = j.job_id) AS child_count
-             FROM %i j
-             LEFT JOIN %i p ON j.pipeline_id = p.pipeline_id
-             LEFT JOIN %i f ON j.flow_id = f.flow_id
-             {$where_sql}
-             ORDER BY {$orderby} {$order}
-             LIMIT %d OFFSET %d",
+			"SELECT {$select_fields}{$child_count_select}
+			 FROM %i j
+			 LEFT JOIN %i p ON j.pipeline_id = p.pipeline_id
+			 LEFT JOIN %i f ON j.flow_id = f.flow_id
+			 {$where_sql}
+			 ORDER BY {$orderby} {$order}
+			 LIMIT %d OFFSET %d",
 			array_merge(
-				array( $this->table_name, $this->table_name, $pipelines_table, $flows_table ),
+				$query_tables,
 				$where_values,
 				array( $per_page, $offset )
 			)
@@ -388,7 +435,7 @@ class Jobs extends BaseRepository {
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above
 		$results = $this->wpdb->get_results( $query, ARRAY_A );
-		if ( $results ) {
+		if ( $results && $decode_engine_data ) {
 			foreach ( $results as &$result ) {
 				if ( isset( $result['engine_data'] ) && is_string( $result['engine_data'] ) && '' !== $result['engine_data'] ) {
 					$decoded               = json_decode( $result['engine_data'], true );

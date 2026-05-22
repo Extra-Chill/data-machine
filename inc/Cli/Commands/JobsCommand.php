@@ -1036,6 +1036,7 @@ class JobsCommand extends BaseCommand {
 		$pipeline_id = isset( $assoc_args['pipeline'] ) ? (int) $assoc_args['pipeline'] : null;
 		$limit       = (int) ( $assoc_args['limit'] ?? 20 );
 		$format      = $assoc_args['format'] ?? 'table';
+		$fields      = $this->parse_job_list_fields( $assoc_args['fields'] ?? '' );
 
 		if ( $limit < 1 ) {
 			$limit = 20;
@@ -1086,6 +1087,15 @@ class JobsCommand extends BaseCommand {
 			$input['since'] = gmdate( 'Y-m-d H:i:s', $timestamp );
 		}
 
+		if ( 'count' === $format ) {
+			WP_CLI::line( (string) ( new Jobs() )->get_jobs_count( $input ) );
+			return;
+		}
+
+		if ( ! empty( $fields ) ) {
+			$input['fields'] = $this->get_database_fields_for_job_list_fields( $fields );
+		}
+
 		$result = ( new GetJobsAbility() )->execute( $input );
 
 		if ( ! $result['success'] ) {
@@ -1119,7 +1129,11 @@ class JobsCommand extends BaseCommand {
 
 		// Transform jobs to flat row format.
 		$items = array_map(
-			function ( $j ) use ( $format ) {
+			function ( $j ) use ( $format, $fields ) {
+				if ( ! empty( $fields ) ) {
+					return $this->format_requested_job_list_fields( $j, $fields );
+				}
+
 				$source         = $j['source'] ?? 'pipeline';
 				$status_display = strlen( $j['status'] ?? '' ) > 40 ? substr( $j['status'], 0, 40 ) . '...' : ( $j['status'] ?? '' );
 
@@ -1153,6 +1167,11 @@ class JobsCommand extends BaseCommand {
 			$jobs
 		);
 
+		if ( ! empty( $fields ) ) {
+			$this->format_items( $items, $fields, $assoc_args, 'id' );
+			return;
+		}
+
 		if ( 'json' === $format ) {
 			WP_CLI::log( wp_json_encode( $items, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
@@ -1163,6 +1182,100 @@ class JobsCommand extends BaseCommand {
 		if ( 'table' === $format ) {
 			WP_CLI::log( sprintf( 'Showing %d jobs.', count( $jobs ) ) );
 		}
+	}
+
+	/**
+	 * Parse comma-separated list fields.
+	 */
+	private function parse_job_list_fields( string $fields ): array {
+		if ( '' === trim( $fields ) ) {
+			return array();
+		}
+
+		$parsed = array();
+		foreach ( explode( ',', $fields ) as $field ) {
+			$field = sanitize_key( trim( $field ) );
+			if ( '' !== $field ) {
+				$parsed[] = $field;
+			}
+		}
+
+		return array_values( array_unique( $parsed ) );
+	}
+
+	/**
+	 * Translate CLI output fields to the minimum job table fields needed.
+	 */
+	private function get_database_fields_for_job_list_fields( array $fields ): array {
+		$field_map = array(
+			'id'            => array( 'job_id' ),
+			'job_id'        => array( 'job_id' ),
+			'user_id'       => array( 'user_id' ),
+			'pipeline_id'   => array( 'pipeline_id' ),
+			'flow_id'       => array( 'flow_id' ),
+			'source'        => array( 'source' ),
+			'label'         => array( 'label' ),
+			'parent_job_id' => array( 'parent_job_id' ),
+			'status'        => array( 'status' ),
+			'created'       => array( 'created_at' ),
+			'created_at'    => array( 'created_at' ),
+			'completed'     => array( 'completed_at' ),
+			'completed_at'  => array( 'completed_at' ),
+			'flow'          => array( 'source', 'label', 'flow_id', 'flow_name' ),
+			'pipeline_name' => array( 'pipeline_name' ),
+			'flow_name'     => array( 'flow_name' ),
+			'handler_slug'  => array( 'status', 'engine_data' ),
+			'outcome'       => array( 'status', 'engine_data' ),
+			'step_results'  => array( 'status', 'engine_data' ),
+			'counts'        => array( 'status', 'engine_data' ),
+		);
+
+		$database_fields = array( 'job_id' );
+		foreach ( $fields as $field ) {
+			foreach ( $field_map[ $field ] ?? array( $field ) as $database_field ) {
+				$database_fields[] = $database_field;
+			}
+		}
+
+		return array_values( array_unique( $database_fields ) );
+	}
+
+	/**
+	 * Build one low-memory CLI output row for an explicit --fields list.
+	 */
+	private function format_requested_job_list_fields( array $job, array $fields ): array {
+		$item    = array();
+		$metrics = null;
+
+		foreach ( $fields as $field ) {
+			switch ( $field ) {
+				case 'id':
+					$item[ $field ] = $job['job_id'] ?? '';
+					break;
+				case 'created':
+					$item[ $field ] = $job['created_at'] ?? '';
+					break;
+				case 'completed':
+					$item[ $field ] = $job['completed_at'] ?? '-';
+					break;
+				case 'flow':
+					$item[ $field ] = 'system' === ( $job['source'] ?? 'pipeline' )
+						? ( $job['label'] ?? $job['display_label'] ?? 'System Task' )
+						: ( $job['flow_name'] ?? ( isset( $job['flow_id'] ) ? "Flow {$job['flow_id']}" : '' ) );
+					break;
+				case 'handler_slug':
+				case 'outcome':
+				case 'step_results':
+				case 'counts':
+					$metrics        = $metrics ?? RunMetrics::fromJob( $job );
+					$item[ $field ] = 'handler_slug' === $field ? ( $metrics['outcome']['handler_slug'] ?? null ) : $metrics[ $field ];
+					break;
+				default:
+					$item[ $field ] = $job[ $field ] ?? null;
+			}
+		}
+
+		return $item;
 	}
 
 	/**

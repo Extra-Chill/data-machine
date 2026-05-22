@@ -95,6 +95,11 @@ class GetJobsAbility {
 								'type'        => array( 'string', 'null' ),
 								'description' => __( 'Filter jobs created at or after this datetime (Y-m-d H:i:s)', 'data-machine' ),
 							),
+							'fields'      => array(
+								'type'        => 'array',
+								'items'       => array( 'type' => 'string' ),
+								'description' => __( 'Optional database field projection for low-memory list output.', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -143,6 +148,7 @@ class GetJobsAbility {
 		$offset      = (int) ( $input['offset'] ?? 0 );
 		$orderby     = $input['orderby'] ?? 'j.job_id';
 		$order       = $input['order'] ?? 'DESC';
+		$fields      = $input['fields'] ?? null;
 
 		// Direct job lookup by ID - bypasses pagination and filters.
 		if ( $job_id ) {
@@ -185,6 +191,10 @@ class GetJobsAbility {
 			'per_page' => $per_page,
 			'offset'   => $offset,
 		);
+
+		if ( is_array( $fields ) && ! empty( $fields ) ) {
+			$args['fields'] = $fields;
+		}
 
 		$filters_applied = array();
 
@@ -239,7 +249,9 @@ class GetJobsAbility {
 		$jobs  = $this->db_jobs->get_jobs_for_list_table( $args );
 		$total = $this->db_jobs->get_jobs_count( $args );
 
-		$jobs = $this->enrichJobNames( $jobs );
+		if ( empty( $args['fields'] ) ) {
+			$jobs = $this->enrichJobNames( $jobs );
+		}
 		$jobs = array_map( array( $this, 'addDisplayFields' ), $jobs );
 
 		return array(
