@@ -9,6 +9,7 @@ namespace DataMachine\Engine\Debug;
 
 use DataMachine\Abilities\Engine\EngineHelpers;
 use DataMachine\Abilities\Engine\RunFlowAbility;
+use DataMachine\Abilities\Engine\ScheduleNextStepAbility;
 use DataMachine\Abilities\StepTypeAbilities;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\JobStatus;
@@ -49,31 +50,31 @@ class SyncRunner {
 		$started_time = gmdate( 'c' );
 
 		$packet = array(
-			'success'         => false,
-			'mode'            => 'sync_debug',
-			'flow_id'         => $flow_id,
-			'job_id'          => null,
-			'stopped_reason'  => null,
-			'bounds'          => array(
+			'success'        => false,
+			'mode'           => 'sync_debug',
+			'flow_id'        => $flow_id,
+			'job_id'         => null,
+			'stopped_reason' => null,
+			'bounds'         => array(
 				'max_steps'       => $options['max_steps'],
 				'max_items'       => $options['max_items'],
 				'timeout_seconds' => $options['timeout_seconds'],
 			),
-			'counts'          => array(
+			'counts'         => array(
 				'steps_executed' => 0,
 				'packets_seen'   => 0,
 			),
-			'steps'           => array(),
-			'errors'          => array(),
-			'started_at'      => $started_time,
-			'completed_at'    => null,
-			'duration_ms'     => null,
+			'steps'          => array(),
+			'errors'         => array(),
+			'started_at'     => $started_time,
+			'completed_at'   => null,
+			'duration_ms'    => null,
 		);
 
-		$initial_packets = $options['input_packets'];
-		$initial_data    = empty( $initial_packets ) ? array() : array( 'sync_runner_input_packets' => $initial_packets );
-		$run_result      = $this->runFlowBootstrap( $flow_id, $initial_data );
-		$job_id          = (int) ( $run_result['job_id'] ?? 0 );
+		$initial_packets  = $options['input_packets'];
+		$initial_data     = empty( $initial_packets ) ? array() : array( 'sync_runner_input_packets' => $initial_packets );
+		$run_result       = $this->runFlowBootstrap( $flow_id, $initial_data );
+		$job_id           = (int) ( $run_result['job_id'] ?? 0 );
 		$packet['job_id'] = $job_id > 0 ? $job_id : null;
 
 		if ( empty( $run_result['success'] ) ) {
@@ -104,9 +105,9 @@ class SyncRunner {
 				break;
 			}
 
-			$step_result = $this->executeStepInline( $job_id, $current_step_id, $data_packets, $options );
+			$step_result       = $this->executeStepInline( $job_id, $current_step_id, $data_packets, $options );
 			$packet['steps'][] = $step_result['diagnostics'];
-			$packet['counts']['steps_executed']++;
+			++$packet['counts']['steps_executed'];
 			$packet['counts']['packets_seen'] += $step_result['output_count'];
 
 			if ( ! empty( $step_result['error'] ) ) {
@@ -152,7 +153,6 @@ class SyncRunner {
 	 */
 	private function runFlowBootstrap( int $flow_id, array $initial_data ): array {
 		$this->captured_schedules = array();
-		$previous_hook            = $GLOBALS['wp_filter']['datamachine_schedule_next_step'] ?? null;
 
 		\remove_all_actions( 'datamachine_schedule_next_step' );
 		\add_action(
@@ -177,14 +177,33 @@ class SyncRunner {
 			);
 		} finally {
 			\remove_all_actions( 'datamachine_schedule_next_step' );
-			if ( null === $previous_hook ) {
-				unset( $GLOBALS['wp_filter']['datamachine_schedule_next_step'] );
-			} else {
-				$GLOBALS['wp_filter']['datamachine_schedule_next_step'] = $previous_hook;
-			}
+			$this->restoreProductionScheduleNextStepHook();
 		}
 
-		return is_array( $result ?? null ) ? $result : array( 'success' => false, 'error' => 'Flow bootstrap returned no result.' );
+		return is_array( $result ?? null ) ? $result : array(
+			'success' => false,
+			'error'   => 'Flow bootstrap returned no result.',
+		);
+	}
+
+	/**
+	 * Restore the production schedule bridge after temporary CLI capture.
+	 */
+	private function restoreProductionScheduleNextStepHook(): void {
+		\add_action(
+			'datamachine_schedule_next_step',
+			static function ( $job_id, $flow_step_id, $data_packets = array() ): void {
+				( new ScheduleNextStepAbility() )->execute(
+					array(
+						'job_id'       => (int) $job_id,
+						'flow_step_id' => (string) $flow_step_id,
+						'data_packets' => is_array( $data_packets ) ? $data_packets : array(),
+					)
+				);
+			},
+			10,
+			3
+		);
 	}
 
 	/**
@@ -276,8 +295,8 @@ class SyncRunner {
 		return array(
 			'diagnostics'    => $diagnostics,
 			'data_packets'   => $output_packets,
-			'output_count'    => $output_count,
-			'next_step_id'    => $next_step_id,
+			'output_count'   => $output_count,
+			'next_step_id'   => $next_step_id,
 			'stopped_reason' => $reason,
 			'error'          => null,
 		);
@@ -297,8 +316,8 @@ class SyncRunner {
 				'error'        => $error,
 			),
 			'data_packets'   => array(),
-			'output_count'    => 0,
-			'next_step_id'    => null,
+			'output_count'   => 0,
+			'next_step_id'   => null,
 			'stopped_reason' => 'error',
 			'error'          => $error,
 		);
@@ -310,7 +329,7 @@ class SyncRunner {
 	private function summarizePackets( array $packets ): array {
 		$summaries = array();
 		foreach ( $packets as $index => $packet ) {
-			$metadata = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
+			$metadata    = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
 			$summaries[] = array(
 				'index'           => $index,
 				'type'            => (string) ( $packet['type'] ?? ( $metadata['type'] ?? 'unknown' ) ),

@@ -96,7 +96,7 @@ class BaseCommand extends WP_CLI_Command {
 	 * @return array<int, array> Packet list.
 	 */
 	private function read_sync_input_packets( string $input_file ): array {
-		$contents = file_get_contents( $input_file );
+		$contents = file_get_contents( $input_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- CLI reads a local JSON path supplied by --input-file.
 		if ( false === $contents ) {
 			WP_CLI::error( sprintf( 'Unable to read input file: %s', $input_file ) );
 		}

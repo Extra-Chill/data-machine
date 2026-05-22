@@ -392,9 +392,9 @@ class PipelinesCommand extends BaseCommand {
 	private function runPipelineSync( int $pipeline_id, array $assoc_args ): void {
 		$result = ( new GetPipelinesAbility() )->execute(
 			array(
-				'pipeline_id'    => $pipeline_id,
-				'output_mode'    => 'full',
-				'include_flows'  => true,
+				'pipeline_id'   => $pipeline_id,
+				'output_mode'   => 'full',
+				'include_flows' => true,
 			)
 		);
 
@@ -409,8 +409,8 @@ class PipelinesCommand extends BaseCommand {
 			return;
 		}
 
-		$format = (string) ( $assoc_args['format'] ?? 'json' );
-		$packet = ( new SyncRunner() )->runFlow( (int) $flows[0]['flow_id'], $this->build_sync_runner_options( $assoc_args ) );
+		$format                = (string) ( $assoc_args['format'] ?? 'json' );
+		$packet                = ( new SyncRunner() )->runFlow( (int) $flows[0]['flow_id'], $this->build_sync_runner_options( $assoc_args ) );
 		$packet['pipeline_id'] = $pipeline_id;
 		$this->output_sync_runner_packet( $packet, $format );
 	}
