@@ -180,7 +180,10 @@ class AgentAuthMiddleware {
 		// Set agent execution context in PermissionHelper.
 		// This adds the agent_id scoping layer and the Agents API capability ceiling.
 		$token_capabilities = $token instanceof \WP_Agent_Token ? $token->allowed_capabilities : null;
-		PermissionHelper::set_agent_context( $agent_id, $owner_id, $token_capabilities, $token_id );
+		$token_scope        = $token instanceof \WP_Agent_Token && isset( $token->metadata['datamachine_scope'] ) && is_array( $token->metadata['datamachine_scope'] )
+			? $token->metadata['datamachine_scope']
+			: $token_capabilities;
+		PermissionHelper::set_agent_context( $agent_id, $owner_id, $token_scope, $token_id );
 		PermissionHelper::set_execution_principal( $principal );
 
 		// Expose the caller context for downstream code (ChatOrchestrator,

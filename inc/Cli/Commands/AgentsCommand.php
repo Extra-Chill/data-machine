@@ -880,7 +880,9 @@ class AgentsCommand extends AgentBundleCommand {
 			WP_CLI::log( sprintf( 'Expires in:  %d days', $days ) );
 		}
 		if ( null !== $capabilities ) {
-			WP_CLI::log( sprintf( 'Capabilities: %s', implode( ', ', $capabilities ) ) );
+			$scope = \DataMachine\Core\Database\Agents\AgentTokens::normalize_capability_payload( $capabilities );
+			WP_CLI::log( sprintf( 'Scope:       %s', \DataMachine\Core\Database\Agents\AgentTokens::scope_label( $capabilities ) ) );
+			WP_CLI::log( sprintf( 'Capabilities: %s', implode( ', ', $scope['allowed_capabilities'] ?? array() ) ) );
 		}
 	}
 
@@ -924,13 +926,14 @@ class AgentsCommand extends AgentBundleCommand {
 				'token_id'  => $token['token_id'],
 				'prefix'    => $token['token_prefix'] . '...',
 				'label'     => ! empty( $token['label'] ) ? $token['label'] : '(none)',
+				'scope'     => $token['scope_label'] ?? 'Full owner ceiling',
 				'last_used' => $token['last_used_at'] ?? 'never',
 				'expires'   => $token['expires_at'] ?? 'never',
 				'status'    => $expired ? 'expired' : 'active',
 			);
 		}
 
-		$this->format_items( $items, array( 'token_id', 'prefix', 'label', 'last_used', 'expires', 'status' ), $assoc_args, 'token_id' );
+		$this->format_items( $items, array( 'token_id', 'prefix', 'label', 'scope', 'last_used', 'expires', 'status' ), $assoc_args, 'token_id' );
 	}
 
 	/**

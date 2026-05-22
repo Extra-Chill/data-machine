@@ -100,6 +100,8 @@ class AgentTokens extends BaseRepository implements \WP_Agent_Token_Store {
 			return null;
 		}
 
+		$scope = self::normalize_capability_payload( $capabilities );
+
 		try {
 			$token = $this->create_token(
 				new \WP_Agent_Token(
@@ -109,13 +111,18 @@ class AgentTokens extends BaseRepository implements \WP_Agent_Token_Store {
 					$token_hash,
 					$prefix,
 					sanitize_text_field( $label ),
-					$capabilities,
+					$scope['allowed_capabilities'],
 					$expires_at,
 					null,
 					current_time( 'mysql', true ),
 					null,
 					null,
-					array( 'agent_slug' => $agent_slug )
+					array_filter(
+						array(
+							'agent_slug'        => $agent_slug,
+							'datamachine_scope' => $scope['stored_payload'],
+						)
+					)
 				)
 			);
 		} catch ( \Throwable $e ) {
@@ -136,12 +143,16 @@ class AgentTokens extends BaseRepository implements \WP_Agent_Token_Store {
 	public function create_token( \WP_Agent_Token $token ): \WP_Agent_Token {
 		$agent_id = (int) $token->agent_id;
 
+		$scope_payload = isset( $token->metadata['datamachine_scope'] ) && is_array( $token->metadata['datamachine_scope'] )
+			? $token->metadata['datamachine_scope']
+			: $token->allowed_capabilities;
+
 		$insert_data = array(
 			'agent_id'     => $agent_id,
 			'token_hash'   => $token->token_hash,
 			'token_prefix' => $token->token_prefix,
 			'label'        => sanitize_text_field( $token->label ),
-			'capabilities' => null !== $token->allowed_capabilities ? wp_json_encode( $token->allowed_capabilities ) : null,
+			'capabilities' => null !== $scope_payload ? wp_json_encode( $scope_payload ) : null,
 			'expires_at'   => $token->expires_at,
 			'created_at'   => $token->created_at ?? current_time( 'mysql', true ),
 		);
@@ -322,9 +333,15 @@ class AgentTokens extends BaseRepository implements \WP_Agent_Token_Store {
 		}
 
 		$capabilities = null;
+		$metadata     = array( 'agent_slug' => (string) $agent['agent_slug'] );
 		if ( ! empty( $row['capabilities'] ) ) {
-			$decoded      = json_decode( (string) $row['capabilities'], true );
-			$capabilities = is_array( $decoded ) ? array_values( array_map( 'strval', $decoded ) ) : null;
+			$decoded = json_decode( (string) $row['capabilities'], true );
+			$scope   = is_array( $decoded ) ? self::normalize_capability_payload( $decoded ) : self::normalize_capability_payload( null );
+
+			$capabilities = $scope['allowed_capabilities'];
+			if ( null !== $scope['stored_payload'] ) {
+				$metadata['datamachine_scope'] = $scope['stored_payload'];
+			}
 		}
 
 		return new \WP_Agent_Token(
@@ -340,7 +357,97 @@ class AgentTokens extends BaseRepository implements \WP_Agent_Token_Store {
 			isset( $row['created_at'] ) ? (string) $row['created_at'] : null,
 			null,
 			null,
-			array( 'agent_slug' => (string) $agent['agent_slug'] )
+			$metadata
 		);
+	}
+
+	/**
+	 * Normalize legacy flat capability arrays and structured Data Machine scopes.
+	 *
+	 * The database column remains the source of truth. Structured payloads are
+	 * preserved for audit/UI while Agents API receives only raw WP capability
+	 * strings for its generic capability ceiling object.
+	 *
+	 * @param array|null $payload Stored or requested capability payload.
+	 * @return array{allowed_capabilities: ?array<int,string>, stored_payload: ?array}
+	 */
+	public static function normalize_capability_payload( ?array $payload ): array {
+		if ( null === $payload ) {
+			return array(
+				'allowed_capabilities' => null,
+				'stored_payload'       => null,
+			);
+		}
+
+		$is_structured = array_keys( $payload ) !== range( 0, count( $payload ) - 1 );
+		if ( ! $is_structured ) {
+			$capabilities = self::normalize_string_list( $payload );
+			return array(
+				'allowed_capabilities' => $capabilities,
+				'stored_payload'       => $capabilities,
+			);
+		}
+
+		$capabilities = self::normalize_string_list( $payload['capabilities'] ?? array() );
+		$stored       = array(
+			'scope'              => sanitize_key( (string) ( $payload['scope'] ?? '' ) ),
+			'label'              => sanitize_text_field( (string) ( $payload['label'] ?? '' ) ),
+			'ability_categories' => self::normalize_string_list( $payload['ability_categories'] ?? array() ),
+			'ability_allow'      => self::normalize_string_list( $payload['ability_allow'] ?? array() ),
+			'ability_deny'       => self::normalize_string_list( $payload['ability_deny'] ?? array() ),
+			'capabilities'       => $capabilities,
+		);
+
+		return array(
+			'allowed_capabilities' => $capabilities,
+			'stored_payload'       => $stored,
+		);
+	}
+
+	/**
+	 * Return a human-readable scope label for token audit surfaces.
+	 *
+	 * @param array|null $payload Token capability payload.
+	 */
+	public static function scope_label( ?array $payload ): string {
+		$scope = self::normalize_capability_payload( $payload );
+		if ( null === $scope['stored_payload'] ) {
+			return __( 'Full owner ceiling', 'data-machine' );
+		}
+
+		$stored = $scope['stored_payload'];
+		if ( isset( $stored['label'] ) && '' !== $stored['label'] ) {
+			return (string) $stored['label'];
+		}
+
+		if ( isset( $stored['scope'] ) && '' !== $stored['scope'] ) {
+			return ucwords( str_replace( '_', ' ', (string) $stored['scope'] ) );
+		}
+
+		return __( 'Custom scope', 'data-machine' );
+	}
+
+	/**
+	 * @param mixed $value Raw list-like value.
+	 * @return array<int,string>
+	 */
+	private static function normalize_string_list( mixed $value ): array {
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		$items = array();
+		foreach ( $value as $item ) {
+			if ( ! is_scalar( $item ) ) {
+				continue;
+			}
+
+			$item = trim( (string) $item );
+			if ( '' !== $item ) {
+				$items[] = $item;
+			}
+		}
+
+		return array_values( array_unique( $items ) );
 	}
 }
