@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.132.1] - 2026-05-22
+
+### Fixed
+- recover stale in-progress step actions
+
 ## [0.132.0] - 2026-05-22
 
 ### Added
