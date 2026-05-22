@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.132.3] - 2026-05-22
+
+### Changed
+- Classify empty AI packet diagnostics
+
 ## [0.132.2] - 2026-05-22
 
 ### Fixed
