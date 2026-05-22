@@ -88,6 +88,8 @@ $metrics = RunMetrics::fromJob(
 );
 $assert( 'base status is completed_no_items', 'completed_no_items' === $metrics['outcome']['base_status'] );
 $assert( 'no_content boolean is true', true === $metrics['outcome']['no_content'] );
+$assert( 'true empty query class is exposed', in_array( 'true_empty_query', $metrics['outcome_classes'], true ) );
+$assert( 'true empty query count is exposed', 1 === $metrics['counts']['true_empty_query'] );
 
 echo "\n[3] failed status exposes failure base status\n";
 $metrics = RunMetrics::fromJob( $job( 'failed - api-timeout', array() ) );
@@ -113,14 +115,63 @@ $metrics = RunMetrics::fromJob(
 );
 $assert( 'source_rejected boolean is true', true === $metrics['outcome']['source_rejected'] );
 $assert( 'source rejection reason is exposed', 'not relevant' === $metrics['outcome']['source_rejection_reason'] );
+$assert( 'source rejected outcome class is exposed', array( 'source_rejected' ) === $metrics['outcome_classes'] );
 
-echo "\n[5] CLI/source integration markers exist\n";
+echo "\n[5] failure reasons expose distinct generic outcome classes\n";
+$metrics = RunMetrics::fromJob( $job( 'failed - mcp_fetch_failed', array() ) );
+$assert( 'provider failure class is exposed from status reason', array( 'provider_error' ) === $metrics['outcome_classes'] );
+$assert( 'provider failure count is exposed', 1 === $metrics['counts']['provider_error'] );
+
+$metrics = RunMetrics::fromJob( $job( 'failed - missing_source_content', array() ) );
+$assert( 'hydration failure class is exposed from status reason', array( 'hydration_failed' ) === $metrics['outcome_classes'] );
+
+$metrics = RunMetrics::fromJob(
+	$job(
+		'failed - step_execution_failure',
+		array(
+			'step_results' => array(
+				'ai_1' => array(
+					'flow_step_id' => 'ai_1',
+					'step_type'    => 'ai',
+					'result'       => 'failed',
+					'reason'       => 'empty_data_packet_returned',
+					'packet_count' => 0,
+				),
+			),
+		)
+	)
+);
+$assert( 'AI empty packet class is exposed from step result', array( 'ai_empty_packet' ) === $metrics['outcome_classes'] );
+
+$metrics = RunMetrics::fromJob(
+	$job(
+		'failed - step_execution_failure',
+		array(
+			'step_results' => array(
+				'ai_1' => array(
+					'flow_step_id' => 'ai_1',
+					'step_type'    => 'ai',
+					'result'       => 'failed',
+					'reason'       => 'handler_requiring_step_missing_handler_packets',
+					'packet_count' => 2,
+				),
+			),
+		)
+	)
+);
+$assert( 'missing handler packet class is exposed from step result', array( 'missing_handler_packet' ) === $metrics['outcome_classes'] );
+
+$metrics = RunMetrics::fromJob( $job( 'failed - item-deferred', array() ) );
+$assert( 'item deferred class is exposed from status reason', array( 'item_deferred' ) === $metrics['outcome_classes'] );
+
+echo "\n[6] CLI/source integration markers exist\n";
 $jobs_command = file_get_contents( __DIR__ . '/../inc/Cli/Commands/JobsCommand.php' ) ?: '';
 $fetch_step   = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/FetchStep.php' ) ?: '';
 $disposition  = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Tools/FetchItemDispositionTool.php' ) ?: '';
 $assert( 'jobs list supports pipeline filter', str_contains( $jobs_command, "assoc_args['pipeline']" ) );
 $assert( 'jobs list supports handler filter', str_contains( $jobs_command, "assoc_args['handler']" ) );
 $assert( 'jobs list JSON includes outcome', str_contains( $jobs_command, "item['outcome']" ) );
+$assert( 'jobs metrics table prints outcome classes', str_contains( $jobs_command, 'Outcome Classes:' ) );
 $assert( 'fetch step records packet count', str_contains( $fetch_step, "'packet_count' => count( \$packets )" ) );
 $assert( 'source rejection persists structured reason', str_contains( $disposition, "'source_rejection'" ) );
 

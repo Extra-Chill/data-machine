@@ -246,6 +246,7 @@ class ExecuteStepAbility {
 					'step_success' => $step_success,
 					'packet_count' => count( $dataPackets ),
 					'status'       => $recorded_status,
+					'reason'       => $result['reason'] ?? ( $result['error'] ?? null ),
 					'error'        => $result['error'] ?? null,
 				)
 			);
@@ -595,6 +596,7 @@ class ExecuteStepAbility {
 						'success'      => true,
 						'step_success' => false,
 						'outcome'      => 'failed',
+						'reason'       => $transition_failure_reason,
 						'error'        => $transition_failure_reason,
 					);
 				}
@@ -742,6 +744,8 @@ class ExecuteStepAbility {
 				'step_type'    => $step_type,
 			)
 		);
+		$empty_packet_reason = $this->getFailureReasonFromPackets( $dataPackets, 'empty_data_packet_returned' );
+
 		do_action(
 			'datamachine_fail_job',
 			$job_id,
@@ -749,7 +753,7 @@ class ExecuteStepAbility {
 			array(
 				'flow_step_id' => $flow_step_id,
 				'class'        => $step_class,
-				'reason'       => $this->getFailureReasonFromPackets( $dataPackets, 'empty_data_packet_returned' ),
+				'reason'       => $empty_packet_reason,
 			)
 		);
 
@@ -757,6 +761,7 @@ class ExecuteStepAbility {
 			'success'      => true,
 			'step_success' => false,
 			'outcome'      => 'failed',
+			'reason'       => $empty_packet_reason,
 		);
 	}
 

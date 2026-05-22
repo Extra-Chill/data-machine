@@ -245,6 +245,21 @@ class FetchItemDispositionTool {
 			)
 		);
 
+		if ( $flow_step_id && class_exists( RunMetrics::class ) ) {
+			RunMetrics::recordStepResult(
+				$job_id,
+				(string) $flow_step_id,
+				array(
+					'step_type'       => 'fetch',
+					'result'          => 'item_deferred',
+					'packet_count'    => 0,
+					'reason'          => 'item-deferred',
+					'source_type'     => $source_type,
+					'item_identifier' => $item_identifier,
+				)
+			);
+		}
+
 		do_action(
 			'datamachine_log',
 			'info',
