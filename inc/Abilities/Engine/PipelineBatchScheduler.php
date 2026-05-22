@@ -121,6 +121,20 @@ class PipelineBatchScheduler {
 	 * @param int $parent_job_id The parent job ID.
 	 */
 	public function processChunk( int $parent_job_id ): void {
+		$parent_job = $this->db_jobs->get_job( $parent_job_id );
+		if ( ! $parent_job || JobStatus::PROCESSING !== ( $parent_job['status'] ?? '' ) ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Pipeline batch: skipped chunk because parent is no longer processing',
+				array(
+					'parent_job_id' => $parent_job_id,
+					'parent_status' => $parent_job['status'] ?? 'missing',
+				)
+			);
+			return;
+		}
+
 		$result = BatchScheduler::processChunk(
 			$parent_job_id,
 			array( $this, 'createChildJobFromBatch' )
