@@ -347,13 +347,13 @@ class DailyMemoryTask extends SystemTask {
 		$persistent_text = $parsed['persistent'];
 		$archived_text   = $parsed['archived'] ?? '';
 
-		$original_items   = WP_Agent_Markdown_Section_Compaction_Adapter::parse( $original_content );
-		$compacted_items  = WP_Agent_Markdown_Section_Compaction_Adapter::parse( $persistent_text );
-		$archived_items   = '' === trim( $archived_text ) ? array() : WP_Agent_Markdown_Section_Compaction_Adapter::parse( $archived_text );
-		$original_size    = strlen( $original_content );
-		$new_size         = strlen( $persistent_text );
-		$archived_size    = strlen( $archived_text );
-		$combined_size    = $new_size + $archived_size;
+		$original_items  = WP_Agent_Markdown_Section_Compaction_Adapter::parse( $original_content );
+		$compacted_items = WP_Agent_Markdown_Section_Compaction_Adapter::parse( $persistent_text );
+		$archived_items  = '' === trim( $archived_text ) ? array() : WP_Agent_Markdown_Section_Compaction_Adapter::parse( $archived_text );
+		$original_size   = strlen( $original_content );
+		$new_size        = strlen( $persistent_text );
+		$archived_size   = strlen( $archived_text );
+		$combined_size   = $new_size + $archived_size;
 
 		/**
 		 * Filter the conservation threshold for daily memory compaction.
