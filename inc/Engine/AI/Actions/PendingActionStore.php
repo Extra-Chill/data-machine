@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Data Machine owns custom operational tables and these paths require fresh runtime state or one-time schema mutation.
 /**
  * PendingActionStore — server-side storage for tool invocations awaiting user resolution.
  *
@@ -429,7 +430,7 @@ class PendingActionStore {
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare_args ), ARRAY_A );
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return array_values( array_filter( array_map( array( self::class, 'row_to_payload' ), (array) $rows ) ) );
 	}
@@ -501,7 +502,7 @@ class PendingActionStore {
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare_args ), ARRAY_A );
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		$summary = array(
 			'total'       => count( (array) $rows ),
@@ -550,7 +551,7 @@ class PendingActionStore {
 				$boundary
 			)
 		);
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		$expired = 0;
 		foreach ( (array) $action_ids as $action_id ) {
@@ -630,7 +631,7 @@ class PendingActionStore {
 			$wpdb->prepare( 'SELECT * FROM %i WHERE action_id = %s', self::get_table_name(), $action_id ),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return is_array( $row ) ? $row : null;
 	}
