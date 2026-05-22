@@ -210,13 +210,13 @@ class RecoverStuckJobsAbility {
 			$job_id      = (int) $job->job_id;
 			$job_flow_id = (int) $job->flow_id;
 
-			if ( $this->hasActiveStepAction( $job_id, $timeout_hours ) ) {
+			if ( $this->hasActiveSchedulerWork( $job_id, $engine_data, $timeout_hours ) ) {
 				++$skipped;
 				$jobs[] = array(
 					'job_id'  => $job_id,
 					'flow_id' => $job_flow_id,
 					'status'  => 'skipped',
-					'reason'  => 'Pending or in-progress Action Scheduler step action exists',
+					'reason'  => 'Pending or in-progress scheduler work exists',
 				);
 				continue;
 			}
@@ -436,7 +436,27 @@ class RecoverStuckJobsAbility {
 	}
 
 	/**
-	 * Check whether Action Scheduler still owns executable work for a job.
+	 * Check whether scheduler or child work still owns executable work for a job.
+	 *
+	 * @param int                  $job_id Job ID.
+	 * @param array<string, mixed> $engine_data Job engine data.
+	 * @param int                  $timeout_hours Hours before in-progress actions are considered stale.
+	 * @return bool True when pending or fresh in-progress work exists.
+	 */
+	private function hasActiveSchedulerWork( int $job_id, array $engine_data, int $timeout_hours ): bool {
+		if ( $this->hasActiveStepAction( $job_id, $timeout_hours ) ) {
+			return true;
+		}
+
+		if ( $this->hasActiveBatchWork( $job_id, $engine_data, $timeout_hours ) ) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check whether Action Scheduler still owns executable step work for a job.
 	 *
 	 * Pipeline jobs can stay in the `processing` state across multiple scheduled
 	 * steps. If a later `datamachine_execute_step` action is still pending or
@@ -501,34 +521,150 @@ class RecoverStuckJobsAbility {
 	}
 
 	/**
+	 * Check whether a pipeline batch parent still has scheduled chunk or child work.
+	 *
+	 * Batch parents wait on `datamachine_pipeline_batch_chunk` actions and child jobs,
+	 * not `datamachine_execute_step` actions. Treat both as live work so recovery
+	 * does not fail a parent while fan-out is still queued or children are active.
+	 *
+	 * @param int                  $parent_job_id Parent job ID.
+	 * @param array<string, mixed> $engine_data Parent engine data.
+	 * @param int                  $timeout_hours Hours before in-progress actions are considered stale.
+	 * @return bool True when batch chunk or child work is still active.
+	 */
+	private function hasActiveBatchWork( int $parent_job_id, array $engine_data, int $timeout_hours ): bool {
+		if ( $parent_job_id <= 0 || empty( $engine_data['batch'] ) ) {
+			return false;
+		}
+
+		if ( $this->hasActiveActionForArg( 'datamachine_pipeline_batch_chunk', 'parent_job_id', $parent_job_id, $timeout_hours ) ) {
+			return true;
+		}
+
+		global $wpdb;
+		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
+		$active_children = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM {$jobs_table}
+				 WHERE parent_job_id = %d
+				 AND status IN ( %s, %s )",
+				$parent_job_id,
+				'pending',
+				'processing'
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		return $active_children > 0;
+	}
+
+	/**
+	 * Check for a pending or fresh in-progress Action Scheduler action by arg ID.
+	 *
+	 * @param string $hook Action hook.
+	 * @param string $arg_name Numeric argument name to match.
+	 * @param int    $arg_id Expected numeric argument value.
+	 * @param int    $timeout_hours Hours before in-progress actions are considered stale.
+	 * @return bool True when matching action is pending or freshly in-progress.
+	 */
+	private function hasActiveActionForArg( string $hook, string $arg_name, int $arg_id, int $timeout_hours ): bool {
+		global $wpdb;
+
+		if ( $arg_id <= 0 ) {
+			return false;
+		}
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$like_arg_id   = '%"' . $wpdb->esc_like( $arg_name ) . '":' . $wpdb->esc_like( (string) $arg_id ) . '%';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
+		$actions = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT action_id, args, status, scheduled_date_gmt, last_attempt_gmt
+				 FROM {$actions_table}
+				 WHERE hook = %s
+				 AND status IN ( %s, %s )
+				 AND args LIKE %s",
+				$hook,
+				'pending',
+				'in-progress',
+				$like_arg_id
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
+		$now_gmt         = strtotime( current_time( 'mysql', true ) );
+
+		foreach ( $actions as $action ) {
+			if ( $arg_id !== $this->extractActionArgInt( (string) ( $action->args ?? '' ), $arg_name ) ) {
+				continue;
+			}
+
+			if ( 'pending' === (string) $action->status ) {
+				return true;
+			}
+
+			$last_attempt = (string) ( $action->last_attempt_gmt ?? '' );
+			$scheduled    = (string) ( $action->scheduled_date_gmt ?? '' );
+			$reference    = $last_attempt && '0000-00-00 00:00:00' !== $last_attempt ? $last_attempt : $scheduled;
+			$started_at   = $reference ? strtotime( $reference ) : false;
+
+			if ( false === $started_at || false === $now_gmt ) {
+				return true;
+			}
+
+			if ( ( $now_gmt - $started_at ) < $timeout_seconds ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Extract the Data Machine job ID from Action Scheduler args.
 	 *
 	 * @param string $args Action Scheduler args payload.
 	 * @return int Job ID, or 0 when unavailable.
 	 */
 	private function extractActionJobId( string $args ): int {
+		return $this->extractActionArgInt( $args, 'job_id' );
+	}
+
+	/**
+	 * Extract a numeric argument from an Action Scheduler args payload.
+	 *
+	 * @param string $args Action Scheduler args payload.
+	 * @param string $arg_name Argument name to extract.
+	 * @return int Argument value, or 0 when unavailable.
+	 */
+	private function extractActionArgInt( string $args, string $arg_name ): int {
 		$decoded = json_decode( $args, true );
 		if ( is_array( $decoded ) ) {
-			if ( isset( $decoded['job_id'] ) && is_numeric( $decoded['job_id'] ) ) {
-				return (int) $decoded['job_id'];
+			if ( isset( $decoded[ $arg_name ] ) && is_numeric( $decoded[ $arg_name ] ) ) {
+				return (int) $decoded[ $arg_name ];
 			}
 
 			foreach ( $decoded as $value ) {
-				if ( is_array( $value ) && isset( $value['job_id'] ) && is_numeric( $value['job_id'] ) ) {
-					return (int) $value['job_id'];
+				if ( is_array( $value ) && isset( $value[ $arg_name ] ) && is_numeric( $value[ $arg_name ] ) ) {
+					return (int) $value[ $arg_name ];
 				}
 			}
 		}
 
 		$unserialized = maybe_unserialize( $args );
 		if ( is_array( $unserialized ) ) {
-			if ( isset( $unserialized['job_id'] ) && is_numeric( $unserialized['job_id'] ) ) {
-				return (int) $unserialized['job_id'];
+			if ( isset( $unserialized[ $arg_name ] ) && is_numeric( $unserialized[ $arg_name ] ) ) {
+				return (int) $unserialized[ $arg_name ];
 			}
 
 			foreach ( $unserialized as $value ) {
-				if ( is_array( $value ) && isset( $value['job_id'] ) && is_numeric( $value['job_id'] ) ) {
-					return (int) $value['job_id'];
+				if ( is_array( $value ) && isset( $value[ $arg_name ] ) && is_numeric( $value[ $arg_name ] ) ) {
+					return (int) $value[ $arg_name ];
 				}
 			}
 		}
