@@ -388,6 +388,50 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'failed', $parent_job['status'] );
 	}
 
+	public function test_final_chunk_completes_parent_when_children_already_terminal(): void {
+		$parent_id = $this->create_parent_job();
+		$engine    = $this->make_engine_snapshot( $parent_id );
+
+		datamachine_merge_engine_data( $parent_id, array(
+			'batch'             => true,
+			'batch_total'       => 1,
+			'batch_scheduled'   => 1,
+			'batch_chunk_size'  => \DataMachine\Core\ActionScheduler\BatchScheduler::DEFAULT_CHUNK_SIZE,
+			'batch_context'     => PipelineBatchScheduler::BATCH_CONTEXT,
+			'next_flow_step_id' => 'step_done',
+			'started_at'        => current_time( 'mysql' ),
+			'batch_state'       => array(
+				'offset' => 1,
+				'total'  => 1,
+				'items'  => array(),
+				'extra'  => array(
+					'next_flow_step_id' => 'step_done',
+					'engine_snapshot'   => $engine,
+				),
+				'hook'   => PipelineBatchScheduler::BATCH_HOOK,
+			),
+		) );
+
+		$child = $this->jobs_db->create_job( array(
+			'pipeline_id'   => $this->test_pipeline_id,
+			'flow_id'       => $this->test_flow_id,
+			'source'        => 'pipeline',
+			'label'         => 'Already terminal child',
+			'parent_job_id' => $parent_id,
+		) );
+		$this->jobs_db->start_job( (int) $child );
+		$this->jobs_db->complete_job( (int) $child, JobStatus::COMPLETED_NO_ITEMS );
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->processChunk( $parent_id );
+
+		$parent_job = $this->jobs_db->get_job( $parent_id );
+		$this->assertEquals( JobStatus::COMPLETED_NO_ITEMS, $parent_job['status'] );
+
+		$parent_engine = datamachine_get_engine_data( $parent_id );
+		$this->assertEquals( 1, $parent_engine['batch_results']['skipped'] );
+	}
+
 	public function test_child_jobs_receive_per_item_engine_data(): void {
 		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );

@@ -193,6 +193,8 @@ class PipelineBatchScheduler {
 				sprintf( 'Pipeline batch: all %d items scheduled', $result['total'] ),
 				array( 'parent_job_id' => $parent_job_id )
 			);
+
+			self::maybeCompleteParent( $parent_job_id );
 		}
 	}
 
@@ -423,6 +425,27 @@ class PipelineBatchScheduler {
 			return; // Not a child job.
 		}
 
+		self::maybeCompleteParent( (int) $parent_job_id );
+	}
+
+	/**
+	 * Complete a batch parent once all scheduled children have reached terminal states.
+	 *
+	 * Child-complete hooks are the common path, but the final chunk is also a
+	 * scheduler ownership boundary. Rechecking there preserves the invariant that
+	 * a fully scheduled, fully terminal batch parent cannot remain processing with
+	 * no future scheduler action.
+	 *
+	 * @param int $parent_job_id Parent job ID.
+	 */
+	private static function maybeCompleteParent( int $parent_job_id ): void {
+		$jobs_db = new Jobs();
+		$parent  = $jobs_db->get_job( $parent_job_id );
+
+		if ( ! $parent || JobStatus::PROCESSING !== ( $parent['status'] ?? '' ) ) {
+			return;
+		}
+
 		// Check parent is a pipeline batch.
 		$parent_engine = datamachine_get_engine_data( (int) $parent_job_id );
 		if ( empty( $parent_engine['batch'] ) ) {
@@ -448,7 +471,7 @@ class PipelineBatchScheduler {
 					COUNT(*) as total,
 					SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
 					SUM(CASE WHEN status LIKE 'failed%%' THEN 1 ELSE 0 END) as failed,
-					SUM(CASE WHEN status LIKE 'agent_skipped%%' THEN 1 ELSE 0 END) as skipped,
+					SUM(CASE WHEN status LIKE 'agent_skipped%%' OR status = 'completed_no_items' THEN 1 ELSE 0 END) as skipped,
 					SUM(CASE WHEN status = 'processing' OR status = 'pending' THEN 1 ELSE 0 END) as active
 				FROM {$table}
 				WHERE parent_job_id = %d",
