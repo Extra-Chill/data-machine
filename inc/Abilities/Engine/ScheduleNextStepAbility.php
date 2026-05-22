@@ -128,6 +128,12 @@ class ScheduleNextStepAbility {
 							'flow_step_id' => $flow_step_id,
 						)
 					);
+					$this->failScheduling(
+						$job_id,
+						$flow_step_id,
+						'missing_flow_id_during_data_storage',
+						array( 'packet_count' => count( $dataPackets ) )
+					);
 					return array(
 						'success' => false,
 						'error'   => 'Flow ID missing during data storage.',
@@ -180,9 +186,53 @@ class ScheduleNextStepAbility {
 			);
 		}
 
+		if ( false === $action_id ) {
+			$this->failScheduling(
+				$job_id,
+				$flow_step_id,
+				'next_step_schedule_failed',
+				array( 'packet_count' => count( $dataPackets ) )
+			);
+		}
+
 		return array(
 			'success'   => false !== $action_id,
 			'action_id' => $action_id,
+		);
+	}
+
+	/**
+	 * Route next-step scheduling failures through the normal job failure policy.
+	 *
+	 * The caller reaches this ability through do_action(), so a false return value
+	 * is not observable by ExecuteStepAbility. Failing here preserves the liveness
+	 * invariant: a job that cannot schedule its required next step is either
+	 * requeued by JobRetryPolicy or completed as failed, never left processing
+	 * without scheduler ownership.
+	 *
+	 * @param int    $job_id       Job ID.
+	 * @param string $flow_step_id Next flow step that could not be scheduled.
+	 * @param string $reason       Failure reason.
+	 * @param array  $context      Additional failure context.
+	 */
+	private function failScheduling( int $job_id, string $flow_step_id, string $reason, array $context = array() ): void {
+		if ( $job_id <= 0 || '' === $flow_step_id ) {
+			return;
+		}
+
+		do_action(
+			'datamachine_fail_job',
+			$job_id,
+			'step_execution_failure',
+			array_merge(
+				array(
+					'flow_step_id'      => $flow_step_id,
+					'next_flow_step_id' => $flow_step_id,
+					'reason'            => $reason,
+					'retryable'         => true,
+				),
+				$context
+			)
 		);
 	}
 }
