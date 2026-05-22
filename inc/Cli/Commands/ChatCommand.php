@@ -132,12 +132,12 @@ class ChatCommand extends BaseCommand {
 		// Flatten for display.
 		$display_items = array();
 		foreach ( $sessions as $session ) {
-			$metadata        = $session['metadata'] ?? array();
+			$metadata        = is_array( $session['metadata'] ?? null ) ? $session['metadata'] : array();
 			$display_items[] = array(
 				'session_id'    => $session['session_id'],
 				'title'         => $session['title'] ?? '(untitled)',
 				'mode'          => $session['mode'] ?? 'chat',
-				'message_count' => $metadata['message_count'] ?? 0,
+				'message_count' => self::get_session_message_count( $session ),
 				'created_at'    => $metadata['started_at'] ?? $session['created_at'] ?? '-',
 			);
 		}
@@ -147,6 +147,26 @@ class ChatCommand extends BaseCommand {
 
 		$format = $assoc_args['format'] ?? 'table';
 		$this->output_pagination( $offset, count( $sessions ), $total, $format, 'sessions' );
+	}
+
+	/**
+	 * Resolve the message count for a session summary row.
+	 *
+	 * @param array $session Session summary or full session payload.
+	 * @return int
+	 */
+	private static function get_session_message_count( array $session ): int {
+		if ( isset( $session['message_count'] ) && is_numeric( $session['message_count'] ) ) {
+			return max( 0, (int) $session['message_count'] );
+		}
+
+		$metadata = is_array( $session['metadata'] ?? null ) ? $session['metadata'] : array();
+		if ( isset( $metadata['message_count'] ) && is_numeric( $metadata['message_count'] ) ) {
+			return max( 0, (int) $metadata['message_count'] );
+		}
+
+		$messages = $session['messages'] ?? null;
+		return is_array( $messages ) ? count( $messages ) : 0;
 	}
 
 	/**
