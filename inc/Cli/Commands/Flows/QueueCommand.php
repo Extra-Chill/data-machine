@@ -31,6 +31,7 @@ namespace DataMachine\Cli\Commands\Flows;
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Abilities\Flow\QueueAbility;
+use DataMachine\Core\AbilityResult;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -171,13 +172,13 @@ class QueueCommand extends BaseCommand {
 				return;
 			}
 
-			$result = wp_get_ability( 'datamachine/config-patch-add' )->execute(
+			$result = AbilityResult::normalize( wp_get_ability( 'datamachine/config-patch-add' )->execute(
 				array(
 					'flow_id'      => $flow_id,
 					'flow_step_id' => $flow_step_id,
 					'patch'        => $patch,
 				)
-			);
+			) );
 		} else {
 			if ( 'fetch' === $step_type ) {
 				WP_CLI::error( 'Fetch steps consume config patches, not string prompts. Use --patch=\'{...}\' instead.' );
@@ -189,13 +190,13 @@ class QueueCommand extends BaseCommand {
 				return;
 			}
 
-			$result = wp_get_ability( 'datamachine/queue-add' )->execute(
+			$result = AbilityResult::normalize( wp_get_ability( 'datamachine/queue-add' )->execute(
 				array(
 					'flow_id'      => $flow_id,
 					'flow_step_id' => $flow_step_id,
 					'prompt'       => $prompt,
 				)
-			);
+			) );
 		}
 
 		if ( ! $result['success'] ) {
@@ -268,19 +269,19 @@ class QueueCommand extends BaseCommand {
 			$flow_step_id = $resolved['step_id'];
 		}
 
-		$prompt_result = wp_get_ability( 'datamachine/queue-list' )->execute(
+		$prompt_result = AbilityResult::normalize( wp_get_ability( 'datamachine/queue-list' )->execute(
 			array(
 				'flow_id'      => $flow_id,
 				'flow_step_id' => $flow_step_id,
 			)
-		);
+		) );
 
-		$patch_result = wp_get_ability( 'datamachine/config-patch-list' )->execute(
+		$patch_result = AbilityResult::normalize( wp_get_ability( 'datamachine/config-patch-list' )->execute(
 			array(
 				'flow_id'      => $flow_id,
 				'flow_step_id' => $flow_step_id,
 			)
-		);
+		) );
 
 		if ( ! $prompt_result['success'] && ! $patch_result['success'] ) {
 			WP_CLI::error( $prompt_result['error'] ?? $patch_result['error'] ?? 'Failed to list queue' );
@@ -397,12 +398,12 @@ class QueueCommand extends BaseCommand {
 			? 'datamachine/config-patch-clear'
 			: 'datamachine/queue-clear';
 
-		$result = wp_get_ability( $ability_id )->execute(
+		$result = AbilityResult::normalize( wp_get_ability( $ability_id )->execute(
 			array(
 				'flow_id'      => $flow_id,
 				'flow_step_id' => $flow_step_id,
 			)
-		);
+		) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to clear queue' );
@@ -469,13 +470,13 @@ class QueueCommand extends BaseCommand {
 			? 'datamachine/config-patch-remove'
 			: 'datamachine/queue-remove';
 
-		$result = wp_get_ability( $ability_id )->execute(
+		$result = AbilityResult::normalize( wp_get_ability( $ability_id )->execute(
 			array(
 				'flow_id'      => $flow_id,
 				'flow_step_id' => $flow_step_id,
 				'index'        => $index,
 			)
-		);
+		) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to remove item from queue' );
@@ -579,27 +580,27 @@ class QueueCommand extends BaseCommand {
 				WP_CLI::error( 'Invalid --patch: not a JSON object.' );
 				return;
 			}
-			$result = wp_get_ability( 'datamachine/config-patch-update' )->execute(
+			$result = AbilityResult::normalize( wp_get_ability( 'datamachine/config-patch-update' )->execute(
 				array(
 					'flow_id'      => $flow_id,
 					'flow_step_id' => $flow_step_id,
 					'index'        => $index,
 					'patch'        => $patch,
 				)
-			);
+			) );
 		} else {
 			if ( 'fetch' === $step_type ) {
 				WP_CLI::error( 'Fetch steps consume config patches, not string prompts. Use --patch=\'{...}\' instead.' );
 				return;
 			}
-			$result = wp_get_ability( 'datamachine/queue-update' )->execute(
+			$result = AbilityResult::normalize( wp_get_ability( 'datamachine/queue-update' )->execute(
 				array(
 					'flow_id'      => $flow_id,
 					'flow_step_id' => $flow_step_id,
 					'index'        => $index,
 					'prompt'       => $prompt,
 				)
-			);
+			) );
 		}
 
 		if ( ! $result['success'] ) {
@@ -671,14 +672,14 @@ class QueueCommand extends BaseCommand {
 			? 'datamachine/config-patch-move'
 			: 'datamachine/queue-move';
 
-		$result = wp_get_ability( $ability_id )->execute(
+		$result = AbilityResult::normalize( wp_get_ability( $ability_id )->execute(
 			array(
 				'flow_id'      => $flow_id,
 				'flow_step_id' => $flow_step_id,
 				'from_index'   => $from_index,
 				'to_index'     => $to_index,
 			)
-		);
+		) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to move item in queue' );
@@ -754,13 +755,13 @@ class QueueCommand extends BaseCommand {
 			$flow_step_id = $resolved['step_id'];
 		}
 
-		$result = wp_get_ability( 'datamachine/queue-mode' )->execute(
+		$result = AbilityResult::normalize( wp_get_ability( 'datamachine/queue-mode' )->execute(
 			array(
 				'flow_id'      => $flow_id,
 				'flow_step_id' => $flow_step_id,
 				'mode'         => $mode,
 			)
-		);
+		) );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Failed to set queue mode' );

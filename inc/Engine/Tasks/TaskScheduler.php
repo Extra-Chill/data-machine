@@ -23,6 +23,7 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\ActionScheduler\BatchScheduler;
 use DataMachine\Core\Agents\AgentIdentityResolver;
+use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\JobStatus;
 
@@ -149,7 +150,7 @@ class TaskScheduler {
 			? $task_meta['label']
 			: ucfirst( str_replace( '_', ' ', $taskType ) );
 
-		$result = $ability->execute( array(
+		$result = AbilityResult::normalize( $ability->execute( array(
 			'workflow'     => $workflow,
 			'timestamp'    => $params['scheduled_at'] ?? null,
 			'initial_data' => array(
@@ -164,7 +165,7 @@ class TaskScheduler {
 				'agent_slug'    => $context_agent_slug,
 				'job'           => $job_snapshot,
 			),
-		) );
+		) ) );
 
 		if ( empty( $result['success'] ) ) {
 			do_action(
