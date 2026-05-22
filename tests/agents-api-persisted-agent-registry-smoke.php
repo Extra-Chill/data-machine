@@ -79,6 +79,13 @@ $repository = new DataMachinePersistedAgentProjectorFakeRepository(
 				'description' => 'Maintains WooCommerce knowledge.',
 			),
 		),
+		array(
+			'agent_id'     => 103,
+			'agent_slug'   => 'roadie',
+			'agent_name'   => 'Roadie',
+			'owner_id'     => 9,
+			'agent_config' => array(),
+		),
 	)
 );
 
@@ -90,12 +97,14 @@ add_action(
 );
 do_action( 'init' );
 
-$agents = wp_get_agents();
-$agent  = wp_get_agent( 'wordpress-com-wiki' );
-agents_api_smoke_assert_equals( array( 'wordpress-com-wiki', 'woocommerce-wiki' ), array_keys( $agents ), 'persisted rows are visible through wp_get_agents()', $failures, $passes );
+$agents       = wp_get_agents();
+$agent        = wp_get_agent( 'wordpress-com-wiki' );
+$roadie_agent = wp_get_agent( 'roadie' );
+agents_api_smoke_assert_equals( array( 'wordpress-com-wiki', 'woocommerce-wiki', 'roadie' ), array_keys( $agents ), 'persisted rows are visible through wp_get_agents()', $failures, $passes );
 agents_api_smoke_assert_equals( true, $agent instanceof WP_Agent, 'persisted row resolves through wp_get_agent()', $failures, $passes );
 agents_api_smoke_assert_equals( 'WordPress.com Wiki', $agent ? $agent->get_label() : '', 'row agent_name becomes label', $failures, $passes );
 agents_api_smoke_assert_equals( 'Maintains the WordPress.com wiki brain.', $agent ? $agent->get_description() : '', 'wiki brain description is surfaced', $failures, $passes );
+agents_api_smoke_assert_equals( '', $roadie_agent ? $roadie_agent->get_description() : 'missing', 'missing config description stays empty instead of synthesizing a runtime-branded fallback', $failures, $passes );
 agents_api_smoke_assert_equals( 7, $agent && is_callable( $agent->get_owner_resolver() ) ? call_user_func( $agent->get_owner_resolver() ) : 0, 'owner_resolver returns persisted owner_id', $failures, $passes );
 agents_api_smoke_assert_equals( 'gpt-5.5', $agent ? $agent->get_default_config()['default_model'] ?? '' : '', 'agent_config becomes default_config', $failures, $passes );
 agents_api_smoke_assert_equals( 'wordpress-com-wiki', $agent ? $agent->get_meta()['source_package'] ?? '' : '', 'bundle slug is exposed as source package', $failures, $passes );
@@ -113,7 +122,7 @@ add_action(
 do_action( 'init' );
 
 $agents = wp_get_agents();
-agents_api_smoke_assert_equals( array( 'wordpress-com-wiki', 'woocommerce-wiki' ), array_keys( $agents ), 'projection skips duplicate slugs without dropping other rows', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'wordpress-com-wiki', 'woocommerce-wiki', 'roadie' ), array_keys( $agents ), 'projection skips duplicate slugs without dropping other rows', $failures, $passes );
 agents_api_smoke_assert_equals( 'Declarative Definition', $agents['wordpress-com-wiki']->get_label(), 'first registered definition wins', $failures, $passes );
 agents_api_smoke_assert_equals( array(), $GLOBALS['__agents_api_smoke_wrong'], 'duplicate skip avoids doing-it-wrong notices', $failures, $passes );
 

@@ -107,8 +107,7 @@ class PersistedAgentProjector {
 			}
 		}
 
-		$label = self::label_from_row( $row );
-		return '' !== $label ? sprintf( 'Data Machine agent: %s.', $label ) : __( 'Data Machine persisted agent.', 'data-machine' );
+		return '';
 	}
 
 	/**
