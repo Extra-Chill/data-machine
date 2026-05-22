@@ -210,7 +210,7 @@ class RecoverStuckJobsAbility {
 			$job_id      = (int) $job->job_id;
 			$job_flow_id = (int) $job->flow_id;
 
-			if ( $this->hasActiveStepAction( $job_id ) ) {
+			if ( $this->hasActiveStepAction( $job_id, $timeout_hours ) ) {
 				++$skipped;
 				$jobs[] = array(
 					'job_id'  => $job_id,
@@ -444,9 +444,10 @@ class RecoverStuckJobsAbility {
 	 * original job row is old.
 	 *
 	 * @param int $job_id Job ID.
-	 * @return bool True when a pending/in-progress step action exists.
+	 * @param int $timeout_hours Hours before in-progress actions are considered stale.
+	 * @return bool True when a pending or fresh in-progress step action exists.
 	 */
-	private function hasActiveStepAction( int $job_id ): bool {
+	private function hasActiveStepAction( int $job_id, int $timeout_hours ): bool {
 		global $wpdb;
 
 		if ( $job_id <= 0 ) {
@@ -459,7 +460,7 @@ class RecoverStuckJobsAbility {
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
 		$actions = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT action_id, args
+				"SELECT action_id, args, status, scheduled_date_gmt, last_attempt_gmt
 				 FROM {$actions_table}
 				 WHERE hook = %s
 				 AND status IN ( %s, %s )
@@ -472,9 +473,27 @@ class RecoverStuckJobsAbility {
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
+		$timeout_seconds = max( 1, $timeout_hours ) * HOUR_IN_SECONDS;
+		$now_gmt         = strtotime( current_time( 'mysql', true ) );
+
 		foreach ( $actions as $action ) {
 			if ( $job_id === $this->extractActionJobId( (string) ( $action->args ?? '' ) ) ) {
-				return true;
+				if ( 'pending' === (string) $action->status ) {
+					return true;
+				}
+
+				$last_attempt = (string) ( $action->last_attempt_gmt ?? '' );
+				$scheduled    = (string) ( $action->scheduled_date_gmt ?? '' );
+				$reference    = $last_attempt && '0000-00-00 00:00:00' !== $last_attempt ? $last_attempt : $scheduled;
+				$started_at   = $reference ? strtotime( $reference ) : false;
+
+				if ( false === $started_at || false === $now_gmt ) {
+					return true;
+				}
+
+				if ( ( $now_gmt - $started_at ) < $timeout_seconds ) {
+					return true;
+				}
 			}
 		}
 
