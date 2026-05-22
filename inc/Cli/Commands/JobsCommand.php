@@ -725,7 +725,7 @@ class JobsCommand extends BaseCommand {
 			$engine_data = array();
 		}
 
-		$child_counts = ! empty( $engine_data['batch'] ) ? $this->get_child_status_counts( $job_id ) : array();
+		$child_counts    = ! empty( $engine_data['batch'] ) ? $this->get_child_status_counts( $job_id ) : array();
 		$active_children = (int) ( $child_counts['active'] ?? 0 );
 		$total_children  = (int) ( $child_counts['total'] ?? 0 );
 		$batch_total     = (int) ( $engine_data['batch_total'] ?? 0 );
@@ -781,7 +781,7 @@ class JobsCommand extends BaseCommand {
 			return array();
 		}
 
-		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$actions_table      = $wpdb->prefix . 'actionscheduler_actions';
 		$like_job_id        = '%"job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
 		$like_parent_job_id = '%"parent_job_id":' . $wpdb->esc_like( (string) $job_id ) . '%';
 
