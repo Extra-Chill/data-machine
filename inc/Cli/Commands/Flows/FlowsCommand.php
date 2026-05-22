@@ -23,6 +23,7 @@ use DataMachine\Cli\UserResolver;
 use DataMachine\Cli\Commands\DrainCommand;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\LegacyHandlerShapeMigrator;
+use DataMachine\Engine\Debug\SyncRunner;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -88,6 +89,21 @@ class FlowsCommand extends BaseCommand {
 	 *
 	 * [--[no-]drain]
 	 * : Drain due Data Machine batch chunk and step actions after an immediate run.
+	 *
+	 * [--max-steps=<number>]
+	 * : Maximum inline steps for run-sync. Default: 20.
+	 *
+	 * [--max-items=<number>]
+	 * : Maximum packets retained from any sync step. Default: 50.
+	 *
+	 * [--timeout=<seconds>]
+	 * : Maximum wall time for run-sync. Default: 60.
+	 *
+	 * [--show-packets]
+	 * : Include full packets in run-sync output instead of summaries.
+	 *
+	 * [--input-file=<path>]
+	 * : JSON packet input for run-sync, useful when exploring downstream steps.
 	 *
 	 * [--pipeline_id=<id>]
 	 * : Pipeline ID for flow creation (create subcommand).
@@ -180,6 +196,9 @@ class FlowsCommand extends BaseCommand {
 	 *
 	 *     # Run a flow immediately
 	 *     wp datamachine flows run 42
+	 *
+	 *     # Run a flow inline for bounded local exploration
+	 *     wp datamachine flows run-sync 42 --max-steps=20 --show-packets --format=json
 	 *
 	 *     # Create a new flow
 	 *     wp datamachine flows create --pipeline_id=3 --name="My Flow"
@@ -370,6 +389,14 @@ class FlowsCommand extends BaseCommand {
 			if ( isset( $args[1] ) ) {
 				$flow_id = (int) $args[1];
 			}
+		} elseif ( ! empty( $args ) && 'run-sync' === $args[0] ) {
+			// Handle 'run-sync' subcommand: `flows run-sync 42`.
+			if ( ! isset( $args[1] ) ) {
+				WP_CLI::error( 'Usage: wp datamachine flows run-sync <flow_id> [--max-steps=N] [--max-items=N] [--timeout=N] [--show-packets] [--input-file=<path>] [--format=json]' );
+				return;
+			}
+			$this->runFlowSync( (int) $args[1], $assoc_args );
+			return;
 		} elseif ( ! empty( $args ) && 'run' === $args[0] ) {
 			// Handle 'run' subcommand: `flows run 42`.
 			if ( ! isset( $args[1] ) ) {
@@ -461,6 +488,18 @@ class FlowsCommand extends BaseCommand {
 		$this->format_items( $items, $this->default_fields, $assoc_args, 'id' );
 		$this->output_pagination( $offset, count( $flows ), $total, $format, 'flows' );
 		$this->outputFilters( $result['filters_applied'] ?? array(), $format );
+	}
+
+	/**
+	 * Run a flow synchronously for bounded local exploration.
+	 *
+	 * @param int   $flow_id    Flow ID.
+	 * @param array $assoc_args WP-CLI args.
+	 */
+	private function runFlowSync( int $flow_id, array $assoc_args ): void {
+		$format = (string) ( $assoc_args['format'] ?? 'json' );
+		$packet = ( new SyncRunner() )->runFlow( $flow_id, $this->build_sync_runner_options( $assoc_args ) );
+		$this->output_sync_runner_packet( $packet, $format );
 	}
 
 	/**

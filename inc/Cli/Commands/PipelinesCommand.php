@@ -20,6 +20,7 @@ use DataMachine\Abilities\Pipeline\DeletePipelineAbility;
 use DataMachine\Abilities\Pipeline\GetPipelinesAbility;
 use DataMachine\Abilities\Pipeline\UpdatePipelineAbility;
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Engine\Debug\SyncRunner;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -121,6 +122,21 @@ class PipelinesCommand extends BaseCommand {
 	 * [--remove=<filename>]
 	 * : Detach a memory file from a pipeline (memory-files subcommand).
 	 *
+	 * [--max-steps=<number>]
+	 * : Maximum inline steps for run-sync. Default: 20.
+	 *
+	 * [--max-items=<number>]
+	 * : Maximum packets retained from any sync step. Default: 50.
+	 *
+	 * [--timeout=<seconds>]
+	 * : Maximum wall time for run-sync. Default: 60.
+	 *
+	 * [--show-packets]
+	 * : Include full packets in run-sync output instead of summaries.
+	 *
+	 * [--input-file=<path>]
+	 * : JSON packet input for run-sync, useful when exploring downstream steps.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # List all pipelines
@@ -181,27 +197,40 @@ class PipelinesCommand extends BaseCommand {
 	 *     # Attach a memory file
 	 *     wp datamachine pipelines memory-files 5 --add=content-briefing.md
 	 *
- *     # Detach a memory file
- *     wp datamachine pipelines memory-files 5 --remove=content-briefing.md
- *
- *     # Update pipeline agent
- *     wp datamachine pipelines update 13 --agent=events-bot
- *
- *     # Update pipeline agent and cascade to child flows
- *     wp datamachine pipelines update 13 --agent=events-bot --cascade-flows
- *
- *     # Bulk reassign: move orphan pipelines → events-bot
- *     wp datamachine pipelines reassign --where-null --to-agent=events-bot
- *
- *     # Bulk reassign: move pipelines from agent_id=1 → events-bot
- *     wp datamachine pipelines reassign --from-agent=1 --to-agent=events-bot
- *
- *     # Dry-run reassign
- *     wp datamachine pipelines reassign --where-null --to-agent=events-bot --dry-run
- *
+	 *     # Detach a memory file
+	 *     wp datamachine pipelines memory-files 5 --remove=content-briefing.md
+	 *
+	 *     # Run the first flow in a pipeline inline for bounded local exploration
+	 *     wp datamachine pipelines run-sync 5 --input-file=packets.json --show-packets --format=json
+	 *
+	 *     # Update pipeline agent
+	 *     wp datamachine pipelines update 13 --agent=events-bot
+	 *
+	 *     # Update pipeline agent and cascade to child flows
+	 *     wp datamachine pipelines update 13 --agent=events-bot --cascade-flows
+	 *
+	 *     # Bulk reassign: move orphan pipelines → events-bot
+	 *     wp datamachine pipelines reassign --where-null --to-agent=events-bot
+	 *
+	 *     # Bulk reassign: move pipelines from agent_id=1 → events-bot
+	 *     wp datamachine pipelines reassign --from-agent=1 --to-agent=events-bot
+	 *
+	 *     # Dry-run reassign
+	 *     wp datamachine pipelines reassign --where-null --to-agent=events-bot --dry-run
+	 *
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		$pipeline_id = null;
+
+		// Handle 'run-sync' subcommand.
+		if ( ! empty( $args ) && 'run-sync' === $args[0] ) {
+			if ( ! isset( $args[1] ) ) {
+				WP_CLI::error( 'Usage: wp datamachine pipelines run-sync <pipeline_id> [--max-steps=N] [--max-items=N] [--timeout=N] [--show-packets] [--input-file=<path>] [--format=json]' );
+				return;
+			}
+			$this->runPipelineSync( (int) $args[1], $assoc_args );
+			return;
+		}
 
 		// Handle 'create' subcommand.
 		if ( ! empty( $args ) && 'create' === $args[0] ) {
@@ -352,6 +381,38 @@ class PipelinesCommand extends BaseCommand {
 			$this->format_items( $items, $this->default_fields, $assoc_args, 'id' );
 			$this->output_pagination( $offset, count( $pipelines ), $total, $format, 'pipelines' );
 		}
+	}
+
+	/**
+	 * Run the first flow attached to a pipeline synchronously.
+	 *
+	 * @param int   $pipeline_id Pipeline ID.
+	 * @param array $assoc_args  WP-CLI args.
+	 */
+	private function runPipelineSync( int $pipeline_id, array $assoc_args ): void {
+		$result = ( new GetPipelinesAbility() )->execute(
+			array(
+				'pipeline_id'   => $pipeline_id,
+				'output_mode'   => 'full',
+				'include_flows' => true,
+			)
+		);
+
+		if ( empty( $result['success'] ) || empty( $result['pipelines'][0] ) ) {
+			WP_CLI::error( $result['error'] ?? 'Pipeline not found' );
+			return;
+		}
+
+		$flows = is_array( $result['pipelines'][0]['flows'] ?? null ) ? $result['pipelines'][0]['flows'] : array();
+		if ( empty( $flows[0]['flow_id'] ) ) {
+			WP_CLI::error( sprintf( 'Pipeline %d has no flows to run synchronously.', $pipeline_id ) );
+			return;
+		}
+
+		$format                = (string) ( $assoc_args['format'] ?? 'json' );
+		$packet                = ( new SyncRunner() )->runFlow( (int) $flows[0]['flow_id'], $this->build_sync_runner_options( $assoc_args ) );
+		$packet['pipeline_id'] = $pipeline_id;
+		$this->output_sync_runner_packet( $packet, $format );
 	}
 
 	/**
