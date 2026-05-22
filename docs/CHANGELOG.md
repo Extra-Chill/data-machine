@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.132.0] - 2026-05-22
+
+### Added
+- add flow config pre-save filter
+
 ## [0.131.10] - 2026-05-22
 
 ### Fixed
