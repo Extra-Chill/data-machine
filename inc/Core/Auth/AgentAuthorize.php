@@ -116,6 +116,10 @@ class AgentAuthorize {
 						'type'     => 'string',
 						'enum'     => array( 'authorize', 'deny' ),
 					),
+					'scope_preset'          => array(
+						'required' => false,
+						'type'     => 'string',
+					),
 					'_authorize_nonce'      => array(
 						'required' => true,
 						'type'     => 'string',
@@ -238,6 +242,7 @@ class AgentAuthorize {
 		$redirect_uri = esc_url_raw( $request->get_param( 'redirect_uri' ) );
 		$label        = sanitize_text_field( $request->get_param( 'label' ) );
 		$action       = sanitize_text_field( $request->get_param( 'action' ) );
+		$scope_key    = sanitize_key( (string) $request->get_param( 'scope_preset' ) );
 		$nonce        = $request->get_param( '_authorize_nonce' );
 
 		// Look up agent for redirect URI validation.
@@ -285,6 +290,18 @@ class AgentAuthorize {
 			exit;
 		}
 
+		$scope_presets = $this->get_scope_presets( $agent, $redirect_uri );
+		if ( '' === $scope_key ) {
+			$scope_key = $this->get_default_scope_key( $agent, $redirect_uri, $scope_presets );
+		}
+
+		if ( ! isset( $scope_presets[ $scope_key ] ) ) {
+			header( 'Location: ' . add_query_arg( 'error', 'invalid_scope', $redirect_uri ) );
+			exit;
+		}
+
+		$scope_payload = $this->scope_payload_from_preset( $scope_key, $scope_presets[ $scope_key ] );
+
 		/**
 		 * Filter: Allow extensions to intercept the authorize flow before token minting.
 		 *
@@ -327,7 +344,7 @@ class AgentAuthorize {
 			(int) $agent['agent_id'],
 			$agent['agent_slug'],
 			$token_label,
-			null, // All capabilities.
+			$scope_payload,
 			null  // No expiry.
 		);
 
@@ -346,6 +363,7 @@ class AgentAuthorize {
 				'user_id'    => $user_id,
 				'token_id'   => $result['token_id'],
 				'label'      => $token_label,
+				'scope'      => $scope_key,
 			)
 		);
 
@@ -475,6 +493,143 @@ class AgentAuthorize {
 	}
 
 	/**
+	 * Return filterable approve-time scope presets.
+	 *
+	 * Null capabilities on the full preset intentionally preserve the existing
+	 * owner-ceiling behavior for users who do not change the selection.
+	 *
+	 * @param array  $agent        Agent row.
+	 * @param string $redirect_uri Redirect URI being authorized.
+	 * @return array<string,array<string,mixed>>
+	 */
+	private function get_scope_presets( array $agent, string $redirect_uri ): array {
+		$presets = array(
+			'read_only'            => array(
+				'label'              => __( 'Read-only', 'data-machine' ),
+				'description'        => __( 'Can read content and use read-oriented agent tools. Cannot create, edit, publish, delete, or change settings.', 'data-machine' ),
+				'ability_categories' => array( 'datamachine-agent', 'datamachine-content', 'datamachine-memory' ),
+				'ability_allow'      => array(),
+				'ability_deny'       => array(),
+				'capabilities'       => array( 'read', 'datamachine_chat', 'datamachine_use_tools' ),
+			),
+			'content_collaborator' => array(
+				'label'              => __( 'Content collaborator', 'data-machine' ),
+				'description'        => __( 'Can draft, edit, and publish owned content through content and memory tools. Cannot manage agents, flows, settings, or logs.', 'data-machine' ),
+				'ability_categories' => array( 'datamachine-agent', 'datamachine-content', 'datamachine-memory', 'datamachine-publishing', 'datamachine-media', 'datamachine-seo' ),
+				'ability_allow'      => array(),
+				'ability_deny'       => array( 'datamachine/delete-flow', 'datamachine/delete-pipeline' ),
+				'capabilities'       => array( 'read', 'edit_posts', 'publish_posts', 'upload_files', 'datamachine_chat', 'datamachine_use_tools' ),
+			),
+			'publisher'            => array(
+				'label'              => __( 'Publisher', 'data-machine' ),
+				'description'        => __( 'Can perform editor-level publishing work. Cannot manage Data Machine settings, flows, or agent credentials.', 'data-machine' ),
+				'ability_categories' => array( 'datamachine-agent', 'datamachine-content', 'datamachine-memory', 'datamachine-publishing', 'datamachine-media', 'datamachine-seo', 'datamachine-taxonomy' ),
+				'ability_allow'      => array(),
+				'ability_deny'       => array( 'datamachine/delete-flow', 'datamachine/delete-pipeline' ),
+				'capabilities'       => array( 'read', 'edit_posts', 'publish_posts', 'edit_others_posts', 'edit_published_posts', 'upload_files', 'datamachine_chat', 'datamachine_use_tools' ),
+			),
+			'full_owner_ceiling'   => array(
+				'label'              => __( 'Full owner ceiling', 'data-machine' ),
+				'description'        => __( 'Current behavior: this token can use anything the authorizing user can use. Choose only for trusted runtimes.', 'data-machine' ),
+				'ability_categories' => array(),
+				'ability_allow'      => array(),
+				'ability_deny'       => array(),
+				'capabilities'       => null,
+			),
+		);
+
+		/**
+		 * Filter approve-time agent token scope presets.
+		 *
+		 * Each preset may define label, description, ability_categories,
+		 * ability_allow, ability_deny, and capabilities. A null capabilities value
+		 * means unrestricted owner ceiling for backwards compatibility.
+		 *
+		 * @since 1.0.0
+		 *
+		 * @param array<string,array<string,mixed>> $presets      Scope presets keyed by slug.
+		 * @param array                            $agent        Agent row.
+		 * @param string                           $redirect_uri Redirect URI being authorized.
+		 */
+		$presets = apply_filters( 'datamachine_agent_scope_presets', $presets, $agent, $redirect_uri );
+
+		$normalized = array();
+		foreach ( (array) $presets as $key => $preset ) {
+			$key = sanitize_key( (string) $key );
+			if ( '' === $key || ! is_array( $preset ) ) {
+				continue;
+			}
+
+			$normalized[ $key ] = array(
+				'label'              => sanitize_text_field( (string) ( $preset['label'] ?? $key ) ),
+				'description'        => sanitize_text_field( (string) ( $preset['description'] ?? '' ) ),
+				'ability_categories' => $this->normalize_string_list( $preset['ability_categories'] ?? array() ),
+				'ability_allow'      => $this->normalize_string_list( $preset['ability_allow'] ?? array() ),
+				'ability_deny'       => $this->normalize_string_list( $preset['ability_deny'] ?? array() ),
+				'capabilities'       => array_key_exists( 'capabilities', $preset ) && null === $preset['capabilities'] ? null : $this->normalize_string_list( $preset['capabilities'] ?? array() ),
+			);
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * @param array<string,array<string,mixed>> $presets Scope presets.
+	 */
+	private function get_default_scope_key( array $agent, string $redirect_uri, array $presets ): string {
+		$config  = $agent['agent_config'] ?? array();
+		$default = is_array( $config ) ? sanitize_key( (string) ( $config['default_scope'] ?? '' ) ) : '';
+
+		if ( '' !== $default && isset( $presets[ $default ] ) ) {
+			return $default;
+		}
+
+		return isset( $presets['full_owner_ceiling'] ) ? 'full_owner_ceiling' : (string) array_key_first( $presets );
+	}
+
+	/**
+	 * @param array<string,mixed> $preset Scope preset.
+	 */
+	private function scope_payload_from_preset( string $scope_key, array $preset ): ?array {
+		if ( array_key_exists( 'capabilities', $preset ) && null === $preset['capabilities'] ) {
+			return null;
+		}
+
+		return array(
+			'scope'              => $scope_key,
+			'label'              => (string) ( $preset['label'] ?? $scope_key ),
+			'ability_categories' => $this->normalize_string_list( $preset['ability_categories'] ?? array() ),
+			'ability_allow'      => $this->normalize_string_list( $preset['ability_allow'] ?? array() ),
+			'ability_deny'       => $this->normalize_string_list( $preset['ability_deny'] ?? array() ),
+			'capabilities'       => $this->normalize_string_list( $preset['capabilities'] ?? array() ),
+		);
+	}
+
+	/**
+	 * @param mixed $value Raw list-like value.
+	 * @return array<int,string>
+	 */
+	private function normalize_string_list( mixed $value ): array {
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		$items = array();
+		foreach ( $value as $item ) {
+			if ( ! is_scalar( $item ) ) {
+				continue;
+			}
+
+			$item = trim( (string) $item );
+			if ( '' !== $item ) {
+				$items[] = $item;
+			}
+		}
+
+		return array_values( array_unique( $items ) );
+	}
+
+	/**
 	 * Render the consent screen HTML.
 	 *
 	 * Minimal, self-contained page — no admin chrome needed.
@@ -501,6 +656,19 @@ class AgentAuthorize {
 
 		$parsed_uri  = wp_parse_url( $redirect_uri );
 		$uri_display = esc_html( ( $parsed_uri['host'] ?? '' ) . ( isset( $parsed_uri['port'] ) ? ':' . $parsed_uri['port'] : '' ) );
+		$presets     = $this->get_scope_presets( $agent, $redirect_uri );
+		$default_key = $this->get_default_scope_key( $agent, $redirect_uri, $presets );
+
+		$scope_options = '';
+		foreach ( $presets as $key => $preset ) {
+			$scope_options .= sprintf(
+				'<label class="scope-option"><input type="radio" name="scope_preset" value="%1$s" %2$s><span><strong>%3$s</strong><small>%4$s</small></span></label>',
+				esc_attr( $key ),
+				checked( $default_key, $key, false ),
+				esc_html( (string) ( $preset['label'] ?? $key ) ),
+				esc_html( (string) ( $preset['description'] ?? '' ) )
+			);
+		}
 
 		header( 'Content-Type: text/html; charset=utf-8' );
 
@@ -573,6 +741,33 @@ class AgentAuthorize {
 			border-left: 4px solid #dba617;
 			border-radius: 0 4px 4px 0;
 		}
+		.scope-options {
+			border: 1px solid #dcdcde;
+			border-radius: 6px;
+			margin-bottom: 1.5rem;
+			overflow: hidden;
+		}
+		.scope-options legend {
+			font-size: 0.75rem;
+			font-weight: 700;
+			color: #50575e;
+			padding: 0 0.5rem;
+			margin-left: 0.75rem;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+		}
+		.scope-option {
+			display: flex;
+			gap: 0.75rem;
+			padding: 0.875rem 1rem;
+			border-top: 1px solid #dcdcde;
+			cursor: pointer;
+		}
+		.scope-option:first-of-type { border-top: 0; }
+		.scope-option:hover { background: #f6f7f7; }
+		.scope-option input { margin-top: 0.2rem; }
+		.scope-option strong { display: block; font-size: 0.9375rem; margin-bottom: 0.25rem; }
+		.scope-option small { display: block; color: #646970; line-height: 1.4; }
 		.auth-actions {
 			display: flex;
 			gap: 0.75rem;
@@ -624,7 +819,7 @@ class AgentAuthorize {
 		</dl>
 
 		<div class="auth-notice">
-			This will create a bearer token granting <strong>' . esc_html( $agent_name ) . '</strong> API access to this site with your permissions. The token does not expire.
+			This will create a bearer token for <strong>' . esc_html( $agent_name ) . '</strong>. Choose the least privilege this runtime needs. The token does not expire.
 		</div>
 
 		<form method="POST" action="' . esc_url( $action_url ) . '">
@@ -638,6 +833,25 @@ class AgentAuthorize {
 			<input type="hidden" name="code_challenge_method" value="' . esc_attr( $code_challenge_method ) . '">' : '' ) .
 			( ! empty( $state ) ? '
 			<input type="hidden" name="state" value="' . esc_attr( $state ) . '">' : '' ) . '
+
+			<fieldset class="scope-options">
+				<legend>Access scope</legend>
+				' . wp_kses(
+					$scope_options,
+					array(
+						'label'  => array( 'class' => true ),
+						'input'  => array(
+							'type'    => true,
+							'name'    => true,
+							'value'   => true,
+							'checked' => true,
+						),
+						'span'   => array(),
+						'strong' => array(),
+						'small'  => array(),
+					)
+				) . '
+			</fieldset>
 
 			<div class="auth-actions">
 				<button type="submit" name="action" value="authorize" class="btn-authorize">Authorize</button>

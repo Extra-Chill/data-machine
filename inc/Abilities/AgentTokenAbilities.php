@@ -320,7 +320,15 @@ class AgentTokenAbilities {
 
 		$tokens_repo = new AgentTokens();
 		$tokens      = array_map(
-			static fn( \WP_Agent_Token $token ): array => $token->to_metadata_array(),
+			static function ( \WP_Agent_Token $token ): array {
+				$metadata = $token->to_metadata_array();
+				$scope    = isset( $token->metadata['datamachine_scope'] ) && is_array( $token->metadata['datamachine_scope'] )
+					? $token->metadata['datamachine_scope']
+					: $token->allowed_capabilities;
+
+				$metadata['scope_label'] = AgentTokens::scope_label( $scope );
+				return $metadata;
+			},
 			$tokens_repo->list_tokens( (string) $agent_id )
 		);
 

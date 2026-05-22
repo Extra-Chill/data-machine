@@ -70,6 +70,11 @@ final class DataMachineToolAccessPolicy {
 				}
 
 				$ability = $registry->get_registered( $slug );
+				$category = is_object( $ability ) && method_exists( $ability, 'get_category' ) ? (string) $ability->get_category() : '';
+				if ( ! PermissionHelper::can_use_ability( $slug, $category ) ) {
+					return false;
+				}
+
 				if ( ! $ability || ! $ability->check_permissions() ) {
 					return false;
 				}

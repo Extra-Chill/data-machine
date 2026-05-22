@@ -9,6 +9,7 @@
 namespace DataMachine\Abilities;
 
 use AgentsAPI\AI\WP_Agent_Execution_Principal;
+use DataMachine\Core\Database\Agents\AgentTokens;
 
 /**
  * Helper class for ability permission checks.
@@ -99,6 +100,14 @@ class PermissionHelper {
 	 * @var array|null
 	 */
 	private static ?\WP_Agent_Capability_Ceiling $capability_ceiling = null;
+
+	/**
+	 * Structured token scope for Data Machine ability-category enforcement.
+	 *
+	 * @since 1.0.0
+	 * @var array|null
+	 */
+	private static ?array $agent_token_scope = null;
 
 	/**
 	 * Agents API execution principal for the current request.
@@ -264,15 +273,19 @@ class PermissionHelper {
 	 * @param int|null   $token_id     Token ID for login-level runtime scoping.
 	 */
 	public static function set_agent_context( int $agent_id, int $owner_id, ?array $capabilities = null, ?int $token_id = null ): void {
+		$scope = AgentTokens::normalize_capability_payload( $capabilities );
+
 		self::$acting_agent_id     = $agent_id;
 		self::$acting_token_id     = $token_id;
 		self::$agent_owner_id      = $owner_id;
+		self::$agent_token_scope   = $scope['stored_payload'];
 		self::$capability_ceiling  = new \WP_Agent_Capability_Ceiling(
 			$owner_id,
-			$capabilities,
+			$scope['allowed_capabilities'],
 			array(
 				'agent_id' => $agent_id,
 				'token_id' => $token_id,
+				'scope'    => $scope['stored_payload'],
 			)
 		);
 		self::$execution_principal = null !== $token_id
@@ -307,6 +320,7 @@ class PermissionHelper {
 		self::$acting_token_id     = null;
 		self::$agent_owner_id      = 0;
 		self::$capability_ceiling  = null;
+		self::$agent_token_scope   = null;
 		self::$execution_principal = null;
 		self::$caller_context      = null;
 	}
@@ -409,6 +423,61 @@ class PermissionHelper {
 	 */
 	public static function in_agent_context(): bool {
 		return null !== self::$acting_agent_id;
+	}
+
+	/**
+	 * Check whether the current token scope allows a Data Machine ability.
+	 *
+	 * Raw WordPress capabilities remain enforced separately through the Agents API
+	 * capability ceiling. This method applies Data Machine's structured scope
+	 * metadata: category allow-list, explicit ability allow-list, and deny-list.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $ability_slug Ability slug, e.g. datamachine/get-posts.
+	 * @param string $category     Optional already-resolved ability category.
+	 * @return bool
+	 */
+	public static function can_use_ability( string $ability_slug, string $category = '' ): bool {
+		if ( '' === trim( $ability_slug ) ) {
+			return false;
+		}
+
+		if ( null === self::$acting_agent_id || null === self::$agent_token_scope ) {
+			return true;
+		}
+
+		$scope = AgentTokens::normalize_capability_payload( self::$agent_token_scope )['stored_payload'];
+		if ( null === $scope ) {
+			return true;
+		}
+
+		$deny = (array) ( $scope['ability_deny'] ?? array() );
+		if ( in_array( $ability_slug, $deny, true ) ) {
+			return false;
+		}
+
+		$allow = (array) ( $scope['ability_allow'] ?? array() );
+		if ( in_array( $ability_slug, $allow, true ) ) {
+			return true;
+		}
+
+		$categories = (array) ( $scope['ability_categories'] ?? array() );
+		if ( array() === $categories ) {
+			return true;
+		}
+
+		if ( '' === $category && class_exists( '\\WP_Abilities_Registry' ) ) {
+			$registry = \WP_Abilities_Registry::get_instance();
+			if ( method_exists( $registry, 'is_registered' ) && $registry->is_registered( $ability_slug ) ) {
+				$ability = $registry->get_registered( $ability_slug );
+				if ( is_object( $ability ) && method_exists( $ability, 'get_category' ) ) {
+					$category = (string) $ability->get_category();
+				}
+			}
+		}
+
+		return '' !== $category && in_array( $category, $categories, true );
 	}
 
 	/**

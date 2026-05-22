@@ -203,6 +203,53 @@ class PermissionHelperTest extends WP_UnitTestCase {
 		$this->assertFalse( PermissionHelper::can( 'manage_agents' ) );
 	}
 
+	public function test_agent_token_context_accepts_structured_scope_payload(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+
+		PermissionHelper::set_agent_context(
+			123,
+			$user_id,
+			array(
+				'scope'              => 'read_only',
+				'label'              => 'Read-only',
+				'ability_categories' => array( 'datamachine-content' ),
+				'ability_allow'      => array( 'datamachine/wiki' ),
+				'ability_deny'       => array( 'datamachine/delete-post' ),
+				'capabilities'       => array( 'datamachine_chat' ),
+			),
+			456
+		);
+
+		$principal = PermissionHelper::get_execution_principal();
+
+		$this->assertSame( array( 'datamachine_chat' ), $principal->capability_ceiling->allowed_capabilities );
+		$this->assertTrue( PermissionHelper::can( 'chat' ) );
+		$this->assertFalse( PermissionHelper::can( 'use_tools' ) );
+	}
+
+	public function test_structured_scope_enforces_ability_allow_deny_and_categories(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+
+		PermissionHelper::set_agent_context(
+			123,
+			$user_id,
+			array(
+				'scope'              => 'content_collaborator',
+				'label'              => 'Content collaborator',
+				'ability_categories' => array( 'datamachine-content' ),
+				'ability_allow'      => array( 'datamachine/wiki' ),
+				'ability_deny'       => array( 'datamachine/delete-post' ),
+				'capabilities'       => array( 'datamachine_chat' ),
+			),
+			456
+		);
+
+		$this->assertTrue( PermissionHelper::can_use_ability( 'datamachine/get-posts', 'datamachine-content' ) );
+		$this->assertTrue( PermissionHelper::can_use_ability( 'datamachine/wiki', 'datamachine-system' ) );
+		$this->assertFalse( PermissionHelper::can_use_ability( 'datamachine/delete-post', 'datamachine-content' ) );
+		$this->assertFalse( PermissionHelper::can_use_ability( 'datamachine/update-settings', 'datamachine-settings' ) );
+	}
+
 	public function test_user_session_agent_context_uses_owner_ceiling_without_token_id(): void {
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 
