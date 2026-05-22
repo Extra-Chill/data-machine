@@ -371,19 +371,19 @@ class Jobs extends BaseRepository {
 
 		if ( is_array( $fields ) && ! empty( $fields ) ) {
 			$allowed_fields = array(
-				'job_id'         => 'j.job_id',
-				'user_id'        => 'j.user_id',
-				'pipeline_id'    => 'j.pipeline_id',
-				'flow_id'        => 'j.flow_id',
-				'source'         => 'j.source',
-				'label'          => 'j.label',
-				'parent_job_id'  => 'j.parent_job_id',
-				'status'         => 'j.status',
-				'engine_data'    => 'j.engine_data',
-				'created_at'     => 'j.created_at',
-				'completed_at'   => 'j.completed_at',
-				'pipeline_name'  => 'p.pipeline_name',
-				'flow_name'      => 'f.flow_name',
+				'job_id'        => 'j.job_id',
+				'user_id'       => 'j.user_id',
+				'pipeline_id'   => 'j.pipeline_id',
+				'flow_id'       => 'j.flow_id',
+				'source'        => 'j.source',
+				'label'         => 'j.label',
+				'parent_job_id' => 'j.parent_job_id',
+				'status'        => 'j.status',
+				'engine_data'   => 'j.engine_data',
+				'created_at'    => 'j.created_at',
+				'completed_at'  => 'j.completed_at',
+				'pipeline_name' => 'p.pipeline_name',
+				'flow_name'     => 'f.flow_name',
 			);
 
 			$requested_fields = array_values( array_unique( array_filter( array_map( 'strval', $fields ) ) ) );
