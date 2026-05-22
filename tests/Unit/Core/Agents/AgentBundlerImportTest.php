@@ -36,6 +36,7 @@ use DataMachine\Core\Database\Jobs\Jobs as JobsRepository;
 use DataMachine\Core\Database\Pipelines\Pipelines as PipelinesRepository;
 use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
+use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\BundleSchema;
@@ -225,6 +226,55 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( 'daily', $flow['scheduling_config']['interval'] ?? null, 'Importer preserves the bundle interval.' );
 		$this->assertTrue( $flow['scheduling_config']['enabled'] ?? false, 'Importer keeps scheduled bundle flows enabled.' );
 		$this->assertSame( array( 'mcp' => 5 ), $flow['scheduling_config']['max_items'] ?? null, 'Importer preserves bundle max item caps.' );
+	}
+
+	public function test_directory_value_object_import_preserves_workflow_runtime_seed_fields(): void {
+		$bundle = $this->fixture_bundle( 'directory-import-agent' );
+		$bundle['flows'][0]['flow_config']['1_step-uuid_1'] = array_merge(
+			$bundle['flows'][0]['flow_config']['1_step-uuid_1'],
+			array(
+				'step_type'          => 'fetch',
+				'handler_configs'    => array(
+					'mcp' => array(
+						'provider' => 'mgs',
+						'auth_ref' => 'mgs:default',
+					),
+				),
+				'enabled_tools'      => array( 'datamachine/search' ),
+				'disabled_tools'     => array( 'datamachine/delete-flow' ),
+				'config_patch_queue' => array(
+					array( 'patch' => array( 'query' => 'bundle-seed' ) ),
+				),
+				'queue_mode'         => 'loop',
+				'enabled'            => false,
+			)
+		);
+		$bundle['flows'][0]['scheduling_config'] = array(
+			'enabled'  => true,
+			'interval' => 'daily',
+			'max_items' => array(
+				'mcp' => 7,
+			),
+		);
+
+		$directory = AgentBundleArrayAdapter::from_array_bundle( $bundle );
+		$result    = $this->bundler->import_directory_object( $directory, null, $this->owner_id );
+
+		$this->assertTrue( (bool) $result['success'], 'Directory value-object import succeeds.' );
+
+		$agent    = $this->agents_repo->get_by_slug( 'directory-import-agent' );
+		$pipeline = $this->pipelines_repo->get_by_portable_slug( (int) $agent['agent_id'], 'static-site-pipeline' );
+		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
+		$step     = reset( $flow['flow_config'] );
+
+		$this->assertSame( 'mgs:default', $step['handler_configs']['mcp']['auth_ref'] ?? null, 'Handler config imports from directory document.' );
+		$this->assertSame( array( 'datamachine/search' ), $step['enabled_tools'] ?? null, 'Enabled tools import from directory document.' );
+		$this->assertSame( array( 'datamachine/delete-flow' ), $step['disabled_tools'] ?? null, 'Disabled tools import from directory document.' );
+		$this->assertSame( 'bundle-seed', $step['config_patch_queue'][0]['patch']['query'] ?? null, 'Queue seed imports from directory document.' );
+		$this->assertSame( 'loop', $step['queue_mode'] ?? null, 'Queue state imports from directory document.' );
+		$this->assertFalse( $step['enabled'] ?? true, 'Disabled step state imports from directory document.' );
+		$this->assertSame( 'daily', $flow['scheduling_config']['interval'] ?? null, 'Schedule imports from directory document.' );
+		$this->assertSame( array( 'mcp' => 7 ), $flow['scheduling_config']['max_items'] ?? null, 'Schedule limits import from directory document.' );
 	}
 
 	public function test_import_exposes_run_artifact_egress_policy_in_agent_and_flow_metadata(): void {
