@@ -346,8 +346,8 @@ class RunMetrics {
 	}
 
 	private static function classesFromStepResult( array $step_result, string $status = '' ): array {
-		$result = (string) ( $step_result['result'] ?? '' );
-		$reason = self::outcomeReasonFrom( $step_result, $status );
+		$result  = (string) ( $step_result['result'] ?? '' );
+		$reason  = self::outcomeReasonFrom( $step_result, $status );
 		$classes = self::classesFromReason( $reason );
 
 		if ( in_array( $result, array( 'no_content', 'completed_no_items' ), true ) ) {
