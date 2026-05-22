@@ -114,6 +114,19 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 	 * @inheritDoc
 	 */
 	public function recordNaturalCompletion( array $messages, string $assistant_text, array $runtime_context, int $turn_count ): WP_Agent_Conversation_Completion_Decision {
+		$remaining_handlers = $this->remainingConfiguredHandlers();
+		if ( ! empty( $remaining_handlers ) ) {
+			return WP_Agent_Conversation_Completion_Decision::incomplete(
+				'AIConversationLoop: Configured handler completion missing, nudging continuation',
+				array(
+					'turn_count'           => $turn_count,
+					'remaining_handlers'   => $remaining_handlers,
+					'configured_handlers'  => $this->configured_handlers,
+					'continuation_message' => DataMachineCompletionAssertions::buildNudge( array( 'handler_slugs' => $remaining_handlers ), $messages ),
+				)
+			);
+		}
+
 		$evaluation = $this->assertions->evaluate( $runtime_context, $assistant_text );
 		if ( $evaluation['complete'] ) {
 			return WP_Agent_Conversation_Completion_Decision::complete(
@@ -135,6 +148,19 @@ class DataMachineHandlerCompletionPolicy implements WP_Agent_Conversation_Comple
 				'continuation_message' => DataMachineCompletionAssertions::buildNudge( $evaluation['missing'], $messages ),
 			)
 		);
+	}
+
+	/**
+	 * Return configured handler slugs that have not completed yet.
+	 *
+	 * @return array<int,string>
+	 */
+	private function remainingConfiguredHandlers(): array {
+		if ( empty( $this->configured_handlers ) ) {
+			return array();
+		}
+
+		return array_values( array_diff( $this->configured_handlers, array_unique( $this->executed_handler_slugs ) ) );
 	}
 
 	/**
