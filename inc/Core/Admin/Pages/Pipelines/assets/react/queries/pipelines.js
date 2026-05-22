@@ -73,7 +73,11 @@ export const usePipelineSearch = ( {
 	const normalizedSearch = search ? search.trim() : '';
 
 	return useQuery( {
-		queryKey: [ 'pipelines', 'search', { search: normalizedSearch, perPage } ],
+		queryKey: [
+			'pipelines',
+			'search',
+			{ search: normalizedSearch, perPage },
+		],
 		queryFn: async () => {
 			const response = await fetchPipelines( null, {
 				perPage,
@@ -96,14 +100,12 @@ export const usePipelineSearch = ( {
 };
 
 /**
- * Fetch a single pipeline by ID. Falls back to the `[ 'pipelines' ]` list
- * cache so reads are free when the pipeline is already in memory.
+ * Fetch a single pipeline by ID with full config. The pipeline list cache is
+ * intentionally lightweight and omits pipeline_config for scalable list loads.
  *
  * @param {number|string|null} pipelineId
  */
 export const usePipeline = ( pipelineId ) => {
-	const queryClient = useQueryClient();
-
 	return useQuery( {
 		queryKey: [
 			'pipelines',
@@ -111,19 +113,9 @@ export const usePipeline = ( pipelineId ) => {
 			pipelineId ? String( pipelineId ) : null,
 		],
 		queryFn: async () => {
-			// Prefer the list cache when the pipeline is already there.
-			const cachedList = queryClient.getQueryData( [ 'pipelines' ] );
-			if ( Array.isArray( cachedList ) ) {
-				const hit = cachedList.find( ( p ) =>
-					isSameId( p.pipeline_id, pipelineId )
-				);
-				if ( hit ) {
-					return hit;
-				}
-			}
-
 			const response = await fetchPipelines( pipelineId, {
 				includeFlows: false,
+				outputMode: 'full',
 			} );
 			if ( ! response.success ) {
 				throw getFetchError( response, 'Failed to fetch pipeline' );
@@ -289,8 +281,6 @@ export const useDeletePipelineStep = () => {
 		},
 	} );
 };
-
-
 
 export const useUploadContextFile = () => {
 	const queryClient = useQueryClient();

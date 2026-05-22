@@ -7,7 +7,10 @@ $root = dirname( __DIR__ );
 
 $get_pipelines    = file_get_contents( $root . '/inc/Abilities/Pipeline/GetPipelinesAbility.php' );
 $pipeline_helpers = file_get_contents( $root . '/inc/Abilities/Pipeline/PipelineHelpers.php' );
+$pipeline_db      = file_get_contents( $root . '/inc/Core/Database/Pipelines/Pipelines.php' );
 $rest_api         = file_get_contents( $root . '/inc/Api/Pipelines/Pipelines.php' );
+$pipelines_app    = file_get_contents( $root . '/inc/Core/Admin/Pages/Pipelines/assets/react/PipelinesApp.jsx' );
+$pipeline_queries = file_get_contents( $root . '/inc/Core/Admin/Pages/Pipelines/assets/react/queries/pipelines.js' );
 $pipelines_client = file_get_contents( $root . '/inc/Core/Admin/Pages/Pipelines/assets/react/utils/api.js' );
 $jobs_client      = file_get_contents( $root . '/inc/Core/Admin/Pages/Jobs/assets/react/api/jobs.js' );
 
@@ -35,6 +38,19 @@ $assert(
 );
 
 $assert(
+	'pipeline database exposes summary query without pipeline_config',
+	false !== strpos( $pipeline_db, 'function get_all_pipelines_summary' )
+		&& false !== strpos( $pipeline_db, 'SELECT pipeline_id, pipeline_name, user_id, agent_id, portable_slug, created_at, updated_at' )
+		&& false === strpos( $pipeline_db, 'SELECT pipeline_id, pipeline_name, pipeline_config' )
+);
+
+$assert(
+	'pipeline ability uses summary query for list-like modes',
+	false !== strpos( $get_pipelines, "array( 'list', 'summary', 'ids' )" )
+		&& false !== strpos( $get_pipelines, 'get_all_pipelines_summary' )
+);
+
+$assert(
 	'pipeline list branch unsets embedded flows',
 	false !== strpos( $pipeline_helpers, "unset( \$pipeline['flows'] );" )
 );
@@ -57,6 +73,17 @@ $assert(
 $assert(
 	'pipelines admin client requests list output mode',
 	false !== strpos( $pipelines_client, "outputMode = 'list'" ) && false !== strpos( $pipelines_client, 'output_mode: outputMode' )
+);
+
+$assert(
+	'selected pipeline query requests full output mode',
+	false !== strpos( $pipeline_queries, "outputMode: 'full'" )
+);
+
+$assert(
+	'pipelines app hydrates selected pipeline separately from list cache',
+	false !== strpos( $pipelines_app, 'usePipeline( selectedPipelineId || null )' )
+		&& false !== strpos( $pipelines_app, 'fetchedSelectedPipeline || selectedFromList' )
 );
 
 $assert(
