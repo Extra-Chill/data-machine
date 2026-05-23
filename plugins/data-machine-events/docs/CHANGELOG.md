@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.39.1] - 2026-05-23
+
+### Changed
+- replace ec_is_team_member with filterable cap (closes #294)
+
 ## [0.39.0] - 2026-05-21
 
 ### Added
