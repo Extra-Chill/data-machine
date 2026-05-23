@@ -79,6 +79,9 @@ require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agen
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolParameters.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/Execution/ToolExecutionCore.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutor.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineToolAccessPolicy.php';
@@ -89,6 +92,7 @@ require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 
 use DataMachine\Engine\AI\Tools\ToolManager;
+use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 
 class SourcePolicyToolManager extends ToolManager {
@@ -406,6 +410,18 @@ $direct_execute  = strpos( $executor_source, 'executePreparedTool' );
 assert_source_equals( true, false !== $client_guard, 'ToolExecutor has an explicit client-executor guard', $failures, $passes );
 assert_source_equals( true, false !== $client_guard && false !== $policy_resolver && $client_guard < $policy_resolver, 'client-executor guard runs before action-policy/direct execution setup', $failures, $passes );
 assert_source_equals( true, false !== $client_guard && false !== $direct_execute && $client_guard < $direct_execute, 'client-executor guard runs before direct PHP tool execution', $failures, $passes );
+
+$client_execution = ToolExecutor::executeTool(
+	'client/select_block',
+	array( 'client_id' => 'block-1' ),
+	$runtime_tools,
+	array(),
+	ToolPolicyResolver::MODE_CHAT,
+	0,
+	array()
+);
+assert_source_equals( false, $client_execution['success'] ?? null, 'client runtime tool is intentionally not executed server-side', $failures, $passes );
+assert_source_equals( 'client', $client_execution['executor'] ?? '', 'client runtime execution refusal preserves executor marker', $failures, $passes );
 
 echo "\n[7] Data Machine source adapters own product vocabulary:\n";
 $registry_source          = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php' );
