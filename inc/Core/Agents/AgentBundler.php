@@ -938,8 +938,8 @@ class AgentBundler {
 
 			// 6. Track bundle-owned prompt/rubric artifacts.
 			foreach ( AgentBundleMaterializedArtifacts::from_array_bundle( $bundle ) as $artifact ) {
-				$artifact_key = self::artifact_key( (string) $artifact['artifact_type'], (string) $artifact['artifact_id'] );
-				$record       = is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null;
+				$artifact_key  = self::artifact_key( (string) $artifact['artifact_type'], (string) $artifact['artifact_id'] );
+				$record        = is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null;
 				$local_payload = AgentBundleMaterializedArtifacts::current_payload_from_record( $record );
 
 				if (
