@@ -277,6 +277,33 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'mcp' => 7 ), $flow['scheduling_config']['max_items'] ?? null, 'Schedule limits import from directory document.' );
 	}
 
+	public function test_schema_versioned_array_import_does_not_require_source_install_ids(): void {
+		$bundle = AgentBundleArrayAdapter::to_array_bundle( AgentBundleArrayAdapter::from_array_bundle( $this->fixture_bundle( 'schema-array-agent' ) ) );
+		$this->assertSame( BundleSchema::VERSION, $bundle['bundle_schema_version'] ?? null, 'Test fixture uses integer schema version.' );
+		unset( $bundle['pipelines'][0]['original_id'], $bundle['flows'][0]['original_id'], $bundle['flows'][0]['original_pipeline_id'] );
+
+		$result = $this->bundler->import( $bundle, null, $this->owner_id );
+
+		$this->assertTrue( (bool) $result['success'], 'Schema-versioned array import succeeds.' );
+		$this->assertSame( 1, $result['summary']['flows_imported'] ?? null, 'Schema-versioned arrays rebuild portable flow references without source install IDs.' );
+
+		$agent    = $this->agents_repo->get_by_slug( 'schema-array-agent' );
+		$pipeline = $this->pipelines_repo->get_by_portable_slug( (int) $agent['agent_id'], 'static-site-pipeline' );
+		$flow     = $this->flows_repo->get_by_portable_slug( (int) $pipeline['pipeline_id'], 'static-site-flow' );
+
+		$this->assertNotEmpty( $flow, 'Flow imports from a schema-versioned array that omits source install IDs.' );
+	}
+
+	public function test_schema_versioned_array_import_preserves_abilities_manifest_for_dry_run_checks(): void {
+		$bundle                       = AgentBundleArrayAdapter::to_array_bundle( AgentBundleArrayAdapter::from_array_bundle( $this->fixture_bundle( 'schema-abilities-agent' ) ) );
+		$bundle['abilities_manifest'] = array( 'datamachine/test-missing-ability' );
+
+		$result = $this->bundler->import( $bundle, null, $this->owner_id, true );
+
+		$this->assertTrue( (bool) $result['success'], 'Schema-versioned dry run succeeds.' );
+		$this->assertSame( array( 'datamachine/test-missing-ability' ), $result['summary']['missing_abilities'] ?? null, 'Abilities manifest survives schema array canonicalization.' );
+	}
+
 	public function test_import_exposes_run_artifact_egress_policy_in_agent_and_flow_metadata(): void {
 		$bundle                  = $this->fixture_bundle( 'artifact-policy-agent' );
 		$bundle['run_artifacts'] = array(

@@ -1163,11 +1163,16 @@ class AgentBundler {
 	 * @return array Importable bundle array.
 	 */
 	private function canonical_import_bundle( array $bundle ): array {
-		if ( (string) ( $bundle['bundle_schema_version'] ?? '' ) !== BundleSchema::VERSION ) {
+		if ( (string) ( $bundle['bundle_schema_version'] ?? '' ) !== (string) BundleSchema::VERSION ) {
 			return $bundle;
 		}
 
-		return AgentBundleArrayAdapter::to_array_bundle( AgentBundleArrayAdapter::from_array_bundle( $bundle ) );
+		$canonical = AgentBundleArrayAdapter::to_array_bundle( AgentBundleArrayAdapter::from_array_bundle( $bundle ) );
+		if ( is_array( $bundle['abilities_manifest'] ?? null ) ) {
+			$canonical['abilities_manifest'] = $bundle['abilities_manifest'];
+		}
+
+		return $canonical;
 	}
 
 	/**
