@@ -45,7 +45,7 @@ class DownloadGoogleDriveAbility {
 				array(
 					'label'               => __( 'Download Google Drive File', 'data-machine-business' ),
 					'description'         => __( 'Download a binary Google Drive file to local disk. Defaults to the WordPress uploads area under drive-imports/<YYYY>/<MM>/. Refuses native Google Docs/Sheets/Slides — use read-googledrive-doc for those.', 'data-machine-business' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'file' ),

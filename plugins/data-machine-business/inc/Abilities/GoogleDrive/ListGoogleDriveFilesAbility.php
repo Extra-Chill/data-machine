@@ -44,7 +44,7 @@ class ListGoogleDriveFilesAbility {
 				array(
 					'label'               => __( 'List Google Drive Files', 'data-machine-business' ),
 					'description'         => __( 'List every file in a Google Drive folder. Drains all pagination pages and returns metadata only — does not export Docs or download binaries.', 'data-machine-business' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'folder' ),

@@ -51,7 +51,7 @@ class ReadGoogleDriveDocAbility {
 				array(
 					'label'               => __( 'Read Google Drive Document', 'data-machine-business' ),
 					'description'         => __( 'Export the text content of a Google Doc, Sheet, or Slides file as markdown, plain text, or CSV. Refuses native binary files (use download-googledrive for those).', 'data-machine-business' ),
-					'category'            => 'datamachine',
+					'category'            => 'datamachine-fetch',
 					'input_schema'        => array(
 						'type'       => 'object',
 						'required'   => array( 'file' ),
