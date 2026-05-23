@@ -618,7 +618,7 @@ function datamachine_build_turn_runner(
 				}
 
 				if ( ! empty( $tool_result['pending'] ) && is_array( $tool_result['runtime_tool_request'] ?? null ) ) {
-					$runtime_tool_pending    = true;
+					$runtime_tool_pending     = true;
 					$runtime_pending_turn     = true;
 					$conversation_complete    = true;
 					$runtime_tool_requests[]  = $tool_result['runtime_tool_request'];
@@ -1073,9 +1073,9 @@ function datamachine_store_runtime_tool_request_on_session( array $pending_reque
 		? $metadata['runtime_tool_requests']
 		: array();
 	$metadata['runtime_tool_requests'][ $pending_request['request_id'] ] = $pending_request;
-	$metadata['has_pending_tools'] = true;
-	$metadata['status']            = 'processing';
-	$metadata['last_activity']     = function_exists( 'current_time' ) ? current_time( 'mysql', true ) : gmdate( 'Y-m-d H:i:s' );
+	$metadata['has_pending_tools']                                       = true;
+	$metadata['status']        = 'processing';
+	$metadata['last_activity'] = function_exists( 'current_time' ) ? current_time( 'mysql', true ) : gmdate( 'Y-m-d H:i:s' );
 
 	$chat_db->update_session(
 		$session_id,
@@ -1151,9 +1151,9 @@ function datamachine_submit_runtime_tool_result( string $request_id, $result ): 
 		(string) ( $session['model'] ?? '' )
 	);
 
-	$request['status']       = ! empty( $tool_result['success'] ) ? 'fulfilled' : 'failed';
-	$request['fulfilled_at'] = gmdate( 'c' );
-	$request['result']       = $tool_result;
+	$request['status']                   = ! empty( $tool_result['success'] ) ? 'fulfilled' : 'failed';
+	$request['fulfilled_at']             = gmdate( 'c' );
+	$request['result']                   = $tool_result;
 	$engine_data['runtime_tool_request'] = $request;
 	$jobs_db->store_engine_data( $job_id, $engine_data );
 	$jobs_db->complete_job( $job_id, ! empty( $tool_result['success'] ) ? 'completed' : 'failed' );

@@ -849,14 +849,14 @@ class ChatOrchestrator {
 			}
 
 			return array(
-				'messages'                       => $loop_result['messages'],
-				'final_content'                  => $loop_result['final_content'],
-				'completed'                      => $loop_result['completed'] ?? false,
-				'turn_count'                     => $loop_result['turn_count'] ?? 1,
-				'last_tool_calls'                => $loop_result['last_tool_calls'] ?? array(),
-				'warning'                        => $loop_result['warning'] ?? null,
-				'max_turns_reached'              => $loop_result['max_turns_reached'] ?? false,
-				'usage'                          => $loop_result['usage'] ?? array(),
+				'messages'                      => $loop_result['messages'],
+				'final_content'                 => $loop_result['final_content'],
+				'completed'                     => $loop_result['completed'] ?? false,
+				'turn_count'                    => $loop_result['turn_count'] ?? 1,
+				'last_tool_calls'               => $loop_result['last_tool_calls'] ?? array(),
+				'warning'                       => $loop_result['warning'] ?? null,
+				'max_turns_reached'             => $loop_result['max_turns_reached'] ?? false,
+				'usage'                         => $loop_result['usage'] ?? array(),
 				'runtime_tool_pending_requests' => $loop_result['runtime_tool_pending_requests'] ?? array(),
 			);
 		} catch ( \Throwable $e ) {
