@@ -734,16 +734,17 @@ class ChatOrchestrator {
 			}
 
 			$resolver       = new ToolPolicyResolver();
+			$client_context = $options['client_context'] ?? array();
 			$all_tools      = $resolver->resolve(
 				array(
-					'modes'       => $modes,
-					'agent_id'    => $agent_id,
-					'agent_slug'  => $agent_slug,
-					'user_id'     => $user_id,
-					'interactive' => true,
+					'modes'          => $modes,
+					'agent_id'       => $agent_id,
+					'agent_slug'     => $agent_slug,
+					'user_id'        => $user_id,
+					'interactive'    => true,
+					'client_context' => is_array( $client_context ) ? $client_context : array(),
 				)
 			);
-			$client_context = $options['client_context'] ?? array();
 
 			// `calling_user_id` is the human user on whose behalf this AI invocation
 			// is running. In a chat session that's the chat caller. Tools that resolve
