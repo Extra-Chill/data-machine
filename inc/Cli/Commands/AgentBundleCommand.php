@@ -858,7 +858,7 @@ class AgentBundleCommand extends BaseCommand {
 			}
 			if ( 'flow' === $type && isset( $flow_by_slug[ $id ] ) ) {
 				$installed_payload = is_array( $record['installed_payload'] ?? null ) ? $record['installed_payload'] : null;
-				$artifacts[]        = array(
+				$artifacts[]       = array(
 					'artifact_type' => 'flow',
 					'artifact_id'   => $id,
 					'source_path'   => (string) ( $record['source_path'] ?? '' ),

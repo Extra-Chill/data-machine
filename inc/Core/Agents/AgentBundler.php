@@ -1214,7 +1214,9 @@ class AgentBundler {
 	}
 
 	private function flow_artifact_payload( array $flow, string $portable_slug, ?array $installed_payload = null ): array {
-		$scheduling_policy = $this->bundle_scheduling_policy( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() );
+		$scheduling_policy = is_string( $installed_payload['scheduling_policy'] ?? null )
+			? $installed_payload['scheduling_policy']
+			: $this->bundle_scheduling_policy( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() );
 		$run_artifacts     = \DataMachine\Engine\Bundle\BundleSchema::normalize_run_artifact_egress_policy( $flow['run_artifacts'] ?? $flow['scheduling_config']['run_artifacts'] ?? array() );
 
 		$payload = array(
@@ -1385,14 +1387,20 @@ class AgentBundler {
 	}
 
 	private function flow_config_without_runtime_queues( array $flow_config ): array {
-		foreach ( $flow_config as &$step ) {
+		$normalized = array();
+		foreach ( $flow_config as $flow_step_id => $step ) {
 			if ( ! is_array( $step ) ) {
+				$normalized[ (string) $flow_step_id ] = $step;
 				continue;
 			}
 			unset( $step['prompt_queue'], $step['config_patch_queue'], $step['queue_mode'], $step['_queue_consume_revision'] );
+			unset( $step['pipeline_id'], $step['flow_id'], $step['flow_step_id'] );
 			unset( $step['handler_config']['max_items'] );
 			if ( empty( $step['handler_config'] ) ) {
 				unset( $step['handler_config'] );
+			}
+			if ( isset( $step['pipeline_step_id'] ) ) {
+				$step['pipeline_step_id'] = $this->normalize_artifact_step_id( (string) $step['pipeline_step_id'] );
 			}
 			if ( is_array( $step['handler_configs'] ?? null ) ) {
 				foreach ( $step['handler_configs'] as $handler_slug => &$handler_config ) {
@@ -1408,10 +1416,20 @@ class AgentBundler {
 					unset( $step['handler_configs'] );
 				}
 			}
-		}
-		unset( $step );
 
-		return $flow_config;
+			$normalized[ $this->normalize_artifact_step_id( (string) $flow_step_id ) ] = $step;
+		}
+		ksort( $normalized, SORT_STRING );
+
+		return $normalized;
+	}
+
+	private function normalize_artifact_step_id( string $step_id ): string {
+		$normalized = preg_replace( '/^\d+_/', '', $step_id );
+		$normalized = is_string( $normalized ) ? $normalized : $step_id;
+		$normalized = preg_replace( '/_\d+$/', '', $normalized );
+
+		return is_string( $normalized ) && '' !== $normalized ? $normalized : $step_id;
 	}
 
 	private function flow_runtime_overlays( array $flow, ?array $installed_payload = null ): array {
