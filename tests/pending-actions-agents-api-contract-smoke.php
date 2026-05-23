@@ -180,8 +180,42 @@ if ( ! function_exists( 'delete_transient' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+	function sanitize_text_field( $value ) {
+		return trim( strip_tags( (string) $value ) );
+	}
+}
+
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $value ): bool {
+		return $value instanceof WP_Error;
+	}
+}
+
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		private string $message;
+
+		public function __construct( string $_code = '', string $message = '' ) {
+			$this->message = $message;
+		}
+
+		public function get_error_message(): string {
+			return $this->message;
+		}
+	}
+}
+
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $_hook_name, $value ) {
+		if ( 'wp_agent_pending_action_store' === $_hook_name && isset( $GLOBALS['datamachine_pending_action_store_override'] ) ) {
+			return $GLOBALS['datamachine_pending_action_store_override'];
+		}
+
+		if ( 'wp_agent_pending_action_store' === $_hook_name && class_exists( '\DataMachine\Engine\AI\Actions\PendingActionStore' ) ) {
+			return \DataMachine\Engine\AI\Actions\PendingActionStore::adapter();
+		}
+
 		return $value;
 	}
 }
@@ -214,6 +248,7 @@ require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionObservers
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/WordPressActionDispatchObserver.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStoreAdapter.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionInspectionAbility.php';
 
 \DataMachine\Engine\AI\Actions\PendingActionObservers::reset();
 \DataMachine\Engine\AI\Actions\PendingActionObservers::register( new \DataMachine\Engine\AI\Actions\WordPressActionDispatchObserver() );
@@ -235,6 +270,7 @@ $action    = \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action::from_array(
 			'datamachine' => array(
 				'created_by' => 123,
 				'agent_id'   => 456,
+				'context'    => array( 'session_id' => 'session_contract_smoke' ),
 			),
 		),
 	)
@@ -249,6 +285,36 @@ $stored = $store->get( $action_id );
 datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action && 'contract_smoke' === $stored->get_kind(), 'contract get reads the stored WP_Agent_Pending_Action', $failures, $passes );
 datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action && $action_id === $stored->get_action_id(), 'contract store preserves action ID in payload', $failures, $passes );
 datamachine_pending_actions_assert( $stored instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action && null !== $stored->get_expires_at(), 'transient fallback preserves expiration audit data', $failures, $passes );
+
+$GLOBALS['datamachine_pending_action_store_override'] = new class( $stored ) implements \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Store {
+	public function __construct( private \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action $action ) {}
+	public function store( \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action $action ): bool { unset( $action ); return true; }
+	public function get( string $action_id, bool $include_resolved = false ): ?\AgentsAPI\AI\Approvals\WP_Agent_Pending_Action { unset( $include_resolved ); return $action_id === $this->action->get_action_id() ? $this->action : null; }
+	public function list( array $filters = array() ): array { unset( $filters ); return array( $this->action ); }
+	public function summary( array $filters = array() ): array { unset( $filters ); return array( 'total' => 1 ); }
+	public function record_resolution( string $action_id, \AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision $decision, string $resolver, $result = null, ?string $error = null, array $metadata = array() ): bool { unset( $action_id, $decision, $resolver, $result, $error, $metadata ); return true; }
+	public function expire( ?string $before = null ): int { unset( $before ); return 0; }
+	public function delete( string $action_id ): bool { unset( $action_id ); return true; }
+};
+
+$alias_list = \DataMachine\Engine\AI\Actions\PendingActionInspectionAbility::list_actions( array( 'kind' => 'contract_smoke' ) );
+$alias_list_action = $alias_list['actions'][0] ?? array();
+datamachine_pending_actions_assert( true === ( $alias_list['success'] ?? false ), 'Data Machine list alias succeeds through Agents API store contract', $failures, $passes );
+datamachine_pending_actions_assert( isset( $alias_list_action['preview'] ) && array( 'ok' => true ) === $alias_list_action['preview'], 'Data Machine list alias returns canonical preview field', $failures, $passes );
+datamachine_pending_actions_assert( 'agent:456' === ( $alias_list_action['agent'] ?? null ), 'Data Machine list alias returns canonical agent field', $failures, $passes );
+datamachine_pending_actions_assert( 'user:123' === ( $alias_list_action['creator'] ?? null ), 'Data Machine list alias returns canonical creator field', $failures, $passes );
+datamachine_pending_actions_assert( 'session_contract_smoke' === ( $alias_list_action['metadata']['datamachine']['context']['session_id'] ?? null ), 'Data Machine list alias keeps Data Machine context in canonical metadata', $failures, $passes );
+datamachine_pending_actions_assert( isset( $alias_list_action['created_at'] ) && is_string( $alias_list_action['created_at'] ), 'Data Machine list alias returns canonical created_at field', $failures, $passes );
+datamachine_pending_actions_assert( ! array_key_exists( 'preview_data', $alias_list_action ), 'Data Machine list alias no longer exposes legacy preview_data field', $failures, $passes );
+
+$alias_get = \DataMachine\Engine\AI\Actions\PendingActionInspectionAbility::get_action( array( 'action_id' => $action_id ) );
+datamachine_pending_actions_assert( true === ( $alias_get['success'] ?? false ), 'Data Machine get alias succeeds through Agents API store contract', $failures, $passes );
+datamachine_pending_actions_assert( isset( $alias_get['action']['preview'] ) && array( 'ok' => true ) === $alias_get['action']['preview'], 'Data Machine get alias returns canonical preview field', $failures, $passes );
+datamachine_pending_actions_assert( 'agent:456' === ( $alias_get['action']['agent'] ?? null ), 'Data Machine get alias returns canonical agent field', $failures, $passes );
+datamachine_pending_actions_assert( 'user:123' === ( $alias_get['action']['creator'] ?? null ), 'Data Machine get alias returns canonical creator field', $failures, $passes );
+datamachine_pending_actions_assert( 'session_contract_smoke' === ( $alias_get['action']['metadata']['datamachine']['context']['session_id'] ?? null ), 'Data Machine get alias keeps Data Machine context in canonical metadata', $failures, $passes );
+datamachine_pending_actions_assert( isset( $alias_get['action']['expires_at'] ) && is_string( $alias_get['action']['expires_at'] ), 'Data Machine get alias returns canonical expires_at field', $failures, $passes );
+datamachine_pending_actions_assert( ! array_key_exists( 'preview_data', $alias_get['action'] ), 'Data Machine get alias no longer exposes legacy preview_data field', $failures, $passes );
 
 $legacy_action_id = 'act_legacy_smoke';
 $product_payload  = array(
