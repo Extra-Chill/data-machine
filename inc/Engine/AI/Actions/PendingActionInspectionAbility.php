@@ -134,9 +134,19 @@ final class PendingActionInspectionAbility {
 	 * Ability callback: list actions.
 	 */
 	public static function list_actions( array $input ): array {
+		$result = \AgentsAPI\AI\Approvals\agents_list_pending_actions(
+			array( 'filters' => self::normalize_filters( $input ) )
+		);
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success' => false,
+				'error'   => $result->get_error_message(),
+			);
+		}
+
 		return array(
 			'success' => true,
-			'actions' => PendingActionStore::list( self::normalize_filters( $input ) ),
+			'actions' => is_array( $result['actions'] ?? null ) ? $result['actions'] : array(),
 		);
 	}
 
@@ -152,7 +162,21 @@ final class PendingActionInspectionAbility {
 			);
 		}
 
-		$action = PendingActionStore::inspect( $action_id );
+		$result = \AgentsAPI\AI\Approvals\agents_get_pending_action(
+			array(
+				'action_id'        => $action_id,
+				'include_resolved' => true,
+			)
+		);
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'action_id' => $action_id,
+			);
+		}
+
+		$action = is_array( $result['action'] ?? null ) ? $result['action'] : null;
 		if ( null === $action ) {
 			return array(
 				'success'   => false,
@@ -171,9 +195,19 @@ final class PendingActionInspectionAbility {
 	 * Ability callback: summarize actions.
 	 */
 	public static function summary( array $input ): array {
+		$result = \AgentsAPI\AI\Approvals\agents_summary_pending_actions(
+			array( 'filters' => self::normalize_filters( $input ) )
+		);
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success' => false,
+				'error'   => $result->get_error_message(),
+			);
+		}
+
 		return array(
 			'success' => true,
-			'summary' => PendingActionStore::summary( self::normalize_filters( $input ) ),
+			'summary' => is_array( $result ) ? $result : array(),
 		);
 	}
 
