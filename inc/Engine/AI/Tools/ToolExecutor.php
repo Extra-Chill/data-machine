@@ -67,6 +67,15 @@ class ToolExecutor {
 		$tool_def            = $prepared['tool_def'];
 		$complete_parameters = $prepared['parameters'];
 
+		if ( 'client' === (string) ( $tool_def['executor'] ?? '' ) || ! empty( $tool_def['external_executor'] ) ) {
+			return array(
+				'success'   => false,
+				'error'     => sprintf( 'Tool "%s" is declared for client-side execution and cannot be executed by the Data Machine PHP tool executor.', $tool_name ),
+				'tool_name' => $tool_name,
+				'executor'  => 'client',
+			);
+		}
+
 		// Resolve the action policy for this invocation. Tools without
 		// action_policy metadata resolve to 'direct' and behave exactly
 		// as before this feature landed.

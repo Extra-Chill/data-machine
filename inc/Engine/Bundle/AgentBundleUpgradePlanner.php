@@ -128,7 +128,7 @@ final class AgentBundleUpgradePlanner {
 			foreach ( $bundle->{$method}() as $relative_path => $payload ) {
 				$artifacts[] = array(
 					'artifact_type' => $type,
-					'artifact_id'   => self::artifact_id_from_relative_path( (string) $relative_path ),
+					'artifact_id'   => self::artifact_id_from_payload( $payload, (string) $relative_path ),
 					'source_path'   => $directory . '/' . $relative_path,
 					'payload'       => $payload,
 				);
@@ -156,6 +156,14 @@ final class AgentBundleUpgradePlanner {
 	private static function artifact_id_from_relative_path( string $relative_path ): string {
 		$relative_path = preg_replace( '/\.(json|md|txt)$/i', '', $relative_path );
 		return null === $relative_path ? '' : $relative_path;
+	}
+
+	private static function artifact_id_from_payload( mixed $payload, string $relative_path ): string {
+		if ( is_array( $payload ) && is_string( $payload['artifact_id'] ?? null ) && '' !== trim( $payload['artifact_id'] ) ) {
+			return (string) $payload['artifact_id'];
+		}
+
+		return self::artifact_id_from_relative_path( $relative_path );
 	}
 
 	/** @param array<int,array<string,mixed>|AgentBundleInstalledArtifact> $artifacts */

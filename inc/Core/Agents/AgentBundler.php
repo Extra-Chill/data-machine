@@ -28,13 +28,15 @@ use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
 use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
-use DataMachine\Engine\Bundle\AgentBundleMaterializedArtifacts;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
+use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
 use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Bundle\PortableSlug;
+use DataMachine\Engine\Bundle\PromptArtifact;
 use DataMachine\Core\Steps\FlowStepConfig;
+use DataMachine\Engine\AI\System\SystemTaskPromptRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -222,6 +224,9 @@ class AgentBundler {
 
 		$pipeline_slugs  = array_map( fn( AgentBundlePipelineFile $pipeline ) => $pipeline->slug(), $pipeline_documents );
 		$flow_slugs      = array_map( fn( AgentBundleFlowFile $flow ) => $flow->slug(), $flow_documents );
+		$artifact_files  = array(
+			\DataMachine\Engine\Bundle\BundleSchema::PROMPTS_DIR => SystemTaskPromptRegistry::bundle_prompt_files(),
+		);
 		$extension_paths = array_map( static fn( array $artifact ) => (string) ( $artifact['source_path'] ?? '' ), $extension_artifacts );
 		$manifest        = new AgentBundleManifest(
 			gmdate( 'c' ),
@@ -240,13 +245,14 @@ class AgentBundler {
 				'memory'       => array_keys( $memory_files ),
 				'pipelines'    => $pipeline_slugs,
 				'flows'        => $flow_slugs,
+				'prompts'      => array_keys( $artifact_files[ \DataMachine\Engine\Bundle\BundleSchema::PROMPTS_DIR ] ),
 				'extensions'   => array_values( array_filter( $extension_paths ) ),
 				'handler_auth' => $handler_auth,
 			)
 		);
 
 		$extras    = self::collect_export_extras( $agent_id, $agent );
-		$directory = new AgentBundleDirectory( $manifest, $memory_files, $pipeline_documents, $flow_documents, array(), $extension_artifacts, $extras );
+		$directory = new AgentBundleDirectory( $manifest, $memory_files, $pipeline_documents, $flow_documents, $artifact_files, $extension_artifacts, $extras );
 
 		return array(
 			'success'   => true,
@@ -534,9 +540,12 @@ class AgentBundler {
 			'source_ref'      => $bundle_source_ref,
 			'source_revision' => $bundle_source_revision,
 		);
-		$is_portable_bundle     = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
-		$reconcile_runtime      = ! empty( $options['reconcile_runtime'] );
-		$is_upgrade             = ! empty( $options['is_upgrade'] );
+		$template_metadata      = AgentTemplateMetadata::from_bundle_array( $bundle )->to_array();
+		unset( $template_metadata['installed_hashes'] );
+		$bundle_metadata    = array_merge( $template_metadata, $bundle_metadata );
+		$is_portable_bundle = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
+		$reconcile_runtime  = ! empty( $options['reconcile_runtime'] );
+		$is_upgrade         = ! empty( $options['is_upgrade'] );
 
 		// Check for slug collision.
 		// On install: existing slug + (renamed-to-collision OR non-portable bundle) is a hard error.
@@ -936,24 +945,47 @@ class AgentBundler {
 				);
 			}
 
-			// 6. Track bundle-owned prompt/rubric artifacts.
-			foreach ( AgentBundleMaterializedArtifacts::from_array_bundle( $bundle ) as $artifact ) {
-				$artifact_key  = self::artifact_key( (string) $artifact['artifact_type'], (string) $artifact['artifact_id'] );
-				$record        = is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null;
-				$local_payload = AgentBundleMaterializedArtifacts::current_payload_from_record( $record );
+			// 6. Apply bundle-owned prompt artifacts and track rubric artifacts.
+			foreach ( self::bundle_file_artifacts( $bundle ) as $artifact ) {
+				$type = (string) $artifact['artifact_type'];
+				if ( ! in_array( $type, array( PromptArtifact::TYPE_PROMPT, PromptArtifact::TYPE_RUBRIC ), true ) ) {
+					continue;
+				}
 
-				if (
-					$record
-					&& $this->artifact_has_local_modifications( $record, $local_payload )
-					&& ! hash_equals(
-						AgentBundleArtifactHasher::hash( $artifact['payload'] ?? null ),
-						AgentBundleArtifactHasher::hash( $local_payload )
-					)
-				) {
+				$artifact_key = self::artifact_key( $type, (string) $artifact['artifact_id'] );
+				$record       = is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null;
+				if ( PromptArtifact::TYPE_RUBRIC === $type ) {
+					$local_payload = self::current_payload_from_record( $record );
+					if (
+						$record
+						&& $this->artifact_has_local_modifications( $record, $local_payload )
+						&& ! hash_equals(
+							AgentBundleArtifactHasher::hash( $artifact['payload'] ?? null ),
+							AgentBundleArtifactHasher::hash( $local_payload )
+						)
+					) {
+						$conflicts[] = array(
+							'artifact_type' => $artifact['artifact_type'],
+							'artifact_id'   => $artifact['artifact_id'],
+							'reason'        => 'local_modified',
+						);
+						continue;
+					}
+				}
+				if ( PromptArtifact::TYPE_PROMPT === $type && SystemTaskPromptRegistry::has_local_override_for_artifact( $artifact ) ) {
 					$conflicts[] = array(
 						'artifact_type' => $artifact['artifact_type'],
 						'artifact_id'   => $artifact['artifact_id'],
 						'reason'        => 'local_modified',
+					);
+					continue;
+				}
+
+				if ( PromptArtifact::TYPE_PROMPT === $type && ! SystemTaskPromptRegistry::apply_bundle_artifact( $artifact ) ) {
+					$conflicts[] = array(
+						'artifact_type' => $artifact['artifact_type'],
+						'artifact_id'   => $artifact['artifact_id'],
+						'reason'        => 'missing_apply_handler',
 					);
 					continue;
 				}
@@ -1356,6 +1388,62 @@ class AgentBundler {
 			'installed_at'      => $now,
 			'updated_at'        => $now,
 		);
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	private static function bundle_file_artifacts( array $bundle ): array {
+		$artifacts = array();
+		$files     = is_array( $bundle['artifact_files'] ?? null ) ? $bundle['artifact_files'] : array();
+
+		foreach ( self::bundle_file_artifact_directories() as $directory => $type ) {
+			foreach ( is_array( $files[ $directory ] ?? null ) ? $files[ $directory ] : array() as $relative_path => $payload ) {
+				$artifact_id = is_array( $payload ) && is_string( $payload['artifact_id'] ?? null )
+					? (string) $payload['artifact_id']
+					: self::artifact_id_from_relative_path( (string) $relative_path );
+
+				$artifacts[] = array(
+					'artifact_type' => $type,
+					'artifact_id'   => $artifact_id,
+					'source_path'   => $directory . '/' . ltrim( (string) $relative_path, '/' ),
+					'payload'       => $payload,
+				);
+			}
+		}
+
+		return $artifacts;
+	}
+
+	/** @return array<string,string> */
+	private static function bundle_file_artifact_directories(): array {
+		return array(
+			\DataMachine\Engine\Bundle\BundleSchema::PROMPTS_DIR       => 'prompt',
+			\DataMachine\Engine\Bundle\BundleSchema::RUBRICS_DIR       => 'rubric',
+			\DataMachine\Engine\Bundle\BundleSchema::TOOL_POLICIES_DIR => 'tool_policy',
+			\DataMachine\Engine\Bundle\BundleSchema::AUTH_REFS_DIR     => 'auth_ref',
+			\DataMachine\Engine\Bundle\BundleSchema::SEED_QUEUES_DIR   => 'seed_queue',
+		);
+	}
+
+	private static function artifact_id_from_relative_path( string $relative_path ): string {
+		$relative_path = preg_replace( '/\.(json|md|txt)$/i', '', $relative_path );
+		return null === $relative_path ? '' : $relative_path;
+	}
+
+	private static function current_payload_from_record( ?array $record ): mixed {
+		if ( ! is_array( $record ) ) {
+			return null;
+		}
+		if ( array_key_exists( 'current_payload', $record ) ) {
+			return $record['current_payload'];
+		}
+		if ( array_key_exists( 'installed_payload', $record ) ) {
+			return $record['installed_payload'];
+		}
+		if ( array_key_exists( 'payload', $record ) ) {
+			return $record['payload'];
+		}
+
+		return null;
 	}
 
 	/** @param array<int,array<string,mixed>> $artifacts */

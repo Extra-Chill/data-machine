@@ -9,9 +9,8 @@
  *
  *   - AIStep              uses `QueueableTrait::consumeFromPromptQueue()`
  *   - FetchStep           uses `QueueableTrait::consumeFromConfigPatchQueue()`
- *   - AgentCallTask       called `QueueAbility::popFromQueue() / ::loopFromQueue()`
- *                         directly — reimplementing pop logic minus the
- *                         static-peek branch.
+ *   - AgentCallTask       called queue helpers directly — reimplementing
+ *                         prompt-field queue consumption outside SystemTask.
  *
  * The trait's `private static consumeFromQueueSlot()` and QueueAbility's
  * `private static popFromQueueSlot()` were near-duplicates (drain/loop
@@ -24,17 +23,18 @@
  * #1299 promotes the consumer-agnostic core to
  * `QueueAbility::consumeFromQueueSlot()` (public static), deletes the
  * three orphan helpers (`popFromQueue`, `loopFromQueue`,
- * `popConfigPatchFromQueue` — the last had ZERO callers), and migrates
- * AgentCallTask to call the new method directly. Single source of truth
- * for the drain / loop / static semantics regardless of consumer.
+ * `popConfigPatchFromQueue` — the last had ZERO callers), and routes
+ * system-task prompt consumption through SystemTask's queueable prompt
+ * helper. Single source of truth for the drain / loop / static semantics
+ * regardless of consumer.
  *
  * This smoke validates:
  *
  *   1. `QueueAbility::consumeFromQueueSlot` exists with the documented
  *      signature.
  *   2. Trait's wrapper methods delegate to the new public method.
- *   3. AgentCallTask calls `consumeFromQueueSlot` directly (no
- *      `popFromQueue` / `loopFromQueue` references remain).
+ *   3. SystemTask owns queueable prompt-field consumption; AgentCallTask
+ *      delegates to it (no `popFromQueue` / `loopFromQueue` references remain).
  *   4. The deleted helpers are truly gone from QueueAbility source.
  *   5. AgentCallTask now writes `queued_prompt_backup` for retry parity
  *      with the trait consumers.
@@ -125,27 +125,42 @@ assert_consolidation(
 );
 
 // ---------------------------------------------------------------
-// SECTION 3: AgentCallTask calls the new method directly.
+// SECTION 3: SystemTask owns the prompt-field queue helper.
 // ---------------------------------------------------------------
 
-echo "\n[agent_call:1] AgentCallTask calls QueueAbility::consumeFromQueueSlot()\n";
+echo "\n[system_task:1] SystemTask prompt-field helper calls QueueAbility::consumeFromQueueSlot()\n";
 $ping_src = (string) file_get_contents(
 	$root_dir . '/inc/Engine/AI/System/Tasks/AgentCallTask.php'
 );
-assert_consolidation(
-	'AgentCallTask calls QueueAbility::consumeFromQueueSlot()',
-	false !== strpos( $ping_src, 'QueueAbility::consumeFromQueueSlot(' )
+$system_task_src = (string) file_get_contents(
+	$root_dir . '/inc/Engine/AI/System/Tasks/SystemTask.php'
 );
 assert_consolidation(
-	'call passes QueueAbility::SLOT_PROMPT_QUEUE constant',
-	false !== strpos( $ping_src, 'QueueAbility::SLOT_PROMPT_QUEUE' )
+	'SystemTask declares resolveQueueablePromptField()',
+	false !== strpos( $system_task_src, 'function resolveQueueablePromptField' )
 );
 assert_consolidation(
-	'call threads queue_mode through (no separate loop/drain branch)',
-	(bool) preg_match(
-		'/consumeFromQueueSlot\([^)]*\$queue_mode\s*\)/s',
-		$ping_src
-	)
+	'SystemTask calls QueueAbility::consumeFromQueueSlot()',
+	false !== strpos( $system_task_src, 'QueueAbility::consumeFromQueueSlot(' )
+);
+assert_consolidation(
+	'SystemTask helper passes QueueAbility::SLOT_PROMPT_QUEUE constant',
+	false !== strpos( $system_task_src, 'QueueAbility::SLOT_PROMPT_QUEUE' )
+);
+assert_consolidation(
+	'SystemTask helper threads queue_mode through (no separate loop/drain branch)',
+	false !== strpos( $system_task_src, "QueueAbility::consumeFromQueueSlot(\n\t\t\t\$flow_id," )
+		&& false !== strpos( $system_task_src, "\n\t\t\t\$queue_mode\n\t\t);" )
+);
+
+echo "\n[agent_call:1] AgentCallTask delegates prompt queue consumption to SystemTask\n";
+assert_consolidation(
+	'AgentCallTask calls resolveQueueablePromptField()',
+	false !== strpos( $ping_src, 'resolveQueueablePromptField(' )
+);
+assert_consolidation(
+	'AgentCallTask does NOT call QueueAbility::consumeFromQueueSlot() directly',
+	false === strpos( $ping_src, 'QueueAbility::consumeFromQueueSlot(' )
 );
 
 echo "\n[agent_call:2] No references to the deleted helpers in AgentCallTask\n";
@@ -222,15 +237,15 @@ assert_consolidation(
 
 echo "\n[parity:1] AgentCallTask writes queued_prompt_backup after a mutating consume\n";
 assert_consolidation(
-	'datamachine_merge_engine_data() called from AgentCallTask',
-	false !== strpos( $ping_src, '\\datamachine_merge_engine_data(' )
+	'datamachine_merge_engine_data() called from SystemTask prompt helper',
+	false !== strpos( $system_task_src, '\\datamachine_merge_engine_data(' )
 );
 assert_consolidation(
 	'queued_prompt_backup payload includes slot, mode, prompt, flow_id, flow_step_id',
-	false !== strpos( $ping_src, "'queued_prompt_backup'" )
-		&& false !== strpos( $ping_src, "'slot'         => QueueAbility::SLOT_PROMPT_QUEUE" )
-		&& false !== strpos( $ping_src, "'mode'         => \$queue_mode" )
-		&& false !== strpos( $ping_src, "'prompt'       => \$queued_item['prompt']" )
+	false !== strpos( $system_task_src, "'queued_prompt_backup'" )
+		&& false !== strpos( $system_task_src, "'slot'         => QueueAbility::SLOT_PROMPT_QUEUE" )
+		&& false !== strpos( $system_task_src, "'mode'         => \$queue_mode" )
+		&& false !== strpos( $system_task_src, "'prompt'       => \$queued_item['prompt']" )
 );
 
 // ---------------------------------------------------------------

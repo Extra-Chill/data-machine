@@ -316,8 +316,8 @@ assert_adapter_equals( 'system_prompt_file resolves into system_prompt', "Review
 assert_adapter_equals( 'system_prompt_file does not leak into runtime config', false, array_key_exists( 'system_prompt_file', $file_backed_pipeline_steps[1] ) );
 assert_adapter_equals( 'prompt_file resolves into prompt queue entry', "Review PR from file.\n", $file_backed_flow_steps[1]['prompt_queue'][0]['prompt'] ?? null );
 assert_adapter_equals( 'prompt_file does not leak into runtime queue', false, array_key_exists( 'prompt_file', $file_backed_flow_steps[1]['prompt_queue'][0] ?? array() ) );
-assert_adapter_equals( 'prompt artifacts round-trip into importable bundle array', "Review from file.\n", $file_backed_round_trip['prompt_artifacts']['system.md'] ?? null );
-assert_adapter_equals( 'rubric artifacts round-trip into importable bundle array', "Score evidence quality.\n", $file_backed_round_trip['rubric_artifacts']['review-quality.md'] ?? null );
+assert_adapter_equals( 'prompt artifacts round-trip into importable bundle array', "Review from file.\n", $file_backed_round_trip['artifact_files']['prompts']['system.md'] ?? null );
+assert_adapter_equals( 'rubric artifacts round-trip into importable bundle array', "Score evidence quality.\n", $file_backed_round_trip['artifact_files']['rubrics']['review-quality.md'] ?? null );
 
 $flow_json['steps'][1]['prompt_queue'][0]['prompt_file'] = 'prompts/missing.md';
 unset( $flow_json['steps'][1]['prompt_queue'][0]['prompt'] );
@@ -340,7 +340,7 @@ assert_adapter( 'export composes AgentBundlePipelineFile directly', false !== st
 assert_adapter( 'export composes AgentBundleFlowFile directly', false !== strpos( $agent_bundler_source, 'new AgentBundleFlowFile' ) );
 assert_adapter( 'to_directory writes AgentBundleArrayAdapter output', false !== strpos( $agent_bundler_source, 'AgentBundleArrayAdapter::from_array_bundle( $bundle )->write( $directory )' ) );
 assert_adapter( 'from_directory reads AgentBundleDirectory before array fallback', false !== strpos( $agent_bundler_source, 'AgentBundleArrayAdapter::to_array_bundle( AgentBundleDirectory::read( $directory ) )' ) );
-assert_adapter( 'import tracks materialized prompt and rubric artifacts', false !== strpos( $agent_bundler_source, 'AgentBundleMaterializedArtifacts::from_array_bundle( $bundle )' ) );
+assert_adapter( 'import tracks bundle file artifacts', false !== strpos( $agent_bundler_source, 'self::bundle_file_artifacts( $bundle )' ) );
 
 rm_adapter_tree( $tmp );
 

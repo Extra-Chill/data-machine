@@ -19,6 +19,7 @@
 
 namespace DataMachine\Core\Steps\AI\Directives;
 
+use DataMachine\Abilities\Flow\QueueAbility;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Core\Steps\FlowStepConfig;
 
@@ -35,7 +36,7 @@ class PipelineSystemPromptDirective implements \DataMachine\Engine\AI\Directives
 		$engine_data     = datamachine_get_engine_data( $payload['job_id'] );
 		$pipeline_config = $engine_data['pipeline_config'] ?? array();
 		$step_config     = $pipeline_config[ $pipeline_step_id ] ?? array();
-		$system_prompt   = $step_config['system_prompt'] ?? '';
+		$system_prompt   = self::resolveSystemPrompt( $pipeline_step_id, $step_config, $payload, $engine_data );
 
 		if ( empty( $system_prompt ) ) {
 			return array();
@@ -157,6 +158,57 @@ class PipelineSystemPromptDirective implements \DataMachine\Engine\AI\Directives
 		$workflow_string = implode( ' → ', $workflow_parts );
 
 		return $workflow_string;
+	}
+
+	/**
+	 * Resolve the pipeline system prompt, optionally from a pipeline-step queue.
+	 *
+	 * Existing `system_prompt` behavior is preserved when no queue is configured.
+	 * When a queue is configured, `system_prompt_queue_mode` controls whether the
+	 * queue head is peeked, drained, or rotated.
+	 *
+	 * @param string $pipeline_step_id Pipeline step ID.
+	 * @param array  $step_config      Pipeline step config.
+	 * @param array  $payload          Directive payload.
+	 * @param array  $engine_data      Job engine data.
+	 * @return string Resolved system prompt.
+	 */
+	private static function resolveSystemPrompt( string $pipeline_step_id, array $step_config, array $payload, array $engine_data ): string {
+		$queue_present = array_key_exists( QueueAbility::SLOT_SYSTEM_PROMPT_QUEUE, $step_config )
+			&& is_array( $step_config[ QueueAbility::SLOT_SYSTEM_PROMPT_QUEUE ] );
+
+		if ( ! $queue_present ) {
+			return (string) ( $step_config['system_prompt'] ?? '' );
+		}
+
+		$queue_mode = $step_config[ QueueAbility::MODE_SYSTEM_PROMPT_QUEUE ] ?? 'static';
+		if ( ! in_array( $queue_mode, array( 'drain', 'loop', 'static' ), true ) ) {
+			$queue_mode = 'static';
+		}
+
+		$pipeline_id = $payload['pipeline_id'] ?? $engine_data['pipeline_id'] ?? $engine_data['job']['pipeline_id'] ?? 0;
+		$entry       = null;
+
+		if ( is_numeric( $pipeline_id ) && (int) $pipeline_id > 0 ) {
+			$entry = QueueAbility::consumeFromPipelineQueueSlot(
+				(int) $pipeline_id,
+				$pipeline_step_id,
+				QueueAbility::SLOT_SYSTEM_PROMPT_QUEUE,
+				$queue_mode
+			);
+		} elseif ( 'static' === $queue_mode ) {
+			$entry = $step_config[ QueueAbility::SLOT_SYSTEM_PROMPT_QUEUE ][0] ?? null;
+		}
+
+		if ( is_array( $entry ) && ! empty( $entry[ QueueAbility::FIELD_PROMPT ] ) ) {
+			return (string) $entry[ QueueAbility::FIELD_PROMPT ];
+		}
+
+		if ( in_array( $queue_mode, array( 'drain', 'loop' ), true ) ) {
+			return '';
+		}
+
+		return (string) ( $step_config['system_prompt'] ?? '' );
 	}
 }
 
