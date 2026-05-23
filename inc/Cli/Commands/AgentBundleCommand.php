@@ -813,6 +813,10 @@ class AgentBundleCommand extends BaseCommand {
 			);
 		}
 
+		foreach ( self::bundle_file_artifacts( $bundle ) as $artifact ) {
+			$artifacts[] = $artifact;
+		}
+
 		foreach ( AgentBundleArtifactExtensions::normalize_artifacts( is_array( $bundle['extension_artifacts'] ?? null ) ? $bundle['extension_artifacts'] : array() ) as $artifact ) {
 			$artifacts[] = $artifact;
 		}
@@ -873,6 +877,7 @@ class AgentBundleCommand extends BaseCommand {
 
 		$artifacts = array_merge(
 			$artifacts,
+			\DataMachine\Engine\AI\System\SystemTaskPromptRegistry::current_artifacts(),
 			AgentBundleArtifactExtensions::current_artifacts(
 				$agent,
 				$installed,
@@ -881,6 +886,45 @@ class AgentBundleCommand extends BaseCommand {
 		);
 
 		return $artifacts;
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	private static function bundle_file_artifacts( array $bundle ): array {
+		$artifacts = array();
+		$files     = is_array( $bundle['artifact_files'] ?? null ) ? $bundle['artifact_files'] : array();
+
+		foreach ( self::bundle_file_artifact_directories() as $directory => $type ) {
+			foreach ( is_array( $files[ $directory ] ?? null ) ? $files[ $directory ] : array() as $relative_path => $payload ) {
+				$artifact_id = is_array( $payload ) && is_string( $payload['artifact_id'] ?? null )
+					? (string) $payload['artifact_id']
+					: self::artifact_id_from_relative_path( (string) $relative_path );
+
+				$artifacts[] = array(
+					'artifact_type' => $type,
+					'artifact_id'   => $artifact_id,
+					'source_path'   => $directory . '/' . ltrim( (string) $relative_path, '/' ),
+					'payload'       => $payload,
+				);
+			}
+		}
+
+		return $artifacts;
+	}
+
+	/** @return array<string,string> */
+	private static function bundle_file_artifact_directories(): array {
+		return array(
+			\DataMachine\Engine\Bundle\BundleSchema::PROMPTS_DIR       => 'prompt',
+			\DataMachine\Engine\Bundle\BundleSchema::RUBRICS_DIR       => 'rubric',
+			\DataMachine\Engine\Bundle\BundleSchema::TOOL_POLICIES_DIR => 'tool_policy',
+			\DataMachine\Engine\Bundle\BundleSchema::AUTH_REFS_DIR     => 'auth_ref',
+			\DataMachine\Engine\Bundle\BundleSchema::SEED_QUEUES_DIR   => 'seed_queue',
+		);
+	}
+
+	private static function artifact_id_from_relative_path( string $relative_path ): string {
+		$relative_path = preg_replace( '/\.(json|md|txt)$/i', '', $relative_path );
+		return null === $relative_path ? '' : $relative_path;
 	}
 
 	private function pipeline_payload( array $pipeline, string $portable_slug ): array {

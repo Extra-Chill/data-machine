@@ -117,7 +117,8 @@ if ( ! function_exists( 'get_option' ) ) {
 }
 
 if ( ! function_exists( 'update_option' ) ) {
-	function update_option( $key, $value ) {
+	function update_option( $key, $value, $autoload = null ) {
+		unset( $autoload );
 		$GLOBALS['__prompt_smoke_options'][ $key ] = $value;
 		return true;
 	}
@@ -129,6 +130,9 @@ use DataMachine\Engine\AI\System\SystemTaskPromptRegistry;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Api\System\System;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
+use DataMachine\Engine\Bundle\AgentBundleDirectory;
+use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
+use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
 use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 use DataMachine\Engine\Bundle\AuthRef;
 use DataMachine\Engine\Bundle\AuthRefResolver;
@@ -312,6 +316,56 @@ $prompt_detail_response = System::get_prompt( new WP_REST_Request( array( 'task_
 $prompt_detail          = $prompt_detail_response['data'];
 prompt_artifact_assert_equals( 'REST prompt detail exposes artifact source path', 'system-tasks/fixture_generation/generate.md', $prompt_detail['artifact_source_path'] ?? null );
 prompt_artifact_assert_equals( 'REST prompt detail exposes default artifact hash', hash( 'sha256', 'Write about {{topic}}.' ), $prompt_detail['artifact_hash'] ?? null );
+
+$bundle_prompt_files = SystemTaskPromptRegistry::bundle_prompt_files();
+$prompt_payload      = $bundle_prompt_files['system-tasks/fixture_generation/generate.json'] ?? array();
+prompt_artifact_assert( 'system task prompt exports as bundle prompt artifact', is_array( $prompt_payload ) && 'system-task:fixture_generation:generate' === ( $prompt_payload['artifact_id'] ?? '' ) );
+
+$directory = new AgentBundleDirectory(
+	AgentBundleManifest::from_array(
+		array(
+			'schema_version' => 1,
+			'bundle_slug'    => 'system-prompt-fixture',
+			'bundle_version' => '1.0.0',
+			'exported_at'    => '2026-04-28T00:00:00Z',
+			'exported_by'    => 'data-machine/test',
+			'agent'          => array(
+				'slug'         => 'fixture-agent',
+				'label'        => 'Fixture Agent',
+				'description'  => 'Exercises system prompt bundle artifacts.',
+				'agent_config' => array(),
+			),
+			'included'       => array(
+				'memory'       => array(),
+				'pipelines'    => array(),
+				'flows'        => array(),
+				'prompts'      => array_keys( $bundle_prompt_files ),
+				'handler_auth' => 'refs',
+			),
+		)
+	),
+	array(),
+	array(),
+	array(),
+	array( BundleSchema::PROMPTS_DIR => $bundle_prompt_files )
+);
+$array_bundle = AgentBundleArrayAdapter::to_array_bundle( $directory );
+$round_trip   = AgentBundleArrayAdapter::from_array_bundle( $array_bundle );
+prompt_artifact_assert_equals( 'array bundle preserves prompt artifact files', $prompt_payload, $round_trip->prompts()['system-tasks/fixture_generation/generate.json'] ?? null );
+
+$target_artifacts = AgentBundleUpgradePlanner::artifacts_from_bundle( $directory );
+$target_prompt    = array_values( array_filter( $target_artifacts, static fn( array $artifact ): bool => 'system-task:fixture_generation:generate' === ( $artifact['artifact_id'] ?? '' ) ) )[0] ?? array();
+prompt_artifact_assert_equals( 'upgrade planner uses payload artifact ID for system prompt', 'prompt', $target_prompt['artifact_type'] ?? null );
+
+SystemTaskPromptRegistry::apply_bundle_artifact( $target_prompt );
+$current_without_override = SystemTaskPromptRegistry::current_artifacts()[0] ?? array();
+prompt_artifact_assert_equals( 'installed prompt artifact is current when no override exists', $prompt_payload['content_hash'], $current_without_override['payload']['content_hash'] ?? null );
+
+SystemTask::setPromptOverride( 'fixture_generation', 'generate', 'Local {{topic}} override.' );
+$current_with_override = SystemTaskPromptRegistry::current_artifacts()[0] ?? array();
+prompt_artifact_assert_equals( 'local override changes current artifact hash deterministically', hash( 'sha256', 'Local {{topic}} override.' ), $current_with_override['payload']['content_hash'] ?? null );
+prompt_artifact_assert( 'local override is detectable before bundle apply', SystemTaskPromptRegistry::has_local_override_for_artifact( $target_prompt ) );
+SystemTask::setPromptOverride( 'fixture_generation', 'generate', '' );
 
 echo "\n[3] Agent template source/version metadata round-trips\n";
 $manifest       = AgentBundleManifest::from_array(

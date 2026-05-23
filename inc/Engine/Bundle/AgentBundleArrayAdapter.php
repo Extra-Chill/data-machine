@@ -54,7 +54,7 @@ final class AgentBundleArrayAdapter {
 			self::memory_files_from_array_bundle( $bundle, $pipeline_slugs, $flow_slugs ),
 			self::pipeline_files_from_array_bundle( $bundle['pipelines'] ?? array(), $pipeline_slugs ),
 			self::flow_files_from_array_bundle( $bundle['flows'] ?? array(), $bundle['pipelines'] ?? array(), $pipeline_slugs, $flow_slugs ),
-			array(),
+			self::artifact_files_from_array_bundle( $bundle ),
 			is_array( $bundle['extension_artifacts'] ?? null ) ? $bundle['extension_artifacts'] : array(),
 			is_array( $bundle['extras'] ?? null ) ? $bundle['extras'] : array()
 		);
@@ -154,6 +154,7 @@ final class AgentBundleArrayAdapter {
 			'user_template'         => $memory_files['USER.md'] ?? '',
 			'pipelines'             => $pipelines,
 			'flows'                 => $flows,
+			'artifact_files'        => self::artifact_files_from_directory( $directory ),
 			'extension_artifacts'   => $directory->extension_artifacts(),
 			'extras'                => $directory->extras(),
 			'abilities_manifest'    => array(),
@@ -164,6 +165,42 @@ final class AgentBundleArrayAdapter {
 		}
 
 		return $bundle;
+	}
+
+	/** @return array<string,array<string,array|string>> */
+	private static function artifact_files_from_array_bundle( array $bundle ): array {
+		$artifact_files = is_array( $bundle['artifact_files'] ?? null ) ? $bundle['artifact_files'] : array();
+		$normalized     = array();
+
+		foreach ( self::artifact_file_directories() as $directory ) {
+			if ( is_array( $artifact_files[ $directory ] ?? null ) ) {
+				$normalized[ $directory ] = $artifact_files[ $directory ];
+			}
+		}
+
+		return $normalized;
+	}
+
+	/** @return array<string,array<string,array|string>> */
+	private static function artifact_files_from_directory( AgentBundleDirectory $directory ): array {
+		return array(
+			BundleSchema::PROMPTS_DIR       => $directory->prompts(),
+			BundleSchema::RUBRICS_DIR       => $directory->rubrics(),
+			BundleSchema::TOOL_POLICIES_DIR => $directory->tool_policies(),
+			BundleSchema::AUTH_REFS_DIR     => $directory->auth_refs(),
+			BundleSchema::SEED_QUEUES_DIR   => $directory->seed_queues(),
+		);
+	}
+
+	/** @return string[] */
+	private static function artifact_file_directories(): array {
+		return array(
+			BundleSchema::PROMPTS_DIR,
+			BundleSchema::RUBRICS_DIR,
+			BundleSchema::TOOL_POLICIES_DIR,
+			BundleSchema::AUTH_REFS_DIR,
+			BundleSchema::SEED_QUEUES_DIR,
+		);
 	}
 
 	/** @param array<int,array<string,mixed>> $pipelines */
