@@ -133,7 +133,7 @@ final class MCPServerRegistry {
 			return;
 		}
 
-		$registered = function_exists( 'apply_filters' ) ? apply_filters( 'datamachine_mcp_servers', array() ) : array();
+		$registered    = function_exists( 'apply_filters' ) ? apply_filters( 'datamachine_mcp_servers', array() ) : array();
 		self::$servers = array();
 
 		if ( ! is_array( $registered ) ) {
