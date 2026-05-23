@@ -143,7 +143,7 @@ class WorkflowConfigFactory {
 			if ( isset( $step['system_prompt_queue_mode'] ) && in_array( $step['system_prompt_queue_mode'], array( 'drain', 'loop', 'static' ), true ) ) {
 				$pipeline_step['system_prompt_queue_mode'] = $step['system_prompt_queue_mode'];
 			}
-			$agent_modes                     = self::sanitizeAgentModes( $step['agent_modes'] ?? array() );
+			$agent_modes = self::sanitizeAgentModes( $step['agent_modes'] ?? array() );
 			if ( ! empty( $agent_modes ) ) {
 				$pipeline_step['agent_modes'] = $agent_modes;
 			}
