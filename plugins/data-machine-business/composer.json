@@ -1,7 +1,7 @@
 {
 	"name": "extra-chill/data-machine-business",
 	"description": "Business and enterprise integrations for Data Machine",
-	"version": "0.1.0",
+	"version": "0.3.0",
 	"license": "GPL-2.0-or-later",
 	"require": {
 		"php": ">=8.2"
