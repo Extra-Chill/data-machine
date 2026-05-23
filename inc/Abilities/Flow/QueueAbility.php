@@ -33,6 +33,7 @@
 namespace DataMachine\Abilities\Flow;
 
 use DataMachine\Core\Database\Flows\Flows as DB_Flows;
+use DataMachine\Core\Database\Pipelines\Pipelines as DB_Pipelines;
 use DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility;
 use DataMachine\Core\Steps\FlowStepConfig;
 
@@ -55,6 +56,16 @@ class QueueAbility {
 	 * object stored verbatim (no JSON-encoding-as-string).
 	 */
 	const SLOT_CONFIG_PATCH_QUEUE = 'config_patch_queue';
+
+	/**
+	 * Pipeline-step scoped queue for pipeline system prompts.
+	 */
+	const SLOT_SYSTEM_PROMPT_QUEUE = 'system_prompt_queue';
+
+	/**
+	 * Pipeline-step scoped mode for system_prompt_queue.
+	 */
+	const MODE_SYSTEM_PROMPT_QUEUE = 'system_prompt_queue_mode';
 
 	/**
 	 * Per-entry payload field name for prompt queues.
@@ -1646,6 +1657,83 @@ class QueueAbility {
 		);
 
 		return null;
+	}
+
+	/**
+	 * Consume one item from a pipeline-step scoped queue slot per the given mode.
+	 *
+	 * This is the pipeline-config sibling of {@see consumeFromQueueSlot()}. It
+	 * keeps the same drain / loop / static semantics while addressing queues that
+	 * live on `pipeline_config[pipeline_step_id]` rather than a flow step.
+	 *
+	 * @param int               $pipeline_id      Pipeline ID.
+	 * @param string            $pipeline_step_id Pipeline step ID.
+	 * @param string            $slot             Queue slot name.
+	 * @param string            $queue_mode       "drain" | "loop" | "static".
+	 * @param DB_Pipelines|null $db_pipelines     Optional database instance.
+	 * @return array|null The consumed entry, or null if the queue was empty.
+	 * @since 0.84.0
+	 */
+	public static function consumeFromPipelineQueueSlot(
+		int $pipeline_id,
+		string $pipeline_step_id,
+		string $slot,
+		string $queue_mode,
+		?DB_Pipelines $db_pipelines = null
+	): ?array {
+		if ( null === $db_pipelines ) {
+			$db_pipelines = new DB_Pipelines();
+		}
+
+		if ( ! in_array( $queue_mode, array( 'drain', 'loop', 'static' ), true ) ) {
+			$queue_mode = 'static';
+		}
+
+		$pipeline_config = $db_pipelines->get_pipeline_config( $pipeline_id );
+		if ( ! isset( $pipeline_config[ $pipeline_step_id ] ) || ! is_array( $pipeline_config[ $pipeline_step_id ] ) ) {
+			return null;
+		}
+
+		$queue = $pipeline_config[ $pipeline_step_id ][ $slot ] ?? array();
+		if ( empty( $queue ) || ! is_array( $queue ) ) {
+			return null;
+		}
+
+		if ( 'static' === $queue_mode ) {
+			return is_array( $queue[0] ?? null ) ? $queue[0] : null;
+		}
+
+		$entry = array_shift( $queue );
+		if ( ! is_array( $entry ) ) {
+			return null;
+		}
+
+		if ( 'loop' === $queue_mode ) {
+			$queue[] = $entry;
+		}
+
+		$pipeline_config[ $pipeline_step_id ][ $slot ]                   = $queue;
+		$pipeline_config[ $pipeline_step_id ]['_queue_consume_revision'] =
+			(int) ( $pipeline_config[ $pipeline_step_id ]['_queue_consume_revision'] ?? 0 ) + 1;
+
+		if ( ! $db_pipelines->update_pipeline( $pipeline_id, array( 'pipeline_config' => $pipeline_config ) ) ) {
+			return null;
+		}
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Item consumed from pipeline queue',
+			array(
+				'pipeline_id'      => $pipeline_id,
+				'pipeline_step_id' => $pipeline_step_id,
+				'slot'             => $slot,
+				'queue_mode'       => $queue_mode,
+				'remaining_count'  => count( $queue ),
+			)
+		);
+
+		return $entry;
 	}
 
 	/**

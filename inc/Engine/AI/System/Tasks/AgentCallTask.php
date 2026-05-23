@@ -11,8 +11,6 @@
 
 namespace DataMachine\Engine\AI\System\Tasks;
 
-use DataMachine\Abilities\Flow\QueueAbility;
-
 defined( 'ABSPATH' ) || exit;
 
 class AgentCallTask extends SystemTask {
@@ -109,70 +107,27 @@ class AgentCallTask extends SystemTask {
 		$input    = is_array( $params['input'] ?? null ) ? $params['input'] : array();
 		$delivery = is_array( $params['delivery'] ?? null ) ? $params['delivery'] : array();
 
-		$flow_id      = (int) ( $params['flow_id'] ?? 0 );
-		$flow_step_id = $params['flow_step_id'] ?? '';
-		$queue_mode   = $params['queue_mode'] ?? 'static';
-		if ( ! in_array( $queue_mode, array( 'drain', 'loop', 'static' ), true ) ) {
-			$queue_mode = 'static';
-		}
-
-		$from_queue = false;
-		if ( 'static' !== $queue_mode && $flow_id > 0 && ! empty( $flow_step_id ) ) {
-			$queued_item = QueueAbility::consumeFromQueueSlot(
-				$flow_id,
-				$flow_step_id,
-				QueueAbility::SLOT_PROMPT_QUEUE,
-				$queue_mode
+		$queue_prompt = $this->resolveQueueablePromptField( $jobId, $params, (string) ( $input['task'] ?? '' ) );
+		if ( $queue_prompt['skipped'] ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Agent call task skipped — queue mode requires per-tick input but queue is empty, no configured fallback',
+				array(
+					'job_id' => $jobId,
+				)
 			);
 
-			if ( $queued_item && ! empty( $queued_item['prompt'] ) ) {
-				$input['task'] = $queued_item['prompt'];
-				$from_queue    = true;
-
-				\datamachine_merge_engine_data(
-					$jobId,
-					array(
-						'queued_prompt_backup' => array(
-							'slot'         => QueueAbility::SLOT_PROMPT_QUEUE,
-							'mode'         => $queue_mode,
-							'prompt'       => $queued_item['prompt'],
-							'flow_id'      => $flow_id,
-							'flow_step_id' => $flow_step_id,
-							'added_at'     => $queued_item['added_at'] ?? null,
-						),
-					)
-				);
-
-				do_action(
-					'datamachine_log',
-					'info',
-					'Agent call task using input task from queue',
-					array(
-						'job_id'       => $jobId,
-						'flow_id'      => $flow_id,
-						'flow_step_id' => $flow_step_id,
-						'queue_mode'   => $queue_mode,
-					)
-				);
-			} elseif ( empty( $input['task'] ) ) {
-				do_action(
-					'datamachine_log',
-					'info',
-					'Agent call task skipped — queue mode requires per-tick input but queue is empty, no configured fallback',
-					array(
-						'job_id'     => $jobId,
-						'queue_mode' => $queue_mode,
-					)
-				);
-
-				$this->completeJob( $jobId, array(
-					'skipped'      => true,
-					'reason'       => sprintf( 'Queue mode "%s" but queue empty, no configured input task', $queue_mode ),
-					'completed_at' => current_time( 'mysql' ),
-				) );
-				return null;
-			}
+			$this->completeJob( $jobId, array(
+				'skipped'      => true,
+				'reason'       => $queue_prompt['reason'],
+				'completed_at' => current_time( 'mysql' ),
+			) );
+			return null;
 		}
+
+		$input['task'] = $queue_prompt['prompt'];
+		$from_queue    = $queue_prompt['from_queue'];
 
 		$context          = is_array( $input['context'] ?? null ) ? $input['context'] : array();
 		$context          = array_merge(

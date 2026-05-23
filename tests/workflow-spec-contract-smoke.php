@@ -164,6 +164,10 @@ $configs         = WorkflowConfigFactory::buildEphemeralConfigs(
 				'label'          => 'Summarize',
 				'agent_modes'    => array( 'rl_task' ),
 				'system_prompt'  => 'Be concise.',
+				'system_prompt_queue' => array(
+					array( 'prompt' => 'Variant A', 'added_at' => '2026-05-22T00:00:00Z' ),
+				),
+				'system_prompt_queue_mode' => 'loop',
 				'disabled_tools' => array( 'danger_tool' ),
 				'completion_assertions' => array(
 					'required_tool_names' => array( 'publish_result' ),
@@ -192,6 +196,8 @@ assert_workflow_spec_equals( array( 0, 1, 2 ), array_column( $pipeline_steps, 'e
 assert_workflow_spec_equals( 'Fetch Source', $pipeline_steps[0]['label'] ?? null, 'ephemeral pipeline_config preserves fetch label', $failures, $passes );
 assert_workflow_spec_equals( array( 'rl_task' ), $pipeline_steps[1]['agent_modes'] ?? null, 'ephemeral pipeline_config preserves AI agent modes', $failures, $passes );
 assert_workflow_spec_equals( 'Be concise.', $pipeline_steps[1]['system_prompt'] ?? null, 'ephemeral pipeline_config preserves AI system prompt', $failures, $passes );
+assert_workflow_spec_equals( array( array( 'prompt' => 'Variant A', 'added_at' => '2026-05-22T00:00:00Z' ) ), $pipeline_steps[1]['system_prompt_queue'] ?? null, 'ephemeral pipeline_config preserves AI system prompt queue', $failures, $passes );
+assert_workflow_spec_equals( 'loop', $pipeline_steps[1]['system_prompt_queue_mode'] ?? null, 'ephemeral pipeline_config preserves AI system prompt queue mode', $failures, $passes );
 assert_workflow_spec_equals( array( 'danger_tool' ), $pipeline_steps[1]['disabled_tools'] ?? null, 'ephemeral pipeline_config preserves AI disabled tools', $failures, $passes );
 assert_workflow_spec_equals( array( 'required_tool_names' => array( 'publish_result' ) ), $pipeline_steps[1]['completion_assertions'] ?? null, 'ephemeral pipeline_config preserves AI completion assertions', $failures, $passes );
 assert_workflow_spec_equals( array( array( 'id' => 'after-worktree', 'max_calls' => 4 ) ), $pipeline_steps[1]['tool_runtime_rules'] ?? null, 'ephemeral pipeline_config preserves AI tool runtime rules', $failures, $passes );
