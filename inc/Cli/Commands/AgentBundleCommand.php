@@ -874,6 +874,17 @@ class AgentBundleCommand extends BaseCommand {
 					'payload'       => $this->flow_payload( $flow_by_slug[ $id ], $id, $installed_payload ),
 				);
 			}
+			if ( 'rubric' === $type ) {
+				$payload = self::current_payload_from_record( is_array( $record ) ? $record : null );
+				if ( null !== $payload ) {
+					$artifacts[] = array(
+						'artifact_type' => $type,
+						'artifact_id'   => $id,
+						'source_path'   => (string) ( $record['source_path'] ?? '' ),
+						'payload'       => $payload,
+					);
+				}
+			}
 		}
 
 		$artifacts = array_merge(
@@ -926,6 +937,23 @@ class AgentBundleCommand extends BaseCommand {
 	private static function artifact_id_from_relative_path( string $relative_path ): string {
 		$relative_path = preg_replace( '/\.(json|md|txt)$/i', '', $relative_path );
 		return null === $relative_path ? '' : $relative_path;
+	}
+
+	private static function current_payload_from_record( ?array $record ): mixed {
+		if ( ! is_array( $record ) ) {
+			return null;
+		}
+		if ( array_key_exists( 'current_payload', $record ) ) {
+			return $record['current_payload'];
+		}
+		if ( array_key_exists( 'installed_payload', $record ) ) {
+			return $record['installed_payload'];
+		}
+		if ( array_key_exists( 'payload', $record ) ) {
+			return $record['payload'];
+		}
+
+		return null;
 	}
 
 	private function pipeline_payload( array $pipeline, string $portable_slug ): array {

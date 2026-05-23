@@ -605,6 +605,8 @@ class AgentBundler {
 			'files'               => count( $bundle['files'] ?? array() ),
 			'pipelines'           => count( $bundle['pipelines'] ?? array() ),
 			'flows'               => count( $bundle['flows'] ?? array() ),
+			'prompt_artifacts'    => count( $bundle['prompt_artifacts'] ?? array() ),
+			'rubric_artifacts'    => count( $bundle['rubric_artifacts'] ?? array() ),
 			'extension_artifacts' => count( $bundle['extension_artifacts'] ?? array() ),
 			'has_user_template'   => ! empty( $bundle['user_template'] ),
 			'upgrade'             => (bool) $existing,
@@ -954,14 +956,34 @@ class AgentBundler {
 				);
 			}
 
-			// 6. Apply bundle-owned prompt artifacts without touching local overrides.
+			// 6. Apply bundle-owned prompt artifacts and track rubric artifacts.
 			foreach ( self::bundle_file_artifacts( $bundle ) as $artifact ) {
-				if ( PromptArtifact::TYPE_PROMPT !== (string) $artifact['artifact_type'] ) {
+				$type = (string) $artifact['artifact_type'];
+				if ( ! in_array( $type, array( PromptArtifact::TYPE_PROMPT, PromptArtifact::TYPE_RUBRIC ), true ) ) {
 					continue;
 				}
 
-				$artifact_key = self::artifact_key( (string) $artifact['artifact_type'], (string) $artifact['artifact_id'] );
-				if ( SystemTaskPromptRegistry::has_local_override_for_artifact( $artifact ) ) {
+				$artifact_key = self::artifact_key( $type, (string) $artifact['artifact_id'] );
+				$record       = is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null;
+				if ( PromptArtifact::TYPE_RUBRIC === $type ) {
+					$local_payload = self::current_payload_from_record( $record );
+					if (
+						$record
+						&& $this->artifact_has_local_modifications( $record, $local_payload )
+						&& ! hash_equals(
+							AgentBundleArtifactHasher::hash( $artifact['payload'] ?? null ),
+							AgentBundleArtifactHasher::hash( $local_payload )
+						)
+					) {
+						$conflicts[] = array(
+							'artifact_type' => $artifact['artifact_type'],
+							'artifact_id'   => $artifact['artifact_id'],
+							'reason'        => 'local_modified',
+						);
+						continue;
+					}
+				}
+				if ( PromptArtifact::TYPE_PROMPT === $type && SystemTaskPromptRegistry::has_local_override_for_artifact( $artifact ) ) {
 					$conflicts[] = array(
 						'artifact_type' => $artifact['artifact_type'],
 						'artifact_id'   => $artifact['artifact_id'],
@@ -970,7 +992,7 @@ class AgentBundler {
 					continue;
 				}
 
-				if ( ! SystemTaskPromptRegistry::apply_bundle_artifact( $artifact ) ) {
+				if ( PromptArtifact::TYPE_PROMPT === $type && ! SystemTaskPromptRegistry::apply_bundle_artifact( $artifact ) ) {
 					$conflicts[] = array(
 						'artifact_type' => $artifact['artifact_type'],
 						'artifact_id'   => $artifact['artifact_id'],
@@ -1292,6 +1314,9 @@ class AgentBundler {
 		if ( ! empty( $bundle['extension_artifacts'] ) ) {
 			return true;
 		}
+		if ( ! empty( $bundle['prompt_artifacts'] ) || ! empty( $bundle['rubric_artifacts'] ) ) {
+			return true;
+		}
 		return false;
 	}
 
@@ -1407,6 +1432,7 @@ class AgentBundler {
 			'installed_hash'    => $hash,
 			'current_hash'      => $hash,
 			'installed_payload' => $payload,
+			'current_payload'   => $payload,
 			'status'            => AgentBundleArtifactStatus::CLEAN,
 			'installed_at'      => $now,
 			'updated_at'        => $now,
@@ -1450,6 +1476,23 @@ class AgentBundler {
 	private static function artifact_id_from_relative_path( string $relative_path ): string {
 		$relative_path = preg_replace( '/\.(json|md|txt)$/i', '', $relative_path );
 		return null === $relative_path ? '' : $relative_path;
+	}
+
+	private static function current_payload_from_record( ?array $record ): mixed {
+		if ( ! is_array( $record ) ) {
+			return null;
+		}
+		if ( array_key_exists( 'current_payload', $record ) ) {
+			return $record['current_payload'];
+		}
+		if ( array_key_exists( 'installed_payload', $record ) ) {
+			return $record['installed_payload'];
+		}
+		if ( array_key_exists( 'payload', $record ) ) {
+			return $record['payload'];
+		}
+
+		return null;
 	}
 
 	/** @param array<int,array<string,mixed>> $artifacts */

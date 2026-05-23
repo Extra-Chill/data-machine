@@ -62,15 +62,26 @@ final class AgentBundleCoreArtifactApply {
 	public static function apply( array $artifact, array $agent, array $context ): mixed {
 		$type     = (string) ( $artifact['artifact_type'] ?? '' );
 		$agent_id = (int) ( $agent['agent_id'] ?? 0 );
-		$payload  = is_array( $artifact['payload'] ?? null ) ? $artifact['payload'] : array();
+		$payload  = $artifact['payload'] ?? null;
 
-		if ( $agent_id <= 0 || empty( $payload ) || ! in_array( $type, array( 'agent_config', 'pipeline', 'flow' ), true ) ) {
+		if ( $agent_id <= 0 || null === $payload || ! in_array( $type, array( 'agent_config', 'pipeline', 'flow', 'prompt', 'rubric' ), true ) ) {
 			return null;
 		}
 
-		if ( 'agent_config' === $type ) {
+		if ( in_array( $type, array( 'prompt', 'rubric' ), true ) ) {
+			$applied = array(
+				'artifact_type' => $type,
+				'artifact_id'   => (string) ( $artifact['artifact_id'] ?? '' ),
+			);
+		} elseif ( 'agent_config' === $type ) {
+			if ( ! is_array( $payload ) ) {
+				return null;
+			}
 			$applied = self::apply_agent_config( $artifact, $agent_id, $payload );
 		} else {
+			if ( ! is_array( $payload ) ) {
+				return null;
+			}
 			$applied = 'pipeline' === $type
 				? self::apply_pipeline( $artifact, $agent_id, $payload )
 				: self::apply_flow( $artifact, $agent_id, $payload );

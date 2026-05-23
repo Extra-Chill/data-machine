@@ -354,7 +354,22 @@ assert_upgrade_plan_equals( 'agent config reason is local modified', 'local_modi
 assert_upgrade_plan_equals( 'authorization header is redacted', '[redacted]', $config_conflict['diff']['before']['intelligence']['context_servers']['wporg']['headers']['Authorization'] ?? null );
 assert_upgrade_plan( 'raw local bearer is absent from config preview', false === strpos( (string) json_encode( $config_plan ), 'local-token' ) );
 
-echo "\n[2c] Flow runtime overlays are planned separately from source shape\n";
+echo "\n[2c] Prompt/rubric artifact edits get readable approval diffs\n";
+$old_prompt      = upgrade_artifact( 'prompt', 'extract-facts', "Extract facts.\n", 'prompts/extract-facts.md' );
+$local_prompt    = upgrade_artifact( 'prompt', 'extract-facts', "Extract facts and cite local sources.\n", 'prompts/extract-facts.md' );
+$target_prompt   = upgrade_artifact( 'prompt', 'extract-facts', "Extract facts and cite bundle sources.\n", 'prompts/extract-facts.md' );
+$prompt_plan     = AgentBundleUpgradePlanner::plan(
+	array( installed_row( $old_prompt ) ),
+	array( $local_prompt ),
+	array( $target_prompt ),
+	array( 'bundle_slug' => 'prompt-bundle' )
+)->to_array();
+$prompt_conflict = $prompt_plan['needs_approval'][0] ?? array();
+assert_upgrade_plan_equals( 'locally changed prompt needs approval', 'prompt:extract-facts', $prompt_conflict['artifact_key'] ?? null );
+assert_upgrade_plan_equals( 'prompt approval includes readable local text', "Extract facts and cite local sources.\n", $prompt_conflict['diff']['before'] ?? null );
+assert_upgrade_plan_equals( 'prompt approval includes readable target text', "Extract facts and cite bundle sources.\n", $prompt_conflict['diff']['after'] ?? null );
+
+echo "\n[2d] Flow runtime overlays are planned separately from source shape\n";
 $installed_runtime_flow = upgrade_artifact(
 	'flow',
 	'queued-fetch',
