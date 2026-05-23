@@ -2,6 +2,25 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.132.4] - 2026-05-23
+
+### Changed
+- Add bounded sync runner for exploration
+
+### Fixed
+- document direct database query exceptions
+- Fix jobs list field hydration at operator scale
+- delegate daily memory conservation
+- scope agent authorize consent
+- lighten pipeline admin list reads
+- normalize WP Ability errors for legacy callers
+- bundle agents api for release
+- fail jobs when next-step scheduling fails
+- protect active batch parents during recovery
+- finalize completed pipeline batch parents
+- require handler completion before natural finish
+- report chat list message counts
+
 ## [0.132.3] - 2026-05-22
 
 ### Changed
