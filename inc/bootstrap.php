@@ -24,6 +24,7 @@ require_once __DIR__ . '/Engine/Filters/DataMachineFilters.php';
 require_once __DIR__ . '/Engine/Filters/Handlers.php';
 require_once __DIR__ . '/Engine/Filters/Admin.php';
 require_once __DIR__ . '/Engine/Logger.php';
+require_once __DIR__ . '/Engine/MCP/functions.php';
 require_once __DIR__ . '/Engine/Filters/OAuth.php';
 require_once __DIR__ . '/Engine/Actions/DataMachineActions.php';
 require_once __DIR__ . '/Engine/Filters/EngineData.php';

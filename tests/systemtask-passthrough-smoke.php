@@ -356,8 +356,8 @@ assert_passthrough(
 );
 assert_passthrough(
 	'both base methods default to inert (false / empty array)',
-	false !== strpos( $base_src, "return false;\n\t}\n\n\t/**\n\t * Declare flow_step_config keys" )
-		&& false !== strpos( $base_src, "return array();\n\t}\n\n\t// ─── Job lifecycle helpers" )
+	false !== strpos( $base_src, "public function needsPipelineContext(): bool {\n\t\treturn false;\n\t}" )
+		&& false !== strpos( $base_src, "public function getFlowStepConfigPassthrough(): array {\n\t\treturn array();\n\t}" )
 );
 
 echo "\n[source:3] AgentCallTask overrides match the test fixture\n";
