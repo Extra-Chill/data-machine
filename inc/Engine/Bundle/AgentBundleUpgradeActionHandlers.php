@@ -206,30 +206,30 @@ final class AgentBundleCoreArtifactApply {
 			return new \WP_Error( 'datamachine_bundle_agent_missing', sprintf( 'Agent ID %d was not found.', $agent_id ) );
 		}
 
-		$config      = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
-		$bundle      = is_array( $context['bundle'] ?? null ) ? $context['bundle'] : array();
-		$bundle_slug = (string) ( $bundle['bundle_slug'] ?? $config['datamachine_bundle']['bundle_slug'] ?? '' );
-		$version     = (string) ( $bundle['bundle_version'] ?? $config['datamachine_bundle']['bundle_version'] ?? '' );
+		$config           = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
+		$bundle           = is_array( $context['bundle'] ?? null ) ? $context['bundle'] : array();
+		$bundle_slug      = (string) ( $bundle['bundle_slug'] ?? $config['datamachine_bundle']['bundle_slug'] ?? '' );
+		$version          = (string) ( $bundle['bundle_version'] ?? $config['datamachine_bundle']['bundle_version'] ?? '' );
 		$template_slug    = (string) ( $bundle['template_slug'] ?? $config['datamachine_bundle']['template_slug'] ?? $bundle_slug );
 		$template_version = (string) ( $bundle['template_version'] ?? $config['datamachine_bundle']['template_version'] ?? $version );
 		$source_ref       = (string) ( $bundle['source_ref'] ?? $config['datamachine_bundle']['source_ref'] ?? '' );
 		$source_revision  = (string) ( $bundle['source_revision'] ?? $config['datamachine_bundle']['source_revision'] ?? '' );
-		$type        = (string) ( $artifact['artifact_type'] ?? '' );
-		$id          = (string) ( $artifact['artifact_id'] ?? '' );
-		$payload     = $artifact['payload'] ?? null;
-		$hash        = AgentBundleArtifactHasher::hash( $payload );
-		$now         = gmdate( 'c' );
+		$type             = (string) ( $artifact['artifact_type'] ?? '' );
+		$id               = (string) ( $artifact['artifact_id'] ?? '' );
+		$payload          = $artifact['payload'] ?? null;
+		$hash             = AgentBundleArtifactHasher::hash( $payload );
+		$now              = gmdate( 'c' );
 
 		if ( '' === $bundle_slug || '' === $type || '' === $id ) {
 			return new \WP_Error( 'datamachine_bundle_registry_incomplete', 'Bundle artifact registry metadata is incomplete.' );
 		}
 
-		$config['datamachine_bundle']['bundle_slug']    = $bundle_slug;
-		$config['datamachine_bundle']['bundle_version'] = $version;
+		$config['datamachine_bundle']['bundle_slug']      = $bundle_slug;
+		$config['datamachine_bundle']['bundle_version']   = $version;
 		$config['datamachine_bundle']['template_slug']    = $template_slug;
 		$config['datamachine_bundle']['template_version'] = $template_version;
-		$config['datamachine_bundle']['source_ref']        = $source_ref;
-		$config['datamachine_bundle']['source_revision']   = $source_revision;
+		$config['datamachine_bundle']['source_ref']       = $source_ref;
+		$config['datamachine_bundle']['source_revision']  = $source_revision;
 		$config['datamachine_bundle']['artifacts'][ AgentBundleArtifactExtensions::artifact_key( $type, $id ) ] = array(
 			'bundle_slug'       => $bundle_slug,
 			'bundle_version'    => $version,

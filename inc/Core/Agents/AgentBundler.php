@@ -536,10 +536,10 @@ class AgentBundler {
 		);
 		$template_metadata      = AgentTemplateMetadata::from_bundle_array( $bundle )->to_array();
 		unset( $template_metadata['installed_hashes'] );
-		$bundle_metadata        = array_merge( $template_metadata, $bundle_metadata );
-		$is_portable_bundle     = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
-		$reconcile_runtime      = ! empty( $options['reconcile_runtime'] );
-		$is_upgrade             = ! empty( $options['is_upgrade'] );
+		$bundle_metadata    = array_merge( $template_metadata, $bundle_metadata );
+		$is_portable_bundle = ! empty( $bundle['bundle_slug'] ) || $this->bundle_has_portable_artifacts( $bundle );
+		$reconcile_runtime  = ! empty( $options['reconcile_runtime'] );
+		$is_upgrade         = ! empty( $options['is_upgrade'] );
 
 		// Check for slug collision.
 		// On install: existing slug + (renamed-to-collision OR non-portable bundle) is a hard error.

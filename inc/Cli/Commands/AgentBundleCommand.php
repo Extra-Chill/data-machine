@@ -991,8 +991,8 @@ class AgentBundleCommand extends BaseCommand {
 			if ( ! is_array( $record ) ) {
 				continue;
 			}
-			$key          = AgentBundleArtifactExtensions::artifact_key( (string) ( $record['artifact_type'] ?? '' ), (string) ( $record['artifact_id'] ?? '' ) );
-			$current_hash = isset( $current[ $key ] ) ? AgentBundleArtifactHasher::hash( $current[ $key ]['payload'] ?? null ) : null;
+			$key                    = AgentBundleArtifactExtensions::artifact_key( (string) ( $record['artifact_type'] ?? '' ), (string) ( $record['artifact_id'] ?? '' ) );
+			$current_hash           = isset( $current[ $key ] ) ? AgentBundleArtifactHasher::hash( $current[ $key ]['payload'] ?? null ) : null;
 			$record['current_hash'] = $current_hash;
 			$record['status']       = AgentBundleArtifactStatus::classify( (string) ( $record['installed_hash'] ?? '' ), $current_hash );
 			$classified[]           = $record;
