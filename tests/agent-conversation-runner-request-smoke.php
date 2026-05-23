@@ -13,15 +13,27 @@
 declare(strict_types=1);
 
 $GLOBALS['datamachine_runner_request_logs'] = array();
+$GLOBALS['datamachine_runner_request_filters'] = array();
 
 if ( ! function_exists( 'add_filter' ) ) {
 	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-		// No-op for smoke tests.
+		$GLOBALS['datamachine_runner_request_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
 	}
 }
 
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $hook, $value, ...$args ) {
+		if ( empty( $GLOBALS['datamachine_runner_request_filters'][ $hook ] ) ) {
+			return $value;
+		}
+
+		ksort( $GLOBALS['datamachine_runner_request_filters'][ $hook ] );
+		foreach ( $GLOBALS['datamachine_runner_request_filters'][ $hook ] as $callbacks ) {
+			foreach ( $callbacks as $callback ) {
+				$value = call_user_func_array( $callback[0], array_slice( array_merge( array( $value ), $args ), 0, (int) $callback[1] ) );
+			}
+		}
+
 		return $value;
 	}
 }
@@ -265,6 +277,105 @@ $last_failure_transcript_call = end( $mid_failure_transcript->calls );
 assert_runner_request( ! empty( $mid_failure_transcript->calls ), 'mid-conversation failure persists refreshed failure transcript' );
 assert_runner_request( str_contains( (string) ( $last_failure_transcript_call['result']['error'] ?? '' ), 'provider offline after tool' ), 'failure transcript result includes provider error' );
 assert_runner_request( 2 === ( $last_failure_transcript_call['result']['turn_count'] ?? null ), 'failure transcript result includes latest turn count' );
+
+// 4. Client runtime tools are fulfilled by the transport callback, not PHP ToolExecutor.
+$runtime_dispatch_count = 0;
+$runtime_requests       = array();
+$runtime_sink           = new RunnerRequestSmokeSink();
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$runtime_dispatch_count ) {
+		++$runtime_dispatch_count;
+
+		if ( 1 === $runtime_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => '',
+					'tool_calls' => array(
+						array(
+							'id'         => 'client-call-1',
+							'name'       => 'client/select_block',
+							'parameters' => array( 'client_id' => 'block-1' ),
+						),
+					),
+					'usage'      => array(
+						'prompt_tokens'     => 3,
+						'completion_tokens' => 4,
+						'total_tokens'      => 7,
+					),
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => 'runtime callback complete',
+				'tool_calls' => array(),
+				'usage'      => array(
+					'prompt_tokens'     => 5,
+					'completion_tokens' => 6,
+					'total_tokens'      => 11,
+				),
+			),
+		);
+	}
+);
+add_filter(
+	'datamachine_runtime_tool_result',
+	function ( $result, array $request ) use ( &$runtime_requests ) {
+		$runtime_requests[] = $request;
+
+		if ( 'client/select_block' !== ( $request['tool_name'] ?? '' ) ) {
+			return $result;
+		}
+
+		return array(
+			'success'     => true,
+			'selected_id' => $request['parameters']['client_id'] ?? '',
+			'call_id'     => $request['call_id'] ?? '',
+		);
+	},
+	10,
+	2
+);
+
+$runtime_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'select the current block' ) ),
+	array(
+		'client/select_block' => array(
+			'name'              => 'client/select_block',
+			'description'       => 'Select a block in the active editor.',
+			'parameters'        => array(
+				'type'       => 'object',
+				'properties' => array(
+					'client_id' => array( 'type' => 'string' ),
+				),
+			),
+			'executor'          => 'client',
+			'external_executor' => true,
+			'runtime_tool'      => true,
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array( 'chat' ),
+	array(
+		'event_sink' => $runtime_sink,
+	),
+	3
+);
+
+assert_runner_request( 2 === $runtime_dispatch_count, 'runtime tool callback returns to the provider for the follow-up turn' );
+assert_runner_request( 'runtime callback complete' === ( $runtime_result['final_content'] ?? null ), 'runtime tool callback preserves final content' );
+assert_runner_request( 1 === count( $runtime_result['tool_execution_results'] ?? array() ), 'runtime tool callback records one tool result' );
+assert_runner_request( true === ( $runtime_result['tool_execution_results'][0]['result']['success'] ?? null ), 'runtime tool callback result succeeds' );
+assert_runner_request( 'client' === ( $runtime_result['tool_execution_results'][0]['result']['executor'] ?? null ), 'runtime tool result preserves client executor marker' );
+assert_runner_request( 'block-1' === ( $runtime_result['tool_execution_results'][0]['result']['selected_id'] ?? null ), 'runtime tool result includes transport-provided data' );
+assert_runner_request( 'client-call-1' === ( $runtime_requests[0]['call_id'] ?? null ), 'runtime tool callback receives the model call id' );
+assert_runner_request( str_contains( wp_json_encode( $runtime_sink->events ), 'runtime_tool_call' ), 'runtime tool callback emits a runtime_tool_call event' );
+assert_runner_request( str_contains( wp_json_encode( $runtime_sink->events ), 'runtime_tool_result' ), 'runtime tool callback emits a runtime_tool_result event' );
 
 if ( runner_request_failure_count() > 0 ) {
 	exit( 1 );

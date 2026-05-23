@@ -571,18 +571,33 @@ function datamachine_build_turn_runner(
 				// Add tool call message.
 				$messages[] = ConversationManager::formatToolCallMessage( $tool_name, $tool_parameters, $turn_count );
 
-				// Execute through DM's ToolExecutor (action policy, post tracking).
+				// Execute through DM's ToolExecutor (action policy, post tracking),
+				// except for run-scoped client tools that must be fulfilled by the
+				// active transport/client instead of PHP.
 				$tool_payload = datamachine_payload_with_inflight_run_artifacts( $loop_payload, $tool_execution_results );
 
-				$tool_result = ToolExecutor::executeTool(
-					$tool_name,
-					$tool_parameters,
-					$tools,
-					$tool_payload,
-					$mode,
-					(int) ( $tool_payload['agent_id'] ?? 0 ),
-					is_array( $tool_payload['client_context'] ?? null ) ? $tool_payload['client_context'] : array()
-				);
+				if ( datamachine_is_external_runtime_tool( is_array( $tool_def ) ? $tool_def : null ) ) {
+					$tool_result = datamachine_fulfill_runtime_tool_call(
+						$tool_call,
+						is_array( $tool_def ) ? $tool_def : array(),
+						$tool_payload,
+						$mode,
+						$modes,
+						$turn_count,
+						$event_sink,
+						$base_log_context
+					);
+				} else {
+					$tool_result = ToolExecutor::executeTool(
+						$tool_name,
+						$tool_parameters,
+						$tools,
+						$tool_payload,
+						$mode,
+						(int) ( $tool_payload['agent_id'] ?? 0 ),
+						is_array( $tool_payload['client_context'] ?? null ) ? $tool_payload['client_context'] : array()
+					);
+				}
 
 				do_action(
 					'datamachine_log',
@@ -789,6 +804,161 @@ function datamachine_tool_runtime_metadata( ?array $tool_definition, array $tool
 	$result_runtime     = is_array( $tool_result['runtime'] ?? null ) ? $tool_result['runtime'] : array();
 
 	return array_merge( $definition_runtime, $result_runtime );
+}
+
+/**
+ * Whether a tool declaration is fulfilled outside the PHP tool executor.
+ *
+ * @param array<string,mixed>|null $tool_definition Tool definition.
+ */
+function datamachine_is_external_runtime_tool( ?array $tool_definition ): bool {
+	if ( null === $tool_definition ) {
+		return false;
+	}
+
+	return 'client' === (string) ( $tool_definition['executor'] ?? '' ) || ! empty( $tool_definition['external_executor'] );
+}
+
+/**
+ * Fulfill a model-called runtime tool via the active client/transport.
+ *
+ * The transport can provide a synchronous result through the
+ * `datamachine_runtime_tool_result` filter, a `runtime_tool_callback` callable
+ * in client_context, or a prefilled `runtime_tool_results` map keyed by call id
+ * or tool name. Returning null means no client result arrived, so the run gets a
+ * structured tool error instead of hanging or falling through to PHP execution.
+ *
+ * @param array<string,mixed>       $tool_call        Normalized model tool call.
+ * @param array<string,mixed>       $tool_definition  Tool definition.
+ * @param array<string,mixed>       $payload          Loop/tool payload.
+ * @param string                    $mode             Comma-separated mode label.
+ * @param array<int,string>         $modes            Normalized mode slugs.
+ * @param int                       $turn_count       Current turn count.
+ * @param LoopEventSinkInterface    $event_sink       Event sink.
+ * @param array<string,mixed>       $base_log_context Base log context.
+ * @return array<string,mixed> Structured tool result.
+ */
+function datamachine_fulfill_runtime_tool_call(
+	array $tool_call,
+	array $tool_definition,
+	array $payload,
+	string $mode,
+	array $modes,
+	int $turn_count,
+	LoopEventSinkInterface $event_sink,
+	array $base_log_context
+): array {
+	$tool_name      = (string) ( $tool_call['name'] ?? '' );
+	$parameters     = is_array( $tool_call['parameters'] ?? null ) ? $tool_call['parameters'] : array();
+	$client_context = is_array( $payload['client_context'] ?? null ) ? $payload['client_context'] : array();
+	$call_id        = isset( $tool_call['id'] ) && is_scalar( $tool_call['id'] ) ? (string) $tool_call['id'] : '';
+	$request        = array(
+		'tool_name'      => $tool_name,
+		'call_id'        => $call_id,
+		'parameters'     => $parameters,
+		'tool_def'       => $tool_definition,
+		'turn_count'     => $turn_count,
+		'mode'           => $mode,
+		'modes'          => $modes,
+		'agent_id'       => (int) ( $payload['agent_id'] ?? 0 ),
+		'job_id'         => $payload['job_id'] ?? null,
+		'session_id'     => $client_context['session_id'] ?? $payload['session_id'] ?? null,
+		'client_context' => $client_context,
+	);
+
+	datamachine_emit_loop_event(
+		$event_sink,
+		'runtime_tool_call',
+		array_merge(
+			$base_log_context,
+			array(
+				'turn_count' => $turn_count,
+				'tool_name'  => $tool_name,
+				'call_id'    => $call_id,
+			)
+		)
+	);
+	do_action( 'datamachine_runtime_tool_call', $request, $payload );
+
+	try {
+		$result = apply_filters( 'datamachine_runtime_tool_result', null, $request, $payload );
+
+		if ( null === $result && is_callable( $client_context['runtime_tool_callback'] ?? null ) ) {
+			$result = call_user_func( $client_context['runtime_tool_callback'], $request, $payload );
+		}
+
+		if ( null === $result && is_array( $client_context['runtime_tool_results'] ?? null ) ) {
+			$results = $client_context['runtime_tool_results'];
+			if ( '' !== $call_id && array_key_exists( $call_id, $results ) ) {
+				$result = $results[ $call_id ];
+			} elseif ( array_key_exists( $tool_name, $results ) ) {
+				$result = $results[ $tool_name ];
+			}
+		}
+	} catch ( \Throwable $e ) {
+		$result = new \WP_Error( 'runtime_tool_callback_failed', $e->getMessage() );
+	}
+
+	$tool_result = datamachine_normalize_runtime_tool_result( $tool_name, $result );
+
+	datamachine_emit_loop_event(
+		$event_sink,
+		'runtime_tool_result',
+		array_merge(
+			$base_log_context,
+			array(
+				'turn_count' => $turn_count,
+				'tool_name'  => $tool_name,
+				'call_id'    => $call_id,
+				'success'    => ! empty( $tool_result['success'] ),
+			)
+		)
+	);
+
+	return $tool_result;
+}
+
+/**
+ * Normalize a transport-provided runtime tool result into DM's result shape.
+ *
+ * @param string $tool_name Tool name.
+ * @param mixed  $result    Raw transport result.
+ * @return array<string,mixed>
+ */
+function datamachine_normalize_runtime_tool_result( string $tool_name, $result ): array {
+	if ( $result instanceof \WP_Error ) {
+		return array(
+			'success'   => false,
+			'error'     => $result->get_error_message(),
+			'code'      => $result->get_error_code(),
+			'tool_name' => $tool_name,
+			'executor'  => 'client',
+		);
+	}
+
+	if ( null === $result ) {
+		return array(
+			'success'   => false,
+			'error'     => sprintf( 'Client runtime tool "%s" did not return a result.', $tool_name ),
+			'code'      => 'runtime_tool_unfulfilled',
+			'tool_name' => $tool_name,
+			'executor'  => 'client',
+		);
+	}
+
+	if ( is_array( $result ) ) {
+		$result['success']   = array_key_exists( 'success', $result ) ? (bool) $result['success'] : true;
+		$result['tool_name'] = $result['tool_name'] ?? $tool_name;
+		$result['executor']  = $result['executor'] ?? 'client';
+		return $result;
+	}
+
+	return array(
+		'success'   => true,
+		'tool_name' => $tool_name,
+		'executor'  => 'client',
+		'data'      => $result,
+	);
 }
 
 /** @return array<int,string> */
