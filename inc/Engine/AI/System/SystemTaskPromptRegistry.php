@@ -156,7 +156,7 @@ final class SystemTaskPromptRegistry {
 			return false;
 		}
 
-		$installed                          = self::installed_artifacts();
+		$installed                                    = self::installed_artifacts();
 		$installed[ $prompt_artifact->artifact_id() ] = $prompt_artifact->to_array();
 
 		return update_option( self::INSTALLED_ARTIFACTS_OPTION, $installed, false );
@@ -277,9 +277,9 @@ final class SystemTaskPromptRegistry {
 			return $payload;
 		}
 
-		$payload['content']      = $override;
-		$payload['content_hash'] = hash( 'sha256', $override );
-		$payload['metadata']     = is_array( $payload['metadata'] ?? null ) ? $payload['metadata'] : array();
+		$payload['content']                    = $override;
+		$payload['content_hash']               = hash( 'sha256', $override );
+		$payload['metadata']                   = is_array( $payload['metadata'] ?? null ) ? $payload['metadata'] : array();
 		$payload['metadata']['local_override'] = true;
 
 		return $payload;
