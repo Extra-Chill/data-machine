@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.4.1] - 2026-05-23
+
+### Fixed
+- register GoogleDrive abilities under datamachine-fetch category
+
 ## [0.4.0] - 2026-05-23
 
 ### Added
