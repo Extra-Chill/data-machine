@@ -15,7 +15,9 @@ use DataMachine\Core\Database\Pipelines\Pipelines;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
+use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
+use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
@@ -107,11 +109,14 @@ class AgentBundleCommand extends BaseCommand {
 			}
 
 			$items[] = array(
-				'agent_id'       => (int) $agent['agent_id'],
-				'agent_slug'     => (string) $agent['agent_slug'],
-				'bundle_slug'    => (string) $bundle['bundle_slug'],
-				'bundle_version' => (string) ( $bundle['bundle_version'] ?? '' ),
-				'artifacts'      => count( is_array( $bundle['artifacts'] ?? null ) ? $bundle['artifacts'] : array() ),
+				'agent_id'         => (int) $agent['agent_id'],
+				'agent_slug'       => (string) $agent['agent_slug'],
+				'template_slug'    => (string) ( $bundle['template_slug'] ?? $bundle['bundle_slug'] ),
+				'template_version' => (string) ( $bundle['template_version'] ?? $bundle['bundle_version'] ?? '' ),
+				'bundle_slug'      => (string) $bundle['bundle_slug'],
+				'bundle_version'   => (string) ( $bundle['bundle_version'] ?? '' ),
+				'source_ref'       => (string) ( $bundle['source_ref'] ?? '' ),
+				'artifacts'        => count( is_array( $bundle['artifacts'] ?? null ) ? $bundle['artifacts'] : array() ),
 			);
 		}
 
@@ -120,7 +125,7 @@ class AgentBundleCommand extends BaseCommand {
 			return;
 		}
 
-		$this->format_items( $items, array( 'agent_id', 'agent_slug', 'bundle_slug', 'bundle_version', 'artifacts' ), $assoc_args, 'agent_id' );
+		$this->format_items( $items, array( 'agent_id', 'agent_slug', 'template_slug', 'template_version', 'bundle_slug', 'bundle_version', 'artifacts' ), $assoc_args, 'agent_id' );
 	}
 
 	/**
@@ -148,7 +153,7 @@ class AgentBundleCommand extends BaseCommand {
 		}
 
 		$status = $this->installed_status( $agent );
-		$this->output( $status, $assoc_args, array( 'agent_id', 'agent_slug', 'bundle_slug', 'bundle_version', 'artifact_count' ) );
+		$this->output( $status, $assoc_args, array( 'agent_id', 'agent_slug', 'template_slug', 'template_version', 'bundle_slug', 'bundle_version', 'artifact_count' ) );
 	}
 
 	/**
@@ -816,7 +821,7 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	/** @param array<int,array<string,mixed>> $installed */
-	private function current_artifacts( array $agent, array $installed ): array {
+	protected function current_artifacts( array $agent, array $installed ): array {
 		$agent_id  = (int) $agent['agent_id'];
 		$artifacts = array();
 		$pipelines = $this->pipelines()->get_all_pipelines( null, $agent_id );
@@ -950,20 +955,50 @@ class AgentBundleCommand extends BaseCommand {
 		return null;
 	}
 
-	private function installed_status( array $agent ): array {
+	protected function installed_status( array $agent ): array {
 		$bundle    = $agent['agent_config']['datamachine_bundle'] ?? array();
 		$artifacts = is_array( $bundle['artifacts'] ?? null ) ? $bundle['artifacts'] : array();
+		$artifacts = $this->classified_installed_artifacts( $agent, array_values( $artifacts ) );
 
 		return array(
-			'agent_id'        => (int) $agent['agent_id'],
-			'agent_slug'      => (string) $agent['agent_slug'],
-			'bundle_slug'     => (string) ( $bundle['bundle_slug'] ?? '' ),
-			'bundle_version'  => (string) ( $bundle['bundle_version'] ?? '' ),
-			'source_ref'      => (string) ( $bundle['source_ref'] ?? '' ),
-			'source_revision' => (string) ( $bundle['source_revision'] ?? '' ),
-			'artifact_count'  => count( $artifacts ),
-			'artifacts'       => array_values( $artifacts ),
+			'agent_id'         => (int) $agent['agent_id'],
+			'agent_slug'       => (string) $agent['agent_slug'],
+			'template_slug'    => (string) ( $bundle['template_slug'] ?? $bundle['bundle_slug'] ?? '' ),
+			'template_version' => (string) ( $bundle['template_version'] ?? $bundle['bundle_version'] ?? '' ),
+			'bundle_slug'      => (string) ( $bundle['bundle_slug'] ?? '' ),
+			'bundle_version'   => (string) ( $bundle['bundle_version'] ?? '' ),
+			'source_ref'       => (string) ( $bundle['source_ref'] ?? '' ),
+			'source_revision'  => (string) ( $bundle['source_revision'] ?? '' ),
+			'artifact_count'   => count( $artifacts ),
+			'artifacts'        => $artifacts,
 		);
+	}
+
+	/**
+	 * @param array<string,mixed>          $agent Agent row.
+	 * @param array<int,array<string,mixed>> $installed Installed registry rows.
+	 * @return array<int,array<string,mixed>>
+	 */
+	protected function classified_installed_artifacts( array $agent, array $installed ): array {
+		$current = array();
+		foreach ( $this->current_artifacts( $agent, $installed ) as $artifact ) {
+			$key             = AgentBundleArtifactExtensions::artifact_key( (string) ( $artifact['artifact_type'] ?? '' ), (string) ( $artifact['artifact_id'] ?? '' ) );
+			$current[ $key ] = $artifact;
+		}
+
+		$classified = array();
+		foreach ( $installed as $record ) {
+			if ( ! is_array( $record ) ) {
+				continue;
+			}
+			$key                    = AgentBundleArtifactExtensions::artifact_key( (string) ( $record['artifact_type'] ?? '' ), (string) ( $record['artifact_id'] ?? '' ) );
+			$current_hash           = isset( $current[ $key ] ) ? AgentBundleArtifactHasher::hash( $current[ $key ]['payload'] ?? null ) : null;
+			$record['current_hash'] = $current_hash;
+			$record['status']       = AgentBundleArtifactStatus::classify( (string) ( $record['installed_hash'] ?? '' ), $current_hash );
+			$classified[]           = $record;
+		}
+
+		return $classified;
 	}
 
 	private function bundle_summary( array $bundle, string $slug = '' ): array {
