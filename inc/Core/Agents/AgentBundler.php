@@ -32,6 +32,7 @@ use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\AgentTemplateMetadata;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
+use DataMachine\Engine\Bundle\BundleSchema;
 use DataMachine\Engine\Bundle\BundleValidationException;
 use DataMachine\Engine\Bundle\PortableSlug;
 use DataMachine\Engine\Bundle\PromptArtifact;
@@ -522,6 +523,16 @@ class AgentBundler {
 				'success'    => false,
 				'error_code' => 'install_invalid_bundle',
 				'error'      => 'Invalid bundle: missing bundle_version or agent data.',
+			);
+		}
+
+		try {
+			$bundle = $this->canonical_import_bundle( $bundle );
+		} catch ( BundleValidationException $e ) {
+			return array(
+				'success'    => false,
+				'error_code' => 'install_invalid_bundle',
+				'error'      => $e->getMessage(),
 			);
 		}
 
@@ -1171,6 +1182,41 @@ class AgentBundler {
 				'error'      => sprintf( 'Agent install rolled back: %s', $e->getMessage() ),
 			);
 		}
+	}
+
+	/**
+	 * Import an agent from a directory bundle value object.
+	 *
+	 * @param AgentBundleDirectory $directory Bundle directory value object.
+	 * @param string|null          $new_slug Optional override slug.
+	 * @param int                  $owner_id WordPress user ID to own the imported agent.
+	 * @param bool                 $dry_run If true, validate without writing.
+	 * @param array                $options Import options.
+	 * @return array{success: bool, message?: string, error?: string, error_code?: string, summary?: array}
+	 */
+	public function import_directory_object( AgentBundleDirectory $directory, ?string $new_slug = null, int $owner_id = 0, bool $dry_run = false, array $options = array() ): array {
+		return $this->import( AgentBundleArrayAdapter::to_array_bundle( $directory ), $new_slug, $owner_id, $dry_run, $options );
+	}
+
+	/**
+	 * Normalize schema-versioned bundle arrays through directory value objects before import.
+	 *
+	 * Legacy backup arrays intentionally keep the raw runtime-config path for compatibility.
+	 *
+	 * @param array $bundle Bundle array.
+	 * @return array Importable bundle array.
+	 */
+	private function canonical_import_bundle( array $bundle ): array {
+		if ( (string) ( $bundle['bundle_schema_version'] ?? '' ) !== (string) BundleSchema::VERSION ) {
+			return $bundle;
+		}
+
+		$canonical = AgentBundleArrayAdapter::to_array_bundle( AgentBundleArrayAdapter::from_array_bundle( $bundle ) );
+		if ( is_array( $bundle['abilities_manifest'] ?? null ) ) {
+			$canonical['abilities_manifest'] = $bundle['abilities_manifest'];
+		}
+
+		return $canonical;
 	}
 
 	/**
