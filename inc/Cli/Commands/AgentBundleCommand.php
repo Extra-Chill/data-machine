@@ -866,11 +866,12 @@ class AgentBundleCommand extends BaseCommand {
 				);
 			}
 			if ( 'flow' === $type && isset( $flow_by_slug[ $id ] ) ) {
-				$artifacts[] = array(
+				$installed_payload = is_array( $record['installed_payload'] ?? null ) ? $record['installed_payload'] : null;
+				$artifacts[]       = array(
 					'artifact_type' => 'flow',
 					'artifact_id'   => $id,
 					'source_path'   => (string) ( $record['source_path'] ?? '' ),
-					'payload'       => $this->flow_payload( $flow_by_slug[ $id ], $id ),
+					'payload'       => $this->flow_payload( $flow_by_slug[ $id ], $id, $installed_payload ),
 				);
 			}
 			if ( 'rubric' === $type ) {
@@ -963,7 +964,7 @@ class AgentBundleCommand extends BaseCommand {
 		);
 	}
 
-	private function flow_payload( array $flow, string $portable_slug ): array {
+	private function flow_payload( array $flow, string $portable_slug, ?array $installed_payload = null ): array {
 		$scheduling_policy = $this->flow_scheduling_policy( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() );
 
 		return array(
@@ -972,6 +973,7 @@ class AgentBundleCommand extends BaseCommand {
 			'flow_config'       => $this->flow_config_without_runtime_queues( is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array() ),
 			'scheduling_policy' => $scheduling_policy,
 			'queue_policy'      => 'create_seed_upgrade_preserve_existing',
+			'runtime_overlays'  => $this->flow_runtime_overlays( $flow, $installed_payload ),
 		);
 	}
 
@@ -990,11 +992,82 @@ class AgentBundleCommand extends BaseCommand {
 		foreach ( $flow_config as &$step ) {
 			if ( is_array( $step ) ) {
 				unset( $step['prompt_queue'], $step['config_patch_queue'], $step['queue_mode'], $step['_queue_consume_revision'] );
+				unset( $step['handler_config']['max_items'] );
+				if ( empty( $step['handler_config'] ) ) {
+					unset( $step['handler_config'] );
+				}
+				if ( is_array( $step['handler_configs'] ?? null ) ) {
+					foreach ( $step['handler_configs'] as $handler_slug => &$handler_config ) {
+						if ( is_array( $handler_config ) ) {
+							unset( $handler_config['max_items'] );
+							if ( empty( $handler_config ) ) {
+								unset( $step['handler_configs'][ $handler_slug ] );
+							}
+						}
+					}
+					unset( $handler_config );
+					if ( empty( $step['handler_configs'] ) ) {
+						unset( $step['handler_configs'] );
+					}
+				}
 			}
 		}
 		unset( $step );
 
 		return $flow_config;
+	}
+
+	private function flow_runtime_overlays( array $flow, ?array $installed_payload = null ): array {
+		if ( is_array( $installed_payload['runtime_overlays'] ?? null ) ) {
+			return $installed_payload['runtime_overlays'];
+		}
+
+		$overlays    = array();
+		$flow_config = is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array();
+		$steps       = array();
+
+		foreach ( $flow_config as $flow_step_id => $step ) {
+			if ( ! is_array( $step ) ) {
+				continue;
+			}
+
+			$step_overlay = array();
+			foreach ( array( 'prompt_queue', 'config_patch_queue', 'queue_mode', '_queue_consume_revision' ) as $field ) {
+				if ( array_key_exists( $field, $step ) ) {
+					$step_overlay[ $field ] = $step[ $field ];
+				}
+			}
+			if ( array_key_exists( 'max_items', $step['handler_config'] ?? array() ) ) {
+				$step_overlay['handler_config'] = array( 'max_items' => $step['handler_config']['max_items'] );
+			}
+			if ( is_array( $step['handler_configs'] ?? null ) ) {
+				foreach ( $step['handler_configs'] as $handler_slug => $handler_config ) {
+					if ( is_array( $handler_config ) && array_key_exists( 'max_items', $handler_config ) ) {
+						$step_overlay['handler_configs'][ (string) $handler_slug ] = array( 'max_items' => $handler_config['max_items'] );
+					}
+				}
+			}
+
+			if ( ! empty( $step_overlay ) ) {
+				ksort( $step_overlay, SORT_STRING );
+				$steps[ (string) $flow_step_id ] = $step_overlay;
+			}
+		}
+
+		if ( ! empty( $steps ) ) {
+			ksort( $steps, SORT_STRING );
+			$overlays['steps'] = $steps;
+		}
+
+		$scheduling = is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array();
+		unset( $scheduling['last_run'], $scheduling['next_run'], $scheduling['run_count'], $scheduling['run_artifacts'] );
+		if ( ! empty( $scheduling ) ) {
+			ksort( $scheduling, SORT_STRING );
+			$overlays['scheduling_config'] = $scheduling;
+		}
+
+		ksort( $overlays, SORT_STRING );
+		return $overlays;
 	}
 
 	private function resolve_bundle_agent( array $bundle, string $slug = '' ): ?array {
