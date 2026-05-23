@@ -298,6 +298,7 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$bundle                       = AgentBundleArrayAdapter::to_array_bundle( AgentBundleArrayAdapter::from_array_bundle( $this->fixture_bundle( 'schema-abilities-agent' ) ) );
 		$bundle['abilities_manifest'] = array( 'datamachine/test-missing-ability' );
 
+		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$result = $this->bundler->import( $bundle, null, $this->owner_id, true );
 
 		$this->assertTrue( (bool) $result['success'], 'Schema-versioned dry run succeeds.' );
