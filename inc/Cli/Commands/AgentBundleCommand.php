@@ -7,6 +7,7 @@
 
 namespace DataMachine\Cli\Commands;
 
+use DataMachine\Abilities\AgentAbilities;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Core\Database\Agents\Agents;
@@ -101,24 +102,8 @@ class AgentBundleCommand extends BaseCommand {
 	public function installed( array $args, array $assoc_args ): void {
 		unset( $args );
 
-		$items = array();
-		foreach ( $this->agents()->get_all() as $agent ) {
-			$bundle = $agent['agent_config']['datamachine_bundle'] ?? array();
-			if ( empty( $bundle['bundle_slug'] ) ) {
-				continue;
-			}
-
-			$items[] = array(
-				'agent_id'         => (int) $agent['agent_id'],
-				'agent_slug'       => (string) $agent['agent_slug'],
-				'template_slug'    => (string) ( $bundle['template_slug'] ?? $bundle['bundle_slug'] ),
-				'template_version' => (string) ( $bundle['template_version'] ?? $bundle['bundle_version'] ?? '' ),
-				'bundle_slug'      => (string) $bundle['bundle_slug'],
-				'bundle_version'   => (string) ( $bundle['bundle_version'] ?? '' ),
-				'source_ref'       => (string) ( $bundle['source_ref'] ?? '' ),
-				'artifacts'        => count( is_array( $bundle['artifacts'] ?? null ) ? $bundle['artifacts'] : array() ),
-			);
-		}
+		$response = AgentAbilities::listAgentBundles();
+		$items    = is_array( $response['bundles'] ?? null ) ? $response['bundles'] : array();
 
 		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) && empty( $items ) ) {
 			WP_CLI::line( '[]' );
@@ -146,13 +131,12 @@ class AgentBundleCommand extends BaseCommand {
 	 * ---
 	 */
 	public function status( array $args, array $assoc_args ): void {
-		$agent = $this->resolve_installed_agent( (string) ( $args[0] ?? '' ) );
-		if ( ! $agent ) {
-			WP_CLI::error( 'Installed bundle not found.' );
+		$status = AgentAbilities::getAgentBundleStatus( array( 'slug' => (string) ( $args[0] ?? '' ) ) );
+		if ( empty( $status['success'] ) ) {
+			WP_CLI::error( (string) ( $status['error'] ?? 'Installed bundle not found.' ) );
 			return;
 		}
 
-		$status = $this->installed_status( $agent );
 		$this->output( $status, $assoc_args, array( 'agent_id', 'agent_slug', 'template_slug', 'template_version', 'bundle_slug', 'bundle_version', 'artifact_count' ) );
 	}
 
@@ -183,13 +167,13 @@ class AgentBundleCommand extends BaseCommand {
 	 * ---
 	 */
 	public function diff( array $args, array $assoc_args ): void {
-		$bundle = $this->load_bundle_arg( $args, $assoc_args );
-		$plan   = $this->add_runtime_drift_to_plan(
-			$this->plan_for_bundle( $bundle, (string) ( $assoc_args['slug'] ?? '' ) )->to_array(),
-			$bundle,
-			(string) ( $assoc_args['slug'] ?? '' )
-		);
-		$this->output_plan( $plan, $assoc_args );
+		$response = AgentAbilities::planAgentBundleUpgrade( $this->bundle_ability_input( $args, $assoc_args ) );
+		if ( empty( $response['success'] ) ) {
+			WP_CLI::error( (string) ( $response['error'] ?? 'Bundle diff failed.' ) );
+			return;
+		}
+
+		$this->output_plan( is_array( $response['plan'] ?? null ) ? $response['plan'] : array(), $assoc_args );
 	}
 
 	/**
@@ -246,25 +230,20 @@ class AgentBundleCommand extends BaseCommand {
 	 * ---
 	 */
 	public function upgrade( array $args, array $assoc_args ): void {
-		$bundle            = $this->load_bundle_arg( $args, $assoc_args );
-		$slug              = (string) ( $assoc_args['slug'] ?? '' );
-		$plan              = $this->plan_for_bundle( $bundle, $slug );
 		$dry_run           = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
-		$reconcile_runtime = \WP_CLI\Utils\get_flag_value( $assoc_args, 'reconcile-runtime', false );
-		$rebase_local      = \WP_CLI\Utils\get_flag_value( $assoc_args, 'rebase-local', false );
-		$policy_name       = (string) ( $assoc_args['policy'] ?? AgentBundleArtifactRebase::POLICY_CONSERVATIVE );
+		$input             = $this->bundle_ability_input( $args, $assoc_args );
+		$input['dry_run']  = $dry_run;
+		if ( isset( $assoc_args['owner'] ) ) {
+			$input['owner_id'] = $this->resolve_user_id( $assoc_args['owner'] );
+		}
 
 		if ( $dry_run ) {
-			$plan_array = $this->add_runtime_drift_to_plan(
-				$plan->to_array(),
-				$bundle,
-				$slug,
-				$reconcile_runtime ? 'replace_bundle_seed' : 'preserve_existing'
-			);
-			if ( $rebase_local ) {
-				$plan_array['rebase'] = $this->rebase_locally_modified( $plan, $bundle, $slug, $policy_name );
+			$response = AgentAbilities::applyAgentBundleUpgrade( $input );
+			if ( empty( $response['success'] ) ) {
+				WP_CLI::error( (string) ( $response['error'] ?? 'Bundle upgrade preview failed.' ) );
+				return;
 			}
-			$this->output_plan( $plan_array, $assoc_args );
+			$this->output_plan( is_array( $response['plan'] ?? null ) ? $response['plan'] : array(), $assoc_args );
 			return;
 		}
 
@@ -272,55 +251,10 @@ class AgentBundleCommand extends BaseCommand {
 			WP_CLI::confirm( 'Apply clean bundle artifact updates now?' );
 		}
 
-		$owner_id = isset( $assoc_args['owner'] ) ? $this->resolve_user_id( $assoc_args['owner'] ) : 0;
-		$result   = $this->bundler()->import(
-			$bundle,
-			'' !== $slug ? $slug : null,
-			$owner_id,
-			false,
-			array(
-				'reconcile_runtime' => $reconcile_runtime,
-				// Mark this as an upgrade so the importer treats an existing agent row as the upgrade
-				// target instead of returning "Agent slug already exists" when local pipelines/flows
-				// have been edited (#1801). Local-modified artifacts come back in `result.conflicts`
-				// and get staged as PendingActions below.
-				'is_upgrade'        => true,
-			)
-		);
-		if ( empty( $result['success'] ) ) {
-			WP_CLI::error( (string) ( $result['error'] ?? 'Bundle upgrade failed.' ) );
+		$response = AgentAbilities::applyAgentBundleUpgrade( $input );
+		if ( empty( $response['success'] ) ) {
+			WP_CLI::error( (string) ( $response['error'] ?? 'Bundle upgrade failed.' ) );
 			return;
-		}
-
-		$response = array(
-			'success' => true,
-			'import'  => $result,
-			'plan'    => $plan->to_array(),
-		);
-
-		if ( $plan->has_pending_approval() ) {
-			$agent                      = $this->resolve_bundle_agent( $bundle, $slug );
-			$rebased_artifacts          = $rebase_local
-				? $this->rebase_locally_modified( $plan, $bundle, $slug, $policy_name )
-				: array();
-			$approved_artifacts         = $this->approved_rebased_artifact_keys( $rebased_artifacts );
-			$pending                    = AgentBundleUpgradePendingAction::stage(
-				$plan,
-				array(
-					'bundle'             => $this->bundle_summary( $bundle, $slug ),
-					'agent'              => $agent ? $agent : array(),
-					'target_artifacts'   => $this->bundle_artifacts( $bundle ),
-					'approved_artifacts' => $approved_artifacts,
-					'rebased_artifacts'  => $rebased_artifacts,
-					'summary'            => 'Review locally modified bundle artifacts before applying.',
-					'agent_id'           => $agent ? (int) $agent['agent_id'] : 0,
-					'user_id'            => get_current_user_id(),
-				)
-			);
-			$response['pending_action'] = $pending;
-			if ( ! empty( $rebased_artifacts ) ) {
-				$response['rebase'] = $rebased_artifacts;
-			}
 		}
 
 		$this->output( $response, $assoc_args, array( 'success' ) );
@@ -344,19 +278,12 @@ class AgentBundleCommand extends BaseCommand {
 	 * ---
 	 */
 	public function apply( array $args, array $assoc_args ): void {
-		$action_id = sanitize_text_field( (string) ( $args[0] ?? '' ) );
-		if ( '' === $action_id ) {
-			WP_CLI::error( 'Pending action ID is required.' );
+		$result               = AgentAbilities::resolveAgentBundleUpgradeAction( array( 'pending_action_id' => (string) ( $args[0] ?? '' ) ) );
+		$assoc_args['format'] = $assoc_args['format'] ?? 'json';
+		if ( empty( $result['success'] ) ) {
+			WP_CLI::error( (string) ( $result['error'] ?? 'Pending action apply failed.' ) );
 			return;
 		}
-
-		$result               = ResolvePendingActionAbility::execute(
-			array(
-				'action_id' => $action_id,
-				'decision'  => 'accepted',
-			)
-		);
-		$assoc_args['format'] = $assoc_args['format'] ?? 'json';
 		$this->output( $result, $assoc_args, array( 'success', 'action_id', 'kind' ) );
 	}
 
@@ -396,30 +323,32 @@ class AgentBundleCommand extends BaseCommand {
 	 * ---
 	 */
 	public function rebase( array $args, array $assoc_args ): void {
-		$bundle      = $this->load_bundle_arg( $args );
-		$slug        = (string) ( $assoc_args['slug'] ?? '' );
-		$plan        = $this->plan_for_bundle( $bundle, $slug );
-		$policy_name = (string) ( $assoc_args['policy'] ?? AgentBundleArtifactRebase::POLICY_CONSERVATIVE );
-		$only        = isset( $assoc_args['artifact'] ) ? (string) $assoc_args['artifact'] : '';
-
-		$rebased = $this->rebase_locally_modified( $plan, $bundle, $slug, $policy_name );
-		if ( '' !== $only ) {
-			$rebased = array_values(
-				array_filter(
-					$rebased,
-					static fn( array $entry ) => ( $entry['artifact_key'] ?? '' ) === $only
-				)
-			);
+		$response = AgentAbilities::rebaseAgentBundleArtifacts( $this->bundle_ability_input( $args, $assoc_args ) );
+		if ( empty( $response['success'] ) ) {
+			WP_CLI::error( (string) ( $response['error'] ?? 'Bundle artifact rebase failed.' ) );
+			return;
 		}
-
-		$response = array(
-			'policy'  => $policy_name,
-			'count'   => count( $rebased ),
-			'rebased' => $rebased,
-		);
 
 		$assoc_args['format'] = $assoc_args['format'] ?? 'json';
 		$this->output( $response, $assoc_args, array( 'policy', 'count' ) );
+	}
+
+	private function bundle_ability_input( array $args, array $assoc_args ): array {
+		$input = array(
+			'source'            => (string) ( $args[0] ?? '' ),
+			'slug'              => (string) ( $assoc_args['slug'] ?? '' ),
+			'reconcile_runtime' => \WP_CLI\Utils\get_flag_value( $assoc_args, 'reconcile-runtime', false ),
+			'rebase_local'      => \WP_CLI\Utils\get_flag_value( $assoc_args, 'rebase-local', false ),
+			'policy'            => (string) ( $assoc_args['policy'] ?? AgentBundleArtifactRebase::POLICY_CONSERVATIVE ),
+		);
+
+		foreach ( array( 'token' => 'token', 'token-env' => 'token_env', 'artifact' => 'artifact' ) as $cli_key => $ability_key ) {
+			if ( isset( $assoc_args[ $cli_key ] ) ) {
+				$input[ $ability_key ] = (string) $assoc_args[ $cli_key ];
+			}
+		}
+
+		return $input;
 	}
 
 	/**

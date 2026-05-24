@@ -270,6 +270,21 @@ final class AgentBundleArtifactRebase {
 			$local_hcs  = is_array( $local_step['handler_configs'] ?? null ) ? $local_step['handler_configs'] : array();
 			$remote_hcs = is_array( $remote_step['handler_configs'] ?? null ) ? $remote_step['handler_configs'] : array();
 
+			// Legacy/single-handler flow shapes still carry `handler_config` directly on
+			// the step. Apply the same burn-in-safe ownership rules there so template
+			// upgrades cannot silently reset local throttles before the config is
+			// normalized into keyed `handler_configs`.
+			if ( empty( $local_hcs ) && empty( $remote_hcs ) && ( is_array( $local_step['handler_config'] ?? null ) || is_array( $remote_step['handler_config'] ?? null ) ) ) {
+				$merged_step['handler_config'] = self::merge_handler_config(
+					is_array( $base_step['handler_config'] ?? null ) ? $base_step['handler_config'] : array(),
+					is_array( $local_step['handler_config'] ?? null ) ? $local_step['handler_config'] : array(),
+					is_array( $remote_step['handler_config'] ?? null ) ? $remote_step['handler_config'] : array(),
+					"flow_config.{$step_id}.handler_config",
+					$decisions,
+					$ambiguous
+				);
+			}
+
 			if ( ! empty( $local_hcs ) || ! empty( $remote_hcs ) ) {
 				$merged_hcs = array();
 				$slugs      = array_unique( array_merge( array_keys( $local_hcs ), array_keys( $remote_hcs ) ) );
