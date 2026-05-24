@@ -90,6 +90,20 @@ $route = ExecuteStepAbility::resolveTransitionRoute(
 	array( 'step_type' => 'ai' ),
 	array(
 		'step_type'     => 'publish',
+		'handler_slugs' => array( 'publish_post' ),
+	),
+	array(
+		transition_fanout_packet( 'tool_result', array( 'tool_name' => 'search' ) ),
+	)
+);
+
+transition_fanout_assert_same( 'fail', $route['mode'], 'single ai non-handler packet fails before handler step', $failures, $passes );
+transition_fanout_assert_same( 'handler_requiring_step_missing_handler_packets', $route['reason'], 'single-packet failure reason is explicit', $failures, $passes );
+
+$route = ExecuteStepAbility::resolveTransitionRoute(
+	array( 'step_type' => 'ai' ),
+	array(
+		'step_type'     => 'publish',
 		'handler_slugs' => array( 'publish_post', 'publish_pin' ),
 	),
 	array(

@@ -198,6 +198,38 @@ class ExecuteStepFanOutFilterTest extends WP_UnitTestCase {
 		$this->assertSame( 'handler_requiring_step_missing_handler_packets', $route['reason'] );
 	}
 
+	public function test_ai_to_handler_step_with_single_non_handler_packet_fails_transition(): void {
+		$route = ExecuteStepAbility::resolveTransitionRoute(
+			array( 'step_type' => 'ai' ),
+			array(
+				'step_type'     => 'publish',
+				'handler_slugs' => array( 'publish_post' ),
+			),
+			array(
+				$this->make_packet( 'tool_result', array( 'tool_name' => 'search' ) ),
+			)
+		);
+
+		$this->assertSame( 'fail', $route['mode'] );
+		$this->assertSame( array(), $route['packets'] );
+		$this->assertSame( 'handler_requiring_step_missing_handler_packets', $route['reason'] );
+	}
+
+	public function test_ai_to_handler_step_with_no_packets_fails_transition(): void {
+		$route = ExecuteStepAbility::resolveTransitionRoute(
+			array( 'step_type' => 'ai' ),
+			array(
+				'step_type'     => 'upsert',
+				'handler_slugs' => array( 'upsert_event' ),
+			),
+			array()
+		);
+
+		$this->assertSame( 'fail', $route['mode'] );
+		$this->assertSame( array(), $route['packets'] );
+		$this->assertSame( 'handler_requiring_step_missing_handler_packets', $route['reason'] );
+	}
+
 	public function test_ai_to_multi_handler_step_keeps_handler_packets_together(): void {
 		$route = ExecuteStepAbility::resolveTransitionRoute(
 			array( 'step_type' => 'ai' ),
