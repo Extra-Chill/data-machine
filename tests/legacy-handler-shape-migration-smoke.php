@@ -1,6 +1,6 @@
 <?php
 /**
- * Pure-PHP smoke test for `LegacyHandlerShapeMigrator`.
+ * Pure-PHP smoke test for the operator-only legacy handler shape migrator.
  *
  * Run with: php tests/legacy-handler-shape-migration-smoke.php
  *
@@ -46,9 +46,9 @@ if ( ! function_exists( 'do_action' ) ) {
 }
 
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
-require_once __DIR__ . '/../inc/Core/Steps/LegacyHandlerShapeMigrator.php';
+require_once __DIR__ . '/../inc/Cli/Commands/Flows/LegacyHandlerShapeMigrator.php';
 
-use DataMachine\Core\Steps\LegacyHandlerShapeMigrator;
+use DataMachine\Cli\Commands\Flows\LegacyHandlerShapeMigrator;
 
 $failures = array();
 $passes   = 0;

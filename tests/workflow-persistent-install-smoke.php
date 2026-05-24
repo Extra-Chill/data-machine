@@ -134,7 +134,9 @@ assert_workflow_equals( 'Webhook Payload', $pipeline_steps[0]['label'] ?? null, 
 assert_workflow_equals( 'Review Pull Request', $pipeline_steps[1]['label'] ?? null, 'pipeline preserves AI label', $failures, $passes );
 assert_workflow_equals( 'Review the PR.', $pipeline_steps[1]['system_prompt'] ?? null, 'pipeline preserves AI system prompt', $failures, $passes );
 assert_workflow_equals( array( 'datamachine/delete-flow' ), $pipeline_steps[1]['disabled_tools'] ?? null, 'pipeline preserves AI disabled tools', $failures, $passes );
+assert_workflow_equals( false, array_key_exists( 'handler', $pipeline_steps[0] ), 'pipeline rows stay handler-alias-free', $failures, $passes );
 assert_workflow_equals( false, array_key_exists( 'handler_slug', $pipeline_steps[0] ), 'pipeline rows stay handler-free', $failures, $passes );
+assert_workflow_equals( false, array_key_exists( 'handler_config', $pipeline_steps[0] ), 'pipeline rows stay scalar-config-free', $failures, $passes );
 
 $flow_config = WorkflowConfigFactory::buildPersistentFlowConfig( $workflow, 88, 144, $pipeline_config );
 $flow_steps  = array_values( $flow_config );
@@ -146,6 +148,9 @@ assert_workflow_equals( 88, $flow_steps[0]['pipeline_id'] ?? null, 'flow stores 
 assert_workflow_equals( 144, $flow_steps[0]['flow_id'] ?? null, 'flow stores target flow id', $failures, $passes );
 assert_workflow_equals( array( 'webhook_payload' ), $flow_steps[0]['handler_slugs'] ?? null, 'flow preserves fetch handler slugs', $failures, $passes );
 assert_workflow_equals( array( 'webhook_payload' => array( 'payload_path' => 'pull_request' ) ), $flow_steps[0]['handler_configs'] ?? null, 'flow preserves fetch handler configs', $failures, $passes );
+assert_workflow_equals( false, array_key_exists( 'handler', $flow_steps[0] ), 'flow rows do not recreate scalar handler alias', $failures, $passes );
+assert_workflow_equals( false, array_key_exists( 'handler_slug', $flow_steps[0] ), 'flow rows do not recreate scalar handler_slug', $failures, $passes );
+assert_workflow_equals( false, array_key_exists( 'handler_config', $flow_steps[0] ), 'flow rows do not recreate scalar handler_config', $failures, $passes );
 assert_workflow_equals( array( 'after' => '2026-04-01' ), $flow_steps[0]['config_patch_queue'][0]['patch'] ?? null, 'flow preserves fetch config patch queue', $failures, $passes );
 assert_workflow_equals( 'drain', $flow_steps[0]['queue_mode'] ?? null, 'flow preserves explicit fetch queue mode', $failures, $passes );
 assert_workflow_equals( array( 'datamachine/get-github-pull-review-context', 'datamachine/upsert-github-pull-review-comment' ), $flow_steps[1]['enabled_tools'] ?? null, 'flow preserves AI enabled tools', $failures, $passes );

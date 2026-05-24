@@ -23,7 +23,6 @@ use DataMachine\Cli\AgentResolver;
 use DataMachine\Cli\UserResolver;
 use DataMachine\Cli\Commands\DrainCommand;
 use DataMachine\Core\Steps\FlowStepConfig;
-use DataMachine\Core\Steps\LegacyHandlerShapeMigrator;
 use DataMachine\Engine\Debug\SyncRunner;
 
 defined( 'ABSPATH' ) || exit;

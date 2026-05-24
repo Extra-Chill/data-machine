@@ -73,9 +73,15 @@ wp datamachine flows list-handlers 10
 
 # Memory file management
 wp datamachine flows memory-files 10 --add=context.md
+
+# Operator repair: audit and rewrite pre-1.0 scalar handler rows
+wp datamachine flows migrate-legacy-handler-shape --dry-run --verbose
+wp datamachine flows migrate-legacy-handler-shape --all-sites --yes
 ```
 
-**Options**: `--per_page`, `--offset`, `--handler`, `--format`, `--fields`
+`migrate-legacy-handler-shape` is a contained operator repair command for older stored `flow_config` rows that still use scalar `handler`, `handler_slug`, or `handler_config` keys. Normal workflow specs, import/update paths, readers, and writers remain canonical-only and use `handler_slugs`, `handler_configs`, and `flow_step_settings`.
+
+**Options**: `--per_page`, `--offset`, `--handler`, `--format`, `--fields`, `--dry-run`, `--all-sites`, `--yes`, `--verbose`
 
 ### datamachine flows queue
 

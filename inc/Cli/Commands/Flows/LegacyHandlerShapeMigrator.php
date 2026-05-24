@@ -7,34 +7,25 @@
  * `handler_config`) into the canonical shape (`handler_slugs`,
  * `handler_configs`, `flow_step_settings`).
  *
- * After `b9db8d8` (#712) the canonical shape became authoritative and a
- * persisted migration ran on every plugins_loaded. That migration was removed
- * in `e113857` ("Drop pre-1.0 data-shape migrations") on the assumption that
- * every install booting current code had already been migrated. That
- * assumption did not hold for every install: production sites that re-issued
- * legacy-shape writes — directly or via cloned/imported flow data — still
- * carry rows in the scalar shape.
+ * This class intentionally lives beside the `flows migrate-legacy-handler-shape`
+ * WP-CLI command. Runtime readers, writers, validators, importers, and step
+ * config factories must stay canonical-only; this is not a compatibility layer.
  *
- * The strict legacy-field rejection landed in #2102 (May 2026) which makes
- * those leftover rows runtime-fatal: handler-backed fetch steps return a null
- * primary slug and run as no-ops. This migrator is the explicit operator path
- * back to the canonical shape without re-introducing an open-ended persisted
- * migration chain.
- *
- * Pure in-memory transformation. The CLI wraps this with persistence and
- * per-site iteration.
- *
- * @package DataMachine\Core\Steps
+ * @package DataMachine\Cli\Commands\Flows
  * @since 0.124.6
  */
 
-namespace DataMachine\Core\Steps;
+namespace DataMachine\Cli\Commands\Flows;
+
+use DataMachine\Core\Steps\FlowStepConfig;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Rewrite legacy scalar handler shapes inside `flow_config` JSON into the
  * canonical `handler_slugs` / `handler_configs` / `flow_step_settings` shape.
+ *
+ * @internal Operator repair helper for `wp datamachine flows migrate-legacy-handler-shape` only.
  */
 class LegacyHandlerShapeMigrator {
 
@@ -102,8 +93,8 @@ class LegacyHandlerShapeMigrator {
 	 * steps) or `flow_step_settings` (handler-free steps), then strips the
 	 * legacy keys via {@see FlowStepConfig::normalizeHandlerShape()}.
 	 *
-	 * @param array<string, mixed>                                                                            $step   Step config row.
-	 * @param array{dropped_orphan_legacy_config: int, ...}                                                   $report In/out report counters.
+	 * @param array<string, mixed>                  $step   Step config row.
+	 * @param array{dropped_orphan_legacy_config:int,...} $report In/out report counters.
 	 * @return array<string, mixed> Migrated step config row.
 	 */
 	private static function migrate_step( array $step, array &$report ): array {
