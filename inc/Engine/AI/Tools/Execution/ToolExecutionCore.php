@@ -12,6 +12,7 @@
 
 namespace DataMachine\Engine\AI\Tools\Execution;
 
+use DataMachine\Core\AbilityResult;
 use DataMachine\Engine\AI\Tools\ToolParameters;
 
 defined( 'ABSPATH' ) || exit;
@@ -203,26 +204,7 @@ class ToolExecutionCore {
 			);
 		}
 
-		$result = $ability->execute( $parameters );
-		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'   => false,
-				'error'     => $result->get_error_message(),
-				'tool_name' => $tool_name,
-				'ability'   => $ability_slug,
-			);
-		}
-
-		if ( is_array( $result ) ) {
-			return $result;
-		}
-
-		return array(
-			'success'   => true,
-			'tool_name' => $tool_name,
-			'ability'   => $ability_slug,
-			'result'    => $result,
-		);
+		return AbilityResult::normalize_tool_result( $ability->execute( $parameters ), $tool_name, $ability_slug );
 	}
 
 	/**

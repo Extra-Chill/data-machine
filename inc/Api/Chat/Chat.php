@@ -15,6 +15,7 @@
 namespace DataMachine\Api\Chat;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\AbilityResult;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\WpAiClientProviderAdmin;
 use WP_REST_Response;
@@ -701,22 +702,19 @@ class Chat {
 			return $result;
 		}
 
-		// Legacy convention: ability callbacks return { success: false, error: ... }.
-		// Map to WP_Error until all abilities are migrated to return WP_Error directly.
-		// See: https://github.com/Extra-Chill/data-machine/issues/999
-		if ( is_array( $result ) && isset( $result['success'] ) && ! $result['success'] ) {
-			$error_code = $result['error'] ?? 'ability_failed';
-
-			$status_map = array(
+		$legacy_error = AbilityResult::legacy_failure_to_wp_error(
+			$result,
+			'ability_failed',
+			'Ability execution failed.',
+			array(
 				'session_not_found'     => 404,
 				'session_access_denied' => 403,
-			);
-
-			return new WP_Error(
-				$error_code,
-				$result['error'] ?? 'Ability execution failed.',
-				array( 'status' => $status_map[ $error_code ] ?? 500 )
-			);
+			),
+			500,
+			true
+		);
+		if ( $legacy_error ) {
+			return $legacy_error;
 		}
 
 		return rest_ensure_response(
