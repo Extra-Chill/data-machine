@@ -649,6 +649,39 @@ class BaseOAuth2ProviderTest extends WP_UnitTestCase {
 		$this->assertNull( $handler->get_pkce_verifier( 'nonexistent_provider' ) );
 	}
 
+	public function test_state_keyed_pkce_verifiers_do_not_cross_match(): void {
+		$handler      = new \DataMachine\Core\OAuth\OAuth2Handler();
+		$first_state  = str_repeat( '1', 64 );
+		$second_state = str_repeat( '2', 64 );
+		$first_pkce   = $handler->create_pkce( 'test_pkce_concurrent', $first_state );
+		$second_pkce  = $handler->create_pkce( 'test_pkce_concurrent', $second_state );
+
+		$this->assertNull(
+			$handler->get_pkce_verifier( 'test_pkce_concurrent', str_repeat( 'x', 64 ) )
+		);
+		$this->assertSame(
+			$first_pkce['verifier'],
+			$handler->get_pkce_verifier( 'test_pkce_concurrent', $first_state )
+		);
+		$this->assertSame(
+			$second_pkce['verifier'],
+			$handler->get_pkce_verifier( 'test_pkce_concurrent', $second_state )
+		);
+	}
+
+	public function test_state_keyed_pkce_verifier_does_not_fallback_to_provider_wide_transient(): void {
+		$handler = new \DataMachine\Core\OAuth\OAuth2Handler();
+		$state   = str_repeat( '3', 64 );
+
+		set_transient( 'datamachine_test_pkce_legacy_pkce_verifier', 'legacy-verifier', 900 );
+
+		$this->assertNull( $handler->get_pkce_verifier( 'test_pkce_legacy', $state ) );
+		$this->assertSame(
+			'legacy-verifier',
+			$handler->get_pkce_verifier( 'test_pkce_legacy' )
+		);
+	}
+
 	public function test_pkce_challenge_is_valid_s256(): void {
 		$handler = new \DataMachine\Core\OAuth\OAuth2Handler();
 		$pkce    = $handler->create_pkce( 'test_pkce_s256' );
