@@ -52,6 +52,8 @@ use DataMachine\Engine\Actions\Handlers\MarkItemProcessedHandler;
 use DataMachine\Engine\Actions\Handlers\FailJobHandler;
 use DataMachine\Engine\Actions\Handlers\JobCompleteHandler;
 use DataMachine\Engine\Actions\Handlers\LogHandler;
+use AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision;
+use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action;
 
 /**
  * Register core Data Machine action hooks.
@@ -78,19 +80,21 @@ function datamachine_register_core_actions() {
 	);
 	add_action(
 		'datamachine_pending_action_resolved',
-		function ( string $decision, string $action_id, string $kind, array $payload ): void {
-			$action_id;
-			$kind;
-			$context = is_array( $payload['context'] ?? null ) ? $payload['context'] : array();
-			$job_id  = (int) ( $context['job_id'] ?? 0 );
+		function ( WP_Agent_Pending_Action $action, WP_Agent_Approval_Decision $decision, string $resolver ): void {
+			unset( $resolver );
+
+			$metadata    = $action->get_metadata();
+			$datamachine = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
+			$context     = is_array( $datamachine['context'] ?? null ) ? $datamachine['context'] : array();
+			$job_id      = (int) ( $context['job_id'] ?? 0 );
 			if ( $job_id <= 0 ) {
 				return;
 			}
-			$key = 'accepted' === $decision ? 'accepted_actions' : 'rejected_actions';
+			$key = $decision->is_accepted() ? 'accepted_actions' : 'rejected_actions';
 			\DataMachine\Core\RunMetrics::increment( $job_id, $key );
 		},
 		10,
-		5
+		3
 	);
 
 	// AI library error logging — universal handler for all AI interactions (pipeline agents, chat agents).

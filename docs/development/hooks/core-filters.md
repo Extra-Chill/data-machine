@@ -552,8 +552,9 @@ action. Receives `WP_Agent_Pending_Action $action`.
 
 ### `datamachine_pending_action_resolved`
 
-**Purpose**: Fires after a staged action is accepted or rejected. This hook keeps
-the legacy signature: `$decision, $action_id, $kind, $payload, $result`.
+**Purpose**: Fires after a staged action is accepted or rejected. Receives the
+canonical Agents API contract: `WP_Agent_Pending_Action $action`,
+`WP_Agent_Approval_Decision $decision`, and `string $resolver`.
 
 ### `datamachine_pending_action_expired`
 
