@@ -399,10 +399,11 @@ wp datamachine drain
 
 # Bound work for cron/supervisors
 wp datamachine drain --limit=500 --batch-size=25 --time-limit=300
+wp datamachine drain --time-limit=600 --stop-before-timeout=30 --format=json
 wp datamachine drain --limit=500 --time-limit=300 --format=json
 ```
 
-**Options**: `--limit`, `--batch-size`, `--time-limit`, `--format=table|json`
+**Options**: `--limit`, `--batch-size`, `--time-limit`, `--stop-before-timeout`, `--job-id`, `--format=table|json`
 
 ### datamachine cycle / cycles
 

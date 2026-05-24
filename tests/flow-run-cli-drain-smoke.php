@@ -40,6 +40,8 @@ assert_drain_contains( "WP_CLI::add_command( 'datamachine drain'", $boot_src, 'f
 assert_drain_contains( "datamachine_pipeline_batch_chunk'", $drain_src, 'drain includes pipeline batch chunk hook' );
 assert_drain_contains( "datamachine_execute_step'", $drain_src, 'drain includes execute step hook' );
 assert_drain_contains( '[--job-id=<ids>]', $drain_src, 'drain documents optional job-id scope' );
+assert_drain_contains( '[--stop-before-timeout=<seconds>]', $drain_src, 'drain documents optional timeout safety margin' );
+assert_drain_contains( "'stop_before_timeout'", $drain_src, 'drain accepts worker-style timeout safety margin option' );
 assert_drain_contains( 'normalizeJobIds', $drain_src, 'drain normalizes optional job-id scope' );
 assert_drain_contains( 'hookWhereSql( $hooks, $job_ids )', $drain_src, 'drain supports optional hook and job-id scopes' );
 assert_drain_contains( 'a.args LIKE %s', $drain_src, 'drain can filter pending actions by serialized job_id args' );
@@ -56,6 +58,8 @@ assert_drain_contains( "'step_executions'", $drain_src, 'drain reports step exec
 assert_drain_contains( "'other_actions'", $drain_src, 'drain reports non-pipeline action counts' );
 assert_drain_contains( "'completions'", $drain_src, 'drain reports completions' );
 assert_drain_contains( "'failures'", $drain_src, 'drain reports failures' );
+assert_drain_contains( "'stop_reason'", $drain_src, 'drain reports why it stopped' );
+assert_drain_contains( "'timeout_margin'", $drain_src, 'drain reports timeout margin stops' );
 
 $run_flow_start = strpos( $src, 'private function runFlow' );
 assert_true( false !== $run_flow_start, 'runFlow method found' );

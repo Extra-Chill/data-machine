@@ -46,6 +46,14 @@ class DrainCommand extends BaseCommand {
 	 * default: 0
 	 * ---
 	 *
+	 * [--stop-before-timeout=<seconds>]
+	 * : Stop this many seconds before the wall-clock limit so the drain exits
+	 * cleanly before an external supervisor timeout. Only applies when
+	 * --time-limit is greater than 0.
+	 * ---
+	 * default: 0
+	 * ---
+	 *
 	 * [--job-id=<ids>]
 	 * : Optional comma-separated Data Machine job IDs to drain. Useful when
 	 * unrelated due work is blocked ahead of a known cleanup or retry run.
@@ -72,10 +80,11 @@ class DrainCommand extends BaseCommand {
 
 		$stats = self::drain(
 			array(
-				'limit'      => isset( $assoc_args['limit'] ) ? (int) $assoc_args['limit'] : 0,
-				'batch_size' => isset( $assoc_args['batch-size'] ) ? (int) $assoc_args['batch-size'] : 25,
-				'time_limit' => isset( $assoc_args['time-limit'] ) ? (int) $assoc_args['time-limit'] : 0,
-				'job_ids'    => isset( $assoc_args['job-id'] ) ? (string) $assoc_args['job-id'] : '',
+				'limit'               => isset( $assoc_args['limit'] ) ? (int) $assoc_args['limit'] : 0,
+				'batch_size'          => isset( $assoc_args['batch-size'] ) ? (int) $assoc_args['batch-size'] : 25,
+				'time_limit'          => isset( $assoc_args['time-limit'] ) ? (int) $assoc_args['time-limit'] : 0,
+				'stop_before_timeout' => isset( $assoc_args['stop-before-timeout'] ) ? (int) $assoc_args['stop-before-timeout'] : 0,
+				'job_ids'             => isset( $assoc_args['job-id'] ) ? (string) $assoc_args['job-id'] : '',
 			)
 		);
 
@@ -94,28 +103,37 @@ class DrainCommand extends BaseCommand {
 	 * so this drain runs concrete due action IDs from that same group instead of
 	 * a hand-maintained hook allow-list.
 	 *
-	 * @param array{limit?:int,batch_size?:int,time_limit?:int,hooks?:string[],job_ids?:string|int[]} $options Drain options.
+	 * @param array{limit?:int,batch_size?:int,time_limit?:int,stop_before_timeout?:int,hooks?:string[],job_ids?:string|int[]} $options Drain options.
 	 * @return array<string,int|string> Drain stats.
 	 */
 	public static function drain( array $options = array() ): array {
-		$limit      = max( 0, (int) ( $options['limit'] ?? 0 ) );
-		$batch_size = max( 1, (int) ( $options['batch_size'] ?? 25 ) );
-		$time_limit = max( 0, (int) ( $options['time_limit'] ?? 0 ) );
-		$hooks      = self::normalizeHooks( $options['hooks'] ?? null );
-		$job_ids    = self::normalizeJobIds( $options['job_ids'] ?? null );
+		$limit               = max( 0, (int) ( $options['limit'] ?? 0 ) );
+		$batch_size          = max( 1, (int) ( $options['batch_size'] ?? 25 ) );
+		$time_limit          = max( 0, (int) ( $options['time_limit'] ?? 0 ) );
+		$stop_before_timeout = max( 0, (int) ( $options['stop_before_timeout'] ?? 0 ) );
+		$hooks               = self::normalizeHooks( $options['hooks'] ?? null );
+		$job_ids             = self::normalizeJobIds( $options['job_ids'] ?? null );
 
 		$started_at    = time();
 		$before_counts = self::getStatusCounts( $hooks, $job_ids );
 		$batches       = 0;
 		$warnings      = 0;
+		$stop_reason   = 'empty';
 
 		while ( self::getDuePendingCount( $hooks, $job_ids ) > 0 ) {
-			$stats = self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids ), $batches, $warnings, $hooks, $job_ids );
+			$stats = self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids ), $batches, $warnings, $hooks, $job_ids, $stop_reason );
 			if ( $limit > 0 && (int) $stats['actions_processed'] >= $limit ) {
+				$stop_reason = 'limit';
 				break;
 			}
 
 			if ( $time_limit > 0 && ( time() - $started_at ) >= $time_limit ) {
+				$stop_reason = 'time_limit';
+				break;
+			}
+
+			if ( $time_limit > 0 && ( $time_limit - ( time() - $started_at ) ) <= $stop_before_timeout ) {
+				$stop_reason = 'timeout_margin';
 				break;
 			}
 
@@ -124,11 +142,13 @@ class DrainCommand extends BaseCommand {
 				$current_batch_size = min( $batch_size, $limit - (int) $stats['actions_processed'] );
 			}
 			if ( $current_batch_size <= 0 ) {
+				$stop_reason = 'limit';
 				break;
 			}
 
 			$action_ids = self::getDuePendingActionIds( $current_batch_size, $hooks, $job_ids );
 			if ( empty( $action_ids ) ) {
+				$stop_reason = 'empty';
 				break;
 			}
 
@@ -141,6 +161,7 @@ class DrainCommand extends BaseCommand {
 				++$warnings;
 				$message = trim( (string) ( $result->stderr ?? '' ) );
 				WP_CLI::warning( '' === $message ? 'Action Scheduler CLI drain failed.' : $message );
+				$stop_reason = 'warning';
 				break;
 			}
 
@@ -149,11 +170,12 @@ class DrainCommand extends BaseCommand {
 			if ( 0 === $progress && self::getDuePendingCount( $hooks, $job_ids ) >= $due_before ) {
 				++$warnings;
 				WP_CLI::warning( 'Drain stopped because Action Scheduler made no observable progress.' );
+				$stop_reason = 'no_progress';
 				break;
 			}
 		}
 
-		return self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids ), $batches, $warnings, $hooks, $job_ids );
+		return self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids ), $batches, $warnings, $hooks, $job_ids, $stop_reason );
 	}
 
 	/**
@@ -213,7 +235,7 @@ class DrainCommand extends BaseCommand {
 	 * @param int                             $warnings      Warning count.
 	 * @return array<string,int|string> Stats.
 	 */
-	private static function buildStats( array $before_counts, array $after_counts, int $batches, int $warnings, ?array $hooks = null, array $job_ids = array() ): array {
+	private static function buildStats( array $before_counts, array $after_counts, int $batches, int $warnings, ?array $hooks = null, array $job_ids = array(), string $stop_reason = 'empty' ): array {
 		$batch_completed   = self::delta( $before_counts, $after_counts, self::HOOK_BATCH_CHUNK, 'complete' );
 		$batch_failed      = self::delta( $before_counts, $after_counts, self::HOOK_BATCH_CHUNK, 'failed' );
 		$step_completed    = self::delta( $before_counts, $after_counts, self::HOOK_EXECUTE_STEP, 'complete' );
@@ -238,6 +260,7 @@ class DrainCommand extends BaseCommand {
 			'remaining_pending'          => self::getDuePendingCount( $hooks, $job_ids ),
 			'total_pending'              => self::getPendingCount( $hooks, $job_ids ),
 			'warnings'                   => $warnings,
+			'stop_reason'                => $stop_reason,
 			'hooks'                      => implode( ',', self::processedHooks( $before_counts, $after_counts ) ),
 			'job_ids'                    => implode( ',', $job_ids ),
 		);
