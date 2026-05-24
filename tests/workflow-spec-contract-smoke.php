@@ -124,6 +124,7 @@ $invalid_cases    = array(
 	'associative steps' => array( 'steps' => array( 'first' => array( 'type' => 'fetch' ) ) ),
 	'scalar step'       => array( 'steps' => array( 'fetch' ) ),
 	'missing type'      => array( 'steps' => array( array( 'handler_slug' => 'rss' ) ) ),
+	'legacy handler alias field' => array( 'steps' => array( array( 'type' => 'fetch', 'handler' => 'rss' ) ) ),
 	'legacy handler field' => array( 'steps' => array( array( 'type' => 'fetch', 'handler_slug' => 'rss' ) ) ),
 	'legacy config field'  => array( 'steps' => array( array( 'type' => 'fetch', 'handler_config' => array( 'url' => 'https://example.com' ) ) ) ),
 	'non-string type'   => array( 'steps' => array( array( 'type' => 123 ) ) ),
@@ -204,6 +205,9 @@ assert_workflow_spec_equals( array( array( 'id' => 'after-worktree', 'max_calls'
 assert_workflow_spec_equals( 'Cleanup', $pipeline_steps[2]['label'] ?? null, 'ephemeral pipeline_config preserves system_task label', $failures, $passes );
 assert_workflow_spec_equals( array( 'task_type' => 'retention_logs' ), $pipeline_steps[2]['flow_step_settings'] ?? null, 'ephemeral pipeline_config preserves system_task settings', $failures, $passes );
 assert_workflow_spec_equals( false, array_key_exists( 'system_prompt', $pipeline_steps[2] ), 'non-AI ephemeral pipeline rows do not gain AI metadata', $failures, $passes );
+assert_workflow_spec_equals( false, array_key_exists( 'handler', $pipeline_steps[0] ), 'ephemeral pipeline rows do not emit scalar handler alias', $failures, $passes );
+assert_workflow_spec_equals( false, array_key_exists( 'handler_slug', $pipeline_steps[0] ), 'ephemeral pipeline rows do not emit scalar handler_slug', $failures, $passes );
+assert_workflow_spec_equals( false, array_key_exists( 'handler_config', $pipeline_steps[0] ), 'ephemeral pipeline rows do not emit scalar handler_config', $failures, $passes );
 
 $execute_source  = file_get_contents( __DIR__ . '/../inc/Abilities/Job/ExecuteWorkflowAbility.php' ) ?: '';
 $pipeline_source = file_get_contents( __DIR__ . '/../inc/Abilities/Pipeline/PipelineHelpers.php' ) ?: '';
