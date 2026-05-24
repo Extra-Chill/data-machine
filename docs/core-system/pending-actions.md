@@ -2,6 +2,8 @@
 
 Data Machine implements the Agents API pending-action approval storage contract with WordPress-backed durable storage.
 
+Pending actions are approval and audit records. Normal runtime requires the durable `datamachine_pending_actions` table; if database access is unavailable, store/resolution operations fail closed and emit `datamachine_pending_action_store_unavailable`. The transient store path is reserved for pure-PHP smoke tests or explicit pre-table boot by defining `DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK`.
+
 ## Boundary
 
 - Agents API owns generic approval vocabulary and contracts.

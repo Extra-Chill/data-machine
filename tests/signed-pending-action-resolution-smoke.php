@@ -11,6 +11,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
 }
 
+if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
+	define( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK', true );
+}
+
 $GLOBALS['__signed_filters']    = array();
 $GLOBALS['__signed_transients'] = array();
 $GLOBALS['__signed_options']    = array();
