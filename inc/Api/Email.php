@@ -11,6 +11,7 @@
 namespace DataMachine\Api;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\AbilityResult;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -659,12 +660,13 @@ class Email {
 			return $result;
 		}
 
+		$legacy_error = AbilityResult::legacy_failure_to_wp_error( $result, 'email_error', 'Operation failed', array(), 400 );
+		if ( $legacy_error ) {
+			return $legacy_error;
+		}
+
 		if ( ! ( $result['success'] ?? false ) ) {
-			return new \WP_Error(
-				'email_error',
-				$result['error'] ?? 'Operation failed',
-				array( 'status' => 400 )
-			);
+			return new \WP_Error( 'email_error', 'Operation failed', array( 'status' => 400 ) );
 		}
 
 		return rest_ensure_response( $result );
