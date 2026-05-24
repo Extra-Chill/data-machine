@@ -620,8 +620,7 @@ class ChatOrchestrator {
 	/**
 	 * Create a new chat session.
 	 *
-	 * Delegates to the create-chat-session ability when available,
-	 * falls back to direct ChatDatabase access.
+	 * Delegates to the canonical create-chat-session ability.
 	 *
 	 * @since 0.31.0
 	 *
@@ -638,77 +637,58 @@ class ChatOrchestrator {
 				: 0;
 		}
 
-		$ability = wp_get_ability( 'datamachine/create-chat-session' );
-
-		if ( $ability ) {
-			$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
-			$input      = array(
-				'user_id'    => $user_id,
-				'agent_slug' => $agent_slug,
-				'mode'       => $mode,
-			);
-
-			if ( null !== $transcript_owner ) {
-				$input['transcript_owner'] = $transcript_owner;
-			}
-
-			if ( $source ) {
-				$input['source'] = $source;
-			}
-
-			$result = \DataMachine\Abilities\PermissionHelper::run_as_authenticated(
-				function () use ( $ability, $input ) {
-					return $ability->execute( $input );
-				}
-			);
-
-			if ( is_wp_error( $result ) ) {
-				return $result;
-			}
-
-			if ( empty( $result['success'] ) ) {
-				return new WP_Error(
-					'session_creation_failed',
-					$result['error'] ?? __( 'Failed to create chat session', 'data-machine' ),
-					array( 'status' => 500 )
-				);
-			}
-
-			return $result['session_id'];
-		}
-
-		// Fallback: direct store access.
-		$chat_db  = ConversationStoreFactory::get();
-		$metadata = array(
-			'started_at'    => current_time( 'mysql', true ),
-			'message_count' => 0,
-		);
-
-		if ( null !== $transcript_owner ) {
-			$metadata['transcript_owner'] = $transcript_owner;
-		}
-
-		$acting_token_id = \DataMachine\Abilities\PermissionHelper::get_acting_token_id();
-		if ( $acting_token_id ) {
-			$metadata['token_id'] = $acting_token_id;
-		}
-
-		if ( $source ) {
-			$metadata['source'] = $source;
-		}
-
-		$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
-		$session_id = $chat_db->create_session( WordPressWorkspaceScope::current(), $user_id, $agent_slug, $metadata, $mode );
-
-		if ( empty( $session_id ) ) {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
 			return new WP_Error(
-				'session_creation_failed',
-				__( 'Failed to create chat session', 'data-machine' ),
+				'session_creation_ability_unavailable',
+				__( 'Chat session creation ability API is unavailable.', 'data-machine' ),
 				array( 'status' => 500 )
 			);
 		}
 
-		return $session_id;
+		$ability = wp_get_ability( 'datamachine/create-chat-session' );
+
+		if ( ! $ability ) {
+			return new WP_Error(
+				'session_creation_ability_unavailable',
+				__( 'Chat session creation ability is unavailable.', 'data-machine' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
+		$input      = array(
+			'user_id'    => $user_id,
+			'agent_slug' => $agent_slug,
+			'mode'       => $mode,
+		);
+
+		if ( null !== $transcript_owner ) {
+			$input['transcript_owner'] = $transcript_owner;
+		}
+
+		if ( $source ) {
+			$input['source'] = $source;
+		}
+
+		$result = \DataMachine\Abilities\PermissionHelper::run_as_authenticated(
+			function () use ( $ability, $input ) {
+				return $ability->execute( $input );
+			}
+		);
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		if ( empty( $result['success'] ) || empty( $result['session_id'] ) ) {
+			return new WP_Error(
+				'session_creation_failed',
+				$result['error'] ?? __( 'Failed to create chat session', 'data-machine' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		return $result['session_id'];
 	}
 
 	/**
