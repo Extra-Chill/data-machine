@@ -51,6 +51,12 @@ if ( ! function_exists( '_doing_it_wrong' ) ) {
 	}
 }
 
+if ( ! function_exists( 'esc_html' ) ) {
+	function esc_html( string $text ): string {
+		return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+	}
+}
+
 if ( ! function_exists( 'set_transient' ) ) {
 	function set_transient( string $_key, $value, int $_expiration = 0 ): bool {
 		unset( $value );
