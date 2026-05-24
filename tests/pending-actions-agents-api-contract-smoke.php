@@ -16,6 +16,10 @@ $passes   = 0;
 
 echo "pending-actions-agents-api-contract-smoke\n";
 
+if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
+	define( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK', true );
+}
+
 function datamachine_pending_actions_assert( bool $condition, string $message, array &$failures, int &$passes ): void {
 	if ( $condition ) {
 		++$passes;
@@ -139,7 +143,10 @@ datamachine_pending_actions_assert( str_contains( $signer_source, 'datamachine/s
 datamachine_pending_actions_assert( str_contains( $signer_source, 'hash_hmac' ) && str_contains( $signer_source, 'datamachine_pending_action_resolution_secret' ), 'signed pending-action resolution uses a stored HMAC secret', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $runtime_source, 'datamachine_migrate_pending_actions_table' ), 'upgrade path creates pending-action table on deployed installs', $failures, $passes );
 
-echo "\n[5] Store contract adapter preserves transient fallback behavior:\n";
+echo "\n[5] Store contract adapter uses the explicit test transient fallback seam:\n";
+
+datamachine_pending_actions_assert( str_contains( $store_source, 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ), 'transient fallback requires an explicit opt-in constant', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $store_source, 'warn_database_unavailable' ), 'missing durable storage reports a clear unavailable-store warning', $failures, $passes );
 
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__ ) . '/' );

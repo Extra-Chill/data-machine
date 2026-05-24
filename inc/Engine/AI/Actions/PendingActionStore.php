@@ -26,8 +26,9 @@
  *       'context'       => array( ... ),   // free-form (session_id, bridge_app, etc.)
  *   )
  *
-	 * Uses durable WordPress database storage in normal runtime. Pure-PHP smoke
-	 * tests and pre-table boot can still fall back to transient storage.
+ * Uses durable WordPress database storage in normal runtime. Pure-PHP smoke
+ * tests and explicitly opted-in pre-table boot can fall back to transient
+ * storage by defining DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK.
  *
  * @package DataMachine\Engine\AI\Actions
  * @since   0.72.0
@@ -63,7 +64,7 @@ class PendingActionStore {
 	/**
 	 * Transient fallback key prefix for pure-PHP smoke tests and pre-table boot.
 	 */
-	private const TRANSIENT_PREFIX = 'dm_pa_';
+	private const TRANSIENT_PREFIX = 'datamachine_pending_action_';
 
 	/**
 	 * Agents API store contract singleton.
@@ -202,6 +203,11 @@ class PendingActionStore {
 		$payload['context']   = $context;
 
 		if ( ! self::has_database() ) {
+			if ( ! self::allows_transient_fallback() ) {
+				self::warn_database_unavailable( 'store' );
+				return false;
+			}
+
 			$payload['created_at'] = time();
 			$payload['expires_at'] = time() + self::resolve_ttl( $payload );
 			$payload['action_id']  = $action_id;
@@ -269,6 +275,11 @@ class PendingActionStore {
 	 */
 	public static function get( string $action_id, bool $include_resolved = false ): ?array {
 		if ( ! self::has_database() ) {
+			if ( ! self::allows_transient_fallback() ) {
+				self::warn_database_unavailable( 'get' );
+				return null;
+			}
+
 			$data = get_transient( self::TRANSIENT_PREFIX . $action_id );
 			return is_array( $data ) ? $data : null;
 		}
@@ -311,6 +322,11 @@ class PendingActionStore {
 	 */
 	public static function delete( string $action_id ): bool {
 		if ( ! self::has_database() ) {
+			if ( ! self::allows_transient_fallback() ) {
+				self::warn_database_unavailable( 'delete' );
+				return false;
+			}
+
 			return delete_transient( self::TRANSIENT_PREFIX . $action_id );
 		}
 
@@ -330,6 +346,11 @@ class PendingActionStore {
 		global $wpdb;
 
 		if ( ! self::has_database() ) {
+			if ( ! self::allows_transient_fallback() ) {
+				self::warn_database_unavailable( 'record_resolution' );
+				return false;
+			}
+
 			$payload = get_transient( self::TRANSIENT_PREFIX . $action_id );
 			$action  = is_array( $payload ) ? self::action_from_payload( $payload ) : null;
 			$deleted = delete_transient( self::TRANSIENT_PREFIX . $action_id );
@@ -832,6 +853,32 @@ class PendingActionStore {
 	private static function has_database(): bool {
 		global $wpdb;
 		return is_object( $wpdb ) && method_exists( $wpdb, 'replace' ) && method_exists( $wpdb, 'get_row' );
+	}
+
+	/**
+	 * Check whether the non-durable transient fallback has been explicitly enabled.
+	 */
+	private static function allows_transient_fallback(): bool {
+		return defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' )
+			&& true === DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK;
+	}
+
+	/**
+	 * Report attempts to use pending actions without durable storage.
+	 */
+	private static function warn_database_unavailable( string $operation ): void {
+		$message = sprintf(
+			'PendingActionStore::%s() requires the durable pending-actions table; define DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK only for pure-PHP smoke tests or explicit pre-table boot.',
+			$operation
+		);
+
+		if ( function_exists( '_doing_it_wrong' ) ) {
+			_doing_it_wrong( esc_html( __CLASS__ . '::' . $operation ), esc_html( $message ), '1.0.0' );
+		}
+
+		if ( function_exists( 'do_action' ) ) {
+			do_action( 'datamachine_pending_action_store_unavailable', $operation, $message );
+		}
 	}
 
 	/**
