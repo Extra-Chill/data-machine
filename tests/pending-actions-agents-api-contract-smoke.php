@@ -100,6 +100,8 @@ datamachine_pending_actions_assert( str_contains( $action_policy, 'use AgentsAPI
 datamachine_pending_actions_assert( str_contains( $resolver_adapter, 'WP_Agent_Approval_Decision' ), 'resolver adapter consumes Agents API WP_Agent_Approval_Decision vocabulary', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $observers_source, 'WP_Agent_Pending_Action_Observer' ), 'observer registry consumes Agents API WP_Agent_Pending_Action_Observer contract', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $wp_observer_source, 'datamachine_pending_action_stored' ) && str_contains( $wp_observer_source, 'datamachine_pending_action_resolved' ) && str_contains( $wp_observer_source, 'datamachine_pending_action_expired' ), 'WordPress observer adapter exposes stored/resolved/expired actions', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $wp_observer_source, 'do_action(' . PHP_EOL . "\t\t\t'datamachine_pending_action_resolved'," . PHP_EOL . "\t\t\t\$action," . PHP_EOL . "\t\t\t\$decision," . PHP_EOL . "\t\t\t\$resolver" ), 'resolved WordPress hook emits canonical Agents API action, decision, and resolver arguments', $failures, $passes );
+datamachine_pending_actions_assert( ! str_contains( $wp_observer_source, 'legacy_payload' ) && ! str_contains( $wp_observer_source, 'preview_data' ), 'resolved WordPress hook no longer builds legacy Data Machine payloads', $failures, $passes );
 
 echo "\n[2] Durable storage preserves legacy lookup while retaining audit rows:\n";
 datamachine_pending_actions_assert( str_contains( $store_source, 'CREATE TABLE {$table_name}' ), 'PendingActionStore creates a durable table', $failures, $passes );
@@ -341,6 +343,17 @@ datamachine_pending_actions_assert( $store->get( $action_id ) instanceof \Agents
 datamachine_pending_actions_assert( $store->record_resolution( $action_id, \AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision::accepted(), 'user:123' ), 'contract record_resolution resolves transient fallback payload', $failures, $passes );
 $resolved_hooks = array_map( static fn( array $event ): string => (string) ( $event['hook'] ?? '' ), $GLOBALS['datamachine_pending_action_observer_events'] ?? array() );
 datamachine_pending_actions_assert( in_array( 'datamachine_pending_action_resolved', $resolved_hooks, true ), 'resolved observer action fires after contract resolution', $failures, $passes );
+$resolved_event = null;
+foreach ( $GLOBALS['datamachine_pending_action_observer_events'] ?? array() as $event ) {
+	if ( 'datamachine_pending_action_resolved' === ( $event['hook'] ?? null ) ) {
+		$resolved_event = $event;
+		break;
+	}
+}
+$resolved_args = is_array( $resolved_event ) ? ( $resolved_event['args'] ?? array() ) : array();
+datamachine_pending_actions_assert( ( $resolved_args[0] ?? null ) instanceof \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action, 'resolved hook receives canonical pending action value object', $failures, $passes );
+datamachine_pending_actions_assert( ( $resolved_args[1] ?? null ) instanceof \AgentsAPI\AI\Approvals\WP_Agent_Approval_Decision, 'resolved hook receives canonical approval decision value object', $failures, $passes );
+datamachine_pending_actions_assert( 'user:123' === ( $resolved_args[2] ?? null ), 'resolved hook receives resolver identifier as third argument', $failures, $passes );
 datamachine_pending_actions_assert( null === $store->get( $action_id ), 'contract get returns null after transient fallback resolution', $failures, $passes );
 
 if ( ! empty( $failures ) ) {

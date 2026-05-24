@@ -27,10 +27,10 @@ The compatibility seam remains the existing `datamachine_pending_action_handlers
 `PendingActionStore` dispatches registered `WP_Agent_Pending_Action_Observer` instances after durable lifecycle transitions complete. Data Machine registers a default WordPress adapter with these hooks:
 
 - `datamachine_pending_action_stored( WP_Agent_Pending_Action $action )`
-- `datamachine_pending_action_resolved( string $decision, string $action_id, string $kind, array $payload, mixed $result )`
+- `datamachine_pending_action_resolved( WP_Agent_Pending_Action $action, WP_Agent_Approval_Decision $decision, string $resolver )`
 - `datamachine_pending_action_expired( WP_Agent_Pending_Action $action )`
 
-The resolved hook keeps its legacy signature for compatibility. Object-oriented observers receive the upstream value-object signature from `WP_Agent_Pending_Action_Observer`.
+The resolved hook receives the same canonical value-object signature as `WP_Agent_Pending_Action_Observer::on_resolved()`.
 
 ## Surfaces
 
