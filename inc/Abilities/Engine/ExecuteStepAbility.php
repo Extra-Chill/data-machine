@@ -530,50 +530,6 @@ class ExecuteStepAbility {
 			$next_flow_step_id = $navigator->get_next_flow_step_id( $flow_step_id, $payload );
 
 			if ( $next_flow_step_id ) {
-				$packet_count = count( $dataPackets );
-
-				// Inline continuation: when a step produces 0-1 DataPackets,
-				// schedule the next step directly on the same job instead of
-				// creating child jobs. This eliminates recursive fan-out where
-				// children spawn grandchildren (e.g., AI step → upsert step).
-				//
-				// Fan-out is only meaningful when a step produces MULTIPLE
-				// packets that need parallel processing (e.g., fetch step
-				// producing one packet per event). A single packet is just
-				// the same job continuing to the next step.
-				if ( $packet_count <= 1 ) {
-					// For fetch/event_import steps with a single item (inline continuation),
-					// seed dedup context into engine_data so markCompletedItemProcessed()
-					// can find it when the last step completes. For fan-out children this
-					// is handled in PipelineBatchScheduler::createChildJob().
-					if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) && ! empty( $dataPackets ) ) {
-						$packet_meta = $dataPackets[0]['metadata'] ?? array();
-						$seed_data   = array();
-						if ( ! empty( $packet_meta['item_identifier'] ) ) {
-							$seed_data['item_identifier'] = $packet_meta['item_identifier'];
-						}
-						if ( ! empty( $packet_meta['source_type'] ) ) {
-							$seed_data['source_type'] = $packet_meta['source_type'];
-						}
-						if ( ! empty( $seed_data ) ) {
-							datamachine_merge_engine_data( $job_id, $seed_data );
-						}
-					}
-
-					do_action(
-						'datamachine_schedule_next_step',
-						$job_id,
-						$next_flow_step_id,
-						$dataPackets
-					);
-
-					return array(
-						'success'      => true,
-						'step_success' => true,
-						'outcome'      => 'inline_continuation',
-					);
-				}
-
 				$engine                = $payload['engine'] ?? null;
 				$next_flow_step_config = $engine instanceof EngineData ? $engine->getFlowStepConfig( $next_flow_step_id ) : array();
 				$transition_route      = self::resolveTransitionRoute( $flow_step_config, $next_flow_step_config, $dataPackets );
@@ -601,15 +557,42 @@ class ExecuteStepAbility {
 					);
 				}
 
-				$fanout_packets = $transition_route['packets'];
+				$routed_packets = $transition_route['packets'];
+				$packet_count   = count( $routed_packets );
 
-				// After filtering, check if we're back to ≤1 packet — inline instead of fan-out.
-				if ( 'inline' === $transition_route['mode'] || count( $fanout_packets ) <= 1 ) {
+				// Inline continuation: when a step produces 0-1 DataPackets,
+				// schedule the next step directly on the same job instead of
+				// creating child jobs. This eliminates recursive fan-out where
+				// children spawn grandchildren (e.g., AI step → upsert step).
+				//
+				// Fan-out is only meaningful when a step produces MULTIPLE
+				// packets that need parallel processing (e.g., fetch step
+				// producing one packet per event). A single packet is just
+				// the same job continuing to the next step.
+				if ( 'inline' === $transition_route['mode'] || $packet_count <= 1 ) {
+					// For fetch/event_import steps with a single item (inline continuation),
+					// seed dedup context into engine_data so markCompletedItemProcessed()
+					// can find it when the last step completes. For fan-out children this
+					// is handled in PipelineBatchScheduler::createChildJob().
+					if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) && ! empty( $routed_packets ) ) {
+						$packet_meta = $routed_packets[0]['metadata'] ?? array();
+						$seed_data   = array();
+						if ( ! empty( $packet_meta['item_identifier'] ) ) {
+							$seed_data['item_identifier'] = $packet_meta['item_identifier'];
+						}
+						if ( ! empty( $packet_meta['source_type'] ) ) {
+							$seed_data['source_type'] = $packet_meta['source_type'];
+						}
+						if ( ! empty( $seed_data ) ) {
+							datamachine_merge_engine_data( $job_id, $seed_data );
+						}
+					}
+
 					do_action(
 						'datamachine_schedule_next_step',
 						$job_id,
 						$next_flow_step_id,
-						$fanout_packets
+						$routed_packets
 					);
 
 					return array(
@@ -619,14 +602,14 @@ class ExecuteStepAbility {
 					);
 				}
 
-				// Fan out: each handler DataPacket becomes its own child job
+				// Fan out: each routed DataPacket becomes its own child job
 				// continuing through the remaining pipeline steps.
 				$engine_snapshot = datamachine_get_engine_data( $job_id );
 				$batch_scheduler = new PipelineBatchScheduler();
 				$batch_result    = $batch_scheduler->fanOut(
 					$job_id,
 					$next_flow_step_id,
-					$fanout_packets,
+					$routed_packets,
 					$engine_snapshot
 				);
 
