@@ -18,6 +18,8 @@ use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Agents\AgentAccess;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
+use DataMachine\Engine\Bundle\AgentBundleAbilityService;
+use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
 use DataMachine\Engine\Bundle\BundleSource;
 use DataMachine\Engine\Bundle\BundleSourceAuth;
 use DataMachine\Engine\Bundle\BundleValidationException;
@@ -361,6 +363,129 @@ class AgentAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'importAgent' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/list-agent-bundles',
+				array(
+					'label'               => 'List Agent Bundles',
+					'description'         => 'List installed bundle-backed agents with template/source metadata.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => array( 'type' => 'object' ),
+					'output_schema'       => array( 'type' => 'object' ),
+					'execute_callback'    => array( self::class, 'listAgentBundles' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'   => true,
+							'idempotent' => true,
+						),
+					),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/get-agent-bundle-status',
+				array(
+					'label'               => 'Get Agent Bundle Status',
+					'description'         => 'Return installed bundle source/version metadata and tracked artifact state for an agent or bundle slug.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'slug' ),
+						'properties' => array(
+							'slug' => array(
+								'type'        => 'string',
+								'description' => 'Agent slug or installed bundle slug.',
+							),
+						),
+					),
+					'output_schema'       => array( 'type' => 'object' ),
+					'execute_callback'    => array( self::class, 'getAgentBundleStatus' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'   => true,
+							'idempotent' => true,
+						),
+					),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/plan-agent-bundle-upgrade',
+				array(
+					'label'               => 'Plan Agent Bundle Upgrade',
+					'description'         => 'Build the canonical bundle upgrade plan, including clean updates, local overrides, warnings, and runtime drift.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => self::bundleLifecycleInputSchema(),
+					'output_schema'       => array( 'type' => 'object' ),
+					'execute_callback'    => array( self::class, 'planAgentBundleUpgrade' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'   => true,
+							'idempotent' => true,
+						),
+					),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/rebase-agent-bundle-artifacts',
+				array(
+					'label'               => 'Rebase Agent Bundle Artifacts',
+					'description'         => 'Preview 3-way rebases for locally modified bundle artifacts using a named policy.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => self::bundleLifecycleInputSchema( true ),
+					'output_schema'       => array( 'type' => 'object' ),
+					'execute_callback'    => array( self::class, 'rebaseAgentBundleArtifacts' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'   => true,
+							'idempotent' => true,
+						),
+					),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/apply-agent-bundle-upgrade',
+				array(
+					'label'               => 'Apply Agent Bundle Upgrade',
+					'description'         => 'Apply clean bundle artifact updates and stage local overrides as PendingActions.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => self::bundleLifecycleInputSchema( true ),
+					'output_schema'       => array( 'type' => 'object' ),
+					'execute_callback'    => array( self::class, 'applyAgentBundleUpgrade' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/resolve-agent-bundle-upgrade-action',
+				array(
+					'label'               => 'Resolve Agent Bundle Upgrade Action',
+					'description'         => 'Accept a staged bundle upgrade PendingAction through the canonical bundle ability surface.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'required'   => array( 'pending_action_id' ),
+						'properties' => array(
+							'pending_action_id' => array( 'type' => 'string' ),
+						),
+					),
+					'output_schema'       => array( 'type' => 'object' ),
+					'execute_callback'    => array( self::class, 'resolveAgentBundleUpgradeAction' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
@@ -1159,6 +1284,126 @@ class AgentAbilities {
 		$result['auth_warnings'] = $auth_warnings;
 
 		return $result;
+	}
+
+	/**
+	 * List installed bundle-backed agents through the canonical bundle ability contract.
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function listAgentBundles( array $input = array() ): array {
+		unset( $input );
+		return self::bundleLifecycleService()->list_installed();
+	}
+
+	/**
+	 * Return installed bundle status for an agent or bundle slug.
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function getAgentBundleStatus( array $input ): array {
+		return self::bundleLifecycleService()->status( (string) ( $input['slug'] ?? '' ) );
+	}
+
+	/**
+	 * Build a canonical bundle upgrade plan.
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function planAgentBundleUpgrade( array $input ): array {
+		return self::bundleLifecycleService()->plan( $input );
+	}
+
+	/**
+	 * Preview 3-way rebases for locally modified bundle artifacts.
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function rebaseAgentBundleArtifacts( array $input ): array {
+		return self::bundleLifecycleService()->rebase( $input );
+	}
+
+	/**
+	 * Apply clean bundle upgrades and stage approval-required changes.
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function applyAgentBundleUpgrade( array $input ): array {
+		return self::bundleLifecycleService()->upgrade( $input );
+	}
+
+	/**
+	 * Resolve a bundle upgrade PendingAction through the bundle ability surface.
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function resolveAgentBundleUpgradeAction( array $input ): array {
+		return self::bundleLifecycleService()->apply_pending_action( (string) ( $input['pending_action_id'] ?? $input['action_id'] ?? '' ) );
+	}
+
+	private static function bundleLifecycleService(): AgentBundleAbilityService {
+		return new AgentBundleAbilityService();
+	}
+
+	private static function bundleLifecycleInputSchema( bool $include_rebase = false ): array {
+		$properties = array(
+			'source'            => array(
+				'type'        => 'string',
+				'description' => 'Bundle source: local path (directory, .zip, .json) or remote URL.',
+			),
+			'slug'              => array(
+				'type'        => 'string',
+				'description' => 'Optional target agent slug override.',
+			),
+			'owner_id'          => array(
+				'type'        => 'integer',
+				'description' => 'WordPress user ID that owns imported or upgraded artifacts.',
+			),
+			'dry_run'           => array(
+				'type'        => 'boolean',
+				'description' => 'Preview without writing.',
+			),
+			'reconcile_runtime' => array(
+				'type'        => 'boolean',
+				'description' => 'Replace preserved flow runtime queues and scheduling with the bundle seed.',
+			),
+			'token'             => array(
+				'type'        => 'string',
+				'description' => 'One-shot auth token for private archive downloads; never persisted.',
+			),
+			'token_env'         => array(
+				'type'        => 'string',
+				'description' => 'Environment variable or PHP constant name that contains a one-shot auth token.',
+			),
+		);
+
+		if ( $include_rebase ) {
+			$properties['rebase_local'] = array(
+				'type'        => 'boolean',
+				'description' => 'Attach a policy-driven 3-way rebase preview for locally modified artifacts.',
+			);
+			$properties['policy']       = array(
+				'type'        => 'string',
+				'enum'        => array( AgentBundleArtifactRebase::POLICY_CONSERVATIVE, AgentBundleArtifactRebase::POLICY_BURN_IN_SAFE ),
+				'description' => 'Rebase policy name.',
+			);
+			$properties['artifact']     = array(
+				'type'        => 'string',
+				'description' => 'Optional artifact_key filter for rebase previews.',
+			);
+		}
+
+		return array(
+			'type'       => 'object',
+			'required'   => array( 'source' ),
+			'properties' => $properties,
+		);
 	}
 
 	/**
