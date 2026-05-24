@@ -83,6 +83,8 @@ function datamachine_run_conversation(
 	$last_request_metadata  = array();
 	$latest_messages        = $messages;
 	$latest_turn_count      = 0;
+	$runtime_tool_pending   = false;
+	$runtime_tool_requests  = array();
 
 	// Base log context for consistent logging.
 	$base_log_context = array_filter(
@@ -189,13 +191,18 @@ function datamachine_run_conversation(
 		$completion_nudges,
 		$last_request_metadata,
 		$latest_messages,
-		$latest_turn_count
+		$latest_turn_count,
+		$runtime_tool_pending,
+		$runtime_tool_requests
 	);
 
 	// Build should_continue callback. Budget enforcement is handled by
 	// upstream via the budgets option — we only check DM-specific conditions.
 	$should_continue = static function ( array $result, array $turn_context ) use ( $single_turn ): bool {
 		unset( $turn_context ); // Required by upstream callable signature.
+		if ( ! empty( $result['runtime_tool_pending'] ) ) {
+			return false;
+		}
 		if ( $single_turn ) {
 			return false;
 		}
@@ -297,6 +304,12 @@ function datamachine_run_conversation(
 	// DM-only fields that the substrate doesn't know about.
 	$result['completed']       = 'budget_exceeded' !== ( $result['status'] ?? '' );
 	$result['last_tool_calls'] = $last_tool_calls;
+	if ( $runtime_tool_pending ) {
+		$result['completed']                     = false;
+		$result['runtime_tool_pending']          = true;
+		$result['runtime_tool_pending_requests'] = $runtime_tool_requests;
+		$result['status']                        = 'runtime_tool_pending';
+	}
 	if ( ! empty( $completion_nudges ) ) {
 		$latest_nudge                              = $completion_nudges[ count( $completion_nudges ) - 1 ];
 		$result['completion_nudge_count']          = count( $completion_nudges );
@@ -375,7 +388,9 @@ function datamachine_build_turn_runner(
 	array &$completion_nudges,
 	array &$last_request_metadata,
 	array &$latest_messages,
-	int &$latest_turn_count
+	int &$latest_turn_count,
+	bool &$runtime_tool_pending,
+	array &$runtime_tool_requests
 ): callable {
 	return static function ( array $messages, array $turn_context ) use (
 		$tools,
@@ -393,7 +408,9 @@ function datamachine_build_turn_runner(
 		&$completion_nudges,
 		&$last_request_metadata,
 		&$latest_messages,
-		&$latest_turn_count
+		&$latest_turn_count,
+		&$runtime_tool_pending,
+		&$runtime_tool_requests
 	): array {
 		// The upstream loop provides the turn number via turn_context.
 		$turn_count        = (int) ( $turn_context['turn'] ?? 1 );
@@ -487,6 +504,7 @@ function datamachine_build_turn_runner(
 		$completion_nudge       = '';
 		$duplicate_rejected     = false;
 		$runtime_rule_rejected  = false;
+		$runtime_pending_turn   = false;
 		if ( ! empty( $tool_calls ) ) {
 			foreach ( $tool_calls as $tool_call ) {
 				$tool_name       = $tool_call['name'];
@@ -599,6 +617,24 @@ function datamachine_build_turn_runner(
 					);
 				}
 
+				if ( ! empty( $tool_result['pending'] ) && is_array( $tool_result['runtime_tool_request'] ?? null ) ) {
+					$runtime_tool_pending     = true;
+					$runtime_pending_turn     = true;
+					$conversation_complete    = true;
+					$runtime_tool_requests[]  = $tool_result['runtime_tool_request'];
+					$tool_execution_results[] = array(
+						'tool_name'       => $tool_name,
+						'result'          => $tool_result,
+						'parameters'      => $tool_parameters,
+						'is_handler_tool' => false,
+						'runtime'         => datamachine_tool_runtime_metadata( is_array( $tool_def ) ? $tool_def : null, $tool_result ),
+						'turn_count'      => $turn_count,
+					);
+					$all_tool_results[]       = $tool_execution_results[ count( $tool_execution_results ) - 1 ];
+					datamachine_persist_inflight_tool_summary( $loop_payload, $tool_execution_results );
+					break;
+				}
+
 				do_action(
 					'datamachine_log',
 					'debug',
@@ -670,7 +706,7 @@ function datamachine_build_turn_runner(
 				}
 			}
 
-			if ( '' !== $completion_nudge && datamachine_should_append_tool_completion_nudge( $tool_execution_results, $completion_decision->context() ) ) {
+			if ( ! $runtime_pending_turn && '' !== $completion_nudge && datamachine_should_append_tool_completion_nudge( $tool_execution_results, $completion_decision->context() ) ) {
 				$messages[] = ConversationManager::buildConversationMessage( 'user', $completion_nudge );
 				datamachine_record_completion_nudge(
 					$completion_nudges,
@@ -735,6 +771,7 @@ function datamachine_build_turn_runner(
 			'completion_nudge'             => $completion_nudge ?? '',
 			'duplicate_tool_call_rejected' => $duplicate_rejected,
 			'tool_runtime_rule_rejected'   => $runtime_rule_rejected,
+			'runtime_tool_pending'         => $runtime_pending_turn,
 		);
 	};
 }
@@ -899,6 +936,15 @@ function datamachine_fulfill_runtime_tool_call(
 		$result = new \WP_Error( 'runtime_tool_callback_failed', $e->getMessage() );
 	}
 
+	if ( null === $result && datamachine_should_defer_runtime_tool_call( $request, $payload ) ) {
+		$deferred = datamachine_defer_runtime_tool_call( $request, $payload );
+		if ( ! ( $deferred instanceof \WP_Error ) ) {
+			return $deferred;
+		}
+
+		$result = $deferred;
+	}
+
 	$tool_result = datamachine_normalize_runtime_tool_result( $tool_name, $result );
 
 	datamachine_emit_loop_event(
@@ -916,6 +962,276 @@ function datamachine_fulfill_runtime_tool_call(
 	);
 
 	return $tool_result;
+}
+
+/**
+ * Whether a runtime tool call should pause the run for async fulfillment.
+ *
+ * @param array<string,mixed> $request Runtime tool request.
+ * @param array<string,mixed> $payload Loop/tool payload.
+ */
+function datamachine_should_defer_runtime_tool_call( array $request, array $payload ): bool {
+	$client_context = is_array( $payload['client_context'] ?? null ) ? $payload['client_context'] : array();
+	if ( empty( $client_context['runtime_tool_async'] ) ) {
+		return false;
+	}
+
+	return '' !== (string) ( $request['session_id'] ?? '' );
+}
+
+/**
+ * Persist a pending runtime tool request and schedule its timeout.
+ *
+ * @param array<string,mixed> $request Runtime tool request.
+ * @param array<string,mixed> $payload Loop/tool payload.
+ * @return array<string,mixed>|\WP_Error Pending tool result or persistence error.
+ */
+function datamachine_defer_runtime_tool_call( array $request, array $payload ): array|\WP_Error {
+	$jobs_db = new \DataMachine\Core\Database\Jobs\Jobs();
+	$job_id  = $jobs_db->create_job(
+		array(
+			'pipeline_id' => null,
+			'flow_id'     => null,
+			'source'      => 'runtime_tool',
+			'label'       => 'Runtime tool: ' . (string) ( $request['tool_name'] ?? '' ),
+			'user_id'     => (int) ( $payload['user_id'] ?? 0 ),
+			'agent_id'    => (int) ( $payload['agent_id'] ?? 0 ),
+		)
+	);
+
+	if ( ! $job_id ) {
+		return new \WP_Error( 'runtime_tool_request_not_persisted', 'Runtime tool request could not be persisted.' );
+	}
+
+	$request_id      = 'runtime_tool_' . (int) $job_id;
+	$client_context  = is_array( $payload['client_context'] ?? null ) ? $payload['client_context'] : array();
+	$timeout_seconds = max( 5, (int) ( $client_context['runtime_tool_timeout'] ?? 300 ) );
+	$pending_request = array(
+		'request_id'      => $request_id,
+		'job_id'          => (int) $job_id,
+		'status'          => 'pending',
+		'tool_name'       => (string) ( $request['tool_name'] ?? '' ),
+		'call_id'         => (string) ( $request['call_id'] ?? '' ),
+		'parameters'      => is_array( $request['parameters'] ?? null ) ? $request['parameters'] : array(),
+		'turn_count'      => (int) ( $request['turn_count'] ?? 0 ),
+		'session_id'      => (string) ( $request['session_id'] ?? '' ),
+		'user_id'         => (int) ( $payload['user_id'] ?? 0 ),
+		'agent_id'        => (int) ( $payload['agent_id'] ?? 0 ),
+		'mode'            => (string) ( $request['mode'] ?? '' ),
+		'modes'           => is_array( $request['modes'] ?? null ) ? $request['modes'] : array(),
+		'created_at'      => gmdate( 'c' ),
+		'expires_at'      => gmdate( 'c', time() + $timeout_seconds ),
+		'timeout_seconds' => $timeout_seconds,
+	);
+
+	$jobs_db->start_job( (int) $job_id, 'pending_runtime_tool' );
+	$jobs_db->store_engine_data(
+		(int) $job_id,
+		array(
+			'task_type'            => 'runtime_tool_request',
+			'runtime_tool_request' => $pending_request,
+		)
+	);
+	datamachine_store_runtime_tool_request_on_session( $pending_request );
+
+	if ( function_exists( 'as_schedule_single_action' ) ) {
+		as_schedule_single_action( time() + $timeout_seconds, 'datamachine_runtime_tool_timeout', array( $request_id ), 'datamachine-runtime-tools' );
+	}
+
+	do_action( 'datamachine_runtime_tool_request_deferred', $pending_request, $payload );
+
+	return array(
+		'success'              => false,
+		'pending'              => true,
+		'tool_name'            => $pending_request['tool_name'],
+		'executor'             => 'client',
+		'code'                 => 'runtime_tool_pending',
+		'error'                => 'Runtime tool request is pending client fulfillment.',
+		'runtime_tool_request' => $pending_request,
+	);
+}
+
+/**
+ * Store pending runtime tool request metadata on the owning chat session.
+ *
+ * @param array<string,mixed> $pending_request Pending request metadata.
+ */
+function datamachine_store_runtime_tool_request_on_session( array $pending_request ): void {
+	$session_id = (string) ( $pending_request['session_id'] ?? '' );
+	if ( '' === $session_id || ! class_exists( \DataMachine\Core\Database\Chat\ConversationStoreFactory::class ) ) {
+		return;
+	}
+
+	$chat_db = \DataMachine\Core\Database\Chat\ConversationStoreFactory::get();
+	$session = $chat_db->get_session( $session_id );
+	if ( ! is_array( $session ) ) {
+		return;
+	}
+
+	$metadata                          = is_array( $session['metadata'] ?? null ) ? $session['metadata'] : array();
+	$metadata['runtime_tool_requests'] = is_array( $metadata['runtime_tool_requests'] ?? null )
+		? $metadata['runtime_tool_requests']
+		: array();
+	$metadata['runtime_tool_requests'][ $pending_request['request_id'] ] = $pending_request;
+	$metadata['has_pending_tools']                                       = true;
+	$metadata['status']        = 'processing';
+	$metadata['last_activity'] = function_exists( 'current_time' ) ? current_time( 'mysql', true ) : gmdate( 'Y-m-d H:i:s' );
+
+	$chat_db->update_session(
+		$session_id,
+		is_array( $session['messages'] ?? null ) ? $session['messages'] : array(),
+		$metadata,
+		(string) ( $session['provider'] ?? '' ),
+		(string) ( $session['model'] ?? '' )
+	);
+}
+
+/**
+ * Submit a client result for a deferred runtime tool request.
+ *
+ * @param string $request_id Runtime tool request id (`runtime_tool_<job_id>`).
+ * @param mixed  $result     Client tool result.
+ * @return array<string,mixed>|\WP_Error Submission result.
+ */
+function datamachine_submit_runtime_tool_result( string $request_id, $result ): array|\WP_Error {
+	$job_id = datamachine_runtime_tool_job_id_from_request_id( $request_id );
+	if ( $job_id <= 0 ) {
+		return new \WP_Error( 'runtime_tool_request_invalid', 'Runtime tool request id is invalid.' );
+	}
+
+	$jobs_db     = new \DataMachine\Core\Database\Jobs\Jobs();
+	$engine_data = $jobs_db->retrieve_engine_data( $job_id );
+	$request     = is_array( $engine_data['runtime_tool_request'] ?? null ) ? $engine_data['runtime_tool_request'] : array();
+	if ( empty( $request ) || 'pending' !== (string) ( $request['status'] ?? '' ) ) {
+		return new \WP_Error( 'runtime_tool_request_not_pending', 'Runtime tool request is not pending.' );
+	}
+
+	$tool_result = datamachine_normalize_runtime_tool_result( (string) ( $request['tool_name'] ?? '' ), $result );
+	$session_id  = (string) ( $request['session_id'] ?? '' );
+	if ( '' === $session_id || ! class_exists( \DataMachine\Core\Database\Chat\ConversationStoreFactory::class ) ) {
+		return new \WP_Error( 'runtime_tool_session_missing', 'Runtime tool request has no resumable chat session.' );
+	}
+
+	$chat_db = \DataMachine\Core\Database\Chat\ConversationStoreFactory::get();
+	$session = $chat_db->get_session( $session_id );
+	if ( ! is_array( $session ) ) {
+		return new \WP_Error( 'runtime_tool_session_not_found', 'Runtime tool session was not found.' );
+	}
+
+	$messages   = is_array( $session['messages'] ?? null ) ? $session['messages'] : array();
+	$messages[] = ConversationManager::formatToolResultMessage(
+		(string) ( $request['tool_name'] ?? '' ),
+		$tool_result,
+		is_array( $request['parameters'] ?? null ) ? $request['parameters'] : array(),
+		false,
+		(int) ( $request['turn_count'] ?? 0 )
+	);
+
+	$metadata = is_array( $session['metadata'] ?? null ) ? $session['metadata'] : array();
+	if ( is_array( $metadata['runtime_tool_requests'] ?? null ) && isset( $metadata['runtime_tool_requests'][ $request_id ] ) ) {
+		$metadata['runtime_tool_requests'][ $request_id ]['status']       = ! empty( $tool_result['success'] ) ? 'fulfilled' : 'failed';
+		$metadata['runtime_tool_requests'][ $request_id ]['fulfilled_at'] = gmdate( 'c' );
+		$metadata['runtime_tool_requests'][ $request_id ]['result']       = $tool_result;
+	}
+	$metadata['runtime_tool_last_result'] = array(
+		'request_id' => $request_id,
+		'tool_name'  => (string) ( $request['tool_name'] ?? '' ),
+		'success'    => ! empty( $tool_result['success'] ),
+		'created_at' => gmdate( 'c' ),
+	);
+	$metadata['has_pending_tools']        = datamachine_session_has_pending_runtime_tools( $metadata );
+	$metadata['status']                   = $metadata['has_pending_tools'] ? 'processing' : 'processing';
+	$metadata['last_activity']            = function_exists( 'current_time' ) ? current_time( 'mysql', true ) : gmdate( 'Y-m-d H:i:s' );
+
+	$chat_db->update_session(
+		$session_id,
+		$messages,
+		$metadata,
+		(string) ( $session['provider'] ?? '' ),
+		(string) ( $session['model'] ?? '' )
+	);
+
+	$request['status']                   = ! empty( $tool_result['success'] ) ? 'fulfilled' : 'failed';
+	$request['fulfilled_at']             = gmdate( 'c' );
+	$request['result']                   = $tool_result;
+	$engine_data['runtime_tool_request'] = $request;
+	$jobs_db->store_engine_data( $job_id, $engine_data );
+	$jobs_db->complete_job( $job_id, ! empty( $tool_result['success'] ) ? 'completed' : 'failed' );
+
+	if ( function_exists( 'as_enqueue_async_action' ) ) {
+		as_enqueue_async_action( 'datamachine_runtime_tool_resume', array( $request_id ), 'datamachine-runtime-tools' );
+	}
+
+	do_action( 'datamachine_runtime_tool_result_submitted', $request, $tool_result );
+
+	return array(
+		'success'    => true,
+		'request_id' => $request_id,
+		'job_id'     => $job_id,
+		'scheduled'  => function_exists( 'as_enqueue_async_action' ),
+	);
+}
+
+/** Resume a deferred runtime tool conversation. */
+function datamachine_resume_runtime_tool_request( string $request_id ): void {
+	$job_id = datamachine_runtime_tool_job_id_from_request_id( $request_id );
+	if ( $job_id <= 0 || ! class_exists( \DataMachine\Api\Chat\ChatOrchestrator::class ) ) {
+		return;
+	}
+
+	$engine_data = ( new \DataMachine\Core\Database\Jobs\Jobs() )->retrieve_engine_data( $job_id );
+	$request     = is_array( $engine_data['runtime_tool_request'] ?? null ) ? $engine_data['runtime_tool_request'] : array();
+	if ( empty( $request ) || 'pending' === (string) ( $request['status'] ?? '' ) ) {
+		return;
+	}
+
+	\DataMachine\Api\Chat\ChatOrchestrator::processContinue(
+		(string) ( $request['session_id'] ?? '' ),
+		(int) ( $request['user_id'] ?? 0 )
+	);
+}
+
+/** Fail and resume an expired runtime tool request. */
+function datamachine_timeout_runtime_tool_request( string $request_id ): void {
+	$job_id = datamachine_runtime_tool_job_id_from_request_id( $request_id );
+	if ( $job_id <= 0 ) {
+		return;
+	}
+
+	$engine_data = ( new \DataMachine\Core\Database\Jobs\Jobs() )->retrieve_engine_data( $job_id );
+	$request     = is_array( $engine_data['runtime_tool_request'] ?? null ) ? $engine_data['runtime_tool_request'] : array();
+	if ( empty( $request ) || 'pending' !== (string) ( $request['status'] ?? '' ) ) {
+		return;
+	}
+
+	datamachine_submit_runtime_tool_result(
+		$request_id,
+		new \WP_Error( 'runtime_tool_timeout', 'Client runtime tool request timed out.' )
+	);
+}
+
+/** @param array<string,mixed> $metadata Session metadata. */
+function datamachine_session_has_pending_runtime_tools( array $metadata ): bool {
+	foreach ( (array) ( $metadata['runtime_tool_requests'] ?? array() ) as $request ) {
+		if ( is_array( $request ) && 'pending' === (string) ( $request['status'] ?? '' ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+function datamachine_runtime_tool_job_id_from_request_id( string $request_id ): int {
+	if ( ! str_starts_with( $request_id, 'runtime_tool_' ) ) {
+		return 0;
+	}
+
+	return max( 0, (int) substr( $request_id, strlen( 'runtime_tool_' ) ) );
+}
+
+if ( function_exists( 'add_action' ) ) {
+	add_action( 'datamachine_runtime_tool_resume', __NAMESPACE__ . '\\datamachine_resume_runtime_tool_request' );
+	add_action( 'datamachine_runtime_tool_timeout', __NAMESPACE__ . '\\datamachine_timeout_runtime_tool_request' );
 }
 
 /**
