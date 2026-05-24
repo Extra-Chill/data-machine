@@ -873,7 +873,7 @@ class PendingActionStore {
 		);
 
 		if ( function_exists( '_doing_it_wrong' ) ) {
-			_doing_it_wrong( __CLASS__ . '::' . $operation, $message, '1.0.0' );
+			_doing_it_wrong( esc_html( __CLASS__ . '::' . $operation ), esc_html( $message ), '1.0.0' );
 		}
 
 		if ( function_exists( 'do_action' ) ) {
