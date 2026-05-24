@@ -34,6 +34,7 @@ class OAuth2HandlerStateTest extends WP_UnitTestCase {
 		delete_transient( 'datamachine_test_malformed_oauth_state' );
 		delete_transient( 'datamachine_test_oversize_oauth_state' );
 		delete_transient( 'datamachine_test_expired_oauth_state' );
+		delete_transient( 'datamachine_test_legacy_oauth_state' );
 		parent::tear_down();
 	}
 
@@ -230,6 +231,35 @@ class OAuth2HandlerStateTest extends WP_UnitTestCase {
 		// Second verification fails (consumed).
 		$result2 = $this->handler->verify_state( 'test_provider', $state );
 		$this->assertFalse( $result2 );
+	}
+
+	public function test_concurrent_provider_states_are_verified_by_nonce(): void {
+		$first_state  = $this->handler->create_state( 'test_concurrent', array( 'request_id' => 'first' ) );
+		$second_state = $this->handler->create_state( 'test_concurrent', array( 'request_id' => 'second' ) );
+
+		$this->assertSame(
+			array( 'request_id' => 'first' ),
+			$this->handler->verify_state( 'test_concurrent', $first_state )
+		);
+		$this->assertSame(
+			array( 'request_id' => 'second' ),
+			$this->handler->verify_state( 'test_concurrent', $second_state )
+		);
+	}
+
+	public function test_provider_wide_state_transient_is_not_used_as_fallback(): void {
+		$requested_state = str_repeat( 'a', 64 );
+
+		set_transient(
+			'datamachine_test_legacy_oauth_state',
+			array(
+				'nonce'   => $requested_state,
+				'payload' => array( 'legacy' => true ),
+			),
+			900
+		);
+
+		$this->assertFalse( $this->handler->verify_state( 'test_legacy', $requested_state ) );
 	}
 
 	// -------------------------------------------------------------------------

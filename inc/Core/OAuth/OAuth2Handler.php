@@ -127,11 +127,6 @@ class OAuth2Handler {
 		$record = get_transient( $this->state_transient_key( $provider_key, $state ) );
 
 		if ( false === $record ) {
-			// Backward compatibility for states created before nonce-keyed storage.
-			$record = get_transient( "datamachine_{$provider_key}_oauth_state" );
-		}
-
-		if ( false === $record ) {
 			$this->log_state_verification( $provider_key, false );
 			return false;
 		}
@@ -147,7 +142,6 @@ class OAuth2Handler {
 		}
 
 		delete_transient( $this->state_transient_key( $provider_key, $state ) );
-		delete_transient( "datamachine_{$provider_key}_oauth_state" );
 		$this->log_state_verification( $provider_key, true );
 
 		return $record['payload'] ?? array();
@@ -250,17 +244,11 @@ class OAuth2Handler {
 	public function get_pkce_verifier( string $provider_key, string $state = '' ): ?string {
 		$verifier = get_transient( $this->pkce_transient_key( $provider_key, $state ) );
 
-		if ( false === $verifier && '' !== $state ) {
-			// Backward compatibility for verifiers created before nonce-keyed storage.
-			$verifier = get_transient( "datamachine_{$provider_key}_pkce_verifier" );
-		}
-
 		if ( false === $verifier ) {
 			return null;
 		}
 
 		delete_transient( $this->pkce_transient_key( $provider_key, $state ) );
-		delete_transient( "datamachine_{$provider_key}_pkce_verifier" );
 		return $verifier;
 	}
 
