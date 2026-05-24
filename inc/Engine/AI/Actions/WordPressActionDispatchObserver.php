@@ -31,5 +31,4 @@ final class WordPressActionDispatchObserver implements WP_Agent_Pending_Action_O
 	public function on_expired( WP_Agent_Pending_Action $action ): void {
 		do_action( 'datamachine_pending_action_expired', $action );
 	}
-
 }

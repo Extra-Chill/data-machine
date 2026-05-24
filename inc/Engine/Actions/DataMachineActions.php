@@ -86,7 +86,7 @@ function datamachine_register_core_actions() {
 			$metadata    = $action->get_metadata();
 			$datamachine = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
 			$context     = is_array( $datamachine['context'] ?? null ) ? $datamachine['context'] : array();
-			$job_id  = (int) ( $context['job_id'] ?? 0 );
+			$job_id      = (int) ( $context['job_id'] ?? 0 );
 			if ( $job_id <= 0 ) {
 				return;
 			}
