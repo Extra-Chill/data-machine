@@ -19,6 +19,9 @@ class RecoverStuckJobsAbility {
 
 	use JobHelpers;
 
+	private const CANDIDATE_BATCH_SIZE = 50;
+	private const JOB_DETAIL_LIMIT     = 100;
+
 	public function __construct() {
 		$this->initDatabases();
 
@@ -98,173 +101,195 @@ class RecoverStuckJobsAbility {
 		$flow_id       = isset( $input['flow_id'] ) && is_numeric( $input['flow_id'] ) ? (int) $input['flow_id'] : null;
 		$timeout_hours = isset( $input['timeout_hours'] ) && is_numeric( $input['timeout_hours'] ) ? max( 1, (int) $input['timeout_hours'] ) : 2;
 
-		$where_clause = "WHERE status = 'processing' AND engine_data LIKE '%\"job_status\"%'";
-		if ( $flow_id ) {
-			$where_clause .= $wpdb->prepare( ' AND flow_id = %d', $flow_id );
-		}
+		$recovered      = 0;
+		$skipped        = 0;
+		$jobs           = array();
+		$jobs_omitted   = 0;
+		$jobs_truncated = false;
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic WHERE clause
-		$stuck_jobs = $wpdb->get_results(
-			"SELECT job_id, flow_id, engine_data
-			 FROM {$table}
-			 {$where_clause}"
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-
-		if ( empty( $stuck_jobs ) ) {
-			$stuck_jobs = array();
-		}
-
-		$recovered = 0;
-		$skipped   = 0;
-		$jobs      = array();
-
-		foreach ( $stuck_jobs as $job ) {
-			$engine_data = json_decode( $job->engine_data, true );
-			$status      = $engine_data['job_status'] ?? null;
-
-			// Truncate to fit varchar(255) column. Full reason is in engine_data.
-			if ( $status && strlen( $status ) > 255 ) {
-				$status = substr( $status, 0, 252 ) . '...';
+		$last_job_id = 0;
+		while ( true ) {
+			$where_clause = $wpdb->prepare(
+				"WHERE status = 'processing' AND job_id > %d AND engine_data LIKE %s",
+				$last_job_id,
+				'%"job_status"%'
+			);
+			if ( $flow_id ) {
+				$where_clause .= $wpdb->prepare( ' AND flow_id = %d', $flow_id );
 			}
 
-			if ( ! $status || ! JobStatus::isStatusFinal( $status ) ) {
-				++$skipped;
-				$jobs[] = array(
-					'job_id'  => (int) $job->job_id,
-					'flow_id' => (int) $job->flow_id,
-					'status'  => 'skipped',
-					'reason'  => sprintf( 'Invalid or non-final status: %s', $status ?? 'null' ),
-				);
-				continue;
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic WHERE clause is prepared above.
+			$stuck_jobs = $wpdb->get_results(
+				"SELECT job_id, flow_id
+					 FROM {$table}
+					 {$where_clause}
+					 ORDER BY job_id ASC
+					 LIMIT " . self::CANDIDATE_BATCH_SIZE
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+			if ( empty( $stuck_jobs ) ) {
+				break;
 			}
 
-			if ( $dry_run ) {
-				++$recovered;
-				$jobs[] = array(
-					'job_id'        => (int) $job->job_id,
-					'flow_id'       => (int) $job->flow_id,
-					'status'        => 'would_recover',
-					'target_status' => $status,
-				);
-			} else {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$result = $wpdb->update(
-					$table,
-					array(
-						'status'       => $status,
-						'completed_at' => current_time( 'mysql', true ),
-					),
-					array( 'job_id' => $job->job_id ),
-					array( '%s', '%s' ),
-					array( '%d' )
-				);
+			foreach ( $stuck_jobs as $job ) {
+				$last_job_id = max( $last_job_id, (int) $job->job_id );
+				$engine_data = $this->getJobEngineData( (int) $job->job_id );
+				$status      = $engine_data['job_status'] ?? null;
 
-				if ( false !== $result ) {
-					++$recovered;
-					$jobs[] = array(
-						'job_id'        => (int) $job->job_id,
-						'flow_id'       => (int) $job->flow_id,
-						'status'        => 'recovered',
-						'target_status' => $status,
-					);
+				// Truncate to fit varchar(255) column. Full reason is in engine_data.
+				if ( $status && strlen( $status ) > 255 ) {
+					$status = substr( $status, 0, 252 ) . '...';
+				}
 
-					do_action( 'datamachine_job_complete', $job->job_id, $status );
-				} else {
+				if ( ! $status || ! JobStatus::isStatusFinal( $status ) ) {
 					++$skipped;
-					$jobs[] = array(
+					$this->appendJobDetail( $jobs, $jobs_omitted, array(
 						'job_id'  => (int) $job->job_id,
 						'flow_id' => (int) $job->flow_id,
 						'status'  => 'skipped',
-						'reason'  => 'Database update failed',
+						'reason'  => sprintf( 'Invalid or non-final status: %s', $status ?? 'null' ),
+					) );
+					continue;
+				}
+
+				if ( $dry_run ) {
+					++$recovered;
+					$this->appendJobDetail( $jobs, $jobs_omitted, array(
+						'job_id'        => (int) $job->job_id,
+						'flow_id'       => (int) $job->flow_id,
+						'status'        => 'would_recover',
+						'target_status' => $status,
+					) );
+				} else {
+					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+					$result = $wpdb->update(
+						$table,
+						array(
+							'status'       => $status,
+							'completed_at' => current_time( 'mysql', true ),
+						),
+						array( 'job_id' => $job->job_id ),
+						array( '%s', '%s' ),
+						array( '%d' )
 					);
+
+					if ( false !== $result ) {
+						++$recovered;
+						$this->appendJobDetail( $jobs, $jobs_omitted, array(
+							'job_id'        => (int) $job->job_id,
+							'flow_id'       => (int) $job->flow_id,
+							'status'        => 'recovered',
+							'target_status' => $status,
+						) );
+
+						do_action( 'datamachine_job_complete', $job->job_id, $status );
+					} else {
+						++$skipped;
+						$this->appendJobDetail( $jobs, $jobs_omitted, array(
+							'job_id'  => (int) $job->job_id,
+							'flow_id' => (int) $job->flow_id,
+							'status'  => 'skipped',
+							'reason'  => 'Database update failed',
+						) );
+					}
 				}
 			}
 		}
 
 		// Second recovery pass: timed-out jobs (processing without job_status override, older than timeout).
-		$timeout_where = $wpdb->prepare(
-			"WHERE status = 'processing' AND engine_data NOT LIKE %s AND created_at < DATE_SUB(NOW(), INTERVAL %d HOUR)",
-			'%"job_status"%',
-			$timeout_hours
-		);
-		if ( $flow_id ) {
-			$timeout_where .= $wpdb->prepare( ' AND flow_id = %d', $flow_id );
-		}
-
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic WHERE clause
-		$timed_out_jobs = $wpdb->get_results(
-			"SELECT job_id, flow_id, engine_data FROM {$table} {$timeout_where}"
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-
 		$timed_out     = 0;
 		$stale_actions = 0;
 		$requeued      = 0;
 
-		foreach ( $timed_out_jobs as $job ) {
-			$engine_data = json_decode( $job->engine_data, true );
-			if ( ! is_array( $engine_data ) ) {
-				$engine_data = array();
+		$last_job_id = 0;
+		while ( true ) {
+			$timeout_where = $wpdb->prepare(
+				"WHERE status = 'processing' AND job_id > %d AND engine_data NOT LIKE %s AND created_at < DATE_SUB(NOW(), INTERVAL %d HOUR)",
+				$last_job_id,
+				'%"job_status"%',
+				$timeout_hours
+			);
+			if ( $flow_id ) {
+				$timeout_where .= $wpdb->prepare( ' AND flow_id = %d', $flow_id );
 			}
 
-			$job_id      = (int) $job->job_id;
-			$job_flow_id = (int) $job->flow_id;
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic WHERE clause is prepared above.
+			$timed_out_jobs = $wpdb->get_results(
+				"SELECT job_id, flow_id
+					 FROM {$table}
+					 {$timeout_where}
+					 ORDER BY job_id ASC
+					 LIMIT " . self::CANDIDATE_BATCH_SIZE
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
-			if ( $this->hasActiveSchedulerWork( $job_id, $engine_data, $timeout_hours ) ) {
-				++$skipped;
-				$jobs[] = array(
-					'job_id'  => $job_id,
-					'flow_id' => $job_flow_id,
-					'status'  => 'skipped',
-					'reason'  => 'Pending or in-progress scheduler work exists',
-				);
-				continue;
+			if ( empty( $timed_out_jobs ) ) {
+				break;
 			}
 
-			if ( $dry_run ) {
-				++$timed_out;
-				$jobs[] = array(
-					'job_id'  => $job_id,
-					'flow_id' => $job_flow_id,
-					'status'  => 'would_timeout',
-				);
-			} else {
-				// Mark as failed
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$result = $wpdb->update(
-					$table,
-					array(
-						'status'       => 'failed',
-						'completed_at' => current_time( 'mysql', true ),
-					),
-					array( 'job_id' => $job_id ),
-					array( '%s', '%s' ),
-					array( '%d' )
-				);
+			foreach ( $timed_out_jobs as $job ) {
+				$last_job_id = max( $last_job_id, (int) $job->job_id );
+				$engine_data = $this->getJobEngineData( (int) $job->job_id );
 
-				if ( false !== $result ) {
-					++$timed_out;
-					$jobs[] = array(
-						'job_id'  => $job_id,
-						'flow_id' => $job_flow_id,
-						'status'  => 'timed_out',
-					);
+				$job_id      = (int) $job->job_id;
+				$job_flow_id = (int) $job->flow_id;
 
-					do_action( 'datamachine_job_complete', $job_id, 'failed' );
-
-					// Restore drain-mode queued_prompt_backup if the prior run removed an entry.
-					$backup = $engine_data['queued_prompt_backup'] ?? array();
-					if ( ! empty( $backup ) && $this->restoreQueuedPromptBackup( $job_flow_id, $backup ) ) {
-						++$requeued;
-					}
-				} else {
-					$jobs[] = array(
+				if ( $this->hasActiveSchedulerWork( $job_id, $engine_data, $timeout_hours ) ) {
+					++$skipped;
+					$this->appendJobDetail( $jobs, $jobs_omitted, array(
 						'job_id'  => $job_id,
 						'flow_id' => $job_flow_id,
 						'status'  => 'skipped',
-						'reason'  => 'Database update failed for timeout',
+						'reason'  => 'Pending or in-progress scheduler work exists',
+					) );
+					continue;
+				}
+
+				if ( $dry_run ) {
+					++$timed_out;
+					$this->appendJobDetail( $jobs, $jobs_omitted, array(
+						'job_id'  => $job_id,
+						'flow_id' => $job_flow_id,
+						'status'  => 'would_timeout',
+					) );
+				} else {
+					// Mark as failed
+					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+					$result = $wpdb->update(
+						$table,
+						array(
+							'status'       => 'failed',
+							'completed_at' => current_time( 'mysql', true ),
+						),
+						array( 'job_id' => $job_id ),
+						array( '%s', '%s' ),
+						array( '%d' )
 					);
+
+					if ( false !== $result ) {
+						++$timed_out;
+						$this->appendJobDetail( $jobs, $jobs_omitted, array(
+							'job_id'  => $job_id,
+							'flow_id' => $job_flow_id,
+							'status'  => 'timed_out',
+						) );
+
+						do_action( 'datamachine_job_complete', $job_id, 'failed' );
+
+						// Restore drain-mode queued_prompt_backup if the prior run removed an entry.
+						$backup = $engine_data['queued_prompt_backup'] ?? array();
+						if ( ! empty( $backup ) && $this->restoreQueuedPromptBackup( $job_flow_id, $backup ) ) {
+							++$requeued;
+						}
+					} else {
+						$this->appendJobDetail( $jobs, $jobs_omitted, array(
+							'job_id'  => $job_id,
+							'flow_id' => $job_flow_id,
+							'status'  => 'skipped',
+							'reason'  => 'Database update failed for timeout',
+						) );
+					}
 				}
 			}
 		}
@@ -278,36 +303,38 @@ class RecoverStuckJobsAbility {
 
 			if ( $dry_run ) {
 				++$stale_actions;
-				$jobs[] = array(
+				$this->appendJobDetail( $jobs, $jobs_omitted, array(
 					'job_id'        => $job_id,
 					'flow_id'       => $job_flow_id,
 					'action_id'     => $action_id,
 					'status'        => 'would_reconcile_action',
 					'target_status' => $terminal_state,
-				);
+				) );
 				continue;
 			}
 
 			if ( $this->completeTerminalBackedAction( $action_id, $job_id, $terminal_state ) ) {
 				++$stale_actions;
-				$jobs[] = array(
+				$this->appendJobDetail( $jobs, $jobs_omitted, array(
 					'job_id'        => $job_id,
 					'flow_id'       => $job_flow_id,
 					'action_id'     => $action_id,
 					'status'        => 'reconciled_action',
 					'target_status' => $terminal_state,
-				);
+				) );
 			} else {
 				++$skipped;
-				$jobs[] = array(
+				$this->appendJobDetail( $jobs, $jobs_omitted, array(
 					'job_id'    => $job_id,
 					'flow_id'   => $job_flow_id,
 					'action_id' => $action_id,
 					'status'    => 'skipped',
 					'reason'    => 'Action Scheduler reconciliation failed',
-				);
+				) );
 			}
 		}
+
+		$jobs_truncated = $jobs_omitted > 0;
 
 		$message = $dry_run
 			? sprintf( 'Dry run complete. Would recover %d jobs, timeout %d jobs, reconcile %d terminal-backed actions.', $recovered, $timed_out, $stale_actions )
@@ -336,9 +363,77 @@ class RecoverStuckJobsAbility {
 			'stale_actions' => $stale_actions,
 			'requeued'      => $requeued,
 			'dry_run'       => $dry_run,
-			'jobs'          => $jobs,
-			'message'       => $message,
+			'jobs'           => $jobs,
+			'jobs_omitted'   => $jobs_omitted,
+			'jobs_truncated' => $jobs_truncated,
+			'message'        => $message,
 		);
+	}
+
+	/**
+	 * Count stale processing work without loading job payloads.
+	 *
+	 * @param int|null $flow_id Optional flow filter.
+	 * @param int      $timeout_hours Timeout window.
+	 * @return int Stale processing candidate count.
+	 */
+	public static function countStuckCandidates( ?int $flow_id = null, int $timeout_hours = 2 ): int {
+		global $wpdb;
+		$table         = $wpdb->prefix . 'datamachine_jobs';
+		$timeout_hours = max( 1, $timeout_hours );
+
+		$where = $wpdb->prepare(
+			"WHERE status = 'processing' AND ( engine_data LIKE %s OR ( engine_data NOT LIKE %s AND created_at < DATE_SUB(NOW(), INTERVAL %d HOUR) ) )",
+			'%"job_status"%',
+			'%"job_status"%',
+			$timeout_hours
+		);
+		if ( $flow_id ) {
+			$where .= $wpdb->prepare( ' AND flow_id = %d', $flow_id );
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic WHERE clause is prepared above.
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} {$where}" );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+
+	/**
+	 * Fetch and decode one job's engine data.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return array<string,mixed> Decoded engine data.
+	 */
+	private function getJobEngineData( int $job_id ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . 'datamachine_jobs';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is generated from the WP prefix.
+		$raw = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT engine_data FROM {$table} WHERE job_id = %d",
+				$job_id
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		$decoded = is_string( $raw ) ? json_decode( $raw, true ) : array();
+		return is_array( $decoded ) ? $decoded : array();
+	}
+
+	/**
+	 * Append a bounded job detail row to keep dry-run output memory-safe.
+	 *
+	 * @param array<int,array<string,mixed>> $jobs Job details.
+	 * @param int                           $jobs_omitted Omitted detail count.
+	 * @param array<string,mixed>           $detail Detail row.
+	 */
+	private function appendJobDetail( array &$jobs, int &$jobs_omitted, array $detail ): void {
+		if ( count( $jobs ) < self::JOB_DETAIL_LIMIT ) {
+			$jobs[] = $detail;
+			return;
+		}
+
+		++$jobs_omitted;
 	}
 
 	/**

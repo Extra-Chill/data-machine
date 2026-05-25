@@ -129,11 +129,13 @@ class JobsCommand extends BaseCommand {
 		if ( 'table' !== $format ) {
 			WP_CLI::print_value(
 				array(
-					'success' => true,
-					'dry_run' => $dry_run,
-					'summary' => $summary,
-					'jobs'    => $jobs,
-					'message' => $result['message'] ?? '',
+					'success'        => true,
+					'dry_run'        => $dry_run,
+					'summary'        => $summary,
+					'jobs'           => $jobs,
+					'jobs_omitted'   => (int) ( $result['jobs_omitted'] ?? 0 ),
+					'jobs_truncated' => ! empty( $result['jobs_truncated'] ),
+					'message'        => $result['message'] ?? '',
 				),
 				array(
 					'format' => $format,
@@ -203,6 +205,10 @@ class JobsCommand extends BaseCommand {
 			}
 		}
 
+		if ( ! empty( $result['jobs_truncated'] ) ) {
+			WP_CLI::log( sprintf( 'Output truncated; %d additional job/action details omitted.', (int) ( $result['jobs_omitted'] ?? 0 ) ) );
+		}
+
 		WP_CLI::success( $result['message'] );
 	}
 
@@ -226,6 +232,7 @@ class JobsCommand extends BaseCommand {
 			'actionable'    => $recovered + $timed_out + $stale_actions,
 			'total'         => $recovered + $timed_out + $stale_actions + $skipped,
 			'requeued'      => (int) ( $result['requeued'] ?? 0 ),
+			'jobs_omitted'  => (int) ( $result['jobs_omitted'] ?? 0 ),
 		);
 	}
 
