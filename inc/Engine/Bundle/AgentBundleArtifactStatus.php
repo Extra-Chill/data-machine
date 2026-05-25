@@ -27,6 +27,10 @@ final class AgentBundleArtifactStatus {
 	 * @return string One of clean, modified, missing, orphaned.
 	 */
 	public static function classify( ?string $installed_hash, ?string $current_hash ): string {
+		if ( class_exists( '\WP_Agent_Package_Artifact_Status' ) ) {
+			return \WP_Agent_Package_Artifact_Status::classify( $installed_hash, $current_hash );
+		}
+
 		$installed_hash = self::normalize_hash( $installed_hash );
 		$current_hash   = self::normalize_hash( $current_hash );
 

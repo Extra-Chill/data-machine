@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "48086caf56f4689948901abdd2a991e1",
+    "content-hash": "e80f9cf6aeff4f17da2aedf7eba19ac2",
     "packages": [
         {
             "name": "automattic/agents-api",
-            "version": "dev-main",
+            "version": "dev-package-lifecycle-foundation",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "fd4040fad23679c98daddeff8e2b0f600784385c"
+                "reference": "af7aa842071456ca701841360a838ba81df45edc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/fd4040fad23679c98daddeff8e2b0f600784385c",
-                "reference": "fd4040fad23679c98daddeff8e2b0f600784385c",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/af7aa842071456ca701841360a838ba81df45edc",
+                "reference": "af7aa842071456ca701841360a838ba81df45edc",
                 "shasum": ""
             },
             "require": {
@@ -26,7 +26,6 @@
             "suggest": {
                 "woocommerce/action-scheduler": "Required to actually run cron-triggered workflows. The substrate detects Action Scheduler at runtime and no-ops cleanly when absent; install this package (or any plugin that ships it, like WooCommerce) to enable scheduled workflow runs."
             },
-            "default-branch": true,
             "type": "wordpress-plugin",
             "autoload": {
                 "files": [
@@ -38,6 +37,7 @@
                     "php tests/bootstrap-smoke.php",
                     "php tests/message-envelope-smoke.php",
                     "php tests/registry-smoke.php",
+                    "php tests/package-lifecycle-smoke.php",
                     "php tests/execution-principal-smoke.php",
                     "php tests/effective-agent-resolver-smoke.php",
                     "php tests/caller-context-smoke.php",
@@ -98,7 +98,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-05-20T13:16:34+00:00"
+            "time": "2026-05-25T15:23:54+00:00"
         },
         {
             "name": "chubes4/block-format-bridge",

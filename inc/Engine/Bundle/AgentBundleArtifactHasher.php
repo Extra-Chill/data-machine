@@ -21,6 +21,10 @@ final class AgentBundleArtifactHasher {
 	 * @return string SHA-256 hash.
 	 */
 	public static function hash( mixed $artifact ): string {
+		if ( class_exists( '\WP_Agent_Package_Artifact_Hasher' ) ) {
+			return \WP_Agent_Package_Artifact_Hasher::hash( $artifact );
+		}
+
 		if ( is_string( $artifact ) ) {
 			$normalized = $artifact;
 		} elseif ( is_array( $artifact ) ) {
