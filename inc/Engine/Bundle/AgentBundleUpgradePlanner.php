@@ -194,5 +194,4 @@ final class AgentBundleUpgradePlanner {
 
 		return $converted;
 	}
-
 }
