@@ -25,6 +25,7 @@ final class AgentBundleInstalledArtifact {
 	private string $status;
 	private string $installed_at;
 	private string $updated_at;
+	private \WP_Agent_Package_Installed_Artifact $package_artifact;
 
 	public function __construct(
 		string $bundle_slug,
@@ -49,6 +50,18 @@ final class AgentBundleInstalledArtifact {
 		$this->status            = AgentBundleArtifactStatus::classify( $this->installed_hash, $this->current_hash );
 		$this->installed_at      = self::non_empty_string( $installed_at, 'installed_at' );
 		$this->updated_at        = self::non_empty_string( $updated_at, 'updated_at' );
+		$this->package_artifact  = self::build_package_artifact(
+			$this->bundle_slug,
+			$this->bundle_version,
+			$this->artifact_type,
+			$this->artifact_id,
+			$this->source_path,
+			$this->installed_hash,
+			$this->current_hash,
+			$this->installed_at,
+			$this->updated_at,
+			$this->installed_payload
+		);
 	}
 
 	/**
@@ -142,22 +155,18 @@ final class AgentBundleInstalledArtifact {
 	}
 
 	public function to_array(): array {
-		$row = array(
-			'bundle_slug'    => $this->bundle_slug,
-			'bundle_version' => $this->bundle_version,
-			'artifact_type'  => $this->artifact_type,
-			'artifact_id'    => $this->artifact_id,
-			'source_path'    => $this->source_path,
-			'installed_hash' => $this->installed_hash,
-			'current_hash'   => $this->current_hash,
-			'status'         => $this->status,
-			'installed_at'   => $this->installed_at,
-			'updated_at'     => $this->updated_at,
-		);
+		$row = self::from_package_artifact_array( $this->package_artifact->to_array() );
 		if ( null !== $this->installed_payload ) {
 			$row['installed_payload'] = $this->installed_payload;
 		}
 		return $row;
+	}
+
+	/**
+	 * Returns the underlying Agents API package artifact snapshot.
+	 */
+	public function package_artifact(): \WP_Agent_Package_Installed_Artifact {
+		return $this->package_artifact;
 	}
 
 	private static function validate_artifact_type( string $type ): string {
@@ -193,5 +202,57 @@ final class AgentBundleInstalledArtifact {
 		}
 
 		return $path;
+	}
+
+	private static function build_package_artifact( string $bundle_slug, string $bundle_version, string $artifact_type, string $artifact_id, string $source_path, ?string $installed_hash, ?string $current_hash, string $installed_at, string $updated_at, mixed $installed_payload ): \WP_Agent_Package_Installed_Artifact {
+		return new \WP_Agent_Package_Installed_Artifact(
+			array(
+				'package_slug'      => $bundle_slug,
+				'package_version'   => $bundle_version,
+				'artifact_type'     => self::package_artifact_type( $artifact_type ),
+				'artifact_id'       => $artifact_id,
+				'source'            => $source_path,
+				'installed_hash'    => $installed_hash,
+				'current_hash'      => $current_hash,
+				'installed_payload' => $installed_payload,
+				'installed_at'      => $installed_at,
+				'updated_at'        => $updated_at,
+			)
+		);
+	}
+
+	/** @param array<string,mixed> $package_row */
+	private static function from_package_artifact_array( array $package_row ): array {
+		$row = array(
+			'bundle_slug'    => (string) $package_row['package_slug'],
+			'bundle_version' => (string) $package_row['package_version'],
+			'artifact_type'  => self::bundle_artifact_type( (string) $package_row['artifact_type'] ),
+			'artifact_id'    => (string) $package_row['artifact_id'],
+			'source_path'    => (string) $package_row['source'],
+			'installed_hash' => $package_row['installed_hash'] ?? null,
+			'current_hash'   => $package_row['current_hash'] ?? null,
+			'status'         => (string) $package_row['status'],
+			'installed_at'   => (string) $package_row['installed_at'],
+			'updated_at'     => (string) $package_row['updated_at'],
+		);
+
+		if ( array_key_exists( 'installed_payload', $package_row ) ) {
+			$row['installed_payload'] = $package_row['installed_payload'];
+		}
+
+		return $row;
+	}
+
+	private static function package_artifact_type( string $type ): string {
+		if ( str_contains( $type, '/' ) ) {
+			return $type;
+		}
+
+		return 'datamachine/' . str_replace( '_', '-', $type );
+	}
+
+	private static function bundle_artifact_type( string $type ): string {
+		$type = str_starts_with( $type, 'datamachine/' ) ? substr( $type, strlen( 'datamachine/' ) ) : $type;
+		return str_replace( '-', '_', $type );
 	}
 }

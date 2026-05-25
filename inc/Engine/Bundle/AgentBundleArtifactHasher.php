@@ -21,18 +21,6 @@ final class AgentBundleArtifactHasher {
 	 * @return string SHA-256 hash.
 	 */
 	public static function hash( mixed $artifact ): string {
-		if ( is_string( $artifact ) ) {
-			$normalized = $artifact;
-		} elseif ( is_array( $artifact ) ) {
-			$normalized = BundleSchema::encode_json( $artifact );
-		} else {
-			$encoded = wp_json_encode( $artifact, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
-			if ( ! is_string( $encoded ) ) {
-				throw new BundleValidationException( 'Unable to encode bundle artifact for hashing.' );
-			}
-			$normalized = $encoded;
-		}
-
-		return hash( 'sha256', $normalized );
+		return \WP_Agent_Package_Artifact_Hasher::hash( $artifact );
 	}
 }

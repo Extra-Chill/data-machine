@@ -13,6 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
 	define( 'HOUR_IN_SECONDS', 3600 );
 }
+if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
+	define( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK', true );
+}
 
 $GLOBALS['__bundle_upgrade_filters']    = array();
 $GLOBALS['__bundle_upgrade_transients'] = array();
