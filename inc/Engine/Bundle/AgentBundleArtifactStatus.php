@@ -14,10 +14,10 @@ defined( 'ABSPATH' ) || exit;
  */
 final class AgentBundleArtifactStatus {
 
-	public const CLEAN    = 'clean';
-	public const MODIFIED = 'modified';
-	public const MISSING  = 'missing';
-	public const ORPHANED = 'orphaned';
+	public const CLEAN    = \WP_Agent_Package_Artifact_Status::CLEAN;
+	public const MODIFIED = \WP_Agent_Package_Artifact_Status::MODIFIED;
+	public const MISSING  = \WP_Agent_Package_Artifact_Status::MISSING;
+	public const ORPHANED = \WP_Agent_Package_Artifact_Status::ORPHANED;
 
 	/**
 	 * Classify an artifact by installed and current hash presence.
@@ -27,26 +27,6 @@ final class AgentBundleArtifactStatus {
 	 * @return string One of clean, modified, missing, orphaned.
 	 */
 	public static function classify( ?string $installed_hash, ?string $current_hash ): string {
-		if ( class_exists( '\WP_Agent_Package_Artifact_Status' ) ) {
-			return \WP_Agent_Package_Artifact_Status::classify( $installed_hash, $current_hash );
-		}
-
-		$installed_hash = self::normalize_hash( $installed_hash );
-		$current_hash   = self::normalize_hash( $current_hash );
-
-		if ( null === $installed_hash && null !== $current_hash ) {
-			return self::ORPHANED;
-		}
-
-		if ( null === $installed_hash || null === $current_hash ) {
-			return self::MISSING;
-		}
-
-		return hash_equals( $installed_hash, $current_hash ) ? self::CLEAN : self::MODIFIED;
-	}
-
-	private static function normalize_hash( ?string $hash ): ?string {
-		$hash = null === $hash ? '' : trim( $hash );
-		return '' === $hash ? null : $hash;
+		return \WP_Agent_Package_Artifact_Status::classify( $installed_hash, $current_hash );
 	}
 }

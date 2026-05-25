@@ -25,7 +25,7 @@ final class AgentBundleInstalledArtifact {
 	private string $status;
 	private string $installed_at;
 	private string $updated_at;
-	private ?\WP_Agent_Package_Installed_Artifact $package_artifact = null;
+	private \WP_Agent_Package_Installed_Artifact $package_artifact;
 
 	public function __construct(
 		string $bundle_slug,
@@ -155,18 +155,7 @@ final class AgentBundleInstalledArtifact {
 	}
 
 	public function to_array(): array {
-		$row = null !== $this->package_artifact ? self::from_package_artifact_array( $this->package_artifact->to_array() ) : array(
-			'bundle_slug'    => $this->bundle_slug,
-			'bundle_version' => $this->bundle_version,
-			'artifact_type'  => $this->artifact_type,
-			'artifact_id'    => $this->artifact_id,
-			'source_path'    => $this->source_path,
-			'installed_hash' => $this->installed_hash,
-			'current_hash'   => $this->current_hash,
-			'status'         => $this->status,
-			'installed_at'   => $this->installed_at,
-			'updated_at'     => $this->updated_at,
-		);
+		$row = self::from_package_artifact_array( $this->package_artifact->to_array() );
 		if ( null !== $this->installed_payload ) {
 			$row['installed_payload'] = $this->installed_payload;
 		}
@@ -174,9 +163,9 @@ final class AgentBundleInstalledArtifact {
 	}
 
 	/**
-	 * Returns the underlying Agents API package artifact snapshot when available.
+	 * Returns the underlying Agents API package artifact snapshot.
 	 */
-	public function package_artifact(): ?\WP_Agent_Package_Installed_Artifact {
+	public function package_artifact(): \WP_Agent_Package_Installed_Artifact {
 		return $this->package_artifact;
 	}
 
@@ -215,11 +204,7 @@ final class AgentBundleInstalledArtifact {
 		return $path;
 	}
 
-	private static function build_package_artifact( string $bundle_slug, string $bundle_version, string $artifact_type, string $artifact_id, string $source_path, ?string $installed_hash, ?string $current_hash, string $installed_at, string $updated_at, mixed $installed_payload ): ?\WP_Agent_Package_Installed_Artifact {
-		if ( ! class_exists( '\WP_Agent_Package_Installed_Artifact' ) ) {
-			return null;
-		}
-
+	private static function build_package_artifact( string $bundle_slug, string $bundle_version, string $artifact_type, string $artifact_id, string $source_path, ?string $installed_hash, ?string $current_hash, string $installed_at, string $updated_at, mixed $installed_payload ): \WP_Agent_Package_Installed_Artifact {
 		return new \WP_Agent_Package_Installed_Artifact(
 			array(
 				'package_slug'      => $bundle_slug,

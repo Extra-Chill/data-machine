@@ -38,10 +38,21 @@ if ( ! function_exists( 'esc_html' ) ) {
 		return htmlspecialchars( (string) $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 	}
 }
+if ( ! function_exists( 'sanitize_title' ) ) {
+	function sanitize_title( $title ) {
+		$title = strtolower( trim( (string) $title ) );
+		$title = preg_replace( '/[^a-z0-9_-]+/', '-', $title );
+		return trim( null === $title ? '' : $title, '-' );
+	}
+}
 
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSchema.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleValidationException.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/PortableSlug.php';
+require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Packages/class-wp-agent-package-artifact.php';
+require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Packages/class-wp-agent-package-artifact-hasher.php';
+require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Packages/class-wp-agent-package-artifact-status.php';
+require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Packages/class-wp-agent-package-installed-artifact.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactHasher.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactStatus.php';
