@@ -292,11 +292,7 @@ class WorkerCommand extends BaseCommand {
 		$drain_status    = DrainCommand::status();
 		$jobs_summary    = ( new JobsSummaryAbility() )->execute( array() );
 		$jobs            = ! empty( $jobs_summary['success'] ) && is_array( $jobs_summary['summary'] ?? null ) ? $jobs_summary['summary'] : array();
-		$stuck           = ( new RecoverStuckJobsAbility() )->execute(
-			array(
-				'dry_run' => true,
-			)
-		);
+		$stuck_jobs      = RecoverStuckJobsAbility::countStuckCandidates();
 
 		return array(
 			'pending_actions'       => (int) ( $pending_summary['total'] ?? 0 ),
@@ -307,7 +303,7 @@ class WorkerCommand extends BaseCommand {
 			'processing_jobs'       => (int) ( $jobs['processing'] ?? 0 ),
 			'pending_jobs'          => (int) ( $jobs['pending'] ?? 0 ),
 			'failed_jobs'           => (int) ( $jobs['failed'] ?? 0 ),
-			'stuck_jobs'            => (int) ( $stuck['recovered'] ?? 0 ) + (int) ( $stuck['timed_out'] ?? 0 ) + (int) ( $stuck['stale_actions'] ?? 0 ),
+			'stuck_jobs'            => $stuck_jobs,
 		);
 	}
 
