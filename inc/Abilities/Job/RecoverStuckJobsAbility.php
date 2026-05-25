@@ -118,7 +118,7 @@ class RecoverStuckJobsAbility {
 				$where_clause .= $wpdb->prepare( ' AND flow_id = %d', $flow_id );
 			}
 
-			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic WHERE clause is prepared above.
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Dynamic WHERE clause is prepared above; limit is an internal constant.
 			$stuck_jobs = $wpdb->get_results(
 				"SELECT job_id, flow_id
 					 FROM {$table}
@@ -126,7 +126,7 @@ class RecoverStuckJobsAbility {
 					 ORDER BY job_id ASC
 					 LIMIT " . self::CANDIDATE_BATCH_SIZE
 			);
-			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
 
 			if ( empty( $stuck_jobs ) ) {
 				break;
@@ -214,7 +214,7 @@ class RecoverStuckJobsAbility {
 				$timeout_where .= $wpdb->prepare( ' AND flow_id = %d', $flow_id );
 			}
 
-			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic WHERE clause is prepared above.
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Dynamic WHERE clause is prepared above; limit is an internal constant.
 			$timed_out_jobs = $wpdb->get_results(
 				"SELECT job_id, flow_id
 					 FROM {$table}
@@ -222,7 +222,7 @@ class RecoverStuckJobsAbility {
 					 ORDER BY job_id ASC
 					 LIMIT " . self::CANDIDATE_BATCH_SIZE
 			);
-			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
 
 			if ( empty( $timed_out_jobs ) ) {
 				break;
@@ -356,13 +356,13 @@ class RecoverStuckJobsAbility {
 		}
 
 		return array(
-			'success'       => true,
-			'recovered'     => $recovered,
-			'skipped'       => $skipped,
-			'timed_out'     => $timed_out,
-			'stale_actions' => $stale_actions,
-			'requeued'      => $requeued,
-			'dry_run'       => $dry_run,
+			'success'        => true,
+			'recovered'      => $recovered,
+			'skipped'        => $skipped,
+			'timed_out'      => $timed_out,
+			'stale_actions'  => $stale_actions,
+			'requeued'       => $requeued,
+			'dry_run'        => $dry_run,
 			'jobs'           => $jobs,
 			'jobs_omitted'   => $jobs_omitted,
 			'jobs_truncated' => $jobs_truncated,
@@ -493,16 +493,16 @@ class RecoverStuckJobsAbility {
 			$query_args[] = $flow_id;
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Dynamic placeholder list is prepared below.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- Dynamic placeholder list is prepared below.
 		$terminal_jobs = $wpdb->get_results(
 			$wpdb->prepare(
-				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- The dynamic SQL contains only generated placeholders; values are supplied in matching order.
+				// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- The dynamic SQL contains only generated placeholders; values are supplied in matching order.
 				$sql,
 				$query_args
 			),
 			ARRAY_A
 		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( empty( $terminal_jobs ) ) {
 			return array();
