@@ -259,6 +259,261 @@ class Jobs extends BaseRepository {
 	}
 
 	/**
+	 * Get memory-safe aggregate job summary counts.
+	 *
+	 * Uses grouped SQL queries so operator dashboards can inspect large job
+	 * backlogs without hydrating or decoding long engine_data blobs.
+	 *
+	 * @param array $args Filter arguments matching get_jobs_count().
+	 * @return array Summary buckets and totals.
+	 */
+	public function get_jobs_summary( array $args = array() ): array {
+		$where_parts = $this->build_jobs_summary_where( $args, 'j' );
+		$where_sql   = $where_parts['sql'];
+		$where_values = $where_parts['values'];
+
+		return array(
+			'total'                   => $this->get_jobs_count( $args ),
+			'failed_count'            => $this->get_jobs_count( array_merge( $args, array( 'status' => 'failed' ) ) ),
+			'stuck_processing_count'  => $this->get_stuck_processing_count( $args ),
+			'status'                  => $this->get_status_summary_rows( $where_sql, $where_values ),
+			'pipeline'                => $this->get_pipeline_summary_rows( $where_sql, $where_values ),
+			'flow'                    => $this->get_flow_summary_rows( $where_sql, $where_values ),
+			'handler'                 => $this->get_handler_summary_rows( $args, $where_sql, $where_values ),
+			'filters'                 => $this->summarize_job_filters( $args ),
+		);
+	}
+
+	/**
+	 * Build WHERE SQL for aggregate summary queries.
+	 *
+	 * @param array  $args  Filter arguments.
+	 * @param string $alias Table alias.
+	 * @return array{sql:string,values:array}
+	 */
+	private function build_jobs_summary_where( array $args, string $alias = 'j' ): array {
+		$prefix        = '' !== $alias ? $alias . '.' : '';
+		$where_clauses = array();
+		$where_values  = array();
+
+		if ( ! empty( $args['flow_id'] ) ) {
+			$where_clauses[] = $prefix . 'flow_id = %s';
+			$where_values[]  = (string) $args['flow_id'];
+		}
+
+		if ( ! empty( $args['pipeline_id'] ) ) {
+			$where_clauses[] = $prefix . 'pipeline_id = %s';
+			$where_values[]  = (string) $args['pipeline_id'];
+		}
+
+		if ( ! empty( $args['status'] ) ) {
+			$status_value    = sanitize_text_field( $args['status'] );
+			$where_clauses[] = $prefix . 'status LIKE %s';
+			$where_values[]  = $this->wpdb->esc_like( $status_value ) . '%';
+		}
+
+		if ( ! empty( $args['source'] ) ) {
+			$where_clauses[] = $prefix . 'source = %s';
+			$where_values[]  = sanitize_text_field( $args['source'] );
+		}
+
+		if ( ! empty( $args['handler'] ) ) {
+			$handler = sanitize_key( (string) $args['handler'] );
+			if ( '' !== $handler ) {
+				$where_clauses[] = '(' . $prefix . 'engine_data LIKE %s OR ' . $prefix . 'engine_data LIKE %s OR ' . $prefix . 'engine_data LIKE %s)';
+				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler_slug":"' . $handler . '"' ) . '%';
+				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler":"' . $handler . '"' ) . '%';
+				$where_values[]  = '%' . $this->wpdb->esc_like( '"handler_slugs":["' . $handler . '"' ) . '%';
+			}
+		}
+
+		if ( isset( $args['user_id'] ) ) {
+			$where_clauses[] = $prefix . 'user_id = %d';
+			$where_values[]  = absint( $args['user_id'] );
+		}
+
+		if ( isset( $args['agent_id'] ) ) {
+			$where_clauses[] = $prefix . 'agent_id = %d';
+			$where_values[]  = absint( $args['agent_id'] );
+		}
+
+		if ( ! empty( $args['since'] ) ) {
+			$where_clauses[] = $prefix . 'created_at >= %s';
+			$where_values[]  = sanitize_text_field( $args['since'] );
+		}
+
+		if ( isset( $args['parent_job_id'] ) ) {
+			$where_clauses[] = $prefix . 'parent_job_id = %d';
+			$where_values[]  = absint( $args['parent_job_id'] );
+		}
+
+		if ( ! empty( $args['hide_children'] ) ) {
+			$where_clauses[] = '(' . $prefix . 'parent_job_id IS NULL OR ' . $prefix . 'parent_job_id = 0)';
+		}
+
+		return array(
+			'sql'    => empty( $where_clauses ) ? '' : 'WHERE ' . implode( ' AND ', $where_clauses ),
+			'values' => $where_values,
+		);
+	}
+
+	/**
+	 * Get aggregate status summary rows.
+	 */
+	private function get_status_summary_rows( string $where_sql, array $where_values ): array {
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		$query = $this->wpdb->prepare(
+			"SELECT
+				CASE
+					WHEN j.status LIKE 'agent_skipped%' THEN 'agent_skipped'
+					WHEN j.status LIKE 'completed_no_items%' THEN 'completed_no_items'
+					WHEN j.status LIKE 'failed%' THEN 'failed'
+					ELSE j.status
+				END AS status,
+				COUNT(*) AS count
+			 FROM %i j
+			 {$where_sql}
+			 GROUP BY status
+			 ORDER BY count DESC",
+			array_merge( array( $this->table_name ), $where_values )
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		return $this->normalize_summary_rows( $this->wpdb->get_results( $query, ARRAY_A ) ?: array(), array( 'status' ) );
+	}
+
+	/**
+	 * Get aggregate pipeline summary rows.
+	 */
+	private function get_pipeline_summary_rows( string $where_sql, array $where_values ): array {
+		$pipelines_table = $this->wpdb->prefix . 'datamachine_pipelines';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		$query = $this->wpdb->prepare(
+			"SELECT j.pipeline_id, p.pipeline_name, COUNT(*) AS count
+			 FROM %i j
+			 LEFT JOIN %i p ON j.pipeline_id = p.pipeline_id
+			 {$where_sql}
+			 GROUP BY j.pipeline_id, p.pipeline_name
+			 ORDER BY count DESC",
+			array_merge( array( $this->table_name, $pipelines_table ), $where_values )
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		return $this->normalize_summary_rows( $this->wpdb->get_results( $query, ARRAY_A ) ?: array(), array( 'pipeline_id', 'pipeline_name' ) );
+	}
+
+	/**
+	 * Get aggregate flow summary rows.
+	 */
+	private function get_flow_summary_rows( string $where_sql, array $where_values ): array {
+		$flows_table = $this->wpdb->prefix . 'datamachine_flows';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		$query = $this->wpdb->prepare(
+			"SELECT j.flow_id, f.flow_name, j.pipeline_id, COUNT(*) AS count
+			 FROM %i j
+			 LEFT JOIN %i f ON j.flow_id = f.flow_id
+			 {$where_sql}
+			 GROUP BY j.flow_id, f.flow_name, j.pipeline_id
+			 ORDER BY count DESC",
+			array_merge( array( $this->table_name, $flows_table ), $where_values )
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		return $this->normalize_summary_rows( $this->wpdb->get_results( $query, ARRAY_A ) ?: array(), array( 'flow_id', 'flow_name', 'pipeline_id' ) );
+	}
+
+	/**
+	 * Get aggregate handler summary rows without selecting engine_data blobs.
+	 */
+	private function get_handler_summary_rows( array $args, string $where_sql, array $where_values ): array {
+		if ( ! empty( $args['handler'] ) ) {
+			$handler = sanitize_key( (string) $args['handler'] );
+			return '' === $handler ? array() : array(
+				array(
+					'handler_slug' => $handler,
+					'count'        => $this->get_jobs_count( $args ),
+				),
+			);
+		}
+
+		$handler_where = '' === $where_sql
+			? 'WHERE j.engine_data LIKE %s'
+			: $where_sql . ' AND j.engine_data LIKE %s';
+		$values        = array_merge( $where_values, array( '%"handler_slug":"%' ) );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		$query = $this->wpdb->prepare(
+			"SELECT
+				SUBSTRING_INDEX(SUBSTRING_INDEX(REGEXP_SUBSTR(j.engine_data, '\"handler_slug\":\"[^\"]+\"'), ':\"', -1), '\"', 1) AS handler_slug,
+				COUNT(*) AS count
+			 FROM %i j
+			 {$handler_where}
+			 GROUP BY handler_slug
+			 HAVING handler_slug IS NOT NULL AND handler_slug != ''
+			 ORDER BY count DESC",
+			array_merge( array( $this->table_name ), $values )
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		return $this->normalize_summary_rows( $this->wpdb->get_results( $query, ARRAY_A ) ?: array(), array( 'handler_slug' ) );
+	}
+
+	/**
+	 * Count processing jobs older than the dashboard stuck threshold.
+	 */
+	private function get_stuck_processing_count( array $args ): int {
+		$stuck_args           = $args;
+		$stuck_args['status'] = 'processing';
+		$where_parts          = $this->build_jobs_summary_where( $stuck_args, 'j' );
+		$where_sql            = '' === $where_parts['sql'] ? 'WHERE j.created_at < %s' : $where_parts['sql'] . ' AND j.created_at < %s';
+		$stuck_seconds        = defined( 'HOUR_IN_SECONDS' ) ? 2 * HOUR_IN_SECONDS : 7200;
+		$where_values         = array_merge( $where_parts['values'], array( gmdate( 'Y-m-d H:i:s', time() - $stuck_seconds ) ) );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+		$query = $this->wpdb->prepare(
+			"SELECT COUNT(j.job_id) FROM %i j {$where_sql}",
+			array_merge( array( $this->table_name ), $where_values )
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		return (int) $this->wpdb->get_var( $query );
+	}
+
+	/**
+	 * Normalize aggregate rows to stable scalar arrays.
+	 */
+	private function normalize_summary_rows( array $rows, array $fields ): array {
+		$normalized = array();
+
+		foreach ( $rows as $row ) {
+			$item = array();
+			foreach ( $fields as $field ) {
+				$item[ $field ] = isset( $row[ $field ] ) ? (string) $row[ $field ] : '';
+			}
+			$item['count'] = (int) ( $row['count'] ?? 0 );
+			$normalized[]  = $item;
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Return the filters applied to a job summary query.
+	 */
+	private function summarize_job_filters( array $args ): array {
+		$filters = array();
+		foreach ( array( 'pipeline_id', 'flow_id', 'handler', 'status', 'source', 'since', 'user_id', 'agent_id', 'parent_job_id', 'hide_children' ) as $key ) {
+			if ( isset( $args[ $key ] ) && '' !== $args[ $key ] && null !== $args[ $key ] ) {
+				$filters[ $key ] = $args[ $key ];
+			}
+		}
+
+		return $filters;
+	}
+
+	/**
 	 * Get paginated jobs with pipeline and flow names.
 	 *
 	 * Supports filtering by flow_id, pipeline_id, and status.

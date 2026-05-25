@@ -1855,6 +1855,24 @@ class JobsCommand extends BaseCommand {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--status=<status>]
+	 * : Filter by status prefix.
+	 *
+	 * [--source=<source>]
+	 * : Filter by job source.
+	 *
+	 * [--flow=<flow_id>]
+	 * : Filter by flow ID.
+	 *
+	 * [--pipeline=<pipeline_id>]
+	 * : Filter by pipeline ID.
+	 *
+	 * [--handler=<handler_slug>]
+	 * : Filter by handler slug recorded in generic job outcome metadata.
+	 *
+	 * [--since=<datetime>]
+	 * : Summarize jobs created after this time. Accepts ISO datetime or relative strings (e.g., "1 hour ago", "today", "yesterday").
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -1880,10 +1898,45 @@ class JobsCommand extends BaseCommand {
 	 *     # JSON output
 	 *     wp datamachine jobs summary --format=json
 	 *
+	 *     # Dashboard-safe summary for today's jobs in one pipeline
+	 *     wp datamachine jobs summary --pipeline=42 --since=today --format=json
+	 *
 	 * @subcommand summary
 	 */
 	public function summary( array $args, array $assoc_args ): void {
-		$result = ( new JobsSummaryAbility() )->execute( array() );
+		$input = AgentResolver::buildScopingInput( $assoc_args );
+
+		if ( ! empty( $assoc_args['status'] ) ) {
+			$input['status'] = (string) $assoc_args['status'];
+		}
+
+		if ( isset( $assoc_args['flow'] ) ) {
+			$input['flow_id'] = (string) $assoc_args['flow'];
+		}
+
+		if ( isset( $assoc_args['pipeline'] ) ) {
+			$input['pipeline_id'] = (string) $assoc_args['pipeline'];
+		}
+
+		if ( ! empty( $assoc_args['source'] ) ) {
+			$input['source'] = (string) $assoc_args['source'];
+		}
+
+		if ( ! empty( $assoc_args['handler'] ) ) {
+			$input['handler'] = (string) $assoc_args['handler'];
+		}
+
+		$since = $assoc_args['since'] ?? null;
+		if ( $since ) {
+			$timestamp = strtotime( $since );
+			if ( false === $timestamp ) {
+				WP_CLI::error( sprintf( 'Invalid --since value: "%s". Use ISO datetime or relative string (e.g., "1 hour ago", "today").', $since ) );
+				return;
+			}
+			$input['since'] = gmdate( 'Y-m-d H:i:s', $timestamp );
+		}
+
+		$result = ( new JobsSummaryAbility() )->execute( $input );
 
 		if ( ! $result['success'] ) {
 			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
@@ -1897,16 +1950,61 @@ class JobsCommand extends BaseCommand {
 			return;
 		}
 
-		// Transform summary to row format.
-		$items = array();
-		foreach ( $summary as $status => $count ) {
-			$items[] = array(
-				'status' => $status,
-				'count'  => $count,
-			);
+		$format = $assoc_args['format'] ?? 'table';
+		if ( 'json' === $format ) {
+			WP_CLI::log( wp_json_encode( $summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
 		}
 
-		$this->format_items( $items, array( 'status', 'count' ), $assoc_args );
+		if ( 'yaml' === $format ) {
+			/** @phpstan-ignore-next-line Spyc is provided by WP-CLI at runtime. */
+			WP_CLI::log( (string) call_user_func( array( 'Spyc', 'YAMLDump' ), $summary, false, false, true ) );
+			return;
+		}
+
+		$items = array();
+		foreach ( array( 'status', 'pipeline', 'flow', 'handler' ) as $group ) {
+			foreach ( $summary[ $group ] ?? array() as $row ) {
+				$items[] = array(
+					'group' => $group,
+					'key'   => $this->get_summary_row_key( $group, $row ),
+					'name'  => $this->get_summary_row_name( $group, $row ),
+					'count' => (int) ( $row['count'] ?? 0 ),
+				);
+			}
+		}
+
+		$this->format_items( $items, array( 'group', 'key', 'name', 'count' ), $assoc_args );
+
+		if ( 'table' === $format ) {
+			WP_CLI::log( sprintf( 'Total: %d', (int) ( $summary['total'] ?? 0 ) ) );
+			WP_CLI::log( sprintf( 'Failed: %d', (int) ( $summary['failed_count'] ?? 0 ) ) );
+			WP_CLI::log( sprintf( 'Stuck processing: %d', (int) ( $summary['stuck_processing_count'] ?? 0 ) ) );
+		}
+	}
+
+	/**
+	 * Get a stable key for a summary table row.
+	 */
+	private function get_summary_row_key( string $group, array $row ): string {
+		return match ( $group ) {
+			'status' => (string) ( $row['status'] ?? '' ),
+			'pipeline' => (string) ( $row['pipeline_id'] ?? '' ),
+			'flow' => (string) ( $row['flow_id'] ?? '' ),
+			'handler' => (string) ( $row['handler_slug'] ?? '' ),
+			default => '',
+		};
+	}
+
+	/**
+	 * Get a display name for a summary table row.
+	 */
+	private function get_summary_row_name( string $group, array $row ): string {
+		return match ( $group ) {
+			'pipeline' => (string) ( $row['pipeline_name'] ?? '' ),
+			'flow' => (string) ( $row['flow_name'] ?? '' ),
+			default => '',
+		};
 	}
 
 	/**

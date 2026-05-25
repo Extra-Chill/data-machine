@@ -32,7 +32,32 @@ class JobsSummaryAbility {
 					'category'            => 'datamachine-jobs',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'properties' => array(),
+						'properties' => array(
+							'flow_id'     => array(
+								'type'        => array( 'integer', 'string', 'null' ),
+								'description' => __( 'Filter jobs by flow ID.', 'data-machine' ),
+							),
+							'pipeline_id' => array(
+								'type'        => array( 'integer', 'string', 'null' ),
+								'description' => __( 'Filter jobs by pipeline ID.', 'data-machine' ),
+							),
+							'handler'     => array(
+								'type'        => array( 'string', 'null' ),
+								'description' => __( 'Filter jobs by handler slug recorded in job outcome metadata.', 'data-machine' ),
+							),
+							'status'      => array(
+								'type'        => array( 'string', 'null' ),
+								'description' => __( 'Filter jobs by status prefix.', 'data-machine' ),
+							),
+							'source'      => array(
+								'type'        => array( 'string', 'null' ),
+								'description' => __( 'Filter jobs by source.', 'data-machine' ),
+							),
+							'since'       => array(
+								'type'        => array( 'string', 'null' ),
+								'description' => __( 'Filter jobs created at or after this datetime (Y-m-d H:i:s).', 'data-machine' ),
+							),
+						),
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -63,42 +88,23 @@ class JobsSummaryAbility {
 	 * Returns job counts grouped by base status. Compound statuses (e.g., "agent_skipped - reason")
 	 * are normalized to their base status.
 	 *
-	 * @param array $input Input parameters (none required).
+	 * @param array $input Filter parameters.
 	 * @return array Result with summary counts.
 	 */
-	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Ability interface requires $input
 	public function execute( array $input ): array {
-		global $wpdb;
-		$table = $wpdb->prefix . 'datamachine_jobs';
-
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$results = $wpdb->get_results(
-			"SELECT
-				CASE
-					WHEN status LIKE 'agent_skipped%' THEN 'agent_skipped'
-					WHEN status LIKE 'completed_no_items%' THEN 'completed_no_items'
-					WHEN status LIKE 'failed%' THEN 'failed'
-					ELSE status
-				END as base_status,
-				COUNT(*) as count
-			 FROM {$table}
-			 GROUP BY base_status
-			 ORDER BY count DESC"
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-
-		$summary = array();
-		$total   = 0;
-
-		foreach ( $results as $row ) {
-			$summary[ $row->base_status ] = (int) $row->count;
-			$total                       += (int) $row->count;
+		$filters = array();
+		foreach ( array( 'flow_id', 'pipeline_id', 'handler', 'status', 'source', 'since', 'user_id', 'agent_id' ) as $key ) {
+			if ( isset( $input[ $key ] ) && '' !== $input[ $key ] && null !== $input[ $key ] ) {
+				$filters[ $key ] = $input[ $key ];
+			}
 		}
+
+		$summary = $this->db_jobs->get_jobs_summary( $filters );
 
 		return array(
 			'success' => true,
 			'summary' => $summary,
-			'total'   => $total,
+			'total'   => (int) ( $summary['total'] ?? 0 ),
 		);
 	}
 }
