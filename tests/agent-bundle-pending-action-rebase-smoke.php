@@ -13,44 +13,46 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__ ) . '/' );
 }
 
-$GLOBALS['__rebase_pa_filters'] = array();
+require_once __DIR__ . '/agents-api-smoke-helpers.php';
+require_once dirname( __DIR__ ) . '/vendor/autoload.php';
+agents_api_smoke_require_module();
 
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $data, $options = 0, $depth = 512 ) {
 		return json_encode( $data, $options, $depth );
 	}
 }
-if ( ! function_exists( 'add_filter' ) ) {
-	function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
-		$GLOBALS['__rebase_pa_filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
-		ksort( $GLOBALS['__rebase_pa_filters'][ $hook ], SORT_NUMERIC );
-		return true;
-	}
-}
-if ( ! function_exists( 'apply_filters' ) ) {
-	function apply_filters( $hook, $value, ...$args ) {
-		if ( empty( $GLOBALS['__rebase_pa_filters'][ $hook ] ) ) {
-			return $value;
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		private string $message;
+
+		public function __construct( string $code = '', string $message = '' ) {
+			unset( $code );
+			$this->message = $message;
 		}
-		foreach ( $GLOBALS['__rebase_pa_filters'][ $hook ] as $callbacks ) {
-			foreach ( $callbacks as $registration ) {
-				$value = call_user_func_array( $registration[0], array_slice( array_merge( array( $value ), $args ), 0, $registration[1] ) );
-			}
+
+		public function get_error_message(): string {
+			return $this->message;
 		}
-		return $value;
 	}
 }
 if ( ! function_exists( 'is_wp_error' ) ) {
 	function is_wp_error( $value ) {
-		return false;
+		return $value instanceof WP_Error;
 	}
 }
 
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSchema.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactHasher.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactStatus.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactRebase.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleUpgradePlanner.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleAdoptionStateStore.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/register-agent-package-artifacts.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleUpgradePendingAction.php';
+
+do_action( 'init' );
 
 use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
