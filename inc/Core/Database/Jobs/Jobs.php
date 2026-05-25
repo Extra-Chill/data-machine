@@ -268,19 +268,19 @@ class Jobs extends BaseRepository {
 	 * @return array Summary buckets and totals.
 	 */
 	public function get_jobs_summary( array $args = array() ): array {
-		$where_parts = $this->build_jobs_summary_where( $args, 'j' );
-		$where_sql = $where_parts['sql'];
+		$where_parts  = $this->build_jobs_summary_where( $args, 'j' );
+		$where_sql    = $where_parts['sql'];
 		$where_values = $where_parts['values'];
 
 		return array(
-			'total' => $this->get_jobs_count( $args ),
-			'failed_count' => $this->get_jobs_count( array_merge( $args, array( 'status' => 'failed' ) ) ),
+			'total'                  => $this->get_jobs_count( $args ),
+			'failed_count'           => $this->get_jobs_count( array_merge( $args, array( 'status' => 'failed' ) ) ),
 			'stuck_processing_count' => $this->get_stuck_processing_count( $args ),
-			'status' => $this->get_status_summary_rows( $where_sql, $where_values ),
-			'pipeline' => $this->get_pipeline_summary_rows( $where_sql, $where_values ),
-			'flow' => $this->get_flow_summary_rows( $where_sql, $where_values ),
-			'handler' => $this->get_handler_summary_rows( $args, $where_sql, $where_values ),
-			'filters' => $this->summarize_job_filters( $args ),
+			'status'                 => $this->get_status_summary_rows( $where_sql, $where_values ),
+			'pipeline'               => $this->get_pipeline_summary_rows( $where_sql, $where_values ),
+			'flow'                   => $this->get_flow_summary_rows( $where_sql, $where_values ),
+			'handler'                => $this->get_handler_summary_rows( $args, $where_sql, $where_values ),
+			'filters'                => $this->summarize_job_filters( $args ),
 		);
 	}
 
@@ -380,7 +380,9 @@ class Jobs extends BaseRepository {
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above from fixed SQL fragments and placeholders.
-		return $this->normalize_summary_rows( $this->wpdb->get_results( $query, ARRAY_A ) ?: array(), array( 'status' ) );
+		$rows = $this->wpdb->get_results( $query, ARRAY_A );
+
+		return $this->normalize_summary_rows( $rows ? $rows : array(), array( 'status' ) );
 	}
 
 	/**
@@ -402,7 +404,9 @@ class Jobs extends BaseRepository {
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above from fixed SQL fragments and placeholders.
-		return $this->normalize_summary_rows( $this->wpdb->get_results( $query, ARRAY_A ) ?: array(), array( 'pipeline_id', 'pipeline_name' ) );
+		$rows = $this->wpdb->get_results( $query, ARRAY_A );
+
+		return $this->normalize_summary_rows( $rows ? $rows : array(), array( 'pipeline_id', 'pipeline_name' ) );
 	}
 
 	/**
@@ -424,7 +428,9 @@ class Jobs extends BaseRepository {
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above from fixed SQL fragments and placeholders.
-		return $this->normalize_summary_rows( $this->wpdb->get_results( $query, ARRAY_A ) ?: array(), array( 'flow_id', 'flow_name', 'pipeline_id' ) );
+		$rows = $this->wpdb->get_results( $query, ARRAY_A );
+
+		return $this->normalize_summary_rows( $rows ? $rows : array(), array( 'flow_id', 'flow_name', 'pipeline_id' ) );
 	}
 
 	/**
@@ -461,7 +467,9 @@ class Jobs extends BaseRepository {
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above from fixed SQL fragments and placeholders.
-		return $this->normalize_summary_rows( $this->wpdb->get_results( $query, ARRAY_A ) ?: array(), array( 'handler_slug' ) );
+		$rows = $this->wpdb->get_results( $query, ARRAY_A );
+
+		return $this->normalize_summary_rows( $rows ? $rows : array(), array( 'handler_slug' ) );
 	}
 
 	/**
