@@ -200,6 +200,14 @@ class ChatOrchestrator {
 		}
 
 		// --- Execute AI conversation turn ---
+		// Pass both 'modes' (array of sanitized slugs) and 'mode' (comma-joined
+		// string for logging/analytics). executeConversationTurn prefers the
+		// array form when present — required so multi-mode contexts like
+		// ['cluckin-chuck', 'chat'] survive. Passing only the comma-joined
+		// string would route through sanitize_key() in ToolPolicyResolver::
+		// normalizeModes which strips the comma and produces a single junk
+		// mode like 'cluckin-chuckchat', causing mode-restricted tool
+		// allowlists (frontend chat surface guards) to silently no-op.
 		$result = self::executeConversationTurn(
 			$session_id,
 			$messages,
@@ -209,6 +217,7 @@ class ChatOrchestrator {
 				'single_turn'          => false,
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id ? $selected_pipeline_id : null,
+				'modes'                => $modes,
 				'mode'                 => $mode,
 				'user_id'              => $user_id,
 				'agent_id'             => $agent_id,
@@ -389,6 +398,19 @@ class ChatOrchestrator {
 			return self::sessionLockContentionError();
 		}
 
+		// Recover the original modes array from the stored session.mode column.
+		// Sessions created from a multi-mode request (e.g. ['cluckin-chuck',
+		// 'chat']) persist as the comma-joined string 'cluckin-chuck,chat'.
+		// Pass both forms — the array survives mode-specific tool allowlist
+		// filters (see ToolPolicyResolver::normalizeModes which would otherwise
+		// sanitize_key the comma away into a junk single mode).
+		$stored_mode = (string) ( $session['mode'] ?? ToolPolicyResolver::MODE_CHAT );
+		$modes       = ToolPolicyResolver::normalizeModes(
+			false !== strpos( $stored_mode, ',' )
+				? array_map( 'trim', explode( ',', $stored_mode ) )
+				: $stored_mode
+		);
+
 		$result = self::executeConversationTurn(
 			$session_id,
 			$messages,
@@ -398,7 +420,8 @@ class ChatOrchestrator {
 				'single_turn'          => false,
 				'max_turns'            => $max_turns,
 				'selected_pipeline_id' => $selected_pipeline_id,
-				'mode'                 => (string) ( $session['mode'] ?? ToolPolicyResolver::MODE_CHAT ),
+				'modes'                => $modes,
+				'mode'                 => $stored_mode,
 				'user_id'              => (int) ( $session['user_id'] ?? 0 ),
 				'agent_id'             => (int) ( $session['agent_id'] ?? 0 ),
 				'agent_slug'           => (string) ( $session['agent_slug'] ?? '' ),
@@ -629,7 +652,23 @@ class ChatOrchestrator {
 	 * @return string|WP_Error Session ID on success, WP_Error on failure.
 	 */
 	private static function createSession( int $user_id, string $source = '', int $agent_id = 0, string $mode = ToolPolicyResolver::MODE_CHAT, ?array $transcript_owner = null ): string|WP_Error {
-		$mode = '' !== $mode ? sanitize_key( $mode ) : ToolPolicyResolver::MODE_CHAT;
+		// Comma-joined multi-mode strings ('cluckin-chuck,chat') survive intact
+		// here so processContinue can later parse them back into a modes array.
+		// Single-mode strings still get sanitize_key'd for the usual safety.
+		if ( '' === $mode ) {
+			$mode = ToolPolicyResolver::MODE_CHAT;
+		} elseif ( false !== strpos( $mode, ',' ) ) {
+			$parts = array_filter( array_map(
+				static fn( $part ) => sanitize_key( trim( (string) $part ) ),
+				explode( ',', $mode )
+			) );
+			$mode  = implode( ',', $parts );
+			if ( '' === $mode ) {
+				$mode = ToolPolicyResolver::MODE_CHAT;
+			}
+		} else {
+			$mode = sanitize_key( $mode );
+		}
 
 		if ( $agent_id <= 0 ) {
 			$agent_id = function_exists( 'datamachine_resolve_or_create_agent_id' )
