@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "53843c7467d344d78f3a1a3c89714f399e3e0674"
+                "reference": "672cbc46442928602f2a2e94256177b08ca93aae"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/53843c7467d344d78f3a1a3c89714f399e3e0674",
-                "reference": "53843c7467d344d78f3a1a3c89714f399e3e0674",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/672cbc46442928602f2a2e94256177b08ca93aae",
+                "reference": "672cbc46442928602f2a2e94256177b08ca93aae",
                 "shasum": ""
             },
             "require": {
@@ -39,6 +39,7 @@
                     "php tests/message-envelope-smoke.php",
                     "php tests/registry-smoke.php",
                     "php tests/package-lifecycle-smoke.php",
+                    "php tests/package-adoption-orchestration-smoke.php",
                     "php tests/execution-principal-smoke.php",
                     "php tests/effective-agent-resolver-smoke.php",
                     "php tests/caller-context-smoke.php",
@@ -99,7 +100,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-05-25T15:51:14+00:00"
+            "time": "2026-05-25T19:51:55+00:00"
         },
         {
             "name": "chubes4/block-format-bridge",

@@ -150,7 +150,7 @@ final class AgentBundleUpgradePlanner {
 		return $converted;
 	}
 
-	private static function package_artifact_type( string $type ): string {
+	public static function package_artifact_type( string $type ): string {
 		if ( str_contains( $type, '/' ) ) {
 			return $type;
 		}
@@ -158,7 +158,11 @@ final class AgentBundleUpgradePlanner {
 		return 'datamachine/' . str_replace( '_', '-', $type );
 	}
 
-	private static function bundle_artifact_type( string $type ): string {
+	public static function bundle_artifact_type( string $type ): string {
+		if ( str_starts_with( $type, 'datamachine-extension/' ) ) {
+			return substr( $type, strlen( 'datamachine-extension/' ) );
+		}
+
 		$type = str_starts_with( $type, 'datamachine/' ) ? substr( $type, strlen( 'datamachine/' ) ) : $type;
 
 		return str_replace( '-', '_', $type );

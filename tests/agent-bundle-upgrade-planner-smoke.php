@@ -19,6 +19,7 @@ if ( ! defined( 'DATAMACHINE_PENDING_ACTION_TRANSIENT_FALLBACK' ) ) {
 
 $GLOBALS['__bundle_upgrade_filters']    = array();
 $GLOBALS['__bundle_upgrade_transients'] = array();
+$GLOBALS['__bundle_upgrade_actions']    = array();
 
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $data, $options = 0, $depth = 512 ) {
@@ -30,9 +31,21 @@ if ( ! function_exists( 'esc_html' ) ) {
 		return htmlspecialchars( (string) $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 	}
 }
+if ( ! function_exists( '_doing_it_wrong' ) ) {
+	function _doing_it_wrong( $function_name, $message, $version ) {
+		unset( $function_name, $message, $version );
+	}
+}
 if ( ! function_exists( 'sanitize_key' ) ) {
 	function sanitize_key( $key ) {
 		return strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $key ) );
+	}
+}
+if ( ! function_exists( 'sanitize_title' ) ) {
+	function sanitize_title( $title ) {
+		$slug = strtolower( (string) $title );
+		$slug = preg_replace( '/[^a-z0-9]+/', '-', $slug );
+		return trim( (string) $slug, '-' );
 	}
 }
 if ( ! function_exists( 'sanitize_text_field' ) ) {
@@ -57,12 +70,12 @@ if ( ! function_exists( 'current_user_can' ) ) {
 }
 if ( ! function_exists( 'did_action' ) ) {
 	function did_action( $hook = '' ) {
-		return 0;
+		return 'init' === $hook ? 1 : 0;
 	}
 }
 if ( ! function_exists( 'doing_action' ) ) {
 	function doing_action( $hook = '' ) {
-		return false;
+		return in_array( $hook, $GLOBALS['__bundle_upgrade_actions'], true );
 	}
 }
 if ( ! function_exists( 'wp_generate_uuid4' ) ) {
@@ -114,7 +127,9 @@ if ( ! function_exists( 'apply_filters' ) ) {
 }
 if ( ! function_exists( 'do_action' ) ) {
 	function do_action( $hook, ...$args ) {
+		$GLOBALS['__bundle_upgrade_actions'][] = $hook;
 		apply_filters( $hook, null, ...$args );
+		array_pop( $GLOBALS['__bundle_upgrade_actions'] );
 	}
 }
 if ( ! function_exists( 'is_wp_error' ) ) {
@@ -211,6 +226,7 @@ if ( ! class_exists( 'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action' ) ) {
 	}
 	' );
 }
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/register-agent-package-artifacts.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleUpgradeActionHandlers.php';
 
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
@@ -236,7 +252,12 @@ function assert_upgrade_plan( string $label, bool $condition ): void {
 }
 
 function assert_upgrade_plan_equals( string $label, $expected, $actual ): void {
-	assert_upgrade_plan( $label, $expected === $actual );
+	$ok = $expected === $actual;
+	assert_upgrade_plan( $label, $ok );
+	if ( ! $ok ) {
+		echo '    expected: ' . var_export( $expected, true ) . "\n";
+		echo '    actual:   ' . var_export( $actual, true ) . "\n";
+	}
 }
 
 function upgrade_artifact( string $type, string $id, $payload, string $source_path = '' ): array {

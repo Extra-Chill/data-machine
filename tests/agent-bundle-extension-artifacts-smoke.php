@@ -16,6 +16,7 @@ if ( class_exists( 'PHPUnit\\Framework\\TestCase', false ) ) {
 }
 
 $GLOBALS['__bundle_extension_filters'] = array();
+$GLOBALS['__bundle_extension_actions'] = array();
 
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $data, $options = 0, $depth = 512 ) {
@@ -25,6 +26,11 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 if ( ! function_exists( 'esc_html' ) ) {
 	function esc_html( $text ) {
 		return htmlspecialchars( (string) $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+	}
+}
+if ( ! function_exists( '_doing_it_wrong' ) ) {
+	function _doing_it_wrong( $function_name, $message, $version ) {
+		unset( $function_name, $message, $version );
 	}
 }
 if ( ! function_exists( 'sanitize_key' ) ) {
@@ -64,8 +70,12 @@ if ( ! function_exists( 'add_filter' ) ) {
 }
 if ( ! function_exists( 'did_action' ) ) {
 	function did_action( $hook = '' ) {
-		unset( $hook );
-		return 0;
+		return 'init' === $hook ? 1 : 0;
+	}
+}
+if ( ! function_exists( 'doing_action' ) ) {
+	function doing_action( $hook = '' ) {
+		return in_array( $hook, $GLOBALS['__bundle_extension_actions'], true );
 	}
 }
 if ( ! function_exists( 'add_action' ) ) {
@@ -86,8 +96,16 @@ if ( ! function_exists( 'apply_filters' ) ) {
 		return $value;
 	}
 }
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( $hook, ...$args ) {
+		$GLOBALS['__bundle_extension_actions'][] = $hook;
+		apply_filters( $hook, null, ...$args );
+		array_pop( $GLOBALS['__bundle_extension_actions'] );
+	}
+}
 
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/register-agent-package-artifacts.php';
 
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
