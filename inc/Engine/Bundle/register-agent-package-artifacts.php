@@ -96,8 +96,8 @@ function datamachine_agent_package_artifact_type_definitions(): array {
  * @return mixed
  */
 function import_datamachine_agent_package_artifact( \WP_Agent_Package_Artifact $artifact, array $context ) {
-	$target         = is_array( $context['target'] ?? null ) ? $context['target'] : array();
-	$bundle_type    = AgentBundleUpgradePlanner::bundle_artifact_type( $artifact->get_type() );
+	$target          = is_array( $context['target'] ?? null ) ? $context['target'] : array();
+	$bundle_type     = AgentBundleUpgradePlanner::bundle_artifact_type( $artifact->get_type() );
 	$bundle_artifact = array(
 		'artifact_type' => $bundle_type,
 		'artifact_id'   => (string) ( $target['artifact_id'] ?? $artifact->get_slug() ),
