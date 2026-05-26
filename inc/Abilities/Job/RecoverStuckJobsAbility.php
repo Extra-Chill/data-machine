@@ -22,6 +22,17 @@ class RecoverStuckJobsAbility {
 	private const CANDIDATE_BATCH_SIZE = 50;
 	private const JOB_DETAIL_LIMIT     = 100;
 
+	/**
+	 * Data Machine-owned Action Scheduler hooks that may be reconciled.
+	 *
+	 * @var array<string,string>
+	 */
+	private const RECOVERABLE_ACTION_HOOK_ARGS = array(
+		'datamachine_execute_step'          => 'job_id',
+		'datamachine_pipeline_batch_chunk'  => 'parent_job_id',
+		'datamachine_run_flow_now'          => 'job_id',
+	);
+
 	public function __construct() {
 		$this->initDatabases();
 
@@ -300,6 +311,7 @@ class RecoverStuckJobsAbility {
 			$action_id      = (int) $action['action_id'];
 			$job_flow_id    = (int) $action['flow_id'];
 			$terminal_state = (string) $action['job_status'];
+			$action_hook    = (string) $action['hook'];
 
 			if ( $dry_run ) {
 				++$stale_actions;
@@ -307,18 +319,20 @@ class RecoverStuckJobsAbility {
 					'job_id'        => $job_id,
 					'flow_id'       => $job_flow_id,
 					'action_id'     => $action_id,
+					'hook'          => $action_hook,
 					'status'        => 'would_reconcile_action',
 					'target_status' => $terminal_state,
 				) );
 				continue;
 			}
 
-			if ( $this->completeTerminalBackedAction( $action_id, $job_id, $terminal_state ) ) {
+			if ( $this->completeTerminalBackedAction( $action_id, $action_hook, $job_id, $terminal_state ) ) {
 				++$stale_actions;
 				$this->appendJobDetail( $jobs, $jobs_omitted, array(
 					'job_id'        => $job_id,
 					'flow_id'       => $job_flow_id,
 					'action_id'     => $action_id,
+					'hook'          => $action_hook,
 					'status'        => 'reconciled_action',
 					'target_status' => $terminal_state,
 				) );
@@ -328,6 +342,7 @@ class RecoverStuckJobsAbility {
 					'job_id'    => $job_id,
 					'flow_id'   => $job_flow_id,
 					'action_id' => $action_id,
+					'hook'      => $action_hook,
 					'status'    => 'skipped',
 					'reason'    => 'Action Scheduler reconciliation failed',
 				) );
@@ -437,57 +452,63 @@ class RecoverStuckJobsAbility {
 	}
 
 	/**
-	 * Find in-progress Action Scheduler step actions whose Data Machine job is terminal.
+	 * Find orphaned in-progress Data Machine Action Scheduler actions whose job is terminal.
 	 *
 	 * @param int|null $flow_id Optional flow filter.
-	 * @return array<int,array{action_id:int,job_id:int,flow_id:int,job_status:string}>
+	 * @return array<int,array{action_id:int,hook:string,job_id:int,flow_id:int,job_status:string}>
 	 */
 	private function getTerminalBackedInProgressActions( ?int $flow_id ): array {
 		global $wpdb;
 
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$claims_table  = $wpdb->prefix . 'actionscheduler_claims';
 		$jobs_table    = $wpdb->prefix . 'datamachine_jobs';
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated from the WP prefix.
-		$actions = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT action_id, args
-				 FROM {$actions_table}
-				 WHERE hook = %s
-				 AND status = %s
-				 AND args LIKE %s",
-				'datamachine_execute_step',
-				'in-progress',
-				'%"job_id"%'
-			)
-		);
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$action_jobs = array();
+		foreach ( self::RECOVERABLE_ACTION_HOOK_ARGS as $hook => $arg_name ) {
+			$arg_like = '%"' . $wpdb->esc_like( $arg_name ) . '"%';
 
-		if ( empty( $actions ) ) {
-			return array();
-		}
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated from the WP prefix.
+			$actions = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT a.action_id, a.hook, a.args
+					 FROM {$actions_table} a
+					 LEFT JOIN {$claims_table} c ON c.claim_id = a.claim_id
+					 WHERE a.hook = %s
+					 AND a.status = %s
+					 AND a.group_id IN (SELECT group_id FROM {$wpdb->prefix}actionscheduler_groups WHERE slug = %s)
+					 AND (a.claim_id = 0 OR c.claim_id IS NULL)
+					 AND a.args LIKE %s",
+					$hook,
+					'in-progress',
+					'data-machine',
+					$arg_like
+				)
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
-		$action_job_ids = array();
-		foreach ( $actions as $action ) {
-			$job_id = $this->extractActionJobId( (string) ( $action->args ?? '' ) );
-			if ( $job_id > 0 ) {
-				$action_job_ids[ (int) $action->action_id ] = $job_id;
+			foreach ( $actions as $action ) {
+				$job_id = $this->extractActionJobIdForHook( (string) ( $action->args ?? '' ), (string) ( $action->hook ?? $hook ) );
+				if ( $job_id > 0 ) {
+					$action_jobs[ (int) $action->action_id ] = array(
+						'hook'   => (string) ( $action->hook ?? $hook ),
+						'job_id' => $job_id,
+					);
+				}
 			}
 		}
 
-		if ( empty( $action_job_ids ) ) {
+		if ( empty( $action_jobs ) ) {
 			return array();
 		}
 
-		$job_placeholders    = implode( ',', array_fill( 0, count( $action_job_ids ), '%d' ) );
-		$status_placeholders = implode( ',', array_fill( 0, count( JobStatus::FINAL_STATUSES ), '%s' ) );
-		$query_args          = array_values( $action_job_ids );
-		$query_args          = array_merge( $query_args, JobStatus::FINAL_STATUSES );
+		$job_ids             = array_values( array_unique( array_column( $action_jobs, 'job_id' ) ) );
+		$job_placeholders    = implode( ',', array_fill( 0, count( $job_ids ), '%d' ) );
+		$query_args          = $job_ids;
 
 		$sql = "SELECT job_id, flow_id, status
 			 FROM {$jobs_table}
-			 WHERE job_id IN ({$job_placeholders})
-				 AND status IN ({$status_placeholders})";
+			 WHERE job_id IN ({$job_placeholders})";
 		if ( $flow_id ) {
 			$sql         .= ' AND flow_id = %d';
 			$query_args[] = $flow_id;
@@ -510,11 +531,16 @@ class RecoverStuckJobsAbility {
 
 		$jobs_by_id = array();
 		foreach ( $terminal_jobs as $job ) {
+			if ( ! JobStatus::isStatusFinal( (string) ( $job['status'] ?? '' ) ) ) {
+				continue;
+			}
+
 			$jobs_by_id[ (int) $job['job_id'] ] = $job;
 		}
 
 		$terminal_actions = array();
-		foreach ( $action_job_ids as $action_id => $job_id ) {
+		foreach ( $action_jobs as $action_id => $action ) {
+			$job_id = (int) $action['job_id'];
 			if ( ! isset( $jobs_by_id[ $job_id ] ) ) {
 				continue;
 			}
@@ -522,6 +548,7 @@ class RecoverStuckJobsAbility {
 			$job                = $jobs_by_id[ $job_id ];
 			$terminal_actions[] = array(
 				'action_id'  => (int) $action_id,
+				'hook'       => (string) $action['hook'],
 				'job_id'     => (int) $job_id,
 				'flow_id'    => (int) $job['flow_id'],
 				'job_status' => (string) $job['status'],
@@ -732,6 +759,27 @@ class RecoverStuckJobsAbility {
 	}
 
 	/**
+	 * Extract the paired Data Machine job ID for a recoverable Action Scheduler hook.
+	 *
+	 * @param string $args Action Scheduler args payload.
+	 * @param string $hook Action Scheduler hook.
+	 * @return int Job ID, or 0 when the action has no paired job.
+	 */
+	private function extractActionJobIdForHook( string $args, string $hook ): int {
+		$arg_name = self::RECOVERABLE_ACTION_HOOK_ARGS[ $hook ] ?? 'job_id';
+		$job_id   = $this->extractActionArgInt( $args, $arg_name );
+		if ( $job_id > 0 ) {
+			return $job_id;
+		}
+
+		if ( 'datamachine_run_flow_now' !== $hook ) {
+			return 0;
+		}
+
+		return $this->extractActionPositionalInt( $args, 1 );
+	}
+
+	/**
 	 * Extract a numeric argument from an Action Scheduler args payload.
 	 *
 	 * @param string $args Action Scheduler args payload.
@@ -769,6 +817,27 @@ class RecoverStuckJobsAbility {
 	}
 
 	/**
+	 * Extract a numeric positional argument from an Action Scheduler args payload.
+	 *
+	 * @param string $args Action Scheduler args payload.
+	 * @param int    $position Zero-based argument position.
+	 * @return int Argument value, or 0 when unavailable.
+	 */
+	private function extractActionPositionalInt( string $args, int $position ): int {
+		$decoded = json_decode( $args, true );
+		if ( is_array( $decoded ) && isset( $decoded[ $position ] ) && is_numeric( $decoded[ $position ] ) ) {
+			return (int) $decoded[ $position ];
+		}
+
+		$unserialized = maybe_unserialize( $args );
+		if ( is_array( $unserialized ) && isset( $unserialized[ $position ] ) && is_numeric( $unserialized[ $position ] ) ) {
+			return (int) $unserialized[ $position ];
+		}
+
+		return 0;
+	}
+
+	/**
 	 * Complete a stale in-progress Action Scheduler action without touching the terminal job.
 	 *
 	 * @param int    $action_id Action Scheduler action ID.
@@ -776,30 +845,37 @@ class RecoverStuckJobsAbility {
 	 * @param string $job_status Terminal Data Machine job status.
 	 * @return bool Whether the Action Scheduler row was reconciled.
 	 */
-	private function completeTerminalBackedAction( int $action_id, int $job_id, string $job_status ): bool {
+	private function completeTerminalBackedAction( int $action_id, string $hook, int $job_id, string $job_status ): bool {
 		global $wpdb;
 
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$claims_table  = $wpdb->prefix . 'actionscheduler_claims';
 		$logs_table    = $wpdb->prefix . 'actionscheduler_logs';
 		$now_gmt       = current_time( 'mysql', true );
 		$now_local     = current_time( 'mysql', false );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$result = $wpdb->update(
-			$actions_table,
-			array(
-				'status'             => 'complete',
-				'claim_id'           => 0,
-				'last_attempt_gmt'   => $now_gmt,
-				'last_attempt_local' => $now_local,
-			),
-			array(
-				'action_id' => $action_id,
-				'status'    => 'in-progress',
-			),
-			array( '%s', '%d', '%s', '%s' ),
-			array( '%d', '%s' )
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are generated from the WP prefix.
+		$result = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$actions_table} a
+				 LEFT JOIN {$claims_table} c ON c.claim_id = a.claim_id
+				 SET a.status = %s,
+					 a.claim_id = 0,
+					 a.last_attempt_gmt = %s,
+					 a.last_attempt_local = %s
+				 WHERE a.action_id = %d
+					 AND a.hook = %s
+					 AND a.status = %s
+					 AND (a.claim_id = 0 OR c.claim_id IS NULL)",
+				'complete',
+				$now_gmt,
+				$now_local,
+				$action_id,
+				$hook,
+				'in-progress'
+			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( false === $result || 0 === (int) $result ) {
 			return false;
@@ -811,7 +887,8 @@ class RecoverStuckJobsAbility {
 			array(
 				'action_id'      => $action_id,
 				'message'        => sprintf(
-					'Data Machine reconciled stale in-progress action: job %d is already terminal (%s).',
+					'Data Machine reconciled stale in-progress %s action: job %d is already terminal (%s).',
+					$hook,
 					$job_id,
 					$job_status
 				),
