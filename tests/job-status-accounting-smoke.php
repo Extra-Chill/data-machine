@@ -30,6 +30,7 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 }
 
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
+require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
 require_once __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/EngineHelpers.php';
@@ -96,7 +97,21 @@ $packets = array(
 
 $assert( 'step fails when no successful handler result exists', false === $evaluate( $packets ) );
 
-echo "\n[3] reconcile-status command exists with repair markers\n";
+echo "\n[3] fallback AI response packet is not execution success\n";
+$packets = array(
+	array(
+		'type'     => 'ai_response',
+		'data'     => array( 'body' => 'summarized but did not execute a handler' ),
+		'metadata' => array(
+			'step_execution_success' => false,
+			'failure_reason'          => 'ai_response_without_tool_result',
+		),
+	),
+);
+
+$assert( 'step fails when only an AI fallback packet exists', false === $evaluate( $packets ) );
+
+echo "\n[4] reconcile-status command exists with repair markers\n";
 $jobs_command = file_get_contents( __DIR__ . '/../inc/Cli/Commands/JobsCommand.php' );
 $assert( 'CLI exposes reconcile-status subcommand', str_contains( $jobs_command, '@subcommand reconcile-status' ) );
 $assert( 'CLI detects successful wiki update artifacts', str_contains( $jobs_command, 'Updated wiki article:' ) );

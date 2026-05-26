@@ -314,6 +314,9 @@ class AIStepTest extends TestCase {
 		$this->assertCount( 1, $result, 'processLoopResults should return only tool result packets, not input packets' );
 		$this->assertSame( 'ai_handler_complete', $result[0]['type'] );
 		$this->assertSame( 'upsert_event', $result[0]['metadata']['tool_name'] );
+		$this->assertArrayHasKey( 'tool_result_envelope', $result[0]['metadata'] );
+		$this->assertArrayHasKey( 'tool_result_data', $result[0]['metadata'] );
+		$this->assertArrayNotHasKey( 'tool_result', $result[0]['metadata'] );
 
 		// Verify the input packet is NOT in the output.
 		foreach ( $result as $packet ) {
@@ -442,6 +445,8 @@ class AIStepTest extends TestCase {
 		// Should emit a single AI response packet, not the input + response.
 		$this->assertCount( 1, $result );
 		$this->assertSame( 'ai_response', $result[0]['type'] );
+		$this->assertFalse( $result[0]['metadata']['step_execution_success'] );
+		$this->assertSame( 'ai_response_without_tool_result', $result[0]['metadata']['failure_reason'] );
 	}
 
 	public function test_process_loop_results_emits_completion_assertion_packet_when_final_turn_is_empty(): void {

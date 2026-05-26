@@ -17,6 +17,65 @@ if ( ! defined('ABSPATH') ) {
  */
 class ToolResultFinder {
 
+	/**
+	 * Project the stable tool-result data payload from a result packet.
+	 *
+	 * New packets carry both the full execution envelope and projected data.
+	 * Legacy packets overloaded metadata.tool_result, so compatibility remains
+	 * isolated here instead of leaking into every consumer.
+	 *
+	 * @param array $entry Tool result packet.
+	 * @return array
+	 */
+	public static function projectResultData( array $entry ): array {
+		$metadata = is_array( $entry['metadata'] ?? null ) ? $entry['metadata'] : array();
+
+		if ( is_array( $metadata['tool_result_data'] ?? null ) ) {
+			return $metadata['tool_result_data'];
+		}
+
+		if ( is_array( $metadata['tool_result_envelope'] ?? null ) ) {
+			$envelope = $metadata['tool_result_envelope'];
+			if ( is_array( $envelope['data'] ?? null ) ) {
+				return $envelope['data'];
+			}
+			if ( is_array( $envelope['result'] ?? null ) ) {
+				return $envelope['result'];
+			}
+			return $envelope;
+		}
+
+		if ( is_array( $metadata['tool_result'] ?? null ) ) {
+			$legacy = $metadata['tool_result'];
+			if ( is_array( $legacy['data'] ?? null ) ) {
+				return $legacy['data'];
+			}
+			return $legacy;
+		}
+
+		return array();
+	}
+
+	/**
+	 * Project the full tool-result envelope from a result packet.
+	 *
+	 * @param array $entry Tool result packet.
+	 * @return array
+	 */
+	public static function projectResultEnvelope( array $entry ): array {
+		$metadata = is_array( $entry['metadata'] ?? null ) ? $entry['metadata'] : array();
+
+		if ( is_array( $metadata['tool_result_envelope'] ?? null ) ) {
+			return $metadata['tool_result_envelope'];
+		}
+
+		if ( is_array( $metadata['tool_result'] ?? null ) ) {
+			return $metadata['tool_result'];
+		}
+
+		return array();
+	}
+
 
 	/**
 	 * Find AI tool execution result by exact handler match.

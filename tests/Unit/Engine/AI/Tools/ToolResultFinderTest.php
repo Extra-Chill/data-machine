@@ -58,4 +58,31 @@ class ToolResultFinderTest extends TestCase {
 		$this->assertNull( $result );
 		$this->assertSame( array(), $logged );
 	}
+
+	public function test_project_result_data_prefers_stable_projected_contract(): void {
+		$entry = array(
+			'metadata' => array(
+				'tool_result_envelope' => array(
+					'success' => true,
+					'data'    => array( 'id' => 123 ),
+				),
+				'tool_result_data'     => array( 'id' => 456 ),
+			),
+		);
+
+		$this->assertSame( array( 'id' => 456 ), ToolResultFinder::projectResultData( $entry ) );
+	}
+
+	public function test_project_result_data_reads_legacy_envelope_shape(): void {
+		$entry = array(
+			'metadata' => array(
+				'tool_result' => array(
+					'success' => true,
+					'data'    => array( 'id' => 123 ),
+				),
+			),
+		);
+
+		$this->assertSame( array( 'id' => 123 ), ToolResultFinder::projectResultData( $entry ) );
+	}
 }

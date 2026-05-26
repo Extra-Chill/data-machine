@@ -132,7 +132,7 @@ class PublishStep extends Step {
 	 * @return array Publish data packet
 	 */
 	private function create_publish_entry_from_tool_result( array $tool_result_entry, array $dataPackets, string $handler, string $flow_step_id ): array {
-		$tool_result_data = $tool_result_entry['metadata']['tool_result'] ?? array();
+		$tool_result_data = ToolResultFinder::projectResultData( $tool_result_entry );
 		$entry_type       = $tool_result_entry['type'] ?? '';
 
 		if ( empty($tool_result_data) ) {

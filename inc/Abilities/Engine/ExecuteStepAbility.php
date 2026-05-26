@@ -21,6 +21,7 @@ use DataMachine\Core\FilesRepository\FileCleanup;
 use DataMachine\Core\FilesRepository\FileRetrieval;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
+use DataMachine\Core\StepExecutionResult;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Engine\StepNavigator;
@@ -203,7 +204,7 @@ class ExecuteStepAbility {
 			$dataPackets = $flow_step->execute( $payload );
 
 			$payload['data'] = $dataPackets;
-			$step_success    = $this->evaluateStepSuccess( $dataPackets, $job_id, $flow_step_id );
+			$step_success    = $this->evaluateStepSuccess( $dataPackets, $job_id, $flow_step_id, $step_type );
 
 			// Refresh engine data to capture changes made during step execution.
 			$refreshed_engine_data = datamachine_get_engine_data( $job_id );
@@ -349,83 +350,25 @@ class ExecuteStepAbility {
 	 * @param string $flow_step_id Flow step ID (for logging).
 	 * @return bool True if step succeeded.
 	 */
-	private function evaluateStepSuccess( array $dataPackets, int $job_id, string $flow_step_id ): bool {
-		$step_success = ! empty( $dataPackets );
+	private function evaluateStepSuccess( array $dataPackets, int $job_id, string $flow_step_id, string $step_type = '' ): bool {
+		$classification = StepExecutionResult::classify( $dataPackets, $step_type );
 
-		if ( $step_success ) {
-			$successful_handlers = $this->collectSuccessfulHandlerTools( $dataPackets );
-
-			foreach ( $dataPackets as $packet ) {
-				$metadata = $packet['metadata'] ?? array();
-				if ( isset( $metadata['success'] ) && false === $metadata['success'] ) {
-					$step_success = false;
-					do_action(
-						'datamachine_log',
-						'warning',
-						'Step returned failure packet',
-						array(
-							'job_id'        => $job_id,
-							'flow_step_id'  => $flow_step_id,
-							'packet_type'   => $packet['type'] ?? 'unknown',
-							'error_message' => $packet['data']['body'] ?? 'No error message',
-						)
-					);
-					break;
-				}
-
-				if ( isset( $metadata['tool_success'] ) && false === $metadata['tool_success'] ) {
-					$handler_tool = isset( $metadata['handler_tool'] ) ? (string) $metadata['handler_tool'] : '';
-					if ( '' !== $handler_tool && isset( $successful_handlers[ $handler_tool ] ) ) {
-						continue;
-					}
-
-					$step_success = false;
-					do_action(
-						'datamachine_log',
-						'warning',
-						'Step returned failed tool result',
-						array(
-							'job_id'        => $job_id,
-							'flow_step_id'  => $flow_step_id,
-							'packet_type'   => $packet['type'] ?? 'unknown',
-							'handler_tool'  => $handler_tool,
-							'error_message' => $packet['data']['body'] ?? 'No error message',
-						)
-					);
-					break;
-				}
-			}
+		if ( ! $classification['success'] ) {
+			do_action(
+				'datamachine_log',
+				'warning',
+				'Step execution did not produce a successful result',
+				array(
+					'job_id'       => $job_id,
+					'flow_step_id' => $flow_step_id,
+					'step_type'    => $step_type,
+					'reason'       => $classification['reason'],
+					'packet_count' => $classification['packet_count'],
+				)
+			);
 		}
 
-		return $step_success;
-	}
-
-	/**
-	 * Collect handler tools that have at least one successful result packet.
-	 *
-	 * AI tools may fail once and then succeed on a later turn. A later successful
-	 * required handler result should allow downstream upsert/publish steps to run.
-	 *
-	 * @param array $dataPackets Returned data packets.
-	 * @return array<string,bool>
-	 */
-	private function collectSuccessfulHandlerTools( array $dataPackets ): array {
-		$handlers = array();
-
-		foreach ( $dataPackets as $packet ) {
-			$metadata     = is_array( $packet['metadata'] ?? null ) ? $packet['metadata'] : array();
-			$handler_tool = isset( $metadata['handler_tool'] ) ? (string) $metadata['handler_tool'] : '';
-
-			if ( '' === $handler_tool ) {
-				continue;
-			}
-
-			if ( 'ai_handler_complete' === ( $packet['type'] ?? '' ) || true === ( $metadata['tool_success'] ?? false ) ) {
-				$handlers[ $handler_tool ] = true;
-			}
-		}
-
-		return $handlers;
+		return (bool) $classification['success'];
 	}
 
 	/**

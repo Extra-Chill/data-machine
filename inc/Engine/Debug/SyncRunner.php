@@ -13,6 +13,7 @@ use DataMachine\Abilities\Engine\ScheduleNextStepAbility;
 use DataMachine\Abilities\StepTypeAbilities;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\JobStatus;
+use DataMachine\Core\StepExecutionResult;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Engine\StepNavigator;
@@ -258,6 +259,7 @@ class SyncRunner {
 		}
 
 		$output_count = count( $output_packets );
+		$classification = StepExecutionResult::classify( $output_packets, $step_type );
 		$next_step_id = ( new StepNavigator() )->get_next_flow_step_id( $flow_step_id, array( 'job_id' => $job_id ) );
 		$reason       = null;
 
@@ -267,8 +269,8 @@ class SyncRunner {
 		} elseif ( 0 === $output_count && in_array( $step_type, array( 'fetch', 'event_import' ), true ) ) {
 			$reason = 'completed_no_items';
 			$this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED_NO_ITEMS );
-		} elseif ( 0 === $output_count ) {
-			return $this->stepFailure( $flow_step_id, 'empty_data_packet_returned', $step_type, $step_class, $input_count );
+		} elseif ( ! $classification['success'] ) {
+			return $this->stepFailure( $flow_step_id, $classification['reason'], $step_type, $step_class, $input_count, $output_count );
 		} elseif ( null === $next_step_id ) {
 			$reason = 'completed';
 			$this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED );
@@ -305,14 +307,14 @@ class SyncRunner {
 	/**
 	 * Build a consistent failed step result.
 	 */
-	private function stepFailure( string $flow_step_id, string $error, string $step_type = '', string $step_class = '', int $input_count = 0 ): array {
+	private function stepFailure( string $flow_step_id, string $error, string $step_type = '', string $step_class = '', int $input_count = 0, int $output_count = 0 ): array {
 		return array(
 			'diagnostics'    => array(
 				'flow_step_id' => $flow_step_id,
 				'step_type'    => $step_type,
 				'step_class'   => $step_class,
 				'input_count'  => $input_count,
-				'output_count' => 0,
+				'output_count' => $output_count,
 				'error'        => $error,
 			),
 			'data_packets'   => array(),

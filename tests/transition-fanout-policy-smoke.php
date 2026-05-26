@@ -18,6 +18,7 @@ function apply_filters( string $hook, $value ) {
 function do_action( string $hook, ...$args ): void {}
 
 require_once __DIR__ . '/../inc/Core/DataPacket.php';
+require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/EngineHelpers.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php';

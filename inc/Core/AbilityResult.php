@@ -65,6 +65,12 @@ class AbilityResult {
 		}
 
 		if ( is_array( $result ) ) {
+			if ( array_key_exists( 'data', $result ) && ! array_key_exists( 'result', $result ) ) {
+				$result['result'] = $result['data'];
+			} elseif ( array_key_exists( 'result', $result ) && ! array_key_exists( 'data', $result ) ) {
+				$result['data'] = $result['result'];
+			}
+
 			return $result;
 		}
 
@@ -72,6 +78,7 @@ class AbilityResult {
 			'success'   => true,
 			'tool_name' => $tool_name,
 			'ability'   => $ability_slug,
+			'data'      => $result,
 			'result'    => $result,
 		);
 	}
