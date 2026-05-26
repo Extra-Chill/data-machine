@@ -158,15 +158,9 @@ class DrainCommand extends BaseCommand {
 					break;
 				}
 
-				$action_ids = self::getDuePendingActionIds( $current_batch_size, $hooks, $job_ids );
-				if ( empty( $action_ids ) ) {
-					$stop_reason = 'empty';
-					break;
-				}
-
 				$due_before    = self::getDuePendingCount( $hooks, $job_ids );
 				$status_before = self::getStatusCounts( $hooks, $job_ids );
-				$result        = self::runActionSchedulerActions( $action_ids );
+				$result        = self::runActionSchedulerBatch( $current_batch_size, $hooks, $job_ids );
 				++$batches;
 
 				if ( 0 !== (int) ( $result->return_code ?? 1 ) ) {
@@ -284,26 +278,50 @@ class DrainCommand extends BaseCommand {
 	}
 
 	/**
-	 * Run specific due Action Scheduler actions.
+	 * Claim and run a batch of due Action Scheduler actions.
 	 *
-	 * @param int[] $action_ids Action IDs.
+	 * @param int           $batch_size Maximum actions to claim.
+	 * @param string[]|null $hooks      Hook scope, or null for all hooks in the group.
+	 * @param int[]         $job_ids    Optional job ID scope.
 	 * @return object Result object with return_code and stderr fields.
 	 */
-	private static function runActionSchedulerActions( array $action_ids ): object {
+	private static function runActionSchedulerBatch( int $batch_size, ?array $hooks = null, array $job_ids = array() ): object {
+		$store    = \ActionScheduler_Store::instance();
 		$runner   = \ActionScheduler::runner();
 		$warnings = array();
+		$claim    = null;
 
-		foreach ( $action_ids as $action_id ) {
-			$action_id = absint( $action_id );
-			if ( $action_id <= 0 ) {
-				continue;
-			}
+		try {
+			$claim = $store->stake_claim( $batch_size, null, $hooks ?? array(), self::GROUP );
+		} catch ( \Throwable $throwable ) {
+			return (object) array(
+				'return_code' => 1,
+				'stdout'      => '',
+				'stderr'      => sprintf( 'Action Scheduler claim failed during drain: %s', $throwable->getMessage() ),
+			);
+		}
 
-			try {
-				$runner->process_action( $action_id, 'Data Machine CLI drain' );
-			} catch ( \Throwable $throwable ) {
-				$warnings[] = sprintf( 'Action %d failed during drain: %s', $action_id, $throwable->getMessage() );
+		try {
+			foreach ( $claim->get_actions() as $action_id ) {
+				$action_id = absint( $action_id );
+				if ( $action_id <= 0 || ! self::actionMatchesJobIds( $action_id, $job_ids ) ) {
+					continue;
+				}
+
+				$claimed_action_ids = array_map( 'intval', $store->find_actions_by_claim_id( $claim->get_id() ) );
+				if ( ! in_array( $action_id, $claimed_action_ids, true ) ) {
+					$warnings[] = sprintf( 'Action Scheduler claim %d was lost during drain.', $claim->get_id() );
+					break;
+				}
+
+				try {
+					$runner->process_action( $action_id, 'Data Machine CLI drain' );
+				} catch ( \Throwable $throwable ) {
+					$warnings[] = sprintf( 'Action %d failed during drain: %s', $action_id, $throwable->getMessage() );
+				}
 			}
+		} finally {
+			$store->release_claim( $claim );
 		}
 
 		return (object) array(
@@ -311,6 +329,46 @@ class DrainCommand extends BaseCommand {
 			'stdout'      => '',
 			'stderr'      => implode( "\n", $warnings ),
 		);
+	}
+
+	/**
+	 * Check whether a claimed action belongs to the requested job scope.
+	 *
+	 * @param int   $action_id Action ID.
+	 * @param int[] $job_ids   Optional job ID scope.
+	 * @return bool True when the action is in scope.
+	 */
+	private static function actionMatchesJobIds( int $action_id, array $job_ids ): bool {
+		if ( empty( $job_ids ) ) {
+			return true;
+		}
+
+		global $wpdb;
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- This checks the args for an already-claimed Action Scheduler row.
+		$args = (string) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT args FROM %i WHERE action_id = %d',
+				$actions_table,
+				$action_id
+			)
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		foreach ( $job_ids as $job_id ) {
+			if (
+				false !== strpos( $args, '"job_id":' . $job_id . ',' )
+				|| false !== strpos( $args, '"job_id":' . $job_id . '}' )
+				|| false !== strpos( $args, '"parent_job_id":' . $job_id . ',' )
+				|| false !== strpos( $args, '"parent_job_id":' . $job_id . '}' )
+			) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -519,43 +577,6 @@ class DrainCommand extends BaseCommand {
 	 */
 	private static function getPendingCount( ?array $hooks = null, array $job_ids = array() ): int {
 		return self::countActions( false, $hooks, $job_ids );
-	}
-
-	/**
-	 * Get due pending Data Machine action IDs in execution order.
-	 *
-	 * @param int $limit Maximum IDs to return.
-	 * @return int[] Action IDs.
-	 */
-	private static function getDuePendingActionIds( int $limit, ?array $hooks = null, array $job_ids = array() ): array {
-		global $wpdb;
-
-		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
-		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
-		$hook_sql      = self::hookWhereSql( $hooks, $job_ids );
-		$values        = array_merge(
-			array( $actions_table, $groups_table ),
-			$hook_sql['values'],
-			array( self::GROUP, gmdate( 'Y-m-d H:i:s' ), $limit )
-		);
-
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic hook scope is constructed from normalized placeholders and values.
-		$ids = $wpdb->get_col(
-			$wpdb->prepare(
-				'SELECT a.action_id
-				FROM %i a
-				INNER JOIN %i g ON g.group_id = a.group_id
-				WHERE ' . $hook_sql['sql'] . 'a.status = \'pending\'
-				AND g.slug = %s
-				AND a.scheduled_date_gmt <= %s
-				ORDER BY a.scheduled_date_gmt ASC, a.action_id ASC
-				LIMIT %d',
-				$values
-			)
-		);
-		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
-
-		return array_map( 'intval', $ids );
 	}
 
 	/**
