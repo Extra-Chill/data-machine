@@ -258,10 +258,10 @@ class SyncRunner {
 			$truncated      = true;
 		}
 
-		$output_count = count( $output_packets );
+		$output_count   = count( $output_packets );
 		$classification = StepExecutionResult::classify( $output_packets, $step_type );
-		$next_step_id = ( new StepNavigator() )->get_next_flow_step_id( $flow_step_id, array( 'job_id' => $job_id ) );
-		$reason       = null;
+		$next_step_id   = ( new StepNavigator() )->get_next_flow_step_id( $flow_step_id, array( 'job_id' => $job_id ) );
+		$reason         = null;
 
 		if ( $truncated ) {
 			$reason = 'max_items';
