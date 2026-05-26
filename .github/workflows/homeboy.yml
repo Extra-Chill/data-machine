@@ -23,5 +23,6 @@ jobs:
     with:
       commands: audit,lint,test
       expected-commands: audit,lint,test
-      autofix: 'false'
+      autofix: 'true'
+      autofix-commands: 'lint --fix'
     secrets: inherit
