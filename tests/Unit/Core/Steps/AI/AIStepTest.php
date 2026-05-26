@@ -404,9 +404,48 @@ class AIStepTest extends TestCase {
 		$this->assertCount( 1, $result );
 		$this->assertSame( 'ai_handler_complete', $result[0]['type'] );
 		$this->assertSame( 'wiki_upsert', $result[0]['metadata']['handler_tool'] );
+		$this->assertSame( 'envelope', $result[0]['metadata']['tool_result_shape'] );
+		$this->assertSame( 'datamachine_tool_result_v1', $result[0]['metadata']['tool_result_contract'] );
+		$this->assertSame( $loop_result['tool_execution_results'][0]['result'], $result[0]['metadata']['tool_result_envelope'] );
+		$this->assertSame( $loop_result['tool_execution_results'][0]['result'], $result[0]['metadata']['tool_result'] );
 
 		$found = ToolResultFinder::findHandlerResult( $result, 'wiki_upsert', 'upsert_step', false );
 		$this->assertSame( $result[0], $found );
+	}
+
+	public function test_process_loop_results_marks_generic_tool_result_payload_shape(): void {
+		$method = new ReflectionMethod( AIStep::class, 'processLoopResults' );
+		$method->setAccessible( true );
+
+		$tool_result = array(
+			'success' => true,
+			'data'    => array( 'items' => array( 'one' ) ),
+		);
+
+		$result = $method->invoke(
+			null,
+			array(
+				'messages'               => array(),
+				'tool_execution_results' => array(
+					array(
+						'tool_name'  => 'search_docs',
+						'result'     => $tool_result,
+						'parameters' => array( 'query' => 'contracts' ),
+						'turn_count' => 1,
+					),
+				),
+			),
+			array(),
+			array( 'flow_step_id' => 'ai_step' ),
+			array( 'search_docs' => array() )
+		);
+
+		$this->assertCount( 1, $result );
+		$this->assertSame( 'tool_result', $result[0]['type'] );
+		$this->assertSame( 'data', $result[0]['metadata']['tool_result_shape'] );
+		$this->assertSame( array( 'items' => array( 'one' ) ), $result[0]['metadata']['tool_result'] );
+		$this->assertSame( $tool_result, $result[0]['metadata']['tool_result_envelope'] );
+		$this->assertTrue( $result[0]['metadata']['tool_success'] );
 	}
 
 	/**

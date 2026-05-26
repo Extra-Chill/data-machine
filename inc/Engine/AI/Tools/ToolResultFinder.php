@@ -39,16 +39,13 @@ class ToolResultFinder {
 			// 'tool_result' entries must be checked for tool_success to avoid treating
 			// failed tool calls as successful publish completions.
 			if ( 'ai_handler_complete' === $entry_type ) {
-				$handler_tool = $entry['metadata']['handler_tool'] ?? '';
-				if ( $handler_tool === $handler ) {
+				if ( self::handlerMatches( $entry, $handler ) && self::toolSucceeded( $entry ) ) {
 					return $entry;
 				}
 			}
 
 			if ( 'tool_result' === $entry_type ) {
-				$handler_tool = $entry['metadata']['handler_tool'] ?? '';
-				$tool_success = $entry['metadata']['tool_success'] ?? false;
-				if ( $handler_tool === $handler && $tool_success ) {
+				if ( self::handlerMatches( $entry, $handler ) && self::toolSucceeded( $entry ) ) {
 					return $entry;
 				}
 			}
@@ -82,12 +79,11 @@ class ToolResultFinder {
 
 		foreach ( $handler_slugs as $slug ) {
 			foreach ( $dataPackets as $entry ) {
-				$entry_type   = $entry['type'] ?? '';
-				$handler_tool = $entry['metadata']['handler_tool'] ?? '';
+				$entry_type = $entry['type'] ?? '';
 
-				if ( 'ai_handler_complete' === $entry_type && $handler_tool === $slug ) {
+				if ( 'ai_handler_complete' === $entry_type && self::handlerMatches( $entry, $slug ) && self::toolSucceeded( $entry ) ) {
 					$results[] = $entry;
-				} elseif ( 'tool_result' === $entry_type && $handler_tool === $slug && ( $entry['metadata']['tool_success'] ?? false ) ) {
+				} elseif ( 'tool_result' === $entry_type && self::handlerMatches( $entry, $slug ) && self::toolSucceeded( $entry ) ) {
 					$results[] = $entry;
 				}
 			}
@@ -106,5 +102,71 @@ class ToolResultFinder {
 		}
 
 		return $results;
+	}
+
+	/**
+	 * Check whether a packet belongs to the requested handler slug.
+	 *
+	 * @param array  $entry   Data packet.
+	 * @param string $handler Handler slug.
+	 * @return bool
+	 */
+	private static function handlerMatches( array $entry, string $handler ): bool {
+		$metadata = is_array( $entry['metadata'] ?? null ) ? $entry['metadata'] : array();
+
+		foreach ( array( 'handler_tool', 'tool_name' ) as $key ) {
+			if ( $handler === (string) ( $metadata[ $key ] ?? '' ) ) {
+				return true;
+			}
+		}
+
+		$envelope = self::toolResultEnvelope( $entry );
+		foreach ( array( 'handler_tool', 'tool_name' ) as $key ) {
+			if ( $handler === (string) ( $envelope[ $key ] ?? '' ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Determine whether the packet represents a successful tool execution.
+	 *
+	 * @param array $entry Data packet.
+	 * @return bool
+	 */
+	private static function toolSucceeded( array $entry ): bool {
+		$metadata = is_array( $entry['metadata'] ?? null ) ? $entry['metadata'] : array();
+		if ( array_key_exists( 'tool_success', $metadata ) ) {
+			return true === $metadata['tool_success'];
+		}
+
+		$envelope = self::toolResultEnvelope( $entry );
+		if ( array_key_exists( 'success', $envelope ) ) {
+			return true === $envelope['success'];
+		}
+
+		return 'ai_handler_complete' === ( $entry['type'] ?? '' );
+	}
+
+	/**
+	 * Read the normalized tool result envelope from canonical or legacy metadata.
+	 *
+	 * @param array $entry Data packet.
+	 * @return array<string,mixed>
+	 */
+	private static function toolResultEnvelope( array $entry ): array {
+		$metadata = is_array( $entry['metadata'] ?? null ) ? $entry['metadata'] : array();
+
+		if ( is_array( $metadata['tool_result_envelope'] ?? null ) ) {
+			return $metadata['tool_result_envelope'];
+		}
+
+		if ( 'envelope' === ( $metadata['tool_result_shape'] ?? '' ) && is_array( $metadata['tool_result'] ?? null ) ) {
+			return $metadata['tool_result'];
+		}
+
+		return array();
 	}
 }

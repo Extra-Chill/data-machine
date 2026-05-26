@@ -71,6 +71,7 @@ require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/DataMachineToolRegistryS
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Sources/AdjacentHandlerToolSource.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolSourceRegistry.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Steps/AI/AIStep.php';
 
 use DataMachine\Core\Steps\AI\AIStep;

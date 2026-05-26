@@ -20,6 +20,7 @@ use DataMachine\Engine\AI\PipelineAIConcurrencyLease;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLimiter;
 use DataMachine\Engine\AI\PipelineTranscriptPolicy;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
+use DataMachine\Engine\AI\Tools\ToolExecutionResult;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
@@ -933,6 +934,7 @@ class AIStep extends Step {
 		$input_source_type = $inputDataPackets[0]['metadata']['source_type'] ?? 'unknown';
 
 		foreach ( $tool_execution_results as $tool_result_data ) {
+			$tool_result_data  = ToolExecutionResult::normalizeEntry( $tool_result_data );
 			$tool_name         = $tool_result_data['tool_name'] ?? '';
 			$tool_result       = $tool_result_data['result'] ?? array();
 			$tool_parameters   = $tool_result_data['parameters'] ?? array();
@@ -955,11 +957,7 @@ class AIStep extends Step {
 					unset( $clean_tool_parameters[ $handler_key ] );
 				}
 
-				$packet        = new DataPacket(
-					array(
-						'title' => 'Handler Tool Executed: ' . $tool_name,
-						'body'  => 'Tool executed successfully by AI agent in ' . $result_turn_count . ' conversation turns',
-					),
+				$metadata      = array_merge(
 					array(
 						'tool_name'         => $tool_name,
 						'handler_tool'      => $tool_def['handler'] ?? null,
@@ -968,8 +966,16 @@ class AIStep extends Step {
 						'source_type'       => $input_source_type,
 						'flow_step_id'      => $flow_step_id,
 						'conversation_turn' => $result_turn_count,
-						'tool_result'       => $tool_result,
 					),
+					ToolExecutionResult::packetResultMetadata( $tool_result, 'envelope' )
+				);
+
+				$packet        = new DataPacket(
+					array(
+						'title' => 'Handler Tool Executed: ' . $tool_name,
+						'body'  => 'Tool executed successfully by AI agent in ' . $result_turn_count . ' conversation turns',
+					),
+					$metadata,
 					'ai_handler_complete'
 				);
 				$outputPackets = $packet->addTo( $outputPackets );
@@ -979,19 +985,22 @@ class AIStep extends Step {
 				// Non-handler tool or failed tool - add tool result data packet
 				$success_message = ConversationManager::generateSuccessMessage( $tool_name, $tool_result, $tool_parameters );
 
+				$metadata      = array_merge(
+					array(
+						'tool_name'       => $tool_name,
+						'handler_tool'    => $tool_def['handler'] ?? null,
+						'tool_parameters' => $tool_parameters,
+						'source_type'     => $input_source_type,
+					),
+					ToolExecutionResult::packetResultMetadata( $tool_result, 'data' )
+				);
+
 				$packet        = new DataPacket(
 					array(
 						'title' => ucwords( str_replace( '_', ' ', $tool_name ) ) . ' Result',
 						'body'  => $success_message,
 					),
-					array(
-						'tool_name'       => $tool_name,
-						'handler_tool'    => $tool_def['handler'] ?? null,
-						'tool_parameters' => $tool_parameters,
-						'tool_success'    => $tool_result['success'] ?? false,
-						'tool_result'     => $tool_result['data'] ?? array(),
-						'source_type'     => $input_source_type,
-					),
+					$metadata,
 					'tool_result'
 				);
 				$outputPackets = $packet->addTo( $outputPackets );

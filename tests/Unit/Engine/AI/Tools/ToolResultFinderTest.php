@@ -58,4 +58,54 @@ class ToolResultFinderTest extends TestCase {
 		$this->assertNull( $result );
 		$this->assertSame( array(), $logged );
 	}
+
+	public function test_find_handler_result_accepts_canonical_tool_result_envelope(): void {
+		$packet = array(
+			'type'     => 'tool_result',
+			'metadata' => array(
+				'handler_tool'         => 'upsert_event',
+				'tool_result_envelope' => array(
+					'success'   => true,
+					'tool_name' => 'upsert_event',
+					'data'      => array( 'post_id' => 123 ),
+				),
+				'tool_result_data'     => array( 'post_id' => 123 ),
+			),
+		);
+
+		$result = ToolResultFinder::findHandlerResult( array( $packet ), 'upsert_event', 'flow_step_1', false );
+
+		$this->assertSame( $packet, $result );
+	}
+
+	public function test_find_handler_result_rejects_failed_canonical_envelope(): void {
+		$packet = array(
+			'type'     => 'tool_result',
+			'metadata' => array(
+				'handler_tool'         => 'upsert_event',
+				'tool_result_envelope' => array(
+					'success' => false,
+					'error'   => 'rejected',
+				),
+			),
+		);
+
+		$result = ToolResultFinder::findHandlerResult( array( $packet ), 'upsert_event', 'flow_step_1', false );
+
+		$this->assertNull( $result );
+	}
+
+	public function test_find_handler_result_falls_back_to_tool_name_for_legacy_handler_packets(): void {
+		$packet = array(
+			'type'     => 'ai_handler_complete',
+			'metadata' => array(
+				'tool_name'            => 'wiki_upsert',
+				'tool_result_envelope' => array( 'success' => true ),
+			),
+		);
+
+		$result = ToolResultFinder::findHandlerResult( array( $packet ), 'wiki_upsert', 'flow_step_1', false );
+
+		$this->assertSame( $packet, $result );
+	}
 }
