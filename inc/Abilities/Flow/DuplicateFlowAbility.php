@@ -108,8 +108,10 @@ class DuplicateFlowAbility {
 		if ( ! $source_flow ) {
 			do_action( 'datamachine_log', 'error', 'Source flow not found for copy', array( 'source_flow_id' => $source_flow_id ) );
 			return array(
-				'success' => false,
-				'error'   => 'Source flow not found',
+				'success'    => false,
+				'error'      => 'Source flow not found',
+				'error_code' => 'flow_not_found',
+				'status'     => 404,
 			);
 		}
 
@@ -120,16 +122,20 @@ class DuplicateFlowAbility {
 		$source_pipeline = $this->db_pipelines->get_pipeline( $source_pipeline_id );
 		if ( ! $source_pipeline ) {
 			return array(
-				'success' => false,
-				'error'   => 'Source pipeline not found',
+				'success'    => false,
+				'error'      => 'Source pipeline not found',
+				'error_code' => 'pipeline_not_found',
+				'status'     => 404,
 			);
 		}
 
 		$target_pipeline = $this->db_pipelines->get_pipeline( $target_pipeline_id );
 		if ( ! $target_pipeline ) {
 			return array(
-				'success' => false,
-				'error'   => 'Target pipeline not found',
+				'success'    => false,
+				'error'      => 'Target pipeline not found',
+				'error_code' => 'pipeline_not_found',
+				'status'     => 404,
 			);
 		}
 

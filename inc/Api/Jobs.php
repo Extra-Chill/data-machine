@@ -19,6 +19,7 @@ namespace DataMachine\Api;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\Job\DeleteJobsAbility;
 use DataMachine\Abilities\Job\GetJobsAbility;
+use DataMachine\Core\AbilityResult;
 
 if ( ! defined( 'WPINC' ) ) {
 	die;
@@ -210,15 +211,7 @@ class Jobs {
 
 		$result = ( new GetJobsAbility() )->execute( $input );
 
-		return rest_ensure_response(
-			array(
-				'success'  => $result['success'],
-				'data'     => $result['jobs'],
-				'total'    => $result['total'],
-				'per_page' => $result['per_page'],
-				'offset'   => $result['offset'],
-			)
-		);
+		return AbilityResult::rest_collection_response( $result, 'jobs', array( 'top_extra' => array( 'filters_applied' ) ), 'get_jobs_failed', __( 'Failed to get jobs.', 'data-machine' ) );
 	}
 
 	/**
@@ -231,20 +224,12 @@ class Jobs {
 
 		$result = ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) );
 
-		if ( ! $result['success'] || empty( $result['jobs'] ) ) {
-			return new \WP_Error(
-				'job_not_found',
-				$result['error'] ?? __( 'Job not found.', 'data-machine' ),
-				array( 'status' => 404 )
-			);
+		$error = AbilityResult::failure_to_wp_error( $result, 'job_not_found', __( 'Job not found.', 'data-machine' ), 404 );
+		if ( $error || empty( $result['jobs'] ) ) {
+			return $error ?: new \WP_Error( 'job_not_found', __( 'Job not found.', 'data-machine' ), array( 'status' => 404 ) );
 		}
 
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => $result['jobs'][0],
-			)
-		);
+		return AbilityResult::rest_item_response( $result, $result['jobs'][0] );
 	}
 
 	/**
@@ -263,12 +248,9 @@ class Jobs {
 			)
 		);
 
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'delete_failed',
-				$result['error'] ?? __( 'Failed to delete jobs.', 'data-machine' ),
-				array( 'status' => 500 )
-			);
+		$error = AbilityResult::failure_to_wp_error( $result, 'delete_failed', __( 'Failed to delete jobs.', 'data-machine' ) );
+		if ( $error ) {
+			return $error;
 		}
 
 		return rest_ensure_response(

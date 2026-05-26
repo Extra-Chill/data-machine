@@ -152,8 +152,10 @@ class CreateFlowAbility {
 		if ( ! $pipeline ) {
 			do_action( 'datamachine_log', 'error', 'Pipeline not found for flow creation', array( 'pipeline_id' => $pipeline_id ) );
 			return array(
-				'success' => false,
-				'error'   => 'Pipeline not found',
+				'success'    => false,
+				'error'      => 'Pipeline not found',
+				'error_code' => 'pipeline_not_found',
+				'status'     => 404,
 			);
 		}
 

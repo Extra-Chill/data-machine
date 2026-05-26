@@ -102,8 +102,10 @@ class UpdatePipelineAbility {
 		$pipeline = $this->db_pipelines->get_pipeline( $pipeline_id );
 		if ( ! $pipeline ) {
 			return array(
-				'success' => false,
-				'error'   => 'Pipeline not found',
+				'success'    => false,
+				'error'      => 'Pipeline not found',
+				'error_code' => 'pipeline_not_found',
+				'status'     => 404,
 			);
 		}
 

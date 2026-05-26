@@ -102,10 +102,132 @@ class AbilityResult {
 			$message = $default_message;
 		}
 
+		$status = isset( $result['status'] ) ? (int) $result['status'] : ( $status_map[ $error_code ] ?? $default_status );
+
 		return new \WP_Error(
 			$error_code,
 			$message,
-			array( 'status' => $status_map[ $error_code ] ?? $default_status )
+			array( 'status' => $status )
+		);
+	}
+
+	/**
+	 * Convert ability output into a REST-ready WP_Error when execution failed.
+	 *
+	 * @param mixed  $result          Ability execution result.
+	 * @param string $default_code    Error code to use when the result has no error code.
+	 * @param string $default_message Error message to use when the result has no message.
+	 * @param int    $default_status  Default HTTP status.
+	 * @return \WP_Error|null WP_Error for failures, null for successful results.
+	 */
+	public static function failure_to_wp_error( $result, string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', int $default_status = 500 ): ?\WP_Error {
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return self::legacy_failure_to_wp_error( $result, $default_code, $default_message, array(), $default_status );
+	}
+
+	/**
+	 * Present a successful ability collection with Data Machine's canonical page envelope.
+	 *
+	 * @param array  $result     Successful ability result.
+	 * @param string $items_key  Key containing collection items in the ability result.
+	 * @param array  $options    Presentation options.
+	 * @return array REST/CLI-safe collection envelope.
+	 */
+	public static function collection_envelope( array $result, string $items_key, array $options = array() ): array {
+		$items        = $result[ $items_key ] ?? array();
+		$data_key     = $options['data_key'] ?? null;
+		$data         = $data_key ? array( $data_key => $items ) : $items;
+		$data_extra   = $options['data_extra'] ?? array();
+		$meta_keys    = $options['meta_keys'] ?? array( 'total', 'per_page', 'offset' );
+		$top_extra    = $options['top_extra'] ?? array();
+		$compat_alias = $options['compat_alias'] ?? array();
+
+		if ( $data_key && is_array( $data ) ) {
+			$data = array_merge( $data_extra, $data );
+			foreach ( $compat_alias as $alias => $source_key ) {
+				if ( array_key_exists( $source_key, $result ) ) {
+					$data[ $alias ] = $result[ $source_key ];
+				}
+			}
+		}
+
+		$envelope = array(
+			'success' => true,
+			'data'    => $data,
+		);
+
+		foreach ( $meta_keys as $key ) {
+			if ( array_key_exists( $key, $result ) ) {
+				$envelope[ $key ] = $result[ $key ];
+			}
+		}
+
+		foreach ( $top_extra as $key ) {
+			if ( array_key_exists( $key, $result ) ) {
+				$envelope[ $key ] = $result[ $key ];
+			}
+		}
+
+		if ( ! array_key_exists( 'total', $envelope ) ) {
+			$envelope['total'] = is_countable( $items ) ? count( $items ) : 0;
+		}
+
+		return $envelope;
+	}
+
+	/**
+	 * Present an ability collection as a REST response, normalizing failures first.
+	 *
+	 * @param mixed  $result          Ability execution result.
+	 * @param string $items_key       Key containing collection items in the ability result.
+	 * @param array  $options         Collection presentation options.
+	 * @param string $default_code    Default error code.
+	 * @param string $default_message Default error message.
+	 * @param int    $default_status  Default HTTP status.
+	 * @return \WP_REST_Response|\WP_Error REST response or error.
+	 */
+	public static function rest_collection_response( $result, string $items_key, array $options = array(), string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', int $default_status = 500 ) {
+		$error = self::failure_to_wp_error( $result, $default_code, $default_message, $default_status );
+		if ( $error ) {
+			return $error;
+		}
+
+		return rest_ensure_response( self::collection_envelope( self::normalize( $result ), $items_key, $options ) );
+	}
+
+	/**
+	 * Present an ability result as a single-resource REST response.
+	 *
+	 * @param mixed  $result          Ability execution result.
+	 * @param mixed  $data            Data payload for the response.
+	 * @param array  $extra           Extra top-level envelope fields.
+	 * @param string $default_code    Default error code.
+	 * @param string $default_message Default error message.
+	 * @param int    $default_status  Default HTTP status.
+	 * @return \WP_REST_Response|\WP_Error REST response or error.
+	 */
+	public static function rest_item_response( $result, $data = null, array $extra = array(), string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', int $default_status = 500 ) {
+		$error = self::failure_to_wp_error( $result, $default_code, $default_message, $default_status );
+		if ( $error ) {
+			return $error;
+		}
+
+		$normalized = self::normalize( $result );
+		if ( null === $data ) {
+			$data = $normalized;
+		}
+
+		return rest_ensure_response(
+			array_merge(
+				array(
+					'success' => true,
+					'data'    => $data,
+				),
+				$extra
+			)
 		);
 	}
 

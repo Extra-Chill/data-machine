@@ -113,8 +113,10 @@ class UpdateFlowAbility {
 		$flow = $this->db_flows->get_flow( $flow_id );
 		if ( ! $flow ) {
 			return array(
-				'success' => false,
-				'error'   => 'Flow not found',
+				'success'    => false,
+				'error'      => 'Flow not found',
+				'error_code' => 'flow_not_found',
+				'status'     => 404,
 			);
 		}
 
