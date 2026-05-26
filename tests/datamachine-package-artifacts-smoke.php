@@ -21,6 +21,7 @@ use DataMachine\Core\Agents\AgentBundler;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
 use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
+use DataMachine\Engine\Bundle\AgentBundleLifecycleProjection;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\AgentBundlePipelineFile;
 use DataMachine\Engine\Bundle\AgentPackageProjection;
@@ -162,10 +163,25 @@ $array_bundle    = AgentBundleArrayAdapter::to_array_bundle( $directory );
 $array_package   = AgentBundler::package_from_bundle( $array_bundle );
 $array_artifacts = datamachine_package_smoke_artifacts_by_type( $array_package );
 $command_source  = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Cli/Commands/AgentBundleCommand.php' );
+$service_source  = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleAbilityService.php' );
 $bundler_source  = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Core/Agents/AgentBundler.php' );
 agents_api_smoke_assert_equals( 'woocommerce-wiki-package', $array_package->get_slug(), 'array bundle projection preserves package identity', $failures, $passes );
 agents_api_smoke_assert_equals( 'flows/daily-ingest-flow.json', $array_artifacts['datamachine/flow:daily-ingest-flow']['source'] ?? '', 'array bundle projection preserves typed artifact payloads', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $command_source, 'AgentBundler::package_from_bundle( $bundle )' ), 'package install/diff summary reads identity through WP_Agent_Package', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $bundler_source, '\'package\'   => AgentPackageProjection::from_directory( $directory )' ), 'export directory path exposes package projection alongside Data Machine directory', $failures, $passes );
+
+echo "\n[4] Ability lifecycle planning uses shared first-class artifact projection:\n";
+$lifecycle_artifacts = array();
+foreach ( ( new AgentBundleLifecycleProjection() )->target_artifacts( $array_bundle ) as $artifact ) {
+	$lifecycle_artifacts[ (string) $artifact['artifact_type'] . ':' . (string) $artifact['artifact_id'] ] = $artifact;
+}
+ksort( $lifecycle_artifacts, SORT_STRING );
+agents_api_smoke_assert_equals( 'prompts/extract-facts.md', $lifecycle_artifacts['prompt:extract-facts']['source_path'] ?? '', 'lifecycle projection includes prompt file artifacts', $failures, $passes );
+agents_api_smoke_assert_equals( 'rubrics/wiki-quality.json', $lifecycle_artifacts['rubric:wiki-quality']['source_path'] ?? '', 'lifecycle projection includes rubric file artifacts', $failures, $passes );
+agents_api_smoke_assert_equals( 'tool-policies/read-only-context.json', $lifecycle_artifacts['tool_policy:read-only-context']['source_path'] ?? '', 'lifecycle projection includes tool policy file artifacts', $failures, $passes );
+agents_api_smoke_assert_equals( 'auth-refs/github-default.json', $lifecycle_artifacts['auth_ref:github-default']['source_path'] ?? '', 'lifecycle projection includes auth ref file artifacts', $failures, $passes );
+agents_api_smoke_assert_equals( 'seed-queues/mgs-topic-loop.json', $lifecycle_artifacts['seed_queue:mgs-topic-loop']['source_path'] ?? '', 'lifecycle projection includes seed queue file artifacts', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $service_source, '$this->projection->target_artifacts( $bundle' ), 'ability service plans through shared lifecycle projection', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $command_source, '$this->projection()->target_artifacts( $bundle' ), 'CLI planning uses the same lifecycle projection', $failures, $passes );
 
 agents_api_smoke_finish( 'Data Machine package artifact projection', $failures, $passes );
