@@ -30,9 +30,7 @@ class WorkerLock {
 		$now = time();
 
 		$existing = self::snapshot( $now, $ttl );
-		if ( 'stale' === $existing['lock_status'] ) {
-			delete_option( self::OPTION_NAME );
-		} elseif ( 'held' === $existing['lock_status'] ) {
+		if ( 'held' === $existing['lock_status'] ) {
 			$existing['acquired'] = false;
 			return $existing;
 		}
@@ -45,6 +43,18 @@ class WorkerLock {
 			'expires_at' => $now + $ttl,
 			'ttl'        => $ttl,
 		);
+
+		if ( 'stale' === $existing['lock_status'] ) {
+			update_option( self::OPTION_NAME, $payload, false );
+			$replaced = get_option( self::OPTION_NAME, array() );
+			if ( is_array( $replaced ) && hash_equals( $token, (string) ( $replaced['token'] ?? '' ) ) ) {
+				return self::formatSnapshot( $payload, $now, 'held', true );
+			}
+
+			$existing             = self::snapshot( $now, $ttl );
+			$existing['acquired'] = false;
+			return $existing;
+		}
 
 		if ( add_option( self::OPTION_NAME, $payload, '', 'no' ) ) {
 			return self::formatSnapshot( $payload, $now, 'held', true );
