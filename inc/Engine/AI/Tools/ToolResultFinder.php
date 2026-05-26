@@ -29,31 +29,44 @@ class ToolResultFinder {
 	 */
 	public static function projectResultData( array $entry ): array {
 		$metadata = is_array( $entry['metadata'] ?? null ) ? $entry['metadata'] : array();
+		$envelope = self::projectResultEnvelope( $entry );
+
+		if ( ! empty( $metadata['tool_result_data'] ) && is_array( $metadata['tool_result_data'] ) ) {
+			return $metadata['tool_result_data'];
+		}
+
+		if ( ! empty( $envelope ) ) {
+			return self::projectEnvelopeData( $envelope );
+		}
 
 		if ( is_array( $metadata['tool_result_data'] ?? null ) ) {
 			return $metadata['tool_result_data'];
 		}
 
-		if ( is_array( $metadata['tool_result_envelope'] ?? null ) ) {
-			$envelope = $metadata['tool_result_envelope'];
-			if ( is_array( $envelope['data'] ?? null ) ) {
-				return $envelope['data'];
-			}
-			if ( is_array( $envelope['result'] ?? null ) ) {
-				return $envelope['result'];
-			}
-			return $envelope;
-		}
-
-		if ( is_array( $metadata['tool_result'] ?? null ) ) {
-			$legacy = $metadata['tool_result'];
-			if ( is_array( $legacy['data'] ?? null ) ) {
-				return $legacy['data'];
-			}
-			return $legacy;
-		}
-
 		return array();
+	}
+
+	/**
+	 * Project payload data from a full tool-result envelope.
+	 *
+	 * @param array $envelope Full tool execution result envelope.
+	 * @return array
+	 */
+	public static function projectEnvelopeData( array $envelope ): array {
+		if ( is_array( $envelope['data'] ?? null ) ) {
+			return $envelope['data'];
+		}
+
+		if ( is_array( $envelope['result'] ?? null ) ) {
+			return $envelope['result'];
+		}
+
+		$payload = $envelope;
+		foreach ( array( 'success', 'error', 'message', 'code', 'tool_name', 'ability', 'executor', 'wp_error_code', 'wp_error_data' ) as $semantic_key ) {
+			unset( $payload[ $semantic_key ] );
+		}
+
+		return $payload;
 	}
 
 	/**
@@ -73,7 +86,35 @@ class ToolResultFinder {
 			return $metadata['tool_result'];
 		}
 
+		if ( is_array( $metadata['tool_result_data'] ?? null ) ) {
+			return array(
+				'success' => (bool) ( $metadata['tool_success'] ?? false ),
+				'data'    => $metadata['tool_result_data'],
+			);
+		}
+
 		return array();
+	}
+
+	/**
+	 * Return semantic success from a result packet.
+	 *
+	 * @param array $entry Tool result packet.
+	 * @return bool
+	 */
+	public static function projectResultSuccess( array $entry ): bool {
+		$metadata = is_array( $entry['metadata'] ?? null ) ? $entry['metadata'] : array();
+		$envelope = self::projectResultEnvelope( $entry );
+
+		if ( array_key_exists( 'success', $envelope ) ) {
+			return (bool) $envelope['success'];
+		}
+
+		if ( array_key_exists( 'tool_success', $metadata ) ) {
+			return (bool) $metadata['tool_success'];
+		}
+
+		return 'ai_handler_complete' === ( $entry['type'] ?? '' );
 	}
 
 

@@ -85,4 +85,19 @@ class ToolResultFinderTest extends TestCase {
 
 		$this->assertSame( array( 'id' => 123 ), ToolResultFinder::projectResultData( $entry ) );
 	}
+
+	public function test_project_result_data_reads_legacy_top_level_payload_shape(): void {
+		$entry = array(
+			'metadata' => array(
+				'tool_result_envelope' => array(
+					'success' => true,
+					'post_id' => 123,
+				),
+				'tool_result_data'     => array(),
+			),
+		);
+
+		$this->assertTrue( ToolResultFinder::projectResultSuccess( $entry ) );
+		$this->assertSame( array( 'post_id' => 123 ), ToolResultFinder::projectResultData( $entry ) );
+	}
 }

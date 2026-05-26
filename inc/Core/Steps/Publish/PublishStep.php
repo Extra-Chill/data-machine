@@ -132,8 +132,10 @@ class PublishStep extends Step {
 	 * @return array Publish data packet
 	 */
 	private function create_publish_entry_from_tool_result( array $tool_result_entry, array $dataPackets, string $handler, string $flow_step_id ): array {
-		$tool_result_data = ToolResultFinder::projectResultData( $tool_result_entry );
-		$entry_type       = $tool_result_entry['type'] ?? '';
+		$tool_result_data     = ToolResultFinder::projectResultData( $tool_result_entry );
+		$tool_result_envelope = ToolResultFinder::projectResultEnvelope( $tool_result_entry );
+		$tool_result_success  = ToolResultFinder::projectResultSuccess( $tool_result_entry );
+		$entry_type           = $tool_result_entry['type'] ?? '';
 
 		if ( empty($tool_result_data) ) {
 			$this->log(
@@ -157,11 +159,12 @@ class PublishStep extends Step {
 			),
 			array(
 				'handler_used'        => $handler,
-				'publish_success'     => true,
+				'publish_success'     => $tool_result_success,
 				'executed_via'        => $executed_via,
 				'flow_step_id'        => $flow_step_id,
 				'source_type'         => $tool_result_entry['metadata']['source_type'] ?? 'unknown',
-				'tool_execution_data' => $tool_result_data,
+				'tool_execution_data' => $tool_result_envelope,
+				'tool_result_data'    => $tool_result_data,
 				'original_entry_type' => $entry_type,
 				'result'              => $tool_result_data,
 			),

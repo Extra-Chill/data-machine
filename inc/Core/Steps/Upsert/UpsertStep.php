@@ -183,7 +183,9 @@ class UpsertStep extends Step {
 	 * @return array Updated data packet array
 	 */
 	private function create_update_entry_from_tool_result( array $tool_result_entry, array $dataPackets, string $handler, string $flow_step_id ): array {
-		$tool_result_data = ToolResultFinder::projectResultData( $tool_result_entry );
+		$tool_result_data     = ToolResultFinder::projectResultData( $tool_result_entry );
+		$tool_result_envelope = ToolResultFinder::projectResultEnvelope( $tool_result_entry );
+		$tool_result_success  = ToolResultFinder::projectResultSuccess( $tool_result_entry );
 
 		$packet = new DataPacket(
 			array(
@@ -194,9 +196,10 @@ class UpsertStep extends Step {
 				'step_type'           => 'upsert',
 				'handler'             => $handler,
 				'flow_step_id'        => $flow_step_id,
-				'success'             => $tool_result_data['success'] ?? false,
+				'success'             => $tool_result_success,
 				'executed_via'        => 'ai_tool_call',
-				'tool_execution_data' => $tool_result_data,
+				'tool_execution_data' => $tool_result_envelope,
+				'tool_result_data'    => $tool_result_data,
 			),
 			'upsert'
 		);

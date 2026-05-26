@@ -317,6 +317,7 @@ class AIStepTest extends TestCase {
 		$this->assertArrayHasKey( 'tool_result_envelope', $result[0]['metadata'] );
 		$this->assertArrayHasKey( 'tool_result_data', $result[0]['metadata'] );
 		$this->assertArrayNotHasKey( 'tool_result', $result[0]['metadata'] );
+		$this->assertSame( array( 'post_id' => 123 ), $result[0]['metadata']['tool_result_data'] );
 
 		// Verify the input packet is NOT in the output.
 		foreach ( $result as $packet ) {

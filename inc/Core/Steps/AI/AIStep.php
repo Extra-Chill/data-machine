@@ -20,6 +20,7 @@ use DataMachine\Engine\AI\PipelineAIConcurrencyLease;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLimiter;
 use DataMachine\Engine\AI\PipelineTranscriptPolicy;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
+use DataMachine\Engine\AI\Tools\ToolResultFinder;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
@@ -945,7 +946,7 @@ class AIStep extends Step {
 
 			$tool_def = $available_tools[ $tool_name ] ?? null;
 
-			$projected_tool_result_data = $tool_result['data'] ?? ( $tool_result['result'] ?? array() );
+			$projected_tool_result_data = ToolResultFinder::projectEnvelopeData( $tool_result );
 
 			if ( $is_handler_tool && ( $tool_result['success'] ?? false ) ) {
 				// Handler tool succeeded - mark completion
