@@ -94,6 +94,7 @@ final class AgentBundleAdoptionStateStore implements \WP_Agent_Package_Artifact_
 			$config['datamachine_bundle']['artifacts'] = array();
 		}
 
+		$artifact_records = array();
 		foreach ( $artifacts as $artifact ) {
 			if ( ! $artifact instanceof \WP_Agent_Package_Installed_Artifact ) {
 				continue;
@@ -104,7 +105,7 @@ final class AgentBundleAdoptionStateStore implements \WP_Agent_Package_Artifact_
 			$id   = (string) $row['artifact_id'];
 			$key  = AgentBundleArtifactExtensions::artifact_key( $type, $id );
 
-			$config['datamachine_bundle']['artifacts'][ $key ] = array(
+			$artifact_records[ $key ] = array(
 				'bundle_slug'       => (string) $config['datamachine_bundle']['bundle_slug'],
 				'bundle_version'    => (string) $config['datamachine_bundle']['bundle_version'],
 				'artifact_type'     => $type,
@@ -117,6 +118,11 @@ final class AgentBundleAdoptionStateStore implements \WP_Agent_Package_Artifact_
 				'installed_at'      => (string) ( $row['installed_at'] ?? '' ),
 				'updated_at'        => (string) ( $row['updated_at'] ?? '' ),
 			);
+		}
+
+		$config['datamachine_bundle']['artifacts'] = array_merge( $config['datamachine_bundle']['artifacts'], $artifact_records );
+		if ( ! AgentBundleArtifactState::persist_for_agent( $agent_id, array_values( $artifact_records ) ) ) {
+			return false;
 		}
 
 		return (bool) $agents->update_agent( $agent_id, array( 'agent_config' => $config ) );
