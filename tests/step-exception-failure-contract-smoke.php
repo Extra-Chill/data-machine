@@ -10,6 +10,9 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
+if ( ! defined( 'WPINC' ) ) {
+	define( 'WPINC', 'wp-includes' );
+}
 
 $datamachine_action_log = array();
 
@@ -66,8 +69,11 @@ if ( ! function_exists( 'datamachine_get_file_context' ) ) {
 
 require_once __DIR__ . '/../inc/Core/DataPacket.php';
 require_once __DIR__ . '/../inc/Core/EngineData.php';
+require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
 require_once __DIR__ . '/../inc/Core/Steps/Step.php';
+require_once __DIR__ . '/../inc/Engine/ExecutionPlan.php';
+require_once __DIR__ . '/../inc/Engine/StepNavigator.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/EngineHelpers.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/ExecuteStepAbility.php';
 
@@ -78,6 +84,10 @@ use DataMachine\Core\Steps\Step;
 class DataMachine_Throwing_Test_Step extends Step {
 	public function __construct() {
 		parent::__construct( 'throwing' );
+	}
+
+	protected function validateStepConfiguration(): bool {
+		return true;
 	}
 
 	protected function executeStep(): array {

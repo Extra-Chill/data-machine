@@ -20,6 +20,7 @@ use DataMachine\Engine\AI\PipelineAIConcurrencyLease;
 use DataMachine\Engine\AI\PipelineAIConcurrencyLimiter;
 use DataMachine\Engine\AI\PipelineTranscriptPolicy;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
+use DataMachine\Engine\AI\Tools\ToolResultFinder;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
@@ -932,18 +933,20 @@ class AIStep extends Step {
 		// Input DataPackets are NOT included — they cause ghost child jobs.
 		$input_source_type = $inputDataPackets[0]['metadata']['source_type'] ?? 'unknown';
 
-		foreach ( $tool_execution_results as $tool_result_data ) {
-			$tool_name         = $tool_result_data['tool_name'] ?? '';
-			$tool_result       = $tool_result_data['result'] ?? array();
-			$tool_parameters   = $tool_result_data['parameters'] ?? array();
-			$is_handler_tool   = $tool_result_data['is_handler_tool'] ?? false;
-			$result_turn_count = $tool_result_data['turn_count'] ?? $turn_count;
+		foreach ( $tool_execution_results as $tool_execution_result ) {
+			$tool_name         = $tool_execution_result['tool_name'] ?? '';
+			$tool_result       = $tool_execution_result['result'] ?? array();
+			$tool_parameters   = $tool_execution_result['parameters'] ?? array();
+			$is_handler_tool   = $tool_execution_result['is_handler_tool'] ?? false;
+			$result_turn_count = $tool_execution_result['turn_count'] ?? $turn_count;
 
 			if ( empty( $tool_name ) ) {
 				continue;
 			}
 
 			$tool_def = $available_tools[ $tool_name ] ?? null;
+
+			$projected_tool_result_data = ToolResultFinder::projectEnvelopeData( $tool_result );
 
 			if ( $is_handler_tool && ( $tool_result['success'] ?? false ) ) {
 				// Handler tool succeeded - mark completion
@@ -961,14 +964,16 @@ class AIStep extends Step {
 						'body'  => 'Tool executed successfully by AI agent in ' . $result_turn_count . ' conversation turns',
 					),
 					array(
-						'tool_name'         => $tool_name,
-						'handler_tool'      => $tool_def['handler'] ?? null,
-						'tool_parameters'   => $clean_tool_parameters,
-						'handler_config'    => $handler_config,
-						'source_type'       => $input_source_type,
-						'flow_step_id'      => $flow_step_id,
-						'conversation_turn' => $result_turn_count,
-						'tool_result'       => $tool_result,
+						'tool_name'              => $tool_name,
+						'handler_tool'           => $tool_def['handler'] ?? null,
+						'tool_parameters'        => $clean_tool_parameters,
+						'handler_config'         => $handler_config,
+						'source_type'            => $input_source_type,
+						'flow_step_id'           => $flow_step_id,
+						'conversation_turn'      => $result_turn_count,
+						'tool_result_envelope'   => $tool_result,
+						'tool_result_data'       => $projected_tool_result_data,
+						'step_execution_success' => true,
 					),
 					'ai_handler_complete'
 				);
@@ -985,12 +990,13 @@ class AIStep extends Step {
 						'body'  => $success_message,
 					),
 					array(
-						'tool_name'       => $tool_name,
-						'handler_tool'    => $tool_def['handler'] ?? null,
-						'tool_parameters' => $tool_parameters,
-						'tool_success'    => $tool_result['success'] ?? false,
-						'tool_result'     => $tool_result['data'] ?? array(),
-						'source_type'     => $input_source_type,
+						'tool_name'            => $tool_name,
+						'handler_tool'         => $tool_def['handler'] ?? null,
+						'tool_parameters'      => $tool_parameters,
+						'tool_success'         => $tool_result['success'] ?? false,
+						'tool_result_envelope' => $tool_result,
+						'tool_result_data'     => $projected_tool_result_data,
+						'source_type'          => $input_source_type,
 					),
 					'tool_result'
 				);
@@ -1010,9 +1016,11 @@ class AIStep extends Step {
 					'body'  => $final_ai_content,
 				),
 				array(
-					'source_type'       => 'ai_response',
-					'flow_step_id'      => $flow_step_id,
-					'conversation_turn' => $turn_count,
+					'source_type'            => 'ai_response',
+					'flow_step_id'           => $flow_step_id,
+					'conversation_turn'      => $turn_count,
+					'step_execution_success' => false,
+					'failure_reason'         => 'ai_response_without_tool_result',
 				),
 				'ai_response'
 			);
@@ -1031,6 +1039,7 @@ class AIStep extends Step {
 					'conversation_turn'               => $turn_count,
 					'completion_assertions_satisfied' => is_array( $loop_result['completion_assertions_satisfied'] ?? null ) ? $loop_result['completion_assertions_satisfied'] : array(),
 					'completion_assertions_missing'   => is_array( $loop_result['completion_assertions_missing'] ?? null ) ? $loop_result['completion_assertions_missing'] : array(),
+					'step_execution_success'          => true,
 				),
 				'ai_completion_assertions'
 			);

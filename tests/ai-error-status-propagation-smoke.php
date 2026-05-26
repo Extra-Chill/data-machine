@@ -44,6 +44,7 @@ if ( ! function_exists( 'datamachine_get_engine_data' ) ) {
 }
 
 require_once __DIR__ . '/../inc/Core/JobStatus.php';
+require_once __DIR__ . '/../inc/Core/StepExecutionResult.php';
 require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
 require_once __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php';
 require_once __DIR__ . '/../inc/Abilities/Engine/EngineHelpers.php';
