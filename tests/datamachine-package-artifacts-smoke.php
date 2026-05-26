@@ -118,6 +118,11 @@ $directory = new AgentBundleDirectory(
 					'handler_configs' => array(),
 					'step_type'       => 'fetch',
 				),
+			),
+			array(
+				'completion_assertions' => array(
+					'egress' => array( 'artifact', 'bundle-file' ),
+				),
 			)
 		),
 	),
@@ -181,6 +186,8 @@ agents_api_smoke_assert_equals( 'rubrics/wiki-quality.json', $lifecycle_artifact
 agents_api_smoke_assert_equals( 'tool-policies/read-only-context.json', $lifecycle_artifacts['tool_policy:read-only-context']['source_path'] ?? '', 'lifecycle projection includes tool policy file artifacts', $failures, $passes );
 agents_api_smoke_assert_equals( 'auth-refs/github-default.json', $lifecycle_artifacts['auth_ref:github-default']['source_path'] ?? '', 'lifecycle projection includes auth ref file artifacts', $failures, $passes );
 agents_api_smoke_assert_equals( 'seed-queues/mgs-topic-loop.json', $lifecycle_artifacts['seed_queue:mgs-topic-loop']['source_path'] ?? '', 'lifecycle projection includes seed queue file artifacts', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'artifact', 'bundle-file' ), $lifecycle_artifacts['flow:daily-ingest-flow']['payload']['run_artifacts']['completion_assertions']['egress'] ?? array(), 'flow lifecycle payload preserves normalized run artifact policy', $failures, $passes );
+agents_api_smoke_assert_equals( true, str_contains( $service_source, 'AgentBundleLifecycleProjection' ), 'ability service uses shared lifecycle projection service', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $service_source, '$this->projection->target_artifacts( $bundle' ), 'ability service plans through shared lifecycle projection', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $command_source, '$this->projection()->target_artifacts( $bundle' ), 'CLI planning uses the same lifecycle projection', $failures, $passes );
 

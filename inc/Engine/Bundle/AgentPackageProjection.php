@@ -117,11 +117,12 @@ final class AgentPackageProjection {
 			);
 		}
 
-		foreach ( self::artifact_file_maps( $directory ) as $directory_name => $definition ) {
-			foreach ( $definition['files'] as $relative_path => $payload ) {
+		foreach ( AgentBundleArtifactDefinitions::file_artifacts() as $directory_name => $definition ) {
+			$files = AgentBundleArtifactDefinitions::files_from_directory( $directory, $directory_name );
+			foreach ( $files as $relative_path => $payload ) {
 				$slug        = self::slug_from_path( (string) $relative_path );
 				$artifacts[] = self::artifact(
-					$definition['type'],
+					$definition['package_type'],
 					$slug,
 					$slug,
 					$directory_name . '/' . ltrim( (string) $relative_path, '/' ),
@@ -152,37 +153,6 @@ final class AgentPackageProjection {
 		}
 
 		return $artifacts;
-	}
-
-	/**
-	 * Build artifact file directory definitions.
-	 *
-	 * @param AgentBundleDirectory $directory Bundle directory.
-	 * @return array<string,array{type:string,files:array<string,array|string>}>
-	 */
-	private static function artifact_file_maps( AgentBundleDirectory $directory ): array {
-		return array(
-			BundleSchema::PROMPTS_DIR       => array(
-				'type'  => 'datamachine/prompt',
-				'files' => $directory->prompts(),
-			),
-			BundleSchema::RUBRICS_DIR       => array(
-				'type'  => 'datamachine/rubric',
-				'files' => $directory->rubrics(),
-			),
-			BundleSchema::TOOL_POLICIES_DIR => array(
-				'type'  => 'datamachine/tool-policy',
-				'files' => $directory->tool_policies(),
-			),
-			BundleSchema::AUTH_REFS_DIR     => array(
-				'type'  => 'datamachine/auth-ref',
-				'files' => $directory->auth_refs(),
-			),
-			BundleSchema::SEED_QUEUES_DIR   => array(
-				'type'  => 'datamachine/queue-seed',
-				'files' => $directory->seed_queues(),
-			),
-		);
 	}
 
 	/**
