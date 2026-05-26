@@ -45,6 +45,12 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 	}
 }
 
+if ( ! function_exists( 'rest_ensure_response' ) ) {
+	function rest_ensure_response( $response ) {
+		return $response;
+	}
+}
+
 require_once __DIR__ . '/../inc/Core/AbilityResult.php';
 
 use DataMachine\Core\AbilityResult;
@@ -131,6 +137,93 @@ $default_code_error = AbilityResult::legacy_failure_to_wp_error(
 );
 $assert( 'legacy failures default to provided error code', 'email_error' === $default_code_error->get_error_code() );
 $assert( 'legacy failures keep error message', 'Human readable failure.' === $default_code_error->get_error_message() );
+
+$status_error = AbilityResult::failure_to_wp_error(
+	array(
+		'success'    => false,
+		'error'      => 'Pipeline not found.',
+		'error_code' => 'pipeline_not_found',
+		'status'     => 404,
+	),
+	'pipeline_failed',
+	'Pipeline failed.',
+	500
+);
+$assert( 'machine-readable legacy error_code is preserved', 'pipeline_not_found' === $status_error->get_error_code() );
+$assert( 'machine-readable status controls HTTP status', 404 === ( $status_error->get_error_data()['status'] ?? null ) );
+
+$collection = AbilityResult::collection_envelope(
+	array(
+		'success'     => true,
+		'pipelines'   => array( array( 'pipeline_id' => 7 ) ),
+		'total'       => 1,
+		'per_page'    => 20,
+		'offset'      => 0,
+		'output_mode' => 'list',
+	),
+	'pipelines',
+	array(
+		'data_key'     => 'pipelines',
+		'compat_alias' => array( 'total' => 'total' ),
+		'top_extra'    => array( 'output_mode' ),
+	)
+);
+$assert( 'collection envelope keeps success flag', true === $collection['success'] );
+$assert( 'collection envelope puts items under data key', 7 === ( $collection['data']['pipelines'][0]['pipeline_id'] ?? null ) );
+$assert( 'collection envelope keeps pagination metadata at top level', 20 === ( $collection['per_page'] ?? null ) );
+$assert( 'collection envelope supports explicit compatibility aliases', 1 === ( $collection['data']['total'] ?? null ) );
+$assert( 'collection envelope carries requested top-level extras', 'list' === ( $collection['output_mode'] ?? null ) );
+
+$rest_collection_error = AbilityResult::rest_collection_response(
+	array(
+		'success'    => false,
+		'error'      => 'No jobs.',
+		'error_code' => 'jobs_unavailable',
+		'status'     => 503,
+	),
+	'jobs',
+	array(),
+	'get_jobs_failed'
+);
+$assert( 'REST collection presenter returns WP_Error for failed ability results', $rest_collection_error instanceof WP_Error );
+$assert( 'REST collection presenter preserves failure status', 503 === ( $rest_collection_error->get_error_data()['status'] ?? null ) );
+
+$rest_item = AbilityResult::rest_item_response(
+	array( 'success' => true ),
+	array( 'job_id' => 9 ),
+	array( 'message' => 'ok' )
+);
+$assert( 'REST item presenter wraps single resource data', 9 === ( $rest_item['data']['job_id'] ?? null ) );
+$assert( 'REST item presenter includes explicit top-level extras', 'ok' === ( $rest_item['message'] ?? null ) );
+
+$legacy_rest = AbilityResult::rest_legacy_response(
+	array(
+		'success' => true,
+		'message' => 'Paused flows.',
+		'paused'  => 3,
+	)
+);
+$assert( 'legacy REST presenter preserves top-level success flag', true === ( $legacy_rest['success'] ?? null ) );
+$assert( 'legacy REST presenter preserves top-level mutation fields', 3 === ( $legacy_rest['paused'] ?? null ) );
+$assert( 'legacy REST presenter does not double-wrap under data', ! array_key_exists( 'data', $legacy_rest ) );
+
+$cli_rows = array(
+	array(
+		'id'     => 12,
+		'source' => 'pipeline',
+	),
+);
+$cli_result = array(
+	'success'  => true,
+	'jobs'     => array(),
+	'total'    => 1,
+	'per_page' => 20,
+	'offset'   => 0,
+);
+$assert( 'CLI collection payload defaults to legacy row array', $cli_rows === AbilityResult::cli_collection_payload( $cli_rows, $cli_result, 'jobs' ) );
+$cli_envelope = AbilityResult::cli_collection_payload( $cli_rows, $cli_result, 'jobs', true );
+$assert( 'CLI collection payload can opt into shared envelope', 12 === ( $cli_envelope['data'][0]['id'] ?? null ) );
+$assert( 'CLI envelope opt-in includes pagination metadata', 20 === ( $cli_envelope['per_page'] ?? null ) );
 
 if ( $failed > 0 ) {
 	echo "=== ability-result-wp-error-smoke: {$failed} FAIL of {$total} ===\n";

@@ -86,8 +86,10 @@ class DeleteFlowAbility {
 		if ( ! $flow ) {
 			do_action( 'datamachine_log', 'error', 'Flow not found for deletion', array( 'flow_id' => $flow_id ) );
 			return array(
-				'success' => false,
-				'error'   => 'Flow not found',
+				'success'    => false,
+				'error'      => 'Flow not found',
+				'error_code' => 'flow_not_found',
+				'status'     => 404,
 			);
 		}
 

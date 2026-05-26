@@ -18,6 +18,7 @@ use DataMachine\Abilities\Pipeline\GetPipelinesAbility;
 use DataMachine\Abilities\Pipeline\ImportExportAbility;
 use DataMachine\Abilities\Pipeline\UpdatePipelineAbility;
 use DataMachine\Core\Admin\DateFormatter;
+use DataMachine\Core\AbilityResult;
 use WP_REST_Server;
 
 if ( ! defined( 'WPINC' ) ) {
@@ -324,12 +325,9 @@ class Pipelines {
 				array( 'pipeline_ids' => $export_ids )
 			);
 
-			if ( ! $result['success'] ) {
-				return new \WP_Error(
-					'export_failed',
-					$result['error'] ?? __( 'Failed to generate CSV export.', 'data-machine' ),
-					array( 'status' => 500 )
-				);
+			$error = AbilityResult::failure_to_wp_error( $result, 'export_failed', __( 'Failed to generate CSV export.', 'data-machine' ) );
+			if ( $error ) {
+				return $error;
 			}
 
 			$response = new \WP_REST_Response( $result['data'] );
@@ -428,12 +426,9 @@ class Pipelines {
 			}
 			$result = ( new GetPipelinesAbility() )->execute( $input );
 
-			if ( ! $result['success'] ) {
-				return new \WP_Error(
-					'get_pipelines_failed',
-					$result['error'] ?? __( 'Failed to get pipelines.', 'data-machine' ),
-					array( 'status' => 500 )
-				);
+			$error = AbilityResult::failure_to_wp_error( $result, 'get_pipelines_failed', __( 'Failed to get pipelines.', 'data-machine' ) );
+			if ( $error ) {
+				return $error;
 			}
 
 			$pipelines = $result['pipelines'];
@@ -447,18 +442,18 @@ class Pipelines {
 				);
 			}
 
-			return rest_ensure_response(
+			$result['pipelines'] = $pipelines;
+
+			return AbilityResult::rest_collection_response(
+				$result,
+				'pipelines',
 				array(
-					'success'     => true,
-					'per_page'    => $result['per_page'] ?? $per_page,
-					'offset'      => $result['offset'] ?? $offset,
-					'total'       => $result['total'],
-					'output_mode' => $result['output_mode'] ?? $output_mode,
-					'data'        => array(
-						'pipelines' => $pipelines,
-						'total'     => $result['total'],
-					),
-				)
+					'data_key'     => 'pipelines',
+					'compat_alias' => array( 'total' => 'total' ),
+					'top_extra'    => array( 'output_mode' ),
+				),
+				'get_pipelines_failed',
+				__( 'Failed to get pipelines.', 'data-machine' )
 			);
 		}
 	}
@@ -491,20 +486,7 @@ class Pipelines {
 
 		$result = ( new CreatePipelineAbility() )->execute( $input );
 
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'rest_internal_server_error',
-				$result['error'] ?? __( 'Failed to create pipeline.', 'data-machine' ),
-				array( 'status' => 500 )
-			);
-		}
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => $result,
-			)
-		);
+		return AbilityResult::rest_item_response( $result, null, array(), 'rest_internal_server_error', __( 'Failed to create pipeline.', 'data-machine' ) );
 	}
 
 	/**
@@ -528,19 +510,7 @@ class Pipelines {
 
 		$result = ( new DeletePipelineAbility() )->execute( array( 'pipeline_id' => $pipeline_id ) );
 
-		if ( ! $result['success'] ) {
-			$status = 500;
-			if ( strpos( $result['error'] ?? '', 'not found' ) !== false ) {
-				$status = 404;
-			}
-			return new \WP_Error(
-				'pipeline_deletion_failed',
-				$result['error'] ?? __( 'Failed to delete pipeline.', 'data-machine' ),
-				array( 'status' => $status )
-			);
-		}
-
-		return rest_ensure_response( $result );
+		return AbilityResult::rest_legacy_response( $result, 'pipeline_deletion_failed', __( 'Failed to delete pipeline.', 'data-machine' ) );
 	}
 
 	/**
@@ -580,16 +550,9 @@ class Pipelines {
 			)
 		);
 
-		if ( ! $result['success'] ) {
-			$status = 500;
-			if ( strpos( $result['error'] ?? '', 'not found' ) !== false ) {
-				$status = 404;
-			}
-			return new \WP_Error(
-				'update_failed',
-				$result['error'] ?? __( 'Failed to save pipeline title', 'data-machine' ),
-				array( 'status' => $status )
-			);
+		$error = AbilityResult::failure_to_wp_error( $result, 'update_failed', __( 'Failed to save pipeline title', 'data-machine' ) );
+		if ( $error ) {
+			return $error;
 		}
 
 		return rest_ensure_response(

@@ -11,6 +11,7 @@
 namespace DataMachine\Api\Flows;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\AbilityResult;
 use WP_REST_Server;
 
 if ( ! defined( 'WPINC' ) ) {
@@ -386,24 +387,7 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'flow_creation_failed',
-				$result['error'] ?? __( 'Failed to create flow.', 'data-machine' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => $result,
-			)
-		);
+		return AbilityResult::rest_item_response( $result, null, array(), 'flow_creation_failed', __( 'Failed to create flow.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -436,19 +420,7 @@ class Flows {
 			)
 		);
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'flow_deletion_failed',
-				$result['error'] ?? __( 'Failed to delete flow.', 'data-machine' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		return rest_ensure_response( $result );
+		return AbilityResult::rest_legacy_response( $result, 'flow_deletion_failed', __( 'Failed to delete flow.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -482,19 +454,7 @@ class Flows {
 			)
 		);
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'flow_duplication_failed',
-				$result['error'] ?? __( 'Failed to duplicate flow.', 'data-machine' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		return rest_ensure_response( $result );
+		return AbilityResult::rest_legacy_response( $result, 'flow_duplication_failed', __( 'Failed to duplicate flow.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -526,38 +486,19 @@ class Flows {
 		}
 		$result = $ability->execute( $input );
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error( 'ability_error', $result['error'], array( 'status' => 500 ) );
-		}
-
 		if ( $pipeline_id ) {
-			return rest_ensure_response(
+			return AbilityResult::rest_collection_response(
+				$result,
+				'flows',
 				array(
-					'success'  => true,
-					'data'     => array(
-						'pipeline_id' => $pipeline_id,
-						'flows'       => $result['flows'],
-					),
-					'total'    => $result['total'],
-					'per_page' => $result['per_page'],
-					'offset'   => $result['offset'],
-				)
+					'data_key'   => 'flows',
+					'data_extra' => array( 'pipeline_id' => $pipeline_id ),
+				),
+				'ability_error'
 			);
 		}
 
-		return rest_ensure_response(
-			array(
-				'success'  => true,
-				'data'     => $result['flows'],
-				'total'    => $result['total'] ?? count( $result['flows'] ),
-				'per_page' => $result['per_page'] ?? 20,
-				'offset'   => $result['offset'] ?? 0,
-			)
-		);
+		return AbilityResult::rest_collection_response( $result, 'flows', array(), 'ability_error' );
 	}
 
 	/**
@@ -573,29 +514,19 @@ class Flows {
 
 		$result = $ability->execute( array( 'flow_id' => $flow_id ) );
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] || empty( $result['flows'] ) ) {
+		$error = AbilityResult::failure_to_wp_error( $result, 'flow_not_found', __( 'Flow not found.', 'data-machine' ), 400 );
+		if ( $error || empty( $result['flows'] ) ) {
 			$status = 400;
-			if ( false !== strpos( $result['error'] ?? '', 'not found' ) || empty( $result['flows'] ) ) {
+			if ( $error && isset( $error->get_error_data()['status'] ) ) {
+				$status = (int) $error->get_error_data()['status'];
+			} elseif ( empty( $result['flows'] ) ) {
 				$status = 404;
 			}
 
-			return new \WP_Error(
-				'flow_not_found',
-				$result['error'] ?? __( 'Flow not found.', 'data-machine' ),
-				array( 'status' => $status )
-			);
+			return $error ? $error : new \WP_Error( 'flow_not_found', __( 'Flow not found.', 'data-machine' ), array( 'status' => $status ) );
 		}
 
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => $result['flows'][0],
-			)
-		);
+		return AbilityResult::rest_item_response( $result, $result['flows'][0] );
 	}
 
 	/**
@@ -640,16 +571,9 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'update_failed',
-				$result['error'] ?? __( 'Failed to update flow', 'data-machine' ),
-				array( 'status' => 400 )
-			);
+		$error = AbilityResult::failure_to_wp_error( $result, 'update_failed', __( 'Failed to update flow', 'data-machine' ), 400 );
+		if ( $error ) {
+			return $error;
 		}
 
 		$flow_id = $result['flow_id'];
@@ -668,13 +592,7 @@ class Flows {
 			}
 		}
 
-		return rest_ensure_response(
-			array(
-				'success' => true,
-				'data'    => $result['flow_data'] ?? array( 'flow_id' => $flow_id ),
-				'message' => __( 'Flow updated successfully', 'data-machine' ),
-			)
-		);
+		return AbilityResult::rest_item_response( $result, $result['flow_data'] ?? array( 'flow_id' => $flow_id ), array( 'message' => __( 'Flow updated successfully', 'data-machine' ) ) );
 	}
 
 	/**
@@ -694,19 +612,7 @@ class Flows {
 
 		$result = $ability->execute( array( 'flow_id' => $flow_id ) );
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'pause_failed',
-				$result['error'] ?? __( 'Failed to pause flow.', 'data-machine' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		return rest_ensure_response( $result );
+		return AbilityResult::rest_legacy_response( $result, 'pause_failed', __( 'Failed to pause flow.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -726,19 +632,7 @@ class Flows {
 
 		$result = $ability->execute( array( 'flow_id' => $flow_id ) );
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'resume_failed',
-				$result['error'] ?? __( 'Failed to resume flow.', 'data-machine' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		return rest_ensure_response( $result );
+		return AbilityResult::rest_legacy_response( $result, 'resume_failed', __( 'Failed to resume flow.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -775,19 +669,7 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'bulk_pause_failed',
-				$result['error'] ?? __( 'Failed to pause flows.', 'data-machine' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		return rest_ensure_response( $result );
+		return AbilityResult::rest_legacy_response( $result, 'bulk_pause_failed', __( 'Failed to pause flows.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -824,19 +706,7 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'bulk_resume_failed',
-				$result['error'] ?? __( 'Failed to resume flows.', 'data-machine' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		return rest_ensure_response( $result );
+		return AbilityResult::rest_legacy_response( $result, 'bulk_resume_failed', __( 'Failed to resume flows.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -861,16 +731,9 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		if ( ! $result['success'] ) {
-			return new \WP_Error(
-				'get_problem_flows_error',
-				$result['error'] ?? __( 'Failed to get problem flows', 'data-machine' ),
-				array( 'status' => 500 )
-			);
+		$error = AbilityResult::failure_to_wp_error( $result, 'get_problem_flows_error', __( 'Failed to get problem flows', 'data-machine' ) );
+		if ( $error ) {
+			return $error;
 		}
 
 		$problem_flows = array_merge( $result['failing'] ?? array(), $result['idle'] ?? array() );

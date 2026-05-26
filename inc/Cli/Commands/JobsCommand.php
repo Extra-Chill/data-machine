@@ -24,6 +24,7 @@ use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Abilities\Job\RetryJobAbility;
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 use DataMachine\Abilities\Job\RunMetricsAbility;
+use DataMachine\Core\AbilityResult;
 use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\RunMetrics;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
@@ -117,8 +118,9 @@ class JobsCommand extends BaseCommand {
 			)
 		);
 
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? 'Unknown error occurred' );
+		$error = AbilityResult::failure_to_wp_error( $result, 'get_jobs_failed', 'Unknown error occurred' );
+		if ( $error ) {
+			WP_CLI::error( $error->get_error_message() );
 			return;
 		}
 
@@ -1115,7 +1117,7 @@ class JobsCommand extends BaseCommand {
 
 		$jobs = $result['jobs'] ?? array();
 
-		if ( empty( $jobs ) ) {
+		if ( empty( $jobs ) && 'json' !== $format ) {
 			WP_CLI::warning( 'No jobs found.' );
 			return;
 		}
@@ -1183,7 +1185,7 @@ class JobsCommand extends BaseCommand {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $items, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( wp_json_encode( AbilityResult::cli_collection_payload( $items, $result, 'jobs' ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
