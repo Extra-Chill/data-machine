@@ -25,6 +25,12 @@ function add_option( string $name, mixed $value, string $deprecated = '', string
 	return true;
 }
 
+function update_option( string $name, mixed $value, string|bool|null $autoload = null ): bool {
+	unset( $autoload );
+	$GLOBALS['datamachine_worker_lock_options'][ $name ] = $value;
+	return true;
+}
+
 function delete_option( string $name ): bool {
 	unset( $GLOBALS['datamachine_worker_lock_options'][ $name ] );
 	return true;
