@@ -42,6 +42,11 @@ assert_drain_contains( "datamachine_execute_step'", $drain_src, 'drain includes 
 assert_drain_contains( '[--job-id=<ids>]', $drain_src, 'drain documents optional job-id scope' );
 assert_drain_contains( '[--stop-before-timeout=<seconds>]', $drain_src, 'drain documents optional timeout safety margin' );
 assert_drain_contains( "'stop_before_timeout'", $drain_src, 'drain accepts worker-style timeout safety margin option' );
+assert_drain_contains( 'WorkerLock::acquire', $drain_src, 'drain acquires shared worker/drain lock' );
+assert_drain_contains( 'WorkerLock::release', $drain_src, 'drain releases shared worker/drain lock' );
+assert_drain_contains( "'stop_reason'                => 'locked'", $drain_src, 'drain exits cleanly when lock is held' );
+assert_drain_contains( 'lock_age_seconds', $drain_src, 'drain reports lock age' );
+assert_drain_contains( 'lock_owner', $drain_src, 'drain reports lock owner' );
 assert_drain_contains( 'normalizeJobIds', $drain_src, 'drain normalizes optional job-id scope' );
 assert_drain_contains( 'hookWhereSql( $hooks, $job_ids )', $drain_src, 'drain supports optional hook and job-id scopes' );
 assert_drain_contains( 'a.args LIKE %s', $drain_src, 'drain can filter pending actions by serialized job_id args' );

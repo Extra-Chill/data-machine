@@ -10,6 +10,7 @@ namespace DataMachine\Cli\Commands;
 use DataMachine\Abilities\Job\JobsSummaryAbility;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Cli\BaseCommand;
+use DataMachine\Cli\WorkerLock;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use WP_CLI;
 
@@ -184,6 +185,11 @@ class WorkerCommand extends BaseCommand {
 		$max_passes              = max( 0, (int) ( $options['max_passes'] ?? 0 ) );
 		$stop_before_timeout     = max( 0, (int) ( $options['stop_before_timeout'] ?? 30 ) );
 		$once                    = (bool) ( $options['once'] ?? false );
+		$lock                    = WorkerLock::acquire( self::defaultLockOwner(), $time_limit > 0 ? $time_limit + max( 60, $stop_before_timeout ) : 600 );
+
+		if ( empty( $lock['acquired'] ) ) {
+			return self::lockedStats( $lock );
+		}
 
 		$passes      = 0;
 		$recoveries  = 0;
@@ -194,92 +200,97 @@ class WorkerCommand extends BaseCommand {
 		$warnings    = 0;
 		$stop_reason = 'time_limit';
 
-		while ( true ) {
-			$elapsed = time() - $started_at;
-			if ( $time_limit > 0 && $elapsed >= $time_limit ) {
-				break;
-			}
-			if ( $time_limit > 0 && ( $time_limit - $elapsed ) <= $stop_before_timeout ) {
-				$stop_reason = 'timeout_margin';
-				break;
-			}
-			if ( $max_passes > 0 && $passes >= $max_passes ) {
-				$stop_reason = 'max_passes';
-				break;
-			}
-
-			$pending_actions = self::pendingActionCount();
-			if ( $stop_on_pending_actions && $pending_actions > 0 ) {
-				$stop_reason = 'pending_actions';
-				break;
-			}
-
-			++$passes;
-
-			if ( $recover_stuck ) {
-				$recovery = ( new RecoverStuckJobsAbility() )->execute(
-					array(
-						'dry_run'       => false,
-						'timeout_hours' => $stuck_timeout,
-					)
-				);
-
-				if ( empty( $recovery['success'] ) ) {
-					++$warnings;
-				} else {
-					$recoveries += (int) ( $recovery['recovered'] ?? 0 );
-					$timed_out  += (int) ( $recovery['timed_out'] ?? 0 );
-					$reconciled += (int) ( $recovery['stale_actions'] ?? 0 );
+		try {
+			while ( true ) {
+				$elapsed = time() - $started_at;
+				if ( $time_limit > 0 && $elapsed >= $time_limit ) {
+					break;
 				}
-			}
-
-			$remaining_time = $time_limit > 0 ? max( 1, $time_limit - $stop_before_timeout - ( time() - $started_at ) ) : $drain_time_limit;
-			$drain          = DrainCommand::drain(
-				array(
-					'limit'      => $drain_limit,
-					'batch_size' => $batch_size,
-					'time_limit' => min( $drain_time_limit, $remaining_time ),
-				)
-			);
-
-			$completions += (int) ( $drain['completions'] ?? 0 );
-			$failures    += (int) ( $drain['failures'] ?? 0 );
-			$warnings    += (int) ( $drain['warnings'] ?? 0 );
-
-			if ( $once ) {
-				$stop_reason = 'once';
-				break;
-			}
-
-			if ( (int) ( $drain['remaining_pending'] ?? 0 ) <= 0 ) {
-				$stop_reason = 'idle';
-				if ( $sleep <= 0 ) {
+				if ( $time_limit > 0 && ( $time_limit - $elapsed ) <= $stop_before_timeout ) {
+					$stop_reason = 'timeout_margin';
+					break;
+				}
+				if ( $max_passes > 0 && $passes >= $max_passes ) {
+					$stop_reason = 'max_passes';
 					break;
 				}
 
-				sleep( min( $sleep, $time_limit > 0 ? max( 0, $time_limit - $stop_before_timeout - ( time() - $started_at ) ) : $sleep ) );
+				$pending_actions = self::pendingActionCount();
+				if ( $stop_on_pending_actions && $pending_actions > 0 ) {
+					$stop_reason = 'pending_actions';
+					break;
+				}
+
+				++$passes;
+
+				if ( $recover_stuck ) {
+					$recovery = ( new RecoverStuckJobsAbility() )->execute(
+						array(
+							'dry_run'       => false,
+							'timeout_hours' => $stuck_timeout,
+						)
+					);
+
+					if ( empty( $recovery['success'] ) ) {
+						++$warnings;
+					} else {
+						$recoveries += (int) ( $recovery['recovered'] ?? 0 );
+						$timed_out  += (int) ( $recovery['timed_out'] ?? 0 );
+						$reconciled += (int) ( $recovery['stale_actions'] ?? 0 );
+					}
+				}
+
+				$remaining_time = $time_limit > 0 ? max( 1, $time_limit - $stop_before_timeout - ( time() - $started_at ) ) : $drain_time_limit;
+				$drain          = DrainCommand::drain(
+					array(
+						'limit'        => $drain_limit,
+						'batch_size'   => $batch_size,
+						'time_limit'   => min( $drain_time_limit, $remaining_time ),
+						'acquire_lock' => false,
+					)
+				);
+
+				$completions += (int) ( $drain['completions'] ?? 0 );
+				$failures    += (int) ( $drain['failures'] ?? 0 );
+				$warnings    += (int) ( $drain['warnings'] ?? 0 );
+
+				if ( $once ) {
+					$stop_reason = 'once';
+					break;
+				}
+
+				if ( (int) ( $drain['remaining_pending'] ?? 0 ) <= 0 ) {
+					$stop_reason = 'idle';
+					if ( $sleep <= 0 ) {
+						break;
+					}
+
+					sleep( min( $sleep, $time_limit > 0 ? max( 0, $time_limit - $stop_before_timeout - ( time() - $started_at ) ) : $sleep ) );
+				}
 			}
+
+			$status = self::statusSnapshot();
+
+			return array(
+				'passes'                   => $passes,
+				'job_recoveries'           => $recoveries,
+				'job_timeouts'             => $timed_out,
+				'stale_actions_reconciled' => $reconciled,
+				'action_completions'       => $completions,
+				'action_failures'          => $failures,
+				'pending_actions'          => (int) $status['pending_actions'],
+				'due_actions'              => (int) $status['due_actions'],
+				'total_pending_actions'    => (int) $status['total_pending_actions'],
+				'processing_jobs'          => (int) $status['processing_jobs'],
+				'pending_jobs'             => (int) $status['pending_jobs'],
+				'stuck_jobs'               => (int) $status['stuck_jobs'],
+				'warnings'                 => $warnings,
+				'duration_seconds'         => time() - $started_at,
+				'stop_reason'              => $stop_reason,
+			) + self::publicLockStatus( $lock );
+		} finally {
+			WorkerLock::release( (string) ( $lock['lock_token'] ?? '' ) );
 		}
-
-		$status = self::statusSnapshot();
-
-		return array(
-			'passes'                   => $passes,
-			'job_recoveries'           => $recoveries,
-			'job_timeouts'             => $timed_out,
-			'stale_actions_reconciled' => $reconciled,
-			'action_completions'       => $completions,
-			'action_failures'          => $failures,
-			'pending_actions'          => (int) $status['pending_actions'],
-			'due_actions'              => (int) $status['due_actions'],
-			'total_pending_actions'    => (int) $status['total_pending_actions'],
-			'processing_jobs'          => (int) $status['processing_jobs'],
-			'pending_jobs'             => (int) $status['pending_jobs'],
-			'stuck_jobs'               => (int) $status['stuck_jobs'],
-			'warnings'                 => $warnings,
-			'duration_seconds'         => time() - $started_at,
-			'stop_reason'              => $stop_reason,
-		);
 	}
 
 	/**
@@ -293,6 +304,7 @@ class WorkerCommand extends BaseCommand {
 		$jobs_summary    = ( new JobsSummaryAbility() )->execute( array() );
 		$jobs            = ! empty( $jobs_summary['success'] ) && is_array( $jobs_summary['summary'] ?? null ) ? $jobs_summary['summary'] : array();
 		$stuck_jobs      = RecoverStuckJobsAbility::countStuckCandidates();
+		$lock            = WorkerLock::snapshot();
 
 		return array(
 			'pending_actions'       => (int) ( $pending_summary['total'] ?? 0 ),
@@ -304,7 +316,59 @@ class WorkerCommand extends BaseCommand {
 			'pending_jobs'          => (int) ( $jobs['pending'] ?? 0 ),
 			'failed_jobs'           => (int) ( $jobs['failed'] ?? 0 ),
 			'stuck_jobs'            => $stuck_jobs,
+		) + self::publicLockStatus( $lock );
+	}
+
+	/**
+	 * Build a lock-skipped worker result.
+	 *
+	 * @param array<string,int|string|bool> $lock Lock state.
+	 * @return array<string,int|string> Worker stats.
+	 */
+	private static function lockedStats( array $lock ): array {
+		$status = self::statusSnapshot();
+
+		return array(
+			'passes'                   => 0,
+			'job_recoveries'           => 0,
+			'job_timeouts'             => 0,
+			'stale_actions_reconciled' => 0,
+			'action_completions'       => 0,
+			'action_failures'          => 0,
+			'pending_actions'          => (int) $status['pending_actions'],
+			'due_actions'              => (int) $status['due_actions'],
+			'total_pending_actions'    => (int) $status['total_pending_actions'],
+			'processing_jobs'          => (int) $status['processing_jobs'],
+			'pending_jobs'             => (int) $status['pending_jobs'],
+			'stuck_jobs'               => (int) $status['stuck_jobs'],
+			'warnings'                 => 0,
+			'duration_seconds'         => 0,
+			'stop_reason'              => 'locked',
+		) + self::publicLockStatus( $lock );
+	}
+
+	/**
+	 * Strip private lock fields before CLI output.
+	 *
+	 * @param array<string,int|string|bool> $lock Lock state.
+	 * @return array<string,int|string> Public lock state.
+	 */
+	private static function publicLockStatus( array $lock ): array {
+		return array(
+			'lock_status'      => (string) ( $lock['lock_status'] ?? 'unlocked' ),
+			'lock_owner'       => (string) ( $lock['lock_owner'] ?? '' ),
+			'lock_age_seconds' => (int) ( $lock['lock_age_seconds'] ?? 0 ),
+			'lock_expires_at'  => (int) ( $lock['lock_expires_at'] ?? 0 ),
 		);
+	}
+
+	/**
+	 * Build a compact default owner string for lock diagnostics.
+	 */
+	private static function defaultLockOwner(): string {
+		$pid = getmypid();
+
+		return sprintf( 'worker pid:%d host:%s', false === $pid ? 0 : $pid, php_uname( 'n' ) );
 	}
 
 	/**
