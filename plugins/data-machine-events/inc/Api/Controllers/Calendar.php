@@ -11,6 +11,22 @@
  * venue/artist archive with distinct geo params produced one expensive
  * query per request because the underlying bucket cache was keyed
  * without geo params.
+ *
+ * Response envelopes
+ * ------------------
+ * - Default (no `format` param, or any value other than `data`):
+ *   the legacy HTML-string envelope (`html`, `pagination.html`,
+ *   `counter`, `navigation.html`) used by the current Calendar block
+ *   frontend bundle. UNCHANGED in phase 1.
+ *
+ * - `?format=data`: the structured data-only envelope introduced in
+ *   phase 1 of refactor #298. Returns event objects, pagination /
+ *   counter / navigation metadata, gap map, and a `by_date` grouping
+ *   index — zero HTML strings. See `docs/calendar-data-schema.md`.
+ *
+ * Both envelopes are cached independently via
+ * `CalendarCache::generate_full_response_key()`, which includes
+ * `format` in its key surface as of this phase.
  */
 
 namespace DataMachineEvents\Api\Controllers;
@@ -22,6 +38,7 @@ use DataMachineEvents\Abilities\CalendarAbilities;
 use DataMachineEvents\Api\BrowserNavigationGuard;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 use DataMachineEvents\Blocks\Calendar\Query\CalendarRequest;
+use DataMachineEvents\Blocks\Calendar\Taxonomy\Badges;
 
 /**
  * Calendar API controller
@@ -50,6 +67,14 @@ class Calendar {
 		$calendar_request = CalendarRequest::fromRestRequest( $request );
 		$envelope         = $calendar_request->toAbilitiesArgs();
 
+		// Thread the format selector into the cache-key envelope so the
+		// HTML and data-only response shapes never share a cache bucket.
+		// `toAbilitiesArgs()` already gates `include_html` on the format,
+		// but the cache key needs an explicit `format` field of its own
+		// (the ability-side envelope only sees the derived `include_html`).
+		$envelope['format'] = $calendar_request->format();
+		$is_data_format     = ( 'data' === $envelope['format'] );
+
 		// Editors with `manage_options` always bypass the cache so they
 		// see fresh data immediately after publishing / editing events.
 		// Anonymous traffic (the DOS-vector path) uses the cache.
@@ -67,7 +92,33 @@ class Calendar {
 		$abilities = new CalendarAbilities();
 		$result    = $abilities->executeGetCalendarPage( $envelope );
 
-		$response_body = array(
+		$response_body = $is_data_format
+			? $this->build_data_response( $result, $calendar_request )
+			: $this->build_html_response( $result, $request );
+
+		if ( ! $bypass_cache ) {
+			CalendarCache::set_full_response(
+				$cache_key,
+				$response_body,
+				CalendarCache::ttl_for_envelope( $envelope )
+			);
+		}
+
+		return rest_ensure_response( $response_body );
+	}
+
+	/**
+	 * Build the legacy HTML-string response envelope.
+	 *
+	 * Existing consumers (the Calendar block's frontend bundle as of phase 1)
+	 * receive this shape. Unchanged contract.
+	 *
+	 * @param array           $result  CalendarAbilities::executeGetCalendarPage() output with HTML strings.
+	 * @param WP_REST_Request $request REST request (used to surface the `past` flag in `navigation.show_past`).
+	 * @return array<string,mixed>
+	 */
+	private function build_html_response( array $result, WP_REST_Request $request ): array {
+		return array(
 			'success'    => true,
 			'html'       => $result['html']['events'],
 			'pagination' => array(
@@ -84,15 +135,244 @@ class Calendar {
 				'show_past'    => ! empty( $request->get_param( 'past' ) ),
 			),
 		);
+	}
 
-		if ( ! $bypass_cache ) {
-			CalendarCache::set_full_response(
-				$cache_key,
-				$response_body,
-				CalendarCache::ttl_for_envelope( $envelope )
-			);
+	/**
+	 * Build the data-only response envelope (phase 1 of refactor #298).
+	 *
+	 * Returns structured event objects, pagination / counter / navigation
+	 * metadata, gap map, and a `by_date` grouping index. NO HTML strings.
+	 *
+	 * Performance note: this path NEVER calls `ob_start()` or any template
+	 * loader. `CalendarAbilities::executeGetCalendarPage()` was already
+	 * invoked with `include_html: false`, so the ability skipped its
+	 * `renderHtml()` branch entirely. The work here is pure array
+	 * restructuring on top of `paged_date_groups`.
+	 *
+	 * Schema: see `docs/calendar-data-schema.md`.
+	 *
+	 * @param array           $result   CalendarAbilities::executeGetCalendarPage() output (no HTML).
+	 * @param CalendarRequest $req      Sanitized request, used for navigation context (`past`) and schema versioning.
+	 * @return array<string,mixed>
+	 */
+	private function build_data_response( array $result, CalendarRequest $req ): array {
+		$paged_date_groups = $result['paged_date_groups'] ?? array();
+		$gaps_detected     = $result['gaps_detected'] ?? array();
+
+		// Flatten paged_date_groups (already serialized by
+		// CalendarAbilities::serializeDateGroups()) into:
+		//   - `events`: a deduplicated array of structured event objects.
+		//   - `grouping.by_date`: a `Y-m-d => [post_id, ...]` index that
+		//     preserves the day-bucket ordering AND multi-day expansion
+		//     produced by DateGrouper (a multi-day event appears under
+		//     every spanned date, in order).
+		//
+		// Deduplication is keyed on post_id so a multi-day event ships
+		// once in `events` but reappears as needed in `grouping.by_date`.
+		// The display_context (is_continuation / is_start_day / day_number)
+		// lives on the grouping entry, not on the event itself, because
+		// the same post can be a "start day" on one date and a
+		// "continuation" on the next.
+		$events_by_id   = array();
+		$grouping       = array();
+		$ordered_dates  = array();
+
+		foreach ( $paged_date_groups as $date_group ) {
+			$date_key = $date_group['date'] ?? '';
+			if ( '' === $date_key ) {
+				continue;
+			}
+
+			$ordered_dates[]       = $date_key;
+			$grouping[ $date_key ] = array();
+
+			foreach ( $date_group['events'] as $event_entry ) {
+				$post_id = (int) ( $event_entry['post_id'] ?? 0 );
+				if ( $post_id <= 0 ) {
+					continue;
+				}
+
+				if ( ! isset( $events_by_id[ $post_id ] ) ) {
+					$events_by_id[ $post_id ] = $this->serialize_event( $post_id, $event_entry );
+				}
+
+				$grouping[ $date_key ][] = array(
+					'post_id'         => $post_id,
+					'display_context' => $event_entry['display_context'] ?? array(),
+				);
+			}
 		}
 
-		return rest_ensure_response( $response_body );
+		$events = array_values( $events_by_id );
+
+		$show_past = $req->past();
+
+		return array(
+			'success'    => true,
+			'schema'     => array(
+				'name'    => 'calendar-data',
+				'version' => 1,
+				'phase'   => 1,
+				'issue'   => 298,
+			),
+			'events'     => $events,
+			'grouping'   => array(
+				'ordered_dates' => $ordered_dates,
+				'by_date'       => $grouping,
+				'gaps'          => $gaps_detected,
+			),
+			'pagination' => array(
+				'current_page' => (int) ( $result['current_page'] ?? 1 ),
+				'total_pages'  => (int) ( $result['max_pages'] ?? 1 ),
+				'total_items'  => (int) ( $result['total_event_count'] ?? 0 ),
+				'page_items'   => (int) ( $result['event_count'] ?? 0 ),
+			),
+			'counter'    => array(
+				'showing_count'   => (int) ( $result['event_count'] ?? 0 ),
+				'total_count'     => (int) ( $result['total_event_count'] ?? 0 ),
+				'page_start_date' => (string) ( $result['date_boundaries']['start_date'] ?? '' ),
+				'page_end_date'   => (string) ( $result['date_boundaries']['end_date'] ?? '' ),
+			),
+			'navigation' => array(
+				'show_past'    => $show_past,
+				'past_count'   => (int) ( $result['event_counts']['past'] ?? 0 ),
+				'future_count' => (int) ( $result['event_counts']['future'] ?? 0 ),
+				'has_past'     => (int) ( $result['event_counts']['past'] ?? 0 ) > 0,
+				'has_future'   => (int) ( $result['event_counts']['future'] ?? 0 ) > 0,
+			),
+		);
+	}
+
+	/**
+	 * Build the structured event object for the data envelope.
+	 *
+	 * Pulls authoritative data from `EventHydrator::parse_event_data()` (already
+	 * baked into `event_entry['event_data']` by the ability) and supplements
+	 * with permalink, post title, venue term metadata, and taxonomy term lists.
+	 *
+	 * Field choices mirror what the HTML templates render server-side so the
+	 * client can produce the same surface without a second round-trip. Anything
+	 * the server currently inlines into `data.html` should be representable
+	 * here as JSON.
+	 *
+	 * Schema notes:
+	 * - `taxonomies` is a flat `slug => [term_summary, ...]` map, NOT a nested
+	 *   structure. Mirrors the shape used by FilterAbilities and keeps the
+	 *   client free to render badges / facets without a second mapping pass.
+	 * - `venue` is denormalized out of taxonomies into its own field because
+	 *   it's a first-class display attribute (every event has at most one
+	 *   venue, the templates render it in a fixed slot, the geo system keys
+	 *   off it).
+	 *
+	 * @param int   $post_id     Event post ID.
+	 * @param array $event_entry The serialized entry from `paged_date_groups`.
+	 * @return array<string,mixed>
+	 */
+	private function serialize_event( int $post_id, array $event_entry ): array {
+		$event_data = $event_entry['event_data'] ?? array();
+		$title      = (string) ( $event_entry['title'] ?? get_the_title( $post_id ) );
+
+		return array(
+			'id'        => $post_id,
+			'title'     => $title,
+			'permalink' => (string) get_permalink( $post_id ),
+			'date'      => array(
+				'start_date'     => (string) ( $event_data['startDate'] ?? '' ),
+				'start_time'     => (string) ( $event_data['startTime'] ?? '' ),
+				'end_date'       => (string) ( $event_data['endDate'] ?? '' ),
+				'end_time'       => (string) ( $event_data['endTime'] ?? '' ),
+				'venue_timezone' => (string) ( $event_data['venueTimezone'] ?? '' ),
+			),
+			'venue'     => $this->serialize_venue( $post_id, $event_data ),
+			'organizer' => $this->serialize_organizer( $event_data ),
+			'ticket'    => array(
+				'url' => (string) ( $event_data['ticketUrl'] ?? '' ),
+			),
+			'performer' => array(
+				'name' => (string) ( $event_data['performerName'] ?? '' ),
+			),
+			'address'   => (string) ( $event_data['address'] ?? '' ),
+			'taxonomies' => $this->serialize_taxonomies( $post_id ),
+		);
+	}
+
+	/**
+	 * Serialize the venue term attached to an event, when present.
+	 *
+	 * Returns null when the event has no venue term, mirroring the optional
+	 * nature of the venue slot in the HTML templates.
+	 *
+	 * @param int   $post_id    Event post ID.
+	 * @param array $event_data Already-hydrated event_data array.
+	 * @return array<string,mixed>|null
+	 */
+	private function serialize_venue( int $post_id, array $event_data ): ?array {
+		$venue_terms = get_the_terms( $post_id, 'venue' );
+		if ( ! $venue_terms || is_wp_error( $venue_terms ) ) {
+			return null;
+		}
+		$term = $venue_terms[0];
+
+		return array(
+			'term_id' => (int) $term->term_id,
+			'name'    => (string) ( $event_data['venue'] ?? $term->name ),
+			'slug'    => (string) $term->slug,
+			'address' => (string) ( $event_data['address'] ?? '' ),
+		);
+	}
+
+	/**
+	 * Serialize organizer (promoter) data from the hydrated event_data.
+	 *
+	 * Returns null when no organizer is attached. Promoter data already
+	 * lives on the hydrated event_data via
+	 * `EventHydrator::hydrate_promoter_from_taxonomy()`.
+	 *
+	 * @param array $event_data Hydrated event_data array.
+	 * @return array<string,mixed>|null
+	 */
+	private function serialize_organizer( array $event_data ): ?array {
+		if ( empty( $event_data['organizer'] ) ) {
+			return null;
+		}
+		return array(
+			'name' => (string) $event_data['organizer'],
+			'url'  => (string) ( $event_data['organizerUrl'] ?? '' ),
+			'type' => (string) ( $event_data['organizerType'] ?? '' ),
+		);
+	}
+
+	/**
+	 * Serialize taxonomy term assignments for an event.
+	 *
+	 * Honors the `data_machine_events_excluded_taxonomies` filter (context:
+	 * 'badge') so the data envelope matches what the badge HTML would have
+	 * surfaced. Returns a `slug => [{term_id, name, slug, link}, ...]` map.
+	 *
+	 * @param int $post_id Event post ID.
+	 * @return array<string,array<int,array<string,mixed>>>
+	 */
+	private function serialize_taxonomies( int $post_id ): array {
+		$taxonomies = Badges::get_event_taxonomies( $post_id );
+		$out        = array();
+
+		foreach ( $taxonomies as $taxonomy_slug => $bundle ) {
+			$terms = $bundle['terms'] ?? array();
+			$list  = array();
+			foreach ( $terms as $term ) {
+				$link = get_term_link( $term, $taxonomy_slug );
+				$list[] = array(
+					'term_id' => (int) $term->term_id,
+					'name'    => (string) $term->name,
+					'slug'    => (string) $term->slug,
+					'link'    => is_wp_error( $link ) ? '' : (string) $link,
+				);
+			}
+			if ( ! empty( $list ) ) {
+				$out[ $taxonomy_slug ] = $list;
+			}
+		}
+
+		return $out;
 	}
 }

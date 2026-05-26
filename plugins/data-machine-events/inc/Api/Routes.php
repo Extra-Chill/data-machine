@@ -92,6 +92,12 @@ function register_routes() {
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
+				'format'           => array(
+					'type'              => 'string',
+					'default'           => '',
+					'sanitize_callback' => 'sanitize_key',
+					'description'       => 'Response format. Default (empty) returns the legacy HTML-string envelope. "data" returns the structured data-only envelope (phase 1 of refactor #298). All other values fall back to the default envelope.',
+				),
 			),
 		)
 	);

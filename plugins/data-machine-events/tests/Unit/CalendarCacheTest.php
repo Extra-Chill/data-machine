@@ -100,6 +100,39 @@ class CalendarCacheTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The `format` envelope field MUST be part of the cache key so the
+	 * legacy HTML-string envelope and the phase-1 data-only envelope
+	 * never collide in the same bucket. See refactor #298.
+	 */
+	public function test_full_response_key_includes_format() {
+		$html_envelope = array(
+			'paged'            => 1,
+			'past'             => false,
+			'event_search'     => '',
+			'date_start'       => '',
+			'date_end'         => '',
+			'scope'            => '',
+			'tax_filter'       => array(),
+			'archive_taxonomy' => '',
+			'archive_term_id'  => 0,
+			'geo_lat'          => '',
+			'geo_lng'          => '',
+			'geo_radius'       => 25,
+			'geo_radius_unit'  => 'mi',
+			'format'           => '',
+		);
+
+		$data_envelope           = $html_envelope;
+		$data_envelope['format'] = 'data';
+
+		$this->assertNotEquals(
+			CalendarCache::generate_full_response_key( $html_envelope ),
+			CalendarCache::generate_full_response_key( $data_envelope ),
+			'format=data MUST produce a distinct cache key from the legacy HTML envelope'
+		);
+	}
+
+	/**
 	 * Past=1 requests MUST be served from cache on the second hit
 	 * without re-running EventQueryBuilder. We pre-seed the cache with
 	 * a sentinel response body that no real query could produce; if

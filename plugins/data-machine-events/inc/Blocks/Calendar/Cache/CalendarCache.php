@@ -117,6 +117,11 @@ class CalendarCache {
 			'geo_radius'       => (int) ( $envelope['geo_radius'] ?? 0 ),
 			'geo_radius_unit'  => (string) ( $envelope['geo_radius_unit'] ?? '' ),
 			'cutoff_hour'      => \DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff::cutoff_hour(),
+			// Phase 1 of refactor #298: HTML and data-only responses
+			// have different shapes and MUST live in separate cache
+			// buckets — otherwise the first response shape served
+			// for a given envelope sticks for the cache TTL.
+			'format'           => (string) ( $envelope['format'] ?? '' ),
 		);
 
 		return self::FULL_PREFIX . md5( wp_json_encode( $key_data ) );
