@@ -176,7 +176,7 @@ final class AgentBundleArrayAdapter {
 		$artifact_files = is_array( $bundle['artifact_files'] ?? null ) ? $bundle['artifact_files'] : array();
 		$normalized     = array();
 
-		foreach ( self::artifact_file_directories() as $directory ) {
+		foreach ( AgentBundleArtifactDefinitions::file_artifact_directories() as $directory ) {
 			if ( is_array( $artifact_files[ $directory ] ?? null ) ) {
 				$normalized[ $directory ] = $artifact_files[ $directory ];
 			}
@@ -187,24 +187,12 @@ final class AgentBundleArrayAdapter {
 
 	/** @return array<string,array<string,array|string>> */
 	private static function artifact_files_from_directory( AgentBundleDirectory $directory ): array {
-		return array(
-			BundleSchema::PROMPTS_DIR       => $directory->prompts(),
-			BundleSchema::RUBRICS_DIR       => $directory->rubrics(),
-			BundleSchema::TOOL_POLICIES_DIR => $directory->tool_policies(),
-			BundleSchema::AUTH_REFS_DIR     => $directory->auth_refs(),
-			BundleSchema::SEED_QUEUES_DIR   => $directory->seed_queues(),
-		);
-	}
+		$artifact_files = array();
+		foreach ( AgentBundleArtifactDefinitions::file_artifact_directories() as $artifact_directory ) {
+			$artifact_files[ $artifact_directory ] = AgentBundleArtifactDefinitions::files_from_directory( $directory, $artifact_directory );
+		}
 
-	/** @return string[] */
-	private static function artifact_file_directories(): array {
-		return array(
-			BundleSchema::PROMPTS_DIR,
-			BundleSchema::RUBRICS_DIR,
-			BundleSchema::TOOL_POLICIES_DIR,
-			BundleSchema::AUTH_REFS_DIR,
-			BundleSchema::SEED_QUEUES_DIR,
-		);
+		return $artifact_files;
 	}
 
 	/** @param array<int,array<string,mixed>> $pipelines */

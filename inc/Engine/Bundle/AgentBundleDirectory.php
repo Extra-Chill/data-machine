@@ -81,7 +81,7 @@ final class AgentBundleDirectory {
 		self::ensure_directory( $directory . '/' . BundleSchema::MEMORY_DIR );
 		self::ensure_directory( $directory . '/' . BundleSchema::PIPELINES_DIR );
 		self::ensure_directory( $directory . '/' . BundleSchema::FLOWS_DIR );
-		foreach ( self::artifact_directories() as $artifact_directory ) {
+		foreach ( AgentBundleArtifactDefinitions::file_artifact_directories() as $artifact_directory ) {
 			self::ensure_directory( $directory . '/' . $artifact_directory );
 		}
 		self::ensure_directory( $directory . '/' . BundleSchema::EXTENSIONS_DIR );
@@ -210,10 +210,10 @@ final class AgentBundleDirectory {
 
 	/** @return array<string,array<string,array|string>> */
 	private static function normalize_artifact_files( array $artifact_files ): array {
-		$normalized = array_fill_keys( self::artifact_directories(), array() );
+		$normalized = array_fill_keys( AgentBundleArtifactDefinitions::file_artifact_directories(), array() );
 		foreach ( $artifact_files as $artifact_directory => $files ) {
 			$artifact_directory = (string) $artifact_directory;
-			if ( ! in_array( $artifact_directory, self::artifact_directories(), true ) ) {
+			if ( ! in_array( $artifact_directory, AgentBundleArtifactDefinitions::file_artifact_directories(), true ) ) {
 				throw new BundleValidationException( sprintf( 'Invalid artifact directory: %s', esc_html( $artifact_directory ) ) );
 			}
 			if ( ! is_array( $files ) ) {
@@ -255,7 +255,7 @@ final class AgentBundleDirectory {
 	/** @return array<string,array<string,array|string>> */
 	private static function read_artifact_directories( string $directory ): array {
 		$artifact_files = array();
-		foreach ( self::artifact_directories() as $artifact_directory ) {
+		foreach ( AgentBundleArtifactDefinitions::file_artifact_directories() as $artifact_directory ) {
 			$artifact_files[ $artifact_directory ] = self::read_artifact_files( $directory . '/' . $artifact_directory );
 		}
 
@@ -522,17 +522,6 @@ final class AgentBundleDirectory {
 		}
 		usort( $documents, fn( $a, $b ) => strcmp( $a->slug(), $b->slug() ) );
 		return $documents;
-	}
-
-	/** @return string[] */
-	private static function artifact_directories(): array {
-		return array(
-			BundleSchema::PROMPTS_DIR,
-			BundleSchema::RUBRICS_DIR,
-			BundleSchema::TOOL_POLICIES_DIR,
-			BundleSchema::AUTH_REFS_DIR,
-			BundleSchema::SEED_QUEUES_DIR,
-		);
 	}
 
 	private static function normalize_relative_path( string $relative_path, string $label ): string {
