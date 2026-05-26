@@ -87,6 +87,7 @@ See `Automattic/intelligence#467` for the reference consumer that claims the `wi
 - `exported_at` and `exported_by`: export metadata.
 - `agent`: `slug`, `label`, `description`, and `agent_config` defaults.
 - `included`: lists of `memory`, `pipelines`, `flows`, `prompts`, `rubrics`, `tool_policies`, `auth_refs`, and `seed_queues`, plus `handler_auth` mode.
+- `capabilities`: optional package-level capability strings required by the bundle.
 
 `handler_auth` is one of:
 
@@ -222,6 +223,26 @@ Bundles have two plugin-extension surfaces with different contracts:
 
 Use extras for bulk opaque content where Data Machine should not inspect individual files. Use extension artifacts when each item needs stable identity, hashes, status, and upgrade behavior.
 
+## Validation And Inspection
+
+`inspect` and `validate` are read-only lifecycle surfaces. They resolve and parse a bundle, project it to an Agents API `WP_Agent_Package`, and run `WP_Agent_Package_Capability_Checker` against Data Machine's host capability list.
+
+The compatibility report shape is stable for automation:
+
+```json
+{
+  "compatible": true,
+  "status": "compatible",
+  "required_capabilities": [],
+  "host_capabilities": ["datamachine", "datamachine/agent-bundle"],
+  "unsupported_capabilities": [],
+  "unknown_artifact_types": [],
+  "unsupported_artifacts": []
+}
+```
+
+Plugins can extend the host capability list with the `datamachine_agent_bundle_host_capabilities` filter. Unsupported package-level requirements appear in `unsupported_capabilities`; unknown artifact types and unsupported artifact-level `requires` entries appear in `unsupported_artifacts`.
+
 ## CLI
 
 Agent package operations live under `wp datamachine agent`:
@@ -231,6 +252,8 @@ Agent package operations live under `wp datamachine agent`:
 - `export <agent>` writes an agent identity, memory, pipelines, and flows to a portable bundle.
 - `installed` reports installed package-backed agents without clobbering `agent list`.
 - `status <slug>` reports installed version and tracked artifact state by agent slug or bundle slug.
+- `inspect <path|url>` loads a bundle without writing and returns package metadata plus compatibility details.
+- `validate <path|url>` loads a bundle without writing and returns whether Data Machine can support its declared package and artifact requirements.
 - `diff <path|url>` builds a read-only upgrade plan.
 - `upgrade <path|url>` applies clean updates and stages locally modified artifacts as PendingActions.
 - `rebase <path|url>` previews 3-way merges for locally modified bundle artifacts.

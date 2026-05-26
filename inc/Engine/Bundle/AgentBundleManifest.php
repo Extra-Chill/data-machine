@@ -23,8 +23,9 @@ final class AgentBundleManifest {
 	private array $agent;
 	private array $included;
 	private array $run_artifacts;
+	private array $capabilities;
 
-	public function __construct( string $exported_at, string $exported_by, string $bundle_slug, string $bundle_version, string $source_ref, string $source_revision, array $agent, array $included, array $run_artifacts = array() ) {
+	public function __construct( string $exported_at, string $exported_by, string $bundle_slug, string $bundle_version, string $source_ref, string $source_revision, array $agent, array $included, array $run_artifacts = array(), array $capabilities = array() ) {
 		$this->exported_at     = $exported_at;
 		$this->exported_by     = $exported_by;
 		$this->bundle_slug     = PortableSlug::normalize( $bundle_slug, 'bundle' );
@@ -34,6 +35,7 @@ final class AgentBundleManifest {
 		$this->agent           = self::validate_agent( $agent );
 		$this->included        = self::validate_included( $included );
 		$this->run_artifacts   = BundleSchema::normalize_run_artifact_egress_policy( $run_artifacts );
+		$this->capabilities    = self::validate_string_list( $capabilities, 'capabilities' );
 	}
 
 	/**
@@ -64,7 +66,8 @@ final class AgentBundleManifest {
 			(string) ( $data['source_revision'] ?? '' ),
 			$data['agent'],
 			$data['included'],
-			is_array( $data['run_artifacts'] ?? null ) ? $data['run_artifacts'] : array()
+			is_array( $data['run_artifacts'] ?? null ) ? $data['run_artifacts'] : array(),
+			is_array( $data['capabilities'] ?? null ) ? $data['capabilities'] : array()
 		);
 	}
 
@@ -88,6 +91,9 @@ final class AgentBundleManifest {
 
 		if ( ! empty( $this->run_artifacts ) ) {
 			$data['run_artifacts'] = $this->run_artifacts;
+		}
+		if ( ! empty( $this->capabilities ) ) {
+			$data['capabilities'] = $this->capabilities;
 		}
 
 		return $data;
@@ -124,6 +130,10 @@ final class AgentBundleManifest {
 
 	public function run_artifacts(): array {
 		return $this->run_artifacts;
+	}
+
+	public function capabilities(): array {
+		return $this->capabilities;
 	}
 
 	private static function validate_agent( array $agent ): array {
@@ -185,6 +195,25 @@ final class AgentBundleManifest {
 			'extensions'    => $included['extensions'],
 			'handler_auth'  => $included['handler_auth'],
 		);
+	}
+
+	private static function validate_string_list( array $values, string $field ): array {
+		if ( ! array_is_list( $values ) ) {
+			throw new BundleValidationException( sprintf( 'manifest.json %s must be a list.', esc_html( $field ) ) );
+		}
+
+		$normalized = array();
+		foreach ( $values as $value ) {
+			$value = trim( strtolower( (string) $value ) );
+			if ( '' !== $value ) {
+				$normalized[] = $value;
+			}
+		}
+
+		$normalized = array_values( array_unique( $normalized ) );
+		sort( $normalized, SORT_STRING );
+
+		return $normalized;
 	}
 
 	private static function validate_version_string( string $value, string $field ): string {

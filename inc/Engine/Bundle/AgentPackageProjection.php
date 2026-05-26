@@ -25,11 +25,12 @@ final class AgentPackageProjection {
 
 		return \WP_Agent_Package::from_array(
 			array(
-				'slug'      => (string) $manifest['bundle_slug'],
-				'version'   => (string) $manifest['bundle_version'],
-				'agent'     => self::agent_from_manifest( $manifest ),
-				'artifacts' => self::artifacts_from_directory( $directory ),
-				'meta'      => self::meta_from_manifest( $manifest ),
+				'slug'         => (string) $manifest['bundle_slug'],
+				'version'      => (string) $manifest['bundle_version'],
+				'agent'        => self::agent_from_manifest( $manifest ),
+				'capabilities' => self::string_list( is_array( $manifest['capabilities'] ?? null ) ? $manifest['capabilities'] : array() ),
+				'artifacts'    => self::artifacts_from_directory( $directory ),
+				'meta'         => self::meta_from_manifest( $manifest ),
 			)
 		);
 	}
@@ -145,7 +146,8 @@ final class AgentPackageProjection {
 				array(
 					'extension_artifact_type' => $artifact_type,
 					'payload_kind'            => 'json',
-				)
+				),
+				self::string_list( is_array( $artifact['requires'] ?? null ) ? $artifact['requires'] : array() )
 			);
 		}
 
@@ -193,8 +195,8 @@ final class AgentPackageProjection {
 	 * @param array<string,mixed> $meta   Artifact metadata.
 	 * @return array<string,mixed>
 	 */
-	private static function artifact( string $type, string $slug, string $label, string $source, array $meta = array() ): array {
-		return array(
+	private static function artifact( string $type, string $slug, string $label, string $source, array $meta = array(), array $requires = array() ): array {
+		$artifact = array(
 			'type'   => $type,
 			'slug'   => $slug,
 			'label'  => $label,
@@ -206,6 +208,33 @@ final class AgentPackageProjection {
 				$meta
 			),
 		);
+
+		if ( ! empty( $requires ) ) {
+			$artifact['requires'] = self::string_list( $requires );
+		}
+
+		return $artifact;
+	}
+
+	/**
+	 * Normalize capability strings for package declarations.
+	 *
+	 * @param array<int,mixed> $values Raw capability values.
+	 * @return array<int,string>
+	 */
+	private static function string_list( array $values ): array {
+		$normalized = array();
+		foreach ( $values as $value ) {
+			$value = trim( strtolower( (string) $value ) );
+			if ( '' !== $value ) {
+				$normalized[] = $value;
+			}
+		}
+
+		$normalized = array_values( array_unique( $normalized ) );
+		sort( $normalized, SORT_STRING );
+
+		return $normalized;
 	}
 
 	/**

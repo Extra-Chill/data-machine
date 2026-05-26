@@ -141,6 +141,80 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	/**
+	 * Inspect an agent package from a local file, directory, or URL without writing.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <path>
+	 * : Package path (.zip, .json, or directory) or remote URL.
+	 *
+	 * [--slug=<slug>]
+	 * : Override target agent slug for summary output.
+	 *
+	 * [--token=<token>]
+	 * : Auth token for private archive downloads. Used for this single resolve(); never persisted, never logged.
+	 *
+	 * [--token-env=<varname>]
+	 * : Environment variable (or PHP constant) name to read the auth token from. Preferred over --token for shell-history hygiene.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: json
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 */
+	public function inspect( array $args, array $assoc_args ): void {
+		$response = AgentAbilities::inspectAgentBundle( $this->bundle_ability_input( $args, $assoc_args ) );
+		if ( empty( $response['success'] ) ) {
+			WP_CLI::error( (string) ( $response['error'] ?? 'Bundle inspect failed.' ) );
+			return;
+		}
+
+		$assoc_args['format'] = $assoc_args['format'] ?? 'json';
+		$this->output( $response, $assoc_args, array( 'success' ) );
+	}
+
+	/**
+	 * Validate an agent package from a local file, directory, or URL without writing.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <path>
+	 * : Package path (.zip, .json, or directory) or remote URL.
+	 *
+	 * [--slug=<slug>]
+	 * : Override target agent slug for summary output.
+	 *
+	 * [--token=<token>]
+	 * : Auth token for private archive downloads. Used for this single resolve(); never persisted, never logged.
+	 *
+	 * [--token-env=<varname>]
+	 * : Environment variable (or PHP constant) name to read the auth token from. Preferred over --token for shell-history hygiene.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: json
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 */
+	public function validate( array $args, array $assoc_args ): void {
+		$response = AgentAbilities::validateAgentBundle( $this->bundle_ability_input( $args, $assoc_args ) );
+		if ( empty( $response['success'] ) ) {
+			WP_CLI::error( (string) ( $response['error'] ?? 'Bundle validation failed.' ) );
+			return;
+		}
+
+		$assoc_args['format'] = $assoc_args['format'] ?? 'json';
+		$this->output( $response, $assoc_args, array( 'valid', 'status' ) );
+	}
+
+	/**
 	 * Show an upgrade diff for a package path.
 	 *
 	 * ## OPTIONS

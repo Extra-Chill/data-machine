@@ -389,6 +389,46 @@ class AgentAbilities {
 			);
 
 			wp_register_ability(
+				'datamachine/inspect-agent-bundle',
+				array(
+					'label'               => 'Inspect Agent Bundle',
+					'description'         => 'Load an agent bundle without writing and return projected package metadata plus host compatibility.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => self::bundleLifecycleInputSchema(),
+					'output_schema'       => array( 'type' => 'object' ),
+					'execute_callback'    => array( self::class, 'inspectAgentBundle' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'   => true,
+							'idempotent' => true,
+						),
+					),
+				)
+			);
+
+			wp_register_ability(
+				'datamachine/validate-agent-bundle',
+				array(
+					'label'               => 'Validate Agent Bundle',
+					'description'         => 'Validate an agent bundle without writing and report unsupported host capabilities or artifact requirements.',
+					'category'            => 'datamachine-agent',
+					'input_schema'        => self::bundleLifecycleInputSchema(),
+					'output_schema'       => array( 'type' => 'object' ),
+					'execute_callback'    => array( self::class, 'validateAgentBundle' ),
+					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'readonly'   => true,
+							'idempotent' => true,
+						),
+					),
+				)
+			);
+
+			wp_register_ability(
 				'datamachine/get-agent-bundle-status',
 				array(
 					'label'               => 'Get Agent Bundle Status',
@@ -1305,6 +1345,26 @@ class AgentAbilities {
 	 */
 	public static function getAgentBundleStatus( array $input ): array {
 		return self::bundleLifecycleService()->status( (string) ( $input['slug'] ?? '' ) );
+	}
+
+	/**
+	 * Inspect a bundle without writing runtime state.
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function inspectAgentBundle( array $input ): array {
+		return self::bundleLifecycleService()->inspect( $input );
+	}
+
+	/**
+	 * Validate a bundle without writing runtime state.
+	 *
+	 * @param array $input Ability input.
+	 * @return array<string,mixed>
+	 */
+	public static function validateAgentBundle( array $input ): array {
+		return self::bundleLifecycleService()->validate( $input );
 	}
 
 	/**
