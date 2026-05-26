@@ -21,6 +21,7 @@ use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
+use DataMachine\Engine\Bundle\AgentBundleArtifactState;
 use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
 use DataMachine\Engine\Bundle\BundleStepIdRemapper;
@@ -652,7 +653,8 @@ class AgentBundler {
 			$existing_bundle_state          = is_array( $existing['agent_config']['datamachine_bundle'] ?? null )
 				? $existing['agent_config']['datamachine_bundle']
 				: array();
-			$artifact_records               = is_array( $existing_bundle_state['artifacts'] ?? null ) ? $existing_bundle_state['artifacts'] : array();
+			$artifact_records               = $existing ? AgentBundleArtifactState::installed_for_agent( $existing ) : array();
+			$artifact_records               = self::index_artifacts( $artifact_records );
 			$config_conflicts               = array();
 			$agent_config_key               = self::artifact_key( 'agent_config', 'config' );
 			$incoming_config_payload        = AgentBundleAgentConfig::tracked_payload( $incoming_config );
@@ -683,7 +685,7 @@ class AgentBundler {
 			$config['datamachine_bundle'] = array_merge(
 				$existing_bundle_state,
 				$bundle_metadata,
-				array( 'artifacts' => $existing_bundle_state['artifacts'] ?? array() )
+				array( 'artifacts' => $artifact_records )
 			);
 			if ( ! empty( $bundle_run_artifacts ) ) {
 				$config['datamachine_bundle']['run_artifacts'] = $bundle_run_artifacts;
@@ -1077,6 +1079,9 @@ class AgentBundler {
 			$summary['runtime_drift']      = $runtime_drift;
 
 			$config['datamachine_bundle']['artifacts'] = $artifact_records;
+			if ( ! AgentBundleArtifactState::persist_for_agent( $agent_id, array_values( $artifact_records ) ) ) {
+				throw new \RuntimeException( 'Failed to persist installed bundle artifact state.' );
+			}
 			if ( ! $this->agents_repo->update_agent( $agent_id, array( 'agent_config' => $config ) ) ) {
 				throw new \RuntimeException( 'Failed to persist final agent_config with bundle artifact registry.' );
 			}

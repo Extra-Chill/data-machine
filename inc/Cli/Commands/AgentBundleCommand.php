@@ -18,6 +18,7 @@ use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
 use DataMachine\Engine\Bundle\AgentBundleArtifactRebase;
 use DataMachine\Engine\Bundle\AgentBundleArtifactStatus;
+use DataMachine\Engine\Bundle\AgentBundleArtifactState;
 use DataMachine\Engine\Bundle\AgentBundleLifecycleProjection;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePendingAction;
 use DataMachine\Engine\Bundle\AgentBundleUpgradePlanner;
@@ -377,8 +378,7 @@ class AgentBundleCommand extends BaseCommand {
 			return array();
 		}
 
-		$bundle_state    = is_array( $agent['agent_config']['datamachine_bundle'] ?? null ) ? $agent['agent_config']['datamachine_bundle'] : array();
-		$installed       = is_array( $bundle_state['artifacts'] ?? null ) ? $bundle_state['artifacts'] : array();
+		$installed       = AgentBundleArtifactState::installed_for_agent( $agent );
 		$installed_index = array();
 		foreach ( $installed as $row ) {
 			if ( ! is_array( $row ) ) {
@@ -660,8 +660,7 @@ class AgentBundleCommand extends BaseCommand {
 			);
 		}
 
-		$bundle_state = is_array( $agent['agent_config']['datamachine_bundle'] ?? null ) ? $agent['agent_config']['datamachine_bundle'] : array();
-		$installed    = array_values( is_array( $bundle_state['artifacts'] ?? null ) ? $bundle_state['artifacts'] : array() );
+		$installed = AgentBundleArtifactState::installed_for_agent( $agent );
 
 		return AgentBundleUpgradePlanner::plan(
 			$installed,
@@ -703,8 +702,7 @@ class AgentBundleCommand extends BaseCommand {
 
 	protected function installed_status( array $agent ): array {
 		$bundle    = $agent['agent_config']['datamachine_bundle'] ?? array();
-		$artifacts = is_array( $bundle['artifacts'] ?? null ) ? $bundle['artifacts'] : array();
-		$artifacts = $this->classified_installed_artifacts( $agent, array_values( $artifacts ) );
+		$artifacts = $this->classified_installed_artifacts( $agent, AgentBundleArtifactState::installed_for_agent( $agent ) );
 
 		return array(
 			'agent_id'         => (int) $agent['agent_id'],

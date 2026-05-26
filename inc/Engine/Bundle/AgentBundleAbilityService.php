@@ -52,7 +52,7 @@ final class AgentBundleAbilityService {
 				'bundle_version'   => (string) ( $bundle['bundle_version'] ?? '' ),
 				'source_ref'       => (string) ( $bundle['source_ref'] ?? '' ),
 				'source_revision'  => (string) ( $bundle['source_revision'] ?? '' ),
-				'artifacts'        => count( is_array( $bundle['artifacts'] ?? null ) ? $bundle['artifacts'] : array() ),
+				'artifacts'        => count( AgentBundleArtifactState::installed_for_agent( $agent ) ),
 			);
 		}
 
@@ -295,8 +295,7 @@ final class AgentBundleAbilityService {
 			return AgentBundleUpgradePlanner::plan( array(), array(), $this->projection->target_artifacts( $bundle ), $this->bundle_summary( $bundle, $slug ) );
 		}
 
-		$bundle_state = is_array( $agent['agent_config']['datamachine_bundle'] ?? null ) ? $agent['agent_config']['datamachine_bundle'] : array();
-		$installed    = array_values( is_array( $bundle_state['artifacts'] ?? null ) ? $bundle_state['artifacts'] : array() );
+		$installed = AgentBundleArtifactState::installed_for_agent( $agent );
 
 		return AgentBundleUpgradePlanner::plan(
 			$installed,
@@ -387,8 +386,7 @@ final class AgentBundleAbilityService {
 			return array();
 		}
 
-		$bundle_state    = is_array( $agent['agent_config']['datamachine_bundle'] ?? null ) ? $agent['agent_config']['datamachine_bundle'] : array();
-		$installed       = is_array( $bundle_state['artifacts'] ?? null ) ? $bundle_state['artifacts'] : array();
+		$installed       = AgentBundleArtifactState::installed_for_agent( $agent );
 		$installed_index = array();
 		foreach ( $installed as $row ) {
 			if ( ! is_array( $row ) ) {
@@ -491,7 +489,7 @@ final class AgentBundleAbilityService {
 
 	private function installed_status( array $agent ): array {
 		$bundle    = $agent['agent_config']['datamachine_bundle'] ?? array();
-		$artifacts = is_array( $bundle['artifacts'] ?? null ) ? $bundle['artifacts'] : array();
+		$artifacts = AgentBundleArtifactState::installed_for_agent( $agent );
 
 		return array(
 			'agent_id'         => (int) $agent['agent_id'],
@@ -503,7 +501,7 @@ final class AgentBundleAbilityService {
 			'source_ref'       => (string) ( $bundle['source_ref'] ?? '' ),
 			'source_revision'  => (string) ( $bundle['source_revision'] ?? '' ),
 			'artifact_count'   => count( $artifacts ),
-			'artifacts'        => array_values( $artifacts ),
+			'artifacts'        => $artifacts,
 		);
 	}
 

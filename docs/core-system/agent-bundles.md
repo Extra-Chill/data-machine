@@ -98,7 +98,9 @@ See `Automattic/intelligence#467` for the reference consumer that claims the `wi
 
 ## Artifact Tracking
 
-Bundle installs track artifacts independently of their runtime table. The foundation record shape is:
+Bundle installs track artifacts independently of their runtime table. Installed artifact state is canonical in the site-scoped `datamachine_bundle_artifacts` table, keyed by `(agent_id, bundle_slug, artifact_type, artifact_id)`. The agent's `datamachine_bundle.artifacts` config may still contain a compatibility mirror for older installs and readers, but planning and lifecycle code should read through the installed artifact state adapter so legacy config rows can be backfilled into the table.
+
+The foundation record shape is:
 
 - `agent_id`
 - `bundle_slug`
@@ -151,8 +153,8 @@ Bundle-installed pipelines and flows use stable `portable_slug` values as their 
 - Pipelines resolve by `(agent_id, portable_slug)`.
 - Flows resolve by `(pipeline_id, portable_slug)`.
 - Re-importing the same bundle updates the existing clean rows instead of creating duplicates.
-- Local edits are detected by comparing the current artifact hash with the install-time hash recorded in the owning agent's `datamachine_bundle.artifacts` config.
-- Installed artifact tracking is persisted in the site-scoped `datamachine_bundle_artifacts` table, keyed by `(agent_id, bundle_slug, artifact_type, artifact_id)`, so bundle state is independent of runtime tables.
+- Local edits are detected by comparing the current artifact hash with the install-time hash recorded in `datamachine_bundle_artifacts`.
+- Legacy installs that only have `datamachine_bundle.artifacts` config rows are read as a compatibility fallback and backfilled into the table on first lifecycle read.
 - Modified artifacts are reported as conflicts and are not overwritten by the import path.
 
 Upgrade planning groups artifacts into deterministic buckets:

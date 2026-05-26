@@ -37,6 +37,7 @@ use DataMachine\Core\Database\Pipelines\Pipelines as PipelinesRepository;
 use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Engine\AI\Tools\Global\AgentDailyMemory;
 use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
+use DataMachine\Engine\Bundle\AgentBundleArtifactState;
 use DataMachine\Engine\Bundle\AgentBundleInstalledArtifact;
 use DataMachine\Engine\Bundle\AgentBundleManifest;
 use DataMachine\Engine\Bundle\BundleSchema;
@@ -226,6 +227,54 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( 'daily', $flow['scheduling_config']['interval'] ?? null, 'Importer preserves the bundle interval.' );
 		$this->assertTrue( $flow['scheduling_config']['enabled'] ?? false, 'Importer keeps scheduled bundle flows enabled.' );
 		$this->assertSame( array( 'mcp' => 5 ), $flow['scheduling_config']['max_items'] ?? null, 'Importer preserves bundle max item caps.' );
+	}
+
+	public function test_import_persists_installed_artifacts_to_canonical_table(): void {
+		$result = $this->bundler->import( $this->fixture_bundle( 'artifact-state-agent' ), null, $this->owner_id );
+
+		$this->assertTrue( (bool) $result['success'], 'Bundle import succeeds.' );
+
+		$agent     = $this->agents_repo->get_by_slug( 'artifact-state-agent' );
+		$artifacts = ( new InstalledBundleArtifacts() )->list_for_bundle( 'artifact-state-agent', (int) $agent['agent_id'] );
+		$types     = array_map( static fn( AgentBundleInstalledArtifact $artifact ): string => $artifact->to_array()['artifact_type'], $artifacts );
+
+		sort( $types );
+		$this->assertSame( array( 'agent_config', 'flow', 'pipeline' ), $types, 'Importer writes installed artifact state to the canonical table.' );
+	}
+
+	public function test_legacy_agent_config_artifacts_backfill_to_canonical_table(): void {
+		$agent_id = $this->agents_repo->create_if_missing(
+			'legacy-artifact-agent',
+			'Legacy Artifact Agent',
+			$this->owner_id,
+			array(
+				'datamachine_bundle' => array(
+					'bundle_slug'    => 'legacy-artifact-agent',
+					'bundle_version' => '1',
+					'artifacts'      => array(
+						'agent_config:config' => array(
+							'bundle_slug'       => 'legacy-artifact-agent',
+							'bundle_version'    => '1',
+							'artifact_type'     => 'agent_config',
+							'artifact_id'       => 'config',
+							'source_path'       => 'manifest.json#/agent/agent_config',
+							'installed_hash'    => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+							'current_hash'      => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+							'installed_payload' => array(),
+							'status'            => 'clean',
+							'installed_at'      => '2026-05-26 00:00:00',
+							'updated_at'        => '2026-05-26 00:00:00',
+						),
+					),
+				),
+			)
+		);
+		$agent    = $this->agents_repo->get_agent( (int) $agent_id );
+
+		$rows = AgentBundleArtifactState::installed_for_agent( $agent );
+
+		$this->assertCount( 1, $rows, 'Legacy agent_config artifact rows remain readable.' );
+		$this->assertCount( 1, ( new InstalledBundleArtifacts() )->list_for_bundle( 'legacy-artifact-agent', (int) $agent_id ), 'Legacy rows are backfilled into the canonical table.' );
 	}
 
 	public function test_directory_value_object_import_preserves_workflow_runtime_seed_fields(): void {

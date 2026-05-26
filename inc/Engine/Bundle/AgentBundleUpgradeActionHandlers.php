@@ -241,7 +241,7 @@ final class AgentBundleCoreArtifactApply {
 		$config['datamachine_bundle']['template_version'] = $template_version;
 		$config['datamachine_bundle']['source_ref']       = $source_ref;
 		$config['datamachine_bundle']['source_revision']  = $source_revision;
-		$config['datamachine_bundle']['artifacts'][ AgentBundleArtifactExtensions::artifact_key( $type, $id ) ] = array(
+		$artifact_record = array(
 			'bundle_slug'       => $bundle_slug,
 			'bundle_version'    => $version,
 			'artifact_type'     => $type,
@@ -254,6 +254,11 @@ final class AgentBundleCoreArtifactApply {
 			'installed_at'      => $now,
 			'updated_at'        => $now,
 		);
+		$config['datamachine_bundle']['artifacts'][ AgentBundleArtifactExtensions::artifact_key( $type, $id ) ] = $artifact_record;
+
+		if ( ! AgentBundleArtifactState::persist_for_agent( $agent_id, array( $artifact_record ) ) ) {
+			return new \WP_Error( 'datamachine_bundle_registry_update_failed', 'Failed to update bundle artifact registry.' );
+		}
 
 		if ( ! $agents->update_agent( $agent_id, array( 'agent_config' => $config ) ) ) {
 			return new \WP_Error( 'datamachine_bundle_registry_update_failed', 'Failed to update bundle artifact registry.' );
