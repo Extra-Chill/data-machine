@@ -292,6 +292,7 @@ class DrainCommand extends BaseCommand {
 		$claim    = null;
 
 		try {
+			self::runActionSchedulerTimeoutCleanup( $store );
 			$claim = $store->stake_claim( $batch_size, null, $hooks ?? array(), self::GROUP );
 		} catch ( \Throwable $throwable ) {
 			return (object) array(
@@ -318,6 +319,8 @@ class DrainCommand extends BaseCommand {
 					$runner->process_action( $action_id, 'Data Machine CLI drain' );
 				} catch ( \Throwable $throwable ) {
 					$warnings[] = sprintf( 'Action %d failed during drain: %s', $action_id, $throwable->getMessage() );
+				} finally {
+					self::flushRuntimeCache();
 				}
 			}
 		} finally {
@@ -329,6 +332,43 @@ class DrainCommand extends BaseCommand {
 			'stdout'      => '',
 			'stderr'      => implode( "\n", $warnings ),
 		);
+	}
+
+	/**
+	 * Reset stale claims/running actions before staking a CLI drain claim.
+	 *
+	 * Action Scheduler's own runners call their protected run_cleanup() before
+	 * claiming work. Data Machine claims a group-scoped batch directly, so it must
+	 * perform the same timeout cleanup or old claims can leave due actions counted
+	 * as pending but not claimable.
+	 *
+	 * @param \ActionScheduler_Store $store Action Scheduler store.
+	 */
+	private static function runActionSchedulerTimeoutCleanup( \ActionScheduler_Store $store ): void {
+		if ( ! class_exists( '\ActionScheduler_QueueCleaner' ) ) {
+			return;
+		}
+
+		$time_limit = absint( apply_filters( 'action_scheduler_queue_runner_time_limit', 30 ) );
+		$timeout    = max( 1, $time_limit ) * 10;
+		$cleaner    = new \ActionScheduler_QueueCleaner( $store );
+
+		$cleaner->reset_timeouts( $timeout );
+		$cleaner->mark_failures( $timeout );
+	}
+
+	/**
+	 * Flush in-request object cache state after each CLI-drained action.
+	 */
+	private static function flushRuntimeCache(): void {
+		if ( function_exists( 'wp_cache_supports' ) && wp_cache_supports( 'flush_runtime' ) && function_exists( 'wp_cache_flush_runtime' ) ) {
+			wp_cache_flush_runtime();
+			return;
+		}
+
+		if ( ! function_exists( 'wp_cache_supports' ) && function_exists( 'wp_cache_flush_runtime' ) ) {
+			wp_cache_flush_runtime();
+		}
 	}
 
 	/**

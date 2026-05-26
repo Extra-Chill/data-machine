@@ -52,12 +52,14 @@ assert_drain_contains( 'hookWhereSql( $hooks, $job_ids )', $drain_src, 'drain su
 assert_drain_contains( 'a.args LIKE %s', $drain_src, 'drain can filter pending actions by serialized job_id args' );
 assert_drain_contains( '"parent_job_id":', $drain_src, 'drain can filter batch actions by serialized parent_job_id args' );
 assert_drain_contains( "a.status = \\'pending\\'", $drain_src, 'drain queries pending actions in the Data Machine group' );
+assert_drain_contains( 'runActionSchedulerTimeoutCleanup( $store )', $drain_src, 'drain resets stale Action Scheduler claims before claiming work' );
 assert_drain_contains( 'stake_claim( $batch_size, null, $hooks ?? array(), self::GROUP )', $drain_src, 'drain claims due Data Machine actions through Action Scheduler' );
 assert_drain_contains( 'find_actions_by_claim_id( $claim->get_id() )', $drain_src, 'drain verifies Action Scheduler claim ownership before processing' );
 assert_drain_contains( 'release_claim( $claim )', $drain_src, 'drain releases Action Scheduler claims after processing' );
 assert_drain_contains( "\\ActionScheduler::runner()", $drain_src, 'drain uses Action Scheduler runner for claimed actions' );
 assert_drain_contains( "'Data Machine CLI drain'", $drain_src, 'drain records a Data Machine-specific execution context' );
 assert_drain_contains( 'catch ( \\Throwable $throwable )', $drain_src, 'drain catches per-action runner failures instead of fataling after job start' );
+assert_drain_contains( 'flushRuntimeCache()', $drain_src, 'drain flushes runtime cache after processing actions' );
 assert_drain_contains( "'return_code' => empty( \$warnings ) ? 0 : 1", $drain_src, 'drain surfaces runner failures through a result object' );
 assert_drain_contains( "'remaining_pending'", $drain_src, 'drain reports remaining pending actions' );
 assert_drain_contains( "'batch_chunks'", $drain_src, 'drain reports batch chunk counts' );
