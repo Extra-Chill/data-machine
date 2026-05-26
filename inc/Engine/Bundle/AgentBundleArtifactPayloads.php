@@ -23,8 +23,8 @@ final class AgentBundleArtifactPayloads {
 	}
 
 	public static function flow_payload( array $flow, string $portable_slug, ?array $installed_payload = null ): array {
-		$scheduling       = is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array();
-		$run_artifacts    = self::flow_run_artifacts( $flow, $scheduling );
+		$scheduling        = is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array();
+		$run_artifacts     = self::flow_run_artifacts( $flow, $scheduling );
 		$scheduling_policy = self::flow_scheduling_policy( $scheduling );
 
 		$payload = array(
