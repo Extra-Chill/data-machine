@@ -41,14 +41,22 @@ class UpcomingCountAbilities {
 						'type'       => 'object',
 						'required'   => array( 'taxonomy' ),
 						'properties' => array(
-							'taxonomy'      => array(
+							'taxonomy'        => array(
 								'type'        => 'string',
 								'enum'        => array( 'venue', 'location', 'artist', 'festival' ),
 								'description' => __( 'Taxonomy to count events for.', 'data-machine-events' ),
 							),
-							'exclude_roots' => array(
+							'exclude_roots'   => array(
 								'type'        => 'boolean',
 								'description' => __( 'Exclude root-level terms (parent = 0). Default true for hierarchical taxonomies like location.', 'data-machine-events' ),
+							),
+							'filter_taxonomy' => array(
+								'type'        => 'string',
+								'description' => __( 'Optional. When paired with filter_term_id, restrict counts to upcoming events also tagged with that term in this taxonomy (e.g. taxonomy=venue + filter_taxonomy=artist + filter_term_id=N counts distinct venues of upcoming events tagged with artist N).', 'data-machine-events' ),
+							),
+							'filter_term_id'  => array(
+								'type'        => 'integer',
+								'description' => __( 'Optional. Term ID to scope by. Must be paired with filter_taxonomy; provided alone is an error.', 'data-machine-events' ),
 							),
 						),
 					),
@@ -106,6 +114,43 @@ class UpcomingCountAbilities {
 		$taxonomy      = $input['taxonomy'];
 		$exclude_roots = $input['exclude_roots'] ?? ( is_taxonomy_hierarchical( $taxonomy ) );
 
+		// Optional co-occurrence filter. Both keys must be set together;
+		// providing only one is misuse and returns an error so callers
+		// catch the wiring bug instead of silently getting unfiltered results.
+		$filter_taxonomy_raw = $input['filter_taxonomy'] ?? null;
+		$filter_term_id_raw  = $input['filter_term_id'] ?? null;
+		$filter_taxonomy     = null;
+		$filter_term_id      = 0;
+		$has_filter          = false;
+
+		if ( null !== $filter_taxonomy_raw || null !== $filter_term_id_raw ) {
+			if ( null === $filter_taxonomy_raw || null === $filter_term_id_raw ) {
+				return new \WP_Error(
+					'invalid_filter_pair',
+					'filter_taxonomy and filter_term_id must be provided together.',
+					array( 'status' => 400 )
+				);
+			}
+			$filter_taxonomy = sanitize_key( (string) $filter_taxonomy_raw );
+			$filter_term_id  = absint( $filter_term_id_raw );
+
+			if ( '' === $filter_taxonomy || 0 === $filter_term_id ) {
+				return new \WP_Error(
+					'invalid_filter_pair',
+					'filter_taxonomy and filter_term_id must both be non-empty.',
+					array( 'status' => 400 )
+				);
+			}
+			if ( ! taxonomy_exists( $filter_taxonomy ) ) {
+				return new \WP_Error(
+					'invalid_filter_taxonomy',
+					"Filter taxonomy '{$filter_taxonomy}' does not exist.",
+					array( 'status' => 400 )
+				);
+			}
+			$has_filter = true;
+		}
+
 		if ( ! taxonomy_exists( $taxonomy ) ) {
 			return new \WP_Error( 'invalid_taxonomy', "Taxonomy '{$taxonomy}' does not exist.", array( 'status' => 400 ) );
 		}
@@ -117,25 +162,55 @@ class UpcomingCountAbilities {
 
 		$parent_clause = $exclude_roots ? 'AND tt.parent != 0' : '';
 
-		// Uses ed.post_status to avoid joining the posts table (3s → <100ms).
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT t.term_id, t.name, t.slug, COUNT(DISTINCT tr.object_id) AS event_count
-				FROM {$wpdb->term_relationships} tr
-				INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-				INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-				INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id
-				WHERE tt.taxonomy = %s
-				AND ed.post_status = 'publish'
-				AND ed.start_datetime >= %s
-				{$parent_clause}
-				GROUP BY t.term_id
-				ORDER BY event_count DESC",
-				$taxonomy,
-				$today
-			)
-		);
+		if ( $has_filter ) {
+			// Co-occurrence join: require each counted post to ALSO be tagged
+			// with $filter_term_id in $filter_taxonomy. Aliases f_tr / f_tt
+			// keep the filter join distinct from the primary tr / tt aliases.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT t.term_id, t.name, t.slug, COUNT(DISTINCT tr.object_id) AS event_count
+					FROM {$wpdb->term_relationships} tr
+					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+					INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
+					INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id
+					INNER JOIN {$wpdb->term_relationships} f_tr ON f_tr.object_id = tr.object_id
+					INNER JOIN {$wpdb->term_taxonomy} f_tt ON f_tr.term_taxonomy_id = f_tt.term_taxonomy_id
+					WHERE tt.taxonomy = %s
+					AND ed.post_status = 'publish'
+					AND ed.start_datetime >= %s
+					AND f_tt.taxonomy = %s
+					AND f_tt.term_id = %d
+					{$parent_clause}
+					GROUP BY t.term_id
+					ORDER BY event_count DESC",
+					$taxonomy,
+					$today,
+					$filter_taxonomy,
+					$filter_term_id
+				)
+			);
+		} else {
+			// Uses ed.post_status to avoid joining the posts table (3s → <100ms).
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT t.term_id, t.name, t.slug, COUNT(DISTINCT tr.object_id) AS event_count
+					FROM {$wpdb->term_relationships} tr
+					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+					INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
+					INNER JOIN {$ed_table} ed ON tr.object_id = ed.post_id
+					WHERE tt.taxonomy = %s
+					AND ed.post_status = 'publish'
+					AND ed.start_datetime >= %s
+					{$parent_clause}
+					GROUP BY t.term_id
+					ORDER BY event_count DESC",
+					$taxonomy,
+					$today
+				)
+			);
+		}
 
 		if ( empty( $rows ) ) {
 			return array(
