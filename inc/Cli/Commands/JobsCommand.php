@@ -1185,9 +1185,7 @@ class JobsCommand extends BaseCommand {
 		}
 
 		if ( 'json' === $format ) {
-			$json_result         = $result;
-			$json_result['jobs'] = $items;
-			WP_CLI::log( wp_json_encode( AbilityResult::collection_envelope( $json_result, 'jobs', array( 'top_extra' => array( 'filters_applied' ) ) ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( wp_json_encode( AbilityResult::cli_collection_payload( $items, $result, 'jobs' ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 

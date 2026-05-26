@@ -510,7 +510,7 @@ class Pipelines {
 
 		$result = ( new DeletePipelineAbility() )->execute( array( 'pipeline_id' => $pipeline_id ) );
 
-		return AbilityResult::rest_item_response( $result, null, array(), 'pipeline_deletion_failed', __( 'Failed to delete pipeline.', 'data-machine' ) );
+		return AbilityResult::rest_legacy_response( $result, 'pipeline_deletion_failed', __( 'Failed to delete pipeline.', 'data-machine' ) );
 	}
 
 	/**

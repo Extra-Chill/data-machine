@@ -196,6 +196,35 @@ $rest_item = AbilityResult::rest_item_response(
 $assert( 'REST item presenter wraps single resource data', 9 === ( $rest_item['data']['job_id'] ?? null ) );
 $assert( 'REST item presenter includes explicit top-level extras', 'ok' === ( $rest_item['message'] ?? null ) );
 
+$legacy_rest = AbilityResult::rest_legacy_response(
+	array(
+		'success' => true,
+		'message' => 'Paused flows.',
+		'paused'  => 3,
+	)
+);
+$assert( 'legacy REST presenter preserves top-level success flag', true === ( $legacy_rest['success'] ?? null ) );
+$assert( 'legacy REST presenter preserves top-level mutation fields', 3 === ( $legacy_rest['paused'] ?? null ) );
+$assert( 'legacy REST presenter does not double-wrap under data', ! array_key_exists( 'data', $legacy_rest ) );
+
+$cli_rows = array(
+	array(
+		'id'     => 12,
+		'source' => 'pipeline',
+	),
+);
+$cli_result = array(
+	'success'  => true,
+	'jobs'     => array(),
+	'total'    => 1,
+	'per_page' => 20,
+	'offset'   => 0,
+);
+$assert( 'CLI collection payload defaults to legacy row array', $cli_rows === AbilityResult::cli_collection_payload( $cli_rows, $cli_result, 'jobs' ) );
+$cli_envelope = AbilityResult::cli_collection_payload( $cli_rows, $cli_result, 'jobs', true );
+$assert( 'CLI collection payload can opt into shared envelope', 12 === ( $cli_envelope['data'][0]['id'] ?? null ) );
+$assert( 'CLI envelope opt-in includes pagination metadata', 20 === ( $cli_envelope['per_page'] ?? null ) );
+
 if ( $failed > 0 ) {
 	echo "=== ability-result-wp-error-smoke: {$failed} FAIL of {$total} ===\n";
 	exit( 1 );

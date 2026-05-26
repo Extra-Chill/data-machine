@@ -199,6 +199,46 @@ class AbilityResult {
 	}
 
 	/**
+	 * Present an ability result as a raw legacy REST response.
+	 *
+	 * Use this at explicit compatibility edges that already exposed ability fields
+	 * at the top level, such as mutation endpoints returning message/count data.
+	 *
+	 * @param mixed  $result          Ability execution result.
+	 * @param string $default_code    Default error code.
+	 * @param string $default_message Default error message.
+	 * @param int    $default_status  Default HTTP status.
+	 * @return \WP_REST_Response|\WP_Error REST response or error.
+	 */
+	public static function rest_legacy_response( $result, string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', int $default_status = 500 ) {
+		$error = self::failure_to_wp_error( $result, $default_code, $default_message, $default_status );
+		if ( $error ) {
+			return $error;
+		}
+
+		return rest_ensure_response( self::normalize( $result ) );
+	}
+
+	/**
+	 * Present collection rows for CLI JSON while allowing explicit envelope opt-in.
+	 *
+	 * @param array  $items        Rows formatted for CLI output.
+	 * @param array  $result       Ability result containing pagination metadata.
+	 * @param string $items_key    Collection key to use when envelope output is requested.
+	 * @param bool   $use_envelope Whether to return the shared collection envelope.
+	 * @return array CLI JSON payload.
+	 */
+	public static function cli_collection_payload( array $items, array $result, string $items_key, bool $use_envelope = false ): array {
+		if ( ! $use_envelope ) {
+			return $items;
+		}
+
+		$result[ $items_key ] = $items;
+
+		return self::collection_envelope( $result, $items_key, array( 'top_extra' => array( 'filters_applied' ) ) );
+	}
+
+	/**
 	 * Present an ability result as a single-resource REST response.
 	 *
 	 * @param mixed  $result          Ability execution result.
