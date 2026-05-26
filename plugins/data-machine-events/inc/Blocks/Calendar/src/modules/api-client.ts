@@ -150,6 +150,15 @@ export async function fetchCalendarEvents(
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json',
+				Accept: 'application/json',
+				// Identifies this as an XHR/fetch call so the
+				// server-side BrowserNavigationGuard lets the JSON
+				// response through. Direct browser navigations
+				// (address bar, middle-click on a stale anchor) do
+				// not send this header and get redirected to the
+				// canonical archive URL or a 404 — never raw JSON.
+				// See Extra-Chill/data-machine-events#297.
+				'X-Requested-With': 'XMLHttpRequest',
 			},
 		} );
 
@@ -247,6 +256,11 @@ export async function fetchFilters(
 		method: 'GET',
 		headers: {
 			'Content-Type': 'application/json',
+			Accept: 'application/json',
+			// See note on the calendar fetch above. Identifies this
+			// call as an XHR so the BrowserNavigationGuard does not
+			// redirect / 404 it. Issue #297.
+			'X-Requested-With': 'XMLHttpRequest',
 		},
 	} );
 

@@ -8,6 +8,7 @@ const API_NAMESPACE = 'datamachine/v1';
 // Ensure controllers are loaded when composer autoloader is not present
 if ( defined( 'DATA_MACHINE_EVENTS_PLUGIN_DIR' ) ) {
 	$controllers = array(
+		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/BrowserNavigationGuard.php',
 		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Calendar.php',
 		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Venues.php',
 		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Events.php',

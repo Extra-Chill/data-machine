@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
 
 use WP_REST_Request;
 use DataMachineEvents\Abilities\FilterAbilities;
+use DataMachineEvents\Api\BrowserNavigationGuard;
 
 /**
  * REST controller for filter options endpoint
@@ -27,6 +28,14 @@ class Filters {
 	 * @return \WP_REST_Response
 	 */
 	public function get( WP_REST_Request $request ) {
+		// Browser-direct navigations get redirected to the canonical
+		// archive (when reconstructible) or 404 — never raw JSON.
+		// See issue #297.
+		$guarded = BrowserNavigationGuard::guard( $request );
+		if ( null !== $guarded ) {
+			return $guarded;
+		}
+
 		$abilities = new FilterAbilities();
 
 		$result = $abilities->executeGetFilterOptions(

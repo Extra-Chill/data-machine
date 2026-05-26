@@ -174,7 +174,14 @@ async function fetchDayHtml(
 		`/wp-json/datamachine/v1/events/calendar?${ params.toString() }`,
 		{
 			method: 'GET',
-			headers: { 'Content-Type': 'application/json' },
+			headers: {
+				'Content-Type': 'application/json',
+				Accept: 'application/json',
+				// Identifies this as an XHR/fetch call so the
+				// server-side BrowserNavigationGuard lets the JSON
+				// response through (see issue #297).
+				'X-Requested-With': 'XMLHttpRequest',
+			},
 		}
 	);
 

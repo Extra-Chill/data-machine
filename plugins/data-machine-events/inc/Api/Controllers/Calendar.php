@@ -19,6 +19,7 @@ defined( 'ABSPATH' ) || exit;
 
 use WP_REST_Request;
 use DataMachineEvents\Abilities\CalendarAbilities;
+use DataMachineEvents\Api\BrowserNavigationGuard;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 use DataMachineEvents\Blocks\Calendar\Query\CalendarRequest;
 
@@ -34,6 +35,18 @@ class Calendar {
 	 * @return \WP_REST_Response
 	 */
 	public function calendar( WP_REST_Request $request ) {
+		// Browser-direct navigations (address-bar paste, middle-click on
+		// stale anchors, share-link) must never receive raw JSON. The
+		// guard redirects to the canonical archive URL when possible
+		// and falls back to a 404 otherwise. JS callers are passed
+		// through because they identify themselves via
+		// `X-Requested-With: XMLHttpRequest` and/or an Accept header
+		// that prefers application/json. See issue #297.
+		$guarded = BrowserNavigationGuard::guard( $request );
+		if ( null !== $guarded ) {
+			return $guarded;
+		}
+
 		$calendar_request = CalendarRequest::fromRestRequest( $request );
 		$envelope         = $calendar_request->toAbilitiesArgs();
 
