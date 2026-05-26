@@ -46,7 +46,8 @@ final class AgentBundleArrayAdapter {
 				'flows'        => array_values( $flow_slugs ),
 				'handler_auth' => 'refs',
 			),
-			BundleSchema::normalize_run_artifact_egress_policy( $bundle['run_artifacts'] ?? array() )
+			BundleSchema::normalize_run_artifact_egress_policy( $bundle['run_artifacts'] ?? array() ),
+			is_array( $bundle['capabilities'] ?? null ) ? $bundle['capabilities'] : array()
 		);
 
 		return new AgentBundleDirectory(
@@ -162,6 +163,9 @@ final class AgentBundleArrayAdapter {
 		$run_artifacts = BundleSchema::normalize_run_artifact_egress_policy( $manifest['run_artifacts'] ?? array() );
 		if ( ! empty( $run_artifacts ) ) {
 			$bundle['run_artifacts'] = $run_artifacts;
+		}
+		if ( ! empty( $manifest['capabilities'] ) && is_array( $manifest['capabilities'] ) ) {
+			$bundle['capabilities'] = $manifest['capabilities'];
 		}
 
 		return $bundle;

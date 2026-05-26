@@ -100,6 +100,50 @@ final class AgentBundleAbilityService {
 	}
 
 	/** @return array<string,mixed> */
+	public function inspect( array $input ): array {
+		$loaded = $this->load_bundle_from_input( $input );
+		if ( empty( $loaded['success'] ) ) {
+			return $loaded;
+		}
+
+		$bundle        = $loaded['bundle'];
+		$package       = AgentPackageProjection::from_array_bundle( $bundle );
+		$compatibility = self::capability_report( $package )->to_array();
+
+		return array(
+			'success'       => true,
+			'bundle'        => $this->bundle_summary( $bundle, (string) ( $input['slug'] ?? '' ) ),
+			'package'       => $package->to_array(),
+			'compatibility' => $compatibility,
+		);
+	}
+
+	/** @return array<string,mixed> */
+	public function validate( array $input ): array {
+		$inspect = $this->inspect( $input );
+		if ( empty( $inspect['success'] ) ) {
+			return array_merge(
+				$inspect,
+				array(
+					'valid'  => false,
+					'status' => 'invalid',
+				)
+			);
+		}
+
+		$compatibility = is_array( $inspect['compatibility'] ?? null ) ? $inspect['compatibility'] : array();
+		$compatible    = ! empty( $compatibility['compatible'] );
+
+		return array(
+			'success'       => true,
+			'valid'         => $compatible,
+			'status'        => $compatible ? 'valid' : 'unsupported',
+			'bundle'        => $inspect['bundle'],
+			'compatibility' => $compatibility,
+		);
+	}
+
+	/** @return array<string,mixed> */
 	public function rebase( array $input ): array {
 		$loaded = $this->load_bundle_from_input( $input );
 		if ( empty( $loaded['success'] ) ) {
@@ -303,6 +347,54 @@ final class AgentBundleAbilityService {
 			$this->projection->target_artifacts( $bundle, $agent ),
 			$this->bundle_summary( $bundle, $slug )
 		);
+	}
+
+	public static function capability_report( \WP_Agent_Package $package ): \WP_Agent_Package_Capability_Report {
+		if ( function_exists( 'wp_get_agent_package_artifact_types' ) && function_exists( 'do_action' ) && ( ! function_exists( 'did_action' ) || 0 === did_action( 'wp_agent_package_artifacts_init' ) ) ) {
+			do_action( 'wp_agent_package_artifacts_init' );
+		}
+
+		return \WP_Agent_Package_Capability_Checker::check( $package, self::host_capabilities() );
+	}
+
+	/** @return array<int,string> */
+	public static function host_capabilities(): array {
+		$capabilities = array(
+			'datamachine',
+			'datamachine/agent',
+			'datamachine/agent-bundle',
+			'datamachine/bundle-schema-v1',
+			'datamachine/pipeline',
+			'datamachine/flow',
+			'datamachine/prompt',
+			'datamachine/rubric',
+			'datamachine/tool-policy',
+			'datamachine/auth-ref',
+			'datamachine/queue-seed',
+		);
+
+		/**
+		 * Extend host capability strings used for read-only bundle compatibility checks.
+		 *
+		 * @param array<int,string> $capabilities Data Machine host capabilities.
+		 */
+		$capabilities = function_exists( 'apply_filters' ) ? apply_filters( 'datamachine_agent_bundle_host_capabilities', $capabilities ) : $capabilities;
+		if ( ! is_array( $capabilities ) ) {
+			$capabilities = array();
+		}
+
+		$normalized = array();
+		foreach ( $capabilities as $capability ) {
+			$capability = trim( strtolower( (string) $capability ) );
+			if ( '' !== $capability ) {
+				$normalized[] = $capability;
+			}
+		}
+
+		$normalized = array_values( array_unique( $normalized ) );
+		sort( $normalized, SORT_STRING );
+
+		return $normalized;
 	}
 
 	private function add_runtime_drift_to_plan( array $plan, array $bundle, string $slug = '', string $decision = 'preserve_existing' ): array {

@@ -100,12 +100,17 @@ final class AgentBundleArtifactExtensions {
 				continue;
 			}
 
-			$normalized[] = array(
+			$normalized_artifact = array(
 				'artifact_type' => $type,
 				'artifact_id'   => $id,
 				'source_path'   => $source_path,
 				'payload'       => $artifact['payload'] ?? null,
 			);
+			if ( is_array( $artifact['requires'] ?? null ) ) {
+				$normalized_artifact['requires'] = self::string_list( $artifact['requires'] );
+			}
+
+			$normalized[] = $normalized_artifact;
 		}
 
 		usort(
@@ -161,6 +166,21 @@ final class AgentBundleArtifactExtensions {
 		$type = trim( is_string( $type ) ? $type : '', '/' );
 
 		return $type;
+	}
+
+	private static function string_list( array $values ): array {
+		$normalized = array();
+		foreach ( $values as $value ) {
+			$value = trim( strtolower( (string) $value ) );
+			if ( '' !== $value ) {
+				$normalized[] = $value;
+			}
+		}
+
+		$normalized = array_values( array_unique( $normalized ) );
+		sort( $normalized, SORT_STRING );
+
+		return $normalized;
 	}
 
 	private static function sanitize_key( string $key ): string {
