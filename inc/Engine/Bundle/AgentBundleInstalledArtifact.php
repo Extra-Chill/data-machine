@@ -170,14 +170,16 @@ final class AgentBundleInstalledArtifact {
 	}
 
 	private static function validate_artifact_type( string $type ): string {
-		$type    = self::non_empty_string( $type, 'artifact_type' );
-		$allowed = BundleSchema::artifact_types();
-		if ( ! in_array( $type, $allowed, true ) ) {
-			$allowed_label = implode( ', ', $allowed );
-			throw new BundleValidationException( sprintf( 'installed bundle artifact_type must be one of: %s.', esc_html( $allowed_label ) ) );
+		$type       = strtolower( trim( str_replace( '\\', '/', self::non_empty_string( $type, 'artifact_type' ) ) ) );
+		$normalized = preg_replace( '/[^a-z0-9_\.\/-]+/', '', $type );
+		$normalized = preg_replace( '#/+#', '/', is_string( $normalized ) ? $normalized : '' );
+		$normalized = trim( is_string( $normalized ) ? $normalized : '', '/' );
+
+		if ( '' === $normalized || $normalized !== $type ) {
+			throw new BundleValidationException( 'installed bundle artifact_type must be a normalized artifact type.' );
 		}
 
-		return $type;
+		return $normalized;
 	}
 
 	private static function non_empty_string( string $value, string $field ): string {
