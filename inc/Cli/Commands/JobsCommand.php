@@ -185,8 +185,9 @@ class JobsCommand extends BaseCommand {
 			} elseif ( 'would_reconcile_action' === $job['status'] ) {
 				WP_CLI::log(
 					sprintf(
-						'Would reconcile Action Scheduler action %d for terminal job %d (flow %d, status %s)',
+						'Would reconcile Action Scheduler action %d (%s) for terminal job %d (flow %d, status %s)',
 						$job['action_id'],
+						$job['hook'] ?? 'unknown',
 						$job['job_id'],
 						$job['flow_id'],
 						$job['target_status']
@@ -195,8 +196,9 @@ class JobsCommand extends BaseCommand {
 			} elseif ( 'reconciled_action' === $job['status'] ) {
 				WP_CLI::log(
 					sprintf(
-						'Reconciled Action Scheduler action %d for terminal job %d (flow %d, status %s)',
+						'Reconciled Action Scheduler action %d (%s) for terminal job %d (flow %d, status %s)',
 						$job['action_id'],
+						$job['hook'] ?? 'unknown',
 						$job['job_id'],
 						$job['flow_id'],
 						$job['target_status']
