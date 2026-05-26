@@ -16,6 +16,8 @@ if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
 	return;
 }
 
+require_once __DIR__ . '/ActionSchedulerWPCLICompat.php';
+
 // Primary commands.
 WP_CLI::add_command( 'datamachine settings', Commands\SettingsCommand::class );
 WP_CLI::add_command( 'datamachine flows', Commands\Flows\FlowsCommand::class );
