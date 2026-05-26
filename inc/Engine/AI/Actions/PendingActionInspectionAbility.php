@@ -243,6 +243,20 @@ final class PendingActionInspectionAbility {
 			}
 		}
 
+		foreach ( array( 'context_limit', 'context-limit' ) as $key ) {
+			if ( isset( $input[ $key ] ) && '' !== $input[ $key ] ) {
+				$filters['context_limit'] = (int) $input[ $key ];
+				break;
+			}
+		}
+
+		foreach ( array( 'include_context_details', 'include-context-details' ) as $key ) {
+			if ( ! empty( $input[ $key ] ) ) {
+				$filters['include_context_details'] = true;
+				break;
+			}
+		}
+
 		if ( isset( $input['context'] ) && is_array( $input['context'] ) ) {
 			$filters['context'] = array_map( 'sanitize_text_field', $input['context'] );
 		}
@@ -257,20 +271,30 @@ final class PendingActionInspectionAbility {
 		return array(
 			'type'       => 'object',
 			'properties' => array(
-				'status'         => array( 'type' => 'string' ),
-				'kind'           => array( 'type' => 'string' ),
-				'agent_id'       => array( 'type' => 'integer' ),
-				'created_by'     => array( 'type' => 'integer' ),
-				'context'        => array( 'type' => 'object' ),
-				'created_after'  => array( 'type' => 'string' ),
-				'created_before' => array( 'type' => 'string' ),
-				'limit'          => array(
+				'status'                  => array( 'type' => 'string' ),
+				'kind'                    => array( 'type' => 'string' ),
+				'agent_id'                => array( 'type' => 'integer' ),
+				'created_by'              => array( 'type' => 'integer' ),
+				'context'                 => array( 'type' => 'object' ),
+				'created_after'           => array( 'type' => 'string' ),
+				'created_before'          => array( 'type' => 'string' ),
+				'limit'                   => array(
 					'type'    => 'integer',
 					'default' => 50,
 				),
-				'offset'         => array(
+				'offset'                  => array(
 					'type'    => 'integer',
 					'default' => 0,
+				),
+				'context_limit'           => array(
+					'type'        => 'integer',
+					'default'     => 25,
+					'description' => __( 'Maximum context buckets to include in summaries. Use 0 for all buckets.', 'data-machine' ),
+				),
+				'include_context_details' => array(
+					'type'        => 'boolean',
+					'default'     => false,
+					'description' => __( 'Include all context buckets in summaries.', 'data-machine' ),
 				),
 			),
 		);

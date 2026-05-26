@@ -35,8 +35,11 @@ assert_worker_contains( "WP_CLI::add_command( 'datamachine worker'", $boot_src, 
 assert_worker_contains( 'class WorkerCommand extends BaseCommand', $worker_src, 'worker follows CLI command pattern' );
 assert_worker_contains( '@subcommand run', $worker_src, 'worker exposes run subcommand' );
 assert_worker_contains( '@subcommand status', $worker_src, 'worker exposes status subcommand' );
+assert_worker_contains( 'WorkerLock::acquire', $worker_src, 'worker acquires shared worker/drain lock' );
+assert_worker_contains( 'WorkerLock::release', $worker_src, 'worker releases shared worker/drain lock' );
 assert_worker_contains( 'RecoverStuckJobsAbility', $worker_src, 'worker composes stuck job recovery ability' );
 assert_worker_contains( 'DrainCommand::drain(', $worker_src, 'worker composes the existing drain loop' );
+assert_worker_contains( "'acquire_lock' => false", $worker_src, 'worker internal drain does not fight outer lock' );
 assert_worker_contains( 'PendingActionStore::summary', $worker_src, 'worker reads pending-action gate through the store' );
 assert_worker_contains( 'JobsSummaryAbility', $worker_src, 'worker reads job status through the existing summary ability' );
 assert_worker_contains( 'stop_on_pending_actions', $worker_src, 'worker can stop at approval gates' );
@@ -44,6 +47,9 @@ assert_worker_contains( 'max_passes', $worker_src, 'worker supports bounded pass
 assert_worker_contains( 'stop_before_timeout', $worker_src, 'worker exits before external supervisor timeouts' );
 assert_worker_contains( 'drain_time_limit', $worker_src, 'worker bounds each drain pass' );
 assert_worker_contains( 'DrainCommand::status()', $worker_src, 'worker reads Action Scheduler state through drain status' );
+assert_worker_contains( 'lock_age_seconds', $worker_src, 'worker status reports lock age' );
+assert_worker_contains( 'lock_owner', $worker_src, 'worker status reports lock owner' );
+assert_worker_contains( "'stop_reason'              => 'locked'", $worker_src, 'worker exits cleanly when lock is held' );
 assert_worker_not_contains( 'action-scheduler action run ', $worker_src, 'worker does not shell directly to Action Scheduler' );
 assert_worker_not_contains( 'actionscheduler_actions', $worker_src, 'worker does not query Action Scheduler tables directly' );
 assert_worker_not_contains( 'datamachine_jobs', $worker_src, 'worker does not query jobs tables directly' );

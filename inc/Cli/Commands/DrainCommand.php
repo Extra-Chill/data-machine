@@ -8,6 +8,7 @@
 namespace DataMachine\Cli\Commands;
 
 use DataMachine\Cli\BaseCommand;
+use DataMachine\Cli\WorkerLock;
 use WP_CLI;
 
 defined( 'ABSPATH' ) || exit;
@@ -103,7 +104,7 @@ class DrainCommand extends BaseCommand {
 	 * so this drain runs concrete due action IDs from that same group instead of
 	 * a hand-maintained hook allow-list.
 	 *
-	 * @param array{limit?:int,batch_size?:int,time_limit?:int,stop_before_timeout?:int,hooks?:string[],job_ids?:string|int[]} $options Drain options.
+	 * @param array{limit?:int,batch_size?:int,time_limit?:int,stop_before_timeout?:int,hooks?:string[],job_ids?:string|int[],acquire_lock?:bool,lock_owner?:string} $options Drain options.
 	 * @return array<string,int|string> Drain stats.
 	 */
 	public static function drain( array $options = array() ): array {
@@ -113,6 +114,16 @@ class DrainCommand extends BaseCommand {
 		$stop_before_timeout = max( 0, (int) ( $options['stop_before_timeout'] ?? 0 ) );
 		$hooks               = self::normalizeHooks( $options['hooks'] ?? null );
 		$job_ids             = self::normalizeJobIds( $options['job_ids'] ?? null );
+		$acquire_lock        = (bool) ( $options['acquire_lock'] ?? true );
+		$lock                = array();
+
+		if ( $acquire_lock ) {
+			$lock_ttl = $time_limit > 0 ? $time_limit + max( 60, $stop_before_timeout ) : 600;
+			$lock     = WorkerLock::acquire( (string) ( $options['lock_owner'] ?? self::defaultLockOwner( 'drain' ) ), $lock_ttl );
+			if ( empty( $lock['acquired'] ) ) {
+				return self::lockedStats( $hooks, $job_ids, $lock );
+			}
+		}
 
 		$started_at    = time();
 		$before_counts = self::getStatusCounts( $hooks, $job_ids );
@@ -120,56 +131,63 @@ class DrainCommand extends BaseCommand {
 		$warnings      = 0;
 		$stop_reason   = 'empty';
 
-		while ( self::getDuePendingCount( $hooks, $job_ids ) > 0 ) {
+		try {
+			while ( self::getDuePendingCount( $hooks, $job_ids ) > 0 ) {
+				$stats = self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids ), $batches, $warnings, $hooks, $job_ids, $stop_reason );
+				if ( $limit > 0 && (int) $stats['actions_processed'] >= $limit ) {
+					$stop_reason = 'limit';
+					break;
+				}
+
+				if ( $time_limit > 0 && ( time() - $started_at ) >= $time_limit ) {
+					$stop_reason = 'time_limit';
+					break;
+				}
+
+				if ( $time_limit > 0 && ( $time_limit - ( time() - $started_at ) ) <= $stop_before_timeout ) {
+					$stop_reason = 'timeout_margin';
+					break;
+				}
+
+				$current_batch_size = $batch_size;
+				if ( $limit > 0 ) {
+					$current_batch_size = min( $batch_size, $limit - (int) $stats['actions_processed'] );
+				}
+				if ( $current_batch_size <= 0 ) {
+					$stop_reason = 'limit';
+					break;
+				}
+
+				$due_before    = self::getDuePendingCount( $hooks, $job_ids );
+				$status_before = self::getStatusCounts( $hooks, $job_ids );
+				$result        = self::runActionSchedulerBatch( $current_batch_size, $hooks, $job_ids );
+				++$batches;
+
+				if ( 0 !== (int) ( $result->return_code ?? 1 ) ) {
+					++$warnings;
+					$message = trim( (string) ( $result->stderr ?? '' ) );
+					WP_CLI::warning( '' === $message ? 'Action Scheduler CLI drain failed.' : $message );
+					$stop_reason = 'warning';
+					break;
+				}
+
+				$status_after = self::getStatusCounts( $hooks, $job_ids );
+				$progress     = self::processedDelta( $status_before, $status_after );
+				if ( 0 === $progress && self::getDuePendingCount( $hooks, $job_ids ) >= $due_before ) {
+					++$warnings;
+					WP_CLI::warning( 'Drain stopped because Action Scheduler made no observable progress.' );
+					$stop_reason = 'no_progress';
+					break;
+				}
+			}
+
 			$stats = self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids ), $batches, $warnings, $hooks, $job_ids, $stop_reason );
-			if ( $limit > 0 && (int) $stats['actions_processed'] >= $limit ) {
-				$stop_reason = 'limit';
-				break;
-			}
-
-			if ( $time_limit > 0 && ( time() - $started_at ) >= $time_limit ) {
-				$stop_reason = 'time_limit';
-				break;
-			}
-
-			if ( $time_limit > 0 && ( $time_limit - ( time() - $started_at ) ) <= $stop_before_timeout ) {
-				$stop_reason = 'timeout_margin';
-				break;
-			}
-
-			$current_batch_size = $batch_size;
-			if ( $limit > 0 ) {
-				$current_batch_size = min( $batch_size, $limit - (int) $stats['actions_processed'] );
-			}
-			if ( $current_batch_size <= 0 ) {
-				$stop_reason = 'limit';
-				break;
-			}
-
-			$due_before    = self::getDuePendingCount( $hooks, $job_ids );
-			$status_before = self::getStatusCounts( $hooks, $job_ids );
-			$result        = self::runActionSchedulerBatch( $current_batch_size, $hooks, $job_ids );
-			++$batches;
-
-			if ( 0 !== (int) ( $result->return_code ?? 1 ) ) {
-				++$warnings;
-				$message = trim( (string) ( $result->stderr ?? '' ) );
-				WP_CLI::warning( '' === $message ? 'Action Scheduler CLI drain failed.' : $message );
-				$stop_reason = 'warning';
-				break;
-			}
-
-			$status_after = self::getStatusCounts( $hooks, $job_ids );
-			$progress     = self::processedDelta( $status_before, $status_after );
-			if ( 0 === $progress && self::getDuePendingCount( $hooks, $job_ids ) >= $due_before ) {
-				++$warnings;
-				WP_CLI::warning( 'Drain stopped because Action Scheduler made no observable progress.' );
-				$stop_reason = 'no_progress';
-				break;
+			return self::withLockStatus( $stats, $lock );
+		} finally {
+			if ( $acquire_lock ) {
+				WorkerLock::release( (string) ( $lock['lock_token'] ?? '' ) );
 			}
 		}
-
-		return self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids ), $batches, $warnings, $hooks, $job_ids, $stop_reason );
 	}
 
 	/**
@@ -181,13 +199,82 @@ class DrainCommand extends BaseCommand {
 	public static function status( array $options = array() ): array {
 		$hooks   = self::normalizeHooks( $options['hooks'] ?? null );
 		$job_ids = self::normalizeJobIds( $options['job_ids'] ?? null );
+		$lock    = WorkerLock::snapshot();
 
 		return array(
 			'due_pending'   => self::getDuePendingCount( $hooks, $job_ids ),
 			'total_pending' => self::getPendingCount( $hooks, $job_ids ),
 			'hooks'         => implode( ',', array_keys( self::getStatusCounts( $hooks, $job_ids ) ) ),
 			'job_ids'       => implode( ',', $job_ids ),
+		) + self::publicLockStatus( $lock );
+	}
+
+	/**
+	 * Build a lock-skipped drain result.
+	 *
+	 * @param string[]|null                 $hooks   Hook scope.
+	 * @param int[]                         $job_ids Job ID scope.
+	 * @param array<string,int|string|bool> $lock    Lock state.
+	 * @return array<string,int|string> Drain stats.
+	 */
+	private static function lockedStats( ?array $hooks, array $job_ids, array $lock ): array {
+		return self::withLockStatus(
+			array(
+				'batches'                    => 0,
+				'batch_chunks'               => 0,
+				'step_executions'            => 0,
+				'completions'                => 0,
+				'failures'                   => 0,
+				'batch_chunk_completions'    => 0,
+				'batch_chunk_failures'       => 0,
+				'step_execution_completions' => 0,
+				'step_execution_failures'    => 0,
+				'actions_processed'          => 0,
+				'other_actions'              => 0,
+				'remaining_pending'          => self::getDuePendingCount( $hooks, $job_ids ),
+				'total_pending'              => self::getPendingCount( $hooks, $job_ids ),
+				'warnings'                   => 0,
+				'stop_reason'                => 'locked',
+				'hooks'                      => implode( ',', array_keys( self::getStatusCounts( $hooks, $job_ids ) ) ),
+				'job_ids'                    => implode( ',', $job_ids ),
+			),
+			$lock
 		);
+	}
+
+	/**
+	 * Add operator-facing lock fields to stats.
+	 *
+	 * @param array<string,int|string>      $stats Stats.
+	 * @param array<string,int|string|bool> $lock  Lock state.
+	 * @return array<string,int|string> Stats with lock fields.
+	 */
+	private static function withLockStatus( array $stats, array $lock ): array {
+		return $stats + self::publicLockStatus( $lock );
+	}
+
+	/**
+	 * Strip private lock fields before CLI output.
+	 *
+	 * @param array<string,int|string|bool> $lock Lock state.
+	 * @return array<string,int|string> Public lock state.
+	 */
+	private static function publicLockStatus( array $lock ): array {
+		return array(
+			'lock_status'      => (string) ( $lock['lock_status'] ?? 'unlocked' ),
+			'lock_owner'       => (string) ( $lock['lock_owner'] ?? '' ),
+			'lock_age_seconds' => (int) ( $lock['lock_age_seconds'] ?? 0 ),
+			'lock_expires_at'  => (int) ( $lock['lock_expires_at'] ?? 0 ),
+		);
+	}
+
+	/**
+	 * Build a compact default owner string for lock diagnostics.
+	 */
+	private static function defaultLockOwner( string $command ): string {
+		$pid = getmypid();
+
+		return sprintf( '%s pid:%d host:%s', $command, false === $pid ? 0 : $pid, php_uname( 'n' ) );
 	}
 
 	/**
