@@ -262,7 +262,7 @@ class SettingsCommand extends BaseCommand {
 			return true;
 		}
 
-		$needles    = array(
+		$needles = array(
 			'api_key',
 			'app_private_key',
 			'authorization',
