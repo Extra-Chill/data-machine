@@ -108,6 +108,12 @@ class PendingActionsCommand extends BaseCommand {
 	 * [--kind=<kind>]
 	 * : Filter by action kind before summarizing.
 	 *
+	 * [--context-limit=<limit>]
+	 * : Maximum context buckets to include. Default 25, max 200. Use 0 for all buckets.
+	 *
+	 * [--include-context-details]
+	 * : Include all context buckets in the summary.
+	 *
 	 * [--format=<format>]
 	 * : Output format. Default json.
 	 *

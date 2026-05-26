@@ -472,11 +472,16 @@ class PendingActionStore {
 	public static function summary( array $filters = array() ): array {
 		if ( ! self::has_database() ) {
 			return array(
-				'total'       => 0,
-				'by_status'   => array(),
-				'by_kind'     => array(),
-				'by_agent_id' => array(),
-				'by_context'  => array(),
+				'total'                    => 0,
+				'by_status'                => array(),
+				'by_kind'                  => array(),
+				'by_agent_id'              => array(),
+				'by_context'               => array(),
+				'by_context_total'         => 0,
+				'by_context_shown'         => 0,
+				'by_context_omitted'       => 0,
+				'context_limit'            => self::normalize_context_summary_limit( $filters ),
+				'context_detail_truncated' => false,
 			);
 		}
 
@@ -525,12 +530,19 @@ class PendingActionStore {
 		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$prepare_args ), ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
+		$context_limit = self::normalize_context_summary_limit( $filters );
+
 		$summary = array(
-			'total'       => count( (array) $rows ),
-			'by_status'   => array(),
-			'by_kind'     => array(),
-			'by_agent_id' => array(),
-			'by_context'  => array(),
+			'total'                    => count( (array) $rows ),
+			'by_status'                => array(),
+			'by_kind'                  => array(),
+			'by_agent_id'              => array(),
+			'by_context'               => array(),
+			'by_context_total'         => 0,
+			'by_context_shown'         => 0,
+			'by_context_omitted'       => 0,
+			'context_limit'            => $context_limit,
+			'context_detail_truncated' => false,
 		);
 
 		foreach ( (array) $rows as $row ) {
@@ -546,7 +558,68 @@ class PendingActionStore {
 			}
 		}
 
+		self::sort_summary_bucket( $summary['by_status'] );
+		self::sort_summary_bucket( $summary['by_kind'] );
+		self::sort_summary_bucket( $summary['by_agent_id'] );
+		self::sort_summary_bucket( $summary['by_context'] );
+
+		$context_total                       = count( $summary['by_context'] );
+		$summary['by_context_total']         = $context_total;
+		$summary['by_context']               = self::limit_summary_bucket( $summary['by_context'], $context_limit );
+		$summary['by_context_shown']         = count( $summary['by_context'] );
+		$summary['by_context_omitted']       = max( 0, $context_total - $summary['by_context_shown'] );
+		$summary['context_detail_truncated'] = $summary['by_context_omitted'] > 0;
+
 		return $summary;
+	}
+
+	/**
+	 * Normalize context bucket output limit for summaries.
+	 *
+	 * @param array $filters Query filters.
+	 * @return int Zero means unbounded.
+	 */
+	private static function normalize_context_summary_limit( array $filters ): int {
+		if ( ! empty( $filters['include_context_details'] ) ) {
+			return 0;
+		}
+
+		if ( array_key_exists( 'context_limit', $filters ) ) {
+			$limit = (int) $filters['context_limit'];
+			return 0 === $limit ? 0 : max( 1, min( 200, $limit ) );
+		}
+
+		return 25;
+	}
+
+	/**
+	 * Sort a summary bucket by count descending, then key ascending.
+	 *
+	 * @param array<string,int> $bucket Bucket to sort.
+	 */
+	private static function sort_summary_bucket( array &$bucket ): void {
+		uksort(
+			$bucket,
+			static function ( string $left, string $right ) use ( $bucket ): int {
+				$count_compare = ( $bucket[ $right ] ?? 0 ) <=> ( $bucket[ $left ] ?? 0 );
+				return 0 !== $count_compare ? $count_compare : strcmp( $left, $right );
+			}
+		);
+	}
+
+	/**
+	 * Return the top summary bucket rows according to the requested limit.
+	 *
+	 * @param array<string,int> $bucket Bucket to limit.
+	 * @param int               $limit  Zero means unbounded.
+	 * @return array<string,int>
+	 */
+	private static function limit_summary_bucket( array $bucket, int $limit ): array {
+		if ( 0 === $limit ) {
+			return $bucket;
+		}
+
+		return array_slice( $bucket, 0, $limit, true );
 	}
 
 	/**
