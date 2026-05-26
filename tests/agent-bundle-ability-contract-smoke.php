@@ -29,6 +29,7 @@ function datamachine_bundle_ability_contains( string $source, string $needle, st
 $abilities = (string) file_get_contents( $root . '/inc/Abilities/AgentAbilities.php' );
 $cli       = (string) file_get_contents( $root . '/inc/Cli/Commands/AgentBundleCommand.php' );
 $service   = (string) file_get_contents( $root . '/inc/Engine/Bundle/AgentBundleAbilityService.php' );
+$projection = (string) file_get_contents( $root . '/inc/Engine/Bundle/AgentBundleLifecycleProjection.php' );
 
 echo "agent-bundle-ability-contract-smoke\n";
 
@@ -50,9 +51,10 @@ foreach ( array(
 	'AgentBundleUpgradePlanner::plan'            => 'service owns upgrade planning',
 	'AgentBundleUpgradePendingAction::stage'     => 'service owns approval staging',
 	'ResolvePendingActionAbility::execute'       => 'service owns PendingAction apply bridge',
-	'AgentBundleArtifactExtensions::current_artifacts' => 'service owns extension current-state collection',
+	'AgentBundleLifecycleProjection'              => 'service uses shared lifecycle projection',
+	'AgentBundleArtifactExtensions::current_artifacts' => 'shared lifecycle projection owns extension current-state collection',
 ) as $needle => $label ) {
-	datamachine_bundle_ability_contains( $service . $abilities, $needle, $label, $failures, $passes );
+	datamachine_bundle_ability_contains( $service . $projection . $abilities, $needle, $label, $failures, $passes );
 }
 
 echo "\n[3] WP-CLI wraps ability callbacks instead of duplicating public lifecycle logic\n";
