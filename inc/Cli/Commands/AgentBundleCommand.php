@@ -230,9 +230,9 @@ class AgentBundleCommand extends BaseCommand {
 	 * ---
 	 */
 	public function upgrade( array $args, array $assoc_args ): void {
-		$dry_run           = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
-		$input             = $this->bundle_ability_input( $args, $assoc_args );
-		$input['dry_run']  = $dry_run;
+		$dry_run          = \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false );
+		$input            = $this->bundle_ability_input( $args, $assoc_args );
+		$input['dry_run'] = $dry_run;
 		if ( isset( $assoc_args['owner'] ) ) {
 			$input['owner_id'] = $this->resolve_user_id( $assoc_args['owner'] );
 		}
@@ -342,7 +342,13 @@ class AgentBundleCommand extends BaseCommand {
 			'policy'            => (string) ( $assoc_args['policy'] ?? AgentBundleArtifactRebase::POLICY_CONSERVATIVE ),
 		);
 
-		foreach ( array( 'token' => 'token', 'token-env' => 'token_env', 'artifact' => 'artifact' ) as $cli_key => $ability_key ) {
+		foreach (
+			array(
+				'token'     => 'token',
+				'token-env' => 'token_env',
+				'artifact'  => 'artifact',
+			) as $cli_key => $ability_key
+		) {
 			if ( isset( $assoc_args[ $cli_key ] ) ) {
 				$input[ $ability_key ] = (string) $assoc_args[ $cli_key ];
 			}

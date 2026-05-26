@@ -27,10 +27,10 @@ final class AgentBundleAbilityService {
 	private AgentBundleLifecycleProjection $projection;
 
 	public function __construct( ?Agents $agents = null, ?Pipelines $pipelines = null, ?Flows $flows = null, ?AgentBundler $bundler = null, ?AgentBundleLifecycleProjection $projection = null ) {
-		$this->agents    = $agents ?? new Agents();
-		$this->pipelines = $pipelines ?? new Pipelines();
-		$this->flows     = $flows ?? new Flows();
-		$this->bundler   = $bundler ?? new AgentBundler();
+		$this->agents     = $agents ?? new Agents();
+		$this->pipelines  = $pipelines ?? new Pipelines();
+		$this->flows      = $flows ?? new Flows();
+		$this->bundler    = $bundler ?? new AgentBundler();
 		$this->projection = $projection ?? new AgentBundleLifecycleProjection( $this->pipelines, $this->flows );
 	}
 
@@ -184,16 +184,16 @@ final class AgentBundleAbilityService {
 		);
 
 		if ( $plan->has_pending_approval() ) {
-			$agent             = $this->resolve_bundle_agent( $bundle, $slug );
-			$rebased_artifacts = $rebase_local
+			$agent                      = $this->resolve_bundle_agent( $bundle, $slug );
+			$rebased_artifacts          = $rebase_local
 				? $this->rebase_locally_modified( $plan, $bundle, $slug, $policy_name )
 				: array();
-			$pending           = AgentBundleUpgradePendingAction::stage(
+			$pending                    = AgentBundleUpgradePendingAction::stage(
 				$plan,
 				array(
 					'bundle'             => $this->bundle_summary( $bundle, $slug ),
 					'agent'              => $agent ? $agent : array(),
-					'target_artifacts'   => $this->projection->target_artifacts( $bundle, $agent ?: null ),
+					'target_artifacts'   => $this->projection->target_artifacts( $bundle, $agent ? $agent : null ),
 					'approved_artifacts' => $this->approved_rebased_artifact_keys( $rebased_artifacts ),
 					'rebased_artifacts'  => $rebased_artifacts,
 					'summary'            => 'Review locally modified bundle artifacts before applying.',
