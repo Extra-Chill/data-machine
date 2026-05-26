@@ -51,6 +51,9 @@ class SettingsCommand extends BaseCommand {
 	 *   - json
 	 * ---
 	 *
+	 * [--reveal]
+	 * : Reveal secret-like settings. By default, secret-like values are redacted.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine settings get default_model
@@ -62,6 +65,7 @@ class SettingsCommand extends BaseCommand {
 	public function get( array $args, array $assoc_args ): void {
 		$key    = $args[0];
 		$format = $assoc_args['format'] ?? 'value';
+		$reveal = ! empty( $assoc_args['reveal'] );
 
 		$value = PluginSettings::get( $key );
 
@@ -69,22 +73,24 @@ class SettingsCommand extends BaseCommand {
 			WP_CLI::error( "Setting '{$key}' is not set." );
 		}
 
+		$display_value = self::redactSecretsForDisplay( $key, $value, $reveal );
+
 		if ( 'json' === $format ) {
 			WP_CLI::log(
 				wp_json_encode(
 					array(
 						'key'   => $key,
-						'value' => $value,
+						'value' => $display_value,
 					),
 					JSON_PRETTY_PRINT
 				)
 			);
-		} elseif ( is_array( $value ) || is_object( $value ) ) {
-				WP_CLI::log( wp_json_encode( $value, JSON_PRETTY_PRINT ) );
-		} elseif ( is_bool( $value ) ) {
-			WP_CLI::log( $value ? 'true' : 'false' );
+		} elseif ( is_array( $display_value ) || is_object( $display_value ) ) {
+			WP_CLI::log( wp_json_encode( $display_value, JSON_PRETTY_PRINT ) );
+		} elseif ( is_bool( $display_value ) ) {
+			WP_CLI::log( $display_value ? 'true' : 'false' );
 		} else {
-			WP_CLI::log( (string) $value );
+			WP_CLI::log( (string) $display_value );
 		}
 	}
 
@@ -158,9 +164,9 @@ class SettingsCommand extends BaseCommand {
 			if ( in_array( $key, $unhandled, true ) ) {
 				WP_CLI::error( "Setting '{$key}' is not a recognized setting key. It was not saved." );
 			}
-			WP_CLI::success( "Updated '{$key}': " . $this->format_value( $old_value ) . ' → ' . $this->format_value( $value ) );
+			WP_CLI::success( "Updated '{$key}': " . $this->format_setting_value( $key, $old_value ) . ' → ' . $this->format_setting_value( $key, $value ) );
 		} elseif ( $old_value === $value ) {
-			WP_CLI::warning( "Setting '{$key}' already has value: " . $this->format_value( $value ) );
+			WP_CLI::warning( "Setting '{$key}' already has value: " . $this->format_setting_value( $key, $value ) );
 		} elseif ( ! empty( $result['error'] ) ) {
 			WP_CLI::error( (string) $result['error'] );
 		} else {
@@ -182,6 +188,9 @@ class SettingsCommand extends BaseCommand {
 	 *   - json
 	 * ---
 	 *
+	 * [--reveal]
+	 * : Reveal secret-like settings. By default, secret-like values are redacted.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine settings list
@@ -192,6 +201,7 @@ class SettingsCommand extends BaseCommand {
 	 */
 	public function list( array $args, array $assoc_args ): void {
 		$format   = $assoc_args['format'] ?? 'table';
+		$reveal   = ! empty( $assoc_args['reveal'] );
 		$settings = PluginSettings::all();
 
 		if ( empty( $settings ) ) {
@@ -199,11 +209,16 @@ class SettingsCommand extends BaseCommand {
 			return;
 		}
 
+		$display_settings = array();
+		foreach ( $settings as $key => $value ) {
+			$display_settings[ $key ] = self::redactSecretsForDisplay( (string) $key, $value, $reveal );
+		}
+
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( wp_json_encode( $display_settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 		} else {
 			$rows = array();
-			foreach ( $settings as $key => $value ) {
+			foreach ( $display_settings as $key => $value ) {
 				$rows[] = array(
 					'key'   => $key,
 					'value' => $this->format_value( $value ),
@@ -211,6 +226,87 @@ class SettingsCommand extends BaseCommand {
 			}
 			WP_CLI\Utils\format_items( 'table', $rows, array( 'key', 'value' ) );
 		}
+	}
+
+	/**
+	 * Redact a setting value when the key name indicates credentials.
+	 *
+	 * @param string $key    Setting key.
+	 * @param mixed  $value  Setting value.
+	 * @param bool   $reveal Whether to reveal raw values.
+	 * @return mixed Redacted or raw value.
+	 */
+	public static function redactSecretsForDisplay( string $key, mixed $value, bool $reveal = false ): mixed {
+		if ( $reveal ) {
+			return $value;
+		}
+
+		if ( self::isSecretKey( $key ) ) {
+			return self::redactedValue( $value );
+		}
+
+		if ( is_array( $value ) ) {
+			$redacted = array();
+			foreach ( $value as $nested_key => $nested_value ) {
+				$redacted[ $nested_key ] = self::redactSecretsForDisplay( (string) $nested_key, $nested_value, false );
+			}
+			return $redacted;
+		}
+
+		return $value;
+	}
+
+	private static function isSecretKey( string $key ): bool {
+		$normalized = strtolower( $key );
+		if ( 'github_pat' === $normalized ) {
+			return true;
+		}
+
+		$needles    = array(
+			'api_key',
+			'app_private_key',
+			'authorization',
+			'bearer',
+			'client_secret',
+			'cookie',
+			'password',
+			'private_key',
+			'refresh_token',
+			'secret',
+			'token',
+		);
+
+		foreach ( $needles as $needle ) {
+			if ( str_contains( $normalized, $needle ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static function redactedValue( mixed $value ): mixed {
+		if ( is_array( $value ) ) {
+			$redacted = array();
+			foreach ( $value as $key => $nested_value ) {
+				$redacted[ $key ] = self::redactedValue( $nested_value );
+			}
+			return $redacted;
+		}
+
+		if ( is_object( $value ) ) {
+			return '[redacted]';
+		}
+
+		if ( null === $value || '' === $value ) {
+			return $value;
+		}
+
+		return '[redacted]';
+	}
+
+	private function format_setting_value( string $key, mixed $value ): string {
+		return $this->format_value( self::redactSecretsForDisplay( $key, $value ) );
 	}
 
 	/**
