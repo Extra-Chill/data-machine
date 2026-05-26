@@ -241,7 +241,7 @@ final class AgentBundleCoreArtifactApply {
 		$config['datamachine_bundle']['template_version'] = $template_version;
 		$config['datamachine_bundle']['source_ref']       = $source_ref;
 		$config['datamachine_bundle']['source_revision']  = $source_revision;
-		$artifact_record                               = array(
+		$artifact_record                                  = array(
 			'bundle_slug'       => $bundle_slug,
 			'bundle_version'    => $version,
 			'artifact_type'     => $type,
