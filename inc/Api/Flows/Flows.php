@@ -523,7 +523,7 @@ class Flows {
 				$status = 404;
 			}
 
-			return $error ?: new \WP_Error( 'flow_not_found', __( 'Flow not found.', 'data-machine' ), array( 'status' => $status ) );
+			return $error ? $error : new \WP_Error( 'flow_not_found', __( 'Flow not found.', 'data-machine' ), array( 'status' => $status ) );
 		}
 
 		return AbilityResult::rest_item_response( $result, $result['flows'][0] );

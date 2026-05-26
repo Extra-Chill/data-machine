@@ -226,7 +226,7 @@ class Jobs {
 
 		$error = AbilityResult::failure_to_wp_error( $result, 'job_not_found', __( 'Job not found.', 'data-machine' ), 404 );
 		if ( $error || empty( $result['jobs'] ) ) {
-			return $error ?: new \WP_Error( 'job_not_found', __( 'Job not found.', 'data-machine' ), array( 'status' => 404 ) );
+			return $error ? $error : new \WP_Error( 'job_not_found', __( 'Job not found.', 'data-machine' ), array( 'status' => 404 ) );
 		}
 
 		return AbilityResult::rest_item_response( $result, $result['jobs'][0] );
