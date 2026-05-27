@@ -58,6 +58,13 @@ class WorkflowSpecValidator {
 				);
 			}
 
+			if ( array_key_exists( 'step_type', $step ) ) {
+				return array(
+					'valid' => false,
+					'error' => "Step {$index} uses stored-config field step_type; ephemeral workflow specs use type",
+				);
+			}
+
 			foreach ( array( 'handler', 'handler_slug', 'handler_config' ) as $legacy_field ) {
 				if ( array_key_exists( $legacy_field, $step ) ) {
 					return array(

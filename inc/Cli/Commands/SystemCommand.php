@@ -205,11 +205,11 @@ class SystemCommand extends BaseCommand {
 	}
 
 	/**
-	 * Run a system task immediately.
+	 * Schedule a system task to run now.
 	 *
-	 * Triggers a registered system task for immediate execution via the
-	 * datamachine/run-task ability. Only tasks with supports_run: true
-	 * can be triggered.
+	 * Enqueues a registered system task via the datamachine/run-task ability.
+	 * Only tasks with supports_run: true can be scheduled manually; process the
+	 * resulting job with `wp datamachine worker run` or `wp datamachine drain`.
 	 *
 	 * ## OPTIONS
 	 *
