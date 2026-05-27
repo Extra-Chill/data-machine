@@ -371,6 +371,133 @@ class JobsCommand extends BaseCommand {
 	}
 
 	/**
+	 * Trim runtime queue payloads from persisted job engine_data.
+	 *
+	 * Historical batch child jobs may carry copied flow runtime queues in
+	 * engine_data. Those queues are read from the live flow record at execution
+	 * time, so keeping them on each child only inflates Action Scheduler memory.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--yes]
+	 * : Apply changes. Without this flag the command is a dry run.
+	 *
+	 * [--limit=<limit>]
+	 * : Maximum rows to inspect.
+	 * ---
+	 * default: 500
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - yaml
+	 * ---
+	 *
+	 * @subcommand trim-runtime-queues
+	 */
+	public function trim_runtime_queues( array $args, array $assoc_args ): void {
+		global $wpdb;
+
+		$apply  = isset( $assoc_args['yes'] );
+		$limit  = isset( $assoc_args['limit'] ) ? max( 1, min( 5000, (int) $assoc_args['limit'] ) ) : 500;
+		$format = $assoc_args['format'] ?? 'table';
+
+		$jobs_table = $wpdb->prefix . 'datamachine_jobs';
+		$jobs_db    = new Jobs();
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is from $wpdb->prefix.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT job_id, flow_id, pipeline_id, parent_job_id, status, engine_data
+				FROM {$jobs_table}
+				WHERE status IN ('pending', 'processing')
+				AND (engine_data LIKE %s OR engine_data LIKE %s OR engine_data LIKE %s)
+				ORDER BY job_id ASC
+				LIMIT %d",
+				'%' . $wpdb->esc_like( '"config_patch_queue"' ) . '%',
+				'%' . $wpdb->esc_like( '"prompt_queue"' ) . '%',
+				'%' . $wpdb->esc_like( '"_queue_consume_revision"' ) . '%',
+				$limit
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		$items   = array();
+		$summary = array(
+			'inspected' => count( $rows ),
+			'trimmed'   => 0,
+			'updated'   => 0,
+			'failed'    => 0,
+		);
+
+		foreach ( $rows as $row ) {
+			$job_id = (int) ( $row['job_id'] ?? 0 );
+			$before = $this->decode_job_engine_data( $row['engine_data'] ?? null );
+			$after  = $this->strip_runtime_queues_from_engine_data( $before );
+
+			$before_bytes = strlen( wp_json_encode( $before ) ?: '' );
+			$after_bytes  = strlen( wp_json_encode( $after ) ?: '' );
+			$changed      = $after !== $before;
+
+			$item = array(
+				'job_id'       => $job_id,
+				'flow_id'      => $row['flow_id'] ?? '',
+				'pipeline_id'  => $row['pipeline_id'] ?? '',
+				'parent_job_id' => (int) ( $row['parent_job_id'] ?? 0 ),
+				'status'       => $row['status'] ?? '',
+				'before_bytes' => $before_bytes,
+				'after_bytes'  => $after_bytes,
+				'saved_bytes'  => max( 0, $before_bytes - $after_bytes ),
+				'action'       => $changed ? ( $apply ? 'updated' : 'would_update' ) : 'unchanged',
+			);
+
+			if ( $changed ) {
+				++$summary['trimmed'];
+				if ( $apply ) {
+					if ( $jobs_db->store_engine_data( $job_id, $after ) ) {
+						++$summary['updated'];
+					} else {
+						++$summary['failed'];
+						$item['action'] = 'failed';
+					}
+				}
+			}
+
+			$items[] = $item;
+		}
+
+		if ( 'json' === $format || 'yaml' === $format ) {
+			WP_CLI::print_value(
+				array(
+					'success' => 0 === $summary['failed'],
+					'dry_run' => ! $apply,
+					'summary' => $summary,
+					'jobs'    => $items,
+				),
+				array( 'format' => $format )
+			);
+			return;
+		}
+
+		if ( empty( $items ) ) {
+			WP_CLI::success( 'No pending or processing jobs with runtime queue payloads found.' );
+			return;
+		}
+
+		$this->format_items( $items, array( 'job_id', 'flow_id', 'status', 'before_bytes', 'after_bytes', 'saved_bytes', 'action' ), $assoc_args, 'job_id' );
+		WP_CLI::log( sprintf( 'Inspected %d jobs; %d need trimming; %d updated; %d failed.', $summary['inspected'], $summary['trimmed'], $summary['updated'], $summary['failed'] ) );
+		if ( ! $apply ) {
+			WP_CLI::log( 'Dry run - pass --yes to apply changes.' );
+		}
+	}
+
+	/**
 	 * Reconcile jobs whose persisted status disagrees with successful engine artifacts.
 	 *
 	 * Repairs historical rows where a completed engine artifact disagrees with the
@@ -666,6 +793,34 @@ class JobsCommand extends BaseCommand {
 
 		$decoded = json_decode( $engine_data, true );
 		return is_array( $decoded ) ? $decoded : array();
+	}
+
+	/**
+	 * Strip runtime queue fields from engine_data flow config.
+	 *
+	 * @param array<string,mixed> $engine_data Decoded engine data.
+	 * @return array<string,mixed> Engine data without copied runtime queue payloads.
+	 */
+	private function strip_runtime_queues_from_engine_data( array $engine_data ): array {
+		$flow_config = is_array( $engine_data['flow_config'] ?? null ) ? $engine_data['flow_config'] : array();
+
+		foreach ( $flow_config as $flow_step_id => $flow_step_config ) {
+			if ( ! is_array( $flow_step_config ) ) {
+				continue;
+			}
+
+			unset(
+				$flow_step_config['prompt_queue'],
+				$flow_step_config['config_patch_queue'],
+				$flow_step_config['_queue_consume_revision']
+			);
+
+			$flow_config[ $flow_step_id ] = $flow_step_config;
+		}
+
+		$engine_data['flow_config'] = $flow_config;
+
+		return $engine_data;
 	}
 
 	/**
