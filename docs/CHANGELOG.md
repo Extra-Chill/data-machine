@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.133.2] - 2026-05-27
+
+### Fixed
+- avoid private job summary calls
+- keep worker status compact
+- make worker job status lightweight
+
 ## [0.133.1] - 2026-05-27
 
 ### Fixed
