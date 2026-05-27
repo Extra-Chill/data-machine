@@ -78,6 +78,7 @@ function datamachine_run_conversation(
 	// final result directly (see agents-api#136), so we only carry by-reference
 	// the things substrate doesn't track for us.
 	$last_tool_calls        = array();
+	$all_tool_calls         = array();
 	$tool_execution_results = array();
 	$completion_nudges      = array();
 	$last_request_metadata  = array();
@@ -139,6 +140,7 @@ function datamachine_run_conversation(
 			'turn_count'                      => 0,
 			'completed'                       => false,
 			'last_tool_calls'                 => array(),
+			'tool_calls'                      => array(),
 			'tool_execution_results'          => array(),
 			'error'                           => $error_message,
 			'error_code'                      => 'completion_required_tool_unavailable',
@@ -187,6 +189,7 @@ function datamachine_run_conversation(
 		$completion_policy,
 		$tool_runtime_rules,
 		$last_tool_calls,
+		$all_tool_calls,
 		$tool_execution_results,
 		$completion_nudges,
 		$last_request_metadata,
@@ -264,6 +267,7 @@ function datamachine_run_conversation(
 			'turn_count'             => $latest_turn_count,
 			'completed'              => false,
 			'last_tool_calls'        => $last_tool_calls,
+			'tool_calls'             => $all_tool_calls,
 			'tool_execution_results' => $tool_execution_results,
 			'error'                  => $e->getMessage(),
 			'usage'                  => array(),
@@ -291,6 +295,7 @@ function datamachine_run_conversation(
 			'turn_count'             => 0,
 			'completed'              => false,
 			'last_tool_calls'        => array(),
+			'tool_calls'             => array(),
 			'tool_execution_results' => array(),
 			'usage'                  => array(),
 			'error'                  => $e->getMessage(),
@@ -304,6 +309,7 @@ function datamachine_run_conversation(
 	// DM-only fields that the substrate doesn't know about.
 	$result['completed']       = 'budget_exceeded' !== ( $result['status'] ?? '' );
 	$result['last_tool_calls'] = $last_tool_calls;
+	$result['tool_calls']      = $all_tool_calls;
 	if ( $runtime_tool_pending ) {
 		$result['completed']                     = false;
 		$result['runtime_tool_pending']          = true;
@@ -367,7 +373,8 @@ function datamachine_run_conversation(
  * @param array                                     $base_log_context   Base log context.
  * @param WP_Agent_Conversation_Completion_Policy   $completion_policy  Completion policy.
  * @param DataMachineToolRuntimeRules               $tool_runtime_rules Tool runtime rules.
- * @param array                                     &$last_tool_calls    Mutable last tool calls (DM-flavored shape).
+ * @param array                                     &$last_tool_calls    Mutable last turn's tool calls (DM-flavored shape).
+ * @param array                                     &$all_tool_calls     Mutable all tool calls made during the run.
  * @param array                                     &$all_tool_results   Mutable all executed tool results (DM-flavored shape).
  * @param array                                     &$completion_nudges  Mutable nudge diagnostics (DM-only).
  * @return callable Turn runner closure.
@@ -384,6 +391,7 @@ function datamachine_build_turn_runner(
 	WP_Agent_Conversation_Completion_Policy $completion_policy,
 	DataMachineToolRuntimeRules $tool_runtime_rules,
 	array &$last_tool_calls,
+	array &$all_tool_calls,
 	array &$all_tool_results,
 	array &$completion_nudges,
 	array &$last_request_metadata,
@@ -404,6 +412,7 @@ function datamachine_build_turn_runner(
 		$completion_policy,
 		$tool_runtime_rules,
 		&$last_tool_calls,
+		&$all_tool_calls,
 		&$all_tool_results,
 		&$completion_nudges,
 		&$last_request_metadata,
@@ -473,6 +482,9 @@ function datamachine_build_turn_runner(
 		$tool_calls      = datamachine_extract_tool_calls( $ai_result );
 		$ai_content      = RequestBuilder::resultText( $ai_result );
 		$last_tool_calls = $tool_calls;
+		foreach ( $tool_calls as $tool_call ) {
+			$all_tool_calls[] = $tool_call;
+		}
 
 		// Per-turn token usage. Substrate accumulates this across turns and
 		// exposes the running total on the final loop result.
