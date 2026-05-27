@@ -110,12 +110,12 @@ function formatEventDateTime( date: string, time: string ): string {
 }
 
 /**
- * Tour-route popup. Lists every upcoming show at this venue for the
- * scoped artist, chronologically. The same shape is used for first, last,
- * and middle markers — only the marker icon differs by tour position.
+ * Chronological-route popup. Lists every upcoming show at this venue for the
+ * scoped taxonomy term, chronologically. The same shape is used for first,
+ * last, and middle markers — only the marker icon differs by route position.
  */
-function buildTourRoutePopupHtml( venue: Venue ): string {
-	let html = '<div class="venue-popup venue-popup--tour-route">';
+function buildChronologicalRoutePopupHtml( venue: Venue ): string {
+	let html = '<div class="venue-popup venue-popup--chronological-route">';
 
 	if ( venue.url ) {
 		html += `<a href="${ escapeHtml( venue.url ) }" class="venue-popup-name">${ escapeHtml( venue.name ) }</a>`;
@@ -161,9 +161,9 @@ function createVenueIcon(): L.DivIcon {
 }
 
 /**
- * Tour-route marker. `position` flags first/last for distinct color
- * treatment; middle stops fall through to the default pin look but in
- * the tour-route className so site CSS can theme them as a set.
+ * Chronological-route marker. `position` flags first/last for distinct color
+ * treatment; middle stops fall through to the default pin look but in the
+ * chronological-route className so site CSS can theme them as a set.
  *
  * Colors picked for high contrast against OSM tiles:
  *   - first = green  (#22c55e)
@@ -173,7 +173,7 @@ function createVenueIcon(): L.DivIcon {
  * v1 keeps numbered badges out of scope (per #310 design notes); revisit
  * once Chris weighs in on the live render.
  */
-function createTourRouteIcon( position: 'first' | 'last' | 'middle' ): L.DivIcon {
+function createChronologicalRouteIcon( position: 'first' | 'last' | 'middle' ): L.DivIcon {
 	const color =
 		position === 'first'
 			? '#22c55e'
@@ -181,11 +181,11 @@ function createTourRouteIcon( position: 'first' | 'last' | 'middle' ): L.DivIcon
 				? '#ef4444'
 				: '#475569';
 
-	const html = `<span class="tour-route-pin tour-route-pin--${ position }" style="background:${ color };"></span>`;
+	const html = `<span class="chronological-route-pin chronological-route-pin--${ position }" style="background:${ color };"></span>`;
 
 	return L.divIcon( {
 		html,
-		className: `tour-route-marker tour-route-marker--${ position }`,
+		className: `chronological-route-marker chronological-route-marker--${ position }`,
 		iconSize: [ 22, 22 ],
 		iconAnchor: [ 11, 22 ],
 		popupAnchor: [ 0, -22 ],
@@ -195,8 +195,8 @@ function createTourRouteIcon( position: 'first' | 'last' | 'middle' ): L.DivIcon
 /**
  * Earliest start_datetime (date + time) for a venue, as a sortable
  * "YYYY-MM-DD HH:MM:SS" string. Used to order venues chronologically when
- * drawing the tour-route polyline. Returns null when no events were
- * attached (which means we should skip the venue from the route).
+ * drawing the chronological-route polyline. Returns null when no events
+ * were attached (which means we should skip the venue from the route).
  */
 function earliestEventKey( venue: Venue ): string | null {
 	const shows = venue.upcoming_events_at_venue ?? [];
@@ -400,21 +400,21 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		nonce,
 		showLocationSearch,
 		geocodeUrl,
-		tourRouteMode,
+		chronologicalRouteMode,
 	} = props;
 
 	const mapRef = useRef<L.Map | null>( null );
 	const clusterGroupRef = useRef<L.MarkerClusterGroup | null>( null );
 	const markerMapRef = useRef<Map<number, L.Marker>>( new Map() );
 	const userMarkerRef = useRef<L.Marker | null>( null );
-	// Single L.polyline holding the chronological tour route. Recreated
-	// from scratch whenever venues change so we don't manage segment-level
+	// Single L.polyline holding the chronological route. Recreated from
+	// scratch whenever venues change so we don't manage segment-level
 	// diffing — the route is at most a few dozen points.
-	const tourPolylineRef = useRef<L.Polyline | null>( null );
-	// Tracks whether the tour-route effect has already fit bounds once.
-	// Without this we'd re-fit on every bounds-change refetch and trap
-	// the user inside the route.
-	const tourFitOnceRef = useRef<boolean>( false );
+	const chronologicalRoutePolylineRef = useRef<L.Polyline | null>( null );
+	// Tracks whether the chronological-route effect has already fit bounds
+	// once. Without this we'd re-fit on every bounds-change refetch and
+	// trap the user inside the route.
+	const chronologicalRouteFitOnceRef = useRef<boolean>( false );
 	const containerRef = useRef<HTMLDivElement | null>( null );
 	const gestureOverlayRef = useRef<HTMLDivElement | null>( null );
 	const gestureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -438,10 +438,10 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 					bounds,
 					taxonomy: taxonomy || undefined,
 					termId: termId || undefined,
-					// Tour-route popups and ordering need the per-venue
-					// upcoming events array. Other contexts stay on the
-					// lean default response shape.
-					includeEvents: tourRouteMode || undefined,
+					// Chronological-route popups and ordering need the
+					// per-venue upcoming events array. Other contexts stay
+					// on the lean default response shape.
+					includeEvents: chronologicalRouteMode || undefined,
 				} );
 				setVenues( result.venues );
 			} catch ( err ) {
@@ -451,7 +451,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				setLoading( false );
 			}
 		},
-		[ restUrl, nonce, taxonomy, termId, tourRouteMode ],
+		[ restUrl, nonce, taxonomy, termId, chronologicalRouteMode ],
 	);
 
 	/* --- debounced bounds handler --- */
@@ -561,10 +561,11 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		mapRef.current = map;
 
 		// Fetch venues on pan/zoom and dispatch bounds-changed events.
-		// Tour-route mode is artist-scoped: the full set is already small
-		// and refetching by viewport would drop venues that the user just
-		// panned away from, mid-route. Skip the moveend refetch for it.
-		if ( ! tourRouteMode ) {
+		// Chronological-route mode operates on a bounded set (one taxonomy
+		// term's events) — the full set is already small and refetching by
+		// viewport would drop venues that the user just panned away from,
+		// mid-route. Skip the moveend refetch for it.
+		if ( ! chronologicalRouteMode ) {
 			map.on( 'moveend', () => debouncedFetch( map ) );
 		}
 
@@ -575,11 +576,11 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		if ( initialVenues.length === 0 ) {
 			// Small delay so map is fully sized first.
 			setTimeout( () => {
-				// Tour-route mode wants the full set of artist venues
+				// Chronological-route mode wants the full bounded set
 				// regardless of the default viewport, then it auto-fits
 				// to those points. Passing bounds here would clip the
 				// route on first paint.
-				const bounds = tourRouteMode ? undefined : getBoundsFromMap( map );
+				const bounds = chronologicalRouteMode ? undefined : getBoundsFromMap( map );
 				loadVenues( bounds );
 				dispatchBoundsChanged( map );
 			}, 200 );
@@ -589,8 +590,8 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			map.remove();
 			mapRef.current = null;
 			clusterGroupRef.current = null;
-			tourPolylineRef.current = null;
-			tourFitOnceRef.current = false;
+			chronologicalRoutePolylineRef.current = null;
+			chronologicalRouteFitOnceRef.current = false;
 			markerMapRef.current.clear();
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -668,23 +669,23 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		const clusterGroup = clusterGroupRef.current;
 		if ( ! map || ! clusterGroup ) return;
 
-		// Always tear down any previously-drawn tour polyline first. Whether
-		// or not this redraw ends up creating a new one, the stale one must
-		// not linger across filter changes / bounds refetches.
-		if ( tourPolylineRef.current ) {
-			map.removeLayer( tourPolylineRef.current );
-			tourPolylineRef.current = null;
+		// Always tear down any previously-drawn route polyline first.
+		// Whether or not this redraw ends up creating a new one, the stale
+		// one must not linger across filter changes / bounds refetches.
+		if ( chronologicalRoutePolylineRef.current ) {
+			map.removeLayer( chronologicalRoutePolylineRef.current );
+			chronologicalRoutePolylineRef.current = null;
 		}
 
 		// ============================================================
-		// Tour-route mode: chronological polyline + first/last styling.
-		// Simpler than the diffing path — every redraw clears markers and
-		// re-creates them because tour position (first/last/middle) is a
-		// function of the whole set, not the individual venue. The route
-		// is bounded by upcoming events for a single artist, so cardinality
-		// is small (typically <30).
+		// Chronological-route mode: polyline ordered by event date with
+		// first/last styling. Simpler than the diffing path — every redraw
+		// clears markers and re-creates them because route position (first/
+		// last/middle) is a function of the whole set, not the individual
+		// venue. The route is bounded by upcoming events for a single
+		// taxonomy term, so cardinality is small (typically <30).
 		// ============================================================
-		if ( tourRouteMode ) {
+		if ( chronologicalRouteMode ) {
 			const currentMarkers = markerMapRef.current;
 			if ( currentMarkers.size > 0 ) {
 				clusterGroup.clearLayers();
@@ -701,10 +702,9 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				.sort( ( a, b ) => ( a.key < b.key ? -1 : a.key > b.key ? 1 : 0 ) )
 				.map( ( entry ) => entry.venue );
 
-			// Per #310: <2 distinct venues = no route. The host plugin
-			// (extrachill-events artist-map.php) also gates this server-side,
-			// but enforce it here too so the block stays self-contained when
-			// rendered directly via shortcode/REST.
+			// Per #310: <2 distinct venues = no route. Host plugins also
+			// gate this server-side, but enforce it here too so the block
+			// stays self-contained when rendered directly via shortcode/REST.
 			if ( routeVenues.length < 2 ) {
 				return;
 			}
@@ -730,10 +730,10 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 					color: '#2563eb',
 					weight: 3,
 					opacity: 0.7,
-					className: 'tour-route-polyline',
+					className: 'chronological-route-polyline',
 				} );
 				polyline.addTo( map );
-				tourPolylineRef.current = polyline;
+				chronologicalRoutePolylineRef.current = polyline;
 			}
 
 			// Build markers with position-aware icons + multi-date popups.
@@ -747,8 +747,8 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 							: 'middle';
 
 				const marker = L.marker( [ venue.lat, venue.lon ], {
-					icon: createTourRouteIcon( position ),
-				} ).bindPopup( buildTourRoutePopupHtml( venue ) );
+					icon: createChronologicalRouteIcon( position ),
+				} ).bindPopup( buildChronologicalRoutePopupHtml( venue ) );
 
 				currentMarkers.set( venue.term_id, marker );
 				markersToAdd.push( marker );
@@ -761,14 +761,14 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			// Fit bounds to the full route on the FIRST successful render.
 			// Subsequent refetches (filter changes, bounds events) keep
 			// the current viewport so the user isn't yanked around.
-			if ( ! tourFitOnceRef.current ) {
+			if ( ! chronologicalRouteFitOnceRef.current ) {
 				const latlngs = orderedLatLngs.length > 0
 					? orderedLatLngs
 					: routeVenues.map( ( v ) => [ v.lat, v.lon ] as L.LatLngExpression );
 				if ( latlngs.length > 0 ) {
 					const bounds = L.latLngBounds( latlngs );
 					map.fitBounds( bounds.pad( 0.15 ) );
-					tourFitOnceRef.current = true;
+					chronologicalRouteFitOnceRef.current = true;
 				}
 			}
 
@@ -776,7 +776,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		}
 
 		// ============================================================
-		// Default (non-tour-route) mode — preserved verbatim.
+		// Default (non-chronological-route) mode — preserved verbatim.
 		// ============================================================
 		const icon = createVenueIcon();
 		const currentMarkers = markerMapRef.current;
@@ -942,7 +942,7 @@ function parseMapProps( container: HTMLElement ): MapProps {
 		nonce: data.nonce || '',
 		showLocationSearch: data.showLocationSearch === '1',
 		geocodeUrl: data.geocodeUrl || '',
-		tourRouteMode: data.tourRouteMode === '1',
+		chronologicalRouteMode: data.chronologicalRouteMode === '1',
 	};
 }
 

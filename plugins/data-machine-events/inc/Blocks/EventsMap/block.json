@@ -26,7 +26,7 @@
             "type": "boolean",
             "default": false
         },
-        "tourRouteMode": {
+        "chronologicalRouteMode": {
             "type": "boolean",
             "default": false
         }

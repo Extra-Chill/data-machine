@@ -280,14 +280,14 @@ a.venue-popup-name:hover {
 	font-size: 1rem;
 }
 
-/* Tour-route mode — chronological polyline + first/last marker styling.
-   Used on artist taxonomy archives via the tourRouteMode block attribute. */
-.data-machine-events-map .tour-route-marker {
+/* Chronological-route mode — polyline ordered by event date with first/last
+   marker styling. Activated via the chronologicalRouteMode block attribute. */
+.data-machine-events-map .chronological-route-marker {
 	background: none;
 	border: none;
 }
 
-.data-machine-events-map .tour-route-pin {
+.data-machine-events-map .chronological-route-pin {
 	display: block;
 	width: 18px;
 	height: 18px;
@@ -298,18 +298,18 @@ a.venue-popup-name:hover {
 	margin-left: 2px;
 }
 
-.data-machine-events-map .tour-route-pin--first {
+.data-machine-events-map .chronological-route-pin--first {
 	width: 22px;
 	height: 22px;
 }
 
-.data-machine-events-map .tour-route-pin--last {
+.data-machine-events-map .chronological-route-pin--last {
 	width: 22px;
 	height: 22px;
 }
 
-/* Tour-route popup — multi-date show list under venue name */
-.data-machine-events-map .venue-popup--tour-route {
+/* Chronological-route popup — multi-date show list under venue name */
+.data-machine-events-map .venue-popup--chronological-route {
 	min-width: 220px;
 	max-width: 280px;
 }

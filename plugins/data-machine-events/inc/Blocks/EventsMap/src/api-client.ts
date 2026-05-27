@@ -20,7 +20,7 @@ interface FetchVenuesParams {
 	/**
 	 * When true, request the opt-in `upcoming_events_at_venue` payload by
 	 * appending `include=events`. Only meaningful in combination with a
-	 * taxonomy/term filter (e.g. tour-route mode on an artist archive).
+	 * taxonomy/term filter (e.g. chronological-route mode).
 	 */
 	includeEvents?: boolean;
 }

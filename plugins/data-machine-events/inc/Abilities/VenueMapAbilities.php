@@ -93,7 +93,7 @@ class VenueMapAbilities {
 						),
 						'include_events' => array(
 							'type'        => 'boolean',
-							'description' => 'When true and taxonomy+term_id are set, attach upcoming_events_at_venue per venue (events tagged with that term, chronological ascending). Powers tour-route mode on the events-map block.',
+							'description' => 'When true and taxonomy+term_id are set, attach upcoming_events_at_venue per venue (events tagged with that term, chronological ascending). Powers chronological-route mode on the events-map block.',
 						),
 					),
 				),
@@ -311,10 +311,10 @@ class VenueMapAbilities {
 			unset( $venue );
 
 			// Opt-in per-venue event list. Only attached when caller asked
-			// for it AND a taxonomy/term filter is in play (e.g. artist
-			// archive) — otherwise this would balloon to every venue's
-			// every upcoming event regardless of scope. The chronological
-			// sort/grouping for tour-route rendering happens client-side.
+			// for it AND a taxonomy/term filter is in play — otherwise this
+			// would balloon to every venue's every upcoming event regardless
+			// of scope. The chronological sort/grouping for route rendering
+			// happens client-side.
 			if ( $include_events && ! empty( $taxonomy ) && $term_id > 0 ) {
 				$events_by_venue = $this->getUpcomingEventsForVenuesAtTerm( $venue_ids, $taxonomy, $term_id );
 				foreach ( $venues as &$venue ) {
@@ -570,9 +570,9 @@ class VenueMapAbilities {
 	 *
 	 * Returns a `venue_term_id => list of event rows` map. Each event row contains
 	 * `post_id, start_date, start_time, title, permalink` — exactly what the
-	 * tour-route popup needs. Rows are ordered ascending by start_datetime
-	 * within each venue group so the client can pick the earliest entry as
-	 * the venue's "tour position" without re-sorting.
+	 * chronological-route popup needs. Rows are ordered ascending by
+	 * start_datetime within each venue group so the client can pick the
+	 * earliest entry as the venue's route position without re-sorting.
 	 *
 	 * Single SQL query: term_relationships(venue) joined to term_relationships(filter term)
 	 * joined to event_dates filtered to publish+future. Avoids N+1 across venues
@@ -580,7 +580,7 @@ class VenueMapAbilities {
 	 * post_name directly so we can build the permalink ourselves.
 	 *
 	 * @param int[]  $venue_ids        Venue term IDs scoping the lookup.
-	 * @param string $filter_taxonomy  Co-occurring taxonomy (e.g. 'artist').
+	 * @param string $filter_taxonomy  Co-occurring taxonomy slug.
 	 * @param int    $filter_term_id   Term ID in that taxonomy.
 	 * @return array<int,array<int,array{post_id:int,start_date:string,start_time:string,title:string,permalink:string}>>
 	 */

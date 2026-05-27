@@ -89,23 +89,25 @@ $geocode_rest_url = $show_location_search ? rest_url( 'datamachine/v1/events/geo
 // Summary (plugins can filter to show venue/event counts).
 $summary = apply_filters( 'data_machine_events_map_summary', '', array(), $context );
 
-// Tour-route mode: artist archives can render the same block with a chronological
-// polyline connecting venues by date. Either the block attribute (set when the
-// host emits the block with {"tourRouteMode":true}) or the filter can flip it on.
-$tour_route_mode = (bool) ( $attributes['tourRouteMode'] ?? false );
+// Chronological-route mode: render the venues as a chronologically-ordered
+// route (polyline through venue markers with distinguished first/last stops).
+// Generic display mode for any consumer that needs to draw a route through
+// venues by event date. Either the block attribute or the filter can flip
+// it on.
+$chronological_route_mode = (bool) ( $attributes['chronologicalRouteMode'] ?? false );
 
 /**
- * Filter whether the events map renders in tour-route mode.
+ * Filter whether the events map renders in chronological-route mode.
  *
- * Tour-route mode draws a chronological polyline between venue markers and
- * distinguishes the first/last venues. Intended for artist taxonomy archives
- * where a venue corresponds to a tour stop. Only meaningful when the block
- * also has a taxonomy/term context.
+ * Chronological-route mode draws a polyline between venue markers ordered by
+ * event date and distinguishes the first/last venues. Generic display mode
+ * for any consumer that needs a chronological route through venues. Only
+ * meaningful when the block also has a taxonomy/term context.
  *
- * @param bool  $tour_route_mode Current value.
- * @param array $context         Map context with taxonomy/term info.
+ * @param bool  $chronological_route_mode Current value.
+ * @param array $context                  Map context with taxonomy/term info.
  */
-$tour_route_mode = (bool) apply_filters( 'data_machine_events_map_tour_route', $tour_route_mode, $context );
+$chronological_route_mode = (bool) apply_filters( 'data_machine_events_map_chronological_route', $chronological_route_mode, $context );
 
 ?>
 <div <?php echo $wrapper; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
@@ -128,8 +130,8 @@ $tour_route_mode = (bool) apply_filters( 'data_machine_events_map_tour_route', $
 		data-show-location-search="1"
 		data-geocode-url="<?php echo esc_attr( $geocode_rest_url ); ?>"
 		<?php endif; ?>
-		<?php if ( $tour_route_mode ) : ?>
-		data-tour-route-mode="1"
+		<?php if ( $chronological_route_mode ) : ?>
+		data-chronological-route-mode="1"
 		<?php endif; ?>
 	></div>
 	<?php if ( ! empty( $summary ) ) : ?>

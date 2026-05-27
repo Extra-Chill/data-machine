@@ -10,7 +10,7 @@
 /**
  * Per-venue upcoming event row attached when the REST endpoint is called
  * with `include=events` and a taxonomy/term filter. Used to drive
- * tour-route popups and chronological ordering.
+ * chronological-route popups and chronological ordering.
  */
 export interface VenueUpcomingEvent {
 	post_id: number;
@@ -63,7 +63,7 @@ export interface MapAttributes {
 	height: number;
 	zoom: number;
 	mapType: MapType;
-	tourRouteMode?: boolean;
+	chronologicalRouteMode?: boolean;
 }
 
 /**
@@ -85,7 +85,7 @@ export interface MapProps {
 	nonce: string;
 	showLocationSearch: boolean;
 	geocodeUrl: string;
-	tourRouteMode: boolean;
+	chronologicalRouteMode: boolean;
 }
 
 /**
