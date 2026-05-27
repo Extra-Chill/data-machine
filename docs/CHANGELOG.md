@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.133.5] - 2026-05-27
+
+### Fixed
+- reclaim stale worker locks
+
 ## [0.133.4] - 2026-05-27
 
 ### Fixed
