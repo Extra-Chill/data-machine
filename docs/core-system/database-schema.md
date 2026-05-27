@@ -1,6 +1,6 @@
 # Database Schema
 
-Data Machine uses eight core tables for managing pipelines, flows, jobs, agents, access control, deduplication tracking, chat sessions, and centralized logging.
+Data Machine uses core tables for managing pipelines, flows, jobs, agents, access control, deduplication tracking, durable source coverage, chat sessions, and centralized logging.
 
 ## Core Tables
 
@@ -142,6 +142,58 @@ CREATE TABLE wp_datamachine_processed_items (
 - `flow_source_item` (UNIQUE) — point lookups + dedupe constraint.
 - `flow_step_id`, `source_type`, `job_id` — bulk deletes and filtered audits.
 - `flow_source_ts` (since 0.71.0) — covers time-windowed range scans used by `find_stale()` / `has_been_processed_within()`. `ProcessedItems::ensure_flow_source_ts_index()` backfills the index on existing installs since `dbDelta` does not reliably add indexes to populated tables.
+
+### `wp_datamachine_tracked_items`
+
+**Purpose**: Durable source/entity coverage ledger
+
+Tracked items are separate from `wp_datamachine_processed_items`. Processed items remain the short-lived dedupe and claim table for flow execution. Tracked items store long-lived coverage state for source entities that need a durable answer such as discovered, queued, generated, reviewed, intentionally excluded, stale, or failed.
+
+```sql
+CREATE TABLE wp_datamachine_tracked_items (
+    id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+    namespace VARCHAR(191) NOT NULL,
+    item_id VARCHAR(191) NOT NULL,
+    item_type VARCHAR(100) NOT NULL DEFAULT '',
+    state VARCHAR(40) NOT NULL DEFAULT 'discovered',
+    source_ref VARCHAR(255) NOT NULL DEFAULT '',
+    source_revision VARCHAR(100) NOT NULL DEFAULT '',
+    source_path VARCHAR(255) NOT NULL DEFAULT '',
+    source_line BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+    output_ref VARCHAR(255) NOT NULL DEFAULT '',
+    metadata_json LONGTEXT NULL,
+    first_seen_at DATETIME NOT NULL,
+    last_seen_at DATETIME NOT NULL,
+    last_job_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY namespace_item (namespace, item_id),
+    KEY namespace_type_state (namespace, item_type, state),
+    KEY namespace_state (namespace, state),
+    KEY source_ref (source_ref(191)),
+    KEY updated_at (updated_at)
+);
+```
+
+**Fields**:
+- `id` - Auto-increment primary key
+- `namespace` - Consumer/project scope for separating ledgers
+- `item_id` - Stable source/entity identifier within the namespace
+- `item_type` - Generic type such as `function`, `class`, `hook`, `block`, `endpoint`, `article`, `ticket`, or another consumer-defined type
+- `state` - Generic coverage state: `discovered`, `queued`, `generated`, `reviewed`, `excluded`, `stale`, or `failed`
+- `source_ref` - Source system or repository reference
+- `source_revision` - Source revision, commit, cursor, or equivalent freshness marker
+- `source_path` and `source_line` - Optional file/source location
+- `output_ref` - Generated artifact, page, document, or other downstream output reference
+- `metadata_json` - Consumer-defined metadata for domain-specific facts and relationships
+- `first_seen_at`, `last_seen_at`, `updated_at` - Coverage ledger timestamps
+- `last_job_id` - Last Data Machine job associated with the tracked state
+
+**Indexes**:
+- `namespace_item` (UNIQUE) — stable upsert key.
+- `namespace_type_state` and `namespace_state` — coverage summaries by namespace/type/state.
+- `source_ref` — source-scoped audits.
+- `updated_at` — recent changes and stale-state scans.
 
 ### `wp_datamachine_chat_sessions`
 
