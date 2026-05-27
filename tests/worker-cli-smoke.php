@@ -9,8 +9,10 @@
 
 $worker_file = __DIR__ . '/../inc/Cli/Commands/WorkerCommand.php';
 $boot_file   = __DIR__ . '/../inc/Cli/Bootstrap.php';
+$lock_file   = __DIR__ . '/../inc/Cli/WorkerLock.php';
 $worker_src  = file_get_contents( $worker_file ) ?: '';
 $boot_src    = file_get_contents( $boot_file ) ?: '';
+$lock_src    = file_get_contents( $lock_file ) ?: '';
 
 $assertions = 0;
 
@@ -54,6 +56,9 @@ assert_worker_contains( 'DrainCommand::status()', $worker_src, 'worker reads Act
 assert_worker_contains( 'lock_age_seconds', $worker_src, 'worker status reports lock age' );
 assert_worker_contains( 'lock_owner', $worker_src, 'worker status reports lock owner' );
 assert_worker_contains( "'stop_reason'              => 'locked'", $worker_src, 'worker exits cleanly when lock is held' );
+assert_worker_contains( "'stale' === \$existing['lock_status']", $lock_src, 'worker lock identifies stale lock payloads during acquisition' );
+assert_worker_contains( 'delete_option( self::OPTION_NAME )', $lock_src, 'worker lock clears stale option payloads before reclaiming' );
+assert_worker_contains( "add_option( self::OPTION_NAME, \$payload, '', 'no' )", $lock_src, 'worker lock reclaims stale locks through the normal add-option path' );
 assert_worker_not_contains( 'action-scheduler action run ', $worker_src, 'worker does not shell directly to Action Scheduler' );
 assert_worker_not_contains( 'actionscheduler_actions', $worker_src, 'worker does not query Action Scheduler tables directly' );
 assert_worker_not_contains( 'datamachine_jobs', $worker_src, 'worker does not query jobs tables directly' );

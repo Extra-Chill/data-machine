@@ -45,9 +45,8 @@ class WorkerLock {
 		);
 
 		if ( 'stale' === $existing['lock_status'] ) {
-			update_option( self::OPTION_NAME, $payload, false );
-			$replaced = get_option( self::OPTION_NAME, array() );
-			if ( is_array( $replaced ) && hash_equals( $token, (string) ( $replaced['token'] ?? '' ) ) ) {
+			delete_option( self::OPTION_NAME );
+			if ( add_option( self::OPTION_NAME, $payload, '', 'no' ) ) {
 				return self::formatSnapshot( $payload, $now, 'held', true );
 			}
 
