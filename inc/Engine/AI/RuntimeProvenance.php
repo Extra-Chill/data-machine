@@ -97,6 +97,11 @@ class RuntimeProvenance {
 			$provenance['tool_audit_events'] = $result['tool_audit_events'];
 		}
 
+		$tool_trace = self::tool_trace( $result );
+		if ( ! empty( $tool_trace ) ) {
+			$provenance['tool_trace'] = $tool_trace;
+		}
+
 		return $provenance;
 	}
 
@@ -171,5 +176,17 @@ class RuntimeProvenance {
 			),
 			static fn( $value ) => null !== $value && array() !== $value
 		);
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	private static function tool_trace( array $result ): array {
+		$trace = array();
+		foreach ( $result['tool_execution_results'] ?? array() as $tool_result ) {
+			if ( is_array( $tool_result ) && is_array( $tool_result['trace'] ?? null ) ) {
+				$trace[] = $tool_result['trace'];
+			}
+		}
+
+		return $trace;
 	}
 }
