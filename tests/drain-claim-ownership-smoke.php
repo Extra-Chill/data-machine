@@ -37,6 +37,8 @@ assert_contains( '$claim->get_actions()', $drain_src, 'drain processes actions f
 assert_contains( 'find_actions_by_claim_id( $claim->get_id() )', $drain_src, 'drain rechecks claim ownership before processing each action' );
 assert_contains( '$runner->process_action( $action_id, \'Data Machine CLI drain\' )', $drain_src, 'drain executes only claim-owned action IDs' );
 assert_contains( 'flushRuntimeCache()', $drain_src, 'drain flushes runtime cache between actions' );
+assert_contains( 'isMemorySoftLimitReached()', $drain_src, 'drain checks memory soft limit while processing actions' );
+assert_contains( "'memory_limit'", $drain_src, 'drain reports memory-limit stop reason from batch processing' );
 assert_contains( 'finally {', $drain_src, 'drain releases claims in a finally block' );
 assert_contains( '$store->release_claim( $claim )', $drain_src, 'drain releases the Action Scheduler claim' );
 assert_not_contains( 'getDuePendingActionIds', $drain_src, 'drain no longer preselects due action IDs outside Action Scheduler claims' );
@@ -47,6 +49,7 @@ $stake_pos   = strpos( $drain_src, 'stake_claim( $batch_size, null, $hooks ?? ar
 $verify_pos  = strpos( $drain_src, 'find_actions_by_claim_id( $claim->get_id() )' );
 $process_pos = strpos( $drain_src, '$runner->process_action( $action_id, \'Data Machine CLI drain\' )' );
 $flush_pos   = strpos( $drain_src, 'flushRuntimeCache()' );
+$memory_pos  = strpos( $drain_src, 'isMemorySoftLimitReached()' );
 $release_pos = strpos( $drain_src, '$store->release_claim( $claim )' );
 
 assert_true( false !== $cleanup_pos, 'timeout cleanup position found' );
@@ -54,6 +57,7 @@ assert_true( false !== $stake_pos, 'claim staking position found' );
 assert_true( false !== $verify_pos, 'claim verification position found' );
 assert_true( false !== $process_pos, 'claimed action processing position found' );
 assert_true( false !== $flush_pos, 'runtime cache flush position found' );
+assert_true( false !== $memory_pos, 'memory soft-limit check position found' );
 assert_true( false !== $release_pos, 'claim release position found' );
 assert_true( $cleanup_pos < $stake_pos, 'drain cleans stale claims before staking a claim' );
 assert_true( $stake_pos < $verify_pos, 'drain stakes a claim before verifying ownership' );

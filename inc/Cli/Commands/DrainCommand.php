@@ -134,6 +134,11 @@ class DrainCommand extends BaseCommand {
 		try {
 			while ( self::getDuePendingCount( $hooks, $job_ids ) > 0 ) {
 				$stats = self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids ), $batches, $warnings, $hooks, $job_ids, $stop_reason );
+				if ( self::isMemorySoftLimitReached() ) {
+					$stop_reason = 'memory_limit';
+					break;
+				}
+
 				if ( $limit > 0 && (int) $stats['actions_processed'] >= $limit ) {
 					$stop_reason = 'limit';
 					break;
@@ -167,7 +172,7 @@ class DrainCommand extends BaseCommand {
 					++$warnings;
 					$message = trim( (string) ( $result->stderr ?? '' ) );
 					WP_CLI::warning( '' === $message ? 'Action Scheduler CLI drain failed.' : $message );
-					$stop_reason = 'warning';
+					$stop_reason = 'memory_limit' === (string) ( $result->stop_reason ?? '' ) ? 'memory_limit' : 'warning';
 					break;
 				}
 
@@ -304,6 +309,11 @@ class DrainCommand extends BaseCommand {
 
 		try {
 			foreach ( $claim->get_actions() as $action_id ) {
+				if ( self::isMemorySoftLimitReached() ) {
+					$warnings[] = 'Drain stopped before processing the next action because PHP memory usage reached the soft limit.';
+					break;
+				}
+
 				$action_id = absint( $action_id );
 				if ( $action_id <= 0 || ! self::actionMatchesJobIds( $action_id, $job_ids ) ) {
 					continue;
@@ -322,15 +332,23 @@ class DrainCommand extends BaseCommand {
 				} finally {
 					self::flushRuntimeCache();
 				}
+
+				if ( self::isMemorySoftLimitReached() ) {
+					$warnings[] = 'Drain stopped after processing an action because PHP memory usage reached the soft limit.';
+					break;
+				}
 			}
 		} finally {
 			$store->release_claim( $claim );
 		}
 
+		$stop_reason = self::warningsContainMemoryLimit( $warnings ) ? 'memory_limit' : '';
+
 		return (object) array(
 			'return_code' => empty( $warnings ) ? 0 : 1,
 			'stdout'      => '',
 			'stderr'      => implode( "\n", $warnings ),
+			'stop_reason' => $stop_reason,
 		);
 	}
 
@@ -369,6 +387,61 @@ class DrainCommand extends BaseCommand {
 		if ( ! function_exists( 'wp_cache_supports' ) && function_exists( 'wp_cache_flush_runtime' ) ) {
 			wp_cache_flush_runtime();
 		}
+	}
+
+	/**
+	 * Whether PHP memory usage is near the hard limit.
+	 */
+	private static function isMemorySoftLimitReached(): bool {
+		$limit = self::memoryLimitBytes();
+		if ( $limit <= 0 ) {
+			return false;
+		}
+
+		$ratio = (float) apply_filters( 'datamachine_cli_drain_memory_soft_limit_ratio', 0.80 );
+		$ratio = max( 0.50, min( 0.95, $ratio ) );
+
+		return memory_get_usage( true ) >= (int) floor( $limit * $ratio );
+	}
+
+	/**
+	 * Return PHP memory_limit in bytes, or 0 for unlimited/unknown.
+	 */
+	private static function memoryLimitBytes(): int {
+		$raw = trim( (string) ini_get( 'memory_limit' ) );
+		if ( '' === $raw || '-1' === $raw ) {
+			return 0;
+		}
+
+		$unit  = strtolower( substr( $raw, -1 ) );
+		$value = (float) $raw;
+		switch ( $unit ) {
+			case 'g':
+				$value *= 1024;
+				// Fall through.
+			case 'm':
+				$value *= 1024;
+				// Fall through.
+			case 'k':
+				$value *= 1024;
+		}
+
+		return max( 0, (int) $value );
+	}
+
+	/**
+	 * Whether a batch warning was caused by the memory soft limit.
+	 *
+	 * @param string[] $warnings Warning messages.
+	 */
+	private static function warningsContainMemoryLimit( array $warnings ): bool {
+		foreach ( $warnings as $warning ) {
+			if ( false !== strpos( $warning, 'memory usage reached the soft limit' ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

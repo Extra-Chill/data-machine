@@ -60,6 +60,8 @@ assert_drain_contains( "\\ActionScheduler::runner()", $drain_src, 'drain uses Ac
 assert_drain_contains( "'Data Machine CLI drain'", $drain_src, 'drain records a Data Machine-specific execution context' );
 assert_drain_contains( 'catch ( \\Throwable $throwable )', $drain_src, 'drain catches per-action runner failures instead of fataling after job start' );
 assert_drain_contains( 'flushRuntimeCache()', $drain_src, 'drain flushes runtime cache after processing actions' );
+assert_drain_contains( 'isMemorySoftLimitReached()', $drain_src, 'drain stops before hard PHP memory exhaustion' );
+assert_drain_contains( "'memory_limit'", $drain_src, 'drain reports memory-limit stop reason' );
 assert_drain_contains( "'return_code' => empty( \$warnings ) ? 0 : 1", $drain_src, 'drain surfaces runner failures through a result object' );
 assert_drain_contains( "'remaining_pending'", $drain_src, 'drain reports remaining pending actions' );
 assert_drain_contains( "'batch_chunks'", $drain_src, 'drain reports batch chunk counts' );
