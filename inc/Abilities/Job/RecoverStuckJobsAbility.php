@@ -28,9 +28,9 @@ class RecoverStuckJobsAbility {
 	 * @var array<string,string>
 	 */
 	private const RECOVERABLE_ACTION_HOOK_ARGS = array(
-		'datamachine_execute_step'          => 'job_id',
-		'datamachine_pipeline_batch_chunk'  => 'parent_job_id',
-		'datamachine_run_flow_now'          => 'job_id',
+		'datamachine_execute_step'         => 'job_id',
+		'datamachine_pipeline_batch_chunk' => 'parent_job_id',
+		'datamachine_run_flow_now'         => 'job_id',
 	);
 
 	public function __construct() {
@@ -502,9 +502,9 @@ class RecoverStuckJobsAbility {
 			return array();
 		}
 
-		$job_ids             = array_values( array_unique( array_column( $action_jobs, 'job_id' ) ) );
-		$job_placeholders    = implode( ',', array_fill( 0, count( $job_ids ), '%d' ) );
-		$query_args          = $job_ids;
+		$job_ids          = array_values( array_unique( array_column( $action_jobs, 'job_id' ) ) );
+		$job_placeholders = implode( ',', array_fill( 0, count( $job_ids ), '%d' ) );
+		$query_args       = $job_ids;
 
 		$sql = "SELECT job_id, flow_id, status
 			 FROM {$jobs_table}
