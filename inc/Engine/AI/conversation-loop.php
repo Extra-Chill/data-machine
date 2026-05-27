@@ -37,7 +37,7 @@ defined( 'ABSPATH' ) || exit;
  * @param array  $tools       Available tools keyed by tool name.
  * @param string $provider    AI provider identifier.
  * @param string $model       AI model identifier.
-	 * @param array  $modes       Execution modes ('pipeline', 'chat', ...).
+ * @param array  $modes       Execution modes ('pipeline', 'chat', ...).
  * @param array  $payload     Step payload / loop context.
  * @param int    $max_turns   Maximum conversation turns.
  * @param bool   $single_turn Execute exactly one turn and return.
@@ -366,8 +366,8 @@ function datamachine_run_conversation(
  * @param array                                     $tools              Available tools.
  * @param string                                    $provider           AI provider.
  * @param string                                    $model              AI model.
-	 * @param string                                    $mode               Comma-separated execution mode label.
-	 * @param array                                     $modes              Execution mode slugs.
+ * @param string                                    $mode               Comma-separated execution mode label.
+ * @param array                                     $modes              Execution mode slugs.
  * @param array                                     $loop_payload       Cleaned payload.
  * @param LoopEventSinkInterface                    $event_sink         DM event sink.
  * @param array                                     $base_log_context   Base log context.
@@ -1485,7 +1485,7 @@ function datamachine_extract_xml_tool_calls( string $text ): array {
 					continue;
 				}
 
-				$parameter_value          = function_exists( '\wp_strip_all_tags' )
+				$parameter_value               = function_exists( '\wp_strip_all_tags' )
 					? \wp_strip_all_tags( (string) $parameter_match[2] )
 					: (string) preg_replace( '/<[^>]*>/', '', (string) $parameter_match[2] );
 				$parameters[ $parameter_name ] = html_entity_decode( trim( $parameter_value ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
@@ -1593,7 +1593,7 @@ function datamachine_resolve_event_sink( array $payload ): LoopEventSinkInterfac
 /**
  * Resolve the runtime completion policy from mode and payload.
  *
-	 * @param array  $modes   Execution modes.
+ * @param array  $modes   Execution modes.
  * @param array  $payload Loop payload.
  * @return WP_Agent_Conversation_Completion_Policy
  */
