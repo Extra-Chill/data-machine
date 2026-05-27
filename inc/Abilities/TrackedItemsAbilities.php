@@ -18,7 +18,7 @@ class TrackedItemsAbilities {
 	private TrackedItems $tracked_items;
 
 	public function __construct( ?TrackedItems $tracked_items = null ) {
-		$this->tracked_items = $tracked_items ?: new TrackedItems();
+		$this->tracked_items = null !== $tracked_items ? $tracked_items : new TrackedItems();
 
 		if ( self::$registered ) {
 			return;
@@ -127,18 +127,30 @@ class TrackedItemsAbilities {
 	/** @param array<string,mixed> $input Input. */
 	public function executeUpsertTrackedItem( array $input ): array {
 		$item = $this->tracked_items->upsert( $input );
-		return $item ? array( 'success' => true, 'item' => $item ) : array( 'success' => false, 'error' => 'Could not upsert tracked item.' );
+		return $item ? array(
+			'success' => true,
+			'item'    => $item,
+		) : array(
+			'success' => false,
+			'error'   => 'Could not upsert tracked item.',
+		);
 	}
 
 	/** @param array<string,mixed> $input Input. */
 	public function executeGetTrackedItem( array $input ): array {
 		$item = $this->tracked_items->get( (string) ( $input['namespace'] ?? '' ), (string) ( $input['item_id'] ?? '' ) );
-		return array( 'success' => null !== $item, 'item' => $item );
+		return array(
+			'success' => null !== $item,
+			'item'    => $item,
+		);
 	}
 
 	/** @param array<string,mixed> $input Input. */
 	public function executeListTrackedItems( array $input ): array {
-		return array( 'success' => true, 'items' => $this->tracked_items->list( $input ) );
+		return array(
+			'success' => true,
+			'items'   => $this->tracked_items->list( $input ),
+		);
 	}
 
 	/** @param array<string,mixed> $input Input. */
@@ -156,7 +168,10 @@ class TrackedItemsAbilities {
 			'namespace'       => array( 'type' => 'string' ),
 			'item_id'         => array( 'type' => 'string' ),
 			'item_type'       => array( 'type' => 'string' ),
-			'state'           => array( 'type' => 'string', 'enum' => TrackedItems::states() ),
+			'state'           => array(
+				'type' => 'string',
+				'enum' => TrackedItems::states(),
+			),
 			'source_ref'      => array( 'type' => 'string' ),
 			'source_revision' => array( 'type' => 'string' ),
 			'source_path'     => array( 'type' => 'string' ),
@@ -172,7 +187,10 @@ class TrackedItemsAbilities {
 		$properties = self::item_schema_properties();
 		$properties['limit']  = array( 'type' => 'integer' );
 		$properties['offset'] = array( 'type' => 'integer' );
-		return array( 'type' => 'object', 'properties' => $properties );
+		return array(
+			'type'       => 'object',
+			'properties' => $properties,
+		);
 	}
 
 	/** @return array<string,mixed> */
@@ -181,7 +199,9 @@ class TrackedItemsAbilities {
 			'type'       => 'object',
 			'properties' => array(
 				'success' => array( 'type' => 'boolean' ),
-				'item'    => array( 'type' => array( 'object', 'null' ) ),
+				'item'    => array(
+					'type' => array( 'object', 'null' ),
+				),
 				'error'   => array( 'type' => 'string' ),
 			),
 		);

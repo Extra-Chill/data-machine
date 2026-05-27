@@ -48,7 +48,7 @@ class TrackedItems extends BaseRepository {
 			'source_line'     => $normalized['source_line'],
 			'output_ref'      => $normalized['output_ref'],
 			'metadata_json'   => wp_json_encode( $normalized['metadata'], JSON_UNESCAPED_SLASHES ),
-			'last_seen_at'    => $normalized['last_seen_at'] ?: $now,
+			'last_seen_at'    => '' !== $normalized['last_seen_at'] ? $normalized['last_seen_at'] : $now,
 			'last_job_id'     => $normalized['last_job_id'],
 			'updated_at'      => $now,
 		);
@@ -65,14 +65,20 @@ class TrackedItems extends BaseRepository {
 				array( '%d' )
 			);
 		} else {
-			$row['first_seen_at'] = $normalized['first_seen_at'] ?: $now;
+			$row['first_seen_at'] = '' !== $normalized['first_seen_at'] ? $normalized['first_seen_at'] : $now;
 			$formats[]            = '%s';
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$result = $this->wpdb->insert( $this->table_name, $row, $formats );
 		}
 
 		if ( false === $result ) {
-			$this->log_db_error( 'TrackedItems::upsert', array( 'namespace' => $normalized['namespace'], 'item_id' => $normalized['item_id'] ) );
+			$this->log_db_error(
+				'TrackedItems::upsert',
+				array(
+					'namespace' => $normalized['namespace'],
+					'item_id'   => $normalized['item_id'],
+				)
+			);
 			return null;
 		}
 
@@ -82,13 +88,13 @@ class TrackedItems extends BaseRepository {
 	/**
 	 * Get one tracked item.
 	 */
-	public function get( string $namespace, string $item_id ): ?array {
+	public function get( string $item_namespace, string $item_id ): ?array {
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
 				'SELECT * FROM %i WHERE namespace = %s AND item_id = %s LIMIT 1',
 				$this->table_name,
-				$namespace,
+				$item_namespace,
 				$item_id
 			),
 			ARRAY_A
@@ -239,7 +245,15 @@ class TrackedItems extends BaseRepository {
 	 * @return string[]
 	 */
 	public static function states(): array {
-		return array( self::STATE_DISCOVERED, self::STATE_QUEUED, self::STATE_GENERATED, self::STATE_REVIEWED, self::STATE_EXCLUDED, self::STATE_STALE, self::STATE_FAILED );
+		return array(
+			self::STATE_DISCOVERED,
+			self::STATE_QUEUED,
+			self::STATE_GENERATED,
+			self::STATE_REVIEWED,
+			self::STATE_EXCLUDED,
+			self::STATE_STALE,
+			self::STATE_FAILED,
+		);
 	}
 
 	/**
@@ -247,7 +261,7 @@ class TrackedItems extends BaseRepository {
 	 * @return array<string,mixed>
 	 */
 	private static function normalize_row( array $row ): array {
-		$metadata = json_decode( (string) ( $row['metadata_json'] ?? '' ), true );
+		$metadata        = json_decode( (string) ( $row['metadata_json'] ?? '' ), true );
 		$row['metadata'] = is_array( $metadata ) ? $metadata : array();
 		unset( $row['metadata_json'] );
 
