@@ -42,6 +42,8 @@ assert_worker_contains( 'DrainCommand::drain(', $worker_src, 'worker composes th
 assert_worker_contains( "'acquire_lock' => false", $worker_src, 'worker internal drain does not fight outer lock' );
 assert_worker_contains( 'PendingActionStore::summary', $worker_src, 'worker reads pending-action gate through the store' );
 assert_worker_contains( 'JobsSummaryAbility', $worker_src, 'worker reads job status through the existing summary ability' );
+assert_worker_contains( "'compact' => true", $worker_src, 'worker status uses compact job summary' );
+assert_worker_contains( 'jobStatusCount', $worker_src, 'worker reads normalized job status buckets' );
 assert_worker_contains( 'stop_on_pending_actions', $worker_src, 'worker can stop at approval gates' );
 assert_worker_contains( 'max_passes', $worker_src, 'worker supports bounded pass counts' );
 assert_worker_contains( 'stop_before_timeout', $worker_src, 'worker exits before external supervisor timeouts' );
