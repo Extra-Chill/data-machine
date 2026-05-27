@@ -7,6 +7,7 @@ use DataMachine\Core\RunMetrics;
 use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
+use DataMachine\Core\Steps\Handlers\HandlerConfigValidator;
 use DataMachine\Engine\Bundle\AuthRefHandlerConfig;
 use DataMachine\Abilities\HandlerAbilities;
 
@@ -185,6 +186,43 @@ class FetchStep extends Step {
 		}
 
 		$handler_settings = $resolved_handler_settings;
+		$validation       = HandlerConfigValidator::validate(
+			(string) $handler,
+			'fetch',
+			$handler_settings,
+			array(
+				'flow_step_id' => $this->flow_step_config['flow_step_id'],
+				'pipeline_id'  => $this->flow_step_config['pipeline_id'],
+				'flow_id'      => $this->flow_step_config['flow_id'],
+				'job_id'       => $this->job_id,
+				'user_id'      => $owner_user_id,
+				'agent_id'     => $agent_id,
+			)
+		);
+
+		if ( is_wp_error( $validation ) ) {
+			$diagnostics = array_merge(
+				$this->extractHandlerOutcomeIds( $handler_settings ),
+				HandlerConfigValidator::diagnostics( $validation )
+			);
+
+			$this->log( 'error', 'Fetch handler config validation failed: ' . $validation->get_error_message(), $diagnostics );
+			RunMetrics::recordStepResult(
+				$this->job_id,
+				$this->flow_step_id,
+				array_merge(
+					$diagnostics,
+					array(
+						'step_type'    => 'fetch',
+						'result'       => 'failed',
+						'handler_slug' => (string) $handler,
+						'packet_count' => 0,
+					)
+				)
+			);
+
+			return $this->buildHandlerConfigValidationFailurePackets( $validation, (string) $handler );
+		}
 
 		$packets = $this->execute_handler_as_owner( $handler, $handler_settings, (string) $this->job_id, $owner_user_id );
 
@@ -332,6 +370,34 @@ class FetchStep extends Step {
 
 		$class_name = $handler_info['class'];
 		return class_exists( $class_name ) ? new $class_name() : null;
+	}
+
+	/**
+	 * Build an explicit failure packet for handler config validation errors.
+	 *
+	 * @param \WP_Error $error Validation error.
+	 * @param string    $handler_slug Handler slug.
+	 * @return array Updated data packet array.
+	 */
+	private function buildHandlerConfigValidationFailurePackets( \WP_Error $error, string $handler_slug ): array {
+		$packet = new DataPacket(
+			array(
+				'body' => $error->get_error_message(),
+			),
+			array_merge(
+				HandlerConfigValidator::diagnostics( $error ),
+				array(
+					'step_type'      => 'fetch',
+					'flow_step_id'   => $this->flow_step_id,
+					'handler_slug'   => $handler_slug,
+					'success'        => false,
+					'failure_reason' => HandlerConfigValidator::ERROR_CODE,
+				)
+			),
+			'step_error'
+		);
+
+		return $packet->addTo( $this->dataPackets );
 	}
 
 	/**

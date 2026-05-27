@@ -37,6 +37,9 @@ trait HandlerRegistrationTrait {
 	 *                                      `datamachine_tools` registry at pipeline execution time.
 	 * @param string|null $authProviderKey Optional custom auth provider key for shared authentication
 	 * @param array $meta Optional arbitrary metadata (e.g. charLimit, maxImages). Passed through to /handlers API.
+	 * @param callable|null $validationCallback Optional runtime config validator. Receives
+	 *                                          `(array $handler_config, array $context)` and returns
+	 *                                          true/null, false, WP_Error, or a validation array.
 	 */
 	protected static function registerHandler(
 		string $slug,
@@ -49,7 +52,8 @@ trait HandlerRegistrationTrait {
 		?string $settingsClass = null,
 		?callable $aiToolCallback = null,
 		?string $authProviderKey = null,
-		array $meta = array()
+		array $meta = array(),
+		?callable $validationCallback = null
 	): void {
 		// Compute auth provider key for both handler metadata and auth registration
 		$provider_key = $authProviderKey ?? $slug;
@@ -117,6 +121,25 @@ trait HandlerRegistrationTrait {
 					);
 					return $tools;
 				}
+			);
+		}
+
+		if ( $validationCallback ) {
+			add_filter(
+				'datamachine_validate_handler_config',
+				function ( $result, string $handler_slug, string $step_type, array $handler_config, array $context ) use ( $slug, $type, $validationCallback ) {
+					if ( false === $result || ( is_array( $result ) && false === ( $result['valid'] ?? true ) ) || ( function_exists( 'is_wp_error' ) && is_wp_error( $result ) ) ) {
+						return $result;
+					}
+
+					if ( $slug !== $handler_slug || $type !== $step_type ) {
+						return $result;
+					}
+
+					return $validationCallback( $handler_config, $context );
+				},
+				10,
+				5
 			);
 		}
 

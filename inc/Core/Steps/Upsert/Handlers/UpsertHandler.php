@@ -12,6 +12,7 @@
 namespace DataMachine\Core\Steps\Upsert\Handlers;
 
 use DataMachine\Core\EngineData;
+use DataMachine\Core\Steps\Handlers\HandlerConfigValidator;
 use DataMachine\Engine\Bundle\AuthRefHandlerConfig;
 
 defined( 'ABSPATH' ) || exit;
@@ -80,14 +81,23 @@ abstract class UpsertHandler {
 		$parameters['job_id'] = $job_id;
 		$parameters['engine'] = $engine;
 
+		$handler_slug   = (string) ( $tool_def['handler'] ?? static::class );
 		$handler_config = $tool_def['handler_config'] ?? array();
 		$handler_config = AuthRefHandlerConfig::resolve_runtime_config(
 			$handler_config,
-			(string) ( $tool_def['handler'] ?? static::class ),
+			$handler_slug,
 			array( 'job_id' => $job_id )
 		);
 		if ( is_wp_error( $handler_config ) ) {
 			return $this->errorResponse( 'Auth ref resolution failed: ' . $handler_config->get_error_message() );
+		}
+
+		$validation = HandlerConfigValidator::validate( $handler_slug, 'upsert', $handler_config, array( 'job_id' => $job_id ) );
+		if ( is_wp_error( $validation ) ) {
+			return $this->errorResponse(
+				$validation->get_error_message(),
+				HandlerConfigValidator::diagnostics( $validation )
+			);
 		}
 
 		$result = $this->executeUpsert( $parameters, $handler_config );
