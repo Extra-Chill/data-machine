@@ -290,6 +290,10 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Media\MediaAbilities();
 	new \DataMachine\Abilities\SEO\MetaDescriptionAbilities();
 	new \DataMachine\Abilities\SEO\IndexNowAbilities();
+	// Image-template abilities are also registered unconditionally at file
+	// include time (see bottom of this file). This call is the defensive
+	// in-runtime path for late `plugins_loaded` inclusion. The static guard
+	// in `ImageTemplateAbilities::ensure_registered()` makes it idempotent.
 	new \DataMachine\Abilities\Media\ImageTemplateAbilities();
 	new \DataMachine\Abilities\AgentCallAbilities();
 	new \DataMachine\Abilities\AgentRemoteCallAbilities();
@@ -476,7 +480,30 @@ if ( did_action( 'plugins_loaded' ) ) {
 require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';
 \DataMachine\Abilities\AbilityCategories::ensure_registered();
 
-
+/**
+ * Register `datamachine/render-image-template` and
+ * `datamachine/list-image-templates` unconditionally on every request.
+ *
+ * These abilities have consumers that fire on lite frontend page views —
+ * specifically `extrachill-multisite`'s OG-card generation task and
+ * `extrachill-events`'s event-roundup handler — neither of which runs in
+ * a request shape that flips `datamachine_should_load_full_runtime()` to
+ * true. Previously the class was only instantiated inside
+ * `datamachine_run_datamachine_plugin()`, so on a normal frontend page view
+ * the constructor never ran, the abilities never registered, and consumers
+ * got a `_doing_it_wrong` notice plus a `null` return from
+ * `wp_get_ability( 'datamachine/render-image-template' )`. The downstream
+ * effect was silent OG-card generation failures on subsite pages and a
+ * notice flood in debug.log. See: Extra-Chill/data-machine#2290.
+ *
+ * Registration is cheap (two ability definitions, both schema-only until
+ * actually executed). The class's `ensure_registered()` uses the same
+ * three-state defensive pattern as `AbilityCategories::ensure_registered()`
+ * adopted in #2288, so it tolerates the lazy abilities-registry
+ * instantiation race described there.
+ */
+require_once __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php';
+\DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
 
 
 /**

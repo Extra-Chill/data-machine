@@ -21,18 +21,103 @@ class ImageTemplateAbilities {
 	private static bool $registered = false;
 
 	public function __construct() {
+		self::ensure_registered();
+	}
+
+	/**
+	 * Ensure the image-template abilities are registered.
+	 *
+	 * Safe to call multiple times — uses a static guard. Handles three
+	 * timing states so registration is robust regardless of when the
+	 * abilities registry is first touched in the request:
+	 *
+	 *   1. `doing_action( wp_abilities_api_init )` — register immediately
+	 *      so the abilities land in this same dispatch pass.
+	 *   2. `! did_action( wp_abilities_api_init )` — the action has not
+	 *      fired yet. Attach a hook for the lazy fire.
+	 *   3. otherwise — the action has already fired and completed. The
+	 *      abilities registry singleton exists; call its instance method
+	 *      directly so the abilities still land in the registry. The
+	 *      public `wp_register_ability()` helper enforces `doing_action()`,
+	 *      but the underlying registry method does not.
+	 *
+	 * Without state (3), late-loaded contexts silently drop registrations
+	 * — for example a lite-mode frontend request that triggers
+	 * `wp_get_ability()` from a plugin running ahead of our
+	 * `plugins_loaded` hook will instantiate the abilities registry, fire
+	 * `wp_abilities_api_init` to completion, and only then reach our
+	 * loader. This is the same race `AbilityCategories::ensure_registered()`
+	 * defends against after #2288.
+	 *
+	 * @return void
+	 */
+	public static function ensure_registered(): void {
 		if ( self::$registered ) {
 			return;
 		}
-		$this->registerAbilities();
+
+		$definitions = self::get_ability_definitions();
+
+		$register_via_helper = static function () use ( $definitions ): void {
+			foreach ( $definitions as $name => $args ) {
+				wp_register_ability( $name, $args );
+			}
+		};
+
+		if ( doing_action( 'wp_abilities_api_init' ) ) {
+			$register_via_helper();
+			self::$registered = true;
+			return;
+		}
+
+		if ( ! did_action( 'wp_abilities_api_init' ) ) {
+			add_action(
+				'wp_abilities_api_init',
+				static function () use ( $register_via_helper ): void {
+					if ( self::$registered ) {
+						return;
+					}
+					$register_via_helper();
+					self::$registered = true;
+				}
+			);
+			return;
+		}
+
+		// State 3: action already fired. Bypass the helper's `doing_action()`
+		// guard by writing through the registry instance directly.
+		if ( ! class_exists( '\WP_Abilities_Registry' ) ) {
+			return;
+		}
+		$registry = \WP_Abilities_Registry::get_instance();
+		if ( null === $registry ) {
+			return;
+		}
+		foreach ( $definitions as $name => $args ) {
+			if ( $registry->is_registered( $name ) ) {
+				continue;
+			}
+			$registry->register( $name, $args );
+		}
 		self::$registered = true;
 	}
 
-	private function registerAbilities(): void {
-		$register_callback = function () {
-			wp_register_ability(
-				'datamachine/render-image-template',
-				array(
+	/**
+	 * Ability definitions used by every registration path in
+	 * `ensure_registered()`. Kept as a single source of truth so the
+	 * three timing-state branches cannot drift.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function get_ability_definitions(): array {
+		return array(
+			'datamachine/render-image-template' => self::render_image_template_definition(),
+			'datamachine/list-image-templates'  => self::list_image_templates_definition(),
+		);
+	}
+
+	private static function render_image_template_definition(): array {
+		return array(
 					'label'               => 'Render Image Template',
 					'description'         => 'Generate branded graphics from registered GD templates',
 					'category'            => 'datamachine-media',
@@ -107,38 +192,29 @@ class ImageTemplateAbilities {
 					'execute_callback'    => array( self::class, 'renderTemplate' ),
 					'permission_callback' => fn() => PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => false ),
-				)
-			);
+		);
+	}
 
-			wp_register_ability(
-				'datamachine/list-image-templates',
-				array(
-					'label'               => 'List Image Templates',
-					'description'         => 'List all registered image generation templates',
-					'category'            => 'datamachine-media',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'properties' => array(),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'   => array( 'type' => 'boolean' ),
-							'templates' => array( 'type' => 'object' ),
-						),
-					),
-					'execute_callback'    => array( self::class, 'listTemplates' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
-					'meta'                => array( 'show_in_rest' => false ),
-				)
-			);
-		};
-
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
+	private static function list_image_templates_definition(): array {
+		return array(
+			'label'               => 'List Image Templates',
+			'description'         => 'List all registered image generation templates',
+			'category'            => 'datamachine-media',
+			'input_schema'        => array(
+				'type'       => 'object',
+				'properties' => array(),
+			),
+			'output_schema'       => array(
+				'type'       => 'object',
+				'properties' => array(
+					'success'   => array( 'type' => 'boolean' ),
+					'templates' => array( 'type' => 'object' ),
+				),
+			),
+			'execute_callback'    => array( self::class, 'listTemplates' ),
+			'permission_callback' => fn() => PermissionHelper::can_manage(),
+			'meta'                => array( 'show_in_rest' => false ),
+		);
 	}
 
 	/**
