@@ -173,6 +173,8 @@ class WorkerCommand extends BaseCommand {
 	 * @return array<string,int|string> Worker stats.
 	 */
 	public static function runLoop( array $options ): array {
+		DrainCommand::ensureCliMemoryLimit();
+
 		$started_at              = time();
 		$time_limit              = max( 0, (int) ( $options['time_limit'] ?? 300 ) );
 		$batch_size              = max( 1, (int) ( $options['batch_size'] ?? 10 ) );
@@ -190,6 +192,13 @@ class WorkerCommand extends BaseCommand {
 		if ( empty( $lock['acquired'] ) ) {
 			return self::lockedStats( $lock );
 		}
+
+		$lock_token = (string) ( $lock['lock_token'] ?? '' );
+		register_shutdown_function(
+			static function () use ( $lock_token ): void {
+				WorkerLock::release( $lock_token );
+			}
+		);
 
 		$passes      = 0;
 		$recoveries  = 0;
