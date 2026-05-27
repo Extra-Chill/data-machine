@@ -108,6 +108,8 @@ class DrainCommand extends BaseCommand {
 	 * @return array<string,int|string> Drain stats.
 	 */
 	public static function drain( array $options = array() ): array {
+		self::ensureCliMemoryLimit();
+
 		$limit               = max( 0, (int) ( $options['limit'] ?? 0 ) );
 		$batch_size          = max( 1, (int) ( $options['batch_size'] ?? 25 ) );
 		$time_limit          = max( 0, (int) ( $options['time_limit'] ?? 0 ) );
@@ -123,6 +125,13 @@ class DrainCommand extends BaseCommand {
 			if ( empty( $lock['acquired'] ) ) {
 				return self::lockedStats( $hooks, $job_ids, $lock );
 			}
+
+			$lock_token = (string) ( $lock['lock_token'] ?? '' );
+			register_shutdown_function(
+				static function () use ( $lock_token ): void {
+					WorkerLock::release( $lock_token );
+				}
+			);
 		}
 
 		$started_at    = time();
@@ -254,6 +263,28 @@ class DrainCommand extends BaseCommand {
 			),
 			$lock
 		);
+	}
+
+	/**
+	 * Raise the CLI memory floor for large Action Scheduler drains.
+	 */
+	public static function ensureCliMemoryLimit( int $minimum_bytes = 1073741824 ): void {
+		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+			return;
+		}
+
+		$current = self::memoryLimitBytes();
+		if ( 0 === $current || $current >= $minimum_bytes ) {
+			return;
+		}
+
+		add_filter(
+			'admin_memory_limit',
+			static function () use ( $minimum_bytes ): string {
+				return (string) $minimum_bytes;
+			}
+		);
+		wp_raise_memory_limit( 'admin' );
 	}
 
 	/**

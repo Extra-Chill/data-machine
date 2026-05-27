@@ -37,8 +37,10 @@ assert_worker_contains( '@subcommand run', $worker_src, 'worker exposes run subc
 assert_worker_contains( '@subcommand status', $worker_src, 'worker exposes status subcommand' );
 assert_worker_contains( 'WorkerLock::acquire', $worker_src, 'worker acquires shared worker/drain lock' );
 assert_worker_contains( 'WorkerLock::release', $worker_src, 'worker releases shared worker/drain lock' );
+assert_worker_contains( 'register_shutdown_function', $worker_src, 'worker releases locks during PHP shutdown after fatals' );
 assert_worker_contains( 'RecoverStuckJobsAbility', $worker_src, 'worker composes stuck job recovery ability' );
 assert_worker_contains( 'DrainCommand::drain(', $worker_src, 'worker composes the existing drain loop' );
+assert_worker_contains( 'DrainCommand::ensureCliMemoryLimit()', $worker_src, 'worker raises the CLI memory floor before draining' );
 assert_worker_contains( "'acquire_lock' => false", $worker_src, 'worker internal drain does not fight outer lock' );
 assert_worker_contains( 'PendingActionStore::summary', $worker_src, 'worker reads pending-action gate through the store' );
 assert_worker_contains( 'JobsSummaryAbility', $worker_src, 'worker reads job status through the existing summary ability' );
