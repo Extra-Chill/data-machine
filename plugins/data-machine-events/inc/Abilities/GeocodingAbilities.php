@@ -15,6 +15,7 @@
 
 namespace DataMachineEvents\Abilities;
 
+use DataMachineEvents\Core\NominatimClient;
 use DataMachineEvents\Core\Venue_Taxonomy;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -25,18 +26,24 @@ class GeocodingAbilities {
 
 	/**
 	 * Transient cache TTL for geocoded addresses (30 days).
+	 *
+	 * @deprecated Use NominatimClient::CACHE_TTL.
 	 */
-	private const CACHE_TTL = 30 * DAY_IN_SECONDS;
+	private const CACHE_TTL = NominatimClient::CACHE_TTL;
 
 	/**
 	 * Transient prefix for cached geocoding results.
+	 *
+	 * @deprecated Use NominatimClient::CACHE_PREFIX.
 	 */
-	private const CACHE_PREFIX = 'dme_geocode_';
+	private const CACHE_PREFIX = NominatimClient::CACHE_PREFIX;
 
 	/**
 	 * Rate limit: seconds between Nominatim requests.
+	 *
+	 * @deprecated Use NominatimClient::RATE_LIMIT_SECONDS.
 	 */
-	private const RATE_LIMIT_SECONDS = 2;
+	private const RATE_LIMIT_SECONDS = NominatimClient::RATE_LIMIT_SECONDS;
 
 	private static bool $registered = false;
 
@@ -113,37 +120,22 @@ class GeocodingAbilities {
 			return new \WP_Error( 'invalid_query', 'Query must be at least 3 characters.', array( 'status' => 400 ) );
 		}
 
-		// Sanitize
+		// Sanitize before handing to the shared client. NominatimClient owns
+		// the cache key derivation + 30d transient TTL so the warm cache
+		// stays bit-compatible with pre-refactor entries.
 		$query = sanitize_text_field( $query );
-		$query = substr( $query, 0, 500 );
 
-		// Check cache
-		$cache_key = self::CACHE_PREFIX . md5( strtolower( $query ) );
-		$cached    = get_transient( $cache_key );
+		// display_name in the cached payload is the user-supplied query
+		// (back-compat with the original behavior); preserve that contract
+		// by overriding NominatimClient's display_name (which echoes
+		// Nominatim's longer response value).
+		$result = NominatimClient::geocodeOne( $query );
 
-		if ( false !== $cached && is_array( $cached ) ) {
-			$cached['cached'] = true;
-			return $cached;
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
 
-		// Query Nominatim via the Venue_Taxonomy method
-		$coordinates = Venue_Taxonomy::query_nominatim( $query );
-
-		if ( ! $coordinates ) {
-			return new \WP_Error( 'geocode_failed', 'Could not geocode address: no results from Nominatim.', array( 'status' => 404 ) );
-		}
-
-		$parts = explode( ',', $coordinates );
-
-		$result = array(
-			'lat'          => $parts[0],
-			'lng'          => $parts[1],
-			'display_name' => $query,
-			'cached'       => false,
-		);
-
-		// Cache result
-		set_transient( $cache_key, $result, self::CACHE_TTL );
+		$result['display_name'] = substr( $query, 0, 500 );
 
 		return $result;
 	}
@@ -216,41 +208,15 @@ class GeocodingAbilities {
 		$query = substr( $query, 0, 500 );
 		$limit = min( max( 1, (int) ( $input['limit'] ?? 5 ) ), 10 );
 
-		$url_args = array(
-			'format'         => 'json',
-			'addressdetails' => '1',
-			'limit'          => (string) $limit,
-			'q'              => $query,
-		);
-
+		$countrycodes = '';
 		if ( ! empty( $input['countrycodes'] ) ) {
-			$url_args['countrycodes'] = sanitize_text_field( $input['countrycodes'] );
+			$countrycodes = sanitize_text_field( $input['countrycodes'] );
 		}
 
-		$url = add_query_arg( $url_args, 'https://nominatim.openstreetmap.org/search' );
+		$data = NominatimClient::searchAddress( $query, $limit, $countrycodes );
 
-		$response = wp_remote_get(
-			$url,
-			array(
-				'timeout'    => 10,
-				'user-agent' => 'DataMachineEvents/1.0 (https://extrachill.com)',
-			)
-		);
-
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'nominatim_request_failed', 'Nominatim request failed: ' . $response->get_error_message(), array( 'status' => 500 ) );
-		}
-
-		$status_code = wp_remote_retrieve_response_code( $response );
-		if ( 200 !== $status_code ) {
-			return new \WP_Error( 'nominatim_error', 'Nominatim returned status ' . $status_code, array( 'status' => 500 ) );
-		}
-
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
-
-		if ( ! is_array( $data ) ) {
-			return new \WP_Error( 'nominatim_invalid_response', 'Invalid response from Nominatim.', array( 'status' => 500 ) );
+		if ( is_wp_error( $data ) ) {
+			return $data;
 		}
 
 		return array(
@@ -410,7 +376,7 @@ class GeocodingAbilities {
 
 			// Rate limit — respect Nominatim's usage policy.
 			if ( $processed < $limit ) {
-				sleep( self::RATE_LIMIT_SECONDS );
+				NominatimClient::sleepForRateLimit();
 			}
 		}
 

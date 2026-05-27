@@ -7,8 +7,8 @@
 
 namespace DataMachineEvents\Core;
 
-use DataMachine\Core\HttpClient;
 use DataMachineEvents\Core\GeoNamesService;
+use DataMachineEvents\Core\NominatimClient;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -19,8 +19,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Venue_Taxonomy {
 
-	private const NOMINATIM_API        = 'https://nominatim.openstreetmap.org/search';
-	private const NOMINATIM_USER_AGENT = 'DataMachineEvents/1.0 (https://extrachill.com)';
+	/**
+	 * @deprecated 0.40.0 Use NominatimClient::USER_AGENT. Retained as a
+	 *             private alias because removing the constant entirely
+	 *             would break any reflective consumer.
+	 */
+	private const NOMINATIM_USER_AGENT = NominatimClient::USER_AGENT;
 
 	public static $meta_fields = array(
 		'address'     => '_venue_address',
@@ -659,63 +663,51 @@ class Venue_Taxonomy {
 	}
 
 	/**
-	 * Query Nominatim API for coordinates
+	 * Query Nominatim API for coordinates.
 	 *
-	 * @param string $query Search query string
-	 * @return string|null Coordinates as "lat,lng" or null on failure
+	 * @deprecated 0.40.0 Use {@see NominatimClient::geocodeOne()} which
+	 *             returns a richer array (`lat` / `lng` / `display_name` /
+	 *             `cached`) instead of the legacy comma-joined string.
+	 *             This method is preserved as a back-compat shim because
+	 *             external consumers may still depend on the
+	 *             `"lat,lng"` return contract.
+	 *
+	 * @param string $query Search query string.
+	 * @return string|null Coordinates as "lat,lng" or null on failure.
 	 */
 	public static function query_nominatim( string $query ): ?string {
 		if ( empty( $query ) ) {
 			return null;
 		}
 
-		$url = add_query_arg(
-			array(
-				'format' => 'json',
-				'limit'  => 1,
-				'q'      => $query,
-			),
-			self::NOMINATIM_API
-		);
+		$result = NominatimClient::geocodeOne( $query );
 
-		$result = HttpClient::get(
-			$url,
-			array(
-				'timeout' => 10,
-				'headers' => array(
-					'User-Agent' => self::NOMINATIM_USER_AGENT,
-				),
-				'context' => 'Venue Geocoding',
-			)
-		);
+		if ( is_wp_error( $result ) ) {
+			$error_code = $result->get_error_code();
 
-		if ( ! $result['success'] ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'Geocoding request failed',
-				array(
-					'error' => $result['error'] ?? 'Unknown error',
-					'query' => $query,
-				)
-			);
+			// 'geocode_failed' is the no-results case — legacy contract
+			// surfaced that as a silent null. Other errors (transport,
+			// invalid response) keep the original log line.
+			if ( 'geocode_failed' !== $error_code ) {
+				do_action(
+					'datamachine_log',
+					'error',
+					'Geocoding request failed',
+					array(
+						'error' => $result->get_error_message(),
+						'query' => $query,
+					)
+				);
+			}
+
 			return null;
 		}
 
-		$body = $result['data'];
-		$data = json_decode( $body, true );
-
-		if ( empty( $data ) || ! is_array( $data ) || empty( $data[0] ) ) {
+		if ( empty( $result['lat'] ) || empty( $result['lng'] ) ) {
 			return null;
 		}
 
-		$nominatim_result = $data[0];
-
-		if ( isset( $nominatim_result['lat'] ) && isset( $nominatim_result['lon'] ) ) {
-			return $nominatim_result['lat'] . ',' . $nominatim_result['lon'];
-		}
-
-		return null;
+		return $result['lat'] . ',' . $result['lng'];
 	}
 
 	/**

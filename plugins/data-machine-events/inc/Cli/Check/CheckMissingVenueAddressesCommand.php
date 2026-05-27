@@ -50,7 +50,7 @@
 
 namespace DataMachineEvents\Cli\Check;
 
-use DataMachine\Core\HttpClient;
+use DataMachineEvents\Core\NominatimClient;
 use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\DuplicateDetection\VenueMergeHelper;
 
@@ -58,20 +58,9 @@ defined( 'ABSPATH' ) || exit;
 
 class CheckMissingVenueAddressesCommand {
 
-	/**
-	 * Nominatim endpoints. Same host the forward geocoder
-	 * (Venue_Taxonomy::query_nominatim) already uses.
-	 */
-	private const NOMINATIM_REVERSE_API = 'https://nominatim.openstreetmap.org/reverse';
-	private const NOMINATIM_SEARCH_API  = 'https://nominatim.openstreetmap.org/search';
-	private const NOMINATIM_USER_AGENT  = 'DataMachineEvents/1.0 (https://extrachill.com)';
-
-	/**
-	 * Seconds to sleep between Nominatim requests. Matches the rate-limit
-	 * in GeocodingAbilities so this command does not get
-	 * rate-limited / banned during a large --apply run.
-	 */
-	private const RATE_LIMIT_SECONDS = 2;
+	// Nominatim endpoints, user-agent, and rate-limit live in
+	// NominatimClient — the single point of HTTP plumbing for every
+	// OSM call in this plugin.
 
 	/**
 	 * Address-component meta keys filled by the repair pass. Subset of
@@ -356,34 +345,15 @@ class CheckMissingVenueAddressesCommand {
 			return null;
 		}
 
-		$url = add_query_arg(
-			array(
-				'format'         => 'jsonv2',
-				'lat'            => $lat,
-				'lon'            => $lon,
-				'addressdetails' => '1',
-			),
-			self::NOMINATIM_REVERSE_API
-		);
+		$data = NominatimClient::reverseGeocode( (float) $lat, (float) $lon );
 
-		$result = HttpClient::get(
-			$url,
-			array(
-				'timeout' => 10,
-				'headers' => array(
-					'User-Agent' => self::NOMINATIM_USER_AGENT,
-				),
-				'context' => 'Venue Reverse Geocoding',
-			)
-		);
-
-		if ( empty( $result['success'] ) ) {
+		if ( is_wp_error( $data ) ) {
 			do_action(
 				'datamachine_log',
 				'warning',
 				'Reverse geocoding request failed',
 				array(
-					'error'       => $result['error'] ?? 'unknown error',
+					'error'       => $data->get_error_message(),
 					'coordinates' => $coordinates,
 				)
 			);
@@ -392,11 +362,9 @@ class CheckMissingVenueAddressesCommand {
 
 		// Be nice to Nominatim between successive lookups when a single
 		// --apply run touches many venues.
-		usleep( self::RATE_LIMIT_SECONDS * 1_000_000 );
+		NominatimClient::sleepForRateLimit();
 
-		$body = is_string( $result['data'] ?? null ) ? $result['data'] : '';
-		$data = json_decode( $body, true );
-		if ( ! is_array( $data ) || empty( $data['address'] ) ) {
+		if ( empty( $data['address'] ) ) {
 			return null;
 		}
 
@@ -425,46 +393,24 @@ class CheckMissingVenueAddressesCommand {
 
 		$query = sprintf( '%s %s', $name, $city );
 
-		$url = add_query_arg(
-			array(
-				'format'         => 'jsonv2',
-				'q'              => $query,
-				'limit'          => '1',
-				'addressdetails' => '1',
-			),
-			self::NOMINATIM_SEARCH_API
-		);
+		$data = NominatimClient::searchAddress( $query, 1 );
 
-		$result = HttpClient::get(
-			$url,
-			array(
-				'timeout' => 10,
-				'headers' => array(
-					'User-Agent' => self::NOMINATIM_USER_AGENT,
-				),
-				'context' => 'Venue Places Lookup',
-			)
-		);
-
-		if ( empty( $result['success'] ) ) {
+		if ( is_wp_error( $data ) ) {
 			do_action(
 				'datamachine_log',
 				'warning',
 				'Places lookup request failed',
 				array(
-					'error' => $result['error'] ?? 'unknown error',
+					'error' => $data->get_error_message(),
 					'query' => $query,
 				)
 			);
 			return null;
 		}
 
-		usleep( self::RATE_LIMIT_SECONDS * 1_000_000 );
+		NominatimClient::sleepForRateLimit();
 
-		$body = is_string( $result['data'] ?? null ) ? $result['data'] : '';
-		$data = json_decode( $body, true );
-
-		if ( ! is_array( $data ) || empty( $data[0] ) || empty( $data[0]['address'] ) ) {
+		if ( empty( $data[0] ) || empty( $data[0]['address'] ) ) {
 			return null;
 		}
 
