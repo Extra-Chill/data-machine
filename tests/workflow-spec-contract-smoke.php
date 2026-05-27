@@ -121,15 +121,14 @@ $pipeline_harness = new WorkflowSpecPipelineHarness();
 $invalid_cases    = array(
 	'missing steps'     => array(),
 	'empty steps'       => array( 'steps' => array() ),
-	'associative steps' => array( 'steps' => array( 'first' => array( 'type' => 'fetch' ) ) ),
+	'associative steps' => array( 'steps' => array( 'first' => array( 'step_type' => 'fetch' ) ) ),
 	'scalar step'       => array( 'steps' => array( 'fetch' ) ),
-	'missing type'      => array( 'steps' => array( array( 'handler_slug' => 'rss' ) ) ),
-	'stored-config step_type field' => array( 'steps' => array( array( 'step_type' => 'fetch' ) ) ),
-	'legacy handler alias field' => array( 'steps' => array( array( 'type' => 'fetch', 'handler' => 'rss' ) ) ),
-	'legacy handler field' => array( 'steps' => array( array( 'type' => 'fetch', 'handler_slug' => 'rss' ) ) ),
-	'legacy config field'  => array( 'steps' => array( array( 'type' => 'fetch', 'handler_config' => array( 'url' => 'https://example.com' ) ) ) ),
-	'non-string type'   => array( 'steps' => array( array( 'type' => 123 ) ) ),
-	'unknown type'      => array( 'steps' => array( array( 'type' => 'time_travel' ) ) ),
+	'missing step_type' => array( 'steps' => array( array( 'handler_slug' => 'rss' ) ) ),
+	'legacy handler alias field' => array( 'steps' => array( array( 'step_type' => 'fetch', 'handler' => 'rss' ) ) ),
+	'legacy handler field' => array( 'steps' => array( array( 'step_type' => 'fetch', 'handler_slug' => 'rss' ) ) ),
+	'legacy config field'  => array( 'steps' => array( array( 'step_type' => 'fetch', 'handler_config' => array( 'url' => 'https://example.com' ) ) ) ),
+	'non-string step_type' => array( 'steps' => array( array( 'step_type' => 123 ) ) ),
+	'unknown step_type' => array( 'steps' => array( array( 'step_type' => 'time_travel' ) ) ),
 );
 
 foreach ( $invalid_cases as $case => $workflow ) {
@@ -142,9 +141,9 @@ foreach ( $invalid_cases as $case => $workflow ) {
 
 $valid_workflow = array(
 	'steps' => array(
-		array( 'type' => 'fetch' ),
-		array( 'type' => 'ai' ),
-		array( 'type' => 'system_task', 'flow_step_settings' => array( 'task_type' => 'daily_memory_generation' ) ),
+		array( 'step_type' => 'fetch' ),
+		array( 'step_type' => 'ai' ),
+		array( 'step_type' => 'system_task', 'flow_step_settings' => array( 'task_type' => 'daily_memory_generation' ) ),
 	),
 );
 
@@ -152,17 +151,28 @@ assert_workflow_spec_equals( array( 'valid' => true ), WorkflowSpecValidator::va
 assert_workflow_spec_equals( true, $pipeline_harness->validateForTest( $valid_workflow ), 'create-pipeline adapter accepts valid workflow', $failures, $passes );
 assert_workflow_spec_equals( array( 'success' => true ), workflow_execute_edge_for_test( $valid_workflow ), 'execute-workflow adapter accepts valid workflow', $failures, $passes );
 
+$compat_workflow = array(
+	'steps' => array(
+		array( 'type' => 'fetch' ),
+		array( 'type' => 'ai' ),
+	),
+);
+
+assert_workflow_spec_equals( array( 'valid' => true ), WorkflowSpecValidator::validate( $compat_workflow ), 'shared validator accepts type compatibility alias', $failures, $passes );
+$compat_configs = WorkflowConfigFactory::buildEphemeralConfigs( $compat_workflow );
+assert_workflow_spec_equals( array( 'fetch', 'ai' ), array_column( array_values( $compat_configs['pipeline_config'] ), 'step_type' ), 'type alias normalizes to canonical step_type rows', $failures, $passes );
+
 $configs         = WorkflowConfigFactory::buildEphemeralConfigs(
 	array(
 		'steps' => array(
 			array(
-				'type'            => 'fetch',
+				'step_type'       => 'fetch',
 				'label'           => 'Fetch Source',
 				'handler_slugs'   => array( 'mcp' ),
 				'handler_configs' => array( 'mcp' => array( 'server' => 'a8c' ) ),
 			),
 			array(
-				'type'           => 'ai',
+				'step_type'      => 'ai',
 				'label'          => 'Summarize',
 				'agent_modes'    => array( 'rl_task' ),
 				'system_prompt'  => 'Be concise.',
@@ -182,7 +192,7 @@ $configs         = WorkflowConfigFactory::buildEphemeralConfigs(
 				),
 			),
 			array(
-				'type'           => 'system_task',
+				'step_type'      => 'system_task',
 				'label'          => 'Cleanup',
 				'flow_step_settings' => array( 'task_type' => 'retention_logs' ),
 			),

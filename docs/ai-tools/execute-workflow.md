@@ -22,12 +22,12 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 
 ## Step Configuration
 
-Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `handler_configs`, and `flow_step_settings`. Stored pipeline and flow config rows use `step_type` internally, but workflow input uses `type`. The old handler aliases `handler_slug` and `handler_config` are rejected by the shared workflow validator.
+Workflow specs use the same canonical fields as stored pipeline and flow config: `step_type`, `handler_slugs`, `handler_configs`, and `flow_step_settings`. The `type` field is accepted only as a compatibility alias for older ephemeral workflow specs. The old handler aliases `handler_slug` and `handler_config` are rejected by the shared workflow validator.
 
 ### Fetch Steps
 ```json
 {
-  "type": "fetch",
+  "step_type": "fetch",
   "handler_slugs": ["handler_name"],
   "handler_configs": {
     "handler_name": {
@@ -41,7 +41,7 @@ Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `hand
 ### AI Steps
 ```json
 {
-  "type": "ai",
+  "step_type": "ai",
   "provider": "anthropic",
   "model": "claude-sonnet-4-20250514",
   "user_message": "Instruction for AI processing",
@@ -54,7 +54,7 @@ Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `hand
 ### Publish Steps
 ```json
 {
-  "type": "publish",
+  "step_type": "publish",
   "handler_slugs": ["handler_name"],
   "handler_configs": {
     "handler_name": {
@@ -68,7 +68,7 @@ Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `hand
 ### Upsert Steps
 ```json
 {
-  "type": "upsert",
+  "step_type": "upsert",
   "handler_slugs": ["handler_name"],
   "handler_configs": {
     "handler_name": {
@@ -82,7 +82,7 @@ Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `hand
 ### System Task Steps
 ```json
 {
-  "type": "system_task",
+  "step_type": "system_task",
   "flow_step_settings": {
     "task_type": "alt_text_generation",
     "params": {
@@ -100,7 +100,7 @@ Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `hand
 {
   "steps": [
     {
-      "type": "fetch",
+      "step_type": "fetch",
       "handler_slugs": ["rss"],
       "handler_configs": {
         "rss": {
@@ -109,11 +109,11 @@ Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `hand
       }
     },
     {
-      "type": "ai",
+      "step_type": "ai",
       "user_message": "Summarize this content and make it engaging for social media"
     },
     {
-      "type": "publish",
+      "step_type": "publish",
       "handler_slugs": ["twitter"],
       "handler_configs": {
         "twitter": {}
@@ -128,7 +128,7 @@ Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `hand
 {
   "steps": [
     {
-      "type": "fetch",
+      "step_type": "fetch",
       "handler_slugs": ["wordpress_local"],
       "handler_configs": {
         "wordpress_local": {
@@ -138,11 +138,11 @@ Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `hand
       }
     },
     {
-      "type": "ai",
+      "step_type": "ai",
       "user_message": "Update these posts with better SEO titles and meta descriptions"
     },
     {
-      "type": "upsert",
+      "step_type": "upsert",
       "handler_slugs": ["wordpress_update"],
       "handler_configs": {
         "wordpress_update": {}
@@ -157,7 +157,7 @@ Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `hand
 {
   "steps": [
     {
-      "type": "fetch",
+      "step_type": "fetch",
       "handler_slugs": ["files"],
       "handler_configs": {
         "files": {
@@ -166,22 +166,22 @@ Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `hand
       }
     },
     {
-      "type": "ai",
+      "step_type": "ai",
       "user_message": "Adapt this content for different social media platforms"
     },
     {
-      "type": "publish",
+      "step_type": "publish",
       "handler_slugs": ["twitter"],
       "handler_configs": {
         "twitter": {}
       }
     },
     {
-      "type": "ai",
+      "step_type": "ai",
       "user_message": "Create a longer version for Facebook"
     },
     {
-      "type": "publish",
+      "step_type": "publish",
       "handler_slugs": ["facebook"],
       "handler_configs": {
         "facebook": {}
@@ -196,7 +196,7 @@ Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `hand
 ### WordPress Publish Handler
 ```json
 {
-  "type": "publish",
+  "step_type": "publish",
   "handler_slugs": ["wordpress"],
   "handler_configs": {
     "wordpress": {
@@ -213,7 +213,7 @@ Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `hand
 ### Social Media Handlers
 ```json
 {
-  "type": "publish",
+  "step_type": "publish",
   "handler_slugs": ["twitter"],
   "handler_configs": {
     "twitter": {}

@@ -46,7 +46,7 @@ class ExecuteWorkflowAbility {
 								'properties'  => array(
 									'steps' => array(
 										'type'        => 'array',
-										'description' => __( 'Array of step objects with type, handler_slugs, handler_configs, and flow_step_settings', 'data-machine' ),
+										'description' => __( 'Array of step objects with step_type, handler_slugs, handler_configs, and flow_step_settings', 'data-machine' ),
 									),
 								),
 							),
