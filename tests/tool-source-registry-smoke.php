@@ -287,6 +287,17 @@ $opt_in_baseline = resolve_source_tools(
 	array( 'allow_only' => array( 'durable_memory_tool' ) )
 );
 assert_source_equals( true, isset( $opt_in_baseline['durable_memory_tool'] ), 'pipeline mode picks up opt-in tool when allowlisted', $failures, $passes );
+$opt_in_tool_policy = resolve_source_tools(
+	ToolPolicyResolver::MODE_PIPELINE,
+	new SourcePolicyToolManager(),
+	array(
+		'tool_policy' => array(
+			'mode'  => 'allow',
+			'tools' => array( 'durable_memory_tool' ),
+		),
+	)
+);
+assert_source_equals( true, isset( $opt_in_tool_policy['durable_memory_tool'] ), 'pipeline mode picks up opt-in tool when allowed by tool policy', $failures, $passes );
 $opt_in_no_allowlist = resolve_source_tools(
 	ToolPolicyResolver::MODE_PIPELINE,
 	new SourcePolicyToolManager()
