@@ -131,6 +131,13 @@ function datamachine_business_load_handlers() {
 
 	// Business AI tools
 	new \DataMachineBusiness\Tools\AmazonAffiliateLink();
+
+	// Media Hygiene — orphan files + unused attachments.
+	new \DataMachineBusiness\Abilities\MediaHygiene\MediaHygieneAbility();
+
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		\WP_CLI::add_command( 'datamachine media', \DataMachineBusiness\Cli\MediaHygieneCommand::class );
+	}
 }
 
 // Hook into plugins_loaded to ensure Data Machine core is loaded first
