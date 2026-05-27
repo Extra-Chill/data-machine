@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.134.3] - 2026-05-27
+
+### Fixed
+- harden system task workflow contracts
+- preserve generic tool trace metadata
+
 ## [0.134.2] - 2026-05-27
 
 ### Fixed
