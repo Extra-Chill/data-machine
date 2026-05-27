@@ -59,6 +59,13 @@ function validate_workflow_for_test( array $workflow ): array {
 	$valid_types         = array_keys( $step_type_abilities->getAllStepTypes() );
 
 	foreach ( $workflow['steps'] as $index => $step ) {
+		if ( array_key_exists( 'step_type', $step ) ) {
+			return array(
+				'valid' => false,
+				'error' => "Step {$index} uses unsupported legacy field step_type; use type",
+			);
+		}
+
 		foreach ( array( 'handler', 'handler_slug', 'handler_config' ) as $legacy_field ) {
 			if ( array_key_exists( $legacy_field, $step ) ) {
 				return array(
@@ -136,6 +143,13 @@ $wf = array( 'steps' => array( array( 'type' => 'fetch', 'handler_slug' => 'rss'
 $r  = validate_workflow_for_test( $wf );
 dm_assert( false === $r['valid'], 'fetch with legacy handler_slug rejected' );
 dm_assert( str_contains( $r['error'] ?? '', 'unsupported legacy field handler_slug' ), 'legacy handler_slug error is explicit' );
+
+// -----------------------------------------------------------------
+echo "\n[5b] step with legacy step_type — INVALID\n";
+$wf = array( 'steps' => array( array( 'step_type' => 'fetch' ) ) );
+$r  = validate_workflow_for_test( $wf );
+dm_assert( false === $r['valid'], 'legacy step_type rejected' );
+dm_assert( str_contains( $r['error'] ?? '', 'unsupported legacy field step_type' ), 'legacy step_type error is explicit' );
 
 // -----------------------------------------------------------------
 echo "\n[6] publish step without handler_slug — VALID at workflow level\n";

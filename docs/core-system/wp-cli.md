@@ -4,6 +4,16 @@ Data Machine provides a broad WP-CLI surface for managing pipelines, flows, jobs
 
 > **Note:** The `wp datamachine workspace` and `wp datamachine github` commands have been moved to the `data-machine-code` extension plugin.
 
+## Contract Boundaries
+
+- **Pipelines** are reusable step templates. They define step order and durable structure.
+- **Flows** are runnable pipeline instances. They own schedules, queues, handler config, prompts, and per-flow step settings.
+- **Step types** are execution primitives such as `fetch`, `ai`, `publish`, `upsert`, and `system_task`.
+- **Handlers** are integrations selected by handler-backed step types. Only step types with `uses_handler=yes` accept handlers.
+- **System tasks** are named operational jobs. Use them for bounded tasks such as alt text, retention, internal links, and memory maintenance. Use pipelines/flows for reusable multi-step workflows instead of hiding workflow composition inside one system task.
+
+Workflow JSON uses canonical fields: `type`, `handler_slugs`, `handler_configs`, and `flow_step_settings`. Legacy aliases such as `step_type`, `handler`, `handler_slug`, and `handler_config` are rejected on normal workflow paths.
+
 ## Available Commands
 
 ### datamachine pipelines
@@ -17,7 +27,7 @@ wp datamachine pipelines list
 # Get a specific pipeline (shows steps and flows)
 wp datamachine pipelines get 5
 
-# Create a pipeline with steps
+# Create a pipeline with minimal step structure
 wp datamachine pipelines create --name="My Pipeline" --steps='[{"step_type":"fetch","label":"RSS Fetch"}]'
 
 # Update pipeline name or config
@@ -37,6 +47,8 @@ wp datamachine pipelines memory-files 5 --remove=strategy.md
 ```
 
 **Options**: `--per_page`, `--offset`, `--format`, `--fields`, `--dry-run`
+
+`--steps` creates pipeline step structure. Use workflow/bundle specs when preserving full step settings such as `handler_slugs`, `handler_configs`, `flow_step_settings`, AI prompts, queues, or tool policy. Use `flow_config` only when intentionally creating the first runnable flow with the pipeline.
 
 ### datamachine flows
 
@@ -82,6 +94,8 @@ wp datamachine flows migrate-legacy-handler-shape --all-sites --yes
 `migrate-legacy-handler-shape` is a contained operator repair command for older stored `flow_config` rows that still use scalar `handler`, `handler_slug`, or `handler_config` keys. Normal workflow specs, import/update paths, readers, and writers remain canonical-only and use `handler_slugs`, `handler_configs`, and `flow_step_settings`.
 
 **Options**: `--per_page`, `--offset`, `--handler`, `--format`, `--fields`, `--dry-run`, `--all-sites`, `--yes`, `--verbose`
+
+Flows own runnable configuration. Put handler config, prompt queues, per-flow task settings, schedules, and run-time overrides on flows, not on the pipeline template.
 
 ### datamachine flows queue
 
@@ -338,7 +352,7 @@ System tasks and health checks. **Since**: 0.41.0
 wp datamachine system health
 wp datamachine system health --types=php,wp,plugin
 
-# Run a system task immediately
+# Schedule a system task to run now
 wp datamachine system run alt_text_generation
 wp datamachine system run daily_memory_generation
 
@@ -351,6 +365,8 @@ wp datamachine system prompt-get alt_text_generation system_prompt
 wp datamachine system prompt-set alt_text_generation system_prompt "New prompt"
 wp datamachine system prompt-reset alt_text_generation system_prompt
 ```
+
+`system run` schedules a job through the system task contract; it does not execute the task inline in the CLI process. Process queued work with `wp datamachine worker run` or `wp datamachine drain`.
 
 ### datamachine batch
 

@@ -22,14 +22,18 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 
 ## Step Configuration
 
+Workflow specs use the canonical fields `type`, `handler_slugs`, `handler_configs`, and `flow_step_settings`. The old aliases `step_type`, `handler_slug`, and `handler_config` are rejected by the shared workflow validator.
+
 ### Fetch Steps
 ```json
 {
-  "step_type": "fetch",
-  "handler_slug": "handler_name",
-  "handler_config": {
-    "required_field": "value",
-    "optional_field": "value"
+  "type": "fetch",
+  "handler_slugs": ["handler_name"],
+  "handler_configs": {
+    "handler_name": {
+      "required_field": "value",
+      "optional_field": "value"
+    }
   }
 }
 ```
@@ -37,7 +41,7 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 ### AI Steps
 ```json
 {
-  "step_type": "ai",
+  "type": "ai",
   "provider": "anthropic",
   "model": "claude-sonnet-4-20250514",
   "user_message": "Instruction for AI processing",
@@ -50,11 +54,13 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 ### Publish Steps
 ```json
 {
-  "step_type": "publish",
-  "handler_slug": "handler_name",
-  "handler_config": {
-    "required_field": "value",
-    "optional_field": "value"
+  "type": "publish",
+  "handler_slugs": ["handler_name"],
+  "handler_configs": {
+    "handler_name": {
+      "required_field": "value",
+      "optional_field": "value"
+    }
   }
 }
 ```
@@ -62,11 +68,27 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 ### Upsert Steps
 ```json
 {
-  "step_type": "update",
-  "handler_slug": "handler_name",
-  "handler_config": {
-    "required_field": "value",
-    "optional_field": "value"
+  "type": "upsert",
+  "handler_slugs": ["handler_name"],
+  "handler_configs": {
+    "handler_name": {
+      "required_field": "value",
+      "optional_field": "value"
+    }
+  }
+}
+```
+
+### System Task Steps
+```json
+{
+  "type": "system_task",
+  "flow_step_settings": {
+    "task_type": "alt_text_generation",
+    "params": {
+      "post_id": 123,
+      "dry_run": true
+    }
   }
 }
 ```
@@ -78,20 +100,24 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 {
   "steps": [
     {
-      "step_type": "fetch",
-      "handler_slug": "rss",
-      "handler_config": {
-        "feed_url": "https://example.com/feed.xml"
+      "type": "fetch",
+      "handler_slugs": ["rss"],
+      "handler_configs": {
+        "rss": {
+          "feed_url": "https://example.com/feed.xml"
+        }
       }
     },
     {
-      "step_type": "ai",
+      "type": "ai",
       "user_message": "Summarize this content and make it engaging for social media"
     },
     {
-      "step_type": "publish",
-      "handler_slug": "twitter",
-      "handler_config": {}
+      "type": "publish",
+      "handler_slugs": ["twitter"],
+      "handler_configs": {
+        "twitter": {}
+      }
     }
   ]
 }
@@ -102,21 +128,25 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 {
   "steps": [
     {
-      "step_type": "fetch",
-      "handler_slug": "wordpress_local",
-      "handler_config": {
-        "post_type": "post",
-        "posts_per_page": 5
+      "type": "fetch",
+      "handler_slugs": ["wordpress_local"],
+      "handler_configs": {
+        "wordpress_local": {
+          "post_type": "post",
+          "posts_per_page": 5
+        }
       }
     },
     {
-      "step_type": "ai",
+      "type": "ai",
       "user_message": "Update these posts with better SEO titles and meta descriptions"
     },
     {
-      "step_type": "update",
-      "handler_slug": "wordpress_update",
-      "handler_config": {}
+      "type": "upsert",
+      "handler_slugs": ["wordpress_update"],
+      "handler_configs": {
+        "wordpress_update": {}
+      }
     }
   ]
 }
@@ -127,29 +157,35 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 {
   "steps": [
     {
-      "step_type": "fetch",
-      "handler_slug": "files",
-      "handler_config": {
-        "file_path": "/content/article.txt"
+      "type": "fetch",
+      "handler_slugs": ["files"],
+      "handler_configs": {
+        "files": {
+          "file_path": "/content/article.txt"
+        }
       }
     },
     {
-      "step_type": "ai",
+      "type": "ai",
       "user_message": "Adapt this content for different social media platforms"
     },
     {
-      "step_type": "publish",
-      "handler_slug": "twitter",
-      "handler_config": {}
+      "type": "publish",
+      "handler_slugs": ["twitter"],
+      "handler_configs": {
+        "twitter": {}
+      }
     },
     {
-      "step_type": "ai",
+      "type": "ai",
       "user_message": "Create a longer version for Facebook"
     },
     {
-      "step_type": "publish",
-      "handler_slug": "facebook",
-      "handler_config": {}
+      "type": "publish",
+      "handler_slugs": ["facebook"],
+      "handler_configs": {
+        "facebook": {}
+      }
     }
   ]
 }
@@ -160,14 +196,16 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 ### WordPress Publish Handler
 ```json
 {
-  "step_type": "publish",
-  "handler_slug": "wordpress",
-  "handler_config": {
-    "post_type": "post",
-    "post_status": "publish",
-    "post_author": 1,
-    "taxonomy_category_selection": "ai_decides",
-    "taxonomy_tags_selection": "Technology, AI"
+  "type": "publish",
+  "handler_slugs": ["wordpress"],
+  "handler_configs": {
+    "wordpress": {
+      "post_type": "post",
+      "post_status": "publish",
+      "post_author": 1,
+      "taxonomy_category_selection": "ai_decides",
+      "taxonomy_tags_selection": "Technology, AI"
+    }
   }
 }
 ```
@@ -175,9 +213,11 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 ### Social Media Handlers
 ```json
 {
-  "step_type": "publish",
-  "handler_slug": "twitter",
-  "handler_config": {}
+  "type": "publish",
+  "handler_slugs": ["twitter"],
+  "handler_configs": {
+    "twitter": {}
+  }
 }
 ```
 

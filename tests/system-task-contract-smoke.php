@@ -40,6 +40,14 @@ datamachine_contract_assert_contains( $settings, "'task_type' => array", 'System
 echo "\n[2] system task step reads only task_type\n";
 datamachine_contract_assert_contains( $step, "\$settings['task_type'] ?? ''", 'SystemTaskStep reads task_type directly', $failures, $passes );
 
+echo "\n[3] legacy task alias fails explicitly\n";
+datamachine_contract_assert_contains( $step, 'system_task_legacy_task_field', 'SystemTaskStep has explicit legacy task failure code', $failures, $passes );
+datamachine_contract_assert_contains( $step, 'flow_step_settings.task_type', 'SystemTaskStep missing-task error names canonical task_type field', $failures, $passes );
+
+echo "\n[4] task metadata documents manual-run guardrails\n";
+datamachine_contract_assert_contains( $system_task, 'supports_run?: bool', 'SystemTask metadata documents supports_run', $failures, $passes );
+datamachine_contract_assert_contains( $system_task, 'params_schema?: array', 'SystemTask metadata documents params_schema', $failures, $passes );
+
 if ( ! empty( $failures ) ) {
 	echo "\nFAILED: " . count( $failures ) . " system task contract assertion(s) failed.\n";
 	exit( 1 );

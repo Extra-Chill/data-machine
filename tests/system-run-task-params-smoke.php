@@ -190,8 +190,8 @@ function smoke_default_system_task_workflow( string $task_type, array $params ):
 			array(
 				'type'               => 'system_task',
 				'flow_step_settings' => array(
-					'task'   => $task_type,
-					'params' => $params,
+					'task_type' => $task_type,
+					'params'    => $params,
 				),
 			),
 		),
@@ -277,6 +277,8 @@ $assert( 'TaskScheduler marks run-now jobs as system jobs', 'system' === $initia
 $assert( 'TaskScheduler labels system task jobs from task type', 'Wiki maintain' === $initial['job_label'] );
 $workflow = smoke_default_system_task_workflow( 'wiki_maintain', $initial['task_params'] );
 $assert( 'SystemTask workflow stores params in flow_step_settings', $scheduled_params === $workflow['steps'][0]['flow_step_settings']['params'] );
+$assert( 'SystemTask workflow stores canonical task_type', 'wiki_maintain' === $workflow['steps'][0]['flow_step_settings']['task_type'] );
+$assert( 'SystemTask workflow does not store legacy task alias', ! array_key_exists( 'task', $workflow['steps'][0]['flow_step_settings'] ) );
 
 echo "\n[4] Source tripwires\n";
 $system_command = file_get_contents( __DIR__ . '/../inc/Cli/Commands/SystemCommand.php' );

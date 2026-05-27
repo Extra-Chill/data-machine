@@ -1,6 +1,8 @@
 # System Tasks
 
-System tasks are reusable task handlers that can run on demand, from recurring schedules, or inline as workflow/pipeline steps. They handle AI-powered content operations (alt text, meta descriptions, internal linking), media processing (image generation, optimization), and agent housekeeping (daily memory synthesis). All system tasks share a common base class with standardized job management, effect tracking, and undo support.
+System tasks are reusable task handlers that can run on demand, from recurring schedules, or inline as workflow/pipeline steps. They handle AI-powered content operations (alt text, meta descriptions, internal linking), media processing (image generation, optimization), retention, and agent housekeeping (daily memory synthesis). All system tasks share a common base class with standardized job management, effect tracking, and undo support.
+
+Use system tasks for named operational jobs. Use pipelines and flows for reusable multi-step product workflows. A system task may call AI or mutate content when its metadata declares the safety envelope, but it should not become a hidden workflow composer that replaces explicit pipeline/flow steps.
 
 ## Overview
 
@@ -46,7 +48,9 @@ abstract class SystemTask {
 ]
 ```
 
-`executeTask()` is the imperative body called by `SystemTaskStep`. System task step settings use `task_type`; configs that still use the older `task` key must be upgraded before they run.
+`executeTask()` is the imperative body called by `SystemTaskStep`. System task step settings use `task_type`; configs that still use the older `task` key fail with an explicit legacy-field error and must be upgraded before they run.
+
+Keep `getWorkflow()` on the default one-step shape unless the task owns a bounded internal handoff that should still be scheduled as one named operation. If the work needs source inventory, generation, publishing, GitSync submission, coverage, or other independently observable stages, model those stages as pipeline/flow steps instead.
 
 ### Job Lifecycle Methods
 
@@ -70,9 +74,19 @@ public static function getTaskMeta(): array {
         'trigger'         => 'How it gets triggered',
         'trigger_type'    => 'cron|event|tool|manual',
         'supports_run'    => false,                       // Can be manually triggered?
+        'mutates'          => false,                       // Can modify content/files/state?
+        'supports_dry_run' => false,                       // Can preview instead of apply?
+        'requires_scope'   => false,                       // Manual runs require an explicit scope param?
+        'params_schema'    => [
+            'accepted' => [ 'post_id', 'limit', 'dry_run' ],
+            'required' => [ 'post_id' ],
+            'scope'    => [ 'post_id' ],
+        ],
     ];
 }
 ```
+
+Manual execution through `wp datamachine system run` or the `datamachine/run-task` ability is opt-in. Tasks must set `supports_run` to `true`; mutating tasks should also declare `mutates`, `supports_dry_run`, `requires_scope`, and `params_schema.scope` so broad runs require an explicit target.
 
 ### AI Model Resolution
 

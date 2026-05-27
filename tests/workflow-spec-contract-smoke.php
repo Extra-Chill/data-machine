@@ -124,6 +124,7 @@ $invalid_cases    = array(
 	'associative steps' => array( 'steps' => array( 'first' => array( 'type' => 'fetch' ) ) ),
 	'scalar step'       => array( 'steps' => array( 'fetch' ) ),
 	'missing type'      => array( 'steps' => array( array( 'handler_slug' => 'rss' ) ) ),
+	'legacy step_type field' => array( 'steps' => array( array( 'step_type' => 'fetch' ) ) ),
 	'legacy handler alias field' => array( 'steps' => array( array( 'type' => 'fetch', 'handler' => 'rss' ) ) ),
 	'legacy handler field' => array( 'steps' => array( array( 'type' => 'fetch', 'handler_slug' => 'rss' ) ) ),
 	'legacy config field'  => array( 'steps' => array( array( 'type' => 'fetch', 'handler_config' => array( 'url' => 'https://example.com' ) ) ) ),
@@ -215,7 +216,8 @@ $system_task_source = file_get_contents( __DIR__ . '/../inc/Core/Steps/SystemTas
 
 assert_workflow_spec_equals( 1, substr_count( $execute_source, 'WorkflowSpecValidator::validate' ), 'execute-workflow calls shared validator once', $failures, $passes );
 assert_workflow_spec_equals( 1, substr_count( $pipeline_source, 'WorkflowSpecValidator::validate' ), 'create-pipeline helper calls shared validator once', $failures, $passes );
-assert_workflow_spec_equals( 0, substr_count( $system_task_source, "['task']" ), 'system_task execution no longer accepts legacy task field', $failures, $passes );
+assert_workflow_spec_equals( false, str_contains( $system_task_source, "\$task_type = \$settings['task']" ), 'system_task execution does not resolve task type from legacy task field', $failures, $passes );
+assert_workflow_spec_equals( true, str_contains( $system_task_source, 'system_task_legacy_task_field' ), 'system_task execution rejects legacy task field explicitly', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " workflow spec assertions failed.\n";
