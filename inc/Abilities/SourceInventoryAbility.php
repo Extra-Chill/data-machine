@@ -82,9 +82,9 @@ class SourceInventoryAbility {
 				return $result;
 			}
 
-			$aggregator       = new PageableSourceAggregator();
-			$config           = $input;
-			$config['params'] = is_array( $source['params'] ?? null ) ? $source['params'] : array();
+			$aggregator        = new PageableSourceAggregator();
+			$config            = $input;
+			$config['params']  = is_array( $source['params'] ?? null ) ? $source['params'] : array();
 			$tracking_callback = $this->buildTrackingCallback( $input, $aggregator );
 			if ( null !== $tracking_callback ) {
 				$config['item_callback'] = $tracking_callback;
@@ -128,13 +128,13 @@ class SourceInventoryAbility {
 	}
 
 	private function buildTrackingCallback( array $input, PageableSourceAggregator $aggregator ): ?callable {
-		$tracking = is_array( $input['track_items'] ?? null ) ? $input['track_items'] : array();
+		$tracking  = is_array( $input['track_items'] ?? null ) ? $input['track_items'] : array();
 		$namespace = trim( (string) ( $tracking['namespace'] ?? '' ) );
 		if ( '' === $namespace ) {
 			return null;
 		}
 
-		$repository = $this->tracked_items ?? new TrackedItems();
+		$repository   = $this->tracked_items ?? new TrackedItems();
 		$item_id_path = (string) ( $tracking['item_id_path'] ?? 'id' );
 
 		return static function ( array $item ) use ( $tracking, $namespace, $item_id_path, $repository, $aggregator ): bool {
