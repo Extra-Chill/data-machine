@@ -56,6 +56,12 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+	function sanitize_text_field( string $text ): string {
+		return trim( preg_replace( '/[\r\n\t ]+/', ' ', strip_tags( $text ) ) ?? '' );
+	}
+}
+
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( string $name, $default_value = false ) {
 		unset( $name );
@@ -478,6 +484,62 @@ assert_runner_request( 1 === count( $json_tool_sandbox_result['tool_calls'] ?? a
 assert_runner_request( 'workspace_read' === ( $json_tool_sandbox_result['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline JSON text tool name is parsed' );
 assert_runner_request( array( 'path' => 'README.md' ) === ( $json_tool_sandbox_result['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline JSON text tool parameters are parsed' );
 assert_runner_request( 1 === count( $json_tool_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline JSON text tool call executes a workspace tool' );
+
+// 4d. Sandbox/pipeline runs also execute fenced JSON tool_calls arrays emitted as text.
+$json_array_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$json_array_dispatch_count ) {
+		++$json_array_dispatch_count;
+
+		if ( 1 === $json_array_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content' => "I will inspect first.\n```json\n{\"tool_calls\":[{\"id\":\"read-call\",\"type\":\"function\",\"function\":{\"name\":\"workspace_read\",\"arguments\":{\"path\":\"README.md\"}}}]}\n```",
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content' => 'json array sandbox complete',
+			),
+		);
+	}
+);
+
+$json_array_sandbox_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'read the sandbox README using fenced JSON tool_calls syntax' ) ),
+	array(
+		'workspace_read' => array(
+			'name'        => 'workspace_read',
+			'description' => 'Read a file from the sandbox workspace.',
+			'parameters'  => array(
+				'type'       => 'object',
+				'properties' => array(
+					'path' => array( 'type' => 'string' ),
+				),
+				'required'   => array( 'path' ),
+			),
+			'class'       => SandboxPipelineSmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array( 'sandbox', 'pipeline' ),
+	array(),
+	3
+);
+
+assert_runner_request( 2 === $json_array_dispatch_count, 'sandbox/pipeline fenced JSON tool_calls returns to provider for final answer' );
+assert_runner_request( 'json array sandbox complete' === ( $json_array_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline fenced JSON tool_calls preserves final answer' );
+assert_runner_request( 1 === count( $json_array_sandbox_result['tool_calls'] ?? array() ), 'sandbox/pipeline fenced JSON tool_calls is parsed' );
+assert_runner_request( 'workspace_read' === ( $json_array_sandbox_result['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline fenced JSON tool_calls name is parsed' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $json_array_sandbox_result['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline fenced JSON tool_calls parameters are parsed' );
+assert_runner_request( 1 === count( $json_array_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline fenced JSON tool_calls executes a workspace tool' );
 
 // 5. Client runtime tools are fulfilled by the transport callback, not PHP ToolExecutor.
 $runtime_dispatch_count = 0;

@@ -37,7 +37,7 @@ defined( 'ABSPATH' ) || exit;
  * @param array  $tools       Available tools keyed by tool name.
  * @param string $provider    AI provider identifier.
  * @param string $model       AI model identifier.
-	 * @param array  $modes       Execution modes ('pipeline', 'chat', ...).
+ * @param array  $modes       Execution modes ('pipeline', 'chat', ...).
  * @param array  $payload     Step payload / loop context.
  * @param int    $max_turns   Maximum conversation turns.
  * @param bool   $single_turn Execute exactly one turn and return.
@@ -366,8 +366,8 @@ function datamachine_run_conversation(
  * @param array                                     $tools              Available tools.
  * @param string                                    $provider           AI provider.
  * @param string                                    $model              AI model.
-	 * @param string                                    $mode               Comma-separated execution mode label.
-	 * @param array                                     $modes              Execution mode slugs.
+ * @param string                                    $mode               Comma-separated execution mode label.
+ * @param array                                     $modes              Execution mode slugs.
  * @param array                                     $loop_payload       Cleaned payload.
  * @param LoopEventSinkInterface                    $event_sink         DM event sink.
  * @param array                                     $base_log_context   Base log context.
@@ -1485,7 +1485,7 @@ function datamachine_extract_xml_tool_calls( string $text ): array {
 					continue;
 				}
 
-				$parameter_value          = function_exists( '\wp_strip_all_tags' )
+				$parameter_value               = function_exists( '\wp_strip_all_tags' )
 					? \wp_strip_all_tags( (string) $parameter_match[2] )
 					: (string) preg_replace( '/<[^>]*>/', '', (string) $parameter_match[2] );
 				$parameters[ $parameter_name ] = html_entity_decode( trim( $parameter_value ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
@@ -1503,34 +1503,55 @@ function datamachine_extract_xml_tool_calls( string $text ): array {
 }
 
 /**
- * Extract JSON tool calls emitted inside <tool_call> text envelopes.
+ * Extract JSON tool calls emitted as text by some providers/models.
  *
  * @param string $text Text candidate content.
  * @return array<int, array{name:string,parameters:array,id:mixed}>
  */
 function datamachine_extract_json_tool_calls( string $text ): array {
-	if ( ! str_contains( $text, '<tool_call>' ) || ! preg_match_all( '/<tool_call>\s*(.*?)\s*<\/tool_call>/is', $text, $matches, PREG_SET_ORDER ) ) {
+	$payloads = array();
+	if ( str_contains( $text, '<tool_call>' ) && preg_match_all( '/<tool_call>\s*(.*?)\s*<\/tool_call>/is', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$payloads[] = (string) $match[1];
+		}
+	}
+
+	if ( str_contains( $text, '```' ) && preg_match_all( '/```(?:json)?\s*(\{.*?\})\s*```/is', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$payloads[] = (string) $match[1];
+		}
+	}
+
+	if ( empty( $payloads ) ) {
 		return array();
 	}
 
 	$tool_calls = array();
-	foreach ( $matches as $index => $match ) {
-		$payload = json_decode( html_entity_decode( trim( (string) $match[1] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ), true );
+	foreach ( $payloads as $index => $raw_payload ) {
+		$payload = json_decode( html_entity_decode( trim( $raw_payload ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ), true );
 		if ( ! is_array( $payload ) ) {
 			continue;
 		}
 
-		$name = sanitize_key( (string) ( $payload['name'] ?? '' ) );
-		if ( '' === $name ) {
-			continue;
-		}
+		$calls = isset( $payload['tool_calls'] ) && is_array( $payload['tool_calls'] ) ? $payload['tool_calls'] : array( $payload );
+		foreach ( $calls as $call_index => $call ) {
+			if ( ! is_array( $call ) ) {
+				continue;
+			}
 
-		$parameters = $payload['arguments'] ?? ( $payload['parameters'] ?? array() );
-		$tool_calls[] = array(
-			'name'       => $name,
-			'parameters' => is_array( $parameters ) ? $parameters : datamachine_normalize_function_args( $parameters ),
-			'id'         => 'json-tool-call-' . ( $index + 1 ),
-		);
+			$function   = isset( $call['function'] ) && is_array( $call['function'] ) ? $call['function'] : array();
+			$name       = sanitize_key( (string) ( $function['name'] ?? ( $call['name'] ?? '' ) ) );
+			$parameters = $function['arguments'] ?? ( $call['arguments'] ?? ( $call['parameters'] ?? array() ) );
+			if ( '' === $name ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => is_array( $parameters ) ? $parameters : datamachine_normalize_function_args( $parameters ),
+				'id'         => $call['id'] ?? ( 'json-tool-call-' . ( $index + 1 ) . '-' . ( $call_index + 1 ) ),
+			);
+		}
 	}
 
 	return $tool_calls;
@@ -1572,7 +1593,7 @@ function datamachine_resolve_event_sink( array $payload ): LoopEventSinkInterfac
 /**
  * Resolve the runtime completion policy from mode and payload.
  *
-	 * @param array  $modes   Execution modes.
+ * @param array  $modes   Execution modes.
  * @param array  $payload Loop payload.
  * @return WP_Agent_Conversation_Completion_Policy
  */
