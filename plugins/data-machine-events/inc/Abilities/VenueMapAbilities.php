@@ -339,6 +339,40 @@ class VenueMapAbilities {
 		$total  = count( $venues );
 		$venues = array_slice( $venues, 0, self::MAX_VENUES );
 
+		/**
+		 * Filter the final venue array before it is returned to the caller.
+		 *
+		 * Runs after sort + cap, so consumers see exactly the venue set that
+		 * will be rendered. Consumers may:
+		 *
+		 *   - Mutate per-venue fields (e.g. override `event_count`, rewrite
+		 *     `address`, attach extra metadata).
+		 *   - Inject the `upcoming_events_at_venue` payload from a custom
+		 *     source when the built-in attachment path (which requires both
+		 *     `taxonomy` and `term_id` plus `include_events=true`) does not
+		 *     apply — e.g. a host plugin that wants to drive the
+		 *     events-map block from a non-taxonomy-archive page and supply
+		 *     its own per-venue event list.
+		 *   - Re-order the array (e.g. chronological order keyed on the
+		 *     injected per-venue payload, replacing the default
+		 *     event-count / distance sort).
+		 *   - Remove venues (filter to a stricter subset).
+		 *
+		 * Consumers should not expand the array beyond `MAX_VENUES` — the
+		 * cap is a safety valve enforced before this filter runs.
+		 *
+		 * @since 1.x.x
+		 *
+		 * @param array $venues The final venue array (already sorted and capped).
+		 *                      Each entry has term_id, name, slug, lat, lon,
+		 *                      address, url, event_count, and optionally
+		 *                      distance / upcoming_events_at_venue.
+		 * @param array $params The original input envelope passed to
+		 *                      executeListVenues() (lat, lng, radius, bounds,
+		 *                      taxonomy, term_id, include_events, etc.).
+		 */
+		$venues = apply_filters( 'data_machine_events_map_venues', $venues, $input );
+
 		return array(
 			'venues' => $venues,
 			'total'  => $total,

@@ -148,6 +148,7 @@ Chat tools in `inc/Api/Chat/Tools` provide AI-driven venue and event management 
 
 - `data_machine_events_calendar_query_args`: Modify calendar WP_Query arguments before template rendering.
 - `data_machine_events_map_query_args`: Modify venue-map query args (`include_ids`, bounds, geo, taxonomy) before the database query runs. Generic extension point for host plugins to inject post-filter constraints.
+- `data_machine_events_map_venues`: Modify the final venue array before it is returned. Runs after sort + cap. Lets consumers inject per-venue payloads (e.g. `upcoming_events_at_venue` from custom sources), re-order, or further filter the set.
 - `data_machine_events_excluded_taxonomies`: Control taxonomies excluded from badge lists or filter modals.
 - Badge/action filters: `data_machine_events_badge_wrapper_classes`, `data_machine_events_badge_classes`, `data_machine_events_more_info_button_classes`, `data_machine_events_ticket_button_classes`, and `data_machine_events_action_buttons` customize badge/CTA markup.
 - Pagination filters: `data_machine_events_pagination_wrapper_classes`, `data_machine_events_pagination_args` customize pagination markup.

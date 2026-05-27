@@ -105,6 +105,7 @@ signatures are stable.
 | `data_machine_events_map_show_location_search` | `(bool $show, array $context)` | Toggle the location search input. |
 | `data_machine_events_map_summary` | `(string $html, array $venues, array $context)` | Inject custom summary HTML above the map. |
 | `data_machine_events_map_query_args` | `(array $query_args, array $params)` | Modify the resolved venue-map query args before the database query runs. `$query_args['include_ids']` is the candidate venue term ID set (null = unrestricted, empty array = zero results, array of ints = intersected with existing filters). Mirrors `data_machine_events_calendar_query_args`. |
+| `data_machine_events_map_venues` | `(array $venues, array $params)` | Modify the final venue array before it is returned to the caller. Runs after sort + cap. Consumers may mutate per-venue fields, inject `upcoming_events_at_venue` payloads from custom sources (when the built-in `include_events` + taxonomy/term gating does not apply), re-order, or remove venues. Cannot expand beyond `MAX_VENUES`. |
 
 ### Event Details / button-row actions
 
