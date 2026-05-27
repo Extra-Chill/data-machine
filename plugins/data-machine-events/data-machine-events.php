@@ -55,6 +55,9 @@ if ( ! function_exists( 'data_machine_events_sanitize_query_params' ) ) {
 // See docs/integration-api.md.
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/public-api.php';
 
+// Add-to-Calendar button + dropdown for single-event pages (issue #312).
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventDetails/add-to-calendar-button.php';
+
 // Load event dates sync (monitors Event Details block saves → datamachine_event_dates table).
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-dates-sync.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/EventDatesTable.php';

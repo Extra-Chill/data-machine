@@ -267,3 +267,105 @@
         background: var(--data-machine-background-secondary);
     }
 }
+
+/* -----------------------------------------------------------------------
+ * Add to Calendar dropdown
+ *
+ * Server-rendered button + menu (see add-to-calendar-button.php). Vanilla
+ * JS (src/add-to-calendar.js) toggles `[hidden]` and `aria-expanded`.
+ * ----------------------------------------------------------------------- */
+
+.dm-events-add-to-calendar {
+    position: relative;
+    display: inline-block;
+}
+
+.dm-events-add-to-calendar-toggle {
+    /* Inherit ticket-button styling so the three action buttons match.
+       Consumers may override `.ticket-button` to restyle all action buttons
+       at once. */
+    cursor: pointer;
+    border: 0;
+    font: inherit;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.dm-events-add-to-calendar-toggle .dashicons {
+    line-height: 1;
+}
+
+.dm-events-add-to-calendar-toggle[aria-expanded="true"] {
+    /* Slight visual cue when open. */
+    filter: brightness(0.95);
+}
+
+.dm-events-add-to-calendar-menu {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    z-index: 50;
+    min-width: 220px;
+    margin: 0;
+    padding: 0.25rem 0;
+    list-style: none;
+    background: var(--data-machine-background-light, #fff);
+    border: 1px solid var(--data-machine-border-color, rgba(0, 0, 0, 0.12));
+    border-radius: var(--data-machine-border-radius, 4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.dm-events-add-to-calendar-menu[hidden] {
+    display: none;
+}
+
+.dm-events-add-to-calendar-menu.is-right-aligned {
+    left: auto;
+    right: 0;
+}
+
+.dm-events-add-to-calendar-menu li {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.dm-events-add-to-calendar-menu a {
+    display: block;
+    padding: 0.6rem 1rem;
+    color: var(--data-machine-text-primary, inherit);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.dm-events-add-to-calendar-menu a:hover,
+.dm-events-add-to-calendar-menu a:focus {
+    background: var(--data-machine-background-secondary, rgba(0, 0, 0, 0.05));
+    color: var(--data-machine-text-accent, inherit);
+    outline: none;
+}
+
+.dm-events-add-to-calendar-menu a:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--data-machine-text-accent, #2271b1);
+}
+
+@media (max-width: 480px) {
+    .dm-events-add-to-calendar-menu {
+        min-width: 200px;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .dm-events-add-to-calendar-menu {
+        background: var(--data-machine-background-secondary, #1f2937);
+        border-color: rgba(255, 255, 255, 0.12);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .dm-events-add-to-calendar-menu a:hover,
+    .dm-events-add-to-calendar-menu a:focus {
+        background: rgba(255, 255, 255, 0.08);
+    }
+}

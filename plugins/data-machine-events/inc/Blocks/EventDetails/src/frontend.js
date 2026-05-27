@@ -12,3 +12,4 @@
  * Internal dependencies
  */
 import './frontend.css';
+import './add-to-calendar.js';

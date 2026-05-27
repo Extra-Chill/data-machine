@@ -11,6 +11,7 @@
     "style": ["data-machine-events-root", "leaflet"],
     "editorStyle": "file:./style.css",
     "viewStyle": "file:./build/frontend.css",
+    "viewScript": "file:./build/frontend.js",
     "attributes": {
         "startDate": {
             "type": "string",

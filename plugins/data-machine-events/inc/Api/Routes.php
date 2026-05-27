@@ -12,9 +12,12 @@ if ( defined( 'DATA_MACHINE_EVENTS_PLUGIN_DIR' ) ) {
 		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Calendar.php',
 		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Venues.php',
 		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Events.php',
+		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/EventIcs.php',
 		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Filters.php',
 		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Geocoding.php',
 		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/VenueMap.php',
+		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/EventActions/CalendarUrlBuilder.php',
+		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/EventActions/IcsBuilder.php',
 	);
 	foreach ( $controllers as $file ) {
 		if ( file_exists( $file ) ) {
@@ -25,6 +28,7 @@ if ( defined( 'DATA_MACHINE_EVENTS_PLUGIN_DIR' ) ) {
 
 use DataMachineEvents\Api\Controllers\Calendar;
 use DataMachineEvents\Api\Controllers\Venues;
+use DataMachineEvents\Api\Controllers\EventIcs;
 use DataMachineEvents\Api\Controllers\Filters;
 use DataMachineEvents\Api\Controllers\Geocoding;
 use DataMachineEvents\Api\Controllers\VenueMap;
@@ -228,6 +232,28 @@ function register_routes() {
 				'past'       => array(
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
+				),
+			),
+		)
+	);
+
+	$event_ics = new EventIcs();
+
+	register_rest_route(
+		API_NAMESPACE,
+		'/events/(?P<id>\d+)/ics',
+		array(
+			'methods'             => 'GET',
+			'callback'            => array( $event_ics, 'download' ),
+			'permission_callback' => '__return_true',
+			'args'                => array(
+				'id' => array(
+					'type'              => 'integer',
+					'required'          => true,
+					'sanitize_callback' => 'absint',
+					'validate_callback' => function ( $param ) {
+						return is_numeric( $param ) && (int) $param > 0;
+					},
 				),
 			),
 		)
