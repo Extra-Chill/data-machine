@@ -81,19 +81,22 @@ namespace {
 
 	class TrackedItemsSmokeRepository extends TrackedItems {
 		private array $items = array();
+		private int $next_id = 1;
 
 		public function __construct() {}
 
 		public function upsert( array $item ): ?array {
 			$key = (string) $item['namespace'] . ':' . (string) $item['item_id'];
+			$existing = $this->items[ $key ] ?? array();
 			$this->items[ $key ] = array_merge(
 				array(
-					'id'         => count( $this->items ) + 1,
+					'id'         => $existing['id'] ?? $this->next_id++,
 					'item_type'  => '',
 					'state'      => TrackedItems::STATE_DISCOVERED,
 					'metadata'   => array(),
 					'updated_at' => '2026-05-26 00:00:00',
 				),
+				$existing,
 				$item
 			);
 			return $this->items[ $key ];
@@ -104,14 +107,39 @@ namespace {
 		}
 
 		public function list( array $filters = array() ): array {
-			return array_values( $this->items );
+			$items = array_values( $this->items );
+			foreach ( array( 'namespace', 'item_type', 'state', 'source_ref', 'output_ref' ) as $filter_key ) {
+				$filter_value = (string) ( $filters[ $filter_key ] ?? '' );
+				if ( '' === $filter_value ) {
+					continue;
+				}
+
+				$items = array_values(
+					array_filter(
+						$items,
+						static fn ( array $item ): bool => $filter_value === (string) ( $item[ $filter_key ] ?? '' )
+					)
+				);
+			}
+
+			return $items;
 		}
 
 		public function summary( array $filters = array() ): array {
+			$items    = $this->list( $filters );
+			$by_type  = array();
+			$by_state = array();
+			foreach ( $items as $item ) {
+				$item_type = (string) ( $item['item_type'] ?? '' );
+				$state     = (string) ( $item['state'] ?? '' );
+				$by_type[ $item_type ][ $state ] = ( $by_type[ $item_type ][ $state ] ?? 0 ) + 1;
+				$by_state[ $state ]              = ( $by_state[ $state ] ?? 0 ) + 1;
+			}
+
 			return array(
-				'total'    => count( $this->items ),
-				'by_type'  => array( 'function' => array( 'generated' => count( $this->items ) ) ),
-				'by_state' => array( 'generated' => count( $this->items ) ),
+				'total'    => count( $items ),
+				'by_type'  => $by_type,
+				'by_state' => $by_state,
 			);
 		}
 	}
@@ -142,20 +170,42 @@ namespace {
 
 	$upsert = $abilities->executeUpsertTrackedItem(
 		array(
-			'namespace' => 'wp-docs:core',
-			'item_id'   => 'function:wp_register_script_module',
-			'item_type' => 'function',
-			'state'     => TrackedItems::STATE_GENERATED,
+			'namespace'  => 'wp-docs:core',
+			'item_id'    => 'function:wp_register_script_module',
+			'item_type'  => 'function',
+			'state'      => TrackedItems::STATE_DISCOVERED,
+			'source_ref' => 'wordpress-develop',
 		)
 	);
 
 	tracked_items_assert( 'upsert succeeds', true === ( $upsert['success'] ?? false ) );
 	$get = $abilities->executeGetTrackedItem( array( 'namespace' => 'wp-docs:core', 'item_id' => 'function:wp_register_script_module' ) );
 	tracked_items_assert( 'get returns tracked item', 'function:wp_register_script_module' === ( $get['item']['item_id'] ?? '' ) );
+	tracked_items_assert( 'initial state is discovered', TrackedItems::STATE_DISCOVERED === ( $get['item']['state'] ?? '' ) );
+
+	$transition = $abilities->executeUpsertTrackedItem(
+		array(
+			'namespace'  => 'wp-docs:core',
+			'item_id'    => 'function:wp_register_script_module',
+			'item_type'  => 'function',
+			'source_ref' => 'wordpress-develop',
+			'output_ref' => 'docs/reference/functions/wp-register-script-module.md',
+			'state'      => TrackedItems::STATE_GENERATED,
+			'metadata'   => array( 'signature' => 'wp_register_script_module()' ),
+		)
+	);
+
+	tracked_items_assert( 'state transition succeeds', true === ( $transition['success'] ?? false ) );
+	tracked_items_assert( 'state transition preserves row identity', ( $upsert['item']['id'] ?? null ) === ( $transition['item']['id'] ?? null ) );
+	tracked_items_assert( 'state transition stores generated state', TrackedItems::STATE_GENERATED === ( $transition['item']['state'] ?? '' ) );
+	tracked_items_assert( 'state transition stores output ref', 'docs/reference/functions/wp-register-script-module.md' === ( $transition['item']['output_ref'] ?? '' ) );
 	$list = $abilities->executeListTrackedItems( array( 'namespace' => 'wp-docs:core' ) );
 	tracked_items_assert( 'list returns tracked item', 1 === count( (array) ( $list['items'] ?? array() ) ) );
+	$filtered_list = $abilities->executeListTrackedItems( array( 'namespace' => 'wp-docs:core', 'state' => TrackedItems::STATE_EXCLUDED ) );
+	tracked_items_assert( 'list filters by state', 0 === count( (array) ( $filtered_list['items'] ?? array() ) ) );
 	$summary = $abilities->executeTrackedItemsSummary( array( 'namespace' => 'wp-docs:core' ) );
 	tracked_items_assert( 'summary counts tracked item', 1 === (int) ( $summary['total'] ?? 0 ) );
+	tracked_items_assert( 'summary groups generated state', 1 === (int) ( $summary['by_state'][ TrackedItems::STATE_GENERATED ] ?? 0 ) );
 
 	if ( $failed > 0 ) {
 		echo "\ntracked-items-smoke failed: {$failed}/{$total} assertions failed.\n";

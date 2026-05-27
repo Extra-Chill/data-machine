@@ -6,7 +6,7 @@ WordPress 6.9 Abilities API provides standardized capability discovery and execu
 
 The Abilities API in `inc/Abilities/` provides a unified interface for Data Machine operations. Each ability implements `execute_callback` with `permission_callback` for consistent access control across REST API, CLI commands, and Chat tools.
 
-**Total registered abilities**: 201
+**Total registered abilities**: 205
 
 This page documents the shape of the current ability surface and the source files that own each domain. For an exact live inventory, run `wp abilities list --category=datamachine-*` in a loaded WordPress install or inspect `wp_register_ability()` callsites under `inc/Abilities/`.
 
@@ -16,7 +16,7 @@ Data Machine follows a WordPress-shaped identifier model: `agent_id` is the stab
 
 ## Registered Ability Domains
 
-The current core registry has 201 `datamachine/*` abilities across these domains:
+The current core registry has 205 `datamachine/*` abilities across these domains:
 
 | Domain | Count | Source anchor | Examples |
 |--------|-------|---------------|----------|
@@ -53,6 +53,7 @@ The current core registry has 201 `datamachine/*` abilities across these domains
 | Step types | 2 | `inc/Abilities/StepTypeAbilities.php` | list/validate step types |
 | System | 3 | `inc/Abilities/SystemAbilities.php` | session titles, health checks, system task runs |
 | Taxonomy | 6 | `inc/Abilities/Taxonomy/` | get/create/update/delete/resolve terms, merge term meta |
+| Tracked items | 4 | `inc/Abilities/TrackedItemsAbilities.php` | upsert/get/list/summarize durable source coverage state |
 | Update handlers | 1 | `inc/Abilities/Update/` | WordPress update handler |
 
 Workspace, GitHub, and code-review abilities are intentionally not registered by Data Machine core. They live in the `data-machine-code` extension plugin.
