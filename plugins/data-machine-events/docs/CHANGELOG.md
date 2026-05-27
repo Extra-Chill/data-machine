@@ -2,6 +2,31 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.40.0] - 2026-05-27
+
+### Added
+- feat(events-map): add data_machine_events_map_venues filter on the final venue array
+- apply data_machine_events_calendar_query_args filter in active code path
+- feat(events-map): add data_machine_events_map_query_args filter hook
+- feat(event-submission): URL-based artist tour import — auto-create artist-scoped pipeline
+- replace pagination with Load More button (closes #314, Phase 2 of #298)
+- feat(events-map): tour-route mode with chronological polyline (refs #310)
+- month-grid display mode (closes #318)
+- feat(event-details): add-to-calendar dropdown (Google / Outlook.com / .ics) (closes #312)
+- scope UpcomingCountAbilities by a filter taxonomy/term pair
+- add data-only REST response schema (phase 1 of #298)
+
+### Changed
+- consolidate Nominatim HTTP into NominatimClient helper
+- tighten date-group + time-gap chrome on sparse archives
+
+### Fixed
+- fix(events-map): rename tourRouteMode → chronologicalRouteMode (closes #326)
+- orphan-venues count_refreshed persists via direct wpdb update + cache invalidation
+- tighten AS + jobs windows for high-volume events site
+- harden REST swap endpoints so direct navigations never surface raw JSON
+- past events button must build URL from clean baseline, not polluted window.location.search
+
 ## [0.39.1] - 2026-05-23
 
 ### Changed
