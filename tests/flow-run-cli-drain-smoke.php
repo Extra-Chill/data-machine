@@ -54,6 +54,8 @@ assert_drain_contains( '"parent_job_id":', $drain_src, 'drain can filter batch a
 assert_drain_contains( "a.status = \\'pending\\'", $drain_src, 'drain queries pending actions in the Data Machine group' );
 assert_drain_contains( 'runActionSchedulerTimeoutCleanup( $store )', $drain_src, 'drain resets stale Action Scheduler claims before claiming work' );
 assert_drain_contains( 'stake_claim( $batch_size, null, $hooks ?? array(), self::GROUP )', $drain_src, 'drain claims due Data Machine actions through Action Scheduler' );
+assert_drain_contains( '$deadline_at = $started_at + max( 0, $time_limit - $stop_before_timeout )', $drain_src, 'drain computes an action-level deadline for claimed batches' );
+assert_drain_contains( 'time() >= $deadline_at', $drain_src, 'drain checks the timeout margin between claimed actions' );
 assert_drain_contains( 'find_actions_by_claim_id( $claim->get_id() )', $drain_src, 'drain verifies Action Scheduler claim ownership before processing' );
 assert_drain_contains( 'release_claim( $claim )', $drain_src, 'drain releases Action Scheduler claims after processing' );
 assert_drain_contains( "\\ActionScheduler::runner()", $drain_src, 'drain uses Action Scheduler runner for claimed actions' );
