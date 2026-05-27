@@ -81,8 +81,8 @@ abstract class UpsertHandler {
 		$parameters['job_id'] = $job_id;
 		$parameters['engine'] = $engine;
 
-		$handler_slug    = (string) ( $tool_def['handler'] ?? static::class );
-		$handler_config  = $tool_def['handler_config'] ?? array();
+		$handler_slug   = (string) ( $tool_def['handler'] ?? static::class );
+		$handler_config = $tool_def['handler_config'] ?? array();
 		$handler_config = AuthRefHandlerConfig::resolve_runtime_config(
 			$handler_config,
 			$handler_slug,
