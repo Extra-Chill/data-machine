@@ -62,6 +62,10 @@ require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventDetails/add-to-ca
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-dates-sync.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/EventDatesTable.php';
 
+// Artist URL Submissions table (moderation queue for the #320 import flow).
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/ArtistUrlSubmissionsTable.php';
+add_action( 'plugins_loaded', array( \DataMachineEvents\Core\ArtistUrlSubmissionsTable::class, 'maybe_install' ), 20 );
+
 // Global alias — event-dates-sync.php is namespaced so this makes the public API accessible globally.
 if ( ! function_exists( 'datamachine_get_event_dates' ) ) {
 	/**
@@ -233,6 +237,11 @@ class DATAMACHINE_Events {
 			// Instantiate Settings_Page to register its hooks
 			if ( class_exists( 'DataMachineEvents\\Admin\\Settings_Page' ) ) {
 				new \DataMachineEvents\Admin\Settings_Page();
+			}
+
+			// Artist URL Submissions moderation queue (extrachill-events#320).
+			if ( class_exists( 'DataMachineEvents\\Admin\\ArtistUrlSubmissionsAdmin' ) ) {
+				new \DataMachineEvents\Admin\ArtistUrlSubmissionsAdmin();
 			}
 		}
 
@@ -484,6 +493,11 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Abilities\MergedBillDecideAbilities();
 		}
 
+		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/ArtistUrlImportAbilities.php' ) ) {
+			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/ArtistUrlImportAbilities.php';
+			new \DataMachineEvents\Abilities\ArtistUrlImportAbilities();
+		}
+
 		// Chat tools for the merged-bill agent decision step (issue #256).
 		if ( class_exists( 'DataMachineEvents\\Api\\Chat\\Tools\\MergedBillInspect' ) ) {
 			new \DataMachineEvents\Api\Chat\Tools\MergedBillInspect();
@@ -606,6 +620,7 @@ class DATAMACHINE_Events {
 
 	public function activate() {
 		\DataMachineEvents\Core\EventDatesTable::create_table();
+		\DataMachineEvents\Core\ArtistUrlSubmissionsTable::create_table();
 		$this->register_post_types();
 		$this->register_taxonomies();
 		flush_rewrite_rules();
