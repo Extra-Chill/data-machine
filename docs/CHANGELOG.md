@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.133.0] - 2026-05-27
+
+### Fixed
+- guarantee category registration before ability registration on multisite subsites
+- satisfy queue trim repair lint
+- add runtime queue trim repair command
+
 ## [0.132.4] - 2026-05-23
 
 ### Changed
