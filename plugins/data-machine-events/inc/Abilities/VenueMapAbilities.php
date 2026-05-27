@@ -217,32 +217,71 @@ class VenueMapAbilities {
 			}
 		}
 
+		// Combine geo and taxonomy filters (if both present) into a single
+		// candidate venue ID set. Null means "no restriction from this path".
+		$include_ids = null;
+		if ( null !== $geo_venue_ids && null !== $taxonomy_venue_ids ) {
+			$include_ids = array_values( array_intersect( $geo_venue_ids, $taxonomy_venue_ids ) );
+		} elseif ( null !== $geo_venue_ids ) {
+			$include_ids = $geo_venue_ids;
+		} elseif ( null !== $taxonomy_venue_ids ) {
+			$include_ids = $taxonomy_venue_ids;
+		}
+
+		/**
+		 * Filter the resolved venue-map query args before the database query runs.
+		 *
+		 * Generic extension point mirroring `data_machine_events_calendar_query_args`
+		 * for the events-map block. Consumers (e.g. an "only venues attended by the
+		 * current user" filter on a `/my-shows/` page) can inject post-filter
+		 * constraints here without referencing host-plugin tables from inside
+		 * data-machine-events.
+		 *
+		 * The `include_ids` key constrains the candidate venue set:
+		 *   - `null`        : no restriction (default when no geo/taxonomy filter).
+		 *   - empty array   : intentionally restrict to zero venues (no results).
+		 *   - array of ints : intersected with any existing geo/taxonomy filter.
+		 *
+		 * @since 1.x.x
+		 *
+		 * @param array $query_args {
+		 *     Resolved query args used by the events-map venue lookup.
+		 *
+		 *     @type array|null $include_ids   Candidate venue term IDs, or null for unrestricted.
+		 *     @type array|null $bounds        Parsed viewport bounds (sw_lat/sw_lng/ne_lat/ne_lng), or null.
+		 *     @type bool       $has_geo       Whether geo proximity filtering is active.
+		 *     @type float|null $lat           Center latitude, when geo filtering.
+		 *     @type float|null $lng           Center longitude, when geo filtering.
+		 *     @type int        $radius        Search radius, when geo filtering.
+		 *     @type string     $radius_unit   Radius unit ('mi' or 'km').
+		 *     @type string     $taxonomy      Taxonomy slug filter, or empty.
+		 *     @type int        $term_id       Taxonomy term ID filter, or 0.
+		 * }
+		 * @param array $params The original input envelope passed to executeListVenues().
+		 */
+		$query_args = apply_filters(
+			'data_machine_events_map_query_args',
+			array(
+				'include_ids' => $include_ids,
+				'bounds'      => $bounds_parsed,
+				'has_geo'     => $has_geo,
+				'lat'         => $has_geo ? $lat : null,
+				'lng'         => $has_geo ? $lng : null,
+				'radius'      => $radius,
+				'radius_unit' => $radius_unit,
+				'taxonomy'    => $taxonomy,
+				'term_id'     => $term_id,
+			),
+			$input
+		);
+
+		$include_ids   = $query_args['include_ids'] ?? null;
+		$bounds_parsed = $query_args['bounds'] ?? null;
+
 		// Bounds mode: query venues with coordinates in SQL.
 		if ( null !== $bounds_parsed ) {
-			$venue_ids_filter = null;
-
-			// Combine geo and taxonomy filters if both present.
-			if ( null !== $geo_venue_ids && null !== $taxonomy_venue_ids ) {
-				$venue_ids_filter = array_intersect( $geo_venue_ids, $taxonomy_venue_ids );
-			} elseif ( null !== $geo_venue_ids ) {
-				$venue_ids_filter = $geo_venue_ids;
-			} elseif ( null !== $taxonomy_venue_ids ) {
-				$venue_ids_filter = $taxonomy_venue_ids;
-			}
-
-			$venues = $this->queryVenuesByBounds( $bounds_parsed, $venue_ids_filter );
+			$venues = $this->queryVenuesByBounds( $bounds_parsed, $include_ids );
 		} else {
-			// Non-bounds mode: query all matching venues.
-			$include_ids = null;
-
-			if ( null !== $geo_venue_ids && null !== $taxonomy_venue_ids ) {
-				$include_ids = array_intersect( $geo_venue_ids, $taxonomy_venue_ids );
-			} elseif ( null !== $geo_venue_ids ) {
-				$include_ids = $geo_venue_ids;
-			} elseif ( null !== $taxonomy_venue_ids ) {
-				$include_ids = $taxonomy_venue_ids;
-			}
-
 			$venues = $this->queryVenuesWithCoordinates( $include_ids );
 		}
 

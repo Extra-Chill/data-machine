@@ -104,6 +104,7 @@ signatures are stable.
 | `data_machine_events_map_user_location` | `(?array $location, array $context)` | Provide a default user location override. |
 | `data_machine_events_map_show_location_search` | `(bool $show, array $context)` | Toggle the location search input. |
 | `data_machine_events_map_summary` | `(string $html, array $venues, array $context)` | Inject custom summary HTML above the map. |
+| `data_machine_events_map_query_args` | `(array $query_args, array $params)` | Modify the resolved venue-map query args before the database query runs. `$query_args['include_ids']` is the candidate venue term ID set (null = unrestricted, empty array = zero results, array of ints = intersected with existing filters). Mirrors `data_machine_events_calendar_query_args`. |
 
 ### Event Details / button-row actions
 
