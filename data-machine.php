@@ -158,6 +158,10 @@ function datamachine_run_datamachine_plugin() {
 	\DataMachine\Core\Auth\ExternalLoginRouter::register();
 
 	// Register ability categories first — must happen before any ability registration.
+	// Categories are also registered unconditionally at file include time (see bottom
+	// of this file); this call is the defensive in-runtime path for late `plugins_loaded`
+	// inclusion (`plugin_sandbox_scrape()` during activation, etc.). The static guard in
+	// `AbilityCategories::register()` makes it idempotent.
 	require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';
 	\DataMachine\Abilities\AbilityCategories::ensure_registered();
 
@@ -443,6 +447,34 @@ if ( did_action( 'plugins_loaded' ) ) {
 	// @phpstan-ignore-next-line WordPress stubs in CI omit the optional priority argument.
 	add_action( 'plugins_loaded', 'datamachine_run_datamachine_plugin', 20 );
 }
+
+/**
+ * Register ability categories unconditionally on every request.
+ *
+ * Categories are a cheap registration (~20 string entries) but they are a
+ * *contract* depended on by every Data Machine extension plugin
+ * (`data-machine-business`, `data-machine-socials`, etc.) and any consumer
+ * that calls `wp_register_ability( ..., [ 'category' => 'datamachine-*' ] )`.
+ *
+ * They MUST NOT be gated by `datamachine_should_load_full_runtime()` because
+ * extension plugins do not honour that gate — they instantiate their own
+ * ability classes at `plugins_loaded:20` regardless of request shape, and
+ * those abilities register against Data Machine categories. If the categories
+ * are missing when the lazy `wp_abilities_api_init` fire happens (e.g. when
+ * a frontend page calls `wp_get_ability()` via Frontend Agent Chat or an
+ * OG-card task), every extension ability registration triggers a
+ * `_doing_it_wrong` notice and the ability is silently dropped from the
+ * registry. See: Extra-Chill/data-machine#2287.
+ *
+ * Loading the file is cheap enough to do at file include time; calling
+ * `ensure_registered()` here attaches the `wp_abilities_api_categories_init`
+ * hook before `init` fires (the action cannot fire before `init`, so any
+ * later `plugins_loaded` priority works too — but earlier is safer for any
+ * site that includes our plugin file via `plugin_sandbox_scrape()` or
+ * similar late-load paths).
+ */
+require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';
+\DataMachine\Abilities\AbilityCategories::ensure_registered();
 
 
 

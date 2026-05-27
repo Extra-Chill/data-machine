@@ -51,13 +51,88 @@ class AbilityCategories {
 	 * Safe to call multiple times — uses a static guard.
 	 * Must be called during `wp_abilities_api_categories_init` action —
 	 * WordPress core enforces this via `doing_action()` check.
+	 *
+	 * @return void
 	 */
 	public static function register(): void {
 		if ( self::$registered ) {
 			return;
 		}
 
-		$categories = array(
+		foreach ( self::get_category_definitions() as $slug => $args ) {
+			wp_register_ability_category( $slug, $args );
+		}
+
+		self::$registered = true;
+	}
+
+	/**
+	 * Ensure categories are registered.
+	 *
+	 * Handles three timing states so registration is robust regardless of
+	 * which plugin instantiates the abilities registry first:
+	 *
+	 *   1. `doing_action( wp_abilities_api_categories_init )` — the action
+	 *      is currently firing. Register immediately so the categories
+	 *      land in this same dispatch pass.
+	 *   2. `! did_action( wp_abilities_api_categories_init )` — the action
+	 *      has not fired yet. Attach a hook for the lazy fire.
+	 *   3. otherwise — the action has already fired and completed. The
+	 *      categories registry singleton exists; call its instance method
+	 *      directly so the categories still land in the registry. The
+	 *      public `wp_register_ability_category()` helper enforces
+	 *      `doing_action()`, but the underlying registry method does not.
+	 *
+	 * This mirrors the defensive pattern used by `block-format-bridge`
+	 * (see `vendor/chubes4/block-format-bridge/includes/abilities.php`)
+	 * and by sibling extension plugins.
+	 *
+	 * @return void
+	 */
+	public static function ensure_registered(): void {
+		if ( self::$registered ) {
+			return;
+		}
+
+		if ( doing_action( 'wp_abilities_api_categories_init' ) ) {
+			self::register();
+			return;
+		}
+
+		if ( ! did_action( 'wp_abilities_api_categories_init' ) ) {
+			add_action( 'wp_abilities_api_categories_init', array( self::class, 'register' ) );
+			return;
+		}
+
+		// Action already fired and completed. The categories registry
+		// singleton exists; register directly via the instance method so
+		// late-loaded contexts (e.g. lazy abilities-registry instantiation
+		// triggered before our `plugins_loaded` hook attached) still get
+		// the Data Machine categories. The instance-method path bypasses
+		// the public helper's `doing_action()` guard.
+		$registry = \WP_Ability_Categories_Registry::get_instance();
+		if ( null === $registry ) {
+			return;
+		}
+
+		foreach ( self::get_category_definitions() as $slug => $args ) {
+			if ( $registry->is_registered( $slug ) ) {
+				continue;
+			}
+			$registry->register( $slug, $args );
+		}
+
+		self::$registered = true;
+	}
+
+	/**
+	 * Category definitions used by both `register()` and the late-fire
+	 * recovery path in `ensure_registered()`.
+	 *
+	 * @return array<string, array<string, string>>
+	 */
+	private static function get_category_definitions(): array {
+		return array(
 			self::CONTENT    => array(
 				'label'       => __( 'Content', 'data-machine' ),
 				'description' => __( 'Content querying, editing, searching, and block operations.', 'data-machine' ),
@@ -135,28 +210,5 @@ class AbilityCategories {
 				'description' => __( 'Pending action staging and resolution (user approval of tool invocations).', 'data-machine' ),
 			),
 		);
-
-		foreach ( $categories as $slug => $args ) {
-			wp_register_ability_category( $slug, $args );
-		}
-
-		self::$registered = true;
-	}
-
-	/**
-	 * Ensure categories are registered.
-	 *
-	 * Always hooks into `wp_abilities_api_categories_init` — WordPress core
-	 * enforces that `wp_register_ability_category()` is only called during
-	 * that action (`doing_action()` check). The hook fires lazily when the
-	 * categories registry singleton is first accessed, so hooking in at
-	 * `plugins_loaded` time is safe.
-	 */
-	public static function ensure_registered(): void {
-		if ( self::$registered ) {
-			return;
-		}
-
-		add_action( 'wp_abilities_api_categories_init', array( self::class, 'register' ) );
 	}
 }
