@@ -1436,6 +1436,64 @@ function datamachine_extract_tool_calls( $result ): array {
 		);
 	}
 
+	if ( empty( $tool_calls ) ) {
+		foreach ( $candidates[0]->getMessage()->getParts() as $part ) {
+			if ( ! method_exists( $part, 'getText' ) ) {
+				continue;
+			}
+
+			$text = $part->getText();
+			if ( ! is_string( $text ) || '' === trim( $text ) ) {
+				continue;
+			}
+
+			$tool_calls = array_merge( $tool_calls, datamachine_extract_xml_tool_calls( $text ) );
+		}
+	}
+
+	return $tool_calls;
+}
+
+/**
+ * Extract XML-style tool calls emitted as plain text by some providers/models.
+ *
+ * @param string $text Text candidate content.
+ * @return array<int, array{name:string,parameters:array,id:mixed}>
+ */
+function datamachine_extract_xml_tool_calls( string $text ): array {
+	if ( ! str_contains( $text, '<function_calls>' ) || ! preg_match_all( '/<invoke\s+name=["\']([^"\']+)["\']\s*>(.*?)<\/invoke>/is', $text, $matches, PREG_SET_ORDER ) ) {
+		return array();
+	}
+
+	$tool_calls = array();
+	foreach ( $matches as $index => $match ) {
+		$name = sanitize_key( (string) $match[1] );
+		if ( '' === $name ) {
+			continue;
+		}
+
+		$parameters = array();
+		if ( preg_match_all( '/<parameter\s+name=["\']([^"\']+)["\']\s*>(.*?)<\/parameter>/is', (string) $match[2], $parameter_matches, PREG_SET_ORDER ) ) {
+			foreach ( $parameter_matches as $parameter_match ) {
+				$parameter_name = sanitize_key( (string) $parameter_match[1] );
+				if ( '' === $parameter_name ) {
+					continue;
+				}
+
+				$parameter_value          = function_exists( '\wp_strip_all_tags' )
+					? \wp_strip_all_tags( (string) $parameter_match[2] )
+					: (string) preg_replace( '/<[^>]*>/', '', (string) $parameter_match[2] );
+				$parameters[ $parameter_name ] = html_entity_decode( trim( $parameter_value ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			}
+		}
+
+		$tool_calls[] = array(
+			'name'       => $name,
+			'parameters' => $parameters,
+			'id'         => 'xml-tool-call-' . ( $index + 1 ),
+		);
+	}
+
 	return $tool_calls;
 }
 
