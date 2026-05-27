@@ -118,80 +118,80 @@ class ImageTemplateAbilities {
 
 	private static function render_image_template_definition(): array {
 		return array(
-					'label'               => 'Render Image Template',
-					'description'         => 'Generate branded graphics from registered GD templates',
-					'category'            => 'datamachine-media',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'template_id', 'data' ),
-						'properties' => array(
-							'template_id' => array(
+			'label'               => 'Render Image Template',
+			'description'         => 'Generate branded graphics from registered GD templates',
+			'category'            => 'datamachine-media',
+			'input_schema'        => array(
+				'type'       => 'object',
+				'required'   => array( 'template_id', 'data' ),
+				'properties' => array(
+					'template_id' => array(
+						'type'        => 'string',
+						'description' => 'Template identifier (e.g. quote_card, event_roundup)',
+					),
+					'data'        => array(
+						'type'        => 'object',
+						'description' => 'Structured data matching the template fields',
+					),
+					'preset'      => array(
+						'type'        => 'string',
+						'description' => 'Platform preset override (e.g. instagram_feed_portrait)',
+					),
+					'format'      => array(
+						'type'        => 'string',
+						'description' => 'Output format: png or jpeg',
+						'enum'        => array( 'png', 'jpeg' ),
+						'default'     => 'png',
+					),
+					'context'     => array(
+						'type'        => 'object',
+						'description' => 'Storage context with pipeline_id and flow_id for repository storage',
+					),
+					'output'      => array(
+						'type'        => 'string',
+						'description' => 'Output destination: "files" returns file paths (default, requires context for repository or returns temp paths), "cached_file" stores the rendered file under uploads/<bucket>/<key>.<ext> and returns a stable public URL — ideal for OG images and other long-lived public artifacts that should not pollute the media library.',
+						'enum'        => array( 'files', 'cached_file' ),
+						'default'     => 'files',
+					),
+					'cache'       => array(
+						'type'        => 'object',
+						'description' => 'Cache options when output=cached_file. Required when output=cached_file.',
+						'properties'  => array(
+							'bucket' => array(
 								'type'        => 'string',
-								'description' => 'Template identifier (e.g. quote_card, event_roundup)',
+								'description' => 'Subdirectory under wp-content/uploads/ (slug-style; sanitized).',
 							),
-							'data'        => array(
-								'type'        => 'object',
-								'description' => 'Structured data matching the template fields',
-							),
-							'preset'      => array(
+							'key'    => array(
 								'type'        => 'string',
-								'description' => 'Platform preset override (e.g. instagram_feed_portrait)',
-							),
-							'format'      => array(
-								'type'        => 'string',
-								'description' => 'Output format: png or jpeg',
-								'enum'        => array( 'png', 'jpeg' ),
-								'default'     => 'png',
-							),
-							'context'     => array(
-								'type'        => 'object',
-								'description' => 'Storage context with pipeline_id and flow_id for repository storage',
-							),
-							'output'      => array(
-								'type'        => 'string',
-								'description' => 'Output destination: "files" returns file paths (default, requires context for repository or returns temp paths), "cached_file" stores the rendered file under uploads/<bucket>/<key>.<ext> and returns a stable public URL — ideal for OG images and other long-lived public artifacts that should not pollute the media library.',
-								'enum'        => array( 'files', 'cached_file' ),
-								'default'     => 'files',
-							),
-							'cache'       => array(
-								'type'        => 'object',
-								'description' => 'Cache options when output=cached_file. Required when output=cached_file.',
-								'properties'  => array(
-									'bucket' => array(
-										'type'        => 'string',
-										'description' => 'Subdirectory under wp-content/uploads/ (slug-style; sanitized).',
-									),
-									'key'    => array(
-										'type'        => 'string',
-										'description' => 'Stable filename stem within the bucket (sanitized). Re-renders overwrite atomically.',
-									),
-								),
+								'description' => 'Stable filename stem within the bucket (sanitized). Re-renders overwrite atomically.',
 							),
 						),
 					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'      => array( 'type' => 'boolean' ),
-							'file_paths'   => array(
-								'type'  => 'array',
-								'items' => array( 'type' => 'string' ),
-							),
-							'cached_paths' => array(
-								'type'  => 'array',
-								'items' => array( 'type' => 'string' ),
-							),
-							'cached_urls'  => array(
-								'type'  => 'array',
-								'items' => array( 'type' => 'string' ),
-							),
-							'template_id'  => array( 'type' => 'string' ),
-							'message'      => array( 'type' => 'string' ),
-						),
+				),
+			),
+			'output_schema'       => array(
+				'type'       => 'object',
+				'properties' => array(
+					'success'      => array( 'type' => 'boolean' ),
+					'file_paths'   => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
 					),
-					'execute_callback'    => array( self::class, 'renderTemplate' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
-					'meta'                => array( 'show_in_rest' => false ),
+					'cached_paths' => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
+					'cached_urls'  => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
+					'template_id'  => array( 'type' => 'string' ),
+					'message'      => array( 'type' => 'string' ),
+				),
+			),
+			'execute_callback'    => array( self::class, 'renderTemplate' ),
+			'permission_callback' => fn() => PermissionHelper::can_manage(),
+			'meta'                => array( 'show_in_rest' => false ),
 		);
 	}
 
