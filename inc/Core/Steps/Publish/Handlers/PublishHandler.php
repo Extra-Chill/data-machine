@@ -16,6 +16,7 @@ namespace DataMachine\Core\Steps\Publish\Handlers;
 
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\EngineData;
+use DataMachine\Core\Steps\Handlers\HandlerConfigValidator;
 use DataMachine\Core\Steps\Handlers\HttpRequestHelpers;
 use DataMachine\Engine\Bundle\AuthRefHandlerConfig;
 
@@ -68,14 +69,23 @@ abstract class PublishHandler {
 		$parameters['job_id'] = $job_id;
 		$parameters['engine'] = $engine;
 
-		$handler_config = $tool_def['handler_config'] ?? array();
+		$handler_slug    = (string) ( $tool_def['handler'] ?? $this->handler_type );
+		$handler_config  = $tool_def['handler_config'] ?? array();
 		$handler_config = AuthRefHandlerConfig::resolve_runtime_config(
 			$handler_config,
-			(string) ( $tool_def['handler'] ?? $this->handler_type ),
+			$handler_slug,
 			array( 'job_id' => $job_id )
 		);
 		if ( is_wp_error( $handler_config ) ) {
 			return $this->errorResponse( 'Auth ref resolution failed: ' . $handler_config->get_error_message() );
+		}
+
+		$validation = HandlerConfigValidator::validate( $handler_slug, 'publish', $handler_config, array( 'job_id' => $job_id ) );
+		if ( is_wp_error( $validation ) ) {
+			return $this->errorResponse(
+				$validation->get_error_message(),
+				HandlerConfigValidator::diagnostics( $validation )
+			);
 		}
 
 		$result = $this->executePublish( $parameters, $handler_config );
