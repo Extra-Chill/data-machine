@@ -92,6 +92,10 @@ class CalendarAbilities {
 								'type'        => 'string',
 								'description' => 'Time scope: today, tonight, this-weekend, this-week (overrides date_start/date_end when set)',
 							),
+							'month'            => array(
+								'type'        => 'string',
+								'description' => 'Visible month for month-grid display (YYYY-MM). When set, the ability scopes events to the full month regardless of past/upcoming, and pagination is collapsed to one page.',
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -164,6 +168,28 @@ class CalendarAbilities {
 		$user_date_start = $input['date_start'] ?? '';
 		$user_date_end   = $input['date_end'] ?? '';
 		$tax_filters     = is_array( $input['tax_filter'] ?? null ) ? $input['tax_filter'] : array();
+
+		// #318: month-grid mode short-circuits scope/paged semantics. When
+		// a `YYYY-MM` month is supplied, expand it to first-of-month →
+		// last-of-month and flip `show_past` on so past dates within the
+		// month are included (grid mode displays both past and future
+		// inside one window — the locked-design decision is "no past/
+		// upcoming toggle in grid; users navigate months freely"). The
+		// existing user_date_range branch downstream collapses pagination
+		// to a single page automatically.
+		$month_input = '';
+		if ( isset( $input['month'] ) && is_string( $input['month'] ) ) {
+			$month_input = self::normalize_month_input( $input['month'] );
+		}
+		if ( '' !== $month_input ) {
+			$month_bounds = self::month_to_date_bounds( $month_input );
+			if ( $month_bounds ) {
+				$user_date_start = $month_bounds['date_start'];
+				$user_date_end   = $month_bounds['date_end'];
+				$show_past       = true; // Include past dates that fall inside the visible month.
+				$current_page    = 1;
+			}
+		}
 
 		// Resolve scope to date boundaries when user hasn't set explicit dates.
 		$scope          = $input['scope'] ?? '';
@@ -398,6 +424,14 @@ class CalendarAbilities {
 
 		$result = array(
 			'paged_date_groups' => $this->serializeDateGroups( $paged_date_groups ),
+			// #318: raw (un-serialized) date groups exposed for in-process
+			// consumers that need WP_Post handles — notably the server-side
+			// month-grid template (MonthGridBuilder) which derives permalinks
+			// and titles from the post objects. This field is intentionally
+			// NOT part of the REST response (the data-only envelope flattens
+			// to post IDs and the HTML envelope renders to strings) — REST
+			// callers see `paged_date_groups` only.
+			'raw_date_groups'   => $paged_date_groups,
 			'gaps_detected'     => $gaps_detected,
 			'current_page'      => $current_page,
 			'max_pages'         => $max_pages,
@@ -816,6 +850,52 @@ class CalendarAbilities {
 			'dates'           => array_keys( $events_per_date ),
 			'total_events'    => $total_events,
 			'events_per_date' => $events_per_date,
+		);
+	}
+
+	/**
+	 * Normalize a `month` ability input to a strict `YYYY-MM` string, or
+	 * return `''` when the input is malformed. Mirrors the sanitizer in
+	 * {@see \DataMachineEvents\Blocks\Calendar\Query\CalendarRequest} so
+	 * the ability is safe even when called directly (CLI, MCP, tests)
+	 * with un-sanitized input.
+	 *
+	 * @param mixed $raw
+	 */
+	private static function normalize_month_input( $raw ): string {
+		$str = is_string( $raw ) ? trim( $raw ) : '';
+		if ( '' === $str ) {
+			return '';
+		}
+		if ( ! preg_match( '/^(\d{4})-(\d{2})$/', $str, $matches ) ) {
+			return '';
+		}
+		$year  = (int) $matches[1];
+		$month = (int) $matches[2];
+		if ( $year < 1970 || $year > 2999 || $month < 1 || $month > 12 ) {
+			return '';
+		}
+		return sprintf( '%04d-%02d', $year, $month );
+	}
+
+	/**
+	 * Expand a `YYYY-MM` string into `[date_start, date_end]` covering the
+	 * full month (first day → last day inclusive). Returns `null` when the
+	 * month is invalid.
+	 *
+	 * @param string $month YYYY-MM
+	 * @return array{date_start:string,date_end:string}|null
+	 */
+	private static function month_to_date_bounds( string $month ): ?array {
+		try {
+			$first = new \DateTimeImmutable( $month . '-01' );
+		} catch ( \Exception $e ) {
+			return null;
+		}
+		$last = $first->modify( 'last day of this month' );
+		return array(
+			'date_start' => $first->format( 'Y-m-d' ),
+			'date_end'   => $last->format( 'Y-m-d' ),
 		);
 	}
 }

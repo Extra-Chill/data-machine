@@ -196,6 +196,29 @@ envelope's metadata fields (`pagination.current_page`,
 key surface as of this phase. HTML and data responses for the same
 envelope are stored in separate cache buckets.
 
+As of [#318](https://github.com/Extra-Chill/data-machine-events/issues/318) the cache key also includes the
+`month` envelope field, so month-grid responses scoped to a specific
+`YYYY-MM` window don't collide with list-mode responses for the same
+archive.
+
+## Month-grid scoping (#318)
+
+Pass `month=YYYY-MM` to scope the response to a single calendar month
+(used by the month-grid display mode):
+
+```bash
+curl 'https://example.com/wp-json/datamachine/v1/events/calendar?format=data&month=2026-09'
+```
+
+Semantics:
+- The ability collapses pagination to a single page and includes BOTH
+  past AND future events that fall within the month (grid mode renders
+  past dates with reduced opacity rather than gating them behind a
+  toggle).
+- `paged` and `past` are effectively ignored when `month` is set —
+  callers should drop them from the URL to keep the cache key clean.
+- An invalid `month` value falls back as if the param were absent.
+
 ## TypeScript
 
 See `inc/Blocks/Calendar/src/types.ts` for the matching interfaces:

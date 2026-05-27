@@ -13,6 +13,7 @@ interface CalendarBlockAttributes {
 	showFilters: boolean;
 	showDateFilter: boolean;
 	defaultDateRange: string;
+	displayMode: 'date-groups' | 'month-grid';
 }
 
 interface EditProps {
@@ -22,7 +23,7 @@ interface EditProps {
 
 registerBlockType( 'data-machine-events/calendar', {
 	edit: function Edit( { attributes, setAttributes }: EditProps ) {
-		const { defaultView, showSearch } = attributes;
+		const { defaultView, showSearch, displayMode } = attributes;
 
 		const blockProps = useBlockProps( {
 			className: 'data-machine-events-calendar-editor',
@@ -72,6 +73,42 @@ registerBlockType( 'data-machine-events/calendar', {
 							checked={ showSearch }
 							onChange={ ( value ) =>
 								setAttributes( { showSearch: value } )
+							}
+						/>
+
+						<SelectControl
+							label={ __(
+								'Display Mode',
+								'data-machine-events'
+							) }
+							help={ __(
+								'Date-grouped list (default) or a month-grid calendar (issue #318). Mobile viewports fall back to the list automatically.',
+								'data-machine-events'
+							) }
+							value={ displayMode ?? 'date-groups' }
+							options={ [
+								{
+									label: __(
+										'Date-grouped list',
+										'data-machine-events'
+									),
+									value: 'date-groups',
+								},
+								{
+									label: __(
+										'Month grid',
+										'data-machine-events'
+									),
+									value: 'month-grid',
+								},
+							] }
+							onChange={ ( value ) =>
+								setAttributes( {
+									displayMode:
+										value === 'month-grid'
+											? 'month-grid'
+											: 'date-groups',
+								} )
 							}
 						/>
 					</PanelBody>

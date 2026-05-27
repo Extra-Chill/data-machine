@@ -36,6 +36,11 @@
 		"defaultDateRange": {
 			"type": "string",
 			"default": "current"
+		},
+		"displayMode": {
+			"type": "string",
+			"enum": [ "date-groups", "month-grid" ],
+			"default": "date-groups"
 		}
 	},
 	"textdomain": "data-machine-events",

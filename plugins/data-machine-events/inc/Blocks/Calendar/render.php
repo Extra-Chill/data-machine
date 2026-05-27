@@ -34,6 +34,26 @@ if ( is_tax() ) {
 	}
 }
 
+// #318: resolve the effective display mode. The block attribute is the
+// baseline; the `data_machine_events_calendar_display_mode` filter lets
+// consumers (e.g. My Shows, festival pages) override per-context at
+// runtime without editing block markup. The filter receives a context
+// array with the resolved archive so it can branch on taxonomy/term.
+$raw_display_mode    = isset( $attributes['displayMode'] ) ? (string) $attributes['displayMode'] : 'date-groups';
+$display_mode_context = array(
+	'attributes'   => $attributes,
+	'archive_term' => $archive_term,
+);
+$display_mode = (string) apply_filters(
+	'data_machine_events_calendar_display_mode',
+	$raw_display_mode,
+	$display_mode_context
+);
+if ( ! in_array( $display_mode, array( 'date-groups', 'month-grid' ), true ) ) {
+	$display_mode = 'date-groups';
+}
+$is_month_grid_mode = ( 'month-grid' === $display_mode );
+
 // CalendarRequest::fromQueryArgs() owns sanitization + unslashing.
 // We only need to layer on two non-`$_GET` fallbacks before handing the
 // array off:
@@ -51,6 +71,14 @@ if ( ! isset( $query_args['paged'] ) || absint( $query_args['paged'] ) < 1 ) {
 }
 if ( ! isset( $query_args['scope'] ) && ! empty( $attributes['defaultDateRange'] ) && 'current' !== $attributes['defaultDateRange'] ) {
 	$query_args['scope'] = (string) $attributes['defaultDateRange'];
+}
+
+// #318: in month-grid mode, default to the current month (in the site
+// timezone) when no `?month=YYYY-MM` was supplied. The CalendarRequest
+// sanitizer still validates the format — we only default when it would
+// otherwise be empty.
+if ( $is_month_grid_mode && empty( $query_args['month'] ) ) {
+	$query_args['month'] = current_time( 'Y-m' );
 }
 
 $request = CalendarRequest::fromQueryArgs( $query_args, $archive_term );
@@ -74,14 +102,37 @@ $archive_context = array(
 	'term_name' => $archive_term instanceof WP_Term ? $archive_term->name : '',
 );
 
-$abilities = new CalendarAbilities();
-$result    = $abilities->executeGetCalendarPage( $request->toAbilitiesArgs() );
+$abilities    = new CalendarAbilities();
+$ability_args = $request->toAbilitiesArgs();
+$result       = $abilities->executeGetCalendarPage( $ability_args );
 
 $current_page        = $result['current_page'];
 $max_pages           = $result['max_pages'];
 $total_event_count   = $result['total_event_count'];
 $past_events_count   = $result['event_counts']['past'];
 $future_events_count = $result['event_counts']['future'];
+
+// #318: build the month-grid structure for the grid render path. We only
+// need this when the block is in month-grid mode. `paged_date_groups` is
+// the serialized form (post_id + event_data + display_context) but we
+// need the raw form with WP_Post objects for MonthGridBuilder's permalink
+// + title lookups. Re-fetch the unrenderered groups via the same path
+// the ability used. Cheaper alternative: thread the raw groups out from
+// the ability — done by adding `raw_date_groups` to the ability result
+// (zero-cost when the caller doesn't read it). See below.
+$grid_payload = null;
+if ( $is_month_grid_mode ) {
+	$visible_month = $request->month();
+	if ( '' === $visible_month ) {
+		$visible_month = current_time( 'Y-m' );
+	}
+	$raw_groups   = $result['raw_date_groups'] ?? array();
+	$grid_payload = \DataMachineEvents\Blocks\Calendar\Grid\MonthGridBuilder::build(
+		$visible_month,
+		$raw_groups,
+		current_time( 'Y-m-d' )
+	);
+}
 
 $date_context = array(
 	'date_start' => $date_start,
@@ -139,11 +190,16 @@ if ( ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_
 
 $block_id           = isset( $block ) && isset( $block->clientId ) ? (string) $block->clientId : uniqid( 'dm', true );
 $instance_id        = 'data-machine-calendar-' . substr( preg_replace( '/[^a-z0-9]/', '', strtolower( $block_id ) ), 0, 12 );
+$wrapper_class      = $is_month_grid_mode
+	? 'data-machine-events-calendar data-machine-events-date-grouped data-machine-events-month-grid-mode'
+	: 'data-machine-events-calendar data-machine-events-date-grouped';
 $wrapper_attributes = get_block_wrapper_attributes(
 	array(
-		'class' => 'data-machine-events-calendar data-machine-events-date-grouped',
+		'class' => $wrapper_class,
 	)
 );
+
+$display_mode_attr = sprintf( ' data-display-mode="%s"', esc_attr( $display_mode ) );
 
 $archive_data_attrs = '';
 if ( ! empty( $archive_context['taxonomy'] ) ) {
@@ -172,7 +228,7 @@ if ( ! empty( $scope ) ) {
 }
 ?>
 
-<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?><?php echo $scope_data_attr; ?> <?php echo $wrapper_attributes; ?>>
+<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?><?php echo $scope_data_attr; ?><?php echo $display_mode_attr; ?> <?php echo $wrapper_attributes; ?>>
 	<?php
 	\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
 		'filter-bar',
@@ -194,6 +250,26 @@ if ( ! empty( $scope ) ) {
 	);
 	?>
 
+	<?php
+	if ( $is_month_grid_mode && is_array( $grid_payload ) ) :
+		// Build the base URL for prev/next/today nav. `add_query_arg`
+		// with null/null returns the current request URL (with all
+		// existing query args); `remove_query_arg` strips `month` so
+		// the template can append a fresh `?month=YYYY-MM`.
+		$base_url_for_nav = remove_query_arg(
+			'month',
+			home_url( add_query_arg( null, null ) )
+		);
+		\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
+			'month-grid',
+			array(
+				'grid'     => $grid_payload,
+				'base_url' => $base_url_for_nav,
+			)
+		);
+	endif;
+	?>
+
 	<div class="data-machine-events-content">
 		<?php
 		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML generated by Template_Loader
@@ -204,9 +280,13 @@ if ( ! empty( $scope ) ) {
 	<?php
 	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML generated by Template_Loader
 	echo $result['html']['counter'];
-	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML generated by Pagination\Renderer::render_pagination
-	echo $result['html']['pagination'];
-	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML generated by Template_Loader
-	echo $result['html']['navigation'];
+	if ( ! $is_month_grid_mode ) :
+		// #318: hide Load More / pagination and Past Events button in
+		// grid mode. The month is the page; prev/next/today navigates.
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML generated by Pagination\Renderer::render_pagination
+		echo $result['html']['pagination'];
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML generated by Template_Loader
+		echo $result['html']['navigation'];
+	endif;
 	?>
 </div>

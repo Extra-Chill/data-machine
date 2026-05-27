@@ -29,8 +29,17 @@ import { getFilterState, destroyFilterState } from './modules/filter-state';
 import { initLazyRender, destroyLazyRender } from './modules/lazy-render';
 import { initDayLoader, destroyDayLoader } from './modules/day-loader';
 import { initGeoSync, destroyGeoSync } from './modules/geo-sync';
+import {
+	initMonthGridNav,
+	destroyMonthGridNav,
+	getMonthGridController,
+} from './modules/month-grid-nav';
 
 import type { FlatpickrInstance } from './types';
+
+function isMonthGridMode( calendar: HTMLElement ): boolean {
+	return calendar.getAttribute( 'data-display-mode' ) === 'month-grid';
+}
 
 const calendarInstances = new WeakMap< HTMLElement, true >();
 
@@ -50,9 +59,21 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 
 	filterState.restoreFromStorage();
 
-	initLazyRender( calendar );
-	initDayLoader( calendar );
-	initCarousel( calendar );
+	const gridMode = isMonthGridMode( calendar );
+
+	if ( gridMode ) {
+		// In grid mode the list view is the mobile fallback and the
+		// progressive-render modules (lazy-render, day-loader) target
+		// it. They keep working for sub-768px viewports; we just skip
+		// the carousel which is list-specific UX.
+		initLazyRender( calendar );
+		initDayLoader( calendar );
+		initMonthGridNav( calendar );
+	} else {
+		initLazyRender( calendar );
+		initDayLoader( calendar );
+		initCarousel( calendar );
+	}
 
 	initDatePicker( calendar, function () {
 		handleFilterChange( calendar );
@@ -93,10 +114,14 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 		function () {
 			destroyLazyRender( calendar );
 			destroyDayLoader( calendar );
-			destroyCarousel( calendar );
+			if ( ! gridMode ) {
+				destroyCarousel( calendar );
+			}
 			initLazyRender( calendar );
 			initDayLoader( calendar );
-			initCarousel( calendar );
+			if ( ! gridMode ) {
+				initCarousel( calendar );
+			}
 		}
 	);
 }
@@ -135,6 +160,11 @@ function initSearchInput( calendar: HTMLElement ): void {
 
 /**
  * Handle filter changes by building params and navigating.
+ *
+ * In list mode (default) a full page reload picks up the new filter
+ * set server-side. In grid mode (#318) the month-grid controller
+ * re-fetches the data envelope and swaps the grid in place so the
+ * visible month doesn't reset.
  */
 function handleFilterChange( calendar: HTMLElement ): void {
 	const filterState = getFilterState( calendar );
@@ -142,6 +172,14 @@ function handleFilterChange( calendar: HTMLElement ): void {
 	const params = filterState.buildParams( datePicker );
 
 	filterState.saveToStorage( params );
+
+	if ( isMonthGridMode( calendar ) ) {
+		const controller = getMonthGridController( calendar );
+		if ( controller ) {
+			void controller.handleFilterChange();
+			return;
+		}
+	}
 
 	navigateToUrl( params );
 }
@@ -175,6 +213,7 @@ window.addEventListener( 'beforeunload', function () {
 			destroyLazyRender( calendar );
 			destroyDayLoader( calendar );
 			destroyGeoSync( calendar );
+			destroyMonthGridNav( calendar );
 			destroyFilterState( calendar );
 		} );
 } );

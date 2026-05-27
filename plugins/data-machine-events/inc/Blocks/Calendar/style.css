@@ -1559,3 +1559,307 @@
     }
 }
 
+/* -------------------------------------------------------------------- */
+/*  Month-grid display mode (#318)                                       */
+/*                                                                       */
+/*  In month-grid mode the server renders BOTH the grid AND the list.    */
+/*  The list serves as the mobile fallback and as the no-JS / sub-768px  */
+/*  viewport experience. At >=768px we hide the list, show the grid.    */
+/* -------------------------------------------------------------------- */
+
+.data-machine-events-calendar[data-display-mode="month-grid"] .data-machine-month-grid {
+    display: none;
+}
+
+@media (min-width: 768px) {
+    .data-machine-events-calendar[data-display-mode="month-grid"] .data-machine-month-grid {
+        display: block;
+    }
+
+    .data-machine-events-calendar[data-display-mode="month-grid"] .data-machine-events-content,
+    .data-machine-events-calendar[data-display-mode="month-grid"] .data-machine-events-results-counter,
+    .data-machine-events-calendar[data-display-mode="month-grid"] .data-machine-events-pagination,
+    .data-machine-events-calendar[data-display-mode="month-grid"] .data-machine-events-past-navigation {
+        display: none;
+    }
+}
+
+.data-machine-month-grid {
+    margin-top: 1rem;
+    color: var(--data-machine-text-primary);
+}
+
+.data-machine-month-grid__nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.data-machine-month-grid__nav a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4rem 0.75rem;
+    border-radius: var(--data-machine-border-radius);
+    background: var(--data-machine-background-light);
+    color: var(--data-machine-text-primary);
+    text-decoration: none;
+    box-shadow: inset 0 0 0 1px var(--data-machine-border-light);
+    font-size: 0.875rem;
+    line-height: 1;
+}
+
+.data-machine-month-grid__nav a:hover,
+.data-machine-month-grid__nav a:focus {
+    box-shadow: inset 0 0 0 2px var(--data-machine-border-focus);
+    color: var(--data-machine-text-accent);
+}
+
+.data-machine-month-grid__title {
+    flex: 1 1 auto;
+    text-align: center;
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.data-machine-month-grid__nav-today {
+    margin-left: auto;
+}
+
+.data-machine-month-grid__weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--data-machine-border-light);
+    border-radius: var(--data-machine-border-radius) var(--data-machine-border-radius) 0 0;
+    overflow: hidden;
+}
+
+.data-machine-month-grid__weekday {
+    background: var(--data-machine-background-light);
+    text-align: center;
+    padding: 0.5rem 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--data-machine-text-secondary);
+}
+
+.data-machine-month-grid__body {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--data-machine-border-light);
+    border-radius: 0 0 var(--data-machine-border-radius) var(--data-machine-border-radius);
+    overflow: hidden;
+}
+
+.data-machine-month-grid__row {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--data-machine-border-light);
+    /* Ribbons are absolutely positioned over the row; reserve a header
+       strip per ribbon lane below the date number so they don't overlap
+       single-day strips. Falls back to zero when no ribbons exist. */
+    --data-machine-month-grid-row-ribbon-space: calc(var(--data-machine-month-grid-lanes, 0) * 1.4rem);
+}
+
+.data-machine-month-grid__cell {
+    position: relative;
+    background: var(--data-machine-background-light);
+    min-height: 6rem;
+    padding: 0.35rem 0.4rem;
+    padding-top: calc(0.35rem + var(--data-machine-month-grid-row-ribbon-space, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.8125rem;
+}
+
+.data-machine-month-grid__cell.is-other-month {
+    background: color-mix(in srgb, var(--data-machine-background-light) 92%, transparent);
+    opacity: 0.55;
+}
+
+.data-machine-month-grid__cell.is-past:not(.is-today) {
+    opacity: 0.7;
+}
+
+.data-machine-month-grid__cell.is-today {
+    box-shadow: inset 0 0 0 2px var(--data-machine-border-focus);
+}
+
+.data-machine-month-grid__cell.is-today .data-machine-month-grid__date-number {
+    color: var(--data-machine-text-accent);
+    font-weight: 700;
+}
+
+/* Day-of-week tint — light wash matching the list view's per-day border
+   color. Sits behind everything else in the cell. */
+.data-machine-month-grid__cell.data-machine-day-sunday    { background-color: color-mix(in srgb, var(--data-machine-day-sunday-rgba) 35%, var(--data-machine-background-light)); }
+.data-machine-month-grid__cell.data-machine-day-monday    { background-color: color-mix(in srgb, var(--data-machine-day-monday-rgba) 35%, var(--data-machine-background-light)); }
+.data-machine-month-grid__cell.data-machine-day-tuesday   { background-color: color-mix(in srgb, var(--data-machine-day-tuesday-rgba) 35%, var(--data-machine-background-light)); }
+.data-machine-month-grid__cell.data-machine-day-wednesday { background-color: color-mix(in srgb, var(--data-machine-day-wednesday-rgba) 35%, var(--data-machine-background-light)); }
+.data-machine-month-grid__cell.data-machine-day-thursday  { background-color: color-mix(in srgb, var(--data-machine-day-thursday-rgba) 35%, var(--data-machine-background-light)); }
+.data-machine-month-grid__cell.data-machine-day-friday    { background-color: color-mix(in srgb, var(--data-machine-day-friday-rgba) 35%, var(--data-machine-background-light)); }
+.data-machine-month-grid__cell.data-machine-day-saturday  { background-color: color-mix(in srgb, var(--data-machine-day-saturday-rgba) 35%, var(--data-machine-background-light)); }
+
+.data-machine-month-grid__cell.is-other-month.data-machine-day-sunday,
+.data-machine-month-grid__cell.is-other-month.data-machine-day-monday,
+.data-machine-month-grid__cell.is-other-month.data-machine-day-tuesday,
+.data-machine-month-grid__cell.is-other-month.data-machine-day-wednesday,
+.data-machine-month-grid__cell.is-other-month.data-machine-day-thursday,
+.data-machine-month-grid__cell.is-other-month.data-machine-day-friday,
+.data-machine-month-grid__cell.is-other-month.data-machine-day-saturday {
+    background-color: var(--data-machine-background-light);
+}
+
+.data-machine-month-grid__date-number {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--data-machine-text-secondary);
+    align-self: flex-start;
+    line-height: 1;
+}
+
+.data-machine-month-grid__events {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+
+.data-machine-month-grid__event-strip {
+    display: block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--data-machine-background-light);
+    color: var(--data-machine-text-primary);
+    font-size: 0.75rem;
+    line-height: 1.25;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: inset 0 0 0 1px var(--data-machine-border-light);
+}
+
+.data-machine-month-grid__event-strip:hover,
+.data-machine-month-grid__event-strip:focus {
+    box-shadow: inset 0 0 0 1px var(--data-machine-border-focus);
+    color: var(--data-machine-text-accent);
+}
+
+/* Per-day-of-week event-strip tint (sibling of single-day cell tint —
+   slightly stronger so the strip visually separates from the cell wash). */
+.data-machine-month-grid__cell.data-machine-day-sunday    .data-machine-month-grid__event-strip { background: var(--data-machine-day-sunday-rgba); }
+.data-machine-month-grid__cell.data-machine-day-monday    .data-machine-month-grid__event-strip { background: var(--data-machine-day-monday-rgba); }
+.data-machine-month-grid__cell.data-machine-day-tuesday   .data-machine-month-grid__event-strip { background: var(--data-machine-day-tuesday-rgba); }
+.data-machine-month-grid__cell.data-machine-day-wednesday .data-machine-month-grid__event-strip { background: var(--data-machine-day-wednesday-rgba); }
+.data-machine-month-grid__cell.data-machine-day-thursday  .data-machine-month-grid__event-strip { background: var(--data-machine-day-thursday-rgba); }
+.data-machine-month-grid__cell.data-machine-day-friday    .data-machine-month-grid__event-strip { background: var(--data-machine-day-friday-rgba); }
+.data-machine-month-grid__cell.data-machine-day-saturday  .data-machine-month-grid__event-strip { background: var(--data-machine-day-saturday-rgba); }
+
+/* Ribbons (multi-day events). One ribbon per (event × row); each row
+   stacks its ribbons via the `lane` index. Positioned at the top of
+   the row via the reserved ribbon space on each cell. */
+.data-machine-month-grid__ribbons {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 1px;
+    /* Don't intercept layout — children handle their own positioning. */
+}
+
+.data-machine-month-grid__ribbon {
+    pointer-events: auto;
+    grid-row: 1;
+    grid-column: var(--data-machine-month-grid-ribbon-start) / span var(--data-machine-month-grid-ribbon-span);
+    margin-top: calc(1.6rem + (var(--data-machine-month-grid-ribbon-lane) * 1.4rem));
+    margin-inline: 2px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--data-machine-day-monday-rgba);
+    color: var(--data-machine-text-primary);
+    font-size: 0.75rem;
+    line-height: 1.25;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: inset 0 0 0 1px var(--data-machine-border-light);
+    height: 1.25rem;
+}
+
+.data-machine-month-grid__ribbon:hover,
+.data-machine-month-grid__ribbon:focus {
+    box-shadow: inset 0 0 0 1px var(--data-machine-border-focus);
+    color: var(--data-machine-text-accent);
+}
+
+.data-machine-month-grid__ribbon.is-continues-left {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding-left: 12px;
+}
+
+.data-machine-month-grid__ribbon.is-continues-right {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    padding-right: 12px;
+}
+
+.data-machine-month-grid__ribbon.is-continues-left::before,
+.data-machine-month-grid__ribbon.is-continues-right::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border: 2px solid currentColor;
+    border-left: 0;
+    border-bottom: 0;
+    transform: translateY(-50%) rotate(45deg);
+    opacity: 0.6;
+}
+
+.data-machine-month-grid__ribbon.is-continues-left::before {
+    left: 3px;
+    transform: translateY(-50%) rotate(225deg);
+}
+
+.data-machine-month-grid__ribbon.is-continues-right::after {
+    right: 3px;
+}
+
+/* Day-of-week ribbon background — matches each ribbon to its row-start
+   day's color. */
+.data-machine-month-grid__ribbon.data-machine-day-sunday    { background: var(--data-machine-day-sunday-rgba); }
+.data-machine-month-grid__ribbon.data-machine-day-monday    { background: var(--data-machine-day-monday-rgba); }
+.data-machine-month-grid__ribbon.data-machine-day-tuesday   { background: var(--data-machine-day-tuesday-rgba); }
+.data-machine-month-grid__ribbon.data-machine-day-wednesday { background: var(--data-machine-day-wednesday-rgba); }
+.data-machine-month-grid__ribbon.data-machine-day-thursday  { background: var(--data-machine-day-thursday-rgba); }
+.data-machine-month-grid__ribbon.data-machine-day-friday    { background: var(--data-machine-day-friday-rgba); }
+.data-machine-month-grid__ribbon.data-machine-day-saturday  { background: var(--data-machine-day-saturday-rgba); }
+
+/* Hide the prev-month / next-month `screen-reader-text` only for AT. */
+.data-machine-month-grid .screen-reader-text {
+    clip: rect(1px, 1px, 1px, 1px);
+    clip-path: inset(50%);
+    height: 1px;
+    width: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    word-wrap: normal !important;
+}
+

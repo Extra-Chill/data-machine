@@ -102,6 +102,12 @@ function register_routes() {
 					'sanitize_callback' => 'sanitize_key',
 					'description'       => 'Response format. Default (empty) returns the legacy HTML-string envelope. "data" returns the structured data-only envelope (phase 1 of refactor #298). All other values fall back to the default envelope.',
 				),
+				'month'            => array(
+					'type'              => 'string',
+					'default'           => '',
+					'sanitize_callback' => 'sanitize_text_field',
+					'description'       => 'Visible month for month-grid display (YYYY-MM). When set, the response is scoped to that calendar month and pagination is collapsed to a single page (issue #318). Invalid values fall back as if absent.',
+				),
 			),
 		)
 	);

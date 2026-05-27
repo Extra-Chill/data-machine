@@ -59,6 +59,21 @@ final class CalendarRequest {
 	private string $date_end;
 	private string $scope;
 
+	/**
+	 * Visible month for the month-grid display mode, in `YYYY-MM` form.
+	 *
+	 * Empty string when not in month-grid mode (or when grid mode is
+	 * driven without an explicit month — defaults to the current month
+	 * at the ability layer).
+	 *
+	 * When set, the ability scopes events to the full month range
+	 * (including past dates) and ignores `paged` / `past` pagination
+	 * boundaries — the month IS the page.
+	 *
+	 * See Extra-Chill/data-machine-events#318.
+	 */
+	private string $month;
+
 	/** @var array<string,int[]> Sanitized taxonomy filter map. */
 	private array $tax_filter;
 
@@ -95,7 +110,8 @@ final class CalendarRequest {
 		string $geo_lng,
 		int $geo_radius,
 		string $geo_radius_unit,
-		string $format = ''
+		string $format = '',
+		string $month = ''
 	) {
 		$this->paged            = $paged;
 		$this->past             = $past;
@@ -111,6 +127,7 @@ final class CalendarRequest {
 		$this->geo_radius       = $geo_radius;
 		$this->geo_radius_unit  = $geo_radius_unit;
 		$this->format           = $format;
+		$this->month            = $month;
 	}
 
 	/**
@@ -147,6 +164,8 @@ final class CalendarRequest {
 			$archive_term_id  = absint( $archive_term->term_id );
 		}
 
+		$month = isset( $get['month'] ) ? self::sanitize_month( wp_unslash( $get['month'] ) ) : '';
+
 		return new self(
 			$paged,
 			$past,
@@ -161,7 +180,8 @@ final class CalendarRequest {
 			$geo_lng,
 			$geo_radius,
 			$geo_radius_unit,
-			'' // format is REST-only.
+			'', // format is REST-only.
+			$month
 		);
 	}
 
@@ -204,6 +224,8 @@ final class CalendarRequest {
 		$format_raw = sanitize_key( (string) ( $request->get_param( 'format' ) ?? '' ) );
 		$format     = ( 'data' === $format_raw ) ? 'data' : '';
 
+		$month = self::sanitize_month( (string) ( $request->get_param( 'month' ) ?? '' ) );
+
 		return new self(
 			$paged,
 			$past,
@@ -218,7 +240,8 @@ final class CalendarRequest {
 			$geo_lng,
 			$geo_radius,
 			$geo_radius_unit,
-			$format
+			$format,
+			$month
 		);
 	}
 
@@ -260,6 +283,7 @@ final class CalendarRequest {
 			'include_html'     => ! $is_data_format,
 			'include_gaps'     => true,
 			'progressive'      => ! $is_data_format,
+			'month'            => $this->month,
 		);
 	}
 
@@ -335,9 +359,40 @@ final class CalendarRequest {
 		return $this->format;
 	}
 
+	/**
+	 * Visible month for the month-grid display mode (`YYYY-MM`), or empty
+	 * string when not set. See `$month` doc for semantics.
+	 */
+	public function month(): string {
+		return $this->month;
+	}
+
 	/* ------------------------------------------------------------------ */
 	/*  Internal                                                           */
 	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Sanitize a `YYYY-MM` month string. Returns an empty string for any
+	 * input that does not match the format exactly OR that does not
+	 * represent a valid calendar month (e.g. month 13).
+	 *
+	 * @param mixed $raw
+	 */
+	private static function sanitize_month( $raw ): string {
+		$str = is_string( $raw ) ? trim( $raw ) : '';
+		if ( '' === $str ) {
+			return '';
+		}
+		if ( ! preg_match( '/^(\d{4})-(\d{2})$/', $str, $matches ) ) {
+			return '';
+		}
+		$year  = (int) $matches[1];
+		$month = (int) $matches[2];
+		if ( $year < 1970 || $year > 2999 || $month < 1 || $month > 12 ) {
+			return '';
+		}
+		return sprintf( '%04d-%02d', $year, $month );
+	}
 
 	/**
 	 * Sanitize the `tax_filter` map to `array<string,int[]>` with no empty
