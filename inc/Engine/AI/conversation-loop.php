@@ -1447,7 +1447,7 @@ function datamachine_extract_tool_calls( $result ): array {
 				continue;
 			}
 
-			$tool_calls = array_merge( $tool_calls, datamachine_extract_xml_tool_calls( $text ) );
+			$tool_calls = array_merge( $tool_calls, datamachine_extract_xml_tool_calls( $text ), datamachine_extract_json_tool_calls( $text ) );
 		}
 	}
 
@@ -1491,6 +1491,40 @@ function datamachine_extract_xml_tool_calls( string $text ): array {
 			'name'       => $name,
 			'parameters' => $parameters,
 			'id'         => 'xml-tool-call-' . ( $index + 1 ),
+		);
+	}
+
+	return $tool_calls;
+}
+
+/**
+ * Extract JSON tool calls emitted inside <tool_call> text envelopes.
+ *
+ * @param string $text Text candidate content.
+ * @return array<int, array{name:string,parameters:array,id:mixed}>
+ */
+function datamachine_extract_json_tool_calls( string $text ): array {
+	if ( ! str_contains( $text, '<tool_call>' ) || ! preg_match_all( '/<tool_call>\s*(.*?)\s*<\/tool_call>/is', $text, $matches, PREG_SET_ORDER ) ) {
+		return array();
+	}
+
+	$tool_calls = array();
+	foreach ( $matches as $index => $match ) {
+		$payload = json_decode( html_entity_decode( trim( (string) $match[1] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ), true );
+		if ( ! is_array( $payload ) ) {
+			continue;
+		}
+
+		$name = sanitize_key( (string) ( $payload['name'] ?? '' ) );
+		if ( '' === $name ) {
+			continue;
+		}
+
+		$parameters = $payload['arguments'] ?? ( $payload['parameters'] ?? array() );
+		$tool_calls[] = array(
+			'name'       => $name,
+			'parameters' => is_array( $parameters ) ? $parameters : datamachine_normalize_function_args( $parameters ),
+			'id'         => 'json-tool-call-' . ( $index + 1 ),
 		);
 	}
 
