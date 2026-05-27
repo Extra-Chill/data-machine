@@ -521,6 +521,7 @@ function datamachine_build_turn_runner(
 			foreach ( $tool_calls as $tool_call ) {
 				$tool_name       = $tool_call['name'];
 				$tool_parameters = $tool_call['parameters'];
+				$tool_started_at  = microtime( true );
 
 				if ( empty( $tool_name ) ) {
 					do_action(
@@ -630,6 +631,7 @@ function datamachine_build_turn_runner(
 				}
 
 				if ( ! empty( $tool_result['pending'] ) && is_array( $tool_result['runtime_tool_request'] ?? null ) ) {
+					$tool_trace            = datamachine_build_tool_trace( $tool_name, $tool_call, $tool_parameters, $tool_result, is_array( $tool_def ) ? $tool_def : null, $turn_count, $tool_started_at, microtime( true ) );
 					$runtime_tool_pending     = true;
 					$runtime_pending_turn     = true;
 					$conversation_complete    = true;
@@ -640,6 +642,7 @@ function datamachine_build_turn_runner(
 						'parameters'      => $tool_parameters,
 						'is_handler_tool' => false,
 						'runtime'         => datamachine_tool_runtime_metadata( is_array( $tool_def ) ? $tool_def : null, $tool_result ),
+						'trace'           => $tool_trace,
 						'turn_count'      => $turn_count,
 					);
 					$all_tool_results[]       = $tool_execution_results[ count( $tool_execution_results ) - 1 ];
@@ -688,12 +691,14 @@ function datamachine_build_turn_runner(
 					);
 				}
 
+				$tool_trace               = datamachine_build_tool_trace( $tool_name, $tool_call, $tool_parameters, $tool_result, is_array( $tool_def ) ? $tool_def : null, $turn_count, $tool_started_at, microtime( true ) );
 				$tool_execution_results[] = array(
 					'tool_name'       => $tool_name,
 					'result'          => $tool_result,
 					'parameters'      => $tool_parameters,
 					'is_handler_tool' => $is_handler_tool,
 					'runtime'         => datamachine_tool_runtime_metadata( is_array( $tool_def ) ? $tool_def : null, $tool_result ),
+					'trace'           => $tool_trace,
 					'turn_count'      => $turn_count,
 				);
 				$all_tool_results[]       = $tool_execution_results[ count( $tool_execution_results ) - 1 ];
@@ -1660,6 +1665,130 @@ function datamachine_payload_with_inflight_run_artifacts( array $payload, array 
 }
 
 /**
+ * Build a generic, redacted trace entry for an executed tool call.
+ *
+ * The trace intentionally describes Data Machine execution mechanics only:
+ * tool identity, bounded/redacted arguments, result status, output summary,
+ * optional artifact references, timing, actor/source, and caller-supplied
+ * execution metadata. Eval consumers can project this into their own schemas
+ * without Data Machine adopting benchmark- or grader-specific semantics.
+ *
+ * @param string     $tool_name       Tool name.
+ * @param array      $tool_call       Normalized model tool call.
+ * @param array      $tool_parameters Tool arguments.
+ * @param array      $tool_result     Tool result envelope.
+ * @param array|null $tool_def        Tool definition.
+ * @param int        $turn_count      Conversation turn count.
+ * @param float      $started_at      Unix timestamp with microseconds.
+ * @param float      $ended_at        Unix timestamp with microseconds.
+ * @return array<string,mixed>
+ */
+function datamachine_build_tool_trace( string $tool_name, array $tool_call, array $tool_parameters, array $tool_result, ?array $tool_def, int $turn_count, float $started_at, float $ended_at ): array {
+	$metadata           = datamachine_tool_trace_metadata( $tool_result );
+	$redacted_arguments = datamachine_redact_tool_trace_value( $tool_parameters );
+	$arguments_json     = wp_json_encode( $tool_parameters, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+	$result_json        = wp_json_encode( $tool_result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+	$duration_ms        = max( 0, (int) round( ( $ended_at - $started_at ) * 1000 ) );
+
+	$trace = array(
+		'schema_version'   => 1,
+		'tool_name'        => sanitize_key( $tool_name ),
+		'tool_call_id'     => isset( $tool_call['id'] ) ? sanitize_text_field( (string) $tool_call['id'] ) : null,
+		'turn_count'       => $turn_count,
+		'actor'            => datamachine_normalize_tool_trace_actor( $metadata['actor'] ?? ( $tool_def['trace_actor'] ?? 'agent' ) ),
+		'source'           => sanitize_key( (string) ( $metadata['source'] ?? ( $tool_def['trace_source'] ?? 'data_machine' ) ) ),
+		'status'           => datamachine_tool_trace_status( $tool_result ),
+		'started_at'       => gmdate( 'c', (int) floor( $started_at ) ),
+		'ended_at'         => gmdate( 'c', (int) floor( $ended_at ) ),
+		'duration_ms'      => $duration_ms,
+		'arguments_sha256' => hash( 'sha256', (string) $arguments_json ),
+		'result_sha256'    => hash( 'sha256', (string) $result_json ),
+		'output_summary'   => datamachine_tool_trace_output_summary( $tool_result ),
+		'artifact_refs'    => datamachine_tool_trace_artifact_refs( $tool_result, $metadata ),
+		'metadata'         => datamachine_redact_tool_trace_value( $metadata ),
+	);
+
+	$redacted_arguments_json = wp_json_encode( $redacted_arguments, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+	if ( strlen( (string) $redacted_arguments_json ) <= 2000 ) {
+		$trace['arguments_redacted'] = $redacted_arguments;
+	} else {
+		$trace['arguments_omitted'] = 'redacted_arguments_too_large';
+	}
+
+	return array_filter(
+		$trace,
+		static fn( $value ) => null !== $value && '' !== $value && array() !== $value
+	);
+}
+
+/** @return array<string,mixed> */
+function datamachine_tool_trace_metadata( array $tool_result ): array {
+	$execution_metadata = is_array( $tool_result['execution_metadata'] ?? null ) ? $tool_result['execution_metadata'] : array();
+	$trace_metadata     = is_array( $tool_result['trace_metadata'] ?? null ) ? $tool_result['trace_metadata'] : array();
+
+	return array_merge( $execution_metadata, $trace_metadata );
+}
+
+function datamachine_normalize_tool_trace_actor( mixed $actor ): string {
+	$actor = sanitize_key( (string) $actor );
+	return in_array( $actor, array( 'agent', 'system', 'grader', 'user' ), true ) ? $actor : 'agent';
+}
+
+function datamachine_tool_trace_status( array $tool_result ): string {
+	if ( ! empty( $tool_result['pending'] ) ) {
+		return 'pending';
+	}
+
+	return true === ( $tool_result['success'] ?? false ) ? 'success' : 'failed';
+}
+
+function datamachine_tool_trace_output_summary( array $tool_result ): ?string {
+	foreach ( array( 'message', 'summary', 'error' ) as $key ) {
+		if ( isset( $tool_result[ $key ] ) && is_scalar( $tool_result[ $key ] ) ) {
+			$summary = sanitize_text_field( (string) $tool_result[ $key ] );
+			return strlen( $summary ) > 500 ? substr( $summary, 0, 497 ) . '...' : $summary;
+		}
+	}
+
+	return null;
+}
+
+/** @return array<int|string,mixed> */
+function datamachine_tool_trace_artifact_refs( array $tool_result, array $metadata ): array {
+	foreach ( array( $metadata['artifact_refs'] ?? null, $tool_result['artifact_refs'] ?? null, $tool_result['artifacts'] ?? null ) as $refs ) {
+		if ( is_array( $refs ) ) {
+			return datamachine_redact_tool_trace_value( $refs );
+		}
+	}
+
+	return array();
+}
+
+function datamachine_redact_tool_trace_value( mixed $value ): mixed {
+	if ( is_array( $value ) ) {
+		$redacted = array();
+		foreach ( $value as $key => $child ) {
+			$key_string = (string) $key;
+			if ( preg_match( '/(api[_-]?key|auth|bearer|cookie|credential|nonce|password|secret|signature|token)/i', $key_string ) ) {
+				$redacted[ $key ] = '[redacted]';
+				continue;
+			}
+			$redacted[ $key ] = datamachine_redact_tool_trace_value( $child );
+		}
+
+		return $redacted;
+	}
+
+	if ( is_string( $value ) ) {
+		$redacted = preg_replace( '/Bearer\s+[A-Za-z0-9._~+\/\-]+=*/i', 'Bearer [redacted]', $value );
+		$redacted = preg_replace( '/\b(api[_-]?key|token|secret|password)\b\s*[:=]\s*\S+/i', '$1: [redacted]', $redacted ?? $value );
+		return $redacted ?? $value;
+	}
+
+	return $value;
+}
+
+/**
  * Build a bounded, non-secret summary of in-flight tool calls.
  *
  * @param array $tool_execution_results Tool execution results accumulated by the loop.
@@ -1687,6 +1816,9 @@ function datamachine_summarize_tool_execution_results( array $tool_execution_res
 			'turn_count' => isset( $result['turn_count'] ) ? (int) $result['turn_count'] : null,
 			'summary'    => isset( $tool_result['message'] ) ? sanitize_text_field( (string) $tool_result['message'] ) : null,
 		);
+		if ( is_array( $result['trace'] ?? null ) ) {
+			$summary['trace'] = $result['trace'];
+		}
 
 		if ( 'agent_daily_memory' === $tool_name ) {
 			$summary['user_id']  = isset( $parameters['user_id'] ) ? (int) $parameters['user_id'] : null;
