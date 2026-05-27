@@ -89,6 +89,24 @@ $geocode_rest_url = $show_location_search ? rest_url( 'datamachine/v1/events/geo
 // Summary (plugins can filter to show venue/event counts).
 $summary = apply_filters( 'data_machine_events_map_summary', '', array(), $context );
 
+// Tour-route mode: artist archives can render the same block with a chronological
+// polyline connecting venues by date. Either the block attribute (set when the
+// host emits the block with {"tourRouteMode":true}) or the filter can flip it on.
+$tour_route_mode = (bool) ( $attributes['tourRouteMode'] ?? false );
+
+/**
+ * Filter whether the events map renders in tour-route mode.
+ *
+ * Tour-route mode draws a chronological polyline between venue markers and
+ * distinguishes the first/last venues. Intended for artist taxonomy archives
+ * where a venue corresponds to a tour stop. Only meaningful when the block
+ * also has a taxonomy/term context.
+ *
+ * @param bool  $tour_route_mode Current value.
+ * @param array $context         Map context with taxonomy/term info.
+ */
+$tour_route_mode = (bool) apply_filters( 'data_machine_events_map_tour_route', $tour_route_mode, $context );
+
 ?>
 <div <?php echo $wrapper; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
 	<div
@@ -109,6 +127,9 @@ $summary = apply_filters( 'data_machine_events_map_summary', '', array(), $conte
 		<?php if ( $show_location_search ) : ?>
 		data-show-location-search="1"
 		data-geocode-url="<?php echo esc_attr( $geocode_rest_url ); ?>"
+		<?php endif; ?>
+		<?php if ( $tour_route_mode ) : ?>
+		data-tour-route-mode="1"
 		<?php endif; ?>
 	></div>
 	<?php if ( ! empty( $summary ) ) : ?>

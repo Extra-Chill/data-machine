@@ -280,6 +280,69 @@ a.venue-popup-name:hover {
 	font-size: 1rem;
 }
 
+/* Tour-route mode — chronological polyline + first/last marker styling.
+   Used on artist taxonomy archives via the tourRouteMode block attribute. */
+.data-machine-events-map .tour-route-marker {
+	background: none;
+	border: none;
+}
+
+.data-machine-events-map .tour-route-pin {
+	display: block;
+	width: 18px;
+	height: 18px;
+	border-radius: 50% 50% 50% 0;
+	transform: rotate(-45deg);
+	border: 2px solid #fff;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+	margin-left: 2px;
+}
+
+.data-machine-events-map .tour-route-pin--first {
+	width: 22px;
+	height: 22px;
+}
+
+.data-machine-events-map .tour-route-pin--last {
+	width: 22px;
+	height: 22px;
+}
+
+/* Tour-route popup — multi-date show list under venue name */
+.data-machine-events-map .venue-popup--tour-route {
+	min-width: 220px;
+	max-width: 280px;
+}
+
+.data-machine-events-map .venue-popup-shows {
+	list-style: none;
+	margin: 0.25rem 0 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.data-machine-events-map .venue-popup-shows li {
+	font-size: 0.8125rem;
+	line-height: 1.35;
+	color: var(--data-machine-text-primary);
+}
+
+.data-machine-events-map .venue-popup-shows a {
+	color: var(--data-machine-text-accent);
+	text-decoration: none;
+}
+
+.data-machine-events-map .venue-popup-shows a:hover {
+	text-decoration: underline;
+}
+
+.data-machine-events-map .venue-popup-show-date {
+	color: var(--data-machine-text-muted);
+	font-size: 0.75rem;
+}
+
 /* Responsive — map keeps rounded corners at all breakpoints.
    The parent theme handles edge-to-edge padding; the map itself
    should always retain its border-radius for visual consistency. */

@@ -25,6 +25,10 @@
         "showLocationSearch": {
             "type": "boolean",
             "default": false
+        },
+        "tourRouteMode": {
+            "type": "boolean",
+            "default": false
         }
     },
     "supports": {

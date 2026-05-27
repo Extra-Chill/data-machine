@@ -193,6 +193,16 @@ function register_routes() {
 					'type'              => 'integer',
 					'sanitize_callback' => 'absint',
 				),
+				'include'     => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+					'description'       => 'Comma-separated opt-in extensions. Currently supports "events" to attach per-venue upcoming_events_at_venue (requires taxonomy+term_id).',
+				),
+				'with_events' => array(
+					'type'              => 'boolean',
+					'sanitize_callback' => 'rest_sanitize_boolean',
+					'description'       => 'Boolean shortcut equivalent to include=events.',
+				),
 			),
 		)
 	);

@@ -27,16 +27,28 @@ class VenueMap {
 	 * @return \WP_REST_Response
 	 */
 	public function list_venues( WP_REST_Request $request ) {
+		// Opt-in per-venue events payload: triggered by `?include=events`
+		// (legacy/REST-style) or `?with_events=1` (boolean shortcut). Either
+		// form sets the include_events ability input; absence keeps the
+		// response byte-identical to today's shape so the existing
+		// location-archive map keeps working.
+		$include_raw  = (string) ( $request->get_param( 'include' ) ?? '' );
+		$with_events  = $request->get_param( 'with_events' );
+		$include_set  = array_filter( array_map( 'trim', explode( ',', $include_raw ) ) );
+		$wants_events = in_array( 'events', $include_set, true )
+			|| ( null !== $with_events && filter_var( $with_events, FILTER_VALIDATE_BOOLEAN ) );
+
 		$abilities = new VenueMapAbilities();
 		$result    = $abilities->executeListVenues(
 			array(
-				'lat'         => $request->get_param( 'lat' ),
-				'lng'         => $request->get_param( 'lng' ),
-				'radius'      => $request->get_param( 'radius' ) ?? 25,
-				'radius_unit' => $request->get_param( 'radius_unit' ) ?? 'mi',
-				'bounds'      => $request->get_param( 'bounds' ) ?? '',
-				'taxonomy'    => $request->get_param( 'taxonomy' ) ?? '',
-				'term_id'     => $request->get_param( 'term_id' ) ?? 0,
+				'lat'            => $request->get_param( 'lat' ),
+				'lng'            => $request->get_param( 'lng' ),
+				'radius'         => $request->get_param( 'radius' ) ?? 25,
+				'radius_unit'    => $request->get_param( 'radius_unit' ) ?? 'mi',
+				'bounds'         => $request->get_param( 'bounds' ) ?? '',
+				'taxonomy'       => $request->get_param( 'taxonomy' ) ?? '',
+				'term_id'        => $request->get_param( 'term_id' ) ?? 0,
+				'include_events' => $wants_events,
 			)
 		);
 

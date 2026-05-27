@@ -74,6 +74,82 @@ function buildPopupHtml( venue: Venue ): string {
 	return html;
 }
 
+/**
+ * Format YYYY-MM-DD (+ HH:MM:SS) into a short human label like
+ * "Sep 23, 2099 · 8:00 PM". Falls back to the raw date if parsing fails so
+ * the popup is never blank.
+ */
+function formatEventDateTime( date: string, time: string ): string {
+	if ( ! date ) return '';
+
+	// Build a date object using local time semantics. The server already
+	// stored start_datetime in the site timezone, so treat it as local.
+	const iso = time ? `${ date }T${ time }` : `${ date }T00:00:00`;
+	const parsed = new Date( iso );
+
+	if ( isNaN( parsed.getTime() ) ) {
+		return time ? `${ date } ${ time }` : date;
+	}
+
+	const datePart = parsed.toLocaleDateString( undefined, {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	} );
+
+	if ( ! time ) {
+		return datePart;
+	}
+
+	const timePart = parsed.toLocaleTimeString( undefined, {
+		hour: 'numeric',
+		minute: '2-digit',
+	} );
+
+	return `${ datePart } · ${ timePart }`;
+}
+
+/**
+ * Tour-route popup. Lists every upcoming show at this venue for the
+ * scoped artist, chronologically. The same shape is used for first, last,
+ * and middle markers — only the marker icon differs by tour position.
+ */
+function buildTourRoutePopupHtml( venue: Venue ): string {
+	let html = '<div class="venue-popup venue-popup--tour-route">';
+
+	if ( venue.url ) {
+		html += `<a href="${ escapeHtml( venue.url ) }" class="venue-popup-name">${ escapeHtml( venue.name ) }</a>`;
+	} else {
+		html += `<span class="venue-popup-name">${ escapeHtml( venue.name ) }</span>`;
+	}
+
+	if ( venue.address ) {
+		html += `<span class="venue-popup-address">${ escapeHtml( venue.address ) }</span>`;
+	}
+
+	const shows = venue.upcoming_events_at_venue ?? [];
+	if ( shows.length > 0 ) {
+		html += '<ul class="venue-popup-shows">';
+		for ( const show of shows ) {
+			const label = formatEventDateTime( show.start_date, show.start_time );
+			const title = show.title || label || 'Event';
+			if ( show.permalink ) {
+				html += `<li><a href="${ escapeHtml( show.permalink ) }">${ escapeHtml( title ) }</a>`;
+			} else {
+				html += `<li><span>${ escapeHtml( title ) }</span>`;
+			}
+			if ( label && label !== title ) {
+				html += ` <span class="venue-popup-show-date">${ escapeHtml( label ) }</span>`;
+			}
+			html += '</li>';
+		}
+		html += '</ul>';
+	}
+
+	html += '</div>';
+	return html;
+}
+
 function createVenueIcon(): L.DivIcon {
 	return L.divIcon( {
 		html: '<span style="font-size: 28px; line-height: 1; display: block;">📍</span>',
@@ -82,6 +158,61 @@ function createVenueIcon(): L.DivIcon {
 		iconAnchor: [ 14, 28 ],
 		popupAnchor: [ 0, -28 ],
 	} );
+}
+
+/**
+ * Tour-route marker. `position` flags first/last for distinct color
+ * treatment; middle stops fall through to the default pin look but in
+ * the tour-route className so site CSS can theme them as a set.
+ *
+ * Colors picked for high contrast against OSM tiles:
+ *   - first = green  (#22c55e)
+ *   - last  = red    (#ef4444)
+ *   - middle = slate (#475569)
+ *
+ * v1 keeps numbered badges out of scope (per #310 design notes); revisit
+ * once Chris weighs in on the live render.
+ */
+function createTourRouteIcon( position: 'first' | 'last' | 'middle' ): L.DivIcon {
+	const color =
+		position === 'first'
+			? '#22c55e'
+			: position === 'last'
+				? '#ef4444'
+				: '#475569';
+
+	const html = `<span class="tour-route-pin tour-route-pin--${ position }" style="background:${ color };"></span>`;
+
+	return L.divIcon( {
+		html,
+		className: `tour-route-marker tour-route-marker--${ position }`,
+		iconSize: [ 22, 22 ],
+		iconAnchor: [ 11, 22 ],
+		popupAnchor: [ 0, -22 ],
+	} );
+}
+
+/**
+ * Earliest start_datetime (date + time) for a venue, as a sortable
+ * "YYYY-MM-DD HH:MM:SS" string. Used to order venues chronologically when
+ * drawing the tour-route polyline. Returns null when no events were
+ * attached (which means we should skip the venue from the route).
+ */
+function earliestEventKey( venue: Venue ): string | null {
+	const shows = venue.upcoming_events_at_venue ?? [];
+	if ( shows.length === 0 ) return null;
+
+	// The REST response already sorts ascending per venue, so shows[0] is
+	// the earliest. Defensive guard for callers that might re-order.
+	let earliest = '';
+	for ( const show of shows ) {
+		const key = `${ show.start_date || '' } ${ show.start_time || '' }`.trim();
+		if ( ! key ) continue;
+		if ( ! earliest || key < earliest ) {
+			earliest = key;
+		}
+	}
+	return earliest || null;
 }
 
 function createUserLocationIcon(): L.DivIcon {
@@ -269,12 +400,21 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		nonce,
 		showLocationSearch,
 		geocodeUrl,
+		tourRouteMode,
 	} = props;
 
 	const mapRef = useRef<L.Map | null>( null );
 	const clusterGroupRef = useRef<L.MarkerClusterGroup | null>( null );
 	const markerMapRef = useRef<Map<number, L.Marker>>( new Map() );
 	const userMarkerRef = useRef<L.Marker | null>( null );
+	// Single L.polyline holding the chronological tour route. Recreated
+	// from scratch whenever venues change so we don't manage segment-level
+	// diffing — the route is at most a few dozen points.
+	const tourPolylineRef = useRef<L.Polyline | null>( null );
+	// Tracks whether the tour-route effect has already fit bounds once.
+	// Without this we'd re-fit on every bounds-change refetch and trap
+	// the user inside the route.
+	const tourFitOnceRef = useRef<boolean>( false );
 	const containerRef = useRef<HTMLDivElement | null>( null );
 	const gestureOverlayRef = useRef<HTMLDivElement | null>( null );
 	const gestureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -298,6 +438,10 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 					bounds,
 					taxonomy: taxonomy || undefined,
 					termId: termId || undefined,
+					// Tour-route popups and ordering need the per-venue
+					// upcoming events array. Other contexts stay on the
+					// lean default response shape.
+					includeEvents: tourRouteMode || undefined,
 				} );
 				setVenues( result.venues );
 			} catch ( err ) {
@@ -307,7 +451,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				setLoading( false );
 			}
 		},
-		[ restUrl, nonce, taxonomy, termId ],
+		[ restUrl, nonce, taxonomy, termId, tourRouteMode ],
 	);
 
 	/* --- debounced bounds handler --- */
@@ -417,7 +561,12 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		mapRef.current = map;
 
 		// Fetch venues on pan/zoom and dispatch bounds-changed events.
-		map.on( 'moveend', () => debouncedFetch( map ) );
+		// Tour-route mode is artist-scoped: the full set is already small
+		// and refetching by viewport would drop venues that the user just
+		// panned away from, mid-route. Skip the moveend refetch for it.
+		if ( ! tourRouteMode ) {
+			map.on( 'moveend', () => debouncedFetch( map ) );
+		}
 
 		// Force a resize check after mount.
 		setTimeout( () => map.invalidateSize(), 100 );
@@ -426,7 +575,11 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		if ( initialVenues.length === 0 ) {
 			// Small delay so map is fully sized first.
 			setTimeout( () => {
-				const bounds = getBoundsFromMap( map );
+				// Tour-route mode wants the full set of artist venues
+				// regardless of the default viewport, then it auto-fits
+				// to those points. Passing bounds here would clip the
+				// route on first paint.
+				const bounds = tourRouteMode ? undefined : getBoundsFromMap( map );
 				loadVenues( bounds );
 				dispatchBoundsChanged( map );
 			}, 200 );
@@ -436,6 +589,8 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 			map.remove();
 			mapRef.current = null;
 			clusterGroupRef.current = null;
+			tourPolylineRef.current = null;
+			tourFitOnceRef.current = false;
 			markerMapRef.current.clear();
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -513,6 +668,116 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		const clusterGroup = clusterGroupRef.current;
 		if ( ! map || ! clusterGroup ) return;
 
+		// Always tear down any previously-drawn tour polyline first. Whether
+		// or not this redraw ends up creating a new one, the stale one must
+		// not linger across filter changes / bounds refetches.
+		if ( tourPolylineRef.current ) {
+			map.removeLayer( tourPolylineRef.current );
+			tourPolylineRef.current = null;
+		}
+
+		// ============================================================
+		// Tour-route mode: chronological polyline + first/last styling.
+		// Simpler than the diffing path — every redraw clears markers and
+		// re-creates them because tour position (first/last/middle) is a
+		// function of the whole set, not the individual venue. The route
+		// is bounded by upcoming events for a single artist, so cardinality
+		// is small (typically <30).
+		// ============================================================
+		if ( tourRouteMode ) {
+			const currentMarkers = markerMapRef.current;
+			if ( currentMarkers.size > 0 ) {
+				clusterGroup.clearLayers();
+				currentMarkers.clear();
+			}
+
+			// Keep only venues with coordinates AND attached events.
+			// Venues without events have no position in the route and
+			// would clutter the map with orphan pins.
+			const routeVenues = venues
+				.filter( ( v ) => v.lat && v.lon && ( v.upcoming_events_at_venue?.length ?? 0 ) > 0 )
+				.map( ( v ) => ( { venue: v, key: earliestEventKey( v ) } ) )
+				.filter( ( entry ): entry is { venue: Venue; key: string } => entry.key !== null )
+				.sort( ( a, b ) => ( a.key < b.key ? -1 : a.key > b.key ? 1 : 0 ) )
+				.map( ( entry ) => entry.venue );
+
+			// Per #310: <2 distinct venues = no route. The host plugin
+			// (extrachill-events artist-map.php) also gates this server-side,
+			// but enforce it here too so the block stays self-contained when
+			// rendered directly via shortcode/REST.
+			if ( routeVenues.length < 2 ) {
+				return;
+			}
+
+			// Polyline coords with consecutive-duplicate collapsing. Two
+			// chronologically-adjacent shows at the same venue (residency)
+			// should NOT cause a self-loop segment. We collapse on
+			// term_id, not on lat/lng, because two venue terms can share
+			// coordinates (e.g. data-quality dupes).
+			const orderedLatLngs: L.LatLngExpression[] = [];
+			let lastTermId = -1;
+			for ( const v of routeVenues ) {
+				if ( v.term_id === lastTermId ) continue;
+				orderedLatLngs.push( [ v.lat, v.lon ] );
+				lastTermId = v.term_id;
+			}
+
+			// Draw the polyline BEFORE the cluster group so markers paint
+			// on top. addLayer is idempotent ordering-wise — earlier
+			// addLayer = lower z-stack.
+			if ( orderedLatLngs.length >= 2 ) {
+				const polyline = L.polyline( orderedLatLngs, {
+					color: '#2563eb',
+					weight: 3,
+					opacity: 0.7,
+					className: 'tour-route-polyline',
+				} );
+				polyline.addTo( map );
+				tourPolylineRef.current = polyline;
+			}
+
+			// Build markers with position-aware icons + multi-date popups.
+			const markersToAdd: L.Marker[] = [];
+			routeVenues.forEach( ( venue, idx ) => {
+				const position: 'first' | 'last' | 'middle' =
+					idx === 0
+						? 'first'
+						: idx === routeVenues.length - 1
+							? 'last'
+							: 'middle';
+
+				const marker = L.marker( [ venue.lat, venue.lon ], {
+					icon: createTourRouteIcon( position ),
+				} ).bindPopup( buildTourRoutePopupHtml( venue ) );
+
+				currentMarkers.set( venue.term_id, marker );
+				markersToAdd.push( marker );
+			} );
+
+			if ( markersToAdd.length > 0 ) {
+				clusterGroup.addLayers( markersToAdd );
+			}
+
+			// Fit bounds to the full route on the FIRST successful render.
+			// Subsequent refetches (filter changes, bounds events) keep
+			// the current viewport so the user isn't yanked around.
+			if ( ! tourFitOnceRef.current ) {
+				const latlngs = orderedLatLngs.length > 0
+					? orderedLatLngs
+					: routeVenues.map( ( v ) => [ v.lat, v.lon ] as L.LatLngExpression );
+				if ( latlngs.length > 0 ) {
+					const bounds = L.latLngBounds( latlngs );
+					map.fitBounds( bounds.pad( 0.15 ) );
+					tourFitOnceRef.current = true;
+				}
+			}
+
+			return;
+		}
+
+		// ============================================================
+		// Default (non-tour-route) mode — preserved verbatim.
+		// ============================================================
 		const icon = createVenueIcon();
 		const currentMarkers = markerMapRef.current;
 		const newVenueIds = new Set<number>();
@@ -677,6 +942,7 @@ function parseMapProps( container: HTMLElement ): MapProps {
 		nonce: data.nonce || '',
 		showLocationSearch: data.showLocationSearch === '1',
 		geocodeUrl: data.geocodeUrl || '',
+		tourRouteMode: data.tourRouteMode === '1',
 	};
 }
 

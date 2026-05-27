@@ -91,6 +91,10 @@ class VenueMapAbilities {
 							'type'        => 'integer',
 							'description' => 'Filter by taxonomy term ID',
 						),
+						'include_events' => array(
+							'type'        => 'boolean',
+							'description' => 'When true and taxonomy+term_id are set, attach upcoming_events_at_venue per venue (events tagged with that term, chronological ascending). Powers tour-route mode on the events-map block.',
+						),
 					),
 				),
 				'output_schema'       => array(
@@ -110,6 +114,19 @@ class VenueMapAbilities {
 									'url'         => array( 'type' => 'string' ),
 									'event_count' => array( 'type' => 'integer' ),
 									'distance'    => array( 'type' => 'number' ),
+									'upcoming_events_at_venue' => array(
+										'type'  => 'array',
+										'items' => array(
+											'type'       => 'object',
+											'properties' => array(
+												'post_id'    => array( 'type' => 'integer' ),
+												'start_date' => array( 'type' => 'string' ),
+												'start_time' => array( 'type' => 'string' ),
+												'title'      => array( 'type' => 'string' ),
+												'permalink'  => array( 'type' => 'string' ),
+											),
+										),
+									),
 								),
 							),
 						),
@@ -138,13 +155,14 @@ class VenueMapAbilities {
 	 * @return array Venue list with optional distance data.
 	 */
 	public function executeListVenues( array $input ): array {
-		$lat         = isset( $input['lat'] ) ? (float) $input['lat'] : null;
-		$lng         = isset( $input['lng'] ) ? (float) $input['lng'] : null;
-		$radius      = isset( $input['radius'] ) ? (int) $input['radius'] : 25;
-		$radius_unit = $input['radius_unit'] ?? 'mi';
-		$bounds      = $input['bounds'] ?? '';
-		$taxonomy    = $input['taxonomy'] ?? '';
-		$term_id     = isset( $input['term_id'] ) ? (int) $input['term_id'] : 0;
+		$lat            = isset( $input['lat'] ) ? (float) $input['lat'] : null;
+		$lng            = isset( $input['lng'] ) ? (float) $input['lng'] : null;
+		$radius         = isset( $input['radius'] ) ? (int) $input['radius'] : 25;
+		$radius_unit    = $input['radius_unit'] ?? 'mi';
+		$bounds         = $input['bounds'] ?? '';
+		$taxonomy       = $input['taxonomy'] ?? '';
+		$term_id        = isset( $input['term_id'] ) ? (int) $input['term_id'] : 0;
+		$include_events = ! empty( $input['include_events'] );
 
 		$has_geo    = null !== $lat && null !== $lng && Geo_Query::validate_params( $lat, $lng, $radius );
 		$has_bounds = ! empty( $bounds );
@@ -252,6 +270,19 @@ class VenueMapAbilities {
 				$venue['event_count'] = (int) ( $upcoming_counts[ $venue['term_id'] ] ?? 0 );
 			}
 			unset( $venue );
+
+			// Opt-in per-venue event list. Only attached when caller asked
+			// for it AND a taxonomy/term filter is in play (e.g. artist
+			// archive) — otherwise this would balloon to every venue's
+			// every upcoming event regardless of scope. The chronological
+			// sort/grouping for tour-route rendering happens client-side.
+			if ( $include_events && ! empty( $taxonomy ) && $term_id > 0 ) {
+				$events_by_venue = $this->getUpcomingEventsForVenuesAtTerm( $venue_ids, $taxonomy, $term_id );
+				foreach ( $venues as &$venue ) {
+					$venue['upcoming_events_at_venue'] = $events_by_venue[ $venue['term_id'] ] ?? array();
+				}
+				unset( $venue );
+			}
 		}
 
 		// Sort by distance if geo filtering, otherwise by event count.
@@ -493,6 +524,108 @@ class VenueMapAbilities {
 		}
 
 		return $counts;
+	}
+
+	/**
+	 * Get upcoming events at each venue, scoped to a co-occurring taxonomy term.
+	 *
+	 * Returns a `venue_term_id => list of event rows` map. Each event row contains
+	 * `post_id, start_date, start_time, title, permalink` — exactly what the
+	 * tour-route popup needs. Rows are ordered ascending by start_datetime
+	 * within each venue group so the client can pick the earliest entry as
+	 * the venue's "tour position" without re-sorting.
+	 *
+	 * Single SQL query: term_relationships(venue) joined to term_relationships(filter term)
+	 * joined to event_dates filtered to publish+future. Avoids N+1 across venues
+	 * and avoids loading every post object — the SELECT pulls post_title and
+	 * post_name directly so we can build the permalink ourselves.
+	 *
+	 * @param int[]  $venue_ids        Venue term IDs scoping the lookup.
+	 * @param string $filter_taxonomy  Co-occurring taxonomy (e.g. 'artist').
+	 * @param int    $filter_term_id   Term ID in that taxonomy.
+	 * @return array<int,array<int,array{post_id:int,start_date:string,start_time:string,title:string,permalink:string}>>
+	 */
+	private function getUpcomingEventsForVenuesAtTerm( array $venue_ids, string $filter_taxonomy, int $filter_term_id ): array {
+		if ( empty( $venue_ids ) || empty( $filter_taxonomy ) || $filter_term_id <= 0 ) {
+			return array();
+		}
+
+		global $wpdb;
+
+		$post_type = Event_Post_Type::POST_TYPE;
+		$today     = gmdate( 'Y-m-d 00:00:00' );
+
+		$placeholders = implode( ',', array_fill( 0, count( $venue_ids ), '%d' ) );
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$query = $wpdb->prepare(
+			"SELECT venue_tt.term_id AS venue_term_id,
+				p.ID AS post_id,
+				p.post_title,
+				p.post_name,
+				ed.start_datetime
+			FROM {$wpdb->term_relationships} venue_tr
+			INNER JOIN {$wpdb->term_taxonomy} venue_tt
+				ON venue_tr.term_taxonomy_id = venue_tt.term_taxonomy_id
+			INNER JOIN {$wpdb->posts} p
+				ON venue_tr.object_id = p.ID
+			INNER JOIN {$wpdb->prefix}datamachine_event_dates ed
+				ON p.ID = ed.post_id
+			INNER JOIN {$wpdb->term_relationships} filter_tr
+				ON filter_tr.object_id = p.ID
+			INNER JOIN {$wpdb->term_taxonomy} filter_tt
+				ON filter_tr.term_taxonomy_id = filter_tt.term_taxonomy_id
+			WHERE venue_tt.taxonomy = 'venue'
+			AND venue_tt.term_id IN ($placeholders)
+			AND p.post_type = %s
+			AND p.post_status = 'publish'
+			AND ed.start_datetime >= %s
+			AND filter_tt.taxonomy = %s
+			AND filter_tt.term_id = %d
+			ORDER BY venue_tt.term_id ASC, ed.start_datetime ASC",
+			array_merge(
+				$venue_ids,
+				array( $post_type, $today, $filter_taxonomy, $filter_term_id )
+			)
+		);
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results( $query );
+
+		if ( empty( $rows ) ) {
+			return array();
+		}
+
+		$by_venue = array();
+		foreach ( $rows as $row ) {
+			$venue_term_id = (int) $row->venue_term_id;
+			$post_id       = (int) $row->post_id;
+			$datetime      = (string) $row->start_datetime;
+
+			// Split "YYYY-MM-DD HH:MM:SS" into separate date/time so the
+			// client can format each independently without re-parsing.
+			$date_part = '';
+			$time_part = '';
+			if ( strpos( $datetime, ' ' ) !== false ) {
+				list( $date_part, $time_part ) = explode( ' ', $datetime, 2 );
+			} else {
+				$date_part = $datetime;
+			}
+
+			// Build permalink without get_permalink() to avoid N+1 post loads.
+			// get_post_permalink falls back to the same path when post_name is set.
+			$permalink = get_permalink( $post_id );
+
+			$by_venue[ $venue_term_id ][] = array(
+				'post_id'    => $post_id,
+				'start_date' => $date_part,
+				'start_time' => $time_part,
+				'title'      => (string) $row->post_title,
+				'permalink'  => is_string( $permalink ) ? $permalink : '',
+			);
+		}
+
+		return $by_venue;
 	}
 
 	/**

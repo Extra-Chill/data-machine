@@ -17,6 +17,12 @@ interface FetchVenuesParams {
 	radiusUnit?: 'mi' | 'km';
 	taxonomy?: string;
 	termId?: number;
+	/**
+	 * When true, request the opt-in `upcoming_events_at_venue` payload by
+	 * appending `include=events`. Only meaningful in combination with a
+	 * taxonomy/term filter (e.g. tour-route mode on an artist archive).
+	 */
+	includeEvents?: boolean;
 }
 
 /**
@@ -64,6 +70,10 @@ export async function fetchVenues(
 
 	if ( params.termId ) {
 		url.searchParams.set( 'term_id', String( params.termId ) );
+	}
+
+	if ( params.includeEvents ) {
+		url.searchParams.set( 'include', 'events' );
 	}
 
 	const response = await fetch( url.toString(), {
