@@ -22,7 +22,7 @@ The ExecuteWorkflow tool enables AI agents to execute complete multi-step workfl
 
 ## Step Configuration
 
-Workflow specs use the canonical fields `type`, `handler_slugs`, `handler_configs`, and `flow_step_settings`. The old aliases `step_type`, `handler_slug`, and `handler_config` are rejected by the shared workflow validator.
+Ephemeral workflow specs use the canonical fields `type`, `handler_slugs`, `handler_configs`, and `flow_step_settings`. Stored pipeline and flow config rows use `step_type` internally, but workflow input uses `type`. The old handler aliases `handler_slug` and `handler_config` are rejected by the shared workflow validator.
 
 ### Fetch Steps
 ```json

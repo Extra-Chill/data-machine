@@ -62,7 +62,7 @@ function validate_workflow_for_test( array $workflow ): array {
 		if ( array_key_exists( 'step_type', $step ) ) {
 			return array(
 				'valid' => false,
-				'error' => "Step {$index} uses unsupported legacy field step_type; use type",
+				'error' => "Step {$index} uses stored-config field step_type; ephemeral workflow specs use type",
 			);
 		}
 
@@ -145,11 +145,11 @@ dm_assert( false === $r['valid'], 'fetch with legacy handler_slug rejected' );
 dm_assert( str_contains( $r['error'] ?? '', 'unsupported legacy field handler_slug' ), 'legacy handler_slug error is explicit' );
 
 // -----------------------------------------------------------------
-echo "\n[5b] step with legacy step_type — INVALID\n";
+echo "\n[5b] workflow spec with stored-config step_type — INVALID\n";
 $wf = array( 'steps' => array( array( 'step_type' => 'fetch' ) ) );
 $r  = validate_workflow_for_test( $wf );
-dm_assert( false === $r['valid'], 'legacy step_type rejected' );
-dm_assert( str_contains( $r['error'] ?? '', 'unsupported legacy field step_type' ), 'legacy step_type error is explicit' );
+dm_assert( false === $r['valid'], 'workflow spec step_type rejected' );
+dm_assert( str_contains( $r['error'] ?? '', 'stored-config field step_type' ), 'workflow spec step_type error is explicit' );
 
 // -----------------------------------------------------------------
 echo "\n[6] publish step without handler_slug — VALID at workflow level\n";

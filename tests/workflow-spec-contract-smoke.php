@@ -124,7 +124,7 @@ $invalid_cases    = array(
 	'associative steps' => array( 'steps' => array( 'first' => array( 'type' => 'fetch' ) ) ),
 	'scalar step'       => array( 'steps' => array( 'fetch' ) ),
 	'missing type'      => array( 'steps' => array( array( 'handler_slug' => 'rss' ) ) ),
-	'legacy step_type field' => array( 'steps' => array( array( 'step_type' => 'fetch' ) ) ),
+	'stored-config step_type field' => array( 'steps' => array( array( 'step_type' => 'fetch' ) ) ),
 	'legacy handler alias field' => array( 'steps' => array( array( 'type' => 'fetch', 'handler' => 'rss' ) ) ),
 	'legacy handler field' => array( 'steps' => array( array( 'type' => 'fetch', 'handler_slug' => 'rss' ) ) ),
 	'legacy config field'  => array( 'steps' => array( array( 'type' => 'fetch', 'handler_config' => array( 'url' => 'https://example.com' ) ) ) ),

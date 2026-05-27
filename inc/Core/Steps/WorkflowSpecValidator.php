@@ -61,7 +61,7 @@ class WorkflowSpecValidator {
 			if ( array_key_exists( 'step_type', $step ) ) {
 				return array(
 					'valid' => false,
-					'error' => "Step {$index} uses unsupported legacy field step_type; use type",
+					'error' => "Step {$index} uses stored-config field step_type; ephemeral workflow specs use type",
 				);
 			}
 

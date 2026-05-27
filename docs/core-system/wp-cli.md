@@ -12,7 +12,7 @@ Data Machine provides a broad WP-CLI surface for managing pipelines, flows, jobs
 - **Handlers** are integrations selected by handler-backed step types. Only step types with `uses_handler=yes` accept handlers.
 - **System tasks** are named operational jobs. Use them for bounded tasks such as alt text, retention, internal links, and memory maintenance. Use pipelines/flows for reusable multi-step workflows instead of hiding workflow composition inside one system task.
 
-Workflow JSON uses canonical fields: `type`, `handler_slugs`, `handler_configs`, and `flow_step_settings`. Legacy aliases such as `step_type`, `handler`, `handler_slug`, and `handler_config` are rejected on normal workflow paths.
+Ephemeral workflow JSON uses canonical fields: `type`, `handler_slugs`, `handler_configs`, and `flow_step_settings`. Stored pipeline and flow config rows continue to use `step_type` internally; `step_type` is rejected only when submitted in an ephemeral workflow spec, where `type` is the public workflow key. Legacy handler aliases such as `handler`, `handler_slug`, and `handler_config` are rejected on normal workflow paths.
 
 ## Available Commands
 
