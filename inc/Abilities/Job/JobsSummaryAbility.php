@@ -98,18 +98,50 @@ class JobsSummaryAbility {
 	 */
 	public function execute( array $input ): array {
 		$filters = array();
-		foreach ( array( 'flow_id', 'pipeline_id', 'handler', 'status', 'source', 'since', 'user_id', 'agent_id', 'compact' ) as $key ) {
-			if ( isset( $input[ $key ] ) && '' !== $input[ $key ] && null !== $input[ $key ] ) {
+		foreach ( array( 'flow_id', 'pipeline_id', 'handler', 'status', 'source', 'since', 'user_id', 'agent_id' ) as $key ) {
+			if ( isset( $input[ $key ] ) && '' !== $input[ $key ] ) {
 				$filters[ $key ] = $input[ $key ];
 			}
 		}
 
-		$summary = $this->db_jobs->get_jobs_summary( $filters );
+		$summary = empty( $input['compact'] ) ? $this->db_jobs->get_jobs_summary( $filters ) : $this->getCompactSummary( $filters );
 
 		return array(
 			'success' => true,
 			'summary' => $summary,
 			'total'   => (int) ( $summary['total'] ?? 0 ),
+		);
+	}
+
+	/**
+	 * Get lightweight status counts for polling surfaces.
+	 *
+	 * @param array<string,mixed> $filters Job filters.
+	 * @return array<string,mixed> Compact summary payload.
+	 */
+	private function getCompactSummary( array $filters ): array {
+		return array(
+			'total'                  => $this->db_jobs->get_jobs_count( $filters ),
+			'failed_count'           => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'failed' ) ) ),
+			'stuck_processing_count' => $this->db_jobs->get_stuck_processing_count( $filters ),
+			'status'                 => array(
+				array(
+					'status' => 'processing',
+					'count'  => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'processing' ) ) ),
+				),
+				array(
+					'status' => 'pending',
+					'count'  => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'pending' ) ) ),
+				),
+				array(
+					'status' => 'failed',
+					'count'  => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'failed' ) ) ),
+				),
+			),
+			'pipeline'               => array(),
+			'flow'                   => array(),
+			'handler'                => array(),
+			'filters'                => $filters,
 		);
 	}
 }

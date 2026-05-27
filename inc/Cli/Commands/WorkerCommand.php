@@ -328,7 +328,7 @@ class WorkerCommand extends BaseCommand {
 	 */
 	private static function jobStatusCount( array $jobs, string $status ): int {
 		foreach ( (array) ( $jobs['status'] ?? array() ) as $row ) {
-			if ( $status === (string) ( $row['status'] ?? '' ) ) {
+			if ( (string) ( $row['status'] ?? '' ) === $status ) {
 				return (int) ( $row['count'] ?? 0 );
 			}
 		}

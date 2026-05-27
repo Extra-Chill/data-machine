@@ -122,11 +122,10 @@ $assert( 'CLI requires successful handler tool summary', str_contains( $jobs_com
 $assert( 'CLI supports dry-run output', str_contains( $jobs_command, "'dry_run' => $" ) || str_contains( $jobs_command, "'dry_run' => \$dry_run" ) );
 
 echo "\n[5] compact job summary avoids heavyweight breakdowns\n";
-$jobs_db = file_get_contents( __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php' );
 $summary_ability = file_get_contents( __DIR__ . '/../inc/Abilities/Job/JobsSummaryAbility.php' );
 $assert( 'jobs summary accepts compact input', str_contains( $summary_ability, "'compact'" ) );
-$assert( 'jobs database returns early for compact summaries', str_contains( $jobs_db, 'if ( ! empty( $args[\'compact\'] ) )' ) );
-$assert( 'compact summaries keep status buckets', str_contains( $jobs_db, "'status'                 => $" ) || str_contains( $jobs_db, "'status'                 => \$this->get_status_summary_rows" ) );
+$assert( 'jobs summary has compact helper', str_contains( $summary_ability, 'getCompactSummary' ) );
+$assert( 'compact summary skips database breakdown helpers', ! str_contains( $summary_ability, 'get_pipeline_summary_rows' ) && ! str_contains( $summary_ability, 'get_flow_summary_rows' ) );
 
 if ( $failures > 0 ) {
 	echo "\n=== job-status-accounting-smoke: {$failures} FAILURE(S) / {$total} assertions ===\n";
