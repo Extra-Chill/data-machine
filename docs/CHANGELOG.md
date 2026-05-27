@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.134.1] - 2026-05-27
+
+### Fixed
+- align xml parser assignment
+- avoid strip_tags in xml tool parsing
+- parse xml tool calls from text responses
+
 ## [0.134.0] - 2026-05-27
 
 ### Added
