@@ -33,6 +33,12 @@ class PageableSourceAggregator {
 		$max_pages               = max( 1, (int) ( $config['max_pages'] ?? 100 ) );
 		$group_by                = $this->normalizeStringList( $config['group_by'] ?? array() );
 		$sample_limit_per_bucket = max( 0, (int) ( $config['sample_limit_per_bucket'] ?? 3 ) );
+		$item_callback           = is_callable( $config['item_callback'] ?? null ) ? $config['item_callback'] : null;
+		$item_callback_result    = array(
+			'attempted' => 0,
+			'succeeded' => 0,
+			'failed'    => 0,
+		);
 
 		$total       = null;
 		$processed   = 0;
@@ -87,6 +93,14 @@ class PageableSourceAggregator {
 				}
 
 				$this->aggregateItem( $item, $group_by, $groups, $samples, $sample_limit_per_bucket );
+				if ( null !== $item_callback ) {
+					++$item_callback_result['attempted'];
+					if ( false !== $item_callback( $item ) ) {
+						++$item_callback_result['succeeded'];
+					} else {
+						++$item_callback_result['failed'];
+					}
+				}
 				++$processed;
 
 				if ( $max_items > 0 && $processed >= $max_items ) {
@@ -110,7 +124,7 @@ class PageableSourceAggregator {
 			$diagnostics['stop_reason'] = 'max_pages';
 		}
 
-		return array(
+		$result = array(
 			'total'       => $total ?? $processed,
 			'processed'   => $processed,
 			'pages'       => $page_count,
@@ -118,6 +132,12 @@ class PageableSourceAggregator {
 			'samples'     => $samples,
 			'diagnostics' => $diagnostics,
 		);
+
+		if ( null !== $item_callback ) {
+			$result['item_callback'] = $item_callback_result;
+		}
+
+		return $result;
 	}
 
 	/**

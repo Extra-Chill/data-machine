@@ -108,6 +108,8 @@ class DrainCommand extends BaseCommand {
 	 * @return array<string,int|string> Drain stats.
 	 */
 	public static function drain( array $options = array() ): array {
+		self::ensureCliMemoryLimit();
+
 		$limit               = max( 0, (int) ( $options['limit'] ?? 0 ) );
 		$batch_size          = max( 1, (int) ( $options['batch_size'] ?? 25 ) );
 		$time_limit          = max( 0, (int) ( $options['time_limit'] ?? 0 ) );
@@ -123,6 +125,13 @@ class DrainCommand extends BaseCommand {
 			if ( empty( $lock['acquired'] ) ) {
 				return self::lockedStats( $hooks, $job_ids, $lock );
 			}
+
+			$lock_token = (string) ( $lock['lock_token'] ?? '' );
+			register_shutdown_function(
+				static function () use ( $lock_token ): void {
+					WorkerLock::release( $lock_token );
+				}
+			);
 		}
 
 		$started_at    = time();
@@ -134,6 +143,7 @@ class DrainCommand extends BaseCommand {
 		try {
 			while ( self::getDuePendingCount( $hooks, $job_ids ) > 0 ) {
 				$stats = self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids ), $batches, $warnings, $hooks, $job_ids, $stop_reason );
+				// @phpstan-ignore-next-line
 				if ( self::isMemorySoftLimitReached() ) {
 					$stop_reason = 'memory_limit';
 					break;
@@ -165,19 +175,27 @@ class DrainCommand extends BaseCommand {
 
 				$due_before    = self::getDuePendingCount( $hooks, $job_ids );
 				$status_before = self::getStatusCounts( $hooks, $job_ids );
-				$result        = self::runActionSchedulerBatch( $current_batch_size, $hooks, $job_ids );
+				$deadline_at   = 0;
+				if ( $time_limit > 0 ) {
+					$deadline_at = $started_at + max( 0, $time_limit - $stop_before_timeout );
+				}
+				$result = self::runActionSchedulerBatch( $current_batch_size, $hooks, $job_ids, $deadline_at );
 				++$batches;
 
-				if ( 0 !== (int) ( $result->return_code ?? 1 ) ) {
+				if ( 0 !== (int) $result['return_code'] ) {
 					++$warnings;
-					$message = trim( (string) ( $result->stderr ?? '' ) );
+					$message = trim( (string) $result['stderr'] );
 					WP_CLI::warning( '' === $message ? 'Action Scheduler CLI drain failed.' : $message );
-					$stop_reason = 'memory_limit' === (string) ( $result->stop_reason ?? '' ) ? 'memory_limit' : 'warning';
+					$stop_reason = 'memory_limit' === (string) $result['stop_reason'] ? 'memory_limit' : 'warning';
 					break;
 				}
 
 				$status_after = self::getStatusCounts( $hooks, $job_ids );
 				$progress     = self::processedDelta( $status_before, $status_after );
+				if ( '' !== (string) $result['stop_reason'] ) {
+					$stop_reason = (string) $result['stop_reason'];
+					break;
+				}
 				if ( 0 === $progress && self::getDuePendingCount( $hooks, $job_ids ) >= $due_before ) {
 					++$warnings;
 					WP_CLI::warning( 'Drain stopped because Action Scheduler made no observable progress.' );
@@ -248,6 +266,28 @@ class DrainCommand extends BaseCommand {
 	}
 
 	/**
+	 * Raise the CLI memory floor for large Action Scheduler drains.
+	 */
+	public static function ensureCliMemoryLimit( int $minimum_bytes = 1073741824 ): void {
+		if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+			return;
+		}
+
+		$current = self::memoryLimitBytes();
+		if ( 0 === $current || $current >= $minimum_bytes ) {
+			return;
+		}
+
+		add_filter(
+			'admin_memory_limit',
+			static function () use ( $minimum_bytes ): string {
+				return (string) $minimum_bytes;
+			}
+		);
+		wp_raise_memory_limit( 'admin' );
+	}
+
+	/**
 	 * Add operator-facing lock fields to stats.
 	 *
 	 * @param array<string,int|string>      $stats Stats.
@@ -288,27 +328,35 @@ class DrainCommand extends BaseCommand {
 	 * @param int           $batch_size Maximum actions to claim.
 	 * @param string[]|null $hooks      Hook scope, or null for all hooks in the group.
 	 * @param int[]         $job_ids    Optional job ID scope.
-	 * @return object Result object with return_code and stderr fields.
+	 * @return array{return_code:int,stdout:string,stderr:string,stop_reason:string} Result data.
 	 */
-	private static function runActionSchedulerBatch( int $batch_size, ?array $hooks = null, array $job_ids = array() ): object {
-		$store    = \ActionScheduler_Store::instance();
-		$runner   = \ActionScheduler::runner();
-		$warnings = array();
-		$claim    = null;
+	private static function runActionSchedulerBatch( int $batch_size, ?array $hooks = null, array $job_ids = array(), int $deadline_at = 0 ): array {
+		$store       = \ActionScheduler_Store::instance();
+		$runner      = \ActionScheduler::runner();
+		$warnings    = array();
+		$claim       = null;
+		$stop_reason = '';
 
 		try {
 			self::runActionSchedulerTimeoutCleanup( $store );
 			$claim = $store->stake_claim( $batch_size, null, $hooks ?? array(), self::GROUP );
 		} catch ( \Throwable $throwable ) {
-			return (object) array(
+			return array(
 				'return_code' => 1,
 				'stdout'      => '',
 				'stderr'      => sprintf( 'Action Scheduler claim failed during drain: %s', $throwable->getMessage() ),
+				'stop_reason' => 'warning',
 			);
 		}
 
 		try {
 			foreach ( $claim->get_actions() as $action_id ) {
+				if ( $deadline_at > 0 && time() >= $deadline_at ) {
+					$stop_reason = 'timeout_margin';
+					break;
+				}
+
+				// @phpstan-ignore-next-line
 				if ( self::isMemorySoftLimitReached() ) {
 					$warnings[] = 'Drain stopped before processing the next action because PHP memory usage reached the soft limit.';
 					break;
@@ -332,19 +380,14 @@ class DrainCommand extends BaseCommand {
 				} finally {
 					self::flushRuntimeCache();
 				}
-
-				if ( self::isMemorySoftLimitReached() ) {
-					$warnings[] = 'Drain stopped after processing an action because PHP memory usage reached the soft limit.';
-					break;
-				}
 			}
 		} finally {
 			$store->release_claim( $claim );
 		}
 
-		$stop_reason = self::warningsContainMemoryLimit( $warnings ) ? 'memory_limit' : '';
+		$stop_reason = self::warningsContainMemoryLimit( $warnings ) ? 'memory_limit' : $stop_reason;
 
-		return (object) array(
+		return array(
 			'return_code' => empty( $warnings ) ? 0 : 1,
 			'stdout'      => '',
 			'stderr'      => implode( "\n", $warnings ),

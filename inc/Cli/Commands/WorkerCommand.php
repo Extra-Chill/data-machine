@@ -173,6 +173,8 @@ class WorkerCommand extends BaseCommand {
 	 * @return array<string,int|string> Worker stats.
 	 */
 	public static function runLoop( array $options ): array {
+		DrainCommand::ensureCliMemoryLimit();
+
 		$started_at              = time();
 		$time_limit              = max( 0, (int) ( $options['time_limit'] ?? 300 ) );
 		$batch_size              = max( 1, (int) ( $options['batch_size'] ?? 10 ) );
@@ -190,6 +192,13 @@ class WorkerCommand extends BaseCommand {
 		if ( empty( $lock['acquired'] ) ) {
 			return self::lockedStats( $lock );
 		}
+
+		$lock_token = (string) ( $lock['lock_token'] ?? '' );
+		register_shutdown_function(
+			static function () use ( $lock_token ): void {
+				WorkerLock::release( $lock_token );
+			}
+		);
 
 		$passes      = 0;
 		$recoveries  = 0;
@@ -301,7 +310,7 @@ class WorkerCommand extends BaseCommand {
 	private static function statusSnapshot(): array {
 		$pending_summary = PendingActionStore::summary( array( 'status' => 'pending' ) );
 		$drain_status    = DrainCommand::status();
-		$jobs_summary    = ( new JobsSummaryAbility() )->execute( array() );
+		$jobs_summary    = ( new JobsSummaryAbility() )->execute( array( 'compact' => true ) );
 		$jobs            = ! empty( $jobs_summary['success'] ) && is_array( $jobs_summary['summary'] ?? null ) ? $jobs_summary['summary'] : array();
 		$stuck_jobs      = RecoverStuckJobsAbility::countStuckCandidates();
 		$lock            = WorkerLock::snapshot();
@@ -312,11 +321,28 @@ class WorkerCommand extends BaseCommand {
 			'due_actions'           => (int) ( $drain_status['due_pending'] ?? 0 ),
 			'total_pending_actions' => (int) ( $drain_status['total_pending'] ?? 0 ),
 			'action_hooks'          => (string) ( $drain_status['hooks'] ?? '' ),
-			'processing_jobs'       => (int) ( $jobs['processing'] ?? 0 ),
-			'pending_jobs'          => (int) ( $jobs['pending'] ?? 0 ),
-			'failed_jobs'           => (int) ( $jobs['failed'] ?? 0 ),
+			'processing_jobs'       => self::jobStatusCount( $jobs, 'processing' ),
+			'pending_jobs'          => self::jobStatusCount( $jobs, 'pending' ),
+			'failed_jobs'           => (int) ( $jobs['failed_count'] ?? self::jobStatusCount( $jobs, 'failed' ) ),
 			'stuck_jobs'            => $stuck_jobs,
 		) + self::publicLockStatus( $lock );
+	}
+
+	/**
+	 * Read one normalized status bucket from a jobs summary result.
+	 *
+	 * @param array<string,mixed> $jobs   Jobs summary payload.
+	 * @param string              $status Normalized status bucket.
+	 * @return int Bucket count.
+	 */
+	private static function jobStatusCount( array $jobs, string $status ): int {
+		foreach ( (array) ( $jobs['status'] ?? array() ) as $row ) {
+			if ( (string) ( $row['status'] ?? '' ) === $status ) {
+				return (int) ( $row['count'] ?? 0 );
+			}
+		}
+
+		return 0;
 	}
 
 	/**

@@ -99,13 +99,22 @@ class SystemTaskStep extends Step {
 		$task_type     = self::getConfiguredTaskType( $step_settings );
 
 		if ( empty( $task_type ) ) {
+			$legacy_task_type = $step_settings['task'] ?? null;
+			$failure_code     = 'system_task_missing_task_type';
+			$error_message    = 'System Task step requires a task type in flow_step_settings.task_type.';
+
+			if ( is_string( $legacy_task_type ) && '' !== $legacy_task_type ) {
+				$failure_code  = 'system_task_legacy_task_field';
+				$error_message = 'System Task step uses unsupported legacy field flow_step_settings.task; use flow_step_settings.task_type.';
+			}
+
 			do_action(
 				'datamachine_fail_job',
 				$this->job_id,
-				'system_task_missing_task_type',
+				$failure_code,
 				array(
 					'flow_step_id'  => $this->flow_step_id,
-					'error_message' => 'System Task step requires a task type in flow_step_settings.',
+					'error_message' => $error_message,
 				)
 			);
 			return false;

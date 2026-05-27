@@ -2,6 +2,61 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.134.2] - 2026-05-27
+
+### Fixed
+- parse json tool call text envelopes
+
+## [0.134.1] - 2026-05-27
+
+### Fixed
+- align xml parser assignment
+- avoid strip_tags in xml tool parsing
+- parse xml tool calls from text responses
+
+## [0.134.0] - 2026-05-27
+
+### Added
+- expose generic content format conversion filter
+
+### Fixed
+- import flow step config in pipeline helpers
+
+## [0.133.5] - 2026-05-27
+
+### Fixed
+- reclaim stale worker locks
+
+## [0.133.4] - 2026-05-27
+
+### Fixed
+- harden worker memory and lock cleanup
+
+## [0.133.3] - 2026-05-27
+
+### Fixed
+- satisfy drain deadline validation
+- stop drain batches before timeout margin
+
+## [0.133.2] - 2026-05-27
+
+### Fixed
+- avoid private job summary calls
+- keep worker status compact
+- make worker job status lightweight
+
+## [0.133.1] - 2026-05-27
+
+### Fixed
+- hoist image-template registration out of runtime gate
+
+## [0.133.0] - 2026-05-27
+
+### Fixed
+- guarantee category registration before ability registration on multisite subsites
+- satisfy queue trim repair lint
+- add runtime queue trim repair command
+
 ## [0.132.4] - 2026-05-23
 
 ### Changed

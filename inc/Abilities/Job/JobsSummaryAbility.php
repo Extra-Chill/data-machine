@@ -57,6 +57,11 @@ class JobsSummaryAbility {
 								'type'        => array( 'string', 'null' ),
 								'description' => __( 'Filter jobs created at or after this datetime (Y-m-d H:i:s).', 'data-machine' ),
 							),
+							'compact'     => array(
+								'type'        => 'boolean',
+								'default'     => false,
+								'description' => __( 'Return only total/status counts and skip heavier pipeline, flow, and handler breakdowns.', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -94,17 +99,49 @@ class JobsSummaryAbility {
 	public function execute( array $input ): array {
 		$filters = array();
 		foreach ( array( 'flow_id', 'pipeline_id', 'handler', 'status', 'source', 'since', 'user_id', 'agent_id' ) as $key ) {
-			if ( isset( $input[ $key ] ) && '' !== $input[ $key ] && null !== $input[ $key ] ) {
+			if ( isset( $input[ $key ] ) && '' !== $input[ $key ] ) {
 				$filters[ $key ] = $input[ $key ];
 			}
 		}
 
-		$summary = $this->db_jobs->get_jobs_summary( $filters );
+		$summary = empty( $input['compact'] ) ? $this->db_jobs->get_jobs_summary( $filters ) : $this->getCompactSummary( $filters );
 
 		return array(
 			'success' => true,
 			'summary' => $summary,
 			'total'   => (int) ( $summary['total'] ?? 0 ),
+		);
+	}
+
+	/**
+	 * Get lightweight status counts for polling surfaces.
+	 *
+	 * @param array<string,mixed> $filters Job filters.
+	 * @return array<string,mixed> Compact summary payload.
+	 */
+	private function getCompactSummary( array $filters ): array {
+		return array(
+			'total'                  => $this->db_jobs->get_jobs_count( $filters ),
+			'failed_count'           => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'failed' ) ) ),
+			'stuck_processing_count' => 0,
+			'status'                 => array(
+				array(
+					'status' => 'processing',
+					'count'  => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'processing' ) ) ),
+				),
+				array(
+					'status' => 'pending',
+					'count'  => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'pending' ) ) ),
+				),
+				array(
+					'status' => 'failed',
+					'count'  => $this->db_jobs->get_jobs_count( array_merge( $filters, array( 'status' => 'failed' ) ) ),
+				),
+			),
+			'pipeline'               => array(),
+			'flow'                   => array(),
+			'handler'                => array(),
+			'filters'                => $filters,
 		);
 	}
 }

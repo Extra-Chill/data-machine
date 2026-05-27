@@ -367,6 +367,118 @@ assert_runner_request( array( 'path' => 'README.md' ) === ( $sandbox_result['too
 assert_runner_request( 1 === count( $sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline function call executes a workspace tool' );
 assert_runner_request( 'README.md' === ( $sandbox_result['tool_execution_results'][0]['result']['path'] ?? null ), 'sandbox/pipeline tool execution receives parsed parameters' );
 
+// 4b. Sandbox/pipeline runs also execute XML tool calls emitted as text.
+$xml_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$xml_dispatch_count ) {
+		++$xml_dispatch_count;
+
+		if ( 1 === $xml_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content' => 'I will inspect first.' . "\n\n" . '<function_calls><invoke name="workspace_read"><parameter name="path">README.md</parameter></invoke></function_calls>',
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content' => 'xml sandbox tool complete',
+			),
+		);
+	}
+);
+
+$xml_sandbox_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'read the sandbox README using XML tool syntax' ) ),
+	array(
+		'workspace_read' => array(
+			'name'        => 'workspace_read',
+			'description' => 'Read a file from the sandbox workspace.',
+			'parameters'  => array(
+				'type'       => 'object',
+				'properties' => array(
+					'path' => array( 'type' => 'string' ),
+				),
+				'required'   => array( 'path' ),
+			),
+			'class'       => SandboxPipelineSmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array( 'sandbox', 'pipeline' ),
+	array(),
+	3
+);
+
+assert_runner_request( 2 === $xml_dispatch_count, 'sandbox/pipeline XML tool call returns to provider for final answer' );
+assert_runner_request( 'xml sandbox tool complete' === ( $xml_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline XML tool call preserves final answer' );
+assert_runner_request( 1 === count( $xml_sandbox_result['tool_calls'] ?? array() ), 'sandbox/pipeline XML tool call is parsed' );
+assert_runner_request( 'workspace_read' === ( $xml_sandbox_result['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline XML tool name is parsed' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $xml_sandbox_result['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline XML tool parameters are parsed' );
+assert_runner_request( 1 === count( $xml_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline XML tool call executes a workspace tool' );
+
+// 4c. Sandbox/pipeline runs also execute JSON tool calls emitted in <tool_call> text envelopes.
+$json_tool_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$json_tool_dispatch_count ) {
+		++$json_tool_dispatch_count;
+
+		if ( 1 === $json_tool_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content' => '<tool_call>{"name":"workspace_read","arguments":{"path":"README.md"}}</tool_call>',
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content' => 'json tool sandbox complete',
+			),
+		);
+	}
+);
+
+$json_tool_sandbox_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'read the sandbox README using JSON tool syntax' ) ),
+	array(
+		'workspace_read' => array(
+			'name'        => 'workspace_read',
+			'description' => 'Read a file from the sandbox workspace.',
+			'parameters'  => array(
+				'type'       => 'object',
+				'properties' => array(
+					'path' => array( 'type' => 'string' ),
+				),
+				'required'   => array( 'path' ),
+			),
+			'class'       => SandboxPipelineSmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array( 'sandbox', 'pipeline' ),
+	array(),
+	3
+);
+
+assert_runner_request( 2 === $json_tool_dispatch_count, 'sandbox/pipeline JSON text tool call returns to provider for final answer' );
+assert_runner_request( 'json tool sandbox complete' === ( $json_tool_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline JSON text tool call preserves final answer' );
+assert_runner_request( 1 === count( $json_tool_sandbox_result['tool_calls'] ?? array() ), 'sandbox/pipeline JSON text tool call is parsed' );
+assert_runner_request( 'workspace_read' === ( $json_tool_sandbox_result['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline JSON text tool name is parsed' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $json_tool_sandbox_result['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline JSON text tool parameters are parsed' );
+assert_runner_request( 1 === count( $json_tool_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline JSON text tool call executes a workspace tool' );
+
 // 5. Client runtime tools are fulfilled by the transport callback, not PHP ToolExecutor.
 $runtime_dispatch_count = 0;
 $runtime_requests       = array();

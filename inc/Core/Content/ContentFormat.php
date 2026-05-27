@@ -11,6 +11,34 @@ defined( 'ABSPATH' ) || exit;
 
 class ContentFormat {
 
+	/**
+	 * Register generic content-format conversion filters.
+	 *
+	 * @return void
+	 */
+	public static function register(): void {
+		add_filter( 'datamachine_content_format_convert', array( self::class, 'convertFilter' ), 10, 5 );
+	}
+
+	/**
+	 * Filter callback for generic content-format conversion requests.
+	 *
+	 * @param  mixed  $converted Existing conversion result from earlier filters.
+	 * @param  string $content   Source content.
+	 * @param  string $from      Source format slug.
+	 * @param  string $to        Target format slug.
+	 * @param  array  $context   Optional conversion context.
+	 * @return string|\WP_Error|null Converted content, error, or null.
+	 */
+	public static function convertFilter( $converted, string $content, string $from, string $to, array $context = array() ) {
+		unset( $context );
+
+		if ( is_string( $converted ) || is_wp_error( $converted ) ) {
+			return $converted;
+		}
+
+		return self::convertWithBfb( $content, $from, $to );
+	}
 
 	/**
 	 * Return the canonical storage format for a post type.
@@ -32,7 +60,24 @@ class ContentFormat {
 	 * @param  string $to      Target format slug.
 	 * @return string|\WP_Error Converted content or error.
 	 */
-	public static function convert( string $content, string $from, string $to ) {
+	public static function convert( string $content, string $from, string $to, array $context = array() ) {
+		$filtered = apply_filters( 'datamachine_content_format_convert', null, $content, $from, $to, $context );
+		if ( is_string( $filtered ) || is_wp_error( $filtered ) ) {
+			return $filtered;
+		}
+
+		return self::convertWithBfb( $content, $from, $to );
+	}
+
+	/**
+	 * Convert content through Block Format Bridge.
+	 *
+	 * @param  string $content Source content.
+	 * @param  string $from    Source format slug.
+	 * @param  string $to      Target format slug.
+	 * @return string|\WP_Error Converted content or error.
+	 */
+	private static function convertWithBfb( string $content, string $from, string $to ) {
 		$from = sanitize_key( $from );
 		$to   = sanitize_key( $to );
 

@@ -2,11 +2,11 @@
 /**
  * Abstract base class for all System Agent tasks.
  *
- * Tasks declare their execution shape via getWorkflow() — returning a
- * step-list JSON that the engine executes through datamachine/execute-workflow.
- * This is the same engine contract used by persistent flows, chat-built
- * workflows, and system tasks. The only difference between them is where
- * the JSON lives: database row, chat context, or hardcoded PHP.
+ * Tasks are named operational jobs. They can be scheduled directly or embedded
+ * in a pipeline through the `system_task` step type. Multi-step product
+ * workflows belong in pipelines/flows; keep getWorkflow() to the default
+ * single `system_task` step unless the task owns a bounded internal handoff
+ * that should still be scheduled as one named operation.
  *
  * ## Dual Contract
  *
@@ -57,8 +57,8 @@ abstract class SystemTask {
 	 *
 	 * Default implementation returns a single system_task step that
 	 * references this task's own type — the engine routes through
-	 * SystemTaskStep which calls executeTask(). Override to return
-	 * richer multi-step workflows.
+	 * SystemTaskStep which calls executeTask(). Prefer pipelines/flows for
+	 * reusable multi-step workflows instead of overriding this method.
 	 *
 	 * @param array $params Task parameters from the scheduler.
 	 * @return array Workflow definition with "steps" key.
@@ -102,12 +102,22 @@ abstract class SystemTask {
 	abstract public function getTaskType(): string;
 
 	/**
-	 * Get task metadata for UI display.
+	 * Get task metadata for registry, UI display, and manual-run safety.
 	 *
-	 * Override in concrete tasks to provide label, description, and
-	 * optional setting key for the System Tasks admin tab.
+	 * Override in concrete tasks to provide labels plus explicit execution
+	 * safety metadata. `supports_run` controls whether `wp datamachine system
+	 * run` and the run-task ability may schedule the task manually. Mutating
+	 * manual tasks should declare `mutates`, `supports_dry_run`, and a scoped
+	 * `params_schema` so callers cannot accidentally run broad operations.
 	 *
-	 * @return array{label: string, description: string, setting_key: ?string, default_enabled: bool}
+	 * Example params_schema:
+	 * array(
+	 *     'accepted' => array( 'post_id', 'limit', 'dry_run' ),
+	 *     'required' => array( 'post_id' ),
+	 *     'scope'    => array( 'post_id' ),
+	 * )
+	 *
+	 * @return array{label: string, description: string, setting_key: ?string, default_enabled: bool, trigger?: string, trigger_type?: string, supports_run?: bool, mutates?: bool, supports_dry_run?: bool, requires_scope?: bool, params_schema?: array{accepted?: array<int, string>, accepted_params?: array<int, string>, required?: array<int, string>, required_params?: array<int, string>, scope?: array<int, string>, scope_params?: array<int, string>}}
 	 * @since 0.32.0
 	 */
 	public static function getTaskMeta(): array {

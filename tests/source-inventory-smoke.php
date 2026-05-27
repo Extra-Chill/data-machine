@@ -21,6 +21,18 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'wp_strip_all_tags' ) ) {
+		function wp_strip_all_tags( $text ) {
+			return strip_tags( (string) $text );
+		}
+	}
+
+	if ( ! function_exists( 'current_time' ) ) {
+		function current_time( $type, $gmt = false ) {
+			return gmdate( 'Y-m-d H:i:s' );
+		}
+	}
+
 	if ( ! function_exists( '__' ) ) {
 		function __( $text, $domain = 'default' ) {
 			return $text;
@@ -87,10 +99,33 @@ namespace DataMachine\Abilities {
 namespace {
 	require_once __DIR__ . '/../inc/Core/SourceAggregation/PageableSourceAggregator.php';
 	require_once __DIR__ . '/../inc/Core/SourceAggregation/SourceInventoryProfiler.php';
+	require_once __DIR__ . '/../inc/Core/Database/BaseRepository.php';
+	require_once __DIR__ . '/../inc/Core/Database/TrackedItems/TrackedItems.php';
 	require_once __DIR__ . '/../inc/Abilities/SourceInventoryAbility.php';
 
 	use DataMachine\Abilities\SourceInventoryAbility;
+	use DataMachine\Core\Database\TrackedItems\TrackedItems;
 	use DataMachine\Core\SourceAggregation\SourceInventoryProfiler;
+
+	class SourceInventoryTrackedItemsSmokeRepository extends TrackedItems {
+		public array $items = array();
+
+		public function __construct() {}
+
+		public function upsert( array $item ): ?array {
+			$key = (string) $item['namespace'] . ':' . (string) $item['item_id'];
+			$this->items[ $key ] = array_merge(
+				array(
+					'id'       => count( $this->items ) + 1,
+					'metadata' => array(),
+				),
+				$this->items[ $key ] ?? array(),
+				$item
+			);
+
+			return $this->items[ $key ];
+		}
+	}
 
 	$failed = 0;
 	$total  = 0;
@@ -194,7 +229,8 @@ namespace {
 		),
 	);
 
-	$ability = new SourceInventoryAbility();
+	$tracked_items = new SourceInventoryTrackedItemsSmokeRepository();
+	$ability       = new SourceInventoryAbility( $tracked_items );
 	assert_source_inventory( 'ability registers datamachine/source-inventory', isset( $GLOBALS['source_inventory_registered_abilities']['datamachine/source-inventory'] ) );
 
 	$result = $ability->execute(
@@ -219,6 +255,37 @@ namespace {
 	assert_source_inventory( 'ability scan processes static pages', 3 === ( $result['scan']['processed'] ?? 0 ) );
 	assert_source_inventory( 'ability scan reports total denominator', 3 === ( $result['scan']['total'] ?? 0 ) );
 	assert_source_inventory( 'ability scan groups item fields', 2 === ( $result['scan']['groups']['venue']['A'] ?? 0 ) );
+
+	$tracked = $ability->execute(
+		array(
+			'source'      => array(
+				'kind'  => 'static_pages',
+				'pages' => array(
+					array(
+						'items' => array(
+							array( 'id' => 'wp_register_script_module', 'kind' => 'function', 'path' => 'src/wp-includes/script-modules.php', 'line' => 42 ),
+							array( 'id' => 'WP_Script_Modules', 'kind' => 'class', 'path' => 'src/wp-includes/class-wp-script-modules.php', 'line' => 14 ),
+						),
+					),
+				),
+			),
+			'scan'        => true,
+			'pagination'  => array( 'limit' => 10, 'item_path' => 'items' ),
+			'track_items' => array(
+				'namespace'        => 'wp-docs:core-script-modules',
+				'item_id_path'     => 'id',
+				'item_type_path'   => 'kind',
+				'state'            => TrackedItems::STATE_DISCOVERED,
+				'source_ref'       => 'wordpress-develop',
+				'source_path_path' => 'path',
+				'source_line_path' => 'line',
+			),
+		)
+	);
+	assert_source_inventory( 'tracked scan succeeds', true === ( $tracked['success'] ?? false ) );
+	assert_source_inventory( 'tracked scan reports upserts', 2 === ( $tracked['scan']['tracked_items']['succeeded'] ?? 0 ) );
+	assert_source_inventory( 'tracked scan writes first item', isset( $tracked_items->items['wp-docs:core-script-modules:wp_register_script_module'] ) );
+	assert_source_inventory( 'tracked scan maps source path', 'src/wp-includes/script-modules.php' === ( $tracked_items->items['wp-docs:core-script-modules:wp_register_script_module']['source_path'] ?? '' ) );
 
 	$unsupported = $ability->execute(
 		array(

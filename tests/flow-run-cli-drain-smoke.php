@@ -44,6 +44,7 @@ assert_drain_contains( '[--stop-before-timeout=<seconds>]', $drain_src, 'drain d
 assert_drain_contains( "'stop_before_timeout'", $drain_src, 'drain accepts worker-style timeout safety margin option' );
 assert_drain_contains( 'WorkerLock::acquire', $drain_src, 'drain acquires shared worker/drain lock' );
 assert_drain_contains( 'WorkerLock::release', $drain_src, 'drain releases shared worker/drain lock' );
+assert_drain_contains( 'register_shutdown_function', $drain_src, 'drain releases locks during PHP shutdown after fatals' );
 assert_drain_contains( "'stop_reason'                => 'locked'", $drain_src, 'drain exits cleanly when lock is held' );
 assert_drain_contains( 'lock_age_seconds', $drain_src, 'drain reports lock age' );
 assert_drain_contains( 'lock_owner', $drain_src, 'drain reports lock owner' );
@@ -54,6 +55,8 @@ assert_drain_contains( '"parent_job_id":', $drain_src, 'drain can filter batch a
 assert_drain_contains( "a.status = \\'pending\\'", $drain_src, 'drain queries pending actions in the Data Machine group' );
 assert_drain_contains( 'runActionSchedulerTimeoutCleanup( $store )', $drain_src, 'drain resets stale Action Scheduler claims before claiming work' );
 assert_drain_contains( 'stake_claim( $batch_size, null, $hooks ?? array(), self::GROUP )', $drain_src, 'drain claims due Data Machine actions through Action Scheduler' );
+assert_drain_contains( '$deadline_at = $started_at + max( 0, $time_limit - $stop_before_timeout )', $drain_src, 'drain computes an action-level deadline for claimed batches' );
+assert_drain_contains( 'time() >= $deadline_at', $drain_src, 'drain checks the timeout margin between claimed actions' );
 assert_drain_contains( 'find_actions_by_claim_id( $claim->get_id() )', $drain_src, 'drain verifies Action Scheduler claim ownership before processing' );
 assert_drain_contains( 'release_claim( $claim )', $drain_src, 'drain releases Action Scheduler claims after processing' );
 assert_drain_contains( "\\ActionScheduler::runner()", $drain_src, 'drain uses Action Scheduler runner for claimed actions' );
@@ -61,6 +64,7 @@ assert_drain_contains( "'Data Machine CLI drain'", $drain_src, 'drain records a 
 assert_drain_contains( 'catch ( \\Throwable $throwable )', $drain_src, 'drain catches per-action runner failures instead of fataling after job start' );
 assert_drain_contains( 'flushRuntimeCache()', $drain_src, 'drain flushes runtime cache after processing actions' );
 assert_drain_contains( 'isMemorySoftLimitReached()', $drain_src, 'drain stops before hard PHP memory exhaustion' );
+assert_drain_contains( 'ensureCliMemoryLimit()', $drain_src, 'drain raises the CLI memory floor before processing large batches' );
 assert_drain_contains( "'memory_limit'", $drain_src, 'drain reports memory-limit stop reason' );
 assert_drain_contains( "'return_code' => empty( \$warnings ) ? 0 : 1", $drain_src, 'drain surfaces runner failures through a result object' );
 assert_drain_contains( "'remaining_pending'", $drain_src, 'drain reports remaining pending actions' );

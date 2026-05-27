@@ -45,7 +45,7 @@ function build_child_engine_data(
 	$parent_agent_id = (int) ( $engine_snapshot['job']['agent_id'] ?? 0 );
 	$parent_user_id  = (int) ( $engine_snapshot['job']['user_id'] ?? 0 );
 
-	$child_engine        = $engine_snapshot;
+	$child_engine        = strip_flow_runtime_queue_payloads( $engine_snapshot );
 	$child_engine['job'] = array(
 		'job_id'        => $child_job_id,
 		'flow_id'       => $flow_id,
@@ -57,6 +57,34 @@ function build_child_engine_data(
 	);
 
 	return $child_engine;
+}
+
+/**
+ * Mirror of PipelineBatchScheduler::stripFlowRuntimeQueuePayloads().
+ *
+ * @param array $engine_snapshot Parent engine data snapshot.
+ * @return array Child-safe engine data snapshot.
+ */
+function strip_flow_runtime_queue_payloads( array $engine_snapshot ): array {
+	$flow_config = is_array( $engine_snapshot['flow_config'] ?? null ) ? $engine_snapshot['flow_config'] : array();
+
+	foreach ( $flow_config as $flow_step_id => $flow_step_config ) {
+		if ( ! is_array( $flow_step_config ) ) {
+			continue;
+		}
+
+		unset(
+			$flow_step_config['prompt_queue'],
+			$flow_step_config['config_patch_queue'],
+			$flow_step_config['_queue_consume_revision']
+		);
+
+		$flow_config[ $flow_step_id ] = $flow_step_config;
+	}
+
+	$engine_snapshot['flow_config'] = $flow_config;
+
+	return $engine_snapshot;
 }
 
 function dm_assert( bool $cond, string $msg ): void {
@@ -95,6 +123,46 @@ dm_assert( '2' === $child['job']['pipeline_id'], 'pipeline_id preserved' );
 dm_assert( '2' === $child['job']['flow_id'], 'flow_id preserved' );
 dm_assert( isset( $child['flow_config'] ), 'engine_snapshot keys preserved (flow_config)' );
 dm_assert( isset( $child['pipeline_config'] ), 'engine_snapshot keys preserved (pipeline_config)' );
+
+// -----------------------------------------------------------------
+echo "\n[1b] runtime queue payloads are not cloned into child engine_data\n";
+$parent_snapshot = array(
+	'job'         => array(
+		'job_id'      => 64,
+		'flow_id'     => '2',
+		'pipeline_id' => '2',
+		'user_id'     => 1,
+		'agent_id'    => 2,
+		'created_at'  => '2026-04-24 22:00:00',
+	),
+	'flow_config' => array(
+		'fetch_step' => array(
+			'flow_step_id'            => 'fetch_step',
+			'step_type'               => 'fetch',
+			'queue_mode'              => 'drain',
+			'config_patch_queue'      => array_fill( 0, 1613, array( 'patch' => array( 'query' => 'report-43' ) ) ),
+			'prompt_queue'            => array( array( 'prompt' => 'unused' ) ),
+			'_queue_consume_revision' => 42,
+		),
+		'ai_step'    => array(
+			'flow_step_id'            => 'ai_step',
+			'step_type'               => 'ai',
+			'queue_mode'              => 'static',
+			'prompt_queue'            => array( array( 'prompt' => 'runtime prompt' ) ),
+			'_queue_consume_revision' => 7,
+		),
+	),
+);
+
+$child = build_child_engine_data( $parent_snapshot, 65, 64, '2', '2' );
+
+dm_assert( isset( $child['flow_config']['fetch_step']['queue_mode'] ), 'queue_mode preserved for queue consumers' );
+dm_assert( 'drain' === $child['flow_config']['fetch_step']['queue_mode'], 'fetch queue_mode value preserved' );
+dm_assert( ! isset( $child['flow_config']['fetch_step']['config_patch_queue'] ), 'config_patch_queue stripped from child engine_data' );
+dm_assert( ! isset( $child['flow_config']['fetch_step']['prompt_queue'] ), 'prompt_queue stripped from child engine_data' );
+dm_assert( ! isset( $child['flow_config']['fetch_step']['_queue_consume_revision'] ), 'queue revision stripped from child engine_data' );
+dm_assert( ! isset( $child['flow_config']['ai_step']['prompt_queue'] ), 'prompt_queue stripped from later steps too' );
+dm_assert( 'ai' === $child['flow_config']['ai_step']['step_type'], 'non-runtime step definition fields preserved' );
 
 // -----------------------------------------------------------------
 echo "\n[2] parent without agent_id — child gets null (not 0, not garbage)\n";

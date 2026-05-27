@@ -18,6 +18,7 @@ use DataMachine\Abilities\StepTypeAbilities;
 use DataMachine\Core\Admin\DateFormatter;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
+use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\WorkflowSpecValidator;
 
 defined( 'ABSPATH' ) || exit;

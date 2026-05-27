@@ -57,6 +57,7 @@ class JobArtifacts {
 			'required_tool_names'    => $this->tool_names_from_assertions( $engine_data['completion_assertions_required'] ?? array() ),
 			'satisfied_tool_names'   => $this->tool_names_from_assertions( $engine_data['completion_assertions_satisfied'] ?? array() ),
 			'successful_tool_calls'  => $tool_calls,
+			'tool_trace'            => $this->tool_trace( $engine_data, $additional_tool_summaries ),
 			'transcript'             => $this->transcript_metadata( $job_id, $engine_data ),
 			'agent_memory_artifacts' => $this->agent_memory_artifacts( $job, $agent, $tool_calls ),
 			'daily_memory_artifacts' => $this->daily_memory_artifacts( $job, $agent, $tool_calls ),
@@ -127,6 +128,25 @@ class JobArtifacts {
 		}
 
 		return $successes;
+	}
+
+	/**
+	 * Return generic redacted tool trace entries for all tool executions.
+	 *
+	 * @param array $engine_data               Job engine data.
+	 * @param array $additional_tool_summaries In-flight summaries supplied by a running loop.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function tool_trace( array $engine_data, array $additional_tool_summaries ): array {
+		$trace     = array();
+		$summaries = is_array( $engine_data['tool_execution_summary'] ?? null ) ? $engine_data['tool_execution_summary'] : array();
+		foreach ( array_merge( $summaries, $additional_tool_summaries ) as $summary ) {
+			if ( is_array( $summary ) && is_array( $summary['trace'] ?? null ) ) {
+				$trace[] = $summary['trace'];
+			}
+		}
+
+		return $trace;
 	}
 
 	/**

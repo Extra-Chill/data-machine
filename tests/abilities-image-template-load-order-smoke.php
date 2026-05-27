@@ -1,0 +1,288 @@
+<?php
+/**
+ * Regression smoke for #2290: `datamachine/render-image-template` must
+ * register on every request that touches the abilities API, including
+ * lite frontend requests where `datamachine_should_load_full_runtime()`
+ * returns false.
+ *
+ * Two kinds of assertions:
+ *
+ * 1. Source-string assertions — `data-machine.php` must call
+ *    `ImageTemplateAbilities::ensure_registered()` UNCONDITIONALLY at
+ *    file include time, NOT only inside the gated runtime function.
+ *
+ * 2. Behavioral assertions — `ImageTemplateAbilities::ensure_registered()`
+ *    must handle all three timing states defensively, matching the
+ *    pattern adopted for `AbilityCategories` in #2288.
+ *
+ * Run with: php tests/abilities-image-template-load-order-smoke.php
+ *
+ * @package DataMachine\Tests
+ */
+
+declare( strict_types = 1 );
+
+$failed = 0;
+$total  = 0;
+
+$assert = static function ( string $name, bool $condition ) use ( &$failed, &$total ): void {
+	++$total;
+	if ( $condition ) {
+		echo "  PASS: {$name}\n";
+		return;
+	}
+
+	echo "  FAIL: {$name}\n";
+	++$failed;
+};
+
+// ============================================================
+// Source-string assertions
+// ============================================================
+
+$plugin_root  = dirname( __DIR__ );
+$bootstrap    = file_get_contents( $plugin_root . '/data-machine.php' );
+$class_source = file_get_contents( $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php' );
+
+if ( false === $bootstrap || false === $class_source ) {
+	fwrite( STDERR, "FAIL: unable to read plugin source\n" );
+	exit( 1 );
+}
+
+$assert(
+	'data-machine.php calls ImageTemplateAbilities::ensure_registered() unconditionally at file load',
+	str_contains( $bootstrap, 'Register `datamachine/render-image-template` and' )
+		&& str_contains( $bootstrap, "require_once __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php';\n\\DataMachine\\Abilities\\Media\\ImageTemplateAbilities::ensure_registered();" )
+);
+
+$assert(
+	'unconditional call site is OUTSIDE datamachine_run_datamachine_plugin()',
+	(bool) preg_match(
+		'/^\\\\DataMachine\\\\Abilities\\\\AbilityCategories::ensure_registered\(\);\s*\n\s*\n\/\*\*\s*\*\s*Register `datamachine\/render-image-template`/m',
+		$bootstrap
+	)
+);
+
+$assert(
+	'in-runtime instantiation is still present (defensive idempotent path)',
+	str_contains( $bootstrap, "new \\DataMachine\\Abilities\\Media\\ImageTemplateAbilities();" )
+);
+
+// ============================================================
+// Behavioral assertions: defensive three-state pattern
+// ============================================================
+
+$assert(
+	'ensure_registered() handles doing_action state',
+	str_contains( $class_source, "doing_action( 'wp_abilities_api_init' )" )
+);
+
+$assert(
+	'ensure_registered() handles pre-action state',
+	str_contains( $class_source, "! did_action( 'wp_abilities_api_init' )" )
+		&& str_contains( $class_source, "add_action(\n\t\t\t\t'wp_abilities_api_init'" )
+);
+
+$assert(
+	'ensure_registered() handles post-action state via registry instance',
+	str_contains( $class_source, '\WP_Abilities_Registry::get_instance()' )
+		&& str_contains( $class_source, '$registry->register( $name, $args )' )
+);
+
+$assert(
+	'post-action recovery path is idempotent (skips already-registered abilities)',
+	str_contains( $class_source, '$registry->is_registered( $name )' )
+);
+
+$assert(
+	'ability definitions extracted into shared helper to avoid drift',
+	str_contains( $class_source, 'private static function get_ability_definitions(): array' )
+);
+
+// ============================================================
+// Behavioral simulation: load class under three stubbed states
+// ============================================================
+
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', '/tmp/' );
+}
+
+$GLOBALS['dm_2290_state'] = (object) array(
+	'doing'           => false,
+	'did'             => 0,
+	'hooked'          => array(),
+	'registered'      => array(),
+	'doing_it_wrong'  => 0,
+);
+
+if ( ! function_exists( '__' ) ) {
+	function __( $text, $domain = null ) {
+		return $text;
+	}
+}
+
+if ( ! function_exists( 'doing_action' ) ) {
+	function doing_action( $hook ) {
+		global $dm_2290_state;
+		return $dm_2290_state->doing && $hook === 'wp_abilities_api_init';
+	}
+}
+
+if ( ! function_exists( 'did_action' ) ) {
+	function did_action( $hook ) {
+		global $dm_2290_state;
+		return $hook === 'wp_abilities_api_init' ? $dm_2290_state->did : 0;
+	}
+}
+
+if ( ! function_exists( 'add_action' ) ) {
+	function add_action( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+		global $dm_2290_state;
+		$dm_2290_state->hooked[ $hook ][] = $callback;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_register_ability' ) ) {
+	function wp_register_ability( $name, $args ) {
+		global $dm_2290_state;
+		// Mirror core's guard: only succeed when doing_action(wp_abilities_api_init) is true.
+		if ( ! doing_action( 'wp_abilities_api_init' ) ) {
+			++$dm_2290_state->doing_it_wrong;
+			return null;
+		}
+		$dm_2290_state->registered[ $name ] = $args;
+		return true;
+	}
+}
+
+// Stub the abilities registry singleton for the post-action recovery test.
+if ( ! class_exists( 'WP_Abilities_Registry' ) ) {
+	class WP_Abilities_Registry {
+		/** @var array<string, array<string, mixed>> */
+		public array $registered = array();
+		private static ?self $instance = null;
+
+		public static function get_instance(): ?self {
+			if ( null === self::$instance ) {
+				self::$instance = new self();
+			}
+			return self::$instance;
+		}
+
+		public static function reset(): void {
+			self::$instance = null;
+		}
+
+		public function is_registered( string $name ): bool {
+			return isset( $this->registered[ $name ] );
+		}
+
+		public function register( string $name, array $args ): bool {
+			$this->registered[ $name ] = $args;
+			return true;
+		}
+	}
+}
+
+// Stub PermissionHelper which the ability definitions reference.
+if ( ! class_exists( 'DataMachine\\Abilities\\PermissionHelper' ) ) {
+	eval(
+		'namespace DataMachine\\Abilities;
+		class PermissionHelper {
+			public static function can_manage(): bool { return true; }
+		}'
+	);
+}
+
+require_once $plugin_root . '/inc/Abilities/Media/ImageTemplateAbilities.php';
+
+$reset = static function (): void {
+	global $dm_2290_state;
+	$dm_2290_state->doing          = false;
+	$dm_2290_state->did            = 0;
+	$dm_2290_state->hooked         = array();
+	$dm_2290_state->registered     = array();
+	$dm_2290_state->doing_it_wrong = 0;
+
+	$reflection = new ReflectionClass( \DataMachine\Abilities\Media\ImageTemplateAbilities::class );
+	$prop       = $reflection->getProperty( 'registered' );
+	$prop->setAccessible( true );
+	$prop->setValue( null, false );
+
+	WP_Abilities_Registry::reset();
+};
+
+// --- State 1: doing_action — register immediately.
+$reset();
+$GLOBALS['dm_2290_state']->doing = true;
+\DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
+$assert(
+	'state 1: when doing_action fires, abilities register immediately via wp_register_ability()',
+	isset( $GLOBALS['dm_2290_state']->registered['datamachine/render-image-template'] )
+		&& isset( $GLOBALS['dm_2290_state']->registered['datamachine/list-image-templates'] )
+		&& empty( $GLOBALS['dm_2290_state']->hooked )
+);
+
+// --- State 2: pre-action — hook for later.
+$reset();
+\DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
+$assert(
+	'state 2: when action has not fired, callback is hooked on wp_abilities_api_init',
+	isset( $GLOBALS['dm_2290_state']->hooked['wp_abilities_api_init'] )
+		&& count( $GLOBALS['dm_2290_state']->hooked['wp_abilities_api_init'] ) === 1
+		&& empty( $GLOBALS['dm_2290_state']->registered )
+);
+
+// --- State 3: post-action — register directly via registry instance.
+//
+// This is the #2290 scenario: a lite frontend request triggered the abilities
+// registry to instantiate and fire `wp_abilities_api_init` to completion
+// before the Data Machine plugin's `plugins_loaded` callback ran. Without
+// the recovery path, `wp_get_ability( 'datamachine/render-image-template' )`
+// would return `null` and emit `_doing_it_wrong`.
+$reset();
+$GLOBALS['dm_2290_state']->did = 1;
+\DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
+$registry = WP_Abilities_Registry::get_instance();
+$assert(
+	'state 3 (regression for #2290): when action already fired, abilities register directly via registry instance',
+	$registry instanceof WP_Abilities_Registry
+		&& $registry->is_registered( 'datamachine/render-image-template' )
+		&& $registry->is_registered( 'datamachine/list-image-templates' )
+);
+
+$assert(
+	'state 3: recovery path does not call wp_register_ability() (which would fire _doing_it_wrong)',
+	0 === $GLOBALS['dm_2290_state']->doing_it_wrong
+);
+
+$assert(
+	'state 3: recovery path does not double-hook the action',
+	empty( $GLOBALS['dm_2290_state']->hooked )
+);
+
+// --- Idempotency: a second ensure_registered() after success is a no-op.
+$prior_registered = $registry->registered;
+\DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
+$assert(
+	'idempotent: second ensure_registered() call is a no-op (static guard)',
+	$registry->registered === $prior_registered
+		&& 0 === $GLOBALS['dm_2290_state']->doing_it_wrong
+);
+
+// --- Constructor path still works (for the in-runtime defensive call site).
+$reset();
+$GLOBALS['dm_2290_state']->doing = true;
+new \DataMachine\Abilities\Media\ImageTemplateAbilities();
+$assert(
+	'constructor path: instantiating the class triggers ensure_registered()',
+	isset( $GLOBALS['dm_2290_state']->registered['datamachine/render-image-template'] )
+);
+
+if ( $failed > 0 ) {
+	fwrite( STDERR, "\nabilities-image-template-load-order-smoke: {$failed}/{$total} assertions failed\n" );
+	exit( 1 );
+}
+
+echo "\nAll {$total} abilities-image-template-load-order assertions passed.\n";

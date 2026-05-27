@@ -3,7 +3,7 @@
  * Plugin Name:     Data Machine
  * Plugin URI:      https://wordpress.org/plugins/data-machine/
  * Description:     AI-powered WordPress plugin for automated content workflows with visual pipeline builder and multi-provider AI integration.
- * Version:           0.132.4
+ * Version:           0.134.2
  * Requires at least: 7.0
  * Requires PHP:     8.2
  * Author:          Chris Huber, extrachill
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-define( 'DATAMACHINE_VERSION', '0.132.4' );
+define( 'DATAMACHINE_VERSION', '0.134.2' );
 
 define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
@@ -158,6 +158,10 @@ function datamachine_run_datamachine_plugin() {
 	\DataMachine\Core\Auth\ExternalLoginRouter::register();
 
 	// Register ability categories first — must happen before any ability registration.
+	// Categories are also registered unconditionally at file include time (see bottom
+	// of this file); this call is the defensive in-runtime path for late `plugins_loaded`
+	// inclusion (`plugin_sandbox_scrape()` during activation, etc.). The static guard in
+	// `AbilityCategories::register()` makes it idempotent.
 	require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';
 	\DataMachine\Abilities\AbilityCategories::ensure_registered();
 
@@ -286,6 +290,10 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Media\MediaAbilities();
 	new \DataMachine\Abilities\SEO\MetaDescriptionAbilities();
 	new \DataMachine\Abilities\SEO\IndexNowAbilities();
+	// Image-template abilities are also registered unconditionally at file
+	// include time (see bottom of this file). This call is the defensive
+	// in-runtime path for late `plugins_loaded` inclusion. The static guard
+	// in `ImageTemplateAbilities::ensure_registered()` makes it idempotent.
 	new \DataMachine\Abilities\Media\ImageTemplateAbilities();
 	new \DataMachine\Abilities\AgentCallAbilities();
 	new \DataMachine\Abilities\AgentRemoteCallAbilities();
@@ -444,7 +452,58 @@ if ( did_action( 'plugins_loaded' ) ) {
 	add_action( 'plugins_loaded', 'datamachine_run_datamachine_plugin', 20 );
 }
 
+/**
+ * Register ability categories unconditionally on every request.
+ *
+ * Categories are a cheap registration (~20 string entries) but they are a
+ * *contract* depended on by every Data Machine extension plugin
+ * (`data-machine-business`, `data-machine-socials`, etc.) and any consumer
+ * that calls `wp_register_ability( ..., [ 'category' => 'datamachine-*' ] )`.
+ *
+ * They MUST NOT be gated by `datamachine_should_load_full_runtime()` because
+ * extension plugins do not honour that gate — they instantiate their own
+ * ability classes at `plugins_loaded:20` regardless of request shape, and
+ * those abilities register against Data Machine categories. If the categories
+ * are missing when the lazy `wp_abilities_api_init` fire happens (e.g. when
+ * a frontend page calls `wp_get_ability()` via Frontend Agent Chat or an
+ * OG-card task), every extension ability registration triggers a
+ * `_doing_it_wrong` notice and the ability is silently dropped from the
+ * registry. See: Extra-Chill/data-machine#2287.
+ *
+ * Loading the file is cheap enough to do at file include time; calling
+ * `ensure_registered()` here attaches the `wp_abilities_api_categories_init`
+ * hook before `init` fires (the action cannot fire before `init`, so any
+ * later `plugins_loaded` priority works too — but earlier is safer for any
+ * site that includes our plugin file via `plugin_sandbox_scrape()` or
+ * similar late-load paths).
+ */
+require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';
+\DataMachine\Abilities\AbilityCategories::ensure_registered();
 
+/**
+ * Register `datamachine/render-image-template` and
+ * `datamachine/list-image-templates` unconditionally on every request.
+ *
+ * These abilities have consumers that fire on lite frontend page views —
+ * specifically `extrachill-multisite`'s OG-card generation task and
+ * `extrachill-events`'s event-roundup handler — neither of which runs in
+ * a request shape that flips `datamachine_should_load_full_runtime()` to
+ * true. Previously the class was only instantiated inside
+ * `datamachine_run_datamachine_plugin()`, so on a normal frontend page view
+ * the constructor never ran, the abilities never registered, and consumers
+ * got a `_doing_it_wrong` notice plus a `null` return from
+ * `wp_get_ability( 'datamachine/render-image-template' )`. The downstream
+ * effect was silent OG-card generation failures on subsite pages and a
+ * notice flood in debug.log. See: Extra-Chill/data-machine#2290.
+ *
+ * Registration is cheap (two ability definitions, both schema-only until
+ * actually executed). The class's `ensure_registered()` uses the same
+ * three-state defensive pattern as `AbilityCategories::ensure_registered()`
+ * adopted in #2288, so it tolerates the lazy abilities-registry
+ * instantiation race described there.
+ */
+require_once __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php';
+\DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
 
 
 /**
