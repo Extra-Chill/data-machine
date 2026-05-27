@@ -441,20 +441,22 @@ class JobsCommand extends BaseCommand {
 			$before = $this->decode_job_engine_data( $row['engine_data'] ?? null );
 			$after  = $this->strip_runtime_queues_from_engine_data( $before );
 
-			$before_bytes = strlen( wp_json_encode( $before ) ?: '' );
-			$after_bytes  = strlen( wp_json_encode( $after ) ?: '' );
+			$before_json  = wp_json_encode( $before );
+			$after_json   = wp_json_encode( $after );
+			$before_bytes = strlen( false === $before_json ? '' : $before_json );
+			$after_bytes  = strlen( false === $after_json ? '' : $after_json );
 			$changed      = $after !== $before;
 
 			$item = array(
-				'job_id'       => $job_id,
-				'flow_id'      => $row['flow_id'] ?? '',
-				'pipeline_id'  => $row['pipeline_id'] ?? '',
+				'job_id'        => $job_id,
+				'flow_id'       => $row['flow_id'] ?? '',
+				'pipeline_id'   => $row['pipeline_id'] ?? '',
 				'parent_job_id' => (int) ( $row['parent_job_id'] ?? 0 ),
-				'status'       => $row['status'] ?? '',
-				'before_bytes' => $before_bytes,
-				'after_bytes'  => $after_bytes,
-				'saved_bytes'  => max( 0, $before_bytes - $after_bytes ),
-				'action'       => $changed ? ( $apply ? 'updated' : 'would_update' ) : 'unchanged',
+				'status'        => $row['status'] ?? '',
+				'before_bytes'  => $before_bytes,
+				'after_bytes'   => $after_bytes,
+				'saved_bytes'   => max( 0, $before_bytes - $after_bytes ),
+				'action'        => $changed ? ( $apply ? 'updated' : 'would_update' ) : 'unchanged',
 			);
 
 			if ( $changed ) {
