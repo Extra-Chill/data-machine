@@ -71,12 +71,14 @@ use DataMachine\Engine\AI\IterationBudgetRegistry;
 use DataMachine\Engine\AI\WpAiClientCache;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
+use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
 use DataMachine\Core\OAuth\HttpBasicAuthProvider;
 use DataMachine\Core\PluginSettings;
 
 add_action( 'plugins_loaded', array( WpAiClientCache::class, 'install' ), 20 );
+ContentFormat::register();
 
 add_filter(
 	'datamachine_auth_providers',
