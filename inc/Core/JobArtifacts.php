@@ -57,7 +57,7 @@ class JobArtifacts {
 			'required_tool_names'    => $this->tool_names_from_assertions( $engine_data['completion_assertions_required'] ?? array() ),
 			'satisfied_tool_names'   => $this->tool_names_from_assertions( $engine_data['completion_assertions_satisfied'] ?? array() ),
 			'successful_tool_calls'  => $tool_calls,
-			'tool_trace'            => $this->tool_trace( $engine_data, $additional_tool_summaries ),
+			'tool_trace'             => $this->tool_trace( $engine_data, $additional_tool_summaries ),
 			'transcript'             => $this->transcript_metadata( $job_id, $engine_data ),
 			'agent_memory_artifacts' => $this->agent_memory_artifacts( $job, $agent, $tool_calls ),
 			'daily_memory_artifacts' => $this->daily_memory_artifacts( $job, $agent, $tool_calls ),
