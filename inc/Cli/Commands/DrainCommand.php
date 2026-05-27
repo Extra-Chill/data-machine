@@ -165,7 +165,11 @@ class DrainCommand extends BaseCommand {
 
 				$due_before    = self::getDuePendingCount( $hooks, $job_ids );
 				$status_before = self::getStatusCounts( $hooks, $job_ids );
-				$result        = self::runActionSchedulerBatch( $current_batch_size, $hooks, $job_ids );
+				$deadline_at   = 0;
+				if ( $time_limit > 0 ) {
+					$deadline_at = $started_at + max( 0, $time_limit - $stop_before_timeout );
+				}
+				$result        = self::runActionSchedulerBatch( $current_batch_size, $hooks, $job_ids, $deadline_at );
 				++$batches;
 
 				if ( 0 !== (int) ( $result->return_code ?? 1 ) ) {
@@ -178,6 +182,10 @@ class DrainCommand extends BaseCommand {
 
 				$status_after = self::getStatusCounts( $hooks, $job_ids );
 				$progress     = self::processedDelta( $status_before, $status_after );
+				if ( '' !== (string) ( $result->stop_reason ?? '' ) ) {
+					$stop_reason = (string) $result->stop_reason;
+					break;
+				}
 				if ( 0 === $progress && self::getDuePendingCount( $hooks, $job_ids ) >= $due_before ) {
 					++$warnings;
 					WP_CLI::warning( 'Drain stopped because Action Scheduler made no observable progress.' );
@@ -290,11 +298,12 @@ class DrainCommand extends BaseCommand {
 	 * @param int[]         $job_ids    Optional job ID scope.
 	 * @return object Result object with return_code and stderr fields.
 	 */
-	private static function runActionSchedulerBatch( int $batch_size, ?array $hooks = null, array $job_ids = array() ): object {
+	private static function runActionSchedulerBatch( int $batch_size, ?array $hooks = null, array $job_ids = array(), int $deadline_at = 0 ): object {
 		$store    = \ActionScheduler_Store::instance();
 		$runner   = \ActionScheduler::runner();
 		$warnings = array();
 		$claim    = null;
+		$stop_reason = '';
 
 		try {
 			self::runActionSchedulerTimeoutCleanup( $store );
@@ -309,6 +318,11 @@ class DrainCommand extends BaseCommand {
 
 		try {
 			foreach ( $claim->get_actions() as $action_id ) {
+				if ( $deadline_at > 0 && time() >= $deadline_at ) {
+					$stop_reason = 'timeout_margin';
+					break;
+				}
+
 				if ( self::isMemorySoftLimitReached() ) {
 					$warnings[] = 'Drain stopped before processing the next action because PHP memory usage reached the soft limit.';
 					break;
@@ -342,7 +356,7 @@ class DrainCommand extends BaseCommand {
 			$store->release_claim( $claim );
 		}
 
-		$stop_reason = self::warningsContainMemoryLimit( $warnings ) ? 'memory_limit' : '';
+		$stop_reason = self::warningsContainMemoryLimit( $warnings ) ? 'memory_limit' : $stop_reason;
 
 		return (object) array(
 			'return_code' => empty( $warnings ) ? 0 : 1,
