@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.133.4] - 2026-05-27
+
+### Fixed
+- harden worker memory and lock cleanup
+
 ## [0.133.3] - 2026-05-27
 
 ### Fixed
