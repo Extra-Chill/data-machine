@@ -839,12 +839,12 @@
 /* Date Group Container */
 .data-machine-events-calendar .data-machine-date-group {
     display: block;
-    margin-bottom: 0.5rem;
+    margin-bottom: 1.25rem;
     border-radius: var(--data-machine-border-radius);
     border: 1px solid var(--data-machine-border-light);
     position: relative;
-    padding-top: 24px;
-    padding-bottom: 1rem;
+    padding-top: 40px;
+    padding-bottom: 2.5rem;
 }
 
 /* Day-specific border colors for date groups */
@@ -861,7 +861,7 @@
     display: flex;
     flex-wrap: nowrap;
     gap: var(--data-machine-grid-gap);
-    padding: 0.75rem;
+    padding: 1.5rem;
     overflow-x: auto;
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
@@ -905,7 +905,7 @@
     content: 'More';
     position: absolute;
     right: 0;
-    top: 24px;
+    top: 40px;
     bottom: 0;
     width: 60px;
     background: linear-gradient(to right, transparent, var(--data-machine-scroll-gradient-color) 70%);
