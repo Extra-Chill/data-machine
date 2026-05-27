@@ -516,6 +516,7 @@ function datamachine_load_step_types() {
 	new \DataMachine\Core\Steps\Upsert\UpsertStep();
 	new \DataMachine\Core\Steps\AI\AIStep();
 	new \DataMachine\Core\Steps\WebhookGate\WebhookGateStep();
+	new \DataMachine\Core\Steps\Ability\AbilityStep();
 	new \DataMachine\Core\Steps\SystemTask\SystemTaskStep();
 }
 
