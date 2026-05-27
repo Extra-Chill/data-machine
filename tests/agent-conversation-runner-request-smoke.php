@@ -94,6 +94,16 @@ class RunnerRequestSmokeTool {
 	}
 }
 
+class SandboxPipelineSmokeTool {
+	public function execute( array $params ): array {
+		return array(
+			'success' => true,
+			'path'    => (string) ( $params['path'] ?? '' ),
+			'content' => 'sandbox file content',
+		);
+	}
+}
+
 class RunnerRequestSmokeTranscriptPersister implements WP_Agent_Transcript_Persister {
 	public array $calls = array();
 
@@ -278,7 +288,86 @@ assert_runner_request( ! empty( $mid_failure_transcript->calls ), 'mid-conversat
 assert_runner_request( str_contains( (string) ( $last_failure_transcript_call['result']['error'] ?? '' ), 'provider offline after tool' ), 'failure transcript result includes provider error' );
 assert_runner_request( 2 === ( $last_failure_transcript_call['result']['turn_count'] ?? null ), 'failure transcript result includes latest turn count' );
 
-// 4. Client runtime tools are fulfilled by the transport callback, not PHP ToolExecutor.
+// 4. Sandbox/pipeline runs expose parsed function calls even after the final no-tool turn.
+$sandbox_dispatch_count = 0;
+$sandbox_requests       = array();
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function ( array $request_body ) use ( &$sandbox_dispatch_count, &$sandbox_requests ) {
+		++$sandbox_dispatch_count;
+		$sandbox_requests[] = $request_body;
+
+		if ( 1 === $sandbox_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => '',
+					'tool_calls' => array(
+						array(
+							'id'         => 'sandbox-call-1',
+							'name'       => 'workspace_read',
+							'parameters' => array( 'path' => 'README.md' ),
+						),
+					),
+					'usage'      => array(
+						'prompt_tokens'     => 7,
+						'completion_tokens' => 8,
+						'total_tokens'      => 15,
+					),
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => 'sandbox tool complete',
+				'tool_calls' => array(),
+				'usage'      => array(
+					'prompt_tokens'     => 2,
+					'completion_tokens' => 3,
+					'total_tokens'      => 5,
+				),
+			),
+		);
+	}
+);
+
+$sandbox_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'read the sandbox README' ) ),
+	array(
+		'workspace_read' => array(
+			'name'        => 'workspace_read',
+			'description' => 'Read a file from the sandbox workspace.',
+			'parameters'  => array(
+				'type'       => 'object',
+				'properties' => array(
+					'path' => array( 'type' => 'string' ),
+				),
+				'required'   => array( 'path' ),
+			),
+			'class'       => SandboxPipelineSmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array( 'sandbox', 'pipeline' ),
+	array(),
+	3
+);
+
+assert_runner_request( 2 === $sandbox_dispatch_count, 'sandbox/pipeline function call returns to provider for final answer' );
+assert_runner_request( isset( $sandbox_requests[0]['tools']['workspace_read'] ), 'sandbox/pipeline request sends workspace tool declaration' );
+assert_runner_request( 'sandbox tool complete' === ( $sandbox_result['final_content'] ?? null ), 'sandbox/pipeline run preserves final no-tool answer' );
+assert_runner_request( array() === ( $sandbox_result['last_tool_calls'] ?? null ), 'last_tool_calls reflects the final no-tool turn' );
+assert_runner_request( 1 === count( $sandbox_result['tool_calls'] ?? array() ), 'tool_calls preserves parsed calls from earlier turns' );
+assert_runner_request( 'workspace_read' === ( $sandbox_result['tool_calls'][0]['name'] ?? null ), 'tool_calls records the parsed workspace tool name' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $sandbox_result['tool_calls'][0]['parameters'] ?? null ), 'tool_calls records parsed workspace tool parameters' );
+assert_runner_request( 1 === count( $sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline function call executes a workspace tool' );
+assert_runner_request( 'README.md' === ( $sandbox_result['tool_execution_results'][0]['result']['path'] ?? null ), 'sandbox/pipeline tool execution receives parsed parameters' );
+
+// 5. Client runtime tools are fulfilled by the transport callback, not PHP ToolExecutor.
 $runtime_dispatch_count = 0;
 $runtime_requests       = array();
 $runtime_sink           = new RunnerRequestSmokeSink();

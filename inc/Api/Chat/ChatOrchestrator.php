@@ -300,7 +300,7 @@ class ChatOrchestrator {
 		$response_data = array(
 			'session_id'   => $session_id,
 			'response'     => $result['final_content'],
-			'tool_calls'   => $result['last_tool_calls'],
+			'tool_calls'   => $result['tool_calls'] ?? $result['last_tool_calls'],
 			'conversation' => $result['messages'],
 			'metadata'     => $metadata,
 			'completed'    => $is_completed,
@@ -872,6 +872,7 @@ class ChatOrchestrator {
 				'final_content'                 => $loop_result['final_content'],
 				'completed'                     => $loop_result['completed'] ?? false,
 				'turn_count'                    => $loop_result['turn_count'] ?? 1,
+				'tool_calls'                    => $loop_result['tool_calls'] ?? array(),
 				'last_tool_calls'               => $loop_result['last_tool_calls'] ?? array(),
 				'warning'                       => $loop_result['warning'] ?? null,
 				'max_turns_reached'             => $loop_result['max_turns_reached'] ?? false,
