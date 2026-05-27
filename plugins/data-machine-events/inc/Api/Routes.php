@@ -5,27 +5,6 @@ defined( 'ABSPATH' ) || exit;
 
 const API_NAMESPACE = 'datamachine/v1';
 
-// Ensure controllers are loaded when composer autoloader is not present
-if ( defined( 'DATA_MACHINE_EVENTS_PLUGIN_DIR' ) ) {
-	$controllers = array(
-		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/BrowserNavigationGuard.php',
-		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Calendar.php',
-		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Venues.php',
-		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Events.php',
-		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/EventIcs.php',
-		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Filters.php',
-		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/Geocoding.php',
-		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Controllers/VenueMap.php',
-		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/EventActions/CalendarUrlBuilder.php',
-		DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/EventActions/IcsBuilder.php',
-	);
-	foreach ( $controllers as $file ) {
-		if ( file_exists( $file ) ) {
-			require_once $file;
-		}
-	}
-}
-
 use DataMachineEvents\Api\Controllers\Calendar;
 use DataMachineEvents\Api\Controllers\Venues;
 use DataMachineEvents\Api\Controllers\EventIcs;
@@ -217,7 +196,7 @@ function register_routes() {
 			'callback'            => array( $filters, 'get' ),
 			'permission_callback' => '__return_true',
 			'args'                => array(
-				'active'     => array(
+				'active'           => array(
 					'type'              => 'object',
 					'default'           => array(),
 					'sanitize_callback' => function ( $value ) {
@@ -232,21 +211,47 @@ function register_routes() {
 						return $sanitized;
 					},
 				),
-				'context'    => array(
+				'context'          => array(
 					'type'              => 'string',
 					'default'           => 'modal',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
-				'date_start' => array(
+				'date_start'       => array(
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
-				'date_end'   => array(
+				'date_end'         => array(
 					'type'              => 'string',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
-				'past'       => array(
+				'past'             => array(
 					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+				'archive_taxonomy' => array(
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_key',
+				),
+				'archive_term_id'  => array(
+					'type'              => 'integer',
+					'sanitize_callback' => 'absint',
+				),
+				'lat'              => array(
+					'type'              => 'number',
+					'sanitize_callback' => 'floatval',
+				),
+				'lng'              => array(
+					'type'              => 'number',
+					'sanitize_callback' => 'floatval',
+				),
+				'radius'           => array(
+					'type'              => 'integer',
+					'default'           => 25,
+					'sanitize_callback' => 'absint',
+				),
+				'radius_unit'      => array(
+					'type'              => 'string',
+					'default'           => 'mi',
 					'sanitize_callback' => 'sanitize_text_field',
 				),
 			),
