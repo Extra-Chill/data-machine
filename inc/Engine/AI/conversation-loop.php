@@ -521,7 +521,7 @@ function datamachine_build_turn_runner(
 			foreach ( $tool_calls as $tool_call ) {
 				$tool_name       = $tool_call['name'];
 				$tool_parameters = $tool_call['parameters'];
-				$tool_started_at  = microtime( true );
+				$tool_started_at = microtime( true );
 
 				if ( empty( $tool_name ) ) {
 					do_action(
@@ -631,7 +631,7 @@ function datamachine_build_turn_runner(
 				}
 
 				if ( ! empty( $tool_result['pending'] ) && is_array( $tool_result['runtime_tool_request'] ?? null ) ) {
-					$tool_trace            = datamachine_build_tool_trace( $tool_name, $tool_call, $tool_parameters, $tool_result, is_array( $tool_def ) ? $tool_def : null, $turn_count, $tool_started_at, microtime( true ) );
+					$tool_trace               = datamachine_build_tool_trace( $tool_name, $tool_call, $tool_parameters, $tool_result, is_array( $tool_def ) ? $tool_def : null, $turn_count, $tool_started_at, microtime( true ) );
 					$runtime_tool_pending     = true;
 					$runtime_pending_turn     = true;
 					$conversation_complete    = true;
