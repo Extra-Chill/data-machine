@@ -186,6 +186,106 @@ class CheckOrphanVenuesCommandTest extends WP_UnitTestCase {
 		$this->assertGreaterThanOrEqual( 1, (int) $refreshed->count );
 	}
 
+	/**
+	 * Regression for issue #284: the count_refreshed action must
+	 * actually persist the refreshed value into `wp_term_taxonomy.count`.
+	 *
+	 * Asserts via a fresh `$wpdb->get_var` query rather than
+	 * `get_term()` so the test cannot be satisfied by a cached value
+	 * — the DB column itself must be updated.
+	 */
+	public function test_count_refreshed_actually_persists_in_term_taxonomy(): void {
+		global $wpdb;
+
+		$term_id = $this->make_venue( 'Persisted Refresh Venue' );
+
+		// Two real relationships against publish-status event posts.
+		$this->make_event_with_venue( 'Event A', $term_id );
+		$this->make_event_with_venue( 'Event B', $term_id );
+
+		// Force the cached count to lie about reality.
+		$wpdb->update(
+			$wpdb->term_taxonomy,
+			array( 'count' => 0 ),
+			array(
+				'term_id'  => $term_id,
+				'taxonomy' => 'venue',
+			),
+			array( '%d' ),
+			array( '%d', '%s' )
+		);
+		clean_term_cache( array( $term_id ), 'venue' );
+
+		// Sanity: cache is now stale (0) but real relationships = 2.
+		$cached_before = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT count FROM {$wpdb->term_taxonomy}
+				 WHERE term_id = %d AND taxonomy = 'venue'",
+				$term_id
+			)
+		);
+		$this->assertSame( 0, $cached_before, 'precondition: stale cache should read 0' );
+
+		$cmd = new CheckOrphanVenuesCommand();
+		$this->run( $cmd, array( 'apply' => true ) );
+
+		// Fresh DB read — must reflect the real count (2), not the stale 0.
+		$cached_after = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT count FROM {$wpdb->term_taxonomy}
+				 WHERE term_id = %d AND taxonomy = 'venue'",
+				$term_id
+			)
+		);
+		$this->assertSame(
+			2,
+			$cached_after,
+			'count_refreshed must persist real_count to wp_term_taxonomy.count'
+		);
+	}
+
+	/**
+	 * Regression for issue #284: after the refresh write, the WP
+	 * object cache layer must be invalidated so the next get_term()
+	 * call returns the fresh value rather than the previously cached
+	 * stale value.
+	 */
+	public function test_count_refresh_invalidates_object_cache(): void {
+		$term_id = $this->make_venue( 'Cache Invalidation Venue' );
+
+		$this->make_event_with_venue( 'Event A', $term_id );
+		$this->make_event_with_venue( 'Event B', $term_id );
+
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->term_taxonomy,
+			array( 'count' => 0 ),
+			array(
+				'term_id'  => $term_id,
+				'taxonomy' => 'venue',
+			),
+			array( '%d' ),
+			array( '%d', '%s' )
+		);
+
+		// Prime caches with the stale value so we can prove invalidation.
+		clean_term_cache( array( $term_id ), 'venue' );
+		$primed = get_term( $term_id, 'venue' );
+		$this->assertSame( 0, (int) $primed->count, 'precondition: primed cache reads 0' );
+
+		$cmd = new CheckOrphanVenuesCommand();
+		$this->run( $cmd, array( 'apply' => true ) );
+
+		// get_term() must now return the fresh value (2) — proves both
+		// the DB write AND the cache invalidation worked together.
+		$refreshed = get_term( $term_id, 'venue' );
+		$this->assertSame(
+			2,
+			(int) $refreshed->count,
+			'get_term() must return the refreshed count, not the stale cached value'
+		);
+	}
+
 	public function test_protects_orphan_referenced_by_active_flow(): void {
 		$term_id = $this->make_venue( 'Flow-Referenced Orphan' );
 

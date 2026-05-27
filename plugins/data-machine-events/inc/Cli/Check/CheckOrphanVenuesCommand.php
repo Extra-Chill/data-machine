@@ -229,7 +229,11 @@ class CheckOrphanVenuesCommand {
 
 		if ( $real_count > 0 ) {
 			if ( ! $dry_run ) {
-				wp_update_term_count_now( array( (int) $term->term_taxonomy_id ), 'venue' );
+				$this->persist_refreshed_count(
+					(int) $term->term_id,
+					(int) $term->term_taxonomy_id,
+					$real_count
+				);
 			}
 			$row['action_taken'] = 'count_refreshed';
 			$row['reason']       = sprintf( 'stale cache: %d real relationships found', $real_count );
@@ -320,6 +324,47 @@ class CheckOrphanVenuesCommand {
 		$row['action_taken'] = 'flagged';
 		$row['reason']       = 'real orphan; flag-only (operator decides deletion)';
 		return $row;
+	}
+
+	/**
+	 * Persist a refreshed `wp_term_taxonomy.count` value for a term
+	 * whose cache was stale (count=0 with real relationship rows).
+	 *
+	 * Issue #284: `wp_update_term_count_now()` calls were observed to
+	 * not actually persist on production — 99 stale-cache terms were
+	 * detected, the function was called against each, but the cached
+	 * `count` column did not move. The exact failure mode (object-cache
+	 * interception, taxonomy-callback indirection, post-status filter
+	 * mismatch) is hard to pin down across environments, so we bypass
+	 * the WP helper entirely:
+	 *
+	 *   1. Write the real count directly to `wp_term_taxonomy.count`
+	 *      via `$wpdb->update()`. This sidesteps any custom
+	 *      `update_count_callback` registered against the taxonomy
+	 *      and any post-status filtering applied by the default
+	 *      counter.
+	 *   2. Invalidate the surrounding term + object cache so the next
+	 *      `get_term()` call reads the fresh DB value rather than the
+	 *      stale cached value.
+	 *
+	 * @param int $term_id          Venue term ID.
+	 * @param int $term_taxonomy_id Venue term_taxonomy_id.
+	 * @param int $real_count       Real relationship count for the term.
+	 * @return void
+	 */
+	private function persist_refreshed_count( int $term_id, int $term_taxonomy_id, int $real_count ): void {
+		global $wpdb;
+
+		$wpdb->update(
+			$wpdb->term_taxonomy,
+			array( 'count' => $real_count ),
+			array( 'term_taxonomy_id' => $term_taxonomy_id ),
+			array( '%d' ),
+			array( '%d' )
+		);
+
+		clean_term_cache( $term_id, 'venue', true );
+		wp_cache_delete( $term_id, 'terms' );
 	}
 
 	/**
