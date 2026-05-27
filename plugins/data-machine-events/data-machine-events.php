@@ -88,6 +88,9 @@ if ( ! function_exists( 'datamachine_get_event_timing' ) ) {
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/performance.php';
 \DataMachineEvents\Core\cache_last_post_time();
 
+// Load retention policy overrides (tightens Data Machine core defaults for this site's volume).
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/retention.php';
+
 	// Load REST API routes (modular)
 if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
 	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php';
