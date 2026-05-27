@@ -1,5 +1,11 @@
 /**
- * Past/upcoming navigation and pagination link handling.
+ * Past/upcoming navigation.
+ *
+ * Pagination behavior moved to `load-more.ts` (issue #314, phase 2 of
+ * #298). The legacy `<nav class="data-machine-events-pagination">` is
+ * still server-rendered as a no-JS fallback, but it's replaced with a
+ * Load More button on JS-enabled mount before any click handlers
+ * could fire.
  */
 
 /**
@@ -32,7 +38,6 @@ export function initNavigation(
 	onNavigate: ( params: URLSearchParams ) => void
 ): void {
 	initPastUpcomingButtons( calendar, onNavigate );
-	initPaginationLinks( calendar, onNavigate );
 }
 
 function initPastUpcomingButtons(
@@ -81,31 +86,4 @@ function initPastUpcomingButtons(
 	} );
 }
 
-function initPaginationLinks(
-	calendar: HTMLElement,
-	onNavigate: ( params: URLSearchParams ) => void
-): void {
-	const paginationContainer = calendar.querySelector< HTMLElement >(
-		'.data-machine-events-pagination'
-	);
-	if ( ! paginationContainer ) {
-		return;
-	}
 
-	paginationContainer.addEventListener( 'click', function ( e: Event ) {
-		const target = e.target as HTMLElement;
-		const link = target.closest< HTMLAnchorElement >( 'a' );
-		if ( ! link ) {
-			return;
-		}
-
-		e.preventDefault();
-
-		const url = new URL( link.href );
-		const params = new URLSearchParams( url.search );
-
-		if ( onNavigate ) {
-			onNavigate( params );
-		}
-	} );
-}

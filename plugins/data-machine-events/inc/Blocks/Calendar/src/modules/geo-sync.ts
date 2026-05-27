@@ -37,7 +37,6 @@ interface BoundsChangedDetail {
  */
 interface GeoSyncState {
 	handler: ( e: Event ) => void;
-	paginationHandler: ( e: Event ) => void;
 	currentGeo: GeoContext | null;
 }
 
@@ -56,7 +55,6 @@ export function initGeoSync( calendar: HTMLElement ): void {
 
 	const state: GeoSyncState = {
 		handler: createBoundsHandler( calendar ),
-		paginationHandler: createPaginationHandler( calendar ),
 		currentGeo: null,
 	};
 
@@ -67,13 +65,10 @@ export function initGeoSync( calendar: HTMLElement ): void {
 		state.handler
 	);
 
-	// Single delegated pagination listener — registered once at init,
-	// scoped to `.data-machine-events-pagination a` clicks inside this
-	// calendar. Survives `outerHTML` swaps of the pagination container
-	// (and any future in-place updates) without re-binding. Geo state is
-	// looked up at click time from `instances.get(calendar).currentGeo`,
-	// not captured in the closure, so it's always current.
-	calendar.addEventListener( 'click', state.paginationHandler );
+	// Pagination is now owned by `load-more.ts` (issue #314). Load More
+	// reads geo state from the URL via `buildCalendarRequest()` after
+	// `fetchAndUpdate()` pushState-writes lat/lng/radius — geo + Load
+	// More compose naturally without a dedicated handler here.
 }
 
 /**
@@ -89,8 +84,6 @@ export function destroyGeoSync( calendar: HTMLElement ): void {
 		'data-machine-map-bounds-changed',
 		state.handler
 	);
-
-	calendar.removeEventListener( 'click', state.paginationHandler );
 
 	instances.delete( calendar );
 }
@@ -191,8 +184,10 @@ async function fetchAndUpdate(
 	// event that fetchCalendarEvents fires after swapping innerHTML. This
 	// module does not destroy or re-init dynamic UI directly — single owner.
 	//
-	// Pagination clicks are handled by the delegated listener registered
-	// once in initGeoSync — no rebinding needed after content swaps.
+	// Pagination ownership moved to `load-more.ts` (issue #314). Geo
+	// updates flow into Load More through the URL (pushed by
+	// `filterState.updateUrl()` above) — the next Load More click reads
+	// fresh geo via `buildCalendarRequest()`.
 	await fetchCalendarEvents( calendar, params, archiveContext );
 }
 
@@ -233,58 +228,4 @@ function boundsToRadius(
 	return Math.max( 1, Math.min( 500, Math.round( distance ) ) );
 }
 
-/**
- * Build a delegated click handler for pagination links inside the
- * calendar wrapper. Registered once at init time on the calendar
- * element itself, so it survives `outerHTML` swaps of the pagination
- * container (and any future in-place updates) without rebinding.
- *
- * Geo state is looked up at click time from `instances.get(calendar)`
- * — never captured in the closure — so the handler always sees the
- * latest geo from the most recent map pan.
- */
-function createPaginationHandler(
-	calendar: HTMLElement
-): ( e: Event ) => void {
-	return function ( e: Event ): void {
-		const target = e.target as HTMLElement | null;
-		if ( ! target ) {
-			return;
-		}
 
-		const link = target.closest< HTMLAnchorElement >(
-			'.data-machine-events-pagination a'
-		);
-		if ( ! link || ! calendar.contains( link ) ) {
-			return;
-		}
-
-		e.preventDefault();
-		e.stopPropagation();
-
-		const url = new URL( link.href );
-		const linkParams = new URLSearchParams( url.search );
-
-		// Inject current geo into the pagination request — read live
-		// from the instance map, not a stale closure capture.
-		const geo = instances.get( calendar )?.currentGeo;
-		if ( geo?.lat && geo.lng ) {
-			linkParams.set( 'lat', geo.lat );
-			linkParams.set( 'lng', geo.lng );
-			linkParams.set( 'radius', String( geo.radius ) );
-			linkParams.set( 'radius_unit', geo.radius_unit );
-		}
-
-		const filterState = getFilterState( calendar );
-		filterState.updateUrl( linkParams );
-
-		// Module lifecycle handled by frontend.ts via the
-		// `data-machine-calendar-content-updated` event. No rebind here:
-		// this listener is delegated and survives content swaps.
-		fetchCalendarEvents(
-			calendar,
-			linkParams,
-			filterState.getArchiveContext()
-		);
-	};
-}

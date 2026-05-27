@@ -34,6 +34,7 @@ import {
 	destroyMonthGridNav,
 	getMonthGridController,
 } from './modules/month-grid-nav';
+import { initLoadMore, destroyLoadMore } from './modules/load-more';
 
 import type { FlatpickrInstance } from './types';
 
@@ -98,6 +99,21 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 	// Auto-detect map block on page and enable geo sync.
 	if ( hasMapBlockOnPage() ) {
 		initGeoSync( calendar );
+	}
+
+	// Replace numbered pagination with a "Load More Events" button on
+	// JS-enabled mount (issue #314, phase 2 of #298). The server still
+	// emits paginate_links() as a no-JS fallback; this hydrates it into
+	// the Load More UX.
+	//
+	// List/date-groups mode ONLY. Month-grid mode (#321) uses the
+	// month-grid-nav module's prev/next-month controls and does not
+	// render `.data-machine-events-pagination` server-side, so
+	// `initLoadMore` would be a no-op there anyway — but gating
+	// explicitly is clearer and survives future grid-mode changes
+	// that might add pagination chrome.
+	if ( ! gridMode ) {
+		initLoadMore( calendar );
 	}
 
 	filterState.updateFilterCountBadge();
@@ -214,6 +230,7 @@ window.addEventListener( 'beforeunload', function () {
 			destroyDayLoader( calendar );
 			destroyGeoSync( calendar );
 			destroyMonthGridNav( calendar );
+			destroyLoadMore( calendar );
 			destroyFilterState( calendar );
 		} );
 } );
