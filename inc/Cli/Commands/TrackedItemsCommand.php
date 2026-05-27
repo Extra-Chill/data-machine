@@ -8,6 +8,7 @@
 namespace DataMachine\Cli\Commands;
 
 use DataMachine\Abilities\TrackedItemsAbilities;
+use DataMachine\Cli\BaseCommand;
 use WP_CLI;
 
 defined( 'ABSPATH' ) || exit;
