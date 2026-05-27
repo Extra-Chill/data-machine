@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.40.1] - 2026-05-27
+
+### Fixed
+- revert #309 chrome density pass, keep single-row + gap-chip (closes #329)
+
 ## [0.40.0] - 2026-05-27
 
 ### Added
