@@ -7,6 +7,7 @@
 
 namespace DataMachine\Abilities;
 
+use DataMachine\Core\Database\TrackedItems\TrackedItems;
 use DataMachine\Core\SourceAggregation\PageableSourceAggregator;
 use DataMachine\Core\SourceAggregation\SourceInventoryProfiler;
 
@@ -16,7 +17,11 @@ class SourceInventoryAbility {
 
 	private static bool $registered = false;
 
-	public function __construct() {
+	private ?TrackedItems $tracked_items;
+
+	public function __construct( ?TrackedItems $tracked_items = null ) {
+		$this->tracked_items = $tracked_items;
+
 		if ( self::$registered ) {
 			return;
 		}
@@ -77,10 +82,19 @@ class SourceInventoryAbility {
 				return $result;
 			}
 
-			$config           = $input;
-			$config['params'] = is_array( $source['params'] ?? null ) ? $source['params'] : array();
+			$aggregator        = new PageableSourceAggregator();
+			$config            = $input;
+			$config['params']  = is_array( $source['params'] ?? null ) ? $source['params'] : array();
+			$tracking_callback = $this->buildTrackingCallback( $input, $aggregator );
+			if ( null !== $tracking_callback ) {
+				$config['item_callback'] = $tracking_callback;
+			}
 
-			$scan           = ( new PageableSourceAggregator() )->aggregate( $page_callback, $config );
+			$scan = $aggregator->aggregate( $page_callback, $config );
+			if ( isset( $scan['item_callback'] ) ) {
+				$scan['tracked_items'] = $scan['item_callback'];
+				unset( $scan['item_callback'] );
+			}
 			$result['scan'] = array_merge( array( 'success' => true ), $scan );
 		}
 
@@ -111,6 +125,64 @@ class SourceInventoryAbility {
 		}
 
 		return null;
+	}
+
+	private function buildTrackingCallback( array $input, PageableSourceAggregator $aggregator ): ?callable {
+		$tracking  = is_array( $input['track_items'] ?? null ) ? $input['track_items'] : array();
+		$namespace = trim( (string) ( $tracking['namespace'] ?? '' ) );
+		if ( '' === $namespace ) {
+			return null;
+		}
+
+		$repository   = $this->tracked_items ?? new TrackedItems();
+		$item_id_path = (string) ( $tracking['item_id_path'] ?? 'id' );
+
+		return static function ( array $item ) use ( $tracking, $namespace, $item_id_path, $repository, $aggregator ): bool {
+			$item_id = $aggregator->getPath( $item, $item_id_path );
+			if ( null === $item_id || '' === (string) $item_id ) {
+				return false;
+			}
+
+			$tracked_item = array(
+				'namespace'       => $namespace,
+				'item_id'         => (string) $item_id,
+				'item_type'       => (string) ( $tracking['item_type'] ?? '' ),
+				'state'           => (string) ( $tracking['state'] ?? TrackedItems::STATE_DISCOVERED ),
+				'source_ref'      => (string) ( $tracking['source_ref'] ?? '' ),
+				'source_revision' => (string) ( $tracking['source_revision'] ?? '' ),
+				'source_path'     => (string) ( $tracking['source_path'] ?? '' ),
+				'source_line'     => max( 0, (int) ( $tracking['source_line'] ?? 0 ) ),
+				'output_ref'      => (string) ( $tracking['output_ref'] ?? '' ),
+				'last_job_id'     => max( 0, (int) ( $tracking['last_job_id'] ?? 0 ) ),
+			);
+
+			foreach ( array( 'item_type', 'source_ref', 'source_revision', 'source_path', 'source_line', 'output_ref' ) as $field ) {
+				$path = (string) ( $tracking[ $field . '_path' ] ?? '' );
+				if ( '' === $path ) {
+					continue;
+				}
+
+				$value = $aggregator->getPath( $item, $path );
+				if ( null !== $value ) {
+					$tracked_item[ $field ] = $value;
+				}
+			}
+
+			$metadata_paths = is_array( $tracking['metadata_paths'] ?? null ) ? $tracking['metadata_paths'] : array();
+			foreach ( $metadata_paths as $metadata_key => $path ) {
+				$metadata_key = trim( (string) $metadata_key );
+				if ( '' === $metadata_key ) {
+					continue;
+				}
+
+				$value = $aggregator->getPath( $item, (string) $path );
+				if ( null !== $value ) {
+					$tracked_item['metadata'][ $metadata_key ] = $value;
+				}
+			}
+
+			return null !== $repository->upsert( $tracked_item );
+		};
 	}
 
 	private function getInputSchema(): array {
@@ -146,6 +218,25 @@ class SourceInventoryAbility {
 				'sample_limit_per_bucket' => array( 'type' => 'integer' ),
 				'max_items'               => array( 'type' => 'integer' ),
 				'max_pages'               => array( 'type' => 'integer' ),
+				'track_items'             => array(
+					'type'        => 'object',
+					'description' => 'When provided with scan=true, upsert each scanned item into the generic tracked-items ledger using path-based field mapping.',
+					'properties'  => array(
+						'namespace'            => array( 'type' => 'string' ),
+						'item_id_path'         => array( 'type' => 'string' ),
+						'item_type'            => array( 'type' => 'string' ),
+						'item_type_path'       => array( 'type' => 'string' ),
+						'state'                => array( 'type' => 'string' ),
+						'source_ref'           => array( 'type' => 'string' ),
+						'source_ref_path'      => array( 'type' => 'string' ),
+						'source_revision_path' => array( 'type' => 'string' ),
+						'source_path_path'     => array( 'type' => 'string' ),
+						'source_line_path'     => array( 'type' => 'string' ),
+						'output_ref_path'      => array( 'type' => 'string' ),
+						'metadata_paths'       => array( 'type' => 'object' ),
+						'last_job_id'          => array( 'type' => 'integer' ),
+					),
+				),
 			),
 		);
 	}
