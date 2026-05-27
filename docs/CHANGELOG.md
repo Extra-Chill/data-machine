@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.133.1] - 2026-05-27
+
+### Fixed
+- hoist image-template registration out of runtime gate
+
 ## [0.133.0] - 2026-05-27
 
 ### Fixed
