@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.134.0] - 2026-05-27
+
+### Added
+- expose generic content format conversion filter
+
+### Fixed
+- import flow step config in pipeline helpers
+
 ## [0.133.5] - 2026-05-27
 
 ### Fixed
