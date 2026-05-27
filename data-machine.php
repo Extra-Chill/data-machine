@@ -176,6 +176,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Core/Similarity/SimilarityEngine.php';
 	require_once __DIR__ . '/inc/Abilities/DuplicateCheck/DuplicateCheckAbility.php';
 	require_once __DIR__ . '/inc/Abilities/ProcessedItemsAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/TrackedItemsAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/SettingsAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/HandlerAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/StepTypeAbilities.php';
@@ -272,6 +273,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\PipelineStepAbilities();
 	new \DataMachine\Abilities\DuplicateCheck\DuplicateCheckAbility();
 	new \DataMachine\Abilities\ProcessedItemsAbilities();
+	new \DataMachine\Abilities\TrackedItemsAbilities();
 	new \DataMachine\Abilities\SettingsAbilities();
 	new \DataMachine\Abilities\HandlerAbilities();
 	new \DataMachine\Abilities\StepTypeAbilities();
@@ -690,6 +692,9 @@ function datamachine_ensure_all_tables() {
 
 	$db_processed_items = new \DataMachine\Core\Database\ProcessedItems\ProcessedItems();
 	$db_processed_items->create_table();
+
+	$db_tracked_items = new \DataMachine\Core\Database\TrackedItems\TrackedItems();
+	$db_tracked_items->create_table();
 
 	$db_identity_index = new \DataMachine\Core\Database\PostIdentityIndex\PostIdentityIndex();
 	$db_identity_index->create_table();
