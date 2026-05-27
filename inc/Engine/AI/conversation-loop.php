@@ -1480,7 +1480,10 @@ function datamachine_extract_xml_tool_calls( string $text ): array {
 					continue;
 				}
 
-				$parameters[ $parameter_name ] = html_entity_decode( trim( strip_tags( (string) $parameter_match[2] ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+				$parameter_value = function_exists( '\wp_strip_all_tags' )
+					? \wp_strip_all_tags( (string) $parameter_match[2] )
+					: (string) preg_replace( '/<[^>]*>/', '', (string) $parameter_match[2] );
+				$parameters[ $parameter_name ] = html_entity_decode( trim( $parameter_value ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 			}
 		}
 
