@@ -57,6 +57,11 @@ class JobsSummaryAbility {
 								'type'        => array( 'string', 'null' ),
 								'description' => __( 'Filter jobs created at or after this datetime (Y-m-d H:i:s).', 'data-machine' ),
 							),
+							'compact'     => array(
+								'type'        => 'boolean',
+								'default'     => false,
+								'description' => __( 'Return only total/status counts and skip heavier pipeline, flow, and handler breakdowns.', 'data-machine' ),
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -93,7 +98,7 @@ class JobsSummaryAbility {
 	 */
 	public function execute( array $input ): array {
 		$filters = array();
-		foreach ( array( 'flow_id', 'pipeline_id', 'handler', 'status', 'source', 'since', 'user_id', 'agent_id' ) as $key ) {
+		foreach ( array( 'flow_id', 'pipeline_id', 'handler', 'status', 'source', 'since', 'user_id', 'agent_id', 'compact' ) as $key ) {
 			if ( isset( $input[ $key ] ) && '' !== $input[ $key ] && null !== $input[ $key ] ) {
 				$filters[ $key ] = $input[ $key ];
 			}

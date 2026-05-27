@@ -2048,6 +2048,9 @@ class JobsCommand extends BaseCommand {
 	 * [--fields=<fields>]
 	 * : Limit output to specific fields (comma-separated).
 	 *
+	 * [--compact]
+	 * : Return only total/status counts and skip heavier pipeline, flow, and handler breakdowns.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Show status summary
@@ -2085,6 +2088,10 @@ class JobsCommand extends BaseCommand {
 
 		if ( ! empty( $assoc_args['handler'] ) ) {
 			$input['handler'] = (string) $assoc_args['handler'];
+		}
+
+		if ( isset( $assoc_args['compact'] ) ) {
+			$input['compact'] = true;
 		}
 
 		$since = $assoc_args['since'] ?? null;

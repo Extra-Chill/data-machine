@@ -272,15 +272,26 @@ class Jobs extends BaseRepository {
 		$where_sql    = $where_parts['sql'];
 		$where_values = $where_parts['values'];
 
-		return array(
+		$summary = array(
 			'total'                  => $this->get_jobs_count( $args ),
 			'failed_count'           => $this->get_jobs_count( array_merge( $args, array( 'status' => 'failed' ) ) ),
 			'stuck_processing_count' => $this->get_stuck_processing_count( $args ),
 			'status'                 => $this->get_status_summary_rows( $where_sql, $where_values ),
-			'pipeline'               => $this->get_pipeline_summary_rows( $where_sql, $where_values ),
-			'flow'                   => $this->get_flow_summary_rows( $where_sql, $where_values ),
-			'handler'                => $this->get_handler_summary_rows( $args, $where_sql, $where_values ),
 			'filters'                => $this->summarize_job_filters( $args ),
+		);
+
+		if ( ! empty( $args['compact'] ) ) {
+			return $summary + array(
+				'pipeline' => array(),
+				'flow'     => array(),
+				'handler'  => array(),
+			);
+		}
+
+		return $summary + array(
+			'pipeline' => $this->get_pipeline_summary_rows( $where_sql, $where_values ),
+			'flow'     => $this->get_flow_summary_rows( $where_sql, $where_values ),
+			'handler'  => $this->get_handler_summary_rows( $args, $where_sql, $where_values ),
 		);
 	}
 

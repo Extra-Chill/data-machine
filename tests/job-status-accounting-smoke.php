@@ -121,6 +121,13 @@ $assert( 'CLI requires successful runtime provenance', str_contains( $jobs_comma
 $assert( 'CLI requires successful handler tool summary', str_contains( $jobs_command, 'engine_data_has_successful_handler_tool' ) );
 $assert( 'CLI supports dry-run output', str_contains( $jobs_command, "'dry_run' => $" ) || str_contains( $jobs_command, "'dry_run' => \$dry_run" ) );
 
+echo "\n[5] compact job summary avoids heavyweight breakdowns\n";
+$jobs_db = file_get_contents( __DIR__ . '/../inc/Core/Database/Jobs/Jobs.php' );
+$summary_ability = file_get_contents( __DIR__ . '/../inc/Abilities/Job/JobsSummaryAbility.php' );
+$assert( 'jobs summary accepts compact input', str_contains( $summary_ability, "'compact'" ) );
+$assert( 'jobs database returns early for compact summaries', str_contains( $jobs_db, 'if ( ! empty( $args[\'compact\'] ) )' ) );
+$assert( 'compact summaries keep status buckets', str_contains( $jobs_db, "'status'                 => $" ) || str_contains( $jobs_db, "'status'                 => \$this->get_status_summary_rows" ) );
+
 if ( $failures > 0 ) {
 	echo "\n=== job-status-accounting-smoke: {$failures} FAILURE(S) / {$total} assertions ===\n";
 	exit( 1 );
