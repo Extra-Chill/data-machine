@@ -184,7 +184,7 @@ class TrackedItemsAbilities {
 
 	/** @return array<string,mixed> */
 	private static function query_input_schema(): array {
-		$properties          = self::item_schema_properties();
+		$properties           = self::item_schema_properties();
 		$properties['limit']  = array( 'type' => 'integer' );
 		$properties['offset'] = array( 'type' => 'integer' );
 		return array(
