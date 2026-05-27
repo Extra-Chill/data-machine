@@ -268,6 +268,28 @@ class EventDateQueryAbilities {
 			$query_args['no_found_rows'] = false; // Need found_posts for count mode.
 		}
 
+		/**
+		 * Filter the final WP_Query args before the events query runs.
+		 *
+		 * Extension point for platform-specific plugins to inject additional
+		 * constraints (e.g. `post__in` to scope a calendar to events a
+		 * specific user has attended). Replaces the dead-code filter of the
+		 * same name on the deprecated EventQueryBuilder — the active code
+		 * path is now EventDateQueryAbilities::executeQueryEvents, so the
+		 * extension point lives here.
+		 *
+		 * Keeps data-machine-events generic (no platform-specific JOINs
+		 * inside this plugin) by letting consumers add WP_Query-level
+		 * constraints. The second argument is the raw ability input so
+		 * callbacks can branch on scope, tax_filters, search, geo, etc.
+		 *
+		 * @since 0.40.0
+		 *
+		 * @param array $query_args WP_Query arguments about to be executed.
+		 * @param array $input      The full ability input array.
+		 */
+		$query_args = (array) apply_filters( 'data_machine_events_calendar_query_args', $query_args, $input );
+
 		// Execute query.
 		$query = new WP_Query( $query_args );
 
