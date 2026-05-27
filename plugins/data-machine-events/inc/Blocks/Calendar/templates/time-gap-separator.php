@@ -23,8 +23,9 @@ if ( 2 == $gap_days ) {
 <div class="data-machine-time-gap-separator">
 	<div class="data-machine-gap-line"></div>
 	<div class="data-machine-gap-text">
-		<span class="data-machine-gap-indicator">• • •</span>
+		<span class="data-machine-gap-indicator" aria-hidden="true">• • •</span>
 		<span class="data-machine-gap-label"><?php echo esc_html( $gap_text ); ?></span>
+		<span class="data-machine-gap-indicator" aria-hidden="true">• • •</span>
 	</div>
 	<div class="data-machine-gap-line"></div>
 </div>
