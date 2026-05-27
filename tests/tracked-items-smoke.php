@@ -170,10 +170,10 @@ namespace {
 
 	$upsert = $abilities->executeUpsertTrackedItem(
 		array(
-			'namespace' => 'wp-docs:core',
-			'item_id'   => 'function:wp_register_script_module',
-			'item_type' => 'function',
-			'state'     => TrackedItems::STATE_DISCOVERED,
+			'namespace'  => 'wp-docs:core',
+			'item_id'    => 'function:wp_register_script_module',
+			'item_type'  => 'function',
+			'state'      => TrackedItems::STATE_DISCOVERED,
 			'source_ref' => 'wordpress-develop',
 		)
 	);
