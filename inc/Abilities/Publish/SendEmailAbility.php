@@ -28,121 +28,180 @@ defined( 'ABSPATH' ) || exit;
 
 class SendEmailAbility {
 
-	private static bool $registered = false;
+	private static bool $registered           = false;
+	private static bool $registration_pending = false;
+	private static ?self $instance            = null;
 
 	public function __construct() {
-		if ( self::$registered ) {
+		if ( null === self::$instance ) {
+			self::$instance = $this;
+		}
+
+		self::ensure_registered();
+	}
+
+	/**
+	 * Ensure the send-email ability is registered across all registry timing states.
+	 *
+	 * @return void
+	 */
+	public static function ensure_registered(): void {
+		if ( self::$registered || self::$registration_pending ) {
 			return;
 		}
 
-		$this->registerAbilities();
-		self::$registered = true;
-	}
+		if ( null === self::$instance ) {
+			new self();
+			return;
+		}
 
-	private function registerAbilities(): void {
-		$register_callback = function () {
-			wp_register_ability(
-				'datamachine/send-email',
-				array(
-					'label'               => __( 'Send Email', 'data-machine' ),
-					'description'         => __( 'Send an email with optional attachments via wp_mail(). Body may be supplied directly or rendered from a template registered via the datamachine_email_templates filter. Optionally routes the wp_mail() call through a specific site via switch_to_blog() on multisite.', 'data-machine' ),
-					'category'            => 'datamachine-publishing',
-					'input_schema'        => array(
-						'type'       => 'object',
-						// `body` is no longer hard-required: callers may supply `template` instead.
-						// Validation is enforced in execute() so existing callers passing `body`
-						// continue to work unchanged.
-						'required'   => array( 'to', 'subject' ),
-						'properties' => array(
-							'to'           => array(
-								'type'        => 'string',
-								'description' => __( 'Comma-separated recipient email addresses', 'data-machine' ),
-							),
-							'cc'           => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Comma-separated CC addresses', 'data-machine' ),
-							),
-							'bcc'          => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Comma-separated BCC addresses', 'data-machine' ),
-							),
-							'subject'      => array(
-								'type'        => 'string',
-								'description' => __( 'Email subject line. Supports {month}, {year}, {site_name}, {date}, {admin_email} placeholders. Placeholders are resolved after template render.', 'data-machine' ),
-							),
-							'body'         => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Email body content (HTML or plain text). Ignored when `template` is supplied. Supports {month}, {year}, {site_name}, {date}, {admin_email} placeholders.', 'data-machine' ),
-							),
-							'template'     => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Optional template id resolved via the datamachine_email_templates filter. When set, the registered callable receives `context` and its return value is used as the body before placeholder replacement. When empty, `body` is used verbatim.', 'data-machine' ),
-							),
-							'context'      => array(
-								'type'        => 'object',
-								'default'     => array(),
-								'description' => __( 'Opaque context array passed to the template callable. Each template owns its own context contract.', 'data-machine' ),
-							),
-							'mail_site_id' => array(
-								'type'        => 'integer',
-								'default'     => 0,
-								'description' => __( 'Optional multisite blog id. When > 0 and multisite is active, the wp_mail() call is wrapped in switch_to_blog()/restore_current_blog() so site-scoped SMTP config applies. Validation, header building, and template rendering run in the original site context.', 'data-machine' ),
-							),
-							'content_type' => array(
-								'type'        => 'string',
-								'default'     => 'text/html',
-								'description' => __( 'Content type: text/html or text/plain', 'data-machine' ),
-							),
-							'from_name'    => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Sender name. Falls back to site name.', 'data-machine' ),
-							),
-							'from_email'   => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Sender email. Falls back to admin email.', 'data-machine' ),
-							),
-							'reply_to'     => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Reply-to email address', 'data-machine' ),
-							),
-							'attachments'  => array(
-								'type'        => 'array',
-								'items'       => array( 'type' => 'string' ),
-								'default'     => array(),
-								'description' => __( 'Array of server file paths to attach', 'data-machine' ),
-							),
-						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'    => array( 'type' => 'boolean' ),
-							'message'    => array( 'type' => 'string' ),
-							'recipients' => array( 'type' => 'array' ),
-							'subject'    => array( 'type' => 'string' ),
-							'error'      => array( 'type' => 'string' ),
-							'logs'       => array( 'type' => 'array' ),
-						),
-					),
-					'execute_callback'    => array( $this, 'execute' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
-				)
-			);
+		$definitions = self::get_ability_definitions( self::$instance );
+
+		$register_via_helper = static function () use ( $definitions ): void {
+			foreach ( $definitions as $name => $args ) {
+				wp_register_ability( $name, $args );
+			}
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
+			$register_via_helper();
+			self::$registered = true;
+			return;
 		}
+
+		if ( ! did_action( 'wp_abilities_api_init' ) ) {
+			self::$registration_pending = true;
+			add_action(
+				'wp_abilities_api_init',
+				static function () use ( $register_via_helper ): void {
+					if ( self::$registered ) {
+						return;
+					}
+					$register_via_helper();
+					self::$registered           = true;
+					self::$registration_pending = false;
+				}
+			);
+			return;
+		}
+
+		if ( ! class_exists( '\WP_Abilities_Registry' ) ) {
+			return;
+		}
+		$registry = \WP_Abilities_Registry::get_instance();
+		if ( null === $registry ) {
+			return;
+		}
+		foreach ( $definitions as $name => $args ) {
+			if ( $registry->is_registered( $name ) ) {
+				continue;
+			}
+			$registry->register( $name, $args );
+		}
+		self::$registered = true;
+	}
+
+	/**
+	 * Ability definitions used by every registration path in ensure_registered().
+	 *
+	 * @param self $instance Instance used for execute and permission callbacks.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function get_ability_definitions( self $instance ): array {
+		return array(
+			'datamachine/send-email' => array(
+				'label'               => __( 'Send Email', 'data-machine' ),
+				'description'         => __( 'Send an email with optional attachments via wp_mail(). Body may be supplied directly or rendered from a template registered via the datamachine_email_templates filter. Optionally routes the wp_mail() call through a specific site via switch_to_blog() on multisite.', 'data-machine' ),
+				'category'            => 'datamachine-publishing',
+				'input_schema'        => array(
+					'type'       => 'object',
+					// `body` is no longer hard-required: callers may supply `template` instead.
+					// Validation is enforced in execute() so existing callers passing `body`
+					// continue to work unchanged.
+					'required'   => array( 'to', 'subject' ),
+					'properties' => array(
+						'to'           => array(
+							'type'        => 'string',
+							'description' => __( 'Comma-separated recipient email addresses', 'data-machine' ),
+						),
+						'cc'           => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Comma-separated CC addresses', 'data-machine' ),
+						),
+						'bcc'          => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Comma-separated BCC addresses', 'data-machine' ),
+						),
+						'subject'      => array(
+							'type'        => 'string',
+							'description' => __( 'Email subject line. Supports {month}, {year}, {site_name}, {date}, {admin_email} placeholders. Placeholders are resolved after template render.', 'data-machine' ),
+						),
+						'body'         => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Email body content (HTML or plain text). Ignored when `template` is supplied. Supports {month}, {year}, {site_name}, {date}, {admin_email} placeholders.', 'data-machine' ),
+						),
+						'template'     => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Optional template id resolved via the datamachine_email_templates filter. When set, the registered callable receives `context` and its return value is used as the body before placeholder replacement. When empty, `body` is used verbatim.', 'data-machine' ),
+						),
+						'context'      => array(
+							'type'        => 'object',
+							'default'     => array(),
+							'description' => __( 'Opaque context array passed to the template callable. Each template owns its own context contract.', 'data-machine' ),
+						),
+						'mail_site_id' => array(
+							'type'        => 'integer',
+							'default'     => 0,
+							'description' => __( 'Optional multisite blog id. When > 0 and multisite is active, the wp_mail() call is wrapped in switch_to_blog()/restore_current_blog() so site-scoped SMTP config applies. Validation, header building, and template rendering run in the original site context.', 'data-machine' ),
+						),
+						'content_type' => array(
+							'type'        => 'string',
+							'default'     => 'text/html',
+							'description' => __( 'Content type: text/html or text/plain', 'data-machine' ),
+						),
+						'from_name'    => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Sender name. Falls back to site name.', 'data-machine' ),
+						),
+						'from_email'   => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Sender email. Falls back to admin email.', 'data-machine' ),
+						),
+						'reply_to'     => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Reply-to email address', 'data-machine' ),
+						),
+						'attachments'  => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'default'     => array(),
+							'description' => __( 'Array of server file paths to attach', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'    => array( 'type' => 'boolean' ),
+						'message'    => array( 'type' => 'string' ),
+						'recipients' => array( 'type' => 'array' ),
+						'subject'    => array( 'type' => 'string' ),
+						'error'      => array( 'type' => 'string' ),
+						'logs'       => array( 'type' => 'array' ),
+					),
+				),
+				'execute_callback'    => array( $instance, 'execute' ),
+				'permission_callback' => array( $instance, 'checkPermission' ),
+				'meta'                => array( 'show_in_rest' => true ),
+			),
+		);
 	}
 
 	/**

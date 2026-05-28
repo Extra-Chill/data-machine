@@ -10,6 +10,8 @@ The Abilities API in `inc/Abilities/` provides a unified interface for Data Mach
 
 This page documents the shape of the current ability surface and the source files that own each domain. For an exact live inventory, run `wp abilities list --category=datamachine-*` in a loaded WordPress install or inspect `wp_register_ability()` callsites under `inc/Abilities/`.
 
+Normal frontend page views intentionally skip the full Data Machine runtime. Abilities that have proven frontend-lite consumers are documented in [Runtime-Gated Abilities Audit](runtime-gated-abilities-audit.md); only those proven reachable abilities should be hoisted out of the runtime gate.
+
 ## Multi-Agent Scoping
 
 Data Machine follows a WordPress-shaped identifier model: `agent_id` is the stable numeric row ID, and `agent_slug` is the human-readable, portable identifier. Programmatic ability inputs should use explicit fields (`agent_id` when selecting by row ID, `agent_slug` when selecting by slug). The generic `agent` selector is reserved for CLI and resolver-style boundaries that intentionally accept either ID or slug. The `PermissionHelper` class resolves selectors to scoped agent and user IDs, enforces ownership checks via `owns_resource()` and `owns_agent_resource()`, and controls access grants via `can_access_agent()`.
