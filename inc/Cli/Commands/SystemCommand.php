@@ -339,7 +339,7 @@ class SystemCommand extends BaseCommand {
 	 * @return array|string
 	 */
 	private static function collectRunTaskParamArgs( array $assoc_args, ?array $argv = null ): array|string {
-		$argv       = $argv ?? array_map(
+		$argv = $argv ?? array_map(
 			static function ( $arg ): string {
 				// Preserve raw CLI parameter payloads; values are parsed/coerced after
 				// the `--param` boundary and may intentionally contain JSON/URLs.
