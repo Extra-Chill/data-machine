@@ -61,6 +61,7 @@ require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agen
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-declaration.php';
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy.php';
+require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-source-registry.php';
 require_once __DIR__ . '/../inc/Engine/AI/ConversationManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
