@@ -67,6 +67,7 @@ assert_retry_policy_smoke( 'explicit retryable flag wins', true === $is_retryabl
 assert_retry_policy_smoke( 'Retry-After implies retryable', true === $is_retryable->invoke( null, 'provider_error', array( 'retry_after' => 10 ) ) );
 assert_retry_policy_smoke( 'rate-limit text implies retryable', true === $is_retryable->invoke( null, 'ai_processing_failed', array( 'ai_error' => 'Provider returned 429 rate limit' ) ) );
 assert_retry_policy_smoke( 'cURL 28 connect timeout text implies retryable', true === $is_retryable->invoke( null, 'ai_processing_failed', array( 'ai_error' => 'cURL error 28: Connection timed out after 15000 milliseconds' ) ) );
+assert_retry_policy_smoke( 'cURL 52 empty reply text implies retryable', true === $is_retryable->invoke( null, 'ai_processing_failed', array( 'ai_error' => 'Network error occurred while sending request: cURL error 52: Empty reply from server' ) ) );
 assert_retry_policy_smoke( 'validation-style failures are not retryable by default', false === $is_retryable->invoke( null, 'missing_flow_id_in_step_config', array() ) );
 
 echo "Case 3: Backoff composes with Retry-After\n";
@@ -85,17 +86,22 @@ assert_retry_policy_smoke( 'Retry-After is a floor over exponential backoff', 30
 
 echo "Case 4: AI retry classification preserves provider backoff and shortens transport retries\n";
 $transport_context = array( 'ai_error' => 'cURL error 28: Connection timed out after 15000 milliseconds' );
+$empty_reply_context = array( 'ai_error' => 'Network error occurred while sending request: cURL error 52: Empty reply from server' );
 $rate_context      = array( 'ai_error' => 'Provider returned 429 rate limit' );
 $generic_context   = array( 'ai_error' => 'Provider temporarily unavailable, try again later' );
 $transport_policy  = $resolve_policy->invoke( null, 123, 'ai_processing_failed', $transport_context, array(), array() );
+$empty_reply_policy = $resolve_policy->invoke( null, 123, 'ai_processing_failed', $empty_reply_context, array(), array() );
 $rate_policy       = $resolve_policy->invoke( null, 123, 'ai_processing_failed', $rate_context, array(), array() );
 $generic_policy    = $resolve_policy->invoke( null, 123, 'ai_processing_failed', $generic_context, array(), array() );
 $transport_delay   = $resolve_delay->invoke( null, 1, $transport_policy, array() );
+$empty_reply_delay = $resolve_delay->invoke( null, 1, $empty_reply_policy, array() );
 $rate_delay        = $resolve_delay->invoke( null, 1, $rate_policy, array() );
 $generic_delay     = $resolve_delay->invoke( null, 1, $generic_policy, array() );
 
 assert_retry_policy_smoke( 'cURL 28 is classified as transport connect timeout', 'transport_connect_timeout' === $classify_failure->invoke( null, 'ai_processing_failed', $transport_context ) );
 assert_retry_policy_smoke( 'cURL 28 uses short transport base delay', 15 === $transport_delay, 'delay was ' . $transport_delay );
+assert_retry_policy_smoke( 'cURL 52 is classified as transport network', 'transport_network' === $classify_failure->invoke( null, 'ai_processing_failed', $empty_reply_context ) );
+assert_retry_policy_smoke( 'cURL 52 uses short transport base delay', 15 === $empty_reply_delay, 'delay was ' . $empty_reply_delay );
 assert_retry_policy_smoke( 'rate limit is classified separately', 'provider_rate_limit' === $rate_policy['retry_class'] );
 assert_retry_policy_smoke( 'rate limit keeps default base delay', 60 === $rate_delay, 'delay was ' . $rate_delay );
 assert_retry_policy_smoke( 'generic retryable AI failure keeps default base delay', 60 === $generic_delay, 'delay was ' . $generic_delay );

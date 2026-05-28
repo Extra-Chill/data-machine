@@ -279,7 +279,7 @@ class JobRetryPolicy {
 			}
 		}
 
-		foreach ( array( 'curl error 7', 'failed to connect', 'connection refused', 'connection reset', 'network is unreachable', 'no route to host' ) as $needle ) {
+		foreach ( array( 'curl error 7', 'curl error 52', 'failed to connect', 'connection refused', 'connection reset', 'empty reply from server', 'network is unreachable', 'no route to host' ) as $needle ) {
 			if ( str_contains( $message, $needle ) ) {
 				return 'transport_network';
 			}
