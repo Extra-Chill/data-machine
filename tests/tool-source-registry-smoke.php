@@ -78,6 +78,7 @@ require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agen
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-declaration.php';
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
 require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy.php';
+require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-source-registry.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolParameters.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Execution/ToolExecutionCore.php';
@@ -213,9 +214,10 @@ echo "\n[3] filters can add a source without disturbing default order:\n";
 remove_all_filters_for_source_smoke();
 add_filter(
 	'agents_api_tool_sources',
-	static function ( array $sources, array $modes, array $args, ToolManager $tool_manager ): array {
-		unset( $modes, $args, $tool_manager );
-		$sources['extra_source'] = static function (): array {
+	static function ( array $sources, array $context ): array {
+		unset( $context );
+		$sources['extra_source'] = static function ( array $source_context ): array {
+			unset( $source_context );
 			return array(
 				'extra_tool' => array( 'origin' => 'extra', 'access_level' => 'public' ),
 			);
@@ -223,19 +225,19 @@ add_filter(
 		return $sources;
 	},
 	10,
-	4
+	2
 );
 add_filter(
-	'agents_api_tool_sources_for_mode',
-	static function ( array $sources, array $modes, array $args ): array {
-		unset( $args );
+	'agents_api_tool_source_order',
+	static function ( array $sources, array $context ): array {
+		$modes = is_array( $context['modes'] ?? null ) ? $context['modes'] : array();
 		if ( in_array( ToolPolicyResolver::MODE_CHAT, $modes, true ) ) {
 			$sources[] = 'extra_source';
 		}
 		return $sources;
 	},
 	10,
-	3
+	2
 );
 $tools = resolve_source_tools( ToolPolicyResolver::MODE_CHAT, new SourcePolicyToolManager() );
 assert_source_equals( array( 'chat_static_tool', 'extra_tool' ), array_keys( $tools ), 'filter appends extra source after static source', $failures, $passes );
@@ -442,6 +444,8 @@ assert_source_equals( false, false !== strpos( $registry_source, 'FlowStepConfig
 assert_source_equals( true, false !== strpos( $adjacent_source, 'FlowStepConfig' ), 'adjacent-handler source owns FlowStepConfig lookup', $failures, $passes );
 assert_source_equals( false, false !== strpos( $registry_source, 'get_all_tools' ), 'generic registry no longer reads Data Machine tool registry', $failures, $passes );
 assert_source_equals( true, false !== strpos( $datamachine_tool_source, 'get_all_tools' ), 'Data Machine registry source owns legacy registry lookup', $failures, $passes );
+assert_source_equals( true, false !== strpos( $registry_source, 'WP_Agent_Tool_Source_Registry' ), 'ToolSourceRegistry delegates source composition to Agents API registry', $failures, $passes );
+assert_source_equals( true, false !== strpos( $registry_source, 'agents_api_tool_source_order' ), 'Data Machine mode ordering uses Agents API source-order hook', $failures, $passes );
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " tool source assertions failed.\n";
