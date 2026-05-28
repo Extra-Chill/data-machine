@@ -65,8 +65,8 @@ datamachine_runtime_async_assert(
 	$passes
 );
 datamachine_runtime_async_assert(
-	str_contains( $loop_source, 'runtime_tool_pending_requests' ) && str_contains( $loop_source, "'runtime_tool_pending'" ),
-	'conversation results surface pending runtime tool requests without fabricating tool output',
+	str_contains( $loop_source, "\$metadata['datamachine']" ) && str_contains( $loop_source, 'runtime_tool_pending_requests' ) && str_contains( $loop_source, "'runtime_tool_pending'" ),
+	'conversation results surface pending runtime tool requests in Data Machine metadata without fabricating tool output',
 	$failures,
 	$passes
 );

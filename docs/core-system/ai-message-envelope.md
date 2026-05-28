@@ -93,9 +93,9 @@ For new adapters, prefer putting type-specific fields in `payload` and adapter-s
 
 ## Result Normalization
 
-`AgentsAPI\AI\WP_Agent_Conversation_Result::normalize()` accepts result arrays from the Agents API loop or compatible adapters and normalizes every returned message to an envelope. Data Machine calls this normalizer immediately after `WP_Agent_Conversation_Loop::run()` and only then adds Data Machine-specific diagnostics such as completion assertions and `last_tool_calls`.
+`AgentsAPI\AI\WP_Agent_Conversation_Result::normalize()` accepts result arrays from the Agents API loop or compatible adapters and normalizes every returned message to an envelope. Data Machine calls this normalizer immediately after `WP_Agent_Conversation_Loop::run()` and then places Data Machine-specific diagnostics such as completion assertions and `last_tool_calls` under `metadata.datamachine`.
 
-Required result fields include `messages`, `final_content`, `turn_count`, `completed`, `tool_execution_results`, and `usage`; optional fields such as `status`, `request_metadata`, `error`, and `warning` are preserved.
+Canonical top-level result fields include `messages`, `final_content`, `turn_count`, `tool_execution_results`, and `usage`; optional fields such as `status`, `request_metadata`, and `error` are preserved. Data Machine UI/runtime hints such as `completed`, `warning`, `max_turns_reached`, `tool_calls`, and completion assertion diagnostics live under `metadata.datamachine`.
 
 ## Adapter Guidance
 

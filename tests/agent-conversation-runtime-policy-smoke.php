@@ -61,6 +61,12 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+	function sanitize_text_field( string $text ): string {
+		return trim( preg_replace( '/[\r\n\t ]+/', ' ', strip_tags( $text ) ) ?? '' );
+	}
+}
+
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( string $_option, $default_value = false ) {
 		return $default_value;
@@ -79,6 +85,7 @@ use DataMachine\Engine\AI\LoopEventSinkInterface;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
+use function DataMachine\Engine\AI\datamachine_conversation_metadata;
 
 class RuntimePolicySmokeCompletionPolicy implements WP_Agent_Conversation_Completion_Policy {
 	public array $calls = array();
@@ -260,9 +267,10 @@ $natural_result = datamachine_run_conversation(
 	array(),
 	5
 );
+$natural_metadata = datamachine_conversation_metadata( $natural_result );
 
 assert_runtime_policy( 1 === $natural_dispatch_count, 'default no-tool response completes naturally' );
-assert_runtime_policy( ! empty( $natural_result['completed'] ), 'default natural completion result is completed' );
+assert_runtime_policy( ! empty( $natural_metadata['completed'] ), 'default natural completion result is completed' );
 
 $satisfied_dispatch_count = 0;
 $satisfied_nudge_actions  = runtime_policy_action_count( 'datamachine_ai_completion_nudge_added' );
@@ -297,10 +305,11 @@ $satisfied_result = datamachine_run_conversation(
 	),
 	5
 );
+$satisfied_metadata = datamachine_conversation_metadata( $satisfied_result );
 
 assert_runtime_policy( 1 === $satisfied_dispatch_count, 'satisfied natural assertion completes without nudge' );
-assert_runtime_policy( ! empty( $satisfied_result['completed'] ), 'satisfied natural assertion result is completed' );
-assert_runtime_policy( ! isset( $satisfied_result['completion_nudge_count'] ), 'satisfied natural assertion has no nudge diagnostics' );
+assert_runtime_policy( ! empty( $satisfied_metadata['completed'] ), 'satisfied natural assertion result is completed' );
+assert_runtime_policy( ! isset( $satisfied_metadata['completion_nudge_count'] ), 'satisfied natural assertion has no nudge diagnostics' );
 assert_runtime_policy( $satisfied_nudge_actions === runtime_policy_action_count( 'datamachine_ai_completion_nudge_added' ), 'satisfied natural assertion emits no nudge action' );
 
 $nudge_dispatch_count = 0;
@@ -374,14 +383,16 @@ $nudge_result = datamachine_run_conversation(
 	),
 	5
 );
+$nudge_metadata = datamachine_conversation_metadata( $nudge_result );
 
 assert_runtime_policy( 3 === $nudge_dispatch_count, 'missing natural assertion nudges and keeps loop running' );
 assert_runtime_policy( str_contains( wp_json_encode( $nudge_second_request ), 'The task is not complete yet' ), 'natural nudge is appended before retry request' );
 assert_runtime_policy( ! str_contains( wp_json_encode( $nudge_second_request ), 'completion signals are still missing' ), 'model-facing nudge omits assertion diagnostics phrasing' );
 assert_runtime_policy( 1 === count( $nudge_result['tool_execution_results'] ?? array() ), 'nudged loop captures required tool result' );
-assert_runtime_policy( 1 === ( $nudge_result['completion_nudge_count'] ?? 0 ), 'nudged loop returns nudge count diagnostic' );
-assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $nudge_result['completion_assertions_satisfied']['tool_names'] ?? null ), 'nudged loop returns final satisfied assertion diagnostic' );
-assert_runtime_policy( str_contains( $nudge_result['completion_nudge'] ?? '', 'The task is not complete yet' ), 'nudged loop returns latest natural nudge message' );
+assert_runtime_policy( 1 === ( $nudge_metadata['completion_nudge_count'] ?? 0 ), 'nudged loop returns nudge count diagnostic' );
+assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $nudge_metadata['completion_assertions_satisfied']['tool_names'] ?? null ), 'nudged loop returns final satisfied assertion diagnostic' );
+assert_runtime_policy( str_contains( $nudge_metadata['completion_nudge'] ?? '', 'The task is not complete yet' ), 'nudged loop returns latest natural nudge message' );
+assert_runtime_policy( ! array_key_exists( 'completion_nudge_count', $nudge_result ), 'nudged loop keeps Data Machine diagnostics out of the Agents API result top level' );
 assert_runtime_policy( 1 === count( array_filter( $nudge_event_sink->events, fn( $entry ) => 'completion_nudge_added' === ( $entry['event'] ?? '' ) ) ), 'nudged loop emits completion_nudge_added event' );
 $nudge_event_payload = runtime_policy_first_event_payload( $nudge_event_sink, 'completion_nudge_added' );
 assert_runtime_policy( array( 'runtime_policy_tool' ) === ( $nudge_event_payload['completion_assertions_missing']['tool_names'] ?? null ), 'nudge event includes missing assertion context' );
@@ -441,12 +452,13 @@ $minimum_count_result = datamachine_run_conversation(
 	),
 	6
 );
+$minimum_count_metadata = datamachine_conversation_metadata( $minimum_count_result );
 
 assert_runtime_policy( 5 === $minimum_count_dispatch_count, 'minimum successful tool count nudges until enough calls run' );
 assert_runtime_policy( 2 === count( $minimum_count_result['tool_execution_results'] ?? array() ), 'minimum successful tool count captures both tool results' );
-assert_runtime_policy( array( 'runtime_policy_tool>=2' ) === ( $minimum_count_result['completion_assertions_satisfied']['tool_counts'] ?? null ), 'minimum successful tool count reports satisfied count assertion' );
-assert_runtime_policy( str_contains( $minimum_count_result['completion_nudge'] ?? '', 'The task is not complete yet' ), 'minimum successful tool count returns natural nudge' );
-assert_runtime_policy( ! str_contains( $minimum_count_result['completion_nudge'] ?? '', 'runtime_policy_tool' ), 'minimum successful tool count nudge omits assertion tool name' );
+assert_runtime_policy( array( 'runtime_policy_tool>=2' ) === ( $minimum_count_metadata['completion_assertions_satisfied']['tool_counts'] ?? null ), 'minimum successful tool count reports satisfied count assertion' );
+assert_runtime_policy( str_contains( $minimum_count_metadata['completion_nudge'] ?? '', 'The task is not complete yet' ), 'minimum successful tool count returns natural nudge' );
+assert_runtime_policy( ! str_contains( $minimum_count_metadata['completion_nudge'] ?? '', 'runtime_policy_tool' ), 'minimum successful tool count nudge omits assertion tool name' );
 
 $duplicate_dispatch_count = 0;
 $duplicate_transcript     = new RuntimePolicySmokeTranscriptPersister();
@@ -1285,10 +1297,11 @@ $daily_memory_unavailable_result = datamachine_run_conversation(
 	),
 	5
 );
+$daily_memory_unavailable_metadata = datamachine_conversation_metadata( $daily_memory_unavailable_result );
 
 assert_runtime_policy( 0 === $daily_memory_unavailable_dispatch_count, 'unavailable required tool fails before provider dispatch' );
 assert_runtime_policy( 'completion_required_tool_unavailable' === ( $daily_memory_unavailable_result['error_code'] ?? '' ), 'unavailable required tool returns clear error code' );
-assert_runtime_policy( array( 'agent_daily_memory' ) === ( $daily_memory_unavailable_result['unavailable_required_tool_names'] ?? null ), 'unavailable required tool diagnostic names missing tool' );
+assert_runtime_policy( array( 'agent_daily_memory' ) === ( $daily_memory_unavailable_metadata['unavailable_required_tool_names'] ?? null ), 'unavailable required tool diagnostic names missing tool' );
 assert_runtime_policy( str_contains( $daily_memory_unavailable_result['error'] ?? '', 'agent_daily_memory' ), 'unavailable required tool error message names daily memory' );
 assert_runtime_policy( array( 'agent_daily_memory' ) === ( runtime_policy_first_event_payload( $daily_memory_unavailable_sink, 'completion_assertions_unavailable' )['unavailable_required_tool_names'] ?? null ), 'unavailable required tool emits preflight event' );
 
@@ -1371,10 +1384,11 @@ $daily_memory_success_result = datamachine_run_conversation(
 );
 
 $daily_memory_tool_results = $daily_memory_success_result['tool_execution_results'] ?? array();
+$daily_memory_success_metadata = datamachine_conversation_metadata( $daily_memory_success_result );
 assert_runtime_policy( 4 === $daily_memory_success_dispatch_count, 'required daily memory nudges until successful tool result and then natural completion' );
 assert_runtime_policy( false === ( $daily_memory_tool_results[0]['result']['success'] ?? null ), 'failed daily memory call is captured but not sufficient' );
 assert_runtime_policy( true === ( $daily_memory_tool_results[1]['result']['success'] ?? null ), 'successful daily memory call satisfies required tool assertion' );
-assert_runtime_policy( ! empty( $daily_memory_success_result['completed'] ), 'daily memory assertion result completes after successful tool call' );
+assert_runtime_policy( ! empty( $daily_memory_success_metadata['completed'] ), 'daily memory assertion result completes after successful tool call' );
 
 $dispatch_count     = 0;
 $provider_context   = null;

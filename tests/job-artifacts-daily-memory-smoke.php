@@ -40,9 +40,9 @@ $assert(
 );
 
 $assert(
-	false !== strpos( $loop, "'completion_assertions_required'  =" )
-		&& false !== strpos( $loop, "'completion_assertions_satisfied' =" ),
-	'conversation loop returns final completion assertion diagnostics even without a nudge'
+	false !== strpos( $loop, "\$datamachine_metadata['completion_assertions_required']" )
+		&& false !== strpos( $loop, "\$datamachine_metadata['completion_assertions_satisfied']" ),
+	'conversation loop returns final completion assertion diagnostics under Data Machine metadata even without a nudge'
 );
 
 $assert(

@@ -24,6 +24,7 @@ use DataMachine\Engine\AI\Tools\ToolResultFinder;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
+use function DataMachine\Engine\AI\datamachine_conversation_metadata;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -539,6 +540,8 @@ class AIStep extends Step {
 				);
 			}
 
+			$loop_metadata = datamachine_conversation_metadata( $loop_result );
+
 			if ( $this->job_id > 0 ) {
 				$artifact_engine_data                           = datamachine_get_engine_data( $this->job_id );
 				$artifact_engine_data['tool_execution_summary'] = self::summarizeToolExecutions( $loop_result );
@@ -547,15 +550,15 @@ class AIStep extends Step {
 				}
 
 				foreach ( array( 'completion_assertions_required', 'completion_assertions_missing', 'completion_assertions_satisfied' ) as $assertion_key ) {
-					if ( isset( $loop_result[ $assertion_key ] ) && array() !== $loop_result[ $assertion_key ] ) {
-						$artifact_engine_data[ $assertion_key ] = $loop_result[ $assertion_key ];
+					if ( isset( $loop_metadata[ $assertion_key ] ) && array() !== $loop_metadata[ $assertion_key ] ) {
+						$artifact_engine_data[ $assertion_key ] = $loop_metadata[ $assertion_key ];
 					}
 				}
 
 				datamachine_set_engine_data( $this->job_id, $artifact_engine_data );
 			}
 
-			$missing_assertion_failure = self::missingCompletionAssertionsFailure( $loop_result );
+			$missing_assertion_failure = self::missingCompletionAssertionsFailure( $loop_result, $loop_metadata );
 			if ( null !== $missing_assertion_failure ) {
 				RunMetrics::recordStepResult(
 					$this->job_id,
@@ -1027,7 +1030,8 @@ class AIStep extends Step {
 			$outputPackets = $packet->addTo( $outputPackets );
 		}
 
-		if ( count( $outputPackets ) === 0 && true === ( $loop_result['completion_assertions_complete'] ?? false ) ) {
+		$loop_metadata = datamachine_conversation_metadata( $loop_result );
+		if ( count( $outputPackets ) === 0 && true === ( $loop_metadata['completion_assertions_complete'] ?? false ) ) {
 			$packet        = new DataPacket(
 				array(
 					'title' => 'AI Completion Assertions Satisfied',
@@ -1037,8 +1041,8 @@ class AIStep extends Step {
 					'source_type'                     => 'ai_completion_assertions',
 					'flow_step_id'                    => $flow_step_id,
 					'conversation_turn'               => $turn_count,
-					'completion_assertions_satisfied' => is_array( $loop_result['completion_assertions_satisfied'] ?? null ) ? $loop_result['completion_assertions_satisfied'] : array(),
-					'completion_assertions_missing'   => is_array( $loop_result['completion_assertions_missing'] ?? null ) ? $loop_result['completion_assertions_missing'] : array(),
+					'completion_assertions_satisfied' => is_array( $loop_metadata['completion_assertions_satisfied'] ?? null ) ? $loop_metadata['completion_assertions_satisfied'] : array(),
+					'completion_assertions_missing'   => is_array( $loop_metadata['completion_assertions_missing'] ?? null ) ? $loop_metadata['completion_assertions_missing'] : array(),
 					'step_execution_success'          => true,
 				),
 				'ai_completion_assertions'
@@ -1144,17 +1148,18 @@ class AIStep extends Step {
 	 * @param array $loop_result Conversation loop result.
 	 * @return array<string,mixed>|null Failure payload, or null when assertions are complete/not configured.
 	 */
-	private static function missingCompletionAssertionsFailure( array $loop_result ): ?array {
-		$missing = is_array( $loop_result['completion_assertions_missing'] ?? null ) ? $loop_result['completion_assertions_missing'] : array();
-		if ( empty( $missing ) || true === ( $loop_result['completion_assertions_complete'] ?? false ) ) {
+	private static function missingCompletionAssertionsFailure( array $loop_result, array $loop_metadata ): ?array {
+		unset( $loop_result );
+		$missing = is_array( $loop_metadata['completion_assertions_missing'] ?? null ) ? $loop_metadata['completion_assertions_missing'] : array();
+		if ( empty( $missing ) || true === ( $loop_metadata['completion_assertions_complete'] ?? false ) ) {
 			return null;
 		}
 
 		return array(
 			'reason'                          => 'completion_assertions_missing',
 			'completion_assertions_missing'   => $missing,
-			'completion_assertions_satisfied' => is_array( $loop_result['completion_assertions_satisfied'] ?? null ) ? $loop_result['completion_assertions_satisfied'] : array(),
-			'completion_assertions_required'  => is_array( $loop_result['completion_assertions_required'] ?? null ) ? $loop_result['completion_assertions_required'] : array(),
+			'completion_assertions_satisfied' => is_array( $loop_metadata['completion_assertions_satisfied'] ?? null ) ? $loop_metadata['completion_assertions_satisfied'] : array(),
+			'completion_assertions_required'  => is_array( $loop_metadata['completion_assertions_required'] ?? null ) ? $loop_metadata['completion_assertions_required'] : array(),
 		);
 	}
 }

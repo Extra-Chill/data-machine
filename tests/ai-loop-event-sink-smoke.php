@@ -85,6 +85,7 @@ use DataMachine\Engine\AI\NullLoopEventSink;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
+use function DataMachine\Engine\AI\datamachine_conversation_metadata;
 
 class LoopEventSinkSmokeCollector implements LoopEventSinkInterface {
 	public array $events = array();
@@ -226,8 +227,9 @@ $result = datamachine_run_conversation(
 	),
 	3
 );
+$result_metadata = datamachine_conversation_metadata( $result );
 
-assert_loop_event_sink( true === $result['completed'], 'evented loop preserves completed result shape' );
+assert_loop_event_sink( true === $result_metadata['completed'], 'evented loop preserves completed result shape' );
 assert_loop_event_sink( 'done' === $result['final_content'], 'evented loop preserves final content' );
 
 // With the upstream substrate, events come from both the substrate loop
@@ -301,9 +303,10 @@ $action_result = datamachine_run_conversation(
 	array( 'job_id' => 1774 ),
 	3
 );
+$action_metadata = datamachine_conversation_metadata( $action_result );
 
 $action_event_names = array_map( fn( array $entry ): string => $entry['event'], $action_events );
-assert_loop_event_sink( true === $action_result['completed'], 'canonical action observer does not require a per-run sink' );
+assert_loop_event_sink( true === $action_metadata['completed'], 'canonical action observer does not require a per-run sink' );
 assert_loop_event_sink( in_array( 'turn_started', $action_event_names, true ), 'canonical action observer receives turn_started' );
 assert_loop_event_sink( in_array( 'completed', $action_event_names, true ), 'canonical action observer receives completed' );
 assert_loop_event_sink( ! in_array( 'request_built', $action_event_names, true ), 'Data Machine request_built event stays product-specific' );
@@ -327,8 +330,9 @@ $failure_result = datamachine_run_conversation(
 	array( 'event_sink' => $failure_sink ),
 	1
 );
+$failure_metadata = datamachine_conversation_metadata( $failure_result );
 
-assert_loop_event_sink( false === $failure_result['completed'], 'failure path preserves completed=false result shape' );
+assert_loop_event_sink( false === $failure_metadata['completed'], 'failure path preserves completed=false result shape' );
 assert_loop_event_sink( str_contains( (string) ( $failure_result['error'] ?? '' ), 'provider offline' ), 'failure path preserves error message' );
 $failure_event_names = loop_event_sink_event_names( $failure_sink );
 assert_loop_event_sink( in_array( 'turn_started', $failure_event_names, true ), 'failure path emits turn_started' );
@@ -365,8 +369,9 @@ $throwing_result = datamachine_run_conversation(
 	array( 'event_sink' => new LoopEventSinkSmokeThrowingSink() ),
 	1
 );
+$throwing_metadata = datamachine_conversation_metadata( $throwing_result );
 
-assert_loop_event_sink( true === $throwing_result['completed'], 'throwing sink does not change loop completion' );
+assert_loop_event_sink( true === $throwing_metadata['completed'], 'throwing sink does not change loop completion' );
 assert_loop_event_sink( loop_event_sink_log_contains( 'datamachine_run_conversation: Event sink failed' ), 'throwing sink is logged as a warning' );
 
 echo "\n";

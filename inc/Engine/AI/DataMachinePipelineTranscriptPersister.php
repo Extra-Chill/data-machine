@@ -27,6 +27,10 @@ class DataMachinePipelineTranscriptPersister implements WP_Agent_Transcript_Pers
 		$metadata        = $request->metadata();
 		$provider        = (string) ( $metadata['provider'] ?? '' );
 		$model           = (string) ( $metadata['model'] ?? '' );
+		$result_metadata = datamachine_conversation_metadata( $result );
+		$completed       = array_key_exists( 'completed', $result_metadata )
+			? (bool) $result_metadata['completed']
+			: (bool) ( $result['completed'] ?? false );
 
 		if ( empty( $runtime_context['persist_transcript'] ) ) {
 			return '';
@@ -62,7 +66,7 @@ class DataMachinePipelineTranscriptPersister implements WP_Agent_Transcript_Pers
 			'provider'     => $provider,
 			'model'        => $model,
 			'turn_count'   => $result['turn_count'] ?? 0,
-			'completed'    => (bool) ( $result['completed'] ?? false ),
+			'completed'    => $completed,
 			'error'        => $result['error'] ?? null,
 			'usage'        => $result['usage'] ?? array(),
 		);

@@ -55,8 +55,8 @@ Current callers, including `AIStep` and `ChatOrchestrator`, call this function d
 - Base log context for `mode`, `job_id`, `flow_step_id`, and `agent_slug`.
 - Completion assertion preflight for required tools that are unavailable to the model.
 - Data Machine turn runner creation through `datamachine_build_turn_runner()`.
-- Mapping the Agents API `budget_exceeded` status back to Data Machine's `max_turns_reached` compatibility flag.
-- Augmenting the normalized Agents API result with Data Machine-only fields such as `last_tool_calls`, completion nudge diagnostics, and completion assertion diagnostics.
+- Mapping the Agents API `budget_exceeded` status to Data Machine's `metadata.datamachine.max_turns_reached` UI diagnostic.
+- Adding Data Machine-only fields such as `completed`, `last_tool_calls`, completion nudge diagnostics, and completion assertion diagnostics under `metadata.datamachine`.
 
 ## What Agents API Owns
 
@@ -148,16 +148,20 @@ If a required tool is not available in the current tool set, `datamachine_run_co
 
 ```php
 [
-    'completed'                       => false,
     'error_code'                      => 'completion_required_tool_unavailable',
-    'completion_assertions_required'  => $assertions->required(),
-    'unavailable_required_tool_names' => $unavailable_required_tools,
-    'available_tool_names'            => array_keys( $tools ),
     'status'                          => 'error',
+    'metadata'                        => [
+        'datamachine' => [
+            'completed'                       => false,
+            'completion_assertions_required'  => $assertions->required(),
+            'unavailable_required_tool_names' => $unavailable_required_tools,
+            'available_tool_names'            => array_keys( $tools ),
+        ],
+    ],
 ]
 ```
 
-When assertions are missing after a natural completion or partial progress, Data Machine appends a nudge as a user message and keeps the loop running when useful. Final results may include:
+When assertions are missing after a natural completion or partial progress, Data Machine appends a nudge as a user message and keeps the loop running when useful. Final results may include these fields under `metadata.datamachine`:
 
 - `completion_nudge_count`
 - `completion_nudge`
@@ -170,25 +174,30 @@ Job engine data and loop events receive the same diagnostics for evidence and ar
 
 ## Result Shape
 
-The returned array is normalized by `AgentsAPI\AI\WP_Agent_Conversation_Result::normalize()` and then augmented by Data Machine.
+The returned array keeps the Agents API conversation result at the top level. Data Machine runtime diagnostics live under `metadata.datamachine` so callers can distinguish substrate fields from Data Machine UI/provenance hints.
 
-Common fields:
+Common top-level fields:
 
 ```php
 [
     'messages'               => [], // canonical Agents API envelopes
     'final_content'          => '',
     'turn_count'             => 1,
-    'completed'              => true,
     'status'                 => 'completed',
-    'last_tool_calls'        => [],
     'tool_execution_results' => [],
     'usage'                  => [],
     'request_metadata'       => [],
+    'metadata'               => [
+        'datamachine' => [
+            'completed'       => true,
+            'last_tool_calls' => [],
+            'tool_calls'      => [],
+        ],
+    ],
 ]
 ```
 
-Error results use the same array style and include `error`; budget exhaustion also includes `max_turns_reached` and a warning.
+Error results use the same array style and include top-level `error`; budget exhaustion keeps top-level `status => budget_exceeded` and places `max_turns_reached` plus the UI warning under `metadata.datamachine`.
 
 ## Runtime Gates And Transport
 

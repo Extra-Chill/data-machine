@@ -25,6 +25,8 @@ class RuntimeProvenance {
 		$request_metadata = is_array( $result['request_metadata'] ?? null ) ? $result['request_metadata'] : array();
 		$usage            = is_array( $result['usage'] ?? null ) ? $result['usage'] : array();
 		$error_message    = isset( $result['error'] ) ? (string) $result['error'] : '';
+		$metadata         = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+		$datamachine      = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
 
 		$provenance = array(
 			'schema_version'  => 1,
@@ -74,7 +76,7 @@ class RuntimeProvenance {
 			'status'          => array_filter(
 				array(
 					'status'        => (string) ( $result['status'] ?? ( isset( $result['error'] ) ? 'error' : 'completed' ) ),
-					'completed'     => (bool) ( $result['completed'] ?? false ),
+					'completed'     => (bool) ( $datamachine['completed'] ?? false ),
 					'finish_reason' => self::finish_reason( $result ),
 					'cancelled'     => 'cancelled' === ( $result['status'] ?? '' ),
 					'timed_out'     => 'timeout' === ( $result['status'] ?? '' ),
@@ -156,13 +158,15 @@ class RuntimeProvenance {
 		if ( isset( $request_metadata['response']['finish_reason'] ) && is_string( $request_metadata['response']['finish_reason'] ) ) {
 			return $request_metadata['response']['finish_reason'];
 		}
-		if ( ! empty( $result['max_turns_reached'] ) || 'budget_exceeded' === ( $result['status'] ?? '' ) ) {
+		$metadata    = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+		$datamachine = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
+		if ( ! empty( $datamachine['max_turns_reached'] ) || 'budget_exceeded' === ( $result['status'] ?? '' ) ) {
 			return 'max_turns';
 		}
 		if ( isset( $result['error'] ) ) {
 			return 'provider_error';
 		}
-		return ! empty( $result['completed'] ) ? 'stop' : null;
+		return ! empty( $datamachine['completed'] ) ? 'stop' : null;
 	}
 
 	/** @return array<string,mixed> */

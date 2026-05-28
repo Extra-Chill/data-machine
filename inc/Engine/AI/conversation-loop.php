@@ -134,38 +134,30 @@ function datamachine_run_conversation(
 			)
 		);
 
-		return array(
+		$error_result = array(
 			'messages'                        => $messages,
 			'final_content'                   => '',
 			'turn_count'                      => 0,
-			'completed'                       => false,
-			'last_tool_calls'                 => array(),
-			'tool_calls'                      => array(),
 			'tool_execution_results'          => array(),
 			'error'                           => $error_message,
 			'error_code'                      => 'completion_required_tool_unavailable',
-			'completion_assertions_required'  => $assertions->required(),
-			'unavailable_required_tool_names' => $unavailable_required_tools,
-			'available_tool_names'            => array_keys( $tools ),
 			'usage'                           => array(),
 			'request_metadata'                => array(),
 			'status'                          => 'error',
-			'runtime_provenance'              => RuntimeProvenance::fromConversationResult(
-				array(
-					'messages'         => $messages,
-					'completed'        => false,
-					'error'            => $error_message,
-					'error_code'       => 'completion_required_tool_unavailable',
-					'usage'            => array(),
-					'request_metadata' => array(),
-					'status'           => 'error',
-				),
-				$loop_payload,
-				$provider,
-				$model,
-				$modes
-			),
 		);
+		$error_result = datamachine_with_conversation_metadata(
+			$error_result,
+			array(
+				'completed'                       => false,
+				'last_tool_calls'                 => array(),
+				'tool_calls'                      => array(),
+				'completion_assertions_required'  => $assertions->required(),
+				'unavailable_required_tool_names' => $unavailable_required_tools,
+				'available_tool_names'            => array_keys( $tools ),
+			)
+		);
+		$error_result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $error_result, $loop_payload, $provider, $model, $modes );
+		return $error_result;
 	}
 
 	// Bridge DM's LoopEventSinkInterface to upstream's on_event callable.
@@ -265,14 +257,19 @@ function datamachine_run_conversation(
 			'messages'               => $latest_messages,
 			'final_content'          => '',
 			'turn_count'             => $latest_turn_count,
-			'completed'              => false,
-			'last_tool_calls'        => $last_tool_calls,
-			'tool_calls'             => $all_tool_calls,
 			'tool_execution_results' => $tool_execution_results,
 			'error'                  => $e->getMessage(),
 			'usage'                  => array(),
 			'request_metadata'       => $last_request_metadata,
 			'status'                 => 'error',
+		);
+		$error_result          = datamachine_with_conversation_metadata(
+			$error_result,
+			array(
+				'completed'       => false,
+				'last_tool_calls' => $last_tool_calls,
+				'tool_calls'      => $all_tool_calls,
+			)
 		);
 		$transcript_session_id = $transcript_persister->persist( $latest_messages, $conversation_request, $error_result );
 		if ( '' !== $transcript_session_id ) {
@@ -289,65 +286,131 @@ function datamachine_run_conversation(
 			$result['tool_execution_results'] = $tool_execution_results;
 		}
 	} catch ( \InvalidArgumentException $e ) {
-		$error_result                       = array(
+		$error_result = array(
 			'messages'               => $messages,
 			'final_content'          => '',
 			'turn_count'             => 0,
-			'completed'              => false,
-			'last_tool_calls'        => array(),
-			'tool_calls'             => array(),
 			'tool_execution_results' => array(),
 			'usage'                  => array(),
 			'error'                  => $e->getMessage(),
+		);
+		$error_result = datamachine_with_conversation_metadata(
+			$error_result,
+			array(
+				'completed'       => false,
+				'last_tool_calls' => array(),
+				'tool_calls'      => array(),
+			)
 		);
 		$error_result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $error_result, $loop_payload, $provider, $model, $modes );
 		return $error_result;
 	}
 
 	// Substrate now surfaces turn_count, final_content, usage, and
-	// request_metadata directly on the result (agents-api#136). Augment with
-	// DM-only fields that the substrate doesn't know about.
-	$result['completed']       = 'budget_exceeded' !== ( $result['status'] ?? '' );
-	$result['last_tool_calls'] = $last_tool_calls;
-	$result['tool_calls']      = $all_tool_calls;
+	// request_metadata directly on the result (agents-api#136). Keep DM-only
+	// diagnostics namespaced so the top level remains the Agents API result.
+	$datamachine_metadata = array(
+		'completed'       => 'budget_exceeded' !== ( $result['status'] ?? '' ),
+		'last_tool_calls' => $last_tool_calls,
+		'tool_calls'      => $all_tool_calls,
+	);
 	if ( $runtime_tool_pending ) {
-		$result['completed']                     = false;
-		$result['runtime_tool_pending']          = true;
-		$result['runtime_tool_pending_requests'] = $runtime_tool_requests;
-		$result['status']                        = 'runtime_tool_pending';
+		$datamachine_metadata['completed']                     = false;
+		$datamachine_metadata['runtime_tool_pending']          = true;
+		$datamachine_metadata['runtime_tool_pending_requests'] = $runtime_tool_requests;
+		$result['status']                                      = 'runtime_tool_pending';
 	}
 	if ( ! empty( $completion_nudges ) ) {
-		$latest_nudge                              = $completion_nudges[ count( $completion_nudges ) - 1 ];
-		$result['completion_nudge_count']          = count( $completion_nudges );
-		$result['completion_nudge']                = $latest_nudge['completion_nudge'] ?? '';
-		$result['completion_assertions_required']  = $latest_nudge['completion_assertions_required'] ?? array();
-		$result['completion_assertions_missing']   = $latest_nudge['completion_assertions_missing'] ?? array();
-		$result['completion_assertions_satisfied'] = $latest_nudge['completion_assertions_satisfied'] ?? array();
+		$latest_nudge                                           = $completion_nudges[ count( $completion_nudges ) - 1 ];
+		$datamachine_metadata['completion_nudge_count']          = count( $completion_nudges );
+		$datamachine_metadata['completion_nudge']                = $latest_nudge['completion_nudge'] ?? '';
+		$datamachine_metadata['completion_assertions_required']  = $latest_nudge['completion_assertions_required'] ?? array();
+		$datamachine_metadata['completion_assertions_missing']   = $latest_nudge['completion_assertions_missing'] ?? array();
+		$datamachine_metadata['completion_assertions_satisfied'] = $latest_nudge['completion_assertions_satisfied'] ?? array();
 	}
 	if ( $assertions->hasAssertions() ) {
-		$evaluation                                = $assertions->evaluate( $loop_payload, $result['final_content'] ?? '' );
-		$result['completion_assertions_required']  = $assertions->required();
-		$result['completion_assertions_missing']   = $evaluation['missing'];
-		$result['completion_assertions_satisfied'] = $evaluation['satisfied'];
-		$result['completion_assertions_complete']  = ! empty( $evaluation['complete'] );
+		$evaluation                                             = $assertions->evaluate( $loop_payload, $result['final_content'] ?? '' );
+		$datamachine_metadata['completion_assertions_required']  = $assertions->required();
+		$datamachine_metadata['completion_assertions_missing']   = $evaluation['missing'];
+		$datamachine_metadata['completion_assertions_satisfied'] = $evaluation['satisfied'];
+		$datamachine_metadata['completion_assertions_complete']  = ! empty( $evaluation['complete'] );
 		if ( ! empty( $evaluation['complete'] ) && 'budget_exceeded' !== ( $result['status'] ?? '' ) ) {
-			$result['completed'] = true;
+			$datamachine_metadata['completed'] = true;
 		}
 	}
-	// Map upstream budget_exceeded status to DM's max_turns_reached flag
-	// for backward compatibility with ChatOrchestrator response shaping.
+	// Map upstream budget_exceeded status to DM's max-turn diagnostics for chat
+	// response shaping without adding legacy aliases to the canonical result.
 	if ( 'budget_exceeded' === ( $result['status'] ?? '' ) && in_array( $result['budget'] ?? '', array( 'conversation_turns', 'turns' ), true ) ) {
-		$result['max_turns_reached'] = true;
-		$result['completed']         = false;
-		$result['warning']           = sprintf(
+		$datamachine_metadata['max_turns_reached'] = true;
+		$datamachine_metadata['completed']         = false;
+		$datamachine_metadata['warning']           = sprintf(
 			'Maximum conversation turns (%d) reached. Response may be incomplete.',
 			$turn_budget->ceiling()
 		);
 	}
 
+	$result = datamachine_with_conversation_metadata( $result, $datamachine_metadata );
 	$result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $result, $loop_payload, $provider, $model, $modes );
 
 	return $result;
+}
+
+/**
+ * Attach Data Machine-only conversation diagnostics under metadata.datamachine.
+ *
+ * @param array $result               Canonical Agents API conversation result.
+ * @param array $datamachine_metadata Data Machine diagnostics and UI hints.
+ * @return array Result with namespaced Data Machine metadata.
+ */
+function datamachine_with_conversation_metadata( array $result, array $datamachine_metadata ): array {
+	foreach ( datamachine_conversation_metadata_top_level_keys() as $key ) {
+		unset( $result[ $key ] );
+	}
+
+	$metadata = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+	$metadata['datamachine'] = array_filter(
+		$datamachine_metadata,
+		static fn( $value ) => null !== $value
+	);
+	$result['metadata'] = $metadata;
+
+	return $result;
+}
+
+/**
+ * Top-level keys owned by Data Machine metadata, not the Agents API result.
+ *
+ * @return string[]
+ */
+function datamachine_conversation_metadata_top_level_keys(): array {
+	return array(
+		'completed',
+		'last_tool_calls',
+		'tool_calls',
+		'runtime_tool_pending',
+		'runtime_tool_pending_requests',
+		'completion_nudge_count',
+		'completion_nudge',
+		'completion_assertions_required',
+		'completion_assertions_missing',
+		'completion_assertions_satisfied',
+		'completion_assertions_complete',
+		'max_turns_reached',
+		'warning',
+		'unavailable_required_tool_names',
+		'available_tool_names',
+	);
+}
+
+/**
+ * Read Data Machine conversation diagnostics from a loop result.
+ *
+ * @param array $result Conversation result.
+ * @return array<string,mixed>
+ */
+function datamachine_conversation_metadata( array $result ): array {
+	$metadata = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+	return is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
 }
 
 /**
