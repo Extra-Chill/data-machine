@@ -79,6 +79,8 @@ use AgentsAPI\AI\WP_Agent_Conversation_Request;
 use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
+use function DataMachine\Engine\AI\datamachine_conversation_metadata;
+use function DataMachine\Engine\AI\datamachine_with_conversation_metadata;
 
 class RunnerRequestSmokeSink implements LoopEventSinkInterface {
 	public array $events = array();
@@ -188,9 +190,12 @@ $result = datamachine_run_conversation(
 	7,
 	true
 );
+$result_metadata = datamachine_conversation_metadata( $result );
 
 assert_runner_request( 'substrate ok' === ( $result['final_content'] ?? null ), 'result preserves final content from provider' );
-assert_runner_request( true === ( $result['completed'] ?? null ), 'result marks conversation complete when no tools called' );
+assert_runner_request( true === ( $result_metadata['completed'] ?? null ), 'result marks conversation complete when no tools called' );
+assert_runner_request( ! array_key_exists( 'completed', $result ), 'DM completion flag is namespaced outside the Agents API result top level' );
+assert_runner_request( is_array( $result['metadata']['datamachine'] ?? null ), 'result carries Data Machine diagnostics under metadata.datamachine' );
 assert_runner_request( 1 === ( $result['turn_count'] ?? null ), 'result preserves turn count' );
 assert_runner_request( is_array( $result['tool_execution_results'] ?? null ), 'result includes tool execution results' );
 assert_runner_request( 5 === ( $result['usage']['total_tokens'] ?? null ), 'result preserves accumulated usage totals' );
@@ -223,12 +228,39 @@ $error_result = datamachine_run_conversation(
 	array(),
 	1
 );
+$error_metadata = datamachine_conversation_metadata( $error_result );
 
 assert_runner_request( isset( $error_result['error'] ), 'error path returns a structured error field' );
 assert_runner_request( str_contains( (string) ( $error_result['error'] ?? '' ), 'provider offline' ), 'error path preserves the provider error message' );
-assert_runner_request( false === ( $error_result['completed'] ?? true ), 'error path marks conversation not completed' );
+assert_runner_request( false === ( $error_metadata['completed'] ?? true ), 'error path marks conversation not completed' );
 assert_runner_request( 'provider_error' === ( $error_result['runtime_provenance']['status']['finish_reason'] ?? null ), 'error provenance records provider error finish reason' );
 assert_runner_request( str_contains( (string) ( $error_result['runtime_provenance']['provider_errors'][0]['message'] ?? '' ), 'provider offline' ), 'error provenance records provider error message' );
+
+// 2b. Budget-exceeded results keep canonical status top-level and DM diagnostics namespaced.
+$budget_result = datamachine_with_conversation_metadata(
+	array(
+		'messages'               => $messages,
+		'final_content'          => '',
+		'turn_count'             => 3,
+		'tool_execution_results' => array(),
+		'usage'                  => array(),
+		'status'                 => 'budget_exceeded',
+		'budget'                 => 'turns',
+		'completed'              => false,
+		'max_turns_reached'      => true,
+	),
+	array(
+		'completed'         => false,
+		'max_turns_reached' => true,
+		'warning'           => 'Maximum conversation turns reached.',
+	)
+);
+$budget_metadata = datamachine_conversation_metadata( $budget_result );
+
+assert_runner_request( 'budget_exceeded' === ( $budget_result['status'] ?? null ), 'budget exceeded remains the canonical Agents API status' );
+assert_runner_request( true === ( $budget_metadata['max_turns_reached'] ?? null ), 'budget exceeded sets namespaced max-turn diagnostic' );
+assert_runner_request( false === ( $budget_metadata['completed'] ?? true ), 'budget exceeded marks namespaced completion false' );
+assert_runner_request( ! array_key_exists( 'max_turns_reached', $budget_result ), 'budget exceeded omits legacy max_turns_reached from top level' );
 
 // 3. Mid-conversation provider failures preserve the completed-turn context.
 $mid_failure_dispatch_count = 0;
@@ -362,14 +394,16 @@ $sandbox_result = datamachine_run_conversation(
 	array(),
 	3
 );
+$sandbox_metadata = datamachine_conversation_metadata( $sandbox_result );
 
 assert_runner_request( 2 === $sandbox_dispatch_count, 'sandbox/pipeline function call returns to provider for final answer' );
 assert_runner_request( isset( $sandbox_requests[0]['tools']['workspace_read'] ), 'sandbox/pipeline request sends workspace tool declaration' );
 assert_runner_request( 'sandbox tool complete' === ( $sandbox_result['final_content'] ?? null ), 'sandbox/pipeline run preserves final no-tool answer' );
-assert_runner_request( array() === ( $sandbox_result['last_tool_calls'] ?? null ), 'last_tool_calls reflects the final no-tool turn' );
-assert_runner_request( 1 === count( $sandbox_result['tool_calls'] ?? array() ), 'tool_calls preserves parsed calls from earlier turns' );
-assert_runner_request( 'workspace_read' === ( $sandbox_result['tool_calls'][0]['name'] ?? null ), 'tool_calls records the parsed workspace tool name' );
-assert_runner_request( array( 'path' => 'README.md' ) === ( $sandbox_result['tool_calls'][0]['parameters'] ?? null ), 'tool_calls records parsed workspace tool parameters' );
+assert_runner_request( array() === ( $sandbox_metadata['last_tool_calls'] ?? null ), 'last_tool_calls reflects the final no-tool turn' );
+assert_runner_request( 1 === count( $sandbox_metadata['tool_calls'] ?? array() ), 'tool_calls preserves parsed calls from earlier turns' );
+assert_runner_request( 'workspace_read' === ( $sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'tool_calls records the parsed workspace tool name' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'tool_calls records parsed workspace tool parameters' );
+assert_runner_request( ! array_key_exists( 'tool_calls', $sandbox_result ), 'tool_calls are namespaced outside the Agents API result top level' );
 assert_runner_request( 1 === count( $sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline function call executes a workspace tool' );
 assert_runner_request( 'README.md' === ( $sandbox_result['tool_execution_results'][0]['result']['path'] ?? null ), 'sandbox/pipeline tool execution receives parsed parameters' );
 
@@ -421,12 +455,13 @@ $xml_sandbox_result = datamachine_run_conversation(
 	array(),
 	3
 );
+$xml_sandbox_metadata = datamachine_conversation_metadata( $xml_sandbox_result );
 
 assert_runner_request( 2 === $xml_dispatch_count, 'sandbox/pipeline XML tool call returns to provider for final answer' );
 assert_runner_request( 'xml sandbox tool complete' === ( $xml_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline XML tool call preserves final answer' );
-assert_runner_request( 1 === count( $xml_sandbox_result['tool_calls'] ?? array() ), 'sandbox/pipeline XML tool call is parsed' );
-assert_runner_request( 'workspace_read' === ( $xml_sandbox_result['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline XML tool name is parsed' );
-assert_runner_request( array( 'path' => 'README.md' ) === ( $xml_sandbox_result['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline XML tool parameters are parsed' );
+assert_runner_request( 1 === count( $xml_sandbox_metadata['tool_calls'] ?? array() ), 'sandbox/pipeline XML tool call is parsed' );
+assert_runner_request( 'workspace_read' === ( $xml_sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline XML tool name is parsed' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $xml_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline XML tool parameters are parsed' );
 assert_runner_request( 1 === count( $xml_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline XML tool call executes a workspace tool' );
 
 // 4c. Sandbox/pipeline runs also execute JSON tool calls emitted in <tool_call> text envelopes.
@@ -477,12 +512,13 @@ $json_tool_sandbox_result = datamachine_run_conversation(
 	array(),
 	3
 );
+$json_tool_sandbox_metadata = datamachine_conversation_metadata( $json_tool_sandbox_result );
 
 assert_runner_request( 2 === $json_tool_dispatch_count, 'sandbox/pipeline JSON text tool call returns to provider for final answer' );
 assert_runner_request( 'json tool sandbox complete' === ( $json_tool_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline JSON text tool call preserves final answer' );
-assert_runner_request( 1 === count( $json_tool_sandbox_result['tool_calls'] ?? array() ), 'sandbox/pipeline JSON text tool call is parsed' );
-assert_runner_request( 'workspace_read' === ( $json_tool_sandbox_result['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline JSON text tool name is parsed' );
-assert_runner_request( array( 'path' => 'README.md' ) === ( $json_tool_sandbox_result['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline JSON text tool parameters are parsed' );
+assert_runner_request( 1 === count( $json_tool_sandbox_metadata['tool_calls'] ?? array() ), 'sandbox/pipeline JSON text tool call is parsed' );
+assert_runner_request( 'workspace_read' === ( $json_tool_sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline JSON text tool name is parsed' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $json_tool_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline JSON text tool parameters are parsed' );
 assert_runner_request( 1 === count( $json_tool_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline JSON text tool call executes a workspace tool' );
 
 // 4d. Sandbox/pipeline runs also execute fenced JSON tool_calls arrays emitted as text.
@@ -533,12 +569,13 @@ $json_array_sandbox_result = datamachine_run_conversation(
 	array(),
 	3
 );
+$json_array_sandbox_metadata = datamachine_conversation_metadata( $json_array_sandbox_result );
 
 assert_runner_request( 2 === $json_array_dispatch_count, 'sandbox/pipeline fenced JSON tool_calls returns to provider for final answer' );
 assert_runner_request( 'json array sandbox complete' === ( $json_array_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline fenced JSON tool_calls preserves final answer' );
-assert_runner_request( 1 === count( $json_array_sandbox_result['tool_calls'] ?? array() ), 'sandbox/pipeline fenced JSON tool_calls is parsed' );
-assert_runner_request( 'workspace_read' === ( $json_array_sandbox_result['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline fenced JSON tool_calls name is parsed' );
-assert_runner_request( array( 'path' => 'README.md' ) === ( $json_array_sandbox_result['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline fenced JSON tool_calls parameters are parsed' );
+assert_runner_request( 1 === count( $json_array_sandbox_metadata['tool_calls'] ?? array() ), 'sandbox/pipeline fenced JSON tool_calls is parsed' );
+assert_runner_request( 'workspace_read' === ( $json_array_sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline fenced JSON tool_calls name is parsed' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $json_array_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline fenced JSON tool_calls parameters are parsed' );
 assert_runner_request( 1 === count( $json_array_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline fenced JSON tool_calls executes a workspace tool' );
 
 // 5. Client runtime tools are fulfilled by the transport callback, not PHP ToolExecutor.

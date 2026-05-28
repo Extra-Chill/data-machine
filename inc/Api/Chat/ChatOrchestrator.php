@@ -27,6 +27,7 @@ use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use WP_Error;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
+use function DataMachine\Engine\AI\datamachine_conversation_metadata;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -232,7 +233,8 @@ class ChatOrchestrator {
 		}
 
 		// --- Update session state ---
-		$is_completed = $result['completed'];
+		$loop_metadata = datamachine_conversation_metadata( $result );
+		$is_completed  = (bool) ( $loop_metadata['completed'] ?? false );
 
 		$metadata = array(
 			'status'            => $is_completed ? 'completed' : 'processing',
@@ -241,9 +243,9 @@ class ChatOrchestrator {
 			'current_turn'      => $result['turn_count'],
 			'has_pending_tools' => ! $is_completed,
 		);
-		if ( ! empty( $result['runtime_tool_pending_requests'] ) ) {
+		if ( ! empty( $loop_metadata['runtime_tool_pending_requests'] ) ) {
 			$metadata['runtime_tool_requests'] = array();
-			foreach ( (array) $result['runtime_tool_pending_requests'] as $request ) {
+			foreach ( (array) $loop_metadata['runtime_tool_pending_requests'] as $request ) {
 				if ( is_array( $request ) && ! empty( $request['request_id'] ) ) {
 					$metadata['runtime_tool_requests'][ (string) $request['request_id'] ] = $request;
 				}
@@ -300,22 +302,22 @@ class ChatOrchestrator {
 		$response_data = array(
 			'session_id'   => $session_id,
 			'response'     => $result['final_content'],
-			'tool_calls'   => $result['tool_calls'] ?? $result['last_tool_calls'],
+			'tool_calls'   => $loop_metadata['tool_calls'] ?? $loop_metadata['last_tool_calls'] ?? array(),
 			'conversation' => $result['messages'],
 			'metadata'     => $metadata,
 			'completed'    => $is_completed,
 			'max_turns'    => $max_turns,
 			'turn_number'  => $result['turn_count'],
 		);
-		if ( ! empty( $result['runtime_tool_pending_requests'] ) ) {
-			$response_data['runtime_tool_pending_requests'] = $result['runtime_tool_pending_requests'];
+		if ( ! empty( $loop_metadata['runtime_tool_pending_requests'] ) ) {
+			$response_data['runtime_tool_pending_requests'] = $loop_metadata['runtime_tool_pending_requests'];
 		}
 
-		if ( isset( $result['warning'] ) ) {
-			$response_data['warning'] = $result['warning'];
+		if ( isset( $loop_metadata['warning'] ) ) {
+			$response_data['warning'] = $loop_metadata['warning'];
 		}
 
-		if ( isset( $result['max_turns_reached'] ) && $result['max_turns_reached'] ) {
+		if ( ! empty( $loop_metadata['max_turns_reached'] ) ) {
 			$response_data['max_turns_reached'] = true;
 		}
 
@@ -435,9 +437,10 @@ class ChatOrchestrator {
 
 		// Extract new messages (added during this turn).
 		$new_messages      = array_slice( $result['messages'], $message_count_before );
-		$is_completed      = $result['completed'];
+		$loop_metadata     = datamachine_conversation_metadata( $result );
+		$is_completed      = (bool) ( $loop_metadata['completed'] ?? false );
 		$current_turn      = ( $metadata['current_turn'] ?? 0 ) + $result['turn_count'];
-		$max_turns_reached = $result['max_turns_reached'] ?? ( $current_turn >= $max_turns );
+		$max_turns_reached = $loop_metadata['max_turns_reached'] ?? ( $current_turn >= $max_turns );
 
 		// Update session with new state.
 		$updated_metadata = array(
@@ -450,9 +453,9 @@ class ChatOrchestrator {
 		if ( ! empty( $metadata['runtime_tool_requests'] ) ) {
 			$updated_metadata['runtime_tool_requests'] = $metadata['runtime_tool_requests'];
 		}
-		if ( ! empty( $result['runtime_tool_pending_requests'] ) ) {
+		if ( ! empty( $loop_metadata['runtime_tool_pending_requests'] ) ) {
 			$updated_metadata['runtime_tool_requests'] = is_array( $updated_metadata['runtime_tool_requests'] ?? null ) ? $updated_metadata['runtime_tool_requests'] : array();
-			foreach ( (array) $result['runtime_tool_pending_requests'] as $request ) {
+			foreach ( (array) $loop_metadata['runtime_tool_pending_requests'] as $request ) {
 				if ( is_array( $request ) && ! empty( $request['request_id'] ) ) {
 					$updated_metadata['runtime_tool_requests'][ (string) $request['request_id'] ] = $request;
 				}
@@ -493,14 +496,14 @@ class ChatOrchestrator {
 			'session_id'        => $session_id,
 			'new_messages'      => $new_messages,
 			'final_content'     => $result['final_content'],
-			'tool_calls'        => $result['last_tool_calls'],
+			'tool_calls'        => $loop_metadata['last_tool_calls'] ?? array(),
 			'completed'         => $is_completed,
 			'turn_number'       => $current_turn,
 			'max_turns'         => $max_turns,
 			'max_turns_reached' => $max_turns_reached,
 		);
-		if ( ! empty( $result['runtime_tool_pending_requests'] ) ) {
-			$continue_response['runtime_tool_pending_requests'] = $result['runtime_tool_pending_requests'];
+		if ( ! empty( $loop_metadata['runtime_tool_pending_requests'] ) ) {
+			$continue_response['runtime_tool_pending_requests'] = $loop_metadata['runtime_tool_pending_requests'];
 		}
 
 		/** This action is documented in inc/Api/Chat/ChatOrchestrator.php */
@@ -867,17 +870,16 @@ class ChatOrchestrator {
 				);
 			}
 
+			$loop_metadata = datamachine_conversation_metadata( $loop_result );
+
 			return array(
-				'messages'                      => $loop_result['messages'],
-				'final_content'                 => $loop_result['final_content'],
-				'completed'                     => $loop_result['completed'] ?? false,
-				'turn_count'                    => $loop_result['turn_count'] ?? 1,
-				'tool_calls'                    => $loop_result['tool_calls'] ?? array(),
-				'last_tool_calls'               => $loop_result['last_tool_calls'] ?? array(),
-				'warning'                       => $loop_result['warning'] ?? null,
-				'max_turns_reached'             => $loop_result['max_turns_reached'] ?? false,
-				'usage'                         => $loop_result['usage'] ?? array(),
-				'runtime_tool_pending_requests' => $loop_result['runtime_tool_pending_requests'] ?? array(),
+				'messages'      => $loop_result['messages'],
+				'final_content' => $loop_result['final_content'],
+				'turn_count'    => $loop_result['turn_count'] ?? 1,
+				'usage'         => $loop_result['usage'] ?? array(),
+				'metadata'      => array(
+					'datamachine' => $loop_metadata,
+				),
 			);
 		} catch ( \Throwable $e ) {
 			do_action(

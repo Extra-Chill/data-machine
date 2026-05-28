@@ -13,6 +13,7 @@ use DataMachine\Engine\AI\Tools\ToolResultFinder;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
+use function DataMachine\Engine\AI\datamachine_with_conversation_metadata;
 
 class AIStepTest extends TestCase {
 
@@ -454,14 +455,18 @@ class AIStepTest extends TestCase {
 		$method = new ReflectionMethod( AIStep::class, 'processLoopResults' );
 		$method->setAccessible( true );
 
-		$loop_result = array(
-			'messages'                         => array(),
-			'tool_execution_results'           => array(),
-			'completion_assertions_complete'    => true,
-			'completion_assertions_satisfied'   => array(
-				'complete_when_any' => array( 'design_comment_and_labels' ),
+		$loop_result = datamachine_with_conversation_metadata(
+			array(
+				'messages'               => array(),
+				'tool_execution_results' => array(),
 			),
-			'completion_assertions_missing'     => array(),
+			array(
+				'completion_assertions_complete'  => true,
+				'completion_assertions_satisfied' => array(
+					'complete_when_any' => array( 'design_comment_and_labels' ),
+				),
+				'completion_assertions_missing'   => array(),
+			)
 		);
 
 		$result = $method->invoke(

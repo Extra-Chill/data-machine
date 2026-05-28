@@ -41,16 +41,16 @@ $assert(
 );
 
 $assert(
+	false !== strpos( $loop, "\$datamachine_metadata['completion_assertions_required']" )
+		&& false !== strpos( $loop, "\$datamachine_metadata['completion_assertions_satisfied']" ),
+	'conversation loop returns final completion assertion diagnostics under Data Machine metadata even without a nudge'
+);
+
+$assert(
 	false !== strpos( $engine_data, 'write_artifact_files' )
 		&& false !== strpos( $engine_data, "'artifact_files' =>" )
 		&& false !== strpos( $job_artifacts, 'datamachine-artifacts/jobs/' ),
 	'engine data persistence writes first-class transcript/tool-trace artifact files and stores refs in engine_data'
-);
-
-$assert(
-	false !== strpos( $loop, "'completion_assertions_required'  =" )
-		&& false !== strpos( $loop, "'completion_assertions_satisfied' =" ),
-	'conversation loop returns final completion assertion diagnostics even without a nudge'
 );
 
 $assert(
