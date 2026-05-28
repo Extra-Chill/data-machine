@@ -130,18 +130,21 @@ function datamachine_get_scaffold_defaults( string $agent_name = '' ): array {
 		$identity_meta = "\n- **Name:** {$agent_name}";
 	}
 
-	$soul = <<<MD
-# Agent Soul — {$site_name}
-
-This file defines your personality. Customize it to shape how you communicate.
-
-## Identity
-{$identity_line}
-{$identity_meta}
-
-## Voice & Tone
-Write in a clear, helpful tone. Match the communication style your human prefers — observe how they talk to you and adapt.
-MD;
+	$soul = implode(
+		"\n",
+		array(
+			"# Agent Soul — {$site_name}",
+			'',
+			'This file defines your personality. Customize it to shape how you communicate.',
+			'',
+			'## Identity',
+			$identity_line,
+			$identity_meta,
+			'',
+			'## Voice & Tone',
+			'Write in a clear, helpful tone. Match the communication style your human prefers — observe how they talk to you and adapt.',
+		)
+	) . "\n";
 
 	// --- USER.md ---
 	$user_lines = array();
@@ -154,37 +157,43 @@ MD;
 	$user_lines[] = '- **Role:** Site Administrator';
 	$user_about   = implode( "\n", $user_lines );
 
-	$user = <<<MD
-# User Profile
-
-This file profiles your human. Update it when you learn new things about them.
-
-## About
-{$user_about}
-
-## Preferences
-<!-- Communication style, formatting preferences, things to remember -->
-
-## Goals
-<!-- What you're working toward with this site or project -->
-MD;
+	$user = implode(
+		"\n",
+		array(
+			'# User Profile',
+			'',
+			'This file profiles your human. Update it when you learn new things about them.',
+			'',
+			'## About',
+			$user_about,
+			'',
+			'## Preferences',
+			'<!-- Communication style, formatting preferences, things to remember -->',
+			'',
+			'## Goals',
+			"<!-- What you're working toward with this site or project -->",
+		)
+	) . "\n";
 
 	// --- MEMORY.md ---
-	$memory = <<<MD
-# Agent Memory
-
-This file tracks persistent knowledge. Keep it lean — persistent facts only, not session logs.
-
-## State
-- Data Machine v{$dm_version} activated on {$created}
-- WordPress {$wp_version}, PHP {$php_version}
-
-## Lessons Learned
-<!-- What worked, what didn't, patterns to remember -->
-
-## Context
-<!-- Accumulated knowledge about the site, audience, domain -->
-MD;
+	$memory = implode(
+		"\n",
+		array(
+			'# Agent Memory',
+			'',
+			'This file tracks persistent knowledge. Keep it lean — persistent facts only, not session logs.',
+			'',
+			'## State',
+			"- Data Machine v{$dm_version} activated on {$created}",
+			"- WordPress {$wp_version}, PHP {$php_version}",
+			'',
+			'## Lessons Learned',
+			"<!-- What worked, what didn't, patterns to remember -->",
+			'',
+			'## Context',
+			'<!-- Accumulated knowledge about the site, audience, domain -->',
+		)
+	) . "\n";
 
 	return array(
 		'SOUL.md'   => $soul,
@@ -374,18 +383,21 @@ function datamachine_scaffold_user_content( string $content, string $filename, a
 
 	$about = implode( "\n", $about_lines );
 
-	return <<<MD
-# User Profile
-
-## About
-{$about}
-
-## Preferences
-<!-- Communication style, topics of interest, working hours, things to remember -->
-
-## Goals
-<!-- What are you working toward? Projects, content themes, skills to develop -->
-MD;
+	return implode(
+		"\n",
+		array(
+			'# User Profile',
+			'',
+			'## About',
+			$about,
+			'',
+			'## Preferences',
+			'<!-- Communication style, topics of interest, working hours, things to remember -->',
+			'',
+			'## Goals',
+			'<!-- What are you working toward? Projects, content themes, skills to develop -->',
+		)
+	) . "\n";
 }
 
 /**
@@ -459,24 +471,27 @@ function datamachine_scaffold_rules_content( string $content, string $filename, 
 	$site_name = get_bloginfo( 'name' );
 	$site_name = $site_name ? $site_name : 'this site';
 
-	return <<<MD
-# Site Rules
-
-Behavioral constraints that apply to every agent on {$site_name}.
-
-## General
-- Be helpful, accurate, and concise.
-- Follow the site's voice and tone.
-- Do not make up facts or hallucinate information.
-
-## Safety
-- Never expose private user data.
-- Never run destructive operations without confirmation.
-- When in doubt, ask before acting.
-
-## Content
-- Do not publish or modify content without authorization.
-MD;
+	return implode(
+		"\n",
+		array(
+			'# Site Rules',
+			'',
+			"Behavioral constraints that apply to every agent on {$site_name}.",
+			'',
+			'## General',
+			'- Be helpful, accurate, and concise.',
+			"- Follow the site's voice and tone.",
+			'- Do not make up facts or hallucinate information.',
+			'',
+			'## Safety',
+			'- Never expose private user data.',
+			'- Never run destructive operations without confirmation.',
+			'- When in doubt, ask before acting.',
+			'',
+			'## Content',
+			'- Do not publish or modify content without authorization.',
+		)
+	) . "\n";
 }
 
 /**

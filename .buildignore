@@ -1,7 +1,10 @@
 # Development files
+.git
 .git/
 .gitignore
 .github/
+.datamachine/
+AGENTS.md
 .DS_Store
 **/.DS_Store
 *.log
@@ -14,6 +17,7 @@ build.sh
 /.homeboy-build/
 
 # Testing
+bin/install-wp-tests.sh
 tests/
 phpunit.xml
 coverage/

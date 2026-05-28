@@ -9,6 +9,8 @@
 
 namespace DataMachine\Core\Admin;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Register root CSS variables
  *

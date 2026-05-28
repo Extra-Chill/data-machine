@@ -351,7 +351,7 @@ class FetchItemDispositionTool {
 			'item_identifier' => $this->cleanScalar( $item_identifier ),
 			'source_url'      => $this->sourceUrlFromMetadata( $metadata ),
 			'provider'        => $this->providerFromMetadata( $metadata ),
-			'source_type'     => $this->cleanScalar( $source_type ?: ( $metadata['source_type'] ?? '' ) ),
+			'source_type'     => $this->cleanScalar( $source_type ? $source_type : ( $metadata['source_type'] ?? '' ) ),
 			'flow_step_id'    => $this->cleanScalar( $flow_step_id ),
 			'packet_count'    => count( $packets ),
 			'excerpt'         => $bounded['text'],
@@ -416,7 +416,7 @@ class FetchItemDispositionTool {
 	 * @return array{text:string,truncated:bool}
 	 */
 	private function boundAndRedact( string $text ): array {
-		$text = function_exists( 'wp_strip_all_tags' ) ? wp_strip_all_tags( $text ) : strip_tags( $text );
+		$text = wp_strip_all_tags( $text );
 		$text = trim( preg_replace( '/\s+/u', ' ', $text ) ?? '' );
 		$text = preg_replace( '/\b(Bearer|Basic)\s+[A-Za-z0-9._~+\/-]+=*/i', '$1 [redacted]', $text ) ?? $text;
 		$text = preg_replace( '/\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|secret)\b\s*[:=]\s*[^\s,;]+/i', '$1=[redacted]', $text ) ?? $text;
