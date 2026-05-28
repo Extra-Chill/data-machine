@@ -247,30 +247,26 @@ class SyncRunner {
 			return $this->stepFailure( $flow_step_id, $e->getMessage(), $step_type, $step_class, $input_count );
 		}
 
-		if ( ! is_array( $output_packets ) ) {
-			$output_packets = array();
-		}
-
-		$output_packets = array_values( $output_packets );
-		$truncated      = false;
+		$execution_result = StepExecutionResult::fromStepOutput( $output_packets, $step_type );
+		$output_packets   = $execution_result['packets'];
+		$truncated        = false;
 		if ( count( $output_packets ) > $options['max_items'] ) {
 			$output_packets = array_slice( $output_packets, 0, $options['max_items'] );
 			$truncated      = true;
 		}
 
-		$output_count   = count( $output_packets );
-		$classification = StepExecutionResult::classify( $output_packets, $step_type );
-		$next_step_id   = ( new StepNavigator() )->get_next_flow_step_id( $flow_step_id, array( 'job_id' => $job_id ) );
-		$reason         = null;
+		$output_count = count( $output_packets );
+		$next_step_id = ( new StepNavigator() )->get_next_flow_step_id( $flow_step_id, array( 'job_id' => $job_id ) );
+		$reason       = null;
 
 		if ( $truncated ) {
 			$reason = 'max_items';
 			$this->markBoundedStop( $job_id, 'sync_runner_max_items' );
-		} elseif ( 0 === $output_count && in_array( $step_type, array( 'fetch', 'event_import' ), true ) ) {
+		} elseif ( 'completed_no_items' === $execution_result['status'] ) {
 			$reason = 'completed_no_items';
 			$this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED_NO_ITEMS );
-		} elseif ( ! $classification['success'] ) {
-			return $this->stepFailure( $flow_step_id, $classification['reason'], $step_type, $step_class, $input_count, $output_count );
+		} elseif ( ! $execution_result['success'] ) {
+			return $this->stepFailure( $flow_step_id, $execution_result['reason'], $step_type, $step_class, $input_count, $output_count );
 		} elseif ( null === $next_step_id ) {
 			$reason = 'completed';
 			$this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED );
