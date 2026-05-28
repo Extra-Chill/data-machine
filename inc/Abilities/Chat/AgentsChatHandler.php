@@ -224,22 +224,28 @@ class AgentsChatHandler {
 	 * @return array
 	 */
 	private function toCanonicalOutput( array $result ): array {
-		$metadata                = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
-		$metadata['datamachine'] = array_filter(
-			array(
-				'tool_calls'   => $result['tool_calls'] ?? null,
-				'conversation' => $result['conversation'] ?? null,
-				'max_turns'    => $result['max_turns'] ?? null,
-				'turn_number'  => $result['turn_number'] ?? null,
+		$metadata             = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+		$datamachine_metadata = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
+		$datamachine_metadata = array_filter(
+			array_merge(
+				$datamachine_metadata,
+				array(
+					'tool_calls'   => $result['tool_calls'] ?? null,
+					'conversation' => $result['conversation'] ?? null,
+					'max_turns'    => $result['max_turns'] ?? null,
+					'turn_number'  => $result['turn_number'] ?? null,
+				)
 			),
 			static fn( $value ): bool => null !== $value
 		);
+		$metadata['datamachine'] = $datamachine_metadata;
+		$completed               = (bool) ( $datamachine_metadata['completed'] ?? $result['completed'] ?? true );
 
 		return array(
 			'session_id' => (string) ( $result['session_id'] ?? '' ),
 			'reply'      => (string) ( $result['response'] ?? '' ),
 			'messages'   => $this->toCanonicalMessages( $result['conversation'] ?? array() ),
-			'completed'  => (bool) ( $result['completed'] ?? true ),
+			'completed'  => $completed,
 			'metadata'   => $metadata,
 		);
 	}
