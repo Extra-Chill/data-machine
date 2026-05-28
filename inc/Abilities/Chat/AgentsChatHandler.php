@@ -84,7 +84,7 @@ class AgentsChatHandler {
 			return $agent_id;
 		}
 
-		$user_id = $this->resolveRuntimeUserId( $agent_id, (string) ( $input['agent'] ?? '' ) );
+		$user_id = $this->resolveRuntimeUserId( $agent_id, (string) ( $input['agent'] ?? '' ), $input );
 		if ( $user_id <= 0 ) {
 			return new WP_Error( 'no_user', __( 'No user context available.', 'data-machine' ), array( 'status' => 400 ) );
 		}
@@ -93,8 +93,14 @@ class AgentsChatHandler {
 		$modes          = $this->resolveModes( $input, $client_context );
 		$mode           = implode( ',', $modes );
 		$agent_config   = PluginSettings::resolveModelForAgentModes( 0 === $agent_id ? null : $agent_id, $modes, 'chat' );
-		$provider       = $agent_config['provider'];
-		$model          = $agent_config['model'];
+		$provider       = (string) ( $input['provider'] ?? '' );
+		$model          = (string) ( $input['model'] ?? '' );
+		if ( '' === $provider ) {
+			$provider = $agent_config['provider'];
+		}
+		if ( '' === $model ) {
+			$model = $agent_config['model'];
+		}
 
 		if ( '' === $provider ) {
 			return new WP_Error( 'provider_required', __( 'AI provider is required. Set a default in Data Machine settings.', 'data-machine' ), array( 'status' => 400 ) );
@@ -110,13 +116,17 @@ class AgentsChatHandler {
 			sanitize_text_field( $model ),
 			$user_id,
 			array(
-				'session_id'       => $input['session_id'] ?? null,
-				'modes'            => $modes,
-				'agent_id'         => $agent_id,
-				'attachments'      => $input['attachments'] ?? array(),
-				'client_context'   => $client_context,
-				'session_owner'    => is_array( $input['session_owner'] ?? null ) ? $input['session_owner'] : null,
-				'transcript_owner' => is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : null,
+				'session_id'           => $input['session_id'] ?? null,
+				'selected_pipeline_id' => (int) ( $input['selected_pipeline_id'] ?? 0 ),
+				'max_turns'            => $input['max_turns'] ?? null,
+				'request_id'           => $input['request_id'] ?? null,
+				'modes'                => $modes,
+				'agent_id'             => $agent_id,
+				'agent_slug'           => sanitize_title( (string) ( $input['agent'] ?? '' ) ),
+				'attachments'          => $input['attachments'] ?? array(),
+				'client_context'       => $client_context,
+				'session_owner'        => is_array( $input['session_owner'] ?? null ) ? $input['session_owner'] : null,
+				'transcript_owner'     => is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : null,
 			)
 		);
 
@@ -160,9 +170,15 @@ class AgentsChatHandler {
 	 *
 	 * @param int    $agent_id Internal Data Machine agent ID.
 	 * @param string $agent    Requested Agents API agent slug/id.
+	 * @param array  $input    Canonical input plus Data Machine facade fields.
 	 * @return int Runtime WordPress user ID, or 0 when no safe context exists.
 	 */
-	private function resolveRuntimeUserId( int $agent_id, string $agent ): int {
+	private function resolveRuntimeUserId( int $agent_id, string $agent, array $input ): int {
+		$user_id = (int) ( $input['user_id'] ?? 0 );
+		if ( $user_id > 0 && PermissionHelper::can( 'chat' ) ) {
+			return $user_id;
+		}
+
 		$user_id = PermissionHelper::acting_user_id();
 		if ( $user_id <= 0 ) {
 			$user_id = get_current_user_id();
@@ -211,9 +227,10 @@ class AgentsChatHandler {
 		$metadata                = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
 		$metadata['datamachine'] = array_filter(
 			array(
-				'tool_calls'  => $result['tool_calls'] ?? null,
-				'max_turns'   => $result['max_turns'] ?? null,
-				'turn_number' => $result['turn_number'] ?? null,
+				'tool_calls'    => $result['tool_calls'] ?? null,
+				'conversation' => $result['conversation'] ?? null,
+				'max_turns'     => $result['max_turns'] ?? null,
+				'turn_number'   => $result['turn_number'] ?? null,
 			),
 			static fn( $value ): bool => null !== $value
 		);
