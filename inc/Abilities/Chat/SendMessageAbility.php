@@ -3,8 +3,8 @@
  * Send Message Ability
  *
  * Sends a user message to an AI agent within a chat session. Creates a new
- * session if none is provided. Wraps ChatOrchestrator::processChat() as the
- * canonical entry point for all interfaces (REST, CLI, bridge, tools).
+ * session if none is provided. This is a Data Machine product facade over the
+ * canonical Agents API `agents/chat` entry point.
  *
  * This is the ability that was missing — prior to this, the "send a message
  * and get an AI response" flow lived only in the Chat REST controller,
@@ -17,9 +17,6 @@
 namespace DataMachine\Abilities\Chat;
 
 use DataMachine\Abilities\PermissionHelper;
-use DataMachine\Api\Chat\ChatOrchestrator;
-use DataMachine\Core\PluginSettings;
-
 defined( 'ABSPATH' ) || exit;
 
 class SendMessageAbility {
@@ -136,9 +133,9 @@ class SendMessageAbility {
 	/**
 	 * Execute send-message ability.
 	 *
-	 * Resolves provider/model from agent context if not provided, then
-	 * delegates to ChatOrchestrator::processChat() for the full AI
-	 * conversation turn.
+	 * Delegates to the canonical Agents API `agents/chat` dispatcher. Data
+	 * Machine-specific inputs are passed through for Data Machine's registered
+	 * `wp_agent_chat_handler`; no chat runtime logic lives in this facade.
 	 *
 	 * @since 0.63.0
 	 *
@@ -146,9 +143,9 @@ class SendMessageAbility {
 	 * @return array|\WP_Error Response data from the orchestrator.
 	 */
 	public function execute( array $input ): array|\WP_Error {
-		$message = $input['message'] ?? '';
+		$message = trim( (string) ( $input['message'] ?? '' ) );
 
-		if ( empty( $message ) ) {
+		if ( '' === $message ) {
 			return new \WP_Error(
 				'empty_message',
 				__( 'Message cannot be empty.', 'data-machine' ),
@@ -156,69 +153,84 @@ class SendMessageAbility {
 			);
 		}
 
-		// Resolve user ID: explicit > acting user.
-		$user_id = (int) ( $input['user_id'] ?? 0 );
-		if ( $user_id <= 0 ) {
-			$user_id = PermissionHelper::acting_user_id();
-		}
-
-		if ( $user_id <= 0 ) {
+		if ( ! function_exists( 'wp_get_ability' ) ) {
 			return new \WP_Error(
-				'no_user',
-				__( 'No user context available.', 'data-machine' ),
-				array( 'status' => 400 )
+				'agents_chat_unavailable',
+				__( 'Agents chat ability is unavailable.', 'data-machine' ),
+				array( 'status' => 500 )
 			);
 		}
 
-		$agent_id = (int) ( $input['agent_id'] ?? 0 );
-		$mode     = ! empty( $input['mode'] ) ? sanitize_key( (string) $input['mode'] ) : 'chat';
+		$ability = wp_get_ability( 'agents/chat' );
+		if ( ! $ability ) {
+			return new \WP_Error(
+				'agents_chat_unavailable',
+				__( 'Agents chat ability is not registered.', 'data-machine' ),
+				array( 'status' => 500 )
+			);
+		}
 
-		// Resolve provider/model from input or agent context.
-		$provider = $input['provider'] ?? '';
-		$model    = $input['model'] ?? '';
+		$canonical_input = $this->toCanonicalInput( array_merge( $input, array( 'message' => $message ) ) );
+		$result          = $ability->execute( $canonical_input );
 
-		if ( empty( $provider ) || empty( $model ) ) {
-			$agent_config = PluginSettings::resolveModelForAgentModes( $agent_id > 0 ? $agent_id : null, array( $mode ), 'chat' );
-			if ( empty( $provider ) ) {
-				$provider = $agent_config['provider'];
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return $this->toDataMachineOutput( is_array( $result ) ? $result : array() );
+	}
+
+	/**
+	 * Convert Data Machine facade input to canonical Agents API chat input.
+	 *
+	 * @param array $input Facade input.
+	 * @return array Canonical agents/chat input plus Data Machine adapter fields.
+	 */
+	private function toCanonicalInput( array $input ): array {
+		$agent_id       = (int) ( $input['agent_id'] ?? 0 );
+		$client_context = is_array( $input['client_context'] ?? null ) ? $input['client_context'] : array();
+
+		$canonical = array(
+			'agent'          => (string) ( $input['agent'] ?? ( $agent_id > 0 ? (string) $agent_id : '' ) ),
+			'message'        => (string) $input['message'],
+			'attachments'    => $input['attachments'] ?? array(),
+			'client_context' => $client_context,
+		);
+
+		foreach ( array( 'session_id', 'session_owner', 'transcript_owner' ) as $key ) {
+			if ( array_key_exists( $key, $input ) ) {
+				$canonical[ $key ] = $input[ $key ];
 			}
-			if ( empty( $model ) ) {
-				$model = $agent_config['model'];
+		}
+
+		foreach ( array( 'user_id', 'provider', 'model', 'mode', 'modes', 'selected_pipeline_id', 'max_turns', 'request_id' ) as $key ) {
+			if ( array_key_exists( $key, $input ) && null !== $input[ $key ] && '' !== $input[ $key ] ) {
+				$canonical[ $key ] = $input[ $key ];
 			}
 		}
 
-		if ( empty( $provider ) ) {
-			return new \WP_Error(
-				'provider_required',
-				__( 'AI provider is required. Set a default in Data Machine settings or provide one in the request.', 'data-machine' ),
-				array( 'status' => 400 )
-			);
-		}
+		return $canonical;
+	}
 
-		if ( empty( $model ) ) {
-			return new \WP_Error(
-				'model_required',
-				__( 'AI model is required. Set a default in Data Machine settings or provide one in the request.', 'data-machine' ),
-				array( 'status' => 400 )
-			);
-		}
+	/**
+	 * Convert canonical Agents API chat output to Data Machine's facade shape.
+	 *
+	 * @param array $result Canonical agents/chat output.
+	 * @return array Data Machine send-message output.
+	 */
+	private function toDataMachineOutput( array $result ): array {
+		$metadata    = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+		$datamachine = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
 
-		return ChatOrchestrator::processChat(
-			$message,
-			sanitize_text_field( $provider ),
-			sanitize_text_field( $model ),
-			$user_id,
-			array(
-				'session_id'           => $input['session_id'] ?? null,
-				'selected_pipeline_id' => (int) ( $input['selected_pipeline_id'] ?? 0 ),
-				'max_turns'            => $input['max_turns'] ?? null,
-				'request_id'           => $input['request_id'] ?? null,
-				'mode'                 => $mode,
-				'agent_id'             => $agent_id,
-				'attachments'          => $input['attachments'] ?? array(),
-				'client_context'       => $input['client_context'] ?? array(),
-				'session_owner'        => is_array( $input['session_owner'] ?? null ) ? $input['session_owner'] : null,
-			)
+		return array(
+			'session_id'   => (string) ( $result['session_id'] ?? '' ),
+			'response'     => (string) ( $result['reply'] ?? '' ),
+			'completed'    => (bool) ( $result['completed'] ?? true ),
+			'tool_calls'   => $datamachine['tool_calls'] ?? array(),
+			'conversation' => $datamachine['conversation'] ?? $result['messages'] ?? array(),
+			'metadata'     => $metadata,
+			'max_turns'    => (int) ( $datamachine['max_turns'] ?? 0 ),
+			'turn_number'  => (int) ( $datamachine['turn_number'] ?? 0 ),
 		);
 	}
 }

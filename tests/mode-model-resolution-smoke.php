@@ -129,7 +129,7 @@ namespace {
 
 	$assert_same( true, str_contains( $ai_step_source, "resolveModelForAgentModes( $" . "agent_id, $" . "modes, ToolPolicyResolver::MODE_PIPELINE )" ), 'AIStep uses shared mode-model resolver with pipeline fallback' );
 	$assert_same( true, str_contains( $chat_source, "resolveModelForAgentModes( 0 === $" . "agent_id ? null : $" . "agent_id, $" . "modes, 'chat' )" ), 'canonical agents/chat uses shared mode-model resolver with chat fallback' );
-	$assert_same( true, str_contains( $send_source, "resolveModelForAgentModes( $" . "agent_id > 0 ? $" . "agent_id : null, array( $" . "mode ), 'chat' )" ), 'send-message ability uses shared mode-model resolver with chat fallback' );
+	$assert_same( true, str_contains( $send_source, "wp_get_ability( 'agents/chat' )" ), 'send-message ability delegates model resolution to canonical agents/chat' );
 
 	echo "\n{$passes} passed, {$fails} failed\n";
 	if ( $fails > 0 ) {
