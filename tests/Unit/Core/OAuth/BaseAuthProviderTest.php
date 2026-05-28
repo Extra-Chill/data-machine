@@ -359,24 +359,24 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 	// Policy-resolved account context API
 	// -------------------------------------------------------------------------
 
-	public function test_get_account_for_context_returns_null_when_no_account(): void {
-		$this->assertNull( $this->provider->get_account_for_context() );
+	public function test_get_account_for_policy_context_returns_null_when_no_account(): void {
+		$this->assertNull( $this->provider->get_account_for_policy_context() );
 	}
 
-	public function test_get_account_for_context_reads_site_account_by_default(): void {
+	public function test_get_account_for_policy_context_reads_site_account_by_default(): void {
 		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
 
-		$this->assertSame( 'tok_site', $this->provider->get_account_for_context()['access_token'] );
+		$this->assertSame( 'tok_site', $this->provider->get_account_for_policy_context()['access_token'] );
 	}
 
-	public function test_get_account_for_context_preserves_site_policy_for_user_context(): void {
+	public function test_get_account_for_policy_context_preserves_site_policy_for_user_context(): void {
 		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
 		$this->provider->save_account_for_user( 42, array( 'access_token' => 'tok_user_42' ) );
 
-		$this->assertSame( 'tok_site', $this->provider->get_account_for_context( array( 'user_id' => 42 ) )['access_token'] );
+		$this->assertSame( 'tok_site', $this->provider->get_account_for_policy_context( array( 'user_id' => 42 ) )['access_token'] );
 	}
 
-	public function test_get_account_for_context_resolves_user_policy(): void {
+	public function test_get_account_for_policy_context_resolves_user_policy(): void {
 		add_filter(
 			'datamachine_auth_scope_policy',
 			function () {
@@ -387,12 +387,12 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
 		$this->provider->save_account_for_user( 42, array( 'access_token' => 'tok_user_42' ) );
 
-		$this->assertSame( 'tok_user_42', $this->provider->get_account_for_context( array( 'user_id' => 42 ) )['access_token'] );
+		$this->assertSame( 'tok_user_42', $this->provider->get_account_for_policy_context( array( 'user_id' => 42 ) )['access_token'] );
 
 		remove_all_filters( 'datamachine_auth_scope_policy' );
 	}
 
-	public function test_get_account_for_context_resolves_agent_before_user_for_principal_policy(): void {
+	public function test_get_account_for_policy_context_resolves_agent_before_user_for_principal_policy(): void {
 		add_filter(
 			'datamachine_auth_scope_policy',
 			function () {
@@ -404,7 +404,7 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 		$this->provider->save_account_for_user( 42, array( 'access_token' => 'tok_user_42' ) );
 		$this->provider->save_account_for_agent( 303, array( 'access_token' => 'tok_agent_303' ) );
 
-		$account = $this->provider->get_account_for_context(
+		$account = $this->provider->get_account_for_policy_context(
 			array(
 				'user_id'  => 42,
 				'agent_id' => 303,
@@ -416,7 +416,7 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 		remove_all_filters( 'datamachine_auth_scope_policy' );
 	}
 
-	public function test_get_account_for_context_falls_back_to_site_account_when_scoped_account_missing(): void {
+	public function test_get_account_for_policy_context_falls_back_to_site_account_when_scoped_account_missing(): void {
 		add_filter(
 			'datamachine_auth_scope_policy',
 			function () {
@@ -426,12 +426,12 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 
 		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
 
-		$this->assertSame( 'tok_site', $this->provider->get_account_for_context( array( 'user_id' => 42 ) )['access_token'] );
+		$this->assertSame( 'tok_site', $this->provider->get_account_for_policy_context( array( 'user_id' => 42 ) )['access_token'] );
 
 		remove_all_filters( 'datamachine_auth_scope_policy' );
 	}
 
-	public function test_get_account_for_context_returns_null_when_policy_scoped_and_no_fallback_exists(): void {
+	public function test_get_account_for_policy_context_returns_null_when_policy_scoped_and_no_fallback_exists(): void {
 		add_filter(
 			'datamachine_auth_scope_policy',
 			function () {
@@ -439,9 +439,55 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 			}
 		);
 
-		$this->assertNull( $this->provider->get_account_for_context( array( 'user_id' => 42 ) ) );
+		$this->assertNull( $this->provider->get_account_for_policy_context( array( 'user_id' => 42 ) ) );
 
 		remove_all_filters( 'datamachine_auth_scope_policy' );
+	}
+
+	public function test_get_account_for_context_emits_deprecation_and_routes_to_policy_context(): void {
+		$deprecated_calls = array();
+		$this->setExpectedDeprecated( 'DataMachine\Core\OAuth\BaseAuthProvider::get_account_for_context' );
+
+		add_filter(
+			'deprecated_function_trigger_error',
+			function () {
+				return false;
+			}
+		);
+		add_filter(
+			'datamachine_auth_scope_policy',
+			function () {
+				return BaseAuthProvider::AUTH_SCOPE_USER;
+			}
+		);
+		add_action(
+			'deprecated_function_run',
+			function ( $function_name, $replacement, $version ) use ( &$deprecated_calls ) {
+				$deprecated_calls[] = array( $function_name, $replacement, $version );
+			},
+			10,
+			3
+		);
+
+		$this->provider->save_site_account( array( 'access_token' => 'tok_site' ) );
+
+		$result = $this->provider->get_account_for_context( array( 'user_id' => 42 ) );
+
+		$this->assertSame( 'tok_site', $result['access_token'] );
+		$this->assertSame(
+			array(
+				array(
+					'DataMachine\Core\OAuth\BaseAuthProvider::get_account_for_context',
+					'BaseAuthProvider::get_account_for_policy_context()',
+					'0.136.0',
+				),
+			),
+			$deprecated_calls
+		);
+
+		remove_all_filters( 'deprecated_function_trigger_error' );
+		remove_all_filters( 'datamachine_auth_scope_policy' );
+		remove_all_filters( 'deprecated_function_run' );
 	}
 
 	public function test_get_account_without_context_does_not_emit_deprecation(): void {
@@ -489,7 +535,7 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 			array(
 				array(
 					'DataMachine\Core\OAuth\BaseAuthProvider::get_account with a context argument',
-					'BaseAuthProvider::get_account_for_context()',
+					'BaseAuthProvider::get_account_for_policy_context()',
 					'0.131.0',
 				),
 			),
@@ -1025,7 +1071,7 @@ class BaseAuthProviderTest extends WP_UnitTestCase {
 
 		$this->assertSame(
 			'tok_agent_303',
-			$this->provider->get_account_for_context( array( 'agent_id' => 303 ) )['access_token']
+			$this->provider->get_account_for_policy_context( array( 'agent_id' => 303 ) )['access_token']
 		);
 
 		$this->provider->save_account_for_agent( 404, array( 'access_token' => 'tok_agent_scoped' ) );

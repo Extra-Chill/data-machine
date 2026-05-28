@@ -10,7 +10,20 @@
 namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\AuthAbilities;
+use DataMachine\Abilities\HandlerAbilities;
+use DataMachine\Core\OAuth\BaseAuthProvider;
 use WP_UnitTestCase;
+
+class AuthAbilitiesAccountScopeProvider extends BaseAuthProvider {
+
+	public function get_config_fields(): array {
+		return array();
+	}
+
+	public function is_authenticated(): bool {
+		return false;
+	}
+}
 
 class AuthAbilitiesTest extends WP_UnitTestCase {
 
@@ -18,6 +31,9 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 
 	public function set_up(): void {
 		parent::set_up();
+		delete_site_option( 'datamachine_auth_data' );
+		AuthAbilities::clearCache();
+		HandlerAbilities::clearCache();
 
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
@@ -26,6 +42,12 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
+		delete_site_option( 'datamachine_auth_data' );
+		remove_all_filters( 'datamachine_auth_providers' );
+		remove_all_filters( 'datamachine_handlers' );
+		AuthAbilities::clearCache();
+		HandlerAbilities::clearCache();
+		wp_set_current_user( 0 );
 		parent::tear_down();
 	}
 
@@ -111,6 +133,67 @@ class AuthAbilitiesTest extends WP_UnitTestCase {
 
 		$this->assertFalse( $result['success'] );
 		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	public function test_set_auth_token_saves_user_account_without_site_fallback(): void {
+		$provider = new AuthAbilitiesAccountScopeProvider( 'scope_provider' );
+		$this->registerAccountScopeProvider( $provider );
+
+		$result = $this->auth_abilities->executeSetAuthToken(
+			array(
+				'handler_slug' => 'scope_handler',
+				'user_id'      => 42,
+				'account_data' => array( 'access_token' => 'tok_user_42' ),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'tok_user_42', $provider->get_account_for_user( 42 )['access_token'] );
+		$this->assertNull( $provider->get_site_account() );
+		$this->assertNull( $provider->get_account_for_user( 99 ) );
+	}
+
+	public function test_set_auth_token_prefers_agent_account_when_user_and_agent_are_present(): void {
+		$provider = new AuthAbilitiesAccountScopeProvider( 'scope_provider' );
+		$this->registerAccountScopeProvider( $provider );
+
+		$result = $this->auth_abilities->executeSetAuthToken(
+			array(
+				'handler_slug' => 'scope_handler',
+				'user_id'      => 42,
+				'agent_id'     => 303,
+				'account_data' => array( 'access_token' => 'tok_agent_303' ),
+			)
+		);
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'tok_agent_303', $provider->get_account_for_agent( 303 )['access_token'] );
+		$this->assertNull( $provider->get_account_for_user( 42 ) );
+		$this->assertNull( $provider->get_site_account() );
+	}
+
+	private function registerAccountScopeProvider( AuthAbilitiesAccountScopeProvider $provider ): void {
+		add_filter(
+			'datamachine_auth_providers',
+			function ( array $providers ) use ( $provider ): array {
+				$providers['scope_provider'] = $provider;
+				return $providers;
+			}
+		);
+		add_filter(
+			'datamachine_handlers',
+			function ( array $handlers ): array {
+				$handlers['scope_handler'] = array(
+					'slug'              => 'scope_handler',
+					'requires_auth'     => true,
+					'auth_provider_key' => 'scope_provider',
+				);
+				return $handlers;
+			}
+		);
+
+		AuthAbilities::clearCache();
+		HandlerAbilities::clearCache();
 	}
 
 	public function test_permission_callback(): void {

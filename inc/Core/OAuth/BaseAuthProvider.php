@@ -320,11 +320,11 @@ abstract class BaseAuthProvider {
 				_deprecated_function(
 					__METHOD__ . ' with a context argument',
 					'0.131.0',
-					'BaseAuthProvider::get_account_for_context()'
+					'BaseAuthProvider::get_account_for_policy_context()'
 				);
 			}
 
-			return $this->get_account_for_context( $context ) ?? array();
+			return $this->get_account_for_policy_context( $context ) ?? array();
 		}
 
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
@@ -345,16 +345,43 @@ abstract class BaseAuthProvider {
 	/**
 	 * Get the OAuth account that applies to an execution context.
 	 *
-	 * This is the explicit policy-resolved account lookup. It preserves the
-	 * existing `get_account( array $context )` scope resolution and site fallback
-	 * semantics while returning `null` when no account is available.
+	 * Deprecated compatibility wrapper for the explicit policy-fallback lookup.
+	 * New callers must choose a named scope API (`get_site_account()`,
+	 * `get_account_for_user()`, `get_account_for_agent()`) or intentionally opt
+	 * into policy resolution plus site fallback via
+	 * `get_account_for_policy_context()`.
 	 *
 	 * @since 0.130.0
+	 * @deprecated 0.136.0 Use get_account_for_policy_context() when fallback is intended.
 	 *
 	 * @param array $context Optional principal context, e.g. user_id or agent_id.
 	 * @return array|null Decrypted account data, or null if no account resolves.
 	 */
 	public function get_account_for_context( array $context = array() ): ?array {
+		if ( function_exists( '_deprecated_function' ) ) {
+			_deprecated_function(
+				__METHOD__,
+				'0.136.0',
+				'BaseAuthProvider::get_account_for_policy_context()'
+			);
+		}
+
+		return $this->get_account_for_policy_context( $context );
+	}
+
+	/**
+	 * Get the policy-resolved OAuth account for an execution context.
+	 *
+	 * This method is the explicit opt-in surface for scope-policy resolution with
+	 * legacy site-account fallback. Use named scope methods when a missing scoped
+	 * account must remain missing instead of falling back to site credentials.
+	 *
+	 * @since 0.136.0
+	 *
+	 * @param array $context Optional principal context, e.g. user_id or agent_id.
+	 * @return array|null Decrypted account data, or null if no account resolves.
+	 */
+	public function get_account_for_policy_context( array $context = array() ): ?array {
 		$all_auth_data = get_site_option( 'datamachine_auth_data', array() );
 		$provider_data = $all_auth_data[ $this->provider_slug ] ?? array();
 		$scope         = $this->get_principal_scope( $context, 'account' );
