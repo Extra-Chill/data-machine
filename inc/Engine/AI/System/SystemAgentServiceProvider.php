@@ -34,6 +34,7 @@ use DataMachine\Engine\AI\System\Tasks\Retention\RetentionFilesTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionLogsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionProcessedItemsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionStaleClaimsTask;
+use DataMachine\Engine\AI\System\Tasks\SourceInventoryTask;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\Tasks\RecurringScheduleRegistry;
 use DataMachine\Engine\Tasks\RecurringScheduler;
@@ -77,6 +78,7 @@ class SystemAgentServiceProvider {
 		$tasks['agent_call']                             = AgentCallTask::class;
 		$tasks['dispatch_message']                       = DispatchMessageTask::class;
 		$tasks['emit_data_packets']                      = EmitDataPacketsTask::class;
+		$tasks['source_inventory']                       = SourceInventoryTask::class;
 		$tasks['image_generation']                       = ImageGenerationTask::class;
 		$tasks['image_optimization']                     = ImageOptimizationTask::class;
 		$tasks['alt_text_generation']                    = AltTextTask::class;
