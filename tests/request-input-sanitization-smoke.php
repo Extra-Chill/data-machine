@@ -29,7 +29,8 @@ $webhook_gate    = file_get_contents( $root . '/inc/Core/Steps/WebhookGate/Webho
 
 echo "\n[1] Superglobal request input is unslashed and sanitized\n";
 $assert( 'REQUEST_URI is unslashed and sanitized before parsing', str_contains( $plugin, "sanitize_text_field( wp_unslash( \$_SERVER['REQUEST_URI'] ) )" ) );
-$assert( 'CLI argv is unslashed and sanitized before parsing', str_contains( $system_command, 'sanitize_text_field( wp_unslash( (string) $arg ) )' ) );
+$assert( 'CLI argv is unslashed before task-param parsing without corrupting raw values', str_contains( $system_command, 'return (string) wp_unslash( $arg );' ) );
+$assert( 'CLI argv sanitization exception documents structured value preservation', str_contains( $system_command, 'full-field sanitization would corrupt structured values' ) );
 $assert( 'authorize cookie is unslashed and sanitized', str_contains( $agent_authorize, 'sanitize_text_field( wp_unslash( $_COOKIE[ LOGGED_IN_COOKIE ] ) )' ) );
 $assert( 'webhook REMOTE_ADDR fallback is unslashed and sanitized', str_contains( $webhook_gate, "sanitize_text_field( wp_unslash( $" . "request->get_header( 'x-forwarded-for' ) ?? \$_SERVER['REMOTE_ADDR'] ?? '' ) )" ) );
 

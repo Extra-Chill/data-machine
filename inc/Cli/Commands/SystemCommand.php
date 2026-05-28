@@ -341,8 +341,11 @@ class SystemCommand extends BaseCommand {
 	private static function collectRunTaskParamArgs( array $assoc_args, ?array $argv = null ): array|string {
 		$argv       = $argv ?? array_map(
 			static function ( $arg ): string {
-				return sanitize_text_field( wp_unslash( (string) $arg ) );
+				// Preserve raw CLI parameter payloads; values are parsed/coerced after
+				// the `--param` boundary and may intentionally contain JSON/URLs.
+				return (string) wp_unslash( $arg );
 			},
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Raw argv values are unslashed here and parsed as CLI task parameters below; full-field sanitization would corrupt structured values.
 			$_SERVER['argv'] ?? array()
 		);
 		$raw_params = array();
