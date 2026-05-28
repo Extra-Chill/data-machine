@@ -183,35 +183,12 @@ final class AgentBundleLifecycleProjection {
 
 	/** @return array<int,array<string,mixed>> */
 	public static function bundle_file_artifacts( array $bundle ): array {
-		$artifacts = array();
-		$files     = is_array( $bundle['artifact_files'] ?? null ) ? $bundle['artifact_files'] : array();
-
-		foreach ( AgentBundleArtifactDefinitions::file_artifacts() as $directory => $definition ) {
-			foreach ( is_array( $files[ $directory ] ?? null ) ? $files[ $directory ] : array() as $relative_path => $payload ) {
-				$artifact_id = is_array( $payload ) && is_string( $payload['artifact_id'] ?? null )
-					? (string) $payload['artifact_id']
-					: self::artifact_id_from_relative_path( (string) $relative_path );
-
-				$artifacts[] = array(
-					'artifact_type' => $definition['artifact_type'],
-					'artifact_id'   => $artifact_id,
-					'source_path'   => $directory . '/' . ltrim( (string) $relative_path, '/' ),
-					'payload'       => $payload,
-				);
-			}
-		}
-
-		return $artifacts;
+		return AgentBundleArtifactDefinitions::file_artifact_rows_from_bundle( $bundle );
 	}
 
 	/** @return string[] */
 	private static function bundle_file_artifact_types(): array {
 		return AgentBundleArtifactDefinitions::file_artifact_types();
-	}
-
-	private static function artifact_id_from_relative_path( string $relative_path ): string {
-		$relative_path = preg_replace( '/\.(json|md|txt)$/i', '', $relative_path );
-		return null === $relative_path ? '' : $relative_path;
 	}
 
 	private static function current_payload_from_record( ?array $record ): mixed {

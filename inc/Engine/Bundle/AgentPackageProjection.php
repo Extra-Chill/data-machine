@@ -94,39 +94,52 @@ final class AgentPackageProjection {
 
 		foreach ( $directory->pipelines() as $pipeline ) {
 			$document    = $pipeline->to_array();
+			$payload     = AgentBundleArtifactPayloads::pipeline_document_payload( $document, (string) $document['slug'] );
 			$artifacts[] = self::artifact(
 				'datamachine/pipeline',
 				(string) $document['slug'],
 				(string) $document['name'],
 				BundleSchema::PIPELINES_DIR . '/' . $document['slug'] . '.json',
-				array( 'step_count' => count( is_array( $document['steps'] ?? null ) ? $document['steps'] : array() ) )
+				array( 'step_count' => count( is_array( $document['steps'] ?? null ) ? $document['steps'] : array() ) ),
+				array(),
+				$payload
 			);
 		}
 
 		foreach ( $directory->flows() as $flow ) {
-			$document    = $flow->to_array();
+			$document      = $flow->to_array();
+			$payload       = AgentBundleArtifactPayloads::flow_document_payload( $document, (string) $document['slug'] );
+			$run_artifacts = BundleSchema::normalize_run_artifact_egress_policy( $document['run_artifacts'] ?? array() );
+			$meta          = array(
+				'pipeline_slug' => (string) ( $document['pipeline_slug'] ?? '' ),
+				'step_count'    => count( is_array( $document['steps'] ?? null ) ? $document['steps'] : array() ),
+			);
+			if ( ! empty( $run_artifacts ) ) {
+				$meta['run_artifacts'] = $run_artifacts;
+			}
 			$artifacts[] = self::artifact(
 				'datamachine/flow',
 				(string) $document['slug'],
 				(string) $document['name'],
 				BundleSchema::FLOWS_DIR . '/' . $document['slug'] . '.json',
-				array(
-					'pipeline_slug' => (string) ( $document['pipeline_slug'] ?? '' ),
-					'step_count'    => count( is_array( $document['steps'] ?? null ) ? $document['steps'] : array() ),
-				)
+				$meta,
+				array(),
+				$payload
 			);
 		}
 
 		foreach ( AgentBundleArtifactDefinitions::file_artifacts() as $directory_name => $definition ) {
 			$files = AgentBundleArtifactDefinitions::files_from_directory( $directory, $directory_name );
 			foreach ( $files as $relative_path => $payload ) {
-				$slug        = self::slug_from_path( (string) $relative_path );
+				$slug        = AgentBundleArtifactDefinitions::artifact_id_from_payload( $payload, (string) $relative_path );
 				$artifacts[] = self::artifact(
 					$definition['package_type'],
 					$slug,
 					$slug,
 					$directory_name . '/' . ltrim( (string) $relative_path, '/' ),
-					array( 'payload_kind' => is_array( $payload ) ? 'json' : 'text' )
+					array( 'payload_kind' => is_array( $payload ) ? 'json' : 'text' ),
+					array(),
+					$payload
 				);
 			}
 		}
@@ -148,7 +161,8 @@ final class AgentPackageProjection {
 					'extension_artifact_type' => $artifact_type,
 					'payload_kind'            => 'json',
 				),
-				self::string_list( is_array( $artifact['requires'] ?? null ) ? $artifact['requires'] : array() )
+				self::string_list( is_array( $artifact['requires'] ?? null ) ? $artifact['requires'] : array() ),
+				$artifact['payload'] ?? null
 			);
 		}
 
@@ -165,7 +179,7 @@ final class AgentPackageProjection {
 	 * @param array<string,mixed> $meta   Artifact metadata.
 	 * @return array<string,mixed>
 	 */
-	private static function artifact( string $type, string $slug, string $label, string $source, array $meta = array(), array $requires = array() ): array {
+	private static function artifact( string $type, string $slug, string $label, string $source, array $meta = array(), array $requires = array(), mixed $payload = null ): array {
 		$artifact = array(
 			'type'   => $type,
 			'slug'   => $slug,
@@ -181,6 +195,10 @@ final class AgentPackageProjection {
 
 		if ( ! empty( $requires ) ) {
 			$artifact['requires'] = self::string_list( $requires );
+		}
+
+		if ( null !== $payload ) {
+			$artifact['checksum'] = AgentBundleArtifactHasher::hash( $payload );
 		}
 
 		return $artifact;
@@ -207,16 +225,4 @@ final class AgentPackageProjection {
 		return $normalized;
 	}
 
-	/**
-	 * Build an artifact slug from a package-relative path.
-	 *
-	 * @param string $path Relative path.
-	 * @return string
-	 */
-	private static function slug_from_path( string $path ): string {
-		$basename = basename( str_replace( '\\', '/', $path ) );
-		$slug     = preg_replace( '/\.[^.]+$/', '', $basename );
-
-		return is_string( $slug ) && '' !== $slug ? $slug : $basename;
-	}
 }

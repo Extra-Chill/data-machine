@@ -23,6 +23,13 @@ if ( ! function_exists( 'esc_html' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sanitize_title' ) ) {
+	function sanitize_title( $text ) {
+		$sanitized = preg_replace( '/[^a-z0-9]+/', '-', strtolower( (string) $text ) );
+		return trim( is_string( $sanitized ) ? $sanitized : '', '-' );
+	}
+}
+
 if ( ! function_exists( 'did_action' ) ) {
 	function did_action( $hook = '' ) {
 		return 0;

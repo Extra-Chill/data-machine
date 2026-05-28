@@ -269,7 +269,7 @@ datamachine_portability_assert( 'prompt artifact round-trips', isset( $imported_
 datamachine_portability_assert( 'rubric artifact round-trips', isset( $imported_by_key['datamachine/rubric:quality-rubric'] ) );
 datamachine_portability_assert( 'tool policy artifact round-trips', isset( $imported_by_key['datamachine/tool-policy:safe-tools'] ) );
 datamachine_portability_assert( 'auth ref artifact round-trips', isset( $imported_by_key['datamachine/auth-ref:github-default'] ) );
-datamachine_portability_assert( 'queue seed artifact round-trips', isset( $imported_by_key['datamachine/seed-queue:topic-loop'] ) );
+datamachine_portability_assert( 'queue seed artifact round-trips', isset( $imported_by_key['datamachine/queue-seed:topic-loop'] ) );
 datamachine_portability_assert( 'extension artifact round-trips with namespaced type', isset( $imported_by_key['intelligence/wiki-brain:portable'] ) );
 
 echo "\n[2] Agents API adoption plan preserves local edits while auto-applying clean artifacts:\n";

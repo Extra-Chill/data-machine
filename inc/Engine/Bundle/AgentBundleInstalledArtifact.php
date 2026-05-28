@@ -170,13 +170,16 @@ final class AgentBundleInstalledArtifact {
 	}
 
 	private static function validate_artifact_type( string $type ): string {
-		$type       = strtolower( trim( str_replace( '\\', '/', self::non_empty_string( $type, 'artifact_type' ) ) ) );
+		$type       = AgentBundleArtifactDefinitions::bundle_artifact_type( self::non_empty_string( $type, 'artifact_type' ) );
 		$normalized = preg_replace( '/[^a-z0-9_\.\/-]+/', '', $type );
 		$normalized = preg_replace( '#/+#', '/', is_string( $normalized ) ? $normalized : '' );
 		$normalized = trim( is_string( $normalized ) ? $normalized : '', '/' );
 
 		if ( '' === $normalized || $normalized !== $type ) {
 			throw new BundleValidationException( 'installed bundle artifact_type must be a normalized artifact type.' );
+		}
+		if ( ! in_array( $normalized, BundleSchema::artifact_types(), true ) ) {
+			throw new BundleValidationException( 'installed bundle artifact_type must be one of the registered bundle artifact types.' );
 		}
 
 		return $normalized;
@@ -246,15 +249,10 @@ final class AgentBundleInstalledArtifact {
 	}
 
 	private static function package_artifact_type( string $type ): string {
-		if ( str_contains( $type, '/' ) ) {
-			return $type;
-		}
-
-		return 'datamachine/' . str_replace( '_', '-', $type );
+		return AgentBundleArtifactDefinitions::package_artifact_type( $type );
 	}
 
 	private static function bundle_artifact_type( string $type ): string {
-		$type = str_starts_with( $type, 'datamachine/' ) ? substr( $type, strlen( 'datamachine/' ) ) : $type;
-		return str_replace( '-', '_', $type );
+		return AgentBundleArtifactDefinitions::bundle_artifact_type( $type );
 	}
 }
