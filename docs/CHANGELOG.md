@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.135.2] - 2026-05-28
+
+### Changed
+- Emit transcript and tool trace artifact files
+
+### Fixed
+- format array flow settings summaries
+
 ## [0.135.1] - 2026-05-28
 
 ### Fixed
