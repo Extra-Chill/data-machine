@@ -11,6 +11,7 @@ use DataMachine\Abilities\Engine\ExecuteStepAbility;
 use DataMachine\Abilities\Engine\RunFlowAbility;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Core\DataPacket;
+use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Pipelines\Pipelines;
@@ -34,6 +35,7 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
     private array $captured_ai_tools = array();
     private array $captured_logs = array();
     private array $original_settings = array();
+    private int $agent_id = 0;
 
     public function set_up(): void
     {
@@ -43,6 +45,12 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
 
         $user_id = self::factory()->user->create(array('role' => 'administrator'));
         wp_set_current_user($user_id);
+
+        $this->agent_id = (new Agents())->create_if_missing(
+            'pipeline-contract-agent',
+            'Pipeline Contract Agent',
+            $user_id
+        );
 
         $this->original_settings = get_option('datamachine_settings', array());
         update_option(
@@ -317,6 +325,7 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
                 'pipeline_name'   => 'Fake AI Pipeline Contract',
                 'pipeline_config' => $pipeline_config,
                 'user_id'         => get_current_user_id(),
+                'agent_id'        => $this->agent_id,
             )
         );
 
@@ -338,6 +347,7 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
                 'flow_config'       => $flow_config,
                 'scheduling_config' => array('enabled' => true),
                 'user_id'           => get_current_user_id(),
+                'agent_id'          => $this->agent_id,
             )
         );
 
