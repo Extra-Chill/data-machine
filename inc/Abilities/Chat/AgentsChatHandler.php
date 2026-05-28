@@ -224,9 +224,9 @@ class AgentsChatHandler {
 	 * @return array
 	 */
 	private function toCanonicalOutput( array $result ): array {
-		$metadata             = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
-		$datamachine_metadata = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
-		$datamachine_metadata = array_filter(
+		$metadata                = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+		$datamachine_metadata    = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
+		$datamachine_metadata    = array_filter(
 			array_merge(
 				$datamachine_metadata,
 				array(
