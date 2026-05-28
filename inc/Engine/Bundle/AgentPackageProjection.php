@@ -233,5 +233,4 @@ final class AgentPackageProjection {
 
 		return $normalized;
 	}
-
 }
