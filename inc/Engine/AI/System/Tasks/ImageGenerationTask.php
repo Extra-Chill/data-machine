@@ -18,6 +18,15 @@ class ImageGenerationTask extends SystemTask {
 	const JPEG_QUALITY = 85;
 
 	/**
+	 * Image generation is permission-checked before scheduling.
+	 *
+	 * @return bool True when agent context is required.
+	 */
+	public function requiresAgentContext(): bool {
+		return false;
+	}
+
+	/**
 	 * Execute image generation task.
 	 *
 	 * @param int   $jobId  Job ID from DM Jobs table.

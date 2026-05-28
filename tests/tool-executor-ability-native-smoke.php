@@ -141,7 +141,7 @@ namespace DataMachine\Core\WordPress {
 		public static array $stored = array();
 
 		public static function extractPostId( array $tool_result ): int {
-			return (int) ( $tool_result['post_id'] ?? 0 );
+			return (int) ( $tool_result['post_id'] ?? $tool_result['result']['post_id'] ?? 0 );
 		}
 
 		public static function store( int $post_id, array $tool_def, int $job_id ): void {
@@ -156,8 +156,14 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	use DataMachine\Engine\AI\Tools\Execution\ToolExecutionCore;
 	use DataMachine\Engine\AI\Tools\ToolExecutor;
 
+	require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-declaration.php';
+	require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-parameters.php';
+	require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-call.php';
+	require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-result.php';
+	require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-executor.php';
+	require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-execution-core.php';
 	require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-action-policy.php';
-	require_once dirname( __DIR__ ) . '/inc/Engine/AI/Tools/ToolParameters.php';
+	require_once dirname( __DIR__ ) . '/inc/Core/AbilityResult.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/AI/Tools/Execution/ToolExecutionCore.php';
 	require_once dirname( __DIR__ ) . '/inc/Engine/AI/Tools/ToolExecutor.php';
 
@@ -252,8 +258,8 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	);
 	assert_smoke( 'ability-only result succeeds', true === ( $result['success'] ?? false ) );
 	assert_smoke( 'ability execute callback ran exactly once', 1 === $ability->execute_count );
-	assert_smoke( 'AI parameter reached ability input', 'hello' === ( $result['received']['message'] ?? null ) );
-	assert_smoke( 'payload parameter reached ability input', 42 === ( $result['received']['job_id'] ?? null ) );
+	assert_smoke( 'AI parameter reached ability input', 'hello' === ( $result['result']['received']['message'] ?? null ) );
+	assert_smoke( 'payload parameter reached ability input', 42 === ( $result['result']['received']['job_id'] ?? null ) );
 	assert_smoke( 'successful ability result still participates in post tracking', 1 === post_tracking_count() );
 
 	echo "\n[core:1] Generic execution core runs without Data Machine decorators\n";
@@ -264,7 +270,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		fn( $input ) => 'scalar-ok'
 	);
 	$registry->register_for_smoke( 'datamachine/core-ability', $core_ability );
-	$core_result = ( new ToolExecutionCore() )->executeTool(
+	$core_result = ( new \AgentsAPI\AI\Tools\WP_Agent_Tool_Execution_Core() )->executeTool(
 		'core_ability_tool',
 		array( 'message' => 'core' ),
 		array(
@@ -278,10 +284,11 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 				),
 			),
 		),
+		new ToolExecutionCore(),
 		array( 'job_id' => 42 )
 	);
 	assert_smoke( 'core wraps scalar ability result with normalized envelope', true === ( $core_result['success'] ?? false ) && 'scalar-ok' === ( $core_result['result'] ?? null ) );
-	assert_smoke( 'core result includes ability slug', 'datamachine/core-ability' === ( $core_result['ability'] ?? null ) );
+	assert_smoke( 'core result includes ability slug metadata', 'datamachine/core-ability' === ( $core_result['metadata']['ability'] ?? null ) );
 	assert_smoke( 'core path does not perform post tracking decoration', 0 === post_tracking_count() );
 
 	echo "\n[decorator:1] ToolExecutor still stages pending actions before direct execution\n";
@@ -328,7 +335,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		)
 	);
 	assert_smoke( 'legacy result succeeds', true === ( $result['success'] ?? false ) );
-	assert_smoke( 'class/method metadata wins over linked ability during migration', true === ( $result['legacy'] ?? false ) );
+	assert_smoke( 'class/method metadata wins over linked ability during migration', true === ( $result['result']['legacy'] ?? false ) );
 
 	echo "\n[ability:2] Missing ability returns a clear failure\n";
 	$result = execute_tool(

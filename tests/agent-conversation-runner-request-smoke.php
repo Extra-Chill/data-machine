@@ -405,7 +405,7 @@ assert_runner_request( 'workspace_read' === ( $sandbox_metadata['tool_calls'][0]
 assert_runner_request( array( 'path' => 'README.md' ) === ( $sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'tool_calls records parsed workspace tool parameters' );
 assert_runner_request( ! array_key_exists( 'tool_calls', $sandbox_result ), 'tool_calls are namespaced outside the Agents API result top level' );
 assert_runner_request( 1 === count( $sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline function call executes a workspace tool' );
-assert_runner_request( 'README.md' === ( $sandbox_result['tool_execution_results'][0]['result']['path'] ?? null ), 'sandbox/pipeline tool execution receives parsed parameters' );
+assert_runner_request( 'README.md' === ( $sandbox_result['tool_execution_results'][0]['result']['result']['path'] ?? null ), 'sandbox/pipeline tool execution receives parsed parameters' );
 
 // 4b. Sandbox/pipeline runs also execute XML tool calls emitted as text.
 $xml_dispatch_count = 0;

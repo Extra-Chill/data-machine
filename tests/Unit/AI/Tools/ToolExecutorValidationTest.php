@@ -7,11 +7,10 @@
 
 namespace DataMachine\Tests\Unit\AI\Tools;
 
-use DataMachine\Engine\AI\Tools\Execution\ToolExecutionCore;
+use AgentsAPI\AI\Tools\WP_Agent_Tool_Parameters;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolManager;
 use WP_UnitTestCase;
-use ReflectionClass;
 
 class ToolExecutorValidationTest extends WP_UnitTestCase {
 
@@ -174,6 +173,19 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'query', $result['error'] );
 	}
 
+	public function test_execute_tool_returns_error_for_missing_tool(): void {
+		$result = ToolExecutor::executeTool(
+			'missing_tool',
+			array(),
+			array(),
+			array()
+		);
+
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'missing_tool', $result['tool_name'] );
+		$this->assertSame( 'tool_not_found', $result['metadata']['error_type'] ?? null );
+	}
+
 	public function test_execute_tool_succeeds_with_required_params_present(): void {
 		$available_tools = array(
 			'test_tool' => array(
@@ -264,11 +276,7 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 	}
 
 	private function invokeValidateMethod( array $tool_parameters, array $tool_def ): array {
-		$reflection = new ReflectionClass( ToolExecutionCore::class );
-		$method     = $reflection->getMethod( 'validateRequiredParameters' );
-		$method->setAccessible( true );
-
-		return $method->invoke( null, $tool_parameters, $tool_def );
+		return WP_Agent_Tool_Parameters::validateRequiredParameters( $tool_parameters, $tool_def );
 	}
 
 }

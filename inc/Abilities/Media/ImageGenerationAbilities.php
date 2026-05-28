@@ -289,6 +289,12 @@ class ImageGenerationAbilities {
 		if ( ! empty( $input['pipeline_job_id'] ) ) {
 			$context['pipeline_job_id'] = (int) $input['pipeline_job_id'];
 		}
+		if ( ! empty( $input['agent_id'] ) ) {
+			$context['agent_id'] = (int) $input['agent_id'];
+		}
+		if ( ! empty( $input['agent_slug'] ) ) {
+			$context['agent_slug'] = sanitize_text_field( $input['agent_slug'] );
+		}
 		if ( ! empty( $input['post_id'] ) ) {
 			$context['post_id'] = (int) $input['post_id'];
 		}

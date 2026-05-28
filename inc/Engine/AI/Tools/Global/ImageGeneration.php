@@ -57,6 +57,12 @@ class ImageGeneration extends BaseTool {
 		if ( ! empty( $parameters['job_id'] ) ) {
 			$input['pipeline_job_id'] = (int) $parameters['job_id'];
 		}
+		if ( ! empty( $parameters['agent_id'] ) ) {
+			$input['agent_id'] = (int) $parameters['agent_id'];
+		}
+		if ( ! empty( $parameters['agent_slug'] ) ) {
+			$input['agent_slug'] = (string) $parameters['agent_slug'];
+		}
 
 		$result = $ability->execute( $input );
 
