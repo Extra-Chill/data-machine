@@ -190,6 +190,7 @@ function datamachine_run_datamachine_plugin() {
 	require_once __DIR__ . '/inc/Abilities/SystemAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/AltTextAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/ImageGenerationAbilities.php';
+	require_once __DIR__ . '/inc/Abilities/Media/ImageOptimizationAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/Media/MediaAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/SEO/MetaDescriptionAbilities.php';
 	require_once __DIR__ . '/inc/Abilities/SEO/IndexNowAbilities.php';
@@ -286,6 +287,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\SystemAbilities();
 	new \DataMachine\Abilities\Media\AltTextAbilities();
 	new \DataMachine\Abilities\Media\ImageGenerationAbilities();
+	new \DataMachine\Abilities\Media\ImageOptimizationAbilities();
 	new \DataMachine\Abilities\Media\MediaAbilities();
 	new \DataMachine\Abilities\SEO\MetaDescriptionAbilities();
 	new \DataMachine\Abilities\SEO\IndexNowAbilities();

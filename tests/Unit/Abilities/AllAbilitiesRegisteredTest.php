@@ -103,6 +103,9 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			// DuplicateCheckAbility (2)
 			'datamachine/check-duplicate',
 			'datamachine/titles-match',
+			// ImageOptimizationAbilities (2)
+			'datamachine/diagnose-images',
+			'datamachine/optimize-images',
 		);
 
 		$missing = array();
