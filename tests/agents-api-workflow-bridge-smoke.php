@@ -1,0 +1,192 @@
+<?php
+/**
+ * Pure-PHP smoke test for bridging Agents API workflows into Data Machine jobs.
+ *
+ * Run with: php tests/agents-api-workflow-bridge-smoke.php
+ *
+ * @package DataMachine\Tests
+ */
+
+namespace DataMachine\Core\Database\Jobs {
+	class Jobs {
+		public array $jobs = array();
+		public array $engine_data = array();
+		public int $next_id = 100;
+
+		public function create_job( array $job_data ): int|false {
+			$job_id = $this->next_id++;
+			$this->jobs[ $job_id ] = array_merge( $job_data, array( 'status' => 'pending' ) );
+			return $job_id;
+		}
+
+		public function start_job( int $job_id, string $status = 'processing' ): bool {
+			$this->jobs[ $job_id ]['status'] = $status;
+			return true;
+		}
+
+		public function complete_job( int $job_id, string $status ): bool {
+			$this->jobs[ $job_id ]['status'] = $status;
+			return true;
+		}
+
+		public function store_engine_data( int $job_id, array $data ): bool {
+			$this->engine_data[ $job_id ] = $data;
+			return true;
+		}
+	}
+}
+
+namespace {
+
+defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
+
+	class WP_Error {
+		public function __construct( private string $code = '', private string $message = '', private $data = null ) {}
+		public function get_error_code(): string { return $this->code; }
+		public function get_error_message(): string { return $this->message; }
+		public function get_error_data() { return $this->data; }
+	}
+
+	function is_wp_error( $value ): bool { return $value instanceof WP_Error; }
+	function __( string $text, string $domain = 'default' ): string { unset( $domain ); return $text; }
+	function doing_action( string $hook ): bool { unset( $hook ); return false; }
+	function did_action( string $hook ): int { unset( $hook ); return 1; }
+	function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void { unset( $hook, $callback, $priority, $accepted_args ); }
+	function apply_filters( string $hook, $value ) { unset( $hook ); return $value; }
+	function get_current_user_id(): int { return 7; }
+	function current_time( string $type, bool $gmt = false ): string { unset( $type, $gmt ); return '2026-05-28 00:00:00'; }
+
+	$GLOBALS['__abilities'] = array();
+	function wp_get_ability( string $name ) { return $GLOBALS['__abilities'][ $name ] ?? null; }
+
+	class Stub_Agent_Workflow_Ability {
+		public function __construct( private \Closure $handler ) {}
+		public function execute( array $input ) { return ( $this->handler )( $input ); }
+	}
+
+	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Workflows/class-wp-agent-workflow-bindings.php';
+	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Workflows/class-wp-agent-workflow-spec-validator.php';
+	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Workflows/class-wp-agent-workflow-spec.php';
+	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Workflows/class-wp-agent-workflow-run-result.php';
+	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Workflows/class-wp-agent-workflow-run-recorder.php';
+	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Workflows/class-wp-agent-workflow-runner.php';
+	require_once __DIR__ . '/../inc/Core/JobStatus.php';
+	require_once __DIR__ . '/../inc/Abilities/PermissionHelper.php';
+	require_once __DIR__ . '/../inc/Abilities/Job/JobHelpers.php';
+	require_once __DIR__ . '/../inc/Core/AgentsApiWorkflowJobRecorder.php';
+	require_once __DIR__ . '/../inc/Abilities/Job/ExecuteAgentWorkflowAbility.php';
+
+	$failures = array();
+	$passes   = 0;
+
+	function assert_agent_workflow_bridge_equals( $expected, $actual, string $name, array &$failures, int &$passes ): void {
+		if ( $expected === $actual ) {
+			++$passes;
+			echo "  PASS {$name}\n";
+			return;
+		}
+
+		$failures[] = $name;
+		echo "  FAIL {$name}\n";
+		echo '    expected: ' . var_export( $expected, true ) . "\n";
+		echo '    actual:   ' . var_export( $actual, true ) . "\n";
+	}
+
+	class Agent_Workflow_Bridge_Harness extends \DataMachine\Abilities\Job\ExecuteAgentWorkflowAbility {
+		public function __construct() {}
+		public function set_jobs( \DataMachine\Core\Database\Jobs\Jobs $jobs ): void { $this->db_jobs = $jobs; }
+	}
+
+	echo "agents-api-workflow-bridge-smoke\n";
+
+	$GLOBALS['__abilities']['demo/uppercase'] = new Stub_Agent_Workflow_Ability(
+		static fn( array $input ): array => array( 'value' => strtoupper( (string) ( $input['text'] ?? '' ) ) )
+	);
+	$GLOBALS['__abilities']['agents/chat'] = new Stub_Agent_Workflow_Ability(
+		static fn( array $input ): array => array( 'reply' => sprintf( '%s: %s', $input['agent'] ?? '', $input['message'] ?? '' ) )
+	);
+
+	$jobs   = new \DataMachine\Core\Database\Jobs\Jobs();
+	$bridge = new Agent_Workflow_Bridge_Harness();
+	$bridge->set_jobs( $jobs );
+
+	$ability_result = $bridge->execute(
+		array(
+			'run_id' => 'run-ability-1',
+			'metadata' => array(
+				'artifacts' => array( array( 'name' => 'summary.json', 'type' => 'application/json' ) ),
+				'logs'      => array( array( 'level' => 'info', 'message' => 'started' ) ),
+			),
+			'spec'   => array(
+				'id'       => 'demo/ability-workflow',
+				'triggers' => array( array( 'type' => 'on_demand' ) ),
+				'inputs'   => array( 'text' => array( 'type' => 'string', 'required' => true ) ),
+				'steps'    => array(
+					array( 'id' => 'upper', 'type' => 'ability', 'ability' => 'demo/uppercase', 'args' => array( 'text' => '${inputs.text}' ) ),
+				),
+			),
+			'inputs' => array( 'text' => 'cook' ),
+		)
+	);
+
+	assert_agent_workflow_bridge_equals( true, $ability_result['success'], 'ability workflow succeeds', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 100, $ability_result['job_id'], 'ability workflow returns job id', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'run-ability-1', $ability_result['run_id'], 'ability workflow preserves Agents API run id', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'completed', $jobs->jobs[100]['status'], 'ability workflow maps success to completed job', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'agents_api_workflow', $jobs->jobs[100]['source'], 'ability workflow records source', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'demo/ability-workflow', $jobs->engine_data[100]['agents_api_workflow']['workflow_id'], 'ability workflow records workflow id', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'COOK', $jobs->engine_data[100]['step_outcomes'][0]['output']['value'], 'ability workflow records step output', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'summary.json', $jobs->engine_data[100]['artifacts'][0]['name'], 'ability workflow records metadata artifacts explicitly', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'started', $jobs->engine_data[100]['logs'][0]['message'], 'ability workflow records metadata logs explicitly', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'WP_Agent_Workflow_Runner', $jobs->engine_data[100]['provenance']['execution'], 'ability workflow records runner provenance', $failures, $passes );
+
+	$agent_result = $bridge->execute(
+		array(
+			'run_id' => 'run-agent-1',
+			'spec'   => array(
+				'id'    => 'demo/agent-workflow',
+				'steps' => array(
+					array( 'id' => 'ask', 'type' => 'agent', 'agent' => 'demo-agent', 'message' => 'hello' ),
+				),
+			),
+		)
+	);
+
+	assert_agent_workflow_bridge_equals( true, $agent_result['success'], 'agent workflow succeeds when agents/chat is registered', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 101, $agent_result['job_id'], 'agent workflow returns job id', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'demo-agent: hello', $jobs->engine_data[101]['step_outcomes'][0]['output']['reply'], 'agent workflow records agent step output', $failures, $passes );
+
+	$unsupported = $bridge->execute(
+		array(
+			'spec' => array(
+				'id'    => 'demo/foreach-workflow',
+				'steps' => array(
+					array( 'id' => 'each', 'type' => 'foreach', 'items' => array(), 'steps' => array( array( 'id' => 'inner', 'type' => 'ability', 'ability' => 'demo/uppercase' ) ) ),
+				),
+			),
+		)
+	);
+
+	assert_agent_workflow_bridge_equals( false, $unsupported['success'], 'unsupported foreach workflow fails clearly', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'agents_api_workflow_step_unsupported', $unsupported['error']['code'], 'unsupported step error is typed', $failures, $passes );
+
+	$trigger_unsupported = $bridge->execute(
+		array(
+			'spec' => array(
+				'id'       => 'demo/cron-workflow',
+				'triggers' => array( array( 'type' => 'cron', 'schedule' => 'hourly' ) ),
+				'steps'    => array( array( 'id' => 'upper', 'type' => 'ability', 'ability' => 'demo/uppercase' ) ),
+			),
+		)
+	);
+
+	assert_agent_workflow_bridge_equals( false, $trigger_unsupported['success'], 'unsupported trigger workflow fails clearly', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'agents_api_workflow_trigger_unsupported', $trigger_unsupported['error']['code'], 'unsupported trigger error is typed', $failures, $passes );
+
+	if ( $failures ) {
+		echo "\nFAILED: " . count( $failures ) . " agents-api workflow bridge assertions failed.\n";
+		exit( 1 );
+	}
+
+	echo "\nAll {$passes} agents-api workflow bridge assertions passed.\n";
+}
