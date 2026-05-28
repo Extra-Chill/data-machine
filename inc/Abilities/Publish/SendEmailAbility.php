@@ -28,9 +28,9 @@ defined( 'ABSPATH' ) || exit;
 
 class SendEmailAbility {
 
-	private static bool $registered = false;
+	private static bool $registered           = false;
 	private static bool $registration_pending = false;
-	private static ?self $instance = null;
+	private static ?self $instance            = null;
 
 	public function __construct() {
 		if ( null === self::$instance ) {
@@ -78,7 +78,7 @@ class SendEmailAbility {
 						return;
 					}
 					$register_via_helper();
-					self::$registered            = true;
+					self::$registered           = true;
 					self::$registration_pending = false;
 				}
 			);

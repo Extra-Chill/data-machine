@@ -27,10 +27,10 @@ defined( 'ABSPATH' ) || exit;
 
 class SendEmailQueuedAbility {
 
-	private static bool $registered = false;
+	private static bool $registered           = false;
 	private static bool $registration_pending = false;
-	private static bool $worker_registered = false;
-	private static ?self $instance = null;
+	private static bool $worker_registered    = false;
+	private static ?self $instance            = null;
 
 	/**
 	 * Action Scheduler hook for the worker that performs the actual send.
@@ -99,7 +99,7 @@ class SendEmailQueuedAbility {
 						return;
 					}
 					$register_via_helper();
-					self::$registered            = true;
+					self::$registered           = true;
 					self::$registration_pending = false;
 				}
 			);
