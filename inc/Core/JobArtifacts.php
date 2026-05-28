@@ -69,6 +69,7 @@ class JobArtifacts {
 			'tool_trace'             => $this->tool_trace( $engine_data, $additional_tool_summaries ),
 			'transcript'             => $this->transcript_metadata( $job_id, $engine_data ),
 			'artifact_refs'          => $this->hashable_artifact_refs( $transcript_artifact, $tool_trace_artifact ),
+			'artifact_files'         => $this->artifact_files_metadata( $engine_data ),
 			'transcript_artifact'    => $transcript_artifact,
 			'tool_trace_artifact'    => $tool_trace_artifact,
 			'agent_memory_artifacts' => $this->agent_memory_artifacts( $job, $agent, $tool_calls ),
@@ -78,6 +79,51 @@ class JobArtifacts {
 		return array(
 			'success'   => true,
 			'artifacts' => $payload,
+		);
+	}
+
+	/**
+	 * Write first-class transcript and tool trace artifact files for a job.
+	 *
+	 * @param int   $job_id                    Job ID.
+	 * @param array $additional_tool_summaries Tool summaries accumulated before engine_data persistence.
+	 * @return array{success: bool, artifact_files?: array<string,array<string,mixed>>, error?: string}
+	 */
+	public function write_artifact_files( int $job_id, array $additional_tool_summaries = array() ): array {
+		$result = $this->get( $job_id, $additional_tool_summaries );
+		if ( empty( $result['success'] ) || ! is_array( $result['artifacts'] ?? null ) ) {
+			return array(
+				'success' => false,
+				'error'   => (string) ( $result['error'] ?? 'Failed to build job artifacts.' ),
+			);
+		}
+
+		$payload        = $result['artifacts'];
+		$artifact_files = array();
+		foreach (
+			array(
+				'transcript' => $payload['transcript_artifact'] ?? null,
+				'tool_trace' => $payload['tool_trace_artifact'] ?? null,
+			) as $artifact_key => $artifact_payload
+		) {
+			if ( ! is_array( $artifact_payload ) ) {
+				continue;
+			}
+
+			$write_result = $this->write_artifact_file( $job_id, $artifact_key, $artifact_payload );
+			if ( empty( $write_result['success'] ) || ! is_array( $write_result['file'] ?? null ) ) {
+				return array(
+					'success' => false,
+					'error'   => (string) ( $write_result['error'] ?? 'Failed to write artifact file.' ),
+				);
+			}
+
+			$artifact_files[ $artifact_key ] = $write_result['file'];
+		}
+
+		return array(
+			'success'        => true,
+			'artifact_files' => $artifact_files,
 		);
 	}
 
@@ -190,6 +236,36 @@ class JobArtifacts {
 	}
 
 	/**
+	 * @return array<string,array<string,mixed>>
+	 */
+	private function artifact_files_metadata( array $engine_data ): array {
+		$artifact_files = is_array( $engine_data['artifact_files'] ?? null ) ? $engine_data['artifact_files'] : array();
+		$out            = array();
+
+		foreach ( array( 'transcript', 'tool_trace' ) as $key ) {
+			if ( ! is_array( $artifact_files[ $key ] ?? null ) ) {
+				continue;
+			}
+
+			$out[ $key ] = $this->filter_empty(
+				array(
+					'artifact_type'  => isset( $artifact_files[ $key ]['artifact_type'] ) ? sanitize_key( (string) $artifact_files[ $key ]['artifact_type'] ) : null,
+					'artifact_ref'   => isset( $artifact_files[ $key ]['artifact_ref'] ) ? sanitize_text_field( (string) $artifact_files[ $key ]['artifact_ref'] ) : null,
+					'relative_path'  => isset( $artifact_files[ $key ]['relative_path'] ) ? sanitize_text_field( (string) $artifact_files[ $key ]['relative_path'] ) : null,
+					'path'           => isset( $artifact_files[ $key ]['path'] ) ? (string) $artifact_files[ $key ]['path'] : null,
+					'url'            => isset( $artifact_files[ $key ]['url'] ) ? esc_url_raw( (string) $artifact_files[ $key ]['url'] ) : null,
+					'sha256'         => isset( $artifact_files[ $key ]['sha256'] ) ? sanitize_text_field( (string) $artifact_files[ $key ]['sha256'] ) : null,
+					'payload_sha256' => isset( $artifact_files[ $key ]['payload_sha256'] ) ? sanitize_text_field( (string) $artifact_files[ $key ]['payload_sha256'] ) : null,
+					'bytes'          => isset( $artifact_files[ $key ]['bytes'] ) ? (int) $artifact_files[ $key ]['bytes'] : null,
+					'written_at'     => isset( $artifact_files[ $key ]['written_at'] ) ? sanitize_text_field( (string) $artifact_files[ $key ]['written_at'] ) : null,
+				)
+			);
+		}
+
+		return $out;
+	}
+
+	/**
 	 * @return array<string,mixed>|null
 	 */
 	private function transcript_artifact( int $job_id, array $job, array $agent, array $engine_data ): ?array {
@@ -265,9 +341,7 @@ class JobArtifacts {
 
 		$entries = array();
 		foreach ( array_slice( $trace, 0, self::MAX_TOOL_TRACE_ENTRIES ) as $index => $entry ) {
-			if ( is_array( $entry ) ) {
-				$entries[] = $this->normalize_tool_trace_entry( $entry, $index );
-			}
+			$entries[] = $this->normalize_tool_trace_entry( $entry, $index );
 		}
 
 		$payload = array(
@@ -401,6 +475,66 @@ class JobArtifacts {
 		}
 
 		return $ref;
+	}
+
+	/**
+	 * @return array{success: bool, file?: array<string,mixed>, error?: string}
+	 */
+	private function write_artifact_file( int $job_id, string $artifact_key, array $artifact_payload ): array {
+		$upload_dir = wp_upload_dir();
+		$base_root  = (string) $upload_dir['basedir'];
+		$base_url   = (string) $upload_dir['baseurl'];
+		if ( '' === trim( $base_root ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Upload directory is unavailable.',
+			);
+		}
+		$base_dir = trailingslashit( $base_root ) . 'datamachine-artifacts/jobs/' . $job_id;
+		$base_url = '' !== $base_url ? trailingslashit( $base_url ) . 'datamachine-artifacts/jobs/' . $job_id : '';
+
+		if ( ! wp_mkdir_p( $base_dir ) ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Failed to create artifact directory for job %d.', $job_id ),
+			);
+		}
+
+		$file_name = sanitize_file_name( str_replace( '_', '-', $artifact_key ) . '.json' );
+		$file_path = trailingslashit( $base_dir ) . $file_name;
+		$json      = wp_json_encode( $this->canonicalize( $artifact_payload ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		if ( ! is_string( $json ) ) {
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Failed to encode %s artifact for job %d.', $artifact_key, $job_id ),
+			);
+		}
+
+		$json .= "\n";
+		if ( false === file_put_contents( $file_path, $json ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			return array(
+				'success' => false,
+				'error'   => sprintf( 'Failed to write %s artifact for job %d.', $artifact_key, $job_id ),
+			);
+		}
+
+		$relative_path = 'datamachine-artifacts/jobs/' . $job_id . '/' . $file_name;
+		return array(
+			'success' => true,
+			'file'    => $this->filter_empty(
+				array(
+					'artifact_type'  => (string) ( $artifact_payload['artifact_type'] ?? $artifact_key ),
+					'artifact_ref'   => (string) ( $artifact_payload['artifact_ref'] ?? $this->artifact_ref( $job_id, $artifact_key ) ),
+					'relative_path'  => $relative_path,
+					'path'           => $file_path,
+					'url'            => '' !== $base_url ? trailingslashit( $base_url ) . $file_name : null,
+					'sha256'         => hash( 'sha256', $json ),
+					'payload_sha256' => (string) ( $artifact_payload['sha256'] ?? '' ),
+					'bytes'          => strlen( $json ),
+					'written_at'     => gmdate( 'c' ),
+				)
+			),
+		);
 	}
 
 	/** @return array<string,mixed> */
@@ -719,7 +853,8 @@ class JobArtifacts {
 
 			$date = (string) ( $tool_call['date'] ?? '' );
 			if ( '' === $date ) {
-				$date = gmdate( 'Y-m-d', strtotime( (string) ( $job['completed_at'] ?? $job['created_at'] ?? 'now' ) ) );
+				$timestamp = strtotime( (string) ( $job['completed_at'] ?? $job['created_at'] ?? 'now' ) );
+				$date      = gmdate( 'Y-m-d', false === $timestamp ? null : $timestamp );
 			}
 
 			if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
@@ -738,7 +873,7 @@ class JobArtifacts {
 			list( $year, $month, $day ) = explode( '-', $date );
 			$daily_memory               = new DailyMemory( (int) $memory_scope['user_id'], (int) $memory_scope['agent_id'] );
 			$read                       = $daily_memory->read( $year, $month, $day );
-			$content                    = empty( $read['success'] ) ? $this->daily_memory_fallback_content( $date, (string) ( $memory_scope['content'] ?? '' ) ) : (string) ( $read['content'] ?? '' );
+			$content                    = empty( $read['success'] ) ? $this->daily_memory_fallback_content( $date, (string) $memory_scope['content'] ) : (string) ( $read['content'] ?? '' );
 			if ( '' === $content ) {
 				continue;
 			}

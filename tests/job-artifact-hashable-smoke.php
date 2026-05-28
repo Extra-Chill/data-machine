@@ -35,6 +35,40 @@ if ( ! function_exists( 'sanitize_title' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sanitize_file_name' ) ) {
+	function sanitize_file_name( $value ): string {
+		return trim( preg_replace( '/[^A-Za-z0-9_.-]+/', '-', (string) $value ), '-' );
+	}
+}
+
+if ( ! function_exists( 'esc_url_raw' ) ) {
+	function esc_url_raw( $value ): string {
+		return (string) $value;
+	}
+}
+
+if ( ! function_exists( 'trailingslashit' ) ) {
+	function trailingslashit( $value ): string {
+		return rtrim( (string) $value, '/\\' ) . '/';
+	}
+}
+
+if ( ! function_exists( 'wp_mkdir_p' ) ) {
+	function wp_mkdir_p( $target ): bool {
+		return is_dir( $target ) || mkdir( $target, 0775, true );
+	}
+}
+
+if ( ! function_exists( 'wp_upload_dir' ) ) {
+	function wp_upload_dir(): array {
+		$base = sys_get_temp_dir() . '/datamachine-job-artifact-smoke';
+		return array(
+			'basedir' => $base,
+			'baseurl' => 'https://example.test/uploads',
+		);
+	}
+}
+
 if ( ! function_exists( 'wp_strip_all_tags' ) ) {
 	function wp_strip_all_tags( $value ): string {
 		return strip_tags( (string) $value );
@@ -97,6 +131,23 @@ $assert_true( '[redacted]' === $message['tool_calls'][0]['arguments_redacted']['
 $assert_true( false === str_contains( $message_json, 'sk-secret' ), 'transcript content redacts bearer secrets' );
 $assert_true( false === str_contains( $message_json, 'plain-secret' ), 'transcript content redacts token assignments' );
 $assert_true( false === str_contains( $message_json, 'metadata-secret' ), 'transcript metadata redacts secret keys' );
+
+$transcript_artifact = $invoke(
+	$artifacts,
+	'with_payload_hash',
+	array(
+		array(
+			'schema_version'   => 1,
+			'artifact_type'    => 'transcript',
+			'artifact_ref'     => 'datamachine://jobs/123/artifacts/transcript/session-abc',
+			'message_count'    => 1,
+			'messages_emitted' => 1,
+			'entries'          => array( $message ),
+			'bounded'          => true,
+			'redacted'         => true,
+		)
+	)
+);
 
 $normal_trace = array(
 	'schema_version'     => 1,
@@ -185,6 +236,35 @@ $assert_true( false === str_contains( $artifact_json, 'runtime-secret' ), 'tool 
 $refs = $invoke( $artifacts, 'hashable_artifact_refs', array( null, $tool_trace_artifact ) );
 $assert_true( $tool_trace_artifact['sha256'] === $refs['tool_trace']['sha256'], 'artifact refs expose tool trace hash' );
 $assert_true( $tool_trace_artifact['artifact_ref'] === $refs['tool_trace']['artifact_ref'], 'artifact refs expose stable tool trace ref' );
+
+$file_result = $invoke( $artifacts, 'write_artifact_file', array( 123, 'tool_trace', $tool_trace_artifact ) );
+$assert_true( true === ( $file_result['success'] ?? false ), 'tool trace artifact file write succeeds' );
+$assert_true( is_file( $file_result['file']['path'] ?? '' ), 'tool trace artifact file exists on disk' );
+$assert_true( 'datamachine-artifacts/jobs/123/tool-trace.json' === ( $file_result['file']['relative_path'] ?? '' ), 'artifact file has stable relative path' );
+$assert_true( $tool_trace_artifact['sha256'] === ( $file_result['file']['payload_sha256'] ?? '' ), 'artifact file references payload hash' );
+$assert_true( hash_file( 'sha256', $file_result['file']['path'] ) === ( $file_result['file']['sha256'] ?? '' ), 'artifact file hash matches written bytes' );
+
+$transcript_file_result = $invoke( $artifacts, 'write_artifact_file', array( 123, 'transcript', $transcript_artifact ) );
+$assert_true( true === ( $transcript_file_result['success'] ?? false ), 'transcript artifact file write succeeds' );
+$assert_true( is_file( $transcript_file_result['file']['path'] ?? '' ), 'transcript artifact file exists on disk' );
+$assert_true( 'datamachine-artifacts/jobs/123/transcript.json' === ( $transcript_file_result['file']['relative_path'] ?? '' ), 'transcript artifact file has stable relative path' );
+$assert_true( $transcript_artifact['sha256'] === ( $transcript_file_result['file']['payload_sha256'] ?? '' ), 'transcript artifact file references payload hash' );
+
+$artifact_files = $invoke(
+	$artifacts,
+	'artifact_files_metadata',
+	array(
+		array(
+			'artifact_files' => array(
+				'transcript' => $transcript_file_result['file'],
+				'tool_trace' => $file_result['file'],
+			),
+		)
+	)
+);
+$assert_true( $transcript_file_result['file']['relative_path'] === ( $artifact_files['transcript']['relative_path'] ?? '' ), 'engine artifact file metadata round-trips transcript relative path' );
+$assert_true( $file_result['file']['relative_path'] === ( $artifact_files['tool_trace']['relative_path'] ?? '' ), 'engine artifact file metadata round-trips relative path' );
+$assert_true( $file_result['file']['sha256'] === ( $artifact_files['tool_trace']['sha256'] ?? '' ), 'engine artifact file metadata round-trips file hash' );
 
 if ( $failures ) {
 	echo "FAILED: " . count( $failures ) . " hashable artifact assertions failed.\n";
