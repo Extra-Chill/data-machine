@@ -15,7 +15,6 @@ use DataMachine\Abilities\Chat\GetChatSessionAbility;
 use DataMachine\Abilities\Chat\DeleteChatSessionAbility;
 use DataMachine\Abilities\Chat\CreateChatSessionAbility;
 use DataMachine\Abilities\Chat\MarkSessionReadAbility;
-use DataMachine\Abilities\Chat\SendMessageAbility;
 use DataMachine\Abilities\Chat\AgentsChatHandler;
 
 defined( 'ABSPATH' ) || exit;
@@ -29,7 +28,6 @@ class ChatAbilities {
 	private DeleteChatSessionAbility $delete_session;
 	private CreateChatSessionAbility $create_session;
 	private MarkSessionReadAbility $mark_session_read;
-	private SendMessageAbility $send_message;
 	private AgentsChatHandler $agents_chat_handler;
 
 	public function __construct() {
@@ -42,7 +40,6 @@ class ChatAbilities {
 		$this->delete_session      = new DeleteChatSessionAbility();
 		$this->create_session      = new CreateChatSessionAbility();
 		$this->mark_session_read   = new MarkSessionReadAbility();
-		$this->send_message        = new SendMessageAbility();
 		$this->agents_chat_handler = new AgentsChatHandler();
 
 		self::$registered = true;

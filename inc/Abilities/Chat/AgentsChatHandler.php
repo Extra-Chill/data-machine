@@ -25,26 +25,9 @@ class AgentsChatHandler {
 	 * Attach handler and permission filters.
 	 */
 	public function __construct() {
-		if ( function_exists( '\AgentsAPI\AI\Channels\register_chat_handler' ) ) {
-			\AgentsAPI\AI\Channels\register_chat_handler( array( $this, 'execute' ) );
-		} else {
-			add_filter( 'wp_agent_chat_handler', array( $this, 'registerHandler' ), 10, 2 );
-		}
+		\AgentsAPI\AI\Channels\register_chat_handler( array( $this, 'execute' ) );
 
 		add_filter( 'agents_chat_permission', array( $this, 'checkPermission' ), 10, 2 );
-	}
-
-	/**
-	 * Register this adapter unless another runtime already won.
-	 *
-	 * @param callable|null $handler Existing handler.
-	 * @param array         $input   Canonical chat input.
-	 * @return callable|null
-	 */
-	public function registerHandler( $handler, array $input ) {
-		unset( $input );
-
-		return null !== $handler ? $handler : array( $this, 'execute' );
 	}
 
 	/**

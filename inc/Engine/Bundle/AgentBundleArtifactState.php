@@ -19,31 +19,20 @@ final class AgentBundleArtifactState {
 	/**
 	 * Return installed artifact rows for an agent.
 	 *
-	 * The dedicated table is canonical. Legacy agent_config rows are used only as
-	 * a compatibility fallback and are backfilled into the table when possible.
-	 *
 	 * @param array<string,mixed> $agent Agent row.
 	 * @return array<int,array<string,mixed>>
 	 */
 	public static function installed_for_agent( array $agent ): array {
 		$agent_id = (int) ( $agent['agent_id'] ?? 0 );
 		if ( $agent_id <= 0 ) {
-			return array_values( self::legacy_rows( $agent ) );
+			return array();
 		}
 
 		$store       = new InstalledBundleArtifacts();
 		$bundle_slug = (string) ( $agent['agent_config']['datamachine_bundle']['bundle_slug'] ?? '' );
 		$installed   = '' !== $bundle_slug ? $store->list_for_bundle( $bundle_slug, $agent_id ) : $store->list_for_agent( $agent_id );
-		if ( ! empty( $installed ) ) {
-			return array_map( static fn( AgentBundleInstalledArtifact $artifact ): array => $artifact->to_array(), $installed );
-		}
 
-		$legacy = array_values( self::legacy_rows( $agent ) );
-		if ( ! empty( $legacy ) ) {
-			self::persist_for_agent( $agent_id, $legacy );
-		}
-
-		return $legacy;
+		return array_map( static fn( AgentBundleInstalledArtifact $artifact ): array => $artifact->to_array(), $installed );
 	}
 
 	/**
@@ -79,14 +68,5 @@ final class AgentBundleArtifactState {
 		}
 
 		return $ok;
-	}
-
-	/**
-	 * @param array<string,mixed> $agent Agent row.
-	 * @return array<string,array<string,mixed>>
-	 */
-	private static function legacy_rows( array $agent ): array {
-		$rows = $agent['agent_config']['datamachine_bundle']['artifacts'] ?? array();
-		return is_array( $rows ) ? array_filter( $rows, 'is_array' ) : array();
 	}
 }

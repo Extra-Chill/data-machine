@@ -463,20 +463,20 @@ class Chat {
 			$client_context = array();
 		}
 
-		// --- Delegate to ability ---
-		$ability = wp_get_ability( 'datamachine/send-message' );
+		// --- Delegate to canonical Agents API chat ability ---
+		$ability = wp_get_ability( 'agents/chat' );
 
 		if ( ! $ability ) {
 			return new WP_Error(
 				'ability_not_found',
-				__( 'Send message ability not registered.', 'data-machine' ),
+				__( 'Agents chat ability not registered.', 'data-machine' ),
 				array( 'status' => 500 )
 			);
 		}
 
 		$input = array(
 			'message'        => sanitize_textarea_field( wp_unslash( $request->get_param( 'message' ) ) ),
-			'agent_id'       => (int) $request->get_param( 'agent_id' ),
+			'agent'          => (string) (int) $request->get_param( 'agent_id' ),
 			'provider'       => (string) ( $request->get_param( 'provider' ) ?? '' ),
 			'model'          => (string) ( $request->get_param( 'model' ) ?? '' ),
 			'mode'           => (string) ( $request->get_param( 'mode' ) ?? '' ),

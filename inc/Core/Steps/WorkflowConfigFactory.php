@@ -189,13 +189,13 @@ class WorkflowConfigFactory {
 	}
 
 	/**
-	 * Resolve the workflow step type from canonical or compatibility fields.
+	 * Resolve the workflow step type from the canonical field.
 	 *
 	 * @param array $step Workflow step input.
 	 * @return string Step type slug.
 	 */
 	private static function getWorkflowStepType( array $step ): string {
-		$step_type = $step['step_type'] ?? ( $step['type'] ?? '' );
+		$step_type = $step['step_type'] ?? '';
 		return is_string( $step_type ) ? $step_type : '';
 	}
 }

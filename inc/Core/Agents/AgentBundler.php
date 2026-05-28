@@ -686,8 +686,7 @@ class AgentBundler {
 
 			$config['datamachine_bundle'] = array_merge(
 				$existing_bundle_state,
-				$bundle_metadata,
-				array( 'artifacts' => $artifact_records )
+				$bundle_metadata
 			);
 			if ( ! empty( $bundle_run_artifacts ) ) {
 				$config['datamachine_bundle']['run_artifacts'] = $bundle_run_artifacts;
@@ -725,9 +724,8 @@ class AgentBundler {
 				$this->write_user_template( $owner_id, $bundle['user_template'] );
 			}
 
-			$artifact_records = $config['datamachine_bundle']['artifacts'];
-			$conflicts        = $config_conflicts;
-			$runtime_drift    = array();
+			$conflicts     = $config_conflicts;
+			$runtime_drift = array();
 			if ( empty( $config_conflicts ) ) {
 				$artifact_records[ $agent_config_key ] = $this->bundle_artifact_record(
 					$bundle_metadata,
@@ -1082,12 +1080,11 @@ class AgentBundler {
 			$summary['conflicts']          = $conflicts;
 			$summary['runtime_drift']      = $runtime_drift;
 
-			$config['datamachine_bundle']['artifacts'] = $artifact_records;
 			if ( ! AgentBundleArtifactState::persist_for_agent( $agent_id, array_values( $artifact_records ) ) ) {
 				throw new \RuntimeException( 'Failed to persist installed bundle artifact state.' );
 			}
 			if ( ! $this->agents_repo->update_agent( $agent_id, array( 'agent_config' => $config ) ) ) {
-				throw new \RuntimeException( 'Failed to persist final agent_config with bundle artifact registry.' );
+				throw new \RuntimeException( 'Failed to persist final agent_config with bundle metadata.' );
 			}
 
 			// Test fault-injection seam — fires after every mutation but before commit so a test handler
@@ -1102,9 +1099,7 @@ class AgentBundler {
 			if ( ! $persisted ) {
 				throw new \RuntimeException( sprintf( 'Agent row for ID %d disappeared after install — possible silent rollback.', $agent_id ) );
 			}
-			$persisted_artifacts = is_array( $persisted['agent_config']['datamachine_bundle']['artifacts'] ?? null )
-			? $persisted['agent_config']['datamachine_bundle']['artifacts']
-			: array();
+			$persisted_artifacts = AgentBundleArtifactState::installed_for_agent( $persisted );
 			if ( count( $persisted_artifacts ) < count( $artifact_records ) ) {
 				throw new \RuntimeException( sprintf(
 				'Agent ID %d persisted %d artifact records but %d were written — possible silent rollback.',

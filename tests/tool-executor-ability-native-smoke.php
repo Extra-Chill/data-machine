@@ -322,22 +322,23 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	assert_smoke( 'preview policy does not execute ability directly', 0 === ability_execute_count( $preview_ability ) );
 	assert_smoke( 'preview policy does not post-track unexecuted action', 0 === post_tracking_count() );
 
-	echo "\n[legacy:1] Legacy class/method tool still executes\n";
+	echo "\n[ability:2] Linked ability takes precedence over class/method metadata\n";
 	LegacyTool::$calls = 0;
 	$result            = execute_tool(
-		'legacy_tool',
-		array( 'message' => 'legacy' ),
+		'ability_precedence_tool',
+		array( 'message' => 'ability' ),
 		array(
-			'name'    => 'legacy_tool',
+			'name'    => 'ability_precedence_tool',
 			'class'   => LegacyTool::class,
 			'method'  => 'execute',
-			'ability' => 'datamachine/missing-legacy-ability',
+			'ability' => 'datamachine/smoke-ability',
 		)
 	);
-	assert_smoke( 'legacy result succeeds', true === ( $result['success'] ?? false ) );
-	assert_smoke( 'class/method metadata wins over linked ability during migration', true === ( $result['result']['legacy'] ?? false ) );
+	assert_smoke( 'ability precedence result succeeds', true === ( $result['success'] ?? false ) );
+	assert_smoke( 'linked ability wins over class/method metadata', true === ( $result['result']['ability'] ?? false ) );
+	assert_smoke( 'class/method fallback is not called when ability exists', 0 === LegacyTool::$calls );
 
-	echo "\n[ability:2] Missing ability returns a clear failure\n";
+	echo "\n[ability:3] Missing ability returns a clear failure\n";
 	$result = execute_tool(
 		'missing_ability_tool',
 		array(),
@@ -348,7 +349,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	assert_smoke( 'missing ability fails', false === ( $result['success'] ?? true ) );
 	assert_smoke( 'missing ability error names the ability slug', false !== strpos( $result['error'] ?? '', 'datamachine/not-registered' ) );
 
-	echo "\n[ability:3] Permission-denied ability does not execute\n";
+	echo "\n[ability:4] Permission-denied ability does not execute\n";
 	$denied = new \Ability_Native_Smoke_Ability(
 		fn( $input ) => false,
 		fn( $input ) => array( 'success' => true )

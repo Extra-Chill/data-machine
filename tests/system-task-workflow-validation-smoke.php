@@ -68,7 +68,7 @@ function validate_workflow_for_test( array $workflow ): array {
 			}
 		}
 
-		$step_type = $step['step_type'] ?? ( $step['type'] ?? null );
+		$step_type = $step['step_type'] ?? null;
 		if ( ! is_string( $step_type ) || '' === trim( $step_type ) ) {
 			return array( 'valid' => false, 'error' => "Step {$index} missing step_type" );
 		}

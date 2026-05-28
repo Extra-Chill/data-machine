@@ -254,8 +254,6 @@ final class AgentBundleCoreArtifactApply {
 			'installed_at'      => $now,
 			'updated_at'        => $now,
 		);
-		$config['datamachine_bundle']['artifacts'][ AgentBundleArtifactExtensions::artifact_key( $type, $id ) ] = $artifact_record;
-
 		if ( ! AgentBundleArtifactState::persist_for_agent( $agent_id, array( $artifact_record ) ) ) {
 			return new \WP_Error( 'datamachine_bundle_registry_update_failed', 'Failed to update bundle artifact registry.' );
 		}

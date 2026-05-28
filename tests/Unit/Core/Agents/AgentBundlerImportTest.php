@@ -242,41 +242,6 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'agent_config', 'flow', 'pipeline' ), $types, 'Importer writes installed artifact state to the canonical table.' );
 	}
 
-	public function test_legacy_agent_config_artifacts_backfill_to_canonical_table(): void {
-		$agent_id = $this->agents_repo->create_if_missing(
-			'legacy-artifact-agent',
-			'Legacy Artifact Agent',
-			$this->owner_id,
-			array(
-				'datamachine_bundle' => array(
-					'bundle_slug'    => 'legacy-artifact-agent',
-					'bundle_version' => '1',
-					'artifacts'      => array(
-						'agent_config:config' => array(
-							'bundle_slug'       => 'legacy-artifact-agent',
-							'bundle_version'    => '1',
-							'artifact_type'     => 'agent_config',
-							'artifact_id'       => 'config',
-							'source_path'       => 'manifest.json#/agent/agent_config',
-							'installed_hash'    => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-							'current_hash'      => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-							'installed_payload' => array(),
-							'status'            => 'clean',
-							'installed_at'      => '2026-05-26 00:00:00',
-							'updated_at'        => '2026-05-26 00:00:00',
-						),
-					),
-				),
-			)
-		);
-		$agent    = $this->agents_repo->get_agent( (int) $agent_id );
-
-		$rows = AgentBundleArtifactState::installed_for_agent( $agent );
-
-		$this->assertCount( 1, $rows, 'Legacy agent_config artifact rows remain readable.' );
-		$this->assertCount( 1, ( new InstalledBundleArtifacts() )->list_for_bundle( 'legacy-artifact-agent', (int) $agent_id ), 'Legacy rows are backfilled into the canonical table.' );
-	}
-
 	public function test_directory_value_object_import_preserves_workflow_runtime_seed_fields(): void {
 		$bundle = $this->fixture_bundle( 'directory-import-agent' );
 		$bundle['flows'][0]['flow_config']['1_step-uuid_1'] = array_merge(

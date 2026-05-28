@@ -90,10 +90,6 @@ final class AgentBundleAdoptionStateStore implements \WP_Agent_Package_Artifact_
 		$config['datamachine_bundle']['source_ref']       = (string) ( $this->bundle['source_ref'] ?? $config['datamachine_bundle']['source_ref'] ?? '' );
 		$config['datamachine_bundle']['source_revision']  = (string) ( $this->bundle['source_revision'] ?? $config['datamachine_bundle']['source_revision'] ?? '' );
 
-		if ( ! isset( $config['datamachine_bundle']['artifacts'] ) || ! is_array( $config['datamachine_bundle']['artifacts'] ) ) {
-			$config['datamachine_bundle']['artifacts'] = array();
-		}
-
 		$artifact_records = array();
 		foreach ( $artifacts as $artifact ) {
 			if ( ! $artifact instanceof \WP_Agent_Package_Installed_Artifact ) {
@@ -120,7 +116,6 @@ final class AgentBundleAdoptionStateStore implements \WP_Agent_Package_Artifact_
 			);
 		}
 
-		$config['datamachine_bundle']['artifacts'] = array_merge( $config['datamachine_bundle']['artifacts'], $artifact_records );
 		if ( ! AgentBundleArtifactState::persist_for_agent( $agent_id, array_values( $artifact_records ) ) ) {
 			return false;
 		}

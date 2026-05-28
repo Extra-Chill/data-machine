@@ -144,21 +144,15 @@ class AbilityResult {
 	 * @return array REST/CLI-safe collection envelope.
 	 */
 	public static function collection_envelope( array $result, string $items_key, array $options = array() ): array {
-		$items        = $result[ $items_key ] ?? array();
-		$data_key     = $options['data_key'] ?? null;
-		$data         = $data_key ? array( $data_key => $items ) : $items;
-		$data_extra   = $options['data_extra'] ?? array();
-		$meta_keys    = $options['meta_keys'] ?? array( 'total', 'per_page', 'offset' );
-		$top_extra    = $options['top_extra'] ?? array();
-		$compat_alias = $options['compat_alias'] ?? array();
+		$items      = $result[ $items_key ] ?? array();
+		$data_key   = $options['data_key'] ?? null;
+		$data       = $data_key ? array( $data_key => $items ) : $items;
+		$data_extra = $options['data_extra'] ?? array();
+		$meta_keys  = $options['meta_keys'] ?? array( 'total', 'per_page', 'offset' );
+		$top_extra  = $options['top_extra'] ?? array();
 
 		if ( $data_key && is_array( $data ) ) {
 			$data = array_merge( $data_extra, $data );
-			foreach ( $compat_alias as $alias => $source_key ) {
-				if ( array_key_exists( $source_key, $result ) ) {
-					$data[ $alias ] = $result[ $source_key ];
-				}
-			}
 		}
 
 		$envelope = array(
@@ -203,27 +197,6 @@ class AbilityResult {
 		}
 
 		return rest_ensure_response( self::collection_envelope( self::normalize( $result ), $items_key, $options ) );
-	}
-
-	/**
-	 * Present an ability result as a raw legacy REST response.
-	 *
-	 * Use this at explicit compatibility edges that already exposed ability fields
-	 * at the top level, such as mutation endpoints returning message/count data.
-	 *
-	 * @param mixed  $result          Ability execution result.
-	 * @param string $default_code    Default error code.
-	 * @param string $default_message Default error message.
-	 * @param int    $default_status  Default HTTP status.
-	 * @return \WP_REST_Response|\WP_Error REST response or error.
-	 */
-	public static function rest_legacy_response( $result, string $default_code = 'ability_failed', string $default_message = 'Ability execution failed.', int $default_status = 500 ) {
-		$error = self::failure_to_wp_error( $result, $default_code, $default_message, $default_status );
-		if ( $error ) {
-			return $error;
-		}
-
-		return rest_ensure_response( self::normalize( $result ) );
 	}
 
 	/**

@@ -330,16 +330,13 @@ class FlowStepConfigFactory {
 	}
 
 	/**
-	 * Resolve the workflow step type from canonical or compatibility fields.
-	 *
-	 * `step_type` is the canonical shared field. `type` is accepted only for
-	 * compatibility with older ephemeral workflow specs.
+	 * Resolve the workflow step type from the canonical field.
 	 *
 	 * @param array $step Workflow step input.
 	 * @return string Step type slug.
 	 */
 	private static function getWorkflowStepType( array $step ): string {
-		$step_type = $step['step_type'] ?? ( $step['type'] ?? '' );
+		$step_type = $step['step_type'] ?? '';
 		return is_string( $step_type ) ? $step_type : '';
 	}
 }
