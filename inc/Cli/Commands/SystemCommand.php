@@ -339,7 +339,12 @@ class SystemCommand extends BaseCommand {
 	 * @return array|string
 	 */
 	private static function collectRunTaskParamArgs( array $assoc_args, ?array $argv = null ): array|string {
-		$argv       = $argv ?? ( $_SERVER['argv'] ?? array() );
+		$argv       = $argv ?? array_map(
+			static function ( $arg ): string {
+				return sanitize_text_field( wp_unslash( (string) $arg ) );
+			},
+			$_SERVER['argv'] ?? array()
+		);
 		$raw_params = array();
 
 		$argv_values = array_values( $argv );

@@ -401,7 +401,7 @@ function datamachine_should_load_full_runtime(): bool {
 		return true;
 	}
 
-	$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) $_SERVER['REQUEST_URI'] : '';
+	$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
 	$path        = (string) wp_parse_url( $request_uri, PHP_URL_PATH );
 
 	if ( str_starts_with( $path, '/wp-json/' ) || str_starts_with( $path, '/datamachine-auth/' ) ) {
