@@ -9,7 +9,7 @@
  *
  * Run with: php tests/system-task-workflow-validation-smoke.php
  *
- * Background — this fix removes a hardcoded `'ai' !== $step['type']`
+ * Background — this fix removes a hardcoded `'ai' !== $step['step_type']`
  * exception that was rejecting all valid handler-free step types other
  * than ai (system_task, webhook_gate). The check itself was redundant
  * because step types validate their own config at execution; the
@@ -59,13 +59,6 @@ function validate_workflow_for_test( array $workflow ): array {
 	$valid_types         = array_keys( $step_type_abilities->getAllStepTypes() );
 
 	foreach ( $workflow['steps'] as $index => $step ) {
-		if ( array_key_exists( 'step_type', $step ) ) {
-			return array(
-				'valid' => false,
-				'error' => "Step {$index} uses stored-config field step_type; ephemeral workflow specs use type",
-			);
-		}
-
 		foreach ( array( 'handler', 'handler_slug', 'handler_config' ) as $legacy_field ) {
 			if ( array_key_exists( $legacy_field, $step ) ) {
 				return array(
@@ -75,14 +68,15 @@ function validate_workflow_for_test( array $workflow ): array {
 			}
 		}
 
-		if ( ! isset( $step['type'] ) ) {
-			return array( 'valid' => false, 'error' => "Step {$index} missing type" );
+		$step_type = $step['step_type'] ?? ( $step['type'] ?? null );
+		if ( ! is_string( $step_type ) || '' === trim( $step_type ) ) {
+			return array( 'valid' => false, 'error' => "Step {$index} missing step_type" );
 		}
 
-		if ( ! in_array( $step['type'], $valid_types, true ) ) {
+		if ( ! in_array( $step_type, $valid_types, true ) ) {
 			return array(
 				'valid' => false,
-				'error' => "Step {$index} has invalid type: {$step['type']}. Valid types: " . implode( ', ', $valid_types ),
+				'error' => "Step {$index} has invalid step_type: {$step_type}. Valid types: " . implode( ', ', $valid_types ),
 			);
 		}
 	}
@@ -104,7 +98,7 @@ echo "\n[1] system_task workflow with no handler_slug — VALID (regression fix)
 $wf = array(
 	'steps' => array(
 		array(
-			'type'               => 'system_task',
+			'step_type'          => 'system_task',
 			'flow_step_settings' => array(
 				'task_type' => 'daily_memory_generation',
 				'params'     => array(),
@@ -117,13 +111,13 @@ dm_assert( true === $r['valid'], 'system_task step accepted without handler_slug
 
 // -----------------------------------------------------------------
 echo "\n[2] webhook_gate step with no handler_slug — VALID\n";
-$wf = array( 'steps' => array( array( 'type' => 'webhook_gate' ) ) );
+$wf = array( 'steps' => array( array( 'step_type' => 'webhook_gate' ) ) );
 $r  = validate_workflow_for_test( $wf );
 dm_assert( true === $r['valid'], 'webhook_gate step accepted without handler_slug' );
 
 // -----------------------------------------------------------------
 echo "\n[3] ai step with no handler_slug — VALID (existing behavior)\n";
-$wf = array( 'steps' => array( array( 'type' => 'ai' ) ) );
+$wf = array( 'steps' => array( array( 'step_type' => 'ai' ) ) );
 $r  = validate_workflow_for_test( $wf );
 dm_assert( true === $r['valid'], 'ai step accepted without handler_slug' );
 
@@ -133,33 +127,26 @@ echo "\n[4] fetch step without handler_slug — VALID at workflow level\n";
 // will fail at runtime when it tries to dispatch to a missing handler.
 // This is the correct boundary: workflow validates structure, step types
 // validate their own config.
-$wf = array( 'steps' => array( array( 'type' => 'fetch' ) ) );
+$wf = array( 'steps' => array( array( 'step_type' => 'fetch' ) ) );
 $r  = validate_workflow_for_test( $wf );
 dm_assert( true === $r['valid'], 'fetch without handler_slug accepted at workflow level' );
 
 // -----------------------------------------------------------------
 echo "\n[5] fetch step WITH legacy handler_slug — INVALID\n";
-$wf = array( 'steps' => array( array( 'type' => 'fetch', 'handler_slug' => 'rss' ) ) );
+$wf = array( 'steps' => array( array( 'step_type' => 'fetch', 'handler_slug' => 'rss' ) ) );
 $r  = validate_workflow_for_test( $wf );
 dm_assert( false === $r['valid'], 'fetch with legacy handler_slug rejected' );
 dm_assert( str_contains( $r['error'] ?? '', 'unsupported legacy field handler_slug' ), 'legacy handler_slug error is explicit' );
 
 // -----------------------------------------------------------------
-echo "\n[5b] workflow spec with stored-config step_type — INVALID\n";
-$wf = array( 'steps' => array( array( 'step_type' => 'fetch' ) ) );
-$r  = validate_workflow_for_test( $wf );
-dm_assert( false === $r['valid'], 'workflow spec step_type rejected' );
-dm_assert( str_contains( $r['error'] ?? '', 'stored-config field step_type' ), 'workflow spec step_type error is explicit' );
-
-// -----------------------------------------------------------------
 echo "\n[6] publish step without handler_slug — VALID at workflow level\n";
-$wf = array( 'steps' => array( array( 'type' => 'publish' ) ) );
+$wf = array( 'steps' => array( array( 'step_type' => 'publish' ) ) );
 $r  = validate_workflow_for_test( $wf );
 dm_assert( true === $r['valid'], 'publish without handler_slug accepted at workflow level' );
 
 // -----------------------------------------------------------------
 echo "\n[7] upsert step without handler_slug — VALID at workflow level\n";
-$wf = array( 'steps' => array( array( 'type' => 'upsert' ) ) );
+$wf = array( 'steps' => array( array( 'step_type' => 'upsert' ) ) );
 $r  = validate_workflow_for_test( $wf );
 dm_assert( true === $r['valid'], 'upsert without handler_slug accepted at workflow level' );
 
@@ -168,12 +155,12 @@ echo "\n[8] mixed workflow: fetch + ai + system_task — VALID\n";
 $wf = array(
 	'steps' => array(
 		array(
-			'type'            => 'fetch',
+			'step_type'       => 'fetch',
 			'handler_slugs'   => array( 'rss' ),
 			'handler_configs' => array( 'rss' => array( 'feed_url' => 'https://example.com/feed.xml' ) ),
 		),
-		array( 'type' => 'ai' ),
-		array( 'type' => 'system_task', 'flow_step_settings' => array( 'task_type' => 'cleanup' ) ),
+		array( 'step_type' => 'ai' ),
+		array( 'step_type' => 'system_task', 'flow_step_settings' => array( 'task_type' => 'cleanup' ) ),
 	),
 );
 $r = validate_workflow_for_test( $wf );
@@ -181,10 +168,10 @@ dm_assert( true === $r['valid'], 'realistic mixed workflow valid' );
 
 // -----------------------------------------------------------------
 echo "\n[9] step with unregistered type — INVALID\n";
-$wf = array( 'steps' => array( array( 'type' => 'time_travel' ) ) );
+$wf = array( 'steps' => array( array( 'step_type' => 'time_travel' ) ) );
 $r  = validate_workflow_for_test( $wf );
 dm_assert( false === $r['valid'], 'unregistered type rejected' );
-dm_assert( str_contains( $r['error'], 'invalid type' ), 'error names the issue' );
+dm_assert( str_contains( $r['error'], 'invalid step_type' ), 'error names the issue' );
 dm_assert( str_contains( $r['error'], 'time_travel' ), 'error names the bad type' );
 dm_assert( str_contains( $r['error'], 'Valid types' ), 'error lists valid alternatives' );
 
@@ -199,10 +186,10 @@ $r = validate_workflow_for_test( array() );
 dm_assert( false === $r['valid'], 'workflow lacking steps array rejected' );
 
 // -----------------------------------------------------------------
-echo "\n[12] step missing type — INVALID\n";
+echo "\n[12] step missing step_type — INVALID\n";
 $r = validate_workflow_for_test( array( 'steps' => array( array() ) ) );
-dm_assert( false === $r['valid'], 'step without type rejected' );
-dm_assert( str_contains( $r['error'], 'missing type' ), 'error names the issue' );
+dm_assert( false === $r['valid'], 'step without step_type rejected' );
+dm_assert( str_contains( $r['error'], 'missing step_type' ), 'error names the issue' );
 dm_assert( str_contains( $r['error'], 'Step 0' ), 'error identifies the step index' );
 
 // -----------------------------------------------------------------
@@ -211,7 +198,7 @@ echo "\n[13] real-world DailyMemoryTask workflow — VALID (the bug case)\n";
 $wf = array(
 	'steps' => array(
 		array(
-			'type'               => 'system_task',
+			'step_type'          => 'system_task',
 			'flow_step_settings' => array(
 				'task_type' => 'daily_memory_generation',
 				'params'     => array( 'date' => '2026-04-24' ),

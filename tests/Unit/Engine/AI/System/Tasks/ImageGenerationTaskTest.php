@@ -57,7 +57,7 @@ class ImageGenerationTaskTest extends WP_UnitTestCase {
 		$workflow = $this->task->getWorkflow( [ 'image_url' => 'https://example.com/generated.png' ] );
 		$this->assertArrayHasKey( 'steps', $workflow );
 		$this->assertCount( 1, $workflow['steps'] );
-		$this->assertSame( 'system_task', $workflow['steps'][0]['type'] );
+		$this->assertSame( 'system_task', $workflow['steps'][0]['step_type'] );
 		$this->assertSame( 'image_generation', $workflow['steps'][0]['flow_step_settings']['task_type'] );
 	}
 

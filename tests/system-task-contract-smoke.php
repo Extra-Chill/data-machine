@@ -34,6 +34,7 @@ $passes   = 0;
 echo "=== system-task-contract-smoke ===\n";
 
 echo "\n[1] task_type is the canonical workflow/settings key\n";
+datamachine_contract_assert_contains( $system_task, "'step_type'          => 'system_task'", 'SystemTask::getWorkflow writes canonical step_type', $failures, $passes );
 datamachine_contract_assert_contains( $system_task, "'task_type' => \$this->getTaskType()", 'SystemTask::getWorkflow writes task_type', $failures, $passes );
 datamachine_contract_assert_contains( $settings, "'task_type' => array", 'SystemTaskSettings exposes task_type field', $failures, $passes );
 

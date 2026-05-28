@@ -58,13 +58,6 @@ class WorkflowSpecValidator {
 				);
 			}
 
-			if ( array_key_exists( 'step_type', $step ) ) {
-				return array(
-					'valid' => false,
-					'error' => "Step {$index} uses stored-config field step_type; ephemeral workflow specs use type",
-				);
-			}
-
 			foreach ( array( 'handler', 'handler_slug', 'handler_config' ) as $legacy_field ) {
 				if ( array_key_exists( $legacy_field, $step ) ) {
 					return array(
@@ -74,18 +67,18 @@ class WorkflowSpecValidator {
 				}
 			}
 
-			$step_type = $step['type'] ?? null;
+			$step_type = $step['step_type'] ?? ( $step['type'] ?? null );
 			if ( ! is_string( $step_type ) || '' === trim( $step_type ) ) {
 				return array(
 					'valid' => false,
-					'error' => "Step {$index} missing type",
+					'error' => "Step {$index} missing step_type",
 				);
 			}
 
 			if ( ! in_array( $step_type, $valid_types, true ) ) {
 				return array(
 					'valid' => false,
-					'error' => "Step {$index} has invalid type: {$step_type}. Valid types: " . implode( ', ', $valid_types ),
+					'error' => "Step {$index} has invalid step_type: {$step_type}. Valid types: " . implode( ', ', $valid_types ),
 				);
 			}
 		}

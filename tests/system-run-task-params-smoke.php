@@ -188,7 +188,7 @@ function smoke_default_system_task_workflow( string $task_type, array $params ):
 	return array(
 		'steps' => array(
 			array(
-				'type'               => 'system_task',
+				'step_type'          => 'system_task',
 				'flow_step_settings' => array(
 					'task_type' => $task_type,
 					'params'    => $params,
