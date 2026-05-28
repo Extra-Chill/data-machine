@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.135.3] - 2026-05-28
+
+### Changed
+- Separate step execution status from packet transport
+
+### Fixed
+- make oauth account scope fallback explicit
+
 ## [0.135.2] - 2026-05-28
 
 ### Changed
