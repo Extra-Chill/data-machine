@@ -135,11 +135,11 @@ function smoke_assert( string $label, bool $condition, string $detail = '' ): vo
 
 echo "[1] two users store provider accounts without overwriting\n";
 $provider = new Principal_Scoped_Provider();
-$provider->save_account( array( 'access_token' => 'alice-token' ), array( 'user_id' => 101 ) );
-$provider->save_account( array( 'access_token' => 'bob-token' ), array( 'user_id' => 202 ) );
+$provider->save_account_for_user( 101, array( 'access_token' => 'alice-token' ) );
+$provider->save_account_for_user( 202, array( 'access_token' => 'bob-token' ) );
 
-smoke_assert( 'alice reads alice token', 'alice-token' === $provider->get_account( array( 'user_id' => 101 ) )['access_token'] );
-smoke_assert( 'bob reads bob token', 'bob-token' === $provider->get_account( array( 'user_id' => 202 ) )['access_token'] );
+smoke_assert( 'alice reads alice token', 'alice-token' === $provider->get_account_for_user( 101 )['access_token'] );
+smoke_assert( 'bob reads bob token', 'bob-token' === $provider->get_account_for_user( 202 )['access_token'] );
 
 $raw = get_site_option( 'datamachine_auth_data', array() );
 smoke_assert( 'alice account stored under user principal', isset( $raw['example']['principals']['user:101']['account'] ) );
@@ -147,19 +147,20 @@ smoke_assert( 'bob account stored under user principal', isset( $raw['example'][
 smoke_assert( 'legacy site account was not written', ! isset( $raw['example']['account'] ) );
 
 echo "\n[2] agent scope wins when explicitly provided\n";
-$provider->save_account( array( 'access_token' => 'agent-token' ), array( 'agent_id' => 303, 'user_id' => 101 ) );
-smoke_assert( 'agent reads agent token', 'agent-token' === $provider->get_account( array( 'agent_id' => 303, 'user_id' => 101 ) )['access_token'] );
+$provider->save_account_for_agent( 303, array( 'access_token' => 'agent-token' ) );
+smoke_assert( 'agent reads agent token', 'agent-token' === $provider->get_account_for_agent( 303 )['access_token'] );
 $raw = get_site_option( 'datamachine_auth_data', array() );
 smoke_assert( 'agent account stored under agent principal', isset( $raw['example']['principals']['agent:303']['account'] ) );
 
-echo "\n[3] legacy account remains readable as fallback\n";
+echo "\n[3] policy context explicitly opts into site fallback\n";
 $GLOBALS['datamachine_auth_scope_options']['datamachine_auth_data']['legacy']['account'] = array( 'access_token' => 'legacy-token' );
 $legacy = new class() extends DataMachine\Core\OAuth\BaseAuthProvider {
 	public function __construct() { parent::__construct( 'legacy' ); }
 	public function get_config_fields(): array { return array(); }
 	public function is_authenticated(): bool { return ! empty( $this->get_account()['access_token'] ); }
 };
-smoke_assert( 'scoped lookup falls back to legacy account', 'legacy-token' === $legacy->get_account( array( 'user_id' => 404 ) )['access_token'] );
+smoke_assert( 'named user lookup does not fall back to legacy account', null === $legacy->get_account_for_user( 404 ) );
+smoke_assert( 'policy context lookup falls back to legacy account', 'legacy-token' === $legacy->get_account_for_policy_context( array( 'user_id' => 404 ) )['access_token'] );
 
 echo "\n[4] site-wide policy remains the default\n";
 $site_provider = new class() extends DataMachine\Core\OAuth\BaseAuthProvider {
@@ -167,9 +168,9 @@ $site_provider = new class() extends DataMachine\Core\OAuth\BaseAuthProvider {
 	public function get_config_fields(): array { return array(); }
 	public function is_authenticated(): bool { return ! empty( $this->get_account()['access_token'] ); }
 };
-$site_provider->save_account( array( 'access_token' => 'site-token-a' ), array( 'user_id' => 101 ) );
-$site_provider->save_account( array( 'access_token' => 'site-token-b' ), array( 'user_id' => 202 ) );
-smoke_assert( 'default policy writes site account', 'site-token-b' === $site_provider->get_account( array( 'user_id' => 101 ) )['access_token'] );
+$site_provider->save_site_account( array( 'access_token' => 'site-token-a' ) );
+$site_provider->save_site_account( array( 'access_token' => 'site-token-b' ) );
+smoke_assert( 'site account writes site account', 'site-token-b' === $site_provider->get_site_account()['access_token'] );
 $raw = get_site_option( 'datamachine_auth_data', array() );
 smoke_assert( 'default policy does not create principal accounts', ! isset( $raw['site_default']['principals'] ) );
 

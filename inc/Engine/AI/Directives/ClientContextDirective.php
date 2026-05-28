@@ -20,6 +20,8 @@
 
 namespace DataMachine\Engine\AI\Directives;
 
+defined( 'ABSPATH' ) || exit;
+
 class ClientContextDirective {
 
 	/**

@@ -201,10 +201,13 @@ class ExecuteStepAbility {
 				'engine'       => $engine,
 			);
 
-			$dataPackets = $flow_step->execute( $payload );
+			$step_output      = $flow_step->execute( $payload );
+			$execution_result = StepExecutionResult::fromStepOutput( $step_output, $step_type );
+			$dataPackets      = $execution_result['packets'];
+			$step_success     = (bool) $execution_result['success'];
 
 			$payload['data'] = $dataPackets;
-			$step_success    = $this->evaluateStepSuccess( $dataPackets, $job_id, $flow_step_id, $step_type );
+			$this->logStepExecutionResult( $execution_result, $job_id, $flow_step_id, $step_type );
 
 			// Refresh engine data to capture changes made during step execution.
 			$refreshed_engine_data = datamachine_get_engine_data( $job_id );
@@ -233,7 +236,8 @@ class ExecuteStepAbility {
 				$dataPackets,
 				$payload,
 				$step_success,
-				$status_override
+				$status_override,
+				$execution_result
 			);
 
 			$recorded_status = $status_override ? $status_override : ( $result['outcome'] ?? null );
@@ -245,9 +249,9 @@ class ExecuteStepAbility {
 					'step_type'    => $step_type,
 					'result'       => $result['outcome'] ?? ( $step_success ? 'completed' : 'failed' ),
 					'step_success' => $step_success,
-					'packet_count' => count( $dataPackets ),
+					'packet_count' => $execution_result['packet_count'],
 					'status'       => $recorded_status,
-					'reason'       => $result['reason'] ?? ( $result['error'] ?? null ),
+					'reason'       => $result['reason'] ?? ( $execution_result['reason'] ?? ( $result['error'] ?? null ) ),
 					'error'        => $result['error'] ?? null,
 				)
 			);
@@ -352,8 +356,23 @@ class ExecuteStepAbility {
 	 */
 	private function evaluateStepSuccess( array $dataPackets, int $job_id, string $flow_step_id, string $step_type = '' ): bool {
 		$classification = StepExecutionResult::classify( $dataPackets, $step_type );
+		$this->logStepExecutionResult( $classification, $job_id, $flow_step_id, $step_type );
 
-		if ( ! $classification['success'] ) {
+		return (bool) $classification['success'];
+	}
+
+	/**
+	 * Log non-successful step execution classification.
+	 *
+	 * @param array  $execution_result Normalized StepExecutionResult contract.
+	 * @param int    $job_id           Job ID (for logging).
+	 * @param string $flow_step_id     Flow step ID (for logging).
+	 * @param string $step_type        Step type identifier.
+	 */
+	private function logStepExecutionResult( array $execution_result, int $job_id, string $flow_step_id, string $step_type = '' ): void {
+		$success = (bool) ( $execution_result['success'] ?? false );
+
+		if ( ! $success ) {
 			do_action(
 				'datamachine_log',
 				'warning',
@@ -362,13 +381,12 @@ class ExecuteStepAbility {
 					'job_id'       => $job_id,
 					'flow_step_id' => $flow_step_id,
 					'step_type'    => $step_type,
-					'reason'       => $classification['reason'],
-					'packet_count' => $classification['packet_count'],
+					'status'       => $execution_result['status'] ?? 'failed',
+					'reason'       => $execution_result['reason'] ?? 'step_execution_failed',
+					'packet_count' => $execution_result['packet_count'] ?? 0,
 				)
 			);
 		}
-
-		return (bool) $classification['success'];
 	}
 
 	/**
@@ -396,7 +414,8 @@ class ExecuteStepAbility {
 		array $dataPackets,
 		array $payload,
 		bool $step_success,
-		$status_override
+		$status_override,
+		array $execution_result = array()
 	): array {
 		$pipeline_id = $flow_step_config['pipeline_id'] ?? null;
 
@@ -595,11 +614,7 @@ class ExecuteStepAbility {
 			);
 		}
 
-		// Fetch/event_import steps: empty data means "nothing to process", not failure.
-		// This applies regardless of whether the flow has historical processed items —
-		// a new flow checking a source with no events is not broken, it just has nothing yet.
-		$is_fetch_step = in_array( $step_type, array( 'fetch', 'event_import' ), true );
-		$prior_status  = $this->getPriorTerminalStatus( $job_id );
+		$prior_status = $this->getPriorTerminalStatus( $job_id );
 		if ( null !== $prior_status ) {
 			do_action(
 				'datamachine_log',
@@ -624,12 +639,15 @@ class ExecuteStepAbility {
 			);
 		}
 
-		if ( $is_fetch_step ) {
+		// completed_no_items is an execution status, not a packet-count guess.
+		// Fetch/event_import legacy empty outputs classify this way, and explicit
+		// result-shaped step returns can also choose it without emitting packets.
+		if ( 'completed_no_items' === ( $execution_result['status'] ?? '' ) ) {
 			$this->db_jobs->complete_job( $job_id, JobStatus::COMPLETED_NO_ITEMS );
 			do_action(
 				'datamachine_log',
 				'info',
-				'Flow completed with no new items to process',
+				'Step completed with no new items to process',
 				array(
 					'job_id'       => $job_id,
 					'pipeline_id'  => $pipeline_id,
@@ -670,7 +688,7 @@ class ExecuteStepAbility {
 				'step_type'    => $step_type,
 			)
 		);
-		$empty_packet_reason = $this->getFailureReasonFromPackets( $dataPackets, 'empty_data_packet_returned' );
+		$empty_packet_reason = $this->getFailureReasonFromPackets( $dataPackets, $execution_result['reason'] ?? 'empty_data_packet_returned' );
 
 		do_action(
 			'datamachine_fail_job',

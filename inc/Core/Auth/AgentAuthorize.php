@@ -153,7 +153,8 @@ class AgentAuthorize {
 		// cookies without an X-WP-Nonce header, so we manually validate
 		// the logged-in cookie to detect the user's session.
 		if ( ! is_user_logged_in() && ! empty( $_COOKIE[ LOGGED_IN_COOKIE ] ) ) {
-			$user_id = wp_validate_auth_cookie( $_COOKIE[ LOGGED_IN_COOKIE ], 'logged_in' );
+			$logged_in_cookie = sanitize_text_field( wp_unslash( $_COOKIE[ LOGGED_IN_COOKIE ] ) );
+			$user_id          = wp_validate_auth_cookie( $logged_in_cookie, 'logged_in' );
 			if ( $user_id ) {
 				wp_set_current_user( $user_id );
 			}
@@ -232,7 +233,8 @@ class AgentAuthorize {
 	public function handle_authorize_post( \WP_REST_Request $request ) {
 		// Same browser cookie validation as the GET handler.
 		if ( ! is_user_logged_in() && ! empty( $_COOKIE[ LOGGED_IN_COOKIE ] ) ) {
-			$user_id = wp_validate_auth_cookie( $_COOKIE[ LOGGED_IN_COOKIE ], 'logged_in' );
+			$logged_in_cookie = sanitize_text_field( wp_unslash( $_COOKIE[ LOGGED_IN_COOKIE ] ) );
+			$user_id          = wp_validate_auth_cookie( $logged_in_cookie, 'logged_in' );
 			if ( $user_id ) {
 				wp_set_current_user( $user_id );
 			}

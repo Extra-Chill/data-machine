@@ -122,11 +122,11 @@ That behavior should be expressed as a named resolver instead of hiding inside
 all account reads:
 
 ```php
-public function get_account_for_context( array $context = array() ): ?array;
+public function get_account_for_policy_context( array $context = array() ): ?array;
 ```
 
-`get_account_for_context()` consults the same policy inputs as the current
-`get_account( array $context )` implementation:
+`get_account_for_policy_context()` consults the same policy inputs as the current
+`get_account( array $context )` compatibility implementation:
 
 - Explicit `agent_id` in context.
 - Explicit `user_id` in context.
@@ -135,8 +135,8 @@ public function get_account_for_context( array $context = array() ): ?array;
 - `get_current_user_id()`.
 - The provider's `datamachine_auth_scope_policy` result.
 
-The resolver may preserve the current site fallback behavior for one release
-cycle so existing policy-scoped providers keep working while callsites migrate.
+The method name makes the site fallback explicit. Named scope methods remain the
+safe default when missing user or agent credentials must stay missing.
 
 ## Deprecation Plan
 
@@ -177,7 +177,7 @@ context-free aliases after `get_site_account()` is widely adopted.
 | `save_account( $account, array( 'user_id' => $id ) )` | `save_account_for_user( $id, $account )` | User account only. |
 | `clear_account( array( 'user_id' => $id ) )` | `delete_account_for_user( $id )` | User account only. |
 | `get_account( array( 'agent_id' => $id ) )` | `get_account_for_agent( $id )` | Agent account only, no fallback. |
-| Ambient policy lookup | `get_account_for_context( $context )` | Provider policy decides scope. |
+| Ambient policy lookup with site fallback | `get_account_for_policy_context( $context )` | Provider policy decides scope, then falls back to site account. |
 
 Vendor plugins should prefer explicit named methods when the caller already
 knows the desired principal. Use policy-resolved lookup only when the desired
@@ -199,16 +199,16 @@ scope is genuinely delegated to provider policy.
    `save_site_account()` / `delete_site_account()`.
 8. Update internal scoped callsites to `get_account_for_user()` or
    `get_account_for_agent()` when the scope is explicit.
-9. Publish vendor migration notes and coordinate downstream plugin updates.
-10. After at least one release cycle, decide whether context-free `get_account()`
+9. Rename policy fallback lookup to `get_account_for_policy_context()` and keep
+   `get_account_for_context()` as a deprecated shim. Shipped in v0.136.0.
+10. Publish vendor migration notes and coordinate downstream plugin updates.
+11. After at least one release cycle, decide whether context-free `get_account()`
    should also become a deprecated alias for `get_site_account()`.
 
 ## Open Questions
 
 - Should config storage get the same named-scope treatment, or should this
   migration stay account-only until vendor account reads are cleaned up?
-- Should `get_account_for_context()` preserve site fallback permanently, or only
-  during the deprecation window?
 - Should per-agent account resolution expose a filter equivalent to
   `datamachine_resolve_oauth_account_for_user`?
 - Should missing site-wide accounts return `null` only in new methods while old

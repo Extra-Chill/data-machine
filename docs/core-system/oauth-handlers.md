@@ -41,7 +41,7 @@ public function delete_account_for_user(int $user_id): bool;
 public function get_account_for_agent(int $agent_id): ?array;
 public function save_account_for_agent(int $agent_id, array $account): bool;
 public function delete_account_for_agent(int $agent_id): bool;
-public function get_account_for_context(array $context = array()): ?array;
+public function get_account_for_policy_context(array $context = array()): ?array;
 public function get_account(): array;
 public function get_config(): array;
 public function save_account(array $data): bool;
@@ -144,14 +144,15 @@ These share the same on-disk shape as the principal-scoped API
 readable through the other. Like the per-user API, these methods never consult
 auth scope policy and never fall back to site-wide storage.
 
-### Policy-resolved account context API (@since v0.130.0)
+### Policy-resolved account context API (@since v0.136.0)
 
-`get_account_for_context()` is the explicit account lookup for callers that want
-provider policy to decide which credential scope applies to an execution
-context:
+`get_account_for_policy_context()` is the explicit account lookup for callers
+that intentionally want provider policy to decide which credential scope applies
+to an execution context and then fall back to the site account when the scoped
+slot is missing:
 
 ```php
-public function get_account_for_context( array $context = array() ): ?array;
+public function get_account_for_policy_context( array $context = array() ): ?array;
 ```
 
 The method consults `datamachine_auth_scope_policy` and the same context inputs
@@ -162,9 +163,9 @@ window, but returns `null` when neither a scoped account nor a site-wide account
 exists.
 
 Passing a non-empty context array to `get_account()` is deprecated as of
-v0.131.0. The legacy method still returns an array for backward compatibility,
-but callers should use `get_account_for_context()` when they want
-policy-resolved lookup.
+v0.131.0. The older `get_account_for_context()` name is deprecated as of
+v0.136.0 because it hid the fallback behavior. Both compatibility methods still
+route through `get_account_for_policy_context()` during the migration window.
 
 Passing a non-empty context array to `save_account()` or `clear_account()` is
 deprecated as of v0.132.0. Callers should use the explicit site, user, or agent

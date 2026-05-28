@@ -30,7 +30,12 @@ function datamachine_get_engine_data( int $job_id ): array {
  * @return bool True on success.
  */
 function datamachine_set_engine_data( int $job_id, array $snapshot ): bool {
-	return \DataMachine\Core\EngineData::persist( $job_id, $snapshot );
+	$persisted = \DataMachine\Core\EngineData::persist( $job_id, $snapshot );
+	if ( $persisted && datamachine_engine_data_should_write_artifact_files( $snapshot ) ) {
+		datamachine_write_engine_data_artifact_files( $job_id );
+	}
+
+	return $persisted;
 }
 
 /**
@@ -42,4 +47,44 @@ function datamachine_set_engine_data( int $job_id, array $snapshot ): bool {
  */
 function datamachine_merge_engine_data( int $job_id, array $data ): bool {
 	return \DataMachine\Core\EngineData::merge( $job_id, $data );
+}
+
+/**
+ * Determine whether an engine data snapshot has enough runtime artifact data to
+ * emit first-class transcript/tool-trace files.
+ *
+ * @param array $snapshot Engine data snapshot.
+ * @return bool Whether artifact files should be written.
+ */
+function datamachine_engine_data_should_write_artifact_files( array $snapshot ): bool {
+	return ! empty( $snapshot['transcript_session_id'] ) || ! empty( $snapshot['tool_execution_summary'] );
+}
+
+/**
+ * Write first-class runtime artifact files and store their refs in engine data.
+ *
+ * @param int $job_id Job ID.
+ * @return void
+ */
+function datamachine_write_engine_data_artifact_files( int $job_id ): void {
+	$artifact_file_result = ( new \DataMachine\Core\JobArtifacts() )->write_artifact_files( $job_id );
+	if ( ! empty( $artifact_file_result['success'] ) && is_array( $artifact_file_result['artifact_files'] ?? null ) && ! empty( $artifact_file_result['artifact_files'] ) ) {
+		\DataMachine\Core\EngineData::merge(
+			$job_id,
+			array( 'artifact_files' => $artifact_file_result['artifact_files'] )
+		);
+		return;
+	}
+
+	if ( empty( $artifact_file_result['success'] ) ) {
+		do_action(
+			'datamachine_log',
+			'warning',
+			'EngineData: Failed to write first-class job artifact files.',
+			array(
+				'job_id' => $job_id,
+				'error'  => (string) ( $artifact_file_result['error'] ?? 'unknown_error' ),
+			)
+		);
+	}
 }

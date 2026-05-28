@@ -10,9 +10,14 @@ namespace DataMachine\Core;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Classifies execution success separately from DataPacket transport.
+ * Normalizes step execution status separately from DataPacket transport.
  */
 class StepExecutionResult {
+
+	private const STATUS_SUCCEEDED          = 'succeeded';
+	private const STATUS_FAILED             = 'failed';
+	private const STATUS_COMPLETED_NO_ITEMS = 'completed_no_items';
+	private const STATUS_BLOCKED            = 'blocked';
 
 	/** @var array<string,bool> */
 	private const NON_SUCCESS_PACKET_TYPES = array(
@@ -20,21 +25,64 @@ class StepExecutionResult {
 	);
 
 	/**
-	 * Classify step output packets into an execution result.
+	 * Normalize a step return value into the explicit execution result contract.
+	 *
+	 * Packet lists remain the legacy transport shape. Result-shaped arrays may
+	 * carry status independently from packets:
+	 *
+	 * array(
+	 *     'status'          => 'succeeded|failed|completed_no_items|blocked',
+	 *     'packets'         => array(),
+	 *     'reason'          => '...',
+	 *     'terminal_status' => null,
+	 * )
+	 *
+	 * @param mixed  $step_output Step return value.
+	 * @param string $step_type   Step type identifier.
+	 * @return array{status: string, packets: array, reason: string, terminal_status: ?string, success: bool, packet_count: int}
+	 */
+	public static function fromStepOutput( $step_output, string $step_type = '' ): array {
+		if ( self::isExplicitResult( $step_output ) ) {
+			$packets = self::normalizePackets( $step_output['packets'] ?? ( $step_output['data_packets'] ?? array() ) );
+			$status  = self::normalizeStatus( $step_output['status'] ?? '' );
+			$reason  = is_scalar( $step_output['reason'] ?? null ) ? self::sanitizeReason( $step_output['reason'] ) : '';
+
+			if ( '' === $status ) {
+				$classified = self::classify( $packets, $step_type );
+				$status     = $classified['status'];
+				$reason     = '' !== $reason ? $reason : $classified['reason'];
+			}
+
+			if ( '' === $reason ) {
+				$reason = self::defaultReasonForStatus( $status, $step_type );
+			}
+
+			$terminal_status = $step_output['terminal_status'] ?? null;
+			$terminal_status = is_scalar( $terminal_status ) && '' !== trim( (string) $terminal_status ) ? trim( (string) $terminal_status ) : null;
+
+			return self::buildResult( $status, $packets, $reason, $terminal_status );
+		}
+
+		return self::classify( self::normalizePackets( $step_output ), $step_type );
+	}
+
+	/**
+	 * Classify legacy step output packets into an execution result.
 	 *
 	 * @param array  $data_packets Returned data packets.
 	 * @param string $step_type    Step type identifier.
-	 * @return array{success: bool, reason: string, packet_count: int}
+	 * @return array{status: string, packets: array, reason: string, terminal_status: ?string, success: bool, packet_count: int}
 	 */
 	public static function classify( array $data_packets, string $step_type = '' ): array {
+		$data_packets = self::normalizePackets( $data_packets );
 		$packet_count = count( $data_packets );
 
 		if ( 0 === $packet_count ) {
-			return array(
-				'success'      => false,
-				'reason'       => 'empty_data_packet_returned',
-				'packet_count' => 0,
-			);
+			if ( in_array( $step_type, array( 'fetch', 'event_import' ), true ) ) {
+				return self::buildResult( self::STATUS_COMPLETED_NO_ITEMS, array(), 'completed_no_items', JobStatus::COMPLETED_NO_ITEMS );
+			}
+
+			return self::buildResult( self::STATUS_FAILED, array(), 'empty_data_packet_returned', null );
 		}
 
 		$successful_handlers = self::collectSuccessfulHandlerTools( $data_packets );
@@ -46,11 +94,7 @@ class StepExecutionResult {
 
 			if ( array_key_exists( 'step_execution_success', $metadata ) ) {
 				if ( false === (bool) $metadata['step_execution_success'] ) {
-					return array(
-						'success'      => false,
-						'reason'       => self::sanitizeReason( $metadata['failure_reason'] ?? 'step_execution_failed' ),
-						'packet_count' => $packet_count,
-					);
+					return self::buildResult( self::STATUS_FAILED, $data_packets, self::sanitizeReason( $metadata['failure_reason'] ?? 'step_execution_failed' ), null );
 				}
 
 				$has_success_packet = true;
@@ -58,11 +102,7 @@ class StepExecutionResult {
 			}
 
 			if ( isset( $metadata['success'] ) && false === $metadata['success'] ) {
-				return array(
-					'success'      => false,
-					'reason'       => self::sanitizeReason( $metadata['failure_reason'] ?? 'packet_failure' ),
-					'packet_count' => $packet_count,
-				);
+				return self::buildResult( self::STATUS_FAILED, $data_packets, self::sanitizeReason( $metadata['failure_reason'] ?? 'packet_failure' ), null );
 			}
 
 			if ( isset( $metadata['tool_success'] ) && false === $metadata['tool_success'] ) {
@@ -71,11 +111,7 @@ class StepExecutionResult {
 					continue;
 				}
 
-				return array(
-					'success'      => false,
-					'reason'       => self::sanitizeReason( $metadata['failure_reason'] ?? 'tool_result_failed' ),
-					'packet_count' => $packet_count,
-				);
+				return self::buildResult( self::STATUS_FAILED, $data_packets, self::sanitizeReason( $metadata['failure_reason'] ?? 'tool_result_failed' ), null );
 			}
 
 			if ( ! isset( self::NON_SUCCESS_PACKET_TYPES[ $type ] ) ) {
@@ -83,11 +119,60 @@ class StepExecutionResult {
 			}
 		}
 
-		return array(
-			'success'      => $has_success_packet,
-			'reason'       => $has_success_packet ? 'completed' : self::fallbackReason( $step_type ),
-			'packet_count' => $packet_count,
+		return self::buildResult(
+			$has_success_packet ? self::STATUS_SUCCEEDED : self::STATUS_FAILED,
+			$data_packets,
+			$has_success_packet ? 'completed' : self::fallbackReason( $step_type ),
+			null
 		);
+	}
+
+	private static function buildResult( string $status, array $packets, string $reason, ?string $terminal_status ): array {
+		$status = self::normalizeStatus( $status );
+		if ( '' === $status ) {
+			$status = self::STATUS_FAILED;
+		}
+
+		return array(
+			'status'          => $status,
+			'packets'         => $packets,
+			'reason'          => self::sanitizeReason( $reason ),
+			'terminal_status' => $terminal_status,
+			'success'         => self::STATUS_SUCCEEDED === $status,
+			'packet_count'    => count( $packets ),
+		);
+	}
+
+	private static function isExplicitResult( $step_output ): bool {
+		return is_array( $step_output ) && ( array_key_exists( 'status', $step_output ) || array_key_exists( 'packets', $step_output ) || array_key_exists( 'terminal_status', $step_output ) );
+	}
+
+	private static function normalizePackets( $packets ): array {
+		if ( ! is_array( $packets ) ) {
+			return array();
+		}
+
+		return array_values( $packets );
+	}
+
+	private static function normalizeStatus( $status ): string {
+		$status = self::sanitizeReason( $status );
+
+		return in_array( $status, array( self::STATUS_SUCCEEDED, self::STATUS_FAILED, self::STATUS_COMPLETED_NO_ITEMS, self::STATUS_BLOCKED ), true ) ? $status : '';
+	}
+
+	private static function defaultReasonForStatus( string $status, string $step_type ): string {
+		switch ( $status ) {
+			case self::STATUS_SUCCEEDED:
+				return 'completed';
+			case self::STATUS_COMPLETED_NO_ITEMS:
+				return 'completed_no_items';
+			case self::STATUS_BLOCKED:
+				return 'blocked';
+			case self::STATUS_FAILED:
+			default:
+				return self::fallbackReason( $step_type );
+		}
 	}
 
 	/**
