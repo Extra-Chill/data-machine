@@ -252,7 +252,7 @@ class SyncRunner {
 		$truncated        = false;
 		if ( count( $output_packets ) > $options['max_items'] ) {
 			$output_packets = array_slice( $output_packets, 0, $options['max_items'] );
-			$truncated     = true;
+			$truncated      = true;
 		}
 
 		$output_count = count( $output_packets );
