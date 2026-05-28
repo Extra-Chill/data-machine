@@ -259,6 +259,7 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Job\GetJobsAbility();
 	new \DataMachine\Abilities\Job\DeleteJobsAbility();
 	new \DataMachine\Abilities\Job\ExecuteWorkflowAbility();
+	new \DataMachine\Abilities\Job\ExecuteAgentWorkflowAbility();
 	new \DataMachine\Abilities\Job\FlowHealthAbility();
 	new \DataMachine\Abilities\Job\ProblemFlowsAbility();
 	new \DataMachine\Abilities\Job\RecoverStuckJobsAbility();
