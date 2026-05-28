@@ -21,10 +21,10 @@ class JobArtifacts {
 
 	private const TRANSCRIPT_ARTIFACT_SCHEMA_VERSION = 1;
 	private const TOOL_TRACE_ARTIFACT_SCHEMA_VERSION = 1;
-	private const MAX_TRANSCRIPT_MESSAGES           = 200;
-	private const MAX_TRANSCRIPT_CONTENT_CHARS      = 4000;
-	private const MAX_TOOL_TRACE_ENTRIES            = 200;
-	private const MAX_TOOL_TRACE_FIELD_CHARS        = 4000;
+	private const MAX_TRANSCRIPT_MESSAGES            = 200;
+	private const MAX_TRANSCRIPT_CONTENT_CHARS       = 4000;
+	private const MAX_TOOL_TRACE_ENTRIES             = 200;
+	private const MAX_TOOL_TRACE_FIELD_CHARS         = 4000;
 
 	/**
 	 * Build a deterministic artifact payload for a job.
@@ -49,9 +49,9 @@ class JobArtifacts {
 			);
 		}
 
-		$engine_data = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
-		$agent       = $this->resolve_agent( $job, $engine_data );
-		$tool_calls  = array_merge(
+		$engine_data         = is_array( $job['engine_data'] ?? null ) ? $job['engine_data'] : array();
+		$agent               = $this->resolve_agent( $job, $engine_data );
+		$tool_calls          = array_merge(
 			$this->successful_tool_summaries( $engine_data ),
 			$this->successful_tool_summaries_from_list( $additional_tool_summaries )
 		);
@@ -166,7 +166,12 @@ class JobArtifacts {
 	 */
 	private function hashable_artifact_refs( ?array $transcript_artifact, ?array $tool_trace_artifact ): array {
 		$refs = array();
-		foreach ( array( 'transcript' => $transcript_artifact, 'tool_trace' => $tool_trace_artifact ) as $key => $artifact ) {
+		foreach (
+			array(
+				'transcript' => $transcript_artifact,
+				'tool_trace' => $tool_trace_artifact,
+			) as $key => $artifact
+		) {
 			if ( ! is_array( $artifact ) ) {
 				continue;
 			}
