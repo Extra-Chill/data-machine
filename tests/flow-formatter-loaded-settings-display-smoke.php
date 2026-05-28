@@ -69,6 +69,12 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'wp_json_encode' ) ) {
+		function wp_json_encode( $value ) {
+			return json_encode( $value );
+		}
+	}
+
 	if ( ! function_exists( 'wp_date' ) ) {
 		function wp_date( string $format, int $timestamp, ?\DateTimeZone $timezone = null ): string {
 			$date = new \DateTimeImmutable( '@' . $timestamp );
@@ -97,6 +103,10 @@ namespace {
 					'label' => 'Flag',
 					'type'  => 'checkbox',
 				),
+				'params' => array(
+					'label' => 'Parameters',
+					'type'  => 'json',
+				),
 			);
 		}
 	}
@@ -120,6 +130,7 @@ namespace {
 					'alpha' => array(
 						'choice' => 'b',
 						'flag'   => true,
+						'params' => array( 'query' => 'WooCommerce Fieldguide P2' ),
 					),
 				),
 			),
@@ -137,8 +148,9 @@ namespace {
 	$formatted = \DataMachine\Core\Admin\FlowFormatter::format_flow_for_response( $flow, null, array( 123 => null ) );
 	$config    = $formatted['flow_config'];
 
-	flow_formatter_loaded_config_expect( 'Choice: Bee | Flag: True' === $config['fetch_123']['settings_summary'], 'Single-handler settings summary should match loaded config.' );
+	flow_formatter_loaded_config_expect( 'Choice: Bee | Flag: True | Parameters: {"query":"WooCommerce Fieldguide P2"}' === $config['fetch_123']['settings_summary'], 'Single-handler settings summary should match loaded config.' );
 	flow_formatter_loaded_config_expect( 'Bee' === $config['fetch_123']['settings_display'][0]['display_value'], 'Single-handler settings display should use option labels.' );
+	flow_formatter_loaded_config_expect( is_array( $config['fetch_123']['settings_display'][2]['display_value'] ), 'Single-handler settings display should preserve array values.' );
 	flow_formatter_loaded_config_expect( 'Aye' === $config['publish_123']['handler_settings_displays']['alpha'][0]['display_value'], 'Multi-handler alpha display should match loaded config.' );
 	flow_formatter_loaded_config_expect( 'Bee' === $config['publish_123']['handler_settings_displays']['beta'][0]['display_value'], 'Multi-handler beta display should match loaded config.' );
 
