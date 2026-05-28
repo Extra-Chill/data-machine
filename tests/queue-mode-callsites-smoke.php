@@ -97,7 +97,7 @@ function assert_callsite( string $name, bool $cond, string $detail = '' ): void 
 function build_ephemeral_flow_step_for_test( array $step, int $index ): array {
 	$step_id          = "ephemeral_step_{$index}";
 	$pipeline_step_id = "ephemeral_pipeline_{$index}";
-	$step_type        = $step['type'];
+	$step_type        = $step['step_type'] ?? ( $step['type'] ?? '' );
 
 	$workflow_user_message = is_string( $step['user_message'] ?? null )
 		? trim( $step['user_message'] )
@@ -126,7 +126,7 @@ echo "=== queue-mode-callsites-smoke ===\n";
 
 echo "\n[ephemeral:1] AI workflow step with user_message → 1-entry static prompt_queue\n";
 $step = array(
-	'type'         => 'ai',
+	'step_type'    => 'ai',
 	'user_message' => 'Summarize for social media',
 );
 $cfg = build_ephemeral_flow_step_for_test( $step, 0 );
@@ -146,7 +146,7 @@ assert_callsite(
 
 echo "\n[ephemeral:2] AI workflow step with empty user_message → empty prompt_queue\n";
 $step = array(
-	'type'         => 'ai',
+	'step_type'    => 'ai',
 	'user_message' => '',
 );
 $cfg = build_ephemeral_flow_step_for_test( $step, 0 );
@@ -155,7 +155,7 @@ assert_callsite( 'queue_mode still static', 'static' === $cfg['queue_mode'] );
 
 echo "\n[ephemeral:3] AI workflow step with no user_message field → empty prompt_queue\n";
 $step = array(
-	'type' => 'ai',
+	'step_type' => 'ai',
 );
 $cfg = build_ephemeral_flow_step_for_test( $step, 0 );
 assert_callsite( 'missing input → empty queue', array() === $cfg['prompt_queue'] );
@@ -165,7 +165,7 @@ echo "\n[ephemeral:4] non-AI workflow step ignores user_message field even when 
 // be defensive: a fetch step with a stray user_message in its spec
 // should NOT seed a prompt_queue (only AI steps consume prompt_queue).
 $step = array(
-	'type'         => 'fetch',
+	'step_type'    => 'fetch',
 	'user_message' => 'should be ignored',
 );
 $cfg = build_ephemeral_flow_step_for_test( $step, 0 );
@@ -176,7 +176,7 @@ assert_callsite(
 
 echo "\n[ephemeral:5] whitespace-only user_message → empty prompt_queue\n";
 $step = array(
-	'type'         => 'ai',
+	'step_type'    => 'ai',
 	'user_message' => '   ',
 );
 $cfg = build_ephemeral_flow_step_for_test( $step, 0 );

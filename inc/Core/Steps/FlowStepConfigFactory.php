@@ -24,7 +24,7 @@ class FlowStepConfigFactory {
 	 * @return array Flow step config row.
 	 */
 	public static function buildFromWorkflowStep( array $step, int $index ): array {
-		$step_type = $step['type'];
+		$step_type = self::getWorkflowStepType( $step );
 		$config    = self::build(
 			array_merge(
 				array(
@@ -180,7 +180,7 @@ class FlowStepConfigFactory {
 			? trim( $step['user_message'] )
 			: '';
 
-		if ( 'ai' !== ( $step['type'] ?? '' ) || '' === $workflow_user_message ) {
+		if ( 'ai' !== self::getWorkflowStepType( $step ) || '' === $workflow_user_message ) {
 			return array( QueueAbility::SLOT_PROMPT_QUEUE => array() );
 		}
 
@@ -327,5 +327,19 @@ class FlowStepConfigFactory {
 		}
 
 		return array_values( array_unique( $sanitized ) );
+	}
+
+	/**
+	 * Resolve the workflow step type from canonical or compatibility fields.
+	 *
+	 * `step_type` is the canonical shared field. `type` is accepted only for
+	 * compatibility with older ephemeral workflow specs.
+	 *
+	 * @param array $step Workflow step input.
+	 * @return string Step type slug.
+	 */
+	private static function getWorkflowStepType( array $step ): string {
+		$step_type = $step['step_type'] ?? ( $step['type'] ?? '' );
+		return is_string( $step_type ) ? $step_type : '';
 	}
 }

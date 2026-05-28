@@ -87,7 +87,7 @@ $built = build_configs_from_workflow_for_test(
 	array(
 		'steps' => array(
 			array(
-				'type'           => 'system_task',
+				'step_type'      => 'system_task',
 				'flow_step_settings' => array(
 					'task_type' => 'daily_memory_generation',
 					'params'    => array(),
@@ -110,7 +110,7 @@ $built = build_configs_from_workflow_for_test(
 	array(
 		'steps' => array(
 			array(
-				'type'            => 'fetch',
+				'step_type'       => 'fetch',
 				'handler_slugs'   => array( 'mcp' ),
 				'handler_configs' => array( 'mcp' => array( 'server' => 'a8c' ) ),
 			),
@@ -131,7 +131,7 @@ $built = build_configs_from_workflow_for_test(
 	array(
 		'steps' => array(
 			array(
-				'type'            => 'publish',
+				'step_type'       => 'publish',
 				'handler_slugs'   => array( 'wordpress_publish' ),
 				'handler_configs' => array( 'wordpress_publish' => array( 'post_type' => 'post' ) ),
 			),
@@ -145,7 +145,7 @@ assert_absent( 'handler_slug', $step0, 'publish has no scalar handler_slug', $fa
 assert_absent( 'handler_config', $step0, 'publish has no scalar handler_config', $failures, $passes );
 
 echo "\n[4] webhook_gate with no config has no handler fields:\n";
-$built = build_configs_from_workflow_for_test( array( 'steps' => array( array( 'type' => 'webhook_gate' ) ) ) );
+$built = build_configs_from_workflow_for_test( array( 'steps' => array( array( 'step_type' => 'webhook_gate' ) ) ) );
 $step0 = $built['flow_config']['ephemeral_step_0'];
 assert_equals( array(), FlowStepConfig::getPrimaryHandlerConfig( $step0 ), 'webhook_gate config empty', $failures, $passes );
 assert_absent( 'handler_slug', $step0, 'webhook_gate has no handler_slug', $failures, $passes );
@@ -157,7 +157,7 @@ $built = build_configs_from_workflow_for_test(
 	array(
 		'steps' => array(
 			array(
-				'type'          => 'ai',
+				'step_type'     => 'ai',
 				'system_prompt' => 'be helpful',
 				'enabled_tools' => array( 'intelligence/search' ),
 			),

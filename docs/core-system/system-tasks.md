@@ -38,7 +38,7 @@ abstract class SystemTask {
 [
     'steps' => [
         [
-            'type' => 'system_task',
+            'step_type' => 'system_task',
             'flow_step_settings' => [
                 'task_type' => $this->getTaskType(),
                 'params'    => $params,

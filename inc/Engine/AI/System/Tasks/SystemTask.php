@@ -68,7 +68,7 @@ abstract class SystemTask {
 		return array(
 			'steps' => array(
 				array(
-					'type'               => 'system_task',
+					'step_type'          => 'system_task',
 					'flow_step_settings' => array(
 						'task_type' => $this->getTaskType(),
 						'params'    => $params,

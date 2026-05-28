@@ -98,11 +98,12 @@ class ToolPolicyResolver {
 			return array();
 		}
 
+		$agent_policy = $agent_id > 0 ? $this->getAgentToolPolicy( $agent_id ) : null;
+		$args         = $this->withAgentPolicyAllowOnly( $args, $agent_policy );
+
 		// 1. Gather tools from Data Machine-owned sources.
 		$args['modes'] = $modes;
 		$tools         = $this->gatherByModes( $modes, $args );
-
-		$agent_policy = $agent_id > 0 ? $this->getAgentToolPolicy( $agent_id ) : null;
 		$tools        = $this->filterRuntimeToolsByPolicyOptIn( $tools, $args, $agent_policy );
 
 		// 2. Delegate generic mode/allow/deny/category policy resolution to Agents API.
@@ -186,6 +187,26 @@ class ToolPolicyResolver {
 		}
 
 		return $tools;
+	}
+
+	/**
+	 * Include explicit agent allow-policy tools in the early opt-in allow list.
+	 *
+	 * @param array      $args Resolution args.
+	 * @param array|null $agent_policy Optional persisted agent tool policy.
+	 * @return array Resolution args.
+	 */
+	private function withAgentPolicyAllowOnly( array $args, ?array $agent_policy ): array {
+		if ( ! is_array( $agent_policy ) || \WP_Agent_Tool_Policy::MODE_ALLOW !== ( $agent_policy['mode'] ?? '' ) ) {
+			return $args;
+		}
+
+		$args['allow_only'] = array_values( array_unique( array_merge(
+			$this->policy_filter->string_list( $args['allow_only'] ?? array() ),
+			$this->policy_filter->string_list( $agent_policy['tools'] ?? array() )
+		) ) );
+
+		return $args;
 	}
 
 	/**
@@ -295,7 +316,16 @@ class ToolPolicyResolver {
 	 * @return bool True when the tool should be included.
 	 */
 	public static function isOptInToolAllowed( array $tool_config, string $tool_name, array $args ): bool {
-		return empty( $tool_config['requires_opt_in'] )
-			|| in_array( $tool_name, $args['allow_only'] ?? array(), true );
+		if ( empty( $tool_config['requires_opt_in'] ) ) {
+			return true;
+		}
+
+		$allowed = is_array( $args['allow_only'] ?? null ) ? $args['allow_only'] : array();
+		$policy  = is_array( $args['tool_policy'] ?? null ) ? $args['tool_policy'] : null;
+		if ( is_array( $policy ) && \WP_Agent_Tool_Policy::MODE_ALLOW === ( $policy['mode'] ?? '' ) ) {
+			$allowed = array_merge( $allowed, is_array( $policy['tools'] ?? null ) ? $policy['tools'] : array() );
+		}
+
+		return in_array( $tool_name, $allowed, true );
 	}
 }

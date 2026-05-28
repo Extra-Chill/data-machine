@@ -122,7 +122,7 @@ class WorkflowConfigFactory {
 	 * @return array<string,mixed> Pipeline step config.
 	 */
 	private static function pipelineStepFromWorkflowStep( array $step, string $pipeline_step_id, int $index ): array {
-		$step_type = (string) ( $step['type'] ?? '' );
+		$step_type = self::getWorkflowStepType( $step );
 		$label     = isset( $step['label'] ) && is_string( $step['label'] ) && '' !== trim( $step['label'] )
 			? $step['label']
 			: ucfirst( str_replace( '_', ' ', $step_type ) );
@@ -186,5 +186,16 @@ class WorkflowConfigFactory {
 		}
 
 		return array_values( array_unique( $sanitized ) );
+	}
+
+	/**
+	 * Resolve the workflow step type from canonical or compatibility fields.
+	 *
+	 * @param array $step Workflow step input.
+	 * @return string Step type slug.
+	 */
+	private static function getWorkflowStepType( array $step ): string {
+		$step_type = $step['step_type'] ?? ( $step['type'] ?? '' );
+		return is_string( $step_type ) ? $step_type : '';
 	}
 }

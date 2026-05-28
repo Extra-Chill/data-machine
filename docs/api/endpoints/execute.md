@@ -43,20 +43,24 @@ An ephemeral workflow must contain a `steps` array:
   "workflow": {
     "steps": [
       {
-        "type": "fetch",
-        "handler_slug": "rss",
-        "handler_config": { "feed_url": "https://example.com/feed" }
+        "step_type": "fetch",
+        "handler_slugs": ["rss"],
+        "handler_configs": {
+          "rss": { "feed_url": "https://example.com/feed" }
+        }
       },
       {
-        "type": "ai",
+        "step_type": "ai",
         "provider": "anthropic",
         "model": "claude-3-5-sonnet-20240620",
         "system_prompt": "Summarize this content"
       },
       {
-        "type": "publish",
-        "handler_slug": "wordpress-post",
-        "handler_config": { "post_status": "draft" }
+        "step_type": "publish",
+        "handler_slugs": ["wordpress-post"],
+        "handler_configs": {
+          "wordpress-post": { "post_status": "draft" }
+        }
       }
     ]
   }
