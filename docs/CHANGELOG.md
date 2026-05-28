@@ -2,6 +2,25 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.135.0] - 2026-05-28
+
+### Added
+- add source inventory system task
+
+### Changed
+- expect system task workflows to use step type
+- Refresh Agents API runtime lock
+- cover tracked item state transitions
+
+### Fixed
+- align workflow specs on step type contract
+- honor allow policy for opt-in tools
+- satisfy tool call array lint
+- align tool trace metadata formatting
+- harden system task workflow contracts
+- parse fenced json tool call arrays
+- preserve generic tool trace metadata
+
 ## [0.134.2] - 2026-05-27
 
 ### Fixed
