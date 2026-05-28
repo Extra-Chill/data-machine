@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.135.4] - 2026-05-28
+
+### Fixed
+- hoist frontend email abilities
+- Fix packaged Plugin Check errors
+- Fix request input sanitization findings
+
 ## [0.135.3] - 2026-05-28
 
 ### Changed
