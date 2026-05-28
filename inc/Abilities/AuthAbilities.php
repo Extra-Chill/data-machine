@@ -829,13 +829,14 @@ class AuthAbilities {
 			}
 		} elseif ( method_exists( $auth_instance, 'save_config' ) ) {
 			$saved = $auth_instance->save_config( $config_data, $principal_context );
-		} elseif ( method_exists( $auth_instance, 'save_account' ) ) {
-			$saved = $auth_instance->save_account( $config_data, $principal_context );
 		} else {
-			return array(
-				'success' => false,
-				'error'   => __( 'Handler does not support saving account', 'data-machine' ),
-			);
+			$saved = $this->saveAuthAccountForContext( $auth_instance, $config_data, $principal_context );
+			if ( null === $saved ) {
+				return array(
+					'success' => false,
+					'error'   => __( 'Handler does not support saving account', 'data-machine' ),
+				);
+			}
 		}
 
 		if ( $saved ) {
@@ -849,6 +850,57 @@ class AuthAbilities {
 			'success' => false,
 			'error'   => __( 'Failed to save configuration', 'data-machine' ),
 		);
+	}
+
+	/**
+	 * Save account data through the explicit site/user/agent account APIs.
+	 *
+	 * @param object $auth_instance Auth provider instance.
+	 * @param array  $account_data Account data to save.
+	 * @param array  $principal_context Principal context with optional agent_id/user_id.
+	 * @return bool|null Save result, or null when no supported account save API exists.
+	 */
+	private function saveAuthAccountForContext( object $auth_instance, array $account_data, array $principal_context ): ?bool {
+		if ( ! empty( $principal_context['agent_id'] ) ) {
+			return method_exists( $auth_instance, 'save_account_for_agent' )
+				? (bool) $auth_instance->save_account_for_agent( absint( $principal_context['agent_id'] ), $account_data )
+				: null;
+		}
+
+		if ( ! empty( $principal_context['user_id'] ) ) {
+			return method_exists( $auth_instance, 'save_account_for_user' )
+				? (bool) $auth_instance->save_account_for_user( absint( $principal_context['user_id'] ), $account_data )
+				: null;
+		}
+
+		if ( method_exists( $auth_instance, 'save_site_account' ) ) {
+			return (bool) $auth_instance->save_site_account( $account_data );
+		}
+
+		if ( method_exists( $auth_instance, 'save_account' ) ) {
+			return (bool) $auth_instance->save_account( $account_data );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Check whether the provider can save account data for the requested context.
+	 *
+	 * @param object $auth_instance Auth provider instance.
+	 * @param array  $principal_context Principal context with optional agent_id/user_id.
+	 * @return bool True when a matching account save API exists.
+	 */
+	private function supportsAuthAccountSaveForContext( object $auth_instance, array $principal_context ): bool {
+		if ( ! empty( $principal_context['agent_id'] ) ) {
+			return method_exists( $auth_instance, 'save_account_for_agent' );
+		}
+
+		if ( ! empty( $principal_context['user_id'] ) ) {
+			return method_exists( $auth_instance, 'save_account_for_user' );
+		}
+
+		return method_exists( $auth_instance, 'save_site_account' ) || method_exists( $auth_instance, 'save_account' );
 	}
 
 	/**
@@ -898,7 +950,7 @@ class AuthAbilities {
 			);
 		}
 
-		if ( ! method_exists( $auth_instance, 'save_account' ) ) {
+		if ( ! $this->supportsAuthAccountSaveForContext( $auth_instance, $principal_context ) ) {
 			return array(
 				'success' => false,
 				'error'   => __( 'This handler does not support saving account data', 'data-machine' ),
@@ -917,7 +969,7 @@ class AuthAbilities {
 			}
 		}
 
-		$saved = $auth_instance->save_account( $sanitized, $principal_context );
+		$saved = $this->saveAuthAccountForContext( $auth_instance, $sanitized, $principal_context );
 
 		if ( $saved ) {
 			// Schedule proactive refresh if the provider supports it.
