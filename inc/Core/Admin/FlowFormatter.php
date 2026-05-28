@@ -86,7 +86,7 @@ class FlowFormatter {
 			if ( ! empty( $step_data['settings_display'] ) && is_array( $step_data['settings_display'] ) ) {
 				$display_parts                 = array_map(
 					function ( $setting ) {
-						return sprintf( '%s: %s', $setting['label'], $setting['display_value'] );
+						return sprintf( '%s: %s', $setting['label'], self::format_display_summary_value( $setting['display_value'] ?? '' ) );
 					},
 					$step_data['settings_display']
 				);
@@ -131,6 +131,20 @@ class FlowFormatter {
 			'next_run'            => $next_run,
 			'next_run_display'    => DateFormatter::format_for_display( $next_run ),
 		);
+	}
+
+	/**
+	 * Format a settings display value for a compact text summary.
+	 *
+	 * @param mixed $value Display value.
+	 */
+	private static function format_display_summary_value( $value ): string {
+		if ( is_scalar( $value ) || null === $value ) {
+			return (string) $value;
+		}
+
+		$encoded = wp_json_encode( $value );
+		return is_string( $encoded ) ? $encoded : '';
 	}
 
 	/**
