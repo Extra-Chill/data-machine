@@ -276,6 +276,10 @@ class SettingsCommand extends BaseCommand {
 			'token',
 		);
 
+		if ( 'key' === $normalized || str_ends_with( $normalized, '_key' ) ) {
+			return true;
+		}
+
 		foreach ( $needles as $needle ) {
 			if ( str_contains( $normalized, $needle ) ) {
 				return true;
