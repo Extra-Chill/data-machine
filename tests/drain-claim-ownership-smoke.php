@@ -32,7 +32,7 @@ function assert_not_contains( string $needle, string $haystack, string $message 
 assert_contains( 'runActionSchedulerBatch', $drain_src, 'drain processes Action Scheduler batches' );
 assert_contains( '\ActionScheduler_Store::instance()', $drain_src, 'drain uses the Action Scheduler store' );
 assert_contains( 'runActionSchedulerTimeoutCleanup( $store )', $drain_src, 'drain runs Action Scheduler timeout cleanup before claiming work' );
-assert_contains( 'stake_claim( $batch_size, null, $hooks ?? array(), self::GROUP )', $drain_src, 'drain stakes a group-scoped Action Scheduler claim' );
+assert_contains( 'stake_claim( $claim_size, null, $hooks ?? array(), self::GROUP )', $drain_src, 'drain stakes a group-scoped Action Scheduler claim' );
 assert_contains( '$claim->get_actions()', $drain_src, 'drain processes actions from the claim' );
 assert_contains( 'find_actions_by_claim_id( $claim->get_id() )', $drain_src, 'drain rechecks claim ownership before processing each action' );
 assert_contains( '$runner->process_action( $action_id, \'Data Machine CLI drain\' )', $drain_src, 'drain executes only claim-owned action IDs' );
@@ -42,10 +42,10 @@ assert_contains( "'memory_limit'", $drain_src, 'drain reports memory-limit stop 
 assert_contains( 'finally {', $drain_src, 'drain releases claims in a finally block' );
 assert_contains( '$store->release_claim( $claim )', $drain_src, 'drain releases the Action Scheduler claim' );
 assert_not_contains( 'getDuePendingActionIds', $drain_src, 'drain no longer preselects due action IDs outside Action Scheduler claims' );
-assert_not_contains( 'SELECT a.action_id', $drain_src, 'drain no longer directly selects action IDs to process' );
+assert_contains( 'laneActionRows', $drain_src, 'drain only selects action IDs for lane filtering/status, not direct processing' );
 
 $cleanup_pos = strpos( $drain_src, 'runActionSchedulerTimeoutCleanup( $store )' );
-$stake_pos   = strpos( $drain_src, 'stake_claim( $batch_size, null, $hooks ?? array(), self::GROUP )' );
+$stake_pos   = strpos( $drain_src, 'stake_claim( $claim_size, null, $hooks ?? array(), self::GROUP )' );
 $verify_pos  = strpos( $drain_src, 'find_actions_by_claim_id( $claim->get_id() )' );
 $process_pos = strpos( $drain_src, '$runner->process_action( $action_id, \'Data Machine CLI drain\' )' );
 $flush_pos   = strpos( $drain_src, 'flushRuntimeCache()' );

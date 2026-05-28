@@ -40,6 +40,7 @@ assert_drain_contains( "WP_CLI::add_command( 'datamachine drain'", $boot_src, 'f
 assert_drain_contains( "datamachine_pipeline_batch_chunk'", $drain_src, 'drain includes pipeline batch chunk hook' );
 assert_drain_contains( "datamachine_execute_step'", $drain_src, 'drain includes execute step hook' );
 assert_drain_contains( '[--job-id=<ids>]', $drain_src, 'drain documents optional job-id scope' );
+assert_drain_contains( '[--lane=<lane>]', $drain_src, 'drain documents optional lane scope' );
 assert_drain_contains( '[--stop-before-timeout=<seconds>]', $drain_src, 'drain documents optional timeout safety margin' );
 assert_drain_contains( "'stop_before_timeout'", $drain_src, 'drain accepts worker-style timeout safety margin option' );
 assert_drain_contains( 'WorkerLock::acquire', $drain_src, 'drain acquires shared worker/drain lock' );
@@ -54,7 +55,9 @@ assert_drain_contains( 'a.args LIKE %s', $drain_src, 'drain can filter pending a
 assert_drain_contains( '"parent_job_id":', $drain_src, 'drain can filter batch actions by serialized parent_job_id args' );
 assert_drain_contains( "a.status = \\'pending\\'", $drain_src, 'drain queries pending actions in the Data Machine group' );
 assert_drain_contains( 'runActionSchedulerTimeoutCleanup( $store )', $drain_src, 'drain resets stale Action Scheduler claims before claiming work' );
-assert_drain_contains( 'stake_claim( $batch_size, null, $hooks ?? array(), self::GROUP )', $drain_src, 'drain claims due Data Machine actions through Action Scheduler' );
+assert_drain_contains( 'stake_claim( $claim_size, null, $hooks ?? array(), self::GROUP )', $drain_src, 'drain claims due Data Machine actions through Action Scheduler' );
+assert_drain_contains( 'actionMatchesLane', $drain_src, 'drain filters claimed actions by lane when requested' );
+assert_drain_contains( 'stepTypeFromExecuteStepArgs', $drain_src, 'drain resolves publish lane from execute-step step type' );
 assert_drain_contains( '$deadline_at = $started_at + max( 0, $time_limit - $stop_before_timeout )', $drain_src, 'drain computes an action-level deadline for claimed batches' );
 assert_drain_contains( 'time() >= $deadline_at', $drain_src, 'drain checks the timeout margin between claimed actions' );
 assert_drain_contains( 'find_actions_by_claim_id( $claim->get_id() )', $drain_src, 'drain verifies Action Scheduler claim ownership before processing' );

@@ -87,6 +87,10 @@ class WorkerCommand extends BaseCommand {
 	 * [--once]
 	 * : Run one recovery/drain pass and exit.
 	 *
+	 * [--lane=<lane>]
+	 * : Optional worker lane to run. Supported lanes: publish, background.
+	 * Publish drains AI/upsert step executions; background drains non-publish work.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -122,6 +126,7 @@ class WorkerCommand extends BaseCommand {
 			'max_passes'              => isset( $assoc_args['max-passes'] ) ? max( 0, (int) $assoc_args['max-passes'] ) : 0,
 			'stop_before_timeout'     => isset( $assoc_args['stop-before-timeout'] ) ? max( 0, (int) $assoc_args['stop-before-timeout'] ) : 30,
 			'once'                    => isset( $assoc_args['once'] ),
+			'lane'                    => isset( $assoc_args['lane'] ) ? (string) $assoc_args['lane'] : '',
 		);
 
 		$stats = self::runLoop( $options );
@@ -144,11 +149,14 @@ class WorkerCommand extends BaseCommand {
 	 * ---
 	 * default: table
 	 * options:
-	 *   - table
-	 *   - json
-	 * ---
-	 *
-	 * @subcommand status
+		 *   - table
+		 *   - json
+		 * ---
+		 *
+		 * [--lane=<lane>]
+		 * : Optional worker lane status. Supported lanes: publish, background.
+		 *
+		 * @subcommand status
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Keyed arguments.
@@ -156,7 +164,7 @@ class WorkerCommand extends BaseCommand {
 	public function status( array $args, array $assoc_args ): void {
 		unset( $args );
 
-		$status = self::statusSnapshot();
+		$status = self::statusSnapshot( isset( $assoc_args['lane'] ) ? (string) $assoc_args['lane'] : '' );
 
 		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
 			WP_CLI::line( (string) wp_json_encode( $status, JSON_PRETTY_PRINT ) );
@@ -187,16 +195,18 @@ class WorkerCommand extends BaseCommand {
 		$max_passes              = max( 0, (int) ( $options['max_passes'] ?? 0 ) );
 		$stop_before_timeout     = max( 0, (int) ( $options['stop_before_timeout'] ?? 30 ) );
 		$once                    = (bool) ( $options['once'] ?? false );
-		$lock                    = WorkerLock::acquire( self::defaultLockOwner(), $time_limit > 0 ? $time_limit + max( 60, $stop_before_timeout ) : 600 );
+		$lane                    = self::normalizeLane( $options['lane'] ?? '' );
+		$lock                    = WorkerLock::acquire( self::defaultLockOwner( $lane ), $time_limit > 0 ? $time_limit + max( 60, $stop_before_timeout ) : 600, $lane );
 
 		if ( empty( $lock['acquired'] ) ) {
-			return self::lockedStats( $lock );
+			return self::lockedStats( $lock, $lane );
 		}
 
 		$lock_token = (string) ( $lock['lock_token'] ?? '' );
+		$lock_lane  = $lane;
 		register_shutdown_function(
-			static function () use ( $lock_token ): void {
-				WorkerLock::release( $lock_token );
+			static function () use ( $lock_token, $lock_lane ): void {
+				WorkerLock::release( $lock_token, $lock_lane );
 			}
 		);
 
@@ -256,6 +266,7 @@ class WorkerCommand extends BaseCommand {
 						'batch_size'   => $batch_size,
 						'time_limit'   => min( $drain_time_limit, $remaining_time ),
 						'acquire_lock' => false,
+						'lane'         => $lane,
 					)
 				);
 
@@ -278,7 +289,7 @@ class WorkerCommand extends BaseCommand {
 				}
 			}
 
-			$status = self::statusSnapshot();
+			$status = self::statusSnapshot( $lane );
 
 			return array(
 				'passes'                   => $passes,
@@ -296,9 +307,10 @@ class WorkerCommand extends BaseCommand {
 				'warnings'                 => $warnings,
 				'duration_seconds'         => time() - $started_at,
 				'stop_reason'              => $stop_reason,
+				'lane'                     => $lane,
 			) + self::publicLockStatus( $lock );
 		} finally {
-			WorkerLock::release( (string) ( $lock['lock_token'] ?? '' ) );
+			WorkerLock::release( (string) ( $lock['lock_token'] ?? '' ), $lane );
 		}
 	}
 
@@ -307,13 +319,14 @@ class WorkerCommand extends BaseCommand {
 	 *
 	 * @return array<string,int|string>
 	 */
-	private static function statusSnapshot(): array {
+	private static function statusSnapshot( string $lane = '' ): array {
+		$lane            = self::normalizeLane( $lane );
 		$pending_summary = PendingActionStore::summary( array( 'status' => 'pending' ) );
-		$drain_status    = DrainCommand::status();
+		$drain_status    = DrainCommand::status( array( 'lane' => $lane ) );
 		$jobs_summary    = ( new JobsSummaryAbility() )->execute( array( 'compact' => true ) );
 		$jobs            = ! empty( $jobs_summary['success'] ) && is_array( $jobs_summary['summary'] ?? null ) ? $jobs_summary['summary'] : array();
 		$stuck_jobs      = RecoverStuckJobsAbility::countStuckCandidates();
-		$lock            = WorkerLock::snapshot();
+		$lock            = WorkerLock::snapshot( null, 600, $lane );
 
 		return array(
 			'pending_actions'       => (int) ( $pending_summary['total'] ?? 0 ),
@@ -325,6 +338,7 @@ class WorkerCommand extends BaseCommand {
 			'pending_jobs'          => self::jobStatusCount( $jobs, 'pending' ),
 			'failed_jobs'           => (int) ( $jobs['failed_count'] ?? self::jobStatusCount( $jobs, 'failed' ) ),
 			'stuck_jobs'            => $stuck_jobs,
+			'lane'                  => $lane,
 		) + self::publicLockStatus( $lock );
 	}
 
@@ -351,8 +365,8 @@ class WorkerCommand extends BaseCommand {
 	 * @param array<string,int|string|bool> $lock Lock state.
 	 * @return array<string,int|string> Worker stats.
 	 */
-	private static function lockedStats( array $lock ): array {
-		$status = self::statusSnapshot();
+	private static function lockedStats( array $lock, string $lane = '' ): array {
+		$status = self::statusSnapshot( $lane );
 
 		return array(
 			'passes'                   => 0,
@@ -370,6 +384,7 @@ class WorkerCommand extends BaseCommand {
 			'warnings'                 => 0,
 			'duration_seconds'         => 0,
 			'stop_reason'              => 'locked',
+			'lane'                     => $lane,
 		) + self::publicLockStatus( $lock );
 	}
 
@@ -385,16 +400,26 @@ class WorkerCommand extends BaseCommand {
 			'lock_owner'       => (string) ( $lock['lock_owner'] ?? '' ),
 			'lock_age_seconds' => (int) ( $lock['lock_age_seconds'] ?? 0 ),
 			'lock_expires_at'  => (int) ( $lock['lock_expires_at'] ?? 0 ),
+			'lock_lane'        => (string) ( $lock['lock_lane'] ?? '' ),
 		);
 	}
 
 	/**
 	 * Build a compact default owner string for lock diagnostics.
 	 */
-	private static function defaultLockOwner(): string {
+	private static function defaultLockOwner( string $lane = '' ): string {
 		$pid = getmypid();
+		$kind = '' === $lane ? 'worker' : 'worker:' . $lane;
 
-		return sprintf( 'worker pid:%d host:%s', false === $pid ? 0 : $pid, php_uname( 'n' ) );
+		return sprintf( '%s pid:%d host:%s', $kind, false === $pid ? 0 : $pid, php_uname( 'n' ) );
+	}
+
+	/**
+	 * Normalize a worker lane identifier.
+	 */
+	private static function normalizeLane( mixed $lane ): string {
+		$lane = is_string( $lane ) ? strtolower( trim( $lane ) ) : '';
+		return in_array( $lane, array( 'publish', 'background' ), true ) ? $lane : '';
 	}
 
 	/**
