@@ -11,8 +11,14 @@ define( 'ABSPATH', __DIR__ );
 
 $GLOBALS['datamachine_worker_lock_options'] = array();
 $GLOBALS['datamachine_worker_lock_delete_noop'] = false;
+$GLOBALS['datamachine_worker_lock_get_after_delete_default'] = false;
 
 function get_option( string $name, mixed $default = false ): mixed {
+	if ( ! empty( $GLOBALS['datamachine_worker_lock_get_after_delete_default'] ) ) {
+		$GLOBALS['datamachine_worker_lock_get_after_delete_default'] = false;
+		return $default;
+	}
+
 	return $GLOBALS['datamachine_worker_lock_options'][ $name ] ?? $default;
 }
 
@@ -34,6 +40,7 @@ function update_option( string $name, mixed $value, string|bool|null $autoload =
 
 function delete_option( string $name ): bool {
 	if ( ! empty( $GLOBALS['datamachine_worker_lock_delete_noop'] ) ) {
+		$GLOBALS['datamachine_worker_lock_get_after_delete_default'] = true;
 		return false;
 	}
 
@@ -131,5 +138,29 @@ assert_worker_lock_true( 'new sticky worker' === $sticky_replacement['lock_owner
 
 WorkerLock::release( (string) $sticky_replacement['lock_token'] );
 assert_worker_lock_true( 'unlocked' === WorkerLock::snapshot()['lock_status'], 'sticky replacement lock releases cleanly' );
+
+$GLOBALS['datamachine_worker_lock_options'] = array();
+$stale_started = time() - 300;
+add_option(
+	'datamachine_worker_runtime_lock',
+	array(
+		'token'      => 'stale-token-with-split-cache',
+		'owner'      => 'old split-cache worker',
+		'started_at' => $stale_started,
+		'expires_at' => $stale_started + 60,
+		'ttl'        => 60,
+	),
+	'',
+	'no'
+);
+
+$GLOBALS['datamachine_worker_lock_delete_noop'] = true;
+$split_cache_replacement = WorkerLock::acquire( 'new split-cache worker', 120 );
+$GLOBALS['datamachine_worker_lock_delete_noop'] = false;
+assert_worker_lock_true( true === $split_cache_replacement['acquired'], 'stale lock is replaced when post-delete snapshot looks unlocked but add_option still fails' );
+assert_worker_lock_true( 'new split-cache worker' === $split_cache_replacement['lock_owner'], 'split-cache replacement lock reports new owner' );
+
+WorkerLock::release( (string) $split_cache_replacement['lock_token'] );
+assert_worker_lock_true( 'unlocked' === WorkerLock::snapshot()['lock_status'], 'split-cache replacement lock releases cleanly' );
 
 echo "OK ({$assertions} assertions)\n";
