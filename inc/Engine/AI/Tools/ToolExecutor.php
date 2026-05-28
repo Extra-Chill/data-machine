@@ -12,6 +12,7 @@
 namespace DataMachine\Engine\AI\Tools;
 
 use AgentsAPI\AI\Tools\WP_Agent_Action_Policy;
+use AgentsAPI\AI\Tools\WP_Agent_Tool_Execution_Core;
 use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
 use DataMachine\Engine\AI\Actions\PendingActionHelper;
@@ -57,15 +58,18 @@ class ToolExecutor {
 		int $agent_id = 0,
 		array $client_context = array()
 	): array {
-		$core     = new ToolExecutionCore();
-		$prepared = $core->prepareToolCall( $tool_name, $tool_parameters, $available_tools, $payload );
+		$core            = new WP_Agent_Tool_Execution_Core();
+		$execution       = new ToolExecutionCore();
+		$available_tools = self::prepareToolDeclarations( $available_tools, $payload );
+		$prepared        = $core->prepareWP_Agent_Tool_Call( $tool_name, $tool_parameters, $available_tools, $payload );
 		if ( empty( $prepared['ready'] ) ) {
 			unset( $prepared['ready'] );
 			return $prepared;
 		}
 
 		$tool_def            = $prepared['tool_def'];
-		$complete_parameters = $prepared['parameters'];
+		$tool_call           = $prepared['tool_call'];
+		$complete_parameters = is_array( $tool_call['parameters'] ?? null ) ? $tool_call['parameters'] : array();
 
 		if ( 'client' === (string) ( $tool_def['executor'] ?? '' ) || ! empty( $tool_def['external_executor'] ) ) {
 			return array(
@@ -148,7 +152,7 @@ class ToolExecutor {
 		}
 
 		// Policy is 'direct' (or 'preview' fell back) — execute the tool normally.
-		$tool_result = $core->executePreparedTool( $tool_name, $complete_parameters, $tool_def );
+		$tool_result = $core->executePreparedTool( $tool_call, $tool_def, $execution, $payload );
 
 		// Automatic post origin tracking — applies to every tool whose result
 		// contains an extractable post_id. This covers both handler tools
@@ -167,6 +171,35 @@ class ToolExecutor {
 		}
 
 		return $tool_result;
+	}
+
+	/**
+	 * Annotate Data Machine declarations with explicit runtime-context bindings.
+	 *
+	 * @param array $available_tools Tool declarations keyed by name.
+	 * @param array $payload         Step payload / invocation context.
+	 * @return array Annotated tool declarations.
+	 */
+	private static function prepareToolDeclarations( array $available_tools, array $payload ): array {
+		$runtime_keys = array( 'job_id', 'flow_step_id', 'data', 'flow_step_config' );
+
+		foreach ( $available_tools as $tool_name => $tool_def ) {
+			if ( ! is_array( $tool_def ) ) {
+				continue;
+			}
+
+			$bindings = is_array( $tool_def['client_context_bindings'] ?? null ) ? $tool_def['client_context_bindings'] : array();
+			foreach ( $runtime_keys as $runtime_key ) {
+				if ( array_key_exists( $runtime_key, $payload ) && ! array_key_exists( $runtime_key, $bindings ) && ! in_array( $runtime_key, $bindings, true ) ) {
+					$bindings[ $runtime_key ] = $runtime_key;
+				}
+			}
+
+			$tool_def['client_context_bindings'] = $bindings;
+			$available_tools[ $tool_name ]       = $tool_def;
+		}
+
+		return $available_tools;
 	}
 
 	/**

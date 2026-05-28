@@ -213,6 +213,11 @@ class PostTracking {
 			return (int) $result['post_id'];
 		}
 
+		// Agents API normalized tool results: result.post_id.
+		if ( ! empty( $result['result']['post_id'] ) ) {
+			return (int) $result['result']['post_id'];
+		}
+
 		return 0;
 	}
 }
