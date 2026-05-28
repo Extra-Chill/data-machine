@@ -340,7 +340,7 @@ class WebhookGateStep extends Step {
 				'source_type'  => 'webhook_gate_inbound',
 				'flow_step_id' => $gate_data['flow_step_id'] ?? '',
 				'received_at'  => gmdate( 'Y-m-d\TH:i:s\Z' ),
-				'remote_ip'    => $request->get_header( 'x-forwarded-for' ) ?? $_SERVER['REMOTE_ADDR'] ?? '',
+				'remote_ip'    => sanitize_text_field( wp_unslash( $request->get_header( 'x-forwarded-for' ) ?? $_SERVER['REMOTE_ADDR'] ?? '' ) ),
 			),
 			'webhook_payload'
 		);
