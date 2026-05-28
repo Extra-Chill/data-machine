@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.135.1] - 2026-05-28
+
+### Fixed
+- align hashable artifact formatting
+- export hashable job trace artifacts
+
 ## [0.135.0] - 2026-05-28
 
 ### Added
