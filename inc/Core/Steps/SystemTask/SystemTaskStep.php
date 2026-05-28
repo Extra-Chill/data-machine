@@ -21,9 +21,9 @@
 namespace DataMachine\Core\Steps\SystemTask;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Agents\AgentIdentity;
 use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\DataPacket;
-use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
 use DataMachine\Core\Database\Jobs\Jobs;
@@ -160,13 +160,45 @@ class SystemTaskStep extends Step {
 		}
 
 		// Resolve the task handler class.
-		$handlers      = TaskRegistry::getHandlers();
-		$handler_class = $handlers[ $task_type ];
+		$handlers             = TaskRegistry::getHandlers();
+		$handler_class        = $handlers[ $task_type ];
+		$task_for_passthrough = new $handler_class();
+		if ( ! $task_for_passthrough instanceof SystemTask ) {
+			do_action(
+				'datamachine_fail_job',
+				$this->job_id,
+				'system_task_invalid_handler',
+				array(
+					'flow_step_id'  => $this->flow_step_id,
+					'task_type'     => $task_type,
+					'error_message' => 'System task handler must extend SystemTask.',
+				)
+			);
+			return array();
+		}
+
+		// Carry parent's agent identity into the child engine_data so
+		// task bodies (and any AI request they fire) can resolve the
+		// correct agent's MEMORY.md / SOUL.md / per-agent model. This
+		// mirrors the AIStep + PipelineBatchScheduler pattern (see
+		// #1083, #1198, #1207). Tasks default to requiring an agent ownership
+		// envelope; pure system maintenance tasks must opt out explicitly via
+		// SystemTask::requiresAgentContext().
+		$parent_job_snapshot = $this->engine->getJobContext();
+		$identity            = $this->resolveAgentIdentityForExecution( $parent_job_snapshot );
+		if ( null === $identity && $task_for_passthrough->requiresAgentContext() ) {
+			$this->failMissingAgentContext( $parent_job_snapshot, $task_type );
+			return array();
+		}
+
+		$parent_agent_id   = null !== $identity ? $identity->agent_id : 0;
+		$parent_agent_slug = null !== $identity ? $identity->agent_slug : '';
+		$parent_user_id    = null !== $identity ? $identity->owner_id : 0;
 
 		// Create a child job for independent tracking.
 		$jobs_db      = new Jobs();
-		$job_context  = $this->engine->getJobContext();
-		$child_job_id = $jobs_db->create_job(
+		$job_context  = $parent_job_snapshot;
+		$child_job_id = (int) $jobs_db->create_job(
 			array(
 				'pipeline_id'   => $job_context['pipeline_id'] ?? 'direct',
 				'flow_id'       => $job_context['flow_id'] ?? 'direct',
@@ -176,7 +208,7 @@ class SystemTaskStep extends Step {
 			)
 		);
 
-		if ( ! $child_job_id ) {
+		if ( $child_job_id <= 0 ) {
 			$this->log( 'error', 'Failed to create child job for system task', array( 'task_type' => $task_type ) );
 
 			$result_packet = new DataPacket(
@@ -194,26 +226,6 @@ class SystemTaskStep extends Step {
 			);
 
 			return $result_packet->addTo( $this->dataPackets );
-		}
-
-		// Carry parent's agent identity into the child engine_data so
-		// task bodies (and any AI request they fire) can resolve the
-		// correct agent's MEMORY.md / SOUL.md / per-agent model. This
-		// mirrors the AIStep + PipelineBatchScheduler pattern (see
-		// #1083, #1198, #1207). On agent-less flows the values are 0
-		// and behaviour matches single-agent installs.
-		$parent_job_snapshot = $this->engine->getJobContext();
-		$parent_agent_id     = (int) ( $parent_job_snapshot['agent_id'] ?? 0 );
-		$parent_agent_slug   = '';
-		$parent_user_id      = (int) ( $parent_job_snapshot['user_id'] ?? 0 );
-		if ( ! empty( $parent_job_snapshot['agent_slug'] ) || $parent_agent_id > 0 ) {
-			try {
-				$identity          = ( new AgentIdentityResolver() )->resolve_agent_identity( $parent_job_snapshot );
-				$parent_agent_id   = $identity->agent_id;
-				$parent_agent_slug = $identity->agent_slug;
-			} catch ( \InvalidArgumentException $e ) {
-				$parent_agent_slug = ! empty( $parent_job_snapshot['agent_slug'] ) ? sanitize_title( (string) $parent_job_snapshot['agent_slug'] ) : '';
-			}
 		}
 
 		// Store task params in child job engine_data.
@@ -239,7 +251,7 @@ class SystemTaskStep extends Step {
 			$child_engine_data['user_id'] = $parent_user_id;
 		}
 		$child_job_snapshot = array(
-			'job_id'        => (int) $child_job_id,
+			'job_id'        => $child_job_id,
 			'user_id'       => $parent_user_id,
 			'parent_job_id' => $this->job_id,
 		);
@@ -250,25 +262,6 @@ class SystemTaskStep extends Step {
 			$child_job_snapshot['agent_slug'] = $parent_agent_slug;
 		}
 		$child_engine_data['job'] = $child_job_snapshot;
-
-		// Instantiate the task once. Used here to read its declarative
-		// passthrough contract (#1297) and again inside the try/catch
-		// envelope below to call executeTask(). Passthrough methods are
-		// pure declarations with no side effects.
-		$task_for_passthrough = new $handler_class();
-		if ( ! $task_for_passthrough instanceof SystemTask ) {
-			do_action(
-				'datamachine_fail_job',
-				$this->job_id,
-				'system_task_invalid_handler',
-				array(
-					'flow_step_id'  => $this->flow_step_id,
-					'task_type'     => $task_type,
-					'error_message' => 'System task handler must extend SystemTask.',
-				)
-			);
-			return array();
-		}
 
 		// Inject the standard pipeline-execution context bundle when the
 		// task declares it needs it. Replaces the per-task `if` block
@@ -298,8 +291,8 @@ class SystemTaskStep extends Step {
 				$child_engine_data[ $key ] = $fsc[ $key ];
 			}
 		}
-		$jobs_db->store_engine_data( (int) $child_job_id, $child_engine_data );
-		$jobs_db->start_job( (int) $child_job_id, JobStatus::PROCESSING );
+		$jobs_db->store_engine_data( $child_job_id, $child_engine_data );
+		$jobs_db->start_job( $child_job_id, JobStatus::PROCESSING );
 
 		$this->log(
 			'info',
@@ -312,28 +305,10 @@ class SystemTaskStep extends Step {
 		);
 
 		// Establish agent execution context before firing the task body.
-		//
-		// SystemTaskStep runs inside the Action Scheduler queue under
-		// whatever user the parent step set up (typically nothing in
-		// pre-#1083 paths). System tasks frequently call abilities that
-		// mutate WordPress content (wp_update_post, update_post_meta,
-		// wp_save_post_revision) — those need a real user for proper
-		// post_author resolution and capability checks. This mirrors
-		// the AIStep envelope from #1083 so abilities fired inside
-		// executeTask() see the right identity.
-		$owner_id = 0;
-		if ( $parent_agent_id > 0 ) {
-			$agents_repo  = new Agents();
-			$agent_record = $agents_repo->get_agent( $parent_agent_id );
-			if ( $agent_record ) {
-				$owner_id = (int) ( $agent_record['owner_id'] ?? 0 );
-			}
-		}
-		if ( $owner_id <= 0 && $parent_user_id > 0 ) {
-			// Legacy / agent-less flows: fall back to the flow's user_id.
-			$this->logAgentlessFallback( $parent_job_snapshot, $parent_user_id, (int) $child_job_id );
-			$owner_id = $parent_user_id;
-		}
+		// System tasks frequently call abilities that mutate WordPress content;
+		// those abilities must see the agent owner plus per-agent capability
+		// context, never a broad user-only fallback.
+		$owner_id = $parent_user_id;
 
 		$previous_user_id = get_current_user_id();
 		$context_set      = false;
@@ -343,16 +318,14 @@ class SystemTaskStep extends Step {
 		$error_msg = '';
 
 		try {
-			if ( $owner_id > 0 ) {
+			if ( $owner_id > 0 && $parent_agent_id > 0 ) {
 				wp_set_current_user( $owner_id );
-				if ( $parent_agent_id > 0 ) {
-					PermissionHelper::set_agent_context( $parent_agent_id, $owner_id );
-					$context_set = true;
-				}
+				PermissionHelper::set_agent_context( $parent_agent_id, $owner_id );
+				$context_set = true;
 			}
 
 			// Reuse the instance built earlier for passthrough resolution.
-			$task_for_passthrough->executeTask( (int) $child_job_id, $child_engine_data );
+			$task_for_passthrough->executeTask( $child_job_id, $child_engine_data );
 		} catch ( \Throwable $e ) {
 			$success   = false;
 			$error_msg = $e->getMessage();
@@ -401,7 +374,7 @@ class SystemTaskStep extends Step {
 		}
 
 		$result = ! empty( $child_data['replace_data_packets'] ) ? array() : $this->dataPackets;
-		foreach ( $this->normalizeOutputDataPackets( $child_data['output_data_packets'] ?? array(), $task_type, (int) $child_job_id ) as $packet ) {
+		foreach ( $this->normalizeOutputDataPackets( $child_data['output_data_packets'] ?? array(), $task_type, $child_job_id ) as $packet ) {
 			$result = $packet->addTo( $result );
 		}
 
@@ -494,24 +467,42 @@ class SystemTaskStep extends Step {
 	}
 
 	/**
-	 * Log when a system task runs via the legacy user fallback without agent context.
+	 * Resolve the agent identity required for queued system-task execution.
 	 *
 	 * @param array $parent_job_snapshot Parent job snapshot from engine data.
-	 * @param int   $fallback_user_id    User ID used for the fallback.
-	 * @param int   $child_job_id        Child job created for the system task.
+	 * @return AgentIdentity|null Resolved identity, or null when the job is agent-less/invalid.
 	 */
-	private function logAgentlessFallback( array $parent_job_snapshot, int $fallback_user_id, int $child_job_id ): void {
+	private function resolveAgentIdentityForExecution( array $parent_job_snapshot ): ?AgentIdentity {
+		if ( empty( $parent_job_snapshot['agent_slug'] ) && empty( $parent_job_snapshot['agent_id'] ) ) {
+			return null;
+		}
+
+		try {
+			return ( new AgentIdentityResolver() )->resolve_agent_identity( $parent_job_snapshot );
+		} catch ( \InvalidArgumentException $e ) {
+			return null;
+		}
+	}
+
+	/**
+	 * Fail queued system-task execution when no real agent owner can be resolved.
+	 *
+	 * @param array  $parent_job_snapshot Parent job snapshot from engine data.
+	 * @param string $task_type           System task type currently executing.
+	 */
+	private function failMissingAgentContext( array $parent_job_snapshot, string $task_type ): void {
 		do_action(
-			'datamachine_log',
-			'warning',
-			'SystemTaskStep: Agent-less parent job snapshot fell back to flow user_id; execution is outside the agent ownership envelope.',
+			'datamachine_fail_job',
+			$this->job_id,
+			'system_task_agent_context_required',
 			array(
-				'parent_job_id'    => $this->job_id,
-				'child_job_id'     => $child_job_id,
-				'flow_id'          => (int) ( $parent_job_snapshot['flow_id'] ?? 0 ),
-				'pipeline_id'      => (int) ( $parent_job_snapshot['pipeline_id'] ?? 0 ),
-				'flow_step_id'     => $this->flow_step_id,
-				'fallback_user_id' => $fallback_user_id,
+				'parent_job_id' => $this->job_id,
+				'flow_id'       => (int) ( $parent_job_snapshot['flow_id'] ?? 0 ),
+				'pipeline_id'   => (int) ( $parent_job_snapshot['pipeline_id'] ?? 0 ),
+				'flow_step_id'  => $this->flow_step_id,
+				'task_type'     => $task_type,
+				'error_message' => 'Queued system-task execution requires a valid agent_id or agent_slug with an owner user. Reassign unowned flows/pipelines before running this step.',
+				'solution'      => 'Inspect with wp datamachine pipelines orphans and wp datamachine flows orphans, then reassign with --where-null.',
 			)
 		);
 	}

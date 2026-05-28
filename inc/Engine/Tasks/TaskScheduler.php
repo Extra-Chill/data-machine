@@ -27,6 +27,7 @@ use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\AbilityResult;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\JobStatus;
+use DataMachine\Engine\AI\System\Tasks\SystemTask;
 
 class TaskScheduler {
 
@@ -86,7 +87,20 @@ class TaskScheduler {
 			return false;
 		}
 
-		$handler  = new $handler_class();
+		$handler = new $handler_class();
+		if ( ! $handler instanceof SystemTask ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				"TaskScheduler: Handler class for '{$taskType}' must extend SystemTask",
+				array(
+					'task_type'     => $taskType,
+					'handler_class' => $handler_class,
+				)
+			);
+			return false;
+		}
+
 		$workflow = $handler->getWorkflow( $params );
 
 		if ( empty( $workflow['steps'] ) ) {
@@ -115,20 +129,49 @@ class TaskScheduler {
 			return false;
 		}
 
-		// Resolve agent identity from the context. Callers without
-		// agent_id/user_id continue to work — the resulting job runs
-		// without an agent (matching pre-multi-agent behaviour).
-		$context_user_id    = (int) ( $context['user_id'] ?? 0 );
-		$context_agent_id   = (int) ( $context['agent_id'] ?? 0 );
-		$context_agent_slug = '';
-		if ( ! empty( $context['agent_slug'] ) || $context_agent_id > 0 ) {
+		// Resolve agent identity from the context when present. Tasks that can
+		// safely run as explicit system maintenance may opt out via
+		// SystemTask::requiresAgentContext(); all other queued task work must have
+		// a real agent owner before the workflow is enqueued.
+		$context_user_id        = 0;
+		$context_agent_id       = 0;
+		$context_agent_slug     = '';
+		$requires_agent_context = $handler->requiresAgentContext();
+		if ( ! empty( $context['agent_slug'] ) || ! empty( $context['agent_id'] ) ) {
 			try {
 				$identity           = ( new AgentIdentityResolver() )->resolve_agent_identity( $context );
+				$context_user_id    = $identity->owner_id;
 				$context_agent_id   = $identity->agent_id;
 				$context_agent_slug = $identity->agent_slug;
 			} catch ( \InvalidArgumentException $e ) {
-				$context_agent_slug = ! empty( $context['agent_slug'] ) ? sanitize_title( (string) $context['agent_slug'] ) : '';
+				do_action(
+					'datamachine_log',
+					'error',
+					'TaskScheduler: queued task received invalid agent context',
+					array(
+						'task_type'  => $taskType,
+						'context'    => 'system',
+						'route'      => $context,
+						'error'      => $e->getMessage(),
+						'error_code' => 'task_scheduler_invalid_agent_context',
+					)
+				);
+				return false;
 			}
+		} elseif ( $requires_agent_context ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'TaskScheduler: queued task requires agent context',
+				array(
+					'task_type'      => $taskType,
+					'context'        => 'system',
+					'route'          => $context,
+					'error_code'     => 'task_scheduler_agent_context_required',
+					'recommendation' => 'Provide agent_id or agent_slug, or reassign unowned flows/pipelines with --where-null before scheduling queued work.',
+				)
+			);
+			return false;
 		}
 
 		// Mirror RunFlowAbility's engine_data['job'] shape so downstream

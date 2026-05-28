@@ -79,6 +79,19 @@ abstract class SystemTask {
 	}
 
 	/**
+	 * Whether this task must run inside a resolved agent ownership envelope.
+	 *
+	 * Most system tasks can invoke abilities or mutate WordPress content, so the
+	 * safe default is agent-scoped execution. Pure internal maintenance tasks may
+	 * opt out explicitly and then run without user/agent fallback context.
+	 *
+	 * @return bool True when agent context is required.
+	 */
+	public function requiresAgentContext(): bool {
+		return true;
+	}
+
+	/**
 	 * Execute the task's imperative business logic.
 	 *
 	 * Called by SystemTaskStep when running as a pipeline/workflow step.

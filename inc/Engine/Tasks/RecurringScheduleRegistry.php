@@ -27,9 +27,9 @@
  *
  * `per_agent` (default false): When true, the recurring hook iterates
  * every registered agent and fires one TaskScheduler::schedule() call per
- * agent with that agent's identity in $context. Site-scoped schedules
- * (e.g. image_optimization) leave it false and continue to fire once
- * per tick.
+ * agent with that agent's identity in $context. Site-scoped schedules leave
+ * it false and fire once per tick only when the task explicitly allows
+ * system-scoped execution.
  *
  * @package DataMachine\Engine\Tasks
  * @since   0.71.0

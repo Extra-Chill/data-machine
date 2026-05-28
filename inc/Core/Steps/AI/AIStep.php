@@ -3,8 +3,8 @@
 namespace DataMachine\Core\Steps\AI;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Agents\AgentIdentity;
 use DataMachine\Core\Agents\AgentIdentityResolver;
-use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\PluginSettings;
@@ -163,12 +163,18 @@ class AIStep extends Step {
 
 		$pipeline_step_id = $this->flow_step_config['pipeline_step_id'];
 
-		// Resolve user_id and agent_id from engine snapshot (set by RunFlowAbility).
+		// Resolve agent identity from engine snapshot (set by RunFlowAbility).
 		$job_snapshot = $this->engine->get( 'job' );
 		$job_snapshot = is_array( $job_snapshot ) ? $job_snapshot : array();
-		$agent_id     = $this->resolveAgentIdFromJobSnapshot( $job_snapshot );
-		$agent_slug   = $this->resolveAgentSlugFromJobSnapshot( $job_snapshot, $agent_id );
-		$user_id      = (int) ( $job_snapshot['user_id'] ?? 0 );
+		$identity     = $this->resolveAgentIdentityForExecution( $job_snapshot );
+		if ( null === $identity ) {
+			$this->failMissingAgentContext( $job_snapshot, (string) $pipeline_step_id );
+			return array();
+		}
+
+		$agent_id   = $identity->agent_id;
+		$agent_slug = $identity->agent_slug;
+		$owner_id   = $identity->owner_id;
 
 		$pipeline_step_config = $this->engine->getPipelineStepConfig( $pipeline_step_id );
 		$execution_modes      = self::resolveExecutionModes( $pipeline_step_config, $this->flow_step_config );
@@ -244,7 +250,6 @@ class AIStep extends Step {
 				// drive the conversation. Fall through with $user_message=''.
 			}
 
-			// Vision image from engine data (single source of truth)
 			$file_path    = null;
 			$mime_type    = null;
 			$engine_image = $this->engine->get( 'image_file_path' );
@@ -289,14 +294,10 @@ class AIStep extends Step {
 				$messages[] = ConversationManager::buildConversationMessage( 'user', $user_message );
 			}
 
-			$max_turns = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
-
-			// Resolve transcript persistence policy once per AI step invocation.
-			// Resolution order: flow > pipeline > site option (default false).
-			// The boolean is threaded through $payload so the loop doesn't need
-			// to repeat the lookup every turn.
+			$max_turns                   = PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 			$transcript_consent_decision = PipelineTranscriptPolicy::decision( $this->engine );
-			$persist_transcript          = $transcript_consent_decision->is_allowed();
+			$persist_transcript          = method_exists( $transcript_consent_decision, 'is_allowed' ) && (bool) call_user_func( array( $transcript_consent_decision, 'is_allowed' ) );
+			$transcript_consent_payload  = method_exists( $transcript_consent_decision, 'to_array' ) ? (array) call_user_func( array( $transcript_consent_decision, 'to_array' ) ) : array();
 
 			$payload = array(
 				'job_id'                      => $this->job_id,
@@ -305,7 +306,7 @@ class AIStep extends Step {
 				'data'                        => $this->dataPackets,
 				'engine'                      => $this->engine,
 				'engine_data'                 => $this->engine->all(),
-				'user_id'                     => $user_id,
+				'user_id'                     => $owner_id,
 				// Pipeline executions have no human caller — the agent is acting on a
 				// scheduled job, not on behalf of a person. Per-user OAuth resolution
 				// reads this field; setting it to 0 prevents accidentally picking up
@@ -317,7 +318,7 @@ class AIStep extends Step {
 				'pipeline_id'                 => $job_snapshot['pipeline_id'] ?? null,
 				'flow_id'                     => $job_snapshot['flow_id'] ?? null,
 				'persist_transcript'          => $persist_transcript,
-				'transcript_consent_decision' => $transcript_consent_decision->to_array(),
+				'transcript_consent_decision' => $transcript_consent_payload,
 			);
 
 			$navigator             = new \DataMachine\Engine\StepNavigator();
@@ -419,29 +420,9 @@ class AIStep extends Step {
 			// correct identity, post_author resolves to the agent owner, and
 			// per-agent capability ceilings are enforced in pipelines the same way
 			// they are in REST.
-			$owner_id = 0;
-			if ( $agent_id > 0 ) {
-				$agents_repo  = new Agents();
-				$agent_record = $agents_repo->get_agent( $agent_id );
-				if ( $agent_record ) {
-					$owner_id = (int) ( $agent_record['owner_id'] ?? 0 );
-				}
-			}
-			if ( $owner_id <= 0 && $user_id > 0 ) {
-				// Legacy / agent-less flows: fall back to the flow's user_id.
-				$this->logAgentlessFallback( $job_snapshot, $user_id, $pipeline_step_id );
-				$owner_id = $user_id;
-			}
-
 			$previous_user_id = get_current_user_id();
-			$context_set      = false;
-			if ( $owner_id > 0 ) {
-				wp_set_current_user( $owner_id );
-				if ( $agent_id > 0 ) {
-					PermissionHelper::set_agent_context( $agent_id, $owner_id );
-					$context_set = true;
-				}
-			}
+			wp_set_current_user( $owner_id );
+			PermissionHelper::set_agent_context( $agent_id, $owner_id );
 
 			try {
 				// Execute conversation loop via agents-api substrate.
@@ -455,10 +436,8 @@ class AIStep extends Step {
 					$max_turns
 				);
 			} finally {
-				if ( $context_set ) {
-					PermissionHelper::clear_agent_context();
-				}
-				if ( $owner_id > 0 && $previous_user_id !== $owner_id ) {
+				PermissionHelper::clear_agent_context();
+				if ( $previous_user_id !== $owner_id ) {
 					wp_set_current_user( $previous_user_id );
 				}
 			}
@@ -820,45 +799,55 @@ class AIStep extends Step {
 	}
 
 	/**
-	 * Log when execution falls back to a user without an agent context.
+	 * Resolve the agent identity required for queued AI execution.
+	 *
+	 * @param array $job_snapshot Portable job snapshot from engine data.
+	 * @return AgentIdentity|null Resolved identity, or null when the job is agent-less/invalid.
+	 */
+	private function resolveAgentIdentityForExecution( array $job_snapshot ): ?AgentIdentity {
+		if ( empty( $job_snapshot['agent_slug'] ) && empty( $job_snapshot['agent_id'] ) ) {
+			return null;
+		}
+
+		try {
+			return ( new AgentIdentityResolver() )->resolve_agent_identity( $job_snapshot );
+		} catch ( \InvalidArgumentException $e ) {
+			return null;
+		}
+	}
+
+	/**
+	 * Fail queued AI execution when no real agent owner can be resolved.
 	 *
 	 * @param array  $job_snapshot     Portable job snapshot from engine data.
-	 * @param int    $fallback_user_id User ID used for the legacy fallback.
 	 * @param string $pipeline_step_id Pipeline step currently executing.
 	 */
-	private function logAgentlessFallback( array $job_snapshot, int $fallback_user_id, string $pipeline_step_id ): void {
+	private function failMissingAgentContext( array $job_snapshot, string $pipeline_step_id ): void {
+		RunMetrics::recordStepResult(
+			$this->job_id,
+			$this->flow_step_id,
+			array(
+				'step_type'    => 'ai',
+				'result'       => 'failed',
+				'packet_count' => 0,
+				'reason'       => 'ai_agent_context_required',
+			)
+		);
+
 		do_action(
-			'datamachine_log',
-			'warning',
-			'AIStep: Agent-less job snapshot fell back to flow user_id; execution is outside the agent ownership envelope.',
+			'datamachine_fail_job',
+			$this->job_id,
+			'ai_agent_context_required',
 			array(
 				'job_id'           => $this->job_id,
 				'flow_id'          => (int) ( $job_snapshot['flow_id'] ?? 0 ),
 				'pipeline_id'      => (int) ( $job_snapshot['pipeline_id'] ?? 0 ),
 				'flow_step_id'     => $this->flow_step_id,
 				'pipeline_step_id' => $pipeline_step_id,
-				'fallback_user_id' => $fallback_user_id,
+				'error_message'    => 'Queued AI execution requires a valid agent_id or agent_slug with an owner user. Reassign unowned flows/pipelines before running this step.',
+				'solution'         => 'Inspect with wp datamachine pipelines orphans and wp datamachine flows orphans, then reassign with --where-null.',
 			)
 		);
-	}
-
-	/**
-	 * Resolve agent slug from a portable job snapshot.
-	 */
-	private function resolveAgentSlugFromJobSnapshot( array $job_snapshot, int $agent_id ): string {
-		if ( ! empty( $job_snapshot['agent_slug'] ) ) {
-			return sanitize_title( (string) $job_snapshot['agent_slug'] );
-		}
-
-		if ( $agent_id <= 0 ) {
-			return '';
-		}
-
-		try {
-			return ( new AgentIdentityResolver() )->resolve_agent_slug( $agent_id );
-		} catch ( \InvalidArgumentException $e ) {
-			return '';
-		}
 	}
 
 	/**

@@ -14,6 +14,10 @@ use DataMachine\Engine\AI\System\Tasks\SystemTask;
 
 abstract class RetentionTask extends SystemTask {
 
+	public function requiresAgentContext(): bool {
+		return false;
+	}
+
 	final public function executeTask( int $jobId, array $params ): void {
 		try {
 			$result = $this->runRetentionCleanup();

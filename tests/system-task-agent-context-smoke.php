@@ -43,6 +43,27 @@ if ( ! function_exists( 'sanitize_title' ) ) {
 
 // ─── Harness functions mirroring production paths ───────────────────
 
+function resolve_agent_identity_for_test( array $context ): ?array {
+	$agents = array(
+		2 => array( 'agent_id' => 2, 'agent_slug' => 'wayward-son', 'owner_id' => 1 ),
+		5 => array( 'agent_id' => 5, 'agent_slug' => 'valid-agent', 'owner_id' => 1 ),
+	);
+
+	$agent_id   = (int) ( $context['agent_id'] ?? 0 );
+	$agent_slug = ! empty( $context['agent_slug'] ) ? sanitize_title( (string) $context['agent_slug'] ) : '';
+
+	foreach ( $agents as $agent ) {
+		if ( $agent_id > 0 && $agent['agent_id'] === $agent_id ) {
+			return $agent;
+		}
+		if ( '' !== $agent_slug && $agent['agent_slug'] === $agent_slug ) {
+			return $agent;
+		}
+	}
+
+	return null;
+}
+
 /**
  * Mirror of TaskScheduler::schedule() initial_data construction.
  */
@@ -50,11 +71,17 @@ function build_task_scheduler_initial_data(
 	string $task_type,
 	array $params,
 	array $context,
-	int $parent_job_id
+	int $parent_job_id,
+	bool $requires_agent_context = true
 ): array {
-	$context_user_id    = (int) ( $context['user_id'] ?? 0 );
-	$context_agent_id   = (int) ( $context['agent_id'] ?? 0 );
-	$context_agent_slug = ! empty( $context['agent_slug'] ) ? sanitize_title( (string) $context['agent_slug'] ) : '';
+	$identity = resolve_agent_identity_for_test( $context );
+	if ( null === $identity && $requires_agent_context ) {
+		return array( 'error_code' => 'task_scheduler_agent_context_required' );
+	}
+
+	$context_user_id    = null !== $identity ? (int) $identity['owner_id'] : 0;
+	$context_agent_id   = null !== $identity ? (int) $identity['agent_id'] : 0;
+	$context_agent_slug = null !== $identity ? (string) $identity['agent_slug'] : '';
 
 	$job_snapshot = array(
 		'user_id' => $context_user_id,
@@ -114,12 +141,18 @@ function build_system_task_child_engine_data(
 	array $parent_engine_data,
 	int $child_job_id,
 	string $task_type,
-	array $task_params
+	array $task_params,
+	bool $requires_agent_context = true
 ): array {
 	$parent_job_snapshot = $parent_engine_data['job'] ?? array();
-	$parent_agent_id     = (int) ( $parent_job_snapshot['agent_id'] ?? 0 );
-	$parent_agent_slug   = ! empty( $parent_job_snapshot['agent_slug'] ) ? sanitize_title( (string) $parent_job_snapshot['agent_slug'] ) : '';
-	$parent_user_id      = (int) ( $parent_job_snapshot['user_id'] ?? 0 );
+	$identity = resolve_agent_identity_for_test( $parent_job_snapshot );
+	if ( null === $identity && $requires_agent_context ) {
+		return array( 'error_code' => 'system_task_agent_context_required' );
+	}
+
+	$parent_agent_id   = null !== $identity ? (int) $identity['agent_id'] : 0;
+	$parent_agent_slug = null !== $identity ? (string) $identity['agent_slug'] : '';
+	$parent_user_id    = null !== $identity ? (int) $identity['owner_id'] : 0;
 
 	$child_engine_data = array_merge( $task_params, array(
 		'task_type'        => $task_type,
@@ -159,10 +192,6 @@ function build_system_task_child_engine_data(
 function fan_out_per_agent_schedule( array $params, array $agents ): array {
 	$calls = array();
 	if ( empty( $agents ) ) {
-		$calls[] = array(
-			'params'  => $params,
-			'context' => array(),
-		);
 		return $calls;
 	}
 
@@ -231,13 +260,9 @@ $initial = build_task_scheduler_initial_data(
 $assert( 'flat agent_slug present', 'wayward-son' === $initial['agent_slug'] );
 $assert( 'job.agent_slug present', 'wayward-son' === $initial['job']['agent_slug'] );
 
-echo "\n[2] TaskScheduler initial_data without agent context (back-compat)\n";
+echo "\n[2] TaskScheduler rejects initial_data without agent context\n";
 $initial = build_task_scheduler_initial_data( 'image_optimization', array(), array(), 0 );
-$assert( 'flat agent_id is 0', 0 === $initial['agent_id'] );
-$assert( 'flat user_id is 0', 0 === $initial['user_id'] );
-$assert( 'job snapshot still present', is_array( $initial['job'] ) );
-$assert( 'job.agent_id absent (no agent set)', ! isset( $initial['job']['agent_id'] ) );
-$assert( 'job.user_id is 0', 0 === $initial['job']['user_id'] );
+$assert( 'agent-less task schedule is rejected', 'task_scheduler_agent_context_required' === $initial['error_code'] );
 
 echo "\n[3] ExecuteWorkflowAbility engine_data['job'] populated from initial_data\n";
 $initial   = build_task_scheduler_initial_data(
@@ -252,13 +277,9 @@ $assert( 'engine_data.job.job_id set', 100 === $engine['job']['job_id'] );
 $assert( 'engine_data.job.agent_id carried through', 2 === $engine['job']['agent_id'] );
 $assert( 'engine_data.job.user_id carried through', 1 === $engine['job']['user_id'] );
 
-echo "\n[4] ExecuteWorkflowAbility engine_data['job'] without agent context\n";
+echo "\n[4] ExecuteWorkflowAbility receives no agent-less TaskScheduler job\n";
 $initial = build_task_scheduler_initial_data( 'image_optimization', array(), array(), 0 );
-$engine  = build_engine_data_job_snapshot( 200, $initial );
-$assert( 'engine_data.job exists', is_array( $engine['job'] ) );
-$assert( 'engine_data.job.job_id set', 200 === $engine['job']['job_id'] );
-$assert( 'engine_data.job.agent_id absent', ! isset( $engine['job']['agent_id'] ) );
-$assert( 'engine_data.job.user_id is 0', 0 === $engine['job']['user_id'] );
+$assert( 'agent-less task does not build workflow initial_data', 'task_scheduler_agent_context_required' === $initial['error_code'] );
 
 echo "\n[5] SystemTaskStep child engine_data carries parent agent_id\n";
 $parent_engine = array(
@@ -281,13 +302,18 @@ $assert( 'child.job.agent_id from parent', 2 === $child['job']['agent_id'] );
 $assert( 'child.job.agent_slug from parent', 'wayward-son' === $child['job']['agent_slug'] );
 $assert( 'task params preserved', 42 === $child['attachment_id'] );
 
-echo "\n[6] SystemTaskStep child without agent context (legacy flow)\n";
+echo "\n[6] SystemTaskStep rejects child execution without agent context\n";
 $parent_engine = array( 'job' => array( 'job_id' => 600, 'user_id' => 0 ) );
 $child         = build_system_task_child_engine_data( 600, $parent_engine, 601, 'image_optimization', array() );
-$assert( 'child has no flat agent_id', ! isset( $child['agent_id'] ) );
-$assert( 'child has no flat user_id', ! isset( $child['user_id'] ) );
-$assert( 'child.job.agent_id absent', ! isset( $child['job']['agent_id'] ) );
-$assert( 'child.job.user_id is 0', 0 === $child['job']['user_id'] );
+$assert( 'agent-less child execution is rejected', 'system_task_agent_context_required' === $child['error_code'] );
+
+echo "\n[6b] Explicit system maintenance tasks may run without agent context\n";
+$initial = build_task_scheduler_initial_data( 'retention_completed_jobs', array(), array(), 0, false );
+$assert( 'system maintenance schedule can be agent-less by explicit task contract', ! isset( $initial['error_code'] ) );
+$assert( 'system maintenance job.user_id remains 0', 0 === $initial['job']['user_id'] );
+$child = build_system_task_child_engine_data( 600, $parent_engine, 601, 'retention_completed_jobs', array(), false );
+$assert( 'system maintenance child can be agent-less by explicit task contract', ! isset( $child['error_code'] ) );
+$assert( 'system maintenance child has no agent_id', ! isset( $child['job']['agent_id'] ) );
 
 echo "\n[7] Recurring schedule per_agent fan-out\n";
 $agents = array(
@@ -303,10 +329,9 @@ $assert( 'third call carries agent 3 with owner 2', 2 === $calls[2]['context']['
 $assert( 'agent_id surfaces in params', 2 === $calls[1]['params']['agent_id'] );
 $assert( 'date param preserved', '2026-04-25' === $calls[1]['params']['date'] );
 
-echo "\n[8] Recurring schedule per_agent fan-out with no agents (back-compat)\n";
+echo "\n[8] Recurring schedule per_agent fan-out with no agents skips scheduling\n";
 $calls = fan_out_per_agent_schedule( array( 'date' => '2026-04-25' ), array() );
-$assert( 'falls back to single call', 1 === count( $calls ) );
-$assert( 'fallback call has no agent context', empty( $calls[0]['context'] ) );
+$assert( 'no site-scoped fallback call is scheduled', 0 === count( $calls ) );
 
 echo "\n[9] Recurring schedule per_agent fan-out skips invalid agents\n";
 $agents = array(
@@ -316,6 +341,20 @@ $agents = array(
 $calls = fan_out_per_agent_schedule( array(), $agents );
 $assert( 'invalid agent_id skipped', 1 === count( $calls ) );
 $assert( 'valid agent fired', 5 === $calls[0]['context']['agent_id'] );
+
+echo "\n[10] Production sources fail instead of falling back to user-only context\n";
+$ai_step_source          = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Steps/AI/AIStep.php' );
+$system_task_step_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Steps/SystemTask/SystemTaskStep.php' );
+$scheduler_source        = file_get_contents( dirname( __DIR__ ) . '/inc/Engine/Tasks/TaskScheduler.php' );
+$provider_source         = file_get_contents( dirname( __DIR__ ) . '/inc/Engine/AI/System/SystemAgentServiceProvider.php' );
+$assert( 'AIStep has explicit missing-agent failure', str_contains( $ai_step_source, 'ai_agent_context_required' ) );
+$assert( 'SystemTaskStep has explicit missing-agent failure', str_contains( $system_task_step_source, 'system_task_agent_context_required' ) );
+$assert( 'TaskScheduler refuses agent-less queued task scheduling', str_contains( $scheduler_source, 'task_scheduler_agent_context_required' ) );
+$assert( 'SystemTask exposes explicit agent-context contract', str_contains( file_get_contents( dirname( __DIR__ ) . '/inc/Engine/AI/System/Tasks/SystemTask.php' ), 'function requiresAgentContext(): bool' ) );
+$assert( 'Retention tasks explicitly opt out of agent context', str_contains( file_get_contents( dirname( __DIR__ ) . '/inc/Engine/AI/System/Tasks/Retention/RetentionTask.php' ), 'function requiresAgentContext(): bool' ) );
+$assert( 'Recurring per-agent schedules do not fall back to a site-scoped task', str_contains( $provider_source, 'recurring_task_agent_context_required' ) && ! str_contains( $provider_source, 'pre-multi-agent behaviour' ) );
+$assert( 'AI fallback warning was removed', ! str_contains( $ai_step_source, 'fell back to flow user_id' ) );
+$assert( 'System task fallback warning was removed', ! str_contains( $system_task_step_source, 'fell back to flow user_id' ) );
 
 echo "\n";
 if ( $failures > 0 ) {
