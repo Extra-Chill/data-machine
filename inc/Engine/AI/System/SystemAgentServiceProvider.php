@@ -283,10 +283,16 @@ class SystemAgentServiceProvider {
 					$agents      = $agents_repo->get_all();
 
 					if ( empty( $agents ) ) {
-						// No agents on this install — fall back to a
-						// single site-scoped run so the task still
-						// fires (mirrors pre-multi-agent behaviour).
-						TaskScheduler::schedule( $task_type, $params );
+						do_action(
+							'datamachine_log',
+							'warning',
+							'SystemAgentServiceProvider: per-agent recurring task skipped because no active agents exist',
+							array(
+								'schedule_id' => $schedule_id,
+								'task_type'   => $task_type,
+								'error_code'  => 'recurring_task_agent_context_required',
+							)
+						);
 						return;
 					}
 
