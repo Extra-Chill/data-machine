@@ -13,6 +13,7 @@ $root          = dirname( __DIR__ );
 $job_artifacts = file_get_contents( $root . '/inc/Core/JobArtifacts.php' );
 $jobs_cli      = file_get_contents( $root . '/inc/Cli/Commands/JobsCommand.php' );
 $ai_step       = file_get_contents( $root . '/inc/Core/Steps/AI/AIStep.php' );
+$engine_data   = file_get_contents( $root . '/inc/Engine/Filters/EngineData.php' );
 $loop          = file_get_contents( $root . '/inc/Engine/AI/conversation-loop.php' );
 
 $failures = array();
@@ -37,6 +38,13 @@ $assert(
 	false !== strpos( $ai_step, "'tool_execution_summary'" )
 		&& false !== strpos( $ai_step, 'summarizeToolExecutions' ),
 	'AI step persists sanitized tool execution summaries into engine_data'
+);
+
+$assert(
+	false !== strpos( $engine_data, 'write_artifact_files' )
+		&& false !== strpos( $engine_data, "'artifact_files' =>" )
+		&& false !== strpos( $job_artifacts, 'datamachine-artifacts/jobs/' ),
+	'engine data persistence writes first-class transcript/tool-trace artifact files and stores refs in engine_data'
 );
 
 $assert(

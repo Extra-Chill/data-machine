@@ -17,6 +17,14 @@ defined( 'ABSPATH' ) || exit;
 interface ConversationSessionIndexInterface {
 
 	/**
+	 * Fetch a full conversation session by ID.
+	 *
+	 * @param string $session_id Conversation session ID.
+	 * @return array<string, mixed>|null Session payload, or null when missing.
+	 */
+	public function get_session( string $session_id ): ?array;
+
+	/**
 	 * List sessions for a user with pagination and optional filtering.
 	 *
 	 * Returned entries are summary rows intended for the session switcher
