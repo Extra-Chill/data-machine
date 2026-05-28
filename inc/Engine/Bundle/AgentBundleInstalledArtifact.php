@@ -22,10 +22,9 @@ final class AgentBundleInstalledArtifact {
 	private ?string $installed_hash;
 	private ?string $current_hash;
 	private mixed $installed_payload;
-	private string $status;
 	private string $installed_at;
 	private string $updated_at;
-	private \WP_Agent_Package_Installed_Artifact $package_artifact;
+	private object $package_artifact;
 
 	public function __construct(
 		string $bundle_slug,
@@ -47,7 +46,6 @@ final class AgentBundleInstalledArtifact {
 		$this->installed_hash    = self::optional_string( $installed_hash );
 		$this->current_hash      = self::optional_string( $current_hash );
 		$this->installed_payload = $installed_payload;
-		$this->status            = AgentBundleArtifactStatus::classify( $this->installed_hash, $this->current_hash );
 		$this->installed_at      = self::non_empty_string( $installed_at, 'installed_at' );
 		$this->updated_at        = self::non_empty_string( $updated_at, 'updated_at' );
 		$this->package_artifact  = self::build_package_artifact(
@@ -155,7 +153,7 @@ final class AgentBundleInstalledArtifact {
 	}
 
 	public function to_array(): array {
-		$row = self::from_package_artifact_array( $this->package_artifact->to_array() );
+		$row = self::from_package_artifact_array( call_user_func( array( $this->package_artifact, 'to_array' ) ) );
 		if ( null !== $this->installed_payload ) {
 			$row['installed_payload'] = $this->installed_payload;
 		}
@@ -165,18 +163,21 @@ final class AgentBundleInstalledArtifact {
 	/**
 	 * Returns the underlying Agents API package artifact snapshot.
 	 */
-	public function package_artifact(): \WP_Agent_Package_Installed_Artifact {
+	public function package_artifact(): object {
 		return $this->package_artifact;
 	}
 
 	private static function validate_artifact_type( string $type ): string {
-		$type       = strtolower( trim( str_replace( '\\', '/', self::non_empty_string( $type, 'artifact_type' ) ) ) );
+		$type       = AgentBundleArtifactDefinitions::bundle_artifact_type( self::non_empty_string( $type, 'artifact_type' ) );
 		$normalized = preg_replace( '/[^a-z0-9_\.\/-]+/', '', $type );
 		$normalized = preg_replace( '#/+#', '/', is_string( $normalized ) ? $normalized : '' );
 		$normalized = trim( is_string( $normalized ) ? $normalized : '', '/' );
 
 		if ( '' === $normalized || $normalized !== $type ) {
 			throw new BundleValidationException( 'installed bundle artifact_type must be a normalized artifact type.' );
+		}
+		if ( ! in_array( $normalized, BundleSchema::artifact_types(), true ) ) {
+			throw new BundleValidationException( 'installed bundle artifact_type must be one of the registered bundle artifact types.' );
 		}
 
 		return $normalized;
@@ -206,8 +207,10 @@ final class AgentBundleInstalledArtifact {
 		return $path;
 	}
 
-	private static function build_package_artifact( string $bundle_slug, string $bundle_version, string $artifact_type, string $artifact_id, string $source_path, ?string $installed_hash, ?string $current_hash, string $installed_at, string $updated_at, mixed $installed_payload ): \WP_Agent_Package_Installed_Artifact {
-		return new \WP_Agent_Package_Installed_Artifact(
+	private static function build_package_artifact( string $bundle_slug, string $bundle_version, string $artifact_type, string $artifact_id, string $source_path, ?string $installed_hash, ?string $current_hash, string $installed_at, string $updated_at, mixed $installed_payload ): object {
+		$artifact_class = 'WP_Agent_Package_Installed_Artifact';
+
+		return new $artifact_class(
 			array(
 				'package_slug'      => $bundle_slug,
 				'package_version'   => $bundle_version,
@@ -246,15 +249,10 @@ final class AgentBundleInstalledArtifact {
 	}
 
 	private static function package_artifact_type( string $type ): string {
-		if ( str_contains( $type, '/' ) ) {
-			return $type;
-		}
-
-		return 'datamachine/' . str_replace( '_', '-', $type );
+		return AgentBundleArtifactDefinitions::package_artifact_type( $type );
 	}
 
 	private static function bundle_artifact_type( string $type ): string {
-		$type = str_starts_with( $type, 'datamachine/' ) ? substr( $type, strlen( 'datamachine/' ) ) : $type;
-		return str_replace( '-', '_', $type );
+		return AgentBundleArtifactDefinitions::bundle_artifact_type( $type );
 	}
 }

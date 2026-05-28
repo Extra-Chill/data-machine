@@ -87,6 +87,7 @@ final class BundleSchema {
 
 	public const CORE_ARTIFACT_TYPES = array(
 		'agent',
+		'agent_config',
 		'memory',
 		'pipeline',
 		'flow',

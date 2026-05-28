@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 
+require_once __DIR__ . '/../inc/Engine/Bundle/BundleSchema.php';
 require_once __DIR__ . '/../inc/Engine/Bundle/AgentBundleRuntimeDrift.php';
 
 use DataMachine\Engine\Bundle\AgentBundleRuntimeDrift;
@@ -70,6 +71,9 @@ $target_flow = array(
 		'enabled'   => false,
 		'interval'  => 'manual',
 		'max_items' => array( 'fetch' => 5 ),
+		'run_artifacts' => array(
+			'completion_assertions' => array( 'egress' => array( 'artifact', 'bundle-file' ) ),
+		),
 	),
 );
 
@@ -86,6 +90,7 @@ agent_bundle_runtime_drift_assert( array( 'mcp' => 5 ) === ( $preview['steps'][0
 agent_bundle_runtime_drift_assert( true === ( $preview['scheduling']['changed'] ?? null ), 'scheduling drift is reported', $failures, $passes );
 agent_bundle_runtime_drift_assert( array( 'fetch' => 50 ) === ( $preview['scheduling']['current']['max_items'] ?? null ), 'current scheduling max_items is reported', $failures, $passes );
 agent_bundle_runtime_drift_assert( array( 'fetch' => 5 ) === ( $preview['scheduling']['target']['max_items'] ?? null ), 'target scheduling max_items is reported', $failures, $passes );
+agent_bundle_runtime_drift_assert( array( 'artifact', 'bundle-file' ) === ( $preview['scheduling']['target']['run_artifacts']['completion_assertions']['egress'] ?? null ), 'target run artifact policy is reported with scheduling drift', $failures, $passes );
 
 $preserved_config = $current_flow['flow_config'];
 agent_bundle_runtime_drift_assert( 2 === count( $preserved_config['88_fetch_2']['config_patch_queue'] ), 'default install leaves existing queue untouched', $failures, $passes );

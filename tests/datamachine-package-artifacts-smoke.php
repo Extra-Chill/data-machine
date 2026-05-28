@@ -17,7 +17,15 @@ require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 agents_api_smoke_require_module();
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/register-agent-package-artifacts.php';
 
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $data, $options = 0, $depth = 512 ) {
+		return json_encode( $data, $options, $depth );
+	}
+}
+
 use DataMachine\Core\Agents\AgentBundler;
+use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
+use DataMachine\Engine\Bundle\AgentBundleArtifactPayloads;
 use DataMachine\Engine\Bundle\AgentBundleDirectory;
 use DataMachine\Engine\Bundle\AgentBundleFlowFile;
 use DataMachine\Engine\Bundle\AgentBundleArrayAdapter;
@@ -162,6 +170,10 @@ agents_api_smoke_assert_equals( 'seed-queues/mgs-topic-loop.json', $artifacts['d
 agents_api_smoke_assert_equals( 'extensions/intelligence/wiki-brain/woocommerce.json', $artifacts['intelligence/wiki-brain:woocommerce']['source'] ?? '', 'namespaced plugin artifact projects with package-relative extension source', $failures, $passes );
 agents_api_smoke_assert_equals( 'extensions/legacy-plugin/seed.json', $artifacts['datamachine-extension/legacy_plugin_artifact:seed']['source'] ?? '', 'legacy plugin artifact maps to generic package namespace', $failures, $passes );
 agents_api_smoke_assert_equals( 'legacy_plugin_artifact', $artifacts['datamachine-extension/legacy_plugin_artifact:seed']['meta']['extension_artifact_type'] ?? '', 'legacy plugin artifact preserves bundle artifact type in metadata', $failures, $passes );
+$flow_document = $directory->flows()[0]->to_array();
+$flow_payload  = AgentBundleArtifactPayloads::flow_document_payload( $flow_document, 'daily-ingest-flow' );
+agents_api_smoke_assert_equals( AgentBundleArtifactHasher::hash( $flow_payload ), $artifacts['datamachine/flow:daily-ingest-flow']['checksum'] ?? '', 'flow package artifact checksum uses shared run-artifact-aware payload', $failures, $passes );
+agents_api_smoke_assert_equals( array( 'artifact', 'bundle-file' ), $artifacts['datamachine/flow:daily-ingest-flow']['meta']['run_artifacts']['completion_assertions']['egress'] ?? array(), 'flow package artifact exposes normalized run artifact policy in metadata', $failures, $passes );
 
 echo "\n[3] Existing bundle paths can read package identity from WP_Agent_Package:\n";
 $array_bundle    = AgentBundleArrayAdapter::to_array_bundle( $directory );
@@ -190,5 +202,48 @@ agents_api_smoke_assert_equals( array( 'artifact', 'bundle-file' ), $lifecycle_a
 agents_api_smoke_assert_equals( true, str_contains( $service_source, 'AgentBundleLifecycleProjection' ), 'ability service uses shared lifecycle projection service', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $service_source, '$this->projection->target_artifacts( $bundle' ), 'ability service plans through shared lifecycle projection', $failures, $passes );
 agents_api_smoke_assert_equals( true, str_contains( $command_source, '$this->projection()->target_artifacts( $bundle' ), 'CLI planning uses the same lifecycle projection', $failures, $passes );
+
+echo "\n[5] Direct WP_Agent_Package artifacts carry run-artifact-aware checksums into generic planning:\n";
+$base_payload   = array( 'run_artifacts' => array( 'completion_assertions' => array( 'egress' => array( 'artifact' ) ) ) );
+$target_payload = array( 'run_artifacts' => array( 'completion_assertions' => array( 'egress' => array( 'artifact', 'bundle-file' ) ) ) );
+$direct_package = WP_Agent_Package::from_array(
+	array(
+		'slug'      => 'direct-package-fixture',
+		'version'   => '2.0.0',
+		'agent'     => array( 'slug' => 'direct-agent', 'label' => 'Direct Agent' ),
+		'artifacts' => array(
+			array(
+				'type'     => 'datamachine/flow',
+				'slug'     => 'direct-flow',
+				'label'    => 'Direct flow',
+				'source'   => 'flows/direct-flow.json',
+				'checksum' => AgentBundleArtifactHasher::hash( $target_payload ),
+				'meta'     => array( 'run_artifacts' => $target_payload['run_artifacts'] ),
+			),
+		),
+	)
+);
+$direct_plan    = WP_Agent_Package_Update_Planner::plan(
+	array(
+		array(
+			'artifact_type'  => 'datamachine/flow',
+			'artifact_id'    => 'direct-flow',
+			'source'         => 'flows/direct-flow.json',
+			'installed_hash' => AgentBundleArtifactHasher::hash( $base_payload ),
+		),
+	),
+	array(
+		array(
+			'artifact_type' => 'datamachine/flow',
+			'artifact_id'   => 'direct-flow',
+			'source'        => 'flows/direct-flow.json',
+			'payload'       => $base_payload,
+		),
+	),
+	$direct_package->get_artifacts()
+);
+$direct_auto_apply = $direct_plan->get_bucket( 'auto_apply' )[0] ?? array();
+agents_api_smoke_assert_equals( 'datamachine/flow:direct-flow', $direct_auto_apply['artifact_key'] ?? '', 'direct WP_Agent_Package artifact participates in generic update planning', $failures, $passes );
+agents_api_smoke_assert_equals( AgentBundleArtifactHasher::hash( $target_payload ), $direct_auto_apply['target_hash'] ?? '', 'direct package checksum supplies target hash without legacy bundle payload', $failures, $passes );
 
 agents_api_smoke_finish( 'Data Machine package artifact projection', $failures, $passes );

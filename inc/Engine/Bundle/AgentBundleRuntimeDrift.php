@@ -191,11 +191,17 @@ final class AgentBundleRuntimeDrift {
 	}
 
 	private static function scheduling_preview( array $scheduling ): array {
-		return array(
+		$preview       = array(
 			'enabled'   => (bool) ( $scheduling['enabled'] ?? false ),
 			'interval'  => (string) ( $scheduling['interval'] ?? 'manual' ),
 			'max_items' => is_array( $scheduling['max_items'] ?? null ) ? $scheduling['max_items'] : array(),
 		);
+		$run_artifacts = BundleSchema::normalize_run_artifact_egress_policy( $scheduling['run_artifacts'] ?? array() );
+		if ( ! empty( $run_artifacts ) ) {
+			$preview['run_artifacts'] = $run_artifacts;
+		}
+
+		return $preview;
 	}
 
 	private static function list_depth( mixed $value ): int {

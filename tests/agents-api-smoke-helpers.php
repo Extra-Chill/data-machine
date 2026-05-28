@@ -76,6 +76,10 @@ function esc_html( string $value ): string {
 	return htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' );
 }
 
+function wp_json_encode( $data, $options = 0, $depth = 512 ) {
+	return json_encode( $data, $options, $depth );
+}
+
 function __( string $text, string $domain = 'default' ): string {
 	unset( $domain );
 	return $text;

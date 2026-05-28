@@ -20,6 +20,8 @@ use DataMachine\Core\FilesRepository\DailyMemory;
 use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Api\Flows\FlowScheduling;
 use DataMachine\Engine\Bundle\AgentBundleArtifactHasher;
+use DataMachine\Engine\Bundle\AgentBundleArtifactPayloads;
+use DataMachine\Engine\Bundle\AgentBundleArtifactDefinitions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactExtensions;
 use DataMachine\Engine\Bundle\AgentBundleArtifactState;
 use DataMachine\Engine\Bundle\AgentBundleAgentConfig;
@@ -315,9 +317,9 @@ class AgentBundler {
 	 * Project a legacy bundle array to the Core-shaped package contract.
 	 *
 	 * @param array<string,mixed> $bundle Legacy bundle array.
-	 * @return \WP_Agent_Package
+	 * @return object
 	 */
-	public static function package_from_bundle( array $bundle ): \WP_Agent_Package {
+	public static function package_from_bundle( array $bundle ): object {
 		return AgentPackageProjection::from_array_bundle( $bundle );
 	}
 
@@ -325,9 +327,9 @@ class AgentBundler {
 	 * Project a bundle directory to the Core-shaped package contract.
 	 *
 	 * @param AgentBundleDirectory $directory Bundle directory.
-	 * @return \WP_Agent_Package
+	 * @return object
 	 */
-	public static function package_from_directory( AgentBundleDirectory $directory ): \WP_Agent_Package {
+	public static function package_from_directory( AgentBundleDirectory $directory ): object {
 		return AgentPackageProjection::from_directory( $directory );
 	}
 
@@ -839,18 +841,20 @@ class AgentBundler {
 					$scheduling['run_artifacts'] = $flow_run_artifacts;
 				}
 
-				$flow_config         = is_array( $flow_data['flow_config'] ?? null ) ? $flow_data['flow_config'] : array();
-				$existing_flow       = $this->flows_repo->get_by_portable_slug( (int) $new_pipeline_id, $portable_slug );
-				$target_flow_config  = $existing_flow
+				$flow_config          = is_array( $flow_data['flow_config'] ?? null ) ? $flow_data['flow_config'] : array();
+				$existing_flow        = $this->flows_repo->get_by_portable_slug( (int) $new_pipeline_id, $portable_slug );
+				$target_flow_config   = $existing_flow
 				? BundleStepIdRemapper::remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, (int) $existing_flow['flow_id'] )
 				: $flow_config;
-				$flow_payload_source = array_merge(
+				$flow_artifact_record = is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null;
+				$installed_payload    = is_array( $flow_artifact_record['installed_payload'] ?? null ) ? $flow_artifact_record['installed_payload'] : null;
+				$flow_payload_source  = array_merge(
 				$flow_data,
 				array(
 					'flow_config' => $target_flow_config,
 				)
 				);
-				$payload             = $this->flow_artifact_payload( $flow_payload_source, $portable_slug );
+				$payload              = $this->flow_artifact_payload( $flow_payload_source, $portable_slug, $installed_payload );
 
 				if ( $existing_flow ) {
 					$preview = AgentBundleRuntimeDrift::preview(
@@ -868,7 +872,7 @@ class AgentBundler {
 				$existing_flow
 				&& ! $reconcile_runtime
 				&& $this->artifact_has_local_modifications(
-					$artifact_records[ $artifact_key ] ?? null,
+					$flow_artifact_record,
 					$this->normalized_existing_flow_payload( $existing_flow, $portable_slug, (int) $new_pipeline_id, is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null )
 				)
 				&& ! hash_equals(
@@ -1326,32 +1330,11 @@ class AgentBundler {
 	}
 
 	private function pipeline_artifact_payload( array $pipeline, string $portable_slug ): array {
-		return array(
-			'portable_slug'   => $portable_slug,
-			'pipeline_name'   => (string) ( $pipeline['pipeline_name'] ?? '' ),
-			'pipeline_config' => is_array( $pipeline['pipeline_config'] ?? null ) ? $pipeline['pipeline_config'] : array(),
-		);
+		return AgentBundleArtifactPayloads::pipeline_payload( $pipeline, $portable_slug );
 	}
 
 	private function flow_artifact_payload( array $flow, string $portable_slug, ?array $installed_payload = null ): array {
-		$scheduling_policy = is_string( $installed_payload['scheduling_policy'] ?? null )
-			? $installed_payload['scheduling_policy']
-			: $this->bundle_scheduling_policy( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() );
-		$run_artifacts     = \DataMachine\Engine\Bundle\BundleSchema::normalize_run_artifact_egress_policy( $flow['run_artifacts'] ?? $flow['scheduling_config']['run_artifacts'] ?? array() );
-
-		$payload = array(
-			'portable_slug'     => $portable_slug,
-			'flow_name'         => (string) ( $flow['flow_name'] ?? '' ),
-			'flow_config'       => $this->flow_config_without_runtime_queues( is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array() ),
-			'scheduling_policy' => $scheduling_policy,
-			'queue_policy'      => 'create_seed_upgrade_preserve_existing',
-			'runtime_overlays'  => $this->flow_runtime_overlays( $flow, $installed_payload ),
-		);
-		if ( ! empty( $run_artifacts ) ) {
-			$payload['run_artifacts'] = $run_artifacts;
-		}
-
-		return $payload;
+		return AgentBundleArtifactPayloads::flow_payload( $flow, $portable_slug, $installed_payload );
 	}
 
 	private function bundle_create_scheduling_config( array $config ): array {
@@ -1398,16 +1381,6 @@ class AgentBundler {
 		}
 	}
 
-	private function bundle_scheduling_policy( array $config ): string {
-		$create_config = $this->bundle_create_scheduling_config( $config );
-
-		if ( 'manual' === (string) ( $create_config['interval'] ?? 'manual' ) || false === ( $create_config['enabled'] ?? true ) ) {
-			return 'create_paused_upgrade_preserve_existing';
-		}
-
-		return 'create_bundle_schedule_upgrade_preserve_existing';
-	}
-
 	private function artifact_has_local_modifications( ?array $record, mixed $current_payload ): bool {
 		if ( empty( $record['installed_hash'] ) ) {
 			return false;
@@ -1421,7 +1394,7 @@ class AgentBundler {
 
 	private function bundle_artifact_record( array $bundle_metadata, string $type, string $id, string $source_path, mixed $payload ): array {
 		$hash = AgentBundleArtifactHasher::hash( $payload );
-		$now  = gmdate( 'c' );
+		$now  = gmdate( 'Y-m-d H:i:s' );
 
 		// installed_payload is the install-time snapshot. AgentBundleArtifactRebase
 		// uses it as the `base` side of the 3-way merge so burn-in-safe can tell
@@ -1446,41 +1419,7 @@ class AgentBundler {
 
 	/** @return array<int,array<string,mixed>> */
 	private static function bundle_file_artifacts( array $bundle ): array {
-		$artifacts = array();
-		$files     = is_array( $bundle['artifact_files'] ?? null ) ? $bundle['artifact_files'] : array();
-
-		foreach ( self::bundle_file_artifact_directories() as $directory => $type ) {
-			foreach ( is_array( $files[ $directory ] ?? null ) ? $files[ $directory ] : array() as $relative_path => $payload ) {
-				$artifact_id = is_array( $payload ) && is_string( $payload['artifact_id'] ?? null )
-					? (string) $payload['artifact_id']
-					: self::artifact_id_from_relative_path( (string) $relative_path );
-
-				$artifacts[] = array(
-					'artifact_type' => $type,
-					'artifact_id'   => $artifact_id,
-					'source_path'   => $directory . '/' . ltrim( (string) $relative_path, '/' ),
-					'payload'       => $payload,
-				);
-			}
-		}
-
-		return $artifacts;
-	}
-
-	/** @return array<string,string> */
-	private static function bundle_file_artifact_directories(): array {
-		return array(
-			\DataMachine\Engine\Bundle\BundleSchema::PROMPTS_DIR       => 'prompt',
-			\DataMachine\Engine\Bundle\BundleSchema::RUBRICS_DIR       => 'rubric',
-			\DataMachine\Engine\Bundle\BundleSchema::TOOL_POLICIES_DIR => 'tool_policy',
-			\DataMachine\Engine\Bundle\BundleSchema::AUTH_REFS_DIR     => 'auth_ref',
-			\DataMachine\Engine\Bundle\BundleSchema::SEED_QUEUES_DIR   => 'seed_queue',
-		);
-	}
-
-	private static function artifact_id_from_relative_path( string $relative_path ): string {
-		$relative_path = preg_replace( '/\.(json|md|txt)$/i', '', $relative_path );
-		return null === $relative_path ? '' : $relative_path;
+		return AgentBundleArtifactDefinitions::file_artifact_rows_from_bundle( $bundle );
 	}
 
 	private static function current_payload_from_record( ?array $record ): mixed {
@@ -1561,105 +1500,6 @@ class AgentBundler {
 			}
 			$step['handler_configs'][ $handler_slug ]['max_items'] = $handler_config['max_items'];
 		}
-	}
-
-	private function flow_config_without_runtime_queues( array $flow_config ): array {
-		$normalized = array();
-		foreach ( $flow_config as $flow_step_id => $step ) {
-			if ( ! is_array( $step ) ) {
-				$normalized[ (string) $flow_step_id ] = $step;
-				continue;
-			}
-			unset( $step['prompt_queue'], $step['config_patch_queue'], $step['queue_mode'], $step['_queue_consume_revision'] );
-			unset( $step['pipeline_id'], $step['flow_id'], $step['flow_step_id'] );
-			unset( $step['handler_config']['max_items'] );
-			if ( empty( $step['handler_config'] ) ) {
-				unset( $step['handler_config'] );
-			}
-			if ( isset( $step['pipeline_step_id'] ) ) {
-				$step['pipeline_step_id'] = $this->normalize_artifact_step_id( (string) $step['pipeline_step_id'] );
-			}
-			if ( is_array( $step['handler_configs'] ?? null ) ) {
-				foreach ( $step['handler_configs'] as $handler_slug => &$handler_config ) {
-					if ( is_array( $handler_config ) ) {
-						unset( $handler_config['max_items'] );
-						if ( empty( $handler_config ) ) {
-							unset( $step['handler_configs'][ $handler_slug ] );
-						}
-					}
-				}
-				unset( $handler_config );
-				if ( empty( $step['handler_configs'] ) ) {
-					unset( $step['handler_configs'] );
-				}
-			}
-
-			$normalized[ $this->normalize_artifact_step_id( (string) $flow_step_id ) ] = $step;
-		}
-		ksort( $normalized, SORT_STRING );
-
-		return $normalized;
-	}
-
-	private function normalize_artifact_step_id( string $step_id ): string {
-		$normalized = preg_replace( '/^\d+_/', '', $step_id );
-		$normalized = is_string( $normalized ) ? $normalized : $step_id;
-		$normalized = preg_replace( '/_\d+$/', '', $normalized );
-
-		return is_string( $normalized ) && '' !== $normalized ? $normalized : $step_id;
-	}
-
-	private function flow_runtime_overlays( array $flow, ?array $installed_payload = null ): array {
-		if ( is_array( $installed_payload['runtime_overlays'] ?? null ) ) {
-			return $installed_payload['runtime_overlays'];
-		}
-
-		$overlays    = array();
-		$flow_config = is_array( $flow['flow_config'] ?? null ) ? $flow['flow_config'] : array();
-		$steps       = array();
-
-		foreach ( $flow_config as $flow_step_id => $step ) {
-			if ( ! is_array( $step ) ) {
-				continue;
-			}
-
-			$step_overlay = array();
-			foreach ( array( 'prompt_queue', 'config_patch_queue', 'queue_mode', '_queue_consume_revision' ) as $field ) {
-				if ( array_key_exists( $field, $step ) ) {
-					$step_overlay[ $field ] = $step[ $field ];
-				}
-			}
-			if ( array_key_exists( 'max_items', $step['handler_config'] ?? array() ) ) {
-				$step_overlay['handler_config'] = array( 'max_items' => $step['handler_config']['max_items'] );
-			}
-			if ( is_array( $step['handler_configs'] ?? null ) ) {
-				foreach ( $step['handler_configs'] as $handler_slug => $handler_config ) {
-					if ( is_array( $handler_config ) && array_key_exists( 'max_items', $handler_config ) ) {
-						$step_overlay['handler_configs'][ (string) $handler_slug ] = array( 'max_items' => $handler_config['max_items'] );
-					}
-				}
-			}
-
-			if ( ! empty( $step_overlay ) ) {
-				ksort( $step_overlay, SORT_STRING );
-				$steps[ (string) $flow_step_id ] = $step_overlay;
-			}
-		}
-
-		if ( ! empty( $steps ) ) {
-			ksort( $steps, SORT_STRING );
-			$overlays['steps'] = $steps;
-		}
-
-		$scheduling = $this->sanitize_scheduling_config( is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array() );
-		unset( $scheduling['run_artifacts'] );
-		if ( ! empty( $scheduling ) ) {
-			ksort( $scheduling, SORT_STRING );
-			$overlays['scheduling_config'] = $scheduling;
-		}
-
-		ksort( $overlays, SORT_STRING );
-		return $overlays;
 	}
 
 	private function normalized_existing_flow_payload( array $flow, string $portable_slug, int $new_pipeline_id, ?array $artifact_record = null ): array {

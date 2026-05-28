@@ -22,10 +22,20 @@ final class AgentBundleArtifactPayloads {
 		);
 	}
 
+	public static function pipeline_document_payload( array $pipeline, string $portable_slug ): array {
+		return array(
+			'portable_slug'   => $portable_slug,
+			'pipeline_name'   => (string) ( $pipeline['name'] ?? '' ),
+			'pipeline_config' => is_array( $pipeline['steps'] ?? null ) ? $pipeline['steps'] : array(),
+		);
+	}
+
 	public static function flow_payload( array $flow, string $portable_slug, ?array $installed_payload = null ): array {
 		$scheduling        = is_array( $flow['scheduling_config'] ?? null ) ? $flow['scheduling_config'] : array();
 		$run_artifacts     = self::flow_run_artifacts( $flow, $scheduling );
-		$scheduling_policy = self::flow_scheduling_policy( $scheduling );
+		$scheduling_policy = is_string( $installed_payload['scheduling_policy'] ?? null )
+			? $installed_payload['scheduling_policy']
+			: self::flow_scheduling_policy( $scheduling );
 
 		$payload = array(
 			'portable_slug'     => $portable_slug,
@@ -41,6 +51,22 @@ final class AgentBundleArtifactPayloads {
 		}
 
 		return $payload;
+	}
+
+	public static function flow_document_payload( array $flow, string $portable_slug ): array {
+		return self::flow_payload(
+			array(
+				'flow_name'         => (string) ( $flow['name'] ?? '' ),
+				'flow_config'       => is_array( $flow['steps'] ?? null ) ? $flow['steps'] : array(),
+				'scheduling_config' => array(
+					'enabled'   => 'manual' !== (string) ( $flow['schedule'] ?? 'manual' ),
+					'interval'  => (string) ( $flow['schedule'] ?? 'manual' ),
+					'max_items' => is_array( $flow['max_items'] ?? null ) ? $flow['max_items'] : array(),
+				),
+				'run_artifacts'     => BundleSchema::normalize_run_artifact_egress_policy( $flow['run_artifacts'] ?? array() ),
+			),
+			$portable_slug
+		);
 	}
 
 	private static function flow_run_artifacts( array $flow, array $scheduling ): array {
@@ -59,12 +85,17 @@ final class AgentBundleArtifactPayloads {
 	}
 
 	private static function flow_config_without_runtime_queues( array $flow_config ): array {
-		foreach ( $flow_config as &$step ) {
+		$normalized = array();
+		foreach ( $flow_config as $flow_step_id => $step ) {
 			if ( is_array( $step ) ) {
 				unset( $step['prompt_queue'], $step['config_patch_queue'], $step['queue_mode'], $step['_queue_consume_revision'] );
+				unset( $step['pipeline_id'], $step['flow_id'], $step['flow_step_id'] );
 				unset( $step['handler_config']['max_items'] );
 				if ( empty( $step['handler_config'] ) ) {
 					unset( $step['handler_config'] );
+				}
+				if ( isset( $step['pipeline_step_id'] ) ) {
+					$step['pipeline_step_id'] = self::normalize_artifact_step_id( (string) $step['pipeline_step_id'] );
 				}
 				if ( is_array( $step['handler_configs'] ?? null ) ) {
 					foreach ( $step['handler_configs'] as $handler_slug => &$handler_config ) {
@@ -81,10 +112,20 @@ final class AgentBundleArtifactPayloads {
 					}
 				}
 			}
-		}
-		unset( $step );
 
-		return $flow_config;
+			$normalized[ self::normalize_artifact_step_id( (string) $flow_step_id ) ] = $step;
+		}
+		ksort( $normalized, SORT_STRING );
+
+		return $normalized;
+	}
+
+	private static function normalize_artifact_step_id( string $step_id ): string {
+		$normalized = preg_replace( '/^\d+_/', '', $step_id );
+		$normalized = is_string( $normalized ) ? $normalized : $step_id;
+		$normalized = preg_replace( '/_\d+$/', '', $normalized );
+
+		return is_string( $normalized ) && '' !== $normalized ? $normalized : $step_id;
 	}
 
 	private static function flow_runtime_overlays( array $flow, ?array $installed_payload = null ): array {
