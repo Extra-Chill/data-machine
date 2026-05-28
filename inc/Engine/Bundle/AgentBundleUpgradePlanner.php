@@ -26,7 +26,8 @@ final class AgentBundleUpgradePlanner {
 	 * @param array<string,mixed>                                         $metadata Optional plan metadata.
 	 */
 	public static function plan( array $installed_artifacts, array $current_artifacts, array $target_artifacts, array $metadata = array() ): AgentBundleUpgradePlan {
-		$plan = \WP_Agent_Package_Update_Planner::plan(
+		$planner_class = 'WP_Agent_Package_Update_Planner';
+		$plan          = $planner_class::plan(
 			self::package_artifacts( $installed_artifacts ),
 			self::package_artifacts( $current_artifacts ),
 			self::package_artifacts( $target_artifacts ),
@@ -105,9 +106,6 @@ final class AgentBundleUpgradePlanner {
 		$converted = array();
 		foreach ( $artifacts as $artifact ) {
 			$row = $artifact instanceof AgentBundleInstalledArtifact ? $artifact->to_array() : $artifact;
-			if ( ! is_array( $row ) ) {
-				continue;
-			}
 
 			$artifact_type = (string) ( $row['artifact_type'] ?? '' );
 			$artifact_id   = (string) ( $row['artifact_id'] ?? '' );
@@ -136,9 +134,9 @@ final class AgentBundleUpgradePlanner {
 		return AgentBundleArtifactDefinitions::bundle_artifact_type( $type );
 	}
 
-	private static function bundle_buckets_from_package_plan( \WP_Agent_Package_Update_Plan $plan ): array {
+	private static function bundle_buckets_from_package_plan( object $plan ): array {
 		$buckets = array();
-		foreach ( $plan->get_buckets() as $bucket => $entries ) {
+		foreach ( call_user_func( array( $plan, 'get_buckets' ) ) as $bucket => $entries ) {
 			$buckets[ $bucket ] = array_map( array( self::class, 'bundle_entry_from_package_entry' ), $entries );
 		}
 

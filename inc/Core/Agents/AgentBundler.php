@@ -317,9 +317,9 @@ class AgentBundler {
 	 * Project a legacy bundle array to the Core-shaped package contract.
 	 *
 	 * @param array<string,mixed> $bundle Legacy bundle array.
-	 * @return \WP_Agent_Package
+	 * @return object
 	 */
-	public static function package_from_bundle( array $bundle ): \WP_Agent_Package {
+	public static function package_from_bundle( array $bundle ): object {
 		return AgentPackageProjection::from_array_bundle( $bundle );
 	}
 
@@ -327,9 +327,9 @@ class AgentBundler {
 	 * Project a bundle directory to the Core-shaped package contract.
 	 *
 	 * @param AgentBundleDirectory $directory Bundle directory.
-	 * @return \WP_Agent_Package
+	 * @return object
 	 */
-	public static function package_from_directory( AgentBundleDirectory $directory ): \WP_Agent_Package {
+	public static function package_from_directory( AgentBundleDirectory $directory ): object {
 		return AgentPackageProjection::from_directory( $directory );
 	}
 
@@ -1392,7 +1392,7 @@ class AgentBundler {
 
 	private function bundle_artifact_record( array $bundle_metadata, string $type, string $id, string $source_path, mixed $payload ): array {
 		$hash = AgentBundleArtifactHasher::hash( $payload );
-		$now  = gmdate( 'c' );
+		$now  = gmdate( 'Y-m-d H:i:s' );
 
 		// installed_payload is the install-time snapshot. AgentBundleArtifactRebase
 		// uses it as the `base` side of the 3-way merge so burn-in-safe can tell

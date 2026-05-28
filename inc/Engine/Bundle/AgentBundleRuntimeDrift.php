@@ -191,7 +191,7 @@ final class AgentBundleRuntimeDrift {
 	}
 
 	private static function scheduling_preview( array $scheduling ): array {
-		$preview = array(
+		$preview       = array(
 			'enabled'   => (bool) ( $scheduling['enabled'] ?? false ),
 			'interval'  => (string) ( $scheduling['interval'] ?? 'manual' ),
 			'max_items' => is_array( $scheduling['max_items'] ?? null ) ? $scheduling['max_items'] : array(),

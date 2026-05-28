@@ -18,12 +18,13 @@ final class AgentPackageProjection {
 	 * Build a package from a bundle directory value object.
 	 *
 	 * @param AgentBundleDirectory $directory Bundle directory.
-	 * @return \WP_Agent_Package
+	 * @return object
 	 */
-	public static function from_directory( AgentBundleDirectory $directory ): \WP_Agent_Package {
-		$manifest = $directory->manifest()->to_array();
+	public static function from_directory( AgentBundleDirectory $directory ): object {
+		$manifest      = $directory->manifest()->to_array();
+		$package_class = 'WP_Agent_Package';
 
-		return \WP_Agent_Package::from_array(
+		return $package_class::from_array(
 			array(
 				'slug'         => (string) $manifest['bundle_slug'],
 				'version'      => (string) $manifest['bundle_version'],
@@ -39,9 +40,9 @@ final class AgentPackageProjection {
 	 * Build a package from a bundle array.
 	 *
 	 * @param array<string,mixed> $bundle Legacy bundle array.
-	 * @return \WP_Agent_Package
+	 * @return object
 	 */
-	public static function from_array_bundle( array $bundle ): \WP_Agent_Package {
+	public static function from_array_bundle( array $bundle ): object {
 		return self::from_directory( AgentBundleArrayAdapter::from_array_bundle( $bundle ) );
 	}
 
@@ -179,7 +180,15 @@ final class AgentPackageProjection {
 	 * @param array<string,mixed> $meta   Artifact metadata.
 	 * @return array<string,mixed>
 	 */
-	private static function artifact( string $type, string $slug, string $label, string $source, array $meta = array(), array $requires = array(), mixed $payload = null ): array {
+	private static function artifact(
+		string $type,
+		string $slug,
+		string $label,
+		string $source,
+		array $meta = array(),
+		array $requires = array(),
+		mixed $payload = null
+	): array {
 		$artifact = array(
 			'type'   => $type,
 			'slug'   => $slug,

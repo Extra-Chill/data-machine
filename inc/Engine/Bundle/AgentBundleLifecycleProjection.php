@@ -162,7 +162,7 @@ final class AgentBundleLifecycleProjection {
 				);
 			}
 			if ( in_array( $type, self::bundle_file_artifact_types(), true ) ) {
-				$payload = self::current_payload_from_record( is_array( $record ) ? $record : null );
+				$payload = self::current_payload_from_record( $record );
 				if ( null !== $payload ) {
 					$artifacts[] = array(
 						'artifact_type' => $type,
