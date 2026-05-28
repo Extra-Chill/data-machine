@@ -168,7 +168,10 @@ class ExecuteAgentWorkflowAbility {
 					return new WP_Error(
 						'agents_api_workflow_trigger_unsupported',
 						sprintf( 'Data Machine can execute Agents API workflows on demand only; trigger at index %d uses `%s`.', $index, '' !== $type ? $type : 'unknown' ),
-						array( 'trigger_index' => $index, 'trigger_type' => $type )
+						array(
+							'trigger_index' => $index,
+							'trigger_type'  => $type,
+						)
 					);
 				}
 			}
@@ -180,7 +183,11 @@ class ExecuteAgentWorkflowAbility {
 				return new WP_Error(
 					'agents_api_workflow_step_unsupported',
 					sprintf( 'Data Machine can record Agents API workflow steps of type ability or agent only; step at index %d uses `%s`.', $index, '' !== $type ? $type : 'unknown' ),
-					array( 'step_index' => $index, 'step_type' => $type, 'supported_step_types' => self::SUPPORTED_STEP_TYPES )
+					array(
+						'step_index'           => $index,
+						'step_type'            => $type,
+						'supported_step_types' => self::SUPPORTED_STEP_TYPES,
+					)
 				);
 			}
 		}

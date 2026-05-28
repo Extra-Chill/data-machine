@@ -117,31 +117,31 @@ class AgentsApiWorkflowJobRecorder implements WP_Agent_Workflow_Run_Recorder {
 		$this->jobs->store_engine_data(
 			$this->job_id,
 			array(
-				'job'                  => array(
+				'job'                 => array(
 					'job_id'     => $this->job_id,
 					'user_id'    => (int) ( $this->options['user_id'] ?? 0 ),
 					'created_at' => function_exists( 'current_time' ) ? current_time( 'mysql', true ) : gmdate( 'Y-m-d H:i:s' ),
 				),
-				'agents_api_workflow'  => array(
+				'agents_api_workflow' => array(
 					'workflow_id' => $result->get_workflow_id(),
 					'run_id'      => $result->get_run_id(),
 					'spec'        => $this->spec,
 					'inputs'      => $result->get_inputs(),
 					'metadata'    => $result->get_metadata(),
 				),
-				'workflow_run_result'  => $result->to_array(),
-				'step_outcomes'        => $result->get_steps(),
-				'output'               => $result->get_output(),
-				'artifacts'            => is_array( $result->get_metadata()['artifacts'] ?? null ) ? $result->get_metadata()['artifacts'] : array(),
-				'logs'                 => is_array( $result->get_metadata()['logs'] ?? null ) ? $result->get_metadata()['logs'] : array(),
-				'error'                => $result->get_error(),
-				'provenance'           => array(
-					'source'       => 'agents-api',
-					'bridge'       => 'datamachine/execute-agent-workflow',
-					'execution'    => 'WP_Agent_Workflow_Runner',
-					'recorded_as'  => 'datamachine_job',
-					'pipeline_id'  => 'direct',
-					'flow_id'      => 'direct',
+				'workflow_run_result' => $result->to_array(),
+				'step_outcomes'       => $result->get_steps(),
+				'output'              => $result->get_output(),
+				'artifacts'           => is_array( $result->get_metadata()['artifacts'] ?? null ) ? $result->get_metadata()['artifacts'] : array(),
+				'logs'                => is_array( $result->get_metadata()['logs'] ?? null ) ? $result->get_metadata()['logs'] : array(),
+				'error'               => $result->get_error(),
+				'provenance'          => array(
+					'source'      => 'agents-api',
+					'bridge'      => 'datamachine/execute-agent-workflow',
+					'execution'   => 'WP_Agent_Workflow_Runner',
+					'recorded_as' => 'datamachine_job',
+					'pipeline_id' => 'direct',
+					'flow_id'     => 'direct',
 				),
 			)
 		);
