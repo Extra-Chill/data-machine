@@ -227,10 +227,10 @@ class AgentsChatHandler {
 		$metadata                = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
 		$metadata['datamachine'] = array_filter(
 			array(
-				'tool_calls'    => $result['tool_calls'] ?? null,
+				'tool_calls'   => $result['tool_calls'] ?? null,
 				'conversation' => $result['conversation'] ?? null,
-				'max_turns'     => $result['max_turns'] ?? null,
-				'turn_number'   => $result['turn_number'] ?? null,
+				'max_turns'    => $result['max_turns'] ?? null,
+				'turn_number'  => $result['turn_number'] ?? null,
 			),
 			static fn( $value ): bool => null !== $value
 		);
