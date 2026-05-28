@@ -67,6 +67,7 @@ add_action( 'datamachine_sections', 'datamachine_register_core_sections' );
  */
 function datamachine_register_core_invalidation_hooks( array $hooks ): array {
 	// SITE.md invalidation — site identity, structure, menus.
+	$hooks[] = 'upgrader_process_complete';
 	$hooks[] = 'switch_theme';
 	$hooks[] = 'update_option_blogname';
 	$hooks[] = 'update_option_blogdescription';
@@ -100,7 +101,15 @@ add_filter( 'datamachine_composable_invalidation_hooks', 'datamachine_register_c
  * @return string
  */
 function datamachine_site_section_header(): string {
-	return '# SITE';
+	$lines   = array();
+	$lines[] = '# SITE';
+	$lines[] = '';
+	$lines[] = sprintf(
+		'Generated: %s. Active plugin data comes from WordPress runtime state; refresh with `wp datamachine memory compose SITE.md` and compare with `wp plugin list --status=active` when auditing freshness.',
+		gmdate( 'Y-m-d H:i:s \U\T\C' )
+	);
+
+	return implode( "\n", $lines );
 }
 
 /**
