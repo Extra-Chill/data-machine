@@ -249,15 +249,15 @@ class SyncRunner {
 
 		$execution_result = StepExecutionResult::fromStepOutput( $output_packets, $step_type );
 		$output_packets   = $execution_result['packets'];
-		$truncated      = false;
+		$truncated        = false;
 		if ( count( $output_packets ) > $options['max_items'] ) {
 			$output_packets = array_slice( $output_packets, 0, $options['max_items'] );
-			$truncated      = true;
+			$truncated     = true;
 		}
 
-		$output_count   = count( $output_packets );
-		$next_step_id   = ( new StepNavigator() )->get_next_flow_step_id( $flow_step_id, array( 'job_id' => $job_id ) );
-		$reason         = null;
+		$output_count = count( $output_packets );
+		$next_step_id = ( new StepNavigator() )->get_next_flow_step_id( $flow_step_id, array( 'job_id' => $job_id ) );
+		$reason       = null;
 
 		if ( $truncated ) {
 			$reason = 'max_items';

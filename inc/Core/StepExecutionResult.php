@@ -50,7 +50,7 @@ class StepExecutionResult {
 			if ( '' === $status ) {
 				$classified = self::classify( $packets, $step_type );
 				$status     = $classified['status'];
-				$reason     = $reason ?: $classified['reason'];
+				$reason     = '' !== $reason ? $reason : $classified['reason'];
 			}
 
 			if ( '' === $reason ) {
@@ -128,7 +128,10 @@ class StepExecutionResult {
 	}
 
 	private static function buildResult( string $status, array $packets, string $reason, ?string $terminal_status ): array {
-		$status = self::normalizeStatus( $status ) ?: self::STATUS_FAILED;
+		$status = self::normalizeStatus( $status );
+		if ( '' === $status ) {
+			$status = self::STATUS_FAILED;
+		}
 
 		return array(
 			'status'          => $status,

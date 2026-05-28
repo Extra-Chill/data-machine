@@ -201,10 +201,10 @@ class ExecuteStepAbility {
 				'engine'       => $engine,
 			);
 
-			$step_output           = $flow_step->execute( $payload );
-			$execution_result      = StepExecutionResult::fromStepOutput( $step_output, $step_type );
-			$dataPackets           = $execution_result['packets'];
-			$step_success          = (bool) $execution_result['success'];
+			$step_output      = $flow_step->execute( $payload );
+			$execution_result = StepExecutionResult::fromStepOutput( $step_output, $step_type );
+			$dataPackets      = $execution_result['packets'];
+			$step_success     = (bool) $execution_result['success'];
 
 			$payload['data'] = $dataPackets;
 			$this->logStepExecutionResult( $execution_result, $job_id, $flow_step_id, $step_type );
