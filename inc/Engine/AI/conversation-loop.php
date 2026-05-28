@@ -77,15 +77,16 @@ function datamachine_run_conversation(
 	// surfaces turn_count, final_content, usage, and request_metadata on the
 	// final result directly (see agents-api#136), so we only carry by-reference
 	// the things substrate doesn't track for us.
-	$last_tool_calls        = array();
-	$all_tool_calls         = array();
-	$tool_execution_results = array();
-	$completion_nudges      = array();
-	$last_request_metadata  = array();
-	$latest_messages        = $messages;
-	$latest_turn_count      = 0;
-	$runtime_tool_pending   = false;
-	$runtime_tool_requests  = array();
+	$last_tool_calls              = array();
+	$all_tool_calls               = array();
+	$tool_execution_results       = array();
+	$completion_nudges            = array();
+	$last_request_metadata        = array();
+	$latest_messages              = $messages;
+	$latest_turn_count            = 0;
+	$latest_conversation_complete = false;
+	$runtime_tool_pending         = false;
+	$runtime_tool_requests        = array();
 
 	// Base log context for consistent logging.
 	$base_log_context = array_filter(
@@ -187,6 +188,7 @@ function datamachine_run_conversation(
 		$last_request_metadata,
 		$latest_messages,
 		$latest_turn_count,
+		$latest_conversation_complete,
 		$runtime_tool_pending,
 		$runtime_tool_requests
 	);
@@ -309,11 +311,22 @@ function datamachine_run_conversation(
 	// Substrate now surfaces turn_count, final_content, usage, and
 	// request_metadata directly on the result (agents-api#136). Keep DM-only
 	// diagnostics namespaced so the top level remains the Agents API result.
-	$datamachine_metadata = array(
+	$datamachine_metadata     = array(
 		'completed'       => 'budget_exceeded' !== ( $result['status'] ?? '' ),
 		'last_tool_calls' => $last_tool_calls,
 		'tool_calls'      => $all_tool_calls,
 	);
+	$silent_max_turns_reached = ! $latest_conversation_complete
+		&& (int) ( $result['turn_count'] ?? 0 ) >= $turn_budget->ceiling()
+		&& 'budget_exceeded' !== ( $result['status'] ?? '' );
+	if ( $silent_max_turns_reached ) {
+		$datamachine_metadata['completed']         = false;
+		$datamachine_metadata['max_turns_reached'] = true;
+		$datamachine_metadata['warning']           = sprintf(
+			'Maximum conversation turns (%d) reached. Response may be incomplete.',
+			$turn_budget->ceiling()
+		);
+	}
 	if ( $runtime_tool_pending ) {
 		$datamachine_metadata['completed']                     = false;
 		$datamachine_metadata['runtime_tool_pending']          = true;
@@ -460,6 +473,7 @@ function datamachine_build_turn_runner(
 	array &$last_request_metadata,
 	array &$latest_messages,
 	int &$latest_turn_count,
+	bool &$latest_conversation_complete,
 	bool &$runtime_tool_pending,
 	array &$runtime_tool_requests
 ): callable {
@@ -481,6 +495,7 @@ function datamachine_build_turn_runner(
 		&$last_request_metadata,
 		&$latest_messages,
 		&$latest_turn_count,
+		&$latest_conversation_complete,
 		&$runtime_tool_pending,
 		&$runtime_tool_requests
 	): array {
@@ -839,7 +854,8 @@ function datamachine_build_turn_runner(
 			}
 		}
 
-		$latest_messages = $messages;
+		$latest_messages              = $messages;
+		$latest_conversation_complete = $conversation_complete;
 
 		return array(
 			'messages'                     => $messages,

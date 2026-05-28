@@ -82,4 +82,31 @@ datamachine_agents_chat_tool_continuation_assert(
 );
 ++ $assertions;
 
+$output_method = new ReflectionMethod( $handler, 'toCanonicalOutput' );
+$output        = $output_method->invoke(
+	$handler,
+	array(
+		'session_id' => 'session-1',
+		'response'   => 'AI ACTION (Turn 4): Executing Workspace Read.',
+		'metadata'   => array(
+			'datamachine' => array(
+				'completed'         => false,
+				'max_turns_reached' => true,
+			),
+		),
+	)
+);
+
+datamachine_agents_chat_tool_continuation_assert(
+	false === $output['completed'],
+	'Canonical Agents API chat output should preserve Data Machine incomplete max-turn state.'
+);
+++ $assertions;
+
+datamachine_agents_chat_tool_continuation_assert(
+	true === ( $output['metadata']['datamachine']['max_turns_reached'] ?? null ),
+	'Canonical Agents API chat output should preserve Data Machine max-turn diagnostics.'
+);
+++ $assertions;
+
 echo 'Agents chat tool continuation smoke passed (' . $assertions . " assertions).\n";
