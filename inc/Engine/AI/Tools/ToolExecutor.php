@@ -181,7 +181,7 @@ class ToolExecutor {
 	 * @return array Annotated tool declarations.
 	 */
 	private static function prepareToolDeclarations( array $available_tools, array $payload ): array {
-		$runtime_keys = array( 'job_id', 'flow_step_id', 'data', 'flow_step_config' );
+		$runtime_keys = array( 'job_id', 'flow_step_id', 'data', 'flow_step_config', 'agent_id', 'agent_slug', 'user_id' );
 
 		foreach ( $available_tools as $tool_name => $tool_def ) {
 			if ( ! is_array( $tool_def ) ) {
