@@ -407,7 +407,46 @@ assert_runner_request( ! array_key_exists( 'tool_calls', $sandbox_result ), 'too
 assert_runner_request( 1 === count( $sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline function call executes a workspace tool' );
 assert_runner_request( 'README.md' === ( $sandbox_result['tool_execution_results'][0]['result']['result']['path'] ?? null ), 'sandbox/pipeline tool execution receives parsed parameters' );
 
-// 4a. Silent max-turn exhaustion after a tool turn is incomplete, not a final answer.
+// 4a. Textual AI ACTION prose is not accepted as a final answer.
+$text_action_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$text_action_dispatch_count ) {
+		++$text_action_dispatch_count;
+
+		if ( 1 === $text_action_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content' => 'AI ACTION (Turn 4): Executing Workspace Read with parameters: repo: agents-api, path: README.md',
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content' => 'text action recovered',
+			),
+		);
+	}
+);
+
+$text_action_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'inspect the README' ) ),
+	array(),
+	'openai',
+	'gpt-smoke',
+	array( 'sandbox', 'chat' ),
+	array(),
+	3
+);
+
+assert_runner_request( 2 === $text_action_dispatch_count, 'textual AI ACTION response receives a continuation turn' );
+assert_runner_request( 'text action recovered' === ( $text_action_result['final_content'] ?? null ), 'textual AI ACTION run preserves recovered final answer' );
+assert_runner_request( str_contains( wp_json_encode( $text_action_result['messages'] ?? array() ), 'did not make a valid tool call' ), 'textual AI ACTION run adds a corrective nudge' );
+
+// 4b. Silent max-turn exhaustion after a tool turn is incomplete, not a final answer.
 $max_turn_tool_dispatch_count = 0;
 WpAiClientTestDouble::reset();
 WpAiClientTestDouble::set_response_callback(
@@ -460,7 +499,7 @@ assert_runner_request( false === ( $max_turn_tool_metadata['completed'] ?? true 
 assert_runner_request( true === ( $max_turn_tool_metadata['max_turns_reached'] ?? null ), 'max-turn tool run sets max-turn diagnostic' );
 assert_runner_request( 1 === count( $max_turn_tool_result['tool_execution_results'] ?? array() ), 'max-turn tool run preserves executed tool result' );
 
-// 4b. Sandbox/pipeline runs also execute XML tool calls emitted as text.
+// 4c. Sandbox/pipeline runs also execute XML tool calls emitted as text.
 $xml_dispatch_count = 0;
 WpAiClientTestDouble::reset();
 WpAiClientTestDouble::set_response_callback(
