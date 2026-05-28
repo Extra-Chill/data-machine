@@ -345,7 +345,6 @@ class GuidelineAgentMemoryStore implements WP_Agent_Memory_Store {
 				'name'             => self::post_name_for_scope( $scope ),
 				'posts_per_page'   => 1,
 				'no_found_rows'    => true,
-				'suppress_filters' => true,
 				'orderby'          => 'ID',
 				'order'            => 'ASC',
 			)
