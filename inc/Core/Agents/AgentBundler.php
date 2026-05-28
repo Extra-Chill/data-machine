@@ -841,18 +841,20 @@ class AgentBundler {
 					$scheduling['run_artifacts'] = $flow_run_artifacts;
 				}
 
-				$flow_config         = is_array( $flow_data['flow_config'] ?? null ) ? $flow_data['flow_config'] : array();
-				$existing_flow       = $this->flows_repo->get_by_portable_slug( (int) $new_pipeline_id, $portable_slug );
-				$target_flow_config  = $existing_flow
+				$flow_config          = is_array( $flow_data['flow_config'] ?? null ) ? $flow_data['flow_config'] : array();
+				$existing_flow        = $this->flows_repo->get_by_portable_slug( (int) $new_pipeline_id, $portable_slug );
+				$target_flow_config   = $existing_flow
 				? BundleStepIdRemapper::remap_flow_step_ids( $flow_config, $old_pipeline_id, (int) $new_pipeline_id, (int) $existing_flow['flow_id'] )
 				: $flow_config;
-				$flow_payload_source = array_merge(
+				$flow_artifact_record = is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null;
+				$installed_payload    = is_array( $flow_artifact_record['installed_payload'] ?? null ) ? $flow_artifact_record['installed_payload'] : null;
+				$flow_payload_source  = array_merge(
 				$flow_data,
 				array(
 					'flow_config' => $target_flow_config,
 				)
 				);
-				$payload             = $this->flow_artifact_payload( $flow_payload_source, $portable_slug );
+				$payload              = $this->flow_artifact_payload( $flow_payload_source, $portable_slug, $installed_payload );
 
 				if ( $existing_flow ) {
 					$preview = AgentBundleRuntimeDrift::preview(
@@ -870,7 +872,7 @@ class AgentBundler {
 				$existing_flow
 				&& ! $reconcile_runtime
 				&& $this->artifact_has_local_modifications(
-					$artifact_records[ $artifact_key ] ?? null,
+					$flow_artifact_record,
 					$this->normalized_existing_flow_payload( $existing_flow, $portable_slug, (int) $new_pipeline_id, is_array( $artifact_records[ $artifact_key ] ?? null ) ? $artifact_records[ $artifact_key ] : null )
 				)
 				&& ! hash_equals(
