@@ -164,15 +164,14 @@ $collection = AbilityResult::collection_envelope(
 	),
 	'pipelines',
 	array(
-		'data_key'     => 'pipelines',
-		'compat_alias' => array( 'total' => 'total' ),
-		'top_extra'    => array( 'output_mode' ),
+		'data_key'  => 'pipelines',
+		'top_extra' => array( 'output_mode' ),
 	)
 );
 $assert( 'collection envelope keeps success flag', true === $collection['success'] );
 $assert( 'collection envelope puts items under data key', 7 === ( $collection['data']['pipelines'][0]['pipeline_id'] ?? null ) );
 $assert( 'collection envelope keeps pagination metadata at top level', 20 === ( $collection['per_page'] ?? null ) );
-$assert( 'collection envelope supports explicit compatibility aliases', 1 === ( $collection['data']['total'] ?? null ) );
+$assert( 'collection envelope does not mirror pagination metadata into data aliases', ! array_key_exists( 'total', $collection['data'] ) );
 $assert( 'collection envelope carries requested top-level extras', 'list' === ( $collection['output_mode'] ?? null ) );
 
 $rest_collection_error = AbilityResult::rest_collection_response(
@@ -197,16 +196,15 @@ $rest_item = AbilityResult::rest_item_response(
 $assert( 'REST item presenter wraps single resource data', 9 === ( $rest_item['data']['job_id'] ?? null ) );
 $assert( 'REST item presenter includes explicit top-level extras', 'ok' === ( $rest_item['message'] ?? null ) );
 
-$legacy_rest = AbilityResult::rest_legacy_response(
+$item_rest = AbilityResult::rest_item_response(
 	array(
 		'success' => true,
 		'message' => 'Paused flows.',
 		'paused'  => 3,
 	)
 );
-$assert( 'legacy REST presenter preserves top-level success flag', true === ( $legacy_rest['success'] ?? null ) );
-$assert( 'legacy REST presenter preserves top-level mutation fields', 3 === ( $legacy_rest['paused'] ?? null ) );
-$assert( 'legacy REST presenter does not double-wrap under data', ! array_key_exists( 'data', $legacy_rest ) );
+$assert( 'REST item presenter preserves success flag', true === ( $item_rest['success'] ?? null ) );
+$assert( 'REST item presenter wraps mutation fields under data', 3 === ( $item_rest['data']['paused'] ?? null ) );
 
 $cli_rows = array(
 	array(

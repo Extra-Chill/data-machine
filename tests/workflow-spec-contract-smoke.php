@@ -129,6 +129,7 @@ $invalid_cases    = array(
 	'legacy config field'  => array( 'steps' => array( array( 'step_type' => 'fetch', 'handler_config' => array( 'url' => 'https://example.com' ) ) ) ),
 	'non-string step_type' => array( 'steps' => array( array( 'step_type' => 123 ) ) ),
 	'unknown step_type' => array( 'steps' => array( array( 'step_type' => 'time_travel' ) ) ),
+	'type alias instead of step_type' => array( 'steps' => array( array( 'type' => 'fetch' ) ) ),
 );
 
 foreach ( $invalid_cases as $case => $workflow ) {
@@ -150,17 +151,6 @@ $valid_workflow = array(
 assert_workflow_spec_equals( array( 'valid' => true ), WorkflowSpecValidator::validate( $valid_workflow ), 'shared validator accepts valid structural workflow', $failures, $passes );
 assert_workflow_spec_equals( true, $pipeline_harness->validateForTest( $valid_workflow ), 'create-pipeline adapter accepts valid workflow', $failures, $passes );
 assert_workflow_spec_equals( array( 'success' => true ), workflow_execute_edge_for_test( $valid_workflow ), 'execute-workflow adapter accepts valid workflow', $failures, $passes );
-
-$compat_workflow = array(
-	'steps' => array(
-		array( 'type' => 'fetch' ),
-		array( 'type' => 'ai' ),
-	),
-);
-
-assert_workflow_spec_equals( array( 'valid' => true ), WorkflowSpecValidator::validate( $compat_workflow ), 'shared validator accepts type compatibility alias', $failures, $passes );
-$compat_configs = WorkflowConfigFactory::buildEphemeralConfigs( $compat_workflow );
-assert_workflow_spec_equals( array( 'fetch', 'ai' ), array_column( array_values( $compat_configs['pipeline_config'] ), 'step_type' ), 'type alias normalizes to canonical step_type rows', $failures, $passes );
 
 $configs         = WorkflowConfigFactory::buildEphemeralConfigs(
 	array(

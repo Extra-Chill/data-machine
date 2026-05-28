@@ -70,7 +70,7 @@ function assert_factory_equals( $expected, $actual, string $name, array &$failur
 function legacy_workflow_step_config_for_test( array $step, int $index ): array {
 	$step_id          = "ephemeral_step_{$index}";
 	$pipeline_step_id = "ephemeral_pipeline_{$index}";
-	$step_type        = $step['step_type'] ?? ( $step['type'] ?? '' );
+	$step_type        = $step['step_type'] ?? '';
 	$prompt_queue     = array();
 
 	$workflow_user_message = is_string( $step['user_message'] ?? null )

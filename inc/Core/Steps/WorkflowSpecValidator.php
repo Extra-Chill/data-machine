@@ -67,7 +67,7 @@ class WorkflowSpecValidator {
 				}
 			}
 
-			$step_type = $step['step_type'] ?? ( $step['type'] ?? null );
+			$step_type = $step['step_type'] ?? null;
 			if ( ! is_string( $step_type ) || '' === trim( $step_type ) ) {
 				return array(
 					'valid' => false,

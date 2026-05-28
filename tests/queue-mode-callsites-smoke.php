@@ -97,7 +97,7 @@ function assert_callsite( string $name, bool $cond, string $detail = '' ): void 
 function build_ephemeral_flow_step_for_test( array $step, int $index ): array {
 	$step_id          = "ephemeral_step_{$index}";
 	$pipeline_step_id = "ephemeral_pipeline_{$index}";
-	$step_type        = $step['step_type'] ?? ( $step['type'] ?? '' );
+	$step_type        = $step['step_type'] ?? '';
 
 	$workflow_user_message = is_string( $step['user_message'] ?? null )
 		? trim( $step['user_message'] )

@@ -420,7 +420,7 @@ class Flows {
 			)
 		);
 
-		return AbilityResult::rest_legacy_response( $result, 'flow_deletion_failed', __( 'Failed to delete flow.', 'data-machine' ), 400 );
+		return AbilityResult::rest_item_response( $result, null, array(), 'flow_deletion_failed', __( 'Failed to delete flow.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -454,7 +454,7 @@ class Flows {
 			)
 		);
 
-		return AbilityResult::rest_legacy_response( $result, 'flow_duplication_failed', __( 'Failed to duplicate flow.', 'data-machine' ), 400 );
+		return AbilityResult::rest_item_response( $result, null, array(), 'flow_duplication_failed', __( 'Failed to duplicate flow.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -612,7 +612,7 @@ class Flows {
 
 		$result = $ability->execute( array( 'flow_id' => $flow_id ) );
 
-		return AbilityResult::rest_legacy_response( $result, 'pause_failed', __( 'Failed to pause flow.', 'data-machine' ), 400 );
+		return AbilityResult::rest_item_response( $result, null, array(), 'pause_failed', __( 'Failed to pause flow.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -632,7 +632,7 @@ class Flows {
 
 		$result = $ability->execute( array( 'flow_id' => $flow_id ) );
 
-		return AbilityResult::rest_legacy_response( $result, 'resume_failed', __( 'Failed to resume flow.', 'data-machine' ), 400 );
+		return AbilityResult::rest_item_response( $result, null, array(), 'resume_failed', __( 'Failed to resume flow.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -669,7 +669,7 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
-		return AbilityResult::rest_legacy_response( $result, 'bulk_pause_failed', __( 'Failed to pause flows.', 'data-machine' ), 400 );
+		return AbilityResult::rest_item_response( $result, null, array(), 'bulk_pause_failed', __( 'Failed to pause flows.', 'data-machine' ), 400 );
 	}
 
 	/**
@@ -706,7 +706,7 @@ class Flows {
 
 		$result = $ability->execute( $input );
 
-		return AbilityResult::rest_legacy_response( $result, 'bulk_resume_failed', __( 'Failed to resume flows.', 'data-machine' ), 400 );
+		return AbilityResult::rest_item_response( $result, null, array(), 'bulk_resume_failed', __( 'Failed to resume flows.', 'data-machine' ), 400 );
 	}
 
 	/**
