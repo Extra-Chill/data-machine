@@ -340,13 +340,13 @@ class GuidelineAgentMemoryStore implements WP_Agent_Memory_Store {
 
 		$posts = get_posts(
 			array(
-				'post_type'        => self::POST_TYPE,
-				'post_status'      => 'any',
-				'name'             => self::post_name_for_scope( $scope ),
-				'posts_per_page'   => 1,
-				'no_found_rows'    => true,
-				'orderby'          => 'ID',
-				'order'            => 'ASC',
+				'post_type'      => self::POST_TYPE,
+				'post_status'    => 'any',
+				'name'           => self::post_name_for_scope( $scope ),
+				'posts_per_page' => 1,
+				'no_found_rows'  => true,
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
 			)
 		);
 

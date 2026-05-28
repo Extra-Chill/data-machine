@@ -351,7 +351,7 @@ class FetchItemDispositionTool {
 			'item_identifier' => $this->cleanScalar( $item_identifier ),
 			'source_url'      => $this->sourceUrlFromMetadata( $metadata ),
 			'provider'        => $this->providerFromMetadata( $metadata ),
-			'source_type'     => $this->cleanScalar( $source_type ?: ( $metadata['source_type'] ?? '' ) ),
+			'source_type'     => $this->cleanScalar( $source_type ? $source_type : ( $metadata['source_type'] ?? '' ) ),
 			'flow_step_id'    => $this->cleanScalar( $flow_step_id ),
 			'packet_count'    => count( $packets ),
 			'excerpt'         => $bounded['text'],
