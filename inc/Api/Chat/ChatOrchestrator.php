@@ -873,11 +873,11 @@ class ChatOrchestrator {
 			$loop_metadata = datamachine_conversation_metadata( $loop_result );
 
 			return array(
-				'messages'                      => $loop_result['messages'],
-				'final_content'                 => $loop_result['final_content'],
-				'turn_count'                    => $loop_result['turn_count'] ?? 1,
-				'usage'                         => $loop_result['usage'] ?? array(),
-				'metadata'                      => array(
+				'messages'      => $loop_result['messages'],
+				'final_content' => $loop_result['final_content'],
+				'turn_count'    => $loop_result['turn_count'] ?? 1,
+				'usage'         => $loop_result['usage'] ?? array(),
+				'metadata'      => array(
 					'datamachine' => $loop_metadata,
 				),
 			);

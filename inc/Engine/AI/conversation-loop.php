@@ -134,18 +134,18 @@ function datamachine_run_conversation(
 			)
 		);
 
-		$error_result = array(
-			'messages'                        => $messages,
-			'final_content'                   => '',
-			'turn_count'                      => 0,
-			'tool_execution_results'          => array(),
-			'error'                           => $error_message,
-			'error_code'                      => 'completion_required_tool_unavailable',
-			'usage'                           => array(),
-			'request_metadata'                => array(),
-			'status'                          => 'error',
+		$error_result                       = array(
+			'messages'               => $messages,
+			'final_content'          => '',
+			'turn_count'             => 0,
+			'tool_execution_results' => array(),
+			'error'                  => $error_message,
+			'error_code'             => 'completion_required_tool_unavailable',
+			'usage'                  => array(),
+			'request_metadata'       => array(),
+			'status'                 => 'error',
 		);
-		$error_result = datamachine_with_conversation_metadata(
+		$error_result                       = datamachine_with_conversation_metadata(
 			$error_result,
 			array(
 				'completed'                       => false,
@@ -286,7 +286,7 @@ function datamachine_run_conversation(
 			$result['tool_execution_results'] = $tool_execution_results;
 		}
 	} catch ( \InvalidArgumentException $e ) {
-		$error_result = array(
+		$error_result                       = array(
 			'messages'               => $messages,
 			'final_content'          => '',
 			'turn_count'             => 0,
@@ -294,7 +294,7 @@ function datamachine_run_conversation(
 			'usage'                  => array(),
 			'error'                  => $e->getMessage(),
 		);
-		$error_result = datamachine_with_conversation_metadata(
+		$error_result                       = datamachine_with_conversation_metadata(
 			$error_result,
 			array(
 				'completed'       => false,
@@ -321,15 +321,15 @@ function datamachine_run_conversation(
 		$result['status']                                      = 'runtime_tool_pending';
 	}
 	if ( ! empty( $completion_nudges ) ) {
-		$latest_nudge                                           = $completion_nudges[ count( $completion_nudges ) - 1 ];
-		$datamachine_metadata['completion_nudge_count']          = count( $completion_nudges );
-		$datamachine_metadata['completion_nudge']                = $latest_nudge['completion_nudge'] ?? '';
+		$latest_nudge                                   = $completion_nudges[ count( $completion_nudges ) - 1 ];
+		$datamachine_metadata['completion_nudge_count'] = count( $completion_nudges );
+		$datamachine_metadata['completion_nudge']       = $latest_nudge['completion_nudge'] ?? '';
 		$datamachine_metadata['completion_assertions_required']  = $latest_nudge['completion_assertions_required'] ?? array();
 		$datamachine_metadata['completion_assertions_missing']   = $latest_nudge['completion_assertions_missing'] ?? array();
 		$datamachine_metadata['completion_assertions_satisfied'] = $latest_nudge['completion_assertions_satisfied'] ?? array();
 	}
 	if ( $assertions->hasAssertions() ) {
-		$evaluation                                             = $assertions->evaluate( $loop_payload, $result['final_content'] ?? '' );
+		$evaluation = $assertions->evaluate( $loop_payload, $result['final_content'] ?? '' );
 		$datamachine_metadata['completion_assertions_required']  = $assertions->required();
 		$datamachine_metadata['completion_assertions_missing']   = $evaluation['missing'];
 		$datamachine_metadata['completion_assertions_satisfied'] = $evaluation['satisfied'];
@@ -349,7 +349,7 @@ function datamachine_run_conversation(
 		);
 	}
 
-	$result = datamachine_with_conversation_metadata( $result, $datamachine_metadata );
+	$result                       = datamachine_with_conversation_metadata( $result, $datamachine_metadata );
 	$result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $result, $loop_payload, $provider, $model, $modes );
 
 	return $result;
@@ -367,12 +367,12 @@ function datamachine_with_conversation_metadata( array $result, array $datamachi
 		unset( $result[ $key ] );
 	}
 
-	$metadata = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+	$metadata                = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
 	$metadata['datamachine'] = array_filter(
 		$datamachine_metadata,
 		static fn( $value ) => null !== $value
 	);
-	$result['metadata'] = $metadata;
+	$result['metadata']      = $metadata;
 
 	return $result;
 }
