@@ -10,6 +10,7 @@
 define( 'ABSPATH', __DIR__ );
 
 $GLOBALS['datamachine_worker_lock_options'] = array();
+$GLOBALS['datamachine_worker_lock_delete_noop'] = false;
 
 function get_option( string $name, mixed $default = false ): mixed {
 	return $GLOBALS['datamachine_worker_lock_options'][ $name ] ?? $default;
@@ -32,6 +33,10 @@ function update_option( string $name, mixed $value, string|bool|null $autoload =
 }
 
 function delete_option( string $name ): bool {
+	if ( ! empty( $GLOBALS['datamachine_worker_lock_delete_noop'] ) ) {
+		return false;
+	}
+
 	unset( $GLOBALS['datamachine_worker_lock_options'][ $name ] );
 	return true;
 }
@@ -122,5 +127,29 @@ WorkerLock::release( (string) $background['lock_token'], 'background' );
 assert_worker_lock_true( 'unlocked' === WorkerLock::snapshot()['lock_status'], 'global lock releases after lane test' );
 assert_worker_lock_true( 'unlocked' === WorkerLock::snapshot( null, 600, 'publish' )['lock_status'], 'publish lane lock releases after lane test' );
 assert_worker_lock_true( 'unlocked' === WorkerLock::snapshot( null, 600, 'background' )['lock_status'], 'background lane lock releases after lane test' );
+
+$GLOBALS['datamachine_worker_lock_options'] = array();
+$stale_started = time() - 300;
+add_option(
+	'datamachine_worker_runtime_lock',
+	array(
+		'token'      => 'stale-token-with-sticky-cache',
+		'owner'      => 'old sticky worker',
+		'started_at' => $stale_started,
+		'expires_at' => $stale_started + 60,
+		'ttl'        => 60,
+	),
+	'',
+	'no'
+);
+
+$GLOBALS['datamachine_worker_lock_delete_noop'] = true;
+$sticky_replacement = WorkerLock::acquire( 'new sticky worker', 120 );
+$GLOBALS['datamachine_worker_lock_delete_noop'] = false;
+assert_worker_lock_true( true === $sticky_replacement['acquired'], 'stale lock is replaced when delete/add does not clear persistent option' );
+assert_worker_lock_true( 'new sticky worker' === $sticky_replacement['lock_owner'], 'sticky replacement lock reports new owner' );
+
+WorkerLock::release( (string) $sticky_replacement['lock_token'] );
+assert_worker_lock_true( 'unlocked' === WorkerLock::snapshot()['lock_status'], 'sticky replacement lock releases cleanly' );
 
 echo "OK ({$assertions} assertions)\n";

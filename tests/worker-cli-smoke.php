@@ -63,7 +63,8 @@ assert_worker_contains( 'lock_lane', $worker_src, 'worker status reports lock la
 assert_worker_contains( "'stop_reason'              => 'locked'", $worker_src, 'worker exits cleanly when lock is held' );
 assert_worker_contains( "'stale' === \$existing['lock_status']", $lock_src, 'worker lock identifies stale lock payloads during acquisition' );
 assert_worker_contains( 'delete_option( $option_name )', $lock_src, 'worker lock clears stale option payloads before reclaiming' );
-assert_worker_contains( "add_option( \$option_name, \$payload, '', 'no' )", $lock_src, 'worker lock reclaims stale locks through the normal add-option path' );
+assert_worker_contains( "add_option( \$option_name, \$payload, '', false )", $lock_src, 'worker lock reclaims stale locks through the normal add-option path' );
+assert_worker_contains( 'update_option( $option_name, $payload, false )', $lock_src, 'worker lock falls back when stale option delete is not reflected immediately' );
 assert_worker_contains( 'OPTION_NAME . \'_\' . $lane', $lock_src, 'worker lock uses lane-specific option names' );
 assert_worker_not_contains( 'action-scheduler action run ', $worker_src, 'worker does not shell directly to Action Scheduler' );
 assert_worker_not_contains( 'actionscheduler_actions', $worker_src, 'worker does not query Action Scheduler tables directly' );
