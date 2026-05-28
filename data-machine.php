@@ -29,7 +29,8 @@ if ( ! defined( 'AGENTS_API_LOADED' ) ) {
 }
 
 // WP-CLI integration
-if ( defined( 'WP_CLI' ) && WP_CLI ) {
+// @phpstan-ignore-next-line Runtime constant may be defined false outside PHPStan's configured CLI context.
+if ( defined( 'WP_CLI' ) && (bool) constant( 'WP_CLI' ) ) {
 	require_once __DIR__ . '/inc/Cli/Bootstrap.php';
 }
 
@@ -110,9 +111,7 @@ function datamachine_run_datamachine_plugin() {
 	\DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::register();
 
 	// Initialize FetchHandler to register skip_item tool for all fetch-type handlers.
-	if ( method_exists( \DataMachine\Core\Steps\Fetch\Handlers\FetchHandler::class, 'init' ) ) {
-		\DataMachine\Core\Steps\Fetch\Handlers\FetchHandler::init();
-	}
+	\DataMachine\Core\Steps\Fetch\Handlers\FetchHandler::init();
 
 	// Register all tools - must happen AFTER step types and handlers are registered.
 	\DataMachine\Engine\AI\Tools\ToolServiceProvider::register();
@@ -319,6 +318,7 @@ function datamachine_run_datamachine_plugin() {
 	// themselves on `datamachine_pending_action_handlers` via
 	// inc/Abilities/Content/ContentActionHandlers.php (required above).
 	if ( interface_exists( '\AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Observer' ) ) {
+		// @phpstan-ignore-next-line Scoped analysis sees the observer implementation before the conditional interface load.
 		\DataMachine\Engine\AI\Actions\PendingActionObservers::register( new \DataMachine\Engine\AI\Actions\WordPressActionDispatchObserver() );
 	}
 	new \DataMachine\Engine\AI\Actions\PendingActionInspectionAbility();
@@ -336,6 +336,10 @@ function datamachine_run_datamachine_plugin() {
 	new \DataMachine\Abilities\Fetch\GetWordPressPostAbility();
 	new \DataMachine\Abilities\Fetch\QueryWordPressPostsAbility();
 	new \DataMachine\Abilities\Publish\PublishWordPressAbility();
+	// Send-email abilities are also registered unconditionally at file
+	// include time (see bottom of this file). This call is the defensive
+	// in-runtime path for late `plugins_loaded` inclusion. The static guards
+	// make it idempotent.
 	new \DataMachine\Abilities\Publish\SendEmailAbility();
 	new \DataMachine\Abilities\Publish\SendEmailQueuedAbility();
 	new \DataMachine\Abilities\Update\UpdateWordPressAbility();
@@ -393,7 +397,8 @@ function datamachine_should_load_full_runtime(): bool {
 		return true;
 	}
 
-	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+	// @phpstan-ignore-next-line Runtime constant may be defined false outside PHPStan's configured CLI context.
+	if ( defined( 'WP_CLI' ) && (bool) constant( 'WP_CLI' ) ) {
 		return true;
 	}
 
@@ -504,6 +509,29 @@ require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';
  */
 require_once __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php';
 \DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
+
+/**
+ * Register `datamachine/send-email` and `datamachine/send-email-queued`
+ * unconditionally on every request.
+ *
+ * These abilities have proven consumers that can fire on lite frontend page
+ * views. `extrachill-multisite` exposes `ec_send_email()` and
+ * `ec_send_email_queued()` as generic mail helpers, so form handlers or other
+ * frontend hooks can resolve these abilities without a REST, Ajax, admin, cron,
+ * or CLI request shape. If the classes stay behind
+ * `datamachine_should_load_full_runtime()`, those helpers can trigger the lazy
+ * Abilities API registry before Data Machine attaches its ability hooks,
+ * causing `wp_get_ability()` to return `null` on normal frontend requests.
+ * See: Extra-Chill/data-machine#2303.
+ *
+ * Registration remains cheap: the immediate ability definitions are schema and
+ * callback wiring only, and the queued worker hook is a single no-op listener
+ * until Action Scheduler dispatches its specific hook.
+ */
+require_once __DIR__ . '/inc/Abilities/Publish/SendEmailAbility.php';
+require_once __DIR__ . '/inc/Abilities/Publish/SendEmailQueuedAbility.php';
+\DataMachine\Abilities\Publish\SendEmailAbility::ensure_registered();
+\DataMachine\Abilities\Publish\SendEmailQueuedAbility::ensure_registered();
 
 
 /**

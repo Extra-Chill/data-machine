@@ -28,6 +28,9 @@ defined( 'ABSPATH' ) || exit;
 class SendEmailQueuedAbility {
 
 	private static bool $registered = false;
+	private static bool $registration_pending = false;
+	private static bool $worker_registered = false;
+	private static ?self $instance = null;
 
 	/**
 	 * Action Scheduler hook for the worker that performs the actual send.
@@ -50,138 +53,192 @@ class SendEmailQueuedAbility {
 	private const RETRY_BACKOFF_SECONDS = 300;
 
 	public function __construct() {
-		if ( self::$registered ) {
-			return;
+		if ( null === self::$instance ) {
+			self::$instance = $this;
 		}
 
-		$this->registerAbility();
-		$this->registerWorker();
-		self::$registered = true;
+		self::ensure_registered();
+		self::ensure_worker_registered( self::$instance );
 	}
 
 	/**
 	 * Register the `datamachine/send-email-queued` ability.
+	 *
+	 * @return void
 	 */
-	private function registerAbility(): void {
-		$register_callback = function () {
-			wp_register_ability(
-				'datamachine/send-email-queued',
-				array(
-					'label'               => __( 'Send Email (Queued)', 'data-machine' ),
-					'description'         => __( 'Queue an email for delivery via Action Scheduler. Accepts the same payload as datamachine/send-email plus optional send_at and priority. Returns the scheduled action id.', 'data-machine' ),
-					'category'            => 'datamachine-publishing',
-					'input_schema'        => array(
-						'type'       => 'object',
-						// Mirror datamachine/send-email: `to` + `subject` are required at the
-						// schema level; `body`/`template` are validated by the worker when the
-						// underlying ability runs.
-						'required'   => array( 'to', 'subject' ),
-						'properties' => array(
-							'to'           => array(
-								'type'        => 'string',
-								'description' => __( 'Comma-separated recipient email addresses', 'data-machine' ),
-							),
-							'cc'           => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Comma-separated CC addresses', 'data-machine' ),
-							),
-							'bcc'          => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Comma-separated BCC addresses', 'data-machine' ),
-							),
-							'subject'      => array(
-								'type'        => 'string',
-								'description' => __( 'Email subject line. Supports placeholders.', 'data-machine' ),
-							),
-							'body'         => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Email body. Ignored when `template` is supplied.', 'data-machine' ),
-							),
-							'template'     => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Template id resolved via datamachine_email_templates at worker run time.', 'data-machine' ),
-							),
-							'context'      => array(
-								'type'        => 'object',
-								'default'     => array(),
-								'description' => __( 'Opaque context passed to the template callable.', 'data-machine' ),
-							),
-							'mail_site_id' => array(
-								'type'        => 'integer',
-								'default'     => 0,
-								'description' => __( 'Optional multisite blog id used to wrap wp_mail() in switch_to_blog().', 'data-machine' ),
-							),
-							'content_type' => array(
-								'type'        => 'string',
-								'default'     => 'text/html',
-								'description' => __( 'Content type: text/html or text/plain', 'data-machine' ),
-							),
-							'from_name'    => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Sender name. Falls back to site name.', 'data-machine' ),
-							),
-							'from_email'   => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Sender email. Falls back to admin email.', 'data-machine' ),
-							),
-							'reply_to'     => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'Reply-to email address.', 'data-machine' ),
-							),
-							'attachments'  => array(
-								'type'        => 'array',
-								'items'       => array( 'type' => 'string' ),
-								'default'     => array(),
-								'description' => __( 'Array of server file paths to attach.', 'data-machine' ),
-							),
-							'send_at'      => array(
-								'type'        => 'string',
-								'default'     => '',
-								'description' => __( 'When to send. Accepts ISO 8601 string or unix timestamp (as string or int). Empty enqueues asynchronously.', 'data-machine' ),
-							),
-							'priority'     => array(
-								'type'        => 'integer',
-								'default'     => 10,
-								'description' => __( 'Reserved for future Action Scheduler priority/group hints; currently informational.', 'data-machine' ),
-							),
-						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'       => array( 'type' => 'boolean' ),
-							'action_id'     => array( 'type' => 'integer' ),
-							'scheduled_for' => array( 'type' => 'integer' ),
-							'error'         => array( 'type' => 'string' ),
-							'logs'          => array( 'type' => 'array' ),
-						),
-					),
-					'execute_callback'    => array( $this, 'execute' ),
-					'permission_callback' => array( $this, 'checkPermission' ),
-					'meta'                => array(
-						'show_in_rest' => true,
-						'annotations'  => array(
-							'readonly'    => false,
-							'destructive' => false,
-							'idempotent'  => false,
-						),
-					),
-				)
-			);
+	public static function ensure_registered(): void {
+		if ( self::$registered || self::$registration_pending ) {
+			return;
+		}
+
+		if ( null === self::$instance ) {
+			new self();
+			return;
+		}
+
+		$definitions = self::get_ability_definitions( self::$instance );
+
+		$register_via_helper = static function () use ( $definitions ): void {
+			foreach ( $definitions as $name => $args ) {
+				wp_register_ability( $name, $args );
+			}
 		};
 
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
+			$register_via_helper();
+			self::$registered = true;
+			return;
 		}
+
+		if ( ! did_action( 'wp_abilities_api_init' ) ) {
+			self::$registration_pending = true;
+			add_action(
+				'wp_abilities_api_init',
+				static function () use ( $register_via_helper ): void {
+					if ( self::$registered ) {
+						return;
+					}
+					$register_via_helper();
+					self::$registered            = true;
+					self::$registration_pending = false;
+				}
+			);
+			return;
+		}
+
+		if ( ! class_exists( '\WP_Abilities_Registry' ) ) {
+			return;
+		}
+		$registry = \WP_Abilities_Registry::get_instance();
+		if ( null === $registry ) {
+			return;
+		}
+		foreach ( $definitions as $name => $args ) {
+			if ( $registry->is_registered( $name ) ) {
+				continue;
+			}
+			$registry->register( $name, $args );
+		}
+		self::$registered = true;
+	}
+
+	/**
+	 * Ability definitions used by every registration path in ensure_registered().
+	 *
+	 * @param self $instance Instance used for execute and permission callbacks.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function get_ability_definitions( self $instance ): array {
+		return array(
+			'datamachine/send-email-queued' => array(
+				'label'               => __( 'Send Email (Queued)', 'data-machine' ),
+				'description'         => __( 'Queue an email for delivery via Action Scheduler. Accepts the same payload as datamachine/send-email plus optional send_at and priority. Returns the scheduled action id.', 'data-machine' ),
+				'category'            => 'datamachine-publishing',
+				'input_schema'        => array(
+					'type'       => 'object',
+					// Mirror datamachine/send-email: `to` + `subject` are required at the
+					// schema level; `body`/`template` are validated by the worker when the
+					// underlying ability runs.
+					'required'   => array( 'to', 'subject' ),
+					'properties' => array(
+						'to'           => array(
+							'type'        => 'string',
+							'description' => __( 'Comma-separated recipient email addresses', 'data-machine' ),
+						),
+						'cc'           => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Comma-separated CC addresses', 'data-machine' ),
+						),
+						'bcc'          => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Comma-separated BCC addresses', 'data-machine' ),
+						),
+						'subject'      => array(
+							'type'        => 'string',
+							'description' => __( 'Email subject line. Supports placeholders.', 'data-machine' ),
+						),
+						'body'         => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Email body. Ignored when `template` is supplied.', 'data-machine' ),
+						),
+						'template'     => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Template id resolved via datamachine_email_templates at worker run time.', 'data-machine' ),
+						),
+						'context'      => array(
+							'type'        => 'object',
+							'default'     => array(),
+							'description' => __( 'Opaque context passed to the template callable.', 'data-machine' ),
+						),
+						'mail_site_id' => array(
+							'type'        => 'integer',
+							'default'     => 0,
+							'description' => __( 'Optional multisite blog id used to wrap wp_mail() in switch_to_blog().', 'data-machine' ),
+						),
+						'content_type' => array(
+							'type'        => 'string',
+							'default'     => 'text/html',
+							'description' => __( 'Content type: text/html or text/plain', 'data-machine' ),
+						),
+						'from_name'    => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Sender name. Falls back to site name.', 'data-machine' ),
+						),
+						'from_email'   => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Sender email. Falls back to admin email.', 'data-machine' ),
+						),
+						'reply_to'     => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'Reply-to email address.', 'data-machine' ),
+						),
+						'attachments'  => array(
+							'type'        => 'array',
+							'items'       => array( 'type' => 'string' ),
+							'default'     => array(),
+							'description' => __( 'Array of server file paths to attach.', 'data-machine' ),
+						),
+						'send_at'      => array(
+							'type'        => 'string',
+							'default'     => '',
+							'description' => __( 'When to send. Accepts ISO 8601 string or unix timestamp (as string or int). Empty enqueues asynchronously.', 'data-machine' ),
+						),
+						'priority'     => array(
+							'type'        => 'integer',
+							'default'     => 10,
+							'description' => __( 'Reserved for future Action Scheduler priority/group hints; currently informational.', 'data-machine' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success'       => array( 'type' => 'boolean' ),
+						'action_id'     => array( 'type' => 'integer' ),
+						'scheduled_for' => array( 'type' => 'integer' ),
+						'error'         => array( 'type' => 'string' ),
+						'logs'          => array( 'type' => 'array' ),
+					),
+				),
+				'execute_callback'    => array( $instance, 'execute' ),
+				'permission_callback' => array( $instance, 'checkPermission' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'    => false,
+						'destructive' => false,
+						'idempotent'  => false,
+					),
+				),
+			),
+		);
 	}
 
 	/**
@@ -190,8 +247,13 @@ class SendEmailQueuedAbility {
 	 * Hooked on plugins_loaded so Action Scheduler can dispatch it even when
 	 * the originating HTTP request that scheduled the job is no longer alive.
 	 */
-	private function registerWorker(): void {
-		add_action( self::WORKER_HOOK, array( $this, 'runWorker' ), 10, 1 );
+	private static function ensure_worker_registered( self $instance ): void {
+		if ( self::$worker_registered ) {
+			return;
+		}
+
+		add_action( self::WORKER_HOOK, array( $instance, 'runWorker' ), 10, 1 );
+		self::$worker_registered = true;
 	}
 
 	/**
@@ -258,7 +320,7 @@ class SendEmailQueuedAbility {
 			$scheduled_for = $timestamp;
 		}
 
-		if ( empty( $action_id ) || ! is_numeric( $action_id ) ) {
+		if ( empty( $action_id ) ) {
 			$logs[] = array(
 				'level'   => 'error',
 				'message' => 'Email queue: Action Scheduler did not return an action id',
@@ -294,7 +356,7 @@ class SendEmailQueuedAbility {
 	 * Calls `datamachine/send-email` with the payload. On failure, re-enqueues
 	 * a retry with a 5-minute delay, up to MAX_ATTEMPTS total attempts.
 	 *
-	 * @param array $payload Send-email payload (includes `_attempt`).
+	 * @param mixed $payload Send-email payload (includes `_attempt`).
 	 * @return void
 	 */
 	public function runWorker( $payload ): void {
