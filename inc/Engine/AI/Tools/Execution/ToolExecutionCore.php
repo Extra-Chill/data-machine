@@ -4,8 +4,8 @@
  *
  * Agents API owns product-neutral tool lookup, parameter assembly, required
  * parameter validation, and result normalization. This adapter owns only Data
- * Machine's concrete execution paths: WordPress Abilities and the legacy
- * class/method handler contract.
+ * Machine's concrete execution paths: WordPress Abilities and Data Machine
+ * product-local class/method tools.
  *
  * @package DataMachine\Engine\AI\Tools\Execution
  */
@@ -33,23 +33,11 @@ class ToolExecutionCore implements WP_Agent_Tool_Executor {
 		$tool_name  = (string) ( $tool_call['tool_name'] ?? '' );
 		$parameters = is_array( $tool_call['parameters'] ?? null ) ? $tool_call['parameters'] : array();
 
-		if ( self::isAbilityOnlyTool( $tool_definition ) ) {
+		if ( ! empty( $tool_definition['ability'] ) ) {
 			return $this->executeAbilityTool( $tool_name, $parameters, $tool_definition );
 		}
 
 		return $this->executeClassMethodTool( $tool_name, $parameters, $tool_definition );
-	}
-
-	/**
-	 * Whether a tool should execute directly through a linked WordPress Ability.
-	 *
-	 * @param array $tool_definition Tool definition.
-	 * @return bool
-	 */
-	private static function isAbilityOnlyTool( array $tool_definition ): bool {
-		return ! empty( $tool_definition['ability'] )
-			&& empty( $tool_definition['class'] )
-			&& empty( $tool_definition['method'] );
 	}
 
 	/**
@@ -164,7 +152,7 @@ class ToolExecutionCore implements WP_Agent_Tool_Executor {
 	}
 
 	/**
-	 * Put legacy Data Machine handler output into the Agents API result envelope.
+	 * Put Data Machine handler output into the Agents API result envelope.
 	 *
 	 * @param array  $result    Raw handler result.
 	 * @param string $tool_name Tool name.
