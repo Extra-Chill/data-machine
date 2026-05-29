@@ -60,6 +60,11 @@ assert_worker_contains( "'job_step_budget'         => isset( \$assoc_args['job-s
 assert_worker_contains( "'job' === self::normalizeMode", $worker_src, 'worker routes job mode to job-claiming loop' );
 assert_worker_contains( 'DrainJobAbility', $worker_src, 'job mode drains one claimed job through the drain-job primitive' );
 assert_worker_contains( 'claimNextJob', $worker_src, 'job mode claims one job before draining it' );
+assert_worker_contains( 'drainBootstrapActions', $worker_src, 'job mode drains bootstrap work when no job is claimable' );
+assert_worker_contains( 'bootstrapHooks', $worker_src, 'job mode limits bootstrap draining to explicit scheduler hooks' );
+assert_worker_contains( "'limit'        => 3", $worker_src, 'job mode bootstrap drain has a small action limit' );
+assert_worker_contains( "'batch_size'   => 1", $worker_src, 'job mode bootstrap drain claims one bootstrap action per batch' );
+assert_worker_contains( "'datamachine_recurring_wiki_brain_refill'", $worker_src, 'job mode bootstrap drain includes wiki refill scheduling' );
 assert_worker_contains( "'job-' . \$job_id", $worker_src, 'job mode uses per-job lock lanes' );
 assert_worker_contains( 'dueJobIds', $worker_src, 'job mode selects due jobs from scheduler work' );
 assert_worker_contains( 'extractActionJobId', $worker_src, 'job mode extracts job ids from scheduler args' );
