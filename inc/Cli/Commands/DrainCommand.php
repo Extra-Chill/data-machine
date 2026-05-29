@@ -59,6 +59,10 @@ class DrainCommand extends BaseCommand {
 	 * : Optional comma-separated Data Machine job IDs to drain. Useful when
 	 * unrelated due work is blocked ahead of a known cleanup or retry run.
 	 *
+	 * [--lane=<lane>]
+	 * : Optional worker lane to drain. Supported lanes: publish, background.
+	 * Publish drains AI/upsert step executions; background drains non-publish work.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -86,6 +90,7 @@ class DrainCommand extends BaseCommand {
 				'time_limit'          => isset( $assoc_args['time-limit'] ) ? (int) $assoc_args['time-limit'] : 0,
 				'stop_before_timeout' => isset( $assoc_args['stop-before-timeout'] ) ? (int) $assoc_args['stop-before-timeout'] : 0,
 				'job_ids'             => isset( $assoc_args['job-id'] ) ? (string) $assoc_args['job-id'] : '',
+				'lane'                => isset( $assoc_args['lane'] ) ? (string) $assoc_args['lane'] : '',
 			)
 		);
 
@@ -104,7 +109,7 @@ class DrainCommand extends BaseCommand {
 	 * so this drain runs concrete due action IDs from that same group instead of
 	 * a hand-maintained hook allow-list.
 	 *
-	 * @param array{limit?:int,batch_size?:int,time_limit?:int,stop_before_timeout?:int,hooks?:string[],job_ids?:string|int[],acquire_lock?:bool,lock_owner?:string} $options Drain options.
+	 * @param array{limit?:int,batch_size?:int,time_limit?:int,stop_before_timeout?:int,hooks?:string[],job_ids?:string|int[],lane?:string,acquire_lock?:bool,lock_owner?:string} $options Drain options.
 	 * @return array<string,int|string> Drain stats.
 	 */
 	public static function drain( array $options = array() ): array {
@@ -116,33 +121,36 @@ class DrainCommand extends BaseCommand {
 		$stop_before_timeout = max( 0, (int) ( $options['stop_before_timeout'] ?? 0 ) );
 		$hooks               = self::normalizeHooks( $options['hooks'] ?? null );
 		$job_ids             = self::normalizeJobIds( $options['job_ids'] ?? null );
+		$lane                = self::normalizeLane( $options['lane'] ?? '' );
+		$hooks               = self::hooksForLane( $lane, $hooks );
 		$acquire_lock        = (bool) ( $options['acquire_lock'] ?? true );
 		$lock                = array();
 
 		if ( $acquire_lock ) {
 			$lock_ttl = $time_limit > 0 ? $time_limit + max( 60, $stop_before_timeout ) : 600;
-			$lock     = WorkerLock::acquire( (string) ( $options['lock_owner'] ?? self::defaultLockOwner( 'drain' ) ), $lock_ttl );
+			$lock     = WorkerLock::acquire( (string) ( $options['lock_owner'] ?? self::defaultLockOwner( 'drain', $lane ) ), $lock_ttl, $lane );
 			if ( empty( $lock['acquired'] ) ) {
-				return self::lockedStats( $hooks, $job_ids, $lock );
+				return self::lockedStats( $hooks, $job_ids, $lock, $lane );
 			}
 
 			$lock_token = (string) ( $lock['lock_token'] ?? '' );
+			$lock_lane  = $lane;
 			register_shutdown_function(
-				static function () use ( $lock_token ): void {
-					WorkerLock::release( $lock_token );
+				static function () use ( $lock_token, $lock_lane ): void {
+					WorkerLock::release( $lock_token, $lock_lane );
 				}
 			);
 		}
 
 		$started_at    = time();
-		$before_counts = self::getStatusCounts( $hooks, $job_ids );
+		$before_counts = self::getStatusCounts( $hooks, $job_ids, $lane );
 		$batches       = 0;
 		$warnings      = 0;
 		$stop_reason   = 'empty';
 
 		try {
-			while ( self::getDuePendingCount( $hooks, $job_ids ) > 0 ) {
-				$stats = self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids ), $batches, $warnings, $hooks, $job_ids, $stop_reason );
+			while ( self::getDuePendingCount( $hooks, $job_ids, $lane ) > 0 ) {
+				$stats = self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids, $lane ), $batches, $warnings, $hooks, $job_ids, $stop_reason, $lane );
 				// @phpstan-ignore-next-line
 				if ( self::isMemorySoftLimitReached() ) {
 					$stop_reason = 'memory_limit';
@@ -173,13 +181,13 @@ class DrainCommand extends BaseCommand {
 					break;
 				}
 
-				$due_before    = self::getDuePendingCount( $hooks, $job_ids );
-				$status_before = self::getStatusCounts( $hooks, $job_ids );
+				$due_before    = self::getDuePendingCount( $hooks, $job_ids, $lane );
+				$status_before = self::getStatusCounts( $hooks, $job_ids, $lane );
 				$deadline_at   = 0;
 				if ( $time_limit > 0 ) {
 					$deadline_at = $started_at + max( 0, $time_limit - $stop_before_timeout );
 				}
-				$result = self::runActionSchedulerBatch( $current_batch_size, $hooks, $job_ids, $deadline_at );
+				$result = self::runActionSchedulerBatch( $current_batch_size, $hooks, $job_ids, $deadline_at, $lane );
 				++$batches;
 
 				if ( 0 !== (int) $result['return_code'] ) {
@@ -190,13 +198,13 @@ class DrainCommand extends BaseCommand {
 					break;
 				}
 
-				$status_after = self::getStatusCounts( $hooks, $job_ids );
-				$progress     = self::processedDelta( $status_before, $status_after );
+				$status_after = self::getStatusCounts( $hooks, $job_ids, $lane );
+				$progress     = (int) ( $result['actions_processed'] ?? self::processedDelta( $status_before, $status_after ) );
 				if ( '' !== (string) $result['stop_reason'] ) {
 					$stop_reason = (string) $result['stop_reason'];
 					break;
 				}
-				if ( 0 === $progress && self::getDuePendingCount( $hooks, $job_ids ) >= $due_before ) {
+				if ( 0 === $progress && self::getDuePendingCount( $hooks, $job_ids, $lane ) >= $due_before ) {
 					++$warnings;
 					WP_CLI::warning( 'Drain stopped because Action Scheduler made no observable progress.' );
 					$stop_reason = 'no_progress';
@@ -204,11 +212,11 @@ class DrainCommand extends BaseCommand {
 				}
 			}
 
-			$stats = self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids ), $batches, $warnings, $hooks, $job_ids, $stop_reason );
+			$stats = self::buildStats( $before_counts, self::getStatusCounts( $hooks, $job_ids, $lane ), $batches, $warnings, $hooks, $job_ids, $stop_reason, $lane );
 			return self::withLockStatus( $stats, $lock );
 		} finally {
 			if ( $acquire_lock ) {
-				WorkerLock::release( (string) ( $lock['lock_token'] ?? '' ) );
+				WorkerLock::release( (string) ( $lock['lock_token'] ?? '' ), $lane );
 			}
 		}
 	}
@@ -216,19 +224,22 @@ class DrainCommand extends BaseCommand {
 	/**
 	 * Return a read-only Data Machine Action Scheduler status snapshot.
 	 *
-	 * @param array{hooks?:string[],job_ids?:string|int[]} $options Status options.
+	 * @param array{hooks?:string[],job_ids?:string|int[],lane?:string} $options Status options.
 	 * @return array<string,int|string> Status stats.
 	 */
 	public static function status( array $options = array() ): array {
 		$hooks   = self::normalizeHooks( $options['hooks'] ?? null );
 		$job_ids = self::normalizeJobIds( $options['job_ids'] ?? null );
-		$lock    = WorkerLock::snapshot();
+		$lane    = self::normalizeLane( $options['lane'] ?? '' );
+		$hooks   = self::hooksForLane( $lane, $hooks );
+		$lock    = WorkerLock::snapshot( null, 600, $lane );
 
 		return array(
-			'due_pending'   => self::getDuePendingCount( $hooks, $job_ids ),
-			'total_pending' => self::getPendingCount( $hooks, $job_ids ),
-			'hooks'         => implode( ',', array_keys( self::getStatusCounts( $hooks, $job_ids ) ) ),
+			'due_pending'   => self::getDuePendingCount( $hooks, $job_ids, $lane ),
+			'total_pending' => self::getPendingCount( $hooks, $job_ids, $lane ),
+			'hooks'         => implode( ',', array_keys( self::getStatusCounts( $hooks, $job_ids, $lane ) ) ),
 			'job_ids'       => implode( ',', $job_ids ),
+			'lane'          => $lane,
 		) + self::publicLockStatus( $lock );
 	}
 
@@ -240,7 +251,7 @@ class DrainCommand extends BaseCommand {
 	 * @param array<string,int|string|bool> $lock    Lock state.
 	 * @return array<string,int|string> Drain stats.
 	 */
-	private static function lockedStats( ?array $hooks, array $job_ids, array $lock ): array {
+	private static function lockedStats( ?array $hooks, array $job_ids, array $lock, string $lane = '' ): array {
 		return self::withLockStatus(
 			array(
 				'batches'                    => 0,
@@ -254,12 +265,13 @@ class DrainCommand extends BaseCommand {
 				'step_execution_failures'    => 0,
 				'actions_processed'          => 0,
 				'other_actions'              => 0,
-				'remaining_pending'          => self::getDuePendingCount( $hooks, $job_ids ),
-				'total_pending'              => self::getPendingCount( $hooks, $job_ids ),
+				'remaining_pending'          => self::getDuePendingCount( $hooks, $job_ids, $lane ),
+				'total_pending'              => self::getPendingCount( $hooks, $job_ids, $lane ),
 				'warnings'                   => 0,
 				'stop_reason'                => 'locked',
-				'hooks'                      => implode( ',', array_keys( self::getStatusCounts( $hooks, $job_ids ) ) ),
+				'hooks'                      => implode( ',', array_keys( self::getStatusCounts( $hooks, $job_ids, $lane ) ) ),
 				'job_ids'                    => implode( ',', $job_ids ),
+				'lane'                       => $lane,
 			),
 			$lock
 		);
@@ -310,14 +322,18 @@ class DrainCommand extends BaseCommand {
 			'lock_owner'       => (string) ( $lock['lock_owner'] ?? '' ),
 			'lock_age_seconds' => (int) ( $lock['lock_age_seconds'] ?? 0 ),
 			'lock_expires_at'  => (int) ( $lock['lock_expires_at'] ?? 0 ),
+			'lock_lane'        => (string) ( $lock['lock_lane'] ?? '' ),
 		);
 	}
 
 	/**
 	 * Build a compact default owner string for lock diagnostics.
 	 */
-	private static function defaultLockOwner( string $command ): string {
+	private static function defaultLockOwner( string $command, string $lane = '' ): string {
 		$pid = getmypid();
+		if ( '' !== $lane ) {
+			$command .= ':' . $lane;
+		}
 
 		return sprintf( '%s pid:%d host:%s', $command, false === $pid ? 0 : $pid, php_uname( 'n' ) );
 	}
@@ -328,24 +344,27 @@ class DrainCommand extends BaseCommand {
 	 * @param int           $batch_size Maximum actions to claim.
 	 * @param string[]|null $hooks      Hook scope, or null for all hooks in the group.
 	 * @param int[]         $job_ids    Optional job ID scope.
-	 * @return array{return_code:int,stdout:string,stderr:string,stop_reason:string} Result data.
+	 * @return array{return_code:int,stdout:string,stderr:string,stop_reason:string,actions_processed:int} Result data.
 	 */
-	private static function runActionSchedulerBatch( int $batch_size, ?array $hooks = null, array $job_ids = array(), int $deadline_at = 0 ): array {
+	private static function runActionSchedulerBatch( int $batch_size, ?array $hooks = null, array $job_ids = array(), int $deadline_at = 0, string $lane = '' ): array {
 		$store       = \ActionScheduler_Store::instance();
 		$runner      = \ActionScheduler::runner();
 		$warnings    = array();
 		$claim       = null;
 		$stop_reason = '';
+		$claim_size  = '' === $lane ? $batch_size : max( $batch_size, min( 1000, $batch_size * 20 ) );
+		$processed   = 0;
 
 		try {
 			self::runActionSchedulerTimeoutCleanup( $store );
-			$claim = $store->stake_claim( $batch_size, null, $hooks ?? array(), self::GROUP );
+			$claim = $store->stake_claim( $claim_size, null, $hooks ?? array(), self::GROUP );
 		} catch ( \Throwable $throwable ) {
 			return array(
-				'return_code' => 1,
-				'stdout'      => '',
-				'stderr'      => sprintf( 'Action Scheduler claim failed during drain: %s', $throwable->getMessage() ),
-				'stop_reason' => 'warning',
+				'return_code'       => 1,
+				'stdout'            => '',
+				'stderr'            => sprintf( 'Action Scheduler claim failed during drain: %s', $throwable->getMessage() ),
+				'stop_reason'       => 'warning',
+				'actions_processed' => 0,
 			);
 		}
 
@@ -363,7 +382,7 @@ class DrainCommand extends BaseCommand {
 				}
 
 				$action_id = absint( $action_id );
-				if ( $action_id <= 0 || ! self::actionMatchesJobIds( $action_id, $job_ids ) ) {
+				if ( $action_id <= 0 || ! self::actionMatchesJobIds( $action_id, $job_ids ) || ! self::actionMatchesLane( $action_id, $lane ) ) {
 					continue;
 				}
 
@@ -375,10 +394,15 @@ class DrainCommand extends BaseCommand {
 
 				try {
 					$runner->process_action( $action_id, 'Data Machine CLI drain' );
+					++$processed;
 				} catch ( \Throwable $throwable ) {
 					$warnings[] = sprintf( 'Action %d failed during drain: %s', $action_id, $throwable->getMessage() );
 				} finally {
 					self::flushRuntimeCache();
+				}
+
+				if ( $processed >= $batch_size ) {
+					break;
 				}
 			}
 		} finally {
@@ -388,10 +412,11 @@ class DrainCommand extends BaseCommand {
 		$stop_reason = self::warningsContainMemoryLimit( $warnings ) ? 'memory_limit' : $stop_reason;
 
 		return array(
-			'return_code' => empty( $warnings ) ? 0 : 1,
-			'stdout'      => '',
-			'stderr'      => implode( "\n", $warnings ),
-			'stop_reason' => $stop_reason,
+			'return_code'       => empty( $warnings ) ? 0 : 1,
+			'stdout'            => '',
+			'stderr'            => implode( "\n", $warnings ),
+			'stop_reason'       => $stop_reason,
+			'actions_processed' => $processed,
 		);
 	}
 
@@ -528,6 +553,78 @@ class DrainCommand extends BaseCommand {
 	}
 
 	/**
+	 * Check whether a claimed action belongs to the requested lane.
+	 */
+	private static function actionMatchesLane( int $action_id, string $lane ): bool {
+		if ( '' === $lane ) {
+			return true;
+		}
+
+		global $wpdb;
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- This checks an already-claimed Action Scheduler row.
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT hook, args FROM %i WHERE action_id = %d',
+				$actions_table,
+				$action_id
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		if ( ! is_array( $row ) ) {
+			return false;
+		}
+
+		return self::actionRowMatchesLane( (string) ( $row['hook'] ?? '' ), (string) ( $row['args'] ?? '' ), $lane );
+	}
+
+	/**
+	 * Check an Action Scheduler row against a worker lane.
+	 */
+	private static function actionRowMatchesLane( string $hook, string $args, string $lane ): bool {
+		if ( '' === $lane ) {
+			return true;
+		}
+
+		$is_publish = self::HOOK_EXECUTE_STEP === $hook && in_array( self::stepTypeFromExecuteStepArgs( $args ), array( 'ai', 'upsert' ), true );
+		if ( 'publish' === $lane ) {
+			return $is_publish;
+		}
+
+		if ( 'background' === $lane ) {
+			return ! $is_publish;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Resolve an execute-step action's configured step type.
+	 */
+	private static function stepTypeFromExecuteStepArgs( string $args ): string {
+		$decoded = json_decode( $args, true );
+		if ( ! is_array( $decoded ) ) {
+			return '';
+		}
+
+		$job_id       = absint( $decoded['job_id'] ?? 0 );
+		$flow_step_id = (string) ( $decoded['flow_step_id'] ?? '' );
+		if ( $job_id <= 0 || '' === $flow_step_id || ! function_exists( 'datamachine_get_engine_data' ) ) {
+			return '';
+		}
+
+		$engine_data = datamachine_get_engine_data( $job_id );
+		$flow_config = is_array( $engine_data['flow_config'] ?? null ) ? $engine_data['flow_config'] : array();
+		$step_config = is_array( $flow_config[ $flow_step_id ] ?? null ) ? $flow_config[ $flow_step_id ] : array();
+
+		return (string) ( $step_config['step_type'] ?? '' );
+	}
+
+	/**
 	 * Build operator-facing stats.
 	 *
 	 * @param array<string,array<string,int>> $before_counts Counts before drain.
@@ -536,7 +633,7 @@ class DrainCommand extends BaseCommand {
 	 * @param int                             $warnings      Warning count.
 	 * @return array<string,int|string> Stats.
 	 */
-	private static function buildStats( array $before_counts, array $after_counts, int $batches, int $warnings, ?array $hooks = null, array $job_ids = array(), string $stop_reason = 'empty' ): array {
+	private static function buildStats( array $before_counts, array $after_counts, int $batches, int $warnings, ?array $hooks = null, array $job_ids = array(), string $stop_reason = 'empty', string $lane = '' ): array {
 		$batch_completed   = self::delta( $before_counts, $after_counts, self::HOOK_BATCH_CHUNK, 'complete' );
 		$batch_failed      = self::delta( $before_counts, $after_counts, self::HOOK_BATCH_CHUNK, 'failed' );
 		$step_completed    = self::delta( $before_counts, $after_counts, self::HOOK_EXECUTE_STEP, 'complete' );
@@ -558,12 +655,13 @@ class DrainCommand extends BaseCommand {
 			'step_execution_failures'    => $step_failed,
 			'actions_processed'          => $total_processed,
 			'other_actions'              => max( 0, $total_processed - $tracked_processed ),
-			'remaining_pending'          => self::getDuePendingCount( $hooks, $job_ids ),
-			'total_pending'              => self::getPendingCount( $hooks, $job_ids ),
+			'remaining_pending'          => self::getDuePendingCount( $hooks, $job_ids, $lane ),
+			'total_pending'              => self::getPendingCount( $hooks, $job_ids, $lane ),
 			'warnings'                   => $warnings,
 			'stop_reason'                => $stop_reason,
 			'hooks'                      => implode( ',', self::processedHooks( $before_counts, $after_counts ) ),
 			'job_ids'                    => implode( ',', $job_ids ),
+			'lane'                       => $lane,
 		);
 	}
 
@@ -646,6 +744,25 @@ class DrainCommand extends BaseCommand {
 	}
 
 	/**
+	 * Normalize a worker lane identifier.
+	 */
+	private static function normalizeLane( mixed $lane ): string {
+		$lane = is_string( $lane ) ? strtolower( trim( $lane ) ) : '';
+		return in_array( $lane, array( 'publish', 'background' ), true ) ? $lane : '';
+	}
+
+	/**
+	 * Restrict hook claims for lanes where hook-level selection is safe.
+	 */
+	private static function hooksForLane( string $lane, ?array $hooks ): ?array {
+		if ( 'publish' === $lane ) {
+			return array( self::HOOK_EXECUTE_STEP );
+		}
+
+		return $hooks;
+	}
+
+	/**
 	 * Normalize an optional job-id scope.
 	 *
 	 * @param mixed $job_ids Optional comma-separated string or ID list.
@@ -722,8 +839,8 @@ class DrainCommand extends BaseCommand {
 	 *
 	 * @return int Due pending count.
 	 */
-	private static function getDuePendingCount( ?array $hooks = null, array $job_ids = array() ): int {
-		return self::countActions( true, $hooks, $job_ids );
+	private static function getDuePendingCount( ?array $hooks = null, array $job_ids = array(), string $lane = '' ): int {
+		return self::countActions( true, $hooks, $job_ids, $lane );
 	}
 
 	/**
@@ -731,8 +848,8 @@ class DrainCommand extends BaseCommand {
 	 *
 	 * @return int Pending count.
 	 */
-	private static function getPendingCount( ?array $hooks = null, array $job_ids = array() ): int {
-		return self::countActions( false, $hooks, $job_ids );
+	private static function getPendingCount( ?array $hooks = null, array $job_ids = array(), string $lane = '' ): int {
+		return self::countActions( false, $hooks, $job_ids, $lane );
 	}
 
 	/**
@@ -741,12 +858,16 @@ class DrainCommand extends BaseCommand {
 	 * @param bool $due_only Whether to count only due actions.
 	 * @return int Pending count.
 	 */
-	private static function countActions( bool $due_only, ?array $hooks = null, array $job_ids = array() ): int {
+	private static function countActions( bool $due_only, ?array $hooks = null, array $job_ids = array(), string $lane = '' ): int {
 		global $wpdb;
 
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
 		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
 		$hook_sql      = self::hookWhereSql( $hooks, $job_ids );
+
+		if ( '' !== $lane ) {
+			return self::countLaneActions( $due_only, $hooks, $job_ids, $lane );
+		}
 
 		if ( $due_only ) {
 			$values = array_merge(
@@ -791,11 +912,66 @@ class DrainCommand extends BaseCommand {
 	}
 
 	/**
+	 * Count pending actions that match a lane.
+	 */
+	private static function countLaneActions( bool $due_only, ?array $hooks, array $job_ids, string $lane ): int {
+		$count = 0;
+		foreach ( self::laneActionRows( $due_only, $hooks, $job_ids ) as $row ) {
+			if ( self::actionRowMatchesLane( (string) ( $row['hook'] ?? '' ), (string) ( $row['args'] ?? '' ), $lane ) ) {
+				++$count;
+			}
+		}
+
+		return $count;
+	}
+
+	/**
+	 * Retrieve Action Scheduler rows for lane filtering.
+	 *
+	 * @return array<int,array<string,string>> Action rows.
+	 */
+	private static function laneActionRows( bool $due_only, ?array $hooks, array $job_ids ): array {
+		global $wpdb;
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
+		$hook_sql      = self::hookWhereSql( $hooks, $job_ids );
+		$status_sql    = "a.status = 'pending'";
+		$date_sql      = $due_only ? 'AND a.scheduled_date_gmt <= %s' : '';
+		$values        = array_merge(
+			array( $actions_table, $groups_table ),
+			$hook_sql['values'],
+			array( self::GROUP )
+		);
+
+		if ( $due_only ) {
+			$values[] = gmdate( 'Y-m-d H:i:s' );
+		}
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic scope is constructed from normalized placeholders and values.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT a.action_id, a.hook, a.status, a.args
+				FROM %i a
+				INNER JOIN %i g ON g.group_id = a.group_id
+				WHERE ' . $hook_sql['sql'] . $status_sql . '
+				AND g.slug = %s
+				' . $date_sql,
+				$values
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
 	 * Get action counts grouped by hook and status.
 	 *
 	 * @return array<string,array<string,int>> Counts by hook and status.
 	 */
-	private static function getStatusCounts( ?array $hooks = null, array $job_ids = array() ): array {
+	private static function getStatusCounts( ?array $hooks = null, array $job_ids = array(), string $lane = '' ): array {
 		global $wpdb;
 
 		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
