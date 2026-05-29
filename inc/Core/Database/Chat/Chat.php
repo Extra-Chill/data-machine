@@ -705,7 +705,7 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			$query_args[] = $identity['agent_id'];
 		}
 
-		$select = $include_messages ? '*' : 'session_id, workspace_type, workspace_id, user_id, owner_type, owner_key_hash, owner_label, agent_id, title, metadata, provider, model, provider_response_id, mode, created_at, updated_at, last_read_at, expires_at';
+		$select = $include_messages ? '*' : 'session_id, workspace_type, workspace_id, user_id, owner_type, owner_key_hash, owner_label, agent_id, title, messages, metadata, provider, model, provider_response_id, mode, created_at, updated_at, last_read_at, expires_at';
 		$sql    = 'SELECT ' . $select . ' FROM %i WHERE ' . implode( ' AND ', $where ) . ' ORDER BY updated_at DESC LIMIT %d OFFSET %d';
 
 		$query_args[] = $limit;
@@ -719,8 +719,17 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		}
 
 		foreach ( $sessions as &$session ) {
-			if ( $include_messages ) {
+			if ( $include_messages || empty( $session['title'] ) ) {
 				$session['messages'] = self::normalize_messages( json_decode( $session['messages'] ?? '[]', true ) ?? array() );
+			}
+			if ( empty( $session['title'] ) && ! empty( $session['messages'] ) ) {
+				$session['title'] = self::title_from_messages( $session['messages'] );
+				if ( '' !== $session['title'] ) {
+					self::set_missing_session_title( $table_name, (string) $session['session_id'], (string) $session['title'] );
+				}
+			}
+			if ( ! $include_messages ) {
+				unset( $session['messages'] );
 			}
 			$session['metadata']   = json_decode( $session['metadata'] ?? '[]', true ) ?? array();
 			$session['agent_slug'] = self::resolve_agent_slug_from_session_row( $session );
@@ -879,7 +888,69 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			return false;
 		}
 
+		$title = self::title_from_messages( $normalized_messages );
+		if ( '' !== $title ) {
+			self::set_missing_session_title( $table_name, $session_id, $title );
+		}
+
 		return true;
+	}
+
+	/**
+	 * Derive a display title from the first user message in a transcript.
+	 *
+	 * @param array<int,array<string,mixed>> $messages Normalized transcript messages.
+	 * @return string Short title, or empty string when no user text exists.
+	 */
+	private static function title_from_messages( array $messages ): string {
+		foreach ( $messages as $message ) {
+			if ( ! is_array( $message ) || 'user' !== (string) ( $message['role'] ?? '' ) ) {
+				continue;
+			}
+
+			$text = self::message_content_text( $message );
+			$text = trim( preg_replace( '/\s+/', ' ', wp_strip_all_tags( $text ) ) ?? '' );
+			if ( '' !== $text ) {
+				return mb_substr( $text, 0, 100 );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Fill the session title only when it has not been set yet.
+	 *
+	 * @param string $table_name Session table name.
+	 * @param string $session_id Session UUID.
+	 * @param string $title      Derived display title.
+	 */
+	private static function set_missing_session_title( string $table_name, string $session_id, string $title ): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
+		$result = $wpdb->query(
+			$wpdb->prepare(
+				'UPDATE %i SET title = %s WHERE session_id = %s AND (title IS NULL OR title = %s)',
+				$table_name,
+				$title,
+				$session_id,
+				''
+			)
+		);
+
+		if ( false === $result ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Failed to set derived chat session title',
+				array(
+					'session_id' => $session_id,
+					'error'      => $wpdb->last_error,
+					'mode'       => 'chat',
+				)
+			);
+		}
 	}
 
 	/**
@@ -1421,6 +1492,19 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$content = $message['content'] ?? '';
 		if ( is_string( $content ) ) {
 			return $content;
+		}
+
+		if ( is_array( $content ) ) {
+			$text = array();
+			foreach ( $content as $part ) {
+				if ( is_array( $part ) && 'text' === (string) ( $part['type'] ?? '' ) && is_string( $part['text'] ?? null ) ) {
+					$text[] = $part['text'];
+				}
+			}
+
+			if ( ! empty( $text ) ) {
+				return implode( "\n\n", $text );
+			}
 		}
 
 		return (string) wp_json_encode( $content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );

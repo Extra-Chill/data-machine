@@ -136,6 +136,86 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$this->assertSame( 'transcript-id-agent', $session['agent_slug'] );
 	}
 
+	public function test_builtin_chat_store_derives_missing_title_from_first_user_message(): void {
+		$store      = ConversationStoreFactory::get();
+		$session_id = $store->create_session( $this->workspace(), 12, $this->create_agent( 'title-agent' ), array(), 'chat' );
+
+		$this->assertTrue(
+			$store->update_session(
+				$session_id,
+				array(
+					array(
+						'role'    => 'assistant',
+						'content' => 'Before the user speaks',
+					),
+					array(
+						'role'    => 'user',
+						'content' => 'Build a candy shop website inspired by Gumroad.',
+					),
+				),
+				array( 'status' => 'completed' ),
+				'openai',
+				'gpt-test'
+			)
+		);
+
+		$session = $store->get_session( $session_id );
+		$this->assertSame( 'Build a candy shop website inspired by Gumroad.', $session['title'] );
+	}
+
+	public function test_builtin_chat_store_does_not_overwrite_existing_title(): void {
+		$store      = ConversationStoreFactory::get();
+		$session_id = $store->create_session( $this->workspace(), 12, $this->create_agent( 'manual-title-agent' ), array(), 'chat' );
+
+		$this->assertTrue( $store->update_title( $session_id, 'Manual title' ) );
+		$this->assertTrue(
+			$store->update_session(
+				$session_id,
+				array(
+					array(
+						'role'    => 'user',
+						'content' => 'This should not replace the title.',
+					),
+				),
+				array( 'status' => 'completed' ),
+				'openai',
+				'gpt-test'
+			)
+		);
+
+		$session = $store->get_session( $session_id );
+		$this->assertSame( 'Manual title', $session['title'] );
+	}
+
+	public function test_builtin_chat_store_backfills_missing_title_when_listing_summaries(): void {
+		global $wpdb;
+
+		$store      = ConversationStoreFactory::get();
+		$workspace  = $this->workspace();
+		$session_id = $store->create_session( $workspace, 12, $this->create_agent( 'summary-title-agent' ), array(), 'chat' );
+
+		$this->assertTrue(
+			$store->update_session(
+				$session_id,
+				array(
+					array(
+						'role'    => 'user',
+						'content' => 'Existing transcript should receive a summary title.',
+					),
+				),
+				array( 'status' => 'completed' ),
+				'openai',
+				'gpt-test'
+			)
+		);
+		$wpdb->update( $store->get_table_name(), array( 'title' => null ), array( 'session_id' => $session_id ), array( '%s' ), array( '%s' ) );
+
+		$sessions = $store->list_sessions( $workspace, 12, array( 'include_messages' => false ) );
+
+		$this->assertSame( 'Existing transcript should receive a summary title.', $sessions[0]['title'] );
+		$this->assertArrayNotHasKey( 'messages', $sessions[0] );
+	}
+
 	public function test_in_memory_store_accepts_agent_slug_and_exposes_it_on_get_session(): void {
 		$store      = new InMemoryConversationStore();
 		$session_id = $store->create_session( $this->workspace(), 5, 'memory-agent', array(), 'pipeline' );
