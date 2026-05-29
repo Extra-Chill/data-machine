@@ -325,7 +325,7 @@ class ConversationManager {
 				continue;
 			}
 
-			if ( $prev_tool_name === $tool_name && $prev_parameters === $tool_parameters ) {
+			if ( $prev_tool_name === $tool_name && $prev_parameters === $tool_parameters && self::hasSuccessfulToolResultAfter( $conversation_messages, $i, $tool_name ) ) {
 				$correction_message = "You already called the {$tool_name} tool with these exact parameters earlier in this conversation. That call already executed successfully. Do not retry — move on to the next step or end the conversation.";
 				return array(
 					'is_duplicate' => true,
@@ -338,6 +338,38 @@ class ConversationManager {
 			'is_duplicate' => false,
 			'message'      => '',
 		);
+	}
+
+	/**
+	 * Determine whether a previous tool call already completed successfully.
+	 *
+	 * Tool-call echoes can appear in restored conversation history before their
+	 * corresponding result exists. Those are not safe duplicates: blocking the
+	 * retry prevents completion tools such as reject_source/defer_item from ever
+	 * satisfying runtime assertions.
+	 *
+	 * @param array<int,array<string,mixed>> $conversation_messages Conversation history.
+	 * @param int                           $call_index Index of the previous tool call.
+	 * @param string                        $tool_name Tool name to match.
+	 * @return bool Whether a later successful result exists for the call.
+	 */
+	private static function hasSuccessfulToolResultAfter( array $conversation_messages, int $call_index, string $tool_name ): bool {
+		$count = count( $conversation_messages );
+		for ( $i = $call_index + 1; $i < $count; $i++ ) {
+			$message = WP_Agent_Message::normalize( $conversation_messages[ $i ] );
+
+			if ( WP_Agent_Message::TYPE_TOOL_RESULT !== $message['type'] ) {
+				continue;
+			}
+
+			if ( $tool_name !== ( $message['payload']['tool_name'] ?? null ) ) {
+				continue;
+			}
+
+			return true === ( $message['payload']['success'] ?? null );
+		}
+
+		return false;
 	}
 
 	private static function toolAllowsRepeatCalls( ?array $tool_definition ): bool {
