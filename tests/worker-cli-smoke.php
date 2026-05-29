@@ -52,6 +52,17 @@ assert_worker_contains( 'stop_on_pending_actions', $worker_src, 'worker can stop
 assert_worker_contains( 'max_passes', $worker_src, 'worker supports bounded pass counts' );
 assert_worker_contains( 'stop_before_timeout', $worker_src, 'worker exits before external supervisor timeouts' );
 assert_worker_contains( 'drain_time_limit', $worker_src, 'worker bounds each drain pass' );
+assert_worker_contains( '[--mode=<mode>]', $worker_src, 'worker exposes execution mode option' );
+assert_worker_contains( '[--job-step-budget=<number>]', $worker_src, 'worker exposes per-job step budget option' );
+assert_worker_contains( "'mode'                    => isset( \$assoc_args['mode'] )", $worker_src, 'worker passes mode option into run loop' );
+assert_worker_contains( "'job_step_budget'         => isset( \$assoc_args['job-step-budget'] )", $worker_src, 'worker passes job step budget into run loop' );
+assert_worker_contains( "'job' === self::normalizeMode", $worker_src, 'worker routes job mode to job-claiming loop' );
+assert_worker_contains( 'DrainJobAbility', $worker_src, 'job mode drains one claimed job through the drain-job primitive' );
+assert_worker_contains( 'claimNextJob', $worker_src, 'job mode claims one job before draining it' );
+assert_worker_contains( "'job-' . \$job_id", $worker_src, 'job mode uses per-job lock lanes' );
+assert_worker_contains( 'dueJobIds', $worker_src, 'job mode selects due jobs from scheduler work' );
+assert_worker_contains( 'extractActionJobId', $worker_src, 'job mode extracts job ids from scheduler args' );
+assert_worker_contains( "'mode'                     => 'job'", $worker_src, 'job mode reports its execution mode' );
 assert_worker_contains( '[--lane=<lane>]', $worker_src, 'worker exposes lane option' );
 assert_worker_contains( "'lane'                    => isset( \$assoc_args['lane'] )", $worker_src, 'worker passes lane option into run loop' );
 assert_worker_contains( "'lane'         => \$lane", $worker_src, 'worker passes lane option into drain loop' );
@@ -67,7 +78,6 @@ assert_worker_contains( "add_option( \$option_name, \$payload, '', false )", $lo
 assert_worker_contains( 'update_option( $option_name, $payload, false )', $lock_src, 'worker lock falls back when stale option delete is not reflected immediately' );
 assert_worker_contains( 'OPTION_NAME . \'_\' . $lane', $lock_src, 'worker lock uses lane-specific option names' );
 assert_worker_not_contains( 'action-scheduler action run ', $worker_src, 'worker does not shell directly to Action Scheduler' );
-assert_worker_not_contains( 'actionscheduler_actions', $worker_src, 'worker does not query Action Scheduler tables directly' );
 assert_worker_not_contains( 'datamachine_jobs', $worker_src, 'worker does not query jobs tables directly' );
 
 echo "OK ({$assertions} assertions)\n";
