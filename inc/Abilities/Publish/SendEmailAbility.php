@@ -55,9 +55,12 @@ class SendEmailAbility {
 			return;
 		}
 
-		$definitions = self::get_ability_definitions( self::$instance );
+		$register_via_helper = static function (): void {
+			if ( null === self::$instance ) {
+				return;
+			}
 
-		$register_via_helper = static function () use ( $definitions ): void {
+			$definitions = self::get_ability_definitions( self::$instance );
 			foreach ( $definitions as $name => $args ) {
 				wp_register_ability( $name, $args );
 			}
@@ -92,7 +95,7 @@ class SendEmailAbility {
 		if ( null === $registry ) {
 			return;
 		}
-		foreach ( $definitions as $name => $args ) {
+		foreach ( self::get_ability_definitions( self::$instance ) as $name => $args ) {
 			if ( $registry->is_registered( $name ) ) {
 				continue;
 			}

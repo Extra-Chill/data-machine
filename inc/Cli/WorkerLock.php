@@ -54,7 +54,7 @@ class WorkerLock {
 			}
 
 			$after_delete = self::snapshot( $now, $ttl, $lane );
-			if ( 'stale' === $after_delete['lock_status'] && update_option( $option_name, $payload, false ) ) {
+			if ( 'held' !== $after_delete['lock_status'] && update_option( $option_name, $payload, false ) ) {
 				$current = get_option( $option_name, array() );
 				if ( is_array( $current ) && hash_equals( $token, (string) ( $current['token'] ?? '' ) ) ) {
 					return self::formatSnapshot( $payload, $now, 'held', true );
