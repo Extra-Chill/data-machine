@@ -256,8 +256,7 @@ class WorkerCommand extends BaseCommand {
 					break;
 				}
 
-				$pending_actions = self::pendingActionCount();
-				if ( $stop_on_pending_actions && $pending_actions > 0 ) {
+				if ( $stop_on_pending_actions && self::pendingActionCount() > 0 ) {
 					$stop_reason = 'pending_actions';
 					break;
 				}
@@ -380,8 +379,7 @@ class WorkerCommand extends BaseCommand {
 				break;
 			}
 
-			$pending_actions = self::pendingActionCount();
-			if ( $stop_on_pending_actions && $pending_actions > 0 ) {
+			if ( $stop_on_pending_actions && self::pendingActionCount() > 0 ) {
 				$stop_reason = 'pending_actions';
 				break;
 			}

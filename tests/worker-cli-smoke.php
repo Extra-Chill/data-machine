@@ -45,6 +45,7 @@ assert_worker_contains( 'DrainCommand::drain(', $worker_src, 'worker composes th
 assert_worker_contains( 'DrainCommand::ensureCliMemoryLimit()', $worker_src, 'worker raises the CLI memory floor before draining' );
 assert_worker_contains( "'acquire_lock' => false", $worker_src, 'worker internal drain does not fight outer lock' );
 assert_worker_contains( 'PendingActionStore::summary', $worker_src, 'worker reads pending-action gate through the store' );
+assert_worker_contains( 'if ( $stop_on_pending_actions && self::pendingActionCount() > 0 )', $worker_src, 'worker only reads pending-action gate when the stop option is enabled' );
 assert_worker_contains( 'JobsSummaryAbility', $worker_src, 'worker reads job status through the existing summary ability' );
 assert_worker_contains( "'compact' => true", $worker_src, 'worker status uses compact job summary' );
 assert_worker_contains( 'jobStatusCount', $worker_src, 'worker reads normalized job status buckets' );
