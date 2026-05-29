@@ -199,7 +199,7 @@ class DrainCommand extends BaseCommand {
 				}
 
 				$status_after = self::getStatusCounts( $hooks, $job_ids, $lane );
-				$progress     = self::processedDelta( $status_before, $status_after );
+				$progress     = (int) ( $result['actions_processed'] ?? self::processedDelta( $status_before, $status_after ) );
 				if ( '' !== (string) $result['stop_reason'] ) {
 					$stop_reason = (string) $result['stop_reason'];
 					break;
@@ -344,7 +344,7 @@ class DrainCommand extends BaseCommand {
 	 * @param int           $batch_size Maximum actions to claim.
 	 * @param string[]|null $hooks      Hook scope, or null for all hooks in the group.
 	 * @param int[]         $job_ids    Optional job ID scope.
-	 * @return array{return_code:int,stdout:string,stderr:string,stop_reason:string} Result data.
+	 * @return array{return_code:int,stdout:string,stderr:string,stop_reason:string,actions_processed:int} Result data.
 	 */
 	private static function runActionSchedulerBatch( int $batch_size, ?array $hooks = null, array $job_ids = array(), int $deadline_at = 0, string $lane = '' ): array {
 		$store       = \ActionScheduler_Store::instance();
@@ -360,10 +360,11 @@ class DrainCommand extends BaseCommand {
 			$claim = $store->stake_claim( $claim_size, null, $hooks ?? array(), self::GROUP );
 		} catch ( \Throwable $throwable ) {
 			return array(
-				'return_code' => 1,
-				'stdout'      => '',
-				'stderr'      => sprintf( 'Action Scheduler claim failed during drain: %s', $throwable->getMessage() ),
-				'stop_reason' => 'warning',
+				'return_code'       => 1,
+				'stdout'            => '',
+				'stderr'            => sprintf( 'Action Scheduler claim failed during drain: %s', $throwable->getMessage() ),
+				'stop_reason'       => 'warning',
+				'actions_processed' => 0,
 			);
 		}
 
@@ -411,10 +412,11 @@ class DrainCommand extends BaseCommand {
 		$stop_reason = self::warningsContainMemoryLimit( $warnings ) ? 'memory_limit' : $stop_reason;
 
 		return array(
-			'return_code' => empty( $warnings ) ? 0 : 1,
-			'stdout'      => '',
-			'stderr'      => implode( "\n", $warnings ),
-			'stop_reason' => $stop_reason,
+			'return_code'       => empty( $warnings ) ? 0 : 1,
+			'stdout'            => '',
+			'stderr'            => implode( "\n", $warnings ),
+			'stop_reason'       => $stop_reason,
+			'actions_processed' => $processed,
 		);
 	}
 
@@ -653,8 +655,8 @@ class DrainCommand extends BaseCommand {
 			'step_execution_failures'    => $step_failed,
 			'actions_processed'          => $total_processed,
 			'other_actions'              => max( 0, $total_processed - $tracked_processed ),
-			'remaining_pending'          => self::getDuePendingCount( $hooks, $job_ids ),
-			'total_pending'              => self::getPendingCount( $hooks, $job_ids ),
+			'remaining_pending'          => self::getDuePendingCount( $hooks, $job_ids, $lane ),
+			'total_pending'              => self::getPendingCount( $hooks, $job_ids, $lane ),
 			'warnings'                   => $warnings,
 			'stop_reason'                => $stop_reason,
 			'hooks'                      => implode( ',', self::processedHooks( $before_counts, $after_counts ) ),

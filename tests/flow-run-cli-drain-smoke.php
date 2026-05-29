@@ -69,8 +69,12 @@ assert_drain_contains( 'flushRuntimeCache()', $drain_src, 'drain flushes runtime
 assert_drain_contains( 'isMemorySoftLimitReached()', $drain_src, 'drain stops before hard PHP memory exhaustion' );
 assert_drain_contains( 'ensureCliMemoryLimit()', $drain_src, 'drain raises the CLI memory floor before processing large batches' );
 assert_drain_contains( "'memory_limit'", $drain_src, 'drain reports memory-limit stop reason' );
-assert_drain_contains( "'return_code' => empty( \$warnings ) ? 0 : 1", $drain_src, 'drain surfaces runner failures through a result object' );
+assert_drain_contains( "'return_code'       => empty( \$warnings ) ? 0 : 1", $drain_src, 'drain surfaces runner failures through a result object' );
+assert_drain_contains( "'actions_processed' => \$processed", $drain_src, 'drain reports lane-filtered actions processed by the current batch' );
+assert_drain_contains( "\$progress     = (int) ( \$result['actions_processed']", $drain_src, 'drain judges lane progress from actions it processed, not unrelated lane deltas' );
 assert_drain_contains( "'remaining_pending'", $drain_src, 'drain reports remaining pending actions' );
+assert_drain_contains( 'getDuePendingCount( $hooks, $job_ids, $lane )', $drain_src, 'drain reports lane-scoped remaining pending actions' );
+assert_drain_contains( 'getPendingCount( $hooks, $job_ids, $lane )', $drain_src, 'drain reports lane-scoped total pending actions' );
 assert_drain_contains( "'batch_chunks'", $drain_src, 'drain reports batch chunk counts' );
 assert_drain_contains( "'step_executions'", $drain_src, 'drain reports step execution counts' );
 assert_drain_contains( "'other_actions'", $drain_src, 'drain reports non-pipeline action counts' );
