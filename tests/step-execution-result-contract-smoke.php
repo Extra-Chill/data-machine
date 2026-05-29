@@ -94,6 +94,31 @@ $result = StepExecutionResult::classify(
 $assert( 'AI response fallback fails without explicit success', 'failed' === $result['status'] );
 $assert( 'AI response fallback uses actionable failure reason', 'ai_response_without_tool_result' === $result['reason'] );
 
+echo "\n[5] non-fatal failed tool packets do not override later successful tool output\n";
+$result = StepExecutionResult::classify(
+	array(
+		array(
+			'type'     => 'tool_result',
+			'metadata' => array(
+				'tool_name'              => 'wiki_read',
+				'tool_success'           => false,
+				'tool_failure_non_fatal' => true,
+			),
+		),
+		array(
+			'type'     => 'tool_result',
+			'metadata' => array(
+				'tool_name'    => 'wiki_upsert',
+				'tool_success' => true,
+			),
+		),
+	),
+	'ai'
+);
+
+$assert( 'non-fatal failed tool packet is retained without failing step', 'succeeded' === $result['status'] );
+$assert( 'successful later tool packet determines AI success', true === $result['success'] );
+
 if ( $failures > 0 ) {
 	echo "\n=== step-execution-result-contract-smoke: {$failures} FAILURE(S) / {$total} assertions ===\n";
 	exit( 1 );

@@ -106,6 +106,10 @@ class StepExecutionResult {
 			}
 
 			if ( isset( $metadata['tool_success'] ) && false === $metadata['tool_success'] ) {
+				if ( ! empty( $metadata['tool_failure_non_fatal'] ) ) {
+					continue;
+				}
+
 				$handler_tool = isset( $metadata['handler_tool'] ) ? (string) $metadata['handler_tool'] : '';
 				if ( '' !== $handler_tool && isset( $successful_handlers[ $handler_tool ] ) ) {
 					continue;
