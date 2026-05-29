@@ -53,6 +53,7 @@ class ChatOrchestrator {
 	 *     @type int    $selected_pipeline_id Currently selected pipeline ID.
 	 *     @type int    $max_turns            Maximum turns allowed.
 	 *     @type string $request_id           Idempotency request ID.
+	 *     @type callable|null $interrupt_source Optional cooperative interrupt source.
 	 * }
 	 * @return array|WP_Error Response data array or WP_Error on failure.
 	 */
@@ -67,6 +68,7 @@ class ChatOrchestrator {
 		$selected_pipeline_id = (int) ( $options['selected_pipeline_id'] ?? 0 );
 		$max_turns            = $options['max_turns'] ?? PluginSettings::get( 'max_turns', PluginSettings::DEFAULT_MAX_TURNS );
 		$request_id           = $options['request_id'] ?? null;
+		$interrupt_source     = is_callable( $options['interrupt_source'] ?? null ) ? $options['interrupt_source'] : null;
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 		$agent_slug           = (string) ( $options['agent_slug'] ?? '' );
 		$modes                = ToolPolicyResolver::normalizeModes( ! empty( $options['modes'] ) ? $options['modes'] : array( $options['mode'] ?? ToolPolicyResolver::MODE_CHAT ) );
@@ -223,6 +225,7 @@ class ChatOrchestrator {
 				'user_id'              => $user_id,
 				'agent_id'             => $agent_id,
 				'agent_slug'           => $agent_slug,
+				'interrupt_source'     => $interrupt_source,
 				'client_context'       => $options['client_context'] ?? array(),
 			)
 		);
@@ -319,6 +322,10 @@ class ChatOrchestrator {
 
 		if ( ! empty( $loop_metadata['max_turns_reached'] ) ) {
 			$response_data['max_turns_reached'] = true;
+		}
+
+		if ( isset( $loop_metadata['interrupted'] ) ) {
+			$response_data['interrupted'] = $loop_metadata['interrupted'];
 		}
 
 		/**
@@ -751,6 +758,7 @@ class ChatOrchestrator {
 	 *     @type int    $max_turns             Maximum turns allowed (default 25).
 	 *     @type int    $selected_pipeline_id  Currently selected pipeline ID.
 	 *     @type string $mode                  Agent mode (default 'chat').
+	 *     @type callable|null $interrupt_source Optional cooperative interrupt source.
 	 * }
 	 * @return array|WP_Error Result array with messages, final_content, completed, turn_count,
 	 *                        last_tool_calls, and optional warning/max_turns_reached keys.
@@ -770,6 +778,7 @@ class ChatOrchestrator {
 		$mode                 = implode( ',', $modes );
 		$agent_id             = (int) ( $options['agent_id'] ?? 0 );
 		$agent_slug           = (string) ( $options['agent_slug'] ?? '' );
+		$interrupt_source     = is_callable( $options['interrupt_source'] ?? null ) ? $options['interrupt_source'] : null;
 
 		$chat_db = ConversationStoreFactory::get();
 
@@ -825,6 +834,9 @@ class ChatOrchestrator {
 			}
 			if ( ! empty( $client_context ) ) {
 				$loop_context['client_context'] = $client_context;
+			}
+			if ( null !== $interrupt_source ) {
+				$loop_context['interrupt_source'] = $interrupt_source;
 			}
 
 			$loop_result = datamachine_run_conversation(

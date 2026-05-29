@@ -103,6 +103,7 @@ class AgentsChatHandler {
 				'selected_pipeline_id' => (int) ( $input['selected_pipeline_id'] ?? 0 ),
 				'max_turns'            => $input['max_turns'] ?? null,
 				'request_id'           => $input['request_id'] ?? null,
+				'interrupt_source'     => is_callable( $input['interrupt_source'] ?? null ) ? $input['interrupt_source'] : null,
 				'modes'                => $modes,
 				'agent_id'             => $agent_id,
 				'agent_slug'           => sanitize_title( (string) ( $input['agent'] ?? '' ) ),
@@ -217,6 +218,7 @@ class AgentsChatHandler {
 					'conversation' => $result['conversation'] ?? null,
 					'max_turns'    => $result['max_turns'] ?? null,
 					'turn_number'  => $result['turn_number'] ?? null,
+					'interrupted'  => $result['interrupted'] ?? null,
 				)
 			),
 			static fn( $value ): bool => null !== $value
