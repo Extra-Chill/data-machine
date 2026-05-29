@@ -408,7 +408,7 @@ class WorkerCommand extends BaseCommand {
 	 * Build a compact default owner string for lock diagnostics.
 	 */
 	private static function defaultLockOwner( string $lane = '' ): string {
-		$pid = getmypid();
+		$pid  = getmypid();
 		$kind = '' === $lane ? 'worker' : 'worker:' . $lane;
 
 		return sprintf( '%s pid:%d host:%s', $kind, false === $pid ? 0 : $pid, php_uname( 'n' ) );
