@@ -7,6 +7,7 @@
 
 namespace DataMachine\Cli\Commands;
 
+use DataMachine\Abilities\Engine\DrainJobAbility;
 use DataMachine\Abilities\Job\JobsSummaryAbility;
 use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
 use DataMachine\Cli\BaseCommand;
@@ -87,6 +88,21 @@ class WorkerCommand extends BaseCommand {
 	 * [--once]
 	 * : Run one recovery/drain pass and exit.
 	 *
+	 * [--mode=<mode>]
+	 * : Worker execution mode. queue drains the shared Action Scheduler queue; job claims and drains one Data Machine job at a time.
+	 * ---
+	 * default: queue
+	 * options:
+	 *   - queue
+	 *   - job
+	 * ---
+	 *
+	 * [--job-step-budget=<number>]
+	 * : Maximum due actions to drain for one claimed job before moving on.
+	 * ---
+	 * default: 50
+	 * ---
+	 *
 	 * [--lane=<lane>]
 	 * : Optional worker lane to run. Supported lanes: publish, background.
 	 * Publish drains AI/upsert step executions; background drains non-publish work.
@@ -126,6 +142,8 @@ class WorkerCommand extends BaseCommand {
 			'max_passes'              => isset( $assoc_args['max-passes'] ) ? max( 0, (int) $assoc_args['max-passes'] ) : 0,
 			'stop_before_timeout'     => isset( $assoc_args['stop-before-timeout'] ) ? max( 0, (int) $assoc_args['stop-before-timeout'] ) : 30,
 			'once'                    => isset( $assoc_args['once'] ),
+			'mode'                    => isset( $assoc_args['mode'] ) ? (string) $assoc_args['mode'] : 'queue',
+			'job_step_budget'         => isset( $assoc_args['job-step-budget'] ) ? max( 1, (int) $assoc_args['job-step-budget'] ) : 50,
 			'lane'                    => isset( $assoc_args['lane'] ) ? (string) $assoc_args['lane'] : '',
 		);
 
@@ -182,6 +200,10 @@ class WorkerCommand extends BaseCommand {
 	 */
 	public static function runLoop( array $options ): array {
 		DrainCommand::ensureCliMemoryLimit();
+
+		if ( 'job' === self::normalizeMode( $options['mode'] ?? 'queue' ) ) {
+			return self::runJobLoop( $options );
+		}
 
 		$started_at              = time();
 		$time_limit              = max( 0, (int) ( $options['time_limit'] ?? 300 ) );
@@ -315,6 +337,135 @@ class WorkerCommand extends BaseCommand {
 	}
 
 	/**
+	 * Execute a job-claiming worker loop.
+	 *
+	 * @param array<string,mixed> $options Worker options.
+	 * @return array<string,int|string> Worker stats.
+	 */
+	private static function runJobLoop( array $options ): array {
+		$started_at              = time();
+		$time_limit              = max( 0, (int) ( $options['time_limit'] ?? 300 ) );
+		$stuck_timeout           = max( 1, (int) ( $options['stuck_timeout'] ?? 2 ) );
+		$recover_stuck           = (bool) ( $options['recover_stuck'] ?? true );
+		$stop_on_pending_actions = (bool) ( $options['stop_on_pending_actions'] ?? false );
+		$max_passes              = max( 0, (int) ( $options['max_passes'] ?? 0 ) );
+		$stop_before_timeout     = max( 0, (int) ( $options['stop_before_timeout'] ?? 30 ) );
+		$once                    = (bool) ( $options['once'] ?? false );
+		$job_step_budget         = max( 1, (int) ( $options['job_step_budget'] ?? 50 ) );
+		$drain_time_limit        = max( 1, (int) ( $options['drain_time_limit'] ?? 120 ) );
+		$drain_job               = new DrainJobAbility();
+
+		$passes      = 0;
+		$recoveries  = 0;
+		$timed_out   = 0;
+		$reconciled  = 0;
+		$job_claims  = 0;
+		$completed   = 0;
+		$actions     = 0;
+		$failures    = 0;
+		$warnings    = 0;
+		$stop_reason = 'time_limit';
+
+		while ( true ) {
+			$elapsed = time() - $started_at;
+			if ( $time_limit > 0 && $elapsed >= $time_limit ) {
+				break;
+			}
+			if ( $time_limit > 0 && ( $time_limit - $elapsed ) <= $stop_before_timeout ) {
+				$stop_reason = 'timeout_margin';
+				break;
+			}
+			if ( $max_passes > 0 && $passes >= $max_passes ) {
+				$stop_reason = 'max_passes';
+				break;
+			}
+
+			$pending_actions = self::pendingActionCount();
+			if ( $stop_on_pending_actions && $pending_actions > 0 ) {
+				$stop_reason = 'pending_actions';
+				break;
+			}
+
+			++$passes;
+
+			if ( $recover_stuck ) {
+				$recovery = ( new RecoverStuckJobsAbility() )->execute(
+					array(
+						'dry_run'       => false,
+						'timeout_hours' => $stuck_timeout,
+					)
+				);
+
+				if ( empty( $recovery['success'] ) ) {
+					++$warnings;
+				} else {
+					$recoveries += (int) ( $recovery['recovered'] ?? 0 );
+					$timed_out  += (int) ( $recovery['timed_out'] ?? 0 );
+					$reconciled += (int) ( $recovery['stale_actions'] ?? 0 );
+				}
+			}
+
+			$claim = self::claimNextJob( $time_limit > 0 ? $time_limit + max( 60, $stop_before_timeout ) : 600 );
+			if ( null === $claim ) {
+				$stop_reason = 'idle';
+				break;
+			}
+
+			++$job_claims;
+			try {
+				$remaining_seconds = $time_limit > 0 ? max( 1, $time_limit - $stop_before_timeout - ( time() - $started_at ) ) : $drain_time_limit;
+				$result            = $drain_job->execute(
+					array(
+						'job_id'         => $claim['job_id'],
+						'step_budget'    => $job_step_budget,
+						'time_budget_ms' => min( $drain_time_limit, $remaining_seconds ) * 1000,
+					)
+				);
+
+				$actions += (int) ( $result['actions_drained'] ?? 0 );
+				if ( ! empty( $result['success'] ) ) {
+					++$completed;
+				} elseif ( ! empty( $result['error'] ) ) {
+					++$failures;
+				}
+			} catch ( \Throwable $throwable ) {
+				unset( $throwable );
+				++$failures;
+			} finally {
+				WorkerLock::release( $claim['token'], $claim['lock_lane'] );
+			}
+
+			if ( $once ) {
+				$stop_reason = 'once';
+				break;
+			}
+		}
+
+		$status = self::statusSnapshot();
+
+		return array(
+			'passes'                   => $passes,
+			'job_recoveries'           => $recoveries,
+			'job_timeouts'             => $timed_out,
+			'stale_actions_reconciled' => $reconciled,
+			'job_claims'               => $job_claims,
+			'job_completions'          => $completed,
+			'action_completions'       => $actions,
+			'action_failures'          => $failures,
+			'pending_actions'          => (int) $status['pending_actions'],
+			'due_actions'              => (int) $status['due_actions'],
+			'total_pending_actions'    => (int) $status['total_pending_actions'],
+			'processing_jobs'          => (int) $status['processing_jobs'],
+			'pending_jobs'             => (int) $status['pending_jobs'],
+			'stuck_jobs'               => (int) $status['stuck_jobs'],
+			'warnings'                 => $warnings,
+			'duration_seconds'         => time() - $started_at,
+			'stop_reason'              => $stop_reason,
+			'mode'                     => 'job',
+		);
+	}
+
+	/**
 	 * Build a lightweight worker status snapshot.
 	 *
 	 * @return array<string,int|string>
@@ -420,6 +571,123 @@ class WorkerCommand extends BaseCommand {
 	private static function normalizeLane( mixed $lane ): string {
 		$lane = is_string( $lane ) ? strtolower( trim( $lane ) ) : '';
 		return in_array( $lane, array( 'publish', 'background' ), true ) ? $lane : '';
+	}
+
+	/**
+	 * Normalize worker execution mode.
+	 */
+	private static function normalizeMode( mixed $mode ): string {
+		$mode = is_string( $mode ) ? strtolower( trim( $mode ) ) : 'queue';
+		return 'job' === $mode ? 'job' : 'queue';
+	}
+
+	/**
+	 * Claim the next due Data Machine job by taking a per-job worker lock.
+	 *
+	 * @return array{job_id:int,token:string,lock_lane:string}|null Claimed job state.
+	 */
+	private static function claimNextJob( int $ttl ): ?array {
+		foreach ( self::dueJobIds() as $job_id ) {
+			$lock_lane = 'job-' . $job_id;
+			$lock      = WorkerLock::acquire( self::defaultJobLockOwner( $job_id ), $ttl, $lock_lane );
+			if ( empty( $lock['acquired'] ) ) {
+				continue;
+			}
+
+			return array(
+				'job_id'    => $job_id,
+				'token'     => (string) ( $lock['lock_token'] ?? '' ),
+				'lock_lane' => $lock_lane,
+			);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Return job IDs that currently have due, job-scoped Data Machine actions.
+	 *
+	 * @return int[] Job IDs ordered by oldest due scheduler action.
+	 */
+	private static function dueJobIds(): array {
+		global $wpdb;
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Worker job selection must inspect fresh scheduler rows.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT a.action_id, a.args
+				FROM %i a
+				INNER JOIN %i g ON g.group_id = a.group_id
+				WHERE a.hook IN (%s, %s)
+				AND a.status = \'pending\'
+				AND g.slug = %s
+				AND a.scheduled_date_gmt <= %s
+				AND (a.args LIKE %s OR a.args LIKE %s)
+				ORDER BY a.scheduled_date_gmt ASC, a.action_id ASC
+				LIMIT 200',
+				$actions_table,
+				$groups_table,
+				DrainCommand::HOOK_EXECUTE_STEP,
+				DrainCommand::HOOK_BATCH_CHUNK,
+				'data-machine',
+				gmdate( 'Y-m-d H:i:s' ),
+				'%"job_id"%',
+				'%"parent_job_id"%'
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		$job_ids = array();
+		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+			$job_id = self::extractActionJobId( (string) ( $row['args'] ?? '' ) );
+			if ( $job_id > 0 ) {
+				$job_ids[] = $job_id;
+			}
+		}
+
+		return array_values( array_unique( $job_ids ) );
+	}
+
+	/**
+	 * Extract a job identifier from Action Scheduler args.
+	 */
+	private static function extractActionJobId( string $args_json ): int {
+		$args = json_decode( $args_json, true );
+		if ( ! is_array( $args ) ) {
+			return 0;
+		}
+
+		if ( isset( $args['job_id'] ) ) {
+			return absint( $args['job_id'] );
+		}
+
+		if ( isset( $args['parent_job_id'] ) ) {
+			return absint( $args['parent_job_id'] );
+		}
+
+		foreach ( $args as $value ) {
+			if ( is_array( $value ) && isset( $value['job_id'] ) ) {
+				return absint( $value['job_id'] );
+			}
+
+			if ( is_array( $value ) && isset( $value['parent_job_id'] ) ) {
+				return absint( $value['parent_job_id'] );
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Build a compact default owner string for per-job locks.
+	 */
+	private static function defaultJobLockOwner( int $job_id ): string {
+		$pid = getmypid();
+		return sprintf( 'worker:job:%d pid:%d host:%s', $job_id, false === $pid ? 0 : $pid, php_uname( 'n' ) );
 	}
 
 	/**
