@@ -64,6 +64,7 @@ function datamachine_run_conversation(
 	$tool_runtime_rules   = datamachine_resolve_tool_runtime_rules( $payload );
 	$transcript_persister = datamachine_resolve_transcript_persister( $payload );
 	$transcript_lock      = $payload['transcript_lock'] ?? $payload['transcript_lock_store'] ?? null;
+	$interrupt_source     = is_callable( $payload['interrupt_source'] ?? null ) ? $payload['interrupt_source'] : null;
 
 	// Strip runtime objects from the loop payload before passing to tools/requests.
 	$loop_payload = datamachine_payload_without_runtime_objects( $payload );
@@ -247,6 +248,7 @@ function datamachine_run_conversation(
 				'transcript_lock'       => $transcript_lock,
 				'transcript_session_id' => (string) ( $loop_payload['transcript_session_id'] ?? $loop_payload['session_id'] ?? '' ),
 				'transcript_lock_ttl'   => (int) ( $payload['transcript_lock_ttl'] ?? 300 ),
+				'interrupt_source'      => $interrupt_source,
 				'on_event'              => $on_event,
 			)
 		);
@@ -312,10 +314,13 @@ function datamachine_run_conversation(
 	// request_metadata directly on the result (agents-api#136). Keep DM-only
 	// diagnostics namespaced so the top level remains the Agents API result.
 	$datamachine_metadata     = array(
-		'completed'       => 'budget_exceeded' !== ( $result['status'] ?? '' ),
+		'completed'       => ! in_array( (string) ( $result['status'] ?? '' ), array( 'budget_exceeded', 'interrupted' ), true ),
 		'last_tool_calls' => $last_tool_calls,
 		'tool_calls'      => $all_tool_calls,
 	);
+	if ( 'interrupted' === ( $result['status'] ?? '' ) && isset( $result['interrupted'] ) ) {
+		$datamachine_metadata['interrupted'] = $result['interrupted'];
+	}
 	$silent_max_turns_reached = ! $latest_conversation_complete
 		&& (int) ( $result['turn_count'] ?? 0 ) >= $turn_budget->ceiling()
 		&& 'budget_exceeded' !== ( $result['status'] ?? '' );
@@ -1960,7 +1965,7 @@ function datamachine_summarize_tool_execution_results( array $tool_execution_res
  * @return array Clean payload.
  */
 function datamachine_payload_without_runtime_objects( array $payload ): array {
-	unset( $payload['event_sink'], $payload['completion_policy'], $payload['transcript_persister'], $payload['transcript_lock'], $payload['transcript_lock_store'] );
+	unset( $payload['event_sink'], $payload['completion_policy'], $payload['transcript_persister'], $payload['transcript_lock'], $payload['transcript_lock_store'], $payload['interrupt_source'] );
 	return $payload;
 }
 

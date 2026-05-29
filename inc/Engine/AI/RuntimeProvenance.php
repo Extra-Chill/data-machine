@@ -163,6 +163,9 @@ class RuntimeProvenance {
 		if ( ! empty( $datamachine['max_turns_reached'] ) || 'budget_exceeded' === ( $result['status'] ?? '' ) ) {
 			return 'max_turns';
 		}
+		if ( 'interrupted' === ( $result['status'] ?? '' ) ) {
+			return 'interrupted';
+		}
 		if ( isset( $result['error'] ) ) {
 			return 'provider_error';
 		}

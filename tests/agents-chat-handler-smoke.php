@@ -81,7 +81,9 @@ $assert( ! str_contains( $handler_source, "wp_agent_chat_handler" ), 'AgentsChat
 $assert( str_contains( $handler_source, 'ChatOrchestrator::processChat(' ), 'AgentsChatHandler owns the single ChatOrchestrator runtime call' );
 $assert( str_contains( $handler_source, "'selected_pipeline_id' => (int) ( $" . "input['selected_pipeline_id'] ?? 0 )" ), 'AgentsChatHandler forwards selected pipeline context' );
 $assert( str_contains( $handler_source, "'request_id'           => $" . "input['request_id'] ?? null" ), 'AgentsChatHandler forwards request id for session dedupe' );
+$assert( str_contains( $handler_source, "'interrupt_source'     => is_callable( $" . "input['interrupt_source'] ?? null ) ? $" . "input['interrupt_source'] : null" ), 'AgentsChatHandler explicitly forwards callable interrupt sources' );
 $assert( str_contains( $handler_source, "'agent_slug'           => sanitize_title( (string) ( $" . "input['agent'] ?? '' ) )" ), 'AgentsChatHandler forwards agent targeting to the chat runtime' );
+$assert( str_contains( $handler_source, "'interrupted'  => $" . "result['interrupted'] ?? null" ), 'AgentsChatHandler returns interrupted diagnostics in canonical metadata' );
 $assert( ! file_exists( $root . '/inc/Abilities/Chat/SendMessageAbility.php' ), 'datamachine/send-message facade class is removed' );
 $assert( ! str_contains( $chat_abilities, 'SendMessageAbility' ), 'ChatAbilities no longer registers datamachine/send-message' );
 $assert( str_contains( $chat_api, "wp_get_ability( 'agents/chat' )" ), 'REST chat endpoint dispatches directly through canonical agents/chat' );

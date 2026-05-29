@@ -262,7 +262,77 @@ assert_runner_request( true === ( $budget_metadata['max_turns_reached'] ?? null 
 assert_runner_request( false === ( $budget_metadata['completed'] ?? true ), 'budget exceeded marks namespaced completion false' );
 assert_runner_request( ! array_key_exists( 'max_turns_reached', $budget_result ), 'budget exceeded omits legacy max_turns_reached from top level' );
 
-// 3. Mid-conversation provider failures preserve the completed-turn context.
+// 3. Interrupt sources are forwarded to the Agents API loop and cancel cooperatively.
+$interrupt_dispatch_count = 0;
+$interrupt_source_calls   = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$interrupt_dispatch_count ) {
+		++$interrupt_dispatch_count;
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => '',
+				'tool_calls' => array(
+					array(
+						'name'       => 'runner_request_smoke_tool',
+						'parameters' => array( 'name' => 'Grace' ),
+					),
+				),
+				'usage'      => array(
+					'prompt_tokens'     => 4,
+					'completion_tokens' => 5,
+					'total_tokens'      => 9,
+				),
+			),
+		);
+	}
+);
+
+$interrupt_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'use a tool before interruption' ) ),
+	array(
+		'runner_request_smoke_tool' => array(
+			'name'        => 'runner_request_smoke_tool',
+			'description' => 'Runner request smoke tool',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RunnerRequestSmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array( 'pipeline' ),
+	array(
+		'interrupt_source' => static function ( WP_Agent_Conversation_Request $request, array $context ) use ( &$interrupt_source_calls ): array {
+			++$interrupt_source_calls;
+
+			assert_runner_request( 3 === count( $request->messages() ), 'interrupt source receives current transcript after tool execution' );
+			assert_runner_request( 1 === ( $context['turn'] ?? null ), 'interrupt source receives current turn context' );
+
+			return array(
+				'role'     => 'user',
+				'content'  => 'Cancel this Data Machine run.',
+				'metadata' => array(
+					'interrupt_action' => 'cancel',
+					'source'           => 'smoke-test',
+				),
+			);
+		},
+	),
+	3
+);
+$interrupt_metadata = datamachine_conversation_metadata( $interrupt_result );
+
+assert_runner_request( 1 === $interrupt_dispatch_count, 'interrupt cancellation prevents a second provider request' );
+assert_runner_request( 1 === $interrupt_source_calls, 'interrupt source is checked once between turns' );
+assert_runner_request( 'interrupted' === ( $interrupt_result['status'] ?? null ), 'interrupt cancellation preserves canonical interrupted status' );
+assert_runner_request( false === ( $interrupt_metadata['completed'] ?? true ), 'interrupt cancellation marks namespaced completion false' );
+assert_runner_request( 'cancel' === ( $interrupt_metadata['interrupted']['action'] ?? null ), 'interrupt diagnostics record cancel action' );
+assert_runner_request( 'interrupted' === ( $interrupt_result['runtime_provenance']['status']['finish_reason'] ?? null ), 'interrupt provenance records interrupted finish reason' );
+
+// 4. Mid-conversation provider failures preserve the completed-turn context.
 $mid_failure_dispatch_count = 0;
 $mid_failure_transcript     = new RunnerRequestSmokeTranscriptPersister();
 WpAiClientTestDouble::reset();
