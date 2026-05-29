@@ -364,6 +364,9 @@ class QueueCommand extends BaseCommand {
 	 * [--step=<flow_step_id>]
 	 * : Target a specific flow step. Auto-resolved if the flow has exactly one queueable step.
 	 *
+	 * [--dry-run]
+	 * : Report how many queued items would be cleared without changing the queue.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     # Clear all queued items
@@ -395,6 +398,30 @@ class QueueCommand extends BaseCommand {
 		}
 
 		$step_type  = $this->getStepType( $flow_id, $flow_step_id );
+
+		if ( ! empty( $assoc_args['dry-run'] ) ) {
+			$list_ability_id = ( 'fetch' === $step_type )
+				? 'datamachine/config-patch-list'
+				: 'datamachine/queue-list';
+
+			$result = AbilityResult::normalize( wp_get_ability( $list_ability_id )->execute(
+				array(
+					'flow_id'      => $flow_id,
+					'flow_step_id' => $flow_step_id,
+				)
+			) );
+
+			if ( ! $result['success'] ) {
+				WP_CLI::error( $result['error'] ?? 'Failed to inspect queue' );
+				return;
+			}
+
+			$count = count( $result['queue'] ?? array() );
+
+			WP_CLI::success( sprintf( 'Would clear %d item(s) from queue.', $count ) );
+			return;
+		}
+
 		$ability_id = ( 'fetch' === $step_type )
 			? 'datamachine/config-patch-clear'
 			: 'datamachine/queue-clear';

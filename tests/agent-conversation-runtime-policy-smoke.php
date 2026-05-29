@@ -542,6 +542,29 @@ assert_runtime_policy( 2 === count( $duplicate_result['tool_execution_results'] 
 assert_runtime_policy( 'second_policy_tool' === ( $duplicate_result['tool_execution_results'][1]['tool_name'] ?? '' ), 'duplicate recovery reaches next required tool' );
 assert_runtime_policy( str_contains( wp_json_encode( $duplicate_transcript->calls[0]['messages'] ?? array() ), 'DUPLICATE REJECTED' ), 'duplicate recovery transcript includes correction message' );
 
+$orphan_retry_validation = DataMachine\Engine\AI\ConversationManager::validateToolCall(
+	'runtime_policy_tool',
+	array( 'name' => 'Ada' ),
+	array(
+		AgentsAPI\AI\WP_Agent_Message::toolCall( 'Calling runtime_policy_tool', 'runtime_policy_tool', array( 'name' => 'Ada' ), 1 ),
+	),
+	array( 'name' => 'runtime_policy_tool' )
+);
+
+assert_runtime_policy( false === $orphan_retry_validation['is_duplicate'], 'orphaned tool calls without successful results may be retried' );
+
+$successful_retry_validation = DataMachine\Engine\AI\ConversationManager::validateToolCall(
+	'runtime_policy_tool',
+	array( 'name' => 'Ada' ),
+	array(
+		AgentsAPI\AI\WP_Agent_Message::toolCall( 'Calling runtime_policy_tool', 'runtime_policy_tool', array( 'name' => 'Ada' ), 1 ),
+		AgentsAPI\AI\WP_Agent_Message::toolResult( 'Done', 'runtime_policy_tool', array( 'success' => true ) ),
+	),
+	array( 'name' => 'runtime_policy_tool' )
+);
+
+assert_runtime_policy( true === $successful_retry_validation['is_duplicate'], 'successful prior tool calls are still treated as duplicates' );
+
 $repeatable_dispatch_count = 0;
 WpAiClientTestDouble::reset();
 WpAiClientTestDouble::set_response_callback(

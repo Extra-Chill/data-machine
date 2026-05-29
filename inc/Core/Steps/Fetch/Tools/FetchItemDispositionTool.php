@@ -18,6 +18,7 @@ namespace DataMachine\Core\Steps\Fetch\Tools;
 
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\RunMetrics;
+use DataMachine\Core\EngineData;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -73,8 +74,8 @@ class FetchItemDispositionTool {
 			);
 		}
 
-		// Get engine data for item identification
-		$engine = $parameters['engine'] ?? null;
+		// Get engine data for item identification.
+		$engine = $this->resolveEngineData( $parameters, $job_id );
 		if ( ! $engine ) {
 			return array(
 				'success'   => false,
@@ -210,7 +211,7 @@ class FetchItemDispositionTool {
 			);
 		}
 
-		$engine = $parameters['engine'] ?? null;
+		$engine = $this->resolveEngineData( $parameters, $job_id );
 		if ( ! $engine ) {
 			return array(
 				'success'   => false,
@@ -297,6 +298,26 @@ class FetchItemDispositionTool {
 		$disposition = $tool_def['disposition'] ?? self::DISPOSITION_REJECT_SOURCE;
 
 		return self::DISPOSITION_DEFER_ITEM === $disposition ? self::DISPOSITION_DEFER_ITEM : self::DISPOSITION_REJECT_SOURCE;
+	}
+
+	/**
+	 * Resolve engine data from explicit runtime context or persisted job state.
+	 *
+	 * @param array<string,mixed> $parameters Tool parameters.
+	 * @param int                 $job_id Job ID.
+	 * @return object|null Engine-like object exposing get(), or null.
+	 */
+	private function resolveEngineData( array $parameters, int $job_id ): ?object {
+		$engine = $parameters['engine'] ?? null;
+		if ( is_object( $engine ) && method_exists( $engine, 'get' ) ) {
+			return $engine;
+		}
+
+		if ( $job_id <= 0 ) {
+			return null;
+		}
+
+		return EngineData::forJob( $job_id );
 	}
 
 	/**

@@ -900,6 +900,8 @@ class AIStep extends Step {
 		$flow_step_id           = $payload['flow_step_id'];
 		$messages               = $loop_result['messages'] ?? array();
 		$tool_execution_results = $loop_result['tool_execution_results'] ?? array();
+		$loop_metadata          = datamachine_conversation_metadata( $loop_result );
+		$assertions_satisfied   = ! empty( $loop_metadata['completion_assertions_satisfied'] ) && empty( $loop_metadata['completion_assertions_missing'] );
 
 		// Start with an empty output array — input packets are NOT carried forward.
 		$outputPackets = array();
@@ -975,6 +977,7 @@ class AIStep extends Step {
 			} else {
 				// Non-handler tool or failed tool - add tool result data packet
 				$success_message = ConversationManager::generateSuccessMessage( $tool_name, $tool_result, $tool_parameters );
+				$tool_success    = $tool_result['success'] ?? false;
 
 				$packet        = new DataPacket(
 					array(
@@ -982,13 +985,14 @@ class AIStep extends Step {
 						'body'  => $success_message,
 					),
 					array(
-						'tool_name'            => $tool_name,
-						'handler_tool'         => $tool_def['handler'] ?? null,
-						'tool_parameters'      => $tool_parameters,
-						'tool_success'         => $tool_result['success'] ?? false,
-						'tool_result_envelope' => $tool_result,
-						'tool_result_data'     => $projected_tool_result_data,
-						'source_type'          => $input_source_type,
+						'tool_name'              => $tool_name,
+						'handler_tool'           => $tool_def['handler'] ?? null,
+						'tool_parameters'        => $tool_parameters,
+						'tool_success'           => $tool_success,
+						'tool_failure_non_fatal' => false === (bool) $tool_success && $assertions_satisfied,
+						'tool_result_envelope'   => $tool_result,
+						'tool_result_data'       => $projected_tool_result_data,
+						'source_type'            => $input_source_type,
 					),
 					'tool_result'
 				);

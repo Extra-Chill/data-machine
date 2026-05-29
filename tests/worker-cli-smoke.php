@@ -45,6 +45,7 @@ assert_worker_contains( 'DrainCommand::drain(', $worker_src, 'worker composes th
 assert_worker_contains( 'DrainCommand::ensureCliMemoryLimit()', $worker_src, 'worker raises the CLI memory floor before draining' );
 assert_worker_contains( "'acquire_lock' => false", $worker_src, 'worker internal drain does not fight outer lock' );
 assert_worker_contains( 'PendingActionStore::summary', $worker_src, 'worker reads pending-action gate through the store' );
+assert_worker_contains( 'if ( $stop_on_pending_actions && self::pendingActionCount() > 0 )', $worker_src, 'worker only reads pending-action gate when the stop option is enabled' );
 assert_worker_contains( 'JobsSummaryAbility', $worker_src, 'worker reads job status through the existing summary ability' );
 assert_worker_contains( "'compact' => true", $worker_src, 'worker status uses compact job summary' );
 assert_worker_contains( 'jobStatusCount', $worker_src, 'worker reads normalized job status buckets' );
@@ -59,6 +60,11 @@ assert_worker_contains( "'job_step_budget'         => isset( \$assoc_args['job-s
 assert_worker_contains( "'job' === self::normalizeMode", $worker_src, 'worker routes job mode to job-claiming loop' );
 assert_worker_contains( 'DrainJobAbility', $worker_src, 'job mode drains one claimed job through the drain-job primitive' );
 assert_worker_contains( 'claimNextJob', $worker_src, 'job mode claims one job before draining it' );
+assert_worker_contains( 'drainBootstrapActions', $worker_src, 'job mode drains bootstrap work when no job is claimable' );
+assert_worker_contains( 'bootstrapHooks', $worker_src, 'job mode limits bootstrap draining to explicit scheduler hooks' );
+assert_worker_contains( "'limit'        => 3", $worker_src, 'job mode bootstrap drain has a small action limit' );
+assert_worker_contains( "'batch_size'   => 1", $worker_src, 'job mode bootstrap drain claims one bootstrap action per batch' );
+assert_worker_contains( "'datamachine_recurring_wiki_brain_refill'", $worker_src, 'job mode bootstrap drain includes wiki refill scheduling' );
 assert_worker_contains( "'job-' . \$job_id", $worker_src, 'job mode uses per-job lock lanes' );
 assert_worker_contains( 'dueJobIds', $worker_src, 'job mode selects due jobs from scheduler work' );
 assert_worker_contains( 'extractActionJobId', $worker_src, 'job mode extracts job ids from scheduler args' );

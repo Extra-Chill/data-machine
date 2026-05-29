@@ -41,6 +41,28 @@ namespace {
 			$data
 		);
 	}
+
+	function wp_cache_get( $key, string $group = '' ) {
+		unset( $key, $group );
+		return false;
+	}
+
+	function wp_cache_set( $key, $value, string $group = '' ): bool {
+		unset( $key, $value, $group );
+		return true;
+	}
+
+	function wp_strip_all_tags( string $text ): string {
+		return strip_tags( $text );
+	}
+}
+
+namespace DataMachine\Core\Database\Jobs {
+	class Jobs {
+		public function retrieve_engine_data( int $job_id ): array {
+			return $GLOBALS['fetch_disposition_smoke_persisted_engine'][ $job_id ] ?? array();
+		}
+	}
 }
 
 namespace DataMachine\Core\Database\ProcessedItems {
@@ -54,6 +76,7 @@ namespace DataMachine\Core\Database\ProcessedItems {
 
 namespace {
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
+	require_once __DIR__ . '/../inc/Core/EngineData.php';
 	require_once __DIR__ . '/../inc/Core/Steps/Fetch/Tools/FetchItemDispositionTool.php';
 
 	final class FetchDispositionSmokeEngine {
@@ -140,6 +163,28 @@ namespace {
 	assert_fetch_disposition_smoke( 'tool-error deferral remains retry eligible', 'failed - item-deferred' === ( $GLOBALS['fetch_disposition_smoke_engine'][1815]['job_status'] ?? '' ) );
 	$defer_diagnostic = $GLOBALS['fetch_disposition_smoke_engine'][1815]['disposition_diagnostic'] ?? array();
 	assert_fetch_disposition_smoke( 'defer_item persists disposition diagnostic', 'defer_item' === ( $defer_diagnostic['disposition'] ?? '' ) && 'tool-error' === ( $defer_diagnostic['reason'] ?? '' ) );
+
+	echo "Case 2b: reject_source hydrates engine data from job_id when runtime engine is absent\n";
+	$GLOBALS['fetch_disposition_smoke_processed']               = array();
+	$GLOBALS['fetch_disposition_smoke_persisted_engine'][1816] = array(
+		'item_identifier' => 'source-456',
+		'source_type'     => 'mcp',
+		'flow_config'     => array(
+			'fetch-step_8' => array( 'step_type' => 'fetch' ),
+			'ai-step_8'    => array( 'step_type' => 'ai' ),
+		),
+	);
+	$reject_hydrated = $tool->handle_tool_call(
+		array(
+			'job_id'       => 1816,
+			'flow_step_id' => 'ai-step_8',
+			'data'         => $data_packets,
+			'reason'       => 'unrelated-subject',
+		),
+		array( 'disposition' => 'reject_source' )
+	);
+	assert_fetch_disposition_smoke( 'reject_source succeeds with persisted engine data', true === ( $reject_hydrated['success'] ?? false ) );
+	assert_fetch_disposition_smoke( 'persisted engine data marks processed source identity', array( 'fetch-step_8', 'mcp', 'source-456', 1816 ) === ( $GLOBALS['fetch_disposition_smoke_processed'][0] ?? null ) );
 
 	echo "Case 3: production tool surface exposes positive affordances\n";
 	$fetch_handler = file_get_contents( __DIR__ . '/../inc/Core/Steps/Fetch/Handlers/FetchHandler.php' );

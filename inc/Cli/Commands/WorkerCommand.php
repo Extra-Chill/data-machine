@@ -256,8 +256,7 @@ class WorkerCommand extends BaseCommand {
 					break;
 				}
 
-				$pending_actions = self::pendingActionCount();
-				if ( $stop_on_pending_actions && $pending_actions > 0 ) {
+				if ( $stop_on_pending_actions && self::pendingActionCount() > 0 ) {
 					$stop_reason = 'pending_actions';
 					break;
 				}
@@ -360,6 +359,7 @@ class WorkerCommand extends BaseCommand {
 		$timed_out   = 0;
 		$reconciled  = 0;
 		$job_claims  = 0;
+		$bootstraps  = 0;
 		$completed   = 0;
 		$actions     = 0;
 		$failures    = 0;
@@ -380,8 +380,7 @@ class WorkerCommand extends BaseCommand {
 				break;
 			}
 
-			$pending_actions = self::pendingActionCount();
-			if ( $stop_on_pending_actions && $pending_actions > 0 ) {
+			if ( $stop_on_pending_actions && self::pendingActionCount() > 0 ) {
 				$stop_reason = 'pending_actions';
 				break;
 			}
@@ -407,6 +406,21 @@ class WorkerCommand extends BaseCommand {
 
 			$claim = self::claimNextJob( $time_limit > 0 ? $time_limit + max( 60, $stop_before_timeout ) : 600 );
 			if ( null === $claim ) {
+				$remaining_seconds = $time_limit > 0 ? max( 1, $time_limit - $stop_before_timeout - ( time() - $started_at ) ) : $drain_time_limit;
+				$bootstrap         = self::drainBootstrapActions( min( $drain_time_limit, $remaining_seconds ) );
+				$bootstraps       += (int) ( $bootstrap['completions'] ?? 0 );
+				$failures         += (int) ( $bootstrap['failures'] ?? 0 );
+				$warnings         += (int) ( $bootstrap['warnings'] ?? 0 );
+
+				if ( (int) ( $bootstrap['completions'] ?? 0 ) > 0 ) {
+					if ( $once ) {
+						$stop_reason = 'once';
+						break;
+					}
+
+					continue;
+				}
+
 				$stop_reason = 'idle';
 				break;
 			}
@@ -450,6 +464,7 @@ class WorkerCommand extends BaseCommand {
 			'stale_actions_reconciled' => $reconciled,
 			'job_claims'               => $job_claims,
 			'job_completions'          => $completed,
+			'bootstrap_actions'        => $bootstraps,
 			'action_completions'       => $actions,
 			'action_failures'          => $failures,
 			'pending_actions'          => (int) $status['pending_actions'],
@@ -462,6 +477,54 @@ class WorkerCommand extends BaseCommand {
 			'duration_seconds'         => time() - $started_at,
 			'stop_reason'              => $stop_reason,
 			'mode'                     => 'job',
+		);
+	}
+
+	/**
+	 * Drain a small amount of non-job scheduler work that creates future jobs.
+	 *
+	 * Job mode should not become a second shared queue worker, but it must keep
+	 * recurring flow/refill/bootstrap hooks moving after the current job backlog
+	 * reaches zero. Action Scheduler owns the concrete action claims, so this can
+	 * run without the legacy global Data Machine worker lock.
+	 *
+	 * @return array<string,int|string>
+	 */
+	private static function drainBootstrapActions( int $time_limit ): array {
+		return DrainCommand::drain(
+			array(
+				'limit'        => 3,
+				'batch_size'   => 1,
+				'time_limit'   => max( 1, $time_limit ),
+				'acquire_lock' => false,
+				'hooks'        => self::bootstrapHooks(),
+			)
+		);
+	}
+
+	/**
+	 * Hooks that seed, schedule, or maintain Data Machine jobs but are not a job.
+	 *
+	 * @return string[]
+	 */
+	private static function bootstrapHooks(): array {
+		return array(
+			'datamachine_run_flow_now',
+			'datamachine_recurring_wiki_brain_refill',
+			'datamachine_recurring_wiki_generated_page_decision',
+			'datamachine_recurring_wiki_graph_maintain',
+			'datamachine_recurring_wiki_timeline_materialize',
+			'datamachine_recurring_wiki_timeline_materialize_wordpress_com',
+			'datamachine_recurring_retention_as_actions',
+			'datamachine_recurring_retention_chat_sessions',
+			'datamachine_recurring_retention_completed_jobs',
+			'datamachine_recurring_retention_failed_jobs',
+			'datamachine_recurring_retention_files',
+			'datamachine_recurring_retention_logs',
+			'datamachine_recurring_retention_processed_items',
+			'datamachine_recurring_retention_stale_claims',
+			'datamachine_recurring_workspace_disk_emergency_cleanup',
+			'datamachine_recurring_workspace_retention_cleanup',
 		);
 	}
 
