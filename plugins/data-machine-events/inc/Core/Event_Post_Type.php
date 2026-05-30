@@ -97,7 +97,54 @@ class Event_Post_Type {
 		// without the storage cost.
 		add_filter( 'wp_revisions_to_keep', array( __CLASS__, 'limit_event_revisions' ), 10, 2 );
 
+		// Prevent WordPress core from stamping a 404 status on paginated XML
+		// sitemap pages. See prevent_sitemap_404() for the full explanation.
+		add_filter( 'pre_handle_404', array( __CLASS__, 'prevent_sitemap_404' ), 10, 2 );
+
 		self::setup_admin_menu_control();
+	}
+
+	/**
+	 * Prevent WordPress core from returning a 404 status on paginated XML
+	 * sitemap pages.
+	 *
+	 * The event post type advertises far more sub-sitemap pages
+	 * (`wp-sitemap-posts-data_machine_events-N.xml`) than the site has pages
+	 * of regular blog posts. During a sitemap request WordPress still builds a
+	 * "main" query that defaults to the `post` post type with the site's
+	 * `posts_per_page`. WP_Sitemaps renders the correct event XML on
+	 * `template_redirect` from its own provider query, but `WP::handle_404()`
+	 * runs earlier (on the `wp` action) against that dummy main query. Once the
+	 * requested `paged` value exceeds the number of regular blog-post pages,
+	 * the main query returns zero posts and core flags `is_404()` —
+	 * stamping a 404 status header on a response whose body is valid event XML.
+	 *
+	 * Net effect: every advertised sitemap page beyond the blog's page count
+	 * (e.g. pages 6–40 of 40) returns HTTP 404 to crawlers despite carrying a
+	 * full, valid `<urlset>`, so Google discards them and most events never get
+	 * indexed.
+	 *
+	 * Fix: short-circuit `handle_404()` for any WP core sitemap request. The
+	 * sitemap renderer remains fully responsible for the response, including
+	 * issuing its own legitimate 404 when a page genuinely has no URLs
+	 * (see WP_Sitemaps::render_sitemaps()).
+	 *
+	 * @since 0.25.0
+	 *
+	 * @param bool      $preempt  Whether to short-circuit default 404 handling.
+	 * @param \WP_Query $wp_query The main query (unused; kept for signature parity).
+	 * @return bool True to bypass core 404 handling on sitemap requests, otherwise the original value.
+	 */
+	public static function prevent_sitemap_404( $preempt, $wp_query ) {
+		// Only intervene on WP core XML sitemap routes. The `sitemap` query var
+		// is set exclusively by WP_Sitemaps rewrite rules
+		// (wp-sitemap*.xml / .xsl), so this never affects normal front-end
+		// requests.
+		if ( get_query_var( 'sitemap' ) || get_query_var( 'sitemap-stylesheet' ) ) {
+			return true;
+		}
+
+		return $preempt;
 	}
 
 	/**
