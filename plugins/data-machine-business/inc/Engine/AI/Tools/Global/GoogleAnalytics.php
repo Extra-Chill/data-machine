@@ -69,14 +69,14 @@ class GoogleAnalytics extends BaseTool {
 		return array(
 			'class'           => __CLASS__,
 			'method'          => 'handle_tool_call',
-			'description'     => 'Fetch visitor analytics from Google Analytics (GA4). Get page performance metrics, traffic sources, daily trends, real-time active users, top events, user demographics, landing pages, engagement metrics, and new-vs-returning user breakdown. Supports sorting, hostname filtering for multisite, and period-over-period comparison.',
+			'description'     => 'Fetch visitor analytics from Google Analytics (GA4). Get page performance metrics (with hostName for multisite), traffic sources, daily trends, real-time active users, top events, user demographics, landing pages, engagement metrics, new-vs-returning user breakdown, and a cross-site network-density proxy. Supports sorting, hostname filtering for multisite, and period-over-period comparison.',
 			'requires_config' => true,
 			'parameters'      => array(
 				'type'       => 'object',
 				'properties' => array(
 					'action'      => array(
 					'type'        => 'string',
-					'description' => 'Action to perform: page_stats (per-page views, sessions, bounce rate), traffic_sources (where visitors come from), date_stats (daily trends over time), realtime (active users right now), top_events (most triggered events), user_demographics (visitor country and device breakdown), landing_pages (entry pages with session metrics), engagement (engagement rate, session quality, pages/session), new_vs_returning (new vs returning user comparison).',
+					'description' => 'Action to perform: page_stats (per-page views, sessions, bounce rate; includes hostName so multisite pages are distinguishable), traffic_sources (where visitors come from), date_stats (daily trends over time), realtime (active users right now), top_events (most triggered events), user_demographics (visitor country and device breakdown), landing_pages (entry pages with session metrics), engagement (engagement rate, session quality, pages/session), new_vs_returning (new vs returning user comparison), network_density (cross-site journey proxy: hostName x pageReferrer, to compute % of sessions per site whose referrer was another site on the network; approximation only — pageReferrer is the immediately-preceding URL not an ordered session path, and is subject to referrer-policy stripping, sampling, and high-cardinality bucketing).',
 				),
 					'property_id' => array(
 					'type'        => 'string',

@@ -68,8 +68,18 @@ class GoogleAnalyticsAbilities {
 	 */
 	const ACTION_REPORTS = array(
 		'page_stats'        => array(
-			'dimensions' => array( 'pagePath', 'pageTitle' ),
+			// hostName is prepended (not replacing pagePath) so existing pagePath-keyed
+			// consumers keep working while cross-site rows become distinguishable — on a
+			// multisite GA4 property two sites otherwise both collapse to pagePath "/".
+			'dimensions' => array( 'hostName', 'pagePath', 'pageTitle' ),
 			'metrics'    => array( 'screenPageViews', 'sessions', 'bounceRate', 'averageSessionDuration', 'activeUsers' ),
+		),
+		'network_density'   => array(
+			// Cross-site journey proxy: current host x previous URL. Bucket pageReferrer's
+			// host into in-network vs external to compute "% of sessions per site whose
+			// referrer was another EC site". Approximation only — see action description.
+			'dimensions' => array( 'hostName', 'pageReferrer' ),
+			'metrics'    => array( 'sessions', 'activeUsers', 'screenPageViews' ),
 		),
 		'traffic_sources'   => array(
 			'dimensions' => array( 'sessionSource', 'sessionMedium' ),
@@ -126,7 +136,7 @@ class GoogleAnalyticsAbilities {
 						'properties' => array(
 							'action'      => array(
 								'type'        => 'string',
-								'description' => 'Action to perform: page_stats, traffic_sources, date_stats, realtime, top_events, user_demographics, landing_pages, engagement, new_vs_returning.',
+								'description' => 'Action to perform: page_stats (per-page metrics, includes hostName for multisite), traffic_sources, date_stats, realtime, top_events, user_demographics, landing_pages, engagement, new_vs_returning, network_density (cross-site journey proxy: hostName x pageReferrer; approximation only — pageReferrer is the immediately-preceding URL, not an ordered session path, and is subject to referrer-policy stripping, sampling, and high-cardinality "(other)" bucketing).',
 							),
 							'property_id' => array(
 								'type'        => 'string',
