@@ -2,6 +2,39 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.136.0] - 2026-05-30
+
+### Added
+- add blog ID and last-updated to NETWORK.md sites table; label SITE.md as current-site
+
+### Changed
+- Remove legacy Agents API compatibility shims
+- Retry cURL empty reply AI failures
+- Converge bundle artifacts on agent packages
+- Add Agents API workflow job bridge
+- Delegate tool execution mediation to Agents API
+- Make agents/chat the canonical chat entry point
+- Collapse tool source registry onto Agents API
+- Normalize conversation loop diagnostics shape
+- Require agent context for queued execution
+
+### Fixed
+- migrate admin entry points to createRoot for React 19
+- stop truncating plugin descriptions in generated SITE.md
+- skip unused worker status checks
+- thread chat interrupt sources through runtime
+- add job-claiming worker mode
+- add lane-scoped worker locks
+- reclaim split-cache stale worker locks
+- defer send-email ability translations
+- reclaim sticky stale worker locks
+- harden settings and site context freshness
+- mark silent max-turn tool runs incomplete
+- register image optimization abilities
+- hoist frontend email abilities
+- Fix packaged Plugin Check errors
+- Fix request input sanitization findings
+
 ## [0.135.3] - 2026-05-28
 
 ### Changed
