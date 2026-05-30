@@ -8,7 +8,7 @@ Stable tag: 0.135.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI-first WordPress plugin for visual pipeline automation, chat, and REST API control.
+AI-powered WordPress operations engine: agent memory, autonomous pipelines and flows, chat, email I/O, and WP-CLI control.
 
 == Description ==
 
