@@ -209,6 +209,10 @@ function datamachine_site_section_post_types(): string {
 
 	$lines   = array();
 	$lines[] = '## Post Types';
+	if ( is_multisite() ) {
+		$lines[] = sprintf( '*Reflects this site (blog %d) only. For the network map, see NETWORK.md.*', get_current_blog_id() );
+		$lines[] = '';
+	}
 	$lines[] = '| Label | Slug | Published | Type |';
 	$lines[] = '|-------|------|-----------|------|';
 
@@ -234,6 +238,10 @@ function datamachine_site_section_taxonomies(): string {
 
 	$lines   = array();
 	$lines[] = '## Taxonomies';
+	if ( is_multisite() ) {
+		$lines[] = sprintf( '*Reflects this site (blog %d) only. For the network map, see NETWORK.md.*', get_current_blog_id() );
+		$lines[] = '';
+	}
 	$lines[] = '| Label | Slug | Terms | Type | Post Types |';
 	$lines[] = '|-------|------|-------|------|------------|';
 
@@ -518,8 +526,8 @@ function datamachine_network_section_sites(): string {
 
 	$lines   = array();
 	$lines[] = '## Sites';
-	$lines[] = '| Site | URL | Theme |';
-	$lines[] = '|------|-----|-------|';
+	$lines[] = '| Site | Blog ID | URL | Theme | Last Updated |';
+	$lines[] = '|------|---------|-----|-------|--------------|';
 
 	foreach ( $sites as $site ) {
 		$blog_id = (int) $site->blog_id;
@@ -530,8 +538,10 @@ function datamachine_network_section_sites(): string {
 		$theme = wp_get_theme()->get( 'Name' ) ? wp_get_theme()->get( 'Name' ) : 'Unknown';
 		restore_current_blog();
 
+		$last_updated = $site->last_updated ? mysql2date( 'Y-m-d H:i', $site->last_updated ) : '';
+
 		$is_main = ( $blog_id === $main_site_id ) ? ' (main)' : '';
-		$lines[] = sprintf( '| %s%s | %s | %s |', $name, $is_main, $url, $theme );
+		$lines[] = sprintf( '| %s%s | %d | %s | %s | %s |', $name, $is_main, $blog_id, $url, $theme, $last_updated );
 	}
 
 	return implode( "\n", $lines );
