@@ -7,7 +7,7 @@
 /**
  * WordPress dependencies
  */
-import { render } from '@wordpress/element';
+import { createRoot } from '@wordpress/element';
 import domReady from '@wordpress/dom-ready';
 /**
  * External dependencies
@@ -34,10 +34,9 @@ domReady( () => {
 		return;
 	}
 
-	render(
+	createRoot( rootElement ).render(
 		<QueryClientProvider client={ queryClient }>
 			<JobsApp />
-		</QueryClientProvider>,
-		rootElement
+		</QueryClientProvider>
 	);
 } );
