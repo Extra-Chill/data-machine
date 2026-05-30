@@ -1323,8 +1323,22 @@ class EmailAbilities {
 			}
 		}
 
-		$auth   = $this->getAuthProvider();
-		$from   = $auth ? $auth->getUser() : 'noreply@extrachill.com';
+		$auth = $this->getAuthProvider();
+		if ( $auth ) {
+			$from = $auth->getUser();
+		} else {
+			// Derive a sane fallback From address from the WordPress site itself
+			// rather than hardcoding any specific domain.
+			$host = wp_parse_url( home_url(), PHP_URL_HOST );
+			$from = $host ? 'wordpress@' . $host : get_bloginfo( 'admin_email' );
+		}
+
+		/**
+		 * Filters the From address used when appending a copy to the Sent folder.
+		 *
+		 * @param string $from The derived From address.
+		 */
+		$from   = apply_filters( 'dm_email_sent_folder_from', $from );
 		$to_str = implode( ', ', $to );
 		$date   = gmdate( 'r' );
 
