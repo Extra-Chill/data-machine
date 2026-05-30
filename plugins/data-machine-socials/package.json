@@ -24,23 +24,25 @@
   "author": "Chris Huber <chris@chubes.net>",
   "license": "GPL-2.0-or-later",
   "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "@wordpress/scripts": "^30.7.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@wordpress/scripts": "^32.0.0",
     "typescript": "^5.3.0"
   },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
   "dependencies": {
-    "@wordpress/api-fetch": "^6.49.0",
-    "@wordpress/components": "^27.0.0",
-    "@wordpress/compose": "^6.32.0",
-    "@wordpress/data": "^9.25.0",
-    "@wordpress/edit-post": "^7.32.0",
-    "@wordpress/element": "^5.32.0",
-    "@wordpress/i18n": "^4.55.0",
-    "@wordpress/icons": "^10.25.0",
-    "@wordpress/plugins": "^6.23.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "@wordpress/api-fetch": "^7.47.0",
+    "@wordpress/components": "^34.0.0",
+    "@wordpress/compose": "^8.0.0",
+    "@wordpress/data": "^10.47.0",
+    "@wordpress/edit-post": "^8.47.0",
+    "@wordpress/element": "^7.0.0",
+    "@wordpress/i18n": "^6.20.0",
+    "@wordpress/icons": "^13.2.0",
+    "@wordpress/plugins": "^7.47.0",
     "react-easy-crop": "^5.4.2"
   }
 }
