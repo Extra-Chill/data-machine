@@ -196,14 +196,9 @@ $stub_code = <<<PHP
 
 // Serve the gating REST route Data Machine core would normally provide.
 //
-// We register it under TWO namespaces:
-//   - datamachine/v1            : the correct route
-//   - wp-json/datamachine/v1    : the path the socials client ACTUALLY requests
-//     today, because src/utils/api.ts double-prefixes "/wp-json/" onto an
-//     apiFetch path that already gets the REST root prepended. See upstream bug
-//     Extra-Chill/data-machine-socials#145. This second registration is a
-//     deliberate TEST-HARNESS shim so the cropper can be exercised; it is NOT a
-//     product workaround and must be removed once #145 is fixed.
+// The editor requests this via apiFetch at /datamachine/v1/socials/auth/status
+// (correct, single REST-root prefix). The earlier double-/wp-json/ harness shim
+// for #145 is no longer needed now that REST_BASE in src/utils/api.ts is fixed.
 \$dms_auth_status_callback = function () {
 	return new WP_REST_Response( array(
 		array(
@@ -218,12 +213,6 @@ $stub_code = <<<PHP
 };
 add_action( 'rest_api_init', function () use ( \$dms_auth_status_callback, \$dms_auth_permission ) {
 	register_rest_route( 'datamachine/v1', '/socials/auth/status', array(
-		'methods'             => 'GET',
-		'permission_callback' => \$dms_auth_permission,
-		'callback'            => \$dms_auth_status_callback,
-	) );
-	// Harness shim for upstream bug #145 (double /wp-json/ prefix).
-	register_rest_route( 'wp-json/datamachine/v1', '/socials/auth/status', array(
 		'methods'             => 'GET',
 		'permission_callback' => \$dms_auth_permission,
 		'callback'            => \$dms_auth_status_callback,

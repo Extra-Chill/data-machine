@@ -5,7 +5,11 @@
 import apiFetch from '@wordpress/api-fetch';
 import { CrossPostPayload, CrossPostResponse, PlatformAuthStatus } from '../types';
 
-const REST_BASE = '/wp-json/datamachine/v1/socials';
+// REST route relative to the WordPress REST root. Do NOT include the
+// "/wp-json/" prefix here: apiFetch (and apiFetch-derived helpers) already
+// prepend the REST root, so a leading "/wp-json/" double-prefixes the request
+// into "/wp-json/wp-json/datamachine/..." and 404s.
+const REST_BASE = '/datamachine/v1/socials';
 
 export async function getAuthStatus(): Promise<PlatformAuthStatus[]> {
 	return apiFetch({ path: `${REST_BASE}/auth/status` });
@@ -49,15 +53,14 @@ export async function uploadCroppedImage(
 	const formData = new FormData();
 	formData.append('file', blob, filename);
 
-	const response = await fetch(`${REST_BASE}/media/crop`, {
+	// Use apiFetch (not raw fetch) so the REST root, nonce, and credentials are
+	// resolved consistently instead of hardcoding "/wp-json/" and the nonce.
+	// apiFetch passes a FormData `body` through untouched (no JSON serialization).
+	return apiFetch({
+		path: `${REST_BASE}/media/crop`,
 		method: 'POST',
 		body: formData,
-		headers: {
-			'X-WP-Nonce': (window as any).dmsData?.restNonce || '',
-		},
 	});
-
-	return response.json();
 }
 
 export async function getPostStatus(postId: number): Promise<unknown> {

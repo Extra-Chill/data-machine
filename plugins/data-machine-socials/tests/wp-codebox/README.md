@@ -69,12 +69,10 @@ written by the seed), because honesty beats a silent stub:
    the pipeline engine) is unrelated to whether the cropper survives React 19,
    so the harness stubs that single route to report Instagram authenticated.
    Everything downstream of that gate is the real editor.
-2. **`apiFetch` double-prefix shim.** The harness also registers the auth-status
-   route at the doubled `/wp-json/wp-json/...` path the editor currently
-   requests, because of the `REST_BASE` bug tracked in **#145**
-   (`src/utils/api.ts` includes a `/wp-json/` literal in a path already prefixed
-   by `apiFetch`). Once #145 is fixed, the doubled-path registration in
-   `crop-modal-seed.php` should be removed.
+Note: an earlier revision of this harness also registered the auth-status route
+at a doubled `/wp-json/wp-json/...` path to work around the `REST_BASE`
+double-prefix bug (#145). That bug is now fixed, so the harness registers the
+route only at the correct `/datamachine/v1/socials/auth/status` path.
 
 ## Extending
 
