@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.40.2] - 2026-05-30
+
+### Fixed
+- re-hydrate Load More after dynamic content swaps
+
 ## [0.40.1] - 2026-05-27
 
 ### Fixed
