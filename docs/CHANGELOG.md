@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.136.1] - 2026-05-30
+
+### Changed
+- remove Discord coupling from generic AgentCall transport, add payload formatter hook (closes #2373)
+
+### Fixed
+- derive fallback email sender from site instead of hardcoded domain (closes #2374)
+
 ## [0.136.0] - 2026-05-30
 
 ### Added
