@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.137.1] - 2026-05-30
+
+### Changed
+- clear phpcs lint debt (release preflight)
+
 ## [0.137.0] - 2026-05-30
 
 ### Added
