@@ -313,7 +313,7 @@ function datamachine_run_conversation(
 	// Substrate now surfaces turn_count, final_content, usage, and
 	// request_metadata directly on the result (agents-api#136). Keep DM-only
 	// diagnostics namespaced so the top level remains the Agents API result.
-	$datamachine_metadata     = array(
+	$datamachine_metadata = array(
 		'completed'       => ! in_array( (string) ( $result['status'] ?? '' ), array( 'budget_exceeded', 'interrupted' ), true ),
 		'last_tool_calls' => $last_tool_calls,
 		'tool_calls'      => $all_tool_calls,

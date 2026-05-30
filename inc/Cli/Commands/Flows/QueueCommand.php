@@ -397,7 +397,7 @@ class QueueCommand extends BaseCommand {
 			$flow_step_id = $resolved['step_id'];
 		}
 
-		$step_type  = $this->getStepType( $flow_id, $flow_step_id );
+		$step_type = $this->getStepType( $flow_id, $flow_step_id );
 
 		if ( ! empty( $assoc_args['dry-run'] ) ) {
 			$list_ability_id = ( 'fetch' === $step_type )
