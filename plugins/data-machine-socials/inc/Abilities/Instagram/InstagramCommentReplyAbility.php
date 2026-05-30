@@ -12,6 +12,7 @@
 namespace DataMachineSocials\Abilities\Instagram;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
 
 defined( 'ABSPATH' ) || exit;
@@ -20,7 +21,7 @@ class InstagramCommentReplyAbility {
 
 	private static bool $registered = false;
 
-	const GRAPH_API_URL = 'https://graph.facebook.com/v23.0';
+	const GRAPH_API_URL = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION;
 
 	const MAX_REPLY_LENGTH = 1000;
 

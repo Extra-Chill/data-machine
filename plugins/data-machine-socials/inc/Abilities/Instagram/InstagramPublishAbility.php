@@ -16,6 +16,7 @@ namespace DataMachineSocials\Abilities\Instagram;
 
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -43,7 +44,7 @@ class InstagramPublishAbility {
 	 *
 	 * @see InstagramAuth — same reasoning as the v0.12.1 username lookup fix.
 	 */
-	const GRAPH_API_URL = 'https://graph.facebook.com/v18.0';
+	const GRAPH_API_URL = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION;
 
 	/**
 	 * Maximum images per carousel

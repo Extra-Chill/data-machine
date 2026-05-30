@@ -13,6 +13,7 @@
 namespace DataMachineSocials\Handlers\Threads;
 
 use DataMachine\Core\HttpClient;
+use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -24,6 +25,17 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	const TOKEN_URL   = 'https://graph.threads.net/oauth/access_token';
 	const REFRESH_URL = 'https://graph.threads.net/refresh_access_token';
 	const SCOPES      = 'threads_basic,threads_content_publish';
+
+	/**
+	 * Meta Graph API base URL for graph.facebook.com calls (profile/permissions).
+	 *
+	 * Threads OAuth issues Meta-flavored tokens, so account profile and permission
+	 * endpoints hit graph.facebook.com. The Graph version is centralized on
+	 * {@see FacebookAuth::GRAPH_API_VERSION}. The Threads content API
+	 * (graph.threads.net/v1.0) is a separate host/API and is intentionally not
+	 * derived from this constant.
+	 */
+	const META_GRAPH_API_URL = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION;
 
 	public function __construct() {
 		parent::__construct( 'threads' );
@@ -252,7 +264,7 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 	* @return array|\WP_Error Profile data or error
 	*/
 	private function get_user_profile( string $access_token ): array|\WP_Error {
-		$url = 'https://graph.facebook.com/v19.0/me?fields=id,name';
+		$url = self::META_GRAPH_API_URL . '/me?fields=id,name';
 
 		$result = HttpClient::get(
 			$url,
@@ -329,7 +341,7 @@ class ThreadsAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		}
 
 		if ( $token ) {
-			$url    = 'https://graph.facebook.com/v19.0/me/permissions';
+			$url    = self::META_GRAPH_API_URL . '/me/permissions';
 			$result = HttpClient::delete(
 				$url,
 				array(

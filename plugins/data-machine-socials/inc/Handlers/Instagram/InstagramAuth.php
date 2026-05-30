@@ -13,6 +13,7 @@
 namespace DataMachineSocials\Handlers\Instagram;
 
 use DataMachine\Core\HttpClient;
+use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -20,10 +21,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class InstagramAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 
-	const AUTH_URL      = 'https://www.facebook.com/v18.0/dialog/oauth';
-	const TOKEN_URL     = 'https://graph.facebook.com/v18.0/oauth/access_token';
+	const AUTH_URL      = 'https://www.facebook.com/' . FacebookAuth::GRAPH_API_VERSION . '/dialog/oauth';
+	const TOKEN_URL     = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION . '/oauth/access_token';
 	const GRAPH_API_URL = 'https://graph.instagram.com';
-	const FB_API_URL    = 'https://graph.facebook.com/v18.0';
+	const FB_API_URL    = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION;
 	const SCOPES        = 'instagram_basic,instagram_content_publish,instagram_manage_messages,instagram_manage_comments,pages_read_engagement';
 
 	public function __construct() {

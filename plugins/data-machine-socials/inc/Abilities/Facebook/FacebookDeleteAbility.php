@@ -20,7 +20,7 @@ class FacebookDeleteAbility {
 
 	private static bool $registered = false;
 
-	const GRAPH_API_URL = 'https://graph.facebook.com/v23.0';
+	const GRAPH_API_URL = FacebookAuth::GRAPH_API_URL;
 
 	public function __construct() {
 		if ( ! class_exists( 'WP_Ability' ) ) {

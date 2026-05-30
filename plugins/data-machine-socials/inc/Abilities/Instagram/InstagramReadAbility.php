@@ -14,6 +14,7 @@ namespace DataMachineSocials\Abilities\Instagram;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
+use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
 
 defined( 'ABSPATH' ) || exit;
@@ -28,7 +29,7 @@ class InstagramReadAbility {
 	 *
 	 * @see InstagramPublishAbility::GRAPH_API_URL for full rationale.
 	 */
-	const GRAPH_API_URL = 'https://graph.facebook.com/v18.0';
+	const GRAPH_API_URL = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION;
 
 	/**
 	 * Regex for extracting @mentions from comment text.

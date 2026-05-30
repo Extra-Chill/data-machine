@@ -12,6 +12,7 @@ namespace DataMachineSocials\Abilities\Facebook;
 
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -356,6 +357,6 @@ class FacebookPublishAbility {
 	 * @return string Full URL.
 	 */
 	private static function build_graph_url( string $path ): string {
-		return 'https://graph.facebook.com/v23.0/' . ltrim( $path, '/' );
+		return FacebookAuth::GRAPH_API_URL . '/' . ltrim( $path, '/' );
 	}
 }
