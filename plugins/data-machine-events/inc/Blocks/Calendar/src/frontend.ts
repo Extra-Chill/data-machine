@@ -138,6 +138,23 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 			if ( ! gridMode ) {
 				initCarousel( calendar );
 			}
+
+			// Re-hydrate Load More after a content swap (issue #314).
+			// Every dynamic re-fetch path (geo-sync, scope tabs,
+			// filters) re-renders the server's `paginate_links()`
+			// nav into the DOM as the no-JS fallback. Without this,
+			// that fresh `.data-machine-events-pagination` nav stays
+			// numbered — the initial-mount `initLoadMore` already ran
+			// and its WeakMap guard makes a bare re-init a no-op,
+			// leaving a Load More button stranded ABOVE the
+			// re-injected numbered pagination on archive pages. Tear
+			// down the stale binding and re-hydrate so the freshly
+			// swapped nav becomes a Load More button again. Grid mode
+			// has no pagination nav, so this is a no-op there.
+			if ( ! gridMode ) {
+				destroyLoadMore( calendar );
+				initLoadMore( calendar );
+			}
 		}
 	);
 }

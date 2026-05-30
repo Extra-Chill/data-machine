@@ -279,6 +279,21 @@ function updatePagination(
 	calendar: HTMLElement,
 	pagination: { html: string } | null
 ): void {
+	// A prior Load More hydration (issue #314) may have replaced the
+	// numbered `.data-machine-events-pagination` nav with a
+	// `.data-machine-events-load-more-nav`. Remove that stale button
+	// so the fresh server-rendered pagination nav can be re-injected
+	// and then re-hydrated by `initLoadMore` on the content-updated
+	// event. Without this, the selector below misses the converted
+	// nav and we leak a duplicate, producing a Load More button
+	// stacked above numbered pagination on archive re-fetches.
+	const loadMoreNav = calendar.querySelector(
+		'.data-machine-events-load-more-nav'
+	);
+	if ( loadMoreNav ) {
+		loadMoreNav.remove();
+	}
+
 	const paginationContainer = calendar.querySelector(
 		'.data-machine-events-pagination'
 	);
