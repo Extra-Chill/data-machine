@@ -993,7 +993,7 @@ class AgentsCommand extends AgentBundleCommand {
 	 *     wp datamachine agents config sarai
 	 *
 	 *     # Set allowed redirect URIs
-	 *     wp datamachine agents config sarai --set='allowed_redirect_uris=["saraichinwag.com","https://saraichinwag.com/*"]'
+	 *     wp datamachine agents config sarai --set='allowed_redirect_uris=["example.com","https://example.com/*"]'
 	 *
 	 *     # Set a single key
 	 *     wp datamachine agents config sarai --set='model=gpt-4o'

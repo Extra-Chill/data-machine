@@ -409,7 +409,7 @@ class AgentAuthorize {
 	 *
 	 * Always allows: localhost (any port), 127.0.0.1, same-site URLs.
 	 * External domains must be registered in the agent's config:
-	 * agent_config.allowed_redirect_uris = ["https://saraichinwag.com/*"]
+	 * agent_config.allowed_redirect_uris = ["https://example.com/*"]
 	 *
 	 * This scopes the blast radius per-agent — a compromised agent can only
 	 * redirect to its own registered domains, not arbitrary URLs.
@@ -468,9 +468,9 @@ class AgentAuthorize {
 	 * Check if a URI matches an allowed pattern.
 	 *
 	 * Supports:
-	 * - Exact match: "https://saraichinwag.com/callback"
-	 * - Wildcard path: "https://saraichinwag.com/*"
-	 * - Domain-only: "saraichinwag.com" (matches any path on that domain)
+	 * - Exact match: "https://example.com/callback"
+	 * - Wildcard path: "https://example.com/*"
+	 * - Domain-only: "example.com" (matches any path on that domain)
 	 *
 	 * @param string $uri     The redirect URI to check.
 	 * @param string $pattern The allowed pattern.
