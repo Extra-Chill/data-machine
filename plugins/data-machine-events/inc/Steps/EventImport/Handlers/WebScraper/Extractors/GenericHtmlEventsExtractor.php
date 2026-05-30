@@ -31,12 +31,12 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 	 */
 	private const CONTAINER_PATTERNS = array(
 		// Cactus Club / custom WP themes — uses <!-- eof eventEntryInner --> comment as delimiter.
-		'eventEntryInner'   => '/<div[^>]+class="[^"]*eventEntryInner[^"]*"[^>]*>(.*?)<!-- eof eventEntryInner -->/is',
+		'eventEntryInner' => '/<div[^>]+class="[^"]*eventEntryInner[^"]*"[^>]*>(.*?)<!-- eof eventEntryInner -->/is',
 		// Generic event-entry patterns — use </article> or next opening tag as delimiter.
-		'event-entry'       => '/<(?:div|article|li)[^>]+class="[^"]*event-entry[^"]*"[^>]*>(.*?)<\/(?:article|li)>/is',
-		'event-item'        => '/<(?:div|article|li)[^>]+class="[^"]*event-item[^"]*"[^>]*>(.*?)<\/(?:article|li)>/is',
-		'event-card'        => '/<(?:div|article|li)[^>]+class="[^"]*event-card[^"]*"[^>]*>(.*?)<\/(?:article|li)>/is',
-		'event-listing'     => '/<(?:div|article|li)[^>]+class="[^"]*event-listing[^"]*"[^>]*>(.*?)<\/(?:article|li)>/is',
+		'event-entry'     => '/<(?:div|article|li)[^>]+class="[^"]*event-entry[^"]*"[^>]*>(.*?)<\/(?:article|li)>/is',
+		'event-item'      => '/<(?:div|article|li)[^>]+class="[^"]*event-item[^"]*"[^>]*>(.*?)<\/(?:article|li)>/is',
+		'event-card'      => '/<(?:div|article|li)[^>]+class="[^"]*event-card[^"]*"[^>]*>(.*?)<\/(?:article|li)>/is',
+		'event-listing'   => '/<(?:div|article|li)[^>]+class="[^"]*event-listing[^"]*"[^>]*>(.*?)<\/(?:article|li)>/is',
 	);
 
 	/**
@@ -44,30 +44,30 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 	 * Each key maps to a regex that captures the text content.
 	 */
 	private const FIELD_PATTERNS = array(
-		'title'   => array(
+		'title' => array(
 			'/<(?:div|span|h[1-6])[^>]+class="[^"]*eventTitle[^"]*"[^>]*>.*?<a[^>]+title="([^"]+)"/is',
 			'/<(?:div|span|h[1-6])[^>]+class="[^"]*eventTitle[^"]*"[^>]*>.*?<a[^>]*>(.*?)<\/a>/is',
 			'/<(?:div|span|h[1-6])[^>]+class="[^"]*event-title[^"]*"[^>]*>(.*?)<\/(?:div|span|h[1-6])>/is',
 			'/<h[1-6][^>]*>\s*<a[^>]+href="[^"]*event[^"]*"[^>]*>(.*?)<\/a>/is',
 		),
-		'date'    => array(
+		'date'  => array(
 			'/<(?:div|span|time)[^>]+class="[^"]*eventDate[^"]*"[^>]*>(.*?)<\/(?:div|span|time)>/is',
 			'/<(?:div|span|time)[^>]+class="[^"]*event-date[^"]*"[^>]*>(.*?)<\/(?:div|span|time)>/is',
 			'/<time[^>]+datetime="([^"]+)"/i',
 		),
-		'time'    => array(
+		'time'  => array(
 			'/<(?:div|span)[^>]+class="[^"]*eventTime[^"]*"[^>]*>(.*?)<\/(?:div|span)>/is',
 			'/<(?:div|span)[^>]+class="[^"]*event-time[^"]*"[^>]*>(.*?)<\/(?:div|span)>/is',
 		),
-		'price'   => array(
+		'price' => array(
 			'/<(?:div|span)[^>]+class="[^"]*eventPrice[^"]*"[^>]*>(.*?)<\/(?:div|span)>/is',
 			'/<(?:div|span)[^>]+class="[^"]*event-price[^"]*"[^>]*>(.*?)<\/(?:div|span)>/is',
 		),
-		'link'    => array(
+		'link'  => array(
 			'/<a[^>]+href="(https?:\/\/[^"]*\/events?\/[^"]+)"/i',
 			'/<a[^>]+href="(\/events?\/[^"]+)"/i',
 		),
-		'image'   => array(
+		'image' => array(
 			'/background-image:\s*url\(([^)]+)\)/i',
 			'/<img[^>]+src="([^"]+)"/i',
 		),
@@ -118,7 +118,7 @@ class GenericHtmlEventsExtractor extends BaseExtractor {
 			return array();
 		}
 
-		$parsed  = wp_parse_url( $source_url );
+		$parsed   = wp_parse_url( $source_url );
 		$base_url = ( $parsed['scheme'] ?? 'https' ) . '://' . ( $parsed['host'] ?? '' );
 
 		$events = array();

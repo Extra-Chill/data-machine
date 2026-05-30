@@ -120,7 +120,7 @@ class UpcomingFilter {
 	 * @return array{joins: string, where: string, param_count: int}
 	 */
 	public static function upcoming_sql( bool $include_status = true, string $join_column = 'p.ID' ): array {
-		$table = EventDatesTable::table_name();
+		$table         = EventDatesTable::table_name();
 		$status_clause = $include_status ? " AND ed.post_status = 'publish'" : '';
 
 		return array(
@@ -138,7 +138,7 @@ class UpcomingFilter {
 	 * @return array{joins: string, where: string, param_count: int}
 	 */
 	public static function past_sql( bool $include_status = true, string $join_column = 'p.ID' ): array {
-		$table = EventDatesTable::table_name();
+		$table         = EventDatesTable::table_name();
 		$status_clause = $include_status ? " AND ed.post_status = 'publish'" : '';
 
 		return array(
@@ -156,7 +156,7 @@ class UpcomingFilter {
 	 * @return array{joins: string, where: string, param_count: int}
 	 */
 	public static function date_range_sql( bool $include_status = true, string $join_column = 'p.ID' ): array {
-		$table = EventDatesTable::table_name();
+		$table         = EventDatesTable::table_name();
 		$status_clause = $include_status ? " AND ed.post_status = 'publish'" : '';
 
 		return array(

@@ -62,32 +62,32 @@ class VenueMapAbilities {
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
-						'lat'         => array(
+						'lat'            => array(
 							'type'        => 'number',
 							'description' => 'Center latitude for proximity filtering',
 						),
-						'lng'         => array(
+						'lng'            => array(
 							'type'        => 'number',
 							'description' => 'Center longitude for proximity filtering',
 						),
-						'radius'      => array(
+						'radius'         => array(
 							'type'        => 'integer',
 							'description' => 'Search radius (default 25, max 500)',
 						),
-						'radius_unit' => array(
+						'radius_unit'    => array(
 							'type'        => 'string',
 							'description' => 'mi or km (default mi)',
 							'enum'        => array( 'mi', 'km' ),
 						),
-						'bounds'      => array(
+						'bounds'         => array(
 							'type'        => 'string',
 							'description' => 'Map viewport bounds as sw_lat,sw_lng,ne_lat,ne_lng',
 						),
-						'taxonomy'    => array(
+						'taxonomy'       => array(
 							'type'        => 'string',
 							'description' => 'Filter by taxonomy slug (e.g. location)',
 						),
-						'term_id'     => array(
+						'term_id'        => array(
 							'type'        => 'integer',
 							'description' => 'Filter by taxonomy term ID',
 						),
@@ -119,11 +119,11 @@ class VenueMapAbilities {
 										'items' => array(
 											'type'       => 'object',
 											'properties' => array(
-												'post_id'    => array( 'type' => 'integer' ),
+												'post_id' => array( 'type' => 'integer' ),
 												'start_date' => array( 'type' => 'string' ),
 												'start_time' => array( 'type' => 'string' ),
-												'title'      => array( 'type' => 'string' ),
-												'permalink'  => array( 'type' => 'string' ),
+												'title'   => array( 'type' => 'string' ),
+												'permalink' => array( 'type' => 'string' ),
 											),
 										),
 									),
@@ -131,7 +131,7 @@ class VenueMapAbilities {
 							),
 						),
 						'total'  => array( 'type' => 'integer' ),
-					'center' => array(
+					'center'     => array(
 						'type'       => array( 'object', 'null' ),
 						'properties' => array(
 							'lat' => array( 'type' => 'number' ),
@@ -401,15 +401,15 @@ class VenueMapAbilities {
 		$sw_lng = $bounds['sw_lng'];
 		$ne_lng = $bounds['ne_lng'];
 
-		$id_filter_sql = '';
+		$id_filter_sql    = '';
 		$id_filter_params = array();
 
 		if ( null !== $venue_ids_filter ) {
 			if ( empty( $venue_ids_filter ) ) {
 				return array();
 			}
-			$placeholders = implode( ',', array_fill( 0, count( $venue_ids_filter ), '%d' ) );
-			$id_filter_sql = " AND tm.term_id IN ($placeholders)";
+			$placeholders     = implode( ',', array_fill( 0, count( $venue_ids_filter ), '%d' ) );
+			$id_filter_sql    = " AND tm.term_id IN ($placeholders)";
 			$id_filter_params = array_values( $venue_ids_filter );
 		}
 

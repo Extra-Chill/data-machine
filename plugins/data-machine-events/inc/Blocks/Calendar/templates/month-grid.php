@@ -98,7 +98,7 @@ $weekday_labels = array(
 				data-row-end="<?php echo esc_attr( $row['end_date'] ); ?>"
 				style="--data-machine-month-grid-lanes: <?php echo esc_attr( (string) $lane_count ); ?>;">
 				<?php foreach ( $row['cells'] as $cell ) :
-					$cell_classes   = array(
+					$cell_classes = array(
 						'data-machine-month-grid__cell',
 						'data-machine-day-' . $cell['day_of_week'],
 					);

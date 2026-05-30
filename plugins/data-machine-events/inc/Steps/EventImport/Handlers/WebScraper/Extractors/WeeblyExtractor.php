@@ -68,7 +68,7 @@ class WeeblyExtractor extends BaseExtractor {
 		}
 
 		// Check for Pattern A: multiple paragraph blocks with date headers.
-		$blocks = $this->extractParagraphBlocks( $html );
+		$blocks       = $this->extractParagraphBlocks( $html );
 		$event_blocks = array_filter( $blocks, array( $this, 'isPatternABlock' ) );
 		if ( count( $event_blocks ) >= self::MIN_EVENT_BLOCKS ) {
 			return true;
@@ -229,8 +229,8 @@ class WeeblyExtractor extends BaseExtractor {
 		$body_lines = array_slice( $lines, 1 );
 
 		// Extract time and price from body, then the rest is artists/description.
-		$time        = '';
-		$price       = '';
+		$time         = '';
+		$price        = '';
 		$artist_lines = array();
 
 		foreach ( $body_lines as $line ) {
@@ -359,8 +359,8 @@ class WeeblyExtractor extends BaseExtractor {
 	 * @return array Array of line arrays, one per sub-event.
 	 */
 	private function splitShowcaseBlock( array $lines ): array {
-		$sub_events  = array();
-		$current     = array();
+		$sub_events = array();
+		$current    = array();
 
 		foreach ( $lines as $line ) {
 			if ( $this->isShowcaseDateHeader( $line ) && ! empty( $current ) ) {
@@ -423,7 +423,7 @@ class WeeblyExtractor extends BaseExtractor {
 
 				if ( ! empty( $artist_name ) ) {
 					// Assume PM for evening events (typical showcase hours 5pm-11pm).
-					$hour = (int) explode( ':', $display_time )[0];
+					$hour       = (int) explode( ':', $display_time )[0];
 					$parse_time = $display_time;
 					if ( $hour >= 1 && $hour <= 11 ) {
 						$parse_time .= 'pm';

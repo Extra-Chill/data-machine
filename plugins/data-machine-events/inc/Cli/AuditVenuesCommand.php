@@ -114,11 +114,11 @@ class AuditVenuesCommand {
 		}
 
 		// Coverage bar.
-		$pct = $result['coverage_percent'];
-		$bar_width  = 40;
-		$filled     = (int) round( $pct / 100 * $bar_width );
-		$empty      = $bar_width - $filled;
-		$bar        = str_repeat( '#', $filled ) . str_repeat( '-', $empty );
+		$pct       = $result['coverage_percent'];
+		$bar_width = 40;
+		$filled    = (int) round( $pct / 100 * $bar_width );
+		$empty     = $bar_width - $filled;
+		$bar       = str_repeat( '#', $filled ) . str_repeat( '-', $empty );
 
 		\WP_CLI::log( sprintf( 'Coverage: [%s] %.1f%%', $bar, $pct ) );
 

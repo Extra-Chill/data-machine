@@ -165,22 +165,22 @@ class EventDateQueryAbilities {
 	 * @return array { posts: array, total: int, post_count: int }
 	 */
 	public function executeQueryEvents( array $input ): array {
-		$scope      = $input['scope'] ?? 'upcoming';
-		$date_start = $input['date_start'] ?? '';
-		$date_end   = $input['date_end'] ?? '';
-		$date_match = $input['date_match'] ?? '';
-		$days_ahead = (int) ( $input['days_ahead'] ?? 0 );
-		$time_start = $input['time_start'] ?? '';
-		$time_end   = $input['time_end'] ?? '';
+		$scope       = $input['scope'] ?? 'upcoming';
+		$date_start  = $input['date_start'] ?? '';
+		$date_end    = $input['date_end'] ?? '';
+		$date_match  = $input['date_match'] ?? '';
+		$days_ahead  = (int) ( $input['days_ahead'] ?? 0 );
+		$time_start  = $input['time_start'] ?? '';
+		$time_end    = $input['time_end'] ?? '';
 		$tax_filters = is_array( $input['tax_filters'] ?? null ) ? $input['tax_filters'] : array();
-		$search     = $input['search'] ?? '';
-		$geo        = is_array( $input['geo'] ?? null ) ? $input['geo'] : array();
-		$exclude    = is_array( $input['exclude'] ?? null ) ? array_map( 'absint', $input['exclude'] ) : array();
-		$per_page   = (int) ( $input['per_page'] ?? -1 );
-		$fields     = $input['fields'] ?? 'all';
-		$order      = strtoupper( $input['order'] ?? 'ASC' ) === 'DESC' ? 'DESC' : 'ASC';
-		$status     = $input['status'] ?? 'publish';
-		$meta_query = is_array( $input['meta_query'] ?? null ) ? $input['meta_query'] : array();
+		$search      = $input['search'] ?? '';
+		$geo         = is_array( $input['geo'] ?? null ) ? $input['geo'] : array();
+		$exclude     = is_array( $input['exclude'] ?? null ) ? array_map( 'absint', $input['exclude'] ) : array();
+		$per_page    = (int) ( $input['per_page'] ?? -1 );
+		$fields      = $input['fields'] ?? 'all';
+		$order       = strtoupper( $input['order'] ?? 'ASC' ) === 'DESC' ? 'DESC' : 'ASC';
+		$status      = $input['status'] ?? 'publish';
+		$meta_query  = is_array( $input['meta_query'] ?? null ) ? $input['meta_query'] : array();
 
 		// Build WP_Query args.
 		$query_args = array(
@@ -382,7 +382,7 @@ class EventDateQueryAbilities {
 			} elseif ( 'upcoming' === $scope ) {
 				// Canonical upcoming — delegates to UpcomingFilter.
 				if ( $days_ahead > 0 ) {
-					$end_date = gmdate( 'Y-m-d 23:59:59', strtotime( "+{$days_ahead} days" ) );
+					$end_date          = gmdate( 'Y-m-d 23:59:59', strtotime( "+{$days_ahead} days" ) );
 					$clauses['where'] .= ' AND ' . UpcomingFilter::upcoming_bounded_where( $now, $end_date );
 				} else {
 					$clauses['where'] .= ' AND ' . UpcomingFilter::upcoming_where( $now );

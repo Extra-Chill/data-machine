@@ -32,13 +32,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CalendarCache {
 
-	const PREFIX             = 'data-machine_cal_';
-	const FULL_PREFIX        = 'data-machine_cal_full_';
-	const GROUP              = 'data-machine-calendar';
-	const TTL_DATES          = 30 * MINUTE_IN_SECONDS;
-	const TTL_COUNTS         = 30 * MINUTE_IN_SECONDS;
-	const TTL_FULL_UPCOMING  = HOUR_IN_SECONDS;
-	const TTL_FULL_PAST      = 24 * HOUR_IN_SECONDS;
+	const PREFIX            = 'data-machine_cal_';
+	const FULL_PREFIX       = 'data-machine_cal_full_';
+	const GROUP             = 'data-machine-calendar';
+	const TTL_DATES         = 30 * MINUTE_IN_SECONDS;
+	const TTL_COUNTS        = 30 * MINUTE_IN_SECONDS;
+	const TTL_FULL_UPCOMING = HOUR_IN_SECONDS;
+	const TTL_FULL_PAST     = 24 * HOUR_IN_SECONDS;
 
 	/**
 	 * Get a cached value (transient-backed bucket cache).

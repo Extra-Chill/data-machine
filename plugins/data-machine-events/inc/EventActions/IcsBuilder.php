@@ -112,7 +112,7 @@ class IcsBuilder {
 
 		$uid_seed = $permalink ?: ( 'event-' . $post_id . '@' . wp_parse_url( home_url(), PHP_URL_HOST ) );
 
-		$lines = array();
+		$lines   = array();
 		$lines[] = 'BEGIN:VCALENDAR';
 		$lines[] = 'VERSION:2.0';
 		$lines[] = 'PRODID:-//Data Machine Events//EN';
@@ -219,7 +219,7 @@ class IcsBuilder {
 			return $prev ? (int) $prev['offset'] : (int) $target['offset'];
 		};
 
-		$lines = array();
+		$lines   = array();
 		$lines[] = 'BEGIN:VTIMEZONE';
 		$lines[] = 'TZID:' . $tz_name;
 
@@ -259,10 +259,10 @@ class IcsBuilder {
 	 * @return string
 	 */
 	private static function format_offset( int $offset_seconds ): string {
-		$sign     = $offset_seconds >= 0 ? '+' : '-';
-		$abs      = abs( $offset_seconds );
-		$hours    = (int) floor( $abs / 3600 );
-		$minutes  = (int) floor( ( $abs % 3600 ) / 60 );
+		$sign    = $offset_seconds >= 0 ? '+' : '-';
+		$abs     = abs( $offset_seconds );
+		$hours   = (int) floor( $abs / 3600 );
+		$minutes = (int) floor( ( $abs % 3600 ) / 60 );
 		return sprintf( '%s%02d%02d', $sign, $hours, $minutes );
 	}
 

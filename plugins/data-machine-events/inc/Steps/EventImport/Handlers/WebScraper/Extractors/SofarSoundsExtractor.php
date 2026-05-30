@@ -326,10 +326,10 @@ GRAPHQL;
 	 * @return array Normalized event array.
 	 */
 	private function normalizeEvent( array $event ): array {
-		$event_id    = (int) ( $event['id'] ?? 0 );
-		$city_title  = $this->sanitizeText( $event['city']['title'] ?? '' );
-		$city_slug   = $event['city']['cachedSlug'] ?? '';
-		$timezone    = $event['city']['timezone'] ?? '';
+		$event_id   = (int) ( $event['id'] ?? 0 );
+		$city_title = $this->sanitizeText( $event['city']['title'] ?? '' );
+		$city_slug  = $event['city']['cachedSlug'] ?? '';
+		$timezone   = $event['city']['timezone'] ?? '';
 
 		// Title: prefer headline → artists → fallback to city name.
 		$title = $this->resolveTitle( $event, $city_title );

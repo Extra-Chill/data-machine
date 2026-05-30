@@ -245,8 +245,8 @@ class Event_Post_Type {
 				$slug = basename( $wp_query->query[ $taxonomy ] );
 				$term = get_term_by( 'slug', $slug, $taxonomy );
 				if ( $term && ! is_wp_error( $term ) ) {
-					$wp_query->is_404  = false;
-					$wp_query->is_tax  = true;
+					$wp_query->is_404     = false;
+					$wp_query->is_tax     = true;
 					$wp_query->is_archive = true;
 					status_header( 200 );
 				}

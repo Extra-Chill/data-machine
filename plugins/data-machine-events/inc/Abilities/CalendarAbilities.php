@@ -409,7 +409,7 @@ class CalendarAbilities {
 
 		// Build paged_events from ability result posts (replaces DateGrouper::build_paged_events
 		// which requires a WP_Query object — we have raw WP_Post objects from the ability).
-		$paged_events = self::build_paged_events_from_posts( $query_result['posts'] );
+		$paged_events      = self::build_paged_events_from_posts( $query_result['posts'] );
 		$paged_date_groups = DateGrouper::group_events_by_date(
 			$paged_events,
 			$show_past,

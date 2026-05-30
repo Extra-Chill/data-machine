@@ -230,7 +230,7 @@ class EventUpsert extends UpsertHandler {
 			$parameters['artist'] = $event_data['performer'];
 		}
 
-		$handler_config_for_tax                          = $handler_config;
+		$handler_config_for_tax                                = $handler_config;
 		$handler_config_for_tax['taxonomy_venue_selection']    = 'skip';
 		$handler_config_for_tax['taxonomy_promoter_selection'] = 'skip';
 		$engine_data_array                                     = $engine instanceof EngineData ? $engine->all() : array();
@@ -385,9 +385,9 @@ class EventUpsert extends UpsertHandler {
 	private function acquireUpsertLock( string $title, string $startDate ): string {
 		global $wpdb;
 
-		$date_only       = self::extractDateForQuery( $startDate );
-		$normalized      = SimilarityEngine::normalizeTitle( $title );
-		$lock_key        = 'dme_' . md5( $date_only . '|' . $normalized );
+		$date_only  = self::extractDateForQuery( $startDate );
+		$normalized = SimilarityEngine::normalizeTitle( $title );
+		$lock_key   = 'dme_' . md5( $date_only . '|' . $normalized );
 
 		// MySQL lock names are limited to 64 characters; md5 = 36 + prefix = 40, safe.
 		// Try up to 3 times with increasing timeouts (5s, 10s, 15s).
@@ -552,9 +552,9 @@ class EventUpsert extends UpsertHandler {
 
 		// Query events at this venue on this date.
 		// Use date-only matching; time comparison is done separately.
-		$date_only = self::extractDateForQuery( $startDate );
-		$ability   = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
-		$result    = $ability->executeQueryEvents( array(
+		$date_only  = self::extractDateForQuery( $startDate );
+		$ability    = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
+		$result     = $ability->executeQueryEvents( array(
 			'date_match'  => $date_only,
 			'tax_filters' => array( 'venue' => array( $venue_term->term_id ) ),
 			'per_page'    => 10,
@@ -721,7 +721,7 @@ class EventUpsert extends UpsertHandler {
 				}
 			}
 		} else {
-			$args = array(
+			$args  = array(
 				'post_type'      => Event_Post_Type::POST_TYPE,
 				'title'          => $title,
 				'posts_per_page' => 1,
@@ -802,11 +802,11 @@ class EventUpsert extends UpsertHandler {
 		$ticket_date_only = self::extractDateForQuery( $startDate );
 		$ability          = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
 		$result_a         = $ability->executeQueryEvents( array(
-			'date_match'  => $ticket_date_only,
-			'per_page'    => 1,
-			'fields'      => 'ids',
-			'status'      => 'any',
-			'meta_query'  => array(
+			'date_match' => $ticket_date_only,
+			'per_page'   => 1,
+			'fields'     => 'ids',
+			'status'     => 'any',
+			'meta_query' => array(
 				array(
 					'key'     => EVENT_TICKET_URL_META_KEY,
 					'value'   => $normalized_url,
@@ -814,7 +814,7 @@ class EventUpsert extends UpsertHandler {
 				),
 			),
 		) );
-		$posts = $result_a['posts'];
+		$posts            = $result_a['posts'];
 
 		if ( ! empty( $posts ) ) {
 			do_action(
@@ -841,11 +841,11 @@ class EventUpsert extends UpsertHandler {
 
 		// Search all events on the same date and compare their canonical identities
 		$result_b   = $ability->executeQueryEvents( array(
-			'date_match'  => $ticket_date_only,
-			'per_page'    => 50,
-			'fields'      => 'ids',
-			'status'      => 'any',
-			'meta_query'  => array(
+			'date_match' => $ticket_date_only,
+			'per_page'   => 50,
+			'fields'     => 'ids',
+			'status'     => 'any',
+			'meta_query' => array(
 				array(
 					'key'     => EVENT_TICKET_URL_META_KEY,
 					'compare' => 'EXISTS',
@@ -903,9 +903,9 @@ class EventUpsert extends UpsertHandler {
 			return null;
 		}
 
-		$date_only = self::extractDateForQuery( $startDate );
-		$ability   = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
-		$result    = $ability->executeQueryEvents( array(
+		$date_only  = self::extractDateForQuery( $startDate );
+		$ability    = new \DataMachineEvents\Abilities\EventDateQueryAbilities();
+		$result     = $ability->executeQueryEvents( array(
 			'date_match' => $date_only,
 			'per_page'   => 20,
 			'status'     => 'any',

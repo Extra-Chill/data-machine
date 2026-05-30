@@ -187,7 +187,7 @@ class EventQueryAbilities {
 		};
 		add_filter( 'posts_clauses', $venue_event_filter );
 
-		$query               = new \WP_Query( $query_args );
+		$query = new \WP_Query( $query_args );
 
 		remove_filter( 'posts_clauses', $venue_event_filter );
 

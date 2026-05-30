@@ -91,7 +91,7 @@ class CheckMissingVenueAddressesCommandTest extends WP_UnitTestCase {
 			'Venue B',
 			array( '_venue_coordinates' => '40.7128,-74.0060' )
 		);
-		$bare = $this->make_venue( 'Venue C' );
+		$bare          = $this->make_venue( 'Venue C' );
 
 		// Distractor: an already-addressed venue must not be processed.
 		$already = $this->make_venue(
@@ -99,7 +99,7 @@ class CheckMissingVenueAddressesCommandTest extends WP_UnitTestCase {
 			array( '_venue_address' => '123 Main St' )
 		);
 
-		$cmd                      = new StubbedMissingVenueAddressesCommand();
+		$cmd                                        = new StubbedMissingVenueAddressesCommand();
 		$cmd->reverse_responses['30.2672,-97.7431'] = array(
 			'address' => '801 Red River St',
 			'city'    => 'Austin',
@@ -124,7 +124,7 @@ class CheckMissingVenueAddressesCommandTest extends WP_UnitTestCase {
 			array( '_venue_coordinates' => '30.2672,-97.7431' )
 		);
 
-		$cmd = new StubbedMissingVenueAddressesCommand();
+		$cmd                                        = new StubbedMissingVenueAddressesCommand();
 		$cmd->reverse_responses['30.2672,-97.7431'] = array(
 			'address' => '801 Red River St',
 			'city'    => 'Austin',

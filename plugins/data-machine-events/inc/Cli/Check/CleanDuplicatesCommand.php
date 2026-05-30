@@ -66,9 +66,9 @@ class CleanDuplicatesCommand {
 	 * @param array $assoc_args Named arguments.
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
-		$scope      = $assoc_args['scope'] ?? 'all';
-		$days_ahead = (int) ( $assoc_args['days-ahead'] ?? 90 );
-		$dry_run    = isset( $assoc_args['dry-run'] );
+		$scope        = $assoc_args['scope'] ?? 'all';
+		$days_ahead   = (int) ( $assoc_args['days-ahead'] ?? 90 );
+		$dry_run      = isset( $assoc_args['dry-run'] );
 		$skip_confirm = isset( $assoc_args['yes'] );
 
 		$events = $this->query_events( $scope, $days_ahead );
@@ -91,8 +91,8 @@ class CleanDuplicatesCommand {
 		\WP_CLI::log( '' );
 
 		// For each pair: keep older, trash newer.
-		$to_trash       = array();
-		$ticket_merges  = 0;
+		$to_trash      = array();
+		$ticket_merges = 0;
 
 		foreach ( $duplicate_groups as $group ) {
 			$a_id   = $group['event_a']['id'];
@@ -110,8 +110,8 @@ class CleanDuplicatesCommand {
 			}
 
 			// Check if we should merge ticket URL.
-			$keep_ticket  = get_post_meta( $keep_id, EVENT_TICKET_URL_META_KEY, true );
-			$trash_ticket = get_post_meta( $trash_id, EVENT_TICKET_URL_META_KEY, true );
+			$keep_ticket         = get_post_meta( $keep_id, EVENT_TICKET_URL_META_KEY, true );
+			$trash_ticket        = get_post_meta( $trash_id, EVENT_TICKET_URL_META_KEY, true );
 			$should_merge_ticket = ! empty( $trash_ticket ) && empty( $keep_ticket );
 
 			if ( $should_merge_ticket ) {
@@ -122,13 +122,13 @@ class CleanDuplicatesCommand {
 			$trash_title = get_the_title( $trash_id );
 
 			$to_trash[] = array(
-				'keep_id'            => $keep_id,
-				'keep_title'         => mb_substr( $keep_title, 0, 40 ),
-				'trash_id'           => $trash_id,
-				'trash_title'        => mb_substr( $trash_title, 0, 40 ),
-				'venue'              => $group['event_a']['venue'] ?: $group['event_b']['venue'],
-				'date'               => $group['date'],
-				'merge_ticket'       => $should_merge_ticket ? 'yes' : 'no',
+				'keep_id'      => $keep_id,
+				'keep_title'   => mb_substr( $keep_title, 0, 40 ),
+				'trash_id'     => $trash_id,
+				'trash_title'  => mb_substr( $trash_title, 0, 40 ),
+				'venue'        => $group['event_a']['venue'] ?: $group['event_b']['venue'],
+				'date'         => $group['date'],
+				'merge_ticket' => $should_merge_ticket ? 'yes' : 'no',
 			);
 		}
 

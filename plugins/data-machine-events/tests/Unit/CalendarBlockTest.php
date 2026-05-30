@@ -18,14 +18,14 @@ class CalendarBlockTest extends WP_UnitTestCase {
 
 	public function test_calendar_block_registered() {
 		$block_registry = \WP_Block_Type_Registry::get_instance();
-		$block = $block_registry->get_registered( 'data-machine-events/calendar' );
+		$block          = $block_registry->get_registered( 'data-machine-events/calendar' );
 
 		$this->assertNotNull( $block, 'Calendar block should be registered' );
 	}
 
 	public function test_calendar_block_has_render_callback() {
 		$block_registry = \WP_Block_Type_Registry::get_instance();
-		$block = $block_registry->get_registered( 'data-machine-events/calendar' );
+		$block          = $block_registry->get_registered( 'data-machine-events/calendar' );
 
 		$this->assertNotNull( $block );
 		$this->assertNotNull( $block->render_callback, 'Block should have render callback' );
@@ -45,9 +45,9 @@ class CalendarBlockTest extends WP_UnitTestCase {
 		$pagination = new Pagination();
 
 		$params = array(
-			'page'    => '2',
-			'search'  => '<script>alert("xss")</script>Test',
-			'nested'  => array(
+			'page'   => '2',
+			'search' => '<script>alert("xss")</script>Test',
+			'nested' => array(
 				'value' => 'test<tag>',
 			),
 		);
@@ -79,7 +79,7 @@ class CalendarBlockTest extends WP_UnitTestCase {
 	public function test_calendar_renders_no_events_state() {
 		// Create a mock render with no events
 		$block_registry = \WP_Block_Type_Registry::get_instance();
-		$block = $block_registry->get_registered( 'data-machine-events/calendar' );
+		$block          = $block_registry->get_registered( 'data-machine-events/calendar' );
 
 		if ( $block && $block->render_callback ) {
 			$output = call_user_func( $block->render_callback, array(), '', $block );

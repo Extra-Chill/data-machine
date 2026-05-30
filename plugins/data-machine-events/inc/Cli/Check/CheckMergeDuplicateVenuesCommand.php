@@ -95,7 +95,7 @@ class CheckMergeDuplicateVenuesCommand {
 		$rows = array();
 
 		foreach ( $clusters as $cluster ) {
-			$row = $this->process_cluster( $cluster, $dry_run );
+			$row    = $this->process_cluster( $cluster, $dry_run );
 			$rows[] = $row;
 		}
 
@@ -184,7 +184,7 @@ class CheckMergeDuplicateVenuesCommand {
 			$by_address[ $addr_key ][] = $term;
 		}
 
-		$clusters     = array();
+		$clusters      = array();
 		$seen_term_ids = array();
 
 		// Emit name-clusters first, then address-clusters. Each term is
@@ -338,11 +338,11 @@ class CheckMergeDuplicateVenuesCommand {
 			return $row;
 		}
 
-		$skipped       = false;
-		$total_posts   = 0;
-		$total_flows   = 0;
-		$skip_reasons  = array();
-		$error_seen    = false;
+		$skipped      = false;
+		$total_posts  = 0;
+		$total_flows  = 0;
+		$skip_reasons = array();
+		$error_seen   = false;
 
 		foreach ( $loser_ids as $loser_id ) {
 			$result = VenueMergeHelper::merge( $winner_id, $loser_id );

@@ -136,7 +136,7 @@ class ArtistUrlImportAbilities {
 						'events_preview'           => array( 'type' => 'array' ),
 						'suggested_artist_name'    => array( 'type' => 'string' ),
 						'suggested_artist_term_id' => array( 'type' => array( 'integer', 'null' ) ),
-						'source_metadata'         => array( 'type' => 'object' ),
+						'source_metadata'          => array( 'type' => 'object' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executePreview' ),
@@ -165,11 +165,11 @@ class ArtistUrlImportAbilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'success'        => array( 'type' => 'boolean' ),
-						'submission_id'  => array( 'type' => 'integer' ),
-						'status'         => array( 'type' => 'string' ),
-						'message'        => array( 'type' => 'string' ),
-						'events_found'   => array( 'type' => 'integer' ),
+						'success'       => array( 'type' => 'boolean' ),
+						'submission_id' => array( 'type' => 'integer' ),
+						'status'        => array( 'type' => 'string' ),
+						'message'       => array( 'type' => 'string' ),
+						'events_found'  => array( 'type' => 'integer' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeSubmit' ),
@@ -199,11 +199,11 @@ class ArtistUrlImportAbilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'success'                       => array( 'type' => 'boolean' ),
-						'pipeline_id'                   => array( 'type' => 'integer' ),
-						'flow_id'                       => array( 'type' => 'integer' ),
-						'artist_term_id'                => array( 'type' => 'integer' ),
-						'events_imported_immediately'   => array( 'type' => array( 'integer', 'null' ) ),
+						'success'                     => array( 'type' => 'boolean' ),
+						'pipeline_id'                 => array( 'type' => 'integer' ),
+						'flow_id'                     => array( 'type' => 'integer' ),
+						'artist_term_id'              => array( 'type' => 'integer' ),
+						'events_imported_immediately' => array( 'type' => array( 'integer', 'null' ) ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeApprove' ),
@@ -293,9 +293,9 @@ class ArtistUrlImportAbilities {
 				'url_already_tracked',
 				__( 'This URL is already being tracked.', 'data-machine-events' ),
 				array(
-					'status'             => 409,
-					'existing_status'    => $existing['status'],
-					'submission_id'      => (int) $existing['id'],
+					'status'          => 409,
+					'existing_status' => $existing['status'],
+					'submission_id'   => (int) $existing['id'],
 				)
 			);
 		}
@@ -390,14 +390,14 @@ class ArtistUrlImportAbilities {
 		if ( is_wp_error( $probe ) || 0 === ( $probe['events_found'] ?? 0 ) ) {
 			$submission_id = ArtistUrlSubmissionsTable::insert(
 				array(
-					'user_id'              => $user_id,
-					'contact_email'        => $contact_email,
-					'contact_name'         => $contact_name,
-					'url'                  => $normalized,
-					'url_hash'             => $hash,
-					'detected_format'      => '',
-					'events_found_count'   => 0,
-					'status'               => ArtistUrlSubmissionsTable::STATUS_SCRAPING_FAILED,
+					'user_id'            => $user_id,
+					'contact_email'      => $contact_email,
+					'contact_name'       => $contact_name,
+					'url'                => $normalized,
+					'url_hash'           => $hash,
+					'detected_format'    => '',
+					'events_found_count' => 0,
+					'status'             => ArtistUrlSubmissionsTable::STATUS_SCRAPING_FAILED,
 				)
 			);
 
@@ -826,7 +826,7 @@ class ArtistUrlImportAbilities {
 			}
 		}
 
-		$name    = '';
+		$name = '';
 		foreach ( $candidates as $candidate ) {
 			$candidate = trim( (string) $candidate );
 			if ( '' !== $candidate ) {
@@ -939,8 +939,8 @@ class ArtistUrlImportAbilities {
 			return null;
 		}
 
-		$best_id   = null;
-		$best_pct  = 0.0;
+		$best_id  = null;
+		$best_pct = 0.0;
 		foreach ( $terms as $term_id => $term_name ) {
 			$pct = 0.0;
 			similar_text( strtolower( $name ), strtolower( (string) $term_name ), $pct );

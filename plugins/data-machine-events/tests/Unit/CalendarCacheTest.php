@@ -72,9 +72,9 @@ class CalendarCacheTest extends WP_UnitTestCase {
 			'geo_radius_unit'  => 'mi',
 		);
 
-		$other_geo_envelope             = $base_envelope;
-		$other_geo_envelope['geo_lat']  = '34.85';
-		$other_geo_envelope['geo_lng']  = '-82.40';
+		$other_geo_envelope            = $base_envelope;
+		$other_geo_envelope['geo_lat'] = '34.85';
+		$other_geo_envelope['geo_lng'] = '-82.40';
 
 		$other_radius_envelope               = $base_envelope;
 		$other_radius_envelope['geo_radius'] = 25;

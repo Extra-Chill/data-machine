@@ -90,7 +90,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$future_datetime = date( 'Y-m-d H:i:s', strtotime( '+1 week' ) );
 		update_post_meta( $post_id, '_datamachine_event_datetime', $future_datetime );
 
-		$request = new WP_REST_Request( 'GET', '/datamachine/v1/events/calendar' );
+		$request  = new WP_REST_Request( 'GET', '/datamachine/v1/events/calendar' );
 		$response = $this->server->dispatch( $request );
 
 		$this->assertEquals( 200, $response->get_status() );
@@ -147,7 +147,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 	}
 
 	public function test_filters_endpoint_returns_taxonomies() {
-		$request = new WP_REST_Request( 'GET', '/datamachine/v1/events/filters' );
+		$request  = new WP_REST_Request( 'GET', '/datamachine/v1/events/filters' );
 		$response = $this->server->dispatch( $request );
 
 		$this->assertEquals( 200, $response->get_status() );

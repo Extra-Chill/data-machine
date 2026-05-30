@@ -107,15 +107,15 @@ class CheckMergedBillsCommand {
 			}
 
 			$rows[] = array(
-				'post_a'   => $pair['post_a_id'],
-				'title_a'  => mb_substr( (string) $pair['post_a_title'], 0, 35 ),
-				'post_b'   => $pair['post_b_id'],
-				'title_b'  => mb_substr( (string) $pair['post_b_title'], 0, 35 ),
-				'venue'    => $pair['venue_term_id'],
-				'start'    => $pair['start_datetime'],
-				'score'    => $pair['score'],
-				'signals'  => implode( ',', $tag_bits ),
-				'queued'   => $pair['score'] >= $result['threshold'] && ! $result['dry_run'] ? 'yes' : 'no',
+				'post_a'  => $pair['post_a_id'],
+				'title_a' => mb_substr( (string) $pair['post_a_title'], 0, 35 ),
+				'post_b'  => $pair['post_b_id'],
+				'title_b' => mb_substr( (string) $pair['post_b_title'], 0, 35 ),
+				'venue'   => $pair['venue_term_id'],
+				'start'   => $pair['start_datetime'],
+				'score'   => $pair['score'],
+				'signals' => implode( ',', $tag_bits ),
+				'queued'  => $pair['score'] >= $result['threshold'] && ! $result['dry_run'] ? 'yes' : 'no',
 			);
 		}
 

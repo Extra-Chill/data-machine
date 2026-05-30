@@ -73,7 +73,7 @@ class EventImportHandlerTest extends WP_UnitTestCase {
 	public function test_clean_html_strips_most_tags() {
 		$method = $this->getProtectedMethod( 'cleanHtml' );
 
-		$html = '<div><script>alert("x")</script><p>Hello</p><a href="#">Link</a></div>';
+		$html   = '<div><script>alert("x")</script><p>Hello</p><a href="#">Link</a></div>';
 		$result = $method->invoke( $this->handler, $html );
 
 		$this->assertStringNotContainsString( '<script>', $result );
@@ -123,7 +123,7 @@ class EventImportHandlerTest extends WP_UnitTestCase {
 
 	private function getProtectedMethod( string $name ) {
 		$reflection = new ReflectionClass( $this->handler );
-		$method = $reflection->getMethod( $name );
+		$method     = $reflection->getMethod( $name );
 		$method->setAccessible( true );
 		return $method;
 	}

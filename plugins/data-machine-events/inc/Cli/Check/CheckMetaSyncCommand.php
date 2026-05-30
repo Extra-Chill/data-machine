@@ -130,7 +130,7 @@ class CheckMetaSyncCommand {
 				continue;
 			}
 
-			$dates = \DataMachineEvents\Core\EventDatesTable::get( $event->ID );
+			$dates      = \DataMachineEvents\Core\EventDatesTable::get( $event->ID );
 			$meta_start = $dates ? $dates->start_datetime : '';
 
 			if ( empty( $meta_start ) ) {
@@ -172,8 +172,8 @@ class CheckMetaSyncCommand {
 			}
 
 			if ( ! empty( $attrs['endDate'] ) ) {
-				$end_datetime = $attrs['endDate'];
-				$end_time     = ! empty( $attrs['endTime'] ) ? $attrs['endTime'] : '23:59:59';
+				$end_datetime  = $attrs['endDate'];
+				$end_time      = ! empty( $attrs['endTime'] ) ? $attrs['endTime'] : '23:59:59';
 				$end_datetime .= ' ' . $end_time;
 			} elseif ( ! empty( $attrs['endTime'] ) ) {
 				$end_datetime = $attrs['startDate'] . ' ' . $attrs['endTime'];

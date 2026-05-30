@@ -78,12 +78,12 @@ class CheckQualityCommand {
 		$abilities = new EventQualityAuditAbilities();
 		$result    = $abilities->executeAudit(
 			array(
-				'scope'      => $assoc_args['scope'] ?? 'upcoming',
-				'days_ahead' => (int) ( $assoc_args['days-ahead'] ?? 90 ),
-				'flow_id'    => (int) ( $assoc_args['flow-id'] ?? 0 ),
+				'scope'            => $assoc_args['scope'] ?? 'upcoming',
+				'days_ahead'       => (int) ( $assoc_args['days-ahead'] ?? 90 ),
+				'flow_id'          => (int) ( $assoc_args['flow-id'] ?? 0 ),
 				'location_term_id' => (int) ( $assoc_args['location-term-id'] ?? 0 ),
-				'issue'      => $assoc_args['issue'] ?? 'all',
-				'limit'      => (int) ( $assoc_args['limit'] ?? 25 ),
+				'issue'            => $assoc_args['issue'] ?? 'all',
+				'limit'            => (int) ( $assoc_args['limit'] ?? 25 ),
 			)
 		);
 

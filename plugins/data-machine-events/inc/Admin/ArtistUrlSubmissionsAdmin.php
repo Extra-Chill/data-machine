@@ -69,7 +69,7 @@ class ArtistUrlSubmissionsAdmin {
 			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'data-machine-events' ) );
 		}
 
-		$status = isset( $_GET['status'] ) ? sanitize_key( wp_unslash( (string) $_GET['status'] ) ) : ArtistUrlSubmissionsTable::STATUS_PENDING_REVIEW;
+		$status           = isset( $_GET['status'] ) ? sanitize_key( wp_unslash( (string) $_GET['status'] ) ) : ArtistUrlSubmissionsTable::STATUS_PENDING_REVIEW;
 		$allowed_statuses = array(
 			ArtistUrlSubmissionsTable::STATUS_PENDING_REVIEW,
 			ArtistUrlSubmissionsTable::STATUS_APPROVED,
@@ -102,10 +102,10 @@ class ArtistUrlSubmissionsAdmin {
 
 		// Status tabs.
 		echo '<ul class="subsubsub">';
-		$tabs = array(
-			ArtistUrlSubmissionsTable::STATUS_PENDING_REVIEW  => __( 'Pending review', 'data-machine-events' ),
-			ArtistUrlSubmissionsTable::STATUS_APPROVED        => __( 'Approved', 'data-machine-events' ),
-			ArtistUrlSubmissionsTable::STATUS_REJECTED        => __( 'Rejected', 'data-machine-events' ),
+		$tabs     = array(
+			ArtistUrlSubmissionsTable::STATUS_PENDING_REVIEW => __( 'Pending review', 'data-machine-events' ),
+			ArtistUrlSubmissionsTable::STATUS_APPROVED => __( 'Approved', 'data-machine-events' ),
+			ArtistUrlSubmissionsTable::STATUS_REJECTED => __( 'Rejected', 'data-machine-events' ),
 			ArtistUrlSubmissionsTable::STATUS_SCRAPING_FAILED => __( 'Failed scrapes', 'data-machine-events' ),
 		);
 		$last_idx = count( $tabs ) - 1;
@@ -202,9 +202,9 @@ class ArtistUrlSubmissionsAdmin {
 	}
 
 	private function render_approve_form( int $submission_id, array $row ): void {
-		$action_url = admin_url( 'admin-post.php' );
-		$suggested_term_id   = (int) ( $row['suggested_artist_term_id'] ?? 0 );
-		$suggested_name      = (string) ( $row['suggested_artist_name'] ?? '' );
+		$action_url        = admin_url( 'admin-post.php' );
+		$suggested_term_id = (int) ( $row['suggested_artist_term_id'] ?? 0 );
+		$suggested_name    = (string) ( $row['suggested_artist_name'] ?? '' );
 		?>
 		<form method="post" action="<?php echo esc_url( $action_url ); ?>" style="display: block; margin-bottom: 6px;">
 			<?php wp_nonce_field( self::NONCE_APPROVE . '_' . $submission_id ); ?>

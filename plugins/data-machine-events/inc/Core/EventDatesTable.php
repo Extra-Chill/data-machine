@@ -158,9 +158,9 @@ class EventDatesTable {
 	public static function backfill( int $batch_size = 500, ?callable $progress = null ): int {
 		global $wpdb;
 
-		$table    = self::table_name();
-		$total    = 0;
-		$offset   = 0;
+		$table  = self::table_name();
+		$total  = 0;
+		$offset = 0;
 
 		while ( true ) {
 			// Find events with postmeta datetime but no row in event_dates table.

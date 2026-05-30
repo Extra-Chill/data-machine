@@ -112,11 +112,11 @@ class WordPressGenericExtractorTest extends WP_UnitTestCase {
 
 		$collection = array(
 			array(
-				'id'    => 101,
-				'title' => array( 'rendered' => 'Headline Act &amp; Friends' ),
-				'link'  => 'https://example.com/events/headline-act/',
-				'date'  => '2026-06-15T10:00:00',
-				'acf'   => array(
+				'id'        => 101,
+				'title'     => array( 'rendered' => 'Headline Act &amp; Friends' ),
+				'link'      => 'https://example.com/events/headline-act/',
+				'date'      => '2026-06-15T10:00:00',
+				'acf'       => array(
 					'event_date' => '2026-06-15T20:30:00',
 					'venue'      => 'Main Stage',
 					'ticket_url' => 'https://www.eventbrite.com/e/headline-act-tickets-123',
@@ -126,7 +126,7 @@ class WordPressGenericExtractorTest extends WP_UnitTestCase {
 						array( 'source_url' => 'https://example.com/wp-content/uploads/2026/06/headline.jpg' ),
 					),
 				),
-				'excerpt' => array( 'rendered' => '<p>A great show.</p>' ),
+				'excerpt'   => array( 'rendered' => '<p>A great show.</p>' ),
 			),
 			array(
 				'id'    => 102,

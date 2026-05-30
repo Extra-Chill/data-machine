@@ -30,37 +30,37 @@ class EventIdentifierGeneratorTest extends WP_UnitTestCase {
 			),
 
 			// Case variations
-			'case_insensitive' => array(
+			'case_insensitive'           => array(
 				'JAZZ NIGHT SPECIAL',
 				'jazz night special',
 			),
 
 			// Whitespace variations
-			'extra_whitespace' => array(
+			'extra_whitespace'           => array(
 				'Jazz  Night   Special',
 				'Jazz Night Special',
 			),
 
 			// Tour name stripped (em dash)
-			'tour_name_em_dash' => array(
+			'tour_name_em_dash'          => array(
 				'Andy Frasco & the U.N. — Growing Pains Tour',
 				'Andy Frasco & the U.N.',
 			),
 
 			// Supporting act stripped (with)
-			'supporting_act_with' => array(
+			'supporting_act_with'        => array(
 				'Headliner Band with Opening Act',
 				'Headliner Band',
 			),
 
 			// Supporting act stripped (feat)
-			'supporting_act_feat' => array(
+			'supporting_act_feat'        => array(
 				'Main Artist feat. Guest Artist',
 				'Main Artist',
 			),
 
 			// Colon delimiter
-			'colon_series_name' => array(
+			'colon_series_name'          => array(
 				'Jazz Night: Holiday Special',
 				'Jazz Night',
 			),
@@ -72,7 +72,7 @@ class EventIdentifierGeneratorTest extends WP_UnitTestCase {
 	 */
 	public function get_non_matching_title_pairs(): array {
 		return array(
-			'completely_different' => array(
+			'completely_different'        => array(
 				'Jazz Night at the Blue Note',
 				'Rock Concert at Red Rocks',
 			),
@@ -82,7 +82,7 @@ class EventIdentifierGeneratorTest extends WP_UnitTestCase {
 				'Burgundy: Funk Nite',
 			),
 
-			'same_venue_different_event' => array(
+			'same_venue_different_event'  => array(
 				'Blue Note: Jazz Series',
 				'Blue Note: Blues Series',
 			),

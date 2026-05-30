@@ -270,8 +270,8 @@ class MergedBillDetectAbilities {
 
 		$buckets = array();
 		foreach ( $rows as $row ) {
-			$key                  = $row['venue_term_id'] . '|' . $row['start_datetime'];
-			$buckets[ $key ][]    = $row;
+			$key               = $row['venue_term_id'] . '|' . $row['start_datetime'];
+			$buckets[ $key ][] = $row;
 		}
 
 		$groups = array();

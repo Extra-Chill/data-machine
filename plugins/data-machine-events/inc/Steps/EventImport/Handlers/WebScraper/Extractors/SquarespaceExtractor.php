@@ -996,7 +996,7 @@ class SquarespaceExtractor extends BaseExtractor {
 
 			if ( ! empty( $matches[3] ) ) {
 				try {
-					$dt = new \DateTime( "{$month} {$day} {$matches[3]}" );
+					$dt                 = new \DateTime( "{$month} {$day} {$matches[3]}" );
 					$event['startDate'] = $dt->format( 'Y-m-d' );
 				} catch ( \Exception $e ) {
 					return;

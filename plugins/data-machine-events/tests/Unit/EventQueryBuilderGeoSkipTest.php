@@ -73,8 +73,8 @@ class EventQueryBuilderGeoSkipTest extends WP_UnitTestCase {
 	public function test_skip_geo_when_archive_taxonomy_is_venue() {
 		$with_geo = EventQueryBuilder::build_query_args(
 			array(
-				'archive_taxonomy' => 'venue',
-				'archive_term_id'  => $this->venue_a,
+				'archive_taxonomy'   => 'venue',
+				'archive_term_id'    => $this->venue_a,
 				'tax_query_override' => array(
 					array(
 						'taxonomy' => 'venue',
@@ -82,18 +82,18 @@ class EventQueryBuilderGeoSkipTest extends WP_UnitTestCase {
 						'terms'    => $this->venue_a,
 					),
 				),
-				'geo_lat'         => 47.66,
-				'geo_lng'         => -122.33,
-				'geo_radius'      => 2,
-				'geo_radius_unit' => 'mi',
+				'geo_lat'            => 47.66,
+				'geo_lng'            => -122.33,
+				'geo_radius'         => 2,
+				'geo_radius_unit'    => 'mi',
 			)
 		);
 		call_user_func( $with_geo['cleanup'] );
 
 		$without_geo = EventQueryBuilder::build_query_args(
 			array(
-				'archive_taxonomy' => 'venue',
-				'archive_term_id'  => $this->venue_a,
+				'archive_taxonomy'   => 'venue',
+				'archive_term_id'    => $this->venue_a,
 				'tax_query_override' => array(
 					array(
 						'taxonomy' => 'venue',
@@ -148,7 +148,7 @@ class EventQueryBuilderGeoSkipTest extends WP_UnitTestCase {
 		call_user_func( $result['cleanup'] );
 
 		// Geo filter should have injected a venue tax_query clause.
-		$tax_query     = $result['args']['tax_query'] ?? array();
+		$tax_query        = $result['args']['tax_query'] ?? array();
 		$has_venue_clause = false;
 		foreach ( $tax_query as $key => $clause ) {
 			if ( 'relation' === $key ) {

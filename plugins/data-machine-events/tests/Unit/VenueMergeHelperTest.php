@@ -39,7 +39,7 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 	private function ensure_flows_table(): void {
 		global $wpdb;
 
-		$table = $wpdb->prefix . 'datamachine_flows';
+		$table  = $wpdb->prefix . 'datamachine_flows';
 		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
 
 		if ( $exists === $table ) {
@@ -244,7 +244,7 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 			'Hook and Ladder Theater',
 			array( VenueMergeHelper::NO_MERGE_META_KEY => '1' )
 		);
-		$loser = $this->make_venue( 'Hook & Ladder Theater' );
+		$loser  = $this->make_venue( 'Hook & Ladder Theater' );
 
 		$loser_post = $this->make_event_with_venue( 'Show B', $loser );
 
@@ -449,7 +449,7 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 			)
 		);
 
-		$cmd = new CheckMergeDuplicateVenuesCommand();
+		$cmd        = new CheckMergeDuplicateVenuesCommand();
 		$reflection = new \ReflectionClass( $cmd );
 		$method     = $reflection->getMethod( 'find_clusters' );
 		$method->setAccessible( true );
@@ -478,7 +478,7 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 				'_venue_city'    => 'Indianapolis',
 			)
 		);
-		$loser = $this->make_venue(
+		$loser  = $this->make_venue(
 			'HI-FI Indianapolis Suite 4',
 			array(
 				'_venue_address' => '1043 Virginia Ave',
@@ -529,7 +529,7 @@ class VenueMergeHelperTest extends WP_UnitTestCase {
 				'_venue_city'    => 'Indianapolis',
 			)
 		);
-		$intruder = $this->make_venue(
+		$intruder  = $this->make_venue(
 			'Completely Unrelated Bowling Alley',
 			array(
 				'_venue_address' => '1043 Virginia Ave',

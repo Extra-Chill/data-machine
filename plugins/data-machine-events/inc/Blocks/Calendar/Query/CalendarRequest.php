@@ -413,8 +413,8 @@ final class CalendarRequest {
 			if ( '' === $taxonomy_slug ) {
 				continue;
 			}
-			$term_ids   = (array) $term_ids;
-			$clean_ids  = array();
+			$term_ids  = (array) $term_ids;
+			$clean_ids = array();
 			foreach ( $term_ids as $term_id ) {
 				$term_id = absint( $term_id );
 				if ( $term_id > 0 ) {

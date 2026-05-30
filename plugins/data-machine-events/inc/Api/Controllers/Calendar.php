@@ -173,9 +173,9 @@ class Calendar {
 		// lives on the grouping entry, not on the event itself, because
 		// the same post can be a "start day" on one date and a
 		// "continuation" on the next.
-		$events_by_id   = array();
-		$grouping       = array();
-		$ordered_dates  = array();
+		$events_by_id  = array();
+		$grouping      = array();
+		$ordered_dates = array();
 
 		foreach ( $paged_date_groups as $date_group ) {
 			$date_key = $date_group['date'] ?? '';
@@ -273,25 +273,25 @@ class Calendar {
 		$title      = (string) ( $event_entry['title'] ?? get_the_title( $post_id ) );
 
 		return array(
-			'id'        => $post_id,
-			'title'     => $title,
-			'permalink' => (string) get_permalink( $post_id ),
-			'date'      => array(
+			'id'         => $post_id,
+			'title'      => $title,
+			'permalink'  => (string) get_permalink( $post_id ),
+			'date'       => array(
 				'start_date'     => (string) ( $event_data['startDate'] ?? '' ),
 				'start_time'     => (string) ( $event_data['startTime'] ?? '' ),
 				'end_date'       => (string) ( $event_data['endDate'] ?? '' ),
 				'end_time'       => (string) ( $event_data['endTime'] ?? '' ),
 				'venue_timezone' => (string) ( $event_data['venueTimezone'] ?? '' ),
 			),
-			'venue'     => $this->serialize_venue( $post_id, $event_data ),
-			'organizer' => $this->serialize_organizer( $event_data ),
-			'ticket'    => array(
+			'venue'      => $this->serialize_venue( $post_id, $event_data ),
+			'organizer'  => $this->serialize_organizer( $event_data ),
+			'ticket'     => array(
 				'url' => (string) ( $event_data['ticketUrl'] ?? '' ),
 			),
-			'performer' => array(
+			'performer'  => array(
 				'name' => (string) ( $event_data['performerName'] ?? '' ),
 			),
-			'address'   => (string) ( $event_data['address'] ?? '' ),
+			'address'    => (string) ( $event_data['address'] ?? '' ),
 			'taxonomies' => $this->serialize_taxonomies( $post_id ),
 		);
 	}
@@ -360,7 +360,7 @@ class Calendar {
 			$terms = $bundle['terms'] ?? array();
 			$list  = array();
 			foreach ( $terms as $term ) {
-				$link = get_term_link( $term, $taxonomy_slug );
+				$link   = get_term_link( $term, $taxonomy_slug );
 				$list[] = array(
 					'term_id' => (int) $term->term_id,
 					'name'    => (string) $term->name,

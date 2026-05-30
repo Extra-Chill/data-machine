@@ -29,9 +29,9 @@ defined( 'ABSPATH' ) || exit;
 
 class MergedBillDecideAbilities {
 
-	public const VERDICT_MERGE        = 'merge';
-	public const VERDICT_DISTINCT     = 'distinct';
-	public const VERDICT_NEEDS_HUMAN  = 'needs_human';
+	public const VERDICT_MERGE       = 'merge';
+	public const VERDICT_DISTINCT    = 'distinct';
+	public const VERDICT_NEEDS_HUMAN = 'needs_human';
 
 	private static bool $registered = false;
 
@@ -126,7 +126,7 @@ class MergedBillDecideAbilities {
 			return new \WP_Error( 'not_found', 'Pending action not found or already resolved.', array( 'status' => 404 ) );
 		}
 
-		$apply = is_array( $action['apply_input'] ?? null ) ? $action['apply_input'] : array();
+		$apply     = is_array( $action['apply_input'] ?? null ) ? $action['apply_input'] : array();
 		$post_a_id = (int) ( $apply['post_a_id'] ?? 0 );
 		$post_b_id = (int) ( $apply['post_b_id'] ?? 0 );
 
@@ -302,8 +302,8 @@ class MergedBillDecideAbilities {
 		$post = get_post( $post_id );
 		if ( ! $post ) {
 			return array(
-				'id'       => $post_id,
-				'missing'  => true,
+				'id'      => $post_id,
+				'missing' => true,
 			);
 		}
 

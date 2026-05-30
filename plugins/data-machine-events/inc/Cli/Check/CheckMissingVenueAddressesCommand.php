@@ -160,7 +160,7 @@ class CheckMissingVenueAddressesCommand {
 			return;
 		}
 
-		$filled = 0;
+		$filled    = 0;
 		$no_repair = 0;
 		foreach ( $rows as $row ) {
 			if ( ! empty( $row['fields_filled'] ) ) {
@@ -420,8 +420,8 @@ class CheckMissingVenueAddressesCommand {
 		// against. Nominatim returns the full display name with commas;
 		// the first comma-segment is the POI name (e.g. "Stubb's
 		// Bar-B-Q, 801 Red River Street, Austin, ...").
-		$display      = (string) ( $data[0]['display_name'] ?? '' );
-		$display_head = strtok( $display, ',' );
+		$display                      = (string) ( $data[0]['display_name'] ?? '' );
+		$display_head                 = strtok( $display, ',' );
 		$parsed['display_name_short'] = (string) ( false === $display_head ? '' : $display_head );
 
 		return $parsed;

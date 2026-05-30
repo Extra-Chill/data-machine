@@ -312,7 +312,7 @@ class DuplicateDetectionAbilities {
 					'per_page'    => 10,
 					'status'      => 'any',
 				) );
-				$candidates = $result['posts'];
+				$candidates  = $result['posts'];
 
 				foreach ( $candidates as $candidate ) {
 					if ( EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {
@@ -335,7 +335,7 @@ class DuplicateDetectionAbilities {
 			'per_page'   => 20,
 			'status'     => 'any',
 		) );
-		$candidates = $result['posts'];
+		$candidates  = $result['posts'];
 
 		foreach ( $candidates as $candidate ) {
 			if ( ! EventIdentifierGenerator::titlesMatch( $title, $candidate->post_title ) ) {

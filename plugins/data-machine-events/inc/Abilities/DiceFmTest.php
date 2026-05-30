@@ -164,16 +164,16 @@ class DiceFmTest {
 
 		foreach ( array_slice( $raw_events, 0, $limit ) as $index => $dice_event ) {
 			$raw_data = array(
-				'name'     => $dice_event['name'] ?? '',
-				'date'     => $dice_event['date'] ?? '',
-				'date_end' => $dice_event['date_end'] ?? '',
-				'venue'    => $dice_event['venue'] ?? '',
-				'url'      => $dice_event['url'] ?? '',
-				'price'    => $dice_event['price'] ?? null,
-				'currency' => $dice_event['currency'] ?? '',
+				'name'         => $dice_event['name'] ?? '',
+				'date'         => $dice_event['date'] ?? '',
+				'date_end'     => $dice_event['date_end'] ?? '',
+				'venue'        => $dice_event['venue'] ?? '',
+				'url'          => $dice_event['url'] ?? '',
+				'price'        => $dice_event['price'] ?? null,
+				'currency'     => $dice_event['currency'] ?? '',
 				'ticket_types' => $dice_event['ticket_types'] ?? array(),
-				'timezone' => $dice_event['timezone'] ?? '',
-				'location' => $dice_event['location'] ?? null,
+				'timezone'     => $dice_event['timezone'] ?? '',
+				'location'     => $dice_event['location'] ?? null,
 			);
 
 			$mapped = $this->mapEvent( $dice_event );

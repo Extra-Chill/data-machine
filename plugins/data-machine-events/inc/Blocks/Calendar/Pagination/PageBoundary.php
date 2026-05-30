@@ -100,7 +100,7 @@ class PageBoundary {
 		}
 
 		// Handle additional taxonomy filters from the filter bar.
-		$tax_filters = $params['tax_filters'] ?? array();
+		$tax_filters  = $params['tax_filters'] ?? array();
 		$filter_index = 0;
 		foreach ( $tax_filters as $taxonomy_slug => $term_ids ) {
 			if ( empty( $term_ids ) || ! is_array( $term_ids ) ) {

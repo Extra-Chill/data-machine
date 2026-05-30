@@ -39,12 +39,12 @@ if ( is_tax() ) {
 // consumers (e.g. My Shows, festival pages) override per-context at
 // runtime without editing block markup. The filter receives a context
 // array with the resolved archive so it can branch on taxonomy/term.
-$raw_display_mode    = isset( $attributes['displayMode'] ) ? (string) $attributes['displayMode'] : 'date-groups';
+$raw_display_mode     = isset( $attributes['displayMode'] ) ? (string) $attributes['displayMode'] : 'date-groups';
 $display_mode_context = array(
 	'attributes'   => $attributes,
 	'archive_term' => $archive_term,
 );
-$display_mode = (string) apply_filters(
+$display_mode         = (string) apply_filters(
 	'data_machine_events_calendar_display_mode',
 	$raw_display_mode,
 	$display_mode_context
@@ -142,7 +142,7 @@ $date_context = array(
 
 // Use FilterAbilities to determine filter-bar visibility on archive pages.
 $hide_filter_button_when_inactive = false;
-$filter_count = ! empty( $tax_filters ) ? array_sum( array_map( 'count', $tax_filters ) ) : 0;
+$filter_count                     = ! empty( $tax_filters ) ? array_sum( array_map( 'count', $tax_filters ) ) : 0;
 
 if ( ! empty( $archive_context['taxonomy'] ) && ! empty( $archive_context['term_id'] ) && 0 === $filter_count ) {
 	$filter_abilities = new FilterAbilities();

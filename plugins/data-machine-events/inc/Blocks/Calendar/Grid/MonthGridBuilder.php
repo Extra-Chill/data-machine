@@ -70,7 +70,7 @@ final class MonthGridBuilder {
 
 		// Start of grid: first day of the week containing the 1st.
 		// Week starts on Sunday (locked decision in #318 v1).
-		$first_dow = (int) $first->format( 'w' ); // 0 = Sunday.
+		$first_dow  = (int) $first->format( 'w' ); // 0 = Sunday.
 		$grid_start = $first->modify( '-' . $first_dow . ' days' );
 
 		// Build a flat date-indexed map for fast event lookup.
@@ -91,7 +91,7 @@ final class MonthGridBuilder {
 			for ( $col_index = 0; $col_index < 7; $col_index++ ) {
 				$cell_date = $row_start->modify( '+' . $col_index . ' days' );
 				$date_key  = $cell_date->format( 'Y-m-d' );
-				$cells[] = self::build_cell(
+				$cells[]   = self::build_cell(
 					$cell_date,
 					$date_key,
 					$by_date[ $date_key ] ?? array(),
@@ -115,7 +115,7 @@ final class MonthGridBuilder {
 		// weeks don't add an empty sixth row. We always KEEP at least
 		// five rows for layout stability.
 		while ( count( $rows ) > 5 ) {
-			$last = end( $rows );
+			$last      = end( $rows );
 			$all_other = true;
 			foreach ( $last['cells'] as $cell ) {
 				if ( ! $cell['is_other_month'] ) {
@@ -153,7 +153,7 @@ final class MonthGridBuilder {
 		int $visible_month_num,
 		int $visible_year
 	): array {
-		$dow_index = (int) $cell_date->format( 'w' );
+		$dow_index   = (int) $cell_date->format( 'w' );
 		$day_of_week = self::DAYS_OF_WEEK[ $dow_index ];
 
 		$is_other_month = (int) $cell_date->format( 'n' ) !== $visible_month_num
@@ -210,9 +210,9 @@ final class MonthGridBuilder {
 		// when its display_context appears under multiple dates in the
 		// row.
 		$ribbons_by_post = array();
-		$cursor = $row_start;
+		$cursor          = $row_start;
 		for ( $i = 0; $i < 7; $i++ ) {
-			$date_key = $cursor->format( 'Y-m-d' );
+			$date_key        = $cursor->format( 'Y-m-d' );
 			$events_for_date = $by_date[ $date_key ] ?? array();
 			foreach ( $events_for_date as $event_item ) {
 				$display_context = $event_item['display_context'] ?? array();
@@ -260,11 +260,11 @@ final class MonthGridBuilder {
 				}
 			}
 			if ( null === $assigned ) {
-				$assigned                = count( $lane_ends );
-				$lane_ends[ $assigned ]  = -1;
+				$assigned               = count( $lane_ends );
+				$lane_ends[ $assigned ] = -1;
 			}
-			$ribbon['lane']            = $assigned;
-			$lane_ends[ $assigned ]    = $ribbon['start_col'] + $ribbon['span'] - 1;
+			$ribbon['lane']         = $assigned;
+			$lane_ends[ $assigned ] = $ribbon['start_col'] + $ribbon['span'] - 1;
 		}
 		unset( $ribbon );
 
@@ -284,7 +284,7 @@ final class MonthGridBuilder {
 		string $row_start_key,
 		string $row_end_key
 	): array {
-		$event_data = $event_item['event_data'] ?? array();
+		$event_data  = $event_item['event_data'] ?? array();
 		$event_start = (string) ( $event_data['startDate'] ?? '' );
 		$event_end   = (string) ( $event_data['endDate'] ?? $event_start );
 		if ( '' === $event_end ) {
@@ -309,11 +309,11 @@ final class MonthGridBuilder {
 		$continues_left  = $event_start < $row_start_key;
 		$continues_right = $event_end > $row_end_key;
 
-		$post       = $event_item['post'];
-		$title      = isset( $post->post_title ) ? (string) $post->post_title : '';
-		$post_id    = isset( $post->ID ) ? (int) $post->ID : 0;
-		$permalink  = $post_id > 0 ? (string) get_permalink( $post_id ) : '';
-		$dow_index  = (int) ( new DateTimeImmutable( $clip_start ) )->format( 'w' );
+		$post      = $event_item['post'];
+		$title     = isset( $post->post_title ) ? (string) $post->post_title : '';
+		$post_id   = isset( $post->ID ) ? (int) $post->ID : 0;
+		$permalink = $post_id > 0 ? (string) get_permalink( $post_id ) : '';
+		$dow_index = (int) ( new DateTimeImmutable( $clip_start ) )->format( 'w' );
 
 		return array(
 			'post_id'         => $post_id,
@@ -349,8 +349,8 @@ final class MonthGridBuilder {
 	 * date-only strings are timezone-neutral).
 	 */
 	private static function days_between( string $a, string $b ): int {
-		$da = new DateTimeImmutable( $a );
-		$db = new DateTimeImmutable( $b );
+		$da   = new DateTimeImmutable( $a );
+		$db   = new DateTimeImmutable( $b );
 		$diff = $da->diff( $db );
 		return (int) ( $diff->invert ? -$diff->days : $diff->days );
 	}

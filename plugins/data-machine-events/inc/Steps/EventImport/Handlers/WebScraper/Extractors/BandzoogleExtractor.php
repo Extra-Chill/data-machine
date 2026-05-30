@@ -322,8 +322,8 @@ class BandzoogleExtractor extends BaseExtractor {
 
 			if ( $calendar_year > 0 ) {
 				try {
-					$dt           = new \DateTime( sprintf( '%s %d %d', $month_name, $day, $calendar_year ) );
-					$out['date']  = $dt->format( 'Y-m-d' );
+					$dt          = new \DateTime( sprintf( '%s %d %d', $month_name, $day, $calendar_year ) );
+					$out['date'] = $dt->format( 'Y-m-d' );
 				} catch ( \Exception $e ) {
 					$out['date'] = '';
 				}

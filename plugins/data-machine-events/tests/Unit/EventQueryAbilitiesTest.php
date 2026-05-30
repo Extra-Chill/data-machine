@@ -80,7 +80,7 @@ class EventQueryAbilitiesTest extends WP_UnitTestCase {
 
 	public function test_get_venue_events_limits_results() {
 		$venue_term = wp_insert_term( 'Limit Test Venue ' . uniqid(), 'venue' );
-		$venue_id = $venue_term['term_id'];
+		$venue_id   = $venue_term['term_id'];
 
 		// Create multiple events
 		for ( $i = 0; $i < 5; $i++ ) {
@@ -110,7 +110,7 @@ class EventQueryAbilitiesTest extends WP_UnitTestCase {
 
 	public function test_get_venue_events_filters_by_status() {
 		$venue_term = wp_insert_term( 'Status Test Venue ' . uniqid(), 'venue' );
-		$venue_id = $venue_term['term_id'];
+		$venue_id   = $venue_term['term_id'];
 
 		// Create published event
 		$published_id = wp_insert_post(

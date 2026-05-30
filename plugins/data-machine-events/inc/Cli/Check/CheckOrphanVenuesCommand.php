@@ -104,10 +104,10 @@ class CheckOrphanVenuesCommand {
 	 * @param array $assoc_args Named arguments.
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
-		$apply           = isset( $assoc_args['apply'] );
-		$delete_orphans  = isset( $assoc_args['delete-orphans'] );
-		$limit           = max( 1, (int) ( $assoc_args['limit'] ?? 100 ) );
-		$format          = (string) ( $assoc_args['format'] ?? 'table' );
+		$apply          = isset( $assoc_args['apply'] );
+		$delete_orphans = isset( $assoc_args['delete-orphans'] );
+		$limit          = max( 1, (int) ( $assoc_args['limit'] ?? 100 ) );
+		$format         = (string) ( $assoc_args['format'] ?? 'table' );
 
 		$dry_run = ! $apply;
 

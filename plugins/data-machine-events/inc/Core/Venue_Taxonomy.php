@@ -364,9 +364,9 @@ class Venue_Taxonomy {
 			return;
 		}
 
-		$updated         = $result['updated'] ?? array();
-		$address_fields  = array( 'address', 'city', 'state', 'zip', 'country' );
-		$address_updated = (bool) array_intersect( $updated, $address_fields );
+		$updated           = $result['updated'] ?? array();
+		$address_fields    = array( 'address', 'city', 'state', 'zip', 'country' );
+		$address_updated   = (bool) array_intersect( $updated, $address_fields );
 		$coordinates_added = in_array( 'coordinates', $updated, true );
 
 		if ( $address_updated ) {
@@ -610,7 +610,7 @@ class Venue_Taxonomy {
 
 		// Strategy 3: Venue name + city + state (Nominatim indexes many POIs by name)
 		if ( ! empty( $name ) && ! empty( $city ) ) {
-			$parts = array_filter( array( $name, $city, $state ) );
+			$parts                  = array_filter( array( $name, $city, $state ) );
 			$queries['name_lookup'] = implode( ', ', $parts );
 		}
 
@@ -630,7 +630,7 @@ class Venue_Taxonomy {
 	 * @return string Street portion of the address
 	 */
 	private static function extract_street_from_address( string $address, string $city ): string {
-		$parts       = preg_split( '/,\s*/', $address );
+		$parts        = preg_split( '/,\s*/', $address );
 		$street_parts = array();
 
 		foreach ( $parts as $part ) {

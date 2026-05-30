@@ -94,15 +94,15 @@ class ArtistUrlSubmissionsTableTest extends WP_UnitTestCase {
 
 		$id = ArtistUrlSubmissionsTable::insert(
 			array(
-				'user_id'              => 1,
-				'contact_email'        => 'fan@example.com',
-				'contact_name'         => 'Fan',
-				'url'                  => $normalized,
-				'url_hash'             => $hash,
+				'user_id'               => 1,
+				'contact_email'         => 'fan@example.com',
+				'contact_name'          => 'Fan',
+				'url'                   => $normalized,
+				'url_hash'              => $hash,
 				'suggested_artist_name' => 'Theo Katzman',
-				'detected_format'      => 'json_ld',
-				'events_found_count'   => 12,
-				'status'               => ArtistUrlSubmissionsTable::STATUS_PENDING_REVIEW,
+				'detected_format'       => 'json_ld',
+				'events_found_count'    => 12,
+				'status'                => ArtistUrlSubmissionsTable::STATUS_PENDING_REVIEW,
 			)
 		);
 

@@ -43,34 +43,34 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
 
 		$api_event = array(
-			'name'        => 'Test Concert',
-			'id'          => 'TM123456',
-			'url'         => 'https://www.ticketmaster.com/event/123',
-			'dates'       => array(
-				'start' => array(
+			'name'      => 'Test Concert',
+			'id'        => 'TM123456',
+			'url'       => 'https://www.ticketmaster.com/event/123',
+			'dates'     => array(
+				'start'    => array(
 					'localDate' => '2026-03-15',
 					'localTime' => '19:30:00',
 				),
 				'timezone' => 'America/Denver',
 			),
-			'_embedded'   => array(
+			'_embedded' => array(
 				'venues' => array(
 					array(
-						'name'    => 'Test Arena',
-						'address' => array(
+						'name'       => 'Test Arena',
+						'address'    => array(
 							'line1' => '123 Main St',
 						),
-						'city'    => array(
+						'city'       => array(
 							'name' => 'Denver',
 						),
-						'state'   => array(
+						'state'      => array(
 							'stateCode' => 'CO',
 						),
 						'postalCode' => '80202',
-						'country' => array(
+						'country'    => array(
 							'countryCode' => 'US',
 						),
-						'timezone' => 'America/Denver',
+						'timezone'   => 'America/Denver',
 					),
 				),
 			),
@@ -180,7 +180,7 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 
 	private function getProtectedMethod( string $name ) {
 		$reflection = new ReflectionClass( $this->handler );
-		$method = $reflection->getMethod( $name );
+		$method     = $reflection->getMethod( $name );
 		$method->setAccessible( true );
 		return $method;
 	}

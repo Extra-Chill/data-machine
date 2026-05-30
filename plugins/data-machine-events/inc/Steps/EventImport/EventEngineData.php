@@ -301,8 +301,8 @@ class EventEngineData {
 		datamachine_merge_engine_data(
 			$job_id,
 			array(
-				'item_identifier'     => $item_identifier,
-				'source_type' => $source_type,
+				'item_identifier' => $item_identifier,
+				'source_type'     => $source_type,
 			)
 		);
 	}

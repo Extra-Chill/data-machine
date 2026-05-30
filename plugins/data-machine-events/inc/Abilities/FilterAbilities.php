@@ -105,12 +105,12 @@ class FilterAbilities {
 							'geo_context'     => array(
 								'type'       => 'object',
 								'properties' => array(
-									'active'       => array( 'type' => 'boolean' ),
-									'venue_count'  => array( 'type' => 'integer' ),
-									'lat'          => array( 'type' => 'number' ),
-									'lng'          => array( 'type' => 'number' ),
-									'radius'       => array( 'type' => 'number' ),
-									'radius_unit'  => array( 'type' => 'string' ),
+									'active'      => array( 'type' => 'boolean' ),
+									'venue_count' => array( 'type' => 'integer' ),
+									'lat'         => array( 'type' => 'number' ),
+									'lng'         => array( 'type' => 'number' ),
+									'radius'      => array( 'type' => 'number' ),
+									'radius_unit' => array( 'type' => 'string' ),
 								),
 							),
 							'meta'            => array(

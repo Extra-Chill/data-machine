@@ -112,14 +112,14 @@ class EventOgCardTemplate implements TemplateInterface {
 		$accent_text    = (string) ( $colors['accent_text'] ?? $colors['text_inverse'] );
 
 		// Surface colors for the card.
-		$bg        = $renderer->color_hex( 'bg', $colors['background'] );
-		$surface   = $renderer->color_hex( 'surface', $colors['surface'] );
-		$accent    = $renderer->color_hex( 'accent', $colors['accent'] );
-		$text_pri  = $renderer->color_hex( 'text_pri', $colors['text_primary'] );
-		$text_mute = $renderer->color_hex( 'text_mute', $colors['text_muted'] );
-		$text_inv  = $renderer->color_hex( 'text_inv', $colors['text_inverse'] );
+		$bg             = $renderer->color_hex( 'bg', $colors['background'] );
+		$surface        = $renderer->color_hex( 'surface', $colors['surface'] );
+		$accent         = $renderer->color_hex( 'accent', $colors['accent'] );
+		$text_pri       = $renderer->color_hex( 'text_pri', $colors['text_primary'] );
+		$text_mute      = $renderer->color_hex( 'text_mute', $colors['text_muted'] );
+		$text_inv       = $renderer->color_hex( 'text_inv', $colors['text_inverse'] );
 		$text_on_accent = $renderer->color_hex( 'text_on_accent', $accent_text );
-		$header_bg = $renderer->color_hex( 'header_bg', $colors['header_bg'] );
+		$header_bg      = $renderer->color_hex( 'header_bg', $colors['header_bg'] );
 
 		// Layout sections.
 		$renderer->fill( $bg );

@@ -247,7 +247,7 @@ class VenuePilotExtractor extends BaseExtractor {
 			$comp_props = $features['props']['render']['compProps'] ?? array();
 
 			foreach ( $comp_matches[1] as $comp_id ) {
-				$props = $comp_props[ $comp_id ] ?? array();
+				$props     = $comp_props[ $comp_id ] ?? array();
 				$embed_url = $props['url'] ?? '';
 
 				if ( empty( $embed_url ) || strpos( $embed_url, 'filesusr.com' ) === false ) {
@@ -280,10 +280,10 @@ class VenuePilotExtractor extends BaseExtractor {
 	 * @return array Raw event objects from the API.
 	 */
 	private function fetchAllEvents( array $account_ids ): array {
-		$all_events   = array();
-		$page         = 1;
-		$max_pages    = 10;
-		$start_date   = gmdate( 'Y-m-d' );
+		$all_events = array();
+		$page       = 1;
+		$max_pages  = 10;
+		$start_date = gmdate( 'Y-m-d' );
 
 		do {
 			$response = $this->queryGraphQL( $account_ids, $start_date, $page );

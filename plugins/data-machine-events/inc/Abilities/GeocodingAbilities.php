@@ -362,8 +362,8 @@ class GeocodingAbilities {
 			$geocoded = Venue_Taxonomy::maybe_geocode_venue( $venue->term_id );
 
 			if ( $geocoded ) {
-				$new_coords                 = get_term_meta( $venue->term_id, '_venue_coordinates', true );
-				$venue_result['action']     = 'geocoded';
+				$new_coords                  = get_term_meta( $venue->term_id, '_venue_coordinates', true );
+				$venue_result['action']      = 'geocoded';
 				$venue_result['coordinates'] = $new_coords;
 				++$success;
 			} else {
@@ -433,15 +433,15 @@ class GeocodingAbilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'total_venues'            => array( 'type' => 'integer' ),
-						'geocoded'                => array( 'type' => 'object' ),
-						'missing_coordinates'     => array( 'type' => 'object' ),
-						'missing_address'         => array( 'type' => 'object' ),
-						'has_address_no_coords'   => array( 'type' => 'object' ),
-						'missing_timezone'        => array( 'type' => 'object' ),
-						'coverage_percent'        => array( 'type' => 'number' ),
-						'message'                 => array( 'type' => 'string' ),
-						'error'                   => array( 'type' => 'string' ),
+						'total_venues'          => array( 'type' => 'integer' ),
+						'geocoded'              => array( 'type' => 'object' ),
+						'missing_coordinates'   => array( 'type' => 'object' ),
+						'missing_address'       => array( 'type' => 'object' ),
+						'has_address_no_coords' => array( 'type' => 'object' ),
+						'missing_timezone'      => array( 'type' => 'object' ),
+						'coverage_percent'      => array( 'type' => 'number' ),
+						'message'               => array( 'type' => 'string' ),
+						'error'                 => array( 'type' => 'string' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'executeAuditVenues' ),
@@ -485,10 +485,10 @@ class GeocodingAbilities {
 		$missing_tz_list      = array();
 
 		foreach ( $venues as $venue ) {
-			$address     = get_term_meta( $venue->term_id, '_venue_address', true );
-			$city        = get_term_meta( $venue->term_id, '_venue_city', true );
-			$coords      = get_term_meta( $venue->term_id, '_venue_coordinates', true );
-			$timezone    = get_term_meta( $venue->term_id, '_venue_timezone', true );
+			$address  = get_term_meta( $venue->term_id, '_venue_address', true );
+			$city     = get_term_meta( $venue->term_id, '_venue_city', true );
+			$coords   = get_term_meta( $venue->term_id, '_venue_coordinates', true );
+			$timezone = get_term_meta( $venue->term_id, '_venue_timezone', true );
 
 			$venue_info = array(
 				'term_id'     => $venue->term_id,
@@ -528,31 +528,31 @@ class GeocodingAbilities {
 		$coverage_percent = $total > 0 ? round( ( $geocoded_count / $total ) * 100, 1 ) : 0;
 
 		$result = array(
-			'total_venues'    => $total,
-			'coverage_percent' => $coverage_percent,
-			'geocoded'         => array(
+			'total_venues'          => $total,
+			'coverage_percent'      => $coverage_percent,
+			'geocoded'              => array(
 				'count' => $geocoded_count,
 			),
-			'missing_coordinates' => array(
+			'missing_coordinates'   => array(
 				'count' => count( $missing_coords_list ),
 			),
-			'missing_address' => array(
+			'missing_address'       => array(
 				'count' => count( $missing_address_list ),
 			),
 			'has_address_no_coords' => array(
 				'count' => count( $has_addr_no_coords ),
 			),
-			'missing_timezone' => array(
+			'missing_timezone'      => array(
 				'count' => count( $missing_tz_list ),
 			),
 		);
 
 		// Add venue lists in detailed mode.
 		if ( 'detailed' === $format ) {
-			$result['missing_coordinates']['venues']     = array_slice( $missing_coords_list, 0, $limit );
-			$result['missing_address']['venues']         = array_slice( $missing_address_list, 0, $limit );
-			$result['has_address_no_coords']['venues']   = array_slice( $has_addr_no_coords, 0, $limit );
-			$result['missing_timezone']['venues']        = array_slice( $missing_tz_list, 0, $limit );
+			$result['missing_coordinates']['venues']   = array_slice( $missing_coords_list, 0, $limit );
+			$result['missing_address']['venues']       = array_slice( $missing_address_list, 0, $limit );
+			$result['has_address_no_coords']['venues'] = array_slice( $has_addr_no_coords, 0, $limit );
+			$result['missing_timezone']['venues']      = array_slice( $missing_tz_list, 0, $limit );
 		}
 
 		// Build summary message.

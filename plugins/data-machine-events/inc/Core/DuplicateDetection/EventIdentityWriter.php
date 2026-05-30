@@ -83,7 +83,7 @@ class EventIdentityWriter {
 			return;
 		}
 
-		$dates = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+		$dates    = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
 		$datetime = $dates ? $dates->start_datetime : '';
 		if ( empty( $datetime ) ) {
 			return;
@@ -142,9 +142,9 @@ class EventIdentityWriter {
 	 * @return int Total events processed.
 	 */
 	public static function backfill( int $batch_size = 500, ?callable $progress = null ): int {
-		$index     = new PostIdentityIndex();
-		$total     = 0;
-		$offset    = 0;
+		$index  = new PostIdentityIndex();
+		$total  = 0;
+		$offset = 0;
 
 		while ( true ) {
 			$missing = $index->find_missing_post_ids( Event_Post_Type::POST_TYPE, $batch_size, $offset );

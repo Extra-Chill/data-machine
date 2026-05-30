@@ -24,8 +24,8 @@ class MusicItemExtractor extends BaseExtractor {
 	}
 
 	public function extract( string $html, string $source_url ): array {
-		$loaded = $this->loadDom( $html );
-		$xpath  = $loaded['xpath'];
+		$loaded      = $this->loadDom( $html );
+		$xpath       = $loaded['xpath'];
 		$event_nodes = $xpath->query( "//*[contains(concat(' ', normalize-space(@class), ' '), ' music__item ')]" );
 
 		if ( 0 === $event_nodes->length ) {

@@ -139,7 +139,7 @@ function datamachine_unwrap_affiliate_url( string $url ): string {
 		'tkqlhce.com',
 	);
 
-	$host = strtolower( $parsed['host'] );
+	$host         = strtolower( $parsed['host'] );
 	$is_affiliate = false;
 	foreach ( $affiliate_hosts as $affiliate_host ) {
 		if ( $host === $affiliate_host || str_ends_with( $host, '.' . $affiliate_host ) ) {

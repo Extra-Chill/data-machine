@@ -120,8 +120,8 @@ class TicketUrlResyncAbilities {
 			'order'    => 'DESC',
 		);
 
-		$result = $event_query->executeQueryEvents( $query_input );
-		$events = $result['posts'];
+		$result  = $event_query->executeQueryEvents( $query_input );
+		$events  = $result['posts'];
 		$updated = 0;
 		$skipped = 0;
 		$changes = array();

@@ -132,7 +132,7 @@ class EventScraperTest {
 		$results = $handler->get_fetch_data( 'direct', $config, null );
 
 		if ( empty( $results ) ) {
-			$warnings = array_values(
+			$warnings         = array_values(
 				array_filter(
 					$logs,
 					static function ( array $entry ): bool {
@@ -219,10 +219,10 @@ class EventScraperTest {
 				'extraction_info' => array_merge(
 					$extraction_info,
 					array(
-						'payload_type'       => 'vision_flyer',
-						'requires_ai_step'   => true,
-						'image_file_stored'  => true,
-						'extraction_method'  => $payload['extraction_method'] ?? 'vision',
+						'payload_type'      => 'vision_flyer',
+						'requires_ai_step'  => true,
+						'image_file_stored' => true,
+						'extraction_method' => $payload['extraction_method'] ?? 'vision',
 					)
 				),
 				'coverage_issues' => array(
@@ -242,13 +242,13 @@ class EventScraperTest {
 		}
 
 		$event_data = array(
-			'title'         => (string) ( $event['title'] ?? '' ),
-			'startDate'     => (string) ( $event['startDate'] ?? '' ),
-			'startTime'     => (string) ( $event['startTime'] ?? '' ),
-			'endDate'       => (string) ( $event['endDate'] ?? '' ),
-			'endTime'       => (string) ( $event['endTime'] ?? '' ),
-			'timezone'      => (string) ( $event['timezone'] ?? $event['venueTimezone'] ?? '' ),
-			'ticketUrl'     => (string) ( $event['ticketUrl'] ?? '' ),
+			'title'     => (string) ( $event['title'] ?? '' ),
+			'startDate' => (string) ( $event['startDate'] ?? '' ),
+			'startTime' => (string) ( $event['startTime'] ?? '' ),
+			'endDate'   => (string) ( $event['endDate'] ?? '' ),
+			'endTime'   => (string) ( $event['endTime'] ?? '' ),
+			'timezone'  => (string) ( $event['timezone'] ?? $event['venueTimezone'] ?? '' ),
+			'ticketUrl' => (string) ( $event['ticketUrl'] ?? '' ),
 		);
 
 		$venue_name  = (string) ( $event['venue'] ?? '' );

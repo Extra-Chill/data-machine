@@ -83,7 +83,7 @@ class VisionExtractionProcessor {
 		// dedup/claim/cap still runs in FetchHandler::get_fetch_data() after this.
 		$collector = new FreshCandidateCollector( $context, 1 );
 		foreach ( $candidates as $candidate ) {
-			$image_url        = $candidate['url'];
+			$image_url = $candidate['url'];
 			// Content-based identifier for cross-run tracking.
 			$image_identifier = md5( $url . $image_url );
 
