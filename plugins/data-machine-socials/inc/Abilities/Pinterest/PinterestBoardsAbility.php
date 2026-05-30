@@ -14,6 +14,7 @@ namespace DataMachineSocials\Abilities\Pinterest;
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -22,7 +23,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * Self-contained ability class following core patterns.
  */
-class PinterestBoardsAbility {
+class PinterestBoardsAbility extends AbstractSocialAbility {
 
 	/**
 	 * Option key for storing cached Pinterest boards.
@@ -43,27 +44,17 @@ class PinterestBoardsAbility {
 	 *
 	 * @var bool
 	 */
-	private static bool $registered = false;
+	protected static bool $registered = false;
 
 	/**
 	 * Constructor.
 	 */
 	public function __construct() {
-		if ( self::$registered ) {
-			return;
-		}
-
-		$this->registerAbilities();
-		self::$registered = true;
+		$this->registerAbility( $this->registerCallback() );
 	}
 
-	/**
-	 * Register Pinterest board abilities.
-	 *
-	 * @return void
-	 */
-	private function registerAbilities(): void {
-		$register_callback = function () {
+	private function registerCallback(): callable {
+		return function () {
 			// Sync boards ability
 			wp_register_ability(
 				'datamachine/pinterest-sync-boards',
@@ -140,12 +131,6 @@ class PinterestBoardsAbility {
 				)
 			);
 		};
-
-		if ( did_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} else {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
 	}
 
 	/**

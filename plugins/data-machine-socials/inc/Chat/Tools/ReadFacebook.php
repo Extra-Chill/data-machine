@@ -9,16 +9,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class ReadFacebook extends BaseTool {
+class ReadFacebook extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'read_facebook', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'read_facebook';
+
+	protected string $platform = 'facebook';
+
+	protected string $platform_label = 'Facebook';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -58,41 +57,9 @@ class ReadFacebook extends BaseTool {
 			return $this->buildErrorResponse( "post_id is required for the {$action} action", $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'facebook' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Facebook auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'facebook',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'    => 'configure_facebook_auth',
-					'message'   => 'Configure Facebook OAuth in Data Machine Settings > Auth.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Facebook is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'facebook',
-					'status'   => 'not_authenticated',
-				),
-				array(
-					'action'    => 'authenticate_facebook',
-					'message'   => 'Connect Facebook via Data Machine Settings > Auth > Facebook.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		$ability = wp_get_ability( 'datamachine/facebook-read' );

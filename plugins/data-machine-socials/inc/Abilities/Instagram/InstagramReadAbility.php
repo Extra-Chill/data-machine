@@ -16,12 +16,13 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
 
-class InstagramReadAbility {
+class InstagramReadAbility extends AbstractSocialAbility {
 
-	private static bool $registered = false;
+	protected static bool $registered = false;
 
 	/**
 	 * Uses Facebook Graph API because our OAuth flow issues FB-flavored tokens.
@@ -47,20 +48,11 @@ class InstagramReadAbility {
 	const DETAIL_FIELDS = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,media_product_type,is_shared_to_feed';
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
-		if ( self::$registered ) {
-			return;
-		}
-
-		$this->registerAbilities();
-		self::$registered = true;
+		$this->registerAbility( $this->registerCallback(), true );
 	}
 
-	private function registerAbilities(): void {
-		$register_callback = function () {
+	private function registerCallback(): callable {
+		return function () {
 			// List media ability.
 			wp_register_ability(
 				'datamachine/instagram-read',
@@ -106,12 +98,6 @@ class InstagramReadAbility {
 				)
 			);
 		};
-
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
 	}
 
 	/**

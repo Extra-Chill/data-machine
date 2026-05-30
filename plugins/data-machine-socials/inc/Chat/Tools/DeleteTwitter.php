@@ -9,16 +9,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class DeleteTwitter extends BaseTool {
+class DeleteTwitter extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'delete_twitter', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'delete_twitter';
+
+	protected string $platform = 'twitter';
+
+	protected string $platform_label = 'Twitter';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -45,17 +44,9 @@ class DeleteTwitter extends BaseTool {
 			return $this->buildErrorResponse( 'tweet_id is required', $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'twitter' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Twitter auth not available',
-				'prerequisite_missing',
-				$tool_name,
-				array( 'provider' => 'twitter' ),
-				array( 'action' => 'configure_twitter' )
-			);
+		$auth_error = $this->guardAuth( false );
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		$ability = wp_get_ability( 'datamachine/twitter-delete' );

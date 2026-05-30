@@ -12,16 +12,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class PublishLinkedIn extends BaseTool {
+class PublishLinkedIn extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'publish_linkedin', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'publish_linkedin';
+
+	protected string $platform = 'linkedin';
+
+	protected string $platform_label = 'LinkedIn';
 
 	/**
 	 * Get tool definition for AI agent.
@@ -72,42 +71,9 @@ class PublishLinkedIn extends BaseTool {
 			return $this->buildErrorResponse( 'content is required', $tool_name );
 		}
 
-		// Get auth provider and check authentication.
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'linkedin' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'LinkedIn auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'linkedin',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'    => 'configure_linkedin_auth',
-					'message'   => 'LinkedIn OAuth needs to be configured in Data Machine Settings > Auth.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'LinkedIn is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'linkedin',
-					'status'   => 'not_authenticated',
-				),
-				array(
-					'action'    => 'authenticate_linkedin',
-					'message'   => 'LinkedIn OAuth needs to be connected. Go to Data Machine Settings > Auth > LinkedIn.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		// Build ability input.

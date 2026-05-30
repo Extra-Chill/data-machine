@@ -12,16 +12,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class PublishThreads extends BaseTool {
+class PublishThreads extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'publish_threads', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'publish_threads';
+
+	protected string $platform = 'threads';
+
+	protected string $platform_label = 'Threads';
 
 	/**
 	 * Get tool definition for AI agent.
@@ -68,42 +67,9 @@ class PublishThreads extends BaseTool {
 			return $this->buildErrorResponse( 'content is required', $tool_name );
 		}
 
-		// Get auth provider and check authentication.
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'threads' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Threads auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'threads',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'    => 'configure_threads_auth',
-					'message'   => 'Threads OAuth needs to be configured in Data Machine Settings > Auth.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Threads is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'threads',
-					'status'   => 'not_authenticated',
-				),
-				array(
-					'action'    => 'authenticate_threads',
-					'message'   => 'Threads OAuth needs to be connected. Go to Data Machine Settings > Auth > Threads.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		// Build ability input.

@@ -13,40 +13,31 @@ namespace DataMachineSocials\Abilities\Facebook;
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Facebook Publish Ability
  */
-class FacebookPublishAbility {
+class FacebookPublishAbility extends AbstractSocialAbility {
 
 	/**
 	 * Whether the ability has been registered.
 	 *
 	 * @var bool
 	 */
-	private static bool $registered = false;
+	protected static bool $registered = false;
 
 	/**
 	 * Constructor.
 	 */
 	public function __construct() {
-		if ( self::$registered ) {
-			return;
-		}
-
-		$this->registerAbilities();
-		self::$registered = true;
+		$this->registerAbility( $this->registerCallback() );
 	}
 
-	/**
-	 * Register Facebook publish ability.
-	 *
-	 * @return void
-	 */
-	private function registerAbilities(): void {
-		$register_callback = function () {
+	private function registerCallback(): callable {
+		return function () {
 			wp_register_ability(
 				'datamachine/facebook-publish',
 				array(
@@ -131,12 +122,6 @@ class FacebookPublishAbility {
 				)
 			);
 		};
-
-		if ( did_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} else {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
 	}
 
 	/**

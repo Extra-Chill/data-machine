@@ -14,12 +14,13 @@ namespace DataMachineSocials\Abilities\Instagram;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
 
-class InstagramDeleteAbility {
+class InstagramDeleteAbility extends AbstractSocialAbility {
 
-	private static bool $registered = false;
+	protected static bool $registered = false;
 
 	/**
 	 * Uses Facebook Graph API because our OAuth flow issues FB-flavored tokens.
@@ -30,20 +31,11 @@ class InstagramDeleteAbility {
 	const GRAPH_API_URL = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION;
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
-		if ( self::$registered ) {
-			return;
-		}
-
-		$this->registerAbilities();
-		self::$registered = true;
+		$this->registerAbility( $this->registerCallback(), true );
 	}
 
-	private function registerAbilities(): void {
-		$register_callback = function () {
+	private function registerCallback(): callable {
+		return function () {
 			wp_register_ability(
 				'datamachine/instagram-delete',
 				array(
@@ -74,12 +66,6 @@ class InstagramDeleteAbility {
 				)
 			);
 		};
-
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
 	}
 
 	public function checkPermission(): bool {
@@ -143,12 +129,13 @@ class InstagramDeleteAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+		$normalized = $this->normalizeJsonResponse( $response );
+		if ( is_wp_error( $normalized ) ) {
+			return $normalized;
 		}
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
+		$status_code = $normalized['status_code'];
+		$body        = $normalized['data'];
 
 		if ( 200 === $status_code || 204 === $status_code ) {
 			return array(
@@ -160,6 +147,6 @@ class InstagramDeleteAbility {
 			);
 		}
 
-		return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Delete failed. The Instagram API may not support deletion for this media type. Consider archiving instead.', array( 'status' => 500 ) );
+		return $this->apiError( $body['error']['message'] ?? 'Delete failed. The Instagram API may not support deletion for this media type. Consider archiving instead.' );
 	}
 }

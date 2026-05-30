@@ -12,40 +12,36 @@ namespace DataMachineSocials\Abilities\Threads;
 
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\PermissionHelper;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Threads Publish Ability
  */
-class ThreadsPublishAbility {
+class ThreadsPublishAbility extends AbstractSocialAbility {
 
 	/**
 	 * Whether the ability has been registered.
 	 *
 	 * @var bool
 	 */
-	private static bool $registered = false;
+	protected static bool $registered = false;
 
 	/**
 	 * Constructor.
 	 */
 	public function __construct() {
-		if ( self::$registered ) {
-			return;
-		}
-
-		$this->registerAbilities();
-		self::$registered = true;
+		$this->registerAbility( $this->registerCallback() );
 	}
 
 	/**
-	 * Register Threads publish ability.
+	 * Build the Threads publish ability registration callback.
 	 *
-	 * @return void
+	 * @return callable
 	 */
-	private function registerAbilities(): void {
-		$register_callback = function () {
+	private function registerCallback(): callable {
+		return function () {
 			wp_register_ability(
 				'datamachine/threads-publish',
 				array(
@@ -117,12 +113,6 @@ class ThreadsPublishAbility {
 				)
 			);
 		};
-
-		if ( did_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} else {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
 	}
 
 	/**

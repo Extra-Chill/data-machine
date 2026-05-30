@@ -12,16 +12,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class PublishBluesky extends BaseTool {
+class PublishBluesky extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'publish_bluesky', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'publish_bluesky';
+
+	protected string $platform = 'bluesky';
+
+	protected string $platform_label = 'Bluesky';
 
 	/**
 	 * Get tool definition for AI agent.
@@ -72,42 +71,9 @@ class PublishBluesky extends BaseTool {
 			return $this->buildErrorResponse( 'content is required', $tool_name );
 		}
 
-		// Get auth provider and check authentication.
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'bluesky' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Bluesky auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'bluesky',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'    => 'configure_bluesky_auth',
-					'message'   => 'Bluesky authentication needs to be configured in Data Machine Settings > Auth.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Bluesky is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'bluesky',
-					'status'   => 'not_authenticated',
-				),
-				array(
-					'action'    => 'authenticate_bluesky',
-					'message'   => 'Bluesky needs to be connected. Go to Data Machine Settings > Auth > Bluesky.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		// Build ability input.

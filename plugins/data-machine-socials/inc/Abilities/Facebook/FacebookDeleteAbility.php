@@ -13,30 +13,22 @@ namespace DataMachineSocials\Abilities\Facebook;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
 
-class FacebookDeleteAbility {
+class FacebookDeleteAbility extends AbstractSocialAbility {
 
-	private static bool $registered = false;
+	protected static bool $registered = false;
 
 	const GRAPH_API_URL = FacebookAuth::GRAPH_API_URL;
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
-		if ( self::$registered ) {
-			return;
-		}
-
-		$this->registerAbilities();
-		self::$registered = true;
+		$this->registerAbility( $this->registerCallback(), true );
 	}
 
-	private function registerAbilities(): void {
-		$register_callback = function () {
+	private function registerCallback(): callable {
+		return function () {
 			wp_register_ability(
 				'datamachine/facebook-delete',
 				array(
@@ -67,12 +59,6 @@ class FacebookDeleteAbility {
 				)
 			);
 		};
-
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
 	}
 
 	public function checkPermission(): bool {
@@ -107,12 +93,13 @@ class FacebookDeleteAbility {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+		$normalized = $this->normalizeJsonResponse( $response );
+		if ( is_wp_error( $normalized ) ) {
+			return $normalized;
 		}
 
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body        = json_decode( wp_remote_retrieve_body( $response ), true );
+		$status_code = $normalized['status_code'];
+		$body        = $normalized['data'];
 
 		if ( 200 === $status_code || ( isset( $body['success'] ) && $body['success'] ) ) {
 			return array(
@@ -124,7 +111,7 @@ class FacebookDeleteAbility {
 			);
 		}
 
-		return new \WP_Error( 'api_error', $body['error']['message'] ?? 'Failed to delete post', array( 'status' => 500 ) );
+		return $this->apiError( $body['error']['message'] ?? 'Failed to delete post' );
 	}
 
 	private function getAuthProvider(): ?FacebookAuth {

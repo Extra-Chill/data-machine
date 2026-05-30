@@ -9,16 +9,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class DeleteBluesky extends BaseTool {
+class DeleteBluesky extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'delete_bluesky', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'delete_bluesky';
+
+	protected string $platform = 'bluesky';
+
+	protected string $platform_label = 'Bluesky';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -45,17 +44,9 @@ class DeleteBluesky extends BaseTool {
 			return $this->buildErrorResponse( 'post_uri is required', $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'bluesky' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Bluesky auth not available',
-				'prerequisite_missing',
-				$tool_name,
-				array( 'provider' => 'bluesky' ),
-				array( 'action' => 'configure_bluesky' )
-			);
+		$auth_error = $this->guardAuth( false );
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		$ability = wp_get_ability( 'datamachine/bluesky-delete' );

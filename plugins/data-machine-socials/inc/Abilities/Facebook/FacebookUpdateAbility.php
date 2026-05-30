@@ -14,30 +14,22 @@ namespace DataMachineSocials\Abilities\Facebook;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
 
-class FacebookUpdateAbility {
+class FacebookUpdateAbility extends AbstractSocialAbility {
 
-	private static bool $registered = false;
+	protected static bool $registered = false;
 
 	const GRAPH_API_URL = FacebookAuth::GRAPH_API_URL;
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
-		if ( self::$registered ) {
-			return;
-		}
-
-		$this->registerAbilities();
-		self::$registered = true;
+		$this->registerAbility( $this->registerCallback(), true );
 	}
 
-	private function registerAbilities(): void {
-		$register_callback = function () {
+	private function registerCallback(): callable {
+		return function () {
 			wp_register_ability(
 				'datamachine/facebook-update',
 				array(
@@ -77,12 +69,6 @@ class FacebookUpdateAbility {
 				)
 			);
 		};
-
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
 	}
 
 	/**

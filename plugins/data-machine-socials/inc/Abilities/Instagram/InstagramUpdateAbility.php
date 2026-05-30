@@ -15,12 +15,13 @@ namespace DataMachineSocials\Abilities\Instagram;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
 
-class InstagramUpdateAbility {
+class InstagramUpdateAbility extends AbstractSocialAbility {
 
-	private static bool $registered = false;
+	protected static bool $registered = false;
 
 	/**
 	 * Uses Facebook Graph API because our OAuth flow issues FB-flavored tokens.
@@ -36,20 +37,11 @@ class InstagramUpdateAbility {
 	const MAX_CAPTION_LENGTH = 2200;
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
-		if ( self::$registered ) {
-			return;
-		}
-
-		$this->registerAbilities();
-		self::$registered = true;
+		$this->registerAbility( $this->registerCallback(), true );
 	}
 
-	private function registerAbilities(): void {
-		$register_callback = function () {
+	private function registerCallback(): callable {
+		return function () {
 			wp_register_ability(
 				'datamachine/instagram-update',
 				array(
@@ -90,12 +82,6 @@ class InstagramUpdateAbility {
 				)
 			);
 		};
-
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
 	}
 
 	/**

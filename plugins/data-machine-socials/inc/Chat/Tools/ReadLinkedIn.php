@@ -9,16 +9,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class ReadLinkedIn extends BaseTool {
+class ReadLinkedIn extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'read_linkedin', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'read_linkedin';
+
+	protected string $platform = 'linkedin';
+
+	protected string $platform_label = 'LinkedIn';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -54,41 +53,9 @@ class ReadLinkedIn extends BaseTool {
 			return $this->buildErrorResponse( 'post_id is required for the get action', $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'linkedin' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'LinkedIn auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'linkedin',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'    => 'configure_linkedin_auth',
-					'message'   => 'Configure LinkedIn OAuth in Data Machine Settings > Auth.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'LinkedIn is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'linkedin',
-					'status'   => 'not_authenticated',
-				),
-				array(
-					'action'    => 'authenticate_linkedin',
-					'message'   => 'Connect LinkedIn via Data Machine Settings > Auth > LinkedIn.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		$ability = wp_get_ability( 'datamachine/linkedin-read' );

@@ -9,16 +9,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class UpdatePinterest extends BaseTool {
+class UpdatePinterest extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'update_pinterest', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'update_pinterest';
+
+	protected string $platform = 'pinterest';
+
+	protected string $platform_label = 'Pinterest';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -50,23 +49,9 @@ class UpdatePinterest extends BaseTool {
 			return $this->buildErrorResponse( 'pin_id is required', $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'pinterest' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Pinterest auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'pinterest',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'  => 'configure_pinterest_auth',
-					'message' => 'Pinterest API token needs to be configured.',
-				)
-			);
+		$auth_error = $this->guardAuth( false );
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		$ability = wp_get_ability( 'datamachine/pinterest-update' );

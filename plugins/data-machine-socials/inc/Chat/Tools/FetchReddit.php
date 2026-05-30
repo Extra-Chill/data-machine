@@ -12,16 +12,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class FetchReddit extends BaseTool {
+class FetchReddit extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'fetch_reddit', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'fetch_reddit';
+
+	protected string $platform = 'reddit';
+
+	protected string $platform_label = 'Reddit';
 
 	/**
 	 * Get tool definition for AI agent.
@@ -90,44 +89,12 @@ class FetchReddit extends BaseTool {
 		}
 
 		// Get auth provider and valid token.
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'reddit' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Reddit auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'reddit',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'    => 'configure_reddit_auth',
-					'message'   => 'Reddit OAuth needs to be configured in Data Machine Settings > Auth.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Reddit is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'reddit',
-					'status'   => 'not_authenticated',
-				),
-				array(
-					'action'    => 'authenticate_reddit',
-					'message'   => 'Reddit OAuth needs to be connected. Go to Data Machine Settings > Auth > Reddit.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
-		}
-
-		$access_token = $provider->get_valid_access_token();
+		$access_token = $this->provider->get_valid_access_token();
 		if ( empty( $access_token ) ) {
 			return $this->buildDiagnosticErrorResponse(
 				'Reddit access token expired and refresh failed',

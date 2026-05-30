@@ -9,16 +9,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class ReadPinterest extends BaseTool {
+class ReadPinterest extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'read_pinterest', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'read_pinterest';
+
+	protected string $platform = 'pinterest';
+
+	protected string $platform_label = 'Pinterest';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -65,41 +64,9 @@ class ReadPinterest extends BaseTool {
 			return $this->buildErrorResponse( 'board_id is required for the board_pins action', $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'pinterest' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Pinterest auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'pinterest',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'    => 'configure_pinterest_auth',
-					'message'   => 'Configure Pinterest access token in Data Machine Settings > Auth.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Pinterest is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'pinterest',
-					'status'   => 'not_authenticated',
-				),
-				array(
-					'action'    => 'authenticate_pinterest',
-					'message'   => 'Set Pinterest access token in Data Machine Settings > Auth > Pinterest.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		$ability = wp_get_ability( 'datamachine/pinterest-read' );

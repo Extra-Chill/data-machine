@@ -14,32 +14,24 @@ namespace DataMachineSocials\Abilities\Twitter;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Handlers\Twitter\TwitterAuth;
+use DataMachineSocials\Abilities\AbstractSocialAbility;
 
 defined( 'ABSPATH' ) || exit;
 
-class TwitterReadAbility {
+class TwitterReadAbility extends AbstractSocialAbility {
 
-	private static bool $registered = false;
+	protected static bool $registered = false;
 
 	const TWEET_FIELDS = 'id,text,created_at,public_metrics,source,lang,conversation_id';
 
 	const USER_FIELDS = 'id,name,username,profile_image_url,public_metrics,description';
 
 	public function __construct() {
-		if ( ! class_exists( 'WP_Ability' ) ) {
-			return;
-		}
-
-		if ( self::$registered ) {
-			return;
-		}
-
-		$this->registerAbilities();
-		self::$registered = true;
+		$this->registerAbility( $this->registerCallback(), true );
 	}
 
-	private function registerAbilities(): void {
-		$register_callback = function () {
+	private function registerCallback(): callable {
+		return function () {
 			wp_register_ability(
 				'datamachine/twitter-read',
 				array(
@@ -84,12 +76,6 @@ class TwitterReadAbility {
 				)
 			);
 		};
-
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			$register_callback();
-		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
-			add_action( 'wp_abilities_api_init', $register_callback );
-		}
 	}
 
 	public function checkPermission(): bool {

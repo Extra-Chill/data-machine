@@ -12,16 +12,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class SubmitReddit extends BaseTool {
+class SubmitReddit extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'submit_reddit', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'submit_reddit';
+
+	protected string $platform = 'reddit';
+
+	protected string $platform_label = 'Reddit';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -72,36 +71,12 @@ class SubmitReddit extends BaseTool {
 			return $this->buildErrorResponse( 'title is required', $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'reddit' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Reddit auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array( 'provider' => 'reddit', 'status' => 'not_registered' ),
-				array(
-					'action'  => 'configure_reddit_auth',
-					'message' => 'Reddit OAuth needs to be configured in Data Machine Settings > Auth.',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Reddit is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array( 'provider' => 'reddit', 'status' => 'not_authenticated' ),
-				array(
-					'action'  => 'authenticate_reddit',
-					'message' => 'Reddit OAuth needs to be connected with submit scope.',
-				)
-			);
-		}
-
-		$access_token = $provider->get_valid_access_token();
+		$access_token = $this->provider->get_valid_access_token();
 		if ( empty( $access_token ) ) {
 			return $this->buildDiagnosticErrorResponse(
 				'Reddit access token expired and refresh failed',

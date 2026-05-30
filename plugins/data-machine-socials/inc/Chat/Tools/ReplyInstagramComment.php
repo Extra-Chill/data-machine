@@ -12,16 +12,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Abilities\AuthAbilities;
-use DataMachine\Engine\AI\Tools\BaseTool;
-
 defined( 'ABSPATH' ) || exit;
 
-class ReplyInstagramComment extends BaseTool {
+class ReplyInstagramComment extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'reply_instagram_comment', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'reply_instagram_comment';
+
+	protected string $platform = 'instagram';
+
+	protected string $platform_label = 'Instagram';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -56,41 +55,9 @@ class ReplyInstagramComment extends BaseTool {
 			return $this->buildErrorResponse( 'message is required', $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'instagram' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Instagram auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'instagram',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'    => 'configure_instagram_auth',
-					'message'   => 'Instagram OAuth needs to be configured in Data Machine Settings > Auth.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Instagram is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'instagram',
-					'status'   => 'not_authenticated',
-				),
-				array(
-					'action'    => 'authenticate_instagram',
-					'message'   => 'Instagram OAuth needs to be connected. Go to Data Machine Settings > Auth > Instagram.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		$ability = wp_get_ability( 'datamachine/instagram-comment-reply' );

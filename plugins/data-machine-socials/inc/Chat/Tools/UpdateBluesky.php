@@ -9,16 +9,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class UpdateBluesky extends BaseTool {
+class UpdateBluesky extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'update_bluesky', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'update_bluesky';
+
+	protected string $platform = 'bluesky';
+
+	protected string $platform_label = 'Bluesky';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -50,39 +49,9 @@ class UpdateBluesky extends BaseTool {
 			return $this->buildErrorResponse( 'post_uri is required', $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'bluesky' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Bluesky auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'bluesky',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'  => 'configure_bluesky_auth',
-					'message' => 'Bluesky app password needs to be configured.',
-				)
-			);
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Bluesky is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'bluesky',
-					'status'   => 'not_authenticated',
-				),
-				array(
-					'action'  => 'authenticate_bluesky',
-					'message' => 'Bluesky app password needs to be connected.',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		$ability = wp_get_ability( 'datamachine/bluesky-update' );

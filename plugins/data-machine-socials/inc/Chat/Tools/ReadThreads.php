@@ -9,16 +9,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class ReadThreads extends BaseTool {
+class ReadThreads extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'read_threads', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'read_threads';
+
+	protected string $platform = 'threads';
+
+	protected string $platform_label = 'Threads';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -58,41 +57,9 @@ class ReadThreads extends BaseTool {
 			return $this->buildErrorResponse( "thread_id is required for the {$action} action", $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'threads' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Threads auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'threads',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'    => 'configure_threads_auth',
-					'message'   => 'Configure Threads OAuth in Data Machine Settings > Auth.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Threads is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'threads',
-					'status'   => 'not_authenticated',
-				),
-				array(
-					'action'    => 'authenticate_threads',
-					'message'   => 'Connect Threads via Data Machine Settings > Auth > Threads.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		$ability = wp_get_ability( 'datamachine/threads-read' );

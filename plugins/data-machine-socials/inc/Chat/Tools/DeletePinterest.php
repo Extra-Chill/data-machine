@@ -9,16 +9,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class DeletePinterest extends BaseTool {
+class DeletePinterest extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'delete_pinterest', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'delete_pinterest';
+
+	protected string $platform = 'pinterest';
+
+	protected string $platform_label = 'Pinterest';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -45,17 +44,9 @@ class DeletePinterest extends BaseTool {
 			return $this->buildErrorResponse( 'pin_id is required', $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'pinterest' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Pinterest auth not available',
-				'prerequisite_missing',
-				$tool_name,
-				array( 'provider' => 'pinterest' ),
-				array( 'action' => 'configure_pinterest' )
-			);
+		$auth_error = $this->guardAuth( false );
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		$ability = wp_get_ability( 'datamachine/pinterest-delete' );

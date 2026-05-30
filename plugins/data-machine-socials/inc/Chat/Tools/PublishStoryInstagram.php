@@ -13,16 +13,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class PublishStoryInstagram extends BaseTool {
+class PublishStoryInstagram extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'publish_story_instagram', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'publish_story_instagram';
+
+	protected string $platform = 'instagram';
+
+	protected string $platform_label = 'Instagram';
 
 	/**
 	 * Get tool definition for AI agent.
@@ -68,42 +67,9 @@ class PublishStoryInstagram extends BaseTool {
 			return $this->buildErrorResponse( 'image_url or video_url is required for Story publishing', $tool_name );
 		}
 
-		// Get auth provider and check authentication.
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'instagram' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Instagram auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'instagram',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'    => 'configure_instagram_auth',
-					'message'   => 'Instagram OAuth needs to be configured in Data Machine Settings > Auth.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Instagram is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'instagram',
-					'status'   => 'not_authenticated',
-				),
-				array(
-					'action'    => 'authenticate_instagram',
-					'message'   => 'Instagram OAuth needs to be connected. Go to Data Machine Settings > Auth > Instagram.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		// Build ability input.

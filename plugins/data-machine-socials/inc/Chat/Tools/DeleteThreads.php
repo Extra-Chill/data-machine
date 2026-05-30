@@ -9,16 +9,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class DeleteThreads extends BaseTool {
+class DeleteThreads extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'delete_threads', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'delete_threads';
+
+	protected string $platform = 'threads';
+
+	protected string $platform_label = 'Threads';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -45,17 +44,9 @@ class DeleteThreads extends BaseTool {
 			return $this->buildErrorResponse( 'thread_id is required', $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'threads' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Threads auth not available',
-				'prerequisite_missing',
-				$tool_name,
-				array( 'provider' => 'threads' ),
-				array( 'action' => 'configure_threads' )
-			);
+		$auth_error = $this->guardAuth( false );
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		$ability = wp_get_ability( 'datamachine/threads-delete' );

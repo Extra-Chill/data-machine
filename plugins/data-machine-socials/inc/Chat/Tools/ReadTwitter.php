@@ -9,16 +9,15 @@
 
 namespace DataMachineSocials\Chat\Tools;
 
-use DataMachine\Engine\AI\Tools\BaseTool;
-use DataMachine\Abilities\AuthAbilities;
-
 defined( 'ABSPATH' ) || exit;
 
-class ReadTwitter extends BaseTool {
+class ReadTwitter extends AbstractSocialTool {
 
-	public function __construct() {
-		$this->registerTool( 'read_twitter', array( $this, 'getToolDefinition' ), array( 'chat' ) );
-	}
+	protected string $tool_name = 'read_twitter';
+
+	protected string $platform = 'twitter';
+
+	protected string $platform_label = 'Twitter';
 
 	public function getToolDefinition(): array {
 		return array(
@@ -58,41 +57,9 @@ class ReadTwitter extends BaseTool {
 			return $this->buildErrorResponse( 'tweet_id is required for the get action', $tool_name );
 		}
 
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'twitter' );
-
-		if ( ! $provider ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Twitter auth provider not available',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'twitter',
-					'status'   => 'not_registered',
-				),
-				array(
-					'action'    => 'configure_twitter_auth',
-					'message'   => 'Configure Twitter OAuth in Data Machine Settings > Auth.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return $this->buildDiagnosticErrorResponse(
-				'Twitter is not authenticated',
-				'prerequisite_missing',
-				$tool_name,
-				array(
-					'provider' => 'twitter',
-					'status'   => 'not_authenticated',
-				),
-				array(
-					'action'    => 'authenticate_twitter',
-					'message'   => 'Connect Twitter via Data Machine Settings > Auth > Twitter.',
-					'tool_hint' => 'authenticate_handler',
-				)
-			);
+		$auth_error = $this->guardAuth();
+		if ( null !== $auth_error ) {
+			return $auth_error;
 		}
 
 		$ability = wp_get_ability( 'datamachine/twitter-read' );
