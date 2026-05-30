@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.137.0] - 2026-05-30
+
+### Added
+- scaffold Working Style section in default USER.md
+
 ## [0.136.1] - 2026-05-30
 
 ### Changed
