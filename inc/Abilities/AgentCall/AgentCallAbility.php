@@ -274,25 +274,22 @@ class AgentCallAbility {
 	}
 
 	/**
-	 * Build webhook payload.
+	 * Build the webhook payload.
+	 *
+	 * Core always builds the canonical {task, messages, context, timestamp}
+	 * envelope. Vendor-specific payload shaping does not live in core: the
+	 * `datamachine_agent_call_payload` filter lets an extension reshape the
+	 * envelope for a given target URL (e.g. a chat-platform webhook). The
+	 * filter receives the canonical payload plus the target URL and the raw
+	 * task/context, and must return an array to send as the JSON body.
+	 *
+	 * @param string $url      Target webhook URL.
+	 * @param string $task     Task string.
+	 * @param array  $context  Call context.
+	 * @param string $reply_to Optional reply-to identifier.
+	 * @return array Payload to encode as the webhook JSON body.
 	 */
 	private function buildWebhookPayload( string $url, string $task, array $context, string $reply_to ): array {
-		if ( $this->isDiscordWebhook( $url ) ) {
-			$first_packet = $context['data_packets'][0] ?? array();
-			$title        = $first_packet['content']['title'] ?? 'New content';
-			$packet_url   = $first_packet['metadata']['url'] ?? $first_packet['metadata']['permalink'] ?? '';
-			$source       = ! empty( $context['from_queue'] ) ? '📋' : '🤖';
-			$content      = "{$source} **{$title}**";
-			if ( ! empty( $packet_url ) ) {
-				$content .= "\n{$packet_url}";
-			}
-			if ( '' !== $task ) {
-				$content .= "\n\n{$task}";
-			}
-
-			return array( 'content' => $content );
-		}
-
 		$engine_data = is_array( $context['engine_data'] ?? null ) ? $context['engine_data'] : array();
 		$payload     = array(
 			'task'      => $task,
@@ -314,16 +311,63 @@ class AgentCallAbility {
 			$payload['reply_to'] = $reply_to;
 		}
 
-		return $payload;
+		/**
+		 * Filter the agent-call webhook payload before delivery.
+		 *
+		 * Extensions can register vendor-specific payload formatters keyed off
+		 * the target URL. Core does not know the shape of any specific vendor's
+		 * API; it only emits the canonical envelope.
+		 *
+		 * @param array  $payload  Canonical {task, messages, context, timestamp} envelope.
+		 * @param string $url      Target webhook URL.
+		 * @param string $task     Task string.
+		 * @param array  $context  Call context.
+		 * @param string $reply_to Optional reply-to identifier.
+		 */
+		$shaped = apply_filters( 'datamachine_agent_call_payload', $payload, $url, $task, $context, $reply_to );
+
+		return is_array( $shaped ) ? $shaped : $payload;
 	}
 
-	private function isDiscordWebhook( string $url ): bool {
-		return str_contains( $url, 'discord.com/api/webhooks/' )
-			|| str_contains( $url, 'discordapp.com/api/webhooks/' );
-	}
-
+	/**
+	 * Mask credentials in a webhook URL before logging.
+	 *
+	 * Generic credential-stripping: webhook providers commonly embed a secret
+	 * as the final path segment (e.g. /api/webhooks/<id>/<token>). Core does not
+	 * know any vendor's URL shape, so it redacts the last path segment of every
+	 * webhook URL while preserving scheme, host, and the leading path for
+	 * debuggability. The query string and fragment are dropped entirely since
+	 * they frequently carry tokens.
+	 *
+	 * @param string $url Webhook URL.
+	 * @return string URL with the trailing path segment masked.
+	 */
 	private function sanitizeUrlForLog( string $url ): string {
-		return preg_replace( '#(discord(?:app)?\.com/api/webhooks/\d+/)[^/\s]+#', '$1[MASKED]', $url );
+		$parts = wp_parse_url( $url );
+		if ( ! is_array( $parts ) || empty( $parts['host'] ) ) {
+			return '[MASKED]';
+		}
+
+		$scheme = isset( $parts['scheme'] ) ? $parts['scheme'] . '://' : '';
+		$host   = $parts['host'];
+		$port   = isset( $parts['port'] ) ? ':' . $parts['port'] : '';
+		$path   = isset( $parts['path'] ) ? $parts['path'] : '';
+
+		$base = $scheme . $host . $port;
+
+		if ( '' === $path || '/' === $path ) {
+			return $base . $path;
+		}
+
+		$trimmed  = rtrim( $path, '/' );
+		$segments = explode( '/', $trimmed );
+		if ( count( $segments ) > 1 ) {
+			$segments[ count( $segments ) - 1 ] = '[MASKED]';
+		} else {
+			$segments = array( '', '[MASKED]' );
+		}
+
+		return $base . implode( '/', $segments );
 	}
 
 	private function failure( string $error, array $output = array() ): array {

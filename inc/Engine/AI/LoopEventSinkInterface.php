@@ -18,7 +18,7 @@ interface LoopEventSinkInterface {
 	 * Emit a loop event.
 	 *
 	 * Event names are transport-neutral. Renderers can map them to logs, SSE,
-	 * WebSockets, CLI output, Discord updates, transcripts, or other consumers.
+	 * WebSockets, CLI output, chat updates, transcripts, or other consumers.
 	 *
 	 * @param string $event   Event name.
 	 * @param array  $payload Structured event payload.
