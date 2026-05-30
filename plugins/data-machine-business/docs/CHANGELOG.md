@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.5.0] - 2026-05-30
+
+### Added
+- expose hostName in GA4 page_stats + add network_density action
+- add Media Hygiene ability + wp datamachine media CLI
+
 ## [0.4.1] - 2026-05-23
 
 ### Fixed
