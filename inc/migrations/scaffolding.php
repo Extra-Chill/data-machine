@@ -170,6 +170,9 @@ function datamachine_get_scaffold_defaults( string $agent_name = '' ): array {
 			'## Preferences',
 			'<!-- Communication style, formatting preferences, things to remember -->',
 			'',
+			'## Working Style',
+			'<!-- Autonomy level, how to handle decisions/forks, detail depth, when to ask before acting -->',
+			'',
 			'## Goals',
 			"<!-- What you're working toward with this site or project -->",
 		)
