@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.40.3] - 2026-05-30
+
+### Changed
+- phpcbf auto-fix array/statement alignment (refs #332)
+
+### Fixed
+- serve 200 on all paginated event XML sitemap pages
+
 ## [0.40.2] - 2026-05-30
 
 ### Fixed
