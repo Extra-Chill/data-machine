@@ -30,6 +30,13 @@ final class InstalledBundleArtifacts extends BaseRepository {
 	private static bool $table_ensured = false;
 
 	/**
+	 * Last write failure context for callers that need diagnostics.
+	 *
+	 * @var array<string,mixed>
+	 */
+	private array $last_error_context = array();
+
+	/**
 	 * Wire cleanup hooks once per request.
 	 *
 	 * Currently registers a `datamachine_agent_deleted` listener that wipes any tracked artifact rows
@@ -105,6 +112,7 @@ final class InstalledBundleArtifacts extends BaseRepository {
 	 */
 	public function upsert( AgentBundleInstalledArtifact $artifact, int $agent_id = 0 ): bool {
 		self::ensure_table();
+		$this->last_error_context = array();
 
 		$artifact_row      = $artifact->to_array();
 		$installed_payload = $artifact->installed_payload();
@@ -142,11 +150,25 @@ final class InstalledBundleArtifacts extends BaseRepository {
 			$result = $this->wpdb->replace( $this->table_name, $row, $format );
 		}
 		if ( false === $result ) {
+			$this->last_error_context = array(
+				'message' => '' !== (string) $this->wpdb->last_error ? (string) $this->wpdb->last_error : 'Unknown database write failure.',
+				'table'   => $this->table_name,
+				'row'     => $this->safe_log_context( $row ),
+			);
 			$this->log_db_error( 'upsert installed bundle artifact', $this->safe_log_context( $row ) );
 			return false;
 		}
 
 		return true;
+	}
+
+	/**
+	 * Return the last write failure context, if any.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function last_error_context(): array {
+		return $this->last_error_context;
 	}
 
 	/**
