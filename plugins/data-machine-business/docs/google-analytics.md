@@ -31,6 +31,38 @@ Existing GA4 installations do not need a migration step. Data Machine Business u
 - `landing_pages`
 - `engagement`
 - `new_vs_returning`
+- `network_density`
+- `path_sequence`
+
+### `network_density` vs `path_sequence`
+
+Both measure cross-site behavior on a multisite GA4 property, but they are not the same thing:
+
+- **`network_density`** groups `hostName` x `pageReferrer`. `pageReferrer` is the immediately-preceding URL — a **single hop**, not an ordered session path — and is subject to referrer-policy stripping, sampling, and high-cardinality `(other)` bucketing. It is a *proxy* for "% of a site's sessions whose referrer was another site."
+
+- **`path_sequence`** returns **true ordered, session-scoped cross-host journeys**. It is the answer to the instrument gap that `network_density` could only approximate.
+
+#### How `path_sequence` works
+
+1. Discovers the hosts present in the property/date range with a `hostName` runReport (top hosts by sessions).
+2. For each **ordered pair** of distinct hosts (A, B), runs a 2-step **closed** `runFunnelReport` (v1alpha) — the only Data API surface that expresses ordered steps: step 1 = `hostName EXACT A`, step 2 = `hostName EXACT B`. In a closed funnel users must enter at step 1, so step 2's `activeUsers` = users who reached B **after** A, in order. (`funnelNextAction` can't be used for this: GA4 restricts the next-action dimension to `eventName` / page / screen dimensions and rejects `hostName`, so explicit ordered step pairs are the correct construction.)
+3. Returns, per host: `entry_users` (funnel step-1 activeUsers), `onward_users` (the largest single ordered next-hop — a lower-bound floor for "reached ≥1 other site"; per-destination funnels can't be summed without double-counting users who reached multiple hosts), and `next_hosts` (ordered host -> next-host transitions with `activeUsers`, descending).
+
+Fan-out is optimized: host pairs are probed unordered (A↔B once); the reverse `B -> A` funnel is only run when `A -> B` had at least one user, since zero shared users in one direction means zero in the other. The `limit` input selects how many top hosts (by sessions) to pair — default **6**, clamped to **12**.
+
+This lets a consumer compute "% of each host's users reaching ≥1 other site" (`onward_users / entry_users`) and rank the top ordered cross-site paths. **In-network bucketing is the consumer's job** — the action is property-agnostic and returns every ordered host-to-host transition; the calling agent decides which hosts count as "in network."
+
+#### `path_sequence` caveats
+
+- **Data source: GA4 Data API v1alpha funnel report.** `runFunnelReport` is an alpha API and may change.
+- **User-scoped metric:** funnels count `activeUsers`, not sessions (the funnel surface exposes no sessions metric). "Ordered" means the user reached B after A; without a `withinDurationFromPriorStep` constraint the two steps may span sessions.
+- **Sampling:** funnel reports are subject to GA4 sampling on large date ranges.
+- **2-hop transitions:** each pair funnel yields an ordered `A -> B` hop. Arbitrary N-hop chains (`A -> B -> C`) are not returned in one row; deeper chains are composed by the consumer from the transition matrix.
+- **Host cap:** only the top hosts (by sessions) are paired, so fan-out is bounded — N hosts cost up to N×(N−1) funnel calls.
+
+#### Long-term target: BigQuery export
+
+The fully-accurate source of truth is a **BigQuery export tap**: with the GA4 property's events exported to BigQuery, a session-level query (events nested per session, ordered by `event_timestamp`, hostname per hit) yields exact, unsampled, arbitrary-depth ordered host paths. No BigQuery credentials/config exist today, so `path_sequence` implements the best available Data-API approximation. When BigQuery config is added, it becomes the intended replacement data source for this action.
 
 ## Authentication
 

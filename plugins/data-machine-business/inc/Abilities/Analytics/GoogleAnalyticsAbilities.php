@@ -46,6 +46,38 @@ class GoogleAnalyticsAbilities {
 	const API_BASE = 'https://analyticsdata.googleapis.com/v1beta/properties/';
 
 	/**
+	 * GA4 Data API v1alpha base URL.
+	 *
+	 * The funnel report surface (runFunnelReport) — the only Data API method that
+	 * expresses ordered, session-scoped steps — is alpha-only. See path_sequence.
+	 *
+	 * @var string
+	 */
+	const API_BASE_ALPHA = 'https://analyticsdata.googleapis.com/v1alpha/properties/';
+
+	/**
+	 * Default number of hostnames to fan out into path_sequence funnels.
+	 *
+	 * path_sequence runs one runFunnelReport per ORDERED host pair, so cost grows
+	 * ~N*(N-1). The default keeps a full run inside a normal CLI/HTTP timeout
+	 * while still covering a typical small multisite network; callers can raise
+	 * it with the `limit` input (clamped to PATH_SEQUENCE_MAX_HOSTS).
+	 *
+	 * @var int
+	 */
+	const PATH_SEQUENCE_DEFAULT_HOSTS = 6;
+
+	/**
+	 * Hard ceiling on path_sequence host fan-out.
+	 *
+	 * Bounds worst-case API usage regardless of the `limit` input — N hosts cost
+	 * up to N*(N-1) funnel calls, so this caps the blast radius.
+	 *
+	 * @var int
+	 */
+	const PATH_SEQUENCE_MAX_HOSTS = 12;
+
+	/**
 	 * Default result limit.
 	 *
 	 * @var int
@@ -136,7 +168,7 @@ class GoogleAnalyticsAbilities {
 						'properties' => array(
 							'action'      => array(
 								'type'        => 'string',
-								'description' => 'Action to perform: page_stats (per-page metrics, includes hostName for multisite), traffic_sources, date_stats, realtime, top_events, user_demographics, landing_pages, engagement, new_vs_returning, network_density (cross-site journey proxy: hostName x pageReferrer; approximation only — pageReferrer is the immediately-preceding URL, not an ordered session path, and is subject to referrer-policy stripping, sampling, and high-cardinality "(other)" bucketing).',
+								'description' => 'Action to perform: page_stats (per-page metrics, includes hostName for multisite), traffic_sources, date_stats, realtime, top_events, user_demographics, landing_pages, engagement, new_vs_returning, network_density (cross-site journey proxy: hostName x pageReferrer; approximation only — pageReferrer is the immediately-preceding URL, not an ordered session path, and is subject to referrer-policy stripping, sampling, and high-cardinality "(other)" bucketing), path_sequence (true ordered cross-host journeys via the v1alpha funnel report — discovers hosts then runs a 2-step closed funnel per ordered host pair, returning each host\'s entry_users, ordered next-host transitions (next_host with activeUsers), and onward_users, so a consumer can compute "% of each host\'s users reaching >=1 other site" and rank top ordered cross-site paths; in-network bucketing is the consumer\'s job. DATA SOURCE: GA4 Data API v1alpha funnel report. Caveats: v1alpha (may change), USER-scoped metric (activeUsers, not sessions), subject to sampling, returns ordered 2-hop transitions per host pair (compose deeper chains from the matrix), capped to the top hosts. The fully-accurate long-term source is a BigQuery export tap, not yet configured).',
 							),
 							'property_id' => array(
 								'type'        => 'string',
@@ -152,7 +184,7 @@ class GoogleAnalyticsAbilities {
 							),
 							'limit'       => array(
 								'type'        => 'integer',
-								'description' => 'Row limit (default: 25, max: 10000).',
+								'description' => 'Row limit (default: 25, max: 10000). For path_sequence this instead selects how many top hosts (by sessions) to pair, default 6, clamped to 12 — fan-out grows ~N*(N-1) funnel calls.',
 							),
 							'page_filter' => array(
 								'type'        => 'string',
@@ -209,7 +241,7 @@ class GoogleAnalyticsAbilities {
 	public static function fetchStats( array $input ): array {
 		$action = sanitize_text_field( $input['action'] ?? '' );
 
-		$valid_actions = array_merge( array_keys( self::ACTION_REPORTS ), array( 'realtime' ) );
+		$valid_actions = array_merge( array_keys( self::ACTION_REPORTS ), array( 'realtime', 'path_sequence' ) );
 		if ( empty( $action ) || ! in_array( $action, $valid_actions, true ) ) {
 			return array(
 				'success' => false,
@@ -256,6 +288,12 @@ class GoogleAnalyticsAbilities {
 		// Route to realtime handler.
 		if ( 'realtime' === $action ) {
 			return self::fetchRealtime( $access_token, $property_id );
+		}
+
+		// Route to path_sequence handler (ordered, session-scoped host journeys
+		// via the v1alpha funnel report — a different endpoint and shape).
+		if ( 'path_sequence' === $action ) {
+			return self::fetchPathSequence( $input, $access_token, $property_id );
 		}
 
 		return self::fetchReport( $input, $action, $access_token, $property_id );
@@ -569,6 +607,407 @@ class GoogleAnalyticsAbilities {
 			'total_page_views'   => $total_page_views,
 			'results_count'      => count( $pages ),
 			'results'            => $pages,
+		);
+	}
+
+	/**
+	 * Fetch ordered, within-journey cross-host path sequences.
+	 *
+	 * DATA SOURCE: GA4 Data API v1alpha funnel report (runFunnelReport). This is
+	 * the ONLY Data API surface that expresses ORDERED, sequential steps — the
+	 * standard v1beta runReport cannot emit intra-session/journey ordering at all
+	 * (its sole cross-site signal is pageReferrer, the immediately-preceding URL:
+	 * a single hop, not an ordered path, and subject to referrer-policy stripping
+	 * and high-cardinality "(other)" bucketing — that is the network_density
+	 * proxy, deliberately distinct from this action).
+	 *
+	 * HOW IT WORKS (generic, no hostnames hardcoded):
+	 *   1. Discover the hosts present in the property/date range via a hostName
+	 *      runReport (top PATH_SEQUENCE_MAX_HOSTS by sessions).
+	 *   2. For each ORDERED pair of distinct hosts (A, B), run a 2-step CLOSED
+	 *      funnel: step 1 = "hostName EXACT A", step 2 = "hostName EXACT B".
+	 *      In a closed funnel users must enter at step 1, so step 2's activeUsers
+	 *      = users who reached B AFTER A in order — a true ordered A -> B
+	 *      transition, not a referrer guess. (funnelNextAction cannot be used
+	 *      here: GA4 restricts nextActionDimension to eventName / page / screen
+	 *      dimensions and rejects hostName, so explicit ordered step pairs are
+	 *      the correct construction.)
+	 *   3. Aggregate per entry host: entry_users (step-1 activeUsers), the ranked
+	 *      ordered next-host transitions (A -> B with users), and onward_users
+	 *      (the max single-hop B, a lower bound on users who left A for another
+	 *      host). A consumer can then compute "% of each host's users reaching
+	 *      >=1 other site" and rank the top ordered cross-site paths.
+	 *
+	 * IN-NETWORK BUCKETING IS THE CONSUMER'S JOB: this action stays generic and
+	 * does not know which hosts belong to a given network. It returns every
+	 * ordered host-to-host transition; the calling agent decides which hosts are
+	 * "in network" and computes density from the raw transitions.
+	 *
+	 * CAVEATS (remaining, even on the funnel surface):
+	 *   - v1alpha: runFunnelReport is an alpha API and may change.
+	 *   - USER-SCOPED metric: funnels count activeUsers, not sessions (the funnel
+	 *     surface exposes no sessions metric). "Ordered" means the user reached B
+	 *     after A; without withinDurationFromPriorStep it may span sessions.
+	 *   - SAMPLING: funnel reports are subject to GA4 sampling on large ranges.
+	 *   - 2-HOP transitions: each pair funnel yields an ordered A -> B hop. Deeper
+	 *     chains (A -> B -> C) are composed by the consumer from the matrix.
+	 *   - HOST CAP: only the top PATH_SEQUENCE_MAX_HOSTS hosts are paired, so the
+	 *     fan-out is bounded (N hosts => up to N*(N-1) funnel calls).
+	 *
+	 * LONG-TERM TARGET (fully accurate): a BigQuery export tap. With the GA4
+	 * property's events exported to BigQuery, a session-level query (events
+	 * nested per session, ordered by event_timestamp, hostname per hit) yields
+	 * exact, unsampled, arbitrary-depth ordered host paths. That is the only
+	 * fully-accurate source of truth and is the intended replacement for this
+	 * Data-API approximation once BigQuery credentials/config exist (none are
+	 * configured today, so this action implements the best Data-API option).
+	 *
+	 * @param array  $input        Ability input.
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $property_id  GA4 property ID.
+	 * @return array
+	 */
+	private static function fetchPathSequence( array $input, string $access_token, string $property_id ): array {
+		$start_date = ! empty( $input['start_date'] ) ? sanitize_text_field( $input['start_date'] ) : gmdate( 'Y-m-d', strtotime( '-28 days' ) );
+		$end_date   = ! empty( $input['end_date'] ) ? sanitize_text_field( $input['end_date'] ) : gmdate( 'Y-m-d', strtotime( '-1 day' ) );
+
+		// `limit` selects how many top hosts to pair. Default keeps a full run
+		// inside a normal timeout; clamp to the hard ceiling to bound fan-out.
+		$max_hosts = ! empty( $input['limit'] )
+			? max( 2, min( (int) $input['limit'], self::PATH_SEQUENCE_MAX_HOSTS ) )
+			: self::PATH_SEQUENCE_DEFAULT_HOSTS;
+
+		$hosts = self::discoverHosts( $access_token, $property_id, $start_date, $end_date, $max_hosts );
+
+		if ( is_wp_error( $hosts ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Failed to discover hosts for path sequence: ' . $hosts->get_error_message(),
+			);
+		}
+
+		$base_response = array(
+			'success'     => true,
+			'action'      => 'path_sequence',
+			'data_source' => 'ga4_data_api_v1alpha_funnel',
+			'metric'      => 'activeUsers',
+			'date_range'  => array(
+				'start_date' => $start_date,
+				'end_date'   => $end_date,
+			),
+		);
+
+		if ( count( $hosts ) < 2 ) {
+			// Need at least two hosts to have any cross-host transition.
+			return array_merge(
+				$base_response,
+				array(
+					'results_count' => 0,
+					'results'       => array(),
+				)
+			);
+		}
+
+		$host_names = wp_list_pluck( $hosts, 'hostName' );
+
+		// Accumulate transitions keyed by entry host. We iterate unordered host
+		// PAIRS (i < j) and probe A -> B first; if A -> B has zero users then no
+		// user reached both hosts, so the reverse B -> A is also zero and we skip
+		// that funnel call. Only when A -> B is non-zero do we probe B -> A.
+		$transitions_by_host = array();
+		$entry_users_by_host = array();
+		foreach ( $host_names as $host_name ) {
+			$transitions_by_host[ $host_name ] = array();
+			$entry_users_by_host[ $host_name ] = null;
+		}
+
+		$count = count( $host_names );
+		for ( $i = 0; $i < $count; $i++ ) {
+			for ( $j = $i + 1; $j < $count; $j++ ) {
+				$a = $host_names[ $i ];
+				$b = $host_names[ $j ];
+
+				$ab = self::fetchOrderedPairTransition( $access_token, $property_id, $start_date, $end_date, $a, $b );
+				if ( is_wp_error( $ab ) ) {
+					return array(
+						'success' => false,
+						'error'   => 'Failed to fetch path sequence for ' . $a . ' -> ' . $b . ': ' . $ab->get_error_message(),
+					);
+				}
+
+				if ( null === $entry_users_by_host[ $a ] ) {
+					$entry_users_by_host[ $a ] = $ab['entry_users'];
+				}
+
+				if ( $ab['next_users'] > 0 ) {
+					$transitions_by_host[ $a ][] = array(
+						'next_host' => $b,
+						'users'     => $ab['next_users'],
+					);
+
+					// Only probe the reverse direction when at least one user
+					// shared both hosts — otherwise B -> A is necessarily zero.
+					$ba = self::fetchOrderedPairTransition( $access_token, $property_id, $start_date, $end_date, $b, $a );
+					if ( is_wp_error( $ba ) ) {
+						return array(
+							'success' => false,
+							'error'   => 'Failed to fetch path sequence for ' . $b . ' -> ' . $a . ': ' . $ba->get_error_message(),
+						);
+					}
+
+					if ( null === $entry_users_by_host[ $b ] ) {
+						$entry_users_by_host[ $b ] = $ba['entry_users'];
+					}
+
+					if ( $ba['next_users'] > 0 ) {
+						$transitions_by_host[ $b ][] = array(
+							'next_host' => $a,
+							'users'     => $ba['next_users'],
+						);
+					}
+				}
+			}
+		}
+
+		$results = array();
+		foreach ( $host_names as $entry_host ) {
+			$transitions = $transitions_by_host[ $entry_host ];
+
+			usort(
+				$transitions,
+				static function ( $a, $b ) {
+					return $b['users'] <=> $a['users'];
+				}
+			);
+
+			$results[] = array(
+				'hostName'     => $entry_host,
+				// Users whose journey touched this host (funnel step-1 activeUsers).
+				'entry_users'  => (int) ( $entry_users_by_host[ $entry_host ] ?? 0 ),
+				// Lower bound on users who, after this host, went on to another
+				// host: the largest single ordered next-hop. (Per-destination
+				// funnels can't be summed without double-counting users who
+				// reached multiple other hosts, so the max is the safe floor for
+				// "% reaching >=1 other site".)
+				'onward_users' => empty( $transitions ) ? 0 : (int) $transitions[0]['users'],
+				// Ordered next-host transitions (this host -> next_host), with
+				// activeUsers, descending. Raw material for top cross-site paths.
+				'next_hosts'   => $transitions,
+			);
+		}
+
+		return array_merge(
+			$base_response,
+			array(
+				'results_count' => count( $results ),
+				'results'       => $results,
+			)
+		);
+	}
+
+	/**
+	 * Discover the hostnames present in the property for a date range.
+	 *
+	 * Uses the standard runReport (hostName x sessions) so path_sequence stays
+	 * property-agnostic — it learns the hosts from the data instead of having
+	 * any host list baked in.
+	 *
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $property_id  GA4 property ID.
+	 * @param string $start_date   Start date (YYYY-MM-DD).
+	 * @param string $end_date     End date (YYYY-MM-DD).
+	 * @param int    $max_hosts    Max hosts to return (top by sessions).
+	 * @return array|\WP_Error Array of array{hostName,sessions} or error.
+	 */
+	private static function discoverHosts( string $access_token, string $property_id, string $start_date, string $end_date, int $max_hosts ) {
+		$request_body = array(
+			'dateRanges' => array(
+				array(
+					'startDate' => $start_date,
+					'endDate'   => $end_date,
+				),
+			),
+			'dimensions' => array( array( 'name' => 'hostName' ) ),
+			'metrics'    => array( array( 'name' => 'sessions' ) ),
+			'orderBys'   => array(
+				array(
+					'metric' => array( 'metricName' => 'sessions' ),
+					'desc'   => true,
+				),
+			),
+			'limit'      => $max_hosts,
+		);
+
+		$result = HttpClient::post(
+			self::API_BASE . $property_id . ':runReport',
+			array(
+				'timeout' => 30,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( $request_body ),
+				'context' => 'Google Analytics Data API (path_sequence host discovery)',
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			return new \WP_Error( 'ga_path_sequence_hosts_failed', $result['error'] ?? 'Unknown error' );
+		}
+
+		$data = json_decode( $result['data'], true );
+
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return new \WP_Error( 'ga_path_sequence_hosts_parse', 'Failed to parse host discovery response.' );
+		}
+
+		if ( ! empty( $data['error'] ) ) {
+			return new \WP_Error( 'ga_path_sequence_hosts_api', $data['error']['message'] ?? 'Unknown API error' );
+		}
+
+		$hosts = array();
+		foreach ( ( $data['rows'] ?? array() ) as $row ) {
+			$host = $row['dimensionValues'][0]['value'] ?? '';
+			if ( '' === $host || '(not set)' === $host ) {
+				continue;
+			}
+			$hosts[] = array(
+				'hostName' => $host,
+				'sessions' => (int) ( $row['metricValues'][0]['value'] ?? 0 ),
+			);
+		}
+
+		return $hosts;
+	}
+
+	/**
+	 * Fetch one ordered host transition (entry_host -> next_host).
+	 *
+	 * Runs a 2-step CLOSED funnel: step 1 = hostName EXACT entry_host, step 2 =
+	 * hostName EXACT next_host. Returns the step-1 activeUsers (entry_users) and
+	 * step-2 activeUsers (next_users = users who reached next_host after
+	 * entry_host, in order).
+	 *
+	 * @param string $access_token OAuth2 access token.
+	 * @param string $property_id  GA4 property ID.
+	 * @param string $start_date   Start date (YYYY-MM-DD).
+	 * @param string $end_date     End date (YYYY-MM-DD).
+	 * @param string $entry_host   First-step hostname.
+	 * @param string $next_host    Second-step hostname.
+	 * @return array|\WP_Error array{entry_users:int,next_users:int} or error.
+	 */
+	private static function fetchOrderedPairTransition( string $access_token, string $property_id, string $start_date, string $end_date, string $entry_host, string $next_host ) {
+		$request_body = array(
+			'dateRanges' => array(
+				array(
+					'startDate' => $start_date,
+					'endDate'   => $end_date,
+				),
+			),
+			'funnel'     => array(
+				// Closed funnel: users must enter at step 1, so step 2 counts only
+				// users who reached next_host AFTER entry_host (ordered).
+				'isOpenFunnel' => false,
+				'steps'        => array(
+					self::buildHostFunnelStep( 'entry', $entry_host ),
+					self::buildHostFunnelStep( 'next', $next_host ),
+				),
+			),
+		);
+
+		$result = HttpClient::post(
+			self::API_BASE_ALPHA . $property_id . ':runFunnelReport',
+			array(
+				'timeout' => 30,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $access_token,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( $request_body ),
+				'context' => 'Google Analytics Data API (path_sequence funnel)',
+			)
+		);
+
+		if ( ! $result['success'] ) {
+			return new \WP_Error( 'ga_path_sequence_funnel_failed', $result['error'] ?? 'Unknown error' );
+		}
+
+		$data = json_decode( $result['data'], true );
+
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return new \WP_Error( 'ga_path_sequence_funnel_parse', 'Failed to parse funnel response.' );
+		}
+
+		if ( ! empty( $data['error'] ) ) {
+			return new \WP_Error( 'ga_path_sequence_funnel_api', $data['error']['message'] ?? 'Unknown API error' );
+		}
+
+		return self::extractFunnelStepUsers( $data );
+	}
+
+	/**
+	 * Build a single hostName-EXACT funnel step.
+	 *
+	 * Public-by-extraction so the request shape is unit-testable without an HTTP
+	 * round-trip (mirrors buildReportRequestBody's testing rationale).
+	 *
+	 * @param string $name Funnel step name.
+	 * @param string $host Exact hostname to match.
+	 * @return array Funnel step definition.
+	 */
+	public static function buildHostFunnelStep( string $name, string $host ): array {
+		return array(
+			'name'             => $name,
+			'filterExpression' => array(
+				'funnelFieldFilter' => array(
+					'fieldName'    => 'hostName',
+					'stringFilter' => array(
+						'matchType' => 'EXACT',
+						'value'     => $host,
+					),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Pull step-1 and step-2 activeUsers out of a 2-step funnelTable response.
+	 *
+	 * The funnelTable returns one row per step (dimension funnelStepName like
+	 * "1. entry", "2. next") and an activeUsers metric column. We read step 1 and
+	 * step 2 activeUsers by their ordinal step prefix, robust to extra metric
+	 * columns (completionRate, abandonments, abandonmentRate).
+	 *
+	 * @param array $data Raw runFunnelReport response.
+	 * @return array array{entry_users:int,next_users:int}
+	 */
+	private static function extractFunnelStepUsers( array $data ): array {
+		$table          = $data['funnelTable'] ?? array();
+		$metric_headers = wp_list_pluck( $table['metricHeaders'] ?? array(), 'name' );
+
+		$users_col = array_search( 'activeUsers', $metric_headers, true );
+		if ( false === $users_col ) {
+			$users_col = 0;
+		}
+
+		$entry_users = 0;
+		$next_users  = 0;
+
+		foreach ( ( $table['rows'] ?? array() ) as $row ) {
+			$step  = $row['dimensionValues'][0]['value'] ?? '';
+			$value = (int) ( $row['metricValues'][ $users_col ]['value'] ?? 0 );
+
+			// Step rows are prefixed with their ordinal: "1. entry", "2. next".
+			if ( 0 === strpos( $step, '1.' ) ) {
+				$entry_users = $value;
+			} elseif ( 0 === strpos( $step, '2.' ) ) {
+				$next_users = $value;
+			}
+		}
+
+		return array(
+			'entry_users' => $entry_users,
+			'next_users'  => $next_users,
 		);
 	}
 

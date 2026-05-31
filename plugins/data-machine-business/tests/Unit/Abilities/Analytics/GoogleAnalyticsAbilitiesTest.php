@@ -168,6 +168,67 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'dimensionFilter', $body );
 	}
 
+	/**
+	 * path_sequence builds a hostName-EXACT funnel step (the unit-testable
+	 * request shape used by the 2-step ordered-pair funnel).
+	 */
+	public function test_path_sequence_build_host_funnel_step(): void {
+		$step = GoogleAnalyticsAbilities::buildHostFunnelStep( 'entry', 'a.example.com' );
+
+		$this->assertSame( 'entry', $step['name'] );
+		$filter = $step['filterExpression']['funnelFieldFilter'];
+		$this->assertSame( 'hostName', $filter['fieldName'] );
+		$this->assertSame( 'EXACT', $filter['stringFilter']['matchType'] );
+		$this->assertSame( 'a.example.com', $filter['stringFilter']['value'] );
+	}
+
+	/**
+	 * path_sequence reads step-1 (entry) and step-2 (next) activeUsers out of a
+	 * 2-step funnelTable response by ordinal step prefix, ignoring the extra
+	 * funnel metric columns (completionRate, abandonments, abandonmentRate).
+	 */
+	public function test_path_sequence_extract_funnel_step_users(): void {
+		$response = array(
+			'funnelTable' => array(
+				'dimensionHeaders' => array( array( 'name' => 'funnelStepName' ) ),
+				'metricHeaders'    => array(
+					array( 'name' => 'activeUsers' ),
+					array( 'name' => 'completionRate' ),
+					array( 'name' => 'abandonments' ),
+					array( 'name' => 'abandonmentRate' ),
+				),
+				'rows'             => array(
+					array(
+						'dimensionValues' => array( array( 'value' => '1. entry' ) ),
+						'metricValues'    => array(
+							array( 'value' => '5132' ),
+							array( 'value' => '0.0304' ),
+							array( 'value' => '4976' ),
+							array( 'value' => '0.9696' ),
+						),
+					),
+					array(
+						'dimensionValues' => array( array( 'value' => '2. next' ) ),
+						'metricValues'    => array(
+							array( 'value' => '156' ),
+							array( 'value' => '0.0' ),
+							array( 'value' => '0' ),
+							array( 'value' => '0.0' ),
+						),
+					),
+				),
+			),
+		);
+
+		$method = new \ReflectionMethod( GoogleAnalyticsAbilities::class, 'extractFunnelStepUsers' );
+		$method->setAccessible( true );
+
+		$users = $method->invoke( null, $response );
+
+		$this->assertSame( 5132, $users['entry_users'] );
+		$this->assertSame( 156, $users['next_users'] );
+	}
+
 	public static function all_filterable_actions(): array {
 		return array(
 			'page_stats'        => array( 'page_stats' ),
