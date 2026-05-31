@@ -125,7 +125,7 @@ final class AgentBundleArtifactState {
 		$row = $artifact instanceof AgentBundleInstalledArtifact ? $artifact->to_array() : $artifact;
 
 		return array(
-			'agent_id'      => $agent_id,
+			'agent_id'       => $agent_id,
 			'artifact_index' => $index,
 			'artifact_type'  => (string) ( $row['artifact_type'] ?? '' ),
 			'artifact_id'    => (string) ( $row['artifact_id'] ?? '' ),
