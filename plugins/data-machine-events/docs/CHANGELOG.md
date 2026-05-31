@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.40.4] - 2026-05-31
+
+### Changed
+- delegate name normalization to canonical core resolver
+
+### Fixed
+- refuse upserting events with a "Rejected:" title
+
 ## [0.40.3] - 2026-05-30
 
 ### Changed
