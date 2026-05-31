@@ -131,15 +131,5 @@ for `datamachine_recurring_<schedule_id>`, and its only job is to call
 definition.
 
 Hooks are schedule-scoped because a single task handler can have multiple
-schedule bindings. Legacy task-scoped hooks (`datamachine_recurring_<task_type>`)
-are unscheduled once the canonical schedule-scoped hook is reconciled.
-
-## Upgrade migration
-
-Existing installs may have pending AS actions under older task-scoped hook
-names. `SystemAgentServiceProvider::manageRecurringTaskSchedules()` runs on
-`action_scheduler_init`, schedules the canonical schedule-scoped hook, and
-unschedules legacy task-scoped hooks when the names differ. No other contract
-changes; `FlowScheduling::handle_scheduling_update()` signature, REST
-endpoints, CLI commands, the `datamachine_scheduler_intervals` filter,
-and `TaskScheduler::schedule()` are all unchanged.
+schedule bindings. The runtime reconciles only canonical
+`datamachine_recurring_<schedule_id>` hooks.
