@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.138.1] - 2026-05-31
+
+### Fixed
+- ensure bundle artifact table during import
+
 ## [0.138.0] - 2026-05-31
 
 ### Added
