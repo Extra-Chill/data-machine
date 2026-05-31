@@ -52,7 +52,9 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'web_fetch', $tools );
 	}
 
-	public function test_chat_includes_chat_tools(): void {
+	public function test_chat_excludes_pipeline_editing_tools(): void {
+		// Pipeline-editing tools moved to the pipeline_editor mode (data-machine#2425),
+		// so generic chat no longer surfaces them. Portable chat surfaces stay clean.
 		$tools = $this->resolver->resolve(
 			array(
 				'mode' => ToolPolicyResolver::MODE_CHAT,
@@ -60,7 +62,36 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		);
 
 		$this->assertIsArray( $tools );
+		$this->assertArrayNotHasKey( 'update_flow', $tools );
+		$this->assertArrayNotHasKey( 'create_pipeline', $tools );
+		$this->assertArrayNotHasKey( 'run_flow', $tools );
+	}
+
+	public function test_pipeline_editor_includes_pipeline_editing_tools(): void {
+		// The DM admin pipeline chat opts into [chat, pipeline_editor]; the
+		// pipeline-editing tools resolve under the pipeline_editor mode.
+		$tools = $this->resolver->resolve(
+			array(
+				'mode' => 'pipeline_editor',
+			)
+		);
+
+		$this->assertIsArray( $tools );
 		$this->assertArrayHasKey( 'update_flow', $tools );
+	}
+
+	public function test_composed_chat_pipeline_editor_unions_tools(): void {
+		// Mode composition is additive: the admin surface sends both modes and
+		// gets the union — generic chat tools plus pipeline-editing tools.
+		$tools = $this->resolver->resolve(
+			array(
+				'modes' => array( ToolPolicyResolver::MODE_CHAT, 'pipeline_editor' ),
+			)
+		);
+
+		$this->assertIsArray( $tools );
+		$this->assertArrayHasKey( 'update_flow', $tools );
+		$this->assertArrayHasKey( 'web_fetch', $tools );
 	}
 
 	public function test_chat_tools_pass_availability_check(): void {
@@ -721,10 +752,14 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_agent_policy_applies_to_chat_context(): void {
+		// Deny a tool that genuinely resolves under chat mode (send_ping is a
+		// portable chat tool) and confirm other chat tools survive. update_flow
+		// is no longer a chat tool post data-machine#2425, so it can't prove the
+		// deny policy here.
 		$agent_id = $this->createAgentWithPolicy(
 			array(
 				'mode'  => 'deny',
-				'tools' => array( 'update_flow' ),
+				'tools' => array( 'send_ping' ),
 			)
 		);
 
@@ -735,7 +770,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertArrayNotHasKey( 'update_flow', $tools );
+		$this->assertArrayNotHasKey( 'send_ping', $tools );
 		// Other chat tools should still be present.
 		$this->assertArrayHasKey( 'web_fetch', $tools );
 	}

@@ -26,9 +26,27 @@ class ChatToolsAvailabilityTest extends WP_UnitTestCase {
 		$this->resolver = new ToolPolicyResolver();
 	}
 
-	public function test_chat_tools_include_update_flow(): void {
+	public function test_chat_tools_exclude_pipeline_editing_tools(): void {
+		// Pipeline-editing tools (update_flow et al.) moved from the generic
+		// chat mode to the dedicated pipeline_editor mode so portable chat
+		// surfaces (frontend widget, bridge) no longer inherit them.
+		// See data-machine#2425.
 		$tools = $this->resolver->resolve( [
 			'mode'     => ToolPolicyResolver::MODE_CHAT,
+		] );
+
+		$this->assertIsArray( $tools );
+		$this->assertArrayNotHasKey( 'update_flow', $tools );
+		$this->assertArrayNotHasKey( 'create_pipeline', $tools );
+		$this->assertArrayNotHasKey( 'run_flow', $tools );
+		$this->assertArrayNotHasKey( 'execute_workflow', $tools );
+	}
+
+	public function test_pipeline_editor_tools_include_update_flow(): void {
+		// The pipeline-editing tools live on the pipeline_editor mode now; the
+		// DM admin pipeline chat opts into [chat, pipeline_editor].
+		$tools = $this->resolver->resolve( [
+			'mode'     => 'pipeline_editor',
 		] );
 
 		$this->assertIsArray( $tools );
