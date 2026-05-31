@@ -511,7 +511,7 @@ class JobArtifacts {
 		}
 
 		$json .= "\n";
-		if ( false === file_put_contents( $file_path, $json ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		if ( ! $this->write_atomic_file( $file_path, $json ) ) {
 			return array(
 				'success' => false,
 				'error'   => sprintf( 'Failed to write %s artifact for job %d.', $artifact_key, $job_id ),
@@ -535,6 +535,31 @@ class JobArtifacts {
 				)
 			),
 		);
+	}
+
+	private function write_atomic_file( string $file_path, string $contents ): bool {
+		$directory = dirname( $file_path );
+		if ( ! is_dir( $directory ) || ! is_writable( $directory ) ) {
+			return false;
+		}
+
+		$temp_path = tempnam( $directory, '.tmp-artifact-' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_tempnam
+		if ( false === $temp_path ) {
+			return false;
+		}
+
+		$written = file_put_contents( $temp_path, $contents, LOCK_EX ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		if ( strlen( $contents ) !== $written ) {
+			@unlink( $temp_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			return false;
+		}
+
+		if ( ! @rename( $temp_path, $file_path ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename
+			@unlink( $temp_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			return false;
+		}
+
+		return true;
 	}
 
 	/** @return array<string,mixed> */

@@ -237,12 +237,29 @@ $refs = $invoke( $artifacts, 'hashable_artifact_refs', array( null, $tool_trace_
 $assert_true( $tool_trace_artifact['sha256'] === $refs['tool_trace']['sha256'], 'artifact refs expose tool trace hash' );
 $assert_true( $tool_trace_artifact['artifact_ref'] === $refs['tool_trace']['artifact_ref'], 'artifact refs expose stable tool trace ref' );
 
+$upload_dir        = wp_upload_dir();
+$artifact_job_dir  = trailingslashit( $upload_dir['basedir'] ) . 'datamachine-artifacts/jobs/123';
+$tool_trace_path   = trailingslashit( $artifact_job_dir ) . 'tool-trace.json';
+$leftover_temp_glob = trailingslashit( $artifact_job_dir ) . '.tmp-artifact-*';
+wp_mkdir_p( $artifact_job_dir );
+foreach ( glob( $leftover_temp_glob ) ?: array() as $leftover_temp_path ) {
+	@unlink( $leftover_temp_path );
+}
+file_put_contents( $tool_trace_path, "stale\n" );
+
 $file_result = $invoke( $artifacts, 'write_artifact_file', array( 123, 'tool_trace', $tool_trace_artifact ) );
 $assert_true( true === ( $file_result['success'] ?? false ), 'tool trace artifact file write succeeds' );
 $assert_true( is_file( $file_result['file']['path'] ?? '' ), 'tool trace artifact file exists on disk' );
 $assert_true( 'datamachine-artifacts/jobs/123/tool-trace.json' === ( $file_result['file']['relative_path'] ?? '' ), 'artifact file has stable relative path' );
 $assert_true( $tool_trace_artifact['sha256'] === ( $file_result['file']['payload_sha256'] ?? '' ), 'artifact file references payload hash' );
 $assert_true( hash_file( 'sha256', $file_result['file']['path'] ) === ( $file_result['file']['sha256'] ?? '' ), 'artifact file hash matches written bytes' );
+$assert_true( "stale\n" !== file_get_contents( $tool_trace_path ), 'artifact file atomically replaces stale final contents' );
+
+$second_file_result = $invoke( $artifacts, 'write_artifact_file', array( 123, 'tool_trace', $tool_trace_artifact ) );
+$assert_true( true === ( $second_file_result['success'] ?? false ), 'repeat tool trace artifact write succeeds' );
+$assert_true( $file_result['file']['path'] === ( $second_file_result['file']['path'] ?? '' ), 'repeat artifact write targets same stable path' );
+$assert_true( $file_result['file']['sha256'] === ( $second_file_result['file']['sha256'] ?? '' ), 'repeat artifact write is byte-idempotent' );
+$assert_true( array() === ( glob( $leftover_temp_glob ) ?: array() ), 'atomic artifact write leaves no temp files behind' );
 
 $transcript_file_result = $invoke( $artifacts, 'write_artifact_file', array( 123, 'transcript', $transcript_artifact ) );
 $assert_true( true === ( $transcript_file_result['success'] ?? false ), 'transcript artifact file write succeeds' );
