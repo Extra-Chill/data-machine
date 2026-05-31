@@ -333,7 +333,6 @@ abstract class MediaValidator {
 			$finfo = finfo_open( FILEINFO_MIME_TYPE );
 			if ( $finfo ) {
 				$mime = finfo_file( $finfo, $file_path );
-				finfo_close( $finfo );
 				if ( $mime && strpos( $mime, '/' ) !== false ) {
 					return $mime;
 				}
