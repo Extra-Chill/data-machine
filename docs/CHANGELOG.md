@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.138.0] - 2026-05-31
+
+### Added
+- add datamachine_indexnow_skip_auto_submit filter for bulk ops
+- add opt-in normalized-name matching to resolve-term
+
 ## [0.137.2] - 2026-05-31
 
 ### Fixed
