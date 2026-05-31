@@ -109,6 +109,23 @@ class IndexNowAbilities {
 			return;
 		}
 
+		/**
+		 * Filters whether to skip the automatic per-post IndexNow ping.
+		 *
+		 * Lets bulk/background operations (e.g. large historical imports)
+		 * suppress the per-item outbound IndexNow POST, which would otherwise
+		 * fire one synchronous HTTP request per published post and ask search
+		 * engines to crawl thousands of pages at once. Callers should restore
+		 * the filter after the bulk operation completes.
+		 *
+		 * @param bool     $skip    Whether to skip the auto-submit. Default false.
+		 * @param int      $post_id Post ID being published/updated.
+		 * @param \WP_Post $post    Post object.
+		 */
+		if ( apply_filters( 'datamachine_indexnow_skip_auto_submit', false, $post_id, $post ) ) {
+			return;
+		}
+
 		$url = get_permalink( $post_id );
 		if ( empty( $url ) ) {
 			return;
