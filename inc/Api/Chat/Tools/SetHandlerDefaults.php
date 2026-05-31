@@ -20,7 +20,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class SetHandlerDefaults extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'set_handler_defaults', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'datamachine/update-handler-defaults' ) );
+		$this->registerTool( 'set_handler_defaults', array( $this, 'getToolDefinition' ), array( 'pipeline_editor' ), array( 'ability' => 'datamachine/update-handler-defaults' ) );
 	}
 
 	public function getToolDefinition(): array {

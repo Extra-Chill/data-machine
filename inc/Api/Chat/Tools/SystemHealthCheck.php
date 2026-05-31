@@ -19,7 +19,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class SystemHealthCheck extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'system_health_check', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'datamachine/system-health-check' ) );
+		$this->registerTool( 'system_health_check', array( $this, 'getToolDefinition' ), array( 'pipeline_editor' ), array( 'ability' => 'datamachine/system-health-check' ) );
 	}
 
 	/**

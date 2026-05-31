@@ -179,6 +179,11 @@ add_action(
 			'description'     => __( 'Structured workflow execution. Operates within defined steps — efficient models work well.', 'data-machine' ),
 			'memory_contexts' => array( 'agent_identity', 'agent_memory' ),
 		) );
+		AgentModeRegistry::register( 'pipeline_editor', 25, array(
+			'label'           => __( 'Pipeline Editor Agent', 'data-machine' ),
+			'description'     => __( 'Admin pipeline-editing surface. Composes on top of chat to add pipeline/handler/flow guidance, the pipelines inventory, and pipeline-editing tools.', 'data-machine' ),
+			'memory_contexts' => array( 'agent_identity', 'agent_memory', 'user_profile' ),
+		) );
 		AgentModeRegistry::register( 'system', 30, array(
 			'label'       => __( 'System Agent', 'data-machine' ),
 			'description' => __( 'Background tasks like alt text generation and issue creation.', 'data-machine' ),
