@@ -499,8 +499,8 @@ class Chat {
 			// guidance, the pipelines inventory, and the pipeline-editing tools.
 			// Portable surfaces (frontend widgets, bridges) send no pipeline and
 			// stay on generic chat. See data-machine#2425.
-			$requested_mode  = sanitize_key( (string) ( $request->get_param( 'mode' ) ?? '' ) );
-			$composed_modes  = array( 'chat', 'pipeline_editor' );
+			$requested_mode = sanitize_key( (string) ( $request->get_param( 'mode' ) ?? '' ) );
+			$composed_modes = array( 'chat', 'pipeline_editor' );
 			if ( '' !== $requested_mode && ! in_array( $requested_mode, $composed_modes, true ) ) {
 				$composed_modes[] = $requested_mode;
 			}
