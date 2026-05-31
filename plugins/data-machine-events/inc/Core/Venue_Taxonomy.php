@@ -263,35 +263,29 @@ class Venue_Taxonomy {
 	/**
 	 * Normalize a venue name for matching purposes.
 	 *
-	 * Strips punctuation, dashes, apostrophes, articles, and case
-	 * to produce a canonical form for comparison.
+	 * Delegates to Data Machine core's canonical, taxonomy-agnostic
+	 * name normalizer (`ResolveTermAbility::normalize_name_for_matching`) so
+	 * venue dedup shares one source of truth with every other taxonomy's
+	 * fuzzy matching. Falls back to an inline copy of the same algorithm when
+	 * core isn't loaded, so this class carries no hard version dependency.
 	 *
 	 * @param string $name Venue name.
 	 * @return string Normalized name.
 	 */
 	public static function normalize_venue_name_for_matching( string $name ): string {
-		// Decode HTML entities: &amp; → &, &#8217; → '
+		if ( class_exists( '\\DataMachine\\Abilities\\Taxonomy\\ResolveTermAbility' )
+			&& method_exists( '\\DataMachine\\Abilities\\Taxonomy\\ResolveTermAbility', 'normalize_name_for_matching' )
+		) {
+			return \DataMachine\Abilities\Taxonomy\ResolveTermAbility::normalize_name_for_matching( $name );
+		}
+
+		// Fallback: inline copy of the canonical algorithm (core not loaded).
 		$text = html_entity_decode( $name, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-
-		// Lowercase.
+		$text = remove_accents( $text );
 		$text = strtolower( $text );
-
-		// Normalize ampersand variants to "and" so "Hook & Ladder" and
-		// "Hook and Ladder" collapse to the same key. Spaced ampersand
-		// becomes " and " (one token); tight ampersand (e.g. "rock&roll")
-		// becomes "and" without surrounding spaces — the subsequent
-		// alphanumeric strip + whitespace collapse normalizes both shapes.
 		$text = preg_replace( '/\s*&\s*/', ' and ', $text );
-
-		// Remove articles at the start.
 		$text = preg_replace( '/^(the|a|an)\s+/i', '', $text );
-
-		// Remove all non-alphanumeric characters (keeps spaces).
-		// This also strips apostrophes, so "Amos' Southend" → "amos southend"
-		// matches "Amos Southend".
 		$text = preg_replace( '/[^a-z0-9\s]/', '', $text );
-
-		// Collapse whitespace and trim.
 		$text = trim( preg_replace( '/\s+/', ' ', $text ) );
 
 		return $text;
