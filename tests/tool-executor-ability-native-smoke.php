@@ -259,8 +259,38 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	assert_smoke( 'ability-only result succeeds', true === ( $result['success'] ?? false ) );
 	assert_smoke( 'ability execute callback ran exactly once', 1 === $ability->execute_count );
 	assert_smoke( 'AI parameter reached ability input', 'hello' === ( $result['result']['received']['message'] ?? null ) );
-	assert_smoke( 'payload parameter reached ability input', 42 === ( $result['result']['received']['job_id'] ?? null ) );
+	assert_smoke( 'ambient payload does not implicitly satisfy ability input', ! array_key_exists( 'job_id', $result['result']['received'] ?? array() ) );
 	assert_smoke( 'successful ability result still participates in post tracking', 1 === post_tracking_count() );
+
+	echo "\n[ability:1b] Explicit context bindings satisfy runtime-owned parameters\n";
+	$bound_ability = new \Ability_Native_Smoke_Ability(
+		fn( $input ) => isset( $input['message'], $input['job_id'] ),
+		fn( $input ) => array(
+			'success'  => true,
+			'received' => $input,
+		)
+	);
+	$registry->register_for_smoke( 'datamachine/bound-ability', $bound_ability );
+	$result = execute_tool(
+		'bound_ability_tool',
+		array( 'message' => 'hello' ),
+		array(
+			'ability'                 => 'datamachine/bound-ability',
+			'client_context_bindings' => array( 'job_id' ),
+			'parameters'              => array(
+				'message' => array(
+					'type'     => 'string',
+					'required' => true,
+				),
+				'job_id'  => array(
+					'type'     => 'integer',
+					'required' => true,
+				),
+			),
+		)
+	);
+	assert_smoke( 'explicit binding executes successfully', true === ( $result['success'] ?? false ) );
+	assert_smoke( 'explicit binding passed job_id from runtime context', 42 === ( $result['result']['received']['job_id'] ?? null ) );
 
 	echo "\n[core:1] Generic execution core runs without Data Machine decorators\n";
 	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
@@ -318,9 +348,36 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		)
 	);
 	assert_smoke( 'preview policy returns staged action result', true === ( $result['staged'] ?? false ) && 'pending_1' === ( $result['action_id'] ?? null ) );
-	assert_smoke( 'pending action helper received complete merged parameters', 42 === first_pending_apply_job_id() );
+	assert_smoke( 'pending action helper does not receive undeclared ambient job_id', null === first_pending_apply_job_id() );
 	assert_smoke( 'preview policy does not execute ability directly', 0 === ability_execute_count( $preview_ability ) );
 	assert_smoke( 'preview policy does not post-track unexecuted action', 0 === post_tracking_count() );
+
+	echo "\n[decorator:2] Staged policy fails closed without pending-action metadata\n";
+	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
+	PendingActionHelper::$staged = array();
+	$missing_metadata_ability    = new \Ability_Native_Smoke_Ability(
+		fn( $input ) => true,
+		fn( $input ) => array( 'success' => true )
+	);
+	$registry->register_for_smoke( 'datamachine/missing-metadata-ability', $missing_metadata_ability );
+	$result = execute_tool(
+		'preview_missing_metadata_tool',
+		array( 'message' => 'needs approval' ),
+		array(
+			'ability'       => 'datamachine/missing-metadata-ability',
+			'action_policy' => ActionPolicyResolver::POLICY_PREVIEW,
+			'parameters'    => array(
+				'message' => array(
+					'type'     => 'string',
+					'required' => true,
+				),
+			),
+		)
+	);
+	assert_smoke( 'preview without action_kind fails closed', false === ( $result['success'] ?? true ) );
+	assert_smoke( 'missing metadata error is machine-readable', 'missing_pending_action_metadata' === ( $result['metadata']['error_type'] ?? null ) );
+	assert_smoke( 'preview without action_kind does not stage ambiguous action', 0 === count( PendingActionHelper::$staged ) );
+	assert_smoke( 'preview without action_kind does not execute ability directly', 0 === ability_execute_count( $missing_metadata_ability ) );
 
 	echo "\n[ability:2] Linked ability takes precedence over class/method metadata\n";
 	LegacyTool::$calls = 0;

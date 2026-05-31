@@ -60,7 +60,6 @@ class ToolExecutor {
 	): array {
 		$core            = new WP_Agent_Tool_Execution_Core();
 		$execution       = new ToolExecutionCore();
-		$available_tools = self::prepareToolDeclarations( $available_tools, $payload );
 		$prepared        = $core->prepareWP_Agent_Tool_Call( $tool_name, $tool_parameters, $available_tools, $payload );
 		if ( empty( $prepared['ready'] ) ) {
 			unset( $prepared['ready'] );
@@ -104,20 +103,29 @@ class ToolExecutor {
 		}
 
 		if ( WP_Agent_Action_Policy::stagesApproval( $policy ) ) {
-			// Tool must declare how to build an action kind and summary.
-			// If it hasn't opted into the preview pipeline properly, fall
-			// back to 'direct' and log a warning — preview is a contract,
-			// not something we can synthesize for tools that don't cooperate.
+			// Tool must declare the pending-action kind. Preview is an approval
+			// contract, not metadata we can synthesize safely at execution time.
 			if ( empty( $tool_def['action_kind'] ) ) {
 				do_action(
 					'datamachine_log',
-					'warning',
-					'WP_Agent_Action_Policy: tool resolved to preview but is missing action_kind metadata; falling back to direct.',
+					'error',
+					'WP_Agent_Action_Policy: tool resolved to preview but is missing action_kind metadata; refusing execution.',
 					array(
 						'tool_name' => $tool_name,
 						'mode'      => $mode,
 						'agent_id'  => $agent_id,
 					)
+				);
+
+				return array(
+					'success'       => false,
+					'error'         => sprintf( 'Tool "%s" resolved to staged approval but is missing required pending-action metadata: action_kind.', $tool_name ),
+					'tool_name'     => $tool_name,
+					'action_policy' => $policy,
+					'metadata'      => array(
+						'error_type'       => 'missing_pending_action_metadata',
+						'missing_metadata' => array( 'action_kind' ),
+					),
 				);
 			} else {
 				$staged = PendingActionHelper::stage(
@@ -151,7 +159,7 @@ class ToolExecutor {
 			}
 		}
 
-		// Policy is 'direct' (or 'preview' fell back) — execute the tool normally.
+		// Policy is 'direct' — execute the tool normally.
 		$tool_result = $core->executePreparedTool( $tool_call, $tool_def, $execution, $payload );
 
 		// Automatic post origin tracking — applies to every tool whose result
@@ -171,35 +179,6 @@ class ToolExecutor {
 		}
 
 		return $tool_result;
-	}
-
-	/**
-	 * Annotate Data Machine declarations with explicit runtime-context bindings.
-	 *
-	 * @param array $available_tools Tool declarations keyed by name.
-	 * @param array $payload         Step payload / invocation context.
-	 * @return array Annotated tool declarations.
-	 */
-	private static function prepareToolDeclarations( array $available_tools, array $payload ): array {
-		$runtime_keys = array( 'job_id', 'flow_step_id', 'data', 'flow_step_config', 'agent_id', 'agent_slug', 'user_id' );
-
-		foreach ( $available_tools as $tool_name => $tool_def ) {
-			if ( ! is_array( $tool_def ) ) {
-				continue;
-			}
-
-			$bindings = is_array( $tool_def['client_context_bindings'] ?? null ) ? $tool_def['client_context_bindings'] : array();
-			foreach ( $runtime_keys as $runtime_key ) {
-				if ( array_key_exists( $runtime_key, $payload ) && ! array_key_exists( $runtime_key, $bindings ) && ! in_array( $runtime_key, $bindings, true ) ) {
-					$bindings[ $runtime_key ] = $runtime_key;
-				}
-			}
-
-			$tool_def['client_context_bindings'] = $bindings;
-			$available_tools[ $tool_name ]       = $tool_def;
-		}
-
-		return $available_tools;
 	}
 
 	/**
