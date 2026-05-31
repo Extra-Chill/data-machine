@@ -164,6 +164,7 @@ add_filter(
 	static function ( array $types ): array {
 		$types[] = 'fake_plugin_artifact';
 		$types[] = 'intelligence/wiki-brain';
+		$types[] = 'datamachine-code/workspace_preload';
 		return $types;
 	},
 	10,
@@ -221,6 +222,7 @@ echo "\n[1] Plugins register artifact types and export/current artifacts\n";
 $types = DataMachine\Engine\Bundle\BundleSchema::artifact_types();
 assert_extension_bundle( 'fake plugin type is registered', in_array( 'fake_plugin_artifact', $types, true ) );
 assert_extension_bundle( 'namespaced plugin type is registered', in_array( 'intelligence/wiki-brain', $types, true ) );
+assert_extension_bundle( 'hyphenated namespaced plugin type is registered', in_array( 'datamachine-code/workspace_preload', $types, true ) );
 
 $agent            = array( 'agent_id' => 7, 'agent_slug' => 'bundle-agent' );
 $export_artifacts = AgentBundleArtifactExtensions::export_artifacts( $agent, array( 'phase' => 'export' ) );
@@ -278,6 +280,8 @@ assert_extension_bundle_equals( 'array adapter preserves extension artifacts', '
 echo "\n[3] Planner treats plugin artifacts like core artifacts and redacts secrets\n";
 $target_artifact = extension_artifact( 'seed', array( 'label' => 'Target', 'api_token' => 'target-secret-token' ) );
 $installed       = AgentBundleInstalledArtifact::from_installed_payload( $manifest, 'fake_plugin_artifact', 'seed', 'extensions/fake-plugin/seed.json', $export_artifacts[0]['payload'], '2026-04-28T00:00:00Z' );
+$hyphenated      = AgentBundleInstalledArtifact::from_installed_payload( $manifest, 'datamachine-code/workspace_preload', 'repos', 'extensions/datamachine-code/workspace_preload/repos.json', array( 'repositories' => array() ), '2026-04-28T00:00:00Z' );
+assert_extension_bundle_equals( 'hyphenated namespaced installed artifact type is preserved', 'datamachine-code/workspace_preload', $hyphenated->to_array()['artifact_type'] ?? null );
 $current_payload = $export_artifacts[0]['payload'];
 $clean_plan      = AgentBundleUpgradePlanner::plan( array( $installed ), AgentBundleArtifactExtensions::current_artifacts( $agent, array( $installed->to_array() ) ), array( $target_artifact ) )->to_array();
 assert_extension_bundle_equals( 'clean installed plugin artifact auto-applies', 'fake_plugin_artifact:seed', $clean_plan['auto_apply'][0]['artifact_key'] ?? null );

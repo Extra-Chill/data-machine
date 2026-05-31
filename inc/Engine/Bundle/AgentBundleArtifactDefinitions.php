@@ -71,7 +71,7 @@ final class AgentBundleArtifactDefinitions {
 
 	public static function bundle_artifact_type( string $type ): string {
 		if ( str_starts_with( $type, 'datamachine-extension/' ) ) {
-			return substr( $type, strlen( 'datamachine-extension/' ) );
+			return self::normalize_artifact_type( substr( $type, strlen( 'datamachine-extension/' ) ) );
 		}
 
 		foreach ( self::file_artifacts() as $definition ) {
@@ -80,9 +80,14 @@ final class AgentBundleArtifactDefinitions {
 			}
 		}
 
+		$type = self::normalize_artifact_type( $type );
+		if ( str_contains( $type, '/' ) && ! str_starts_with( $type, 'datamachine/' ) ) {
+			return $type;
+		}
+
 		$type = str_starts_with( $type, 'datamachine/' ) ? substr( $type, strlen( 'datamachine/' ) ) : $type;
 
-		return str_replace( '-', '_', self::normalize_artifact_type( $type ) );
+		return str_replace( '-', '_', $type );
 	}
 
 	public static function artifact_id_from_payload( mixed $payload, string $relative_path ): string {
