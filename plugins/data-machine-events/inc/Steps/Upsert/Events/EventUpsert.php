@@ -81,6 +81,25 @@ class EventUpsert extends UpsertHandler {
 			);
 		}
 
+		// Belt-and-suspenders guard against "Rejected:" leakage (see issue #349).
+		//
+		// When the AI recognizes a source item is not a real, attendable event
+		// (e.g. season-ticket packages, parking passes), it is supposed to call
+		// the reject_source disposition tool. If the per-pipeline prompt lacks
+		// rejection guidance, the model sometimes improvises by publishing the
+		// item with a "Rejected:" prefix in the title instead — leaking junk
+		// onto the public calendar. This guard refuses to create/update any
+		// post whose title starts with "Rejected:" or "Rejected -" so a prompt
+		// regression can never silently publish a rejected item again.
+		if ( $this->isRejectedTitle( $title ) ) {
+			return $this->errorResponse(
+				'Refusing to upsert event with a "Rejected:" title; the AI should call reject_source instead of publishing a rejected item (see issue #349)',
+				array(
+					'title' => $title,
+				)
+			);
+		}
+
 		do_action(
 			'datamachine_log',
 			'debug',
@@ -118,6 +137,24 @@ class EventUpsert extends UpsertHandler {
 		} finally {
 			$this->releaseUpsertLock( $lock_key );
 		}
+	}
+
+	/**
+	 * Determine whether an event title indicates a rejected source item.
+	 *
+	 * Matches titles that begin with "Rejected:" or "Rejected -" (case-insensitive,
+	 * after trimming surrounding whitespace). The AI is meant to call the
+	 * reject_source disposition tool for non-events; when a stale prompt omits
+	 * rejection guidance it can instead improvise a "Rejected:" prefixed title and
+	 * publish the junk item. See issue #349.
+	 *
+	 * @param string $title Event title.
+	 * @return bool True if the title is a rejected-item leak.
+	 */
+	private function isRejectedTitle( string $title ): bool {
+		$trimmed = trim( $title );
+
+		return (bool) preg_match( '/^rejected\s*[:\-]/i', $trimmed );
 	}
 
 	/**

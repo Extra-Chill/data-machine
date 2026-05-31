@@ -243,4 +243,62 @@ class EventUpsertTest extends WP_UnitTestCase {
 		wp_delete_post( $existing_post_id, true );
 		wp_delete_term( $venue_term['term_id'], 'venue' );
 	}
+
+	/**
+	 * The defensive guard against "Rejected:" title leakage refuses titles
+	 * beginning with "Rejected:" (case-insensitive, after trimming).
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/349
+	 */
+	public function test_is_rejected_title_refuses_colon_prefix(): void {
+		$method = new \ReflectionMethod( $this->handler, 'isRejectedTitle' );
+		$method->setAccessible( true );
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, 'Rejected: 2026 Premium Season Tickets — Everwise Amphitheater (Ticketmaster)' ),
+			'A title starting with "Rejected:" must be refused.'
+		);
+
+		// Leading whitespace + lowercase variant must also be caught.
+		$this->assertTrue(
+			$method->invoke( $this->handler, '   rejected: parking pass' ),
+			'A trimmed, lowercase "rejected:" title must be refused.'
+		);
+	}
+
+	/**
+	 * The guard also catches the "Rejected -" dash variant.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/349
+	 */
+	public function test_is_rejected_title_refuses_dash_prefix(): void {
+		$method = new \ReflectionMethod( $this->handler, 'isRejectedTitle' );
+		$method->setAccessible( true );
+
+		$this->assertTrue(
+			$method->invoke( $this->handler, 'Rejected - 2026 Premium Season Tickets' ),
+			'A title starting with "Rejected -" must be refused.'
+		);
+	}
+
+	/**
+	 * A normal event title is NOT treated as a rejected item, including titles
+	 * that merely contain the word "rejected" elsewhere.
+	 *
+	 * @see https://github.com/Extra-Chill/data-machine-events/issues/349
+	 */
+	public function test_is_rejected_title_allows_normal_title(): void {
+		$method = new \ReflectionMethod( $this->handler, 'isRejectedTitle' );
+		$method->setAccessible( true );
+
+		$this->assertFalse(
+			$method->invoke( $this->handler, 'The Rejects Live at The Royal American' ),
+			'A normal event title must NOT be refused.'
+		);
+
+		$this->assertFalse(
+			$method->invoke( $this->handler, 'Eggy at Charleston Pour House' ),
+			'A normal event title must NOT be refused.'
+		);
+	}
 }
