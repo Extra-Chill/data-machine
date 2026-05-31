@@ -82,6 +82,28 @@ assert_tool_trace_metadata( true === $trace['metadata']['structured_output']['pa
 assert_tool_trace_metadata( 'terminal' === $trace['metadata']['runner'], 'trace preserves generic execution metadata', $failures, $passes );
 assert_tool_trace_metadata( 'artifacts/stdout.txt' === $trace['artifact_refs']['stdout'], 'trace preserves artifact refs', $failures, $passes );
 
+$large_trace = DataMachine\Engine\AI\datamachine_build_tool_trace(
+	'manage_github_issue',
+	array( 'id' => 'call_large' ),
+	array(
+		'action'       => 'comment',
+		'repo'         => 'owner/repo',
+		'issue_number' => 123,
+		'body'         => str_repeat( 'Large body. ', 400 ),
+	),
+	array( 'success' => false, 'error' => 'GitHub API error (403): Resource not accessible by integration' ),
+	array(),
+	1,
+	1000.0,
+	1000.1
+);
+
+assert_tool_trace_metadata( 'redacted_arguments_too_large' === $large_trace['arguments_omitted'], 'large trace marks omitted full arguments', $failures, $passes );
+assert_tool_trace_metadata( 'comment' === $large_trace['arguments_redacted']['action'], 'large trace keeps bounded action argument', $failures, $passes );
+assert_tool_trace_metadata( 'owner/repo' === $large_trace['arguments_redacted']['repo'], 'large trace keeps bounded repo argument', $failures, $passes );
+assert_tool_trace_metadata( 123 === $large_trace['arguments_redacted']['issue_number'], 'large trace keeps bounded issue number argument', $failures, $passes );
+assert_tool_trace_metadata( strlen( $large_trace['arguments_redacted']['body'] ) <= 240, 'large trace truncates long string arguments', $failures, $passes );
+
 $summary = DataMachine\Engine\AI\datamachine_summarize_tool_execution_results(
 	array(
 		array(

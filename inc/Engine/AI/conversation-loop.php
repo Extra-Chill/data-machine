@@ -1817,13 +1817,44 @@ function datamachine_build_tool_trace( string $tool_name, array $tool_call, arra
 	if ( strlen( (string) $redacted_arguments_json ) <= 2000 ) {
 		$trace['arguments_redacted'] = $redacted_arguments;
 	} else {
-		$trace['arguments_omitted'] = 'redacted_arguments_too_large';
+		$trace['arguments_redacted'] = datamachine_bound_tool_trace_value( $redacted_arguments );
+		$trace['arguments_omitted']  = 'redacted_arguments_too_large';
 	}
 
 	return array_filter(
 		$trace,
 		static fn( $value ) => null !== $value && '' !== $value && array() !== $value
 	);
+}
+
+/**
+ * Keep non-secret scalar tool arguments visible when full arguments are large.
+ *
+ * @param mixed $value Redacted trace value.
+ * @return mixed Bounded trace value.
+ */
+function datamachine_bound_tool_trace_value( mixed $value ): mixed {
+	if ( is_array( $value ) ) {
+		$bounded = array();
+		$count   = 0;
+		foreach ( $value as $key => $child ) {
+			if ( $count >= 20 ) {
+				$bounded['__truncated__'] = true;
+				break;
+			}
+
+			$bounded[ $key ] = datamachine_bound_tool_trace_value( $child );
+			++$count;
+		}
+
+		return $bounded;
+	}
+
+	if ( is_string( $value ) && strlen( $value ) > 240 ) {
+		return substr( $value, 0, 237 ) . '...';
+	}
+
+	return $value;
 }
 
 /** @return array<string,mixed> */
