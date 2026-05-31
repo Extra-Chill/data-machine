@@ -24,7 +24,7 @@
       "mysql_password": "",
       "release_latest_branch": "release-latest",
       "settings": {
-        "playground_wordpress_version": "7.0"
+        "wp_codebox_wordpress_version": "7.0"
       }
     }
   },
