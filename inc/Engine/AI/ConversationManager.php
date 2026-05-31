@@ -37,7 +37,7 @@ class ConversationManager {
 	 *
 	 * @param string       $role     Role identifier (user, assistant, system).
 	 * @param string|array $content  Message content — string for text, array for multi-modal content blocks.
-	 * @param array        $metadata Optional metadata for the message (e.g., type, tool_data, attachments).
+	 * @param array        $metadata Optional metadata for the message (e.g., type, tool_result, attachments).
 	 * @return array Message envelope.
 	 */
 	public static function buildConversationMessage( string $role, $content, array $metadata = array() ): array {
@@ -160,12 +160,13 @@ class ConversationManager {
 			'turn'    => $turn_count,
 		);
 
-		if ( ! empty( $tool_result['data'] ) ) {
-			$payload['tool_data'] = $tool_result['data'];
+		$result_payload = $tool_result['result'] ?? null;
+		if ( ! empty( $result_payload ) ) {
+			$payload['tool_result'] = $result_payload;
 
 			// Still append to content for AI context, but frontend can use metadata to hide it
 			if ( ! $is_handler_tool ) {
-				$content .= "\n\n" . wp_json_encode( $tool_result['data'] );
+				$content .= "\n\n" . wp_json_encode( $result_payload );
 			}
 		}
 
@@ -194,7 +195,7 @@ class ConversationManager {
 	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Kept for callers that pass original tool params alongside result data.
 	public static function generateSuccessMessage( string $tool_name, array $tool_result, array $tool_parameters ): string {
 		$success = $tool_result['success'] ?? false;
-		$data    = $tool_result['data'] ?? array();
+		$data    = is_array( $tool_result['result'] ?? null ) ? $tool_result['result'] : array();
 
 		if ( ! $success ) {
 			$error = $tool_result['error'] ?? 'Unknown error occurred';

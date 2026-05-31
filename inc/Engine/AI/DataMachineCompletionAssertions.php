@@ -306,7 +306,7 @@ class DataMachineCompletionAssertions {
 				return true;
 			}
 
-			if ( is_array( $result['data'] ?? null ) && $this->hasNonEmptyPath( $result['data'], $field ) ) {
+			if ( is_array( $result['result'] ?? null ) && $this->hasNonEmptyPath( $result['result'], $field ) ) {
 				return true;
 			}
 		}

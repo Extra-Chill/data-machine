@@ -50,6 +50,16 @@ class UpsertStepTest extends WP_UnitTestCase {
 		);
 	}
 
+	/**
+	 * Return packets from the explicit Step::execute contract.
+	 *
+	 * @param array $result Step execution result.
+	 * @return array
+	 */
+	private function resultPackets( array $result ): array {
+		return is_array( $result['packets'] ?? null ) ? $result['packets'] : array();
+	}
+
 	public function test_missing_required_handler_tool_sets_explicit_failure_reason(): void {
 		$step = new UpsertStep();
 
@@ -63,8 +73,10 @@ class UpsertStepTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertNotEmpty( $result );
-		$last = $result[ array_key_last( $result ) ];
+		$packets = $this->resultPackets( $result );
+
+		$this->assertNotEmpty( $packets );
+		$last = $packets[ array_key_last( $packets ) ];
 
 		$this->assertSame( 'upsert', $last['type'] ?? '' );
 		$this->assertSame( 'required_handler_tool_not_called', $last['metadata']['failure_reason'] ?? '' );
@@ -100,11 +112,12 @@ class UpsertStepTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertNotEmpty( $result );
+		$packets = $this->resultPackets( $result );
+		$this->assertNotEmpty( $packets );
 
 		// Find the update packet — it's added alongside the original tool_result.
 		$update_packet = null;
-		foreach ( $result as $packet ) {
+		foreach ( $packets as $packet ) {
 			if ( ( $packet['type'] ?? '' ) === 'upsert' ) {
 				$update_packet = $packet;
 				break;
@@ -158,8 +171,10 @@ class UpsertStepTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertNotEmpty( $result );
-		$last = $result[ array_key_last( $result ) ];
+		$packets = $this->resultPackets( $result );
+
+		$this->assertNotEmpty( $packets );
+		$last = $packets[ array_key_last( $packets ) ];
 
 		// Must be a real failure, NOT a fan-out skip packet.
 		$this->assertSame( 'upsert', $last['type'] ?? '' );

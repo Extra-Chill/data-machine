@@ -174,13 +174,9 @@ class ToolExecutionCore implements WP_Agent_Tool_Executor {
 		}
 
 		if ( ! array_key_exists( 'result', $result ) ) {
-			if ( array_key_exists( 'data', $result ) ) {
-				$result['result'] = $result['data'];
-			} else {
-				$payload = $result;
-				unset( $payload['success'], $payload['tool_name'], $payload['metadata'], $payload['runtime'] );
-				$result['result'] = $payload;
-			}
+			$payload = $result;
+			unset( $payload['success'], $payload['tool_name'], $payload['metadata'], $payload['runtime'] );
+			$result['result'] = $payload;
 		}
 
 		return $result;

@@ -1369,8 +1369,6 @@ function datamachine_normalize_runtime_tool_result( string $tool_name, $result )
 		$result['executor']  = $result['executor'] ?? 'client';
 		if ( array_key_exists( 'data', $result ) && ! array_key_exists( 'result', $result ) ) {
 			$result['result'] = $result['data'];
-		} elseif ( array_key_exists( 'result', $result ) && ! array_key_exists( 'data', $result ) ) {
-			$result['data'] = $result['result'];
 		}
 		return $result;
 	}
@@ -1379,7 +1377,6 @@ function datamachine_normalize_runtime_tool_result( string $tool_name, $result )
 		'success'   => true,
 		'tool_name' => $tool_name,
 		'executor'  => 'client',
-		'data'      => $result,
 		'result'    => $result,
 	);
 }
