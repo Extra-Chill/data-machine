@@ -202,6 +202,17 @@ class Event_Post_Type {
 			return;
 		}
 
+		// Never touch feed requests. Forcing fields=ids on a feed query makes
+		// $wp_query->posts hold scalar IDs instead of WP_Post objects, which
+		// breaks WordPress core's get_feed_build_date(): wp_list_pluck() emits
+		// a "values must be objects or arrays" notice and the subsequent
+		// max( $modified_times ) throws a ValueError on an empty array
+		// (feed.php). The 404-prevention logic below only matters for HTML
+		// archive pagination, never for feeds.
+		if ( $query->is_feed() ) {
+			return;
+		}
+
 		// Check query vars directly — conditional tags like is_tax() aren't
 		// reliable inside pre_get_posts because the query hasn't executed yet.
 		$event_taxonomies = get_object_taxonomies( self::POST_TYPE );
