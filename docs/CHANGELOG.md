@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.138.3] - 2026-05-31
+
+### Fixed
+- preserve extension artifact type slugs
+
 ## [0.138.2] - 2026-05-31
 
 ### Changed
