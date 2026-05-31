@@ -242,6 +242,26 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'agent_config', 'flow', 'pipeline' ), $types, 'Importer writes installed artifact state to the canonical table.' );
 	}
 
+	public function test_import_ensures_installed_artifact_table_at_runtime(): void {
+		global $wpdb;
+
+		// Some isolated runtimes can reach bundle import before deploy-time schema
+		// ensures run. The repository should self-heal instead of failing import.
+		$suppress_errors = $wpdb->suppress_errors( true );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}datamachine_bundle_artifacts" );
+		$wpdb->suppress_errors( $suppress_errors );
+
+		$result = $this->bundler->import( $this->fixture_bundle( 'artifact-table-ensure-agent' ), null, $this->owner_id );
+
+		$this->assertTrue( (bool) $result['success'], 'Bundle import succeeds after recreating the artifact table.' );
+
+		$agent     = $this->agents_repo->get_by_slug( 'artifact-table-ensure-agent' );
+		$artifacts = ( new InstalledBundleArtifacts() )->list_for_bundle( 'artifact-table-ensure-agent', (int) $agent['agent_id'] );
+
+		$this->assertCount( 3, $artifacts, 'Installed artifact rows are written after runtime table ensure.' );
+	}
+
 	public function test_directory_value_object_import_preserves_workflow_runtime_seed_fields(): void {
 		$bundle = $this->fixture_bundle( 'directory-import-agent' );
 		$bundle['flows'][0]['flow_config']['1_step-uuid_1'] = array_merge(
