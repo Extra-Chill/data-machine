@@ -48,6 +48,11 @@ class ResolveTermAbility {
 								'default'     => false,
 								'description' => __( 'Create term if not found', 'data-machine' ),
 							),
+							'fuzzy'      => array(
+								'type'        => 'boolean',
+								'default'     => false,
+								'description' => __( 'Also match an existing term by normalized name (case/punctuation/article-insensitive) before creating. Catches variants like "Tyler, the Creator" vs "Tyler the Creator". Default false (exact name/slug only).', 'data-machine' ),
+							),
 							'args'       => array(
 								'type'        => 'object',
 								'description' => __( 'Optional arguments forwarded to wp_insert_term() on the create path. Ignored when an existing term is matched.', 'data-machine' ),
@@ -115,6 +120,7 @@ class ResolveTermAbility {
 		$identifier = trim( (string) ( $input['identifier'] ?? '' ) );
 		$taxonomy   = trim( (string) ( $input['taxonomy'] ?? '' ) );
 		$create     = (bool) ( $input['create'] ?? false );
+		$fuzzy      = (bool) ( $input['fuzzy'] ?? false );
 		$term_args  = is_array( $input['args'] ?? null ) ? $input['args'] : array();
 
 		// Validate inputs.
@@ -154,7 +160,17 @@ class ResolveTermAbility {
 			return $this->success_response( $term, false );
 		}
 
-		// 4. Not found - create if requested.
+		// 4. Opt-in: try by normalized name (case/punctuation/article-insensitive).
+		// Catches variants exact name/slug matching misses, e.g.
+		// "Tyler, the Creator" = "Tyler the Creator", "Beyoncé" = "Beyonce".
+		if ( $fuzzy ) {
+			$term = $this->find_by_normalized_name( $identifier, $taxonomy );
+			if ( $term ) {
+				return $this->success_response( $term, false );
+			}
+		}
+
+		// 5. Not found - create if requested.
 		if ( $create ) {
 			$insert_args = $this->normalize_term_args( $term_args );
 			$result      = wp_insert_term( $identifier, $taxonomy, $insert_args );
@@ -210,6 +226,102 @@ class ResolveTermAbility {
 	}
 
 	/**
+	 * Find an existing term by normalized-name comparison.
+	 *
+	 * Generic fuzzy term resolution: normalizes the identifier and every
+	 * existing term name in the taxonomy to a canonical form and compares.
+	 * Catches variants that exact name/slug matching misses:
+	 * - "Tyler, the Creator" = "Tyler the Creator"
+	 * - "Beyoncé" = "Beyonce"
+	 * - "AC/DC" = "ACDC"
+	 * - "Saturn - Birmingham" = "Saturn Birmingham"
+	 *
+	 * Requires the normalized identifier to be at least 3 characters to avoid
+	 * false matches on very short names.
+	 *
+	 * @param string $identifier Term name to search for.
+	 * @param string $taxonomy   Taxonomy name.
+	 * @return \WP_Term|null Matching term, or null.
+	 */
+	private function find_by_normalized_name( string $identifier, string $taxonomy ): ?\WP_Term {
+		$normalized_input = self::normalize_name_for_matching( $identifier );
+
+		if ( strlen( $normalized_input ) < 3 ) {
+			return null;
+		}
+
+		$terms = get_terms(
+			array(
+				'taxonomy'   => $taxonomy,
+				'hide_empty' => false,
+				'number'     => 0,
+			)
+		);
+
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return null;
+		}
+
+		foreach ( $terms as $term ) {
+			if ( self::normalize_name_for_matching( $term->name ) === $normalized_input ) {
+				do_action(
+					'datamachine_log',
+					'info',
+					'Term matched via normalized name',
+					array(
+						'taxonomy'      => $taxonomy,
+						'input_name'    => $identifier,
+						'matched_name'  => $term->name,
+						'matched_id'    => $term->term_id,
+						'normalized_as' => $normalized_input,
+					)
+				);
+				return $term;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Normalize a term name to a canonical form for fuzzy matching.
+	 *
+	 * Decodes HTML entities, lowercases, normalizes ampersands to "and",
+	 * strips leading articles, removes accents and all non-alphanumeric
+	 * characters, and collapses whitespace. Pure string function — taxonomy
+	 * agnostic, so any consumer (venue, artist, location, ...) shares it.
+	 *
+	 * @param string $name Raw term name.
+	 * @return string Normalized comparison key.
+	 */
+	public static function normalize_name_for_matching( string $name ): string {
+		// Decode HTML entities: &amp; → &, &#8217; → '.
+		$text = html_entity_decode( $name, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
+		// Strip accents: "Beyoncé" → "Beyonce".
+		$text = remove_accents( $text );
+
+		// Lowercase.
+		$text = strtolower( $text );
+
+		// Normalize ampersand variants to "and" so "Hook & Ladder" and
+		// "Hook and Ladder" collapse together.
+		$text = preg_replace( '/\s*&\s*/', ' and ', $text );
+
+		// Remove a leading article.
+		$text = preg_replace( '/^(the|a|an)\s+/i', '', $text );
+
+		// Remove all non-alphanumeric characters (keeps spaces). Also strips
+		// apostrophes/commas/slashes: "AC/DC" → "acdc", "Tyler, the" → "tyler the".
+		$text = preg_replace( '/[^a-z0-9\s]/', '', $text );
+
+		// Collapse whitespace and trim.
+		$text = trim( preg_replace( '/\s+/', ' ', $text ) );
+
+		return $text;
+	}
+
+	/**
 	 * Build success response.
 	 *
 	 * @param \WP_Term $term    Resolved term.
@@ -259,9 +371,10 @@ class ResolveTermAbility {
 	 * @param bool   $create     Create if not found.
 	 * @param array  $args       Optional wp_insert_term() args, forwarded only on the create path.
 	 *                           Whitelisted keys: description, parent, slug, alias_of.
+	 * @param bool   $fuzzy      Also match by normalized name before creating. Default false.
 	 * @return array Result with success, term data, or error.
 	 */
-	public static function resolve( string $identifier, string $taxonomy, bool $create = false, array $args = array() ): array {
+	public static function resolve( string $identifier, string $taxonomy, bool $create = false, array $args = array(), bool $fuzzy = false ): array {
 		$instance = new self();
 		return $instance->execute(
 			array(
@@ -269,6 +382,7 @@ class ResolveTermAbility {
 				'taxonomy'   => $taxonomy,
 				'create'     => $create,
 				'args'       => $args,
+				'fuzzy'      => $fuzzy,
 			)
 		);
 	}
