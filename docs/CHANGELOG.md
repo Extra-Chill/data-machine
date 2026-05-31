@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.137.2] - 2026-05-31
+
+### Fixed
+- use WP Codebox WordPress setting
+
 ## [0.137.1] - 2026-05-30
 
 ### Changed
