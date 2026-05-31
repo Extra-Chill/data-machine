@@ -1080,8 +1080,9 @@ class AgentBundler {
 			$summary['conflicts']          = $conflicts;
 			$summary['runtime_drift']      = $runtime_drift;
 
-			if ( ! AgentBundleArtifactState::persist_for_agent( $agent_id, array_values( $artifact_records ) ) ) {
-				throw new \RuntimeException( 'Failed to persist installed bundle artifact state.' );
+			$artifact_persist_result = AgentBundleArtifactState::persist_for_agent_result( $agent_id, array_values( $artifact_records ) );
+			if ( is_wp_error( $artifact_persist_result ) ) {
+				throw new \RuntimeException( $artifact_persist_result->get_error_message() );
 			}
 			if ( ! $this->agents_repo->update_agent( $agent_id, array( 'agent_config' => $config ) ) ) {
 				throw new \RuntimeException( 'Failed to persist final agent_config with bundle metadata.' );
