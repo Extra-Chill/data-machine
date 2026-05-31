@@ -492,6 +492,19 @@ class Chat {
 		$pipeline_id = (int) $request->get_param( 'selected_pipeline_id' );
 		if ( $pipeline_id > 0 ) {
 			$input['selected_pipeline_id'] = $pipeline_id;
+
+			// A selected pipeline means this request originates from the DM admin
+			// pipeline editor surface. Opt that surface into pipeline_editor mode
+			// (composed on top of chat) so it receives the pipeline/handler/flow
+			// guidance, the pipelines inventory, and the pipeline-editing tools.
+			// Portable surfaces (frontend widgets, bridges) send no pipeline and
+			// stay on generic chat. See data-machine#2425.
+			$requested_mode  = sanitize_key( (string) ( $request->get_param( 'mode' ) ?? '' ) );
+			$composed_modes  = array( 'chat', 'pipeline_editor' );
+			if ( '' !== $requested_mode && ! in_array( $requested_mode, $composed_modes, true ) ) {
+				$composed_modes[] = $requested_mode;
+			}
+			$input['modes'] = $composed_modes;
 		}
 
 		if ( $request_id ) {

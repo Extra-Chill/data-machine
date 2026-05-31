@@ -20,7 +20,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ExecuteWorkflowTool extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'execute_workflow', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'datamachine/execute-workflow' ) );
+		$this->registerTool( 'execute_workflow', array( $this, 'getToolDefinition' ), array( 'pipeline_editor' ), array( 'ability' => 'datamachine/execute-workflow' ) );
 	}
 
 	/**
