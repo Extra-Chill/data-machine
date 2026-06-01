@@ -64,6 +64,10 @@ class DataMachineToolRuntimeRules {
 			return $this->evaluateRequirePriorToolRule( $rule, $tool_name, $messages );
 		}
 
+		if ( 'block_until_tool' === ( $rule['type'] ?? '' ) ) {
+			return $this->evaluateBlockUntilToolRule( $rule, $tool_name, $messages );
+		}
+
 		$after_tool  = (string) $rule['after_tool'];
 		$after_index = $this->lastToolCallIndex( $messages, $after_tool );
 		if ( $after_index < 0 ) {
@@ -172,6 +176,60 @@ class DataMachineToolRuntimeRules {
 	}
 
 	/**
+	 * @param array<string,mixed> $rule Runtime rule.
+	 * @return array{allowed:bool,error:string,context:array<string,mixed>}
+	 */
+	private function evaluateBlockUntilToolRule( array $rule, string $tool_name, array $messages ): array {
+		$after_tool  = (string) $rule['after_tool'];
+		$after_index = $this->lastToolCallIndex( $messages, $after_tool );
+		if ( $after_index < 0 ) {
+			return array(
+				'allowed' => true,
+				'error'   => '',
+				'context' => array(),
+			);
+		}
+
+		$until_one_of = (array) $rule['until_one_of'];
+		if ( in_array( $tool_name, $until_one_of, true ) || $this->hasToolCallAfter( $messages, $after_index, $until_one_of ) ) {
+			return array(
+				'allowed' => true,
+				'error'   => '',
+				'context' => array(),
+			);
+		}
+
+		$blocked_tools = (array) $rule['blocked_tools'];
+		if ( ! in_array( $tool_name, $blocked_tools, true ) ) {
+			return array(
+				'allowed' => true,
+				'error'   => '',
+				'context' => array(),
+			);
+		}
+
+		$required = implode( ', ', $until_one_of );
+		$error    = sprintf(
+			'TOOL POLICY REJECTED: After %1$s, do not use %2$s again until one of these follow-up tools succeeds: %3$s.',
+			$after_tool,
+			$tool_name,
+			$required
+		);
+
+		return array(
+			'allowed' => false,
+			'error'   => $error,
+			'context' => array(
+				'rule_id'       => (string) $rule['id'],
+				'after_tool'    => $after_tool,
+				'blocked_tools' => $blocked_tools,
+				'until_one_of'  => $until_one_of,
+				'rejected_tool' => $tool_name,
+			),
+		);
+	}
+
+	/**
 	 * @return array<int,array<string,mixed>>
 	 */
 	private function normalizeRules( array $rules ): array {
@@ -196,6 +254,24 @@ class DataMachineToolRuntimeRules {
 					'before_tool'                   => $before_tool,
 					'require_prior_tool'            => $require_prior_tool,
 					'require_prior_tool_parameters' => $require_prior_tool_parameters,
+				);
+				continue;
+			}
+
+			if ( 'block_until_tool' === $type ) {
+				$after_tool    = $this->sanitizeToolName( $rule['after_tool'] ?? '' );
+				$blocked_tools = $this->sanitizeToolList( $rule['blocked_tools'] ?? $rule['blocked_tool_names'] ?? array() );
+				$until_one_of  = $this->sanitizeToolList( $rule['until_one_of'] ?? $rule['then_require_one_of'] ?? array() );
+				if ( '' === $after_tool || empty( $blocked_tools ) || empty( $until_one_of ) ) {
+					continue;
+				}
+
+				$normalized[] = array(
+					'id'            => $this->sanitizeRuleId( $rule['id'] ?? 'tool-runtime-rule-' . $index ),
+					'type'          => 'block_until_tool',
+					'after_tool'    => $after_tool,
+					'blocked_tools' => $blocked_tools,
+					'until_one_of'  => $until_one_of,
 				);
 				continue;
 			}
@@ -317,7 +393,7 @@ class DataMachineToolRuntimeRules {
 
 	private function sanitizeRuleType( $value ): string {
 		$value = sanitize_key( (string) $value );
-		return in_array( $value, array( 'require_prior_tool' ), true ) ? $value : '';
+		return in_array( $value, array( 'require_prior_tool', 'block_until_tool' ), true ) ? $value : '';
 	}
 
 	/**
