@@ -13,6 +13,8 @@ namespace DataMachine\Engine\AI\Tools;
 
 use AgentsAPI\AI\Tools\WP_Agent_Action_Policy;
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Execution_Core;
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
 use DataMachine\Engine\AI\Actions\PendingActionHelper;
@@ -84,12 +86,13 @@ class ToolExecutor {
 		// as before this feature landed.
 		$resolver = new ActionPolicyResolver();
 		$policy   = $resolver->resolveForTool(
-			array(
-				'tool_name'      => $tool_name,
-				'tool_def'       => $tool_def,
-				'mode'           => $mode,
-				'agent_id'       => $agent_id,
-				'client_context' => $client_context,
+			array_merge(
+				self::buildActionPolicyContext( $payload, $agent_id, $client_context ),
+				array(
+					'tool_name' => $tool_name,
+					'tool_def'  => $tool_def,
+					'mode'      => $mode,
+				)
 			)
 		);
 
@@ -179,6 +182,130 @@ class ToolExecutor {
 		}
 
 		return $tool_result;
+	}
+
+	/**
+	 * Build canonical identity context for action-policy resolution.
+	 *
+	 * @param array $payload        Step payload / invocation context.
+	 * @param int   $agent_id       Acting Data Machine agent ID.
+	 * @param array $client_context Client-supplied context.
+	 * @return array<string,mixed> First-class Agents API context plus namespaced Data Machine metadata.
+	 */
+	private static function buildActionPolicyContext( array $payload, int $agent_id, array $client_context ): array {
+		$context = array(
+			'client_context' => $client_context,
+			'datamachine'    => array_filter(
+				array(
+					'job_id'               => $payload['job_id'] ?? null,
+					'flow_step_id'         => $payload['flow_step_id'] ?? null,
+					'selected_pipeline_id' => $payload['selected_pipeline_id'] ?? null,
+				),
+				static fn( $value ): bool => null !== $value && '' !== $value
+			),
+		);
+
+		$workspace = self::resolveActionPolicyWorkspace( $payload );
+		if ( null !== $workspace ) {
+			$context['workspace'] = $workspace;
+		}
+
+		$user_id = self::firstPositiveInt( $payload, $client_context, 'user_id' );
+		if ( $user_id > 0 ) {
+			$context['user_id'] = $user_id;
+		}
+
+		$acting_user_id = self::firstPositiveInt( $payload, $client_context, 'acting_user_id', 'calling_user_id' );
+		if ( $acting_user_id > 0 ) {
+			$context['acting_user_id'] = $acting_user_id;
+		}
+
+		if ( $agent_id > 0 ) {
+			$context['agent_id'] = $agent_id;
+		}
+
+		$agent_slug = self::firstNonEmptyString( $payload, $client_context, 'agent_slug' );
+		if ( '' !== $agent_slug ) {
+			$context['agent_slug'] = sanitize_title( $agent_slug );
+		}
+
+		foreach ( array( 'session_id', 'transcript_session_id', 'request_id' ) as $identifier ) {
+			$value = self::firstNonEmptyString( $payload, $client_context, $identifier );
+			if ( '' !== $value ) {
+				$context[ $identifier ] = $value;
+			}
+		}
+
+		if ( empty( $context['datamachine'] ) ) {
+			unset( $context['datamachine'] );
+		}
+
+		return $context;
+	}
+
+	/**
+	 * Resolve the canonical workspace for action-policy resolution.
+	 *
+	 * @param array $payload Step payload / invocation context.
+	 * @return WP_Agent_Workspace_Scope|null Workspace scope.
+	 */
+	private static function resolveActionPolicyWorkspace( array $payload ): ?WP_Agent_Workspace_Scope {
+		$workspace = $payload['workspace'] ?? null;
+		if ( $workspace instanceof WP_Agent_Workspace_Scope ) {
+			return $workspace;
+		}
+
+		if ( is_array( $workspace ) ) {
+			try {
+				return WP_Agent_Workspace_Scope::from_array( $workspace );
+			} catch ( \InvalidArgumentException $e ) {
+				return null;
+			}
+		}
+
+		return WordPressWorkspaceScope::current();
+	}
+
+	/**
+	 * Return the first positive integer from payload or client context.
+	 *
+	 * @param array  $payload        Step payload / invocation context.
+	 * @param array  $client_context Client-supplied context.
+	 * @param string ...$keys        Candidate keys in priority order.
+	 * @return int Positive integer or 0.
+	 */
+	private static function firstPositiveInt( array $payload, array $client_context, string ...$keys ): int {
+		foreach ( $keys as $key ) {
+			foreach ( array( $payload, $client_context ) as $source ) {
+				$value = isset( $source[ $key ] ) ? (int) $source[ $key ] : 0;
+				if ( $value > 0 ) {
+					return $value;
+				}
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Return the first non-empty string from payload or client context.
+	 *
+	 * @param array  $payload        Step payload / invocation context.
+	 * @param array  $client_context Client-supplied context.
+	 * @param string ...$keys        Candidate keys in priority order.
+	 * @return string Non-empty string or empty string.
+	 */
+	private static function firstNonEmptyString( array $payload, array $client_context, string ...$keys ): string {
+		foreach ( $keys as $key ) {
+			foreach ( array( $payload, $client_context ) as $source ) {
+				$value = $source[ $key ] ?? null;
+				if ( is_scalar( $value ) && '' !== trim( (string) $value ) ) {
+					return trim( (string) $value );
+				}
+			}
+		}
+
+		return '';
 	}
 
 	/**
