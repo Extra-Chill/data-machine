@@ -24,8 +24,8 @@ class ToolExecutor {
 
 
 	/**
-	 * Execute tool with parameter merging and comprehensive error handling.
-	 * Builds complete parameters by combining AI parameters with step payload.
+	 * Execute tool with parameter preparation and comprehensive error handling.
+	 * Runtime context values only satisfy parameters through explicit tool bindings.
 	 *
 	 * Before invoking the tool handler, consults ActionPolicyResolver to
 	 * decide whether the invocation should execute directly, be staged for

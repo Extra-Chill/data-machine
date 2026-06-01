@@ -192,6 +192,11 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		return PendingActionHelper::$staged[0]['apply_input']['job_id'] ?? null;
 	}
 
+	function missing_parameters( array $result ): array {
+		$missing = $result['metadata']['missing_parameters'] ?? array();
+		return is_array( $missing ) ? $missing : array();
+	}
+
 	function ability_execute_count( \Ability_Native_Smoke_Ability $ability ): int {
 		return $ability->execute_count;
 	}
@@ -291,6 +296,57 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 	);
 	assert_smoke( 'explicit binding executes successfully', true === ( $result['success'] ?? false ) );
 	assert_smoke( 'explicit binding passed job_id from runtime context', 42 === ( $result['result']['received']['job_id'] ?? null ) );
+
+	echo "\n[ability:1c] Ambient runtime keys do not satisfy required parameters\n";
+	$runtime_keys_ability = new \Ability_Native_Smoke_Ability(
+		fn( $input ) => true,
+		fn( $input ) => array(
+			'success'  => true,
+			'received' => $input,
+		)
+	);
+	$registry->register_for_smoke( 'datamachine/runtime-keys-ability', $runtime_keys_ability );
+	$result  = execute_tool(
+		'runtime_keys_tool',
+		array( 'message' => 'hello' ),
+		array(
+			'ability'    => 'datamachine/runtime-keys-ability',
+			'parameters' => array(
+				'message'      => array(
+					'type'     => 'string',
+					'required' => true,
+				),
+				'job_id'       => array(
+					'type'     => 'integer',
+					'required' => true,
+				),
+				'flow_step_id' => array(
+					'type'     => 'integer',
+					'required' => true,
+				),
+				'agent_id'     => array(
+					'type'     => 'integer',
+					'required' => true,
+				),
+				'user_id'      => array(
+					'type'     => 'integer',
+					'required' => true,
+				),
+			),
+		),
+		array(
+			'flow_step_id' => 77,
+			'agent_id'     => 88,
+			'user_id'      => 99,
+		)
+	);
+	$missing = missing_parameters( $result );
+	assert_smoke( 'ambient runtime keys fail required-parameter validation without bindings', false === ( $result['success'] ?? true ) );
+	assert_smoke( 'unbound job_id remains missing', in_array( 'job_id', $missing, true ) );
+	assert_smoke( 'unbound flow_step_id remains missing', in_array( 'flow_step_id', $missing, true ) );
+	assert_smoke( 'unbound agent_id remains missing', in_array( 'agent_id', $missing, true ) );
+	assert_smoke( 'unbound user_id remains missing', in_array( 'user_id', $missing, true ) );
+	assert_smoke( 'ability is not executed when runtime bindings are absent', 0 === ability_execute_count( $runtime_keys_ability ) );
 
 	echo "\n[core:1] Generic execution core runs without Data Machine decorators\n";
 	// @phpstan-ignore-next-line smoke-test stub property shadows production class.
