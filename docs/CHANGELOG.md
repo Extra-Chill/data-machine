@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.138.8] - 2026-06-01
+
+### Fixed
+- merge top-level tool result fields
+
 ## [0.138.7] - 2026-06-01
 
 ### Fixed
