@@ -23,6 +23,12 @@ interface FetchVenuesParams {
 	 * taxonomy/term filter (e.g. chronological-route mode).
 	 */
 	includeEvents?: boolean;
+	/**
+	 * Opaque consumer-minted scope token. Sent as `scope_token` so a
+	 * consumer's server-side venue scoping (e.g. owner scoping) survives
+	 * the REST round-trip. data-machine-events does not interpret it. #160.
+	 */
+	scopeToken?: string;
 }
 
 /**
@@ -74,6 +80,10 @@ export async function fetchVenues(
 
 	if ( params.includeEvents ) {
 		url.searchParams.set( 'include', 'events' );
+	}
+
+	if ( params.scopeToken ) {
+		url.searchParams.set( 'scope_token', params.scopeToken );
 	}
 
 	const response = await fetch( url.toString(), {

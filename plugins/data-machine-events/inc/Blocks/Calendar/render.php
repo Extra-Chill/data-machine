@@ -73,6 +73,47 @@ if ( ! isset( $query_args['scope'] ) && ! empty( $attributes['defaultDateRange']
 	$query_args['scope'] = (string) $attributes['defaultDateRange'];
 }
 
+// #160: let a consumer inject an opaque scope token at server-render time.
+// The token is uninterpreted by data-machine-events — it is emitted as a
+// `data-scope-token` attribute on the calendar root so the frontend
+// re-sends it on every prev/next month REST fetch, and threaded into the
+// ability `$input` so a consumer's query-args filter can re-apply a
+// server-side constraint that would otherwise die over REST. The block
+// render path has no `$_GET['scope_token']` (the embedded calendar is
+// rendered via do_blocks(), not a URL), so the filter is the only way a
+// consumer can seed it on initial paint. URL-driven values (set via the
+// passthrough above on the JS round-trip) win when present.
+if ( empty( $query_args['scope_token'] ) ) {
+	/**
+	 * Filter the opaque scope token emitted on the calendar root and
+	 * threaded into the ability input.
+	 *
+	 * Generic seam: data-machine-events neither mints nor validates this
+	 * value. A consumer (e.g. a "my tracked shows" page) returns a
+	 * non-spoofable, server-minted token here; the same consumer validates
+	 * it inside its `data_machine_events_calendar_query_args` callback. The
+	 * token must round-trip through the public REST endpoint, so consumers
+	 * MUST make it tamper-evident (HMAC / signed nonce) rather than a plain
+	 * identifier.
+	 *
+	 * @since 0.41.0
+	 *
+	 * @param string $scope_token Default empty string (no scoping).
+	 * @param array  $context     Render context: block `attributes` + resolved `display_mode`.
+	 */
+	$injected_scope_token = (string) apply_filters(
+		'data_machine_events_calendar_scope_token',
+		'',
+		array(
+			'attributes'   => $attributes,
+			'display_mode' => $display_mode,
+		)
+	);
+	if ( '' !== $injected_scope_token ) {
+		$query_args['scope_token'] = $injected_scope_token;
+	}
+}
+
 // #318: in month-grid mode, default to the current month (in the site
 // timezone) when no `?month=YYYY-MM` was supplied. The CalendarRequest
 // sanitizer still validates the format — we only default when it would
@@ -226,9 +267,18 @@ $scope_data_attr = '';
 if ( ! empty( $scope ) ) {
 	$scope_data_attr = sprintf( ' data-scope="%s"', esc_attr( $scope ) );
 }
+
+// #160: opaque scope token round-trip attribute. The frontend re-sends
+// this on every month-grid prev/next REST fetch so the server-side
+// constraint survives the round-trip.
+$scope_token_data_attr = '';
+$scope_token_value     = $request->scopeToken();
+if ( '' !== $scope_token_value ) {
+	$scope_token_data_attr = sprintf( ' data-scope-token="%s"', esc_attr( $scope_token_value ) );
+}
 ?>
 
-<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?><?php echo $scope_data_attr; ?><?php echo $display_mode_attr; ?> <?php echo $wrapper_attributes; ?>>
+<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?><?php echo $scope_data_attr; ?><?php echo $scope_token_data_attr; ?><?php echo $display_mode_attr; ?> <?php echo $wrapper_attributes; ?>>
 	<?php
 	\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
 		'filter-bar',

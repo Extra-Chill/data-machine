@@ -111,6 +111,21 @@ class MonthGridController {
 		// `overrides` because they aren't in the CalendarRequest type.
 		params.set( 'format', 'data' );
 		params.set( 'month', month );
+
+		// #160: re-send the opaque scope token so a consumer's server-side
+		// query constraint (e.g. owner scoping) survives the prev/next
+		// REST fetch. The token rides on the calendar root as
+		// `data-scope-token`; the URL has no `?scope_token=` on the
+		// embedded-calendar first paint, so reading it from the DOM is the
+		// authoritative source. data-machine-events never interprets it.
+		const scopeToken = this.readScopeToken();
+		if ( scopeToken ) {
+			params.set( 'scope_token', scopeToken );
+		} else {
+			// No token present — make sure a stale one never leaks in from
+			// the URL passthrough for an unscoped calendar.
+			params.delete( 'scope_token' );
+		}
 		// Past / paged are irrelevant in grid mode — the month IS the
 		// page. Drop them so they don't pollute the cache key.
 		params.delete( 'past' );
@@ -211,6 +226,14 @@ class MonthGridController {
 			};
 		}
 		return {};
+	}
+
+	/**
+	 * Read the opaque scope token emitted on the calendar root by
+	 * render.php (`data-scope-token`). Empty string when absent. #160.
+	 */
+	private readScopeToken(): string {
+		return this.calendar.getAttribute( 'data-scope-token' ) ?? '';
 	}
 
 	private readGeoContext(): Partial< GeoContext > {

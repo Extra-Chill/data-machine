@@ -128,6 +128,14 @@ class CalendarCache {
 			// never share a cache bucket, and so distinct grid months
 			// each get their own bucket.
 			'month'            => (string) ( $envelope['month'] ?? '' ),
+			// #160: an opaque consumer-minted scope token narrows the
+			// result set server-side (e.g. owner scoping via the
+			// query-args filter). Fold it into the key so a scoped
+			// response can NEVER be served to a different viewer (or to
+			// the public, unscoped, calendar) and vice-versa. Distinct
+			// tokens each get their own bucket; the empty-token (public)
+			// bucket stays isolated from every scoped bucket.
+			'scope_token'      => (string) ( $envelope['scope_token'] ?? '' ),
 		);
 
 		return self::FULL_PREFIX . md5( wp_json_encode( $key_data ) );

@@ -36,6 +36,11 @@ const CALENDAR_PASSTHROUGH_KEYS: ( keyof CalendarRequest )[] = [
 	'paged',
 	'date_start',
 	'date_end',
+	// #160: opaque scope token. Passed through from the URL so re-fetches
+	// preserve it; the month-grid nav also injects it from the calendar
+	// root's `data-scope-token` attribute (a server-embedded calendar has
+	// no `?scope_token=` in the URL on first paint).
+	'scope_token',
 ];
 
 /**

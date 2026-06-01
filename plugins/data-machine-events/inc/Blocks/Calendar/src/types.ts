@@ -98,6 +98,14 @@ export interface CalendarRequest {
 	lng: string;
 	radius: string;
 	radius_unit: string;
+	/**
+	 * Opaque consumer-minted scope token. data-machine-events does not
+	 * interpret it; it round-trips from the calendar root's
+	 * `data-scope-token` attribute to the REST endpoint so a server-side
+	 * query constraint (e.g. owner scoping) survives the prev/next month
+	 * fetch. See Extra-Chill/data-machine-events#160.
+	 */
+	scope_token: string;
 }
 
 /* ------------------------------------------------------------------ */

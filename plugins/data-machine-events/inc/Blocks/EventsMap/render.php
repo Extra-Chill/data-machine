@@ -109,6 +109,31 @@ $chronological_route_mode = (bool) ( $attributes['chronologicalRouteMode'] ?? fa
  */
 $chronological_route_mode = (bool) apply_filters( 'data_machine_events_map_chronological_route', $chronological_route_mode, $context );
 
+// #160: opaque scope token. Mirrors the calendar's scope_token seam. A
+// consumer (e.g. a "my tracked shows" map) returns a non-spoofable,
+// server-minted token here; data-machine-events emits it as
+// `data-scope-token` on the map root so the frontend re-sends it on every
+// venue fetch (mount + pan/zoom), and the consumer validates it inside its
+// `data_machine_events_map_query_args` / `data_machine_events_map_venues`
+// callbacks. The map fetches venues over the public REST endpoint on
+// mount, where page-context gates like is_page() do NOT hold — so without
+// this token the consumer's owner-scoping silently drops and the map leaks
+// the full venue set. The generic layer never mints or validates the token.
+$scope_token = '';
+/**
+ * Filter the opaque scope token emitted on the events-map root.
+ *
+ * Generic seam: data-machine-events neither mints nor validates this
+ * value. Consumers MUST make it tamper-evident (HMAC / signed nonce)
+ * because the venues REST endpoint is public.
+ *
+ * @since 0.41.0
+ *
+ * @param string $scope_token Default empty string (no scoping).
+ * @param array  $context     Map render context (taxonomy/term/attributes).
+ */
+$scope_token = (string) apply_filters( 'data_machine_events_map_scope_token', $scope_token, $context );
+
 ?>
 <div <?php echo $wrapper; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
 	<div
@@ -132,6 +157,9 @@ $chronological_route_mode = (bool) apply_filters( 'data_machine_events_map_chron
 		<?php endif; ?>
 		<?php if ( $chronological_route_mode ) : ?>
 		data-chronological-route-mode="1"
+		<?php endif; ?>
+		<?php if ( '' !== $scope_token ) : ?>
+		data-scope-token="<?php echo esc_attr( $scope_token ); ?>"
 		<?php endif; ?>
 	></div>
 	<?php if ( ! empty( $summary ) ) : ?>

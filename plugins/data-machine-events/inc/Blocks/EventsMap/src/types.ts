@@ -86,6 +86,14 @@ export interface MapProps {
 	showLocationSearch: boolean;
 	geocodeUrl: string;
 	chronologicalRouteMode: boolean;
+	/**
+	 * Opaque consumer-minted scope token, read from the map root's
+	 * `data-scope-token` attribute. Re-sent on every venue fetch (mount +
+	 * pan/zoom) so a consumer's server-side owner scoping survives the REST
+	 * round-trip. data-machine-events does not interpret it.
+	 * See Extra-Chill/data-machine-events#160.
+	 */
+	scopeToken: string;
 }
 
 /**

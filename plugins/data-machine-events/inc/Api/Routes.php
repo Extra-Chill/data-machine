@@ -88,6 +88,12 @@ function register_routes() {
 					'sanitize_callback' => 'sanitize_text_field',
 					'description'       => 'Visible month for month-grid display (YYYY-MM). When set, the response is scoped to that calendar month and pagination is collapsed to a single page (issue #318). Invalid values fall back as if absent.',
 				),
+				'scope_token'      => array(
+					'type'              => 'string',
+					'default'           => '',
+					'sanitize_callback' => 'sanitize_text_field',
+					'description'       => 'Opaque consumer-minted scope token. data-machine-events does not interpret it; it is passed through to the data_machine_events_calendar_query_args filter $input so a consumer can re-apply a server-side query constraint (e.g. owner scoping) that must survive the REST round-trip. The minting + validation is owned entirely by the consumer.',
+				),
 			),
 		)
 	);
@@ -182,6 +188,12 @@ function register_routes() {
 					'type'              => 'boolean',
 					'sanitize_callback' => 'rest_sanitize_boolean',
 					'description'       => 'Boolean shortcut equivalent to include=events.',
+				),
+				'scope_token' => array(
+					'type'              => 'string',
+					'default'           => '',
+					'sanitize_callback' => 'sanitize_text_field',
+					'description'       => 'Opaque consumer-minted scope token. data-machine-events does not interpret it; it is passed through to the data_machine_events_map_query_args and data_machine_events_map_venues filter $input so a consumer can re-apply a server-side constraint (e.g. owner scoping) that must survive the REST round-trip. Minting + validation owned entirely by the consumer.',
 				),
 			),
 		)

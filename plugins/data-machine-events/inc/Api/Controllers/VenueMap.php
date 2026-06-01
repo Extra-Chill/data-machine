@@ -49,6 +49,13 @@ class VenueMap {
 				'taxonomy'       => $request->get_param( 'taxonomy' ) ?? '',
 				'term_id'        => $request->get_param( 'term_id' ) ?? 0,
 				'include_events' => $wants_events,
+				// #160: opaque consumer-minted scope token. Threaded into
+				// the ability input so the data_machine_events_map_query_args
+				// and data_machine_events_map_venues filters receive it and
+				// a consumer can re-apply owner scoping that would otherwise
+				// die over REST (page-context gates don't hold). The generic
+				// layer never interprets it.
+				'scope_token'    => (string) ( $request->get_param( 'scope_token' ) ?? '' ),
 			)
 		);
 

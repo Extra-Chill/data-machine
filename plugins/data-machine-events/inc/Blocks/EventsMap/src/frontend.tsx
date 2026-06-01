@@ -401,6 +401,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 		showLocationSearch,
 		geocodeUrl,
 		chronologicalRouteMode,
+		scopeToken,
 	} = props;
 
 	const mapRef = useRef<L.Map | null>( null );
@@ -442,6 +443,11 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 					// per-venue upcoming events array. Other contexts stay
 					// on the lean default response shape.
 					includeEvents: chronologicalRouteMode || undefined,
+					// #160: re-send the opaque scope token so a consumer's
+					// server-side venue scoping survives this REST fetch
+					// (mount + every pan/zoom). Without it the public
+					// endpoint returns the full venue set.
+					scopeToken: scopeToken || undefined,
 				} );
 				setVenues( result.venues );
 			} catch ( err ) {
@@ -451,7 +457,7 @@ function EventsMap( props: MapProps ): JSX.Element | null {
 				setLoading( false );
 			}
 		},
-		[ restUrl, nonce, taxonomy, termId, chronologicalRouteMode ],
+		[ restUrl, nonce, taxonomy, termId, chronologicalRouteMode, scopeToken ],
 	);
 
 	/* --- debounced bounds handler --- */
@@ -943,6 +949,7 @@ function parseMapProps( container: HTMLElement ): MapProps {
 		showLocationSearch: data.showLocationSearch === '1',
 		geocodeUrl: data.geocodeUrl || '',
 		chronologicalRouteMode: data.chronologicalRouteMode === '1',
+		scopeToken: data.scopeToken || '',
 	};
 }
 

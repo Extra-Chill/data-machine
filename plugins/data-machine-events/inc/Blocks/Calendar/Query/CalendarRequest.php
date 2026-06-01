@@ -74,6 +74,24 @@ final class CalendarRequest {
 	 */
 	private string $month;
 
+	/**
+	 * Opaque consumer-minted scope token.
+	 *
+	 * data-machine-events treats this as an uninterpreted string. It is
+	 * threaded through {@see toAbilitiesArgs()} into the ability `$input`
+	 * so the `data_machine_events_calendar_query_args` filter receives it
+	 * and a consumer can re-apply a server-side query constraint (e.g.
+	 * owner scoping) that would otherwise be lost on the REST round-trip
+	 * (page-context gates like `is_page()` do not hold over REST).
+	 *
+	 * The generic layer never mints, validates, or branches on this value
+	 * — that is entirely the consumer's responsibility. Empty string when
+	 * no consumer supplied one.
+	 *
+	 * See Extra-Chill/data-machine-events#160.
+	 */
+	private string $scope_token;
+
 	/** @var array<string,int[]> Sanitized taxonomy filter map. */
 	private array $tax_filter;
 
@@ -111,7 +129,8 @@ final class CalendarRequest {
 		int $geo_radius,
 		string $geo_radius_unit,
 		string $format = '',
-		string $month = ''
+		string $month = '',
+		string $scope_token = ''
 	) {
 		$this->paged            = $paged;
 		$this->past             = $past;
@@ -128,6 +147,7 @@ final class CalendarRequest {
 		$this->geo_radius_unit  = $geo_radius_unit;
 		$this->format           = $format;
 		$this->month            = $month;
+		$this->scope_token      = $scope_token;
 	}
 
 	/**
@@ -166,6 +186,8 @@ final class CalendarRequest {
 
 		$month = isset( $get['month'] ) ? self::sanitize_month( wp_unslash( $get['month'] ) ) : '';
 
+		$scope_token = isset( $get['scope_token'] ) ? sanitize_text_field( wp_unslash( $get['scope_token'] ) ) : '';
+
 		return new self(
 			$paged,
 			$past,
@@ -181,7 +203,8 @@ final class CalendarRequest {
 			$geo_radius,
 			$geo_radius_unit,
 			'', // format is REST-only.
-			$month
+			$month,
+			$scope_token
 		);
 	}
 
@@ -226,6 +249,8 @@ final class CalendarRequest {
 
 		$month = self::sanitize_month( (string) ( $request->get_param( 'month' ) ?? '' ) );
 
+		$scope_token = sanitize_text_field( (string) ( $request->get_param( 'scope_token' ) ?? '' ) );
+
 		return new self(
 			$paged,
 			$past,
@@ -241,7 +266,8 @@ final class CalendarRequest {
 			$geo_radius,
 			$geo_radius_unit,
 			$format,
-			$month
+			$month,
+			$scope_token
 		);
 	}
 
@@ -284,6 +310,11 @@ final class CalendarRequest {
 			'include_gaps'     => true,
 			'progressive'      => ! $is_data_format,
 			'month'            => $this->month,
+			// Opaque passthrough — reaches the
+			// data_machine_events_calendar_query_args filter $input so a
+			// consumer can re-apply a server-side constraint that must
+			// survive the REST round-trip. #160.
+			'scope_token'      => $this->scope_token,
 		);
 	}
 
@@ -365,6 +396,15 @@ final class CalendarRequest {
 	 */
 	public function month(): string {
 		return $this->month;
+	}
+
+	/**
+	 * Opaque consumer-minted scope token, or empty string when none.
+	 * data-machine-events never interprets this value. See `$scope_token`
+	 * doc for semantics. #160.
+	 */
+	public function scopeToken(): string {
+		return $this->scope_token;
 	}
 
 	/* ------------------------------------------------------------------ */
