@@ -21,6 +21,7 @@ require_once __DIR__ . '/WpAiClientCache.php';
 require_once __DIR__ . '/DefaultOptionsHttpTransporter.php';
 
 class RequestBuilder {
+	private const CODEX_CONNECT_TIMEOUT_FLOOR = 120.0;
 
 	/**
 	 * Build standardized AI request for any execution mode.
@@ -646,6 +647,13 @@ class RequestBuilder {
 			),
 			$request_timeout
 		);
+		if ( self::isCodexProvider( $provider ) ) {
+			$default_timeout = min(
+				max( $default_timeout, self::CODEX_CONNECT_TIMEOUT_FLOOR ),
+				$request_timeout,
+				PluginSettings::MAX_WP_AI_CLIENT_CONNECT_TIMEOUT
+			);
+		}
 		$timeout         = apply_filters(
 			'datamachine_wp_ai_client_connect_timeout',
 			$default_timeout,
@@ -661,6 +669,10 @@ class RequestBuilder {
 		}
 
 		return max( 0.0, (float) $timeout );
+	}
+
+	private static function isCodexProvider( string $provider ): bool {
+		return 'codex' === strtolower( $provider );
 	}
 
 	/**
