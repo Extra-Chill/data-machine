@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.138.9] - 2026-06-01
+
+### Fixed
+- parse tag-style text tool calls
+
 ## [0.138.8] - 2026-06-01
 
 ### Fixed

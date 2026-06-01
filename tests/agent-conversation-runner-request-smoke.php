@@ -740,6 +740,120 @@ assert_runner_request( 'workspace_read' === ( $json_array_sandbox_metadata['tool
 assert_runner_request( array( 'path' => 'README.md' ) === ( $json_array_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline fenced JSON tool_calls parameters are parsed' );
 assert_runner_request( 1 === count( $json_array_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline fenced JSON tool_calls executes a workspace tool' );
 
+// 4e. Sandbox/pipeline runs also execute self-closing tag tool calls emitted as text.
+$tag_tool_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$tag_tool_dispatch_count ) {
+		++$tag_tool_dispatch_count;
+
+		if ( 1 === $tag_tool_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content' => '<workspace_read path="README.md" />',
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content' => 'tag tool sandbox complete',
+			),
+		);
+	}
+);
+
+$tag_tool_sandbox_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'read the sandbox README using tag tool syntax' ) ),
+	array(
+		'workspace_read' => array(
+			'name'        => 'workspace_read',
+			'description' => 'Read a file from the sandbox workspace.',
+			'parameters'  => array(
+				'type'       => 'object',
+				'properties' => array(
+					'path' => array( 'type' => 'string' ),
+				),
+				'required'   => array( 'path' ),
+			),
+			'class'       => SandboxPipelineSmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array( 'sandbox', 'pipeline' ),
+	array(),
+	3
+);
+$tag_tool_sandbox_metadata = datamachine_conversation_metadata( $tag_tool_sandbox_result );
+
+assert_runner_request( 2 === $tag_tool_dispatch_count, 'sandbox/pipeline self-closing tag tool call returns to provider for final answer' );
+assert_runner_request( 'tag tool sandbox complete' === ( $tag_tool_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline self-closing tag tool call preserves final answer' );
+assert_runner_request( 1 === count( $tag_tool_sandbox_metadata['tool_calls'] ?? array() ), 'sandbox/pipeline self-closing tag tool call is parsed' );
+assert_runner_request( 'workspace_read' === ( $tag_tool_sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline self-closing tag tool name is parsed' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $tag_tool_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline self-closing tag tool parameters are parsed' );
+assert_runner_request( 1 === count( $tag_tool_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline self-closing tag tool call executes a workspace tool' );
+
+// 4f. Sandbox/pipeline runs also execute named <tool> tag calls emitted as text.
+$named_tag_tool_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$named_tag_tool_dispatch_count ) {
+		++$named_tag_tool_dispatch_count;
+
+		if ( 1 === $named_tag_tool_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content' => '<tool name="workspace_read">{"path":"README.md"}</tool>',
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content' => 'named tag tool sandbox complete',
+			),
+		);
+	}
+);
+
+$named_tag_tool_sandbox_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'read the sandbox README using named tag tool syntax' ) ),
+	array(
+		'workspace_read' => array(
+			'name'        => 'workspace_read',
+			'description' => 'Read a file from the sandbox workspace.',
+			'parameters'  => array(
+				'type'       => 'object',
+				'properties' => array(
+					'path' => array( 'type' => 'string' ),
+				),
+				'required'   => array( 'path' ),
+			),
+			'class'       => SandboxPipelineSmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array( 'sandbox', 'pipeline' ),
+	array(),
+	3
+);
+$named_tag_tool_sandbox_metadata = datamachine_conversation_metadata( $named_tag_tool_sandbox_result );
+
+assert_runner_request( 2 === $named_tag_tool_dispatch_count, 'sandbox/pipeline named tag tool call returns to provider for final answer' );
+assert_runner_request( 'named tag tool sandbox complete' === ( $named_tag_tool_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline named tag tool call preserves final answer' );
+assert_runner_request( 1 === count( $named_tag_tool_sandbox_metadata['tool_calls'] ?? array() ), 'sandbox/pipeline named tag tool call is parsed' );
+assert_runner_request( 'workspace_read' === ( $named_tag_tool_sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline named tag tool name is parsed' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $named_tag_tool_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline named tag tool parameters are parsed' );
+assert_runner_request( 1 === count( $named_tag_tool_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline named tag tool call executes a workspace tool' );
+
 // 5. Client runtime tools are fulfilled by the transport callback, not PHP ToolExecutor.
 $runtime_dispatch_count = 0;
 $runtime_requests       = array();
