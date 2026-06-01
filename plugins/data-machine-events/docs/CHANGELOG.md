@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.40.6] - 2026-06-01
+
+### Fixed
+- add generic scope_token passthrough so consumer scoping survives REST
+
 ## [0.40.5] - 2026-06-01
 
 ### Fixed
