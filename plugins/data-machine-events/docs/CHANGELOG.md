@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.40.7] - 2026-06-01
+
+### Fixed
+- tighten low-density calendar day layout so 1-2 event days stop looking puffy
+
 ## [0.40.6] - 2026-06-01
 
 ### Fixed
