@@ -740,6 +740,9 @@ class PendingActionStore {
 	private static function row_to_payload( array $row ): array {
 		$created_at = self::mysql_to_timestamp( (string) ( $row['created_at'] ?? '' ) );
 		$expires_at = self::mysql_to_timestamp( (string) ( $row['expires_at'] ?? '' ) );
+		$metadata   = self::decode_json( $row['metadata'] ?? null );
+		$metadata   = is_array( $metadata ) ? $metadata : array();
+		$grants     = isset( $metadata['datamachine']['resolver_grants'] ) && is_array( $metadata['datamachine']['resolver_grants'] ) ? $metadata['datamachine']['resolver_grants'] : array();
 
 		return array(
 			'action_id'           => (string) ( $row['action_id'] ?? '' ),
@@ -747,6 +750,7 @@ class PendingActionStore {
 			'summary'             => (string) ( $row['summary'] ?? '' ),
 			'preview_data'        => self::decode_json( $row['preview_data'] ?? null ),
 			'apply_input'         => self::decode_json( $row['apply_input'] ?? null ),
+			'resolver_grants'     => $grants,
 			'agent_id'            => isset( $row['agent_id'] ) ? (int) $row['agent_id'] : 0,
 			'agent'               => isset( $row['agent'] ) ? (string) $row['agent'] : null,
 			'workspace'           => ! empty( $row['workspace_type'] ) && ! empty( $row['workspace_id'] ) ? array(
@@ -756,7 +760,7 @@ class PendingActionStore {
 			'created_by'          => isset( $row['created_by'] ) ? (int) $row['created_by'] : 0,
 			'creator'             => isset( $row['creator'] ) ? (string) $row['creator'] : null,
 			'context'             => self::decode_json( $row['context'] ?? null ),
-			'metadata'            => self::decode_json( $row['metadata'] ?? null ),
+			'metadata'            => $metadata,
 			'status'              => (string) ( $row['status'] ?? WP_Agent_Pending_Action_Status::PENDING ),
 			'created_at'          => $created_at,
 			'created_at_iso'      => $created_at > 0 ? gmdate( 'c', $created_at ) : null,
@@ -791,6 +795,7 @@ class PendingActionStore {
 			'agent_id'            => $metadata['datamachine']['agent_id'] ?? null,
 			'created_by'          => $metadata['datamachine']['created_by'] ?? null,
 			'context'             => $metadata['datamachine']['context'] ?? array(),
+			'resolver_grants'     => $metadata['datamachine']['resolver_grants'] ?? array(),
 			'metadata'            => $metadata,
 			'status'              => $data['status'],
 			'created_at'          => $data['created_at'],
@@ -814,9 +819,10 @@ class PendingActionStore {
 		$metadata['datamachine'] = array_merge(
 			isset( $metadata['datamachine'] ) && is_array( $metadata['datamachine'] ) ? $metadata['datamachine'] : array(),
 			array(
-				'agent_id'   => $payload['agent_id'] ?? 0,
-				'created_by' => $payload['created_by'] ?? 0,
-				'context'    => $payload['context'] ?? array(),
+				'agent_id'        => $payload['agent_id'] ?? 0,
+				'created_by'      => $payload['created_by'] ?? 0,
+				'context'         => $payload['context'] ?? array(),
+				'resolver_grants' => $payload['resolver_grants'] ?? array(),
 			)
 		);
 

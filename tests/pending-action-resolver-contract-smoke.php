@@ -269,13 +269,103 @@ add_filter(
 );
 
 PendingActionStore::store(
-	'act_legacy_reject',
+	'act_ungranted_agent_accept',
 	array(
 		'kind'        => 'legacy_kind',
-		'summary'     => 'Reject legacy handler.',
-		'apply_input' => array( 'target' => 'diff-456' ),
+		'summary'     => 'Ungrant agent acceptance.',
+		'apply_input' => array( 'target' => 'diff-ungranted' ),
 		'created_by'  => 123,
 		'creator'     => 'user:123',
+	)
+);
+
+$ungranted_agent_accept = ResolvePendingActionAbility::execute(
+	array(
+		'action_id' => 'act_ungranted_agent_accept',
+		'decision'  => 'accepted',
+		'resolver'  => 'agent:7',
+	)
+);
+
+resolver_smoke_assert( false === ( $ungranted_agent_accept['success'] ?? true ), 'ungranted agent acceptance fails closed', $failures, $passes );
+resolver_smoke_assert( 0 === $legacy_apply_calls, 'ungranted agent acceptance does not invoke apply handler', $failures, $passes );
+
+PendingActionStore::store(
+	'act_granted_agent_accept',
+	array(
+		'kind'            => 'legacy_kind',
+		'summary'         => 'Grant agent acceptance.',
+		'apply_input'     => array( 'target' => 'diff-agent-granted' ),
+		'created_by'      => 123,
+		'creator'         => 'user:123',
+		'resolver_grants' => array(
+			array(
+				'type'                    => 'agent',
+				'decisions'               => array( 'accepted' ),
+				'resolvers'               => array( 'agent:7' ),
+				'kind'                    => 'legacy_kind',
+				'required_payload_fields' => array( 'evidence' ),
+			),
+		),
+	)
+);
+
+$granted_agent_accept = ResolvePendingActionAbility::execute(
+	array(
+		'action_id' => 'act_granted_agent_accept',
+		'decision'  => 'accepted',
+		'resolver'  => 'agent:7',
+		'payload'   => array( 'evidence' => 'deterministic-policy' ),
+	)
+);
+
+resolver_smoke_assert( true === ( $granted_agent_accept['success'] ?? false ), 'granted agent acceptance succeeds', $failures, $passes );
+resolver_smoke_assert( 1 === $legacy_apply_calls, 'granted agent acceptance invokes apply handler once', $failures, $passes );
+
+PendingActionStore::store(
+	'act_rejection_only_system',
+	array(
+		'kind'            => 'legacy_kind',
+		'summary'         => 'Grant system rejection only.',
+		'apply_input'     => array( 'target' => 'diff-rejection-only' ),
+		'created_by'      => 123,
+		'creator'         => 'user:123',
+		'resolver_grants' => array(
+			array(
+				'type'      => 'system_task',
+				'decision'  => 'rejected',
+				'resolvers' => array( 'system_task:wiki_graph_maintain' ),
+			),
+		),
+	)
+);
+
+$rejection_only_accept = ResolvePendingActionAbility::execute(
+	array(
+		'action_id' => 'act_rejection_only_system',
+		'decision'  => 'accepted',
+		'resolver'  => 'system_task:wiki_graph_maintain',
+	)
+);
+
+resolver_smoke_assert( false === ( $rejection_only_accept['success'] ?? true ), 'rejection-only system resolver cannot accept', $failures, $passes );
+resolver_smoke_assert( 1 === $legacy_apply_calls, 'rejection-only accept denial does not invoke apply handler', $failures, $passes );
+
+PendingActionStore::store(
+	'act_legacy_reject',
+	array(
+		'kind'            => 'legacy_kind',
+		'summary'         => 'Reject legacy handler.',
+		'apply_input'     => array( 'target' => 'diff-456' ),
+		'created_by'      => 123,
+		'creator'         => 'user:123',
+		'resolver_grants' => array(
+			array(
+				'type'      => 'system_task',
+				'decision'  => 'rejected',
+				'resolvers' => array( 'system:test-resolver' ),
+			),
+		),
 	)
 );
 
@@ -290,9 +380,10 @@ $rejected = ResolvePendingActionAbility::execute(
 
 resolver_smoke_assert( true === ( $rejected['success'] ?? false ), 'rejected legacy resolution succeeds', $failures, $passes );
 resolver_smoke_assert( 'rejected' === ( $rejected['decision'] ?? null ), 'rejected response keeps Data Machine decision string', $failures, $passes );
-resolver_smoke_assert( 'safe-test' === ( $legacy_permission_seen[0]['context']['reason'] ?? null ), 'legacy can_resolve receives resolver context', $failures, $passes );
-resolver_smoke_assert( 'system:test-resolver' === ( $legacy_permission_seen[0]['context']['resolver'] ?? null ), 'legacy can_resolve receives resolver identity', $failures, $passes );
-resolver_smoke_assert( 0 === $legacy_apply_calls, 'rejected resolution does not invoke apply handler', $failures, $passes );
+$legacy_reject_permission = end( $legacy_permission_seen );
+resolver_smoke_assert( 'safe-test' === ( $legacy_reject_permission['context']['reason'] ?? null ), 'legacy can_resolve receives resolver context', $failures, $passes );
+resolver_smoke_assert( 'system:test-resolver' === ( $legacy_reject_permission['context']['resolver'] ?? null ), 'legacy can_resolve receives resolver identity', $failures, $passes );
+resolver_smoke_assert( 1 === $legacy_apply_calls, 'rejected resolution does not invoke apply handler', $failures, $passes );
 
 $denied_apply_calls = 0;
 $denying_handler    = new class( $denied_apply_calls ) implements WP_Agent_Pending_Action_Handler {

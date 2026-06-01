@@ -50,6 +50,7 @@ class PendingActionHelper {
 	 *     @type int|null $agent_id     Optional. Acting agent ID (recorded for audit + can_resolve checks).
 	 *     @type int|null $user_id      Optional. Acting user ID (defaults to current user).
 	 *     @type array    $context      Optional. Free-form context (session_id, bridge_app, etc.).
+	 *     @type array    $resolver_grants Optional. Explicit non-human resolver grants.
 	 * }
 	 * @return array Agents API approval_required envelope, or a `staged=>false`
 	 *               error array when staging fails.
@@ -63,6 +64,7 @@ class PendingActionHelper {
 		$user_id      = isset( $args['user_id'] ) ? (int) $args['user_id'] : get_current_user_id();
 		$context      = isset( $args['context'] ) && is_array( $args['context'] ) ? $args['context'] : array();
 		$action_id    = isset( $args['action_id'] ) ? (string) $args['action_id'] : '';
+		$grants       = isset( $args['resolver_grants'] ) && is_array( $args['resolver_grants'] ) ? $args['resolver_grants'] : array();
 
 		if ( '' === $kind ) {
 			return array(
@@ -86,22 +88,27 @@ class PendingActionHelper {
 			$action_id = PendingActionStore::generate_id();
 		}
 
+		$grants = apply_filters( 'datamachine_pending_action_resolver_grants', $grants, $args );
+		$grants = is_array( $grants ) ? array_values( array_filter( $grants, 'is_array' ) ) : array();
+
 		$payload = array(
-			'kind'         => $kind,
-			'summary'      => wp_strip_all_tags( $summary ),
-			'apply_input'  => $apply_input,
-			'preview_data' => $preview_data,
-			'agent_id'     => $agent_id,
-			'agent'        => $agent_id > 0 ? 'agent:' . $agent_id : null,
-			'created_by'   => $user_id,
-			'creator'      => $user_id > 0 ? 'user:' . $user_id : null,
-			'context'      => $context,
-			'metadata'     => array(
+			'kind'            => $kind,
+			'summary'         => wp_strip_all_tags( $summary ),
+			'apply_input'     => $apply_input,
+			'preview_data'    => $preview_data,
+			'resolver_grants' => $grants,
+			'agent_id'        => $agent_id,
+			'agent'           => $agent_id > 0 ? 'agent:' . $agent_id : null,
+			'created_by'      => $user_id,
+			'creator'         => $user_id > 0 ? 'user:' . $user_id : null,
+			'context'         => $context,
+			'metadata'        => array(
 				'datamachine' => array(
-					'agent_id'     => $agent_id,
-					'created_by'   => $user_id,
-					'context'      => $context,
-					'resolve_with' => 'resolve_pending_action',
+					'agent_id'        => $agent_id,
+					'created_by'      => $user_id,
+					'context'         => $context,
+					'resolver_grants' => $grants,
+					'resolve_with'    => 'resolve_pending_action',
 				),
 			),
 		);
@@ -140,16 +147,17 @@ class PendingActionHelper {
 		$created_at = isset( $stored_payload['created_at'] ) ? (int) $stored_payload['created_at'] : time();
 
 		$pending_action = array(
-			'action_id'   => $action_id,
-			'kind'        => $kind,
-			'summary'     => $payload['summary'],
-			'preview'     => $preview_data,
-			'apply_input' => $apply_input,
-			'creator'     => $payload['creator'],
-			'agent'       => $payload['agent'],
-			'metadata'    => $payload['metadata'],
-			'created_at'  => gmdate( 'c', $created_at ),
-			'expires_at'  => null !== $expires_at ? gmdate( 'c', $expires_at ) : null,
+			'action_id'       => $action_id,
+			'kind'            => $kind,
+			'summary'         => $payload['summary'],
+			'preview'         => $preview_data,
+			'apply_input'     => $apply_input,
+			'resolver_grants' => $grants,
+			'creator'         => $payload['creator'],
+			'agent'           => $payload['agent'],
+			'metadata'        => $payload['metadata'],
+			'created_at'      => gmdate( 'c', $created_at ),
+			'expires_at'      => null !== $expires_at ? gmdate( 'c', $expires_at ) : null,
 		);
 
 		if ( class_exists( WP_Agent_Pending_Action::class ) ) {
