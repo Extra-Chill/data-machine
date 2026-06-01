@@ -229,8 +229,9 @@ class ConversationManager {
 	 * @return array<string,mixed>
 	 */
 	private static function modelFacingToolData( array $tool_result ): array {
+		$data = array();
 		if ( ! empty( $tool_result['data'] ) && is_array( $tool_result['data'] ) ) {
-			return $tool_result['data'];
+			$data = $tool_result['data'];
 		}
 
 		$public_keys = array(
@@ -245,9 +246,8 @@ class ConversationManager {
 			'pull_request_url',
 			'message',
 		);
-		$data        = array();
 		foreach ( $public_keys as $key ) {
-			if ( isset( $tool_result[ $key ] ) && ( is_scalar( $tool_result[ $key ] ) || null === $tool_result[ $key ] ) ) {
+			if ( ! array_key_exists( $key, $data ) && isset( $tool_result[ $key ] ) && ( is_scalar( $tool_result[ $key ] ) || null === $tool_result[ $key ] ) ) {
 				$data[ $key ] = $tool_result[ $key ];
 			}
 		}

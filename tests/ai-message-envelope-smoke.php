@@ -118,6 +118,25 @@ datamachine_message_envelope_count();
 datamachine_message_envelope_assert( str_contains( $top_level_tool_result['content'], 'github.com\\/Extra-Chill\\/data-machine\\/issues\\/2433' ), 'Top-level tool result URL is included in model-facing content.' );
 datamachine_message_envelope_count();
 
+$merged_tool_result = ConversationManager::formatToolResultMessage(
+	'create_github_issue',
+	array(
+		'success'  => true,
+		'data'     => array(
+			'message' => 'Issue created.',
+		),
+		'html_url' => 'https://github.com/Extra-Chill/data-machine/issues/2434',
+	),
+	array(),
+	false,
+	4
+);
+$merged_tool_result_envelope = WP_Agent_Message::normalize( $merged_tool_result );
+datamachine_message_envelope_assert( 'https://github.com/Extra-Chill/data-machine/issues/2434' === ( $merged_tool_result_envelope['payload']['tool_data']['html_url'] ?? null ), 'Safe top-level tool result URL is merged into existing tool_data.' );
+datamachine_message_envelope_count();
+datamachine_message_envelope_assert( 'Issue created.' === ( $merged_tool_result_envelope['payload']['tool_data']['message'] ?? null ), 'Existing nested tool data is preserved when top-level fields are merged.' );
+datamachine_message_envelope_count();
+
 $typed_final_result = array(
 	'schema'   => WP_Agent_Message::SCHEMA,
 	'version'  => WP_Agent_Message::VERSION,
