@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.40.5] - 2026-06-01
+
+### Fixed
+- skip taxonomy 404 prevention on feed queries to avoid fields=ids fatal
+
 ## [0.40.4] - 2026-05-31
 
 ### Changed
