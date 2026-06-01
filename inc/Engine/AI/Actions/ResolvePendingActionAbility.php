@@ -507,11 +507,11 @@ class ResolvePendingActionAbility {
 	 * @return array<int,array<string,mixed>>
 	 */
 	private static function resolverGrants( array $payload ): array {
-		$metadata            = isset( $payload['metadata'] ) && is_array( $payload['metadata'] ) ? $payload['metadata'] : array();
+		$metadata             = isset( $payload['metadata'] ) && is_array( $payload['metadata'] ) ? $payload['metadata'] : array();
 		$datamachine_metadata = isset( $metadata['datamachine'] ) && is_array( $metadata['datamachine'] ) ? $metadata['datamachine'] : array();
-		$grants              = isset( $payload['resolver_grants'] ) && is_array( $payload['resolver_grants'] ) ? $payload['resolver_grants'] : array();
-		$metadata_grants     = isset( $datamachine_metadata['resolver_grants'] ) && is_array( $datamachine_metadata['resolver_grants'] ) ? $datamachine_metadata['resolver_grants'] : array();
-		$legacy              = isset( $payload['allowed_resolvers'] ) && is_array( $payload['allowed_resolvers'] ) ? $payload['allowed_resolvers'] : array();
+		$grants               = isset( $payload['resolver_grants'] ) && is_array( $payload['resolver_grants'] ) ? $payload['resolver_grants'] : array();
+		$metadata_grants      = isset( $datamachine_metadata['resolver_grants'] ) && is_array( $datamachine_metadata['resolver_grants'] ) ? $datamachine_metadata['resolver_grants'] : array();
+		$legacy               = isset( $payload['allowed_resolvers'] ) && is_array( $payload['allowed_resolvers'] ) ? $payload['allowed_resolvers'] : array();
 
 		$grants = array_merge( $grants, $metadata_grants );
 
