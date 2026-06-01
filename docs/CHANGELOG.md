@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.138.12] - 2026-06-01
+
+### Fixed
+- Fix resolver grant lint
+- require pending action resolver grants
+
 ## [0.138.11] - 2026-06-01
 
 ### Fixed
