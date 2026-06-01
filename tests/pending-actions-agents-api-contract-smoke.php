@@ -195,6 +195,24 @@ if ( ! function_exists( 'sanitize_text_field' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	function get_current_user_id(): int {
+		return 123;
+	}
+}
+
+if ( ! function_exists( 'is_user_logged_in' ) ) {
+	function is_user_logged_in(): bool {
+		return true;
+	}
+}
+
+if ( ! function_exists( 'user_can' ) ) {
+	function user_can( int $_user_id, string $_capability ): bool {
+		return false;
+	}
+}
+
 if ( ! function_exists( 'is_wp_error' ) ) {
 	function is_wp_error( $value ): bool {
 		return $value instanceof WP_Error;
@@ -252,11 +270,13 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 }
 
 require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/agents-api.php';
+require_once dirname( __DIR__ ) . '/inc/Abilities/PermissionHelper.php';
 require_once dirname( __DIR__ ) . '/inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionObservers.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/WordPressActionDispatchObserver.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStoreAdapter.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionScope.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionInspectionAbility.php';
 
 \DataMachine\Engine\AI\Actions\PendingActionObservers::reset();
@@ -271,6 +291,7 @@ $action    = \AgentsAPI\AI\Approvals\WP_Agent_Pending_Action::from_array(
 		'summary'     => 'Contract smoke',
 		'preview'     => array( 'ok' => true ),
 		'apply_input' => array( 'value' => 1 ),
+		'workspace'   => \DataMachine\Core\Workspace\WordPressWorkspaceScope::current()->to_array(),
 		'creator'     => 'user:123',
 		'agent'       => 'agent:456',
 		'created_at'  => gmdate( 'c' ),

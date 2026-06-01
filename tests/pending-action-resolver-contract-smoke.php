@@ -126,10 +126,12 @@ if ( ! class_exists( 'WP_Error' ) ) {
 }
 
 require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/agents-api.php';
+require_once dirname( __DIR__ ) . '/inc/Abilities/PermissionHelper.php';
 require_once dirname( __DIR__ ) . '/inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionObservers.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/WordPressActionDispatchObserver.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';
+require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionScope.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionResolverAdapter.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/ResolvePendingActionAbility.php';
 
@@ -221,6 +223,8 @@ PendingActionStore::store(
 		'kind'        => 'contract_kind',
 		'summary'     => 'Apply contract handler.',
 		'apply_input' => array( 'target' => 'diff-123' ),
+		'created_by'  => 123,
+		'creator'     => 'user:123',
 	)
 );
 
@@ -270,6 +274,8 @@ PendingActionStore::store(
 		'kind'        => 'legacy_kind',
 		'summary'     => 'Reject legacy handler.',
 		'apply_input' => array( 'target' => 'diff-456' ),
+		'created_by'  => 123,
+		'creator'     => 'user:123',
 	)
 );
 
@@ -320,6 +326,8 @@ PendingActionStore::store(
 		'kind'        => 'denied_kind',
 		'summary'     => 'Denied contract handler.',
 		'apply_input' => array( 'target' => 'diff-789' ),
+		'created_by'  => 123,
+		'creator'     => 'user:123',
 	)
 );
 
@@ -340,6 +348,43 @@ $invalid = ResolvePendingActionAbility::execute(
 	)
 );
 resolver_smoke_assert( false === ( $invalid['success'] ?? true ), 'unknown Agents API approval decision is rejected', $failures, $passes );
+
+$scoped_out_apply_calls = 0;
+add_filter(
+	'datamachine_pending_action_handlers',
+	static function ( array $handlers ) use ( &$scoped_out_apply_calls ) {
+		$handlers['scoped_out_kind'] = array(
+			'apply' => static function () use ( &$scoped_out_apply_calls ) {
+				++$scoped_out_apply_calls;
+				return array( 'success' => true );
+			},
+		);
+
+		return $handlers;
+	},
+	40,
+	1
+);
+
+PendingActionStore::store(
+	'act_scoped_out',
+	array(
+		'kind'        => 'scoped_out_kind',
+		'summary'     => 'Scoped-out handler.',
+		'apply_input' => array( 'target' => 'diff-000' ),
+		'created_by'  => 999,
+		'creator'     => 'user:999',
+	)
+);
+
+$scoped_out = ResolvePendingActionAbility::execute(
+	array(
+		'action_id' => 'act_scoped_out',
+		'decision'  => 'accepted',
+	)
+);
+resolver_smoke_assert( false === ( $scoped_out['success'] ?? true ), 'resolver rejects actions outside caller owner scope', $failures, $passes );
+resolver_smoke_assert( 0 === $scoped_out_apply_calls, 'scope denial happens before handler execution', $failures, $passes );
 
 if ( ! empty( $failures ) ) {
 	echo "\nFailures:\n";
