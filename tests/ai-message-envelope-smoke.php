@@ -13,6 +13,12 @@ use AgentsAPI\AI\WP_Agent_Conversation_Result;
 use DataMachine\Engine\AI\ConversationManager;
 use AgentsAPI\AI\WP_Agent_Message;
 
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $data, int $flags = 0 ) {
+		return json_encode( $data, $flags );
+	}
+}
+
 function datamachine_message_envelope_assert( bool $condition, string $message ): void {
 	if ( ! $condition ) {
 		throw new RuntimeException( $message );
@@ -89,6 +95,27 @@ datamachine_message_envelope_count();
 datamachine_message_envelope_assert( array( 'post_id' => 123 ) === $tool_result_envelope['payload']['tool_data'], 'Tool result data is promoted to envelope payload.' );
 datamachine_message_envelope_count();
 datamachine_message_envelope_assert( $legacy_tool_result === WP_Agent_Message::to_provider_message( $tool_result_envelope ), 'Tool result envelope projects back to provider message shape.' );
+datamachine_message_envelope_count();
+
+$top_level_tool_result = ConversationManager::formatToolResultMessage(
+	'create_github_issue',
+	array(
+		'success'      => true,
+		'kind'         => 'issue',
+		'repo'         => 'Extra-Chill/data-machine',
+		'issue_number' => 2433,
+		'url'          => 'https://github.com/Extra-Chill/data-machine/issues/2433',
+		'html_url'     => 'https://github.com/Extra-Chill/data-machine/issues/2433',
+		'message'      => 'Issue #2433 created in Extra-Chill/data-machine.',
+	),
+	array(),
+	false,
+	4
+);
+$top_level_tool_result_envelope = WP_Agent_Message::normalize( $top_level_tool_result );
+datamachine_message_envelope_assert( 'https://github.com/Extra-Chill/data-machine/issues/2433' === ( $top_level_tool_result_envelope['payload']['tool_data']['url'] ?? null ), 'Top-level tool result URL is promoted to tool_data.' );
+datamachine_message_envelope_count();
+datamachine_message_envelope_assert( str_contains( $top_level_tool_result['content'], 'github.com\\/Extra-Chill\\/data-machine\\/issues\\/2433' ), 'Top-level tool result URL is included in model-facing content.' );
 datamachine_message_envelope_count();
 
 $typed_final_result = array(
