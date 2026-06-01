@@ -339,6 +339,8 @@ class ToolManager {
 					$tool_def['access_level'] = $access_level;
 				}
 
+				$tool_def = self::withHandlerContextBindings( $tool_def );
+
 				$resolved[ $tool_name ] = $tool_def;
 			}
 		}
@@ -348,6 +350,28 @@ class ToolManager {
 		}
 
 		return $resolved;
+	}
+
+	/**
+	 * Add the explicit runtime context bindings owned by handler tools.
+	 *
+	 * Handler tools execute inside a pipeline job and may write audit or origin
+	 * metadata against that job. Keep that binding narrow and visible on the
+	 * resolved tool declaration instead of letting every payload key satisfy
+	 * tool parameters implicitly.
+	 *
+	 * @param array $tool_def Resolved handler tool definition.
+	 * @return array Tool definition with handler-owned context bindings.
+	 */
+	private static function withHandlerContextBindings( array $tool_def ): array {
+		$bindings = is_array( $tool_def['client_context_bindings'] ?? null ) ? $tool_def['client_context_bindings'] : array();
+		if ( ! array_key_exists( 'job_id', $bindings ) && ! in_array( 'job_id', $bindings, true ) ) {
+			$bindings['job_id'] = 'job_id';
+		}
+
+		$tool_def['client_context_bindings'] = $bindings;
+
+		return $tool_def;
 	}
 
 	/**
