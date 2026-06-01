@@ -28,14 +28,17 @@ final class RuntimeToolSource {
 	public function __invoke( array $modes, array $args = array() ): array {
 		$tools = array();
 
-		foreach ( $this->declarationsFromContext( $args ) as $declaration ) {
+		foreach ( $this->declarationsFromContext( $args ) as $entry ) {
+			$declaration = $entry['declaration'] ?? null;
 			if ( ! is_array( $declaration ) ) {
+				$this->emitInvalidDeclarationDiagnostic( $entry['key'] ?? '', 'runtime_tool_declaration_must_be_an_object' );
 				continue;
 			}
 
 			try {
 				$normalized = WP_Agent_Tool_Declaration::normalize( $declaration );
-			} catch ( \InvalidArgumentException ) {
+			} catch ( \InvalidArgumentException $e ) {
+				$this->emitInvalidDeclarationDiagnostic( $declaration['name'] ?? ( $entry['key'] ?? '' ), $e->getMessage() );
 				continue;
 			}
 
@@ -59,7 +62,7 @@ final class RuntimeToolSource {
 	 * Extract declarations from explicit resolver args and nested client context.
 	 *
 	 * @param array $args Full resolution arguments.
-	 * @return array<int,array|string|mixed> Runtime declarations.
+	 * @return array<int,array{key:string, declaration:mixed}> Runtime declarations.
 	 */
 	private function declarationsFromContext( array $args ): array {
 		$sets = array(
@@ -79,18 +82,60 @@ final class RuntimeToolSource {
 			}
 
 			foreach ( $set as $name => $declaration ) {
-				if ( ! is_array( $declaration ) ) {
-					continue;
-				}
-
-				if ( is_string( $name ) && '' !== $name && empty( $declaration['name'] ) ) {
+				if ( is_array( $declaration ) && is_string( $name ) && '' !== $name && empty( $declaration['name'] ) ) {
 					$declaration['name'] = $name;
 				}
 
-				$declarations[] = $declaration;
+				$declarations[] = array(
+					'key'         => is_string( $name ) ? $name : (string) $name,
+					'declaration' => $declaration,
+				);
 			}
 		}
 
 		return $declarations;
+	}
+
+	/**
+	 * Emit a bounded diagnostic without including the raw runtime declaration.
+	 *
+	 * @param mixed  $name_or_key Declaration name/key supplied by the caller.
+	 * @param string $reason      Validation failure reason.
+	 * @return void
+	 */
+	private function emitInvalidDeclarationDiagnostic( $name_or_key, string $reason ): void {
+		if ( ! function_exists( 'do_action' ) ) {
+			return;
+		}
+
+		do_action(
+			'datamachine_log',
+			'warning',
+			'Invalid runtime tool declaration skipped',
+			array(
+				'code'  => 'invalid_runtime_tool_declaration',
+				'tool'  => $this->boundedDiagnosticString( is_scalar( $name_or_key ) ? (string) $name_or_key : 'unknown' ),
+				'error' => $this->boundedDiagnosticString( $reason ),
+			)
+		);
+	}
+
+	/**
+	 * Bound diagnostic strings so logs identify the failure without carrying payloads.
+	 *
+	 * @param string $value Raw diagnostic value.
+	 * @return string Bounded diagnostic value.
+	 */
+	private function boundedDiagnosticString( string $value ): string {
+		$value = trim( preg_replace( '/\s+/', ' ', $value ) ?? '' );
+		if ( '' === $value ) {
+			return 'unknown';
+		}
+
+		if ( strlen( $value ) <= 160 ) {
+			return $value;
+		}
+
+		return substr( $value, 0, 120 ) . '...' . substr( hash( 'sha256', $value ), 0, 12 );
 	}
 }

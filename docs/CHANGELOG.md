@@ -2,6 +2,22 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.138.10] - 2026-06-01
+
+### Changed
+- cover explicit runtime tool bindings
+
+### Fixed
+- scope pending action access
+- enforce agent access for canonical chat
+- surface runtime tool source diagnostics
+- harden tool approval contracts
+
+## [0.138.9] - 2026-06-01
+
+### Fixed
+- parse tag-style text tool calls
+
 ## [0.138.8] - 2026-06-01
 
 ### Fixed

@@ -9,7 +9,8 @@ namespace DataMachine\Abilities\Chat;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Api\Chat\ChatOrchestrator;
-use DataMachine\Core\Database\Agents\Agents;
+use DataMachine\Core\Agents\AgentIdentity;
+use DataMachine\Core\Agents\AgentIdentityResolver;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
 use WP_Error;
@@ -38,16 +39,17 @@ class AgentsChatHandler {
 	 * @return bool
 	 */
 	public function checkPermission( bool $allowed, array $input ): bool {
-		if ( $allowed || PermissionHelper::can( 'chat' ) ) {
-			return true;
+		$agent = trim( (string) ( $input['agent'] ?? '' ) );
+		if ( '' === $agent ) {
+			return $allowed || PermissionHelper::can( 'chat' );
 		}
 
-		$agent = sanitize_title( (string) ( $input['agent'] ?? '' ) );
-		if ( '' === $agent || ! class_exists( '\WP_Agent_Access' ) || ! class_exists( '\WP_Agent_Access_Grant' ) ) {
+		$identity = $this->resolveAgentIdentity( $agent );
+		if ( $identity instanceof WP_Error || ! class_exists( '\WP_Agent_Access' ) || ! class_exists( '\WP_Agent_Access_Grant' ) ) {
 			return false;
 		}
 
-		return \WP_Agent_Access::can_current_principal_access_agent( $agent, \WP_Agent_Access_Grant::ROLE_VIEWER );
+		return $allowed || \WP_Agent_Access::can_current_principal_access_agent( $identity->agent_slug, \WP_Agent_Access_Grant::ROLE_VIEWER );
 	}
 
 	/**
@@ -62,12 +64,13 @@ class AgentsChatHandler {
 			return new WP_Error( 'empty_message', __( 'Message cannot be empty.', 'data-machine' ), array( 'status' => 400 ) );
 		}
 
-		$agent_id = $this->resolveAgentId( (string) ( $input['agent'] ?? '' ) );
-		if ( $agent_id instanceof WP_Error ) {
-			return $agent_id;
+		$identity = $this->resolveAgentIdentity( (string) ( $input['agent'] ?? '' ) );
+		if ( $identity instanceof WP_Error ) {
+			return $identity;
 		}
+		$agent_id = $identity ? $identity->agent_id : 0;
 
-		$user_id = $this->resolveRuntimeUserId( $agent_id, (string) ( $input['agent'] ?? '' ), $input );
+		$user_id = $this->resolveRuntimeUserId( $identity, (string) ( $input['agent'] ?? '' ), $input );
 		if ( $user_id <= 0 ) {
 			return new WP_Error( 'no_user', __( 'No user context available.', 'data-machine' ), array( 'status' => 400 ) );
 		}
@@ -106,7 +109,7 @@ class AgentsChatHandler {
 				'interrupt_source'     => is_callable( $input['interrupt_source'] ?? null ) ? $input['interrupt_source'] : null,
 				'modes'                => $modes,
 				'agent_id'             => $agent_id,
-				'agent_slug'           => sanitize_title( (string) ( $input['agent'] ?? '' ) ),
+				'agent_slug'           => $identity ? $identity->agent_slug : '',
 				'attachments'          => $input['attachments'] ?? array(),
 				'client_context'       => $client_context,
 				'session_owner'        => is_array( $input['session_owner'] ?? null ) ? $input['session_owner'] : null,
@@ -122,27 +125,22 @@ class AgentsChatHandler {
 	}
 
 	/**
-	 * Resolve canonical agent input into Data Machine's integer agent ID.
+	 * Resolve canonical agent input into Data Machine's canonical identity.
 	 *
 	 * @param string $agent Agent slug or numeric ID.
-	 * @return int|WP_Error
+	 * @return AgentIdentity|WP_Error|null
 	 */
-	private function resolveAgentId( string $agent ) {
+	private function resolveAgentIdentity( string $agent ): AgentIdentity|WP_Error|null {
 		$agent = trim( $agent );
 		if ( '' === $agent ) {
-			return 0;
+			return null;
 		}
 
-		if ( ctype_digit( $agent ) ) {
-			return (int) $agent;
-		}
-
-		$row = ( new Agents() )->get_by_slug( sanitize_title( $agent ) );
-		if ( ! $row ) {
+		try {
+			return ( new AgentIdentityResolver() )->resolve_agent_identity( $agent );
+		} catch ( \InvalidArgumentException $e ) {
 			return new WP_Error( 'agent_not_found', __( 'Agent not found.', 'data-machine' ), array( 'status' => 404 ) );
 		}
-
-		return (int) ( $row['agent_id'] ?? 0 );
 	}
 
 	/**
@@ -152,12 +150,12 @@ class AgentsChatHandler {
 	 * Agents API access check succeeds, keeping model credentials and tool policy
 	 * scoped to the site-owned brain agent instead of an anonymous WP user.
 	 *
-	 * @param int    $agent_id Internal Data Machine agent ID.
+	 * @param AgentIdentity|null $identity Resolved agent identity, or null for unscoped legacy chats.
 	 * @param string $agent    Requested Agents API agent slug/id.
 	 * @param array  $input    Canonical input plus Data Machine facade fields.
 	 * @return int Runtime WordPress user ID, or 0 when no safe context exists.
 	 */
-	private function resolveRuntimeUserId( int $agent_id, string $agent, array $input ): int {
+	private function resolveRuntimeUserId( ?AgentIdentity $identity, string $agent, array $input ): int {
 		$user_id = (int) ( $input['user_id'] ?? 0 );
 		if ( $user_id > 0 && PermissionHelper::can( 'chat' ) ) {
 			return $user_id;
@@ -172,17 +170,15 @@ class AgentsChatHandler {
 			return $user_id;
 		}
 
-		$agent_slug = sanitize_title( $agent );
-		if ( '' === $agent_slug || ! class_exists( '\WP_Agent_Access' ) || ! class_exists( '\WP_Agent_Access_Grant' ) ) {
+		if ( ! $identity || ! class_exists( '\WP_Agent_Access' ) || ! class_exists( '\WP_Agent_Access_Grant' ) ) {
 			return 0;
 		}
 
-		if ( ! \WP_Agent_Access::can_current_principal_access_agent( $agent_slug, \WP_Agent_Access_Grant::ROLE_VIEWER ) ) {
+		if ( ! \WP_Agent_Access::can_current_principal_access_agent( $identity->agent_slug, \WP_Agent_Access_Grant::ROLE_VIEWER ) ) {
 			return 0;
 		}
 
-		$row = ( new Agents() )->get_agent( $agent_id );
-		return $row ? (int) ( $row['owner_id'] ?? 0 ) : 0;
+		return $identity->owner_id;
 	}
 
 	/**

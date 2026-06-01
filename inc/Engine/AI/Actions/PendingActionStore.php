@@ -421,6 +421,8 @@ class PendingActionStore {
 		self::add_filter_clause( $where, $args, $filters, 'created_by', 'created_by', '%d' );
 		self::add_filter_clause( $where, $args, $filters, 'creator', 'creator', '%s' );
 		self::add_filter_clause( $where, $args, $filters, 'resolver', 'resolver', '%s' );
+		self::add_owner_scope_clause( $where, $args, $filters );
+		self::add_agent_scope_clause( $where, $args, $filters );
 
 		if ( ! empty( $filters['context'] ) && is_array( $filters['context'] ) ) {
 			foreach ( $filters['context'] as $key => $value ) {
@@ -501,6 +503,8 @@ class PendingActionStore {
 		self::add_filter_clause( $where, $args, $filters, 'created_by', 'created_by', '%d' );
 		self::add_filter_clause( $where, $args, $filters, 'creator', 'creator', '%s' );
 		self::add_filter_clause( $where, $args, $filters, 'resolver', 'resolver', '%s' );
+		self::add_owner_scope_clause( $where, $args, $filters );
+		self::add_agent_scope_clause( $where, $args, $filters );
 
 		if ( ! empty( $filters['context'] ) && is_array( $filters['context'] ) ) {
 			foreach ( $filters['context'] as $key => $value ) {
@@ -895,6 +899,62 @@ class PendingActionStore {
 
 		$where[] = $column . ' = ' . $format;
 		$args[]  = '%d' === $format ? (int) $filters[ $filter_key ] : (string) $filters[ $filter_key ];
+	}
+
+	/**
+	 * Add an owner scope that matches either legacy numeric or canonical principal columns.
+	 *
+	 * @param array<int,string> $where   SQL where clauses.
+	 * @param array<int,mixed>  $args    SQL prepare args.
+	 * @param array<string,mixed> $filters Query filters.
+	 */
+	private static function add_owner_scope_clause( array &$where, array &$args, array $filters ): void {
+		if ( empty( $filters['owner_user_id'] ) ) {
+			return;
+		}
+
+		$owner_user_id = (int) $filters['owner_user_id'];
+		if ( $owner_user_id <= 0 ) {
+			return;
+		}
+
+		$where[] = '(created_by = %d OR creator = %s)';
+		$args[]  = $owner_user_id;
+		$args[]  = 'user:' . $owner_user_id;
+	}
+
+	/**
+	 * Add an agent scope that matches either legacy numeric or canonical principal columns.
+	 *
+	 * @param array<int,string> $where   SQL where clauses.
+	 * @param array<int,mixed>  $args    SQL prepare args.
+	 * @param array<string,mixed> $filters Query filters.
+	 */
+	private static function add_agent_scope_clause( array &$where, array &$args, array $filters ): void {
+		if ( empty( $filters['agent_scope'] ) || ! is_array( $filters['agent_scope'] ) ) {
+			return;
+		}
+
+		$agent_id = isset( $filters['agent_scope']['agent_id'] ) ? (int) $filters['agent_scope']['agent_id'] : 0;
+		$agent    = isset( $filters['agent_scope']['agent'] ) ? trim( (string) $filters['agent_scope']['agent'] ) : '';
+
+		if ( $agent_id > 0 && '' !== $agent ) {
+			$where[] = '(agent_id = %d OR agent = %s)';
+			$args[]  = $agent_id;
+			$args[]  = $agent;
+			return;
+		}
+
+		if ( $agent_id > 0 ) {
+			$where[] = 'agent_id = %d';
+			$args[]  = $agent_id;
+			return;
+		}
+
+		if ( '' !== $agent ) {
+			$where[] = 'agent = %s';
+			$args[]  = $agent;
+		}
 	}
 
 	/**
