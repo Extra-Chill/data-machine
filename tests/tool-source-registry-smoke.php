@@ -12,9 +12,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $__filters = array();
+$__datamachine_log_entries = array();
+
+function source_smoke_filter_id( callable $callback ): string {
+	if ( is_array( $callback ) ) {
+		$owner = is_object( $callback[0] ) ? spl_object_hash( $callback[0] ) : (string) $callback[0];
+		return $owner . '::' . (string) $callback[1];
+	}
+
+	if ( $callback instanceof Closure ) {
+		return spl_object_hash( $callback );
+	}
+
+	return is_string( $callback ) ? $callback : spl_object_hash( (object) $callback );
+}
 
 function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): void {
-	$GLOBALS['__filters'][ $hook ][ $priority ][] = array( $callback, $accepted_args );
+	$GLOBALS['__filters'][ $hook ][ $priority ][ source_smoke_filter_id( $callback ) ] = array( $callback, $accepted_args );
 }
 
 function remove_all_filters_for_source_smoke(): void {
@@ -48,7 +62,11 @@ function apply_filters( string $hook, $value, ...$args ) {
 	return $value;
 }
 
-function do_action( string $hook, ...$args ): void {}
+function do_action( string $hook, ...$args ): void {
+	if ( 'datamachine_log' === $hook ) {
+		$GLOBALS['__datamachine_log_entries'][] = $args;
+	}
+}
 
 function did_action( string $hook ): int {
 	return 1;
@@ -100,6 +118,7 @@ require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php';
 use DataMachine\Engine\AI\Tools\ToolManager;
 use DataMachine\Engine\AI\Tools\ToolExecutor;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
+use DataMachine\Engine\AI\Tools\ToolSourceRegistry;
 
 class SourcePolicyToolManager extends ToolManager {
 	/** @var array<int, string> */
@@ -160,6 +179,14 @@ function assert_source_equals( $expected, $actual, string $name, array &$failure
 	echo "  ✗ {$name}\n";
 	echo '    expected: ' . var_export( $expected, true ) . "\n";
 	echo '    actual:   ' . var_export( $actual, true ) . "\n";
+}
+
+function count_source_smoke_callbacks( string $hook ): int {
+	$count = 0;
+	foreach ( $GLOBALS['__filters'][ $hook ] ?? array() as $callbacks ) {
+		$count += count( $callbacks );
+	}
+	return $count;
 }
 
 function resolve_source_tools( string|array $modes, SourcePolicyToolManager $manager, array $extra = array() ): array {
@@ -327,6 +354,7 @@ $chat_no_inheritance = resolve_source_tools(
 assert_source_equals( false, isset( $chat_no_inheritance['durable_memory_tool'] ), 'chat mode also respects requires_opt_in', $failures, $passes );
 
 echo "\n[6] runtime tools are normalized and opt-in:\n";
+$GLOBALS['__datamachine_log_entries'] = array();
 $runtime_tools = resolve_source_tools(
 	ToolPolicyResolver::MODE_CHAT,
 	new SourcePolicyToolManager(),
@@ -396,7 +424,7 @@ $runtime_tools = resolve_source_tools(
 					'scope'       => 'run',
 				),
 				'client/bad_tool'     => array(
-					'description' => 'Invalid missing executor.',
+					'description' => 'Invalid missing executor with secret payload super-secret-token.',
 					'scope'       => 'run',
 				),
 			),
@@ -405,6 +433,14 @@ $runtime_tools = resolve_source_tools(
 );
 assert_source_equals( true, isset( $runtime_tools['client/select_block'] ), 'allow_only opts in a client runtime tool through existing policy filtering', $failures, $passes );
 assert_source_equals( false, isset( $runtime_tools['client/bad_tool'] ), 'invalid runtime declarations are skipped', $failures, $passes );
+assert_source_equals( 1, count( $GLOBALS['__datamachine_log_entries'] ), 'invalid runtime declaration emits one diagnostic log entry', $failures, $passes );
+$runtime_diagnostic = $GLOBALS['__datamachine_log_entries'][0] ?? array();
+assert_source_equals( 'warning', $runtime_diagnostic[0] ?? '', 'invalid runtime declaration diagnostic uses warning level', $failures, $passes );
+assert_source_equals( 'Invalid runtime tool declaration skipped', $runtime_diagnostic[1] ?? '', 'invalid runtime declaration diagnostic uses bounded message', $failures, $passes );
+assert_source_equals( 'invalid_runtime_tool_declaration', $runtime_diagnostic[2]['code'] ?? '', 'invalid runtime declaration diagnostic includes stable code', $failures, $passes );
+assert_source_equals( 'client/bad_tool', $runtime_diagnostic[2]['tool'] ?? '', 'invalid runtime declaration diagnostic identifies declaration name', $failures, $passes );
+assert_source_equals( true, false !== strpos( $runtime_diagnostic[2]['error'] ?? '', 'executor' ), 'invalid runtime declaration diagnostic reports validation field', $failures, $passes );
+assert_source_equals( false, false !== strpos( (string) json_encode( $runtime_diagnostic ), 'super-secret-token' ), 'invalid runtime declaration diagnostic excludes raw declaration payload', $failures, $passes );
 assert_source_equals( 'client', $runtime_tools['client/select_block']['executor'] ?? '', 'runtime tool keeps client executor marker', $failures, $passes );
 assert_source_equals( true, $runtime_tools['client/select_block']['external_executor'] ?? false, 'runtime tool is marked external executor', $failures, $passes );
 assert_source_equals( 'run', $runtime_tools['client/select_block']['scope'] ?? '', 'runtime tool keeps run scope', $failures, $passes );
@@ -451,6 +487,20 @@ assert_source_equals( false, false !== strpos( $registry_source, 'get_all_tools'
 assert_source_equals( true, false !== strpos( $datamachine_tool_source, 'get_all_tools' ), 'Data Machine registry source owns legacy registry lookup', $failures, $passes );
 assert_source_equals( true, false !== strpos( $registry_source, 'WP_Agent_Tool_Source_Registry' ), 'ToolSourceRegistry delegates source composition to Agents API registry', $failures, $passes );
 assert_source_equals( true, false !== strpos( $registry_source, 'agents_api_tool_source_order' ), 'Data Machine mode ordering uses Agents API source-order hook', $failures, $passes );
+
+echo "\n[8] source ordering uses one shared global callback:\n";
+remove_all_filters_for_source_smoke();
+new ToolSourceRegistry( new SourcePolicyToolManager() );
+new ToolSourceRegistry( new SourcePolicyToolManager() );
+new ToolSourceRegistry( new SourcePolicyToolManager() );
+assert_source_equals( 1, count_source_smoke_callbacks( 'agents_api_tool_source_order' ), 'multiple registry instances do not accumulate duplicate source-order callbacks', $failures, $passes );
+assert_source_equals(
+	array( 'static_registry', 'adjacent_handlers', 'runtime_tools' ),
+	ToolSourceRegistry::orderSourcesForContext( array( 'static_registry', 'adjacent_handlers', 'runtime_tools' ), array( 'modes' => array( ToolPolicyResolver::MODE_CHAT ) ), new AgentsAPI\AI\Tools\WP_Agent_Tool_Source_Registry() ),
+	'ordering callback leaves non-Data Machine registries unchanged',
+	$failures,
+	$passes
+);
 
 if ( $failures ) {
 	echo "\nFAILED: " . count( $failures ) . " tool source assertions failed.\n";
