@@ -151,9 +151,31 @@ function initCalendarInstance( calendar: HTMLElement ): void {
 			// down the stale binding and re-hydrate so the freshly
 			// swapped nav becomes a Load More button again. Grid mode
 			// has no pagination nav, so this is a no-op there.
+			//
+			// CRITICAL (#158): only re-hydrate when a fresh NUMBERED
+			// `.data-machine-events-pagination` nav is actually
+			// present. The Load More APPEND path (load-more.ts) fires
+			// this same `content-updated` event to re-init the sibling
+			// modules above on the newly-appended date groups — but it
+			// does NOT re-inject a numbered nav (it appended in place;
+			// the working `.data-machine-events-load-more-nav` button
+			// is already bound). Unconditionally running
+			// destroyLoadMore + initLoadMore there tore the listener
+			// off the live button, and initLoadMore then early-returned
+			// because there is no `.data-machine-events-pagination` to
+			// hydrate — leaving a DEAD button that froze the calendar
+			// at the first appended page boundary (reported as "stuck
+			// at June 9"). Gate the re-hydrate on the numbered nav so
+			// the append path leaves its own working button untouched
+			// while full content swaps still re-hydrate as before.
 			if ( ! gridMode ) {
-				destroyLoadMore( calendar );
-				initLoadMore( calendar );
+				const hasNumberedNav = calendar.querySelector(
+					'.data-machine-events-pagination'
+				);
+				if ( hasNumberedNav ) {
+					destroyLoadMore( calendar );
+					initLoadMore( calendar );
+				}
 			}
 		}
 	);
