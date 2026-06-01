@@ -220,6 +220,14 @@ class ResolvePendingActionAbility {
 			);
 		}
 
+		if ( ! PendingActionScope::can_access_payload( $payload, $input ) ) {
+			return array(
+				'success'   => false,
+				'error'     => 'You do not have permission to resolve this pending action.',
+				'action_id' => $action_id,
+			);
+		}
+
 		$kind             = (string) ( $payload['kind'] ?? '' );
 		$user_id          = get_current_user_id();
 		$apply_input      = isset( $payload['apply_input'] ) && is_array( $payload['apply_input'] ) ? $payload['apply_input'] : array();
