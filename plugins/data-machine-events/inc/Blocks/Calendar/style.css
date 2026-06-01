@@ -958,7 +958,9 @@
     width: 100%;
     height: auto;
     flex: 1 1 100%;
-    padding: 0.85rem 1rem;
+    /* Tighter vertical padding so a single-row card doesn't read puffy;
+     * horizontal padding unchanged for breathing room at the card edges. */
+    padding: 0.55rem 1rem;
 }
 
 .data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .data-machine-event-item {
@@ -969,21 +971,27 @@
 
 .data-machine-events-calendar .data-machine-date-group[data-event-count="1"] .data-machine-event-link,
 .data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .data-machine-event-link {
-    /* Collapse the title-above-meta column layout into a single row strip. */
+    /* Collapse the title-above-meta column layout into a single row strip.
+     * Tighter row/column gaps keep everything compact-but-breathable and
+     * baseline-aligned across title, meta, badges and More Info. */
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 0.5rem 1rem;
+    gap: 0.35rem 0.85rem;
     height: auto;
+    line-height: 1.3;
 }
 
 .data-machine-events-calendar .data-machine-date-group[data-event-count="1"] .data-machine-event-title,
 .data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .data-machine-event-title {
-    /* Title sits inline with meta instead of stacking above it. */
+    /* Title sits inline with meta instead of stacking above it. This higher-specificity
+     * rule already overrides the stacked-card `.data-machine-date-group .data-machine-event-title`
+     * margin-bottom that would otherwise re-add dead vertical space here. */
     margin: 0;
     flex: 1 1 auto;
     min-width: 0;
+    line-height: 1.3;
 }
 
 .data-machine-events-calendar .data-machine-date-group[data-event-count="1"] .data-machine-event-meta,
@@ -991,7 +999,9 @@
     flex-direction: row;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    /* Tighter inline gap between time / performer / badges so the meta row
+     * stays a single compact strip rather than spreading out. */
+    gap: 0.5rem 0.85rem;
 }
 
 /* Badges sit inline with everything else in the row strip, so drop the
@@ -1006,6 +1016,17 @@
 .data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .taxonomy-badges {
     margin-bottom: 0;
     align-items: center;
+    flex: 0 0 auto;
+}
+
+/* More Info button in the single-row strip: the base rule uses
+ * `align-self: flex-start` + `margin-top: auto` to pin the button to the bottom
+ * of a fixed-height stacked card. In the centered row strip those push it out of
+ * alignment and add stray space, so neutralize them and let it sit inline. */
+.data-machine-events-calendar .data-machine-date-group[data-event-count="1"] .data-machine-more-info-button,
+.data-machine-events-calendar .data-machine-date-group[data-event-count="2"] .data-machine-more-info-button {
+    align-self: center;
+    margin-top: 0;
     flex: 0 0 auto;
 }
 
