@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.138.6] - 2026-06-01
+
+### Fixed
+- block repeated tools until required follow-up
+
 ## [0.138.5] - 2026-05-31
 
 ### Fixed
