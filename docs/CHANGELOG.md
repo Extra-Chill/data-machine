@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.138.11] - 2026-06-01
+
+### Fixed
+- pass identity context to action policies
+
 ## [0.138.10] - 2026-06-01
 
 ### Changed
