@@ -2,7 +2,7 @@
 /**
  * ResolvePendingAction chat tool.
  *
- * Thin chat wrapper around datamachine/resolve-pending-action. Exposes the
+ * Thin chat wrapper around agents/resolve-pending-action. Exposes the
  * accept/reject decision to the AI so it can finalize user approval of a
  * staged tool invocation.
  *
@@ -27,7 +27,7 @@ class ResolvePendingAction extends BaseTool {
 			'resolve_pending_action',
 			array( $this, 'getToolDefinition' ),
 			array( 'chat' ),
-			array( 'ability' => 'datamachine/resolve-pending-action' )
+			array( 'ability' => 'agents/resolve-pending-action' )
 		);
 	}
 
@@ -74,12 +74,17 @@ class ResolvePendingAction extends BaseTool {
 			return $this->buildErrorResponse( 'action_id and decision are required.', 'resolve_pending_action' );
 		}
 
-		$result = ResolvePendingActionAbility::execute(
+		$result = \AgentsAPI\AI\Approvals\agents_resolve_pending_action(
 			array(
 				'action_id' => $action_id,
 				'decision'  => $decision,
+				'resolver'  => ResolvePendingActionAbility::resolver_from_current_user(),
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			return $this->buildErrorResponse( $result->get_error_message(), 'resolve_pending_action' );
+		}
 
 		return $result;
 	}

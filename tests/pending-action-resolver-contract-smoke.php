@@ -161,6 +161,15 @@ echo "pending-action-resolver-contract-smoke\n";
 $adapter = ResolvePendingActionAbility::adapter();
 resolver_smoke_assert( $adapter instanceof WP_Agent_Pending_Action_Resolver, 'resolver adapter implements Agents API resolver contract', $failures, $passes );
 
+add_filter(
+	'wp_agent_pending_action_resolver',
+	static function () use ( $adapter ) {
+		return $adapter;
+	},
+	10,
+	2
+);
+
 $handler_calls   = array();
 $permission_seen = array();
 $handler         = new class( $handler_calls ) implements WP_Agent_Pending_Action_Handler {
@@ -244,6 +253,56 @@ resolver_smoke_assert( 'accepted' === ( $handler_calls[1]['decision'] ?? null ),
 resolver_smoke_assert( 'looks-good' === ( $handler_calls[1]['payload']['reason'] ?? null ), 'contract handler receives resolver payload', $failures, $passes );
 resolver_smoke_assert( 'reviewer' === ( $handler_calls[1]['context']['actor'] ?? null ), 'contract handler receives resolver context', $failures, $passes );
 resolver_smoke_assert( empty( $permission_seen ), 'legacy can_resolve is not duplicated for Agents API handler objects', $failures, $passes );
+
+PendingActionStore::store(
+	'act_canonical_accept',
+	array(
+		'kind'        => 'contract_kind',
+		'summary'     => 'Apply canonical ability.',
+		'apply_input' => array( 'target' => 'diff-canonical' ),
+		'created_by'  => 123,
+		'creator'     => 'user:123',
+	)
+);
+
+$canonical = \AgentsAPI\AI\Approvals\agents_resolve_pending_action(
+	array(
+		'action_id' => 'act_canonical_accept',
+		'decision'  => 'accepted',
+		'resolver'  => 'user:123',
+		'payload'   => array( 'reason' => 'canonical-path' ),
+		'context'   => array( 'actor' => 'canonical-reviewer' ),
+	)
+);
+
+resolver_smoke_assert( ! is_wp_error( $canonical ), 'canonical Agents API resolve ability succeeds against Data Machine adapter', $failures, $passes );
+resolver_smoke_assert( 'act_canonical_accept' === ( $canonical['action_id'] ?? null ), 'canonical resolve response keeps action ID', $failures, $passes );
+resolver_smoke_assert( 'accepted' === ( $canonical['decision'] ?? null ), 'canonical resolve response keeps decision', $failures, $passes );
+resolver_smoke_assert( true === ( $canonical['result']['success'] ?? false ), 'canonical resolve wraps Data Machine resolver result', $failures, $passes );
+resolver_smoke_assert( 'diff-canonical' === ( $canonical['result']['result']['target'] ?? null ), 'canonical resolve applies the Data Machine handler', $failures, $passes );
+
+PendingActionStore::store(
+	'act_alias_accept',
+	array(
+		'kind'        => 'contract_kind',
+		'summary'     => 'Apply alias ability.',
+		'apply_input' => array( 'target' => 'diff-alias' ),
+		'created_by'  => 123,
+		'creator'     => 'user:123',
+	)
+);
+
+$alias = ResolvePendingActionAbility::execute(
+	array(
+		'action_id' => 'act_alias_accept',
+		'decision'  => 'accepted',
+		'payload'   => array( 'reason' => 'alias-path' ),
+		'context'   => array( 'actor' => 'alias-reviewer' ),
+	)
+);
+
+resolver_smoke_assert( true === ( $alias['success'] ?? false ), 'Data Machine resolve alias delegates through canonical Agents API resolve', $failures, $passes );
+resolver_smoke_assert( 'diff-alias' === ( $alias['result']['target'] ?? null ), 'Data Machine resolve alias preserves legacy result shape', $failures, $passes );
 
 $legacy_apply_calls = 0;
 $legacy_permission_seen = array();

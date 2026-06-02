@@ -127,6 +127,13 @@ add_filter(
 	}
 );
 
+add_filter(
+	'agents_pending_action_permission',
+	static function (): bool {
+		return \DataMachine\Abilities\PermissionHelper::can( 'chat' );
+	}
+);
+
 /*
 |--------------------------------------------------------------------------
 | Iteration budget registrations

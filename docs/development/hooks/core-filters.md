@@ -479,7 +479,9 @@ through the same lane.
 > `ResolvePendingActionAbility` (ability slug
 > `datamachine/resolve-pending-action`, REST route
 > `POST /datamachine/v1/actions/resolve`, chat tool
-> `resolve_pending_action`) finalizes every kind.
+> `resolve_pending_action`) finalizes every kind. New ability clients should
+> prefer the canonical Agents API ability `agents/resolve-pending-action`; the
+> Data Machine slug remains a compatibility alias.
 
 ### `datamachine_pending_action_handlers`
 
