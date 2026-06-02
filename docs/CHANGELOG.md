@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.138.13] - 2026-06-02
+
+### Changed
+- centralize bootstrap dependency checks
+
+### Fixed
+- remove legacy migration repair paths
+
 ## [0.138.12] - 2026-06-01
 
 ### Fixed
