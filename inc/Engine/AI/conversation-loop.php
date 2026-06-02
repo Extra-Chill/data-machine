@@ -1700,8 +1700,8 @@ function datamachine_extract_named_text_tool_calls( string $text ): array {
 
 	if ( preg_match_all( '/(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\((?P<value>["\']?[^\)]*?["\']?)\)/', $text, $matches, PREG_SET_ORDER ) ) {
 		foreach ( $matches as $match ) {
-			$name  = sanitize_key( (string) $match['name'] );
-			$value = trim( (string) $match['value'], " \t\n\r\0\x0B\"'" );
+			$name       = sanitize_key( (string) $match['name'] );
+			$value      = trim( (string) $match['value'], " \t\n\r\0\x0B\"'" );
 			$parameters = array( 'path' => html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 			if ( ! datamachine_is_plausible_text_tool_name( $name ) || '' === $value || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
 				continue;
