@@ -431,14 +431,11 @@ export const useFlowMemoryFiles = ( flowId ) =>
 		queryFn: async () => {
 			const response = await fetchFlowMemoryFiles( flowId );
 			if ( response.success && response.data ) {
-				// Current REST shape: { memory_files: [...] }
 				if ( typeof response.data === 'object' && ! Array.isArray( response.data ) ) {
 					return {
 						memoryFiles: response.data.memory_files || [],
 					};
 				}
-				// Backward compat: old shape was a bare array.
-				return { memoryFiles: response.data };
 			}
 			return { memoryFiles: [] };
 		},

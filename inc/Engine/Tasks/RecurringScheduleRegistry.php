@@ -140,16 +140,6 @@ class RecurringScheduleRegistry {
 	}
 
 	/**
-	 * Legacy task-scoped Action Scheduler hook used before schedule ids were canonical.
-	 *
-	 * @param array $schedule Normalized schedule definition.
-	 * @return string Legacy hook name.
-	 */
-	public static function legacyHookFor( array $schedule ): string {
-		return 'datamachine_recurring_' . self::sanitizeHookSuffix( (string) $schedule['task_type'] );
-	}
-
-	/**
 	 * Normalize a schedule/task id for an Action Scheduler hook suffix.
 	 *
 	 * @param string $value Raw schedule or task identifier.
