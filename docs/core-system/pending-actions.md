@@ -6,7 +6,7 @@ Pending actions are approval and audit records. Normal runtime requires the dura
 
 ## Boundary
 
-- Agents API owns generic approval vocabulary and contracts.
+- Agents API owns generic approval vocabulary, contracts, and the canonical pending-action abilities.
 - Data Machine owns the concrete WordPress table, CLI, REST routes, abilities, and legacy resolver/tool compatibility.
 - Domain plugins register action-specific handlers through `datamachine_pending_action_handlers`.
 
@@ -36,11 +36,12 @@ The resolved hook receives the same canonical value-object signature as `WP_Agen
 
 ## Surfaces
 
-- Ability: `datamachine/list-pending-actions`
-- Ability: `datamachine/get-pending-action`
-- Ability: `datamachine/summarize-pending-actions`
+- Ability: `agents/list-pending-actions`
+- Ability: `agents/get-pending-action`
+- Ability: `agents/summary-pending-actions`
+- Ability: `agents/resolve-pending-action`
 - Ability: `datamachine/sign-pending-action-resolution`
-- Resolver ability: `datamachine/resolve-pending-action`
+- Compatibility alias: `datamachine/resolve-pending-action`
 - Chat tool: `resolve_pending_action`
 - REST: `GET /datamachine/v1/actions`
 - REST: `GET /datamachine/v1/actions/{action_id}`
@@ -77,6 +78,8 @@ array(
 )
 ```
 
-The public token route validates the signature and expiry before delegating to the same resolver path as `datamachine/resolve-pending-action`. Already-resolved accepted/rejected rows return their existing decision instead of being overwritten. Expired, deleted, missing, or otherwise non-resolvable rows return `410`.
+The public token route validates the signature and expiry before delegating to the canonical `agents/resolve-pending-action` path. Already-resolved accepted/rejected rows return their existing decision instead of being overwritten. Expired, deleted, missing, or otherwise non-resolvable rows return `410`.
+
+`datamachine/list-pending-actions`, `datamachine/get-pending-action`, `datamachine/summarize-pending-actions`, `datamachine/resolve-pending-action`, and `POST /datamachine/v1/actions/resolve` remain compatibility surfaces for existing Data Machine clients. New clients should call the canonical `agents/*pending-action*` abilities. Data Machine supplies the host store/resolver through `wp_agent_pending_action_store` and `wp_agent_pending_action_resolver`; Agents API does not own Data Machine's storage table.
 
 Use `SignPendingActionResolutionAbility::rotate_secret()` to invalidate existing signed URLs during a security incident.

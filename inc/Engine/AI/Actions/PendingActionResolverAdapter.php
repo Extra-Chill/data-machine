@@ -13,8 +13,8 @@ use AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Resolver;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Implements the generic Agents API resolver contract while preserving
- * `datamachine/resolve-pending-action` as the single Data Machine resolver.
+ * Implements the generic Agents API resolver contract through Data Machine's
+ * concrete resolver implementation.
  */
 final class PendingActionResolverAdapter implements WP_Agent_Pending_Action_Resolver {
 
@@ -29,7 +29,7 @@ final class PendingActionResolverAdapter implements WP_Agent_Pending_Action_Reso
 	 * @return mixed
 	 */
 	public function resolve_pending_action( string $pending_action_id, WP_Agent_Approval_Decision $decision, string $resolver, array $payload = array(), array $context = array() ): mixed {
-		return ResolvePendingActionAbility::execute(
+		return ResolvePendingActionAbility::resolve_with_datamachine_handlers(
 			array(
 				'action_id' => $pending_action_id,
 				'decision'  => $decision->value(),

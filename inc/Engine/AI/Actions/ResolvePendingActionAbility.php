@@ -91,8 +91,8 @@ class ResolvePendingActionAbility {
 			wp_register_ability(
 				'datamachine/resolve-pending-action',
 				array(
-					'label'               => __( 'Resolve Pending Action', 'data-machine' ),
-					'description'         => __( 'Accept or reject a pending tool invocation staged by WP_Agent_Action_Policy.', 'data-machine' ),
+					'label'               => __( 'Resolve Pending Action (Data Machine Alias)', 'data-machine' ),
+					'description'         => __( 'Deprecated compatibility alias for agents/resolve-pending-action.', 'data-machine' ),
 					'category'            => 'datamachine-actions',
 					'input_schema'        => array(
 						'type'       => 'object',
@@ -122,7 +122,15 @@ class ResolvePendingActionAbility {
 					),
 					'execute_callback'    => array( self::class, 'execute' ),
 					'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
-					'meta'                => array( 'show_in_rest' => true ),
+					'meta'                => array(
+						'show_in_rest' => true,
+						'annotations'  => array(
+							'deprecated'  => true,
+							'replacement' => 'agents/resolve-pending-action',
+							'destructive' => true,
+							'idempotent'  => false,
+						),
+					),
 				)
 			);
 		};
@@ -185,12 +193,64 @@ class ResolvePendingActionAbility {
 	}
 
 	/**
-	 * Execute: accept or reject a pending action.
+	 * Execute the deprecated Data Machine alias via the canonical Agents API ability.
 	 *
 	 * @param array $input { action_id, decision }.
 	 * @return array
 	 */
 	public static function execute( array $input ): array {
+		$action_id      = isset( $input['action_id'] ) ? sanitize_text_field( $input['action_id'] ) : '';
+		$decision_value = isset( $input['decision'] ) ? sanitize_text_field( $input['decision'] ) : '';
+		$resolver       = isset( $input['resolver'] ) ? sanitize_text_field( (string) $input['resolver'] ) : self::resolverFromCurrentUser();
+
+		if ( '' === $action_id || '' === $decision_value || '' === $resolver ) {
+			return array(
+				'success' => false,
+				'error'   => 'action_id, decision, and resolver are required.',
+			);
+		}
+
+		$result = \AgentsAPI\AI\Approvals\agents_resolve_pending_action(
+			array(
+				'action_id' => $action_id,
+				'decision'  => $decision_value,
+				'resolver'  => $resolver,
+				'payload'   => isset( $input['payload'] ) && is_array( $input['payload'] ) ? $input['payload'] : array(),
+				'context'   => isset( $input['context'] ) && is_array( $input['context'] ) ? $input['context'] : array(),
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $result->get_error_message(),
+				'action_id' => $action_id,
+			);
+		}
+
+		$compat_result = is_array( $result['result'] ?? null ) ? $result['result'] : array();
+		if ( ! empty( $compat_result ) ) {
+			return $compat_result;
+		}
+
+		return array(
+			'success'   => true,
+			'action_id' => $action_id,
+			'decision'  => (string) ( $result['decision'] ?? $decision_value ),
+			'result'    => $result['result'] ?? null,
+		);
+	}
+
+	/**
+	 * Resolve through Data Machine's concrete handler map.
+	 *
+	 * This is the internal adapter target used by the canonical Agents API
+	 * resolver. Public Data Machine clients should call the Agents API ability.
+	 *
+	 * @param array $input { action_id, decision, resolver, payload, context }.
+	 * @return array
+	 */
+	public static function resolve_with_datamachine_handlers( array $input ): array {
 		$action_id      = isset( $input['action_id'] ) ? sanitize_text_field( $input['action_id'] ) : '';
 		$decision_value = isset( $input['decision'] ) ? sanitize_text_field( $input['decision'] ) : '';
 
@@ -676,8 +736,15 @@ class ResolvePendingActionAbility {
 	/**
 	 * Build a resolver audit identifier for the active user.
 	 */
-	private static function resolverFromCurrentUser(): string {
+	public static function resolver_from_current_user(): string {
 		$user_id = get_current_user_id();
 		return $user_id > 0 ? 'user:' . $user_id : 'system:anonymous';
+	}
+
+	/**
+	 * Back-compat shim for existing internal callers.
+	 */
+	private static function resolverFromCurrentUser(): string {
+		return self::resolver_from_current_user();
 	}
 }

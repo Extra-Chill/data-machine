@@ -210,7 +210,7 @@ The result is an Agents API `approval_required` message with:
 | `payload.pending_action.action_id` | Identifier to resolve later. |
 | `payload.pending_action.summary` | Human-readable preview summary. |
 | `payload.pending_action.preview` | Renderable preview data. |
-| `payload.resolve_with` | Tool name to call for resolution, currently `resolve_pending_action`. |
+| `payload.resolve_with` | Chat tool name to call for resolution, currently `resolve_pending_action`, backed by `agents/resolve-pending-action`. |
 | `payload.resolve_params` | Required resolution arguments. |
 | top-level `staged` and `action_id` | Data Machine compatibility fields for internal callers. |
 

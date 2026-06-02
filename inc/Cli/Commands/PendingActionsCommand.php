@@ -10,7 +10,6 @@ namespace DataMachine\Cli\Commands;
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Engine\AI\Actions\PendingActionInspectionAbility;
 use DataMachine\Engine\AI\Actions\PendingActionScope;
-use DataMachine\Engine\AI\Actions\PendingActionStore;
 use WP_CLI;
 
 defined( 'ABSPATH' ) || exit;
@@ -74,7 +73,12 @@ class PendingActionsCommand extends BaseCommand {
 			WP_CLI::error( $filters->get_error_message() );
 		}
 
-		$rows = PendingActionStore::list( $filters );
+		$result = \AgentsAPI\AI\Approvals\agents_list_pending_actions( array( 'filters' => $filters ) );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
+		$rows = is_array( $result['actions'] ?? null ) ? $result['actions'] : array();
 
 		$fields = array( 'action_id', 'kind', 'summary', 'status', 'agent_id', 'created_by', 'created_at_iso', 'expires_at_iso' );
 		$this->format_items( $rows, $fields, $assoc_args, 'action_id' );
@@ -105,8 +109,18 @@ class PendingActionsCommand extends BaseCommand {
 		}
 
 		$scope_input = ! empty( $assoc_args['operator-wide'] ) ? array( 'operator_wide' => true ) : array();
-		$action      = PendingActionStore::inspect( $action_id );
-		if ( null === $action || ! PendingActionScope::can_access_payload( $action, $scope_input ) ) {
+		$result      = \AgentsAPI\AI\Approvals\agents_get_pending_action(
+			array(
+				'action_id'        => $action_id,
+				'include_resolved' => true,
+			)
+		);
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+		}
+
+		$action = is_array( $result['action'] ?? null ) ? $result['action'] : null;
+		if ( null === $action || ! PendingActionScope::can_access_payload( PendingActionScope::action_array_to_payload( $action ), $scope_input ) ) {
 			WP_CLI::error( 'Pending action not found.' );
 		}
 
@@ -152,8 +166,11 @@ class PendingActionsCommand extends BaseCommand {
 			WP_CLI::error( $filters->get_error_message() );
 		}
 
-		$summary = PendingActionStore::summary( $filters );
-		$format  = $assoc_args['format'] ?? 'json';
+		$summary = \AgentsAPI\AI\Approvals\agents_summary_pending_actions( array( 'filters' => $filters ) );
+		if ( is_wp_error( $summary ) ) {
+			WP_CLI::error( $summary->get_error_message() );
+		}
+		$format = $assoc_args['format'] ?? 'json';
 
 		WP_CLI\Utils\format_items( $format, array( $summary ), array_keys( $summary ) );
 	}
