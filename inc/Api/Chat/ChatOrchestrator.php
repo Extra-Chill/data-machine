@@ -307,7 +307,7 @@ class ChatOrchestrator {
 			'session_id'             => $session_id,
 			'response'               => $result['final_content'],
 			'tool_calls'             => $loop_metadata['tool_calls'] ?? $loop_metadata['last_tool_calls'] ?? array(),
-			'tool_execution_summary' => datamachine_summarize_tool_execution_results( $result['tool_execution_results'] ?? array(), false ),
+			'tool_execution_summary' => $loop_metadata['tool_execution_summary'] ?? datamachine_summarize_tool_execution_results( $result['tool_execution_results'] ?? array(), false ),
 			'conversation'           => $result['messages'],
 			'metadata'               => $metadata,
 			'completed'              => $is_completed,

@@ -318,6 +318,9 @@ function datamachine_run_conversation(
 		'last_tool_calls' => $last_tool_calls,
 		'tool_calls'      => $all_tool_calls,
 	);
+	if ( ! empty( $tool_execution_results ) ) {
+		$datamachine_metadata['tool_execution_summary'] = datamachine_summarize_tool_execution_results( $tool_execution_results, false );
+	}
 	if ( 'interrupted' === ( $result['status'] ?? '' ) && isset( $result['interrupted'] ) ) {
 		$datamachine_metadata['interrupted'] = $result['interrupted'];
 	}

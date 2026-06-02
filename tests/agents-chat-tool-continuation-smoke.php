@@ -54,6 +54,12 @@ datamachine_agents_chat_tool_continuation_assert(
 );
 ++ $assertions;
 
+datamachine_agents_chat_tool_continuation_assert(
+	str_contains( $chat_orchestrator_source, "\$loop_metadata['tool_execution_summary']" ),
+	'ChatOrchestrator should preserve tool execution summaries from conversation loop metadata.'
+);
+++ $assertions;
+
 require_once __DIR__ . '/../inc/Abilities/Chat/AgentsChatHandler.php';
 
 $handler_reflection = new ReflectionClass( DataMachine\Abilities\Chat\AgentsChatHandler::class );
@@ -179,6 +185,35 @@ datamachine_agents_chat_tool_continuation_assert(
 datamachine_agents_chat_tool_continuation_assert(
 	! str_contains( wp_json_encode( $tool_output['metadata']['datamachine']['tool_execution_summary'] ), 'raw file content' ),
 	'Canonical Agents API chat output should not copy raw tool content into metadata summaries.'
+);
+++ $assertions;
+
+$summary_output = $output_method->invoke(
+	$handler,
+	array(
+		'session_id'              => 'session-3',
+		'response'                => 'I checked the workspace.',
+		'tool_execution_summary'  => array(
+			array(
+				'tool_name'  => 'workspace_read',
+				'success'    => true,
+				'turn_count' => 1,
+				'summary'    => 'Read README.md.',
+			),
+		),
+		'tool_execution_results'  => array(),
+	),
+);
+
+datamachine_agents_chat_tool_continuation_assert(
+	1 === count( $summary_output['metadata']['datamachine']['tool_execution_summary'] ?? array() ),
+	'Canonical Agents API chat output should preserve non-empty precomputed tool execution summaries.'
+);
+++ $assertions;
+
+datamachine_agents_chat_tool_continuation_assert(
+	'workspace_read' === ( $summary_output['metadata']['datamachine']['tool_execution_summary'][0]['tool_name'] ?? null ),
+	'Canonical Agents API chat output should expose executed tool summaries without requiring raw tool results.'
 );
 ++ $assertions;
 
