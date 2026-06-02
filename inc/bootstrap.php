@@ -74,6 +74,7 @@ use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
+use DataMachine\Core\Bootstrap\DependencyChecker;
 use DataMachine\Core\OAuth\HttpBasicAuthProvider;
 use DataMachine\Core\PluginSettings;
 
@@ -101,7 +102,7 @@ add_filter(
 	2
 );
 
-if ( interface_exists( 'WP_Agent_Access_Store' ) && interface_exists( 'WP_Agent_Principal_Access_Store' ) ) {
+if ( DependencyChecker::has( DependencyChecker::CHECK_AGENTS_API_ACCESS_STORE ) ) {
 	AgentAccessStoreAdapter::register();
 }
 
@@ -178,6 +179,11 @@ add_action(
 			'label'           => __( 'Pipeline Agent', 'data-machine' ),
 			'description'     => __( 'Structured workflow execution. Operates within defined steps — efficient models work well.', 'data-machine' ),
 			'memory_contexts' => array( 'agent_identity', 'agent_memory' ),
+		) );
+		AgentModeRegistry::register( 'pipeline_editor', 25, array(
+			'label'           => __( 'Pipeline Editor Agent', 'data-machine' ),
+			'description'     => __( 'Admin pipeline-editing surface. Composes on top of chat to add pipeline/handler/flow guidance, the pipelines inventory, and pipeline-editing tools.', 'data-machine' ),
+			'memory_contexts' => array( 'agent_identity', 'agent_memory', 'user_profile' ),
 		) );
 		AgentModeRegistry::register( 'system', 30, array(
 			'label'       => __( 'System Agent', 'data-machine' ),

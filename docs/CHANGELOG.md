@@ -2,6 +2,82 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.138.13] - 2026-06-02
+
+### Changed
+- centralize bootstrap dependency checks
+
+### Fixed
+- remove legacy migration repair paths
+
+## [0.138.12] - 2026-06-01
+
+### Fixed
+- Fix resolver grant lint
+- require pending action resolver grants
+
+## [0.138.11] - 2026-06-01
+
+### Fixed
+- pass identity context to action policies
+
+## [0.138.10] - 2026-06-01
+
+### Changed
+- cover explicit runtime tool bindings
+
+### Fixed
+- scope pending action access
+- enforce agent access for canonical chat
+- surface runtime tool source diagnostics
+- harden tool approval contracts
+
+## [0.138.9] - 2026-06-01
+
+### Fixed
+- parse tag-style text tool calls
+
+## [0.138.8] - 2026-06-01
+
+### Fixed
+- merge top-level tool result fields
+
+## [0.138.7] - 2026-06-01
+
+### Fixed
+- satisfy tool result exposure lint
+- expose top-level tool result fields
+
+## [0.138.6] - 2026-06-01
+
+### Fixed
+- block repeated tools until required follow-up
+
+## [0.138.5] - 2026-05-31
+
+### Fixed
+- bound large tool trace arguments
+
+## [0.138.4] - 2026-05-31
+
+### Changed
+- Decouple pipeline-editing surface into core pipeline_editor mode
+
+## [0.138.3] - 2026-05-31
+
+### Fixed
+- preserve extension artifact type slugs
+
+## [0.138.2] - 2026-05-31
+
+### Changed
+- Report bundle artifact persist failures
+
+## [0.138.1] - 2026-05-31
+
+### Fixed
+- ensure bundle artifact table during import
+
 ## [0.138.0] - 2026-05-31
 
 ### Added

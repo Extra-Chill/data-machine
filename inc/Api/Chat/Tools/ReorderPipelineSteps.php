@@ -19,7 +19,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ReorderPipelineSteps extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'reorder_pipeline_steps', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'ability' => 'datamachine/reorder-pipeline-steps' ) );
+		$this->registerTool( 'reorder_pipeline_steps', array( $this, 'getToolDefinition' ), array( 'pipeline_editor' ), array( 'ability' => 'datamachine/reorder-pipeline-steps' ) );
 	}
 
 	/**

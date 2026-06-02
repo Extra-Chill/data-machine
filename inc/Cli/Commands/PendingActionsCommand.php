@@ -9,6 +9,7 @@ namespace DataMachine\Cli\Commands;
 
 use DataMachine\Cli\BaseCommand;
 use DataMachine\Engine\AI\Actions\PendingActionInspectionAbility;
+use DataMachine\Engine\AI\Actions\PendingActionScope;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use WP_CLI;
 
@@ -42,6 +43,9 @@ class PendingActionsCommand extends BaseCommand {
 	 * [--offset=<offset>]
 	 * : Offset for pagination.
 	 *
+	 * [--operator-wide]
+	 * : Explicitly inspect actions across all owners/agents/workspaces.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -61,7 +65,16 @@ class PendingActionsCommand extends BaseCommand {
 	 */
 	public function list( array $args, array $assoc_args ): void {
 		$filters = PendingActionInspectionAbility::normalize_filters( $assoc_args );
-		$rows    = PendingActionStore::list( $filters );
+		if ( ! empty( $assoc_args['operator-wide'] ) ) {
+			$filters['operator_wide'] = true;
+		}
+
+		$filters = PendingActionScope::filters( $filters );
+		if ( is_wp_error( $filters ) ) {
+			WP_CLI::error( $filters->get_error_message() );
+		}
+
+		$rows = PendingActionStore::list( $filters );
 
 		$fields = array( 'action_id', 'kind', 'summary', 'status', 'agent_id', 'created_by', 'created_at_iso', 'expires_at_iso' );
 		$this->format_items( $rows, $fields, $assoc_args, 'action_id' );
@@ -78,6 +91,9 @@ class PendingActionsCommand extends BaseCommand {
 	 * [--format=<format>]
 	 * : Output format. Default json.
 	 *
+	 * [--operator-wide]
+	 * : Explicitly inspect an action outside the current caller scope.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp datamachine pending-actions get act_123
@@ -88,8 +104,9 @@ class PendingActionsCommand extends BaseCommand {
 			WP_CLI::error( 'action_id is required.' );
 		}
 
-		$action = PendingActionStore::inspect( $action_id );
-		if ( null === $action ) {
+		$scope_input = ! empty( $assoc_args['operator-wide'] ) ? array( 'operator_wide' => true ) : array();
+		$action      = PendingActionStore::inspect( $action_id );
+		if ( null === $action || ! PendingActionScope::can_access_payload( $action, $scope_input ) ) {
 			WP_CLI::error( 'Pending action not found.' );
 		}
 
@@ -114,6 +131,9 @@ class PendingActionsCommand extends BaseCommand {
 	 * [--include-context-details]
 	 * : Include all context buckets in the summary.
 	 *
+	 * [--operator-wide]
+	 * : Explicitly summarize actions across all owners/agents/workspaces.
+	 *
 	 * [--format=<format>]
 	 * : Output format. Default json.
 	 *
@@ -122,7 +142,17 @@ class PendingActionsCommand extends BaseCommand {
 	 *     wp datamachine pending-actions summary
 	 */
 	public function summary( array $args, array $assoc_args ): void {
-		$summary = PendingActionStore::summary( PendingActionInspectionAbility::normalize_filters( $assoc_args ) );
+		$filters = PendingActionInspectionAbility::normalize_filters( $assoc_args );
+		if ( ! empty( $assoc_args['operator-wide'] ) ) {
+			$filters['operator_wide'] = true;
+		}
+
+		$filters = PendingActionScope::filters( $filters );
+		if ( is_wp_error( $filters ) ) {
+			WP_CLI::error( $filters->get_error_message() );
+		}
+
+		$summary = PendingActionStore::summary( $filters );
 		$format  = $assoc_args['format'] ?? 'json';
 
 		WP_CLI\Utils\format_items( $format, array( $summary ), array_keys( $summary ) );

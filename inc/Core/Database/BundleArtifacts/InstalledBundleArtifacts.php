@@ -23,6 +23,20 @@ final class InstalledBundleArtifacts extends BaseRepository {
 	public const TABLE_NAME = 'datamachine_bundle_artifacts';
 
 	/**
+	 * Whether this request has already ensured the artifact table exists.
+	 *
+	 * @var bool
+	 */
+	private static bool $table_ensured = false;
+
+	/**
+	 * Last write failure context for callers that need diagnostics.
+	 *
+	 * @var array<string,mixed>
+	 */
+	private array $last_error_context = array();
+
+	/**
 	 * Wire cleanup hooks once per request.
 	 *
 	 * Currently registers a `datamachine_agent_deleted` listener that wipes any tracked artifact rows
@@ -97,6 +111,9 @@ final class InstalledBundleArtifacts extends BaseRepository {
 	 * @return bool
 	 */
 	public function upsert( AgentBundleInstalledArtifact $artifact, int $agent_id = 0 ): bool {
+		self::ensure_table();
+		$this->last_error_context = array();
+
 		$artifact_row      = $artifact->to_array();
 		$installed_payload = $artifact->installed_payload();
 		$encoded_payload   = null === $installed_payload
@@ -127,11 +144,31 @@ final class InstalledBundleArtifacts extends BaseRepository {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $this->wpdb->replace( $this->table_name, $row, $format );
 		if ( false === $result ) {
+			self::$table_ensured = false;
+			self::ensure_table();
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result = $this->wpdb->replace( $this->table_name, $row, $format );
+		}
+		if ( false === $result ) {
+			$this->last_error_context = array(
+				'message' => '' !== (string) $this->wpdb->last_error ? (string) $this->wpdb->last_error : 'Unknown database write failure.',
+				'table'   => $this->table_name,
+				'row'     => $this->safe_log_context( $row ),
+			);
 			$this->log_db_error( 'upsert installed bundle artifact', $this->safe_log_context( $row ) );
 			return false;
 		}
 
 		return true;
+	}
+
+	/**
+	 * Return the last write failure context, if any.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function last_error_context(): array {
+		return $this->last_error_context;
 	}
 
 	/**
@@ -158,6 +195,8 @@ final class InstalledBundleArtifacts extends BaseRepository {
 	 * Find one tracked artifact.
 	 */
 	public function get( string $bundle_slug, string $artifact_type, string $artifact_id, int $agent_id = 0 ): ?AgentBundleInstalledArtifact {
+		self::ensure_table();
+
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$row = $this->wpdb->get_row(
 			$this->wpdb->prepare(
@@ -181,6 +220,8 @@ final class InstalledBundleArtifacts extends BaseRepository {
 	 * @return AgentBundleInstalledArtifact[]
 	 */
 	public function list_for_bundle( string $bundle_slug, int $agent_id = 0 ): array {
+		self::ensure_table();
+
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
@@ -202,6 +243,8 @@ final class InstalledBundleArtifacts extends BaseRepository {
 	 * @return AgentBundleInstalledArtifact[]
 	 */
 	public function list_for_agent( int $agent_id ): array {
+		self::ensure_table();
+
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
@@ -254,6 +297,8 @@ final class InstalledBundleArtifacts extends BaseRepository {
 	 * Delete a tracked artifact row.
 	 */
 	public function delete( string $bundle_slug, string $artifact_type, string $artifact_id, int $agent_id = 0 ): bool {
+		self::ensure_table();
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$result = $this->wpdb->delete(
 			$this->table_name,
@@ -293,6 +338,8 @@ final class InstalledBundleArtifacts extends BaseRepository {
 	}
 
 	private function existing_record_id( array $row ): ?int {
+		self::ensure_table();
+
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$value = $this->wpdb->get_var(
 			$this->wpdb->prepare(
@@ -317,5 +364,20 @@ final class InstalledBundleArtifacts extends BaseRepository {
 			'artifact_id'   => (string) $row['artifact_id'],
 			'local_status'  => AgentBundleArtifactStatus::classify( (string) $row['installed_hash'], isset( $row['current_hash'] ) ? (string) $row['current_hash'] : null ),
 		);
+	}
+
+	/**
+	 * Ensure the table exists before runtime artifact reads/writes.
+	 *
+	 * Deploy-time migrations normally create this table, but isolated runtimes can
+	 * import bundles before the version-gated schema ensure has run.
+	 */
+	private static function ensure_table(): void {
+		if ( self::$table_ensured ) {
+			return;
+		}
+
+		self::create_table();
+		self::$table_ensured = true;
 	}
 }

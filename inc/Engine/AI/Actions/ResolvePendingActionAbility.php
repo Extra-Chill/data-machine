@@ -220,6 +220,14 @@ class ResolvePendingActionAbility {
 			);
 		}
 
+		if ( ! PendingActionScope::can_access_payload( $payload, $input ) ) {
+			return array(
+				'success'   => false,
+				'error'     => 'You do not have permission to resolve this pending action.',
+				'action_id' => $action_id,
+			);
+		}
+
 		$kind             = (string) ( $payload['kind'] ?? '' );
 		$user_id          = get_current_user_id();
 		$apply_input      = isset( $payload['apply_input'] ) && is_array( $payload['apply_input'] ) ? $payload['apply_input'] : array();
@@ -240,6 +248,24 @@ class ResolvePendingActionAbility {
 
 		$handlers = self::getKindHandlers();
 		$handler  = $handlers[ $kind ] ?? null;
+		$grant    = self::canResolveWithGrant( $payload, $decision, $resolver, $resolver_payload, $resolver_context );
+		if ( is_wp_error( $grant ) ) {
+			return array(
+				'success'   => false,
+				'error'     => $grant->get_error_message(),
+				'action_id' => $action_id,
+				'kind'      => $kind,
+			);
+		}
+
+		if ( false === $grant ) {
+			return array(
+				'success'   => false,
+				'error'     => 'This resolver is not granted permission to resolve this pending action.',
+				'action_id' => $action_id,
+				'kind'      => $kind,
+			);
+		}
 
 		if ( ! is_array( $handler ) || empty( $handler['apply'] ) || ! self::isApplyHandler( $handler['apply'] ) ) {
 			// No handler registered — can't apply, but reject is still safe.
@@ -430,6 +456,207 @@ class ResolvePendingActionAbility {
 		}
 
 		return $apply->can_resolve_pending_action( $pending_action, $decision, $resolver_payload, $resolver_context );
+	}
+
+	/**
+	 * Enforce explicit resolver grants for agent/system-led resolutions.
+	 *
+	 * Human user and signed-token approvals remain valid by default. Machine
+	 * resolvers must be represented by a stored grant so the policy is auditable.
+	 *
+	 * @return bool|\WP_Error True when allowed, false when denied.
+	 */
+	private static function canResolveWithGrant( array $payload, WP_Agent_Approval_Decision $decision, string $resolver, array $resolver_payload, array $resolver_context ) {
+		$resolver_type = self::resolverType( $resolver, $resolver_context );
+		if ( in_array( $resolver_type, array( 'user', 'signed_url' ), true ) ) {
+			return true;
+		}
+
+		$grants = self::resolverGrants( $payload );
+		foreach ( $grants as $grant ) {
+			if ( ! self::grantMatchesResolverType( $grant, $resolver_type ) ) {
+				continue;
+			}
+
+			if ( ! self::grantMatchesDecision( $grant, $decision->value() ) ) {
+				continue;
+			}
+
+			if ( ! self::grantMatchesResolver( $grant, $resolver ) ) {
+				continue;
+			}
+
+			if ( ! self::grantMatchesKind( $grant, (string) ( $payload['kind'] ?? '' ) ) ) {
+				continue;
+			}
+
+			if ( ! self::grantMatchesAgent( $grant, (int) ( $payload['agent_id'] ?? 0 ) ) ) {
+				continue;
+			}
+
+			if ( ! self::grantMatchesSession( $grant, $payload, $resolver_context ) ) {
+				continue;
+			}
+
+			$missing = self::missingRequiredGrantFields( $grant, $resolver_payload, $resolver_context );
+			if ( ! empty( $missing ) ) {
+				return new \WP_Error( 'missing_resolver_evidence', sprintf( 'Resolver grant requires %s.', implode( ', ', $missing ) ) );
+			}
+
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Normalize stored resolver grants from the pending action payload.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function resolverGrants( array $payload ): array {
+		$metadata             = isset( $payload['metadata'] ) && is_array( $payload['metadata'] ) ? $payload['metadata'] : array();
+		$datamachine_metadata = isset( $metadata['datamachine'] ) && is_array( $metadata['datamachine'] ) ? $metadata['datamachine'] : array();
+		$grants               = isset( $payload['resolver_grants'] ) && is_array( $payload['resolver_grants'] ) ? $payload['resolver_grants'] : array();
+		$metadata_grants      = isset( $datamachine_metadata['resolver_grants'] ) && is_array( $datamachine_metadata['resolver_grants'] ) ? $datamachine_metadata['resolver_grants'] : array();
+		$legacy               = isset( $payload['allowed_resolvers'] ) && is_array( $payload['allowed_resolvers'] ) ? $payload['allowed_resolvers'] : array();
+
+		$grants = array_merge( $grants, $metadata_grants );
+
+		foreach ( $legacy as $resolver ) {
+			$grants[] = array( 'resolver' => $resolver );
+		}
+
+		if ( ! empty( $payload['agent_resolvable'] ) ) {
+			$grants[] = array( 'type' => 'agent' );
+		}
+
+		if ( ! empty( $payload['system_resolvable'] ) ) {
+			$grants[] = array( 'type' => 'system_task' );
+		}
+
+		return array_values( array_filter( $grants, 'is_array' ) );
+	}
+
+	private static function grantMatchesResolverType( array $grant, string $resolver_type ): bool {
+		$types = self::stringList( $grant['types'] ?? ( $grant['type'] ?? ( $grant['resolver_type'] ?? null ) ) );
+		if ( empty( $types ) ) {
+			return true;
+		}
+
+		return in_array( $resolver_type, $types, true );
+	}
+
+	private static function grantMatchesDecision( array $grant, string $decision ): bool {
+		$decisions = self::stringList( $grant['decisions'] ?? ( $grant['decision'] ?? null ) );
+		if ( empty( $decisions ) ) {
+			return true;
+		}
+
+		return in_array( $decision, $decisions, true );
+	}
+
+	private static function grantMatchesResolver( array $grant, string $resolver ): bool {
+		$resolvers = self::stringList( $grant['resolvers'] ?? ( $grant['resolver'] ?? null ) );
+		if ( empty( $resolvers ) ) {
+			return true;
+		}
+
+		return in_array( $resolver, $resolvers, true );
+	}
+
+	private static function grantMatchesKind( array $grant, string $kind ): bool {
+		$kinds = self::stringList( $grant['kinds'] ?? ( $grant['kind'] ?? null ) );
+		if ( empty( $kinds ) ) {
+			return true;
+		}
+
+		return in_array( $kind, $kinds, true );
+	}
+
+	private static function grantMatchesAgent( array $grant, int $agent_id ): bool {
+		if ( ! isset( $grant['agent_id'] ) ) {
+			return true;
+		}
+
+		return (int) $grant['agent_id'] === $agent_id;
+	}
+
+	private static function grantMatchesSession( array $grant, array $payload, array $resolver_context ): bool {
+		if ( ! isset( $grant['session_id'] ) ) {
+			return true;
+		}
+
+		$payload_context = isset( $payload['context'] ) && is_array( $payload['context'] ) ? $payload['context'] : array();
+		$session_id      = (string) ( $resolver_context['session_id'] ?? ( $payload_context['session_id'] ?? '' ) );
+
+		return (string) $grant['session_id'] === $session_id;
+	}
+
+	/**
+	 * Check required evidence fields declared by a machine resolver grant.
+	 *
+	 * @return string[] Missing field labels.
+	 */
+	private static function missingRequiredGrantFields( array $grant, array $resolver_payload, array $resolver_context ): array {
+		$missing = array();
+		foreach ( self::stringList( $grant['required_payload_fields'] ?? null ) as $field ) {
+			if ( ! array_key_exists( $field, $resolver_payload ) || null === $resolver_payload[ $field ] || '' === $resolver_payload[ $field ] ) {
+				$missing[] = 'payload.' . $field;
+			}
+		}
+
+		foreach ( self::stringList( $grant['required_context_fields'] ?? null ) as $field ) {
+			if ( ! array_key_exists( $field, $resolver_context ) || null === $resolver_context[ $field ] || '' === $resolver_context[ $field ] ) {
+				$missing[] = 'context.' . $field;
+			}
+		}
+
+		return $missing;
+	}
+
+	/**
+	 * Identify the broad resolver class from the audit identifier/context.
+	 */
+	private static function resolverType( string $resolver, array $resolver_context ): string {
+		if ( 'signed_url' === (string) ( $resolver_context['resolution_transport'] ?? '' ) ) {
+			return 'signed_url';
+		}
+
+		if ( str_starts_with( $resolver, 'user:' ) ) {
+			return 'user';
+		}
+
+		if ( str_starts_with( $resolver, 'agent:' ) ) {
+			return 'agent';
+		}
+
+		if ( str_starts_with( $resolver, 'system_task:' ) || str_starts_with( $resolver, 'system:' ) ) {
+			return 'system_task';
+		}
+
+		if ( str_starts_with( $resolver, 'cli:' ) || str_starts_with( $resolver, 'operator:' ) ) {
+			return 'operator';
+		}
+
+		return 'unknown';
+	}
+
+	/**
+	 * Normalize grant scalar/list fields to strings.
+	 *
+	 * @return string[]
+	 */
+	private static function stringList( $value ): array {
+		if ( null === $value ) {
+			return array();
+		}
+
+		$values = is_array( $value ) ? $value : array( $value );
+		$values = array_map( 'strval', $values );
+		$values = array_map( 'sanitize_text_field', $values );
+
+		return array_values( array_filter( $values, static fn ( string $item ): bool => '' !== $item ) );
 	}
 
 	/**

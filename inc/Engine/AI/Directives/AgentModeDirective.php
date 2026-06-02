@@ -35,7 +35,23 @@ class AgentModeDirective implements DirectiveInterface {
 	private const CHAT_MODE = <<<'MD'
 # Chat Session Context
 
-This is a live chat session with a user in the Data Machine admin UI. You have tools to configure and manage workflows. Your identity, voice, and knowledge come from your memory files above.
+This is a live interactive chat session with a user. Your identity, voice, and knowledge come from your memory files above.
+MD;
+
+	/**
+	 * Default pipeline editor mode guidance.
+	 *
+	 * The DM admin pipeline-editing surface (the pipeline chat with a selected
+	 * pipeline) opts into this mode in addition to `chat`. It carries the
+	 * pipeline/handler/flow operating manual that used to live in CHAT_MODE.
+	 * Generic chat surfaces (frontend widgets, bridges) never receive it.
+	 *
+	 * @since 0.139.0
+	 */
+	private const PIPELINE_EDITOR_MODE = <<<'MD'
+# Pipeline Editor Context
+
+You are in the Data Machine admin pipeline editor. You have tools to configure and manage workflows.
 
 ## Data Machine Architecture
 
@@ -194,10 +210,11 @@ MD;
 	 */
 	private static function get_default_for_mode( string $mode ): string {
 		return match ( $mode ) {
-			'chat'     => self::CHAT_MODE,
-			'pipeline' => self::PIPELINE_MODE,
-			'system'   => self::SYSTEM_MODE,
-			default     => '',
+			'chat'            => self::CHAT_MODE,
+			'pipeline_editor' => self::PIPELINE_EDITOR_MODE,
+			'pipeline'        => self::PIPELINE_MODE,
+			'system'          => self::SYSTEM_MODE,
+			default           => '',
 		};
 	}
 

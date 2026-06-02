@@ -135,7 +135,8 @@ class ActionPolicyResolver {
 		if ( ! empty( $config ) ) {
 			$context['agent_config'] = $config;
 		} else {
-			unset( $context['agent_id'] );
+			// Preserve canonical agent identity while preventing fallback registry lookups.
+			$context['agent_config'] = array();
 		}
 
 		return $context;

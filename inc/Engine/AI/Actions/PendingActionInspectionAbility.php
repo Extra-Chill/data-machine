@@ -134,8 +134,16 @@ final class PendingActionInspectionAbility {
 	 * Ability callback: list actions.
 	 */
 	public static function list_actions( array $input ): array {
+		$filters = PendingActionScope::filters( self::normalize_filters( $input ) );
+		if ( is_wp_error( $filters ) ) {
+			return array(
+				'success' => false,
+				'error'   => $filters->get_error_message(),
+			);
+		}
+
 		$result = \AgentsAPI\AI\Approvals\agents_list_pending_actions(
-			array( 'filters' => self::normalize_filters( $input ) )
+			array( 'filters' => $filters )
 		);
 		if ( is_wp_error( $result ) ) {
 			return array(
@@ -177,7 +185,7 @@ final class PendingActionInspectionAbility {
 		}
 
 		$action = is_array( $result['action'] ?? null ) ? $result['action'] : null;
-		if ( null === $action ) {
+		if ( null === $action || ! PendingActionScope::can_access_payload( PendingActionScope::action_array_to_payload( $action ), $input ) ) {
 			return array(
 				'success'   => false,
 				'error'     => 'Pending action not found.',
@@ -195,8 +203,16 @@ final class PendingActionInspectionAbility {
 	 * Ability callback: summarize actions.
 	 */
 	public static function summary( array $input ): array {
+		$filters = PendingActionScope::filters( self::normalize_filters( $input ) );
+		if ( is_wp_error( $filters ) ) {
+			return array(
+				'success' => false,
+				'error'   => $filters->get_error_message(),
+			);
+		}
+
 		$result = \AgentsAPI\AI\Approvals\agents_summary_pending_actions(
-			array( 'filters' => self::normalize_filters( $input ) )
+			array( 'filters' => $filters )
 		);
 		if ( is_wp_error( $result ) ) {
 			return array(
@@ -231,7 +247,7 @@ final class PendingActionInspectionAbility {
 	 */
 	public static function normalize_filters( array $input ): array {
 		$filters = array();
-		foreach ( array( 'status', 'kind', 'created_after', 'created_before' ) as $key ) {
+		foreach ( array( 'status', 'kind', 'created_after', 'created_before', 'workspace_type', 'workspace_id', 'agent', 'creator', 'operator_wide', 'operator-wide', 'all' ) as $key ) {
 			if ( isset( $input[ $key ] ) && '' !== $input[ $key ] ) {
 				$filters[ $key ] = sanitize_text_field( (string) $input[ $key ] );
 			}
@@ -261,6 +277,12 @@ final class PendingActionInspectionAbility {
 			$filters['context'] = array_map( 'sanitize_text_field', $input['context'] );
 		}
 
+		foreach ( array( 'session_id', 'transcript_session_id' ) as $key ) {
+			if ( isset( $input[ $key ] ) && '' !== $input[ $key ] ) {
+				$filters['context'][ $key ] = sanitize_text_field( (string) $input[ $key ] );
+			}
+		}
+
 		return $filters;
 	}
 
@@ -276,6 +298,17 @@ final class PendingActionInspectionAbility {
 				'agent_id'                => array( 'type' => 'integer' ),
 				'created_by'              => array( 'type' => 'integer' ),
 				'context'                 => array( 'type' => 'object' ),
+				'workspace_type'          => array( 'type' => 'string' ),
+				'workspace_id'            => array( 'type' => 'string' ),
+				'agent'                   => array( 'type' => 'string' ),
+				'creator'                 => array( 'type' => 'string' ),
+				'session_id'              => array( 'type' => 'string' ),
+				'transcript_session_id'   => array( 'type' => 'string' ),
+				'operator_wide'           => array(
+					'type'        => 'boolean',
+					'default'     => false,
+					'description' => __( 'Explicitly request an operator-wide view. Requires manage-level Data Machine permissions.', 'data-machine' ),
+				),
 				'created_after'           => array( 'type' => 'string' ),
 				'created_before'          => array( 'type' => 'string' ),
 				'limit'                   => array(

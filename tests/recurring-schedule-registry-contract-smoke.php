@@ -58,9 +58,6 @@ echo "\n[1] hooks are schedule-scoped\n";
 datamachine_recurring_contract_assert_same( 'datamachine_recurring_cleanup_fast', RecurringScheduleRegistry::hookFor( $schedules['cleanup_fast'] ), 'fast cleanup schedule gets unique hook', $failures, $passes );
 datamachine_recurring_contract_assert_same( 'datamachine_recurring_cleanup_slow', RecurringScheduleRegistry::hookFor( $schedules['cleanup_slow'] ), 'slow cleanup schedule gets unique hook', $failures, $passes );
 
-echo "\n[2] legacy task-scoped hook remains discoverable for migration\n";
-datamachine_recurring_contract_assert_same( 'datamachine_recurring_cleanup', RecurringScheduleRegistry::legacyHookFor( $schedules['cleanup_fast'] ), 'legacy hook is task-scoped', $failures, $passes );
-
 if ( ! empty( $failures ) ) {
 	echo "\nFAILED: " . count( $failures ) . " recurring schedule contract assertion(s) failed.\n";
 	exit( 1 );

@@ -421,6 +421,8 @@ class PendingActionStore {
 		self::add_filter_clause( $where, $args, $filters, 'created_by', 'created_by', '%d' );
 		self::add_filter_clause( $where, $args, $filters, 'creator', 'creator', '%s' );
 		self::add_filter_clause( $where, $args, $filters, 'resolver', 'resolver', '%s' );
+		self::add_owner_scope_clause( $where, $args, $filters );
+		self::add_agent_scope_clause( $where, $args, $filters );
 
 		if ( ! empty( $filters['context'] ) && is_array( $filters['context'] ) ) {
 			foreach ( $filters['context'] as $key => $value ) {
@@ -501,6 +503,8 @@ class PendingActionStore {
 		self::add_filter_clause( $where, $args, $filters, 'created_by', 'created_by', '%d' );
 		self::add_filter_clause( $where, $args, $filters, 'creator', 'creator', '%s' );
 		self::add_filter_clause( $where, $args, $filters, 'resolver', 'resolver', '%s' );
+		self::add_owner_scope_clause( $where, $args, $filters );
+		self::add_agent_scope_clause( $where, $args, $filters );
 
 		if ( ! empty( $filters['context'] ) && is_array( $filters['context'] ) ) {
 			foreach ( $filters['context'] as $key => $value ) {
@@ -736,6 +740,9 @@ class PendingActionStore {
 	private static function row_to_payload( array $row ): array {
 		$created_at = self::mysql_to_timestamp( (string) ( $row['created_at'] ?? '' ) );
 		$expires_at = self::mysql_to_timestamp( (string) ( $row['expires_at'] ?? '' ) );
+		$metadata   = self::decode_json( $row['metadata'] ?? null );
+		$metadata   = is_array( $metadata ) ? $metadata : array();
+		$grants     = isset( $metadata['datamachine']['resolver_grants'] ) && is_array( $metadata['datamachine']['resolver_grants'] ) ? $metadata['datamachine']['resolver_grants'] : array();
 
 		return array(
 			'action_id'           => (string) ( $row['action_id'] ?? '' ),
@@ -743,6 +750,7 @@ class PendingActionStore {
 			'summary'             => (string) ( $row['summary'] ?? '' ),
 			'preview_data'        => self::decode_json( $row['preview_data'] ?? null ),
 			'apply_input'         => self::decode_json( $row['apply_input'] ?? null ),
+			'resolver_grants'     => $grants,
 			'agent_id'            => isset( $row['agent_id'] ) ? (int) $row['agent_id'] : 0,
 			'agent'               => isset( $row['agent'] ) ? (string) $row['agent'] : null,
 			'workspace'           => ! empty( $row['workspace_type'] ) && ! empty( $row['workspace_id'] ) ? array(
@@ -752,7 +760,7 @@ class PendingActionStore {
 			'created_by'          => isset( $row['created_by'] ) ? (int) $row['created_by'] : 0,
 			'creator'             => isset( $row['creator'] ) ? (string) $row['creator'] : null,
 			'context'             => self::decode_json( $row['context'] ?? null ),
-			'metadata'            => self::decode_json( $row['metadata'] ?? null ),
+			'metadata'            => $metadata,
 			'status'              => (string) ( $row['status'] ?? WP_Agent_Pending_Action_Status::PENDING ),
 			'created_at'          => $created_at,
 			'created_at_iso'      => $created_at > 0 ? gmdate( 'c', $created_at ) : null,
@@ -787,6 +795,7 @@ class PendingActionStore {
 			'agent_id'            => $metadata['datamachine']['agent_id'] ?? null,
 			'created_by'          => $metadata['datamachine']['created_by'] ?? null,
 			'context'             => $metadata['datamachine']['context'] ?? array(),
+			'resolver_grants'     => $metadata['datamachine']['resolver_grants'] ?? array(),
 			'metadata'            => $metadata,
 			'status'              => $data['status'],
 			'created_at'          => $data['created_at'],
@@ -810,9 +819,10 @@ class PendingActionStore {
 		$metadata['datamachine'] = array_merge(
 			isset( $metadata['datamachine'] ) && is_array( $metadata['datamachine'] ) ? $metadata['datamachine'] : array(),
 			array(
-				'agent_id'   => $payload['agent_id'] ?? 0,
-				'created_by' => $payload['created_by'] ?? 0,
-				'context'    => $payload['context'] ?? array(),
+				'agent_id'        => $payload['agent_id'] ?? 0,
+				'created_by'      => $payload['created_by'] ?? 0,
+				'context'         => $payload['context'] ?? array(),
+				'resolver_grants' => $payload['resolver_grants'] ?? array(),
 			)
 		);
 
@@ -889,6 +899,62 @@ class PendingActionStore {
 
 		$where[] = $column . ' = ' . $format;
 		$args[]  = '%d' === $format ? (int) $filters[ $filter_key ] : (string) $filters[ $filter_key ];
+	}
+
+	/**
+	 * Add an owner scope that matches either legacy numeric or canonical principal columns.
+	 *
+	 * @param array<int,string> $where   SQL where clauses.
+	 * @param array<int,mixed>  $args    SQL prepare args.
+	 * @param array<string,mixed> $filters Query filters.
+	 */
+	private static function add_owner_scope_clause( array &$where, array &$args, array $filters ): void {
+		if ( empty( $filters['owner_user_id'] ) ) {
+			return;
+		}
+
+		$owner_user_id = (int) $filters['owner_user_id'];
+		if ( $owner_user_id <= 0 ) {
+			return;
+		}
+
+		$where[] = '(created_by = %d OR creator = %s)';
+		$args[]  = $owner_user_id;
+		$args[]  = 'user:' . $owner_user_id;
+	}
+
+	/**
+	 * Add an agent scope that matches either legacy numeric or canonical principal columns.
+	 *
+	 * @param array<int,string> $where   SQL where clauses.
+	 * @param array<int,mixed>  $args    SQL prepare args.
+	 * @param array<string,mixed> $filters Query filters.
+	 */
+	private static function add_agent_scope_clause( array &$where, array &$args, array $filters ): void {
+		if ( empty( $filters['agent_scope'] ) || ! is_array( $filters['agent_scope'] ) ) {
+			return;
+		}
+
+		$agent_id = isset( $filters['agent_scope']['agent_id'] ) ? (int) $filters['agent_scope']['agent_id'] : 0;
+		$agent    = isset( $filters['agent_scope']['agent'] ) ? trim( (string) $filters['agent_scope']['agent'] ) : '';
+
+		if ( $agent_id > 0 && '' !== $agent ) {
+			$where[] = '(agent_id = %d OR agent = %s)';
+			$args[]  = $agent_id;
+			$args[]  = $agent;
+			return;
+		}
+
+		if ( $agent_id > 0 ) {
+			$where[] = 'agent_id = %d';
+			$args[]  = $agent_id;
+			return;
+		}
+
+		if ( '' !== $agent ) {
+			$where[] = 'agent = %s';
+			$args[]  = $agent;
+		}
 	}
 
 	/**

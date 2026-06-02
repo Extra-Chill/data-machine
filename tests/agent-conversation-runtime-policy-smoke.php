@@ -866,6 +866,94 @@ assert_runtime_policy( 6 === $pr_prerequisite_dispatch_count, 'prior-tool runtim
 assert_runtime_policy( array( 'agent_daily_memory', 'agent_daily_memory', 'create_github_pull_request' ) === $pr_prerequisite_tool_names, 'prior-tool runtime rule excludes rejected PR attempts from tool results' );
 assert_runtime_policy( str_contains( wp_json_encode( $pr_prerequisite_result['messages'] ?? array() ), 'Before using create_github_pull_request' ), 'prior-tool runtime rule explains required tool order' );
 
+$block_until_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$block_until_dispatch_count ) {
+		++$block_until_dispatch_count;
+		$tool_name = match ( $block_until_dispatch_count ) {
+			1, 2 => 'create_github_issue',
+			3    => 'comment_github_pull_request',
+			default => '',
+		};
+
+		if ( '' === $tool_name ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content'    => 'Done after source PR callback.',
+					'tool_calls' => array(),
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content'    => '',
+				'tool_calls' => array(
+					array(
+						'name'       => $tool_name,
+						'parameters' => array( 'name' => 'block-until-smoke-' . $block_until_dispatch_count ),
+					),
+				),
+			),
+		);
+	}
+);
+
+$block_until_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'open one fallback issue, then comment on the source PR' ) ),
+	array(
+		'create_github_issue'          => array(
+			'name'        => 'create_github_issue',
+			'description' => 'Open a fallback issue',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+		'comment_github_pull_request' => array(
+			'name'        => 'comment_github_pull_request',
+			'description' => 'Comment back on the source PR',
+			'parameters'  => array( 'name' => array( 'type' => 'string' ) ),
+			'class'       => RuntimePolicySmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array( 'pipeline' ),
+	array(
+		'completion_assertions' => array(
+			'complete_when_any'    => array(
+				array(
+					'name'  => 'issue_fallback_path',
+					'tools' => array(
+						array( 'name' => 'create_github_issue' ),
+						array( 'name' => 'comment_github_pull_request' ),
+					),
+				),
+			),
+			'required_tool_names' => array( 'comment_github_pull_request' ),
+		),
+		'tool_runtime_rules'    => array(
+			array(
+				'id'            => 'issue-before-source-callback-smoke',
+				'type'          => 'block_until_tool',
+				'after_tool'    => 'create_github_issue',
+				'blocked_tools' => array( 'create_github_issue' ),
+				'until_one_of'  => array( 'comment_github_pull_request' ),
+			),
+		),
+	),
+	6
+);
+
+$block_until_tool_names = array_map( static fn( $entry ) => (string) ( $entry['tool_name'] ?? '' ), $block_until_result['tool_execution_results'] ?? array() );
+assert_runtime_policy( 3 === $block_until_dispatch_count, 'block-until runtime rule lets the model recover after rejected repeat publish tool' );
+assert_runtime_policy( array( 'create_github_issue', 'comment_github_pull_request' ) === $block_until_tool_names, 'block-until runtime rule excludes repeated publish tool before callback' );
+assert_runtime_policy( str_contains( wp_json_encode( $block_until_result['messages'] ?? array() ), 'After create_github_issue' ), 'block-until runtime rule explains required follow-up tool' );
+
 $satisfied_runtime_rule_dispatch_count = 0;
 WpAiClientTestDouble::reset();
 WpAiClientTestDouble::set_response_callback(

@@ -160,13 +160,13 @@ class ConversationManager {
 			'turn'    => $turn_count,
 		);
 
-		$result_payload = $tool_result['result'] ?? null;
-		if ( ! empty( $result_payload ) ) {
-			$payload['tool_result'] = $result_payload;
+		$tool_data = self::modelFacingToolData( $tool_result );
+		if ( ! empty( $tool_data ) ) {
+			$payload['tool_data'] = $tool_data;
 
 			// Still append to content for AI context, but frontend can use metadata to hide it
 			if ( ! $is_handler_tool ) {
-				$content .= "\n\n" . wp_json_encode( $result_payload );
+				$content .= "\n\n" . wp_json_encode( $tool_data );
 			}
 		}
 
@@ -195,7 +195,7 @@ class ConversationManager {
 	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Kept for callers that pass original tool params alongside result data.
 	public static function generateSuccessMessage( string $tool_name, array $tool_result, array $tool_parameters ): string {
 		$success = $tool_result['success'] ?? false;
-		$data    = is_array( $tool_result['result'] ?? null ) ? $tool_result['result'] : array();
+		$data    = self::modelFacingToolData( $tool_result );
 
 		if ( ! $success ) {
 			$error = $tool_result['error'] ?? 'Unknown error occurred';
@@ -216,6 +216,43 @@ class ConversationManager {
 
 		// Default fallback for tools without custom message
 		return 'SUCCESS: ' . ucwords( str_replace( '_', ' ', $tool_name ) ) . ' completed successfully.';
+	}
+
+	/**
+	 * Return bounded, model-facing tool data from common result shapes.
+	 *
+	 * Some extension tools return canonical outputs (for example `url`) at the
+	 * top level instead of inside `data`; expose safe scalars so follow-up tools
+	 * can reference exact created resources without re-querying.
+	 *
+	 * @param array $tool_result Tool result envelope.
+	 * @return array<string,mixed>
+	 */
+	private static function modelFacingToolData( array $tool_result ): array {
+		$data = array();
+		if ( ! empty( $tool_result['data'] ) && is_array( $tool_result['data'] ) ) {
+			$data = $tool_result['data'];
+		}
+
+		$public_keys = array(
+			'kind',
+			'repo',
+			'number',
+			'issue_number',
+			'pull_number',
+			'url',
+			'html_url',
+			'issue_url',
+			'pull_request_url',
+			'message',
+		);
+		foreach ( $public_keys as $key ) {
+			if ( ! array_key_exists( $key, $data ) && array_key_exists( $key, $tool_result ) && ( is_scalar( $tool_result[ $key ] ) || null === $tool_result[ $key ] ) ) {
+				$data[ $key ] = $tool_result[ $key ];
+			}
+		}
+
+		return $data;
 	}
 
 	/**

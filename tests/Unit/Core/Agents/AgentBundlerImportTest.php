@@ -242,6 +242,54 @@ class AgentBundlerImportTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'agent_config', 'flow', 'pipeline' ), $types, 'Importer writes installed artifact state to the canonical table.' );
 	}
 
+	public function test_import_ensures_installed_artifact_table_at_runtime(): void {
+		global $wpdb;
+
+		// Some isolated runtimes can reach bundle import before deploy-time schema
+		// ensures run. The repository should self-heal instead of failing import.
+		$suppress_errors = $wpdb->suppress_errors( true );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}datamachine_bundle_artifacts" );
+		$wpdb->suppress_errors( $suppress_errors );
+
+		$result = $this->bundler->import( $this->fixture_bundle( 'artifact-table-ensure-agent' ), null, $this->owner_id );
+
+		$this->assertTrue( (bool) $result['success'], 'Bundle import succeeds after recreating the artifact table.' );
+
+		$agent     = $this->agents_repo->get_by_slug( 'artifact-table-ensure-agent' );
+		$artifacts = ( new InstalledBundleArtifacts() )->list_for_bundle( 'artifact-table-ensure-agent', (int) $agent['agent_id'] );
+
+		$this->assertCount( 3, $artifacts, 'Installed artifact rows are written after runtime table ensure.' );
+	}
+
+	public function test_artifact_persistence_reports_artifact_failure_details(): void {
+		$result = AgentBundleArtifactState::persist_for_agent_result(
+			123,
+			array(
+				array(
+					'bundle_slug'    => 'broken-bundle',
+					'bundle_version' => '1',
+					'artifact_type'  => 'not a valid type',
+					'artifact_id'    => 'broken-artifact',
+					'source_path'    => 'broken.json',
+					'installed_hash' => 'abc123',
+					'current_hash'   => 'abc123',
+					'installed_at'   => '2026-05-31 00:00:00',
+					'updated_at'     => '2026-05-31 00:00:00',
+				),
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'datamachine_bundle_artifact_persist_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'broken-artifact', $result->get_error_message() );
+		$this->assertStringContainsString( 'installed bundle artifact_type must be one of the registered bundle artifact types', $result->get_error_message() );
+
+		$data = $result->get_error_data();
+		$this->assertSame( 'broken-artifact', $data['errors'][0]['artifact_id'] ?? null );
+		$this->assertSame( 'broken.json', $data['errors'][0]['source_path'] ?? null );
+	}
+
 	public function test_directory_value_object_import_preserves_workflow_runtime_seed_fields(): void {
 		$bundle = $this->fixture_bundle( 'directory-import-agent' );
 		$bundle['flows'][0]['flow_config']['1_step-uuid_1'] = array_merge(

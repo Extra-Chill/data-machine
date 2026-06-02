@@ -13,6 +13,8 @@ namespace DataMachine\Engine\AI\Tools;
 
 use AgentsAPI\AI\Tools\WP_Agent_Action_Policy;
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Execution_Core;
+use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Core\WordPress\PostTracking;
 use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
 use DataMachine\Engine\AI\Actions\PendingActionHelper;
@@ -24,8 +26,8 @@ class ToolExecutor {
 
 
 	/**
-	 * Execute tool with parameter merging and comprehensive error handling.
-	 * Builds complete parameters by combining AI parameters with step payload.
+	 * Execute tool with parameter preparation and comprehensive error handling.
+	 * Runtime context values only satisfy parameters through explicit tool bindings.
 	 *
 	 * Before invoking the tool handler, consults ActionPolicyResolver to
 	 * decide whether the invocation should execute directly, be staged for
@@ -60,7 +62,6 @@ class ToolExecutor {
 	): array {
 		$core            = new WP_Agent_Tool_Execution_Core();
 		$execution       = new ToolExecutionCore();
-		$available_tools = self::prepareToolDeclarations( $available_tools, $payload );
 		$prepared        = $core->prepareWP_Agent_Tool_Call( $tool_name, $tool_parameters, $available_tools, $payload );
 		if ( empty( $prepared['ready'] ) ) {
 			unset( $prepared['ready'] );
@@ -85,12 +86,13 @@ class ToolExecutor {
 		// as before this feature landed.
 		$resolver = new ActionPolicyResolver();
 		$policy   = $resolver->resolveForTool(
-			array(
-				'tool_name'      => $tool_name,
-				'tool_def'       => $tool_def,
-				'mode'           => $mode,
-				'agent_id'       => $agent_id,
-				'client_context' => $client_context,
+			array_merge(
+				self::buildActionPolicyContext( $payload, $agent_id, $client_context ),
+				array(
+					'tool_name' => $tool_name,
+					'tool_def'  => $tool_def,
+					'mode'      => $mode,
+				)
 			)
 		);
 
@@ -104,20 +106,29 @@ class ToolExecutor {
 		}
 
 		if ( WP_Agent_Action_Policy::stagesApproval( $policy ) ) {
-			// Tool must declare how to build an action kind and summary.
-			// If it hasn't opted into the preview pipeline properly, fall
-			// back to 'direct' and log a warning — preview is a contract,
-			// not something we can synthesize for tools that don't cooperate.
+			// Tool must declare the pending-action kind. Preview is an approval
+			// contract, not metadata we can synthesize safely at execution time.
 			if ( empty( $tool_def['action_kind'] ) ) {
 				do_action(
 					'datamachine_log',
-					'warning',
-					'WP_Agent_Action_Policy: tool resolved to preview but is missing action_kind metadata; falling back to direct.',
+					'error',
+					'WP_Agent_Action_Policy: tool resolved to preview but is missing action_kind metadata; refusing execution.',
 					array(
 						'tool_name' => $tool_name,
 						'mode'      => $mode,
 						'agent_id'  => $agent_id,
 					)
+				);
+
+				return array(
+					'success'       => false,
+					'error'         => sprintf( 'Tool "%s" resolved to staged approval but is missing required pending-action metadata: action_kind.', $tool_name ),
+					'tool_name'     => $tool_name,
+					'action_policy' => $policy,
+					'metadata'      => array(
+						'error_type'       => 'missing_pending_action_metadata',
+						'missing_metadata' => array( 'action_kind' ),
+					),
 				);
 			} else {
 				$staged = PendingActionHelper::stage(
@@ -151,7 +162,7 @@ class ToolExecutor {
 			}
 		}
 
-		// Policy is 'direct' (or 'preview' fell back) — execute the tool normally.
+		// Policy is 'direct' — execute the tool normally.
 		$tool_result = $core->executePreparedTool( $tool_call, $tool_def, $execution, $payload );
 
 		// Automatic post origin tracking — applies to every tool whose result
@@ -174,32 +185,127 @@ class ToolExecutor {
 	}
 
 	/**
-	 * Annotate Data Machine declarations with explicit runtime-context bindings.
+	 * Build canonical identity context for action-policy resolution.
 	 *
-	 * @param array $available_tools Tool declarations keyed by name.
-	 * @param array $payload         Step payload / invocation context.
-	 * @return array Annotated tool declarations.
+	 * @param array $payload        Step payload / invocation context.
+	 * @param int   $agent_id       Acting Data Machine agent ID.
+	 * @param array $client_context Client-supplied context.
+	 * @return array<string,mixed> First-class Agents API context plus namespaced Data Machine metadata.
 	 */
-	private static function prepareToolDeclarations( array $available_tools, array $payload ): array {
-		$runtime_keys = array( 'job_id', 'flow_step_id', 'data', 'flow_step_config', 'agent_id', 'agent_slug', 'user_id' );
+	private static function buildActionPolicyContext( array $payload, int $agent_id, array $client_context ): array {
+		$context = array(
+			'client_context' => $client_context,
+			'datamachine'    => array_filter(
+				array(
+					'job_id'               => $payload['job_id'] ?? null,
+					'flow_step_id'         => $payload['flow_step_id'] ?? null,
+					'selected_pipeline_id' => $payload['selected_pipeline_id'] ?? null,
+				),
+				static fn( $value ): bool => null !== $value && '' !== $value
+			),
+		);
 
-		foreach ( $available_tools as $tool_name => $tool_def ) {
-			if ( ! is_array( $tool_def ) ) {
-				continue;
-			}
-
-			$bindings = is_array( $tool_def['client_context_bindings'] ?? null ) ? $tool_def['client_context_bindings'] : array();
-			foreach ( $runtime_keys as $runtime_key ) {
-				if ( array_key_exists( $runtime_key, $payload ) && ! array_key_exists( $runtime_key, $bindings ) && ! in_array( $runtime_key, $bindings, true ) ) {
-					$bindings[ $runtime_key ] = $runtime_key;
-				}
-			}
-
-			$tool_def['client_context_bindings'] = $bindings;
-			$available_tools[ $tool_name ]       = $tool_def;
+		$workspace = self::resolveActionPolicyWorkspace( $payload );
+		if ( null !== $workspace ) {
+			$context['workspace'] = $workspace;
 		}
 
-		return $available_tools;
+		$user_id = self::firstPositiveInt( $payload, $client_context, 'user_id' );
+		if ( $user_id > 0 ) {
+			$context['user_id'] = $user_id;
+		}
+
+		$acting_user_id = self::firstPositiveInt( $payload, $client_context, 'acting_user_id', 'calling_user_id' );
+		if ( $acting_user_id > 0 ) {
+			$context['acting_user_id'] = $acting_user_id;
+		}
+
+		if ( $agent_id > 0 ) {
+			$context['agent_id'] = $agent_id;
+		}
+
+		$agent_slug = self::firstNonEmptyString( $payload, $client_context, 'agent_slug' );
+		if ( '' !== $agent_slug ) {
+			$context['agent_slug'] = sanitize_title( $agent_slug );
+		}
+
+		foreach ( array( 'session_id', 'transcript_session_id', 'request_id' ) as $identifier ) {
+			$value = self::firstNonEmptyString( $payload, $client_context, $identifier );
+			if ( '' !== $value ) {
+				$context[ $identifier ] = $value;
+			}
+		}
+
+		if ( empty( $context['datamachine'] ) ) {
+			unset( $context['datamachine'] );
+		}
+
+		return $context;
+	}
+
+	/**
+	 * Resolve the canonical workspace for action-policy resolution.
+	 *
+	 * @param array $payload Step payload / invocation context.
+	 * @return WP_Agent_Workspace_Scope|null Workspace scope.
+	 */
+	private static function resolveActionPolicyWorkspace( array $payload ): ?WP_Agent_Workspace_Scope {
+		$workspace = $payload['workspace'] ?? null;
+		if ( $workspace instanceof WP_Agent_Workspace_Scope ) {
+			return $workspace;
+		}
+
+		if ( is_array( $workspace ) ) {
+			try {
+				return WP_Agent_Workspace_Scope::from_array( $workspace );
+			} catch ( \InvalidArgumentException $e ) {
+				return null;
+			}
+		}
+
+		return WordPressWorkspaceScope::current();
+	}
+
+	/**
+	 * Return the first positive integer from payload or client context.
+	 *
+	 * @param array  $payload        Step payload / invocation context.
+	 * @param array  $client_context Client-supplied context.
+	 * @param string ...$keys        Candidate keys in priority order.
+	 * @return int Positive integer or 0.
+	 */
+	private static function firstPositiveInt( array $payload, array $client_context, string ...$keys ): int {
+		foreach ( $keys as $key ) {
+			foreach ( array( $payload, $client_context ) as $source ) {
+				$value = isset( $source[ $key ] ) ? (int) $source[ $key ] : 0;
+				if ( $value > 0 ) {
+					return $value;
+				}
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Return the first non-empty string from payload or client context.
+	 *
+	 * @param array  $payload        Step payload / invocation context.
+	 * @param array  $client_context Client-supplied context.
+	 * @param string ...$keys        Candidate keys in priority order.
+	 * @return string Non-empty string or empty string.
+	 */
+	private static function firstNonEmptyString( array $payload, array $client_context, string ...$keys ): string {
+		foreach ( $keys as $key ) {
+			foreach ( array( $payload, $client_context ) as $source ) {
+				$value = $source[ $key ] ?? null;
+				if ( is_scalar( $value ) && '' !== trim( (string) $value ) ) {
+					return trim( (string) $value );
+				}
+			}
+		}
+
+		return '';
 	}
 
 	/**

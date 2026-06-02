@@ -260,7 +260,6 @@ class SystemAgentServiceProvider {
 		// primary agent.
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
 			$hook        = RecurringScheduleRegistry::hookFor( $schedule );
-			$legacy_hook = RecurringScheduleRegistry::legacyHookFor( $schedule );
 			$task_type   = $schedule['task_type'];
 			$schedule_id = $schedule['schedule_id'];
 			if ( '' === $hook ) {
@@ -338,9 +337,8 @@ class SystemAgentServiceProvider {
 		}
 
 		foreach ( RecurringScheduleRegistry::all() as $schedule ) {
-			$hook        = RecurringScheduleRegistry::hookFor( $schedule );
-			$legacy_hook = RecurringScheduleRegistry::legacyHookFor( $schedule );
-			$enabled     = RecurringScheduleRegistry::isEnabled( $schedule );
+			$hook    = RecurringScheduleRegistry::hookFor( $schedule );
+			$enabled = RecurringScheduleRegistry::isEnabled( $schedule );
 
 			$options = array();
 			if ( ! empty( $schedule['cron_expression'] ) ) {
@@ -360,10 +358,6 @@ class SystemAgentServiceProvider {
 				$options,
 				$enabled
 			);
-
-			if ( $legacy_hook !== $hook ) {
-				RecurringScheduler::unschedule( $legacy_hook, array() );
-			}
 
 			if ( $result instanceof \WP_Error ) {
 				do_action(

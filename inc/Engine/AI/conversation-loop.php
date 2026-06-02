@@ -1533,7 +1533,7 @@ function datamachine_extract_tool_calls( $result ): array {
 				continue;
 			}
 
-			$tool_calls = array_merge( $tool_calls, datamachine_extract_xml_tool_calls( $text ), datamachine_extract_json_tool_calls( $text ) );
+			$tool_calls = array_merge( $tool_calls, datamachine_extract_xml_tool_calls( $text ), datamachine_extract_json_tool_calls( $text ), datamachine_extract_tag_tool_calls( $text ) );
 		}
 	}
 
@@ -1631,6 +1631,66 @@ function datamachine_extract_json_tool_calls( string $text ): array {
 				'name'       => $name,
 				'parameters' => is_array( $parameters ) ? $parameters : datamachine_normalize_function_args( $parameters ),
 				'id'         => $call['id'] ?? ( 'json-tool-call-' . ( $index + 1 ) . '-' . ( $call_index + 1 ) ),
+			);
+		}
+	}
+
+	return $tool_calls;
+}
+
+/**
+ * Extract tag-style tool calls emitted as plain text by some providers/models.
+ *
+ * Supports compact forms such as `<workspace_read path="README.md" />` and
+ * `<tool name="workspace_read">{"path":"README.md"}</tool>`.
+ *
+ * @param string $text Text candidate content.
+ * @return array<int, array{name:string,parameters:array,id:mixed}>
+ */
+function datamachine_extract_tag_tool_calls( string $text ): array {
+	$tool_calls = array();
+	$index      = 0;
+
+	if ( preg_match_all( '/<tool\s+name=["\']([^"\']+)["\']\s*>(.*?)<\/tool>/is', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name = sanitize_key( (string) $match[1] );
+			if ( '' === $name ) {
+				continue;
+			}
+
+			$parameters = datamachine_normalize_function_args( html_entity_decode( trim( (string) $match[2] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+			++$index;
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'tag-tool-call-' . $index,
+			);
+		}
+	}
+
+	if ( preg_match_all( '/<([a-zA-Z][a-zA-Z0-9_-]*)\s+([^<>]*?)\/>/s', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name = sanitize_key( (string) $match[1] );
+			if ( '' === $name || ! str_contains( $name, '_' ) ) {
+				continue;
+			}
+
+			$parameters = array();
+			if ( preg_match_all( '/([a-zA-Z][a-zA-Z0-9_-]*)\s*=\s*(["\'])(.*?)\2/s', (string) $match[2], $attribute_matches, PREG_SET_ORDER ) ) {
+				foreach ( $attribute_matches as $attribute_match ) {
+					$parameter_name = sanitize_key( (string) $attribute_match[1] );
+					if ( '' === $parameter_name ) {
+						continue;
+					}
+					$parameters[ $parameter_name ] = html_entity_decode( (string) $attribute_match[3], ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+				}
+			}
+
+			++$index;
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'tag-tool-call-' . $index,
 			);
 		}
 	}
@@ -1814,13 +1874,44 @@ function datamachine_build_tool_trace( string $tool_name, array $tool_call, arra
 	if ( strlen( (string) $redacted_arguments_json ) <= 2000 ) {
 		$trace['arguments_redacted'] = $redacted_arguments;
 	} else {
-		$trace['arguments_omitted'] = 'redacted_arguments_too_large';
+		$trace['arguments_redacted'] = datamachine_bound_tool_trace_value( $redacted_arguments );
+		$trace['arguments_omitted']  = 'redacted_arguments_too_large';
 	}
 
 	return array_filter(
 		$trace,
 		static fn( $value ) => null !== $value && '' !== $value && array() !== $value
 	);
+}
+
+/**
+ * Keep non-secret scalar tool arguments visible when full arguments are large.
+ *
+ * @param mixed $value Redacted trace value.
+ * @return mixed Bounded trace value.
+ */
+function datamachine_bound_tool_trace_value( mixed $value ): mixed {
+	if ( is_array( $value ) ) {
+		$bounded = array();
+		$count   = 0;
+		foreach ( $value as $key => $child ) {
+			if ( $count >= 20 ) {
+				$bounded['__truncated__'] = true;
+				break;
+			}
+
+			$bounded[ $key ] = datamachine_bound_tool_trace_value( $child );
+			++$count;
+		}
+
+		return $bounded;
+	}
+
+	if ( is_string( $value ) && strlen( $value ) > 240 ) {
+		return substr( $value, 0, 237 ) . '...';
+	}
+
+	return $value;
 }
 
 /** @return array<string,mixed> */
