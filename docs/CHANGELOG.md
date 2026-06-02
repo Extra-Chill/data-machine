@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.138.14] - 2026-06-02
+
+### Fixed
+- satisfy result contract static analysis
+- satisfy atomic artifact lint
+- satisfy conversation manager lint
+- make step and tool results explicit
+- write job artifact files atomically
+
 ## [0.138.13] - 2026-06-02
 
 ### Changed
