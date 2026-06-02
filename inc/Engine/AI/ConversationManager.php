@@ -363,7 +363,7 @@ class ConversationManager {
 				continue;
 			}
 
-			if ( $tool_name !== ( $message['payload']['tool_name'] ?? null ) ) {
+			if ( ( $message['payload']['tool_name'] ?? null ) !== $tool_name ) {
 				continue;
 			}
 
