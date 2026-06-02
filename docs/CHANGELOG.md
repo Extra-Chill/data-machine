@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.0] - 2026-06-02
+
+### Added
+- expose ability-backed tool declarations
+
+### Fixed
+- expose agents chat tool execution summaries
+
 ## [0.138.16] - 2026-06-02
 
 ### Fixed
