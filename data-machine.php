@@ -320,7 +320,11 @@ function datamachine_run_datamachine_plugin() {
 	// ActionPolicy + unified pending-action resolver. Content abilities register
 	// themselves on `datamachine_pending_action_handlers` via
 	// inc/Abilities/Content/ContentActionHandlers.php (required above).
-	if ( interface_exists( '\AgentsAPI\AI\Approvals\WP_Agent_Pending_Action_Observer' ) ) {
+	if (
+		\DataMachine\Core\Bootstrap\DependencyChecker::has(
+			\DataMachine\Core\Bootstrap\DependencyChecker::CHECK_PENDING_ACTION_OBSERVER
+		)
+	) {
 		// @phpstan-ignore-next-line Scoped analysis sees the observer implementation before the conditional interface load.
 		\DataMachine\Engine\AI\Actions\PendingActionObservers::register( new \DataMachine\Engine\AI\Actions\WordPressActionDispatchObserver() );
 	}
@@ -387,40 +391,7 @@ function datamachine_run_datamachine_plugin() {
  * @return bool True when full runtime registration should run.
  */
 function datamachine_should_load_full_runtime(): bool {
-	// WordPress PHPUnit loads plugins through a frontend-shaped request. Keep
-	// the full runtime available so ability/tool registration tests exercise
-	// the same surfaces as CLI, REST, admin, cron, and Ajax entry points.
-	// Any of these constants is sufficient to identify a WP test environment.
-	if (
-		defined( 'WP_TESTS_DOMAIN' )
-		|| defined( 'WP_TESTS_CONFIG_FILE_PATH' )
-		|| defined( 'WP_TESTS_EMAIL' )
-		|| defined( 'WP_TESTS_TITLE' )
-	) {
-		return true;
-	}
-
-	// @phpstan-ignore-next-line Runtime constant may be defined false outside PHPStan's configured CLI context.
-	if ( defined( 'WP_CLI' ) && (bool) constant( 'WP_CLI' ) ) {
-		return true;
-	}
-
-	if ( is_admin() || wp_doing_ajax() || wp_doing_cron() ) {
-		return true;
-	}
-
-	$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
-	$path        = (string) wp_parse_url( $request_uri, PHP_URL_PATH );
-
-	if ( str_starts_with( $path, '/wp-json/' ) || str_starts_with( $path, '/datamachine-auth/' ) ) {
-		return true;
-	}
-
-	if ( isset( $_GET['rest_route'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Request-shape detection only.
-		return true;
-	}
-
-	return (bool) apply_filters( 'datamachine_should_load_full_runtime', false );
+	return \DataMachine\Core\Bootstrap\RuntimeEnvironment::should_load_full_runtime();
 }
 
 

@@ -74,6 +74,7 @@ use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
+use DataMachine\Core\Bootstrap\DependencyChecker;
 use DataMachine\Core\OAuth\HttpBasicAuthProvider;
 use DataMachine\Core\PluginSettings;
 
@@ -101,7 +102,7 @@ add_filter(
 	2
 );
 
-if ( interface_exists( 'WP_Agent_Access_Store' ) && interface_exists( 'WP_Agent_Principal_Access_Store' ) ) {
+if ( DependencyChecker::has( DependencyChecker::CHECK_AGENTS_API_ACCESS_STORE ) ) {
 	AgentAccessStoreAdapter::register();
 }
 
