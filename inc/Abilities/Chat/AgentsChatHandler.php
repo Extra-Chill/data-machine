@@ -206,15 +206,17 @@ class AgentsChatHandler {
 	private function toCanonicalOutput( array $result ): array {
 		$metadata                = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
 		$datamachine_metadata    = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
+		$tool_execution_summary  = $this->toToolExecutionSummary( $result );
 		$datamachine_metadata    = array_filter(
 			array_merge(
 				$datamachine_metadata,
 				array(
-					'tool_calls'   => $result['tool_calls'] ?? null,
-					'conversation' => $result['conversation'] ?? null,
-					'max_turns'    => $result['max_turns'] ?? null,
-					'turn_number'  => $result['turn_number'] ?? null,
-					'interrupted'  => $result['interrupted'] ?? null,
+					'tool_calls'             => $result['tool_calls'] ?? null,
+					'tool_execution_summary' => $tool_execution_summary,
+					'conversation'           => $result['conversation'] ?? null,
+					'max_turns'              => $result['max_turns'] ?? null,
+					'turn_number'            => $result['turn_number'] ?? null,
+					'interrupted'            => $result['interrupted'] ?? null,
 				)
 			),
 			static fn( $value ): bool => null !== $value
@@ -228,6 +230,55 @@ class AgentsChatHandler {
 			'messages'   => $this->toCanonicalMessages( $result['conversation'] ?? array() ),
 			'completed'  => $completed,
 			'metadata'   => $metadata,
+		);
+	}
+
+	/**
+	 * Build the bounded tool execution diagnostics exposed through canonical metadata.
+	 *
+	 * @param array $result Data Machine chat response.
+	 * @return array<int,array<string,mixed>>|null
+	 */
+	private function toToolExecutionSummary( array $result ): ?array {
+		if ( is_array( $result['tool_execution_summary'] ?? null ) ) {
+			return $result['tool_execution_summary'];
+		}
+
+		$tool_execution_results = is_array( $result['tool_execution_results'] ?? null ) ? $result['tool_execution_results'] : array();
+		if ( empty( $tool_execution_results ) ) {
+			return null;
+		}
+
+		$summary_function = '\\DataMachine\\Engine\\AI\\datamachine_summarize_tool_execution_results';
+		if ( function_exists( $summary_function ) ) {
+			return $summary_function( $tool_execution_results, false );
+		}
+
+		return array_values(
+			array_filter(
+				array_map(
+					static function ( $result ): ?array {
+						if ( ! is_array( $result ) ) {
+							return null;
+						}
+						$tool_name   = isset( $result['tool_name'] ) ? sanitize_key( (string) $result['tool_name'] ) : '';
+						$tool_result = is_array( $result['result'] ?? null ) ? $result['result'] : array();
+						if ( '' === $tool_name ) {
+							return null;
+						}
+						return array_filter(
+							array(
+								'tool_name'  => $tool_name,
+								'success'    => true === ( $tool_result['success'] ?? false ),
+								'turn_count' => isset( $result['turn_count'] ) ? (int) $result['turn_count'] : null,
+								'summary'    => isset( $tool_result['message'] ) ? sanitize_text_field( (string) $tool_result['message'] ) : null,
+							),
+							static fn( $value ): bool => null !== $value && '' !== $value
+						);
+					},
+					$tool_execution_results
+				)
+			)
 		);
 	}
 
