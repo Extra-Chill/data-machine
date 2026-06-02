@@ -539,7 +539,7 @@ class JobArtifacts {
 
 	private function write_atomic_file( string $file_path, string $contents ): bool {
 		$directory = dirname( $file_path );
-		if ( ! is_dir( $directory ) || ! is_writable( $directory ) ) {
+		if ( ! is_dir( $directory ) || ! is_writable( $directory ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_is_writable
 			return false;
 		}
 
@@ -550,12 +550,12 @@ class JobArtifacts {
 
 		$written = file_put_contents( $temp_path, $contents, LOCK_EX ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 		if ( strlen( $contents ) !== $written ) {
-			@unlink( $temp_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			unlink( $temp_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 			return false;
 		}
 
-		if ( ! @rename( $temp_path, $file_path ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename
-			@unlink( $temp_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+		if ( ! rename( $temp_path, $file_path ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename
+			unlink( $temp_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 			return false;
 		}
 
