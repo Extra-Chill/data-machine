@@ -870,6 +870,8 @@ WpAiClientTestDouble::set_response_callback(
 						. 'to=workspace_read {"path":"README.md"}'
 						. "```workspace_read\n{\"path\":\"README.md\"}\n```"
 						. ' workspace_read("README.md")'
+						. ' workspace_edit path=README.md'
+						. ' workspace_grep path=README.md'
 						. ' workspace_edit path=README.md old="before" new="after"',
 				),
 			);

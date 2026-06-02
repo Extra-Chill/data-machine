@@ -1624,7 +1624,7 @@ function datamachine_extract_named_text_tool_calls( string $text ): array {
 		foreach ( $matches as $match ) {
 			$name       = sanitize_key( (string) $match['name'] );
 			$parameters = datamachine_parse_text_tool_attributes( (string) $match['attrs'] );
-			if ( ! datamachine_is_plausible_text_tool_name( $name ) || empty( $parameters ) ) {
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || empty( $parameters ) || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
 				continue;
 			}
 
@@ -1654,7 +1654,7 @@ function datamachine_extract_named_text_tool_calls( string $text ): array {
 				}
 			}
 
-			if ( ! datamachine_is_plausible_text_tool_name( $name ) || empty( $parameters ) ) {
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || empty( $parameters ) || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
 				continue;
 			}
 
@@ -1670,7 +1670,7 @@ function datamachine_extract_named_text_tool_calls( string $text ): array {
 		foreach ( $matches as $match ) {
 			$name       = sanitize_key( (string) $match['name'] );
 			$parameters = json_decode( (string) $match['json'], true );
-			if ( ! datamachine_is_plausible_text_tool_name( $name ) || ! is_array( $parameters ) ) {
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || ! is_array( $parameters ) || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
 				continue;
 			}
 
@@ -1686,7 +1686,7 @@ function datamachine_extract_named_text_tool_calls( string $text ): array {
 		foreach ( $matches as $match ) {
 			$name       = sanitize_key( (string) $match['name'] );
 			$parameters = json_decode( (string) $match['json'], true );
-			if ( ! datamachine_is_plausible_text_tool_name( $name ) || ! is_array( $parameters ) ) {
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || ! is_array( $parameters ) || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
 				continue;
 			}
 
@@ -1700,15 +1700,16 @@ function datamachine_extract_named_text_tool_calls( string $text ): array {
 
 	if ( preg_match_all( '/(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\((?P<value>["\']?[^\)]*?["\']?)\)/', $text, $matches, PREG_SET_ORDER ) ) {
 		foreach ( $matches as $match ) {
-			$name  = sanitize_key( (string) $match['name'] );
-			$value = trim( (string) $match['value'], " \t\n\r\0\x0B\"'" );
-			if ( ! datamachine_is_plausible_text_tool_name( $name ) || '' === $value ) {
+			$name       = sanitize_key( (string) $match['name'] );
+			$value      = trim( (string) $match['value'], " \t\n\r\0\x0B\"'" );
+			$parameters = array( 'path' => html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || '' === $value || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
 				continue;
 			}
 
 			$tool_calls[] = array(
 				'name'       => $name,
-				'parameters' => array( 'path' => html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ),
+				'parameters' => $parameters,
 				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
 			);
 		}
@@ -1718,7 +1719,7 @@ function datamachine_extract_named_text_tool_calls( string $text ): array {
 		foreach ( $matches as $match ) {
 			$name       = sanitize_key( (string) $match['name'] );
 			$parameters = datamachine_parse_text_tool_attributes( (string) $match['attrs'] );
-			if ( ! datamachine_is_plausible_text_tool_name( $name ) || empty( $parameters ) ) {
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || empty( $parameters ) || ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
 				continue;
 			}
 
@@ -1745,6 +1746,36 @@ function datamachine_is_plausible_text_tool_name( string $name ): bool {
 	}
 
 	return ! in_array( $name, array( 'function_calls', 'tool_call' ), true );
+}
+
+/**
+ * Avoid executing malformed partial calls extracted from prose-like text.
+ *
+ * @param string $name       Tool name.
+ * @param array  $parameters Parsed parameters.
+ * @return bool
+ */
+function datamachine_text_tool_parameters_complete( string $name, array $parameters ): bool {
+	if ( str_starts_with( $name, 'workspace_' ) && empty( $parameters['path'] ) ) {
+		return false;
+	}
+
+	if ( 'workspace_grep' === $name && empty( $parameters['pattern'] ) ) {
+		return false;
+	}
+
+	if ( 'workspace_write' === $name && ! array_key_exists( 'content', $parameters ) ) {
+		return false;
+	}
+
+	if ( 'workspace_edit' === $name ) {
+		$has_old_new        = array_key_exists( 'old', $parameters ) && array_key_exists( 'new', $parameters );
+		$has_old_string_new = array_key_exists( 'old_string', $parameters ) && array_key_exists( 'new_string', $parameters );
+		$has_search_replace = array_key_exists( 'search', $parameters ) && array_key_exists( 'replace', $parameters );
+		return $has_old_new || $has_old_string_new || $has_search_replace;
+	}
+
+	return true;
 }
 
 /**
@@ -1856,6 +1887,9 @@ function datamachine_extract_tag_tool_calls( string $text ): array {
 			if ( '' !== $body && empty( $parameters ) ) {
 				continue;
 			}
+			if ( ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
+				continue;
+			}
 			++$index;
 			$tool_calls[] = array(
 				'name'       => $name,
@@ -1881,6 +1915,9 @@ function datamachine_extract_tag_tool_calls( string $text ): array {
 					}
 					$parameters[ $parameter_name ] = html_entity_decode( (string) $attribute_match[3], ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 				}
+			}
+			if ( ! datamachine_text_tool_parameters_complete( $name, $parameters ) ) {
+				continue;
 			}
 
 			++$index;
