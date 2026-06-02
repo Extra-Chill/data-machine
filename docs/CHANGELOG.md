@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.2] - 2026-06-02
+
+### Fixed
+- preserve chat tool execution summaries
+- prefer canonical pending action abilities
+- route chat sessions through canonical abilities
+
 ## [0.139.1] - 2026-06-02
 
 ### Fixed
