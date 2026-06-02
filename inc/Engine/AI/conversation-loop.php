@@ -601,6 +601,7 @@ function datamachine_build_turn_runner(
 		$runtime_rule_rejected  = false;
 		$runtime_pending_turn   = false;
 		if ( ! empty( $tool_calls ) ) {
+			$completion_decision = \AgentsAPI\AI\WP_Agent_Conversation_Completion_Decision::complete();
 			foreach ( $tool_calls as $tool_call ) {
 				$tool_name       = $tool_call['name'];
 				$tool_parameters = $tool_call['parameters'];
@@ -869,7 +870,7 @@ function datamachine_build_turn_runner(
 			'usage'                        => $turn_usage,
 			'finish_reason'                => $finish_reason,
 			'conversation_complete'        => $conversation_complete,
-			'completion_nudge'             => $completion_nudge ?? '',
+			'completion_nudge'             => $completion_nudge,
 			'duplicate_tool_call_rejected' => $duplicate_rejected,
 			'tool_runtime_rule_rejected'   => $runtime_rule_rejected,
 			'runtime_tool_pending'         => $runtime_pending_turn,
@@ -887,9 +888,9 @@ function datamachine_ai_result_finish_reason( $result ): ?string {
 	try {
 		$candidates = $result->getCandidates();
 		$candidate  = $candidates[0] ?? null;
-		if ( is_object( $candidate ) && method_exists( $candidate, 'getFinishReason' ) ) {
+		if ( null !== $candidate ) {
 			$reason = $candidate->getFinishReason();
-			return is_scalar( $reason ) ? (string) $reason : null;
+			return $reason->value;
 		}
 	} catch ( \Throwable $e ) {
 		return null;
@@ -1369,8 +1370,6 @@ function datamachine_normalize_runtime_tool_result( string $tool_name, $result )
 		$result['executor']  = $result['executor'] ?? 'client';
 		if ( array_key_exists( 'data', $result ) && ! array_key_exists( 'result', $result ) ) {
 			$result['result'] = $result['data'];
-		} elseif ( array_key_exists( 'result', $result ) && ! array_key_exists( 'data', $result ) ) {
-			$result['data'] = $result['result'];
 		}
 		return $result;
 	}
@@ -1379,7 +1378,6 @@ function datamachine_normalize_runtime_tool_result( string $tool_name, $result )
 		'success'   => true,
 		'tool_name' => $tool_name,
 		'executor'  => 'client',
-		'data'      => $result,
 		'result'    => $result,
 	);
 }
@@ -1527,10 +1525,6 @@ function datamachine_extract_tool_calls( $result ): array {
 
 	if ( empty( $tool_calls ) ) {
 		foreach ( $candidates[0]->getMessage()->getParts() as $part ) {
-			if ( ! method_exists( $part, 'getText' ) ) {
-				continue;
-			}
-
 			$text = $part->getText();
 			if ( ! is_string( $text ) || '' === trim( $text ) ) {
 				continue;

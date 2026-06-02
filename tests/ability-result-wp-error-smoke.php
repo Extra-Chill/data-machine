@@ -108,7 +108,7 @@ $assert( 'tool array results pass through unchanged', $tool_array_result === Abi
 $tool_scalar_result = AbilityResult::normalize_tool_result( 'ok', 'demo_tool', 'datamachine/demo' );
 $assert( 'tool scalar result is wrapped as success', true === $tool_scalar_result['success'] );
 $assert( 'tool scalar result payload uses tool result key', 'ok' === $tool_scalar_result['result'] );
-$assert( 'tool scalar result payload also uses data key', 'ok' === $tool_scalar_result['data'] );
+$assert( 'tool scalar result does not mirror payload into data key', ! array_key_exists( 'data', $tool_scalar_result ) );
 
 $legacy_error = AbilityResult::legacy_failure_to_wp_error(
 	array(

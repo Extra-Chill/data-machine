@@ -47,6 +47,10 @@ class AbilityResult {
 	/**
 	 * Convert a WP_Ability::execute() result into Data Machine's tool result shape.
 	 *
+	 * AI tools use the Agents API execution envelope. The payload key is `result`;
+	 * `data` remains an ability/REST presentation concern, not a mirrored tool
+	 * result field.
+	 *
 	 * @param mixed  $result       Ability execution result.
 	 * @param string $tool_name    Tool name.
 	 * @param string $ability_slug Ability slug.
@@ -67,8 +71,6 @@ class AbilityResult {
 		if ( is_array( $result ) ) {
 			if ( array_key_exists( 'data', $result ) && ! array_key_exists( 'result', $result ) ) {
 				$result['result'] = $result['data'];
-			} elseif ( array_key_exists( 'result', $result ) && ! array_key_exists( 'data', $result ) ) {
-				$result['data'] = $result['result'];
 			}
 
 			return $result;
@@ -78,7 +80,6 @@ class AbilityResult {
 			'success'   => true,
 			'tool_name' => $tool_name,
 			'ability'   => $ability_slug,
-			'data'      => $result,
 			'result'    => $result,
 		);
 	}

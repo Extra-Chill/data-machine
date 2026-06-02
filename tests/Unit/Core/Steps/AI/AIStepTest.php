@@ -290,7 +290,7 @@ class AIStepTest extends TestCase {
 			'tool_execution_results' => array(
 				array(
 					'tool_name'       => 'upsert_event',
-					'result'          => array( 'success' => true, 'data' => array( 'post_id' => 123 ) ),
+					'result'          => array( 'success' => true, 'result' => array( 'post_id' => 123 ) ),
 					'parameters'      => array( 'title' => 'Test Event' ),
 					'is_handler_tool' => true,
 					'turn_count'      => 1,

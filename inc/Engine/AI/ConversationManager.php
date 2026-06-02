@@ -37,7 +37,7 @@ class ConversationManager {
 	 *
 	 * @param string       $role     Role identifier (user, assistant, system).
 	 * @param string|array $content  Message content — string for text, array for multi-modal content blocks.
-	 * @param array        $metadata Optional metadata for the message (e.g., type, tool_data, attachments).
+	 * @param array        $metadata Optional metadata for the message (e.g., type, tool_result, attachments).
 	 * @return array Message envelope.
 	 */
 	public static function buildConversationMessage( string $role, $content, array $metadata = array() ): array {
@@ -247,7 +247,7 @@ class ConversationManager {
 			'message',
 		);
 		foreach ( $public_keys as $key ) {
-			if ( ! array_key_exists( $key, $data ) && isset( $tool_result[ $key ] ) && ( is_scalar( $tool_result[ $key ] ) || null === $tool_result[ $key ] ) ) {
+			if ( ! array_key_exists( $key, $data ) && array_key_exists( $key, $tool_result ) && ( is_scalar( $tool_result[ $key ] ) || null === $tool_result[ $key ] ) ) {
 				$data[ $key ] = $tool_result[ $key ];
 			}
 		}

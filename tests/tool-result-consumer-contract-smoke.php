@@ -88,10 +88,10 @@ function handler_tool_result_entry( array $envelope ): array {
 echo "=== tool-result-consumer-contract-smoke ===\n";
 
 $cases = array(
-	'success + data'             => array(
+	'success + result'           => array(
 		'envelope' => array(
 			'success' => true,
-			'data'    => array( 'post_id' => 123 ),
+			'result'  => array( 'post_id' => 123 ),
 		),
 		'payload'  => array( 'post_id' => 123 ),
 	),

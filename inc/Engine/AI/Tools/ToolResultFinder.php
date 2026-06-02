@@ -53,12 +53,12 @@ class ToolResultFinder {
 	 * @return array
 	 */
 	public static function projectEnvelopeData( array $envelope ): array {
-		if ( is_array( $envelope['data'] ?? null ) ) {
-			return $envelope['data'];
-		}
-
 		if ( is_array( $envelope['result'] ?? null ) ) {
 			return $envelope['result'];
+		}
+
+		if ( is_array( $envelope['data'] ?? null ) ) {
+			return $envelope['data'];
 		}
 
 		$payload = $envelope;
@@ -89,7 +89,7 @@ class ToolResultFinder {
 		if ( is_array( $metadata['tool_result_data'] ?? null ) ) {
 			return array(
 				'success' => (bool) ( $metadata['tool_success'] ?? false ),
-				'data'    => $metadata['tool_result_data'],
+				'result'  => $metadata['tool_result_data'],
 			);
 		}
 

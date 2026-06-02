@@ -376,6 +376,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 		array( 'job_id' => 42 )
 	);
 	assert_smoke( 'core wraps scalar ability result with normalized envelope', true === ( $core_result['success'] ?? false ) && 'scalar-ok' === ( $core_result['result'] ?? null ) );
+	assert_smoke( 'core scalar envelope does not mirror result into data', ! array_key_exists( 'data', $core_result ) );
 	assert_smoke( 'core result includes ability slug metadata', 'datamachine/core-ability' === ( $core_result['metadata']['ability'] ?? null ) );
 	assert_smoke( 'core path does not perform post tracking decoration', 0 === post_tracking_count() );
 

@@ -158,7 +158,7 @@ class DataMachineCompletionAssertions {
 	/**
 	 * Return required assertion config for diagnostics.
 	 *
-	 * @return array<string, array<int, string>>
+	 * @return array<string, mixed>
 	 */
 	public function required(): array {
 		return array_filter(
@@ -306,7 +306,7 @@ class DataMachineCompletionAssertions {
 				return true;
 			}
 
-			if ( is_array( $result['data'] ?? null ) && $this->hasNonEmptyPath( $result['data'], $field ) ) {
+			if ( is_array( $result['result'] ?? null ) && $this->hasNonEmptyPath( $result['result'], $field ) ) {
 				return true;
 			}
 		}

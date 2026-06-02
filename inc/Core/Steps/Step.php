@@ -13,6 +13,7 @@ namespace DataMachine\Core\Steps;
 
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\EngineData;
+use DataMachine\Core\StepExecutionResult;
 
 if ( ! defined('ABSPATH') ) {
 	exit;
@@ -81,7 +82,7 @@ abstract class Step {
 	 * Execute step with unified payload handling.
 	 *
 	 * @param  array $payload Unified step payload (job_id, flow_step_id, data, flow_step_config)
-	 * @return array Updated data packet array
+	 * @return array Explicit step execution result.
 	 */
 	public function execute( array $payload ): array {
 		try {
@@ -90,18 +91,18 @@ abstract class Step {
 
 			// Validate common configuration
 			if ( ! $this->validateCommonConfiguration() ) {
-				return $this->dataPackets;
+				return $this->failedStepResult( 'invalid_step_configuration' );
 			}
 
 			// Validate step-specific configuration
 			if ( ! $this->validateStepConfiguration() ) {
-				return $this->dataPackets;
+				return $this->failedStepResult( 'invalid_step_configuration' );
 			}
 
 			// Execute step-specific logic
-			return $this->executeStep();
+			return StepExecutionResult::fromStepOutput( $this->executeStep(), $this->step_type );
 		} catch ( \Exception $e ) {
-			return $this->handleException($e);
+			return StepExecutionResult::fromStepOutput( $this->handleException( $e ), $this->step_type );
 		}
 	}
 
@@ -112,6 +113,25 @@ abstract class Step {
 	 * @return array Updated data packet array
 	 */
 	abstract protected function executeStep(): array;
+
+	/**
+	 * Build an explicit failed execution result for validation failures.
+	 *
+	 * @param string $reason Machine-readable failure reason.
+	 * @return array Explicit step execution result.
+	 */
+	protected function failedStepResult( string $reason ): array {
+		$status = in_array( $this->step_type, array( 'fetch', 'event_import' ), true ) && empty( $this->dataPackets ) ? 'completed_no_items' : 'failed';
+
+		return StepExecutionResult::fromStepOutput(
+			array(
+				'status'  => $status,
+				'reason'  => $reason,
+				'packets' => $this->dataPackets,
+			),
+			$this->step_type
+		);
+	}
 
 	/**
 	 * Validate step-specific configuration requirements.
