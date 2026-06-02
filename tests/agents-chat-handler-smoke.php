@@ -72,6 +72,7 @@ $assert = static function ( bool $condition, string $label ) use ( &$passes, &$f
 
 $root           = dirname( __DIR__ );
 $handler_source = (string) file_get_contents( $root . '/inc/Abilities/Chat/AgentsChatHandler.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
+$orchestrator   = (string) file_get_contents( $root . '/inc/Api/Chat/ChatOrchestrator.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
 $chat_abilities = (string) file_get_contents( $root . '/inc/Abilities/ChatAbilities.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
 $chat_api       = (string) file_get_contents( $root . '/inc/Api/Chat/Chat.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Source smoke fixture.
 
@@ -85,6 +86,7 @@ $assert( str_contains( $handler_source, "'interrupt_source'     => is_callable( 
 $assert( str_contains( $handler_source, "'agent_slug'           => $" . "identity ? $" . "identity->agent_slug : ''" ), 'AgentsChatHandler forwards resolved agent targeting to the chat runtime' );
 $assert( str_contains( $handler_source, "'interrupted'" ) && str_contains( $handler_source, "$" . "result['interrupted'] ?? null" ), 'AgentsChatHandler returns interrupted diagnostics in canonical metadata' );
 $assert( str_contains( $handler_source, "'tool_execution_summary'" ), 'AgentsChatHandler returns bounded tool execution diagnostics in canonical metadata' );
+$assert( str_contains( $orchestrator, "'tool_execution_summary'" ) && str_contains( $orchestrator, 'datamachine_summarize_tool_execution_results' ), 'ChatOrchestrator forwards bounded tool execution diagnostics to chat adapters' );
 $assert( ! file_exists( $root . '/inc/Abilities/Chat/SendMessageAbility.php' ), 'datamachine/send-message facade class is removed' );
 $assert( ! str_contains( $chat_abilities, 'SendMessageAbility' ), 'ChatAbilities no longer registers datamachine/send-message' );
 $assert( str_contains( $chat_api, "wp_get_ability( 'agents/chat' )" ), 'REST chat endpoint dispatches directly through canonical agents/chat' );

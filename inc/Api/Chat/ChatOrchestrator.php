@@ -28,6 +28,7 @@ use WP_Error;
 
 use function DataMachine\Engine\AI\datamachine_run_conversation;
 use function DataMachine\Engine\AI\datamachine_conversation_metadata;
+use function DataMachine\Engine\AI\datamachine_summarize_tool_execution_results;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -303,14 +304,15 @@ class ChatOrchestrator {
 
 		// --- Build response data ---
 		$response_data = array(
-			'session_id'   => $session_id,
-			'response'     => $result['final_content'],
-			'tool_calls'   => $loop_metadata['tool_calls'] ?? $loop_metadata['last_tool_calls'] ?? array(),
-			'conversation' => $result['messages'],
-			'metadata'     => $metadata,
-			'completed'    => $is_completed,
-			'max_turns'    => $max_turns,
-			'turn_number'  => $result['turn_count'],
+			'session_id'             => $session_id,
+			'response'               => $result['final_content'],
+			'tool_calls'             => $loop_metadata['tool_calls'] ?? $loop_metadata['last_tool_calls'] ?? array(),
+			'tool_execution_summary' => datamachine_summarize_tool_execution_results( $result['tool_execution_results'] ?? array(), false ),
+			'conversation'           => $result['messages'],
+			'metadata'               => $metadata,
+			'completed'              => $is_completed,
+			'max_turns'              => $max_turns,
+			'turn_number'            => $result['turn_count'],
 		);
 		if ( ! empty( $loop_metadata['runtime_tool_pending_requests'] ) ) {
 			$response_data['runtime_tool_pending_requests'] = $loop_metadata['runtime_tool_pending_requests'];
