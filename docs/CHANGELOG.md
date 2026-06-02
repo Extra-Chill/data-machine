@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.1] - 2026-06-02
+
+### Fixed
+- carry chat tool summaries from orchestrator
+
 ## [0.139.0] - 2026-06-02
 
 ### Added
