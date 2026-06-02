@@ -158,7 +158,7 @@ class DataMachineCompletionAssertions {
 	/**
 	 * Return required assertion config for diagnostics.
 	 *
-	 * @return array<string, array<int, string>>
+	 * @return array<string, mixed>
 	 */
 	public function required(): array {
 		return array_filter(
