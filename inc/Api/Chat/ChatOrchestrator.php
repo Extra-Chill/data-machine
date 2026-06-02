@@ -696,7 +696,7 @@ class ChatOrchestrator {
 			);
 		}
 
-		$ability = wp_get_ability( 'datamachine/create-chat-session' );
+		$ability = wp_get_ability( 'agents/create-conversation-session' );
 
 		if ( ! $ability ) {
 			return new WP_Error(
@@ -708,17 +708,21 @@ class ChatOrchestrator {
 
 		$agent_slug = ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
 		$input      = array(
-			'user_id'    => $user_id,
-			'agent_slug' => $agent_slug,
-			'mode'       => $mode,
+			'workspace' => WordPressWorkspaceScope::current()->to_array(),
+			'agent'     => $agent_slug,
+			'context'   => $mode,
+			'metadata'  => array(
+				'started_at'    => current_time( 'mysql', true ),
+				'message_count' => 0,
+			),
 		);
 
 		if ( null !== $transcript_owner ) {
-			$input['transcript_owner'] = $transcript_owner;
+			$input['session_owner'] = $transcript_owner;
 		}
 
 		if ( $source ) {
-			$input['source'] = $source;
+			$input['metadata']['source'] = $source;
 		}
 
 		$result = \DataMachine\Abilities\PermissionHelper::run_as_authenticated(
@@ -731,15 +735,17 @@ class ChatOrchestrator {
 			return $result;
 		}
 
-		if ( empty( $result['success'] ) || empty( $result['session_id'] ) ) {
+		$session_id = (string) ( $result['session']['session_id'] ?? '' );
+
+		if ( '' === $session_id ) {
 			return new WP_Error(
 				'session_creation_failed',
-				$result['error'] ?? __( 'Failed to create chat session', 'data-machine' ),
+				__( 'Failed to create chat session', 'data-machine' ),
 				array( 'status' => 500 )
 			);
 		}
 
-		return $result['session_id'];
+		return $session_id;
 	}
 
 	/**

@@ -16,7 +16,9 @@ namespace DataMachine\Api\Chat;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\AbilityResult;
+use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
+use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 use DataMachine\Engine\AI\WpAiClientProviderAdmin;
 use WP_REST_Response;
 use WP_REST_Server;
@@ -369,14 +371,16 @@ class Chat {
 	 * @return WP_REST_Response|WP_Error Response data or error.
 	 */
 	public static function list_sessions( WP_REST_Request $request ) {
-		return self::execute_ability(
-			'datamachine/list-chat-sessions',
+		$agent_id   = PermissionHelper::resolve_scoped_agent_id( $request );
+		$agent_slug = null !== $agent_id ? ConversationStoreFactory::resolve_agent_slug_for_transcript( (int) $agent_id ) : '';
+
+		return self::execute_conversation_session_ability(
+			'agents/list-conversation-sessions',
 			array(
-				'user_id'  => get_current_user_id(),
-				'agent_id' => PermissionHelper::resolve_scoped_agent_id( $request ),
-				'limit'    => (int) $request->get_param( 'limit' ),
-				'offset'   => (int) $request->get_param( 'offset' ),
-				'mode'     => $request->get_param( 'mode' ),
+				'limit'   => (int) $request->get_param( 'limit' ),
+				'offset'  => (int) $request->get_param( 'offset' ),
+				'context' => $request->get_param( 'mode' ),
+				'agent'   => $agent_slug,
 			)
 		);
 	}
@@ -406,11 +410,10 @@ class Chat {
 	 * @return WP_REST_Response|WP_Error Response data or error.
 	 */
 	public static function delete_session( WP_REST_Request $request ) {
-		return self::execute_ability(
-			'datamachine/delete-chat-session',
+		return self::execute_conversation_session_ability(
+			'agents/delete-conversation-session',
 			array(
 				'session_id' => sanitize_text_field( $request->get_param( 'session_id' ) ),
-				'user_id'    => get_current_user_id(),
 			)
 		);
 	}
@@ -422,11 +425,10 @@ class Chat {
 	 * @return WP_REST_Response|WP_Error Response data or error.
 	 */
 	public static function get_session( WP_REST_Request $request ) {
-		return self::execute_ability(
-			'datamachine/get-chat-session',
+		return self::execute_conversation_session_ability(
+			'agents/get-conversation-session',
 			array(
 				'session_id' => sanitize_text_field( $request->get_param( 'session_id' ) ),
-				'user_id'    => get_current_user_id(),
 			)
 		);
 	}
@@ -736,5 +738,23 @@ class Chat {
 				'data'    => $result,
 			)
 		);
+	}
+
+	/**
+	 * Execute a canonical Agents API conversation-session ability.
+	 *
+	 * The REST endpoint keeps Data Machine's response envelope, but generic
+	 * session CRUD now goes through the canonical Agents API ability slugs.
+	 *
+	 * @since next
+	 *
+	 * @param string $slug  Canonical ability slug.
+	 * @param array  $input Ability input.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	private static function execute_conversation_session_ability( string $slug, array $input = array() ) {
+		$input['workspace'] ??= WordPressWorkspaceScope::current()->to_array();
+
+		return self::execute_ability( $slug, array_filter( $input, static fn( $value ) => null !== $value && '' !== $value ) );
 	}
 }
