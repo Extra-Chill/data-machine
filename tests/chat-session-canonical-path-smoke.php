@@ -25,8 +25,13 @@ $assert = static function ( bool $condition, string $message ) use ( &$failures 
 };
 
 $assert(
-	false !== strpos( $chat_orchestrator, "wp_get_ability( 'datamachine/create-chat-session' )" ),
-	'ChatOrchestrator resolves the create-chat-session ability'
+	false !== strpos( $chat_orchestrator, "wp_get_ability( 'agents/create-conversation-session' )" ),
+	'ChatOrchestrator resolves the canonical create-conversation-session ability'
+);
+
+$assert(
+	false !== strpos( $chat_orchestrator, "'session_owner'" ),
+	'ChatOrchestrator passes opaque owners through the canonical session_owner input'
 );
 
 $assert(

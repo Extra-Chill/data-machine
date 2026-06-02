@@ -24,6 +24,7 @@ use DataMachine\Core\Database\Chat\ConversationRetentionInterface;
 use DataMachine\Core\Database\Chat\ConversationSessionIndexInterface;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Chat\ConversationStoreInterface;
+use AgentsAPI\AI\WP_Agent_Execution_Principal;
 use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Lock;
 use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store;
 use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
@@ -449,6 +450,88 @@ class ConversationStoreFactoryTest extends WP_UnitTestCase {
 		$this->assertCount( 1, $result['sessions'] );
 		$this->assertSame( $session_id, $result['sessions'][0]['session_id'] );
 		$this->assertSame( 'hello', $result['sessions'][0]['first_message'] );
+	}
+
+	public function test_canonical_conversation_session_abilities_route_through_swapped_store(): void {
+		$memory_store = new InMemoryConversationStore();
+		$user_id      = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		$principal    = WP_Agent_Execution_Principal::user_session( $user_id, 'memory-agent' );
+		$workspace    = $this->workspace()->to_array();
+
+		add_filter(
+			'datamachine_conversation_store',
+			static fn() => $memory_store,
+			10,
+			1
+		);
+		ConversationStoreFactory::reset();
+
+		if ( ! did_action( 'wp_abilities_api_init' ) ) {
+			do_action( 'wp_abilities_api_init' );
+		}
+
+		$create = wp_get_ability( 'agents/create-conversation-session' );
+		$list   = wp_get_ability( 'agents/list-conversation-sessions' );
+		$get    = wp_get_ability( 'agents/get-conversation-session' );
+		$title  = wp_get_ability( 'agents/update-conversation-session-title' );
+		$delete = wp_get_ability( 'agents/delete-conversation-session' );
+
+		$this->assertNotFalse( $create );
+		$this->assertNotFalse( $list );
+		$this->assertNotFalse( $get );
+		$this->assertNotFalse( $title );
+		$this->assertNotFalse( $delete );
+
+		$created = $create->execute(
+			array(
+				'principal' => $principal,
+				'workspace' => $workspace,
+				'agent'     => 'memory-agent',
+				'context'   => 'chat',
+				'metadata'  => array( 'source' => 'canonical-test' ),
+			)
+		);
+		$this->assertIsArray( $created );
+		$session_id = (string) ( $created['session']['session_id'] ?? '' );
+		$this->assertNotSame( '', $session_id );
+
+		$listed = $list->execute(
+			array(
+				'principal' => $principal,
+				'workspace' => $workspace,
+				'agent'     => 'memory-agent',
+			)
+		);
+		$this->assertSame( $session_id, $listed['sessions'][0]['session_id'] ?? '' );
+
+		$titled = $title->execute(
+			array(
+				'principal'  => $principal,
+				'workspace'  => $workspace,
+				'session_id' => $session_id,
+				'title'      => 'Canonical Session',
+			)
+		);
+		$this->assertSame( 'Canonical Session', $titled['session']['title'] ?? '' );
+
+		$loaded = $get->execute(
+			array(
+				'principal'  => $principal,
+				'workspace'  => $workspace,
+				'session_id' => $session_id,
+			)
+		);
+		$this->assertSame( 'canonical-test', $loaded['session']['metadata']['source'] ?? '' );
+
+		$deleted = $delete->execute(
+			array(
+				'principal'  => $principal,
+				'workspace'  => $workspace,
+				'session_id' => $session_id,
+			)
+		);
+		$this->assertTrue( $deleted['deleted'] ?? false );
+		$this->assertNull( $memory_store->get_session( $session_id ) );
 	}
 
 	private function workspace(): WP_Agent_Workspace_Scope {
