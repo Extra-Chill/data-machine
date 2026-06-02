@@ -1530,11 +1530,33 @@ function datamachine_extract_tool_calls( $result ): array {
 				continue;
 			}
 
-			$tool_calls = array_merge( $tool_calls, datamachine_extract_xml_tool_calls( $text ), datamachine_extract_json_tool_calls( $text ), datamachine_extract_tag_tool_calls( $text ) );
+			$tool_calls = array_merge( $tool_calls, datamachine_extract_xml_tool_calls( $text ), datamachine_extract_json_tool_calls( $text ), datamachine_extract_tag_tool_calls( $text ), datamachine_extract_named_text_tool_calls( $text ) );
 		}
 	}
 
-	return $tool_calls;
+	return datamachine_dedupe_tool_calls( $tool_calls );
+}
+
+/**
+ * Remove exact duplicate tool calls produced by fallback text parsers.
+ *
+ * @param array<int, array{name:string,parameters:array,id:mixed}> $tool_calls Tool calls.
+ * @return array<int, array{name:string,parameters:array,id:mixed}>
+ */
+function datamachine_dedupe_tool_calls( array $tool_calls ): array {
+	$seen   = array();
+	$result = array();
+	foreach ( $tool_calls as $tool_call ) {
+		$key = ( $tool_call['name'] ?? '' ) . ':' . wp_json_encode( $tool_call['parameters'] ?? array() );
+		if ( isset( $seen[ $key ] ) ) {
+			continue;
+		}
+
+		$seen[ $key ] = true;
+		$result[]     = $tool_call;
+	}
+
+	return $result;
 }
 
 /**
@@ -1578,6 +1600,180 @@ function datamachine_extract_xml_tool_calls( string $text ): array {
 	}
 
 	return $tool_calls;
+}
+
+/**
+ * Extract named tool calls emitted as plain text by models that do not use the
+ * provider's structured tool-call transport.
+ *
+ * @param string $text Text candidate content.
+ * @return array<int, array{name:string,parameters:array,id:mixed}>
+ */
+function datamachine_extract_named_text_tool_calls( string $text ): array {
+	$tool_calls = array();
+
+	$patterns = array(
+		'/<(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\s+(?P<attrs>[^<>]*?)\s*\/?>(?:\s*<\/\1>)?/s',
+		'/\[(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\s+(?P<attrs>[^\]]*?)\](?:.*?\[\/\1\])?/s',
+	);
+	foreach ( $patterns as $pattern ) {
+		if ( ! preg_match_all( $pattern, $text, $matches, PREG_SET_ORDER ) ) {
+			continue;
+		}
+
+		foreach ( $matches as $match ) {
+			$name       = sanitize_key( (string) $match['name'] );
+			$parameters = datamachine_parse_text_tool_attributes( (string) $match['attrs'] );
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || empty( $parameters ) ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
+			);
+		}
+	}
+
+	if ( preg_match_all( '/<tool\s+name=["\']([^"\']+)["\']\s*>(.*?)<\/tool>/is', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name       = sanitize_key( (string) $match[1] );
+			$parameters = array();
+			if ( preg_match_all( '/<param\s+name=["\']([^"\']+)["\']\s*>(.*?)<\/param>/is', (string) $match[2], $parameter_matches, PREG_SET_ORDER ) ) {
+				foreach ( $parameter_matches as $parameter_match ) {
+					$parameter_name = sanitize_key( (string) $parameter_match[1] );
+					if ( '' === $parameter_name ) {
+						continue;
+					}
+
+					$parameter_value               = function_exists( '\wp_strip_all_tags' )
+						? \wp_strip_all_tags( (string) $parameter_match[2] )
+						: (string) preg_replace( '/<[^>]*>/', '', (string) $parameter_match[2] );
+					$parameters[ $parameter_name ] = html_entity_decode( trim( $parameter_value ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+				}
+			}
+
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || empty( $parameters ) ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
+			);
+		}
+	}
+
+	if ( preg_match_all( '/(?:^|\s)to=(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\s+(?P<json>\{.*?\})(?=\s|$)/s', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name       = sanitize_key( (string) $match['name'] );
+			$parameters = json_decode( (string) $match['json'], true );
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || ! is_array( $parameters ) ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
+			);
+		}
+	}
+
+	if ( preg_match_all( '/```(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\s*(?P<json>\{.*?\})\s*```/is', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name       = sanitize_key( (string) $match['name'] );
+			$parameters = json_decode( (string) $match['json'], true );
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || ! is_array( $parameters ) ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
+			);
+		}
+	}
+
+	if ( preg_match_all( '/(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\((?P<value>["\']?[^\)]*?["\']?)\)/', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name  = sanitize_key( (string) $match['name'] );
+			$value = trim( (string) $match['value'], " \t\n\r\0\x0B\"'" );
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || '' === $value ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => array( 'path' => html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ),
+				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
+			);
+		}
+	}
+
+	if ( preg_match_all( '/(?:^|\s)(?P<name>[a-zA-Z][a-zA-Z0-9_\-]*)\s+(?P<attrs>(?:[a-zA-Z_][a-zA-Z0-9_\-]*=(?:"[^"]*"|\'[^\']*\'|\S+)\s*){2,})/s', $text, $matches, PREG_SET_ORDER ) ) {
+		foreach ( $matches as $match ) {
+			$name       = sanitize_key( (string) $match['name'] );
+			$parameters = datamachine_parse_text_tool_attributes( (string) $match['attrs'] );
+			if ( ! datamachine_is_plausible_text_tool_name( $name ) || empty( $parameters ) ) {
+				continue;
+			}
+
+			$tool_calls[] = array(
+				'name'       => $name,
+				'parameters' => $parameters,
+				'id'         => 'text-tool-call-' . ( count( $tool_calls ) + 1 ),
+			);
+		}
+	}
+
+	return $tool_calls;
+}
+
+/**
+ * Determine whether a bare text token looks like a tool name, not wrapper text.
+ *
+ * @param string $name Sanitized candidate tool name.
+ * @return bool
+ */
+function datamachine_is_plausible_text_tool_name( string $name ): bool {
+	if ( '' === $name || ! str_contains( $name, '_' ) ) {
+		return false;
+	}
+
+	return ! in_array( $name, array( 'function_calls', 'tool_call' ), true );
+}
+
+/**
+ * Parse key=value attributes from text tool-call forms.
+ *
+ * @param string $attributes Attribute text.
+ * @return array<string, string>
+ */
+function datamachine_parse_text_tool_attributes( string $attributes ): array {
+	$parameters = array();
+	if ( ! preg_match_all( '/([a-zA-Z_][a-zA-Z0-9_\-]*)=("[^"]*"|\'[^\']*\'|[^\s>\]]+)/', $attributes, $matches, PREG_SET_ORDER ) ) {
+		return $parameters;
+	}
+
+	foreach ( $matches as $match ) {
+		$name = sanitize_key( (string) $match[1] );
+		if ( '' === $name ) {
+			continue;
+		}
+
+		$value = trim( (string) $match[2] );
+		if ( ( str_starts_with( $value, '"' ) && str_ends_with( $value, '"' ) ) || ( str_starts_with( $value, "'" ) && str_ends_with( $value, "'" ) ) ) {
+			$value = substr( $value, 1, -1 );
+		}
+
+		$parameters[ $name ] = html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+	}
+
+	return $parameters;
 }
 
 /**
@@ -1655,7 +1851,11 @@ function datamachine_extract_tag_tool_calls( string $text ): array {
 				continue;
 			}
 
-			$parameters = datamachine_normalize_function_args( html_entity_decode( trim( (string) $match[2] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+			$body       = html_entity_decode( trim( (string) $match[2] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			$parameters = datamachine_normalize_function_args( $body );
+			if ( '' !== $body && empty( $parameters ) ) {
+				continue;
+			}
 			++$index;
 			$tool_calls[] = array(
 				'name'       => $name,

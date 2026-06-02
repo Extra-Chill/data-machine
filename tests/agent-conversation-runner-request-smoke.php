@@ -854,6 +854,85 @@ assert_runner_request( 'workspace_read' === ( $named_tag_tool_sandbox_metadata['
 assert_runner_request( array( 'path' => 'README.md' ) === ( $named_tag_tool_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline named tag tool parameters are parsed' );
 assert_runner_request( 1 === count( $named_tag_tool_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline named tag tool call executes a workspace tool' );
 
+// 4g. Sandbox/pipeline runs also execute named text tool calls emitted by Codex-style responses.
+$named_text_dispatch_count = 0;
+WpAiClientTestDouble::reset();
+WpAiClientTestDouble::set_response_callback(
+	function () use ( &$named_text_dispatch_count ) {
+		++$named_text_dispatch_count;
+
+		if ( 1 === $named_text_dispatch_count ) {
+			return array(
+				'success' => true,
+				'data'    => array(
+					'content' => '<tool name="workspace_read"><param name="path">README.md</param></tool>'
+						. '[workspace_read path="README.md"][/workspace_read]'
+						. 'to=workspace_read {"path":"README.md"}'
+						. "```workspace_read\n{\"path\":\"README.md\"}\n```"
+						. ' workspace_read("README.md")'
+						. ' workspace_edit path=README.md old="before" new="after"',
+				),
+			);
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'content' => 'named text sandbox complete',
+			),
+		);
+	}
+);
+
+$named_text_sandbox_result = datamachine_run_conversation(
+	array( array( 'role' => 'user', 'content' => 'read and edit the sandbox README using named text syntax' ) ),
+	array(
+		'workspace_read' => array(
+			'name'        => 'workspace_read',
+			'description' => 'Read a file from the sandbox workspace.',
+			'parameters'  => array(
+				'type'       => 'object',
+				'properties' => array(
+					'path' => array( 'type' => 'string' ),
+				),
+				'required'   => array( 'path' ),
+			),
+			'class'       => SandboxPipelineSmokeTool::class,
+			'method'      => 'execute',
+		),
+		'workspace_edit' => array(
+			'name'        => 'workspace_edit',
+			'description' => 'Edit a file in the sandbox workspace.',
+			'parameters'  => array(
+				'type'       => 'object',
+				'properties' => array(
+					'path' => array( 'type' => 'string' ),
+					'old'  => array( 'type' => 'string' ),
+					'new'  => array( 'type' => 'string' ),
+				),
+				'required'   => array( 'path', 'old', 'new' ),
+			),
+			'class'       => SandboxPipelineSmokeTool::class,
+			'method'      => 'execute',
+		),
+	),
+	'openai',
+	'gpt-smoke',
+	array( 'sandbox', 'pipeline' ),
+	array(),
+	3
+);
+$named_text_sandbox_metadata = datamachine_conversation_metadata( $named_text_sandbox_result );
+
+assert_runner_request( 2 === $named_text_dispatch_count, 'sandbox/pipeline named text tool calls return to provider for final answer' );
+assert_runner_request( 'named text sandbox complete' === ( $named_text_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline named text tool calls preserve final answer' );
+assert_runner_request( 2 === count( $named_text_sandbox_metadata['tool_calls'] ?? array() ), 'sandbox/pipeline named text tool calls are parsed and deduped' );
+assert_runner_request( 'workspace_read' === ( $named_text_sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline named text read tool name is parsed' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $named_text_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline named text read parameters are parsed' );
+assert_runner_request( 'workspace_edit' === ( $named_text_sandbox_metadata['tool_calls'][1]['name'] ?? null ), 'sandbox/pipeline named text edit tool name is parsed' );
+assert_runner_request( array( 'path' => 'README.md', 'old' => 'before', 'new' => 'after' ) === ( $named_text_sandbox_metadata['tool_calls'][1]['parameters'] ?? null ), 'sandbox/pipeline named text edit parameters are parsed' );
+assert_runner_request( 2 === count( $named_text_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline named text tool calls execute workspace tools' );
+
 // 5. Client runtime tools are fulfilled by the transport callback, not PHP ToolExecutor.
 $runtime_dispatch_count = 0;
 $runtime_requests       = array();
