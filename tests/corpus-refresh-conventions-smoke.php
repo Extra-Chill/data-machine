@@ -44,11 +44,11 @@ final class CorpusRefreshLedgerForSmoke {
 
 echo "=== corpus-refresh-conventions-smoke ===\n";
 
-$doc_key       = CorpusRefreshConventions::document_key( 'Core Brain', 'Doc 42', 'SHA256:ABC123' );
-$same_doc_key  = CorpusRefreshConventions::document_key( 'core brain', 'doc 42', 'sha256:abc123' );
-$new_doc_key   = CorpusRefreshConventions::document_key( 'Core Brain', 'Doc 42', 'SHA256:DEF456' );
-$chunk_key     = CorpusRefreshConventions::chunk_key( 'Core Brain', 'chunk/7', 'chunkhash' );
-$embedding_key = CorpusRefreshConventions::embedding_key( 'Core Brain', 'OpenAI', 'text-embedding-3-large', 'chunkhash' );
+$doc_key       = CorpusRefreshConventions::document_key( 'Docs Corpus', 'Doc 42', 'SHA256:ABC123' );
+$same_doc_key  = CorpusRefreshConventions::document_key( 'docs corpus', 'doc 42', 'sha256:abc123' );
+$new_doc_key   = CorpusRefreshConventions::document_key( 'Docs Corpus', 'Doc 42', 'SHA256:DEF456' );
+$chunk_key     = CorpusRefreshConventions::chunk_key( 'Docs Corpus', 'chunk/7', 'chunkhash' );
+$embedding_key = CorpusRefreshConventions::embedding_key( 'Docs Corpus', 'OpenAI', 'text-embedding-3-large', 'chunkhash' );
 
 datamachine_corpus_conventions_assert( $doc_key === $same_doc_key, 'document key is stable across casing' );
 datamachine_corpus_conventions_assert( $doc_key !== $new_doc_key, 'document key changes when source hash changes' );
@@ -64,7 +64,7 @@ datamachine_corpus_conventions_assert( ! $ledger->should_skip( CorpusRefreshConv
 
 $metadata = CorpusRefreshConventions::batch_metadata(
 	array(
-		'corpus_id' => 'core-brain',
+		'corpus_id' => 'docs-corpus',
 		'batch_id'  => 'refresh-2026-06-03-1',
 		'selected'  => 10,
 		'skipped'   => 4,
@@ -75,7 +75,7 @@ $metadata = CorpusRefreshConventions::batch_metadata(
 );
 
 datamachine_corpus_conventions_assert( 'corpus_refresh' === $metadata['workload'], 'batch metadata identifies corpus refresh workload' );
-datamachine_corpus_conventions_assert( 'core-brain' === $metadata['corpus_id'], 'batch metadata carries corpus id' );
+datamachine_corpus_conventions_assert( 'docs-corpus' === $metadata['corpus_id'], 'batch metadata carries corpus id' );
 datamachine_corpus_conventions_assert( 10 === $metadata['counts']['selected'], 'batch metadata carries selected count' );
 datamachine_corpus_conventions_assert( 4 === $metadata['counts']['skipped'], 'batch metadata carries skipped count' );
 datamachine_corpus_conventions_assert( 5 === $metadata['counts']['processed'], 'batch metadata carries processed count' );
