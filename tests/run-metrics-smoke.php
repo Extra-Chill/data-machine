@@ -63,9 +63,11 @@ $metrics = RunMetrics::fromJob(
 				'started_at' => '2026-05-03 10:00:00',
 			),
 			'batch_results' => array(
+				'selected'  => 11,
 				'completed' => 8,
 				'failed'    => 1,
 				'skipped'   => 2,
+				'retried'   => 1,
 			),
 			'token_usage'   => array(
 				'total_tokens' => 99,
@@ -75,9 +77,11 @@ $metrics = RunMetrics::fromJob(
 );
 
 dm_assert( 123 === $metrics['job_id'], 'job_id surfaced' );
+dm_assert( 11 === $metrics['counts']['selected'], 'batch selected count surfaced' );
 dm_assert( 8 === $metrics['counts']['processed'], 'batch completed count maps to processed' );
 dm_assert( 2 === $metrics['counts']['skipped'], 'batch skipped count surfaced' );
 dm_assert( 1 === $metrics['counts']['failed'], 'batch failed count surfaced' );
+dm_assert( 1 === $metrics['counts']['retried'], 'batch retried count surfaced' );
 dm_assert( 3 === $metrics['counts']['staged_actions'], 'staged action count surfaced' );
 dm_assert( 2 === $metrics['counts']['accepted_actions'], 'accepted action count surfaced' );
 dm_assert( 300 === $metrics['duration_seconds'], 'duration uses started/completed timestamps' );

@@ -19,6 +19,7 @@ class RunMetrics {
 	private const KEY = 'run_metrics';
 
 	private const COUNT_KEYS = array(
+		'selected',
 		'processed',
 		'skipped',
 		'failed',
@@ -262,9 +263,11 @@ class RunMetrics {
 		$counts = array();
 
 		if ( isset( $engine['batch_results'] ) && is_array( $engine['batch_results'] ) ) {
-			$counts['processed'] = (int) ( $engine['batch_results']['completed'] ?? 0 );
+			$counts['selected']  = (int) ( $engine['batch_results']['selected'] ?? 0 );
+			$counts['processed'] = (int) ( $engine['batch_results']['processed'] ?? ( $engine['batch_results']['completed'] ?? 0 ) );
 			$counts['failed']    = (int) ( $engine['batch_results']['failed'] ?? 0 );
 			$counts['skipped']   = (int) ( $engine['batch_results']['skipped'] ?? 0 );
+			$counts['retried']   = (int) ( $engine['batch_results']['retried'] ?? 0 );
 		}
 
 		foreach ( array( 'batch_scheduled', 'tasks_scheduled' ) as $key ) {
