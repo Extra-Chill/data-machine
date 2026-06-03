@@ -26,6 +26,33 @@ use DataMachine\Engine\Bundle\BundleValidationException;
 
 defined( 'ABSPATH' ) || exit;
 
+if ( ! function_exists( __NAMESPACE__ . '\\wp_register_ability' ) ) {
+	/**
+	 * Register an ability during or after the Abilities API init hook.
+	 *
+	 * WordPress' public helper intentionally only works while
+	 * `wp_abilities_api_init` is firing. Agent bundle import may lazy-load this
+	 * registry after that hook has completed inside browser Playgrounds, so late
+	 * registration needs to go through the registry instance directly.
+	 *
+	 * @param string $name Ability name.
+	 * @param array  $args Ability arguments.
+	 * @return \WP_Ability|null Registered ability, or null on failure.
+	 */
+	function wp_register_ability( string $name, array $args ): ?\WP_Ability {
+		if ( doing_action( 'wp_abilities_api_init' ) ) {
+			return \wp_register_ability( $name, $args );
+		}
+
+		$registry = \WP_Abilities_Registry::get_instance();
+		if ( null === $registry || $registry->is_registered( $name ) ) {
+			return null;
+		}
+
+		return $registry->register( $name, $args );
+	}
+}
+
 class AgentAbilities {
 
 	private static bool $registered     = false;
@@ -36,11 +63,19 @@ class AgentAbilities {
 			return;
 		}
 
-		$this->registerAbilities();
+		if ( did_action( 'wp_abilities_api_init' ) ) {
+			$this->registerAbilities();
+		} else {
+			add_action( 'wp_abilities_api_init', array( $this, 'registerAbilities' ) );
+		}
 		self::$registered = true;
 	}
 
-	private function registerAbilities(): void {
+	public function registerAbilities(): void {
+		if ( class_exists( AbilityCategories::class ) ) {
+			AbilityCategories::ensure_registered();
+		}
+
 		$register_callback = function () {
 			wp_register_ability(
 				'datamachine/export-agent',
@@ -707,6 +742,8 @@ class AgentAbilities {
 			$register_callback();
 		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', $register_callback );
+		} else {
+			$register_callback();
 		}
 	}
 
