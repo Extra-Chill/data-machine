@@ -1145,6 +1145,87 @@ class MemoryCommand extends BaseCommand {
 	}
 
 	/**
+	 * List registered sections for composable memory files.
+	 *
+	 * Sections are registered by plugins through SectionRegistry and assembled into
+	 * generated memory files such as AGENTS.md and SITE.md. This command exposes
+	 * section ownership and provenance without regenerating the files.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [<filename>]
+	 * : Optional composable filename filter, e.g. AGENTS.md.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine memory section-list AGENTS.md
+	 *     wp datamachine memory section-list --format=json
+	 *
+	 * @subcommand section-list
+	 */
+	public function section_list( array $args, array $assoc_args ): void {
+		$filename = $args[0] ?? '';
+		$this->compose_list( $filename, $assoc_args );
+	}
+
+	/**
+	 * Explain one registered composable memory section.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <filename>
+	 * : Composable filename, e.g. AGENTS.md.
+	 *
+	 * <slug>
+	 * : Section slug, e.g. workspace-inventory.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 *   - csv
+	 *   - yaml
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp datamachine memory explain AGENTS.md workspace-inventory
+	 *
+	 * @subcommand explain
+	 */
+	public function explain( array $args, array $assoc_args ): void {
+		$filename = $args[0] ?? '';
+		$slug     = $args[1] ?? '';
+
+		if ( '' === $filename || '' === $slug ) {
+			WP_CLI::error( 'Usage: wp datamachine memory explain <filename> <slug>' );
+			return;
+		}
+
+		$section = SectionRegistry::get_section( $filename, $slug );
+		if ( null === $section ) {
+			WP_CLI::error( sprintf( 'Section "%s" is not registered for "%s".', $slug, $filename ) );
+			return;
+		}
+
+		$this->format_items( array( $this->section_to_cli_row( $filename, $slug, $section ) ), array( 'file', 'slug', 'priority', 'label', 'owner', 'freshness', 'conditions', 'source_plugin', 'source_file', 'source_callback', 'registered_at' ), $assoc_args );
+	}
+
+	/**
 	 * List registered sections for composable files.
 	 *
 	 * @param string $filename Optional filename filter.
@@ -1163,17 +1244,7 @@ class MemoryCommand extends BaseCommand {
 			}
 
 			foreach ( $sections as $slug => $section ) {
-				$items[] = array(
-					'file'            => $filename,
-					'slug'            => $slug,
-					'priority'        => $section['priority'],
-					'label'           => $section['label'],
-					'description'     => $section['description'],
-					'source_plugin'   => $section['source_plugin'] ?? '-',
-					'source_file'     => $section['source_file'] ?? '-',
-					'source_callback' => $section['source_callback'] ?? '-',
-					'registered_at'   => $section['registered_at'] ?? '-',
-				);
+				$items[] = $this->section_to_cli_row( $filename, $slug, $section );
 			}
 		} else {
 			// All sections across all composable files.
@@ -1187,17 +1258,7 @@ class MemoryCommand extends BaseCommand {
 			foreach ( $composable as $fname => $meta ) {
 				$sections = SectionRegistry::get_sections( $fname );
 				foreach ( $sections as $slug => $section ) {
-					$items[] = array(
-						'file'            => $fname,
-						'slug'            => $slug,
-						'priority'        => $section['priority'],
-						'label'           => $section['label'],
-						'description'     => $section['description'],
-						'source_plugin'   => $section['source_plugin'] ?? '-',
-						'source_file'     => $section['source_file'] ?? '-',
-						'source_callback' => $section['source_callback'] ?? '-',
-						'registered_at'   => $section['registered_at'] ?? '-',
-					);
+					$items[] = $this->section_to_cli_row( $fname, $slug, $section );
 				}
 
 				if ( empty( $sections ) ) {
@@ -1207,6 +1268,9 @@ class MemoryCommand extends BaseCommand {
 						'priority'        => '-',
 						'label'           => '-',
 						'description'     => 'No sections registered.',
+						'owner'           => '-',
+						'freshness'       => '-',
+						'conditions'      => '-',
 						'source_plugin'   => '-',
 						'source_file'     => '-',
 						'source_callback' => '-',
@@ -1221,7 +1285,33 @@ class MemoryCommand extends BaseCommand {
 			return;
 		}
 
-		$this->format_items( $items, array( 'file', 'slug', 'priority', 'label', 'source_plugin', 'source_file', 'source_callback', 'registered_at' ), $assoc_args );
+		$this->format_items( $items, array( 'file', 'slug', 'priority', 'label', 'owner', 'freshness', 'source_plugin', 'source_file', 'source_callback', 'registered_at' ), $assoc_args );
+	}
+
+	/**
+	 * Convert a SectionRegistry row into stable CLI output.
+	 *
+	 * @param string $filename Composable filename.
+	 * @param string $slug     Section slug.
+	 * @param array  $section  Section metadata.
+	 * @return array<string, string|int>
+	 */
+	private function section_to_cli_row( string $filename, string $slug, array $section ): array {
+		$source_plugin = $section['source_plugin'] ?? '-';
+		return array(
+			'file'            => $filename,
+			'slug'            => $slug,
+			'priority'        => $section['priority'],
+			'label'           => $section['label'],
+			'description'     => $section['description'],
+			'owner'           => $section['owner'] ?? $source_plugin,
+			'freshness'       => $section['freshness'] ?? '-',
+			'conditions'      => $section['conditions'] ?? '-',
+			'source_plugin'   => $source_plugin,
+			'source_file'     => $section['source_file'] ?? '-',
+			'source_callback' => $section['source_callback'] ?? '-',
+			'registered_at'   => $section['registered_at'] ?? '-',
+		);
 	}
 
 	/**
