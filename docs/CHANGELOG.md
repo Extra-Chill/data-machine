@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.3] - 2026-06-03
+
+### Fixed
+- pass agent context to manual system tasks
+
 ## [0.139.2] - 2026-06-02
 
 ### Fixed
