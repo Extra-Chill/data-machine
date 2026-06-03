@@ -17,6 +17,15 @@ defined( 'ABSPATH' ) || exit;
 
 class ConversationManager {
 
+	/** Maximum JSON bytes to expose in a model-facing tool result payload. */
+	private const MODEL_FACING_TOOL_DATA_MAX_BYTES = 12000;
+
+	/** Maximum string bytes to expose inside a model-facing tool result payload. */
+	private const MODEL_FACING_TOOL_DATA_STRING_MAX_BYTES = 1000;
+
+	/** Maximum nested depth to expose inside a model-facing tool result payload. */
+	private const MODEL_FACING_TOOL_DATA_MAX_DEPTH = 6;
+
 	/**
 	 * Build standardized conversation message envelope.
 	 *
@@ -166,7 +175,7 @@ class ConversationManager {
 
 			// Still append to content for AI context, but frontend can use metadata to hide it
 			if ( ! $is_handler_tool ) {
-				$content .= "\n\n" . wp_json_encode( $tool_data );
+				$content .= "\n\n" . self::modelFacingToolDataJson( $tool_data );
 			}
 		}
 
@@ -230,8 +239,12 @@ class ConversationManager {
 	 */
 	private static function modelFacingToolData( array $tool_result ): array {
 		$data = array();
-		if ( ! empty( $tool_result['data'] ) && is_array( $tool_result['data'] ) ) {
+		if ( is_array( $tool_result['data'] ?? null ) ) {
 			$data = $tool_result['data'];
+		} elseif ( is_array( $tool_result['result'] ?? null ) ) {
+			$data = $tool_result['result'];
+		} elseif ( array_key_exists( 'result', $tool_result ) && ( is_scalar( $tool_result['result'] ) || null === $tool_result['result'] ) ) {
+			$data = array( 'result' => $tool_result['result'] );
 		}
 
 		$public_keys = array(
@@ -252,7 +265,92 @@ class ConversationManager {
 			}
 		}
 
-		return $data;
+		return self::boundModelFacingToolData( $data );
+	}
+
+	/**
+	 * Encode bounded model-facing tool data.
+	 *
+	 * @param array<string,mixed> $tool_data Bounded tool data.
+	 * @return string JSON string.
+	 */
+	private static function modelFacingToolDataJson( array $tool_data ): string {
+		$json = wp_json_encode( $tool_data );
+
+		return is_string( $json ) ? $json : '{}';
+	}
+
+	/**
+	 * Bound model-facing tool data while preserving useful payload shape.
+	 *
+	 * @param array<string,mixed> $data Tool data payload.
+	 * @return array<string,mixed>
+	 */
+	private static function boundModelFacingToolData( array $data ): array {
+		foreach ( array( 50, 20, 10 ) as $max_items ) {
+			$bounded = self::boundModelFacingToolValue( $data, 0, $max_items );
+			$json    = self::modelFacingToolDataJson( $bounded );
+
+			if ( strlen( $json ) <= self::MODEL_FACING_TOOL_DATA_MAX_BYTES ) {
+				return $bounded;
+			}
+		}
+
+		$keys = array_slice( array_keys( $data ), 0, 50 );
+
+		return array(
+			'__truncated__' => true,
+			'keys'          => $keys,
+			'preview'       => substr( self::modelFacingToolDataJson( self::boundModelFacingToolValue( $data, 0, 3 ) ), 0, self::MODEL_FACING_TOOL_DATA_MAX_BYTES ),
+		);
+	}
+
+	/**
+	 * Bound a model-facing tool result value recursively.
+	 *
+	 * @param mixed $value     Value to bound.
+	 * @param int   $depth     Current depth.
+	 * @param int   $max_items Maximum array entries to preserve at each level.
+	 * @return mixed
+	 */
+	private static function boundModelFacingToolValue( $value, int $depth, int $max_items ) {
+		if ( is_string( $value ) ) {
+			if ( strlen( $value ) <= self::MODEL_FACING_TOOL_DATA_STRING_MAX_BYTES ) {
+				return $value;
+			}
+
+			return substr( $value, 0, self::MODEL_FACING_TOOL_DATA_STRING_MAX_BYTES ) . '... [truncated]';
+		}
+
+		if ( is_scalar( $value ) || null === $value ) {
+			return $value;
+		}
+
+		if ( ! is_array( $value ) ) {
+			return '[unserializable]';
+		}
+
+		if ( $depth >= self::MODEL_FACING_TOOL_DATA_MAX_DEPTH ) {
+			return array(
+				'__truncated__' => true,
+				'reason'        => 'max_depth',
+			);
+		}
+
+		$bounded = array();
+		$count   = 0;
+		foreach ( $value as $key => $child ) {
+			if ( $count >= $max_items ) {
+				$bounded['__truncated__'] = true;
+				$bounded['__omitted__']   = max( 0, count( $value ) - $count );
+				break;
+			}
+
+			$bounded[ $key ] = self::boundModelFacingToolValue( $child, $depth + 1, $max_items );
+			++$count;
+		}
+
+		return $bounded;
 	}
 
 	/**
