@@ -100,12 +100,13 @@ class PipelineExecutionContractTest extends WP_UnitTestCase
                 '_handler_callable' => static function (string $slug, array $config): array {
                     return array(
                         'fake_publish_tool' => array(
-                            'description'    => 'Publish synthetic content for the pipeline contract test.',
-                            'class'          => FakePipelinePublishTool::class,
-                            'method'         => 'handle',
-                            'handler'        => $slug,
-                            'handler_config' => $config,
-                            'parameters'     => array(
+                            'description'             => 'Publish synthetic content for the pipeline contract test.',
+                            'class'                   => FakePipelinePublishTool::class,
+                            'client_context_bindings' => array( 'job_id' ),
+                            'method'                  => 'handle',
+                            'handler'                 => $slug,
+                            'handler_config'          => $config,
+                            'parameters'              => array(
                                 'title'   => array(
                                     'type'     => 'string',
                                     'required' => true,

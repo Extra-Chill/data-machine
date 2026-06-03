@@ -77,12 +77,13 @@ class WordPress extends PublishHandler {
 					}
 
 					$tools['wordpress_publish'] = array(
-						'class'          => self::class,
-						'method'         => 'handle_tool_call',
-						'handler'        => 'wordpress_publish',
-						'description'    => 'Create WordPress posts and pages with automatic taxonomy assignment, featured image processing, and source URL attribution.',
-						'parameters'     => $tool_parameters,
-						'handler_config' => $handler_config,
+						'class'                   => self::class,
+						'client_context_bindings' => array( 'job_id' ),
+						'method'                  => 'handle_tool_call',
+						'handler'                 => 'wordpress_publish',
+						'description'             => 'Create WordPress posts and pages with automatic taxonomy assignment, featured image processing, and source URL attribution.',
+						'parameters'              => $tool_parameters,
+						'handler_config'          => $handler_config,
 					);
 				}
 				return $tools;

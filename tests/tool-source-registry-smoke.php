@@ -80,6 +80,10 @@ function get_option( string $key, $default_value = false ) {
 	return $default_value;
 }
 
+function wp_json_encode( $value, int $flags = 0, int $depth = 512 ) {
+	return json_encode( $value, $flags, $depth );
+}
+
 class WP_Abilities_Registry {
 	public static function get_instance(): self {
 		return new self();
@@ -242,6 +246,38 @@ assert_source_equals( array( 'chat_static_tool' ), array_keys( resolve_source_to
 assert_source_equals( array(), $manager->handler_calls, 'chat mode does not query adjacent handlers', $failures, $passes );
 assert_source_equals( array( 'system_static_tool' ), array_keys( resolve_source_tools( ToolPolicyResolver::MODE_SYSTEM, new SourcePolicyToolManager() ) ), 'system mode gets static system tools only', $failures, $passes );
 assert_source_equals( array( 'custom_static_tool' ), array_keys( resolve_source_tools( 'custom_mode', new SourcePolicyToolManager() ) ), 'custom mode gets static custom-mode tools only', $failures, $passes );
+
+echo "\n[2b] handler runtime context bindings stay declaration-owned:\n";
+remove_all_filters_for_source_smoke();
+add_filter(
+	'datamachine_tools',
+	static function ( array $tools ): array {
+		$tools['__handler_tools_context_smoke'] = array(
+			'_handler_callable' => static function (): array {
+				return array(
+					'unbound_handler_tool' => array(
+						'description' => 'Handler tool without runtime context.',
+					),
+					'bound_handler_tool'   => array(
+						'description'             => 'Handler tool with explicit job context.',
+						'client_context_bindings' => array( 'job_id' ),
+					),
+				);
+			},
+			'handler'           => 'context_smoke',
+			'modes'             => array( 'pipeline' ),
+		);
+		return $tools;
+	}
+);
+$handler_context_tools = ( new ToolManager() )->resolveHandlerTools(
+	'context_smoke',
+	array(),
+	array( 'job_id' => 99 ),
+	'context_scope'
+);
+assert_source_equals( false, isset( $handler_context_tools['unbound_handler_tool']['client_context_bindings'] ), 'handler tools do not receive implicit job_id bindings', $failures, $passes );
+assert_source_equals( array( 'job_id' ), $handler_context_tools['bound_handler_tool']['client_context_bindings'] ?? null, 'handler tools keep explicit job_id bindings', $failures, $passes );
 
 echo "\n[3] filters can add a source without disturbing default order:\n";
 remove_all_filters_for_source_smoke();

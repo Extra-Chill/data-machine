@@ -37,11 +37,12 @@ class WordPress extends UpsertHandler {
 	public static function registerTools( $tools, $handler_slug, $handler_config ) {
 		if ( 'wordpress_update' === $handler_slug ) {
 			$tools['wordpress_update'] = array(
-				'class'       => self::class,
-				'method'      => 'handle_tool_call',
-				'handler'     => 'wordpress_update',
-				'description' => 'Update an existing WordPress post. Supports surgical text find/replace, block-level edits by index, full content replacement, title updates, and taxonomy assignment. Requires source_url from previous fetch step.',
-				'parameters'  => array(
+				'class'                   => self::class,
+				'client_context_bindings' => array( 'job_id' ),
+				'method'                  => 'handle_tool_call',
+				'handler'                 => 'wordpress_update',
+				'description'             => 'Update an existing WordPress post. Supports surgical text find/replace, block-level edits by index, full content replacement, title updates, and taxonomy assignment. Requires source_url from previous fetch step.',
+				'parameters'              => array(
 					'type'       => 'object',
 					'properties' => array(
 						'content'       => array(
