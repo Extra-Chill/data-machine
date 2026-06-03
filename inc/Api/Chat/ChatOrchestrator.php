@@ -884,7 +884,7 @@ class ChatOrchestrator {
 				);
 
 				return new WP_Error(
-					'chubes_ai_request_failed',
+					'wp_ai_client_request_failed',
 					$loop_result['error'],
 					array( 'status' => 500 )
 				);
