@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.7] - 2026-06-03
+
+### Fixed
+- avoid full graph builds for cold backlinks
+
 ## [0.139.6] - 2026-06-03
 
 ### Fixed
