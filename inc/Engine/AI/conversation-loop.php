@@ -79,15 +79,15 @@ function datamachine_run_conversation(
 	// surfaces turn_count, final_content, usage, and request_metadata on the
 	// final result directly (see agents-api#136), so we only carry by-reference
 	// the things substrate doesn't track for us.
-	$last_tool_calls              = array();
-	$all_tool_calls               = array();
-	$tool_execution_results       = array();
-	$completion_nudges            = array();
-	$last_request_metadata        = array();
-	$latest_messages              = $messages;
-	$latest_turn_count            = 0;
-	$runtime_tool_pending         = false;
-	$runtime_tool_requests        = array();
+	$last_tool_calls        = array();
+	$all_tool_calls         = array();
+	$tool_execution_results = array();
+	$completion_nudges      = array();
+	$last_request_metadata  = array();
+	$latest_messages        = $messages;
+	$latest_turn_count      = 0;
+	$runtime_tool_pending   = false;
+	$runtime_tool_requests  = array();
 
 	// Base log context for consistent logging.
 	$base_log_context = array_filter(
@@ -189,7 +189,7 @@ function datamachine_run_conversation(
 		$completion_nudges
 	);
 
-	$tool_executor = datamachine_build_loop_tool_executor( $tools, $loop_payload, $mode );
+	$tool_executor     = datamachine_build_loop_tool_executor( $tools, $loop_payload, $mode );
 	$pre_tool_mediator = datamachine_build_pre_tool_mediator(
 		$tools,
 		$loop_payload,
@@ -306,8 +306,8 @@ function datamachine_run_conversation(
 			}
 		}
 		if ( isset( $result['failure'] ) && is_array( $result['failure'] ) && ! isset( $result['error'] ) ) {
-			$result['error']      = (string) ( $result['failure']['message'] ?? 'Provider request failed.' );
-			$result['error_code'] = (string) ( $result['failure']['code'] ?? 'provider_error' );
+			$result['error']         = (string) ( $result['failure']['message'] ?? 'Provider request failed.' );
+			$result['error_code']    = (string) ( $result['failure']['code'] ?? 'provider_error' );
 			$result['finish_reason'] = 'provider_error';
 		}
 		$tool_execution_results = datamachine_enrich_mediated_tool_results(
@@ -366,8 +366,8 @@ function datamachine_run_conversation(
 		);
 	}
 	if ( 'runtime_tool_pending' === (string) ( $result['status'] ?? '' ) || ! empty( $result['runtime_tool_pending'] ) ) {
-		$runtime_tool_pending  = true;
-		$runtime_tool_requests = is_array( $result['runtime_tool_pending'] ?? null ) ? array( $result['runtime_tool_pending'] ) : $runtime_tool_requests;
+		$runtime_tool_pending                                  = true;
+		$runtime_tool_requests                                 = is_array( $result['runtime_tool_pending'] ?? null ) ? array( $result['runtime_tool_pending'] ) : $runtime_tool_requests;
 		$datamachine_metadata['completed']                     = false;
 		$datamachine_metadata['runtime_tool_pending']          = true;
 		$datamachine_metadata['runtime_tool_pending_requests'] = $runtime_tool_requests;
@@ -521,7 +521,7 @@ function datamachine_build_loop_tool_executor( array $tools, array $loop_payload
 			);
 
 			$metadata                              = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
-			$metadata['datamachine']                = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
+			$metadata['datamachine']               = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
 			$metadata['datamachine']['parameters'] = $parameters;
 			$result['metadata']                    = $metadata;
 			return $result;
@@ -692,16 +692,16 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
 			continue;
 		}
 
-		$tool_name       = (string) ( $tool_result_entry['tool_name'] ?? '' );
-		$parameters      = is_array( $tool_result_entry['parameters'] ?? null ) ? $tool_result_entry['parameters'] : array();
-		$result          = is_array( $tool_result_entry['result'] ?? null ) ? $tool_result_entry['result'] : array();
-		$metadata        = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+		$tool_name  = (string) ( $tool_result_entry['tool_name'] ?? '' );
+		$parameters = is_array( $tool_result_entry['parameters'] ?? null ) ? $tool_result_entry['parameters'] : array();
+		$result     = is_array( $tool_result_entry['result'] ?? null ) ? $tool_result_entry['result'] : array();
+		$metadata   = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
 		if ( in_array( (string) ( $metadata['error_type'] ?? '' ), array( 'duplicate_tool_call', 'tool_runtime_rule_rejected' ), true ) ) {
 			continue;
 		}
 
 		if ( ! empty( $result['success'] ) && is_array( $result['result'] ?? null ) ) {
-			$result = array_merge( $result['result'], $result );
+			$result                      = array_merge( $result['result'], $result );
 			$tool_result_entry['result'] = $result;
 		}
 		$turn_count      = (int) ( $tool_result_entry['turn_count'] ?? 0 );

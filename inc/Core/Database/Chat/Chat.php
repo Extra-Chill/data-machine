@@ -651,6 +651,9 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 		$session['messages']   = self::normalize_messages( json_decode( $session['messages'], true ) ?? array() );
 		$session['metadata']   = json_decode( $session['metadata'], true ) ?? array();
 		$session['agent_slug'] = self::resolve_agent_slug_from_session_row( $session );
+		$session['title']      = is_string( $session['title'] ?? null ) ? $session['title'] : '';
+		$session['provider']   = is_string( $session['provider'] ?? null ) ? $session['provider'] : '';
+		$session['model']      = is_string( $session['model'] ?? null ) ? $session['model'] : '';
 
 		return $session;
 	}
@@ -724,6 +727,9 @@ class Chat extends BaseRepository implements ConversationStoreInterface {
 			}
 			$session['metadata']   = json_decode( $session['metadata'] ?? '[]', true ) ?? array();
 			$session['agent_slug'] = self::resolve_agent_slug_from_session_row( $session );
+			$session['title']      = is_string( $session['title'] ?? null ) ? $session['title'] : '';
+			$session['provider']   = is_string( $session['provider'] ?? null ) ? $session['provider'] : '';
+			$session['model']      = is_string( $session['model'] ?? null ) ? $session['model'] : '';
 		}
 		unset( $session );
 
