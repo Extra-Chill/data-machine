@@ -75,7 +75,7 @@ final class DataMachineToolAccessPolicy {
 					return false;
 				}
 
-				if ( ! $ability || ! $ability->check_permissions() ) {
+				if ( ! $ability || true !== $ability->check_permissions() ) {
 					return false;
 				}
 			}

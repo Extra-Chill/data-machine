@@ -71,6 +71,7 @@ use DataMachine\Engine\AI\IterationBudgetRegistry;
 use DataMachine\Engine\AI\WpAiClientCache;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
+use DataMachine\Abilities\AbilityScopePermissionFilter;
 use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
@@ -79,6 +80,7 @@ use DataMachine\Core\OAuth\HttpBasicAuthProvider;
 use DataMachine\Core\PluginSettings;
 
 add_action( 'plugins_loaded', array( WpAiClientCache::class, 'install' ), 20 );
+AbilityScopePermissionFilter::register();
 ContentFormat::register();
 
 add_filter(
