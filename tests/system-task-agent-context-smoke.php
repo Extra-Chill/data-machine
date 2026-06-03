@@ -347,9 +347,11 @@ $ai_step_source          = file_get_contents( dirname( __DIR__ ) . '/inc/Core/St
 $system_task_step_source = file_get_contents( dirname( __DIR__ ) . '/inc/Core/Steps/SystemTask/SystemTaskStep.php' );
 $scheduler_source        = file_get_contents( dirname( __DIR__ ) . '/inc/Engine/Tasks/TaskScheduler.php' );
 $provider_source         = file_get_contents( dirname( __DIR__ ) . '/inc/Engine/AI/System/SystemAgentServiceProvider.php' );
+$system_abilities_source = file_get_contents( dirname( __DIR__ ) . '/inc/Abilities/SystemAbilities.php' );
 $assert( 'AIStep has explicit missing-agent failure', str_contains( $ai_step_source, 'ai_agent_context_required' ) );
 $assert( 'SystemTaskStep has explicit missing-agent failure', str_contains( $system_task_step_source, 'system_task_agent_context_required' ) );
 $assert( 'TaskScheduler refuses agent-less queued task scheduling', str_contains( $scheduler_source, 'task_scheduler_agent_context_required' ) );
+$assert( 'Manual system task runs extract scheduler context', str_contains( $system_abilities_source, 'extractRunTaskContext' ) && str_contains( $system_abilities_source, 'TaskScheduler::schedule( $task_type, array_merge( $task_params' ) && str_contains( $system_abilities_source, '$task_context' ) );
 $assert( 'SystemTask exposes explicit agent-context contract', str_contains( file_get_contents( dirname( __DIR__ ) . '/inc/Engine/AI/System/Tasks/SystemTask.php' ), 'function requiresAgentContext(): bool' ) );
 $assert( 'Retention tasks explicitly opt out of agent context', str_contains( file_get_contents( dirname( __DIR__ ) . '/inc/Engine/AI/System/Tasks/Retention/RetentionTask.php' ), 'function requiresAgentContext(): bool' ) );
 $assert( 'Recurring per-agent schedules do not fall back to a site-scoped task', str_contains( $provider_source, 'recurring_task_agent_context_required' ) && ! str_contains( $provider_source, 'pre-multi-agent behaviour' ) );
