@@ -154,3 +154,23 @@ function datamachine_register_persisted_agents(): void {
 	PersistedAgentProjector::register_persisted_agents();
 }
 add_action( 'wp_agents_api_init', 'datamachine_register_persisted_agents', 20 );
+
+/**
+ * Materialize runtime-imported Agents API bundles for Data Machine chat.
+ *
+ * Browser runtimes can import a request-local agent bundle immediately before
+ * calling `agents/chat`. The generic importer registers that definition in the
+ * Agents API registry; Data Machine still needs a persisted identity row so its
+ * chat handler can resolve owner, model config, and tool policy.
+ *
+ * @param mixed $result Runtime bundle import result.
+ * @return mixed Import result.
+ */
+function datamachine_reconcile_runtime_agent_bundle_import( $result ) {
+	if ( is_array( $result ) && ! empty( $result['success'] ) && ! empty( $result['agent_slug'] ) ) {
+		AgentRegistry::reconcile();
+	}
+
+	return $result;
+}
+add_filter( 'wp_agent_runtime_import_bundle', 'datamachine_reconcile_runtime_agent_bundle_import', 20, 1 );

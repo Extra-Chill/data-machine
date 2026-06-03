@@ -228,6 +228,9 @@ class ChatOrchestrator {
 				'agent_slug'           => $agent_slug,
 				'interrupt_source'     => $interrupt_source,
 				'client_context'       => $options['client_context'] ?? array(),
+				'tool_policy'          => is_array( $options['tool_policy'] ?? null ) ? $options['tool_policy'] : null,
+				'allow_only'           => is_array( $options['allow_only'] ?? null ) ? $options['allow_only'] : null,
+				'completion_assertions' => is_array( $options['completion_assertions'] ?? null ) ? $options['completion_assertions'] : null,
 			)
 		);
 
@@ -303,13 +306,20 @@ class ChatOrchestrator {
 		}
 
 		// --- Build response data ---
+		$response_metadata = is_array( $loop_result['metadata'] ?? null ) ? $loop_result['metadata'] : array();
+		if ( empty( $response_metadata ) ) {
+			$response_metadata = $metadata;
+		} else {
+			$response_metadata = array_merge( $metadata, $response_metadata );
+		}
+
 		$response_data = array(
 			'session_id'             => $session_id,
 			'response'               => $result['final_content'],
 			'tool_calls'             => $loop_metadata['tool_calls'] ?? $loop_metadata['last_tool_calls'] ?? array(),
 			'tool_execution_summary' => $loop_metadata['tool_execution_summary'] ?? datamachine_summarize_tool_execution_results( $result['tool_execution_results'] ?? array(), false ),
 			'conversation'           => $result['messages'],
-			'metadata'               => $metadata,
+			'metadata'               => $response_metadata,
 			'completed'              => $is_completed,
 			'max_turns'              => $max_turns,
 			'turn_number'            => $result['turn_count'],
@@ -811,6 +821,8 @@ class ChatOrchestrator {
 					'user_id'        => $user_id,
 					'interactive'    => true,
 					'client_context' => is_array( $client_context ) ? $client_context : array(),
+					'tool_policy'    => is_array( $options['tool_policy'] ?? null ) ? $options['tool_policy'] : null,
+					'allow_only'     => is_array( $options['allow_only'] ?? null ) ? $options['allow_only'] : array(),
 				)
 			);
 
@@ -842,6 +854,9 @@ class ChatOrchestrator {
 			}
 			if ( ! empty( $client_context ) ) {
 				$loop_context['client_context'] = $client_context;
+			}
+			if ( is_array( $options['completion_assertions'] ?? null ) ) {
+				$loop_context['completion_assertions'] = $options['completion_assertions'];
 			}
 			if ( null !== $interrupt_source ) {
 				$loop_context['interrupt_source'] = $interrupt_source;

@@ -84,9 +84,13 @@ $assert( str_contains( $handler_source, "'selected_pipeline_id' => (int) ( $" . 
 $assert( str_contains( $handler_source, "'request_id'           => $" . "input['request_id'] ?? null" ), 'AgentsChatHandler forwards request id for session dedupe' );
 $assert( str_contains( $handler_source, "'interrupt_source'     => is_callable( $" . "input['interrupt_source'] ?? null ) ? $" . "input['interrupt_source'] : null" ), 'AgentsChatHandler explicitly forwards callable interrupt sources' );
 $assert( str_contains( $handler_source, "'agent_slug'           => $" . "identity ? $" . "identity->agent_slug : ''" ), 'AgentsChatHandler forwards resolved agent targeting to the chat runtime' );
+$assert( str_contains( $handler_source, "'tool_policy'" ) && str_contains( $handler_source, "input['tool_policy']" ), 'AgentsChatHandler forwards caller tool policy to the chat runtime' );
+$assert( str_contains( $handler_source, "'allow_only'" ) && str_contains( $orchestrator, "options['allow_only']" ), 'agents/chat forwards caller allow_only through tool resolution' );
+$assert( str_contains( $handler_source, "'completion_assertions'" ) && str_contains( $orchestrator, "loop_context['completion_assertions']" ), 'agents/chat forwards completion assertions into the loop context' );
 $assert( str_contains( $handler_source, "'interrupted'" ) && str_contains( $handler_source, "$" . "result['interrupted'] ?? null" ), 'AgentsChatHandler returns interrupted diagnostics in canonical metadata' );
 $assert( str_contains( $handler_source, "'tool_execution_summary'" ), 'AgentsChatHandler returns bounded tool execution diagnostics in canonical metadata' );
 $assert( str_contains( $orchestrator, "'tool_execution_summary'" ) && str_contains( $orchestrator, 'datamachine_summarize_tool_execution_results' ), 'ChatOrchestrator forwards bounded tool execution diagnostics to chat adapters' );
+$assert( str_contains( $orchestrator, '$response_metadata = is_array( $loop_result[\'metadata\'] ?? null )' ), 'ChatOrchestrator exposes loop metadata in chat adapter responses' );
 $assert( ! file_exists( $root . '/inc/Abilities/Chat/SendMessageAbility.php' ), 'datamachine/send-message facade class is removed' );
 $assert( ! str_contains( $chat_abilities, 'SendMessageAbility' ), 'ChatAbilities no longer registers datamachine/send-message' );
 $assert( str_contains( $chat_api, "wp_get_ability( 'agents/chat' )" ), 'REST chat endpoint dispatches directly through canonical agents/chat' );
