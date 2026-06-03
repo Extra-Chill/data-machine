@@ -87,6 +87,38 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 		$this->assertSame( 'widget_publish', $resolved['widget_publish']['_observed']['slug'] );
 		$this->assertSame( array( 'site_id' => 42 ), $resolved['widget_publish']['_observed']['config'] );
 		$this->assertSame( array( 'job_id' => 99 ), $resolved['widget_publish']['_observed']['engine'] );
+		$this->assertArrayNotHasKey( 'client_context_bindings', $resolved['widget_publish'] );
+	}
+
+	public function test_preserves_explicit_handler_context_bindings(): void {
+		add_filter(
+			'datamachine_tools',
+			function ( array $tools ): array {
+				$tools['__handler_tools_widget_publish_bound'] = array(
+					'_handler_callable' => static function () {
+						return array(
+							'widget_publish_bound' => array(
+								'description'             => 'Publish to widget with job context',
+								'client_context_bindings' => array( 'job_id' ),
+							),
+						);
+					},
+					'handler'           => 'widget_publish_bound',
+					'modes'             => array( 'pipeline' ),
+				);
+				return $tools;
+			}
+		);
+
+		$resolved = $this->tool_manager->resolveHandlerTools(
+			'widget_publish_bound',
+			array(),
+			array( 'job_id' => 99 ),
+			'flow_step_xyz'
+		);
+
+		$this->assertArrayHasKey( 'widget_publish_bound', $resolved );
+		$this->assertSame( array( 'job_id' ), $resolved['widget_publish_bound']['client_context_bindings'] );
 	}
 
 	public function test_resolves_three_param_filter_style_handler_callable_before_static_tool(): void {

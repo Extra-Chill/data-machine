@@ -39,11 +39,12 @@ class Email extends PublishHandler {
 			function ( $tools, $handler_slug, $handler_config ) {
 				if ( 'email_publish' === $handler_slug ) {
 					$tools['email_send'] = array(
-						'class'          => self::class,
-						'method'         => 'handle_tool_call',
-						'handler'        => 'email_publish',
-						'description'    => 'Send an email. Compose the subject and body (HTML). Optionally override recipients and attach files by providing server file paths.',
-						'parameters'     => array(
+						'class'                   => self::class,
+						'client_context_bindings' => array( 'job_id' ),
+						'method'                  => 'handle_tool_call',
+						'handler'                 => 'email_publish',
+						'description'             => 'Send an email. Compose the subject and body (HTML). Optionally override recipients and attach files by providing server file paths.',
+						'parameters'              => array(
 							'type'       => 'object',
 							'properties' => array(
 								'to'          => array(
@@ -66,7 +67,7 @@ class Email extends PublishHandler {
 							),
 							'required'   => array( 'subject', 'body' ),
 						),
-						'handler_config' => $handler_config,
+						'handler_config'          => $handler_config,
 					);
 				}
 				return $tools;
