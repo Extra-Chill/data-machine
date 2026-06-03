@@ -396,7 +396,8 @@ class AgentAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'importAgent' ),
-					'permission_callback' => fn() => PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can_manage()
+						|| ( PermissionHelper::in_agent_context() && PermissionHelper::can_use_ability( 'datamachine/import-agent', 'datamachine-agent' ) ),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
