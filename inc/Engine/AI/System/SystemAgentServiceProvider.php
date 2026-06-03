@@ -18,6 +18,10 @@ defined( 'ABSPATH' ) || exit;
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Engine\AI\System\Tasks\AgentCallTask;
 use DataMachine\Engine\AI\System\Tasks\AltTextTask;
+use DataMachine\Engine\AI\System\Tasks\Corpus\CorpusEmbedChunksTask;
+use DataMachine\Engine\AI\System\Tasks\Corpus\CorpusIndexTask;
+use DataMachine\Engine\AI\System\Tasks\Corpus\CorpusRefreshTask;
+use DataMachine\Engine\AI\System\Tasks\Corpus\CorpusRetrieveEvalTask;
 use DataMachine\Engine\AI\System\Tasks\DailyMemoryTask;
 use DataMachine\Engine\AI\System\Tasks\DispatchMessageTask;
 use DataMachine\Engine\AI\System\Tasks\EmitDataPacketsTask;
@@ -76,6 +80,10 @@ class SystemAgentServiceProvider {
 	 */
 	public function getBuiltInTasks( array $tasks ): array {
 		$tasks['agent_call']                             = AgentCallTask::class;
+		$tasks['corpus_index']                           = CorpusIndexTask::class;
+		$tasks['corpus_refresh']                         = CorpusRefreshTask::class;
+		$tasks['corpus_embed_chunks']                    = CorpusEmbedChunksTask::class;
+		$tasks['corpus_retrieve_eval']                   = CorpusRetrieveEvalTask::class;
 		$tasks['dispatch_message']                       = DispatchMessageTask::class;
 		$tasks['emit_data_packets']                      = EmitDataPacketsTask::class;
 		$tasks['source_inventory']                       = SourceInventoryTask::class;
