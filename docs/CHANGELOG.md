@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.10] - 2026-06-03
+
+### Fixed
+- resolve owning agent on flow/pipeline creation to prevent agent_id=NULL orphans
+
 ## [0.139.9] - 2026-06-03
 
 ### Fixed
