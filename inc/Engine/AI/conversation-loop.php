@@ -20,6 +20,7 @@ use AgentsAPI\AI\WP_Agent_Conversation_Result;
 use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use AgentsAPI\AI\WP_Agent_Message;
 use AgentsAPI\AI\WP_Agent_Null_Transcript_Persister;
+use AgentsAPI\AI\Tools\WP_Agent_Tool_Executor;
 use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
@@ -85,7 +86,6 @@ function datamachine_run_conversation(
 	$last_request_metadata        = array();
 	$latest_messages              = $messages;
 	$latest_turn_count            = 0;
-	$latest_conversation_complete = false;
 	$runtime_tool_pending         = false;
 	$runtime_tool_requests        = array();
 
@@ -180,18 +180,24 @@ function datamachine_run_conversation(
 		$loop_payload,
 		$event_sink,
 		$base_log_context,
-		$completion_policy,
-		$tool_runtime_rules,
 		$last_tool_calls,
 		$all_tool_calls,
-		$tool_execution_results,
-		$completion_nudges,
 		$last_request_metadata,
 		$latest_messages,
 		$latest_turn_count,
-		$latest_conversation_complete,
-		$runtime_tool_pending,
-		$runtime_tool_requests
+		$completion_policy,
+		$completion_nudges
+	);
+
+	$tool_executor = datamachine_build_loop_tool_executor( $tools, $loop_payload, $mode );
+	$pre_tool_mediator = datamachine_build_pre_tool_mediator(
+		$tools,
+		$loop_payload,
+		$mode,
+		$modes,
+		$tool_runtime_rules,
+		$event_sink,
+		$base_log_context
 	);
 
 	// Build should_continue callback. Budget enforcement is handled by
@@ -204,12 +210,11 @@ function datamachine_run_conversation(
 		if ( $single_turn ) {
 			return false;
 		}
-		// The DM turn runner sets conversation_complete when the completion
-		// policy says stop, or when no tools were called (natural completion).
+		// Mediated turns keep running after tool calls; natural/completed turns stop.
 		if ( ! empty( $result['conversation_complete'] ) ) {
 			return false;
 		}
-		return ! empty( $result['tool_execution_results'] ) || ! empty( $result['completion_nudge'] ) || ! empty( $result['duplicate_tool_call_rejected'] ) || ! empty( $result['tool_runtime_rule_rejected'] );
+		return ! empty( $result['tool_calls'] ) || ! empty( $result['completion_nudge'] );
 	};
 
 	$conversation_request = new \AgentsAPI\AI\WP_Agent_Conversation_Request(
@@ -250,6 +255,10 @@ function datamachine_run_conversation(
 				'transcript_lock_ttl'   => (int) ( $payload['transcript_lock_ttl'] ?? 300 ),
 				'interrupt_source'      => $interrupt_source,
 				'on_event'              => $on_event,
+				'tool_executor'         => $tool_executor,
+				'tool_declarations'     => $tools,
+				'pre_tool_mediator'     => $pre_tool_mediator,
+				'completion_policy'     => $completion_policy,
 			)
 		);
 	} catch ( \RuntimeException $e ) {
@@ -286,8 +295,19 @@ function datamachine_run_conversation(
 	// Normalize the substrate result and augment with DM-specific fields.
 	try {
 		$result = WP_Agent_Conversation_Result::normalize( $result );
+		if ( isset( $result['failure'] ) && is_array( $result['failure'] ) && ! isset( $result['error'] ) ) {
+			$result['error']      = (string) ( $result['failure']['message'] ?? 'Provider request failed.' );
+			$result['error_code'] = (string) ( $result['failure']['code'] ?? 'provider_error' );
+			$result['finish_reason'] = 'provider_error';
+		}
+		$tool_execution_results = datamachine_enrich_mediated_tool_results(
+			is_array( $result['tool_execution_results'] ?? null ) ? $result['tool_execution_results'] : array(),
+			$tools,
+			$loop_payload
+		);
 		if ( ! empty( $tool_execution_results ) ) {
 			$result['tool_execution_results'] = $tool_execution_results;
+			datamachine_persist_inflight_tool_summary( $loop_payload, $tool_execution_results );
 		}
 	} catch ( \InvalidArgumentException $e ) {
 		$error_result                       = array(
@@ -314,7 +334,7 @@ function datamachine_run_conversation(
 	// request_metadata directly on the result (agents-api#136). Keep DM-only
 	// diagnostics namespaced so the top level remains the Agents API result.
 	$datamachine_metadata = array(
-		'completed'       => ! in_array( (string) ( $result['status'] ?? '' ), array( 'budget_exceeded', 'interrupted' ), true ),
+		'completed'       => ! isset( $result['error'] ) && ! in_array( (string) ( $result['status'] ?? '' ), array( 'budget_exceeded', 'interrupted', 'failed' ), true ),
 		'last_tool_calls' => $last_tool_calls,
 		'tool_calls'      => $all_tool_calls,
 	);
@@ -324,7 +344,7 @@ function datamachine_run_conversation(
 	if ( 'interrupted' === ( $result['status'] ?? '' ) && isset( $result['interrupted'] ) ) {
 		$datamachine_metadata['interrupted'] = $result['interrupted'];
 	}
-	$silent_max_turns_reached = ! $latest_conversation_complete
+	$silent_max_turns_reached = ! empty( $last_tool_calls )
 		&& (int) ( $result['turn_count'] ?? 0 ) >= $turn_budget->ceiling()
 		&& 'budget_exceeded' !== ( $result['status'] ?? '' );
 	if ( $silent_max_turns_reached ) {
@@ -335,7 +355,9 @@ function datamachine_run_conversation(
 			$turn_budget->ceiling()
 		);
 	}
-	if ( $runtime_tool_pending ) {
+	if ( 'runtime_tool_pending' === (string) ( $result['status'] ?? '' ) || ! empty( $result['runtime_tool_pending'] ) ) {
+		$runtime_tool_pending  = true;
+		$runtime_tool_requests = is_array( $result['runtime_tool_pending'] ?? null ) ? array( $result['runtime_tool_pending'] ) : $runtime_tool_requests;
 		$datamachine_metadata['completed']                     = false;
 		$datamachine_metadata['runtime_tool_pending']          = true;
 		$datamachine_metadata['runtime_tool_pending_requests'] = $runtime_tool_requests;
@@ -372,6 +394,12 @@ function datamachine_run_conversation(
 
 	$result                       = datamachine_with_conversation_metadata( $result, $datamachine_metadata );
 	$result['runtime_provenance'] = RuntimeProvenance::fromConversationResult( $result, $loop_payload, $provider, $model, $modes );
+	if ( 'failed' === (string) ( $result['status'] ?? '' ) || isset( $result['error'] ) ) {
+		$transcript_session_id = $transcript_persister->persist( is_array( $result['messages'] ?? null ) ? $result['messages'] : $latest_messages, $conversation_request, $result );
+		if ( '' !== $transcript_session_id ) {
+			$result['transcript_session_id'] = $transcript_session_id;
+		}
+	}
 
 	return $result;
 }
@@ -435,12 +463,218 @@ function datamachine_conversation_metadata( array $result ): array {
 }
 
 /**
+ * Build the Data Machine executor adapter used by the mediated Agents API loop.
+ *
+ * @param array<string,array<string,mixed>> $tools        Tool declarations keyed by name.
+ * @param array<string,mixed>              $loop_payload Cleaned loop payload.
+ * @param string                           $mode         Comma-separated execution mode label.
+ */
+function datamachine_build_loop_tool_executor( array $tools, array $loop_payload, string $mode ): WP_Agent_Tool_Executor {
+	return new class( $tools, $loop_payload, $mode ) implements WP_Agent_Tool_Executor {
+		/** @var array<string,array<string,mixed>> */
+		private array $tools;
+
+		/** @var array<string,mixed> */
+		private array $loop_payload;
+
+		private string $mode;
+
+		/**
+		 * @param array<string,array<string,mixed>> $tools        Tool declarations keyed by name.
+		 * @param array<string,mixed>              $loop_payload Cleaned loop payload.
+		 * @param string                           $mode         Comma-separated execution mode label.
+		 */
+		public function __construct( array $tools, array $loop_payload, string $mode ) {
+			$this->tools        = $tools;
+			$this->loop_payload = $loop_payload;
+			$this->mode         = $mode;
+		}
+
+		/** @inheritDoc */
+		public function executeWP_Agent_Tool_Call( array $tool_call, array $tool_definition, array $context = array() ): array {
+			unset( $tool_definition );
+
+			$tool_name      = (string) ( $tool_call['tool_name'] ?? '' );
+			$parameters     = is_array( $tool_call['parameters'] ?? null ) ? $tool_call['parameters'] : array();
+			$prior_results  = is_array( $context['prior_tool_results'] ?? null ) ? $context['prior_tool_results'] : array();
+			$tool_payload   = datamachine_payload_with_inflight_run_artifacts( $this->loop_payload, $prior_results );
+			$client_context = is_array( $tool_payload['client_context'] ?? null ) ? $tool_payload['client_context'] : array();
+
+			return ToolExecutor::executeTool(
+				$tool_name,
+				$parameters,
+				$this->tools,
+				$tool_payload,
+				$this->mode,
+				(int) ( $tool_payload['agent_id'] ?? 0 ),
+				$client_context
+			);
+		}
+	};
+}
+
+/**
+ * Build Data Machine's pre-tool mediator for duplicate, runtime-rule, and client-tool handling.
+ *
+ * @param array<string,array<string,mixed>> $tools              Tool declarations keyed by name.
+ * @param array<string,mixed>              $loop_payload       Cleaned loop payload.
+ * @param string                           $mode               Comma-separated execution mode label.
+ * @param array<int,string>                $modes              Execution mode slugs.
+ * @param DataMachineToolRuntimeRules      $tool_runtime_rules Tool runtime rules.
+ * @param LoopEventSinkInterface           $event_sink         DM event sink.
+ * @param array<string,mixed>              $base_log_context   Base log context.
+ */
+function datamachine_build_pre_tool_mediator( array $tools, array $loop_payload, string $mode, array $modes, DataMachineToolRuntimeRules $tool_runtime_rules, LoopEventSinkInterface $event_sink, array $base_log_context ): callable {
+	return static function ( array $context ) use ( $tools, $loop_payload, $mode, $modes, $tool_runtime_rules, $event_sink, $base_log_context ): array {
+		$tool_name       = (string) ( $context['tool_name'] ?? '' );
+		$tool_parameters = is_array( $context['parameters'] ?? null ) ? $context['parameters'] : array();
+		$messages        = is_array( $context['messages'] ?? null ) ? $context['messages'] : array();
+		$turn_count      = (int) ( $context['turn'] ?? 0 );
+		$tool_def        = is_array( $tools[ $tool_name ] ?? null ) ? $tools[ $tool_name ] : null;
+
+		$validation_result = ConversationManager::validateToolCall( $tool_name, $tool_parameters, $messages, $tool_def );
+		if ( ! empty( $validation_result['is_duplicate'] ) ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'datamachine_run_conversation: Duplicate tool call prevented',
+				array_merge(
+					$base_log_context,
+					array(
+						'turn_count' => $turn_count,
+						'tool_name'  => $tool_name,
+					)
+				)
+			);
+
+			return array(
+				'action'   => 'reject',
+				'error'    => ConversationManager::duplicateToolCallError( $tool_name, $mode ),
+				'metadata' => array( 'error_type' => 'duplicate_tool_call' ),
+			);
+		}
+
+		$runtime_rule_result = $tool_runtime_rules->evaluate( $tool_name, $messages );
+		if ( ! $runtime_rule_result['allowed'] ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'datamachine_run_conversation: Tool runtime rule rejected call',
+				array_merge(
+					$base_log_context,
+					array(
+						'turn_count' => $turn_count,
+						'tool_name'  => $tool_name,
+						'policy'     => $runtime_rule_result['context'],
+					)
+				)
+			);
+
+			return array(
+				'action'   => 'reject',
+				'error'    => $runtime_rule_result['error'],
+				'metadata' => array(
+					'error_type' => 'tool_runtime_rule_rejected',
+					'policy'     => $runtime_rule_result['context'],
+				),
+			);
+		}
+
+		if ( datamachine_is_external_runtime_tool( $tool_def ) ) {
+			$raw_tool_call = is_array( $context['raw_tool_call'] ?? null ) ? $context['raw_tool_call'] : array();
+			$tool_payload  = datamachine_payload_with_inflight_run_artifacts(
+				$loop_payload,
+				is_array( $context['prior_tool_results'] ?? null ) ? $context['prior_tool_results'] : array()
+			);
+			$tool_result   = datamachine_fulfill_runtime_tool_call(
+				array_merge(
+					$raw_tool_call,
+					array(
+						'name'       => $tool_name,
+						'parameters' => $tool_parameters,
+					)
+				),
+				$tool_def ?? array(),
+				$tool_payload,
+				$mode,
+				$modes,
+				$turn_count,
+				$event_sink,
+				$base_log_context
+			);
+
+			$tool_result['tool_name'] = is_string( $tool_result['tool_name'] ?? null ) && '' !== $tool_result['tool_name'] ? $tool_result['tool_name'] : $tool_name;
+			if ( ! array_key_exists( 'result', $tool_result ) ) {
+				$runtime_result_payload = $tool_result;
+				unset( $runtime_result_payload['success'], $runtime_result_payload['tool_name'], $runtime_result_payload['metadata'], $runtime_result_payload['runtime'] );
+				$tool_result['result'] = $runtime_result_payload;
+			}
+			if ( ! empty( $tool_result['pending'] ) ) {
+				$tool_result['status']             = 'runtime_tool_pending';
+				$tool_result['metadata']['status'] = 'runtime_tool_pending';
+			}
+
+			return array(
+				'action'   => 'replace_result',
+				'result'   => $tool_result,
+				'complete' => ! empty( $tool_result['pending'] ),
+			);
+		}
+
+		return array( 'action' => 'proceed' );
+	};
+}
+
+/**
+ * Add Data Machine trace/runtime metadata to upstream mediated tool results.
+ *
+ * @param array<int,array<string,mixed>>   $tool_results Tool results from Agents API mediation.
+ * @param array<string,array<string,mixed>> $tools        Tool declarations keyed by name.
+ * @param array<string,mixed>              $loop_payload Cleaned loop payload.
+ * @return array<int,array<string,mixed>> Data Machine-enriched tool results.
+ */
+function datamachine_enrich_mediated_tool_results( array $tool_results, array $tools, array $loop_payload ): array {
+	$enriched = array();
+	foreach ( $tool_results as $tool_result_entry ) {
+		if ( ! is_array( $tool_result_entry ) ) {
+			continue;
+		}
+
+		$tool_name       = (string) ( $tool_result_entry['tool_name'] ?? '' );
+		$parameters      = is_array( $tool_result_entry['parameters'] ?? null ) ? $tool_result_entry['parameters'] : array();
+		$result          = is_array( $tool_result_entry['result'] ?? null ) ? $tool_result_entry['result'] : array();
+		if ( ! empty( $result['success'] ) && is_array( $result['result'] ?? null ) ) {
+			$result = array_merge( $result['result'], $result );
+			$tool_result_entry['result'] = $result;
+		}
+		$turn_count      = (int) ( $tool_result_entry['turn_count'] ?? 0 );
+		$tool_def        = is_array( $tools[ $tool_name ] ?? null ) ? $tools[ $tool_name ] : null;
+		$started_at      = microtime( true );
+		$normalized_call = array(
+			'name'       => $tool_name,
+			'parameters' => $parameters,
+		);
+		if ( isset( $tool_result_entry['tool_call_id'] ) ) {
+			$normalized_call['id'] = (string) $tool_result_entry['tool_call_id'];
+		}
+
+		$tool_result_entry['is_handler_tool'] = is_array( $tool_def ) && isset( $tool_def['handler'] );
+		$tool_result_entry['runtime']         = datamachine_tool_runtime_metadata( $tool_def, $result );
+		$tool_result_entry['trace']           = datamachine_build_tool_trace( $tool_name, $normalized_call, $parameters, $result, $tool_def, $turn_count, $started_at, microtime( true ) );
+
+		$enriched[] = $tool_result_entry;
+	}
+
+	unset( $loop_payload );
+	return $enriched;
+}
+
+/**
  * Build the DM-specific turn runner closure.
  *
  * The turn runner handles one provider turn: build request → dispatch via
- * wp-ai-client → extract tool calls → execute tools → format messages.
- * The upstream loop handles multi-turn sequencing, completion policy, and
- * transcript persistence.
+ * wp-ai-client → extract tool calls. The upstream loop handles mediated tool
+ * execution, multi-turn sequencing, completion policy, and transcript persistence.
  *
  * Per-turn `usage` and `request_metadata` are returned in the turn runner's
  * result array; the substrate accumulates and exposes them on the final
@@ -455,11 +689,12 @@ function datamachine_conversation_metadata( array $result ): array {
  * @param array                                     $loop_payload       Cleaned payload.
  * @param LoopEventSinkInterface                    $event_sink         DM event sink.
  * @param array                                     $base_log_context   Base log context.
- * @param WP_Agent_Conversation_Completion_Policy   $completion_policy  Completion policy.
- * @param DataMachineToolRuntimeRules               $tool_runtime_rules Tool runtime rules.
  * @param array                                     &$last_tool_calls    Mutable last turn's tool calls (DM-flavored shape).
  * @param array                                     &$all_tool_calls     Mutable all tool calls made during the run.
- * @param array                                     &$all_tool_results   Mutable all executed tool results (DM-flavored shape).
+ * @param array                                     &$last_request_metadata Mutable last request metadata.
+ * @param array                                     &$latest_messages    Mutable latest messages.
+ * @param int                                       &$latest_turn_count  Mutable latest turn count.
+ * @param WP_Agent_Conversation_Completion_Policy   $completion_policy  Completion policy for natural completions.
  * @param array                                     &$completion_nudges  Mutable nudge diagnostics (DM-only).
  * @return callable Turn runner closure.
  */
@@ -472,18 +707,13 @@ function datamachine_build_turn_runner(
 	array $loop_payload,
 	LoopEventSinkInterface $event_sink,
 	array $base_log_context,
-	WP_Agent_Conversation_Completion_Policy $completion_policy,
-	DataMachineToolRuntimeRules $tool_runtime_rules,
 	array &$last_tool_calls,
 	array &$all_tool_calls,
-	array &$all_tool_results,
-	array &$completion_nudges,
 	array &$last_request_metadata,
 	array &$latest_messages,
 	int &$latest_turn_count,
-	bool &$latest_conversation_complete,
-	bool &$runtime_tool_pending,
-	array &$runtime_tool_requests
+	WP_Agent_Conversation_Completion_Policy $completion_policy,
+	array &$completion_nudges
 ): callable {
 	return static function ( array $messages, array $turn_context ) use (
 		$tools,
@@ -495,17 +725,12 @@ function datamachine_build_turn_runner(
 		$event_sink,
 		$base_log_context,
 		$completion_policy,
-		$tool_runtime_rules,
 		&$last_tool_calls,
 		&$all_tool_calls,
-		&$all_tool_results,
-		&$completion_nudges,
 		&$last_request_metadata,
 		&$latest_messages,
 		&$latest_turn_count,
-		&$latest_conversation_complete,
-		&$runtime_tool_pending,
-		&$runtime_tool_requests
+		&$completion_nudges
 	): array {
 		// The upstream loop provides the turn number via turn_context.
 		$turn_count        = (int) ( $turn_context['turn'] ?? 1 );
@@ -596,19 +821,10 @@ function datamachine_build_turn_runner(
 			do_action( 'datamachine_ai_response_received', $mode, $messages, $loop_payload );
 		}
 
-		// Process tool calls.
-		$tool_execution_results = array();
-		$conversation_complete  = false;
-		$completion_nudge       = '';
-		$duplicate_rejected     = false;
-		$runtime_rule_rejected  = false;
-		$runtime_pending_turn   = false;
 		if ( ! empty( $tool_calls ) ) {
-			$completion_decision = \AgentsAPI\AI\WP_Agent_Conversation_Completion_Decision::complete();
 			foreach ( $tool_calls as $tool_call ) {
-				$tool_name       = $tool_call['name'];
-				$tool_parameters = $tool_call['parameters'];
-				$tool_started_at = microtime( true );
+				$tool_name       = (string) ( $tool_call['name'] ?? '' );
+				$tool_parameters = is_array( $tool_call['parameters'] ?? null ) ? $tool_call['parameters'] : array();
 
 				if ( empty( $tool_name ) ) {
 					do_action(
@@ -639,190 +855,17 @@ function datamachine_build_turn_runner(
 						)
 					)
 				);
-
-				$tool_def = $tools[ $tool_name ] ?? null;
-
-				// Validate for duplicate tool calls.
-				$validation_result = ConversationManager::validateToolCall( $tool_name, $tool_parameters, $messages, is_array( $tool_def ) ? $tool_def : null );
-				if ( $validation_result['is_duplicate'] ) {
-					$messages[]         = ConversationManager::generateDuplicateToolCallMessage( $tool_name, $turn_count, $mode );
-					$duplicate_rejected = true;
-					do_action(
-						'datamachine_log',
-						'info',
-						'datamachine_run_conversation: Duplicate tool call prevented',
-						array_merge(
-							$base_log_context,
-							array(
-								'turn_count' => $turn_count,
-								'tool_name'  => $tool_name,
-							)
-						)
-					);
-					continue;
-				}
-
-				$runtime_rule_result = $tool_runtime_rules->evaluate( $tool_name, $messages );
-				if ( ! $runtime_rule_result['allowed'] ) {
-					$tool_result           = array(
-						'success' => false,
-						'error'   => $runtime_rule_result['error'],
-					);
-					$messages[]            = ConversationManager::formatToolResultMessage( $tool_name, $tool_result, $tool_parameters, false, $turn_count );
-					$runtime_rule_rejected = true;
-					do_action(
-						'datamachine_log',
-						'info',
-						'datamachine_run_conversation: Tool runtime rule rejected call',
-						array_merge(
-							$base_log_context,
-							array(
-								'turn_count' => $turn_count,
-								'tool_name'  => $tool_name,
-								'policy'     => $runtime_rule_result['context'],
-							)
-						)
-					);
-					continue;
-				}
-
-				// Add tool call message.
-				$messages[] = ConversationManager::formatToolCallMessage( $tool_name, $tool_parameters, $turn_count );
-
-				// Execute through DM's ToolExecutor (action policy, post tracking),
-				// except for run-scoped client tools that must be fulfilled by the
-				// active transport/client instead of PHP.
-				$tool_payload = datamachine_payload_with_inflight_run_artifacts( $loop_payload, $tool_execution_results );
-
-				if ( datamachine_is_external_runtime_tool( is_array( $tool_def ) ? $tool_def : null ) ) {
-					$tool_result = datamachine_fulfill_runtime_tool_call(
-						$tool_call,
-						is_array( $tool_def ) ? $tool_def : array(),
-						$tool_payload,
-						$mode,
-						$modes,
-						$turn_count,
-						$event_sink,
-						$base_log_context
-					);
-				} else {
-					$tool_result = ToolExecutor::executeTool(
-						$tool_name,
-						$tool_parameters,
-						$tools,
-						$tool_payload,
-						$mode,
-						(int) ( $tool_payload['agent_id'] ?? 0 ),
-						is_array( $tool_payload['client_context'] ?? null ) ? $tool_payload['client_context'] : array()
-					);
-				}
-
-				if ( ! empty( $tool_result['pending'] ) && is_array( $tool_result['runtime_tool_request'] ?? null ) ) {
-					$tool_trace               = datamachine_build_tool_trace( $tool_name, $tool_call, $tool_parameters, $tool_result, is_array( $tool_def ) ? $tool_def : null, $turn_count, $tool_started_at, microtime( true ) );
-					$runtime_tool_pending     = true;
-					$runtime_pending_turn     = true;
-					$conversation_complete    = true;
-					$runtime_tool_requests[]  = $tool_result['runtime_tool_request'];
-					$tool_execution_results[] = array(
-						'tool_name'       => $tool_name,
-						'result'          => $tool_result,
-						'parameters'      => $tool_parameters,
-						'is_handler_tool' => false,
-						'runtime'         => datamachine_tool_runtime_metadata( is_array( $tool_def ) ? $tool_def : null, $tool_result ),
-						'trace'           => $tool_trace,
-						'turn_count'      => $turn_count,
-					);
-					$all_tool_results[]       = $tool_execution_results[ count( $tool_execution_results ) - 1 ];
-					datamachine_persist_inflight_tool_summary( $loop_payload, $tool_execution_results );
-					break;
-				}
-
-				do_action(
-					'datamachine_log',
-					'debug',
-					'datamachine_run_conversation: Tool result',
-					array_merge(
-						$base_log_context,
-						array(
-							'turn'    => $turn_count,
-							'tool'    => $tool_name,
-							'success' => $tool_result['success'] ?? false,
-						)
-					)
-				);
-
-				$is_handler_tool = is_array( $tool_def ) && isset( $tool_def['handler'] );
-
-				// Evaluate the DM completion policy.
-				$completion_decision   = $completion_policy->recordToolResult(
-					$tool_name,
-					is_array( $tool_def ) ? $tool_def : null,
-					$tool_result,
-					array_merge(
-						$turn_context,
-						$loop_payload,
-						array(
-							'mode'            => $mode,
-							'tool_parameters' => $tool_parameters,
-						)
-					),
-					$turn_count
-				);
-				$conversation_complete = $completion_decision->isComplete();
-				if ( '' !== $completion_decision->message() ) {
-					do_action(
-						'datamachine_log',
-						'debug',
-						$completion_decision->message(),
-						array_merge( $base_log_context, $completion_decision->context() )
-					);
-				}
-
-				$tool_trace               = datamachine_build_tool_trace( $tool_name, $tool_call, $tool_parameters, $tool_result, is_array( $tool_def ) ? $tool_def : null, $turn_count, $tool_started_at, microtime( true ) );
-				$tool_execution_results[] = array(
-					'tool_name'       => $tool_name,
-					'result'          => $tool_result,
-					'parameters'      => $tool_parameters,
-					'is_handler_tool' => $is_handler_tool,
-					'runtime'         => datamachine_tool_runtime_metadata( is_array( $tool_def ) ? $tool_def : null, $tool_result ),
-					'trace'           => $tool_trace,
-					'turn_count'      => $turn_count,
-				);
-				$all_tool_results[]       = $tool_execution_results[ count( $tool_execution_results ) - 1 ];
-				datamachine_persist_inflight_tool_summary( $loop_payload, $tool_execution_results );
-
-				// Add tool result message.
-				$messages[] = ConversationManager::formatToolResultMessage(
-					$tool_name,
-					$tool_result,
-					$tool_parameters,
-					$is_handler_tool,
-					$turn_count
-				);
-
-				if ( ! $conversation_complete && '' === $completion_nudge ) {
-					$completion_nudge = (string) ( $completion_decision->context()['continuation_message'] ?? '' );
-				}
-
-				// Break out of tool processing when conversation is complete.
-				if ( $conversation_complete ) {
-					break;
-				}
 			}
 
-			if ( ! $runtime_pending_turn && '' !== $completion_nudge && datamachine_should_append_tool_completion_nudge( $tool_execution_results, $completion_decision->context() ) ) {
-				$messages[] = ConversationManager::buildConversationMessage( 'user', $completion_nudge );
-				datamachine_record_completion_nudge(
-					$completion_nudges,
-					$event_sink,
-					$base_log_context,
-					$mode,
-					$messages,
-					$loop_payload,
-					array_merge( $completion_decision->context(), array( 'continuation_message' => $completion_nudge ) ),
-					$turn_count
-				);
-			}
+			$latest_messages = $messages;
+			return array(
+				'messages'         => $messages,
+				'tool_calls'       => $tool_calls,
+				'request_metadata' => $request_metadata,
+				'usage'            => $turn_usage,
+				'finish_reason'    => $finish_reason,
+				'content'          => '',
+			);
 		} else {
 			$natural_completion_decision = $completion_policy instanceof NaturalCompletionPolicyInterface
 				? $completion_policy->recordNaturalCompletion(
@@ -863,20 +906,15 @@ function datamachine_build_turn_runner(
 			}
 		}
 
-		$latest_messages              = $messages;
-		$latest_conversation_complete = $conversation_complete;
+		$latest_messages = $messages;
 
 		return array(
-			'messages'                     => $messages,
-			'tool_execution_results'       => $tool_execution_results,
-			'request_metadata'             => $request_metadata,
-			'usage'                        => $turn_usage,
-			'finish_reason'                => $finish_reason,
-			'conversation_complete'        => $conversation_complete,
-			'completion_nudge'             => $completion_nudge,
-			'duplicate_tool_call_rejected' => $duplicate_rejected,
-			'tool_runtime_rule_rejected'   => $runtime_rule_rejected,
-			'runtime_tool_pending'         => $runtime_pending_turn,
+			'messages'              => $messages,
+			'request_metadata'      => $request_metadata,
+			'usage'                 => $turn_usage,
+			'finish_reason'         => $finish_reason,
+			'conversation_complete' => $conversation_complete,
+			'completion_nudge'      => $completion_nudge,
 		);
 	};
 }

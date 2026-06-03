@@ -5,7 +5,7 @@
  * The bootstrap-fatal scenario (Agents API substrate missing) is exercised
  * by the pure-PHP smoke at
  * `tests/memory-file-registry-missing-agents-api-smoke.php`, which loads
- * MemoryFileRegistry without `automattic/agents-api` and asserts every
+ * MemoryFileRegistry without `wordpress/agents-api` and asserts every
  * code path the playground bootstrap can hit. That smoke is the
  * substrate-missing test; this file is the substrate-loaded regression test,
  * proving the refactor of `register()` did not change production behavior.

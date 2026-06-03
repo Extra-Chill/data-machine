@@ -25,7 +25,7 @@ define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
 require_once __DIR__ . '/vendor/autoload.php';
 
 if ( ! defined( 'AGENTS_API_LOADED' ) ) {
-	require_once __DIR__ . '/vendor/automattic/agents-api/agents-api.php';
+	require_once __DIR__ . '/vendor/wordpress/agents-api/agents-api.php';
 }
 
 // WP-CLI integration

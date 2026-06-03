@@ -96,16 +96,16 @@ class WP_Abilities_Registry {
 
 require_once __DIR__ . '/../inc/Core/PluginSettings.php';
 require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
-require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy.php';
-require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-declaration.php';
-require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-parameters.php';
-require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-call.php';
-require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-result.php';
-require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-executor.php';
-require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-execution-core.php';
-require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
-require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy.php';
-require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-source-registry.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-access-policy.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-declaration.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-parameters.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-call.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-result.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-executor.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-execution-core.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-source-registry.php';
 require_once __DIR__ . '/../inc/Core/AbilityResult.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Execution/ToolExecutionCore.php';

@@ -56,35 +56,35 @@ $action_policy      = datamachine_pending_actions_source( 'inc/Engine/AI/Actions
 
 $expected_agents_api_approval_primitives = array(
 	'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action_Store'    => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-pending-action-store.php',
+		'path' => 'vendor/wordpress/agents-api/src/Approvals/class-wp-agent-pending-action-store.php',
 		'type' => 'interface WP_Agent_Pending_Action_Store',
 	),
 	'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action_Resolver' => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-pending-action-resolver.php',
+		'path' => 'vendor/wordpress/agents-api/src/Approvals/class-wp-agent-pending-action-resolver.php',
 		'type' => 'interface WP_Agent_Pending_Action_Resolver',
 	),
 	'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action_Handler'  => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-pending-action-handler.php',
+		'path' => 'vendor/wordpress/agents-api/src/Approvals/class-wp-agent-pending-action-handler.php',
 		'type' => 'interface WP_Agent_Pending_Action_Handler',
 	),
 	'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action_Observer' => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-pending-action-observer.php',
+		'path' => 'vendor/wordpress/agents-api/src/Approvals/class-wp-agent-pending-action-observer.php',
 		'type' => 'interface WP_Agent_Pending_Action_Observer',
 	),
 	'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action'                  => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-pending-action.php',
+		'path' => 'vendor/wordpress/agents-api/src/Approvals/class-wp-agent-pending-action.php',
 		'type' => 'class WP_Agent_Pending_Action',
 	),
 	'AgentsAPI\\AI\\Approvals\\WP_Agent_Pending_Action_Status'            => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-pending-action-status.php',
+		'path' => 'vendor/wordpress/agents-api/src/Approvals/class-wp-agent-pending-action-status.php',
 		'type' => 'final class WP_Agent_Pending_Action_Status',
 	),
 	'AgentsAPI\\AI\\Approvals\\WP_Agent_Approval_Decision'               => array(
-		'path' => 'vendor/automattic/agents-api/src/Approvals/class-wp-agent-approval-decision.php',
+		'path' => 'vendor/wordpress/agents-api/src/Approvals/class-wp-agent-approval-decision.php',
 		'type' => 'final class WP_Agent_Approval_Decision',
 	),
 	'AgentsAPI\\AI\\Tools\\WP_Agent_Action_Policy'                       => array(
-		'path' => 'vendor/automattic/agents-api/src/Tools/class-wp-agent-action-policy.php',
+		'path' => 'vendor/wordpress/agents-api/src/Tools/class-wp-agent-action-policy.php',
 		'type' => 'final class WP_Agent_Action_Policy',
 	),
 );
@@ -144,7 +144,7 @@ datamachine_pending_actions_assert( str_contains( $plugin_source, 'new \\DataMac
 datamachine_pending_actions_assert( str_contains( $resolver_source, "'replacement' => 'agents/resolve-pending-action'" ), 'deprecated alias metadata names the canonical replacement', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $plugin_source, 'agents_pending_action_permission' ) || str_contains( $runtime_source, 'agents_pending_action_permission' ) || str_contains( datamachine_pending_actions_source( 'inc/bootstrap.php' ), 'agents_pending_action_permission' ), 'Data Machine grants canonical pending-action abilities through its chat permission policy', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $plugin_source, 'PendingActionObservers::register' ) && str_contains( $plugin_source, 'WordPressActionDispatchObserver' ), 'default WordPress pending-action observer is registered during bootstrap', $failures, $passes );
-datamachine_pending_actions_assert( str_contains( $plugin_source, 'vendor/automattic/agents-api/agents-api.php' ), 'default WordPress pending-action observer registers after Agents API dependency loading', $failures, $passes );
+datamachine_pending_actions_assert( str_contains( $plugin_source, 'vendor/wordpress/agents-api/agents-api.php' ), 'default WordPress pending-action observer registers after Agents API dependency loading', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $plugin_source, 'new \\DataMachine\\Engine\\AI\\Actions\\SignPendingActionResolutionAbility();' ), 'signed pending-action resolution ability is registered', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $signer_source, 'datamachine/sign-pending-action-resolution' ) && str_contains( $signer_source, '/actions/resolve-by-token' ), 'signed pending-action resolution exposes ability and public token route', $failures, $passes );
 datamachine_pending_actions_assert( str_contains( $signer_source, 'hash_hmac' ) && str_contains( $signer_source, 'datamachine_pending_action_resolution_secret' ), 'signed pending-action resolution uses a stored HMAC secret', $failures, $passes );
@@ -276,7 +276,7 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	}
 }
 
-require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/agents-api.php';
+require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/agents-api.php';
 require_once dirname( __DIR__ ) . '/inc/Abilities/PermissionHelper.php';
 require_once dirname( __DIR__ ) . '/inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionObservers.php';

@@ -606,6 +606,17 @@ class ConversationManager {
 	}
 
 	/**
+	 * Return the mode-appropriate duplicate tool-call correction text.
+	 *
+	 * @param string $tool_name Tool name that was duplicated.
+	 * @param string $mode      Execution mode slug.
+	 * @return string Correction message routed to the AI.
+	 */
+	public static function duplicateToolCallError( string $tool_name, string $mode = 'chat' ): string {
+		return self::buildDuplicateToolCallError( $tool_name, $mode );
+	}
+
+	/**
 	 * Build the mode-appropriate correction text for a duplicate tool call.
 	 *
 	 * @param string $tool_name Tool name that was duplicated.

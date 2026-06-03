@@ -49,10 +49,10 @@ if ( ! function_exists( 'sanitize_title' ) ) {
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleSchema.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/BundleValidationException.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/PortableSlug.php';
-require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Packages/class-wp-agent-package-artifact.php';
-require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Packages/class-wp-agent-package-artifact-hasher.php';
-require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Packages/class-wp-agent-package-artifact-status.php';
-require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/src/Packages/class-wp-agent-package-installed-artifact.php';
+require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact.php';
+require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact-hasher.php';
+require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-artifact-status.php';
+require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/src/Packages/class-wp-agent-package-installed-artifact.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactExtensions.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactHasher.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactStatus.php';
