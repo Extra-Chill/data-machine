@@ -925,13 +925,7 @@ class InternalLinkingAbilities {
 
 		$graph = get_transient( self::GRAPH_TRANSIENT_KEY );
 		if ( false === $graph || ! is_array( $graph ) || ( $graph['post_type'] ?? '' ) !== $post_type ) {
-			// No cache — run audit.
-			$graph = self::buildLinkGraph( $post_type, '', array() );
-			if ( isset( $graph['error'] ) ) {
-				return $graph;
-			}
-			set_transient( self::GRAPH_TRANSIENT_KEY, $graph, self::GRAPH_CACHE_TTL );
-			$from_cache = false;
+			return self::scanBacklinksForTarget( $post_id, $post_type, $types, $limit );
 		}
 
 		$all_links   = $graph['_all_links'] ?? array();
@@ -982,6 +976,136 @@ class InternalLinkingAbilities {
 			'backlink_count' => $total_backlinks,
 			'backlinks'      => $backlinks,
 			'from_cache'     => $from_cache,
+		);
+	}
+
+	/**
+	 * Scan source posts for backlinks to one target without materializing the full graph.
+	 *
+	 * This is the cold-cache path for render-time backlink lookups. Full graph
+	 * construction is still available through audit workflows, but a single
+	 * backlinks block should not need to build/cache every edge on a large site.
+	 *
+	 * @since 0.139.7
+	 *
+	 * @param int        $post_id   Target post ID.
+	 * @param string     $post_type Source post type scope.
+	 * @param array|null $types     Optional edge types to include.
+	 * @param int        $limit     Maximum source rows to return. 0 for all.
+	 * @return array Ability response.
+	 */
+	private static function scanBacklinksForTarget( int $post_id, string $post_type, ?array $types, int $limit ): array {
+		global $wpdb;
+
+		$target_permalink = get_permalink( $post_id );
+		$url_to_id        = array();
+		if ( false !== $target_permalink && '' !== $target_permalink ) {
+			$url_to_id[ untrailingslashit( $target_permalink ) ] = $post_id;
+			$url_to_id[ trailingslashit( $target_permalink ) ]   = $post_id;
+		}
+
+		$home_url  = home_url();
+		$home_host = wp_parse_url( $home_url, PHP_URL_HOST );
+		$home_host = is_string( $home_host ) ? $home_host : '';
+		$types_set = null === $types ? null : array_flip( array_map( 'strval', $types ) );
+
+		$sources = array();
+		$titles  = array();
+		$last_id = 0;
+		$chunk   = 100;
+
+		do {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$posts = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT ID, post_title, post_content FROM {$wpdb->posts}
+					WHERE post_type = %s AND post_status = %s AND ID > %d
+					ORDER BY ID ASC LIMIT %d",
+					$post_type,
+					'publish',
+					$last_id,
+					$chunk
+				)
+			);
+
+			if ( ! is_array( $posts ) || empty( $posts ) ) {
+				break;
+			}
+			$post_count = count( $posts );
+
+			foreach ( $posts as $source_post ) {
+				if ( ! is_object( $source_post ) || empty( $source_post->ID ) ) {
+					continue;
+				}
+
+				$source_id = (int) $source_post->ID;
+				$last_id   = max( $last_id, $source_id );
+
+				if ( $source_id === $post_id || empty( $source_post->post_content ) ) {
+					continue;
+				}
+
+				$extract_context = array(
+					'post_id'        => $source_id,
+					'post_type'      => $post_type,
+					'home_host'      => $home_host,
+					'home_url'       => $home_url,
+					'target_post_id' => $post_id,
+					'url_to_id'      => $url_to_id,
+				);
+
+				$edges = self::dispatchExtractors( (string) $source_post->post_content, $extract_context );
+				foreach ( $edges as $edge ) {
+					$target_hint = $edge['target_hint'] ?? '';
+					$edge_type   = (string) ( $edge['edge_type'] ?? '' );
+					if ( '' === $target_hint || '' === $edge_type ) {
+						continue;
+					}
+					if ( null !== $types_set && ! isset( $types_set[ $edge_type ] ) ) {
+						continue;
+					}
+
+					$resolve_context             = $extract_context;
+					$resolve_context['edge']     = $edge;
+					$resolve_context['post_ids'] = array( $post_id );
+
+					$target_id = self::dispatchResolver( (string) $target_hint, $edge_type, $resolve_context );
+					if ( $target_id !== $post_id ) {
+						continue;
+					}
+
+					if ( ! isset( $sources[ $source_id ] ) ) {
+						$sources[ $source_id ] = 0;
+						$titles[ $source_id ]  = (string) ( $source_post->post_title ?? '' );
+					}
+					++$sources[ $source_id ];
+				}
+			}
+		} while ( $post_count === $chunk );
+
+		arsort( $sources, SORT_NUMERIC );
+		$total_backlinks = count( $sources );
+		if ( $limit > 0 ) {
+			$sources = array_slice( $sources, 0, $limit, true );
+		}
+
+		$backlinks = array();
+		foreach ( $sources as $source_id => $link_count ) {
+			$permalink   = get_permalink( $source_id );
+			$backlinks[] = array(
+				'source_id'  => $source_id,
+				'title'      => $titles[ $source_id ] ?? '',
+				'permalink'  => false !== $permalink ? $permalink : '',
+				'link_count' => $link_count,
+			);
+		}
+
+		return array(
+			'success'        => true,
+			'post_id'        => $post_id,
+			'backlink_count' => $total_backlinks,
+			'backlinks'      => $backlinks,
+			'from_cache'     => false,
 		);
 	}
 
