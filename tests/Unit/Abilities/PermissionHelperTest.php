@@ -13,6 +13,7 @@
 namespace DataMachine\Tests\Unit\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\AbilityScopePermissionFilter;
 use WP_UnitTestCase;
 
 class PermissionHelperTest extends WP_UnitTestCase {
@@ -248,6 +249,66 @@ class PermissionHelperTest extends WP_UnitTestCase {
 		$this->assertTrue( PermissionHelper::can_use_ability( 'datamachine/wiki', 'datamachine-system' ) );
 		$this->assertFalse( PermissionHelper::can_use_ability( 'datamachine/delete-post', 'datamachine-content' ) );
 		$this->assertFalse( PermissionHelper::can_use_ability( 'datamachine/update-settings', 'datamachine-settings' ) );
+	}
+
+	public function test_ability_scope_filter_denies_excluded_datamachine_ability(): void {
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		$ability = new class() {
+			public function get_category(): string {
+				return 'datamachine-settings';
+			}
+		};
+
+		PermissionHelper::set_agent_context(
+			123,
+			$user_id,
+			array(
+				'scope'              => 'content_only',
+				'label'              => 'Content only',
+				'ability_categories' => array( 'datamachine-content' ),
+				'ability_allow'      => array(),
+				'ability_deny'       => array(),
+				'capabilities'       => array( 'datamachine_manage_settings' ),
+			),
+			456
+		);
+
+		$result = AbilityScopePermissionFilter::filter_permission_result( true, 'datamachine/update-settings', array(), $ability );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'datamachine_ability_scope_denied', $result->get_error_code() );
+	}
+
+	public function test_structured_scope_denies_direct_ability_execution(): void {
+		if ( version_compare( get_bloginfo( 'version' ), '7.1-alpha', '<' ) ) {
+			$this->markTestSkipped( 'Core ability permission lifecycle filter requires WordPress 7.1+.' );
+		}
+
+		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		$ability = wp_get_ability( 'datamachine/update-settings' );
+
+		if ( ! $ability ) {
+			$this->markTestSkipped( 'datamachine/update-settings ability not registered.' );
+		}
+
+		PermissionHelper::set_agent_context(
+			123,
+			$user_id,
+			array(
+				'scope'              => 'content_only',
+				'label'              => 'Content only',
+				'ability_categories' => array( 'datamachine-content' ),
+				'ability_allow'      => array(),
+				'ability_deny'       => array(),
+				'capabilities'       => array( 'datamachine_manage_settings' ),
+			),
+			456
+		);
+
+		$result = $ability->execute( array() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'datamachine_ability_scope_denied', $result->get_error_code() );
 	}
 
 	public function test_user_session_agent_context_uses_owner_ceiling_without_token_id(): void {
