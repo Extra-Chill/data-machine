@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.4] - 2026-06-03
+
+### Changed
+- remove legacy ai provider bridge
+
 ## [0.139.3] - 2026-06-03
 
 ### Fixed
