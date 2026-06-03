@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.13] - 2026-06-03
+
+### Fixed
+- scope tool source ordering to active registry
+
 ## [0.139.12] - 2026-06-03
 
 ### Fixed
