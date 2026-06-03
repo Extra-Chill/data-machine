@@ -73,6 +73,7 @@ use DataMachine\Engine\AI\WpAiClientCache;
 use DataMachine\Engine\AI\Actions\PendingActionStore;
 use DataMachine\Engine\AI\Actions\ResolvePendingActionAbility;
 use DataMachine\Abilities\AbilityScopePermissionFilter;
+use DataMachine\Abilities\AgentAbilities;
 use DataMachine\Core\Content\ContentFormat;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
@@ -83,6 +84,8 @@ use DataMachine\Core\PluginSettings;
 add_action( 'plugins_loaded', array( WpAiClientCache::class, 'install' ), 20 );
 AbilityScopePermissionFilter::register();
 ContentFormat::register();
+
+add_filter( 'wp_agent_runtime_import_bundle', array( AgentAbilities::class, 'importRuntimeAgentBundle' ), 10, 4 );
 
 add_filter(
 	'datamachine_auth_providers',

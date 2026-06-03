@@ -16,6 +16,7 @@
 
 namespace DataMachine\Api\Chat;
 
+use AgentsAPI\AI\WP_Agent_Execution_Principal;
 use DataMachine\Abilities\Chat\ChatTranscriptOwner;
 use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\PluginSettings;
@@ -711,6 +712,13 @@ class ChatOrchestrator {
 			'workspace' => WordPressWorkspaceScope::current()->to_array(),
 			'agent'     => $agent_slug,
 			'context'   => $mode,
+			'principal' => WP_Agent_Execution_Principal::user_session(
+				$user_id,
+				$agent_slug,
+				WP_Agent_Execution_Principal::REQUEST_CONTEXT_CHAT,
+				array(),
+				WordPressWorkspaceScope::current()->key()
+			),
 			'metadata'  => array(
 				'started_at'    => current_time( 'mysql', true ),
 				'message_count' => 0,
