@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.8] - 2026-06-03
+
+### Fixed
+- stabilize Agents API chat contracts
+- avoid full graph builds for cold backlinks
+- preserve Data Machine mediated tool semantics
+- mediate conversation tools through Agents API
+
 ## [0.139.6] - 2026-06-03
 
 ### Fixed
