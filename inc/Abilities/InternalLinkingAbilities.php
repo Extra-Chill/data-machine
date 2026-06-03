@@ -631,7 +631,8 @@ class InternalLinkingAbilities {
 	 * @param array $input Ability input (unused).
 	 * @return array Ability response.
 	 */
-	public static function diagnoseInternalLinks( array $_input = array() ): array {
+	public static function diagnoseInternalLinks( array $input = array() ): array {
+		unset( $input );
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
