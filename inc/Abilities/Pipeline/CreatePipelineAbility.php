@@ -152,6 +152,19 @@ class CreatePipelineAbility {
 		$workflow    = isset( $input['workflow'] ) && is_array( $input['workflow'] ) ? $input['workflow'] : array();
 		$flow_config = $input['flow_config'] ?? array();
 
+		// Resolve the owning agent when the caller did not supply one, mirroring
+		// CreateFlowAbility. Without this a pipeline created without an explicit
+		// agent_id — and the flow it seeds below — persist agent_id = NULL and are
+		// orphaned from agent-scoped reads / export / bundle round-trips. The
+		// resolved id flows into both the pipeline row and the seeded flow input.
+		// NULL stays valid when no agent context can be resolved. See #2481.
+		if ( ( null === $agent_id || $agent_id <= 0 ) && function_exists( 'datamachine_resolve_agent_id' ) ) {
+			$resolved_agent_id = datamachine_resolve_agent_id();
+			if ( null !== $resolved_agent_id && $resolved_agent_id > 0 ) {
+				$agent_id = $resolved_agent_id;
+			}
+		}
+
 		$has_steps    = ! empty( $steps ) && is_array( $steps );
 		$has_workflow = ! empty( $workflow );
 
