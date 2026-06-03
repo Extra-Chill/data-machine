@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 $root              = dirname( __DIR__ );
 $chat_orchestrator = file_get_contents( $root . '/inc/Api/Chat/ChatOrchestrator.php' );
+$bootstrap         = file_get_contents( $root . '/inc/bootstrap.php' );
+$agent_abilities   = file_get_contents( $root . '/inc/Abilities/AgentAbilities.php' );
 
 $failures = array();
 
@@ -32,6 +34,26 @@ $assert(
 $assert(
 	false !== strpos( $chat_orchestrator, "'session_owner'" ),
 	'ChatOrchestrator passes opaque owners through the canonical session_owner input'
+);
+
+$assert(
+	false !== strpos( $chat_orchestrator, 'WP_Agent_Execution_Principal::user_session' ),
+	'ChatOrchestrator passes a bounded user-session principal for non-REST canonical session creation'
+);
+
+$assert(
+	false !== strpos( $bootstrap, "'wp_agent_runtime_import_bundle'" ) && false !== strpos( $bootstrap, 'importRuntimeAgentBundle' ),
+	'Data Machine registers the generic agent runtime bundle importer hook'
+);
+
+$assert(
+	false !== strpos( $agent_abilities, "wp_get_ability( 'datamachine/import-agent' )" ) && false !== strpos( $agent_abilities, 'PermissionHelper::set_agent_context' ),
+	'Data Machine owns Data Machine agent bundle import mechanics for generic agent runtimes'
+);
+
+$assert(
+	false === strpos( $bootstrap, 'wp_codebox_' ) && false === strpos( $agent_abilities, 'wp_codebox_' ),
+	'Data Machine does not reference WP Codebox-specific runtime hooks'
 );
 
 $assert(
