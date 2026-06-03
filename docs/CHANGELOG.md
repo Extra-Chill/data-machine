@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.12] - 2026-06-03
+
+### Fixed
+- guard against agents-api dual-load version skew on bootstrap
+
 ## [0.139.11] - 2026-06-03
 
 ### Fixed
