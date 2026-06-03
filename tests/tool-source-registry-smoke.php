@@ -31,6 +31,17 @@ function add_filter( string $hook, callable $callback, int $priority = 10, int $
 	$GLOBALS['__filters'][ $hook ][ $priority ][ source_smoke_filter_id( $callback ) ] = array( $callback, $accepted_args );
 }
 
+function remove_filter( string $hook, callable $callback, int $priority = 10 ): void {
+	$callback_id = source_smoke_filter_id( $callback );
+	unset( $GLOBALS['__filters'][ $hook ][ $priority ][ $callback_id ] );
+	if ( empty( $GLOBALS['__filters'][ $hook ][ $priority ] ) ) {
+		unset( $GLOBALS['__filters'][ $hook ][ $priority ] );
+	}
+	if ( empty( $GLOBALS['__filters'][ $hook ] ) ) {
+		unset( $GLOBALS['__filters'][ $hook ] );
+	}
+}
+
 function remove_all_filters_for_source_smoke(): void {
 	$GLOBALS['__filters'] = array();
 }
@@ -525,15 +536,17 @@ assert_source_equals( true, false !== strpos( $datamachine_tool_source, 'get_all
 assert_source_equals( true, false !== strpos( $registry_source, 'WP_Agent_Tool_Source_Registry' ), 'ToolSourceRegistry delegates source composition to Agents API registry', $failures, $passes );
 assert_source_equals( true, false !== strpos( $registry_source, 'agents_api_tool_source_order' ), 'Data Machine mode ordering uses Agents API source-order hook', $failures, $passes );
 
-echo "\n[8] source ordering uses one shared global callback:\n";
+echo "\n[8] source ordering is attached only while gathering:\n";
 remove_all_filters_for_source_smoke();
+$instance_registry = new ToolSourceRegistry( new SourcePolicyToolManager() );
 new ToolSourceRegistry( new SourcePolicyToolManager() );
 new ToolSourceRegistry( new SourcePolicyToolManager() );
-new ToolSourceRegistry( new SourcePolicyToolManager() );
-assert_source_equals( 1, count_source_smoke_callbacks( 'agents_api_tool_source_order' ), 'multiple registry instances do not accumulate duplicate source-order callbacks', $failures, $passes );
+assert_source_equals( 0, count_source_smoke_callbacks( 'agents_api_tool_source_order' ), 'constructing registry instances does not leave source-order callbacks registered', $failures, $passes );
+resolve_source_tools( ToolPolicyResolver::MODE_PIPELINE, new SourcePolicyToolManager() );
+assert_source_equals( 0, count_source_smoke_callbacks( 'agents_api_tool_source_order' ), 'gather removes its instance-scoped source-order callback', $failures, $passes );
 assert_source_equals(
 	array( 'static_registry', 'adjacent_handlers', 'runtime_tools' ),
-	ToolSourceRegistry::orderSourcesForContext( array( 'static_registry', 'adjacent_handlers', 'runtime_tools' ), array( 'modes' => array( ToolPolicyResolver::MODE_CHAT ) ), new AgentsAPI\AI\Tools\WP_Agent_Tool_Source_Registry() ),
+	$instance_registry->orderSourcesForContext( array( 'static_registry', 'adjacent_handlers', 'runtime_tools' ), array( 'modes' => array( ToolPolicyResolver::MODE_CHAT ) ), new AgentsAPI\AI\Tools\WP_Agent_Tool_Source_Registry() ),
 	'ordering callback leaves non-Data Machine registries unchanged',
 	$failures,
 	$passes

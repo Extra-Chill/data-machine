@@ -26,22 +26,12 @@ class ToolSourceRegistry {
 
 	private ToolManager $tool_manager;
 	private WP_Agent_Tool_Source_Registry $registry;
-	/**
-	 * Data Machine-owned Agents API registries that should use DM source ordering.
-	 *
-	 * @var \WeakMap<WP_Agent_Tool_Source_Registry, bool>|null
-	 */
-	private static ?\WeakMap $ordered_registries = null;
 
 	public function __construct( ToolManager $tool_manager ) {
 		$this->tool_manager = $tool_manager;
 		$this->registry     = new WP_Agent_Tool_Source_Registry();
 
 		$this->registerDataMachineSources();
-		if ( function_exists( 'add_filter' ) ) {
-			add_filter( 'agents_api_tool_source_order', array( self::class, 'orderSourcesForContext' ), 5, 3 );
-		}
-		$this->registerOrderedRegistry( $this->registry );
 	}
 
 	/**
@@ -52,15 +42,26 @@ class ToolSourceRegistry {
 	 * @return array Tools keyed by tool name.
 	 */
 	public function gather( array $modes, array $args ): array {
-		return $this->registry->gather(
-			array_merge(
-				$args,
-				array(
-					'modes'        => $modes,
-					'tool_manager' => $this->tool_manager,
+		$callback = array( $this, 'orderSourcesForContext' );
+		if ( function_exists( 'add_filter' ) ) {
+			add_filter( 'agents_api_tool_source_order', $callback, 5, 3 );
+		}
+
+		try {
+			return $this->registry->gather(
+				array_merge(
+					$args,
+					array(
+						'modes'        => $modes,
+						'tool_manager' => $this->tool_manager,
+					)
 				)
-			)
-		);
+			);
+		} finally {
+			if ( function_exists( 'remove_filter' ) ) {
+				remove_filter( 'agents_api_tool_source_order', $callback, 5 );
+			}
+		}
 	}
 
 	/**
@@ -115,8 +116,8 @@ class ToolSourceRegistry {
 	 * @param WP_Agent_Tool_Source_Registry $registry Source registry instance.
 	 * @return array<int, string> Source slugs in precedence order.
 	 */
-	public static function orderSourcesForContext( array $order, array $context, WP_Agent_Tool_Source_Registry $registry ): array {
-		if ( null === self::$ordered_registries || ! isset( self::$ordered_registries[ $registry ] ) ) {
+	public function orderSourcesForContext( array $order, array $context, WP_Agent_Tool_Source_Registry $registry ): array {
+		if ( $registry !== $this->registry ) {
 			return $order;
 		}
 
@@ -132,17 +133,6 @@ class ToolSourceRegistry {
 				static fn( $source ) => is_string( $source ) && '' !== $source && in_array( $source, $order, true )
 			)
 		);
-	}
-
-	/**
-	 * Mark an Agents API registry as Data Machine-owned for the shared order hook.
-	 *
-	 * @param WP_Agent_Tool_Source_Registry $registry Source registry instance.
-	 * @return void
-	 */
-	private function registerOrderedRegistry( WP_Agent_Tool_Source_Registry $registry ): void {
-		self::$ordered_registries ??= new \WeakMap();
-		self::$ordered_registries[ $registry ] = true;
 	}
 
 }
