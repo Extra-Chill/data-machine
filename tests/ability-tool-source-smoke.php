@@ -167,6 +167,7 @@ require_once __DIR__ . '/../inc/Engine/AI/Actions/ActionPolicyResolver.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolManager.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Execution/ToolExecutionCore.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutor.php';
+require_once __DIR__ . '/../inc/Engine/AI/Tools/ability-tool-projections.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php';
 require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineToolAccessPolicy.php';
@@ -274,8 +275,16 @@ $disabled = new Ability_Tool_Source_Smoke_Ability(
 );
 $registry->register_for_smoke( 'demo/disabled', $disabled );
 
+$helper_registered = datamachine_register_ability_tool(
+	'helper_demo',
+	array(
+		'ability' => 'demo/summarize',
+		'modes'   => array( 'chat' ),
+	)
+);
+
 add_filter(
-	'datamachine_ability_tools',
+	'datamachine_ability_tool_projections',
 	static function ( array $tools ): array {
 		$tools['summarize_demo'] = array(
 			'ability'              => 'demo/summarize',
@@ -304,6 +313,19 @@ add_filter(
 );
 
 add_filter(
+	'datamachine_ability_tools',
+	static function ( array $tools ): array {
+		$tools['legacy_alias_demo'] = array(
+			'ability' => 'demo/summarize',
+			'modes'   => array( 'chat' ),
+		);
+		return $tools;
+	},
+	10,
+	1
+);
+
+add_filter(
 	'datamachine_ability_tool_definition',
 	static function ( array $tool, string $tool_name ): array {
 		if ( 'summarize_demo' === $tool_name ) {
@@ -318,7 +340,10 @@ add_filter(
 echo "\n[1] ability metadata becomes a model-facing tool declaration:\n";
 $source = new AbilityToolSource( new AbilityToolSourceSmokeManager() );
 $tools  = $source( array( 'chat' ), array( 'allow_only' => array( 'summarize_demo' ) ) );
+assert_ability_tool_source_equals( true, $helper_registered, 'helper registers a valid ability tool projection', $failures, $passes );
 assert_ability_tool_source_equals( true, isset( $tools['summarize_demo'] ), 'chat mode exposes selected ability tool when opted in', $failures, $passes );
+assert_ability_tool_source_equals( true, isset( $tools['helper_demo'] ), 'helper projection feeds ability tool source', $failures, $passes );
+assert_ability_tool_source_equals( true, isset( $tools['legacy_alias_demo'] ), 'legacy ability tools filter remains supported', $failures, $passes );
 assert_ability_tool_source_equals( 'demo/summarize', $tools['summarize_demo']['ability'] ?? '', 'generated tool links ability slug', $failures, $passes );
 assert_ability_tool_source_equals( 'Summarize Demo', $tools['summarize_demo']['label'] ?? '', 'generated tool carries ability label', $failures, $passes );
 assert_ability_tool_source_equals( 'demo-category', $tools['summarize_demo']['ability_category'] ?? '', 'generated tool carries ability category', $failures, $passes );

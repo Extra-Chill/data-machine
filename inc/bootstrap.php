@@ -28,6 +28,7 @@ require_once __DIR__ . '/Engine/MCP/functions.php';
 require_once __DIR__ . '/Engine/Filters/OAuth.php';
 require_once __DIR__ . '/Engine/Actions/DataMachineActions.php';
 require_once __DIR__ . '/Engine/Filters/EngineData.php';
+require_once __DIR__ . '/Engine/AI/Tools/ability-tool-projections.php';
 require_once __DIR__ . '/Core/Admin/Settings/SettingsFilters.php';
 
 /*
