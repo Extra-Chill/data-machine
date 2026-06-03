@@ -280,6 +280,11 @@ class InternalLinkingAbilities {
 								'items'       => array( 'type' => 'string' ),
 								'description' => 'Optional edge types to include (e.g. ["html_anchor"]). Omit for all types.',
 							),
+							'limit'     => array(
+								'type'        => 'integer',
+								'description' => 'Maximum number of backlink source posts to return. Default: 0 for all.',
+								'default'     => 0,
+							),
 						),
 					),
 					'output_schema'       => array(
@@ -908,6 +913,7 @@ class InternalLinkingAbilities {
 		$post_id    = absint( $input['post_id'] ?? 0 );
 		$post_type  = sanitize_text_field( $input['post_type'] ?? 'post' );
 		$types      = self::normalizeTypesInput( $input['types'] ?? null );
+		$limit      = absint( $input['limit'] ?? 0 );
 		$from_cache = true;
 
 		if ( 0 === $post_id ) {
@@ -951,7 +957,14 @@ class InternalLinkingAbilities {
 			++$sources[ $source_id ];
 		}
 
-		// Build the response array with titles and permalinks.
+		// Sort by link count descending (most links first) before hydrating rows.
+		arsort( $sources, SORT_NUMERIC );
+		$total_backlinks = count( $sources );
+		if ( $limit > 0 ) {
+			$sources = array_slice( $sources, 0, $limit, true );
+		}
+
+		// Build the response array with titles and permalinks for the returned slice.
 		$backlinks = array();
 		foreach ( $sources as $source_id => $link_count ) {
 			$permalink   = get_permalink( $source_id );
@@ -963,13 +976,10 @@ class InternalLinkingAbilities {
 			);
 		}
 
-		// Sort by link count descending (most links first).
-		usort( $backlinks, fn( $a, $b ) => $b['link_count'] <=> $a['link_count'] );
-
 		return array(
 			'success'        => true,
 			'post_id'        => $post_id,
-			'backlink_count' => count( $backlinks ),
+			'backlink_count' => $total_backlinks,
 			'backlinks'      => $backlinks,
 			'from_cache'     => $from_cache,
 		);
