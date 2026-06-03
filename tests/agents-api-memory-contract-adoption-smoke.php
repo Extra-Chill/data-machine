@@ -111,7 +111,17 @@ datamachine_contract_adoption_assert( WP_Agent_Context_Authority_Tier::WORKSPACE
 datamachine_contract_adoption_assert( false === $datamachine_file['editable'], 'composable files remain non-editable through the adapter' );
 
 SectionRegistry::reset();
-SectionRegistry::register( 'SITE.md', 'one', 20, static fn(): string => "## One\nFirst" );
+SectionRegistry::register(
+	'SITE.md',
+	'one',
+	20,
+	static fn(): string => "## One\nFirst",
+	array(
+		'owner'      => 'test-owner',
+		'freshness'  => 'snapshot',
+		'conditions' => 'test condition',
+	)
+);
 SectionRegistry::register( 'SITE.md', 'zero', 10, static fn(): string => "## Zero\nBefore" );
 $content = SectionRegistry::generate( 'SITE.md' );
 datamachine_contract_adoption_assert( "## Zero\nBefore\n\n## One\nFirst" === $content, 'Data Machine section composition stays priority-stable through Agents API' );
@@ -120,6 +130,11 @@ datamachine_contract_adoption_assert( 'tests' === $sections['one']['source_plugi
 datamachine_contract_adoption_assert( 'tests/agents-api-memory-contract-adoption-smoke.php' === $sections['one']['source_file'], 'section registry records source file provenance' );
 datamachine_contract_adoption_assert( 'Closure' === $sections['one']['source_callback'], 'section registry records callback provenance' );
 datamachine_contract_adoption_assert( '-' === $sections['one']['registered_at'], 'section registry records registration hook provenance fallback' );
+datamachine_contract_adoption_assert( 'test-owner' === $sections['one']['owner'], 'section registry records logical owner metadata' );
+datamachine_contract_adoption_assert( 'snapshot' === $sections['one']['freshness'], 'section registry records freshness metadata' );
+datamachine_contract_adoption_assert( 'test condition' === $sections['one']['conditions'], 'section registry records condition metadata' );
+datamachine_contract_adoption_assert( $sections['one'] === SectionRegistry::get_section( 'SITE.md', 'one' ), 'section registry exposes single-section lookup' );
+datamachine_contract_adoption_assert( null === SectionRegistry::get_section( 'SITE.md', 'missing' ), 'section registry single-section lookup returns null for missing sections' );
 
 $disk_store = ( new ReflectionClass( DiskAgentMemoryStore::class ) )->newInstanceWithoutConstructor();
 $disk_caps  = $disk_store->capabilities();

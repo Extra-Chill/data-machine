@@ -50,6 +50,9 @@ class SectionRegistry {
 	 *
 	 *     @type string $label       Human-readable label.
 	 *     @type string $description Description of what this section provides.
+	 *     @type string $owner       Logical owner of the section. Defaults to source_plugin.
+	 *     @type string $freshness   Freshness model: static, generated, snapshot, conditional, or custom.
+	 *     @type string $conditions  Human-readable inclusion conditions, or '-' when unconditional.
 	 *     @type string $source_plugin Plugin slug/path that owns the registration.
 	 *     @type string $source_file   File that registered the section.
 	 *     @type string $source_callback Callback that renders the section.
@@ -75,6 +78,7 @@ class SectionRegistry {
 		};
 
 		$provenance = array_merge( self::registration_provenance( $callback ), array_intersect_key( $args, array_flip( array( 'source_plugin', 'source_file', 'source_callback', 'registered_at' ) ) ) );
+		$owner      = $args['owner'] ?? $args['source_plugin'] ?? $provenance['source_plugin'];
 
 		self::$sections[ $filename ][ $slug ] = array(
 			'slug'            => $slug,
@@ -82,6 +86,9 @@ class SectionRegistry {
 			'callback'        => $section_callback,
 			'label'           => $args['label'] ?? self::slug_to_label( $slug ),
 			'description'     => $args['description'] ?? '',
+			'owner'           => is_string( $owner ) && '' !== trim( $owner ) ? trim( $owner ) : '-',
+			'freshness'       => isset( $args['freshness'] ) && is_string( $args['freshness'] ) && '' !== trim( $args['freshness'] ) ? trim( $args['freshness'] ) : '-',
+			'conditions'      => isset( $args['conditions'] ) && is_string( $args['conditions'] ) && '' !== trim( $args['conditions'] ) ? trim( $args['conditions'] ) : '-',
 			'source_plugin'   => $provenance['source_plugin'],
 			'source_file'     => $provenance['source_file'],
 			'source_callback' => $provenance['source_callback'],
@@ -100,6 +107,9 @@ class SectionRegistry {
 				'modes'            => $args['modes'] ?? array( MemoryFileRegistry::MODE_ALL ),
 				'meta'             => array(
 					'filename'        => $filename,
+					'owner'           => self::$sections[ $filename ][ $slug ]['owner'],
+					'freshness'       => self::$sections[ $filename ][ $slug ]['freshness'],
+					'conditions'      => self::$sections[ $filename ][ $slug ]['conditions'],
 					'source_plugin'   => self::$sections[ $filename ][ $slug ]['source_plugin'],
 					'source_file'     => self::$sections[ $filename ][ $slug ]['source_file'],
 					'source_callback' => self::$sections[ $filename ][ $slug ]['source_callback'],
@@ -148,6 +158,27 @@ class SectionRegistry {
 		);
 
 		return $sections;
+	}
+
+	/**
+	 * Get one registered section for a composable file.
+	 *
+	 * @since x.y.z
+	 *
+	 * @param string $filename Composable filename.
+	 * @param string $slug     Section identifier.
+	 * @return array<string, mixed>|null Section metadata, or null when not registered.
+	 */
+	public static function get_section( string $filename, string $slug ): ?array {
+		$filename = sanitize_file_name( $filename );
+		$slug     = sanitize_key( $slug );
+
+		if ( empty( $filename ) || empty( $slug ) ) {
+			return null;
+		}
+
+		$sections = self::get_sections( $filename );
+		return $sections[ $slug ] ?? null;
 	}
 
 	/**

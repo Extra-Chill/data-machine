@@ -90,9 +90,9 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test creating a pipeline without agent_id leaves it NULL.
+	 * Test creating a pipeline without agent_id resolves the current user's agent.
 	 */
-	public function test_create_pipeline_without_agent_id(): void {
+	public function test_create_pipeline_without_agent_id_resolves_current_user_agent(): void {
 		$result = $this->create_pipeline_ability->execute(
 			array( 'pipeline_name' => 'Unscoped Pipeline' )
 		);
@@ -101,7 +101,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 
 		$db       = new Pipelines();
 		$pipeline = $db->get_pipeline( $result['pipeline_id'] );
-		$this->assertNull( $pipeline['agent_id'] );
+		$this->assertEquals( $this->agent_id, (int) $pipeline['agent_id'] );
 	}
 
 	/**
@@ -169,9 +169,9 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test creating a flow without agent_id leaves it NULL.
+	 * Test creating a flow without agent_id resolves the current user's agent.
 	 */
-	public function test_create_flow_without_agent_id(): void {
+	public function test_create_flow_without_agent_id_resolves_current_user_agent(): void {
 		$pipeline_result = $this->create_pipeline_ability->execute(
 			array( 'pipeline_name' => 'Flow Test Pipeline 2' )
 		);
@@ -188,7 +188,7 @@ class AgentContextPropagationTest extends WP_UnitTestCase {
 
 		$db_flows = new Flows();
 		$flow     = $db_flows->get_flow( $result['flow_id'] );
-		$this->assertNull( $flow['agent_id'] );
+		$this->assertEquals( $this->agent_id, (int) $flow['agent_id'] );
 	}
 
 	// =========================================================================
