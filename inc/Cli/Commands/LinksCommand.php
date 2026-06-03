@@ -488,8 +488,11 @@ class LinksCommand extends BaseCommand {
 	 * ---
 	 * default: 50
 	 * ---
-		 *
-		 * [--format=<format>]
+	 *
+	 * [--types=<types>]
+	 * : Comma-separated list of edge types to include (e.g. html_anchor,wikilink). Omit for all types.
+	 *
+	 * [--format=<format>]
 	 * : Output format.
 	 * ---
 	 * default: table
@@ -579,13 +582,10 @@ class LinksCommand extends BaseCommand {
 	 * default: post
 	 * ---
 	 *
-		 * [--types=<types>]
-		 * : Comma-separated list of edge types to include (e.g. html_anchor,wikilink). Omit for all types.
-		 *
-		 * [--limit=<count>]
-		 * : Maximum number of backlink source posts to return. Default: 0 for all.
-		 *
-		 * [--format=<format>]
+	 * [--types=<types>]
+	 * : Comma-separated list of edge types to include (e.g. html_anchor,wikilink). Omit for all types.
+	 *
+	 * [--format=<format>]
 	 * : Output format.
 	 * ---
 	 * default: table
@@ -626,7 +626,6 @@ class LinksCommand extends BaseCommand {
 				'post_id'   => $post_id,
 				'post_type' => $post_type,
 				'types'     => self::parseTypesArg( $assoc_args ),
-				'limit'     => absint( $assoc_args['limit'] ?? 0 ),
 			)
 		);
 

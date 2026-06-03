@@ -280,11 +280,6 @@ class InternalLinkingAbilities {
 								'items'       => array( 'type' => 'string' ),
 								'description' => 'Optional edge types to include (e.g. ["html_anchor"]). Omit for all types.',
 							),
-							'limit'     => array(
-								'type'        => 'integer',
-								'description' => 'Maximum number of backlink source posts to return. Default: 0 for all.',
-								'default'     => 0,
-							),
 						),
 					),
 					'output_schema'       => array(
@@ -329,6 +324,11 @@ class InternalLinkingAbilities {
 								'type'        => 'array',
 								'items'       => array( 'type' => 'string' ),
 								'description' => 'Optional edge types to include (e.g. ["html_anchor"]). Omit for all types.',
+							),
+							'limit'     => array(
+								'type'        => 'integer',
+								'description' => 'Maximum number of backlink source posts to return. Default: 0 for all.',
+								'default'     => 0,
 							),
 						),
 					),
@@ -568,7 +568,7 @@ class InternalLinkingAbilities {
 		$eligible = array();
 		foreach ( $post_ids as $pid ) {
 			$post = get_post( $pid );
-			if ( $post && 'publish' === $post->post_status ) {
+			if ( $post instanceof \WP_Post && 'publish' === $post->post_status ) {
 				$eligible[] = $pid;
 			}
 		}
@@ -616,11 +616,11 @@ class InternalLinkingAbilities {
 			'success'      => true,
 			'queued_count' => count( $eligible ),
 			'post_ids'     => $eligible,
-			'batch_id'     => $batch['batch_id'] ?? null,
+			'batch_id'     => $batch['batch_id'],
 			'message'      => sprintf(
 				'Internal linking batch scheduled for %d post(s) (chunks of %d).',
 				count( $eligible ),
-				$batch['chunk_size'] ?? \DataMachine\Core\ActionScheduler\BatchScheduler::DEFAULT_CHUNK_SIZE
+				$batch['chunk_size']
 			),
 		);
 	}
@@ -631,8 +631,7 @@ class InternalLinkingAbilities {
 	 * @param array $input Ability input (unused).
 	 * @return array Ability response.
 	 */
-	public static function diagnoseInternalLinks( array $input = array() ): array {
-		$input;
+	public static function diagnoseInternalLinks( array $_input = array() ): array {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -1106,7 +1105,7 @@ class InternalLinkingAbilities {
 				// Deduplicate source IDs for this URL.
 				$seen_sources = array();
 				foreach ( $sources as $source ) {
-					$source_id = $source['source_id'] ?? 0;
+					$source_id = (int) $source['source_id'];
 					if ( isset( $seen_sources[ $source_id ] ) ) {
 						continue;
 					}
@@ -1118,7 +1117,7 @@ class InternalLinkingAbilities {
 						'source_title' => $id_to_title[ $source_id ] ?? get_the_title( $source_id ),
 						'broken_url'   => $url,
 						'status_code'  => $status,
-						'anchor_text'  => $source['anchor_text'] ?? '',
+						'anchor_text'  => (string) $source['anchor_text'],
 					);
 				}
 			}
@@ -1161,7 +1160,7 @@ class InternalLinkingAbilities {
 			return 0;
 		}
 
-		$status = wp_remote_retrieve_response_code( $response );
+		$status = (int) wp_remote_retrieve_response_code( $response );
 
 		// Some external servers block HEAD requests — fall back to GET.
 		if ( $is_external && ( 405 === $status || 403 === $status ) ) {
@@ -1176,7 +1175,7 @@ class InternalLinkingAbilities {
 			);
 
 			if ( ! is_wp_error( $get_response ) ) {
-				$get_status = wp_remote_retrieve_response_code( $get_response );
+				$get_status = (int) wp_remote_retrieve_response_code( $get_response );
 				// 206 (Partial Content) means the server supports Range and the URL is alive.
 				if ( 206 === $get_status || ( $get_status >= 200 && $get_status < 400 ) ) {
 					return $get_status;
@@ -1279,8 +1278,8 @@ class InternalLinkingAbilities {
 			);
 		}
 
-		$start_date = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
-		$end_date   = gmdate( 'Y-m-d', strtotime( '-3 days' ) );
+		$start_date = gmdate( 'Y-m-d', time() - ( $days * DAY_IN_SECONDS ) );
+		$end_date   = gmdate( 'Y-m-d', time() - ( 3 * DAY_IN_SECONDS ) );
 
 		$gsc_result = $gsc_ability->execute(
 			array(
@@ -1365,7 +1364,7 @@ class InternalLinkingAbilities {
 
 			// Verify the post exists and is published.
 			$post = get_post( $post_id );
-			if ( ! $post || 'publish' !== $post->post_status || 'post' !== $post->post_type ) {
+			if ( ! $post instanceof \WP_Post || 'publish' !== $post->post_status || 'post' !== $post->post_type ) {
 				continue;
 			}
 
@@ -1378,7 +1377,7 @@ class InternalLinkingAbilities {
 			$outbound = $outbound_counts[ $post_id ] ?? 0;
 
 			// Average position across URL variants.
-			$avg_position = $traffic['row_count'] > 0 ? $traffic['position'] / $traffic['row_count'] : 0;
+			$avg_position = $traffic['position'] / $traffic['row_count'];
 
 			// 4. Score: clicks * (1 / (inbound_links + 1)).
 			$score = $traffic['clicks'] * ( 1 / ( $inbound + 1 ) );
@@ -1426,7 +1425,7 @@ class InternalLinkingAbilities {
 	 *
 	 * @since 0.72.0
 	 *
-	 * @return array<string, array{label?: string, description?: string, callback: callable}>
+	 * @return array<string, array{label?: string, description?: string, callback?: mixed}>
 	 */
 	public static function getExtractors(): array {
 		$extractors = apply_filters( 'datamachine_link_extractors', array() );
@@ -1443,7 +1442,7 @@ class InternalLinkingAbilities {
 	 *
 	 * @since 0.72.0
 	 *
-	 * @return array<string, array{callback: callable}>
+	 * @return array<string, array{callback?: mixed}>
 	 */
 	public static function getResolvers(): array {
 		$resolvers = apply_filters( 'datamachine_link_resolvers', array() );
@@ -1527,9 +1526,10 @@ class InternalLinkingAbilities {
 	 */
 	public static function extractHtmlAnchorEdges( string $content, array $context ): array {
 		$home_host = $context['home_host'] ?? wp_parse_url( home_url(), PHP_URL_HOST );
+		$home_host = is_string( $home_host ) ? $home_host : '';
 		$edges     = array();
 
-		if ( empty( $content ) || ! is_string( $home_host ) || '' === $home_host ) {
+		if ( empty( $content ) || '' === $home_host ) {
 			return $edges;
 		}
 
@@ -1632,6 +1632,7 @@ class InternalLinkingAbilities {
 
 		$home_url  = home_url();
 		$home_host = wp_parse_url( $home_url, PHP_URL_HOST );
+		$home_host = is_string( $home_host ) ? $home_host : '';
 
 		// Build the query for posts to scan.
 		if ( ! empty( $specific_ids ) ) {
