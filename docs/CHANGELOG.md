@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.11] - 2026-06-03
+
+### Fixed
+- align agent context propagation tests
+- expose composable memory section provenance
+
 ## [0.139.10] - 2026-06-03
 
 ### Fixed
