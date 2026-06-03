@@ -112,6 +112,9 @@ class AgentsChatHandler {
 				'agent_slug'           => $identity ? $identity->agent_slug : '',
 				'attachments'          => $input['attachments'] ?? array(),
 				'client_context'       => $client_context,
+				'tool_policy'          => is_array( $input['tool_policy'] ?? null ) ? $input['tool_policy'] : null,
+				'allow_only'           => is_array( $input['allow_only'] ?? null ) ? $input['allow_only'] : null,
+				'completion_assertions' => is_array( $input['completion_assertions'] ?? null ) ? $input['completion_assertions'] : null,
 				'session_owner'        => is_array( $input['session_owner'] ?? null ) ? $input['session_owner'] : null,
 				'transcript_owner'     => is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : null,
 			)
@@ -121,7 +124,8 @@ class AgentsChatHandler {
 			return $result;
 		}
 
-		return $this->toCanonicalOutput( $result );
+		$output = $this->toCanonicalOutput( $result );
+		return $this->withInputControlDiagnostics( $output, $input );
 	}
 
 	/**
@@ -231,6 +235,36 @@ class AgentsChatHandler {
 			'completed'  => $completed,
 			'metadata'   => $metadata,
 		);
+	}
+
+	/**
+	 * Add bounded diagnostics showing which caller-owned controls reached the runtime adapter.
+	 *
+	 * @param array $output Canonical output.
+	 * @param array $input  Canonical input received by the handler.
+	 * @return array Output with namespaced Data Machine diagnostics.
+	 */
+	private function withInputControlDiagnostics( array $output, array $input ): array {
+		$metadata             = is_array( $output['metadata'] ?? null ) ? $output['metadata'] : array();
+		$datamachine_metadata = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
+		$tool_policy          = is_array( $input['tool_policy'] ?? null ) ? $input['tool_policy'] : array();
+		$assertions           = is_array( $input['completion_assertions'] ?? null ) ? $input['completion_assertions'] : array();
+
+		$datamachine_metadata['input_controls'] = array_filter(
+			array(
+				'has_tool_policy'              => is_array( $input['tool_policy'] ?? null ),
+				'tool_policy_mode'             => is_scalar( $tool_policy['mode'] ?? null ) ? (string) $tool_policy['mode'] : null,
+				'tool_policy_tools'            => is_array( $tool_policy['tools'] ?? null ) ? array_values( array_map( 'strval', $tool_policy['tools'] ) ) : null,
+				'allow_only'                   => is_array( $input['allow_only'] ?? null ) ? array_values( array_map( 'strval', $input['allow_only'] ) ) : null,
+				'completion_required_tool_names' => is_array( $assertions['required_tool_names'] ?? null ) ? array_values( array_map( 'strval', $assertions['required_tool_names'] ) ) : null,
+			),
+			static fn( $value ): bool => null !== $value
+		);
+
+		$metadata['datamachine'] = $datamachine_metadata;
+		$output['metadata']      = $metadata;
+
+		return $output;
 	}
 
 	/**
