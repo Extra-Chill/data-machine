@@ -578,6 +578,8 @@ class SystemAbilities {
 			);
 		}
 
+		$task_context = self::extractRunTaskContext( $task_params );
+
 		$validation = self::validateRunTaskParams( $task_type, $meta, $task_params );
 		if ( ! $validation['success'] ) {
 			return array(
@@ -592,7 +594,7 @@ class SystemAbilities {
 		$job_id = TaskScheduler::schedule( $task_type, array_merge( $task_params, array(
 			'source'       => 'admin_run_now',
 			'triggered_by' => get_current_user_id(),
-		) ) );
+		) ), $task_context );
 
 		if ( ! $job_id ) {
 			return array(
@@ -610,6 +612,24 @@ class SystemAbilities {
 			'job_id'    => $job_id,
 			'message'   => "{$label} scheduled (Job #{$job_id}).",
 		);
+	}
+
+	/**
+	 * Extract scheduler context from manual run params.
+	 *
+	 * @param array $params Task params passed by reference.
+	 * @return array Scheduler context.
+	 */
+	private static function extractRunTaskContext( array &$params ): array {
+		$context = array();
+		foreach ( array( 'agent_id', 'agent_slug' ) as $key ) {
+			if ( array_key_exists( $key, $params ) ) {
+				$context[ $key ] = $params[ $key ];
+				unset( $params[ $key ] );
+			}
+		}
+
+		return $context;
 	}
 
 	/**
