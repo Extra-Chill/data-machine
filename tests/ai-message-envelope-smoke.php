@@ -137,6 +137,60 @@ datamachine_message_envelope_count();
 datamachine_message_envelope_assert( 'Issue created.' === ( $merged_tool_result_envelope['payload']['tool_data']['message'] ?? null ), 'Existing nested tool data is preserved when top-level fields are merged.' );
 datamachine_message_envelope_count();
 
+$agents_api_result_tool_result = ConversationManager::formatToolResultMessage(
+	'workspace_ls',
+	array(
+		'success'   => true,
+		'tool_name' => 'workspace_ls',
+		'result'    => array(
+			'path'    => '.',
+			'entries' => array(
+				array(
+					'name' => 'composer.json',
+					'type' => 'file',
+				),
+				array(
+					'name' => 'inc',
+					'type' => 'directory',
+				),
+			),
+		),
+	),
+	array(),
+	false,
+	5
+);
+$agents_api_result_envelope = WP_Agent_Message::normalize( $agents_api_result_tool_result );
+datamachine_message_envelope_assert( 'composer.json' === ( $agents_api_result_envelope['payload']['tool_data']['entries'][0]['name'] ?? null ), 'Agents API result envelope entries are promoted to model-facing tool_data.' );
+datamachine_message_envelope_count();
+datamachine_message_envelope_assert( str_contains( $agents_api_result_tool_result['content'], 'composer.json' ), 'Agents API result envelope entries are included in model-facing content.' );
+datamachine_message_envelope_count();
+
+$large_entries = array();
+for ( $i = 0; $i < 80; ++$i ) {
+	$large_entries[] = array(
+		'name'    => 'file-' . $i . '.txt',
+		'content' => str_repeat( 'x', 2000 ),
+	);
+}
+$large_tool_result = ConversationManager::formatToolResultMessage(
+	'workspace_ls',
+	array(
+		'success' => true,
+		'result'  => array(
+			'entries' => $large_entries,
+		),
+	),
+	array(),
+	false,
+	6
+);
+$large_tool_result_envelope = WP_Agent_Message::normalize( $large_tool_result );
+datamachine_message_envelope_assert( true === ( $large_tool_result_envelope['payload']['tool_data']['__truncated__'] ?? $large_tool_result_envelope['payload']['tool_data']['entries']['__truncated__'] ?? false ), 'Large model-facing tool result payloads are marked as truncated.' );
+datamachine_message_envelope_count();
+datamachine_message_envelope_assert( strlen( $large_tool_result['content'] ) < 13000, 'Large model-facing tool result content is bounded.' );
+datamachine_message_envelope_count();
+
 $typed_final_result = array(
 	'schema'   => WP_Agent_Message::SCHEMA,
 	'version'  => WP_Agent_Message::VERSION,
