@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.5] - 2026-06-03
+
+### Fixed
+- enforce token scopes in permission lifecycle
+
 ## [0.139.4] - 2026-06-03
 
 ### Changed
