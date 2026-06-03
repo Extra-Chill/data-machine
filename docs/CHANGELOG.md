@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.9] - 2026-06-03
+
+### Fixed
+- honor agents chat runtime controls
+
 ## [0.139.8] - 2026-06-03
 
 ### Fixed
