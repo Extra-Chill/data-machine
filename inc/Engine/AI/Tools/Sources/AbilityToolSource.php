@@ -53,7 +53,8 @@ final class AbilityToolSource {
 	/**
 	 * Gather selected abilities as Data Machine tool declarations.
 	 *
-	 * Plugins opt in through `datamachine_ability_tools`:
+	 * Plugins opt in through `datamachine_ability_tool_projections` or the
+	 * `datamachine_register_ability_tool()` helper:
 	 *
 	 *     $tools['my_tool'] = array(
 	 *         'ability' => 'my-plugin/my-ability',
@@ -74,7 +75,8 @@ final class AbilityToolSource {
 			return array();
 		}
 
-		$declared = apply_filters( 'datamachine_ability_tools', array(), $args );
+		$declared = apply_filters( 'datamachine_ability_tool_projections', array(), $args );
+		$declared = apply_filters( 'datamachine_ability_tools', $declared, $args );
 		if ( ! is_array( $declared ) ) {
 			return array();
 		}
