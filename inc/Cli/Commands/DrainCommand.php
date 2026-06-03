@@ -352,7 +352,7 @@ class DrainCommand extends BaseCommand {
 		$warnings    = array();
 		$claim       = null;
 		$stop_reason = '';
-		$claim_size  = '' === $lane ? $batch_size : max( $batch_size, min( 1000, $batch_size * 20 ) );
+		$claim_size  = self::claimSizeForScope( $batch_size, $hooks, $job_ids, $lane );
 		$processed   = 0;
 
 		try {
@@ -418,6 +418,101 @@ class DrainCommand extends BaseCommand {
 			'stop_reason'       => $stop_reason,
 			'actions_processed' => $processed,
 		);
+	}
+
+	/**
+	 * Determine how many due actions must be claimed to reach a scoped target.
+	 *
+	 * Action Scheduler claims by due order, but does not support filtering a claim
+	 * by serialized job IDs. When a targeted drain is requested, size the claim
+	 * through the first matching job action so the post-claim filter can process it.
+	 *
+	 * @param int           $batch_size Maximum matching actions to process.
+	 * @param string[]|null $hooks      Hook scope, or null for all hooks in the group.
+	 * @param int[]         $job_ids    Optional job ID scope.
+	 */
+	private static function claimSizeForScope( int $batch_size, ?array $hooks, array $job_ids, string $lane ): int {
+		$claim_size = '' === $lane ? $batch_size : max( $batch_size, min( 1000, $batch_size * 20 ) );
+
+		if ( empty( $job_ids ) ) {
+			return $claim_size;
+		}
+
+		return max( $claim_size, self::claimSizeThroughFirstJobAction( $hooks, $job_ids ) );
+	}
+
+	/**
+	 * Count due group actions through the first due action matching a job scope.
+	 *
+	 * @param string[]|null $hooks   Hook scope, or null for all hooks in the group.
+	 * @param int[]         $job_ids Job ID scope.
+	 */
+	private static function claimSizeThroughFirstJobAction( ?array $hooks, array $job_ids ): int {
+		global $wpdb;
+
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
+		$hook_sql      = self::hookWhereSql( $hooks, $job_ids );
+		$now           = gmdate( 'Y-m-d H:i:s' );
+		$values        = array_merge(
+			array( $actions_table, $groups_table ),
+			$hook_sql['values'],
+			array( self::GROUP, $now )
+		);
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic hook/job scope is constructed from normalized placeholders and values.
+		$target = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT a.action_id, a.scheduled_date_gmt, a.priority
+				FROM %i a
+				INNER JOIN %i g ON g.group_id = a.group_id
+				WHERE ' . $hook_sql['sql'] . 'a.status = \'pending\'
+				AND g.slug = %s
+				AND a.scheduled_date_gmt <= %s
+				ORDER BY a.scheduled_date_gmt ASC, a.priority ASC, a.action_id ASC
+				LIMIT 1',
+				$values
+			),
+			ARRAY_A
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		if ( ! is_array( $target ) ) {
+			return 0;
+		}
+
+		$hook_sql = self::hookWhereSql( $hooks );
+		$values   = array_merge(
+			array( $actions_table, $groups_table ),
+			$hook_sql['values'],
+			array(
+				self::GROUP,
+				(string) $target['scheduled_date_gmt'],
+				(string) $target['scheduled_date_gmt'],
+				(int) $target['priority'],
+				(string) $target['scheduled_date_gmt'],
+				(int) $target['priority'],
+				(int) $target['action_id'],
+			)
+		);
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic hook scope is constructed from normalized placeholders and values.
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*)
+				FROM %i a
+				INNER JOIN %i g ON g.group_id = a.group_id
+				WHERE ' . $hook_sql['sql'] . 'a.status = \'pending\'
+				AND g.slug = %s
+				AND (
+					a.scheduled_date_gmt < %s
+					OR (a.scheduled_date_gmt = %s AND a.priority < %d)
+					OR (a.scheduled_date_gmt = %s AND a.priority = %d AND a.action_id <= %d)
+				)',
+				$values
+			)
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 	}
 
 	/**
