@@ -2,6 +2,22 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.6] - 2026-06-03
+
+### Fixed
+- expose ability tool projections helper
+- mark link diagnosis input unused
+- keep backlink limit change lint-clean
+- bound backlink ability responses
+- preserve Agents API tool result payloads
+- handle runtime agent bundle imports
+- honor import-agent ability scope
+- require explicit tool context bindings
+- keep agent ability registration class-only
+- drain targeted jobs reliably
+- support late agent ability registration
+- enforce token scopes in permission lifecycle
+
 ## [0.139.4] - 2026-06-03
 
 ### Changed

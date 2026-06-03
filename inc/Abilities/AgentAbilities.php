@@ -2310,4 +2310,88 @@ class AgentAbilities {
 			'message'       => sprintf( 'Agent "%s" (ID: %d) deleted.%s', $slug, $agent_id, $files_deleted ? ' Files removed.' : '' ),
 		);
 	}
+
+	/**
+	 * Import an agent bundle staged by a disposable agent runtime.
+	 *
+	 * @param mixed $result Previous importer result, or null when unhandled.
+	 * @param array $spec   Original bundle spec.
+	 * @param array $input  Staged datamachine/import-agent input.
+	 * @param int   $index  Bundle index in the runtime request.
+	 * @return mixed Import result or WP_Error.
+	 */
+	public static function importRuntimeAgentBundle( $result, array $spec, array $input, int $index ) {
+		unset( $index );
+
+		if ( null !== $result ) {
+			return $result;
+		}
+
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'datamachine/import-agent' ) : null;
+		if ( ! $ability instanceof \WP_Ability ) {
+			return new \WP_Error(
+				'datamachine_import_agent_unavailable',
+				__( 'The Data Machine import-agent ability is not available inside the runtime site.', 'data-machine' )
+			);
+		}
+
+		$principal = self::runtimeAgentBundleImportPrincipal( $spec, $input );
+		if ( is_wp_error( $principal ) ) {
+			return $principal;
+		}
+
+		PermissionHelper::set_agent_context( (int) $principal['agent_id'], (int) $principal['owner_id'], $principal['scope'], $principal['token_id'] );
+		try {
+			return $ability->execute( $input );
+		} finally {
+			PermissionHelper::clear_agent_context();
+		}
+	}
+
+	/**
+	 * Resolve the Data Machine principal used for browser runtime bundle imports.
+	 *
+	 * @param array $spec  Original bundle spec.
+	 * @param array $input Staged datamachine/import-agent input.
+	 * @return array|\WP_Error
+	 */
+	private static function runtimeAgentBundleImportPrincipal( array $spec, array $input ) {
+		$principal       = is_array( $spec['import_principal'] ?? null ) ? $spec['import_principal'] : array();
+		$agent_id        = (int) ( $principal['agent_id'] ?? 1 );
+		$current_user_id = get_current_user_id();
+		if ( $agent_id <= 0 ) {
+			return new \WP_Error( 'datamachine_browser_bundle_import_principal_missing_agent', __( 'Agent bundle import principals require a positive agent_id.', 'data-machine' ) );
+		}
+
+		$capabilities = array_values( array_filter( array_map( 'strval', is_array( $principal['capabilities'] ?? null ) ? $principal['capabilities'] : array() ) ) );
+		if ( empty( $capabilities ) ) {
+			$capabilities = array( 'datamachine_manage_agents' );
+		}
+
+		$scope = is_array( $principal['scope'] ?? null ) ? $principal['scope'] : array();
+
+		$scope = array_merge(
+			array(
+				'scope'              => 'agent_bundle_import',
+				'label'              => 'Agent bundle import',
+				'ability_categories' => array(),
+				'ability_allow'      => array( 'datamachine/import-agent' ),
+				'ability_deny'       => array(),
+				'capabilities'       => $capabilities,
+			),
+			$scope
+		);
+
+		$scope['capabilities'] = array_values( array_filter( array_map( 'strval', is_array( $scope['capabilities'] ?? null ) ? $scope['capabilities'] : $capabilities ) ) );
+		if ( empty( $scope['capabilities'] ) ) {
+			$scope['capabilities'] = $capabilities;
+		}
+
+		return array(
+			'agent_id' => $agent_id,
+			'owner_id' => (int) ( $principal['owner_id'] ?? $input['owner_id'] ?? ( $current_user_id ? $current_user_id : 1 ) ),
+			'scope'    => $scope,
+			'token_id' => isset( $principal['token_id'] ) && (int) $principal['token_id'] > 0 ? (int) $principal['token_id'] : null,
+		);
+	}
 }
