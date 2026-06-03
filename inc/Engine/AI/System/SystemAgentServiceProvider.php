@@ -29,6 +29,7 @@ use DataMachine\Engine\AI\System\Tasks\Retention\RetentionActionSchedulerTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionChatSessionsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCleanup;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCompletedJobsTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCorpusArtifactsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionFailedJobsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionFilesTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionLogsTask;
@@ -85,14 +86,15 @@ class SystemAgentServiceProvider {
 		$tasks['internal_linking']                       = InternalLinkingTask::class;
 		$tasks['daily_memory_generation']                = DailyMemoryTask::class;
 		$tasks['meta_description_generation']            = MetaDescriptionTask::class;
-		$tasks[ RetentionCleanup::TASK_COMPLETED_JOBS ]  = RetentionCompletedJobsTask::class;
-		$tasks[ RetentionCleanup::TASK_FAILED_JOBS ]     = RetentionFailedJobsTask::class;
-		$tasks[ RetentionCleanup::TASK_LOGS ]            = RetentionLogsTask::class;
-		$tasks[ RetentionCleanup::TASK_PROCESSED_ITEMS ] = RetentionProcessedItemsTask::class;
-		$tasks[ RetentionCleanup::TASK_AS_ACTIONS ]      = RetentionActionSchedulerTask::class;
-		$tasks[ RetentionCleanup::TASK_STALE_CLAIMS ]    = RetentionStaleClaimsTask::class;
-		$tasks[ RetentionCleanup::TASK_FILES ]           = RetentionFilesTask::class;
-		$tasks[ RetentionCleanup::TASK_CHAT_SESSIONS ]   = RetentionChatSessionsTask::class;
+		$tasks[ RetentionCleanup::TASK_COMPLETED_JOBS ]   = RetentionCompletedJobsTask::class;
+		$tasks[ RetentionCleanup::TASK_FAILED_JOBS ]      = RetentionFailedJobsTask::class;
+		$tasks[ RetentionCleanup::TASK_LOGS ]             = RetentionLogsTask::class;
+		$tasks[ RetentionCleanup::TASK_PROCESSED_ITEMS ]  = RetentionProcessedItemsTask::class;
+		$tasks[ RetentionCleanup::TASK_AS_ACTIONS ]       = RetentionActionSchedulerTask::class;
+		$tasks[ RetentionCleanup::TASK_STALE_CLAIMS ]     = RetentionStaleClaimsTask::class;
+		$tasks[ RetentionCleanup::TASK_FILES ]            = RetentionFilesTask::class;
+		$tasks[ RetentionCleanup::TASK_CHAT_SESSIONS ]    = RetentionChatSessionsTask::class;
+		$tasks[ RetentionCleanup::TASK_CORPUS_ARTIFACTS ] = RetentionCorpusArtifactsTask::class;
 
 		return $tasks;
 	}
@@ -214,6 +216,16 @@ class SystemAgentServiceProvider {
 					'enabled_setting' => 'retention_chat_sessions_enabled',
 					'default_enabled' => true,
 					'label'           => 'Daily chat-session cleanup',
+				)
+			),
+			RetentionCleanup::TASK_CORPUS_ARTIFACTS => array_merge(
+				$daily_first_run,
+				array(
+					'task_type'       => RetentionCleanup::TASK_CORPUS_ARTIFACTS,
+					'interval'        => 'daily',
+					'enabled_setting' => 'retention_corpus_artifacts_enabled',
+					'default_enabled' => true,
+					'label'           => 'Daily corpus-artifact cleanup',
 				)
 			),
 		);

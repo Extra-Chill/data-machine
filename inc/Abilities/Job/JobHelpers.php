@@ -15,6 +15,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\Flow\QueueAbility;
 
 use DataMachine\Core\Admin\DateFormatter;
+use DataMachine\Core\CorpusJobSurfaces;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Pipelines\Pipelines;
@@ -119,6 +120,13 @@ trait JobHelpers {
 
 		if ( isset( $job['completed_at'] ) ) {
 			$job['completed_at_display'] = DateFormatter::format_for_display( $job['completed_at'] );
+		}
+
+		if ( is_array( $job['engine_data'] ?? null ) ) {
+			$job_summary = CorpusJobSurfaces::summary( $job, $job['engine_data'] );
+			if ( ! empty( $job_summary ) ) {
+				$job['job_summary'] = $job_summary;
+			}
 		}
 
 		// Compute display_label for UI
