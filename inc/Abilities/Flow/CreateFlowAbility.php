@@ -168,6 +168,23 @@ class CreateFlowAbility {
 		$scheduling_config = $input['scheduling_config'] ?? array( 'interval' => 'manual' );
 		$flow_config       = $input['flow_config'] ?? array();
 
+		// Resolve the owning agent when the caller did not supply one. Agent-first
+		// scoping (#735) makes agent-scoped reads filter `WHERE agent_id = %d`, so a
+		// flow persisted with agent_id = NULL is orphaned from every agent-scoped
+		// query — invisible to agent-filtered listings/counts and silently dropped
+		// from `agent export` / bundle round-trips. datamachine_resolve_agent_id()
+		// is the context-agnostic resolver shared by logging: explicit context →
+		// PermissionHelper active-agent context (set by AIStep / SystemTaskStep /
+		// RunFlowAbility / AgentAuthMiddleware for REST / MCP / chat / pipeline runs)
+		// → acting-user → owned-agent fallback. NULL remains a legitimate "unowned /
+		// system" state when no agent context can be resolved. See #2481.
+		if ( ( null === $agent_id || $agent_id <= 0 ) && function_exists( 'datamachine_resolve_agent_id' ) ) {
+			$resolved_agent_id = datamachine_resolve_agent_id();
+			if ( null !== $resolved_agent_id && $resolved_agent_id > 0 ) {
+				$agent_id = $resolved_agent_id;
+			}
+		}
+
 		// Validate and resolve interval aliases before storing.
 		$interval = $scheduling_config['interval'] ?? 'manual';
 		if ( 'manual' !== $interval && function_exists( 'datamachine_validate_interval' ) ) {
