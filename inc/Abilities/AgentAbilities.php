@@ -26,7 +26,11 @@ use DataMachine\Engine\Bundle\BundleValidationException;
 
 defined( 'ABSPATH' ) || exit;
 
-if ( ! function_exists( __NAMESPACE__ . '\\wp_register_ability' ) ) {
+class AgentAbilities {
+
+	private static bool $registered     = false;
+	private const ACTIVE_AGENT_META_KEY = 'datamachine_active_agent_slug';
+
 	/**
 	 * Register an ability during or after the Abilities API init hook.
 	 *
@@ -39,7 +43,7 @@ if ( ! function_exists( __NAMESPACE__ . '\\wp_register_ability' ) ) {
 	 * @param array  $args Ability arguments.
 	 * @return \WP_Ability|null Registered ability, or null on failure.
 	 */
-	function wp_register_ability( string $name, array $args ): ?\WP_Ability {
+	private static function registerAbility( string $name, array $args ): ?\WP_Ability {
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
 			return \wp_register_ability( $name, $args );
 		}
@@ -51,12 +55,6 @@ if ( ! function_exists( __NAMESPACE__ . '\\wp_register_ability' ) ) {
 
 		return $registry->register( $name, $args );
 	}
-}
-
-class AgentAbilities {
-
-	private static bool $registered     = false;
-	private const ACTIVE_AGENT_META_KEY = 'datamachine_active_agent_slug';
 
 	public function __construct() {
 		if ( self::$registered ) {
@@ -77,7 +75,7 @@ class AgentAbilities {
 		}
 
 		$register_callback = function () {
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/export-agent',
 				array(
 					'label'               => 'Export Agent',
@@ -133,7 +131,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/rename-agent',
 				array(
 					'label'               => 'Rename Agent',
@@ -170,7 +168,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/list-agents',
 				array(
 					'label'               => 'List Agents',
@@ -228,7 +226,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/get-active-agent',
 				array(
 					'label'               => 'Get Active Agent',
@@ -260,7 +258,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/set-active-agent',
 				array(
 					'label'               => 'Set Active Agent',
@@ -296,7 +294,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/create-agent',
 				array(
 					'label'               => 'Create Agent',
@@ -343,7 +341,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/import-agent',
 				array(
 					'label'               => 'Import Agent',
@@ -403,7 +401,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/list-agent-bundles',
 				array(
 					'label'               => 'List Agent Bundles',
@@ -423,7 +421,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/inspect-agent-bundle',
 				array(
 					'label'               => 'Inspect Agent Bundle',
@@ -443,7 +441,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/validate-agent-bundle',
 				array(
 					'label'               => 'Validate Agent Bundle',
@@ -463,7 +461,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/get-agent-bundle-status',
 				array(
 					'label'               => 'Get Agent Bundle Status',
@@ -492,7 +490,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/plan-agent-bundle-upgrade',
 				array(
 					'label'               => 'Plan Agent Bundle Upgrade',
@@ -512,7 +510,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/rebase-agent-bundle-artifacts',
 				array(
 					'label'               => 'Rebase Agent Bundle Artifacts',
@@ -532,7 +530,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/apply-agent-bundle-upgrade',
 				array(
 					'label'               => 'Apply Agent Bundle Upgrade',
@@ -546,7 +544,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/resolve-agent-bundle-upgrade-action',
 				array(
 					'label'               => 'Resolve Agent Bundle Upgrade Action',
@@ -566,7 +564,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/get-agent',
 				array(
 					'label'               => 'Get Agent',
@@ -605,7 +603,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/update-agent',
 				array(
 					'label'               => 'Update Agent',
@@ -650,7 +648,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/delete-agent',
 				array(
 					'label'               => 'Delete Agent',
@@ -694,7 +692,7 @@ class AgentAbilities {
 				)
 			);
 
-			wp_register_ability(
+			self::registerAbility(
 				'datamachine/grant-agent-audience-access',
 				array(
 					'label'               => 'Grant Agent Audience Access',
