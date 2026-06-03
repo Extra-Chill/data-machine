@@ -71,12 +71,12 @@ function datamachine_agents_api_bundled_require_targets( string $bootstrap_path 
 		return array();
 	}
 
-	$source = file_get_contents( $bootstrap_path );
+	$source = file_get_contents( $bootstrap_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading a bundled PHP file from disk at bootstrap, before the WordPress filesystem abstraction is available.
 	if ( ! is_string( $source ) || '' === $source ) {
 		return array();
 	}
 
-	// Match: require_once AGENTS_API_PATH . 'src/.../file.php';
+	// Match each require_once AGENTS_API_PATH . 'src/.../file.php' bootstrap line.
 	if ( ! preg_match_all(
 		"/require_once\s+AGENTS_API_PATH\s*\.\s*'(src\/[^']+\.php)'/",
 		$source,
@@ -102,7 +102,7 @@ function datamachine_agents_api_bundled_require_targets( string $bootstrap_path 
  * @return bool True when the canary class is available after the top-up.
  */
 function datamachine_agents_api_self_heal( string $bundled_dir ): bool {
-	$bundled_dir   = rtrim( $bundled_dir, '/\\' ) . '/';
+	$bundled_dir    = rtrim( $bundled_dir, '/\\' ) . '/';
 	$bootstrap_path = $bundled_dir . 'agents-api.php';
 
 	$targets = datamachine_agents_api_bundled_require_targets( $bootstrap_path );

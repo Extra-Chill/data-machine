@@ -55,28 +55,35 @@ agents_api_smoke_assert_equals(
 require_once dirname( __DIR__ ) . '/inc/agents-api-guardrail.php';
 
 echo "\n[1] Require-target parser reads the bundled bootstrap require list:\n";
-$targets = datamachine_agents_api_bundled_require_targets( $bootstrap_path );
+$require_targets = datamachine_agents_api_bundled_require_targets( $bootstrap_path );
 agents_api_smoke_assert_equals(
 	true,
-	count( $targets ) > 10,
+	count( $require_targets ) > 10,
 	'parser extracts the bundled src/ require targets',
 	$failures,
 	$passes
 );
 agents_api_smoke_assert_equals(
 	true,
-	in_array( 'src/Packages/class-wp-agent-package-artifact-hasher.php', $targets, true ),
+	in_array( 'src/Packages/class-wp-agent-package-artifact-hasher.php', $require_targets, true ),
 	'parser includes the canary class file target',
 	$failures,
 	$passes
 );
-foreach ( $targets as $relative_path ) {
+$only_src_targets = true;
+foreach ( $require_targets as $relative_path ) {
 	if ( ! str_starts_with( $relative_path, 'src/' ) ) {
-		$failures[] = 'parser only returns src/ targets';
-		echo "  FAIL parser only returns src/ targets (got {$relative_path})\n";
+		$only_src_targets = false;
 		break;
 	}
 }
+agents_api_smoke_assert_equals(
+	true,
+	$only_src_targets,
+	'parser only returns src/ require targets',
+	$failures,
+	$passes
+);
 
 echo "\n[2] Simulate the collision: older copy won, canary class is absent:\n";
 // Mimic the older standalone copy winning the load race.
