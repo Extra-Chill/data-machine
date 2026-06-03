@@ -295,6 +295,16 @@ function datamachine_run_conversation(
 	// Normalize the substrate result and augment with DM-specific fields.
 	try {
 		$result = WP_Agent_Conversation_Result::normalize( $result );
+		foreach ( is_array( $result['events'] ?? null ) ? $result['events'] : array() as $event ) {
+			if ( ! is_array( $event ) || ! in_array( (string) ( $event['type'] ?? '' ), array( 'completion_policy_stop', 'completion_policy_continue' ), true ) ) {
+				continue;
+			}
+
+			$event_metadata = is_array( $event['metadata'] ?? null ) ? $event['metadata'] : array();
+			if ( is_string( $event_metadata['message'] ?? null ) && '' !== $event_metadata['message'] ) {
+				do_action( 'datamachine_log', 'debug', $event_metadata['message'], array_merge( $base_log_context, is_array( $event_metadata['context'] ?? null ) ? $event_metadata['context'] : array() ) );
+			}
+		}
 		if ( isset( $result['failure'] ) && is_array( $result['failure'] ) && ! isset( $result['error'] ) ) {
 			$result['error']      = (string) ( $result['failure']['message'] ?? 'Provider request failed.' );
 			$result['error_code'] = (string) ( $result['failure']['code'] ?? 'provider_error' );
@@ -500,7 +510,7 @@ function datamachine_build_loop_tool_executor( array $tools, array $loop_payload
 			$tool_payload   = datamachine_payload_with_inflight_run_artifacts( $this->loop_payload, $prior_results );
 			$client_context = is_array( $tool_payload['client_context'] ?? null ) ? $tool_payload['client_context'] : array();
 
-			return ToolExecutor::executeTool(
+			$result = ToolExecutor::executeTool(
 				$tool_name,
 				$parameters,
 				$this->tools,
@@ -509,6 +519,12 @@ function datamachine_build_loop_tool_executor( array $tools, array $loop_payload
 				(int) ( $tool_payload['agent_id'] ?? 0 ),
 				$client_context
 			);
+
+			$metadata                              = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+			$metadata['datamachine']                = is_array( $metadata['datamachine'] ?? null ) ? $metadata['datamachine'] : array();
+			$metadata['datamachine']['parameters'] = $parameters;
+			$result['metadata']                    = $metadata;
+			return $result;
 		}
 	};
 }
@@ -529,10 +545,11 @@ function datamachine_build_pre_tool_mediator( array $tools, array $loop_payload,
 		$tool_name       = (string) ( $context['tool_name'] ?? '' );
 		$tool_parameters = is_array( $context['parameters'] ?? null ) ? $context['parameters'] : array();
 		$messages        = is_array( $context['messages'] ?? null ) ? $context['messages'] : array();
+		$policy_messages = datamachine_messages_before_current_tool_call( $messages, (string) ( $context['tool_call_id'] ?? '' ) );
 		$turn_count      = (int) ( $context['turn'] ?? 0 );
 		$tool_def        = is_array( $tools[ $tool_name ] ?? null ) ? $tools[ $tool_name ] : null;
 
-		$validation_result = ConversationManager::validateToolCall( $tool_name, $tool_parameters, $messages, $tool_def );
+		$validation_result = ConversationManager::validateToolCall( $tool_name, $tool_parameters, $policy_messages, $tool_def );
 		if ( ! empty( $validation_result['is_duplicate'] ) ) {
 			do_action(
 				'datamachine_log',
@@ -554,7 +571,7 @@ function datamachine_build_pre_tool_mediator( array $tools, array $loop_payload,
 			);
 		}
 
-		$runtime_rule_result = $tool_runtime_rules->evaluate( $tool_name, $messages );
+		$runtime_rule_result = $tool_runtime_rules->evaluate( $tool_name, $policy_messages );
 		if ( ! $runtime_rule_result['allowed'] ) {
 			do_action(
 				'datamachine_log',
@@ -626,6 +643,41 @@ function datamachine_build_pre_tool_mediator( array $tools, array $loop_payload,
 }
 
 /**
+ * Return transcript history before the current mediated tool-call message.
+ *
+ * Agents API calls the pre-tool mediator after appending the current synthetic
+ * tool-call message. Data Machine duplicate/runtime policies reason about prior
+ * history, so remove that current call before evaluating those policies.
+ *
+ * @param array<int,array<string,mixed>> $messages     Current mediated transcript.
+ * @param string                         $tool_call_id Current tool call id.
+ * @return array<int,array<string,mixed>> Transcript before current tool call.
+ */
+function datamachine_messages_before_current_tool_call( array $messages, string $tool_call_id ): array {
+	if ( empty( $messages ) ) {
+		return $messages;
+	}
+
+	$last_index = array_key_last( $messages );
+	if ( null === $last_index || ! is_array( $messages[ $last_index ] ) ) {
+		return $messages;
+	}
+
+	$last_message = $messages[ $last_index ];
+	if ( 'tool_call' !== (string) ( $last_message['type'] ?? '' ) ) {
+		return $messages;
+	}
+
+	$message_tool_call_id = (string) ( $last_message['metadata']['tool_call_id'] ?? '' );
+	if ( '' !== $tool_call_id && '' !== $message_tool_call_id && $tool_call_id !== $message_tool_call_id ) {
+		return $messages;
+	}
+
+	unset( $messages[ $last_index ] );
+	return array_values( $messages );
+}
+
+/**
  * Add Data Machine trace/runtime metadata to upstream mediated tool results.
  *
  * @param array<int,array<string,mixed>>   $tool_results Tool results from Agents API mediation.
@@ -643,6 +695,11 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
 		$tool_name       = (string) ( $tool_result_entry['tool_name'] ?? '' );
 		$parameters      = is_array( $tool_result_entry['parameters'] ?? null ) ? $tool_result_entry['parameters'] : array();
 		$result          = is_array( $tool_result_entry['result'] ?? null ) ? $tool_result_entry['result'] : array();
+		$metadata        = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+		if ( in_array( (string) ( $metadata['error_type'] ?? '' ), array( 'duplicate_tool_call', 'tool_runtime_rule_rejected' ), true ) ) {
+			continue;
+		}
+
 		if ( ! empty( $result['success'] ) && is_array( $result['result'] ?? null ) ) {
 			$result = array_merge( $result['result'], $result );
 			$tool_result_entry['result'] = $result;
