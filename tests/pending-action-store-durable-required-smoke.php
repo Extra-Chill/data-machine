@@ -77,7 +77,7 @@ if ( ! function_exists( 'delete_transient' ) ) {
 	}
 }
 
-require_once dirname( __DIR__ ) . '/vendor/automattic/agents-api/agents-api.php';
+require_once dirname( __DIR__ ) . '/vendor/wordpress/agents-api/agents-api.php';
 require_once dirname( __DIR__ ) . '/inc/Core/Workspace/WordPressWorkspaceScope.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionObservers.php';
 require_once dirname( __DIR__ ) . '/inc/Engine/AI/Actions/PendingActionStore.php';

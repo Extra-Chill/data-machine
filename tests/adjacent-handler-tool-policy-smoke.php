@@ -36,11 +36,11 @@ namespace {
 	}
 
 	require_once __DIR__ . '/../inc/Core/Steps/FlowStepConfig.php';
-	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-access-policy.php';
-	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-declaration.php';
-	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
-	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy.php';
-	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-source-registry.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-access-policy.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-declaration.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-source-registry.php';
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php';
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php';
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineToolAccessPolicy.php';
@@ -129,7 +129,7 @@ namespace {
 	$resolver_source  = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/ToolPolicyResolver.php' );
 	$mandatory_source = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineMandatoryToolPolicy.php' );
 	$agent_source     = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineAgentToolPolicyProvider.php' );
-	$filter_source    = (string) file_get_contents( __DIR__ . '/../vendor/automattic/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php' );
+	$filter_source    = (string) file_get_contents( __DIR__ . '/../vendor/wordpress/agents-api/src/Tools/class-wp-agent-tool-policy-filter.php' );
 	$access_source    = (string) file_get_contents( __DIR__ . '/../inc/Engine/AI/Tools/Policy/DataMachineToolAccessPolicy.php' );
 	assert_same_policy( false, false !== strpos( $resolver_source, 'DataMachine\\Core\\Database\\Agents\\Agents' ), 'resolver no longer imports Data Machine agent table repository', $failures, $passes );
 	assert_same_policy( false, false !== strpos( $resolver_source, 'isPipelineHandlerTool' ), 'resolver no longer owns handler-tool classifier', $failures, $passes );

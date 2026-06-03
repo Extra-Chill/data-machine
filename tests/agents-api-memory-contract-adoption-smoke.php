@@ -63,7 +63,7 @@ if ( ! function_exists( 'apply_filters' ) ) {
 	}
 }
 
-require_once __DIR__ . '/../vendor/automattic/agents-api/agents-api.php';
+require_once __DIR__ . '/../vendor/wordpress/agents-api/agents-api.php';
 require_once __DIR__ . '/../inc/Engine/AI/MemoryFileRegistry.php';
 require_once __DIR__ . '/../inc/Engine/AI/SectionRegistry.php';
 require_once __DIR__ . '/../inc/Core/FilesRepository/DiskAgentMemoryStore.php';

@@ -64,12 +64,12 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 		public function execute( array $input ) { return ( $this->handler )( $input ); }
 	}
 
-	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Workflows/class-wp-agent-workflow-bindings.php';
-	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Workflows/class-wp-agent-workflow-spec-validator.php';
-	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Workflows/class-wp-agent-workflow-spec.php';
-	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Workflows/class-wp-agent-workflow-run-result.php';
-	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Workflows/class-wp-agent-workflow-run-recorder.php';
-	require_once __DIR__ . '/../vendor/automattic/agents-api/src/Workflows/class-wp-agent-workflow-runner.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-bindings.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-spec-validator.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-spec.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-run-result.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-run-recorder.php';
+	require_once __DIR__ . '/../vendor/wordpress/agents-api/src/Workflows/class-wp-agent-workflow-runner.php';
 	require_once __DIR__ . '/../inc/Core/JobStatus.php';
 	require_once __DIR__ . '/../inc/Abilities/PermissionHelper.php';
 	require_once __DIR__ . '/../inc/Abilities/Job/JobHelpers.php';

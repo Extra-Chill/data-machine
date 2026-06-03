@@ -4,7 +4,7 @@
  * substrate loaded — the Homeboy playground bootstrap scenario that fataled
  * before issue #2005 was fixed.
  *
- * The smoke deliberately avoids loading `vendor/automattic/agents-api/` so
+ * The smoke deliberately avoids loading `vendor/wordpress/agents-api/` so
  * `WP_Agent_Memory_Layer`, `WP_Agent_Memory_Registry`,
  * `WP_Agent_Context_Injection_Policy`, and
  * `\AgentsAPI\AI\Context\WP_Agent_Context_Authority_Tier` are all absent

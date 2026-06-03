@@ -41,19 +41,19 @@ $blueprint = datamachine_release_bundle_json_file( $root . '/blueprints/playgrou
 $plugin_source = (string) file_get_contents( $root . '/data-machine.php' );
 
 echo "\n[1] Release metadata bundles Agents API instead of requiring a separate plugin:\n";
-datamachine_release_bundle_assert( isset( $composer['require']['automattic/agents-api'] ), 'composer production dependencies include automattic/agents-api', $failures, $passes );
-datamachine_release_bundle_assert( ! isset( $composer['require-dev']['automattic/agents-api'] ), 'composer dev dependencies do not own automattic/agents-api', $failures, $passes );
+datamachine_release_bundle_assert( isset( $composer['require']['wordpress/agents-api'] ), 'composer production dependencies include wordpress/agents-api', $failures, $passes );
+datamachine_release_bundle_assert( ! isset( $composer['require-dev']['wordpress/agents-api'] ), 'composer dev dependencies do not own wordpress/agents-api', $failures, $passes );
 datamachine_release_bundle_assert( false === strpos( $plugin_source, 'Requires Plugins: agents-api' ), 'plugin header does not require standalone Agents API activation', $failures, $passes );
 
 $runtime_packages = array_column( $lock['packages'] ?? array(), 'name' );
 $dev_packages     = array_column( $lock['packages-dev'] ?? array(), 'name' );
-datamachine_release_bundle_assert( in_array( 'automattic/agents-api', $runtime_packages, true ), 'composer.lock keeps automattic/agents-api in runtime packages', $failures, $passes );
-datamachine_release_bundle_assert( ! in_array( 'automattic/agents-api', $dev_packages, true ), 'composer.lock keeps automattic/agents-api out of dev packages', $failures, $passes );
+datamachine_release_bundle_assert( in_array( 'wordpress/agents-api', $runtime_packages, true ), 'composer.lock keeps wordpress/agents-api in runtime packages', $failures, $passes );
+datamachine_release_bundle_assert( ! in_array( 'wordpress/agents-api', $dev_packages, true ), 'composer.lock keeps wordpress/agents-api out of dev packages', $failures, $passes );
 
 echo "\n[2] Runtime bootstrap is idempotent with standalone Agents API:\n";
 datamachine_release_bundle_assert( false !== strpos( $plugin_source, "defined( 'AGENTS_API_LOADED' )" ), 'Data Machine checks the Agents API loaded sentinel before bundling', $failures, $passes );
-datamachine_release_bundle_assert( false !== strpos( $plugin_source, "vendor/automattic/agents-api/agents-api.php" ), 'Data Machine loads the bundled Agents API bootstrap', $failures, $passes );
-datamachine_release_bundle_assert( is_file( $root . '/vendor/automattic/agents-api/agents-api.php' ), 'local bundled Agents API bootstrap exists for package validation', $failures, $passes );
+datamachine_release_bundle_assert( false !== strpos( $plugin_source, "vendor/wordpress/agents-api/agents-api.php" ), 'Data Machine loads the bundled Agents API bootstrap', $failures, $passes );
+datamachine_release_bundle_assert( is_file( $root . '/vendor/wordpress/agents-api/agents-api.php' ), 'local bundled Agents API bootstrap exists for package validation', $failures, $passes );
 
 echo "\n[3] Validation paths no longer install a separate GitHub-only Agents API plugin:\n";
 $validation_dependencies = $homeboy['extensions']['wordpress']['settings']['validation_dependencies'] ?? '';

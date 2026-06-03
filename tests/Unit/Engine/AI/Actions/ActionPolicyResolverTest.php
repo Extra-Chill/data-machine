@@ -22,7 +22,7 @@ use DataMachine\Engine\AI\Actions\ActionPolicyResolver;
 use WP_UnitTestCase;
 
 if ( ! class_exists( WP_Agent_Action_Policy::class ) ) {
-	require_once dirname( __DIR__, 5 ) . '/vendor/automattic/agents-api/src/Tools/class-wp-agent-action-policy.php';
+	require_once dirname( __DIR__, 5 ) . '/vendor/wordpress/agents-api/src/Tools/class-wp-agent-action-policy.php';
 }
 
 class ActionPolicyResolverTest extends WP_UnitTestCase {
