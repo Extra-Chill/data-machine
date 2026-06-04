@@ -1,12 +1,14 @@
 <?php
 /**
- * Pure-PHP smoke test for the agents-api dual-load version-skew guardrail (#2477).
+ * Pure-PHP smoke test for the agents-api substrate-load guardrail (#2477, #2500).
  *
- * Simulates the collision: an OLDER standalone copy of agents-api wins the load race,
- * defines AGENTS_API_LOADED, and freezes a class set that lacks the newer bundled
- * classes (canary: WP_Agent_Package_Artifact_Hasher). The guardrail must (a) detect the
- * skew, then (b) self-heal by topping up the missing class files from data-machine's OWN
- * bundled copy — without ever fataling on a bare "Class ... not found".
+ * Simulates the failure mode: AGENTS_API_LOADED is defined but the substrate class set is
+ * incomplete (canary: WP_Agent_Package_Artifact_Hasher absent). Triggers include an older
+ * standalone copy winning the load race, a partial/aborted bootstrap, or a load-order
+ * regression. The guardrail must top up the missing class files from data-machine's OWN
+ * bundled copy — UNCONDITIONALLY whenever the bootstrap constant is defined — so the
+ * substrate is complete before any namespaced delegator references a WP_Agent_* global,
+ * without ever fataling on a bare "Class ... not found".
  *
  * Run with: php tests/agents-api-dualload-guardrail-smoke.php
  *
@@ -137,4 +139,22 @@ agents_api_smoke_assert_equals(
 	$passes
 );
 
-agents_api_smoke_finish( 'Agents API dual-load guardrail', $failures, $passes );
+echo "\n[5] Namespaced delegator resolves the topped-up global (the #2500 regression):\n";
+// This is the exact call path that fataled on production: the namespaced
+// AgentBundleArtifactHasher delegating to the global WP_Agent_Package_Artifact_Hasher.
+require_once dirname( __DIR__ ) . '/inc/Engine/Bundle/AgentBundleArtifactHasher.php';
+$delegated_hash = \DataMachine\Engine\Bundle\AgentBundleArtifactHasher::hash(
+	array(
+		'a' => 1,
+		'b' => array( 2, 3 ),
+	)
+);
+agents_api_smoke_assert_equals(
+	true,
+	is_string( $delegated_hash ) && 64 === strlen( $delegated_hash ),
+	'AgentBundleArtifactHasher::hash() returns a sha256 without fataling',
+	$failures,
+	$passes
+);
+
+agents_api_smoke_finish( 'Agents API substrate-load guardrail', $failures, $passes );
