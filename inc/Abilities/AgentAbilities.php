@@ -350,11 +350,18 @@ class AgentAbilities {
 					'category'            => 'datamachine-agent',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'source' ),
+						'anyOf'      => array(
+							array( 'required' => array( 'source' ) ),
+							array( 'required' => array( 'bundle' ) ),
+						),
 						'properties' => array(
 							'source'      => array(
 								'type'        => 'string',
 								'description' => 'Bundle source: local path (directory, .zip, .json) or remote URL (HTTPS to a .zip/.json or a GitHub blob/tree/archive URL).',
+							),
+							'bundle'      => array(
+								'type'        => 'object',
+								'description' => 'Already-parsed portable Data Machine agent bundle array.',
 							),
 							'slug'        => array(
 								'type'        => 'string',
@@ -1257,30 +1264,38 @@ class AgentAbilities {
 	 * @return array<string,mixed>
 	 */
 	public static function importAgent( array $input ): array {
-		$source = trim( (string) ( $input['source'] ?? '' ) );
-		if ( '' === $source ) {
+		$has_inline_bundle = isset( $input['bundle'] ) && is_array( $input['bundle'] );
+		$source            = trim( (string) ( $input['source'] ?? '' ) );
+		if ( ! $has_inline_bundle && '' === $source ) {
 			return array(
 				'success' => false,
-				'error'   => 'Bundle source is required.',
+				'error'   => 'Bundle source or inline bundle is required.',
 			);
 		}
 
-		$context  = self::build_resolve_context( $input );
-		$resolved = BundleSource::resolve( $source, $context );
-		if ( is_wp_error( $resolved ) ) {
-			return array(
-				'success' => false,
-				'error'   => $resolved->get_error_message(),
-			);
-		}
+		$resolved = null;
+		$revision = null;
+		$bundle   = $has_inline_bundle ? $input['bundle'] : null;
+		if ( ! $has_inline_bundle ) {
+			$context  = self::build_resolve_context( $input );
+			$resolved = BundleSource::resolve( $source, $context );
+			if ( is_wp_error( $resolved ) ) {
+				return array(
+					'success' => false,
+					'error'   => $resolved->get_error_message(),
+				);
+			}
 
-		// Snapshot the revision before any nested resolve() call could
-		// reset it.
-		$revision = BundleSource::is_remote( $source ) ? BundleSource::last_resolved_revision() : null;
+			// Snapshot the revision before any nested resolve() call could
+			// reset it.
+			$revision = BundleSource::is_remote( $source ) ? BundleSource::last_resolved_revision() : null;
+		}
 
 		$on_conflict = (string) ( $input['on_conflict'] ?? 'error' );
 		if ( ! in_array( $on_conflict, array( 'error', 'skip', 'upgrade' ), true ) ) {
-			BundleSource::cleanup( $resolved, $source );
+			if ( null !== $resolved ) {
+				BundleSource::cleanup( $resolved, $source );
+			}
 			return array(
 				'success' => false,
 				'error'   => 'on_conflict must be one of: error, skip, upgrade.',
@@ -1289,7 +1304,9 @@ class AgentAbilities {
 
 		$owner_id = self::resolve_import_owner_id( isset( $input['owner_id'] ) ? (int) $input['owner_id'] : 0 );
 		if ( $owner_id <= 0 ) {
-			BundleSource::cleanup( $resolved, $source );
+			if ( null !== $resolved ) {
+				BundleSource::cleanup( $resolved, $source );
+			}
 			return array(
 				'success' => false,
 				'error'   => 'Unable to resolve import owner. Pass owner_id, authenticate as a user, or set datamachine_default_owner_id.',
@@ -1297,12 +1314,14 @@ class AgentAbilities {
 		}
 
 		$bundler = new AgentBundler();
-		$bundle  = self::load_import_bundle( $bundler, $resolved );
+		if ( null !== $resolved ) {
+			$bundle = self::load_import_bundle( $bundler, $resolved );
 
-		// from_zip() extracts to its own tempdir and from_json() reads
-		// the file into memory, so the resolver's temp file is safe to
-		// remove now (success or failure of parse).
-		BundleSource::cleanup( $resolved, $source );
+			// from_zip() extracts to its own tempdir and from_json() reads
+			// the file into memory, so the resolver's temp file is safe to
+			// remove now (success or failure of parse).
+			BundleSource::cleanup( $resolved, $source );
+		}
 
 		if ( ! is_array( $bundle ) ) {
 			return array(
@@ -1314,7 +1333,7 @@ class AgentAbilities {
 		// Stamp the original remote source so installed bundle metadata
 		// records where this came from. source_revision is best-effort
 		// from the response ETag for GitHub archives (#1830).
-		if ( BundleSource::is_remote( $source ) && empty( $bundle['source_ref'] ) ) {
+		if ( ! $has_inline_bundle && BundleSource::is_remote( $source ) && empty( $bundle['source_ref'] ) ) {
 			$bundle['source_ref'] = $source;
 		}
 		if ( null !== $revision && empty( $bundle['source_revision'] ) ) {
@@ -2501,6 +2520,7 @@ class AgentAbilities {
 			);
 		}
 
+		$input     = self::runtimeAgentBundleImportInput( $spec, $input );
 		$principal = self::runtimeAgentBundleImportPrincipal( $spec, $input );
 		if ( is_wp_error( $principal ) ) {
 			return $principal;
@@ -2512,6 +2532,57 @@ class AgentAbilities {
 		} finally {
 			PermissionHelper::clear_agent_context();
 		}
+	}
+
+	/**
+	 * Normalize a runtime bundle spec into canonical datamachine/import-agent input.
+	 *
+	 * @param array $spec  Original bundle spec.
+	 * @param array $input Runtime import defaults supplied by the caller.
+	 * @return array<string,mixed>
+	 */
+	private static function runtimeAgentBundleImportInput( array $spec, array $input ): array {
+		$canonical = array();
+
+		foreach ( array( 'bundle', 'source', 'slug', 'owner_id', 'on_conflict', 'dry_run', 'token', 'token_env' ) as $field ) {
+			if ( array_key_exists( $field, $input ) ) {
+				$canonical[ $field ] = $input[ $field ];
+			}
+		}
+
+		foreach ( array( 'bundle', 'source', 'slug', 'owner_id', 'on_conflict', 'dry_run', 'token', 'token_env' ) as $field ) {
+			if ( array_key_exists( $field, $spec ) ) {
+				$canonical[ $field ] = $spec[ $field ];
+			}
+		}
+
+		foreach ( array( 'source', 'slug', 'token', 'token_env' ) as $field ) {
+			if ( isset( $canonical[ $field ] ) ) {
+				$canonical[ $field ] = trim( (string) $canonical[ $field ] );
+				if ( '' === $canonical[ $field ] ) {
+					unset( $canonical[ $field ] );
+				}
+			}
+		}
+
+		foreach ( array( 'owner_id' ) as $field ) {
+			if ( isset( $canonical[ $field ] ) ) {
+				$canonical[ $field ] = (int) $canonical[ $field ];
+				if ( $canonical[ $field ] <= 0 ) {
+					unset( $canonical[ $field ] );
+				}
+			}
+		}
+
+		if ( isset( $canonical['dry_run'] ) ) {
+			$canonical['dry_run'] = (bool) $canonical['dry_run'];
+		}
+
+		if ( isset( $canonical['bundle'] ) && is_array( $canonical['bundle'] ) ) {
+			unset( $canonical['source'] );
+		}
+
+		return $canonical;
 	}
 
 	/**
