@@ -28,7 +28,7 @@ class CorpusRetrieveEvalTask extends CorpusPacketTask {
 			'params_schema'   => array(
 				'type'       => 'object',
 				'properties' => array(
-					'corpus' => array( 'type' => 'object' ),
+					'corpus'  => array( 'type' => 'object' ),
 					'queries' => array( 'type' => 'array' ),
 					'query'   => array( 'type' => 'object' ),
 					'evals'   => array( 'type' => 'array' ),

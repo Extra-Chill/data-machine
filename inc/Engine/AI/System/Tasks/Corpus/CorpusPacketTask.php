@@ -87,7 +87,14 @@ abstract class CorpusPacketTask extends SystemTask {
 	 */
 	protected function normalizeCorpus( array $input ): array {
 		$corpus = isset( $input['corpus'] ) && is_array( $input['corpus'] ) ? $input['corpus'] : array();
-		foreach ( array( 'id' => 'corpus_id', 'ref' => 'corpus_ref', 'key' => 'corpus_key', 'label' => 'corpus_label' ) as $target => $source ) {
+		foreach (
+			array(
+				'id'    => 'corpus_id',
+				'ref'   => 'corpus_ref',
+				'key'   => 'corpus_key',
+				'label' => 'corpus_label',
+			) as $target => $source
+		) {
 			if ( ! array_key_exists( $target, $corpus ) && array_key_exists( $source, $input ) ) {
 				$corpus[ $target ] = $input[ $source ];
 			}
