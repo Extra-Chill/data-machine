@@ -13,6 +13,7 @@ namespace DataMachine\Engine\AI\Tools\Sources;
 
 use DataMachine\Engine\AI\Tools\ToolManager;
 use DataMachine\Engine\AI\Tools\ToolPolicyResolver;
+use DataMachine\Core\PluginSettings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -96,15 +97,13 @@ final class AbilityToolSource {
 				continue;
 			}
 
-			if ( ! ToolPolicyResolver::isOptInToolAllowed( $tool, $tool_name, $args ) ) {
+			$include_unavailable = ! empty( $args['include_unavailable'] );
+
+			if ( ! $include_unavailable && ! ToolPolicyResolver::isOptInToolAllowed( $tool, $tool_name, $args ) ) {
 				continue;
 			}
 
-			if ( ! empty( $tool['requires_config'] ) ) {
-				if ( ! $this->tool_manager->is_tool_available( $tool_name, null ) ) {
-					continue;
-				}
-			} elseif ( ! $this->tool_manager->is_globally_enabled( $tool_name ) ) {
+			if ( ! $include_unavailable && ! $this->isToolAvailable( $tool_name, $tool ) ) {
 				continue;
 			}
 
@@ -198,6 +197,31 @@ final class AbilityToolSource {
 		$tool_modes = is_array( $tool_modes ) ? $tool_modes : array( $tool_modes );
 
 		return ! empty( array_intersect( ToolPolicyResolver::normalizeModes( $tool_modes ), $modes ) );
+	}
+
+	/**
+	 * Whether a generated ability projection is enabled and configured.
+	 *
+	 * Ability-native tools are not necessarily present in ToolManager's static
+	 * `datamachine_tools` registry, so source-level availability must evaluate
+	 * the generated declaration directly instead of asking ToolManager to look the
+	 * tool up by name.
+	 *
+	 * @param string $tool_name Tool name.
+	 * @param array  $tool      Generated tool declaration.
+	 * @return bool Whether the tool is available.
+	 */
+	private function isToolAvailable( string $tool_name, array $tool ): bool {
+		$disabled_tools = PluginSettings::get( 'disabled_tools', array() );
+		if ( isset( $disabled_tools[ $tool_name ] ) ) {
+			return false;
+		}
+
+		if ( empty( $tool['requires_config'] ) ) {
+			return true;
+		}
+
+		return (bool) apply_filters( 'datamachine_tool_configured', false, $tool_name );
 	}
 
 }

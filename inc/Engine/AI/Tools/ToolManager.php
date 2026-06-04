@@ -16,6 +16,7 @@
 namespace DataMachine\Engine\AI\Tools;
 
 use DataMachine\Core\PluginSettings;
+use DataMachine\Engine\AI\Tools\Sources\AbilityToolSource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -454,7 +455,7 @@ class ToolManager {
 	 * @return bool True if requires config
 	 */
 	public function requires_configuration( string $tool_id ): bool {
-		$tools = $this->get_all_tools();
+		$tools = $this->get_all_tool_declarations();
 		return ! empty( $tools[ $tool_id ]['requires_config'] );
 	}
 
@@ -520,7 +521,7 @@ class ToolManager {
 	 * @return bool True if tool is available
 	 */
 	public function is_tool_available( string $tool_id, ?string $context_id = null ): bool {
-		$tools       = $this->get_all_tools();
+		$tools       = $this->get_all_tool_declarations();
 		$tool_config = $tools[ $tool_id ] ?? null;
 
 		if ( ! $tool_config ) {
@@ -558,7 +559,7 @@ class ToolManager {
 	 * @return bool True if valid selection
 	 */
 	public function validate_tool_selection( string $tool_id ): bool {
-		$tools = $this->get_all_tools();
+		$tools = $this->get_all_tool_declarations();
 		if ( ! isset( $tools[ $tool_id ] ) ) {
 			return false; // Tool doesn't exist
 		}
@@ -613,7 +614,7 @@ class ToolManager {
 	 */
 	public function get_tools_for_step_modal( string $context_id ): array {
 		return array(
-			'global_tools'         => $this->get_all_tools(),
+			'global_tools'         => $this->get_all_tool_declarations(),
 			'modal_disabled_tools' => $this->get_step_disabled_tools( $context_id ),
 			'pipeline_step_id'     => $context_id,
 		);
@@ -625,7 +626,7 @@ class ToolManager {
 	 * @return array All global tools with status
 	 */
 	public function get_tools_for_settings_page(): array {
-		$tools = $this->get_all_tools();
+		$tools = $this->get_all_tool_declarations();
 		$data  = array();
 
 		foreach ( $tools as $tool_id => $tool_config ) {
@@ -638,6 +639,27 @@ class ToolManager {
 		}
 
 		return $data;
+	}
+
+	/**
+	 * Get static and ability-projected tool declarations for management surfaces.
+	 *
+	 * Runtime source resolution keeps legacy registry tools and ability projections
+	 * separate. Settings and selection validation need a complete declaration list
+	 * so ability-native tools can be configured and saved without retaining a
+	 * duplicate class/method registry shadow.
+	 *
+	 * @return array<string,array<string,mixed>> Tool declarations keyed by tool name.
+	 */
+	private function get_all_tool_declarations(): array {
+		$static_tools   = $this->get_all_tools();
+		$ability_source = new AbilityToolSource( $this );
+		$ability_tools  = $ability_source(
+			array( ToolPolicyResolver::MODE_CHAT, ToolPolicyResolver::MODE_PIPELINE, ToolPolicyResolver::MODE_SYSTEM ),
+			array( 'include_unavailable' => true )
+		);
+
+		return array_merge( $ability_tools, $static_tools );
 	}
 
 	/**
