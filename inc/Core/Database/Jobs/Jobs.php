@@ -604,6 +604,15 @@ class Jobs extends BaseRepository {
 			}
 		}
 
+		foreach ( array_filter( (array) ( $args['engine_data_contains'] ?? array() ), 'is_string' ) as $engine_data_marker ) {
+			if ( '' === $engine_data_marker ) {
+				continue;
+			}
+
+			$where_clauses[] = 'j.engine_data LIKE %s';
+			$where_values[]  = '%' . $this->wpdb->esc_like( $engine_data_marker ) . '%';
+		}
+
 		if ( isset( $args['user_id'] ) ) {
 			$where_clauses[] = 'j.user_id = %d';
 			$where_values[]  = absint( $args['user_id'] );
