@@ -1305,12 +1305,14 @@ function datamachine_runtime_tool_request_store(): WP_Agent_Runtime_Tool_Request
 				}
 
 				$engine_data = ( new \DataMachine\Core\Database\Jobs\Jobs() )->retrieve_engine_data( $job_id );
-				$request     = is_array( $engine_data['runtime_tool_request'] ?? null ) ? $engine_data['runtime_tool_request'] : array();
+				$request     = is_array( $engine_data['runtime_tool_request'] ?? null )
+					? datamachine_normalize_stored_runtime_tool_request( $engine_data['runtime_tool_request'] )
+					: null;
 				if ( empty( $request ) ) {
 					return null;
 				}
 
-				return WP_Agent_Runtime_Tool_Request::normalize( $request );
+				return $request;
 			}
 
 			public function complete( string $request_id, array $result ): void {
@@ -1552,6 +1554,51 @@ function datamachine_runtime_tool_job_id_from_request( array $request ): int {
 }
 
 /**
+ * Normalize a stored runtime-tool request, including rows persisted before the canonical request contract.
+ *
+ * @param array<string,mixed> $request Stored request payload.
+ * @return array<string,mixed>|null Canonical request or null when invalid.
+ */
+function datamachine_normalize_stored_runtime_tool_request( array $request ): ?array {
+	$metadata             = is_array( $request['metadata'] ?? null ) ? $request['metadata'] : array();
+	$datamachine_metadata = datamachine_runtime_tool_datamachine_metadata( $request );
+	$legacy_status        = is_string( $request['status'] ?? null ) ? $request['status'] : '';
+
+	foreach ( array( 'job_id', 'session_id', 'user_id', 'agent_id', 'mode', 'modes', 'turn_count', 'created_at', 'expires_at', 'timeout_seconds', 'fulfilled_at', 'result' ) as $key ) {
+		if ( ! array_key_exists( $key, $datamachine_metadata ) && array_key_exists( $key, $request ) ) {
+			$datamachine_metadata[ $key ] = $request[ $key ];
+		}
+	}
+
+	if ( ! isset( $datamachine_metadata['persistence_status'] ) && '' !== $legacy_status ) {
+		$datamachine_metadata['persistence_status'] = WP_Agent_Runtime_Tool_Request::STATUS_PENDING === $legacy_status ? 'pending' : $legacy_status;
+	}
+
+	$metadata['datamachine'] = $datamachine_metadata;
+
+	try {
+		return WP_Agent_Runtime_Tool_Request::normalize(
+			array(
+				'request_id'   => (string) ( $request['request_id'] ?? '' ),
+				'tool_name'    => (string) ( $request['tool_name'] ?? '' ),
+				'tool_call_id' => (string) ( $request['tool_call_id'] ?? $request['call_id'] ?? $request['request_id'] ?? '' ),
+				'parameters'   => is_array( $request['parameters'] ?? null ) ? $request['parameters'] : array(),
+				'run_id'       => (string) ( $request['run_id'] ?? $request['session_id'] ?? '' ),
+				'timeout_at'   => (string) ( $request['timeout_at'] ?? $request['expires_at'] ?? '' ),
+				'runtime'      => is_array( $request['runtime'] ?? null ) ? $request['runtime'] : array(
+					'executor' => 'client',
+					'scope'    => 'run',
+				),
+				'metadata'     => $metadata,
+			)
+		);
+	} catch ( \InvalidArgumentException $e ) {
+		unset( $e );
+		return null;
+	}
+}
+
+/**
  * Read Data Machine-owned metadata from a canonical runtime-tool payload.
  *
  * @param array<string,mixed> $payload Canonical runtime-tool request or result.
@@ -1561,6 +1608,21 @@ function datamachine_runtime_tool_datamachine_metadata( array $payload ): array 
 	$metadata = is_array( $payload['metadata'] ?? null ) ? $payload['metadata'] : array();
 	if ( is_array( $metadata['datamachine'] ?? null ) ) {
 		return $metadata['datamachine'];
+	}
+
+	$legacy = array();
+	foreach ( array( 'job_id', 'session_id', 'user_id', 'agent_id', 'mode', 'modes', 'turn_count', 'created_at', 'expires_at', 'timeout_seconds', 'fulfilled_at', 'result' ) as $key ) {
+		if ( array_key_exists( $key, $payload ) ) {
+			$legacy[ $key ] = $payload[ $key ];
+		}
+	}
+
+	if ( isset( $payload['status'] ) && is_string( $payload['status'] ) ) {
+		$legacy['persistence_status'] = WP_Agent_Runtime_Tool_Request::STATUS_PENDING === $payload['status'] ? 'pending' : $payload['status'];
+	}
+
+	if ( ! empty( $legacy ) ) {
+		return $legacy;
 	}
 
 	return array();

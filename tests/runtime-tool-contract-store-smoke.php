@@ -104,6 +104,7 @@ namespace {
 	use DataMachine\Core\Database\Jobs\Jobs;
 	use function DataMachine\Engine\AI\datamachine_defer_runtime_tool_call;
 	use function DataMachine\Engine\AI\datamachine_runtime_tool_request_store;
+	use function DataMachine\Engine\AI\datamachine_session_has_pending_runtime_tools;
 	use function DataMachine\Engine\AI\datamachine_submit_runtime_tool_result;
 	use function DataMachine\Engine\AI\datamachine_timeout_runtime_tool_request;
 
@@ -231,6 +232,33 @@ namespace {
 	$assert( 'failed' === ( $timeout_stored['metadata']['datamachine']['persistence_status'] ?? '' ), 'timeout marks namespaced Data Machine status failed' );
 	$assert( 'runtime_tool_timeout' === ( $timeout_stored['metadata']['datamachine']['result']['metadata']['datamachine']['code'] ?? '' ), 'timeout stores canonical error result metadata' );
 	$assert( 'failed' === ( Jobs::$jobs[2]['status'] ?? '' ), 'timeout fails the Data Machine job' );
+
+	$chat_db->sessions['legacy-session'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
+	Jobs::$jobs[3]                       = array( 'status' => 'pending_runtime_tool' );
+	Jobs::$engine_data[3]                = array(
+		'task_type'            => 'runtime_tool_request',
+		'runtime_tool_request' => array(
+			'request_id'      => 'runtime_tool_3',
+			'job_id'          => 3,
+			'status'          => 'pending',
+			'tool_name'       => 'client/legacy_select',
+			'call_id'         => 'legacy-call-1',
+			'parameters'      => array( 'label' => 'Legacy' ),
+			'turn_count'      => 5,
+			'session_id'      => 'legacy-session',
+			'user_id'         => 7,
+			'created_at'      => gmdate( 'c' ),
+			'expires_at'      => gmdate( 'c', time() + 30 ),
+			'timeout_seconds' => 30,
+		),
+	);
+	$legacy_request                      = datamachine_runtime_tool_request_store()->get( 'runtime_tool_3' );
+	$assert( 'legacy-call-1' === ( $legacy_request['tool_call_id'] ?? '' ), 'store adapter normalizes legacy call_id to canonical tool_call_id' );
+	$assert( 'pending' === ( $legacy_request['metadata']['datamachine']['persistence_status'] ?? '' ), 'store adapter preserves legacy pending status in namespaced metadata' );
+	$assert( datamachine_session_has_pending_runtime_tools( array( 'runtime_tool_requests' => array( 'runtime_tool_3' => Jobs::$engine_data[3]['runtime_tool_request'] ) ) ), 'pending-session check recognizes legacy request metadata' );
+	$legacy_submission = datamachine_submit_runtime_tool_result( 'runtime_tool_3', array( 'selected_id' => 'legacy-block' ) );
+	$assert( true === ( $legacy_submission['success'] ?? false ), 'legacy pending request can still be submitted after contract migration' );
+	$assert( 'completed' === ( Jobs::$jobs[3]['status'] ?? '' ), 'legacy pending request submission completes its job' );
 
 	if ( $failures ) {
 		echo "\nFAILED: " . count( $failures ) . " runtime tool contract store assertions failed.\n";
