@@ -35,19 +35,10 @@ class ImageTemplateAbilities {
 	 *      so the abilities land in this same dispatch pass.
 	 *   2. `! did_action( wp_abilities_api_init )` — the action has not
 	 *      fired yet. Attach a hook for the lazy fire.
-	 *   3. otherwise — the action has already fired and completed. The
-	 *      abilities registry singleton exists; call its instance method
-	 *      directly so the abilities still land in the registry. The
-	 *      public `wp_register_ability()` helper enforces `doing_action()`,
-	 *      but the underlying registry method does not.
-	 *
-	 * Without state (3), late-loaded contexts silently drop registrations
-	 * — for example a lite-mode frontend request that triggers
-	 * `wp_get_ability()` from a plugin running ahead of our
-	 * `plugins_loaded` hook will instantiate the abilities registry, fire
-	 * `wp_abilities_api_init` to completion, and only then reach our
-	 * loader. This is the same race `AbilityCategories::ensure_registered()`
-	 * defends against after #2288.
+	 *   3. otherwise — the action has already fired and completed. Do not
+	 *      register; the public `wp_register_ability()` helper intentionally
+	 *      enforces this lifecycle, and Data Machine must not bypass it by
+	 *      writing through `WP_Abilities_Registry` directly.
 	 *
 	 * @return void
 	 */
@@ -84,22 +75,8 @@ class ImageTemplateAbilities {
 			return;
 		}
 
-		// State 3: action already fired. Bypass the helper's `doing_action()`
-		// guard by writing through the registry instance directly.
-		if ( ! class_exists( '\WP_Abilities_Registry' ) ) {
-			return;
-		}
-		$registry = \WP_Abilities_Registry::get_instance();
-		if ( null === $registry ) {
-			return;
-		}
-		foreach ( $definitions as $name => $args ) {
-			if ( $registry->is_registered( $name ) ) {
-				continue;
-			}
-			$registry->register( $name, $args );
-		}
-		self::$registered = true;
+		// The public Abilities API does not expose a late-registration surface.
+		// Once the init action has fired, avoid mutating registry internals.
 	}
 
 	/**
