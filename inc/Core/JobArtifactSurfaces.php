@@ -1,6 +1,6 @@
 <?php
 /**
- * Generic corpus-style job summary and artifact conventions.
+ * Generic job summary and artifact retention surfaces.
  *
  * @package DataMachine\Core
  */
@@ -9,71 +9,54 @@ namespace DataMachine\Core;
 
 defined( 'ABSPATH' ) || exit;
 
-class CorpusJobSurfaces {
+class JobArtifactSurfaces {
 
-	public const WORKLOAD_TYPE   = 'corpus_indexing';
-	public const RETENTION_SCOPE = 'corpus_indexing';
+	public const DEFAULT_WORKLOAD_TYPE   = 'indexing';
+	public const DEFAULT_RETENTION_SCOPE = 'indexing_artifacts';
 
 	private const SUMMARY_SCHEMA_VERSION  = 1;
 	private const ARTIFACT_SCHEMA_VERSION = 1;
 
-	private const CORPUS_COUNT_KEYS = array(
-		'items_total',
-		'items_seen',
-		'items_indexed',
-		'items_unchanged',
-		'items_skipped',
-		'extraction_failures',
-		'chunks_created',
-		'chunking_failures',
-		'embeddings_created',
-		'embedding_failures',
-		'retrieval_evaluations',
-	);
-
-	private const CORPUS_ARTIFACT_TYPES = array(
-		'extraction_failures',
-		'chunking_summary',
-		'embedding_failures',
-		'retrieval_evaluation',
-		'skipped_items',
-		'unchanged_items',
+	private const DEFAULT_COUNT_KEYS = array(
+		'selected',
+		'processed',
+		'skipped',
+		'failed',
+		'retried',
+		'scheduled',
 	);
 
 	/**
-	 * Normalize a concise operator-facing summary for corpus-style jobs.
+	 * Normalize a concise operator-facing summary for long-running jobs.
 	 *
-	 * @param array<string,mixed> $job Job row.
+	 * @param array<string,mixed> $job         Job row.
 	 * @param array<string,mixed> $engine_data Job engine data.
 	 * @return array<string,mixed>
 	 */
 	public static function summary( array $job, array $engine_data ): array {
 		$summary = is_array( $engine_data['job_summary'] ?? null ) ? $engine_data['job_summary'] : array();
-		$corpus  = self::corpusData( $engine_data );
-
-		if ( empty( $summary ) && empty( $corpus ) ) {
+		if ( empty( $summary ) ) {
 			return array();
 		}
 
 		$metrics = is_array( $engine_data['run_metrics'] ?? null ) ? RunMetrics::normalize( $engine_data['run_metrics'] ) : array();
-		$counts  = self::countsFrom( $summary, $corpus, $metrics['counts'] ?? array() );
 
 		return self::filterEmpty(
 			array(
 				'schema_version' => self::SUMMARY_SCHEMA_VERSION,
-				'workload_type'  => self::WORKLOAD_TYPE,
-				'headline'       => self::boundedText( $summary['headline'] ?? ( $summary['summary'] ?? ( $corpus['headline'] ?? ( $corpus['summary'] ?? '' ) ) ), 280 ),
+				'workload_type'  => self::key( $summary['workload_type'] ?? ( $engine_data['workload_type'] ?? self::DEFAULT_WORKLOAD_TYPE ) ),
+				'headline'       => self::boundedText( $summary['headline'] ?? ( $summary['summary'] ?? '' ), 280 ),
 				'status'         => isset( $job['status'] ) ? (string) $job['status'] : null,
-				'counts'         => $counts,
+				'counts'         => self::countsFrom( $summary, $metrics['counts'] ?? array() ),
 				'artifact_refs'  => self::artifactRefs( $engine_data ),
-				'notes'          => self::boundedText( $summary['notes'] ?? ( $corpus['notes'] ?? '' ), 1000 ),
-				'updated_at'     => self::text( $summary['updated_at'] ?? ( $corpus['updated_at'] ?? '' ) ),
+				'notes'          => self::boundedText( $summary['notes'] ?? '', 1000 ),
+				'updated_at'     => self::text( $summary['updated_at'] ?? '' ),
 			)
 		);
 	}
 
 	/**
-	 * Normalize artifact references recorded by corpus-style workloads.
+	 * Normalize job artifact references with explicit retention scopes.
 	 *
 	 * @param array<string,mixed> $engine_data Job engine data.
 	 * @return array<string,array<string,mixed>>
@@ -94,85 +77,53 @@ class CorpusJobSurfaces {
 	}
 
 	/**
-	 * Return artifact retention policy definitions for corpus indexing surfaces.
+	 * Return retention policy definitions for scoped job artifacts.
+	 *
+	 * Consumers can add product/domain scopes through the filter without putting
+	 * their semantics into Data Machine core.
 	 *
 	 * @return array<string,array<string,mixed>>
 	 */
 	public static function retentionPolicies(): array {
-		$max_age_days = self::positiveDays( self::filter( 'datamachine_corpus_artifacts_max_age_days', 30 ), 30 );
+		$max_age_days = self::positiveDays( self::filter( 'datamachine_job_artifacts_max_age_days', 30 ), 30 );
 		$policies     = array(
-			self::RETENTION_SCOPE => array(
-				'label'           => 'Corpus indexing artifacts',
-				'retention_scope' => self::RETENTION_SCOPE,
-				'artifact_types'  => self::corpusArtifactTypes(),
+			self::DEFAULT_RETENTION_SCOPE => array(
+				'label'           => 'Indexing job artifacts',
+				'retention_scope' => self::DEFAULT_RETENTION_SCOPE,
 				'max_age_days'    => $max_age_days,
-				'filter'          => 'datamachine_corpus_artifacts_max_age_days',
+				'filter'          => 'datamachine_job_artifacts_max_age_days',
 			),
 		);
 
 		$policies = self::filter( 'datamachine_job_artifact_retention_policies', $policies );
-		return is_array( $policies ) ? $policies : array();
+		return is_array( $policies ) ? self::normalizePolicies( $policies ) : array();
 	}
 
 	/**
-	 * @return array<int,string>
+	 * @return array<string,mixed>
 	 */
-	public static function corpusArtifactTypes(): array {
-		$types = self::filter( 'datamachine_corpus_job_artifact_types', self::CORPUS_ARTIFACT_TYPES );
-		if ( ! is_array( $types ) ) {
-			return self::CORPUS_ARTIFACT_TYPES;
+	private static function countsFrom( array $summary, array $metrics_counts ): array {
+		$counts = is_array( $summary['counts'] ?? null ) ? $summary['counts'] : array();
+		foreach ( self::DEFAULT_COUNT_KEYS as $key ) {
+			if ( ! isset( $counts[ $key ] ) && isset( $summary[ $key ] ) ) {
+				$counts[ $key ] = $summary[ $key ];
+			}
+
+			if ( ! isset( $counts[ $key ] ) && isset( $metrics_counts[ $key ] ) ) {
+				$counts[ $key ] = $metrics_counts[ $key ];
+			}
 		}
 
 		$out = array();
-		foreach ( $types as $type ) {
-			$type = self::key( $type );
-			if ( '' !== $type ) {
-				$out[] = $type;
+		foreach ( $counts as $key => $value ) {
+			$key = self::key( $key );
+			if ( '' !== $key && is_scalar( $value ) ) {
+				$out[ $key ] = max( 0, (int) $value );
 			}
 		}
 
-		return array_values( array_unique( $out ) );
-	}
-
-	/**
-	 * @param array<string,mixed> $engine_data Job engine data.
-	 * @return array<string,mixed>
-	 */
-	private static function corpusData( array $engine_data ): array {
-		foreach ( array( 'corpus_indexing', 'corpus_indexing_summary' ) as $key ) {
-			if ( is_array( $engine_data[ $key ] ?? null ) ) {
-				return $engine_data[ $key ];
-			}
-		}
-
-		return array();
-	}
-
-	/**
-	 * @return array<string,mixed>
-	 */
-	private static function countsFrom( array $summary, array $corpus, array $metrics_counts ): array {
-		$counts = array();
-		foreach ( self::CORPUS_COUNT_KEYS as $key ) {
-			$value = $summary[ $key ] ?? ( $corpus[ $key ] ?? null );
-			if ( null !== $value ) {
-				$counts[ $key ] = max( 0, (int) $value );
-			}
-		}
-
-		$aliases = array(
-			'processed' => 'items_indexed',
-			'skipped'   => 'items_skipped',
-			'failed'    => 'extraction_failures',
-		);
-		foreach ( $aliases as $metrics_key => $count_key ) {
-			if ( ! isset( $counts[ $count_key ] ) && isset( $metrics_counts[ $metrics_key ] ) ) {
-				$counts[ $count_key ] = max( 0, (int) $metrics_counts[ $metrics_key ] );
-			}
-		}
-
-		ksort( $counts, SORT_STRING );
-		return $counts;
+		ksort( $out, SORT_STRING );
+		return $out;
 	}
 
 	/**
@@ -180,16 +131,22 @@ class CorpusJobSurfaces {
 	 * @return array<string,array<string,mixed>>
 	 */
 	private static function artifactSources( array $engine_data ): array {
-		$sources = array();
-		foreach ( array( 'artifact_refs', 'artifact_files', 'corpus_artifacts' ) as $key ) {
-			if ( is_array( $engine_data[ $key ] ?? null ) ) {
-				$sources = array_replace( $sources, self::normalizeSourceList( $engine_data[ $key ] ) );
-			}
+		$sources     = array();
+		$summary     = is_array( $engine_data['job_summary'] ?? null ) ? $engine_data['job_summary'] : array();
+		$source_keys = self::filter( 'datamachine_job_artifact_source_keys', array( 'job_artifacts', 'artifact_refs', 'artifact_files' ) );
+		if ( ! is_array( $source_keys ) ) {
+			$source_keys = array( 'job_artifacts', 'artifact_refs', 'artifact_files' );
 		}
 
-		$corpus = self::corpusData( $engine_data );
-		if ( is_array( $corpus['artifacts'] ?? null ) ) {
-			$sources = array_replace( $sources, self::normalizeSourceList( $corpus['artifacts'] ) );
+		if ( is_array( $summary['artifact_refs'] ?? null ) ) {
+			$sources = array_replace( $sources, self::normalizeSourceList( $summary['artifact_refs'], true ) );
+		}
+
+		foreach ( $source_keys as $key ) {
+			$key = (string) $key;
+			if ( is_array( $engine_data[ $key ] ?? null ) ) {
+				$sources = array_replace( $sources, self::normalizeSourceList( $engine_data[ $key ], 'job_artifacts' === $key ) );
+			}
 		}
 
 		return $sources;
@@ -198,11 +155,15 @@ class CorpusJobSurfaces {
 	/**
 	 * @return array<string,array<string,mixed>>
 	 */
-	private static function normalizeSourceList( array $artifacts ): array {
+	private static function normalizeSourceList( array $artifacts, bool $default_scope ): array {
 		$out = array();
 		foreach ( $artifacts as $key => $artifact ) {
 			if ( ! is_array( $artifact ) ) {
 				continue;
+			}
+
+			if ( $default_scope && empty( $artifact['retention_scope'] ) ) {
+				$artifact['retention_scope'] = self::DEFAULT_RETENTION_SCOPE;
 			}
 
 			$artifact_key         = is_string( $key ) ? $key : (string) ( $artifact['artifact_key'] ?? ( $artifact['artifact_type'] ?? '' ) );
@@ -216,13 +177,8 @@ class CorpusJobSurfaces {
 	 * @return array<string,mixed>
 	 */
 	private static function normalizeArtifact( string $artifact_key, array $artifact ): array {
-		$artifact_type = self::key( $artifact['artifact_type'] ?? $artifact_key );
-		$retention     = self::key( $artifact['retention_scope'] ?? '' );
-		if ( '' === $retention && in_array( $artifact_type, self::corpusArtifactTypes(), true ) ) {
-			$retention = self::RETENTION_SCOPE;
-		}
-
-		if ( self::RETENTION_SCOPE !== $retention && ! in_array( $artifact_type, self::corpusArtifactTypes(), true ) ) {
+		$retention = self::key( $artifact['retention_scope'] ?? '' );
+		if ( '' === $retention || ! isset( self::retentionPolicies()[ $retention ] ) ) {
 			return array();
 		}
 
@@ -230,10 +186,10 @@ class CorpusJobSurfaces {
 			array(
 				'schema_version'  => self::ARTIFACT_SCHEMA_VERSION,
 				'artifact_key'    => self::key( $artifact['artifact_key'] ?? $artifact_key ),
-				'artifact_type'   => $artifact_type,
+				'artifact_type'   => self::key( $artifact['artifact_type'] ?? $artifact_key ),
 				'artifact_ref'    => self::text( $artifact['artifact_ref'] ?? '' ),
 				'label'           => self::text( $artifact['label'] ?? '' ),
-				'retention_scope' => '' !== $retention ? $retention : self::RETENTION_SCOPE,
+				'retention_scope' => $retention,
 				'relative_path'   => self::text( $artifact['relative_path'] ?? '' ),
 				'url'             => self::url( $artifact['url'] ?? '' ),
 				'sha256'          => self::text( $artifact['sha256'] ?? '' ),
@@ -241,6 +197,34 @@ class CorpusJobSurfaces {
 				'created_at'      => self::text( $artifact['created_at'] ?? ( $artifact['written_at'] ?? '' ) ),
 			)
 		);
+	}
+
+	/**
+	 * @return array<string,array<string,mixed>>
+	 */
+	private static function normalizePolicies( array $policies ): array {
+		$out = array();
+		foreach ( $policies as $scope => $policy ) {
+			if ( ! is_array( $policy ) ) {
+				continue;
+			}
+
+			$scope = self::key( $policy['retention_scope'] ?? $scope );
+			if ( '' === $scope ) {
+				continue;
+			}
+
+			$out[ $scope ] = self::filterEmpty(
+				array(
+					'label'           => self::text( $policy['label'] ?? $scope ),
+					'retention_scope' => $scope,
+					'max_age_days'    => self::positiveDays( $policy['max_age_days'] ?? 30, 30 ),
+					'filter'          => self::text( $policy['filter'] ?? '' ),
+				)
+			);
+		}
+
+		return $out;
 	}
 
 	private static function positiveDays( mixed $value, int $fallback ): int {

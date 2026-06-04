@@ -11,8 +11,6 @@
 
 namespace DataMachine\Core\FilesRepository;
 
-use DataMachine\Core\CorpusJobSurfaces;
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -290,7 +288,6 @@ class FileCleanup {
 			return true;
 		}
 
-		$artifact_type = isset( $payload['artifact_type'] ) ? sanitize_key( (string) $payload['artifact_type'] ) : '';
-		return CorpusJobSurfaces::RETENTION_SCOPE === $retention_scope && in_array( $artifact_type, CorpusJobSurfaces::corpusArtifactTypes(), true );
+		return false;
 	}
 }

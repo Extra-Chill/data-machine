@@ -227,10 +227,10 @@ class RetentionCommand extends BaseCommand {
 				'count'     => array( RetentionCleanup::class, 'countChatSessions' ),
 			),
 			array(
-				'label'     => 'Corpus artifacts',
-				'task_type' => RetentionCleanup::TASK_CORPUS_ARTIFACTS,
-				'threshold' => RetentionCleanup::corpusArtifactsMaxAgeDays() . ' days',
-				'count'     => array( RetentionCleanup::class, 'countCorpusArtifacts' ),
+				'label'     => 'Job artifacts',
+				'task_type' => RetentionCleanup::TASK_JOB_ARTIFACTS,
+				'threshold' => RetentionCleanup::jobArtifactsMaxAgeDays() . ' days',
+				'count'     => array( RetentionCleanup::class, 'countJobArtifacts' ),
 			),
 		);
 	}
@@ -274,9 +274,9 @@ class RetentionCommand extends BaseCommand {
 				'retention' => \DataMachine\Core\PluginSettings::get( 'file_retention_days', 7 ) . ' days',
 				'filter'    => 'setting: file_retention_days',
 			),
-			'Corpus artifacts' => array(
-				'retention' => RetentionCleanup::corpusArtifactsMaxAgeDays() . ' days',
-				'filter'    => 'datamachine_corpus_artifacts_max_age_days',
+			'Job artifacts'    => array(
+				'retention' => RetentionCleanup::jobArtifactsMaxAgeDays() . ' days',
+				'filter'    => 'datamachine_job_artifacts_max_age_days',
 			),
 		);
 	}

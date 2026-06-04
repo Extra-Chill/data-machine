@@ -33,9 +33,9 @@ use DataMachine\Engine\AI\System\Tasks\Retention\RetentionActionSchedulerTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionChatSessionsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCleanup;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCompletedJobsTask;
-use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCorpusArtifactsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionFailedJobsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionFilesTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionJobArtifactsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionLogsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionProcessedItemsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionStaleClaimsTask;
@@ -102,7 +102,7 @@ class SystemAgentServiceProvider {
 		$tasks[ RetentionCleanup::TASK_STALE_CLAIMS ]     = RetentionStaleClaimsTask::class;
 		$tasks[ RetentionCleanup::TASK_FILES ]            = RetentionFilesTask::class;
 		$tasks[ RetentionCleanup::TASK_CHAT_SESSIONS ]    = RetentionChatSessionsTask::class;
-		$tasks[ RetentionCleanup::TASK_CORPUS_ARTIFACTS ] = RetentionCorpusArtifactsTask::class;
+		$tasks[ RetentionCleanup::TASK_JOB_ARTIFACTS ]    = RetentionJobArtifactsTask::class;
 
 		return $tasks;
 	}
@@ -226,14 +226,14 @@ class SystemAgentServiceProvider {
 					'label'           => 'Daily chat-session cleanup',
 				)
 			),
-			RetentionCleanup::TASK_CORPUS_ARTIFACTS => array_merge(
+			RetentionCleanup::TASK_JOB_ARTIFACTS    => array_merge(
 				$daily_first_run,
 				array(
-					'task_type'       => RetentionCleanup::TASK_CORPUS_ARTIFACTS,
+					'task_type'       => RetentionCleanup::TASK_JOB_ARTIFACTS,
 					'interval'        => 'daily',
-					'enabled_setting' => 'retention_corpus_artifacts_enabled',
+					'enabled_setting' => 'retention_job_artifacts_enabled',
 					'default_enabled' => true,
-					'label'           => 'Daily corpus-artifact cleanup',
+					'label'           => 'Daily scoped job-artifact cleanup',
 				)
 			),
 		);

@@ -15,8 +15,8 @@ use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Logs\LogRepository;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
-use DataMachine\Core\CorpusJobSurfaces;
 use DataMachine\Core\FilesRepository\FileCleanup;
+use DataMachine\Core\JobArtifactSurfaces;
 use DataMachine\Core\PluginSettings;
 
 class RetentionCleanup {
@@ -29,7 +29,7 @@ class RetentionCleanup {
 	public const TASK_STALE_CLAIMS     = 'retention_stale_claims';
 	public const TASK_FILES            = 'retention_files';
 	public const TASK_CHAT_SESSIONS    = 'retention_chat_sessions';
-	public const TASK_CORPUS_ARTIFACTS = 'retention_corpus_artifacts';
+	public const TASK_JOB_ARTIFACTS    = 'retention_job_artifacts';
 
 	public static function completedJobsMaxAgeDays(): int {
 		return self::positiveDays( apply_filters( 'datamachine_completed_jobs_max_age_days', 30 ), 30 );
@@ -68,13 +68,13 @@ class RetentionCleanup {
 		return (int) get_option( 'datamachine_pipeline_transcript_retention_days', 30 );
 	}
 
-	public static function corpusArtifactsMaxAgeDays(): int {
-		$policy = CorpusJobSurfaces::retentionPolicies()[ CorpusJobSurfaces::RETENTION_SCOPE ] ?? array();
+	public static function jobArtifactsMaxAgeDays(): int {
+		$policy = JobArtifactSurfaces::retentionPolicies()[ JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE ] ?? array();
 		return self::positiveDays( $policy['max_age_days'] ?? 30, 30 );
 	}
 
 	public static function jobArtifactRetentionPolicies(): array {
-		return CorpusJobSurfaces::retentionPolicies();
+		return JobArtifactSurfaces::retentionPolicies();
 	}
 
 	public static function countCompletedJobs(): int {
@@ -430,20 +430,20 @@ class RetentionCleanup {
 		);
 	}
 
-	public static function countCorpusArtifacts(): int {
-		return ( new FileCleanup() )->count_old_job_artifacts( CorpusJobSurfaces::RETENTION_SCOPE, self::corpusArtifactsMaxAgeDays() );
+	public static function countJobArtifacts(): int {
+		return ( new FileCleanup() )->count_old_job_artifacts( JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE, self::jobArtifactsMaxAgeDays() );
 	}
 
-	public static function cleanupCorpusArtifacts(): array {
-		$retention_days = self::corpusArtifactsMaxAgeDays();
-		$deleted        = ( new FileCleanup() )->cleanup_old_job_artifacts( CorpusJobSurfaces::RETENTION_SCOPE, $retention_days );
+	public static function cleanupJobArtifacts(): array {
+		$retention_days = self::jobArtifactsMaxAgeDays();
+		$deleted        = ( new FileCleanup() )->cleanup_old_job_artifacts( JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE, $retention_days );
 
 		if ( $deleted > 0 ) {
 			self::log(
-				'Scheduled cleanup: deleted old corpus indexing artifacts',
+				'Scheduled cleanup: deleted old scoped job artifacts',
 				array(
 					'artifacts_deleted' => $deleted,
-					'retention_scope'   => CorpusJobSurfaces::RETENTION_SCOPE,
+					'retention_scope'   => JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE,
 					'max_age_days'      => $retention_days,
 				)
 			);
@@ -451,7 +451,7 @@ class RetentionCleanup {
 
 		return array(
 			'deleted'         => (int) $deleted,
-			'retention_scope' => CorpusJobSurfaces::RETENTION_SCOPE,
+			'retention_scope' => JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE,
 			'max_age_days'    => $retention_days,
 		);
 	}
