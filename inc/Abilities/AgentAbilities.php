@@ -1537,7 +1537,7 @@ class AgentAbilities {
 					'type'        => 'string',
 					'description' => 'Optional job source label. Defaults to agent_bundle.',
 				),
-				'job_label'    => array(
+				'job_label'           => array(
 					'type'        => 'string',
 					'description' => 'Optional job label. Defaults to the selected flow name.',
 				),
