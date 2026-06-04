@@ -15,7 +15,7 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\Flow\QueueAbility;
 
 use DataMachine\Core\Admin\DateFormatter;
-use DataMachine\Core\CorpusJobSurfaces;
+use DataMachine\Core\JobArtifactSurfaces;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Pipelines\Pipelines;
@@ -123,7 +123,7 @@ trait JobHelpers {
 		}
 
 		if ( is_array( $job['engine_data'] ?? null ) ) {
-			$job_summary = CorpusJobSurfaces::summary( $job, $job['engine_data'] );
+			$job_summary = JobArtifactSurfaces::summary( $job, $job['engine_data'] );
 			if ( ! empty( $job_summary ) ) {
 				$job['job_summary'] = $job_summary;
 			}
