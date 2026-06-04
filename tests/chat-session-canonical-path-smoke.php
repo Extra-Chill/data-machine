@@ -79,6 +79,16 @@ $assert(
 );
 
 $assert(
+	false !== strpos( $conversation_loop, 'static function ( array $messages, array $turn_context = array() )' ),
+	'Data Machine provider turn adapter accepts the Agents API loop turn signature'
+);
+
+$assert(
+	false === strpos( $conversation_loop, 'WP_Agent_Provider_Turn_Request $provider_turn_request' ),
+	'Data Machine provider turn adapter does not require an object turn request from the loop'
+);
+
+$assert(
 	false === strpos( $chat_orchestrator, 'Fallback: direct store access' ),
 	'ChatOrchestrator does not keep a direct-store fallback path'
 );

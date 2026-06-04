@@ -20,7 +20,6 @@ use AgentsAPI\AI\WP_Agent_Conversation_Result;
 use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use AgentsAPI\AI\WP_Agent_Message;
 use AgentsAPI\AI\WP_Agent_Null_Transcript_Persister;
-use AgentsAPI\AI\WP_Agent_Provider_Turn_Request;
 use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request;
 use AgentsAPI\AI\WP_Agent_Runtime_Tool_Request_Store;
 use AgentsAPI\AI\WP_Agent_Runtime_Tool_Result;
@@ -774,7 +773,7 @@ function datamachine_build_provider_turn_adapter(
 	WP_Agent_Conversation_Completion_Policy $completion_policy,
 	array &$completion_nudges
 ): callable {
-	return static function ( WP_Agent_Provider_Turn_Request $provider_turn_request ) use (
+	return static function ( array $messages, array $turn_context = array() ) use (
 		$tools,
 		$provider,
 		$model,
@@ -791,9 +790,6 @@ function datamachine_build_provider_turn_adapter(
 		&$latest_turn_count,
 		&$completion_nudges
 	): array {
-		$messages     = $provider_turn_request->messages();
-		$turn_context = $provider_turn_request->context();
-
 		// The upstream loop provides the turn number via turn_context.
 		$turn_count        = (int) ( $turn_context['turn'] ?? 1 );
 		$latest_turn_count = $turn_count;
