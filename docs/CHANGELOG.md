@@ -2,6 +2,31 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.29] - 2026-06-04
+
+### Changed
+- Delegate runtime-tool lifecycle to Agents API
+- align image generation tool projection expectations
+- Project global tools through abilities
+- Avoid unsafe late ability registration
+- Migrate taxonomy ability failures to WP_Error
+- Implement Agents API workflow recorder lookups
+
+### Fixed
+- Fix runtime tool lifecycle alignment
+- align mediated tool result formatting
+- stamp runtime agent identity for bundle runs
+- restore provider tool call extraction
+- align provider turn adapter handoff
+- accept provider turn request objects
+- satisfy artifact surface lint checks
+- Fix workflow recorder lookup formatting
+- Fix provider turn tool extraction delegation
+- align provider turn adapter with loop signature
+- pass provider turn runner to conversation loop
+- support inline agent bundle imports
+- make job artifact surfaces generic
+
 ## [0.139.26] - 2026-06-04
 
 ### Changed
