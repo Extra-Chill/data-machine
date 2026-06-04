@@ -480,7 +480,7 @@ class GDRenderer {
 			imagecopyresampled( $this->image, $source, $x, $y, 0, 0, $dst_width, $dst_height, $src_width, $src_height );
 		}
 
-		imagedestroy( $source );
+		unset( $source );
 
 		return $this;
 	}
@@ -840,7 +840,6 @@ class GDRenderer {
 	 */
 	public function destroy(): void {
 		if ( $this->image ) {
-			imagedestroy( $this->image );
 			$this->image = null;
 		}
 		$this->colors = array();
