@@ -1535,10 +1535,10 @@ function datamachine_submit_runtime_tool_result( string $request_id, $result ): 
 function datamachine_continue_runtime_tool_request( array $request, array $canonical_result, array $context = array() ): array {
 	unset( $context );
 
-	$request_id       = (string) ( $request['request_id'] ?? '' );
+	$request_id           = (string) ( $request['request_id'] ?? '' );
 	$datamachine_metadata = datamachine_runtime_tool_datamachine_metadata( $request );
-	$tool_result      = datamachine_runtime_tool_result_for_transcript( $canonical_result );
-	$session_id       = (string) ( $datamachine_metadata['session_id'] ?? '' );
+	$tool_result          = datamachine_runtime_tool_result_for_transcript( $canonical_result );
+	$session_id           = (string) ( $datamachine_metadata['session_id'] ?? '' );
 	if ( '' === $session_id || ! class_exists( \DataMachine\Core\Database\Chat\ConversationStoreFactory::class ) ) {
 		return array( 'scheduled' => false );
 	}
