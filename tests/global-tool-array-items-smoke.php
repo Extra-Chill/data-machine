@@ -47,6 +47,7 @@ if ( ! function_exists( 'add_filter' ) ) {
 }
 
 require_once $root . '/inc/Engine/AI/Tools/BaseTool.php';
+require_once $root . '/inc/Engine/AI/Tools/ToolPolicyResolver.php';
 
 $tools_dir = $root . '/inc/Engine/AI/Tools/Global';
 $tool_files = glob( $tools_dir . '/*.php' ) ?: array();

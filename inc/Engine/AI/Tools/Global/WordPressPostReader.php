@@ -17,7 +17,20 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class WordPressPostReader extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'wordpress_post_reader', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'ability' => 'datamachine/get-wordpress-post' ) );
+		if ( ! function_exists( '\datamachine_register_ability_tool' ) ) {
+			return;
+		}
+
+		\datamachine_register_ability_tool(
+			'wordpress_post_reader',
+			array_merge(
+				$this->getToolDefinition(),
+				array(
+					'ability' => 'datamachine/get-wordpress-post',
+					'modes'   => array( 'chat', 'pipeline' ),
+				)
+			)
+		);
 	}
 
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
@@ -100,8 +113,6 @@ class WordPressPostReader extends BaseTool {
 	 */
 	public function getToolDefinition(): array {
 		return array(
-			'class'           => __CLASS__,
-			'method'          => 'handle_tool_call',
 			'name'            => 'WordPress Post Reader',
 			'description'     => 'Read full content and metadata from a specific WordPress post by permalink URL. Use after Local Search when you need complete post content instead of excerpts. Accepts standard WordPress permalinks (e.g., /post-slug/) or shortlinks (?p=123). Does NOT accept REST API URLs (/wp-json/...). Essential for content analysis before WordPress Update operations.',
 			'requires_config' => false,

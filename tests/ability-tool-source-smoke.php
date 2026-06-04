@@ -303,6 +303,11 @@ add_filter(
 			'modes'           => array( 'pipeline' ),
 			'requires_config' => true,
 		);
+		$tools['configured_ability_tool'] = array(
+			'ability'         => 'demo/summarize',
+			'modes'           => array( 'pipeline' ),
+			'requires_config' => true,
+		);
 		$tools['missing_ability_tool'] = array(
 			'ability' => 'demo/missing',
 			'modes'   => array( 'pipeline' ),
@@ -311,6 +316,15 @@ add_filter(
 	},
 	10,
 	1
+);
+
+add_filter(
+	'datamachine_tool_configured',
+	static function ( bool $configured, string $tool_name ): bool {
+		return 'configured_ability_tool' === $tool_name ? true : $configured;
+	},
+	10,
+	2
 );
 
 add_filter(
@@ -359,8 +373,13 @@ $with_opt_in = $source( array( 'pipeline' ), array( 'allow_only' => array( 'summ
 assert_ability_tool_source_equals( true, isset( $with_opt_in['summarize_demo'] ), 'allow_only exposes opt-in ability tool', $failures, $passes );
 assert_ability_tool_source_equals( false, isset( $with_opt_in['missing_ability_tool'] ), 'missing ability declaration is skipped', $failures, $passes );
 assert_ability_tool_source_equals( false, isset( $with_opt_in['disabled_ability_tool'] ), 'requires_config ability tool respects tool availability', $failures, $passes );
+assert_ability_tool_source_equals( true, isset( $with_opt_in['configured_ability_tool'] ), 'requires_config ability projection can be available without static registry entry', $failures, $passes );
 $chat_only = $source( array( 'chat' ), array( 'allow_only' => array( 'summarize_demo' ) ) );
 assert_ability_tool_source_equals( false, isset( $chat_only['collision_tool'] ), 'mode filtering hides unrelated ability tools', $failures, $passes );
+
+$manager_tools = ( new ToolManager() )->get_tools_for_settings_page();
+assert_ability_tool_source_equals( true, isset( $manager_tools['configured_ability_tool'] ), 'ToolManager settings data includes ability projection without static registry entry', $failures, $passes );
+assert_ability_tool_source_equals( true, $manager_tools['configured_ability_tool']['requires_config'] ?? false, 'ToolManager preserves ability projection configuration requirement', $failures, $passes );
 
 echo "\n[3] composed resolver keeps static tools ahead of generated ability tools:\n";
 $resolved = resolve_ability_source_tools( 'pipeline', array( 'allow_only' => array( 'summarize_demo', 'collision_tool' ) ) );
