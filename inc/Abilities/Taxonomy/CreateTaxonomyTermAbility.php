@@ -76,9 +76,9 @@ class CreateTaxonomyTermAbility extends AbstractTaxonomyAbility {
 	 * Execute create taxonomy term ability.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with created taxonomy term data.
+	 * @return array|\WP_Error Result with created taxonomy term data or failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$taxonomy    = $input['taxonomy'] ?? null;
 		$name        = $input['name'] ?? null;
 		$slug        = $input['slug'] ?? null;
@@ -87,32 +87,20 @@ class CreateTaxonomyTermAbility extends AbstractTaxonomyAbility {
 
 		// Validate required fields
 		if ( empty( $taxonomy ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'taxonomy parameter is required',
-			);
+			return $this->abilityError( 'taxonomy_required', 'taxonomy parameter is required', 400 );
 		}
 
 		if ( empty( $name ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'name parameter is required',
-			);
+			return $this->abilityError( 'term_name_required', 'name parameter is required', 400 );
 		}
 
 		// Validate taxonomy
 		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return array(
-				'success' => false,
-				'error'   => "Taxonomy '{$taxonomy}' does not exist",
-			);
+			return $this->abilityError( 'taxonomy_not_found', "Taxonomy '{$taxonomy}' does not exist", 404 );
 		}
 
 		if ( TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
-			return array(
-				'success' => false,
-				'error'   => "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be modified",
-			);
+			return $this->abilityError( 'taxonomy_not_modifiable', "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be modified", 403 );
 		}
 
 		// Sanitize inputs
@@ -158,20 +146,18 @@ class CreateTaxonomyTermAbility extends AbstractTaxonomyAbility {
 		$result = wp_insert_term( $name, $taxonomy, $args );
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success' => false,
-				'error'   => $result->get_error_message(),
-			);
+			return $result;
 		}
 
 		$term_id = $result['term_id'];
 		$term    = get_term( $term_id, $taxonomy );
 
 		if ( ! $term || is_wp_error( $term ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to retrieve created term',
-			);
+			if ( is_wp_error( $term ) ) {
+				return $term;
+			}
+
+			return $this->abilityError( 'term_retrieval_failed', 'Failed to retrieve created term', 500 );
 		}
 
 		do_action(

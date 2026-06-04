@@ -94,7 +94,17 @@ class AgentsApiWorkflowJobRecorder implements WP_Agent_Workflow_Run_Recorder {
 	 * @return WP_Agent_Workflow_Run_Result|null
 	 */
 	public function find( string $run_id ): ?WP_Agent_Workflow_Run_Result {
-		unset( $run_id );
+		if ( '' === $run_id ) {
+			return null;
+		}
+
+		foreach ( $this->query_jobs( array( $this->json_field_marker( 'run_id', $run_id ) ), 1, 0 ) as $job ) {
+			$result = $this->result_from_job( $job );
+			if ( $result && $run_id === $result->get_run_id() ) {
+				return $result;
+			}
+		}
+
 		return null;
 	}
 
@@ -105,8 +115,67 @@ class AgentsApiWorkflowJobRecorder implements WP_Agent_Workflow_Run_Recorder {
 	 * @return WP_Agent_Workflow_Run_Result[]
 	 */
 	public function recent( array $args = array() ): array {
-		unset( $args );
-		return array();
+		$limit   = max( 1, min( 100, (int) ( $args['limit'] ?? 10 ) ) );
+		$offset  = max( 0, (int) ( $args['offset'] ?? 0 ) );
+		$markers = array();
+
+		if ( is_string( $args['workflow_id'] ?? null ) && '' !== $args['workflow_id'] ) {
+			$markers[] = $this->json_field_marker( 'workflow_id', $args['workflow_id'] );
+		}
+
+		$results = array();
+		foreach ( $this->query_jobs( $markers, $limit, $offset ) as $job ) {
+			$result = $this->result_from_job( $job );
+			if ( $result ) {
+				$results[] = $result;
+			}
+		}
+
+		return $results;
+	}
+
+	/**
+	 * Query Agents API workflow jobs with optional exact JSON field markers.
+	 *
+	 * @param string[] $engine_data_markers JSON fragments that must be present.
+	 * @param int      $limit Bounded result limit.
+	 * @param int      $offset Result offset.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function query_jobs( array $engine_data_markers, int $limit, int $offset ): array {
+		if ( ! method_exists( $this->jobs, 'get_jobs_for_list_table' ) ) {
+			return array();
+		}
+
+		return $this->jobs->get_jobs_for_list_table(
+			array(
+				'source'               => 'agents_api_workflow',
+				'engine_data_contains' => $engine_data_markers,
+				'fields'               => array( 'job_id', 'engine_data', 'created_at' ),
+				'orderby'              => 'j.job_id',
+				'order'                => 'DESC',
+				'per_page'             => $limit,
+				'offset'               => $offset,
+			)
+		);
+	}
+
+	/**
+	 * Rebuild an Agents API workflow result from Data Machine job engine data.
+	 *
+	 * @param array<string, mixed> $job Data Machine job row.
+	 */
+	private function result_from_job( array $job ): ?WP_Agent_Workflow_Run_Result {
+		$engine_data = $job['engine_data'] ?? array();
+		if ( ! is_array( $engine_data ) || ! is_array( $engine_data['workflow_run_result'] ?? null ) ) {
+			return null;
+		}
+
+		return WP_Agent_Workflow_Run_Result::from_array( $engine_data['workflow_run_result'] );
+	}
+
+	private function json_field_marker( string $field, string $value ): string {
+		return '"' . $field . '":' . wp_json_encode( $value );
 	}
 
 	private function persist_result( WP_Agent_Workflow_Run_Result $result ): void {

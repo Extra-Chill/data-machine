@@ -104,9 +104,9 @@ class MergeTermMetaAbility {
 	 * Execute the merge.
 	 *
 	 * @param array $input Input shape — see input_schema above.
-	 * @return array Output shape — see output_schema above.
+	 * @return array|\WP_Error Output shape or failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$term_id     = (int) ( $input['term_id'] ?? 0 );
 		$taxonomy    = trim( (string) ( $input['taxonomy'] ?? '' ) );
 		$data        = is_array( $input['data'] ?? null ) ? $input['data'] : array();
@@ -115,32 +115,36 @@ class MergeTermMetaAbility {
 		$description = array_key_exists( 'description', $input ) ? (string) $input['description'] : null;
 
 		if ( $term_id <= 0 ) {
-			return $this->error_response( 'term_id is required' );
+			return $this->error_response( 'term_id_required', 'term_id is required', 400 );
 		}
 
 		if ( '' === $taxonomy ) {
-			return $this->error_response( 'taxonomy is required' );
+			return $this->error_response( 'taxonomy_required', 'taxonomy is required', 400 );
 		}
 
 		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return $this->error_response( "Taxonomy '{$taxonomy}' does not exist" );
+			return $this->error_response( 'taxonomy_not_found', "Taxonomy '{$taxonomy}' does not exist", 404 );
 		}
 
 		if ( TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
-			return $this->error_response( "Cannot write meta for system taxonomy '{$taxonomy}'" );
+			return $this->error_response( 'taxonomy_not_modifiable', "Cannot write meta for system taxonomy '{$taxonomy}'", 403 );
 		}
 
 		if ( empty( $field_map ) ) {
-			return $this->error_response( 'field_map is required and cannot be empty' );
+			return $this->error_response( 'field_map_required', 'field_map is required and cannot be empty', 400 );
 		}
 
 		if ( ! in_array( $strategy, array( self::STRATEGY_FILL_EMPTY, self::STRATEGY_OVERWRITE ), true ) ) {
-			return $this->error_response( "Unknown strategy '{$strategy}'" );
+			return $this->error_response( 'strategy_invalid', "Unknown strategy '{$strategy}'", 400 );
 		}
 
 		$term = get_term( $term_id, $taxonomy );
 		if ( ! $term || is_wp_error( $term ) ) {
-			return $this->error_response( "Term {$term_id} not found in taxonomy '{$taxonomy}'" );
+			if ( is_wp_error( $term ) ) {
+				return $term;
+			}
+
+			return $this->error_response( 'term_not_found', "Term {$term_id} not found in taxonomy '{$taxonomy}'", 404 );
 		}
 
 		$updated = array();
@@ -198,7 +202,7 @@ class MergeTermMetaAbility {
 				);
 
 				if ( is_wp_error( $result ) ) {
-					return $this->error_response( $result->get_error_message() );
+					return $result;
 				}
 
 				$description_updated = true;
@@ -218,14 +222,13 @@ class MergeTermMetaAbility {
 	/**
 	 * Build error response.
 	 *
+	 * @param string $code    Machine-readable error code.
 	 * @param string $message Error message.
-	 * @return array
+	 * @param int    $status  HTTP status for REST presentation.
+	 * @return \WP_Error
 	 */
-	private function error_response( string $message ): array {
-		return array(
-			'success' => false,
-			'error'   => $message,
-		);
+	private function error_response( string $code, string $message, int $status ): \WP_Error {
+		return new \WP_Error( $code, $message, array( 'status' => $status ) );
 	}
 
 	/**
@@ -268,6 +271,14 @@ class MergeTermMetaAbility {
 			$input['description'] = $description;
 		}
 
-		return ( new self() )->execute( $input );
+		$result = ( new self() )->execute( $input );
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success' => false,
+				'error'   => $result->get_error_message(),
+			);
+		}
+
+		return $result;
 	}
 }

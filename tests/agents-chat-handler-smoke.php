@@ -80,10 +80,13 @@ $assert( str_contains( $chat_abilities, 'new AgentsChatHandler();' ), 'ChatAbili
 $assert( str_contains( $handler_source, "register_chat_handler( array( $" . "this, 'execute' ) )" ), 'AgentsChatHandler attaches to canonical Agents API chat handler seam' );
 $assert( ! str_contains( $handler_source, "wp_agent_chat_handler" ), 'AgentsChatHandler no longer falls back to legacy chat handler filter' );
 $assert( str_contains( $handler_source, 'ChatOrchestrator::processChat(' ), 'AgentsChatHandler owns the single ChatOrchestrator runtime call' );
-$assert( str_contains( $handler_source, "'selected_pipeline_id' => (int) ( $" . "input['selected_pipeline_id'] ?? 0 )" ), 'AgentsChatHandler forwards selected pipeline context' );
-$assert( str_contains( $handler_source, "'request_id'           => $" . "input['request_id'] ?? null" ), 'AgentsChatHandler forwards request id for session dedupe' );
-$assert( str_contains( $handler_source, "'interrupt_source'     => is_callable( $" . "input['interrupt_source'] ?? null ) ? $" . "input['interrupt_source'] : null" ), 'AgentsChatHandler explicitly forwards callable interrupt sources' );
-$assert( str_contains( $handler_source, "'agent_slug'           => $" . "identity ? $" . "identity->agent_slug : ''" ), 'AgentsChatHandler forwards resolved agent targeting to the chat runtime' );
+$assert( str_contains( $handler_source, "'selected_pipeline_id'  => (int) ( $" . "input['selected_pipeline_id'] ?? 0 )" ), 'AgentsChatHandler forwards selected pipeline context' );
+$assert( str_contains( $handler_source, "'request_id'            => $" . "input['request_id'] ?? null" ), 'AgentsChatHandler forwards request id for session dedupe' );
+$assert( str_contains( $handler_source, "'interrupt_source'      => is_callable( $" . "input['interrupt_source'] ?? null ) ? $" . "input['interrupt_source'] : null" ), 'AgentsChatHandler explicitly forwards callable interrupt sources' );
+$assert( str_contains( $handler_source, "'agent_slug'            => $" . "identity ? $" . "identity->agent_slug : ''" ), 'AgentsChatHandler forwards resolved agent targeting to the chat runtime' );
+$assert( str_contains( $handler_source, "apply_filters( 'agents_chat_runtime_principal_permission'" ), 'AgentsChatHandler delegates explicit runtime principal permission decisions' );
+$assert( str_contains( $handler_source, "\\AgentsAPI\\AI\\WP_Agent_Execution_Principal" ), 'AgentsChatHandler resolves canonical Agents API runtime principals' );
+$assert( str_contains( $handler_source, "defined( 'REST_REQUEST' )" ), 'AgentsChatHandler ignores caller-supplied principals during REST requests' );
 $assert( str_contains( $handler_source, "'tool_policy'" ) && str_contains( $handler_source, "input['tool_policy']" ), 'AgentsChatHandler forwards caller tool policy to the chat runtime' );
 $assert( str_contains( $handler_source, "'allow_only'" ) && str_contains( $orchestrator, "options['allow_only']" ), 'agents/chat forwards caller allow_only through tool resolution' );
 $assert( str_contains( $handler_source, "'completion_assertions'" ) && str_contains( $orchestrator, "loop_context['completion_assertions']" ), 'agents/chat forwards completion assertions into the loop context' );

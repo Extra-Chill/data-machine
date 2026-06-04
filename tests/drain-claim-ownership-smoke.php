@@ -31,6 +31,7 @@ function assert_not_contains( string $needle, string $haystack, string $message 
 
 assert_contains( 'runActionSchedulerBatch', $drain_src, 'drain processes Action Scheduler batches' );
 assert_contains( '\ActionScheduler_Store::instance()', $drain_src, 'drain uses the Action Scheduler store' );
+assert_contains( 'GroupRegistrar::ensureDataMachineGroup()', $drain_src, 'drain ensures the Data Machine group exists before claiming' );
 assert_contains( 'runActionSchedulerTimeoutCleanup( $store )', $drain_src, 'drain runs Action Scheduler timeout cleanup before claiming work' );
 assert_contains( 'stake_claim( $claim_size, null, $hooks ?? array(), self::GROUP )', $drain_src, 'drain stakes a group-scoped Action Scheduler claim' );
 assert_contains( '$claim->get_actions()', $drain_src, 'drain processes actions from the claim' );
@@ -44,6 +45,7 @@ assert_contains( '$store->release_claim( $claim )', $drain_src, 'drain releases 
 assert_not_contains( 'getDuePendingActionIds', $drain_src, 'drain no longer preselects due action IDs outside Action Scheduler claims' );
 assert_contains( 'laneActionRows', $drain_src, 'drain only selects action IDs for lane filtering/status, not direct processing' );
 
+$ensure_pos  = strpos( $drain_src, 'GroupRegistrar::ensureDataMachineGroup()' );
 $cleanup_pos = strpos( $drain_src, 'runActionSchedulerTimeoutCleanup( $store )' );
 $stake_pos   = strpos( $drain_src, 'stake_claim( $claim_size, null, $hooks ?? array(), self::GROUP )' );
 $verify_pos  = strpos( $drain_src, 'find_actions_by_claim_id( $claim->get_id() )' );
@@ -52,6 +54,7 @@ $flush_pos   = strpos( $drain_src, 'flushRuntimeCache()' );
 $memory_pos  = strpos( $drain_src, 'isMemorySoftLimitReached()' );
 $release_pos = strpos( $drain_src, '$store->release_claim( $claim )' );
 
+assert_true( false !== $ensure_pos, 'group registration position found' );
 assert_true( false !== $cleanup_pos, 'timeout cleanup position found' );
 assert_true( false !== $stake_pos, 'claim staking position found' );
 assert_true( false !== $verify_pos, 'claim verification position found' );
@@ -59,6 +62,7 @@ assert_true( false !== $process_pos, 'claimed action processing position found' 
 assert_true( false !== $flush_pos, 'runtime cache flush position found' );
 assert_true( false !== $memory_pos, 'memory soft-limit check position found' );
 assert_true( false !== $release_pos, 'claim release position found' );
+assert_true( $ensure_pos < $stake_pos, 'drain ensures group before staking a claim' );
 assert_true( $cleanup_pos < $stake_pos, 'drain cleans stale claims before staking a claim' );
 assert_true( $stake_pos < $verify_pos, 'drain stakes a claim before verifying ownership' );
 assert_true( $verify_pos < $process_pos, 'drain verifies ownership before processing' );

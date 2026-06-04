@@ -77,15 +77,11 @@ class AbilityCategories {
 	 *      land in this same dispatch pass.
 	 *   2. `! did_action( wp_abilities_api_categories_init )` — the action
 	 *      has not fired yet. Attach a hook for the lazy fire.
-	 *   3. otherwise — the action has already fired and completed. The
-	 *      categories registry singleton exists; call its instance method
-	 *      directly so the categories still land in the registry. The
-	 *      public `wp_register_ability_category()` helper enforces
-	 *      `doing_action()`, but the underlying registry method does not.
-	 *
-	 * This mirrors the defensive pattern used by `block-format-bridge`
-	 * (see `vendor/chubes4/block-format-bridge/includes/abilities.php`)
-	 * and by sibling extension plugins.
+	 *   3. otherwise — the action has already fired and completed. Do not
+	 *      register; the public `wp_register_ability_category()` helper
+	 *      intentionally enforces this lifecycle, and Data Machine must not
+	 *      bypass it by writing through `WP_Ability_Categories_Registry`
+	 *      directly.
 	 *
 	 * @return void
 	 */
@@ -104,30 +100,13 @@ class AbilityCategories {
 			return;
 		}
 
-		// Action already fired and completed. The categories registry
-		// singleton exists; register directly via the instance method so
-		// late-loaded contexts (e.g. lazy abilities-registry instantiation
-		// triggered before our `plugins_loaded` hook attached) still get
-		// the Data Machine categories. The instance-method path bypasses
-		// the public helper's `doing_action()` guard.
-		$registry = \WP_Ability_Categories_Registry::get_instance();
-		if ( null === $registry ) {
-			return;
-		}
-
-		foreach ( self::get_category_definitions() as $slug => $args ) {
-			if ( $registry->is_registered( $slug ) ) {
-				continue;
-			}
-			$registry->register( $slug, $args );
-		}
-
-		self::$registered = true;
+		// The public Abilities API does not expose a late category-registration
+		// surface. Once the init action has fired, avoid mutating registry internals.
 	}
 
 	/**
-	 * Category definitions used by both `register()` and the late-fire
-	 * recovery path in `ensure_registered()`.
+	 * Category definitions used by both `register()` and lifecycle-safe
+	 * registration checks in `ensure_registered()`.
 	 *
 	 * @return array<string, array<string, string>>
 	 */

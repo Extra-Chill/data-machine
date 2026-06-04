@@ -2,6 +2,29 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.26] - 2026-06-04
+
+### Changed
+- Preserve runtime chat permission grants
+
+## [0.139.25] - 2026-06-04
+
+### Changed
+- Honor runtime principals for agents chat
+
+## [0.139.24] - 2026-06-04
+
+### Fixed
+- Fix Action Scheduler data-machine group registration
+
+## [0.139.23] - 2026-06-04
+
+### Changed
+- Expose semantic bundle run outputs
+
+### Fixed
+- Fix bundle output assignment alignment
+
 ## [0.139.22] - 2026-06-04
 
 ### Changed

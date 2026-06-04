@@ -26,7 +26,20 @@ class ImageGeneration extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'image_generation' );
-		$this->registerTool( 'image_generation', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'ability' => 'datamachine/generate-image' ) );
+		if ( ! function_exists( '\datamachine_register_ability_tool' ) ) {
+			return;
+		}
+
+		\datamachine_register_ability_tool(
+			'image_generation',
+			array_merge(
+				$this->getToolDefinition(),
+				array(
+					'ability' => 'datamachine/generate-image',
+					'modes'   => array( 'chat', 'pipeline' ),
+				)
+			)
+		);
 	}
 
 	/**
@@ -93,8 +106,6 @@ class ImageGeneration extends BaseTool {
 	 */
 	public function getToolDefinition(): array {
 		return array(
-			'class'           => __CLASS__,
-			'method'          => 'handle_tool_call',
 			'description'     => 'Generate images using wp-ai-client image models. Returns a pending image-generation job that will sideload the generated image and optionally set it as featured media. Use descriptive, detailed prompts for best results. Default aspect ratio is 3:4 (portrait, ideal for Pinterest and blog featured images).',
 			'requires_config' => true,
 			'parameters'      => array(

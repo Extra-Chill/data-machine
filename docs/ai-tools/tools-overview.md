@@ -1,6 +1,8 @@
 # AI Tools Overview
 
-AI tools are registered by `inc/Engine/AI/Tools/ToolServiceProvider.php` into the unified Data Machine tool registry. Tools declare where they can run (`chat`, `pipeline`, or pipeline-policy mode) and the ability or access level required to execute them.
+AI tools should be exposed as WordPress Ability projections whenever a single registered ability already owns the execution contract. `inc/Engine/AI/Tools/ToolServiceProvider.php` still instantiates tool classes so they can register configuration handlers and ability projections, but the model-facing declaration should use `datamachine_register_ability_tool()` instead of a class/method handler when possible.
+
+The legacy `datamachine_tools` class/method registry remains for composite orchestration tools and adjacent handler tools that do not map cleanly to one public ability. Tools declare where they can run (`chat`, `pipeline`, or pipeline-policy mode) and the ability or access level required to execute them.
 
 ## Registered Tool Inventory
 
@@ -119,7 +121,22 @@ Common extension tools include:
 
 ## Tool Architecture
 
-Tool classes extend `BaseTool` and register themselves with `registerTool()`. Registration declares:
+Ability-native projections are the preferred model-tool path:
+
+- Register the underlying WordPress ability with `wp_register_ability()`.
+- Expose it to model runs with `datamachine_register_ability_tool()` or the `datamachine_ability_tool_projections` filter.
+- Put model-facing overrides such as `description`, `modes`, `parameters`, `requires_config`, and action-policy metadata on the projection declaration.
+
+Class/method tool declarations are still explicit exceptions:
+
+- `agent_memory` and `agent_daily_memory` compose several file/memory abilities behind one action router and resolve agent/user scope before dispatch.
+- `internal_link_audit` composes several internal-link abilities behind one action router and strips internal response keys.
+- `queue_validator` contains duplicate-prevention orchestration across published posts and queue state that is reused by queue-add behavior.
+- `web_fetch` has no registered WordPress ability yet; it remains a class/method tool until a first-class fetch ability exists.
+- Chat-only workflow/admin tools in `inc/Api/Chat/Tools/` remain Data Machine product tools until each one has a public ability contract worth projecting.
+- Adjacent handler tools remain runtime-generated class/method declarations because their schemas depend on neighboring pipeline handler configuration.
+
+Legacy tool classes extend `BaseTool` and register themselves with `registerTool()`. Registration declares:
 
 - tool slug
 - definition callback

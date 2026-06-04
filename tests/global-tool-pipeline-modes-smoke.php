@@ -151,11 +151,8 @@ assert_true_for_pipeline_modes(
 );
 
 $pipeline_tools = array(
-	'web_fetch'             => array( 'inc/Engine/AI/Tools/Global/WebFetch.php', 'DataMachine\Engine\AI\Tools\Global\WebFetch' ),
-	'wordpress_post_reader' => array( 'inc/Engine/AI/Tools/Global/WordPressPostReader.php', 'DataMachine\Engine\AI\Tools\Global\WordPressPostReader' ),
-	'image_generation'      => array( 'inc/Engine/AI/Tools/Global/ImageGeneration.php', 'DataMachine\Engine\AI\Tools\Global\ImageGeneration' ),
-	'local_search'          => array( 'inc/Engine/AI/Tools/Global/LocalSearch.php', 'DataMachine\Engine\AI\Tools\Global\LocalSearch' ),
-	'internal_link_audit'   => array( 'inc/Engine/AI/Tools/Global/InternalLinkAudit.php', 'DataMachine\Engine\AI\Tools\Global\InternalLinkAudit' ),
+	'web_fetch'           => array( 'inc/Engine/AI/Tools/Global/WebFetch.php', 'DataMachine\Engine\AI\Tools\Global\WebFetch' ),
+	'internal_link_audit' => array( 'inc/Engine/AI/Tools/Global/InternalLinkAudit.php', 'DataMachine\Engine\AI\Tools\Global\InternalLinkAudit' ),
 );
 
 foreach ( $pipeline_tools as $tool => [ $path, $class_name ] ) {
@@ -167,6 +164,22 @@ foreach ( $pipeline_tools as $tool => $unused ) {
 	assert_true_for_pipeline_modes(
 		isset( $resolved_pipeline_tools[ $tool ] ),
 		"{$tool} remains pipeline-visible",
+		$failures,
+		$passes
+	);
+}
+
+$projected_pipeline_tools = array(
+	'wordpress_post_reader' => 'inc/Engine/AI/Tools/Global/WordPressPostReader.php',
+	'image_generation'      => 'inc/Engine/AI/Tools/Global/ImageGeneration.php',
+	'local_search'          => 'inc/Engine/AI/Tools/Global/LocalSearch.php',
+);
+
+foreach ( $projected_pipeline_tools as $tool => $path ) {
+	assert_true_for_pipeline_modes(
+		file_contains_for_pipeline_modes( $path, 'datamachine_register_ability_tool' )
+			&& file_contains_for_pipeline_modes( $path, "'modes'   => array( 'chat', 'pipeline' )" ),
+		"{$tool} remains pipeline-visible through ability projection",
 		$failures,
 		$passes
 	);

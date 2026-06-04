@@ -21,7 +21,7 @@ $sources = array(
 	'files'     => file_get_contents( $root . '/inc/Core/FilesRepository/FileCleanup.php' ) ?: '',
 	'chat'      => file_get_contents( $root . '/inc/Core/Database/Chat/Chat.php' ) ?: '',
 	'cleanup'   => file_get_contents( $root . '/inc/Engine/AI/System/Tasks/Retention/RetentionCleanup.php' ) ?: '',
-	'corpus'    => file_get_contents( $root . '/inc/Core/CorpusJobSurfaces.php' ) ?: '',
+	'artifacts' => file_get_contents( $root . '/inc/Core/JobArtifactSurfaces.php' ) ?: '',
 );
 
 $failed = 0;
@@ -69,7 +69,7 @@ $task_classes = array(
 	'RetentionStaleClaimsTask',
 	'RetentionFilesTask',
 	'RetentionChatSessionsTask',
-	'RetentionCorpusArtifactsTask',
+	'RetentionJobArtifactsTask',
 );
 
 foreach ( $task_classes as $task_class ) {
@@ -90,7 +90,7 @@ $task_constants = array(
 	'TASK_STALE_CLAIMS',
 	'TASK_FILES',
 	'TASK_CHAT_SESSIONS',
-	'TASK_CORPUS_ARTIFACTS',
+	'TASK_JOB_ARTIFACTS',
 );
 
 foreach ( $task_constants as $constant ) {
@@ -133,9 +133,9 @@ assert_retention(
 		&& str_contains( $sources['cleanup'], '++$count;' )
 );
 assert_retention(
-	'corpus artifact retention has separate scope policy hook',
-	str_contains( $sources['corpus'], 'datamachine_corpus_artifacts_max_age_days' )
-		&& str_contains( $sources['cleanup'], 'TASK_CORPUS_ARTIFACTS' )
+	'job artifact retention has separate scope policy hook',
+	str_contains( $sources['artifacts'], 'datamachine_job_artifacts_max_age_days' )
+		&& str_contains( $sources['cleanup'], 'TASK_JOB_ARTIFACTS' )
 );
 
 if ( retention_failed_count() > 0 ) {

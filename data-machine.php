@@ -3,7 +3,7 @@
  * Plugin Name:     Data Machine
  * Plugin URI:      https://wordpress.org/plugins/data-machine/
  * Description:     AI-powered WordPress operations engine: persistent agent memory, autonomous pipelines and flows, multi-turn chat, email I/O, and a full WP-CLI control surface over the WordPress Abilities API.
- * Version:           0.139.22
+ * Version:           0.139.26
  * Requires at least: 7.0
  * Requires PHP:     8.2
  * Author:          Chris Huber, extrachill
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-define( 'DATAMACHINE_VERSION', '0.139.22' );
+define( 'DATAMACHINE_VERSION', '0.139.26' );
 
 define( 'DATAMACHINE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'DATAMACHINE_URL', plugin_dir_url( __FILE__ ) );
@@ -47,6 +47,12 @@ require_once __DIR__ . '/inc/bootstrap.php';
 if ( ! class_exists( 'ActionScheduler' ) ) {
 	require_once __DIR__ . '/vendor/woocommerce/action-scheduler/action-scheduler.php';
 }
+
+add_action(
+	'action_scheduler_init',
+	array( \DataMachine\Core\ActionScheduler\GroupRegistrar::class, 'ensureDataMachineGroup' ),
+	0
+);
 
 if ( function_exists( 'wp_installing' ) && wp_installing() ) {
 	add_action( 'wp_loaded', 'datamachine_skip_action_scheduler_migration_during_install', 0 );
@@ -482,10 +488,10 @@ require_once __DIR__ . '/inc/Abilities/AbilityCategories.php';
  * notice flood in debug.log. See: Extra-Chill/data-machine#2290.
  *
  * Registration is cheap (two ability definitions, both schema-only until
- * actually executed). The class's `ensure_registered()` uses the same
- * three-state defensive pattern as `AbilityCategories::ensure_registered()`
- * adopted in #2288, so it tolerates the lazy abilities-registry
- * instantiation race described there.
+ * actually executed). The class's `ensure_registered()` uses the public
+ * Abilities API lifecycle only: register during `wp_abilities_api_init`, hook
+ * before it fires, and no-op after it has fired instead of mutating registry
+ * internals.
  */
 require_once __DIR__ . '/inc/Abilities/Media/ImageTemplateAbilities.php';
 \DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();

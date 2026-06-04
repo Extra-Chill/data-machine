@@ -740,7 +740,7 @@ assert_runner_request( 'workspace_read' === ( $json_array_sandbox_metadata['tool
 assert_runner_request( array( 'path' => 'README.md' ) === ( $json_array_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline fenced JSON tool_calls parameters are parsed' );
 assert_runner_request( 1 === count( $json_array_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline fenced JSON tool_calls executes a workspace tool' );
 
-// 4e. Sandbox/pipeline runs also execute self-closing tag tool calls emitted as text.
+// 4e. Sandbox/pipeline runs also execute Agents API tag tool-call envelopes.
 $tag_tool_dispatch_count = 0;
 WpAiClientTestDouble::reset();
 WpAiClientTestDouble::set_response_callback(
@@ -751,7 +751,7 @@ WpAiClientTestDouble::set_response_callback(
 			return array(
 				'success' => true,
 				'data'    => array(
-					'content' => '<workspace_read path="README.md" />',
+					'content' => '<tool_call name="workspace_read">{"path":"README.md"}</tool_call>',
 				),
 			);
 		}
@@ -790,14 +790,14 @@ $tag_tool_sandbox_result = datamachine_run_conversation(
 );
 $tag_tool_sandbox_metadata = datamachine_conversation_metadata( $tag_tool_sandbox_result );
 
-assert_runner_request( 2 === $tag_tool_dispatch_count, 'sandbox/pipeline self-closing tag tool call returns to provider for final answer' );
-assert_runner_request( 'tag tool sandbox complete' === ( $tag_tool_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline self-closing tag tool call preserves final answer' );
-assert_runner_request( 1 === count( $tag_tool_sandbox_metadata['tool_calls'] ?? array() ), 'sandbox/pipeline self-closing tag tool call is parsed' );
-assert_runner_request( 'workspace_read' === ( $tag_tool_sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline self-closing tag tool name is parsed' );
-assert_runner_request( array( 'path' => 'README.md' ) === ( $tag_tool_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline self-closing tag tool parameters are parsed' );
-assert_runner_request( 1 === count( $tag_tool_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline self-closing tag tool call executes a workspace tool' );
+assert_runner_request( 2 === $tag_tool_dispatch_count, 'sandbox/pipeline tag tool-call envelope returns to provider for final answer' );
+assert_runner_request( 'tag tool sandbox complete' === ( $tag_tool_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline tag tool-call envelope preserves final answer' );
+assert_runner_request( 1 === count( $tag_tool_sandbox_metadata['tool_calls'] ?? array() ), 'sandbox/pipeline tag tool-call envelope is extracted' );
+assert_runner_request( 'workspace_read' === ( $tag_tool_sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline tag tool-call envelope name is extracted' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $tag_tool_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline tag tool-call envelope parameters are extracted' );
+assert_runner_request( 1 === count( $tag_tool_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline tag tool-call envelope executes a workspace tool' );
 
-// 4f. Sandbox/pipeline runs also execute named <tool> tag calls emitted as text.
+// 4f. Sandbox/pipeline runs also execute conservative whole-line named text tool calls.
 $named_tag_tool_dispatch_count = 0;
 WpAiClientTestDouble::reset();
 WpAiClientTestDouble::set_response_callback(
@@ -808,7 +808,7 @@ WpAiClientTestDouble::set_response_callback(
 			return array(
 				'success' => true,
 				'data'    => array(
-					'content' => '<tool name="workspace_read">{"path":"README.md"}</tool>',
+					'content' => 'workspace_read path="README.md"',
 				),
 			);
 		}
@@ -847,14 +847,14 @@ $named_tag_tool_sandbox_result = datamachine_run_conversation(
 );
 $named_tag_tool_sandbox_metadata = datamachine_conversation_metadata( $named_tag_tool_sandbox_result );
 
-assert_runner_request( 2 === $named_tag_tool_dispatch_count, 'sandbox/pipeline named tag tool call returns to provider for final answer' );
-assert_runner_request( 'named tag tool sandbox complete' === ( $named_tag_tool_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline named tag tool call preserves final answer' );
-assert_runner_request( 1 === count( $named_tag_tool_sandbox_metadata['tool_calls'] ?? array() ), 'sandbox/pipeline named tag tool call is parsed' );
-assert_runner_request( 'workspace_read' === ( $named_tag_tool_sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline named tag tool name is parsed' );
-assert_runner_request( array( 'path' => 'README.md' ) === ( $named_tag_tool_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline named tag tool parameters are parsed' );
-assert_runner_request( 1 === count( $named_tag_tool_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline named tag tool call executes a workspace tool' );
+assert_runner_request( 2 === $named_tag_tool_dispatch_count, 'sandbox/pipeline named text tool call returns to provider for final answer' );
+assert_runner_request( 'named tag tool sandbox complete' === ( $named_tag_tool_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline named text tool call preserves final answer' );
+assert_runner_request( 1 === count( $named_tag_tool_sandbox_metadata['tool_calls'] ?? array() ), 'sandbox/pipeline named text tool call is extracted' );
+assert_runner_request( 'workspace_read' === ( $named_tag_tool_sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline named text tool name is extracted' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $named_tag_tool_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline named text tool parameters are extracted' );
+assert_runner_request( 1 === count( $named_tag_tool_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline named text tool call executes a workspace tool' );
 
-// 4g. Sandbox/pipeline runs also execute named text tool calls emitted by Codex-style responses.
+// 4g. Sandbox/pipeline extraction dedupes overlapping Agents API fallback envelopes.
 $named_text_dispatch_count = 0;
 WpAiClientTestDouble::reset();
 WpAiClientTestDouble::set_response_callback(
@@ -865,14 +865,8 @@ WpAiClientTestDouble::set_response_callback(
 			return array(
 				'success' => true,
 				'data'    => array(
-					'content' => '<tool name="workspace_read"><param name="path">README.md</param></tool>'
-						. '[workspace_read path="README.md"][/workspace_read]'
-						. 'to=workspace_read {"path":"README.md"}'
-						. "```workspace_read\n{\"path\":\"README.md\"}\n```"
-						. ' workspace_read("README.md")'
-						. ' workspace_edit path=README.md'
-						. ' workspace_grep path=README.md'
-						. ' workspace_edit path=README.md old="before" new="after"',
+					'content' => '<function_calls><invoke name="workspace_read"><parameter name="path">README.md</parameter></invoke></function_calls>'
+						. "\n```json\n{\"tool_calls\":[{\"id\":\"read-call\",\"type\":\"function\",\"function\":{\"name\":\"workspace_read\",\"arguments\":{\"path\":\"README.md\"}}}]}\n```",
 				),
 			);
 		}
@@ -926,14 +920,12 @@ $named_text_sandbox_result = datamachine_run_conversation(
 );
 $named_text_sandbox_metadata = datamachine_conversation_metadata( $named_text_sandbox_result );
 
-assert_runner_request( 2 === $named_text_dispatch_count, 'sandbox/pipeline named text tool calls return to provider for final answer' );
-assert_runner_request( 'named text sandbox complete' === ( $named_text_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline named text tool calls preserve final answer' );
-assert_runner_request( 2 === count( $named_text_sandbox_metadata['tool_calls'] ?? array() ), 'sandbox/pipeline named text tool calls are parsed and deduped' );
-assert_runner_request( 'workspace_read' === ( $named_text_sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline named text read tool name is parsed' );
-assert_runner_request( array( 'path' => 'README.md' ) === ( $named_text_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline named text read parameters are parsed' );
-assert_runner_request( 'workspace_edit' === ( $named_text_sandbox_metadata['tool_calls'][1]['name'] ?? null ), 'sandbox/pipeline named text edit tool name is parsed' );
-assert_runner_request( array( 'path' => 'README.md', 'old' => 'before', 'new' => 'after' ) === ( $named_text_sandbox_metadata['tool_calls'][1]['parameters'] ?? null ), 'sandbox/pipeline named text edit parameters are parsed' );
-assert_runner_request( 2 === count( $named_text_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline named text tool calls execute workspace tools' );
+assert_runner_request( 2 === $named_text_dispatch_count, 'sandbox/pipeline overlapping fallback envelopes return to provider for final answer' );
+assert_runner_request( 'named text sandbox complete' === ( $named_text_sandbox_result['final_content'] ?? null ), 'sandbox/pipeline overlapping fallback envelopes preserve final answer' );
+assert_runner_request( 1 === count( $named_text_sandbox_metadata['tool_calls'] ?? array() ), 'sandbox/pipeline overlapping fallback envelopes are deduped' );
+assert_runner_request( 'workspace_read' === ( $named_text_sandbox_metadata['tool_calls'][0]['name'] ?? null ), 'sandbox/pipeline deduped fallback tool name is extracted' );
+assert_runner_request( array( 'path' => 'README.md' ) === ( $named_text_sandbox_metadata['tool_calls'][0]['parameters'] ?? null ), 'sandbox/pipeline deduped fallback parameters are extracted' );
+assert_runner_request( 1 === count( $named_text_sandbox_result['tool_execution_results'] ?? array() ), 'sandbox/pipeline deduped fallback tool call executes a workspace tool' );
 
 // 5. Client runtime tools are fulfilled by the transport callback, not PHP ToolExecutor.
 $runtime_dispatch_count = 0;

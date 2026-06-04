@@ -17,7 +17,20 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class LocalSearch extends BaseTool {
 
 	public function __construct() {
-		$this->registerTool( 'local_search', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'ability' => 'datamachine/local-search' ) );
+		if ( ! function_exists( '\datamachine_register_ability_tool' ) ) {
+			return;
+		}
+
+		\datamachine_register_ability_tool(
+			'local_search',
+			array_merge(
+				$this->getToolDefinition(),
+				array(
+					'ability' => 'datamachine/local-search',
+					'modes'   => array( 'chat', 'pipeline' ),
+				)
+			)
+		);
 	}
 
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
@@ -65,8 +78,6 @@ class LocalSearch extends BaseTool {
 
 	public function getToolDefinition(): array {
 		return array(
-			'class'           => __CLASS__,
-			'method'          => 'handle_tool_call',
 			'description'     => 'Search this WordPress site for posts by title or content. Returns up to 10 results with titles, excerpts, permalinks, and metadata. Automatically tries multiple search strategies (standard search, title matching, split queries) if initial search returns no results. For best results, search for ONE item at a time. Use title_only=true for precise title matching.',
 			'requires_config' => false,
 			'parameters'      => array(

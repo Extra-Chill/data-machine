@@ -33,6 +33,28 @@ namespace DataMachine\Core\Database\Jobs {
 			$this->engine_data[ $job_id ] = $data;
 			return true;
 		}
+
+		public function get_jobs_for_list_table( array $args ): array {
+			$rows = array();
+			foreach ( $this->jobs as $job_id => $job ) {
+				if ( isset( $args['source'] ) && ( $job['source'] ?? null ) !== $args['source'] ) {
+					continue;
+				}
+
+				$engine_data = $this->engine_data[ $job_id ] ?? array();
+				$encoded     = json_encode( $engine_data );
+				foreach ( (array) ( $args['engine_data_contains'] ?? array() ) as $marker ) {
+					if ( is_string( $marker ) && '' !== $marker && false === strpos( $encoded, $marker ) ) {
+						continue 2;
+					}
+				}
+
+				$rows[] = array_merge( array( 'job_id' => $job_id, 'engine_data' => $engine_data ), $job );
+			}
+
+			usort( $rows, static fn( array $a, array $b ): int => $b['job_id'] <=> $a['job_id'] );
+			return array_slice( $rows, (int) ( $args['offset'] ?? 0 ), (int) ( $args['per_page'] ?? 20 ) );
+		}
 	}
 }
 
@@ -55,6 +77,7 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 	function apply_filters( string $hook, $value ) { unset( $hook ); return $value; }
 	function get_current_user_id(): int { return 7; }
 	function current_time( string $type, bool $gmt = false ): string { unset( $type, $gmt ); return '2026-05-28 00:00:00'; }
+	function wp_json_encode( $value ): string { return json_encode( $value ); }
 
 	$GLOBALS['__abilities'] = array();
 	function wp_get_ability( string $name ) { return $GLOBALS['__abilities'][ $name ] ?? null; }
@@ -140,6 +163,12 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 	assert_agent_workflow_bridge_equals( 'started', $jobs->engine_data[100]['logs'][0]['message'], 'ability workflow records metadata logs explicitly', $failures, $passes );
 	assert_agent_workflow_bridge_equals( 'WP_Agent_Workflow_Runner', $jobs->engine_data[100]['provenance']['execution'], 'ability workflow records runner provenance', $failures, $passes );
 
+	$recorder     = new \DataMachine\Core\AgentsApiWorkflowJobRecorder( $jobs, array() );
+	$found_result = $recorder->find( 'run-ability-1' );
+	assert_agent_workflow_bridge_equals( 'run-ability-1', $found_result?->get_run_id(), 'recorder find returns recorded run id', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'succeeded', $found_result?->get_status(), 'recorder find reconstructs succeeded status', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'COOK', $found_result?->get_steps()[0]['output']['value'] ?? null, 'recorder find reconstructs step output', $failures, $passes );
+
 	$agent_result = $bridge->execute(
 		array(
 			'run_id' => 'run-agent-1',
@@ -155,6 +184,36 @@ defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
 	assert_agent_workflow_bridge_equals( true, $agent_result['success'], 'agent workflow succeeds when agents/chat is registered', $failures, $passes );
 	assert_agent_workflow_bridge_equals( 101, $agent_result['job_id'], 'agent workflow returns job id', $failures, $passes );
 	assert_agent_workflow_bridge_equals( 'demo-agent: hello', $jobs->engine_data[101]['step_outcomes'][0]['output']['reply'], 'agent workflow records agent step output', $failures, $passes );
+
+	$recent = $recorder->recent( array( 'limit' => 2 ) );
+	assert_agent_workflow_bridge_equals( array( 'run-agent-1', 'run-ability-1' ), array_map( static fn( $result ): string => $result->get_run_id(), $recent ), 'recorder recent returns newest workflow runs', $failures, $passes );
+
+	$recent_ability = $recorder->recent( array( 'workflow_id' => 'demo/ability-workflow' ) );
+	assert_agent_workflow_bridge_equals( array( 'run-ability-1' ), array_map( static fn( $result ): string => $result->get_run_id(), $recent_ability ), 'recorder recent filters by workflow id', $failures, $passes );
+
+	$missing_input = $bridge->execute(
+		array(
+			'run_id' => 'run-missing-input',
+			'spec'   => array(
+				'id'     => 'demo/missing-input-workflow',
+				'inputs' => array( 'text' => array( 'type' => 'string', 'required' => true ) ),
+				'steps'  => array(
+					array( 'id' => 'upper', 'type' => 'ability', 'ability' => 'demo/uppercase', 'args' => array( 'text' => '${inputs.text}' ) ),
+				),
+			),
+		)
+	);
+
+	assert_agent_workflow_bridge_equals( false, $missing_input['success'], 'missing input workflow fails', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'failed - missing_required_input', $jobs->jobs[102]['status'], 'failed workflow maps to failed job reason', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'failed', $recorder->find( 'run-missing-input' )?->get_status(), 'recorder find reconstructs failed status', $failures, $passes );
+
+	$skipped_recorder = new \DataMachine\Core\AgentsApiWorkflowJobRecorder( $jobs, array() );
+	$skipped_result   = new \AgentsAPI\AI\Workflows\WP_Agent_Workflow_Run_Result( 'run-skipped', 'demo/skipped-workflow', 'skipped', array(), array(), array(), array(), 1, 2, array() );
+	$skipped_recorder->start( $skipped_result );
+	$skipped_recorder->update( $skipped_result );
+	assert_agent_workflow_bridge_equals( 'failed - agents_api_workflow_skipped', $jobs->jobs[103]['status'], 'skipped workflow maps to skipped failure reason', $failures, $passes );
+	assert_agent_workflow_bridge_equals( 'skipped', $recorder->find( 'run-skipped' )?->get_status(), 'recorder find reconstructs skipped status', $failures, $passes );
 
 	$unsupported = $bridge->execute(
 		array(

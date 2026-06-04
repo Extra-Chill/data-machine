@@ -39,6 +39,13 @@ class AgentsChatHandler {
 	 * @return bool
 	 */
 	public function checkPermission( bool $allowed, array $input ): bool {
+		if ( ! $allowed ) {
+			$principal = $this->resolveCallerPrincipal( $input );
+			if ( null !== $principal && (bool) apply_filters( 'agents_chat_runtime_principal_permission', false, $principal, $input ) ) {
+				return true;
+			}
+		}
+
 		$agent = trim( (string) ( $input['agent'] ?? '' ) );
 		if ( '' === $agent ) {
 			return $allowed || PermissionHelper::can( 'chat' );
@@ -46,10 +53,38 @@ class AgentsChatHandler {
 
 		$identity = $this->resolveAgentIdentity( $agent );
 		if ( $identity instanceof WP_Error || ! class_exists( '\WP_Agent_Access' ) || ! class_exists( '\WP_Agent_Access_Grant' ) ) {
-			return false;
+			return $allowed;
 		}
 
 		return $allowed || \WP_Agent_Access::can_current_principal_access_agent( $identity->agent_slug, \WP_Agent_Access_Grant::ROLE_VIEWER );
+	}
+
+	/**
+	 * Resolve an explicit non-REST runtime principal supplied by trusted runtime code.
+	 *
+	 * @param array $input Canonical chat input.
+	 * @return object|null
+	 */
+	private function resolveCallerPrincipal( array $input ): ?object {
+		$principal_class = '\AgentsAPI\AI\WP_Agent_Execution_Principal';
+		if ( defined( 'REST_REQUEST' ) || ! class_exists( $principal_class ) ) {
+			return null;
+		}
+
+		$principal = $input['principal'] ?? null;
+		if ( $principal instanceof \AgentsAPI\AI\WP_Agent_Execution_Principal ) {
+			return $principal;
+		}
+
+		if ( is_array( $principal ) ) {
+			try {
+				return \AgentsAPI\AI\WP_Agent_Execution_Principal::from_array( $principal );
+			} catch ( \InvalidArgumentException ) {
+				return null;
+			}
+		}
+
+		return null;
 	}
 
 	/**

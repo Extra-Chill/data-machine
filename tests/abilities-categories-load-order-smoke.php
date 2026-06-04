@@ -13,10 +13,10 @@
  *    available on every request that touches the abilities API.
  *
  * 2. Behavioral assertions — `AbilityCategories::ensure_registered()` must
- *    handle all three timing states defensively:
+ *    use the public lifecycle-safe registration path:
  *      - `doing_action()` → register immediately
  *      - `! did_action()` → hook for later
- *      - already-fired → register directly via the registry instance
+ *      - already-fired → no-op instead of writing through registry internals
  *
  * Run with: php tests/abilities-categories-load-order-smoke.php
  *
@@ -75,7 +75,7 @@ $assert(
 );
 
 // ============================================================
-// Behavioral assertions: defensive three-state pattern
+// Behavioral assertions: lifecycle-safe registration pattern
 // ============================================================
 
 $assert(
@@ -90,14 +90,14 @@ $assert(
 );
 
 $assert(
-	'ensure_registered() handles post-action state via registry instance',
-	str_contains( $categories, 'WP_Ability_Categories_Registry::get_instance()' )
-		&& str_contains( $categories, '$registry->register(' )
+	'ensure_registered() avoids post-action registry writes',
+	! str_contains( $categories, 'WP_Ability_Categories_Registry::get_instance()' )
+		&& ! str_contains( $categories, '$registry->register(' )
 );
 
 $assert(
-	'post-action recovery path is idempotent (skips already-registered slugs)',
-	str_contains( $categories, '$registry->is_registered( $slug )' )
+	'ensure_registered() documents missing late category registration surface',
+	str_contains( $categories, 'does not expose a late category-registration' )
 );
 
 $assert(
@@ -158,35 +158,6 @@ if ( ! function_exists( 'wp_register_ability_category' ) ) {
 	}
 }
 
-// Stub the categories registry singleton for the post-action recovery test.
-if ( ! class_exists( 'WP_Ability_Categories_Registry' ) ) {
-	class WP_Ability_Categories_Registry {
-		/** @var array<string, array<string, mixed>> */
-		public array $registered = array();
-		private static ?self $instance = null;
-
-		public static function get_instance(): ?self {
-			if ( null === self::$instance ) {
-				self::$instance = new self();
-			}
-			return self::$instance;
-		}
-
-		public static function reset(): void {
-			self::$instance = null;
-		}
-
-		public function is_registered( string $slug ): bool {
-			return isset( $this->registered[ $slug ] );
-		}
-
-		public function register( string $slug, array $args ): bool {
-			$this->registered[ $slug ] = $args;
-			return true;
-		}
-	}
-}
-
 $GLOBALS['dm_2287_state'] = $state;
 
 require_once $plugin_root . '/inc/Abilities/AbilityCategories.php';
@@ -201,10 +172,8 @@ $reset = static function (): void {
 
 	$reflection = new ReflectionClass( \DataMachine\Abilities\AbilityCategories::class );
 	$prop       = $reflection->getProperty( 'registered' );
-	$prop->setAccessible( true );
 	$prop->setValue( null, false );
 
-	WP_Ability_Categories_Registry::reset();
 };
 
 // --- State 1: doing_action — register immediately via helper.
@@ -232,35 +201,23 @@ $assert(
 		&& empty( $state->registered )
 );
 
-// --- State 3: post-action — register directly via registry instance.
-//
-// This is the #2287 scenario: the abilities registry was instantiated by a
-// frontend `wp_get_ability()` call (e.g. Frontend Agent Chat enqueue) before
-// Data Machine's hook was attached. Without the recovery path, every
-// `wp_register_ability( ..., [ 'category' => 'datamachine-publishing' ] )`
-// in extension plugins triggers a `_doing_it_wrong` notice and the ability
-// is dropped from the registry.
+// --- State 3: post-action — no-op instead of mutating registry internals.
 $reset();
 $state->doing = false;
 $state->did   = 1; // action has fired and completed
 \DataMachine\Abilities\AbilityCategories::ensure_registered();
-$registry = WP_Ability_Categories_Registry::get_instance();
 $assert(
-	'state 3 (regression for #2287): when action already fired, categories register directly via registry instance',
-	$registry instanceof WP_Ability_Categories_Registry
-		&& $registry->is_registered( 'datamachine-publishing' )
-		&& $registry->is_registered( 'datamachine-fetch' )
-		&& $registry->is_registered( 'datamachine-analytics' )
-		&& $registry->is_registered( 'datamachine-media' )
+	'state 3: when action already fired, categories do not register late',
+	empty( $state->registered )
 );
 
 $assert(
-	'state 3: recovery path does not call wp_register_ability_category() (which would fire _doing_it_wrong)',
+	'state 3: no-op path does not call wp_register_ability_category() (which would fire _doing_it_wrong)',
 	0 === ( $state->doing_it_wrong ?? 0 )
 );
 
 $assert(
-	'state 3: recovery path does not double-hook the action',
+	'state 3: no-op path does not double-hook the action',
 	empty( $state->hooked )
 );
 
