@@ -2,6 +2,14 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.21] - 2026-06-04
+
+### Changed
+- Add runtime agent bundle runner contract
+
+### Fixed
+- align runtime bundle runner style
+
 ## [0.139.20] - 2026-06-04
 
 ### Changed
