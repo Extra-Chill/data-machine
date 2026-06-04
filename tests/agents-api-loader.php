@@ -6,6 +6,14 @@
  */
 
 function datamachine_tests_agents_api_bootstrap_path(): string {
+	$override = getenv( 'DATAMACHINE_TESTS_AGENTS_API_PATH' );
+	if ( is_string( $override ) && '' !== $override ) {
+		$override_path = rtrim( $override, '/\\' ) . '/agents-api.php';
+		if ( file_exists( $override_path ) ) {
+			return $override_path;
+		}
+	}
+
 	$path = dirname( __DIR__ ) . '/vendor/wordpress/agents-api/agents-api.php';
 	if ( ! file_exists( $path ) ) {
 		throw new RuntimeException( 'Agents API dependency is missing. Run composer install before this smoke.' );

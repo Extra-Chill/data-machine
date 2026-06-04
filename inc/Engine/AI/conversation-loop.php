@@ -20,6 +20,7 @@ use AgentsAPI\AI\WP_Agent_Conversation_Result;
 use AgentsAPI\AI\WP_Agent_Transcript_Persister;
 use AgentsAPI\AI\WP_Agent_Message;
 use AgentsAPI\AI\WP_Agent_Null_Transcript_Persister;
+use AgentsAPI\AI\WP_Agent_Provider_Turn_Request;
 use AgentsAPI\AI\Tools\WP_Agent_Tool_Executor;
 use DataMachine\Core\JobArtifacts;
 use DataMachine\Core\PluginSettings;
@@ -31,8 +32,8 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Run a multi-turn AI conversation through the agents-api substrate.
  *
- * Builds a DM-specific turn runner (request building + wp-ai-client dispatch +
- * tool execution) and delegates orchestration to WP_Agent_Conversation_Loop::run().
+ * Builds a DM-specific provider-turn adapter (request building + wp-ai-client
+ * dispatch) and delegates orchestration to WP_Agent_Conversation_Loop::run().
  *
  * @param array  $messages    Initial conversation messages.
  * @param array  $tools       Available tools keyed by tool name.
@@ -167,11 +168,11 @@ function datamachine_run_conversation(
 		datamachine_emit_loop_event( $event_sink, $event, array_merge( $base_log_context, $event_payload ) );
 	};
 
-	// Build the DM-specific turn runner. The completion policy is evaluated
-	// inside the turn runner (not by upstream) because DM's tool execution
-	// results have a different shape than what the upstream loop expects and
-	// the policy needs access to DM-specific tool_def metadata.
-	$turn_runner = datamachine_build_turn_runner(
+	// Build the DM-specific provider-turn adapter. Data Machine owns provider/model
+	// resolution, request assembly, wp-ai-client dispatch, narrow tool-call parsing,
+	// and natural-completion nudges; Agents API owns the turn request/result shape,
+	// continuation, mediated tool execution, transcripts, and stop conditions.
+	$provider_turn_adapter = datamachine_build_provider_turn_adapter(
 		$tools,
 		$provider,
 		$model,
@@ -210,11 +211,7 @@ function datamachine_run_conversation(
 		if ( $single_turn ) {
 			return false;
 		}
-		// Mediated turns keep running after tool calls; natural/completed turns stop.
-		if ( ! empty( $result['conversation_complete'] ) ) {
-			return false;
-		}
-		return ! empty( $result['tool_calls'] ) || ! empty( $result['completion_nudge'] );
+		return ! empty( $result['tool_calls'] ) || ! empty( $result['continuation_messages'] );
 	};
 
 	$conversation_request = new \AgentsAPI\AI\WP_Agent_Conversation_Request(
@@ -239,7 +236,7 @@ function datamachine_run_conversation(
 	try {
 		$result = WP_Agent_Conversation_Loop::run(
 			$messages,
-			$turn_runner,
+			null,
 			array(
 				'max_turns'             => $max_turns,
 				'budgets'               => array( $turn_budget ),
@@ -257,12 +254,13 @@ function datamachine_run_conversation(
 				'on_event'              => $on_event,
 				'tool_executor'         => $tool_executor,
 				'tool_declarations'     => $tools,
+				'provider_turn_adapter' => $provider_turn_adapter,
 				'pre_tool_mediator'     => $pre_tool_mediator,
 				'completion_policy'     => $completion_policy,
 			)
 		);
 	} catch ( \RuntimeException $e ) {
-		// The turn runner throws RuntimeException for wp-ai-client failures before
+		// The provider-turn adapter throws RuntimeException for wp-ai-client failures before
 		// the substrate can return its accumulated result. Preserve the latest
 		// known state from completed turns so failed job artifacts still explain
 		// where the conversation stopped.
@@ -727,13 +725,14 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
 }
 
 /**
- * Build the DM-specific turn runner closure.
+ * Build the DM-specific provider-turn adapter callable.
  *
- * The turn runner handles one provider turn: build request → dispatch via
- * wp-ai-client → extract tool calls. The upstream loop handles mediated tool
- * execution, multi-turn sequencing, completion policy, and transcript persistence.
+ * The adapter handles one provider turn: build request → dispatch via
+ * wp-ai-client → extract tool calls. The upstream loop handles provider-turn
+ * request/result normalization, continuation, mediated tool execution,
+ * multi-turn sequencing, completion policy, and transcript persistence.
  *
- * Per-turn `usage` and `request_metadata` are returned in the turn runner's
+ * Per-turn `usage` and `request_metadata` are returned in the adapter's
  * result array; the substrate accumulates and exposes them on the final
  * loop result (see agents-api#136), so callers don't need by-reference
  * accumulators for those fields.
@@ -753,9 +752,9 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
  * @param int                                       &$latest_turn_count  Mutable latest turn count.
  * @param WP_Agent_Conversation_Completion_Policy   $completion_policy  Completion policy for natural completions.
  * @param array                                     &$completion_nudges  Mutable nudge diagnostics (DM-only).
- * @return callable Turn runner closure.
+ * @return callable Provider-turn adapter callable.
  */
-function datamachine_build_turn_runner(
+function datamachine_build_provider_turn_adapter(
 	array $tools,
 	string $provider,
 	string $model,
@@ -772,7 +771,7 @@ function datamachine_build_turn_runner(
 	WP_Agent_Conversation_Completion_Policy $completion_policy,
 	array &$completion_nudges
 ): callable {
-	return static function ( array $messages, array $turn_context ) use (
+	return static function ( WP_Agent_Provider_Turn_Request $provider_turn_request ) use (
 		$tools,
 		$provider,
 		$model,
@@ -789,6 +788,9 @@ function datamachine_build_turn_runner(
 		&$latest_turn_count,
 		&$completion_nudges
 	): array {
+		$messages     = $provider_turn_request->messages();
+		$turn_context = $provider_turn_request->context();
+
 		// The upstream loop provides the turn number via turn_context.
 		$turn_count        = (int) ( $turn_context['turn'] ?? 1 );
 		$latest_turn_count = $turn_count;
@@ -868,14 +870,18 @@ function datamachine_build_turn_runner(
 			$last_request_metadata                         = $request_metadata;
 		}
 
-		// Add AI message to conversation if it has content.
+		$messages_with_response = $messages;
+
+		// Build the assistant turn used for observers and completion policy. The
+		// provider-turn adapter returns this as `content`; Agents API appends it to
+		// the canonical transcript.
 		if ( ! empty( $ai_content ) ) {
-			$messages[] = ConversationManager::buildConversationMessage(
+			$messages_with_response[] = ConversationManager::buildConversationMessage(
 				'assistant',
 				$ai_content,
 				array( 'type' => 'text' )
 			);
-			do_action( 'datamachine_ai_response_received', $mode, $messages, $loop_payload );
+			do_action( 'datamachine_ai_response_received', $mode, $messages_with_response, $loop_payload );
 		}
 
 		if ( ! empty( $tool_calls ) ) {
@@ -914,19 +920,16 @@ function datamachine_build_turn_runner(
 				);
 			}
 
-			$latest_messages = $messages;
 			return array(
-				'messages'         => $messages,
 				'tool_calls'       => $tool_calls,
 				'request_metadata' => $request_metadata,
 				'usage'            => $turn_usage,
-				'finish_reason'    => $finish_reason,
-				'content'          => '',
+				'content'          => $ai_content,
 			);
 		} else {
 			$natural_completion_decision = $completion_policy instanceof NaturalCompletionPolicyInterface
 				? $completion_policy->recordNaturalCompletion(
-					$messages,
+					$messages_with_response,
 					$ai_content,
 					array_merge( $turn_context, $loop_payload, array( 'mode' => $mode ) ),
 					$turn_count
@@ -945,16 +948,18 @@ function datamachine_build_turn_runner(
 				);
 			}
 
+			$continuation_messages = array();
+
 			if ( ! $conversation_complete ) {
 				$completion_nudge = (string) ( $natural_completion_decision->context()['continuation_message'] ?? '' );
 				if ( '' !== $completion_nudge ) {
-					$messages[] = ConversationManager::buildConversationMessage( 'user', $completion_nudge );
+					$continuation_messages[] = ConversationManager::buildConversationMessage( 'user', $completion_nudge );
 					datamachine_record_completion_nudge(
 						$completion_nudges,
 						$event_sink,
 						$base_log_context,
 						$mode,
-						$messages,
+						array_merge( $messages_with_response, $continuation_messages ),
 						$loop_payload,
 						$natural_completion_decision->context(),
 						$turn_count
@@ -963,15 +968,24 @@ function datamachine_build_turn_runner(
 			}
 		}
 
-		$latest_messages = $messages;
-
 		return array(
-			'messages'              => $messages,
+			'content'               => $ai_content,
+			'continuation_messages' => $continuation_messages,
 			'request_metadata'      => $request_metadata,
 			'usage'                 => $turn_usage,
-			'finish_reason'         => $finish_reason,
-			'conversation_complete' => $conversation_complete,
-			'completion_nudge'      => $completion_nudge,
+			'provider_diagnostics'  => array_filter(
+				array(
+					'datamachine' => array_filter(
+						array(
+							'finish_reason'         => $finish_reason,
+							'conversation_complete' => $conversation_complete,
+							'completion_nudge'      => $completion_nudge,
+						),
+						static fn( $value ) => null !== $value && '' !== $value
+					),
+				),
+				static fn( $value ) => ! empty( $value )
+			),
 		);
 	};
 }
