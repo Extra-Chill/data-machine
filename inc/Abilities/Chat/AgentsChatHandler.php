@@ -115,6 +115,7 @@ class AgentsChatHandler {
 				'tool_policy'          => is_array( $input['tool_policy'] ?? null ) ? $input['tool_policy'] : null,
 				'allow_only'           => is_array( $input['allow_only'] ?? null ) ? $input['allow_only'] : null,
 				'completion_assertions' => is_array( $input['completion_assertions'] ?? null ) ? $input['completion_assertions'] : null,
+				'event_sink'            => $input['event_sink'] ?? null,
 				'session_owner'        => is_array( $input['session_owner'] ?? null ) ? $input['session_owner'] : null,
 				'transcript_owner'     => is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : null,
 			)

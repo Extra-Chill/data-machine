@@ -308,7 +308,7 @@ class RequestBuilder {
 	 */
 	private static function wpAiClientHistoryMessage( array $message ): ?\WordPress\AiClient\Messages\DTO\Message {
 		$role  = (string) ( $message['role'] ?? '' );
-		$parts = self::wpAiClientMessageParts( $message['content'] ?? '' );
+		$parts = self::wpAiClientMessagePartsFromMessage( $message );
 		if ( empty( $parts ) ) {
 			return null;
 		}
@@ -353,9 +353,6 @@ class RequestBuilder {
 
 			$role    = (string) ( $message['role'] ?? '' );
 			$content = $message['content'] ?? '';
-			if ( '' === $content || array() === $content ) {
-				continue;
-			}
 
 			if ( 'system' === $role && is_string( $content ) ) {
 				$system_parts[] = $content;
@@ -366,7 +363,7 @@ class RequestBuilder {
 				continue;
 			}
 
-			$candidate_parts = self::wpAiClientMessageParts( $content );
+			$candidate_parts = self::wpAiClientMessagePartsFromMessage( $message );
 			if ( ! empty( $candidate_parts ) ) {
 				$prompt_index = $index;
 				$prompt_parts = $candidate_parts;
@@ -392,6 +389,69 @@ class RequestBuilder {
 			'system_parts' => $system_parts,
 			'history'      => $history,
 		);
+	}
+
+	/**
+	 * Convert a canonical message envelope into wp-ai-client MessagePart objects.
+	 *
+	 * @param array $message Canonical message envelope or legacy role/content message.
+	 * @return array<int,\WordPress\AiClient\Messages\DTO\MessagePart>
+	 */
+	private static function wpAiClientMessagePartsFromMessage( array $message ): array {
+		try {
+			$envelope = \AgentsAPI\AI\WP_Agent_Message::normalize( $message );
+		} catch ( \Throwable $e ) {
+			return self::wpAiClientMessageParts( $message['content'] ?? '' );
+		}
+
+		$type     = (string) ( $envelope['type'] ?? \AgentsAPI\AI\WP_Agent_Message::TYPE_TEXT );
+		$payload  = is_array( $envelope['payload'] ?? null ) ? $envelope['payload'] : array();
+		$metadata = is_array( $envelope['metadata'] ?? null ) ? $envelope['metadata'] : array();
+
+		if ( \AgentsAPI\AI\WP_Agent_Message::TYPE_TOOL_CALL === $type ) {
+			$tool_name = isset( $payload['tool_name'] ) ? (string) $payload['tool_name'] : '';
+			$call_id   = isset( $metadata['tool_call_id'] ) ? (string) $metadata['tool_call_id'] : '';
+			if ( '' === $call_id ) {
+				$call_id = isset( $payload['tool_call_id'] ) ? (string) $payload['tool_call_id'] : '';
+			}
+			if ( '' === $tool_name && '' === $call_id ) {
+				return array();
+			}
+
+			$parameters = is_array( $payload['parameters'] ?? null ) ? $payload['parameters'] : array();
+			return array(
+				new \WordPress\AiClient\Messages\DTO\MessagePart(
+					new \WordPress\AiClient\Tools\DTO\FunctionCall(
+						'' !== $call_id ? $call_id : null,
+						'' !== $tool_name ? $tool_name : null,
+						$parameters
+					)
+				),
+			);
+		}
+
+		if ( \AgentsAPI\AI\WP_Agent_Message::TYPE_TOOL_RESULT === $type ) {
+			$tool_name = isset( $payload['tool_name'] ) ? (string) $payload['tool_name'] : '';
+			$call_id   = isset( $metadata['tool_call_id'] ) ? (string) $metadata['tool_call_id'] : '';
+			if ( '' === $call_id ) {
+				$call_id = isset( $payload['tool_call_id'] ) ? (string) $payload['tool_call_id'] : '';
+			}
+			if ( '' === $tool_name && '' === $call_id ) {
+				return array();
+			}
+
+			return array(
+				new \WordPress\AiClient\Messages\DTO\MessagePart(
+					new \WordPress\AiClient\Tools\DTO\FunctionResponse(
+						'' !== $call_id ? $call_id : null,
+						'' !== $tool_name ? $tool_name : null,
+						$payload
+					)
+				),
+			);
+		}
+
+		return self::wpAiClientMessageParts( $envelope['content'] ?? '' );
 	}
 
 	/**

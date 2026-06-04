@@ -232,6 +232,7 @@ class ChatOrchestrator {
 				'tool_policy'          => is_array( $options['tool_policy'] ?? null ) ? $options['tool_policy'] : null,
 				'allow_only'           => is_array( $options['allow_only'] ?? null ) ? $options['allow_only'] : null,
 				'completion_assertions' => is_array( $options['completion_assertions'] ?? null ) ? $options['completion_assertions'] : null,
+				'event_sink'           => $options['event_sink'] ?? null,
 			)
 		);
 
@@ -865,6 +866,9 @@ class ChatOrchestrator {
 			}
 			if ( is_array( $options['completion_assertions'] ?? null ) ) {
 				$loop_context['completion_assertions'] = $options['completion_assertions'];
+			}
+			if ( isset( $options['event_sink'] ) ) {
+				$loop_context['event_sink'] = $options['event_sink'];
 			}
 			if ( null !== $interrupt_source ) {
 				$loop_context['interrupt_source'] = $interrupt_source;
