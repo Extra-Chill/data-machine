@@ -150,8 +150,8 @@ final class AgentBundleRunner {
 		$response['completion_outcome'] = $this->completion_outcome( $response );
 		$response['transcript_refs']    = $this->transcript_refs( $response );
 		$response['export_refs']        = $this->export_refs( $response );
-		$output_projection             = $this->output_projection( $response );
-		$response['outputs']           = $output_projection['outputs'];
+		$output_projection              = $this->output_projection( $response );
+		$response['outputs']            = $output_projection['outputs'];
 		$response['output_diagnostics'] = $output_projection['diagnostics'];
 
 		return $response;
