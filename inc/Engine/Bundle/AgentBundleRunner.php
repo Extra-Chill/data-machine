@@ -57,9 +57,9 @@ final class AgentBundleRunner {
 			'flow_slug'       => (string) ( $selection['flow_slug'] ?? '' ),
 			'pipeline_slug'   => (string) ( $selection['pipeline_slug'] ?? '' ),
 		);
-		$initial_data['agent_slug'] = (string) ( $manifest['agent']['slug'] ?? '' );
-		$initial_data['job_source'] = (string) ( $input['job_source'] ?? 'agent_bundle' );
-		$initial_data['job_label']  = (string) ( $input['job_label'] ?? ( $selection['flow_name'] ?? 'Agent Bundle Workflow' ) );
+		$initial_data['agent_slug']  = (string) ( $manifest['agent']['slug'] ?? '' );
+		$initial_data['job_source']  = (string) ( $input['job_source'] ?? 'agent_bundle' );
+		$initial_data['job_label']   = (string) ( $input['job_label'] ?? ( $selection['flow_name'] ?? 'Agent Bundle Workflow' ) );
 
 		if ( ! empty( $input['dry_run'] ) ) {
 			return array(
@@ -163,7 +163,7 @@ final class AgentBundleRunner {
 			$flow = null;
 			foreach ( $flows as $candidate ) {
 				$data = $candidate->to_array();
-				if ( $requested_slug === (string) ( $data['slug'] ?? '' ) ) {
+				if ( (string) ( $data['slug'] ?? '' ) === $requested_slug ) {
 					$flow = $candidate;
 					break;
 				}
@@ -180,7 +180,7 @@ final class AgentBundleRunner {
 		$pipeline_slug = (string) ( $flow_data['pipeline_slug'] ?? '' );
 		foreach ( $directory->pipelines() as $pipeline ) {
 			$pipeline_data = $pipeline->to_array();
-			if ( $pipeline_slug === (string) ( $pipeline_data['slug'] ?? '' ) ) {
+			if ( (string) ( $pipeline_data['slug'] ?? '' ) === $pipeline_slug ) {
 				return array(
 					'success'       => true,
 					'flow'          => $flow_data,
@@ -210,8 +210,8 @@ final class AgentBundleRunner {
 			if ( ! is_array( $flow_step ) ) {
 				continue;
 			}
-			$position      = (int) ( $flow_step['step_position'] ?? 0 );
-			$pipeline_step = $pipeline_steps[ $position ] ?? array();
+			$position         = (int) ( $flow_step['step_position'] ?? 0 );
+			$pipeline_step    = $pipeline_steps[ $position ] ?? array();
 			$workflow_steps[] = array_merge(
 				is_array( $pipeline_step['step_config'] ?? null ) ? $pipeline_step['step_config'] : array(),
 				$flow_step,

@@ -51,7 +51,7 @@ foreach ( array(
 	'ExecuteWorkflowAbility'                     => 'runner reuses existing headless workflow executor',
 	"'schema'       => 'datamachine/agent-bundle-run/v1'" => 'runner returns stable response schema',
 	"'dry_run'      => true"                     => 'runner supports dry-run projection without job creation',
-	"\$initial_data['job_source'] = (string) ( \$input['job_source'] ?? 'agent_bundle' );" => 'runner stamps agent_bundle job source by default',
+	"\$initial_data['job_source']  = (string) ( \$input['job_source'] ?? 'agent_bundle' );" => 'runner stamps agent_bundle job source by default',
 ) as $needle => $label ) {
 	datamachine_bundle_runner_contains( $runner, $needle, $label, $failures, $passes );
 }

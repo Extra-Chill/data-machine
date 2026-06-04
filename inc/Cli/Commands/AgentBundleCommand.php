@@ -136,8 +136,8 @@ class AgentBundleCommand extends BaseCommand {
 			'token_env'    => (string) ( $assoc_args['token-env'] ?? '' ),
 		);
 
-		$result                 = AgentAbilities::runAgentBundle( array_filter( $input, static fn( $value ) => null !== $value && '' !== $value && array() !== $value ) );
-		$assoc_args['format']   = $assoc_args['format'] ?? 'json';
+		$result               = AgentAbilities::runAgentBundle( array_filter( $input, static fn( $value ) => null !== $value && '' !== $value && array() !== $value ) );
+		$assoc_args['format'] = $assoc_args['format'] ?? 'json';
 		$this->output( $result, $assoc_args, array( 'success', 'schema', 'dry_run', 'job_id', 'message', 'error' ) );
 	}
 
