@@ -8,7 +8,9 @@
 namespace DataMachine\Engine\Bundle;
 
 use DataMachine\Abilities\Job\ExecuteWorkflowAbility;
+use DataMachine\Abilities\Engine\DrainJobAbility;
 use DataMachine\Core\Agents\AgentBundler;
+use DataMachine\Core\Database\Jobs\Jobs;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -80,7 +82,7 @@ final class AgentBundleRunner {
 			)
 		);
 
-		return array_merge(
+		$response = array_merge(
 			array(
 				'schema'  => 'datamachine/agent-bundle-run/v1',
 				'dry_run' => false,
@@ -88,6 +90,47 @@ final class AgentBundleRunner {
 			),
 			$result
 		);
+
+		if ( ! empty( $input['wait_for_completion'] ) || ! empty( $input['wait'] ) ) {
+			$response = $this->wait_for_completion( $response, $input );
+		}
+
+		return $response;
+	}
+
+	/** @return array<string,mixed> */
+	private function wait_for_completion( array $response, array $input ): array {
+		$job_id = (int) ( $response['job_id'] ?? 0 );
+		if ( $job_id <= 0 || empty( $response['success'] ) ) {
+			return $response;
+		}
+
+		if ( 'delayed' === (string) ( $response['execution_type'] ?? '' ) ) {
+			$response['wait_result'] = array(
+				'success' => false,
+				'error'   => 'Cannot wait for delayed agent bundle runs.',
+			);
+			return $response;
+		}
+
+		$drain_result = ( new DrainJobAbility() )->execute(
+			array(
+				'job_id'         => $job_id,
+				'step_budget'    => max( 1, (int) ( $input['step_budget'] ?? 50 ) ),
+				'time_budget_ms' => max( 1, (int) ( $input['time_budget_ms'] ?? 300000 ) ),
+			)
+		);
+
+		$job         = ( new Jobs() )->get_job( $job_id );
+		$job_status  = is_array( $job ) ? (string) ( $job['status'] ?? '' ) : '';
+		$engine_data = function_exists( 'datamachine_get_engine_data' ) ? datamachine_get_engine_data( $job_id ) : array();
+
+		$response['wait_for_completion'] = true;
+		$response['wait_result']         = $drain_result;
+		$response['job_status']          = $job_status;
+		$response['engine_data']         = $engine_data;
+
+		return $response;
 	}
 
 	/** @return array<string,mixed> */

@@ -1509,6 +1509,22 @@ class AgentAbilities {
 					'type'        => 'boolean',
 					'description' => 'Return the projected workflow and initial_data without creating a job.',
 				),
+				'wait_for_completion' => array(
+					'type'        => 'boolean',
+					'description' => 'Synchronously drain the created job and include terminal job_status plus engine_data in the response.',
+				),
+				'wait'         => array(
+					'type'        => 'boolean',
+					'description' => 'Alias for wait_for_completion.',
+				),
+				'step_budget'  => array(
+					'type'        => 'integer',
+					'description' => 'Maximum number of scheduled job actions to drain when wait_for_completion is true.',
+				),
+				'time_budget_ms' => array(
+					'type'        => 'integer',
+					'description' => 'Maximum wall-clock milliseconds to drain when wait_for_completion is true.',
+				),
 				'token'        => array(
 					'type'        => 'string',
 					'description' => 'Auth token for private archive downloads. Used for this single resolve(); never persisted or logged.',
