@@ -51,6 +51,19 @@ class InternalLinkingAbilities {
 	 */
 	const EDGE_TYPE_HTML_ANCHOR = 'html_anchor';
 
+	/**
+	 * Number of posts whose `post_content` is loaded into memory at once while
+	 * scanning the site for the link graph.
+	 *
+	 * The graph builder streams content in chunks of this size and frees each
+	 * chunk before fetching the next, so peak memory is bounded by ~this many
+	 * posts of content rather than the entire site. Sized to comfortably scan a
+	 * multi-thousand-post site within a 512MB limit (see issue #2501).
+	 *
+	 * @since 0.140.0
+	 */
+	const SCAN_BATCH_SIZE = 200;
+
 	private static bool $registered = false;
 
 	public function __construct() {
@@ -1737,54 +1750,49 @@ class InternalLinkingAbilities {
 	}
 
 	/**
-	 * Build the internal link graph by scanning post content.
+	 * Resolve the scan scope to a lightweight list of post ID + title rows.
 	 *
-	 * Shared logic used by audit, get-orphaned-posts, and check-broken-links.
-	 * Returns the full graph data structure suitable for caching.
+	 * Deliberately selects ONLY `ID` and `post_title` (never `post_content`) so
+	 * the scope list scales with post count, not content size. Content is loaded
+	 * separately in bounded batches by {@see self::fetchPostContentBatch()}.
 	 *
-	 * @since 0.32.0
-	 * @since 0.72.0 Graph edges carry `edge_type`; extractors and resolvers
-	 *               are pluggable via `datamachine_link_extractors` and
-	 *               `datamachine_link_resolvers` filters.
+	 * @since 0.140.0
 	 *
 	 * @param string $post_type    Post type to scan.
-	 * @param string $category     Category slug to filter by.
-	 * @param array  $specific_ids Specific post IDs to scan.
-	 * @return array Graph data structure.
+	 * @param string $category     Category slug to filter by (empty = all).
+	 * @param array  $specific_ids Specific post IDs to scan (overrides category).
+	 * @return array<int, object>|null List of `{ID, post_title}` rows, an empty
+	 *                                 array when nothing matches, or null on a
+	 *                                 hard error (unknown category).
 	 */
-	private static function buildLinkGraph( string $post_type, string $category, array $specific_ids ): array {
+	private static function resolveScanScope( string $post_type, string $category, array $specific_ids ): ?array {
 		global $wpdb;
 
-		$home_url  = home_url();
-		$home_host = wp_parse_url( $home_url, PHP_URL_HOST );
-		$home_host = is_string( $home_host ) ? $home_host : '';
-
-		// Build the query for posts to scan.
 		if ( ! empty( $specific_ids ) ) {
 			$id_placeholders = implode( ',', array_fill( 0, count( $specific_ids ), '%d' ) );
 			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$posts = $wpdb->get_results(
+			$rows = $wpdb->get_results(
 				$wpdb->prepare(
 					// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
-					"SELECT ID, post_title, post_content FROM {$wpdb->posts}
+					"SELECT ID, post_title FROM {$wpdb->posts}
 					WHERE ID IN ($id_placeholders) AND post_status = %s",
 					array_merge( $specific_ids, array( 'publish' ) )
 				)
 			);
-					// phpcs:enable WordPress.DB.PreparedSQL
-		} elseif ( ! empty( $category ) ) {
+			// phpcs:enable WordPress.DB.PreparedSQL
+			return is_array( $rows ) ? $rows : array();
+		}
+
+		if ( ! empty( $category ) ) {
 			$term = get_term_by( 'slug', $category, 'category' );
 			if ( ! $term ) {
-				return array(
-					'success' => false,
-					'error'   => "Category '{$category}' not found.",
-				);
+				return null;
 			}
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$posts = $wpdb->get_results(
+			$rows = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT p.ID, p.post_title, p.post_content
+					"SELECT p.ID, p.post_title
 					FROM {$wpdb->posts} p
 					INNER JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id
 					INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
@@ -1796,19 +1804,96 @@ class InternalLinkingAbilities {
 					$term->term_id
 				)
 			);
-		} else {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$posts = $wpdb->get_results(
-				$wpdb->prepare(
-					"SELECT ID, post_title, post_content FROM {$wpdb->posts}
-					WHERE post_type = %s AND post_status = %s",
-					$post_type,
-					'publish'
-				)
+			return is_array( $rows ) ? $rows : array();
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT ID, post_title FROM {$wpdb->posts}
+				WHERE post_type = %s AND post_status = %s",
+				$post_type,
+				'publish'
+			)
+		);
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
+	 * Fetch `post_content` for a bounded batch of post IDs.
+	 *
+	 * Used by the streaming content scan in {@see self::buildLinkGraph()} to keep
+	 * only {@see self::SCAN_BATCH_SIZE} posts of content resident at a time.
+	 *
+	 * @since 0.140.0
+	 *
+	 * @param array<int, int> $id_batch Post IDs to load (already publish-scoped).
+	 * @return array<int, object> List of `{ID, post_content}` rows.
+	 */
+	private static function fetchPostContentBatch( array $id_batch ): array {
+		global $wpdb;
+
+		if ( empty( $id_batch ) ) {
+			return array();
+		}
+
+		$id_placeholders = implode( ',', array_fill( 0, count( $id_batch ), '%d' ) );
+		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				// phpcs:disable WordPress.DB.PreparedSQL -- Table name from $wpdb->prefix, not user input.
+				"SELECT ID, post_content FROM {$wpdb->posts}
+				WHERE ID IN ($id_placeholders)",
+				$id_batch
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL
+
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
+	 * Build the internal link graph by scanning post content.
+	 *
+	 * Shared logic used by audit, get-orphaned-posts, and check-broken-links.
+	 * Returns the full graph data structure suitable for caching.
+	 *
+	 * Memory is bounded: the scan scope is resolved to an ID/title list first
+	 * (no content), then `post_content` is streamed in {@see self::SCAN_BATCH_SIZE}
+	 * chunks and freed per chunk, with cache addition suspended for the duration.
+	 * This keeps a multi-thousand-post site within the PHP memory limit (#2501).
+	 *
+	 * @since 0.32.0
+	 * @since 0.72.0 Graph edges carry `edge_type`; extractors and resolvers
+	 *               are pluggable via `datamachine_link_extractors` and
+	 *               `datamachine_link_resolvers` filters.
+	 * @since 0.140.0 Content is scanned in bounded batches instead of loading
+	 *               every post into memory at once.
+	 *
+	 * @param string $post_type    Post type to scan.
+	 * @param string $category     Category slug to filter by.
+	 * @param array  $specific_ids Specific post IDs to scan.
+	 * @return array Graph data structure.
+	 */
+	private static function buildLinkGraph( string $post_type, string $category, array $specific_ids ): array {
+		$home_url  = home_url();
+		$home_host = wp_parse_url( $home_url, PHP_URL_HOST );
+		$home_host = is_string( $home_host ) ? $home_host : '';
+
+		// First pass: resolve the scan scope to a lightweight list of IDs +
+		// titles ONLY. Post content is intentionally excluded here so the full
+		// (potentially multi-hundred-MB) content set is never resident at once —
+		// see the batched content scan below. Returns null on a hard error
+		// (e.g. an unknown category), or an empty array when nothing matches.
+		$scope = self::resolveScanScope( $post_type, $category, $specific_ids );
+		if ( null === $scope ) {
+			return array(
+				'success' => false,
+				'error'   => "Category '{$category}' not found.",
 			);
 		}
 
-		if ( empty( $posts ) ) {
+		if ( empty( $scope ) ) {
 			return array(
 				'success'             => true,
 				'post_type'           => $post_type,
@@ -1828,87 +1913,116 @@ class InternalLinkingAbilities {
 			);
 		}
 
-		// Build a lookup of all scanned post URLs -> IDs.
+		// Build the URL/title/ID lookups that the whole graph keeps alive. These
+		// scale with post COUNT (not content size), so they stay bounded.
 		$url_to_id   = array();
 		$id_to_url   = array();
 		$id_to_title = array();
 		$post_ids    = array();
 
-		foreach ( $posts as $post ) {
-			$permalink = get_permalink( $post->ID );
+		foreach ( $scope as $row ) {
+			$pid       = (int) $row->ID;
+			$permalink = get_permalink( $pid );
 			if ( $permalink ) {
-				$url_to_id[ untrailingslashit( $permalink ) ] = $post->ID;
-				$url_to_id[ trailingslashit( $permalink ) ]   = $post->ID;
-				$id_to_url[ $post->ID ]                       = $permalink;
+				$url_to_id[ untrailingslashit( $permalink ) ] = $pid;
+				$url_to_id[ trailingslashit( $permalink ) ]   = $pid;
+				$id_to_url[ $pid ]                            = $permalink;
 			}
-			$id_to_title[ $post->ID ] = $post->post_title;
-			$post_ids[]               = (int) $post->ID;
+			$id_to_title[ $pid ] = $row->post_title;
+			$post_ids[]          = $pid;
+		}
+		unset( $scope );
+
+		// Second pass: scan content in batches. We fetch post_content for a
+		// chunk of IDs, extract links, then free the chunk before the next one,
+		// so peak memory is bounded by SCAN_BATCH_SIZE posts of content rather
+		// than the entire site. Cache addition is suspended for the duration so
+		// the persistent object cache doesn't retain every scanned row (the
+		// downstream object-cache.php OOM in issue #2501).
+		$all_links          = array(); // all discovered internal edge entries (with edge_type).
+		$all_external_links = array();
+		$total_links        = 0;
+
+		$suspended = function_exists( 'wp_suspend_cache_addition' ) ? wp_suspend_cache_addition() : false;
+		if ( function_exists( 'wp_suspend_cache_addition' ) ) {
+			wp_suspend_cache_addition( true );
 		}
 
-		// Scan each post's content using the registered extractors + resolvers.
-		$all_links   = array(); // all discovered internal edge entries (with edge_type).
-		$total_links = 0;
+		try {
+			foreach ( array_chunk( $post_ids, self::SCAN_BATCH_SIZE ) as $id_batch ) {
+				$rows = self::fetchPostContentBatch( $id_batch );
 
-		$all_external_links = array();
+				foreach ( $rows as $post ) {
+					$content = $post->post_content;
+					if ( empty( $content ) ) {
+						continue;
+					}
 
-		foreach ( $posts as $post ) {
-			$content = $post->post_content;
-			if ( empty( $content ) ) {
-				continue;
+					$source_id       = (int) $post->ID;
+					$extract_context = array(
+						'post_id'   => $source_id,
+						'post_type' => $post_type,
+						'home_host' => $home_host,
+						'home_url'  => $home_url,
+					);
+
+					$edges = self::dispatchExtractors( $content, $extract_context );
+
+					foreach ( $edges as $edge ) {
+						$target_hint = $edge['target_hint'] ?? '';
+						$edge_type   = $edge['edge_type'] ?? '';
+						if ( '' === $target_hint || '' === $edge_type ) {
+							continue;
+						}
+
+						++$total_links;
+
+						$resolve_context = $extract_context;
+						if ( self::EDGE_TYPE_HTML_ANCHOR === $edge_type ) {
+							$resolve_context['url_to_id'] = $url_to_id;
+						}
+						$resolve_context['edge']     = $edge;
+						$resolve_context['post_ids'] = $post_ids;
+
+						$target_id = self::dispatchResolver( $target_hint, $edge_type, $resolve_context );
+
+						// Don't self-loop.
+						if ( null !== $target_id && $target_id === $source_id ) {
+							$target_id = null;
+						}
+
+						$all_links[] = array(
+							'source_id'  => $source_id,
+							'target_url' => $target_hint,
+							'target_id'  => $target_id,
+							'edge_type'  => $edge_type,
+							'resolved'   => null !== $target_id,
+							'display'    => $edge['display'] ?? '',
+							'location'   => $edge['location'] ?? '',
+						);
+					}
+
+					// External links — html_anchor auxiliary data for broken-link checks.
+					$external = self::extractExternalLinks( $content, $home_host );
+					foreach ( $external as $ext_link ) {
+						$all_external_links[] = array(
+							'source_id'   => $source_id,
+							'target_url'  => $ext_link['url'],
+							'anchor_text' => $ext_link['anchor_text'],
+							'domain'      => $ext_link['domain'],
+						);
+					}
+
+					// Free this post's content before moving on.
+					unset( $content, $edges, $external, $post->post_content );
+				}
+
+				// Free the whole batch before fetching the next one.
+				unset( $rows );
 			}
-
-			$extract_context = array(
-				'post_id'   => (int) $post->ID,
-				'post_type' => $post_type,
-				'home_host' => $home_host,
-				'home_url'  => $home_url,
-			);
-
-			$edges = self::dispatchExtractors( $content, $extract_context );
-
-			foreach ( $edges as $edge ) {
-				$target_hint = $edge['target_hint'] ?? '';
-				$edge_type   = $edge['edge_type'] ?? '';
-				if ( '' === $target_hint || '' === $edge_type ) {
-					continue;
-				}
-
-				++$total_links;
-
-				$resolve_context = $extract_context;
-				if ( self::EDGE_TYPE_HTML_ANCHOR === $edge_type ) {
-					$resolve_context['url_to_id'] = $url_to_id;
-				}
-				$resolve_context['edge']     = $edge;
-				$resolve_context['post_ids'] = $post_ids;
-
-				$target_id = self::dispatchResolver( $target_hint, $edge_type, $resolve_context );
-
-				// Don't self-loop.
-				if ( null !== $target_id && $target_id === (int) $post->ID ) {
-					$target_id = null;
-				}
-
-				$all_links[] = array(
-					'source_id'  => (int) $post->ID,
-					'target_url' => $target_hint,
-					'target_id'  => $target_id,
-					'edge_type'  => $edge_type,
-					'resolved'   => null !== $target_id,
-					'display'    => $edge['display'] ?? '',
-					'location'   => $edge['location'] ?? '',
-				);
-			}
-
-			// External links — html_anchor-specific auxiliary data for broken-link checks.
-			$external = self::extractExternalLinks( $content, $home_host );
-			foreach ( $external as $ext_link ) {
-				$all_external_links[] = array(
-					'source_id'   => (int) $post->ID,
-					'target_url'  => $ext_link['url'],
-					'anchor_text' => $ext_link['anchor_text'],
-					'domain'      => $ext_link['domain'],
-				);
+		} finally {
+			if ( function_exists( 'wp_suspend_cache_addition' ) ) {
+				wp_suspend_cache_addition( $suspended );
 			}
 		}
 
@@ -1918,7 +2032,7 @@ class InternalLinkingAbilities {
 		return array(
 			'success'             => true,
 			'post_type'           => $post_type,
-			'total_scanned'       => count( $posts ),
+			'total_scanned'       => count( $post_ids ),
 			'total_links'         => $total_links,
 			'orphaned_count'      => $aggregates['orphaned_count'],
 			'avg_outbound'        => $aggregates['avg_outbound'],
