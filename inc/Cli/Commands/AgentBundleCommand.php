@@ -136,16 +136,16 @@ class AgentBundleCommand extends BaseCommand {
 		}
 
 		$input = array(
-			'source'       => $source,
-			'flow'         => (string) ( $assoc_args['flow'] ?? '' ),
-			'initial_data' => $this->json_assoc_arg( $assoc_args, 'initial-data' ),
-			'timestamp'    => isset( $assoc_args['timestamp'] ) ? (int) $assoc_args['timestamp'] : null,
-			'dry_run'      => \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false ),
+			'source'              => $source,
+			'flow'                => (string) ( $assoc_args['flow'] ?? '' ),
+			'initial_data'        => $this->json_assoc_arg( $assoc_args, 'initial-data' ),
+			'timestamp'           => isset( $assoc_args['timestamp'] ) ? (int) $assoc_args['timestamp'] : null,
+			'dry_run'             => \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false ),
 			'wait_for_completion' => \WP_CLI\Utils\get_flag_value( $assoc_args, 'wait', false ),
-			'step_budget'  => isset( $assoc_args['step-budget'] ) ? (int) $assoc_args['step-budget'] : null,
-			'time_budget_ms' => isset( $assoc_args['time-budget-ms'] ) ? (int) $assoc_args['time-budget-ms'] : null,
-			'token'        => (string) ( $assoc_args['token'] ?? '' ),
-			'token_env'    => (string) ( $assoc_args['token-env'] ?? '' ),
+			'step_budget'         => isset( $assoc_args['step-budget'] ) ? (int) $assoc_args['step-budget'] : null,
+			'time_budget_ms'      => isset( $assoc_args['time-budget-ms'] ) ? (int) $assoc_args['time-budget-ms'] : null,
+			'token'               => (string) ( $assoc_args['token'] ?? '' ),
+			'token_env'           => (string) ( $assoc_args['token-env'] ?? '' ),
 		);
 
 		$result               = AgentAbilities::runAgentBundle( array_filter( $input, static fn( $value ) => null !== $value && '' !== $value && array() !== $value ) );
