@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.24] - 2026-06-04
+
+### Fixed
+- Fix Action Scheduler data-machine group registration
+
 ## [0.139.23] - 2026-06-04
 
 ### Changed
