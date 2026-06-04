@@ -1475,6 +1475,36 @@ class AgentAbilities {
 		return ( new AgentBundleRunner() )->run( $input );
 	}
 
+	/**
+	 * Run a Data Machine runtime bundle through the generic agent runtime seam.
+	 *
+	 * @param mixed $result         Previous runner result, or null when unhandled.
+	 * @param array $task_config    Generic task/bundle execution config.
+	 * @param array $runtime_config Generic runtime config supplied by the sandbox owner.
+	 * @param int   $index          Bundle/task index in the runtime request.
+	 * @return mixed Runtime bundle run result.
+	 */
+	public static function runRuntimeAgentBundle( $result, array $task_config, array $runtime_config = array(), int $index = 0 ) {
+		unset( $index );
+
+		if ( null !== $result ) {
+			return $result;
+		}
+
+		$input = array_merge( $runtime_config, $task_config );
+		if ( isset( $task_config['bundle'] ) && is_array( $task_config['bundle'] ) && ! isset( $input['runtime_bundle'] ) ) {
+			$input['runtime_bundle'] = $task_config['bundle'];
+		}
+		if ( isset( $task_config['bundles'] ) && is_array( $task_config['bundles'] ) && ! isset( $input['runtime_bundles'] ) ) {
+			$input['runtime_bundles'] = $task_config['bundles'];
+		}
+		if ( isset( $runtime_config['import'] ) && is_array( $runtime_config['import'] ) && ! isset( $input['runtime_import'] ) ) {
+			$input['runtime_import'] = $runtime_config['import'];
+		}
+
+		return self::runAgentBundle( $input );
+	}
+
 	private static function bundleLifecycleService(): AgentBundleAbilityService {
 		return new AgentBundleAbilityService();
 	}
@@ -1483,7 +1513,7 @@ class AgentAbilities {
 	private static function runAgentBundleInputSchema(): array {
 		return array(
 			'type'       => 'object',
-			'required'   => array( 'source' ),
+			'required'   => array(),
 			'properties' => array(
 				'source'              => array(
 					'type'        => 'string',
@@ -1540,6 +1570,36 @@ class AgentAbilities {
 				'token_env'           => array(
 					'type'        => 'string',
 					'description' => 'Environment variable or PHP constant name to read the auth token from.',
+				),
+				'runtime_bundle'      => array(
+					'type'        => 'object',
+					'description' => 'Single generic runtime bundle spec to import before running. Uses wp_agent_runtime_import_bundle internally.',
+				),
+				'runtime_bundles'     => array(
+					'type'        => 'array',
+					'description' => 'Generic runtime bundle specs to import before running. Uses wp_agent_import_runtime_bundles/wp_agent_runtime_import_bundle internally.',
+					'items'       => array( 'type' => 'object' ),
+				),
+				'agent_bundles'       => array(
+					'type'        => 'array',
+					'description' => 'Alias for runtime_bundles used by sandbox task payloads.',
+					'items'       => array( 'type' => 'object' ),
+				),
+				'runtime_import'      => array(
+					'type'        => 'object',
+					'description' => 'Defaults passed to the generic runtime bundle import seam, such as owner_id.',
+				),
+				'runtime_tools'       => array(
+					'type'        => 'object',
+					'description' => 'Runtime-scoped Data Machine tool definitions merged through datamachine_resolved_tools only for this run.',
+				),
+				'tools'               => array(
+					'type'        => array( 'object', 'array' ),
+					'description' => 'Alias for runtime_tools; accepts keyed tool definitions or a list with name/tool fields.',
+				),
+				'disable_directives'  => array(
+					'type'        => 'boolean',
+					'description' => 'Disable Data Machine directives only while this runtime bundle run executes.',
 				),
 				'job_source'          => array(
 					'type'        => 'string',

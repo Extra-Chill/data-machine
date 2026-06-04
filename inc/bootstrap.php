@@ -86,6 +86,7 @@ AbilityScopePermissionFilter::register();
 ContentFormat::register();
 
 add_filter( 'wp_agent_runtime_import_bundle', array( AgentAbilities::class, 'importRuntimeAgentBundle' ), 10, 4 );
+add_filter( 'wp_agent_runtime_run_bundle', array( AgentAbilities::class, 'runRuntimeAgentBundle' ), 10, 4 );
 
 add_filter(
 	'datamachine_auth_providers',
