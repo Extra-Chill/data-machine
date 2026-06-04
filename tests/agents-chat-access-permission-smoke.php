@@ -130,6 +130,7 @@ namespace {
 
 	$GLOBALS['datamachine_agents_chat_access_grants'] = array( 'wiki-brain' => false );
 	$assert_same( true, $handler->checkPermission( true, array( 'agent' => 'wiki-brain' ) ), 'explicit upstream admin/operator override can chat with the agent' );
+	$assert_same( true, $handler->checkPermission( true, array( 'agent' => 'wp-codebox-sandbox' ) ), 'explicit upstream runtime-principal override is preserved for runtime agent slugs' );
 
 	$GLOBALS['datamachine_agents_chat_access_broad_chat'] = true;
 	$GLOBALS['datamachine_agents_chat_access_grants']     = array( 'wiki-brain' => false );
