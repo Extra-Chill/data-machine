@@ -504,7 +504,7 @@ function datamachine_build_loop_tool_executor( array $tools, array $loop_payload
 		public function executeWP_Agent_Tool_Call( array $tool_call, array $tool_definition, array $context = array() ): array {
 			unset( $tool_definition );
 
-			$tool_name      = (string) ( $tool_call['tool_name'] ?? '' );
+			$tool_name      = (string) ( $tool_call['tool_name'] ?? $tool_call['name'] ?? '' );
 			$parameters     = is_array( $tool_call['parameters'] ?? null ) ? $tool_call['parameters'] : array();
 			$prior_results  = is_array( $context['prior_tool_results'] ?? null ) ? $context['prior_tool_results'] : array();
 			$tool_payload   = datamachine_payload_with_inflight_run_artifacts( $this->loop_payload, $prior_results );
@@ -542,7 +542,7 @@ function datamachine_build_loop_tool_executor( array $tools, array $loop_payload
  */
 function datamachine_build_pre_tool_mediator( array $tools, array $loop_payload, string $mode, array $modes, DataMachineToolRuntimeRules $tool_runtime_rules, LoopEventSinkInterface $event_sink, array $base_log_context ): callable {
 	return static function ( array $context ) use ( $tools, $loop_payload, $mode, $modes, $tool_runtime_rules, $event_sink, $base_log_context ): array {
-		$tool_name       = (string) ( $context['tool_name'] ?? '' );
+		$tool_name       = (string) ( $context['tool_name'] ?? $context['name'] ?? '' );
 		$tool_parameters = is_array( $context['parameters'] ?? null ) ? $context['parameters'] : array();
 		$messages        = is_array( $context['messages'] ?? null ) ? $context['messages'] : array();
 		$policy_messages = datamachine_messages_before_current_tool_call( $messages, (string) ( $context['tool_call_id'] ?? '' ) );
@@ -692,7 +692,7 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
 			continue;
 		}
 
-		$tool_name  = (string) ( $tool_result_entry['tool_name'] ?? '' );
+		$tool_name  = (string) ( $tool_result_entry['tool_name'] ?? $tool_result_entry['name'] ?? '' );
 		$parameters = is_array( $tool_result_entry['parameters'] ?? null ) ? $tool_result_entry['parameters'] : array();
 		$result     = is_array( $tool_result_entry['result'] ?? null ) ? $tool_result_entry['result'] : array();
 		$metadata   = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
@@ -704,7 +704,8 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
 			$result                      = array_merge( $result['result'], $result );
 			$tool_result_entry['result'] = $result;
 		}
-		$turn_count      = (int) ( $tool_result_entry['turn_count'] ?? 0 );
+		$tool_result_entry['tool_name'] = $tool_name;
+		$turn_count                    = (int) ( $tool_result_entry['turn_count'] ?? 0 );
 		$tool_def        = is_array( $tools[ $tool_name ] ?? null ) ? $tools[ $tool_name ] : null;
 		$started_at      = microtime( true );
 		$normalized_call = array(
@@ -773,7 +774,7 @@ function datamachine_build_provider_turn_adapter(
 	WP_Agent_Conversation_Completion_Policy $completion_policy,
 	array &$completion_nudges
 ): callable {
-	return static function ( array $messages, array $turn_context = array() ) use (
+	return static function ( $provider_turn_request, array $turn_context = array() ) use (
 		$tools,
 		$provider,
 		$model,
@@ -790,6 +791,19 @@ function datamachine_build_provider_turn_adapter(
 		&$latest_turn_count,
 		&$completion_nudges
 	): array {
+		$messages = is_array( $provider_turn_request ) ? $provider_turn_request : array();
+		if ( is_object( $provider_turn_request ) ) {
+			if ( method_exists( $provider_turn_request, 'messages' ) ) {
+				$messages = $provider_turn_request->messages();
+			}
+			if ( method_exists( $provider_turn_request, 'runtimeContext' ) ) {
+				$request_context = $provider_turn_request->runtimeContext();
+				if ( is_array( $request_context ) ) {
+					$turn_context = array_merge( $request_context, $turn_context );
+				}
+			}
+		}
+
 		// The upstream loop provides the turn number via turn_context.
 		$turn_count        = (int) ( $turn_context['turn'] ?? 1 );
 		$latest_turn_count = $turn_count;
