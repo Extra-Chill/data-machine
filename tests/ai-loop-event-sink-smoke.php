@@ -71,6 +71,12 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+	function sanitize_text_field( $text ): string {
+		return trim( preg_replace( '/[\r\n\t ]+/', ' ', strip_tags( (string) $text ) ) ?? '' );
+	}
+}
+
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( string $_option, $default_value = false ) {
 		return $default_value;
