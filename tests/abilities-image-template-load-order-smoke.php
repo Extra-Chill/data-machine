@@ -69,7 +69,7 @@ $assert(
 );
 
 // ============================================================
-// Behavioral assertions: defensive three-state pattern
+// Behavioral assertions: lifecycle-safe registration pattern
 // ============================================================
 
 $assert(
@@ -84,14 +84,14 @@ $assert(
 );
 
 $assert(
-	'ensure_registered() handles post-action state via registry instance',
-	str_contains( $class_source, '\WP_Abilities_Registry::get_instance()' )
-		&& str_contains( $class_source, '$registry->register( $name, $args )' )
+	'ensure_registered() avoids post-action registry writes',
+	! str_contains( $class_source, '\WP_Abilities_Registry::get_instance()' )
+		&& ! str_contains( $class_source, '$registry->register( $name, $args )' )
 );
 
 $assert(
-	'post-action recovery path is idempotent (skips already-registered abilities)',
-	str_contains( $class_source, '$registry->is_registered( $name )' )
+	'ensure_registered() documents missing late registration surface',
+	str_contains( $class_source, 'does not expose a late-registration surface' )
 );
 
 $assert(
@@ -156,35 +156,6 @@ if ( ! function_exists( 'wp_register_ability' ) ) {
 	}
 }
 
-// Stub the abilities registry singleton for the post-action recovery test.
-if ( ! class_exists( 'WP_Abilities_Registry' ) ) {
-	class WP_Abilities_Registry {
-		/** @var array<string, array<string, mixed>> */
-		public array $registered = array();
-		private static ?self $instance = null;
-
-		public static function get_instance(): ?self {
-			if ( null === self::$instance ) {
-				self::$instance = new self();
-			}
-			return self::$instance;
-		}
-
-		public static function reset(): void {
-			self::$instance = null;
-		}
-
-		public function is_registered( string $name ): bool {
-			return isset( $this->registered[ $name ] );
-		}
-
-		public function register( string $name, array $args ): bool {
-			$this->registered[ $name ] = $args;
-			return true;
-		}
-	}
-}
-
 // Stub PermissionHelper which the ability definitions reference.
 if ( ! class_exists( 'DataMachine\\Abilities\\PermissionHelper' ) ) {
 	eval(
@@ -207,10 +178,8 @@ $reset = static function (): void {
 
 	$reflection = new ReflectionClass( \DataMachine\Abilities\Media\ImageTemplateAbilities::class );
 	$prop       = $reflection->getProperty( 'registered' );
-	$prop->setAccessible( true );
 	$prop->setValue( null, false );
 
-	WP_Abilities_Registry::reset();
 };
 
 // --- State 1: doing_action — register immediately.
@@ -234,40 +203,31 @@ $assert(
 		&& empty( $GLOBALS['dm_2290_state']->registered )
 );
 
-// --- State 3: post-action — register directly via registry instance.
-//
-// This is the #2290 scenario: a lite frontend request triggered the abilities
-// registry to instantiate and fire `wp_abilities_api_init` to completion
-// before the Data Machine plugin's `plugins_loaded` callback ran. Without
-// the recovery path, `wp_get_ability( 'datamachine/render-image-template' )`
-// would return `null` and emit `_doing_it_wrong`.
+// --- State 3: post-action — no-op instead of mutating registry internals.
 $reset();
 $GLOBALS['dm_2290_state']->did = 1;
 \DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
-$registry = WP_Abilities_Registry::get_instance();
 $assert(
-	'state 3 (regression for #2290): when action already fired, abilities register directly via registry instance',
-	$registry instanceof WP_Abilities_Registry
-		&& $registry->is_registered( 'datamachine/render-image-template' )
-		&& $registry->is_registered( 'datamachine/list-image-templates' )
+	'state 3: when action already fired, abilities do not register late',
+	empty( $GLOBALS['dm_2290_state']->registered )
 );
 
 $assert(
-	'state 3: recovery path does not call wp_register_ability() (which would fire _doing_it_wrong)',
+	'state 3: no-op path does not call wp_register_ability() (which would fire _doing_it_wrong)',
 	0 === $GLOBALS['dm_2290_state']->doing_it_wrong
 );
 
 $assert(
-	'state 3: recovery path does not double-hook the action',
+	'state 3: no-op path does not double-hook the action',
 	empty( $GLOBALS['dm_2290_state']->hooked )
 );
 
-// --- Idempotency: a second ensure_registered() after success is a no-op.
-$prior_registered = $registry->registered;
+// --- Idempotency: a second post-action ensure_registered() remains a no-op.
+$prior_registered = $GLOBALS['dm_2290_state']->registered;
 \DataMachine\Abilities\Media\ImageTemplateAbilities::ensure_registered();
 $assert(
-	'idempotent: second ensure_registered() call is a no-op (static guard)',
-	$registry->registered === $prior_registered
+	'idempotent: second post-action ensure_registered() call is a no-op',
+	$GLOBALS['dm_2290_state']->registered === $prior_registered
 		&& 0 === $GLOBALS['dm_2290_state']->doing_it_wrong
 );
 

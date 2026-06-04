@@ -88,20 +88,8 @@ class SendEmailAbility {
 			return;
 		}
 
-		if ( ! class_exists( '\WP_Abilities_Registry' ) ) {
-			return;
-		}
-		$registry = \WP_Abilities_Registry::get_instance();
-		if ( null === $registry ) {
-			return;
-		}
-		foreach ( self::get_ability_definitions( self::$instance ) as $name => $args ) {
-			if ( $registry->is_registered( $name ) ) {
-				continue;
-			}
-			$registry->register( $name, $args );
-		}
-		self::$registered = true;
+		// The public Abilities API does not expose a late-registration surface.
+		// Once the init action has fired, avoid mutating registry internals.
 	}
 
 	/**

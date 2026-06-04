@@ -33,28 +33,22 @@ class AgentAbilities {
 	private const ACTIVE_AGENT_META_KEY = 'datamachine_active_agent_slug';
 
 	/**
-	 * Register an ability during or after the Abilities API init hook.
+	 * Register an ability only during the public Abilities API init lifecycle.
 	 *
-	 * WordPress' public helper intentionally only works while
-	 * `wp_abilities_api_init` is firing. Agent bundle import may lazy-load this
-	 * registry after that hook has completed inside browser Playgrounds, so late
-	 * registration needs to go through the registry instance directly.
+	 * WordPress' public helper is intentionally scoped to
+	 * `wp_abilities_api_init`. Data Machine must not bypass that lifecycle by
+	 * writing through `WP_Abilities_Registry` directly.
 	 *
 	 * @param string $name Ability name.
 	 * @param array  $args Ability arguments.
-	 * @return \WP_Ability|null Registered ability, or null on failure.
+	 * @return \WP_Ability|null Registered ability, or null when called outside the official lifecycle.
 	 */
 	private static function registerAbility( string $name, array $args ): ?\WP_Ability {
-		if ( doing_action( 'wp_abilities_api_init' ) ) {
-			return \wp_register_ability( $name, $args );
-		}
-
-		$registry = \WP_Abilities_Registry::get_instance();
-		if ( null === $registry || $registry->is_registered( $name ) ) {
+		if ( ! doing_action( 'wp_abilities_api_init' ) ) {
 			return null;
 		}
 
-		return $registry->register( $name, $args );
+		return \wp_register_ability( $name, $args );
 	}
 
 	public function __construct() {
@@ -62,9 +56,9 @@ class AgentAbilities {
 			return;
 		}
 
-		if ( did_action( 'wp_abilities_api_init' ) ) {
+		if ( doing_action( 'wp_abilities_api_init' ) ) {
 			$this->registerAbilities();
-		} else {
+		} elseif ( ! did_action( 'wp_abilities_api_init' ) ) {
 			add_action( 'wp_abilities_api_init', array( $this, 'registerAbilities' ) );
 		}
 		self::$registered = true;

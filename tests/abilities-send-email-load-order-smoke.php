@@ -69,13 +69,13 @@ foreach ( array( 'send-email' => $send_source, 'send-email-queued' => $queue_sou
 			&& str_contains( $source, "add_action(\n\t\t\t\t'wp_abilities_api_init'" )
 	);
 	$assert(
-		"{$label}: ensure_registered() handles post-action state via registry instance",
-		str_contains( $source, '\\WP_Abilities_Registry::get_instance()' )
-			&& str_contains( $source, '$registry->register( $name, $args )' )
+		"{$label}: ensure_registered() avoids post-action registry writes",
+		! str_contains( $source, '\\WP_Abilities_Registry::get_instance()' )
+			&& ! str_contains( $source, '$registry->register( $name, $args )' )
 	);
 	$assert(
-		"{$label}: recovery path skips already-registered abilities",
-		str_contains( $source, '$registry->is_registered( $name )' )
+		"{$label}: ensure_registered() documents missing late registration surface",
+		str_contains( $source, 'does not expose a late-registration surface' )
 	);
 	$assert(
 		"{$label}: definitions are shared across timing branches",
@@ -135,34 +135,6 @@ if ( ! function_exists( 'wp_register_ability' ) ) {
 	}
 }
 
-if ( ! class_exists( 'WP_Abilities_Registry' ) ) {
-	class WP_Abilities_Registry {
-		/** @var array<string, array<string, mixed>> */
-		public array $registered = array();
-		private static ?self $instance = null;
-
-		public static function get_instance(): ?self {
-			if ( null === self::$instance ) {
-				self::$instance = new self();
-			}
-			return self::$instance;
-		}
-
-		public static function reset(): void {
-			self::$instance = null;
-		}
-
-		public function is_registered( string $name ): bool {
-			return isset( $this->registered[ $name ] );
-		}
-
-		public function register( string $name, array $args ): bool {
-			$this->registered[ $name ] = $args;
-			return true;
-		}
-	}
-}
-
 if ( ! class_exists( 'DataMachine\\Abilities\\PermissionHelper' ) ) {
 	eval(
 		'namespace DataMachine\\Abilities;
@@ -200,7 +172,6 @@ $reset = static function () use ( $reset_class ): void {
 
 	$reset_class( \DataMachine\Abilities\Publish\SendEmailAbility::class );
 	$reset_class( \DataMachine\Abilities\Publish\SendEmailQueuedAbility::class );
-	WP_Abilities_Registry::reset();
 };
 
 $reset();
@@ -227,25 +198,22 @@ $reset();
 $GLOBALS['datamachine_2303_state']->did = 1;
 \DataMachine\Abilities\Publish\SendEmailAbility::ensure_registered();
 \DataMachine\Abilities\Publish\SendEmailQueuedAbility::ensure_registered();
-$registry = WP_Abilities_Registry::get_instance();
 $assert(
-	'state 3: post-action registers both email abilities directly via registry instance',
-	$registry instanceof WP_Abilities_Registry
-		&& $registry->is_registered( 'datamachine/send-email' )
-		&& $registry->is_registered( 'datamachine/send-email-queued' )
+	'state 3: post-action does not register email abilities late',
+	empty( $GLOBALS['datamachine_2303_state']->registered )
 );
 
 $assert(
-	'state 3: recovery path avoids wp_register_ability() doing-it-wrong notices',
+	'state 3: no-op path avoids wp_register_ability() doing-it-wrong notices',
 	0 === $GLOBALS['datamachine_2303_state']->doing_it_wrong
 );
 
-$prior_registered = $registry->registered;
+$prior_registered = $GLOBALS['datamachine_2303_state']->registered;
 \DataMachine\Abilities\Publish\SendEmailAbility::ensure_registered();
 \DataMachine\Abilities\Publish\SendEmailQueuedAbility::ensure_registered();
 $assert(
-	'idempotent: repeated ensure_registered() calls are no-ops after success',
-	$registry->registered === $prior_registered
+	'idempotent: repeated post-action ensure_registered() calls remain no-ops',
+	$GLOBALS['datamachine_2303_state']->registered === $prior_registered
 		&& 0 === $GLOBALS['datamachine_2303_state']->doing_it_wrong
 );
 
