@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.14] - 2026-06-04
+
+### Fixed
+- Fix corpus job surface lint
+- expose corpus job artifact surfaces
+
 ## [0.139.13] - 2026-06-03
 
 ### Fixed
