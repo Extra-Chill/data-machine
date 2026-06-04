@@ -131,6 +131,18 @@ class RecurringScheduler {
 				);
 			}
 
+			// Datastore-readiness guard. If we cannot confirm AS is ready to
+			// answer queries, do NOT proceed to unschedule()+schedule(): the
+			// unschedule would be a no-op while the schedule later succeeds,
+			// creating a duplicate chain. Bail so the caller retries later.
+			if ( ! self::isActionSchedulerDataStoreReady() ) {
+				return self::error(
+					'datastore_not_ready',
+					'Action Scheduler datastore not ready; deferring schedule to avoid creating a duplicate chain.',
+					array( 'status' => 503 )
+				);
+			}
+
 			if ( empty( $options['force_reschedule'] ) && self::hasMatchingSingleAction( $hook, $args, $group, (int) $timestamp ) ) {
 				return array(
 					'interval'       => 'one_time',
@@ -192,6 +204,19 @@ class RecurringScheduler {
 			);
 		}
 
+		// Datastore-readiness guard. If we cannot confirm AS is ready to answer
+		// queries, do NOT proceed to unschedule()+schedule(): the unschedule
+		// would be a no-op (AS not ready) while as_schedule_recurring_action
+		// later succeeds in the same request — creating a SECOND parallel
+		// recurring chain. Bail so the caller retries when AS is ready.
+		if ( ! self::isActionSchedulerDataStoreReady() ) {
+			return self::error(
+				'datastore_not_ready',
+				'Action Scheduler datastore not ready; deferring schedule to avoid creating a duplicate chain.',
+				array( 'status' => 503 )
+			);
+		}
+
 		// Determine first-run timestamp. Caller override wins (e.g. "tomorrow
 		// midnight UTC" for daily memory). Otherwise compute from stagger seed.
 		if ( isset( $options['first_run_timestamp'] ) ) {
@@ -205,6 +230,30 @@ class RecurringScheduler {
 		}
 
 		if ( empty( $options['force_reschedule'] ) && self::hasMatchingRecurringAction( $hook, $args, $group, (int) $interval_seconds ) ) {
+			// Self-healing dedup: if a previous call already created MORE THAN
+			// ONE matching pending chain for this signature, collapse them to a
+			// single chain now instead of preserving the duplicates.
+			if ( self::countMatchingPendingActions( $hook, $args, $group ) > 1 ) {
+				self::unschedule( $hook, $args, $group );
+				as_schedule_recurring_action( $first_run_time, $interval_seconds, $hook, $args, $group );
+
+				if ( ! self::isScheduled( $hook, $args, $group ) ) {
+					return self::error(
+						'schedule_not_persisted',
+						'Action Scheduler accepted the schedule but no pending action was found. AS tables may not be ready.',
+						array( 'status' => 500 )
+					);
+				}
+
+				return array(
+					'interval'         => $resolved_interval,
+					'scheduled'        => true,
+					'interval_seconds' => (int) $interval_seconds,
+					'first_run'        => wp_date( 'c', $first_run_time ),
+					'deduplicated'     => true,
+				);
+			}
+
 			return array(
 				'interval'         => $resolved_interval,
 				'scheduled'        => true,
@@ -332,6 +381,42 @@ class RecurringScheduler {
 
 		$action = reset( $actions );
 		return is_object( $action ) ? $action : null;
+	}
+
+	/**
+	 * Count ALL pending Action Scheduler actions matching (hook, args, group).
+	 *
+	 * Used to detect duplicate recurring/cron chains for the same signature so
+	 * ensureSchedule can self-heal (collapse N>1 chains to exactly one) even on
+	 * the preserve fast path. Unlike getPendingAction() (per_page=1), this asks
+	 * for more than one row so duplicates are visible.
+	 *
+	 * @param string $hook  Hook name.
+	 * @param array  $args  Action args.
+	 * @param string $group AS group.
+	 * @return int Number of matching pending actions (0 when AS is not ready).
+	 */
+	private static function countMatchingPendingActions( string $hook, array $args, string $group ): int {
+		if ( ! function_exists( 'as_get_scheduled_actions' ) ) {
+			return 0;
+		}
+
+		if ( ! self::isActionSchedulerDataStoreReady() ) {
+			return 0;
+		}
+
+		$actions = as_get_scheduled_actions(
+			array(
+				'hook'     => $hook,
+				'args'     => $args,
+				'group'    => $group,
+				'status'   => 'pending',
+				'per_page' => 100,
+			),
+			'ids'
+		);
+
+		return is_array( $actions ) ? count( $actions ) : 0;
 	}
 
 	/**
@@ -575,7 +660,41 @@ class RecurringScheduler {
 			);
 		}
 
+		// Datastore-readiness guard — same asymmetry as the recurring/one_time
+		// branches: a not-ready unschedule is a no-op but the schedule succeeds,
+		// duplicating the chain. Bail and let the caller retry when AS is ready.
+		if ( ! self::isActionSchedulerDataStoreReady() ) {
+			return self::error(
+				'datastore_not_ready',
+				'Action Scheduler datastore not ready; deferring cron schedule to avoid creating a duplicate chain.',
+				array( 'status' => 503 )
+			);
+		}
+
 		if ( ! $force_reschedule && self::hasMatchingCronAction( $hook, $args, $group, $cron_expression ) ) {
+			// Self-healing dedup: collapse an already-duplicated signature to a
+			// single chain instead of preserving the duplicates.
+			if ( self::countMatchingPendingActions( $hook, $args, $group ) > 1 ) {
+				self::unschedule( $hook, $args, $group );
+				$action_id = as_schedule_cron_action( time(), $cron_expression, $hook, $args, $group );
+
+				if ( ! self::isScheduled( $hook, $args, $group ) ) {
+					return self::error(
+						'schedule_not_persisted',
+						'Action Scheduler accepted the cron schedule but no pending action was found.',
+						array( 'status' => 500 )
+					);
+				}
+
+				return array(
+					'interval'        => 'cron',
+					'scheduled'       => true,
+					'cron_expression' => $cron_expression,
+					'action_id'       => $action_id,
+					'deduplicated'    => true,
+				);
+			}
+
 			return array(
 				'interval'        => 'cron',
 				'scheduled'       => true,
