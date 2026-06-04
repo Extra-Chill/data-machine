@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.22] - 2026-06-04
+
+### Changed
+- Update AI step mode plumbing smoke
+- Allow bundle runs to set pipeline model config
+
 ## [0.139.21] - 2026-06-04
 
 ### Changed
