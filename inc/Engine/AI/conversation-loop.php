@@ -707,10 +707,10 @@ function datamachine_enrich_mediated_tool_results( array $tool_results, array $t
 			$tool_result_entry['result'] = $result;
 		}
 		$tool_result_entry['tool_name'] = $tool_name;
-		$turn_count                    = (int) ( $tool_result_entry['turn_count'] ?? 0 );
-		$tool_def        = is_array( $tools[ $tool_name ] ?? null ) ? $tools[ $tool_name ] : null;
-		$started_at      = microtime( true );
-		$normalized_call = array(
+		$turn_count                     = (int) ( $tool_result_entry['turn_count'] ?? 0 );
+		$tool_def                       = is_array( $tools[ $tool_name ] ?? null ) ? $tools[ $tool_name ] : null;
+		$started_at                     = microtime( true );
+		$normalized_call                = array(
 			'name'       => $tool_name,
 			'parameters' => $parameters,
 		);
