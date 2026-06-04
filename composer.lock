@@ -818,12 +818,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/agents-api.git",
-                "reference": "23b16606847a61029e2b307005af887287f1a12b"
+                "reference": "824a01be4c0758936d136b688396b4f1439daf6f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/23b16606847a61029e2b307005af887287f1a12b",
-                "reference": "23b16606847a61029e2b307005af887287f1a12b",
+                "url": "https://api.github.com/repos/Automattic/agents-api/zipball/824a01be4c0758936d136b688396b4f1439daf6f",
+                "reference": "824a01be4c0758936d136b688396b4f1439daf6f",
                 "shasum": ""
             },
             "require": {
@@ -854,6 +854,7 @@
                     "php tests/registry-smoke.php",
                     "php tests/installed-agent-materialization-smoke.php",
                     "php tests/registered-agent-materialization-adapter-smoke.php",
+                    "php tests/runtime-agent-bundle-importer-smoke.php",
                     "php tests/package-lifecycle-smoke.php",
                     "php tests/package-capability-contract-smoke.php",
                     "php tests/package-adoption-orchestration-smoke.php",
@@ -868,6 +869,7 @@
                     "php tests/consent-policy-smoke.php",
                     "php tests/tool-policy-contracts-smoke.php",
                     "php tests/tool-source-registry-smoke.php",
+                    "php tests/runtime-tool-policy-smoke.php",
                     "php tests/tool-tier-resolver-smoke.php",
                     "php tests/action-policy-resolver-smoke.php",
                     "php tests/ability-meta-abilities-smoke.php",
@@ -893,6 +895,7 @@
                     "php tests/spin-detector-smoke.php",
                     "php tests/identical-failure-tracker-smoke.php",
                     "php tests/tool-result-truncator-smoke.php",
+                    "php tests/citation-metadata-smoke.php",
                     "php tests/context-registry-smoke.php",
                     "php tests/conversation-loop-smoke.php",
                     "php tests/provider-turn-adapter-smoke.php",
@@ -906,6 +909,7 @@
                     "php tests/channels-smoke.php",
                     "php tests/chat-run-control-smoke.php",
                     "php tests/frontend-chat-rest-smoke.php",
+                    "php tests/agents-chat-jsonrpc-route-smoke.php",
                     "php tests/agents-dispatch-message-ability-smoke.php",
                     "php tests/webhook-safety-smoke.php",
                     "php tests/remote-bridge-smoke.php",
@@ -934,7 +938,7 @@
                 "issues": "https://github.com/Automattic/agents-api/issues",
                 "source": "https://github.com/Automattic/agents-api"
             },
-            "time": "2026-06-03T15:51:56+00:00"
+            "time": "2026-06-04T13:51:48+00:00"
         }
     ],
     "packages-dev": [
