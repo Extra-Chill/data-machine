@@ -25,13 +25,12 @@
  *     bootstrap require block has run to completion.
  *
  * The durable fix belongs upstream in Automattic/agents-api (idempotent per-class loading
- * independent of the bootstrap constant). This file is data-machine's guardrail: it
- * UNCONDITIONALLY tops up the substrate class set from data-machine's OWN bundled copy
- * after bootstrap. Because every bundled include is `require_once`, the top-up is a no-op
- * when the classes are already present and a complete recovery when they are not — so it
- * closes the entire "constant defined, classes missing" fatal class, not just the skew
- * sub-case. If a class is STILL missing after the top-up (e.g. a bundled file is absent),
- * it fails LOUD and CLEAR instead of degrading into a cryptic fatal.
+ * independent of the bootstrap constant). This file is data-machine's guardrail: it gates
+ * on a cheap canary `class_exists()` check (no file I/O on the healthy path), and when the
+ * canary is missing it tops up the substrate class set from data-machine's OWN bundled
+ * copy via idempotent `require_once`. This recovers from any cause above, not just the
+ * skew sub-case. If a class is STILL missing after the top-up (e.g. a bundled file is
+ * absent), it fails LOUD and CLEAR instead of degrading into a cryptic fatal.
  *
  * @package DataMachine
  */
@@ -100,15 +99,20 @@ function datamachine_agents_api_bundled_require_targets( string $bootstrap_path 
 /**
  * Ensure the bundled agents-api substrate class set is fully loaded.
  *
- * Re-runs each class-file require target from the bundled bootstrap against the bundled
- * agents-api tree. Every include uses `require_once`, so files already loaded are skipped
- * (a no-op) and only the missing classes are topped up. This makes data-machine's
- * substrate-dependent surface (export, packages, bundle hashing, etc.) work whenever the
- * bootstrap constant is defined but the class set is incomplete — regardless of cause
- * (version skew, partial bootstrap, or a load-order regression).
+ * Re-runs each `require_once AGENTS_API_PATH . 'src/...php'` target parsed from the
+ * bundled bootstrap against the bundled agents-api tree. The target list includes both
+ * class files and the substrate's `register-*.php` files (which call `add_action()` at
+ * file scope). Because every include uses `require_once`, any target already loaded by
+ * the original bootstrap is skipped (a no-op) — so re-running this list does NOT
+ * double-register hooks. Only targets that never loaded for this request are executed,
+ * which restores both the missing classes AND any registrations the incomplete bootstrap
+ * skipped. This makes data-machine's substrate-dependent surface (export, packages,
+ * bundle hashing, etc.) work whenever the bootstrap constant is defined but the class set
+ * is incomplete — regardless of cause (version skew, partial bootstrap, or load-order
+ * regression).
  *
- * Only `src/...php` class/registration files are re-run; the side-effect `add_action`
- * registrations at the foot of the bootstrap are intentionally not re-fired here.
+ * The trailing `add_action()` registrations in the bootstrap body (outside the parsed
+ * `require_once src/...` lines, e.g. the `init` hooks) are not matched and not re-run.
  *
  * @param string $bundled_dir Absolute path to data-machine's bundled agents-api dir
  *                            (trailing slash optional).
@@ -162,26 +166,28 @@ function datamachine_agents_api_skew_message(): string {
  * the require block leaves `WP_Agent_*` classes missing and produces a bare "Class not
  * found" fatal the first time one is referenced (e.g. during `agent export`).
  *
- * To close that entire fatal class — not just the version-skew sub-case — the guardrail
- * UNCONDITIONALLY tops up the substrate class set from data-machine's own bundled copy
- * whenever the bootstrap constant is defined. Because every bundled include is
- * `require_once`, the top-up is a no-op in the common single-copy case and a complete
- * recovery when the class set is incomplete. If the canary class is STILL missing after
- * the top-up (e.g. a bundled file is absent), surface a clear admin notice and (under
+ * The guardrail gates on a cheap canary `class_exists()` check: when the substrate loaded
+ * completely the canary is present and the guardrail returns immediately, adding no file
+ * I/O on the healthy path. When the canary is missing (the bootstrap constant is defined
+ * but the class set is incomplete), it tops up the missing classes from data-machine's own
+ * bundled copy via idempotent `require_once`. If the canary is STILL missing after the
+ * top-up (e.g. a bundled file is absent), it surfaces a clear admin notice and (under
  * WP-CLI) a hard error so the failure is loud and actionable rather than a cryptic fatal.
  *
  * @param string $bundled_dir Absolute path to data-machine's bundled agents-api dir.
  * @return void
  */
 function datamachine_agents_api_run_guardrail( string $bundled_dir ): void {
-	// Nothing loaded the substrate at all — leave bootstrap diagnostics to the loader.
-	if ( ! defined( 'AGENTS_API_LOADED' ) ) {
+	// Common case: the substrate loaded completely, so the canary class is present.
+	// This is a single class_exists() check — no file I/O — so the guardrail adds no
+	// measurable per-request cost on the overwhelmingly common healthy path.
+	if ( ! datamachine_agents_api_skew_detected() ) {
 		return;
 	}
 
-	// Idempotent top-up: re-require the bundled class files. Already-loaded files are
-	// skipped via require_once; missing classes are restored. Closes the "constant
-	// defined, classes missing" fatal class regardless of how the constant came to be.
+	// Incomplete load detected. Idempotently top up the bundled class files: already-loaded
+	// files are skipped via require_once, and the missing classes are restored. This closes
+	// the "constant defined, classes missing" fatal class regardless of cause.
 	if ( datamachine_agents_api_self_heal( $bundled_dir ) ) {
 		return;
 	}
