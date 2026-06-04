@@ -49,6 +49,9 @@ foreach ( array(
 	'BundleSourceAuth::build_resolve_context'    => 'runner shares bundle token resolution with import/install surfaces',
 	'workflow_from_bundle_flow'                  => 'runner converts selected bundle flow to workflow steps',
 	'ExecuteWorkflowAbility'                     => 'runner reuses existing headless workflow executor',
+	'DrainJobAbility'                            => 'runner can drain jobs for final result callers',
+	"'wait_for_completion'"                     => 'runner exposes opt-in final result mode',
+	"'engine_data'"                              => 'runner returns final engine data after waiting',
 	"'schema'       => 'datamachine/agent-bundle-run/v1'" => 'runner returns stable response schema',
 	"'dry_run'      => true"                     => 'runner supports dry-run projection without job creation',
 	"\$initial_data['job_source']   = (string) ( \$input['job_source'] ?? 'agent_bundle' );" => 'runner stamps agent_bundle job source by default',
@@ -62,6 +65,7 @@ foreach ( array(
 	'AgentAbilities::runAgentBundle' => 'CLI calls ability callback',
 	'--initial-data=<json>'        => 'CLI accepts JSON initial data',
 	'--dry-run'                    => 'CLI exposes dry-run projection',
+	'--wait'                       => 'CLI exposes final result mode',
 ) as $needle => $label ) {
 	datamachine_bundle_runner_contains( $cli, $needle, $label, $failures, $passes );
 }

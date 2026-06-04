@@ -1485,43 +1485,59 @@ class AgentAbilities {
 			'type'       => 'object',
 			'required'   => array( 'source' ),
 			'properties' => array(
-				'source'       => array(
+				'source'              => array(
 					'type'        => 'string',
 					'description' => 'Bundle source: local path (directory, .zip, .json) or remote URL.',
 				),
-				'flow'         => array(
+				'flow'                => array(
 					'type'        => 'string',
 					'description' => 'Optional bundle flow slug. Defaults to the first flow in the bundle.',
 				),
-				'flow_slug'    => array(
+				'flow_slug'           => array(
 					'type'        => 'string',
 					'description' => 'Alias for flow.',
 				),
-				'initial_data' => array(
+				'initial_data'        => array(
 					'type'        => 'object',
 					'description' => 'Initial engine data merged into the ephemeral workflow job.',
 				),
-				'timestamp'    => array(
+				'timestamp'           => array(
 					'type'        => array( 'integer', 'null' ),
 					'description' => 'Future Unix timestamp for delayed execution. Omit for immediate execution.',
 				),
-				'dry_run'      => array(
+				'dry_run'             => array(
 					'type'        => 'boolean',
 					'description' => 'Return the projected workflow and initial_data without creating a job.',
 				),
-				'token'        => array(
+				'wait_for_completion' => array(
+					'type'        => 'boolean',
+					'description' => 'Synchronously drain the created job and include terminal job_status plus engine_data in the response.',
+				),
+				'wait'                => array(
+					'type'        => 'boolean',
+					'description' => 'Alias for wait_for_completion.',
+				),
+				'step_budget'         => array(
+					'type'        => 'integer',
+					'description' => 'Maximum number of scheduled job actions to drain when wait_for_completion is true.',
+				),
+				'time_budget_ms'      => array(
+					'type'        => 'integer',
+					'description' => 'Maximum wall-clock milliseconds to drain when wait_for_completion is true.',
+				),
+				'token'               => array(
 					'type'        => 'string',
 					'description' => 'Auth token for private archive downloads. Used for this single resolve(); never persisted or logged.',
 				),
-				'token_env'    => array(
+				'token_env'           => array(
 					'type'        => 'string',
 					'description' => 'Environment variable or PHP constant name to read the auth token from.',
 				),
-				'job_source'   => array(
+				'job_source'          => array(
 					'type'        => 'string',
 					'description' => 'Optional job source label. Defaults to agent_bundle.',
 				),
-				'job_label'    => array(
+				'job_label'           => array(
 					'type'        => 'string',
 					'description' => 'Optional job label. Defaults to the selected flow name.',
 				),
