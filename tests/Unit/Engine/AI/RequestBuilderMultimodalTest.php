@@ -29,6 +29,8 @@ use DataMachine\Engine\AI\RequestBuilder;
 use DataMachine\Tests\Unit\Support\WpAiClientTestDouble;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
+use AgentsAPI\AI\WP_Agent_Message;
+use WordPress\AiClient\Messages\DTO\ModelMessage;
 use WordPress\AiClient\Files\DTO\File;
 use WordPress\AiClient\Messages\DTO\MessagePart;
 use WordPress\AiClient\Messages\DTO\UserMessage;
@@ -274,6 +276,54 @@ class RequestBuilderMultimodalTest extends TestCase {
 		);
 		$this->assertCount( 1, $file_parts, 'Exactly one file MessagePart must flow into the builder' );
 		$this->assertSame( 'image/jpeg', (string) $file_parts[0]->getFile()->getMimeType() );
+	}
+
+	/**
+	 * Tool-call transcripts must survive the canonical envelope → wp-ai-client
+	 * conversion as typed function call/response parts so Responses API providers
+	 * can replay the loop without flattening tool output into plain user text.
+	 */
+	public function test_prompt_context_preserves_tool_call_and_result_parts(): void {
+		$messages = array(
+			array(
+				'role'    => 'user',
+				'content' => 'Create the site.',
+			),
+			WP_Agent_Message::toolCall(
+				'',
+				'client/filesystem-write',
+				array( 'path' => 'index.html' ),
+				1,
+				array( 'tool_call_id' => 'call_123' )
+			),
+			WP_Agent_Message::toolResult(
+				'{"success":true}',
+				'client/filesystem-write',
+				array(
+					'success' => true,
+					'result'  => array( 'path' => 'index.html' ),
+				),
+				array( 'tool_call_id' => 'call_123' )
+			),
+		);
+
+		$context = $this->invokePrivate( 'wpAiClientPromptContext', array( $messages ) );
+
+		$this->assertCount( 2, $context['history'], 'Initial user prompt and assistant tool call remain in history' );
+		$this->assertInstanceOf( ModelMessage::class, $context['history'][1] );
+
+		$function_call = $context['history'][1]->getParts()[0]->getFunctionCall();
+		$this->assertNotNull( $function_call, 'Assistant tool call converts to a function call part' );
+		$this->assertSame( 'call_123', $function_call->getId() );
+		$this->assertSame( 'client/filesystem-write', $function_call->getName() );
+		$this->assertSame( array( 'path' => 'index.html' ), $function_call->getArgs() );
+
+		$this->assertCount( 1, $context['prompt_parts'], 'Latest tool result becomes the current prompt part' );
+		$function_response = $context['prompt_parts'][0]->getFunctionResponse();
+		$this->assertNotNull( $function_response, 'Tool result converts to a function response part' );
+		$this->assertSame( 'call_123', $function_response->getId() );
+		$this->assertSame( 'client/filesystem-write', $function_response->getName() );
+		$this->assertTrue( $function_response->getResponse()['success'] );
 	}
 
 	/**

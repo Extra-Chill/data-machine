@@ -552,20 +552,24 @@ namespace WordPress\AiClient\Messages\DTO {
 			private ?string $text                                                          = null;
 			private ?\WordPress\AiClient\Files\DTO\File $file                              = null;
 			private ?\WordPress\AiClient\Tools\DTO\FunctionCall $function_call             = null;
+			private ?\WordPress\AiClient\Tools\DTO\FunctionResponse $function_response     = null;
 
 			/**
-			 * Accepts a string (text part), a File (file part), or a FunctionCall.
+			 * Accepts a string (text part), a File (file part), a FunctionCall,
+			 * or a FunctionResponse.
 			 * Matches the production MessagePart constructor surface used by Data
 			 * Machine for multimodal vision input.
 			 *
-			 * @param string|\WordPress\AiClient\Files\DTO\File|\WordPress\AiClient\Tools\DTO\FunctionCall|null $content Part content.
-			 * @param \WordPress\AiClient\Tools\DTO\FunctionCall|null                                          $function_call Back-compat positional function call.
+			 * @param string|\WordPress\AiClient\Files\DTO\File|\WordPress\AiClient\Tools\DTO\FunctionCall|\WordPress\AiClient\Tools\DTO\FunctionResponse|null $content Part content.
+			 * @param \WordPress\AiClient\Tools\DTO\FunctionCall|null                                                                                              $function_call Back-compat positional function call.
 			 */
 			public function __construct( $content = null, ?\WordPress\AiClient\Tools\DTO\FunctionCall $function_call = null ) {
 				if ( $content instanceof \WordPress\AiClient\Files\DTO\File ) {
 					$this->file = $content;
 				} elseif ( $content instanceof \WordPress\AiClient\Tools\DTO\FunctionCall ) {
 					$this->function_call = $content;
+				} elseif ( $content instanceof \WordPress\AiClient\Tools\DTO\FunctionResponse ) {
+					$this->function_response = $content;
 				} elseif ( is_string( $content ) ) {
 					$this->text = $content;
 				}
@@ -589,6 +593,10 @@ namespace WordPress\AiClient\Messages\DTO {
 
 			public function getFunctionCall(): ?\WordPress\AiClient\Tools\DTO\FunctionCall {
 				return $this->function_call;
+			}
+
+			public function getFunctionResponse(): ?\WordPress\AiClient\Tools\DTO\FunctionResponse {
+				return $this->function_response;
 			}
 		}
 	}
@@ -633,17 +641,24 @@ namespace WordPress\AiClient\Tools\DTO {
 
 	if ( ! class_exists( FunctionCall::class ) ) {
 		class FunctionCall {
-			private string $name;
+			private ?string $name;
 			private array $args;
 			private ?string $id;
 
-			public function __construct( string $name, array $args = array(), ?string $id = null ) {
-				$this->name = $name;
-				$this->args = $args;
-				$this->id   = $id;
+			public function __construct( ?string $id_or_name = null, $name_or_args = null, $args_or_id = null ) {
+				if ( is_array( $name_or_args ) || null === $name_or_args ) {
+					$this->id   = is_string( $args_or_id ) ? $args_or_id : null;
+					$this->name = $id_or_name;
+					$this->args = is_array( $name_or_args ) ? $name_or_args : array();
+					return;
+				}
+
+				$this->id   = $id_or_name;
+				$this->name = is_string( $name_or_args ) ? $name_or_args : null;
+				$this->args = is_array( $args_or_id ) ? $args_or_id : array();
 			}
 
-			public function getName(): string {
+			public function getName(): ?string {
 				return $this->name;
 			}
 
@@ -653,6 +668,32 @@ namespace WordPress\AiClient\Tools\DTO {
 
 			public function getId(): ?string {
 				return $this->id;
+			}
+		}
+	}
+
+	if ( ! class_exists( FunctionResponse::class ) ) {
+		class FunctionResponse {
+			private ?string $id;
+			private ?string $name;
+			private $response;
+
+			public function __construct( ?string $id = null, ?string $name = null, $response = null ) {
+				$this->id       = $id;
+				$this->name     = $name;
+				$this->response = $response;
+			}
+
+			public function getId(): ?string {
+				return $this->id;
+			}
+
+			public function getName(): ?string {
+				return $this->name;
+			}
+
+			public function getResponse() {
+				return $this->response;
 			}
 		}
 	}
