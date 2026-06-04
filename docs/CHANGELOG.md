@@ -2,6 +2,15 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.16] - 2026-06-04
+
+### Changed
+- use neutral corpus refresh fixtures
+
+### Fixed
+- preserve tool transcripts for wp-ai-client replay
+- document corpus refresh processed-item conventions
+
 ## [0.139.15] - 2026-06-04
 
 ### Changed
