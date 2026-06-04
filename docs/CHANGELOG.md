@@ -2,6 +2,16 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.139.27] - 2026-06-04
+
+### Changed
+- Project global tools through abilities
+- Avoid unsafe late ability registration
+- Migrate taxonomy ability failures to WP_Error
+
+### Fixed
+- Fix provider turn tool extraction delegation
+
 ## [0.139.26] - 2026-06-04
 
 ### Changed
