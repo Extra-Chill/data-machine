@@ -30,7 +30,7 @@ $assert(
 
 $assert(
 	'model resolution uses resolved execution modes',
-	false !== strpos( $source, 'resolveModelForExecutionModes( $agent_id, $execution_modes )' )
+	false !== strpos( $source, 'resolveModelForExecutionModes( $agent_id, $execution_modes, $job_snapshot )' )
 );
 
 $assert(
