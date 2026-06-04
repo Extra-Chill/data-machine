@@ -78,6 +78,10 @@ foreach ( array(
 	"'schema'       => 'datamachine/agent-bundle-run/v1'" => 'runner returns stable response schema',
 	"'dry_run'      => true"                     => 'runner supports dry-run projection without job creation',
 	"\$initial_data['job_source']   = (string) ( \$input['job_source'] ?? 'agent_bundle' );" => 'runner stamps agent_bundle job source by default',
+	'ensure_runtime_agent_identity'               => 'runner resolves or imports a runtime agent identity before execution',
+	'stamp_runtime_agent_identity'                => 'runner stamps runtime agent identity into workflow initial data',
+	'AgentIdentityResolver'                       => 'runner reuses canonical agent identity resolution',
+	"\$job_snapshot['user_id'] = \$owner_id"       => 'runner stamps owner user into the job snapshot',
 ) as $needle => $label ) {
 	datamachine_bundle_runner_contains( $runner, $needle, $label, $failures, $passes );
 }
