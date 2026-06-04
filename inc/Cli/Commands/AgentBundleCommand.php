@@ -84,6 +84,64 @@ class AgentBundleCommand extends BaseCommand {
 	}
 
 	/**
+	 * Run a flow from a portable agent package as a headless ephemeral workflow.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <path>
+	 * : Package path (.zip, .json, or directory) or remote URL.
+	 *
+	 * [--flow=<slug>]
+	 * : Flow slug to run. Defaults to the first flow in the bundle.
+	 *
+	 * [--initial-data=<json>]
+	 * : JSON object merged into the workflow engine data.
+	 *
+	 * [--timestamp=<timestamp>]
+	 * : Future Unix timestamp for delayed execution. Omit for immediate execution.
+	 *
+	 * [--dry-run]
+	 * : Return projected workflow and initial data without creating a job.
+	 *
+	 * [--token=<token>]
+	 * : Auth token for private archive downloads. Used for this single resolve(); never persisted, never logged.
+	 *
+	 * [--token-env=<varname>]
+	 * : Environment variable (or PHP constant) name to read the auth token from. Preferred over --token for shell-history hygiene.
+	 *
+	 * [--format=<format>]
+	 * : Output format.
+	 * ---
+	 * default: json
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * @subcommand run-bundle
+	 */
+	public function run_bundle( array $args, array $assoc_args ): void {
+		$source = (string) ( $args[0] ?? '' );
+		if ( '' === $source ) {
+			WP_CLI::error( 'Bundle source is required.' );
+		}
+
+		$input = array(
+			'source'       => $source,
+			'flow'         => (string) ( $assoc_args['flow'] ?? '' ),
+			'initial_data' => $this->json_assoc_arg( $assoc_args, 'initial-data' ),
+			'timestamp'    => isset( $assoc_args['timestamp'] ) ? (int) $assoc_args['timestamp'] : null,
+			'dry_run'      => \WP_CLI\Utils\get_flag_value( $assoc_args, 'dry-run', false ),
+			'token'        => (string) ( $assoc_args['token'] ?? '' ),
+			'token_env'    => (string) ( $assoc_args['token-env'] ?? '' ),
+		);
+
+		$result                 = AgentAbilities::runAgentBundle( array_filter( $input, static fn( $value ) => null !== $value && '' !== $value && array() !== $value ) );
+		$assoc_args['format']   = $assoc_args['format'] ?? 'json';
+		$this->output( $result, $assoc_args, array( 'success', 'schema', 'dry_run', 'job_id', 'message', 'error' ) );
+	}
+
+	/**
 	 * List installed package-backed agents.
 	 *
 	 * ## OPTIONS
@@ -695,6 +753,20 @@ class AgentBundleCommand extends BaseCommand {
 		}
 
 		return $bundle;
+	}
+
+	/** @return array<string,mixed> */
+	private function json_assoc_arg( array $assoc_args, string $key ): array {
+		if ( ! isset( $assoc_args[ $key ] ) || '' === trim( (string) $assoc_args[ $key ] ) ) {
+			return array();
+		}
+
+		$decoded = json_decode( (string) $assoc_args[ $key ], true );
+		if ( ! is_array( $decoded ) || array_is_list( $decoded ) ) {
+			WP_CLI::error( sprintf( '--%s must be a JSON object.', $key ) );
+		}
+
+		return $decoded;
 	}
 
 	/**
