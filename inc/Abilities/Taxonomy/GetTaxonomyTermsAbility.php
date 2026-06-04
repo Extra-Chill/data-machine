@@ -96,9 +96,9 @@ class GetTaxonomyTermsAbility extends AbstractTaxonomyAbility {
 	 * Execute get taxonomy terms ability.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with taxonomy terms data.
+	 * @return array|\WP_Error Result with taxonomy terms data or failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$taxonomy   = $input['taxonomy'] ?? null;
 		$search     = $input['search'] ?? '';
 		$parent     = $input['parent'] ?? null;
@@ -110,17 +110,11 @@ class GetTaxonomyTermsAbility extends AbstractTaxonomyAbility {
 
 		// Validate taxonomy
 		if ( ! empty( $taxonomy ) && ! taxonomy_exists( $taxonomy ) ) {
-			return array(
-				'success' => false,
-				'error'   => "Taxonomy '{$taxonomy}' does not exist",
-			);
+			return $this->abilityError( 'taxonomy_not_found', "Taxonomy '{$taxonomy}' does not exist", 404 );
 		}
 
 		if ( ! empty( $taxonomy ) && TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
-			return array(
-				'success' => false,
-				'error'   => "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be accessed",
-			);
+			return $this->abilityError( 'taxonomy_not_accessible', "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be accessed", 403 );
 		}
 
 		// Build get_terms arguments
@@ -151,10 +145,7 @@ class GetTaxonomyTermsAbility extends AbstractTaxonomyAbility {
 		$terms = get_terms( $args );
 
 		if ( is_wp_error( $terms ) ) {
-			return array(
-				'success' => false,
-				'error'   => $terms->get_error_message(),
-			);
+			return $terms;
 		}
 
 		// Format terms data

@@ -114,9 +114,9 @@ class ResolveTermAbility {
 	 * 4. If create=true and not found, create via wp_insert_term()
 	 *
 	 * @param array $input Input with identifier, taxonomy, create flag, optional args.
-	 * @return array Success with term data or error.
+	 * @return array|\WP_Error Success with term data or failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$identifier = trim( (string) ( $input['identifier'] ?? '' ) );
 		$taxonomy   = trim( (string) ( $input['taxonomy'] ?? '' ) );
 		$create     = (bool) ( $input['create'] ?? false );
@@ -125,19 +125,19 @@ class ResolveTermAbility {
 
 		// Validate inputs.
 		if ( empty( $identifier ) ) {
-			return $this->error_response( 'identifier is required' );
+			return $this->error_response( 'identifier_required', 'identifier is required', 400 );
 		}
 
 		if ( empty( $taxonomy ) ) {
-			return $this->error_response( 'taxonomy is required' );
+			return $this->error_response( 'taxonomy_required', 'taxonomy is required', 400 );
 		}
 
 		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return $this->error_response( "Taxonomy '{$taxonomy}' does not exist" );
+			return $this->error_response( 'taxonomy_not_found', "Taxonomy '{$taxonomy}' does not exist", 404 );
 		}
 
 		if ( TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
-			return $this->error_response( "Cannot resolve terms in system taxonomy '{$taxonomy}'" );
+			return $this->error_response( 'taxonomy_not_modifiable', "Cannot resolve terms in system taxonomy '{$taxonomy}'", 403 );
 		}
 
 		// 1. Check if numeric - try by ID first.
@@ -175,7 +175,7 @@ class ResolveTermAbility {
 			$insert_args = $this->normalize_term_args( $term_args );
 			$result      = wp_insert_term( $identifier, $taxonomy, $insert_args );
 			if ( is_wp_error( $result ) ) {
-				return $this->error_response( $result->get_error_message() );
+				return $result;
 			}
 			$term = get_term( $result['term_id'], $taxonomy );
 			if ( $term && ! is_wp_error( $term ) ) {
@@ -194,7 +194,7 @@ class ResolveTermAbility {
 			}
 		}
 
-		return $this->error_response( "Term '{$identifier}' not found in taxonomy '{$taxonomy}'" );
+		return $this->error_response( 'term_not_found', "Term '{$identifier}' not found in taxonomy '{$taxonomy}'", 404 );
 	}
 
 	/**
@@ -342,14 +342,13 @@ class ResolveTermAbility {
 	/**
 	 * Build error response.
 	 *
+	 * @param string $code    Machine-readable error code.
 	 * @param string $message Error message.
-	 * @return array
+	 * @param int    $status  HTTP status for REST presentation.
+	 * @return \WP_Error
 	 */
-	private function error_response( string $message ): array {
-		return array(
-			'success' => false,
-			'error'   => $message,
-		);
+	private function error_response( string $code, string $message, int $status ): \WP_Error {
+		return new \WP_Error( $code, $message, array( 'status' => $status ) );
 	}
 
 	/**
@@ -376,7 +375,7 @@ class ResolveTermAbility {
 	 */
 	public static function resolve( string $identifier, string $taxonomy, bool $create = false, array $args = array(), bool $fuzzy = false ): array {
 		$instance = new self();
-		return $instance->execute(
+		$result   = $instance->execute(
 			array(
 				'identifier' => $identifier,
 				'taxonomy'   => $taxonomy,
@@ -385,5 +384,14 @@ class ResolveTermAbility {
 				'fuzzy'      => $fuzzy,
 			)
 		);
+
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success' => false,
+				'error'   => $result->get_error_message(),
+			);
+		}
+
+		return $result;
 	}
 }

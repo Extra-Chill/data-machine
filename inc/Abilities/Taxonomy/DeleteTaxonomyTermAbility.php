@@ -67,50 +67,35 @@ class DeleteTaxonomyTermAbility extends AbstractTaxonomyAbility {
 	 * Execute delete taxonomy term ability.
 	 *
 	 * @param array $input Input parameters.
-	 * @return array Result with deletion status.
+	 * @return array|\WP_Error Result with deletion status or failure.
 	 */
-	public function execute( array $input ): array {
+	public function execute( array $input ): array|\WP_Error {
 		$term_identifier = $input['term'] ?? null;
 		$taxonomy        = $input['taxonomy'] ?? null;
 		$reassign        = $input['reassign'] ?? null;
 
 		// Validate required fields
 		if ( empty( $term_identifier ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'term parameter is required',
-			);
+			return $this->abilityError( 'term_required', 'term parameter is required', 400 );
 		}
 
 		if ( empty( $taxonomy ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'taxonomy parameter is required',
-			);
+			return $this->abilityError( 'taxonomy_required', 'taxonomy parameter is required', 400 );
 		}
 
 		// Validate taxonomy
 		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return array(
-				'success' => false,
-				'error'   => "Taxonomy '{$taxonomy}' does not exist",
-			);
+			return $this->abilityError( 'taxonomy_not_found', "Taxonomy '{$taxonomy}' does not exist", 404 );
 		}
 
 		if ( TaxonomyHandler::shouldSkipTaxonomy( $taxonomy ) ) {
-			return array(
-				'success' => false,
-				'error'   => "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be modified",
-			);
+			return $this->abilityError( 'taxonomy_not_modifiable', "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be modified", 403 );
 		}
 
 		// Find the term using centralized resolver
 		$resolved = ResolveTermAbility::resolve( $term_identifier, $taxonomy, false );
 		if ( ! $resolved['success'] ) {
-			return array(
-				'success' => false,
-				'error'   => $resolved['error'] ?? "Term '{$term_identifier}' not found in taxonomy '{$taxonomy}'",
-			);
+			return $this->abilityError( 'term_not_found', $resolved['error'] ?? "Term '{$term_identifier}' not found in taxonomy '{$taxonomy}'", 404 );
 		}
 		$term = get_term( $resolved['term_id'], $taxonomy );
 
@@ -118,18 +103,16 @@ class DeleteTaxonomyTermAbility extends AbstractTaxonomyAbility {
 		if ( null !== $reassign ) {
 			$reassign_term = get_term( absint( $reassign ), $taxonomy );
 			if ( ! $reassign_term || is_wp_error( $reassign_term ) ) {
-				return array(
-					'success' => false,
-					'error'   => "Reassign term ID '{$reassign}' not found in taxonomy '{$taxonomy}'",
-				);
+				if ( is_wp_error( $reassign_term ) ) {
+					return $reassign_term;
+				}
+
+				return $this->abilityError( 'reassign_term_not_found', "Reassign term ID '{$reassign}' not found in taxonomy '{$taxonomy}'", 404 );
 			}
 
 			// Cannot reassign to itself
 			if ( $reassign_term->term_id === $term->term_id ) {
-				return array(
-					'success' => false,
-					'error'   => 'Cannot reassign term to itself',
-				);
+				return $this->abilityError( 'reassign_term_invalid', 'Cannot reassign term to itself', 400 );
 			}
 		}
 
@@ -142,17 +125,11 @@ class DeleteTaxonomyTermAbility extends AbstractTaxonomyAbility {
 		$result = wp_delete_term( $term->term_id, $taxonomy, $args );
 
 		if ( is_wp_error( $result ) ) {
-			return array(
-				'success' => false,
-				'error'   => $result->get_error_message(),
-			);
+			return $result;
 		}
 
 		if ( false === $result ) {
-			return array(
-				'success' => false,
-				'error'   => 'Failed to delete term (unknown error)',
-			);
+			return $this->abilityError( 'term_delete_failed', 'Failed to delete term (unknown error)', 500 );
 		}
 
 		do_action(
