@@ -57,9 +57,9 @@ final class AgentBundleRunner {
 			'flow_slug'       => (string) ( $selection['flow_slug'] ?? '' ),
 			'pipeline_slug'   => (string) ( $selection['pipeline_slug'] ?? '' ),
 		);
-		$initial_data['agent_slug']  = (string) ( $manifest['agent']['slug'] ?? '' );
-		$initial_data['job_source']  = (string) ( $input['job_source'] ?? 'agent_bundle' );
-		$initial_data['job_label']   = (string) ( $input['job_label'] ?? ( $selection['flow_name'] ?? 'Agent Bundle Workflow' ) );
+		$initial_data['agent_slug']   = (string) ( $manifest['agent']['slug'] ?? '' );
+		$initial_data['job_source']   = (string) ( $input['job_source'] ?? 'agent_bundle' );
+		$initial_data['job_label']    = (string) ( $input['job_label'] ?? ( $selection['flow_name'] ?? 'Agent Bundle Workflow' ) );
 
 		if ( ! empty( $input['dry_run'] ) ) {
 			return array(
